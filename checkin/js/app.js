@@ -1,7 +1,18 @@
 // ========================================
 // KONFIGURATION
 // ========================================
-const API_BASE = '../api/api.php';
+// Ermittle automatisch den korrekten Basis-Pfad
+const API_BASE = (() => {
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    
+    // Extrahiere Basis-Pfad (alles vor /checkin/)
+    // z.B. /ehrenzeit/checkin/ → /ehrenzeit/
+    const match = pathname.match(/^(.*?)\/checkin\//);
+    const basePath = match ? match[1] : '';
+    
+    return `${origin}${basePath}/api/api.php`;
+})();
 
 // ========================================
 // STATE MANAGEMENT
@@ -111,16 +122,17 @@ document.addEventListener('DOMContentLoaded', function() {
 // API HELPER
 // ========================================
 async function apiCall(resource, method = 'GET', data = null, params = {}) {
+   
     const url = new URL(API_BASE);
-    url.searchParams.append('resource', resource);
 
+    url.searchParams.append('resource', resource);
     let connectionStatus = true;
     
     for (const [key, value] of Object.entries(params)) {
         url.searchParams.append(key, value);
     }
 
-    // WICHTIG: Token auch als URL-Parameter (Fallback für Apache)
+    // Token auch als URL-Parameter (Fallback für Apache)
     if (apiToken) {
         url.searchParams.append('api_token', apiToken);
     }
@@ -229,6 +241,8 @@ let success = false;
     try {
         const meData = await apiCall('me');
         userData = meData;
+
+        console.log('User Data:', meData); // Debug
         
         if (meData.member_id) {
             try {
@@ -251,6 +265,7 @@ let success = false;
             }
         }
         
+        // Fallback
         if (meData.email && meData.email !== 'token-auth') {
             elements.userName.textContent = meData.email;
         } else if (meData.user_id) {
@@ -313,10 +328,16 @@ function updateClock() {
 // ========================================
 async function toggleScanner() {
     const scannerContainer = document.getElementById('scannerContainer');
-    //const container = document.querySelector('.container');
     
     if (isScanning) {
-        await html5QrCode.stop();
+
+        try {
+            await html5QrCode.stop();
+        }
+        catch(error){
+            console.log('Stopp-Error (ignoriert):', error);
+        }
+
         scannerContainer.style.display = 'none';
         elements.stopScanButton.style.display = 'none'; // Stop-Button verstecken
         elements.scanButton.style.display = 'flex'; // Scan-Button zeigen
@@ -324,11 +345,7 @@ async function toggleScanner() {
         elements.scanButton.innerHTML = '<span class="icon">📷</span><span>QR-Code scannen</span>';
         isScanning = false;
     } else {
-            scannerContainer.style.display = 'block';
-            elements.stopScanButton.style.display = 'flex'; // Stop-Button zeigen
-            elements.scanButton.style.display = 'none'; // Scan-Button verstecken            
-            isScanning = true;
-
+            
         if (!html5QrCode) {
             html5QrCode = new Html5Qrcode("qr-reader", {
                 verbose: false // Zum Debugen aktivieren
@@ -354,9 +371,20 @@ async function toggleScanner() {
                     }
                 }
             );
+
+            scannerContainer.style.display = 'block';
+            elements.stopScanButton.style.display = 'flex'; // Stop-Button zeigen
+            elements.scanButton.style.display = 'none'; // Scan-Button verstecken            
+            isScanning = true;
             
         } catch (error) {
             console.error('Kamera-Fehler:', error);
+
+            // Bei Fehler: Alles zurücksetzen
+            scannerContainer.style.display = 'none';
+            elements.stopScanButton.style.display = 'none';
+            elements.scanButton.style.display = 'flex';
+            isScanning = false;
             
             let errorMsg = 'Kamera-Zugriff nicht möglich';
             if (error.name === 'NotAllowedError') {
@@ -368,9 +396,6 @@ async function toggleScanner() {
             }
             
             showMessage(errorMsg, 'error');
-            //scannerContainer.style.display = 'none';
-
-            stopScannerIfRunning();
         }
     }
 }
@@ -523,11 +548,13 @@ async function submitException() {
     const reason = elements.exceptionReason.value.trim();
     
     if (!appointmentId) {
+        closeExceptionModal();
         showMessage('Bitte Termin auswählen', 'error');
         return;
     }
     
     if (!reason) {
+        closeExceptionModal();
         showMessage('Bitte Begründung angeben', 'error');
         return;
     }
@@ -563,6 +590,7 @@ async function submitException() {
             closeExceptionModal();
         }
     } catch (error) {
+        closeExceptionModal();
         showMessage(error.message || 'Fehler beim Erstellen des Antrags', 'error');
     }
 }
@@ -606,10 +634,10 @@ function showOfflineIndicator() {
 async function loadHistory() {    
     try {
         // Lade letzte 10 Records
-        const records = await apiCall('records');
+        let records = await apiCall('records');
         
         // Lade offene Exceptions
-        const exceptions = await apiCall('exceptions', 'GET', null, { status: 'pending' });
+        let exceptions = await apiCall('exceptions', 'GET', null, { status: 'pending' });
         
         // Kombiniere und sortiere nach Datum (neueste zuerst)
         const combined = [
@@ -624,8 +652,8 @@ async function loadHistory() {
                 timestamp: new Date(e.created_at)
             }))
         ];
-        
-        combined.sort((a, b) => b.timestamp - a.timestamp);
+
+        combined.sort((a, b) => b.timestamp - a.timestamp);                    
         
         // Zeige die letzten 10 Einträge
         renderHistory(combined.slice(0, 10));
