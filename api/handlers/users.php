@@ -8,7 +8,7 @@ function handleUsers($db, $method, $id) {
         case 'GET':
             if($id) {
                 $stmt = $db->prepare("SELECT u.user_id, u.email, u.role, u.is_active, 
-                                    u.member_id, u.created_at, u.api_token, u.device_type,
+                                    u.member_id, u.created_at, u.api_token,
                                     m.name, m.surname
                                     FROM users u
                                     LEFT JOIN members m ON u.member_id = m.member_id
@@ -31,7 +31,7 @@ function handleUsers($db, $method, $id) {
             
             } else {
                 $stmt = $db->query("SELECT u.user_id, u.email, u.role, u.is_active, 
-                                u.member_id, u.created_at, u.device_type,
+                                u.member_id, u.created_at,
                                 m.name, m.surname
                                 FROM users u
                                 LEFT JOIN members m ON u.member_id = m.member_id
@@ -44,7 +44,7 @@ function handleUsers($db, $method, $id) {
             $rawData = json_decode(file_get_contents("php://input"));
 
             // Nur erlaubte Felder extrahieren
-            $allowedFields = ['email', 'password', 'role', 'member_id','api_token','device_type'];
+            $allowedFields = ['email', 'password', 'role', 'member_id','api_token'];
             $data = new stdClass();
             foreach($allowedFields as $field) {
                 if(isset($rawData->$field)) {
@@ -91,8 +91,8 @@ function handleUsers($db, $method, $id) {
             }
 
             $stmt = $db->prepare("INSERT INTO users 
-                          (email, password_hash, role, member_id, api_token, api_token_expires_at, device_type) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?)");
+                          (email, password_hash, role, member_id, api_token, api_token_expires_at) 
+                          VALUES (?, ?, ?, ?, ?, ?)");
 
             if($stmt->execute([
                 $data->email, 
@@ -100,8 +100,7 @@ function handleUsers($db, $method, $id) {
                 $data->role ?? 'user', 
                 $member_id,
                 $api_token,
-                $api_token_expires_at, 
-                $device_type
+                $api_token_expires_at
             ])) {
                 http_response_code(201);
                 echo json_encode([
@@ -120,7 +119,7 @@ function handleUsers($db, $method, $id) {
             $rawData = json_decode(file_get_contents("php://input"));
 
             // Nur erlaubte Felder extrahieren
-            $allowedFields = ['email', 'password', 'role', 'member_id','is_active','api_token','device_type'];
+            $allowedFields = ['email', 'password', 'role', 'member_id','is_active','api_token'];
             $data = new stdClass();
             foreach($allowedFields as $field) {
                 if(isset($rawData->$field)) {
@@ -158,28 +157,25 @@ function handleUsers($db, $method, $id) {
                 $password_hash = password_hash($data->password, PASSWORD_DEFAULT);
                 $stmt = $db->prepare("UPDATE users 
                                     SET email = ?, password_hash = ?, role = ?, member_id = ?, 
-                                        is_active = ?, device_type = ?
+                                        is_active = ?
                                     WHERE user_id = ?");
                 $success = $stmt->execute([
                     $data->email, 
                     $password_hash, 
                     $data->role, 
                     $member_id,
-                    $data->is_active ?? true,
-                    $device_type,
+                    $data->is_active ?? true,                    
                     $id
                 ]);
             } else {
                 $stmt = $db->prepare("UPDATE users 
-                                    SET email = ?, role = ?, member_id = ?, 
-                                        is_active = ?, device_type = ?
+                                    SET email = ?, role = ?, member_id = ?, is_active = ?
                                     WHERE user_id = ?");
                 $success = $stmt->execute([
                     $data->email, 
                     $data->role, 
                     $member_id,
-                    $data->is_active ?? true,
-                    $device_type,
+                    $data->is_active ?? true,                    
                     $id
                 ]);
             }

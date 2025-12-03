@@ -1,7 +1,7 @@
 // ========================================
 // KONFIGURATION
 // ========================================
-const API_BASE = 'http://localhost/members/api/api.php';
+const API_BASE = '../api/api.php';
 
 // ========================================
 // STATE MANAGEMENT
