@@ -1,5 +1,4 @@
 <?php
-
 // ============================================
 // QR Verification Controller
 // ============================================
@@ -48,7 +47,10 @@ function handleQRVerification($db, $request_method, $authUserId, $authUserRole, 
         $validLocation = null;
         
         foreach($devices as $device) {
-        if(verifyTOTP($device['location_secret'], $totpCode)) {
+        // Erstelle TOTP-Objekt mit Secret
+        $totp = new TOTP($device['location_secret']);
+
+        if($totp->verify($code, null, 1)) {
             $validLocation = $device;
             break;
         }
@@ -57,13 +59,17 @@ function handleQRVerification($db, $request_method, $authUserId, $authUserRole, 
         if($validLocation) {
             //error_log("Valid check-in from location: " . $validLocation);
             // Code gültig → Auto-Checkin mit verified Flag
-            handleAutoCheckin($db, 'POST', $authUserId, $authUserRole, $authMemberId, $isTokenAuth, 'qr_verified',['location_name' => $validLocation]);
+            handleAutoCheckin($db, 'POST', $authUserId, $authUserRole, $authMemberId, $isTokenAuth, 'qr_verified',
+                                                                            [
+                                                                                'location_name' => $validLocation['email'],
+                                                                                'device_name' => $validLocation['email']
+                                                                            ]
+                                                                            );
         } else {
             http_response_code(401);
             echo json_encode([
                 "message" => "Invalid or expired location code",
-                "hint" => "QR-Code might be outdated (max 90s valid)",
-                "tested_locations" => count($locations)
+                "hint" => "QR-Code might be outdated (max 90s valid)"
             ]);
         }
     }
