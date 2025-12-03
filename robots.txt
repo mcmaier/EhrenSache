@@ -1,0 +1,15 @@
+User-Agent: *
+Disallow: /
+Disallow: /siteadmin
+
+# PWA ist auch intern, sollte nicht indexiert werden
+Disallow: /checkin/
+
+# API-Endpoints sperren
+Disallow: /api/
+
+# Optionale Pfade falls vorhanden
+Disallow: /css/
+Disallow: /js/
+
+Sitemap: http://zeiterfassung.musikverein-moesbach.de/sitemap.xml
