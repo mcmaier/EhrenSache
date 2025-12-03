@@ -21,9 +21,8 @@ export function showScreen(screenName) {
 
 // Separate Funktion für Button-Erstellung
 export function createMobileMenuButton() {
-    const mobileMenuBtn = document.createElement('button');
-    mobileMenuBtn.id = 'mobileMenuBtn';
-    mobileMenuBtn.className = 'mobile-menu-btn';
+
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     mobileMenuBtn.setAttribute('aria-label', 'Menu');
     mobileMenuBtn.innerHTML = `
         <span></span>

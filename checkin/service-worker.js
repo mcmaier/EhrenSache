@@ -8,6 +8,26 @@ const urlsToCache = [
   '/manifest.json'
 ];
 
+// Install Event
+self.addEventListener('install', (event) => {
+    console.log('Service Worker: Installing...');
+    self.skipWaiting();
+});
+
+// Activate Event
+self.addEventListener('activate', (event) => {
+    console.log('Service Worker: Activating...');
+    event.waitUntil(clients.claim());
+});
+
+// Fetch Event (optional - für Offline-Funktionalität)
+self.addEventListener('fetch', (event) => {
+    // Einfach durchreichen, kein Caching
+    event.respondWith(fetch(event.request));
+});
+
+/*
+
 // Installation - Cache static resources
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -83,3 +103,4 @@ self.addEventListener('fetch', event => {
       })
   );
 });
+*/

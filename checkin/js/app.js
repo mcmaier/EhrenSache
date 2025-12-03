@@ -25,6 +25,18 @@ let clockInterval = null;
 let appointments = [];
 let deleteExceptionId = null;
 
+// In checkin/index.html oder checkin/app.js
+    if ('serviceWorker' in navigator) {
+        const currentPath = window.location.pathname;
+        const basePath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+
+        navigator.serviceWorker.register('./service-worker.js', {
+            scope: basePath  // Wichtig: Expliziter Scope!
+        })
+        .then(reg => console.log('✓ Service Worker registriert:', reg.scope))
+        .catch(err => console.log('✗ Service Worker Fehler:', err));
+    }
+
 // ========================================
 // DOM ELEMENTS (werden nach DOMContentLoaded gesetzt)
 // ========================================
@@ -89,8 +101,8 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.closeConfirmDeleteBtn.addEventListener('click', closeConfirmDeleteModal);
     elements.submitConfirmDeleteBtn.addEventListener('click', submitConfirmDelete);   
     elements.stopScanButton.addEventListener('click', toggleScanner); 
-    elements.refreshHistoryButton.addEventListener('click', loadHistory);   
-    
+    elements.refreshHistoryButton.addEventListener('click', loadHistory);           
+
     // Enter-Taste im Code-Input
     elements.manualCode.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
