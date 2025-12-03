@@ -1,0 +1,156 @@
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+/* Tablets (Portrait) */
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: flex;
+    } 
+
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: var(--spacing-lg);
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-bar {
+        flex-direction: column;
+    }
+
+    .content-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .content-header h1 {
+        margin-bottom: var(--spacing-sm);
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .filter-bar {
+        flex-direction: column;
+    }
+    
+    .filter-bar .form-group {
+        width: 100%;
+    }
+    
+    .btn-reset-filter {
+        width: 100%;
+    }
+    
+    .modal-content {
+        width: 95%;
+        padding: var(--spacing-lg);
+    }
+    
+    .calendar-day {
+        font-size: 12px;
+        min-height: 30px;
+        aspect-ratio: 1.5;
+    }
+    
+    .toast-container {
+        left: var(--spacing-sm);
+        right: var(--spacing-sm);
+        bottom: var(--spacing-sm);
+    }
+    
+    .toast {
+        min-width: 0;
+        max-width: none;
+    }   
+    
+        
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+    .mobile-menu-btn {
+        display: flex;
+    }
+
+    .login-box {
+        padding: var(--spacing-lg);
+    }
+    
+    .data-table {
+        padding: var(--spacing-sm);
+    }
+    
+    table {
+        font-size: 12px;
+    }
+    
+    th, td {
+        padding: var(--spacing-sm);
+    }
+    
+    .action-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+        margin-bottom: var(--spacing-xs);
+    }
+    
+    .stat-card {
+        padding: var(--spacing-md);
+    }
+    
+    .stat-card .number {
+        font-size: 24px;
+    }
+    
+    .calendar-grid {
+        gap: 2px;
+    }
+    
+    .calendar-day {
+        font-size: 10px;
+        min-height: 25px;
+        aspect-ratio: 1;
+   }
+    
+    .calendar-day-header {
+        font-size: 12px;
+        padding: var(--spacing-xs);
+    }
+}
+
+/* Desktop Large */
+@media (min-width: 1200px) {
+    .mobile-menu-btn {
+        display: none;
+    }
+
+    .main-content {
+        margin-left: 250px;
+        margin-right: auto;
+        padding: var(--spacing-xl) var(--spacing-xl);
+    }
+    
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+
+     .calendar-day {
+        font-size: 14px;
+        min-height: 30px;
+        aspect-ratio: 2;
+   }
+}

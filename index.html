@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vereinsverwaltung - Dashboard</title>
+
+    <link rel="stylesheet" href="css/main.css">
+
+</head>
+
+<body>
+     <!-- Hamburger Menu Button -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+    
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    <!-- Login Seite -->
+    <div class="login-container" id="loginPage">
+        <div class="login-box">
+            <h2>Vereinsverwaltung</h2>
+            <form id="loginForm" onsubmit="return false;">
+                <div class="form-group">
+                    <label for="email">E-Mail</label>
+                    <input type="email" id="email" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="password">Passwort</label>
+                    <input type="password" id="password" required autocomplete="current-password" value="test123">
+                </div>
+                <button type="submit" class="btn-login" id="loginBtn">Anmelden</button>
+                <div class="error-message" id="loginError"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dashboard" id="dashboard">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h3>Vereinsverwaltung</h3>
+                <div class="user-info">
+                    <div>Angemeldet als:</div>
+                    <strong id="currentUser">-</strong>
+                    <div id="userRole">(-)</div>
+                </div>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item" data-section="einstellungen">
+                    <span>⚙️ Einstellungen</span>
+                </li>               
+                <li class="nav-item" data-section="termine">
+                    <span>📅 Termine</span>
+                </li>
+                <li class="nav-item" data-section="anwesenheit">
+                    <span>✓ Anwesenheiten</span>
+                </li>
+                <li class="nav-item" data-section="antraege">
+                    <span>📋 Anträge</span>
+                </li>        
+                 <li class="nav-item active" data-section="mitglieder" data-role="admin">
+                    <span>👥 Mitglieder</span>
+                </li>        
+                <li class="nav-item" data-section="benutzer" data-role="admin">
+                    <span>🔐 Benutzer</span>
+                </li>
+            </ul>
+            <button class="btn-logout" id="logoutBtn">Abmelden</button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+        <!-- Einstellungen Section -->
+            <div class="content-section" id="einstellungen">
+                <div class="content-header">
+                    <h1>Meine Einstellungen</h1>
+                </div>
+
+                <div class="settings-container">
+                    <!-- Account-Informationen -->
+                    <div class="settings-card">
+                        <h3>Account-Informationen</h3>
+                        <div class="settings-item">
+                            <label>E-Mail-Adresse</label>
+                            <input type="email" id="settings_email" readonly style="background: #f8f9fa; cursor: not-allowed;">
+                            <small style="color: #7f8c8d;">Die E-Mail-Adresse kann nicht geändert werden</small>
+                        </div>
+                        <div class="settings-item">
+                            <label>Rolle</label>
+                            <input type="text" id="settings_role" readonly style="background: #f8f9fa; cursor: not-allowed;">
+                        </div>
+                        <div class="settings-item" id="settings_member_info" style="display: none;">
+                            <label>Verknüpftes Mitglied</label>
+                            <input type="text" id="settings_member" readonly style="background: #f8f9fa; cursor: not-allowed;">
+                        </div>
+                    </div>
+
+                    <!-- Passwort ändern -->
+                    <div class="settings-card">
+                        <h3>Passwort ändern</h3>
+                        <form id="changePasswordForm">
+                            <div class="settings-item">
+                                <label for="current_password">Aktuelles Passwort*</label>
+                                <input type="password" id="current_password" required>
+                            </div>
+                            <div class="settings-item">
+                                <label for="new_password">Neues Passwort*</label>
+                                <input type="password" id="new_password" required minlength="6">
+                                <small style="color: #7f8c8d;">Mindestens 6 Zeichen</small>
+                            </div>
+                            <div class="settings-item">
+                                <label for="confirm_password">Passwort bestätigen*</label>
+                                <input type="password" id="confirm_password" required>
+                            </div>
+                            <button type="submit" class="btn-add" style="margin-top: 10px;">Passwort ändern</button>
+                        </form>
+                    </div>
+
+                    <!-- API-Token -->
+                    <div class="settings-card">
+                        <h3>API-Token für Zeiterfassung</h3>
+                        <p style="color: #7f8c8d; margin-bottom: 15px; font-size: 14px;">
+                            Verwenden Sie diesen Token für automatische Zeiterfassungs-Geräte
+                        </p>
+                        <div class="settings-item">
+                            <label>API-Token</label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <div style="flex: 1; position: relative;">
+                                    <input type="password" id="settings_token" readonly class="token-hidden"
+                                           style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace;">
+                                    <button onclick="toggleSettingsTokenVisibility()" id="toggleSettingsTokenBtn" type="button"
+                                            style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
+                                        👁️
+                                    </button>
+                                </div>
+                                <button onclick="copySettingsToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋 Kopieren</button>
+                            </div>
+                        </div>
+                        <div id="settingsTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
+                        <button onclick="regenerateSettingsToken()" type="button" class="action-btn btn-delete" style="margin-top: 10px;">
+                            🔄 Neuen Token generieren
+                        </button>
+                        <p style="color: #e74c3c; font-size: 12px; margin-top: 10px;">
+                            ⚠️ Behandeln Sie diesen Token wie ein Passwort!
+                        </p>
+                    </div>
+                </div>
+            </div>            
+
+            <!-- Termine Section -->
+            <div class="content-section" id="termine">
+                <div class="content-header">
+                    <h1>Terminverwaltung</h1>
+                    <!-- Bei Termine -->
+                    <button class="btn-add" data-role="admin" onclick="openAppointmentModal()">+ Neuer Termin</button>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Anstehende Termine</h3>
+                        <div class="number" id="statUpcomingAppointments">-</div>
+                    </div>
+                </div>
+
+                <!-- Kalenderansicht -->
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <button class="calendar-nav" onclick="previousMonth()">‹</button>
+                        <h2 id="calendarMonthYear">November 2025</h2>
+                        <button class="calendar-nav" onclick="nextMonth()">›</button>
+                    </div>
+                    <div class="calendar-grid">
+                        <div class="calendar-day-header">Mo</div>
+                        <div class="calendar-day-header">Di</div>
+                        <div class="calendar-day-header">Mi</div>
+                        <div class="calendar-day-header">Do</div>
+                        <div class="calendar-day-header">Fr</div>
+                        <div class="calendar-day-header">Sa</div>
+                        <div class="calendar-day-header">So</div>
+                    </div>
+                    <div id="calendarDaysContainer"></div>
+                </div>
+
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Titel</th>
+                                <th>Beschreibung</th>
+                                <th>Datum</th>
+                                <th>Uhrzeit</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appointmentsTableBody">
+                            <tr><td colspan="5" class="loading">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Anwesenheit Section -->
+            <div class="content-section" id="anwesenheit">
+                <div class="content-header">
+                    <h1>Anwesenheitsverwaltung</h1>
+                    <button class="btn-add" data-role="admin" onclick="openRecordModal()">+ Anwesenheit erfassen</button>
+                </div>
+
+                <!-- Filter-Leiste -->
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="filterAppointment">Filter nach Termin:</label>
+                        <select id="filterAppointment" onchange="applyRecordFilter()">
+                            <option value="">Alle Termine</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filterMember">Filter nach Mitglied:</label>
+                        <select id="filterMember" onchange="applyRecordFilter()">
+                            <option value="">Alle Mitglieder</option>
+                        </select>
+                    </div>
+                    <button class="btn-reset-filter" onclick="resetRecordFilter()">Filter zurücksetzen</button>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Erfasste Anwesenheiten</h3>
+                        <div class="number" id="statTotalRecords">-</div>
+                    </div>
+                </div>
+
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Termin</th>
+                                <th>Mitglied</th>
+                                <th>Ankunftszeit</th>
+                                <th>Status</th>
+                                <th>Quelle</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordsTableBody">
+                            <tr><td colspan="7" class="loading">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Anträge/Exceptions Section -->
+            <div class="content-section" id="antraege">
+                <div class="content-header">
+                    <h1>Anträge & Entschuldigungen</h1>
+                    <button class="btn-add" onclick="openExceptionModal()">+ Neuer Antrag</button>
+                </div>
+
+                <!-- Filter-Leiste -->
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="filterExceptionStatus">Status:</label>
+                        <select id="filterExceptionStatus" onchange="applyExceptionFilter()">
+                            <option value="">Alle</option>
+                            <option value="pending">Ausstehend</option>
+                            <option value="approved">Genehmigt</option>
+                            <option value="rejected">Abgelehnt</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filterExceptionType">Typ:</label>
+                        <select id="filterExceptionType" onchange="applyExceptionFilter()">
+                            <option value="">Alle</option>
+                            <option value="absence">Entschuldigung</option>
+                            <option value="time_correction">Zeitkorrektur</option>
+                        </select>
+                    </div>
+                    <button class="btn-reset-filter" onclick="resetExceptionFilter()">Filter zurücksetzen</button>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Ausstehende Anträge</h3>
+                        <div class="number" id="statPendingExceptions">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Genehmigte Anträge</h3>
+                        <div class="number" id="statApprovedExceptions">-</div>
+                    </div>
+                </div>
+
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Typ</th>
+                                <th>Mitglied</th>
+                                <th>Termin</th>
+                                <th>Begründung</th>
+                                <th>Gewünschte Zeit</th>
+                                <th>Status</th>
+                                <th>Erstellt am</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exceptionsTableBody">
+                            <tr><td colspan="8" class="loading">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>  
+            
+            <!-- Mitglieder Section (nur Admin)-->
+            <div class="content-section active" id="mitglieder">
+                <div class="content-header">
+                    <h1>Mitgliederverwaltung</h1> 
+                    <button class="btn-add" data-role="admin" onclick="openMemberModal()">+ Neues Mitglied</button>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Aktive Mitglieder</h3>
+                        <div class="number" id="statActiveMembersCount">-</div>                                             
+                    </div>
+                </div>
+
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Vorname</th>
+                                <th>Mitgliedsnummer</th>
+                                <th>Status</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="membersTableBody">
+                            <tr><td colspan="5" class="loading">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Benutzer-Verwaltung Section (nur Admin) -->
+            <div class="content-section" id="benutzer">
+                <div class="content-header">
+                    <h1>Benutzerverwaltung</h1>
+                    <button class="btn-add" onclick="openUserModal()">+ Neuer Benutzer</button>
+                </div>
+
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>E-Mail</th>
+                                <th>Rolle</th>
+                                <th>Verknüpftes Mitglied</th>
+                                <th>Status</th>
+                                <th>Erstellt am</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr><td colspan="7" class="loading">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal für Mitglieder -->
+    <div class="modal" id="memberModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="memberModalTitle">Neues Mitglied</h2>
+                <button class="close-modal" onclick="closeMemberModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="memberForm">
+                    <input type="hidden" id="member_id">
+                    <div class="form-group">
+                        <label for="member_name">Vorname*</label>
+                        <input type="text" id="member_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="member_surname">Nachname*</label>
+                        <input type="text" id="member_surname" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="member_number">Mitgliedsnummer</label>
+                        <input type="text" id="member_number">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="member_active" checked>
+                            <span>Aktiv</span>
+                        </label>
+                    </div>                    
+                    <div class="form-group" id="membershipDatesGroup" style="display: none;">
+                        <label>Mitgliedschaftszeiträume</label>
+                        <div id="membershipDatesList"></div>
+                        <button type="button" class="btn-add" onclick="addMembershipDate()" style="margin-top: 10px;">
+                            + Zeitraum hinzufügen
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeMemberModal()">Abbrechen</button>
+                <button class="btn-save" onclick="saveMember()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal für Termine -->
+    <div class="modal" id="appointmentModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="appointmentModalTitle">Neuer Termin</h2>
+                <button class="close-modal" onclick="closeAppointmentModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="appointmentForm">
+                    <input type="hidden" id="appointment_id">
+                    <div class="form-group">
+                        <label for="appointment_title">Titel*</label>
+                        <input type="text" id="appointment_title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="appointment_description">Beschreibung</label>
+                        <textarea id="appointment_description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="appointment_date">Datum*</label>
+                        <input type="date" id="appointment_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="appointment_time">Startzeit*</label>
+                        <input type="time" id="appointment_time" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeAppointmentModal()">Abbrechen</button>
+                <button class="btn-save" onclick="saveAppointment()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal für Anwesenheiten -->
+    <div class="modal" id="recordModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="recordModalTitle">Anwesenheit erfassen</h2>
+                <button class="close-modal" onclick="closeRecordModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="recordForm">
+                    <input type="hidden" id="record_id">
+                    <div class="form-group">
+                        <label for="record_member">Mitglied*</label>
+                        <select id="record_member" required>
+                            <option value="">Bitte wählen...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="record_appointment">Termin*</label>
+                        <select id="record_appointment" required>
+                            <option value="">Bitte wählen...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="record_arrival_time">Ankunftszeit*</label>
+                        <input type="datetime-local" id="record_arrival_time" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="record_status">Status*</label>
+                        <select id="record_status" required>
+                            <option value="present">Anwesend</option>
+                            <option value="absent">Abwesend</option>
+                            <option value="excused">Entschuldigt</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeRecordModal()">Abbrechen</button>
+                <button class="btn-save" onclick="saveRecord()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal für Anträge/Exceptions -->
+    <div class="modal" id="exceptionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="exceptionModalTitle">Neuer Antrag</h2>
+                <button class="close-modal" onclick="closeExceptionModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="exceptionForm">
+                    <input type="hidden" id="exception_id">
+                    
+                    <div class="form-group" id="exceptionMemberGroup">
+                        <label for="exception_member">Mitglied*</label>
+                        <select id="exception_member">
+                            <option value="">Bitte wählen...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="exception_appointment">Termin*</label>
+                        <select id="exception_appointment" required>
+                            <option value="">Bitte wählen...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="exception_type">Art des Antrags*</label>
+                        <select id="exception_type" required onchange="toggleExceptionFields()">
+                            <option value="absence">Entschuldigung</option>
+                            <option value="time_correction">Zeitkorrektur</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="requestedTimeGroup" style="display: none;">
+                        <label for="exception_requested_time">Gewünschte Ankunftszeit</label>
+                        <input type="datetime-local" id="exception_requested_time">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="exception_reason">Begründung*</label>
+                        <textarea id="exception_reason" rows="4" required></textarea>
+                    </div>
+                    
+                    <!-- Nur für Admin sichtbar -->
+                    <div class="form-group" id="exceptionStatusGroup" style="display: none;">
+                        <label for="exception_status">Status*</label>
+                        <select id="exception_status">
+                            <option value="pending">Ausstehend</option>
+                            <option value="approved">Genehmigt</option>
+                            <option value="rejected">Abgelehnt</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeExceptionModal()">Abbrechen</button>
+                <button class="btn-save" onclick="saveException()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal für Benutzer -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="userModalTitle">Neuer Benutzer</h2>
+                <button class="close-modal" onclick="closeUserModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="user_id">
+                    <div class="form-group">
+                        <label for="user_email">E-Mail / Geräte-Name*</label>
+                        <input type="text" id="user_email" required>
+                        <small>Bei Geräten: z.B. "nfc-reader-entrance"</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="user_password">Passwort</label>
+                        <input type="password" id="user_password">
+                        <small>Leer lassen um bestehendes Passwort zu behalten. Geräte benötigen kein Passwort.</small>
+                    </div>                    
+                    <div class="form-group">
+                        <label for="user_role">Rolle*</label>
+                        <select id="user_role" required>
+                            <option value="user">Benutzer</option>
+                            <option value="admin">Administrator</option>
+                            <option value="device">Gerät (IoT/Terminal)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="userMemberGroup">
+                        <label for="user_member">Verknüpftes Mitglied</label>
+                        <select id="user_member">
+                            <option value="">Kein Mitglied</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="deviceConfigGroup" style="display: none;">
+                        <label>Gerätekonfiguration</label>
+                        <div id="deviceConfigsList"></div>
+                        <button type="button" class="btn-add" onclick="addDeviceConfig()" style="margin-top: 10px;">
+                            + Gerät hinzufügen
+                        </button>
+                    </div>
+                    <div class="form-group" id="userDeviceTypeGroup" style="display: none;">
+                        <label for="user_device_type">Geräte-Typ</label>
+                        <select id="user_device_type">
+                            <option value="">Bitte wählen...</option>
+                            <option value="fingerprint">Fingerabdruck-Scanner</option>
+                            <option value="nfc">NFC-Leser</option>
+                            <option value="rfid">RFID-Leser</option>
+                            <option value="terminal">Terminal</option>
+                            <option value="other">Sonstiges</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="user_active" checked>
+                            <span>Aktiv</span>
+                        </label>
+                    </div>
+
+                    <!-- API-Token Anzeige (nur für Devices und nach Erstellung) -->
+                    <div class="form-group" id="userTokenGroup" style="display: none;">
+                        <label>API-Token</label>
+                        <p style="color: #7f8c8d; margin-bottom: 10px; font-size: 12px;">
+                            Dieser Token wird für die API-Authentifizierung benötigt
+                        </p>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div style="flex: 1; position: relative;">
+                                <input type="password" id="user_token" readonly class="token-hidden" 
+                                    style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace; background: #f8f9fa;">
+                                <button onclick="toggleUserTokenVisibility()" id="toggleUserTokenBtn" type="button"
+                                        style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
+                                    👁️
+                                </button>
+                            </div>
+                            <button onclick="copyUserToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
+                        </div>
+                        <!-- Im userTokenGroup nach dem Token-Input -->
+                        <div id="tokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
+                        <button onclick="regenerateUserToken()" type="button" class="action-btn btn-delete" style="margin-top: 10px;">
+                            🔄 Neuen Token generieren
+                        </button>
+                        <p style="color: #e74c3c; font-size: 12px; margin-top: 10px;">
+                            ⚠️ Token nach Erstellung sicher aufbewahren!
+                        </p>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeUserModal()">Abbrechen</button>
+                <button class="btn-save" onclick="saveUser()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+        <!-- Confirmation Modal -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2 id="confirmTitle">Bestätigung</h2>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">Sind Sie sicher?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" id="confirmCancel">Abbrechen</button>
+                <button class="btn-confirm-delete" id="confirmOk">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Konfiguration -->
+    <script type="module" src="./js/config.js"></script>
+
+    <!-- Module -->
+    <script type="module" src="./js/modules/utils.js"></script>
+    <script type="module" src="./js/modules/api.js"></script>
+    <script type="module" src="./js/modules/ui.js"></script>
+    <script type="module" src="./js/modules/auth.js"></script>
+    <script type="module" src="./js/modules/members.js"></script>
+    <script type="module" src="./js/modules/appointments.js"></script>
+    <script type="module" src="./js/modules/records.js"></script>
+    <script type="module" src="./js/modules/exceptions.js"></script>
+    <script type="module" src="./js/modules/users.js"></script>
+    <script type="module" src="./js/modules/settings.js"></script>
+
+    <!-- Hauptdatei -->
+    <script type="module" src="./js/app.js"></script>
+
+</body>
+</html>

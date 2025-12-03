@@ -1,0 +1,63 @@
+/* ============================================
+   CSS VARIABLES
+   ============================================ */
+:root {
+    /* Colors */
+    --primary-color: #667eea;
+    --primary-dark: #5568d3;
+    --secondary-color: #764ba2;
+    --success-color: #27ae60;
+    --success-dark: #229954;
+    --danger-color: #e74c3c;
+    --danger-dark: #c0392b;
+    --warning-color: #f39c12;
+    --info-color: #3498db;
+    
+    /* Grays */
+    --text-dark: #2c3e50;
+    --text-medium: #555;
+    --text-light: #7f8c8d;
+    --text-muted: #bdc3c7;
+    --bg-white: #ffffff;
+    --bg-light: #f8f9fa;
+    --bg-gray: #f5f5f5;
+    --border-color: #ddd;
+    --border-light: #e0e0e0;
+    
+    /* Sidebar */
+    --sidebar-bg: #2c3e50;
+    --sidebar-hover: #34495e;
+    --sidebar-width: 250px;
+    
+    /* Spacing */
+    --spacing-xs: 5px;
+    --spacing-sm: 10px;
+    --spacing-md: 15px;
+    --spacing-lg: 20px;
+    --spacing-xl: 30px;
+    --spacing-xxl: 40px;
+    
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 5px;
+    --radius-lg: 8px;
+    --radius-xl: 10px;
+    --radius-round: 50%;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.15);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.2);
+    
+    /* Transitions */
+    --transition-fast: 0.2s ease;
+    --transition-base: 0.3s ease;
+
+    /* OVerlay Hierarchy */
+    --z-base: 1;
+    --z-sidebar: 100;
+    --z-mobile-menu: 101;
+    --z-modal: 1000;
+    --z-toast: 9999;
+
+}

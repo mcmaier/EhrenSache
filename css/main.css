@@ -1,0 +1,27 @@
+/* ============================================
+   MAIN CSS - Import all modules
+   ============================================ */
+
+/* Base */
+@import url('variables.css');
+@import url('reset.css');
+@import url('layout.css');
+
+/* Components */
+@import url('components/buttons.css');
+@import url('components/forms.css');
+@import url('components/cards.css');
+@import url('components/tables.css');
+@import url('components/modals.css');
+@import url('components/badges.css');
+@import url('components/calendar.css');
+@import url('components/toast.css');
+
+/* Sections */
+@import url('sections/login.css');
+@import url('sections/sidebar.css');
+@import url('sections/content.css');
+
+/* Utilities */
+@import url('utilities.css');
+@import url('responsive.css');

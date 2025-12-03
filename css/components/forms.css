@@ -1,0 +1,116 @@
+.error-message {
+    color: #e74c3c;
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: var(--spacing-lg);
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-medium);
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color var(--transition-fast);
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+/* Checkbox-Label richtig ausrichten */
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #555;
+    font-weight: 500;
+}
+
+/* Spezielle Regel für Labels MIT Checkbox */
+.form-group label:has(input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+/* Checkbox selbst */
+.form-group input[type="checkbox"] {
+    width: auto;  /* ← Überschreibt die 100% von input */
+    margin: 0;
+    cursor: pointer;
+    flex-shrink: 0;  /* ← Verhindert Schrumpfen */
+}
+
+/* Text neben Checkbox */
+.form-group label:has(input[type="checkbox"]) span {
+    line-height: 1.4;
+}
+
+/* ============================================
+   FILTER BAR
+   ============================================ */
+.filter-bar {
+    background: var(--bg-white);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    gap: var(--spacing-lg);
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.filter-bar .form-group {
+    flex: 1;
+    min-width: 200px;
+    margin-bottom: 0;
+}
+
+.filter-bar label {
+    font-size: 14px;
+}
+
+.btn-reset-filter {
+    height: 44px;
+}
+
+/* Token Input Styling */
+#apiTokenDisplay {
+    letter-spacing: 2px;
+    font-size: 13px;
+    z-index: 1;
+}
+
+#apiTokenDisplay[type="password"] {
+    letter-spacing: 4px;
+    font-size: 16px;
+    z-index: 1;
+}
+
+#toggleTokenBtn {
+    transition: opacity 0.2s;
+}
+
+#toggleTokenBtn:hover {
+    opacity: 0.7;
+}

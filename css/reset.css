@@ -1,0 +1,15 @@
+/* ============================================
+   RESET & BASICS
+   ============================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+   body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-gray);
+    line-height: 1.6;
+    color: var(--text-dark);
+}
