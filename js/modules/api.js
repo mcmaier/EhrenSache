@@ -1,4 +1,5 @@
 import { API_BASE } from '../config.js';
+import { showLogin, showScreen, showToast, showDashboard, updateUIForRole} from './ui.js';
 
 // Globale State
 export let currentUser = null;
@@ -67,7 +68,7 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
                     const { showToast } = await import('./ui.js');
                     showToast('Sitzung abgelaufen. Bitte erneut anmelden.', 'warning');
                 }
-                const { showLogin } = await import('./auth.js');
+                const { showLogin } = await import('./ui.js');
                 showLogin();
                 
                 return null;

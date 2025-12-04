@@ -24,6 +24,8 @@ let isScanning = false;
 let clockInterval = null;
 let appointments = [];
 let deleteExceptionId = null;
+let nfcAbortController = null;
+let isNFCScanning = false;
 
 // In checkin/index.html oder checkin/app.js
     if ('serviceWorker' in navigator) {
@@ -85,7 +87,8 @@ document.addEventListener('DOMContentLoaded', function() {
         closeConfirmDeleteBtn: document.getElementById('closeConfirmDeleteBtn'),
         submitConfirmDeleteBtn: document.getElementById('submitConfirmDeleteBtn'),
         stopScanButton: document.getElementById('stopScanButton'),
-        refreshHistoryButton: document.getElementById('refreshHistoryButton')
+        refreshHistoryButton: document.getElementById('refreshHistoryButton'),
+        nfcButton: document.getElementById('nfcButton')
     };
 
     // Event Listeners
@@ -101,7 +104,8 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.closeConfirmDeleteBtn.addEventListener('click', closeConfirmDeleteModal);
     elements.submitConfirmDeleteBtn.addEventListener('click', submitConfirmDelete);   
     elements.stopScanButton.addEventListener('click', toggleScanner); 
-    elements.refreshHistoryButton.addEventListener('click', loadHistory);           
+    elements.refreshHistoryButton.addEventListener('click', loadHistory);   
+    elements.nfcButton.addEventListener('click', toggleNFCReader);        
 
     // Enter-Taste im Code-Input
     elements.manualCode.addEventListener('keypress', (e) => {
@@ -109,6 +113,8 @@ document.addEventListener('DOMContentLoaded', function() {
             submitManualCode();
         }
     });
+
+    checkNFCSupport();
 
     // Prüfe gespeicherten Token
     const savedToken = localStorage.getItem('api_token');
@@ -164,7 +170,7 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
     }
 
     try {
-        console.log('API Call:', method, url.toString());
+        //console.log('API Call:', method, url.toString());
         const response = await fetch(url, options);
         
         if (!response.ok) {
@@ -253,8 +259,6 @@ let success = false;
     try {
         const meData = await apiCall('me');
         userData = meData;
-
-        console.log('User Data:', meData); // Debug
         
         if (meData.member_id) {
             try {
@@ -506,6 +510,192 @@ async function submitManualCode() {
     }
         
     await verifyCheckin(`CHECKIN:${code}`);
+}
+
+
+// ========================================
+// NFC READER
+// ========================================
+
+async function checkNFCSupport() {
+    if ('NDEFReader' in window) {
+        try {
+            // Prüfe Permissions
+            const permissionStatus = await navigator.permissions.query({ name: "nfc" });
+            
+            if (permissionStatus.state === "granted" || permissionStatus.state === "prompt") {
+                elements.nfcButton.style.display = 'flex';
+                console.log('✓ NFC wird unterstützt');
+            } else {
+                console.log('✗ NFC-Berechtigung verweigert');
+            }
+        } catch (error) {
+            console.log('✗ NFC-Permission-Check fehlgeschlagen:', error);
+            // Zeige Button trotzdem - User kann beim ersten Scan Berechtigung erteilen
+            elements.nfcButton.style.display = 'flex';
+        }
+    } else {
+        console.log('✗ NFC wird von diesem Browser nicht unterstützt');
+        elements.nfcButton.style.display = 'none';
+    }
+}
+
+async function toggleNFCReader() {
+    if (isNFCScanning) {
+        stopNFCReader();
+    } else {
+        await startNFCReader();
+    }
+}
+
+async function startNFCReader() {
+    if (!('NDEFReader' in window)) {
+        showMessage('NFC wird von diesem Gerät nicht unterstützt', 'error');
+        return;
+    }
+    
+    // Falls QR-Scanner läuft, erst stoppen
+    await stopScannerIfRunning();
+    
+    try {
+        const ndef = new NDEFReader();
+        nfcAbortController = new AbortController();
+        
+        await ndef.scan({ signal: nfcAbortController.signal });
+        
+        isNFCScanning = true;
+        elements.nfcButton.classList.add('scanning');
+        elements.nfcButton.innerHTML = '<span class="icon">⏹️</span><span>NFC-Scan beenden</span>';
+        elements.nfcButton.style.background = '#e74c3c';
+        
+        showMessage('📡 Halte ein NFC-Tag an die Rückseite des Geräts...', 'info');
+        
+        ndef.addEventListener("reading", ({ message, serialNumber }) => {
+            console.log('NFC-Tag erkannt:', serialNumber);
+            onNFCTagRead(message, serialNumber);
+        }, { signal: nfcAbortController.signal });
+        
+        ndef.addEventListener("readingerror", () => {
+            showMessage('Fehler beim Lesen des NFC-Tags', 'error');
+        }, { signal: nfcAbortController.signal });
+        
+    } catch (error) {
+        console.error('NFC-Fehler:', error);
+        
+        if (error.name === 'NotAllowedError') {
+            showMessage('NFC-Berechtigung wurde verweigert. Bitte erlaube NFC-Zugriff in den Browser-Einstellungen.', 'error');
+        } else if (error.name === 'NotSupportedError') {
+            showMessage('NFC wird von diesem Gerät nicht unterstützt', 'error');
+        } else {
+            showMessage('NFC konnte nicht gestartet werden: ' + error.message, 'error');
+        }
+        
+        stopNFCReader();
+    }
+}
+
+function stopNFCReader() {
+    if (nfcAbortController) {
+        nfcAbortController.abort();
+        nfcAbortController = null;
+    }
+    
+    isNFCScanning = false;
+    elements.nfcButton.classList.remove('scanning');
+    elements.nfcButton.innerHTML = '<span class="icon">📡</span><span>NFC-Tag scannen</span>';
+    elements.nfcButton.style.background = '';
+    
+    showMessage('NFC-Scan beendet', 'info');
+}
+
+async function onNFCTagRead(message, serialNumber) {
+    console.log('NFC-Tag gelesen:', { message, serialNumber });
+    
+    stopNFCReader();
+    
+    // Versuche NDEF-Records zu lesen
+    let checkinCode = null;
+    
+    for (const record of message.records) {
+        console.log('NDEF Record:', record.recordType, record);
+        
+        if (record.recordType === "text") {
+            const textDecoder = new TextDecoder(record.encoding || 'utf-8');
+            const text = textDecoder.decode(record.data);
+            console.log('Text-Record:', text);
+            
+            // Prüfe ob es ein CHECKIN-Code ist
+            if (text.startsWith('CHECKIN:')) {
+                checkinCode = text;
+                break;
+            }
+        } else if (record.recordType === "url") {
+            const textDecoder = new TextDecoder();
+            const url = textDecoder.decode(record.data);
+            console.log('URL-Record:', url);
+            
+            // Extrahiere Code aus URL (z.B. https://example.com/checkin?code=CHECKIN:123456)
+            const match = url.match(/CHECKIN:\d{6}/);
+            if (match) {
+                checkinCode = match[0];
+                break;
+            }
+        }
+    }
+    
+    if (checkinCode) {
+        await verifyCheckin(checkinCode);
+    } else {
+        // Fallback: Verwende Serial Number als Member-Number
+        showMessage('⚠️ Kein Check-in-Code auf Tag gefunden. Verwende Tag-ID als Mitgliedsnummer...', 'warning');
+        
+        // Formatiere Serial Number (entferne Doppelpunkte)
+        const tagId = serialNumber.replace(/:/g, '').toUpperCase();
+        
+        await performMemberNumberCheckin(tagId);
+    }
+}
+
+// NEU: Check-in per Mitgliedsnummer (für NFC-Tags ohne NDEF)
+async function performMemberNumberCheckin(memberNumber) {
+    elements.nfcButton.disabled = true;
+    
+    const now = new Date();
+    const arrivalTime = formatDateTime(now);
+    
+    if (!userData || !userData.member_id) {
+        showMessage('Kein Mitglied verknüpft. Bitte Administrator kontaktieren.', 'error');
+        elements.nfcButton.disabled = false;
+        return;
+    }
+    
+    try {
+        const requestData = {
+            member_number: memberNumber,
+            arrival_time: arrivalTime
+        };
+        
+        // Admin muss member_id explizit mitschicken
+        if (userData.role === 'admin') {
+            requestData.member_id = userData.member_id;
+        }
+        
+        const data = await apiCall('auto_checkin', 'POST', requestData);
+        
+        if (data.appointment) {
+            showMessage('✓ Erfolgreich eingecheckt!', 'success');
+            addNewActivityToHistory({
+                appointment: data.appointment,
+                verified: true,
+                pending: false
+            });
+        }
+    } catch (error) {
+        showMessage('Check-in fehlgeschlagen: ' + (error.message || 'Unbekannter Fehler'), 'error');
+        console.error(error);
+    } finally {
+        elements.nfcButton.disabled = false;
+    }
 }
 
 // ========================================

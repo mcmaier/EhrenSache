@@ -46,10 +46,42 @@ export async function loadSettings() {
     } else {
         memberInfoDiv.style.display = 'none';
     }
+
+     //API-Token neu laden und versteckt anzeigen
+    const tokenInput = document.getElementById('settings_token');
+    const toggleBtn = document.getElementById('toggleSettingsTokenBtn');
+    const expiryInfo = document.getElementById('settingsTokenExpiryInfo');
     
     // API-Token
     if (userDetails.api_token) {
         document.getElementById('settings_token').value = userDetails.api_token;
+
+        // Token als versteckt zurücksetzen
+        tokenInput.type = 'password';
+        toggleBtn.textContent = '👁️';
+        
+        // Ablaufdatum anzeigen
+        if (userDetails.api_token_expires_at) {
+            const expiresAt = new Date(userDetails.api_token_expires_at);
+            const now = new Date();
+            const isExpired = now > expiresAt;
+            
+            const expiresText = expiresAt.toLocaleDateString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            
+            expiryInfo.innerHTML = isExpired 
+                ? `<span style="color: #e74c3c;">⚠️ Abgelaufen am: ${expiresText}</span>`
+                : `<span style="color: #7f8c8d;">Gültig bis: ${expiresText}</span>`;
+            expiryInfo.style.display = 'block';
+        } else {
+            expiryInfo.style.display = 'none';
+        }
+    } else {
+        tokenInput.value = '';
+        expiryInfo.style.display = 'none';    
     }
 }
 

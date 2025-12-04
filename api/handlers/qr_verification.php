@@ -62,7 +62,7 @@ function handleQRVerification($db, $request_method, $authUserId, $authUserRole, 
             handleAutoCheckin($db, 'POST', $authUserId, $authUserRole, $authMemberId, $isTokenAuth, 'qr_verified',
                                                                             [
                                                                                 'location_name' => $validLocation['email'],
-                                                                                'device_name' => $validLocation['email']
+                                                                                'device_name' => $validLocation['device_name']
                                                                             ]
                                                                             );
         } else {

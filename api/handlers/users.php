@@ -8,7 +8,7 @@ function handleUsers($db, $method, $id) {
         case 'GET':
             if($id) {
                 $stmt = $db->prepare("SELECT u.user_id, u.email, u.role, u.is_active, 
-                                    u.member_id, u.created_at, u.api_token,
+                                    u.member_id, u.created_at, u.api_token, u.api_token_expires_at,
                                     m.name, m.surname
                                     FROM users u
                                     LEFT JOIN members m ON u.member_id = m.member_id
@@ -22,6 +22,13 @@ function handleUsers($db, $method, $id) {
                     return;
                 }
 
+                // Bei Devices → Zähle device_configs
+                if($user['role'] === 'device') {
+                    $countStmt = $db->prepare("SELECT COUNT(*) FROM device_configs WHERE user_id = ?");
+                    $countStmt->execute([$id]);
+                    $user['device_config_count'] = (int)$countStmt->fetchColumn();
+                }
+
                 // Token nur für eigenen Account oder Admin sichtbar
                 if($_SESSION['role'] !== 'admin' && $_SESSION['user_id'] != $user['user_id']) {
                     unset($user['api_token']); // Anderen Usern den Token nicht zeigen
@@ -30,13 +37,24 @@ function handleUsers($db, $method, $id) {
                 echo json_encode($user);              
             
             } else {
-                $stmt = $db->query("SELECT u.user_id, u.email, u.role, u.is_active, 
+                $stmt = $db->query("SELECT u.user_id, u.email, u.role, u.is_active, u.api_token_expires_at,
                                 u.member_id, u.created_at,
                                 m.name, m.surname
                                 FROM users u
                                 LEFT JOIN members m ON u.member_id = m.member_id
                                 ORDER BY u.created_at DESC");
-                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // Für jeden Device-User → Anzahl der Configs
+                foreach($users as &$user) {
+                    if($user['role'] === 'device') {
+                        $countStmt = $db->prepare("SELECT COUNT(*) FROM device_configs WHERE user_id = ?");
+                        $countStmt->execute([$user['user_id']]);
+                        $user['device_config_count'] = (int)$countStmt->fetchColumn();
+                    }
+                }
+
+                echo json_encode($users);
             }
             break;
             
@@ -44,7 +62,7 @@ function handleUsers($db, $method, $id) {
             $rawData = json_decode(file_get_contents("php://input"));
 
             // Nur erlaubte Felder extrahieren
-            $allowedFields = ['email', 'password', 'role', 'member_id','api_token'];
+            $allowedFields = ['email', 'password', 'role', 'member_id'];
             $data = new stdClass();
             foreach($allowedFields as $field) {
                 if(isset($rawData->$field)) {
@@ -66,6 +84,7 @@ function handleUsers($db, $method, $id) {
 
             // Generiere API-Token
             $api_token = bin2hex(random_bytes(24));
+            $expiresAt = date('Y-m-d H:i:s', strtotime('+1 year'));
             
             // Passwort-Hash (nur wenn Passwort gesetzt, Devices brauchen keins)
             $password_hash = 0;
@@ -91,7 +110,7 @@ function handleUsers($db, $method, $id) {
             }
 
             $stmt = $db->prepare("INSERT INTO users 
-                          (email, password_hash, role, member_id, api_token, api_token_expires_at) 
+                          (email, password_hash, role, member_id, api_token, api_token_expires_at ) 
                           VALUES (?, ?, ?, ?, ?, ?)");
 
             if($stmt->execute([
@@ -100,14 +119,14 @@ function handleUsers($db, $method, $id) {
                 $data->role ?? 'user', 
                 $member_id,
                 $api_token,
-                $api_token_expires_at
+                $expiresAt
             ])) {
                 http_response_code(201);
                 echo json_encode([
                     "message" => "User created", 
                     "id" => $db->lastInsertId(),
                     "api_token" => $api_token,
-                    "expires_at" => $api_token_expires_at
+                    "api_token_expires_at" => $expiresAt
                 ]);
             } else {
                 http_response_code(500);
@@ -119,7 +138,7 @@ function handleUsers($db, $method, $id) {
             $rawData = json_decode(file_get_contents("php://input"));
 
             // Nur erlaubte Felder extrahieren
-            $allowedFields = ['email', 'password', 'role', 'member_id','is_active','api_token'];
+            $allowedFields = ['email', 'password', 'role', 'member_id','is_active'];
             $data = new stdClass();
             foreach($allowedFields as $field) {
                 if(isset($rawData->$field)) {

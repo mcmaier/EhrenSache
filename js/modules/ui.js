@@ -1,5 +1,12 @@
 import { TOAST_DURATION } from '../config.js';
 import {apiCall, isAdmin, currentUser, setCurrentUser} from './api.js';
+import {loadSettings} from './settings.js';
+import {loadUsers} from'./users.js';
+import {loadAppointments} from'./appointments.js';
+import {loadExceptions, loadExceptionFilters} from'./exceptions.js';
+import {loadRecords, loadRecordFilters} from'./records.js';
+import {loadMembers} from'./members.js';
+
 
 // ============================================
 // UI
@@ -198,13 +205,12 @@ export function updateMobileMenuVisibility() {
     mobileMenuBtn.style.display = (isLoggedIn && isMobile) ? 'flex' : 'none';
 }
 
-
 // UI Helper
 export function showLogin() {
     document.getElementById('loginPage').style.display = 'flex';
     document.getElementById('dashboard').classList.remove('active');
     document.getElementById('loginForm').reset();
-    currentUser = null;
+    setCurrentUser(null);
 
     // Verstecke Button IMMER beim Login
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -286,7 +292,7 @@ export function updateTableHeaders() {
     });
 }
 
-export function initNavigation() {
+export async function initNavigation() {
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', function() {
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
@@ -298,6 +304,59 @@ export function initNavigation() {
             
              // Speichere aktuelle Section
             sessionStorage.setItem('currentSection', section);
+
+            loadAllData();
+
+            // Schließe Sidebar auf Mobile nach Klick auf Menu Item
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            
+            if (sidebar && sidebar.classList.contains('mobile-open')) {
+                sidebar.classList.remove('mobile-open');
+                if (overlay) overlay.classList.remove('active');
+                if (mobileMenuBtn) mobileMenuBtn.classList.remove('active');
+            }
         });
     });
 }
+
+
+export async function loadAllData() {
+    const section = sessionStorage.getItem('currentSection') || 'einstellungen';
+    
+    //Aktive Section zuerst laden
+    if(section === 'einstellungen') {
+        await loadSettings();
+    }
+    else if (section === 'mitglieder') {
+        await loadMembers(true);
+    } else if (section === 'termine') {
+        await loadAppointments(true);
+    } else if (section === 'anwesenheit') {
+        await loadRecordFilters();
+        await loadRecords();
+    } else if (section === 'antraege') {
+        await loadExceptionFilters();
+        await loadExceptions();
+    } else if (section === 'benutzer' && isAdmin) {
+        await loadUsers();
+    }
+
+        //Rest im Hintergrund laden (nicht-blockierend)
+        setTimeout(() => {
+            if (section !== 'mitglieder') loadMembers(true);
+            if (section !== 'termine') loadAppointments(true);
+            if (section !== 'anwesenheit') {
+                loadRecordFilters();
+                loadRecords();
+            }
+            if (section !== 'antraege') {
+                loadExceptions();
+                loadExceptionFilters();
+            }
+            if (isAdmin && section !== 'benutzer') loadUsers();
+            if (section !== 'einstellungen') loadSettings();
+        }, 100);
+}
+

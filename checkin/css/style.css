@@ -883,6 +883,23 @@ body {
     display: block;
 }
 
+.btn.scanning {
+    background: #e74c3c;
+    color: white;
+}
+
+.btn.scanning .icon {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
 
 /* Responsive */
 @media (max-width: 480px) {

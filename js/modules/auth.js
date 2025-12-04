@@ -1,6 +1,5 @@
-import { loadAllData } from '../app.js';
 import { apiCall, setCurrentUser, currentUser, setCsrfToken} from './api.js';
-import { showScreen, showToast, showDashboard, updateUIForRole} from './ui.js';
+import { loadAllData, showLogin, showScreen, showToast, showDashboard, updateUIForRole} from './ui.js';
 
 // ============================================
 // AUTH
@@ -8,13 +7,6 @@ import { showScreen, showToast, showDashboard, updateUIForRole} from './ui.js';
 // import {} from './auth.js'
 // ============================================
 
-
-export function showLogin() {
-    document.getElementById('loginPage').style.display = 'flex';
-    document.getElementById('dashboard').classList.remove('active');
-    document.getElementById('loginForm').reset();
-    setCurrentUser(null);
-}
 
 export async function handleLogin(e) {
     e.preventDefault();

@@ -26,10 +26,23 @@ export async function loadUsers() {
         const createdAt = new Date(user.created_at);
         const formattedCreated = createdAt.toLocaleDateString('de-DE');
 
-        // In der forEach-Schleife
-        const roleText = user.role === 'admin' ? 'Admin' : 
-                 user.role === 'device' ? `Gerät (${user.device_type || 'unbekannt'})` : 
-                 'Benutzer';
+        // Rollendarstellung
+        let roleText;
+        if (user.role === 'admin') {
+            roleText = 'Admin';
+        } else if (user.role === 'device') {
+            // Zeige Anzahl der Konfigurationen
+            const configCount = user.device_config_count || 0;
+            if (configCount === 0) {
+                roleText = 'Gerät (nicht konfiguriert)';
+            } else if (configCount === 1) {
+                roleText = 'Gerät (1 Konfiguration)';
+            } else {
+                roleText = `Gerät (${configCount} Konfigurationen)`;
+            }
+        } else {
+            roleText = 'Benutzer';
+        }
         
         // Mitgliedsname aus JOIN
         let memberName = '-';
@@ -75,7 +88,7 @@ function toggleUserRoleFields() {
     const memberGroup = document.getElementById('userMemberGroup');
     const memberSelect = document.getElementById('user_member');
     const passwordGroup = document.querySelector('label[for="user_password"]').parentElement;
-    const deviceTypeGroup = document.getElementById('userDeviceTypeGroup');
+    const deviceConfigGroup = document.getElementById('deviceConfigGroup');
     
     if (role === 'device') {
         // Device: Kein Mitglied, kein Passwort, Device-Typ erforderlich
@@ -86,8 +99,7 @@ function toggleUserRoleFields() {
         passwordGroup.style.display = 'none';
         document.getElementById('user_password').required = false;
         
-        deviceTypeGroup.style.display = 'block';
-        document.getElementById('user_device_type').required = true;
+        deviceConfigGroup.style.display = 'block';
         
     } else {
         // Admin/User: Mitglied optional, Passwort erforderlich
@@ -98,8 +110,7 @@ function toggleUserRoleFields() {
         const userId = document.getElementById('user_id').value;
         document.getElementById('user_password').required = !userId; // Nur bei Neuanlage
         
-        deviceTypeGroup.style.display = 'none';
-        document.getElementById('user_device_type').required = false;
+        deviceConfigGroup.style.display = 'none';
     }
 }
 
@@ -122,15 +133,21 @@ export async function openUserModal(userId = null) {
             memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
         });
     }
-    
+
     if (userId) {
         title.textContent = 'Benutzer bearbeiten';
-        loadUserData(userId);
-        document.getElementById('user_password').required = false;
+        await loadUserData(userId);
+        document.getElementById('user_password').required = false;  
 
-        // Lade Device Configs
-        deviceConfigGroup.style.display = 'block';
-        await loadDeviceConfigs(userId);
+        //Device Config nur für Geräte laden
+        const role = document.getElementById('user_role').value;
+        if(role === 'device') {
+             deviceConfigGroup.style.display = 'block';
+            await loadDeviceConfigs(userId);
+        } else {
+            deviceConfigGroup.style.display = 'none';
+            currentDeviceConfigs = [];
+        }
     } else {
         title.textContent = 'Neuer Benutzer';
         document.getElementById('userForm').reset();
@@ -140,8 +157,17 @@ export async function openUserModal(userId = null) {
         deviceConfigGroup.style.display = 'none';
         currentDeviceConfigs = [];
 
-        // Token-Felder verstecken (wird erst nach Erstellung angezeigt)
-        document.getElementById('userTokenGroup').style.display = 'none';
+        // Token-Gruppe verstecken und zurücksetzen
+        const tokenGroup = document.getElementById('userTokenGroup');
+        const tokenInput = document.getElementById('user_token');
+        const toggleBtn = document.getElementById('toggleUserTokenBtn');
+        const expiryInfo = document.getElementById('tokenExpiryInfo');
+
+        tokenGroup.style.display = 'none';
+        tokenInput.value = '';
+        tokenInput.type = 'password';
+        toggleBtn.textContent = '👁️';
+        expiryInfo.style.display = 'none';
     }
 
     // Event Listener für Rollen-Wechsel
@@ -171,44 +197,47 @@ export async function loadUserData(userId) {
         document.getElementById('user_active').checked = user.is_active == 1;
         document.getElementById('user_password').value = '';
 
-        // Device-Typ
-        if (user.device_type) {
-            document.getElementById('user_device_type').value = user.device_type;
-        }
+        // Token-Gruppe und Werte aktualisieren
+        const tokenGroup = document.getElementById('userTokenGroup');
+        const tokenInput = document.getElementById('user_token');
+        const toggleBtn = document.getElementById('toggleUserTokenBtn');
+        const expiryInfo = document.getElementById('tokenExpiryInfo');
 
-        // Zeige API-Token für Devices und Admins
-        if (user.role === 'device' || user.role === 'admin') {
-            const tokenGroup = document.getElementById('userTokenGroup');
-            tokenGroup.style.display = 'block';
+        // Zeige Token-Gruppe
+        tokenGroup.style.display = 'block';
+        
+        // Token-Wert setzen (auch wenn leer)
+        tokenInput.value = user.api_token || '';
+        
+        // Token als versteckt zurücksetzen
+        tokenInput.type = 'password';
+        toggleBtn.textContent = '👁️';
+        
+        // NEU: Ablaufdatum aktualisieren
+        if (user.api_token && user.api_token_expires_at) {
+            const expiresAt = new Date(user.api_token_expires_at);
+            const now = new Date();
+            const isExpired = now > expiresAt;
             
-            if (user.api_token) {
-                document.getElementById('user_token').value = user.api_token;
-                
-                // Zeige Ablaufdatum falls vorhanden
-                if (user.api_token_expires_at) {
-                    const expiresAt = new Date(user.api_token_expires_at);
-                    const expiresText = expiresAt.toLocaleDateString('de-DE', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    
-                    // Prüfe ob abgelaufen
-                    const now = new Date();
-                    const isExpired = now > expiresAt;
-                    
-                    const expiryInfo = document.getElementById('tokenExpiryInfo');
-                    if (expiryInfo) {
-                        expiryInfo.innerHTML = isExpired 
-                            ? `<span style="color: #e74c3c;">⚠️ Abgelaufen am: ${expiresText}</span>`
-                            : `<span style="color: #7f8c8d;">Gültig bis: ${expiresText}</span>`;
-                        expiryInfo.style.display = 'block';
-                    }
-                }
-            }
-        }
+            const expiresText = expiresAt.toLocaleDateString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            
+            expiryInfo.innerHTML = isExpired 
+                ? `<span style="color: #e74c3c;">⚠️ Abgelaufen am: ${expiresText}</span>`
+                : `<span style="color: #7f8c8d;">Gültig bis: ${expiresText}</span>`;
+            expiryInfo.style.display = 'block';
+        } else if (user.api_token) {
+            // Token vorhanden, aber kein Ablaufdatum
+            expiryInfo.innerHTML = '<span style="color: #7f8c8d;">Kein Ablaufdatum</span>';
+            expiryInfo.style.display = 'block';
+        } else {
+            // Kein Token vorhanden
+            expiryInfo.innerHTML = '<span style="color: #e74c3c;">Kein Token generiert</span>';
+            expiryInfo.style.display = 'block';
+        }        
         
         toggleUserRoleFields();
     }
@@ -237,7 +266,6 @@ export async function saveUser() {
         data.member_id = document.getElementById('user_member').value || null;
     } else {
         data.member_id = null;
-        data.device_type = document.getElementById('user_device_type').value;
     }
     
     // Passwort nur mitschicken wenn gesetzt
