@@ -11,7 +11,7 @@ const API_BASE = (() => {
     const match = pathname.match(/^(.*?)\/checkin\//);
     const basePath = match ? match[1] : '';
     
-    //console.log('PWA API Base:', basePath);
+    console.log('PWA API Base:', basePath);
 
     return `${origin}${basePath}/api/api.php`;    
 })();
@@ -31,14 +31,14 @@ let isNFCScanning = false;
 
 // In checkin/index.html oder checkin/app.js
     if ('serviceWorker' in navigator) {
-        const currentPath = window.location.pathname;
-        const basePath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+        //const currentPath = window.location.pathname;
+        //const basePath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
 
-        navigator.serviceWorker.register('./service-worker.js', {
-            scope: basePath  // Wichtig: Expliziter Scope!
+        navigator.serviceWorker.register('./checkin/service-worker.js', {
+            scope: './checkin/'
         })
         .then(reg => console.log('✓ Service Worker registriert:', reg.scope))
-        .catch(err => console.log('✗ Service Worker Fehler:', err));
+        .catch(err => console.log('✗ Service Worker Fehler:', err));        
     }
 
 // ========================================

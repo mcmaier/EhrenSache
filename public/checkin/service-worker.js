@@ -1,11 +1,11 @@
 // Service Worker für PWA Offline-Support
 const CACHE_NAME = 'checkin-app-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/app.js',
-  '/manifest.json'
+  '/checkin/',
+  '/checkin/index.html',
+  '/checkin/css/style.css',
+  '/checkin/js/app.js',
+  '/checkin/manifest.json'
 ];
 
 // Install Event
