@@ -1,0 +1,197 @@
+/* Dashboard Layout */
+.dashboard {
+    display: none;
+    min-height: 100vh;
+}
+
+.dashboard.active {
+    display: flex;
+}
+
+/* Main Content */
+.main-content {
+    margin-left: var(--sidebar-width);
+    padding: var(--spacing-xl);
+    width: calc(100% - var(--sidebar-width));
+    transition: margin-left var(--transition-base), width var(--transition-base);
+}
+
+.content-header {
+    margin-bottom: var(--spacing-xl);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.content-header h1 {
+    color: var(--text-dark);
+    font-size: 28px;
+}
+
+.content-section {
+    display: none;
+}
+
+.content-section.active {
+    display: block;
+}
+
+
+/* Settings Layout */
+.settings-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 800px;
+    z-index: 1;
+}
+
+.settings-card {
+    background: --bg-light;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px var(--shadow-lg);
+}
+
+.settings-card h3 {
+    color: --text-dark;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-light);
+}
+
+.settings-item {
+    margin-bottom: 20px;
+}
+
+.settings-item:last-child {
+    margin-bottom: 0;
+}
+
+.settings-item label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-medium);
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.settings-item input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.settings-item input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.settings-item small {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+}
+
+/* Verwaltungs-Sektion */
+#verwaltung .data-table {
+    margin-bottom: var(--spacing-xl);
+}
+
+#verwaltung .data-table h2 {
+    color: var(--text-dark);
+    font-size: 20px;
+}
+
+#verwaltung table {
+    table-layout: auto;
+}
+
+/* Kompaktere Badges in Tabellen */
+#verwaltung .type-badge,
+#verwaltung .status-badge {
+    display: inline-block;
+    margin: 2px;
+    white-space: nowrap;
+}
+
+/* Gruppen-Checkboxen im Modal */
+.type-group-checkbox {
+    width: auto !important;
+    margin: 0 !important;
+}
+
+/* Farbauswahl */
+#type_color {
+    width: 60px;
+    height: 40px;
+    padding: 2px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+/* Mitgliederliste im Gruppen-Modal */
+#groupMembersList {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    background: var(--bg-light);
+}
+
+#groupMembersList > div {
+    padding: var(--spacing-xs) 0;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 14px;
+}
+
+#groupMembersList > div:last-child {
+    border-bottom: none;
+}
+
+/* Gruppen-Auswahl im Type-Modal */
+#typeGroupsList {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    background: var(--bg-white);
+}
+
+#typeGroupsList label {
+    display: flex !important;
+    align-items: flex-start;
+    padding: var(--spacing-sm);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+    margin-bottom: 0 !important;
+}
+
+#typeGroupsList label:hover {
+    background: var(--bg-light);
+}
+
+#typeGroupsList input[type="checkbox"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+#typeGroupsList label > span {
+    margin-left: var(--spacing-sm);
+    flex: 1;
+}
+
+#typeGroupsList small {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-light);
+    font-size: 12px;
+}

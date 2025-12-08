@@ -1,0 +1,77 @@
+# ============================================
+# HTACCESS - Root (public/)
+# ============================================
+
+# Engine aktivieren
+RewriteEngine On
+
+# ============================================
+# HTTPS REDIRECT (nur Production)
+# ============================================
+# Aktiviere diese Zeilen NUR auf dem Live-Server!
+# Lokal auskommentiert lassen
+
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ============================================
+# SICHERHEIT
+# ============================================
+
+# Verzeichnis-Listings verhindern
+Options -Indexes
+
+# Zugriff auf sensible Dateien blockieren
+<FilesMatch "\.(lock|sql|md|sh|bat|config)$">
+    Require all denied
+</FilesMatch>
+
+# .htaccess selbst schützen
+<Files .htaccess>
+    Require all denied
+</Files>
+
+# ============================================
+# INDEX Rewrite
+# ============================================
+
+# Index-Datei festlegen
+DirectoryIndex index.html index.php
+
+# Verhindere dass index.php im Pfad erscheint
+RewriteEngine On
+RewriteCond %{REQUEST_URI} ^(.*)/index\.(html|php)$
+RewriteRule ^(.*)$ /%1/ [R=301,L]
+
+# ============================================
+# MIME-TYPES (für PWA)
+# ============================================
+AddType application/manifest+json .json
+AddType application/x-web-app-manifest+json .webapp
+AddType text/cache-manifest .appcache
+
+# ============================================
+# CACHING (optional)
+# ============================================
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Bilder
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    
+    # CSS & JS
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    
+    # HTML nicht cachen
+    ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+
+# ============================================
+# COMPRESSION (optional)
+# ============================================
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json
+</IfModule>

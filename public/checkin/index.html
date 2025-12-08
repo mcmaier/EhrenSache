@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Vereins-Check-In</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="css/style.css">        
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="active">
+        <div class="login-box">
+            <div class="logo">📱</div>
+            <h2>Vereins-Check-in</h2>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="apiToken">API-Token</label>
+                    <input type="password" id="apiToken" name="apiToken" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="saveToken">
+                        Token speichern
+                    </label>
+                </div>
+                <button type="submit" class="btn">Anmelden</button>
+                <div id="loginError"></div>
+            </form>
+
+            <div class="info-box">
+                <p>💡 <strong>Wo finde ich meinen Token?</strong></p>
+                <p>Im Web-Dashboard unter "Einstellungen"</p>
+                <a href="../index.html" class="dashboard-link">
+                    🌐 Zum Web-Dashboard →
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Main Screen -->
+    <div id="mainScreen">
+        <div class="header">
+            <h1>📍 Check-In</h1>
+            <button id="toDashboardBtn" class="btn-icon" title="Zur Verwaltung">⚙️</button>        
+            <button id="logoutBtn" class="btn-icon">➡️</button>
+        </div>
+        <div class="container">
+            <!-- User + Datetime nebeneinander -->
+            <div class="info-row">
+                <div class="datetime-display">
+                    <div id="currentDate">-</div>
+                    <div id="currentTime">--:--:--</div>
+                </div>
+
+                <div class="user-card">
+                    <div class="user-avatar">👤</div>
+                    <div class="user-info">
+                        <div id="userName" class="user-name">Lädt...</div>
+                        <div id="userRole" class="user-role">-</div>
+                    </div>
+                </div>
+            </div>    
+
+            <!-- Stop-Button beim Scannen (direkt unter info-row) -->
+            <button id="stopScanButton" class="btn scanning" style="display: none;">
+                <span class="icon">⏹️</span>
+                <span>Scan beenden</span>
+            </button>
+
+            <!-- Scanner mit Overlay -->
+            <div class="scanner-container" id="scannerContainer" style="display: none;">
+                <div id="qr-reader"></div>
+                <div class="scanner-overlay">
+                    <div class="scanner-overlay-corner"></div>
+                </div>
+                <div class="scanner-hint">QR-Code im Rahmen positionieren</div>
+            </div>
+
+            <button id="scanButton" class="btn">
+                <span class="icon">📷</span>
+                <span>QR-Code scannen</span>
+            </button>
+
+            <!-- NEU: NFC-Button (nur wenn unterstützt) -->
+            <button id="nfcButton" class="btn" style="display: none;">
+                <span class="icon">📡</span>
+                <span>NFC-Tag scannen</span>
+            </button>
+
+            <button id="manualCodeBtn" class="btn btn-secondary">
+                <span class="icon">🔢</span>
+                <span>Code manuell eingeben</span>
+            </button>
+
+            <div class="divider"><span>oder</span></div>
+
+            <button id="exceptionBtn" class="btn btn-secondary">
+                <span class="icon">📋</span>
+                <span>Erfassungsantrag stellen</span>
+            </button>
+
+            <div id="statusMessage"></div>
+
+            <!-- History Section -->
+            <div id="history" style="display: block;">
+                <div id="history-header">
+                    <h2>📋 Letzte Aktivitäten</h2>
+                    <button id="refreshHistoryButton" class="btn-icon">🔃</button>
+                </div>
+                <div id="historyList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Manuelle Code-Eingabe -->
+    <div class="modal" id="manualCodeModal">
+        <div class="modal-content">
+            <h2>Code manuell eingeben</h2>
+            <div class="form-group">
+                <label for="manualCode">6-stelliger Code</label>
+                <input type="text" id="manualCode" maxlength="6" pattern="\d{6}" 
+                       placeholder="123456" inputmode="numeric">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" id="closeManualCodeBtn">Abbrechen</button>
+                <button class="btn" id="submitManualCodeBtn">Einchecken</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Exception-Antrag -->
+    <div class="modal" id="exceptionModal">
+        <div class="modal-content">
+            <h2>Nachträglicher Antrag</h2>
+            <div class="form-group">
+                <label for="exceptionAppointment">Termin</label>
+                <select id="exceptionAppointment" required>
+                    <option value="">Lädt...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="exceptionReason">Begründung</label>
+                <input type="text" id="exceptionReason" required 
+                       placeholder="z.B. QR-Scanner nicht verfügbar">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" id="closeExceptionBtn">Abbrechen</button>
+                <button class="btn" id="submitExceptionBtn">Antrag stellen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Löschen bestätigen  -->
+    <div class="modal" id="confirmDeleteModal">
+        <div class="modal-content">
+            <h2>Löschen bestätigen</h2>            
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" id="closeConfirmDeleteBtn">Abbrechen</button>
+                <button class="btn btn-delete" id="submitConfirmDeleteBtn">Löschen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Offline Indicator -->
+    <div id="offlineIndicator" class="offline-indicator">
+        ⚠️ Verbindung prüfen!
+    </div>
+
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

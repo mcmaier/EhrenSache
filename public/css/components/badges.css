@@ -1,0 +1,47 @@
+
+.status-badge, .type-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-approved {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-rejected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/*
+.type-badge {
+    border-radius: var(--radius-sm);
+    background: #e9ecef;
+    color: #495057;
+}*/
+
+/* Inline-Badges für mehrere Gruppen */
+.badges-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.type-badge {
+    white-space: nowrap;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    background: #e9ecef;
+    color: #495057;
+}
