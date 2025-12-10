@@ -21,6 +21,7 @@ require_once '../../private/handlers/regenerate_token.php';
 require_once '../../private/handlers/change_password.php';
 require_once '../../private/handlers/member_groups.php';
 require_once '../../private/handlers/appointment_types.php';
+require_once '../../private/handlers/statistics.php';
 
 // Headers
 header("Content-Type: application/json; charset=UTF-8");
@@ -380,6 +381,9 @@ switch($resource) {
     case 'appointment_types':
         handleAppointmentTypes($db, $request_method, $id);
         break;        
+    case 'statistics':
+        handleStatistics($db, $request_method, $authUserId, $authUserRole, $authMemberId);        
+        break;
     case 'auto_checkin':
         handleAutoCheckin($db, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
         exit();        

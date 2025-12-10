@@ -155,7 +155,7 @@ function handleUsers($db, $method, $id) {
                 $member_id,
                 $api_token,
                 $expiresAt,                
-                $totp_secret
+                $totp_secret ?? NULL
             ])) {
                 http_response_code(201);
                 echo json_encode([

@@ -1,0 +1,56 @@
+/* Statistik Sektion */
+.statistics-group {
+    background: var(--bg-light);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--spacing-xl);
+}
+
+.statistics-group h2 {
+    color: var(--text-dark);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 2px solid var(--border-light);
+}
+
+.statistics-table-wrapper {
+    overflow-x: auto;
+}
+
+.stat-present {
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+.stat-unexcused {
+    color: var(--danger-color);
+    font-weight: 600;
+}
+
+.attendance-rate {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.rate-bar {
+    flex: 1;
+    height: 20px;
+    background: var(--border-light);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.rate-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--danger-color) 0%, var(--warning-color) 50%, var(--success-color) 100%);
+    transition: width 0.3s ease;
+}
+
+.rate-text {
+    min-width: 45px;
+    text-align: right;
+    font-weight: 600;
+    color: var(--text-dark);
+}

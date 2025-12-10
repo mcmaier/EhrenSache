@@ -21,6 +21,7 @@
 @import url('sections/login.css');
 @import url('sections/sidebar.css');
 @import url('sections/content.css');
+@import url('sections/statistics.css');
 
 /* Utilities */
 @import url('utilities.css');

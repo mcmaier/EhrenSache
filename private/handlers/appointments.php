@@ -29,6 +29,7 @@ function handleAppointments($db, $method, $id) {
                 $month = $_GET['month'] ?? null;
                 $from_date = $_GET['from_date'] ?? null;
                 $to_date = $_GET['to_date'] ?? null;
+                $type_id = $_GET['type_id'] ?? null;
                 
                 // Baue Query dynamisch - MIT Alias für type_description
                 $sql = "SELECT a.*, 
@@ -93,6 +94,11 @@ function handleAppointments($db, $method, $id) {
                 if($to_date) {
                     $sql .= " AND a.date <= ?";
                     $params[] = $to_date;
+                }
+
+                if($type_id) {
+                    $sql .= " AND at.type_id = ?";
+                    $params[] = $type_id;
                 }
                 
                 $sql .= " ORDER BY a.date DESC, a.start_time";

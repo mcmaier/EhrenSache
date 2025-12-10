@@ -69,7 +69,7 @@ CREATE TABLE `membership_dates` (
   `member_id` int(11) NOT NULL,
   `start_date` date NOT NULL,
   `end_date` date DEFAULT NULL,
-  `status` enum('active','expired','pending') DEFAULT 'active',
+  `status` enum('active','inactive') DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -84,7 +84,7 @@ CREATE TABLE `records` (
   `member_id` int(11) NOT NULL,
   `appointment_id` int(11) NOT NULL,
   `arrival_time` datetime NOT NULL,
-  `status` enum('present','absent','excused') DEFAULT 'present',
+  `status` enum('present','excused') DEFAULT 'present',
   `checkin_source` enum('admin','user_totp','device_auth','auto_checkin') DEFAULT 'admin',
   `source_device` varchar(100) DEFAULT NULL,
   `location_name` varchar(100) DEFAULT NULL,

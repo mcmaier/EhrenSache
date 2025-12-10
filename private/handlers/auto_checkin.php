@@ -20,6 +20,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
     }
 
     // DEBUG: Zeige Auth-Info
+    /*
     $debugInfo = [
         "auth_user_id" => $authUserId,
         "auth_user_role" => $authUserRole,
@@ -28,11 +29,11 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         "checkin_source" => $checkinSource
     ];
 
-    //error_log("=== MEMBER ID DETERMINATION ===");
-    //error_log("authUserRole: $authUserRole");
-    //error_log("authMemberId: " . ($authMemberId ?? 'NULL'));
-    //error_log("data->member_id: " . (isset($data->member_id) ? $data->member_id : 'NOT SET'));
-    
+    error_log("=== MEMBER ID DETERMINATION ===");
+    error_log("authUserRole: $authUserRole");
+    error_log("authMemberId: " . ($authMemberId ?? 'NULL'));
+    error_log("data->member_id: " . (isset($data->member_id) ? $data->member_id : 'NOT SET'));    
+    */
     
      // Member-ID bestimmen
     if($authUserRole === 'admin' || $authUserRole === 'device') {
@@ -115,15 +116,23 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
     }
     
     $arrivalDate = $arrivalTime->format('Y-m-d');
-    $arrivalTimeStr = $arrivalTime->format('H:i:s');    
-
+    $arrivalTimeStr = $arrivalTime->format('H:i:s'); 
+        
     // Zeittoleranz aus globaler Config
     $tolerance = isset($data->tolerance_hours) ? intval($data->tolerance_hours) : AUTO_CHECKIN_TOLERANCE_HOURS;
     
     // Begrenze Toleranz auf sinnvollen Bereich
-    if($tolerance < 0 || $tolerance > 12) {
+    if($tolerance < 0 || $tolerance > 8) {
         $tolerance = AUTO_CHECKIN_TOLERANCE_HOURS;
     }
+
+    //DEBUG Info Zeitfenster
+    /*
+    error_log("=== AUTO-CHECKIN DEBUG ===");
+    error_log("Arrival: {$arrivalDate} {$arrivalTimeStr}");
+    error_log("Tolerance: {$tolerance} hours");
+    error_log("Member ID: {$memberId}");
+    */
     
     // Suche nach passendem Termin
     $toleranceStart = clone $arrivalTime;
@@ -132,34 +141,110 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
     $toleranceEnd = clone $arrivalTime;
     $toleranceEnd->modify("+{$tolerance} hours");
     
-    $stmt = $db->prepare("SELECT appointment_id, title, date, start_time 
-                          FROM appointments 
-                          WHERE date = ? 
-                          AND start_time BETWEEN ? AND ?
-                          ORDER BY ABS(TIMESTAMPDIFF(SECOND, 
-                              CONCAT(date, ' ', start_time), 
-                              ?)) ASC
-                          LIMIT 1");
+    $toleranceSeconds = $tolerance * 3600;
+
+    //error_log("Window: {$toleranceStart->format('H:i:s')} - {$toleranceEnd->format('H:i:s')}");
+
+    // ===========================================
+    // Suche ALLE potentiellen Termine im Fenster
+    // ===========================================
     
+    $sql = "SELECT a.appointment_id, a.title, a.date, a.start_time, a.type_id,at.type_name,
+               ABS(TIMESTAMPDIFF(SECOND, 
+                   CONCAT(a.date, ' ', a.start_time), 
+                   ?)) as time_diff_seconds
+        FROM appointments a
+        LEFT JOIN appointment_types at ON a.type_id = at.type_id
+        WHERE a.date = ?
+        AND TIME(a.start_time) BETWEEN TIME(?) AND TIME(?)
+        ORDER BY time_diff_seconds ASC";
+    
+    $stmt = $db->prepare($sql);
     $stmt->execute([
-        $arrivalDate,
-        $toleranceStart->format('H:i:s'),
-        $toleranceEnd->format('H:i:s'),
-        $data->arrival_time
+        $data->arrival_time,               // Für time_diff Berechnung
+        $arrivalDate,                      // Datum
+        $toleranceStart->format('H:i:s'),  // Fenster Start
+        $toleranceEnd->format('H:i:s')     // Fenster Ende
     ]);
     
-    $matchedAppointment = $stmt->fetch(PDO::FETCH_ASSOC);
+    $potentialAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    //error_log("Found " . count($potentialAppointments) . " potential appointments");
+
+    foreach($potentialAppointments as $apt) {
+        $typeName = $apt['type_name'] ?: 'no type';
+        //error_log("  - #{$apt['appointment_id']}: {$apt['title']} (Start: {$apt['start_time']}) Type: {$typeName} " . " Diff: {$apt['time_diff_seconds']}s");
+    }
     
+
+    // ============================================
+    // Filter nach Gruppen-Berechtigung
+    // ============================================
+
+    $matchedAppointment = null;
+    foreach($potentialAppointments as $appointment) {
+        // Wenn Termin einen Type hat, prüfe Gruppen-Berechtigung
+        if($appointment['type_id']) {
+
+        // Prüfe ob dieser Termin-Typ Gruppen-Einschränkungen hat
+            $typeGroupsStmt = $db->prepare("SELECT group_id 
+                                            FROM appointment_type_groups 
+                                            WHERE type_id = ?");
+            $typeGroupsStmt->execute([$appointment['type_id']]);
+            $restrictedGroups = $typeGroupsStmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            if(empty($restrictedGroups)) {
+                // Keine Gruppen-Einschränkung für diesen Typ → Termin für alle
+                $matchedAppointment = $appointment;
+                //error_log("✓ Matched appointment #{$appointment['appointment_id']} (type has no group restrictions)");
+                break;
+            }
+            
+            //error_log("  Type {$appointment['type_id']} restricted to groups: " . implode(', ', $restrictedGroups));
+            
+            // Prüfe ob Member in einer der erlaubten Gruppen ist
+            $placeholders = implode(',', array_fill(0, count($restrictedGroups), '?'));
+            $memberGroupStmt = $db->prepare("SELECT 1 
+                                            FROM member_group_assignments 
+                                            WHERE member_id = ? 
+                                            AND group_id IN ({$placeholders})");
+            
+            $params = array_merge([$memberId], $restrictedGroups);
+            $memberGroupStmt->execute($params);
+            
+            if($memberGroupStmt->fetch()) {
+                // Member ist in einer erlaubten Gruppe
+                $matchedAppointment = $appointment;
+                //error_log("✓ Matched appointment #{$appointment['appointment_id']} (member in allowed group)");
+                break;
+            } else {
+                //error_log("✗ Skipped appointment #{$appointment['appointment_id']} (member NOT in allowed groups)");
+                continue;
+            }
+            
+            
+        } else {
+            // Kein Type → Kein Filter → Termin für alle
+            $matchedAppointment = $appointment;
+            //error_log("✓ Matched appointment #{$appointment['appointment_id']} (no type restriction)");
+            break;
+}
+    }
+        
     if($matchedAppointment) {
         // Passender Termin gefunden
         $appointmentId = $matchedAppointment['appointment_id'];
         $action = 'matched';
+        //error_log("==> Final match: Appointment #{$appointmentId}");
     } else {
+        // Kein passender Termin → Erstelle automatischen Termin
+        //error_log("==> No match found, creating auto appointment");
+        
         // Runde auf 5-Minuten-Schritte
         $minutes = (int)$arrivalTime->format('i');
         $roundedMinutes = round($minutes / 5) * 5;
         
-        // Setze gerundete Zeit (Stunden, Minuten, Sekunden=0)
+        // Setze gerundete Zeit
         $arrivalTime->setTime(
             (int)$arrivalTime->format('H'),
             $roundedMinutes,
@@ -173,7 +258,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
 
 
         // Kein passender Termin - erstelle automatisch einen
-        $autoTitle = "Auto-Erfassung " . $arrivalTime->format('d.m.Y H:i:s');
+        $autoTitle = "Automatisch erstellter Termin";
         $timeWithoutSeconds = $arrivalTime->format('H:i:s');
         
         $createStmt = $db->prepare("INSERT INTO appointments 
@@ -183,7 +268,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         $createStmt->execute([
             $autoTitle,
             $typeId,
-            "Automatisch erstellt durch Zeiterfassung",
+            "Erstellt durch Zeiterfassung",
             $arrivalDate,
             $timeWithoutSeconds,
             $authUserId
@@ -241,10 +326,12 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
                 $locationName,
                 $existingRecord['record_id']
             ]);
-            $recordAction = 'updated';
+            $recordAction = 'updated';            
         } else {
             $recordAction = 'unchanged';
         }
+        
+        //error_log("Record Action: $recordAction");
         
         http_response_code(200);
         echo json_encode([
@@ -288,9 +375,11 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
                 "appointment" => $matchedAppointment,
                 "warning" => isset($warning) ? $warning : null
             ]);
+
+            //error_log("Record Action: Created new Record");
         } else {
             http_response_code(500);
-            echo json_encode(["message" => "Failed to create check-in"]);
+            echo json_encode(["message" => "Failed to create check-in"]);            
         }
     }
 }

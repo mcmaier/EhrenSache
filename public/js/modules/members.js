@@ -334,8 +334,7 @@ function renderMembershipDates() {
                 <select onchange="updateMembershipDate(${index}, 'status', this.value)" 
                         style="flex: 1;">
                     <option value="active" ${period.status === 'active' ? 'selected' : ''}>Aktiv</option>
-                    <option value="expired" ${period.status === 'expired' ? 'selected' : ''}>Abgelaufen</option>
-                    <option value="pending" ${period.status === 'pending' ? 'selected' : ''}>Ausstehend</option>
+                    <option value="expired" ${period.status === 'inactive' ? 'selected' : ''}>Inaktiv</option>
                 </select>
                 <button type="button" class="action-btn btn-delete" 
                         onclick="removeMembershipDate(${index})">×</button>

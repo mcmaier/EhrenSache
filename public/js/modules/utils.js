@@ -7,7 +7,6 @@
 export function translateRecordStatus(status) {
     const translations = {
         'present': 'Anwesend',
-        'absent': 'Abwesend',
         'excused': 'Entschuldigt'
     };
     return translations[status] || status;
@@ -73,4 +72,8 @@ export function updateModalId(modalHeaderId, entityId) {
             header.appendChild(badge);
         }
     }
+}
+
+export function round(value, decimals) {
+    return Number(Math.round(value + 'e' + decimals) + 'e-' + decimals);
 }

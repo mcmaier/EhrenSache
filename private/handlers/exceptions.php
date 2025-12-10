@@ -10,7 +10,9 @@ function handleExceptions($db, $method, $id) {
                 // Einzelne Exception mit allen Details
                 $stmt = $db->prepare("SELECT e.*, 
                                      m.name, m.surname, 
-                                     a.title, a.date, a.start_time,
+                                     a.title as appointment_title, a.date as appointment_date, a.start_time as appointment_start,
+                                     at.type_name as appointment_type_name,
+                                     at.type_id as appointment_type_id,
                                      u1.email as created_by_email,
                                      u2.email as approved_by_email
                                      FROM exceptions e 
@@ -18,7 +20,9 @@ function handleExceptions($db, $method, $id) {
                                      JOIN appointments a ON e.appointment_id = a.appointment_id 
                                      LEFT JOIN users u1 ON e.created_by = u1.user_id
                                      LEFT JOIN users u2 ON e.approved_by = u2.user_id
+                                     LEFT JOIN appointment_types at ON a.type_id = at.type_id
                                      WHERE e.exception_id = ?");
+
                 $stmt->execute([$id]);
                 $exception = $stmt->fetch(PDO::FETCH_ASSOC);
                 
@@ -63,7 +67,8 @@ function handleExceptions($db, $method, $id) {
                 // Baue Query dynamisch
                 $sql = "SELECT e.*, 
                         m.name, m.surname, 
-                        a.title, a.date, a.start_time,
+                        a.title as appointment_title, a.date as appointment_date, a.start_time as appointment_start_time,
+                        at.type_id as appointment_type_id, at.type_name as appointment_type_name,
                         u1.email as created_by_email,
                         u2.email as approved_by_email
                         FROM exceptions e 
@@ -71,6 +76,7 @@ function handleExceptions($db, $method, $id) {
                         JOIN appointments a ON e.appointment_id = a.appointment_id 
                         LEFT JOIN users u1 ON e.created_by = u1.user_id
                         LEFT JOIN users u2 ON e.approved_by = u2.user_id
+                        LEFT JOIN appointment_types at ON a.type_id = at.type_id
                         WHERE 1=1";
                 
                 $params = [];

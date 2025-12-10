@@ -7,34 +7,90 @@
 function handleMembers($db, $method, $id) {
     switch($method) {
         case 'GET':
-            if($id) {
-                $stmt = $db->prepare("SELECT * FROM members WHERE member_id = ?");
-                $stmt->execute([$id]);
-                $member = $stmt->fetch(PDO::FETCH_ASSOC);
-                if($member) {
-                    // Lade zugehörige Gruppen
-                    $groupStmt = $db->prepare("SELECT g.* FROM member_groups g
-                                            JOIN member_group_assignments mga ON g.group_id = mga.group_id
-                                            WHERE mga.member_id = ?");
-                    $groupStmt->execute([$id]);
-                    $member['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+            if($id) {    
+                // Zugriffskontrolle: Nur Admin können alle Infos lesen
+                if ($_SESSION['role'] === 'admin') {
 
+                        $stmt = $db->prepare("SELECT * FROM members WHERE member_id = ?");
+                        $stmt->execute([$id]);
+                        $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                    echo json_encode($member);
+                        if($member) {
+                            // Lade zugehörige Gruppen
+                            $groupStmt = $db->prepare("SELECT g.* FROM member_groups g
+                                                    JOIN member_group_assignments mga ON g.group_id = mga.group_id
+                                                    WHERE mga.member_id = ?");
+                            $groupStmt->execute([$id]);
+                            $member['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+                            echo json_encode($member);
+                        }
+                        else {
+                            http_response_code(404);
+                            echo json_encode(["message" => "Member not found"]);
+                        }
                 } else {
-                    http_response_code(404);
-                    echo json_encode(["message" => "Member not found"]);
-                }
-            } else {
-                    // Liste aller Mitglieder MIT Gruppennamen
-                    $stmt = $db->query("SELECT m.*,
+                    $stmt = $db->prepare("SELECT name,surname FROM members WHERE member_id = ?");
+                    $stmt->execute([$id]);
+                    $member = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                    if($member)
+                    {
+                        echo json_encode($member);
+                    }
+                    else {             
+                        http_response_code(404);
+                        echo json_encode(["message" => "Member not found"]);
+                    }
+                }                       
+            } 
+            else
+            {
+                // Zugriffskontrolle: Nur Admin können alle Infos lesen
+                if ($_SESSION['role'] === 'admin') 
+                {
+                    $group_id = $_GET['group_id'] ?? null;
+                    $params = [];
+                    
+                    if($group_id)
+                    {
+                        $sql = "SELECT m.*,
+                                    GROUP_CONCAT(g.group_name SEPARATOR ', ') as group_names
+                                    FROM members m
+                                    LEFT JOIN member_group_assignments mga ON m.member_id = mga.member_id
+                                    LEFT JOIN member_groups g ON mga.group_id = g.group_id
+                                    WHERE mga.group_id = ?
+                                    GROUP BY m.member_id                                    
+                                    ORDER BY m.surname, m.name";
+                                    $params[] = $group_id;
+                    }
+                    else
+                    {
+                        $sql = "SELECT m.*,
                                     GROUP_CONCAT(g.group_name SEPARATOR ', ') as group_names
                                     FROM members m
                                     LEFT JOIN member_group_assignments mga ON m.member_id = mga.member_id
                                     LEFT JOIN member_groups g ON mga.group_id = g.group_id
                                     GROUP BY m.member_id
-                                    ORDER BY m.surname, m.name");
-                    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                                    ORDER BY m.surname, m.name";
+                    }
+
+                    if(count($params) > 0) {
+                        $stmt = $db->prepare($sql);
+                        $stmt->execute($params);
+                    } else {
+                        $stmt = $db->query($sql);
+                    }
+             
+                    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                }
+                else
+                {
+                    // Liste aller Mitglieder MIT Gruppennamen
+                    $stmt = $db->query("SELECT name, surname FROM members ORDER BY surname, name");
+                                $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                }
+
+                echo json_encode($members);
             }
             break;
             
@@ -141,6 +197,7 @@ function handleMembers($db, $method, $id) {
             $db->prepare("DELETE FROM records WHERE member_id = ?")->execute([$id]);
             $db->prepare("DELETE FROM exceptions WHERE member_id = ?")->execute([$id]);
             $db->prepare("DELETE FROM membership_dates WHERE member_id = ?")->execute([$id]);
+            $db->prepare("DELETE FROM member_group_assignments WHERE member_id = ?")->execute([$id]);
 
             $db->prepare("UPDATE users SET member_id = NULL WHERE member_id = ?")->execute([$id]);
             

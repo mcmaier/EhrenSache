@@ -8,6 +8,8 @@ import { loadExceptions } from './modules/exceptions.js';
 import { loadUsers } from './modules/users.js';
 import { loadSettings, initSettings} from './modules/settings.js';
 import { loadGroups, loadTypes } from './modules/management.js';
+import { initStatistics} from './modules/statistics.js'
+
 
 // ============================================
 // INIT JS
@@ -18,7 +20,7 @@ async function init() {
     initNavigation();
     initSettings();
     initModalEscHandler();
-    initPWAQuickAccess();
+    initPWAQuickAccess();    
 
     // Check Session beim Laden
     const userData = await apiCall('me');
@@ -38,8 +40,9 @@ async function init() {
         });
         if (loginData?.csrf_token) {
             setCsrfToken(loginData.csrf_token);
-        }        
+        }      
         
+        initStatistics();           
         showDashboard();
         loadAllData();
     } else {

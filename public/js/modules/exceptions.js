@@ -157,9 +157,35 @@ export async function loadExceptionFilters() {
     appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
     if (appointments) {
-        appointments.forEach(apt => {
-            appointmentSelect.innerHTML += `<option value="${apt.appointment_id}">${apt.title} (${apt.date})</option>`;
+     
+        appointments.forEach(appointment => {
+            const date = new Date(appointment.date + 'T00:00:00');
+            const formattedDate = date.toLocaleDateString('de-DE');
+            const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
+            
+            // Terminart-Anzeige im Dropdown-Text
+            let displayText = `${appointment.title} (${formattedDate} ${startTime})`;
+            
+            if (appointment.type_name) {
+                displayText += ` - [${appointment.type_name}]`;
+            }
+            
+            // Erstelle Option mit data-Attributen
+            const option = document.createElement('option');
+            option.value = appointment.appointment_id;
+            option.textContent = displayText;
+            
+            // Speichere Type-Daten für Badge-Anzeige
+            option.dataset.typeId = appointment.type_id || '';
+            option.dataset.typeName = appointment.type_name || '';
+            
+            appointmentSelect.appendChild(option);
         });
+     
+     
+     /*   appointments.forEach(apt => {
+            appointmentSelect.innerHTML += `<option value="${apt.appointment_id}">${apt.title} (${apt.date})</option>`;
+        });*/
     }
     
     // Lade Mitglieder für Dropdown (nur für Admin)

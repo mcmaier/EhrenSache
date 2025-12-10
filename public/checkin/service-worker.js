@@ -20,7 +20,7 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(clients.claim());
 });
 
-// Fetch Event (optional - für Offline-Funktionalität)
+// Fetch Event
 self.addEventListener('fetch', (event) => {
     // Einfach durchreichen, kein Caching
     event.respondWith(fetch(event.request));
@@ -39,6 +39,7 @@ self.addEventListener('install', event => {
   );
   self.skipWaiting();
 });
+
 
 // Activation - Clean up old caches
 self.addEventListener('activate', event => {

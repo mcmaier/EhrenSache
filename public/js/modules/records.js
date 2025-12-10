@@ -10,6 +10,7 @@ import {translateRecordStatus,datetimeLocalToMysql, mysqlToDatetimeLocal, format
 
 let membersCache = [];
 let appointmentsCache = [];
+let appointmentTypeCache = {};
 let currentRecordYear = null;
 
 // ============================================
@@ -29,6 +30,17 @@ export async function loadRecords(forceReload = false) {
         params.member_id = currentFilter.member;
     }
 
+    // Lade Jahre beim ersten Laden
+    if (forceReload) {
+        membersCache = [];
+        appointmentsCache = [];
+
+        await loadRecordYears();
+        await loadRecordFilters(currentRecordYear);
+        await loadRecordMemberFilter();
+        await loadAppointmentTypesCache();
+    }
+
     const records = await apiCall('records', 'GET', null, params);
     
     if (!records) return;
@@ -46,6 +58,41 @@ export async function loadRecords(forceReload = false) {
         const arrivalTime = new Date(record.arrival_time);
         const formattedTime = arrivalTime.toLocaleString('de-DE');
 
+        // Termin-Info mit Terminart
+        let appointmentInfo = '-';
+        if (record.appointment_id && record.title) {
+            appointmentInfo = `<div style="line-height: 1.4;">
+                <strong>${record.title}</strong>`;
+            
+            if (record.date && record.start_time) {
+                const aptDate = new Date(record.date + 'T00:00:00');
+                const formattedAptDate = aptDate.toLocaleDateString('de-DE');
+                appointmentInfo += `<br><small style="color: #7f8c8d;">${formattedAptDate}, ${record.start_time.substring(0, 5)}</small>`;
+            }
+            
+            appointmentInfo += '</div>';
+        }
+        
+        // Terminart Badge
+        let appointmentTypeBadge = '-';
+        
+        if (record.appointment_type_id && appointmentTypeCache[record.appointment_type_id]) {
+            const type = appointmentTypeCache[record.appointment_type_id];
+            appointmentTypeBadge = `<span class="type-badge" style="background: ${type.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                                        ${type.type_name}
+                                    </span>`;
+        } else if (record.appointment_type_name) {
+            // Fallback: type_name vorhanden, aber nicht im Cache
+            appointmentTypeBadge = `<span class="type-badge" style="background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                                        ${record.appointment_type_name}
+                                    </span>`;
+        } else if (record.appointment_id) {
+            // Termin ohne Terminart
+            appointmentTypeBadge = `<span class="type-badge" style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                                        Allgemein
+                                    </span>`;
+        }
+
         // Check-in Source Badge
         const sourceInfo = getSourceBadge(record);
         
@@ -62,7 +109,8 @@ export async function loadRecords(forceReload = false) {
         
         const row = `
             <tr>
-                <td>${record.title}</td>
+                <td>${appointmentInfo}</td>
+                <td>${appointmentTypeBadge}</td>
                 <td>${record.surname}, ${record.name}</td>
                 <td>${formattedTime}</td>
                 <td>${translateRecordStatus(record.status)}</td>
@@ -75,12 +123,14 @@ export async function loadRecords(forceReload = false) {
 
     document.getElementById('statTotalRecords').textContent = records.length;
 
+    /*
     // Lade Jahre beim ersten Laden
     if (forceReload) {
         await loadRecordYears();
         await loadRecordFilters(currentRecordYear);
         await loadRecordMemberFilter();
-    }
+        await loadAppointmentTypesCache();
+    }*/
 }
 
 
@@ -98,15 +148,7 @@ async function loadRecordYears() {
     
     years.forEach(year => {
         select.innerHTML += `<option value="${year}">${year}</option>`;
-    });
-    
-    /*
-    // Setze aktuelles Jahr als Default
-    const currentYear = new Date().getFullYear();
-    if (years.includes(currentYear)) {
-        select.value = currentYear;
-        currentRecordYear = currentYear;
-    }*/
+    });    
 }
 
 export function applyRecordYearFilter() {
@@ -145,16 +187,35 @@ export async function loadRecordDropdowns() {
     // Lade Termine
     if (appointmentsCache.length === 0) {
         appointmentsCache = await apiCall('appointments');
-    }
+    }    
     
-    const appointmentSelect = document.getElementById('record_appointment');
+    const appointmentSelect = document.getElementById('record_appointment');    
     appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
-    appointmentsCache.forEach(apt => {
-        appointmentSelect.innerHTML += `<option value="${apt.appointment_id}">${apt.title} (${apt.date})</option>`;
-    });
+    appointmentsCache.forEach(appointment => {
+            const date = new Date(appointment.date + 'T00:00:00');
+            const formattedDate = date.toLocaleDateString('de-DE');
+            const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
+            
+            // Terminart-Anzeige im Dropdown-Text
+            let displayText = `${appointment.title} (${formattedDate} ${startTime})`;
+            
+            if (appointment.type_name) {
+                displayText += ` - [${appointment.type_name}]`;
+            }
+            
+            // Erstelle Option mit data-Attributen
+            const option = document.createElement('option');
+            option.value = appointment.appointment_id;
+            option.textContent = displayText;
+            
+            // Speichere Type-Daten für Badge-Anzeige
+            option.dataset.typeId = appointment.type_id || '';
+            option.dataset.typeName = appointment.type_name || '';
+            
+            appointmentSelect.appendChild(option);
+        });
 }
-
 
 // Filter-Status
 let currentFilter = {
@@ -267,6 +328,24 @@ function getSourceBadge(record) {
     return badge;
 }
 
+async function loadAppointmentTypesCache() {
+    const types = await apiCall('appointment_types');
+    
+    if (types) {
+        // Erstelle Lookup-Objekt: { type_id: { type_name, color, ... } }
+        appointmentTypeCache = {};
+        types.forEach(type => {
+            appointmentTypeCache[type.type_id] = {
+                type_name: type.type_name,
+                color: type.color || '#667eea',
+                description: type.description
+            };
+        });
+        
+        //console.log('Appointment types cached:', appointmentTypeCache);
+    }
+}
+
 // ============================================
 // MODAL FUNCTIONS
 // ============================================
@@ -302,9 +381,16 @@ export async function openRecordModal(recordId = null) {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         document.getElementById('record_arrival_time').value = `${year}-${month}-${day}T${hours}:${minutes}`;
 
-        // Event Listener für Termin-Auswahl hinzufügen
-        document.getElementById('record_appointment').addEventListener('change', updateArrivalTimeFromAppointment);
+        // Verstecke Terminart-Anzeige
+        document.getElementById('recordAppointmentTypeGroup').style.display = 'none';            
     }
+
+    // Event Listener für Termin-Auswahl (nur einmal registrieren)
+    const appointmentSelect = document.getElementById('record_appointment');
+    appointmentSelect.removeEventListener('change', updateAppointmentTypeDisplay);
+    appointmentSelect.removeEventListener('change',updateArrivalTimeFromAppointment);
+    appointmentSelect.addEventListener('change', updateAppointmentTypeDisplay);
+    appointmentSelect.addEventListener('change',updateArrivalTimeFromAppointment);
     
     modal.classList.add('active');
 }
@@ -326,11 +412,14 @@ export async function loadRecordData(recordId) {
         document.getElementById('record_appointment').value = record.appointment_id;
         
         // Konvertiere Timestamp zu datetime-local Format
-        document.getElementById('record_arrival_time').value = mysqlToDatetimeLocal(record.arrival_time);
-        
+        document.getElementById('record_arrival_time').value = mysqlToDatetimeLocal(record.arrival_time);        
         document.getElementById('record_status').value = record.status;
+
+        // Terminart anzeigen
+        updateAppointmentTypeDisplay();
     }
 }
+
 
 export async function saveRecord() {
     // Form-Validierung prüfen
@@ -385,9 +474,48 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
     if (confirmed) {
         const result = await apiCall('records', 'DELETE', null, { id: recordId });
         if (result) {
-            loadRecords();
-             showToast(`Eintrag wurde gelöscht`, 'success');
+            loadRecords(true);
+            showToast(`Eintrag wurde gelöscht`, 'success');
         }
+    }
+}
+
+function updateAppointmentTypeDisplay() {
+    const appointmentSelect = document.getElementById('record_appointment');
+    const selectedOption = appointmentSelect.options[appointmentSelect.selectedIndex];
+    const typeGroup = document.getElementById('recordAppointmentTypeGroup');
+    const typeBadge = document.getElementById('recordAppointmentTypeBadge');
+    
+    // Kein Termin gewählt
+    if (!selectedOption.value) {
+        typeGroup.style.display = 'none';
+        return;
+    }
+    
+    // Termin gewählt
+    typeGroup.style.display = 'block';
+    
+    const typeId = selectedOption.dataset.typeId;
+    const typeName = selectedOption.dataset.typeName;
+    
+    // Type-ID vorhanden → Lookup im Cache für Farbe
+    if (typeId && appointmentTypeCache[typeId]) {
+        const type = appointmentTypeCache[typeId];
+        typeBadge.innerHTML = `<span class="type-badge" style="background: ${type.color}; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px;">
+                                  ${type.type_name}
+                               </span>`;
+    } 
+    // Fallback: type_name vorhanden (aus Dropdown), aber nicht im Cache
+    else if (typeName) {
+        typeBadge.innerHTML = `<span class="type-badge" style="background: #667eea; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px;">
+                                  ${typeName}
+                               </span>`;
+    } 
+    // Termin ohne Type
+    else {
+        typeBadge.innerHTML = `<span class="type-badge" style="background: #95a5a6; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px;">
+                                  Allgemein
+                               </span>`;
     }
 }
 

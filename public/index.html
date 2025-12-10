@@ -71,7 +71,10 @@
                 </li>
                 <li class="nav-item" data-section="antraege">
                     <span>📋 Anträge</span>
-                </li>                         
+                </li>  
+                <li class="nav-item" data-section="statistik">
+                    <span>📊 Statistik</span>
+                </li>                       
             </ul>
             <button class="btn-logout" id="logoutBtn">Abmelden</button>
             <!-- Quick Access Bar -->
@@ -213,16 +216,14 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Datum</th>
-                                <th>Uhrzeit</th>
-                                <th>Titel</th>
+                                <th>Termin</th>
                                 <th>Terminart</th>
                                 <th>Beschreibung</th>                                
                                 <th>Aktionen</th>
                             </tr>
                         </thead>
                         <tbody id="appointmentsTableBody">
-                            <tr><td colspan="6" class="loading">Lade Daten...</td></tr>
+                            <tr><td colspan="4" class="loading">Lade Daten...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -271,6 +272,7 @@
                         <thead>
                             <tr>
                                 <th>Termin</th>
+                                <th>Terminart</th>
                                 <th>Mitglied</th>
                                 <th>Ankunftszeit</th>
                                 <th>Status</th>
@@ -279,7 +281,7 @@
                             </tr>
                         </thead>
                         <tbody id="recordsTableBody">
-                            <tr><td colspan="6" class="loading">Lade Daten...</td></tr>
+                            <tr><td colspan="7" class="loading">Lade Daten...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -351,6 +353,58 @@
                     </table>
                 </div>
             </div>  
+
+            <!-- Statistik Sektion -->
+            <section class="content-section" id="statistik">
+                <div class="content-header">
+                    <h1>Statistik</h1>
+                </div>                
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="statYear">Jahr</label>
+                        <select id="statYear" class="form-input"></select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="statGroup">Termingruppe</label>
+                        <select id="statGroup" class="form-input">
+                            <option value="">Alle Gruppen</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="statMemberFilterGroup" style="display:none;">
+                        <label for="statMember">Mitglied</label>
+                        <select id="statMember" class="form-input">
+                            <option value="">Alle Mitglieder</option>
+                        </select>
+                    </div>                    
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Termine gesamt</h3>
+                        <div class="number" id="statTotalAppointments">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Anwesend</h3>
+                        <div class="number" id="statTotalPresent">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Entschuldigt</h3>
+                        <div class="number" id="statTotalExcused">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Unentschuldigt</h3>
+                        <div class="number" id="statTotalUnexcused">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Durchschnitt</h3>
+                        <div class="number" id="statOverallAverage">-</div>
+                    </div>
+                </div>
+
+                <div id="statisticsContainer"></div>
+            </section>
             
             <!-- Mitglieder Section (nur Admin)-->
             <div class="content-section active" id="mitglieder">
@@ -590,6 +644,12 @@
                             <option value="">Bitte wählen...</option>
                         </select>
                     </div>
+                    <!-- Terminart-Anzeige  -->
+                    <div class="form-group" id="recordAppointmentTypeGroup" style="display: none;">
+                        <div id="recordAppointmentTypeDisplay" style="padding: 10px; background: #f8f9fa; border-radius: 4px;">
+                            <span id="recordAppointmentTypeBadge"></span>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label for="record_arrival_time">Ankunftszeit*</label>
                         <input type="datetime-local" id="record_arrival_time" required>
@@ -598,7 +658,6 @@
                         <label for="record_status">Status*</label>
                         <select id="record_status" required>
                             <option value="present">Anwesend</option>
-                            <option value="absent">Abwesend</option>
                             <option value="excused">Entschuldigt</option>
                         </select>
                     </div>
@@ -892,6 +951,7 @@
     <script type="module" src="./js/modules/users.js"></script>
     <script type="module" src="./js/modules/settings.js"></script>
     <script type="module" src="./js/modules/management.js"></script>
+    <script type="module" src="./js/modules/statistics.js"></script>
 
     <!-- Hauptdatei -->
     <script type="module" src="./js/app.js"></script>

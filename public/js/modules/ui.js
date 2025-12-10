@@ -6,7 +6,8 @@ import {loadAppointments} from'./appointments.js';
 import {loadExceptions, loadExceptionFilters} from'./exceptions.js';
 import {loadRecords, loadRecordFilters} from'./records.js';
 import {loadMembers} from'./members.js';
-import { loadGroups, loadTypes } from './management.js';
+import {loadGroups, loadTypes} from './management.js';
+import {loadStatistics, initStatistics, reloadStatisticsFilters} from './statistics.js';
 
 
 // ============================================
@@ -274,8 +275,8 @@ export function showDashboard() {
 export function updateTableHeaders() {
     const tables = [
         { id: 'membersTableBody', headers: ['Name', 'Vorname', 'Mitgliedsnummer', 'Gruppen','Status'] },
-        { id: 'appointmentsTableBody', headers: ['Datum', 'Uhrzeit','Titel', 'Terminart', 'Beschreibung',] },
-        { id: 'recordsTableBody', headers: ['Termin', 'Mitglied', 'Ankunftszeit', 'Status','Quelle'] },
+        { id: 'appointmentsTableBody', headers: ['Termin', 'Terminart', 'Beschreibung',] },
+        { id: 'recordsTableBody', headers: ['Termin', 'Terminart', 'Mitglied', 'Ankunftszeit', 'Status','Quelle'] },
         { id: 'exceptionsTableBody', headers: ['Typ', 'Mitglied', 'Termin', 'Begründung', 'Gewünschte Zeit', 'Status', 'Erstellt am'] }
     ];
     
@@ -352,6 +353,10 @@ export async function loadAllData() {
         await loadGroups();
         await loadTypes();
     }
+    else if (section === 'statistik') {
+        await reloadStatisticsFilters();
+        await loadStatistics();
+    }
 
         //Rest im Hintergrund laden (nicht-blockierend)
         setTimeout(() => {
@@ -370,6 +375,11 @@ export async function loadAllData() {
             if (isAdmin && section !== 'verwaltung') {
                 loadGroups();
                 loadTypes();
+            }
+            if(section != 'statistik')
+            {
+                reloadStatisticsFilters();
+                loadStatistics();
             }
         }, 100);
 }

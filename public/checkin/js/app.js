@@ -437,7 +437,8 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
     try {
         const requestData = {
             totp_code: code,
-            arrival_time: arrivalTime
+            arrival_time: arrivalTime,
+            source_device: inputMethod
         };
 
         // Admin muss member_id explizit mitschicken
@@ -451,9 +452,9 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
         const methodText = '✗';
 
         if (data.appointment) {
-            const methodText = inputMethod === 'qr' ? '📷 QR-Code' :
-                             inputMethod === 'nfc' ? '📱 NFC' :
-                             inputMethod === 'manual' ? '⌨️ Manuell' : '';
+            const methodText = inputMethod === 'QR' ? '📷 QR-Code' :
+                             inputMethod === 'NFC' ? '📱 NFC' :
+                             inputMethod === 'CODE' ? '⌨️ Manuell' : '';
 
             showMessage(methodText + ' eingecheckt!', 'success');
             addNewActivityToHistory({
@@ -570,7 +571,7 @@ async function onQRScanned(decodedText) {
         return;
     }
     
-    await verifyCheckin(totpCode, 'qr');
+    await verifyCheckin(totpCode, 'QR');
 }
 
 // Helper-Funktion zum Stoppen des Scanners
@@ -611,7 +612,7 @@ async function submitManualCode() {
         return;
     }
         
-    await verifyCheckin(code,'manual');
+    await verifyCheckin(code,'CODE');
 }
 
 
@@ -746,7 +747,7 @@ async function onNFCTagRead(message, serialNumber) {
     }
     
     if (checkinCode) {
-        await verifyCheckin(checkinCod,'nfc');
+        await verifyCheckin(checkinCod,'NFC');
     } 
 }
 
@@ -943,7 +944,7 @@ function renderHistory(items) {
 // Fügt Record zur History hinzu
 function addRecordToHistory(record) {
     const item = document.createElement('div');
-    item.className = 'history-item verified';
+    item.className = 'history-item verified';    
     
     const arrivalTime = new Date(record.arrival_time);
     const dateStr = arrivalTime.toLocaleDateString('de-DE', { 
@@ -957,11 +958,19 @@ function addRecordToHistory(record) {
     });
     
     const statusText = translateStatus(record.status);
+
+    // Appointment Type Badge hinzufügen (falls vorhanden)
+    let typeBadge = '';
+    if (record.appointment_type_name) {
+        const typeClass = record.appointment_type_name.toLowerCase().replace(/\s+/g, '-');
+        typeBadge = `<span class="type-badge ${typeClass}">${record.appointment_type_name}</span>`;
+    }
     
     item.innerHTML = `
         <div class="time">📍 ${dateStr} ${timeStr}</div>
         <div class="appointment">${record.title}</div>
         <span class="status verified">✓ ${statusText}</span>
+        ${typeBadge}
     `;
     
     elements.historyList.appendChild(item);
@@ -988,6 +997,13 @@ function addExceptionToHistory(exception) {
     const typeText = exception.exception_type === 'absence' ? 'Entschuldigung' : 'Zeitkorrektur';
     const statusText = translateExceptionStatus(exception.status);
 
+    // Appointment Type Badge hinzufügen (falls vorhanden)
+    let typeBadge = '';
+    if (exception.appointment_type_name) {
+        const typeClass = exception.appointment_type_name.toLowerCase().replace(/\s+/g, '-');
+        typeBadge = `<span class="type-badge ${typeClass}">${exception.appointment_type_name}</span>`;
+    }
+
     // Delete-Button nur bei pending
     const deleteBtn = canDelete 
         ? `<button class="delete-btn" onclick="deleteException(${exception.exception_id})">🗑️ Löschen</button>`
@@ -997,6 +1013,7 @@ function addExceptionToHistory(exception) {
         <div class="time">📋 ${dateStr} ${timeStr} ${deleteBtn}</div>
         <div class="appointment">${exception.title}</div>
         <span class="status pending">${statusText} - ${typeText}</span>
+        ${typeBadge}
         
     `;
     
@@ -1060,6 +1077,13 @@ function addNewActivityToHistory(data) {
         hour: '2-digit', 
         minute: '2-digit' 
     });
+
+    // Appointment Type Badge hinzufügen (falls vorhanden)
+    let typeBadge = '';
+    if (data.appointment_type_name) {
+        const typeClass = data.appointment_type_name.toLowerCase().replace(/\s+/g, '-');
+        typeBadge = `<span class="type-badge ${typeClass}">${data.appointment_type_name}</span>`;
+    }
     
     const statusBadge = data.pending 
         ? '<span class="status pending">⏳ Antrag ausstehend</span>'
@@ -1069,6 +1093,7 @@ function addNewActivityToHistory(data) {
         <div class="time">🆕 Gerade eben (${timeStr})</div>
         <div class="appointment">${data.appointment?.title || 'Unbekannter Termin'}</div>
         ${statusBadge}
+        ${typeBadge}
     `;
     
     // Füge am Anfang ein
@@ -1089,7 +1114,6 @@ function addNewActivityToHistory(data) {
 function translateStatus(status) {
     const translations = {
         'present': 'Anwesend',
-        'absent': 'Abwesend',
         'excused': 'Entschuldigt'
     };
     return translations[status] || status;

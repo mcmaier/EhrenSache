@@ -114,8 +114,23 @@ function renderAppointments(cachedData) {
     
     const tbody = document.getElementById('appointmentsTableBody');
     tbody.innerHTML = '';
-    
+        
     appointments.forEach(apt => {
+        // Termin-Info mit Terminart
+        let appointmentInfo = '-';
+        if (apt.appointment_id && apt.title) {
+            appointmentInfo = `<div style="line-height: 1.4;">
+                <strong>${apt.title}</strong>`;
+            
+            if (apt.date && apt.start_time) {
+                const aptDate = new Date(apt.date + 'T00:00:00');
+                const formattedAptDate = aptDate.toLocaleDateString('de-DE');
+                appointmentInfo += `<br><style="color: #7f8c8d;">${formattedAptDate}, ${apt.start_time.substring(0, 5)}</small>`;
+            }
+            
+            appointmentInfo += '</div>';
+        }
+
         const typeBadge = apt.type_name 
             ? `<span class="type-badge" style="background: ${apt.color || '#667eea'}; color: white;">${apt.type_name}</span>`
             : '<span class="type-badge">-</span>';
@@ -133,9 +148,7 @@ function renderAppointments(cachedData) {
         
         const row = `
             <tr>
-                <td>${apt.date}</td>
-                <td>${apt.start_time}</td>
-                <td>${apt.title}</td>
+                <td>${appointmentInfo}</td>
                 <td>${typeBadge}</td>
                 <td>${apt.description || '-'}</td>
                 ${actionsHtml}

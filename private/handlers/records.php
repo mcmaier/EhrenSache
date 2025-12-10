@@ -7,12 +7,18 @@ function handleRecords($db, $method, $id) {
     switch($method) {
         case 'GET': 
             if($id) {
-                // Einzelner Record
-                $stmt = $db->prepare("SELECT r.*, m.name, m.surname, a.title 
-                                     FROM records r 
-                                     JOIN members m ON r.member_id = m.member_id 
-                                     JOIN appointments a ON r.appointment_id = a.appointment_id 
-                                     WHERE r.record_id = ?");
+                // Einzelner Record mit Terminart
+                    $stmt = $db->prepare("SELECT r.*, 
+                                        m.name, m.surname, m.member_number,
+                                        a.title as appointment_title, a.date as appointment_date, 
+                                        a.start_time as appointment_start,
+                                        at.type_name as appointment_type_name,
+                                        at.type_id as appointment_type_id
+                                        FROM records r
+                                        LEFT JOIN members m ON r.member_id = m.member_id
+                                        LEFT JOIN appointments a ON r.appointment_id = a.appointment_id
+                                        LEFT JOIN appointment_types at ON a.type_id = at.type_id
+                                        WHERE r.record_id = ?");
                 $stmt->execute([$id]);
                 $record = $stmt->fetch(PDO::FETCH_ASSOC);
                 
@@ -45,6 +51,7 @@ function handleRecords($db, $method, $id) {
                 $from_date = $_GET['from_date'] ?? null;
                 $to_date = $_GET['to_date'] ?? null;
                 $status = $_GET['status'] ?? null;
+                $appointment_type_id = $_GET['appointment_type_id'] ?? null;
                 
                 // User sehen nur ihre eigenen Records
                 if($_SESSION['role'] !== 'admin') {
@@ -61,13 +68,16 @@ function handleRecords($db, $method, $id) {
                 $sql = "SELECT r.*, 
                         m.name, m.surname, m.member_number, 
                         a.title, a.date, a.start_time,
-                        r.checkin_source, r.source_device, r.location_name
+                        r.checkin_source, r.source_device, r.location_name,
+                        at.type_name as appointment_type_name,
+                        at.type_id as appointment_type_id
                         FROM records r 
-                        JOIN members m ON r.member_id = m.member_id 
-                        JOIN appointments a ON r.appointment_id = a.appointment_id 
+                        LEFT JOIN members m ON r.member_id = m.member_id 
+                        LEFT JOIN appointments a ON r.appointment_id = a.appointment_id 
+                        LEFT JOIN appointment_types at ON a.type_id = at.type_id
                         WHERE 1=1";                
-                $params = [];
-                
+                $params = [];            
+
                 // Filter: Termin
                 if($appointment_id) {
                     $sql .= " AND r.appointment_id = ?";
@@ -108,6 +118,11 @@ function handleRecords($db, $method, $id) {
                 if($status) {
                     $sql .= " AND r.status = ?";
                     $params[] = $status;
+                }
+
+                if($appointment_type_id) {
+                    $sql .= " AND at.type_id = ?";
+                    $params[] = $appointment_type_id;
                 }
                 
                 $sql .= " ORDER BY a.date DESC, r.arrival_time DESC";
@@ -156,9 +171,48 @@ function handleRecords($db, $method, $id) {
             
         case 'PUT':
             $data = json_decode(file_get_contents("php://input"));
-            $stmt = $db->prepare("UPDATE records SET arrival_time=?, status=? 
-                                  WHERE record_id=?");
-            if($stmt->execute([$data->arrival_time, $data->status, $id])) {
+
+            // Hole ursprüngliche Daten des Records
+            $origStmt = $db->prepare("SELECT member_id, appointment_id FROM records WHERE record_id = ?");
+            $origStmt->execute([$id]);
+            $originalRecord = $origStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$originalRecord) {
+                http_response_code(404);
+                echo json_encode(["message" => "Record not found"]);
+                break;
+            }
+            
+            // Prüfe ob Mitglied oder Termin geändert wird
+            $memberChanged = ($data->member_id != $originalRecord['member_id']);
+            $appointmentChanged = ($data->appointment_id != $originalRecord['appointment_id']);
+            
+            if ($memberChanged || $appointmentChanged) {
+                // Prüfe ob bereits ein anderer Record für neue Kombination existiert
+                $checkStmt = $db->prepare("SELECT record_id FROM records 
+                                        WHERE member_id = ? AND appointment_id = ? AND record_id != ?");
+                $checkStmt->execute([$data->member_id, $data->appointment_id, $id]);
+                
+                if ($checkStmt->fetch()) {
+                    http_response_code(409); 
+                    echo json_encode(["message" => "Record for this member and appointment already exists"]);
+                    break;
+                }
+                
+                // Kein Konflikt - komplettes Update
+                $stmt = $db->prepare("UPDATE records 
+                                    SET member_id=?, appointment_id=?, arrival_time=?, status=? 
+                                    WHERE record_id=?");
+                $success = $stmt->execute([$data->member_id, $data->appointment_id, $data->arrival_time, $data->status, $id]);
+            } else {
+                // Nur Zeit/Status ändern - kein Konfliktrisiko
+                $stmt = $db->prepare("UPDATE records 
+                                    SET arrival_time=?, status=? 
+                                    WHERE record_id=?");
+                $success = $stmt->execute([$data->arrival_time, $data->status, $id]);
+            }
+            
+            if ($success) {
                 echo json_encode(["message" => "Record updated"]);
             } else {
                 http_response_code(500);

@@ -29,6 +29,9 @@ function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $au
     }
 
     $totpCode = trim($data->totp_code);
+    $sourceDevice = $data->source_device ?? null;
+
+    error_log("Auto-Checkin Source-Device: {$sourceDevice}");
 
     // Validiere 6-stelliger numerischer Code
     if(!preg_match('/^\d{6}$/', $totpCode)) {
@@ -74,7 +77,8 @@ function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $au
         // Code gültig → Auto-Checkin mit verified Flag
         handleAutoCheckin($db, 'POST', $authUserId, $authUserRole, $authMemberId, $isTokenAuth, 'user_totp',
                                                                         [
-                                                                            'location_name' => $validLocation['email']
+                                                                            'location_name' => $validLocation['email'],
+                                                                            'device_name' => $sourceDevice
                                                                         ]
                                                                         );
     } else {
@@ -82,7 +86,7 @@ function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $au
         echo json_encode([
             "message" => "Invalid or expired TOTP code",
             "hint" => "Code might be outdated (max 90s valid)",
-            "tested_locations" => count($devices)
+            "tested_locations" => count($locations)
         ]);
     }
 }
