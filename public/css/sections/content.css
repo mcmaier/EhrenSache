@@ -195,3 +195,9 @@
     color: var(--text-light);
     font-size: 12px;
 }
+
+.header-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+}

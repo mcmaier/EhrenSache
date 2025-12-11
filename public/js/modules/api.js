@@ -57,7 +57,9 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
     try {
         const response = await fetch(url, options);
         const result = await response.json();
-        
+                
+        console.log("API call: ",resource);
+
         if (!response.ok)
         {            
             if(response.status === 401) 
@@ -99,4 +101,17 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
         showToast('Fehler bei der Kommunikation mit dem Server', 'error');
         return null;
     }
+}
+
+// Neue Hilfsfunktion für Auth-Headers (auch für FormData)
+export function getAuthHeaders(skipContentType = false) {
+    const headers = {
+        'Authorization': `Bearer ${sessionStorage.getItem('api_token')}`
+    };
+    
+    if (!skipContentType) {
+        headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
 }

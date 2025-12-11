@@ -1,5 +1,5 @@
 import { apiCall, currentUser, isAdmin } from './api.js';
-import { showToast, showConfirm } from './ui.js';
+import { showToast, showConfirm, isCacheValid, dataCache, invalidateCache } from './ui.js';
 
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime } from './utils.js';
 
@@ -13,13 +13,28 @@ import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime } from './uti
 // DATA FUNCTIONS (API-Calls)
 // ============================================
 
-export async function loadSettings() {
-    const userData = await apiCall('me');
-    if (!userData) return;
-    
-    const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
-    if (!userDetails) return;
-    
+export async function loadSettings(forceReload = false) {
+
+    let userData = null
+    let userDetails = null;
+
+    // Userprofil abfragen (falls nicht gecacht)
+    if (!forceReload && isCacheValid('userData')) {        
+        console.log("Loading User Data from Cache");
+        userData = dataCache.userData.data.userData;
+        userDetails = dataCache.userData.data.userDetails;        
+    }
+    else
+    {
+        console.log("Loading User Data from API");
+        userData = await apiCall('me');
+        userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
+        
+        // userData Cache separat speichern
+        dataCache.userData.data = { userData, userDetails };
+        dataCache.userData.timestamp = Date.now();
+    }
+
     // Account-Informationen
     document.getElementById('settings_email').value = userDetails.email;
     const roleText = userDetails.role === 'admin' ? 'Administrator' :
@@ -198,6 +213,8 @@ export async function regenerateSettingsToken() {
                 });
                 document.getElementById('settingsTokenExpiryInfo').textContent = `Gültig bis: ${expiresText}`;
             }
+
+            invalidateCache('userData');
             
             showToast('Neuer Token generiert!', 'success');
         }

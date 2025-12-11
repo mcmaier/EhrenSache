@@ -221,7 +221,6 @@ async function handleLogin(e) {
         apiToken = token;
         
         //Test API Verbindung
-        //await apiCall('records');
         if(await loadUserData() != true)
         {
             throw new Error('Benutzer konnte nicht geladen werden');       

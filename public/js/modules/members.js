@@ -1,8 +1,10 @@
 import { apiCall, isAdmin } from './api.js';
-import { showToast, showConfirm} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache} from './ui.js';
+import { loadUserData } from './users.js';
 import { loadRecordFilters } from './records.js';
 import { loadExceptionFilters } from './exceptions.js';
 import { updateModalId } from './utils.js';
+import { loadGroups } from './management.js';
 
 
 // ============================================
@@ -17,32 +19,28 @@ import { updateModalId } from './utils.js';
 
 let currentMembershipDates = [];
 let currentMemberGroups = [];
-let allAvailableGroups = [];
-
-const membersCache = {
-    members: { data: null, loaded: false }
-};
-
-function invalidateMembersCache(resource) {
-    if (membersCache) {
-        membersCache.loaded = false;
-        membersCache.data = null;
-    }
-}
+//let allAvailableGroups = [];
 
 export async function loadMembers(forceReload = false) {
-    // Cache verwenden wenn vorhanden und nicht forceReload
-    if (!forceReload && membersCache.loaded && membersCache.data) {
-        renderMembers(membersCache.data);
+    // Cache verwenden wenn vorhanden und nicht forceReload    
+    if (!forceReload && isCacheValid('members')) {
+        console.log("Loading members from cache:", dataCache.members.data);
+        renderMembers(dataCache.members.data);
         return;
     }
 
-    let members;
-        
-    // Userprofil abfragen
-    const userData = await apiCall('me');
-    const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
-    
+    // Userprofil abfragen (falls nicht gecacht)
+    await loadUserData();
+
+    // Mitglieder laden basierend auf gecachten userDetails
+    const { userDetails } = dataCache.userData.data;
+
+    //console.log("Getting user data:", dataCache.userData.data);
+
+    let members = [];
+
+    console.log("Loading members from API");
+            
     if(isAdmin){
         // Admin sieht alle Mitglieder
         members = await apiCall('members');        
@@ -51,26 +49,22 @@ export async function loadMembers(forceReload = false) {
         if (userDetails && userDetails.member_id) {
             const member = await apiCall('members', 'GET', null, { id: userDetails.member_id });
             members = member ? [member] : [];
-        } else {
-            members = [];
-        }
+        } 
     }     
 
     // Cache speichern
-    membersCache.data = { members, userDetails };
-    membersCache.loaded = true;
+    dataCache.members.data = members;
+    dataCache.members.timestamp = Date.now();
 
-    renderMembers(membersCache.data);
+    renderMembers(dataCache.members.data);
 }
 
 // ============================================
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
-function renderMembers(cachedData) {
-    const { members, userDetails } = cachedData;
-
-    if (!members || members.length === 0) {
+function renderMembers(memberData) {
+    if (!memberData || memberData.length === 0) {
         const tbody = document.getElementById('membersTableBody');
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Kein Profil verknüpft</td></tr>';
         return;
@@ -79,7 +73,7 @@ function renderMembers(cachedData) {
     const tbody = document.getElementById('membersTableBody');
     tbody.innerHTML = '';
     
-    members.forEach(member => {
+    memberData.forEach(member => {
         // Gruppen-Badges erstellen
         const groupBadges = member.group_names 
             ? member.group_names.split(', ').map(name => 
@@ -113,7 +107,7 @@ function renderMembers(cachedData) {
 
     // Statistik nur für Admin
     if (isAdmin) {
-        const activeCount = members.filter(m => m.active).length;
+        const activeCount = memberData.filter(m => m.active).length;
         document.getElementById('statActiveMembersCount').textContent = activeCount;
     } else {
         document.getElementById('statActiveMembersCount').textContent = '-';
@@ -131,8 +125,8 @@ export async function openMemberModal(memberId = null) {
     const membershipGroup = document.getElementById('membershipDatesGroup');
 
     // Lade alle verfügbaren Gruppen
-    if (allAvailableGroups.length === 0) {
-        allAvailableGroups = await apiCall('member_groups') || [];
+    if (dataCache.groups.data.length === 0) {
+        loadGroups(true);
     }
     
     if (memberId) {
@@ -161,7 +155,7 @@ export async function openMemberModal(memberId = null) {
         updateModalId('memberModal', null);
 
         // Setze Standard-Gruppe als vorausgewählt
-        const defaultGroup = allAvailableGroups.find(g => g.is_default);
+        const defaultGroup = dataCache.groups.data.find(g => g.is_default);
         currentMemberGroups = defaultGroup ? [defaultGroup.group_id] : [];
     }
 
@@ -192,12 +186,12 @@ export async function loadMemberData(memberId) {
 function renderMemberGroups() {
     const container = document.getElementById('memberGroupsList');
     
-    if (allAvailableGroups.length === 0) {
+    if (dataCache.groups.data.length === 0) {
         container.innerHTML = '<p style="color: #7f8c8d;">Keine Gruppen verfügbar</p>';
         return;
     }
     
-    container.innerHTML = allAvailableGroups.map(group => `
+    container.innerHTML = dataCache.groups.data.map(group => `
         <label style="display: flex; align-items: flex-start; padding: 8px; cursor: pointer; border-radius: 4px;" 
                onmouseover="this.style.background='#f5f5f5'" 
                onmouseout="this.style.background='transparent'">
@@ -263,11 +257,11 @@ export async function saveMember() {
         closeMemberModal();
 
         // Cache invalidieren und neu laden
-        invalidateMembersCache();
+        invalidateCache('members');
 
-        await loadMembers(true);        
-        await loadRecordFilters();
-        await loadExceptionFilters();
+        await loadMembers(true);     
+        //await loadRecordFilters();
+        //await loadExceptionFilters();
 
         // Erfolgs-Toast
         showToast(
@@ -288,11 +282,11 @@ export async function deleteMember(memberId, name) {
         if (result) {
 
             // Cache invalidieren und neu laden
-            invalidateMembersCache();
+            invalidateCache('members');
 
             await loadMembers(true);        
-            await loadRecordFilters();
-            await loadExceptionFilters();
+            //await loadRecordFilters();
+            //await loadExceptionFilters();
 
             showToast('Mitglied erfolgreich gelöscht', 'success');
         }

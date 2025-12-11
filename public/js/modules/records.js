@@ -1,6 +1,9 @@
 import { apiCall, currentUser, isAdmin } from './api.js';
-import { showToast, showConfirm } from './ui.js';
-import {translateRecordStatus,datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId} from './utils.js';
+import { loadAppointments } from './appointments.js';
+import { loadTypes } from './management.js';
+import { loadMembers } from './members.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, currentYear} from './ui.js';
+import { translateRecordStatus,datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
 
 // ============================================
 // RECORDS
@@ -8,9 +11,6 @@ import {translateRecordStatus,datetimeLocalToMysql, mysqlToDatetimeLocal, format
 // import {} from './records.js'
 // ============================================
 
-let membersCache = [];
-let appointmentsCache = [];
-let appointmentTypeCache = {};
 let currentRecordYear = null;
 
 // ============================================
@@ -18,11 +18,19 @@ let currentRecordYear = null;
 // ============================================
 
 export async function loadRecords(forceReload = false) {
+    const year = currentYear;
+    
+    // Cache-Check: Nur laden wenn nötig
+    if (!forceReload && isCacheValid('records', year)) {
+        console.log('Loading records from cache for ${year}', year);
+        renderRecords(dataCache.records[year].data);        
+        return;
+    }
+
     let params = {};
 
-    if (currentRecordYear) {
-        params.year = currentRecordYear;
-    }        
+    params.year = year;
+  
     if (currentFilter.appointment) {
         params.appointment_id = currentFilter.appointment;
     }
@@ -30,31 +38,37 @@ export async function loadRecords(forceReload = false) {
         params.member_id = currentFilter.member;
     }
 
-    // Lade Jahre beim ersten Laden
-    if (forceReload) {
-        membersCache = [];
-        appointmentsCache = [];
+    await loadTypes();
+    await loadRecordFilters();
+    await loadRecordMemberFilter();        
+    
+    console.log("Loading records from API for ${year}", year);
+    const records = await apiCall('records', 'GET', null, params);
 
-        await loadRecordYears();
-        await loadRecordFilters(currentRecordYear);
-        await loadRecordMemberFilter();
-        await loadAppointmentTypesCache();
+    if(!dataCache.records[year])
+    {
+        dataCache.records[year] = {};
     }
 
-    const records = await apiCall('records', 'GET', null, params);
-    
-    if (!records) return;
-    
-    const tbody = document.getElementById('recordsTableBody');
+    dataCache.records[year].data = records;
+    dataCache.records[year].timestamp = Date.now();    
+
+    renderRecords(records);
+}
+
+
+function renderRecords(recordData)
+{
+   const tbody = document.getElementById('recordsTableBody');
     tbody.innerHTML = '';
     
-    if (records.length === 0) {
+    if (recordData.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Einträge gefunden</td></tr>';
         document.getElementById('statTotalRecords').textContent = '0';
         return;
     }
     
-    records.forEach(record => {
+    recordData.forEach(record => {
         const arrivalTime = new Date(record.arrival_time);
         const formattedTime = arrivalTime.toLocaleString('de-DE');
 
@@ -76,8 +90,8 @@ export async function loadRecords(forceReload = false) {
         // Terminart Badge
         let appointmentTypeBadge = '-';
         
-        if (record.appointment_type_id && appointmentTypeCache[record.appointment_type_id]) {
-            const type = appointmentTypeCache[record.appointment_type_id];
+        if (record.appointment_type_id && (dataCache.types.data.length !== 0)) {
+            const type = dataCache.types.data;
             appointmentTypeBadge = `<span class="type-badge" style="background: ${type.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
                                         ${type.type_name}
                                     </span>`;
@@ -121,21 +135,12 @@ export async function loadRecords(forceReload = false) {
         tbody.innerHTML += row;
     });
 
-    document.getElementById('statTotalRecords').textContent = records.length;
-
-    /*
-    // Lade Jahre beim ersten Laden
-    if (forceReload) {
-        await loadRecordYears();
-        await loadRecordFilters(currentRecordYear);
-        await loadRecordMemberFilter();
-        await loadAppointmentTypesCache();
-    }*/
+    document.getElementById('statTotalRecords').textContent = recordData.length;
 }
-
 
 // Lade verfügbare Jahre
 async function loadRecordYears() {
+    /*
     const records = await apiCall('records');
     if (!records) return;
     
@@ -148,7 +153,9 @@ async function loadRecordYears() {
     
     years.forEach(year => {
         select.innerHTML += `<option value="${year}">${year}</option>`;
-    });    
+    });   
+    */
+    return 0;
 }
 
 export function applyRecordYearFilter() {
@@ -170,29 +177,32 @@ export function applyRecordYearFilter() {
 // ============================================
 
 export async function loadRecordDropdowns() {
-    // Lade Mitglieder
-    if (membersCache.length === 0) {
-        membersCache = await apiCall('members');
-    }
     
+    
+    // Lade Mitglieder
+    //if (dataCache.members.data.length === 0) {
+    //    const members =  await loadMembers(true);
+    //}
+    
+    const members =  await loadMembers(true);
     const memberSelect = document.getElementById('record_member');
     memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
-    membersCache
+    members
         .filter(m => m.active)
         .forEach(member => {
             memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
         });
     
     // Lade Termine
-    if (appointmentsCache.length === 0) {
-        appointmentsCache = await apiCall('appointments');
+    if (dataCache.appointments.data.length === 0) {
+        await loadAppointments(true);
     }    
     
     const appointmentSelect = document.getElementById('record_appointment');    
     appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
-    appointmentsCache.forEach(appointment => {
+    dataCache.appointments.data.forEach(appointment => {
             const date = new Date(appointment.date + 'T00:00:00');
             const formattedDate = date.toLocaleDateString('de-DE');
             const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
@@ -224,22 +234,19 @@ let currentFilter = {
 };
 
 // Lade Filter-Dropdowns
-export async function loadRecordFilters(year = null) {
+export async function loadRecordFilters() {
 
-    await loadRecordAppointmentFilter(year);
+    await loadRecordAppointmentFilter();
     await loadRecordMemberFilter();
 }
 
 // Separate Funktion NUR für Termine (jahresabhängig)
-export async function loadRecordAppointmentFilter(year = null) {
-    const filterYear = year || currentRecordYear;
-    let params = {};
-    if (filterYear) {
-        params.year = filterYear;
-    }
+export async function loadRecordAppointmentFilter() {
     
+    await loadAppointments(false);    
+
     // Lade nur Termine des gefilterten Jahres
-    const appointments = await apiCall('appointments', 'GET', null, params);
+    const appointments = dataCache.appointments[currentYear].data;
     const appointmentSelect = document.getElementById('filterAppointment');
     appointmentSelect.innerHTML = '<option value="">Alle Termine</option>';
     
@@ -252,10 +259,23 @@ export async function loadRecordAppointmentFilter(year = null) {
 
 // Separate Funktion NUR für Mitglieder (jahresunabhängig)
 export async function loadRecordMemberFilter() {
-    const members = await apiCall('members');
-    const memberSelect = document.getElementById('filterMember');
     
-    // Merke aktuellen Wert VOR dem Neuladen
+    // Cache laden falls leer
+    if (!dataCache.members.data || dataCache.members.data.length === 0) {
+        await loadMembers(true);
+    }
+
+    // Safe extraction
+    let members = dataCache.members.data;
+
+    //console.log(members);
+
+    // Falls API-Response-Wrapper: {success: true, data: [...]}
+    if (!Array.isArray(members) && members.data) {
+        members = members.data;
+    }
+
+    const memberSelect = document.getElementById('filterMember');
     const currentValue = memberSelect.value;
     
     memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
@@ -286,7 +306,7 @@ export async function applyRecordFilter() {
 }
 
 // Filter zurücksetzen
-export function resetRecordFilter() {
+export async function resetRecordFilter() {
     document.getElementById('filterAppointment').value = '';
     document.getElementById('filterMember').value = '';
     currentFilter.appointment = null;
@@ -294,7 +314,7 @@ export function resetRecordFilter() {
 
     // Jahresfilter NICHT zurücksetzen, aber Termin-Filter neu laden
     //loadRecordFilters(currentRecordYear);
-    loadRecords();
+    await loadRecords();
 }
 
 
@@ -303,10 +323,11 @@ function getSourceBadge(record) {
         'admin': { icon: '👤', label: 'Admin', color: '#3498db' },
         'user_totp': { icon: '📱', label: 'App', color: '#27ae60' },
         'device_auth': { icon: '🔐', label: 'Gerät', color: '#9b59b6' },        
-        'auto_checkin': { icon: '🤖', label: 'Auto', color: '#95a5a6' }
+        'auto_checkin': { icon: '🤖', label: 'Auto', color: '#95a5a6' },
+        'import':{icon: '📤', label: 'Import', color: '#dbbb2dff'}
     };
     
-    const source = sources[record.checkin_source] || sources['auto_checkin'];
+    const source = sources[record.checkin_source] || sources['admin'];
     
     let badge = `<span class="source-badge" style="background: ${source.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
                     ${source.icon} ${source.label}
@@ -328,23 +349,26 @@ function getSourceBadge(record) {
     return badge;
 }
 
+/*
 async function loadAppointmentTypesCache() {
-    const types = await apiCall('appointment_types');
+    if(dataCache.types.data.length === 0)
+    {
+        await loadTypes(true);
+    }
     
-    if (types) {
-        // Erstelle Lookup-Objekt: { type_id: { type_name, color, ... } }
-        appointmentTypeCache = {};
-        types.forEach(type => {
+    /*
+    if (dataCache.types.data) {
+        // Erstelle Lookup-Objekt: { type_id: { type_name, color, ... } }    
+        dataCache.types.data.forEach(type => {
             appointmentTypeCache[type.type_id] = {
                 type_name: type.type_name,
                 color: type.color || '#667eea',
                 description: type.description
             };
-        });
-        
+        });        
         //console.log('Appointment types cached:', appointmentTypeCache);
     }
-}
+}*/
 
 // ============================================
 // MODAL FUNCTIONS
@@ -452,10 +476,12 @@ export async function saveRecord() {
     
     if (result) {
         closeRecordModal();
-        loadRecords();
+
+        invalidateCache('records', currentYear);
+        await loadRecords(true);
         // Cache leeren für nächstes Mal
-        membersCache = [];
-        appointmentsCache = [];
+        //membersCache = [];
+        //appointmentsCache = [];
         
         // Erfolgs-Toast
         showToast(
@@ -474,6 +500,7 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
     if (confirmed) {
         const result = await apiCall('records', 'DELETE', null, { id: recordId });
         if (result) {
+            invalidateCache('records', currentYear);
             loadRecords(true);
             showToast(`Eintrag wurde gelöscht`, 'success');
         }
@@ -499,8 +526,8 @@ function updateAppointmentTypeDisplay() {
     const typeName = selectedOption.dataset.typeName;
     
     // Type-ID vorhanden → Lookup im Cache für Farbe
-    if (typeId && appointmentTypeCache[typeId]) {
-        const type = appointmentTypeCache[typeId];
+    if (typeId && dataCache.types.data[typeId]) {
+        const type = dataCache.types.data[typeId];
         typeBadge.innerHTML = `<span class="type-badge" style="background: ${type.color}; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px;">
                                   ${type.type_name}
                                </span>`;
@@ -533,7 +560,7 @@ function updateArrivalTimeFromAppointment() {
     if (!selectedAppointmentId) return;
     
     // Finde den gewählten Termin im Cache
-    const appointment = appointmentsCache.find(apt => apt.appointment_id == selectedAppointmentId);
+    const appointment = dataCache.appointments.data.find(apt => apt.appointment_id == selectedAppointmentId);
     
     if (appointment && appointment.date && appointment.start_time) {
         // Konvertiere zu datetime-local Format

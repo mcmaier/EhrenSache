@@ -85,7 +85,7 @@ CREATE TABLE `records` (
   `appointment_id` int(11) NOT NULL,
   `arrival_time` datetime NOT NULL,
   `status` enum('present','excused') DEFAULT 'present',
-  `checkin_source` enum('admin','user_totp','device_auth','auto_checkin') DEFAULT 'admin',
+  `checkin_source` enum('admin','user_totp','device_auth','auto_checkin','import') DEFAULT 'admin',
   `source_device` varchar(100) DEFAULT NULL,
   `location_name` varchar(100) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()

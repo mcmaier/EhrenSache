@@ -1,5 +1,6 @@
 import { apiCall, currentUser, isAdmin } from './api.js';
-import { showToast, showConfirm } from './ui.js';
+import { loadMembers } from './members.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
 import { updateModalId } from './utils.js';
 
 // ============================================
@@ -12,15 +13,49 @@ import { updateModalId } from './utils.js';
 // DATA FUNCTIONS (API-Calls)
 // ============================================
 
-export async function loadUsers() {
+export async function loadUsers(forceReload = false) {
+
+    if (!forceReload && isCacheValid('users')) {
+        console.log("Loading users from cache");
+        renderUsers(dataCache.users.data);
+        return;
+    }
+
     const users = await apiCall('users');
     
-    if (!users) return;
+    // Cache speichern
+    dataCache.users.data = users;
+    dataCache.users.timestamp = Date.now();
     
-    const tbody = document.getElementById('usersTableBody');
+    renderUsers(dataCache.users.data);
+}
+
+export async function loadUserData(forceReload = false) {
+
+    if(!forceReload && isCacheValid('userData'))
+    {
+        console.log("Loading user Data (ME) from cache");
+        return;
+    }
+
+    const userData = await apiCall('me');
+    const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
+        
+    // userData Cache separat speichern
+    dataCache.userData.data = { userData, userDetails };
+    dataCache.userData.timestamp = Date.now();
+}
+
+// ============================================
+// RENDER FUNCTIONS (DOM-Manipulation)
+// ============================================
+
+function renderUsers(userData)
+{
+const tbody = document.getElementById('usersTableBody');
     tbody.innerHTML = '';
     
-    users.forEach(user => {
+    userData.forEach(user => {
         const createdAt = new Date(user.created_at);
         const formattedCreated = createdAt.toLocaleDateString('de-DE');
 
@@ -70,10 +105,6 @@ export async function loadUsers() {
         tbody.innerHTML += row;
     });
 }
-
-// ============================================
-// RENDER FUNCTIONS (DOM-Manipulation)
-// ============================================
 
 function toggleUserRoleFields() {
 
@@ -161,12 +192,17 @@ export async function openUserModal(userId = null) {
     const title = document.getElementById('userModalTitle');
     
     // Lade Mitglieder für Dropdown
-    const members = await apiCall('members');
+
+    if(dataCache.members.data.length === 0)
+    {
+        loadMembers(true);
+    }
+
     const memberSelect = document.getElementById('user_member');
     memberSelect.innerHTML = '<option value="">Kein Mitglied</option>';
     
-    if (members) {
-        members.forEach(member => {
+    if (dataCache.members.data) {
+        dataCache.members.data.forEach(member => {
             memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
         });
     }
@@ -183,7 +219,7 @@ export async function openUserModal(userId = null) {
 
     if (userId) {
         title.textContent = 'Benutzer bearbeiten';
-        await loadUserData(userId);
+        await loadUserFormData(userId);
         document.getElementById('user_password').required = false;
         updateModalId('userModal', userId);
 
@@ -212,11 +248,11 @@ export function closeUserModal() {
 // CRUD FUNCTIONS
 // ============================================
 
-export async function loadUserData(userId) {
+export async function loadUserFormData(userId) {
     const user = await apiCall('users', 'GET', null, { id: userId });
     
     if (user) {
-        //console.log('User loaded from API:', user);
+        console.log('User loaded from API:', user);
 
         document.getElementById('user_id').value = user.user_id;
         document.getElementById('user_email').value = user.email;
@@ -273,7 +309,7 @@ export async function saveUser() {
     }
     
     // Passwort nur mitschicken wenn gesetzt
-    if (password) {
+    if (password) { 
         data.password = password;
     }
 
@@ -315,6 +351,7 @@ export async function saveUser() {
     
     if (result) {
         closeUserModal();
+        invalidateCache('users');
         await loadUsers(true);
 
         showToast(
@@ -333,8 +370,8 @@ export async function deleteUser(userId, email) {
     if (confirmed) {
         const result = await apiCall('users', 'DELETE', null, { id: userId });
         if (result) {
-            loadUsers();
-
+            invalidateCache('users');
+            loadUsers(true);
             showToast(`User "${email}" wurde gelöscht`, 'success');        
         }
     }

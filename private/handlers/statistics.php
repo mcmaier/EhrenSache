@@ -2,6 +2,54 @@
 // ============================================
 // STATISTICS Handler
 // ============================================
+// In api/handlers/statistics.php (oder neue Datei years.php)
+function handleAvailableYears($db, $request_method, $id) {
+
+    if ($request_method !== 'GET') {
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        exit();
+    }
+
+    try {
+        // Jahre aus verschiedenen Tabellen sammeln
+        $stmt = $db->query("
+            SELECT DISTINCT YEAR(date) as year 
+            FROM appointments 
+            WHERE date IS NOT NULL
+            UNION
+            SELECT DISTINCT YEAR(arrival_time) as year 
+            FROM records 
+            WHERE arrival_time IS NOT NULL
+            ORDER BY year DESC
+        ");
+        $years = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        // Aktuelles Jahr + 1 immer einschließen (für neue Termine)
+        $currentYear = (int)date('Y');
+        /*$nextYear = $currentYear + 1;*/
+        
+        if (!in_array($currentYear, $years)) {
+            $years[] = $currentYear;
+        }
+        /*if (!in_array($nextYear, $years)) {
+            $years[] = $nextYear;
+        }*/
+        
+        rsort($years); // Absteigend sortieren
+        
+        http_response_code(200);
+        echo json_encode($years); 
+        
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Fehler beim Laden der Jahre: ' . $e->getMessage()
+        ]);
+    }
+}
+
 
 function handleStatistics($db, $request_method, $authUserId, $authUserRole, $authMemberId) {
     if ($request_method !== 'GET') {

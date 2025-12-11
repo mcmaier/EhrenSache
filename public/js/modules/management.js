@@ -1,27 +1,41 @@
 import { apiCall, isAdmin } from './api.js';
-import { showToast, showConfirm } from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
 import { updateModalId } from './utils.js';
 
 // ============================================
 // MANAGEMENT (Groups & Types)
 // ============================================
 
-let allMembers = [];
-let allGroups = [];
+//let allMembers = [];
+//let allGroups = [];
 
 // ============================================
 // GROUPS - Data Loading
 // ============================================
 
-export async function loadGroups() {
+export async function loadGroups(forceReload = false) {
+    // Cache-Check: Nur laden wenn nötig
+    if (!forceReload && isCacheValid('groups')) {
+        console.log('Loading groups from cache');
+        renderGroups(dataCache.groups.data);
+        return;
+    }
+
+    console.log('Loading groups from API');
     const groups = await apiCall('member_groups');
-    
-    if (!groups) return;
-    
-    const tbody = document.getElementById('groupsTableBody');
+
+    dataCache.groups.data = groups;
+    dataCache.groups.timestamp = Date.now();
+
+    renderGroups(dataCache.groups.data);        
+}
+
+function renderGroups(groupData)
+{
+const tbody = document.getElementById('groupsTableBody');
     tbody.innerHTML = '';
     
-    groups.forEach(group => {
+    groupData.forEach(group => {
         const isDefaultBadge = group.is_default 
             ? '<span class="status-badge status-approved">✓ Ja</span>' 
             : '<span class="type-badge">Nein</span>';
@@ -47,8 +61,6 @@ export async function loadGroups() {
         `;
         tbody.innerHTML += row;
     });
-    
-    allGroups = groups;
 }
 
 // ============================================
@@ -59,11 +71,17 @@ export async function openGroupModal(groupId = null) {
     const modal = document.getElementById('groupModal');
     const title = document.getElementById('groupModalTitle');
     const membersGroup = document.getElementById('groupMembersGroup');
+
+    if(dataCache.members.length === 0)
+    {
+        await loadMembers(true);
+    }
     
     // Lade alle Mitglieder falls nötig
+    /*
     if (allMembers.length === 0) {
         allMembers = await apiCall('members') || [];
-    }
+    }*/
     
     if (groupId) {
         title.textContent = 'Gruppe bearbeiten';
@@ -138,14 +156,15 @@ export async function saveGroup() {
     const isDefault = document.getElementById('group_is_default').checked;
 
      // Bei neuer Standard-Gruppe: Warnung wenn bereits eine existiert
-    if (isDefault) {
+    if (isDefault) {        
         // Lade aktuelle Gruppen falls Cache leer
-        if (allGroups.length === 0) {
-            allGroups = await apiCall('member_groups') || [];
+        if(dataCache.groups.data.length === 0)
+        {
+            await loadGroups(true);
         }
         
         // Finde aktuelle Standard-Gruppe (aber nicht die, die wir gerade bearbeiten)
-        const currentDefault = allGroups.find(g => g.is_default && g.group_id != groupId);
+        const currentDefault = dataCache.groups.find(g => g.is_default && g.group_id != groupId);
         
         if (currentDefault) {
             const confirmed = await showConfirm(
@@ -171,7 +190,8 @@ export async function saveGroup() {
     
     if (result) {
         closeGroupModal();
-        await loadGroups();
+        invalidateCache('groups'); 
+        await loadGroups(true);
         showToast(
             groupId ? 'Gruppe erfolgreich aktualisiert' : 'Gruppe erfolgreich erstellt',
             'success'
@@ -188,7 +208,8 @@ export async function deleteGroup(groupId, groupName) {
     if (confirmed) {
         const result = await apiCall('member_groups', 'DELETE', null, { id: groupId });
         if (result) {
-            await loadGroups();
+            invalidateCache('groups'); 
+            await loadGroups(true);
             showToast(`Gruppe "${groupName}" wurde gelöscht`, 'success');
         }
     }
@@ -198,15 +219,29 @@ export async function deleteGroup(groupId, groupName) {
 // TYPES - Data Loading
 // ============================================
 
-export async function loadTypes() {
-    const types = await apiCall('appointment_types');
+export async function loadTypes(forceReload = false) {
+    // Cache-Check: Nur laden wenn nötig
+    if (!forceReload && isCacheValid('types')) {
+        console.log('Loading Appointment Types from cache',dataCache.types.data);
+        renderTypeGroupOverview(dataCache.types.data);
+        return;
+    }
     
-    if (!types) return;
+    const types = await apiCall('appointment_types');    
+    console.log('Loading Appointment Types from API', types);
+
+    dataCache.types.data = types;
+    dataCache.types.timestamp = Date.now();
     
+    renderTypeGroupOverview(dataCache.types.data);         
+}
+
+function renderTypeGroupOverview(typeData)
+{
     const tbody = document.getElementById('typesTableBody');
     tbody.innerHTML = '';
     
-    types.forEach(type => {
+    typeData.forEach(type => {
         const isDefaultBadge = type.is_default 
             ? '<span class="status-badge status-approved">✓ Ja</span>' 
             : '<span class="type-badge">Nein</span>';
@@ -241,7 +276,17 @@ export async function loadTypes() {
 }
 
 async function loadTypeGroups(typeId) {
-    const type = await apiCall('appointment_types', 'GET', null, { id: typeId });
+    let type;
+
+    if(dataCache.types.data.typeId === typeId)
+    {
+        type = dataCache.types.data[typeId];
+    }
+    else
+    {
+        type = await apiCall('appointment_types', 'GET', null, { id: typeId });
+    }
+
     const cell = document.getElementById(`type_groups_${typeId}`);
     
     if (type && type.groups && type.groups.length > 0) {
@@ -258,11 +303,11 @@ async function loadTypeGroups(typeId) {
 export async function openTypeModal(typeId = null) {
     const modal = document.getElementById('typeModal');
     const title = document.getElementById('typeModalTitle');
-    
-    // Lade Gruppen falls nötig
-    if (allGroups.length === 0) {
-        allGroups = await apiCall('member_groups') || [];
-    }
+
+    if(dataCache.groups.data.length === 0)
+    {
+        await apiCall('member_groups');
+    }   
     
     if (typeId) {
         title.textContent = 'Terminart bearbeiten';
@@ -303,7 +348,7 @@ function renderTypeGroups(selectedGroups) {
     const container = document.getElementById('typeGroupsList');
     const selectedIds = selectedGroups.map(g => g.group_id);
     
-    container.innerHTML = allGroups.map(group => `
+    container.innerHTML = dataCache.groups.data.map(group => `
         <label style="display: block; padding: 8px; cursor: pointer; border-radius: 4px;" 
                onmouseover="this.style.background='#f5f5f5'" 
                onmouseout="this.style.background='transparent'">
@@ -342,7 +387,7 @@ export async function saveType() {
     // Validierung: Standard-Terminart muss "Alle Mitglieder" enthalten
     if (isDefault) {
         // Hole die "Alle Mitglieder" Gruppe (normalerweise group_id = 1)
-        const allMembersGroup = allGroups.find(g => g.is_default);
+        const allMembersGroup = dataCache.groups.data.find(g => g.is_default);
         
         if (allMembersGroup && !groupIds.includes(allMembersGroup.group_id)) {
             showToast(
@@ -371,7 +416,8 @@ export async function saveType() {
     
     if (result) {
         closeTypeModal();
-        await loadTypes();
+        invalidateCache('types');
+        await loadTypes(true);
         showToast(
             typeId ? 'Terminart erfolgreich aktualisiert' : 'Terminart erfolgreich erstellt',
             'success'
@@ -388,7 +434,8 @@ export async function deleteType(typeId, typeName) {
     if (confirmed) {
         const result = await apiCall('appointment_types', 'DELETE', null, { id: typeId });
         if (result) {
-            await loadTypes();
+            invalidateCache('types');
+            await loadTypes(true);
             showToast(`Terminart "${typeName}" wurde gelöscht`, 'success');
         }
     }

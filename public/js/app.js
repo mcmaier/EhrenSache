@@ -1,4 +1,4 @@
-import { loadAllData, showLogin, showDashboard, initNavigation, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess} from './modules/ui.js';
+import { loadAllData, showLogin, showDashboard, initNavigation, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, setCurrentYear} from './modules/ui.js';
 import { apiCall, setCurrentUser, setCsrfToken, setInitialLoad, currentUser, isAdmin} from './modules/api.js';
 import { initAuth } from './modules/auth.js';
 import { loadMembers } from './modules/members.js';
@@ -8,7 +8,8 @@ import { loadExceptions } from './modules/exceptions.js';
 import { loadUsers } from './modules/users.js';
 import { loadSettings, initSettings} from './modules/settings.js';
 import { loadGroups, loadTypes } from './modules/management.js';
-import { initStatistics} from './modules/statistics.js'
+import { initStatistics} from './modules/statistics.js';
+import { exportMembers, exportAppointments, exportRecords } from './modules/import_export.js';
 
 
 // ============================================
@@ -41,10 +42,25 @@ async function init() {
         if (loginData?.csrf_token) {
             setCsrfToken(loginData.csrf_token);
         }      
-        
-        initStatistics();           
+                         
         showDashboard();
-        loadAllData();
+
+        // Gespeichertes Jahr laden
+        const savedYear = sessionStorage.getItem('selectedYear');
+        if (savedYear) {            
+            setCurrentYear(parseInt(savedYear));
+            console.log('Saved Year: ', savedYear);
+        }
+        else{
+            setCurrentYear(new Date().getFullYear());
+            console.log("Fallback, current Year:", currentYear);
+        }
+        
+        // Alle Jahresfilter befüllen und synchronisieren
+        await initAllYearFilters();
+
+        await loadAllData();
+        await initStatistics();  
     } else {
         showLogin();
     }   

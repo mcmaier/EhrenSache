@@ -1,6 +1,6 @@
 
 import { apiCall, currentUser, isAdmin } from './api.js';
-import { showToast, showConfirm } from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache,currentYear} from './ui.js';
 import { loadRecords } from './records.js';
 import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime , updateModalId} from './utils.js';
 
@@ -22,8 +22,19 @@ let currentExceptionYear = null;
 // ============================================
 
 export async function loadExceptions(forceReload = false) {
+    const year = currentYear;
+
+    // Cache-Check: Nur laden wenn nötig
+    if (!forceReload && isCacheValid('exceptions', year)) {
+        console.log('Loading exceptions from cache for ${year}', year);
+        renderExceptions(dataCache.exceptions[year].data);        
+        return;
+    }
+
+    console.log('Loading exceptions from API for ${year}', year);
+
     let params = {};
-    
+
     if (currentExceptionFilter.status) {
         params.status = currentExceptionFilter.status;
     }
@@ -32,24 +43,37 @@ export async function loadExceptions(forceReload = false) {
     }
     // Jahresfilter anwenden
     if (currentExceptionYear) {
-        params.year = currentExceptionYear;
+        params.year = year;
     }
 
     const exceptions = await apiCall('exceptions', 'GET', null, params);
-    
-    if (!exceptions) return;
+
+    if(!dataCache.exceptions[year])
+    {
+        dataCache.exceptions[year] = {};
+    }
+
+    dataCache.exceptions[year].data = exceptions;
+    dataCache.exceptions[year].timestamp = Date.now();
+
+    renderExceptions(exceptions);
+}
+
+function renderExceptions(exceptionData)
+{   
+    if (!exceptionData) return;
     
     const tbody = document.getElementById('exceptionsTableBody');
     tbody.innerHTML = '';
     
-    if (exceptions.length === 0) {
+    if (exceptionData.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="loading">Keine Anträge gefunden</td></tr>';
         document.getElementById('statPendingExceptions').textContent = '0';
         document.getElementById('statApprovedExceptions').textContent = '0';
         return;
     }
     
-    exceptions.forEach(exception => {
+    exceptionData.forEach(exception => {
         const createdAt = new Date(exception.created_at);
         const formattedCreated = createdAt.toLocaleString('de-DE');
         
@@ -108,15 +132,11 @@ export async function loadExceptions(forceReload = false) {
     const approved = exceptions.filter(e => e.status === 'approved').length;
     document.getElementById('statPendingExceptions').textContent = pending;
     document.getElementById('statApprovedExceptions').textContent = approved;
-
-    // Lade Jahre beim ersten Laden
-    if (forceReload) {
-        await loadExceptionYears();
-    }
 }
 
 // Lade verfügbare Jahre
 async function loadExceptionYears() {
+    /*
     const exceptions = await apiCall('exceptions');
     if (!exceptions) return;
     
@@ -124,12 +144,15 @@ async function loadExceptionYears() {
     const years = [...new Set(exceptions.map(e => new Date(e.created_at).getFullYear()))];
     years.sort((a, b) => b - a);
     
-    const select = document.getElementById('filterExceptionYear');
-    select.innerHTML = '<option value="">Alle Jahre</option>';
+    //const select = document.getElementById('filterExceptionYear');
+    //select.innerHTML = '<option value="">Alle Jahre</option>';
     
     years.forEach(year => {
         select.innerHTML += `<option value="${year}">${year}</option>`;
     });
+    */
+
+    return 0;load
     
     /*
     // Setze aktuelles Jahr als Default
@@ -141,7 +164,7 @@ async function loadExceptionYears() {
 }
 
 export function applyExceptionYearFilter() {
-    const year = document.getElementById('filterExceptionYear').value;
+    const year = document.getElementById('exceptionYearFilter').value;
     currentExceptionYear = year || null;
     loadExceptions();
 }
@@ -360,12 +383,15 @@ export async function saveException() {
     }
     
     if (result) {
-        closeExceptionModal();
-        loadExceptions();
-        
+        closeExceptionModal();        
+        invalidateCache('exceptions',currentYear);
+        loadExceptions(true);
+
         // Wenn Zeitkorrektur genehmigt wurde, Records neu laden
         if (isAdmin && data.status === 'approved' && data.exception_type === 'time_correction') {
-            loadRecords();
+            invalidateCache('exceptions',currentYear);
+            invalidateCache('records',currentYear);
+            //loadRecords();
         }
 
         // Erfolgs-Toast
@@ -386,7 +412,8 @@ export async function deleteException(exceptionId) {
     if (confirmed) {
         const result = await apiCall('exceptions', 'DELETE', null, { id: exceptionId });
         if (result) {
-            loadExceptions();
+            invalidateCache('exceptions',currentYear);
+            loadExceptions(true);
              showToast(`Eintrag wurde gelöscht`, 'success');
 
         }

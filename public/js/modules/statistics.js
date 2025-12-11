@@ -1,16 +1,38 @@
 import { apiCall, isAdmin } from './api.js';
-import { showToast } from './ui.js';
+import { loadGroups } from './management.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, currentYear, setCurrentYear} from './ui.js';
 import { round } from './utils.js';
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
 // ============================================
 
-export async function loadStatistics() {
-    const year = document.getElementById('statYear').value;
+export async function loadStatistics(forceReload = false) {
+    const year = currentYear; 
+
+    // Cache-Check
+    if (!forceReload && isCacheValid('statistics', year)) {
+        console.log(`Loading statistics for ${year} from cache`);
+        renderStatistics(dataCache.statistics[year].data);
+        return;
+    }
+
     const groupId = document.getElementById('statGroup').value;
     const memberId = isAdmin ? document.getElementById('statMember').value : null;
+
+    // API-Call mit Jahr
+    const stats = await apiCall('statistics', 'GET', null, { year: year });
     
+    // Cache speichern
+    if (!dataCache.statistics[year]) {
+        dataCache.statistics[year] = {};
+    }
+    dataCache.statistics[year].data = stats;
+    dataCache.statistics[year].timestamp = Date.now();
+    
+    renderStatistics(stats);
+    
+    /*
     let params = {};
     if(year) params.year = year;
     if (groupId) params.group_id = groupId;
@@ -23,21 +45,30 @@ export async function loadStatistics() {
         showToast('Fehler beim Laden der Statistik', 'error');
         console.error(error);
     }
+    */
 }
 
 export async function reloadStatisticsFilters() {
     // Jahr-Filter (aktuelle + letzte 5 Jahre)
-    const yearSelect = document.getElementById('statYear');
-    const currentYear = new Date().getFullYear();
-    yearSelect.innerHTML = '';
-    for (let i = 0; i < 6; i++) {
-        const year = currentYear - i;
-        yearSelect.innerHTML += `<option value="${year}">${year}</option>`;
-    }
     
+    const yearSelect = document.getElementById('statisticYearFilter');
+
+    // Gespeichertes/aktuelles Jahr setzen
+    yearSelect.value = currentYear;
+
+    // Event Listener für Synchronisation (falls noch nicht vorhanden)
+    if (!yearSelect.dataset.listenerAdded) {
+        yearSelect.addEventListener('change', (e) => {
+            setCurrentYear(e.target.value);
+        });
+        yearSelect.dataset.listenerAdded = 'true';
+    }
+
     // Gruppen laden
     try {
-        const groups = await apiCall('member_groups');
+        loadGroups(false);
+
+        const groups = dataCache.groups.data;
         const groupSelect = document.getElementById('statGroup');
         groupSelect.innerHTML = '<option value="">Alle Gruppen</option>';
         groups.forEach(group => {
@@ -181,10 +212,10 @@ function updateOverallStats(summary) {
     document.getElementById('statOverallAverage').textContent = summary.overall_average + '%';
 }
 
-export function initStatistics() {
+export async function initStatistics() {
 
     // Change-Listener für automatische Aktualisierung
-    document.getElementById('statYear').addEventListener('change', loadStatistics);
+    //document.getElementById('statYear').addEventListener('change', loadStatistics);
     document.getElementById('statGroup').addEventListener('change', async function() {
         if (isAdmin) {
             await loadMemberFilterOptions();

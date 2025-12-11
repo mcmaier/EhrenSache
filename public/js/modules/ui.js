@@ -1,4 +1,4 @@
-import { TOAST_DURATION } from '../config.js';
+import {TOAST_DURATION} from '../config.js';
 import {apiCall, isAdmin, currentUser, setCurrentUser} from './api.js';
 import {loadSettings} from './settings.js';
 import {loadUsers} from'./users.js';
@@ -15,8 +15,163 @@ import {loadStatistics, initStatistics, reloadStatisticsFilters} from './statist
 // Reference:
 // import {} from './ui.js'
 // ============================================
+// ============================================
+// CACHING
+// ============================================
 
-// UI Helper Funktionen
+export const dataCache = {
+    userData: { data: [], timestamp: null},
+    members: { data: [], year: null, timestamp: null },
+    users: { data: [], timestamp: null },
+    groups: { data: [], timestamp: null },
+    types: { data: [], timestamp: null },
+    availableYears: { data: [], timestamp: null }, 
+    
+    //Jahresabhängige Daten separat
+    statistics: {},
+    appointments: {},
+    records: {},
+    exceptions: {}
+};
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 Minuten
+
+export function isCacheValid(cacheKey, year = null) {
+
+    const cached = dataCache[cacheKey];
+
+    // Jahresabhängige Daten
+    if (year !== null) {
+        if (!cached[year] || !cached[year].data || !cached[year].timestamp) {
+            return false;
+        }
+        return (Date.now() - cached[year].timestamp) < CACHE_TTL;
+    }
+    
+    // Normale Daten
+    if (!cached.data || !cached.timestamp) return false;
+    return (Date.now() - cached.timestamp) < CACHE_TTL;
+}
+
+export function invalidateCache(cacheKey = null, year = null) {
+    if (cacheKey) {
+        if (year !== null) {
+            // Spezifisches Jahr invalidieren
+            if (dataCache[cacheKey][year]) {
+                dataCache[cacheKey][year] = { data: [], timestamp: null };
+            }
+        } else if (typeof dataCache[cacheKey] === 'object' && !Array.isArray(dataCache[cacheKey])) {
+            // Alle Jahre invalidieren
+            Object.keys(dataCache[cacheKey]).forEach(y => {
+                dataCache[cacheKey][y] = { data: [], timestamp: null };
+            });
+        } else {
+            // Normale Cache-Einträge
+            dataCache[cacheKey].data = [];
+            dataCache[cacheKey].timestamp = null;
+        }
+    } else {
+        // Alles invalidieren
+        Object.keys(dataCache).forEach(key => {
+            if (typeof dataCache[key] === 'object' && !Array.isArray(dataCache[key]) && !dataCache[key].data) {
+                dataCache[key] = {};
+            } else {
+                dataCache[key].data = [];
+                dataCache[key].timestamp = null;
+            }
+        });
+    }
+}
+
+// ============================================
+// Jahresabhängige Filterung
+// ============================================
+
+export let currentYear = new Date().getFullYear();
+
+export function setCurrentYear(year) {
+    currentYear = parseInt(year);
+    sessionStorage.setItem('selectedYear', year);
+    
+    // Alle Jahresfilter synchronisieren
+    syncAllYearFilters(year);
+    
+    // Jahresabhängige Daten neu laden
+    loadYearDependentData();
+}
+
+function syncAllYearFilters(year) {
+    // Alle Jahres-Select-Felder finden und synchronisieren
+    const yearSelects = document.querySelectorAll('[id$="YearFilter"], [id*="year"]');
+    yearSelects.forEach(select => {
+        if (select.tagName === 'SELECT' && select.value !== year.toString()) {
+            select.value = year;
+        }
+    });
+}
+
+export async function populateYearFilter(selectElement) {
+    const years = await loadAvailableYears();
+    const savedYear = sessionStorage.getItem('selectedYear') || currentYear;
+    
+    selectElement.innerHTML = '';
+    years.forEach(year => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        if (year === parseInt(savedYear)) option.selected = true;
+        selectElement.appendChild(option);
+    });
+}
+
+export async function initAllYearFilters() {
+    // Alle Jahresfilter identifizieren und befüllen
+    const yearFilters = [
+        'appointmentYearFilter',
+        'recordYearFilter', 
+        'exceptionYearFilter',
+        'statisticYearFilter'
+    ];
+
+    console.log("Initializing Year Filters");
+    
+    for (const filterId of yearFilters) {
+        const element = document.getElementById(filterId);
+        if (element) {
+            await populateYearFilter(element);
+            
+            // Event Listener hinzufügen
+            element.addEventListener('change', (e) => {
+                setCurrentYear(e.target.value);
+            });
+        }
+    }
+}
+
+export async function loadAvailableYears(forceReload = false) {
+
+    if (!forceReload && isCacheValid('availableYears')) {
+        console.log('Loading available years from cache', dataCache.availableYears.data);
+        return dataCache.availableYears.data;
+    }
+    
+    const years = await apiCall('available_years');  // Direkt das Array
+    console.log('Loading years from API', years);
+    
+    if (Array.isArray(years)) {
+        dataCache.availableYears.data = years;
+        dataCache.availableYears.timestamp = Date.now();
+        return years;
+    }
+    
+    // Fallback
+    return [new Date().getFullYear()];
+}
+
+// ============================================
+// UI Helper
+// ============================================
+
 export function showScreen(screenName) {
     const screens = {
         login: document.getElementById('loginPage'),
@@ -312,6 +467,8 @@ export async function initNavigation() {
              // Speichere aktuelle Section
             sessionStorage.setItem('currentSection', section);
 
+            console.log("==== SECTION CHANGED ===>", section);            
+
             loadAllData();
 
             // Schließe Sidebar auf Mobile nach Klick auf Menu Item
@@ -331,57 +488,100 @@ export async function initNavigation() {
 
 export async function loadAllData() {
     const section = sessionStorage.getItem('currentSection') || 'einstellungen';
+
+    switch(section)
+    {
+        case 'einstellungen':
+            await loadSettings(!isCacheValid('userData'));
+            break;
+        case 'mitglieder':
+            await loadMembers(!isCacheValid('members'));
+            break;
+        case 'termine':
+            await loadAppointments(!isCacheValid('appointments',currentYear));
+            break;
+        case 'anwesenheit':
+            {
+                //await loadRecordFilters();
+                await loadRecords(!isCacheValid('records',currentYear));
+            }
+            break;
+        case 'antraege':
+            {
+                //await loadExceptionFilters();
+                await loadExceptions(!isCacheValid('exceptions',currentYear));
+            }
+            break;
+        case 'benutzer':
+            if(isAdmin){
+                await loadUsers(!isCacheValid('users'));
+            }            
+            break;
+        case 'verwaltung':
+            if(isAdmin){
+                await loadGroups(!isCacheValid('groups'));
+                await loadTypes(!isCacheValid('types'));
+            }
+            break;
+        case 'statistik':
+            //await reloadStatisticsFilters();
+            await loadStatistics(!isCacheValid('statistics',currentYear));
+            break;
+            default:
+                break;
+    }    
+
+    // Hintergrund-Laden nur für ungecachte Daten
+    setTimeout(() => {
+        if ((section !== 'mitglieder') && !isCacheValid('members')) 
+            loadMembers(true);
+        if ((section !== 'termine') && !isCacheValid('appointments',currentYear)) 
+            loadAppointments(true);
+        if ((section !== 'anwesenheit') && !isCacheValid('records',currentYear)) {
+            loadRecordFilters();
+            loadRecords(true);
+        }
+        if ((section !== 'antraege') && !isCacheValid('exceptions',currentYear)) {
+            loadExceptionFilters();
+            loadExceptions(true);
+        }
+        if((section !== 'statistik') && !isCacheValid('statistics', currentYear)) {
+            reloadStatisticsFilters();
+            loadStatistics(true);
+        }
+
+        if(isAdmin)
+        {
+            if((section !== 'benutzer') && !isCacheValid('users'))
+            {
+                loadUsers(true);
+            }
+            if(section !== 'verwaltung')
+            {            
+                if (!isCacheValid('groups')) loadGroups(true);
+                if (!isCacheValid('types')) loadTypes(true);
+            }
+        }
+    }, 100);
+}
+
+
+async function loadYearDependentData() {
+    const section = sessionStorage.getItem('currentSection');
     
-    //Aktive Section zuerst laden
-    if(section === 'einstellungen') {
-        await loadSettings();
-    }
-    else if (section === 'mitglieder') {
-        await loadMembers(true);
-    } else if (section === 'termine') {
-        await loadAppointments(true);
+    // Nur aktive Section neu laden
+    if (section === 'termine') {
+        await loadAppointments(false);  // false = aus Cache wenn möglich
     } else if (section === 'anwesenheit') {
         await loadRecordFilters();
-        await loadRecords(true);
+        await loadRecords(false);
     } else if (section === 'antraege') {
         await loadExceptionFilters();
-        await loadExceptions(true);
-    } else if (section === 'benutzer' && isAdmin) {
-        await loadUsers();
-    }
-    else if(section === 'verwaltung' && isAdmin) {
-        await loadGroups();
-        await loadTypes();
-    }
-    else if (section === 'statistik') {
+        await loadExceptions(false);
+    } else if (section === 'statistik') {
         await reloadStatisticsFilters();
-        await loadStatistics();
+        await loadStatistics(false);
     }
-
-        //Rest im Hintergrund laden (nicht-blockierend)
-        setTimeout(() => {
-            if (section !== 'mitglieder') loadMembers(true);
-            if (section !== 'termine') loadAppointments(true);
-            if (section !== 'anwesenheit') {
-                loadRecordFilters();
-                loadRecords(true);
-            }
-            if (section !== 'antraege') {
-                loadExceptions(true);
-                loadExceptionFilters();
-            }
-            if (isAdmin && section !== 'benutzer') loadUsers();
-            if (section !== 'einstellungen') loadSettings();
-            if (isAdmin && section !== 'verwaltung') {
-                loadGroups();
-                loadTypes();
-            }
-            if(section != 'statistik')
-            {
-                reloadStatisticsFilters();
-                loadStatistics();
-            }
-        }, 100);
 }
 
 export function initModalEscHandler() {

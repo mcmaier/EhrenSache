@@ -22,6 +22,8 @@ require_once '../../private/handlers/change_password.php';
 require_once '../../private/handlers/member_groups.php';
 require_once '../../private/handlers/appointment_types.php';
 require_once '../../private/handlers/statistics.php';
+require_once '../../private/handlers/export.php';
+require_once '../../private/handlers/import.php';
 
 // Headers
 header("Content-Type: application/json; charset=UTF-8");
@@ -302,7 +304,7 @@ if($resource === 'me' && $request_method === 'GET') {
 if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 
     //Von CSRF ausgenommen
-    $excludedResources = ['login', 'logout', 'regenerate_token'];
+    $excludedResources = ['login', 'logout', 'regenerate_token','import'];
     
     // Login und Logout sind ausgenommen
     if(!in_array($resource, $excludedResources)) {
@@ -325,6 +327,17 @@ if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
             echo json_encode(["message" => "Invalid CSRF token"]);
             exit();
         }        
+    }
+    else if($resource === 'import')
+    {
+    // CSRF-Token aus $_POST (FormData) lesen, nicht aus JSON-Body
+        $csrfToken = $_POST['csrf_token'] ?? null;
+        
+        if (!$csrfToken || !validateCSRFToken($csrfToken)) {
+            http_response_code(403);
+            echo json_encode(["message" => "Invalid CSRF token"]);
+            exit();
+        }
     }
 }        
 
@@ -357,12 +370,15 @@ foreach($adminOnlyResources as $res => $methods) {
 // ============================================
 
 switch($resource) {
+    case 'available_years':
+        handleAvailableYears($db, $request_method, $id);
+        break;
     case 'members':
         handleMembers($db, $request_method, $id);
         break;
     case 'appointments':
         handleAppointments($db, $request_method, $id);
-        break;
+        break;    
     case 'records':
         handleRecords($db, $request_method, $id);
         break;
@@ -395,6 +411,12 @@ switch($resource) {
         exit();                
     case 'change_password':
         handlePasswordChange($db, $request_method, $authUserId);        
+        exit();
+    case 'export':
+        handleExport($db, $request_method, $authUserRole);
+        exit();
+    case 'import':
+        handleImport($db, $request_method, $authUserRole);
         exit();
                 
     default:

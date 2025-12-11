@@ -1,9 +1,10 @@
 
 import { apiCall, isAdmin } from './api.js';
-import { showToast, showConfirm } from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear} from './ui.js';
 import { loadRecordFilters } from './records.js';
 import { loadExceptionFilters } from './exceptions.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
+import { loadTypes } from './management.js';
 
 // ============================================
 // APPOINTMENTS
@@ -12,54 +13,38 @@ import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalI
 // ============================================
 
 let currentCalendarDate = new Date();
-let allAppointments = [];
-let appointmentTypesCache = [];
+//let allAppointments = [];
+//let appointmentTypesCache = [];
 let currentAppointmentYear = null;
-let yearsLoaded = false;
+//let yearsLoaded = false;
 
-const appointmentsCache = {
-    appointments: { data: null, loaded: false }
-};
-
-function invalidateAppointmentsCache(resource) {
-    if (appointmentsCache) {
-        appointmentsCache.loaded = false;
-        appointmentsCache.data = null;
-    }
-}
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
 // ============================================
 
 export async function loadAppointments(forceReload = false) {
+    const year = currentYear;
+
     // Cache verwenden wenn vorhanden und nicht forceReload
-    if (!forceReload && appointmentsCache.loaded && appointmentsCache.data) {
-        renderAppointments(appointmentsCache.data);
+    if (!forceReload && isCacheValid('appointments', year)) {
+        console.log("Loading appointments from cache for ${year}", year);
+        renderAppointments(dataCache.appointments[year].data);
         return;
     }
+    
+    console.log("Loading appointments from API for ${year}", year);
+    const appointments = await apiCall('appointments', 'GET', null, {year: year});
 
-    let params = {};
-
-    // Jahresfilter anwenden
-    if (currentAppointmentYear) {
-        params.year = currentAppointmentYear;
+    // Cache für dieses Jahr speichern
+    if (!dataCache.appointments[year]) {
+        dataCache.appointments[year] = {};
     }
 
-    let appointments = await apiCall('appointments', 'GET', null, params);
+    dataCache.appointments[year].data = appointments;
+    dataCache.appointments[year].timestamp = Date.now();
 
-    // Cache speichern
-    appointmentsCache.data = appointments;
-    appointmentsCache.loaded = true;
-
-    renderAppointments(appointmentsCache.data);
-
-    // Lade Jahre beim ersten Laden
-    if (!yearsLoaded) {
-        await loadAppointmentYears();
-        yearsLoaded = true;
-    }
-
+    renderAppointments(appointments);
 }
 
 async function loadAppointmentData(appointmentId) {
@@ -77,45 +62,39 @@ async function loadAppointmentData(appointmentId) {
 
 // Lade verfügbare Jahre
 async function loadAppointmentYears() {
+    /*
     const appointments = await apiCall('appointments');
     if (!appointments) return;
     
     // Extrahiere eindeutige Jahre
-    const years = [...new Set(appointments.map(a => new Date(a.date).getFullYear()))];
-    years.sort((a, b) => b - a); // Neueste zuerst
+    //const years = [...new Set(appointments.map(a => new Date(a.date).getFullYear()))];
+    //years.sort((a, b) => b - a); // Neueste zuerst
     
-    const select = document.getElementById('filterAppointmentYear');
-    select.innerHTML = '<option value="">Alle Jahre</option>';
+    //const select = document.getElementById('filterAppointmentYear');
+    //select.innerHTML = '<option value="">Alle Jahre</option>';
     
     years.forEach(year => {
         select.innerHTML += `<option value="${year}">${year}</option>`;
-    });
-    
-    /*
-    // Setze aktuelles Jahr als Default
-    const currentYear = new Date().getFullYear();
-    if (years.includes(currentYear)) {
-        select.value = currentYear;
-        currentAppointmentYear = currentYear;
-    }*/
+    });    */
+
+    return 0;
 }
 
 // ============================================
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
-function renderAppointments(cachedData) {
+function renderAppointments(appointmentsData) {
 
-    const appointments = cachedData;
     
-    if (!appointments) return;
+    if (!appointmentsData) return;
 
-    allAppointments = appointments;
+    //allAppointments = appointments;
     
     const tbody = document.getElementById('appointmentsTableBody');
     tbody.innerHTML = '';
         
-    appointments.forEach(apt => {
+    appointmentsData.forEach(apt => {
         // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (apt.appointment_id && apt.title) {
@@ -159,7 +138,7 @@ function renderAppointments(cachedData) {
 
     // Statistiken
     const today = new Date().toISOString().split('T')[0];
-    const upcoming = appointments.filter(a => a.date >= today).length;
+    const upcoming = appointmentsData.filter(a => a.date >= today).length;
     document.getElementById('statUpcomingAppointments').textContent = upcoming;    
     
     /*
@@ -246,7 +225,7 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false) {
     
     // Prüfe ob Termine an diesem Tag
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-    const dayAppointments = allAppointments.filter(apt => apt.date === dateStr);
+    const dayAppointments = dataCache.appointments[currentYear].data.filter(apt => apt.date === dateStr);
     
     if (dayAppointments.length > 0) {
         day.classList.add('has-event');
@@ -348,7 +327,7 @@ export function applyAppointmentYearFilter() {
     }
 
     // Cache invalidieren und neu laden
-    invalidateAppointmentsCache();
+    invalidateCache('appointments',currentYear);
     loadAppointments(true);
 }
 
@@ -401,7 +380,7 @@ export async function openAppointmentModal(appointmentId = null) {
         updateModalId('appointmentModal', null);
 
          // Setze Default-Terminart falls vorhanden
-        const defaultType = appointmentTypesCache.find(t => t.is_default);
+        const defaultType = dataCache.types.data.find(t => t.is_default);
         if (defaultType) {
             document.getElementById('appointment_type').value = defaultType.type_id;
         }
@@ -446,11 +425,10 @@ export async function saveAppointment() {
         closeAppointmentModal();
 
         // Cache invalidieren und neu laden
-        invalidateAppointmentsCache();
-
+        invalidateCache('appointments',currentYear);
         await loadAppointments(true);        
-        await loadRecordFilters();
-        await loadExceptionFilters();
+        //await loadRecordFilters();
+        //await loadExceptionFilters();
 
         // Erfolgs-Toast
         showToast(
@@ -470,11 +448,10 @@ export async function deleteAppointment(appointmentId, title) {
         const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
         if (result) {
              // Cache invalidieren und neu laden            
-            invalidateAppointmentsCache();
-
+            invalidateCache('appointments',currentYear);
             await loadAppointments(true);        
-            await loadRecordFilters();
-            await loadExceptionFilters();
+            //await loadRecordFilters();
+            //await loadExceptionFilters();
 
             showToast(`Termin "${title}" wurde gelöscht`, 'success');
         }
@@ -483,14 +460,14 @@ export async function deleteAppointment(appointmentId, title) {
 
 // Neue Funktion: Terminarten laden
 async function loadAppointmentTypes() {
-    if (appointmentTypesCache.length === 0) {
-        appointmentTypesCache = await apiCall('appointment_types') || [];
+    if (dataCache.types.data.length === 0) {
+        await loadTypes(true);
     }
     
     const select = document.getElementById('appointment_type');
     select.innerHTML = '<option value="">Bitte wählen...</option>';
     
-    appointmentTypesCache.forEach(type => {
+    dataCache.types.data.forEach(type => {
         const option = document.createElement('option');
         option.value = type.type_id;
         option.textContent = type.type_name;
@@ -506,18 +483,18 @@ async function loadAppointmentTypes() {
     });
 }
 
-function goToToday() {
+async function goToToday() {
     currentCalendarDate = new Date();
     
     // Setze Filter auf aktuelles Jahr
-    const currentYear = new Date().getFullYear();
+    //const currentYear = new Date().getFullYear();
     document.getElementById('filterAppointmentYear').value = currentYear;
     currentAppointmentYear = currentYear;
     checkCalendarFilterMismatch();
     
     // Lade Appointments neu
-    invalidateAppointmentsCache();
-    loadAppointments(true);
+    invalidateCache('appointments',currentYear);
+    await loadAppointments(true);
 }
 
 // ============================================

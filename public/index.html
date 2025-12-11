@@ -164,9 +164,11 @@
             <!-- Termine Section -->
             <div class="content-section" id="termine">
                 <div class="content-header">
-                    <h1>Terminverwaltung</h1>
-                    <!-- Bei Termine -->
-                    <button class="btn-add" data-role="admin" onclick="openAppointmentModal()">+ Neuer Termin</button>
+                    <h1>Terminverwaltung</h1>                    
+                     <div class="header-actions">
+                        <button class="btn-secondary" data-role="admin" onclick="exportAppointments()">📥 Export CSV</button>            
+                        <button class="btn-add" data-role="admin" onclick="openAppointmentModal()">+ Neuer Termin</button>
+                     </div>
                 </div>
                 
                  <!-- Hinweis für User -->
@@ -181,9 +183,8 @@
                     </div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
                         <h3>Jahr filtern</h3>
-                        <select id="filterAppointmentYear" onchange="applyAppointmentYearFilter()" 
+                        <select id="appointmentYearFilter"
                                 style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
-                            <option value="">Alle Jahre</option>
                         </select>
                     </div>
                 </div>
@@ -233,7 +234,11 @@
             <div class="content-section" id="anwesenheit">
                 <div class="content-header">
                     <h1>Anwesenheitsverwaltung</h1>
-                    <button class="btn-add" data-role="admin" onclick="openRecordModal()">+ Anwesenheit erfassen</button>
+                    <div class="header-actions">
+                        <button class="btn-secondary" data-role="admin" onclick="exportRecords()">📥 Export CSV</button>  
+                        <button class="btn-secondary" data-role="admin" onclick="openRecordsImportModal()">📤 Import CSV</button>                  
+                        <button class="btn-add" data-role="admin" onclick="openRecordModal()">+ Anwesenheit erfassen</button>
+                    </div>
                 </div>
 
                 <div class="stats-grid">
@@ -243,9 +248,8 @@
                     </div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
                         <h3>Jahr filtern</h3>
-                        <select id="filterRecordYear" onchange="applyRecordYearFilter()" 
+                        <select id="recordYearFilter"
                                 style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
-                            <option value="">Alle Jahre</option>
                         </select>
                     </div>
                 </div>
@@ -305,9 +309,8 @@
                     </div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
                         <h3>Jahr filtern</h3>
-                        <select id="filterExceptionYear" onchange="applyExceptionYearFilter()" 
-                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
-                            <option value="">Alle Jahre</option>
+                        <select id="exceptionYearFilter"
+                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">                            
                         </select>
                     </div>
                 </div>
@@ -359,11 +362,38 @@
                 <div class="content-header">
                     <h1>Statistik</h1>
                 </div>                
+                
+                <div class="stats-grid">                    
+                    <div class="stat-card">
+                        <div class="form-group">
+                            <label for="statGroup">Termingruppe</label>
+                            <select id="statGroup" class="form-input">
+                                <option value="">Alle Gruppen</option>
+                            </select>
+                        </div>       
+                    </div>
+                    <div class="stat-card">
+                        <div class="form-group" id="statMemberFilterGroup" style="display:none;">
+                            <label for="statMember">Mitglied</label>
+                            <select id="statMember" class="form-input">
+                                <option value="">Alle Mitglieder</option>
+                            </select>                            
+                        </div>
+                    </div>
+                                           
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
+                        <h3>Jahr filtern</h3>
+                        <select id="statisticYearFilter"
+                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
+                        </select>
+                    </div>                                       
+                </div>
+                <!--
                 <div class="filter-bar">
-                    <div class="form-group">
+                     <div class="form-group">
                         <label for="statYear">Jahr</label>
                         <select id="statYear" class="form-input"></select>
-                    </div>
+                    </div> 
                     
                     <div class="form-group">
                         <label for="statGroup">Termingruppe</label>
@@ -377,8 +407,8 @@
                         <select id="statMember" class="form-input">
                             <option value="">Alle Mitglieder</option>
                         </select>
-                    </div>                    
-                </div>
+                    </div>                   
+                </div> -->
 
                 <div class="stats-grid">
                     <div class="stat-card">
@@ -410,7 +440,11 @@
             <div class="content-section active" id="mitglieder">
                 <div class="content-header">
                     <h1>Mitgliederverwaltung</h1> 
-                    <button class="btn-add" data-role="admin" onclick="openMemberModal()">+ Neues Mitglied</button>
+                    <div class="header-actions">
+                        <button class="btn-secondary" data-role="admin" onclick="exportMembers()">📥 Export CSV</button>
+                        <button class="btn-secondary" data-role="admin" onclick="openImportModal()">📤 Import CSV</button>            
+                        <button class="btn-add" data-role="admin" onclick="openMemberModal()">+ Neues Mitglied</button>                    
+                    </div>
                 </div>
                 
                 <div class="stats-grid">
@@ -517,13 +551,11 @@
                 </div>
             </div>
 
-        <!-- ENDE MAIN ----------------------------  -->
+        <!-- ENDE MAIN ---->
         </main>
     </div>
 
-    <!-- ----------------------------  -->
     <!-- MODALS ---------------------  -->
-    <!-- ----------------------------  -->
 
     <!-- Modal für Mitglieder -->
     <div class="modal" id="memberModal">
@@ -933,6 +965,97 @@
         </div>
     </div>
 
+    <!-- Member Import Modal -->
+    <div class="modal" id="importModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Mitglieder importieren (CSV)</h2>
+                <span class="modal-close" onclick="closeImportModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="import-info">
+                    <h3>CSV-Format:</h3>
+                    <p>Die CSV-Datei muss folgende Spalten enthalten:</p>
+                    <ul>
+                        <li><strong>name</strong> - Pflichtfeld</li>
+                        <li><strong>surname</strong> - Pflichtfeld</li>
+                        <li><strong>member_number</strong> - Optional, für eindeutige Zuordnung empfohlen</li>
+                        <li><strong>active</strong> - 1 oder 0</li>
+                        <li><strong>groups</strong> - Gruppennamen getrennt durch |</li>
+                    </ul>
+                    <p><strong>Trennzeichen:</strong> Semikolon (;)</p>
+                    <p><strong>Encoding:</strong> UTF-8</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="importFile">CSV-Datei auswählen:</label>
+                    <input type="file" id="importFile" accept=".csv" class="file-input">
+                </div>
+                
+                <div id="importProgress" style="display:none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="importProgressFill"></div>
+                    </div>
+                    <p id="importStatus">Importiere...</p>
+                </div>
+                
+                <div id="importResult" style="display:none;">
+                    <h3>Import-Ergebnis:</h3>
+                    <div id="importResultContent"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeImportModal()">Abbrechen</button>
+                <button class="btn-save" id="importBtn" onclick="executeImport()">Importieren</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Import Modal -->
+    <div class="modal" id="recordsImportModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Anwesenheiten importieren (CSV)</h2>
+                <span class="modal-close" onclick="closeRecordsImportModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="import-info">
+                    <h3>CSV-Format:</h3>
+                    <p>Die CSV-Datei muss folgende Spalten enthalten:</p>
+                    <ul>
+                        <li><strong>member_number</strong> - Pflichtfeld (Mitgliedsnummer)</li>
+                        <li><strong>arrival_date_time</strong> - Pflichtfeld (Format: YYYY-MM-DD HH:MM:SS)</li>
+                        <li><strong>status</strong> - Optional (present/excused, Standard: present)</li>
+                    </ul>
+                    <p><strong>Hinweis:</strong> Das System sucht automatisch passende Termine am angegebenen Datum.</p>
+                    <p><strong>Trennzeichen:</strong> Semikolon (;)</p>
+                    <p><strong>Encoding:</strong> UTF-8</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="recordsImportFile">CSV-Datei auswählen:</label>
+                    <input type="file" id="recordsImportFile" accept=".csv" class="file-input">
+                </div>
+                
+                <div id="recordsImportProgress" style="display:none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="recordsImportProgressFill"></div>
+                    </div>
+                    <p id="recordsImportStatus">Importiere...</p>
+                </div>
+                
+                <div id="recordsImportResult" style="display:none;">
+                    <h3>Import-Ergebnis:</h3>
+                    <div id="recordsImportResultContent"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeRecordsImportModal()">Abbrechen</button>
+                <button class="btn-save" id="recordsImportBtn" onclick="executeRecordsImport()">Importieren</button>
+            </div>
+        </div>
+    </div>
+
     <!-- QR Code Generator -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
@@ -952,6 +1075,7 @@
     <script type="module" src="./js/modules/settings.js"></script>
     <script type="module" src="./js/modules/management.js"></script>
     <script type="module" src="./js/modules/statistics.js"></script>
+    <script type="module" src="./js/modules/import_export.js"></script>
 
     <!-- Hauptdatei -->
     <script type="module" src="./js/app.js"></script>
