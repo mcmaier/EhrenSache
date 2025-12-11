@@ -1,4 +1,4 @@
-import { loadAllData, showLogin, showDashboard, initNavigation, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, setCurrentYear} from './modules/ui.js';
+import { loadAllData, showLogin, showDashboard, initNavigation, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, currentYear, setCurrentYear} from './modules/ui.js';
 import { apiCall, setCurrentUser, setCsrfToken, setInitialLoad, currentUser, isAdmin} from './modules/api.js';
 import { initAuth } from './modules/auth.js';
 import { loadMembers } from './modules/members.js';
@@ -11,12 +11,12 @@ import { loadGroups, loadTypes } from './modules/management.js';
 import { initStatistics} from './modules/statistics.js';
 import { exportMembers, exportAppointments, exportRecords } from './modules/import_export.js';
 
-
 // ============================================
 // INIT JS
 // ============================================
 
 async function init() {
+
     initAuth();
     initNavigation();
     initSettings();

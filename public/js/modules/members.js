@@ -26,7 +26,7 @@ export async function loadMembers(forceReload = false) {
     if (!forceReload && isCacheValid('members')) {
         console.log("Loading members from cache:", dataCache.members.data);
         renderMembers(dataCache.members.data);
-        return;
+        return dataCache.members.data;
     }
 
     // Userprofil abfragen (falls nicht gecacht)
@@ -57,6 +57,7 @@ export async function loadMembers(forceReload = false) {
     dataCache.members.timestamp = Date.now();
 
     renderMembers(dataCache.members.data);
+    return members;
 }
 
 // ============================================

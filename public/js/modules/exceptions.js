@@ -3,6 +3,9 @@ import { apiCall, currentUser, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache,currentYear} from './ui.js';
 import { loadRecords } from './records.js';
 import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime , updateModalId} from './utils.js';
+import { loadUserData } from './users.js';
+import { loadAppointments } from './appointments.js';
+import { loadMembers } from './members.js';
 
 // ============================================
 // EXCEPTIONS
@@ -28,7 +31,7 @@ export async function loadExceptions(forceReload = false) {
     if (!forceReload && isCacheValid('exceptions', year)) {
         console.log('Loading exceptions from cache for ${year}', year);
         renderExceptions(dataCache.exceptions[year].data);        
-        return;
+        return dataCache.exceptions[year].data;
     }
 
     console.log('Loading exceptions from API for ${year}', year);
@@ -41,12 +44,8 @@ export async function loadExceptions(forceReload = false) {
     if (currentExceptionFilter.type) {
         params.type = currentExceptionFilter.type;
     }
-    // Jahresfilter anwenden
-    if (currentExceptionYear) {
-        params.year = year;
-    }
 
-    const exceptions = await apiCall('exceptions', 'GET', null, params);
+    const exceptions = await apiCall('exceptions', 'GET', null, {year: year});
 
     if(!dataCache.exceptions[year])
     {
@@ -57,6 +56,7 @@ export async function loadExceptions(forceReload = false) {
     dataCache.exceptions[year].timestamp = Date.now();
 
     renderExceptions(exceptions);
+    return exceptions;
 }
 
 function renderExceptions(exceptionData)
@@ -67,7 +67,7 @@ function renderExceptions(exceptionData)
     tbody.innerHTML = '';
     
     if (exceptionData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="loading">Keine Anträge gefunden</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Anträge gefunden</td></tr>';
         document.getElementById('statPendingExceptions').textContent = '0';
         document.getElementById('statApprovedExceptions').textContent = '0';
         return;
@@ -84,6 +84,16 @@ function renderExceptions(exceptionData)
         const statusBadge = `<span class="status-badge status-${exception.status}">${translateExceptionStatus(exception.status)}</span>`;
         const typeBadge = `<span class="type-badge">${translateExceptionType(exception.exception_type)}</span>`;
         
+        let appointmentInfo = 'Kein Termin';
+        if (exception.appointment_id && dataCache.appointments[currentYear]) {
+            const appointment = dataCache.appointments[currentYear].data.find(
+                a => a.appointment_id == exception.appointment_id
+            );
+            if (appointment) {
+                appointmentInfo = `${appointment.title} (${appointment.date})`;
+            }
+        }
+
         // Aktionen: User sehen nur bei pending eigene Anträge Buttons
         let actionsHtml = '';
         if (isAdmin) {
@@ -116,7 +126,7 @@ function renderExceptions(exceptionData)
             <tr>
                 <td>${typeBadge}</td>
                 <td>${exception.surname}, ${exception.name}</td>
-                <td>${exception.title} (${exception.date})</td>
+                <td>${appointmentInfo}</td>
                 <td>${exception.reason}</td>
                 <td>${requestedTime}</td>
                 <td>${statusBadge}</td>
@@ -128,54 +138,22 @@ function renderExceptions(exceptionData)
     });
 
     // Statistiken
-    const pending = exceptions.filter(e => e.status === 'pending').length;
-    const approved = exceptions.filter(e => e.status === 'approved').length;
+    const pending = exceptionData.filter(e => e.status === 'pending').length;
+    const approved = exceptionData.filter(e => e.status === 'approved').length;
     document.getElementById('statPendingExceptions').textContent = pending;
     document.getElementById('statApprovedExceptions').textContent = approved;
-}
-
-// Lade verfügbare Jahre
-async function loadExceptionYears() {
-    /*
-    const exceptions = await apiCall('exceptions');
-    if (!exceptions) return;
-    
-    // Extrahiere eindeutige Jahre aus created_at
-    const years = [...new Set(exceptions.map(e => new Date(e.created_at).getFullYear()))];
-    years.sort((a, b) => b - a);
-    
-    //const select = document.getElementById('filterExceptionYear');
-    //select.innerHTML = '<option value="">Alle Jahre</option>';
-    
-    years.forEach(year => {
-        select.innerHTML += `<option value="${year}">${year}</option>`;
-    });
-    */
-
-    return 0;load
-    
-    /*
-    // Setze aktuelles Jahr als Default
-    const currentYear = new Date().getFullYear();
-    if (years.includes(currentYear)) {
-        select.value = currentYear;
-        currentExceptionYear = currentYear;
-    }*/
-}
-
-export function applyExceptionYearFilter() {
-    const year = document.getElementById('exceptionYearFilter').value;
-    currentExceptionYear = year || null;
-    loadExceptions();
 }
 
 // ============================================
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
-export async function loadExceptionFilters() {
-    // Lade Termine für Dropdown
-    const appointments = await apiCall('appointments');
+export async function loadExceptionFilters(forceReload = false) {
+
+    //await loadAppointments();
+
+    const appointments = await loadAppointments();//dataCache.appointments[currentYear].data;
+
     const appointmentSelect = document.getElementById('exception_appointment');
     appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
@@ -203,17 +181,15 @@ export async function loadExceptionFilters() {
             option.dataset.typeName = appointment.type_name || '';
             
             appointmentSelect.appendChild(option);
-        });
-     
-     
-     /*   appointments.forEach(apt => {
-            appointmentSelect.innerHTML += `<option value="${apt.appointment_id}">${apt.title} (${apt.date})</option>`;
-        });*/
+        });     
     }
     
     // Lade Mitglieder für Dropdown (nur für Admin)
+    //TODO Members aus Cache laden
     if (isAdmin) {
-        const members = await apiCall('members');
+        const members = await loadMembers();
+
+        //const members = await apiCall('members');
         const memberSelect = document.getElementById('exception_member');
         memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
         
@@ -267,6 +243,7 @@ export async function openExceptionModal(exceptionId = null) {
         updateModalId('exceptionModal', null);
 
         // User: Automatisch eigene Member-ID setzen
+        //TODO Daten aus Cache laden
         if (!isAdmin) {
             const userData = await apiCall('me');
             const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
@@ -351,6 +328,7 @@ export async function saveException() {
     if (isAdmin) {
         member_id = parseInt(document.getElementById('exception_member').value);
     } else {
+        //TODO Load User Data from cache
         const userData = await apiCall('me');
         const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
         member_id = userDetails.member_id;        
@@ -375,6 +353,8 @@ export async function saveException() {
         status: isAdmin ? document.getElementById('exception_status').value : 'pending'
     };
     
+    console.log("Exception data:",data);
+
     let result;
     if (exceptionId) {
         result = await apiCall('exceptions', 'PUT', data, { id: exceptionId });
@@ -431,4 +411,3 @@ window.closeExceptionModal = () => document.getElementById('exceptionModal').cla
 window.deleteException = deleteException;
 window.resetExceptionFilter = resetExceptionFilter;
 window.applyExceptionFilter = applyExceptionFilter;
-window.applyExceptionYearFilter = applyExceptionYearFilter;

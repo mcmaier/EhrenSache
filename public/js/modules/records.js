@@ -11,7 +11,7 @@ import { translateRecordStatus,datetimeLocalToMysql, mysqlToDatetimeLocal, forma
 // import {} from './records.js'
 // ============================================
 
-let currentRecordYear = null;
+let appointmentTypeCache = {};
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -40,8 +40,9 @@ export async function loadRecords(forceReload = false) {
 
     await loadTypes();
     await loadRecordFilters();
-    await loadRecordMemberFilter();        
-    
+    await loadRecordMemberFilter(); 
+    //await loadAppointmentTypesCache();       
+
     console.log("Loading records from API for ${year}", year);
     const records = await apiCall('records', 'GET', null, params);
 
@@ -56,7 +57,6 @@ export async function loadRecords(forceReload = false) {
     renderRecords(records);
 }
 
-
 function renderRecords(recordData)
 {
    const tbody = document.getElementById('recordsTableBody');
@@ -66,7 +66,7 @@ function renderRecords(recordData)
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Einträge gefunden</td></tr>';
         document.getElementById('statTotalRecords').textContent = '0';
         return;
-    }
+    }    
     
     recordData.forEach(record => {
         const arrivalTime = new Date(record.arrival_time);
@@ -88,20 +88,25 @@ function renderRecords(recordData)
         }
         
         // Terminart Badge
-        let appointmentTypeBadge = '-';
-        
-        if (record.appointment_type_id && (dataCache.types.data.length !== 0)) {
-            const type = dataCache.types.data;
+        let appointmentTypeBadge = '-';    
+        const typeId = record.appointment_type_id;
+        const typeName = record.appointment_type_name;
+    
+        // Type-ID vorhanden → Lookup im Cache (Array durchsuchen)
+        if (typeId && dataCache.types.data && Array.isArray(dataCache.types.data)) {
+            const type = dataCache.types.data.find(t => t.type_id == typeId);
             appointmentTypeBadge = `<span class="type-badge" style="background: ${type.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
                                         ${type.type_name}
                                     </span>`;
-        } else if (record.appointment_type_name) {
-            // Fallback: type_name vorhanden, aber nicht im Cache
+        } 
+        // Fallback: type_name vorhanden (aus Dropdown), aber nicht im Cache
+        else if (typeName) {
             appointmentTypeBadge = `<span class="type-badge" style="background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                                        ${record.appointment_type_name}
+                                        ${type.type_name}
                                     </span>`;
-        } else if (record.appointment_id) {
-            // Termin ohne Terminart
+        } 
+        // Termin ohne Type
+        else {
             appointmentTypeBadge = `<span class="type-badge" style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
                                         Allgemein
                                     </span>`;
@@ -138,25 +143,6 @@ function renderRecords(recordData)
     document.getElementById('statTotalRecords').textContent = recordData.length;
 }
 
-// Lade verfügbare Jahre
-async function loadRecordYears() {
-    /*
-    const records = await apiCall('records');
-    if (!records) return;
-    
-    // Extrahiere eindeutige Jahre aus arrival_time
-    const years = [...new Set(records.map(r => new Date(r.arrival_time).getFullYear()))];
-    years.sort((a, b) => b - a);
-    
-    const select = document.getElementById('filterRecordYear');
-    select.innerHTML = '<option value="">Alle Jahre</option>';
-    
-    years.forEach(year => {
-        select.innerHTML += `<option value="${year}">${year}</option>`;
-    });   
-    */
-    return 0;
-}
 
 export function applyRecordYearFilter() {
     const year = document.getElementById('filterRecordYear').value;
@@ -184,7 +170,7 @@ export async function loadRecordDropdowns() {
     //    const members =  await loadMembers(true);
     //}
     
-    const members =  await loadMembers(true);
+    const members =  await loadMembers();
     const memberSelect = document.getElementById('record_member');
     memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
@@ -194,15 +180,11 @@ export async function loadRecordDropdowns() {
             memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
         });
     
-    // Lade Termine
-    if (dataCache.appointments.data.length === 0) {
-        await loadAppointments(true);
-    }    
-    
+    const appointments = await loadAppointments();    
     const appointmentSelect = document.getElementById('record_appointment');    
     appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
-    dataCache.appointments.data.forEach(appointment => {
+    appointments.forEach(appointment => {
             const date = new Date(appointment.date + 'T00:00:00');
             const formattedDate = date.toLocaleDateString('de-DE');
             const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
@@ -349,14 +331,11 @@ function getSourceBadge(record) {
     return badge;
 }
 
-/*
+
 async function loadAppointmentTypesCache() {
-    if(dataCache.types.data.length === 0)
-    {
-        await loadTypes(true);
-    }
-    
-    /*
+
+    await loadTypes();    
+        
     if (dataCache.types.data) {
         // Erstelle Lookup-Objekt: { type_id: { type_name, color, ... } }    
         dataCache.types.data.forEach(type => {
@@ -366,9 +345,9 @@ async function loadAppointmentTypesCache() {
                 description: type.description
             };
         });        
-        //console.log('Appointment types cached:', appointmentTypeCache);
+        console.log('Appointment types cached:', appointmentTypeCache);
     }
-}*/
+}
 
 // ============================================
 // MODAL FUNCTIONS
@@ -560,7 +539,7 @@ function updateArrivalTimeFromAppointment() {
     if (!selectedAppointmentId) return;
     
     // Finde den gewählten Termin im Cache
-    const appointment = dataCache.appointments.data.find(apt => apt.appointment_id == selectedAppointmentId);
+    const appointment = dataCache.appointments[currentYear].data.find(apt => apt.appointment_id == selectedAppointmentId);
     
     if (appointment && appointment.date && appointment.start_time) {
         // Konvertiere zu datetime-local Format

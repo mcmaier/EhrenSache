@@ -1,6 +1,6 @@
 
 import { apiCall, isAdmin } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
 import { loadRecordFilters } from './records.js';
 import { loadExceptionFilters } from './exceptions.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
@@ -30,7 +30,7 @@ export async function loadAppointments(forceReload = false) {
     if (!forceReload && isCacheValid('appointments', year)) {
         console.log("Loading appointments from cache for ${year}", year);
         renderAppointments(dataCache.appointments[year].data);
-        return;
+        return dataCache.appointments[year].data;
     }
     
     console.log("Loading appointments from API for ${year}", year);
@@ -45,6 +45,7 @@ export async function loadAppointments(forceReload = false) {
     dataCache.appointments[year].timestamp = Date.now();
 
     renderAppointments(appointments);
+    return appointments;    
 }
 
 async function loadAppointmentData(appointmentId) {
@@ -60,32 +61,11 @@ async function loadAppointmentData(appointmentId) {
     }
 }
 
-// Lade verfügbare Jahre
-async function loadAppointmentYears() {
-    /*
-    const appointments = await apiCall('appointments');
-    if (!appointments) return;
-    
-    // Extrahiere eindeutige Jahre
-    //const years = [...new Set(appointments.map(a => new Date(a.date).getFullYear()))];
-    //years.sort((a, b) => b - a); // Neueste zuerst
-    
-    //const select = document.getElementById('filterAppointmentYear');
-    //select.innerHTML = '<option value="">Alle Jahre</option>';
-    
-    years.forEach(year => {
-        select.innerHTML += `<option value="${year}">${year}</option>`;
-    });    */
-
-    return 0;
-}
-
 // ============================================
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
 function renderAppointments(appointmentsData) {
-
     
     if (!appointmentsData) return;
 
@@ -304,13 +284,11 @@ function showAppointmentPopup(event, appointments) {
 function previousMonth() {
     currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
     renderCalendar();
-    checkCalendarFilterMismatch();
 }
 
 function nextMonth() {
     currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
     renderCalendar();
-    checkCalendarFilterMismatch();
 }
 
 export function applyAppointmentYearFilter() {
@@ -329,29 +307,6 @@ export function applyAppointmentYearFilter() {
     // Cache invalidieren und neu laden
     invalidateCache('appointments',currentYear);
     loadAppointments(true);
-}
-
-function checkCalendarFilterMismatch() {
-    if (currentAppointmentYear) {
-        const calendarYear = currentCalendarDate.getFullYear();
-        const filterYear = parseInt(currentAppointmentYear);
-        
-        if (calendarYear !== filterYear) {
-            // Visueller Hinweis im Kalender-Header
-            const header = document.querySelector('.calendar-header h2');
-            if (header) {
-                header.style.color = '#e67e22'; // Orange für "außerhalb Filter"
-                header.title = `Kalender zeigt ${calendarYear}, aber Filter ist auf ${filterYear} gesetzt`;
-            }
-        } else {
-            // Normal
-            const header = document.querySelector('.calendar-header h2');
-            if (header) {
-                header.style.color = '';
-                header.title = '';
-            }
-        }
-    }
 }
 
 // ============================================
@@ -485,16 +440,13 @@ async function loadAppointmentTypes() {
 
 async function goToToday() {
     currentCalendarDate = new Date();
-    
     // Setze Filter auf aktuelles Jahr
-    //const currentYear = new Date().getFullYear();
-    document.getElementById('filterAppointmentYear').value = currentYear;
-    currentAppointmentYear = currentYear;
-    checkCalendarFilterMismatch();
+    setCurrentYear(currentCalendarDate.getFullYear());    
+    document.getElementById('appointmentYearFilter').value = currentYear;
     
     // Lade Appointments neu
-    invalidateCache('appointments',currentYear);
-    await loadAppointments(true);
+    //invalidateCache('appointments',currentYear);
+    //await loadAppointments();
 }
 
 // ============================================

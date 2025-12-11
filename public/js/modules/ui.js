@@ -86,7 +86,6 @@ export function invalidateCache(cacheKey = null, year = null) {
 // ============================================
 // Jahresabhängige Filterung
 // ============================================
-
 export let currentYear = new Date().getFullYear();
 
 export function setCurrentYear(year) {
