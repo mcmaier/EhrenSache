@@ -1,13 +1,13 @@
 import {TOAST_DURATION} from '../config.js';
 import {apiCall, isAdmin, currentUser, setCurrentUser} from './api.js';
 import {loadSettings} from './settings.js';
-import {loadUsers} from'./users.js';
-import {loadAppointments} from'./appointments.js';
-import {loadExceptions, loadExceptionFilters} from'./exceptions.js';
-import {loadRecords, loadRecordFilters} from'./records.js';
-import {loadMembers} from'./members.js';
-import {loadGroups, loadTypes} from './management.js';
-import {loadStatistics, initStatistics, reloadStatisticsFilters} from './statistics.js';
+import {loadUsers, showUserSection} from'./users.js';
+import {loadAppointments, setCalendarToYear, showAppointmentSection} from'./appointments.js';
+import {loadExceptions, showExceptionSection, initExceptionEventHandlers} from'./exceptions.js';
+import {loadRecords, showRecordsSection, initRecordEventHandlers} from'./records.js';
+import {loadMembers, showMemberSection} from'./members.js';
+import {loadGroups, loadTypes, showGroupSection} from './management.js';
+import {loadStatistics, showStatisticsSection} from './statistics.js';
 
 
 // ============================================
@@ -34,7 +34,7 @@ export const dataCache = {
     exceptions: {}
 };
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 Minuten
+const CACHE_TTL = 10 * 60 * 1000; // 10 Minuten
 
 export function isCacheValid(cacheKey, year = null) {
 
@@ -53,7 +53,7 @@ export function isCacheValid(cacheKey, year = null) {
     return (Date.now() - cached.timestamp) < CACHE_TTL;
 }
 
-export function invalidateCache(cacheKey = null, year = null) {
+export async function invalidateCache(cacheKey = null, year = null) {
     if (cacheKey) {
         if (year !== null) {
             // Spezifisches Jahr invalidieren
@@ -86,7 +86,7 @@ export function invalidateCache(cacheKey = null, year = null) {
 // ============================================
 // Jahresabhängige Filterung
 // ============================================
-export let currentYear = new Date().getFullYear();
+export let currentYear = sessionStorage.getItem('selectedYear') || new Date().getFullYear();
 
 export function setCurrentYear(year) {
     currentYear = parseInt(year);
@@ -112,6 +112,8 @@ function syncAllYearFilters(year) {
 export async function populateYearFilter(selectElement) {
     const years = await loadAvailableYears();
     const savedYear = sessionStorage.getItem('selectedYear') || currentYear;
+
+    console.log("Populating year filter.", years)
     
     selectElement.innerHTML = '';
     years.forEach(year => {
@@ -126,6 +128,7 @@ export async function populateYearFilter(selectElement) {
 export async function initAllYearFilters() {
     // Alle Jahresfilter identifizieren und befüllen
     const yearFilters = [
+        'memberYearFilter',
         'appointmentYearFilter',
         'recordYearFilter', 
         'exceptionYearFilter',
@@ -142,7 +145,10 @@ export async function initAllYearFilters() {
             // Event Listener hinzufügen
             element.addEventListener('change', (e) => {
                 setCurrentYear(e.target.value);
+                setCalendarToYear();
             });
+
+            setCurrentYear(currentYear);
         }
     }
 }
@@ -150,12 +156,12 @@ export async function initAllYearFilters() {
 export async function loadAvailableYears(forceReload = false) {
 
     if (!forceReload && isCacheValid('availableYears')) {
-        console.log('Loading available years from cache', dataCache.availableYears.data);
+        console.log('Loading AVAILABLE YEARS from CACHE');
         return dataCache.availableYears.data;
     }
     
-    const years = await apiCall('available_years');  // Direkt das Array
-    console.log('Loading years from API', years);
+    console.log('Loading AVAILABLE YEARS from API');
+    const years = await apiCall('available_years');  // Direkt das Array    
     
     if (Array.isArray(years)) {
         dataCache.availableYears.data = years;
@@ -484,9 +490,31 @@ export async function initNavigation() {
     });
 }
 
+export async function initDataCache()
+{   
+    loadSettings(true);
+    loadUsers(true);
+    loadMembers(true);         
+    loadTypes(true);
+    loadGroups(true);
+    
+    loadAppointments(true, currentYear);
+    loadExceptions(true, currentYear);
+    loadRecords(true, currentYear);
+    loadStatistics(true, currentYear);
+}
+
+export async function initEventHandlers()
+{
+    initRecordEventHandlers();
+    initExceptionEventHandlers();
+}
+
 
 export async function loadAllData() {
     const section = sessionStorage.getItem('currentSection') || 'einstellungen';
+
+    console.log("== LOAD ALL DATA == ")
 
     switch(section)
     {
@@ -494,37 +522,29 @@ export async function loadAllData() {
             await loadSettings(!isCacheValid('userData'));
             break;
         case 'mitglieder':
-            await loadMembers(!isCacheValid('members'));
+            await showMemberSection();
             break;
         case 'termine':
-            await loadAppointments(!isCacheValid('appointments',currentYear));
+            await showAppointmentSection();
             break;
         case 'anwesenheit':
-            {
-                //await loadRecordFilters();
-                await loadRecords(!isCacheValid('records',currentYear));
-            }
+            await showRecordsSection();
             break;
         case 'antraege':
-            {
-                //await loadExceptionFilters();
-                await loadExceptions(!isCacheValid('exceptions',currentYear));
-            }
+            await showExceptionSection();
             break;
         case 'benutzer':
             if(isAdmin){
-                await loadUsers(!isCacheValid('users'));
+                await showUserSection();
             }            
             break;
         case 'verwaltung':
             if(isAdmin){
-                await loadGroups(!isCacheValid('groups'));
-                await loadTypes(!isCacheValid('types'));
+                await showGroupSection();
             }
             break;
         case 'statistik':
-            //await reloadStatisticsFilters();
-            await loadStatistics(!isCacheValid('statistics',currentYear));
+            await showStatisticsSection();
             break;
             default:
                 break;
@@ -532,20 +552,17 @@ export async function loadAllData() {
 
     // Hintergrund-Laden nur für ungecachte Daten
     setTimeout(() => {
-        if ((section !== 'mitglieder') && !isCacheValid('members')) 
+        if ((section !== 'mitglieder') && !isCacheValid('members'))             
             loadMembers(true);
         if ((section !== 'termine') && !isCacheValid('appointments',currentYear)) 
             loadAppointments(true);
         if ((section !== 'anwesenheit') && !isCacheValid('records',currentYear)) {
-            loadRecordFilters();
             loadRecords(true);
         }
         if ((section !== 'antraege') && !isCacheValid('exceptions',currentYear)) {
-            loadExceptionFilters();
             loadExceptions(true);
         }
         if((section !== 'statistik') && !isCacheValid('statistics', currentYear)) {
-            reloadStatisticsFilters();
             loadStatistics(true);
         }
 
@@ -570,16 +587,13 @@ async function loadYearDependentData() {
     
     // Nur aktive Section neu laden
     if (section === 'termine') {
-        await loadAppointments(false);  // false = aus Cache wenn möglich
-    } else if (section === 'anwesenheit') {
-        await loadRecordFilters();
-        await loadRecords(false);
+        await showAppointmentSection();
+    } else if (section === 'anwesenheit') {        
+        await showRecordsSection();
     } else if (section === 'antraege') {
-        await loadExceptionFilters();
-        await loadExceptions(false);
+        await showExceptionSection();
     } else if (section === 'statistik') {
-        await reloadStatisticsFilters();
-        await loadStatistics(false);
+        await showStatisticsSection();
     }
 }
 

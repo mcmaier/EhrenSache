@@ -1,4 +1,4 @@
-import { loadAllData, showLogin, showDashboard, initNavigation, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, currentYear, setCurrentYear} from './modules/ui.js';
+import { loadAllData, showLogin, showDashboard, initNavigation, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, currentYear, setCurrentYear, initDataCache, initEventHandlers} from './modules/ui.js';
 import { apiCall, setCurrentUser, setCsrfToken, setInitialLoad, currentUser, isAdmin} from './modules/api.js';
 import { initAuth } from './modules/auth.js';
 import { loadMembers } from './modules/members.js';
@@ -41,26 +41,24 @@ async function init() {
         });
         if (loginData?.csrf_token) {
             setCsrfToken(loginData.csrf_token);
-        }      
-                         
-        showDashboard();
-
-        // Gespeichertes Jahr laden
-        const savedYear = sessionStorage.getItem('selectedYear');
-        if (savedYear) {            
-            setCurrentYear(parseInt(savedYear));
-            console.log('Saved Year: ', savedYear);
-        }
-        else{
-            setCurrentYear(new Date().getFullYear());
-            console.log("Fallback, current Year:", currentYear);
-        }
+        }                                       
         
-        // Alle Jahresfilter befüllen und synchronisieren
+        //Event Handler Registrieren
+        initEventHandlers();
+        
         await initAllYearFilters();
 
+        console.log("== CACHE INIT START ==");
+
+        // Alle Caches befüllen
+        await initDataCache();
+
+        console.log("== CACHE INIT END ==");
+
+        showDashboard();        
         await loadAllData();
-        await initStatistics();  
+        //await initAllYearFilters();
+        //await initStatistics();  
     } else {
         showLogin();
     }   

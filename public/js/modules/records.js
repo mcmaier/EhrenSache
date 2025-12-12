@@ -1,8 +1,8 @@
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { loadAppointments } from './appointments.js';
-import { loadTypes } from './management.js';
+import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, currentYear} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, currentYear, populateYearFilter, setCurrentYear} from './ui.js';
 import { translateRecordStatus,datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
 
 // ============================================
@@ -22,51 +22,68 @@ export async function loadRecords(forceReload = false) {
     
     // Cache-Check: Nur laden wenn nötig
     if (!forceReload && isCacheValid('records', year)) {
-        console.log('Loading records from cache for ${year}', year);
-        renderRecords(dataCache.records[year].data);        
-        return;
+        console.log(`Loading RECORDS from CACHE for ${year}`);
+        //renderRecords(dataCache.records[year].data);        
+        return dataCache.records[year].data;
     }
 
-    let params = {};
+    console.log(`Loading RECORDS from API for ${year}`);
+    const records = await apiCall('records', 'GET', null, {year:year});
 
-    params.year = year;
-  
-    if (currentFilter.appointment) {
-        params.appointment_id = currentFilter.appointment;
-    }
-    if (currentFilter.member) {
-        params.member_id = currentFilter.member;
-    }
-
-    await loadTypes();
-    await loadRecordFilters();
-    await loadRecordMemberFilter(); 
-    //await loadAppointmentTypesCache();       
-
-    console.log("Loading records from API for ${year}", year);
-    const records = await apiCall('records', 'GET', null, params);
-
-    if(!dataCache.records[year])
-    {
+    if(!dataCache.records[year]){
         dataCache.records[year] = {};
     }
-
     dataCache.records[year].data = records;
     dataCache.records[year].timestamp = Date.now();    
-
-    renderRecords(records);
+    
+    return records;
 }
 
-function renderRecords(recordData)
-{
-   const tbody = document.getElementById('recordsTableBody');
-    tbody.innerHTML = '';
+export function filterRecords(records, filters = {}) {
+    console.log("Filter Records ()");
+
+    if (!records || records.length === 0) return [];
     
-    if (recordData.length === 0) {
+    let filtered = [...records];
+    
+    // Filter: Termin
+    if (filters.appointment && filters.appointment !== '') {
+        filtered = filtered.filter(r => r.appointment_id == filters.appointment);
+    }
+    
+    // Filter: Mitglied
+    if (filters.member && filters.member !== '') {
+        filtered = filtered.filter(r => r.member_id == filters.member);
+    }
+    
+    // Filter: Gruppe
+    if (filters.group && filters.group !== '') {
+        filtered = filtered.filter(r => r.group_id == filters.group);
+    }
+    
+    // Optionaler Filter: Status (z.B. verspätet/pünktlich)
+    if (filters.status && filters.status !== '') {
+        filtered = filtered.filter(r => r.status == filters.status);
+    }
+    
+    return filtered;
+}
+
+export async function renderRecords(recordData)
+{
+    console.log("Render Records()");
+
+    const types =  await loadTypes(false);
+
+    const tbody = document.getElementById('recordsTableBody');
+    
+    if (!recordData || (recordData.length === 0)) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Einträge gefunden</td></tr>';
-        document.getElementById('statTotalRecords').textContent = '0';
+        updateRecordStats([]);
         return;
     }    
+
+    tbody.innerHTML = '';
     
     recordData.forEach(record => {
         const arrivalTime = new Date(record.arrival_time);
@@ -91,7 +108,7 @@ function renderRecords(recordData)
         let appointmentTypeBadge = '-';    
         const typeId = record.appointment_type_id;
         const typeName = record.appointment_type_name;
-    
+            
         // Type-ID vorhanden → Lookup im Cache (Array durchsuchen)
         if (typeId && dataCache.types.data && Array.isArray(dataCache.types.data)) {
             const type = dataCache.types.data.find(t => t.type_id == typeId);
@@ -140,37 +157,149 @@ function renderRecords(recordData)
         tbody.innerHTML += row;
     });
 
-    document.getElementById('statTotalRecords').textContent = recordData.length;
+    updateRecordStats(recordData);
+}
+
+function updateRecordStats(records) {
+    console.log("Update Record Stats ()");
+    const totalRecords = records.length;
+    //const onTime = records.filter(r => r.status === 'on_time').length;
+    //const late = records.filter(r => r.status === 'late').length;
+    //const excused = records.filter(r => r.status === 'excused').length;
+    
+    document.getElementById('statTotalRecords').textContent = totalRecords;
+    //document.getElementById('statOnTime').textContent = onTime;
+    //document.getElementById('statLate').textContent = late;
+    //document.getElementById('statExcused').textContent = excused;
+}
+
+export async function loadRecordFilters() {
+
+    console.log("Load Record Filters ()");
+
+    const year = currentYear;
+    
+    // Termine für Jahr laden (aus Cache wenn möglich)
+    const appointments = await loadAppointments();
+    
+    // Mitglieder laden (jahresunabhängig)
+    const members = await loadMembers();
+    
+    // Gruppen laden
+    //if (!isCacheValid('groups')) {
+    //    await loadGroups(true);
+    //}
+    //const groups = await loadGroups();
+    
+    // Termin-Filter befüllen
+    const appointmentSelect = document.getElementById('filterAppointment');
+    const currentAppointmentValue = appointmentSelect.value;
+    
+    appointmentSelect.innerHTML = '<option value="">Alle Termine</option>';
+    if (appointments && appointments.length > 0) {
+        appointments.forEach(app => {
+            appointmentSelect.innerHTML += `<option value="${app.appointment_id}">${app.title} (${app.date})</option>`;
+        });
+    }
+    appointmentSelect.value = currentAppointmentValue;
+    
+    // Mitglieder-Filter befüllen
+    const memberSelect = document.getElementById('filterMember');
+    const currentMemberValue = memberSelect.value;
+    
+    memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
+    if (members && members.length > 0) {
+        members
+            .filter(m => m.active)
+            .forEach(member => {
+                memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+            });
+    }
+    memberSelect.value = currentMemberValue;
+    
+    // Gruppen-Filter befüllen
+    /*
+    const groupSelect = document.getElementById('filterGroup');
+    const currentGroupValue = groupSelect.value;
+    
+    groupSelect.innerHTML = '<option value="">Alle Gruppen</option>';
+    if (groups && groups.length > 0) {
+        groups.forEach(group => {
+            groupSelect.innerHTML += `<option value="${group.group_id}">${group.group_name}</option>`;
+        });
+    }
+    groupSelect.value = currentGroupValue;
+    */
 }
 
 
-export function applyRecordYearFilter() {
-    const year = document.getElementById('filterRecordYear').value;
-    currentRecordYear = year || null;
+export async function applyRecordFilters() {
+    // Records laden (aus Cache wenn möglich)
+    const allRecords = await loadRecords(false);
 
-    // Lade Termin-Filter NEU mit dem gewählten Jahr
-    loadRecordAppointmentFilter(currentRecordYear);
+    console.log("Apply Record Filters ()");
+
+    // Aktuelle Filter auslesen
+    const filters = {
+        appointment: document.getElementById('filterAppointment')?.value || null,
+        member: document.getElementById('filterMember')?.value || null,
+        //group: document.getElementById('filterGroup')?.value || null
+    };
+
+    // Filtern
+    const filteredRecords = filterRecords(allRecords, filters);
+
+    // Rendern (nur wenn auf Records-Section)
+    //const currentSection = sessionStorage.getItem('currentSection');
+    //if (currentSection === 'anwesenheit') {
+    renderRecords(filteredRecords);
+    //}
     
-    // Reset Termin-Filter (da sich die verfügbaren Termine geändert haben)
-    document.getElementById('filterAppointment').value = '';
-    currentFilter.appointment = null;
-
-    loadRecords();
+    //return filteredRecords;    
 }
 
 // ============================================
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
+// Im Init oder beim Section-Wechsel registrieren
+export async function initRecordEventHandlers() {
+
+    console.log("Init Record Event Handlers ()");
+
+    // Filter-Änderungen
+    document.getElementById('filterAppointment')?.addEventListener('change', () => {
+        applyRecordFilters();
+    });
+    
+    document.getElementById('filterMember')?.addEventListener('change', () => {
+        applyRecordFilters();
+    });
+    
+    /*document.getElementById('filterGroup')?.addEventListener('change', () => {
+        applyRecordFilters();
+    });*/
+    
+    // Reset-Button (optional)
+    document.getElementById('resetRecordFilter')?.addEventListener('click', () => {
+        document.getElementById('filterAppointment').value = '';
+        document.getElementById('filterMember').value = '';
+        //document.getElementById('filterGroup').value = '';
+        applyRecordFilters();
+    });
+}
+
+export async function showRecordsSection() {
+    console.log("Show Record Section ()");
+    // Filter-Optionen laden
+    await loadRecordFilters();
+    // Daten laden, filtern und anzeigen
+    await applyRecordFilters();
+}
+
 export async function loadRecordDropdowns() {
-    
-    
-    // Lade Mitglieder
-    //if (dataCache.members.data.length === 0) {
-    //    const members =  await loadMembers(true);
-    //}
-    
-    const members =  await loadMembers();
+        
+    const members =  await loadMembers(false);
     const memberSelect = document.getElementById('record_member');
     memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
@@ -180,7 +309,7 @@ export async function loadRecordDropdowns() {
             memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
         });
     
-    const appointments = await loadAppointments();    
+    const appointments = await loadAppointments(false,currentYear);    
     const appointmentSelect = document.getElementById('record_appointment');    
     appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
@@ -209,96 +338,13 @@ export async function loadRecordDropdowns() {
         });
 }
 
-// Filter-Status
-let currentFilter = {
-    appointment: null,
-    member: null
-};
-
-// Lade Filter-Dropdowns
-export async function loadRecordFilters() {
-
-    await loadRecordAppointmentFilter();
-    await loadRecordMemberFilter();
-}
-
-// Separate Funktion NUR für Termine (jahresabhängig)
-export async function loadRecordAppointmentFilter() {
-    
-    await loadAppointments(false);    
-
-    // Lade nur Termine des gefilterten Jahres
-    const appointments = dataCache.appointments[currentYear].data;
-    const appointmentSelect = document.getElementById('filterAppointment');
-    appointmentSelect.innerHTML = '<option value="">Alle Termine</option>';
-    
-    if (appointments) {
-        appointments.forEach(apt => {
-            appointmentSelect.innerHTML += `<option value="${apt.appointment_id}">${apt.title} (${apt.date})</option>`;
-        });
-    }
-}
-
-// Separate Funktion NUR für Mitglieder (jahresunabhängig)
-export async function loadRecordMemberFilter() {
-    
-    // Cache laden falls leer
-    if (!dataCache.members.data || dataCache.members.data.length === 0) {
-        await loadMembers(true);
-    }
-
-    // Safe extraction
-    let members = dataCache.members.data;
-
-    //console.log(members);
-
-    // Falls API-Response-Wrapper: {success: true, data: [...]}
-    if (!Array.isArray(members) && members.data) {
-        members = members.data;
-    }
-
-    const memberSelect = document.getElementById('filterMember');
-    const currentValue = memberSelect.value;
-    
-    memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
-    
-    if (members) {
-        members
-            .filter(m => m.active)
-            .forEach(member => {
-                memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
-            });
-    }
-    
-    // Stelle vorherigen Wert wieder her
-    if (currentValue) {
-        memberSelect.value = currentValue;
-    }
-}
-
-// Filter anwenden
-export async function applyRecordFilter() {
-    const appointmentId = document.getElementById('filterAppointment').value;
-    const memberId = document.getElementById('filterMember').value;
-    
-    currentFilter.appointment = appointmentId || null;
-    currentFilter.member = memberId || null;
-    
-    await loadRecords();
-}
-
 // Filter zurücksetzen
 export async function resetRecordFilter() {
     document.getElementById('filterAppointment').value = '';
     document.getElementById('filterMember').value = '';
-    currentFilter.appointment = null;
-    currentFilter.member = null;
 
-    // Jahresfilter NICHT zurücksetzen, aber Termin-Filter neu laden
-    //loadRecordFilters(currentRecordYear);
-    await loadRecords();
-}
-
+    await showRecordsSection();
+}    
 
 function getSourceBadge(record) {
     const sources = {
@@ -331,24 +377,6 @@ function getSourceBadge(record) {
     return badge;
 }
 
-
-async function loadAppointmentTypesCache() {
-
-    await loadTypes();    
-        
-    if (dataCache.types.data) {
-        // Erstelle Lookup-Objekt: { type_id: { type_name, color, ... } }    
-        dataCache.types.data.forEach(type => {
-            appointmentTypeCache[type.type_id] = {
-                type_name: type.type_name,
-                color: type.color || '#667eea',
-                description: type.description
-            };
-        });        
-        console.log('Appointment types cached:', appointmentTypeCache);
-    }
-}
-
 // ============================================
 // MODAL FUNCTIONS
 // ============================================
@@ -356,11 +384,18 @@ async function loadAppointmentTypesCache() {
 export async function openRecordModal(recordId = null) {
     const modal = document.getElementById('recordModal');
     const title = document.getElementById('recordModalTitle');
+    const form = document.getElementById('recordForm');
+
+    form.reset();
     
     // Lade Mitglieder und Termine für Dropdowns
     await loadRecordDropdowns();
     
     if (recordId) {
+        // Bearbeiten: Record aus Cache finden
+        //const allRecords = await loadRecords(false);
+        //const record = allRecords.find(r => r.record_id == recordId);
+
         title.textContent = 'Anwesenheit bearbeiten';
         await loadRecordData(recordId);
 
@@ -456,12 +491,10 @@ export async function saveRecord() {
     if (result) {
         closeRecordModal();
 
-        invalidateCache('records', currentYear);
-        await loadRecords(true);
-        // Cache leeren für nächstes Mal
-        //membersCache = [];
-        //appointmentsCache = [];
-        
+        await invalidateCache('records', currentYear);
+        applyRecordFilters();
+        //await loadRecords(true);
+
         // Erfolgs-Toast
         showToast(
             recordId ? 'Eintrag wurde erfolgreich aktualisiert' : 'Eintrag wurde erfolgreich erstellt',
@@ -479,8 +512,10 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
     if (confirmed) {
         const result = await apiCall('records', 'DELETE', null, { id: recordId });
         if (result) {
-            invalidateCache('records', currentYear);
-            loadRecords(true);
+            await invalidateCache('records', currentYear);
+            applyRecordFilters();
+            //invalidateCache('records', currentYear);
+            //await loadRecords(true, currentYear);
             showToast(`Eintrag wurde gelöscht`, 'success');
         }
     }
@@ -557,6 +592,5 @@ window.openRecordModal = openRecordModal;
 window.saveRecord = saveRecord;
 window.closeRecordModal = () => document.getElementById('recordModal').classList.remove('active');
 window.deleteRecord = deleteRecord;
+window.applyRecordFilters = applyRecordFilters;
 window.resetRecordFilter = resetRecordFilter;
-window.applyRecordFilter = applyRecordFilter;
-window.applyRecordYearFilter = applyRecordYearFilter;

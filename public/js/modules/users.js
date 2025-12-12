@@ -15,29 +15,37 @@ import { updateModalId } from './utils.js';
 
 export async function loadUsers(forceReload = false) {
 
-    if (!forceReload && isCacheValid('users')) {
-        console.log("Loading users from cache");
-        renderUsers(dataCache.users.data);
+    if(!isAdmin)
+    {
         return;
     }
 
+    if (!forceReload && isCacheValid('users')) {
+        console.log("Loading USERS from CACHE");
+        //renderUsers(dataCache.users.data);
+        return dataCache.users.data;
+    }
+
+    console.log("Loading USERS from API");
     const users = await apiCall('users');
     
     // Cache speichern
     dataCache.users.data = users;
     dataCache.users.timestamp = Date.now();
     
-    renderUsers(dataCache.users.data);
+    return users;
+    //renderUsers(dataCache.users.data);
 }
 
 export async function loadUserData(forceReload = false) {
 
     if(!forceReload && isCacheValid('userData'))
     {
-        console.log("Loading user Data (ME) from cache");
+        console.log("Loading USER DETAILS (ME) from CACHE");
         return;
     }
 
+    console.log("Loading USER DETAILS (ME) from API");
     const userData = await apiCall('me');
     const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
         
@@ -52,6 +60,9 @@ export async function loadUserData(forceReload = false) {
 
 function renderUsers(userData)
 {
+    if(!isAdmin)
+        return;
+
 const tbody = document.getElementById('usersTableBody');
     tbody.innerHTML = '';
     
@@ -104,6 +115,13 @@ const tbody = document.getElementById('usersTableBody');
         `;
         tbody.innerHTML += row;
     });
+}
+
+export async function showUserSection(forceReload = false)
+{
+    console.log("Show User Section ()");
+    const allUsers = await loadUsers(forceReload);
+    renderUsers(allUsers);
 }
 
 function toggleUserRoleFields() {
@@ -351,8 +369,7 @@ export async function saveUser() {
     
     if (result) {
         closeUserModal();
-        invalidateCache('users');
-        await loadUsers(true);
+        showUserSection(true);
 
         showToast(
             userId ? 'Benutzer wurde erfolgreich aktualisiert' : 'Benutzer wurde erfolgreich erstellt',
@@ -370,8 +387,7 @@ export async function deleteUser(userId, email) {
     if (confirmed) {
         const result = await apiCall('users', 'DELETE', null, { id: userId });
         if (result) {
-            invalidateCache('users');
-            loadUsers(true);
+            showUserSection(true);
             showToast(`User "${email}" wurde gelöscht`, 'success');        
         }
     }

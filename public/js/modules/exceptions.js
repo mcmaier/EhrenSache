@@ -29,13 +29,12 @@ export async function loadExceptions(forceReload = false) {
 
     // Cache-Check: Nur laden wenn nötig
     if (!forceReload && isCacheValid('exceptions', year)) {
-        console.log('Loading exceptions from cache for ${year}', year);
-        renderExceptions(dataCache.exceptions[year].data);        
+        console.log(`Loading EXCEPTIONS from CACHE for ${year}`);
+        //renderExceptions(dataCache.exceptions[year].data);        
         return dataCache.exceptions[year].data;
     }
 
-    console.log('Loading exceptions from API for ${year}', year);
-
+    /*
     let params = {};
 
     if (currentExceptionFilter.status) {
@@ -43,8 +42,9 @@ export async function loadExceptions(forceReload = false) {
     }
     if (currentExceptionFilter.type) {
         params.type = currentExceptionFilter.type;
-    }
+    }*/
 
+    console.log(`Loading EXCEPTIONS from API for ${year}`);
     const exceptions = await apiCall('exceptions', 'GET', null, {year: year});
 
     if(!dataCache.exceptions[year])
@@ -55,24 +55,24 @@ export async function loadExceptions(forceReload = false) {
     dataCache.exceptions[year].data = exceptions;
     dataCache.exceptions[year].timestamp = Date.now();
 
-    renderExceptions(exceptions);
+    //renderExceptions(exceptions);
     return exceptions;
 }
 
-function renderExceptions(exceptionData)
-{   
-    if (!exceptionData) return;
-    
+export async function renderExceptions(exceptionData)
+{       
     const tbody = document.getElementById('exceptionsTableBody');
-    tbody.innerHTML = '';
-    
-    if (exceptionData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Anträge gefunden</td></tr>';
-        document.getElementById('statPendingExceptions').textContent = '0';
-        document.getElementById('statApprovedExceptions').textContent = '0';
+
+    console.log("Rendering Exceptions...");
+
+    if (!exceptionData || (exceptionData.length === 0)) {
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge gefunden</td></tr>';
+        updateExceptionStats([]);
         return;
     }
     
+    tbody.innerHTML = '';
+
     exceptionData.forEach(exception => {
         const createdAt = new Date(exception.created_at);
         const formattedCreated = createdAt.toLocaleString('de-DE');
@@ -84,6 +84,7 @@ function renderExceptions(exceptionData)
         const statusBadge = `<span class="status-badge status-${exception.status}">${translateExceptionStatus(exception.status)}</span>`;
         const typeBadge = `<span class="type-badge">${translateExceptionType(exception.exception_type)}</span>`;
         
+        //TODO Terminzuordnung
         let appointmentInfo = 'Kein Termin';
         if (exception.appointment_id && dataCache.appointments[currentYear]) {
             const appointment = dataCache.appointments[currentYear].data.find(
@@ -137,11 +138,112 @@ function renderExceptions(exceptionData)
         tbody.innerHTML += row;
     });
 
+    updateExceptionStats(exceptionData);
+}
+
+function updateExceptionStats(exceptions){
+
+    console.log("Update Exception Stats ()");
+
     // Statistiken
-    const pending = exceptionData.filter(e => e.status === 'pending').length;
-    const approved = exceptionData.filter(e => e.status === 'approved').length;
+    const pending = exceptions.filter(e => e.status === 'pending').length;
+    const approved = exceptions.filter(e => e.status === 'approved').length;
     document.getElementById('statPendingExceptions').textContent = pending;
     document.getElementById('statApprovedExceptions').textContent = approved;
+}
+
+export function filterExceptions(exceptions, filters = {}) {
+    console.log("Filter Exceptions ()");
+
+    if (!exceptions || exceptions.length === 0) return [];
+    
+    let filtered = [...exceptions];
+    
+    // Filter: ExceptionType
+    if (filters.exceptionType && filters.exceptionType !== '') {
+        filtered = filtered.filter(e => e.exception_type === filters.exceptionType);
+    }
+    
+    // Filter: ExceptionStatus
+    if (filters.exceptionStatus && filters.exceptionStatus !== '') {
+        filtered = filtered.filter(e => e.status === filters.exceptionStatus);
+    }
+    
+    return filtered;
+}
+
+
+export async function applyExceptionFilters() {
+    // Exceptions laden (aus Cache wenn möglich)
+    const allExceptions = await loadExceptions(false);
+
+    console.log("Apply Exception Filters ()");
+
+    // Aktuelle Filter auslesen
+    const filters = {
+        exceptionStatus: document.getElementById('filterExceptionStatus')?.value || null,
+        exceptionType: document.getElementById('filterExceptionType')?.value || null,
+        //group: document.getElementById('filterGroup')?.value || null
+    };
+
+    // Filtern
+    const filteredExceptions = filterExceptions(allExceptions, filters);
+
+    console.log("Filtering:", allExceptions, filteredExceptions, filters);
+
+    // Rendern (nur wenn auf Records-Section)
+    //const currentSection = sessionStorage.getItem('currentSection');
+    //if (currentSection === 'anwesenheit') {
+    await renderExceptions(filteredExceptions);
+    //}
+    
+    //return filteredRecords;    
+}
+
+
+// Filter zurücksetzen
+export async function resetExceptionFilter() {
+    document.getElementById('filterExceptionType').value = '';
+    document.getElementById('filterExceptionStatus').value = '';
+
+    await showExceptionSection();
+}    
+
+// ============================================
+// RENDER FUNCTIONS (DOM-Manipulation)
+// ============================================
+
+// Im Init oder beim Section-Wechsel registrieren
+export async function initExceptionEventHandlers() {
+
+    console.log("Init Exception Event Handlers ()");
+
+    // Filter-Änderungen
+    document.getElementById('filterExceptionStatus')?.addEventListener('change', () => {
+        applyExceptionFilters();
+    });
+    
+    document.getElementById('filterExceptionType')?.addEventListener('change', () => {
+        applyExceptionFilters();
+    });
+    
+    // Reset-Button (optional)
+    document.getElementById('resetExceptionFilter')?.addEventListener('click', () => {
+        document.getElementById('filterExceptionStatus').value = '';
+        document.getElementById('filterExceptionType').value = '';
+        applyExceptionFilters();
+    });
+}
+
+export async function showExceptionSection() {
+    console.log("Show Exception Section ()");
+    
+    // Filter-Optionen laden
+    //await loadExceptionilters();
+    
+    // Daten laden, filtern und anzeigen
+    await applyExceptionFilters();
+
 }
 
 // ============================================
@@ -150,9 +252,7 @@ function renderExceptions(exceptionData)
 
 export async function loadExceptionFilters(forceReload = false) {
 
-    //await loadAppointments();
-
-    const appointments = await loadAppointments();//dataCache.appointments[currentYear].data;
+    const appointments = await loadAppointments();
 
     const appointmentSelect = document.getElementById('exception_appointment');
     appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
@@ -185,7 +285,6 @@ export async function loadExceptionFilters(forceReload = false) {
     }
     
     // Lade Mitglieder für Dropdown (nur für Admin)
-    //TODO Members aus Cache laden
     if (isAdmin) {
         const members = await loadMembers();
 
@@ -199,20 +298,6 @@ export async function loadExceptionFilters(forceReload = false) {
             });
         }
     }
-}
-
-export function applyExceptionFilter() {
-    currentExceptionFilter.status = document.getElementById('filterExceptionStatus').value || null;
-    currentExceptionFilter.type = document.getElementById('filterExceptionType').value || null;
-    loadExceptions();
-}
-
-export function resetExceptionFilter() {
-    document.getElementById('filterExceptionStatus').value = '';
-    document.getElementById('filterExceptionType').value = '';
-    currentExceptionFilter.status = null;
-    currentExceptionFilter.type = null;
-    loadExceptions();
 }
 
 // ============================================
@@ -364,15 +449,14 @@ export async function saveException() {
     
     if (result) {
         closeExceptionModal();        
-        invalidateCache('exceptions',currentYear);
-        loadExceptions(true);
 
+        await invalidateCache('exceptions',currentYear);
+        
         // Wenn Zeitkorrektur genehmigt wurde, Records neu laden
         if (isAdmin && data.status === 'approved' && data.exception_type === 'time_correction') {
-            invalidateCache('exceptions',currentYear);
             invalidateCache('records',currentYear);
-            //loadRecords();
         }
+        applyExceptionFilters();
 
         // Erfolgs-Toast
         showToast(
@@ -393,7 +477,7 @@ export async function deleteException(exceptionId) {
         const result = await apiCall('exceptions', 'DELETE', null, { id: exceptionId });
         if (result) {
             invalidateCache('exceptions',currentYear);
-            loadExceptions(true);
+            applyExceptionFilters();
              showToast(`Eintrag wurde gelöscht`, 'success');
 
         }
@@ -410,4 +494,4 @@ window.toggleExceptionFields = toggleExceptionFields;
 window.closeExceptionModal = () => document.getElementById('exceptionModal').classList.remove('active');
 window.deleteException = deleteException;
 window.resetExceptionFilter = resetExceptionFilter;
-window.applyExceptionFilter = applyExceptionFilter;
+window.applyExceptionFilter = applyExceptionFilters;

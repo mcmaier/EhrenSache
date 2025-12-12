@@ -258,13 +258,13 @@
                 <div class="filter-bar">
                     <div class="form-group">
                         <label for="filterAppointment">Filter nach Termin:</label>
-                        <select id="filterAppointment" onchange="applyRecordFilter()">
+                        <select id="filterAppointment"> <!-- onchange="applyRecordFilters()"> -->
                             <option value="">Alle Termine</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="filterMember">Filter nach Mitglied:</label>
-                        <select id="filterMember" onchange="applyRecordFilter()">
+                        <select id="filterMember" ><!--onchange="applyRecordFilters()"> -->
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
@@ -319,7 +319,7 @@
                 <div class="filter-bar">
                     <div class="form-group">
                         <label for="filterExceptionStatus">Status:</label>
-                        <select id="filterExceptionStatus" onchange="applyExceptionFilter()">
+                        <select id="filterExceptionStatus">
                             <option value="">Alle</option>
                             <option value="pending">Ausstehend</option>
                             <option value="approved">Genehmigt</option>
@@ -328,13 +328,13 @@
                     </div>
                     <div class="form-group">
                         <label for="filterExceptionType">Typ:</label>
-                        <select id="filterExceptionType" onchange="applyExceptionFilter()">
+                        <select id="filterExceptionType">
                             <option value="">Alle</option>
                             <option value="absence">Entschuldigung</option>
                             <option value="time_correction">Zeitkorrektur</option>
                         </select>
                     </div>
-                    <button class="btn-reset-filter" onclick="resetExceptionFilter()">Filter zurücksetzen</button>
+                    <button id="resetExceptionFilter" class="btn-reset-filter">Filter zurücksetzen</button>
                 </div>
 
                 <div class="data-table">
@@ -451,6 +451,12 @@
                     <div class="stat-card">
                         <h3>Aktive Mitglieder</h3>
                         <div class="number" id="statActiveMembersCount">-</div>                                             
+                    </div>
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
+                        <h3>Jahr filtern</h3>
+                        <select id="memberYearFilter"
+                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
+                        </select>
                     </div>
                 </div>
 

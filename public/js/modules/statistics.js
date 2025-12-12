@@ -12,15 +12,16 @@ export async function loadStatistics(forceReload = false) {
 
     // Cache-Check
     if (!forceReload && isCacheValid('statistics', year)) {
-        console.log(`Loading statistics for ${year} from cache`);
-        renderStatistics(dataCache.statistics[year].data);
-        return;
+        console.log(`Loading STATISTICS from CACHE for ${year}`);        
+        //renderStatistics(dataCache.statistics[year].data);
+        return dataCache.statistics[year].data;
     }
 
     const groupId = document.getElementById('statGroup').value;
     const memberId = isAdmin ? document.getElementById('statMember').value : null;
 
     // API-Call mit Jahr
+    console.log(`Loading STATISTICS from API for ${year}`);        
     const stats = await apiCall('statistics', 'GET', null, { year: year });
     
     // Cache speichern
@@ -29,8 +30,10 @@ export async function loadStatistics(forceReload = false) {
     }
     dataCache.statistics[year].data = stats;
     dataCache.statistics[year].timestamp = Date.now();
+
+    return stats;
     
-    renderStatistics(stats);
+    //renderStatistics(stats);
     
     /*
     let params = {};
@@ -135,6 +138,15 @@ async function loadMemberFilterOptions() {
 // RENDERING
 // ============================================
 
+export async function showStatisticsSection(forceReload = false)
+{
+    console.log("== Show Statistics Section == ")
+    const statData = await loadStatistics(forceReload);
+
+    renderStatistics(statData);
+
+}
+
 function renderStatistics(data) {
     const container = document.getElementById('statisticsContainer');
     
@@ -220,7 +232,7 @@ export async function initStatistics() {
         if (isAdmin) {
             await loadMemberFilterOptions();
         }
-        loadStatistics();
+        //loadStatistics();
     });
     
     if (isAdmin) {

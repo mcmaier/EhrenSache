@@ -1,13 +1,19 @@
 import { apiCall, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
-import { updateModalId } from './utils.js';
+import { formatDateTime, updateModalId } from './utils.js';
 
 // ============================================
 // MANAGEMENT (Groups & Types)
 // ============================================
 
-//let allMembers = [];
-//let allGroups = [];
+export async function showGroupSection(forceReload = false)
+{
+    const groupData = await loadGroups(forceReload);
+    renderGroups(groupData);
+
+    const typeData = await loadTypes(forceReload);
+    renderTypeGroupOverview(typeData);
+}
 
 // ============================================
 // GROUPS - Data Loading
@@ -17,7 +23,7 @@ export async function loadGroups(forceReload = false) {
     // Cache-Check: Nur laden wenn nötig
     if (!forceReload && isCacheValid('groups')) {
         console.log('Loading groups from cache');
-        renderGroups(dataCache.groups.data);
+        //renderGroups(dataCache.groups.data);
         return dataCache.groups.data;
     }
 
@@ -27,7 +33,7 @@ export async function loadGroups(forceReload = false) {
     dataCache.groups.data = groups;
     dataCache.groups.timestamp = Date.now();
 
-    renderGroups(dataCache.groups.data);
+    //renderGroups(dataCache.groups.data);
     return groups;        
 }
 
@@ -159,12 +165,8 @@ export async function saveGroup() {
      // Bei neuer Standard-Gruppe: Warnung wenn bereits eine existiert
     if (isDefault) {        
         // Lade aktuelle Gruppen falls Cache leer
-        if(dataCache.groups.data.length === 0)
-        {
-            await loadGroups(true);
-        }
-        
-        const groups = dataCache.groups.data;
+
+        const groups = await loadGroups();            
 
         // Falls API-Response-Wrapper: {success: true, data: [...]}
         /*if (!Array.isArray(members) && members.data) {
@@ -198,8 +200,9 @@ export async function saveGroup() {
     
     if (result) {
         closeGroupModal();
-        invalidateCache('groups'); 
-        await loadGroups(true);
+        //invalidateCache('groups'); 
+        //await loadGroups(true);
+        await showGroupSection(true);
         showToast(
             groupId ? 'Gruppe erfolgreich aktualisiert' : 'Gruppe erfolgreich erstellt',
             'success'
@@ -216,8 +219,9 @@ export async function deleteGroup(groupId, groupName) {
     if (confirmed) {
         const result = await apiCall('member_groups', 'DELETE', null, { id: groupId });
         if (result) {
-            invalidateCache('groups'); 
-            await loadGroups(true);
+            //invalidateCache('groups'); 
+            //await loadGroups(true);
+            await showGroupSection(true);
             showToast(`Gruppe "${groupName}" wurde gelöscht`, 'success');
         }
     }
@@ -228,24 +232,25 @@ export async function deleteGroup(groupId, groupName) {
 // ============================================
 
 export async function loadTypes(forceReload = false) {
+    
     // Cache-Check: Nur laden wenn nötig
     if (!forceReload && isCacheValid('types')) {
-        console.log('Loading Appointment Types from cache',dataCache.types.data);
-        renderTypeGroupOverview(dataCache.types.data);
+        console.log('Loading Appointment Types from CACHE');
+        //renderTypeGroupOverview(dataCache.types.data);
         return dataCache.types.data;
     }
     
-    const types = await apiCall('appointment_types');    
-    console.log('Loading Appointment Types from API', types);
+    console.log('Loading Appointment Types from API');
+    const types = await apiCall('appointment_types');        
 
     dataCache.types.data = types;
     dataCache.types.timestamp = Date.now();
     
-    renderTypeGroupOverview(dataCache.types.data);  
+    //renderTypeGroupOverview(dataCache.types.data);  
     return types;       
 }
 
-function renderTypeGroupOverview(typeData)
+export async function renderTypeGroupOverview(typeData)
 {
     const tbody = document.getElementById('typesTableBody');
     tbody.innerHTML = '';
@@ -285,17 +290,10 @@ function renderTypeGroupOverview(typeData)
 }
 
 async function loadTypeGroup(typeId) {
-    let type;
+    
+    const types = await loadTypes(false);
 
-    if(dataCache.types.data.typeId === typeId)
-    {
-        type = dataCache.types.data[typeId];
-    }
-    else
-    {
-        type = await apiCall('appointment_types', 'GET', null, { id: typeId });
-    }
-
+    const type = types.find(t => t.type_id == typeId);
     const cell = document.getElementById(`type_groups_${typeId}`);
     
     if (type && type.groups && type.groups.length > 0) {
@@ -342,7 +340,9 @@ export function closeTypeModal() {
 }
 
 async function loadTypeData(typeId) {
-    const type = await apiCall('appointment_types', 'GET', null, { id: typeId });
+
+    const types = await loadTypes(false);
+    const type = dataCache.types.data.find(t => t.type_id == typeId);
     
     if (type) {
         document.getElementById('type_id').value = type.type_id;
@@ -428,7 +428,9 @@ export async function saveType() {
     if (result) {
         closeTypeModal();
         //invalidateCache('types');
-        await loadTypes(true);
+        //await loadTypes(true);
+
+        await showGroupSection(true);
         showToast(
             typeId ? 'Terminart erfolgreich aktualisiert' : 'Terminart erfolgreich erstellt',
             'success'
@@ -446,7 +448,8 @@ export async function deleteType(typeId, typeName) {
         const result = await apiCall('appointment_types', 'DELETE', null, { id: typeId });
         if (result) {
             //invalidateCache('types');
-            await loadTypes(true);
+            //await loadTypes(true);
+            await showGroupSection(true);
             showToast(`Terminart "${typeName}" wurde gelöscht`, 'success');
         }
     }

@@ -16,7 +16,7 @@ function handleAppointmentTypes($db, $method, $id) {
                 if($type) {
                     // Lade zugehörige Gruppen
                     $groupStmt = $db->prepare("SELECT g.* FROM member_groups g
-                                               JOIN appointment_type_groups atg ON g.group_id = atg.group_id
+                                               INNER JOIN appointment_type_groups atg ON g.group_id = atg.group_id
                                                WHERE atg.type_id = ?");
                     $groupStmt->execute([$id]);
                     $type['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -27,9 +27,25 @@ function handleAppointmentTypes($db, $method, $id) {
                     echo json_encode(["message" => "Type not found"]);
                 }
             } else {
-                // Liste aller Terminarten
+                // ALLE Types MIT Gruppen
                 $stmt = $db->query("SELECT * FROM appointment_types ORDER BY type_name");
-                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Für jeden Type die Gruppen laden
+                foreach ($types as &$type) {
+                    $stmt = $db->prepare("
+                        SELECT g.* 
+                        FROM member_groups g
+                        INNER JOIN appointment_type_groups atg ON g.group_id = atg.group_id
+                        WHERE atg.type_id = ?
+                    ");
+                    $stmt->execute([$type['type_id']]);
+                    $type['groups'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                }
+                
+                echo json_encode($types);
+                return;
+
             }
             break;
             

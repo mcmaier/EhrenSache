@@ -24,8 +24,8 @@ let currentMemberGroups = [];
 export async function loadMembers(forceReload = false) {
     // Cache verwenden wenn vorhanden und nicht forceReload    
     if (!forceReload && isCacheValid('members')) {
-        console.log("Loading members from cache:", dataCache.members.data);
-        renderMembers(dataCache.members.data);
+        console.log("Loading MEMBERS from CACHE");
+        //renderMembers(dataCache.members.data);
         return dataCache.members.data;
     }
 
@@ -39,7 +39,7 @@ export async function loadMembers(forceReload = false) {
 
     let members = [];
 
-    console.log("Loading members from API");
+    console.log("Loading MEMBERS from API");
             
     if(isAdmin){
         // Admin sieht alle Mitglieder
@@ -56,7 +56,7 @@ export async function loadMembers(forceReload = false) {
     dataCache.members.data = members;
     dataCache.members.timestamp = Date.now();
 
-    renderMembers(dataCache.members.data);
+    //renderMembers(dataCache.members.data);
     return members;
 }
 
@@ -113,6 +113,14 @@ function renderMembers(memberData) {
     } else {
         document.getElementById('statActiveMembersCount').textContent = '-';
     }            
+}
+
+export async function showMemberSection(forceReload = false) {
+
+    console.log("Show Member Section ()");
+
+    const allMembers = await loadMembers(forceReload);
+    renderMembers(allMembers);
 }
 
 // ============================================
@@ -258,11 +266,8 @@ export async function saveMember() {
         closeMemberModal();
 
         // Cache invalidieren und neu laden
-        invalidateCache('members');
-
-        await loadMembers(true);     
-        //await loadRecordFilters();
-        //await loadExceptionFilters();
+        //invalidateCache('members');
+        showMemberSection(true);
 
         // Erfolgs-Toast
         showToast(
@@ -283,11 +288,8 @@ export async function deleteMember(memberId, name) {
         if (result) {
 
             // Cache invalidieren und neu laden
-            invalidateCache('members');
-
-            await loadMembers(true);        
-            //await loadRecordFilters();
-            //await loadExceptionFilters();
+            //invalidateCache('members');            
+            showMemberSection(true);
 
             showToast('Mitglied erfolgreich gelöscht', 'success');
         }

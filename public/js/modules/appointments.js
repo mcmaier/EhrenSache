@@ -1,8 +1,6 @@
 
 import { apiCall, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
-import { loadRecordFilters } from './records.js';
-import { loadExceptionFilters } from './exceptions.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
 import { loadTypes } from './management.js';
 
@@ -13,11 +11,6 @@ import { loadTypes } from './management.js';
 // ============================================
 
 let currentCalendarDate = new Date();
-//let allAppointments = [];
-//let appointmentTypesCache = [];
-let currentAppointmentYear = null;
-//let yearsLoaded = false;
-
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -28,12 +21,11 @@ export async function loadAppointments(forceReload = false) {
 
     // Cache verwenden wenn vorhanden und nicht forceReload
     if (!forceReload && isCacheValid('appointments', year)) {
-        console.log("Loading appointments from cache for ${year}", year);
-        renderAppointments(dataCache.appointments[year].data);
+        console.log(`Loading APPOINTMENTS from CACHE for ${year}`);
         return dataCache.appointments[year].data;
     }
     
-    console.log("Loading appointments from API for ${year}", year);
+    console.log(`Loading APPOINTMENTS from API for ${year}`);
     const appointments = await apiCall('appointments', 'GET', null, {year: year});
 
     // Cache für dieses Jahr speichern
@@ -44,7 +36,6 @@ export async function loadAppointments(forceReload = false) {
     dataCache.appointments[year].data = appointments;
     dataCache.appointments[year].timestamp = Date.now();
 
-    renderAppointments(appointments);
     return appointments;    
 }
 
@@ -65,16 +56,24 @@ async function loadAppointmentData(appointmentId) {
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
-function renderAppointments(appointmentsData) {
+export async function showAppointmentSection(forceReload = false)
+{
+    console.log("== Show Appointment Section == ")
+    const appointmentData = await loadAppointments(forceReload);
+
+    renderAppointments(appointmentData);
+}
+
+async function renderAppointments(appointmentData) {
     
-    if (!appointmentsData) return;
+    if (!appointmentData) return;
 
     //allAppointments = appointments;
     
     const tbody = document.getElementById('appointmentsTableBody');
     tbody.innerHTML = '';
         
-    appointmentsData.forEach(apt => {
+    appointmentData.forEach(apt => {
         // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (apt.appointment_id && apt.title) {
@@ -118,11 +117,11 @@ function renderAppointments(appointmentsData) {
 
     // Statistiken
     const today = new Date().toISOString().split('T')[0];
-    const upcoming = appointmentsData.filter(a => a.date >= today).length;
+    const upcoming = appointmentData.filter(a => a.date >= today).length;
     document.getElementById('statUpcomingAppointments').textContent = upcoming;    
     
     /*
-    // Diese Woche
+    // Anstehende Termine nur diese Woche
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
     const weekEnd = new Date(weekStart);
@@ -291,24 +290,6 @@ function nextMonth() {
     renderCalendar();
 }
 
-export function applyAppointmentYearFilter() {
-    const year = document.getElementById('filterAppointmentYear').value;
-    currentAppointmentYear = year || null;
-
-    // Springe zum entsprechenden Jahr im Kalender
-    if (currentAppointmentYear) {
-        // Setze Kalender auf Januar des gewählten Jahres
-        currentCalendarDate = new Date(parseInt(currentAppointmentYear), 0, 1);
-    } else {
-        // Setze Kalender auf aktuellen Monat
-        currentCalendarDate = new Date();
-    }
-
-    // Cache invalidieren und neu laden
-    invalidateCache('appointments',currentYear);
-    loadAppointments(true);
-}
-
 // ============================================
 // MODAL FUNCTIONS
 // ============================================
@@ -380,10 +361,7 @@ export async function saveAppointment() {
         closeAppointmentModal();
 
         // Cache invalidieren und neu laden
-        invalidateCache('appointments',currentYear);
-        await loadAppointments(true);        
-        //await loadRecordFilters();
-        //await loadExceptionFilters();
+        showAppointmentSection(true);
 
         // Erfolgs-Toast
         showToast(
@@ -402,11 +380,8 @@ export async function deleteAppointment(appointmentId, title) {
     if (confirmed) {
         const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
         if (result) {
-             // Cache invalidieren und neu laden            
-            invalidateCache('appointments',currentYear);
-            await loadAppointments(true);        
-            //await loadRecordFilters();
-            //await loadExceptionFilters();
+            // Cache invalidieren und neu laden            
+            showAppointmentSection(true);
 
             showToast(`Termin "${title}" wurde gelöscht`, 'success');
         }
@@ -414,15 +389,13 @@ export async function deleteAppointment(appointmentId, title) {
 }
 
 // Neue Funktion: Terminarten laden
-async function loadAppointmentTypes() {
-    if (dataCache.types.data.length === 0) {
-        await loadTypes(true);
-    }
+async function loadAppointmentTypes() {    
+    const types =  await loadTypes(true);    
     
     const select = document.getElementById('appointment_type');
     select.innerHTML = '<option value="">Bitte wählen...</option>';
     
-    dataCache.types.data.forEach(type => {
+    types.forEach(type => {
         const option = document.createElement('option');
         option.value = type.type_id;
         option.textContent = type.type_name;
@@ -444,9 +417,19 @@ async function goToToday() {
     setCurrentYear(currentCalendarDate.getFullYear());    
     document.getElementById('appointmentYearFilter').value = currentYear;
     
-    // Lade Appointments neu
-    //invalidateCache('appointments',currentYear);
-    //await loadAppointments();
+    showAppointmentSection();
+}
+
+export async function setCalendarToYear() {
+    // Springe zum entsprechenden Jahr im Kalender
+    if (currentYear) {
+        // Setze Kalender auf Januar des gewählten Jahres
+        currentCalendarDate = new Date(parseInt(currentYear), 0, 1);
+    } else {
+        // Setze Kalender auf aktuellen Monat
+        currentCalendarDate = new Date();
+    }
+
 }
 
 // ============================================
@@ -460,5 +443,4 @@ window.closeAppointmentModal = () => document.getElementById('appointmentModal')
 window.deleteAppointment = deleteAppointment;
 window.previousMonth = previousMonth;
 window.nextMonth = nextMonth;
-window.applyAppointmentYearFilter = applyAppointmentYearFilter;
 window.goToToday = goToToday;

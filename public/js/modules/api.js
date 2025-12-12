@@ -58,7 +58,7 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
         const response = await fetch(url, options);
         const result = await response.json();
                 
-        console.log("API call: ",resource);
+        console.log("API call:",resource, method, params);
 
         if (!response.ok)
         {            
