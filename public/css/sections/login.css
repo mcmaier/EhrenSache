@@ -16,9 +16,12 @@
     max-width: 400px;
 }
 
-
 .login-box h2 {
     margin-bottom: 30px;
     color: #333;
     text-align: center;
+}
+
+.btn-login {
+    margin-top: 12px;
 }

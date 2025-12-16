@@ -316,9 +316,9 @@ if ($step == 4) {
             <h2>Schritt 2: Datenbank-Konfiguration</h2>
             <form method="POST">
                 <div class="form-group">
-                    <label>Datenbank-Host*</label>
+                    <label>Datenbank-Host:Port*</label>
                     <input type="text" name="db_host" value="localhost" required>
-                    <small>Meist "localhost", check bei deinem Hoster</small>
+                    <small>Meist "localhost", check bei deinem Hoster. Port benötigt wenn nicht 3306</small>
                 </div>
                 <div class="form-group">
                     <label>Datenbankname*</label>
@@ -360,24 +360,11 @@ if ($step == 4) {
                     <strong>Deine Zugangsdaten:</strong><br>
                     E-Mail: <?= htmlspecialchars($_SESSION['admin_account']['email']) ?><br>
                     API-Token: <code><?= $_SESSION['admin_token'] ?></code>
-                </div>
-                
-                <?php if ($_SESSION['install_deleted']): ?>
-                    <div class="success">
-                        ✓ Installationsverzeichnis wurde automatisch gelöscht
-                    </div>
-                <?php else: ?>
-                    <div class="error">
-                        ⚠️ Installationsverzeichnis konnte nicht automatisch gelöscht werden<br>
-                        <strong>Bitte manuell löschen:</strong> <code>/public/install/</code>
-                    </div>
-                <?php endif; ?>
+                </div>                
                 
                 <h3>Nächste Schritte:</h3>
-                <ol style="line-height: 2; margin: 20px 0;">
-                    <?php if (!$_SESSION['install_deleted']): ?>
-                        <li>⚠️ <strong>Lösche /install/ Verzeichnis manuell!</strong></li>
-                    <?php endif; ?>
+                <ol style="line-height: 2; margin: 20px 0;">                    
+                    <li>⚠️ <strong>Lösche /install/ Verzeichnis manuell!</strong></li>
                 </ol>
             
             <a href="../index.html"><button class="btn">Zum Login</button></a>

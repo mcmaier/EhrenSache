@@ -3,6 +3,7 @@ import { apiCall, getAuthHeaders } from './api.js';
 import { showToast } from './ui.js';
 import { loadMembers } from './members.js';
 import { loadRecords } from './records.js';
+import {debug} from '../app.js'
 
 // ============================================
 // EXPORT
@@ -170,7 +171,7 @@ export async function executeImport() {
         
         const result = await response.json();
 
-        //console.log('Import result:',result);
+        debug.log('Import result:',result);
         
         // Progress auf 100%
         document.getElementById('importProgressFill').style.width = '100%';

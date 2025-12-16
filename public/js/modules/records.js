@@ -4,14 +4,13 @@ import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, currentYear, populateYearFilter, setCurrentYear} from './ui.js';
 import { translateRecordStatus,datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
+import {debug} from '../app.js'
 
 // ============================================
 // RECORDS
 // Reference:
 // import {} from './records.js'
 // ============================================
-
-let appointmentTypeCache = {};
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -22,12 +21,11 @@ export async function loadRecords(forceReload = false) {
     
     // Cache-Check: Nur laden wenn nötig
     if (!forceReload && isCacheValid('records', year)) {
-        console.log(`Loading RECORDS from CACHE for ${year}`);
-        //renderRecords(dataCache.records[year].data);        
+        debug.log(`Loading RECORDS from CACHE for ${year}`);           
         return dataCache.records[year].data;
     }
 
-    console.log(`Loading RECORDS from API for ${year}`);
+    debug.log(`Loading RECORDS from API for ${year}`);
     const records = await apiCall('records', 'GET', null, {year:year});
 
     if(!dataCache.records[year]){
@@ -40,7 +38,7 @@ export async function loadRecords(forceReload = false) {
 }
 
 export function filterRecords(records, filters = {}) {
-    console.log("Filter Records ()");
+    debug.log("Filter Records ()");
 
     if (!records || records.length === 0) return [];
     
@@ -71,7 +69,7 @@ export function filterRecords(records, filters = {}) {
 
 export async function renderRecords(recordData)
 {
-    console.log("Render Records()");
+    debug.log("Render Records()");
 
     const types =  await loadTypes(false);
 
@@ -161,7 +159,7 @@ export async function renderRecords(recordData)
 }
 
 function updateRecordStats(records) {
-    console.log("Update Record Stats ()");
+    debug.log("Update Record Stats ()");
     const totalRecords = records.length;
     //const onTime = records.filter(r => r.status === 'on_time').length;
     //const late = records.filter(r => r.status === 'late').length;
@@ -175,7 +173,7 @@ function updateRecordStats(records) {
 
 export async function loadRecordFilters() {
 
-    console.log("Load Record Filters ()");
+    debug.log("Load Record Filters ()");
 
     const year = currentYear;
     
@@ -237,7 +235,7 @@ export async function applyRecordFilters() {
     // Records laden (aus Cache wenn möglich)
     const allRecords = await loadRecords(false);
 
-    console.log("Apply Record Filters ()");
+    debug.log("Apply Record Filters ()");
 
     // Aktuelle Filter auslesen
     const filters = {
@@ -265,7 +263,7 @@ export async function applyRecordFilters() {
 // Im Init oder beim Section-Wechsel registrieren
 export async function initRecordEventHandlers() {
 
-    console.log("Init Record Event Handlers ()");
+    debug.log("Init Record Event Handlers ()");
 
     // Filter-Änderungen
     document.getElementById('filterAppointment')?.addEventListener('change', () => {
@@ -290,7 +288,7 @@ export async function initRecordEventHandlers() {
 }
 
 export async function showRecordsSection() {
-    console.log("Show Record Section ()");
+    debug.log("Show Record Section ()");
     // Filter-Optionen laden
     await loadRecordFilters();
     // Daten laden, filtern und anzeigen

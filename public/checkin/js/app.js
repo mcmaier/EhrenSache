@@ -28,6 +28,7 @@ let appointments = [];
 let deleteExceptionId = null;
 let nfcAbortController = null;
 let isNFCScanning = false;
+let currentStatsYear = new Date().getFullYear();
 
 // In checkin/index.html oder checkin/app.js
     if ('serviceWorker' in navigator) {
@@ -88,8 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmDeleteModal: document.getElementById('confirmDeleteModal'),
         closeConfirmDeleteBtn: document.getElementById('closeConfirmDeleteBtn'),
         submitConfirmDeleteBtn: document.getElementById('submitConfirmDeleteBtn'),
-        stopScanButton: document.getElementById('stopScanButton'),
-        refreshHistoryButton: document.getElementById('refreshHistoryButton'),
+        stopScanButton: document.getElementById('stopScanButton'),        
         nfcButton: document.getElementById('nfcButton'),
         toDashboardBtn: document.getElementById('toDashboardBtn')
     };
@@ -106,10 +106,10 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.submitExceptionBtn.addEventListener('click', submitException);  
     elements.closeConfirmDeleteBtn.addEventListener('click', closeConfirmDeleteModal);
     elements.submitConfirmDeleteBtn.addEventListener('click', submitConfirmDelete);   
-    elements.stopScanButton.addEventListener('click', toggleScanner); 
-    elements.refreshHistoryButton.addEventListener('click', loadHistory);   
+    elements.stopScanButton.addEventListener('click', toggleScanner);      
     elements.nfcButton.addEventListener('click', toggleNFCReader);        
     toDashboardBtn.addEventListener('click', handleDashboardNavigation);
+
 
     // Enter-Taste im Code-Input
     elements.manualCode.addEventListener('keypress', (e) => {
@@ -134,6 +134,9 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Fehler beim Laden des gespeicherten Tokens');
         }
     }
+
+    initTabs();
+    initYearNavigation();
 
     // Online/Offline Detection
     window.addEventListener('online', () => console.log('Online'));
@@ -221,7 +224,7 @@ async function handleLogin(e) {
         apiToken = token;
         
         //Test API Verbindung
-        if(await loadUserData() != true)
+        if(await loadUserData(true) != true)
         {
             throw new Error('Benutzer konnte nicht geladen werden');       
         }
@@ -230,7 +233,7 @@ async function handleLogin(e) {
             localStorage.setItem('api_token', btoa(token));
         }
                 
-        await loadHistory();
+        //await loadHistory();
 
         showScreen('main');        
         startClock();
@@ -456,12 +459,12 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
                              inputMethod === 'CODE' ? '⌨️ Manuell' : '';
 
             showMessage(methodText + ' eingecheckt!', 'success');
-            addNewActivityToHistory({
+            /*addNewActivityToHistory({
                 appointment: data.appointment,
                 verified: true,
                 pending: false,
                 method: inputMethod
-            });
+            });*/
         }
     } catch (error) {
         showMessage('Check-in fehlgeschlagen', 'error');
@@ -836,11 +839,11 @@ async function submitException() {
             showMessage('✓ Antrag erfolgreich gestellt (wartet auf Genehmigung)', 'warning');
             
             const apt = appointments.find(a => a.appointment_id == appointmentId);
-            addNewActivityToHistory({
+            /*addNewActivityToHistory({
                 appointment: apt,
                 verified: false,
                 pending: true
-            });
+            });*/
             
             closeExceptionModal();
         }
@@ -887,6 +890,7 @@ function showOfflineIndicator() {
 
 // Lädt History beim Login
 async function loadHistory() {    
+        
     try {
         // Lade letzte 10 Records
         let records = await apiCall('records');
@@ -908,7 +912,10 @@ async function loadHistory() {
             }))
         ];
 
-        combined.sort((a, b) => b.timestamp - a.timestamp);                    
+        combined.sort((a, b) => b.timestamp - a.timestamp);       
+        
+        // Debug
+        //console.log("Loading History", combined);
         
         // Zeige die letzten 10 Einträge
         renderHistory(combined.slice(0, 10));
@@ -925,7 +932,7 @@ function renderHistory(items) {
     
     if (items.length === 0) {
         elements.historyList.innerHTML = '<div class="history-empty">Noch keine Aktivitäten</div>';
-        elements.history.style.display = 'block';
+        //elements.history.style.display = 'block';
         return;
     }
     
@@ -937,7 +944,7 @@ function renderHistory(items) {
         }
     });
     
-    elements.history.style.display = 'block';
+    //elements.history.style.display = 'block';
 }
 
 // Fügt Record zur History hinzu
@@ -1010,7 +1017,7 @@ function addExceptionToHistory(exception) {
     
     item.innerHTML = `        
         <div class="time">📋 ${dateStr} ${timeStr} ${deleteBtn}</div>
-        <div class="appointment">${exception.title}</div>
+        <div class="appointment">${exception.appointment_title}</div>
         <span class="status pending">${statusText} - ${typeText}</span>
         ${typeBadge}
         
@@ -1103,7 +1110,182 @@ function addNewActivityToHistory(data) {
         elements.historyList.removeChild(elements.historyList.lastChild);
     }
     
-    elements.history.style.display = 'block';
+    //elements.history.style.display = 'block';
+}
+
+// ========================================
+// TAB MANAGEMENT
+// ========================================
+function initTabs() {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const targetTab = button.dataset.tab;
+            
+            // Deaktiviere alle
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Aktiviere gewählten Tab
+            button.classList.add('active');
+            document.querySelector(`.tab-content[data-tab="${targetTab}"]`).classList.add('active');
+            
+            // Scanner stoppen wenn Tab gewechselt wird
+            if (targetTab !== 'checkin' && isScanning) {
+                stopScannerIfRunning();
+            }
+
+            // Lade Daten wenn nötig
+            if (targetTab === 'stats') {
+                loadStatistics();
+            }
+            else if(targetTab === 'history')
+            {
+                loadHistory();
+            }                                    
+        });
+    });
+}
+
+// ========================================
+// STATISTICS LOADING
+// ========================================
+
+
+async function loadStatistics() {
+    const statsLoading = document.getElementById('statsLoading');
+    const statsContent = document.getElementById('statsContent');
+    
+    statsLoading.style.display = 'block';
+    statsContent.style.display = 'none';
+    
+  try {
+        // Hole Member-spezifische Statistik
+        if (!userData || !userData.member_id) {
+            throw new Error('Keine Member-ID verfügbar');
+        }
+        
+       // Hole Statistik für aktuelles Jahr
+        const stats = await apiCall('statistics', 'GET', null, { 
+            member_id: userData.member_id,
+            year: currentStatsYear
+        });
+        
+        // Debug
+        //console.log('Statistics:', stats); 
+
+        // Zeige Jahr an
+        document.getElementById('currentYear').textContent = currentStatsYear;
+        
+        // Zeige Statistiken an
+        displayStatistics(stats);
+        
+        // Zeige Inhalt
+        statsLoading.style.display = 'none';
+        statsContent.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Fehler beim Laden der Statistik:', error);
+        showMessage('Statistik konnte nicht geladen werden', 'error');
+        statsLoading.innerHTML = '<p style="color: #e74c3c;">❌ Fehler beim Laden</p>';
+    }
+}
+
+// ========================================
+// STATISTICS DISPLAY
+// ========================================
+function displayStatistics(stats) {
+    if (!stats || !stats.summary) {
+        document.getElementById('statAttendanceRate').textContent = '0%';
+        document.getElementById('statTotalAppointments').textContent = '0';
+        document.getElementById('groupsList').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Keine Daten verfügbar</p>';
+        return;
+    }
+    
+    const summary = stats.summary;
+    
+    // 1. Anwesenheitsquote
+    const attendanceRate = summary.overall_average || 0;
+    document.getElementById('statAttendanceRate').textContent = `${attendanceRate.toFixed(1)}%`;
+    
+    // 2. Gesamtanzahl Termine
+    const totalAppointments = summary.total_appointments || 0;
+    document.getElementById('statTotalAppointments').textContent = totalAppointments;
+    
+    // 4. Gruppen-Übersicht
+    displayGroupStats(stats);
+}
+
+
+// ========================================
+// GROUP STATS DISPLAY
+// ========================================
+function displayGroupStats(stats) {
+    const groupsList = document.getElementById('groupsList');
+    
+    // Prüfe ob groups vorhanden sind
+    if (!stats.statistics  || stats.statistics.length === 0) {
+        groupsList.innerHTML = `
+            <div class="groups-empty">
+                <div class="empty-icon">📊</div>
+                <p>Keine Gruppendaten für ${currentStatsYear} verfügbar</p>
+            </div>
+        `;
+        return;
+    }
+    
+// Sortiere Gruppen nach Namen
+    const sortedGroups = [...stats.statistics].sort((a, b) => 
+        a.group_name.localeCompare(b.group_name)
+    );
+    
+    // Rendere Gruppen-Liste - verwende Daten direkt aus API
+    groupsList.innerHTML = sortedGroups.map(group => {
+        // Die API liefert bereits die Daten für das angemeldete Mitglied
+        const member = group.members[0]; // Nur ein Mitglied (das angemeldete)        
+        const groupName = group.group_name || 'Ohne Gruppe';
+        const appointments = member.total_appointments || 0;
+        const attended = member.attended || 0;
+        const attendanceRate = member.attendance_rate || 0;
+        
+        // Farbe basierend auf Quote
+        let rateColor = '#27ae60'; // Grün (>= 75%)
+        if (attendanceRate < 50) {
+            rateColor = '#e74c3c'; // Rot
+        } else if (attendanceRate < 75) {
+            rateColor = '#f39c12'; // Orange
+        }
+        
+        return `
+            <div class="group-item">
+                <div class="group-header">
+                    <div class="group-name">${groupName}</div>
+                    <div class="group-rate" style="color: ${rateColor};">${attendanceRate.toFixed(1)}%</div>
+                </div>
+                <div class="group-details">
+                    <span class="group-stat">📅 ${appointments} Termin${appointments !== 1 ? 'e' : ''}</span>
+                    <span class="group-stat">✓ ${attended} anwesend</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ========================================
+// YEAR NAVIGATION
+// ========================================
+function initYearNavigation() {
+    document.getElementById('prevYear').addEventListener('click', async () => {
+        currentStatsYear--;
+        await loadStatistics();
+    });
+    
+    document.getElementById('nextYear').addEventListener('click', async () => {
+            currentStatsYear++;
+            await loadStatistics();
+    });    
 }
 
 // ========================================

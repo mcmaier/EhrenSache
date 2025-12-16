@@ -19,16 +19,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         return;
     }
 
-    // DEBUG: Zeige Auth-Info
     /*
-    $debugInfo = [
-        "auth_user_id" => $authUserId,
-        "auth_user_role" => $authUserRole,
-        "auth_member_id" => $authMemberId,
-        "is_token_auth" => $isTokenAuth,
-        "checkin_source" => $checkinSource
-    ];
-
     error_log("=== MEMBER ID DETERMINATION ===");
     error_log("authUserRole: $authUserRole");
     error_log("authMemberId: " . ($authMemberId ?? 'NULL'));
@@ -41,8 +32,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         if(!isset($data->member_id) && !isset($data->member_number)) {
             http_response_code(400);
             echo json_encode([
-                "message" => "Either member_id or member_number is required",
-                "debug" => $debugInfo
+                "message" => "Either member_id or member_number is required"
             ]);
             return;
         }
@@ -65,8 +55,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
             http_response_code(404);
             echo json_encode([
                 "message" => "Member not found",
-                "searched_for" => $data->member_number ?? $data->member_id,
-                "debug" => $debugInfo
+                "searched_for" => $data->member_number ?? $data->member_id
             ]);
             return;
         }
@@ -74,6 +63,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         // Bestimme Source für Response
         if($authUserRole === 'device') {
             $authType = 'device_auth';
+            $checkinSource = 'device_auth';
         } else {
             $authType = $isTokenAuth ? 'admin_token' : 'admin_session';
         }
@@ -84,8 +74,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
             http_response_code(403);
             echo json_encode([
                 "message" => "No member linked to your account",
-                "hint" => "Contact administrator",
-                "debug" => $debugInfo
+                "hint" => "Contact administrator"
             ]);
             return;
         }
@@ -291,19 +280,24 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
     $checkStmt->execute([$memberId, $appointmentId]);
     $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
-    // Bestimme Source-Informationen
-    $sourceDevice = $sourceInfo['device_name'] ?? null;
+    $sourceDevice = $data->source_device ?? null;
+
     $locationName = $sourceInfo['location_name'] ?? null;
 
+    if(!$sourceDevice)
+    {
+        // Bestimme Source-Informationen
+        $sourceDevice = $sourceInfo['source_device'] ?? null;        
+    }    
+
      // Bei Device: Hole Device-Info aus users Tabelle
-    if($authUserRole === 'device' && !$sourceDevice) {
+    if($authUserRole === 'device') {
         $deviceStmt = $db->prepare("SELECT email, device_type FROM users WHERE user_id = ?");
         $deviceStmt->execute([$authUserId]);
         $deviceInfo = $deviceStmt->fetch(PDO::FETCH_ASSOC);
         
         if($deviceInfo) {
-            $sourceDevice = $deviceInfo['email'] . 
-                           ($deviceInfo['device_type'] ? " ({$deviceInfo['device_type']})" : "");
+            $locationName = $deviceInfo['email']; 
         }
     }
     

@@ -1,6 +1,7 @@
 import { apiCall, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
 import { formatDateTime, updateModalId } from './utils.js';
+import {debug} from '../app.js'
 
 // ============================================
 // MANAGEMENT (Groups & Types)
@@ -22,18 +23,16 @@ export async function showGroupSection(forceReload = false)
 export async function loadGroups(forceReload = false) {
     // Cache-Check: Nur laden wenn nötig
     if (!forceReload && isCacheValid('groups')) {
-        console.log('Loading groups from cache');
-        //renderGroups(dataCache.groups.data);
+        debug.log('Loading groups from cache');
         return dataCache.groups.data;
     }
 
-    console.log('Loading groups from API');
+    debug.log('Loading groups from API');
     const groups = await apiCall('member_groups');
 
     dataCache.groups.data = groups;
     dataCache.groups.timestamp = Date.now();
 
-    //renderGroups(dataCache.groups.data);
     return groups;        
 }
 
@@ -79,16 +78,7 @@ export async function openGroupModal(groupId = null) {
     const title = document.getElementById('groupModalTitle');
     const membersGroup = document.getElementById('groupMembersGroup');
 
-    if(dataCache.members.length === 0)
-    {
-        await loadMembers(true);
-    }
-    
-    // Lade alle Mitglieder falls nötig
-    /*
-    if (allMembers.length === 0) {
-        allMembers = await apiCall('members') || [];
-    }*/
+    await loadMembers();       
     
     if (groupId) {
         title.textContent = 'Gruppe bearbeiten';
@@ -235,12 +225,12 @@ export async function loadTypes(forceReload = false) {
     
     // Cache-Check: Nur laden wenn nötig
     if (!forceReload && isCacheValid('types')) {
-        console.log('Loading Appointment Types from CACHE');
+        debug.log('Loading Appointment Types from CACHE');
         //renderTypeGroupOverview(dataCache.types.data);
         return dataCache.types.data;
     }
     
-    console.log('Loading Appointment Types from API');
+    debug.log('Loading Appointment Types from API');
     const types = await apiCall('appointment_types');        
 
     dataCache.types.data = types;

@@ -14,7 +14,6 @@ require_once '../../private/handlers/records.php';
 require_once '../../private/handlers/exceptions.php';
 require_once '../../private/handlers/users.php';
 require_once '../../private/handlers/membership_dates.php';
-require_once '../../private/handlers/device_config.php';
 require_once '../../private/handlers/auto_checkin.php';
 require_once '../../private/handlers/totp_checkin.php';
 require_once '../../private/handlers/regenerate_token.php';

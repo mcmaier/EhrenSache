@@ -1,167 +1,176 @@
 import { apiCall, isAdmin } from './api.js';
 import { loadGroups } from './management.js';
-import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, currentYear, setCurrentYear} from './ui.js';
-import { round } from './utils.js';
+import { loadMembers } from './members.js';
+import { showToast, showConfirm, currentYear} from './ui.js';
+import {debug} from '../app.js'
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
 // ============================================
 
-export async function loadStatistics(forceReload = false) {
+export async function loadStatistics(filters = {}) {
     const year = currentYear; 
-
-    // Cache-Check
-    if (!forceReload && isCacheValid('statistics', year)) {
-        console.log(`Loading STATISTICS from CACHE for ${year}`);        
-        //renderStatistics(dataCache.statistics[year].data);
-        return dataCache.statistics[year].data;
-    }
 
     const groupId = document.getElementById('statGroup').value;
     const memberId = isAdmin ? document.getElementById('statMember').value : null;
 
     // API-Call mit Jahr
-    console.log(`Loading STATISTICS from API for ${year}`);        
-    const stats = await apiCall('statistics', 'GET', null, { year: year });
+    debug.log(`Loading STATISTICS from API for ${year} with filters:`, filters);    
     
-    // Cache speichern
-    if (!dataCache.statistics[year]) {
-        dataCache.statistics[year] = {};
-    }
-    dataCache.statistics[year].data = stats;
-    dataCache.statistics[year].timestamp = Date.now();
+    const params = {year: year};
 
-    return stats;
-    
-    //renderStatistics(stats);
-    
-    /*
-    let params = {};
-    if(year) params.year = year;
-    if (groupId) params.group_id = groupId;
-    if (memberId) params.member_id = memberId;
-    
-    try {
-        const response = await apiCall('statistics','GET', null, params);
-        renderStatistics(response);
-    } catch (error) {
-        showToast('Fehler beim Laden der Statistik', 'error');
-        console.error(error);
+    if (filters.group && filters.group !== '') {
+        params.group_id = filters.group;
     }
-    */
+    
+    if (filters.member && filters.member !== '') {
+        params.member_id = filters.member;
+    }
+    
+    const stats = await apiCall('statistics', 'GET', null, params);
+
+    return stats;    
+
 }
 
-export async function reloadStatisticsFilters() {
-    // Jahr-Filter (aktuelle + letzte 5 Jahre)
-    
-    const yearSelect = document.getElementById('statisticYearFilter');
+// ============================================
+// FILTERING
+// ============================================
 
-    // Gespeichertes/aktuelles Jahr setzen
-    yearSelect.value = currentYear;
-
-    // Event Listener für Synchronisation (falls noch nicht vorhanden)
-    if (!yearSelect.dataset.listenerAdded) {
-        yearSelect.addEventListener('change', (e) => {
-            setCurrentYear(e.target.value);
-        });
-        yearSelect.dataset.listenerAdded = 'true';
-    }
+export async function loadStatisticsFilters() {
 
     // Gruppen laden
-    try {
-        loadGroups(false);
-
-        const groups = dataCache.groups.data;
-        const groupSelect = document.getElementById('statGroup');
+    const groups = await loadGroups(true);
+    
+    // Gruppen-Filter befüllen
+    const groupSelect = document.getElementById('statGroup');
+    if (groupSelect) {
+        const currentValue = groupSelect.value;
+        
         groupSelect.innerHTML = '<option value="">Alle Gruppen</option>';
-        groups.forEach(group => {
-            groupSelect.innerHTML += `<option value="${group.group_id}">${group.group_name}</option>`;
-        });
-    } catch (error) {
-        console.error('Fehler beim Laden der Gruppen:', error);
+        if (groups && groups.length > 0) {
+            groups.forEach(group => {
+                groupSelect.innerHTML += `<option value="${group.group_id}">${group.group_name}</option>`;
+            });
+        }
+        
+        if (currentValue) groupSelect.value = currentValue;
+    }    
+
+    // Grid-Klasse für Layout setzen
+    const filterGrid = document.querySelector('.filter-grid');
+
+    // Mitglieder-Filter (nur für Admins)
+    if (isAdmin) {
+        document.getElementById('statMemberFilterGroup').style.display = 'block';              
+        // Initial alle Mitglieder anzeigen         
+        
+        // Grid für 2 Spalten
+        if (filterGrid) {
+            filterGrid.classList.remove('single-filter');
+            filterGrid.classList.add('dual-filter');
+        }
+
+        await updateStatisticsFilters(); 
+        
+    } else {
+        document.getElementById('statMemberFilterGroup').style.display = 'none';
+
+        // Grid für 1 Spalte
+        if (filterGrid) {
+            filterGrid.classList.remove('dual-filter');
+            filterGrid.classList.add('single-filter');
+        }
     }
     
-    // Mitglieder-Filter nur für Admins
-    if (isAdmin) {
-        document.getElementById('statMemberFilterGroup').style.display = 'block';
-        await loadMemberFilterOptions();
-    }
-    else
-    {
-        document.getElementById('statMemberFilterGroup').style.display = 'none';
-    }
 }
 
-
-async function loadMemberFilterOptions() {
-    const groupId = document.getElementById('statGroup').value;
-    const currentMemberId = document.getElementById('statMember').value;
+export async function updateStatisticsFilters() {
+    if (!isAdmin) return;
+    
+    const groupSelect = document.getElementById('statGroup');
     const memberSelect = document.getElementById('statMember');
     
-    try {
-        let members;
-        let params = {};
-
-        if (groupId) {
-            // Lade nur Mitglieder der ausgewählten Gruppe
-            params.group_id = groupId;
-            members = await apiCall('members', 'GET', null, params);     
-        } else {
-            // Alle aktiven Mitglieder
-            members = await apiCall('members', 'GET');
-        }
-        
-        // Select neu befüllen
-        memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
-        members.forEach(member => {
-            memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+    //if (!groupSelect || !memberSelect) return;
+    
+    const selectedGroupId = groupSelect.value;
+    const currentMemberId = memberSelect.value;
+    
+    debug.log('Updating member filter for group:', selectedGroupId);
+    
+    // Alle Mitglieder laden
+    const allMembers = await loadMembers();
+    
+    // Filtern nach Gruppe (wenn ausgewählt)
+    let filteredMembers = allMembers.filter(m => m.active);
+    
+    if (selectedGroupId && selectedGroupId !== '') {
+        filteredMembers = filteredMembers.filter(m => {
+            return m.group_ids_array && m.group_ids_array.includes(parseInt(selectedGroupId));
         });
-        
-        // Prüfe ob aktuell ausgewähltes Mitglied noch in der Liste ist
-        if (currentMemberId) {
-            const memberStillAvailable = members.some(m => m.member_id == currentMemberId);
-            if (memberStillAvailable) {
-                memberSelect.value = currentMemberId;
-            } else {
-                // Zurücksetzen auf "Alle Mitglieder"
-                memberSelect.value = '';
-            }
-        }
-        
-    } catch (error) {
-        console.error('Fehler beim Laden der Mitglieder:', error);
-        memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
     }
+    
+    // Dropdown neu befüllen
+    memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
+    filteredMembers.forEach(member => {
+        memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+    });    
+    
+    if (currentMemberId && filteredMembers.some(m => m.member_id == currentMemberId)) {
+        memberSelect.value = currentMemberId;
+    } else {
+        memberSelect.value = '';
+    }    
 }
+
+export async function applyStatisticsFilters() {
+
+    debug.log("Load Statistics with Filters ()");
+
+    // Aktuelle Filter auslesen
+    const filters = {        
+        member:isAdmin ? (document.getElementById('statMember')?.value || null) : null,
+        group: document.getElementById('statGroup')?.value || null
+    };
+    
+    // Statistik laden
+    const stats = await loadStatistics(filters);
+    
+    // Rendern
+    renderStatistics(stats);  
+}
+
 
 // ============================================
 // RENDERING
 // ============================================
 
-export async function showStatisticsSection(forceReload = false)
+export async function showStatisticsSection()
 {
-    console.log("== Show Statistics Section == ")
-    const statData = await loadStatistics(forceReload);
+    debug.log("== Show Statistics Section == ")
 
-    renderStatistics(statData);
+    await loadStatisticsFilters();
 
+    await applyStatisticsFilters();
 }
 
-function renderStatistics(data) {
-    const container = document.getElementById('statisticsContainer');
-    
-    if (!data.statistics || data.statistics.length === 0) {
-        container.innerHTML = '<p class="info-message">Keine Daten für die ausgewählten Filter vorhanden.</p>';
+export async function renderStatistics(statsData) {
+    const container = document.getElementById('statisticsContainer');    
+
+    debug.log("Rendering stats:", statsData)
+
+    if (!statsData || !statsData.statistics === 0) {        
         // Stats auf 0 setzen
+        container.innerHTML = '<p class="info-message">Keine Daten für die ausgewählten Filter vorhanden.</p>';
         updateOverallStats(null);
         return;
     }
 
-    updateOverallStats(data.summary);
+    updateOverallStats(statsData.summary);
     
     let html = '';
     
-    data.statistics.forEach(group => {
+    statsData.statistics.forEach(group => {
         html += `
             <div class="statistics-group">
                 <h2>${group.group_name}</h2>
@@ -186,7 +195,8 @@ function renderStatistics(data) {
                                     <td>
                                         <div class="attendance-rate">
                                             <div class="rate-bar">
-                                                <div class="rate-fill" style="width: ${member.attendance_rate}%"></div>
+                                                <div class="rate-fill-gradient"></div>
+                                                <div class="rate-fill-mask" style="width: ${100 - member.attendance_rate}%"></div>
                                             </div>
                                             <span class="rate-text">${member.attendance_rate}%</span>
                                         </div>
@@ -224,18 +234,21 @@ function updateOverallStats(summary) {
     document.getElementById('statOverallAverage').textContent = summary.overall_average + '%';
 }
 
-export async function initStatistics() {
+export async function initStatisticsEventHandlers() {
 
     // Change-Listener für automatische Aktualisierung
-    //document.getElementById('statYear').addEventListener('change', loadStatistics);
-    document.getElementById('statGroup').addEventListener('change', async function() {
-        if (isAdmin) {
-            await loadMemberFilterOptions();
-        }
-        //loadStatistics();
-    });
-    
+    document.getElementById('statGroup').addEventListener('change', () => {
+            updateStatisticsFilters();
+            applyStatisticsFilters();      
+        });
+
     if (isAdmin) {
-        document.getElementById('statMember').addEventListener('change', loadStatistics);
+        document.getElementById('statMember').addEventListener('change', () => {
+            updateStatisticsFilters();
+            applyStatisticsFilters(); 
+        });
     }
 }
+
+window.updateStatisticsFilters = updateStatisticsFilters;
+window.applyStatisticsFilters = applyStatisticsFilters;

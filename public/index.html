@@ -361,54 +361,31 @@
             <section class="content-section" id="statistik">
                 <div class="content-header">
                     <h1>Statistik</h1>
-                </div>                
-                
-                <div class="stats-grid">                    
-                    <div class="stat-card">
-                        <div class="form-group">
-                            <label for="statGroup">Termingruppe</label>
-                            <select id="statGroup" class="form-input">
-                                <option value="">Alle Gruppen</option>
-                            </select>
-                        </div>       
-                    </div>
-                    <div class="stat-card">
-                        <div class="form-group" id="statMemberFilterGroup" style="display:none;">
-                            <label for="statMember">Mitglied</label>
-                            <select id="statMember" class="form-input">
-                                <option value="">Alle Mitglieder</option>
-                            </select>                            
+                </div>                          
+                <div class="stats-header">
+                    <div class="filter-card">
+                        <div class="filter-grid">
+                            <div class="form-group">
+                                <label for="statGroup">Gruppe</label>
+                                <select id="statGroup" class="form-input">
+                                    <option value="">Alle Gruppen</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group" id="statMemberFilterGroup" style="display:none;">
+                                <label for="statMember">Mitglied</label>
+                                <select id="statMember" class="form-input">
+                                    <option value="">Alle Mitglieder</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
-                                           
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
+                    </div>                
+                    <div class="year-card">
                         <h3>Jahr filtern</h3>
-                        <select id="statisticYearFilter"
-                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
-                        </select>
-                    </div>                                       
-                </div>
-                <!--
-                <div class="filter-bar">
-                     <div class="form-group">
-                        <label for="statYear">Jahr</label>
-                        <select id="statYear" class="form-input"></select>
-                    </div> 
-                    
-                    <div class="form-group">
-                        <label for="statGroup">Termingruppe</label>
-                        <select id="statGroup" class="form-input">
-                            <option value="">Alle Gruppen</option>
+                        <select id="statisticYearFilter" class="form-input year-select">
                         </select>
                     </div>
-                    
-                    <div class="form-group" id="statMemberFilterGroup" style="display:none;">
-                        <label for="statMember">Mitglied</label>
-                        <select id="statMember" class="form-input">
-                            <option value="">Alle Mitglieder</option>
-                        </select>
-                    </div>                   
-                </div> -->
+                </div>
 
                 <div class="stats-grid">
                     <div class="stat-card">
@@ -455,7 +432,7 @@
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
                         <h3>Jahr filtern</h3>
                         <select id="memberYearFilter"
-                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
+                                style="width: 100%; padding: 6px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
                         </select>
                     </div>
                 </div>
@@ -1099,7 +1076,7 @@
                 
                 // Wenn "not_installed" Status → Weiterleitung
                 if (result.status === 'not_installed') {
-                    console.log('Installation erforderlich - Weiterleitung...');
+                    debug.log('Installation erforderlich - Weiterleitung...');
                     window.location.href = './install/';
                 }
             } catch (error) {

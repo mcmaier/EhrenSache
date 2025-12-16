@@ -1,10 +1,9 @@
 import { apiCall, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache} from './ui.js';
 import { loadUserData } from './users.js';
-import { loadRecordFilters } from './records.js';
-import { loadExceptionFilters } from './exceptions.js';
 import { updateModalId } from './utils.js';
 import { loadGroups } from './management.js';
+import {debug} from '../app.js'
 
 
 // ============================================
@@ -19,13 +18,11 @@ import { loadGroups } from './management.js';
 
 let currentMembershipDates = [];
 let currentMemberGroups = [];
-//let allAvailableGroups = [];
 
 export async function loadMembers(forceReload = false) {
     // Cache verwenden wenn vorhanden und nicht forceReload    
     if (!forceReload && isCacheValid('members')) {
-        console.log("Loading MEMBERS from CACHE");
-        //renderMembers(dataCache.members.data);
+        debug.log("Loading MEMBERS from CACHE");
         return dataCache.members.data;
     }
 
@@ -35,15 +32,24 @@ export async function loadMembers(forceReload = false) {
     // Mitglieder laden basierend auf gecachten userDetails
     const { userDetails } = dataCache.userData.data;
 
-    //console.log("Getting user data:", dataCache.userData.data);
-
     let members = [];
 
-    console.log("Loading MEMBERS from API");
+    debug.log("Loading MEMBERS from API");
             
     if(isAdmin){
         // Admin sieht alle Mitglieder
-        members = await apiCall('members');        
+        members = await apiCall('members');    
+        
+        // GROUP_CONCAT Strings zu Arrays konvertieren
+        members.forEach(member => {
+            if (member.group_ids && typeof member.group_ids === 'string') {
+                member.group_ids_array = member.group_ids
+                    .split(',')
+                    .map(id => parseInt(id.trim()));
+            } else {
+                member.group_ids_array = [];
+            }
+        });
     }
     else {        
         if (userDetails && userDetails.member_id) {
@@ -117,7 +123,7 @@ function renderMembers(memberData) {
 
 export async function showMemberSection(forceReload = false) {
 
-    console.log("Show Member Section ()");
+    debug.log("Show Member Section ()");
 
     const allMembers = await loadMembers(forceReload);
     renderMembers(allMembers);
@@ -287,8 +293,7 @@ export async function deleteMember(memberId, name) {
         const result = await apiCall('members', 'DELETE', null, { id: memberId });
         if (result) {
 
-            // Cache invalidieren und neu laden
-            //invalidateCache('members');            
+            // Cache invalidieren und neu laden         
             showMemberSection(true);
 
             showToast('Mitglied erfolgreich gelöscht', 'success');
@@ -304,6 +309,8 @@ async function loadMembershipDates(memberId) {
     // API muss erweitert werden für membership_dates
     const response = await apiCall('membership_dates', 'GET', null, { member_id: memberId });
     currentMembershipDates = response || [];
+
+    debug.log("Getting membership dates:", response);
     renderMembershipDates();
 }
 
@@ -331,7 +338,7 @@ function renderMembershipDates() {
                 <select onchange="updateMembershipDate(${index}, 'status', this.value)" 
                         style="flex: 1;">
                     <option value="active" ${period.status === 'active' ? 'selected' : ''}>Aktiv</option>
-                    <option value="expired" ${period.status === 'inactive' ? 'selected' : ''}>Inaktiv</option>
+                    <option value="inactive" ${period.status === 'inactive' ? 'selected' : ''}>Inaktiv</option>
                 </select>
                 <button type="button" class="action-btn btn-delete" 
                         onclick="removeMembershipDate(${index})">×</button>
@@ -352,6 +359,9 @@ function addMembershipDate() {
 }
 
 function updateMembershipDate(index, field, value) {
+
+    debug.log("Current Membership Dates: ", currentMembershipDates);
+
     currentMembershipDates[index][field] = value || null;
 }
 
@@ -414,3 +424,4 @@ window.closeMemberModal = () => document.getElementById('memberModal').classList
 window.deleteMember = deleteMember;
 window.addMembershipDate = addMembershipDate;
 window.removeMembershipDate = removeMembershipDate;
+window.updateMembershipDate = updateMembershipDate;

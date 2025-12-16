@@ -273,6 +273,7 @@ function calculateMemberStatistics($db, $memberId, $groupId, $year) {
         LEFT JOIN appointment_type_groups atg ON a.type_id = atg.type_id        
         WHERE atg.group_id = ? 
         AND YEAR(date) = ?
+        AND date <= CURDATE()
         ORDER BY date
     ");
     $stmt->execute([$groupId, $year]);

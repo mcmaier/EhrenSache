@@ -17,18 +17,23 @@ function handleMembers($db, $method, $id) {
 
                         if($member) {
                             // Lade zugehörige Gruppen
-                            $groupStmt = $db->prepare("SELECT g.* FROM member_groups g
-                                                    JOIN member_group_assignments mga ON g.group_id = mga.group_id
-                                                    WHERE mga.member_id = ?");
+                            $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name 
+                                                        FROM member_groups g
+                                                        INNER JOIN member_group_assignments mga ON g.group_id = mga.group_id
+                                                        WHERE mga.member_id = ?");
                             $groupStmt->execute([$id]);
                             $member['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
-                            echo json_encode($member);
+                            //$member['group_ids'] = array_column($member['groups'], 'group_id');
+                            //$member['group_names'] = implode(', ', array_column($member['groups'], 'group_name'));
+            
+                            echo json_encode($member ?: []);
                         }
                         else {
                             http_response_code(404);
                             echo json_encode(["message" => "Member not found"]);
                         }
-                } else {
+                }               
+                else{
                     $stmt = $db->prepare("SELECT name,surname FROM members WHERE member_id = ?");
                     $stmt->execute([$id]);
                     $member = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -53,19 +58,19 @@ function handleMembers($db, $method, $id) {
                     
                     if($group_id)
                     {
-                        $sql = "SELECT m.*,
-                                    GROUP_CONCAT(g.group_name SEPARATOR ', ') as group_names
+                        $sql = "SELECT m.*, g.group_id, g.group_name                                   
                                     FROM members m
                                     LEFT JOIN member_group_assignments mga ON m.member_id = mga.member_id
                                     LEFT JOIN member_groups g ON mga.group_id = g.group_id
                                     WHERE mga.group_id = ?
                                     GROUP BY m.member_id                                    
                                     ORDER BY m.surname, m.name";
-                                    $params[] = $group_id;
+                                    $params[] = $group_id;                                    
                     }
                     else
                     {
                         $sql = "SELECT m.*,
+                                    GROUP_CONCAT(g.group_id SEPARATOR ', ') as group_ids,
                                     GROUP_CONCAT(g.group_name SEPARATOR ', ') as group_names
                                     FROM members m
                                     LEFT JOIN member_group_assignments mga ON m.member_id = mga.member_id
@@ -83,9 +88,15 @@ function handleMembers($db, $method, $id) {
              
                     $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
+                else if($_SESSION['role'] === 'device')
+                {
+                    // Liste aller Mitglieder mit Member_Number für Auto-Checkin
+                    $stmt = $db->query("SELECT name, surname, member_number FROM members ORDER BY surname, name");
+                                $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                }
                 else
                 {
-                    // Liste aller Mitglieder MIT Gruppennamen
+                    // Liste aller Mitglieder
                     $stmt = $db->query("SELECT name, surname FROM members ORDER BY surname, name");
                                 $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }

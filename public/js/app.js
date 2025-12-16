@@ -1,25 +1,23 @@
-import { loadAllData, showLogin, showDashboard, initNavigation, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, currentYear, setCurrentYear, initDataCache, initEventHandlers} from './modules/ui.js';
+import { loadAllData, showLogin, showDashboard, initNavigation, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, initEventHandlers} from './modules/ui.js';
 import { apiCall, setCurrentUser, setCsrfToken, setInitialLoad, currentUser, isAdmin} from './modules/api.js';
 import { initAuth } from './modules/auth.js';
-import { loadMembers } from './modules/members.js';
-import { loadAppointments } from './modules/appointments.js';
-import { loadRecords, loadRecordFilters } from './modules/records.js';
-import { loadExceptions } from './modules/exceptions.js';
-import { loadUsers } from './modules/users.js';
-import { loadSettings, initSettings} from './modules/settings.js';
-import { loadGroups, loadTypes } from './modules/management.js';
-import { initStatistics} from './modules/statistics.js';
-import { exportMembers, exportAppointments, exportRecords } from './modules/import_export.js';
 
 // ============================================
 // INIT JS
 // ============================================
 
+const DEBUG = false;
+
+export const debug = {
+  log:  (...args) => DEBUG && console.log(...args),
+  warn: (...args) => DEBUG && console.warn(...args),
+  error:(...args) => DEBUG && console.error(...args),
+};
+
 async function init() {
 
     initAuth();
     initNavigation();
-    initSettings();
     initModalEscHandler();
     initPWAQuickAccess();    
 
@@ -48,17 +46,9 @@ async function init() {
         
         await initAllYearFilters();
 
-        console.log("== CACHE INIT START ==");
-
-        // Alle Caches befüllen
-        await initDataCache();
-
-        console.log("== CACHE INIT END ==");
-
         showDashboard();        
-        await loadAllData();
-        //await initAllYearFilters();
-        //await initStatistics();  
+        loadAllData();
+        
     } else {
         showLogin();
     }   

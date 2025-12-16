@@ -1,4 +1,5 @@
 import { API_BASE } from '../config.js';
+import {debug} from '../app.js'
 import { showLogin, showScreen, showToast, showDashboard, updateUIForRole} from './ui.js';
 
 // Globale State
@@ -58,7 +59,8 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
         const response = await fetch(url, options);
         const result = await response.json();
                 
-        console.log("API call:",resource, method, params);
+        //Debug
+        debug.log("API call:",resource, method, params, data);
 
         if (!response.ok)
         {            

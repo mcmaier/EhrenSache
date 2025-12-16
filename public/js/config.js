@@ -25,24 +25,7 @@ function getApiBase() {
         basePath += '/';
     }
     
-    return origin + basePath + 'api/api.php';
-    /*
-    // Hole aktuellen Pfad
-    let basePath = window.location.pathname;
-    
-    // Entferne Dateinamen (index.html, etc.)
-    if (basePath.endsWith('.html')) {
-        basePath = basePath.substring(0, basePath.lastIndexOf('/') + 1);
-    }
-    
-    // Stelle sicher dass Pfad mit / endet
-    if (!basePath.endsWith('/')) {
-        basePath += '/';
-    }
-    
-    // Füge api/api.php hinzu
-    return basePath + 'api/api.php';
-    */
+    return origin + basePath + 'api/api.php';    
 }
 
 

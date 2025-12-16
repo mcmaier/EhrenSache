@@ -2,6 +2,7 @@ import { apiCall, currentUser, isAdmin } from './api.js';
 import { showToast, showConfirm, isCacheValid, dataCache, invalidateCache } from './ui.js';
 import { loadUserData } from './users.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime } from './utils.js';
+import {debug} from '../app.js'
 
 // ============================================
 // SETTINGS
@@ -15,28 +16,9 @@ import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime } from './uti
 
 export async function loadSettings(forceReload = false) {
 
-    await loadUserData();
+    await loadUserData(forceReload);
 
-    const userData = dataCache.userData.data.userData;
     const userDetails = dataCache.userData.data.userDetails; 
-
-    /*
-    // Userprofil abfragen (falls nicht gecacht)
-    if (!forceReload && isCacheValid('userData')) {        
-        console.log("Loading SETTINGS from CACHE");
-        userData = dataCache.userData.data.userData;
-        userDetails = dataCache.userData.data.userDetails;        
-    }
-    else
-    {
-        console.log("Loading SETTINGS from API");
-        userData = await apiCall('me');
-        userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
-        
-        // userData Cache separat speichern
-        dataCache.userData.data = { userData, userDetails };
-        dataCache.userData.timestamp = Date.now();
-    }*/
 
     // Account-Informationen
     document.getElementById('settings_email').value = userDetails.email;
@@ -106,11 +88,12 @@ export async function loadSettings(forceReload = false) {
     }
 }
 
+
 // ============================================
 // CRUD FUNCTIONS
 // ============================================
 
-export function initSettings()
+export function initSettingsEventHandler()
 {
     if (changePasswordForm) {
         changePasswordForm.addEventListener('submit', async (e) => {

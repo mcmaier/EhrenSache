@@ -1,14 +1,14 @@
 import {TOAST_DURATION} from '../config.js';
 import {apiCall, isAdmin, currentUser, setCurrentUser} from './api.js';
-import {loadSettings} from './settings.js';
+import {loadSettings, initSettingsEventHandler} from './settings.js';
 import {loadUsers, showUserSection} from'./users.js';
 import {loadAppointments, setCalendarToYear, showAppointmentSection} from'./appointments.js';
 import {loadExceptions, showExceptionSection, initExceptionEventHandlers} from'./exceptions.js';
 import {loadRecords, showRecordsSection, initRecordEventHandlers} from'./records.js';
 import {loadMembers, showMemberSection} from'./members.js';
 import {loadGroups, loadTypes, showGroupSection} from './management.js';
-import {loadStatistics, showStatisticsSection} from './statistics.js';
-
+import {loadStatistics, initStatisticsEventHandlers, showStatisticsSection} from './statistics.js';
+import {debug} from '../app.js'
 
 // ============================================
 // UI
@@ -28,7 +28,6 @@ export const dataCache = {
     availableYears: { data: [], timestamp: null }, 
     
     //Jahresabhängige Daten separat
-    statistics: {},
     appointments: {},
     records: {},
     exceptions: {}
@@ -113,7 +112,7 @@ export async function populateYearFilter(selectElement) {
     const years = await loadAvailableYears();
     const savedYear = sessionStorage.getItem('selectedYear') || currentYear;
 
-    console.log("Populating year filter.", years)
+    debug.log("Populating year filter.", years)
     
     selectElement.innerHTML = '';
     years.forEach(year => {
@@ -135,7 +134,7 @@ export async function initAllYearFilters() {
         'statisticYearFilter'
     ];
 
-    console.log("Initializing Year Filters");
+    debug.log("Initializing Year Filters");
     
     for (const filterId of yearFilters) {
         const element = document.getElementById(filterId);
@@ -146,6 +145,7 @@ export async function initAllYearFilters() {
             element.addEventListener('change', (e) => {
                 setCurrentYear(e.target.value);
                 setCalendarToYear();
+                resetRecordFilter();
             });
 
             setCurrentYear(currentYear);
@@ -156,11 +156,11 @@ export async function initAllYearFilters() {
 export async function loadAvailableYears(forceReload = false) {
 
     if (!forceReload && isCacheValid('availableYears')) {
-        console.log('Loading AVAILABLE YEARS from CACHE');
+        debug.log('Loading AVAILABLE YEARS from CACHE');
         return dataCache.availableYears.data;
     }
     
-    console.log('Loading AVAILABLE YEARS from API');
+    debug.log('Loading AVAILABLE YEARS from API');
     const years = await apiCall('available_years');  // Direkt das Array    
     
     if (Array.isArray(years)) {
@@ -472,7 +472,7 @@ export async function initNavigation() {
              // Speichere aktuelle Section
             sessionStorage.setItem('currentSection', section);
 
-            console.log("==== SECTION CHANGED ===>", section);            
+            debug.log("==== SECTION CHANGED ===>", section);            
 
             loadAllData();
 
@@ -508,18 +508,21 @@ export async function initEventHandlers()
 {
     initRecordEventHandlers();
     initExceptionEventHandlers();
+    initStatisticsEventHandlers();
+
+    initSettingsEventHandler();
 }
 
 
 export async function loadAllData() {
     const section = sessionStorage.getItem('currentSection') || 'einstellungen';
 
-    console.log("== LOAD ALL DATA == ")
+    debug.log("== LOAD ALL DATA == ")
 
     switch(section)
     {
         case 'einstellungen':
-            await loadSettings(!isCacheValid('userData'));
+            await loadSettings(true);
             break;
         case 'mitglieder':
             await showMemberSection();
@@ -549,6 +552,7 @@ export async function loadAllData() {
             default:
                 break;
     }    
+    /*
 
     // Hintergrund-Laden nur für ungecachte Daten
     setTimeout(() => {
@@ -562,8 +566,8 @@ export async function loadAllData() {
         if ((section !== 'antraege') && !isCacheValid('exceptions',currentYear)) {
             loadExceptions(true);
         }
-        if((section !== 'statistik') && !isCacheValid('statistics', currentYear)) {
-            loadStatistics(true);
+        if((section !== 'statistik')) {
+            loadStatistics();
         }
 
         if(isAdmin)
@@ -578,7 +582,7 @@ export async function loadAllData() {
                 if (!isCacheValid('types')) loadTypes(true);
             }
         }
-    }, 100);
+    }, 100);*/
 }
 
 

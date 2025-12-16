@@ -2,6 +2,7 @@ import { apiCall, currentUser, isAdmin } from './api.js';
 import { loadMembers } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
 import { updateModalId } from './utils.js';
+import {debug} from '../app.js'
 
 // ============================================
 // USERS
@@ -21,31 +22,29 @@ export async function loadUsers(forceReload = false) {
     }
 
     if (!forceReload && isCacheValid('users')) {
-        console.log("Loading USERS from CACHE");
-        //renderUsers(dataCache.users.data);
+        debug.log("Loading USERS from CACHE");        
         return dataCache.users.data;
     }
 
-    console.log("Loading USERS from API");
+    debug.log("Loading USERS from API");
     const users = await apiCall('users');
     
     // Cache speichern
     dataCache.users.data = users;
     dataCache.users.timestamp = Date.now();
     
-    return users;
-    //renderUsers(dataCache.users.data);
+    return users;    
 }
 
 export async function loadUserData(forceReload = false) {
 
     if(!forceReload && isCacheValid('userData'))
     {
-        console.log("Loading USER DETAILS (ME) from CACHE");
+        debug.log("Loading USER DETAILS (ME) from CACHE");
         return;
     }
 
-    console.log("Loading USER DETAILS (ME) from API");
+    debug.log("Loading USER DETAILS (ME) from API");
     const userData = await apiCall('me');
     const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
         
@@ -119,7 +118,7 @@ const tbody = document.getElementById('usersTableBody');
 
 export async function showUserSection(forceReload = false)
 {
-    console.log("Show User Section ()");
+    debug.log("Show User Section ()");
     const allUsers = await loadUsers(forceReload);
     renderUsers(allUsers);
 }
@@ -211,16 +210,14 @@ export async function openUserModal(userId = null) {
     
     // Lade Mitglieder für Dropdown
 
-    if(dataCache.members.data.length === 0)
-    {
-        loadMembers(true);
-    }
+    const members = await loadMembers(true);
+    
 
     const memberSelect = document.getElementById('user_member');
     memberSelect.innerHTML = '<option value="">Kein Mitglied</option>';
     
-    if (dataCache.members.data) {
-        dataCache.members.data.forEach(member => {
+    if (members) {
+        members.forEach(member => {
             memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
         });
     }
@@ -270,7 +267,7 @@ export async function loadUserFormData(userId) {
     const user = await apiCall('users', 'GET', null, { id: userId });
     
     if (user) {
-        console.log('User loaded from API:', user);
+        debug.log('User loaded from API:', user);
 
         document.getElementById('user_id').value = user.user_id;
         document.getElementById('user_email').value = user.email;
@@ -331,7 +328,7 @@ export async function saveUser() {
         data.password = password;
     }
 
-   // console.log('Saving User:', data);
+    debug.log('Saving User:', data);
     
     let result;
     if (userId) {

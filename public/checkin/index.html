@@ -32,7 +32,7 @@
                         Token speichern
                     </label>
                 </div>
-                <button type="submit" class="btn">Anmelden</button>
+                <button type="submit" class="action-button">Anmelden</button>
                 <div id="loginError"></div>
             </form>
 
@@ -56,69 +56,138 @@
         </div>
         <div class="container">
             <!-- User + Datetime nebeneinander -->
-            <div class="info-row">
+             <div class="info-row">
                 <div class="datetime-display">
                     <div id="currentDate">-</div>
                     <div id="currentTime">--:--:--</div>
                 </div>
-
                 <div class="user-card">
                     <div class="user-avatar">👤</div>
                     <div class="user-info">
                         <div id="userName" class="user-name">Lädt...</div>
                         <div id="userRole" class="user-role">-</div>
                     </div>
-                </div>
-            </div>    
+                </div>                                
+            </div>             
 
-            <!-- Stop-Button beim Scannen (direkt unter info-row) -->
-            <button id="stopScanButton" class="btn scanning" style="display: none;">
-                <span class="icon">⏹️</span>
-                <span>Scan beenden</span>
-            </button>
-
-            <!-- Scanner mit Overlay -->
-            <div class="scanner-container" id="scannerContainer" style="display: none;">
-                <div id="qr-reader"></div>
-                <div class="scanner-overlay">
-                    <div class="scanner-overlay-corner"></div>
-                </div>
-                <div class="scanner-hint">QR-Code im Rahmen positionieren</div>
+            <!-- TAB NAVIGATION -->
+            <div class="tabs">
+                <button class="tab-button active" data-tab="checkin">
+                    <span class="icon">📍</span>
+                    <span>Check-in</span>
+                </button>
+                <button class="tab-button" data-tab="history">
+                    <span class="icon">📋</span>
+                    <span>Verlauf</span>
+                </button>
+                <button class="tab-button" data-tab="stats">
+                    <span class="icon">📊</span>
+                    <span>Statistik</span>
+                </button>
             </div>
-
-            <button id="scanButton" class="btn">
-                <span class="icon">📷</span>
-                <span>QR-Code scannen</span>
-            </button>
-
-            <!-- NEU: NFC-Button (nur wenn unterstützt) -->
-            <button id="nfcButton" class="btn" style="display: none;">
-                <span class="icon">📡</span>
-                <span>NFC-Tag scannen</span>
-            </button>
-
-            <button id="manualCodeBtn" class="btn btn-secondary">
-                <span class="icon">🔢</span>
-                <span>Code manuell eingeben</span>
-            </button>
-
-            <div class="divider"><span>oder</span></div>
-
-            <button id="exceptionBtn" class="btn btn-secondary">
-                <span class="icon">📋</span>
-                <span>Erfassungsantrag stellen</span>
-            </button>
 
             <div id="statusMessage"></div>
 
-            <!-- History Section -->
-            <div id="history" style="display: block;">
-                <div id="history-header">
-                    <h2>📋 Letzte Aktivitäten</h2>
-                    <button id="refreshHistoryButton" class="btn-icon">🔃</button>
+            <!-- TAB 1: CHECK-IN -->
+            <div class="tab-content active" data-tab="checkin">                
+                    <!-- Scanner Container -->
+                    <div class="scanner-container" id="scannerContainer" style="display: none;">
+                        <div id="qr-reader"></div>
+                        <div class="scanner-overlay">
+                            <div class="scanner-overlay-corner"></div>
+                        </div>
+                        <div class="scanner-hint">QR-Code im grünen Rahmen positionieren</div>
+                    </div>
+                    
+                <div class="action-buttons">
+                    <!-- Stop-Button beim Scannen -->
+                    <button id="stopScanButton" class="action-button" style="display: none;">
+                        <span class="icon">⏹️</span>
+                        <span>Scan beenden</span>
+                    </button>
+
+                    <!-- Scanner mit Overlay -->
+                    <div class="scanner-container" id="scannerContainer" style="display: none;">
+                        <div id="qr-reader"></div>
+                        <div class="scanner-overlay">
+                            <div class="scanner-overlay-corner"></div>
+                        </div>
+                        <div class="scanner-hint">QR-Code im Rahmen positionieren</div>
+                    </div>
+
+                    <button id="scanButton" class="action-button">
+                        <span class="icon">📷</span>
+                        <span>QR-Code scannen</span>
+                    </button>
+
+                    <!--  NFC-Button (nur wenn unterstützt) -->
+                    <button id="nfcButton" class="action-button" style="display: none;">
+                        <span class="icon">📡</span>
+                        <span>NFC-Tag scannen</span>
+                    </button>
+
+                    <button id="manualCodeBtn" class="action-button secondary">
+                        <span class="icon">🔢</span>
+                        <span>Code manuell eingeben</span>
+                    </button>
+
+                    <div class="divider"><span>oder</span></div>
+
+                    <button id="exceptionBtn" class="action-button secondary">
+                        <span class="icon">📋</span>
+                        <span>Erfassungsantrag stellen</span>
+                    </button>        
+                </div>     
+            </div>            
+
+            <!-- TAB 2: HISTORY -->
+            <div class="tab-content" data-tab="history">
+                <div class="history-section" style="display: block;">
+                    <div id="history-header">                        
+                        <h3>📋 Letzte Aktivitäten</h3>                                               
+                    </div>
+                    <div class="history-list" id="historyList"></div>
                 </div>
-                <div id="historyList"></div>
             </div>
+
+            <!-- TAB 3: STATISTICS -->
+            <div class="tab-content" data-tab="stats">
+                <div class="stats-loading" id="statsLoading">
+                    <div class="spinner"></div>
+                    <p>Lade Statistik...</p>
+                </div>
+                
+                <div class="stats-section" id="statsContent" style="display: none;">
+                    <!-- Jahr-Anzeige -->
+                    <div class="stats-year-selector">
+                        <button class="year-nav" id="prevYear">‹</button>
+                        <span id="currentYear">2025</span>
+                        <button class="year-nav" id="nextYear">›</button>
+                    </div>
+
+                    <!-- Stats Cards -->
+                    <div class="stats-cards">
+                        <div class="stat-card">
+                            <div class="stat-icon">✓</div>
+                            <div class="stat-value" id="statAttendanceRate">-</div>
+                            <div class="stat-label">Anwesenheit</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📅</div>
+                            <div class="stat-value" id="statTotalAppointments">-</div>
+                            <div class="stat-label">Termine</div>
+                        </div>
+                    </div>
+
+                    <!-- Gruppen-Übersicht -->
+                    <div class="stats-section">
+                        <h3>Übersicht nach Gruppen</h3>
+                        <div class="groups-list" id="groupsList">
+                            <!-- Dynamisch gefüllt -->
+                        </div>
+                    </div>
+                </div>
+            </div>                        
         </div>
     </div>
 
@@ -132,8 +201,8 @@
                        placeholder="123456" inputmode="numeric">
             </div>
             <div class="modal-buttons">
-                <button class="btn btn-cancel" id="closeManualCodeBtn">Abbrechen</button>
-                <button class="btn" id="submitManualCodeBtn">Einchecken</button>
+                <button class="action-button btn-cancel" id="closeManualCodeBtn">Abbrechen</button>
+                <button class="action-button" id="submitManualCodeBtn">Einchecken</button>
             </div>
         </div>
     </div>
@@ -154,8 +223,8 @@
                        placeholder="z.B. QR-Scanner nicht verfügbar">
             </div>
             <div class="modal-buttons">
-                <button class="btn btn-cancel" id="closeExceptionBtn">Abbrechen</button>
-                <button class="btn" id="submitExceptionBtn">Antrag stellen</button>
+                <button class="action-button btn-cancel" id="closeExceptionBtn">Abbrechen</button>
+                <button class="action-button" id="submitExceptionBtn">Antrag stellen</button>
             </div>
         </div>
     </div>
@@ -165,8 +234,8 @@
         <div class="modal-content">
             <h2>Löschen bestätigen</h2>            
             <div class="modal-buttons">
-                <button class="btn btn-cancel" id="closeConfirmDeleteBtn">Abbrechen</button>
-                <button class="btn btn-delete" id="submitConfirmDeleteBtn">Löschen</button>
+                <button class="action-button btn-cancel" id="closeConfirmDeleteBtn">Abbrechen</button>
+                <button class="action-button btn-delete" id="submitConfirmDeleteBtn">Löschen</button>
             </div>
         </div>
     </div>

@@ -1,5 +1,6 @@
 import { apiCall, setCurrentUser, currentUser, setCsrfToken} from './api.js';
-import { loadAllData, showLogin, showScreen, showToast, showDashboard, updateUIForRole} from './ui.js';
+import { loadAllData, showLogin, showScreen, showToast, showDashboard, updateUIForRole, initAllYearFilters, initEventHandlers} from './ui.js';
+import {debug} from '../app.js'
 
 // ============================================
 // AUTH
@@ -26,9 +27,12 @@ export async function handleLogin(e) {
         if (result.csrf_token) {
             sessionStorage.setItem('csrf_token', result.csrf_token);
             setCsrfToken(result.csrfToken);
-            console.log('CSRF token stored:', result.csrf_token.substring(0, 16) + '...');
+            debug.log('CSRF token stored:', result.csrf_token.substring(0, 16) + '...');
         }
 
+
+        initEventHandlers();                
+        await initAllYearFilters();
         showDashboard();
         loadAllData();
     } else {

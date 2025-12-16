@@ -3,7 +3,7 @@ import { apiCall, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
 import { loadTypes } from './management.js';
-
+import {debug} from '../app.js'
 // ============================================
 // APPOINTMENTS
 // Reference:
@@ -21,11 +21,11 @@ export async function loadAppointments(forceReload = false) {
 
     // Cache verwenden wenn vorhanden und nicht forceReload
     if (!forceReload && isCacheValid('appointments', year)) {
-        console.log(`Loading APPOINTMENTS from CACHE for ${year}`);
+        debug.log(`Loading APPOINTMENTS from CACHE for ${year}`);
         return dataCache.appointments[year].data;
     }
     
-    console.log(`Loading APPOINTMENTS from API for ${year}`);
+    debug.log(`Loading APPOINTMENTS from API for ${year}`);
     const appointments = await apiCall('appointments', 'GET', null, {year: year});
 
     // Cache für dieses Jahr speichern
@@ -58,7 +58,7 @@ async function loadAppointmentData(appointmentId) {
 
 export async function showAppointmentSection(forceReload = false)
 {
-    console.log("== Show Appointment Section == ")
+    debug.log("== Show Appointment Section == ")
     const appointmentData = await loadAppointments(forceReload);
 
     renderAppointments(appointmentData);
@@ -67,8 +67,6 @@ export async function showAppointmentSection(forceReload = false)
 async function renderAppointments(appointmentData) {
     
     if (!appointmentData) return;
-
-    //allAppointments = appointments;
     
     const tbody = document.getElementById('appointmentsTableBody');
     tbody.innerHTML = '';

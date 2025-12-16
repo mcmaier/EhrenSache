@@ -1,24 +1,16 @@
 
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache,currentYear} from './ui.js';
-import { loadRecords } from './records.js';
 import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime , updateModalId} from './utils.js';
-import { loadUserData } from './users.js';
 import { loadAppointments } from './appointments.js';
 import { loadMembers } from './members.js';
+import {debug} from '../app.js'
 
 // ============================================
 // EXCEPTIONS
 // Reference:
 // import {} from './exceptions.js'
 // ============================================
-
-let currentExceptionFilter = {
-    status: null,
-    type: null
-};
-
-let currentExceptionYear = null;
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -29,22 +21,11 @@ export async function loadExceptions(forceReload = false) {
 
     // Cache-Check: Nur laden wenn nötig
     if (!forceReload && isCacheValid('exceptions', year)) {
-        console.log(`Loading EXCEPTIONS from CACHE for ${year}`);
-        //renderExceptions(dataCache.exceptions[year].data);        
+        debug.log(`Loading EXCEPTIONS from CACHE for ${year}`);   
         return dataCache.exceptions[year].data;
     }
 
-    /*
-    let params = {};
-
-    if (currentExceptionFilter.status) {
-        params.status = currentExceptionFilter.status;
-    }
-    if (currentExceptionFilter.type) {
-        params.type = currentExceptionFilter.type;
-    }*/
-
-    console.log(`Loading EXCEPTIONS from API for ${year}`);
+    debug.log(`Loading EXCEPTIONS from API for ${year}`);
     const exceptions = await apiCall('exceptions', 'GET', null, {year: year});
 
     if(!dataCache.exceptions[year])
@@ -55,7 +36,6 @@ export async function loadExceptions(forceReload = false) {
     dataCache.exceptions[year].data = exceptions;
     dataCache.exceptions[year].timestamp = Date.now();
 
-    //renderExceptions(exceptions);
     return exceptions;
 }
 
@@ -63,7 +43,7 @@ export async function renderExceptions(exceptionData)
 {       
     const tbody = document.getElementById('exceptionsTableBody');
 
-    console.log("Rendering Exceptions...");
+    debug.log("Rendering Exceptions...");
 
     if (!exceptionData || (exceptionData.length === 0)) {
         tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge gefunden</td></tr>';
@@ -143,7 +123,7 @@ export async function renderExceptions(exceptionData)
 
 function updateExceptionStats(exceptions){
 
-    console.log("Update Exception Stats ()");
+    debug.log("Update Exception Stats ()");
 
     // Statistiken
     const pending = exceptions.filter(e => e.status === 'pending').length;
@@ -153,7 +133,7 @@ function updateExceptionStats(exceptions){
 }
 
 export function filterExceptions(exceptions, filters = {}) {
-    console.log("Filter Exceptions ()");
+    debug.log("Filter Exceptions ()");
 
     if (!exceptions || exceptions.length === 0) return [];
     
@@ -177,7 +157,7 @@ export async function applyExceptionFilters() {
     // Exceptions laden (aus Cache wenn möglich)
     const allExceptions = await loadExceptions(false);
 
-    console.log("Apply Exception Filters ()");
+    debug.log("Apply Exception Filters ()");
 
     // Aktuelle Filter auslesen
     const filters = {
@@ -189,7 +169,7 @@ export async function applyExceptionFilters() {
     // Filtern
     const filteredExceptions = filterExceptions(allExceptions, filters);
 
-    console.log("Filtering:", allExceptions, filteredExceptions, filters);
+    debug.log("Filtering:", allExceptions, filteredExceptions, filters);
 
     // Rendern (nur wenn auf Records-Section)
     //const currentSection = sessionStorage.getItem('currentSection');
@@ -216,7 +196,7 @@ export async function resetExceptionFilter() {
 // Im Init oder beim Section-Wechsel registrieren
 export async function initExceptionEventHandlers() {
 
-    console.log("Init Exception Event Handlers ()");
+    debug.log("Init Exception Event Handlers ()");
 
     // Filter-Änderungen
     document.getElementById('filterExceptionStatus')?.addEventListener('change', () => {
@@ -236,7 +216,7 @@ export async function initExceptionEventHandlers() {
 }
 
 export async function showExceptionSection() {
-    console.log("Show Exception Section ()");
+    debug.log("Show Exception Section ()");
     
     // Filter-Optionen laden
     //await loadExceptionilters();
@@ -438,7 +418,7 @@ export async function saveException() {
         status: isAdmin ? document.getElementById('exception_status').value : 'pending'
     };
     
-    console.log("Exception data:",data);
+    debug.log("Exception data:",data);
 
     let result;
     if (exceptionId) {

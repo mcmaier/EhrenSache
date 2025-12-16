@@ -201,3 +201,120 @@
     gap: var(--spacing-sm);
     align-items: center;
 }
+
+/* Stats Header Layout */
+.stats-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr; /* 2/3 und 1/3 */
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+/* Responsive: Unter 768px stapeln */
+@media (max-width: 768px) {
+    .stats-header {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Filter Card */
+.filter-card {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.filter-card h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Filter Grid innerhalb der Card */
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+/* Wenn Member-Filter sichtbar: 2 Spalten */
+.filter-grid:has(#statMemberFilterGroup:not([style*="display: none"])) {
+    grid-template-columns: 1fr 1fr;
+}
+
+/* Wenn Member-Filter versteckt: 1 Spalte */
+.filter-grid:has(#statMemberFilterGroup[style*="display: none"]) {
+    grid-template-columns: 1fr;
+}
+
+/* Alternative ohne :has() (bessere Browser-Kompatibilität) */
+.filter-grid.single-filter {
+    grid-template-columns: 1fr;
+}
+
+.filter-grid.dual-filter {
+    grid-template-columns: 1fr 1fr;
+}
+
+/* Jahr Card */
+.year-card {
+    background: var(--bg-light, #f8f9fa);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--info-color, #3498db);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.year-card h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.year-select {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: white;
+    cursor: pointer;
+}
+
+/* Form Elemente */
+.form-group {
+    margin: 0;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary, #666);
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    background: white;
+    transition: border-color 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #667eea);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
