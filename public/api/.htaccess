@@ -17,7 +17,7 @@ RedirectMatch 403 ^/api/(handlers|helpers)/
 # Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-API-Key"
 
 # Rate Limiting (optional, wenn mod_ratelimit verfügbar)
-# <IfModule mod_ratelimit.c>
-#     SetOutputFilter RATE_LIMIT
-#     SetEnv rate-limit 400
-# </IfModule>
+ <IfModule mod_ratelimit.c>
+     SetOutputFilter RATE_LIMIT
+     SetEnv rate-limit 600
+ </IfModule>

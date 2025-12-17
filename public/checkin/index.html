@@ -168,7 +168,12 @@
                         <span>QR-Code scannen</span>
                     </button>
 
-                    <!--  NFC-Button (nur wenn unterstützt) -->
+                    <!--  NFC-Container (nur wenn unterstützt) -->
+                    <div class="nfc-scanner-container" id="nfcScannerContainer" style="display: none;">
+                        <div class="nfc-animation">🪪</div>
+                        <div class="nfc-hint">NFC-Tag an Gerät halten</div>
+                    </div>
+
                     <button id="nfcButton" class="action-button" style="display: none;">
                         <span class="icon">📡</span>
                         <span>NFC-Tag scannen</span>

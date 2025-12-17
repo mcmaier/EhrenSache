@@ -27,16 +27,25 @@ const API_BASE = (() => {
 // ========================================
 // STATE MANAGEMENT
 // ========================================
+
+const UI_STATE = {
+    IDLE: 'idle',           // Ruhezustand
+    QR_SCANNING: 'qr',      // QR-Scanner aktiv
+    NFC_SCANNING: 'nfc'     // NFC-Scanner aktiv
+};
+
+let currentUIState = UI_STATE.IDLE;
 let apiToken = null;
 let userData = null;
 let html5QrCode = null;
 let isScanning = false;
+let isNFCScanning = false;
 let clockInterval = null;
 let appointments = [];
 let appointmentTypes = [];
 let deleteExceptionId = null;
 let nfcAbortController = null;
-let isNFCScanning = false;
+let nfcAvailable = false;
 let currentStatsYear = new Date().getFullYear();
 
 // In checkin/index.html oder checkin/app.js
@@ -106,7 +115,9 @@ document.addEventListener('DOMContentLoaded', function() {
         stopScanButton: document.getElementById('stopScanButton'),        
         nfcButton: document.getElementById('nfcButton'),
         toDashboardBtn: document.getElementById('toDashboardBtn'),
-        checkinDivider: document.getElementById('checkinDivider')
+        checkinDivider: document.getElementById('checkinDivider'),
+        nfcScannerContainer: document.getElementById('nfcScannerContainer'),
+        scannerContainer: document.getElementById('scannerContainer')
     };
 
     // Event Listeners
@@ -140,23 +151,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Auto-Login prüfen
     checkAutoLogin();
 
-
-    // Prüfe gespeicherten Token
-    /*
-    const savedToken = localStorage.getItem('api_token');
-    if (savedToken) {
-        try {
-            const decodedToken = atob(savedToken);
-            elements.apiTokenInput.value = decodedToken;
-            elements.saveTokenCheckbox.checked = true;
-            
-            // Auto-Login versuchen
-            handleLogin(new Event('submit'));
-        } catch (error) {
-            debug.error('Fehler beim Laden des gespeicherten Tokens');
-        }
-    }*/
-
     // Online/Offline Detection
     window.addEventListener('online', () => debug.log('Online'));
     window.addEventListener('offline', showOfflineIndicator);
@@ -175,12 +169,6 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
     for (const [key, value] of Object.entries(params)) {
         url.searchParams.append(key, value);
     }
-
-    /*
-    // Token auch als URL-Parameter (Fallback für Apache)
-    if (apiToken) {
-        url.searchParams.append('api_token', apiToken);
-    }*/
 
     const options = {
         method: method,
@@ -381,6 +369,7 @@ function toggleTokenLogin() {
 
 async function handleLogout() {
     await stopScannerIfRunning();
+    await stopNFCReader();
 
     localStorage.removeItem('api_token');
     apiToken = null;
@@ -618,18 +607,72 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
                              inputMethod === 'CODE' ? '⌨️ Manuell' : '';
 
             showMessage(methodText + ' eingecheckt!', 'success');
-            /*addNewActivityToHistory({
-                appointment: data.appointment,
-                verified: true,
-                pending: false,
-                method: inputMethod
-            });*/
         }
     } catch (error) {
         showMessage('Check-in fehlgeschlagen', 'error');
         debug.error(error.message);
     } finally {
         elements.scanButton.disabled = false;
+    }
+}
+
+// ========================================
+// UI STATE HELPER
+// ========================================
+
+function setCheckinUIState(state) {
+    currentUIState = state;
+    
+    switch(state) {
+        case UI_STATE.IDLE:
+            // Ruhezustand: Alle Optionen anzeigen
+            elements.scannerContainer.style.display = 'none';
+            elements.stopScanButton.style.display = 'none';
+            elements.scanButton.style.display = 'flex';
+            elements.manualCodeBtn.style.display = 'flex';
+            elements.exceptionBtn.style.display = 'flex';
+            elements.checkinDivider.style.display = 'block';            
+            elements.nfcScannerContainer.style.display = 'none';  
+
+            // NFC Button wieder zeigen falls NFC verfügbar
+            if (nfcAvailable) {                 
+                elements.nfcButton.classList.remove('scanning');
+                elements.nfcButton.innerHTML = '<span class="icon">📡</span><span>NFC-Tag scannen</span>';
+                elements.nfcButton.style.background = '';
+                elements.nfcButton.style.display = 'flex';
+            }
+            
+            isScanning = false;
+            isNFCScanning = false;
+            break;
+            
+        case UI_STATE.QR_SCANNING:
+            // QR-Scanner aktiv: Nur Scanner und Stop-Button
+            elements.scannerContainer.style.display = 'block';
+            elements.stopScanButton.style.display = 'flex';
+            elements.scanButton.style.display = 'none';
+            elements.manualCodeBtn.style.display = 'none';
+            elements.exceptionBtn.style.display = 'none';
+            elements.checkinDivider.style.display = 'none';            
+            elements.nfcButton.style.display = 'none';                        
+            isScanning = true;
+            break;
+            
+        case UI_STATE.NFC_SCANNING:
+
+            elements.nfcScannerContainer.style.display = 'block';            
+            
+            // Alle anderen Buttons verstecken
+            elements.scanButton.style.display = 'none';
+            elements.manualCodeBtn.style.display = 'none';
+            elements.exceptionBtn.style.display = 'none';
+            elements.checkinDivider.style.display = 'none';
+            elements.nfcButton.classList.add('scanning');
+            elements.nfcButton.innerHTML = '<span class="icon">⏹️</span><span>NFC-Scan beenden</span>';
+            elements.nfcButton.style.background = '#e74c3c';                        
+            isNFCScanning = true;
+
+            break;
     }
 }
 
@@ -648,16 +691,8 @@ async function toggleScanner() {
             debug.log('Stopp-Error (ignoriert):', error);
         }
 
-        scannerContainer.style.display = 'none';
-        elements.stopScanButton.style.display = 'none'; // Stop-Button verstecken
-        elements.scanButton.style.display = 'flex'; // Scan-Button zeigen
-        elements.manualCodeBtn.style.display = 'flex'; //Manual Code Button zeigen
-        elements.exceptionBtn.style.display = 'flex'; //Antrags-Button zeigen
-        elements.checkinDivider.style.display = 'block';
+        setCheckinUIState(UI_STATE.IDLE);
 
-        elements.scanButton.classList.remove('scanning');
-        elements.scanButton.innerHTML = '<span class="icon">📷</span><span>QR-Code scannen</span>';
-        isScanning = false;
     } else {
             
         if (!html5QrCode) {
@@ -691,26 +726,13 @@ async function toggleScanner() {
                 }
             );
 
-            scannerContainer.style.display = 'block';
-            elements.stopScanButton.style.display = 'flex'; // Stop-Button zeigen
-            elements.scanButton.style.display = 'none'; // Scan-Button verstecken     
-            elements.manualCodeBtn.style.display = 'none'; //Manual Code Button verstecken
-            elements.exceptionBtn.style.display = 'none'; //Antrags-Button verstecken
-            elements.checkinDivider.style.display = 'none';
-            
-            isScanning = true;
+            setCheckinUIState(UI_STATE.QR_SCANNING);
             
         } catch (error) {
             debug.error('Kamera-Fehler:', error);
 
             // Bei Fehler: Alles zurücksetzen
-            scannerContainer.style.display = 'none';
-            elements.stopScanButton.style.display = 'none';
-            elements.scanButton.style.display = 'flex';
-            elements.manualCodeBtn.style.display = 'flex'; //Manual Code Button zeigen
-            elements.exceptionBtn.style.display = 'flex'; //Antrags-Button zeigen
-            elements.checkinDivider.style.display = 'block';
-            isScanning = false;
+            setCheckinUIState(UI_STATE.IDLE);
             
             let errorMsg = 'Kamera-Zugriff nicht möglich';
             if (error.name === 'NotAllowedError') {
@@ -750,15 +772,8 @@ async function onQRScanned(decodedText) {
 async function stopScannerIfRunning() {
     if (isScanning && html5QrCode) {
         await html5QrCode.stop();
-        document.getElementById('scannerContainer').style.display = 'none';
-        elements.stopScanButton.style.display = 'none';
-        elements.scanButton.style.display = 'flex';
-        elements.manualCodeBtn.style.display = 'flex'; //Manual Code Button zeigen
-        elements.exceptionBtn.style.display = 'flex'; //Antrags-Button zeigen
-        elements.checkinDivider.style.display = 'block';
-        elements.scanButton.classList.remove('scanning');
-        elements.scanButton.innerHTML = '<span class="icon">📷</span><span>QR-Code scannen</span>';
-        isScanning = false;
+
+        setCheckinUIState(UI_STATE.IDLE);
     }
 }
 
@@ -795,14 +810,15 @@ async function submitManualCode() {
 // NFC READER
 // ========================================
 
-async function checkNFCSupport() {
+async function checkNFCSupport() {    
     if ('NDEFReader' in window) {
         try {
             // Prüfe Permissions
             const permissionStatus = await navigator.permissions.query({ name: "nfc" });
-            
+                        
             if (permissionStatus.state === "granted" || permissionStatus.state === "prompt") {
                 elements.nfcButton.style.display = 'flex';
+                nfcAvailable = true;
                 debug.log('✓ NFC wird unterstützt');
             } else {
                 debug.log('✗ NFC-Berechtigung verweigert');
@@ -811,6 +827,7 @@ async function checkNFCSupport() {
             debug.log('✗ NFC-Permission-Check fehlgeschlagen:', error);
             // Zeige Button trotzdem - User kann beim ersten Scan Berechtigung erteilen
             elements.nfcButton.style.display = 'flex';
+            nfcAvailable = true;
         }
     } else {
         debug.log('✗ NFC wird von diesem Browser nicht unterstützt');
@@ -827,26 +844,23 @@ async function toggleNFCReader() {
 }
 
 async function startNFCReader() {
+    
+    // Falls QR-Scanner läuft, erst stoppen
+    await stopScannerIfRunning();
+
     if (!('NDEFReader' in window)) {
         showMessage('NFC wird von diesem Gerät nicht unterstützt', 'error');
         return;
     }
-    
-    // Falls QR-Scanner läuft, erst stoppen
-    await stopScannerIfRunning();
-    
+        
     try {
+        
         const ndef = new NDEFReader();
         nfcAbortController = new AbortController();
         
         await ndef.scan({ signal: nfcAbortController.signal });
-        
-        isNFCScanning = true;
-        elements.nfcButton.classList.add('scanning');
-        elements.nfcButton.innerHTML = '<span class="icon">⏹️</span><span>NFC-Scan beenden</span>';
-        elements.nfcButton.style.background = '#e74c3c';
-        
-        showMessage('📡 Halte ein NFC-Tag an die Rückseite des Geräts...', 'info');
+
+        setCheckinUIState(UI_STATE.NFC_SCANNING);                                   
         
         ndef.addEventListener("reading", ({ message, serialNumber }) => {
             debug.log('NFC-Tag erkannt:', serialNumber);
@@ -855,7 +869,8 @@ async function startNFCReader() {
         
         ndef.addEventListener("readingerror", () => {
             showMessage('Fehler beim Lesen des NFC-Tags', 'error');
-        }, { signal: nfcAbortController.signal });
+        }, { signal: nfcAbortController.signal });        
+        
         
     } catch (error) {
         debug.error('NFC-Fehler:', error);
@@ -872,18 +887,17 @@ async function startNFCReader() {
     }
 }
 
-function stopNFCReader() {
+function stopNFCReader() {    
+
+    if(isNFCScanning)
+        setCheckinUIState(UI_STATE.IDLE);
+
     if (nfcAbortController) {
         nfcAbortController.abort();
-        nfcAbortController = null;
-    }
-    
-    isNFCScanning = false;
-    elements.nfcButton.classList.remove('scanning');
-    elements.nfcButton.innerHTML = '<span class="icon">📡</span><span>NFC-Tag scannen</span>';
-    elements.nfcButton.style.background = '';
-    
-    showMessage('NFC-Scan beendet', 'info');
+        nfcAbortController = null;        
+                    
+        showMessage('NFC-Scan abgebrochen', 'warning');
+    }       
 }
 
 async function onNFCTagRead(message, serialNumber) {
@@ -925,7 +939,6 @@ async function onNFCTagRead(message, serialNumber) {
         await verifyCheckin(checkinCod,'NFC');
     } 
 }
-
 
 // ========================================
 // EXCEPTION
@@ -1022,14 +1035,6 @@ async function submitException() {
 
         if (data) {
             showMessage('✓ Antrag erfolgreich gestellt (wartet auf Genehmigung)', 'warning');
-            
-            /*
-            const apt = appointments.find(a => a.appointment_id == appointmentId);
-            addNewActivityToHistory({
-                appointment: apt,
-                verified: false,
-                pending: true
-            });*/
             
             closeExceptionModal();
         }
@@ -1314,8 +1319,9 @@ function initTabs() {
             document.querySelector(`.tab-content[data-tab="${targetTab}"]`).classList.add('active');
             
             // Scanner stoppen wenn Tab gewechselt wird
-            if (targetTab !== 'checkin' && isScanning) {
+            if (targetTab !== 'checkin') {
                 stopScannerIfRunning();
+                stopNFCReader();
             }
 
             // Lade Daten wenn nötig

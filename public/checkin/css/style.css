@@ -472,71 +472,40 @@ body {
     z-index: 101;
 }
 
-/* Buttons beim Scannen nach unten schieben */
-#scanButton {
-    transition: all 0.3s ease;
-}
-
-#scanButton.scanning {
-    order: -1; /* Kommt vor allen anderen Buttons */
-    background: #e74c3c;
-    color: white;
-}
-
-/* Container-Anordnung beim Scannen */
-.container.scanning {
-    gap: 20px; /* Mehr Abstand beim Scannen */
-}
-
-.container.scanning #manualCodeBtn,
-.container.scanning .divider,
-.container.scanning #exceptionBtn {
-    margin-top: 10px; /* Schiebt Buttons weiter nach unten */
-}
-
-#stopScanButton {
+/* NFC Scanner Container */
+.nfc-scanner-container {
+    position: relative;
     width: 100%;
     max-width: 400px;
-    padding: 14px 25px;
-    background: #e74c3c;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s;
-    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
+    margin-bottom: 15px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    padding: 60px 20px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
 
-#stopScanButton:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+.nfc-animation {
+    font-size: 80px;
+    animation: nfcPulse 1s ease-in-out infinite;
 }
 
-#stopScanButton:active {
-    transform: translateY(0);
-}
-
-#stopScanButton .icon {
-    font-size: 24px;
-}
-
-#stopScanButton .icon {
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
+@keyframes nfcPulse {
     0%, 100% {
+        transform: scale(1);
         opacity: 1;
     }
     50% {
-        opacity: 0.5;
+        transform: scale(1.1);
+        opacity: 0.8;
     }
+}
+
+.nfc-hint {
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    margin-top: 20px;
 }
 
 /* ========================================
@@ -1082,7 +1051,7 @@ body {
     justify-content: center;
     gap: 18px;
     padding: 14px 20px;
-    background: var(--success);
+    background: linear-gradient(135deg, #53b679 0%, #19b648 100%);
     color: var(--button-bg);
     border: none;
     border-radius: 10px;
@@ -1120,15 +1089,77 @@ body {
     color: #667eea;
 }
 
-/* Stop-Button für Scanner */
+/* Container-Anordnung beim Scannen */
+.container.scanning {
+    gap: 20px; /* Mehr Abstand beim Scannen */
+}
+
+.container.scanning #manualCodeBtn,
+.container.scanning .divider,
+.container.scanning #exceptionBtn {
+    margin-top: 10px; /* Schiebt Buttons weiter nach unten */
+}
+
+#nfcButton {
+    display: flex;
+    width: 100%;
+    background: linear-gradient(135deg, #424683 0%, #4c57bb 100%);
+    color: white;    
+    box-shadow: 0 4px 15px rgba(144, 54, 218, 0.3);    
+}
+
+#nfcButton .icon{
+    font-size: 24px;
+}
+
+#nfcButton .icon .scanning {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
 #stopScanButton {
+    width: 100%;
+    max-width: 400px;
+    padding: 14px 25px;
     background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
     color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
     margin-bottom: 12px;
 }
 
 #stopScanButton:hover {
-    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+}
+
+#stopScanButton:active {
+    transform: translateY(0);
+}
+
+#stopScanButton .icon {
+    font-size: 24px;
+}
+
+#stopScanButton .icon {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
 }
 
 .btn-delete {
