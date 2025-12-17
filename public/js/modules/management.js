@@ -1,5 +1,6 @@
 import { apiCall, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
+import { loadMembers } from './members.js';
 import { formatDateTime, updateModalId } from './utils.js';
 import {debug} from '../app.js'
 
@@ -226,7 +227,6 @@ export async function loadTypes(forceReload = false) {
     // Cache-Check: Nur laden wenn nötig
     if (!forceReload && isCacheValid('types')) {
         debug.log('Loading Appointment Types from CACHE');
-        //renderTypeGroupOverview(dataCache.types.data);
         return dataCache.types.data;
     }
     
@@ -236,7 +236,6 @@ export async function loadTypes(forceReload = false) {
     dataCache.types.data = types;
     dataCache.types.timestamp = Date.now();
     
-    //renderTypeGroupOverview(dataCache.types.data);  
     return types;       
 }
 

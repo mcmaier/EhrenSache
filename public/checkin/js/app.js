@@ -1,3 +1,11 @@
+const DEBUG = true;
+
+const debug = {
+  log:  (...args) => DEBUG && console.log(...args),
+  warn: (...args) => DEBUG && console.warn(...args),
+  error:(...args) => DEBUG && console.error(...args)
+};
+
 // ========================================
 // KONFIGURATION
 // ========================================
@@ -11,7 +19,7 @@ const API_BASE = (() => {
     const match = pathname.match(/^(.*?)\/checkin\//);
     const basePath = match ? match[1] : '';
     
-    console.log('PWA API Base:', basePath);
+    debug.log('PWA API Base:', basePath);
 
     return `${origin}${basePath}/api/api.php`;    
 })();
@@ -25,6 +33,7 @@ let html5QrCode = null;
 let isScanning = false;
 let clockInterval = null;
 let appointments = [];
+let appointmentTypes = [];
 let deleteExceptionId = null;
 let nfcAbortController = null;
 let isNFCScanning = false;
@@ -38,8 +47,8 @@ let currentStatsYear = new Date().getFullYear();
         navigator.serviceWorker.register('./checkin/service-worker.js', {
             scope: './checkin/'
         })
-        .then(reg => console.log('✓ Service Worker registriert:', reg.scope))
-        .catch(err => console.log('✗ Service Worker Fehler:', err));        
+        .then(reg => debug.log('✓ Service Worker registriert:', reg.scope))
+        .catch(err => debug.log('✗ Service Worker Fehler:', err));        
     }
 
 // ========================================
@@ -58,11 +67,16 @@ let elements = {};
 document.addEventListener('DOMContentLoaded', function() {
     // DOM Elements cachen
     elements = {
+        emailInput: document.getElementById('emailInput'),
+        passwordInput: document.getElementById('passwordInput'),
+        saveLoginCheckbox: document.getElementById('saveLoginCheckbox'),
+        showTokenLoginButton: document.getElementById('showTokenLoginButton'),
+        tokenLoginSection: document.getElementById('tokenLoginSection'),
+        apiTokenInput: document.getElementById('apiTokenInput'),
+        tokenLoginButton: document.getElementById('tokenLoginButton'),
         loginScreen: document.getElementById('loginScreen'),
         mainScreen: document.getElementById('mainScreen'),
         loginForm: document.getElementById('loginForm'),
-        apiTokenInput: document.getElementById('apiToken'),
-        saveTokenCheckbox: document.getElementById('saveToken'),
         loginError: document.getElementById('loginError'),
         logoutBtn: document.getElementById('logoutBtn'),
         userName: document.getElementById('userName'),
@@ -91,12 +105,15 @@ document.addEventListener('DOMContentLoaded', function() {
         submitConfirmDeleteBtn: document.getElementById('submitConfirmDeleteBtn'),
         stopScanButton: document.getElementById('stopScanButton'),        
         nfcButton: document.getElementById('nfcButton'),
-        toDashboardBtn: document.getElementById('toDashboardBtn')
+        toDashboardBtn: document.getElementById('toDashboardBtn'),
+        checkinDivider: document.getElementById('checkinDivider')
     };
 
     // Event Listeners
     elements.loginForm.addEventListener('submit', handleLogin);
-    elements.logoutBtn.addEventListener('click', handleLogout);
+    elements.showTokenLoginButton.addEventListener('click', toggleTokenLogin);
+    elements.tokenLoginButton.addEventListener('click', handleTokenLogin);
+    elements.logoutBtn.addEventListener('click', requestLogout);
     elements.scanButton.addEventListener('click', toggleScanner);
     elements.manualCodeBtn.addEventListener('click', openManualCodeInput);
     elements.exceptionBtn.addEventListener('click', openExceptionModal);
@@ -120,7 +137,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     checkNFCSupport();
 
+    // Auto-Login prüfen
+    checkAutoLogin();
+
+
     // Prüfe gespeicherten Token
+    /*
     const savedToken = localStorage.getItem('api_token');
     if (savedToken) {
         try {
@@ -131,15 +153,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Auto-Login versuchen
             handleLogin(new Event('submit'));
         } catch (error) {
-            console.error('Fehler beim Laden des gespeicherten Tokens');
+            debug.error('Fehler beim Laden des gespeicherten Tokens');
         }
-    }
-
-    initTabs();
-    initYearNavigation();
+    }*/
 
     // Online/Offline Detection
-    window.addEventListener('online', () => console.log('Online'));
+    window.addEventListener('online', () => debug.log('Online'));
     window.addEventListener('offline', showOfflineIndicator);
 });
 
@@ -178,12 +197,12 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
     }
 
     try {
-        //console.log('API Call:', method, url.toString());
+        debug.log('API Call:', method, url.toString());
         const response = await fetch(url, options);
         
         if (!response.ok) {
             if (response.status === 401) {
-                throw new Error('Token ungültig oder abgelaufen');                
+                throw new Error('Anmeldedaten ungültig');                
             }
             else
             {         
@@ -194,7 +213,7 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
         
         return await response.json();
     } catch (error) {
-        console.error('API Error:', error);
+        debug.error('API Error:', error);
 
         if(!connectionStatus) {
             showOfflineIndicator();
@@ -211,6 +230,60 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
 async function handleLogin(e) {
     e.preventDefault();
     
+    const email = elements.emailInput.value.trim();
+    const password = elements.passwordInput.value;
+    
+    if (!email || !password) {
+        showError('Bitte E-Mail und Passwort eingeben');
+        return;
+    }
+    
+    elements.loginError.classList.remove('active');
+    
+    try {
+        // Login via API
+        const response = await apiCall('auth','POST',{email: email, password: password});
+
+        debug.log("Login response:", response);
+
+        if (!response.success) {
+            const error = response;
+            throw new Error(error.message || 'Login fehlgeschlagen');
+        }    
+        
+        // Speichere Token
+        apiToken = response.token;
+        
+        if (elements.saveLoginCheckbox.checked) {
+            // Speichere Token (Base64 kodiert)
+            localStorage.setItem('api_token', btoa(apiToken));
+        }
+        
+        debug.log('✓ Login erfolgreich');
+        
+        // Lade Daten
+        await loadAppointmentTypes();
+        await loadUserData();
+        //await loadHistory();
+        await initTabs();
+        await initYearNavigation();
+
+        debug.log("Showing main screen");        
+        showScreen('main');
+        startClock();
+        
+    } catch (error) {
+        debug.error('Login Fehler:', error);
+        showError(error.message || 'Ungültige Anmeldedaten');
+    }
+
+}
+
+
+// ========================================
+// TOKEN LOGIN (FALLBACK)
+// ========================================
+async function handleTokenLogin() {
     const token = elements.apiTokenInput.value.trim();
     
     if (!token) {
@@ -223,25 +296,86 @@ async function handleLogin(e) {
     try {
         apiToken = token;
         
-        //Test API Verbindung
-        if(await loadUserData(true) != true)
-        {
-            throw new Error('Benutzer konnte nicht geladen werden');       
-        }
+        // Test API-Verbindung
+        await apiCall('me');
+        debug.log('✓ Token-Login erfolgreich');
         
-        if (elements.saveTokenCheckbox.checked) {
-            localStorage.setItem('api_token', btoa(token));
-        }
-                
+        // Speichere Token
+        localStorage.setItem('api_token', btoa(token));
+        
+        // Lade Daten
+        await loadAppointmentTypes();
+        await loadUserData();
         //await loadHistory();
+        await initTabs();
+        await initYearNavigation();
 
-        showScreen('main');        
+        debug.log("Showing main screen");        
+        showScreen('main');
         startClock();
         
     } catch (error) {
-        console.error('Login Fehler:', error);
-        showError('Ungültiger Token oder keine Verbindung zur API');
+        debug.error('Token-Login Fehler:', error);
+        showError('Ungültiger Token');
         apiToken = null;
+    }
+}
+
+
+// ========================================
+// AUTO LOGIN
+// ========================================
+async function checkAutoLogin() {
+    const savedToken = localStorage.getItem('api_token');
+    
+    if (savedToken) {
+        try {
+            apiToken = atob(savedToken);
+        
+        // Teste Token
+        await apiCall('me');
+        debug.log('✓ Auto-Login erfolgreich');
+            
+        // Lade Daten
+        await loadAppointmentTypes();
+        await loadUserData();
+        //await loadHistory();
+        await initTabs();
+        await initYearNavigation();
+
+        debug.log("Showing main screen");
+            
+        showScreen('main');
+        startClock();
+            
+        } catch (error) {
+            debug.log('Auto-Login fehlgeschlagen:', error);
+            // Token ungültig - zeige Login
+            localStorage.removeItem('api_token');
+            apiToken = null;
+        }
+    }
+}
+
+//=========================================
+// ERROR DISPLAY
+// ========================================
+function showError(message) {
+    elements.loginError.textContent = message;
+    elements.loginError.classList.add('active');
+}
+
+// ========================================
+// TOGGLE TOKEN LOGIN
+// ========================================
+function toggleTokenLogin() {
+    const section = elements.tokenLoginSection;
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        elements.showTokenLoginButton.textContent = 'Mit E-Mail anmelden';
+    } else {
+        section.style.display = 'none';
+        elements.showTokenLoginButton.textContent = 'Mit Token anmelden';
     }
 }
 
@@ -251,13 +385,22 @@ async function handleLogout() {
     localStorage.removeItem('api_token');
     apiToken = null;
     userData = null;
-	currentRecords = [];
     
     elements.loginForm.reset();
+    elements.emailInput.value = '';
+    elements.passwordInput.value = '';
     elements.loginError.classList.remove('active');
+
+    // Reset Token-Login (falls sichtbar)
+    if (elements.tokenLoginSection) {
+        elements.tokenLoginSection.style.display = 'none';
+        elements.showTokenLoginButton.textContent = 'Mit Token anmelden';
+    }
     
     showScreen('login');
     stopClock();
+
+    debug.log('✓ Abgemeldet');
 }
 
 async function loadUserData() {
@@ -284,7 +427,7 @@ let success = false;
                     return success;
                 }
             } catch (error) {
-                console.log('Member-Daten konnten nicht geladen werden:', error);
+                debug.log('Member-Daten konnten nicht geladen werden:', error);
             }
         }
         
@@ -303,7 +446,7 @@ let success = false;
         success = true;
         
     } catch (error) {
-        console.log('User-Daten konnten nicht geladen werden:', error);
+        debug.log('User-Daten konnten nicht geladen werden:', error);
         elements.userName.textContent = 'Benutzer';
         elements.userRole.textContent = 'Mitglied';
     }
@@ -382,6 +525,22 @@ function showNavigationConfirm(title, message, onConfirm) {
     });
     
     modal.classList.add('active');
+}
+
+// ========================================
+// LOGOUT HANDLING
+// ========================================
+function requestLogout() {
+    showNavigationConfirm(
+        'Abmelden',
+        'Möchten Sie sich wirklich abmelden?',
+        async () => {
+            await handleLogout();
+        },
+        () => {
+            // Cancel - nichts tun
+        }
+    );
 }
 
 // ========================================
@@ -468,7 +627,7 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
         }
     } catch (error) {
         showMessage('Check-in fehlgeschlagen', 'error');
-        console.error(error.message);
+        debug.error(error.message);
     } finally {
         elements.scanButton.disabled = false;
     }
@@ -486,12 +645,16 @@ async function toggleScanner() {
             await html5QrCode.stop();
         }
         catch(error){
-            console.log('Stopp-Error (ignoriert):', error);
+            debug.log('Stopp-Error (ignoriert):', error);
         }
 
         scannerContainer.style.display = 'none';
         elements.stopScanButton.style.display = 'none'; // Stop-Button verstecken
         elements.scanButton.style.display = 'flex'; // Scan-Button zeigen
+        elements.manualCodeBtn.style.display = 'flex'; //Manual Code Button zeigen
+        elements.exceptionBtn.style.display = 'flex'; //Antrags-Button zeigen
+        elements.checkinDivider.style.display = 'block';
+
         elements.scanButton.classList.remove('scanning');
         elements.scanButton.innerHTML = '<span class="icon">📷</span><span>QR-Code scannen</span>';
         isScanning = false;
@@ -523,23 +686,30 @@ async function toggleScanner() {
                                             msg.includes("No barcode or QR code detected") ||
                                             msg.includes("No MultiFormat Readers were able to detect the code");
                     if (!isParseError) {
-                        console.warn("Scan error:", msg);
+                        debug.warn("Scan error:", msg);
                     }
                 }
             );
 
             scannerContainer.style.display = 'block';
             elements.stopScanButton.style.display = 'flex'; // Stop-Button zeigen
-            elements.scanButton.style.display = 'none'; // Scan-Button verstecken            
+            elements.scanButton.style.display = 'none'; // Scan-Button verstecken     
+            elements.manualCodeBtn.style.display = 'none'; //Manual Code Button verstecken
+            elements.exceptionBtn.style.display = 'none'; //Antrags-Button verstecken
+            elements.checkinDivider.style.display = 'none';
+            
             isScanning = true;
             
         } catch (error) {
-            console.error('Kamera-Fehler:', error);
+            debug.error('Kamera-Fehler:', error);
 
             // Bei Fehler: Alles zurücksetzen
             scannerContainer.style.display = 'none';
             elements.stopScanButton.style.display = 'none';
             elements.scanButton.style.display = 'flex';
+            elements.manualCodeBtn.style.display = 'flex'; //Manual Code Button zeigen
+            elements.exceptionBtn.style.display = 'flex'; //Antrags-Button zeigen
+            elements.checkinDivider.style.display = 'block';
             isScanning = false;
             
             let errorMsg = 'Kamera-Zugriff nicht möglich';
@@ -583,6 +753,9 @@ async function stopScannerIfRunning() {
         document.getElementById('scannerContainer').style.display = 'none';
         elements.stopScanButton.style.display = 'none';
         elements.scanButton.style.display = 'flex';
+        elements.manualCodeBtn.style.display = 'flex'; //Manual Code Button zeigen
+        elements.exceptionBtn.style.display = 'flex'; //Antrags-Button zeigen
+        elements.checkinDivider.style.display = 'block';
         elements.scanButton.classList.remove('scanning');
         elements.scanButton.innerHTML = '<span class="icon">📷</span><span>QR-Code scannen</span>';
         isScanning = false;
@@ -630,17 +803,17 @@ async function checkNFCSupport() {
             
             if (permissionStatus.state === "granted" || permissionStatus.state === "prompt") {
                 elements.nfcButton.style.display = 'flex';
-                console.log('✓ NFC wird unterstützt');
+                debug.log('✓ NFC wird unterstützt');
             } else {
-                console.log('✗ NFC-Berechtigung verweigert');
+                debug.log('✗ NFC-Berechtigung verweigert');
             }
         } catch (error) {
-            console.log('✗ NFC-Permission-Check fehlgeschlagen:', error);
+            debug.log('✗ NFC-Permission-Check fehlgeschlagen:', error);
             // Zeige Button trotzdem - User kann beim ersten Scan Berechtigung erteilen
             elements.nfcButton.style.display = 'flex';
         }
     } else {
-        console.log('✗ NFC wird von diesem Browser nicht unterstützt');
+        debug.log('✗ NFC wird von diesem Browser nicht unterstützt');
         elements.nfcButton.style.display = 'none';
     }
 }
@@ -676,7 +849,7 @@ async function startNFCReader() {
         showMessage('📡 Halte ein NFC-Tag an die Rückseite des Geräts...', 'info');
         
         ndef.addEventListener("reading", ({ message, serialNumber }) => {
-            console.log('NFC-Tag erkannt:', serialNumber);
+            debug.log('NFC-Tag erkannt:', serialNumber);
             onNFCTagRead(message, serialNumber);
         }, { signal: nfcAbortController.signal });
         
@@ -685,7 +858,7 @@ async function startNFCReader() {
         }, { signal: nfcAbortController.signal });
         
     } catch (error) {
-        console.error('NFC-Fehler:', error);
+        debug.error('NFC-Fehler:', error);
         
         if (error.name === 'NotAllowedError') {
             showMessage('NFC-Berechtigung wurde verweigert. Bitte erlaube NFC-Zugriff in den Browser-Einstellungen.', 'error');
@@ -714,7 +887,7 @@ function stopNFCReader() {
 }
 
 async function onNFCTagRead(message, serialNumber) {
-    console.log('NFC-Tag gelesen:', { message, serialNumber });
+    debug.log('NFC-Tag gelesen:', { message, serialNumber });
     
     stopNFCReader();
     
@@ -722,12 +895,12 @@ async function onNFCTagRead(message, serialNumber) {
     let checkinCode = null;
     
     for (const record of message.records) {
-        console.log('NDEF Record:', record.recordType, record);
+        debug.log('NDEF Record:', record.recordType, record);
         
         if (record.recordType === "text") {
             const textDecoder = new TextDecoder(record.encoding || 'utf-8');
             const text = textDecoder.decode(record.data);
-            console.log('Text-Record:', text);
+            debug.log('Text-Record:', text);
             
             // Prüfe ob es ein CHECKIN-Code ist
             if (text.startsWith('CHECKIN:')) {
@@ -737,7 +910,7 @@ async function onNFCTagRead(message, serialNumber) {
         } else if (record.recordType === "url") {
             const textDecoder = new TextDecoder();
             const url = textDecoder.decode(record.data);
-            console.log('URL-Record:', url);
+            debug.log('URL-Record:', url);
             
             // Extrahiere Code aus URL (z.B. https://example.com/checkin?code=CHECKIN:123456)
             const match = url.match(/CHECKIN:\d{6}/);
@@ -757,6 +930,18 @@ async function onNFCTagRead(message, serialNumber) {
 // ========================================
 // EXCEPTION
 // ========================================
+
+async function loadAppointmentTypes() {
+
+    try {        
+        appointmentTypes = await apiCall('appointment_types');        
+        debug.log('Terminarten geladen', appointmentTypes);
+    }
+    catch (error) {
+        appointmentTypes = [];
+        debug.error('Keine Terminarten gefunden.', error);
+    }
+}
 
 async function loadAppointments() {
     try {
@@ -784,7 +969,7 @@ async function loadAppointments() {
             elements.exceptionAppointment.appendChild(option);
         });
     } catch (error) {
-        console.error('Fehler beim Laden der Termine:', error);
+        debug.error('Fehler beim Laden der Termine:', error);
     }
 }
 
@@ -838,8 +1023,9 @@ async function submitException() {
         if (data) {
             showMessage('✓ Antrag erfolgreich gestellt (wartet auf Genehmigung)', 'warning');
             
+            /*
             const apt = appointments.find(a => a.appointment_id == appointmentId);
-            /*addNewActivityToHistory({
+            addNewActivityToHistory({
                 appointment: apt,
                 verified: false,
                 pending: true
@@ -915,13 +1101,13 @@ async function loadHistory() {
         combined.sort((a, b) => b.timestamp - a.timestamp);       
         
         // Debug
-        //console.log("Loading History", combined);
+        debug.log("Loading History", combined);
         
         // Zeige die letzten 10 Einträge
         renderHistory(combined.slice(0, 10));
         
     } catch (error) {
-        console.error('Fehler beim Laden der History:', error);
+        debug.error('Fehler beim Laden der History:', error);
         elements.historyList.innerHTML = '<div class="history-empty">Fehler beim Laden der Historie</div>';
     }
 }
@@ -932,7 +1118,6 @@ function renderHistory(items) {
     
     if (items.length === 0) {
         elements.historyList.innerHTML = '<div class="history-empty">Noch keine Aktivitäten</div>';
-        //elements.history.style.display = 'block';
         return;
     }
     
@@ -943,8 +1128,6 @@ function renderHistory(items) {
             addExceptionToHistory(item.data);
         }
     });
-    
-    //elements.history.style.display = 'block';
 }
 
 // Fügt Record zur History hinzu
@@ -968,8 +1151,8 @@ function addRecordToHistory(record) {
     // Appointment Type Badge hinzufügen (falls vorhanden)
     let typeBadge = '';
     if (record.appointment_type_name) {
-        const typeClass = record.appointment_type_name.toLowerCase().replace(/\s+/g, '-');
-        typeBadge = `<span class="type-badge ${typeClass}">${record.appointment_type_name}</span>`;
+        const color = getTypeColor(record.appointment_type_name);
+        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${record.appointment_type_name}</span>`;
     }
     
     item.innerHTML = `
@@ -1006,8 +1189,8 @@ function addExceptionToHistory(exception) {
     // Appointment Type Badge hinzufügen (falls vorhanden)
     let typeBadge = '';
     if (exception.appointment_type_name) {
-        const typeClass = exception.appointment_type_name.toLowerCase().replace(/\s+/g, '-');
-        typeBadge = `<span class="type-badge ${typeClass}">${exception.appointment_type_name}</span>`;
+        const color = getTypeColor(exception.appointment_type_name);
+        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${exception.appointment_type_name}</span>`;
     }
 
     // Delete-Button nur bei pending
@@ -1063,7 +1246,7 @@ async function submitConfirmDelete() {
         await loadHistory();
         
     } catch (error) {
-        console.error('Fehler beim Löschen:', error);
+        debug.error('Fehler beim Löschen:', error);
         showMessage(error.message || 'Fehler beim Löschen', 'error');
     }
 
@@ -1087,8 +1270,8 @@ function addNewActivityToHistory(data) {
     // Appointment Type Badge hinzufügen (falls vorhanden)
     let typeBadge = '';
     if (data.appointment_type_name) {
-        const typeClass = data.appointment_type_name.toLowerCase().replace(/\s+/g, '-');
-        typeBadge = `<span class="type-badge ${typeClass}">${data.appointment_type_name}</span>`;
+        const color = getTypeColor(data.appointment_type_name);
+        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${data.appointment_type_name}</span>`;
     }
     
     const statusBadge = data.pending 
@@ -1109,8 +1292,6 @@ function addNewActivityToHistory(data) {
     while (elements.historyList.children.length > 10) {
         elements.historyList.removeChild(elements.historyList.lastChild);
     }
-    
-    //elements.history.style.display = 'block';
 }
 
 // ========================================
@@ -1153,7 +1334,6 @@ function initTabs() {
 // STATISTICS LOADING
 // ========================================
 
-
 async function loadStatistics() {
     const statsLoading = document.getElementById('statsLoading');
     const statsContent = document.getElementById('statsContent');
@@ -1174,7 +1354,7 @@ async function loadStatistics() {
         });
         
         // Debug
-        //console.log('Statistics:', stats); 
+        debug.log('Statistics:', stats); 
 
         // Zeige Jahr an
         document.getElementById('currentYear').textContent = currentStatsYear;
@@ -1187,7 +1367,7 @@ async function loadStatistics() {
         statsContent.style.display = 'block';
         
     } catch (error) {
-        console.error('Fehler beim Laden der Statistik:', error);
+        debug.error('Fehler beim Laden der Statistik:', error);
         showMessage('Statistik konnte nicht geladen werden', 'error');
         statsLoading.innerHTML = '<p style="color: #e74c3c;">❌ Fehler beim Laden</p>';
     }
@@ -1236,7 +1416,7 @@ function displayGroupStats(stats) {
         return;
     }
     
-// Sortiere Gruppen nach Namen
+    // Sortiere Gruppen nach Namen
     const sortedGroups = [...stats.statistics].sort((a, b) => 
         a.group_name.localeCompare(b.group_name)
     );
@@ -1318,4 +1498,18 @@ function formatDateTime(date) {
     const seconds = String(date.getSeconds()).padStart(2, '0');
     
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function getTypeColor(typeName) {
+    if (!typeName || appointmentTypes.length === 0) {
+        return '#95a5a6'; // Fallback Grau
+    }
+    
+    // Finde Type in appointmentTypes Array
+    const type = appointmentTypes.find(t => 
+        t.type_name === typeName || 
+        t.type_name.toLowerCase() === typeName.toLowerCase()
+    );
+    
+    return type ? type.color : '#95a5a6'; // Fallback wenn nicht gefunden
 }

@@ -103,7 +103,7 @@ export function initSettingsEventHandler()
             try {
                 await handlePasswordChange(e);
             } catch (error) {
-                console.error('Fehler beim Passwort ändern:', error);
+                debug.error('Fehler beim Passwort ändern:', error);
             }
         });
     } 

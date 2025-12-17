@@ -266,14 +266,14 @@ function calculateMemberStatistics($db, $memberId, $groupId, $year) {
         return null;
     }
     
-    // Alle Termine der Gruppe im Jahr
+    // Alle Termine der Gruppe im Jahr bis heute (inkl. laufendem Termin)
     $stmt = $db->prepare("
         SELECT appointment_id, date 
         FROM appointments a
         LEFT JOIN appointment_type_groups atg ON a.type_id = atg.type_id        
         WHERE atg.group_id = ? 
         AND YEAR(date) = ?
-        AND date <= CURDATE()
+        AND date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)        
         ORDER BY date
     ");
     $stmt->execute([$groupId, $year]);

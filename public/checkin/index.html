@@ -23,6 +23,53 @@
 
             <form id="loginForm">
                 <div class="form-group">
+                    <label for="emailInput">E-Mail</label>
+                    <input type="email" id="emailInput" required autocomplete="email">
+                </div>
+                
+                <div class="form-group">
+                    <label for="passwordInput">Passwort</label>
+                    <input type="password" id="passwordInput" required autocomplete="current-password">
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="saveLoginCheckbox" checked>
+                        Angemeldet bleiben
+                    </label>
+                </div>
+                
+                <button type="submit" class="action-button btn-login">Anmelden</button>
+                
+                <div id="loginError" class="error-message"></div>
+            </form>
+            
+            <!-- Optional: Token-Login als Fallback -->
+            <div class="divider" style="margin: 20px 0;">oder</div>
+            
+            <button class="action-button btn-secondary" id="showTokenLoginButton">
+                Mit Token anmelden
+            </button>
+            
+            <!-- Token-Login (versteckt) -->
+            <div id="tokenLoginSection" style="display: none; margin-top: 20px;">
+                <div class="form-group">
+                    <label for="apiTokenInput">API Token</label>
+                    <input type="text" id="apiTokenInput" placeholder="Token eingeben">
+                </div>
+                <button type="button" class="action-button btn-login" id="tokenLoginButton">
+                    Mit Token anmelden
+                </button>
+            </div>
+            
+            <div class="info-box">
+                <p><strong>Hinweis:</strong> Verwenden Sie Ihre Dashboard-Zugangsdaten.</p>
+                <a href="../index.html" class="dashboard-link">Zum Dashboard</a>
+            </div>
+
+            <!--
+            <form id="loginForm">
+                <div class="form-group">
                     <label for="apiToken">API-Token</label>
                     <input type="password" id="apiToken" name="apiToken" required>
                 </div>
@@ -43,6 +90,7 @@
                     🌐 Zum Web-Dashboard →
                 </a>
             </div>
+            -->
 
         </div>
     </div>
@@ -131,7 +179,7 @@
                         <span>Code manuell eingeben</span>
                     </button>
 
-                    <div class="divider"><span>oder</span></div>
+                    <div id="checkinDivider" class="divider"><span>oder</span></div>
 
                     <button id="exceptionBtn" class="action-button secondary">
                         <span class="icon">📋</span>
@@ -198,7 +246,7 @@
             <div class="form-group">
                 <label for="manualCode">6-stelliger Code</label>
                 <input type="text" id="manualCode" maxlength="6" pattern="\d{6}" 
-                       placeholder="123456" inputmode="numeric">
+                       placeholder="123456" inputmode="numeric" autocomplete="off">
             </div>
             <div class="modal-buttons">
                 <button class="action-button btn-cancel" id="closeManualCodeBtn">Abbrechen</button>

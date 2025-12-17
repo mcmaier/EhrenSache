@@ -6,12 +6,12 @@ import { initAuth } from './modules/auth.js';
 // INIT JS
 // ============================================
 
-const DEBUG = false;
+const DEBUG = true;
 
 export const debug = {
   log:  (...args) => DEBUG && console.log(...args),
   warn: (...args) => DEBUG && console.warn(...args),
-  error:(...args) => DEBUG && console.error(...args),
+  error:(...args) => DEBUG && console.error(...args)
 };
 
 async function init() {

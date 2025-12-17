@@ -4,7 +4,7 @@
 // MEMBERS Controller
 // ============================================
 
-function handleMembers($db, $method, $id) {
+function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMemberId) {
     switch($method) {
         case 'GET':
             if($id) {    
@@ -34,13 +34,22 @@ function handleMembers($db, $method, $id) {
                         }
                 }               
                 else{
-                    $stmt = $db->prepare("SELECT name,surname FROM members WHERE member_id = ?");
-                    $stmt->execute([$id]);
-                    $member = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $memberId = $authMemberId; 
+                    $stmt = $db->prepare("SELECT name, surname, member_number FROM members WHERE member_id = ?");
+                    $stmt->execute([$memberId]);
+                    $member = $stmt->fetch(PDO::FETCH_ASSOC);                            
+
+                    $warning = null;
+                    if( $id!= $memberId) {
+                        $warning = "member_id ignored - you can only get your own linked member number (ID: $memberId)";
+                    }
 
                     if($member)
                     {
-                        echo json_encode($member);
+                        echo json_encode([  "name" => $member['name'],
+                                            "surname" => $member['surname'],
+                                            "member_number" => $member['member_number'],
+                                            "warning" => $warning]);
                     }
                     else {             
                         http_response_code(404);

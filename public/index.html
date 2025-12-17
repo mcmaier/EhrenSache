@@ -166,7 +166,8 @@
                 <div class="content-header">
                     <h1>Terminverwaltung</h1>                    
                      <div class="header-actions">
-                        <button class="btn-secondary" data-role="admin" onclick="exportAppointments()">📥 Export CSV</button>            
+                        <button class="btn-secondary" onclick="openAppointmentsImportModal()">📤 Import CSV</button>
+                        <button class="btn-secondary" data-role="admin" onclick="exportAppointments()">💾 Export CSV</button>                                    
                         <button class="btn-add" data-role="admin" onclick="openAppointmentModal()">+ Neuer Termin</button>
                      </div>
                 </div>
@@ -234,9 +235,9 @@
             <div class="content-section" id="anwesenheit">
                 <div class="content-header">
                     <h1>Anwesenheitsverwaltung</h1>
-                    <div class="header-actions">
-                        <button class="btn-secondary" data-role="admin" onclick="exportRecords()">📥 Export CSV</button>  
+                    <div class="header-actions">                        
                         <button class="btn-secondary" data-role="admin" onclick="openRecordsImportModal()">📤 Import CSV</button>                  
+                        <button class="btn-secondary" data-role="admin" onclick="exportRecords()">💾 Export CSV</button>  
                         <button class="btn-add" data-role="admin" onclick="openRecordModal()">+ Anwesenheit erfassen</button>
                     </div>
                 </div>
@@ -417,9 +418,9 @@
             <div class="content-section active" id="mitglieder">
                 <div class="content-header">
                     <h1>Mitgliederverwaltung</h1> 
-                    <div class="header-actions">
-                        <button class="btn-secondary" data-role="admin" onclick="exportMembers()">📥 Export CSV</button>
-                        <button class="btn-secondary" data-role="admin" onclick="openImportModal()">📤 Import CSV</button>            
+                    <div class="header-actions">                        
+                        <button class="btn-secondary" data-role="admin" onclick="openImportModal()">📤 Import CSV</button>
+                        <button class="btn-secondary" data-role="admin" onclick="exportMembers()">💾 Export CSV</button>            
                         <button class="btn-add" data-role="admin" onclick="openMemberModal()">+ Neues Mitglied</button>                    
                     </div>
                 </div>
@@ -994,6 +995,53 @@
         </div>
     </div>
 
+    <!-- Appointments Import Modal -->
+    <div class="modal" id="appointmentsImportModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Termine importieren (CSV)</h2>
+                <span class="modal-close" onclick="closeAppointmentsImportModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="import-info">
+                    <h3>CSV-Format:</h3>
+                    <p>Die CSV-Datei muss folgende Spalten enthalten:</p>
+                    <ul>
+                        <li><strong>date</strong> - Pflichtfeld (Format: YYYY-MM-DD)</li>
+                        <li><strong>start_time</strong> - Pflichtfeld (Format: HH:MM:SS)</li>
+                        <li><strong>title</strong> - Pflichtfeld</li>
+                        <li><strong>type_name</strong> - Pflichtfeld (Name der Terminart)</li>
+                        <li><strong>description</strong> - Optional</li>
+                    </ul>
+                    <p><strong>Hinweis:</strong> Die Terminart muss bereits existieren.</p>
+                    <p><strong>Trennzeichen:</strong> Semikolon (;)</p>
+                    <p><strong>Encoding:</strong> UTF-8</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="appointmentsImportFile">CSV-Datei auswählen:</label>
+                    <input type="file" id="appointmentsImportFile" accept=".csv" class="file-input">
+                </div>
+                
+                <div id="appointmentsImportProgress" style="display:none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="appointmentsImportProgressFill"></div>
+                    </div>
+                    <p id="appointmentsImportStatus">Importiere...</p>
+                </div>
+                
+                <div id="appointmentsImportResult" style="display:none;">
+                    <h3>Import-Ergebnis:</h3>
+                    <div id="appointmentsImportResultContent"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeAppointmentsImportModal()">Abbrechen</button>
+                <button class="btn-save" id="appointmentsImportBtn" onclick="executeAppointmentsImport()">Importieren</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Records Import Modal -->
     <div class="modal" id="recordsImportModal">
         <div class="modal-content">
@@ -1076,7 +1124,7 @@
                 
                 // Wenn "not_installed" Status → Weiterleitung
                 if (result.status === 'not_installed') {
-                    debug.log('Installation erforderlich - Weiterleitung...');
+                    console.log('Installation erforderlich - Weiterleitung...');
                     window.location.href = './install/';
                 }
             } catch (error) {

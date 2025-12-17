@@ -43,6 +43,10 @@ function handleImport($db, $request_method, $authUserRole) {
         case 'records':
             $result = importRecords($db, $file['tmp_name']);
             break;
+        case 'appointments':
+            $result = importAppointments($db, $file['tmp_name']);
+            break;
+
         default:
             http_response_code(400);
             echo json_encode(["message" => "Invalid import type"]);
@@ -92,6 +96,17 @@ function importMembers($db, $filePath) {
     try {
         while (($data = fgetcsv($handle, 0, ';')) !== false) {
             $rowNumber++;
+
+            // Überspringe leere Zeilen
+            if (empty($data) || (count($data) === 1 && empty($data[0]))) {
+                continue;
+            }
+            
+            // Prüfe ob Anzahl der Spalten passt
+            if (count($header) !== count($data)) {
+                $errors[] = "Row $rowNumber: Column count mismatch (expected " . count($header) . ", got " . count($data) . ")";
+                continue;
+            }
             
             // CSV zu assoziativem Array
             $row = array_combine($header, $data);
@@ -198,6 +213,149 @@ function importMembers($db, $filePath) {
 }
 
 // ============================================
+// IMPORT APPOINTMENTS
+// ============================================
+
+function importAppointments($db, $filePath) {
+    $handle = fopen($filePath, 'r');
+    if (!$handle) {
+        return ["success" => false, "message" => "Could not read file"];
+    }
+    
+    // UTF-8 BOM überspringen falls vorhanden
+    $bom = fread($handle, 3);
+    if ($bom !== "\xEF\xBB\xBF") {
+        rewind($handle);
+    }
+    
+    // Header-Zeile einlesen
+    $header = fgetcsv($handle, 0, ';');
+    if (!$header || !in_array('date', $header) || !in_array('start_time', $header) || !in_array('title', $header) || !in_array('type_name', $header)) {
+        fclose($handle);
+        return ["success" => false, "message" => "Invalid CSV format - missing required columns (date, start_time, title, type_name)"];
+    }
+    
+    $imported = 0;
+    $updated = 0;
+    $errors = [];
+    $rowNumber = 1;
+    
+    // Cache für Terminarten-Lookup
+    $typeCache = [];
+    $stmt = $db->query("SELECT type_id, type_name FROM appointment_types");
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $typeCache[$row['type_name']] = $row['type_id'];
+    }
+    
+    $db->beginTransaction();
+    
+    try {
+        while (($data = fgetcsv($handle, 0, ';')) !== false) {
+            $rowNumber++;
+            
+            // Überspringe leere Zeilen
+            if (empty($data) || (count($data) === 1 && empty($data[0]))) {
+                continue;
+            }
+            
+            // Prüfe ob Anzahl der Spalten passt
+            if (count($header) !== count($data)) {
+                $errors[] = "Row $rowNumber: Column count mismatch (expected " . count($header) . ", got " . count($data) . ")";
+                continue;
+            }
+            
+            // CSV zu assoziativem Array
+            $row = array_combine($header, $data);
+            
+            // Validierung
+            if (empty($row['date']) || empty($row['start_time']) || empty($row['title']) || empty($row['type_name'])) {
+                $errors[] = "Row $rowNumber: date, start_time, title and type_name required";
+                continue;
+            }
+            
+            $date = trim($row['date']);
+            $startTime = trim($row['start_time']);
+            $title = trim($row['title']);
+            $typeName = trim($row['type_name']);
+            $description = trim($row['description'] ?? '');
+            
+            // Validiere Datum
+            $dateObj = DateTime::createFromFormat('Y-m-d', $date);
+            if (!$dateObj || $dateObj->format('Y-m-d') !== $date) {
+                $errors[] = "Row $rowNumber: Invalid date format '$date' (expected: YYYY-MM-DD)";
+                continue;
+            }
+            
+            // Validiere Zeit
+            $timeObj = DateTime::createFromFormat('H:i:s', $startTime);
+            if (!$timeObj) {
+                // Versuche H:i Format
+                $timeObj = DateTime::createFromFormat('H:i', $startTime);
+                if ($timeObj) {
+                    $startTime = $timeObj->format('H:i:s');
+                } else {
+                    $errors[] = "Row $rowNumber: Invalid time format '$startTime' (expected: HH:MM:SS or HH:MM)";
+                    continue;
+                }
+            }
+            
+            // Finde Terminart
+            if (!isset($typeCache[$typeName])) {
+                $errors[] = "Row $rowNumber: Appointment type '$typeName' not found";
+                continue;
+            }
+            $typeId = $typeCache[$typeName];
+            
+            // Prüfe ob Termin bereits existiert (gleicher Typ, Datum und Zeit)
+            $stmt = $db->prepare("
+                SELECT appointment_id 
+                FROM appointments 
+                WHERE type_id = ? AND date = ? AND start_time = ?
+            ");
+            $stmt->execute([$typeId, $date, $startTime]);
+            $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($existing) {
+                // Update existierenden Termin
+                $stmt = $db->prepare("
+                    UPDATE appointments 
+                    SET title=?, description=?
+                    WHERE appointment_id=?
+                ");
+                $stmt->execute([$title, $description, $existing['appointment_id']]);
+                $updated++;
+            } else {
+                // Neuen Termin erstellen
+                $stmt = $db->prepare("
+                    INSERT INTO appointments (type_id, date, start_time, title, description)
+                    VALUES (?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([$typeId, $date, $startTime, $title, $description]);
+                $imported++;
+            }
+        }
+        
+        $db->commit();
+        fclose($handle);
+        
+        return [
+            "success" => true,
+            "imported" => $imported,
+            "updated" => $updated,
+            "errors" => $errors
+        ];
+        
+    } catch (Exception $e) {
+        $db->rollBack();
+        fclose($handle);
+        return [
+            "success" => false,
+            "message" => "Import failed: " . $e->getMessage()
+        ];
+    }
+}
+
+// ============================================
 // IMPORT RECORDS
 // ============================================
 
@@ -232,6 +390,17 @@ function importRecords($db, $filePath) {
         while (($data = fgetcsv($handle, 0, ';')) !== false) {
             $rowNumber++;
             
+            // Überspringe leere Zeilen
+            if (empty($data) || (count($data) === 1 && empty($data[0]))) {
+                continue;
+            }
+            
+            // Prüfe ob Anzahl der Spalten passt
+            if (count($header) !== count($data)) {
+                $errors[] = "Row $rowNumber: Column count mismatch (expected " . count($header) . ", got " . count($data) . ")";
+                continue;
+            }
+
             // CSV zu assoziativem Array
             $row = array_combine($header, $data);
             

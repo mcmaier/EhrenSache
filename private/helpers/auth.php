@@ -4,6 +4,8 @@
 // ============================================
 
 function login($db, $email, $password) {
+
+    
     // Rate Limiting für Login
     $key = 'login_attempts_' . $email;
     
@@ -64,6 +66,101 @@ function login($db, $email, $password) {
     }
     
     return ["success" => false, "message" => "Invalid credentials"];
+}
+
+
+function loginWithToken($db, $email, $password) {    
+
+    // Rate Limiting Check
+    $ip = $_SERVER['REMOTE_ADDR'];
+    $cacheFile = sys_get_temp_dir() . "/login_attempts_" . md5($ip);
+    $maxAttempts = 5;
+    $resetTime = 300;
+    
+    if (file_exists($cacheFile)) {
+        $fileTime = filemtime($cacheFile);
+
+        if (time() - $fileTime > $resetTime) {
+                unlink($cacheFile); // Altes Limit löschen
+                $attempts = 0;
+            } else {
+                $attempts = (int)file_get_contents($cacheFile);
+                if ($attempts >= $maxAttempts) {
+                    http_response_code(429);
+                    return ["success" => false, "message" => "Zu viele Login-Versuche. Bitte warten Sie 5 Minuten."];
+                }
+            }
+        } 
+        else {
+            $attempts = 0;
+        }
+
+        // Versuch zählen (und Datei mit aktuellem Zeitstempel speichern)
+        $attempts++;
+        file_put_contents($cacheFile, $attempts);
+        touch($cacheFile, time() + $resetTime); // TTL setzen    
+
+    try {
+        // Hole User aus DB
+        $stmt = $db->prepare("
+            SELECT user_id, email, password_hash, role, member_id, api_token, is_active 
+            FROM users 
+            WHERE email = ?
+        ");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            http_response_code(401);
+            return ["success" => false, "message" => "Ungültige Anmeldedaten"];
+        }
+
+        // Prüfe ob Account aktiv
+        if (!$user['is_active']) {
+            http_response_code(403);
+            return ["success" => false, "message" => "Account ist deaktiviert"];
+        }
+
+        // Verifiziere Passwort
+        if (!password_verify($password, $user['password_hash'])) {
+            http_response_code(401);
+            return ["success" => false, "message" => "Ungültige Anmeldedaten"];
+        }
+
+        // Gib/Generiere Token
+        $token = $user['api_token'];
+        
+        if (empty($token)) {
+            // Generiere neuen Token
+            $token = bin2hex(random_bytes(32));
+            
+            $stmt = $db->prepare("UPDATE users SET api_token = ? WHERE user_id = ?");
+            $stmt->execute([$token, $user['user_id']]);
+        }
+
+        // Bei Erfolg: Reset attempts
+        if (file_exists($cacheFile)) {
+            unlink($cacheFile);
+        }
+
+        http_response_code(200);
+        return [
+            "success" => true,
+            "message" => "Login erfolgreich",
+            "token" => $token,
+            "user" => [
+                "user_id" => (int)$user['user_id'],
+                "email" => $user['email'],
+                "role" => $user['role'],
+                "member_id" => $user['member_id'] ? (int)$user['member_id'] : null
+            ]
+        ];
+
+    } catch (PDOException $e) {      
+        error_log("Login error: " . $e->getMessage());
+        http_response_code(500);
+        return ["success" => false, "message" => "Serverfehler beim Login"];
+    }
 }
 
 function logout() {

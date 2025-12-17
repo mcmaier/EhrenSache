@@ -160,16 +160,92 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
 
     //error_log("Found " . count($potentialAppointments) . " potential appointments");
 
+    /*
     foreach($potentialAppointments as $apt) {
         $typeName = $apt['type_name'] ?: 'no type';
         //error_log("  - #{$apt['appointment_id']}: {$apt['title']} (Start: {$apt['start_time']}) Type: {$typeName} " . " Diff: {$apt['time_diff_seconds']}s");
+    }*/    
+
+    // ============================================
+    // Filter nach Gruppen-Berechtigung mit Priorisierung
+    // ============================================
+
+    $matchedAppointment = null;
+    $fallbackAppointment = null; // Für nicht-Standard-Gruppen
+
+    foreach($potentialAppointments as $appointment) {
+        // Wenn Termin einen Type hat, prüfe Gruppen-Berechtigung
+        if($appointment['type_id']) {
+            // Prüfe ob dieser Termin-Typ Gruppen-Einschränkungen hat
+            $typeGroupsStmt = $db->prepare("
+                SELECT atg.group_id, mg.is_default 
+                FROM appointment_type_groups atg
+                LEFT JOIN member_groups mg ON atg.group_id = mg.group_id
+                WHERE atg.type_id = ?
+            ");
+            $typeGroupsStmt->execute([$appointment['type_id']]);
+            $restrictedGroups = $typeGroupsStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            if(empty($restrictedGroups)) {
+                // Keine Gruppen-Einschränkung für diesen Typ → Termin für alle
+                $matchedAppointment = $appointment;
+                break;
+            }
+            
+            $groupIds = array_column($restrictedGroups, 'group_id');
+            $hasDefaultGroup = false;
+            foreach($restrictedGroups as $grp) {
+                if($grp['is_default']) {
+                    $hasDefaultGroup = true;
+                    break;
+                }
+            }
+            
+            // Prüfe ob Member in einer der erlaubten Gruppen ist
+            $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+            $memberGroupStmt = $db->prepare("
+                SELECT 1 
+                FROM member_group_assignments 
+                WHERE member_id = ? 
+                AND group_id IN ({$placeholders})
+            ");
+            
+            $params = array_merge([$memberId], $groupIds);
+            $memberGroupStmt->execute($params);
+            
+            if($memberGroupStmt->fetch()) {
+                // Member ist in einer erlaubten Gruppe
+                if($hasDefaultGroup) {
+                    // Termin mit Standard-Gruppe → sofort nehmen
+                    $matchedAppointment = $appointment;
+                    break;
+                } else {
+                    // Termin ohne Standard-Gruppe → als Fallback merken
+                    if(!$fallbackAppointment) {
+                        $fallbackAppointment = $appointment;
+                    }
+                }
+            } else {
+                continue;
+            }
+            
+        } else {
+            // Kein Type → Kein Filter → Termin für alle
+            $matchedAppointment = $appointment;
+            break;
+        }
     }
-    
+
+    // Wenn kein Standard-Termin gefunden, nutze Fallback
+    if(!$matchedAppointment && $fallbackAppointment) {
+        $matchedAppointment = $fallbackAppointment;
+    }
 
     // ============================================
     // Filter nach Gruppen-Berechtigung
     // ============================================
 
+    /*
     $matchedAppointment = null;
     foreach($potentialAppointments as $appointment) {
         // Wenn Termin einen Type hat, prüfe Gruppen-Berechtigung
@@ -217,8 +293,9 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
             $matchedAppointment = $appointment;
             //error_log("✓ Matched appointment #{$appointment['appointment_id']} (no type restriction)");
             break;
-}
+        }
     }
+    */    
         
     if($matchedAppointment) {
         // Passender Termin gefunden
@@ -272,7 +349,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
             'date' => $arrivalDate,
             'start_time' => $timeWithoutSeconds
         ];
-    }
+    }    
     
     // Prüfe ob bereits ein Record existiert
     $checkStmt = $db->prepare("SELECT record_id, arrival_time FROM records 

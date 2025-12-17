@@ -390,10 +390,6 @@ export async function openRecordModal(recordId = null) {
     await loadRecordDropdowns();
     
     if (recordId) {
-        // Bearbeiten: Record aus Cache finden
-        //const allRecords = await loadRecords(false);
-        //const record = allRecords.find(r => r.record_id == recordId);
-
         title.textContent = 'Anwesenheit bearbeiten';
         await loadRecordData(recordId);
 
@@ -419,13 +415,14 @@ export async function openRecordModal(recordId = null) {
 
         // Verstecke Terminart-Anzeige
         document.getElementById('recordAppointmentTypeGroup').style.display = 'none';            
-    }
+    }    
 
     // Event Listener für Termin-Auswahl (nur einmal registrieren)
     const appointmentSelect = document.getElementById('record_appointment');
-    appointmentSelect.removeEventListener('change', updateAppointmentTypeDisplay);
+    //appointmentSelect.removeEventListener('change', updateAppointmentTypeDisplay);
     appointmentSelect.removeEventListener('change',updateArrivalTimeFromAppointment);
-    appointmentSelect.addEventListener('change', updateAppointmentTypeDisplay);
+
+    //appointmentSelect.addEventListener('change', updateAppointmentTypeDisplay);
     appointmentSelect.addEventListener('change',updateArrivalTimeFromAppointment);
     
     modal.classList.add('active');
@@ -452,7 +449,7 @@ export async function loadRecordData(recordId) {
         document.getElementById('record_status').value = record.status;
 
         // Terminart anzeigen
-        updateAppointmentTypeDisplay();
+        //updateAppointmentTypeDisplay();
     }
 }
 
@@ -519,23 +516,27 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
     }
 }
 
-function updateAppointmentTypeDisplay() {
+async function updateAppointmentTypeDisplay() {
     const appointmentSelect = document.getElementById('record_appointment');
     const selectedOption = appointmentSelect.options[appointmentSelect.selectedIndex];
     const typeGroup = document.getElementById('recordAppointmentTypeGroup');
     const typeBadge = document.getElementById('recordAppointmentTypeBadge');
-    
+        
     // Kein Termin gewählt
     if (!selectedOption.value) {
         typeGroup.style.display = 'none';
         return;
     }
+
+    await loadTypes();
     
     // Termin gewählt
     typeGroup.style.display = 'block';
     
     const typeId = selectedOption.dataset.typeId;
     const typeName = selectedOption.dataset.typeName;
+
+    debug.log("Updating Appointment Type: ",selectedOption, typeId, typeName);
     
     // Type-ID vorhanden → Lookup im Cache für Farbe
     if (typeId && dataCache.types.data[typeId]) {

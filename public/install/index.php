@@ -345,7 +345,7 @@ if ($step == 4) {
                 </div>
                 <div class="form-group">
                     <label>Passwort* (min. 6 Zeichen)</label>
-                    <input type="password" name="admin_password" required minlength="6">
+                    <input type="password" name="admin_password" required minlength="8">
                 </div>
                 <div class="form-group">
                     <label>Passwort bestätigen*</label>

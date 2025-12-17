@@ -80,6 +80,7 @@ body {
     font-weight: 500;
 }
 
+.form-group input[type="email"],
 .form-group input[type="text"],
 .form-group input[type="password"] {
     width: 100%;
@@ -103,12 +104,30 @@ body {
     color: #e74c3c;
     font-size: 14px;
     margin-top: 10px;
+    padding: 10px;
+    background: rgba(231, 76, 60, 0.1);
+    border-radius: 5px;
     display: none;
 }
 
 #loginError.active {
     display: block;
 }
+
+/*
+.error-message {
+    color: #e74c3c;
+    font-size: 14px;
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(231, 76, 60, 0.1);
+    border-radius: 5px;
+    display: none;
+}
+
+.error-message.active {
+    display: block;
+}*/
 
 .info-box {
     margin-top: 30px;
@@ -871,49 +890,24 @@ body {
     opacity: 0.5;
 }
 
-/* Type Badge Styling */
+/*----------------------------*/
+/*  Type Badges               */
+/*----------------------------*/
+
+/* Type Badge Standard Styling, wenn keine Typen verfügbar */
 .type-badge {
     display: inline-block;
-    padding: 2px 6px;
+    padding: 3px 8px;
     border-radius: 4px;
     font-size: 11px;
     font-weight: 600;
-    background: #e0e0e0;
-    color: #555;
-}
-
-/*----------------------------*/
-/*  Type Badges für Veranstaltungen */
-/*----------------------------*/
-/* Spezifische Farben je nach Type */
-.type-badge.training {
-    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
     color: white;
 }
 
-.type-badge.event,
-.type-badge.veranstaltung {
-    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
-    color: white;
+/* Fallback wenn keine Farbe gesetzt */
+.type-badge:not([style*="background"]) {
+    background: var(--text);
 }
-
-.type-badge.meeting,
-.type-badge.besprechung {
-    background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
-    color: white;
-}
-
-.type-badge.workshop {
-    background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
-    color: white;
-}
-
-.type-badge.other,
-.type-badge.sonstiges {
-    background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
-    color: white;
-}
-/*----------------------------*/
 
 /* Modal */
 .modal {
@@ -1144,6 +1138,14 @@ body {
 
 .btn-cancel {
     background: var(--text-light);
+    color: var(--card-bg);
+}
+
+.btn-login {
+    width: 100%;
+    max-width: 400px;
+    margin-top: 10px;
+    background: var(--primary);
     color: var(--card-bg);
 }
 

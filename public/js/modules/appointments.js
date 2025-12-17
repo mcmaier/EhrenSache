@@ -155,7 +155,7 @@ function renderCalendar() {
     
     const container = document.getElementById('calendarDaysContainer');
     if (!container) {
-        console.error('calendarDaysContainer not found');
+        debug.error('calendarDaysContainer not found');
         return;
     }
     

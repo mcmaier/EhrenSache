@@ -138,17 +138,18 @@ function handleAppointments($db, $method, $id) {
                     ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
                 FROM appointments 
                 WHERE date = ?
+                AND type_id = ?
                 HAVING time_diff <= ?
             ");
             
-            $checkStmt->execute([$newDateTime, $data->date, $toleranceSeconds]);
+            $checkStmt->execute([$newDateTime, $data->date, $data->type_id ?? null, $toleranceSeconds]);
             
             $conflict = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
             if($conflict) {
             http_response_code(409);
             echo json_encode([
-                "message" => "Ein Termin existiert bereits im Toleranzbereich von ±{$tolerance}h",
+                "message" => "Ein Termin dieser Art existiert bereits im Toleranzbereich von ±{$tolerance}h",
                 "conflict" => [
                     "title" => $conflict['title'],
                     "date" => $conflict['date'],
@@ -186,7 +187,7 @@ function handleAppointments($db, $method, $id) {
                 }
             }
 
-            // Prüfe ob bereits ein anderer Termin in der Toleranz existiert
+            // Prüfe ob bereits ein anderer Termin der gleichen Art in der Toleranzzeit existiert
             $tolerance = AUTO_CHECKIN_TOLERANCE_HOURS;
             $toleranceSeconds = $tolerance * 3600;
             
@@ -197,18 +198,19 @@ function handleAppointments($db, $method, $id) {
                     ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
                 FROM appointments 
                 WHERE date = ?
+                AND type_id = ?
                 AND appointment_id != ?
                 HAVING time_diff <= ?
             ");
             
-            $checkStmt->execute([$newDateTime, $data->date, $id, $toleranceSeconds]);
+            $checkStmt->execute([$newDateTime, $data->date, $data->type_id ?? null, $id, $toleranceSeconds]);
             
             $conflict = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
             if($conflict) {
                 http_response_code(409);
                 echo json_encode([
-                    "message" => "Ein Termin existiert bereits im Toleranzbereich von ±{$tolerance}h",
+                    "message" => "Ein Termin dieser Art existiert bereits im Toleranzbereich von ±{$tolerance}h",
                     "conflict" => [
                         "title" => $conflict['title'],
                         "date" => $conflict['date'],

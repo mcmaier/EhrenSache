@@ -1,6 +1,5 @@
 import { API_BASE } from '../config.js';
-import {debug} from '../app.js'
-import { showLogin, showScreen, showToast, showDashboard, updateUIForRole} from './ui.js';
+import { debug } from '../app.js'
 
 // Globale State
 export let currentUser = null;
@@ -98,7 +97,7 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
         isInitialLoad = false;
         return result;
     } catch (error) {
-        console.error('API Error:', error);
+        debug.error('API Error:', error);
         const { showToast } = await import('./ui.js');
         showToast('Fehler bei der Kommunikation mit dem Server', 'error');
         return null;

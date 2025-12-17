@@ -31,7 +31,7 @@ function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $au
     $totpCode = trim($data->totp_code);
     $sourceDevice = $data->source_device ?? null;
 
-    error_log("Auto-Checkin Source-Device: {$sourceDevice}");
+    //error_log("Auto-Checkin Source-Device: {$sourceDevice}");
 
     // Validiere 6-stelliger numerischer Code
     if(!preg_match('/^\d{6}$/', $totpCode)) {

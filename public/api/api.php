@@ -165,14 +165,57 @@ $authMemberId = null;
 // ÖFFENTLICHE ENDPOINTS (keine Auth nötig)
 // ============================================
 
-if($resource === 'login' && $request_method === 'POST') {
+if($resource === 'login') {
+    if($request_method !== 'POST')
+    {
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        exit();
+    }
+    
+    ini_set('session.cookie_httponly', 1);
+    //ini_set('session.cookie_secure', 1);      // Falls HTTPS
+    ini_set('session.cookie_samesite', 'Strict');
+    ini_set('session.use_strict_mode', 1);
+
     session_start();
+
+    if(isset($_SESSION['last_activity']) && 
+    (time() - $_SESSION['last_activity'] > 1800)) { // 30 min
+        session_unset();
+        session_destroy();
+        http_response_code(401);
+        echo json_encode(["message" => "Session expired"]);
+        exit();
+    }
+    $_SESSION['last_activity'] = time();
+
     $data = json_decode(file_get_contents("php://input"));
     echo json_encode(login($db, $data->email, $data->password));
     exit();
 }
 
-if($resource === 'logout' && $request_method === 'POST') {
+// PWA Login (Token-basiert)
+if($resource === 'auth'){
+    if($request_method !== 'POST')
+    {
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        exit();
+    }
+    $data = json_decode(file_get_contents("php://input"));
+    echo json_encode(loginWithToken($db, $data->email, $data->password));
+    exit();
+}
+
+if($resource === 'logout'){
+    if($request_method !== 'POST')
+    {
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        exit();
+    }
+    
     session_start();
     echo json_encode(logout());
     exit();
@@ -275,11 +318,18 @@ if($apiToken) {
 // ME ENDPOINT
 // ============================================
 
-if($resource === 'me' && $request_method === 'GET') {
+if($resource === 'me'){
+    if($request_method !== 'GET') {
+
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        exit();
+    }
+
     if($isTokenAuth) {
         echo json_encode([
             "user_id" => $authUserId,
-            "email" => "token-auth", // Email nicht verfügbar ohne Session
+            "email" => "token-auth",
             "role" => $authUserRole,
             "member_id" => $authMemberId,
             "auth_type" => "token"
@@ -303,7 +353,7 @@ if($resource === 'me' && $request_method === 'GET') {
 if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 
     //Von CSRF ausgenommen
-    $excludedResources = ['login', 'logout', 'regenerate_token','import'];
+    $excludedResources = ['login', 'logout', 'auth', 'regenerate_token','import'];
     
     // Login und Logout sind ausgenommen
     if(!in_array($resource, $excludedResources)) {
@@ -373,7 +423,7 @@ switch($resource) {
         handleAvailableYears($db, $request_method, $id);
         break;
     case 'members':
-        handleMembers($db, $request_method, $id);
+        handleMembers($db, $request_method, $id, $authUserId, $authUserRole, $authMemberId);
         break;
     case 'appointments':
         handleAppointments($db, $request_method, $id);
