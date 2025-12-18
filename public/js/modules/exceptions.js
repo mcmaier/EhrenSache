@@ -12,6 +12,10 @@ import {debug} from '../app.js'
 // import {} from './exceptions.js'
 // ============================================
 
+let currentExceptionsPage = 1;
+const exceptionsPerPage = 25;
+let allFilteredExceptions = [];
+
 // ============================================
 // DATA FUNCTIONS (API-Calls)
 // ============================================
@@ -39,24 +43,40 @@ export async function loadExceptions(forceReload = false) {
     return exceptions;
 }
 
-export async function renderExceptions(exceptionData)
-{       
-    const tbody = document.getElementById('exceptionsTableBody');
-
+export async function renderExceptions(exceptions, page = 1)
+{   
     debug.log("Rendering Exceptions...");
+    
+    const tbody = document.getElementById('exceptionsTableBody');    
 
-    if (!exceptionData || (exceptionData.length === 0)) {
+    if (!exceptions || (exceptions.length === 0)) {
         tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge gefunden</td></tr>';
         updateExceptionStats([]);
         return;
     }
-    
-    tbody.innerHTML = '';
 
-    exceptionData.forEach(exception => {
+    // Alle Exceptions speichern für Pagination
+    allFilteredExceptions = exceptions;
+    currentExceptionsPage = page;
+    
+    updateExceptionStats(exceptions);
+
+    // Pagination berechnen
+    const totalExceptions = exceptions.length;
+    const totalPages = Math.ceil(totalExceptions / exceptionsPerPage);
+    const startIndex = (page - 1) * exceptionsPerPage;
+    const endIndex = startIndex + exceptionsPerPage;
+    const pageExceptions = exceptions.slice(startIndex, endIndex);
+
+    debug.log(`Rendering page ${page}/${totalPages} (${pageExceptions.length} of ${totalExceptions} exceptions)`);
+    
+    // DocumentFragment für Performance
+    const fragment = document.createDocumentFragment();
+
+    pageExceptions.forEach(exception => {
+        const tr = document.createElement('tr');  
         const createdAt = new Date(exception.created_at);
-        const formattedCreated = createdAt.toLocaleString('de-DE');
-        
+        const formattedCreated = createdAt.toLocaleString('de-DE');        
         const requestedTime = exception.requested_arrival_time 
             ? new Date(exception.requested_arrival_time).toLocaleString('de-DE')
             : '-';
@@ -77,49 +97,193 @@ export async function renderExceptions(exceptionData)
 
         // Aktionen: User sehen nur bei pending eigene Anträge Buttons
         let actionsHtml = '';
-        if (isAdmin) {
+        if (isAdmin && (exception.status === 'pending')) {
             actionsHtml = `
-                <td>
-                    <button class="action-btn btn-edit" onclick="openExceptionModal(${exception.exception_id})">
-                        ${exception.status === 'pending' ? 'Bearbeiten' : 'Ansehen'}
+                <td class="actions-cell">
+                    <button class="action-btn btn-icon btn-approve" 
+                            onclick="quickApproveException(${exception.exception_id})"
+                            title="Genehmigen">
+                        ✓
                     </button>
-                    ${exception.status === 'pending' ? `
-                        <button class="action-btn btn-delete" onclick="deleteException(${exception.exception_id})">
-                            Löschen
+                    <button class="action-btn btn-icon btn-reject" 
+                            onclick="quickRejectException(${exception.exception_id})"
+                            title="Ablehnen">
+                        ✗
+                    </button>
+                    <button class="action-btn btn-icon btn-edit" 
+                            onclick="openExceptionModal(${exception.exception_id})"
+                            title="Bearbeiten">
+                        ✎
+                    </button>
+                    <button class="action-btn btn-icon btn-delete" 
+                            onclick="deleteException(${exception.exception_id})"
+                            title="Löschen">
+                        🗑
+                    </button>
+                </td>
+            `;
+        } else if (isAdmin) {
+                actionsHtml = `
+                    <td class="actions-cell">
+                        <button class="action-btn btn-icon btn-view" 
+                                onclick="openExceptionModal(${exception.exception_id})"
+                                title="Ansehen">
+                            👁
                         </button>
-                    ` : ''}
-                </td>
-            `;
-        } else if (exception.status === 'pending') {
-            actionsHtml = `
-                <td>
-                    <button class="action-btn btn-edit" onclick="openExceptionModal(${exception.exception_id})">
-                        Bearbeiten
-                    </button>
-                    <button class="action-btn btn-delete" onclick="deleteException(${exception.exception_id})">
-                        Löschen
-                    </button>
-                </td>
-            `;
+                    </td>
+                `;
+        }
+        else{
+            if(exception.status === 'pending')
+            {
+                actionsHtml = `
+                    <td class="actions-cell">
+                        <button class="action-btn btn-icon btn-edit" 
+                                onclick="openExceptionModal(${exception.exception_id})"
+                                title="Bearbeiten">
+                            ✎
+                        </button>
+                        <button class="action-btn btn-icon btn-delete" 
+                                onclick="deleteException(${exception.exception_id})"
+                                title="Löschen">
+                            🗑
+                        </button>
+                    </td>
+                `;
+            }
+            else
+            {
+               actionsHtml = '<td></td>' 
+            }
         }
         
-        const row = `
-            <tr>
-                <td>${typeBadge}</td>
-                <td>${exception.surname}, ${exception.name}</td>
-                <td>${appointmentInfo}</td>
-                <td>${exception.reason}</td>
-                <td>${requestedTime}</td>
-                <td>${statusBadge}</td>
-                <td>${formattedCreated}</td>
-                ${actionsHtml}
-            </tr>
+        const row = 
+        tr.innerHTML = `            
+            <td>${typeBadge}</td>
+            <td>${exception.surname}, ${exception.name}</td>
+            <td>${appointmentInfo}</td>
+            <td>${exception.reason}</td>
+            <td>${requestedTime}</td>
+            <td>${statusBadge}</td>
+            <td>${formattedCreated}</td>
+            ${actionsHtml}            
         `;
-        tbody.innerHTML += row;
+        fragment.appendChild(tr);
     });
 
-    updateExceptionStats(exceptionData);
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
+    
+    // Pagination Controls
+    renderExceptionsPagination(page, totalPages, totalExceptions);
 }
+
+
+function renderExceptionsPagination(currentPage, totalPages, totalExceptions) {
+    const container = document.getElementById('exceptionsPagination');
+    if (!container) return;
+    
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const startException = (currentPage - 1) * exceptionsPerPage + 1;
+    const endException = Math.min(currentPage * exceptionsPerPage, totalExceptions);
+    
+    let html = `
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Zeige ${startException} - ${endException} von ${totalExceptions} Einträgen
+            </div>
+            <div class="pagination-buttons">
+    `;
+    
+    if (totalPages <= 5) {
+        // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
+        for (let i = 1; i <= totalPages; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" onclick="goToExceptionsPage(${i})">${i}</button>`;
+        }
+    } 
+    else {
+        // Erste Seite Button
+        if (currentPage > 1) {
+            //html += `<button onclick="goToExceptionsPage(1)" title="Erste Seite">
+            //           «
+            //        </button>`;
+            html += `<button onclick="goToExceptionsPage(${currentPage - 1})" title="Vorherige Seite">
+                        ‹
+                    </button>`;
+        }
+        
+        // Seitenzahlen (max 5 anzeigen)
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        
+        if (startPage > 1) {
+            html += `<button onclick="goToExceptionsPage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" onclick="goToExceptionsPage(${i})">${i}</button>`;
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+            html += `<button onclick="goToExceptionsPage(${totalPages})">${totalPages}</button>`;
+        }
+        
+        // Letzte Seite Button
+        if (currentPage < totalPages) {
+            html += `<button onclick="goToExceptionsPage(${currentPage + 1})" title="Nächste Seite">
+                        ›
+                    </button>`;
+            //html += `<button onclick="goToExceptionsPage(${totalPages})" title="Letzte Seite">
+            //            »
+            //        </button>`;
+        }
+    }
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// Global für onclick
+window.goToExceptionsPage = function(page) {
+
+    // Aktuelle Scroll-Position der Tabelle speichern
+    const tableContainer = document.querySelector('.data-table')?.parentElement;
+    const scrollBefore = tableContainer?.scrollTop || 0;
+
+    renderExceptions(allFilteredExceptions, page);
+    
+    // Scroll nach oben zur Tabelle
+    //document.getElementById('exceptionsTableBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // KEIN automatisches Scrollen - Position beibehalten
+    // ODER: Sanft zur Tabelle scrollen
+    if (scrollBefore === 0) {
+        // Nur scrollen wenn User nicht gescrollt hat
+        const paginationElement = document.getElementById('exceptionsPagination');
+        if (paginationElement) {
+            paginationElement.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest' 
+            });
+        }
+    }
+};
 
 function updateExceptionStats(exceptions){
 
@@ -153,9 +317,9 @@ export function filterExceptions(exceptions, filters = {}) {
 }
 
 
-export async function applyExceptionFilters() {
+export async function applyExceptionFilters(forceReload) {
     // Exceptions laden (aus Cache wenn möglich)
-    const allExceptions = await loadExceptions(false);
+    const allExceptions = await loadExceptions(forceReload);
 
     debug.log("Apply Exception Filters ()");
 
@@ -171,13 +335,11 @@ export async function applyExceptionFilters() {
 
     debug.log("Filtering:", allExceptions, filteredExceptions, filters);
 
-    // Rendern (nur wenn auf Records-Section)
-    //const currentSection = sessionStorage.getItem('currentSection');
-    //if (currentSection === 'anwesenheit') {
-    await renderExceptions(filteredExceptions);
-    //}
-    
-    //return filteredRecords;    
+    // Rendern (nur wenn auf Exceptions-Section)
+    const currentSection = sessionStorage.getItem('currentSection');
+    if (currentSection === 'antraege') {
+        renderExceptions(filteredExceptions);
+    } 
 }
 
 
@@ -215,24 +377,18 @@ export async function initExceptionEventHandlers() {
     });
 }
 
-export async function showExceptionSection() {
-    debug.log("Show Exception Section ()");
+export async function showExceptionSection(forceReload = false) {
     
-    // Filter-Optionen laden
-    //await loadExceptionilters();
+    debug.log("Show Exception Section ()");    
     
     // Daten laden, filtern und anzeigen
-    await applyExceptionFilters();
+    await applyExceptionFilters(forceReload);
 
 }
 
-// ============================================
-// RENDER FUNCTIONS (DOM-Manipulation)
-// ============================================
+export async function loadExceptionModalFilters(forceReload = false) {
 
-export async function loadExceptionFilters(forceReload = false) {
-
-    const appointments = await loadAppointments();
+    const appointments = await loadAppointments(forceReload);
 
     const appointmentSelect = document.getElementById('exception_appointment');
     appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
@@ -266,7 +422,7 @@ export async function loadExceptionFilters(forceReload = false) {
     
     // Lade Mitglieder für Dropdown (nur für Admin)
     if (isAdmin) {
-        const members = await loadMembers();
+        const members = await loadMembers(forceReload);
 
         //const members = await apiCall('members');
         const memberSelect = document.getElementById('exception_member');
@@ -288,7 +444,7 @@ export async function openExceptionModal(exceptionId = null) {
     const modal = document.getElementById('exceptionModal');
     const title = document.getElementById('exceptionModalTitle');
     
-    await loadExceptionFilters();
+    await loadExceptionModalFilters();
     
     // Admin-Felder ein/ausblenden
     document.getElementById('exceptionStatusGroup').style.display = isAdmin ? 'block' : 'none';
@@ -345,6 +501,36 @@ export function toggleExceptionFields() {
         document.getElementById('exception_member').required = true;
     }
 }
+
+// Schnelles Genehmigen
+window.quickApproveException = async function(exceptionId) {
+    // Modal öffnen mit Status = approved vorausgewählt
+    await openExceptionModal(exceptionId);
+    
+    // Status auf "approved" setzen und Felder sperren
+    document.getElementById('exception_status').value = 'approved';
+    document.getElementById('exception_member').disabled = true;
+    document.getElementById('exception_appointment').disabled = true;
+    document.getElementById('exception_type').disabled = true;
+    
+    // Fokus auf Admin-Notizen
+    document.getElementById('exception_reason')?.focus();
+};
+
+// Schnelles Ablehnen
+window.quickRejectException = async function(exceptionId) {
+    // Modal öffnen mit Status = rejected vorausgewählt
+    await openExceptionModal(exceptionId);
+    
+    // Status auf "rejected" setzen und Felder sperren
+    document.getElementById('exception_status').value = 'rejected';
+    document.getElementById('exception_member').disabled = true;
+    document.getElementById('exception_appointment').disabled = true;
+    document.getElementById('exception_type').disabled = true;
+    
+    // Fokus auf Admin-Notizen (Grund für Ablehnung)
+    document.getElementById('exception_reason')?.focus();
+};
 
 // ============================================
 // CRUD FUNCTIONS

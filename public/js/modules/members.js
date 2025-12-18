@@ -12,6 +12,10 @@ import {debug} from '../app.js'
 // import {} from './members.js'
 // ============================================
 
+let currentMembersPage = 1;
+const membersPerPage = 25;
+let allFilteredMembers = [];
+
 // ============================================
 // DATA FUNCTIONS (Cache, API-Calls)
 // ============================================
@@ -62,7 +66,6 @@ export async function loadMembers(forceReload = false) {
     dataCache.members.data = members;
     dataCache.members.timestamp = Date.now();
 
-    //renderMembers(dataCache.members.data);
     return members;
 }
 
@@ -70,17 +73,41 @@ export async function loadMembers(forceReload = false) {
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
-function renderMembers(memberData) {
-    if (!memberData || memberData.length === 0) {
-        const tbody = document.getElementById('membersTableBody');
+function renderMembers(members, page = 1) {
+    debug.log("Render Members()");
+
+    const tbody = document.getElementById('membersTableBody');
+    tbody.innerHTML = '';
+
+    if (!members || members.length === 0) {
+        
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Kein Profil verknüpft</td></tr>';
+        updateMemberStats(members);
         return;
     }
     
-    const tbody = document.getElementById('membersTableBody');
-    tbody.innerHTML = '';
+    // Alle Members speichern für Pagination
+    allFilteredMembers = members;
+    currentMembersPage = page;
+
+    updateMemberStats(members);
+
+    // Pagination berechnen
+    const totalMembers = members.length;
+    const totalPages = Math.ceil(totalMembers / membersPerPage);
+    const startIndex = (page - 1) * membersPerPage;
+    const endIndex = startIndex + membersPerPage;
+    const pageMembers = members.slice(startIndex, endIndex);
+
+
+    debug.log(`Rendering page ${page}/${totalPages} (${pageMembers.length} of ${totalMembers} members)`);
+
+    // DocumentFragment für Performance
+    const fragment = document.createDocumentFragment();
     
-    memberData.forEach(member => {
+    pageMembers.forEach(member => {  
+        const tr = document.createElement('tr');
+        
         // Gruppen-Badges erstellen
         const groupBadges = member.group_names 
             ? member.group_names.split(', ').map(name => 
@@ -89,44 +116,166 @@ function renderMembers(memberData) {
             : '<span style="color: #7f8c8d;">Keine</span>';
 
         const actionsHtml = isAdmin ? `
-            <td>
-                <button class="action-btn btn-edit" onclick="openMemberModal(${member.member_id})">
-                    Bearbeiten
+            <td class="actions-cell">
+                      <button class="action-btn btn-icon btn-edit" onclick="openMemberModal(${member.member_id})" title="Bearbeiten">
+                    ✎
                 </button>
-                <button class="action-btn btn-delete" onclick="deleteMember(${member.member_id}, '${member.name} ${member.surname}')">
-                    Löschen
+                <button class="action-btn btn-icon btn-delete" onclick="deleteMember(${member.member_id}, '${member.name} ${member.surname}')" title="Löschen">
+                    🗑
                 </button>
             </td>
         ` : '';
-        
-        const row = `
-            <tr>
+
+        tr.innerHTML = `
                 <td>${member.surname}</td>
                 <td>${member.name}</td>
                 <td>${member.member_number || '-'}</td>
                 <td>${groupBadges}</td>
                 <td>${member.active ? 'Aktiv' : 'Inaktiv'}</td>
                 ${actionsHtml}
-            </tr>
-        `;
-        tbody.innerHTML += row;
-    });
+                `;
 
-    // Statistik nur für Admin
+              fragment.appendChild(tr);
+    });
+    
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
+    
+    // Pagination Controls
+    renderMembersPagination(page, totalPages, totalMembers);        
+}
+
+
+function renderMembersPagination(currentPage, totalPages, totalMembers) {
+    const container = document.getElementById('membersPagination');
+    if (!container) return;
+    
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const startMember = (currentPage - 1) * membersPerPage + 1;
+    const endMember = Math.min(currentPage * membersPerPage, totalMembers);
+    
+    let html = `
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Zeige ${startMember} - ${endMember} von ${totalMembers} Einträgen
+            </div>
+            <div class="pagination-buttons">
+    `;
+    
+
+    if (totalPages <= 5) {
+        // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
+        for (let i = 1; i <= totalPages; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" onclick="goToMembersPage(${i})">${i}</button>`;
+        }
+    } 
+    else
+    {
+        // Erste Seite Button
+        if (currentPage > 1) {
+            //html += `<button onclick="goToMembersPage(1)" title="Erste Seite">
+            //            «
+            //        </button>`;
+            html += `<button onclick="goToMembersPage(${currentPage - 1})" title="Vorherige Seite">
+                        ‹
+                    </button>`;
+        }
+        
+        // Seitenzahlen (max 5 anzeigen)
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        
+        if (startPage > 1) {
+            html += `<button onclick="goToMembersPage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" onclick="goToMembersPage(${i})">${i}</button>`;
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+            html += `<button onclick="goToMembersPage(${totalPages})">${totalPages}</button>`;
+        }
+        
+        // Letzte Seite Button
+        if (currentPage < totalPages) {
+            html += `<button onclick="goToMembersPage(${currentPage + 1})" title="Nächste Seite">
+                        ›
+                    </button>`;
+            //html += `<button onclick="goToMembersPage(${totalPages})" title="Letzte Seite">
+            //            »
+            //        </button>`;
+        }
+    }
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// Global für onclick
+window.goToMembersPage = function(page) {
+
+    // Aktuelle Scroll-Position der Tabelle speichern
+    const tableContainer = document.querySelector('.data-table')?.parentElement;
+    const scrollBefore = tableContainer?.scrollTop || 0;
+
+    renderMembers(allFilteredMembers, page);
+    
+    // Scroll nach oben zur Tabelle
+    //document.getElementById('membersTableBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // KEIN automatisches Scrollen - Position beibehalten
+    // ODER: Sanft zur Tabelle scrollen
+    if (scrollBefore === 0) {
+        // Nur scrollen wenn User nicht gescrollt hat
+        const paginationElement = document.getElementById('membersPagination');
+        if (paginationElement) {
+            paginationElement.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest' 
+            });
+        }
+    }
+};
+
+function updateMemberStats(members)
+{
+// Statistik nur für Admin
     if (isAdmin) {
-        const activeCount = memberData.filter(m => m.active).length;
+        const activeCount = members.filter(m => m.active).length;
         document.getElementById('statActiveMembersCount').textContent = activeCount;
     } else {
         document.getElementById('statActiveMembersCount').textContent = '-';
-    }            
+    }   
 }
 
 export async function showMemberSection(forceReload = false) {
 
-    debug.log("Show Member Section ()");
+    debug.log("Show Member Section ()");    
 
     const allMembers = await loadMembers(forceReload);
-    renderMembers(allMembers);
+
+    const currentSection = sessionStorage.getItem('currentSection');
+    if(currentSection === 'mitglieder')
+    {
+        renderMembers(allMembers, 1);
+    }
 }
 
 // ============================================

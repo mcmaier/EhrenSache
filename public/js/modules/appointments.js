@@ -12,6 +12,10 @@ import {debug} from '../app.js'
 
 let currentCalendarDate = new Date();
 
+let currentAppointmentsPage = 1;
+const appointmentsPerPage = 25;
+let allFilteredAppointments = [];
+
 // ============================================
 // DATA FUNCTIONS (API-Calls)
 // ============================================
@@ -61,17 +65,47 @@ export async function showAppointmentSection(forceReload = false)
     debug.log("== Show Appointment Section == ")
     const appointmentData = await loadAppointments(forceReload);
 
-    renderAppointments(appointmentData);
+    const currentSection = sessionStorage.getItem('currentSection');
+    if (currentSection === 'termine')
+    {
+        renderAppointments(appointmentData,1);
+    }
 }
 
-async function renderAppointments(appointmentData) {
-    
-    if (!appointmentData) return;
+async function renderAppointments(appointments, page = 1) {
     
     const tbody = document.getElementById('appointmentsTableBody');
-    tbody.innerHTML = '';
+    if (!appointments){
+        tbody.innerHTML = '<tr><td colspan="4" class="loading">Keine Einträge gefunden</td></tr>';
+        updateAppointmentStats(0);
+        return;
+    }
+
+    // Alle Appointments speichern für Pagination
+    allFilteredAppointments = appointments;
+    currentAppointmentsPage = page;
+
+    updateAppointmentStats(appointments);
+
+    // Pagination berechnen
+    const totalAppointments = appointments.length;
+    const totalPages = Math.ceil(totalAppointments / appointmentsPerPage);
+    const startIndex = (page - 1) * appointmentsPerPage;
+    const endIndex = startIndex + appointmentsPerPage;
+    const pageAppointments = appointments.slice(startIndex, endIndex);
+
+
+    debug.log(`Rendering page ${page}/${totalPages} (${pageAppointments.length} of ${totalAppointments} appointments)`);
+    
+    
+
+    // DocumentFragment für Performance
+    const fragment = document.createDocumentFragment();
+
+    pageAppointments.forEach(apt => {
         
-    appointmentData.forEach(apt => {
+        const tr = document.createElement('tr');
+    
         // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (apt.appointment_id && apt.title) {
@@ -92,47 +126,181 @@ async function renderAppointments(appointmentData) {
             : '<span class="type-badge">-</span>';
 
         const actionsHtml = isAdmin ? `
-            <td>
-                <button class="action-btn btn-edit" onclick="openAppointmentModal(${apt.appointment_id})">
-                    Bearbeiten
-                </button>
-                <button class="action-btn btn-delete" onclick="deleteAppointment(${apt.appointment_id}, '${apt.title}')">
-                    Löschen
-                </button>
-            </td>
+            <td class="actions-cell">
+                    <button class="action-btn btn-icon btn-edit" 
+                            onclick="openAppointmentModal(${apt.appointment_id})"
+                            title="Bearbeiten">
+                        ✎
+                    </button>
+                    <button class="action-btn btn-icon btn-delete" 
+                            onclick="deleteAppointment(${apt.appointment_id}, '${apt.title}')"
+                            title="Löschen">
+                        🗑
+                    </button>
+                </td>
         ` : '';
         
-        const row = `
-            <tr>
+        tr.innerHTML = `
                 <td>${appointmentInfo}</td>
                 <td>${typeBadge}</td>
                 <td>${apt.description || '-'}</td>
                 ${actionsHtml}
-            </tr>
-        `;
-        tbody.innerHTML += row;
+                `;
+        fragment.appendChild(tr);
     });
+
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
+    
+    // Pagination Controls
+    renderAppointmentsPagination(page, totalPages, totalAppointments); 
+    
+    renderCalendar();    
+}
+
+
+function renderAppointmentsPagination(currentPage, totalPages, totalAppointments) {
+    const container = document.getElementById('appointmentsPagination');
+    if (!container) return;
+    
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const startAppointment = (currentPage - 1) * appointmentsPerPage + 1;
+    const endAppointment = Math.min(currentPage * appointmentsPerPage, totalAppointments);
+    
+    let html = `
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Zeige ${startAppointment} - ${endAppointment} von ${totalAppointments} Einträgen
+            </div>
+            <div class="pagination-buttons">
+    `;
+
+    if (totalPages <= 5) {
+        // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
+        for (let i = 1; i <= totalPages; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" onclick="goToAppointmentsPage(${i})">${i}</button>`;
+        }
+    } 
+    else {
+        // Erste Seite Button
+        if (currentPage > 1) {
+            //html += `<button onclick="goToAppointmentsPage(1)" title="Erste Seite">
+            //            «
+            //        </button>`;
+            html += `<button onclick="goToAppointmentsPage(${currentPage - 1})" title="Vorherige Seite">
+                        ‹
+                    </button>`;
+        }
+        
+        // Seitenzahlen (max 5 anzeigen)
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+        
+        if (startPage > 1) {
+            html += `<button onclick="goToAppointmentsPage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" onclick="goToAppointmentsPage(${i})">${i}</button>`;
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+            html += `<button onclick="goToAppointmentsPage(${totalPages})">${totalPages}</button>`;
+        }
+        
+        // Letzte Seite Button
+        if (currentPage < totalPages) {
+            html += `<button onclick="goToAppointmentsPage(${currentPage + 1})" title="Nächste Seite">
+                        ›
+                    </button>`;
+            //html += `<button onclick="goToAppointmentsPage(${totalPages})" title="Letzte Seite">
+            //            »
+            //        </button>`;
+        }
+    }
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// Global für onclick
+window.goToAppointmentsPage = function(page) {
+
+    // Aktuelle Scroll-Position der Tabelle speichern
+    const tableContainer = document.querySelector('.data-table')?.parentElement;
+    const scrollBefore = tableContainer?.scrollTop || 0;
+
+    renderAppointments(allFilteredAppointments, page);
+    
+    // Scroll nach oben zur Tabelle
+    //document.getElementById('appointmentsTableBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // KEIN automatisches Scrollen - Position beibehalten
+    // ODER: Sanft zur Tabelle scrollen
+    if (scrollBefore === 0) {
+        // Nur scrollen wenn User nicht gescrollt hat
+        const paginationElement = document.getElementById('appointmentsPagination');
+        if (paginationElement) {
+            paginationElement.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest' 
+            });
+        }
+    }
+};
+
+function updateAppointmentStats(appointments)
+{
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Heute 00:00 Uhr
+    
+    let pastCount = 0;
+    let upcomingCount = 0;
+    
+    appointments.forEach(appointment => {
+        // Appointment-Datum parsen
+        const appointmentDate = new Date(appointment.date);
+        
+        if (appointmentDate < today) {
+            pastCount++;
+        } else {
+            upcomingCount++;
+        }
+    });
+    
+    // Statistiken aktualisieren
+    document.getElementById('statPastAppointments').textContent = pastCount;
+    document.getElementById('statUpcomingAppointments').textContent = upcomingCount
+
+    /*
+    if(!appointments || appointments.length === 0)
+    {
+        document.getElementById('statUpcomingAppointments').textContent = '0';
+        return;
+    }
 
     // Statistiken
     const today = new Date().toISOString().split('T')[0];
-    const upcoming = appointmentData.filter(a => a.date >= today).length;
-    document.getElementById('statUpcomingAppointments').textContent = upcoming;    
-    
-    /*
-    // Anstehende Termine nur diese Woche
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    
-    const thisWeek = appointments.filter(a => {
-        const aptDate = new Date(a.date);
-        return aptDate >= weekStart && aptDate <= weekEnd;
-    }).length; */  
-    
-    // Kalender rendern
-    renderCalendar();
+    const upcoming = appointments.filter(a => a.date >= today).length;
+    document.getElementById('statUpcomingAppointments').textContent = upcoming;    */    
 }
+
 
 
 function renderCalendar() {

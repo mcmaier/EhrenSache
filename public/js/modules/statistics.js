@@ -136,8 +136,12 @@ export async function applyStatisticsFilters() {
     // Statistik laden
     const stats = await loadStatistics(filters);
     
-    // Rendern
-    renderStatistics(stats);  
+    //Rendern, wenn Sektion aktiv
+    const currentSection = sessionStorage.getItem('currentSection');
+    if (currentSection === 'statistik')
+    {        
+        renderStatistics(stats);  
+    }
 }
 
 

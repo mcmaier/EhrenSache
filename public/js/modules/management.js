@@ -56,14 +56,14 @@ const tbody = document.getElementById('groupsTableBody');
                 <td>${group.description || '-'}</td>                
                 <td>${memberCount}</td>
                 <td>${isDefaultBadge}</td>
-                <td>
-                    <button class="action-btn btn-edit" onclick="openGroupModal(${group.group_id})">
-                        Bearbeiten
+                <td class="actions-cell">
+                    <button class="action-btn btn-icon btn-edit" onclick="openGroupModal(${group.group_id})" title="Bearbeiten">
+                        ✎
                     </button>
-                    <button class="action-btn btn-delete" onclick="deleteGroup(${group.group_id}, '${group.group_name}')">
-                        Löschen
+                    <button class="action-btn btn-icon btn-delete" onclick="deleteGroup(${group.group_id}, '${group.group_name}')" title="Löschen">
+                        🗑
                     </button>
-                </td>
+                </td>                
             </tr>
         `;
         tbody.innerHTML += row;
@@ -261,12 +261,12 @@ export async function renderTypeGroupOverview(typeData)
                 <td>${colorBadge}</td>
                 <td id="type_groups_${type.type_id}">Lädt...</td>
                 <td>${isDefaultBadge}</td>
-                <td>
-                    <button class="action-btn btn-edit" onclick="openTypeModal(${type.type_id})">
-                        Bearbeiten
+                <td class="actions-cell">
+                    <button class="action-btn btn-icon btn-edit" onclick="openTypeModal(${type.type_id})" title="Bearbeiten">
+                        ✎
                     </button>
-                    <button class="action-btn btn-delete" onclick="deleteType(${type.type_id}, '${type.type_name}')">
-                        Löschen
+                    <button class="action-btn btn-icon btn-delete" onclick="deleteType(${type.type_id}, '${type.type_name}')" title="Löschen">
+                        🗑
                     </button>
                 </td>
             </tr>

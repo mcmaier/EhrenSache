@@ -106,6 +106,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
     
     $arrivalDate = $arrivalTime->format('Y-m-d');
     $arrivalTimeStr = $arrivalTime->format('H:i:s'); 
+    $timestamp = $arrivalTime->format('Y-m-d H:i:s');
         
     // Zeittoleranz aus globaler Config
     $tolerance = isset($data->tolerance_hours) ? intval($data->tolerance_hours) : AUTO_CHECKIN_TOLERANCE_HOURS;
@@ -115,45 +116,37 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         $tolerance = AUTO_CHECKIN_TOLERANCE_HOURS;
     }
 
+    $toleranceSeconds = $tolerance * 3600;
+
     //DEBUG Info Zeitfenster
     /*
     error_log("=== AUTO-CHECKIN DEBUG ===");
     error_log("Arrival: {$arrivalDate} {$arrivalTimeStr}");
     error_log("Tolerance: {$tolerance} hours");
     error_log("Member ID: {$memberId}");
-    */
-    
-    // Suche nach passendem Termin
-    $toleranceStart = clone $arrivalTime;
-    $toleranceStart->modify("-{$tolerance} hours");
-    
-    $toleranceEnd = clone $arrivalTime;
-    $toleranceEnd->modify("+{$tolerance} hours");
-    
-    $toleranceSeconds = $tolerance * 3600;
-
-    //error_log("Window: {$toleranceStart->format('H:i:s')} - {$toleranceEnd->format('H:i:s')}");
+    */    
 
     // ===========================================
     // Suche ALLE potentiellen Termine im Fenster
     // ===========================================
     
     $sql = "SELECT a.appointment_id, a.title, a.date, a.start_time, a.type_id,at.type_name,
-               ABS(TIMESTAMPDIFF(SECOND, 
-                   CONCAT(a.date, ' ', a.start_time), 
-                   ?)) as time_diff_seconds
-        FROM appointments a
-        LEFT JOIN appointment_types at ON a.type_id = at.type_id
-        WHERE a.date = ?
-        AND TIME(a.start_time) BETWEEN TIME(?) AND TIME(?)
-        ORDER BY time_diff_seconds ASC";
+                ABS(TIMESTAMPDIFF(SECOND, 
+                CONCAT(a.date, ' ', a.start_time), 
+                ?)) as time_diff_seconds
+            FROM appointments a
+            LEFT JOIN appointment_types at ON a.type_id = at.type_id
+            WHERE 
+                ABS(TIMESTAMPDIFF(SECOND, 
+                CONCAT(a.date, ' ', a.start_time), 
+                ?)) <= ?
+            ORDER BY time_diff_seconds ASC";
     
     $stmt = $db->prepare($sql);
     $stmt->execute([
-        $data->arrival_time,               // Für time_diff Berechnung
-        $arrivalDate,                      // Datum
-        $toleranceStart->format('H:i:s'),  // Fenster Start
-        $toleranceEnd->format('H:i:s')     // Fenster Ende
+        $timestamp,               // Für SELECT
+        $timestamp,               // Für WHERE
+        $toleranceSeconds         // Toleranzeit
     ]);
     
     $potentialAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);

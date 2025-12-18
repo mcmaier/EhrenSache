@@ -1,7 +1,7 @@
 import {TOAST_DURATION} from '../config.js';
 import {apiCall, isAdmin, currentUser, setCurrentUser} from './api.js';
 import {loadSettings, initSettingsEventHandler} from './settings.js';
-import {loadUsers, showUserSection} from'./users.js';
+import {loadUsers, showUserSection, initUsersEventHandlers} from'./users.js';
 import {loadAppointments, setCalendarToYear, showAppointmentSection} from'./appointments.js';
 import {loadExceptions, showExceptionSection, initExceptionEventHandlers} from'./exceptions.js';
 import {loadRecords, showRecordsSection, initRecordEventHandlers} from'./records.js';
@@ -509,7 +509,7 @@ export async function initEventHandlers()
     initRecordEventHandlers();
     initExceptionEventHandlers();
     initStatisticsEventHandlers();
-
+    initUsersEventHandlers();
     initSettingsEventHandler();
 }
 
@@ -525,25 +525,25 @@ export async function loadAllData() {
             await loadSettings(true);
             break;
         case 'mitglieder':
-            await showMemberSection();
+            await showMemberSection(true);
             break;
         case 'termine':
-            await showAppointmentSection();
+            await showAppointmentSection(true);
             break;
         case 'anwesenheit':
-            await showRecordsSection();
+            await showRecordsSection(true);
             break;
         case 'antraege':
-            await showExceptionSection();
+            await showExceptionSection(true);
             break;
         case 'benutzer':
             if(isAdmin){
-                await showUserSection();
+                await showUserSection(true);
             }            
             break;
         case 'verwaltung':
             if(isAdmin){
-                await showGroupSection();
+                await showGroupSection(true);
             }
             break;
         case 'statistik':
@@ -552,7 +552,7 @@ export async function loadAllData() {
             default:
                 break;
     }    
-    /*
+    
 
     // Hintergrund-Laden nur für ungecachte Daten
     setTimeout(() => {
@@ -565,24 +565,22 @@ export async function loadAllData() {
         }
         if ((section !== 'antraege') && !isCacheValid('exceptions',currentYear)) {
             loadExceptions(true);
-        }
-        if((section !== 'statistik')) {
-            loadStatistics();
-        }
-
+        }  
+        /*   Statistik nicht gecached           
+        if(section !== 'statistik') {}*/
+        if(section !== 'verwaltung')
+        {            
+            if (!isCacheValid('groups')) loadGroups(true);
+            if (!isCacheValid('types')) loadTypes(true);
+        }        
         if(isAdmin)
         {
             if((section !== 'benutzer') && !isCacheValid('users'))
             {
                 loadUsers(true);
             }
-            if(section !== 'verwaltung')
-            {            
-                if (!isCacheValid('groups')) loadGroups(true);
-                if (!isCacheValid('types')) loadTypes(true);
-            }
         }
-    }, 100);*/
+    }, 100);
 }
 
 
@@ -591,13 +589,13 @@ async function loadYearDependentData() {
     
     // Nur aktive Section neu laden
     if (section === 'termine') {
-        await showAppointmentSection();
+        await showAppointmentSection(true);
     } else if (section === 'anwesenheit') {        
-        await showRecordsSection();
+        await showRecordsSection(true);
     } else if (section === 'antraege') {
-        await showExceptionSection();
+        await showExceptionSection(true);
     } else if (section === 'statistik') {
-        await showStatisticsSection();
+        await showStatisticsSection(true);
     }
 }
 

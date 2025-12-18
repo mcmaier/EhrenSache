@@ -12,6 +12,10 @@ import {debug} from '../app.js'
 // import {} from './records.js'
 // ============================================
 
+let currentRecordsPage = 1;
+const recordsPerPage = 25;
+let allFilteredRecords = [];
+
 // ============================================
 // DATA FUNCTIONS (API-Calls)
 // ============================================
@@ -67,27 +71,49 @@ export function filterRecords(records, filters = {}) {
     return filtered;
 }
 
-export async function renderRecords(recordData)
+export async function renderRecords(records, page = 1)
 {
     debug.log("Render Records()");
 
-    const types =  await loadTypes(false);
+    if(!isCacheValid('types'))
+    { 
+        await loadTypes(false);
+    }
 
     const tbody = document.getElementById('recordsTableBody');
     
-    if (!recordData || (recordData.length === 0)) {
+    if (!records || (records.length === 0)) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Einträge gefunden</td></tr>';
         updateRecordStats([]);
         return;
     }    
 
-    tbody.innerHTML = '';
+    // Alle Records speichern für Pagination
+    allFilteredRecords = records;
+    currentRecordsPage = page;
+
+    updateRecordStats(records);
+
+    // Pagination berechnen
+    const totalRecords = records.length;
+    const totalPages = Math.ceil(totalRecords / recordsPerPage);
+    const startIndex = (page - 1) * recordsPerPage;
+    const endIndex = startIndex + recordsPerPage;
+    const pageRecords = records.slice(startIndex, endIndex);
+
+
+    debug.log(`Rendering page ${page}/${totalPages} (${pageRecords.length} of ${totalRecords} records)`);
     
-    recordData.forEach(record => {
+    // DocumentFragment für Performance
+    const fragment = document.createDocumentFragment();
+    
+     pageRecords.forEach(record => {
+        const tr = document.createElement('tr');
+        
         const arrivalTime = new Date(record.arrival_time);
         const formattedTime = arrivalTime.toLocaleString('de-DE');
 
-        // Termin-Info mit Terminart
+         // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (record.appointment_id && record.title) {
             appointmentInfo = `<div style="line-height: 1.4;">
@@ -101,7 +127,7 @@ export async function renderRecords(recordData)
             
             appointmentInfo += '</div>';
         }
-        
+
         // Terminart Badge
         let appointmentTypeBadge = '-';    
         const typeId = record.appointment_type_id;
@@ -129,20 +155,22 @@ export async function renderRecords(recordData)
 
         // Check-in Source Badge
         const sourceInfo = getSourceBadge(record);
-        
+
         const actionsHtml = isAdmin ? `
-            <td>
-                <button class="action-btn btn-edit" onclick="openRecordModal(${record.record_id})">
-                    Bearbeiten
-                </button>
-                <button class="action-btn btn-delete" onclick="deleteRecord(${record.record_id}, '${record.name} ${record.surname}', '${record.title}')">
-                    Löschen
-                </button>
-            </td>
-        ` : '';
-        
-        const row = `
-            <tr>
+                        <td class="actions-cell">
+                            <button class="action-btn btn-icon btn-edit" 
+                                    onclick="openRecordModal(${record.record_id})"
+                                    title="Bearbeiten">
+                                ✎
+                            </button>
+                            <button class="action-btn btn-icon btn-delete" 
+                                    onclick="deleteRecord(${record.record_id},'${record.name}','${record.title}')"
+                                    title="Löschen">
+                                🗑
+                            </button>
+                        </td>` : '';
+
+        tr.innerHTML = `
                 <td>${appointmentInfo}</td>
                 <td>${appointmentTypeBadge}</td>
                 <td>${record.surname}, ${record.name}</td>
@@ -150,13 +178,117 @@ export async function renderRecords(recordData)
                 <td>${translateRecordStatus(record.status)}</td>
                 <td>${sourceInfo}</td>
                 ${actionsHtml}
-            </tr>
-        `;
-        tbody.innerHTML += row;
+        `;        
+        
+        fragment.appendChild(tr);
     });
-
-    updateRecordStats(recordData);
+    
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
+    
+    // Pagination Controls
+    renderRecordsPagination(page, totalPages, totalRecords); 
 }
+
+function renderRecordsPagination(currentPage, totalPages, totalRecords) {
+    const container = document.getElementById('recordsPagination');
+    if (!container) return;
+    
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    const startRecord = (currentPage - 1) * recordsPerPage + 1;
+    const endRecord = Math.min(currentPage * recordsPerPage, totalRecords);
+    
+    let html = `
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Zeige ${startRecord} - ${endRecord} von ${totalRecords} Einträgen
+            </div>
+            <div class="pagination-buttons">
+    `;
+    
+
+    if (totalPages <= 5) {
+        // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
+        for (let i = 1; i <= totalPages; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" onclick="goToRecordsPage(${i})">${i}</button>`;
+        }
+    } 
+    else
+    {
+        // Erste Seite Button
+        if (currentPage > 1) {
+            //html += `<button onclick="goToRecordsPage(1)" title="Erste Seite">«</button>`;
+            html += `<button onclick="goToRecordsPage(${currentPage - 1})" title="Vorherige Seite">‹</button>`;
+        }
+        
+        // Seitenzahlen (max 3 anzeigen)
+        const startPage = Math.max(1, currentPage - 1);
+        const endPage = Math.min(totalPages, currentPage + 1);
+        
+        if (startPage > 1) {
+            html += `<button onclick="goToRecordsPage(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" onclick="goToRecordsPage(${i})">${i}</button>`;
+        }
+        
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+            html += `<button onclick="goToRecordsPage(${totalPages})">${totalPages}</button>`;
+        }
+        
+        // Letzte Seite Button
+        if (currentPage < totalPages) {
+            html += `<button onclick="goToRecordsPage(${currentPage + 1})" title="Nächste Seite">›</button>`;
+            //html += `<button onclick="goToRecordsPage(${totalPages})" title="Letzte Seite">»</button>`;
+        }
+    }
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// Global für onclick
+window.goToRecordsPage = function(page) {
+
+    // Aktuelle Scroll-Position der Tabelle speichern
+    const tableContainer = document.querySelector('.data-table')?.parentElement;
+    const scrollBefore = tableContainer?.scrollTop || 0;
+
+    renderRecords(allFilteredRecords, page);
+    
+    // Scroll nach oben zur Tabelle
+    //document.getElementById('recordsTableBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // KEIN automatisches Scrollen - Position beibehalten
+    // ODER: Sanft zur Tabelle scrollen
+    if (scrollBefore === 0) {
+        // Nur scrollen wenn User nicht gescrollt hat
+        const paginationElement = document.getElementById('recordsPagination');
+        if (paginationElement) {
+            paginationElement.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest' 
+            });
+        }
+    }
+};
 
 function updateRecordStats(records) {
     debug.log("Update Record Stats ()");
@@ -171,17 +303,17 @@ function updateRecordStats(records) {
     //document.getElementById('statExcused').textContent = excused;
 }
 
-export async function loadRecordFilters() {
+export async function loadRecordFilters(forceReload = false) {
 
     debug.log("Load Record Filters ()");
 
     const year = currentYear;
     
     // Termine für Jahr laden (aus Cache wenn möglich)
-    const appointments = await loadAppointments();
+    const appointments = await loadAppointments(forceReload);
     
     // Mitglieder laden (jahresunabhängig)
-    const members = await loadMembers();
+    const members = await loadMembers(forceReload);
     
     // Gruppen laden
     //if (!isCacheValid('groups')) {
@@ -231,9 +363,9 @@ export async function loadRecordFilters() {
 }
 
 
-export async function applyRecordFilters() {
+export async function applyRecordFilters(forceReload = false) {
     // Records laden (aus Cache wenn möglich)
-    const allRecords = await loadRecords(false);
+    const allRecords = await loadRecords(forceReload);
 
     debug.log("Apply Record Filters ()");
 
@@ -250,8 +382,15 @@ export async function applyRecordFilters() {
     // Rendern (nur wenn auf Records-Section)
     //const currentSection = sessionStorage.getItem('currentSection');
     //if (currentSection === 'anwesenheit') {
-    renderRecords(filteredRecords);
+    //renderRecords(filteredRecords);
     //}
+
+    // Rendern (nur wenn auf Records-Section) - IMMER Seite 1 nach Filter-Änderung
+    const currentSection = sessionStorage.getItem('currentSection');
+    if (currentSection === 'anwesenheit') {
+        renderRecords(filteredRecords, 1); // ← Reset auf Seite 1
+        debug.log('Records rendered');
+    }
     
     //return filteredRecords;    
 }
@@ -287,12 +426,15 @@ export async function initRecordEventHandlers() {
     });
 }
 
-export async function showRecordsSection() {
+export async function showRecordsSection(forceReload = false) {
+
     debug.log("Show Record Section ()");
+
     // Filter-Optionen laden
     await loadRecordFilters();
+
     // Daten laden, filtern und anzeigen
-    await applyRecordFilters();
+    await applyRecordFilters(forceReload);
 }
 
 export async function loadRecordDropdowns() {
@@ -498,9 +640,9 @@ export async function saveRecord() {
     }
 }
 
-export async function deleteRecord(recordId, memberName, appointmentTitle) {
+export async function deleteRecord(recordId, memberName, appointmentTitle) {    
      const confirmed = await showConfirm(
-        `Anwesenheit von "${memberName}" am "${appointmentTitle}" wirklich löschen?`,
+        `Anwesenheit von "${memberName}" bei "${appointmentTitle}" wirklich löschen?`,
         'Anwesenheit löschen'
     );
 

@@ -285,6 +285,12 @@ ALTER TABLE appointments
 ADD COLUMN type_id INT DEFAULT NULL AFTER title,
 ADD FOREIGN KEY (type_id) REFERENCES appointment_types(type_id) ON DELETE SET NULL;
 
+ALTER TABLE records ADD INDEX idx_member_year (member_id, arrival_time);
+ALTER TABLE records ADD INDEX idx_year (arrival_time);
+ALTER TABLE appointments ADD INDEX idx_year (date);
+ALTER TABLE member_group_assignments ADD INDEX idx_member (member_id);
+ALTER TABLE member_group_assignments ADD INDEX idx_group (group_id);
+
 /* Beispieldaten*/
 /*
 ALTER TABLE users 

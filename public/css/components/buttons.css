@@ -78,6 +78,7 @@
     background: var(--text-light);
 }
 
+/*
 .btn-edit {
     background: var(--info-color);
 }
@@ -85,6 +86,7 @@
 .btn-delete {
     background: var(--danger-color);
 }
+*/
 
 .btn-confirm-delete {
     padding: var(--spacing-xs) var(--spacing-sm);
@@ -115,4 +117,99 @@
 
 .btn-secondary:hover {
     opacity: 0.85;
+}
+
+
+/* Neue Icon Action Buttons */
+
+/* Actions Cell */
+.actions-cell {
+    white-space: nowrap;
+    text-align: left;
+}
+
+/* Icon Buttons */
+.action-btn.btn-icon {
+    min-width: 32px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 18px;
+    line-height: 32px;
+    text-align: center;
+    border-radius: var(--radius-sm);
+    margin: 0 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+/* Approve - Grün */
+.btn-approve {
+    color: #27ae60;
+    border-color: #27ae60;
+}
+
+.btn-approve:hover {
+    background: #27ae60;
+    color: white;
+}
+
+/* Reject - Rot */
+.btn-reject {
+    color: #e74c3c;
+    border-color: #e74c3c;
+}
+
+.btn-reject:hover {
+    background: #e74c3c;
+    color: white;
+}
+
+/* Edit - Orange */
+.btn-edit {
+    color: #f39c12;
+    border-color: #f39c12;
+}
+
+.btn-edit:hover {
+    background: #f39c12;
+    color: white;
+}
+
+/* Delete - Dunkelrot */
+.btn-delete {
+    color: #c0392b;
+    border-color: #c0392b;
+}
+
+.btn-delete:hover {
+    background: #c0392b;
+    color: white;
+}
+
+/* View - Blau */
+.btn-view {
+    color: #3498db;
+    border-color: #3498db;
+}
+
+.btn-view:hover {
+    background: #3498db;
+    color: white;
+}
+
+/* Responsive: Kleinere Icons auf Mobile */
+@media (max-width: 768px) {
+    .action-btn.btn-icon {
+        min-width: 28px;
+        width: 28px;
+        height: 28px;
+        font-size: 16px;
+        margin: 0 1px;
+    }
 }

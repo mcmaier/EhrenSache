@@ -16,6 +16,7 @@
 @import url('components/badges.css');
 @import url('components/calendar.css');
 @import url('components/toast.css');
+@import url('components/pagination.css');
 
 /* Sections */
 @import url('sections/login.css');

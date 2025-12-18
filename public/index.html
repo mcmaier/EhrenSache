@@ -171,15 +171,13 @@
                         <button class="btn-add" data-role="admin" onclick="openAppointmentModal()">+ Neuer Termin</button>
                      </div>
                 </div>
-                
-                 <!-- Hinweis für User -->
-                <div class="info-box" id="userTerminInfo" style="display: none; margin-bottom: 20px; padding: 15px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 5px;">
-                    <strong>ℹ️ Info:</strong> Sie sehen nur Termine der Terminarten, die Ihren Gruppen zugeordnet sind.
-                </div>
-
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <h3>Anstehende Termine</h3>
+                        <h3>Vergangene Termine</h3>
+                        <div class="number" id="statPastAppointments">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Kommende Termine</h3>
                         <div class="number" id="statUpcomingAppointments">-</div>
                     </div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
@@ -213,6 +211,9 @@
                     </div>
                     <div id="calendarDaysContainer"></div>
                 </div>
+                
+                 <!-- Pagination OBEN -->
+                <div id="appointmentsPagination"></div>
 
                 <div class="data-table">
                     <table>
@@ -271,6 +272,9 @@
                     </div>
                     <button class="btn-reset-filter" onclick="resetRecordFilter()">Filter zurücksetzen</button>
                 </div>
+
+                 <!-- Pagination OBEN -->
+                <div id="recordsPagination"></div>
 
                 <div class="data-table">
                     <table>
@@ -336,7 +340,9 @@
                         </select>
                     </div>
                     <button id="resetExceptionFilter" class="btn-reset-filter">Filter zurücksetzen</button>
-                </div>
+                </div>                
+                 <!-- Pagination OBEN -->
+                <div id="exceptionsPagination"></div>
 
                 <div class="data-table">
                     <table>
@@ -438,6 +444,9 @@
                     </div>
                 </div>
 
+                 <!-- Pagination OBEN -->
+                <div id="membersPagination"></div>
+
                 <div class="data-table">
                     <table>
                         <thead>
@@ -463,6 +472,51 @@
                     <h1>Benutzerverwaltung</h1>
                     <button class="btn-add" onclick="openUserModal()">+ Neuer Benutzer</button>
                 </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Gesamte Nutzer</h3>
+                        <div class="number" id="statTotalUsers">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Aktive Nutzer</h3>
+                        <div class="number" id="statActiveUsers">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Geräte</h3>
+                        <div class="number" id="statDeviceUsers">-</div>
+                    </div>
+                </div>
+                
+                <!-- Filter Container (NEU) -->
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="filterUserRole">Rolle</label>
+                        <select id="filterUserRole" class="form-input">
+                            <option value="">Alle Rollen</option>
+                            <option value="admin">Administrator</option>
+                            <option value="user">Benutzer</option>
+                            <option value="device">Gerät</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="filterUserStatus">Status</label>
+                        <select id="filterUserStatus" class="form-input">
+                            <option value="">Alle Status</option>
+                            <option value="active">Aktiv</option>
+                            <option value="inactive">Inaktiv</option>
+                        </select>
+                    </div>
+                    
+                    <button id="resetUserFilters" class="btn-reset-filter">
+                        Filter zurücksetzen
+                    </button>
+                </div>
+
+                 <!-- Pagination OBEN -->
+                <div id="usersPagination"></div>
 
                 <div class="data-table">
                     <table>

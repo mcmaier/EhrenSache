@@ -72,6 +72,124 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
         $memberId = $authMemberId;
     }
     
+    // Neue Stat Funktion zum Test
+
+    /*
+    // 1. Termine zählen (1 Query)
+    $appointmentsSql = "SELECT COUNT(*) as total FROM appointments WHERE YEAR(date) = ?";
+    $stmt = $db->prepare($appointmentsSql);
+    $stmt->execute([$year]);
+    $totalAppointments = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+
+    // 2. Mitglieder laden (1 Query mit JOINs)
+    $membersSql = "SELECT 
+        m.*,
+        GROUP_CONCAT(DISTINCT g.group_id) as group_ids,
+        GROUP_CONCAT(DISTINCT g.group_name) as group_names
+    FROM members m
+    LEFT JOIN member_group_assignments mga ON m.member_id = mga.member_id
+    LEFT JOIN member_groups g ON mga.group_id = g.group_id
+    WHERE m.active = 1";
+    
+    $params = [];
+    if ($memberId) {
+        $membersSql .= " AND m.member_id = ?";
+        $params[] = $memberId;
+    }
+    if ($groupId) {
+        $membersSql .= " AND g.group_id = ?";
+        $params[] = $groupId;
+    }
+    
+    $membersSql .= " GROUP BY m.member_id ORDER BY m.surname, m.name";
+    
+    $stmt = $db->prepare($membersSql);
+    $stmt->execute($params);
+    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 3. ALLE Records für Jahr in EINER Query laden
+    $recordsSql = "SELECT 
+        r.member_id,
+        COUNT(*) as total_records,
+        SUM(CASE WHEN r.status IN ('present') THEN 1 ELSE 0 END) as present,
+        SUM(CASE WHEN r.status = 'excused' THEN 1 ELSE 0 END) as excused
+    FROM records r
+    WHERE YEAR(r.arrival_time) = ?
+    GROUP BY r.member_id";
+    
+    $stmt = $db->prepare($recordsSql);
+    $stmt->execute([$year]);
+    
+    $recordsByMember = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $recordsByMember[$row['member_id']] = $row;
+    }
+
+    // 4. Statistiken berechnen
+    $totalPresent = 0;
+    $totalExcused = 0;
+    $totalUnexcused = 0;
+
+    foreach ($members as &$member) {
+        $stats = $recordsByMember[$member['member_id']] ?? [
+            'present' => 0,
+            'excused' => 0,
+            'total_records' => 0
+        ];
+        
+        $member['present'] = (int)$stats['present'];
+        $member['excused'] = (int)$stats['excused'];
+        $member['unexcused'] = $totalAppointments - $member['present'] - $member['excused'];
+        
+        if ($totalAppointments > 0) {
+            $member['attendance_percentage'] = round(($member['present'] / $totalAppointments) * 100);
+        } else {
+            $member['attendance_percentage'] = 0;
+        }
+        
+        $totalPresent += $member['present'];
+        $totalExcused += $member['excused'];
+        $totalUnexcused += $member['unexcused'];
+    }
+
+    // 5. Gruppiere nach Gruppen
+    $groupedStats = [];
+    foreach ($members as $member) {
+        $groupNames = $member['group_names'] ? explode(',', $member['group_names']) : ['Keine Gruppe'];
+        
+        foreach ($groupNames as $groupName) {
+            $groupName = trim($groupName);
+            if (!isset($groupedStats[$groupName])) {
+                $groupedStats[$groupName] = [
+                    'group_name' => $groupName,
+                    'members' => []
+                ];
+            }
+            $groupedStats[$groupName]['members'][] = $member;
+        }
+    }
+
+    // 6. Response
+    $overallAverage = count($members) > 0 && $totalAppointments > 0
+        ? round(($totalPresent / (count($members) * $totalAppointments)) * 100)
+        : 0;
+
+    echo json_encode([
+        'year' => $year,
+        'summary' => [
+            'total_appointments' => $totalAppointments,
+            'total_members' => count($members),
+            'total_present' => $totalPresent,
+            'total_excused' => $totalExcused,
+            'total_unexcused' => $totalUnexcused,
+            'overall_average' => $overallAverage
+        ],
+        'statistics' => array_values($groupedStats)
+    ]);
+    */
+
+    /* Bisherige Funktion */
+
     // Gruppen ermitteln
     if ($groupId !== null) {
         // Prüfe Gruppenzugriff
@@ -154,6 +272,7 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
         ],
         'statistics' => $statistics
     ]);
+    
 }
 
 function getActiveMemberCount($db, $groupIds, $specificMemberId = null) {
