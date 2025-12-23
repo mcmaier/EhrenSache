@@ -6,7 +6,7 @@ import { initAuth } from './modules/auth.js';
 // INIT JS
 // ============================================
 
-const DEBUG = true;
+const DEBUG = false;
 
 export const debug = {
   log:  (...args) => DEBUG && console.log(...args),
