@@ -27,7 +27,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
     */
     
      // Member-ID bestimmen
-    if($authUserRole === 'admin' || $authUserRole === 'device') {
+    if(isAdminOrManager() || isDevice()) {
         // Admin/Device kann für beliebige member_id/member_number einchecken
         if(!isset($data->member_id) && !isset($data->member_number)) {
             http_response_code(400);
@@ -61,7 +61,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         }
         
         // Bestimme Source für Response
-        if($authUserRole === 'device') {
+        if(isDevice()) {
             $authType = 'device_auth';
             $checkinSource = 'device_auth';
         } else {
@@ -361,7 +361,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
     }    
 
      // Bei Device: Hole Device-Info aus users Tabelle
-    if($authUserRole === 'device') {
+    if(isDevice()) {
         $deviceStmt = $db->prepare("SELECT email, device_type FROM users WHERE user_id = ?");
         $deviceStmt->execute([$authUserId]);
         $deviceInfo = $deviceStmt->fetch(PDO::FETCH_ASSOC);

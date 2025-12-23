@@ -1,9 +1,11 @@
 
-import { apiCall, isAdmin } from './api.js';
+import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
 import { loadTypes } from './management.js';
 import {debug} from '../app.js'
+import { globalPaginationValue } from './settings.js';
+
 // ============================================
 // APPOINTMENTS
 // Reference:
@@ -13,7 +15,7 @@ import {debug} from '../app.js'
 let currentCalendarDate = new Date();
 
 let currentAppointmentsPage = 1;
-const appointmentsPerPage = 25;
+let appointmentsPerPage = 25;
 let allFilteredAppointments = [];
 
 // ============================================
@@ -81,6 +83,8 @@ async function renderAppointments(appointments, page = 1) {
         return;
     }
 
+    appointmentsPerPage = globalPaginationValue;
+
     // Alle Appointments speichern für Pagination
     allFilteredAppointments = appointments;
     currentAppointmentsPage = page;
@@ -125,7 +129,7 @@ async function renderAppointments(appointments, page = 1) {
             ? `<span class="type-badge" style="background: ${apt.color || '#667eea'}; color: white;">${apt.type_name}</span>`
             : '<span class="type-badge">-</span>';
 
-        const actionsHtml = isAdmin ? `
+        const actionsHtml = isAdminOrManager ? `
             <td class="actions-cell">
                     <button class="action-btn btn-icon btn-edit" 
                             onclick="openAppointmentModal(${apt.appointment_id})"

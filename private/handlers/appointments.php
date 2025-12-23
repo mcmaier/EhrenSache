@@ -30,6 +30,7 @@ function handleAppointments($db, $method, $id) {
                 $from_date = $_GET['from_date'] ?? null;
                 $to_date = $_GET['to_date'] ?? null;
                 $type_id = $_GET['type_id'] ?? null;
+                $member_id = $_GET['member_id'] ?? null;
                 
                 // Baue Query dynamisch - MIT Alias für type_description
                 $sql = "SELECT a.*, 
@@ -41,19 +42,25 @@ function handleAppointments($db, $method, $id) {
                         LEFT JOIN appointment_types at ON a.type_id = at.type_id
                         WHERE 1=1";
                 $params = [];
-
+                
                 // Gruppen-Filterung für User
-                if($_SESSION['role'] !== 'admin') {
+                if(!isAdminOrManager() || isset($member_id)) {
                     // Hole member_id des Users
                     $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $userMemberId = $userStmt->fetchColumn();
+
+                    if($member_id !== null)
+                    {
+                        $userMemberId = $member_id;
+                    }
                     
                     if($userMemberId) {
                         // Hole Gruppen des Mitglieds
                         $groupStmt = $db->prepare("SELECT group_id FROM member_group_assignments WHERE member_id = ?");
                         $groupStmt->execute([$userMemberId]);
                         $userGroupIds = $groupStmt->fetchAll(PDO::FETCH_COLUMN);
+                        
                         
                         if(empty($userGroupIds)) {
                             // Kein Gruppe zugeordnet → keine Termine sichtbar
@@ -116,6 +123,8 @@ function handleAppointments($db, $method, $id) {
             break;
             
         case 'POST':
+            requireAdminOrManager();
+
             $rawData = json_decode(file_get_contents("php://input"));
             
             // Nur erlaubte Felder extrahieren
@@ -176,6 +185,8 @@ function handleAppointments($db, $method, $id) {
             break;
             
         case 'PUT':
+            requireAdminOrManager();
+
             $rawData = json_decode(file_get_contents("php://input"));
             
             // Nur erlaubte Felder extrahieren
@@ -240,6 +251,8 @@ function handleAppointments($db, $method, $id) {
             break;
             
         case 'DELETE':
+            requireAdminOrManager();
+            
             // Lösche zuerst abhängige Datensätze
             $db->prepare("DELETE FROM records WHERE appointment_id = ?")->execute([$id]);
             $db->prepare("DELETE FROM exceptions WHERE appointment_id = ?")->execute([$id]);

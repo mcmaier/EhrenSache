@@ -3,20 +3,19 @@
 // ============================================
 // USERS Controller
 // ============================================
-function handleUsers($db, $method, $id) {
+function handleUsers($db, $method, $id, $authUserId) {
     switch($method) {
         case 'GET':
             if($id) {
-
-                // Zugriffskontrolle: Nur Admin oder eigener Account
-                if($_SESSION['role'] !== 'admin' && $_SESSION['user_id'] != $id) {
+                if(!isAdmin() && ($authUserId != $id))
+                {
                     http_response_code(403);
                     echo json_encode([
                         "message" => "Access denied",
                         "hint" => "You can only view your own user data"
                     ]);
                     return;
-                }
+                }                
 
                 $stmt = $db->prepare("SELECT u.user_id, u.email, u.role, u.is_active, 
                                     u.member_id, u.device_type, u.created_at, u.totp_secret, u.api_token, u.api_token_expires_at,
@@ -34,7 +33,7 @@ function handleUsers($db, $method, $id) {
                 }
 
                 // Sensitive Daten filtern für Nicht-Admins
-                if($_SESSION['role'] !== 'admin') {
+                if(!isAdmin()) {
                     // User sieht nur eigene Daten, aber ohne sensitive Infos von Devices
                     unset($user['totp_secret']); // TOTP Secret verstecken
                     
@@ -50,11 +49,11 @@ function handleUsers($db, $method, $id) {
             } else {
                 // Liste aller User                
                 // Zugriffskontrolle: Nur Admin darf alle User sehen
-                if($_SESSION['role'] !== 'admin') {
+                if(!isAdmin()) {
                     http_response_code(403);
                     echo json_encode([
                         "message" => "Access denied",
-                        "hint" => "Only administrators can list all users"
+                        "hint" => "Admin Access required"
                     ]);
                     return;
                 }
@@ -71,6 +70,8 @@ function handleUsers($db, $method, $id) {
             break;
             
         case 'POST':
+            requireAdmin();
+
             $rawData = json_decode(file_get_contents("php://input"));
 
             // Nur erlaubte Felder extrahieren
@@ -168,11 +169,11 @@ function handleUsers($db, $method, $id) {
             }
             break;
             
-        case 'PUT':
+        case 'PUT':            
             $rawData = json_decode(file_get_contents("php://input"));
 
             // Zugriffskontrolle: Nur Admin oder eigener Account
-            if($_SESSION['role'] !== 'admin' && $_SESSION['user_id'] != $id) {
+            if(!isAdmin() && ($authUserId != $id)) {
                 http_response_code(403);
                 echo json_encode([
                     "message" => "Access denied",
@@ -182,7 +183,7 @@ function handleUsers($db, $method, $id) {
             }
 
             // User darf eigene Rolle/Device-Type nicht ändern
-            if($_SESSION['role'] !== 'admin') {
+            if(!isAdmin()) {
                 unset($data->role);
                 unset($data->device_type);
                 unset($data->member_id);
@@ -227,7 +228,7 @@ function handleUsers($db, $method, $id) {
             }
             
             // Nur Admin darf diese Felder ändern
-            if($_SESSION['role'] === 'admin') {
+            if(isAdmin()) {
                 if(isset($data->role)) {
                     $updateFields[] = "role = ?";
                     $updateParams[] = $data->role;
@@ -282,9 +283,10 @@ function handleUsers($db, $method, $id) {
             break;
             
         case 'DELETE':
-            // Nur Admin darf User löschen            
+            // Nur Admin darf User löschen     
+            requireAdmin();  
             // Eigenen Account nicht löschen
-            if($_SESSION['user_id'] == $id) {
+            if($authUserId == $id) {
                 http_response_code(400);
                 echo json_encode([
                     "message" => "Cannot delete your own account",

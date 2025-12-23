@@ -34,6 +34,13 @@ const UI_STATE = {
     NFC_SCANNING: 'nfc'     // NFC-Scanner aktiv
 };
 
+
+let appearanceSettings = {
+    organization_name: 'EhrenSache',
+    primary_color: '#667eea',
+    background_color: '#f8f9fa'
+};
+
 let currentUIState = UI_STATE.IDLE;
 let apiToken = null;
 let userData = null;
@@ -74,6 +81,9 @@ let elements = {};
 // INITIALIZATION
 // ========================================
 document.addEventListener('DOMContentLoaded', function() {
+
+    loadAppearanceSettings();
+
     // DOM Elements cachen
     elements = {
         emailInput: document.getElementById('emailInput'),
@@ -213,6 +223,46 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
 }
 
 // ========================================
+// APPEARANCE
+// ========================================
+
+async function loadAppearanceSettings() {
+    try {
+        const url = new URL(API_BASE);
+        url.searchParams.append('resource', 'appearance');
+        
+        const response = await fetch(url);
+        if (response.ok) {
+            const data = await response.json();
+            appearanceSettings = data.settings;
+            applyAppearanceSettings();
+        }
+    } catch (error) {
+        debug.error('Appearance Settings laden fehlgeschlagen:', error);
+        // Fallback auf Standardwerte
+        applyAppearanceSettings();
+    }
+}
+
+function applyAppearanceSettings() {
+    // Titel setzen
+    document.title = appearanceSettings.organization_name || 'EhrenZeit';
+    
+    // Alle Elemente mit class="org-name" aktualisieren
+    document.querySelectorAll('.org-name').forEach(el => {
+        el.textContent = appearanceSettings.organization_name || 'EhrenZeit';
+    });
+    
+    // CSS-Variablen setzen
+    if (appearanceSettings.primary_color) {
+        document.documentElement.style.setProperty('--primary-color', appearanceSettings.primary_color);
+    }
+    if (appearanceSettings.background_color) {
+        document.documentElement.style.setProperty('--background-color', appearanceSettings.background_color);
+    }
+}
+
+// ========================================
 // AUTHENTICATION
 // ========================================
 async function handleLogin(e) {
@@ -251,10 +301,10 @@ async function handleLogin(e) {
         
         // Lade Daten
         await loadAppointmentTypes();
-        await loadUserData();
+        await loadUserData();        
         //await loadHistory();
         await initTabs();
-        await initYearNavigation();
+        await initYearNavigation();    
 
         debug.log("Showing main screen");        
         showScreen('main');
@@ -297,7 +347,7 @@ async function handleTokenLogin() {
         //await loadHistory();
         await initTabs();
         await initYearNavigation();
-
+        
         debug.log("Showing main screen");        
         showScreen('main');
         startClock();
@@ -329,7 +379,7 @@ async function checkAutoLogin() {
         await loadUserData();
         //await loadHistory();
         await initTabs();
-        await initYearNavigation();
+        await initYearNavigation();        
 
         debug.log("Showing main screen");
             
@@ -418,6 +468,11 @@ let success = false;
             } catch (error) {
                 debug.log('Member-Daten konnten nicht geladen werden:', error);
             }
+        }
+        else
+        {
+            showMessage('Kein Mitglied mit diesem Benutzer verknüpft. Bitte Administrator kontaktieren.', 'error');
+            return false;
         }
         
         // Fallback
@@ -588,7 +643,8 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
         const requestData = {
             totp_code: code,
             arrival_time: arrivalTime,
-            source_device: inputMethod
+            source_device: inputMethod,
+            member_id: userData.member_id
         };
 
         // Admin muss member_id explizit mitschicken
@@ -958,7 +1014,7 @@ async function loadAppointmentTypes() {
 
 async function loadAppointments() {
     try {
-        appointments = await apiCall('appointments');
+        appointments = await apiCall('appointments','GET',null, {member_id:userData.member_id});
         
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -1084,10 +1140,10 @@ async function loadHistory() {
         
     try {
         // Lade letzte 10 Records
-        let records = await apiCall('records');
+        let records = await apiCall('records','GET',null,{ member_id: userData.member_id });
         
         // Lade offene Exceptions
-        let exceptions = await apiCall('exceptions', 'GET', null, { status: 'pending' });
+        let exceptions = await apiCall('exceptions', 'GET', null, { member_id: userData.member_id,status: 'pending' });
         
         // Kombiniere und sortiere nach Datum (neueste zuerst)
         const combined = [

@@ -63,7 +63,7 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
     $memberId = isset($_GET['member_id']) ? intval($_GET['member_id']) : null;
     
     // Normale User können nur ihre eigene Statistik sehen
-    if ($authUserRole !== 'admin') {        
+    if (!isAdminOrManager()) {        
         // Warnung wenn andere member_id angegeben wurde
         $warning = null;
         if(isset($memberId) && ($memberId != $authMemberId)) {
@@ -301,7 +301,7 @@ function getActiveMemberCount($db, $groupIds, $specificMemberId = null) {
 }
 
 function getStatisticsGroups($db, $memberId, $role) {
-    if ($role === 'admin') {
+    if (isAdminOrManager()) {
         $stmt = $db->query("SELECT group_id FROM member_groups");
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
@@ -317,7 +317,7 @@ function getStatisticsGroups($db, $memberId, $role) {
 }
 
 function hasStatisticsGroupAccess($db, $memberId, $role, $groupId) {
-    if ($role === 'admin') {
+    if (isAdminOrManager() ) {
         return true;
     }
     

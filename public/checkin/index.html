@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="robots" content="noindex, nofollow">
-    <title>Vereins-Check-In</title>
+    <title>EhrenSache</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
@@ -19,7 +19,8 @@
     <div id="loginScreen" class="active">
         <div class="login-box">
             <div class="logo">📱</div>
-            <h2>Vereins-Check-in</h2>
+            <h2>EhrenSache Check-In</h2>
+            <h3 class="org-name">Mein Verein</h3>
 
             <form id="loginForm">
                 <div class="form-group">
@@ -66,41 +67,20 @@
                 <p><strong>Hinweis:</strong> Verwenden Sie Ihre Dashboard-Zugangsdaten.</p>
                 <a href="../index.html" class="dashboard-link">Zum Dashboard</a>
             </div>
-
-            <!--
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="apiToken">API-Token</label>
-                    <input type="password" id="apiToken" name="apiToken" required>
-                </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="saveToken">
-                        Token speichern
-                    </label>
-                </div>
-                <button type="submit" class="action-button">Anmelden</button>
-                <div id="loginError"></div>
-            </form>
-
-            <div class="info-box">
-                <p>💡 <strong>Wo finde ich meinen Token?</strong></p>
-                <p>Im Web-Dashboard unter "Einstellungen"</p>
-                <a href="../index.html" class="dashboard-link">
-                    🌐 Zum Web-Dashboard →
-                </a>
-            </div>
-            -->
-
         </div>
     </div>
 
     <!-- Main Screen -->
     <div id="mainScreen">
         <div class="header">
-            <h1>📍 Check-In</h1>
-            <button id="toDashboardBtn" class="btn-icon" title="Zur Verwaltung">⚙️</button>        
-            <button id="logoutBtn" class="btn-icon">➡️</button>
+            <div class="title">
+                <h1>📍 Check-In</h1>
+                <h2 class="org-name">Mein Verein</h2>
+            </div>
+            <div>            
+                <button id="toDashboardBtn" class="btn-icon" title="Zur Verwaltung">⚙️</button>        
+                <button id="logoutBtn" class="btn-icon">➡️</button>
+            </div>
         </div>
         <div class="container">
             <!-- User + Datetime nebeneinander -->

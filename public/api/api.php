@@ -23,6 +23,7 @@ require_once '../../private/handlers/appointment_types.php';
 require_once '../../private/handlers/statistics.php';
 require_once '../../private/handlers/export.php';
 require_once '../../private/handlers/import.php';
+require_once '../../private/handlers/settings.php';
 
 // Headers
 header("Content-Type: application/json; charset=UTF-8");
@@ -164,6 +165,18 @@ $authMemberId = null;
 // ============================================
 // ÖFFENTLICHE ENDPOINTS (keine Auth nötig)
 // ============================================
+
+if($resource === 'appearance')
+{
+    if($request_method !== 'GET')
+    {
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        exit();
+    }
+    getAppearance($db);
+    exit();
+}
 
 if($resource === 'login') {
     if($request_method !== 'POST')
@@ -394,7 +407,8 @@ if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 // ADMIN-CHECKS
 // ============================================
 
-$adminOnlyResources = [
+/*
+$managementResources = [
     'members' => ['POST', 'PUT', 'DELETE'],
     'appointments' => ['POST', 'PUT', 'DELETE'],
     'records' => ['POST', 'PUT', 'DELETE'],
@@ -404,15 +418,30 @@ $adminOnlyResources = [
     'appointment_types' => ['POST', 'PUT', 'DELETE']
 ];
 
-foreach($adminOnlyResources as $res => $methods) {
+foreach($managementResources as $res => $methods) {
     if($resource === $res && in_array($request_method, $methods)) {
-        if($authUserRole !== 'admin') {
+        if(!isAdminOrManager()) {
+            http_response_code(403);
+            echo json_encode(["message" => "Management access required"]);
+            exit();
+        }
+    }
+}
+
+$adminResources = [
+    'settings' => ['GET','POST', 'PUT', 'DELETE'],
+    'users' => ['POST', 'PUT', 'DELETE']
+];
+
+foreach($adminResources as $res => $methods) {
+    if($resource === $res && in_array($request_method, $methods)) {
+        if(!isAdmin()) {
             http_response_code(403);
             echo json_encode(["message" => "Admin access required"]);
             exit();
         }
     }
-}
+}*/
 
 // ============================================
 // ROUTING
@@ -435,7 +464,7 @@ switch($resource) {
         handleExceptions($db, $request_method, $id);
         break;
     case 'users':
-        handleUsers($db, $request_method, $id);
+        handleUsers($db, $request_method, $id, $authUserId);
         break;
     case 'membership_dates':
         handleMembershipDates($db, $request_method, $id);        
@@ -466,6 +495,9 @@ switch($resource) {
         exit();
     case 'import':
         handleImport($db, $request_method, $authUserRole);
+        exit();
+    case 'settings':
+        handleSettings($db, $request_method,$authUserId, $authUserRole);
         exit();
                 
     default:

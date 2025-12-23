@@ -23,7 +23,7 @@ function handleRecords($db, $method, $id) {
                 $record = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 // User dürfen nur ihre eigenen Records sehen
-                if($_SESSION['role'] !== 'admin') {
+                if(!isAdminOrManager()) {
                     // Hole member_id des Users
                     $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
@@ -54,7 +54,7 @@ function handleRecords($db, $method, $id) {
                 $appointment_type_id = $_GET['appointment_type_id'] ?? null;
                 
                 // User sehen nur ihre eigenen Records
-                if($_SESSION['role'] !== 'admin') {
+                if(!isAdminOrManager()) {
                     $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $member_id = $userStmt->fetchColumn();
@@ -140,6 +140,8 @@ function handleRecords($db, $method, $id) {
             break;
             
         case 'POST':
+            requireAdminOrManager();
+
             $data = json_decode(file_get_contents("php://input"));
             
             // Prüfe ob bereits ein Record für dieses Mitglied + Termin existiert
@@ -170,6 +172,7 @@ function handleRecords($db, $method, $id) {
             break;
             
         case 'PUT':
+            requireAdminOrManager();
             $data = json_decode(file_get_contents("php://input"));
 
             // Hole ursprüngliche Daten des Records
@@ -221,6 +224,7 @@ function handleRecords($db, $method, $id) {
             break;
             
         case 'DELETE':
+            requireAdminOrManager();
             $stmt = $db->prepare("DELETE FROM records WHERE record_id = ?");
             if($stmt->execute([$id])) {
                 echo json_encode(["message" => "Record deleted"]);

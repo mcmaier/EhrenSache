@@ -1,10 +1,11 @@
-import { apiCall, currentUser, isAdmin } from './api.js';
+import { apiCall, isAdminOrManager } from './api.js';
 import { loadAppointments } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, currentYear, populateYearFilter, setCurrentYear} from './ui.js';
 import { translateRecordStatus,datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
 import {debug} from '../app.js'
+import { globalPaginationValue } from './settings.js';
 
 // ============================================
 // RECORDS
@@ -13,7 +14,7 @@ import {debug} from '../app.js'
 // ============================================
 
 let currentRecordsPage = 1;
-const recordsPerPage = 25;
+let recordsPerPage = 25;
 let allFilteredRecords = [];
 
 // ============================================
@@ -94,6 +95,8 @@ export async function renderRecords(records, page = 1)
 
     updateRecordStats(records);
 
+    recordsPerPage = globalPaginationValue;
+
     // Pagination berechnen
     const totalRecords = records.length;
     const totalPages = Math.ceil(totalRecords / recordsPerPage);
@@ -156,7 +159,7 @@ export async function renderRecords(records, page = 1)
         // Check-in Source Badge
         const sourceInfo = getSourceBadge(record);
 
-        const actionsHtml = isAdmin ? `
+        const actionsHtml = isAdminOrManager ? `
                         <td class="actions-cell">
                             <button class="action-btn btn-icon btn-edit" 
                                     onclick="openRecordModal(${record.record_id})"

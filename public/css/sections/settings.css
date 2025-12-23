@@ -1,0 +1,121 @@
+/* Settings Container */
+.settings-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 800px;
+}
+
+/* Settings Card (ersetzt settings-category) */
+.settings-card {
+    background: var(--bg-light, white);
+    padding: 25px;
+    border-radius: var(--radius-md, 8px);
+    box-shadow: var(--shadow-md, 0 2px 4px rgba(0,0,0,0.1));
+}
+
+.settings-card h3 {
+    color: var(--text-dark, #2c3e50);
+    margin: 0 0 20px 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color, #667eea);
+    font-size: 18px;
+}
+
+/* Settings Item */
+.setting-item {
+    margin-bottom: 20px;
+}
+
+.setting-item:last-child {
+    margin-bottom: 0;
+}
+
+.setting-item label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-medium, #7f8c8d);
+    font-weight: 500;
+    font-size: 14px;
+}
+
+/* Settings Input */
+.setting-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-light, #ddd);
+    border-radius: var(--radius-sm, 4px);
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.setting-input:focus {
+    outline: none;
+    border-color: var(--primary-color, #667eea);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.setting-input[type="number"] {
+    max-width: 200px;
+}
+
+.setting-input[type="color"] {
+    width: 80px;
+    height: 40px;
+    padding: 4px;
+    cursor: pointer;
+    border: 2px solid var(--border-light, #ddd);
+}
+
+.setting-input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.setting-input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
+}
+
+/* Speichern-Button mit Änderungen */
+#saveSettingsBtn.has-changes {
+    background: var(--success-color, #27ae60);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(39, 174, 96, 0);
+    }
+}
+
+/* Input Hint */
+.input-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-light, #95a5a6);
+}
+
+/* Invalid Input */
+.setting-input.invalid {
+    border-color: var(--error-color, #e74c3c);
+    background-color: rgba(231, 76, 60, 0.05);
+}
+
+.setting-input.invalid:focus {
+    border-color: var(--error-color, #e74c3c);
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+}
+
+/* Validierungs-Feedback */
+.setting-input:invalid {
+    border-color: var(--error-color, #e74c3c);
+}
+
+/*
+.setting-input:valid:not(:placeholder-shown) {
+    border-color: var(--success-color, #27ae60);
+}*/

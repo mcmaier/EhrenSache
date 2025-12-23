@@ -1,0 +1,22 @@
+# KRITISCH: Verhindert PHP-Ausführung
+<Files *>
+    # Kein PHP ausführen
+    <IfModule mod_php7.c>
+        php_flag engine off
+    </IfModule>
+    <IfModule mod_php8.c>
+        php_flag engine off
+    </IfModule>
+    
+    # Nur Download erlauben (kein direkter Zugriff nötig)
+    deny from all
+</Files>
+
+# Kein Directory Listing
+Options -Indexes
+
+# Content-Type erzwingen
+<IfModule mod_mime.c>
+    AddType text/plain .csv
+    AddType text/plain .txt
+</IfModule>

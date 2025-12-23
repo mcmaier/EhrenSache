@@ -39,8 +39,8 @@
 }
 
 
-/* Settings Layout */
-.settings-container {
+/* Profile Layout */
+.profile-container {
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -48,29 +48,29 @@
     z-index: 1;
 }
 
-.settings-card {
+.profile-card {
     background: --bg-light;
     padding: 25px;
     border-radius: 8px;
     box-shadow: 0 2px 4px var(--shadow-lg);
 }
 
-.settings-card h3 {
+.profile-card h3 {
     color: --text-dark;
     margin-bottom: 20px;
     padding-bottom: 10px;
     border-bottom: 2px solid var(--border-light);
 }
 
-.settings-item {
+.profile-item {
     margin-bottom: 20px;
 }
 
-.settings-item:last-child {
+.profile-item:last-child {
     margin-bottom: 0;
 }
 
-.settings-item label {
+.profile-item label {
     display: block;
     margin-bottom: 5px;
     color: var(--text-medium);
@@ -78,7 +78,7 @@
     font-size: 14px;
 }
 
-.settings-item input {
+.profile-item input {
     width: 100%;
     padding: 12px;
     border: 1px solid var(--border-light);
@@ -86,12 +86,12 @@
     font-size: 14px;
 }
 
-.settings-item input:focus {
+.profile-item input:focus {
     outline: none;
     border-color: var(--primary-color);
 }
 
-.settings-item small {
+.profile-item small {
     display: block;
     margin-top: 5px;
     font-size: 12px;

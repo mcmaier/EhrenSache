@@ -11,11 +11,7 @@ function handleImport($db, $request_method, $authUserRole) {
     }
     
     // Nur Admins dürfen importieren
-    if ($authUserRole !== 'admin') {
-        http_response_code(403);
-        echo json_encode(["message" => "Admin access required"]);
-        exit();
-    }
+    requireAdmin();
     
     $type = $_GET['type'] ?? 'members';
     
@@ -28,30 +24,117 @@ function handleImport($db, $request_method, $authUserRole) {
     
     $file = $_FILES['file'];
     
+    /*
     // Prüfe Dateityp
     $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     if ($fileExt !== 'csv') {
         http_response_code(400);
         echo json_encode(["message" => "Only CSV files allowed"]);
         exit();
+    }*/
+    //-------
+
+    // 1. GRÖSSEN-LIMIT (10MB)
+    $maxSize = 5 * 1024 * 1024;
+    if($file['size'] > $maxSize) {
+        http_response_code(413);
+        echo json_encode([
+            "message" => "File too large",
+            "max_size" => "5MB",
+            "uploaded_size" => round($file['size'] / 1024 / 1024, 2) . "MB"
+        ]);
+        return;
     }
+    
+    // 2. MIME-TYPE PRÜFUNG (Server-seitig!)
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+    
+    $allowedMimes = ['text/plain', 'text/csv', 'application/csv'];
+    if(!in_array($mimeType, $allowedMimes)) {
+        http_response_code(400);
+        echo json_encode([
+            "message" => "Invalid file type",
+            "detected" => $mimeType,
+            "allowed" => "CSV only"
+        ]);
+        return;
+    }
+    
+    // 3. DATEIINHALT PRÜFEN (keine PHP-Tags!)
+    $content = file_get_contents($file['tmp_name']);
+    
+    if(preg_match('/<\?php|<\?=|<script/i', $content)) {
+        http_response_code(400);
+        echo json_encode([
+            "message" => "File contains forbidden code",
+            "hint" => "PHP/Script tags not allowed"
+        ]);
+        return;
+    }
+    
+    // 4. DATEINAMEN SÄUBERN
+    $originalName = pathinfo($file['name'], PATHINFO_FILENAME);
+    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+    
+    // Nur erlaubte Extensions
+    if(strtolower($extension) !== 'csv') {
+        http_response_code(400);
+        echo json_encode(["message" => "Only .csv files allowed"]);
+        return;
+    }
+    
+    // Gefährliche Zeichen entfernen
+    $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '', $originalName);
+    $safeName = substr($safeName, 0, 50); // Max 50 Zeichen
+    
+    // 5. ZUFÄLLIGER DATEINAME (verhindert Überschreiben)
+    $randomName = bin2hex(random_bytes(8));
+    $finalName = $randomName . '_' . $safeName . '.csv';
+    
+    // 6. UPLOAD-ORDNER AUSSERHALB WEBROOT
+    $uploadDir = __DIR__ . '/../uploads/';
+    
+    // Erstelle Ordner falls nicht vorhanden
+    if(!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+    
+    $targetPath = $uploadDir . $finalName;
+    
+    // 7. VERSCHIEBEN (nicht kopieren!)
+    if(!move_uploaded_file($file['tmp_name'], $targetPath)) {
+        http_response_code(500);
+        echo json_encode(["message" => "Failed to save file"]);
+        return;
+    }
+
+
+
+    //------- $file['tmp_name']
     
     switch($type) {
         case 'members':
-            $result = importMembers($db, $file['tmp_name']);
+            $result = importMembers($db, $targetPath);
             break;
         case 'records':
-            $result = importRecords($db, $file['tmp_name']);
+            $result = importRecords($db, $targetPath);
             break;
         case 'appointments':
-            $result = importAppointments($db, $file['tmp_name']);
+            $result = importAppointments($db, $targetPath);
             break;
 
         default:
             http_response_code(400);
             echo json_encode(["message" => "Invalid import type"]);
-            exit();
-    }
+            // Datei nach Verarbeitung LÖSCHEN
+            unlink($targetPath);
+            exit();    
+        }
+
+    // Datei nach Verarbeitung LÖSCHEN
+    unlink($targetPath);
     
     echo json_encode($result);
 }

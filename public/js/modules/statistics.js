@@ -1,4 +1,4 @@
-import { apiCall, isAdmin } from './api.js';
+import { apiCall, isAdminOrManager } from './api.js';
 import { loadGroups } from './management.js';
 import { loadMembers } from './members.js';
 import { showToast, showConfirm, currentYear} from './ui.js';
@@ -12,7 +12,7 @@ export async function loadStatistics(filters = {}) {
     const year = currentYear; 
 
     const groupId = document.getElementById('statGroup').value;
-    const memberId = isAdmin ? document.getElementById('statMember').value : null;
+    const memberId = isAdminOrManager ? document.getElementById('statMember').value : null;
 
     // API-Call mit Jahr
     debug.log(`Loading STATISTICS from API for ${year} with filters:`, filters);    
@@ -61,7 +61,7 @@ export async function loadStatisticsFilters() {
     const filterGrid = document.querySelector('.filter-grid');
 
     // Mitglieder-Filter (nur für Admins)
-    if (isAdmin) {
+    if (isAdminOrManager) {
         document.getElementById('statMemberFilterGroup').style.display = 'block';              
         // Initial alle Mitglieder anzeigen         
         
@@ -86,7 +86,7 @@ export async function loadStatisticsFilters() {
 }
 
 export async function updateStatisticsFilters() {
-    if (!isAdmin) return;
+    if (!isAdminOrManager) return;
     
     const groupSelect = document.getElementById('statGroup');
     const memberSelect = document.getElementById('statMember');
@@ -129,7 +129,7 @@ export async function applyStatisticsFilters() {
 
     // Aktuelle Filter auslesen
     const filters = {        
-        member:isAdmin ? (document.getElementById('statMember')?.value || null) : null,
+        member:isAdminOrManager ? (document.getElementById('statMember')?.value || null) : null,
         group: document.getElementById('statGroup')?.value || null
     };
     
@@ -246,7 +246,7 @@ export async function initStatisticsEventHandlers() {
             applyStatisticsFilters();      
         });
 
-    if (isAdmin) {
+    if (isAdminOrManager) {
         document.getElementById('statMember').addEventListener('change', () => {
             updateStatisticsFilters();
             applyStatisticsFilters(); 

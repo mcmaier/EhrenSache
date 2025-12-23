@@ -1,9 +1,10 @@
-import { apiCall, isAdmin } from './api.js';
+import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache} from './ui.js';
 import { loadUserData } from './users.js';
 import { updateModalId } from './utils.js';
 import { loadGroups } from './management.js';
 import {debug} from '../app.js'
+import { globalPaginationValue } from './settings.js';
 
 
 // ============================================
@@ -13,7 +14,7 @@ import {debug} from '../app.js'
 // ============================================
 
 let currentMembersPage = 1;
-const membersPerPage = 25;
+let membersPerPage = 25;
 let allFilteredMembers = [];
 
 // ============================================
@@ -40,7 +41,7 @@ export async function loadMembers(forceReload = false) {
 
     debug.log("Loading MEMBERS from API");
             
-    if(isAdmin){
+    if(isAdminOrManager){
         // Admin sieht alle Mitglieder
         members = await apiCall('members');    
         
@@ -90,6 +91,8 @@ function renderMembers(members, page = 1) {
     allFilteredMembers = members;
     currentMembersPage = page;
 
+    membersPerPage = globalPaginationValue;
+
     updateMemberStats(members);
 
     // Pagination berechnen
@@ -115,7 +118,7 @@ function renderMembers(members, page = 1) {
               ).join('')
             : '<span style="color: #7f8c8d;">Keine</span>';
 
-        const actionsHtml = isAdmin ? `
+        const actionsHtml = isAdminOrManager ? `
             <td class="actions-cell">
                       <button class="action-btn btn-icon btn-edit" onclick="openMemberModal(${member.member_id})" title="Bearbeiten">
                     ✎
@@ -257,7 +260,7 @@ window.goToMembersPage = function(page) {
 function updateMemberStats(members)
 {
 // Statistik nur für Admin
-    if (isAdmin) {
+    if (isAdminOrManager) {
         const activeCount = members.filter(m => m.active).length;
         document.getElementById('statActiveMembersCount').textContent = activeCount;
     } else {
@@ -301,7 +304,7 @@ export async function openMemberModal(memberId = null) {
         // Zeige ID im Header
         updateModalId('memberModal', memberId);
 
-        if (isAdmin) {
+        if (isAdminOrManager) {
             membershipGroup.style.display = 'block';
             await loadMembershipDates(memberId);
         }
@@ -404,7 +407,7 @@ export async function saveMember() {
         result = await apiCall('members', 'PUT', data, { id: memberId });
         
         // Update Mitgliedschaftszeiträume (nur Admin)
-        if (result && isAdmin && currentMembershipDates.length > 0) {
+        if (result && isAdminOrManager && currentMembershipDates.length > 0) {
             await saveMembershipDates(memberId);
         }
     } else {
@@ -412,7 +415,7 @@ export async function saveMember() {
         result = await apiCall('members', 'POST', data);
         
         // Erstelle Mitgliedschaftszeiträume falls vorhanden
-        if (result && result.id && isAdmin && currentMembershipDates.length > 0) {
+        if (result && result.id && isAdminOrManager && currentMembershipDates.length > 0) {
             await saveMembershipDates(result.id);
         }
     }

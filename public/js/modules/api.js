@@ -4,12 +4,16 @@ import { debug } from '../app.js'
 // Globale State
 export let currentUser = null;
 export let isAdmin = false;
+export let isManager = false;
+export let isAdminOrManager = false;
 export let csrfToken = null;
 export let isInitialLoad = true;
 
 export function setCurrentUser(user) {
     currentUser = user;
     isAdmin = user?.role === 'admin';
+    isManager = user?.role === 'manager';
+    isAdminOrManager = isAdmin || isManager;
 }
 
 export function setCsrfToken(token) {

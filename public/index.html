@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vereinsverwaltung - Dashboard</title>
+    <title>EhrenSache - Dashboard</title>
 
     <link rel="stylesheet" href="css/main.css">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="robots" content="noindex, nofollow">
+    <script type="module" src="js/theme.js"></script>
 </head>
 
 <body>
@@ -22,7 +24,8 @@
     <!-- Login Seite -->
     <div class="login-container" id="loginPage">
         <div class="login-box">
-            <h2>Vereinsverwaltung</h2>
+            <h2>EhrenSache</h2>
+            <h3 class ="org-name" id="loginOrgTitle">Mein Verein</h3>
             <form id="loginForm" onsubmit="return false;">
                 <div class="form-group">
                     <label for="email">E-Mail</label>
@@ -43,7 +46,8 @@
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
             <div class="sidebar-header">
-                <h3>Vereinsverwaltung</h3>
+                <h3>EhrenSache</h3>
+                <h4 class="org-name">Mein Verein</h4>
                 <div class="user-info">
                     <div>Angemeldet als:</div>
                     <strong id="currentUser">-</strong>
@@ -51,16 +55,19 @@
                 </div>
             </div>
             <ul class="nav-menu">
-                <li class="nav-item" data-section="einstellungen">
-                    <span>⚙️ Mein Profil</span>
+                <li class="nav-item" data-section="profil">
+                    <span>👤 Mein Profil</span>
                 </li>        
+                <li class="nav-item" data-section="einstellungen" data-role="admin">
+                    <span>⚙️ Einstellungen</span>
+                </li>
                 <li class="nav-item" data-section="benutzer" data-role="admin">
                     <span>🔐 Benutzer</span>
                 </li>       
-                <li class="nav-item" data-section="verwaltung" data-role="admin">
-                    <span>⚙️ Gruppenverwaltung</span>
+                <li class="nav-item" data-section="verwaltung" data-role="manager">
+                    <span>🎭 Gruppenverwaltung</span>
                 </li>
-                <li class="nav-item active" data-section="mitglieder" data-role="admin">
+                <li class="nav-item active" data-section="mitglieder" data-role="manager">
                     <span>👥 Mitglieder</span>
                 </li>     
                 <li class="nav-item" data-section="termine">
@@ -74,58 +81,58 @@
                 </li>  
                 <li class="nav-item" data-section="statistik">
                     <span>📊 Statistik</span>
-                </li>                       
-            </ul>
-            <button class="btn-logout" id="logoutBtn">Abmelden</button>
+                </li>                  
+            </ul>                        
             <!-- Quick Access Bar -->
             <div class="quick-access-bar">
                 <button class="quick-access-btn" id="openPWABtn" title="Check-In App öffnen">
                     📱 Check-In App
                 </button>
+                <button class="btn-logout" id="logoutBtn">Abmelden</button>
             </div>
         </nav>
 
         <!-- Main Content Area -->
         <main class="main-content">
-        <!-- Einstellungen Section -->
-            <div class="content-section" id="einstellungen">
+        <!-- Profil Section -->
+            <div class="content-section" id="profil">
                 <div class="content-header">
-                    <h1>Meine Einstellungen</h1>
+                    <h1>Mein Profil</h1>
                 </div>
 
-                <div class="settings-container">
+                <div class="profile-container">
                     <!-- Account-Informationen -->
-                    <div class="settings-card">
+                    <div class="profile-card">
                         <h3>Account-Informationen</h3>
-                        <div class="settings-item">
+                        <div class="profile-item">
                             <label>E-Mail-Adresse</label>
-                            <input type="email" id="settings_email" readonly style="background: #f8f9fa; cursor: not-allowed;">
+                            <input type="email" id="profile_email" readonly style="background: #f8f9fa; cursor: not-allowed;">
                             <small style="color: #7f8c8d;">Die E-Mail-Adresse kann nicht geändert werden</small>
                         </div>
-                        <div class="settings-item">
+                        <div class="profile-item">
                             <label>Rolle</label>
-                            <input type="text" id="settings_role" readonly style="background: #f8f9fa; cursor: not-allowed;">
+                            <input type="text" id="profile_role" readonly style="background: #f8f9fa; cursor: not-allowed;">
                         </div>
-                        <div class="settings-item" id="settings_member_info" style="display: none;">
+                        <div class="profile-item" id="profile_member_info" style="display: none;">
                             <label>Verknüpftes Mitglied</label>
-                            <input type="text" id="settings_member" readonly style="background: #f8f9fa; cursor: not-allowed;">
+                            <input type="text" id="profile_member" readonly style="background: #f8f9fa; cursor: not-allowed;">
                         </div>
                     </div>
 
                     <!-- Passwort ändern -->
-                    <div class="settings-card">
+                    <div class="profile-card">
                         <h3>Passwort ändern</h3>
                         <form id="changePasswordForm">
-                            <div class="settings-item">
+                            <div class="profile-item">
                                 <label for="current_password">Aktuelles Passwort*</label>
                                 <input type="password" id="current_password" required>
                             </div>
-                            <div class="settings-item">
+                            <div class="profile-item">
                                 <label for="new_password">Neues Passwort*</label>
                                 <input type="password" id="new_password" required minlength="6">
                                 <small style="color: #7f8c8d;">Mindestens 6 Zeichen</small>
                             </div>
-                            <div class="settings-item">
+                            <div class="profile-item">
                                 <label for="confirm_password">Passwort bestätigen*</label>
                                 <input type="password" id="confirm_password" required>
                             </div>
@@ -134,41 +141,90 @@
                     </div>
 
                     <!-- API-Token -->
-                    <div class="settings-card">
+                    <div class="profile-card">
                         <h3>API-Token für Zeiterfassung</h3>
                         <p style="color: #e74c3c; margin-bottom: 15px; font-size: 14px;">
                             ⚠️ Dieser Token wird für die Check-In App benötigt. Behandeln Sie diesen wie ein Passwort!
                         </p>
-                        <div class="settings-item">
+                        <div class="profile-item">
                             <label>API-Token</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
                                 <div style="flex: 1; position: relative;">
-                                    <input type="password" id="settings_token" readonly class="token-hidden"
+                                    <input type="password" id="profile_token" readonly class="token-hidden"
                                            style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace;">
-                                    <button onclick="toggleSettingsTokenVisibility()" id="toggleSettingsTokenBtn" type="button"
+                                    <button onclick="toggleProfileTokenVisibility()" id="toggleProfileTokenBtn" type="button"
                                             style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
                                         👁️
                                     </button>
                                 </div>
-                                <button onclick="copySettingsToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋 Kopieren</button>
+                                <button onclick="copyProfileToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋 Kopieren</button>
                             </div>
                         </div>
-                        <div id="settingsTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
-                        <button onclick="regenerateSettingsToken()" type="button" class="action-btn btn-delete" style="margin-top: 10px;">
+                        <div id="profileTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
+                        <button onclick="regenerateProfileToken()" type="button" class="action-btn btn-delete" style="margin-top: 10px;">
                             🔄 Neuen Token generieren
                         </button>
                     </div>
                 </div>
-            </div>            
+            </div>    
+            
+            <!-- System-Einstellungen Section (nur Admin) -->
+            <div class="content-section" id="einstellungen">
+                <div class="content-header">
+                    <h1>Systemeinstellungen</h1>
+                    <button class="btn-add" id="saveSettingsBtn">💾 Speichern</button>
+                </div>
+
+                <div class="settings-container">
+                    <!-- Allgemein -->
+                    <div class="settings-card">
+                        <h3>Allgemein</h3>
+                        <div class="settings-item">
+                            <label>Name der Organisation</label>
+                            <input type="text" id="setting_organization_name" class="setting-input" data-key="organization_name">
+                        </div>
+                    </div>
+
+                    <!-- Erscheinungsbild -->
+                    <div class="settings-card">
+                        <h3>Erscheinungsbild</h3>
+                        <div class="settings-item">
+                            <label>Primärfarbe</label>
+                            <input type="color" id="setting_primary_color" class="setting-input" data-key="primary_color">
+                        </div>
+                        <div class="settings-item">
+                            <label>Hintergrundfarbe</label>
+                            <input type="color" id="setting_background_color" class="setting-input" data-key="background_color">
+                        </div>
+                    </div>
+
+                    <!-- Paginierung -->
+                    <div class="settings-card">
+                        <h3>Paginierung</h3>
+                        <div class="settings-item">
+                            <label>Datenreihen pro Seite</label>
+                            <input type="number" 
+                                id="entries_per_page" 
+                                class="setting-input" 
+                                data-key="pagination_limit" 
+                                min="10" 
+                                max="100" 
+                                step="5"
+                                required>
+                            <small class="input-hint">(Werte zwischen 10 und 100 in 5er Schritten)</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Termine Section -->
             <div class="content-section" id="termine">
                 <div class="content-header">
                     <h1>Terminverwaltung</h1>                    
                      <div class="header-actions">
-                        <button class="btn-secondary" onclick="openAppointmentsImportModal()">📤 Import CSV</button>
-                        <button class="btn-secondary" data-role="admin" onclick="exportAppointments()">💾 Export CSV</button>                                    
-                        <button class="btn-add" data-role="admin" onclick="openAppointmentModal()">+ Neuer Termin</button>
+                        <button class="btn-secondary" data-role="admin" onclick="openAppointmentsImportModal()">📤 Import CSV</button>
+                        <button class="btn-secondary" data-role="manager" onclick="exportAppointments()">💾 Export CSV</button>                                    
+                        <button class="btn-add" data-role="manager" onclick="openAppointmentModal()">+ Neuer Termin</button>
                      </div>
                 </div>
                 <div class="stats-grid">
@@ -238,8 +294,8 @@
                     <h1>Anwesenheitsverwaltung</h1>
                     <div class="header-actions">                        
                         <button class="btn-secondary" data-role="admin" onclick="openRecordsImportModal()">📤 Import CSV</button>                  
-                        <button class="btn-secondary" data-role="admin" onclick="exportRecords()">💾 Export CSV</button>  
-                        <button class="btn-add" data-role="admin" onclick="openRecordModal()">+ Anwesenheit erfassen</button>
+                        <button class="btn-secondary" data-role="manager" onclick="exportRecords()">💾 Export CSV</button>  
+                        <button class="btn-add" data-role="manager" onclick="openRecordModal()">+ Anwesenheit erfassen</button>
                     </div>
                 </div>
 
@@ -426,8 +482,8 @@
                     <h1>Mitgliederverwaltung</h1> 
                     <div class="header-actions">                        
                         <button class="btn-secondary" data-role="admin" onclick="openImportModal()">📤 Import CSV</button>
-                        <button class="btn-secondary" data-role="admin" onclick="exportMembers()">💾 Export CSV</button>            
-                        <button class="btn-add" data-role="admin" onclick="openMemberModal()">+ Neues Mitglied</button>                    
+                        <button class="btn-secondary" data-role="manager" onclick="exportMembers()">💾 Export CSV</button>            
+                        <button class="btn-add" data-role="manager" onclick="openMemberModal()">+ Neues Mitglied</button>                    
                     </div>
                 </div>
                 
@@ -496,6 +552,7 @@
                         <select id="filterUserRole" class="form-input">
                             <option value="">Alle Rollen</option>
                             <option value="admin">Administrator</option>
+                            <option value="manager">Manager</option>
                             <option value="user">Benutzer</option>
                             <option value="device">Gerät</option>
                         </select>
@@ -830,7 +887,8 @@
                     <div class="form-group">
                         <label for="user_role">Rolle*</label>
                         <select id="user_role" required>
-                            <option value="user">Benutzer</option>
+                            <option value="user">Benutzer</option>                        
+                            <option value="manager">Manager</option>
                             <option value="admin">Administrator</option>
                             <option value="device">Gerät (TOTP/Terminal)</option>
                         </select>
@@ -1157,7 +1215,7 @@
     <script type="module" src="./js/modules/records.js"></script>
     <script type="module" src="./js/modules/exceptions.js"></script>
     <script type="module" src="./js/modules/users.js"></script>
-    <script type="module" src="./js/modules/settings.js"></script>
+    <script type="module" src="./js/modules/profile.js"></script>
     <script type="module" src="./js/modules/management.js"></script>
     <script type="module" src="./js/modules/statistics.js"></script>
     <script type="module" src="./js/modules/import_export.js"></script>

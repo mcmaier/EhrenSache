@@ -1,10 +1,11 @@
 
-import { apiCall, currentUser, isAdmin } from './api.js';
+import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache,currentYear} from './ui.js';
 import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime , updateModalId} from './utils.js';
 import { loadAppointments } from './appointments.js';
 import { loadMembers } from './members.js';
 import {debug} from '../app.js'
+import { globalPaginationValue } from './settings.js';
 
 // ============================================
 // EXCEPTIONS
@@ -13,7 +14,7 @@ import {debug} from '../app.js'
 // ============================================
 
 let currentExceptionsPage = 1;
-const exceptionsPerPage = 25;
+let exceptionsPerPage = 25;
 let allFilteredExceptions = [];
 
 // ============================================
@@ -54,6 +55,8 @@ export async function renderExceptions(exceptions, page = 1)
         updateExceptionStats([]);
         return;
     }
+
+    exceptionsPerPage = globalPaginationValue;
 
     // Alle Exceptions speichern für Pagination
     allFilteredExceptions = exceptions;
@@ -97,7 +100,7 @@ export async function renderExceptions(exceptions, page = 1)
 
         // Aktionen: User sehen nur bei pending eigene Anträge Buttons
         let actionsHtml = '';
-        if (isAdmin && (exception.status === 'pending')) {
+        if (isAdminOrManager && (exception.status === 'pending')) {
             actionsHtml = `
                 <td class="actions-cell">
                     <button class="action-btn btn-icon btn-approve" 
@@ -122,7 +125,7 @@ export async function renderExceptions(exceptions, page = 1)
                     </button>
                 </td>
             `;
-        } else if (isAdmin) {
+        } else if (isAdminOrManager) {
                 actionsHtml = `
                     <td class="actions-cell">
                         <button class="action-btn btn-icon btn-view" 
@@ -421,7 +424,7 @@ export async function loadExceptionModalFilters(forceReload = false) {
     }
     
     // Lade Mitglieder für Dropdown (nur für Admin)
-    if (isAdmin) {
+    if (isAdminOrManager) {
         const members = await loadMembers(forceReload);
 
         //const members = await apiCall('members');
@@ -447,11 +450,11 @@ export async function openExceptionModal(exceptionId = null) {
     await loadExceptionModalFilters();
     
     // Admin-Felder ein/ausblenden
-    document.getElementById('exceptionStatusGroup').style.display = isAdmin ? 'block' : 'none';
-    document.getElementById('exceptionMemberGroup').style.display = isAdmin ? 'block' : 'none';
+    document.getElementById('exceptionStatusGroup').style.display = isAdminOrManager ? 'block' : 'none';
+    document.getElementById('exceptionMemberGroup').style.display = isAdminOrManager ? 'block' : 'none';
     
     if (exceptionId) {
-        title.textContent = isAdmin ? 'Antrag bearbeiten' : 'Antrag ansehen';
+        title.textContent = isAdminOrManager ? 'Antrag bearbeiten' : 'Antrag ansehen';
         await loadExceptionData(exceptionId);
         updateModalId('exceptionModal', exceptionId)
     } else {
@@ -465,7 +468,7 @@ export async function openExceptionModal(exceptionId = null) {
 
         // User: Automatisch eigene Member-ID setzen
         //TODO Daten aus Cache laden
-        if (!isAdmin) {
+        if (!isAdminOrManager) {
             const userData = await apiCall('me');
             const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
             if (userDetails && userDetails.member_id) {
@@ -496,7 +499,7 @@ export function toggleExceptionFields() {
         document.getElementById('exception_requested_time').required = false;
     }
 
-    if(isAdmin)
+    if(isAdminOrManager)
     {
         document.getElementById('exception_member').required = true;
     }
@@ -554,7 +557,7 @@ export async function loadExceptionData(exceptionId) {
         toggleExceptionFields();                  
         
         // Bei nicht-pending Status: Felder readonly für User
-        if (!isAdmin && exception.status !== 'pending') {
+        if (!isAdminOrManager && exception.status !== 'pending') {
             document.querySelectorAll('#exceptionForm input, #exceptionForm select, #exceptionForm textarea').forEach(field => {
                 field.disabled = true;
                 field.required = false;
@@ -576,7 +579,7 @@ export async function saveException() {
     const exceptionId = document.getElementById('exception_id').value;
     
     let member_id;
-    if (isAdmin) {
+    if (isAdminOrManager) {
         member_id = parseInt(document.getElementById('exception_member').value);
     } else {
         //TODO Load User Data from cache
@@ -601,7 +604,7 @@ export async function saveException() {
         exception_type: type,
         reason: document.getElementById('exception_reason').value,
         requested_arrival_time: requested_time,
-        status: isAdmin ? document.getElementById('exception_status').value : 'pending'
+        status: isAdminOrManager ? document.getElementById('exception_status').value : 'pending'
     };
     
     debug.log("Exception data:",data);
@@ -619,7 +622,7 @@ export async function saveException() {
         await invalidateCache('exceptions',currentYear);
         
         // Wenn Zeitkorrektur genehmigt wurde, Records neu laden
-        if (isAdmin && data.status === 'approved' && data.exception_type === 'time_correction') {
+        if (isAdminOrManager && data.status === 'approved' && data.exception_type === 'time_correction') {
             invalidateCache('records',currentYear);
         }
         applyExceptionFilters();

@@ -15,7 +15,7 @@ function handleTokenRegeneration($db, $request_method, $authUserId, $authUserRol
     $targetUserId = $data->user_id ?? $authUserId; // Standard: eigener User
     
     // Device darf keinen Token regenerieren
-    if($authUserRole === 'device') {
+    if(isDevice()) {
         http_response_code(403);
         echo json_encode([
             "message" => "Devices cannot regenerate tokens",
@@ -25,7 +25,7 @@ function handleTokenRegeneration($db, $request_method, $authUserId, $authUserRol
     }
     
     // User darf nur eigenen Token regenerieren
-    if($authUserRole !== 'admin' && $targetUserId != $authUserId) {
+    if(!isAdmin() && ($targetUserId != $authUserId)) {
         http_response_code(403);
         echo json_encode([
             "message" => "You can only regenerate your own token",
@@ -35,7 +35,7 @@ function handleTokenRegeneration($db, $request_method, $authUserId, $authUserRol
     }
     
     // Admin darf jeden Token regenerieren
-    if($authUserRole === 'admin') {
+    if(isAdmin()) {
         // Prüfe ob Ziel-User existiert
         $checkStmt = $db->prepare("SELECT user_id, role FROM users WHERE user_id = ?");
         $checkStmt->execute([$targetUserId]);

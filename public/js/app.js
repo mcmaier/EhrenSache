@@ -1,6 +1,7 @@
 import { loadAllData, showLogin, showDashboard, initNavigation, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, initEventHandlers} from './modules/ui.js';
-import { apiCall, setCurrentUser, setCsrfToken, setInitialLoad, currentUser, isAdmin} from './modules/api.js';
+import { apiCall, setCurrentUser, setCsrfToken, setInitialLoad, } from './modules/api.js';
 import { initAuth } from './modules/auth.js';
+import { applyTheme, renderSystemSettings } from './modules/settings.js';
 
 // ============================================
 // INIT JS

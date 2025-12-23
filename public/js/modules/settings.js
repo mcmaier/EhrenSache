@@ -1,217 +1,214 @@
-import { apiCall, currentUser, isAdmin } from './api.js';
-import { showToast, showConfirm, isCacheValid, dataCache, invalidateCache } from './ui.js';
-import { loadUserData } from './users.js';
-import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime } from './utils.js';
-import {debug} from '../app.js'
+import { apiCall, isAdmin } from './api.js';
+import { showToast } from './ui.js';
+import { debug } from '../app.js';
+
+let systemSettings = {};
+let hasUnsavedChanges = false;
+
+export let globalPaginationValue = 25;
 
 // ============================================
-// SETTINGS
-// Reference:
-// import {} from './settings.js'
+// DATA FUNCTIONS
 // ============================================
 
-// ============================================
-// DATA FUNCTIONS (API-Calls)
-// ============================================
-
-export async function loadSettings(forceReload = false) {
-
-    await loadUserData(forceReload);
-
-    const userDetails = dataCache.userData.data.userDetails; 
-
-    // Account-Informationen
-    document.getElementById('settings_email').value = userDetails.email;
-    const roleText = userDetails.role === 'admin' ? 'Administrator' :
-                     userDetails.role === 'device' ? 'Gerät' :
-                     'Benutzer';
-    document.getElementById('settings_role').value = roleText;
-
-    // Verknüpftes Mitglied anzeigen
-    const memberInfoDiv = document.getElementById('settings_member_info');
-    const memberInput = document.getElementById('settings_member');
+export async function loadSystemSettings() {
+    if (!isAdmin) return;
     
-    if (userDetails.member_id) {
-        // Hole Mitglieds-Details
-        const member = await apiCall('members', 'GET', null, { id: userDetails.member_id });
-        
-        if (member) {
-            memberInfoDiv.style.display = 'block';
-            memberInput.value = `${member.surname}, ${member.name}`;
-            
-            // Optional: Mitgliedsnummer anzeigen
-            if (member.member_number) {
-                memberInput.value += ` (${member.member_number})`;
-            }
-        } else {
-            memberInfoDiv.style.display = 'none';
-        }
-    } else {
-        memberInfoDiv.style.display = 'none';
-    }
-
-     //API-Token neu laden und versteckt anzeigen
-    const tokenInput = document.getElementById('settings_token');
-    const toggleBtn = document.getElementById('toggleSettingsTokenBtn');
-    const expiryInfo = document.getElementById('settingsTokenExpiryInfo');
+    debug.log("Loading SYSTEM SETTINGS from API");
+    const response = await apiCall('settings');
+    systemSettings = {};
     
-    // API-Token
-    if (userDetails.api_token) {
-        document.getElementById('settings_token').value = userDetails.api_token;
-
-        // Token als versteckt zurücksetzen
-        tokenInput.type = 'password';
-        toggleBtn.textContent = '👁️';
-        
-        // Ablaufdatum anzeigen
-        if (userDetails.api_token_expires_at) {
-            const expiresAt = new Date(userDetails.api_token_expires_at);
-            const now = new Date();
-            const isExpired = now > expiresAt;
-            
-            const expiresText = expiresAt.toLocaleDateString('de-DE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            });
-            
-            expiryInfo.innerHTML = isExpired 
-                ? `<span style="color: #e74c3c;">⚠️ Abgelaufen am: ${expiresText}</span>`
-                : `<span style="color: #7f8c8d;">Gültig bis: ${expiresText}</span>`;
-            expiryInfo.style.display = 'block';
-        } else {
-            expiryInfo.style.display = 'none';
-        }
-    } else {
-        tokenInput.value = '';
-        expiryInfo.style.display = 'none';    
-    }
-}
-
-
-// ============================================
-// CRUD FUNCTIONS
-// ============================================
-
-export function initSettingsEventHandler()
-{
-    if (changePasswordForm) {
-        changePasswordForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            try {
-                await handlePasswordChange(e);
-            } catch (error) {
-                debug.error('Fehler beim Passwort ändern:', error);
-            }
-        });
-    } 
-}
-
-export async function handlePasswordChange(e)
-{            
-    const currentPassword = document.getElementById('current_password').value;
-    const newPassword = document.getElementById('new_password').value;
-    const confirmPassword = document.getElementById('confirm_password').value;
-        
-    // Validierung
-    if (newPassword !== confirmPassword) {
-        showToast('Die Passwörter stimmen nicht überein', 'error');
-        return;
-    }
-    
-    if (newPassword.length < 6) {
-        showToast('Das Passwort muss mindestens 6 Zeichen lang sein', 'error');
-        return;
-    }
-    
-    // API-Call zum Passwort ändern
-    const result = await apiCall('change_password', 'POST', {
-        current_password: currentPassword,
-        new_password: newPassword
+    // Array zu Object umwandeln für einfachen Zugriff
+    response.settings.forEach(setting => {
+        systemSettings[setting.setting_key] = setting.setting_value;
     });
     
-    if (result && result.message) {
-        document.getElementById('changePasswordForm').reset();
-        showToast('Passwort erfolgreich geändert', 'success');
-    } else {
-        document.getElementById('changePasswordForm').reset();
-        showToast(result?.message || 'Passwort konnte nicht geändert werden', 'error');
-    }
+    return systemSettings;
+}
+
+export async function loadPublicSettings() {
+    debug.log("Loading PUBLIC SETTINGS from API");
+    const response = await apiCall('appearance');
+    return response.settings;
 }
 
 // ============================================
-// TOKEN MANAGEMENT
+// RENDER FUNCTIONS
 // ============================================
 
-export function copySettingsToken() {
-    const tokenInput = document.getElementById('settings_token');
-    if (tokenInput) {
-        tokenInput.select();
-        tokenInput.setSelectionRange(0, 99999);
-        
-        navigator.clipboard.writeText(tokenInput.value).then(() => {
-            showToast('Token in Zwischenablage kopiert!', 'success');
-        }).catch(() => {
-            document.execCommand('copy');
-            showToast('Token kopiert!', 'success');
-        });
-    }
-}
-
-
-// Token-Funktionen für Settings
-export function toggleSettingsTokenVisibility() {
+export async function renderSystemSettings() {
+    if (!isAdmin) return;
     
-    const tokenInput = document.getElementById('settings_token');
-    const toggleBtn = document.getElementById('toggleSettingsTokenBtn');
-
-    if (tokenInput.type === 'password') {
-        tokenInput.type = 'text';
-        toggleBtn.textContent = '🙈'; // Auge durchgestrichen
-    } else {
-        tokenInput.type = 'password';
-        toggleBtn.textContent = '👁️'; // Auge offen
-    }
-}
-
-export async function regenerateSettingsToken() {
-    const confirmed = await showConfirm(
-        'Token wirklich neu generieren? Der alte Token wird ungültig!',
-        'Token neu generieren'
-    );
+    const settings = await loadSystemSettings();
     
-    if (confirmed) {
-        // Ohne user_id → eigener Token
-        const result = await apiCall('regenerate_token', 'POST', {});
-        
-        if (result && result.api_token) {
-            document.getElementById('settings_token').value = result.api_token;
-            
-            // Expiry-Info aktualisieren
-            if (result.expires_at) {
-                const expiresAt = new Date(result.expires_at);
-                const expiresText = expiresAt.toLocaleDateString('de-DE', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                });
-                document.getElementById('settingsTokenExpiryInfo').textContent = `Gültig bis: ${expiresText}`;
+    // Felder befüllen
+    Object.keys(settings).forEach(key => {
+        const input = document.querySelector(`[data-key="${key}"]`);
+        if (input) {
+            if (input.type === 'checkbox') {
+                input.checked = settings[key] === '1';
+            } else {
+                input.value = settings[key];
             }
+        }
+    });
 
-            invalidateCache('userData');
-            
-            showToast('Neuer Token generiert!', 'success');
+    // Reset unsaved changes flag
+    hasUnsavedChanges = false;
+    updateSaveButtonState();
+    
+    // Event-Listener für Änderungen (nur markieren, nicht speichern)
+    document.querySelectorAll('.setting-input').forEach(input => {
+        input.removeEventListener('input', markAsChanged);
+        input.addEventListener('input', markAsChanged);
+    });
+
+    // Event-Listener für Speichern-Button
+    const saveBtn = document.getElementById('saveSettingsBtn');
+    if (saveBtn) {
+        saveBtn.removeEventListener('click', saveAllSettings);
+        saveBtn.addEventListener('click', saveAllSettings);
+    }
+}
+
+function markAsChanged() {
+    const input = event.target;
+    
+    // Validierung für Number-Inputs
+    if (input.type === 'number') {
+        const value = parseInt(input.value);
+        const min = parseInt(input.min);
+        const max = parseInt(input.max);
+        
+        if (isNaN(value) || value < min || value > max) {
+            input.classList.add('invalid');
+            input.setCustomValidity(`Wert muss zwischen ${min} und ${max} liegen`);
+            return; // Nicht als geändert markieren
+        } else {
+            input.classList.remove('invalid');
+            input.setCustomValidity('');
+        }
+    }
+    
+    hasUnsavedChanges = true;
+    updateSaveButtonState();
+}
+
+
+function updateSaveButtonState() {
+    const saveBtn = document.getElementById('saveSettingsBtn');
+    if (saveBtn) {
+        if (hasUnsavedChanges) {
+            saveBtn.classList.add('has-changes');
+            saveBtn.textContent = '💾 Speichern *';
+        } else {
+            saveBtn.classList.remove('has-changes');
+            saveBtn.textContent = '💾 Speichern';
         }
     }
 }
 
+async function saveAllSettings() {
+    const inputs = document.querySelectorAll('.setting-input');
+    const updates = [];
+
+    // Validierung vor dem Speichern
+    let hasErrors = false;
+    inputs.forEach(input => {
+        if (input.type === 'number') {
+            const value = parseInt(input.value);
+            const min = parseInt(input.min);
+            const max = parseInt(input.max);
+            
+            if (isNaN(value) || value < min || value > max) {
+                input.classList.add('invalid');
+                hasErrors = true;
+            }
+        }
+    });
+    
+    if (hasErrors) {
+        showToast('Bitte korrigiere die ungültigen Eingaben', 'error');
+        return;
+    }
+    
+    inputs.forEach(input => {
+        const key = input.dataset.key;
+        let value;
+        
+        if (input.type === 'checkbox') {
+            value = input.checked ? '1' : '0';
+        } else {
+            value = input.value;
+        }
+        
+        // Nur speichern wenn Wert sich geändert hat
+        if (systemSettings[key] !== value) {
+            updates.push({ key, value });
+        }
+    });
+    
+    if (updates.length === 0) {
+        showToast('Keine Änderungen zum Speichern', 'info');
+        return;
+    }
+    
+    try {
+        // Alle Änderungen nacheinander speichern
+        for (const update of updates) {
+            await apiCall('settings', 'PUT', {
+                setting_key: update.key,
+                setting_value: update.value
+            });
+            
+            // Lokalen Cache aktualisieren
+            systemSettings[update.key] = update.value;
+            
+            // Theme-Einstellungen sofort anwenden
+            applyThemeSetting(update.key, update.value);
+        }
+        
+        hasUnsavedChanges = false;
+        updateSaveButtonState();
+        showToast(`${updates.length} Einstellung(en) gespeichert`, 'success');
+        
+    } catch (error) {
+        showToast('Fehler beim Speichern', 'error');
+    }
+}
+
+function applyThemeSetting(key, value) {
+    const root = document.documentElement;
+    
+    if (key === 'primary_color') {
+        root.style.setProperty('--primary-color', value);
+    } else if (key === 'background_color') {
+        root.style.setProperty('--background-color', value);
+    } else if (key === 'organization_name') {
+        document.title = "EhrenSache - " + value;
+    }
+    else if(key === 'pagination_limit')
+    {
+        debug.log("Pagination Value changed:",value);
+        globalPaginationValue = value;
+    }
+}
+
 // ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
+// THEME (öffentlich)
 // ============================================
 
-window.regenerateSettingsToken = regenerateSettingsToken;
-window.copySettingsToken = copySettingsToken;
-window.toggleSettingsTokenVisibility = toggleSettingsTokenVisibility;
-
+export async function applyTheme() {
+    const settings = await loadPublicSettings();
+    const root = document.documentElement;
+    
+    if (settings.primary_color) {
+        root.style.setProperty('--primary-color', settings.primary_color);
+    }
+    if (settings.background_color) {
+        root.style.setProperty('--background-color', settings.background_color);
+    }
+    if (settings.organization_name) {
+        document.title = settings.organization_name;
+    }
+}

@@ -98,6 +98,7 @@ function renderUsers(users, page = 1)
 
     // Rollentext mit Device-Type
     let roleText = user.role === 'admin' ? 'Admin' : 
+                    user.role === 'manager' ? 'Manager' :
                     user.role === 'user' ? 'Benutzer' : 
                     'Gerät ';
     

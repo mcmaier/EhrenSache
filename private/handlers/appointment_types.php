@@ -50,6 +50,8 @@ function handleAppointmentTypes($db, $method, $id) {
             break;
             
         case 'POST':
+            requireAdminOrManager();
+
             $data = json_decode(file_get_contents("php://input"));
 
             // Wenn is_default=true, setze alle anderen auf false
@@ -85,6 +87,8 @@ function handleAppointmentTypes($db, $method, $id) {
             break;
             
         case 'PUT':
+            requireAdminOrManager();
+
             $data = json_decode(file_get_contents("php://input"));
 
             // Wenn is_default=true, setze alle anderen auf false (außer dieser)
@@ -120,6 +124,8 @@ function handleAppointmentTypes($db, $method, $id) {
             break;
             
         case 'DELETE':
+            requireAdminOrManager();
+            
             $stmt = $db->prepare("DELETE FROM appointment_types WHERE type_id = ?");
             if($stmt->execute([$id])) {
                 echo json_encode(["message" => "Type deleted"]);

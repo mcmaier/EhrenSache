@@ -10,12 +10,14 @@ function handleExport($db, $request_method, $authUserRole) {
         exit();
     }
     
+    requireAdminOrManager();
+    /*
     // Nur Admins dürfen exportieren
     if ($authUserRole !== 'admin') {
         http_response_code(403);
         echo json_encode(["message" => "Admin access required"]);
         exit();
-    }
+    }*/
     
     $type = $_GET['type'] ?? 'members';
     

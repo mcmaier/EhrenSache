@@ -101,7 +101,7 @@ CREATE TABLE `users` (
   `user_id` int(11) NOT NULL,
   `email` varchar(255) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
-  `role` enum('admin','user','device') DEFAULT 'user',
+  `role` enum('admin','manager','user','device') DEFAULT 'user',
   `device_type` enum('totp_location','auth_device') DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `member_id` int(11) DEFAULT NULL,
@@ -290,6 +290,25 @@ ALTER TABLE records ADD INDEX idx_year (arrival_time);
 ALTER TABLE appointments ADD INDEX idx_year (date);
 ALTER TABLE member_group_assignments ADD INDEX idx_member (member_id);
 ALTER TABLE member_group_assignments ADD INDEX idx_group (group_id);
+
+CREATE TABLE `system_settings` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `setting_key` VARCHAR(50) NOT NULL UNIQUE,
+  `setting_value` TEXT,
+  `setting_type` ENUM('text', 'number', 'color', 'boolean') DEFAULT 'text',
+  `category` ENUM('general', 'appearance', 'pagination', 'security') DEFAULT 'general',
+  `description` VARCHAR(255),
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `updated_by` INT,
+  FOREIGN KEY (`updated_by`) REFERENCES `users`(`user_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Standard-Werte einfügen
+INSERT INTO `system_settings` (`setting_key`, `setting_value`, `setting_type`, `category`, `description`) VALUES
+('organization_name', 'EhrenZeit', 'text', 'general', 'Name der Organisation'),
+('primary_color', '#007bff', 'color', 'appearance', 'Primärfarbe'),
+('background_color', '#f8f9fa', 'color', 'appearance', 'Hintergrundfarbe'),
+('pagination_limit', '25', 'number', 'pagination', 'Einträge pro Seite')
 
 /* Beispieldaten*/
 /*

@@ -180,13 +180,72 @@ function requireAuth() {
     }
 }
 
-function requireRole($role) {
+function requireRole($allowedRoles) {
     requireAuth();
-    if($_SESSION['role'] !== $role) {
-        http_response_code(403);
-        echo json_encode(["message" => "Forbidden"]);
-        exit();
+
+    if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Nicht authentifiziert']);
+        exit;
     }
+    
+    // Wenn Array übergeben wurde, prüfe ob Rolle enthalten ist
+    if (is_array($allowedRoles)) {
+        if (!in_array($_SESSION['role'], $allowedRoles)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Zugriff verweigert']);
+            exit;
+        }
+    } else {
+        // Einzelne Rolle
+        if ($_SESSION['role'] !== $allowedRoles) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Zugriff verweigert']);
+            exit;
+        }
+    }
+}
+
+function requireAdminOrManager()
+{
+    if(!isAdminOrManager())
+    {
+        http_response_code(403);
+        echo json_encode(['error' => 'Zugriff verweigert']);
+        exit;
+    }
+}
+
+function requireAdmin()
+{
+    if(!isAdmin())
+    {
+        http_response_code(403);
+        echo json_encode(['error' => 'Zugriff verweigert']);
+        exit;
+    }
+}
+
+function requireDevice()
+{
+    if(!isDevice())
+    {
+        http_response_code(403);
+        echo json_encode(['error' => 'Zugriff verweigert']);
+        exit;
+    }
+}
+
+function isAdminOrManager() {
+    return isset($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'manager']);
+}
+
+function isAdmin() {
+    return isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
+}
+
+function isDevice() {
+    return isset($_SESSION['role']) && $_SESSION['role'] === 'device';
 }
 
 function getCurrentUserId() {

@@ -1,14 +1,15 @@
 import {TOAST_DURATION} from '../config.js';
-import {apiCall, isAdmin, currentUser, setCurrentUser} from './api.js';
-import {loadSettings, initSettingsEventHandler} from './settings.js';
+import {apiCall, isAdmin, isManager, isAdminOrManager, currentUser, setCurrentUser} from './api.js';
+import {loadProfile, initProfileEventHandler} from './profile.js';
 import {loadUsers, showUserSection, initUsersEventHandlers} from'./users.js';
 import {loadAppointments, setCalendarToYear, showAppointmentSection} from'./appointments.js';
 import {loadExceptions, showExceptionSection, initExceptionEventHandlers} from'./exceptions.js';
 import {loadRecords, showRecordsSection, initRecordEventHandlers} from'./records.js';
 import {loadMembers, showMemberSection} from'./members.js';
 import {loadGroups, loadTypes, showGroupSection} from './management.js';
-import {loadStatistics, initStatisticsEventHandlers, showStatisticsSection} from './statistics.js';
+import {initStatisticsEventHandlers, showStatisticsSection} from './statistics.js';
 import {debug} from '../app.js'
+import {renderSystemSettings} from './settings.js';
 
 // ============================================
 // UI
@@ -339,14 +340,29 @@ export async function showConfirm(message, title = 'Bestätigung') {
 }
 
 export function updateUIForRole() {
-    // Buttons mit data-role="admin" nur für Admins anzeigen
-    const adminButtons = document.querySelectorAll('[data-role="admin"]');
-    adminButtons.forEach(btn => {
-        btn.style.display = isAdmin ? 'block' : 'none';
+    // Sections für Admin und Manager sichtbar
+    document.querySelectorAll('[data-role="admin"]').forEach(el => {
+        el.style.display = isAdmin ? 'block' : 'none';
     });
     
+    document.querySelectorAll('[data-role="manager"]').forEach(el => {
+        el.style.display = isAdminOrManager ? 'block' : 'none';
+    });
+    
+    // System-Einstellungen NUR für Admin
+    const systemSettings = document.querySelector('[data-section="einstellungen"]');
+    if (systemSettings) {
+        systemSettings.style.display = isAdmin ? 'block' : 'none';
+    }
+    
+    // Benutzer-Verwaltung NUR für Admin
+    const userSection = document.querySelector('[data-section="benutzer"]');
+    if (userSection) {
+        userSection.style.display = isAdmin ? 'block' : 'none';
+    }
+    
     // Filter-Leiste anpassen
-    if (!isAdmin) {
+    if (!isAdminOrManager) {
         const filterMember = document.getElementById('filterMember');
         if (filterMember) {
             filterMember.style.display = 'none';
@@ -402,16 +418,16 @@ export function showDashboard() {
 
         // Setze aktive Navigation basierend auf gespeicherter Section
         let section = sessionStorage.getItem('currentSection');
-        
+                
         // Validiere Section für User
-        if (!section || (section === 'mitglieder' && !isAdmin)) {
-            section = 'einstellungen';
+        if (!section || (section === 'mitglieder' && !isAdminOrManager)) {
+            section = 'profil';
             sessionStorage.setItem('currentSection', section);
         }
 
         const userTerminInfo = document.getElementById('userTerminInfo');
         if (userTerminInfo) {
-            userTerminInfo.style.display = isAdmin ? 'none' : 'block';
+            userTerminInfo.style.display = isAdminOrManager ? 'none' : 'block';
         }
         
         // Aktiviere entsprechende Navigation
@@ -453,7 +469,7 @@ export function updateTableHeaders() {
         });
         
         // Füge Aktionen-Spalte nur für Admins hinzu
-        if (isAdmin || (table.id === 'exceptionsTableBody')) {
+        if (isAdminOrManager || (table.id === 'exceptionsTableBody')) {
             thead.innerHTML += '<th>Aktionen</th>';
         }
     });
@@ -490,39 +506,25 @@ export async function initNavigation() {
     });
 }
 
-export async function initDataCache()
-{   
-    loadSettings(true);
-    loadUsers(true);
-    loadMembers(true);         
-    loadTypes(true);
-    loadGroups(true);
-    
-    loadAppointments(true, currentYear);
-    loadExceptions(true, currentYear);
-    loadRecords(true, currentYear);
-    loadStatistics(true, currentYear);
-}
-
 export async function initEventHandlers()
 {
     initRecordEventHandlers();
     initExceptionEventHandlers();
     initStatisticsEventHandlers();
     initUsersEventHandlers();
-    initSettingsEventHandler();
+    initProfileEventHandler();
 }
 
 
 export async function loadAllData() {
-    const section = sessionStorage.getItem('currentSection') || 'einstellungen';
+    const section = sessionStorage.getItem('currentSection') || 'profil';
 
     debug.log("== LOAD ALL DATA == ")
 
     switch(section)
     {
-        case 'einstellungen':
-            await loadSettings(true);
+        case 'profil':
+            await loadProfile(true);
             break;
         case 'mitglieder':
             await showMemberSection(true);
@@ -542,12 +544,15 @@ export async function loadAllData() {
             }            
             break;
         case 'verwaltung':
-            if(isAdmin){
+            if(isAdminOrManager){
                 await showGroupSection(true);
             }
             break;
         case 'statistik':
             await showStatisticsSection();
+            break;
+        case  'einstellungen':
+            await renderSystemSettings();
             break;
             default:
                 break;

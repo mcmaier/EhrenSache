@@ -27,7 +27,7 @@ function handleExceptions($db, $method, $id) {
                 $exception = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 // User dürfen nur ihre eigenen Exceptions sehen
-                if($_SESSION['role'] !== 'admin') {
+                if($_SESSION['role'] !isAdminOrManager() {
                     $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $userMemberId = $userStmt->fetchColumn();
@@ -53,7 +53,7 @@ function handleExceptions($db, $method, $id) {
                 $year = $_GET['year'] ?? null;
                 
                 // User sehen nur ihre eigenen Exceptions
-                if($_SESSION['role'] !== 'admin') {
+                if(!isAdminOrManager()) {
                     $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $member_id = $userStmt->fetchColumn();
@@ -116,7 +116,7 @@ function handleExceptions($db, $method, $id) {
             // Prüfe ob User für sich selbst oder Admin für andere
             $requesting_member_id = $data->member_id;
             
-            if($_SESSION['role'] !== 'admin') {
+            if(!isAdminOrManager()) {
                 // User dürfen nur für sich selbst Anträge stellen
                 $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
                 $userStmt->execute([getCurrentUserId()]);
@@ -174,7 +174,7 @@ function handleExceptions($db, $method, $id) {
             }
             
             // User dürfen nur ihre eigenen pending Anträge bearbeiten
-            if($_SESSION['role'] !== 'admin') {
+            if(!isAdminOrManager()) {
                 $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
                 $userStmt->execute([getCurrentUserId()]);
                 $userMemberId = $userStmt->fetchColumn();
@@ -243,7 +243,7 @@ function handleExceptions($db, $method, $id) {
                 return;
             }
             
-            if($_SESSION['role'] !== 'admin') {
+            if(!isAdminOrManager()) {
                 $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
                 $userStmt->execute([getCurrentUserId()]);
                 $userMemberId = $userStmt->fetchColumn();

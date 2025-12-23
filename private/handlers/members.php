@@ -7,31 +7,29 @@
 function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMemberId) {
     switch($method) {
         case 'GET':
-            if($id) {    
-                // Zugriffskontrolle: Nur Admin können alle Infos lesen
-                if ($_SESSION['role'] === 'admin') {
+            if($id) {  
+                // Zugriffskontrolle: Nur Admin können alle Infos lesen  
+                if(isAdminOrManager())                
+                {
+                    $stmt = $db->prepare("SELECT * FROM members WHERE member_id = ?");
+                    $stmt->execute([$id]);
+                    $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                        $stmt = $db->prepare("SELECT * FROM members WHERE member_id = ?");
-                        $stmt->execute([$id]);
-                        $member = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                        if($member) {
-                            // Lade zugehörige Gruppen
-                            $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name 
-                                                        FROM member_groups g
-                                                        INNER JOIN member_group_assignments mga ON g.group_id = mga.group_id
-                                                        WHERE mga.member_id = ?");
-                            $groupStmt->execute([$id]);
-                            $member['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
-                            //$member['group_ids'] = array_column($member['groups'], 'group_id');
-                            //$member['group_names'] = implode(', ', array_column($member['groups'], 'group_name'));
-            
-                            echo json_encode($member ?: []);
-                        }
-                        else {
-                            http_response_code(404);
-                            echo json_encode(["message" => "Member not found"]);
-                        }
+                    if($member) {
+                        // Lade zugehörige Gruppen
+                        $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name 
+                                                    FROM member_groups g
+                                                    INNER JOIN member_group_assignments mga ON g.group_id = mga.group_id
+                                                    WHERE mga.member_id = ?");
+                        $groupStmt->execute([$id]);
+                        $member['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+                        echo json_encode($member ?: []);
+                    }
+                    else {
+                        http_response_code(404);
+                        echo json_encode(["message" => "Member not found"]);
+                    }
                 }               
                 else{
                     $memberId = $authMemberId; 
@@ -60,7 +58,7 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
             else
             {
                 // Zugriffskontrolle: Nur Admin können alle Infos lesen
-                if ($_SESSION['role'] === 'admin') 
+                if(isAdminOrManager())    
                 {
                     $group_id = $_GET['group_id'] ?? null;
                     $params = [];
@@ -97,7 +95,7 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
              
                     $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
-                else if($_SESSION['role'] === 'device')
+                else if(isDevice())
                 {
                     // Liste aller Mitglieder mit Member_Number für Auto-Checkin
                     $stmt = $db->query("SELECT name, surname, member_number FROM members ORDER BY surname, name");
@@ -105,7 +103,7 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
                 }
                 else
                 {
-                    // Liste aller Mitglieder
+                    // Liste aller Mitglieder ohne weitere Infos
                     $stmt = $db->query("SELECT name, surname FROM members ORDER BY surname, name");
                                 $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
@@ -115,6 +113,8 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
             break;
             
         case 'POST':
+            requireAdminOrManager();
+
             $data = json_decode(file_get_contents("php://input"));
 
             // Nur erlaubte Felder extrahieren
@@ -161,6 +161,8 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
             break;
             
         case 'PUT':
+            requireAdminOrManager();
+
             $data = json_decode(file_get_contents("php://input"));
 
             // Nur erlaubte Felder extrahieren
@@ -213,6 +215,8 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
             break;
             
         case 'DELETE':
+            requireAdminOrManager();
+
             // Lösche zuerst abhängige Datensätze
             $db->prepare("DELETE FROM records WHERE member_id = ?")->execute([$id]);
             $db->prepare("DELETE FROM exceptions WHERE member_id = ?")->execute([$id]);

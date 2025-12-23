@@ -3,16 +3,11 @@
 // ============================================
 // MEMBERSHIP_DATES Controller
 // ============================================
-function handleMembershipDates($db, $method, $id) {
-    // Nur Admins dürfen Mitgliedschaftszeiträume verwalten
-    if($_SESSION['role'] !== 'admin') {
-        http_response_code(403);
-        echo json_encode(["message" => "Admin access required"]);
-        return;
-    }
-    
+function handleMembershipDates($db, $method, $id) {    
     switch($method) {
         case 'GET':
+            requireAdminOrManager();
+
             if($id) {
                 // Einzelner Zeitraum
                 $stmt = $db->prepare("SELECT md.*, m.name, m.surname 
@@ -50,6 +45,7 @@ function handleMembershipDates($db, $method, $id) {
             break;
             
         case 'POST':
+            requireAdminOrManager();
             $data = json_decode(file_get_contents("php://input"));
             
             // Validierung
@@ -81,6 +77,7 @@ function handleMembershipDates($db, $method, $id) {
             break;
             
         case 'PUT':
+            requireAdminOrManager();
             $data = json_decode(file_get_contents("php://input"));
             
             $stmt = $db->prepare("UPDATE membership_dates 
@@ -101,6 +98,7 @@ function handleMembershipDates($db, $method, $id) {
             break;
             
         case 'DELETE':
+            requireAdminOrManager();
             $stmt = $db->prepare("DELETE FROM membership_dates WHERE membership_date_id = ?");
             
             if($stmt->execute([$id])) {

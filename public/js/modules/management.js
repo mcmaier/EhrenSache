@@ -1,4 +1,4 @@
-import { apiCall, isAdmin } from './api.js';
+import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
 import { loadMembers } from './members.js';
 import { formatDateTime, updateModalId } from './utils.js';

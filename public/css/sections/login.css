@@ -17,11 +17,17 @@
 }
 
 .login-box h2 {
-    margin-bottom: 30px;
+    margin-bottom: 10px;
     color: #333;
     text-align: center;
 }
 
 .btn-login {
-    margin-top: 12px;
+    margin-top: 18px;
+}
+
+#loginOrgTitle {
+    text-align: center;
+    font-weight: 400;
+    margin-bottom: 15px;
 }

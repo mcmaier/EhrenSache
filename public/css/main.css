@@ -23,6 +23,7 @@
 @import url('sections/sidebar.css');
 @import url('sections/content.css');
 @import url('sections/statistics.css');
+@import url('sections/settings.css');
 
 /* Utilities */
 @import url('utilities.css');
