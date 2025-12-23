@@ -1,4 +1,4 @@
-const DEBUG = true;
+const DEBUG = false;
 
 const debug = {
   log:  (...args) => DEBUG && console.log(...args),
