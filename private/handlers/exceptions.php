@@ -27,7 +27,7 @@ function handleExceptions($db, $method, $id) {
                 $exception = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 // User dürfen nur ihre eigenen Exceptions sehen
-                if($_SESSION['role'] !isAdminOrManager() {
+                if(!isAdminOrManager()) {
                     $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $userMemberId = $userStmt->fetchColumn();
