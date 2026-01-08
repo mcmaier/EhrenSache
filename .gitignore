@@ -1,0 +1,5 @@
+*.bak
+install/.htaccess
+private/uploads/*.*
+private/config.php
+private/install.lock
