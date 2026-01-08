@@ -320,7 +320,7 @@ export function filterExceptions(exceptions, filters = {}) {
 }
 
 
-export async function applyExceptionFilters(forceReload) {
+export async function applyExceptionFilters(forceReload = false, page = 1) {
     // Exceptions laden (aus Cache wenn möglich)
     const allExceptions = await loadExceptions(forceReload);
 
@@ -341,7 +341,7 @@ export async function applyExceptionFilters(forceReload) {
     // Rendern (nur wenn auf Exceptions-Section)
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'antraege') {
-        renderExceptions(filteredExceptions);
+        renderExceptions(filteredExceptions, page);
     } 
 }
 
@@ -502,6 +502,10 @@ export function toggleExceptionFields() {
     if(isAdminOrManager)
     {
         document.getElementById('exception_member').required = true;
+
+        document.getElementById('exception_member').disabled = false;
+        document.getElementById('exception_appointment').disabled = false;
+        document.getElementById('exception_type').disabled = false;
     }
 }
 
@@ -625,7 +629,8 @@ export async function saveException() {
         if (isAdminOrManager && data.status === 'approved' && data.exception_type === 'time_correction') {
             invalidateCache('records',currentYear);
         }
-        applyExceptionFilters();
+
+        applyExceptionFilters(true, currentExceptionsPage);
 
         // Erfolgs-Toast
         showToast(
@@ -646,7 +651,7 @@ export async function deleteException(exceptionId) {
         const result = await apiCall('exceptions', 'DELETE', null, { id: exceptionId });
         if (result) {
             invalidateCache('exceptions',currentYear);
-            applyExceptionFilters();
+            applyExceptionFilters(true, currentExceptionsPage);
              showToast(`Eintrag wurde gelöscht`, 'success');
 
         }

@@ -243,6 +243,11 @@ function handleUsers($db, $method, $id, $authUserId) {
                     $updateFields[] = "member_id = ?";
                     $updateParams[] = $data->member_id ?: NULL;
                 }
+                else
+                {
+                    $updateFields[] = "member_id = ?";
+                    $updateParams[] =  NULL;
+                }
                 
                 if(isset($data->totp_secret)) {
                     $updateFields[] = "totp_secret = ?";

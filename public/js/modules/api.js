@@ -28,6 +28,8 @@ export function setInitialLoad(value) {
 export async function apiCall(resource, method = 'GET', data = null, params = {}) {
     const url = new URL(API_BASE, window.location.origin);
     url.searchParams.append('resource', resource);
+
+    let result = {success:false};
     
     for (const [key, value] of Object.entries(params)) {
         url.searchParams.append(key, value);
@@ -60,7 +62,9 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
 
     try {
         const response = await fetch(url, options);
-        const result = await response.json();
+        result = await response.json();
+
+        result.success = response.ok;
                 
         //Debug
         debug.log("API call:",resource, method, params, data);
@@ -74,11 +78,12 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
                 if (!isInitialLoad) {
                     const { showToast } = await import('./ui.js');
                     showToast('Sitzung abgelaufen. Bitte erneut anmelden.', 'warning');
+                    isInitialLoad = true;
                 }
                 const { showLogin } = await import('./ui.js');
                 showLogin();
                 
-                return null;
+                return result;
             }
             
             // Andere Fehler als Toast anzeigen
@@ -94,18 +99,20 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
             const errorMessage = result.message || result.hint || 'Ein unbekannter Fehler ist aufgetreten';
             const { showToast } = await import('./ui.js');
             showToast(errorMessage, 'error', errorTitle);
-            return null;
+            return result;
         }
         
         //Reset Flag
-        isInitialLoad = false;
+        isInitialLoad = false;        
+
         return result;
     } catch (error) {
         debug.error('API Error:', error);
         const { showToast } = await import('./ui.js');
         showToast('Fehler bei der Kommunikation mit dem Server', 'error');
-        return null;
+        return result;
     }
+    
 }
 
 // Neue Hilfsfunktion für Auth-Headers (auch für FormData)

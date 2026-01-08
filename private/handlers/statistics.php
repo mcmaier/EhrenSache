@@ -61,6 +61,7 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
     $year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
     $groupId = isset($_GET['group_id']) ? intval($_GET['group_id']) : null;
     $memberId = isset($_GET['member_id']) ? intval($_GET['member_id']) : null;
+    $appointmentTypeId = isset($_GET['appointment_type_id']) ? intval($_GET['appointment_type_id']) : null;
     
     // Normale User können nur ihre eigene Statistik sehen
     if (!isAdminOrManager()) {        
@@ -227,7 +228,7 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
             }
         }
 
-        $stats = calculateGroupStatistics($db, $gid, $year, $memberId, $authUserRole);
+        $stats = calculateGroupStatistics($db, $gid, $year, $memberId, $authUserRole, $appointmentTypeId);
         if ($stats) {
             $statistics[] = $stats;
 
@@ -236,11 +237,16 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
             $groupAppointments = 0;
             if (count($stats['members']) > 0) {
                 $groupAppointments = $stats['members'][0]['total_appointments'];
+                //$totalAppointments += $groupAppointments;
+            }
+
+            // NEU: Nur unique Termine zählen (nach appointment_type_id gruppiert)
+            if (!isset($countedAppointmentTypes[$stats['appointment_type_id']])) {
                 $totalAppointments += $groupAppointments;
+                $countedAppointmentTypes[$stats['appointment_type_id']] = true;
             }
 
             $groupMembers = count($stats['members']);
-
             // Pro Gruppe: mögliche Anwesenheiten = Termine * Mitglieder
             $totalPossible += ($groupAppointments * $groupMembers);
 
@@ -343,6 +349,8 @@ function calculateGroupStatistics($db, $groupId, $year, $memberId, $role) {
         return null;
     }
     
+   $typeId = $group['type_id'];  // ← WICHTIG: Speichern
+
     // Mitglieder ermitteln
     if ($memberId) {
         $memberIds = [$memberId];
@@ -362,7 +370,7 @@ function calculateGroupStatistics($db, $groupId, $year, $memberId, $role) {
     
     $memberStats = [];
     foreach ($memberIds as $mid) {
-        $stats = calculateMemberStatistics($db, $mid, $groupId, $year);
+        $stats = calculateMemberStatistics($db, $mid, $groupId, $year, $typeId);
         if ($stats) {
             $memberStats[] = $stats;
         }
@@ -371,11 +379,12 @@ function calculateGroupStatistics($db, $groupId, $year, $memberId, $role) {
     return [
         'group_id' => $groupId,
         'group_name' => $group['group_name'],
+        'appointment_type_id' => $typeId,
         'members' => $memberStats
     ];
 }
 
-function calculateMemberStatistics($db, $memberId, $groupId, $year) {
+function calculateMemberStatistics($db, $memberId, $groupId, $year, $typeId) {
     // Mitgliedsinfo
     $stmt = $db->prepare("SELECT name, surname FROM members WHERE member_id = ?");
     $stmt->execute([$memberId]);
@@ -384,18 +393,22 @@ function calculateMemberStatistics($db, $memberId, $groupId, $year) {
     if (!$member) {
         return null;
     }
-    
+        
     // Alle Termine der Gruppe im Jahr bis heute (inkl. laufendem Termin)
+
+    //FROM appointments a
+    //LEFT JOIN appointment_type_groups atg ON a.type_id = atg.type_id  
+    //...
+
     $stmt = $db->prepare("
         SELECT appointment_id, date 
-        FROM appointments a
-        LEFT JOIN appointment_type_groups atg ON a.type_id = atg.type_id        
-        WHERE atg.group_id = ? 
+        FROM appointments a              
+        WHERE a.type_id = ? 
         AND YEAR(date) = ?
         AND date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)        
         ORDER BY date
     ");
-    $stmt->execute([$groupId, $year]);
+    $stmt->execute([$typeId, $year]);
     $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $totalAppointments = count($appointments);
@@ -434,6 +447,6 @@ function calculateMemberStatistics($db, $memberId, $groupId, $year) {
         'attended' => $attended,
         'unexcused_absences' => $unexcused,
         'attendance_rate' => $attendanceRate
-    ];
+    ];    
 }
 ?>

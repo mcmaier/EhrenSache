@@ -1,4 +1,4 @@
-
+import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
@@ -62,7 +62,7 @@ async function loadAppointmentData(appointmentId) {
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
-export async function showAppointmentSection(forceReload = false)
+export async function showAppointmentSection(forceReload = false, page = 1)
 {
     debug.log("== Show Appointment Section == ")
     const appointmentData = await loadAppointments(forceReload);
@@ -70,7 +70,7 @@ export async function showAppointmentSection(forceReload = false)
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'termine')
     {
-        renderAppointments(appointmentData,1);
+        renderAppointments(appointmentData,page);
     }
 }
 
@@ -531,7 +531,7 @@ export async function saveAppointment() {
         closeAppointmentModal();
 
         // Cache invalidieren und neu laden
-        showAppointmentSection(true);
+        showAppointmentSection(true, currentAppointmentsPage);
 
         // Erfolgs-Toast
         showToast(
@@ -551,7 +551,7 @@ export async function deleteAppointment(appointmentId, title) {
         const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
         if (result) {
             // Cache invalidieren und neu laden            
-            showAppointmentSection(true);
+            showAppointmentSection(true, currentAppointmentsPage);
 
             showToast(`Termin "${title}" wurde gelöscht`, 'success');
         }
@@ -601,7 +601,6 @@ export async function setCalendarToYear() {
     }
 
 }
-
 // ============================================
 // GLOBAL EXPORTS (für onclick in HTML)
 // ============================================

@@ -144,6 +144,103 @@
     margin: var(--spacing-xs) 0;
 }
 
+/* New Import Tabs */
+
+/* Tab-Navigation */
+.import-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #ddd;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s;
+}
+
+.tab-btn.active {
+    border-bottom-color: var(--primary-color, #4CAF50);
+    font-weight: bold;
+}
+
+.tab-btn:hover {
+    background: #f5f5f5;
+}
+
+.import-tab-content {
+    animation: fadeIn 0.3s;
+}
+
+/* Suggestions Liste */
+.suggestions-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+    gap: 10px;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item input[type="checkbox"] {
+    margin-top: 3px;
+}
+
+.suggestion-item label {
+    flex: 1;
+    cursor: pointer;
+}
+
+.suggestion-item small {
+    display: block;
+    color: #666;
+    margin-top: 4px;
+}
+
+.no-suggestions {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+}
+
+.no-suggestions p {
+    margin: 10px 0;
+}
+
+.no-suggestions ul {
+    text-align: left;
+    display: inline-block;
+    margin: 15px 0;
+}
+
+.no-suggestions em {
+    color: #888;
+    font-size: 0.9em;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* New Import Tabs */
+
 .file-input {
     width: 100%;
     padding: var(--spacing-sm);

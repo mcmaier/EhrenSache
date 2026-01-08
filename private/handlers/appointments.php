@@ -136,6 +136,16 @@ function handleAppointments($db, $method, $id) {
                 }
             }
 
+            // Hole Standard-Terminart
+            $typeStmt = $db->query("SELECT type_id FROM appointment_types WHERE is_default = 1 LIMIT 1");
+            $defaultType = $typeStmt->fetch(PDO::FETCH_ASSOC);
+            $typeId = $defaultType ? $defaultType['type_id'] : null;
+
+            if(isSet($data->type_id) && ($data->type_id !== null))
+            {
+                $typeId = $data->type_id;
+            }
+
             // Prüfe ob bereits ein Termin in der Toleranz existiert
             $tolerance = AUTO_CHECKIN_TOLERANCE_HOURS;
             $toleranceSeconds = $tolerance * 3600;  // Stunden in Sekunden
@@ -151,7 +161,7 @@ function handleAppointments($db, $method, $id) {
                 HAVING time_diff <= ?
             ");
             
-            $checkStmt->execute([$newDateTime, $data->date, $data->type_id ?? null, $toleranceSeconds]);
+            $checkStmt->execute([$newDateTime, $data->date, $typeId, $toleranceSeconds]);
             
             $conflict = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -174,7 +184,7 @@ function handleAppointments($db, $method, $id) {
             $stmt = $db->prepare("INSERT INTO appointments (title, type_id, description, date, 
                                   start_time, created_by) VALUES (?, ?, ?, ?, ?, ?)");
             $createdBy = getCurrentUserId(); 
-            if($stmt->execute([$data->title, $data->type_id ?? null, $data->description ?? null, $data->date, 
+            if($stmt->execute([$data->title, $typeId, $data->description ?? null, $data->date, 
                                $data->start_time, $createdBy])) {
                 http_response_code(201);
                 echo json_encode(["message" => "Appointment created", "id" => $db->lastInsertId()]);

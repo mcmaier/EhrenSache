@@ -456,7 +456,7 @@ switch($resource) {
         break;
     case 'appointments':
         handleAppointments($db, $request_method, $id);
-        break;    
+        break;       
     case 'records':
         handleRecords($db, $request_method, $id);
         break;

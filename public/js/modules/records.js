@@ -76,10 +76,7 @@ export async function renderRecords(records, page = 1)
 {
     debug.log("Render Records()");
 
-    if(!isCacheValid('types'))
-    { 
-        await loadTypes(false);
-    }
+    await loadTypes();    
 
     const tbody = document.getElementById('recordsTableBody');
     
@@ -366,7 +363,7 @@ export async function loadRecordFilters(forceReload = false) {
 }
 
 
-export async function applyRecordFilters(forceReload = false) {
+export async function applyRecordFilters(forceReload = false, currentPage = 1) {
     // Records laden (aus Cache wenn möglich)
     const allRecords = await loadRecords(forceReload);
 
@@ -391,7 +388,7 @@ export async function applyRecordFilters(forceReload = false) {
     // Rendern (nur wenn auf Records-Section) - IMMER Seite 1 nach Filter-Änderung
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'anwesenheit') {
-        renderRecords(filteredRecords, 1); // ← Reset auf Seite 1
+        renderRecords(filteredRecords, currentPage); // ← Reset auf Seite 1
         debug.log('Records rendered');
     }
     
@@ -631,8 +628,8 @@ export async function saveRecord() {
     if (result) {
         closeRecordModal();
 
-        await invalidateCache('records', currentYear);
-        applyRecordFilters();
+        //await invalidateCache('records', currentYear);
+        applyRecordFilters(true, currentRecordsPage);
         //await loadRecords(true);
 
         // Erfolgs-Toast
@@ -652,9 +649,8 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
     if (confirmed) {
         const result = await apiCall('records', 'DELETE', null, { id: recordId });
         if (result) {
-            await invalidateCache('records', currentYear);
-            applyRecordFilters();
-            //invalidateCache('records', currentYear);
+            //await invalidateCache('records', currentYear);
+            applyRecordFilters(true, currentRecordsPage);
             //await loadRecords(true, currentYear);
             showToast(`Eintrag wurde gelöscht`, 'success');
         }

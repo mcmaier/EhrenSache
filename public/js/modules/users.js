@@ -264,18 +264,18 @@ window.goToUsersPage = function(page) {
     }
 }
 
-export async function showUserSection(forceReload = false)
+export async function showUserSection(forceReload = false, page = 1)
 {
     debug.log("Show User Section ()");
 
-    applyUserFilters(forceReload);
+    applyUserFilters(forceReload, page);
     /*
     const allUsers = await loadUsers(forceReload);
     renderUsers(allUsers, 1);
     */
 }
 
-export async function applyUserFilters(forceReload = false) {
+export async function applyUserFilters(forceReload = false, page = 1) {
     debug.log('applyUserFilters called');
     
     // Users laden (aus Cache wenn möglich)
@@ -295,7 +295,7 @@ export async function applyUserFilters(forceReload = false) {
     // Rendern (nur wenn auf User-Section) - Reset auf Seite 1
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'benutzer') {
-        renderUsers(filteredUsers, 1);
+        renderUsers(filteredUsers, page);
         debug.log('Users rendered');
     }
     
@@ -603,7 +603,7 @@ export async function saveUser() {
     
     if (result) {
         closeUserModal();
-        showUserSection(true);
+        showUserSection(true, currentUsersPage);
 
         showToast(
             userId ? 'Benutzer wurde erfolgreich aktualisiert' : 'Benutzer wurde erfolgreich erstellt',
@@ -621,7 +621,7 @@ export async function deleteUser(userId, email) {
     if (confirmed) {
         const result = await apiCall('users', 'DELETE', null, { id: userId });
         if (result) {
-            showUserSection(true);
+            showUserSection(true, currentUsersPage);
             showToast(`User "${email}" wurde gelöscht`, 'success');        
         }
     }

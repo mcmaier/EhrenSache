@@ -1162,35 +1162,100 @@
                 <span class="modal-close" onclick="closeRecordsImportModal()">&times;</span>
             </div>
             <div class="modal-body">
-                <div class="import-info">
-                    <h3>CSV-Format:</h3>
-                    <p>Die CSV-Datei muss folgende Spalten enthalten:</p>
-                    <ul>
-                        <li><strong>member_number</strong> - Pflichtfeld (Mitgliedsnummer)</li>
-                        <li><strong>arrival_date_time</strong> - Pflichtfeld (Format: YYYY-MM-DD HH:MM:SS)</li>
-                        <li><strong>status</strong> - Optional (present/excused, Standard: present)</li>
-                    </ul>
-                    <p><strong>Hinweis:</strong> Das System sucht automatisch passende Termine am angegebenen Datum.</p>
-                    <p><strong>Trennzeichen:</strong> Semikolon (;)</p>
-                    <p><strong>Encoding:</strong> UTF-8</p>
+                <!-- Tab-Navigation -->
+                <div class="import-tabs">
+                    <button class="tab-btn active" onclick="switchImportTab('records')">Records Importieren</button>
+                    <button class="tab-btn" onclick="switchImportTab('analyze')">Termine Vorschlagen</button>
                 </div>
-                
-                <div class="form-group">
-                    <label for="recordsImportFile">CSV-Datei auswählen:</label>
-                    <input type="file" id="recordsImportFile" accept=".csv" class="file-input">
+
+                <!-- Tab 1: Bestehender Records-Import -->
+                <div id="import-tab-records" class="import-tab-content active">
+                    <!-- Dein bestehender Import-Code bleibt hier -->
+                    <form id="importForm">
+                        <div class="import-info">
+                            <h3>CSV-Format:</h3>
+                            <p>Die CSV-Datei muss folgende Spalten enthalten:</p>
+                            <ul>
+                                <li><strong>member_number</strong> - Pflichtfeld (Mitgliedsnummer)</li>
+                                <li><strong>arrival_date_time</strong> - Pflichtfeld (Format: YYYY-MM-DD HH:MM:SS)</li>
+                                <li><strong>status</strong> - Optional (present/excused, Standard: present)</li>
+                            </ul>
+                            <p><strong>Hinweis:</strong> Das System sucht automatisch passende Termine am angegebenen Datum.</p>
+                            <p><strong>Trennzeichen:</strong> Semikolon (;)</p>
+                            <p><strong>Encoding:</strong> UTF-8</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="recordsImportFile">CSV-Datei auswählen:</label>
+                            <input type="file" id="recordsImportFile" accept=".csv" class="file-input">
+                        </div>
+                        
+                        <div id="recordsImportProgress" style="display:none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="recordsImportProgressFill"></div>
+                            </div>
+                            <p id="recordsImportStatus">Importiere...</p>
+                        </div>
+                        
+                        <div id="recordsImportResult" style="display:none;">
+                            <h3>Import-Ergebnis:</h3>
+                            <div id="recordsImportResultContent"></div>
+                        </div>
+                    </form>
                 </div>
-                
-                <div id="recordsImportProgress" style="display:none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="recordsImportProgressFill"></div>
-                    </div>
-                    <p id="recordsImportStatus">Importiere...</p>
-                </div>
-                
-                <div id="recordsImportResult" style="display:none;">
-                    <h3>Import-Ergebnis:</h3>
-                    <div id="recordsImportResultContent"></div>
-                </div>
+
+                <!-- Tab 2: Neuer Termin-Analyse -->
+                <div id="import-tab-analyze" class="import-tab-content" style="display:none;">
+                    <form id="analyzeForm">
+                        <div class="import-info">
+                            <h3>CSV-Format:</h3>
+                            <p>Die CSV-Datei muss folgende Spalten enthalten:</p>
+                            <ul>
+                                <li><strong>member_number</strong> - Mitgliedsnummer</li>
+                                <li><strong>arrival_date_time</strong> - Format: YYYY-MM-DD HH:MM:SS</li>
+                            </ul>
+                            <p><strong>Hinweis:</strong> Auf Basis der Einträge werden passende Termine vorgeschlagen.</p>
+                            <p><strong>Trennzeichen:</strong> Semikolon (;)</p>
+                            <p><strong>Encoding:</strong> UTF-8</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="csv-analyze-file">CSV-Datei mit Zeitstempeln:</label>
+                            <input type="file" id="csv-analyze-file" accept=".csv" required class="file-input">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="min-records">Mindestanzahl Records:</label>
+                                <input type="number" id="min-records" value="5" min="1">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="round-minutes">Startzeit runden auf:</label>
+                                <select id="round-minutes">
+                                    <option value="15">15 Minuten</option>
+                                    <option value="30">30 Minuten</option>
+                                    <option value="60">60 Minuten</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <button type="button" class="btn-save" onclick="analyzeCsvForAppointments()">Analysieren</button>
+                    </form>
+                    
+                    <div id="suggestions-container" style="display:none; margin-top: 20px;">
+                        <h3>Vorgeschlagene Termine <span id="suggestion-count"></span></h3>
+                        <div id="suggestions-list" class="suggestions-list"></div>
+                        
+                        <div class="form-actions" style="margin-top: 20px;">
+                            <button onclick="createSelectedAppointments()" class="btn-save">
+                                Ausgewählte Termine anlegen
+                            </button>
+                            <button onclick="clearSuggestions()" class="btn-secondary">
+                                Verwerfen
+                            </button>
+                        </div>
+                    </div> 
+                </div>               
             </div>
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="closeRecordsImportModal()">Abbrechen</button>

@@ -1,8 +1,9 @@
 import { API_BASE } from '../config.js';
+import { apiCall } from './api.js';
 import { debug } from '../app.js'
 import { getAuthHeaders } from './api.js';
 import { showToast } from './ui.js';
-import { loadMembers } from './members.js';
+import { loadAppointments } from './appointments.js';
 import { showRecordsSection } from './records.js';
 import { showAppointmentSection } from './appointments.js';
 import { showMemberSection } from './members.js';
@@ -47,7 +48,7 @@ export function exportMembers() {
 }
 
 export function exportAppointments() {
-    const year = document.getElementById('filterAppointmentYear')?.value || new Date().getFullYear();
+    const year = document.getElementById('appointmentYearFilter')?.value || new Date().getFullYear();
     const url = `${API_BASE}?resource=export&type=appointments&year=${year}`;
     
     fetch(url, {
@@ -73,7 +74,7 @@ export function exportAppointments() {
 }
 
 export function exportRecords() {
-    const year = document.getElementById('filterRecordYear')?.value || new Date().getFullYear();
+    const year = document.getElementById('recordYearFilter')?.value || new Date().getFullYear();
     const url = `${API_BASE}?resource=export&type=records&year=${year}`;
     
     fetch(url, {
@@ -363,6 +364,169 @@ function displayRecordsImportResult(result) {
     resultDiv.style.display = 'block';
 }
 
+// Tab-Wechsel
+export function switchImportTab(tab) {
+    // Tabs umschalten
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.import-tab-content').forEach(content => content.style.display = 'none');
+    
+    event.target.classList.add('active');
+    document.getElementById(`import-tab-${tab}`).style.display = 'block';
+}
+
+
+// ============================================
+// APPOINTMENTS EXTRACTOR
+// ============================================
+
+export async function analyzeCsvForAppointments() {
+    const fileInput = document.getElementById('csv-analyze-file');
+    const minRecords = document.getElementById('min-records').value || 5;
+    const roundMinutes = document.getElementById('round-minutes').value || 15;
+    const file = fileInput.files[0];
+
+    let result = { success: false };
+    
+    if (!file) {
+        alert('Bitte CSV-Datei auswählen');
+        return;        
+    }    
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('csrf_token', sessionStorage.getItem('csrf_token'));
+    formData.append('min_records', minRecords);
+    formData.append('round_minutes', roundMinutes);
+
+        try {
+        const response = await fetch(`${API_BASE}?resource=import&type=extract_appointments`, {
+            method: 'POST',
+            credentials: 'same-origin', // Session-Cookies mit senden
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            debug.error('Import error response:', errorText);
+            throw new Error(`Import failed: ${response.status}`);
+        }
+        
+        result = await response.json();
+
+        debug.log('Import result:',result);    
+    } catch (error) {
+        debug.error('Import error:', error);
+        showToast('Import fehlgeschlagen', 'error');
+    }
+        
+    if (result.success) {
+        displaySuggestions(result);
+    }
+}
+
+function displaySuggestions(result) {
+    const container = document.getElementById('suggestions-container');
+    const list = document.getElementById('suggestions-list');
+    const count = document.getElementById('suggestion-count');
+    
+    const suggestions = result.suggestions || [];
+    
+    if (suggestions.length === 0) {
+        // Keine Vorschläge gefunden
+        count.textContent = '(0 gefunden)';
+        list.innerHTML = `
+            <div class="no-suggestions">
+                <p><strong>Keine Termine gefunden</strong></p>
+                <p>Mit den aktuellen Parametern wurden keine passenden Termincluster gefunden.</p>
+                <ul>
+                    <li>Mindestanzahl Records: ${result.parameters.min_records}</li>
+                    <li>Toleranz: ${result.parameters.tolerance_hours} Stunden</li>
+                    <li>Verarbeitete Records: ${result.total_records}</li>
+                </ul>
+                <p><em>Tipp: Versuche die Mindestanzahl zu reduzieren oder die Toleranz zu erhöhen.</em></p>
+            </div>
+        `;
+        container.style.display = 'block';
+        return;
+    }
+    
+    // Vorschläge vorhanden
+    count.textContent = `(${suggestions.length} gefunden)`;
+    
+    list.innerHTML = suggestions.map((s, idx) => `
+        <div class="suggestion-item">
+            <input type="checkbox" id="sugg-${idx}" data-suggestion='${JSON.stringify(s)}' checked>
+            <label for="sugg-${idx}">
+                <strong>${s.date} um ${s.start_time.substring(0,5)} Uhr</strong>
+                (${s.record_count} Records)
+                <small>Zeitspanne: ${s.time_range.earliest.substring(0,5)} - ${s.time_range.latest.substring(0,5)} Uhr</small>
+            </label>
+        </div>
+    `).join('');
+    
+    container.style.display = 'block';
+}
+
+// Ausgewählte Termine anlegen
+async function createSelectedAppointments() {
+    const checkboxes = document.querySelectorAll('#suggestions-list input[type="checkbox"]:checked');
+    const appointments = Array.from(checkboxes).map(cb => JSON.parse(cb.dataset.suggestion));
+    
+    if (appointments.length === 0) {
+        showToast('Keine Termine ausgewählt', 'error');
+        return;
+    }
+    
+    if (!confirm(`${appointments.length} Termine anlegen?`)) {
+        return;
+    }
+    
+    let created = 0;
+    let errors = [];
+    
+    for (const apt of appointments) {
+        try {
+            const data = {
+                title: `Import ${apt.date}`,
+                description: `Automatisch erstellt aus ${apt.record_count} Records`,
+                //type_id: '', // Leer lassen oder Standard-Type-ID wenn vorhanden
+                date: apt.date,
+                start_time: apt.start_time,
+                created_by: '' // Wird serverseitig aus Session gesetzt
+            };
+
+            const result = await apiCall('appointments', 'POST', data);
+            
+            if (result.success) {
+                created++;
+            } else {
+                errors.push(`${apt.date}: ${result.message || result.error || 'Unbekannter Fehler'}`);
+            }
+        } catch (error) {
+            errors.push(`${apt.date}: ${error.message}`);
+        }
+    }
+    
+    // Erfolgsmeldung
+    if (created > 0) {
+        showToast(`${created} Termine erfolgreich angelegt`, 'success');
+        clearSuggestions();
+        await loadAppointments(true); // Refresh Terminliste
+    }
+    
+    // Fehlermeldungen
+    if (errors.length > 0) {
+        showToast(`Fehler bei ${errors.length} Termin(en)`, 'error');
+        console.error('Appointment creation errors:', errors);
+    }
+}
+
+// Vorschläge verwerfen
+function clearSuggestions() {
+    document.getElementById('suggestions-container').style.display = 'none';
+    document.getElementById('csv-analyze-file').value = '';
+}
+
 // ============================================
 // APPOINTMENTS IMPORT
 // ============================================
@@ -509,4 +673,7 @@ window.openRecordsImportModal = openRecordsImportModal;
 window.closeRecordsImportModal = closeRecordsImportModal;
 window.executeRecordsImport = executeRecordsImport;
 window.exportRecords = exportRecords;
-
+window.switchImportTab = switchImportTab;
+window.analyzeCsvForAppointments = analyzeCsvForAppointments;
+window.createSelectedAppointments = createSelectedAppointments;
+window.clearSuggestions = clearSuggestions;

@@ -110,8 +110,6 @@ function handleImport($db, $request_method, $authUserRole) {
         return;
     }
 
-
-
     //------- $file['tmp_name']
     
     switch($type) {
@@ -123,6 +121,13 @@ function handleImport($db, $request_method, $authUserRole) {
             break;
         case 'appointments':
             $result = importAppointments($db, $targetPath);
+            break;
+        case 'extract_appointments':
+            $minRecords = isset($_POST['min_records']) ? (int)$_POST['min_records'] : 5;
+            $roundMinutes = isset($_POST['round_minutes']) ? (int)$_POST['round_minutes'] : 15;
+            $toleranceHours = isset($_POST['tolerance_hours']) ? (int)$_POST['tolerance_hours'] : null;
+    
+            $result = extractAppointments($db, $targetPath, $minRecords, $roundMinutes, $toleranceHours);
             break;
 
         default:
@@ -438,6 +443,7 @@ function importAppointments($db, $filePath) {
     }
 }
 
+
 // ============================================
 // IMPORT RECORDS
 // ============================================
@@ -598,6 +604,179 @@ function importRecords($db, $filePath) {
             "message" => "Import failed: " . $e->getMessage()
         ];
     }
+}
+
+// ============================================
+// EXTRACT APPOINTMENTS from RECORD-FILE
+// ============================================
+
+function extractAppointments($db, $filePath, $minRecords = 5, $roundMinutes = 15, $toleranceHours = null) {
+    if ($toleranceHours === null) {
+        $toleranceHours = AUTO_CHECKIN_TOLERANCE_HOURS;
+    }
+    
+    $handle = fopen($filePath, 'r');
+    if (!$handle) {
+        return ["success" => false, "message" => "Could not read file"];
+    }
+    
+    // UTF-8 BOM überspringen falls vorhanden
+    $bom = fread($handle, 3);
+    if ($bom !== "\xEF\xBB\xBF") {
+        rewind($handle);
+    }
+    
+    // Header-Zeile einlesen
+    $header = fgetcsv($handle, 0, ';');
+    if (!$header || !in_array('arrival_date_time', $header)) {
+        fclose($handle);
+        return ["success" => false, "message" => "Invalid CSV format - missing required column (arrival_date_time)"];
+    }
+    
+    // Sammle alle Zeitstempel
+    $timestamps = [];
+    while (($data = fgetcsv($handle, 0, ';')) !== false) {
+        // Überspringe leere Zeilen
+        if (empty($data) || (count($data) === 1 && empty($data[0]))) {
+            continue;
+        }
+        
+        $row = array_combine($header, $data);
+        if (!empty($row['arrival_date_time'])) {
+            $timestamps[] = trim($row['arrival_date_time']);
+        }
+    }
+    fclose($handle);
+    
+    // Gruppiere nach Datum
+    $dateGroups = [];
+    foreach ($timestamps as $ts) {
+        try {
+            $dateTime = new DateTime($ts);
+            $date = $dateTime->format('Y-m-d');
+            $time = $dateTime->format('H:i:s');
+            
+            if (!isset($dateGroups[$date])) {
+                $dateGroups[$date] = [];
+            }
+            $dateGroups[$date][] = $time;
+        } catch (Exception $e) {
+            // Überspringe ungültige Zeitstempel
+            continue;
+        }
+    }
+    
+    // Analysiere jeden Tag
+    $suggestions = [];
+    
+    foreach ($dateGroups as $date => $times) {
+        sort($times);
+        
+        // Clustering: Finde Zeitfenster mit mindestens $minRecords innerhalb $toleranceHours
+        $clusters = [];
+        
+        foreach ($times as $time) {
+            $placed = false;
+            
+            foreach ($clusters as &$cluster) {
+                $clusterStart = strtotime("$date {$cluster['times'][0]}");
+                $clusterEnd = strtotime("$date " . end($cluster['times']));
+                $currentTime = strtotime("$date $time");
+                
+                // Prüfe ob innerhalb Toleranz zum Cluster
+                if (abs($currentTime - $clusterStart) <= $toleranceHours * 3600 ||
+                    abs($currentTime - $clusterEnd) <= $toleranceHours * 3600) {
+                    $cluster['times'][] = $time;
+                    $placed = true;
+                    break;
+                }
+            }
+            
+            if (!$placed) {
+                $clusters[] = ['times' => [$time]];
+            }
+        }        
+        // Filtere Cluster nach Mindestanzahl
+        foreach ($clusters as $cluster) {
+            if (count($cluster['times']) >= $minRecords) {
+                // Berechne Startzeit basierend auf Median oder 75. Perzentil
+                // Annahme: Die meisten kommen VOR dem Event, daher höheren Wert nehmen
+                $times = $cluster['times'];
+                $count = count($times);
+                
+                // Nutze 25. Perzentil 
+                $percentileIndex =  floor($count * 0.25);
+                
+                $suggestedTime = $times[$percentileIndex];
+                $timeObj = DateTime::createFromFormat('H:i:s', $suggestedTime);
+                
+                // Runde AUFWÄRTS auf $roundMinutes
+                // Wenn Event um 19:12 beginnt → 19:15 (nicht 19:00)
+                $minutes = (int)$timeObj->format('i');
+                $roundedMinutes = ceil($minutes / $roundMinutes) * $roundMinutes;
+                
+                // Überlauf behandeln (z.B. 55 Min + Rundung auf 60)
+                if ($roundedMinutes >= 60) {
+                    $timeObj->modify('+1 hour');
+                    $roundedMinutes = 0;
+                }
+                
+                $timeObj->setTime((int)$timeObj->format('H'), $roundedMinutes, 0);
+                
+                $suggestions[] = [
+                    'date' => $date,
+                    'start_time' => $timeObj->format('H:i:s'),
+                    'record_count' => count($times),
+                    'time_range' => [
+                        'earliest' => $times[0],
+                        'latest' => end($times)
+                    ]
+                ];
+            }
+        }
+        
+
+        // Filtere Cluster nach Mindestanzahl
+        /*
+        foreach ($clusters as $cluster) {
+            if (count($cluster['times']) >= $minRecords) {
+                // Berechne gerundete Startzeit (nimm früheste Zeit)
+                $firstTime = $cluster['times'][0];
+                $timeObj = DateTime::createFromFormat('H:i:s', $firstTime);
+                
+                // Runde auf $roundMinutes
+                $minutes = (int)$timeObj->format('i');
+                $roundedMinutes = floor($minutes / $roundMinutes) * $roundMinutes;
+                $timeObj->setTime((int)$timeObj->format('H'), $roundedMinutes, 0);
+                
+                $suggestions[] = [
+                    'date' => $date,
+                    'start_time' => $timeObj->format('H:i:s'),
+                    'record_count' => count($cluster['times']),
+                    'time_range' => [
+                        'earliest' => $cluster['times'][0],
+                        'latest' => end($cluster['times'])
+                    ]
+                ];
+            }
+        }*/
+    }
+    
+    // Sortiere nach Datum
+    usort($suggestions, function($a, $b) {
+        return strcmp($a['date'] . $a['start_time'], $b['date'] . $b['start_time']);
+    });
+    
+    return [
+        'success' => true,
+        'parameters' => [
+            'min_records' => $minRecords,
+            'round_minutes' => $roundMinutes,
+            'tolerance_hours' => $toleranceHours
+        ],
+        'total_records' => count($timestamps),
+        'suggestions' => $suggestions
+    ];
 }
 
 ?>

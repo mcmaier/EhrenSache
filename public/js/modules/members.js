@@ -268,7 +268,7 @@ function updateMemberStats(members)
     }   
 }
 
-export async function showMemberSection(forceReload = false) {
+export async function showMemberSection(forceReload = false, page = 1) {
 
     debug.log("Show Member Section ()");    
 
@@ -277,7 +277,7 @@ export async function showMemberSection(forceReload = false) {
     const currentSection = sessionStorage.getItem('currentSection');
     if(currentSection === 'mitglieder')
     {
-        renderMembers(allMembers, 1);
+        renderMembers(allMembers, page);
     }
 }
 
@@ -425,7 +425,7 @@ export async function saveMember() {
 
         // Cache invalidieren und neu laden
         //invalidateCache('members');
-        showMemberSection(true);
+        showMemberSection(true, currentMembersPage);
 
         // Erfolgs-Toast
         showToast(
@@ -446,7 +446,7 @@ export async function deleteMember(memberId, name) {
         if (result) {
 
             // Cache invalidieren und neu laden         
-            showMemberSection(true);
+            showMemberSection(true, currentMembersPage);
 
             showToast('Mitglied erfolgreich gelöscht', 'success');
         }
