@@ -135,36 +135,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                             status_text,
                             role_name
                         FROM v_users_extended 
-                        WHERE role IN ('admin', 'manager', 'user')";
-                        
-                        /*
-                        // Status-Filter
-                        if(isset($_GET['status']) && in_array($_GET['status'], ['pending', 'active', 'suspended'])) {
-                            $query .= " AND account_status = ?";
-                            $params[] = $_GET['status'];
-                        }
-                        
-                        // Role-Filter
-                        if(isset($_GET['role']) && in_array($_GET['role'], ['admin', 'manager', 'user'])) {
-                            $query .= " AND role = ?";
-                            $params[] = $_GET['role'];
-                        }
-                        
-                        // Search
-                        if($search) {
-                            $query .= " AND (email LIKE ? OR user_name LIKE ? OR member_number LIKE ?)";
-                            $searchTerm = '%' . $search . '%';
-                            $params[] = $searchTerm;
-                            $params[] = $searchTerm;
-                            $params[] = $searchTerm;
-                        }
-                        
-                        
-                        // is_active Filter
-                        if(isset($_GET['is_active'])) {
-                            $query .= " AND is_active = ?";
-                            $params[] = intval($_GET['is_active']);
-                        }*/
+                        WHERE role IN ('admin', 'manager', 'user')";                        
                         
                         // Sortierung
                         $query .= " ORDER BY created_at DESC";
@@ -215,48 +186,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                     $stmt->execute($params);
                     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                    echo json_encode($users);
-                    
-                    /*
-                    // STATUS COUNTS (nur für Menschen)
-                    $statusCounts = null;
-                    if($userType === 'human') {
-                        $countStmt = $db->query(
-                            "SELECT 
-                                COUNT(*) as total,
-                                SUM(CASE WHEN account_status = 'pending' THEN 1 ELSE 0 END) as pending,
-                                SUM(CASE WHEN account_status = 'active' THEN 1 ELSE 0 END) as active,
-                                SUM(CASE WHEN account_status = 'suspended' THEN 1 ELSE 0 END) as suspended
-                             FROM users 
-                             WHERE role IN ('admin', 'manager', 'user')"
-                        );
-                        $statusCounts = $countStmt->fetch(PDO::FETCH_ASSOC);
-                    }
-                    
-                    // DEVICE TYPE COUNTS (nur für Geräte)
-                    $deviceTypeCounts = null;
-                    if($userType === 'device') {
-                        $countStmt = $db->query(
-                            "SELECT 
-                                COUNT(*) as total,
-                                SUM(CASE WHEN device_type = 'totp_location' THEN 1 ELSE 0 END) as totp_location,
-                                SUM(CASE WHEN device_type = 'auth_device' THEN 1 ELSE 0 END) as auth_device,
-                                SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
-                                SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) as inactive
-                             FROM users 
-                             WHERE role = 'device'"
-                        );
-                        $deviceTypeCounts = $countStmt->fetch(PDO::FETCH_ASSOC);
-                    }
-                    
-                    echo json_encode([
-                        'success' => true,
-                        'users' => $users,
-                        'user_type' => $userType,
-                        'status_counts' => $statusCounts,
-                        'device_type_counts' => $deviceTypeCounts
-                    ]);
-                    */
+                    echo json_encode($users);                    
                     
                 } catch (Exception $e) {
                     error_log("Get users error: " . $e->getMessage());
@@ -267,127 +197,35 @@ function handleUsers($db, $method, $id, $authUserId) {
                     ]);
                 }
             }
-
-
-            /*
-            if($id) {
-                if(!isAdmin() && ($authUserId != $id))
-                {
-                    http_response_code(403);
-                    echo json_encode([
-                        "message" => "Access denied",
-                        "hint" => "You can only view your own user data"
-                    ]);
-                    return;
-                }                
-
-                $stmt = $db->prepare("SELECT u.user_id, u.email, u.role, u.is_active,  
-                                    u.member_id, u.device_name, u.device_type, u.created_at, u.totp_secret, u.api_token, u.api_token_expires_at,
-                                    m.name, m.surname
-                                    FROM users u
-                                    LEFT JOIN members m ON u.member_id = m.member_id
-                                    WHERE u.user_id = ?");
-                $stmt->execute([$id]);
-                $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if(!$user) {                
-                    http_response_code(404);
-                    echo json_encode(["message" => "User not found"]);
-                    return;
-                }
-
-                // Sensitive Daten filtern für Nicht-Admins
-                if(!isAdmin()) {
-                    // User sieht nur eigene Daten, aber ohne sensitive Infos von Devices
-                    unset($user['totp_secret']); // TOTP Secret verstecken
-                    
-                    // Nur eigenen API-Token zeigen
-                    if($user['user_id'] != $_SESSION['user_id']) {
-                        unset($user['api_token']);
-                        unset($user['api_token_expires_at']);
-                    }
-                }
-
-                echo json_encode($user);              
-            
-            } else {
-                // Liste aller User                
-                // Zugriffskontrolle: Nur Admin darf alle User sehen
-                if(!isAdmin()) {
-                    http_response_code(403);
-                    echo json_encode([
-                        "message" => "Access denied",
-                        "hint" => "Admin Access required"
-                    ]);
-                    return;
-                }
-
-                try{
-                    $userType = $_GET['user_type'] ?? 'human'; // 'human' oder 'device
-
-                    $query = "SELECT * FROM v_users_extended WHERE 1=1";
-                    $params = [];
-                    
-                    // Typ-Filter
-                    if($userType === 'human') {
-                        $query .= " AND role IN ('admin', 'manager', 'user')";
-                    } else if($userType === 'device') {
-                        $query .= " AND role = 'device'";
-                    }
-                    
-                    // Status-Filter (nur für Menschen)
-                    if($userType === 'human') {
-                        $status = $_GET['status'] ?? null;
-                        if($status && in_array($status, ['pending', 'active', 'suspended'])) {
-                            $query .= " AND account_status = ?";
-                            $params[] = $status;
-                        }
-                    }
-                    
-                    // Device-Type Filter (nur für Geräte)
-                    if($userType === 'device') {
-                        $deviceType = $_GET['device_type'] ?? null;
-                        if($deviceType && in_array($deviceType, ['totp_location', 'auth_device'])) {
-                            $query .= " AND device_type = ?";
-                            $params[] = $deviceType;
-                        }
-                    }
-                    
-                    // is_active Filter (für beide)
-                    if(isset($_GET['is_active'])) {
-                        $query .= " AND is_active = ?";
-                        $params[] = intval($_GET['is_active']);
-                    }
-                    
-                    $stmt = $db->query($query);
-
-                    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                    echo json_encode($users);
-                }
-                catch (Exception $e) {
-                        error_log("Get user error: " . $e->getMessage());
-                        http_response_code(500);
-                        echo json_encode(['message' => 'Fehler beim Abfragen']);
-                    }
-            }*/
             break;
             
         case 'POST':
             $rawData = json_decode(file_get_contents("php://input"));
 
-            if(isset($rawData->action))
-            {
-                $action = $rawData->action;
-                
+            $action = $rawData->action ?? null;
+            $mailUserId = $rawData->mail_user_id ?? null;
+
+            if(isset($action))
+            {                             
                 if($action === 'create_device') 
                 {
                     createDevice($db, $authUserId);
+                    exit();
                 } 
-                else if($action === 'resend_verification')   
+                elseif($action === 'resend_verification')   
                 {
-                    resendVerificationEmail($db, $rawData->user_id);
-                }            
+                    if(isSet($mailUserId))
+                    {
+                        resendVerificationEmail($db, $mailUserId);
+                    }
+                    else
+                    {
+                        http_response_code(400);
+                        echo json_encode(['message' => 'Ungültige User ID']);
+                    }
+                    
+                    exit();
+                }           
                 else {
                     http_response_code(400);
                     echo json_encode(['message' => 'Invalid action']);
@@ -395,7 +233,9 @@ function handleUsers($db, $method, $id, $authUserId) {
                 }
             }
             else {
-                requireAdmin();                
+                requireAdmin();          
+                
+                
 
                 // Nur erlaubte Felder extrahieren
                 $allowedFields = ['email', 'name', 'password', 'role', 'member_id'];
@@ -404,6 +244,13 @@ function handleUsers($db, $method, $id, $authUserId) {
                     if(isset($rawData->$field)) {
                         $data->$field = $rawData->$field;
                     }
+                }
+
+                if(!isSet($data->email))
+                {
+                    http_response_code(400);
+                    echo json_encode(['message' => 'Keine Email-Adresse']);
+                    return;
                 }
 
                 // Validierung
@@ -833,6 +680,7 @@ function createDevice($db, $authUserId) {
                 'totp_secret' => $totpSecret
             ]
         ]);
+        exit();
         
     } catch (Exception $e) {
         $db->rollBack();
@@ -935,6 +783,7 @@ function handleUserActivation($db, $method, $authUserRole) {
             'success' => true,
             'message' => 'Benutzer erfolgreich aktiviert'
         ]);
+        exit();
         
     } catch (Exception $e) {
         if ($db->inTransaction()) {
@@ -990,6 +839,7 @@ function handleUserStatus($db, $method, $authUserRole) {
                 ? 'Benutzer aktiviert' 
                 : 'Benutzer gesperrt'
         ]);
+        exit();
         
     } catch (Exception $e) {
         error_log("Update status error: " . $e->getMessage());

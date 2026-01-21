@@ -817,21 +817,7 @@ export async function saveUser() {
 
         userData.password = password;
         
-        result = await apiCall('users', 'POST', userData);
-
-        // Zeige Token nach Erstellung (besonders wichtig für Auth Device)
-        if (result && result.api_token) {
-            showToast('Benutzer erfolgreich erstellt', 'success');
-            
-            // Modal schließen und neu öffnen mit Token-Anzeige
-            setTimeout(async () => {
-                await loadUsers(true);
-                if (result.id) {
-                    await openUserModal(result.id);
-                }
-            }, 500);
-            return;
-        }
+        result = await apiCall('users', 'POST', userData); 
     }
     
     if (result.success) {
@@ -973,9 +959,9 @@ async function resendVerificationEmail(userId, email) {
     }
     
     try {
-        const response = await apiCall('users', 'POST', {
+        const response = await apiCall('users', 'POST',{
             action: 'resend_verification',
-            user_id: userId
+            mail_user_id: userId
         });
         
         if (response.success) {

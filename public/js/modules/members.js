@@ -420,7 +420,7 @@ export async function saveMember() {
         }
     }
     
-    if (result) {
+    if (result.success) {
         closeMemberModal();
 
         // Cache invalidieren und neu laden

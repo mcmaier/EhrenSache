@@ -133,8 +133,7 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
                 if($checkStmt->fetch()) {
                     http_response_code(409);
                     echo json_encode([
-                        "message" => "Diese Mitgliedsnummer ist bereits vergeben",
-                        "field" => "member_number"
+                        "message" => "Diese Mitgliedsnummer ist bereits vergeben"
                     ]);
                     break;
                 }

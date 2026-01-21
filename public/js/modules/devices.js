@@ -101,7 +101,7 @@ function renderDevices(devices, page = 1)
                 <td>${formattedCreated}</td>
                 <td class="actions-cell">
                     <button class="action-btn btn-icon btn-edit" onclick="openDeviceModal(${device.user_id})">✎</button>
-                    <button class="action-btn btn-icon btn-delete" onclick="deleteDevice(${device.user_id})">🗑</button>
+                    <button class="action-btn btn-icon btn-delete" onclick="deleteDevice(${device.user_id}, '${device.device_name}')">🗑</button>
                 </td> `;                     
                 fragment.appendChild(tr);
         });
@@ -428,7 +428,7 @@ export async function saveDevice() {
     const data = {
         device_name: document.getElementById('device_name').value,
         is_active: document.getElementById('device_active').checked,
-        device_type: document.getElementById('device_type').value
+        device_type: document.getElementById('device_type').value,
     };
  
         
@@ -444,26 +444,12 @@ export async function saveDevice() {
     if (deviceId) {
         result = await apiCall('users', 'PUT', data, { id: deviceId });
 
-    } else {
-        
-        result = await apiCall('users', 'POST', data, { action: "create_device" });
-
-        // Zeige Token nach Erstellung (besonders wichtig für Auth Device)
-        if (result && result.api_token) {
-            showToast('Gerät erfolgreich erstellt', 'success');
-            
-            // Modal schließen und neu öffnen mit Token-Anzeige
-            setTimeout(async () => {
-                await loadDevices(true);
-                if (result.id) {
-                    await openDeviceModal(result.id);
-                }
-            }, 500);
-            return;
-        }
+    } else {        
+        data.action = 'create_device';        
+        result = await apiCall('users', 'POST', data);
     }
     
-    if (result) {
+    if (result.success) {
         closeDeviceModal();
         showDeviceSection(true, currentDevicesPage);
 
@@ -474,9 +460,9 @@ export async function saveDevice() {
     }
 }
 
-export async function deleteDevice(deviceId, email) {
+export async function deleteDevice(deviceId, name) {
     const confirmed = await showConfirm(
-        `Gerät "${email}" wirklich löschen?`,
+        `Gerät "${name}" wirklich löschen?`,
         'Gerät löschen'
     );
 
@@ -484,7 +470,7 @@ export async function deleteDevice(deviceId, email) {
         const result = await apiCall('users', 'DELETE', null, { id: deviceId });
         if (result) {
             showDeviceSection(true, currentDevicesPage);
-            showToast(`Device "${email}" wurde gelöscht`, 'success');        
+            showToast(`Gerät wurde gelöscht`, 'success');        
         }
     }
 }

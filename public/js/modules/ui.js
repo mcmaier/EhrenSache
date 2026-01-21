@@ -148,7 +148,7 @@ export async function initAllYearFilters() {
             element.addEventListener('change', (e) => {
                 setCurrentYear(e.target.value);
                 setCalendarToYear();
-                resetRecordFilter();
+                //resetRecordFilter();
             });
 
             setCurrentYear(currentYear);

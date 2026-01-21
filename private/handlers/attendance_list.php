@@ -69,7 +69,8 @@ function handleAttendanceList($db, $method, $id) {
             GROUP_CONCAT(DISTINCT mg.group_name ORDER BY mg.group_name SEPARATOR ', ') as groups,
             r.record_id,
             r.arrival_time,
-            r.checkin_source
+            r.checkin_source,
+            r.status
         FROM members m
         JOIN member_group_assignments mga ON m.member_id = mga.member_id
         JOIN member_groups mg ON mga.group_id = mg.group_id

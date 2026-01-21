@@ -399,7 +399,7 @@
 
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <h3>Erfasste Anwesenheiten</h3>
+                        <h3 id="statTotalRecordsTitle">Erfasste Anwesenheiten</h3>
                         <div class="number" id="statTotalRecords">-</div>
                     </div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
@@ -424,7 +424,7 @@
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
-                    <button class="btn-reset-filter" onclick="resetRecordFilter()">Filter zurücksetzen</button>
+                    <button id="resetRecordFilter" class="btn-reset-filter">Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->
