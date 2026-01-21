@@ -143,27 +143,54 @@ function handleRecords($db, $method, $id) {
             requireAdminOrManager();
 
             $data = json_decode(file_get_contents("php://input"));
+            $member_id = $data->member_id ?? null;
+            $appointment_id = $data->appointment_id ?? null;
+            
+            if(!$member_id || !$appointment_id) {
+                http_response_code(400);
+                echo json_encode(["message" => "member_id and appointment_id required"]);
+                exit();
+            }
             
             // Prüfe ob bereits ein Record für dieses Mitglied + Termin existiert
             $checkStmt = $db->prepare("SELECT record_id FROM records 
                                     WHERE member_id = ? AND appointment_id = ?");
-            $checkStmt->execute([$data->member_id, $data->appointment_id]);
+            $checkStmt->execute([$member_id, $appointment_id]);
             
             if($checkStmt->fetch()) {
                 http_response_code(409); // Conflict
                 echo json_encode([
-                    "message" => "Record already exists for this member and appointment",
-                    "hint" => "Use PUT to update the existing record"
+                    "message" => "Already checked in"
                 ]);
                 break;
             }
+
+            // Bestimme arrival_time: 
+            // 1. Nutze übergebenen Wert falls vorhanden
+            // 2. Sonst: Termin-Startzeit
+            $arrival_time = $data->arrival_time ?? null;
             
-            $stmt = $db->prepare("INSERT INTO records (member_id, appointment_id, 
-                                arrival_time, status) VALUES (?, ?, ?, ?)");
-            if($stmt->execute([$data->member_id, $data->appointment_id, 
-                            $data->arrival_time, $data->status ?? 'present'])) {
+            if(!$arrival_time) {
+                // Hole Termin-Startzeit
+                $aptStmt = $db->prepare("SELECT date, start_time FROM appointments WHERE appointment_id = ?");
+                $aptStmt->execute([$appointment_id]);
+                $apt = $aptStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if($apt && $apt['date'] && $apt['start_time']) {
+                    $arrival_time = $apt['date'] . ' ' . $apt['start_time'];
+                } else {
+                    // Fallback: NOW()
+                    $arrival_time = date('Y-m-d H:i:s');
+                }
+            }
+
+            // Erstelle Record (manuell durch Admin)
+            $stmt = $db->prepare("INSERT INTO records (member_id, appointment_id, arrival_time, status, checkin_source) VALUES (?, ?, ?, ?, 'admin')");
+            if($stmt->execute([$member_id, $appointment_id, $arrival_time, $data->status ?? 'present'])) {
                 http_response_code(201);
-                echo json_encode(["message" => "Record created", "id" => $db->lastInsertId()]);
+                echo json_encode([  "message" => "Record created", 
+                                    "id" => $db->lastInsertId(),
+                                    "arrival_time" => $arrival_time ]);
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to create record"]);

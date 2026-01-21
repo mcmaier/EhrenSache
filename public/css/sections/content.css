@@ -318,3 +318,187 @@
     border-color: var(--primary-color, #667eea);
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
+
+/* USER Page  */
+/* Status-Badges in Tabelle */
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.suspended {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-badge.email-pending {
+    background: #e7f3ff;
+    color: #004085;
+}
+
+/* Linked Member Info */
+.linked-member {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+}
+
+/* USER Filter  */
+
+
+.controls {
+    margin-bottom: 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Grid-Layout: Status links, Controls rechts */
+.filter-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    align-items: center;
+}
+
+/* Status-Filter Buttons (links) */
+.status-filter-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 10px 18px;
+    border: 2px solid #ddd;
+    background: white;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.filter-btn:hover {
+    background: #f8f9fa;
+    transform: translateY(-1px);
+}
+
+.filter-btn.active {
+    border-color: #007bff;
+    background: #007bff;
+    color: white;
+}
+
+.filter-btn.pending {
+    border-color: #ffc107;
+}
+
+.filter-btn.pending.active {
+    background: #ffc107;
+    color: #333;
+    border-color: #ffc107;
+}
+
+.filter-btn.active-status {
+    border-color: #28a745;
+}
+
+.filter-btn.active-status.active {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.filter-btn.suspended {
+    border-color: #dc3545;
+}
+
+.filter-btn.suspended.active {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+/* Filter-Controls (rechts) */
+.filter-controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #555;
+    white-space: nowrap;
+}
+
+.filter-group select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    min-width: 150px;
+}
+
+.filter-group select:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .filter-row {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .filter-controls {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 768px) {
+    .status-filter-group {
+        justify-content: center;
+    }
+    
+    .filter-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-group {
+        width: 100%;
+    }
+    
+    .filter-group select {
+        flex: 1;
+    }
+}

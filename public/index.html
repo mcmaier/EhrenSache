@@ -21,25 +21,6 @@
     
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
-    <!-- Login Seite -->
-    <div class="login-container" id="loginPage">
-        <div class="login-box">
-            <h2>EhrenSache</h2>
-            <h3 class ="org-name" id="loginOrgTitle">Mein Verein</h3>
-            <form id="loginForm" onsubmit="return false;">
-                <div class="form-group">
-                    <label for="email">E-Mail</label>
-                    <input type="email" id="email" required autocomplete="email">
-                </div>
-                <div class="form-group">
-                    <label for="password">Passwort</label>
-                    <input type="password" id="password" required autocomplete="current-password">
-                </div>
-                <button type="submit" class="btn-login" id="loginBtn">Anmelden</button>
-                <div class="error-message" id="loginError"></div>
-            </form>
-        </div>
-    </div>
 
     <!-- Dashboard -->
     <div class="dashboard" id="dashboard">
@@ -64,6 +45,9 @@
                 <li class="nav-item" data-section="benutzer" data-role="admin">
                     <span>🔐 Benutzer</span>
                 </li>       
+                <li class="nav-item" data-section="geraete" data-role="admin">
+                    <span>📟 Geräte</span>
+                </li>   
                 <li class="nav-item" data-section="verwaltung" data-role="manager">
                     <span>🎭 Gruppenverwaltung</span>
                 </li>
@@ -74,7 +58,7 @@
                     <span>📅 Termine</span>
                 </li>                                                   
                 <li class="nav-item" data-section="anwesenheit">
-                    <span>✓ Anwesenheiten</span>
+                    <span>✓ Anwesenheit</span>
                 </li>
                 <li class="nav-item" data-section="antraege">
                     <span>📋 Anträge</span>
@@ -161,7 +145,7 @@
                             </div>
                         </div>
                         <div id="profileTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
-                        <button onclick="regenerateProfileToken()" type="button" class="action-btn btn-delete" style="margin-top: 10px;">
+                        <button onclick="regenerateProfileToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
                             🔄 Neuen Token generieren
                         </button>
                     </div>
@@ -195,6 +179,120 @@
                         <div class="settings-item">
                             <label>Hintergrundfarbe</label>
                             <input type="color" id="setting_background_color" class="setting-input" data-key="background_color">
+                        </div>
+                    </div>   
+                    
+                    <!-- E-Mail-Einstellungen -->
+                    <div class="settings-card">
+                        <h3>📧 E-Mail-Einstellungen</h3>
+                        
+                        <!-- Mail-System aktivieren/deaktivieren -->
+                        <div class="settings-item">
+                            <label class="checkbox-label">
+                                <input type="checkbox" 
+                                    id="setting_mail_enabled" 
+                                    class="setting-input" 
+                                    data-key="mail_enabled">
+                                E-Mail-System aktivieren
+                            </label>
+                            <small class="input-hint">Aktiviert/Deaktiviert den gesamten E-Mail-Versand</small>
+                        </div>
+                        
+                        <!-- Absender-Informationen -->
+                        <div class="settings-item">
+                            <label for="setting_mail_from_email">Absender-Email</label>
+                            <input type="email" 
+                                id="setting_mail_from_email" 
+                                class="setting-input" 
+                                data-key="mail_from_email"
+                                placeholder="noreply@example.com">
+                            <small class="input-hint">Email-Adresse als Absender</small>
+                        </div>
+                        
+                        <div class="settings-item">
+                            <label for="setting_mail_from_name">Absender-Name</label>
+                            <input type="text" 
+                                id="setting_mail_from_name" 
+                                class="setting-input" 
+                                data-key="mail_from_name"
+                                placeholder="EhrenSache System">
+                            <small class="input-hint">Name der in Emails angezeigt wird</small>
+                        </div>
+                        
+                        <!-- Mail-Typen aktivieren/deaktivieren -->
+                        <div class="settings-item" style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 15px;">
+                            <label style="font-weight: 600; margin-bottom: 10px; display: block;">
+                                E-Mail-Typen
+                            </label>
+
+                            <div class="checkbox-group">                            
+                                <label class="checkbox-label">
+                                    <input type="checkbox" 
+                                        id="setting_mail_registration_enabled" 
+                                        class="setting-input" 
+                                        data-key="mail_registration_enabled">
+                                    Registrierungs-Mails (Email-Verifikation)
+                                </label>
+                                
+                                <label class="checkbox-label">
+                                    <input type="checkbox" 
+                                        id="setting_mail_password_reset_enabled" 
+                                        class="setting-input" 
+                                        data-key="mail_password_reset_enabled">
+                                    Passwort-Reset-Mails
+                                </label>
+                                
+                                <label class="checkbox-label">
+                                    <input type="checkbox" 
+                                        id="setting_mail_activation_enabled" 
+                                        class="setting-input" 
+                                        data-key="mail_activation_enabled">
+                                    Account-Aktivierungs-Mails
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- SMTP Status und Konfiguration -->
+                        <div class="settings-item" style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 15px;">
+                            <label style="font-weight: 600; margin-bottom: 10px; display: block;">
+                                SMTP-Konfiguration
+                            </label>
+                            
+                            <div id="smtpStatusDisplay" style="padding: 12px; background: #f8f9fa; border-radius: 4px; margin-bottom: 15px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span id="smtpStatusIcon">⚠️</span>
+                                    <span id="smtpStatusText">Status wird geladen...</span>
+                                </div>
+                            </div>
+                            
+                            <button type="button" 
+                                    class="btn btn-secondary" 
+                                    onclick="openSmtpConfigModal()"
+                                    style="width: 100%;">
+                                ⚙️ SMTP-Server konfigurieren
+                            </button>
+                            
+                            <small class="input-hint">
+                                SMTP-Zugangsdaten werden sicher in einer separaten Konfigurationsdatei gespeichert
+                            </small>
+                        </div>
+                        
+                        <!-- Test-Mail -->
+                        <div class="settings-item" style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 15px;">
+                            <label for="test_mail_recipient">Test-Email senden</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="email" 
+                                    id="test_mail_recipient" 
+                                    placeholder="ihre.email@example.com"
+                                    style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                                <button type="button" 
+                                        class="btn btn-secondary" 
+                                        onclick="sendTestMail()"
+                                        id="testMailBtn">
+                                    📤 Test senden
+                                </button>
+                            </div>
+                            <small class="input-hint">Sendet eine Test-Email um die Einstellungen zu prüfen</small>
                         </div>
                     </div>
 
@@ -333,7 +431,7 @@
                 <div id="recordsPagination"></div>
 
                 <div class="data-table">
-                    <table>
+                    <table id="recordsTable">
                         <thead>
                             <tr>
                                 <th>Termin</th>
@@ -526,50 +624,46 @@
             <div class="content-section" id="benutzer">
                 <div class="content-header">
                     <h1>Benutzerverwaltung</h1>
-                    <button class="btn-add" onclick="openUserModal()">+ Neuer Benutzer</button>
+                    <div class="header-actions">                                                 
+                        <button class="btn-add" onclick="openUserModal()">+ Neuer Benutzer</button>
+                    </div>  
                 </div>
 
-                <!-- Stats Grid -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Gesamte Nutzer</h3>
-                        <div class="number" id="statTotalUsers">-</div>
+                <div class="controls">
+                    <div class="filter-row">
+                        <!-- Links: Status-Buttons -->
+                        <div id="userStatusFilter" class="status-filter-group">
+                            <button class="filter-btn active" data-status="all" onclick="setUserStatusFilter('all')">
+                                Alle (<span id="count-all">0</span>)
+                            </button>
+                            <button class="filter-btn pending" data-status="pending" onclick="setUserStatusFilter('pending')">
+                                ⏳ Ausstehend (<span id="count-pending">0</span>)
+                            </button>
+                            <button class="filter-btn active-status" data-status="active" onclick="setUserStatusFilter('active')">
+                                ✓ Aktiv (<span id="count-active">0</span>)
+                            </button>
+                            <button class="filter-btn suspended" data-status="suspended" onclick="setUserStatusFilter('suspended')">
+                                🚫 Gesperrt (<span id="count-suspended">0</span>)
+                            </button>
+                        </div>
+                        
+                        <!-- Rechts: Rolle + Reset -->
+                        <div class="filter-controls">
+                            <div class="filter-group">
+                                <label for="userRoleFilter">Rolle:</label>
+                                <select id="userRoleFilter" onchange="applyUserFilters()">
+                                    <option value="">Alle Rollen</option>
+                                    <option value="admin">Administrator</option>
+                                    <option value="manager">Manager</option>
+                                    <option value="user">Benutzer</option>
+                                </select>
+                            </div>
+                            
+                            <button id= "btnResetUserFilters" class="btn-reset-filter">
+                                Filter zurücksetzen
+                            </button>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <h3>Aktive Nutzer</h3>
-                        <div class="number" id="statActiveUsers">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Geräte</h3>
-                        <div class="number" id="statDeviceUsers">-</div>
-                    </div>
-                </div>
-                
-                <!-- Filter Container (NEU) -->
-                <div class="filter-bar">
-                    <div class="form-group">
-                        <label for="filterUserRole">Rolle</label>
-                        <select id="filterUserRole" class="form-input">
-                            <option value="">Alle Rollen</option>
-                            <option value="admin">Administrator</option>
-                            <option value="manager">Manager</option>
-                            <option value="user">Benutzer</option>
-                            <option value="device">Gerät</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="filterUserStatus">Status</label>
-                        <select id="filterUserStatus" class="form-input">
-                            <option value="">Alle Status</option>
-                            <option value="active">Aktiv</option>
-                            <option value="inactive">Inaktiv</option>
-                        </select>
-                    </div>
-                    
-                    <button id="resetUserFilters" class="btn-reset-filter">
-                        Filter zurücksetzen
-                    </button>
                 </div>
 
                  <!-- Pagination OBEN -->
@@ -581,13 +675,55 @@
                             <tr>
                                 <th>E-Mail</th>
                                 <th>Rolle</th>
-                                <th>Verknüpftes Mitglied</th>
-                                <th>Status</th>
+                                <th>Mitgliedsstatus</th>
                                 <th>Erstellt am</th>
                                 <th>Aktionen</th>
                             </tr>
                         </thead>
                         <tbody id="usersTableBody">
+                            <tr><td colspan="5" class="loading">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Geräte-Verwaltung Section (nur Admin) -->
+            <div class="content-section" id="geraete">
+                <div class="content-header">
+                    <h1>Geräteverwaltung</h1>
+                    <div class="header-actions">                                             
+                        <button class="btn-add" onclick="openDeviceModal()">🔧 Neues Gerät</button>
+                    </div>  
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Aktive Geräte</h3>
+                        <div class="number" id="statActiveDevices">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Inaktive Geräte</h3>
+                        <div class="number" id="statInactiveDevices">-</div>
+                    </div>
+                </div>                                               
+
+                 <!-- Pagination OBEN -->
+                <div id="devicePagination"></div>
+
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Gerätename</th>
+                                <th>Typ</th>
+                                <th>Status</th>
+                                <th>Token läuft ab</th>
+                                <th>Erstellt</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="devicesTableBody">
                             <tr><td colspan="6" class="loading">Lade Daten...</td></tr>
                         </tbody>
                     </table>
@@ -868,88 +1004,233 @@
             <div class="modal-body">                
                 <form id="userForm">
                     <input type="hidden" id="user_id">
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="user_active" checked>
-                            <span>Aktiv</span>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label for="user_email">E-Mail / Geräte-Name*</label>
-                        <input type="text" id="user_email" required>
-                        <small>Bei Geräten: z.B. "nfc-reader-entrance"</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="user_password">Passwort</label>
-                        <input type="password" id="user_password">
-                        <small>Leer lassen um bestehendes Passwort zu behalten. Geräte benötigen kein Passwort.</small>
-                    </div>                    
-                    <div class="form-group">
-                        <label for="user_role">Rolle*</label>
-                        <select id="user_role" required>
-                            <option value="user">Benutzer</option>                        
-                            <option value="manager">Manager</option>
-                            <option value="admin">Administrator</option>
-                            <option value="device">Gerät (TOTP/Terminal)</option>
-                        </select>
-                    </div>
-                    <div class="form-group" id="userMemberGroup">
-                        <label for="user_member">Verknüpftes Mitglied</label>
-                        <select id="user_member">
-                            <option value="">Kein Mitglied</option>
-                        </select>
-                    </div>
-                    <div class="form-group" id="userDeviceTypeGroup" style="display: none;">
-                        <label for="user_device_type">Geräte-Typ*</label>
-                        <select id="user_device_type" required>
-                            <option value="">Bitte wählen...</option>
-                            <option value="totp_location">🔢 TOTP-Location (User-Authentifizierung)</option>
-                            <option value="auth_device">🔐 Auth-Device (Member-Authentifizierung)</option>
-                        </select>
-                        <small id="deviceTypeHint" style="display: block; margin-top: 5px; color: #7f8c8d;"></small>
-                    </div>
 
-                    <!-- TOTP Secret nur bei totp_location -->
-                    <div class="form-group" id="userTotpSecretGroup" style="display: none;">
-                        <label for="user_totp_secret">TOTP Secret (Base32)*</label>
-                        <input type="text" id="user_totp_secret" maxlength="255" style="font-family: monospace;">
-                        <button type="button" onclick="generateTotpSecret()" class="btn-add" style="margin-top: 5px;">
-                            🔄 Secret generieren
-                        </button>
-                        <small>Wird für TOTP-basierte Standortverifizierung benötigt</small>
-                    </div>                    
-
-                    <!-- API-Token Anzeige (nur für Devices und nach Erstellung) -->
-                    <div class="form-group" id="userTokenGroup" style="display: none;">
-                        <label>API-Token</label>
-                        <p style="color: #7f8c8d; margin-bottom: 10px; font-size: 12px;">
-                            Dieser Token wird für die API-Authentifizierung benötigt
-                        </p>
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <div style="flex: 1; position: relative;">
-                                <input type="password" id="user_token" readonly class="token-hidden" 
-                                    style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace; background: #f8f9fa;">
-                                <button onclick="toggleUserTokenVisibility()" id="toggleUserTokenBtn" type="button"
-                                        style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
-                                    👁️
+                    <div class="modal-section">
+                        <!-- 
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="user_active" checked style="pointer-events: none;">
+                                <span>Aktiv</span>
+                            </label>
+                        </div> -->
+                        <div class="form-group">
+                            <label for="user_email">E-Mail *</label>
+                            <input type="text" id="user_email" required>
+                        </div>                        
+                        <div class="form-group">
+                            <label for="user_name">Name</label>
+                            <input type="text" id="user_name" placeholder="Optional">
+                        </div>
+                        <div class="form-group">
+                            <label for="user_password">Passwort</label>
+                            <input type="password" id="user_password">
+                            <small>Leer lassen um bestehendes Passwort zu behalten.</small>
+                        </div>                    
+                        <div class="form-group">
+                            <label for="user_role">Rolle *</label>
+                            <select id="user_role" required>
+                                <option value="user">Benutzer</option>                        
+                                <option value="manager">Manager</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="userMemberGroup">
+                            <label for="user_member">Verknüpftes Mitglied</label>
+                            <select id="user_member">
+                                <option value="">Kein Mitglied</option>
+                            </select>
+                        </div>  
+                    </div>                                        
+                    
+                    <!-- Account-Status Section (nur beim Bearbeiten) -->
+                    <div class="modal-section" id="statusSection" style="display: none;">
+                        <h3>Account-Status</h3>
+                        
+                        <!-- Status + Action Button in einer Zeile -->
+                        <div class="status-action-row">
+                            <!-- Status-Anzeige (links) -->
+                            <div id="currentStatus" class="status-info"></div>
+                            
+                            <!-- Action Buttons (rechts) -->
+                            <div class="status-actions">
+                                <!-- Aktivierungs-Button (pending + email verifiziert) -->
+                                <button type="button" id="activateBtn" class="btn btn-modal-success" style="display: none;">
+                                    ✓ Aktivieren
+                                </button>
+                                
+                                <!-- Sperr-Button (aktive User) -->
+                                <button type="button" id="suspendBtn" class="btn btn-modal-warning" style="display: none;">
+                                    🚫 Sperren
+                                </button>
+                                
+                                <!-- Reaktivierungs-Button (gesperrte User) -->
+                                <button type="button" id="reactivateBtn" class="btn btn-modal-success" style="display: none;">
+                                    ✓ Reaktivieren
+                                </button>
+                                <button type="button" id="resendVerificationBtn" class="btn btn-secondary" style="display: none;" title="Email-Verifikation erneut senden">
+                                    📧 Email erneut senden
                                 </button>
                             </div>
-                            <button onclick="copyUserToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
                         </div>
-                        <!-- Im userTokenGroup nach dem Token-Input -->
-                        <div id="tokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
-                        <button onclick="regenerateUserToken()" type="button" class="action-btn btn-delete" style="margin-top: 10px;">
-                            🔄 Neuen Token generieren
-                        </button>
-                        <p style="color: #e74c3c; font-size: 12px; margin-top: 10px;">
-                            ⚠️ Token nach Erstellung sicher aufbewahren!
-                        </p>
+
+                        <!-- Member-Auswahl für Aktivierung -->
+                        <div id="activationGroup" style="display: none;">
+                            <div class="form-group" style="margin-top: 15px;">
+                                <label for="linkMemberId">Mit Mitglied verknüpfen:</label>
+                                <select id="linkMemberId" class="form-control">
+                                    <option value="">-- Kein Mitglied --</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Email-Verifizierung Info -->
+                        <div id="emailVerificationInfo" style="display: none; margin-top: 15px;">
+                            <div class="alert alert-info">
+                                <strong>📧 Email-Bestätigung:</strong>
+                                <span id="emailVerificationStatus"></span>
+                            </div>
+                        </div>
+                        
+                        <!-- Member-Verknüpfung (editierbar für aktive/gesperrte User) -->
+                        <div id="memberLinkSection" style="display: none; margin-top: 15px;">
+                            <label for="currentMemberId">Verknüpftes Mitglied:</label>
+                            <!-- Anzeige-Modus -->
+                            <div id="memberDisplayMode">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div id="linkedMemberInfo" style="flex: 1; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+                                        -
+                                    </div>
+                                    <button id="editMemberBtn" type="button" class="action-btn btn-edit" onclick="toggleMemberEdit()" title="Bearbeiten">
+                                        ✏️
+                                    </button>
+                                </div>
+                            </div>                            
+                                
+                            <!-- Edit-Modus -->
+                            <div id="memberEditMode" style="display: none;" class="form-group">
+                                <select id="editMemberId" class="form-control">
+                                    <option value="">Kein Mitglied</option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    Änderungen werden mit "Speichern" unten übernommen
+                                </small>
+                            </div>                            
+                        </div> 
+                    </div>                                          
+
+                    <!-- API-Token Anzeige  -->                     
+                    <div class="modal-section" id="userTokenGroup" style="display: none;">
+                        <div class="form-group">
+                            <label>API-Token</label>
+                            <p style="color: #7f8c8d; margin-bottom: 10px; font-size: 12px;">
+                                Dieser Token wird für die API-Authentifizierung benötigt
+                            </p>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <div style="flex: 1; position: relative;">
+                                    <input type="password" id="user_token" readonly class="token-hidden" 
+                                        style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace; background: #f8f9fa;">
+                                    <button onclick="toggleUserTokenVisibility()" id="toggleUserTokenBtn" type="button"
+                                            style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
+                                        👁️
+                                    </button>
+                                </div>
+                                <button onclick="copyUserToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
+                            </div>
+                            <!-- Im userTokenGroup nach dem Token-Input -->
+                            <div id="tokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
+                            <button onclick="regenerateUserToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
+                                🔄 Neuen Token generieren
+                            </button>
+                            <p style="color: #e74c3c; font-size: 12px; margin-top: 10px;">
+                                ⚠️ Token nach Erstellung sicher aufbewahren!
+                            </p>                        
+                        </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="closeUserModal()">Abbrechen</button>
                 <button class="btn-save" onclick="saveUser()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal für Geräte -->
+    <div class="modal" id="deviceModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="deviceModalTitle">Neues Gerät</h2>
+                <button class="close-modal" onclick="closeDeviceModal()">×</button>
+            </div>
+            <div class="modal-body">                
+                <form id="deviceForm">
+                    <input type="hidden" id="device_id">
+
+                    <div class="form-group">
+                        <label for="device_name">Gerätename *</label>
+                        <input type="text" id="device_name" class="form-control" 
+                            placeholder="z.B. NFC-Station Eingang" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="device_type">Gerätetyp *</label>
+                        <select id="device_type" class="form-control" required>                       
+                            <option value="">-- Auswählen --</option>
+                            <option value="totp_location">🔢 TOTP-Station</option>
+                            <option value="auth_device">🔐 Auth-Gerät</option>
+                        </select>
+                        <small id="deviceTypeHint" style="display: block; margin-top: 5px; color: #7f8c8d;"></small>
+                    </div>     
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="device_active" checked>
+                            Gerät aktiviert
+                        </label>
+                    </div>
+                    
+                    <!-- TOTP Secret (nur bei Bearbeitung oder totp_location) -->
+                    <div id="totpSecretGroup" style="display: none;">
+                        <div class="form-group">
+                            <label for="device_totp_secret">TOTP Secret</label>
+                            <input type="text" id="device_totp_secret" style="font-family: monospace;">
+                            <button type="button" id="toggleDeviceTotpBtn" onclick="generateTotpSecret()" 
+                                    class="btn-secondary" style="margin-top: 5px;">
+                                🔄 Secret neu generieren
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- API-Token Anzeige  -->
+                    <div class="form-group" id="apiTokenGroup" style="display: none;">
+                        <label>API-Token</label>
+                        <p style="color: #7f8c8d; margin-bottom: 10px; font-size: 12px;">
+                            Dieser Token wird für die API-Authentifizierung benötigt
+                        </p>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <div style="flex: 1; position: relative;">
+                                <input type="password" id="device_token" readonly class="token-hidden" 
+                                    style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace; background: #f8f9fa;">
+                                <button onclick="toggleDeviceTokenVisibility()" id="toggleDeviceTokenBtn" type="button"
+                                        style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
+                                    👁️
+                                </button>
+                            </div>
+                            <button onclick="copyDeviceToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
+                        </div>
+                        <!-- Im userTokenGroup nach dem Token-Input -->
+                        <div id="deviceTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
+                        <button onclick="regenerateDeviceToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
+                            🔄 Neuen Token generieren
+                        </button>
+                        <p style="color: #e74c3c; font-size: 12px; margin-top: 10px;">
+                            ⚠️ Token nach Erstellung sicher aufbewahren!
+                        </p>
+                    </div>
+                </form>               
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeDeviceModal()">Abbrechen</button>
+                <button class="btn-save" onclick="saveDevice()">Speichern</button>
             </div>
         </div>
     </div>
@@ -1264,6 +1545,78 @@
         </div>
     </div>
 
+    <!-- SMTP Config Modal (außerhalb der settings-card) -->
+    <div class="modal" id="smtpConfigModal">
+        <div class="modal-content">
+            <div class="modal-header">            
+                <span class="close" onclick="closeSmtpConfigModal()">&times;</span>
+                <h2>SMTP-Server Konfiguration</h2>
+            </div>
+            
+            <div class="modal-body">
+                <form id="smtpConfigForm" onsubmit="return false;">
+                    <div class="form-group">
+                        <label for="smtp_host">SMTP Server</label>
+                        <input type="text" id="smtp_host" class="form-control" placeholder="mail.example.com" required>
+                        <small>Hostname oder IP-Adresse des SMTP-Servers</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="smtp_port">SMTP Port</label>
+                        <input type="number" id="smtp_port" class="form-control" min="1" max="65535" placeholder="587" required>
+                        <small>Standard: 587 (STARTTLS), 465 (SSL), 25 (unsicher)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="smtp_encryption">Verschlüsselung</label>
+                        <select id="smtp_encryption" class="form-control">
+                            <option value="none">Keine</option>
+                            <option value="tls" selected>TLS/STARTTLS</option>
+                            <option value="ssl">SSL</option>
+                        </select>
+                        <small>Empfohlen: TLS für Port 587</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="smtp_user">SMTP Benutzername</label>
+                        <input type="text" id="smtp_user" class="form-control" autocomplete="off" placeholder="noreply@example.com">
+                        <small>Oft identisch mit der Absender-Email</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="smtp_password">SMTP Passwort</label>
+                        <div style="position: relative;">
+                            <input type="password" 
+                                id="smtp_password" 
+                                class="form-control" 
+                                autocomplete="new-password"
+                                placeholder="Leer lassen um bestehendes zu behalten">
+                            <button type="button" 
+                                    class="btn-icon" 
+                                    onclick="togglePasswordVisibility('smtp_password')"
+                                    style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);"
+                                    title="Passwort anzeigen/verbergen">
+                                👁️
+                            </button>
+                        </div>
+                        <small>Leer lassen um bestehendes Passwort zu behalten</small>
+                    </div>
+                </form>
+            </div>
+                    
+                <div class="modal-footer">
+                    <button type="button" class="btn-std btn-modal-cancel" onclick="closeSmtpConfigModal()">
+                        Abbrechen
+                    </button>
+                    <button type="button" class="btn-std btn-modal-success" onclick="saveSmtpConfig()">
+                        💾 Speichern
+                    </button>
+                </div>                
+        </div>
+    </div>
+
+
+
     <!-- QR Code Generator -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
@@ -1280,6 +1633,7 @@
     <script type="module" src="./js/modules/records.js"></script>
     <script type="module" src="./js/modules/exceptions.js"></script>
     <script type="module" src="./js/modules/users.js"></script>
+    <script type="module" src="./js/modules/devices.js"></script>
     <script type="module" src="./js/modules/profile.js"></script>
     <script type="module" src="./js/modules/management.js"></script>
     <script type="module" src="./js/modules/statistics.js"></script>

@@ -40,7 +40,7 @@ export async function loadStatistics(filters = {}) {
 export async function loadStatisticsFilters() {
 
     // Gruppen laden
-    const groups = await loadGroups(true);
+    const groups = await loadGroups();    
     
     // Gruppen-Filter befüllen
     const groupSelect = document.getElementById('statGroup');
@@ -64,6 +64,7 @@ export async function loadStatisticsFilters() {
     if (isAdminOrManager) {
         document.getElementById('statMemberFilterGroup').style.display = 'block';              
         // Initial alle Mitglieder anzeigen         
+        await loadMembers();
         
         // Grid für 2 Spalten
         if (filterGrid) {

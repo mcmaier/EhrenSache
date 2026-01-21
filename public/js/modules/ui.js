@@ -2,6 +2,7 @@ import {TOAST_DURATION} from '../config.js';
 import {apiCall, isAdmin, isManager, isAdminOrManager, currentUser, setCurrentUser} from './api.js';
 import {loadProfile, initProfileEventHandler} from './profile.js';
 import {loadUsers, showUserSection, initUsersEventHandlers} from'./users.js';
+import {loadDevices, showDeviceSection, initDevicesEventHandlers} from'./devices.js';
 import {loadAppointments, setCalendarToYear, showAppointmentSection} from'./appointments.js';
 import {loadExceptions, showExceptionSection, initExceptionEventHandlers} from'./exceptions.js';
 import {loadRecords, showRecordsSection, initRecordEventHandlers} from'./records.js';
@@ -24,6 +25,7 @@ export const dataCache = {
     userData: { data: [], timestamp: null},
     members: { data: [], year: null, timestamp: null },
     users: { data: [], timestamp: null },
+    devices: { data: [], timestamp: null },
     groups: { data: [], timestamp: null },
     types: { data: [], timestamp: null },
     availableYears: { data: [], timestamp: null }, 
@@ -180,7 +182,7 @@ export async function loadAvailableYears(forceReload = false) {
 
 export function showScreen(screenName) {
     const screens = {
-        login: document.getElementById('loginPage'),
+        //login: document.getElementById('loginPage'),
         main: document.getElementById('dashboard')
     };
     
@@ -384,6 +386,7 @@ export function updateMobileMenuVisibility() {
 }
 
 // UI Helper
+/*
 export function showLogin() {
     document.getElementById('loginPage').style.display = 'flex';
     document.getElementById('dashboard').classList.remove('active');
@@ -402,10 +405,11 @@ export function showLogin() {
     if (sidebar) sidebar.classList.remove('mobile-open');
     if (overlay) overlay.classList.remove('active');
 }
+*/
 
 // Nach Login/Session-Check setzen
 export function showDashboard() {
-    document.getElementById('loginPage').style.display = 'none';
+    //document.getElementById('loginPage').style.display = 'none';
     document.getElementById('dashboard').classList.add('active');
     
     if (currentUser) {
@@ -541,6 +545,11 @@ export async function loadAllData() {
         case 'benutzer':
             if(isAdmin){
                 await showUserSection(true);
+            }            
+            break;
+        case 'geraete':
+            if(isAdmin){
+                await showDeviceSection(true);
             }            
             break;
         case 'verwaltung':

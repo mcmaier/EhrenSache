@@ -45,14 +45,13 @@
                 <div id="loginError" class="error-message"></div>
             </form>
             
-            <!-- Optional: Token-Login als Fallback -->
+            <!-- Optional: Token-Login als Fallback
             <div class="divider" style="margin: 20px 0;">oder</div>
             
             <button class="action-button btn-secondary" id="showTokenLoginButton">
                 Mit Token anmelden
             </button>
             
-            <!-- Token-Login (versteckt) -->
             <div id="tokenLoginSection" style="display: none; margin-top: 20px;">
                 <div class="form-group">
                     <label for="apiTokenInput">API Token</label>
@@ -62,6 +61,7 @@
                     Mit Token anmelden
                 </button>
             </div>
+            -->
             
             <div class="info-box">
                 <p><strong>Hinweis:</strong> Verwenden Sie Ihre Dashboard-Zugangsdaten.</p>
@@ -107,10 +107,14 @@
                 <button class="tab-button" data-tab="history">
                     <span class="icon">📋</span>
                     <span>Verlauf</span>
-                </button>
+                </button>                
                 <button class="tab-button" data-tab="stats">
                     <span class="icon">📊</span>
                     <span>Statistik</span>
+                </button>
+                <button class="tab-button" data-tab="attendance-list" id="attendanceListTab" style="display: none;">
+                    <span class="icon">✓</span>
+                    <span>Anwesenheit</span>
                 </button>
             </div>
 
@@ -220,7 +224,40 @@
                         </div>
                     </div>
                 </div>
-            </div>                        
+            </div>
+            
+               <!-- ATTENDANCE LIST TAB (nur für Admin/Manager) -->
+            <div class="tab-content" id="attendanceListPanel" data-tab="attendance-list">
+                <div class="attendance-header">
+                    <h3>Anwesenheitsliste</h3>
+                    
+                    <div class="filter-section">
+                        <select id="attendanceAppointmentFilter" class="select-input">
+                            <option value="">Termin wählen...</option>
+                        </select>
+                    </div>
+
+                    <div class="attendance-controls">
+                        <button id="btnRefreshAttendance" class="btn-refresh" style="display: none;">
+                            🔄 Aktualisieren
+                        </button>
+                        <button id="btnCreateAppointment" class="btn-create-appointment" style="display: block;">
+                            ➕ Termin anlegen
+                        </button>
+                        <button id="btnEditAppointment" class="btn-edit-appointment" style="display: none;">
+                            ✎ Termin bearbeiten
+                        </button>
+                    </div>
+                </div>                
+
+                <div class="attendance-scroll-container">
+                    <div id="attendanceListContent">
+                        <div class="info-box">
+                            <p>Bitte wähle einen aktuellen Termin aus.</p>
+                        </div>
+                    </div>
+                </div
+            </div>       
         </div>
     </div>
 
@@ -259,6 +296,37 @@
                 <button class="action-button btn-cancel" id="closeExceptionBtn">Abbrechen</button>
                 <button class="action-button" id="submitExceptionBtn">Antrag stellen</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Appointment Modal -->
+    <div class="modal" id="appointmentModal">
+        <div class="modal-content">
+            <h3 id="appointmentModalTitle">Termin anlegen</h3>
+            <form id="appointmentForm">
+                <div class="form-group">
+                    <label for="appointmentTitle">Titel *</label>
+                    <input type="text" id="appointmentTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentDate">Datum *</label>
+                    <input type="date" id="appointmentDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentTime">Uhrzeit *</label>
+                    <input type="time" id="appointmentTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="appointmentType">Terminart *</label>
+                    <select id="appointmentType" required>
+                        <option value="">Bitte wählen...</option>
+                    </select>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="btn-modal-cancel" id="btnCancelAppointment">Abbrechen</button>
+                    <button type="submit" class="btn-modal-confirm" id="btnSaveAppointment">Speichern</button>
+                </div>
+            </form>
         </div>
     </div>
 

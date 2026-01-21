@@ -1,8 +1,14 @@
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Commercial License](https://img.shields.io/badge/Commercial-License%20Available-green.svg)](COMMERCIAL-LICENSE.md)
+
 # EhrenSache
 
-> Digitales Zeiterfassungs- und Mitgliederverwaltungssystem für Vereine
+**Moderne Anwesenheitserfassung für ehrenamtliche Organisationen**
 
-EhrenZeit ist eine umfassende webbasierte Lösung zur Verwaltung von ehrenamtlicher Arbeit in Vereinen. Das System ermöglicht die digitale Erfassung von Anwesenheiten über verschiedene Kanäle (Web, Mobile, QR-Code, NFC, IoT-Geräte) und bietet umfangreiche Verwaltungsfunktionen für Vereinsadministratoren.
+Entwickelt für Musikvereine, Sportvereine und andere gemeinnützige 
+Organisationen. Kostenlos unter AGPL-3.0 nutzbar.
+
+> **💼 Kommerziell nutzen?** Siehe [Lizenzierung](#-lizenzierung)
 
 ## Features
 
@@ -233,12 +239,12 @@ Response: Array of members with groups
 # XAMPP oder ähnliches installieren
 # Projekt nach htdocs/ kopieren
 # Datenbank erstellen
-# In Browser: http://localhost/EhrenZeit
+# In Browser: http://localhost/EhrenSache
 ```
 
 ### Code-Struktur
 ```
-EhrenZeit/
+EhrenSache/
 ├── api/              # REST API Endpoints
 ├── js/               # Frontend JavaScript (ES6 Module)
 ├── css/              # Stylesheets
@@ -256,13 +262,6 @@ Das System verwendet ein intelligentes Jahr-basiertes Caching:
 - Invalidierung bei Änderungen über Event-System
 - Cache-Keys im localStorage
 
-## Lizenz
-
-[Lizenz hier einfügen]
-
-## Autor
-
-Martin Maier
 
 ## Support
 
@@ -270,4 +269,39 @@ Bei Fragen oder Problemen bitte ein Issue auf GitHub erstellen.
 
 ---
 
-**Status:** Aktive Entwicklung | **Version:** 1.0 | **Letzte Aktualisierung:** Dezember 2025
+## 📋 Lizenzierung
+
+EhrenZeit ist unter einer **dualen Lizenz** verfügbar:
+
+### 🆓 Kostenlos für gemeinnützige Organisationen
+
+Gemeinnützige Vereine, Musikvereine, Sportvereine und andere ehrenamtliche 
+Organisationen können EhrenZeit **kostenlos** unter der 
+[AGPL-3.0-Lizenz](LICENSE) nutzen.
+
+**Das bedeutet:**
+- ✅ Kostenlose Nutzung
+- ✅ Quellcode einsehbar und anpassbar
+- ✅ Selbst-Hosting möglich
+- ⚠️ Änderungen müssen veröffentlicht werden (AGPL-Bedingung)
+
+### 💼 Kommerzielle Lizenz
+
+Für kommerzielle Nutzung (SaaS-Anbieter, Systemhäuser, Unternehmen) ist eine 
+**kommerzielle Lizenz** erforderlich.
+
+**Wann brauche ich eine kommerzielle Lizenz?**
+- Du hostest EhrenZeit als kostenpflichtige Dienstleistung
+- Du integrierst EhrenZeit in ein kommerzielles Produkt
+- Du möchtest Änderungen NICHT veröffentlichen
+- Du verkaufst EhrenZeit-basierte Lösungen
+
+
+## 📄 Lizenz & Copyright
+
+Copyright (c) 2026 Martin Maier
+
+- **Gemeinnützige Nutzung:** [AGPL-3.0](LICENSE)
+- **Kommerzielle Nutzung:** [Kommerzielle Lizenz](COMMERCIAL-LICENSE.md)
+
+Made with ❤️ for the volunteer community

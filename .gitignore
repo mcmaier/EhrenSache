@@ -1,5 +1,6 @@
 *.bak
 install/.htaccess
 private/uploads/*.*
-private/config.php
-private/install.lock
+private/config/config.php
+private/config/mail_config.php
+private/config/install.lock

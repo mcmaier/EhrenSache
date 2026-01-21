@@ -54,6 +54,7 @@ let deleteExceptionId = null;
 let nfcAbortController = null;
 let nfcAvailable = false;
 let currentStatsYear = new Date().getFullYear();
+let currentEditAppointmentId = null;
 
 // In checkin/index.html oder checkin/app.js
     if ('serviceWorker' in navigator) {
@@ -89,10 +90,10 @@ document.addEventListener('DOMContentLoaded', function() {
         emailInput: document.getElementById('emailInput'),
         passwordInput: document.getElementById('passwordInput'),
         saveLoginCheckbox: document.getElementById('saveLoginCheckbox'),
-        showTokenLoginButton: document.getElementById('showTokenLoginButton'),
-        tokenLoginSection: document.getElementById('tokenLoginSection'),
-        apiTokenInput: document.getElementById('apiTokenInput'),
-        tokenLoginButton: document.getElementById('tokenLoginButton'),
+        //showTokenLoginButton: document.getElementById('showTokenLoginButton'),
+        //tokenLoginSection: document.getElementById('tokenLoginSection'),
+        //apiTokenInput: document.getElementById('apiTokenInput'),
+        //tokenLoginButton: document.getElementById('tokenLoginButton'),
         loginScreen: document.getElementById('loginScreen'),
         mainScreen: document.getElementById('mainScreen'),
         loginForm: document.getElementById('loginForm'),
@@ -132,8 +133,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Event Listeners
     elements.loginForm.addEventListener('submit', handleLogin);
-    elements.showTokenLoginButton.addEventListener('click', toggleTokenLogin);
-    elements.tokenLoginButton.addEventListener('click', handleTokenLogin);
+    //elements.showTokenLoginButton.addEventListener('click', toggleTokenLogin);
+    //elements.tokenLoginButton.addEventListener('click', handleTokenLogin);
     elements.logoutBtn.addEventListener('click', requestLogout);
     elements.scanButton.addEventListener('click', toggleScanner);
     elements.manualCodeBtn.addEventListener('click', openManualCodeInput);
@@ -173,8 +174,7 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
    
     const url = new URL(API_BASE);
 
-    url.searchParams.append('resource', resource);
-    let connectionStatus = true;
+    url.searchParams.append('resource', resource);   
     
     for (const [key, value] of Object.entries(params)) {
         url.searchParams.append(key, value);
@@ -197,28 +197,68 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
     try {
         debug.log('API Call:', method, url.toString());
         const response = await fetch(url, options);
-        
-        if (!response.ok) {
-            if (response.status === 401) {
-                throw new Error('Anmeldedaten ungültig');                
-            }
-            else
-            {         
-                connectionStatus = false; 
-                throw new Error(`HTTP ${response.status}`);
-            }
+
+        // Parse Response Body
+        let responseData = null;
+
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            responseData = await response.json();
         }
-        
-        return await response.json();
+
+        // Erfolgreiche Antwort
+        if (response.ok) {
+            return {
+                success: true,
+                status: response.status,
+                data: responseData
+            };
+        }
+
+        // Fehlerhafte Antwort
+        let errorMessage = responseData?.message || `HTTP ${response.status}`;
+
+        // Spezifische Fehlermeldungen
+        switch (response.status) {
+            case 401:
+                errorMessage = 'Anmeldedaten ungültig';
+                break;
+            case 403:
+                errorMessage = 'Keine Berechtigung für diese Aktion';
+                break;
+            case 404:
+                errorMessage = 'Ressource nicht gefunden';
+                break;
+            case 409:
+                errorMessage = responseData?.message || 'Konflikt - Eintrag existiert bereits';
+                break;
+            case 422:
+                errorMessage = responseData?.message || 'Ungültige Eingabedaten';
+                break;
+            case 429:
+                errorMessage = 'Zu viele Anfragen - bitte warten';
+                break;
+            case 500:
+                errorMessage = 'Serverfehler - bitte später erneut versuchen';
+                break;
+        }
+
+         return {
+            success: false,
+            status: response.status,
+            error: errorMessage,
+            data: responseData
+        };
     } catch (error) {
         debug.error('API Error:', error);
+        showOfflineIndicator();
 
-        if(!connectionStatus) {
-            showOfflineIndicator();
-            connectionStatus = true;
-        }
-
-        throw error;
+         return {
+            success: false,
+            status: 0,
+            error: 'Verbindungsfehler',
+            data: null
+        };
     }
 }
 
@@ -246,11 +286,11 @@ async function loadAppearanceSettings() {
 
 function applyAppearanceSettings() {
     // Titel setzen
-    document.title = appearanceSettings.organization_name || 'EhrenZeit';
+    document.title = appearanceSettings.organization_name || 'EhrenSache';
     
     // Alle Elemente mit class="org-name" aktualisieren
     document.querySelectorAll('.org-name').forEach(el => {
-        el.textContent = appearanceSettings.organization_name || 'EhrenZeit';
+        el.textContent = appearanceSettings.organization_name || 'EhrenSache';
     });
     
     // CSS-Variablen setzen
@@ -280,17 +320,17 @@ async function handleLogin(e) {
     
     try {
         // Login via API
-        const response = await apiCall('auth','POST',{email: email, password: password});
+        const result = await apiCall('auth','POST',{email: email, password: password});
 
-        debug.log("Login response:", response);
+        debug.log("Login response:", result);
 
-        if (!response.success) {
-            const error = response;
+        if (!result.success) {
+            const error = result;
             throw new Error(error.message || 'Login fehlgeschlagen');
         }    
         
         // Speichere Token
-        apiToken = response.token;
+        apiToken = result.data.token;
         
         if (elements.saveLoginCheckbox.checked) {
             // Speichere Token (Base64 kodiert)
@@ -305,6 +345,8 @@ async function handleLogin(e) {
         //await loadHistory();
         await initTabs();
         await initYearNavigation();    
+        // Anwesenheitsliste initialisieren
+        //await initAttendanceList();
 
         debug.log("Showing main screen");        
         showScreen('main');
@@ -321,6 +363,7 @@ async function handleLogin(e) {
 // ========================================
 // TOKEN LOGIN (FALLBACK)
 // ========================================
+/*
 async function handleTokenLogin() {
     const token = elements.apiTokenInput.value.trim();
     
@@ -347,6 +390,8 @@ async function handleTokenLogin() {
         //await loadHistory();
         await initTabs();
         await initYearNavigation();
+        // Anwesenheitsliste initialisieren
+        //await initAttendanceList();
         
         debug.log("Showing main screen");        
         showScreen('main');
@@ -358,7 +403,7 @@ async function handleTokenLogin() {
         apiToken = null;
     }
 }
-
+*/
 
 // ========================================
 // AUTO LOGIN
@@ -370,21 +415,29 @@ async function checkAutoLogin() {
         try {
             apiToken = atob(savedToken);
         
-        // Teste Token
-        await apiCall('me');
-        debug.log('✓ Auto-Login erfolgreich');
-            
-        // Lade Daten
-        await loadAppointmentTypes();
-        await loadUserData();
-        //await loadHistory();
-        await initTabs();
-        await initYearNavigation();        
+            // Teste Token
+            const result = await apiCall('me');
 
-        debug.log("Showing main screen");
-            
-        showScreen('main');
-        startClock();
+            if (!result.success) {
+                const error = result;
+                throw new Error(error.message || 'Login fehlgeschlagen');
+            }  
+
+            debug.log('✓ Auto-Login erfolgreich');
+                
+            // Lade Daten
+            await loadAppointmentTypes();
+            await loadUserData();
+            //await loadHistory();
+            await initTabs();
+            await initYearNavigation();      
+            // Anwesenheitsliste initialisieren
+            //await initAttendanceList();  
+
+            debug.log("Showing main screen");
+                
+            showScreen('main');
+            startClock();
             
         } catch (error) {
             debug.log('Auto-Login fehlgeschlagen:', error);
@@ -406,7 +459,7 @@ function showError(message) {
 // ========================================
 // TOGGLE TOKEN LOGIN
 // ========================================
-function toggleTokenLogin() {
+/*function toggleTokenLogin() {
     const section = elements.tokenLoginSection;
     if (section.style.display === 'none') {
         section.style.display = 'block';
@@ -415,7 +468,7 @@ function toggleTokenLogin() {
         section.style.display = 'none';
         elements.showTokenLoginButton.textContent = 'Mit Token anmelden';
     }
-}
+}*/
 
 async function handleLogout() {
     await stopScannerIfRunning();
@@ -430,11 +483,12 @@ async function handleLogout() {
     elements.passwordInput.value = '';
     elements.loginError.classList.remove('active');
 
+    /*
     // Reset Token-Login (falls sichtbar)
     if (elements.tokenLoginSection) {
         elements.tokenLoginSection.style.display = 'none';
         elements.showTokenLoginButton.textContent = 'Mit Token anmelden';
-    }
+    }*/
     
     showScreen('login');
     stopClock();
@@ -446,23 +500,42 @@ async function loadUserData() {
 let success = false;
 
     try {
-        const meData = await apiCall('me');
+        const result = await apiCall('me');
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
+        const meData = result.data;
         userData = meData;
         
         if (meData.member_id) {
             try {
-                const member = await apiCall('members', 'GET', null, { id: meData.member_id });
+                const result = await apiCall('members', 'GET', null, { id: meData.member_id });
+
+                if (!result.success) {
+                            throw new Error(result.error);
+                        }
+                
+                const member = result.data;
                 
                 if (member) {
                     elements.userName.textContent = `${member.name} ${member.surname}`;
                     
-                    const roleText = meData.role === 'admin' ? 'Administrator' : 'Mitglied';
+                    // Rollentext mit Manager-Unterstützung
+                    let roleText = 'Mitglied';
+                    if (meData.role === 'admin') roleText = 'Administrator';
+                    else if (meData.role === 'manager') roleText = 'Manager';
+                    
                     if (member.member_number) {
                         elements.userRole.textContent = `${roleText} • Nr. ${member.member_number}`;
                     } else {
                         elements.userRole.textContent = roleText;
                     }
                     success = true;
+                    
+                    // Anwesenheitsliste initialisieren wenn Admin/Manager
+                    await initAttendanceList();
+                    
                     return success;
                 }
             } catch (error) {
@@ -484,7 +557,10 @@ let success = false;
             elements.userName.textContent = 'Benutzer';
         }
         
-        const roleText = meData.role === 'admin' ? 'Administrator' : 'Mitglied';
+        // Rollentext mit Manager-Unterstützung
+        let roleText = 'Mitglied';
+        if (meData.role === 'admin') roleText = 'Administrator';
+        else if (meData.role === 'manager') roleText = 'Manager';
         elements.userRole.textContent = roleText;
 
         success = true;
@@ -496,6 +572,408 @@ let success = false;
     }
 
     return success;
+}
+
+// ========================================
+// ATTENDANCE LIST (Admin/Manager)
+// ========================================
+
+async function initAttendanceList() {
+
+    // Prüfe ob Benutzer Admin oder Manager ist
+    if (!userData || (userData.role !== 'admin' && userData.role !== 'manager')) {
+        // Tab ausblenden falls vorhanden
+        const tab = document.querySelector('[data-tab="attendance-list"]');
+        if (tab) tab.style.display = 'none';
+        return;
+    }
+
+    const tab = document.querySelector('[data-tab="attendance-list"]');    
+    if (tab) {
+        tab.style.display = 'flex';      
+    }
+    
+    // Filter Listener
+    const filterSelect = document.getElementById('attendanceAppointmentFilter');
+    if (filterSelect && !filterSelect.dataset.listenerAdded) {
+        filterSelect.addEventListener('change', loadAttendanceList);
+        filterSelect.dataset.listenerAdded = 'true';
+    }
+
+    // Refresh Button
+    const btnRefresh = document.getElementById('btnRefreshAttendance');
+    if (btnRefresh && !btnRefresh.dataset.listenerAdded) {
+        btnRefresh.addEventListener('click', async () => {
+            await refreshAttendanceList();
+        });
+        btnRefresh.dataset.listenerAdded = 'true';
+    }
+    
+    // Create Appointment Button
+    const btnCreate = document.getElementById('btnCreateAppointment');
+    if (btnCreate && !btnCreate.dataset.listenerAdded) {
+        btnCreate.addEventListener('click', showCreateAppointmentModal);
+        btnCreate.dataset.listenerAdded = 'true';
+    }
+    
+    // Edit Appointment Button
+    const btnEdit = document.getElementById('btnEditAppointment');
+    if (btnEdit && !btnEdit.dataset.listenerAdded) {
+        btnEdit.addEventListener('click', showEditAppointmentModal);
+        btnEdit.dataset.listenerAdded = 'true';
+    }
+
+     // Modal Cancel Button
+    const btnCancelAppointment = document.getElementById('btnCancelAppointment');
+    if (btnCancelAppointment && !btnCancelAppointment.dataset.listenerAdded) {
+        btnCancelAppointment.addEventListener('click', () => {
+            document.getElementById('appointmentModal').classList.remove('active');
+        });
+        btnCancelAppointment.dataset.listenerAdded = 'true';
+    }
+    
+    // Modal Click Outside
+    const appointmentModal = document.getElementById('appointmentModal');
+    if (appointmentModal && !appointmentModal.dataset.listenerAdded) {
+        appointmentModal.addEventListener('click', (e) => {
+            if (e.target.id === 'appointmentModal') {
+                appointmentModal.classList.remove('active');
+            }
+        });
+        appointmentModal.dataset.listenerAdded = 'true';
+    }
+    
+    // Appointment Form Submit
+    const appointmentForm = document.getElementById('appointmentForm');
+    if (appointmentForm && !appointmentForm.dataset.listenerAdded) {
+        appointmentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                title: document.getElementById('appointmentTitle').value,
+                date: document.getElementById('appointmentDate').value,
+                start_time: document.getElementById('appointmentTime').value,
+                type_id: document.getElementById('appointmentType').value,                
+            };
+            
+            try {
+                if (currentEditAppointmentId) {
+                    // Update                    
+                    const result = await apiCall('appointments', 'PUT', formData, { id: currentEditAppointmentId });
+                    if(result.success) {showMessage('Termin aktualisiert', 'success');}
+                    else{showMessage(result.error,'error');}
+                } else {
+                    // Create
+                    const result = await apiCall('appointments', 'POST', formData);
+                    if(result.success) {showMessage('Termin erstellt', 'success');}
+                    else{showMessage(result.error,'error');}
+                }
+                
+                // Modal schließen
+                document.getElementById('appointmentModal').classList.remove('active');
+                
+                // Liste aktualisieren
+                await loadAttendanceAppointments();
+                if(currentEditAppointmentId)
+                {
+                    refreshAttendanceList();
+                }
+                
+            } catch (error) {
+                debug.log('Fehler beim Speichern:', error);
+                showMessage('Fehler beim Speichern', 'error');
+            }
+        });
+        appointmentForm.dataset.listenerAdded = 'true';
+    }
+}
+
+async function loadAttendanceAppointments() {
+    try {
+        // Hole Termine der nächsten 7 Tage (inkl. heute)
+        const today = new Date();
+        const nextWeek = new Date(today);
+        nextWeek.setDate(nextWeek.getDate() + 3);
+
+
+        const result = await apiCall('appointments', 'GET', null, {
+            from_date: formatDate(today),
+            to_date: formatDate(nextWeek)
+        });
+        
+        if (!result.success) {
+            throw new Error(result.error);
+            }
+
+        appointments = result.data;
+
+        if (!appointments || !Array.isArray(appointments)) {
+            appointments = [];
+        }
+        
+        // Filter: Nur Termine die in Toleranz sind
+        const toleranceHours = 6;
+        const now = new Date();
+        
+        const relevantAppointments = appointments.filter(apt => {
+            const aptDateTime = new Date(`${apt.date}T${apt.start_time}`);
+            const diffHours = Math.abs(now - aptDateTime) / (1000 * 60 * 60);
+            return diffHours <= toleranceHours;
+        });
+        
+        // Dropdown befüllen
+        const select = document.getElementById('attendanceAppointmentFilter');
+        select.innerHTML = '<option value="">Termin wählen...</option>';
+        
+        relevantAppointments.forEach(apt => {
+            const option = document.createElement('option');
+            option.value = apt.appointment_id;
+            option.textContent = `${apt.title} - ${formatDate(new Date(apt.date))} ${apt.start_time}`;
+            select.appendChild(option);
+        });
+        
+        if (relevantAppointments.length === 0) {
+            select.innerHTML = '<option value="">Keine aktuellen Termine</option>';
+        }
+        
+    } catch (error) {
+        debug.log('Fehler beim Laden der Termine:', error);
+        showMessage('Fehler beim Laden der Termine', 'error');
+    }
+}
+
+async function loadAttendanceList() {
+    const appointmentId = document.getElementById('attendanceAppointmentFilter').value;
+    const content = document.getElementById('attendanceListContent');
+    const btnRefresh = document.getElementById('btnRefreshAttendance');
+    const btnCreate = document.getElementById('btnCreateAppointment');
+    const btnEdit = document.getElementById('btnEditAppointment');    
+    
+    if (!appointmentId) {
+        content.innerHTML = '<div class="info-box"><p>Bitte wähle einen Termin aus.</p></div>';
+        btnRefresh.style.display = 'none';
+        btnCreate.style.display = 'block';
+        btnEdit.style.display = 'none';        
+        currentEditAppointmentId = null;
+        return;
+    }
+
+    // Speichere gewählten Termin
+    currentEditAppointmentId = appointmentId;
+    
+    try {
+        content.innerHTML = '<div class="loading">Lädt...</div>';
+        
+        const result = await apiCall('attendance_list', 'GET', null, {
+            appointment_id: appointmentId
+        });
+
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        if (!result.data) {
+            throw new Error('Keine Daten erhalten');
+        }
+        renderAttendanceList(result.data);
+
+        // Buttons anzeigen
+        btnRefresh.style.display = 'block';
+        btnCreate.style.display = 'none';
+        btnEdit.style.display = 'block';
+        
+    } catch (error) {
+        debug.log('Fehler beim Laden der Anwesenheitsliste:', error);
+        content.innerHTML = '<div class="error-box"><p>Fehler beim Laden der Liste</p></div>';
+
+        btnRefresh.style.display = 'none';
+        btnCreate.style.display = 'block';
+        btnEdit.style.display = 'none';        
+        currentEditAppointmentId = null;
+
+        showMessage('Fehler beim Laden der Anwesenheitsliste', 'error');
+    }
+}
+
+function refreshAttendanceList()
+{
+    debug.log("Refreshing Attendance List");
+    if(currentEditAppointmentId) {
+        const select = document.getElementById('attendanceAppointmentFilter');
+        if (select) {
+            select.value = currentEditAppointmentId;
+            loadAttendanceList();
+        }
+    }    
+}
+
+function renderAttendanceList(data) {
+    const content = document.getElementById('attendanceListContent');
+    
+    if (!data.members || data.members.length === 0) {
+        content.innerHTML = '<div class="info-box"><p>Keine Mitglieder für diesen Termin gefunden.</p></div>';
+        return;
+    }
+    
+    // Gruppiere Mitglieder nach Gruppen
+    const groupedMembers = {};
+    data.members.forEach(member => {
+        const groups = member.groups || 'Keine Gruppe';
+        if (!groupedMembers[groups]) {
+            groupedMembers[groups] = [];
+        }
+        groupedMembers[groups].push(member);
+    });
+    
+let html =``;    
+    // Render jede Gruppe
+    Object.keys(groupedMembers).sort().forEach(groupName => {
+        const members = groupedMembers[groupName];
+        
+        html += `<div class="group-section">
+            <h4 class="group-header">${groupName}</h4>
+            <div class="attendance-list">`;
+        
+        members.forEach(member => {
+            const isPresent = member.record_id !== null;
+            const statusClass = isPresent ? 'present' : 'absent';
+            const statusIcon = isPresent ? '✓' : '○';
+
+            // Format Ankunftszeit
+            let arrivalTimeHtml = '';
+            if (isPresent && member.arrival_time) {
+                const arrivalDate = new Date(member.arrival_time);
+                const timeStr = arrivalDate.toLocaleTimeString('de-DE', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                arrivalTimeHtml = `<span class="arrival-time">Ankunft: ${timeStr}</span>`;
+            }
+            
+            html += `
+                <div class="attendance-item ${statusClass}" data-member-id="${member.member_id}">
+                    <div class="member-info">
+                    <span class="status-icon">${statusIcon}</span>
+                        <div class="member-info-row">                            
+                            <span class="member-name">${member.surname}, ${member.name}</span>
+                            ${arrivalTimeHtml}
+                        </div>                        
+                    </div>
+                    <button class="btn-toggle-attendance" 
+                            data-member-id="${member.member_id}"
+                            data-appointment-id="${data.appointment.appointment_id}"
+                            data-record-id="${member.record_id || ''}"
+                            data-is-present="${isPresent}">
+                        ${isPresent ? '✗' : '✓'}
+                    </button>
+                </div>`;
+        });
+        
+        html += `</div></div>`;
+    });
+    
+    content.innerHTML = html;
+    
+    // Event Listener für Toggle-Buttons
+    content.querySelectorAll('.btn-toggle-attendance').forEach(btn => {
+        btn.addEventListener('click', handleAttendanceToggle);
+    });
+}
+
+async function handleAttendanceToggle(event) {
+    const btn = event.target;
+    const memberId = btn.dataset.memberId;
+    const appointmentId = btn.dataset.appointmentId;
+    const recordId = btn.dataset.recordId;
+    const isPresent = btn.dataset.isPresent === 'true';
+
+    // Speichere Scroll-Position
+    const scrollContainer = document.querySelector('.attendance-scroll-container');
+    const scrollPosition = scrollContainer ? scrollContainer.scrollTop : 0;
+    
+    btn.disabled = true;
+
+    // Finde das Listenelement
+    const listItem = btn.closest('.attendance-item');
+    
+    try {
+        if (isPresent) {
+            // Bestätigung vor dem Löschen
+            showNavigationConfirm(
+                'Anwesenheit entfernen',
+                `Anwesenheit wirklich entfernen?`,
+                async () => {
+                    btn.disabled = true;
+
+                    try{
+                        // Entfernen der Anwesenheit
+                        const result = await apiCall('records', 'DELETE', null, { id: recordId });
+
+                        if (!result.success) {
+                            throw new Error(result.error);
+                        }
+                        
+                        // Optimistisches UI-Update
+                        listItem.classList.remove('present');
+                        listItem.classList.add('absent');
+                        listItem.querySelector('.status-icon').textContent = '○';
+                        listItem.querySelector('.status-icon').style.color = '#bdc3c7';
+                        btn.textContent = '✓';
+                        btn.dataset.isPresent = 'false';
+                        btn.dataset.recordId = '';
+                        
+                        // Entferne Ankunftszeit
+                        const arrivalTime = listItem.querySelector('.arrival-time');
+                        if (arrivalTime) arrivalTime.remove();
+                        
+                        showMessage('Anwesenheit entfernt', 'warning');
+                        btn.disabled = false;
+                    }
+                    catch(error) {
+                        debug.log('Fehler beim Entfernen:', error);
+                        showMessage('Fehler beim Entfernen', 'error');
+                        btn.disabled = false;
+                    }
+                });
+        } else {
+            // Hinzufügen der Anwesenheit
+            const result = await apiCall('records', 'POST', {
+                member_id: parseInt(memberId),
+                appointment_id: parseInt(appointmentId)
+            });
+
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+            
+            // Optimistisches UI-Update
+            listItem.classList.remove('absent');
+            listItem.classList.add('present');
+            listItem.querySelector('.status-icon').textContent = '✓';
+            listItem.querySelector('.status-icon').style.color = '#27ae60';
+            btn.textContent = '✗';
+            btn.dataset.isPresent = 'true';
+            btn.dataset.recordId = result.id;
+            
+            // Füge Ankunftszeit hinzu (aus API-Response)
+            if (result.data.arrival_time) {
+                const arrivalDate = new Date(result.data.arrival_time);
+                const timeStr = arrivalDate.toLocaleTimeString('de-DE', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                const arrivalTimeHtml = `<span class="arrival-time">Ankunft: ${timeStr}</span>`;
+                listItem.querySelector('.member-info-row').insertAdjacentHTML('beforeend', arrivalTimeHtml);
+            }
+        }
+        
+        btn.disabled = false;
+        
+    } catch (error) {
+        debug.log('Fehler beim Umschalten:', error);
+        showMessage('Fehler beim Aktualisieren', 'error');
+        btn.disabled = false;
+    }
 }
 
 // ========================================
@@ -648,14 +1126,18 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
         };
 
         // Admin muss member_id explizit mitschicken
-        if (userData.role === 'admin') {
-            requestData.member_id = userData.member_id;
-        }
+        //if (userData.role === 'admin') {
+        requestData.member_id = userData.member_id;
+        //}
         // User: member_id wird vom Backend automatisch verwendet
 
-        const data = await apiCall('totp_checkin', 'POST', requestData);
+        const result = await apiCall('totp_checkin', 'POST', requestData);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
 
-        const methodText = '✗';
+        const data = result.data;
 
         if (data.appointment) {
             const methodText = inputMethod === 'QR' ? '📷 QR-Code' :
@@ -1003,7 +1485,11 @@ async function onNFCTagRead(message, serialNumber) {
 async function loadAppointmentTypes() {
 
     try {        
-        appointmentTypes = await apiCall('appointment_types');        
+        const result = await apiCall('appointment_types');
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        appointmentTypes =  result.data;       
         debug.log('Terminarten geladen', appointmentTypes);
     }
     catch (error) {
@@ -1014,7 +1500,12 @@ async function loadAppointmentTypes() {
 
 async function loadAppointments() {
     try {
-        appointments = await apiCall('appointments','GET',null, {member_id:userData.member_id});
+        const result = await apiCall('appointments','GET',null, {member_id:userData.member_id});
+
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        appointments = result.data;
         
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -1081,13 +1572,18 @@ async function submitException() {
         const now = new Date();
         const arrivalTime = formatDateTime(now);             
 
-        const data = await apiCall('exceptions', 'POST', {
+        const result = await apiCall('exceptions', 'POST', {
             member_id: userData.member_id,
             appointment_id: parseInt(appointmentId),
             exception_type: 'time_correction',
             reason: reason,
             requested_arrival_time: arrivalTime       
         });
+
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        const data = result.data;
 
         if (data) {
             showMessage('✓ Antrag erfolgreich gestellt (wartet auf Genehmigung)', 'warning');
@@ -1140,10 +1636,19 @@ async function loadHistory() {
         
     try {
         // Lade letzte 10 Records
-        let records = await apiCall('records','GET',null,{ member_id: userData.member_id });
+        let result = await apiCall('records','GET',null,{ member_id: userData.member_id });
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        let records = result.data;
         
         // Lade offene Exceptions
-        let exceptions = await apiCall('exceptions', 'GET', null, { member_id: userData.member_id,status: 'pending' });
+        result = await apiCall('exceptions', 'GET', null, { member_id: userData.member_id,status: 'pending' });
+         if (!result.success) {
+            throw new Error(result.error);
+        }
+
+        let exceptions = result.data;
         
         // Kombiniere und sortiere nach Datum (neueste zuerst)
         const combined = [
@@ -1271,6 +1776,86 @@ function addExceptionToHistory(exception) {
 }
 
 // ========================================
+// APPOINTMENT MODAL
+// ========================================
+
+async function showCreateAppointmentModal() {
+    currentEditAppointmentId = null;
+    document.getElementById('appointmentModalTitle').textContent = 'Termin anlegen';
+    
+    // Lade Terminarten
+    await loadAppointmentTypes();
+    
+    // Formular zurücksetzen
+    document.getElementById('appointmentForm').reset();
+    
+    // Zeige Modal
+    document.getElementById('appointmentModal').classList.add('active');
+}
+
+async function showEditAppointmentModal() {
+    const appointmentId = document.getElementById('attendanceAppointmentFilter').value;
+    if (!appointmentId) return;
+    
+    currentEditAppointmentId = appointmentId;
+    document.getElementById('appointmentModalTitle').textContent = 'Termin bearbeiten';
+    
+    try {
+        // Lade Terminarten
+        await loadAppointmentTypes();
+        
+        // Lade Termin-Daten
+        const result = await apiCall('appointments', 'GET', null, { id: appointmentId });
+         if (!result.success) {
+            throw new Error(result.error);
+        }
+
+        const appointment = result.data;
+        
+        if (appointment) {
+            document.getElementById('appointmentTitle').value = appointment.title || '';
+            document.getElementById('appointmentDate').value = appointment.date || '';
+            document.getElementById('appointmentTime').value = appointment.start_time || '';
+            document.getElementById('appointmentType').value = appointment.type_id || '';            
+        }
+        
+        // Zeige Modal
+        document.getElementById('appointmentModal').classList.add('active');
+        
+    } catch (error) {
+        debug.log('Fehler beim Laden des Termins:', error);
+        showMessage('Fehler beim Laden des Termins', 'error');
+    }
+}
+
+async function loadAppointmentTypes() {
+    try {
+        const result = await apiCall('appointment_types', 'GET');
+
+        if (!result.success) {
+                    throw new Error(result.error);
+                }
+
+        appointmentTypes = result.data;
+        
+        const select = document.getElementById('appointmentType');
+        select.innerHTML = '<option value="">Bitte wählen...</option>';
+        
+        if (appointmentTypes && Array.isArray(appointmentTypes)) {
+            appointmentTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.type_id;
+                option.textContent = type.type_name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        debug.log('Fehler beim Laden der Terminarten:', error);
+    }
+}
+
+
+// ========================================
 // CONFIRMATION MODAL
 // ========================================
 
@@ -1299,7 +1884,11 @@ async function submitConfirmDelete() {
         return;    
 
     try {
-        await apiCall('exceptions', 'DELETE', null, { id: deleteExceptionId });
+        const result =  await apiCall('exceptions', 'DELETE', null, { id: deleteExceptionId });
+
+         if (!result.success) {
+            throw new Error(result.error);
+        }
         
         showMessage('✓ Antrag erfolgreich gelöscht', 'success');
         
@@ -1382,15 +1971,33 @@ function initTabs() {
 
             // Lade Daten wenn nötig
             if (targetTab === 'stats') {
+                debug.log("Loading Stats");
                 loadStatistics();
             }
             else if(targetTab === 'history')
             {
+                debug.log("Loading History");
                 loadHistory();
+            }
+            else if(targetTab === 'attendance-list')
+            {
+                debug.log("Loading Attendance List");
+                loadAttendanceAppointments().then(() => {
+                    // Stelle gespeicherte Auswahl wieder her
+                    if (currentEditAppointmentId) {
+                        const select = document.getElementById('attendanceAppointmentFilter');
+                        if (select) {
+                            select.value = currentEditAppointmentId;
+                            // Trigger das change Event um die Liste zu laden
+                            loadAttendanceList();
+                        }
+                    }
+                });
             }                                    
         });
     });
 }
+
 
 // ========================================
 // STATISTICS LOADING
@@ -1410,10 +2017,16 @@ async function loadStatistics() {
         }
         
        // Hole Statistik für aktuelles Jahr
-        const stats = await apiCall('statistics', 'GET', null, { 
+        const result = await apiCall('statistics', 'GET', null, { 
             member_id: userData.member_id,
             year: currentStatsYear
         });
+
+         if (!result.success) {
+            throw new Error(result.error);
+        }
+
+        const stats = result.data;
         
         // Debug
         debug.log('Statistics:', stats); 
@@ -1549,6 +2162,14 @@ function translateExceptionStatus(status) {
         'rejected': 'Abgelehnt'
     };
     return translations[status] || status;
+}
+
+function formatDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
 }
 
 function formatDateTime(date) {

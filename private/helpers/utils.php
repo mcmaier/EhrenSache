@@ -44,6 +44,48 @@ function handleApprovedTimeCorrection($db, $exceptionId, $exceptionData) {
 }
 
 // ============================================
+// HILFSFUNKTION: Genehmigte Entschuldigung verarbeiten
+// ============================================
+
+function handleApprovedAbsence($db, $exceptionId, $data) {
+    // Exception-Details holen
+    $stmt = $db->prepare(
+        "SELECT member_id, appointment_id 
+         FROM exceptions 
+         WHERE exception_id = ?"
+    );
+    $stmt->execute([$exceptionId]);
+    $exception = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if(!$exception) return;
+    
+    // Appointment-Datum holen für arrival_time
+    $stmt = $db->prepare(
+        "SELECT date, start_time 
+         FROM appointments 
+         WHERE appointment_id = ?"
+    );
+    $stmt->execute([$exception['appointment_id']]);
+    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if(!$appointment) return;
+    
+    $arrivalTime = $appointment['date'] . ' ' . $appointment['start_time'];
+    
+    // Record erstellen (INSERT IGNORE falls bereits vorhanden)
+    $stmt = $db->prepare(
+        "INSERT IGNORE INTO records 
+         (member_id, appointment_id, arrival_time, status, checkin_source) 
+         VALUES (?, ?, ?, 'excused', 'admin')"
+    );
+    $stmt->execute([
+        $exception['member_id'],
+        $exception['appointment_id'],
+        $arrivalTime
+    ]);
+}
+
+// ============================================
 // HILFSFUNKTION: Member-ID aus Nummer ermitteln
 // ============================================
 function resolveMemberIdByNumber($db, $memberNumber) {

@@ -79,6 +79,8 @@ export async function renderRecords(records, page = 1)
     await loadTypes();    
 
     const tbody = document.getElementById('recordsTableBody');
+
+    updateTableHeader(false); // false = Record-Modus
     
     if (!records || (records.length === 0)) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Einträge gefunden</td></tr>';
@@ -156,6 +158,11 @@ export async function renderRecords(records, page = 1)
         // Check-in Source Badge
         const sourceInfo = getSourceBadge(record);
 
+        // Status mit Icon und Farbe
+        const statusHtml = record.status === 'present'
+            ? '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span>'
+            : '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
+
         const actionsHtml = isAdminOrManager ? `
                         <td class="actions-cell">
                             <button class="action-btn btn-icon btn-edit" 
@@ -175,7 +182,7 @@ export async function renderRecords(records, page = 1)
                 <td>${appointmentTypeBadge}</td>
                 <td>${record.surname}, ${record.name}</td>
                 <td>${formattedTime}</td>
-                <td>${translateRecordStatus(record.status)}</td>
+                <td>${statusHtml}</td>
                 <td>${sourceInfo}</td>
                 ${actionsHtml}
         `;        
@@ -405,8 +412,26 @@ export async function initRecordEventHandlers() {
     debug.log("Init Record Event Handlers ()");
 
     // Filter-Änderungen
-    document.getElementById('filterAppointment')?.addEventListener('change', () => {
+    /*document.getElementById('filterAppointment')?.addEventListener('change', () => {
         applyRecordFilters();
+    });*/
+
+    // Event-Listener für Termin-Filter
+    document.getElementById('filterAppointment').addEventListener('change', async function() {
+        const appointmentId = this.value;
+        const memberFilter = document.getElementById('filterMember');
+        
+        if (appointmentId && appointmentId !== '') {
+            // Attendance-Modus: Member-Filter deaktivieren
+            memberFilter.disabled = true;
+            memberFilter.value = '';
+            //await loadAndRenderAttendanceList(appointmentId);
+            await loadAttendanceList(appointmentId);
+        } else {
+            // Records-Modus: Member-Filter aktivieren
+            memberFilter.disabled = false;
+            await applyRecordFilters(); // Normale Filterung
+        }
     });
     
     document.getElementById('filterMember')?.addEventListener('change', () => {
@@ -698,6 +723,73 @@ async function updateAppointmentTypeDisplay() {
                                   Allgemein
                                </span>`;
     }
+}
+
+// ============================================
+// ATTENDANCE LIST
+// ============================================
+
+
+async function loadAttendanceList(appointmentId) {
+    try {
+        const attendance = await apiCall('attendance_list', 'GET', null, {appointment_id:appointmentId});
+        
+        debug.log("Attendance Data:", attendance);
+        if (attendance.success) {
+            renderAttendanceList(attendance.members);
+        }
+    } catch (error) {
+        console.error('Fehler beim Laden der Anwesenheitsliste:', error);
+    }
+}
+
+function renderAttendanceList(attendanceData) {
+    const tbody = document.getElementById('recordsTableBody');
+    tbody.innerHTML = '';
+    
+    updateTableHeader(true); // true = Attendance-Modus
+
+    attendanceData.forEach(member => {
+        const tr = document.createElement('tr');
+        
+        // Status-Icon und Styling
+        let statusHtml, rowClass;
+        if (member.status === 'present') {
+            statusHtml = '<span class="status-present">✓ Anwesend</span>';
+            rowClass = '';
+        } else if (member.status === 'excused') {
+            statusHtml = '<span class="status-excused">⚠ Entschuldigt</span>';
+            rowClass = '';
+        } else {
+            statusHtml = '<span style="color: #dc3545;">✗ Fehlend</span>';
+            rowClass = 'table-secondary'; // Grau ausgegraut
+        }
+        
+        // Quick Actions
+        const actionsHtml = member.record_id 
+            ? `<button class="btn btn-sm btn-primary" onclick="editRecord(${member.record_id})">✎</button>
+               <button class="btn btn-sm btn-danger" onclick="deleteRecord(${member.record_id})">🗑</button>`
+            : `<button class="btn btn-sm btn-success" onclick="quickCheckin(${member.member_id}, 'present')">✓ Anwesend</button>
+               <button class="btn btn-sm btn-warning" onclick="quickCheckin(${member.member_id}, 'excused')">⚠ Entschuldigen</button>`;
+        
+        tr.className = rowClass;
+        tr.innerHTML = `
+            <td>${member.surname}, ${member.name}</td>
+            <td>${member.member_number || '-'}</td>
+            <td>${member.arrival_time || '-'}</td>
+            <td>${statusHtml}</td>
+            <td>${actionsHtml}</td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
+}
+
+function updateTableHeader(isAttendanceMode) {
+    const thead = document.querySelector('#recordsTable thead tr');
+    thead.innerHTML = isAttendanceMode
+        ? '<th>Mitglied</th><th>Nummer</th><th>Gruppen</th><th>Ankunft</th><th>Status</th><th>Aktionen</th>'
+        : '<th>Termin</th><th>Typ</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
 }
 
 // ============================================

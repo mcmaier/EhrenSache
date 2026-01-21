@@ -1,0 +1,100 @@
+<!-- public/login.html -->
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - EhrenSache</title>
+    <link rel="stylesheet" href="css/login.css">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <meta name="robots" content="noindex, nofollow">
+</head>
+<body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <div class="login-container">
+        <div class="login-box">
+            <!-- Logo/Titel -->
+            <div class="login-header">
+                <h1>EhrenSache</h1>
+                <p class="org-name" id="loginOrgTitle">Vereinsmanagement</p>
+            </div>
+            
+            <!-- Tab-Navigation -->
+            <div class="login-tabs">
+                <button class="tab-btn active" data-tab="login">Anmelden</button>
+                <button class="tab-btn" data-tab="register">Registrieren</button>
+            </div>
+            
+            <!-- Login Tab -->
+            <div class="tab-content active" id="loginTab">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginEmail">E-Mail</label>
+                        <input type="email" id="loginEmail" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Passwort</label>
+                        <input type="password" id="loginPassword" required autocomplete="current-password">
+                    </div>
+                    <div class="form-actions">
+                        <a href="#" class="link-small" id="forgotPasswordLink">Passwort vergessen?</a>
+                    </div>
+                    <button id="submitBtn" type="submit" class="btn-primary btn-full">Anmelden</button>
+                    <div class="error-message" id="loginError"></div>
+                </form>
+            </div>
+            
+            <!-- Register Tab -->
+            <div class="tab-content" id="registerTab">
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="registerName">Name</label>
+                        <input type="text" id="registerName" required autocomplete="name">
+                        <small>Optional - Ihr Vor- und Nachname</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerEmail">E-Mail</label>
+                        <input type="email" id="registerEmail" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">Passwort</label>
+                        <input type="password" id="registerPassword" required 
+                               autocomplete="new-password" minlength="8">
+                        <small>Mindestens 8 Zeichen</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPasswordConfirm">Passwort bestätigen</label>
+                        <input type="password" id="registerPasswordConfirm" required 
+                               autocomplete="new-password" minlength="8">
+                    </div>
+                    <button id="submitRegisterBtn" type="submit" class="btn-primary btn-full">Registrieren</button>
+                    <div class="error-message" id="registerError"></div>
+                    <div class="success-message" id="registerSuccess"></div>
+                </form>
+            </div>
+            
+            <!-- Passwort vergessen Modal -->
+            <div class="modal" id="forgotPasswordModal">
+                <div class="modal-content modal-small">
+                    <span class="close" onclick="closeForgotPasswordModal()">&times;</span>
+                    <h3>Passwort zurücksetzen</h3>
+                    <form id="forgotPasswordForm">
+                        <div class="form-group">
+                            <label for="resetEmail">E-Mail</label>
+                            <input type="email" id="resetEmail" required autocomplete="email">
+                            <small>Sie erhalten einen Link zum Zurücksetzen per Email</small>
+                        </div>
+                        <button id="submitPasswordResetBtn" type="submit" class="btn-primary btn-full">Link senden</button>
+                        <div class="error-message" id="resetError"></div>
+                        <div class="success-message" id="resetSuccess"></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="js/login.js"></script>
+</body>
+</html>

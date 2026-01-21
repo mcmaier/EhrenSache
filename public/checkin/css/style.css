@@ -994,7 +994,7 @@ body {
 .tabs {
     display: flex;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     background: #f8f9fa;
     padding: 8px;
     border-radius: 12px;
@@ -1432,6 +1432,257 @@ body {
     font-size: 48px;
     margin-bottom: 12px;
     opacity: 0.3;
+}
+
+/* ========================================
+   ATTENDANCE LIST 
+   ======================================== */
+
+.attendance-header {
+    top: 0;
+    z-index: 10;
+    padding-bottom: 10px;
+    margin-bottom: 6px;
+    display: block;
+    background: white;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    width: 100%;
+    max-width: 400px;
+}
+
+.attendance-controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.attendance-controls button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-refresh {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-refresh:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-create-appointment,
+.btn-edit-appointment {
+    background: #f39c12;
+    color: white;
+}
+
+.btn-create-appointment:hover,
+.btn-edit-appointment:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+}
+
+.attendance-scroll-container {
+    display: block;
+    background: white;
+    gap: 8px;
+    max-height: calc(100vh - 320px);
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    width: 100%;
+    max-width: 400px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #bbb #f0f0f0;
+}
+
+/* Scrollbar Styling */
+.attendance-scroll-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.attendance-scroll-container::-webkit-scrollbar-track {
+    background: var(--bg-light);
+    border-radius: 3px;
+}
+
+.attendance-scroll-container::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 3px;
+}
+
+.attendance-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #5568d3;
+}
+
+.appointment-info {
+    padding: 15px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border-left: 4px solid var(--primary);
+}
+
+.group-section {
+    margin-bottom: 25px;
+}
+
+.group-header {
+    margin: 0 0 10px 0;
+    padding: 8px 12px;
+    background: var(--bg-light);
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.attendance-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.attendance-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+    background: var(--card-bg);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    transition: all 0.3s;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    min-height: 70px;
+}
+
+.attendance-item.present {
+    border-color: #27ae60;
+    background: rgba(39, 174, 96, 0.05);
+}
+
+.attendance-item.absent {
+    border-color: #bdc3c7;
+}
+
+.status-icon {
+    font-size: 20px;
+    width: 24px;
+    text-align: center;
+}
+
+.attendance-item.present .status-icon {
+    color: #27ae60;
+}
+
+.attendance-item.absent .status-icon {
+    color: #bdc3c7;
+}
+
+.member-name {
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.btn-toggle-attendance {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s;    
+    color: white;
+    min-width: 50px;
+}
+
+.attendance-item.present .btn-toggle-attendance {
+    background: var(--error);
+}
+
+.attendance-item.absent .btn-toggle-attendance {
+    background: var(--success);
+}
+
+.btn-toggle-attendance:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.btn-toggle-attendance:active {
+    transform: scale(0.95);
+}
+
+.btn-toggle-attendance:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.filter-section {
+    margin-bottom: 16px;
+}
+
+.select-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    background: var(--card-bg);
+    color: var(--text);
+}
+
+.member-info {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.member-info-row {
+    display: flex;
+    flex-direction: column;
+    align-items: left;
+}
+
+.arrival-time {
+    font-size: 12px;
+    color: var(--text-light);
+    font-weight: 400;
+}
+
+/* ========================================
+   APPOINTMENT MODAL
+   ======================================== */
+
+.btn-modal-cancel,
+.btn-modal-confirm {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btn-modal-cancel {
+    background: #95a5a6;
+    color: white;
+}
+
+.btn-modal-confirm {
+    background: var(--primary);
+    color: white;
 }
 
 /* ========================================

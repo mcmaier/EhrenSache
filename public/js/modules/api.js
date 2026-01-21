@@ -31,8 +31,11 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
 
     let result = {success:false};
     
+    // Query-Parameter hinzufügen
     for (const [key, value] of Object.entries(params)) {
-        url.searchParams.append(key, value);
+        if (value !== null && value !== undefined) {
+            url.searchParams.set(key, value);
+        }
     }
 
     const options = {
@@ -80,10 +83,8 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
                     showToast('Sitzung abgelaufen. Bitte erneut anmelden.', 'warning');
                     isInitialLoad = true;
                 }
-                const { showLogin } = await import('./ui.js');
-                showLogin();
-                
-                return result;
+                window.location.href = 'login.html';                
+                return null;
             }
             
             // Andere Fehler als Toast anzeigen

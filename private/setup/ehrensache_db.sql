@@ -99,21 +99,30 @@ CREATE TABLE `records` (
 
 CREATE TABLE `users` (
   `user_id` int(11) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `password_hash` varchar(255) NOT NULL,
+  `email` varchar(255) NULL,
+  `name` varchar(100) NULL,
+  `device_name` varchar(100) NULL,
+  `email_verified` TINYINT(1) DEFAULT 0,
+  `account_status` enum('pending', 'active', 'suspended') DEFAULT 'pending',
+  `password_hash` varchar(255) NULL,
   `role` enum('admin','manager','user','device') DEFAULT 'user',
   `device_type` enum('totp_location','auth_device') DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `member_id` int(11) DEFAULT NULL,
+  `pending_member_id` INT(11) DEFAULT NULL,
   `api_token` varchar(64) DEFAULT NULL,
   `api_token_expires_at` datetime DEFAULT NULL,
   `totp_secret` varchar(64) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
--- Indizes der exportierten Tabellen
---
+
+ALTER TABLE users 
+    ADD CONSTRAINT check_device_email 
+    CHECK (
+        (role = 'device' AND email IS NULL) OR 
+        (role != 'device' AND email IS NOT NULL)
+    );
 
 --
 -- Indizes für die Tabelle `appointments`
@@ -163,7 +172,8 @@ ALTER TABLE `users`
   ADD PRIMARY KEY (`user_id`),
   ADD UNIQUE KEY `email` (`email`),
   ADD UNIQUE KEY `api_token` (`api_token`),
-  ADD KEY `member_id` (`member_id`);
+  ADD KEY `member_id` (`member_id`),
+  ADD FOREIGN KEY (`pending_member_id`) REFERENCES `members` (`member_id`) ON DELETE SET NULL;
 
 --
 -- AUTO_INCREMENT für exportierte Tabellen
@@ -241,7 +251,7 @@ ALTER TABLE `records`
 -- Constraints der Tabelle `users`
 --
 ALTER TABLE `users`
-  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `members` (`member_id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `users_ibfk_member_id1` FOREIGN KEY (`member_id`) REFERENCES `members` (`member_id`) ON DELETE SET NULL;
 
 -- Neue Tabelle: Benutzergruppen
 CREATE TABLE member_groups (
@@ -291,6 +301,43 @@ ALTER TABLE appointments ADD INDEX idx_year (date);
 ALTER TABLE member_group_assignments ADD INDEX idx_member (member_id);
 ALTER TABLE member_group_assignments ADD INDEX idx_group (group_id);
 
+-- Rate Limiting
+CREATE TABLE rate_limits (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    identifier VARCHAR(64) NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_identifier_action (identifier, action),
+    INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Email-Verifikation für neue Registrierungen
+CREATE TABLE email_verification_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(64) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    used TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_token (token),
+    INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Passwort-Reset Tokens
+CREATE TABLE password_reset_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(64) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    used TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_token (token),
+    INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE `system_settings` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `setting_key` VARCHAR(50) NOT NULL UNIQUE,
@@ -305,16 +352,131 @@ CREATE TABLE `system_settings` (
 
 -- Standard-Werte einfügen
 INSERT INTO `system_settings` (`setting_key`, `setting_value`, `setting_type`, `category`, `description`) VALUES
-('organization_name', 'EhrenZeit', 'text', 'general', 'Name der Organisation'),
+('organization_name', 'EhrenSache', 'text', 'general', 'Name der Organisation'),
 ('primary_color', '#007bff', 'color', 'appearance', 'Primärfarbe'),
 ('background_color', '#f8f9fa', 'color', 'appearance', 'Hintergrundfarbe'),
-('pagination_limit', '25', 'number', 'pagination', 'Einträge pro Seite')
+('pagination_limit', '25', 'number', 'pagination', 'Einträge pro Seite');
+
+-- Mail-Settings in system_settings
+INSERT INTO system_settings (setting_key, setting_value, setting_type, category, description) VALUES
+('mail_enabled', '0', 'boolean', 'general', 'E-Mail-Versand aktiviert'),
+('mail_from_email', 'noreply@ehrenzeit.de', 'text', 'general', 'Absender E-Mail-Adresse'),
+('mail_from_name', 'EhrenSache System', 'text', 'general', 'Absender Name'),
+('mail_registration_enabled', '1', 'boolean', 'general', 'Registrierungs-Mails senden'),
+('mail_password_reset_enabled', '1', 'boolean', 'general', 'Passwort-Reset-Mails senden'),
+('mail_activation_enabled', '1', 'boolean', 'general', 'Aktivierungs-Mails senden'),
+('smtp_configured', '0', 'boolean', 'general', 'SMTP-Server konfiguriert');
+
+
+CREATE OR REPLACE VIEW v_users_extended AS
+SELECT 
+    u.user_id,
+    u.email,
+    u.name AS user_name,
+    u.device_name,
+    u.email_verified,
+    u.account_status,
+    u.role,
+    u.device_type,
+    u.is_active,
+    u.member_id,
+    u.pending_member_id,
+    u.created_at,
+    u.api_token,
+    u.api_token_expires_at,
+    
+    -- Display Name (User-Name oder Geräte-Name)
+    COALESCE(u.name, u.device_name, 'Unbenannt') AS display_name,
+    
+    -- Aktiver Member
+    m_active.member_number,
+    m_active.name AS member_name,
+    m_active.surname AS member_surname,
+    
+    -- Pending Member
+    m_pending.member_number AS pending_member_number,
+    m_pending.name AS pending_member_name,
+    m_pending.surname AS pending_member_surname,
+    
+    -- Status-Text
+    CASE 
+        -- GERÄTE
+        WHEN u.role = 'device' AND u.is_active = 1 THEN 
+            CONCAT('🔧 Gerät aktiv (', COALESCE(u.device_name, 'Unbenannt'), ')')
+        WHEN u.role = 'device' AND u.is_active = 0 THEN 
+            '🔧 Gerät deaktiviert'
+            
+        -- NORMALE USER
+        WHEN u.role != 'device' AND u.account_status = 'pending' AND u.email_verified = 0 THEN 
+            '📧 Email-Bestätigung ausstehend'
+        WHEN u.role != 'device' AND u.account_status = 'pending' AND u.email_verified = 1 AND u.pending_member_id IS NULL THEN 
+            '⏳ Wartet auf Member-Verknüpfung'
+        WHEN u.role != 'device' AND u.account_status = 'pending' AND u.email_verified = 1 AND u.pending_member_id IS NOT NULL THEN 
+            CONCAT('⏳ Bereit zur Aktivierung (→ ', m_pending.member_number, ')')
+        WHEN u.role != 'device' AND u.account_status = 'active' AND u.member_id IS NOT NULL THEN 
+            CONCAT('✓ Aktiv (', m_active.member_number, ')')
+        WHEN u.role != 'device' AND u.account_status = 'active' AND u.member_id IS NULL THEN 
+            '✓ Aktiv (kein Member)'
+        WHEN u.role != 'device' AND u.account_status = 'suspended' THEN 
+            '🚫 Gesperrt'
+        ELSE 'Unbekannt'
+    END AS status_text,
+    
+    -- Role-Name
+    CASE u.role
+        WHEN 'admin' THEN 'Administrator'
+        WHEN 'manager' THEN 'Manager'
+        WHEN 'user' THEN 'Benutzer'
+        WHEN 'device' THEN CASE u.device_type
+            WHEN 'totp_location' THEN 'TOTP-Station'
+            WHEN 'auth_device' THEN 'Auth-Gerät'
+            ELSE 'Gerät'
+        END
+        ELSE 'Unbekannt'
+    END AS role_name
+    
+FROM users u
+LEFT JOIN members m_active ON u.member_id = m_active.member_id
+LEFT JOIN members m_pending ON u.pending_member_id = m_pending.member_id;
+
+-- Trigger für INSERT
+CREATE TRIGGER check_device_email_insert
+BEFORE INSERT ON users
+FOR EACH ROW
+BEGIN
+    -- Geräte dürfen KEINE Email haben
+    IF NEW.role = 'device' AND NEW.email IS NOT NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Geräte dürfen keine Email-Adresse haben';
+    END IF;
+    
+    -- Normale User MÜSSEN Email haben
+    IF NEW.role != 'device' AND NEW.email IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Benutzer benötigen eine Email-Adresse';
+    END IF;
+END;
+
+-- Trigger für UPDATE
+CREATE TRIGGER check_device_email_update
+BEFORE UPDATE ON users
+FOR EACH ROW
+BEGIN
+    -- Geräte dürfen KEINE Email haben
+    IF NEW.role = 'device' AND NEW.email IS NOT NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Geräte dürfen keine Email-Adresse haben';
+    END IF;
+    
+    -- Normale User MÜSSEN Email haben
+    IF NEW.role != 'device' AND NEW.email IS NULL THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Benutzer benötigen eine Email-Adresse';
+    END IF;
+END;
 
 /* Beispieldaten*/
 /*
-ALTER TABLE users 
-ADD COLUMN totp_secret varchar(64) DEFAULT NULL,
-
 -- Initiale Daten
 INSERT INTO member_groups (group_name, description, is_default) VALUES
 ('Alle Mitglieder', 'Standard-Gruppe für alle', 1),

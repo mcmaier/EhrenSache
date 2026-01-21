@@ -1,7 +1,7 @@
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { loadMembers } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
-import { updateModalId } from './utils.js';
+import { showToast, showConfirm, dataCache, isCacheValid} from './ui.js';
+import { updateModalId, escapeHtml } from './utils.js';
 import {debug} from '../app.js'
 
 // ============================================
@@ -13,6 +13,7 @@ import {debug} from '../app.js'
 let currentUsersPage = 1;
 const usersPerPage = 25;
 let allFilteredUsers = [];
+let currentUserStatusFilter = 'all'; 
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -31,7 +32,7 @@ export async function loadUsers(forceReload = false) {
     }
 
     debug.log("Loading USERS from API");
-    const users = await apiCall('users');
+    const users = await apiCall('users','GET',null,{user_type:'human'});
     
     // Cache speichern
     dataCache.users.data = users;
@@ -84,7 +85,6 @@ function renderUsers(users, page = 1)
     const endIndex = startIndex + usersPerPage;
     const pageUsers = users.slice(startIndex, endIndex);
 
-
     debug.log(`Rendering page ${page}/${totalPages} (${pageUsers.length} of ${totalUsers} users)`);
     
     // DocumentFragment für Performance
@@ -99,26 +99,42 @@ function renderUsers(users, page = 1)
     // Rollentext mit Device-Type
     let roleText = user.role === 'admin' ? 'Admin' : 
                     user.role === 'manager' ? 'Manager' :
-                    user.role === 'user' ? 'Benutzer' : 
-                    'Gerät ';
-    
-    if (user.role === 'device' && user.device_type) {
-        const deviceTypes = {
-            'totp_location': 'TOTP-Location',
-            'auth_device': 'Auth-Device'
-        };
-        roleText += ` (${deviceTypes[user.device_type] || user.device_type})`;
-    }
-    
-    // Mitgliedsname aus JOIN
-    let memberName = '-';
-    if (user.member_id && user.name && user.surname) {
-        memberName = `${user.surname}, ${user.name}`;
-    } else if (user.member_id) {
-        memberName = `Mitglied #${user.member_id}`;
-    }
+                    'Benutzer';   
+                    
+    // Status-Badge
+    let statusBadge = '';
+    let memberInfo = '';
 
-
+     // Termin-Info mit Terminart       
+    let userInfo = `<div style="line-height: 1.3;">${user.email}`;    
+    if (user.user_name) {
+       // userInfo += `<br><small><style="color: #7f8c8d;">${user.user_name}</small>`;
+        userInfo += `<br><div class="linked-member">${escapeHtml(user.user_name)}</div>`;
+    }    
+    userInfo += '</div>';        
+    
+    if (user.account_status === 'pending' && !user.email_verified) {
+        statusBadge = '<span class="status-badge email-pending">📧 Email-Bestätigung</span>';
+        
+    } else if (user.account_status === 'pending' && user.email_verified && !user.pending_member_id) {
+        statusBadge = '<span class="status-badge pending">⏳ Member-Verknüpfung fehlt</span>';
+        
+    } else if (user.account_status === 'pending' && user.email_verified && user.pending_member_id) {
+        statusBadge = '<span class="status-badge pending">⏳ Bereit zur Aktivierung</span>';
+        memberInfo = `<div class="linked-member">→ wird verknüpft: ${escapeHtml(user.pending_member_surname)}, ${escapeHtml(user.pending_member_name)} (${user.pending_member_number})</div>`;
+        
+    } else if (user.account_status === 'active') {
+        statusBadge = '<span class="status-badge active">✓ Aktiv</span>';
+        if (user.member_number) {
+            memberInfo = `<div class="linked-member">→ ${escapeHtml(user.member_surname)}, ${escapeHtml(user.member_name)} (${user.member_number})</div>`;
+        }
+        
+    } else if (user.account_status === 'suspended') {
+        statusBadge = '<span class="status-badge suspended">🚫 Gesperrt</span>';
+        if (user.member_number) {
+            memberInfo = `<div class="linked-member">→ ${escapeHtml(user.member_surname)}, ${escapeHtml(user.member_name)} (${user.member_number})</div>`;
+        }
+    }
     
     // Lösch-Button nicht für den eigenen Account anzeigen
     const deleteBtn = (currentUser && user.user_id !== currentUser.user_id) ? `
@@ -128,10 +144,9 @@ function renderUsers(users, page = 1)
     ` : '';
     
         tr.innerHTML = `
-            <td>${user.email}</td>
+            <td>${userInfo}</td>
             <td><span class="type-badge">${roleText}</span></td>
-            <td>${memberName}</td>
-            <td>${user.is_active ? 'Aktiv' : 'Inaktiv'}</td>
+            <td> ${statusBadge} ${memberInfo}</td>
             <td>${formattedCreated}</td>
             <td class="actions-cell">
                 <button class="action-btn btn-icon btn-edit" onclick="openUserModal(${user.user_id})">
@@ -233,12 +248,15 @@ function renderUsersPagination(currentPage, totalPages, totalUsers) {
 
 function updateUserStats(users) {
     const totalUsers = users.length;
-    const activeUsers = users.filter(u => u.is_active === 1 || u.is_active === true).length;
-    const deviceUsers = users.filter(u => u.role === 'device').length;
+    const activeUsers = users.filter(u => u.account_status === 'active').length;    
+    const pendingUsers = users.filter(u => u.account_status === 'pending').length;      
+    const suspendedUsers = users.filter(u => u.account_status === 'suspended').length;     
+        
+    document.getElementById('count-all').textContent = totalUsers || 0;           
+    document.getElementById('count-pending').textContent = pendingUsers || 0;   
+    document.getElementById('count-active').textContent = activeUsers || 0;     
+    document.getElementById('count-suspended').textContent = suspendedUsers || 0;     
     
-    document.getElementById('statTotalUsers').textContent = totalUsers;
-    document.getElementById('statActiveUsers').textContent = activeUsers;
-    document.getElementById('statDeviceUsers').textContent = deviceUsers;
 }
 
 // Global für onclick
@@ -269,11 +287,24 @@ export async function showUserSection(forceReload = false, page = 1)
     debug.log("Show User Section ()");
 
     applyUserFilters(forceReload, page);
-    /*
-    const allUsers = await loadUsers(forceReload);
-    renderUsers(allUsers, 1);
-    */
 }
+
+// ============================================
+// FILTER FUNCTIONS
+// ============================================
+
+window.setUserStatusFilter = function(status) {
+    currentUserStatusFilter = status;
+    
+    // Button-Status aktualisieren
+    document.querySelectorAll('.status-filter-group .filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-status="${status}"]`).classList.add('active');
+    
+    applyUserFilters();
+};
+
 
 export async function applyUserFilters(forceReload = false, page = 1) {
     debug.log('applyUserFilters called');
@@ -284,8 +315,8 @@ export async function applyUserFilters(forceReload = false, page = 1) {
     
     // Aktuelle Filter auslesen
     const filters = {
-        role: document.getElementById('filterUserRole')?.value || null,
-        status: document.getElementById('filterUserStatus')?.value || null
+        role: document.getElementById('userRoleFilter')?.value || null,
+        status: currentUserStatusFilter !== 'all' ? currentUserStatusFilter : null
     };
     debug.log('Active filters:', filters);
     
@@ -315,13 +346,9 @@ export function filterUsers(users, filters = {}) {
         debug.log(`After role filter (${filters.role}):`, filtered.length);
     }
     
-    // Filter: Status (aktiv/inaktiv)
+    // Filter: Status 
     if (filters.status && filters.status !== '') {
-        if (filters.status === 'active') {
-            filtered = filtered.filter(u => u.is_active === 1 || u.is_active === true);
-        } else if (filters.status === 'inactive') {
-            filtered = filtered.filter(u => u.is_active === 0 || u.is_active === false);
-        }
+        filtered = filtered.filter(u => u.account_status === filters.status);
         debug.log(`After status filter (${filters.status}):`, filtered.length);
     }
     
@@ -335,43 +362,43 @@ export async function initUsersEventHandlers()
     if (!isAdmin) return;
 
         // Filter-Änderungen
-        document.getElementById('filterUserRole')?.addEventListener('change', () => {
+        document.getElementById('userRoleFilter')?.addEventListener('change', () => {
             applyUserFilters();
         });
         
-        document.getElementById('filterUserStatus')?.addEventListener('change', () => {
+        // Reset-Button
+        document.getElementById('btnResetUserFilters')?.addEventListener('click', () => {
+            // Status-Filter zurücksetzen
+            currentUserStatusFilter = 'all';
+            document.querySelectorAll('.status-filter-group .filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector('[data-status="all"]').classList.add('active');
+            
+            // Rolle zurücksetzen
+            document.getElementById('userRoleFilter').value = '';
+            
             applyUserFilters();
         });
-        
-        /*document.getElementById('filterGroup')?.addEventListener('change', () => {
-            applyRecordFilters();
-        });*/
-        
-        // Reset-Button (optional)
-        document.getElementById('resetUserFilters')?.addEventListener('click', () => {
-            document.getElementById('filterUserRole').value = '';
-            document.getElementById('filterUserStatus').value = '';
-            //document.getElementById('filterGroup').value = '';
-            applyUserFilters();
-        });
-    
+            
 
     // Users laden und anzeigen
-    //await applyUserFilters();
+    await applyUserFilters();
 }
 
 // ============================================
-// MODAL FUNCTIONS
+// USER MODAL FUNCTIONS
 // ============================================
 
 export async function openUserModal(userId = null) {
     const modal = document.getElementById('userModal');
     const title = document.getElementById('userModalTitle');
+    const statusSection = document.getElementById('statusSection');
+    const userMemberGroup = document.getElementById('userMemberGroup');
     
     // Lade Mitglieder für Dropdown
 
-    const members = await loadMembers(true);
-    
+    const members = await loadMembers(true);    
 
     const memberSelect = document.getElementById('user_member');
     memberSelect.innerHTML = '<option value="">Kein Mitglied</option>';
@@ -382,20 +409,16 @@ export async function openUserModal(userId = null) {
         });
     }
 
-    // Event Listener EINMAL registrieren (mit removeEventListener zuerst)
-    const roleSelect = document.getElementById('user_role');
-    const deviceTypeSelect = document.getElementById('user_device_type');
-    
-    roleSelect.removeEventListener('change', toggleUserRoleFields);
-    deviceTypeSelect.removeEventListener('change', toggleUserRoleFields);
-    
-    roleSelect.addEventListener('change', toggleUserRoleFields);
-    deviceTypeSelect.addEventListener('change', toggleUserRoleFields);
-
     if (userId) {
         title.textContent = 'Benutzer bearbeiten';
         await loadUserFormData(userId);
         document.getElementById('user_password').required = false;
+
+        //Status-Section anzeigen (nur beim Bearbeiten)
+        statusSection.style.display = 'block';
+        // Member-Dropdown verstecken (wird in Status-Section angezeigt)
+        userMemberGroup.style.display = 'none';
+
         updateModalId('userModal', userId);
 
     } else {
@@ -406,95 +429,262 @@ export async function openUserModal(userId = null) {
         document.getElementById('user_password').required = true;
 
         updateModalId('userModal', null);
+        statusSection.style.display = 'none';
+                
+        // Member-Dropdown anzeigen (bei Neu-Erstellung)
+        userMemberGroup.style.display = 'block';
         
         // Token-Gruppe verstecken und zurücksetzen
         resetTokenDisplay();
     }
-
-    toggleUserRoleFields();
     modal.classList.add('active');
 }
 
 export function closeUserModal() {
     document.getElementById('userModal').classList.remove('active');
+    document.getElementById('userForm').reset();
+    
+    // Edit-Modus zurücksetzen
+    document.getElementById('memberDisplayMode').style.display = 'block';
+    document.getElementById('memberEditMode').style.display = 'none';
+    
+    // Sections verstecken
+    document.getElementById('statusSection').style.display = 'none';
+    document.getElementById('memberLinkSection').style.display = 'none';
+    document.getElementById('activationGroup').style.display = 'none';
 }
 
-function toggleUserRoleFields() {
+function updateStatusSection(user) {    
+    const statusInfo = document.getElementById('currentStatus');
+    const emailVerificationInfo = document.getElementById('emailVerificationInfo');
+    const emailVerificationStatus = document.getElementById('emailVerificationStatus');
+    const activationGroup = document.getElementById('activationGroup');
+    const memberLinkSection = document.getElementById('memberLinkSection');
+    const userMemberGroup = document.getElementById('userMemberGroup');
 
-    const role = document.getElementById('user_role').value;
-    const deviceType = document.getElementById('user_device_type').value;
-    const memberGroup = document.getElementById('userMemberGroup');
-    const memberSelect = document.getElementById('user_member');
-    const passwordGroup = document.querySelector('label[for="user_password"]').parentElement;
-    const deviceTypeGroup = document.getElementById('userDeviceTypeGroup');
-    const totpSecretGroup = document.getElementById('userTotpSecretGroup');
-    const tokenGroup = document.getElementById('userTokenGroup');
+    // Action Buttons
+    const activateBtn = document.getElementById('activateBtn');
+    const suspendBtn = document.getElementById('suspendBtn');
+    const reactivateBtn = document.getElementById('reactivateBtn');
+    const resendVerificationBtn = document.getElementById('resendVerificationBtn');
+
+    // Alle Gruppen zurücksetzen
+    emailVerificationInfo.style.display = 'none';
+    activationGroup.style.display = 'none';
+    memberLinkSection.style.display = 'none';
+    userMemberGroup.style.display = 'none';
+
+    // Buttons verstecken
+    activateBtn.style.display = 'none';
+    suspendBtn.style.display = 'none';
+    reactivateBtn.style.display = 'none';
+    resendVerificationBtn.style.display = 'none';
+
+    // Event-Listener entfernen (um Duplikate zu vermeiden)
+    activateBtn.replaceWith(activateBtn.cloneNode(true));
+    suspendBtn.replaceWith(suspendBtn.cloneNode(true));
+    reactivateBtn.replaceWith(reactivateBtn.cloneNode(true));
+    resendVerificationBtn.replaceWith(resendVerificationBtn.cloneNode(true)); // NEU
     
-    if (role === 'device') {
-        // Device: Kein Mitglied, kein Passwort
-        memberGroup.style.display = 'none';
-        memberSelect.required = false;
-        memberSelect.value = '';
+    // Neu referenzieren nach replaceWith
+    const newActivateBtn = document.getElementById('activateBtn');
+    const newSuspendBtn = document.getElementById('suspendBtn');
+    const newReactivateBtn = document.getElementById('reactivateBtn');
+    const newResendBtn = document.getElementById('resendVerificationBtn'); // NEU
+    
+    // Status-Box Styling
+    statusInfo.className = 'status-info ' + user.account_status;
+    
+    // Status: Pending - Email NICHT bestätigt
+    if (user.account_status === 'pending' && !user.email_verified) {
+        // Warten auf Email-Bestätigung
+        statusInfo.innerHTML = '<strong>📧 Email-Bestätigung ausstehend</strong>';
+        statusInfo.className = 'status-info pending';
         
-        passwordGroup.style.display = 'none';
-        document.getElementById('user_password').required = false;
+        // NEU: Button zum erneuten Versenden der Verifikations-Mail
+        newResendBtn.style.display = 'inline-block';
+        newResendBtn.addEventListener('click', () => resendVerificationEmail(user.user_id, user.email));
+    
         
-        // Device-Type erforderlich
-        deviceTypeGroup.style.display = 'block';
-        document.getElementById('user_device_type').required = true;
+    } 
+    // Status: Pending - Email bestätigt, aber keine Member-ID
+    else if (user.account_status === 'pending' && user.email_verified && !user.pending_member_id) {
+        statusInfo.innerHTML = '<strong>⏳ Member-Verknüpfung fehlt</strong><br><small>Email bestätigt, aber noch kein Mitglied zugeordnet</small>';
+        statusInfo.className = 'status-info pending';
         
-        // Hints aktualisieren
-        updateDeviceTypeHint(deviceType);
+        newActivateBtn.style.display = 'inline-block';
+        activationGroup.style.display = 'block';
         
-        // Felder je nach Device-Type
-        if (deviceType === 'totp_location') {
-            // TOTP-Location: Secret erforderlich, kein Token
-            totpSecretGroup.style.display = 'block';
-            document.getElementById('user_totp_secret').required = true;
-            tokenGroup.style.display = 'none';
-            
-        } else if (deviceType === 'auth_device') {
-            // Auth-Device: Token erforderlich, kein Secret
-            totpSecretGroup.style.display = 'none';
-            document.getElementById('user_totp_secret').required = false;
-            
-            // Token nur bei Bearbeitung anzeigen
-            const userId = document.getElementById('user_id').value;
-            tokenGroup.style.display = userId ? 'block' : 'none';
-            
-        } else {
-            // Kein Type gewählt
-            totpSecretGroup.style.display = 'none';
-            tokenGroup.style.display = 'none';
-        }
+        newActivateBtn.addEventListener('click', () => activateUser(user.user_id));
+        loadMembersForActivation(user.pending_member_id);
+    }
+    // Status: Pending - Email bestätigt UND Member-ID vorhanden
+    else if (user.account_status === 'pending' && user.email_verified && user.pending_member_id) {
+        statusInfo.innerHTML = '<strong>⏳ Bereit zur Aktivierung</strong><br><small>Email bestätigt und Mitglied zugeordnet</small>';
+        statusInfo.className = 'status-info pending';
         
-    } else {
-        // Admin/User: Mitglied optional, Passwort erforderlich
-        memberGroup.style.display = 'block';
-        memberSelect.required = false;
+        newActivateBtn.style.display = 'inline-block';
+        activationGroup.style.display = 'block';
         
-        passwordGroup.style.display = 'block';
-        const userId = document.getElementById('user_id').value;
-        document.getElementById('user_password').required = !userId;
+        newActivateBtn.addEventListener('click', () => activateUser(user.user_id));
+        loadMembersForActivation(user.pending_member_id);
+    }
+    // Status: Aktiv
+    else if (user.account_status === 'active') {
+        statusInfo.innerHTML = '<strong>✓ Aktiv</strong>';
+        statusInfo.className = 'status-info active';
         
-        // Device-Felder verstecken
-        deviceTypeGroup.style.display = 'none';
-        document.getElementById('user_device_type').required = false;
-        totpSecretGroup.style.display = 'none';
-        tokenGroup.style.display = userId ? 'block' : 'none';
+        newSuspendBtn.style.display = 'inline-block';
+        memberLinkSection.style.display = 'block';
+        
+        newSuspendBtn.addEventListener('click', () => suspendUser(user.user_id));
+        displayMemberLink(user);
+    }
+    // Status: Gesperrt
+    else if (user.account_status === 'suspended') {
+        statusInfo.innerHTML = '<strong>🚫 Gesperrt</strong>';
+        statusInfo.className = 'status-info suspended';
+        
+        newReactivateBtn.style.display = 'inline-block';
+        memberLinkSection.style.display = 'block';
+        
+        newReactivateBtn.addEventListener('click', () => reactivateUser(user.user_id));
+        displayMemberLink(user);
     }
 }
-   
-function updateDeviceTypeHint(deviceType) {
-    const hints = {
-        'totp_location': '🔢 Zeigt TOTP-Code (QR/NFC/Display), User authentifizieren sich per App. Benötigt TOTP Secret.',
-        'auth_device': '🔐 Authentifiziert Member (z.B. Fingerabdruck, Karte, PIN). Benötigt API-Token.'
-    };
+
+async function loadMembersForActivation(preselectedId = null) {
+    const members = await loadMembers(true);
+    const select = document.getElementById('linkMemberId');
+    select.innerHTML = '<option value="">-- Mitglied auswählen --</option>';
     
-    const hintElement = document.getElementById('deviceTypeHint');
-    hintElement.textContent = hints[deviceType] || '';
-    hintElement.style.color = deviceType ? '#667eea' : '#7f8c8d';
+    if (members) {
+        members.forEach(member => {
+            const option = document.createElement('option');
+            option.value = member.member_id;
+            option.textContent = `${member.member_number} - ${member.surname}, ${member.name}`;
+            if (member.member_id === preselectedId) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    }
 }
+
+function displayMemberLink(user) {
+    const linkedMemberInfo = document.getElementById('linkedMemberInfo');
+    const memberLinkSection = document.getElementById('memberLinkSection');
+    const editMemberId = document.getElementById('editMemberId');
+
+    memberLinkSection.style.display = 'block';
+    
+    if (user.member_id && user.member_number) {
+        linkedMemberInfo.className = 'linked-member-info';
+        linkedMemberInfo.innerHTML = `
+            <strong>${escapeHtml(user.member_name)} ${escapeHtml(user.member_surname)}</strong>
+            <small>Mitgliedsnummer: ${escapeHtml(user.member_number)}</small>
+        `;
+    } else {
+        linkedMemberInfo.className = 'linked-member-info no-member';
+        linkedMemberInfo.innerHTML = `Kein Mitglied verknüpft`;
+    }
+    
+    // Edit-Modus zurücksetzen
+    document.getElementById('memberEditMode').style.display = 'none';
+    document.getElementById('memberDisplayMode').style.display = 'block';
+    document.getElementById('editMemberBtn').style.display = 'inline-block';
+
+    // Edit-Select füllen (für späteren Edit-Modus)
+    loadMembersForEdit(user.member_id);
+}
+
+
+// ============================================
+// MEMBER-VERKNÜPFUNG EDITIEREN
+// ============================================
+
+window.toggleMemberEdit = async function() {
+    const displayMode = document.getElementById('memberDisplayMode');
+    const editMode = document.getElementById('memberEditMode');
+    //const editBtn = document.getElementById('editMemberBtn');    
+    //const linkedInfo = document.getElementById('linkedMemberInfo');
+    
+    if (editMode.style.display === 'none') {
+        // Edit-Modus aktivieren
+        displayMode.style.display = 'none';
+        editMode.style.display = 'block';
+        
+        // Aktuellen Wert in Edit-Select übernehmen
+        const currentMemberId = document.getElementById('currentMemberId')?.value || '';
+        const editSelect = document.getElementById('editMemberId');
+        editSelect.value = currentMemberId;
+        
+    } else {
+        // Edit-Modus schließen (ohne Speichern)
+        displayMode.style.display = 'block';
+        editMode.style.display = 'none';
+    }
+}
+
+
+
+async function loadMembersForEdit(currentMemberId = null) {
+
+    try {
+        const members = await apiCall('members', 'GET');
+        const editSelect = document.getElementById('editMemberId');
+        
+        editSelect.innerHTML = '<option value="">Kein Mitglied</option>';
+        
+        members.forEach(member => {
+            const option = document.createElement('option');
+            option.value = member.member_id;
+            option.textContent = `${member.surname}, ${member.name} (${member.member_number})`;
+            
+            if (currentMemberId && member.member_id === currentMemberId) {
+                option.selected = true;
+            }
+            
+            editSelect.appendChild(option);
+        });
+        
+    } catch (error) {
+        console.error('Fehler beim Laden der Mitglieder:', error);
+    }
+}
+
+window.saveMemberLink = async function() {
+    const userId = document.getElementById('user_id').value;
+    const memberId = document.getElementById('editMemberId').value;
+
+    const confirmed = await showConfirm(
+        `Mitgliedsverknüpfung ändern?`,
+        'Änderung bestätigen'
+    );
+
+    if(!confirmed)
+    {
+        return;
+    }
+    
+    try {
+        const response = await apiCall('users', 'PUT', {
+            member_id: memberId ? parseInt(memberId) : null
+        }, { id: userId });
+        
+        if (response.success || response.message === 'User updated') {
+            showToast('Verknüpfung aktualisiert', 'success');
+            
+            // Modal neu laden
+            await loadUserFormData(userId);
+            cancelMemberEdit();
+        } else {
+            showToast('Fehler: ' + response.message, 'error');
+        }
+    } catch (error) {
+        showToast('Fehler beim Speichern: ' + error.message, 'error');
+    }
+};
 
 // ============================================
 // CRUD FUNCTIONS
@@ -503,27 +693,46 @@ function updateDeviceTypeHint(deviceType) {
 export async function loadUserFormData(userId) {
     const user = await apiCall('users', 'GET', null, { id: userId });
     
-    if (user) {
-        debug.log('User loaded from API:', user);
-
-        document.getElementById('user_id').value = user.user_id;
-        document.getElementById('user_email').value = user.email;
-        document.getElementById('user_role').value = user.role;
-        document.getElementById('user_member').value = user.member_id || '';
-        document.getElementById('user_active').checked = user.is_active == 1;
-        document.getElementById('user_password').value = '';
-        document.getElementById('user_device_type').value = user.device_type || '';
-        document.getElementById('user_totp_secret').value = user.totp_secret || '';
-
-        // Token-Anzeige aktualisieren
-        if (user.api_token) {
-            updateTokenDisplay(user.api_token, user.api_token_expires_at);
-        } else {
-            resetTokenDisplay();
-        }
-
-         toggleUserRoleFields();
+    if (!user) {
+        showToast('User nicht gefunden', 'error');
+        return;
     }
+
+    debug.log('User loaded from API:', user);
+
+    document.getElementById('user_id').value = user.user_id;
+    document.getElementById('user_email').value = user.email;
+    document.getElementById('user_name').value = user.user_name || '';
+    document.getElementById('user_role').value = user.role;
+    //document.getElementById('user_member').value = user.member_id || '';
+    //document.getElementById('user_active').checked = user.is_active;
+    document.getElementById('user_password').value = '';
+
+
+    // Hidden Field für aktuelle Member-ID
+    let currentMemberIdField = document.getElementById('currentMemberId');
+    if (!currentMemberIdField) {
+        currentMemberIdField = document.createElement('input');
+        currentMemberIdField.type = 'hidden';
+        currentMemberIdField.id = 'currentMemberId';
+        document.getElementById('userForm').appendChild(currentMemberIdField);
+    }
+    currentMemberIdField.value = user.member_id || '';
+
+    updateStatusSection(user);
+
+    // Member-Info anzeigen (wenn aktiv/gesperrt)
+    if (user.account_status === 'active' || user.account_status === 'suspended') {
+        displayMemberLink(user);
+    }
+
+    // Token-Anzeige aktualisieren
+    if (user.api_token) {
+        updateTokenDisplay(user.api_token, user.api_token_expires_at);
+    } else {
+        resetTokenDisplay();
+    }
+      
 }
 
 export async function saveUser() {
@@ -537,54 +746,51 @@ export async function saveUser() {
     const userId = document.getElementById('user_id').value;
     const password = document.getElementById('user_password').value;
     const role = document.getElementById('user_role').value;
+    const name = document.getElementById('user_name').value;
     
-    const data = {
+    const userData = {
         email: document.getElementById('user_email').value,
         role: role,
-        is_active: document.getElementById('user_active').checked
+        name: name
+        //is_active: document.getElementById('user_active').checked
     };
-
-    // Mitglied nur bei User/Admin, nicht bei Device
-    if (role !== 'device') {
-        data.member_id = document.getElementById('user_member').value || null;
-        data.device_type = null;
-        data.totp_secret = null;
-    } else {
-        data.member_id = null;
-        data.device_type = document.getElementById('user_device_type').value;
-        
-        if (data.device_type === 'totp_location') {
-            data.totp_secret = document.getElementById('user_totp_secret').value || null;
-        } else {
-            data.totp_secret = null;
-        }
-    }
     
     // Passwort nur mitschicken wenn gesetzt
     if (password) { 
-        data.password = password;
+        userData.password = password;
     }
 
-    debug.log('Saving User:', data);
+    // Member-ID: Edit-Modus hat Vorrang, sonst aktueller Wert
+    const editMemberId = document.getElementById('editMemberId');
+    const currentMemberId = document.getElementById('currentMemberId');
+
+    if (editMemberId.parentElement.style.display !== 'none') {
+        // Edit-Modus aktiv → Wert aus Edit-Select
+        const memberId = editMemberId.value;
+        userData.member_id = memberId ? parseInt(memberId) : null;
+    } else if (currentMemberId) {
+        // Kein Edit-Modus → Aktuellen Wert beibehalten
+        const memberId = currentMemberId.value;
+        if (memberId) {
+            userData.member_id = parseInt(memberId);
+        }
+    }
+
+    debug.log('Saving User:', userData);
     
     let result;
     if (userId) {
-        result = await apiCall('users', 'PUT', data, { id: userId });
+        result = await apiCall('users', 'PUT', userData, { id: userId });
 
     } else {
-        if (!password && role != 'device') {
+        if (!password) {
             alert('Passwort ist erforderlich für neue Benutzer');
             return;
         }
 
-        // Device braucht kein Passwort
-        if (role === 'device') {
-            data.password = null;            
-        } else {
-            data.password = password;
-        }
-
-        result = await apiCall('users', 'POST', data);
+        userData.password = password;
+        
+        result = await apiCall('users', 'POST', userData);
 
         // Zeige Token nach Erstellung (besonders wichtig für Auth Device)
         if (result && result.api_token) {
@@ -601,14 +807,14 @@ export async function saveUser() {
         }
     }
     
-    if (result) {
+    if (result.success) {
         closeUserModal();
         showUserSection(true, currentUsersPage);
 
         showToast(
             userId ? 'Benutzer wurde erfolgreich aktualisiert' : 'Benutzer wurde erfolgreich erstellt',
             'success'
-        );                
+        );                      
     }
 }
 
@@ -630,7 +836,6 @@ export async function deleteUser(userId, email) {
 // ============================================
 // TOKEN MANAGEMENT
 // ============================================
-
 
 function updateTokenDisplay(token, expiresAt) {
     const tokenGroup = document.getElementById('userTokenGroup');
@@ -726,18 +931,131 @@ export async function regenerateUserToken() {
     }
 }
 
-export function generateTotpSecret() {
-    // Generiere zufälliges Base32-Secret (32 Zeichen)
-    const base32chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    let secret = '';
+// ============================================
+// AKTIVIERUNGS-FUNKTIONEN
+// ============================================
+
+async function resendVerificationEmail(userId, email) {
+    const confirmed = await showConfirm(
+        `Verifikations-Email erneut an ${email} senden?`,
+        'Email erneut senden'
+    );
     
-    for (let i = 0; i < 32; i++) {
-        secret += base32chars[Math.floor(Math.random() * 32)];
+    if (!confirmed) {
+        return;
     }
     
-    document.getElementById('user_totp_secret').value = secret;
-    showToast('TOTP Secret generiert', 'success');
+    try {
+        const response = await apiCall('users', 'POST', {
+            action: 'resend_verification',
+            user_id: userId
+        });
+        
+        if (response.success) {
+            showToast('Verifikations-Email wurde erneut versendet', 'success');
+        } else {
+            showToast('Fehler: ' + response.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Resend verification error:', error);
+        showToast('Fehler beim Versenden: ' + error.message, 'error');
+    }
 }
+
+async function activateUser(userId) {    
+    const memberId = document.getElementById('linkMemberId')?.value;
+    
+    if (!memberId) {
+        showToast('Bitte wählen Sie ein Mitglied aus', 'error');
+        return;
+    }
+    
+    const confirmed = await showConfirm(
+        `User aktivieren und mit Mitglied verknüpfen?`,
+        'Benutzer aktivieren'
+    );
+
+    if(!confirmed)
+    {
+        return;
+    }
+    
+    try {
+        const response = await apiCall('activate_user', 'POST', {
+            user_id: userId,
+            member_id: parseInt(memberId)
+        });
+        
+        if (response.success) {
+            closeUserModal();
+            showToast('User erfolgreich aktiviert', 'success');            
+            showUserSection(true,currentUsersPage);       
+        } else {
+            showToast('Fehler: ' + response.message, 'error');
+        }
+    } catch (error) {
+        showToast('Fehler beim Aktivieren: ' + error.message, 'error');
+    }
+};
+
+async function suspendUser(userId)  {
+    const confirmed = await showConfirm(
+        `Benutzer sperren? Der User kann sich dann nicht mehr einloggen.`,
+        'Benutzer sperren'
+    );
+
+    if(!confirmed)
+    {
+        return;
+    }    
+    
+    try {
+        const response = await apiCall('user_status', 'POST', {
+            user_id: userId,
+            status: 'suspended'
+        });
+        
+        if (response.success) {
+            closeUserModal();
+            showToast('User gesperrt', 'success');            
+            showUserSection(true,currentUsersPage);
+        } else {
+            showToast('Fehler: ' + response.message, 'error');
+        }
+    } catch (error) {
+        showToast('Fehler beim Sperren: ' + error.message, 'error');
+    }
+};
+
+async function reactivateUser(userId) {    
+    const confirmed = await showConfirm(
+        `Sperrung wirklich aufheben?`,
+        'Benutzer entsperren'
+    );
+
+    if(!confirmed)
+    {
+        return;
+    }
+    
+    try {
+        const response = await apiCall('user_status', 'POST', {
+            user_id: userId,
+            status: 'active'
+        });
+        
+        if (response.success) {
+            closeUserModal();
+            showToast('Sperrung aufgehoben', 'success');            
+            showUserSection(true,currentUsersPage);
+        } else {
+            showToast('Fehler: ' + response.message, 'error');
+        }
+    } catch (error) {
+        showToast('Fehler beim Reaktivieren: ' + error.message, 'error');
+    }
+};
 
 // ============================================
 // GLOBAL EXPORTS (für onclick in HTML)
@@ -745,10 +1063,10 @@ export function generateTotpSecret() {
 
 window.openUserModal = openUserModal;
 window.saveUser = saveUser;
-window.closeUserModal = () => document.getElementById('userModal').classList.remove('active');
+window.closeUserModal = closeUserModal;
 window.deleteUser = deleteUser;
 window.regenerateUserToken = regenerateUserToken;
 window.copyUserToken = copyUserToken;
 window.toggleUserTokenVisibility = toggleUserTokenVisibility;
-window.generateTotpSecret = generateTotpSecret;
 window.applyUserFilters = applyUserFilters;
+

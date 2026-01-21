@@ -2,7 +2,7 @@
 session_start();
 
 // Prüfe ob bereits installiert
-if (file_exists('../../private/install.lock')) {
+if (file_exists('../../private/config/install.lock')) {
     die('Installation bereits abgeschlossen. Lösche install.lock zum Neuinstallieren.');
 }
 
@@ -93,70 +93,51 @@ if ($step == 4) {
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         
         // Importiere Schema
-        $schema = file_get_contents('../../private/setup/ehrenzeit_db.sql');
+        $schema = file_get_contents('../../private/setup/ehrensache_db.sql');
         $pdo->exec($schema);
         
         // Erstelle Admin-User
         $admin = $_SESSION['admin_account'];
         $passwordHash = password_hash($admin['password'], PASSWORD_DEFAULT);
         $apiToken = bin2hex(random_bytes(24));
-        $tokenExpires = date('Y-m-d H:i:s', strtotime('+1 year'));
+        $tokenExpires = date('Y-m-d H:i:s', strtotime('+1 year'));        
         
-        $stmt = $pdo->prepare("INSERT INTO users (email, password_hash, role, is_active, api_token, api_token_expires_at) 
-                               VALUES (?, ?, 'admin', 1, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO users (email, password_hash, role, is_active, account_status, api_token, api_token_expires_at) 
+                               VALUES (?, ?, 'admin', 1, 'active', ?, ?)");
         $stmt->execute([$admin['email'], $passwordHash, $apiToken, $tokenExpires]);
-        
-        // Erstelle config.php
-        $configContent = "<?php\n" .
-            "class Database {\n" .
-            "    private \$host = \"{$cfg['host']}\";\n" .
-            "    private \$db_name = \"{$cfg['name']}\";\n" .
-            "    private \$username = \"{$cfg['user']}\";\n" .
-            "    private \$password = \"" . addslashes($cfg['pass']) . "\";\n" .
-            "    public \$conn;\n\n" .
-            "    public function getConnection() {\n" .
-            "        \$this->conn = null;\n" .
-            "        try {\n" .
-            "            \$this->conn = new PDO(\"mysql:host=\" . \$this->host . \";dbname=\" . \$this->db_name, \n" .
-            "                                  \$this->username, \$this->password);\n" .
-            "            \$this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);\n" .
-            "            \$this->conn->exec(\"set names utf8mb4\");\n" .
-            "        } catch(PDOException \$e) {\n" .
-            "            http_response_code(500);\n" .
-            "            echo json_encode([\"message\" => \"Database connection error\"]);\n" .
-            "            exit();\n" .
-            "        }\n" .
-            "        return \$this->conn;\n" .
-            "    }\n" .
-            "}\n\n" .
-            "define('AUTO_CHECKIN_TOLERANCE_HOURS', 2);\n";
-        
-        // Erstelle private-Verzeichnis falls nötig
-        if (!is_dir('../../private')) {
-            mkdir('../../private', 0755, true);
+               
+        // Prüfen ob config.php bereits existiert
+        if (file_exists('../../private/config/config.php')) {
+            die('Installation bereits durchgeführt. Lösche config.php für Neuinstallation.');
         }
-        
-        file_put_contents('../../private/config.php', $configContent);
+
+        // config.php erstellen aus Template
+        $configTemplate = file_get_contents('../../private/config/config_example.php');
+        $configContent = str_replace(
+            ['your_host','your_database', 'your_username', 'your_password'],
+            [$cfg['host'], $cfg['name'], $cfg['user'], $cfg['pass']],
+            $configTemplate
+        );
+        file_put_contents('../../private/config/config.php', $configContent);
         
         // Erstelle Lock-File
-        file_put_contents('../../private/install.lock', date('Y-m-d H:i:s'));
+        file_put_contents('../../private/config/install.lock', date('Y-m-d H:i:s'));
         
         // Update api.php require_once
-        $apiPath = '../api/config.php';
+        $apiPath = '../api/api.php';
         $apiContent = file_get_contents($apiPath);
         $apiContent = str_replace(
             "require_once 'config.php';",
-            "require_once '../../private/config.php';",
+            "require_once '../../private/config/config.php';",
             $apiContent
         );
         file_put_contents($apiPath, $apiContent);
         
-
         $success = true;
 
         if ($success) {
             // Lock-File erstellen
-            file_put_contents('../../private/install.lock', date('Y-m-d H:i:s'));
+            file_put_contents('../../private/config/install.lock', date('Y-m-d H:i:s'));
 
             // In Step 4 nach Lock-File:
             $htaccessContent = <<<'HTACCESS'
@@ -181,7 +162,7 @@ if ($step == 4) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EhrenZeit Installation</title>
+    <title>EhrenSache Installation</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -281,7 +262,7 @@ if ($step == 4) {
 </head>
 <body>
     <div class="container">
-        <h1>🎯 EhrenZeit Installation</h1>
+        <h1>🎯 EhrenSache Installation</h1>
         <p>Schritt-für-Schritt Setup für Shared-Hosting</p>
         
         <div class="progress">
@@ -318,7 +299,7 @@ if ($step == 4) {
                 <div class="form-group">
                     <label>Datenbank-Host:Port*</label>
                     <input type="text" name="db_host" value="localhost" required>
-                    <small>Meist "localhost", check bei deinem Hoster. Port benötigt wenn nicht 3306</small>
+                    <small>Meist "localhost", check bei deinem Hoster. Ein anderer Port als 3306 muss angegeben werden.</small>
                 </div>
                 <div class="form-group">
                     <label>Datenbankname*</label>
@@ -344,7 +325,7 @@ if ($step == 4) {
                     <input type="email" name="admin_email" required>
                 </div>
                 <div class="form-group">
-                    <label>Passwort* (min. 6 Zeichen)</label>
+                    <label>Passwort* (min. 8 Zeichen)</label>
                     <input type="password" name="admin_password" required minlength="8">
                 </div>
                 <div class="form-group">
@@ -364,7 +345,8 @@ if ($step == 4) {
                 
                 <h3>Nächste Schritte:</h3>
                 <ol style="line-height: 2; margin: 20px 0;">                    
-                    <li>⚠️ <strong>Lösche /install/ Verzeichnis manuell!</strong></li>
+                    <li>⚠️ <strong>/install/ Verzeichnis manuell löschen!</strong></li>
+                    <li>📧 <strong>Mail-Server konfigureren.</strong></li>
                 </ol>
             
             <a href="../index.html"><button class="btn">Zum Login</button></a>

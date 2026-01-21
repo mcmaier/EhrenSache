@@ -1,5 +1,5 @@
 import { apiCall, setCurrentUser, currentUser, setCsrfToken} from './api.js';
-import { loadAllData, showLogin, showScreen, showToast, showDashboard, updateUIForRole, initAllYearFilters, initEventHandlers} from './ui.js';
+import { loadAllData, showScreen, showToast, showDashboard, updateUIForRole, initAllYearFilters, initEventHandlers} from './ui.js';
 import {debug} from '../app.js'
 
 // ============================================
@@ -8,53 +8,73 @@ import {debug} from '../app.js'
 // import {} from './auth.js'
 // ============================================
 
+let apiFailureCount = 0;
+const MAX_API_FAILURES = 3;
 
-export async function handleLogin(e) {
-    e.preventDefault();
-
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const errorDiv = document.getElementById('loginError');
-    
-    errorDiv.textContent = '';
-    
-    const result = await apiCall('login', 'POST', { email, password });
-    
-    if (result && result.success) {
-        setCurrentUser(result.user);
-
-         // Speichere CSRF-Token
-        if (result.csrf_token) {
-            sessionStorage.setItem('csrf_token', result.csrf_token);
-            setCsrfToken(result.csrfToken);
-            debug.log('CSRF token stored:', result.csrf_token.substring(0, 16) + '...');
+// In checkAuth() Funktion anpassen:
+export async function checkAuth() {
+    try {
+        const response = await fetch('/api/auth.php?action=check_session');
+        
+        if (!response.ok) {
+            apiFailureCount++;
+            
+            if (apiFailureCount >= MAX_API_FAILURES) {
+                // API komplett down - Fehlerseite anzeigen
+                document.body.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; 
+                                height: 100vh; flex-direction: column; font-family: system-ui;">
+                        <h1>? Verbindungsfehler</h1>
+                        <p>Die API ist nicht erreichbar. Bitte später erneut versuchen.</p>
+                        <button onclick="location.reload()" 
+                                style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">
+                            Neu laden
+                        </button>
+                    </div>
+                `;
+                return null;
+            }
+            
+            throw new Error('API nicht erreichbar');
         }
-
-
-        initEventHandlers();                
-        await initAllYearFilters();
-        showDashboard();
-        loadAllData();
-    } else {
-        errorDiv.textContent = result?.message || 'Login fehlgeschlagen';
+        
+        const data = await response.json();
+        
+        // Bei Erfolg Counter zurücksetzen
+        apiFailureCount = 0;
+        
+        return data.authenticated ? data : null;
+        
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        return null;
     }
 }
 
+// ============================================
+// LOGOUT
+// ============================================
 export async function handleLogout() {
-    await apiCall('logout', 'POST');  
-    sessionStorage.removeItem('csrf_token');
-    setCsrfToken(null);
-    sessionStorage.removeItem('currentSection');
-    showLogin();
+    try {
+        await apiCall('logout', 'POST');
+    } catch (error) {
+        console.error('Logout error:', error);
+    } finally {
+        // Cleanup
+        sessionStorage.removeItem('csrf_token');
+        sessionStorage.removeItem('current_user');
+        sessionStorage.removeItem('currentSection');
+        setCsrfToken(null);
+        
+        // Redirect zu Login
+        window.location.href = 'login.html';
+    }
 }
 
-// Event Listeners
+// ============================================
+// EVENT LISTENERS
+// ============================================
 export function initAuth() {
-    loginForm.addEventListener('submit', (e) => {
-        e.preventDefault();  // Verhindert URL-Parameter
-        handleLogin(e);
-    });
-    
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', handleLogout);

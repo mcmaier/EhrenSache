@@ -5,35 +5,39 @@
 
 function login($db, $email, $password) {
 
-    
-    // Rate Limiting für Login
-    $key = 'login_attempts_' . $email;
-    
-    if(!isset($_SESSION[$key])) {
-        $_SESSION[$key] = ['count' => 0, 'locked_until' => 0];
-    }
-    
-    // Account gesperrt?
-    if($_SESSION[$key]['locked_until'] > time()) {
-        $remaining = $_SESSION[$key]['locked_until'] - time();
+    $rateLimiter = new RateLimiter($db);
+
+    // Login-Versuche prüfen
+    if (!$rateLimiter->canAttemptLogin($email, 5, 900)) {
         return [
-            "success" => false, 
-            "message" => "Too many failed attempts. Try again in {$remaining} seconds"
+            "success" => false,
+            "message" => "Zu viele Login-Versuche. Bitte versuchen Sie es in 15 Minuten erneut."
         ];
     }
-    
-    $stmt = $db->prepare("SELECT user_id, email, password_hash, role, is_active 
+        
+    $stmt = $db->prepare("SELECT user_id, email, password_hash, role, is_active, account_status
                           FROM users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if($user && password_verify($password, $user['password_hash'])) {
         if(!$user['is_active']) {
-            return ["success" => false, "message" => "Account deactivated"];
+            return ["success" => false, "message" => "Account deaktiviert"];
+        }
+
+        if ($user['account_status'] === 'suspended') {
+            return [
+                "success" => false,
+                "message" => "Account wurde gesperrt"
+            ];
         }
         
-        // Reset Login-Versuche
-        unset($_SESSION[$key]);
+        if ($user['account_status'] === 'pending') {
+            return [
+                "success" => false,
+                "message" => "Account wurde noch nicht aktiviert"
+            ];
+        }
         
         $_SESSION['user_id'] = $user['user_id'];
         $_SESSION['email'] = $user['email'];
@@ -51,21 +55,9 @@ function login($db, $email, $password) {
             "role" => $user['role']],
             "csrf_token" => $csrfToken 
         ];
-    }
+    }    
     
-    // Fehlversuch zählen
-    $_SESSION[$key]['count']++;
-    
-    // Nach 5 Versuchen: 15 Minuten sperren
-    if($_SESSION[$key]['count'] >= 5) {
-        $_SESSION[$key]['locked_until'] = time() + (15 * 60);
-        return [
-            "success" => false, 
-            "message" => "Too many failed attempts. Account locked for 15 minutes"
-        ];
-    }
-    
-    return ["success" => false, "message" => "Invalid credentials"];
+    return ["success" => false, "message" => "Ungültige Anmeldedaten"];
 }
 
 

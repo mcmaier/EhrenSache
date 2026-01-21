@@ -119,7 +119,7 @@ async function renderAppointments(appointments, page = 1) {
             if (apt.date && apt.start_time) {
                 const aptDate = new Date(apt.date + 'T00:00:00');
                 const formattedAptDate = aptDate.toLocaleDateString('de-DE');
-                appointmentInfo += `<br><style="color: #7f8c8d;">${formattedAptDate}, ${apt.start_time.substring(0, 5)}</small>`;
+                appointmentInfo += `<br><style="color: #7f8c8d;">${formattedAptDate}, ${apt.start_time.substring(0, 5)}`;
             }
             
             appointmentInfo += '</div>';

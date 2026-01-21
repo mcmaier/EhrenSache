@@ -1,11 +1,27 @@
 <?php
 
+// ============================================
+// 1. HEADERS
+// ============================================
+
+// Headers
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key");
+header("Access-Control-Allow-Credentials: true"); 
+
+// ============================================
+// 2. INCLUDES
+// ============================================
+
 //Module laden
-require_once '../../private/config.php';
+require_once '../../private/config/config.php';
 require_once '../../private/helpers/auth.php';
 require_once '../../private/helpers/rate_limiter.php';
 require_once '../../private/helpers/totp.php';
 require_once '../../private/helpers/utils.php';
+require_once '../../private/helpers/mailer.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';
@@ -24,13 +40,9 @@ require_once '../../private/handlers/statistics.php';
 require_once '../../private/handlers/export.php';
 require_once '../../private/handlers/import.php';
 require_once '../../private/handlers/settings.php';
+require_once '../../private/handlers/user_mailer.php';
+require_once '../../private/handlers/attendance_list.php';
 
-// Headers
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key");
-header("Access-Control-Allow-Credentials: true"); 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -38,57 +50,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // ============================================
-// RATE LIMITS
+// 3. REQUEST VARIABLEN
 // ============================================
-
-// Rate Limiting für API-Requests
-$rateLimiter = new RateLimiter(100, 60); // 100 Requests pro Minute
-
-// Identifier: IP + User/Token
-$identifier = $_SERVER['REMOTE_ADDR'];
-if(isset($_SESSION['user_id'])) {
-    $identifier .= '_user_' . $_SESSION['user_id'];
-}
-
-if(!$rateLimiter->check($identifier)) {
-    http_response_code(429); // Too Many Requests
-    echo json_encode([
-        "message" => "Rate limit exceeded",
-        "retry_after" => 60
-    ]);
-    exit();
-}
-
-// Identifier: IP + User/Token
-$identifier = $_SERVER['REMOTE_ADDR'];
-if(isset($_SESSION['user_id'])) {
-    $identifier .= '_user_' . $_SESSION['user_id'];
-}
-
-if(!$rateLimiter->check($identifier)) {
-    http_response_code(429); // Too Many Requests
-    echo json_encode([
-        "message" => "Rate limit exceeded",
-        "retry_after" => 60
-    ]);
-    exit();
-}
-
-
-// ============================================
-// REQUEST
-// ============================================
-
 $request_method = $_SERVER['REQUEST_METHOD'];
 $resource = $_GET['resource'] ?? '';
 $id = $_GET['id'] ?? null;
 
 // ============================================
-// PING ENDPOINT (vor Auth)
+// 4. SESSION-START (nur wo nötig)
 // ============================================
+
+// Session-Konfiguration (nur wenn Session gestartet wird)
+ini_set('session.cookie_httponly', 1);
+ini_set('session.cookie_secure', 1);
+ini_set('session.cookie_samesite', 'Lax');
+ini_set('session.use_strict_mode', 1);
+
+// Liste der Endpoints die Session brauchen (ohne Token)
+$sessionEndpoints = ['login', 'logout', 'register'];
+
+// Prüfe ob API-Token vorhanden ist
+$apiToken = null;
+
+if(isset($_SERVER['HTTP_AUTHORIZATION'])) {
+    $auth = $_SERVER['HTTP_AUTHORIZATION'];
+    if(strpos($auth, 'Bearer ') === 0) {
+        $apiToken = substr($auth, 7);
+    } else {
+        $apiToken = $auth;
+    }
+}
+
+if(!$apiToken && isset($_SERVER['HTTP_X_API_KEY'])) {
+    $apiToken = $_SERVER['HTTP_X_API_KEY'];
+}
+
+if(!$apiToken && isset($_GET['api_token'])) {
+    $apiToken = $_GET['api_token'];
+}
+
+// Session NUR starten wenn:
+// 1. Kein Token vorhanden UND
+// 2. Nicht auf öffentlichem Endpoint (außer login/logout/register)
+if (!$apiToken) {
+    session_start();
+    
+    // Session-Timeout prüfen
+    if(isset($_SESSION['last_activity']) && 
+       (time() - $_SESSION['last_activity'] > 3600)) {
+        session_unset();
+        session_destroy();
+        session_start(); // Neu starten für Error-Response
+    }
+    $_SESSION['last_activity'] = time();
+}
+
+// ============================================
+// 5. RATE LIMITING
+// ============================================
+
+$rateLimiter = new RateLimiter();
+
+// Identifier: IP + User/Token
+$identifier = $_SERVER['REMOTE_ADDR'];
+if(isset($_SESSION['user_id'])) {
+    $identifier .= '_user_' . $_SESSION['user_id'];
+}
+
+// API Rate Limit: 100 Requests pro Minute
+if (!$rateLimiter->check($identifier, 'api_request', 100, 60)) {
+    http_response_code(429);
+    echo json_encode([
+        "message" => "Rate limit exceeded",
+        "retry_after" => 60
+    ]);
+    exit();
+}
+
+// ============================================
+// 6. ÖFFENTLICHE ENDPOINTS
+// ============================================
+
 if($resource === 'ping' && $request_method === 'GET') {
     // Prüfe ob config.php existiert
-    $configPath = __DIR__ . '/../../private/config.php';
+    $configPath = __DIR__ . '/../../private/config/config.php';
     
     if (!file_exists($configPath)) {
         http_response_code(503);
@@ -100,7 +145,7 @@ if($resource === 'ping' && $request_method === 'GET') {
     }
     
     // Prüfe ob Lock-File existiert
-    $lockPath = __DIR__ . '/../../private/install.lock';
+    $lockPath = __DIR__ . '/../../private/config/install.lock';
     
     if (!file_exists($lockPath)) {
         http_response_code(503);
@@ -149,35 +194,57 @@ if($resource === 'ping' && $request_method === 'GET') {
 }
 
 // ============================================
-// INIT
+// 6.1 Datenbank verbinden
 // ============================================
 
 //Datenbank verbinden
 $database = new Database();
 $db = $database->getConnection();
 
-// Globale Auth-Variablen
-$isTokenAuth = false;
-$authUserId = null;
-$authUserRole = null;
-$authMemberId = null;
-
-// ============================================
-// ÖFFENTLICHE ENDPOINTS (keine Auth nötig)
-// ============================================
-
-if($resource === 'appearance')
-{
-    if($request_method !== 'GET')
-    {
-        http_response_code(405);
-        echo json_encode(["message" => "Method not allowed"]);
-        exit();
-    }
+// APPEARANCE
+if($resource === 'appearance' && $request_method === 'GET') {
     getAppearance($db);
     exit();
 }
 
+// LOGIN
+if($resource === 'login' && $request_method === 'POST') {
+    // Session wurde oben bereits gestartet
+    $data = json_decode(file_get_contents("php://input"));
+    echo json_encode(login($db, $data->email, $data->password));
+    exit();
+}
+
+// PWA LOGIN (Token-basiert)
+if($resource === 'auth' && $request_method === 'POST') {
+    $data = json_decode(file_get_contents("php://input"));
+    echo json_encode(loginWithToken($db, $data->email, $data->password));
+    exit();
+}
+
+// LOGOUT
+if($resource === 'logout' && $request_method === 'POST') {
+    // Session wurde oben bereits gestartet
+    echo json_encode(logout());
+    exit();
+}
+
+// REGISTRATION (öffentlich, Session für Rate-Limit)
+if($resource === 'register' && $request_method === 'POST') {
+    // Session wurde oben bereits gestartet (für Rate-Limiting)
+    $result = registerNewUser($db);
+    echo json_encode($result);
+    exit();    
+}
+
+
+// PASSWORD RESET REQUEST (öffentlich)
+if($resource === 'password_reset_request' && $request_method === 'POST') {
+    handlePasswordResetRequest($db, $request_method);
+    exit();
+}
+
+/*
 if($resource === 'login') {
     if($request_method !== 'POST')
     {
@@ -187,14 +254,14 @@ if($resource === 'login') {
     }
     
     ini_set('session.cookie_httponly', 1);
-    //ini_set('session.cookie_secure', 1);      // Falls HTTPS
+    ini_set('session.cookie_secure', 1);      // Falls HTTPS
     ini_set('session.cookie_samesite', 'Strict');
     ini_set('session.use_strict_mode', 1);
 
     session_start();
 
     if(isset($_SESSION['last_activity']) && 
-    (time() - $_SESSION['last_activity'] > 1800)) { // 30 min
+    (time() - $_SESSION['last_activity'] > 3600)) { // 60 min
         session_unset();
         session_destroy();
         http_response_code(401);
@@ -234,32 +301,32 @@ if($resource === 'logout'){
     exit();
 }
 
+if($resource === 'register'){
+    if($request_method !== 'POST')
+    {
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        exit();
+    }        
+
+    $data = json_decode(file_get_contents("php://input"));
+    echo json_encode(registerNewUser($db));
+
+    //session_destroy();
+    exit();    
+}
+
+*/
+
 // ============================================
-// AUTHENTIFIZIERUNG FÜR GESCHÜTZTE ENDPOINTS
+// 7. AUTHENTIFIZIERUNG (geschützte Endpoints)
 // ============================================
 
-// Prüfe auf API-Token in verschiedenen Quellen
-$apiToken = null;
-
-// Authorization Header (Standard)
-if(isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    $auth = $_SERVER['HTTP_AUTHORIZATION'];
-    if(strpos($auth, 'Bearer ') === 0) {
-        $apiToken = substr($auth, 7);
-    } else {
-        $apiToken = $auth;
-    }
-}
-
-// X-API-Key Header
-if(!$apiToken && isset($_SERVER['HTTP_X_API_KEY'])) {
-    $apiToken = $_SERVER['HTTP_X_API_KEY'];
-}
-
-//Token als URL Parameter
-if(!$apiToken && isset($_GET['api_token'])) {
-    $apiToken = $_GET['api_token'];
-}
+// Globale Auth-Variablen
+$isTokenAuth = false;
+$authUserId = null;
+$authUserRole = null;
+$authMemberId = null;
 
 // Token-Authentifizierung
 if($apiToken) {
@@ -297,9 +364,15 @@ if($apiToken) {
     $isTokenAuth = true;
     $authUserId = intval($tokenUser['user_id']);
     $authUserRole = $tokenUser['role'];
-    $authMemberId = $tokenUser['member_id'] ? intval($tokenUser['member_id']) : null; // ← FIX!
+    $authMemberId = $tokenUser['member_id'] ? intval($tokenUser['member_id']) : null;
     
-   //error_log("Token Auth: SUCCESS - User ID: $authUserId, Role: $authUserRole, Member ID: " . ($authMemberId ?? 'NULL'));
+    //error_log("Token Auth: SUCCESS - User ID: $authUserId, Role: $authUserRole, Member ID: " . ($authMemberId ?? 'NULL'));
+
+    // Session für Token-Auth NICHT starten, aber Variablen setzen für Kompatibilität
+    // (Falls Code $_SESSION abfragt, auch wenn es Token-Auth ist)
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
     
     $_SESSION['user_id'] = $authUserId;
     $_SESSION['role'] = $authUserRole;
@@ -308,7 +381,6 @@ if($apiToken) {
     $_SESSION['auth_type'] = 'token';
 } else {
     //error_log("Session Auth: No token, checking session");
-    session_start();
     
     if(!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
         http_response_code(401);
@@ -321,7 +393,7 @@ if($apiToken) {
     
     $stmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
     $stmt->execute([$authUserId]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC); // ← fetch() statt fetchColumn()!
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
     $authMemberId = $result && $result['member_id'] ? intval($result['member_id']) : null; // ← FIX!
     
     //error_log("Session Auth: User ID: $authUserId, Role: $authUserRole, Member ID: " . ($authMemberId ?? 'NULL'));
@@ -331,18 +403,12 @@ if($apiToken) {
 // ME ENDPOINT
 // ============================================
 
-if($resource === 'me'){
-    if($request_method !== 'GET') {
-
-        http_response_code(405);
-        echo json_encode(["message" => "Method not allowed"]);
-        exit();
-    }
+if($resource === 'me' && $request_method === 'GET') {
 
     if($isTokenAuth) {
         echo json_encode([
             "user_id" => $authUserId,
-            "email" => "token-auth",
+            "email" => $_SESSION['email'] ?? "token-auth",
             "role" => $authUserRole,
             "member_id" => $authMemberId,
             "auth_type" => "token"
@@ -366,7 +432,7 @@ if($resource === 'me'){
 if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 
     //Von CSRF ausgenommen
-    $excludedResources = ['login', 'logout', 'auth', 'regenerate_token','import'];
+    $excludedResources = ['login', 'logout', 'auth', 'regenerate_token','import','register'];
     
     // Login und Logout sind ausgenommen
     if(!in_array($resource, $excludedResources)) {
@@ -404,47 +470,7 @@ if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 }        
 
 // ============================================
-// ADMIN-CHECKS
-// ============================================
-
-/*
-$managementResources = [
-    'members' => ['POST', 'PUT', 'DELETE'],
-    'appointments' => ['POST', 'PUT', 'DELETE'],
-    'records' => ['POST', 'PUT', 'DELETE'],
-    'users' => ['POST', 'PUT', 'DELETE'],
-    'membership_dates' => ['GET', 'POST', 'PUT', 'DELETE'],
-    'member_groups' => ['POST', 'PUT', 'DELETE'],
-    'appointment_types' => ['POST', 'PUT', 'DELETE']
-];
-
-foreach($managementResources as $res => $methods) {
-    if($resource === $res && in_array($request_method, $methods)) {
-        if(!isAdminOrManager()) {
-            http_response_code(403);
-            echo json_encode(["message" => "Management access required"]);
-            exit();
-        }
-    }
-}
-
-$adminResources = [
-    'settings' => ['GET','POST', 'PUT', 'DELETE'],
-    'users' => ['POST', 'PUT', 'DELETE']
-];
-
-foreach($adminResources as $res => $methods) {
-    if($resource === $res && in_array($request_method, $methods)) {
-        if(!isAdmin()) {
-            http_response_code(403);
-            echo json_encode(["message" => "Admin access required"]);
-            exit();
-        }
-    }
-}*/
-
-// ============================================
-// ROUTING
+// 10. ROUTING
 // ============================================
 
 switch($resource) {
@@ -480,25 +506,34 @@ switch($resource) {
         break;
     case 'auto_checkin':
         handleAutoCheckin($db, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
-        exit();        
+        break;        
     case 'totp_checkin':
         handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
-        exit();        
+        break;        
     case 'regenerate_token':
         handleTokenRegeneration($db, $request_method, $authUserId, $authUserRole);
-        exit();                
+        break;                
     case 'change_password':
         handlePasswordChange($db, $request_method, $authUserId);        
-        exit();
+        break;
     case 'export':
         handleExport($db, $request_method, $authUserRole);
-        exit();
+        break;
     case 'import':
         handleImport($db, $request_method, $authUserRole);
-        exit();
+        break;
     case 'settings':
         handleSettings($db, $request_method,$authUserId, $authUserRole);
-        exit();
+        break;
+    case 'attendance_list':
+        handleAttendanceList($db, $request_method, $id);
+        break;
+    case 'activate_user':
+        handleUserActivation($db, $request_method, $authUserRole);
+        break;    
+    case 'user_status':
+        handleUserStatus($db, $request_method, $authUserRole);
+        break;    
                 
     default:
         http_response_code(404);

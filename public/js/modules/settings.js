@@ -53,6 +53,9 @@ export async function renderSystemSettings() {
         }
     });
 
+    // SMTP Status anzeigen
+    updateSmtpStatus(settings.smtp_configured === '1');
+
     // Reset unsaved changes flag
     hasUnsavedChanges = false;
     updateSaveButtonState();
@@ -68,6 +71,21 @@ export async function renderSystemSettings() {
     if (saveBtn) {
         saveBtn.removeEventListener('click', saveAllSettings);
         saveBtn.addEventListener('click', saveAllSettings);
+    }
+}
+
+function updateSmtpStatus(configured) {
+    const icon = document.getElementById('smtpStatusIcon');
+    const text = document.getElementById('smtpStatusText');
+    
+    if (configured) {
+        icon.textContent = '✅';
+        text.textContent = 'SMTP ist konfiguriert und einsatzbereit';
+        text.style.color = '#28a745';
+    } else {
+        icon.textContent = '⚠️';
+        text.textContent = 'SMTP noch nicht konfiguriert - E-Mail-Versand nicht möglich';
+        text.style.color = '#ffc107';
     }
 }
 
@@ -212,3 +230,154 @@ export async function applyTheme() {
         document.title = settings.organization_name;
     }
 }
+
+
+// ============================================
+// SMTP CONFIGURATION MODAL
+// ============================================
+
+window.openSmtpConfigModal = async function() {
+    const modal = document.getElementById('smtpConfigModal');
+    modal.classList.add('active');
+    //modal.style.display = 'block';
+        
+    // Aktuelle SMTP-Config laden (ohne Passwort)
+    try {
+        const response = await apiCall('settings', 'POST', {
+            action: 'get_smtp_config'
+        });
+        
+        if (response.success && response.config) {
+            document.getElementById('smtp_host').value = response.config.smtp_host || '';
+            document.getElementById('smtp_port').value = response.config.smtp_port || 587;
+            document.getElementById('smtp_encryption').value = response.config.smtp_encryption || 'tls';
+            document.getElementById('smtp_user').value = response.config.smtp_user || '';
+            // Passwort wird NICHT geladen (Sicherheit)
+            document.getElementById('smtp_password').value = '';
+            document.getElementById('smtp_password').placeholder = response.config.smtp_password_set 
+                ? '••••••••' 
+                : 'Passwort eingeben';
+        }
+    } catch (error) {
+        debug.error('Error loading SMTP config:', error);
+    }    
+};
+
+window.closeSmtpConfigModal = function() {
+    document.getElementById('smtpConfigModal').classList.remove('active');
+    document.getElementById('smtpConfigForm').reset();
+};
+
+window.saveSmtpConfig = async function() {
+    const smtpData = {
+        smtp_host: document.getElementById('smtp_host').value.trim(),
+        smtp_port: parseInt(document.getElementById('smtp_port').value),
+        smtp_encryption: document.getElementById('smtp_encryption').value,
+        smtp_user: document.getElementById('smtp_user').value.trim(),
+        smtp_password: document.getElementById('smtp_password').value
+    };
+    
+    // Validierung
+    if (!smtpData.smtp_host) {
+        showToast('SMTP Server erforderlich', 'error');
+        return;
+    }
+    
+    if (isNaN(smtpData.smtp_port) || smtpData.smtp_port < 1 || smtpData.smtp_port > 65535) {
+        showToast('Ungültiger Port', 'error');
+        return;
+    }
+    
+    try {
+        const response = await apiCall('settings', 'POST', {
+            action: 'save_smtp_config',
+            config: smtpData
+        });
+        
+        if (response.success) {
+            showToast('SMTP-Konfiguration gespeichert', 'success');
+            closeSmtpConfigModal();
+            
+            // SMTP Status aktualisieren
+            updateSmtpStatus(true);
+            
+            // smtp_configured in systemSettings aktualisieren
+            systemSettings.smtp_configured = '1';
+        } else {
+            showToast('Fehler: ' + response.message, 'error');
+        }
+    } catch (error) {
+        showToast('Fehler beim Speichern: ' + error.message, 'error');
+    }
+};
+
+// ============================================
+// TEST MAIL
+// ============================================
+
+window.sendTestMail = async function() {
+    const recipientInput = document.getElementById('test_mail_recipient');
+    const recipient = recipientInput.value.trim();
+    const testBtn = document.getElementById('testMailBtn');
+    
+    if (!recipient) {
+        showToast('Bitte Email-Adresse eingeben', 'warning');
+        recipientInput.focus();
+        return;
+    }
+    
+    if (!recipient.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        showToast('Ungültige Email-Adresse', 'error');
+        recipientInput.focus();
+        return;
+    }
+    
+    // Prüfen ob SMTP konfiguriert ist
+    if (systemSettings.smtp_configured !== '1') {
+        showToast('SMTP muss zuerst konfiguriert werden', 'warning');
+        return;
+    }
+    
+    const originalText = testBtn.textContent;
+    
+    try {
+        testBtn.disabled = true;
+        testBtn.textContent = '📤 Senden...';
+        
+        const response = await apiCall('settings', 'POST', {
+            action: 'test_mail',
+            recipient: recipient
+        });
+        
+        if (response.success) {
+            showToast('Test-Email versendet! Bitte Posteingang prüfen.', 'success');
+            recipientInput.value = '';
+        } else {
+            showToast('Fehler beim Versand: ' + response.message, 'error');
+        }
+        
+    } catch (error) {
+        debug.error('Test mail error:', error);
+        showToast('Fehler: ' + error.message, 'error');
+    } finally {
+        testBtn.disabled = false;
+        testBtn.textContent = originalText;
+    }
+};
+
+// ============================================
+// PASSWORD VISIBILITY TOGGLE
+// ============================================
+
+window.togglePasswordVisibility = function(inputId) {
+    const input = document.getElementById(inputId);
+    const button = event.target.closest('button');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        button.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        button.textContent = '👁️';
+    }
+};

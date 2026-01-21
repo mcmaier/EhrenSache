@@ -291,12 +291,15 @@ window.goToExceptionsPage = function(page) {
 function updateExceptionStats(exceptions){
 
     debug.log("Update Exception Stats ()");
-
-    // Statistiken
-    const pending = exceptions.filter(e => e.status === 'pending').length;
-    const approved = exceptions.filter(e => e.status === 'approved').length;
-    document.getElementById('statPendingExceptions').textContent = pending;
-    document.getElementById('statApprovedExceptions').textContent = approved;
+    
+    if(exceptions !== null)
+    {
+        // Statistiken
+        const pending = exceptions.filter(e => e.status === 'pending').length;
+        const approved = exceptions.filter(e => e.status === 'approved').length;
+        document.getElementById('statPendingExceptions').textContent = pending;
+        document.getElementById('statApprovedExceptions').textContent = approved;
+    }
 }
 
 export function filterExceptions(exceptions, filters = {}) {
@@ -323,6 +326,8 @@ export function filterExceptions(exceptions, filters = {}) {
 export async function applyExceptionFilters(forceReload = false, page = 1) {
     // Exceptions laden (aus Cache wenn möglich)
     const allExceptions = await loadExceptions(forceReload);
+
+    await loadAppointments();
 
     debug.log("Apply Exception Filters ()");
 
@@ -623,11 +628,12 @@ export async function saveException() {
     if (result) {
         closeExceptionModal();        
 
-        await invalidateCache('exceptions',currentYear);
+        //await invalidateCache('exceptions');
+        await loadExceptions(true);
         
         // Wenn Zeitkorrektur genehmigt wurde, Records neu laden
         if (isAdminOrManager && data.status === 'approved' && data.exception_type === 'time_correction') {
-            invalidateCache('records',currentYear);
+            invalidateCache('records');
         }
 
         applyExceptionFilters(true, currentExceptionsPage);

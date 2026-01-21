@@ -442,7 +442,7 @@ function calculateMemberStatistics($db, $memberId, $groupId, $year, $typeId) {
     
     return [
         'member_id' => $memberId,
-        'member_name' => $member['name'] . ' ' . $member['surname'],
+        'member_name' => $member['surname'] . ', ' . $member['name'],
         'total_appointments' => $totalAppointments,
         'attended' => $attended,
         'unexcused_absences' => $unexcused,

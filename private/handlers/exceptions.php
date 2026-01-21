@@ -97,7 +97,7 @@ function handleExceptions($db, $method, $id) {
                 }
 
                 if($year) {
-                    $sql .= " AND YEAR(e.created_at) = ?";
+                    $sql .= " AND YEAR(a.date) = ?";
                     $params[] = $year;
                 }
                 
@@ -222,8 +222,14 @@ function handleExceptions($db, $method, $id) {
                 ]);
                 
                 // Bei Genehmigung einer Zeitkorrektur: Record erstellen/aktualisieren
-                if($data->status === 'approved' && $data->exception_type === 'time_correction') {
-                    handleApprovedTimeCorrection($db, $id, $data);
+                if($data->status === 'approved')
+                {                    
+                    if($data->exception_type === 'time_correction') {
+                        handleApprovedTimeCorrection($db, $id, $data);
+                    }
+                    elseif($data->exception_type === 'absence') {
+                        handleApprovedAbsence($db, $id, $data);
+                    }
                 }
             }
             

@@ -1,4 +1,4 @@
-.action-btn {
+.btn-std {
     padding: 6px 12px;
     margin-right: var(--spacing-xs);
     border: none;
@@ -9,7 +9,7 @@
     color: white;
 }
 
-.action-btn:hover {
+.btn-std:hover {
     opacity: 0.8;
 }
 
@@ -103,9 +103,37 @@
     opacity: 0.85;
 }
 
+/* Modal Buttons */
+.btn-success {
+    background: var(--success-dark);
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.btn-success:hover {
+    background: #218838;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #212529;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+}
 
 /* Neue Icon Action Buttons */
-
 /* Actions Cell */
 .actions-cell {
     white-space: nowrap;
@@ -113,7 +141,7 @@
 }
 
 /* Icon Buttons */
-.action-btn.btn-icon {
+.action-btn {
     min-width: 32px;
     width: 32px;
     height: 32px;
