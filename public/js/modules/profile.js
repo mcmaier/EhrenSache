@@ -24,11 +24,11 @@ export async function loadProfile(forceReload = false) {
     document.getElementById('profile_email').value = userDetails.email;
     const roleText = userDetails.role === 'admin' ? 'Administrator' :
                      userDetails.role === 'manager' ? 'Manager' :
-                     userDetails.role === 'device' ? 'Ger‰t' :
+                     userDetails.role === 'device' ? 'Ger√§t' :
                      'Benutzer';
     document.getElementById('profile_role').value = roleText;
 
-    // Verkn¸pftes Mitglied anzeigen
+    // VerknÔøΩpftes Mitglied anzeigen
     const memberInfoDiv = document.getElementById('profile_member_info');
     const memberInput = document.getElementById('profile_member');
     
@@ -60,9 +60,9 @@ export async function loadProfile(forceReload = false) {
     if (userDetails.api_token) {
         document.getElementById('profile_token').value = userDetails.api_token;
 
-        // Token als versteckt zur¸cksetzen
+        // Token als versteckt zur√ºcksetzen
         tokenInput.type = 'password';
-        toggleBtn.textContent = '???';
+        toggleBtn.textContent = 'üëÅÔ∏è';
         
         // Ablaufdatum anzeigen
         if (userDetails.api_token_expires_at) {
@@ -78,7 +78,7 @@ export async function loadProfile(forceReload = false) {
             
             expiryInfo.innerHTML = isExpired 
                 ? `<span style="color: #e74c3c;">?? Abgelaufen am: ${expiresText}</span>`
-                : `<span style="color: #7f8c8d;">G¸ltig bis: ${expiresText}</span>`;
+                : `<span style="color: #7f8c8d;">G√ºltig bis: ${expiresText}</span>`;
             expiryInfo.style.display = 'block';
         } else {
             expiryInfo.style.display = 'none';
@@ -104,7 +104,7 @@ export function initProfileEventHandler()
             try {
                 await handlePasswordChange(e);
             } catch (error) {
-                debug.error('Fehler beim Passwort ‰ndern:', error);
+                debug.error('Fehler beim Passwort √§ndern:', error);
             }
         });
     } 
@@ -118,16 +118,16 @@ export async function handlePasswordChange(e)
         
     // Validierung
     if (newPassword !== confirmPassword) {
-        showToast('Die Passwˆrter stimmen nicht ¸berein', 'error');
+        showToast('Die Passw√∂rter stimmen nicht √ºberein', 'error');
         return;
     }
     
-    if (newPassword.length < 6) {
-        showToast('Das Passwort muss mindestens 6 Zeichen lang sein', 'error');
+    if (newPassword.length < 8) {
+        showToast('Das Passwort muss mindestens 8 Zeichen lang sein', 'error');
         return;
     }
     
-    // API-Call zum Passwort ‰ndern
+    // API-Call zum Passwort √§ndern
     const result = await apiCall('change_password', 'POST', {
         current_password: currentPassword,
         new_password: newPassword
@@ -135,10 +135,10 @@ export async function handlePasswordChange(e)
     
     if (result && result.message) {
         document.getElementById('changePasswordForm').reset();
-        showToast('Passwort erfolgreich ge‰ndert', 'success');
+        showToast('Passwort erfolgreich ge√§ndert', 'success');
     } else {
         document.getElementById('changePasswordForm').reset();
-        showToast(result?.message || 'Passwort konnte nicht ge‰ndert werden', 'error');
+        showToast(result?.message || 'Passwort konnte nicht ge√§ndert werden', 'error');
     }
 }
 
@@ -162,7 +162,7 @@ export function copyProfileToken() {
 }
 
 
-// Token-Funktionen f¸r Profile
+// Token-Funktionen fÔøΩr Profile
 export function toggleProfileTokenVisibility() {
     
     const tokenInput = document.getElementById('profile_token');
@@ -170,16 +170,16 @@ export function toggleProfileTokenVisibility() {
 
     if (tokenInput.type === 'password') {
         tokenInput.type = 'text';
-        toggleBtn.textContent = '??'; // Auge durchgestrichen
+        toggleBtn.textContent = 'üôà'; // Auge durchgestrichen
     } else {
         tokenInput.type = 'password';
-        toggleBtn.textContent = '???'; // Auge offen
+        toggleBtn.textContent = 'üëÅÔ∏è'; // Auge offen
     }
 }
 
 export async function regenerateProfileToken() {
     const confirmed = await showConfirm(
-        'Token wirklich neu generieren? Der alte Token wird ung¸ltig!',
+        'Token wirklich neu generieren? Der alte Token wird ung√ºltig!',
         'Token neu generieren'
     );
     
@@ -198,7 +198,7 @@ export async function regenerateProfileToken() {
                     month: '2-digit',
                     year: 'numeric'
                 });
-                document.getElementById('profileTokenExpiryInfo').textContent = `G¸ltig bis: ${expiresText}`;
+                document.getElementById('profileTokenExpiryInfo').textContent = `G√ºltig bis: ${expiresText}`;
             }
 
             invalidateCache('userData');
@@ -209,7 +209,7 @@ export async function regenerateProfileToken() {
 }
 
 // ============================================
-// GLOBAL EXPORTS (f¸r onclick in HTML)
+// GLOBAL EXPORTS (fÔøΩr onclick in HTML)
 // ============================================
 
 window.regenerateProfileToken = regenerateProfileToken;

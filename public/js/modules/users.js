@@ -412,7 +412,7 @@ export async function openUserModal(userId = null) {
     if (userId) {
         title.textContent = 'Benutzer bearbeiten';
         await loadUserFormData(userId);
-        document.getElementById('user_password').required = false;
+        document.getElementById('user_password').required = false;        
 
         //Status-Section anzeigen (nur beim Bearbeiten)
         statusSection.style.display = 'block';
@@ -420,12 +420,21 @@ export async function openUserModal(userId = null) {
         userMemberGroup.style.display = 'none';
 
         updateModalId('userModal', userId);
+        
+        if(userId === currentUser.user_id)
+        {
+            document.getElementById('user_role').disabled = true;
+        }
+        else
+        {
+            document.getElementById('user_role').disabled = false;
+        }
 
     } else {
         title.textContent = 'Neuer Benutzer';
         document.getElementById('userForm').reset();
         document.getElementById('user_id').value = '';
-        document.getElementById('user_active').checked = true;
+        //document.getElementById('user_active').checked = true;
         document.getElementById('user_password').required = true;
 
         updateModalId('userModal', null);
@@ -494,62 +503,72 @@ function updateStatusSection(user) {
     
     // Status-Box Styling
     statusInfo.className = 'status-info ' + user.account_status;
-    
-    // Status: Pending - Email NICHT bestätigt
-    if (user.account_status === 'pending' && !user.email_verified) {
-        // Warten auf Email-Bestätigung
-        statusInfo.innerHTML = '<strong>📧 Email-Bestätigung ausstehend</strong>';
-        statusInfo.className = 'status-info pending';
-        
-        // NEU: Button zum erneuten Versenden der Verifikations-Mail
-        newResendBtn.style.display = 'inline-block';
-        newResendBtn.addEventListener('click', () => resendVerificationEmail(user.user_id, user.email));
-    
-        
-    } 
-    // Status: Pending - Email bestätigt, aber keine Member-ID
-    else if (user.account_status === 'pending' && user.email_verified && !user.pending_member_id) {
-        statusInfo.innerHTML = '<strong>⏳ Member-Verknüpfung fehlt</strong><br><small>Email bestätigt, aber noch kein Mitglied zugeordnet</small>';
-        statusInfo.className = 'status-info pending';
-        
-        newActivateBtn.style.display = 'inline-block';
-        activationGroup.style.display = 'block';
-        
-        newActivateBtn.addEventListener('click', () => activateUser(user.user_id));
-        loadMembersForActivation(user.pending_member_id);
-    }
-    // Status: Pending - Email bestätigt UND Member-ID vorhanden
-    else if (user.account_status === 'pending' && user.email_verified && user.pending_member_id) {
-        statusInfo.innerHTML = '<strong>⏳ Bereit zur Aktivierung</strong><br><small>Email bestätigt und Mitglied zugeordnet</small>';
-        statusInfo.className = 'status-info pending';
-        
-        newActivateBtn.style.display = 'inline-block';
-        activationGroup.style.display = 'block';
-        
-        newActivateBtn.addEventListener('click', () => activateUser(user.user_id));
-        loadMembersForActivation(user.pending_member_id);
-    }
-    // Status: Aktiv
-    else if (user.account_status === 'active') {
+
+    if(user.user_id === currentUser.user_id)
+    {
         statusInfo.innerHTML = '<strong>✓ Aktiv</strong>';
-        statusInfo.className = 'status-info active';
-        
-        newSuspendBtn.style.display = 'inline-block';
+        statusInfo.className = 'status-info active';                    
         memberLinkSection.style.display = 'block';
-        
-        newSuspendBtn.addEventListener('click', () => suspendUser(user.user_id));
         displayMemberLink(user);
     }
-    // Status: Gesperrt
-    else if (user.account_status === 'suspended') {
-        statusInfo.innerHTML = '<strong>🚫 Gesperrt</strong>';
-        statusInfo.className = 'status-info suspended';
+    else
+    {        
+        // Status: Pending - Email NICHT bestätigt
+        if (user.account_status === 'pending' && !user.email_verified) {
+            // Warten auf Email-Bestätigung
+            statusInfo.innerHTML = '<strong>📧 Email-Bestätigung ausstehend</strong>';
+            statusInfo.className = 'status-info pending';
+            
+            // NEU: Button zum erneuten Versenden der Verifikations-Mail
+            newResendBtn.style.display = 'inline-block';
+            newResendBtn.addEventListener('click', () => resendVerificationEmail(user.user_id, user.email));
         
-        newReactivateBtn.style.display = 'inline-block';
-        memberLinkSection.style.display = 'block';
-        
-        newReactivateBtn.addEventListener('click', () => reactivateUser(user.user_id));
-        displayMemberLink(user);
+            
+        } 
+        // Status: Pending - Email bestätigt, aber keine Member-ID
+        else if (user.account_status === 'pending' && user.email_verified && !user.pending_member_id) {
+            statusInfo.innerHTML = '<strong>⏳ Member-Verknüpfung fehlt</strong><br><small>Email bestätigt, aber noch kein Mitglied zugeordnet</small>';
+            statusInfo.className = 'status-info pending';
+            
+            newActivateBtn.style.display = 'inline-block';
+            activationGroup.style.display = 'block';
+            
+            newActivateBtn.addEventListener('click', () => activateUser(user.user_id));
+            loadMembersForActivation(user.pending_member_id);
+        }
+        // Status: Pending - Email bestätigt UND Member-ID vorhanden
+        else if (user.account_status === 'pending' && user.email_verified && user.pending_member_id) {
+            statusInfo.innerHTML = '<strong>⏳ Bereit zur Aktivierung</strong><br><small>Email bestätigt und Mitglied zugeordnet</small>';
+            statusInfo.className = 'status-info pending';
+            
+            newActivateBtn.style.display = 'inline-block';
+            activationGroup.style.display = 'block';
+            
+            newActivateBtn.addEventListener('click', () => activateUser(user.user_id));
+            loadMembersForActivation(user.pending_member_id);
+        }
+        // Status: Aktiv
+        else if (user.account_status === 'active') {
+            statusInfo.innerHTML = '<strong>✓ Aktiv</strong>';
+            statusInfo.className = 'status-info active';
+            
+            newSuspendBtn.style.display = 'inline-block';
+            memberLinkSection.style.display = 'block';
+            
+            newSuspendBtn.addEventListener('click', () => suspendUser(user.user_id));
+            displayMemberLink(user);
+        }
+        // Status: Gesperrt
+        else if (user.account_status === 'suspended') {
+            statusInfo.innerHTML = '<strong>🚫 Gesperrt</strong>';
+            statusInfo.className = 'status-info suspended';
+            
+            newReactivateBtn.style.display = 'inline-block';
+            memberLinkSection.style.display = 'block';
+            
+            newReactivateBtn.addEventListener('click', () => reactivateUser(user.user_id));
+            displayMemberLink(user);
+        }
     }
 }
 
@@ -708,6 +727,14 @@ export async function loadUserFormData(userId) {
     //document.getElementById('user_active').checked = user.is_active;
     document.getElementById('user_password').value = '';
 
+    if(userId === currentUser.user_id)
+    {
+        document.getElementById('user_role').disabled = true;
+    }
+    else
+    {
+        document.getElementById('user_role').disabled = false;
+    }
 
     // Hidden Field für aktuelle Member-ID
     let currentMemberIdField = document.getElementById('currentMemberId');

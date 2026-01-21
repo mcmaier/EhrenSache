@@ -5,8 +5,8 @@
 
 **Moderne Anwesenheitserfassung für ehrenamtliche Organisationen**
 
-Entwickelt für Musikvereine, Sportvereine und andere gemeinnützige 
-Organisationen. Kostenlos unter AGPL-3.0 nutzbar.
+Entwickelt für gemeinnützige Organisationen, wie z.B. Musikvereine, Sportvereine, ... 
+Kostenlos unter AGPL-3.0 nutzbar.
 
 > **💼 Kommerziell nutzen?** Siehe [Lizenzierung](#-lizenzierung)
 
@@ -273,12 +273,12 @@ Bei Fragen oder Problemen bitte ein Issue auf GitHub erstellen.
 
 ## 📋 Lizenzierung
 
-EhrenZeit ist unter einer **dualen Lizenz** verfügbar:
+EhrenSache ist unter einer **dualen Lizenz** verfügbar:
 
 ### 🆓 Kostenlos für gemeinnützige Organisationen
 
 Gemeinnützige Vereine, Musikvereine, Sportvereine und andere ehrenamtliche 
-Organisationen können EhrenZeit **kostenlos** unter der 
+Organisationen können EhrenSache **kostenlos** unter der 
 [AGPL-3.0-Lizenz](LICENSE) nutzen.
 
 **Das bedeutet:**
@@ -293,10 +293,10 @@ Für kommerzielle Nutzung (SaaS-Anbieter, Systemhäuser, Unternehmen) ist eine
 **kommerzielle Lizenz** erforderlich.
 
 **Wann brauche ich eine kommerzielle Lizenz?**
-- Du hostest EhrenZeit als kostenpflichtige Dienstleistung
-- Du integrierst EhrenZeit in ein kommerzielles Produkt
+- Du hostest EhrenSache als kostenpflichtige Dienstleistung
+- Du integrierst EhrenSache in ein kommerzielles Produkt
 - Du möchtest Änderungen NICHT veröffentlichen
-- Du verkaufst EhrenZeit-basierte Lösungen
+- Du verkaufst EhrenSache-basierte Lösungen
 
 
 ## 📄 Lizenz & Copyright

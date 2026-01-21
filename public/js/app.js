@@ -44,7 +44,7 @@ import { applyTheme, renderSystemSettings } from './modules/settings.js';
 // INIT JS
 // ============================================
 
-const DEBUG = false;
+const DEBUG = true;
 
 export const debug = {
   log:  (...args) => DEBUG && console.log(...args),
