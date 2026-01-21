@@ -1,21 +1,13 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Commercial License](https://img.shields.io/badge/Commercial-License%20Available-green.svg)](COMMERCIAL-LICENSE.md)
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Commercial License](https://img.shields.io/badge/Commercial-License%20Available-green.svg)](COMMERCIAL-LICENSE.md)
-
 # EhrenSache
 
 **Moderne Anwesenheitserfassung für ehrenamtliche Organisationen**
 
 Entwickelt für Musikvereine, Sportvereine und andere gemeinnützige 
 Organisationen. Kostenlos unter AGPL-3.0 nutzbar.
-**Moderne Anwesenheitserfassung für ehrenamtliche Organisationen**
 
-Entwickelt für Musikvereine, Sportvereine und andere gemeinnützige 
-Organisationen. Kostenlos unter AGPL-3.0 nutzbar.
-
-> **💼 Kommerziell nutzen?** Siehe [Lizenzierung](#-lizenzierung)
 > **💼 Kommerziell nutzen?** Siehe [Lizenzierung](#-lizenzierung)
 
 ## Features
