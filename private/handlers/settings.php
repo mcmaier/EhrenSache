@@ -5,7 +5,7 @@
 // ============================================
 function handleSettings($db, $method, $authUserId, $authUserRole) {
 
-    // Nur Admins dürfen auf Einstellungen zugreifen
+    // Nur Admins dï¿½rfen auf Einstellungen zugreifen
     requireAdmin();
 
     try {
@@ -123,13 +123,18 @@ function getSmtpConfig() {
     }
     
     $config = require $configPath;
+
+    $encryption = 'none';
+        if ($config['use_tls']) {
+            $encryption = ($config['smtp_port'] == 465) ? 'ssl' : 'tls';
+        }
     
     echo json_encode([
         'success' => true,
         'config' => [
             'smtp_host' => $config['smtp_host'] ?? '',
             'smtp_port' => $config['smtp_port'] ?? 587,
-            'smtp_encryption' => ($config['use_tls'] ?? true) ? 'tls' : 'none',
+            'smtp_encryption' => $encryption,
             'smtp_user' => $config['smtp_user'] ?? '',
             'smtp_password_set' => !empty($config['smtp_pass'])
         ]
@@ -145,8 +150,18 @@ function saveSmtpConfig($db, $config) {
         if (file_exists($configPath)) {
             $existingConfig = require $configPath;
         }
+
+        $encryption = $config->smtp_encryption ?? 'none';
+    
+        // Encryption in use_tls Flag konvertieren
+        $use_tls = ($encryption === 'tls' || $encryption === 'ssl');
         
-        // Neue Werte übernehmen
+        // Port-Empfehlung setzen falls leer
+        if (empty($config->smtp_port)) {
+            $config->smtp_port = ($encryption === 'ssl') ? 465 : 587;
+        }
+        
+        // Neue Werte Ã¼bernehmen
         $newConfig = [
             'smtp_host' => $config->smtp_host ?? $existingConfig['smtp_host'] ?? '',
             'smtp_port' => intval($config->smtp_port ?? $existingConfig['smtp_port'] ?? 587),
@@ -154,7 +169,7 @@ function saveSmtpConfig($db, $config) {
             'smtp_pass' => !empty($config->smtp_password) 
                 ? $config->smtp_password 
                 : ($existingConfig['smtp_pass'] ?? ''),
-            'use_tls' => ($config->smtp_encryption ?? 'tls') !== 'none',
+            'use_tls' => $use_tls,
             'from_email' => $existingConfig['from_email'] ?? 'noreply@example.com',
             'from_name' => $existingConfig['from_name'] ?? 'EhrenSache'
         ];
@@ -204,7 +219,7 @@ function sendTestMail($db, $recipient) {
         http_response_code(400);
         echo json_encode([
             'success' => false,
-            'message' => 'Ungültige Email-Adresse'
+            'message' => 'UngÃ¼ltige Email-Adresse'
         ]);
         return;
     }
@@ -231,7 +246,7 @@ function sendTestMail($db, $recipient) {
             http_response_code(500);
             echo json_encode([
                 'success' => false,
-                'message' => 'Email-Versand fehlgeschlagen. Prüfen Sie die Einstellungen und Server-Logs.'
+                'message' => 'Email-Versand fehlgeschlagen. Prï¿½fen Sie die Einstellungen und Server-Logs.'
             ]);
         }
         
@@ -248,7 +263,7 @@ function sendTestMail($db, $recipient) {
 function getAppearance($db)
 {
     try {
-    // Nur Appearance-Einstellungen für öffentlichen Zugriff
+    // Nur Appearance-Einstellungen fï¿½r ï¿½ffentlichen Zugriff
     $stmt = $db->prepare("
         SELECT setting_key, setting_value 
         FROM system_settings 

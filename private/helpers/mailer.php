@@ -134,11 +134,32 @@ class Mailer {
             return false;
         }
         
-        // Socket öffnen
-        $socket = @fsockopen($this->smtp_host, $this->smtp_port, $errno, $errstr, 30);
+        // Socket-Verbindung MIT SSL für Port 465
+        if ($this->smtp_port == 465) {
+            // Direkte SSL-Verbindung
+            $socket = @stream_socket_client(
+                "ssl://{$this->smtp_host}:{$this->smtp_port}",
+                $errno,
+                $errstr,
+                30,
+                STREAM_CLIENT_CONNECT,
+                stream_context_create(['ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false
+                ]])
+            );
+        } else {
+            // Normale Verbindung für Port 587/25
+            $socket = @stream_socket_client(
+                "{$this->smtp_host}:{$this->smtp_port}",
+                $errno,
+                $errstr,
+                30
+            );
+        }
+
         if (!$socket) {
-            error_log("Mailer: Connection failed: $errstr ($errno)");
-            return false;
+            throw new Exception("Could not connect to SMTP server: $errstr ($errno)");
         }
         
         stream_set_timeout($socket, 30);
