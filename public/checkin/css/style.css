@@ -9,14 +9,6 @@
  */
 
 :root {
-    /*
-    --primary-color:#667eea;
-    --primary-dark: #1F5FBF;
-    --secondary-color: #4CAF50;
-    --background-color:#e0e0e0;    
-    --text: #2c3e50;
-    --text-light: #7f8c8d;
-    */
     --primary-color:#1F5FBF;
     --primary-dark: #0F4F9F;
     --secondary-color: #4CAF50;
@@ -123,13 +115,13 @@ body {
 .login-box h2 {
     margin-bottom: 10px;
     color: var(--primary-color);
-    text-align: center;
+    text-align: left;
 }
 
 .login-box h3 {
     color: var(--primary-color);
     font-weight: 400;
-    text-align: center;
+    text-align: left;
 }
 
 .form-group {

@@ -1,0 +1,21 @@
+# ============================================
+# ASSETS - Statische Dateien
+# ============================================
+
+# Erlaube nur Bilder, Fonts, etc.
+<FilesMatch "\.(png|jpg|jpeg|svg|webp|woff|woff2|ttf|eot|ico)$">
+    Require all granted
+</FilesMatch>
+
+# Blockiere alles andere
+<FilesMatch "\.(?!(png|jpg|jpeg|svg|webp|woff|woff2|ttf|eot|ico)$)">
+    Require all denied
+</FilesMatch>
+
+# Keine PHP-Ausführung
+<Files *.php>
+    Require all denied
+</Files>
+
+# Blockiere Verzeichnis-Listings
+Options -Indexes

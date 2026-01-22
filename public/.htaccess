@@ -11,8 +11,8 @@ RewriteEngine On
 # Aktiviere diese Zeilen NUR auf dem Live-Server!
 # Lokal auskommentiert lassen
 
-# RewriteCond %{HTTPS} off
-# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # ============================================
 # SICHERHEIT
@@ -42,7 +42,6 @@ DirectoryIndex index.html index.php
 RewriteEngine On
 RewriteCond %{REQUEST_URI} ^(.*)/index\.(html|php)$
 RewriteRule ^(.*)$ %1/ [R=301,L]
-# RewriteRule ^(.*)$ /%1/ [R=301,L]
 
 # ============================================
 # MIME-TYPES (für PWA)

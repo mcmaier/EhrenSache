@@ -1,0 +1,26 @@
+# ============================================
+# UPLOADS - Nur Bilder erlauben
+# ============================================
+
+# Erlaube nur spezifische Bild-Dateitypen
+<FilesMatch "\.(png|jpg|jpeg|svg|webp)$">
+    Require all granted
+</FilesMatch>
+
+# Blockiere alles andere (PHP, JS, HTML, etc.)
+<FilesMatch "\.(?!(png|jpg|jpeg|svg|webp)$)">
+    Require all denied
+</FilesMatch>
+
+# Verhindere PHP-Ausführung (zusätzliche Sicherheit)
+<Files *.php>
+    Require all denied
+</Files>
+
+# Verhindere dass .htaccess selbst aufgerufen wird
+<Files .htaccess>
+    Require all denied
+</Files>
+
+# Blockiere Verzeichnis-Listings
+Options -Indexes
