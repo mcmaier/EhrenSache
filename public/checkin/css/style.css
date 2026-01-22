@@ -1,16 +1,37 @@
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ * 
+ * Copyright (c) 2026 Martin Maier
+ * 
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
 :root {
-    --primary: #667eea;
-    --primary-dark: #5568d3;
-    --success: #27ae60;
-    --error: #e74c3c;
+    /*
+    --primary-color:#667eea;
+    --primary-dark: #1F5FBF;
+    --secondary-color: #4CAF50;
+    --background-color:#e0e0e0;    
     --text: #2c3e50;
     --text-light: #7f8c8d;
+    */
+    --primary-color:#1F5FBF;
+    --primary-dark: #0F4F9F;
+    --secondary-color: #4CAF50;
+    --background-color:#e0e0e0;    
+    --text: #2F3A45;
+    --text-light: #6B7280;
+
+    --success: #27ae60;
+    --error: #e74c3c;
+    --warning: #f39c12;
+    --info: #3498db;
     --button-bg: #f5f5f5;
     --bg: #e0e0e0;
     --card-bg: #ffffff;
     --border: #e0e6ed;
-    --primary_color:#667eea;
-    --background_color:#e0e0e0;
 }
 
 * {
@@ -38,7 +59,7 @@ body {
     justify-content: center;
     min-height: 100vh;
     padding: 20px;
-    background: linear-gradient(135deg, var(--primary) 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
 }
 
 #loginScreen.active {
@@ -73,7 +94,7 @@ body {
 
 .login-box h3 {
     margin-bottom: 18px;
-    color: var(--primary_color);
+    color: var(--primary-color);
     font-weight: 400;
     text-align: center;
 }
@@ -102,7 +123,7 @@ body {
 
 .form-group input:focus {
     outline: none;
-    border-color: var(--primary);
+    border-color: var(--primary-color);
  }
 
 .form-group input[type="checkbox"] {
@@ -141,7 +162,7 @@ body {
 .info-box {
     margin-top: 30px;
     padding: 15px;
-    background: #f8f9fa;
+    background: var(--bg);
     border-radius: 10px;
     font-size: 13px;
     color: var(--text-light);
@@ -158,7 +179,7 @@ body {
     display: inline-block;
     margin-top: 12px;
     padding: 10px 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--secondary-color);
     color: white;
     text-decoration: none;
     border-radius: 8px;
@@ -250,12 +271,12 @@ body {
 }
 
 .pwa-confirm-content h3 {
-    color: #2c3e50;
+    color: var(--text);
     margin-bottom: 15px;
 }
 
 .pwa-confirm-content p {
-    color: #7f8c8d;
+    color: var(--text-light);
     margin-bottom: 20px;
     font-size: 14px;
 }
@@ -330,7 +351,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
     border-radius: 50%;
     align-self: flex-start;
 }
@@ -422,7 +443,7 @@ body {
     transform: translate(-50%, -50%);
     width: 250px;
     height: 250px;
-    border: 3px solid #27ae60;
+    border: 3px solid var(--success);
     border-radius: 10px;
     pointer-events: none;
     z-index: 100;
@@ -436,7 +457,7 @@ body {
     position: absolute;
     width: 30px;
     height: 30px;
-    border: 4px solid #27ae60;
+    border: 4px solid var(--success);
 }
 
 .scanner-overlay::before {
@@ -465,7 +486,7 @@ body {
     position: absolute;
     width: 30px;
     height: 30px;
-    border: 4px solid #27ae60;
+    border: 4px solid var(--success);
 }
 
 .scanner-overlay-corner::before {
@@ -501,7 +522,7 @@ body {
     width: 100%;
     max-width: 400px;
     margin-bottom: 15px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
     border-radius: 12px;
     padding: 60px 20px;
     text-align: center;
@@ -560,7 +581,7 @@ body {
 .status-message.success {
     background: white;
     color: #155724;
-    border-left: 4px solid #27ae60;
+    border-left: 4px solid var(--success);
     display: flex;
     align-items: center;
 }
@@ -572,7 +593,7 @@ body {
     justify-content: center;
     width: 24px;
     height: 24px;
-    background: #27ae60;
+    background: var(--success);
     color: white;
     border-radius: 50%;
     margin-right: 12px;
@@ -583,7 +604,7 @@ body {
 .status-message.error {
     background: white;
     color: #721c24;
-    border-left: 4px solid #e74c3c;
+    border-left: 4px solid var(--error);
     display: flex;
     align-items: center;
 }
@@ -595,7 +616,7 @@ body {
     justify-content: center;
     width: 24px;
     height: 24px;
-    background: #e74c3c;
+    background: var(--error);
     color: white;
     border-radius: 50%;
     margin-right: 12px;
@@ -606,7 +627,7 @@ body {
 .status-message.info {
     background: white;
     color: #004085;
-    border-left: 4px solid #3498db;
+    border-left: 4px solid var(--info);
     display: flex;
     align-items: center;
 }
@@ -618,7 +639,7 @@ body {
     justify-content: center;
     width: 24px;
     height: 24px;
-    background: #3498db;
+    background: var(--info);
     color: white;
     border-radius: 50%;
     margin-right: 12px;
@@ -629,7 +650,7 @@ body {
 .status-message.warning {
     background: white;
     color: #856404;
-    border-left: 4px solid #f39c12;
+    border-left: 4px solid var(--warning);
     display: flex;
     align-items: center;
 }
@@ -641,7 +662,7 @@ body {
     justify-content: center;
     width: 24px;
     height: 24px;
-    background: #f39c12;
+    background: var(--warning);
     color: white;
     border-radius: 50%;
     margin-right: 12px;
@@ -785,17 +806,17 @@ body {
 
 /* Border Farben je nach Status */
 .history-item.verified {
-    border-left-color: #27ae60;
+    border-left-color: var(--success);
 }
 
 .history-item.pending {
-    border-left-color: #f39c12;
+    border-left-color: var(--warning);
 }
 
 /* Time Display */
 .history-item .time {
     font-size: 12px;
-    color: #666;
+    color: var(--text-light);
     margin-bottom: 4px;
     display: flex;
     align-items: center;
@@ -806,7 +827,7 @@ body {
 .history-item .appointment {
     font-size: 14px;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--text);
     margin-bottom: 6px;
     line-height: 1.3;
 }
@@ -830,12 +851,12 @@ body {
 
 .history-item .status.verified {
     background: rgba(39, 174, 96, 0.15);
-    color: #27ae60;
+    color: var(--success);
 }
 
 .history-item .status.pending {
     background: rgba(243, 156, 18, 0.15);
-    color: #f39c12;
+    color: var(--warning);
 }
 
 /* Delete Button für pending Items */
@@ -844,7 +865,7 @@ body {
     top: 10px;
     right: 10px;
     background: rgba(231, 76, 60, 0.1);
-    color: #e74c3c;
+    color: var(--error);
     border: 1px solid rgba(231, 76, 60, 0.3);
     padding: 4px 8px;
     border-radius: 5px;
@@ -855,9 +876,9 @@ body {
 }
 
 .history-item .delete-btn:hover {
-    background: #e74c3c;
+    background: var(--error);
     color: white;
-    border-color: #e74c3c;
+    border-color: var(--error);
 }
 
 .history-item .delete-btn:active {
@@ -930,7 +951,7 @@ body {
 
 .modal-content h2 {
     margin-bottom: 20px;
-    color: #667eea;
+    color: var(--primary-color);
 }
 
 .modal-content .form-group input,
@@ -945,7 +966,7 @@ body {
 .modal-content .form-group input:focus,
 .modal-content .form-group select:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: var(--primary-color);
 }
 
 .modal-buttons {
@@ -995,7 +1016,7 @@ body {
     display: flex;
     gap: 8px;
     margin-bottom: 4px;
-    background: #f8f9fa;
+    background: var(--bg-light);;
     padding: 8px;
     border-radius: 12px;
     width: 100%;
@@ -1015,7 +1036,7 @@ body {
     cursor: pointer;
     transition: all 0.2s;
     font-size: 13px; /* Erhöht von 12px auf 13px */
-    color: #666;
+    color: var(--text-light);
     font-weight: 500;
     min-height: 64px; /* Garantiert gute Touch-Größe */
 }
@@ -1026,7 +1047,7 @@ body {
 
 .tab-button.active {
     background: white;
-    color: #667eea;
+    color: var(--primary-color);
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
@@ -1074,7 +1095,7 @@ body {
     justify-content: center;
     gap: 18px;
     padding: 14px 20px;
-    background: linear-gradient(135deg, #53b679 0%, #19b648 100%);
+    background: linear-gradient(135deg, #53b679 0%, var(--success) 100%);
     color: var(--button-bg);
     border: none;
     border-radius: 10px;
@@ -1108,8 +1129,8 @@ body {
 }
 
 .action-button.secondary:hover {
-    border-color: #667eea;
-    color: #667eea;
+    border-color: var(--primary-color);
+    color: var(--primary-color);;
 }
 
 /* Container-Anordnung beim Scannen */
@@ -1126,7 +1147,7 @@ body {
 #nfcButton {
     display: flex;
     width: 100%;
-    background: linear-gradient(135deg, #424683 0%, #4c57bb 100%);
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
     color: white;    
     box-shadow: 0 4px 15px rgba(144, 54, 218, 0.3);    
 }
@@ -1199,7 +1220,7 @@ body {
     width: 100%;
     max-width: 400px;
     margin-top: 10px;
-    background: var(--primary);
+    background: var(--primary-color);
     color: var(--card-bg);
 }
 
@@ -1226,12 +1247,12 @@ body {
 }
 
 .btn-confirm-yes {
-    background: #667eea;
+    background: var(--primary-color);
     color: white;
 }
 
 .btn-confirm-no {
-    background: #95a5a6;
+    background: var(--text-light);
     color: white;
 }
 
@@ -1249,7 +1270,7 @@ body {
     height: 40px;
     margin: 0 auto 16px;
     border: 4px solid #f0f0f0;
-    border-top: 4px solid #667eea;
+    border-top: 4px solid var(--primary-color);;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -1339,7 +1360,7 @@ body {
     border-radius: 8px;
     cursor: pointer;
     font-size: 20px;
-    color: #667eea;
+    color: var(--primary-color);;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1347,7 +1368,7 @@ body {
 }
 
 .year-nav:hover:not(:disabled) {
-    background: #667eea;
+    background: var(--primary-color);
     color: white;
     transform: scale(1.1);
 }
@@ -1359,7 +1380,7 @@ body {
 
 #currentYear {
     font-weight: 700;
-    color: #2c3e50;
+    color: var(--text);
     font-size: 18px;
     min-width: 60px;
     text-align: center;
@@ -1378,7 +1399,7 @@ body {
     background: #f8f9fa;
     padding: 14px;
     border-radius: 10px;
-    border-left: 4px solid #667eea;
+    border-left: 4px solid var(--primary-color);
     transition: all 0.2s;
 }
 
@@ -1470,7 +1491,7 @@ body {
 }
 
 .btn-refresh {
-    background: var(--primary);
+    background: var(--primary-color);
     color: white;
 }
 
@@ -1481,7 +1502,7 @@ body {
 
 .btn-create-appointment,
 .btn-edit-appointment {
-    background: #f39c12;
+    background: var(--warning);
     color: white;
 }
 
@@ -1517,7 +1538,7 @@ body {
 }
 
 .attendance-scroll-container::-webkit-scrollbar-thumb {
-    background: var(--primary);
+    background: var(--primary-color);
     border-radius: 3px;
 }
 
@@ -1530,7 +1551,7 @@ body {
     background: var(--card-bg);
     border-radius: 8px;
     margin-bottom: 20px;
-    border-left: 4px solid var(--primary);
+    border-left: 4px solid var(--primary-color);
 }
 
 .group-section {
@@ -1567,7 +1588,7 @@ body {
 }
 
 .attendance-item.present {
-    border-color: #27ae60;
+    border-color: var(--success);
     background: rgba(39, 174, 96, 0.05);
 }
 
@@ -1582,7 +1603,7 @@ body {
 }
 
 .attendance-item.present .status-icon {
-    color: #27ae60;
+    color: var(--success);
 }
 
 .attendance-item.absent .status-icon {
@@ -1676,12 +1697,12 @@ body {
 }
 
 .btn-modal-cancel {
-    background: #95a5a6;
+    background: var(--text-light);
     color: white;
 }
 
 .btn-modal-confirm {
-    background: var(--primary);
+    background: var(--primary-color);
     color: white;
 }
 

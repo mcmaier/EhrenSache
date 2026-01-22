@@ -1,3 +1,13 @@
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ * 
+ * Copyright (c) 2026 Martin Maier
+ * 
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
 import { apiCall, setCurrentUser, currentUser, setCsrfToken} from './api.js';
 import { loadAllData, showScreen, showToast, showDashboard, updateUIForRole, initAllYearFilters, initEventHandlers} from './ui.js';
 import {debug} from '../app.js'
@@ -25,7 +35,7 @@ export async function checkAuth() {
                     <div style="display: flex; align-items: center; justify-content: center; 
                                 height: 100vh; flex-direction: column; font-family: system-ui;">
                         <h1>? Verbindungsfehler</h1>
-                        <p>Die API ist nicht erreichbar. Bitte sp�ter erneut versuchen.</p>
+                        <p>Die API ist nicht erreichbar. Bitte sp�ter erneut versuchen.</p>
                         <button onclick="location.reload()" 
                                 style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">
                             Neu laden
@@ -40,7 +50,7 @@ export async function checkAuth() {
         
         const data = await response.json();
         
-        // Bei Erfolg Counter zur�cksetzen
+        // Bei Erfolg Counter zur�cksetzen
         apiFailureCount = 0;
         
         return data.authenticated ? data : null;

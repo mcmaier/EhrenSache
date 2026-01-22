@@ -1,5 +1,4 @@
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Commercial License](https://img.shields.io/badge/Commercial-License%20Available-green.svg)](COMMERCIAL-LICENSE.md)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0) [![Commercial License](https://img.shields.io/badge/Commercial-License%20Available-green.svg)](COMMERCIAL-LICENSE.md)
 
 # EhrenSache
 
@@ -11,6 +10,13 @@ Kostenlos unter AGPL-3.0 nutzbar.
 > **💼 Kommerziell nutzen?** Siehe [Lizenzierung](#-lizenzierung)
 
 ## Features
+
+**Anwesenheit ist EhrenSache!** 
+
+Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder sich eigenverantwortlich anmeldet oder der Schriftführer die Anwesenheit prüft. EhrenSache erfasst Anwesenheit und Entschuldigen inklusive nachträglicher Korrekturmöglichkeit. 
+
+Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünkltichkeit belohnen wollen.
+
 
 ### Kernfunktionen
 - **Mehrstufiges Rollensystem**: Admin, Manager und Benutzer mit differenzierten Berechtigungen
@@ -29,7 +35,7 @@ Kostenlos unter AGPL-3.0 nutzbar.
 ### Sicherheit
 - XSS-Schutz durch Content Security Policy
 - SQL-Injection-Prävention mit Prepared Statements
-- CSRF-Schutz für alle Formulare
+- CSRF-Schutz für Dateneingaben
 - Sichere Session-Verwaltung mit HttpOnly und SameSite Cookies
 - Input-Validierung auf Client- und Server-Seite
 - Sichere Datei-Upload-Verifikation
@@ -37,55 +43,51 @@ Kostenlos unter AGPL-3.0 nutzbar.
 ## Technologie-Stack
 
 **Backend:**
-- PHP 7.4+ (Vanilla, keine Frameworks)
+- PHP 8+ (Vanilla)
 - MySQL 5.7+
 - REST API Architektur
 
 **Frontend:**
-- Vanilla JavaScript (ES6 Module)
+- Vanilla HTML + JavaScript
 - CSS3 (Grid, Flexbox)
-- Service Worker für PWA-Funktionalität
 
 **IoT-Integration (WIP):**
-- ESP32 Mikrocontroller
-- PN532 NFC Module
-- Displays
-- RFID/Fingerprint Reader Support
+- (geplant) TOTP-Device für QR-Checkin via App
+- (geplant) Fingerprint-Scanner für Biometrie-Checkin
+
 
 ## Installation
 
 ### Voraussetzungen
-- Webserver mit PHP 7.4+ und MySQL 5.7+
+- Webserver mit PHP 8+ und MySQL 5.7+
 - SSL-Zertifikat (für PWA und sichere Authentifizierung)
 - Schreibrechte für Upload-Verzeichnisse
 
 ### Setup
 
-1. Repository klonen:
+1. Repository klonen oder Paket downloaden:
 ```bash
 git clone https://github.com/mcmaier/EhrenSache.git
-cd EhrenSache
+```
+2. Komplettes Verzeichnis in Webspace hochladen.
+> [!IMPORTANT]
+> Die Web-Root der Domain muss auf den Ordner **EhrenSache/public** zeigen!
+
+3. Neue Datenbank erstellen.
+
+4. Setup ausführen (Angenommen, Ehrensache ist in der Subdomain ehrensache installiert):
+```
+https://ehrensache.meine-domain.de/
+--> Leitet automatisch zu Setup weiter
 ```
 
-2. Datenbank erstellen und SQL-Schema importieren:
-```bash
-mysql -u username -p < database/schema.sql
-```
+## Erste Schritte
 
-3. Setup ausführen:
+Während der Installation wird ein Admin-Account erstellt.
 
-4. Upload-Verzeichnis mit Schreibrechten versehen:
-```bash
-chmod 755 uploads/
-```
-
-5. `.htaccess` für Apache konfigurieren (bereits enthalten)
-
-### Erster Admin-Account
-
-Nach der Installation über das Registrierungsformular anmelden. Der erste Benutzer erhält automatisch Admin-Rechte.
-
-## Bedienung
+1. Gruppenverwaltung --> Mindestens eine Benutzergruppe anlegen
+2. Gruppenverwaltung --> Eine Terminart erstellen und Benutzergruppe zuweisen
+3. Mitglieder --> Erstellen oder aus CSV Importieren
 
 ### Für Administratoren
 
@@ -117,7 +119,7 @@ Nach der Installation über das Registrierungsformular anmelden. Der erste Benut
 ### Für Manager
 
 Manager haben eingeschränkten Zugriff:
-- Einsehen aller Mitglieder und Termine
+- Einsehen und Bearbeiten aller Mitglieder und Termine
 - Teilnehmerverwaltung bei Terminen
 - Keine Systemkonfiguration oder Rollenverwaltung
 
@@ -125,60 +127,45 @@ Manager haben eingeschränkten Zugriff:
 
 **Check-in Web:**
 1. Login → Dashboard
-2. Statistik einsehen
-3. Anträge erstellen
-4. Optional: TOTP-Code eingeben (falls Standortverifikation aktiv)
+2. Termine und Anwesenheiten einsehen
+3. Statistik einsehen
+4. Anträge erstellen
 
 **Check-in Mobile (PWA):**
 1. App auf Smartphone installieren (Browser-Menü → "Zum Startbildschirm")
 2. Öffnen der App
-3. QR-Code scannen oder manueller Check-in
+3. QR-Code scannen an TOTP-Station oder manueller Check-in 
+4. Korrekturantrag stellen
 
 **Check-in QR-Code:**
 1. QR-Code am Veranstaltungsort scannen (z.B. mit Smartphone-Kamera)
 2. Link öffnet direkt den Check-in
 3. Automatische Erfassung
 
-**Check-in NFC/IoT:**
+**Check-in NFC/IoT (geplant)**
 - NFC-Tag an NFC-Station halten
 - RFID-Karte an Lesegerät
 - Fingerabdruck an Fingerprint-Reader
 - Automatische Erfassung durch verknüpftes Gerät
 
 **Ausnahmen beantragen:**
-1. Dashboard → Meine Ausnahmen
-2. Neue Ausnahme → Typ wählen (Urlaub, Krankheit, etc.)
-3. Zeitraum angeben und Begründung
+1. Dashboard → Meine Anträge
+2. Neue Ausnahme → Typ wählen (Zeitkorrektur, Entschuldigt)
+3. Datum angeben und Begründung
 4. Absenden → Wartet auf Genehmigung durch Admin/Manager
 
 ## IoT-Integration
 
-### NFC-Station (ESP32)
-
-**Hardware:**
-- ESP32 DevKit
-- PN532 NFC Module (I2C)
-- OLED Display SSD1306
-- Spannungsversorgung 5V
-
-**Konfiguration:**
-1. ESP32 mit EhrenSache-Firmware flashen
-2. WiFi-Credentials über Serial eingeben
-3. Im Dashboard: Gerät registrieren und Token generieren
-4. TOTP-Secret konfigurieren
-5. NFC-Tags mit Mitglieder-IDs beschreiben
-
-**Funktionsweise:**
-- Mitglied hält NFC-Tag an Station
-- ESP32 liest Mitglieds-ID
-- Generiert aktuellen TOTP-Code
-- Sendet Check-in an API mit Token-Auth
-- Feedback über OLED Display
+**geplant:**
+- QR Code Station mit TOTP Code
+- NFC Station für TOTP Code
+- Fingerprint Authentifizierungsgerät
 
 ### Weitere Geräte
 
-Das System unterstützt beliebige IoT-Geräte über die REST API:
-- Endpoint: `/api/api.php&resource=auto_checkin`
+Das System unterstützt beliebige IoT-Geräte über die REST API mit API Token:
+- TOTP-Endpoint: `/api/api.php&resource=totp_checkin`
+- Auth-Endpoint: `/api/api.php&resource=auto_checkin`
 - Authentifizierung: Bearer Token
 - Parameter: `member_id`, `appointment_id`, `totp_code`, `source`
 
@@ -198,7 +185,7 @@ Response: Session-Cookie
 Header: Authorization: Bearer {token}
 ```
 
-### Endpoints (Auswahl)
+### Endpoints (Doku unvollständig!)
 
 **Check-in:**
 ```
@@ -225,7 +212,7 @@ Response: Array of members with groups
 
 ## Sicherheitshinweise
 
-- **HTTPS zwingend erforderlich** für Produktivbetrieb
+- **HTTPS erforderlich** für Produktivbetrieb
 - Regelmäßige Updates der Abhängigkeiten
 - Starke Passwörter für Admin-Accounts
 - TOTP-Secrets sicher aufbewahren
@@ -240,25 +227,27 @@ Response: Array of members with groups
 # Projekt nach htdocs/ kopieren
 # Datenbank erstellen
 # In Browser: http://localhost/EhrenSache
-# In Browser: http://localhost/EhrenSache
 ```
 
 ### Code-Struktur
 ```
 EhrenSache/
-EhrenSache/
-├── api/              # REST API Endpoints
-├── js/               # Frontend JavaScript (ES6 Module)
-├── css/              # Stylesheets
-├── uploads/          # Profilbilder
-├── database/         # SQL Schema
-├── esp32/            # IoT Firmware
-└── index.html        # Hauptanwendung
+├── private/              # Interne Dateien
+|   ├── config/           # Config Dateien
+|   ├── handlers/         # API Endpunkt-Handler
+|   └── ...             
+└── public/               # Öffentlich zugänglich
+    ├── checkin/          # PWA
+    ├── api/              # REST API Endpoints
+    ├── js/               # Frontend JavaScript
+    ├── css/              # Stylesheets
+    ├── ...             
+    └── index.html        # Hauptanwendung
 ```
 
 ### Caching-System
 
-Das System verwendet ein intelligentes Jahr-basiertes Caching:
+Das System verwendet ein Jahr-basiertes Caching:
 - Termine/Anwesenheiten: Pro Jahr gecacht
 - Mitglieder/Gruppen: Global gecacht
 - Invalidierung bei Änderungen über Event-System
@@ -271,15 +260,16 @@ Bei Fragen oder Problemen bitte ein Issue auf GitHub erstellen.
 
 ---
 
-## 📋 Lizenzierung
+## 📋 Lizenzierung & Copyright
 
 EhrenSache ist unter einer **dualen Lizenz** verfügbar:
 
 ### 🆓 Kostenlos für gemeinnützige Organisationen
 
 Gemeinnützige Vereine, Musikvereine, Sportvereine und andere ehrenamtliche 
-Organisationen können EhrenSache **kostenlos** unter der 
-[AGPL-3.0-Lizenz](LICENSE) nutzen.
+Organisationen können EhrenSache **kostenlos** unter der [AGPL-3.0-Lizenz](LICENSE) nutzen.
+
+
 
 **Das bedeutet:**
 - ✅ Kostenlose Nutzung
@@ -290,7 +280,7 @@ Organisationen können EhrenSache **kostenlos** unter der
 ### 💼 Kommerzielle Lizenz
 
 Für kommerzielle Nutzung (SaaS-Anbieter, Systemhäuser, Unternehmen) ist eine 
-**kommerzielle Lizenz** erforderlich.
+**[Kommerzielle Lizenz](COMMERCIAL-LICENSE.md)** erforderlich.
 
 **Wann brauche ich eine kommerzielle Lizenz?**
 - Du hostest EhrenSache als kostenpflichtige Dienstleistung
@@ -298,12 +288,8 @@ Für kommerzielle Nutzung (SaaS-Anbieter, Systemhäuser, Unternehmen) ist eine
 - Du möchtest Änderungen NICHT veröffentlichen
 - Du verkaufst EhrenSache-basierte Lösungen
 
-
-## 📄 Lizenz & Copyright
+---
 
 Copyright (c) 2026 Martin Maier
-
-- **Gemeinnützige Nutzung:** [AGPL-3.0](LICENSE)
-- **Kommerzielle Nutzung:** [Kommerzielle Lizenz](COMMERCIAL-LICENSE.md)
 
 Made with ❤️ for the volunteer community

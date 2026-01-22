@@ -1,3 +1,13 @@
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ * 
+ * Copyright (c) 2026 Martin Maier
+ * 
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
 /* Settings Container */
 .settings-container {
     display: flex;
@@ -76,7 +86,7 @@
     border-radius: 4px;
 }
 
-/* Speichern-Button mit �nderungen */
+/* Speichern-Button mit �nderungen */
 #saveSettingsBtn.has-changes {
     background: var(--success-color, #27ae60);
     animation: pulse 2s infinite;

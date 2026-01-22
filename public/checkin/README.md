@@ -1,6 +1,10 @@
-# Check-In PWA - Installationsanleitung
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0) [![Commercial License](https://img.shields.io/badge/Commercial-License%20Available-green.svg)](../../COMMERCIAL-LICENSE.md)
+
+# EhrenSache - Checkin
 
 ## 📱 Progressive Web App für Vereinsverwaltung
+
+**Moderne Anwesenheitserfassung für ehrenamtliche Organisationen**
 
 Diese PWA ermöglicht Mitgliedern einen schnellen Check-In über Mobilgeräte.
 
@@ -8,12 +12,10 @@ Diese PWA ermöglicht Mitgliedern einen schnellen Check-In über Mobilgeräte.
 
 ## 🚀 Installation
 
-### 1. Dateien kopieren
-
-Kopiere den kompletten `checkin-app` Ordner in dein Webserver-Verzeichnis:
+Die PWA ist teil des EhrenSache-Pakets und  ist im selben Webspace wie die Webseite installiert, da sie die gleiche API und Datenbank nutzt.
 
 ```
-/htdocs/checkin-app/
+/EhrenSache/public/checkin/
   ├── index.html
   ├── manifest.json
   ├── service-worker.js
@@ -22,54 +24,32 @@ Kopiere den kompletten `checkin-app` Ordner in dein Webserver-Verzeichnis:
   └── js/
       └── app.js
 ```
-
-### 2. API-URL anpassen
-
-Öffne `js/app.js` und passe die API-URL an (Zeile 4):
-
-```javascript
-const API_BASE = 'http://deine-domain.de/members/api/api.php';
-```
-
-**Wichtig:** In Production HTTPS verwenden!
-
-### 3. Icons erstellen (optional)
-
-Erstelle zwei App-Icons:
-- `icon-192.png` (192x192 Pixel)
-- `icon-512.png` (512x512 Pixel)
-
-Oder nutze einen Icon-Generator wie: https://favicon.io/
-
 ---
 
 ## 📲 App auf Smartphone installieren
 
+> Eine Progressive Web App ist keine native App, die installiert wird.
+> Es ist eher wie eine Webseite, die im Schnellzugriff gespeichert wird.
+
 ### Android (Chrome)
 
-1. Öffne `http://deine-url/checkin-app/` im Chrome Browser
+1. Öffne `http://deine-url/checkin/` im Chrome Browser
 2. Tippe auf das ⋮ Menü (oben rechts)
 3. Wähle "Zum Startbildschirm hinzufügen"
 4. App erscheint auf dem Homescreen
 
 ### iOS (Safari)
 
-1. Öffne `http://deine-url/checkin-app/` in Safari
+1. Öffne `http://deine-url/checkin/` in Safari
 2. Tippe auf das Teilen-Symbol (Quadrat mit Pfeil)
 3. Scrolle runter und wähle "Zum Home-Bildschirm"
 4. App erscheint auf dem Homescreen
 
 ---
 
-## 🔑 API Token erhalten
+## 🔑 Login
 
-Users finden ihren API-Token im Web-Dashboard:
-
-1. Im Dashboard anmelden
-2. Zu "Mitglieder" → eigenes Profil navigieren
-3. Token kopieren (unter der Mitglieder-Tabelle)
-
-**Sicherheit:** Token wie ein Passwort behandeln!
+Sobald du dich im Web-Dashboard registriert hast und von einem Admin freigeschaltet wurdest, kannst du dich in der Checkin-App mit den gleichen Nutzerdaten anmelden.
 
 ---
 
@@ -77,50 +57,26 @@ Users finden ihren API-Token im Web-Dashboard:
 
 ### ✅ Was funktioniert
 
-- **Auto-Login**: Token wird sicher gespeichert
+- **Auto-Login**: Login wird sicher gespeichert
 - **Check-In**: Ein Klick für Zeiterfassung
-- **Anwesenheiten**: Letzte 20 Records anzeigen
-- **Offline-UI**: App funktioniert ohne Internet (nur UI)
+- **Anwesenheiten**: Letzte 10 Records anzeigen
 - **Installierbar**: Wie native App nutzbar
 - **Responsive**: Optimiert für alle Bildschirmgrößen
+- **QR-Code Scanner**: Schneller Termin-Check-In
+- **Statistiken**: Anwesenheitsquote und letzte Einträge
 
 ### ⚠️ Limitierungen
 
 - **API erfordert Internet**: Check-In benötigt Online-Verbindung
 - **Kein Background Sync**: Keine Offline-Queue für Check-Ins
-- **HTTP in Entwicklung OK**: Production benötigt HTTPS für volle PWA-Features
-
----
-
-## 🔧 Entwicklung & Testing
-
-### Lokaler Test
-
-```bash
-# Im checkin-app Ordner
-python -m http.server 8000
-
-# Oder mit PHP
-php -S localhost:8000
-```
-
-Öffne: `http://localhost:8000`
-
-### Chrome DevTools
-
-1. F12 → Application Tab
-2. Manifest prüfen
-3. Service Worker Status checken
-4. Lighthouse Audit durchführen
 
 ---
 
 ## 🐛 Troubleshooting
 
-### "Token ungültig"
-
-- Token im Web-Dashboard neu generieren
-- Token komplett kopieren (keine Leerzeichen)
+### "Login nicht möglich"
+- Ist der Account bereits freigeschaltet?
+- API-Token im Web-Dashboard neu generieren
 - Gespeicherten Token löschen: Browser-Cache leeren
 
 ### "Keine Verbindung zur API"
@@ -131,7 +87,7 @@ php -S localhost:8000
 
 ### Service Worker lädt nicht
 
-- HTTPS verwenden (in Production)
+- HTTPS verwenden
 - Browser-Cache leeren
 - Service Worker in DevTools manuell unregistrieren
 
@@ -140,29 +96,6 @@ php -S localhost:8000
 - HTTPS erforderlich (außer localhost)
 - `manifest.json` korrekt eingebunden
 - Icons vorhanden
-- Lighthouse Audit für Details
-
----
-
-## 🔒 Sicherheit (Production)
-
-### HTTPS aktivieren
-
-```apache
-# .htaccess
-RewriteEngine On
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-```
-
-### Token-Speicherung
-
-Token wird Base64-codiert im LocalStorage gespeichert.
-**Nicht ideal für höchste Sicherheit**, aber praktikabel für diesen Use-Case.
-
-**Bessere Alternative (optional):**
-- Token in httpOnly Cookie speichern
-- Session-basierter Login statt Token-Speicherung
 
 ---
 
@@ -172,23 +105,17 @@ Token wird Base64-codiert im LocalStorage gespeichert.
 
 - [ ] Push-Notifications bei Check-In
 - [ ] Offline-Queue für Check-Ins
-- [ ] QR-Code Scanner für Termin-Check-In
 - [ ] Dark Mode
-- [ ] Statistiken (Anwesenheitsquote)
-- [ ] Biometrische Authentifizierung
 
 ---
 
-## 📝 Lizenz & Support
+## 📄 Lizenz & Copyright
 
-Erstellt für Vereinsverwaltung-System
-Bei Fragen: Dokumentation im Projekt prüfen
+Entwickelt für gemeinnützige Organisationen, wie z.B. Musikvereine, Sportvereine, ... 
 
----
+- **Gemeinnützige Nutzung:** [AGPL-3.0](../../LICENSE)
+- **Kommerzielle Nutzung:** [Kommerzielle Lizenz](../../COMMERCIAL-LICENSE.md)
 
-## ⚡ Quick Reference
+Copyright (c) 2026 Martin Maier
 
-**Login:** Token aus Web-Dashboard
-**Check-In:** Ein Klick → fertig
-**Offline:** UI funktioniert, API benötigt Internet
-**Update:** Service Worker cached automatisch Updates
+Made with ❤️ for the volunteer community

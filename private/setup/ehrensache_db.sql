@@ -1,11 +1,12 @@
--- phpMyAdmin SQL Dump
--- version 5.2.1
--- https://www.phpmyadmin.net/
---
--- Host: 127.0.0.1
--- Erstellungszeit: 03. Dez 2025 um 21:30
--- Server-Version: 10.4.32-MariaDB
--- PHP-Version: 8.2.12
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ * 
+ * Copyright (c) 2026 Martin Maier
+ * 
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
 
 -- --------------------------------------------------------
 
@@ -353,8 +354,9 @@ CREATE TABLE `system_settings` (
 -- Standard-Werte einfügen
 INSERT INTO `system_settings` (`setting_key`, `setting_value`, `setting_type`, `category`, `description`) VALUES
 ('organization_name', 'EhrenSache', 'text', 'general', 'Name der Organisation'),
-('primary_color', '#007bff', 'color', 'appearance', 'Primärfarbe'),
-('background_color', '#f8f9fa', 'color', 'appearance', 'Hintergrundfarbe'),
+('primary_color', '#1F5FBF', 'color', 'appearance', 'Primärfarbe'),
+('secondary_color', '#4CAF50', 'color', 'appearance', 'Sekundärfarbe'),
+('background_color', '#f8f9fa', 'color', 'appearance', 'Hintergrundfarbe'), 
 ('pagination_limit', '25', 'number', 'pagination', 'Einträge pro Seite');
 
 -- Mail-Settings in system_settings
@@ -439,6 +441,7 @@ FROM users u
 LEFT JOIN members m_active ON u.member_id = m_active.member_id
 LEFT JOIN members m_pending ON u.pending_member_id = m_pending.member_id;
 
+/*
 -- Trigger für INSERT
 CREATE TRIGGER check_device_email_insert
 BEFORE INSERT ON users
@@ -474,6 +477,7 @@ BEGIN
         SET MESSAGE_TEXT = 'Benutzer benötigen eine Email-Adresse';
     END IF;
 END;
+*/
 
 /* Beispieldaten*/
 /*

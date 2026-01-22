@@ -1,7 +1,7 @@
-# Kommerzielle Lizenz für EhrenZeit
+# Kommerzielle Lizenz für EhrenSache
 
 ## Übersicht
-Diese kommerzielle Lizenz erlaubt die Nutzung von EhrenZeit außerhalb der 
+Diese kommerzielle Lizenz erlaubt die Nutzung von EhrenSache außerhalb der 
 Bedingungen der AGPL-3.0-Lizenz.
 
 ## Wer benötigt eine kommerzielle Lizenz?
@@ -45,7 +45,7 @@ Optional buchbar:
 
 ## Kontakt
 
-Lizenzanfragen an: [deine-email]
+Lizenzanfragen an: [info@ehrensache.app]
 
 ---
 

@@ -1,23 +1,44 @@
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ * 
+ * Copyright (c) 2026 Martin Maier
+ * 
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
 /* ============================================
    CSS VARIABLES
    ============================================ */
 :root {
     /* Colors */
+    /*
     --primary-color: #667eea;
     --primary-dark: #5568d3;
     --secondary-color: #764ba2;
+    */
+    --primary-color: #1F5FBF;
+    --primary-dark: #0F4F9F;
+    --secondary-color: #4CAF50;
+
     --success-color: #27ae60;
     --success-dark: #229954;
     --danger-color: #e74c3c;
     --danger-dark: #c0392b;
     --warning-color: #f39c12;
     --info-color: #3498db;
+
+    --ehren-blau: #1F5FBF;
+    --ehren-gruen: #4CAF50;
+    --ehren-orange: #F5A623;
+    --ehren-gelb: #FFC83D;
     
     /* Grays */
-    --text-dark: #2c3e50;
+    --text-dark: #2F3A45;
     --text-medium: #555;
     --text-light: #7f8c8d;
-    --text-muted: #bdc3c7;
+    --text-muted: #6B7280;
     --bg-white: #ffffff;
     --bg-light: #f8f9fa;
     --bg-gray: #f5f5f5;
@@ -25,8 +46,8 @@
     --border-light: #e0e0e0;
     
     /* Sidebar */
-    --sidebar-bg: #2c3e50;
-    --sidebar-hover: #34495e;
+    --sidebar-bg: #2F3A45;
+    --sidebar-hover: #6B7280;
     --sidebar-width: 250px;
     
     /* Spacing */
