@@ -18,7 +18,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, var(--ehren-gruen) 0%, var(--ehren-blau) 100%);
+    background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -41,6 +41,35 @@ body {
 .login-header {
     text-align: center;
     margin-bottom: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.login-logo {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+}
+
+.login-title {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.login-header .org-name {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.login-header .app-name {
+    font-size: 14px;
+    color: var(--text-light);
+    letter-spacing: 0.5px;
 }
 
 .login-header h1 {
@@ -75,8 +104,8 @@ body {
 }
 
 .tab-btn.active {
-    color: #667eea;
-    border-bottom-color: #667eea;
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
     font-weight: 500;
 }
 
@@ -113,7 +142,7 @@ input[type="text"] {
 
 input:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: var(--primary-color);
 }
 
 small {
@@ -130,18 +159,19 @@ small {
 }
 
 .link-small {
-    color: #667eea;
+    color: var(--primary-color);
     text-decoration: none;
     font-size: 14px;
 }
 
 .link-small:hover {
+    filter: brightness(0.9);
     text-decoration: underline;
 }
 
 .btn-primary {
     padding: 12px 24px;
-    background: #667eea;
+    background: var(--primary-color);
     color: white;
     border: none;
     border-radius: 6px;
@@ -151,8 +181,9 @@ small {
     transition: background 0.3s;
 }
 
+
 .btn-primary:hover {
-    background: #5568d3;
+    filter: brightness(0.9);
 }
 
 .btn-full {
@@ -229,7 +260,7 @@ small {
 }
 
 .close:hover {
-    color: #333;
+    filter: brightness(0.9);
 }
 
 /* Toast */

@@ -368,7 +368,7 @@ if($resource === 'me' && $request_method === 'GET') {
 if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 
     //Von CSRF ausgenommen
-    $excludedResources = ['login', 'logout', 'auth', 'regenerate_token','import','register'];
+    $excludedResources = ['login', 'logout', 'auth', 'regenerate_token','import','register','upload-logo'];
     
     // Login und Logout sind ausgenommen
     if(!in_array($resource, $excludedResources)) {
@@ -460,6 +460,9 @@ switch($resource) {
         break;
     case 'settings':
         handleSettings($db, $request_method,$authUserId, $authUserRole);
+        break;
+    case 'upload-logo':
+        uploadLogo($db, $request_method,$authUserId,$authUserRole);
         break;
     case 'attendance_list':
         handleAttendanceList($db, $request_method, $id);

@@ -13,7 +13,7 @@
 // ============================================
 function handleSettings($db, $method, $authUserId, $authUserRole) {
 
-    // Nur Admins d�rfen auf Einstellungen zugreifen
+    // Nur Admins dürfen auf Einstellungen zugreifen
     requireAdmin();
 
     try {
@@ -289,6 +289,112 @@ function getAppearance($db)
     } catch (Exception $e) {
         http_response_code(500);
         echo json_encode(['error' => 'Fehler beim Laden']);
+    }
+}
+
+
+function uploadLogo($db, $method, $authUserId, $authUserRole)
+{
+    if (!isAdmin()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Admin-Zugriff erforderlich']);
+        exit;
+    }
+
+    if ($method !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['error' => 'Methode nicht erlaubt']);
+        exit;
+    }
+
+    try {
+    if (!isset($_FILES['logo']) || $_FILES['logo']['error'] !== UPLOAD_ERR_OK) {
+        throw new Exception('Keine Datei hochgeladen');
+        }
+    
+        $file = $_FILES['logo'];
+        
+        // Validierung
+        $allowedTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+        
+        if (!in_array($mimeType, $allowedTypes)) {
+            throw new Exception('Ungültiger Dateityp');
+        }
+        
+        // 2. Dateiendung prüfen
+        $allowedExtensions = ['png', 'jpg', 'jpeg', 'svg'];
+        $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        
+        if (!in_array($extension, $allowedExtensions)) {
+            throw new Exception('Ungültige Dateiendung');
+        }
+
+        if ($file['size'] > 500 * 1024) { // 500KB
+            throw new Exception('Datei zu groß (max. 500KB)');
+        }
+
+        // Für SVG: XML-Validierung
+        if ($mimeType === 'image/svg+xml') {
+            $content = file_get_contents($file['tmp_name']);
+            
+            // Blockiere gefährliche Tags
+            $dangerous = ['script', 'onclick', 'onload', 'onerror', 'onmouseover'];
+            foreach ($dangerous as $tag) {
+                if (stripos($content, $tag) !== false) {
+                    throw new Exception('SVG enthält nicht erlaubte Elemente');
+                }
+            }
+            
+            // Validiere XML-Struktur
+            libxml_use_internal_errors(true);
+            $svg = simplexml_load_string($content);
+            if ($svg === false) {
+                throw new Exception('Ungültige SVG-Datei');
+            }
+            libxml_clear_errors();
+        }
+
+        //error_log("File Check ok.");
+        
+        // Upload-Verzeichnis
+        $uploadDir = '../uploads/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+                
+        // Eindeutiger Dateiname
+        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $filename = 'logo_' . bin2hex(random_bytes(4)). '.' . $extension;
+        $targetPath = $uploadDir . $filename;
+
+        //error_log("File Path: {$targetPath}");
+
+         // Altes Logo löschen (optional)
+        $stmt = $db->query("SELECT setting_value FROM system_settings WHERE setting_key = 'organization_logo'");
+        $oldLogo = $stmt->fetchColumn();
+        if ($oldLogo && file_exists('../public/' . $oldLogo)) {
+            unlink('../public/' . $oldLogo);
+        }
+        
+        // Datei verschieben
+        if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+            throw new Exception('Upload fehlgeschlagen');
+        }
+        
+        // Relativer Pfad für Datenbank
+        $relativePath = 'uploads/' . $filename;
+        
+        echo json_encode([
+            'success' => true,
+            'path' => $relativePath
+        ]);
+        
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(['error' => $e->getMessage()]);
     }
 }
 

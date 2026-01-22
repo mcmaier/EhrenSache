@@ -246,7 +246,7 @@ class Mailer {
         return $response;
     }
 
-    public function sendVerificationEmail($to, $name, $token) {
+    public function sendVerificationEmail($to, $name, $token, $db) {
         // Status-Check für Registrierungs-Mails
         $status = $this->checkMailStatus('registration');
         if (!$status['enabled']) {
@@ -262,13 +262,14 @@ class Mailer {
 
         $body = EmailTemplate::render('verify_email', [
             'USER_NAME' => $name,
-            'VERIFICATION_LINK' => $verificationLink
-        ]);
+            'VERIFICATION_LINK' => $verificationLink,
+            'BASE_URL' => BASE_URL            
+        ], $db);
         
         return $this->send($to, $subject, $body, true);
     }
 
-    public function sendPasswordResetEmail($to, $name, $token) {
+    public function sendPasswordResetEmail($to, $name, $token, $db) {
         // Status-Check für Password-Reset-Mails
         $status = $this->checkMailStatus('password_reset');
         if (!$status['enabled']) {
@@ -284,13 +285,14 @@ class Mailer {
         
         $body = EmailTemplate::render('password_reset', [
             'USER_NAME' => $name,
-            'RESET_LINK' => $resetLink
-        ]);
+            'RESET_LINK' => $resetLink,
+            'BASE_URL' => BASE_URL            
+        ], $db);
         
         return $this->send($to, $subject, $body, true);
     }
 
-    public function sendActivationEmail($to, $name, $memberInfo) {
+    public function sendActivationEmail($to, $name, $memberInfo, $db) {
         // Status-Check für Aktivierungs-Mails
         $status = $this->checkMailStatus('activation');
         if (!$status['enabled']) {
@@ -308,8 +310,9 @@ class Mailer {
             'USER_NAME' => $name,
             'USER_EMAIL' => $to,
             'LOGIN_LINK' => BASE_URL . '/login.html',
-            'MEMBER_INFO' => $memberInfo
-        ]);
+            'MEMBER_INFO' => $memberInfo,
+            'BASE_URL' => BASE_URL
+        ], $db);
                 
         return $this->send($to, $subject, $body, true);
     }

@@ -11,9 +11,12 @@
 import { apiCall, isAdmin } from './api.js';
 import { showToast } from './ui.js';
 import { debug } from '../app.js';
+import { API_BASE } from '../config.js';
 
 let systemSettings = {};
 let hasUnsavedChanges = false;
+let logoUploadInitialized = false;
+let colorResetInitialized = false;
 
 export let globalPaginationValue = 25;
 
@@ -62,6 +65,30 @@ export async function renderSystemSettings() {
             }
         }
     });
+    
+    // Logo-Vorschau anzeigen
+    if (settings.organization_logo) {
+        const preview = document.getElementById('logo-preview');
+        const removeBtn = document.getElementById('remove-logo-btn');
+
+        if (preview && removeBtn) {
+            preview.src = settings.organization_logo;
+            preview.style.display = 'block';
+            removeBtn.style.display = 'inline-block';
+        }
+    }
+
+    // Logo-Upload nur EINMAL initialisieren
+    if (!logoUploadInitialized) {
+        setupLogoUpload();
+        logoUploadInitialized = true;
+    }
+
+    // Color-Reset Buttons nur EINMAL initialisieren
+    if (!colorResetInitialized) {
+        setupColorReset();
+        colorResetInitialized = true;
+    }
 
     // SMTP Status anzeigen
     updateSmtpStatus(settings.smtp_configured === '1');
@@ -84,6 +111,34 @@ export async function renderSystemSettings() {
     }
 }
 
+function setupColorReset() {
+    const resetButtons = document.querySelectorAll('.btn-reset-color');
+
+    // Standardwerte aus CSS-Variablen
+    const defaults = {
+        'setting_primary_color': getComputedStyle(document.documentElement)
+            .getPropertyValue('--primary-color').trim() || '#1F5FBF',
+        'setting_secondary_color': getComputedStyle(document.documentElement)
+            .getPropertyValue('--secondary-color').trim() || '#4CAF50',
+        'setting_background_color': getComputedStyle(document.documentElement)
+            .getPropertyValue('--background-color').trim() || '#f8f9fa'
+    };
+    
+    resetButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const inputId = this.dataset.input;
+            const defaultValue = this.dataset.default;
+            const input = document.getElementById(inputId);
+            
+            if (input) {
+                input.value = defaultValue;
+                markAsChanged();
+                showToast('Standardfarbe wiederhergestellt', 'info');
+            }
+        });
+    });
+}
+
 function updateSmtpStatus(configured) {
     const icon = document.getElementById('smtpStatusIcon');
     const text = document.getElementById('smtpStatusText');
@@ -99,7 +154,14 @@ function updateSmtpStatus(configured) {
     }
 }
 
-function markAsChanged() {
+function markAsChanged(event) {
+    
+    if (!event || !event.target) {
+        hasUnsavedChanges = true;
+        updateSaveButtonState();
+        return;
+    }
+
     const input = event.target;
     
     // Validierung für Number-Inputs
@@ -119,7 +181,7 @@ function markAsChanged() {
     }
     
     hasUnsavedChanges = true;
-    updateSaveButtonState();
+    updateSaveButtonState();    
 }
 
 
@@ -143,8 +205,15 @@ async function saveAllSettings() {
     // Validierung vor dem Speichern
     let hasErrors = false;
     inputs.forEach(input => {
-        if (input.type === 'number') {
-            const value = parseInt(input.value);
+        const key = input.dataset.key;
+        let value;
+
+        if (input.type === 'checkbox') {
+            value = input.checked ? '1' : '0';
+        }
+
+        else if (input.type === 'number') {
+            value = parseInt(input.value);
             const min = parseInt(input.min);
             const max = parseInt(input.max);
             
@@ -152,23 +221,22 @@ async function saveAllSettings() {
                 input.classList.add('invalid');
                 hasErrors = true;
             }
-        }
-    });
-    
-    if (hasErrors) {
-        showToast('Bitte korrigiere die ungültigen Eingaben', 'error');
-        return;
-    }
-    
-    inputs.forEach(input => {
-        const key = input.dataset.key;
-        let value;
-        
-        if (input.type === 'checkbox') {
-            value = input.checked ? '1' : '0';
-        } else {
+            else
+            {
+                value = input.value;
+            }
+        }        
+        else if(input.type === 'hidden' && key === 'organization_logo'){
             value = input.value;
         }
+        else {
+            value = input.value;
+        }                        
+    
+        if (hasErrors) {
+            showToast('Bitte korrigiere die ungültigen Eingaben', 'error');
+            return;
+        }    
         
         // Nur speichern wenn Wert sich geändert hat
         if (systemSettings[key] !== value) {
@@ -205,21 +273,123 @@ async function saveAllSettings() {
     }
 }
 
+
+function setupLogoUpload() {
+    const uploadBtn = document.getElementById('upload-logo-btn');
+    const removeBtn = document.getElementById('remove-logo-btn');
+    const fileInput = document.getElementById('logo-upload');
+    const preview = document.getElementById('logo-preview');
+    const hiddenInput = document.getElementById('setting_organization_logo');
+    
+    if (!uploadBtn || !fileInput) return;
+
+    // Upload Button
+    uploadBtn?.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    // File ausgewählt
+    fileInput?.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Validierung
+        const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
+        if (!validTypes.includes(file.type)) {
+            showToast('Nur PNG, JPG oder SVG erlaubt', 'error');
+            return;
+        }
+        
+        if (file.size > 500 * 1024) { // 500KB
+            showToast('Datei zu groß (max. 500KB)', 'error');
+            return;
+        }
+        
+        // Upload
+        try {
+            const formData = new FormData();
+            formData.append('logo', file);
+            formData.append('csrf_token', sessionStorage.getItem('csrf_token')); // CSRF Token hinzufügen    
+            
+            debug.log("Uploading Image - API Call")
+            const response = await fetch(`${API_BASE}?resource=upload-logo`, {
+                method: 'POST',
+                credentials: 'same-origin',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            debug.log("API Response:", result);
+            
+            if (result.success && result.path) {
+                // Vorschau aktualisieren
+                preview.src = result.path;
+                preview.style.display = 'block';
+                removeBtn.style.display = 'inline-block';
+                
+                // Hidden input aktualisieren
+                hiddenInput.value = result.path;
+                
+                markAsChanged();
+                showToast('Logo hochgeladen', 'success');
+                return;
+            } else {
+                debug.log("Upload Failed", result);
+                showToast(result.error || 'Upload fehlgeschlagen', 'error');
+            }
+        } catch (error) {
+            debug.log("Upload Exception", error)
+            showToast('Upload fehlgeschlagen', 'error');
+        }
+    });
+    
+    // Remove Button
+    removeBtn?.addEventListener('click', () => {
+        preview.style.display = 'none';
+        preview.src = '';
+        removeBtn.style.display = 'none';
+        hiddenInput.value = '';
+        fileInput.value = '';
+        markAsChanged();
+    });
+}
+
+
 function applyThemeSetting(key, value) {
     const root = document.documentElement;
-    
-    if (key === 'primary_color') {
-        root.style.setProperty('--primary-color', value);
-    } else if (key === 'background_color') {
-        root.style.setProperty('--background-color', value);
-    } else if (key === 'organization_name') {
-        document.title = "EhrenSache - " + value;
-    }
-    else if(key === 'pagination_limit')
+
+    switch(key)
     {
-        debug.log("Pagination Value changed:",value);
-        globalPaginationValue = value;
-    }
+        case 'primary_color':
+            root.style.setProperty('--primary-color', value);
+            break;
+        case 'secondary_color':
+            root.style.setProperty('--secondary-color', value);
+            break;
+        case 'background_color':
+            root.style.setProperty('--background-color', value);
+            break;
+
+        case 'organization_name':
+                document.title = value + " - EhrenSache";
+            break;
+
+        case 'organization_logo':
+            break;
+
+        case 'pagination_limit':
+                debug.log("Pagination Value changed:",value);
+                globalPaginationValue = value;
+            break;
+
+        default:
+            break;
+    }    
 }
 
 // ============================================
@@ -233,11 +403,17 @@ export async function applyTheme() {
     if (settings.primary_color) {
         root.style.setProperty('--primary-color', settings.primary_color);
     }
+    
+    if (settings.secondary_color) {
+        root.style.setProperty('--secondary-color', settings.secondary_color);
+    }
+
     if (settings.background_color) {
         root.style.setProperty('--background-color', settings.background_color);
     }
+
     if (settings.organization_name) {
-        document.title = settings.organization_name;
+        document.title = settings.organization_name + " - EhrenSache";
     }
 }
 

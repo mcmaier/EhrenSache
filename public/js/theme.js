@@ -8,43 +8,79 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+async function loadTheme() {    
 
-// theme.js - wird auf JEDER Seite geladen
-import { apiCall } from './modules/api.js';
-
-async function loadTheme() {
     try {
-        const response = await apiCall('appearance','GET');
-        const settings = response.settings;
-        
-        // CSS-Variablen setzen
-        const root = document.documentElement;
-        
-        if (settings.primary_color) {
-            root.style.setProperty('--primary-color', settings.primary_color);
-        }
-        if (settings.background_color) {
-            root.style.setProperty('--background-color', settings.background_color);
-        }
-        if (settings.organization_name) {
-            document.title = settings.organization_name;
-            // Alle Elemente mit class="org-name" aktualisieren
-            document.querySelectorAll('.org-name').forEach(el => {
-                el.textContent = settings.organization_name;
-            });
+        // Direkte fetch-Anfrage OHNE api.js (kein Session-Check!)
+        const response = await fetch('api/api.php?resource=appearance', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Theme konnte nicht geladen werden');
         }
         
+        const data = await response.json();
+        const settings = data.settings;
+
+        applyTheme(settings); 
+
         // Settings im SessionStorage cachen (60 Minuten)
         sessionStorage.setItem('theme-settings', JSON.stringify(settings));
-        sessionStorage.setItem('theme-loaded', Date.now());
+        sessionStorage.setItem('theme-loaded', Date.now());        
         
     } catch (error) {
         console.error('Theme-Laden fehlgeschlagen:', error);
     }
 }
 
+
+function applyTheme(settings) {
+    const root = document.documentElement;
+    
+    // CSS-Variablen
+    if (settings.primary_color) {
+        root.style.setProperty('--primary-color', settings.primary_color);
+    }
+    if (settings.secondary_color) {
+        root.style.setProperty('--secondary-color', settings.secondary_color);
+    }        
+    if (settings.background_color) {
+        root.style.setProperty('--background-color', settings.background_color);
+    }
+    
+    // Organisations-Name
+    if (settings.organization_name) {
+        document.title = settings.organization_name;
+        document.querySelectorAll('.org-name').forEach(el => {
+            el.textContent = settings.organization_name;
+        });
+    }
+
+    // Logo anzeigen
+    const logoSelectors = '.org-logo, .login-logo';
+    if (settings.organization_logo) {
+        document.querySelectorAll(logoSelectors).forEach(img => {
+            img.src = settings.organization_logo;
+            img.style.display = 'block';
+        });
+    } else {
+        // Fallback auf Standard-Logo
+        document.querySelectorAll(logoSelectors).forEach(img => {
+            img.src = 'assets/logo-default.png';
+            img.style.display = 'block';
+        });
+    }
+}
+
+
 // Prüfen ob Cache aktuell ist (< 60 Min alt)
 function isThemeCacheValid() {
+
+    return false;
 
     const loadTime = sessionStorage.getItem('theme-loaded');
     if (!loadTime) return false;
@@ -57,17 +93,7 @@ function isThemeCacheValid() {
 if (isThemeCacheValid()) {
     // Aus Cache laden (sofort)
     const settings = JSON.parse(sessionStorage.getItem('theme-settings'));
-    const root = document.documentElement;
-    if (settings.primary_color) root.style.setProperty('--primary-color', settings.primary_color);
-    if (settings.background_color) root.style.setProperty('--background-color', settings.background_color);
-
-    if (settings.organization_name) {
-            document.title = settings.organization_name;
-            // Alle Elemente mit class="org-name" aktualisieren
-            document.querySelectorAll('.org-name').forEach(el => {
-                el.textContent = settings.organization_name;
-            });
-        }
+    applyTheme(settings);
 } else {
     // Frisch von API laden
     await loadTheme();

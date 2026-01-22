@@ -80,20 +80,53 @@ body {
     color: #2c3e50;
 }
 
-.logo {
-    font-size: 64px;
-    text-align: center;
+
+/* Org Branding */
+.org-branding {
+    display: flex;
+    align-items: center;
+    gap: 20px;
     margin-bottom: 20px;
+}
+
+.org-logo {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.org-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.org-name {
+    font-size: 32px;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1;
+    color: white;
+}
+
+.app-name {
+    font-size: 18px;
+    font-weight: 400;
+    color: gray;
+    letter-spacing: 0.5px;
 }
 
 .login-box h2 {
     margin-bottom: 10px;
-    color: #667eea;
+    color: var(--primary-color);
     text-align: center;
 }
 
 .login-box h3 {
-    margin-bottom: 18px;
     color: var(--primary-color);
     font-weight: 400;
     text-align: center;
@@ -191,6 +224,7 @@ body {
 
 .dashboard-link:hover {
     transform: translateY(-2px);
+    filter: brightness(1.1); 
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
@@ -1114,6 +1148,7 @@ body {
 }
 
 .action-button:hover {
+    filter: brightness(1.1); 
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
@@ -1129,6 +1164,7 @@ body {
 }
 
 .action-button.secondary:hover {
+    filter: brightness(1.1); 
     border-color: var(--primary-color);
     color: var(--primary-color);;
 }

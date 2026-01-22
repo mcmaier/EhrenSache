@@ -260,7 +260,7 @@ Bei Fragen oder Problemen bitte ein Issue auf GitHub erstellen.
 
 ---
 
-## 📋 Lizenzierung & Copyright
+## 📋 Lizenzierung
 
 EhrenSache ist unter einer **dualen Lizenz** verfügbar:
 
@@ -288,7 +288,7 @@ Für kommerzielle Nutzung (SaaS-Anbieter, Systemhäuser, Unternehmen) ist eine
 - Du möchtest Änderungen NICHT veröffentlichen
 - Du verkaufst EhrenSache-basierte Lösungen
 
----
+## ©️ Copyright
 
 Copyright (c) 2026 Martin Maier
 

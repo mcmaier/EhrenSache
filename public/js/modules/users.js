@@ -121,8 +121,8 @@ function renderUsers(users, page = 1)
        // userInfo += `<br><small><style="color: #7f8c8d;">${user.user_name}</small>`;
         userInfo += `<br><div class="linked-member">${escapeHtml(user.user_name)}</div>`;
     }    
-    userInfo += '</div>';        
-    
+    userInfo += '</div>';      
+
     if (user.account_status === 'pending' && !user.email_verified) {
         statusBadge = '<span class="status-badge email-pending">📧 Email-Bestätigung</span>';
         
@@ -131,18 +131,29 @@ function renderUsers(users, page = 1)
         
     } else if (user.account_status === 'pending' && user.email_verified && user.pending_member_id) {
         statusBadge = '<span class="status-badge pending">⏳ Bereit zur Aktivierung</span>';
-        memberInfo = `<div class="linked-member">→ wird verknüpft: ${escapeHtml(user.pending_member_surname)}, ${escapeHtml(user.pending_member_name)} (${user.pending_member_number})</div>`;
+            
+        // Member-Number kann null sein
+        const memberNumber = user.pending_member_number 
+            ? ` (${user.pending_member_number})` 
+            : '';
+        memberInfo = `<div class="linked-member">→ wird verknüpft: ${escapeHtml(user.pending_member_surname)}, ${escapeHtml(user.pending_member_name)} ${memberNumber}</div>`;
         
     } else if (user.account_status === 'active') {
         statusBadge = '<span class="status-badge active">✓ Aktiv</span>';
-        if (user.member_number) {
-            memberInfo = `<div class="linked-member">→ ${escapeHtml(user.member_surname)}, ${escapeHtml(user.member_name)} (${user.member_number})</div>`;
-        }
-        
+        if (user.member_id) {
+            const memberNumber = user.member_number 
+                ? ` (${user.member_number})` 
+                : '';
+
+            memberInfo = `<div class="linked-member">→ ${escapeHtml(user.member_surname)}, ${escapeHtml(user.member_name)} ${memberNumber}</div>`;
+        }        
     } else if (user.account_status === 'suspended') {
         statusBadge = '<span class="status-badge suspended">🚫 Gesperrt</span>';
-        if (user.member_number) {
-            memberInfo = `<div class="linked-member">→ ${escapeHtml(user.member_surname)}, ${escapeHtml(user.member_name)} (${user.member_number})</div>`;
+        if (user.member_id) {
+            const memberNumber = user.member_number 
+                ? ` (${user.member_number})` 
+                : '';
+            memberInfo = `<div class="linked-member">→ ${escapeHtml(user.member_surname)}, ${escapeHtml(user.member_name)}${memberNumber}</div>`;
         }
     }
     
@@ -591,7 +602,12 @@ async function loadMembersForActivation(preselectedId = null) {
         members.forEach(member => {
             const option = document.createElement('option');
             option.value = member.member_id;
-            option.textContent = `${member.member_number} - ${member.surname}, ${member.name}`;
+        
+            const memberNumber = member.member_number 
+                        ? `(${member.member_number}) - ` 
+                        : '';            
+
+            option.textContent = `${memberNumber}${member.surname}, ${member.name}`;
             if (member.member_id === preselectedId) {
                 option.selected = true;
             }
@@ -607,11 +623,15 @@ function displayMemberLink(user) {
 
     memberLinkSection.style.display = 'block';
     
-    if (user.member_id && user.member_number) {
+    if (user.member_id) {
+            const memberNumber = user.member_number 
+                ? ` Mitgliedsnummer: ${user.member_number}` 
+                : '';
+
         linkedMemberInfo.className = 'linked-member-info';
         linkedMemberInfo.innerHTML = `
             <strong>${escapeHtml(user.member_name)} ${escapeHtml(user.member_surname)}</strong>
-            <small>Mitgliedsnummer: ${escapeHtml(user.member_number)}</small>
+            <small>${memberNumber}</small>
         `;
     } else {
         linkedMemberInfo.className = 'linked-member-info no-member';
@@ -667,8 +687,13 @@ async function loadMembersForEdit(currentMemberId = null) {
         
         members.forEach(member => {
             const option = document.createElement('option');
+
+            const memberNumber = member.member_number 
+                ? ` (${member.member_number})` 
+                : '';
+
             option.value = member.member_id;
-            option.textContent = `${member.surname}, ${member.name} (${member.member_number})`;
+            option.textContent = `${member.surname}, ${member.name}${memberNumber}`;
             
             if (currentMemberId && member.member_id === currentMemberId) {
                 option.selected = true;

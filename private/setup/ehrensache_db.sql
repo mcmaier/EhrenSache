@@ -357,12 +357,10 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`, `setting_type`, `
 ('primary_color', '#1F5FBF', 'color', 'appearance', 'Primärfarbe'),
 ('secondary_color', '#4CAF50', 'color', 'appearance', 'Sekundärfarbe'),
 ('background_color', '#f8f9fa', 'color', 'appearance', 'Hintergrundfarbe'), 
-('pagination_limit', '25', 'number', 'pagination', 'Einträge pro Seite');
-
--- Mail-Settings in system_settings
-INSERT INTO system_settings (setting_key, setting_value, setting_type, category, description) VALUES
+('organization_logo', 'assets/logo-default.png', 'text', 'appearance', 'Logo-Pfad (relativ zu /public/)'),
+('pagination_limit', '25', 'number', 'pagination', 'Einträge pro Seite'),
 ('mail_enabled', '0', 'boolean', 'general', 'E-Mail-Versand aktiviert'),
-('mail_from_email', 'noreply@ehrenzeit.de', 'text', 'general', 'Absender E-Mail-Adresse'),
+('mail_from_email', 'noreply@ehrensache.de', 'text', 'general', 'Absender E-Mail-Adresse'),
 ('mail_from_name', 'EhrenSache System', 'text', 'general', 'Absender Name'),
 ('mail_registration_enabled', '1', 'boolean', 'general', 'Registrierungs-Mails senden'),
 ('mail_password_reset_enabled', '1', 'boolean', 'general', 'Passwort-Reset-Mails senden'),

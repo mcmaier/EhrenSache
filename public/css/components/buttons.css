@@ -36,12 +36,12 @@
 }
 
 .btn-login:hover {
-    background: var(--primary-dark);
+    opacity: 0.8;
 }
 
 .btn-add, .btn-save {
     padding: var(--spacing-sm) var(--spacing-lg);
-    background: var(--success-color);
+    background: var(--primary-color);
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -53,12 +53,12 @@
 
 
 .btn-add:hover, .btn-save:hover {
-    background: var(--success-dark);
+    opacity: 0.8;
 }
 
 .btn-cancel, .btn-reset-filter {
     padding: var(--spacing-sm) var(--spacing-lg);
-    background: #95a5a6;
+    background: gray;
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -68,18 +68,8 @@
 }
 
 .btn-cancel:hover, .btn-reset-filter:hover {
-    background: var(--text-light);
+    opacity: 0.8;
 }
-
-/*
-.btn-edit {
-    background: var(--info-color);
-}
-
-.btn-delete {
-    background: var(--danger-color);
-}
-*/
 
 .btn-confirm-delete {
     padding: var(--spacing-xs) var(--spacing-sm);
@@ -98,7 +88,7 @@
 
 .btn-secondary {
     padding: var(--spacing-sm) var(--spacing-lg);
-    background: var(--info-color);
+    background: var(--secondary-color);
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -110,7 +100,7 @@
 }
 
 .btn-secondary:hover {
-    opacity: 0.85;
+    opacity: 0.8;
 }
 
 /* Modal Buttons */
@@ -126,7 +116,7 @@
 }
 
 .btn-success:hover {
-    background: #218838;
+    opacity: 0.8;
 }
 
 .btn-warning {
@@ -140,7 +130,7 @@
 }
 
 .btn-warning:hover {
-    background: #e0a800;
+    opacity: 0.8;
 }
 
 /* Neue Icon Action Buttons */

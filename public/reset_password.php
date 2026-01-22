@@ -14,11 +14,14 @@
 header("Content-Type: text/html; charset=UTF-8");
 
 require_once '../private/config/config.php';
+require_once '../private/helpers/branding.php';
 
 session_start();
 
 $database = new Database();
 $db = $database->getConnection();
+
+$branding = getBrandingSettings($db);
 
 $token = $_GET['token'] ?? '';
 
@@ -29,12 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Validierung
     if (strlen($newPassword) < 8) {
-        showForm($token, 'Passwort muss mindestens 8 Zeichen lang sein');
+        showForm($token, 'Passwort muss mindestens 8 Zeichen lang sein',$branding);
         exit();
     }
     
     if ($newPassword !== $confirmPassword) {
-        showForm($token, 'Passwörter stimmen nicht überein');
+        showForm($token, 'Passwörter stimmen nicht überein',$branding);
         exit();
     }
     
@@ -54,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$result) {
-            showError('Token ungültig', 'Der Reset-Link ist abgelaufen oder wurde bereits verwendet.');
+            showError('Token ungültig', 'Der Reset-Link ist abgelaufen oder wurde bereits verwendet.',$branding);
             exit();
         }
         
@@ -76,14 +79,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $db->commit();
         
-        showSuccess();
+        showSuccess($branding);
         
     } catch (Exception $e) {
         if ($db->inTransaction()) {
             $db->rollBack();
         }
         error_log("Password reset error: " . $e->getMessage());
-        showError('Fehler', 'Ein technischer Fehler ist aufgetreten.');
+        showError('Fehler', 'Ein technischer Fehler ist aufgetreten.',$branding);
     }
     
     exit();
@@ -109,13 +112,17 @@ if (!$stmt->fetch()) {
     exit();
 }
 
-showForm($token);
+showForm($token,'',$branding);
 
 // ============================================
 // HTML OUTPUT FUNCTIONS
 // ============================================
 
-function showForm($token, $error = '') {
+function showForm($token, $error = '', $branding) {
+    $brandingCSS = getBrandingCSS($branding);
+    $brandingLogo = getBrandingLogo($branding);
+    $orgName = htmlspecialchars($branding['organization_name'])
+
     ?>
     <!DOCTYPE html>
     <html lang='de'>
@@ -128,13 +135,15 @@ function showForm($token, $error = '') {
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 padding: 20px;
             }
+            
+            <?= $brandingCSS ?>
+
             .container {
                 background: white;
                 border-radius: 12px;
@@ -153,14 +162,9 @@ function showForm($token, $error = '') {
                 border-radius: 6px;
                 font-size: 14px;
             }
-            input[type="password"]:focus {
-                outline: none;
-                border-color: #667eea;
-            }
             button {
                 width: 100%;
                 padding: 12px;
-                background: #667eea;
                 color: white;
                 border: none;
                 border-radius: 6px;
@@ -169,7 +173,6 @@ function showForm($token, $error = '') {
                 cursor: pointer;
                 transition: background 0.3s;
             }
-            button:hover { background: #5568d3; }
             .error {
                 background: #f8d7da;
                 border-left: 4px solid #dc3545;
@@ -177,10 +180,21 @@ function showForm($token, $error = '') {
                 margin-bottom: 20px;
                 color: #721c24;
             }
+            .info-box {
+                background: #f8f9fa;
+                padding: 15px;
+                margin-top: 20px;
+                text-align: left;
+            }
+            .info-box p {
+                margin: 0;
+                font-size: 14px;
+            }
         </style>
     </head>
     <body>
         <div class='container'>
+            <?= $brandingLogo ?>
             <h1>Neues Passwort setzen</h1>
             
             <?php if ($error): ?>
@@ -211,24 +225,30 @@ function showForm($token, $error = '') {
     <?php
 }
 
-function showSuccess() {
+function showSuccess($branding) {
+    $brandingCSS = getBrandingCSS($branding);
+    $brandingLogo = getBrandingLogo($branding);
+    $orgName = htmlspecialchars($branding['organization_name']);
+
     ?>
     <!DOCTYPE html>
     <html lang='de'>
     <head>
         <meta charset='UTF-8'>
-        <title>Passwort geändert - EhrenSache</title>
+        <title>Passwort geändert - <?= $orgName ?></title>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 padding: 20px;
             }
+            
+            <?= $brandingCSS ?>
+
             .container {
                 background: white;
                 border-radius: 12px;
@@ -274,19 +294,14 @@ function showSuccess() {
                 display: inline-block;
                 margin-top: 30px;
                 padding: 12px 30px;
-                background: #667eea;
                 color: white;
                 text-decoration: none;
                 border-radius: 6px;
                 font-weight: 500;
                 transition: background 0.3s;
             }
-            .button:hover {
-                background: #5568d3;
-            }
             .info-box {
                 background: #f8f9fa;
-                border-left: 4px solid #667eea;
                 padding: 15px;
                 margin-top: 20px;
                 text-align: left;
@@ -299,6 +314,7 @@ function showSuccess() {
     </head>
     <body>
         <div class='container'>
+            <?= $brandingLogo ?>
             <div class='success-icon'></div>
             <h1>Passwort erfolgreich geändert!</h1>
             <p>Sie können sich jetzt mit Ihrem neuen Passwort einloggen.</p>
@@ -310,25 +326,31 @@ function showSuccess() {
 }
 
 
-function showError($title, $message = '') {
+function showError($title, $message = '', $branding) {
+    $brandingCSS = getBrandingCSS($branding);
+    $brandingLogo = getBrandingLogo($branding);
+    $orgName = htmlspecialchars($branding['organization_name']);
+    
     ?>
     <!DOCTYPE html>
     <html lang='de'>
     <head>
         <meta charset='UTF-8'>
         <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-        <title>Fehler - EhrenSache</title>
+        <title>Fehler - <?= $orgName ?></title>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 padding: 20px;
             }
+
+            <?= $brandingCSS ?>
+
             .container {
                 background: white;
                 border-radius: 12px;
@@ -368,20 +390,27 @@ function showError($title, $message = '') {
                 display: inline-block;
                 margin-top: 30px;
                 padding: 12px 30px;
-                background: #667eea;
                 color: white;
                 text-decoration: none;
                 border-radius: 6px;
                 font-weight: 500;
                 transition: background 0.3s;
             }
-            .button:hover {
-                background: #5568d3;
+            .info-box {
+                background: #f8f9fa;
+                padding: 15px;
+                margin-top: 20px;
+                text-align: left;
+            }
+            .info-box p {
+                margin: 0;
+                font-size: 14px;
             }
         </style>
     </head>
     <body>
         <div class='container'>
+             <?= $brandingLogo ?>
             <div class='error-icon'></div>
             <h1><?= htmlspecialchars($title) ?></h1>
             <?php if ($message): ?>

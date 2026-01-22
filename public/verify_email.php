@@ -14,17 +14,20 @@
 header("Content-Type: text/html; charset=UTF-8");
 
 require_once '../private/config/config.php';
+require_once '../private/helpers/branding.php';
 
 session_start();
 
 $database = new Database();
 $db = $database->getConnection();
 
+$branding = getBrandingSettings($db);
+
 // Token aus URL
 $token = $_GET['token'] ?? '';
 
 if (empty($token) || !ctype_xdigit($token) || strlen($token) !== 64) {
-    showError('Ungültiger Verifikations-Link');
+    showError('Ungültiger Verifikations-Link',$branding);
     exit();
 }
 
@@ -45,7 +48,7 @@ try {
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$result) {
-        showError('Token ungültig oder abgelaufen', 'Der Verifikations-Link ist nicht mehr gültig oder wurde bereits verwendet.');
+        showError('Token ungültig oder abgelaufen', 'Der Verifikations-Link ist nicht mehr gültig oder wurde bereits verwendet.',$branding);
         exit();
     }
     
@@ -70,39 +73,44 @@ try {
     $db->commit();
     
     // Erfolg anzeigen
-    showSuccess($result['name']);
+    showSuccess($result['name'],$branding);
     
 } catch (Exception $e) {
     if ($db->inTransaction()) {
         $db->rollBack();
     }
     error_log("Email verification error: " . $e->getMessage());
-    showError('Fehler bei der Verifikation', 'Ein technischer Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.');
+    showError('Fehler bei der Verifikation', 'Ein technischer Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.',$branding);
 }
 
 // ============================================
 // HTML OUTPUT FUNCTIONS
 // ============================================
 
-function showSuccess($name) {
+function showSuccess($name, $branding) {
+    
+    $brandingCSS = getBrandingCSS($branding);
+    $brandingLogo = getBrandingLogo($branding);
+    $orgName = htmlspecialchars($branding['organization_name']) 
     ?>
     <!DOCTYPE html>
     <html lang='de'>
     <head>
         <meta charset='UTF-8'>
         <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-        <title>Email bestätigt - EhrenSache</title>
+        <title>E-Mail bestätigt - <?= $orgName ?></title>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 padding: 20px;
             }
+            <?= $brandingCSS ?>
+
             .container {
                 background: white;
                 border-radius: 12px;
@@ -148,19 +156,14 @@ function showSuccess($name) {
                 display: inline-block;
                 margin-top: 30px;
                 padding: 12px 30px;
-                background: #667eea;
                 color: white;
                 text-decoration: none;
                 border-radius: 6px;
                 font-weight: 500;
                 transition: background 0.3s;
             }
-            .button:hover {
-                background: #5568d3;
-            }
             .info-box {
                 background: #f8f9fa;
-                border-left: 4px solid #667eea;
                 padding: 15px;
                 margin-top: 20px;
                 text-align: left;
@@ -173,6 +176,7 @@ function showSuccess($name) {
     </head>
     <body>
         <div class='container'>
+            <?= $brandingLogo ?>
             <div class='success-icon'></div>
             <h1>Email erfolgreich bestätigt!</h1>
             <p>Vielen Dank <strong><?= htmlspecialchars($name) ?></strong>.</p>
@@ -192,25 +196,28 @@ function showSuccess($name) {
     <?php
 }
 
-function showError($title, $message = '') {
+function showError($title, $message = '', $branding) {
+    $brandingCSS = getBrandingCSS($branding);
+    $brandingLogo = getBrandingLogo($branding);
+    $orgName = htmlspecialchars($branding['organization_name'])
     ?>
     <!DOCTYPE html>
     <html lang='de'>
     <head>
         <meta charset='UTF-8'>
         <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-        <title>Fehler - EhrenSache</title>
+        <title>Fehler - <?= $orgName ?></title>
         <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 min-height: 100vh;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 padding: 20px;
             }
+            <?= $brandingCSS ?>
             .container {
                 background: white;
                 border-radius: 12px;
@@ -250,20 +257,27 @@ function showError($title, $message = '') {
                 display: inline-block;
                 margin-top: 30px;
                 padding: 12px 30px;
-                background: #667eea;
                 color: white;
                 text-decoration: none;
                 border-radius: 6px;
                 font-weight: 500;
                 transition: background 0.3s;
             }
-            .button:hover {
-                background: #5568d3;
+            .info-box {
+                background: #f8f9fa;
+                padding: 15px;
+                margin-top: 20px;
+                text-align: left;
+            }
+            .info-box p {
+                margin: 0;
+                font-size: 14px;
             }
         </style>
     </head>
     <body>
         <div class='container'>
+            <?= $brandingLogo ?>
             <div class='error-icon'></div>
             <h1><?= htmlspecialchars($title) ?></h1>
             <?php if ($message): ?>

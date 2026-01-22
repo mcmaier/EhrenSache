@@ -19,11 +19,23 @@ export let isAdminOrManager = false;
 export let csrfToken = null;
 export let isInitialLoad = true;
 
-export function setCurrentUser(user) {
+export async function setCurrentUser(user) {
     currentUser = user;
     isAdmin = user?.role === 'admin';
     isManager = user?.role === 'manager';
     isAdminOrManager = isAdmin || isManager;
+
+    // Lade Member-Name falls vorhanden
+    if (user && user.member_id) {
+        try {
+            const member = await apiCall('members', 'GET', null, { id: user.member_id });
+            if (member) {
+                currentUser.member_name = `${member.name} ${member.surname}`;
+            }
+        } catch (error) {
+            debug.log('Member-Name konnte nicht geladen werden:', error);
+        }
+    }
 }
 
 export function setCsrfToken(token) {

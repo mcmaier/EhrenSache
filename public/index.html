@@ -37,12 +37,17 @@
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
             <div class="sidebar-header">
-                <h3>EhrenSache</h3>
-                <h4 class="org-name">Mein Verein</h4>
+                <div class="org-branding">
+                    <img class="org-logo" src="assets/logo-default.png" alt="Logo">
+                    <div class="org-info">
+                        <h3 class="org-name">Mein Verein</h3>
+                        <span class="app-name">EhrenSache</span>
+                    </div>
+                </div>                
                 <div class="user-info">
-                    <div>Angemeldet als:</div>
-                    <strong id="currentUser">-</strong>
-                    <div id="userRole">(-)</div>
+                    <!-- <div class="user-greeting">Angemeldet als</div> -->
+                    <strong class="user-name" id="currentUser">-</strong>
+                    <div class="user-role" id="userRole">(-)</div>
                 </div>
             </div>
             <ul class="nav-menu">
@@ -182,13 +187,46 @@
                     <!-- Erscheinungsbild -->
                     <div class="settings-card">
                         <h3>Erscheinungsbild</h3>
+
+                        <!-- Logo Upload -->
+                        <div class="settings-item">
+                            <label>Logo</label>
+                            <div class="logo-upload-container">
+                                <img id="logo-preview" class="logo-preview" src="" alt="Logo Vorschau" style="display: none;">
+                                <input type="file" id="logo-upload" accept="image/png,image/jpeg,image/svg+xml" style="display: none;">
+                                <button type="button" class="btn-secondary" id="upload-logo-btn">📁 Logo hochladen</button>
+                                <button type="button" class="btn-secondary" id="remove-logo-btn" style="display: none;">🗑️ Entfernen</button>
+                                <input type="hidden" id="setting_organization_logo" class="setting-input" data-key="organization_logo">
+                            </div>
+                            <small class="input-hint">PNG, JPG oder SVG • Max. 500KB • Empfohlen: 200x60 Pixel</small>
+                        </div>
+
                         <div class="settings-item">
                             <label>Primärfarbe</label>
-                            <input type="color" id="setting_primary_color" class="setting-input" data-key="primary_color">
+                            <div class="color-input-group">
+                                <input type="color" id="setting_primary_color" class="setting-input" data-key="primary_color">
+                                <button type="button" class="btn-reset-color" data-input="setting_primary_color" data-default="#1F5FBF" title="Standard wiederherstellen">
+                                    ↺
+                                </button>
+                            </div>
+                        </div>
+                        <div class="settings-item">
+                            <label>Sekundärfarbe</label>
+                            <div class="color-input-group">
+                                <input type="color" id="setting_secondary_color" class="setting-input" data-key="secondary_color">
+                                <button type="button" class="btn-reset-color" data-input="setting_secondary_color" data-default="#4CAF50" title="Standard wiederherstellen">
+                                    ↺
+                                </button>
+                            </div>
                         </div>
                         <div class="settings-item">
                             <label>Hintergrundfarbe</label>
-                            <input type="color" id="setting_background_color" class="setting-input" data-key="background_color">
+                            <div class="color-input-group">
+                                <input type="color" id="setting_background_color" class="setting-input" data-key="background_color">
+                                <button type="button" class="btn-reset-color" data-input="setting_background_color" data-default="#f8f9fa" title="Standard wiederherstellen">
+                                    ↺
+                                </button>
+                            </div>
                         </div>
                     </div>   
                     
@@ -344,7 +382,7 @@
                         <h3>Kommende Termine</h3>
                         <div class="number" id="statUpcomingAppointments">-</div>
                     </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
                         <h3>Jahr filtern</h3>
                         <select id="appointmentYearFilter"
                                 style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
@@ -412,7 +450,7 @@
                         <h3 id="statTotalRecordsTitle">Erfasste Anwesenheiten</h3>
                         <div class="number" id="statTotalRecords">-</div>
                     </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
                         <h3>Jahr filtern</h3>
                         <select id="recordYearFilter"
                                 style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
@@ -476,7 +514,7 @@
                         <h3>Genehmigte Anträge</h3>
                         <div class="number" id="statApprovedExceptions">-</div>
                     </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
                         <h3>Jahr filtern</h3>
                         <select id="exceptionYearFilter"
                                 style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">                            
@@ -551,9 +589,11 @@
                             </div>
                         </div>
                     </div>                
-                    <div class="year-card">
+                    <!--<div class="year-card">-->
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">                        
                         <h3>Jahr filtern</h3>
-                        <select id="statisticYearFilter" class="form-input year-select">
+                        <select id="statisticYearFilter" class="form-input year-select"
+                            style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
                         </select>
                     </div>
                 </div>
@@ -600,7 +640,7 @@
                         <h3>Aktive Mitglieder</h3>
                         <div class="number" id="statActiveMembersCount">-</div>                                             
                     </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--info-color);">
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
                         <h3>Jahr filtern</h3>
                         <select id="memberYearFilter"
                                 style="width: 100%; padding: 6px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">

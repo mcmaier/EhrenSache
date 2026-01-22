@@ -9,10 +9,19 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+require_once 'branding.php';
+
 class EmailTemplate {
     private static $templatesPath = __DIR__ . '/../email_templates/';
     
-    public static function render($templateName, $variables = []) {
+    public static function render($templateName, $variables = [], $pdo = null) {
+        // Branding laden (falls PDO übergeben)
+        $branding = [];
+
+        if ($pdo) {
+            $branding = getBrandingSettings($pdo);
+        }
+
         // Base-Template laden
         $baseTemplate = file_get_contents(self::$templatesPath . 'base.html');
         
@@ -21,7 +30,10 @@ class EmailTemplate {
         
         // Standard-Variablen
         $defaultVars = [
-            'ORGANIZATION_NAME' => 'EhrenSache',
+            'ORGANIZATION_NAME' => $branding['organization_name'] ?? 'Mein Verein',
+            'ORGANIZATION_LOGO' => $branding['organization_logo'] ?? 'assets/logo-default.png',
+            'PRIMARY_COLOR' => $branding['primary_color'] ?? '#1F5FBF',
+            'SECONDARY_COLOR' => $branding['secondary_color'] ?? '#4CAF50',
             'CURRENT_YEAR' => date('Y')
         ];
         

@@ -113,7 +113,7 @@ function registerNewUser($db) {
         );
         $stmt->execute([$userId, $tokenHash, $expiresAt]);
                   
-        $emailSent = $mailer->sendVerificationEmail($data->email, $data->name ?? '', $token);
+        $emailSent = $mailer->sendVerificationEmail($data->email, $data->name ?? '', $token, $db);
 
         if (!$emailSent) {
             error_log("Verification email could not be sent to: " . $data->email);
@@ -224,7 +224,7 @@ function handlePasswordResetRequest($db, $method) {
         $stmt->execute([$user['user_id'], $tokenHash, $expiresAt]);
                 
         // Mail senden
-        $emailSent = $mailer->sendPasswordResetEmail($user['email'], $user['name'], $token);
+        $emailSent = $mailer->sendPasswordResetEmail($user['email'], $user['name'], $token, $db);
         
         if (!$emailSent) {
             error_log("Password reset email could not be sent to: " . $email);

@@ -395,36 +395,31 @@ export function updateMobileMenuVisibility() {
     mobileMenuBtn.style.display = (isLoggedIn && isMobile) ? 'flex' : 'none';
 }
 
-// UI Helper
-/*
-export function showLogin() {
-    document.getElementById('loginPage').style.display = 'flex';
-    document.getElementById('dashboard').classList.remove('active');
-    document.getElementById('loginForm').reset();
-    setCurrentUser(null);
-
-    // Verstecke Button IMMER beim Login
-    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-    if (mobileMenuBtn) {
-        mobileMenuBtn.style.display = 'none';
-    }
-    
-    // Schließe Sidebar falls offen
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.querySelector('.sidebar-overlay');
-    if (sidebar) sidebar.classList.remove('mobile-open');
-    if (overlay) overlay.classList.remove('active');
-}
-*/
 
 // Nach Login/Session-Check setzen
 export function showDashboard() {
-    //document.getElementById('loginPage').style.display = 'none';
     document.getElementById('dashboard').classList.add('active');
     
     if (currentUser) {
-        document.getElementById('currentUser').textContent = currentUser.email;
-        document.getElementById('userRole').textContent = `(${currentUser.role})`;
+        // User-Name anzeigen (falls member_id vorhanden)
+        let displayName = currentUser.email;
+        
+        if (currentUser.member_id && currentUser.member_name) {
+            // Wenn Mitglied verknüpft ist, zeige Namen
+            displayName = currentUser.member_name;
+        }
+
+        document.getElementById('currentUser').textContent = displayName;
+
+        // Rolle übersetzen
+        const roleTranslations = {
+            'admin': 'Administrator',
+            'manager': 'Manager',
+            'user': 'Benutzer'
+        };
+
+        const roleName = roleTranslations[currentUser.role] || currentUser.role;
+        document.getElementById('userRole').textContent = roleName;
         
         // UI anpassen nach Rolle
         updateUIForRole();

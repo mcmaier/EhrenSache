@@ -47,7 +47,7 @@ const UI_STATE = {
 
 let appearanceSettings = {
     organization_name: 'EhrenSache',
-    primary_color: '#667eea',
+    primary_color: '#1F5FBF',
     background_color: '#f8f9fa'
 };
 
@@ -303,9 +303,29 @@ function applyAppearanceSettings() {
         el.textContent = appearanceSettings.organization_name || 'EhrenSache';
     });
     
+    // Logo anzeigen
+    if (appearanceSettings.organization_logo) {
+        // Pfad relativ zur PWA anpassen (ein Verzeichnis höher)
+        const logoPath = `../${appearanceSettings.organization_logo}`;
+        
+        document.querySelectorAll('.pwa-org-logo').forEach(img => {
+            img.src = logoPath;
+            img.style.display = 'block';                        
+        });
+    } else {
+        // Kein Logo -> Fallback auf Standard oder Emoji
+        document.querySelectorAll('.pwa-org-logo').forEach(img => {
+            img.src = '../assets/logo-default.png';
+            img.style.display = 'block';
+        });
+    }
+
     // CSS-Variablen setzen
     if (appearanceSettings.primary_color) {
         document.documentElement.style.setProperty('--primary-color', appearanceSettings.primary_color);
+    }
+    if (appearanceSettings.secondary_color) {
+        document.documentElement.style.setProperty('--secondary-color', appearanceSettings.secondary_color);
     }
     if (appearanceSettings.background_color) {
         document.documentElement.style.setProperty('--background-color', appearanceSettings.background_color);

@@ -784,7 +784,7 @@ function handleUserActivation($db, $method, $authUserRole) {
             $body = "Hallo {$user['name']},\n\nIhr Account wurde aktiviert.\n";
             $body .= "Login: " . BASE_URL . "/login.html\n";
             
-            $mailer->sendActivationEmail($user['email'],$user['name'],$memberInfo);            
+            $mailer->sendActivationEmail($user['email'],$user['name'],$memberInfo, $db);            
         }
                         
         echo json_encode([
@@ -944,7 +944,8 @@ function resendVerificationEmail($db, $userId) {
         $emailSent = $mailer->sendVerificationEmail(
             $user['email'], 
             $user['name'] ?? '', 
-            $token
+            $token,
+            $db
         );
         
         if (!$emailSent) {
