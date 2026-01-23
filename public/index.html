@@ -142,10 +142,11 @@
                     <!-- API-Token -->
                     <div class="profile-card">
                         <h3>API-Token für Zeiterfassung</h3>
-                        <p style="color: #e74c3c; margin-bottom: 15px; font-size: 14px;">
-                            ⚠️ Dieser Token wird für die Check-In App benötigt. Behandeln Sie diesen wie ein Passwort!
+                        <p style="color: #7f8c8d; margin-bottom: 15px; font-size: 14px;">
+                            Der API-Token wird für die Check-In App benötigt.<br>
+                            Sollte der Login nicht mehr gehen, prüfen Sie ob der Token noch gültig ist.
                         </p>
-                        <div class="profile-item">
+                        <div class="profile-item" data-role="admin">
                             <label>API-Token</label>
                             <div style="display: flex; gap: 10px; align-items: center;">
                                 <div style="flex: 1; position: relative;">
@@ -159,10 +160,13 @@
                                 <button onclick="copyProfileToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋 Kopieren</button>
                             </div>
                         </div>
-                        <div id="profileTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
-                        <button onclick="regenerateProfileToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
-                            🔄 Neuen Token generieren
-                        </button>
+                        
+                        <div style="display: flex; flex-direction: row; align-items: baseline; gap: 16px;">
+                            <div id="profileTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 14px;"></div>
+                            <button onclick="regenerateProfileToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
+                                🔄 Neuen Token generieren
+                            </button>                             
+                        </div>
                     </div>
                 </div>
             </div>    
@@ -1190,10 +1194,7 @@
                             <div id="tokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
                             <button onclick="regenerateUserToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
                                 🔄 Neuen Token generieren
-                            </button>
-                            <p style="color: #e74c3c; font-size: 12px; margin-top: 10px;">
-                                ⚠️ Token nach Erstellung sicher aufbewahren!
-                            </p>                        
+                            </button>                       
                         </div>
                     </div>
                 </form>
@@ -1272,9 +1273,6 @@
                         <button onclick="regenerateDeviceToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
                             🔄 Neuen Token generieren
                         </button>
-                        <p style="color: #e74c3c; font-size: 12px; margin-top: 10px;">
-                            ⚠️ Token nach Erstellung sicher aufbewahren!
-                        </p>
                     </div>
                 </form>               
             </div>

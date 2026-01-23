@@ -75,7 +75,7 @@ function loginWithToken($db, $email, $password) {
     // Rate Limiting Check
     $ip = $_SERVER['REMOTE_ADDR'];
     $cacheFile = sys_get_temp_dir() . "/login_attempts_" . md5($ip);
-    $maxAttempts = 5;
+    $maxAttempts = 10;
     $resetTime = 300;
     
     if (file_exists($cacheFile)) {
@@ -104,7 +104,7 @@ function loginWithToken($db, $email, $password) {
     try {
         // Hole User aus DB
         $stmt = $db->prepare("
-            SELECT user_id, email, password_hash, role, member_id, api_token, is_active 
+            SELECT user_id, email, password_hash, role, member_id, api_token, api_token_expires_at, is_active 
             FROM users 
             WHERE email = ?
         ");
@@ -130,13 +130,20 @@ function loginWithToken($db, $email, $password) {
 
         // Gib/Generiere Token
         $token = $user['api_token'];
-        
-        if (empty($token)) {
+        $tokenExpired = empty($user['api_token_expires_at']) || strtotime($user['api_token_expires_at']) < time();
+                
+        if (empty($token) || $tokenExpired) {
+            http_response_code(401);
+            return ["success" => false, "message" => "Token ungültig oder abgelaufen"];
+
+        /*
             // Generiere neuen Token
-            $token = bin2hex(random_bytes(32));
+            $token = bin2hex(random_bytes(24));
+            $expiresAt = date('Y-m-d H:i:s', strtotime('+1 year'));
             
-            $stmt = $db->prepare("UPDATE users SET api_token = ? WHERE user_id = ?");
-            $stmt->execute([$token, $user['user_id']]);
+            $stmt = $db->prepare("UPDATE users SET api_token = ?, api_token_expires_at = ? WHERE user_id = ?");
+            $stmt->execute([$token, $user['user_id'], $expiresAt]);
+            */        
         }
 
         // Bei Erfolg: Reset attempts
@@ -148,7 +155,7 @@ function loginWithToken($db, $email, $password) {
         return [
             "success" => true,
             "message" => "Login erfolgreich",
-            "token" => $token,
+            "token" => $token,            
             "user" => [
                 "user_id" => (int)$user['user_id'],
                 "email" => $user['email'],

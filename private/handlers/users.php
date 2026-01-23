@@ -636,7 +636,7 @@ function createDevice($db, $authUserId) {
     }
 
     // API-Token generieren
-    $apiToken = bin2hex(random_bytes(32));
+    $apiToken = bin2hex(random_bytes(24));
     $tokenExpires = date('Y-m-d H:i:s', strtotime('+10 years')); // Geräte-Tokens lange gültig
 
     // TOTP-Secret für totp_location Geräte

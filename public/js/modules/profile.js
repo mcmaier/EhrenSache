@@ -87,8 +87,8 @@ export async function loadProfile(forceReload = false) {
             });
             
             expiryInfo.innerHTML = isExpired 
-                ? `<span style="color: #e74c3c;">?? Abgelaufen am: ${expiresText}</span>`
-                : `<span style="color: #7f8c8d;">Gültig bis: ${expiresText}</span>`;
+                ? `<span style="color: #e74c3c;">⚠️ Abgelaufen am: ${expiresText}</span>`
+                : `<span style="color: var(--text-dark);">Gültig bis: ${expiresText}</span>`;
             expiryInfo.style.display = 'block';
         } else {
             expiryInfo.style.display = 'none';

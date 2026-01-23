@@ -11,12 +11,13 @@
 // Service Worker für PWA Offline-Support
 const CACHE_NAME = 'checkin-app-v1';
 const urlsToCache = [
-  '/checkin/',
-  '/checkin/index.html',
-  '/checkin/css/style.css',
-  '/checkin/js/app.js',
-  '/checkin/manifest.json'
+  '/',
+  '/index.html',
+  '/css/style.css',
+  '/js/app.js',
+  '/manifest.json'
 ];
+
 
 // Install Event
 self.addEventListener('install', (event) => {
@@ -36,15 +37,26 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(fetch(event.request));
 });
 
-/*
 
+/*
 // Installation - Cache static resources
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Cache opened');
-        return cache.addAll(urlsToCache);
+      .then(async cache => {
+
+        for (const url of urlsToCache) {
+        try {
+          console.log('Try cache:', url);
+          await cache.add(url);
+        } catch (err) {
+          console.warn('Fehler beim Cachen:', url, err);
+        }
+      }
+
+        //console.log('Cache opened');
+        //return cache.addAll(urlsToCache);
+
       })
   );
   self.skipWaiting();
@@ -112,6 +124,13 @@ self.addEventListener('fetch', event => {
             return response;
           });
       })
+      .catch(err => {
+        console.error('Fetch im Service Worker fehlgeschlagen:', err);
+        // Optional: Offline-Fallback zurückgeben, z.B. eine offline.html
+        // return caches.match('/offline.html');
+        return new Response('Offline oder Netzwerkfehler', { status: 503 });
+      })
   );
 });
 */
+

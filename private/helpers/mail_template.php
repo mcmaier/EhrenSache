@@ -30,8 +30,8 @@ class EmailTemplate {
         
         // Standard-Variablen
         $defaultVars = [
-            'ORGANIZATION_NAME' => $branding['organization_name'] ?? 'Mein Verein',
-            'ORGANIZATION_LOGO' => $branding['organization_logo'] ?? 'assets/logo-default.png',
+            'ORGANIZATION_NAME' => $branding['organization_name'] ?? 'Mein Verein',            
+            'ORGANIZATION_LOGO' => !empty($branding['organization_logo']) ? $branding['organization_logo'] : 'assets/logo-default.png',
             'PRIMARY_COLOR' => $branding['primary_color'] ?? '#1F5FBF',
             'SECONDARY_COLOR' => $branding['secondary_color'] ?? '#4CAF50',
             'CURRENT_YEAR' => date('Y')

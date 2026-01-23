@@ -71,8 +71,8 @@ let currentEditAppointmentId = null;
         //const currentPath = window.location.pathname;
         //const basePath = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
 
-        navigator.serviceWorker.register('./checkin/service-worker.js', {
-            scope: './checkin/'
+        navigator.serviceWorker.register('./service-worker.js', {
+            scope: './'
         })
         .then(reg => debug.log('✓ Service Worker registriert:', reg.scope))
         .catch(err => debug.log('✗ Service Worker Fehler:', err));        
@@ -230,8 +230,8 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
 
         // Spezifische Fehlermeldungen
         switch (response.status) {
-            case 401:
-                errorMessage = 'Anmeldedaten ungültig';
+            case 401:                
+                errorMessage = 'Anmeldedaten ungültig oder Token abgelaufen';
                 break;
             case 403:
                 errorMessage = 'Keine Berechtigung für diese Aktion';
@@ -240,10 +240,10 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
                 errorMessage = 'Ressource nicht gefunden';
                 break;
             case 409:
-                errorMessage = responseData?.message || 'Konflikt - Eintrag existiert bereits';
+                errorMessage = 'Konflikt - Eintrag existiert bereits';
                 break;
             case 422:
-                errorMessage = responseData?.message || 'Ungültige Eingabedaten';
+                errorMessage = 'Ungültige Eingabedaten';
                 break;
             case 429:
                 errorMessage = 'Zu viele Anfragen - bitte warten';
@@ -355,8 +355,8 @@ async function handleLogin(e) {
         debug.log("Login response:", result);
 
         if (!result.success) {
-            const error = result;
-            throw new Error(error.message || 'Login fehlgeschlagen');
+            const error = result.error;
+            throw new Error(error || 'Login fehlgeschlagen');
         }    
         
         // Speichere Token
@@ -384,7 +384,7 @@ async function handleLogin(e) {
         
     } catch (error) {
         debug.error('Login Fehler:', error);
-        showError(error.message || 'Ungültige Anmeldedaten');
+        showError(error.message || 'Ungültige Anmeldedaten oder Token abgelaufen');
     }
 
 }
@@ -513,13 +513,6 @@ async function handleLogout() {
     elements.passwordInput.value = '';
     elements.loginError.classList.remove('active');
 
-    /*
-    // Reset Token-Login (falls sichtbar)
-    if (elements.tokenLoginSection) {
-        elements.tokenLoginSection.style.display = 'none';
-        elements.showTokenLoginButton.textContent = 'Mit Token anmelden';
-    }*/
-    
     showScreen('login');
     stopClock();
 

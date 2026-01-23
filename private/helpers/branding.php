@@ -30,7 +30,9 @@ function getBrandingSettings($pdo) {
         ];
         
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $settings[$row['setting_key']] = $row['setting_value'];
+            if (!empty($row['setting_value'])) {
+                $settings[$row['setting_key']] = $row['setting_value'];
+            }
         }
         
         return $settings;
@@ -73,7 +75,10 @@ function getBrandingCSS($settings) {
  * Generiere Logo-HTML
  */
 function getBrandingLogo($settings) {
-    $logoPath = htmlspecialchars($settings['organization_logo']);
+    // Verwende Standard-Logo wenn keins hochgeladen wurde
+    $logoPath = !empty($settings['organization_logo']) 
+        ? htmlspecialchars($settings['organization_logo'])
+        : 'assets/logo-default.png';
     $orgName = htmlspecialchars($settings['organization_name']);
     
     return "

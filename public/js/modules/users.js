@@ -908,10 +908,10 @@ function updateTokenDisplay(token, expiresAt) {
         
         expiryInfo.innerHTML = isExpired 
             ? `<span style="color: #e74c3c;">⚠️ Abgelaufen am: ${expiresText}</span>`
-            : `<span style="color: #7f8c8d;">Gültig bis: ${expiresText}</span>`;
+            : `<span style="color: var(--text-dark);">Gültig bis: ${expiresText}</span>`;
         expiryInfo.style.display = 'block';
     } else if (token) {
-        expiryInfo.innerHTML = '<span style="color: #7f8c8d;">Kein Ablaufdatum</span>';
+        expiryInfo.innerHTML = '<span style="color: var(--text-dark);">Kein Ablaufdatum</span>';
         expiryInfo.style.display = 'block';
     }
 }
