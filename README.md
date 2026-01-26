@@ -288,6 +288,10 @@ Für kommerzielle Nutzung (SaaS-Anbieter, Systemhäuser, Unternehmen) ist eine
 - Du möchtest Änderungen NICHT veröffentlichen
 - Du verkaufst EhrenSache-basierte Lösungen
 
+**Lizenzmodelle:**  
+Wir bieten flexible Einmal- und Jahreslizenzen, abgestimmt auf Ihr 
+Geschäftsmodell. Kontaktieren Sie uns für ein individuelles Angebot.
+
 ## ©️ Copyright
 
 Copyright (c) 2026 Martin Maier
