@@ -20,33 +20,48 @@ Die kommerzielle Lizenz gewährt:
 - ✓ Integration in kommerzielle Produkte
 - ✓ White-Label-Lösungen
 
-## Preismodelle
+## Lizenzmodelle
+
+Wir bieten flexible Lizenzmodelle für unterschiedliche Anforderungen:
 
 ### Einmallizenzen
-- **Einzelinstanz**: 500 € einmalig
-  - Eine produktive Installation
-  - Updates für 12 Monate inklusive
+- **Einzelinstanz**: Für eine produktive Installation mit Update-Zeitraum
+- **Unlimited**: Für unbegrenzte Installationen mit langfristigem Update-Zugang
 
-- **Unlimited**: 2.500 € einmalig
-  - Unbegrenzte Installationen
-  - Lifetime-Updates
+### SaaS-Lizenzen
+- Staffelmodelle nach Anzahl der betreuten Kunden/Installationen
+- Jahreslizenzen mit unterschiedlichen Volumenstufen
+- Enterprise-Lösungen für größere Anbieter
 
-### SaaS-Lizenzen (jährlich)
-- **Bis 10 Kunden**: 1.200 € / Jahr
-- **Bis 50 Kunden**: 3.600 € / Jahr
-- **Bis 200 Kunden**: 9.600 € / Jahr
-- **Enterprise**: Individuelle Vereinbarung
+### Support & Wartung
+Optionales Support-Paket nach Vereinbarung
 
-## Support & Wartung
+## Individuelle Vereinbarung
 
-Optional buchbar:
-- Standard-Support: 600 € / Jahr (Email, 48h Response)
-- Premium-Support: 1.800 € / Jahr (Email + Telefon, 8h Response)
+Die konkrete Ausgestaltung der Lizenz wird **individuell auf Ihr 
+Geschäftsmodell abgestimmt**:
 
-## Kontakt
+- 📊 **Nutzungsumfang**: Anzahl Installationen, Kunden, Endnutzer
+- 🔧 **Technische Anforderungen**: White-Label, API-Zugang, Custom-Features
+- 📅 **Laufzeit**: Einmalig, jährlich oder mehrjährig
+- 🛠️ **Support-Level**: Nach Ihrem Bedarf
 
-Lizenzanfragen an: [info@ehrensache.app]
+**Jedes Lizenzmodell wird auf Ihre Situation zugeschnitten.**
+
+## Kontakt für Lizenzanfragen
+
+Für ein unverbindliches Angebot kontaktieren Sie uns bitte:
+
+**Email**: [info@ehrensache.app]
+
+**Bitte teilen Sie uns mit:**
+- Ihr geplantes Geschäftsmodell (SaaS, Integration, etc.)
+- Voraussichtliche Anzahl Installationen/Kunden
+- Gewünschte Laufzeit (einmalig/jährlich)
+- Benötigte Support-Leistungen
+
+Wir erstellen Ihnen gerne ein individuelles Angebot.
 
 ---
 
-*Preise zzgl. MwSt. | Stand: 2026*
+*Alle Vereinbarungen unterliegen deutschem Recht.*
