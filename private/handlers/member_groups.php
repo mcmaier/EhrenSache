@@ -99,6 +99,7 @@ function handleMemberGroups($db, $method, $id) {
             break;
             
         case 'DELETE':
+            demoBlockedResponse();
             requireAdminOrManager();
 
             $stmt = $db->prepare("DELETE FROM member_groups WHERE group_id = ?");

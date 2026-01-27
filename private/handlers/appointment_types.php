@@ -133,6 +133,7 @@ function handleAppointmentTypes($db, $method, $id) {
             break;
             
         case 'DELETE':
+            demoBlockedResponse();
             requireAdminOrManager();
             
             $stmt = $db->prepare("DELETE FROM appointment_types WHERE type_id = ?");

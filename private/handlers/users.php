@@ -208,8 +208,10 @@ function handleUsers($db, $method, $id, $authUserId) {
             break;
             
         case 'POST':
-            $rawData = json_decode(file_get_contents("php://input"));
+            demoBlockedResponse();
 
+            $rawData = json_decode(file_get_contents("php://input"));
+            
             $action = $rawData->action ?? null;
             $mailUserId = $rawData->mail_user_id ?? null;
 
@@ -350,7 +352,9 @@ function handleUsers($db, $method, $id, $authUserId) {
             }
             break;
             
-        case 'PUT':            
+        case 'PUT':        
+            demoBlockedResponse();
+            
             $rawData = json_decode(file_get_contents("php://input"));
 
             // Zugriffskontrolle: Nur Admin oder eigener Account
@@ -585,6 +589,8 @@ function handleUsers($db, $method, $id, $authUserId) {
             break;            
             
         case 'DELETE':
+            demoBlockedResponse();
+
             // Nur Admin darf User löschen     
             requireAdmin();  
             // Eigenen Account nicht löschen

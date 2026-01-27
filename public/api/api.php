@@ -32,6 +32,7 @@ require_once '../../private/helpers/rate_limiter.php';
 require_once '../../private/helpers/totp.php';
 require_once '../../private/helpers/utils.php';
 require_once '../../private/helpers/mailer.php';
+require_once '../../private/demo/demo_config.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';

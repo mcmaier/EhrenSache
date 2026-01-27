@@ -29,6 +29,8 @@ function registerNewUser($db) {
         return;
     }          
 
+    demoBlockedResponse();
+
     if(!isSet($data->email) || !filter_var($data->email, FILTER_VALIDATE_EMAIL))
     {
         http_response_code(400);

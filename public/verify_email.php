@@ -14,6 +14,7 @@
 header("Content-Type: text/html; charset=UTF-8");
 
 require_once '../private/config/config.php';
+require_once '../private/helpers/mailer.php';
 require_once '../private/helpers/branding.php';
 
 session_start();
@@ -70,10 +71,39 @@ try {
     );
     $stmt->execute([$tokenHash]);
     
-    $db->commit();
-    
+    $db->commit();        
+
+    // Mail-Status prüfen BEVOR User gesucht wird
+    $mailer = new Mailer(getMailConfig(), $db);
+    $mailStatus = $mailer->checkMailStatus();
+
+    if (!$mailStatus['enabled']) {
+        exit();
+    }
+
+    // Admin benachrichtigen
+    // Hole Benutzerinformationen für die Admin-Benachrichtigung
+    $user_stmt = $db->prepare("SELECT name, email FROM users WHERE user_id = ?");
+    $user_stmt->execute([$result['user_id']]);
+    $user_data = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Benachrichtige alle Admins
+    $admin_stmt = $db->prepare("SELECT email FROM users WHERE role = 'admin' AND is_active = 1");
+    $admin_stmt->execute();
+
+    while ($admin = $admin_stmt->fetch(PDO::FETCH_ASSOC)) {
+        $subject = "Neue Registrierung: {$user_data['name']}";
+        $message = "Ein neuer Benutzer hat seine E-Mail-Adresse bestätigt:\n\n";
+        $message .= "Name: {$user_data['name']}\n";
+        $message .= "E-Mail: {$user_data['email']}\n\n";
+        $message .= "Bitte aktivieren Sie den Benutzer über die Mitgliederverwaltung.";
+        
+        $mailer->send($admin['email'], $subject, $message);
+    }
+
     // Erfolg anzeigen
     showSuccess($result['name'],$branding);
+    exit();
     
 } catch (Exception $e) {
     if ($db->inTransaction()) {

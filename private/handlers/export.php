@@ -19,6 +19,7 @@ function handleExport($db, $request_method, $authUserRole) {
         exit();
     }
     
+    demoBlockedResponse();
     requireAdminOrManager();
     /*
     // Nur Admins dürfen exportieren

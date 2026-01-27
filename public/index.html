@@ -93,6 +93,81 @@
 
         <!-- Main Content Area -->
         <main class="main-content">
+
+        <style>
+        /* Demo Banner */
+        .demo-banner {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            padding: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            position: relative;
+            z-index: 99;
+            font-size: 14px;
+        }
+
+        .demo-banner strong {
+            font-weight: 700;
+        }
+
+        .demo-banner a {
+            color: white;
+            text-decoration: underline;
+            font-weight: 600;
+        }
+
+        .demo-banner a:hover {
+            text-decoration: none;
+        }
+
+        .demo-banner .icon {
+            font-size: 18px;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+
+        .demo-timer {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin: 0 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .demo-limitations {
+            margin-top: 5px;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        /* Mobile Anpassung */
+        @media (max-width: 768px) {
+            .demo-banner {
+                font-size: 12px;
+                padding: 10px 15px;
+            }
+            
+            .demo-banner br.desktop-only {
+                display: none;
+            }
+            
+            .demo-limitations {
+                display: none; /* Auf Mobile ausblenden */
+            }
+        }
+        </style>
+
+        <div class="demo-banner" id="demoBanner">
+            <span class="icon">⚠️</span>
+            <strong>DEMO-MODUS</strong> | 
+            Datenbank wird alle 30 Min. zurückgesetzt  | 
+            <span class="desktop-only">🔒 Funktionen eingeschränkt </span>
+        </div>
+
         <!-- Profil Section -->
             <div class="content-section" id="profil">
                 <div class="content-header">

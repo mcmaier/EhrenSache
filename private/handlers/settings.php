@@ -28,6 +28,9 @@ function handleSettings($db, $method, $authUserId, $authUserRole) {
                 break;
 
             case 'POST':
+
+                demoBlockedResponse();
+
                 $data = json_decode(file_get_contents("php://input"));
                 
                 if (!isset($data->action)) {
@@ -295,6 +298,8 @@ function getAppearance($db)
 
 function uploadLogo($db, $method, $authUserId, $authUserRole)
 {
+    demoBlockedResponse();
+
     if (!isAdmin()) {
         http_response_code(403);
         echo json_encode(['error' => 'Admin-Zugriff erforderlich']);

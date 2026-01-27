@@ -14,6 +14,8 @@
 
 function handlePasswordChange($db, $request_method, $authUserId)
 {
+    demoBlockedResponse();
+
     if($request_method !== 'POST') {
             http_response_code(405);
             echo json_encode(["message" => "Method not allowed"]);

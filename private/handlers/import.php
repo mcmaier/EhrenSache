@@ -19,6 +19,7 @@ function handleImport($db, $request_method, $authUserRole) {
         exit();
     }
     
+    demoBlockedResponse();
     // Nur Admins dürfen importieren
     requireAdmin();
     
