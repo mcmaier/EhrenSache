@@ -13,7 +13,7 @@ Kostenlos unter AGPL-3.0 nutzbar.
 
 **Anwesenheit ist EhrenSache!** 
 
-Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder sich eigenverantwortlich anmeldet oder der Schriftführer die Anwesenheit prüft. EhrenSache erfasst Anwesenheit und Entschuldigen inklusive nachträglicher Korrekturmöglichkeit. 
+Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder sich eigenverantwortlich anmeldet oder der Schriftführer die Anwesenheit prüft. EhrenSache erfasst Anwesenheit und Entschuldigungen inklusive nachträglicher Korrekturmöglichkeit. 
 
 Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünkltichkeit belohnen wollen.
 
@@ -28,7 +28,7 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 ### Technische Highlights
 - **Sichere Authentifizierung**: Session-basiert für Web, Token-basiert für Geräte
 - **TOTP-Standortverifikation**: Zeitbasierte Einmalpasswörter für sichere Check-ins
-- **Intelligentes Caching**: 95% Reduktion der API-Anfragen durch Jahr-basiertes Caching
+- **Intelligentes Caching**: ~90% Reduktion der API-Anfragen durch Jahr-basiertes Caching
 - **Progressive Web App**: Installation auf Mobilgeräten möglich
 - **Responsive Design**: Optimiert für Desktop, Tablet und Smartphone
 
@@ -70,15 +70,14 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 git clone https://github.com/mcmaier/EhrenSache.git
 ```
 2. Komplettes Verzeichnis in Webspace hochladen.
-> [!IMPORTANT]
-> Die Web-Root der Domain muss auf den Ordner **EhrenSache/public** zeigen!
+> [!WARNING]
+> Die Web-Root der (Sub-)Domain muss auf den Ordner **EhrenSache/public** zeigen!
 
 3. Neue Datenbank erstellen.
 
-4. Setup ausführen (Angenommen, Ehrensache ist in der Subdomain ehrensache installiert):
+4. Setup ausführen (Angenommen, Ehrensache ist in der Subdomain ehrensache.meine-domain.de installiert):
 ```
-https://ehrensache.meine-domain.de/
---> Leitet automatisch zu Setup weiter
+https://ehrensache.meine-domain.de/install
 ```
 
 ## Erste Schritte
@@ -171,6 +170,9 @@ Das System unterstützt beliebige IoT-Geräte über die REST API mit API Token:
 
 ## API-Dokumentation
 
+> [!NOTE]
+> (Work in Progress)
+
 ### Authentifizierung
 
 **Web-Login:**
@@ -226,7 +228,7 @@ Response: Array of members with groups
 # XAMPP oder ähnliches installieren
 # Projekt nach htdocs/ kopieren
 # Datenbank erstellen
-# In Browser: http://localhost/EhrenSache
+# In Browser: http://localhost/EhrenSache/public
 ```
 
 ### Code-Struktur
