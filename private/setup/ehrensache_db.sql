@@ -365,7 +365,7 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}system_settings` (
   `setting_key` VARCHAR(50) NOT NULL UNIQUE,
   `setting_value` TEXT,
   `setting_type` ENUM('text', 'number', 'color', 'boolean') DEFAULT 'text',
-  `category` ENUM('general', 'appearance', 'pagination', 'security') DEFAULT 'general',
+  `category` ENUM('general', 'public', 'pagination', 'security') DEFAULT 'general',
   `description` VARCHAR(255),
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `updated_by` INT,

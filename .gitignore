@@ -1,5 +1,7 @@
 *.bak
 install/.htaccess
+public/uploads/*.jpg
+public/uploads/*.png
 private/uploads/*.*
 private/config/config.php
 private/config/mail_config.php

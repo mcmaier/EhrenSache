@@ -1,0 +1,3 @@
+# Installation abgeschlossen - Zugriff gesperrt
+Order Deny,Allow
+Deny from all

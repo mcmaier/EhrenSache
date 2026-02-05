@@ -645,12 +645,16 @@ function createDevice($db, $database, $authUserId) {
     $apiToken = bin2hex(random_bytes(24));
     $tokenExpires = date('Y-m-d H:i:s', strtotime('+10 years')); // Geräte-Tokens lange gültig
 
-    // TOTP-Secret für totp_location Geräte
-    $totpSecret = null;
-    if($device_type === 'totp_location') {
-        require_once __DIR__ . '/../helpers/totp.php';
-        $totpSecret = TOTP::generateSecret();
-    }
+    $totpSecret = $data->totp_secret ?? null;
+
+    // TOTP-Secret für totp_location Geräte, wenn nicht angegeben
+    if ($device_type === 'totp_location')
+    {
+        if($totpSecret === null){
+            require_once __DIR__ . '/../helpers/totp.php';
+            $totpSecret = TOTP::generateSecret();
+        } 
+    }     
     
     try {        
         $db->beginTransaction();                     
