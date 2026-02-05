@@ -10,7 +10,7 @@
 
 import { apiCall, isAdminOrManager } from './api.js';
 import { loadAppointments } from './appointments.js';
-import { loadTypes } from './management.js';
+import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
 import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml } from './utils.js';
@@ -32,7 +32,6 @@ const RecordMode = Object.freeze({
 let currentRecordsPage = 1;
 let recordsPerPage = 25;
 let allFilteredRecords = [];
-//let isAttendanceMode = false;
 let currentMode = RecordMode.ALL_RECORDS;
 let currentAppointmentId = null;
 let currentMemberId = null;
@@ -80,8 +79,8 @@ export function filterRecords(records, filters = {}) {
     }
     
     // Filter: Gruppe
-    if (filters.group && filters.group !== '') {
-        filtered = filtered.filter(r => r.group_id == filters.group);
+    if (filters.aptType && filters.aptType !== '') {
+        filtered = filtered.filter(r => r.appointment_type_id == filters.aptType);
     }
     
     // Optionaler Filter: Status (z.B. verspätet/pünktlich)
@@ -322,11 +321,7 @@ window.goToRecordsPage = function(page) {
 
     renderRecords(allFilteredRecords, page);
     
-    // Scroll nach oben zur Tabelle
-    //document.getElementById('recordsTableBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
     // KEIN automatisches Scrollen - Position beibehalten
-    // ODER: Sanft zur Tabelle scrollen
     if (scrollBefore === 0) {
         // Nur scrollen wenn User nicht gescrollt hat
         const paginationElement = document.getElementById('recordsPagination');
@@ -342,64 +337,111 @@ window.goToRecordsPage = function(page) {
 function updateRecordStats(records) {    
     const totalRecords = records.length;
     const present = records.filter(r => r.status === 'present').length;
-    //const excused = records.filter(r => r.status === 'excused').length;
-    //const absent = records.filter(r => r.status === 'excused').length;
+    const absent = totalRecords - present;
 
     if(currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT)
     {
         document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesende Mitglieder zum Termin';        
         document.getElementById('statTotalRecords').textContent = present;
+        document.getElementById('statMissingRecords').textContent = absent;
     }
     else if(currentMode === RecordMode.ATTENDANCE_BY_MEMBER)
     {
         document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesend bei Terminen';
         document.getElementById('statTotalRecords').textContent = present;
+        document.getElementById('statMissingRecords').textContent = absent;
     } 
     else
     {
         document.getElementById('statTotalRecordsTitle').innerHTML = 'Erfasste Anwesenheitseinträge';
         document.getElementById('statTotalRecords').textContent = totalRecords;
-    }       
-    
-    //document.getElementById('statOnTime').textContent = onTime;
-    //document.getElementById('statLate').textContent = late;
-    //document.getElementById('statExcused').textContent = excused;
+        document.getElementById('statMissingRecords').textContent = absent;
+    }           
 }
 
 export async function loadRecordFilters(forceReload = false) {
 
     debug.log("Load Record Filters ()");
 
-    const year = currentYear;
+    // Gruppen laden
+    const aptTypes = await loadTypes(forceReload);
+
+    // Gruppen-Filter befüllen
+    const aptTypeSelect = document.getElementById('filterAptType');
+    const currentAptTypeValue = aptTypeSelect.value;
     
+    aptTypeSelect.innerHTML = '<option value="">Alle Termine</option>';
+    if (aptTypes && aptTypes.length > 0) {
+        aptTypes.forEach(aptt => {
+            aptTypeSelect.innerHTML += `<option value="${aptt.type_id}">${aptt.type_name}</option>`;
+        });
+    }
+    aptTypeSelect.value = currentAptTypeValue;
+    
+    loadAppointmentFilter(forceReload);
+
+    loadMemberFilter(forceReload);
+    
+}
+
+async function loadAppointmentFilter(forceReload = false, appointmentType = null)
+{
     // Termine für Jahr laden (aus Cache wenn möglich)
     const appointments = await loadAppointments(forceReload);
-    
-    // Mitglieder laden (jahresunabhängig)
-    const members = await loadMembers(forceReload);
-    
-    // Gruppen laden
-    //if (!isCacheValid('groups')) {
-    //    await loadGroups(true);
-    //}
-    //const groups = await loadGroups();
-    
+
     // Termin-Filter befüllen
     const appointmentSelect = document.getElementById('filterAppointment');
     const currentAppointmentValue = appointmentSelect.value;
+
+    let filtered = [...appointments];
+
+    if (appointmentType) {
+        filtered = filtered.filter(r => r.type_id == appointmentType);
+    }
     
     appointmentSelect.innerHTML = '<option value="">Alle Termine</option>';
-    if (appointments && appointments.length > 0) {
-        appointments.forEach(app => {
+    if (filtered && filtered.length > 0) {
+        filtered.forEach(app => {
             appointmentSelect.innerHTML += `<option value="${app.appointment_id}">${app.title} (${app.date})</option>`;
         });
     }
     appointmentSelect.value = currentAppointmentValue;
-    
+}
+
+async function loadMemberFilter(forceReload = false, appointmentType = null)
+{
+    // Mitglieder laden (jahresunabhängig)
+    const members = await loadMembers(forceReload);    
+
     // Mitglieder-Filter befüllen
     const memberSelect = document.getElementById('filterMember');
     const currentMemberValue = memberSelect.value;
     
+    let filtered = [...members];
+
+    if (appointmentType) {
+        // Hole die Gruppen des Appointment-Types
+        const types = await loadTypes(forceReload);
+        
+        debug.log("Types: ", types);
+
+        // TO DO: Kombination Types mit Groups auswerten
+        if (types.length > 0) {
+            // Filtere Mitglieder: mindestens eine Gruppe muss übereinstimmen
+            filtered = filtered.filter(member => {
+                // Konvertiere String zu Array (beachte Leerzeichen!)
+                const memberGroups = member.group_ids 
+                    ? member.group_ids.split(',').map(id => parseInt(id.trim()))
+                    : [];
+                
+                // Prüfe Überschneidung
+                return memberGroups.some(group_ids => 
+                    types.includes(group_ids)
+                );
+            });
+        }
+    }
+
     memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
     if (members && members.length > 0) {
         members
@@ -409,22 +451,7 @@ export async function loadRecordFilters(forceReload = false) {
             });
     }
     memberSelect.value = currentMemberValue;
-    
-    // Gruppen-Filter befüllen
-    /*
-    const groupSelect = document.getElementById('filterGroup');
-    const currentGroupValue = groupSelect.value;
-    
-    groupSelect.innerHTML = '<option value="">Alle Gruppen</option>';
-    if (groups && groups.length > 0) {
-        groups.forEach(group => {
-            groupSelect.innerHTML += `<option value="${group.group_id}">${group.group_name}</option>`;
-        });
-    }
-    groupSelect.value = currentGroupValue;
-    */
 }
-
 
 export async function applyRecordFilters(forceReload = false, currentPage = 1) {
     // Records laden (aus Cache wenn möglich)
@@ -436,22 +463,16 @@ export async function applyRecordFilters(forceReload = false, currentPage = 1) {
     const filters = {
         appointment: document.getElementById('filterAppointment')?.value || null,
         member: document.getElementById('filterMember')?.value || null,
-        //group: document.getElementById('filterGroup')?.value || null
+        aptType: document.getElementById('filterAptType')?.value || null
     };
 
     // Filtern
     const filteredRecords = filterRecords(allRecords, filters);
 
-    // Rendern (nur wenn auf Records-Section)
-    //const currentSection = sessionStorage.getItem('currentSection');
-    //if (currentSection === 'anwesenheit') {
-    //renderRecords(filteredRecords);
-    //}
-
-    // Rendern (nur wenn auf Records-Section) - IMMER Seite 1 nach Filter-Änderung
+    // Rendern (nur wenn auf Records-Section) 
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'anwesenheit') {
-        renderRecords(filteredRecords, currentPage); // ← Reset auf Seite 1
+        renderRecords(filteredRecords, currentPage);
         debug.log('Records rendered');
     }
     
@@ -467,19 +488,31 @@ export async function initRecordEventHandlers() {
 
     debug.log("Init Record Event Handlers ()");
 
-    // Filter-Änderungen
-    /*document.getElementById('filterAppointment')?.addEventListener('change', () => {
-        applyRecordFilters();
-    });*/
-
-    // Event-Listener für Termin-Filter
-    document.getElementById('filterAppointment').addEventListener('change', async function() {
-        const appointmentId = this.value;
+    // Event-Listener für Gruppen-Filter
+    document.getElementById('filterAptType').addEventListener('change', async function() {
+        const appointmentTypeId = this.value;        
+        const appointmentFilter = document.getElementById('filterAppointment');
         const memberFilter = document.getElementById('filterMember');
+                
+        currentMode = RecordMode.ALL_RECORDS;
+        currentAppointmentId = null;
+        currentMemberId = null;
+        appointmentFilter.disabled = false;
+        appointmentFilter.value = '';
+        memberFilter.disabled = false;
+        memberFilter.value = '';
+        
+        loadAppointmentFilter(false,appointmentTypeId);
+        loadMemberFilter(false,appointmentTypeId);
+
+
+        await applyRecordFilters(true);
+        /*
+        const appointmentId = this.value;
+        const memberFilter = document.getElementById('filterGroup');
         
         if (appointmentId && appointmentId !== '') {
             // Attendance-Modus: Member-Filter deaktivieren
-            //isAttendanceMode = true;
             currentMode = RecordMode.ATTENDANCE_BY_APPOINTMENT;
             currentAppointmentId = appointmentId;
             currentMemberId = null;
@@ -489,7 +522,30 @@ export async function initRecordEventHandlers() {
             await loadAttendanceList(appointmentId);
         } else {
             // Records-Modus: Member-Filter aktivieren
-            //isAttendanceMode = false;
+            currentMode = RecordMode.ALL_RECORDS;
+            currentAppointmentId = null;
+            currentMemberId = null;
+            memberFilter.disabled = false;
+            await applyRecordFilters(true); // Normale Filterung
+        }*/
+    });
+
+    // Event-Listener für Termin-Filter
+    document.getElementById('filterAppointment').addEventListener('change', async function() {
+        const appointmentId = this.value;
+        const memberFilter = document.getElementById('filterMember');
+        
+        if (appointmentId && appointmentId !== '') {
+            // Attendance-Modus: Member-Filter deaktivieren
+            currentMode = RecordMode.ATTENDANCE_BY_APPOINTMENT;
+            currentAppointmentId = appointmentId;
+            currentMemberId = null;
+            memberFilter.disabled = true;
+            memberFilter.value = '';
+            //await loadAndRenderAttendanceList(appointmentId);
+            await loadAttendanceList(appointmentId);
+        } else {
+            // Records-Modus: Member-Filter aktivieren
             currentMode = RecordMode.ALL_RECORDS;
             currentAppointmentId = null;
             currentMemberId = null;
@@ -498,6 +554,7 @@ export async function initRecordEventHandlers() {
         }
     });
 
+    // Event-Listener für Member-Filter
     document.getElementById('filterMember')?.addEventListener('change', async function() {
         const memberId = this.value;
         const appointmentFilter = document.getElementById('filterAppointment');
@@ -520,22 +577,13 @@ export async function initRecordEventHandlers() {
         }
     });
     
-    /*
-    document.getElementById('filterMember')?.addEventListener('change', () => {
-        applyRecordFilters();
-    });
-    
-    document.getElementById('filterGroup')?.addEventListener('change', () => {
-        applyRecordFilters();
-    });*/
-    
     // Reset-Button
     document.getElementById('resetRecordFilter')?.addEventListener('click', async function() {
 
         debug.log("Reset Filters");
         const appointmentFilter = document.getElementById('filterAppointment');
         const memberFilter = document.getElementById('filterMember');
-        //document.getElementById('filterGroup').value = '';
+        document.getElementById('filterAptType').value = '';
         appointmentFilter.disabled = false;
         memberFilter.disabled = false;
         appointmentFilter.value = '';
@@ -569,48 +617,6 @@ export async function showRecordsSection(forceReload = false) {
         await applyRecordFilters(forceReload);
     }
 }
-
-export async function loadRecordDropdowns() {
-        
-    const members =  await loadMembers(false);
-    const memberSelect = document.getElementById('record_member');
-    memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
-    
-    members
-        .filter(m => m.active)
-        .forEach(member => {
-            memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
-        });
-    
-    const appointments = await loadAppointments(false,currentYear);    
-    const appointmentSelect = document.getElementById('record_appointment');    
-    appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
-    
-    appointments.forEach(appointment => {
-            const date = new Date(appointment.date + 'T00:00:00');
-            const formattedDate = date.toLocaleDateString('de-DE');
-            const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
-            
-            // Terminart-Anzeige im Dropdown-Text
-            let displayText = `${appointment.title} (${formattedDate} ${startTime})`;
-            
-            if (appointment.type_name) {
-                displayText += ` - [${appointment.type_name}]`;
-            }
-            
-            // Erstelle Option mit data-Attributen
-            const option = document.createElement('option');
-            option.value = appointment.appointment_id;
-            option.textContent = displayText;
-            
-            // Speichere Type-Daten für Badge-Anzeige
-            option.dataset.typeId = appointment.type_id || '';
-            option.dataset.typeName = appointment.type_name || '';
-            
-            appointmentSelect.appendChild(option);
-        });
-}
-
 
 function getSourceBadge(record) {
     const sources = {
@@ -722,6 +728,47 @@ export async function loadRecordData(recordId) {
     }
 }
 
+
+export async function loadRecordDropdowns() {
+        
+    const members =  await loadMembers(false);
+    const memberSelect = document.getElementById('record_member');
+    memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
+    
+    members
+        .filter(m => m.active)
+        .forEach(member => {
+            memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+        });
+    
+    const appointments = await loadAppointments(false,currentYear);    
+    const appointmentSelect = document.getElementById('record_appointment');    
+    appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
+    
+    appointments.forEach(appointment => {
+            const date = new Date(appointment.date + 'T00:00:00');
+            const formattedDate = date.toLocaleDateString('de-DE');
+            const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
+            
+            // Terminart-Anzeige im Dropdown-Text
+            let displayText = `${appointment.title} (${formattedDate} ${startTime})`;
+            
+            if (appointment.type_name) {
+                displayText += ` - [${appointment.type_name}]`;
+            }
+            
+            // Erstelle Option mit data-Attributen
+            const option = document.createElement('option');
+            option.value = appointment.appointment_id;
+            option.textContent = displayText;
+            
+            // Speichere Type-Daten für Badge-Anzeige
+            option.dataset.typeId = appointment.type_id || '';
+            option.dataset.typeName = appointment.type_name || '';
+            
+            appointmentSelect.appendChild(option);
+        });
+}
 
 export async function saveRecord() {
     // Form-Validierung prüfen

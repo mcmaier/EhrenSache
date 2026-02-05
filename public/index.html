@@ -520,6 +520,10 @@
                         <h3 id="statTotalRecordsTitle">Erfasste Anwesenheiten</h3>
                         <div class="number" id="statTotalRecords">-</div>
                     </div>
+                    <div class="stat-card">
+                        <h3 id="statMissingRecordsTitle">Abwesend</h3>
+                        <div class="number" id="statMissingRecords">-</div>
+                    </div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
                         <h3>Jahr filtern</h3>
                         <select id="recordYearFilter"
@@ -530,6 +534,12 @@
 
                 <!-- Filter-Leiste -->
                 <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="filterAptType">Terminart:</label>
+                        <select id="filterAptType"> <!-- onchange="applyRecordFilters()"> -->
+                            <option value="">Alle Termine</option>
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label for="filterAppointment">Filter nach Termin:</label>
                         <select id="filterAppointment"> <!-- onchange="applyRecordFilters()"> -->
