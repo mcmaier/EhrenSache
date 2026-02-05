@@ -481,6 +481,154 @@
     border-color: #667eea;
 }
 
+/* Import Logs */
+
+.log-summary {
+    background: var(--bg-light);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.summary-item label {
+    font-weight: 600;
+    color: var(--text-light);
+    font-size: 13px;
+    text-transform: uppercase;
+}
+
+.summary-item span {
+    font-size: 15px;
+    color: var(--text-dark);
+}
+
+.log-details {
+    padding: var(--spacing-md);
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--spacing-sm);
+    background: var(--bg-light);
+    border-radius: var(--radius-sm);
+}
+
+
+/* Fehler-Section */
+.log-errors-section h3 {
+    margin-bottom: var(--spacing-md);
+    color: var(--text-dark);
+}
+
+.log-errors-section h3 span {
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.error-list {
+    max-height: 500px;
+    overflow-y: auto;
+    background: var(--bg-light);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+}
+
+.error-item {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    background: white;
+    border-left: 3px solid var(--danger-color);
+    border-radius: var(--radius-sm);
+}
+
+.error-item:hover {
+    background: #fafafa;
+}
+
+.error-item:last-child {
+    margin-bottom: 0;
+}
+
+.error-number {
+    font-weight: bold;
+    color: var(--danger-color);
+    min-width: 40px;
+}
+
+.error-text {
+    flex: 1;
+    word-break: break-word;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--text-light);
+    font-size: 16px;
+}
+
+/* Badge Farben für Import-Typen */
+.badge-members { 
+    background: #3498db;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.badge-records { 
+    background: #2ecc71;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.badge-appointments { 
+    background: #9b59b6;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.badge-extract_appointments { 
+    background: #e67e22;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* Text-Farben */
+.text-success {
+    color: var(--success-color);
+}
+
+.text-danger {
+    color: var(--danger-color);
+}
 
 /* Responsive */
 @media (max-width: 1024px) {

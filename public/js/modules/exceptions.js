@@ -634,7 +634,7 @@ export async function saveException() {
         result = await apiCall('exceptions', 'POST', data);
     }
     
-    if (result) {
+    if (result.success) {
         closeExceptionModal();        
 
         //await invalidateCache('exceptions');
@@ -664,11 +664,10 @@ export async function deleteException(exceptionId) {
 
     if (confirmed) {
         const result = await apiCall('exceptions', 'DELETE', null, { id: exceptionId });
-        if (result) {
+        if (result.success) {
             invalidateCache('exceptions',currentYear);
             applyExceptionFilters(true, currentExceptionsPage);
-             showToast(`Eintrag wurde gelöscht`, 'success');
-
+            showToast(`Eintrag wurde gelöscht`, 'success');
         }
     }
 }

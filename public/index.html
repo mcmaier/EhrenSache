@@ -41,31 +41,38 @@
                     <img class="org-logo" src="assets/logo-default.png" alt="Logo">
                     <div class="org-info">
                         <h3 class="org-name">Mein Verein</h3>
-                        <span class="app-name">EhrenSache</span>
+                        <a href="https://ehrensache.app" class="app-name" style="text-decoration: none;" target="_blank">EhrenSache</a>
                     </div>
                 </div>                
                 <div class="user-info">
                     <!-- <div class="user-greeting">Angemeldet als</div> -->
                     <strong class="user-name" id="currentUser">-</strong>
                     <div class="user-role" id="userRole">(-)</div>
+                    <div class="session-timeout" id="sessionTimeout" title="Verbleibende Sitzungszeit">
+                        <span class="timeout-icon">⏱️</span>
+                        <span id="timeoutText">--:--</span>
+                    </div>
                 </div>
             </div>
-            <ul class="nav-menu">
+
+             <!-- Tab-Navigation (nur für Admins) -->
+            <div class="nav-tabs" data-role="admin" style="display: none;">
+                <button class="nav-tab-btn active" data-nav-tab="main">
+                    <span>📋 Verwaltung</span>
+                </button>
+                <button class="nav-tab-btn" data-nav-tab="system">
+                    <span>⚙️ System</span>
+                </button>
+            </div>
+
+             <!-- HAUPT-NAVIGATION -->
+            <ul class="nav-menu" data-nav-group="main">
                 <li class="nav-item" data-section="profil">
                     <span>👤 Mein Profil</span>
                 </li>        
-                <li class="nav-item" data-section="einstellungen" data-role="admin">
-                    <span>⚙️ Einstellungen</span>
-                </li>
-                <li class="nav-item" data-section="benutzer" data-role="admin">
-                    <span>🔐 Benutzer</span>
-                </li>       
-                <li class="nav-item" data-section="geraete" data-role="admin">
-                    <span>📟 Geräte</span>
-                </li>   
                 <li class="nav-item" data-section="verwaltung" data-role="manager">
-                    <span>🎭 Gruppenverwaltung</span>
-                </li>
+                    <span>🎭 Gruppen</span>
+                </li>  
                 <li class="nav-item active" data-section="mitglieder" data-role="manager">
                     <span>👥 Mitglieder</span>
                 </li>     
@@ -80,8 +87,24 @@
                 </li>  
                 <li class="nav-item" data-section="statistik">
                     <span>📊 Statistik</span>
-                </li>                  
-            </ul>                        
+                </li>                                
+            </ul>          
+             <!-- SYSTEM-NAVIGATION -->
+              <ul class="nav-menu" data-nav-group="system" data-role="admin">
+                <li class="nav-item" data-section="einstellungen">
+                    <span>⚙️ Einstellungen</span>
+                </li>
+                <li class="nav-item" data-section="benutzer" >
+                    <span>🔐 Benutzer</span>
+                </li>       
+                <li class="nav-item" data-section="geraete">
+                    <span>📟 Geräte</span>
+                </li>
+                <li class="nav-item" data-section="import-logs">
+                    <span>📋 Import-Logs</span>
+                </li>
+            </ul>
+            
             <!-- Quick Access Bar -->
             <div class="quick-access-bar">
                 <button class="quick-access-btn" id="openPWABtn" title="Check-In App öffnen">
@@ -115,6 +138,18 @@
                         <div class="profile-item" id="profile_member_info" style="display: none;">
                             <label>Verknüpftes Mitglied</label>
                             <input type="text" id="profile_member" readonly style="background: #f8f9fa; cursor: not-allowed;">
+                        </div>
+                        <div class="profile-item" id="profile_user_data">
+                            <label>Meine Daten</label>
+                            <div style="display: flex; flex-direction: row; gap: 20px;">                                                                
+                                <button onclick="downloadMyData()" class="btn-std btn-delete">
+                                    📥 Herunterladen
+                                </button>
+                                <select id="profile_user_data_format" class="form-input" style="background: #f8f9fa; cursor: not-allowed; max-width: 100px;">
+                                    <option value="json">JSON</option>
+                                    <option value="csv">CSV</option>
+                                </select>
+                            </div>                               
                         </div>
                     </div>
 
@@ -181,10 +216,20 @@
                 <div class="settings-container">
                     <!-- Allgemein -->
                     <div class="settings-card">
-                        <h3>Allgemein</h3>
+                        <h3>Organisation</h3>
                         <div class="settings-item">
                             <label>Name der Organisation</label>
                             <input type="text" id="setting_organization_name" class="setting-input" data-key="organization_name">
+                        </div>
+                        <div class="settings-item">
+                            <label for="privacyPolicyUrl">
+                                Datenschutzerklärung (URL) für Registrierung
+                            </label>
+                            <input type="url" 
+                                class="setting-input" 
+                                id="setting_privacy_url" 
+                                data-key="privacy_policy_url"
+                                placeholder="https://example.com/datenschutz">
                         </div>
                     </div>
 
@@ -205,34 +250,72 @@
                             <small class="input-hint">PNG, JPG oder SVG • Max. 500KB • Empfohlen: 200x60 Pixel</small>
                         </div>
 
-                        <div class="settings-item">
-                            <label>Primärfarbe</label>
-                            <div class="color-input-group">
-                                <input type="color" id="setting_primary_color" class="setting-input" data-key="primary_color">
-                                <button type="button" class="btn-reset-color" data-input="setting_primary_color" data-default="#1F5FBF" title="Standard wiederherstellen">
-                                    ↺
-                                </button>
-                            </div>
+                        <div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: var(--spacing-lg);">
+                            <div class="settings-item">
+                                <label for="setting_primary_color">Primärfarbe</label>
+                                <div class="color-input-group">
+                                    <input type="color" id="setting_primary_color" class="setting-input" data-key="primary_color">
+                                    <button type="button" class="btn-reset-color" data-input="setting_primary_color" data-default="#1F5FBF" title="Standard wiederherstellen">
+                                        ↺
+                                    </button>
+                                </div>
                         </div>
-                        <div class="settings-item">
-                            <label>Sekundärfarbe</label>
-                            <div class="color-input-group">
-                                <input type="color" id="setting_secondary_color" class="setting-input" data-key="secondary_color">
-                                <button type="button" class="btn-reset-color" data-input="setting_secondary_color" data-default="#4CAF50" title="Standard wiederherstellen">
-                                    ↺
-                                </button>
+                            <div class="settings-item">
+                                <label for="setting_secondary_color">Sekundärfarbe</label>
+                                <div class="color-input-group">
+                                    <input type="color" id="setting_secondary_color" class="setting-input" data-key="secondary_color">
+                                    <button type="button" class="btn-reset-color" data-input="setting_secondary_color" data-default="#4CAF50" title="Standard wiederherstellen">
+                                        ↺
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="settings-item">
-                            <label>Hintergrundfarbe</label>
-                            <div class="color-input-group">
-                                <input type="color" id="setting_background_color" class="setting-input" data-key="background_color">
-                                <button type="button" class="btn-reset-color" data-input="setting_background_color" data-default="#f8f9fa" title="Standard wiederherstellen">
-                                    ↺
-                                </button>
+                            <div class="settings-item">
+                                <label for="setting_background_color">Hintergrundfarbe</label>
+                                <div class="color-input-group">
+                                    <input type="color" id="setting_background_color" class="setting-input" data-key="background_color">
+                                    <button type="button" class="btn-reset-color" data-input="setting_background_color" data-default="#f8f9fa" title="Standard wiederherstellen">
+                                        ↺
+                                    </button>
+                                </div>
                             </div>
-                        </div>
+                        </div>                        
                     </div>   
+
+                    <!-- Paginierung  -->
+                    <div class="settings-card">
+                        <h3>Paginierung</h3>
+                        <div class="settings-item">
+                            <label>Datenreihen pro Seite</label>
+                            <input type="number" 
+                                id="entries_per_page" 
+                                class="setting-input" 
+                                data-key="pagination_limit" 
+                                min="10" 
+                                max="100" 
+                                step="5"
+                                required>
+                            <small class="input-hint">(Werte zwischen 10 und 100 in 5er Schritten)</small>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3>📋 DSGVO Datenverwaltung</h3>        
+                        <div class="settings-item">
+                            <label>
+                                <strong>Alte Anwesenheitsdaten löschen</strong>
+                                <small>Löscht alle Records älter als X Jahre (empfohlen: 3 Jahre)</small>
+                            </label>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="number" class="setting-input" id="cleanup_years" data-key="dsgvo-cleanup-years" value="3" min="1" max="10" 
+                                    style="width: 80px;">
+                                <span>Jahre</span>
+                                <button onclick="performCleanup()" class="btn-std btn-delete">
+                                    🗑️ Alte Daten löschen
+                                </button>
+                            </div>
+                            <div id="cleanup_result" style="margin-top: 10px;"></div>
+                        </div>
+                    </div>
                     
                     <!-- E-Mail-Einstellungen -->
                     <div class="settings-card">
@@ -346,24 +429,7 @@
                             </div>
                             <small class="input-hint">Sendet eine Test-Email um die Einstellungen zu prüfen</small>
                         </div>
-                    </div>
-
-                    <!-- Paginierung -->
-                    <div class="settings-card">
-                        <h3>Paginierung</h3>
-                        <div class="settings-item">
-                            <label>Datenreihen pro Seite</label>
-                            <input type="number" 
-                                id="entries_per_page" 
-                                class="setting-input" 
-                                data-key="pagination_limit" 
-                                min="10" 
-                                max="100" 
-                                step="5"
-                                required>
-                            <small class="input-hint">(Werte zwischen 10 und 100 in 5er Schritten)</small>
-                        </div>
-                    </div>
+                    </div>                    
                 </div>
             </div>
 
@@ -571,7 +637,7 @@
             </div>  
 
             <!-- Statistik Sektion -->
-            <section class="content-section" id="statistik">
+            <div class="content-section" id="statistik">
                 <div class="content-header">
                     <h1>Statistik</h1>
                 </div>                          
@@ -626,7 +692,7 @@
                 </div>
 
                 <div id="statisticsContainer"></div>
-            </section>
+            </div>
             
             <!-- Mitglieder Section (nur Admin)-->
             <div class="content-section active" id="mitglieder">
@@ -836,11 +902,89 @@
                 </div>
             </div>
 
+            <!-- Import Logs Section -->
+            <div class="content-section" id="import-logs">
+                <div class="content-header">
+                    <h1>Import-Protokolle</h1>
+                    <div class="header-actions">
+                        <div class = filter-group>
+                            <select id="log-type-filter">
+                                <option value="">Alle Typen</option>
+                                <option value="members">Mitglieder</option>
+                                <option value="records">Anwesenheiten</option>
+                                <option value="appointments">Termine</option>
+                            </select>
+                        </div>
+                        <button class="btn-reset-filter" onclick="window.ImportLogs.refresh()">
+                            🔄 Aktualisieren
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="data-table">
+                    <div id="import-logs-list" class="table-container"></div>
+                </div>                
+            </div>
         <!-- ENDE MAIN ---->
         </main>
     </div>
 
     <!-- MODALS ---------------------  -->
+    <!-- Log Details Modal -->
+    <div id="log-details-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import-Details</h2>
+                <button class="close-modal" onclick="closeLogModal()">×</button>
+            </div>
+            <div class="modal-body">
+            <!-- Zusammenfassung -->
+                <div class="log-summary">
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <label>Datum:</label>
+                            <span id="log_created_at">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Typ:</label>
+                            <span id="log_type_badge"></span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Datei:</label>
+                            <span id="log_filename">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Benutzer:</label>
+                            <span id="log_user_name">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Gesamt Zeilen:</label>
+                            <span id="log_total_rows">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Erfolgreich:</label>
+                            <span id="log_successful_rows" class="text-success">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>Fehler:</label>
+                            <span id="log_failed_rows" class="text-danger">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fehlerdetails -->
+                <div class="log-errors-section">
+                    <h3>Fehlerdetails <span id="log_error_count"></span></h3>
+                    <div id="log_errors_list" class="error-list">
+                        <!-- Wird dynamisch befüllt -->
+                    </div>
+                </div>
+            </div>           
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeLogModal()">Schließen</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal für Mitglieder -->
     <div class="modal" id="memberModal">
@@ -1662,9 +1806,7 @@
                 </div>                
         </div>
     </div>
-
-
-
+    
     <!-- QR Code Generator -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
@@ -1672,6 +1814,7 @@
     <script type="module" src="./js/config.js"></script>
 
     <!-- Module -->
+    <script type="module" src="./js/modules/settings.js"></script>
     <script type="module" src="./js/modules/utils.js"></script>
     <script type="module" src="./js/modules/api.js"></script>
     <script type="module" src="./js/modules/ui.js"></script>

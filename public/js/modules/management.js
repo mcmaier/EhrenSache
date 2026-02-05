@@ -199,7 +199,7 @@ export async function saveGroup() {
         result = await apiCall('member_groups', 'POST', data);
     }
     
-    if (result) {
+    if (result.success) {
         closeGroupModal();
         //invalidateCache('groups'); 
         //await loadGroups(true);
@@ -219,7 +219,7 @@ export async function deleteGroup(groupId, groupName) {
     
     if (confirmed) {
         const result = await apiCall('member_groups', 'DELETE', null, { id: groupId });
-        if (result) {
+        if (result.success) {
             //invalidateCache('groups'); 
             //await loadGroups(true);
             await showGroupSection(true);
@@ -424,7 +424,7 @@ export async function saveType() {
         result = await apiCall('appointment_types', 'POST', data);
     }
     
-    if (result) {
+    if (result.success) {
         closeTypeModal();
         //invalidateCache('types');
         //await loadTypes(true);
@@ -445,7 +445,7 @@ export async function deleteType(typeId, typeName) {
     
     if (confirmed) {
         const result = await apiCall('appointment_types', 'DELETE', null, { id: typeId });
-        if (result) {
+        if (result.success) {
             //invalidateCache('types');
             //await loadTypes(true);
             await showGroupSection(true);

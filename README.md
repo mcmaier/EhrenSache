@@ -13,10 +13,9 @@ Kostenlos unter AGPL-3.0 nutzbar.
 
 **Anwesenheit ist EhrenSache!** 
 
-Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder sich eigenverantwortlich anmeldet oder der Schriftführer die Anwesenheit prüft. EhrenSache erfasst Anwesenheit und Entschuldigen inklusive nachträglicher Korrekturmöglichkeit. 
+Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder sich eigenverantwortlich anmeldet oder der Schriftführer die Anwesenheit prüft. EhrenSache erfasst Anwesenheit und Entschuldigungen inklusive nachträglicher Korrekturmöglichkeit. 
 
-Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünkltichkeit belohnen wollen.
-
+Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen.
 
 ### Kernfunktionen
 - **Mehrstufiges Rollensystem**: Admin, Manager und Benutzer mit differenzierten Berechtigungen
@@ -28,7 +27,7 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 ### Technische Highlights
 - **Sichere Authentifizierung**: Session-basiert für Web, Token-basiert für Geräte
 - **TOTP-Standortverifikation**: Zeitbasierte Einmalpasswörter für sichere Check-ins
-- **Intelligentes Caching**: 95% Reduktion der API-Anfragen durch Jahr-basiertes Caching
+- **Intelligentes Caching**: ~90% Reduktion der API-Anfragen durch Jahr-basiertes Caching
 - **Progressive Web App**: Installation auf Mobilgeräten möglich
 - **Responsive Design**: Optimiert für Desktop, Tablet und Smartphone
 
@@ -39,6 +38,38 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 - Sichere Session-Verwaltung mit HttpOnly und SameSite Cookies
 - Input-Validierung auf Client- und Server-Seite
 - Sichere Datei-Upload-Verifikation
+
+---
+
+## ⚠️ Wichtige Hinweise für Betreiber
+
+### Datenschutz (DSGVO)
+
+EhrenSache verarbeitet personenbezogene Daten. Als **Betreiber** sind Sie 
+**Verantwortlicher** im Sinne der DSGVO und müssen eigenständig für 
+datenschutzkonforme Nutzung sorgen.
+
+**Betreiber-Pflichten:**
+- ✓ Datenschutzerklärung erstellen
+- ✓ Rechtsgrundlage definieren (z.B. berechtigtes Interesse)
+- ✓ Mitglieder informieren
+- ✓ Betroffenenrechte gewährleisten
+- ✓ Technische Schutzmaßnahmen (HTTPS, Backups, etc.)
+
+**Der Entwickler:**
+- ❌ Ist NICHT verantwortlich für Ihre Datenverarbeitung
+- ❌ Haftet NICHT für DSGVO-Verstöße in Ihrer Installation
+- ❌ Gibt KEINE Rechtsberatung
+
+📄 **Ausführliche Informationen**: [DATENSCHUTZ.md](DATENSCHUTZ.md)  
+⚖️ **Haftungsausschluss**: [HAFTUNGSAUSSCHLUSS.md](DISCLAIMER.md)
+
+### Empfehlung
+
+Konsultieren Sie vor Inbetriebnahme einen Datenschutzbeauftragten oder 
+Fachanwalt für IT-Recht, um die DSGVO-Konformität sicherzustellen.
+
+---
 
 ## Technologie-Stack
 
@@ -52,9 +83,10 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 - CSS3 (Grid, Flexbox)
 
 **IoT-Integration (WIP):**
-- (geplant) TOTP-Device für QR-Checkin via App
+- TOTP-Device für QR-Checkin via App
 - (geplant) Fingerprint-Scanner für Biometrie-Checkin
 
+---
 
 ## Installation
 
@@ -70,24 +102,31 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 git clone https://github.com/mcmaier/EhrenSache.git
 ```
 2. Komplettes Verzeichnis in Webspace hochladen.
-> [!IMPORTANT]
-> Die Web-Root der Domain muss auf den Ordner **EhrenSache/public** zeigen!
+> [!WARNING]
+> Die Web-Root der (Sub-)Domain muss auf den Ordner **EhrenSache/public** zeigen!
 
-3. Neue Datenbank erstellen.
+3. Ggf. Neue Datenbank erstellen.
 
-4. Setup ausführen (Angenommen, Ehrensache ist in der Subdomain ehrensache installiert):
+4. Setup ausführen (Angenommen, Ehrensache ist in der Subdomain ehrensache.meine-domain.de installiert):
 ```
-https://ehrensache.meine-domain.de/
---> Leitet automatisch zu Setup weiter
+https://ehrensache.meine-domain.de/install
 ```
-
-## Erste Schritte
 
 Während der Installation wird ein Admin-Account erstellt.
 
-1. Gruppenverwaltung --> Mindestens eine Benutzergruppe anlegen
-2. Gruppenverwaltung --> Eine Terminart erstellen und Benutzergruppe zuweisen
-3. Mitglieder --> Erstellen oder aus CSV Importieren
+5. Als Admin Einloggen:
+
+- Gruppenverwaltung --> Mindestens eine Benutzergruppe anlegen
+- Gruppenverwaltung --> Eine Terminart erstellen und Benutzergruppe zuweisen
+- Datenschutz konfigurieren
+  - **Datenschutzerklärung** erstellen und verlinken
+  - **Mitglieder informieren** (Rundmail, Mitgliederversammlung)
+    > Siehe [DATENSCHUTZ.md](DATENSCHUTZ.md) für Checkliste und Muster-Texte.
+- Mitglieder anlegen oder aus CSV Importieren
+
+---
+
+## Funktionen
 
 ### Für Administratoren
 
@@ -127,8 +166,8 @@ Manager haben eingeschränkten Zugriff:
 
 **Check-in Web:**
 1. Login → Dashboard
-2. Termine und Anwesenheiten einsehen
-3. Statistik einsehen
+2. Termine und eigene Anwesenheiten einsehen
+3. Eigene Statistik einsehen
 4. Anträge erstellen
 
 **Check-in Mobile (PWA):**
@@ -156,68 +195,13 @@ Manager haben eingeschränkten Zugriff:
 
 ## IoT-Integration
 
-**geplant:**
 - QR Code Station mit TOTP Code
-- NFC Station für TOTP Code
-- Fingerprint Authentifizierungsgerät
+- NFC Station für TOTP Code (geplant)
+- Fingerprint Authentifizierungsgerät (geplant)
 
-### Weitere Geräte
 
-Das System unterstützt beliebige IoT-Geräte über die REST API mit API Token:
-- TOTP-Endpoint: `/api/api.php&resource=totp_checkin`
-- Auth-Endpoint: `/api/api.php&resource=auto_checkin`
-- Authentifizierung: Bearer Token
-- Parameter: `member_id`, `appointment_id`, `totp_code`, `source`
 
-## API-Dokumentation
-
-### Authentifizierung
-
-**Web-Login:**
-```
-POST /api/api.php&resource=login
-Body: { "email": "email", "password": "pass" }
-Response: Session-Cookie
-```
-
-**Device-Auth:**
-```
-Header: Authorization: Bearer {token}
-```
-
-### Endpoints (Doku unvollständig!)
-
-**Check-in:**
-```
-POST /api/api.php&resource=totp_checkin
-Body: {
-  "appointment_id": 123,
-  "member_id": 456,
-  "source": "nfc",
-  "totp_code": "123456"
-}
-```
-
-**Termine abrufen:**
-```
-GET /api/api.php&resource=appointments&year=2025
-Response: Array of appointments
-```
-
-**Mitglieder abrufen:**
-```
-GET /api/api.php&resource=members
-Response: Array of members with groups
-```
-
-## Sicherheitshinweise
-
-- **HTTPS erforderlich** für Produktivbetrieb
-- Regelmäßige Updates der Abhängigkeiten
-- Starke Passwörter für Admin-Accounts
-- TOTP-Secrets sicher aufbewahren
-- Device-Tokens niemals im Code hardcoden
-- Backup-Strategie für Datenbank implementieren
+Das System unterstützt beliebige IoT-Geräte über die REST API.
 
 ## Entwicklung
 
@@ -226,7 +210,7 @@ Response: Array of members with groups
 # XAMPP oder ähnliches installieren
 # Projekt nach htdocs/ kopieren
 # Datenbank erstellen
-# In Browser: http://localhost/EhrenSache
+# In Browser: http://localhost/EhrenSache/public
 ```
 
 ### Code-Struktur
@@ -236,7 +220,7 @@ EhrenSache/
 |   ├── config/           # Config Dateien
 |   ├── handlers/         # API Endpunkt-Handler
 |   └── ...             
-└── public/               # Öffentlich zugänglich
+└── public/               # Öffentlich zugänglich <-- Web Root!
     ├── checkin/          # PWA
     ├── api/              # REST API Endpoints
     ├── js/               # Frontend JavaScript
@@ -253,6 +237,9 @@ Das System verwendet ein Jahr-basiertes Caching:
 - Invalidierung bei Änderungen über Event-System
 - Cache-Keys im localStorage
 
+### API-Dokumentation
+
+Siehe **[API Dokumentation](API.md)**
 
 ## Support
 
@@ -270,7 +257,6 @@ Gemeinnützige Vereine, Musikvereine, Sportvereine und andere ehrenamtliche
 Organisationen können EhrenSache **kostenlos** unter der [AGPL-3.0-Lizenz](LICENSE) nutzen.
 
 
-
 **Das bedeutet:**
 - ✅ Kostenlose Nutzung
 - ✅ Quellcode einsehbar und anpassbar
@@ -279,7 +265,7 @@ Organisationen können EhrenSache **kostenlos** unter der [AGPL-3.0-Lizenz](LICE
 
 ### 💼 Kommerzielle Lizenz
 
-Für kommerzielle Nutzung (SaaS-Anbieter, Systemhäuser, Unternehmen) ist eine 
+Für kommerzielle Nutzung ohne Offenlegungspflicht gemäß AGPL ist eine 
 **[Kommerzielle Lizenz](COMMERCIAL-LICENSE.md)** erforderlich.
 
 **Wann brauche ich eine kommerzielle Lizenz?**
@@ -287,6 +273,9 @@ Für kommerzielle Nutzung (SaaS-Anbieter, Systemhäuser, Unternehmen) ist eine
 - Du integrierst EhrenSache in ein kommerzielles Produkt
 - Du möchtest Änderungen NICHT veröffentlichen
 - Du verkaufst EhrenSache-basierte Lösungen
+
+**Lizenzmodelle:**  
+Kontaktieren Sie uns für ein individuelles Angebot.
 
 ## ©️ Copyright
 

@@ -8,11 +8,12 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // IMPORT Handler
 // ============================================
 
-function handleImport($db, $request_method, $authUserRole) {
+function handleImport($db, $database, $request_method, $authUserRole) {
     if ($request_method !== 'POST') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
@@ -21,6 +22,8 @@ function handleImport($db, $request_method, $authUserRole) {
     
     // Nur Admins dürfen importieren
     requireAdmin();
+
+    $prefix = $database->table('');
     
     $type = $_GET['type'] ?? 'members';
     
@@ -32,16 +35,6 @@ function handleImport($db, $request_method, $authUserRole) {
     }
     
     $file = $_FILES['file'];
-    
-    /*
-    // Prüfe Dateityp
-    $fileExt = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if ($fileExt !== 'csv') {
-        http_response_code(400);
-        echo json_encode(["message" => "Only CSV files allowed"]);
-        exit();
-    }*/
-    //-------
 
     // 1. GRÖSSEN-LIMIT (10MB)
     $maxSize = 5 * 1024 * 1024;
@@ -123,20 +116,20 @@ function handleImport($db, $request_method, $authUserRole) {
     
     switch($type) {
         case 'members':
-            $result = importMembers($db, $targetPath);
+            $result = importMembers($db, $database, $targetPath);
             break;
         case 'records':
-            $result = importRecords($db, $targetPath);
+            $result = importRecords($db, $database, $targetPath);
             break;
         case 'appointments':
-            $result = importAppointments($db, $targetPath);
+            $result = importAppointments($db, $database, $targetPath);
             break;
         case 'extract_appointments':
             $minRecords = isset($_POST['min_records']) ? (int)$_POST['min_records'] : 5;
             $roundMinutes = isset($_POST['round_minutes']) ? (int)$_POST['round_minutes'] : 15;
             $toleranceHours = isset($_POST['tolerance_hours']) ? (int)$_POST['tolerance_hours'] : null;
     
-            $result = extractAppointments($db, $targetPath, $minRecords, $roundMinutes, $toleranceHours);
+            $result = extractAppointments($db, $database, $targetPath, $minRecords, $roundMinutes, $toleranceHours);
             break;
 
         default:
@@ -146,6 +139,18 @@ function handleImport($db, $request_method, $authUserRole) {
             unlink($targetPath);
             exit();    
         }
+
+        // Nach dem switch - Log speichern wenn Fehler vorhanden
+    if ($result['success'] && ($type !== 'extract_appointments')) {
+        saveImportLog($db, $database, [
+            'type' => $type,
+            'filename' => $_FILES['file']['name'],
+            'total' => ($result['imported'] ?? 0) + ($result['updated'] ?? 0) + count($result['errors']),
+            'successful' => ($result['imported'] ?? 0) + ($result['updated'] ?? 0),
+            'failed' => count($result['errors']),
+            'errors' => $result['errors']
+        ]);
+    }
 
     // Datei nach Verarbeitung LÖSCHEN
     unlink($targetPath);
@@ -157,11 +162,13 @@ function handleImport($db, $request_method, $authUserRole) {
 // IMPORT MEMBERS
 // ============================================
 
-function importMembers($db, $filePath) {
+function importMembers($db, $database, $filePath) {
     $handle = fopen($filePath, 'r');
     if (!$handle) {
         return ["success" => false, "message" => "Could not read file"];
     }
+
+    $prefix = $database->table('');
     
     // UTF-8 BOM überspringen falls vorhanden
     $bom = fread($handle, 3);
@@ -183,7 +190,7 @@ function importMembers($db, $filePath) {
     
     // Cache für Gruppen-Lookup
     $groupCache = [];
-    $stmt = $db->query("SELECT group_id, group_name FROM member_groups");
+    $stmt = $db->query("SELECT group_id, group_name FROM {$prefix}member_groups");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $groupCache[$row['group_name']] = $row['group_id'];
     }
@@ -225,7 +232,7 @@ function importMembers($db, $filePath) {
             // Suche nach existierendem Mitglied
             if (!empty($memberNumber)) {
                 // Primär: Suche nach member_number
-                $stmt = $db->prepare("SELECT member_id FROM members WHERE member_number = ?");
+                $stmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_number = ?");
                 $stmt->execute([$memberNumber]);
                 $existing = $stmt->fetch(PDO::FETCH_ASSOC);
                 
@@ -236,7 +243,7 @@ function importMembers($db, $filePath) {
 
             if (!$memberId) {
                 // Sekundär: Suche nach Name + Surname
-                $stmt = $db->prepare("SELECT member_id FROM members WHERE name = ? AND surname = ?");
+                $stmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE name = ? AND surname = ?");
                 $stmt->execute([$name, $surname]);
                 $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
@@ -253,7 +260,7 @@ function importMembers($db, $filePath) {
             if ($memberId) {
                 // Update existierendes Mitglied
                 $stmt = $db->prepare("
-                    UPDATE members 
+                    UPDATE {$prefix}members 
                     SET name=?, surname=?, member_number=?, active=?
                     WHERE member_id=?
                 ");
@@ -262,7 +269,7 @@ function importMembers($db, $filePath) {
             } else {
                 // Neues Mitglied erstellen
                 $stmt = $db->prepare("
-                    INSERT INTO members (name, surname, member_number, active)
+                    INSERT INTO {$prefix}members (name, surname, member_number, active)
                     VALUES (?, ?, ?, ?)
                 ");
                 $stmt->execute([$name, $surname, $memberNumber, $active]);
@@ -273,11 +280,11 @@ function importMembers($db, $filePath) {
             // Gruppenzuordnungen aktualisieren
             if (!empty($groups)) {
                 // Alte Zuordnungen löschen
-                $stmt = $db->prepare("DELETE FROM member_group_assignments WHERE member_id=?");
+                $stmt = $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id=?");
                 $stmt->execute([$memberId]);
                 
                 // Neue Zuordnungen erstellen
-                $stmt = $db->prepare("INSERT INTO member_group_assignments (member_id, group_id) VALUES (?, ?)");
+                $stmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
                 foreach ($groups as $groupName) {
                     $groupName = trim($groupName);
                     if (isset($groupCache[$groupName])) {
@@ -313,11 +320,13 @@ function importMembers($db, $filePath) {
 // IMPORT APPOINTMENTS
 // ============================================
 
-function importAppointments($db, $filePath) {
+function importAppointments($db, $database, $filePath) {
     $handle = fopen($filePath, 'r');
     if (!$handle) {
         return ["success" => false, "message" => "Could not read file"];
     }
+
+    $prefix = $database->table('');
     
     // UTF-8 BOM überspringen falls vorhanden
     $bom = fread($handle, 3);
@@ -339,7 +348,7 @@ function importAppointments($db, $filePath) {
     
     // Cache für Terminarten-Lookup
     $typeCache = [];
-    $stmt = $db->query("SELECT type_id, type_name FROM appointment_types");
+    $stmt = $db->query("SELECT type_id, type_name FROM {$prefix}appointment_types");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $typeCache[$row['type_name']] = $row['type_id'];
     }
@@ -406,7 +415,7 @@ function importAppointments($db, $filePath) {
             // Prüfe ob Termin bereits existiert (gleicher Typ, Datum und Zeit)
             $stmt = $db->prepare("
                 SELECT appointment_id 
-                FROM appointments 
+                FROM {$prefix}appointments 
                 WHERE type_id = ? AND date = ? AND start_time = ?
             ");
             $stmt->execute([$typeId, $date, $startTime]);
@@ -415,7 +424,7 @@ function importAppointments($db, $filePath) {
             if ($existing) {
                 // Update existierenden Termin
                 $stmt = $db->prepare("
-                    UPDATE appointments 
+                    UPDATE {$prefix}appointments 
                     SET title=?, description=?
                     WHERE appointment_id=?
                 ");
@@ -424,7 +433,7 @@ function importAppointments($db, $filePath) {
             } else {
                 // Neuen Termin erstellen
                 $stmt = $db->prepare("
-                    INSERT INTO appointments (type_id, date, start_time, title, description)
+                    INSERT INTO {$prefix}appointments (type_id, date, start_time, title, description)
                     VALUES (?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([$typeId, $date, $startTime, $title, $description]);
@@ -457,11 +466,13 @@ function importAppointments($db, $filePath) {
 // IMPORT RECORDS
 // ============================================
 
-function importRecords($db, $filePath) {
+function importRecords($db, $database, $filePath) {
     $handle = fopen($filePath, 'r');
     if (!$handle) {
         return ["success" => false, "message" => "Could not read file"];
     }
+
+    $prefix = $database->table('');
     
     // UTF-8 BOM überspringen falls vorhanden
     $bom = fread($handle, 3);
@@ -528,7 +539,7 @@ function importRecords($db, $filePath) {
             }
             
             // Finde Mitglied anhand member_number
-            $stmt = $db->prepare("SELECT member_id FROM members WHERE member_number = ?");
+            $stmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_number = ?");
             $stmt->execute([$membershipNumber]);
             $member = $stmt->fetch(PDO::FETCH_ASSOC);
             
@@ -545,7 +556,7 @@ function importRecords($db, $filePath) {
             $stmt = $db->prepare("
                 SELECT appointment_id, date, start_time,
                     ABS(TIMESTAMPDIFF(MINUTE, CONCAT(date, ' ', start_time), ?)) as time_diff_minutes
-                FROM appointments 
+                FROM {$prefix}appointments 
                 WHERE CONCAT(date, ' ', start_time) BETWEEN 
                     DATE_SUB(?, INTERVAL ? HOUR) AND 
                     DATE_ADD(?, INTERVAL ? HOUR)
@@ -570,14 +581,14 @@ function importRecords($db, $filePath) {
             $appointmentId = $appointment['appointment_id'];
             
             // Prüfe ob Record bereits existiert
-            $stmt = $db->prepare("SELECT record_id FROM records WHERE member_id = ? AND appointment_id = ?");
+            $stmt = $db->prepare("SELECT record_id FROM {$prefix}records WHERE member_id = ? AND appointment_id = ?");
             $stmt->execute([$memberId, $appointmentId]);
             $existingRecord = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($existingRecord) {
                 // Update existierenden Record
                 $stmt = $db->prepare("
-                    UPDATE records 
+                    UPDATE {$prefix}records 
                     SET arrival_time=?, status=?, checkin_source='import'
                     WHERE record_id=?
                 ");
@@ -586,7 +597,7 @@ function importRecords($db, $filePath) {
             } else {
                 // Neuen Record erstellen
                 $stmt = $db->prepare("
-                    INSERT INTO records (member_id, appointment_id, arrival_time, status, checkin_source)
+                    INSERT INTO {$prefix}records (member_id, appointment_id, arrival_time, status, checkin_source)
                     VALUES (?, ?, ?, ?, 'import')
                 ");
                 $stmt->execute([$memberId, $appointmentId, $arrivalTime, $status]);
@@ -619,7 +630,7 @@ function importRecords($db, $filePath) {
 // EXTRACT APPOINTMENTS from RECORD-FILE
 // ============================================
 
-function extractAppointments($db, $filePath, $minRecords = 5, $roundMinutes = 15, $toleranceHours = null) {
+function extractAppointments($db, $database, $filePath, $minRecords = 5, $roundMinutes = 15, $toleranceHours = null) {
     if ($toleranceHours === null) {
         $toleranceHours = AUTO_CHECKIN_TOLERANCE_HOURS;
     }
@@ -628,6 +639,8 @@ function extractAppointments($db, $filePath, $minRecords = 5, $roundMinutes = 15
     if (!$handle) {
         return ["success" => false, "message" => "Could not read file"];
     }
+
+    $prefix = $database->table('');
     
     // UTF-8 BOM überspringen falls vorhanden
     $bom = fread($handle, 3);
@@ -742,33 +755,7 @@ function extractAppointments($db, $filePath, $minRecords = 5, $roundMinutes = 15
                     ]
                 ];
             }
-        }
-        
-
-        // Filtere Cluster nach Mindestanzahl
-        /*
-        foreach ($clusters as $cluster) {
-            if (count($cluster['times']) >= $minRecords) {
-                // Berechne gerundete Startzeit (nimm früheste Zeit)
-                $firstTime = $cluster['times'][0];
-                $timeObj = DateTime::createFromFormat('H:i:s', $firstTime);
-                
-                // Runde auf $roundMinutes
-                $minutes = (int)$timeObj->format('i');
-                $roundedMinutes = floor($minutes / $roundMinutes) * $roundMinutes;
-                $timeObj->setTime((int)$timeObj->format('H'), $roundedMinutes, 0);
-                
-                $suggestions[] = [
-                    'date' => $date,
-                    'start_time' => $timeObj->format('H:i:s'),
-                    'record_count' => count($cluster['times']),
-                    'time_range' => [
-                        'earliest' => $cluster['times'][0],
-                        'latest' => end($cluster['times'])
-                    ]
-                ];
-            }
-        }*/
+        }        
     }
     
     // Sortiere nach Datum
@@ -786,6 +773,116 @@ function extractAppointments($db, $filePath, $minRecords = 5, $roundMinutes = 15
         'total_records' => count($timestamps),
         'suggestions' => $suggestions
     ];
+}
+
+/**
+ * Speichert Import-Log in Datenbank
+ */
+function saveImportLog($db, $database, $data) {
+    $prefix = $database->table('');
+    
+    try {
+        $stmt = $db->prepare("
+            INSERT INTO {$prefix}import_logs 
+            (user_id, import_type, filename, total_rows, successful_rows, failed_rows, errors)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+        
+        $stmt->execute([
+            getCurrentUserId(),
+            $data['type'],
+            $data['filename'],
+            $data['total'],
+            $data['successful'],
+            $data['failed'],
+            json_encode($data['errors'], JSON_UNESCAPED_UNICODE)
+        ]);
+        
+        return $db->lastInsertId();
+        
+    } catch (PDOException $e) {
+        error_log("Error saving import log: " . $e->getMessage());
+        return null;
+    }
+}
+
+
+function handleImportLogs($db, $database, $method, $authUserRole, $id) {
+    
+    $prefix = $database->table('');
+
+    requireAdmin();
+    
+    switch($method) {
+        case 'GET':
+            if($id) {
+                // Einzelner Log mit Details
+                $stmt = $db->prepare("
+                    SELECT l.*, u.email as user_email, u.name as user_name
+                    FROM {$prefix}import_logs l
+                    JOIN {$prefix}users u ON l.user_id = u.user_id
+                    WHERE log_id = ?
+                ");
+                $stmt->execute([$id]);
+                $log = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if($log) {
+                    $log['errors'] = json_decode($log['errors'], true);
+                    echo json_encode($log);
+                } else {
+                    http_response_code(404);
+                    echo json_encode(["message" => "Log not found"]);
+                }
+            } else {
+                // Liste aller Logs
+                $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
+                $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
+                $type = $_GET['type'] ?? null;
+                
+                // Validierung
+                $limit = max(1, min($limit, 100)); // Zwischen 1 und 100
+                $offset = max(0, $offset);
+
+                $sql = "
+                    SELECT l.log_id, l.import_type, l.filename, 
+                           l.total_rows, l.successful_rows, l.failed_rows,
+                           l.created_at, u.email as user_email, u.name as user_name,
+                           COALESCE(u.name, u.email) as user_name
+                    FROM {$prefix}import_logs l
+                    JOIN {$prefix}users u ON l.user_id = u.user_id
+                ";
+                
+                $params = [];
+                if($type) {
+                    $sql .= " WHERE l.import_type = ?";
+                    $params[] = $type;
+                }
+                
+                // LIMIT/OFFSET direkt einfügen (sicher weil (int) cast)
+                $sql .= " ORDER BY l.created_at DESC LIMIT {$limit} OFFSET {$offset}";
+                
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
+                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+            }
+            break;
+            
+        case 'DELETE':
+            requireAdmin();
+            if($id) {
+                $stmt = $db->prepare("DELETE FROM {$prefix}import_logs WHERE log_id = ?");
+                $stmt->execute([$id]);
+                echo json_encode(["message" => "Log deleted successfully"]);
+            } else {
+                http_response_code(400);
+                echo json_encode(["message" => "Log ID required"]);
+            }
+            break;
+            
+        default:
+            http_response_code(405);
+            echo json_encode(["message" => "Method not allowed"]);
+    }
 }
 
 ?>

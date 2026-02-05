@@ -109,6 +109,16 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         errorDiv.style.display = 'block';
         return;
     }
+
+    // Privacy Policy Validierung (nur wenn sichtbar)
+    const privacyCheckbox = document.getElementById('acceptPrivacy');
+    const privacyGroup = document.getElementById('privacyPolicyGroup');
+    
+    if (privacyGroup.style.display !== 'none' && !privacyCheckbox.checked) {
+        errorDiv.textContent = 'Bitte akzeptieren Sie die Datenschutzerklärung';
+        errorDiv.style.display = 'block';
+        return;
+    }
     
     try {
         const response = await fetch(`${API_BASE}?resource=register`, {
@@ -138,6 +148,11 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
 
             successDiv.style.display = 'block';
             document.getElementById('registerForm').reset();
+
+            // Checkbox zurücksetzen (falls vorhanden)
+            if (privacyCheckbox) {
+                privacyCheckbox.checked = false;
+            }
 
              setTimeout(() => {
                 document.querySelector('[data-tab="login"]').click();

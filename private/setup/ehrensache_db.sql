@@ -14,14 +14,17 @@
 -- Tabellenstruktur für Tabelle `appointments`
 --
 
-CREATE TABLE `appointments` (
-  `appointment_id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `{PREFIX}appointments` (
+  `appointment_id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(200) NOT NULL,
   `description` text DEFAULT NULL,
   `date` date NOT NULL,
   `start_time` time NOT NULL,
   `created_by` int(11) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`appointment_id`),
+  KEY `created_by` (`created_by`),
+  KEY `idx_date` (`date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -30,8 +33,8 @@ CREATE TABLE `appointments` (
 -- Tabellenstruktur für Tabelle `exceptions`
 --
 
-CREATE TABLE `exceptions` (
-  `exception_id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `{PREFIX}exceptions` (
+  `exception_id` int(11) NOT NULL AUTO_INCREMENT,
   `member_id` int(11) NOT NULL,
   `appointment_id` int(11) NOT NULL,
   `exception_type` enum('absence','time_correction') NOT NULL,
@@ -41,7 +44,13 @@ CREATE TABLE `exceptions` (
   `created_by` int(11) NOT NULL,
   `approved_by` int(11) DEFAULT NULL,
   `approved_at` timestamp NULL DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`exception_id`),
+  KEY `member_id` (`member_id`),
+  KEY `appointment_id` (`appointment_id`),
+  KEY `created_by` (`created_by`),
+  KEY `approved_by` (`approved_by`),
+  KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -50,13 +59,14 @@ CREATE TABLE `exceptions` (
 -- Tabellenstruktur für Tabelle `members`
 --
 
-CREATE TABLE `members` (
-  `member_id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `{PREFIX}members` (
+  `member_id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
   `surname` varchar(100) NOT NULL,
   `member_number` varchar(50) DEFAULT NULL,
   `active` tinyint(1) DEFAULT 1,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`member_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -65,13 +75,15 @@ CREATE TABLE `members` (
 -- Tabellenstruktur für Tabelle `membership_dates`
 --
 
-CREATE TABLE `membership_dates` (
-  `membership_date_id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `{PREFIX}membership_dates` (
+  `membership_date_id` int(11) NOT NULL AUTO_INCREMENT,
   `member_id` int(11) NOT NULL,
   `start_date` date NOT NULL,
   `end_date` date DEFAULT NULL,
   `status` enum('active','inactive') DEFAULT 'active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`membership_date_id`),
+  KEY `idx_member_dates` (`member_id`,`start_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -80,8 +92,8 @@ CREATE TABLE `membership_dates` (
 -- Tabellenstruktur für Tabelle `records`
 --
 
-CREATE TABLE `records` (
-  `record_id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `{PREFIX}records` (
+  `record_id` int(11) NOT NULL AUTO_INCREMENT,
   `member_id` int(11) NOT NULL,
   `appointment_id` int(11) NOT NULL,
   `arrival_time` datetime NOT NULL,
@@ -89,7 +101,11 @@ CREATE TABLE `records` (
   `checkin_source` enum('admin','user_totp','device_auth','auto_checkin','import') DEFAULT 'admin',
   `source_device` varchar(100) DEFAULT NULL,
   `location_name` varchar(100) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`record_id`),
+  UNIQUE KEY `unique_member_appointment` (`member_id`,`appointment_id`),
+  KEY `appointment_id` (`appointment_id`),
+  KEY `idx_arrival` (`arrival_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -98,8 +114,8 @@ CREATE TABLE `records` (
 -- Tabellenstruktur für Tabelle `users`
 --
 
-CREATE TABLE `users` (
-  `user_id` int(11) NOT NULL,
+CREATE TABLE IF NOT EXISTS `{PREFIX}users` (
+  `user_id` int(11) NOT NULL AUTO_INCREMENT,
   `email` varchar(255) NULL,
   `name` varchar(100) NULL,
   `device_name` varchar(100) NULL,
@@ -114,148 +130,111 @@ CREATE TABLE `users` (
   `api_token` varchar(64) DEFAULT NULL,
   `api_token_expires_at` datetime DEFAULT NULL,
   `totp_secret` varchar(64) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `api_token` (`api_token`),
+  KEY `member_id` (`member_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-ALTER TABLE users 
-    ADD CONSTRAINT check_device_email 
-    CHECK (
-        (role = 'device' AND email IS NULL) OR 
-        (role != 'device' AND email IS NOT NULL)
-    );
+-- Check Constraint nur hinzufügen wenn nicht vorhanden
+SET @check_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS 
+    WHERE CONSTRAINT_SCHEMA = DATABASE() 
+    AND TABLE_NAME = '{PREFIX}users'
+    AND CONSTRAINT_NAME = '{PREFIX}check_device_email');
 
---
--- Indizes für die Tabelle `appointments`
---
-ALTER TABLE `appointments`
-  ADD PRIMARY KEY (`appointment_id`),
-  ADD KEY `created_by` (`created_by`),
-  ADD KEY `idx_date` (`date`);
+SET @sql = IF(@check_exists = 0,
+    'ALTER TABLE `{PREFIX}users` ADD CONSTRAINT {PREFIX}check_device_email CHECK ((role = ''device'' AND email IS NULL) OR (role != ''device'' AND email IS NOT NULL))',
+    'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
+-- Indizes für die Tabelle `users` bereits in CREATE TABLE definiert
+-- Nur pending_member_id FK muss separat hinzugefügt werden (wegen Reihenfolge)
 --
--- Indizes für die Tabelle `exceptions`
---
-ALTER TABLE `exceptions`
-  ADD PRIMARY KEY (`exception_id`),
-  ADD KEY `member_id` (`member_id`),
-  ADD KEY `appointment_id` (`appointment_id`),
-  ADD KEY `created_by` (`created_by`),
-  ADD KEY `approved_by` (`approved_by`),
-  ADD KEY `idx_status` (`status`);
-
---
--- Indizes für die Tabelle `members`
---
-ALTER TABLE `members`
-  ADD PRIMARY KEY (`member_id`);
-
---
--- Indizes für die Tabelle `membership_dates`
---
-ALTER TABLE `membership_dates`
-  ADD PRIMARY KEY (`membership_date_id`),
-  ADD KEY `idx_member_dates` (`member_id`,`start_date`);
-
---
--- Indizes für die Tabelle `records`
---
-ALTER TABLE `records`
-  ADD PRIMARY KEY (`record_id`),
-  ADD UNIQUE KEY `unique_member_appointment` (`member_id`,`appointment_id`),
-  ADD KEY `appointment_id` (`appointment_id`),
-  ADD KEY `idx_arrival` (`arrival_time`);
-
---
--- Indizes für die Tabelle `users`
---
-ALTER TABLE `users`
-  ADD PRIMARY KEY (`user_id`),
-  ADD UNIQUE KEY `email` (`email`),
-  ADD UNIQUE KEY `api_token` (`api_token`),
-  ADD KEY `member_id` (`member_id`),
-  ADD FOREIGN KEY (`pending_member_id`) REFERENCES `members` (`member_id`) ON DELETE SET NULL;
-
---
--- AUTO_INCREMENT für exportierte Tabellen
---
-
---
--- AUTO_INCREMENT für Tabelle `appointments`
---
-ALTER TABLE `appointments`
-  MODIFY `appointment_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT für Tabelle `exceptions`
---
-ALTER TABLE `exceptions`
-  MODIFY `exception_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT für Tabelle `members`
---
-ALTER TABLE `members`
-  MODIFY `member_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT für Tabelle `membership_dates`
---
-ALTER TABLE `membership_dates`
-  MODIFY `membership_date_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT für Tabelle `records`
---
-ALTER TABLE `records`
-  MODIFY `record_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT für Tabelle `users`
---
-ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- Constraints der exportierten Tabellen
---
+SET @sql = 'ALTER TABLE `{PREFIX}users` ADD CONSTRAINT `{PREFIX}users_ibfk_pending` FOREIGN KEY (`pending_member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE SET NULL';
+SET @exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}users' AND CONSTRAINT_NAME = '{PREFIX}users_ibfk_pending');
+PREPARE stmt FROM IF(@exists = 0, @sql, 'SELECT 1');
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 --
 -- Constraints der Tabelle `appointments`
+-- (Constraint wird nur hinzugefügt wenn nicht vorhanden, sonst stillschweigend übersprungen)
 --
-ALTER TABLE `appointments`
-  ADD CONSTRAINT `appointments_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+SET @sql = 'ALTER TABLE `{PREFIX}appointments` ADD CONSTRAINT `{PREFIX}appointments_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `{PREFIX}users` (`user_id`) ON DELETE SET NULL';
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS 
+    WHERE CONSTRAINT_SCHEMA = DATABASE() 
+    AND TABLE_NAME = '{PREFIX}appointments'
+    AND CONSTRAINT_NAME = '{PREFIX}appointments_ibfk_1');
+PREPARE stmt FROM IF(@constraint_exists = 0, @sql, 'SELECT 1');
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 --
 -- Constraints der Tabelle `exceptions`
 --
-ALTER TABLE `exceptions`
-  ADD CONSTRAINT `exceptions_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `members` (`member_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `exceptions_ibfk_2` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`appointment_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `exceptions_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `exceptions_ibfk_4` FOREIGN KEY (`approved_by`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+SET @sql1 = 'ALTER TABLE `{PREFIX}exceptions` ADD CONSTRAINT `{PREFIX}exceptions_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE CASCADE';
+SET @exists1 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}exceptions' AND CONSTRAINT_NAME = '{PREFIX}exceptions_ibfk_1');
+PREPARE stmt1 FROM IF(@exists1 = 0, @sql1, 'SELECT 1');
+EXECUTE stmt1;
+DEALLOCATE PREPARE stmt1;
+
+SET @sql2 = 'ALTER TABLE `{PREFIX}exceptions` ADD CONSTRAINT `{PREFIX}exceptions_ibfk_2` FOREIGN KEY (`appointment_id`) REFERENCES `{PREFIX}appointments` (`appointment_id`) ON DELETE CASCADE';
+SET @exists2 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}exceptions' AND CONSTRAINT_NAME = '{PREFIX}exceptions_ibfk_2');
+PREPARE stmt2 FROM IF(@exists2 = 0, @sql2, 'SELECT 1');
+EXECUTE stmt2;
+DEALLOCATE PREPARE stmt2;
+
+SET @sql3 = 'ALTER TABLE `{PREFIX}exceptions` ADD CONSTRAINT `{PREFIX}exceptions_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `{PREFIX}users` (`user_id`) ON DELETE CASCADE';
+SET @exists3 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}exceptions' AND CONSTRAINT_NAME = '{PREFIX}exceptions_ibfk_3');
+PREPARE stmt3 FROM IF(@exists3 = 0, @sql3, 'SELECT 1');
+EXECUTE stmt3;
+DEALLOCATE PREPARE stmt3;
+
+SET @sql4 = 'ALTER TABLE `{PREFIX}exceptions` ADD CONSTRAINT `{PREFIX}exceptions_ibfk_4` FOREIGN KEY (`approved_by`) REFERENCES `{PREFIX}users` (`user_id`) ON DELETE SET NULL';
+SET @exists4 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}exceptions' AND CONSTRAINT_NAME = '{PREFIX}exceptions_ibfk_4');
+PREPARE stmt4 FROM IF(@exists4 = 0, @sql4, 'SELECT 1');
+EXECUTE stmt4;
+DEALLOCATE PREPARE stmt4;
 
 --
 -- Constraints der Tabelle `membership_dates`
 --
-ALTER TABLE `membership_dates`
-  ADD CONSTRAINT `membership_dates_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `members` (`member_id`) ON DELETE CASCADE;
+SET @sql = 'ALTER TABLE `{PREFIX}membership_dates` ADD CONSTRAINT `{PREFIX}membership_dates_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE CASCADE';
+SET @exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}membership_dates' AND CONSTRAINT_NAME = '{PREFIX}membership_dates_ibfk_1');
+PREPARE stmt FROM IF(@exists = 0, @sql, 'SELECT 1');
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 --
 -- Constraints der Tabelle `records`
 --
-ALTER TABLE `records`
-  ADD CONSTRAINT `records_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `members` (`member_id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `records_ibfk_2` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`appointment_id`) ON DELETE CASCADE;
+SET @sql1 = 'ALTER TABLE `{PREFIX}records` ADD CONSTRAINT `{PREFIX}records_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE CASCADE';
+SET @exists1 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND CONSTRAINT_NAME = '{PREFIX}records_ibfk_1');
+PREPARE stmt1 FROM IF(@exists1 = 0, @sql1, 'SELECT 1');
+EXECUTE stmt1;
+DEALLOCATE PREPARE stmt1;
+
+SET @sql2 = 'ALTER TABLE `{PREFIX}records` ADD CONSTRAINT `{PREFIX}records_ibfk_2` FOREIGN KEY (`appointment_id`) REFERENCES `{PREFIX}appointments` (`appointment_id`) ON DELETE CASCADE';
+SET @exists2 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND CONSTRAINT_NAME = '{PREFIX}records_ibfk_2');
+PREPARE stmt2 FROM IF(@exists2 = 0, @sql2, 'SELECT 1');
+EXECUTE stmt2;
+DEALLOCATE PREPARE stmt2;
 
 --
 -- Constraints der Tabelle `users`
 --
-ALTER TABLE `users`
-  ADD CONSTRAINT `users_ibfk_member_id1` FOREIGN KEY (`member_id`) REFERENCES `members` (`member_id`) ON DELETE SET NULL;
+SET @sql = 'ALTER TABLE `{PREFIX}users` ADD CONSTRAINT `{PREFIX}users_ibfk_member_id1` FOREIGN KEY (`member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE SET NULL';
+SET @exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}users' AND CONSTRAINT_NAME = '{PREFIX}users_ibfk_member_id1');
+PREPARE stmt FROM IF(@exists = 0, @sql, 'SELECT 1');
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Neue Tabelle: Benutzergruppen
-CREATE TABLE member_groups (
+CREATE TABLE  IF NOT EXISTS `{PREFIX}member_groups` (
   group_id INT PRIMARY KEY AUTO_INCREMENT,
   group_name VARCHAR(100) NOT NULL,
   description TEXT,
@@ -264,16 +243,16 @@ CREATE TABLE member_groups (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- M:N-Tabelle: Member <-> Groups
-CREATE TABLE member_group_assignments (
+CREATE TABLE IF NOT EXISTS `{PREFIX}member_group_assignments` (
   member_id INT NOT NULL,
   group_id INT NOT NULL,
   PRIMARY KEY (member_id, group_id),
-  FOREIGN KEY (member_id) REFERENCES members(member_id) ON DELETE CASCADE,
-  FOREIGN KEY (group_id) REFERENCES member_groups(group_id) ON DELETE CASCADE
+  FOREIGN KEY (member_id) REFERENCES `{PREFIX}members`(member_id) ON DELETE CASCADE,
+  FOREIGN KEY (group_id) REFERENCES `{PREFIX}member_groups`(group_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Neue Tabelle: Terminarten
-CREATE TABLE appointment_types (
+CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_types` (
   type_id INT PRIMARY KEY AUTO_INCREMENT,
   type_name VARCHAR(100) NOT NULL,
   description TEXT,
@@ -283,27 +262,69 @@ CREATE TABLE appointment_types (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- M:N-Tabelle: Terminarten <-> Gruppen (welche Gruppen sind betroffen)
-CREATE TABLE appointment_type_groups (
+CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_type_groups` (
   type_id INT NOT NULL,
   group_id INT NOT NULL,
   PRIMARY KEY (type_id, group_id),
-  FOREIGN KEY (type_id) REFERENCES appointment_types(type_id) ON DELETE CASCADE,
-  FOREIGN KEY (group_id) REFERENCES member_groups(group_id) ON DELETE CASCADE
+  FOREIGN KEY (type_id) REFERENCES `{PREFIX}appointment_types`(type_id) ON DELETE CASCADE,
+  FOREIGN KEY (group_id) REFERENCES `{PREFIX}member_groups`(group_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Appointments erweitern
-ALTER TABLE appointments 
-ADD COLUMN type_id INT DEFAULT NULL AFTER title,
-ADD FOREIGN KEY (type_id) REFERENCES appointment_types(type_id) ON DELETE SET NULL;
+-- Spalte type_id nur hinzufügen wenn nicht vorhanden
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS 
+    WHERE TABLE_SCHEMA = DATABASE() 
+    AND TABLE_NAME = '{PREFIX}appointments' 
+    AND COLUMN_NAME = 'type_id');
 
-ALTER TABLE records ADD INDEX idx_member_year (member_id, arrival_time);
-ALTER TABLE records ADD INDEX idx_year (arrival_time);
-ALTER TABLE appointments ADD INDEX idx_year (date);
-ALTER TABLE member_group_assignments ADD INDEX idx_member (member_id);
-ALTER TABLE member_group_assignments ADD INDEX idx_group (group_id);
+SET @sql_column = IF(@column_exists = 0,
+    'ALTER TABLE `{PREFIX}appointments` ADD COLUMN type_id INT DEFAULT NULL AFTER title',
+    'SELECT 1');
+PREPARE stmt FROM @sql_column;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Foreign Key nur hinzufügen wenn nicht vorhanden
+SET @fk_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS 
+    WHERE CONSTRAINT_SCHEMA = DATABASE() 
+    AND TABLE_NAME = '{PREFIX}appointments'
+    AND CONSTRAINT_NAME = '{PREFIX}appointments_type_fk');
+
+SET @sql_fk = IF(@fk_exists = 0,
+    'ALTER TABLE `{PREFIX}appointments` ADD CONSTRAINT `{PREFIX}appointments_type_fk` FOREIGN KEY (type_id) REFERENCES `{PREFIX}appointment_types`(type_id) ON DELETE SET NULL',
+    'SELECT 1');
+PREPARE stmt FROM @sql_fk;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Zusätzliche Indizes nur hinzufügen wenn nicht vorhanden
+SET @idx1 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND INDEX_NAME = '{PREFIX}idx_member_year');
+PREPARE stmt FROM IF(@idx1 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX {PREFIX}idx_member_year (member_id, arrival_time)', 'SELECT 1');
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx2 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND INDEX_NAME = '{PREFIX}idx_year');
+PREPARE stmt FROM IF(@idx2 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX {PREFIX}idx_year (arrival_time)', 'SELECT 1');
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx3 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}appointments' AND INDEX_NAME = '{PREFIX}idx_year');
+PREPARE stmt FROM IF(@idx3 = 0, 'ALTER TABLE `{PREFIX}appointments` ADD INDEX {PREFIX}idx_year (date)', 'SELECT 1');
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx4 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}member_group_assignments' AND INDEX_NAME = '{PREFIX}idx_member');
+PREPARE stmt FROM IF(@idx4 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX {PREFIX}idx_member (member_id)', 'SELECT 1');
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @idx5 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}member_group_assignments' AND INDEX_NAME = '{PREFIX}idx_group');
+PREPARE stmt FROM IF(@idx5 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX {PREFIX}idx_group (group_id)', 'SELECT 1');
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- Rate Limiting
-CREATE TABLE rate_limits (
+CREATE TABLE IF NOT EXISTS `{PREFIX}rate_limits` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     identifier VARCHAR(64) NOT NULL,
     action VARCHAR(50) NOT NULL,
@@ -314,32 +335,32 @@ CREATE TABLE rate_limits (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Email-Verifikation für neue Registrierungen
-CREATE TABLE email_verification_tokens (
+CREATE TABLE IF NOT EXISTS `{PREFIX}email_verification_tokens` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     token VARCHAR(64) NOT NULL UNIQUE,
     expires_at DATETIME NOT NULL,
     used TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES `{PREFIX}users`(user_id) ON DELETE CASCADE,
     INDEX idx_token (token),
     INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Passwort-Reset Tokens
-CREATE TABLE password_reset_tokens (
+CREATE TABLE IF NOT EXISTS `{PREFIX}password_reset_tokens` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     token VARCHAR(64) NOT NULL UNIQUE,
     expires_at DATETIME NOT NULL,
     used TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES `{PREFIX}users`(user_id) ON DELETE CASCADE,
     INDEX idx_token (token),
     INDEX idx_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE `system_settings` (
+CREATE TABLE IF NOT EXISTS `{PREFIX}system_settings` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `setting_key` VARCHAR(50) NOT NULL UNIQUE,
   `setting_value` TEXT,
@@ -348,16 +369,44 @@ CREATE TABLE `system_settings` (
   `description` VARCHAR(255),
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `updated_by` INT,
-  FOREIGN KEY (`updated_by`) REFERENCES `users`(`user_id`) ON DELETE SET NULL
+  FOREIGN KEY (`updated_by`) REFERENCES `{PREFIX}users`(`user_id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Standard-Werte einfügen
-INSERT INTO `system_settings` (`setting_key`, `setting_value`, `setting_type`, `category`, `description`) VALUES
-('organization_name', 'EhrenSache', 'text', 'general', 'Name der Organisation'),
-('primary_color', '#1F5FBF', 'color', 'appearance', 'Primärfarbe'),
-('secondary_color', '#4CAF50', 'color', 'appearance', 'Sekundärfarbe'),
-('background_color', '#f8f9fa', 'color', 'appearance', 'Hintergrundfarbe'), 
-('organization_logo', 'assets/logo-default.png', 'text', 'appearance', 'Logo-Pfad (relativ zu /public/)'),
+CREATE TABLE IF NOT EXISTS `{PREFIX}import_logs` (
+  `log_id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `import_type` ENUM('members', 'records', 'appointments') NOT NULL,
+  `filename` VARCHAR(255),
+  `total_rows` INT DEFAULT 0,
+  `successful_rows` INT DEFAULT 0,
+  `failed_rows` INT DEFAULT 0,
+  `errors` TEXT,  -- JSON mit Fehlerdetails
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `{PREFIX}users`(`user_id`) ON DELETE CASCADE,
+  INDEX idx_user_date (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Foreign Key
+SET @fk_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS 
+    WHERE CONSTRAINT_SCHEMA = DATABASE() 
+    AND TABLE_NAME = '{PREFIX}import_logs'
+    AND CONSTRAINT_NAME = '{PREFIX}import_logs_user_fk');
+
+SET @sql = IF(@fk_exists = 0,
+    'ALTER TABLE `{PREFIX}import_logs` ADD CONSTRAINT `{PREFIX}import_logs_user_fk` FOREIGN KEY (`user_id`) REFERENCES `{PREFIX}users`(`user_id`) ON DELETE CASCADE',
+    'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Standard-Werte einfügen (nur wenn noch nicht vorhanden)
+INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `setting_type`, `category`, `description`) VALUES
+('organization_name', 'EhrenSache', 'text', 'public', 'Name der Organisation'),
+('privacy_policy_url', '', 'text', 'public', 'Link zur Datenschutzerklärung'),
+('primary_color', '#1F5FBF', 'color', 'public', 'Primärfarbe'),
+('secondary_color', '#4CAF50', 'color', 'public', 'Sekundärfarbe'),
+('background_color', '#f8f9fa', 'color', 'public', 'Hintergrundfarbe'), 
+('organization_logo', 'assets/logo-default.png', 'text', 'public', 'Logo-Pfad (relativ zu /public/)'),
 ('pagination_limit', '25', 'number', 'pagination', 'Einträge pro Seite'),
 ('mail_enabled', '0', 'boolean', 'general', 'E-Mail-Versand aktiviert'),
 ('mail_from_email', 'noreply@ehrensache.de', 'text', 'general', 'Absender E-Mail-Adresse'),
@@ -368,7 +417,7 @@ INSERT INTO `system_settings` (`setting_key`, `setting_value`, `setting_type`, `
 ('smtp_configured', '0', 'boolean', 'general', 'SMTP-Server konfiguriert');
 
 
-CREATE OR REPLACE VIEW v_users_extended AS
+CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS
 SELECT 
     u.user_id,
     u.email,
@@ -435,65 +484,7 @@ SELECT
         ELSE 'Unbekannt'
     END AS role_name
     
-FROM users u
-LEFT JOIN members m_active ON u.member_id = m_active.member_id
-LEFT JOIN members m_pending ON u.pending_member_id = m_pending.member_id;
+FROM `{PREFIX}users` u
+LEFT JOIN `{PREFIX}members` m_active ON u.member_id = m_active.member_id
+LEFT JOIN `{PREFIX}members` m_pending ON u.pending_member_id = m_pending.member_id;
 
-/*
--- Trigger für INSERT
-CREATE TRIGGER check_device_email_insert
-BEFORE INSERT ON users
-FOR EACH ROW
-BEGIN
-    -- Geräte dürfen KEINE Email haben
-    IF NEW.role = 'device' AND NEW.email IS NOT NULL THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Geräte dürfen keine Email-Adresse haben';
-    END IF;
-    
-    -- Normale User MÜSSEN Email haben
-    IF NEW.role != 'device' AND NEW.email IS NULL THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Benutzer benötigen eine Email-Adresse';
-    END IF;
-END;
-
--- Trigger für UPDATE
-CREATE TRIGGER check_device_email_update
-BEFORE UPDATE ON users
-FOR EACH ROW
-BEGIN
-    -- Geräte dürfen KEINE Email haben
-    IF NEW.role = 'device' AND NEW.email IS NOT NULL THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Geräte dürfen keine Email-Adresse haben';
-    END IF;
-    
-    -- Normale User MÜSSEN Email haben
-    IF NEW.role != 'device' AND NEW.email IS NULL THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Benutzer benötigen eine Email-Adresse';
-    END IF;
-END;
-*/
-
-/* Beispieldaten*/
-/*
--- Initiale Daten
-INSERT INTO member_groups (group_name, description, is_default) VALUES
-('Alle Mitglieder', 'Standard-Gruppe für alle', 1),
-('Vorstandschaft', 'Vorstandsmitglieder', 0);
-
-INSERT INTO appointment_types (type_name, description, is_default, color) VALUES
-('Probe', 'Reguläre Probe', 1, '#27ae60'),
-('Vorstandschaftssitzung', 'Nur Vorstand', 0, '#3498db'),
-('Sonstiges', 'Sonstige Termine', 0, '#95a5a6');
-
--- Verknüpfe Standard-Terminart mit "Alle Mitglieder"
-INSERT INTO appointment_type_groups (type_id, group_id)
-SELECT 1, 1; -- Probe -> Alle
-
--- Verknüpfe Vorstandssitzung mit "Vorstandschaft"
-INSERT INTO appointment_type_groups (type_id, group_id)
-SELECT 2, 2; -- Vorstandschaftssitzung -> Vorstandschaft
-*/

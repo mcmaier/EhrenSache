@@ -9,6 +9,7 @@
  */
 
 import { API_BASE } from '../config.js';
+import { resetSessionTimeout } from './auth.js';
 import { debug } from '../app.js'
 
 // Globale State
@@ -90,6 +91,11 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
         result = await response.json();
 
         result.success = response.ok;
+
+        // Bei erfolgreichem API-Call: Session verlängern
+        if (response.ok && currentUser) {
+            resetSessionTimeout();
+        }
                 
         //Debug
         debug.log("API call:",resource, method, params, data);
@@ -99,13 +105,13 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
             if(response.status === 401) 
             {
                 //Session abgelaufen
-                csrfToken = null;                
+                csrfToken = null;     
+                window.location.href = 'login.html';             
                 if (!isInitialLoad) {
                     const { showToast } = await import('./ui.js');
                     showToast('Sitzung abgelaufen. Bitte erneut anmelden.', 'warning');
                     isInitialLoad = true;
-                }
-                window.location.href = 'login.html';                
+                }                              
                 return null;
             }
             
@@ -121,7 +127,7 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
             const errorTitle = errorMessages[response.status] || 'Fehler';
             const errorMessage = result.message || result.hint || 'Ein unbekannter Fehler ist aufgetreten';
             const { showToast } = await import('./ui.js');
-            showToast(errorMessage, 'error', errorTitle);
+            showToast(errorMessage, 'error');
             return result;
         }
         
@@ -132,7 +138,7 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
     } catch (error) {
         debug.error('API Error:', error);
         const { showToast } = await import('./ui.js');
-        showToast('Fehler bei der Kommunikation mit dem Server', 'error');
+        showToast('Fehler bei der Kommunikation mit dem Server', 'error', 6000);
         return result;
     }
     

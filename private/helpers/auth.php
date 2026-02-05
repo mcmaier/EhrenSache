@@ -12,9 +12,11 @@
 // auth.php
 // ============================================
 
-function login($db, $email, $password) {
+function login($db, $database, $email, $password) {
 
-    $rateLimiter = new RateLimiter($db);
+    $prefix = $database->table('');
+
+    $rateLimiter = new RateLimiter($db, $database);
 
     // Login-Versuche prüfen
     if (!$rateLimiter->canAttemptLogin($email, 5, 900)) {
@@ -25,7 +27,7 @@ function login($db, $email, $password) {
     }
         
     $stmt = $db->prepare("SELECT user_id, email, password_hash, role, is_active, account_status
-                          FROM users WHERE email = ?");
+                          FROM {$prefix}users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -70,7 +72,9 @@ function login($db, $email, $password) {
 }
 
 
-function loginWithToken($db, $email, $password) {    
+function loginWithToken($db, $database, $email, $password) {    
+
+    $prefix = $database->table('');
 
     // Rate Limiting Check
     $ip = $_SERVER['REMOTE_ADDR'];
@@ -105,7 +109,7 @@ function loginWithToken($db, $email, $password) {
         // Hole User aus DB
         $stmt = $db->prepare("
             SELECT user_id, email, password_hash, role, member_id, api_token, api_token_expires_at, is_active 
-            FROM users 
+            FROM {$prefix}users 
             WHERE email = ?
         ");
         $stmt->execute([$email]);
@@ -133,17 +137,13 @@ function loginWithToken($db, $email, $password) {
         $tokenExpired = empty($user['api_token_expires_at']) || strtotime($user['api_token_expires_at']) < time();
                 
         if (empty($token) || $tokenExpired) {
-            http_response_code(401);
-            return ["success" => false, "message" => "Token ungültig oder abgelaufen"];
-
-        /*
+        
             // Generiere neuen Token
             $token = bin2hex(random_bytes(24));
             $expiresAt = date('Y-m-d H:i:s', strtotime('+1 year'));
             
-            $stmt = $db->prepare("UPDATE users SET api_token = ?, api_token_expires_at = ? WHERE user_id = ?");
-            $stmt->execute([$token, $user['user_id'], $expiresAt]);
-            */        
+            $stmt = $db->prepare("UPDATE {$prefix}users SET api_token = ?, api_token_expires_at = ? WHERE user_id = ?");
+            $stmt->execute([$token, $expiresAt, $user['user_id']]);                    
         }
 
         // Bei Erfolg: Reset attempts

@@ -9,10 +9,10 @@
  */
 
 import {TOAST_DURATION} from '../config.js';
-import {apiCall, isAdmin, isManager, isAdminOrManager, currentUser, setCurrentUser} from './api.js';
+import {apiCall, isAdmin, isAdminOrManager, currentUser} from './api.js';
 import {loadProfile, initProfileEventHandler} from './profile.js';
 import {loadUsers, showUserSection, initUsersEventHandlers} from'./users.js';
-import {loadDevices, showDeviceSection, initDevicesEventHandlers} from'./devices.js';
+import {showDeviceSection} from'./devices.js';
 import {loadAppointments, setCalendarToYear, showAppointmentSection} from'./appointments.js';
 import {loadExceptions, showExceptionSection, initExceptionEventHandlers} from'./exceptions.js';
 import {loadRecords, showRecordsSection, initRecordEventHandlers} from'./records.js';
@@ -21,6 +21,7 @@ import {loadGroups, loadTypes, showGroupSection} from './management.js';
 import {initStatisticsEventHandlers, showStatisticsSection} from './statistics.js';
 import {debug} from '../app.js'
 import {renderSystemSettings} from './settings.js';
+import {loadImportLogs} from './import_export.js';
 
 // ============================================
 // UI
@@ -215,25 +216,30 @@ export function createMobileMenuButton() {
     // Initial IMMER versteckt
     mobileMenuBtn.style.display = 'none';
     document.body.appendChild(mobileMenuBtn);
-    
+
+    //const mobileScreen = document.getElementById('dashboard');
+        
     const sidebar = document.querySelector('.sidebar');
-    const sidebarOverlay = document.createElement('div');
-    sidebarOverlay.className = 'sidebar-overlay';
-    document.body.appendChild(sidebarOverlay);
+    //const sidebarOverlay = document.createElement('div');
+    //sidebarOverlay.className = 'sidebar-overlay';
+    //mobileScreen.appendChild(sidebarOverlay);    
     
     // Toggle Funktion
     mobileMenuBtn.addEventListener('click', function() {
         sidebar.classList.toggle('mobile-open');
-        sidebarOverlay.classList.toggle('active');
+        //sidebarOverlay.classList.toggle('active');
         this.classList.toggle('active');
     });
     
+    
+    /*
     // Schließen bei Overlay-Click
     sidebarOverlay.addEventListener('click', function() {
         sidebar.classList.remove('mobile-open');
         this.classList.remove('active');
         mobileMenuBtn.classList.remove('active');
     });
+    */
     
     // Responsive Handler
     window.addEventListener('resize', updateMobileMenuVisibility);
@@ -352,6 +358,7 @@ export async function showConfirm(message, title = 'Bestätigung') {
 }
 
 export function updateUIForRole() {
+
     // Sections für Admin und Manager sichtbar
     document.querySelectorAll('[data-role="admin"]').forEach(el => {
         el.style.display = isAdmin ? 'block' : 'none';
@@ -359,18 +366,17 @@ export function updateUIForRole() {
     
     document.querySelectorAll('[data-role="manager"]').forEach(el => {
         el.style.display = isAdminOrManager ? 'block' : 'none';
-    });
-    
-    // System-Einstellungen NUR für Admin
-    const systemSettings = document.querySelector('[data-section="einstellungen"]');
-    if (systemSettings) {
-        systemSettings.style.display = isAdmin ? 'block' : 'none';
+    });    
+
+    // Zeige Tabs nur für Admins
+    const navTabs = document.querySelector('.nav-tabs');
+    if (navTabs && isAdmin) {
+        navTabs.style.display = 'flex';
     }
     
-    // Benutzer-Verwaltung NUR für Admin
-    const userSection = document.querySelector('[data-section="benutzer"]');
-    if (userSection) {
-        userSection.style.display = isAdmin ? 'block' : 'none';
+    // Initialisiere Tabs
+    if (isAdmin) {
+        initNavTabs();
     }
     
     // Filter-Leiste anpassen
@@ -395,6 +401,19 @@ export function updateMobileMenuVisibility() {
     mobileMenuBtn.style.display = (isLoggedIn && isMobile) ? 'flex' : 'none';
 }
 
+
+function closeMobileSidebar(){
+    // Schließe Sidebar auf Mobile nach Klick auf Menu Item
+    const sidebar = document.querySelector('.sidebar');
+    //const overlay = document.querySelector('.sidebar-overlay');
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    
+    if (sidebar && sidebar.classList.contains('mobile-open')) {
+        sidebar.classList.remove('mobile-open');
+        //if (overlay) overlay.classList.remove('active');
+        if (mobileMenuBtn) mobileMenuBtn.classList.remove('active');
+    }
+}
 
 // Nach Login/Session-Check setzen
 export function showDashboard() {
@@ -492,24 +511,88 @@ export async function initNavigation() {
             
             this.classList.add('active');
             const section = this.getAttribute('data-section');
-            document.getElementById(section).classList.add('active');
-            
+            document.getElementById(section).classList.add('active');            
+
              // Speichere aktuelle Section
             sessionStorage.setItem('currentSection', section);
 
             debug.log("==== SECTION CHANGED ===>", section);            
-
             loadAllData();
 
-            // Schließe Sidebar auf Mobile nach Klick auf Menu Item
-            const sidebar = document.querySelector('.sidebar');
-            const overlay = document.querySelector('.sidebar-overlay');
-            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            closeMobileSidebar();
             
-            if (sidebar && sidebar.classList.contains('mobile-open')) {
-                sidebar.classList.remove('mobile-open');
-                if (overlay) overlay.classList.remove('active');
-                if (mobileMenuBtn) mobileMenuBtn.classList.remove('active');
+        });
+    });
+}
+
+
+export function initNavTabs() {
+    const tabs = document.querySelectorAll('.nav-tab-btn');
+    const mainNav = document.querySelector('.nav-menu[data-nav-group="main"]');
+    const systemNav = document.querySelector('.nav-menu[data-nav-group="system"]');
+    
+    if (!tabs.length || !mainNav || !systemNav) return;
+
+    const savedTab = sessionStorage.getItem('currentNavTab') || 'main';
+    
+    // Entferne ALLE active Klassen zuerst
+    tabs.forEach(t => t.classList.remove('active'));
+
+    // INITIAL STATE - zeige main
+    if (savedTab === 'main') {
+        mainNav.style.display = 'block';
+        systemNav.style.display = 'none';
+        tabs[0].classList.add('active');
+    } else {
+        mainNav.style.display = 'none';
+        systemNav.style.display = 'block';
+        tabs[1].classList.add('active');
+    }
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            const targetGroup = tab.dataset.navTab;            
+            
+             // Tab-Auswahl speichern
+            sessionStorage.setItem('currentNavTab', targetGroup);
+
+            // Tab aktiv setzen
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Navigation umschalten
+            if (targetGroup === 'main') {
+                mainNav.style.display = 'block';
+                systemNav.style.display = 'none';
+            } else {
+                mainNav.style.display = 'none';
+                systemNav.style.display = 'block';
+            }
+            
+            // Prüfe ob aktives Item noch sichtbar ist
+            const activeItem = document.querySelector('.nav-item.active');
+            const visibleNav = targetGroup === 'main' ? mainNav : systemNav;        
+
+           // Wenn aktives Item nicht in sichtbarer Nav ist
+            if (!activeItem || !visibleNav.contains(activeItem)) {
+                const firstItem = visibleNav.querySelector('.nav-item');
+                if (firstItem) {
+                    // NICHT .click() verwenden - manuell aktivieren!
+                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+                    
+                    firstItem.classList.add('active');
+                    const section = firstItem.getAttribute('data-section');
+                    const contentSection = document.getElementById(section);
+                    if (contentSection) {
+                        contentSection.classList.add('active');
+                    }
+                    
+                    sessionStorage.setItem('currentSection', section);
+                    loadAllData();                
+                }
             }
         });
     });
@@ -562,16 +645,23 @@ export async function loadAllData() {
                 await showGroupSection(true);
             }
             break;
-        case 'statistik':
-            await showStatisticsSection();
+        case 'statistik':            
+            await showStatisticsSection();            
             break;
         case  'einstellungen':
-            await renderSystemSettings();
+            if(isAdmin){
+                await renderSystemSettings();
+            }
             break;
-            default:
-                break;
-    }    
-    
+        case 'import-logs':
+            if(isAdmin){
+                await loadImportLogs();
+            }
+            break;
+
+        default:
+            break;
+    }        
 
     // Hintergrund-Laden nur für ungecachte Daten
     setTimeout(() => {

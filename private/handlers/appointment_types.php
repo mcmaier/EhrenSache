@@ -12,20 +12,22 @@
 // ============================================
 // APPOINTMENT_TYPES Controller
 // ============================================
-function handleAppointmentTypes($db, $method, $id) {
+function handleAppointmentTypes($db, $database, $method, $id) {
     
+    $prefix = $database->table('');
+
     switch($method) {
         case 'GET':
             if($id) {
                 // Einzelne Terminart mit Gruppen
-                $stmt = $db->prepare("SELECT * FROM appointment_types WHERE type_id = ?");
+                $stmt = $db->prepare("SELECT * FROM {$prefix}appointment_types WHERE type_id = ?");
                 $stmt->execute([$id]);
                 $type = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if($type) {
                     // Lade zugehörige Gruppen
-                    $groupStmt = $db->prepare("SELECT g.* FROM member_groups g
-                                               INNER JOIN appointment_type_groups atg ON g.group_id = atg.group_id
+                    $groupStmt = $db->prepare("SELECT g.* FROM {$prefix}member_groups g
+                                               INNER JOIN {$prefix}appointment_type_groups atg ON g.group_id = atg.group_id
                                                WHERE atg.type_id = ?");
                     $groupStmt->execute([$id]);
                     $type['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -37,15 +39,15 @@ function handleAppointmentTypes($db, $method, $id) {
                 }
             } else {
                 // ALLE Types MIT Gruppen
-                $stmt = $db->query("SELECT * FROM appointment_types ORDER BY type_name");
+                $stmt = $db->query("SELECT * FROM {$prefix}appointment_types ORDER BY type_name");
                 $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 // Für jeden Type die Gruppen laden
                 foreach ($types as &$type) {
                     $stmt = $db->prepare("
                         SELECT g.* 
-                        FROM member_groups g
-                        INNER JOIN appointment_type_groups atg ON g.group_id = atg.group_id
+                        FROM {$prefix}member_groups g
+                        INNER JOIN {$prefix}appointment_type_groups atg ON g.group_id = atg.group_id
                         WHERE atg.type_id = ?
                     ");
                     $stmt->execute([$type['type_id']]);
@@ -65,10 +67,10 @@ function handleAppointmentTypes($db, $method, $id) {
 
             // Wenn is_default=true, setze alle anderen auf false
             if(isset($data->is_default) && $data->is_default) {
-                $db->exec("UPDATE appointment_types SET is_default = 0");
+                $db->exec("UPDATE {$prefix}appointment_types SET is_default = 0");
             }
             
-            $stmt = $db->prepare("INSERT INTO appointment_types 
+            $stmt = $db->prepare("INSERT INTO {$prefix}appointment_types 
                                   (type_name, description, is_default, color) 
                                   VALUES (?, ?, ?, ?)");
             if($stmt->execute([
@@ -81,7 +83,7 @@ function handleAppointmentTypes($db, $method, $id) {
                 
                 // Verknüpfe mit Gruppen
                 if(isset($data->group_ids) && is_array($data->group_ids)) {
-                    $linkStmt = $db->prepare("INSERT INTO appointment_type_groups (type_id, group_id) VALUES (?, ?)");
+                    $linkStmt = $db->prepare("INSERT INTO {$prefix}appointment_type_groups (type_id, group_id) VALUES (?, ?)");
                     foreach($data->group_ids as $groupId) {
                         $linkStmt->execute([$typeId, $groupId]);
                     }
@@ -102,10 +104,10 @@ function handleAppointmentTypes($db, $method, $id) {
 
             // Wenn is_default=true, setze alle anderen auf false (außer dieser)
             if(isset($data->is_default) && $data->is_default) {
-                $db->prepare("UPDATE appointment_types SET is_default = 0 WHERE type_id != ?")->execute([$id]);
+                $db->prepare("UPDATE {$prefix}appointment_types SET is_default = 0 WHERE type_id != ?")->execute([$id]);
             }
             
-            $stmt = $db->prepare("UPDATE appointment_types 
+            $stmt = $db->prepare("UPDATE {$prefix}appointment_types 
                                   SET type_name = ?, description = ?, is_default = ?, color = ?
                                   WHERE type_id = ?");
             if($stmt->execute([
@@ -116,10 +118,10 @@ function handleAppointmentTypes($db, $method, $id) {
                 $id
             ])) {
                 // Aktualisiere Gruppen-Verknüpfungen
-                $db->prepare("DELETE FROM appointment_type_groups WHERE type_id = ?")->execute([$id]);
+                $db->prepare("DELETE FROM {$prefix}appointment_type_groups WHERE type_id = ?")->execute([$id]);
                 
                 if(isset($data->group_ids) && is_array($data->group_ids)) {
-                    $linkStmt = $db->prepare("INSERT INTO appointment_type_groups (type_id, group_id) VALUES (?, ?)");
+                    $linkStmt = $db->prepare("INSERT INTO {$prefix}appointment_type_groups (type_id, group_id) VALUES (?, ?)");
                     foreach($data->group_ids as $groupId) {
                         $linkStmt->execute([$id, $groupId]);
                     }
@@ -135,7 +137,7 @@ function handleAppointmentTypes($db, $method, $id) {
         case 'DELETE':
             requireAdminOrManager();
             
-            $stmt = $db->prepare("DELETE FROM appointment_types WHERE type_id = ?");
+            $stmt = $db->prepare("DELETE FROM {$prefix}appointment_types WHERE type_id = ?");
             if($stmt->execute([$id])) {
                 echo json_encode(["message" => "Type deleted"]);
             } else {

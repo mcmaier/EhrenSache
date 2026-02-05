@@ -14,6 +14,7 @@
 header("Content-Type: text/html; charset=UTF-8");
 
 require_once '../private/config/config.php';
+require_once '../private/helpers/mailer.php';
 require_once '../private/helpers/branding.php';
 
 session_start();
@@ -21,13 +22,15 @@ session_start();
 $database = new Database();
 $db = $database->getConnection();
 
-$branding = getBrandingSettings($db);
+$prefix = $database->table('');
+
+$branding = getBrandingSettings($db, $database);
 
 // Token aus URL
 $token = $_GET['token'] ?? '';
 
 if (empty($token) || !ctype_xdigit($token) || strlen($token) !== 64) {
-    showError('Ungültiger Verifikations-Link',$branding);
+    showError('Ungültiger Verifikations-Link','Der Verifikations-Link ist nicht gültig.', $branding);
     exit();
 }
 
@@ -38,8 +41,8 @@ try {
     // Token aus DB holen
     $stmt = $db->prepare(
         "SELECT evt.user_id, u.name, u.email 
-         FROM email_verification_tokens evt
-         JOIN users u ON evt.user_id = u.user_id
+         FROM {$prefix}email_verification_tokens evt
+         JOIN {$prefix}users u ON evt.user_id = u.user_id
          WHERE evt.token = ? 
          AND evt.used = 0 
          AND evt.expires_at > NOW()"
@@ -56,7 +59,7 @@ try {
     $db->beginTransaction();
     
     $stmt = $db->prepare(
-        "UPDATE users 
+        "UPDATE {$prefix}users 
          SET email_verified = 1 
          WHERE user_id = ?"
     );
@@ -64,16 +67,45 @@ try {
     
     // Token als verwendet markieren
     $stmt = $db->prepare(
-        "UPDATE email_verification_tokens 
+        "UPDATE {$prefix}email_verification_tokens 
          SET used = 1 
          WHERE token = ?"
     );
     $stmt->execute([$tokenHash]);
     
-    $db->commit();
-    
+    $db->commit();        
+
+    // Mail-Status prüfen BEVOR User gesucht wird
+    $mailer = new Mailer(getMailConfig(), $db, $database);
+    $mailStatus = $mailer->checkMailStatus();
+
+    if (!$mailStatus['enabled']) {
+        exit();
+    }
+
+    // Admin benachrichtigen
+    // Hole Benutzerinformationen für die Admin-Benachrichtigung
+    $user_stmt = $db->prepare("SELECT name, email FROM {$prefix}users WHERE user_id = ?");
+    $user_stmt->execute([$result['user_id']]);
+    $user_data = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
+    // Benachrichtige alle Admins
+    $admin_stmt = $db->prepare("SELECT email FROM {$prefix}users WHERE role = 'admin' AND is_active = 1");
+    $admin_stmt->execute();
+
+    while ($admin = $admin_stmt->fetch(PDO::FETCH_ASSOC)) {
+        $subject = "Neue Registrierung: {$user_data['name']}";
+        $message = "Ein neuer Benutzer hat seine E-Mail-Adresse bestätigt:\n\n";
+        $message .= "Name: {$user_data['name']}\n";
+        $message .= "E-Mail: {$user_data['email']}\n\n";
+        $message .= "Bitte aktivieren Sie den Benutzer über die Mitgliederverwaltung.";
+        
+        $mailer->send($admin['email'], $subject, $message);
+    }
+
     // Erfolg anzeigen
     showSuccess($result['name'],$branding);
+    exit();
     
 } catch (Exception $e) {
     if ($db->inTransaction()) {

@@ -23,10 +23,16 @@
 }
 
 .sidebar-header {
-    padding: 20px;
+    padding: 16px;
     border-bottom: 1px solid #34495e;
-    margin-bottom: 20px;
+    margin-bottom: 6px;
     flex-shrink: 0;
+}
+
+.sidebar-overlay {
+    background: rgba(255, 255, 255, 0.1);
+    z-index: 99; 
+    display: block;
 }
 
 
@@ -40,6 +46,72 @@
     margin: 0;
     flex: 1; /* Nimmt verfügbaren Platz */
     overflow-y: auto; /* Scrollbar wenn nötig */
+}
+
+/* Standard: Beide Navigationen vorbereiten */
+.nav-menu[data-nav-group="main"] {
+    display: block; /* Standard sichtbar */
+}
+
+.nav-menu[data-nav-group="system"] {
+    display: none; /* Standard versteckt */
+}
+/* Wenn System-Tab aktiv */
+.nav-tabs.system-active ~ .nav-menu[data-nav-group="main"] {
+    display: none;
+}
+
+.nav-tabs.system-active ~ .nav-menu[data-nav-group="system"] {
+    display: block;
+}
+
+/* Nav Tabs für Admin */
+.nav-tabs {
+    display: flex;
+    gap: 0;
+    /*padding: 0 var(--spacing-md);*/
+    margin: var(--spacing-sm) 0;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-tab-btn {
+    flex: 1;
+    padding: var(--spacing-sm);
+    background: none;
+    border: none;
+    border-bottom: 4px solid transparent;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.nav-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.nav-tab-btn.active {
+    color: white;
+    border-bottom-color: var(--secondary-color);
+}
+
+/* Responsive: Mobile */
+@media (max-width: 768px) {
+    .nav-tabs {
+        padding: 0 var(--spacing-sm);
+        margin: var(--spacing-sm) 0;
+    }
+    
+    .nav-tab-btn {
+        font-size: 13px;
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+    
+    .nav-tab-btn span {
+        display: block;
+    }
 }
 
 /* Scrollbar Styling */
@@ -60,7 +132,7 @@
     padding: 15px 20px;
     cursor: pointer;
     transition: background 0.3s;
-    border-left: 3px solid transparent;
+    border-left: 4px solid transparent;
 }
 
 .nav-item:hover {
@@ -280,12 +352,12 @@
 
 /* User Info */
 .user-info {
-    padding: 10px;
+    padding: 8px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: var(--radius-md);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .user-greeting {
@@ -304,4 +376,32 @@
 .user-role {
     font-size: 12px;
     color: #bdc3c7;
+}
+
+.session-timeout {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #bdc3c7;
+}
+
+.timeout-icon {
+    font-size: 14px;
+}
+
+.session-timeout.warning {
+    color: #ffc107;
+    font-weight: 500;
+}
+
+.session-timeout.critical {
+    color: #dc3545;
+    font-weight: 600;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }

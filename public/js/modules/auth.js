@@ -8,9 +8,8 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-import { apiCall, setCurrentUser, currentUser, setCsrfToken} from './api.js';
-import { loadAllData, showScreen, showToast, showDashboard, updateUIForRole, initAllYearFilters, initEventHandlers} from './ui.js';
-import {debug} from '../app.js'
+import { apiCall, setCsrfToken} from './api.js';
+import { debug } from '../app.js'
 
 // ============================================
 // AUTH
@@ -20,6 +19,12 @@ import {debug} from '../app.js'
 
 let apiFailureCount = 0;
 const MAX_API_FAILURES = 3;
+
+let sessionTimeoutInterval = null;
+let lastActivityTime = null;
+const SESSION_DURATION = 30 * 60 * 1000; // 30 Minuten
+const INACTIVITY_WARNING = 5 * 60 * 1000; // Warnung nach 25 Min Inaktivität
+
 
 // In checkAuth() Funktion anpassen:
 export async function checkAuth() {
@@ -74,7 +79,10 @@ export async function handleLogout() {
         sessionStorage.removeItem('csrf_token');
         sessionStorage.removeItem('current_user');
         sessionStorage.removeItem('currentSection');
+        sessionStorage.removeItem('currentNavTab');
         setCsrfToken(null);
+
+        stopSessionTimeout(); 
         
         // Redirect zu Login
         window.location.href = 'login.html';
@@ -89,4 +97,104 @@ export function initAuth() {
     if (logoutBtn) {
         logoutBtn.addEventListener('click', handleLogout);
     }
+}
+
+
+// ============================================
+// SESSION TIMEOUT
+// ============================================
+
+export function startSessionTimeout() {
+    lastActivityTime = Date.now();
+    
+    if (sessionTimeoutInterval) {
+        clearInterval(sessionTimeoutInterval);
+    }
+    
+    sessionTimeoutInterval = setInterval(updateSessionTimeout, 1000);
+    
+    // Activity-Listener registrieren
+    //setupActivityTracking();
+    
+    updateSessionTimeout();
+}
+
+function setupActivityTracking() {
+    // Bei jeder Interaktion Timer zurücksetzen
+    /*
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    
+    events.forEach(event => {
+        document.addEventListener(event, handleUserActivity, { passive: true });
+    });
+    */
+}
+
+function handleUserActivity() {
+    lastActivityTime = Date.now();
+}
+
+export function resetSessionTimeout() {
+    lastActivityTime = Date.now();
+    updateSessionTimeout();
+}
+
+function updateSessionTimeout() {
+    const inactiveTime = Date.now() - lastActivityTime;
+    const remaining = SESSION_DURATION - inactiveTime;
+    
+    if (remaining <= 0) {
+        clearInterval(sessionTimeoutInterval);
+        showToast('Sitzung wegen Inaktivität abgelaufen', 'error');
+        handleLogout();
+        return;
+    }
+    
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    const timeoutElement = document.getElementById('sessionTimeout');
+    const timeoutText = document.getElementById('timeoutText');
+    
+    if (timeoutText) {
+        timeoutText.textContent = timeText;
+    }
+    
+    if (timeoutElement) {
+        // Warnung bei < 5 Minuten verbleibend
+        if (remaining < INACTIVITY_WARNING) {
+            timeoutElement.classList.add('warning');
+            timeoutElement.classList.remove('critical');
+            
+            // Einmalige Warnung bei 5 Minuten
+            if (remaining < INACTIVITY_WARNING && remaining > INACTIVITY_WARNING - 1000) {
+                showToast('Sitzung läuft in 5 Minuten ab', 'warning');
+            }
+        }
+        
+        // Kritisch bei < 2 Minuten
+        if (remaining < 2 * 60 * 1000) {
+            timeoutElement.classList.add('critical');
+            timeoutElement.classList.remove('warning');
+        }
+        
+        // Normal
+        if (remaining >= INACTIVITY_WARNING) {
+            timeoutElement.classList.remove('warning', 'critical');
+        }
+    }
+}
+
+export function stopSessionTimeout() {
+    if (sessionTimeoutInterval) {
+        clearInterval(sessionTimeoutInterval);
+        sessionTimeoutInterval = null;
+    }
+    
+    // Activity-Listener entfernen
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(event => {
+        document.removeEventListener(event, handleUserActivity);
+    });
 }

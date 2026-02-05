@@ -452,7 +452,7 @@ export async function deleteMember(memberId, name) {
     
     if (confirmed) {
         const result = await apiCall('members', 'DELETE', null, { id: memberId });
-        if (result) {
+        if (result.success) {
 
             // Cache invalidieren und neu laden         
             showMemberSection(true, currentMembersPage);

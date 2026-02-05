@@ -8,10 +8,14 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // USERS Controller
 // ============================================
-function handleUsers($db, $method, $id, $authUserId) {
+function handleUsers($db, $database, $method, $id, $authUserId) {
+
+    $prefix = $database->table('');
+
     switch($method) {
         case 'GET':
             if($id) {
@@ -26,7 +30,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                 }
                 
                 // Prüfe ob User oder Device
-                $roleStmt = $db->prepare("SELECT role FROM users WHERE user_id = ?");
+                $roleStmt = $db->prepare("SELECT role FROM {$prefix}users WHERE user_id = ?");
                 $roleStmt->execute([$id]);
                 $role = $roleStmt->fetchColumn();
                 
@@ -50,7 +54,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                             api_token,
                             api_token_expires_at,
                             created_at
-                        FROM users
+                        FROM {$prefix}users
                         WHERE user_id = ?
                     ");
                     $stmt->execute([$id]);
@@ -79,7 +83,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                             api_token,
                             api_token_expires_at,
                             role_name
-                        FROM v_users_extended
+                        FROM {$prefix}v_users_extended
                         WHERE user_id = ?
                     ");
                     $stmt->execute([$id]);
@@ -142,7 +146,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                             pending_member_surname,
                             status_text,
                             role_name
-                        FROM v_users_extended 
+                        FROM {$prefix}v_users_extended 
                         WHERE role IN ('admin', 'manager', 'user')";                        
                         
                         // Sortierung
@@ -169,7 +173,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                                 WHEN u.is_active = 1 THEN 'Aktiv'
                                 ELSE 'Inaktiv'
                             END AS status_text
-                        FROM users u
+                        FROM {$prefix}users u
                         WHERE u.role = 'device'";
                         
                         /*
@@ -217,14 +221,14 @@ function handleUsers($db, $method, $id, $authUserId) {
             {                             
                 if($action === 'create_device') 
                 {
-                    createDevice($db, $authUserId);
+                    createDevice($db, $database, $authUserId);
                     exit();
                 } 
                 elseif($action === 'resend_verification')   
                 {
                     if(isSet($mailUserId))
                     {
-                        resendVerificationEmail($db, $mailUserId);
+                        resendVerificationEmail($db, $database, $mailUserId);
                     }
                     else
                     {
@@ -269,7 +273,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                 }
 
                 // Prüfe ob E-Mail bereits existiert
-                $checkStmt = $db->prepare("SELECT user_id FROM users WHERE email = ?");
+                $checkStmt = $db->prepare("SELECT user_id FROM {$prefix}users WHERE email = ?");
                 $checkStmt->execute([$data->email]);
                 if($checkStmt->fetch()) {
                     http_response_code(409);
@@ -304,7 +308,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                 $expiresAt = date('Y-m-d H:i:s', strtotime('+1 year'));
                                 
                 try{
-                    $stmt = $db->prepare("INSERT INTO users 
+                    $stmt = $db->prepare("INSERT INTO {$prefix}users 
                                 ( 
                                 email, 
                                 password_hash, 
@@ -363,7 +367,7 @@ function handleUsers($db, $method, $id, $authUserId) {
             }
 
             // Hole aktuelle User-Daten (um role zu prüfen)
-            $currentUserStmt = $db->prepare("SELECT role, email FROM users WHERE user_id = ?");
+            $currentUserStmt = $db->prepare("SELECT role, email FROM {$prefix}users WHERE user_id = ?");
             $currentUserStmt->execute([$id]);
             $currentUser = $currentUserStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -401,7 +405,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                     }
                     
                     // Prüfe ob Email bereits existiert
-                    $checkStmt = $db->prepare("SELECT user_id FROM users 
+                    $checkStmt = $db->prepare("SELECT user_id FROM {$prefix}users 
                                             WHERE email = ? AND user_id != ?");
                     $checkStmt->execute([$data->email, $id]);
                     if($checkStmt->fetch()) {
@@ -424,7 +428,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                 // Prüfe ob Member-ID bereits von anderem User verwendet wird
                 $checkMemberStmt = $db->prepare(
                     "SELECT user_id, name, email 
-                    FROM users 
+                    FROM {$prefix}users 
                     WHERE member_id = ? AND user_id != ?"
                 );
                 $checkMemberStmt->execute([$data->member_id, $id]);
@@ -441,7 +445,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                 
                 // Prüfe ob Member-ID existiert
                 $checkMemberExists = $db->prepare(
-                    "SELECT member_id FROM members WHERE member_id = ?"
+                    "SELECT member_id FROM {$prefix}members WHERE member_id = ?"
                 );
                 $checkMemberExists->execute([$data->member_id]);
                 
@@ -557,7 +561,7 @@ function handleUsers($db, $method, $id, $authUserId) {
             
             $updateParams[] = $id; // WHERE user_id = ?
             
-            $sql = "UPDATE users SET " . implode(", ", $updateFields) . " WHERE user_id = ?";
+            $sql = "UPDATE {$prefix}users SET " . implode(", ", $updateFields) . " WHERE user_id = ?";
 
             try {
 
@@ -597,7 +601,7 @@ function handleUsers($db, $method, $id, $authUserId) {
                 exit();
             }
             
-            $stmt = $db->prepare("DELETE FROM users WHERE user_id = ?");
+            $stmt = $db->prepare("DELETE FROM {$prefix}users WHERE user_id = ?");
             if($stmt->execute([$id])) {
                 echo json_encode(["message" => "User deleted"]);
             } else {
@@ -609,7 +613,7 @@ function handleUsers($db, $method, $id, $authUserId) {
 }
 
 // Gerät erstellen (nur Admin)
-function createDevice($db, $authUserId) {
+function createDevice($db, $database, $authUserId) {
 
     // Prüfen ob Admin    
     if(!isAdmin()) {
@@ -617,6 +621,8 @@ function createDevice($db, $authUserId) {
         echo json_encode(['message' => 'Nur Admins können Geräte erstellen']);
         exit();
     }
+
+    $prefix = $database->table('');
     
     $data = json_decode(file_get_contents("php://input"));
     
@@ -650,7 +656,7 @@ function createDevice($db, $authUserId) {
         $db->beginTransaction();                     
         // Gerät anlegen (OHNE Email, OHNE Passwort)
         $stmt = $db->prepare(
-            "INSERT INTO users (
+            "INSERT INTO {$prefix}users (
                 device_name, 
                 role, 
                 device_type, 
@@ -699,7 +705,7 @@ function createDevice($db, $authUserId) {
     }
 }
 
-function handleUserActivation($db, $method, $authUserRole) {
+function handleUserActivation($db, $database, $method, $authUserRole) {
     // Nur Admins
     requireAdmin();
     
@@ -708,6 +714,8 @@ function handleUserActivation($db, $method, $authUserRole) {
         echo json_encode(['message' => 'Method not allowed']);
         exit();
     }
+
+    $prefix = $database->table('');
     
     $data = json_decode(file_get_contents("php://input"));
     $userId = intval($data->user_id ?? 0);
@@ -723,7 +731,7 @@ function handleUserActivation($db, $method, $authUserRole) {
         // User-Daten holen
         $stmt = $db->prepare(
             "SELECT email, name, email_verified, pending_member_id 
-             FROM users 
+             FROM {$prefix}users 
              WHERE user_id = ?"
         );
         $stmt->execute([$userId]);
@@ -749,7 +757,7 @@ function handleUserActivation($db, $method, $authUserRole) {
         
         // User aktivieren: account_status UND is_active setzen
         $stmt = $db->prepare(
-            "UPDATE users 
+            "UPDATE {$prefix}users 
              SET account_status = 'active',
                  is_active = 1,
                  member_id = ?,
@@ -762,7 +770,7 @@ function handleUserActivation($db, $method, $authUserRole) {
         // Member-Daten für Mail auslesen
         $stmt = $db->prepare(
             "SELECT m.member_number, m.name, m.surname 
-            FROM members m 
+            FROM {$prefix}members m 
             WHERE m.member_id = ?"
         );
         $stmt->execute([$finalMemberId]);
@@ -774,7 +782,7 @@ function handleUserActivation($db, $method, $authUserRole) {
         : 'Kein Mitglied verknüpft';
             
         // Mail-Status prüfen
-        $mailer = new Mailer(getMailConfig(), $db);
+        $mailer = new Mailer(getMailConfig(), $db, $database);
         $mailStatus = $mailer->checkMailStatus('activation');
 
         if($mailStatus)
@@ -804,7 +812,7 @@ function handleUserActivation($db, $method, $authUserRole) {
     }
 }
 
-function handleUserStatus($db, $method, $authUserRole) {
+function handleUserStatus($db, $database, $method, $authUserRole) {
     // Nur Admins
     requireAdmin();
     
@@ -813,6 +821,8 @@ function handleUserStatus($db, $method, $authUserRole) {
         echo json_encode(['message' => 'Method not allowed']);
         exit();
     }
+
+    $prefix = $database->table('');
     
     $data = json_decode(file_get_contents("php://input"));
     $userId = intval($data->user_id ?? 0);
@@ -828,7 +838,7 @@ function handleUserStatus($db, $method, $authUserRole) {
         $isActive = ($status === 'active') ? 1 : 0;
         
         $stmt = $db->prepare(
-            "UPDATE users 
+            "UPDATE {$prefix}users 
              SET account_status = ?, 
                  is_active = ? 
              WHERE user_id = ?"
@@ -862,7 +872,7 @@ function handleUserStatus($db, $method, $authUserRole) {
 // VERIFIKATIONS-MAIL ERNEUT SENDEN
 // ============================================
 
-function resendVerificationEmail($db, $userId) {
+function resendVerificationEmail($db, $database, $userId) {
     // Nur Admin darf das
     requireAdmin();
     
@@ -871,12 +881,14 @@ function resendVerificationEmail($db, $userId) {
         echo json_encode(['success' => false, 'message' => 'User ID erforderlich']);
         return;
     }
+
+        $prefix = $database->table('');
     
     try {
         // User-Daten holen
         $stmt = $db->prepare(
             "SELECT email, name, account_status, email_verified 
-             FROM users 
+             FROM {$prefix}users 
              WHERE user_id = ?"
         );
         $stmt->execute([$userId]);
@@ -909,7 +921,7 @@ function resendVerificationEmail($db, $userId) {
         }
         
         // Mail-System prüfen
-        $mailer = new Mailer(getMailConfig(), $db);
+        $mailer = new Mailer(getMailConfig(), $db, $database);
         $mailStatus = $mailer->checkMailStatus('registration');
         
         if (!$mailStatus['enabled']) {
@@ -923,7 +935,7 @@ function resendVerificationEmail($db, $userId) {
         
         // Alten Token löschen/deaktivieren (optional)
         $stmt = $db->prepare(
-            "UPDATE email_verification_tokens 
+            "UPDATE {$prefix}email_verification_tokens 
              SET used = 1 
              WHERE user_id = ? AND used = 0"
         );
@@ -935,7 +947,7 @@ function resendVerificationEmail($db, $userId) {
         $expiresAt = date('Y-m-d H:i:s', time() + 86400); // 24h
         
         $stmt = $db->prepare(
-            "INSERT INTO email_verification_tokens (user_id, token, expires_at) 
+            "INSERT INTO {$prefix}email_verification_tokens (user_id, token, expires_at) 
              VALUES (?, ?, ?)"
         );
         $stmt->execute([$userId, $tokenHash, $expiresAt]);

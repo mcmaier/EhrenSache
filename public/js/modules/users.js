@@ -115,7 +115,7 @@ function renderUsers(users, page = 1)
     let statusBadge = '';
     let memberInfo = '';
 
-     // Termin-Info mit Terminart       
+     // User-Info mit verknüpftem Mitglied       
     let userInfo = `<div style="line-height: 1.3;">${user.email}`;    
     if (user.user_name) {
        // userInfo += `<br><small><style="color: #7f8c8d;">${user.user_name}</small>`;

@@ -45,16 +45,15 @@ function checkRedirectLoop() {
 // Vor dem Router aufrufen
 checkRedirectLoop();
 
-import { loadAllData, showDashboard, initNavigation, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, initEventHandlers} from './modules/ui.js';
-import { apiCall, setCurrentUser, setCsrfToken, setInitialLoad, } from './modules/api.js';
-import { initAuth } from './modules/auth.js';
-import { applyTheme, renderSystemSettings } from './modules/settings.js';
+import { loadAllData, showDashboard, initNavigation, initNavTabs, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, initEventHandlers} from './modules/ui.js';
+import { setCurrentUser, setCsrfToken, setInitialLoad, } from './modules/api.js';
+import { initAuth, startSessionTimeout} from './modules/auth.js';
 
 // ============================================
 // INIT JS
 // ============================================
 
-const DEBUG = false;
+const DEBUG = true;
 
 export const debug = {
   log:  (...args) => DEBUG && console.log(...args),
@@ -112,6 +111,7 @@ async function init() {
 
     initAuth();
     initNavigation();
+    initNavTabs();
     initModalEscHandler();
     initPWAQuickAccess();    
 
@@ -143,6 +143,8 @@ async function init() {
 
         showDashboard();        
         loadAllData();
+
+        startSessionTimeout();
         
         debug.log('Dashboard initialized successfully');
     //} 

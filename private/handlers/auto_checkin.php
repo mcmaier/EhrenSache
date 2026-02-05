@@ -8,15 +8,18 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // AUTO CHECK-IN Controller
 // ============================================
-function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth, $checkinSource = 'auto_checkin', $sourceInfo = []) {
+function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth, $checkinSource = 'auto_checkin', $sourceInfo = []) {
     if($method !== 'POST') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
         return;
     }
+    
+    $prefix = $database->table('');
     
     $data = json_decode(file_get_contents("php://input"));
     
@@ -47,12 +50,12 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         
         // Resolve member_id
         if(isset($data->member_number)) {
-            $memberId = resolveMemberIdByNumber($db, $data->member_number);
+            $memberId = resolveMemberIdByNumber($db, $database, $data->member_number);
         } else {
             $memberId = intval($data->member_id);
             
             // Validiere member_id
-            $checkMember = $db->prepare("SELECT member_id FROM members WHERE member_id = ?");
+            $checkMember = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ?");
             $checkMember->execute([$memberId]);
             if(!$checkMember->fetchColumn()) {
                 $memberId = null;
@@ -142,8 +145,8 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
                 ABS(TIMESTAMPDIFF(SECOND, 
                 CONCAT(a.date, ' ', a.start_time), 
                 ?)) as time_diff_seconds
-            FROM appointments a
-            LEFT JOIN appointment_types at ON a.type_id = at.type_id
+            FROM {$prefix}appointments a
+            LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
             WHERE 
                 ABS(TIMESTAMPDIFF(SECOND, 
                 CONCAT(a.date, ' ', a.start_time), 
@@ -180,8 +183,8 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
             // Prüfe ob dieser Termin-Typ Gruppen-Einschränkungen hat
             $typeGroupsStmt = $db->prepare("
                 SELECT atg.group_id, mg.is_default 
-                FROM appointment_type_groups atg
-                LEFT JOIN member_groups mg ON atg.group_id = mg.group_id
+                FROM {$prefix}appointment_type_groups atg
+                LEFT JOIN {$prefix}member_groups mg ON atg.group_id = mg.group_id
                 WHERE atg.type_id = ?
             ");
             $typeGroupsStmt->execute([$appointment['type_id']]);
@@ -206,7 +209,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
             $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
             $memberGroupStmt = $db->prepare("
                 SELECT 1 
-                FROM member_group_assignments 
+                FROM {$prefix}member_group_assignments 
                 WHERE member_id = ? 
                 AND group_id IN ({$placeholders})
             ");
@@ -319,7 +322,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         );
 
          // Hole Standard-Terminart
-        $typeStmt = $db->query("SELECT type_id FROM appointment_types WHERE is_default = 1 LIMIT 1");
+        $typeStmt = $db->query("SELECT type_id FROM {$prefix}appointment_types WHERE is_default = 1 LIMIT 1");
         $defaultType = $typeStmt->fetch(PDO::FETCH_ASSOC);
         $typeId = $defaultType ? $defaultType['type_id'] : null;
 
@@ -328,7 +331,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         $autoTitle = "Automatisch erstellter Termin";
         $timeWithoutSeconds = $arrivalTime->format('H:i:s');
         
-        $createStmt = $db->prepare("INSERT INTO appointments 
+        $createStmt = $db->prepare("INSERT INTO {$prefix}appointments 
                                     (title, type_id, description, date, start_time, created_by) 
                                     VALUES (?, ?, ?, ?, ?, ?)");
         
@@ -353,7 +356,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
     }    
     
     // Prüfe ob bereits ein Record existiert
-    $checkStmt = $db->prepare("SELECT record_id, arrival_time FROM records 
+    $checkStmt = $db->prepare("SELECT record_id, arrival_time FROM {$prefix}records 
                                WHERE member_id = ? AND appointment_id = ?");
     $checkStmt->execute([$memberId, $appointmentId]);
     $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -370,7 +373,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
 
      // Bei Device: Hole Device-Info aus users Tabelle
     if(isDevice()) {
-        $deviceStmt = $db->prepare("SELECT email, device_type FROM users WHERE user_id = ?");
+        $deviceStmt = $db->prepare("SELECT email, device_type FROM {$prefix}users WHERE user_id = ?");
         $deviceStmt->execute([$authUserId]);
         $deviceInfo = $deviceStmt->fetch(PDO::FETCH_ASSOC);
         
@@ -384,7 +387,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         $existingTime = new DateTime($existingRecord['arrival_time']);
         
         if($arrivalTime < $existingTime) {
-            $updateStmt = $db->prepare("UPDATE records 
+            $updateStmt = $db->prepare("UPDATE {$prefix}records 
                                         SET arrival_time = ?, 
                                             status = 'present',
                                             checkin_source = ?,
@@ -420,7 +423,7 @@ function handleAutoCheckin($db, $method, $authUserId, $authUserRole, $authMember
         ]);
     } else {
         // Erstelle neuen Record
-        $insertStmt = $db->prepare("INSERT INTO records 
+        $insertStmt = $db->prepare("INSERT INTO {$prefix}records 
                                     (member_id, appointment_id, arrival_time, status, 
                                      checkin_source, source_device, location_name) 
                                     VALUES (?, ?, ?, 'present', ?, ?, ?)");

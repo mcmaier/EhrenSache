@@ -8,10 +8,14 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // RECORDS Controller
 // ============================================
-function handleRecords($db, $method, $id) {
+function handleRecords($db, $database, $method, $id) {
+
+    $prefix = $database->table('');
+
     switch($method) {
         case 'GET': 
             if($id) {
@@ -22,10 +26,10 @@ function handleRecords($db, $method, $id) {
                                         a.start_time as appointment_start,
                                         at.type_name as appointment_type_name,
                                         at.type_id as appointment_type_id
-                                        FROM records r
-                                        LEFT JOIN members m ON r.member_id = m.member_id
-                                        LEFT JOIN appointments a ON r.appointment_id = a.appointment_id
-                                        LEFT JOIN appointment_types at ON a.type_id = at.type_id
+                                        FROM {$prefix}records r
+                                        LEFT JOIN {$prefix}members m ON r.member_id = m.member_id
+                                        LEFT JOIN {$prefix}appointments a ON r.appointment_id = a.appointment_id
+                                        LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
                                         WHERE r.record_id = ?");
                 $stmt->execute([$id]);
                 $record = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -33,7 +37,7 @@ function handleRecords($db, $method, $id) {
                 // User dürfen nur ihre eigenen Records sehen
                 if(!isAdminOrManager()) {
                     // Hole member_id des Users
-                    $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
+                    $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $userMemberId = $userStmt->fetchColumn();
                     
@@ -63,7 +67,7 @@ function handleRecords($db, $method, $id) {
                 
                 // User sehen nur ihre eigenen Records
                 if(!isAdminOrManager()) {
-                    $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
+                    $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $member_id = $userStmt->fetchColumn();
                     
@@ -79,10 +83,10 @@ function handleRecords($db, $method, $id) {
                         r.checkin_source, r.source_device, r.location_name,
                         at.type_name as appointment_type_name,
                         at.type_id as appointment_type_id
-                        FROM records r 
-                        LEFT JOIN members m ON r.member_id = m.member_id 
-                        LEFT JOIN appointments a ON r.appointment_id = a.appointment_id 
-                        LEFT JOIN appointment_types at ON a.type_id = at.type_id
+                        FROM {$prefix}records r 
+                        LEFT JOIN {$prefix}members m ON r.member_id = m.member_id 
+                        LEFT JOIN {$prefix}appointments a ON r.appointment_id = a.appointment_id 
+                        LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
                         WHERE 1=1";                
                 $params = [];            
 
@@ -161,7 +165,7 @@ function handleRecords($db, $method, $id) {
             }
             
             // Prüfe ob bereits ein Record für dieses Mitglied + Termin existiert
-            $checkStmt = $db->prepare("SELECT record_id FROM records 
+            $checkStmt = $db->prepare("SELECT record_id FROM {$prefix}records 
                                     WHERE member_id = ? AND appointment_id = ?");
             $checkStmt->execute([$member_id, $appointment_id]);
             
@@ -180,7 +184,7 @@ function handleRecords($db, $method, $id) {
             
             if(!$arrival_time) {
                 // Hole Termin-Startzeit
-                $aptStmt = $db->prepare("SELECT date, start_time FROM appointments WHERE appointment_id = ?");
+                $aptStmt = $db->prepare("SELECT date, start_time FROM {$prefix}appointments WHERE appointment_id = ?");
                 $aptStmt->execute([$appointment_id]);
                 $apt = $aptStmt->fetch(PDO::FETCH_ASSOC);
                 
@@ -193,7 +197,7 @@ function handleRecords($db, $method, $id) {
             }
 
             // Erstelle Record (manuell durch Admin)
-            $stmt = $db->prepare("INSERT INTO records (member_id, appointment_id, arrival_time, status, checkin_source) VALUES (?, ?, ?, ?, 'admin')");
+            $stmt = $db->prepare("INSERT INTO {$prefix}records (member_id, appointment_id, arrival_time, status, checkin_source) VALUES (?, ?, ?, ?, 'admin')");
             if($stmt->execute([$member_id, $appointment_id, $arrival_time, $data->status ?? 'present'])) {
                 http_response_code(201);
                 echo json_encode([  "message" => "Record created", 
@@ -211,7 +215,7 @@ function handleRecords($db, $method, $id) {
             $data = json_decode(file_get_contents("php://input"));
 
             // Hole ursprüngliche Daten des Records
-            $origStmt = $db->prepare("SELECT member_id, appointment_id FROM records WHERE record_id = ?");
+            $origStmt = $db->prepare("SELECT member_id, appointment_id FROM {$prefix}records WHERE record_id = ?");
             $origStmt->execute([$id]);
             $originalRecord = $origStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -227,7 +231,7 @@ function handleRecords($db, $method, $id) {
             
             if ($memberChanged || $appointmentChanged) {
                 // Prüfe ob bereits ein anderer Record für neue Kombination existiert
-                $checkStmt = $db->prepare("SELECT record_id FROM records 
+                $checkStmt = $db->prepare("SELECT record_id FROM {$prefix}records 
                                         WHERE member_id = ? AND appointment_id = ? AND record_id != ?");
                 $checkStmt->execute([$data->member_id, $data->appointment_id, $id]);
                 
@@ -238,13 +242,13 @@ function handleRecords($db, $method, $id) {
                 }
                 
                 // Kein Konflikt - komplettes Update
-                $stmt = $db->prepare("UPDATE records 
+                $stmt = $db->prepare("UPDATE {$prefix}records 
                                     SET member_id=?, appointment_id=?, arrival_time=?, status=? 
                                     WHERE record_id=?");
                 $success = $stmt->execute([$data->member_id, $data->appointment_id, $data->arrival_time, $data->status, $id]);
             } else {
                 // Nur Zeit/Status ändern - kein Konfliktrisiko
-                $stmt = $db->prepare("UPDATE records 
+                $stmt = $db->prepare("UPDATE {$prefix}records 
                                     SET arrival_time=?, status=? 
                                     WHERE record_id=?");
                 $success = $stmt->execute([$data->arrival_time, $data->status, $id]);
@@ -260,12 +264,45 @@ function handleRecords($db, $method, $id) {
             
         case 'DELETE':
             requireAdminOrManager();
-            $stmt = $db->prepare("DELETE FROM records WHERE record_id = ?");
-            if($stmt->execute([$id])) {
-                echo json_encode(["message" => "Record deleted"]);
+            // Prüfe ob member_id als Parameter übergeben wurde
+            $member_id = $_GET['member_id'] ?? null;
+            
+            if($member_id) {
+                // BULK DELETE: Alle Records eines Mitglieds löschen
+                
+                // Optional: Zeitraum einschränken
+                $before_date = $_GET['before_date'] ?? null; // Format: YYYY-MM-DD
+                
+                if($before_date) {
+                    // Nur Records vor bestimmtem Datum löschen
+                    $stmt = $db->prepare("DELETE FROM {$prefix}records 
+                                        WHERE member_id = ? AND arrival_time < ?");
+                    $params = [$member_id, $before_date];
+                } else {
+                    // Alle Records des Mitglieds löschen
+                    $stmt = $db->prepare("DELETE FROM {$prefix}records WHERE member_id = ?");
+                    $params = [$member_id];
+                }
+                
+                if($stmt->execute($params)) {
+                    $deletedCount = $stmt->rowCount();
+                    echo json_encode([
+                        "message" => "Records deleted",
+                        "deleted_count" => $deletedCount
+                    ]);
+                } else {
+                    http_response_code(500);
+                    echo json_encode(["message" => "Failed to delete records"]);
+                }                
             } else {
-                http_response_code(500);
-                echo json_encode(["message" => "Failed to delete record"]);
+
+                    $stmt = $db->prepare("DELETE FROM {$prefix}records WHERE record_id = ?");
+                    if($stmt->execute([$id])) {
+                        echo json_encode(["message" => "Record deleted"]);
+                    } else {
+                        http_response_code(500);
+                        echo json_encode(["message" => "Failed to delete record"]);
+                    }
             }
             break;
     }

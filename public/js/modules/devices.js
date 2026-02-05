@@ -478,7 +478,7 @@ export async function deleteDevice(deviceId, name) {
 
     if (confirmed) {
         const result = await apiCall('users', 'DELETE', null, { id: deviceId });
-        if (result) {
+        if (result.success) {
             showDeviceSection(true, currentDevicesPage);
             showToast(`Gerät wurde gelöscht`, 'success');        
         }

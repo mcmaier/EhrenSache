@@ -8,10 +8,14 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // MEMBERSHIP_DATES Controller
 // ============================================
-function handleMembershipDates($db, $method, $id) {    
+function handleMembershipDates($db, $database, $method, $id) {    
+
+    $prefix = $database->table('');
+
     switch($method) {
         case 'GET':
             requireAdminOrManager();
@@ -19,8 +23,8 @@ function handleMembershipDates($db, $method, $id) {
             if($id) {
                 // Einzelner Zeitraum
                 $stmt = $db->prepare("SELECT md.*, m.name, m.surname 
-                                     FROM membership_dates md
-                                     JOIN members m ON md.member_id = m.member_id
+                                     FROM {$prefix}membership_dates md
+                                     JOIN {$prefix}members m ON md.member_id = m.member_id
                                      WHERE md.membership_date_id = ?");
                 $stmt->execute([$id]);
                 $membershipDate = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -37,15 +41,15 @@ function handleMembershipDates($db, $method, $id) {
                 
                 if($member_id) {
                     $stmt = $db->prepare("SELECT md.*, m.name, m.surname 
-                                         FROM membership_dates md
-                                         JOIN members m ON md.member_id = m.member_id
+                                         FROM {$prefix}membership_dates md
+                                         JOIN {$prefix}members m ON md.member_id = m.member_id
                                          WHERE md.member_id = ?
                                          ORDER BY md.start_date DESC");
                     $stmt->execute([$member_id]);
                 } else {
                     $stmt = $db->query("SELECT md.*, m.name, m.surname 
-                                       FROM membership_dates md
-                                       JOIN members m ON md.member_id = m.member_id
+                                       FROM {$prefix}membership_dates md
+                                       JOIN {$prefix}members m ON md.member_id = m.member_id
                                        ORDER BY md.start_date DESC");
                 }
                 echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -63,7 +67,7 @@ function handleMembershipDates($db, $method, $id) {
                 return;
             }
             
-            $stmt = $db->prepare("INSERT INTO membership_dates 
+            $stmt = $db->prepare("INSERT INTO {$prefix}membership_dates 
                                   (member_id, start_date, end_date, status) 
                                   VALUES (?, ?, ?, ?)");
             
@@ -88,7 +92,7 @@ function handleMembershipDates($db, $method, $id) {
             requireAdminOrManager();
             $data = json_decode(file_get_contents("php://input"));
             
-            $stmt = $db->prepare("UPDATE membership_dates 
+            $stmt = $db->prepare("UPDATE {$prefix}membership_dates 
                                   SET start_date = ?, end_date = ?, status = ?
                                   WHERE membership_date_id = ?");
             
@@ -107,7 +111,7 @@ function handleMembershipDates($db, $method, $id) {
             
         case 'DELETE':
             requireAdminOrManager();
-            $stmt = $db->prepare("DELETE FROM membership_dates WHERE membership_date_id = ?");
+            $stmt = $db->prepare("DELETE FROM {$prefix}membership_dates WHERE membership_date_id = ?");
             
             if($stmt->execute([$id])) {
                 echo json_encode(["message" => "Membership date deleted"]);

@@ -12,7 +12,7 @@
 // STATISTICS Handler
 // ============================================
 // In api/handlers/statistics.php (oder neue Datei years.php)
-function handleAvailableYears($db, $request_method, $id) {
+function handleAvailableYears($db, $database, $request_method, $id) {
 
     if ($request_method !== 'GET') {
         http_response_code(405);
@@ -20,15 +20,17 @@ function handleAvailableYears($db, $request_method, $id) {
         exit();
     }
 
+    $prefix = $database->table('');
+
     try {
         // Jahre aus verschiedenen Tabellen sammeln
         $stmt = $db->query("
             SELECT DISTINCT YEAR(date) as year 
-            FROM appointments 
+            FROM {$prefix}appointments 
             WHERE date IS NOT NULL
             UNION
             SELECT DISTINCT YEAR(arrival_time) as year 
-            FROM records 
+            FROM {$prefix}records 
             WHERE arrival_time IS NOT NULL
             ORDER BY year DESC
         ");
@@ -60,12 +62,14 @@ function handleAvailableYears($db, $request_method, $id) {
 }
 
 
-function handleStatistics($db, $request_method, $authUserId, $authUserRole, $authMemberId) {
+function handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId) {
     if ($request_method !== 'GET') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
         exit();
     }
+
+    $prefix = $database->table('');
     
     $year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
     $groupId = isset($_GET['group_id']) ? intval($_GET['group_id']) : null;
@@ -203,14 +207,14 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
     // Gruppen ermitteln
     if ($groupId !== null) {
         // Prüfe Gruppenzugriff
-        if (!hasStatisticsGroupAccess($db, $authMemberId, $authUserRole, $groupId)) {
+        if (!hasStatisticsGroupAccess($db, $database, $authMemberId, $authUserRole, $groupId)) {
             http_response_code(403);
             echo json_encode(["message" => "No access to this group"]);
             exit();
         }
         $groups = [$groupId];
     } else {
-        $groups = getStatisticsGroups($db, $authMemberId, $authUserRole);
+        $groups = getStatisticsGroups($db, $database, $authMemberId, $authUserRole);
     }
     
     $statistics = [];
@@ -225,7 +229,7 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
         if ($memberId !== null) {
             $stmt = $db->prepare("
                 SELECT COUNT(*) 
-                FROM member_group_assignments 
+                FROM {$prefix}member_group_assignments 
                 WHERE member_id = ? AND group_id = ?
             ");
             $stmt->execute([$memberId, $gid]);
@@ -237,7 +241,7 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
             }
         }
 
-        $stats = calculateGroupStatistics($db, $gid, $year, $memberId, $authUserRole, $appointmentTypeId);
+        $stats = calculateGroupStatistics($db, $database, $gid, $year, $memberId, $authUserRole, $appointmentTypeId);
         if ($stats) {
             $statistics[] = $stats;
 
@@ -268,7 +272,7 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
     }
 
     // Mitglieder korrekt aus DB zählen (keine Duplikate)
-    $totalMembers = getActiveMemberCount($db, $groups, $memberId);
+    $totalMembers = getActiveMemberCount($db, $database, $groups, $memberId);
 
     // Gesamtdurchschnitt berechnen
     //$totalPossible = $totalAppointments * $totalMembers;
@@ -290,19 +294,21 @@ function handleStatistics($db, $request_method, $authUserId, $authUserRole, $aut
     
 }
 
-function getActiveMemberCount($db, $groupIds, $specificMemberId = null) {
+function getActiveMemberCount($db, $database, $groupIds, $specificMemberId = null) {
     // Wenn ein spezifisches Mitglied angegeben ist
     if ($specificMemberId !== null) {
         return 1;
     }
     
+    $prefix = $database->table('');
+
     // Wenn Gruppen angegeben sind
     if (!empty($groupIds)) {
         $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
         $stmt = $db->prepare("
             SELECT COUNT(DISTINCT mga.member_id)
-            FROM member_group_assignments mga
-            JOIN members m ON mga.member_id = m.member_id
+            FROM {$prefix}member_group_assignments mga
+            JOIN {$prefix}members m ON mga.member_id = m.member_id
             WHERE mga.group_id IN ($placeholders)
             AND m.active = 1
         ");
@@ -311,19 +317,22 @@ function getActiveMemberCount($db, $groupIds, $specificMemberId = null) {
     }
     
     // Alle aktiven Mitglieder
-    $stmt = $db->query("SELECT COUNT(*) FROM members WHERE active = 1");
+    $stmt = $db->query("SELECT COUNT(*) FROM {$prefix}members WHERE active = 1");
     return $stmt->fetchColumn();
 }
 
-function getStatisticsGroups($db, $memberId, $role) {
+function getStatisticsGroups($db, $database, $memberId, $role) {
+
+    $prefix = $database->table('');
+
     if (isAdminOrManager()) {
-        $stmt = $db->query("SELECT group_id FROM member_groups");
+        $stmt = $db->query("SELECT group_id FROM {$prefix}member_groups");
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
-    }
-    
+    }    
+
     $stmt = $db->prepare("
         SELECT DISTINCT group_id 
-        FROM member_group_assignments 
+        FROM {$prefix}member_group_assignments 
         WHERE member_id = ?
         ORDER BY group_id
     ");
@@ -331,25 +340,29 @@ function getStatisticsGroups($db, $memberId, $role) {
     return $stmt->fetchAll(PDO::FETCH_COLUMN);
 }
 
-function hasStatisticsGroupAccess($db, $memberId, $role, $groupId) {
+function hasStatisticsGroupAccess($db, $database, $memberId, $role, $groupId) {
     if (isAdminOrManager() ) {
         return true;
     }
+
+    $prefix = $database->table('');
     
     $stmt = $db->prepare("
         SELECT COUNT(*) 
-        FROM member_group_assignments 
+        FROM {$prefix}member_group_assignments 
         WHERE member_id = ? AND group_id = ?
     ");
     $stmt->execute([$memberId, $groupId]);
     return $stmt->fetchColumn() > 0;
 }
 
-function calculateGroupStatistics($db, $groupId, $year, $memberId, $role) {
+function calculateGroupStatistics($db, $database, $groupId, $year, $memberId, $role) {
     // Gruppeninfo
+    $prefix = $database->table('');
+
     $stmt = $db->prepare("      SELECT atg.type_id, mg.group_name
-                                FROM appointment_type_groups atg
-                                JOIN member_groups mg ON atg.group_id = mg.group_id
+                                FROM {$prefix}appointment_type_groups atg
+                                JOIN {$prefix}member_groups mg ON atg.group_id = mg.group_id
                                 WHERE atg.group_id = ?");
     $stmt->execute([$groupId]);
     $group = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -367,9 +380,9 @@ function calculateGroupStatistics($db, $groupId, $year, $memberId, $role) {
         // Nur für Admins: alle Gruppenmitglieder
         $stmt = $db->prepare("
             SELECT DISTINCT mga.member_id, mg.group_name
-            FROM member_group_assignments mga
-            JOIN members m ON mga.member_id = m.member_id
-            LEFT JOIN member_groups mg ON mga.group_id = mg.group_id
+            FROM {$prefix}member_group_assignments mga
+            JOIN {$prefix}members m ON mga.member_id = m.member_id
+            LEFT JOIN {$prefix}member_groups mg ON mga.group_id = mg.group_id
             WHERE mga.group_id = ? AND m.active = 1
             ORDER BY m.surname, m.name
         ");
@@ -379,7 +392,7 @@ function calculateGroupStatistics($db, $groupId, $year, $memberId, $role) {
     
     $memberStats = [];
     foreach ($memberIds as $mid) {
-        $stats = calculateMemberStatistics($db, $mid, $groupId, $year, $typeId);
+        $stats = calculateMemberStatistics($db, $database, $mid, $groupId, $year, $typeId);
         if ($stats) {
             $memberStats[] = $stats;
         }
@@ -393,9 +406,11 @@ function calculateGroupStatistics($db, $groupId, $year, $memberId, $role) {
     ];
 }
 
-function calculateMemberStatistics($db, $memberId, $groupId, $year, $typeId) {
+function calculateMemberStatistics($db, $database, $memberId, $groupId, $year, $typeId) {
     // Mitgliedsinfo
-    $stmt = $db->prepare("SELECT name, surname FROM members WHERE member_id = ?");
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT name, surname FROM {$prefix}members WHERE member_id = ?");
     $stmt->execute([$memberId]);
     $member = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -411,7 +426,7 @@ function calculateMemberStatistics($db, $memberId, $groupId, $year, $typeId) {
 
     $stmt = $db->prepare("
         SELECT appointment_id, date 
-        FROM appointments a              
+        FROM {$prefix}appointments a              
         WHERE a.type_id = ? 
         AND YEAR(date) = ?
         AND date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)        
@@ -428,7 +443,7 @@ function calculateMemberStatistics($db, $memberId, $groupId, $year, $typeId) {
         // Check ob Record existiert
         $stmt = $db->prepare("
             SELECT status 
-            FROM records 
+            FROM {$prefix}records 
             WHERE member_id = ? AND appointment_id = ?
         ");
         $stmt->execute([$memberId, $apt['appointment_id']]);

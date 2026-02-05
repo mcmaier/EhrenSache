@@ -10,11 +10,11 @@
 
 import { apiCall, isAdminOrManager } from './api.js';
 import { loadAppointments } from './appointments.js';
-import { loadGroups, loadTypes } from './management.js';
+import { loadTypes } from './management.js';
 import { loadMembers } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, currentYear, populateYearFilter, setCurrentYear} from './ui.js';
-import { translateRecordStatus,datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
-import {debug} from '../app.js'
+import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
+import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml } from './utils.js';
+import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 
 // ============================================
@@ -23,11 +23,19 @@ import { globalPaginationValue } from './settings.js';
 // import {} from './records.js'
 // ============================================
 
+const RecordMode = Object.freeze({
+    ALL_RECORDS: 'all',
+    ATTENDANCE_BY_APPOINTMENT: 'appointment',
+    ATTENDANCE_BY_MEMBER: 'member'
+});
+
 let currentRecordsPage = 1;
 let recordsPerPage = 25;
 let allFilteredRecords = [];
-let isAttendanceMode = false;
+//let isAttendanceMode = false;
+let currentMode = RecordMode.ALL_RECORDS;
 let currentAppointmentId = null;
+let currentMemberId = null;
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -167,6 +175,13 @@ export async function renderRecords(records, page = 1)
                                     </span>`;
         }
 
+        // Member-Info mit Mitgliedsnr. wenn vorhanden       
+        let memberInfo = `<div style="line-height: 1.4;">${record.surname}, ${record.name}`;    
+        if (record.member_number) {            
+            memberInfo += `<br><small style="color: #7f8c8d;">${escapeHtml(record.member_number)}</small>`;
+        }    
+        memberInfo += '</div>';
+
         let arrivalHtml = '-';
         if (record.arrival_time) {
             const arrivalDate = new Date(record.arrival_time);
@@ -207,7 +222,7 @@ export async function renderRecords(records, page = 1)
         tr.innerHTML = `
                 <td>${appointmentInfo}</td>
                 <td>${appointmentTypeBadge}</td>
-                <td>${record.surname}, ${record.name}</td>
+                <td>${memberInfo}</td>
                 <td>${arrivalHtml}</td>
                 <td>${statusHtml}</td>
                 <td>${sourceInfo}</td>
@@ -326,20 +341,26 @@ window.goToRecordsPage = function(page) {
 
 function updateRecordStats(records) {    
     const totalRecords = records.length;
-    //const onTime = records.filter(r => r.status === 'on_time').length;
-    //const late = records.filter(r => r.status === 'late').length;
+    const present = records.filter(r => r.status === 'present').length;
     //const excused = records.filter(r => r.status === 'excused').length;
+    //const absent = records.filter(r => r.status === 'excused').length;
 
-    if(isAttendanceMode)
+    if(currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT)
     {
-        document.getElementById('statTotalRecordsTitle').innerHTML = 'Anzahl Mitglieder zum Termin';
+        document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesende Mitglieder zum Termin';        
+        document.getElementById('statTotalRecords').textContent = present;
     }
+    else if(currentMode === RecordMode.ATTENDANCE_BY_MEMBER)
+    {
+        document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesend bei Terminen';
+        document.getElementById('statTotalRecords').textContent = present;
+    } 
     else
     {
         document.getElementById('statTotalRecordsTitle').innerHTML = 'Erfasste Anwesenheitseinträge';
-    }
-        
-    document.getElementById('statTotalRecords').textContent = totalRecords;
+        document.getElementById('statTotalRecords').textContent = totalRecords;
+    }       
+    
     //document.getElementById('statOnTime').textContent = onTime;
     //document.getElementById('statLate').textContent = late;
     //document.getElementById('statExcused').textContent = excused;
@@ -458,26 +479,53 @@ export async function initRecordEventHandlers() {
         
         if (appointmentId && appointmentId !== '') {
             // Attendance-Modus: Member-Filter deaktivieren
-            isAttendanceMode = true;
+            //isAttendanceMode = true;
+            currentMode = RecordMode.ATTENDANCE_BY_APPOINTMENT;
             currentAppointmentId = appointmentId;
+            currentMemberId = null;
             memberFilter.disabled = true;
             memberFilter.value = '';
             //await loadAndRenderAttendanceList(appointmentId);
             await loadAttendanceList(appointmentId);
         } else {
             // Records-Modus: Member-Filter aktivieren
-            isAttendanceMode = false;
+            //isAttendanceMode = false;
+            currentMode = RecordMode.ALL_RECORDS;
             currentAppointmentId = null;
+            currentMemberId = null;
             memberFilter.disabled = false;
             await applyRecordFilters(true); // Normale Filterung
         }
     });
+
+    document.getElementById('filterMember')?.addEventListener('change', async function() {
+        const memberId = this.value;
+        const appointmentFilter = document.getElementById('filterAppointment');
+        
+        if (memberId && memberId !== '') {
+            // Attendance-by-Member-Modus
+            currentMode = RecordMode.ATTENDANCE_BY_MEMBER;
+            currentMemberId = memberId;
+            currentAppointmentId = null;
+            appointmentFilter.disabled = true;
+            appointmentFilter.value = '';
+            await loadMemberAttendanceList(memberId);
+        } else {
+            // Zurück zu ALL_RECORDS falls kein Appointment gewählt
+            currentMode = RecordMode.ALL_RECORDS;
+            currentMemberId = null;
+            currentAppointmentId = null;
+            appointmentFilter.disabled = false;
+            await applyRecordFilters(true);
+        }
+    });
     
+    /*
     document.getElementById('filterMember')?.addEventListener('change', () => {
         applyRecordFilters();
     });
     
-    /*document.getElementById('filterGroup')?.addEventListener('change', () => {
+    document.getElementById('filterGroup')?.addEventListener('change', () => {
         applyRecordFilters();
     });*/
     
@@ -488,11 +536,14 @@ export async function initRecordEventHandlers() {
         const appointmentFilter = document.getElementById('filterAppointment');
         const memberFilter = document.getElementById('filterMember');
         //document.getElementById('filterGroup').value = '';
+        appointmentFilter.disabled = false;
         memberFilter.disabled = false;
         appointmentFilter.value = '';
         memberFilter.value = '';
-        isAttendanceMode = false;
+        //isAttendanceMode = false;
+        currentMode = RecordMode.ALL_RECORDS;
         currentAppointmentId = null;
+        currentMemberId = null;
         
         await applyRecordFilters();
     });
@@ -505,10 +556,16 @@ export async function showRecordsSection(forceReload = false) {
     // Filter-Optionen laden
     await loadRecordFilters();
 
-    // Ansicht wiederherstellen (Attendance oder normale Records)
-    if (isAttendanceMode && currentAppointmentId) {
+    if((currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT) && currentAppointmentId)
+    {
         await loadAttendanceList(currentAppointmentId);
-    } else {
+    }
+    else if((currentMode === RecordMode.ATTENDANCE_BY_MEMBER) && currentMemberId)
+    {
+        await loadMemberAttendanceList(currentMemberId);
+    }
+    else
+    {
         await applyRecordFilters(forceReload);
     }
 }
@@ -697,10 +754,19 @@ export async function saveRecord() {
     
     if (result.success) {
         closeRecordModal();
-
-        //await invalidateCache('records', currentYear);
-        applyRecordFilters(true, currentRecordsPage);
-        //await loadRecords(true);
+   
+        if(currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT)
+        {
+            loadAttendanceList(currentAppointmentId);                
+        }
+        else if(currentMode === RecordMode.ATTENDANCE_BY_MEMBER)
+        {
+            loadMemberAttendanceList(currentMemberId);
+        }    
+        else
+        {                    
+            applyRecordFilters(true, currentRecordsPage);
+        } 
 
         // Erfolgs-Toast
         showToast(
@@ -718,10 +784,14 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
 
     if (confirmed) {
         const result = await apiCall('records', 'DELETE', null, { id: recordId });
-        if (result) {
-            if(isAttendanceMode)
+        if (result.success) {
+            if(currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT)
             {
                 loadAttendanceList(currentAppointmentId);                
+            }
+            else if(currentMode === RecordMode.ATTENDANCE_BY_MEMBER)
+            {
+                loadMemberAttendanceList(currentMemberId);
             }
             else
             {
@@ -806,10 +876,17 @@ function renderAttendanceList(attendanceData) {
 
     tbody.innerHTML = '';    
     
-    updateTableHeader(true); // true = Attendance-Modus
+    updateTableHeader('appointment');
 
     attendanceData.forEach(member => {
-        const tr = document.createElement('tr');   
+        const tr = document.createElement('tr'); 
+
+        // Member-Info mit Mitgliedsnr. wenn vorhanden       
+        let memberInfo = `<div style="line-height: 1.4;">${member.surname}, ${member.name}`;    
+        if (member.member_number) {            
+            memberInfo += `<br><small style="color: #7f8c8d;">${escapeHtml(member.member_number)}</small>`;                            
+        }    
+        memberInfo += '</div>'        
         
         let arrivalHtml = '-';
         if (member.arrival_time) {
@@ -861,12 +938,12 @@ function renderAttendanceList(attendanceData) {
             // Kein Eintrag → Anwesend & Entschuldigt
             actionsHtml = `
                 <button class="action-btn btn-icon btn-approve" 
-                        onclick="quickCreateRecord(${member.member_id}, 'present')"
+                        onclick="quickCreateRecordForMember(${member.member_id}, 'present')"
                         title="Anwesend">
                     ✓
                 </button>
                 <button class="action-btn btn-icon btn-edit" 
-                        onclick="quickCreateRecord(${member.member_id}, 'excused')"
+                        onclick="quickCreateRecordForMember(${member.member_id}, 'excused')"
                         title="Entschuldigt">
                     ⚠
                 </button>
@@ -875,8 +952,7 @@ function renderAttendanceList(attendanceData) {
         
         tr.className = rowClass;
         tr.innerHTML = `
-            <td>${member.surname}, ${member.name}</td>
-            <td>${member.member_number || '-'}</td>            
+            <td>${memberInfo}</td>     
             <td>${arrivalHtml}</td>
             <td>${statusHtml}</td>
             <td>${sourceInfo}</td>
@@ -887,14 +963,165 @@ function renderAttendanceList(attendanceData) {
     });
 }
 
-function updateTableHeader(isAttendanceMode) {
-    const thead = document.querySelector('#recordsTable thead tr');
-    thead.innerHTML = isAttendanceMode
-        ? '<th>Mitglied</th><th>Nummer</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>'
-        : '<th>Termin</th><th>Typ</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+async function loadMemberAttendanceList(memberId) {
+    try {
+        // Jahr aus bestehendem Filter oder aktuelles Jahr
+        const year = document.getElementById('filterYear')?.value || new Date().getFullYear();
+        
+        const attendance = await apiCall('attendance_list', 'GET', null, {
+            member_id: memberId,
+            year: currentYear
+        });
+        
+        debug.log("Member Attendance Data:", attendance);
+        if (attendance.success) {
+            renderMemberAttendanceList(attendance.appointments, attendance.member);
+        }
+    } catch (error) {
+        console.error('Fehler beim Laden der Mitglieder-Anwesenheit:', error);
+    }
 }
 
-async function quickCreateRecord(memberId, status = 'present') {
+function renderMemberAttendanceList(appointmentsData, memberInfo) {
+    const tbody = document.getElementById('recordsTableBody');
+
+    updateRecordStats(appointmentsData);
+
+    const container = document.getElementById('recordsPagination');
+    if (!container) return;
+
+    container.innerHTML = '';    
+    tbody.innerHTML = '';    
+    
+    // Neuer Header-Modus für Member-Ansicht
+    updateTableHeader('member'); // 'member' = Member-Attendance-Modus
+
+    appointmentsData.forEach(appointment => {
+        const tr = document.createElement('tr');        
+        
+        const arrivalTime = new Date(appointment.arrival_time);
+        const formattedTime = arrivalTime.toLocaleString('de-DE');
+
+         // Termin-Info mit Terminart
+        let appointmentInfo = '-';
+        if (appointment.appointment_id && appointment.title) {
+            appointmentInfo = `<div style="line-height: 1.4;">
+                <strong>${appointment.title}</strong>`;
+            
+            if (appointment.date && appointment.start_time) {
+                const aptDate = new Date(appointment.date + 'T00:00:00');
+                const formattedAptDate = aptDate.toLocaleDateString('de-DE');
+                appointmentInfo += `<br><small style="color: #7f8c8d;">${formattedAptDate}, ${appointment.start_time.substring(0, 5)}</small>`;
+            }
+            
+            appointmentInfo += '</div>';
+        }
+
+
+        //Ankunftszeitpunkt
+        let arrivalHtml = '-';
+        if (appointment.arrival_time) {
+            const arrivalDate = new Date(appointment.arrival_time);
+            const formattedDate = arrivalDate.toLocaleDateString('de-DE');
+            const formattedTime = arrivalDate.toLocaleTimeString('de-DE', { 
+                hour: '2-digit', 
+                minute: '2-digit' ,
+                second: '2-digit'
+            });
+            
+            arrivalHtml = `<div style="line-height: 1.4;">${formattedTime}<br>
+                <small style="color: #7f8c8d;">${formattedDate}</small>
+            </div>`;
+        }        
+
+        // Check-in Source Badge
+        const sourceInfo = getSourceBadge(appointment);
+        
+        // Status-Icon und Styling
+        let statusHtml, rowClass;
+        if (appointment.status === 'present') {
+            statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span>';
+            rowClass = '';
+        } else if (appointment.status === 'excused') {
+            statusHtml = '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
+            rowClass = '';
+        } else {
+            statusHtml = '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>';
+            rowClass = 'table-secondary';
+        }
+
+
+        // Terminart Badge
+        let appointmentTypeBadge = '-';    
+        const typeId = appointment.type_id;
+        const typeName = appointment.type_name;
+            
+        // Type-ID vorhanden → Lookup im Cache (Array durchsuchen)
+        if (typeId && dataCache.types.data && Array.isArray(dataCache.types.data)) {
+            const type = dataCache.types.data.find(t => t.type_id == typeId);
+            appointmentTypeBadge = `<span class="type-badge" style="background: ${type.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                                        ${type.type_name}
+                                    </span>`;
+        } 
+        // Fallback: type_name vorhanden (aus Dropdown), aber nicht im Cache
+        else if (typeName) {
+            appointmentTypeBadge = `<span class="type-badge" style="background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                                        ${type.type_name}
+                                    </span>`;
+        } 
+        // Termin ohne Type
+        else {
+            appointmentTypeBadge = `<span class="type-badge" style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                                        Allgemein
+                                    </span>`;
+        }
+
+        let actionsHtml;
+        if (appointment.record_id) {
+            // Eintrag vorhanden → Edit & Delete
+            actionsHtml = `
+                <button class="action-btn btn-icon btn-edit" 
+                        onclick="openRecordModal(${appointment.record_id})"
+                        title="Bearbeiten">
+                    ✎
+                </button>
+                <button class="action-btn btn-icon btn-delete" 
+                        onclick="deleteRecord(${appointment.record_id},'${memberInfo.name}','diesem Termin')"
+                        title="Löschen">
+                    🗑
+                </button>
+            `;
+        } else {
+            // Kein Eintrag → Anwesend & Entschuldigt
+            actionsHtml = `
+                <button class="action-btn btn-icon btn-approve" 
+                        onclick="quickCreateRecordForAppointment(${appointment.appointment_id}, 'present')"
+                        title="Anwesend">
+                    ✓
+                </button>
+                <button class="action-btn btn-icon btn-edit" 
+                        onclick="quickCreateRecordForAppointment(${appointment.appointment_id}, 'excused')"
+                        title="Entschuldigt">
+                    ⚠
+                </button>
+            `;
+        }   
+        
+        tr.className = rowClass;
+        tr.innerHTML = `
+            <td>${appointmentInfo}</td>
+            <td>${appointmentTypeBadge}</td>
+            <td>${arrivalHtml}</td>
+            <td>${statusHtml}</td>
+            <td>${sourceInfo}</td>
+            <td>${actionsHtml}</td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
+}
+
+async function quickCreateRecordForMember(memberId, status = 'present') {
     const appointmentId = currentAppointmentId;
     
     if (!appointmentId) {
@@ -921,6 +1148,51 @@ async function quickCreateRecord(memberId, status = 'present') {
         showToast('Fehler beim Erstellen der Anwesenheit', 'error');
     }
 }
+
+
+// Quick-Create für Member-Ansicht (umgekehrte Logik)
+async function quickCreateRecordForAppointment(appointmentId, status = 'present') {
+    const memberId = currentMemberId;
+    
+    if (!memberId) {
+        showToast('Kein Mitglied ausgewählt', 'error');
+        return;
+    }
+    
+    try {
+        await apiCall('records', 'POST', {
+            member_id: parseInt(memberId),
+            appointment_id: parseInt(appointmentId),
+            status: status
+        });
+        
+        const message = status === 'excused' ? 'Entschuldigung erfasst' : 'Anwesenheit erfasst';
+        showToast(message, 'success');
+        
+        // Member-Anwesenheitsliste neu laden
+        await loadMemberAttendanceList(memberId);
+        
+    } catch (error) {
+        console.error('Fehler beim Erstellen:', error);
+        showToast('Fehler beim Erstellen der Anwesenheit', 'error');
+    }
+}
+
+function updateTableHeader(mode) {
+    const thead = document.querySelector('#recordsTable thead tr');
+    
+    if (mode === 'member') {
+        // Member-Attendance: Termine auflisten
+        thead.innerHTML = '<th>Termin</th><th>Typ</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+    } else if (mode === 'appointment') {
+        // Appointment-Attendance: Mitglieder auflisten
+        thead.innerHTML = '<th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+    } else {
+        // ALL_RECORDS: Alle Felder
+        thead.innerHTML = '<th>Termin</th><th>Typ</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+    }
+}
+
 
 // ============================================
 // HELPERS
@@ -955,4 +1227,5 @@ window.saveRecord = saveRecord;
 window.closeRecordModal = () => document.getElementById('recordModal').classList.remove('active');
 window.deleteRecord = deleteRecord;
 window.applyRecordFilters = applyRecordFilters;
-window.quickCreateRecord = quickCreateRecord;
+window.quickCreateRecordForMember = quickCreateRecordForMember;
+window.quickCreateRecordForAppointment = quickCreateRecordForAppointment;

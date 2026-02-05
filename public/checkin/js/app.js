@@ -8,7 +8,7 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-const DEBUG = false;
+const DEBUG = true;
 
 const debug = {
   log:  (...args) => DEBUG && console.log(...args),
@@ -230,9 +230,11 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
 
         // Spezifische Fehlermeldungen
         switch (response.status) {
+            /*case 400:
+                break;
             case 401:                
                 errorMessage = 'Anmeldedaten ungültig oder Token abgelaufen';
-                break;
+                break;*/
             case 403:
                 errorMessage = 'Keine Berechtigung für diese Aktion';
                 break;
@@ -250,7 +252,7 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
                 break;
             case 500:
                 errorMessage = 'Serverfehler - bitte später erneut versuchen';
-                break;
+                break;            
         }
 
          return {
@@ -1170,7 +1172,7 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
             showMessage(methodText + ' eingecheckt!', 'success');
         }
     } catch (error) {
-        showMessage('Check-in fehlgeschlagen', 'error');
+        showMessage(error.message, 'error');
         debug.error(error.message);
     } finally {
         elements.scanButton.disabled = false;

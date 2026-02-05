@@ -21,7 +21,9 @@ session_start();
 $database = new Database();
 $db = $database->getConnection();
 
-$branding = getBrandingSettings($db);
+$branding = getBrandingSettings($db, $database);
+
+$prefix = $database->table('');
 
 $token = $_GET['token'] ?? '';
 
@@ -47,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Token prüfen
         $stmt = $db->prepare(
             "SELECT prt.user_id, u.email 
-             FROM password_reset_tokens prt
-             JOIN users u ON prt.user_id = u.user_id
+             FROM {$prefix}password_reset_tokens prt
+             JOIN {$prefix}users u ON prt.user_id = u.user_id
              WHERE prt.token = ? 
              AND prt.used = 0 
              AND prt.expires_at > NOW()"
@@ -67,13 +69,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
         
         $stmt = $db->prepare(
-            "UPDATE users SET password_hash = ? WHERE user_id = ?"
+            "UPDATE {$prefix}users SET password_hash = ? WHERE user_id = ?"
         );
         $stmt->execute([$passwordHash, $result['user_id']]);
         
         // Token als verwendet markieren
         $stmt = $db->prepare(
-            "UPDATE password_reset_tokens SET used = 1 WHERE token = ?"
+            "UPDATE {$prefix}password_reset_tokens SET used = 1 WHERE token = ?"
         );
         $stmt->execute([$tokenHash]);
         
@@ -94,25 +96,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // GET: Formular anzeigen
 if (empty($token) || !ctype_xdigit($token) || strlen($token) !== 64) {
-    showError('Ungültiger Link');
+    showError('Token ungültig', 'Der Reset-Link ist ungültig.',$branding);
     exit();
 }
 
-// Token validieren
-$tokenHash = hash('sha256', $token);
+try {
+    // Token validieren
+    $tokenHash = hash('sha256', $token);
 
-$stmt = $db->prepare(
-    "SELECT user_id FROM password_reset_tokens 
-     WHERE token = ? AND used = 0 AND expires_at > NOW()"
-);
-$stmt->execute([$tokenHash]);
+    $stmt = $db->prepare(
+        "SELECT user_id FROM {$prefix}password_reset_tokens 
+        WHERE token = ? AND used = 0 AND expires_at > NOW()"
+    );
+    $stmt->execute([$tokenHash]);
 
-if (!$stmt->fetch()) {
-    showError('Token ungültig', 'Der Reset-Link ist abgelaufen oder wurde bereits verwendet.');
+    if (!$stmt->fetch()) {
+        showError('Token ungültig', 'Der Reset-Link ist abgelaufen oder wurde bereits verwendet.', $branding);
+        exit();
+    }
+
+    showForm($token,'',$branding);
     exit();
+} catch (Exception $e) {
+        error_log("Password reset error: " . $e->getMessage());
+        showError('Fehler', 'Ein technischer Fehler ist aufgetreten.', $branding);
+        exit();
 }
-
-showForm($token,'',$branding);
 
 // ============================================
 // HTML OUTPUT FUNCTIONS

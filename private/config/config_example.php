@@ -26,6 +26,7 @@ class Database {
     private $db_name = "your_database";
     private $username = "your_username";
     private $password = "your_password";
+    private $prefix ="your_prefix";
     public $conn;
 
     public function getConnection() {
@@ -41,6 +42,11 @@ class Database {
             exit();
         }
         return $this->conn;
+    }
+
+    // Helper-Methode für Tabellennamen
+    public function table($tableName) {
+        return $this->prefix . $tableName;
     }
 }
 

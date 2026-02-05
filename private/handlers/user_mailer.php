@@ -8,15 +8,18 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // USER REGISTRATION & PASSWORT MAIL Handler
 // ============================================
 
 // Registrierung (öffentlich zugänglich)
-function registerNewUser($db) {
+function registerNewUser($db, $database) {
     require_once __DIR__ . '/../helpers/rate_limiter.php';
 
-    $rateLimiter = new RateLimiter($db);
+    $prefix = $database->table('');
+
+    $rateLimiter = new RateLimiter($db,$database);
 
     $data = json_decode(file_get_contents("php://input"));
     
@@ -59,7 +62,7 @@ function registerNewUser($db) {
     }
     
     // Email bereits registriert?
-    $stmt = $db->prepare("SELECT user_id FROM users WHERE email = ?");
+    $stmt = $db->prepare("SELECT user_id FROM {$prefix}users WHERE email = ?");
     $stmt->execute([$email]);
     if($stmt->fetch()) {
         // Sicherheit: gleiche Response (keine Email-Enumeration)
@@ -78,7 +81,7 @@ function registerNewUser($db) {
         // User anlegen
         $passwordHash = password_hash($data->password, PASSWORD_DEFAULT);
         $stmt = $db->prepare(
-            "INSERT INTO users (email, password_hash, name, role, is_active, email_verified, account_status, api_token, api_token_expires_at, created_at) 
+            "INSERT INTO {$prefix}users (email, password_hash, name, role, is_active, email_verified, account_status, api_token, api_token_expires_at, created_at) 
              VALUES (?, ?, ?, 'user',0, 0, 'pending', ?, ?, NOW())"
         );
 
@@ -88,7 +91,7 @@ function registerNewUser($db) {
         $db->commit();  
 
         // Mail-Status prüfen BEVOR Token erstellt wird
-        $mailer = new Mailer(getMailConfig(), $db);
+        $mailer = new Mailer(getMailConfig(), $db, $database);
         $mailStatus = $mailer->checkMailStatus('registration');        
         
         if (!$mailStatus['enabled']) {
@@ -109,7 +112,7 @@ function registerNewUser($db) {
         $expiresAt = date('Y-m-d H:i:s', time() + 86400);
         
         $stmt = $db->prepare(
-            "INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES (?, ?, ?)"
+            "INSERT INTO {$prefix}email_verification_tokens (user_id, token, expires_at) VALUES (?, ?, ?)"
         );
         $stmt->execute([$userId, $tokenHash, $expiresAt]);
                   
@@ -144,7 +147,9 @@ function registerNewUser($db) {
     }
 }
 
-function handlePasswordResetRequest($db, $method) {
+function handlePasswordResetRequest($db, $database, $method) {
+
+    $prefix = $database->table('');
 
     if($method !== 'POST') {
         http_response_code(405);
@@ -169,7 +174,7 @@ function handlePasswordResetRequest($db, $method) {
     }
 
     // Mail-Status prüfen BEVOR User gesucht wird
-    $mailer = new Mailer(getMailConfig(), $db);
+    $mailer = new Mailer(getMailConfig(), $db, $database);
     $mailStatus = $mailer->checkMailStatus('password_reset');
     
     if (!$mailStatus['enabled']) {
@@ -181,7 +186,7 @@ function handlePasswordResetRequest($db, $method) {
         return;
     }
 
-    $rateLimiter = new RateLimiter($db);
+    $rateLimiter = new RateLimiter($db,$database);
     
     // Email Rate Limit: 3 Resets pro Stunde
     if (!$rateLimiter->canSendEmail($data->email, 'password_reset', 3, 3600)) {
@@ -202,7 +207,7 @@ function handlePasswordResetRequest($db, $method) {
     }
     
     // User existiert?
-    $stmt = $db->prepare("SELECT user_id, email, name FROM users WHERE email = ? AND account_status = 'active'");
+    $stmt = $db->prepare("SELECT user_id, email, name FROM {$prefix}users WHERE email = ? AND account_status = 'active'");
     $stmt->execute([$email]);
     $user = $stmt->fetch();
     
@@ -219,7 +224,7 @@ function handlePasswordResetRequest($db, $method) {
         $expiresAt = date('Y-m-d H:i:s', time() + 3600);
         
         $stmt = $db->prepare(
-            "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)"
+            "INSERT INTO {$prefix}password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)"
         );
         $stmt->execute([$user['user_id'], $tokenHash, $expiresAt]);
                 

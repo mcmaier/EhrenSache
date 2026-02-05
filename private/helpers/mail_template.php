@@ -14,12 +14,12 @@ require_once 'branding.php';
 class EmailTemplate {
     private static $templatesPath = __DIR__ . '/../email_templates/';
     
-    public static function render($templateName, $variables = [], $pdo = null) {
+    public static function render($templateName, $variables = [], $pdo = null, $database = null) {
         // Branding laden (falls PDO übergeben)
         $branding = [];
 
         if ($pdo) {
-            $branding = getBrandingSettings($pdo);
+            $branding = getBrandingSettings($pdo, $database);
         }
 
         // Base-Template laden
