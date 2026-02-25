@@ -35,6 +35,8 @@ let allFilteredRecords = [];
 let currentMode = RecordMode.ALL_RECORDS;
 let currentAppointmentId = null;
 let currentMemberId = null;
+let currentAppointmentType = null;
+let isLoadingFilters = false;
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -149,30 +151,10 @@ export async function renderRecords(records, page = 1)
             appointmentInfo += '</div>';
         }
 
-        // Terminart Badge
-        let appointmentTypeBadge = '-';    
         const typeId = record.appointment_type_id;
-        const typeName = record.appointment_type_name;
-            
-        // Type-ID vorhanden → Lookup im Cache (Array durchsuchen)
-        if (typeId && dataCache.types.data && Array.isArray(dataCache.types.data)) {
-            const type = dataCache.types.data.find(t => t.type_id == typeId);
-            appointmentTypeBadge = `<span class="type-badge" style="background: ${type.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                                        ${type.type_name}
-                                    </span>`;
-        } 
-        // Fallback: type_name vorhanden (aus Dropdown), aber nicht im Cache
-        else if (typeName) {
-            appointmentTypeBadge = `<span class="type-badge" style="background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                                        ${type.type_name}
-                                    </span>`;
-        } 
-        // Termin ohne Type
-        else {
-            appointmentTypeBadge = `<span class="type-badge" style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                                        Allgemein
-                                    </span>`;
-        }
+
+        // Terminart Badge
+        const appointmentTypeBadge = createAppointmentTypeBadge(typeId);                
 
         // Member-Info mit Mitgliedsnr. wenn vorhanden       
         let memberInfo = `<div style="line-height: 1.4;">${record.surname}, ${record.name}`;    
@@ -337,31 +319,43 @@ window.goToRecordsPage = function(page) {
 function updateRecordStats(records) {    
     const totalRecords = records.length;
     const present = records.filter(r => r.status === 'present').length;
+    const excused = records.filter(r => r.status === 'excused').length;;
     const absent = totalRecords - present;
 
     if(currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT)
     {
         document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesende Mitglieder zum Termin';        
         document.getElementById('statTotalRecords').textContent = present;
-        document.getElementById('statMissingRecords').textContent = absent;
+        document.getElementById('statMissingRecordsTitle').innerHTML = 'Entschuldigt';
+        document.getElementById('statMissingRecords').textContent = excused;
     }
     else if(currentMode === RecordMode.ATTENDANCE_BY_MEMBER)
     {
         document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesend bei Terminen';
         document.getElementById('statTotalRecords').textContent = present;
-        document.getElementById('statMissingRecords').textContent = absent;
+        document.getElementById('statMissingRecordsTitle').innerHTML = 'Entschuldigt';
+        document.getElementById('statMissingRecords').textContent = excused;
     } 
     else
     {
         document.getElementById('statTotalRecordsTitle').innerHTML = 'Erfasste Anwesenheitseinträge';
-        document.getElementById('statTotalRecords').textContent = totalRecords;
-        document.getElementById('statMissingRecords').textContent = absent;
+        document.getElementById('statTotalRecords').textContent = present;
+        document.getElementById('statMissingRecordsTitle').innerHTML = 'Entschuldigt';
+        document.getElementById('statMissingRecords').textContent = excused;
     }           
 }
 
 export async function loadRecordFilters(forceReload = false) {
 
     debug.log("Load Record Filters ()");
+
+    // Verhindere Event-Trigger während des Ladens
+    if (isLoadingFilters) {
+        debug.log("Already loading filters, skipping");
+        return;
+    }
+
+    isLoadingFilters = true;
 
     // Gruppen laden
     const aptTypes = await loadTypes(forceReload);
@@ -373,7 +367,27 @@ export async function loadRecordFilters(forceReload = false) {
     aptTypeSelect.innerHTML = '<option value="">Alle Termine</option>';
     if (aptTypes && aptTypes.length > 0) {
         aptTypes.forEach(aptt => {
-            aptTypeSelect.innerHTML += `<option value="${aptt.type_id}">${aptt.type_name}</option>`;
+            //aptTypeSelect.innerHTML += `<option value="${aptt.type_id}">${aptt.type_name}</option>`;
+       
+            // Terminart-Anzeige im Dropdown-Text
+            let displayText = `${aptt.type_name}`;
+            
+            // Erstelle Option mit data-Attributen
+            const option = document.createElement('option');
+            option.value = aptt.type_id;
+            option.textContent = displayText;
+
+            // Füge Farbe hinzu (funktioniert in den meisten Browsern)
+            if (aptt.color) {
+                option.style.color = aptt.color;
+                option.style.fontWeight = '500';
+            }
+            
+            // Speichere Type-Daten für Badge-Anzeige
+            option.dataset.typeId = aptt.type_id || '';
+            option.dataset.typeName = aptt.type_name || '';
+            
+            aptTypeSelect.appendChild(option); 
         });
     }
     aptTypeSelect.value = currentAptTypeValue;
@@ -381,7 +395,9 @@ export async function loadRecordFilters(forceReload = false) {
     loadAppointmentFilter(forceReload);
 
     loadMemberFilter(forceReload);
+
     
+    isLoadingFilters = false;    
 }
 
 async function loadAppointmentFilter(forceReload = false, appointmentType = null)
@@ -402,7 +418,35 @@ async function loadAppointmentFilter(forceReload = false, appointmentType = null
     appointmentSelect.innerHTML = '<option value="">Alle Termine</option>';
     if (filtered && filtered.length > 0) {
         filtered.forEach(app => {
-            appointmentSelect.innerHTML += `<option value="${app.appointment_id}">${app.title} (${app.date})</option>`;
+
+            const date = new Date(app.date + 'T00:00:00');
+            const formattedDate = date.toLocaleDateString('de-DE');
+            const startTime = app.start_time ? app.start_time.substring(0, 5) : '';
+            
+            // Terminart-Anzeige im Dropdown-Text
+            let displayText = `${app.title} (${formattedDate} - ${startTime})`;
+            
+            if (app.type_name) {
+                displayText = `${displayText}`;
+            }
+            
+            // Erstelle Option mit data-Attributen
+            const option = document.createElement('option');
+            option.value = app.appointment_id;
+            option.textContent = displayText;
+
+            // Füge Farbe hinzu (funktioniert in den meisten Browsern)
+            if (app.color) {
+                option.style.color = app.color;
+                option.style.fontWeight = '500';
+            }
+            
+            // Speichere Type-Daten für Badge-Anzeige
+            option.dataset.typeId = app.type_id || '';
+            option.dataset.typeName = app.type_name || '';
+            
+            appointmentSelect.appendChild(option);         
+            
         });
     }
     appointmentSelect.value = currentAppointmentValue;
@@ -411,7 +455,7 @@ async function loadAppointmentFilter(forceReload = false, appointmentType = null
 async function loadMemberFilter(forceReload = false, appointmentType = null)
 {
     // Mitglieder laden (jahresunabhängig)
-    const members = await loadMembers(forceReload);    
+    const members = await loadMembers();    
 
     // Mitglieder-Filter befüllen
     const memberSelect = document.getElementById('filterMember');
@@ -420,37 +464,48 @@ async function loadMemberFilter(forceReload = false, appointmentType = null)
     let filtered = [...members];
 
     if (appointmentType) {
-        // Hole die Gruppen des Appointment-Types
-        const types = await loadTypes(forceReload);
+        // Hole member_group_ids für diesen appointment_type
+        const allowedGroupIds = await getAppointmentTypeGroups(appointmentType);
         
-        debug.log("Types: ", types);
-
-        // TO DO: Kombination Types mit Groups auswerten
-        if (types.length > 0) {
-            // Filtere Mitglieder: mindestens eine Gruppe muss übereinstimmen
+        if (allowedGroupIds.length > 0) {
             filtered = filtered.filter(member => {
-                // Konvertiere String zu Array (beachte Leerzeichen!)
-                const memberGroups = member.group_ids 
+                // Member group_ids: "1, 2" → [1, 2]
+                const memberGroupIds = member.group_ids 
                     ? member.group_ids.split(',').map(id => parseInt(id.trim()))
                     : [];
                 
-                // Prüfe Überschneidung
-                return memberGroups.some(group_ids => 
-                    types.includes(group_ids)
-                );
+                // Hat Member mindestens eine erlaubte Gruppe?
+                return memberGroupIds.some(gid => allowedGroupIds.includes(gid));
             });
         }
     }
 
     memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
-    if (members && members.length > 0) {
-        members
+    if (filtered  && filtered .length > 0) {
+        filtered 
             .filter(m => m.active)
             .forEach(member => {
                 memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
             });
     }
     memberSelect.value = currentMemberValue;
+}
+
+async function getAppointmentTypeGroups(appointmentTypeId) {
+    try {
+        const response = await apiCall(`appointment_types`, 'GET', null, {id: appointmentTypeId});
+        
+        debug.log("Response: ", response);
+
+        if (response.success && response.groups && Array.isArray(response.groups)) {
+            // Extrahiere group_ids aus dem Objekt-Array
+            return response.groups.map(group => group.group_id);
+        }
+        return [];
+    } catch (error) {
+        debug.error('Fehler beim Laden der Type-Gruppen:', error);
+        return [];
+    }
 }
 
 export async function applyRecordFilters(forceReload = false, currentPage = 1) {
@@ -493,8 +548,17 @@ export async function initRecordEventHandlers() {
         const appointmentTypeId = this.value;        
         const appointmentFilter = document.getElementById('filterAppointment');
         const memberFilter = document.getElementById('filterMember');
+
+        if (appointmentTypeId && appointmentTypeId !== '') 
+        {
+            currentAppointmentType = appointmentTypeId;  
+        }
+        else 
+        {
+            currentAppointmentType = null;
+        }
                 
-        currentMode = RecordMode.ALL_RECORDS;
+        currentMode = RecordMode.ALL_RECORDS;      
         currentAppointmentId = null;
         currentMemberId = null;
         appointmentFilter.disabled = false;
@@ -505,35 +569,14 @@ export async function initRecordEventHandlers() {
         loadAppointmentFilter(false,appointmentTypeId);
         loadMemberFilter(false,appointmentTypeId);
 
-
-        await applyRecordFilters(true);
-        /*
-        const appointmentId = this.value;
-        const memberFilter = document.getElementById('filterGroup');
-        
-        if (appointmentId && appointmentId !== '') {
-            // Attendance-Modus: Member-Filter deaktivieren
-            currentMode = RecordMode.ATTENDANCE_BY_APPOINTMENT;
-            currentAppointmentId = appointmentId;
-            currentMemberId = null;
-            memberFilter.disabled = true;
-            memberFilter.value = '';
-            //await loadAndRenderAttendanceList(appointmentId);
-            await loadAttendanceList(appointmentId);
-        } else {
-            // Records-Modus: Member-Filter aktivieren
-            currentMode = RecordMode.ALL_RECORDS;
-            currentAppointmentId = null;
-            currentMemberId = null;
-            memberFilter.disabled = false;
-            await applyRecordFilters(true); // Normale Filterung
-        }*/
+        await applyRecordFilters(false);
     });
 
     // Event-Listener für Termin-Filter
     document.getElementById('filterAppointment').addEventListener('change', async function() {
         const appointmentId = this.value;
         const memberFilter = document.getElementById('filterMember');
+        const aptTypeFilter = document.getElementById('filterAptType');
         
         if (appointmentId && appointmentId !== '') {
             // Attendance-Modus: Member-Filter deaktivieren
@@ -542,7 +585,7 @@ export async function initRecordEventHandlers() {
             currentMemberId = null;
             memberFilter.disabled = true;
             memberFilter.value = '';
-            //await loadAndRenderAttendanceList(appointmentId);
+            aptTypeFilter.disabled = true;            
             await loadAttendanceList(appointmentId);
         } else {
             // Records-Modus: Member-Filter aktivieren
@@ -550,7 +593,8 @@ export async function initRecordEventHandlers() {
             currentAppointmentId = null;
             currentMemberId = null;
             memberFilter.disabled = false;
-            await applyRecordFilters(true); // Normale Filterung
+            aptTypeFilter.disabled = false
+            await applyRecordFilters(false); // Normale Filterung
         }
     });
 
@@ -558,43 +602,77 @@ export async function initRecordEventHandlers() {
     document.getElementById('filterMember')?.addEventListener('change', async function() {
         const memberId = this.value;
         const appointmentFilter = document.getElementById('filterAppointment');
+        const aptTypeFilter = document.getElementById('filterAptType');
         
         if (memberId && memberId !== '') {
             // Attendance-by-Member-Modus
             currentMode = RecordMode.ATTENDANCE_BY_MEMBER;
             currentMemberId = memberId;
             currentAppointmentId = null;
+            aptTypeFilter.disabled = true;
             appointmentFilter.disabled = true;
             appointmentFilter.value = '';
-            await loadMemberAttendanceList(memberId);
+            await loadMemberAttendanceList(memberId, currentAppointmentType);
         } else {
             // Zurück zu ALL_RECORDS falls kein Appointment gewählt
             currentMode = RecordMode.ALL_RECORDS;
             currentMemberId = null;
             currentAppointmentId = null;
             appointmentFilter.disabled = false;
-            await applyRecordFilters(true);
+            aptTypeFilter.disabled = false;
+            await applyRecordFilters(false);
         }
     });
     
+    /*
     // Reset-Button
     document.getElementById('resetRecordFilter')?.addEventListener('click', async function() {
 
         debug.log("Reset Filters");
+        const aptTypeFilter = document.getElementById('filterAptType');
         const appointmentFilter = document.getElementById('filterAppointment');
         const memberFilter = document.getElementById('filterMember');
-        document.getElementById('filterAptType').value = '';
         appointmentFilter.disabled = false;
-        memberFilter.disabled = false;
+        memberFilter.disabled = false;  
+        aptTypeFilter.disabled = false
+        aptTypeFilter.value ='';      
         appointmentFilter.value = '';
         memberFilter.value = '';
         //isAttendanceMode = false;
         currentMode = RecordMode.ALL_RECORDS;
         currentAppointmentId = null;
         currentMemberId = null;
+        currentAppointmentType = null;
+
+        loadAppointmentFilter(false);
+        loadMemberFilter(false);
         
         await applyRecordFilters();
-    });
+    });*/
+}
+
+export async function resetRecordFilter()
+{
+        debug.log("Reset Filters");
+        const aptTypeFilter = document.getElementById('filterAptType');
+        const appointmentFilter = document.getElementById('filterAppointment');
+        const memberFilter = document.getElementById('filterMember');
+        appointmentFilter.disabled = false;
+        memberFilter.disabled = false;  
+        aptTypeFilter.disabled = false
+        aptTypeFilter.value ='';      
+        appointmentFilter.value = '';
+        memberFilter.value = '';
+        //isAttendanceMode = false;
+        currentMode = RecordMode.ALL_RECORDS;
+        currentAppointmentId = null;
+        currentMemberId = null;
+        currentAppointmentType = null;
+
+        loadAppointmentFilter(false);
+        loadMemberFilter(false);
+        
+        await applyRecordFilters();
 }
 
 export async function showRecordsSection(forceReload = false) {
@@ -610,11 +688,11 @@ export async function showRecordsSection(forceReload = false) {
     }
     else if((currentMode === RecordMode.ATTENDANCE_BY_MEMBER) && currentMemberId)
     {
-        await loadMemberAttendanceList(currentMemberId);
+        await loadMemberAttendanceList(currentMemberId, currentAppointmentType);
     }
     else
     {
-        await applyRecordFilters(forceReload);
+        await applyRecordFilters();
     }
 }
 
@@ -659,7 +737,13 @@ export async function openRecordModal(recordId = null) {
     const title = document.getElementById('recordModalTitle');
     const form = document.getElementById('recordForm');
 
+    const memberSelect = document.getElementById('record_member');
+    const appointmentSelect = document.getElementById('record_appointment'); 
+
     form.reset();
+
+    memberSelect.disabled = false;
+    appointmentSelect.disabled = false;      
     
     // Lade Mitglieder und Termine für Dropdowns
     await loadRecordDropdowns();
@@ -675,6 +759,9 @@ export async function openRecordModal(recordId = null) {
         document.getElementById('recordForm').reset();
         document.getElementById('record_id').value = '';
         document.getElementById('record_status').value = 'present';
+        
+        document.getElementById('record_member').disabled = false;
+        document.getElementById('record_appointment').disabeld = false;        
 
         // Keine ID anzeigen
         updateModalId('recordModal', null);
@@ -693,7 +780,6 @@ export async function openRecordModal(recordId = null) {
     }    
 
     // Event Listener für Termin-Auswahl (nur einmal registrieren)
-    const appointmentSelect = document.getElementById('record_appointment');
     //appointmentSelect.removeEventListener('change', updateAppointmentTypeDisplay);
     appointmentSelect.removeEventListener('change',updateArrivalTimeFromAppointment);
 
@@ -723,6 +809,9 @@ export async function loadRecordData(recordId) {
         document.getElementById('record_arrival_time').value = mysqlToDatetimeLocal(record.arrival_time);        
         document.getElementById('record_status').value = record.status;
 
+        document.getElementById('record_member').disabled = true;
+        document.getElementById('record_appointment').disabled = true;
+
         // Terminart anzeigen
         //updateAppointmentTypeDisplay();
     }
@@ -731,7 +820,8 @@ export async function loadRecordData(recordId) {
 
 export async function loadRecordDropdowns() {
         
-    const members =  await loadMembers(false);
+    await loadTypes();
+    const members =  await loadMembers();
     const memberSelect = document.getElementById('record_member');
     memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
@@ -751,16 +841,22 @@ export async function loadRecordDropdowns() {
             const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
             
             // Terminart-Anzeige im Dropdown-Text
-            let displayText = `${appointment.title} (${formattedDate} ${startTime})`;
+            let displayText = `${appointment.title} (${formattedDate} - ${startTime})`;
             
             if (appointment.type_name) {
-                displayText += ` - [${appointment.type_name}]`;
+                displayText = `${displayText} [${appointment.type_name}]`;
             }
             
             // Erstelle Option mit data-Attributen
             const option = document.createElement('option');
             option.value = appointment.appointment_id;
             option.textContent = displayText;
+
+            // Füge Farbe hinzu (funktioniert in den meisten Browsern)
+            if (appointment.color) {
+                option.style.color = appointment.color;
+                option.style.fontWeight = '500';
+            }
             
             // Speichere Type-Daten für Badge-Anzeige
             option.dataset.typeId = appointment.type_id || '';
@@ -808,7 +904,7 @@ export async function saveRecord() {
         }
         else if(currentMode === RecordMode.ATTENDANCE_BY_MEMBER)
         {
-            loadMemberAttendanceList(currentMemberId);
+            loadMemberAttendanceList(currentMemberId, currentAppointmentType);
         }    
         else
         {                    
@@ -838,7 +934,7 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
             }
             else if(currentMode === RecordMode.ATTENDANCE_BY_MEMBER)
             {
-                loadMemberAttendanceList(currentMemberId);
+                loadMemberAttendanceList(currentMemberId, currentAppointmentType);
             }
             else
             {
@@ -863,35 +959,9 @@ async function updateAppointmentTypeDisplay() {
         return;
     }
 
-    await loadTypes();
-    
-    // Termin gewählt
     typeGroup.style.display = 'block';
-    
-    const typeId = selectedOption.dataset.typeId;
-    const typeName = selectedOption.dataset.typeName;
+    typeBadge.innerHTML = await createAppointmentTypeBadge(selectedOption.dataset.typeId);
 
-    debug.log("Updating Appointment Type: ",selectedOption, typeId, typeName);
-    
-    // Type-ID vorhanden → Lookup im Cache für Farbe
-    if (typeId && dataCache.types.data[typeId]) {
-        const type = dataCache.types.data[typeId];
-        typeBadge.innerHTML = `<span class="type-badge" style="background: ${type.color}; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px;">
-                                  ${type.type_name}
-                               </span>`;
-    } 
-    // Fallback: type_name vorhanden (aus Dropdown), aber nicht im Cache
-    else if (typeName) {
-        typeBadge.innerHTML = `<span class="type-badge" style="background: #667eea; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px;">
-                                  ${typeName}
-                               </span>`;
-    } 
-    // Termin ohne Type
-    else {
-        typeBadge.innerHTML = `<span class="type-badge" style="background: #95a5a6; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px;">
-                                  Allgemein
-                               </span>`;
-    }
 }
 
 // ============================================
@@ -1010,14 +1080,12 @@ function renderAttendanceList(attendanceData) {
     });
 }
 
-async function loadMemberAttendanceList(memberId) {
-    try {
-        // Jahr aus bestehendem Filter oder aktuelles Jahr
-        const year = document.getElementById('filterYear')?.value || new Date().getFullYear();
-        
+async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
+    try {        
         const attendance = await apiCall('attendance_list', 'GET', null, {
             member_id: memberId,
-            year: currentYear
+            year: currentYear,
+            type_id: appointmentTypeId
         });
         
         debug.log("Member Attendance Data:", attendance);
@@ -1064,6 +1132,14 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
             appointmentInfo += '</div>';
         }
 
+        /*
+        // Wenn Mitglied zu diesem Termin inaktiv war → visuell kennzeichnen
+        if (appointment.member_was_active === 0) {
+            rowClass += ' inactive-period';
+            // Tooltip oder Badge hinzufügen
+            statusHtml = '<span style="color: #6c757d; font-weight: 500;">○ Inaktiv</span>';
+        }*/
+
 
         //Ankunftszeitpunkt
         let arrivalHtml = '-';
@@ -1099,29 +1175,7 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
 
 
         // Terminart Badge
-        let appointmentTypeBadge = '-';    
-        const typeId = appointment.type_id;
-        const typeName = appointment.type_name;
-            
-        // Type-ID vorhanden → Lookup im Cache (Array durchsuchen)
-        if (typeId && dataCache.types.data && Array.isArray(dataCache.types.data)) {
-            const type = dataCache.types.data.find(t => t.type_id == typeId);
-            appointmentTypeBadge = `<span class="type-badge" style="background: ${type.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                                        ${type.type_name}
-                                    </span>`;
-        } 
-        // Fallback: type_name vorhanden (aus Dropdown), aber nicht im Cache
-        else if (typeName) {
-            appointmentTypeBadge = `<span class="type-badge" style="background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                                        ${type.type_name}
-                                    </span>`;
-        } 
-        // Termin ohne Type
-        else {
-            appointmentTypeBadge = `<span class="type-badge" style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                                        Allgemein
-                                    </span>`;
-        }
+        let appointmentTypeBadge = createAppointmentTypeBadge(appointment.type_id);
 
         let actionsHtml;
         if (appointment.record_id) {
@@ -1166,6 +1220,27 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
         
         tbody.appendChild(tr);
     });
+}
+
+function createAppointmentTypeBadge(appointment_type_id = null)
+{
+    const types = dataCache.types.data;
+        
+    // Type-ID vorhanden UND types ist Array
+    if (appointment_type_id && Array.isArray(types)) {
+        const type = types.find(t => t.type_id == appointment_type_id);
+        
+        if (type) {
+            return `<span class="type-badge" style="background: ${type.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                        ${type.type_name}
+                    </span>`;
+        }
+    }
+    
+    // Fallback: Termin ohne Type ODER nicht gefunden
+    return `<span class="type-badge" style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                Allgemein
+            </span>`;
 }
 
 async function quickCreateRecordForMember(memberId, status = 'present') {
@@ -1217,7 +1292,7 @@ async function quickCreateRecordForAppointment(appointmentId, status = 'present'
         showToast(message, 'success');
         
         // Member-Anwesenheitsliste neu laden
-        await loadMemberAttendanceList(memberId);
+        await loadMemberAttendanceList(memberId, currentAppointmentType);
         
     } catch (error) {
         console.error('Fehler beim Erstellen:', error);
@@ -1273,6 +1348,6 @@ window.openRecordModal = openRecordModal;
 window.saveRecord = saveRecord;
 window.closeRecordModal = () => document.getElementById('recordModal').classList.remove('active');
 window.deleteRecord = deleteRecord;
-window.applyRecordFilters = applyRecordFilters;
+window.resetRecordFilter = resetRecordFilter;
 window.quickCreateRecordForMember = quickCreateRecordForMember;
 window.quickCreateRecordForAppointment = quickCreateRecordForAppointment;

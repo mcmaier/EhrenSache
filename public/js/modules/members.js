@@ -9,11 +9,11 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
 import { loadUserData } from './users.js';
 import { updateModalId } from './utils.js';
 import { loadGroups } from './management.js';
-import {debug} from '../app.js'
+import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 
 // ============================================
@@ -33,11 +33,14 @@ let allFilteredMembers = [];
 let currentMembershipDates = [];
 let currentMemberGroups = [];
 
+
 export async function loadMembers(forceReload = false) {
+    const year = currentYear;
+
     // Cache verwenden wenn vorhanden und nicht forceReload    
-    if (!forceReload && isCacheValid('members')) {
-        debug.log("Loading MEMBERS from CACHE");
-        return dataCache.members.data;
+    if (!forceReload && isCacheValid('members', year)) {
+        debug.log(`Loading MEMBERS from CACHE for ${year}`);
+        return dataCache.members[year].data;
     }
 
     // Userprofil abfragen (falls nicht gecacht)
@@ -48,11 +51,11 @@ export async function loadMembers(forceReload = false) {
 
     let members = [];
 
-    debug.log("Loading MEMBERS from API");
+    debug.log(`Loading MEMBERS from API for ${year}`);
             
     if(isAdminOrManager){
         // Admin sieht alle Mitglieder
-        members = await apiCall('members');    
+       members = await apiCall('members','GET',null, {year: year, include_inactive: true});    
         
         // GROUP_CONCAT Strings zu Arrays konvertieren
         members.forEach(member => {
@@ -72,9 +75,14 @@ export async function loadMembers(forceReload = false) {
         } 
     }     
 
+    // Cache für dieses Jahr speichern
+    if (!dataCache.members[year]) {
+        dataCache.members[year] = {};
+    }
+
     // Cache speichern
-    dataCache.members.data = members;
-    dataCache.members.timestamp = Date.now();
+    dataCache.members[year].data = members;
+    dataCache.members[year].timestamp = Date.now();
 
     return members;
 }
@@ -143,7 +151,7 @@ function renderMembers(members, page = 1) {
                 <td>${member.name}</td>
                 <td>${member.member_number || '-'}</td>
                 <td>${groupBadges}</td>
-                <td>${member.active ? 'Aktiv' : 'Inaktiv'}</td>
+                <td>${member.is_active_in_period ? 'Aktiv' : 'Inaktiv'}</td>
                 ${actionsHtml}
                 `;
 
@@ -270,7 +278,7 @@ function updateMemberStats(members)
 {
 // Statistik nur für Admin
     if (isAdminOrManager) {
-        const activeCount = members.filter(m => m.active).length;
+        const activeCount = members.filter(m => m.is_active_in_period).length;
         document.getElementById('statActiveMembersCount').textContent = activeCount;
     } else {
         document.getElementById('statActiveMembersCount').textContent = '-';
@@ -288,6 +296,11 @@ export async function showMemberSection(forceReload = false, page = 1) {
     {
         renderMembers(allMembers, page);
     }
+}
+
+export function resetMemberFilter()
+{
+    
 }
 
 // ============================================
@@ -586,3 +599,4 @@ window.deleteMember = deleteMember;
 window.addMembershipDate = addMembershipDate;
 window.removeMembershipDate = removeMembershipDate;
 window.updateMembershipDate = updateMembershipDate;
+window.resetMemberFilter = resetMemberFilter;

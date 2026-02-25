@@ -14,6 +14,8 @@
 
 function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole, $authMemberId) {
     
+    require_once __DIR__ . '/../helpers/member_activity.php';
+
     $prefix = $database->table('');
 
     switch($method) {
@@ -68,32 +70,112 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
             } 
             else
             {
+                // Parameter
+                $group_id = $_GET['group_id'] ?? null;
+                $year = $_GET['year'] ?? null;
+                $date = $_GET['date'] ?? null;
+                $include_inactive = $_GET['include_inactive'] ?? 'false';
+
+                // Include_inactive nur für Admin/Manager
+                $includeInactive = (isAdminOrManager() && $include_inactive === 'true');        
+                
+                // Datum für Aktivitätsprüfung
+                $checkDate = null;
+                if ($date) {
+                    $checkDate = "'$date'"; // Spezifisches Datum
+                } elseif ($year) {
+                    $yearRangeCheck = true;
+                    $yearStart = "'$year-01-01'";
+                    $yearEnd = "'$year-12-31'";
+                }
+
+                $activityFilter = '';
+                $activityFlag = 'm.active';
+
+                if ($yearRangeCheck && !$includeInactive) {
+                    // Filter: War im Jahr IRGENDWANN aktiv
+                    $activityFilter = "AND (
+                        m.active = 1
+                        AND (
+                            -- Keine membership_dates → immer aktiv
+                            NOT EXISTS (
+                                SELECT 1 FROM {$prefix}membership_dates md 
+                                WHERE md.member_id = m.member_id
+                            )
+                            OR
+                            -- Hat membership_dates → Zeitraum überlappt mit Jahr
+                            EXISTS (
+                                SELECT 1 FROM {$prefix}membership_dates md
+                                WHERE md.member_id = m.member_id
+                                AND md.start_date <= $yearEnd
+                                AND (md.end_date IS NULL OR md.end_date >= $yearStart)
+                            )
+                        )
+                    )";
+                }
+
+                if ($yearRangeCheck) {
+                    // Flag: War im Jahr aktiv (für Anzeige)
+                    $activityFlag = "CASE 
+                        WHEN (
+                            m.active = 1
+                            AND (
+                                NOT EXISTS (
+                                    SELECT 1 FROM {$prefix}membership_dates md 
+                                    WHERE md.member_id = m.member_id
+                                )
+                                OR
+                                EXISTS (
+                                    SELECT 1 FROM {$prefix}membership_dates md
+                                    WHERE md.member_id = m.member_id
+                                    AND md.start_date <= $yearEnd
+                                    AND (md.end_date IS NULL OR md.end_date >= $yearStart)
+                                )
+                            )
+                        ) THEN 1 
+                        ELSE 0 
+                    END";
+                } elseif ($checkDate) {
+                    // Spezifisches Datum
+                    $activityWhere = getMemberActivityWhere('m', $checkDate, false);
+                    
+                    if (!$includeInactive) {
+                        $activityFilter = "AND ($activityWhere)";
+                    }
+                    
+                    $activityFlag = "CASE WHEN ($activityWhere) THEN 1 ELSE 0 END";
+                }
+
                 // Zugriffskontrolle: Nur Admin können alle Infos lesen
                 if(isAdminOrManager())    
                 {
-                    $group_id = $_GET['group_id'] ?? null;
                     $params = [];
                     
                     if($group_id)
                     {
-                        $sql = "SELECT m.*, g.group_id, g.group_name                                   
+                        $sql = "SELECT m.*, g.group_id, g.group_name,    
+                                        $activityFlag as is_active_in_period                              
                                     FROM {$prefix}members m
                                     LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
                                     LEFT JOIN {$prefix}member_groups g ON mga.group_id = g.group_id
                                     WHERE mga.group_id = ?
-                                    GROUP BY m.member_id                                    
-                                    ORDER BY m.surname, m.name";
-                                    $params[] = $group_id;                                    
+                                    $activityFilter
+                                    GROUP BY m.member_id ORDER BY m.surname, m.name";
+                                
+                        $params[] = $group_id;                                    
                     }
                     else
                     {
                         $sql = "SELECT m.*,
-                                    GROUP_CONCAT(g.group_id SEPARATOR ', ') as group_ids,
-                                    GROUP_CONCAT(g.group_name SEPARATOR ', ') as group_names
+                                        GROUP_CONCAT(g.group_id SEPARATOR ', ') as group_ids,
+                                        GROUP_CONCAT(g.group_name SEPARATOR ', ') as group_names,
+                                        $activityFlag as is_active_in_period
                                     FROM {$prefix}members m
                                     LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
                                     LEFT JOIN {$prefix}member_groups g ON mga.group_id = g.group_id
-                                    GROUP BY m.member_id
+                                    WHERE 1=1
+                                        $activityFilter
+                                    GROUP BY m.member_id 
                                     ORDER BY m.surname, m.name";
                     }
 
@@ -109,14 +191,28 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                 else if(isDevice())
                 {
                     // Liste aller Mitglieder mit Member_Number für Auto-Checkin
-                    $stmt = $db->query("SELECT name, surname, member_number FROM {$prefix}members ORDER BY surname, name");
-                                $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $sql = "SELECT name, surname, member_number 
+                            FROM {$prefix}members m
+                            WHERE 1=1
+                                $activityFilter
+                            ORDER BY surname, name";
+
+                    //$stmt = $db->query("SELECT name, surname, member_number FROM {$prefix}members ORDER BY surname, name");
+                    
+                    $stmt = $db->query($sql);
+                    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
                 else
                 {
                     // Liste aller Mitglieder ohne weitere Infos
-                    $stmt = $db->query("SELECT name, surname FROM {$prefix}members ORDER BY surname, name");
-                                $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $sql = "SELECT name, surname 
+                            FROM {$prefix}members m
+                            WHERE 1=1
+                                $activityFilter
+                            ORDER BY surname, name";
+                    
+                    $stmt = $db->query($sql);
+                    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
 
                 echo json_encode($members);

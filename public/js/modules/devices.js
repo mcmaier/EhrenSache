@@ -305,10 +305,6 @@ export async function initDevicesEventHandlers()
             applyDeviceFilters();
         });
         
-        /*document.getElementById('filterGroup')?.addEventListener('change', () => {
-            applyRecordFilters();
-        });*/
-        
         // Reset-Button (optional)
         document.getElementById('resetDeviceFilters')?.addEventListener('click', () => {
             document.getElementById('filterDeviceRole').value = '';

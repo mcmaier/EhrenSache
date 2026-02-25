@@ -9,7 +9,7 @@
  */
 
 import { API_BASE } from '../config.js';
-import { resetSessionTimeout } from './auth.js';
+import { handleLogout, resetSessionTimeout } from './auth.js';
 import { debug } from '../app.js'
 
 // Globale State
@@ -18,7 +18,7 @@ export let isAdmin = false;
 export let isManager = false;
 export let isAdminOrManager = false;
 export let csrfToken = null;
-export let isInitialLoad = true;
+//export let isInitialLoad = true;
 
 export async function setCurrentUser(user) {
     currentUser = user;
@@ -44,7 +44,7 @@ export function setCsrfToken(token) {
 }
 
 export function setInitialLoad(value) {
-    isInitialLoad = value;
+    //isInitialLoad = value;
 }
 
 // API Helper Funktion
@@ -104,14 +104,7 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
         {            
             if(response.status === 401) 
             {
-                //Session abgelaufen
-                csrfToken = null;     
-                window.location.href = 'login.html';             
-                if (!isInitialLoad) {
-                    const { showToast } = await import('./ui.js');
-                    showToast('Sitzung abgelaufen. Bitte erneut anmelden.', 'warning');
-                    isInitialLoad = true;
-                }                              
+                handleLogout(true);                           
                 return null;
             }
             
@@ -132,7 +125,7 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
         }
         
         //Reset Flag
-        isInitialLoad = false;        
+        //isInitialLoad = false;        
 
         return result;
     } catch (error) {

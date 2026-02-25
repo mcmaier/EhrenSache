@@ -137,7 +137,7 @@ function handleRecords($db, $database, $method, $id) {
                     $params[] = $appointment_type_id;
                 }
                 
-                $sql .= " ORDER BY a.date DESC, r.arrival_time DESC";
+                $sql .= " ORDER BY a.date DESC, r.arrival_time DESC, m.surname ASC, m.name ASC";
                 
                 // Query ausführen
                 if(count($params) > 0) {

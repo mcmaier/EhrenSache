@@ -9,7 +9,8 @@
  */
 
 import { apiCall, setCsrfToken} from './api.js';
-import { debug } from '../app.js'
+import { showToast } from './ui.js';
+import { debug } from '../app.js';
 
 // ============================================
 // AUTH
@@ -22,6 +23,7 @@ const MAX_API_FAILURES = 3;
 
 let sessionTimeoutInterval = null;
 let lastActivityTime = null;
+//const SESSION_DURATION = 30000; // Test: 30 Sekunden
 const SESSION_DURATION = 30 * 60 * 1000; // 30 Minuten
 const INACTIVITY_WARNING = 5 * 60 * 1000; // Warnung nach 25 Min Inaktivität
 
@@ -69,9 +71,9 @@ export async function checkAuth() {
 // ============================================
 // LOGOUT
 // ============================================
-export async function handleLogout() {
+export async function handleLogout(sessionTimeout = false) {
     try {
-        await apiCall('logout', 'POST');
+        await apiCall('logout', 'POST');        
     } catch (error) {
         console.error('Logout error:', error);
     } finally {
@@ -85,7 +87,11 @@ export async function handleLogout() {
         stopSessionTimeout(); 
         
         // Redirect zu Login
-        window.location.href = 'login.html';
+        if (sessionTimeout) {
+            window.location.href = 'login.html?session_expired=1';
+        } else {
+            window.location.href = 'login.html';
+        }    
     }
 }
 
@@ -173,10 +179,9 @@ function updateSessionTimeout() {
             }
         }
         
-        // Kritisch bei < 2 Minuten
-        if (remaining < 2 * 60 * 1000) {
-            timeoutElement.classList.add('critical');
-            timeoutElement.classList.remove('warning');
+        // Automatischer Logout
+        if (remaining < 1000) {
+            handleLogout(true);
         }
         
         // Normal

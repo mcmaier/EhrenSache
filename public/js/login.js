@@ -28,6 +28,21 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
 });
 
+document.addEventListener('DOMContentLoaded', () => {
+    
+    const errorDiv = document.getElementById('loginError');
+    // Prüfe URL-Parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    if (urlParams.get('session_expired') === '1') {
+        errorDiv.textContent = 'Sitzung abgelaufen';
+        errorDiv.style.display = 'block';
+        
+        // Parameter aus URL entfernen (ohne Reload)
+        window.history.replaceState({}, document.title, 'login.html');
+    }
+});
+
 // ============================================
 // LOGIN
 // ============================================
@@ -224,7 +239,7 @@ document.getElementById('forgotPasswordForm').addEventListener('submit', async (
 async function checkAuth() {
     try {
         const response = await fetch(`${API_BASE}?resource=me`, {
-            credentials: 'include'  // ← WICHTIG
+            credentials: 'include'
         });
 
         if (response.ok) {

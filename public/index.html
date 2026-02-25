@@ -41,7 +41,10 @@
                     <img class="org-logo" src="assets/logo-default.png" alt="Logo">
                     <div class="org-info">
                         <h3 class="org-name">Mein Verein</h3>
-                        <a href="https://ehrensache.app" class="app-name" style="text-decoration: none;" target="_blank">EhrenSache</a>
+                        <span> 
+                        <a href="https://ehrensache.app" class="app-name" style="text-decoration: none;" target="_blank">EhrenSache - </a> 
+                        <a class="app-name" id="app-version">v0.0.0</a>
+                        </span>
                     </div>
                 </div>                
                 <div class="user-info">
@@ -552,7 +555,7 @@
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
-                    <button id="resetRecordFilter" class="btn-reset-filter">Filter zurücksetzen</button>
+                    <button id="resetRecordFilter" onclick="resetRecordFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->
@@ -726,6 +729,23 @@
                                 style="width: 100%; padding: 6px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
                         </select>
                     </div>
+                </div>
+
+                <!-- Filter-Leiste -->
+                <div class="filter-bar">                    
+                    <div class="form-group">
+                        <label for="filterMemberGroup">Filter nach Gruppe</label>
+                        <select id="filterMemberGroup" >
+                            <option value="">Alle Gruppen</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>       
+                            <input type="checkbox" id="show_inactive_members" class="checkbox-label" checked>
+                            <span>Inaktive anzeigen</span>
+                        </label>
+                    </div>
+                    <button id="resetMemberFilter" onclick="resetMemberFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->

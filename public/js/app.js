@@ -45,7 +45,7 @@ function checkRedirectLoop() {
 // Vor dem Router aufrufen
 checkRedirectLoop();
 
-import { loadAllData, showDashboard, initNavigation, initNavTabs, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, initEventHandlers} from './modules/ui.js';
+import { loadAllData, showDashboard, initNavigation, initNavTabs, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, initEventHandlers, loadVersion} from './modules/ui.js';
 import { setCurrentUser, setCsrfToken, setInitialLoad, } from './modules/api.js';
 import { initAuth, startSessionTimeout} from './modules/auth.js';
 
@@ -113,13 +113,13 @@ async function init() {
     initNavigation();
     initNavTabs();
     initModalEscHandler();
-    initPWAQuickAccess();    
+    initPWAQuickAccess();   
 
     // Check Session beim Laden
     //const userData = await apiCall('me');
 
     // Nach initialem Check: Flag zurücksetzen
-    setInitialLoad(false);
+    //setInitialLoad(false);
     // Erstelle Button (nachdem Status klar ist)
     createMobileMenuButton();
     
@@ -140,6 +140,7 @@ async function init() {
         initEventHandlers();
         
         await initAllYearFilters();
+        await loadVersion(); 
 
         showDashboard();        
         loadAllData();

@@ -54,6 +54,8 @@ function login($db, $database, $email, $password) {
         $_SESSION['email'] = $user['email'];
         $_SESSION['role'] = $user['role'];
         $_SESSION['logged_in'] = true;
+        $_SESSION['last_activity'] = time();
+        $_SESSION['created_at'] = time(); 
         
         session_regenerate_id(true);
 
@@ -270,6 +272,45 @@ function generateCSRFToken() {
 function validateCSRFToken($token) {
     return isset($_SESSION['csrf_token']) && 
            hash_equals($_SESSION['csrf_token'], $token);
+}
+
+function getSessionDebugInfo($method) {
+    if($method !== 'GET')
+    {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+        exit();
+    }
+
+    // Nur für eingeloggte User
+    if (!isAuthenticated()) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+        exit();
+    }
+
+    // Session-Informationen sammeln
+    $sessionInfo = [
+        'session_id' => session_id(),
+        'session_name' => session_name(),
+        'session_status' => session_status(), // 0=disabled, 1=none, 2=active
+        'cookie_lifetime' => ini_get('session.cookie_lifetime'),
+        'gc_maxlifetime' => ini_get('session.gc_maxlifetime'),
+        'session_data' => $_SESSION,
+        'last_activity' => $_SESSION['last_activity'] ?? null,
+        'current_time' => time(),
+        'time_since_activity' => isset($_SESSION['last_activity']) 
+            ? time() - $_SESSION['last_activity'] 
+            : null,
+        'remaining_seconds' => isset($_SESSION['last_activity']) 
+            ? (int)ini_get('session.gc_maxlifetime') - (time() - $_SESSION['last_activity'])
+            : null
+    ];
+
+    echo json_encode([
+        'success' => true,
+        'data' => $sessionInfo
+    ]);
 }
 
 ?>

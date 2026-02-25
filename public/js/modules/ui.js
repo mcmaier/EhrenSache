@@ -15,7 +15,7 @@ import {loadUsers, showUserSection, initUsersEventHandlers} from'./users.js';
 import {showDeviceSection} from'./devices.js';
 import {loadAppointments, setCalendarToYear, showAppointmentSection} from'./appointments.js';
 import {loadExceptions, showExceptionSection, initExceptionEventHandlers} from'./exceptions.js';
-import {loadRecords, showRecordsSection, initRecordEventHandlers} from'./records.js';
+import {loadRecords, showRecordsSection, initRecordEventHandlers, resetRecordFilter} from'./records.js';
 import {loadMembers, showMemberSection} from'./members.js';
 import {loadGroups, loadTypes, showGroupSection} from './management.js';
 import {initStatisticsEventHandlers, showStatisticsSection} from './statistics.js';
@@ -28,13 +28,16 @@ import {loadImportLogs} from './import_export.js';
 // Reference:
 // import {} from './ui.js'
 // ============================================
+
+let yearFiltersInitialized = false;
+
 // ============================================
 // CACHING
 // ============================================
 
 export const dataCache = {
     userData: { data: [], timestamp: null},
-    members: { data: [], year: null, timestamp: null },
+    //members: { data: [], year: null, timestamp: null },
     users: { data: [], timestamp: null },
     devices: { data: [], timestamp: null },
     groups: { data: [], timestamp: null },
@@ -42,6 +45,7 @@ export const dataCache = {
     availableYears: { data: [], timestamp: null }, 
     
     //Jahresabhängige Daten separat
+    members: {},
     appointments: {},
     records: {},
     exceptions: {}
@@ -139,6 +143,13 @@ export async function populateYearFilter(selectElement) {
 }
 
 export async function initAllYearFilters() {
+
+    // Verhindere Mehrfach-Initialisierung
+    if (yearFiltersInitialized) {
+        debug.log("Year filters already initialized, skipping");
+        return;
+    }
+
     // Alle Jahresfilter identifizieren und befüllen
     const yearFilters = [
         'memberYearFilter',
@@ -149,22 +160,36 @@ export async function initAllYearFilters() {
     ];
 
     debug.log("Initializing Year Filters");
-    
+
+    // PHASE 1: Alle Dropdowns befüllen (OHNE Events zu triggern)
     for (const filterId of yearFilters) {
         const element = document.getElementById(filterId);
         if (element) {
             await populateYearFilter(element);
-            
-            // Event Listener hinzufügen
-            element.addEventListener('change', (e) => {
-                setCurrentYear(e.target.value);
-                setCalendarToYear();
-                //resetRecordFilter();
-            });
-
-            setCurrentYear(currentYear);
+            element.value = currentYear;
         }
     }
+
+    // PHASE 2: Jetzt Event-Listener registrieren (nachdem alle befüllt sind)
+    for (const filterId of yearFilters) {
+        const element = document.getElementById(filterId);
+        if (element) {
+            element.addEventListener('change', (e) => {
+                const newYear = e.target.value;
+                setCurrentYear(newYear);
+                setCalendarToYear();
+
+                const section = sessionStorage.getItem('currentSection');                
+                if (section === 'anwesenheit') {
+                    resetRecordFilter();
+                }
+            });
+        }
+    }
+    
+    yearFiltersInitialized = true;
+    debug.log("Year filters initialized successfully");
+    
 }
 
 export async function loadAvailableYears(forceReload = false) {
@@ -611,6 +636,8 @@ export async function initEventHandlers()
 export async function loadAllData() {
     const section = sessionStorage.getItem('currentSection') || 'profil';
 
+    const sectionsUsingTypes = ['verwaltung', 'anwesenheit', 'termine'];
+
     debug.log("== LOAD ALL DATA == ")
 
     switch(section)
@@ -663,24 +690,23 @@ export async function loadAllData() {
             break;
     }        
 
+    
     // Hintergrund-Laden nur für ungecachte Daten
     setTimeout(() => {
         if ((section !== 'mitglieder') && !isCacheValid('members'))             
-            loadMembers(true);
+            loadMembers();
         if ((section !== 'termine') && !isCacheValid('appointments',currentYear)) 
-            loadAppointments(true);
+            loadAppointments();
         if ((section !== 'anwesenheit') && !isCacheValid('records',currentYear)) {
-            loadRecords(true);
+            loadRecords();
         }
         if ((section !== 'antraege') && !isCacheValid('exceptions',currentYear)) {
-            loadExceptions(true);
+            loadExceptions();
         }  
-        /*   Statistik nicht gecached           
-        if(section !== 'statistik') {}*/
-        if(section !== 'verwaltung')
+        if(!sectionsUsingTypes.includes(section))
         {            
-            if (!isCacheValid('groups')) loadGroups(true);
-            if (!isCacheValid('types')) loadTypes(true);
+            if (!isCacheValid('groups')) loadGroups();
+            if (!isCacheValid('types')) loadTypes();
         }        
         if(isAdmin)
         {
@@ -689,7 +715,8 @@ export async function loadAllData() {
                 loadUsers(true);
             }
         }
-    }, 100);
+    }, 500);
+    
 }
 
 
@@ -698,13 +725,15 @@ async function loadYearDependentData() {
     
     // Nur aktive Section neu laden
     if (section === 'termine') {
-        await showAppointmentSection(true);
+        await showAppointmentSection();
     } else if (section === 'anwesenheit') {        
-        await showRecordsSection(true);
+        await showRecordsSection();
     } else if (section === 'antraege') {
-        await showExceptionSection(true);
+        await showExceptionSection();
     } else if (section === 'statistik') {
-        await showStatisticsSection(true);
+        await showStatisticsSection();
+    } else if(section === 'mitglieder') {
+        await showMemberSection();
     }
 }
 
@@ -723,6 +752,23 @@ export function initModalEscHandler() {
     });
 }
 
+// ============================================
+// VERSION
+// ============================================
+
+export async function loadVersion() {
+    try {
+        const version = await apiCall('version');
+
+        if(version.success)
+        {
+            document.getElementById('app-version').textContent = `v${version.version}`;
+        }
+        
+    } catch (error) {
+        console.error('Version load failed:', error);
+    }
+}
 
 // ============================================
 // PWA QUICK ACCESS

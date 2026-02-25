@@ -32,6 +32,7 @@ require_once '../../private/helpers/rate_limiter.php';
 require_once '../../private/helpers/totp.php';
 require_once '../../private/helpers/utils.php';
 require_once '../../private/helpers/mailer.php';
+require_once '../../private/helpers/version.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';
@@ -106,6 +107,7 @@ if(!$apiToken && isset($_GET['api_token'])) {
 if (!$apiToken) {
     session_start();
     
+    /*
     // Session-Timeout prüfen
     if(isset($_SESSION['last_activity']) && 
        (time() - $_SESSION['last_activity'] > 1800)) {
@@ -114,6 +116,7 @@ if (!$apiToken) {
         session_start(); // Neu starten für Error-Response
     }
     $_SESSION['last_activity'] = time();
+    */
 }
 
 // ============================================
@@ -128,8 +131,8 @@ if(isset($_SESSION['user_id'])) {
     $identifier .= '_user_' . $_SESSION['user_id'];
 }
 
-// API Rate Limit: 100 Requests pro Minute
-if (!$rateLimiter->check($identifier, 'api_request', 100, 60)) {
+// API Rate Limit: 150 Requests pro Minute
+if (!$rateLimiter->check($identifier, 'api_request', 150, 60)) {
     http_response_code(429);
     echo json_encode([
         "message" => "Rate limit exceeded",
@@ -326,6 +329,25 @@ if($apiToken) {
         echo json_encode(["message" => "Unauthorized"]);
         exit();
     }
+
+    // Session-Timeout prüfen (optional, falls du serverseitig auch timeout willst)
+    $sessionLifetime = (int)ini_get('session.gc_maxlifetime'); // z.B. 1800 = 30 Min
+    
+    if(isset($_SESSION['last_activity'])) {
+        $inactiveTime = time() - $_SESSION['last_activity'];
+        
+        if($inactiveTime > $sessionLifetime) {
+            // Session abgelaufen
+            session_unset();
+            session_destroy();
+            http_response_code(401);
+            echo json_encode(["message" => "Session expired due to inactivity"]);
+            exit();
+        }
+    }
+
+    // Session verlängern: Last Activity aktualisieren
+    $_SESSION['last_activity'] = time();
     
     $authUserId = intval($_SESSION['user_id']);
     $authUserRole = $_SESSION['role'];
@@ -333,7 +355,7 @@ if($apiToken) {
     $stmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
     $stmt->execute([$authUserId]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    $authMemberId = $result && $result['member_id'] ? intval($result['member_id']) : null; // ← FIX!
+    $authMemberId = $result && $result['member_id'] ? intval($result['member_id']) : null;
     
     //error_log("Session Auth: User ID: $authUserId, Role: $authUserRole, Member ID: " . ($authMemberId ?? 'NULL'));
 }
@@ -485,6 +507,12 @@ switch($resource) {
     case 'my_data':
         handleMyData($db, $database, $request_method, $authUserId);
         break;
+    case 'session_info':
+        getSessionDebugInfo($request_method);
+        break;
+    case 'version':
+        getVersion();
+    break;
                 
     default:
         http_response_code(404);

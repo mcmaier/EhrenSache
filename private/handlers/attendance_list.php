@@ -14,6 +14,7 @@
 // ============================================
 function handleAttendanceList($db, $database, $method, $id) {
 
+    require_once __DIR__ . '/../helpers/member_activity.php';
     $prefix = $database->table('');
 
     // Nur GET erlaubt
@@ -29,10 +30,16 @@ function handleAttendanceList($db, $database, $method, $id) {
         echo json_encode(["message" => "Access denied"]);
         exit();
     }
+
+    // Check: Ist User Admin/Manager?
+    //$includeInactive = isAdminOrManager();
+    $includeInactive = null;
+    
     
     $appointment_id = $_GET['appointment_id'] ?? null;
     $member_id = $_GET['member_id'] ?? null;
     $year = $_GET['year'] ?? (int)date('Y');
+    $appointment_type_id = $_GET['type_id'] ?? null;
     
     if((!$appointment_id && !$member_id) || ($appointment_id && $member_id)){
         http_response_code(400);
@@ -63,6 +70,9 @@ function handleAttendanceList($db, $database, $method, $id) {
             echo json_encode(["message" => "Appointment not found"]);
             exit();
         }
+
+        // Aktivitäts-WHERE-Clause generieren
+        $activityWhere = getMemberActivityWhere('m', 'a.date', $includeInactive);        
         
         // Parse Gruppen-IDs
         $group_ids = $appointment['group_ids'] ? explode(',', $appointment['group_ids']) : [];
@@ -77,6 +87,7 @@ function handleAttendanceList($db, $database, $method, $id) {
         
         // Hole alle Mitglieder der relevanten Gruppen
         $placeholders = str_repeat('?,', count($group_ids) - 1) . '?';
+        /*
         $stmt = $db->prepare("
             SELECT DISTINCT 
                 m.member_id,
@@ -97,9 +108,34 @@ function handleAttendanceList($db, $database, $method, $id) {
                 AND m.active = 1
             GROUP BY m.member_id
             ORDER BY m.surname, m.name
+        ");*/
+
+        
+        $stmt = $db->prepare("
+            SELECT DISTINCT 
+                m.member_id,
+                m.name,
+                m.surname,
+                m.member_number,
+                GROUP_CONCAT(DISTINCT mg.group_name ORDER BY mg.group_name SEPARATOR ', ') as groups,
+                r.record_id,
+                r.arrival_time,
+                r.checkin_source,
+                r.status
+            FROM {$prefix}members m
+            JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
+            JOIN {$prefix}member_groups mg ON mga.group_id = mg.group_id
+            CROSS JOIN {$prefix}appointments a
+            LEFT JOIN {$prefix}records r ON m.member_id = r.member_id 
+                AND r.appointment_id = ?
+            WHERE mga.group_id IN ($placeholders)
+                AND a.appointment_id = ?
+                AND ($activityWhere)
+            GROUP BY m.member_id
+            ORDER BY m.surname, m.name
         ");
         
-        $params = array_merge([$appointment_id], $group_ids);
+        $params = array_merge([$appointment_id], $group_ids, [$appointment_id]);
         $stmt->execute($params);
         $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -132,8 +168,8 @@ function handleAttendanceList($db, $database, $method, $id) {
             http_response_code(404);
             echo json_encode(["message" => "Member not found"]);
             exit();
-        }
-        
+        }            
+
         // Parse Member-Gruppen
         $member_group_ids = $member['group_ids'] ? explode(',', $member['group_ids']) : [];
         
@@ -146,8 +182,25 @@ function handleAttendanceList($db, $database, $method, $id) {
             exit();
         }
         
+        // WHERE-Clause für type_id aufbauen
+        
+        $params = [$member_id, $year, $member_id];
+
+        $typeCondition = '';
+        if($appointment_type_id) {
+            $typeCondition = 'AND a.type_id = ?';
+            $params[] = $appointment_type_id;
+        }
+
+        $includeInactive = null;
+
+        // Aktivitäts-WHERE-Clause generieren
+        $activityWhere = getMemberActivityWhere('m', 'a.date', $includeInactive);    
+
         // Hole alle Termine des Jahres, die für die Member-Gruppen relevant sind
         $placeholders = str_repeat('?,', count($member_group_ids) - 1) . '?';
+        $params = array_merge($params, $member_group_ids);
+
         $stmt = $db->prepare("
             SELECT 
                 a.appointment_id,
@@ -161,19 +214,26 @@ function handleAttendanceList($db, $database, $method, $id) {
                 r.record_id,
                 r.arrival_time,
                 r.checkin_source,
-                r.status
+                r.status,
+                CASE 
+                    WHEN ($activityWhere) THEN 1
+                    ELSE 0
+                END as member_was_active
             FROM {$prefix}appointments a
             LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
             LEFT JOIN {$prefix}appointment_type_groups atg ON at.type_id = atg.type_id
+            CROSS JOIN {$prefix}members m
             LEFT JOIN {$prefix}records r ON a.appointment_id = r.appointment_id 
                 AND r.member_id = ?
             WHERE YEAR(a.date) = ?
+                AND m.member_id = ?
+                $typeCondition
                 AND atg.group_id IN ($placeholders)
+                AND ($activityWhere)
             GROUP BY a.appointment_id
             ORDER BY a.date DESC, a.start_time DESC
         ");
         
-        $params = array_merge([$member_id, $year], $member_group_ids);
         $stmt->execute($params);
         $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         

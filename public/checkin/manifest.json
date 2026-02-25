@@ -1,8 +1,8 @@
 {
   "name": "Check-In App",
   "short_name": "Check-In",
-  "description": "Vereinsverwaltung Check-In App",
-  "version":"1.0.1",
+  "description": "EhrenSache Check-In App",
+  "version":"1.1.0",
   "id":"/checkin/",
   "start_url": "/checkin/index.html",
   "scope":"/checkin/",
