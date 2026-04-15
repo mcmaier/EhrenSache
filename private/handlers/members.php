@@ -45,24 +45,32 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                     }
                 }               
                 else{
-                    $memberId = $authMemberId; 
-                    $stmt = $db->prepare("SELECT name, surname, member_number FROM {$prefix}members WHERE member_id = ?");
+                    $memberId = $authMemberId;
+                    $stmt = $db->prepare("
+                        SELECT m.name, m.surname, m.member_number,
+                               GROUP_CONCAT(mga.group_id SEPARATOR ', ') as group_ids
+                        FROM {$prefix}members m
+                        LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
+                        WHERE m.member_id = ?
+                        GROUP BY m.member_id
+                    ");
                     $stmt->execute([$memberId]);
-                    $member = $stmt->fetch(PDO::FETCH_ASSOC);                            
+                    $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
                     $warning = null;
-                    if( $id!= $memberId) {
+                    if ($id != $memberId) {
                         $warning = "member_id ignored - you can only get your own linked member number (ID: $memberId)";
                     }
 
-                    if($member)
-                    {
-                        echo json_encode([  "name" => $member['name'],
-                                            "surname" => $member['surname'],
-                                            "member_number" => $member['member_number'],
-                                            "warning" => $warning]);
-                    }
-                    else {             
+                    if ($member) {
+                        echo json_encode([
+                            "name"          => $member['name'],
+                            "surname"       => $member['surname'],
+                            "member_number" => $member['member_number'],
+                            "group_ids"     => $member['group_ids'],
+                            "warning"       => $warning
+                        ]);
+                    } else {
                         http_response_code(404);
                         echo json_encode(["message" => "Member not found"]);
                     }
