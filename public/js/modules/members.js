@@ -414,7 +414,10 @@ export async function loadMemberData(memberId) {
         document.getElementById('member_number').value = member.member_number || '';
         const statusEl = document.getElementById('member_active_status');
         if (statusEl) {
-            const isActive = member.is_active_in_period;
+            // Single-GET returns no is_active_in_period — read from cache, fallback to active flag
+            const cachedMembers = dataCache.members[currentYear]?.data || [];
+            const cached = cachedMembers.find(m => m.member_id == member.member_id);
+            const isActive = cached ? !!cached.is_active_in_period : (member.active == 1);
             statusEl.textContent = isActive ? 'Aktiv' : 'Inaktiv';
             statusEl.className = isActive
                 ? 'status-badge status-approved'
