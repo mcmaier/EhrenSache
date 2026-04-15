@@ -151,6 +151,7 @@ function handleAttendanceList($db, $database, $method, $id) {
     if($member_id)
     {
         // Hole Member-Details mit seinen Gruppen-IDs
+        $memberActivityWhere = getMemberActivityWhereYear($year, 'm');
         $stmt = $db->prepare("
             SELECT m.member_id, m.name, m.surname, m.member_number,
                    GROUP_CONCAT(DISTINCT mg.group_name ORDER BY mg.group_name SEPARATOR ', ') as groups,
@@ -158,7 +159,7 @@ function handleAttendanceList($db, $database, $method, $id) {
             FROM {$prefix}members m
             LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
             LEFT JOIN {$prefix}member_groups mg ON mga.group_id = mg.group_id
-            WHERE m.member_id = ? AND m.active = 1
+            WHERE m.member_id = ? AND ($memberActivityWhere)
             GROUP BY m.member_id
         ");
         $stmt->execute([$member_id]);

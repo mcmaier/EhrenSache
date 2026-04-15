@@ -769,7 +769,7 @@ export async function openRecordModal(recordId = null) {
         document.getElementById('record_status').value = 'present';
         
         document.getElementById('record_member').disabled = false;
-        document.getElementById('record_appointment').disabeld = false;        
+        document.getElementById('record_appointment').disabled = false;
 
         // Keine ID anzeigen
         updateModalId('recordModal', null);
