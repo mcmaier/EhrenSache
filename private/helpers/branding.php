@@ -13,17 +13,20 @@
 /**
  * Lade Branding-Einstellungen aus der Datenbank
  */
-function getBrandingSettings($pdo) {
+function getBrandingSettings($pdo, $database) {
     try {
+
+        $prefix = $database->table('');
+
         $stmt = $pdo->prepare("
             SELECT setting_key, setting_value 
-            FROM system_settings 
+            FROM {$prefix}system_settings 
             WHERE setting_key IN ('organization_name', 'organization_logo', 'primary_color', 'secondary_color')
         ");
         $stmt->execute();
         
         $settings = [
-            'organization_name' => 'Mein Verein',
+            'organization_name' => 'EhrenSache',
             'organization_logo' => 'assets/logo-default.png',
             'primary_color' => '#1F5FBF',
             'secondary_color' => '#4CAF50'

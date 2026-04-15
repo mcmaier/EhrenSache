@@ -115,7 +115,7 @@ function renderUsers(users, page = 1)
     let statusBadge = '';
     let memberInfo = '';
 
-     // Termin-Info mit Terminart       
+     // User-Info mit verknüpftem Mitglied       
     let userInfo = `<div style="line-height: 1.3;">${user.email}`;    
     if (user.user_name) {
        // userInfo += `<br><small><style="color: #7f8c8d;">${user.user_name}</small>`;
@@ -680,28 +680,28 @@ window.toggleMemberEdit = async function() {
 async function loadMembersForEdit(currentMemberId = null) {
 
     try {
-        const members = await apiCall('members', 'GET');
+        const members = await loadMembers();
         const editSelect = document.getElementById('editMemberId');
-        
+
         editSelect.innerHTML = '<option value="">Kein Mitglied</option>';
-        
+
         members.forEach(member => {
             const option = document.createElement('option');
 
-            const memberNumber = member.member_number 
-                ? ` (${member.member_number})` 
+            const memberNumber = member.member_number
+                ? ` (${member.member_number})`
                 : '';
 
             option.value = member.member_id;
             option.textContent = `${member.surname}, ${member.name}${memberNumber}`;
-            
+
             if (currentMemberId && member.member_id === currentMemberId) {
                 option.selected = true;
             }
-            
+
             editSelect.appendChild(option);
         });
-        
+
     } catch (error) {
         console.error('Fehler beim Laden der Mitglieder:', error);
     }

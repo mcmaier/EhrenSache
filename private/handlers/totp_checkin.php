@@ -8,19 +8,22 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // TOTP CHECK-IN Controller
 // Authentifizierung via TOTP-Code (6-stellig)
 // Unterstützt: QR-Scan, NFC, manuelle Eingabe
 // ============================================
 
-function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth)
+function handleTotpCheckin($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth)
 {      
     if($request_method !== 'POST') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
         return;
     }
+    
+    $prefix = $database->table('');
 
     $data = json_decode(file_get_contents("php://input"));
 
@@ -46,7 +49,7 @@ function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $au
     if(!preg_match('/^\d{6}$/', $totpCode)) {
         http_response_code(400);
         echo json_encode([
-            "message" => "Invalid TOTP code format",
+            "message" => "Ungültiges Code-Format",
             "hint" => "Code must be exactly 6 digits"
         ]);
         return;
@@ -54,7 +57,7 @@ function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $au
     
     // Hole alle aktiven TOTP-Location Devices aus users Tabelle
     $stmt = $db->query("SELECT u.user_id, u.email, u.device_type, u.totp_secret
-                        FROM users u
+                        FROM {$prefix}users u
                         WHERE u.role = 'device' 
                         AND u.device_type = 'totp_location'
                         AND u.is_active = 1
@@ -64,7 +67,7 @@ function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $au
 
     if(empty($locations)) {
         http_response_code(400);
-        echo json_encode([  "message" => "No active TOTP device configured",
+        echo json_encode([  "message" => "Keine TOTP-Stationen konfiguriert.",
                             "hint" => "Admin must configure device with TOTP secret"]);
         return;
     }
@@ -84,7 +87,7 @@ function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $au
     if($validLocation) {
         //error_log("Valid check-in from location: " . $validLocation);
         // Code gültig → Auto-Checkin mit verified Flag
-        handleAutoCheckin($db, 'POST', $authUserId, $authUserRole, $authMemberId, $isTokenAuth, 'user_totp',
+        handleAutoCheckin($db, $database, 'POST', $authUserId, $authUserRole, $authMemberId, $isTokenAuth, 'user_totp',
                                                                         [
                                                                             'location_name' => $validLocation['email'],
                                                                             'device_name' => $sourceDevice
@@ -93,8 +96,7 @@ function handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $au
     } else {
         http_response_code(401);
         echo json_encode([
-            "message" => "Invalid or expired TOTP code",
-            "hint" => "Code might be outdated (max 90s valid)",
+            "message" => "Ungültiger oder abgelaufener TOTP Code",
             "tested_locations" => count($locations)
         ]);
     }

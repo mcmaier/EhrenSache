@@ -17,6 +17,7 @@ import { loadAppointments } from './appointments.js';
 import { showRecordsSection } from './records.js';
 import { showAppointmentSection } from './appointments.js';
 import { showMemberSection } from './members.js';
+import { showConfirm } from './ui.js';
 
 // ============================================
 // EXPORT
@@ -666,11 +667,199 @@ function displayAppointmentsImportResult(result) {
     resultDiv.style.display = 'block';
 }
 
+// ============================================
+// IMPORT LOG SECTION
+// ============================================
+
+export async function initImportLogs() {
+    console.log('Import Logs initialisiert');
+    
+    // Filter Event Listener
+    const filterSelect = document.getElementById('log-type-filter');
+    if (filterSelect) {
+        filterSelect.addEventListener('change', loadImportLogs);
+    }
+    
+    // Modal Close Handler
+    const modal = document.getElementById('log-details-modal');
+    const closeBtn = modal?.querySelector('.close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => closeModal('log-details-modal'));
+    }
+    
+    await loadImportLogs();
+}
+
+export async function loadImportLogs() {    
+    const container = document.getElementById('import-logs-list');
+    if (!container) return;
+    
+    container.innerHTML = '<p class="loading">Lade Import-Logs...</p>';
+    
+    try {        
+        const logs = await apiCall('import_logs', 'GET');
+
+        //const result = await apiCall('import_logs', 'GET', null, { id: logId });
+        
+        if (!logs || logs.length === 0) {
+            container.innerHTML = '<p class="empty-state">📋 Keine Import-Logs vorhanden</p>';
+            return;
+        }
+        
+        renderLogsList(logs);
+        
+    } catch (error) {
+        console.error('Fehler beim Laden der Logs:', error);
+        showToast('Fehler beim Laden der Import-Logs', 'error');
+        container.innerHTML = '<p class="error-state">Fehler beim Laden der Logs</p>';
+    }
+}
+
+function renderLogsList(logs) {
+    const container = document.getElementById('import-logs-list');
+    
+    const html = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Datum</th>
+                    <th>Typ</th>
+                    <th>Datei</th>
+                    <th>Benutzer</th>
+                    <th>Gesamt</th>
+                    <th>Erfolgreich</th>
+                    <th>Fehler</th>
+                    <th>Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${logs.map(log => `
+                    <tr>
+                        <td>${log.created_at}</td>
+                        <td><span class="badge badge-${log.import_type}">${getTypeLabel(log.import_type)}</span></td>
+                        <td>${log.filename || 'N/A'}</td>
+                        <td>${log.user_name}</td>
+                        <td>${log.total_rows}</td>
+                        <td class="text-success"><strong>${log.successful_rows}</strong></td>
+                        <td class="text-danger"><strong>${log.failed_rows}</strong></td>
+                        <td class="actions-cell">
+                            <button class="action-btn btn-icon btn-view" onclick="window.ImportLogs.showDetails(${log.log_id})" title="Details anzeigen">
+                                👁
+                            </button>
+                            <button class="action-btn btn-icon btn-delete" onclick="window.ImportLogs.deleteLog(${log.log_id})" title="Log löschen">
+                                🗑
+                            </button>
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+    
+    container.innerHTML = html;
+}
+
+async function showDetails(logId) {
+    try {
+        const log = await apiCall('import_logs','GET',null,{id: logId});        
+        const modal = document.getElementById('log-details-modal');
+                
+        // Zusammenfassung befüllen
+        document.getElementById('log_created_at').textContent = log.created_at;
+        document.getElementById('log_filename').textContent = log.filename || 'N/A';
+        document.getElementById('log_user_name').textContent = log.user_email;
+        document.getElementById('log_total_rows').textContent = log.total_rows;
+        document.getElementById('log_successful_rows').textContent = log.successful_rows;
+        document.getElementById('log_failed_rows').textContent = log.failed_rows;
+
+        // Typ-Badge
+        const typeBadge = document.getElementById('log_type_badge');
+        typeBadge.className = `badge badge-${log.import_type}`;
+        typeBadge.textContent = getTypeLabel(log.import_type);
+        
+        // Fehleranzahl
+        document.getElementById('log_error_count').textContent = 
+            log.failed_rows > 0 ? `(${log.failed_rows})` : '';
+        
+        // Fehlerliste
+        const errorsList = document.getElementById('log_errors_list');
+        
+        if (!log.errors || log.errors.length === 0) {
+            errorsList.innerHTML = '<p class="empty-state">✅ Keine Fehler</p>';
+        } else {
+            errorsList.innerHTML = log.errors.map((error, index) => `
+                <div class="error-item">
+                    <span class="error-number">#${index + 1}</span>
+                    <span class="error-text">${error}</span>
+                </div>
+            `).join('');
+        }
+
+    
+        modal.classList.add('active');        
+        
+    } catch (error) {
+        console.error('Fehler beim Laden der Details:', error);
+        showToast('Fehler beim Laden der Details', 'error');
+    }
+}
+
+export function closeLogModal() {
+    document.getElementById('log-details-modal').classList.remove('active');
+}
+
+
+async function deleteLog(logId) {
+    const confirmed = await showConfirm(
+            'Log wirklich löschen?',
+            'Log löschen'
+        );
+
+    if (confirmed)
+    {    
+        try {
+            const result = await apiCall('import_logs', 'DELETE', null, { id: logId });
+            if(result.success)
+            {
+                showToast('Log gelöscht', 'success');
+                await loadImportLogs();
+                return;
+            }
+        } catch (error) {
+            console.error('Fehler beim Löschen:', error);
+            showToast('Fehler beim Löschen des Logs', 'error');
+        }
+    }
+}
+
+function getTypeLabel(type) {
+    const labels = {
+        'members': 'Mitglieder',
+        'records': 'Anwesenheiten',
+        'appointments': 'Termine',
+        'extract_appointments': 'Termine (extrahiert)'
+    };
+    return labels[type] || type;
+}
+
+function refresh() {
+    loadImportLogs();
+}
+
+// Globaler Zugriff für onclick-Handler
+window.ImportLogs = {
+    showDetails,
+    deleteLog,
+    refresh
+};
+
+
 // Globale Funktionen
 window.openAppointmentsImportModal = openAppointmentsImportModal;
 window.closeAppointmentsImportModal = closeAppointmentsImportModal;
 window.executeAppointmentsImport = executeAppointmentsImport;
 window.exportAppointments = exportAppointments;
+window.closeLogModal = closeLogModal;
 
 // Globale Funktionen für Members
 window.exportMembers = exportMembers;

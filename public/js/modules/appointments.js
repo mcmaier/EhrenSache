@@ -537,7 +537,7 @@ export async function saveAppointment() {
         result = await apiCall('appointments', 'POST', data);
     }
     
-    if (result) {
+    if (result.success) {
         closeAppointmentModal();
 
         // Cache invalidieren und neu laden
@@ -559,7 +559,7 @@ export async function deleteAppointment(appointmentId, title) {
 
     if (confirmed) {
         const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
-        if (result) {
+        if (result.success) {
             // Cache invalidieren und neu laden            
             showAppointmentSection(true, currentAppointmentsPage);
 

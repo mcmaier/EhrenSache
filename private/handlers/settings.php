@@ -8,10 +8,13 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // SETTINGS Controller
 // ============================================
-function handleSettings($db, $method, $authUserId, $authUserRole) {
+function handleSettings($db, $database, $method, $authUserId, $authUserRole) {
+
+    $prefix = $database->table('');
 
     // Nur Admins dürfen auf Einstellungen zugreifen
     requireAdmin();
@@ -19,12 +22,7 @@ function handleSettings($db, $method, $authUserId, $authUserRole) {
     try {
         switch ($method) {
             case 'GET':
-                getSettings($db);
-
-                // Alle Einstellungen abrufen
-                /*$stmt = $db->query("SELECT * FROM system_settings ORDER BY category, setting_key");
-                $settings = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                echo json_encode(['settings' => $settings]);*/
+                getSettings($db, $database);
                 break;
 
             case 'POST':
@@ -42,11 +40,11 @@ function handleSettings($db, $method, $authUserId, $authUserRole) {
                         break;
                         
                     case 'save_smtp_config':
-                        saveSmtpConfig($db, $data->config);
+                        saveSmtpConfig($db, $database, $data->config);
                         break;
                         
                     case 'test_mail':
-                        sendTestMail($db, $data->recipient);
+                        sendTestMail($db, $database, $data->recipient);
                         break;
                         
                     default:
@@ -58,7 +56,7 @@ function handleSettings($db, $method, $authUserId, $authUserRole) {
             case 'PUT':
                 // Einstellung aktualisieren
                 $data = json_decode(file_get_contents('php://input'), true);
-                updateSetting($db, $data['setting_key'], $data['setting_value']);                                            
+                updateSetting($db, $database, $data['setting_key'], $data['setting_value']);                                            
                 break;
 
             default:
@@ -72,9 +70,11 @@ function handleSettings($db, $method, $authUserId, $authUserRole) {
 }
 
 
-function getSettings($db) {
+function getSettings($db, $database) {
+    $prefix = $database->table('');
+
     try {
-        $stmt = $db->query("SELECT setting_key, setting_value FROM system_settings ORDER BY setting_key");
+        $stmt = $db->query("SELECT setting_key, setting_value FROM {$prefix}system_settings ORDER BY setting_key");
         $settings = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         echo json_encode(['settings' => $settings]);
@@ -86,7 +86,9 @@ function getSettings($db) {
     }
 }
 
-function updateSetting($db, $key, $value) {
+function updateSetting($db, $database, $key, $value) {
+
+    $prefix = $database->table('');
 
     try {
         if (!isset($key) || !isset($value)) {
@@ -94,7 +96,7 @@ function updateSetting($db, $key, $value) {
         }
 
         $stmt = $db->prepare(
-            "INSERT INTO system_settings (setting_key, setting_value) 
+            "INSERT INTO {$prefix}system_settings (setting_key, setting_value) 
              VALUES (?, ?) 
              ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
         );
@@ -149,7 +151,9 @@ function getSmtpConfig() {
     ]);
 }
 
-function saveSmtpConfig($db, $config) {
+function saveSmtpConfig($db, $database, $config) {
+    $prefix = $database->table('');
+
     try {
         $configPath = __DIR__ . '/../config/mail_config.php';
         
@@ -201,7 +205,7 @@ function saveSmtpConfig($db, $config) {
         
         // smtp_configured Flag in DB setzen
         $stmt = $db->prepare(
-            "INSERT INTO system_settings (setting_key, setting_value) 
+            "INSERT INTO {$prefix}system_settings (setting_key, setting_value) 
              VALUES ('smtp_configured', '1') 
              ON DUPLICATE KEY UPDATE setting_value = '1'"
         );
@@ -222,7 +226,7 @@ function saveSmtpConfig($db, $config) {
     }
 }
 
-function sendTestMail($db, $recipient) {
+function sendTestMail($db, $database, $recipient) {
     if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
         echo json_encode([
@@ -231,11 +235,13 @@ function sendTestMail($db, $recipient) {
         ]);
         return;
     }
+
+    $prefix = $database->table('');
     
     try {
         require_once __DIR__ . '/../helpers/mailer.php';
         
-        $mailer = new Mailer(getMailConfig(), $db);
+        $mailer = new Mailer(getMailConfig(), $db, $database);
         
         $subject = 'Test-Email von EhrenSache';
         $body = "Dies ist eine Test-Email.\n\n";
@@ -268,14 +274,16 @@ function sendTestMail($db, $recipient) {
     }
 }
 
-function getAppearance($db)
+function getAppearance($db, $database)
 {
+    $prefix = $database->table('');
+
     try {
     // Nur Appearance-Einstellungen f�r �ffentlichen Zugriff
     $stmt = $db->prepare("
         SELECT setting_key, setting_value 
-        FROM system_settings 
-        WHERE category = 'appearance' OR setting_key = 'organization_name'
+        FROM {$prefix}system_settings 
+        WHERE category = 'public'
     ");
     $stmt->execute();
     
@@ -293,8 +301,10 @@ function getAppearance($db)
 }
 
 
-function uploadLogo($db, $method, $authUserId, $authUserRole)
+function uploadLogo($db, $database, $method, $authUserId, $authUserRole)
 {
+    $prefix = $database->table('');
+
     if (!isAdmin()) {
         http_response_code(403);
         echo json_encode(['error' => 'Admin-Zugriff erforderlich']);
@@ -373,7 +383,7 @@ function uploadLogo($db, $method, $authUserId, $authUserRole)
         //error_log("File Path: {$targetPath}");
 
          // Altes Logo löschen (optional)
-        $stmt = $db->query("SELECT setting_value FROM system_settings WHERE setting_key = 'organization_logo'");
+        $stmt = $db->query("SELECT setting_value FROM {$prefix}system_settings WHERE setting_key = 'organization_logo'");
         $oldLogo = $stmt->fetchColumn();
         if ($oldLogo && file_exists('../public/' . $oldLogo)) {
             unlink('../public/' . $oldLogo);
@@ -396,6 +406,47 @@ function uploadLogo($db, $method, $authUserId, $authUserRole)
         http_response_code(400);
         echo json_encode(['error' => $e->getMessage()]);
     }
+}
+
+// ============================================
+// CLEANUP - DSGVO-konforme Datenlöschung
+// ============================================
+
+function handleCleanup($db, $database, $request_method, $authUserRole)
+{
+    if($request_method !== 'POST') {
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        exit();
+    }
+
+    $prefix = $database->table('');
+    
+    // Nur Admins dürfen aufräumen
+    requireAdmin();
+    
+    $data = json_decode(file_get_contents("php://input"));
+    $years = $data->years ?? 3; // Standard: 3 Jahre
+    
+    // Datum berechnen (z.B. alles vor 3 Jahren)
+    $cutoffDate = date('Y-m-d', strtotime("-{$years} years"));
+    
+    // Lösche alte Records
+    $stmt = $db->prepare("DELETE FROM {$prefix}records WHERE arrival_time < ?");
+    $stmt->execute([$cutoffDate]);
+    $deletedRecords = $stmt->rowCount();
+    
+    // Lösche alte Exceptions
+    $stmt = $db->prepare("DELETE FROM {$prefix}exceptions WHERE created_at < ?");
+    $stmt->execute([$cutoffDate]);
+    $deletedExceptions = $stmt->rowCount();
+    
+    echo json_encode([
+        "message" => "Cleanup completed",
+        "cutoff_date" => $cutoffDate,
+        "deleted_records" => $deletedRecords,
+        "deleted_exceptions" => $deletedExceptions
+    ]);
 }
 
 ?>

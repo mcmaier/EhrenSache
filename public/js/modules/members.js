@@ -9,11 +9,11 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
 import { loadUserData } from './users.js';
 import { updateModalId } from './utils.js';
 import { loadGroups } from './management.js';
-import {debug} from '../app.js'
+import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 
 // ============================================
@@ -32,12 +32,16 @@ let allFilteredMembers = [];
 
 let currentMembershipDates = [];
 let currentMemberGroups = [];
+let memberFilterInitialized = false;
+
 
 export async function loadMembers(forceReload = false) {
+    const year = currentYear;
+
     // Cache verwenden wenn vorhanden und nicht forceReload    
-    if (!forceReload && isCacheValid('members')) {
-        debug.log("Loading MEMBERS from CACHE");
-        return dataCache.members.data;
+    if (!forceReload && isCacheValid('members', year)) {
+        debug.log(`Loading MEMBERS from CACHE for ${year}`);
+        return dataCache.members[year].data;
     }
 
     // Userprofil abfragen (falls nicht gecacht)
@@ -48,11 +52,11 @@ export async function loadMembers(forceReload = false) {
 
     let members = [];
 
-    debug.log("Loading MEMBERS from API");
+    debug.log(`Loading MEMBERS from API for ${year}`);
             
     if(isAdminOrManager){
         // Admin sieht alle Mitglieder
-        members = await apiCall('members');    
+       members = await apiCall('members','GET',null, {year: year, include_inactive: true});    
         
         // GROUP_CONCAT Strings zu Arrays konvertieren
         members.forEach(member => {
@@ -65,18 +69,46 @@ export async function loadMembers(forceReload = false) {
             }
         });
     }
-    else {        
+    else {
         if (userDetails && userDetails.member_id) {
             const member = await apiCall('members', 'GET', null, { id: userDetails.member_id });
             members = member ? [member] : [];
-        } 
+        }
+        // group_ids_array aus group_ids-String berechnen (analog zum Admin-Zweig)
+        members.forEach(member => {
+            if (member.group_ids && typeof member.group_ids === 'string') {
+                member.group_ids_array = member.group_ids
+                    .split(',')
+                    .map(id => parseInt(id.trim()));
+            } else {
+                member.group_ids_array = [];
+            }
+        });
     }     
 
+    // Cache für dieses Jahr speichern
+    if (!dataCache.members[year]) {
+        dataCache.members[year] = {};
+    }
+
     // Cache speichern
-    dataCache.members.data = members;
-    dataCache.members.timestamp = Date.now();
+    dataCache.members[year].data = members;
+    dataCache.members[year].timestamp = Date.now();
 
     return members;
+}
+
+/**
+ * Gibt die group_ids des eingeloggten Users zurück.
+ * - null  → Admin/Manager (keine Einschränkung)
+ * - []    → User ohne verknüpftes Mitglied oder ohne Gruppen
+ * - [1,3] → User mit diesen Gruppen
+ */
+export async function getUserGroupIds() {
+    if (isAdminOrManager) return null;
+    const members = await loadMembers();
+    if (!members || members.length === 0) return [];
+    return members[0].group_ids_array || [];
 }
 
 // ============================================
@@ -119,7 +151,10 @@ function renderMembers(members, page = 1) {
     
     pageMembers.forEach(member => {  
         const tr = document.createElement('tr');
-        
+        if (!member.is_active_in_period) {
+            tr.classList.add('row-inactive');
+        }
+
         // Gruppen-Badges erstellen
         const groupBadges = member.group_names 
             ? member.group_names.split(', ').map(name => 
@@ -143,7 +178,7 @@ function renderMembers(members, page = 1) {
                 <td>${member.name}</td>
                 <td>${member.member_number || '-'}</td>
                 <td>${groupBadges}</td>
-                <td>${member.active ? 'Aktiv' : 'Inaktiv'}</td>
+                <td>${member.is_active_in_period ? 'Aktiv' : 'Inaktiv'}</td>
                 ${actionsHtml}
                 `;
 
@@ -270,7 +305,7 @@ function updateMemberStats(members)
 {
 // Statistik nur für Admin
     if (isAdminOrManager) {
-        const activeCount = members.filter(m => m.active).length;
+        const activeCount = members.filter(m => m.is_active_in_period).length;
         document.getElementById('statActiveMembersCount').textContent = activeCount;
     } else {
         document.getElementById('statActiveMembersCount').textContent = '-';
@@ -278,16 +313,60 @@ function updateMemberStats(members)
 }
 
 export async function showMemberSection(forceReload = false, page = 1) {
-
-    debug.log("Show Member Section ()");    
+    debug.log("Show Member Section ()");
 
     const allMembers = await loadMembers(forceReload);
 
-    const currentSection = sessionStorage.getItem('currentSection');
-    if(currentSection === 'mitglieder')
-    {
-        renderMembers(allMembers, page);
+    // Event-Listener einmalig registrieren (Admin/Manager)
+    if (!memberFilterInitialized && isAdminOrManager) {
+        const checkbox = document.getElementById('show_inactive_members');
+        if (checkbox) {
+            checkbox.addEventListener('change', () => showMemberSection(false));
+        }
+        const groupFilter = document.getElementById('filterMemberGroup');
+        if (groupFilter) {
+            groupFilter.addEventListener('change', () => showMemberSection(false));
+        }
+        memberFilterInitialized = true;
     }
+
+    // Gruppen-Dropdown befüllen (einmalig, wenn noch leer)
+    if (isAdminOrManager) {
+        const groupFilter = document.getElementById('filterMemberGroup');
+        if (groupFilter && groupFilter.options.length <= 1) {
+            groupFilter.innerHTML = '<option value="">Alle Gruppen</option>';
+            dataCache.groups.data.forEach(g => {
+                groupFilter.innerHTML += `<option value="${g.group_id}">${g.group_name}</option>`;
+            });
+        }
+    }
+
+    const currentSection = sessionStorage.getItem('currentSection');
+    if (currentSection === 'mitglieder') {
+        const showInactive = isAdminOrManager &&
+            document.getElementById('show_inactive_members')?.checked;
+        const selectedGroupId = document.getElementById('filterMemberGroup')?.value;
+
+        let displayMembers = showInactive
+            ? allMembers
+            : allMembers.filter(m => m.is_active_in_period);
+
+        if (selectedGroupId) {
+            displayMembers = displayMembers.filter(m =>
+                m.group_ids_array && m.group_ids_array.includes(parseInt(selectedGroupId))
+            );
+        }
+
+        renderMembers(displayMembers, page);
+    }
+}
+
+export function resetMemberFilter() {
+    const showInactiveEl = document.getElementById('show_inactive_members');
+    if (showInactiveEl) showInactiveEl.checked = false;
+    const groupFilterEl = document.getElementById('filterMemberGroup');
+    if (groupFilterEl) groupFilterEl.value = '';
+    showMemberSection(false);
 }
 
 // ============================================
@@ -323,7 +402,11 @@ export async function openMemberModal(memberId = null) {
         title.textContent = 'Neues Mitglied';
         document.getElementById('memberForm').reset();
         document.getElementById('member_id').value = '';
-        document.getElementById('member_active').checked = true;
+        const statusEl = document.getElementById('member_active_status');
+        if (statusEl) {
+            statusEl.textContent = 'Aktiv';
+            statusEl.className = 'status-badge status-approved';
+        }
         membershipGroup.style.display = 'none';
         currentMembershipDates = [];
 
@@ -352,7 +435,17 @@ export async function loadMemberData(memberId) {
         document.getElementById('member_name').value = member.name;
         document.getElementById('member_surname').value = member.surname;
         document.getElementById('member_number').value = member.member_number || '';
-        document.getElementById('member_active').checked = member.active == 1;
+        const statusEl = document.getElementById('member_active_status');
+        if (statusEl) {
+            // Single-GET returns no is_active_in_period — read from cache, fallback to active flag
+            const cachedMembers = dataCache.members[currentYear]?.data || [];
+            const cached = cachedMembers.find(m => m.member_id == member.member_id);
+            const isActive = cached ? !!cached.is_active_in_period : (member.active == 1);
+            statusEl.textContent = isActive ? 'Aktiv' : 'Inaktiv';
+            statusEl.className = isActive
+                ? 'status-badge status-approved'
+                : 'status-badge status-rejected';
+        }
         // Speichere ausgewählte Gruppen
         currentMemberGroups = member.groups ? member.groups.map(g => g.group_id) : [];
     
@@ -406,7 +499,7 @@ export async function saveMember() {
         name: document.getElementById('member_name').value,
         surname: document.getElementById('member_surname').value,
         member_number: document.getElementById('member_number').value || null,
-        active: document.getElementById('member_active').checked,
+        active: 1,  // Aktivstatus wird über membership_dates gesteuert, nicht direkt
         group_ids: groupIds
     };
     
@@ -452,7 +545,7 @@ export async function deleteMember(memberId, name) {
     
     if (confirmed) {
         const result = await apiCall('members', 'DELETE', null, { id: memberId });
-        if (result) {
+        if (result.success) {
 
             // Cache invalidieren und neu laden         
             showMemberSection(true, currentMembersPage);
@@ -586,3 +679,4 @@ window.deleteMember = deleteMember;
 window.addMembershipDate = addMembershipDate;
 window.removeMembershipDate = removeMembershipDate;
 window.updateMembershipDate = updateMembershipDate;
+window.resetMemberFilter = resetMemberFilter;

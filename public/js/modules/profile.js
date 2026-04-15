@@ -8,11 +8,11 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-import { apiCall, currentUser, isAdmin } from './api.js';
-import { showToast, showConfirm, isCacheValid, dataCache, invalidateCache } from './ui.js';
+import { apiCall } from './api.js';
+import { showToast, showConfirm, dataCache, invalidateCache } from './ui.js';
 import { loadUserData } from './users.js';
-import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime } from './utils.js';
-import {debug} from '../app.js'
+import { debug } from '../app.js'
+import { API_BASE } from '../config.js';
 
 // ============================================
 // PROFLE
@@ -219,10 +219,61 @@ export async function regenerateProfileToken() {
 }
 
 // ============================================
-// GLOBAL EXPORTS (f�r onclick in HTML)
+// DSGVO DATA EXPORT
+// ============================================
+
+export async function downloadMyData(format = 'json') {
+
+    const confirmed = await showConfirm('Ihre persönlichen Daten herunterladen?\n\nEnthält: Stammdaten, Anwesenheiten, Ausnahmen, Gruppenzugehörigkeiten','Download bestätigen');
+    
+    format = document.getElementById("profile_user_data_format").value;
+
+    if(confirmed)
+    {
+        try {
+            const url = new URL(API_BASE, window.location.origin);
+            url.searchParams.append('resource', 'my_data');
+            url.searchParams.append('format', format);
+            
+            // CSRF-Token für Session-Auth
+            const csrfToken = sessionStorage.getItem('csrf_token');
+            if(csrfToken) {
+                url.searchParams.append('csrf_token', csrfToken);
+            }
+            
+            const response = await fetch(url, {
+                method: 'GET',
+                credentials: 'include'
+            });
+            
+            if(!response.ok) {
+                throw new Error('Export fehlgeschlagen');
+            }
+            
+            // Datei herunterladen
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `meine_daten_${new Date().toISOString().split('T')[0]}.${format}`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+            
+            showToast('Daten erfolgreich exportiert');
+            
+        } catch(error) {
+            showToast('Fehler beim Export: ' + error.message, 'error');
+        }
+    }
+}
+
+// ============================================
+// GLOBAL EXPORTS (für onclick in HTML)
 // ============================================
 
 window.regenerateProfileToken = regenerateProfileToken;
 window.copyProfileToken = copyProfileToken;
 window.toggleProfileTokenVisibility = toggleProfileTokenVisibility;
-
+window.downloadMyData = downloadMyData;

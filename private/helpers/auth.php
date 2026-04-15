@@ -12,9 +12,11 @@
 // auth.php
 // ============================================
 
-function login($db, $email, $password) {
+function login($db, $database, $email, $password) {
 
-    $rateLimiter = new RateLimiter($db);
+    $prefix = $database->table('');
+
+    $rateLimiter = new RateLimiter($db, $database);
 
     // Login-Versuche prüfen
     if (!$rateLimiter->canAttemptLogin($email, 5, 900)) {
@@ -25,7 +27,7 @@ function login($db, $email, $password) {
     }
         
     $stmt = $db->prepare("SELECT user_id, email, password_hash, role, is_active, account_status
-                          FROM users WHERE email = ?");
+                          FROM {$prefix}users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -52,6 +54,8 @@ function login($db, $email, $password) {
         $_SESSION['email'] = $user['email'];
         $_SESSION['role'] = $user['role'];
         $_SESSION['logged_in'] = true;
+        $_SESSION['last_activity'] = time();
+        $_SESSION['created_at'] = time(); 
         
         session_regenerate_id(true);
 
@@ -70,7 +74,9 @@ function login($db, $email, $password) {
 }
 
 
-function loginWithToken($db, $email, $password) {    
+function loginWithToken($db, $database, $email, $password) {    
+
+    $prefix = $database->table('');
 
     // Rate Limiting Check
     $ip = $_SERVER['REMOTE_ADDR'];
@@ -105,7 +111,7 @@ function loginWithToken($db, $email, $password) {
         // Hole User aus DB
         $stmt = $db->prepare("
             SELECT user_id, email, password_hash, role, member_id, api_token, api_token_expires_at, is_active 
-            FROM users 
+            FROM {$prefix}users 
             WHERE email = ?
         ");
         $stmt->execute([$email]);
@@ -133,17 +139,13 @@ function loginWithToken($db, $email, $password) {
         $tokenExpired = empty($user['api_token_expires_at']) || strtotime($user['api_token_expires_at']) < time();
                 
         if (empty($token) || $tokenExpired) {
-            http_response_code(401);
-            return ["success" => false, "message" => "Token ungültig oder abgelaufen"];
-
-        /*
+        
             // Generiere neuen Token
             $token = bin2hex(random_bytes(24));
             $expiresAt = date('Y-m-d H:i:s', strtotime('+1 year'));
             
-            $stmt = $db->prepare("UPDATE users SET api_token = ?, api_token_expires_at = ? WHERE user_id = ?");
-            $stmt->execute([$token, $user['user_id'], $expiresAt]);
-            */        
+            $stmt = $db->prepare("UPDATE {$prefix}users SET api_token = ?, api_token_expires_at = ? WHERE user_id = ?");
+            $stmt->execute([$token, $expiresAt, $user['user_id']]);                    
         }
 
         // Bei Erfolg: Reset attempts
@@ -270,6 +272,45 @@ function generateCSRFToken() {
 function validateCSRFToken($token) {
     return isset($_SESSION['csrf_token']) && 
            hash_equals($_SESSION['csrf_token'], $token);
+}
+
+function getSessionDebugInfo($method) {
+    if($method !== 'GET')
+    {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+        exit();
+    }
+
+    // Nur für eingeloggte User
+    if (!isAuthenticated()) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+        exit();
+    }
+
+    // Session-Informationen sammeln
+    $sessionInfo = [
+        'session_id' => session_id(),
+        'session_name' => session_name(),
+        'session_status' => session_status(), // 0=disabled, 1=none, 2=active
+        'cookie_lifetime' => ini_get('session.cookie_lifetime'),
+        'gc_maxlifetime' => ini_get('session.gc_maxlifetime'),
+        'session_data' => $_SESSION,
+        'last_activity' => $_SESSION['last_activity'] ?? null,
+        'current_time' => time(),
+        'time_since_activity' => isset($_SESSION['last_activity']) 
+            ? time() - $_SESSION['last_activity'] 
+            : null,
+        'remaining_seconds' => isset($_SESSION['last_activity']) 
+            ? (int)ini_get('session.gc_maxlifetime') - (time() - $_SESSION['last_activity'])
+            : null
+    ];
+
+    echo json_encode([
+        'success' => true,
+        'data' => $sessionInfo
+    ]);
 }
 
 ?>

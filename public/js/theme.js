@@ -38,7 +38,7 @@ async function loadTheme() {
 }
 
 
-function applyTheme(settings) {
+async function applyTheme(settings) {
     const root = document.documentElement;
     
     // CSS-Variablen
@@ -58,6 +58,20 @@ function applyTheme(settings) {
         document.querySelectorAll('.org-name').forEach(el => {
             el.textContent = settings.organization_name;
         });
+    }
+    
+    if(settings.privacy_policy_url)
+    {
+        const privacyGroup = document.getElementById('privacyPolicyGroup');
+        const privacyLink = document.getElementById('privacyPolicyLink');
+
+        try
+        {            
+            privacyLink.href = settings.privacy_policy_url;
+            privacyGroup.style.display = 'block';
+        }
+        catch(error)
+        {}
     }
 
     // Logo anzeigen
@@ -99,4 +113,4 @@ if (isThemeCacheValid()) {
     await loadTheme();
 }
 
-export { loadTheme };
+export { loadTheme, applyTheme }

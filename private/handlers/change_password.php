@@ -8,21 +8,24 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // CHANGE_PASSWORD Controller
 // ============================================
 
-function handlePasswordChange($db, $request_method, $authUserId)
+function handlePasswordChange($db, $database, $request_method, $authUserId)
 {
     if($request_method !== 'POST') {
             http_response_code(405);
             echo json_encode(["message" => "Method not allowed"]);
             exit();
     }
+
+    $prefix = $database->table('');
     
     $data = json_decode(file_get_contents("php://input"));
     
-    $stmt = $db->prepare("SELECT password_hash FROM users WHERE user_id = ?");
+    $stmt = $db->prepare("SELECT password_hash FROM {$prefix}users WHERE user_id = ?");
     $stmt->execute([$authUserId]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -39,7 +42,7 @@ function handlePasswordChange($db, $request_method, $authUserId)
     }
     
     $newHash = password_hash($data->new_password, PASSWORD_DEFAULT);
-    $updateStmt = $db->prepare("UPDATE users SET password_hash = ? WHERE user_id = ?");
+    $updateStmt = $db->prepare("UPDATE {$prefix}users SET password_hash = ? WHERE user_id = ?");
     
     if($updateStmt->execute([$newHash, $authUserId])) {
         echo json_encode(["message" => "Password changed successfully"]);

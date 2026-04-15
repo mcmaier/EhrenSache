@@ -8,10 +8,14 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // EXCEPTIONS Controller
 // ============================================
-function handleExceptions($db, $method, $id) {
+function handleExceptions($db, $database, $method, $id) {
+
+    $prefix = $database->table('');
+
     switch($method) {
         case 'GET':
             if($id) {
@@ -23,12 +27,12 @@ function handleExceptions($db, $method, $id) {
                                      at.type_id as appointment_type_id,
                                      u1.email as created_by_email,
                                      u2.email as approved_by_email
-                                     FROM exceptions e 
-                                     JOIN members m ON e.member_id = m.member_id 
-                                     JOIN appointments a ON e.appointment_id = a.appointment_id 
-                                     LEFT JOIN users u1 ON e.created_by = u1.user_id
-                                     LEFT JOIN users u2 ON e.approved_by = u2.user_id
-                                     LEFT JOIN appointment_types at ON a.type_id = at.type_id
+                                     FROM {$prefix}exceptions e 
+                                     JOIN {$prefix}members m ON e.member_id = m.member_id 
+                                     JOIN {$prefix}appointments a ON e.appointment_id = a.appointment_id 
+                                     LEFT JOIN {$prefix}users u1 ON e.created_by = u1.user_id
+                                     LEFT JOIN {$prefix}users u2 ON e.approved_by = u2.user_id
+                                     LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
                                      WHERE e.exception_id = ?");
 
                 $stmt->execute([$id]);
@@ -36,7 +40,7 @@ function handleExceptions($db, $method, $id) {
                 
                 // User dürfen nur ihre eigenen Exceptions sehen
                 if(!isAdminOrManager()) {
-                    $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
+                    $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $userMemberId = $userStmt->fetchColumn();
                     
@@ -62,7 +66,7 @@ function handleExceptions($db, $method, $id) {
                 
                 // User sehen nur ihre eigenen Exceptions
                 if(!isAdminOrManager()) {
-                    $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
+                    $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $member_id = $userStmt->fetchColumn();
                     
@@ -79,12 +83,12 @@ function handleExceptions($db, $method, $id) {
                         at.type_id as appointment_type_id, at.type_name as appointment_type_name,
                         u1.email as created_by_email,
                         u2.email as approved_by_email
-                        FROM exceptions e 
-                        JOIN members m ON e.member_id = m.member_id 
-                        JOIN appointments a ON e.appointment_id = a.appointment_id 
-                        LEFT JOIN users u1 ON e.created_by = u1.user_id
-                        LEFT JOIN users u2 ON e.approved_by = u2.user_id
-                        LEFT JOIN appointment_types at ON a.type_id = at.type_id
+                        FROM {$prefix}exceptions e 
+                        JOIN {$prefix}members m ON e.member_id = m.member_id 
+                        JOIN {$prefix}appointments a ON e.appointment_id = a.appointment_id 
+                        LEFT JOIN {$prefix}users u1 ON e.created_by = u1.user_id
+                        LEFT JOIN {$prefix}users u2 ON e.approved_by = u2.user_id
+                        LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
                         WHERE 1=1";
                 
                 $params = [];
@@ -126,7 +130,7 @@ function handleExceptions($db, $method, $id) {
             
             if(!isAdminOrManager()) {
                 // User dürfen nur für sich selbst Anträge stellen
-                $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
+                $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
                 $userStmt->execute([getCurrentUserId()]);
                 $userMemberId = $userStmt->fetchColumn();
                 
@@ -137,7 +141,7 @@ function handleExceptions($db, $method, $id) {
                 }
             }
             
-            $stmt = $db->prepare("INSERT INTO exceptions 
+            $stmt = $db->prepare("INSERT INTO {$prefix}exceptions 
                                   (member_id, appointment_id, exception_type, reason, 
                                    requested_arrival_time, status, created_by) 
                                   VALUES (?, ?, ?, ?, ?, ?, ?)");
@@ -171,7 +175,7 @@ function handleExceptions($db, $method, $id) {
             $data = json_decode(file_get_contents("php://input"));
             
             // Hole Exception Info
-            $checkStmt = $db->prepare("SELECT member_id, status FROM exceptions WHERE exception_id = ?");
+            $checkStmt = $db->prepare("SELECT member_id, status FROM {$prefix}exceptions WHERE exception_id = ?");
             $checkStmt->execute([$id]);
             $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -183,7 +187,7 @@ function handleExceptions($db, $method, $id) {
             
             // User dürfen nur ihre eigenen pending Anträge bearbeiten
             if(!isAdminOrManager()) {
-                $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
+                $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
                 $userStmt->execute([getCurrentUserId()]);
                 $userMemberId = $userStmt->fetchColumn();
                 
@@ -194,7 +198,7 @@ function handleExceptions($db, $method, $id) {
                 }
                 
                 // User Update (nur Reason und requested_arrival_time)
-                $stmt = $db->prepare("UPDATE exceptions 
+                $stmt = $db->prepare("UPDATE {$prefix}exceptions 
                                       SET reason = ?, requested_arrival_time = ? 
                                       WHERE exception_id = ?");
                 $stmt->execute([
@@ -204,7 +208,7 @@ function handleExceptions($db, $method, $id) {
                 ]);
             } else {
                 // Admin Update (inkl. Status ändern)
-                $stmt = $db->prepare("UPDATE exceptions 
+                $stmt = $db->prepare("UPDATE {$prefix}exceptions 
                                       SET reason = ?, 
                                           requested_arrival_time = ?,
                                           status = ?,
@@ -233,10 +237,10 @@ function handleExceptions($db, $method, $id) {
                 if($data->status === 'approved')
                 {                    
                     if($data->exception_type === 'time_correction') {
-                        handleApprovedTimeCorrection($db, $id, $data);
+                        handleApprovedTimeCorrection($db, $database, $id, $data);
                     }
                     elseif($data->exception_type === 'absence') {
-                        handleApprovedAbsence($db, $id, $data);
+                        handleApprovedAbsence($db, $database, $id, $data);
                     }
                 }
             }
@@ -247,7 +251,7 @@ function handleExceptions($db, $method, $id) {
         case 'DELETE':
             // User dürfen nur ihre eigenen pending Anträge löschen
             // Admin darf alles löschen
-            $checkStmt = $db->prepare("SELECT member_id, status FROM exceptions WHERE exception_id = ?");
+            $checkStmt = $db->prepare("SELECT member_id, status FROM {$prefix}exceptions WHERE exception_id = ?");
             $checkStmt->execute([$id]);
             $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -258,7 +262,7 @@ function handleExceptions($db, $method, $id) {
             }
             
             if(!isAdminOrManager()) {
-                $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
+                $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
                 $userStmt->execute([getCurrentUserId()]);
                 $userMemberId = $userStmt->fetchColumn();
                 
@@ -269,7 +273,7 @@ function handleExceptions($db, $method, $id) {
                 }
             }
             
-            $stmt = $db->prepare("DELETE FROM exceptions WHERE exception_id = ?");
+            $stmt = $db->prepare("DELETE FROM {$prefix}exceptions WHERE exception_id = ?");
             if($stmt->execute([$id])) {
                 echo json_encode(["message" => "Exception deleted"]);
             } else {

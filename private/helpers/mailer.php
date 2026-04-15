@@ -18,8 +18,10 @@ class Mailer {
     private $from_name;
     private $use_tls;
     private $pdo;
+    private $prefix;
+    private $database;
     
-    public function __construct($config, $pdo = null) {
+    public function __construct($config, $pdo = null, $database = null) {
         $this->smtp_host = $config['smtp_host'];
         $this->smtp_port = $config['smtp_port'];
         $this->smtp_user = $config['smtp_user'];
@@ -28,8 +30,10 @@ class Mailer {
         $this->from_name = $config['from_name'];
         $this->use_tls = $config['use_tls'] ?? true;
         $this->pdo = $pdo;
+        $this->database = $database;      
 
         if ($pdo) {
+            $this->prefix = $database->table('');
             $this->loadFromDatabase();
         } else {
             $this->from_email = $config['from_email'];
@@ -43,7 +47,7 @@ class Mailer {
         try {
             $stmt = $this->pdo->query(
                 "SELECT setting_key, setting_value 
-                 FROM system_settings 
+                 FROM {$this->prefix}system_settings 
                  WHERE setting_key IN ('mail_from_email', 'mail_from_name')"
             );
             
@@ -67,7 +71,7 @@ class Mailer {
         try {
             $stmt = $this->pdo->query(
                 "SELECT setting_key, setting_value 
-                 FROM system_settings 
+                 FROM {$this->prefix}system_settings 
                  WHERE setting_key IN ('mail_enabled', 'smtp_configured', 
                                       'mail_registration_enabled', 
                                       'mail_password_reset_enabled', 
@@ -264,7 +268,7 @@ class Mailer {
             'USER_NAME' => $name,
             'VERIFICATION_LINK' => $verificationLink,
             'BASE_URL' => BASE_URL            
-        ], $db);
+        ], $db, $this->database);
         
         return $this->send($to, $subject, $body, true);
     }
@@ -287,7 +291,7 @@ class Mailer {
             'USER_NAME' => $name,
             'RESET_LINK' => $resetLink,
             'BASE_URL' => BASE_URL            
-        ], $db);
+        ], $db, $this->database);
         
         return $this->send($to, $subject, $body, true);
     }
@@ -312,7 +316,7 @@ class Mailer {
             'LOGIN_LINK' => BASE_URL . '/login.html',
             'MEMBER_INFO' => $memberInfo,
             'BASE_URL' => BASE_URL
-        ], $db);
+        ], $db, $this->database);
                 
         return $this->send($to, $subject, $body, true);
     }

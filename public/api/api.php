@@ -32,6 +32,7 @@ require_once '../../private/helpers/rate_limiter.php';
 require_once '../../private/helpers/totp.php';
 require_once '../../private/helpers/utils.php';
 require_once '../../private/helpers/mailer.php';
+require_once '../../private/helpers/version.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';
@@ -52,6 +53,7 @@ require_once '../../private/handlers/import.php';
 require_once '../../private/handlers/settings.php';
 require_once '../../private/handlers/user_mailer.php';
 require_once '../../private/handlers/attendance_list.php';
+require_once '../../private/handlers/my_data.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -105,14 +107,16 @@ if(!$apiToken && isset($_GET['api_token'])) {
 if (!$apiToken) {
     session_start();
     
+    /*
     // Session-Timeout prüfen
     if(isset($_SESSION['last_activity']) && 
-       (time() - $_SESSION['last_activity'] > 3600)) {
+       (time() - $_SESSION['last_activity'] > 1800)) {
         session_unset();
         session_destroy();
         session_start(); // Neu starten für Error-Response
     }
     $_SESSION['last_activity'] = time();
+    */
 }
 
 // ============================================
@@ -127,8 +131,8 @@ if(isset($_SESSION['user_id'])) {
     $identifier .= '_user_' . $_SESSION['user_id'];
 }
 
-// API Rate Limit: 100 Requests pro Minute
-if (!$rateLimiter->check($identifier, 'api_request', 100, 60)) {
+// API Rate Limit: 150 Requests pro Minute
+if (!$rateLimiter->check($identifier, 'api_request', 150, 60)) {
     http_response_code(429);
     echo json_encode([
         "message" => "Rate limit exceeded",
@@ -171,10 +175,11 @@ if($resource === 'ping' && $request_method === 'GET') {
         require_once $configPath;
         $database = new Database();
         $testDb = $database->getConnection();
-        
+        $prefix = $database->table('');
+
         // Prüfe ob users Tabelle existiert
-        $stmt = $testDb->query("SHOW TABLES LIKE 'users'");
-        $tableExists = $stmt->rowCount() > 0;
+        $stmt = $testDb->query("SHOW TABLES LIKE '{$prefix}users'");
+        $tableExists = $stmt->rowCount() > 0;        
         
         if (!$tableExists) {
             http_response_code(503);
@@ -210,10 +215,11 @@ if($resource === 'ping' && $request_method === 'GET') {
 //Datenbank verbinden
 $database = new Database();
 $db = $database->getConnection();
+$prefix = $database->table('');
 
 // APPEARANCE
 if($resource === 'appearance' && $request_method === 'GET') {
-    getAppearance($db);
+    getAppearance($db, $database);
     exit();
 }
 
@@ -221,14 +227,14 @@ if($resource === 'appearance' && $request_method === 'GET') {
 if($resource === 'login' && $request_method === 'POST') {
     // Session wurde oben bereits gestartet
     $data = json_decode(file_get_contents("php://input"));
-    echo json_encode(login($db, $data->email, $data->password));
+    echo json_encode(login($db, $database, $data->email, $data->password));
     exit();
 }
 
 // PWA LOGIN (Token-basiert)
 if($resource === 'auth' && $request_method === 'POST') {
     $data = json_decode(file_get_contents("php://input"));
-    echo json_encode(loginWithToken($db, $data->email, $data->password));
+    echo json_encode(loginWithToken($db, $database, $data->email, $data->password));
     exit();
 }
 
@@ -242,7 +248,7 @@ if($resource === 'logout' && $request_method === 'POST') {
 // REGISTRATION (öffentlich, Session für Rate-Limit)
 if($resource === 'register' && $request_method === 'POST') {
     // Session wurde oben bereits gestartet (für Rate-Limiting)
-    $result = registerNewUser($db);
+    $result = registerNewUser($db, $database);
     echo json_encode($result);
     exit();    
 }
@@ -250,7 +256,7 @@ if($resource === 'register' && $request_method === 'POST') {
 
 // PASSWORD RESET REQUEST (öffentlich)
 if($resource === 'password_reset_request' && $request_method === 'POST') {
-    handlePasswordResetRequest($db, $request_method);
+    handlePasswordResetRequest($db, $database, $request_method);
     exit();
 }
 
@@ -269,7 +275,7 @@ if($apiToken) {
     //error_log("Token Auth: Token received, length=" . strlen($apiToken));
     
     $stmt = $db->prepare("SELECT user_id, member_id, role, is_active, email, api_token_expires_at
-                         FROM users 
+                         FROM {$prefix}users 
                          WHERE api_token = ?");
     $stmt->execute([$apiToken]);
     $tokenUser = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -323,14 +329,33 @@ if($apiToken) {
         echo json_encode(["message" => "Unauthorized"]);
         exit();
     }
+
+    // Session-Timeout prüfen (optional, falls du serverseitig auch timeout willst)
+    $sessionLifetime = (int)ini_get('session.gc_maxlifetime'); // z.B. 1800 = 30 Min
+    
+    if(isset($_SESSION['last_activity'])) {
+        $inactiveTime = time() - $_SESSION['last_activity'];
+        
+        if($inactiveTime > $sessionLifetime) {
+            // Session abgelaufen
+            session_unset();
+            session_destroy();
+            http_response_code(401);
+            echo json_encode(["message" => "Session expired due to inactivity"]);
+            exit();
+        }
+    }
+
+    // Session verlängern: Last Activity aktualisieren
+    $_SESSION['last_activity'] = time();
     
     $authUserId = intval($_SESSION['user_id']);
     $authUserRole = $_SESSION['role'];
     
-    $stmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
+    $stmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
     $stmt->execute([$authUserId]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    $authMemberId = $result && $result['member_id'] ? intval($result['member_id']) : null; // ← FIX!
+    $authMemberId = $result && $result['member_id'] ? intval($result['member_id']) : null;
     
     //error_log("Session Auth: User ID: $authUserId, Role: $authUserRole, Member ID: " . ($authMemberId ?? 'NULL'));
 }
@@ -411,68 +436,83 @@ if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 
 switch($resource) {
     case 'available_years':
-        handleAvailableYears($db, $request_method, $id);
+        handleAvailableYears($db, $database, $request_method, $id);
         break;
     case 'members':
-        handleMembers($db, $request_method, $id, $authUserId, $authUserRole, $authMemberId);
+        handleMembers($db, $database, $request_method, $id, $authUserId, $authUserRole, $authMemberId);
         break;
     case 'appointments':
-        handleAppointments($db, $request_method, $id);
+        handleAppointments($db, $database, $request_method, $id);
         break;       
     case 'records':
-        handleRecords($db, $request_method, $id);
+        handleRecords($db, $database, $request_method, $id);
         break;
     case 'exceptions':
-        handleExceptions($db, $request_method, $id);
+        handleExceptions($db, $database, $request_method, $id);
         break;
     case 'users':
-        handleUsers($db, $request_method, $id, $authUserId);
+        handleUsers($db, $database, $request_method, $id, $authUserId);
         break;
     case 'membership_dates':
-        handleMembershipDates($db, $request_method, $id);        
+        handleMembershipDates($db, $database, $request_method, $id);        
         break;    
     case 'member_groups':
-        handleMemberGroups($db, $request_method, $id);
+        handleMemberGroups($db, $database, $request_method, $id);
         break;        
     case 'appointment_types':
-        handleAppointmentTypes($db, $request_method, $id);
+        handleAppointmentTypes($db, $database, $request_method, $id);
         break;        
     case 'statistics':
-        handleStatistics($db, $request_method, $authUserId, $authUserRole, $authMemberId);        
+        handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId);        
         break;
     case 'auto_checkin':
-        handleAutoCheckin($db, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
+        handleAutoCheckin($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
         break;        
     case 'totp_checkin':
-        handleTotpCheckin($db, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
+        handleTotpCheckin($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
         break;        
     case 'regenerate_token':
-        handleTokenRegeneration($db, $request_method, $authUserId, $authUserRole);
+        handleTokenRegeneration($db, $database, $request_method, $authUserId, $authUserRole);
         break;                
     case 'change_password':
-        handlePasswordChange($db, $request_method, $authUserId);        
+        handlePasswordChange($db, $database, $request_method, $authUserId);        
         break;
     case 'export':
-        handleExport($db, $request_method, $authUserRole);
+        handleExport($db, $database, $request_method, $authUserRole);
         break;
     case 'import':
-        handleImport($db, $request_method, $authUserRole);
+        handleImport($db, $database, $request_method, $authUserRole);
         break;
     case 'settings':
-        handleSettings($db, $request_method,$authUserId, $authUserRole);
+        handleSettings($db, $database, $request_method,$authUserId, $authUserRole);
         break;
     case 'upload-logo':
-        uploadLogo($db, $request_method,$authUserId,$authUserRole);
+        uploadLogo($db, $database, $request_method,$authUserId,$authUserRole);
         break;
     case 'attendance_list':
-        handleAttendanceList($db, $request_method, $id);
+        handleAttendanceList($db, $database, $request_method, $id);
         break;
     case 'activate_user':
-        handleUserActivation($db, $request_method, $authUserRole);
+        handleUserActivation($db, $database, $request_method, $authUserRole);
         break;    
     case 'user_status':
-        handleUserStatus($db, $request_method, $authUserRole);
+        handleUserStatus($db, $database, $request_method, $authUserRole);
         break;    
+    case 'import_logs':
+        handleImportLogs($db, $database, $request_method, $authUserRole, $id);
+        break;
+    case 'cleanup':
+        handleCleanup($db, $database, $request_method, $authUserRole);
+        break;
+    case 'my_data':
+        handleMyData($db, $database, $request_method, $authUserId);
+        break;
+    case 'session_info':
+        getSessionDebugInfo($request_method);
+        break;
+    case 'version':
+        getVersion();
+    break;
                 
     default:
         http_response_code(404);
@@ -484,4 +524,3 @@ switch($resource) {
 }
 
 ?>
-

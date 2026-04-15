@@ -12,13 +12,23 @@
 class RateLimiter {
     private $db;
     private $useDatabase;
+    private $prefix;
     
     /**
      * @param PDO|null $db Datenbank-Connection (null = Session-Modus)
      */
-    public function __construct($db = null) {
+    public function __construct($db = null, $database = null) {
         $this->db = $db;
-        $this->useDatabase = ($db !== null);
+        $this->useDatabase = ($db !== null);  
+        
+        if($database !== null)
+        {
+            $this->prefix = $database->table('');
+        }
+        else 
+        {
+            $this->prefix ='';
+        }
     }
     
     /**
@@ -67,14 +77,14 @@ class RateLimiter {
             // Alte Einträge aufräumen (älter als Zeitfenster)
             $cutoffTime = date('Y-m-d H:i:s', time() - $windowSeconds);
             $cleanupStmt = $this->db->prepare(
-                "DELETE FROM rate_limits WHERE created_at < ?"
+                "DELETE FROM {$this->prefix}rate_limits WHERE created_at < ?"
             );
             $cleanupStmt->execute([$cutoffTime]);
             
             // Aktuelle Versuche zählen
             $countStmt = $this->db->prepare(
                 "SELECT COUNT(*) as attempt_count 
-                 FROM rate_limits 
+                 FROM {$this->prefix}rate_limits 
                  WHERE identifier = ? 
                  AND action = ? 
                  AND created_at >= ?"
@@ -91,7 +101,7 @@ class RateLimiter {
             
             // Versuch registrieren
             $insertStmt = $this->db->prepare(
-                "INSERT INTO rate_limits (identifier, action, created_at) VALUES (?, ?, NOW())"
+                "INSERT INTO {$this->prefix}rate_limits (identifier, action, created_at) VALUES (?, ?, NOW())"
             );
             $insertStmt->execute([$hashedIdentifier, $action]);
             
@@ -111,7 +121,7 @@ class RateLimiter {
             
             $countStmt = $this->db->prepare(
                 "SELECT COUNT(*) as attempt_count 
-                 FROM rate_limits 
+                 FROM {$this->prefix}rate_limits 
                  WHERE identifier = ? 
                  AND action = ? 
                  AND created_at >= ?"
@@ -215,7 +225,7 @@ class RateLimiter {
             try {
                 $hashedIdentifier = hash('sha256', $email . 'login_attempt');
                 $stmt = $this->db->prepare(
-                    "DELETE FROM rate_limits WHERE identifier = ? AND action = 'login_attempt'"
+                    "DELETE FROM {$this->prefix}rate_limits WHERE identifier = ? AND action = 'login_attempt'"
                 );
                 $stmt->execute([$hashedIdentifier]);
             } catch (PDOException $e) {
@@ -227,126 +237,3 @@ class RateLimiter {
         }
     }
 }
-
-/*
-class RateLimiter {
-    private $maxRequests;
-    private $timeWindow;
-    
-    public function __construct($maxRequests = 100, $timeWindow = 60) {
-        $this->maxRequests = $maxRequests;
-        $this->timeWindow = $timeWindow; // Sekunden
-    }
-    
-    public function check($identifier) {
-        $key = 'rate_limit_' . $identifier;
-        
-        if(!isset($_SESSION[$key])) {
-            $_SESSION[$key] = [
-                'count' => 1,
-                'start' => time()
-            ];
-            return true;
-        }
-        
-        $data = $_SESSION[$key];
-        $elapsed = time() - $data['start'];
-        
-        // Zeitfenster abgelaufen -> Reset
-        if($elapsed > $this->timeWindow) {
-            $_SESSION[$key] = [
-                'count' => 1,
-                'start' => time()
-            ];
-            return true;
-        }
-        
-        // Limit erreicht?
-        if($data['count'] >= $this->maxRequests) {
-            return false;
-        }
-        
-        // Counter erhöhen
-        $_SESSION[$key]['count']++;
-        return true;
-    }
-    
-    public function getRemainingRequests($identifier) {
-        $key = 'rate_limit_' . $identifier;
-        if(!isset($_SESSION[$key])) return $this->maxRequests;
-        
-        $data = $_SESSION[$key];
-        $elapsed = time() - $data['start'];
-        
-        if($elapsed > $this->timeWindow) return $this->maxRequests;
-        
-        return max(0, $this->maxRequests - $data['count']);
-    }
-}
-
-
-class MailRateLimiter {
-    private $pdo;
-    
-    public function __construct($pdo) {
-        $this->pdo = $pdo;
-    }
-    
-    public function canSendEmail($email, $action, $maxAttempts = 3, $windowSeconds = 3600) {
-        $identifier = hash('sha256', $email . $action);
-        
-        // Alte Einträge löschen
-        $stmt = $this->pdo->prepare("DELETE FROM rate_limits WHERE expires_at < NOW()");
-        $stmt->execute();
-        
-        // Aktuelle Einträge zählen
-        $stmt = $this->pdo->prepare(
-            "SELECT COUNT(*) as count FROM rate_limits 
-             WHERE identifier = ? AND action = ? AND expires_at > NOW()"
-        );
-        $stmt->execute([$identifier, $action]);
-        $result = $stmt->fetch();
-        
-        if ($result['count'] >= $maxAttempts) {
-            return false;
-        }
-        
-        // Neuen Eintrag erstellen
-        $expiresAt = date('Y-m-d H:i:s', time() + $windowSeconds);
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO rate_limits (identifier, action, expires_at) VALUES (?, ?, ?)"
-        );
-        $stmt->execute([$identifier, $action, $expiresAt]);
-        
-        return true;
-    }
-    
-    // IP-basiertes Rate Limiting für Formulare
-    public function canSubmitForm($action, $maxAttempts = 10, $windowSeconds = 3600) {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $identifier = hash('sha256', $ip . $action);
-        
-        $stmt = $this->pdo->prepare("DELETE FROM rate_limits WHERE expires_at < NOW()");
-        $stmt->execute();
-        
-        $stmt = $this->pdo->prepare(
-            "SELECT COUNT(*) as count FROM rate_limits 
-             WHERE identifier = ? AND action = ? AND expires_at > NOW()"
-        );
-        $stmt->execute([$identifier, $action]);
-        $result = $stmt->fetch();
-        
-        if ($result['count'] >= $maxAttempts) {
-            return false;
-        }
-        
-        $expiresAt = date('Y-m-d H:i:s', time() + $windowSeconds);
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO rate_limits (identifier, action, expires_at) VALUES (?, ?, ?)"
-        );
-        $stmt->execute([$identifier, $action, $expiresAt]);
-        
-        return true;
-    }
-}
-*/

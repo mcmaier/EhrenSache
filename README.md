@@ -17,6 +17,7 @@ Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder si
 
 Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünkltichkeit belohnen wollen.
 
+Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen.
 
 ### Kernfunktionen
 - **Mehrstufiges Rollensystem**: Admin, Manager und Benutzer mit differenzierten Berechtigungen
@@ -40,6 +41,38 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 - Input-Validierung auf Client- und Server-Seite
 - Sichere Datei-Upload-Verifikation
 
+---
+
+## ⚠️ Wichtige Hinweise für Betreiber
+
+### Datenschutz (DSGVO)
+
+EhrenSache verarbeitet personenbezogene Daten. Als **Betreiber** sind Sie 
+**Verantwortlicher** im Sinne der DSGVO und müssen eigenständig für 
+datenschutzkonforme Nutzung sorgen.
+
+**Betreiber-Pflichten:**
+- ✓ Datenschutzerklärung erstellen
+- ✓ Rechtsgrundlage definieren (z.B. berechtigtes Interesse)
+- ✓ Mitglieder informieren
+- ✓ Betroffenenrechte gewährleisten
+- ✓ Technische Schutzmaßnahmen (HTTPS, Backups, etc.)
+
+**Der Entwickler:**
+- ❌ Ist NICHT verantwortlich für Ihre Datenverarbeitung
+- ❌ Haftet NICHT für DSGVO-Verstöße in Ihrer Installation
+- ❌ Gibt KEINE Rechtsberatung
+
+📄 **Ausführliche Informationen**: [DATENSCHUTZ.md](DATENSCHUTZ.md)  
+⚖️ **Haftungsausschluss**: [HAFTUNGSAUSSCHLUSS.md](DISCLAIMER.md)
+
+### Empfehlung
+
+Konsultieren Sie vor Inbetriebnahme einen Datenschutzbeauftragten oder 
+Fachanwalt für IT-Recht, um die DSGVO-Konformität sicherzustellen.
+
+---
+
 ## Technologie-Stack
 
 **Backend:**
@@ -52,9 +85,10 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 - CSS3 (Grid, Flexbox)
 
 **IoT-Integration (WIP):**
-- (geplant) TOTP-Device für QR-Checkin via App
+- TOTP-Device für QR-Checkin via App
 - (geplant) Fingerprint-Scanner für Biometrie-Checkin
 
+---
 
 ## Installation
 
@@ -73,20 +107,28 @@ git clone https://github.com/mcmaier/EhrenSache.git
 > [!WARNING]
 > Die Web-Root der (Sub-)Domain muss auf den Ordner **EhrenSache/public** zeigen!
 
-3. Neue Datenbank erstellen.
+3. Ggf. Neue Datenbank erstellen.
 
 4. Setup ausführen (Angenommen, Ehrensache ist in der Subdomain ehrensache.meine-domain.de installiert):
 ```
 https://ehrensache.meine-domain.de/install
 ```
 
-## Erste Schritte
-
 Während der Installation wird ein Admin-Account erstellt.
 
-1. Gruppenverwaltung --> Mindestens eine Benutzergruppe anlegen
-2. Gruppenverwaltung --> Eine Terminart erstellen und Benutzergruppe zuweisen
-3. Mitglieder --> Erstellen oder aus CSV Importieren
+5. Als Admin Einloggen:
+
+- Gruppenverwaltung --> Mindestens eine Benutzergruppe anlegen
+- Gruppenverwaltung --> Eine Terminart erstellen und Benutzergruppe zuweisen
+- Datenschutz konfigurieren
+  - **Datenschutzerklärung** erstellen und verlinken
+  - **Mitglieder informieren** (Rundmail, Mitgliederversammlung)
+    > Siehe [DATENSCHUTZ.md](DATENSCHUTZ.md) für Checkliste und Muster-Texte.
+- Mitglieder anlegen oder aus CSV Importieren
+
+---
+
+## Funktionen
 
 ### Für Administratoren
 
@@ -126,8 +168,8 @@ Manager haben eingeschränkten Zugriff:
 
 **Check-in Web:**
 1. Login → Dashboard
-2. Termine und Anwesenheiten einsehen
-3. Statistik einsehen
+2. Termine und eigene Anwesenheiten einsehen
+3. Eigene Statistik einsehen
 4. Anträge erstellen
 
 **Check-in Mobile (PWA):**
@@ -155,18 +197,11 @@ Manager haben eingeschränkten Zugriff:
 
 ## IoT-Integration
 
-**geplant:**
 - QR Code Station mit TOTP Code
-- NFC Station für TOTP Code
-- Fingerprint Authentifizierungsgerät
+- NFC Station für TOTP Code (geplant)
+- Fingerprint Authentifizierungsgerät (geplant)
 
-### Weitere Geräte
 
-Das System unterstützt beliebige IoT-Geräte über die REST API mit API Token:
-- TOTP-Endpoint: `/api/api.php&resource=totp_checkin`
-- Auth-Endpoint: `/api/api.php&resource=auto_checkin`
-- Authentifizierung: Bearer Token
-- Parameter: `member_id`, `appointment_id`, `totp_code`, `source`
 
 ## API-Dokumentation
 
@@ -238,7 +273,7 @@ EhrenSache/
 |   ├── config/           # Config Dateien
 |   ├── handlers/         # API Endpunkt-Handler
 |   └── ...             
-└── public/               # Öffentlich zugänglich
+└── public/               # Öffentlich zugänglich <-- Web Root!
     ├── checkin/          # PWA
     ├── api/              # REST API Endpoints
     ├── js/               # Frontend JavaScript
@@ -255,6 +290,9 @@ Das System verwendet ein Jahr-basiertes Caching:
 - Invalidierung bei Änderungen über Event-System
 - Cache-Keys im localStorage
 
+### API-Dokumentation
+
+Siehe **[API Dokumentation](API.md)**
 
 ## Support
 
@@ -272,7 +310,6 @@ Gemeinnützige Vereine, Musikvereine, Sportvereine und andere ehrenamtliche
 Organisationen können EhrenSache **kostenlos** unter der [AGPL-3.0-Lizenz](LICENSE) nutzen.
 
 
-
 **Das bedeutet:**
 - ✅ Kostenlose Nutzung
 - ✅ Quellcode einsehbar und anpassbar
@@ -281,7 +318,7 @@ Organisationen können EhrenSache **kostenlos** unter der [AGPL-3.0-Lizenz](LICE
 
 ### 💼 Kommerzielle Lizenz
 
-Für kommerzielle Nutzung (SaaS-Anbieter, Systemhäuser, Unternehmen) ist eine 
+Für kommerzielle Nutzung ohne Offenlegungspflicht gemäß AGPL ist eine 
 **[Kommerzielle Lizenz](COMMERCIAL-LICENSE.md)** erforderlich.
 
 **Wann brauche ich eine kommerzielle Lizenz?**

@@ -12,22 +12,27 @@
 // MEMBERS Controller
 // ============================================
 
-function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMemberId) {
+function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole, $authMemberId) {
+    
+    require_once __DIR__ . '/../helpers/member_activity.php';
+
+    $prefix = $database->table('');
+
     switch($method) {
         case 'GET':
             if($id) {  
                 // Zugriffskontrolle: Nur Admin können alle Infos lesen  
                 if(isAdminOrManager())                
                 {
-                    $stmt = $db->prepare("SELECT * FROM members WHERE member_id = ?");
+                    $stmt = $db->prepare("SELECT * FROM {$prefix}members WHERE member_id = ?");
                     $stmt->execute([$id]);
                     $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
                     if($member) {
                         // Lade zugehörige Gruppen
                         $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name 
-                                                    FROM member_groups g
-                                                    INNER JOIN member_group_assignments mga ON g.group_id = mga.group_id
+                                                    FROM {$prefix}member_groups g
+                                                    INNER JOIN {$prefix}member_group_assignments mga ON g.group_id = mga.group_id
                                                     WHERE mga.member_id = ?");
                         $groupStmt->execute([$id]);
                         $member['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -40,24 +45,32 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
                     }
                 }               
                 else{
-                    $memberId = $authMemberId; 
-                    $stmt = $db->prepare("SELECT name, surname, member_number FROM members WHERE member_id = ?");
+                    $memberId = $authMemberId;
+                    $stmt = $db->prepare("
+                        SELECT m.name, m.surname, m.member_number,
+                               GROUP_CONCAT(mga.group_id SEPARATOR ', ') as group_ids
+                        FROM {$prefix}members m
+                        LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
+                        WHERE m.member_id = ?
+                        GROUP BY m.member_id
+                    ");
                     $stmt->execute([$memberId]);
-                    $member = $stmt->fetch(PDO::FETCH_ASSOC);                            
+                    $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
                     $warning = null;
-                    if( $id!= $memberId) {
+                    if ($id != $memberId) {
                         $warning = "member_id ignored - you can only get your own linked member number (ID: $memberId)";
                     }
 
-                    if($member)
-                    {
-                        echo json_encode([  "name" => $member['name'],
-                                            "surname" => $member['surname'],
-                                            "member_number" => $member['member_number'],
-                                            "warning" => $warning]);
-                    }
-                    else {             
+                    if ($member) {
+                        echo json_encode([
+                            "name"          => $member['name'],
+                            "surname"       => $member['surname'],
+                            "member_number" => $member['member_number'],
+                            "group_ids"     => $member['group_ids'],
+                            "warning"       => $warning
+                        ]);
+                    } else {
                         http_response_code(404);
                         echo json_encode(["message" => "Member not found"]);
                     }
@@ -65,32 +78,121 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
             } 
             else
             {
+                // Parameter
+                $group_id = $_GET['group_id'] ?? null;
+                $year = isset($_GET['year']) ? intval($_GET['year']) : null;
+                $date = $_GET['date'] ?? null;
+                $include_inactive = $_GET['include_inactive'] ?? 'false';
+
+                // $date auf gültiges YYYY-MM-DD validieren
+                if ($date !== null) {
+                    $parsedDate = DateTime::createFromFormat('Y-m-d', $date);
+                    if (!$parsedDate || $parsedDate->format('Y-m-d') !== $date) {
+                        $date = null;
+                    }
+                }
+
+                // Include_inactive nur für Admin/Manager
+                $includeInactive = (isAdminOrManager() && $include_inactive === 'true');
+
+                // Datum für Aktivitätsprüfung
+                $yearRangeCheck = false;
+                $checkDate = null;
+                if ($date) {
+                    $checkDate = "'$date'"; // Spezifisches Datum (bereits als Y-m-d validiert)
+                } elseif ($year) {
+                    $yearRangeCheck = true;
+                    $yearStart = "'" . $year . "-01-01'";
+                    $yearEnd   = "'" . $year . "-12-31'";
+                }
+
+                $activityFilter = '';
+                $activityFlag = 'm.active';
+
+                if ($yearRangeCheck && !$includeInactive) {
+                    // Filter: War im Jahr IRGENDWANN aktiv
+                    $activityFilter = "AND (
+                        m.active = 1
+                        AND (
+                            -- Keine membership_dates → immer aktiv
+                            NOT EXISTS (
+                                SELECT 1 FROM {$prefix}membership_dates md 
+                                WHERE md.member_id = m.member_id
+                            )
+                            OR
+                            -- Hat membership_dates → Zeitraum überlappt mit Jahr
+                            EXISTS (
+                                SELECT 1 FROM {$prefix}membership_dates md
+                                WHERE md.member_id = m.member_id
+                                AND md.start_date <= $yearEnd
+                                AND (md.end_date IS NULL OR md.end_date >= $yearStart)
+                            )
+                        )
+                    )";
+                }
+
+                if ($yearRangeCheck) {
+                    // Flag: War im Jahr aktiv (für Anzeige)
+                    $activityFlag = "CASE 
+                        WHEN (
+                            m.active = 1
+                            AND (
+                                NOT EXISTS (
+                                    SELECT 1 FROM {$prefix}membership_dates md 
+                                    WHERE md.member_id = m.member_id
+                                )
+                                OR
+                                EXISTS (
+                                    SELECT 1 FROM {$prefix}membership_dates md
+                                    WHERE md.member_id = m.member_id
+                                    AND md.start_date <= $yearEnd
+                                    AND (md.end_date IS NULL OR md.end_date >= $yearStart)
+                                )
+                            )
+                        ) THEN 1 
+                        ELSE 0 
+                    END";
+                } elseif ($checkDate) {
+                    // Spezifisches Datum
+                    $activityWhere = getMemberActivityWhere('m', $checkDate, false);
+                    
+                    if (!$includeInactive) {
+                        $activityFilter = "AND ($activityWhere)";
+                    }
+                    
+                    $activityFlag = "CASE WHEN ($activityWhere) THEN 1 ELSE 0 END";
+                }
+
                 // Zugriffskontrolle: Nur Admin können alle Infos lesen
                 if(isAdminOrManager())    
                 {
-                    $group_id = $_GET['group_id'] ?? null;
                     $params = [];
                     
                     if($group_id)
                     {
-                        $sql = "SELECT m.*, g.group_id, g.group_name                                   
-                                    FROM members m
-                                    LEFT JOIN member_group_assignments mga ON m.member_id = mga.member_id
-                                    LEFT JOIN member_groups g ON mga.group_id = g.group_id
+                        $sql = "SELECT m.*, g.group_id, g.group_name,    
+                                        $activityFlag as is_active_in_period                              
+                                    FROM {$prefix}members m
+                                    LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
+                                    LEFT JOIN {$prefix}member_groups g ON mga.group_id = g.group_id
                                     WHERE mga.group_id = ?
-                                    GROUP BY m.member_id                                    
-                                    ORDER BY m.surname, m.name";
-                                    $params[] = $group_id;                                    
+                                    $activityFilter
+                                    GROUP BY m.member_id ORDER BY m.surname, m.name";
+                                
+                        $params[] = $group_id;                                    
                     }
                     else
                     {
                         $sql = "SELECT m.*,
-                                    GROUP_CONCAT(g.group_id SEPARATOR ', ') as group_ids,
-                                    GROUP_CONCAT(g.group_name SEPARATOR ', ') as group_names
-                                    FROM members m
-                                    LEFT JOIN member_group_assignments mga ON m.member_id = mga.member_id
-                                    LEFT JOIN member_groups g ON mga.group_id = g.group_id
-                                    GROUP BY m.member_id
+                                        GROUP_CONCAT(g.group_id SEPARATOR ', ') as group_ids,
+                                        GROUP_CONCAT(g.group_name SEPARATOR ', ') as group_names,
+                                        $activityFlag as is_active_in_period
+                                    FROM {$prefix}members m
+                                    LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
+                                    LEFT JOIN {$prefix}member_groups g ON mga.group_id = g.group_id
+                                    WHERE 1=1
+                                        $activityFilter
+                                    GROUP BY m.member_id 
                                     ORDER BY m.surname, m.name";
                     }
 
@@ -106,14 +208,28 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
                 else if(isDevice())
                 {
                     // Liste aller Mitglieder mit Member_Number für Auto-Checkin
-                    $stmt = $db->query("SELECT name, surname, member_number FROM members ORDER BY surname, name");
-                                $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $sql = "SELECT name, surname, member_number 
+                            FROM {$prefix}members m
+                            WHERE 1=1
+                                $activityFilter
+                            ORDER BY surname, name";
+
+                    //$stmt = $db->query("SELECT name, surname, member_number FROM {$prefix}members ORDER BY surname, name");
+                    
+                    $stmt = $db->query($sql);
+                    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
                 else
                 {
                     // Liste aller Mitglieder ohne weitere Infos
-                    $stmt = $db->query("SELECT name, surname FROM members ORDER BY surname, name");
-                                $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $sql = "SELECT name, surname 
+                            FROM {$prefix}members m
+                            WHERE 1=1
+                                $activityFilter
+                            ORDER BY surname, name";
+                    
+                    $stmt = $db->query($sql);
+                    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
 
                 echo json_encode($members);
@@ -136,7 +252,7 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
 
             // Prüfe ob member_number bereits existiert (falls angegeben)
             if(isset($cleanData->member_number) && !empty($cleanData->member_number)) {
-                $checkStmt = $db->prepare("SELECT member_id FROM members WHERE member_number = ?");
+                $checkStmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_number = ?");
                 $checkStmt->execute([$cleanData->member_number]);
                 if($checkStmt->fetch()) {
                     http_response_code(409);
@@ -147,14 +263,14 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
                 }
             }
 
-            $stmt = $db->prepare("INSERT INTO members (name, surname, member_number, active) 
+            $stmt = $db->prepare("INSERT INTO {$prefix}members (name, surname, member_number, active) 
                                   VALUES (?, ?, ?, ?)");
             if($stmt->execute([$cleanData->name, $cleanData->surname, $cleanData->member_number ?? null, 
                                $cleanData->active ?? true])) {
                 $memberId = $db->lastInsertId();
                 // Speichere Gruppen-Zuordnungen
                 if(isset($cleanData->group_ids) && is_array($cleanData->group_ids)) {
-                    $groupStmt = $db->prepare("INSERT INTO member_group_assignments (member_id, group_id) VALUES (?, ?)");
+                    $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
                     foreach($cleanData->group_ids as $groupId) {
                         $groupStmt->execute([$memberId, $groupId]);
                     }
@@ -183,7 +299,7 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
 
             //Prüfe ob member_number bereits von anderem Mitglied verwendet wird
             if(isset($cleanData->member_number) && !empty($cleanData->member_number)) {
-                $checkStmt = $db->prepare("SELECT member_id FROM members 
+                $checkStmt = $db->prepare("SELECT member_id FROM {$prefix}members 
                                         WHERE member_number = ? AND member_id != ?");
                 $checkStmt->execute([$cleanData->member_number, $id]);
                 if($checkStmt->fetch()) {
@@ -197,18 +313,18 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
             }
 
 
-            $stmt = $db->prepare("UPDATE members SET name=?, surname=?, member_number=?, 
+            $stmt = $db->prepare("UPDATE {$prefix}members SET name=?, surname=?, member_number=?, 
                                   active=? WHERE member_id=?");
             if($stmt->execute([$cleanData->name, $cleanData->surname, $cleanData->member_number ?? null, 
                                $cleanData->active, $id])) {
                 // Aktualisiere Gruppen-Zuordnungen
                 if(isset($cleanData->group_ids)) {
                     // Lösche alte Zuordnungen
-                    $db->prepare("DELETE FROM member_group_assignments WHERE member_id = ?")->execute([$id]);
+                    $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
                     
                     // Füge neue Zuordnungen hinzu
                     if(is_array($cleanData->group_ids)) {
-                        $groupStmt = $db->prepare("INSERT INTO member_group_assignments (member_id, group_id) VALUES (?, ?)");
+                        $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
                         foreach($cleanData->group_ids as $groupId) {
                             $groupStmt->execute([$id, $groupId]);
                         }
@@ -224,18 +340,31 @@ function handleMembers($db, $method, $id, $authUserId, $authUserRole, $authMembe
         case 'DELETE':
             requireAdminOrManager();
 
-            // Lösche zuerst abhängige Datensätze
-            $db->prepare("DELETE FROM records WHERE member_id = ?")->execute([$id]);
-            $db->prepare("DELETE FROM exceptions WHERE member_id = ?")->execute([$id]);
-            $db->prepare("DELETE FROM membership_dates WHERE member_id = ?")->execute([$id]);
-            $db->prepare("DELETE FROM member_group_assignments WHERE member_id = ?")->execute([$id]);
+            // Nur inaktive Mitglieder löschen
+            $checkStmt = $db->prepare("SELECT active FROM {$prefix}members WHERE member_id = ?");
+            $checkStmt->execute([$id]);
+            $member = $checkStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if($member && $member['active'] == 1) {
+                http_response_code(400);
+                echo json_encode([
+                    "message" => "Aktives Mitglied zuerst deaktivieren."
+                ]);
+                break;
+            }
 
-            $db->prepare("UPDATE users SET member_id = NULL WHERE member_id = ?")->execute([$id]);
+            // Lösche zuerst abhängige Datensätze
+            $db->prepare("DELETE FROM {$prefix}records WHERE member_id = ?")->execute([$id]);
+            $db->prepare("DELETE FROM {$prefix}exceptions WHERE member_id = ?")->execute([$id]);
+            $db->prepare("DELETE FROM {$prefix}membership_dates WHERE member_id = ?")->execute([$id]);
+            $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
+
+            $db->prepare("UPDATE {$prefix}users SET member_id = NULL WHERE member_id = ?")->execute([$id]);
             
             // Dann das Mitglied selbst
-            $stmt = $db->prepare("DELETE FROM members WHERE member_id = ?");
+            $stmt = $db->prepare("DELETE FROM {$prefix}members WHERE member_id = ?");
             if($stmt->execute([$id])) {
-                echo json_encode(["message" => "Member deleted"]);
+                echo json_encode(["message" => "Member and all associated data deleted"]);
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to delete member"]);

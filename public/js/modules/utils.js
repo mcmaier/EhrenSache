@@ -96,3 +96,29 @@ export function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+/**
+ * Gibt alle Termine zurück, die mit dem Mitglied gruppenkompatibel sind.
+ * Terminart ohne Gruppen gilt als universell kompatibel.
+ */
+export function getCompatibleAppointments(member, appointments, types) {
+    return appointments.filter(apt => {
+        const type = types.find(t => t.type_id == apt.type_id);
+        if (!type || !type.groups || type.groups.length === 0) return true;
+        const typeGroupIds = type.groups.map(g => g.group_id);
+        return member.group_ids_array.some(gid => typeGroupIds.includes(gid));
+    });
+}
+
+/**
+ * Gibt alle Mitglieder zurück, die mit dem Termin gruppenkompatibel sind.
+ * Terminart ohne Gruppen → alle Mitglieder kompatibel.
+ */
+export function getCompatibleMembers(appointment, members, types) {
+    const type = types.find(t => t.type_id == appointment.type_id);
+    if (!type || !type.groups || type.groups.length === 0) return members;
+    const typeGroupIds = type.groups.map(g => g.group_id);
+    return members.filter(m =>
+        m.group_ids_array.some(gid => typeGroupIds.includes(gid))
+    );
+}

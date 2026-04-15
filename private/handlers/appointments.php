@@ -8,10 +8,14 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // APPOINTMENTS Controller
 // ============================================
-function handleAppointments($db, $method, $id) {
+function handleAppointments($db, $database, $method, $id) {
+ 
+    $prefix = $database->table('');
+
     switch($method) {
         case 'GET':
             if($id) {
@@ -19,8 +23,8 @@ function handleAppointments($db, $method, $id) {
                                         at.type_name, 
                                         at.color,
                                         at.description as type_description
-                                        FROM appointments a
-                                        LEFT JOIN appointment_types at ON a.type_id = at.type_id
+                                        FROM {$prefix}appointments a
+                                        LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
                                         WHERE a.appointment_id = ?");
                 $stmt->execute([$id]);
                 $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -46,15 +50,15 @@ function handleAppointments($db, $method, $id) {
                         at.color, 
                         at.type_id,
                         at.description as type_description
-                        FROM appointments a
-                        LEFT JOIN appointment_types at ON a.type_id = at.type_id
+                        FROM {$prefix}appointments a
+                        LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
                         WHERE 1=1";
                 $params = [];
                 
                 // Gruppen-Filterung für User
                 if(!isAdminOrManager() || isset($member_id)) {
                     // Hole member_id des Users
-                    $userStmt = $db->prepare("SELECT member_id FROM users WHERE user_id = ?");
+                    $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $userMemberId = $userStmt->fetchColumn();
 
@@ -65,7 +69,7 @@ function handleAppointments($db, $method, $id) {
                     
                     if($userMemberId) {
                         // Hole Gruppen des Mitglieds
-                        $groupStmt = $db->prepare("SELECT group_id FROM member_group_assignments WHERE member_id = ?");
+                        $groupStmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?");
                         $groupStmt->execute([$userMemberId]);
                         $userGroupIds = $groupStmt->fetchAll(PDO::FETCH_COLUMN);
                         
@@ -79,7 +83,7 @@ function handleAppointments($db, $method, $id) {
                         // Filterung: Nur Termine deren Terminart zu den User-Gruppen passt
                         $placeholders = str_repeat('?,', count($userGroupIds) - 1) . '?';
                         $sql .= " AND EXISTS (
-                            SELECT 1 FROM appointment_type_groups atg
+                            SELECT 1 FROM {$prefix}appointment_type_groups atg
                             WHERE atg.type_id = a.type_id
                             AND atg.group_id IN ($placeholders)
                         )";
@@ -145,7 +149,7 @@ function handleAppointments($db, $method, $id) {
             }
 
             // Hole Standard-Terminart
-            $typeStmt = $db->query("SELECT type_id FROM appointment_types WHERE is_default = 1 LIMIT 1");
+            $typeStmt = $db->query("SELECT type_id FROM {$prefix}appointment_types WHERE is_default = 1 LIMIT 1");
             $defaultType = $typeStmt->fetch(PDO::FETCH_ASSOC);
             $typeId = $defaultType ? $defaultType['type_id'] : null;
 
@@ -163,7 +167,7 @@ function handleAppointments($db, $method, $id) {
             $checkStmt = $db->prepare("
                 SELECT appointment_id, title, start_time, date,
                     ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
-                FROM appointments 
+                FROM {$prefix}appointments 
                 WHERE date = ?
                 AND type_id = ?
                 HAVING time_diff <= ?
@@ -189,7 +193,7 @@ function handleAppointments($db, $method, $id) {
             }
             
                   
-            $stmt = $db->prepare("INSERT INTO appointments (title, type_id, description, date, 
+            $stmt = $db->prepare("INSERT INTO {$prefix}appointments (title, type_id, description, date, 
                                   start_time, created_by) VALUES (?, ?, ?, ?, ?, ?)");
             $createdBy = getCurrentUserId(); 
             if($stmt->execute([$data->title, $typeId, $data->description ?? null, $data->date, 
@@ -225,7 +229,7 @@ function handleAppointments($db, $method, $id) {
             $checkStmt = $db->prepare("
                 SELECT appointment_id, title, start_time, date,
                     ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
-                FROM appointments 
+                FROM {$prefix}appointments 
                 WHERE date = ?
                 AND type_id = ?
                 AND appointment_id != ?
@@ -257,7 +261,7 @@ function handleAppointments($db, $method, $id) {
                 $description = $data->description;
             }
 
-            $stmt = $db->prepare("UPDATE appointments SET title=?, type_id=?, description=?, date=?, 
+            $stmt = $db->prepare("UPDATE {$prefix}appointments SET title=?, type_id=?, description=?, date=?, 
                                   start_time=? WHERE appointment_id=?");
             if($stmt->execute([$data->title, $data->type_id ?? null, $description, $data->date, 
                               $data->start_time, $id])) {
@@ -272,11 +276,11 @@ function handleAppointments($db, $method, $id) {
             requireAdminOrManager();
             
             // Lösche zuerst abhängige Datensätze
-            $db->prepare("DELETE FROM records WHERE appointment_id = ?")->execute([$id]);
-            $db->prepare("DELETE FROM exceptions WHERE appointment_id = ?")->execute([$id]);
+            $db->prepare("DELETE FROM {$prefix}records WHERE appointment_id = ?")->execute([$id]);
+            $db->prepare("DELETE FROM {$prefix}exceptions WHERE appointment_id = ?")->execute([$id]);
             
             // Dann den Termin selbst
-            $stmt = $db->prepare("DELETE FROM appointments WHERE appointment_id = ?");
+            $stmt = $db->prepare("DELETE FROM {$prefix}appointments WHERE appointment_id = ?");
             if($stmt->execute([$id])) {
                 echo json_encode(["message" => "Appointment deleted"]);
             } else {

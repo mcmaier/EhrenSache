@@ -13,10 +13,12 @@
 // ============================================
 // HILFSFUNKTION: Genehmigte Zeitkorrektur verarbeiten
 // ============================================
-function handleApprovedTimeCorrection($db, $exceptionId, $exceptionData) {
+function handleApprovedTimeCorrection($db, $database, $exceptionId, $exceptionData) {
     // Hole Exception Details
+    $prefix = $database->table('');
+
     $stmt = $db->prepare("SELECT member_id, appointment_id, requested_arrival_time 
-                          FROM exceptions WHERE exception_id = ?");
+                          FROM {$prefix}exceptions WHERE exception_id = ?");
     $stmt->execute([$exceptionId]);
     $exception = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -25,14 +27,14 @@ function handleApprovedTimeCorrection($db, $exceptionId, $exceptionData) {
     }
     
     // Prüfe ob bereits ein Record existiert
-    $checkStmt = $db->prepare("SELECT record_id FROM records 
+    $checkStmt = $db->prepare("SELECT record_id FROM {$prefix}records 
                                WHERE member_id = ? AND appointment_id = ?");
     $checkStmt->execute([$exception['member_id'], $exception['appointment_id']]);
     $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
     
     if($existingRecord) {
         // Update bestehenden Record
-        $updateStmt = $db->prepare("UPDATE records 
+        $updateStmt = $db->prepare("UPDATE {$prefix}records 
                                     SET arrival_time = ?, status = 'present' 
                                     WHERE record_id = ?");
         $updateStmt->execute([
@@ -41,7 +43,7 @@ function handleApprovedTimeCorrection($db, $exceptionId, $exceptionData) {
         ]);
     } else {
         // Erstelle neuen Record
-        $insertStmt = $db->prepare("INSERT INTO records 
+        $insertStmt = $db->prepare("INSERT INTO {$prefix}records 
                                     (member_id, appointment_id, arrival_time, status) 
                                     VALUES (?, ?, ?, 'present')");
         $insertStmt->execute([
@@ -56,11 +58,12 @@ function handleApprovedTimeCorrection($db, $exceptionId, $exceptionData) {
 // HILFSFUNKTION: Genehmigte Entschuldigung verarbeiten
 // ============================================
 
-function handleApprovedAbsence($db, $exceptionId, $data) {
+function handleApprovedAbsence($db, $database, $exceptionId, $data) {
     // Exception-Details holen
+    $prefix = $database->table('');
     $stmt = $db->prepare(
         "SELECT member_id, appointment_id 
-         FROM exceptions 
+         FROM {$prefix}exceptions 
          WHERE exception_id = ?"
     );
     $stmt->execute([$exceptionId]);
@@ -71,7 +74,7 @@ function handleApprovedAbsence($db, $exceptionId, $data) {
     // Appointment-Datum holen für arrival_time
     $stmt = $db->prepare(
         "SELECT date, start_time 
-         FROM appointments 
+         FROM {$prefix}appointments 
          WHERE appointment_id = ?"
     );
     $stmt->execute([$exception['appointment_id']]);
@@ -83,7 +86,7 @@ function handleApprovedAbsence($db, $exceptionId, $data) {
     
     // Record erstellen (INSERT IGNORE falls bereits vorhanden)
     $stmt = $db->prepare(
-        "INSERT IGNORE INTO records 
+        "INSERT IGNORE INTO {$prefix}records 
          (member_id, appointment_id, arrival_time, status, checkin_source) 
          VALUES (?, ?, ?, 'excused', 'admin')"
     );
@@ -97,8 +100,9 @@ function handleApprovedAbsence($db, $exceptionId, $data) {
 // ============================================
 // HILFSFUNKTION: Member-ID aus Nummer ermitteln
 // ============================================
-function resolveMemberIdByNumber($db, $memberNumber) {
-    $stmt = $db->prepare("SELECT member_id FROM members WHERE member_number = ?");
+function resolveMemberIdByNumber($db, $database, $memberNumber) {
+    $prefix = $database->table('');
+    $stmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_number = ?");
     $stmt->execute([$memberNumber]);
     $memberId = $stmt->fetchColumn();
     

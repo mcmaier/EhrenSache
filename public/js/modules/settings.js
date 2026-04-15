@@ -8,10 +8,12 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-import { apiCall, isAdmin } from './api.js';
-import { showToast } from './ui.js';
-import { debug } from '../app.js';
 import { API_BASE } from '../config.js';
+import { apiCall, isAdmin } from './api.js';
+import { showConfirm, showToast } from './ui.js';
+import { debug } from '../app.js';
+import { applyTheme } from '../theme.js';
+
 
 let systemSettings = {};
 let hasUnsavedChanges = false;
@@ -204,8 +206,15 @@ async function saveAllSettings() {
 
     // Validierung vor dem Speichern
     let hasErrors = false;
+
     inputs.forEach(input => {
         const key = input.dataset.key;
+
+        if(!key) {
+            debug.warn('Input ohne data-key gefunden:', input);
+            return;
+        }
+
         let value;
 
         if (input.type === 'checkbox') {
@@ -220,6 +229,7 @@ async function saveAllSettings() {
             if (isNaN(value) || value < min || value > max) {
                 input.classList.add('invalid');
                 hasErrors = true;
+                return;
             }
             else
             {
@@ -228,26 +238,36 @@ async function saveAllSettings() {
         }        
         else if(input.type === 'hidden' && key === 'organization_logo'){
             value = input.value;
+
+            if (!value && !systemSettings[key]) {
+                return; // Beide leer → keine Änderung
+            }
         }
         else {
             value = input.value;
-        }                        
-    
-        if (hasErrors) {
-            showToast('Bitte korrigiere die ungültigen Eingaben', 'error');
-            return;
-        }    
+        }           
+
+        // Nur speichern wenn Wert sich WIRKLICH geändert hat
+        const oldValue = systemSettings[key];
         
-        // Nur speichern wenn Wert sich geändert hat
-        if (systemSettings[key] !== value) {
+        // Typ-sichere Vergleiche
+        const normalizedOld = oldValue === undefined ? '' : String(oldValue);
+        const normalizedNew = value === undefined ? '' : String(value);
+        
+        if (normalizedOld !== normalizedNew) {
             updates.push({ key, value });
-        }
+        }                
     });
     
     if (updates.length === 0) {
         showToast('Keine Änderungen zum Speichern', 'info');
         return;
     }
+
+    if (hasErrors) {
+            showToast('Bitte korrigiere die ungültigen Eingaben', 'error');
+            return;
+    } 
     
     try {
         // Alle Änderungen nacheinander speichern
@@ -258,11 +278,13 @@ async function saveAllSettings() {
             });
             
             // Lokalen Cache aktualisieren
-            systemSettings[update.key] = update.value;
+            systemSettings[update.key] = update.value;            
             
             // Theme-Einstellungen sofort anwenden
-            applyThemeSetting(update.key, update.value);
+            //applyNewThemeSetting(update.key, update.value);
         }
+
+        applyTheme(systemSettings);
         
         hasUnsavedChanges = false;
         updateSaveButtonState();
@@ -359,64 +381,38 @@ function setupLogoUpload() {
     });
 }
 
-
-function applyThemeSetting(key, value) {
-    const root = document.documentElement;
-
-    switch(key)
-    {
-        case 'primary_color':
-            root.style.setProperty('--primary-color', value);
-            break;
-        case 'secondary_color':
-            root.style.setProperty('--secondary-color', value);
-            break;
-        case 'background_color':
-            root.style.setProperty('--background-color', value);
-            break;
-
-        case 'organization_name':
-                document.title = value + " - EhrenSache";
-            break;
-
-        case 'organization_logo':
-            break;
-
-        case 'pagination_limit':
-                debug.log("Pagination Value changed:",value);
-                globalPaginationValue = value;
-            break;
-
-        default:
-            break;
-    }    
-}
-
 // ============================================
-// THEME (öffentlich)
+// DATA cleanup
 // ============================================
 
-export async function applyTheme() {
-    const settings = await loadPublicSettings();
-    const root = document.documentElement;
-    
-    if (settings.primary_color) {
-        root.style.setProperty('--primary-color', settings.primary_color);
-    }
-    
-    if (settings.secondary_color) {
-        root.style.setProperty('--secondary-color', settings.secondary_color);
-    }
+export async function performCleanup() {
+    const years = document.getElementById('cleanup_years').value;
 
-    if (settings.background_color) {
-        root.style.setProperty('--background-color', settings.background_color);
-    }
-
-    if (settings.organization_name) {
-        document.title = settings.organization_name + " - EhrenSache";
+    const confirmed = await showConfirm(`Wirklich alle Anwesenheitsdaten älter als ${years} Jahre löschen?\n\nDieser Vorgang kann nicht rückgängig gemacht werden!`,'Warnung');
+    
+    if(confirmed)
+    {    
+        try {
+            const result = await apiCall('cleanup', 'POST', { years: parseInt(years) });
+            
+            document.getElementById('cleanup_result').innerHTML = `
+                <div class="success-message">
+                    ✅ Bereinigung erfolgreich<br>
+                    Gelöscht: ${result.deleted_records} Anwesenheiten, 
+                    ${result.deleted_exceptions} Ausnahmen<br>
+                    (älter als ${result.cutoff_date})
+                </div>
+            `;
+            
+            showToast('Datenlöschung erfolgreich','success');
+            
+        } catch(error) {
+            document.getElementById('cleanup_result').innerHTML = `
+                <div class="error-message">❌ Fehler: ${error.message}</div>
+            `;
+        }
     }
 }
-
 
 // ============================================
 // SMTP CONFIGURATION MODAL
@@ -567,3 +563,5 @@ window.togglePasswordVisibility = function(inputId) {
         button.textContent = '👁️';
     }
 };
+
+window.performCleanup = performCleanup;

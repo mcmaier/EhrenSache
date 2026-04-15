@@ -41,6 +41,7 @@ if ($step == 2 && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $dbName = $_POST['db_name'] ?? '';
     $dbUser = $_POST['db_user'] ?? '';
     $dbPass = $_POST['db_pass'] ?? '';
+    $dbPrefix = $_POST['db_prefix'] ?? 'es_';
     
     // Teste Verbindung
     try {
@@ -57,7 +58,8 @@ if ($step == 2 && $_SERVER['REQUEST_METHOD'] === 'POST') {
             'host' => $dbHost,
             'name' => $dbName,
             'user' => $dbUser,
-            'pass' => $dbPass
+            'pass' => $dbPass,
+            'prefix' => $dbPrefix
         ];
         
         header('Location: ?step=3');
@@ -106,6 +108,10 @@ if ($step == 4) {
         
         // Importiere Schema
         $schema = file_get_contents('../../private/setup/ehrensache_db.sql');
+
+        // Ersetze Präfix-Platzhalter
+        $schema = str_replace('{PREFIX}', $cfg['prefix'], $schema);
+
         $pdo->exec($schema);
         
         // Erstelle Admin-User
@@ -114,7 +120,9 @@ if ($step == 4) {
         $apiToken = bin2hex(random_bytes(24));
         $tokenExpires = date('Y-m-d H:i:s', strtotime('+1 year'));        
         
-        $stmt = $pdo->prepare("INSERT INTO users (email, password_hash, role, is_active, account_status, api_token, api_token_expires_at) 
+
+        $usersTable = $cfg['prefix'] . 'users';
+        $stmt = $pdo->prepare("INSERT INTO {$usersTable} (email, password_hash, role, is_active, account_status, api_token, api_token_expires_at) 
                                VALUES (?, ?, 'admin', 1, 'active', ?, ?)");
         $stmt->execute([$admin['email'], $passwordHash, $apiToken, $tokenExpires]);
                
@@ -126,8 +134,8 @@ if ($step == 4) {
         // config.php erstellen aus Template
         $configTemplate = file_get_contents('../../private/config/config_example.php');
         $configContent = str_replace(
-            ['your_host','your_database', 'your_username', 'your_password'],
-            [$cfg['host'], $cfg['name'], $cfg['user'], $cfg['pass']],
+            ['your_host','your_database', 'your_username', 'your_password','your_prefix'],
+            [$cfg['host'], $cfg['name'], $cfg['user'], $cfg['pass'], $cfg['prefix']],
             $configTemplate
         );
         file_put_contents('../../private/config/config.php', $configContent);
@@ -325,6 +333,11 @@ if ($step == 4) {
                 <div class="form-group">
                     <label>Passwort*</label>
                     <input type="password" name="db_pass" required>
+                </div>
+                <div class="form-group">
+                    <label>Tabellen-Präfix</label>
+                    <input type="text" name="db_prefix" value="es_" pattern="[a-z_]+" required>
+                    <small>Ermöglicht mehrere Installationen in einer DB (z.B. es_, mv_, etc.)</small>
                 </div>
                 <button type="submit" class="btn">Verbindung testen & weiter</button>
             </form>

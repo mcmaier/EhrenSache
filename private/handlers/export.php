@@ -8,11 +8,12 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // EXPORT Handler
 // ============================================
 
-function handleExport($db, $request_method, $authUserRole) {
+function handleExport($db, $database, $request_method, $authUserRole) {
     if ($request_method !== 'GET') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
@@ -20,25 +21,18 @@ function handleExport($db, $request_method, $authUserRole) {
     }
     
     requireAdminOrManager();
-    /*
-    // Nur Admins dürfen exportieren
-    if ($authUserRole !== 'admin') {
-        http_response_code(403);
-        echo json_encode(["message" => "Admin access required"]);
-        exit();
-    }*/
     
     $type = $_GET['type'] ?? 'members';
     
     switch($type) {
         case 'members':
-            exportMembers($db);
+            exportMembers($db, $database);
             break;
         case 'appointments':
-            exportAppointments($db);
+            exportAppointments($db, $database);
             break;
         case 'records':
-            exportRecords($db);
+            exportRecords($db, $database);
             break;
         default:
             http_response_code(400);
@@ -46,14 +40,16 @@ function handleExport($db, $request_method, $authUserRole) {
     }
 }
 
-function exportMembers($db) {
+function exportMembers($db, $database) {
+    $prefix = $database->table('');
+
     // Hole alle Mitglieder mit Gruppenzuordnungen
     $stmt = $db->query("
         SELECT m.member_id, m.name, m.surname, m.member_number, m.active,
                GROUP_CONCAT(g.group_name SEPARATOR '|') as group_names
-        FROM members m
-        LEFT JOIN member_group_assignments mga ON m.member_id = mga.member_id
-        LEFT JOIN member_groups g ON mga.group_id = g.group_id
+        FROM {$prefix}members m
+        LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
+        LEFT JOIN {$prefix}member_groups g ON mga.group_id = g.group_id
         GROUP BY m.member_id
         ORDER BY m.surname, m.name
     ");
@@ -88,17 +84,19 @@ function exportMembers($db) {
     exit();
 }
 
-function exportAppointments($db) {
+function exportAppointments($db, $database) {
     $year = $_GET['year'] ?? date('Y');
+
+    $prefix = $database->table('');
     
     $stmt = $db->prepare("
         SELECT a.appointment_id, a.date, a.start_time, a.title, a.description,
                at.type_name,
                GROUP_CONCAT(DISTINCT g.group_name SEPARATOR '|') as group_names
-        FROM appointments a
-        LEFT JOIN appointment_types at ON a.type_id = at.type_id
-        LEFT JOIN appointment_type_groups atg ON at.type_id = atg.type_id
-        LEFT JOIN member_groups g ON atg.group_id = g.group_id
+        FROM {$prefix}appointments a
+        LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
+        LEFT JOIN {$prefix}appointment_type_groups atg ON at.type_id = atg.type_id
+        LEFT JOIN {$prefix}member_groups g ON atg.group_id = g.group_id
         WHERE YEAR(a.date) = ?
         GROUP BY a.appointment_id
         ORDER BY a.date, a.start_time
@@ -128,16 +126,18 @@ function exportAppointments($db) {
     exit();
 }
 
-function exportRecords($db) {
+function exportRecords($db, $database) {
     $year = $_GET['year'] ?? date('Y');
+
+    $prefix = $database->table('');
     
     $stmt = $db->prepare("
         SELECT r.record_id, r.arrival_time, r.status, r.checkin_source,
                m.name, m.surname, m.member_number,
                a.date as appointment_date, a.title as appointment_title
-        FROM records r
-        JOIN members m ON r.member_id = m.member_id
-        JOIN appointments a ON r.appointment_id = a.appointment_id
+        FROM {$prefix}records r
+        JOIN {$prefix}members m ON r.member_id = m.member_id
+        JOIN {$prefix}appointments a ON r.appointment_id = a.appointment_id
         WHERE YEAR(a.date) = ?
         ORDER BY a.date, r.arrival_time
     ");

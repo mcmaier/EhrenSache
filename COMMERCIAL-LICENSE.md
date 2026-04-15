@@ -16,7 +16,7 @@ Bedingungen der AGPL-3.0-Lizenz.
 Die kommerzielle Lizenz gewährt:
 - ✓ Nutzung in geschlossenen/proprietären Systemen
 - ✓ Keine Pflicht zur Veröffentlichung von Änderungen
-- ✓ Hosting als kostenpflichtige SaaS-Lösung
+- ✓ Hosting als kostenpflichtige SaaS-Lösung ohne Offenlegung des Codes
 - ✓ Integration in kommerzielle Produkte
 - ✓ White-Label-Lösungen
 

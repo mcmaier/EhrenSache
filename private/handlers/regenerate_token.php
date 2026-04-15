@@ -8,11 +8,12 @@
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
+
 // ============================================
 // REGENERATE TOKEN Controller
 // ============================================
 
-function handleTokenRegeneration($db, $request_method, $authUserId, $authUserRole)
+function handleTokenRegeneration($db, $database, $request_method, $authUserId, $authUserRole)
 {
     if($request_method !== 'POST') {
         http_response_code(405);
@@ -20,6 +21,7 @@ function handleTokenRegeneration($db, $request_method, $authUserId, $authUserRol
         exit();
     }
     
+    $prefix = $database->table('');
     $data = json_decode(file_get_contents("php://input"));
     $targetUserId = $data->user_id ?? $authUserId; // Standard: eigener User
     
@@ -42,7 +44,7 @@ function handleTokenRegeneration($db, $request_method, $authUserId, $authUserRol
     }
     
     // Prüfe ob Ziel-User existiert
-    $checkStmt = $db->prepare("SELECT user_id, role FROM users WHERE user_id = ?");
+    $checkStmt = $db->prepare("SELECT user_id, role FROM {$prefix}users WHERE user_id = ?");
     $checkStmt->execute([$targetUserId]);
     $targetUser = $checkStmt->fetch(PDO::FETCH_ASSOC);
     
@@ -66,7 +68,7 @@ function handleTokenRegeneration($db, $request_method, $authUserId, $authUserRol
     }
     
     try{    
-        $stmt = $db->prepare("UPDATE users SET api_token = ?, api_token_expires_at = ? WHERE user_id = ?");
+        $stmt = $db->prepare("UPDATE {$prefix}users SET api_token = ?, api_token_expires_at = ? WHERE user_id = ?");
         
         if($stmt->execute([$newToken, $expiresAt, $targetUserId])) {
             echo json_encode([

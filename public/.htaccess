@@ -11,8 +11,8 @@ RewriteEngine On
 # Aktiviere diese Zeilen NUR auf dem Live-Server!
 # Lokal auskommentiert lassen
 
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # ============================================
 # SICHERHEIT
