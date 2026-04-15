@@ -693,7 +693,7 @@ export async function loadAllData() {
     
     // Hintergrund-Laden nur für ungecachte Daten
     setTimeout(() => {
-        if ((section !== 'mitglieder') && !isCacheValid('members'))             
+        if ((section !== 'mitglieder') && !isCacheValid('members', currentYear))
             loadMembers();
         if ((section !== 'termine') && !isCacheValid('appointments',currentYear)) 
             loadAppointments();

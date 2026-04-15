@@ -80,21 +80,30 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
             {
                 // Parameter
                 $group_id = $_GET['group_id'] ?? null;
-                $year = $_GET['year'] ?? null;
+                $year = isset($_GET['year']) ? intval($_GET['year']) : null;
                 $date = $_GET['date'] ?? null;
                 $include_inactive = $_GET['include_inactive'] ?? 'false';
 
+                // $date auf gültiges YYYY-MM-DD validieren
+                if ($date !== null) {
+                    $parsedDate = DateTime::createFromFormat('Y-m-d', $date);
+                    if (!$parsedDate || $parsedDate->format('Y-m-d') !== $date) {
+                        $date = null;
+                    }
+                }
+
                 // Include_inactive nur für Admin/Manager
-                $includeInactive = (isAdminOrManager() && $include_inactive === 'true');        
-                
+                $includeInactive = (isAdminOrManager() && $include_inactive === 'true');
+
                 // Datum für Aktivitätsprüfung
+                $yearRangeCheck = false;
                 $checkDate = null;
                 if ($date) {
-                    $checkDate = "'$date'"; // Spezifisches Datum
+                    $checkDate = "'$date'"; // Spezifisches Datum (bereits als Y-m-d validiert)
                 } elseif ($year) {
                     $yearRangeCheck = true;
-                    $yearStart = "'$year-01-01'";
-                    $yearEnd = "'$year-12-31'";
+                    $yearStart = "'" . $year . "-01-01'";
+                    $yearEnd   = "'" . $year . "-12-31'";
                 }
 
                 $activityFilter = '';

@@ -1233,7 +1233,7 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
                     ✎
                 </button>
                 <button class="action-btn btn-icon btn-delete" 
-                        onclick="deleteRecord(${appointment.record_id},'${memberInfo.name}','diesem Termin')"
+                        onclick="deleteRecord(${appointment.record_id},'${escapeHtml(memberInfo.name)}','diesem Termin')"
                         title="Löschen">
                     🗑
                 </button>

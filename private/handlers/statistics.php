@@ -245,7 +245,7 @@ function calculateGroupStatistics($db, $database, $groupId, $year, $memberId, $r
 
     $typeId = $group['type_id'];
 
-    if ($appointmentTypeId !== null && $typeId !== $appointmentTypeId) {
+    if ($appointmentTypeId !== null && (int)$typeId !== $appointmentTypeId) {
         return null;
     }
 
