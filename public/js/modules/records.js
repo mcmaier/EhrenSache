@@ -13,7 +13,7 @@ import { loadAppointments } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
-import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml } from './utils.js';
+import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers } from './utils.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 
@@ -37,6 +37,11 @@ let currentAppointmentId = null;
 let currentMemberId = null;
 let currentAppointmentType = null;
 let isLoadingFilters = false;
+
+// State für Cross-Filtering im Record-Modal
+let _recordAllMembers = [];
+let _recordAllAppointments = [];
+let _recordTypes = [];
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -787,12 +792,10 @@ export async function openRecordModal(recordId = null) {
         document.getElementById('recordAppointmentTypeGroup').style.display = 'none';            
     }    
 
-    // Event Listener für Termin-Auswahl (nur einmal registrieren)
-    //appointmentSelect.removeEventListener('change', updateAppointmentTypeDisplay);
-    appointmentSelect.removeEventListener('change',updateArrivalTimeFromAppointment);
-
-    //appointmentSelect.addEventListener('change', updateAppointmentTypeDisplay);
-    appointmentSelect.addEventListener('change',updateArrivalTimeFromAppointment);
+    memberSelect.removeEventListener('change', onRecordMemberChange);
+    appointmentSelect.removeEventListener('change', onRecordAppointmentChange);
+    memberSelect.addEventListener('change', onRecordMemberChange);
+    appointmentSelect.addEventListener('change', onRecordAppointmentChange);
     
     modal.classList.add('active');
 }
@@ -826,52 +829,74 @@ export async function loadRecordData(recordId) {
 }
 
 
-export async function loadRecordDropdowns() {
-        
-    await loadTypes();
-    const members =  await loadMembers();
-    const memberSelect = document.getElementById('record_member');
-    memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
-    
-    members
-        .filter(m => m.is_active_in_period)
-        .forEach(member => {
-            memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
-        });
-    
-    const appointments = await loadAppointments(false,currentYear);    
-    const appointmentSelect = document.getElementById('record_appointment');    
-    appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
-    
-    appointments.forEach(appointment => {
-            const date = new Date(appointment.date + 'T00:00:00');
-            const formattedDate = date.toLocaleDateString('de-DE');
-            const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
-            
-            // Terminart-Anzeige im Dropdown-Text
-            let displayText = `${appointment.title} (${formattedDate} - ${startTime})`;
-            
-            if (appointment.type_name) {
-                displayText = `${displayText} [${appointment.type_name}]`;
-            }
-            
-            // Erstelle Option mit data-Attributen
-            const option = document.createElement('option');
-            option.value = appointment.appointment_id;
-            option.textContent = displayText;
+function buildRecordMemberOptions(members) {
+    const select = document.getElementById('record_member');
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">Bitte wählen...</option>';
+    members.forEach(member => {
+        const opt = document.createElement('option');
+        opt.value = member.member_id;
+        opt.textContent = `${member.surname}, ${member.name}`;
+        select.appendChild(opt);
+    });
+    if (members.some(m => m.member_id == currentVal)) select.value = currentVal;
+}
 
-            // Füge Farbe hinzu (funktioniert in den meisten Browsern)
-            if (appointment.color) {
-                option.style.color = appointment.color;
-                option.style.fontWeight = '500';
-            }
-            
-            // Speichere Type-Daten für Badge-Anzeige
-            option.dataset.typeId = appointment.type_id || '';
-            option.dataset.typeName = appointment.type_name || '';
-            
-            appointmentSelect.appendChild(option);
-        });
+function buildRecordAppointmentOptions(appointments) {
+    const select = document.getElementById('record_appointment');
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">Bitte wählen...</option>';
+    appointments.forEach(appointment => {
+        const date = new Date(appointment.date + 'T00:00:00');
+        const formattedDate = date.toLocaleDateString('de-DE');
+        const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
+        let displayText = `${appointment.title} (${formattedDate} - ${startTime})`;
+        if (appointment.type_name) displayText += ` [${appointment.type_name}]`;
+        const option = document.createElement('option');
+        option.value = appointment.appointment_id;
+        option.textContent = displayText;
+        if (appointment.color) {
+            option.style.color = appointment.color;
+            option.style.fontWeight = '500';
+        }
+        option.dataset.typeId = appointment.type_id || '';
+        option.dataset.typeName = appointment.type_name || '';
+        select.appendChild(option);
+    });
+    if (appointments.some(a => a.appointment_id == currentVal)) select.value = currentVal;
+}
+
+function onRecordMemberChange() {
+    const memberSelect = document.getElementById('record_member');
+    const selectedMember = _recordAllMembers.find(m => m.member_id == memberSelect.value);
+    if (!selectedMember) {
+        buildRecordAppointmentOptions(_recordAllAppointments);
+        return;
+    }
+    const compatible = getCompatibleAppointments(selectedMember, _recordAllAppointments, _recordTypes);
+    buildRecordAppointmentOptions(compatible);
+}
+
+function onRecordAppointmentChange() {
+    updateArrivalTimeFromAppointment();
+    const appointmentSelect = document.getElementById('record_appointment');
+    const selectedAppointment = _recordAllAppointments.find(a => a.appointment_id == appointmentSelect.value);
+    if (!selectedAppointment) {
+        buildRecordMemberOptions(_recordAllMembers);
+        return;
+    }
+    const compatible = getCompatibleMembers(selectedAppointment, _recordAllMembers, _recordTypes);
+    buildRecordMemberOptions(compatible);
+}
+
+export async function loadRecordDropdowns() {
+    _recordTypes = await loadTypes();
+    const members = await loadMembers();
+    _recordAllMembers = members.filter(m => m.is_active_in_period);
+    _recordAllAppointments = await loadAppointments(false, currentYear);
+
+    buildRecordMemberOptions(_recordAllMembers);
+    buildRecordAppointmentOptions(_recordAllAppointments);
 }
 
 export async function saveRecord() {
