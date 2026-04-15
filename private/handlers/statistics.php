@@ -272,7 +272,7 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
     }
 
     // Mitglieder korrekt aus DB zählen (keine Duplikate)
-    $totalMembers = getActiveMemberCount($db, $database, $groups, $memberId);
+    $totalMembers = getActiveMemberCount($db, $database, $groups, $year, $memberId);
 
     // Gesamtdurchschnitt berechnen
     //$totalPossible = $totalAppointments * $totalMembers;
@@ -294,7 +294,7 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
     
 }
 
-function getActiveMemberCount($db, $database, $groupIds, $specificMemberId = null) {
+function getActiveMemberCount($db, $database, $groupIds, $year, $specificMemberId = null) {
     // Wenn ein spezifisches Mitglied angegeben ist
     if ($specificMemberId !== null) {
         return 1;
@@ -310,14 +310,15 @@ function getActiveMemberCount($db, $database, $groupIds, $specificMemberId = nul
             FROM {$prefix}member_group_assignments mga
             JOIN {$prefix}members m ON mga.member_id = m.member_id
             WHERE mga.group_id IN ($placeholders)
-            AND m.active = 1
+            AND " . getMemberActivityWhereYear($year, 'm') . "
         ");
         $stmt->execute($groupIds);
         return $stmt->fetchColumn();
     }
     
     // Alle aktiven Mitglieder
-    $stmt = $db->query("SELECT COUNT(*) FROM {$prefix}members WHERE active = 1");
+    $activityWhere = getMemberActivityWhereYear($year, 'm');
+    $stmt = $db->query("SELECT COUNT(*) FROM {$prefix}members m WHERE {$activityWhere}");
     return $stmt->fetchColumn();
 }
 
@@ -383,7 +384,7 @@ function calculateGroupStatistics($db, $database, $groupId, $year, $memberId, $r
             FROM {$prefix}member_group_assignments mga
             JOIN {$prefix}members m ON mga.member_id = m.member_id
             LEFT JOIN {$prefix}member_groups mg ON mga.group_id = mg.group_id
-            WHERE mga.group_id = ? AND m.active = 1
+            WHERE mga.group_id = ? AND " . getMemberActivityWhereYear($year, 'm') . "
             ORDER BY m.surname, m.name
         ");
         $stmt->execute([$groupId]);
