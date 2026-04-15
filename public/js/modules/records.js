@@ -11,7 +11,7 @@
 import { apiCall, isAdminOrManager } from './api.js';
 import { loadAppointments } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
-import { loadMembers } from './members.js';
+import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
 import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers } from './utils.js';
 import { debug } from '../app.js'
@@ -362,21 +362,29 @@ export async function loadRecordFilters(forceReload = false) {
 
     isLoadingFilters = true;
 
-    // Gruppen laden
+    // Terminarten und User-Gruppen laden
     const aptTypes = await loadTypes(forceReload);
+    const userGroupIds = await getUserGroupIds();
 
-    // Gruppen-Filter befüllen
+    // Terminart-Filter befüllen
     const aptTypeSelect = document.getElementById('filterAptType');
     const currentAptTypeValue = aptTypeSelect.value;
-    
+
     aptTypeSelect.innerHTML = '<option value="">Alle Termine</option>';
     if (aptTypes && aptTypes.length > 0) {
         aptTypes.forEach(aptt => {
-            //aptTypeSelect.innerHTML += `<option value="${aptt.type_id}">${aptt.type_name}</option>`;
-       
+            // Für non-Admin: nur Terminarten mit passender Gruppenverknüpfung anzeigen
+            if (userGroupIds !== null) {
+                // Typen ohne Gruppen ausblenden (noch nicht konfiguriert)
+                if (!aptt.groups || aptt.groups.length === 0) return;
+                // Nur Typen anzeigen, die mindestens eine der eigenen Gruppen haben
+                const hasMatch = aptt.groups.some(g => userGroupIds.includes(g.group_id));
+                if (!hasMatch) return;
+            }
+
             // Terminart-Anzeige im Dropdown-Text
             let displayText = `${aptt.type_name}`;
-            
+
             // Erstelle Option mit data-Attributen
             const option = document.createElement('option');
             option.value = aptt.type_id;
@@ -387,22 +395,27 @@ export async function loadRecordFilters(forceReload = false) {
                 option.style.color = aptt.color;
                 option.style.fontWeight = '500';
             }
-            
+
             // Speichere Type-Daten für Badge-Anzeige
             option.dataset.typeId = aptt.type_id || '';
             option.dataset.typeName = aptt.type_name || '';
-            
-            aptTypeSelect.appendChild(option); 
+
+            aptTypeSelect.appendChild(option);
         });
     }
     aptTypeSelect.value = currentAptTypeValue;
-    
+
+    // Termin-Filter für non-Admin ausblenden
+    const appointmentFilterGroup = document.getElementById('filterAppointment')?.closest('.form-group');
+    if (appointmentFilterGroup) {
+        appointmentFilterGroup.style.display = isAdminOrManager ? '' : 'none';
+    }
+
     loadAppointmentFilter(forceReload);
 
     loadMemberFilter(forceReload);
 
-    
-    isLoadingFilters = false;    
+    isLoadingFilters = false;
 }
 
 async function loadAppointmentFilter(forceReload = false, appointmentType = null)
