@@ -446,7 +446,7 @@ export async function loadExceptionModalFilters(forceReload = false) {
         memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
         
         if (members) {
-            members.filter(m => m.active).forEach(member => {
+            members.filter(m => m.is_active_in_period).forEach(member => {
                 memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
             });
         }
