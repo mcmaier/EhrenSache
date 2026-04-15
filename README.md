@@ -15,6 +15,8 @@ Kostenlos unter AGPL-3.0 nutzbar.
 
 Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder sich eigenverantwortlich anmeldet oder der Schriftführer die Anwesenheit prüft. EhrenSache erfasst Anwesenheit und Entschuldigungen inklusive nachträglicher Korrekturmöglichkeit. 
 
+Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünkltichkeit belohnen wollen.
+
 Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen.
 
 ### Kernfunktionen
@@ -201,7 +203,58 @@ Manager haben eingeschränkten Zugriff:
 
 
 
-Das System unterstützt beliebige IoT-Geräte über die REST API.
+## API-Dokumentation
+
+> [!NOTE]
+> (Work in Progress)
+
+### Authentifizierung
+
+**Web-Login:**
+```
+POST /api/api.php&resource=login
+Body: { "email": "email", "password": "pass" }
+Response: Session-Cookie
+```
+
+**Device-Auth:**
+```
+Header: Authorization: Bearer {token}
+```
+
+### Endpoints (Doku unvollständig!)
+
+**Check-in:**
+```
+POST /api/api.php&resource=totp_checkin
+Body: {
+  "appointment_id": 123,
+  "member_id": 456,
+  "source": "nfc",
+  "totp_code": "123456"
+}
+```
+
+**Termine abrufen:**
+```
+GET /api/api.php&resource=appointments&year=2025
+Response: Array of appointments
+```
+
+**Mitglieder abrufen:**
+```
+GET /api/api.php&resource=members
+Response: Array of members with groups
+```
+
+## Sicherheitshinweise
+
+- **HTTPS erforderlich** für Produktivbetrieb
+- Regelmäßige Updates der Abhängigkeiten
+- Starke Passwörter für Admin-Accounts
+- TOTP-Secrets sicher aufbewahren
+- Device-Tokens niemals im Code hardcoden
+- Backup-Strategie für Datenbank implementieren
 
 ## Entwicklung
 
@@ -275,7 +328,8 @@ Für kommerzielle Nutzung ohne Offenlegungspflicht gemäß AGPL ist eine
 - Du verkaufst EhrenSache-basierte Lösungen
 
 **Lizenzmodelle:**  
-Kontaktieren Sie uns für ein individuelles Angebot.
+Wir bieten flexible Einmal- und Jahreslizenzen, abgestimmt auf Ihr 
+Geschäftsmodell. Kontaktieren Sie uns für ein individuelles Angebot.
 
 ## ©️ Copyright
 

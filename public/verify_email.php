@@ -73,10 +73,10 @@ try {
     );
     $stmt->execute([$tokenHash]);
     
-    $db->commit();        
+    $db->commit();
 
     // Mail-Status prüfen BEVOR User gesucht wird
-    $mailer = new Mailer(getMailConfig(), $db, $database);
+    $mailer = new Mailer(getMailConfig(), $db);
     $mailStatus = $mailer->checkMailStatus();
 
     if (!$mailStatus['enabled']) {
