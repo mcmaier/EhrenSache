@@ -32,6 +32,7 @@ let allFilteredMembers = [];
 
 let currentMembershipDates = [];
 let currentMemberGroups = [];
+let memberFilterInitialized = false;
 
 
 export async function loadMembers(forceReload = false) {
@@ -127,7 +128,10 @@ function renderMembers(members, page = 1) {
     
     pageMembers.forEach(member => {  
         const tr = document.createElement('tr');
-        
+        if (!member.is_active_in_period) {
+            tr.classList.add('row-inactive');
+        }
+
         // Gruppen-Badges erstellen
         const groupBadges = member.group_names 
             ? member.group_names.split(', ').map(name => 
@@ -286,21 +290,60 @@ function updateMemberStats(members)
 }
 
 export async function showMemberSection(forceReload = false, page = 1) {
-
-    debug.log("Show Member Section ()");    
+    debug.log("Show Member Section ()");
 
     const allMembers = await loadMembers(forceReload);
 
+    // Event-Listener einmalig registrieren (Admin/Manager)
+    if (!memberFilterInitialized && isAdminOrManager) {
+        const checkbox = document.getElementById('show_inactive_members');
+        if (checkbox) {
+            checkbox.addEventListener('change', () => showMemberSection(false));
+        }
+        const groupFilter = document.getElementById('filterMemberGroup');
+        if (groupFilter) {
+            groupFilter.addEventListener('change', () => showMemberSection(false));
+        }
+        memberFilterInitialized = true;
+    }
+
+    // Gruppen-Dropdown befüllen (einmalig, wenn noch leer)
+    if (isAdminOrManager) {
+        const groupFilter = document.getElementById('filterMemberGroup');
+        if (groupFilter && groupFilter.options.length <= 1) {
+            groupFilter.innerHTML = '<option value="">Alle Gruppen</option>';
+            dataCache.groups.data.forEach(g => {
+                groupFilter.innerHTML += `<option value="${g.group_id}">${g.group_name}</option>`;
+            });
+        }
+    }
+
     const currentSection = sessionStorage.getItem('currentSection');
-    if(currentSection === 'mitglieder')
-    {
-        renderMembers(allMembers, page);
+    if (currentSection === 'mitglieder') {
+        const showInactive = isAdminOrManager &&
+            document.getElementById('show_inactive_members')?.checked;
+        const selectedGroupId = document.getElementById('filterMemberGroup')?.value;
+
+        let displayMembers = showInactive
+            ? allMembers
+            : allMembers.filter(m => m.is_active_in_period);
+
+        if (selectedGroupId) {
+            displayMembers = displayMembers.filter(m =>
+                m.group_ids_array && m.group_ids_array.includes(parseInt(selectedGroupId))
+            );
+        }
+
+        renderMembers(displayMembers, page);
     }
 }
 
-export function resetMemberFilter()
-{
-    
+export function resetMemberFilter() {
+    const showInactiveEl = document.getElementById('show_inactive_members');
+    if (showInactiveEl) showInactiveEl.checked = false;
+    const groupFilterEl = document.getElementById('filterMemberGroup');
+    if (groupFilterEl) groupFilterEl.value = '';
+    showMemberSection(false);
 }
 
 // ============================================
