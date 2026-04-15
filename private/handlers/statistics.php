@@ -63,6 +63,8 @@ function handleAvailableYears($db, $database, $request_method, $id) {
 
 
 function handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId) {
+    require_once __DIR__ . '/../helpers/member_activity.php';
+
     if ($request_method !== 'GET') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
@@ -223,6 +225,7 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
     $totalExcused = 0;
     $totalUnexcused = 0;
     $totalPossible = 0;
+    $countedAppointmentTypes = [];
 
     foreach ($groups as $gid) {
         // Wenn ein spezifisches Mitglied gewählt wurde, prüfe ob es in dieser Gruppe ist
