@@ -10,9 +10,10 @@
 
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache,currentYear} from './ui.js';
-import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime , updateModalId} from './utils.js';
+import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, getCompatibleAppointments, getCompatibleMembers} from './utils.js';
 import { loadAppointments } from './appointments.js';
 import { loadMembers } from './members.js';
+import { loadTypes } from './management.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
 
@@ -25,6 +26,11 @@ import { globalPaginationValue } from './settings.js';
 let currentExceptionsPage = 1;
 let exceptionsPerPage = 25;
 let allFilteredExceptions = [];
+
+// State für Cross-Filtering im Exception-Modal
+let _exceptionAllMembers = [];
+let _exceptionAllAppointments = [];
+let _exceptionTypes = [];
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -403,53 +409,78 @@ export async function showExceptionSection(forceReload = false) {
 
 }
 
-export async function loadExceptionModalFilters(forceReload = false) {
+function buildExceptionMemberOptions(members) {
+    const select = document.getElementById('exception_member');
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">Bitte wählen...</option>';
+    members.forEach(member => {
+        const opt = document.createElement('option');
+        opt.value = member.member_id;
+        opt.textContent = `${member.surname}, ${member.name}`;
+        select.appendChild(opt);
+    });
+    if (members.some(m => m.member_id == currentVal)) select.value = currentVal;
+}
 
-    const appointments = await loadAppointments(forceReload);
+function buildExceptionAppointmentOptions(appointments) {
+    const select = document.getElementById('exception_appointment');
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">Bitte wählen...</option>';
+    appointments.forEach(appointment => {
+        const date = new Date(appointment.date + 'T00:00:00');
+        const formattedDate = date.toLocaleDateString('de-DE');
+        const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
+        let displayText = `${appointment.title} (${formattedDate} ${startTime})`;
+        if (appointment.type_name) displayText += ` - [${appointment.type_name}]`;
+        const option = document.createElement('option');
+        option.value = appointment.appointment_id;
+        option.textContent = displayText;
+        option.dataset.typeId = appointment.type_id || '';
+        option.dataset.typeName = appointment.type_name || '';
+        select.appendChild(option);
+    });
+    if (appointments.some(a => a.appointment_id == currentVal)) select.value = currentVal;
+}
 
-    const appointmentSelect = document.getElementById('exception_appointment');
-    appointmentSelect.innerHTML = '<option value="">Bitte wählen...</option>';
-    
-    if (appointments) {
-     
-        appointments.forEach(appointment => {
-            const date = new Date(appointment.date + 'T00:00:00');
-            const formattedDate = date.toLocaleDateString('de-DE');
-            const startTime = appointment.start_time ? appointment.start_time.substring(0, 5) : '';
-            
-            // Terminart-Anzeige im Dropdown-Text
-            let displayText = `${appointment.title} (${formattedDate} ${startTime})`;
-            
-            if (appointment.type_name) {
-                displayText += ` - [${appointment.type_name}]`;
-            }
-            
-            // Erstelle Option mit data-Attributen
-            const option = document.createElement('option');
-            option.value = appointment.appointment_id;
-            option.textContent = displayText;
-            
-            // Speichere Type-Daten für Badge-Anzeige
-            option.dataset.typeId = appointment.type_id || '';
-            option.dataset.typeName = appointment.type_name || '';
-            
-            appointmentSelect.appendChild(option);
-        });     
+function onExceptionMemberChange() {
+    const memberSelect = document.getElementById('exception_member');
+    const selectedMember = _exceptionAllMembers.find(m => m.member_id == memberSelect.value);
+    if (!selectedMember) {
+        buildExceptionAppointmentOptions(_exceptionAllAppointments);
+        return;
     }
-    
-    // Lade Mitglieder für Dropdown (nur für Admin)
+    const compatible = getCompatibleAppointments(selectedMember, _exceptionAllAppointments, _exceptionTypes);
+    buildExceptionAppointmentOptions(compatible);
+}
+
+function onExceptionAppointmentChange() {
+    const appointmentSelect = document.getElementById('exception_appointment');
+    const selectedAppointment = _exceptionAllAppointments.find(a => a.appointment_id == appointmentSelect.value);
+    if (!selectedAppointment) {
+        buildExceptionMemberOptions(_exceptionAllMembers);
+        return;
+    }
+    const compatible = getCompatibleMembers(selectedAppointment, _exceptionAllMembers, _exceptionTypes);
+    buildExceptionMemberOptions(compatible);
+}
+
+export async function loadExceptionModalFilters(forceReload = false) {
+    _exceptionTypes = await loadTypes();
+    _exceptionAllAppointments = await loadAppointments(forceReload);
+
+    buildExceptionAppointmentOptions(_exceptionAllAppointments);
+
     if (isAdminOrManager) {
         const members = await loadMembers(forceReload);
+        _exceptionAllMembers = members.filter(m => m.is_active_in_period);
+        buildExceptionMemberOptions(_exceptionAllMembers);
 
-        //const members = await apiCall('members');
         const memberSelect = document.getElementById('exception_member');
-        memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
-        
-        if (members) {
-            members.filter(m => m.is_active_in_period).forEach(member => {
-                memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
-            });
-        }
+        const appointmentSelect = document.getElementById('exception_appointment');
+        memberSelect.removeEventListener('change', onExceptionMemberChange);
+        appointmentSelect.removeEventListener('change', onExceptionAppointmentChange);
+        memberSelect.addEventListener('change', onExceptionMemberChange);
+        appointmentSelect.addEventListener('change', onExceptionAppointmentChange);
     }
 }
 
