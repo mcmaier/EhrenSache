@@ -10,7 +10,7 @@
 
 import { apiCall, isAdminOrManager } from './api.js';
 import { loadGroups } from './management.js';
-import { loadMembers } from './members.js';
+import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, currentYear} from './ui.js';
 import {debug} from '../app.js'
 
@@ -56,15 +56,29 @@ export async function loadStatisticsFilters() {
     const groupSelect = document.getElementById('statGroup');
     if (groupSelect) {
         const currentValue = groupSelect.value;
-        
+
         groupSelect.innerHTML = '<option value="">Alle Gruppen</option>';
         if (groups && groups.length > 0) {
             groups.forEach(group => {
                 groupSelect.innerHTML += `<option value="${group.group_id}">${group.group_name}</option>`;
             });
         }
-        
+
         if (currentValue) groupSelect.value = currentValue;
+
+        // Für non-Admin: nur eigene Gruppen anzeigen
+        const userGroupIds = await getUserGroupIds();
+        if (userGroupIds !== null) {
+            Array.from(groupSelect.options).forEach(opt => {
+                if (opt.value !== '' && !userGroupIds.includes(parseInt(opt.value))) {
+                    opt.remove();
+                }
+            });
+            // Automatisch vorauswählen wenn nur eine Gruppe vorhanden
+            if (!groupSelect.value && groupSelect.options.length === 2) {
+                groupSelect.selectedIndex = 1;
+            }
+        }
     }    
 
     // Grid-Klasse für Layout setzen
