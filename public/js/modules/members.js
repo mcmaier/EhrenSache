@@ -379,7 +379,11 @@ export async function openMemberModal(memberId = null) {
         title.textContent = 'Neues Mitglied';
         document.getElementById('memberForm').reset();
         document.getElementById('member_id').value = '';
-        document.getElementById('member_active').checked = true;
+        const statusEl = document.getElementById('member_active_status');
+        if (statusEl) {
+            statusEl.textContent = 'Aktiv';
+            statusEl.className = 'status-badge status-approved';
+        }
         membershipGroup.style.display = 'none';
         currentMembershipDates = [];
 
@@ -408,7 +412,14 @@ export async function loadMemberData(memberId) {
         document.getElementById('member_name').value = member.name;
         document.getElementById('member_surname').value = member.surname;
         document.getElementById('member_number').value = member.member_number || '';
-        document.getElementById('member_active').checked = member.active == 1;
+        const statusEl = document.getElementById('member_active_status');
+        if (statusEl) {
+            const isActive = member.is_active_in_period;
+            statusEl.textContent = isActive ? 'Aktiv' : 'Inaktiv';
+            statusEl.className = isActive
+                ? 'status-badge status-approved'
+                : 'status-badge status-rejected';
+        }
         // Speichere ausgewählte Gruppen
         currentMemberGroups = member.groups ? member.groups.map(g => g.group_id) : [];
     
@@ -462,7 +473,7 @@ export async function saveMember() {
         name: document.getElementById('member_name').value,
         surname: document.getElementById('member_surname').value,
         member_number: document.getElementById('member_number').value || null,
-        active: document.getElementById('member_active').checked,
+        active: 1,  // Aktivstatus wird über membership_dates gesteuert, nicht direkt
         group_ids: groupIds
     };
     
