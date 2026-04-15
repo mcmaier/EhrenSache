@@ -49,3 +49,14 @@ tbody tr:hover {
     padding: var(--spacing-xxl);
     color: var(--text-light);
 }
+
+/* Inaktive Mitglieder-Zeilen (basierend auf membership_dates) */
+tr.row-inactive td {
+    opacity: 0.45;
+    background-color: var(--bg-gray);
+}
+
+tr.row-inactive:hover td {
+    opacity: 0.65;
+    background-color: var(--bg-light);
+}
