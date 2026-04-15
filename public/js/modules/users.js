@@ -680,28 +680,28 @@ window.toggleMemberEdit = async function() {
 async function loadMembersForEdit(currentMemberId = null) {
 
     try {
-        const members = await apiCall('members', 'GET');
+        const members = await loadMembers();
         const editSelect = document.getElementById('editMemberId');
-        
+
         editSelect.innerHTML = '<option value="">Kein Mitglied</option>';
-        
+
         members.forEach(member => {
             const option = document.createElement('option');
 
-            const memberNumber = member.member_number 
-                ? ` (${member.member_number})` 
+            const memberNumber = member.member_number
+                ? ` (${member.member_number})`
                 : '';
 
             option.value = member.member_id;
             option.textContent = `${member.surname}, ${member.name}${memberNumber}`;
-            
+
             if (currentMemberId && member.member_id === currentMemberId) {
                 option.selected = true;
             }
-            
+
             editSelect.appendChild(option);
         });
-        
+
     } catch (error) {
         console.error('Fehler beim Laden der Mitglieder:', error);
     }
