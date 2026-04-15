@@ -69,11 +69,21 @@ export async function loadMembers(forceReload = false) {
             }
         });
     }
-    else {        
+    else {
         if (userDetails && userDetails.member_id) {
             const member = await apiCall('members', 'GET', null, { id: userDetails.member_id });
             members = member ? [member] : [];
-        } 
+        }
+        // group_ids_array aus group_ids-String berechnen (analog zum Admin-Zweig)
+        members.forEach(member => {
+            if (member.group_ids && typeof member.group_ids === 'string') {
+                member.group_ids_array = member.group_ids
+                    .split(',')
+                    .map(id => parseInt(id.trim()));
+            } else {
+                member.group_ids_array = [];
+            }
+        });
     }     
 
     // Cache für dieses Jahr speichern
@@ -86,6 +96,19 @@ export async function loadMembers(forceReload = false) {
     dataCache.members[year].timestamp = Date.now();
 
     return members;
+}
+
+/**
+ * Gibt die group_ids des eingeloggten Users zurück.
+ * - null  → Admin/Manager (keine Einschränkung)
+ * - []    → User ohne verknüpftes Mitglied oder ohne Gruppen
+ * - [1,3] → User mit diesen Gruppen
+ */
+export async function getUserGroupIds() {
+    if (isAdminOrManager) return null;
+    const members = await loadMembers();
+    if (!members || members.length === 0) return [];
+    return members[0].group_ids_array || [];
 }
 
 // ============================================
