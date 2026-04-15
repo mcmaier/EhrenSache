@@ -113,7 +113,7 @@ export async function updateStatisticsFilters() {
     const allMembers = await loadMembers();
     
     // Filtern nach Gruppe (wenn ausgewählt)
-    let filteredMembers = allMembers.filter(m => m.active);
+    let filteredMembers = allMembers.filter(m => m.is_active_in_period);
     
     if (selectedGroupId && selectedGroupId !== '') {
         filteredMembers = filteredMembers.filter(m => {
