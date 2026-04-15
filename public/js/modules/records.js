@@ -482,8 +482,8 @@ async function loadMemberFilter(forceReload = false, appointmentType = null)
 
     memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
     if (filtered  && filtered .length > 0) {
-        filtered 
-            .filter(m => m.active)
+        filtered
+            .filter(m => m.is_active_in_period)
             .forEach(member => {
                 memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
             });
@@ -524,14 +524,22 @@ export async function applyRecordFilters(forceReload = false, currentPage = 1) {
     // Filtern
     const filteredRecords = filterRecords(allRecords, filters);
 
-    // Rendern (nur wenn auf Records-Section) 
+    // Einträge inaktiver Mitglieder für das gewählte Jahr ausblenden
+    const members = await loadMembers();
+    const activeFilteredRecords = filteredRecords.filter(r => {
+        const member = members.find(m => m.member_id === r.member_id);
+        // Nicht gefundenes Mitglied (z.B. gelöscht) → trotzdem anzeigen
+        return !member || member.is_active_in_period;
+    });
+
+    // Rendern (nur wenn auf Records-Section)
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'anwesenheit') {
-        renderRecords(filteredRecords, currentPage);
+        renderRecords(activeFilteredRecords, currentPage);
         debug.log('Records rendered');
     }
-    
-    //return filteredRecords;    
+
+    //return filteredRecords;
 }
 
 // ============================================
@@ -826,7 +834,7 @@ export async function loadRecordDropdowns() {
     memberSelect.innerHTML = '<option value="">Bitte wählen...</option>';
     
     members
-        .filter(m => m.active)
+        .filter(m => m.is_active_in_period)
         .forEach(member => {
             memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
         });
