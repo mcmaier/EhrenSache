@@ -603,8 +603,12 @@ export async function loadExceptionData(exceptionId) {
             document.getElementById('exception_requested_time').value = mysqlToDatetimeLocal(exception.requested_arrival_time);
         }
         
-        toggleExceptionFields();                  
-        
+        toggleExceptionFields();
+
+        // Mitglied und Termin beim Bearbeiten sperren (wie im Record-Modal)
+        document.getElementById('exception_member').disabled = true;
+        document.getElementById('exception_appointment').disabled = true;
+
         // Bei nicht-pending Status: Felder readonly für User
         if (!isAdminOrManager && exception.status !== 'pending') {
             document.querySelectorAll('#exceptionForm input, #exceptionForm select, #exceptionForm textarea').forEach(field => {
