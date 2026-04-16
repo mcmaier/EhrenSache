@@ -22,7 +22,8 @@ function login($db, $database, $email, $password) {
     if (!$rateLimiter->canAttemptLogin($email, 5, 900)) {
         return [
             "success" => false,
-            "message" => "Zu viele Login-Versuche. Bitte versuchen Sie es in 15 Minuten erneut."
+            "message" => "Zu viele Login-Versuche. Bitte versuchen Sie es in 15 Minuten erneut.",
+            "code"    => "RATE_LIMIT_EXCEEDED"
         ];
     }
         
@@ -33,20 +34,22 @@ function login($db, $database, $email, $password) {
     
     if($user && password_verify($password, $user['password_hash'])) {
         if(!$user['is_active']) {
-            return ["success" => false, "message" => "Account deaktiviert"];
+            return ["success" => false, "message" => "Account deaktiviert", "code" => "ACCOUNT_INACTIVE"];
         }
 
         if ($user['account_status'] === 'suspended') {
             return [
                 "success" => false,
-                "message" => "Account wurde gesperrt"
+                "message" => "Account wurde gesperrt",
+                "code"    => "ACCOUNT_SUSPENDED"
             ];
         }
         
         if ($user['account_status'] === 'pending') {
             return [
                 "success" => false,
-                "message" => "Account wurde noch nicht aktiviert"
+                "message" => "Account wurde noch nicht aktiviert",
+                "code"    => "ACCOUNT_PENDING"
             ];
         }
         
@@ -68,9 +71,9 @@ function login($db, $database, $email, $password) {
             "role" => $user['role']],
             "csrf_token" => $csrfToken 
         ];
-    }    
-    
-    return ["success" => false, "message" => "Ungültige Anmeldedaten"];
+    }
+
+    return ["success" => false, "message" => "Ungültige Anmeldedaten", "code" => "INVALID_CREDENTIALS"];
 }
 
 

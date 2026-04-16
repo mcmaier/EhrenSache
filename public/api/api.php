@@ -228,8 +228,7 @@ if($resource === 'login' && $request_method === 'POST') {
     $data = json_decode(file_get_contents("php://input"));
     $result = login($db, $database, $data->email, $data->password);
     if (!$result['success']) {
-        // Rate-limit-Fehler → 429, alle anderen Fehler → 401
-        $code = (isset($result['message']) && str_contains($result['message'], 'Login-Versuche')) ? 429 : 401;
+        $code = ($result['code'] === 'RATE_LIMIT_EXCEEDED') ? 429 : 401;
         http_response_code($code);
     }
     echo json_encode($result);
