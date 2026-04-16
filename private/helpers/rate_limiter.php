@@ -71,46 +71,46 @@ class RateLimiter {
     
     private function checkDatabase($identifier, $action, $maxAttempts, $windowSeconds) {
         try {
-            // Hash für Datenschutz
             $hashedIdentifier = hash('sha256', $identifier . $action);
-            
-            // Alte Einträge aufräumen (älter als Zeitfenster)
             $cutoffTime = date('Y-m-d H:i:s', time() - $windowSeconds);
-            $cleanupStmt = $this->db->prepare(
+
+            $this->db->beginTransaction();
+
+            // Alte Einträge aufräumen
+            $this->db->prepare(
                 "DELETE FROM {$this->prefix}rate_limits WHERE created_at < ?"
-            );
-            $cleanupStmt->execute([$cutoffTime]);
-            
-            // Aktuelle Versuche zählen
+            )->execute([$cutoffTime]);
+
+            // Aktuellen Zähler lesen – FOR UPDATE sperrt die Zeilen gegen parallele Reads
             $countStmt = $this->db->prepare(
-                "SELECT COUNT(*) as attempt_count 
-                 FROM {$this->prefix}rate_limits 
-                 WHERE identifier = ? 
-                 AND action = ? 
-                 AND created_at >= ?"
+                "SELECT COUNT(*) as attempt_count
+                 FROM {$this->prefix}rate_limits
+                 WHERE identifier = ? AND action = ? AND created_at >= ?
+                 FOR UPDATE"
             );
             $countStmt->execute([$hashedIdentifier, $action, $cutoffTime]);
-            $result = $countStmt->fetch(PDO::FETCH_ASSOC);
-            $currentAttempts = $result['attempt_count'];
-            
-            // Limit erreicht?
+            $currentAttempts = (int)$countStmt->fetchColumn();
+
             if ($currentAttempts >= $maxAttempts) {
+                $this->db->rollBack();
                 error_log("RateLimiter: Limit reached for action '$action': $currentAttempts/$maxAttempts");
                 return false;
             }
-            
+
             // Versuch registrieren
-            $insertStmt = $this->db->prepare(
+            $this->db->prepare(
                 "INSERT INTO {$this->prefix}rate_limits (identifier, action, created_at) VALUES (?, ?, NOW())"
-            );
-            $insertStmt->execute([$hashedIdentifier, $action]);
-            
+            )->execute([$hashedIdentifier, $action]);
+
+            $this->db->commit();
             return true;
-            
+
         } catch (PDOException $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             error_log("RateLimiter DB error: " . $e->getMessage());
-            // Bei DB-Fehler: Erlauben (fail-open, um System nicht zu blockieren)
-            return true;
+            return true; // fail-open
         }
     }
     

@@ -77,44 +77,25 @@ function login($db, $database, $email, $password) {
 }
 
 
-function loginWithToken($db, $database, $email, $password) {    
+function loginWithToken($db, $database, $email, $password) {
 
     $prefix = $database->table('');
 
-    // Rate Limiting Check
-    $ip = $_SERVER['REMOTE_ADDR'];
-    $cacheFile = sys_get_temp_dir() . "/login_attempts_" . md5($ip);
-    $maxAttempts = 10;
-    $resetTime = 300;
-    
-    if (file_exists($cacheFile)) {
-        $fileTime = filemtime($cacheFile);
-
-        if (time() - $fileTime > $resetTime) {
-                unlink($cacheFile); // Altes Limit löschen
-                $attempts = 0;
-            } else {
-                $attempts = (int)file_get_contents($cacheFile);
-                if ($attempts >= $maxAttempts) {
-                    http_response_code(429);
-                    return ["success" => false, "message" => "Zu viele Login-Versuche. Bitte warten Sie 5 Minuten."];
-                }
-            }
-        } 
-        else {
-            $attempts = 0;
-        }
-
-        // Versuch zählen (und Datei mit aktuellem Zeitstempel speichern)
-        $attempts++;
-        file_put_contents($cacheFile, $attempts);
-        touch($cacheFile, time() + $resetTime); // TTL setzen    
+    // Rate Limiting – identisch zum Session-Login (Email-basiert, DB-gespeichert)
+    $rateLimiter = new RateLimiter($db, $database);
+    if (!$rateLimiter->canAttemptLogin($email, 5, 900)) {
+        http_response_code(429);
+        return [
+            "success" => false,
+            "message" => "Zu viele Login-Versuche. Bitte versuchen Sie es in 15 Minuten erneut.",
+            "code"    => "RATE_LIMIT_EXCEEDED"
+        ];
+    }
 
     try {
-        // Hole User aus DB
         $stmt = $db->prepare("
-            SELECT user_id, email, password_hash, role, member_id, api_token, api_token_expires_at, is_active 
-            FROM {$prefix}users 
+            SELECT user_id, email, password_hash, role, member_id, api_token, api_token_expires_at, is_active
+            FROM {$prefix}users
             WHERE email = ?
         ");
         $stmt->execute([$email]);
@@ -122,57 +103,50 @@ function loginWithToken($db, $database, $email, $password) {
 
         if (!$user) {
             http_response_code(401);
-            return ["success" => false, "message" => "Ungültige Anmeldedaten"];
+            return ["success" => false, "message" => "Ungültige Anmeldedaten", "code" => "INVALID_CREDENTIALS"];
         }
 
-        // Prüfe ob Account aktiv
         if (!$user['is_active']) {
             http_response_code(403);
-            return ["success" => false, "message" => "Account ist deaktiviert"];
+            return ["success" => false, "message" => "Account ist deaktiviert", "code" => "ACCOUNT_INACTIVE"];
         }
 
-        // Verifiziere Passwort
         if (!password_verify($password, $user['password_hash'])) {
             http_response_code(401);
-            return ["success" => false, "message" => "Ungültige Anmeldedaten"];
+            return ["success" => false, "message" => "Ungültige Anmeldedaten", "code" => "INVALID_CREDENTIALS"];
         }
 
-        // Gib/Generiere Token
+        // Bei Erfolg: Login-Zähler zurücksetzen
+        $rateLimiter->resetLoginAttempts($email);
+
+        // Token ausstellen oder vorhandenes zurückgeben
         $token = $user['api_token'];
         $tokenExpired = empty($user['api_token_expires_at']) || strtotime($user['api_token_expires_at']) < time();
-                
+
         if (empty($token) || $tokenExpired) {
-        
-            // Generiere neuen Token
             $token = bin2hex(random_bytes(24));
             $expiresAt = date('Y-m-d H:i:s', strtotime('+1 year'));
-            
-            $stmt = $db->prepare("UPDATE {$prefix}users SET api_token = ?, api_token_expires_at = ? WHERE user_id = ?");
-            $stmt->execute([$token, $expiresAt, $user['user_id']]);                    
-        }
-
-        // Bei Erfolg: Reset attempts
-        if (file_exists($cacheFile)) {
-            unlink($cacheFile);
+            $db->prepare("UPDATE {$prefix}users SET api_token = ?, api_token_expires_at = ? WHERE user_id = ?")
+               ->execute([$token, $expiresAt, $user['user_id']]);
         }
 
         http_response_code(200);
         return [
-            "success" => true,
-            "message" => "Login erfolgreich",
-            "token" => $token,            
-            "user" => [
-                "user_id" => (int)$user['user_id'],
-                "email" => $user['email'],
-                "role" => $user['role'],
+            "success"  => true,
+            "message"  => "Login erfolgreich",
+            "token"    => $token,
+            "user"     => [
+                "user_id"   => (int)$user['user_id'],
+                "email"     => $user['email'],
+                "role"      => $user['role'],
                 "member_id" => $user['member_id'] ? (int)$user['member_id'] : null
             ]
         ];
 
-    } catch (PDOException $e) {      
+    } catch (PDOException $e) {
         error_log("Login error: " . $e->getMessage());
         http_response_code(500);
-        return ["success" => false, "message" => "Serverfehler beim Login"];
+        return ["success" => false, "message" => "Serverfehler beim Login", "code" => "SERVER_ERROR"];
     }
 }
 
