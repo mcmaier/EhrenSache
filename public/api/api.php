@@ -319,8 +319,8 @@ if($apiToken) {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
-    // Alte Session-Daten explizit leeren bevor Token-Daten geschrieben werden
-    session_unset();
+    // Nur sicherheitsrelevante Felder überschreiben – verhindert Privilege-Escalation
+    // durch ältere Session-Daten, ohne die gesamte Session (inkl. csrf_token) zu leeren.
     $_SESSION['user_id']   = $authUserId;
     $_SESSION['role']      = $authUserRole;
     $_SESSION['email']     = $tokenUser['email'];

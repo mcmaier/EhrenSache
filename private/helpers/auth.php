@@ -53,6 +53,9 @@ function login($db, $database, $email, $password) {
             ];
         }
         
+        // Login-Zähler zurücksetzen
+        $rateLimiter->resetLoginAttempts($email);
+
         $_SESSION['user_id'] = $user['user_id'];
         $_SESSION['email'] = $user['email'];
         $_SESSION['role'] = $user['role'];

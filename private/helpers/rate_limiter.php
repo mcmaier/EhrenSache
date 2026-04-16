@@ -74,12 +74,12 @@ class RateLimiter {
             $hashedIdentifier = hash('sha256', $identifier . $action);
             $cutoffTime = date('Y-m-d H:i:s', time() - $windowSeconds);
 
-            $this->db->beginTransaction();
-
-            // Alte Einträge aufräumen
+            // Alte Einträge aufräumen (vor der Transaktion – kein Deadlock-Risiko)
             $this->db->prepare(
                 "DELETE FROM {$this->prefix}rate_limits WHERE created_at < ?"
             )->execute([$cutoffTime]);
+
+            $this->db->beginTransaction();
 
             // Aktuellen Zähler lesen – FOR UPDATE sperrt die Zeilen gegen parallele Reads
             $countStmt = $this->db->prepare(
