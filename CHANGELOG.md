@@ -1,0 +1,68 @@
+# Changelog
+
+Alle wesentlichen Änderungen an EhrenSache werden in dieser Datei dokumentiert.
+
+Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
+Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
+
+---
+
+## [1.1.3] – 2026-04-16
+
+### Neu
+- **Update-Wizard** (`/update`): Schritt-für-Schritt Datenbank-Migration ohne Datenverlust
+  - Automatische Erkennung der installierten DB-Version
+  - Tabellen-Prefix-Migration (v1.0.0 → v1.1.x)
+  - `config.php` wird automatisch um Prefix-Feld und `table()`-Methode ergänzt
+  - Migrationsprotokoll mit Warnhinweisen
+  - Wizard sperrt sich nach erfolgter Migration automatisch
+- **Schema-Versionierung**: Tabelle `schema_version` für künftiges Versions-Tracking
+- **Import-Protokollierung**: Neue Tabelle `import_logs`
+- **Terminarten-Zuordnung**: Neue Spalte `appointments.type_id`
+- **Performance**: Zusätzliche Indizes auf `records`, `appointments`, `member_group_assignments`
+- **Dropdown-Querfilterung**: Mitglieder- und Termin-Dropdowns in Record- und Ausnahmen-Modal filtern sich gegenseitig
+- **Mitglieder-Aktivitätsstatus**: Inaktive Mitglieder werden in Listen hervorgehoben, Toggle zum Ein-/Ausblenden
+- **Rollenbasierte Filter**: Statistik- und Terminart-Filter für normale Benutzer auf eigene Gruppen eingeschränkt
+
+### Geändert
+- `system_settings`: ENUM-Wert `appearance` → `public` für Einstellungskategorien
+- Neue Einstellung `privacy_policy_url` in system_settings
+- Mitglieder-Modal: `is_active`-Checkbox durch schreibgeschütztes Status-Badge ersetzt
+- Statistik-Filterung nach Mitgliedschaftszeitraum (jahresbasiert) statt `active`-Flag
+
+### Fixes
+- **Sicherheit**: Direktzugriff auf `private/`-Verzeichnis über HTTP gesperrt (BUG-1)
+- **Authentifizierung**: `Authorization`-Header wird korrekt durch Apache weitergeleitet (BUG-4)
+- **Authentifizierung**: Session-Shadowing bei Token-Authentifizierung verhindert (BUG-4)
+- **Authentifizierung**: Rate Limiting für Token- und Session-Login vereinheitlicht (BUG-5, BUG-6)
+- **Authentifizierung**: Atomare Rate-Limiter-Transaktionen (BUG-5, BUG-6)
+- **Login**: HTTP 401/429 statt 200 bei fehlgeschlagenem Login (BUG-7)
+- **Login**: Expliziter Fehlercode statt String-Matching (BUG-7)
+- **Mitglieder**: Eingabevalidierung ergänzt (BUG-2)
+- **Mitglieder**: PUT verwendet PATCH-Semantik (BUG-2)
+- **Mitglieder**: DELETE in Transaktion mit Deadlock-Behandlung (BUG-3, BUG-9)
+- **Mitglieder**: Aktiv-Voraussetzung für DELETE entfernt (BUG-3, BUG-9)
+- **Ausnahmen**: Eingabevalidierung ergänzt
+- **Dropdowns**: Mitglied-/Termin-Dropdowns filtern nach aktiven Mitgliedschaftszeiträumen
+- **Statistik**: Mitglieder-Dropdown filtert nach aktivem Zeitraum im gewählten Jahr
+- **TOTP**: Geräte-Generierung und Datenbank-Initialisierung für Einstellungen korrigiert
+- **version.php**: Pfad zu `version.json` auf `__DIR__`-basiert umgestellt
+
+---
+
+## [1.0.0] – 2026-01-23
+
+### Erstveröffentlichung
+
+- Mehrstufiges Rollensystem (Admin, Manager, Benutzer, Gerät)
+- Session-basierte Authentifizierung (Web) und Bearer-Token (API/PWA)
+- Terminverwaltung mit Terminarten und Gruppenzuordnung
+- Anwesenheitserfassung (Web, QR-Code, TOTP-Station)
+- Ausnahmenverwaltung (Entschuldigungen, Zeitkorrekturen)
+- Gruppenverwaltung mit M:N-Zuordnung
+- Mitgliederverwaltung mit CSV-Import
+- Statistikauswertung nach Termin, Mitglied und Gruppe
+- Progressive Web App (PWA) für mobilen Check-in
+- TOTP-basierte Standortverifikation für Geräte
+- Installations-Wizard (`/install`)
+- Duales Lizenzmodell (AGPL-3.0 / Kommerziell)

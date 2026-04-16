@@ -8,5 +8,6 @@ private/config/mail_config.php
 private/config/install.lock
 .claude
 docs
+CLAUDE.md
 
 test_credentials.md
