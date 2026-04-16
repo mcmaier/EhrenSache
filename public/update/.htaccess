@@ -1,0 +1,7 @@
+# EhrenSache Update-Assistent
+# Zugriff standardmäßig gesperrt.
+# Zum Aktivieren des Updates diese Datei leeren oder umbenennen.
+# Nach dem Update wird der Zugriff automatisch wieder gesperrt.
+
+Order Deny,Allow
+Deny from all

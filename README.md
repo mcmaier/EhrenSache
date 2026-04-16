@@ -128,6 +128,38 @@ Während der Installation wird ein Admin-Account erstellt.
 
 ---
 
+## Update
+
+### Voraussetzungen
+
+- Datenbankbackup erstellen (wird im Wizard abgefragt, aber vorab erledigen!)
+
+### Update-Prozess
+
+1. Neue Dateien auf den Server hochladen (bestehende Dateien überschreiben).
+
+> [!WARNING]
+> `private/config/config.php` **nicht** überschreiben – sie enthält die Zugangsdaten der Installation!
+
+2. Update-Wizard freischalten: Inhalt von `public/update/.htaccess` leeren oder die Datei löschen.
+
+3. Update-Wizard aufrufen:
+```
+https://ehrensache.meine-domain.de/update
+```
+
+4. Wizard durchlaufen:
+   - **Schritt 1:** Systemprüfung und automatische Versionserkennung
+   - **Schritt 2:** Prefix eingeben (nur bei Update von v1.0.0), Änderungen prüfen, Backup bestätigen
+   - **Schritt 3:** Migration wird ausgeführt, Protokoll wird angezeigt
+
+Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
+
+> [!NOTE]
+> Bei Update von **v1.0.0 → v1.1.x**: Der Wizard ergänzt `config.php` automatisch um das Prefix-Feld und benennt alle Tabellen entsprechend um. Es ist kein manueller Eingriff in die Konfiguration nötig.
+
+---
+
 ## Funktionen
 
 ### Für Administratoren

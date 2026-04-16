@@ -11,7 +11,7 @@
 
 function getVersion()
 {
-    $versionFile ='../../version.json';
+    $versionFile = __DIR__ . '/../../version.json';
     if (!file_exists($versionFile)) {
         http_response_code(500);
         echo json_encode(['error' => 'Version file not found']);
