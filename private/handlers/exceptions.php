@@ -125,6 +125,20 @@ function handleExceptions($db, $database, $method, $id) {
             // User können Anträge erstellen (für sich selbst oder Admin für alle)
             $data = json_decode(file_get_contents("php://input"));
             
+            // Pflichtfeld-Prüfung
+            if (empty($data->member_id ?? null) || empty($data->appointment_id ?? null) ||
+                empty($data->exception_type ?? null) || empty($data->reason ?? null)) {
+                http_response_code(400);
+                echo json_encode(["message" => "member_id, appointment_id, exception_type und reason sind Pflichtfelder"]);
+                return;
+            }
+            // exception_type auf erlaubte Werte prüfen
+            if (!in_array($data->exception_type, ['absence', 'time_correction'])) {
+                http_response_code(400);
+                echo json_encode(["message" => "exception_type muss 'absence' oder 'time_correction' sein"]);
+                return;
+            }
+
             // Prüfe ob User für sich selbst oder Admin für andere
             $requesting_member_id = $data->member_id;
             
@@ -198,12 +212,17 @@ function handleExceptions($db, $database, $method, $id) {
                 }
                 
                 // User Update (nur Reason und requested_arrival_time)
-                $stmt = $db->prepare("UPDATE {$prefix}exceptions 
-                                      SET reason = ?, requested_arrival_time = ? 
+                if (empty($data->reason ?? null)) {
+                    http_response_code(400);
+                    echo json_encode(["message" => "reason ist ein Pflichtfeld"]);
+                    return;
+                }
+                $stmt = $db->prepare("UPDATE {$prefix}exceptions
+                                      SET reason = ?, requested_arrival_time = ?
                                       WHERE exception_id = ?");
                 $stmt->execute([
-                    $data->reason, 
-                    $data->requested_arrival_time ?? null, 
+                    $data->reason,
+                    $data->requested_arrival_time ?? null,
                     $id
                 ]);
             } else {

@@ -250,6 +250,13 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                 }
             }
 
+            // Pflichtfeld-Prüfung
+            if (empty($cleanData->name ?? null) || empty($cleanData->surname ?? null)) {
+                http_response_code(400);
+                echo json_encode(["message" => "name und surname sind Pflichtfelder"]);
+                break;
+            }
+
             // Prüfe ob member_number bereits existiert (falls angegeben)
             if(isset($cleanData->member_number) && !empty($cleanData->member_number)) {
                 $checkStmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_number = ?");
@@ -288,53 +295,73 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
 
             $data = json_decode(file_get_contents("php://input"));
 
-            // Nur erlaubte Felder extrahieren
+            // Erlaubte Felder
             $allowedFields = ['name', 'surname', 'member_number', 'active', 'group_ids'];
             $cleanData = new stdClass();
-            foreach($allowedFields as $field) {
-                if(isset($data->$field)) {
+            foreach ($allowedFields as $field) {
+                if (isset($data->$field)) {
                     $cleanData->$field = $data->$field;
                 }
             }
 
-            //Prüfe ob member_number bereits von anderem Mitglied verwendet wird
-            if(isset($cleanData->member_number) && !empty($cleanData->member_number)) {
-                $checkStmt = $db->prepare("SELECT member_id FROM {$prefix}members 
-                                        WHERE member_number = ? AND member_id != ?");
+            // member_number-Duplikat prüfen (wenn angegeben)
+            if (isset($cleanData->member_number) && !empty($cleanData->member_number)) {
+                $checkStmt = $db->prepare("SELECT member_id FROM {$prefix}members
+                                           WHERE member_number = ? AND member_id != ?");
                 $checkStmt->execute([$cleanData->member_number, $id]);
-                if($checkStmt->fetch()) {
+                if ($checkStmt->fetch()) {
                     http_response_code(409);
-                    echo json_encode([
-                        "message" => "Diese Mitgliedsnummer ist bereits vergeben",
-                        "field" => "member_number"
-                    ]);
+                    echo json_encode(["message" => "Diese Mitgliedsnummer ist bereits vergeben", "field" => "member_number"]);
                     break;
                 }
             }
 
+            // Dynamisches UPDATE: nur gelieferte Felder
+            $updatable = ['name', 'surname', 'member_number', 'active'];
+            $setParts  = [];
+            $params    = [];
+            foreach ($updatable as $field) {
+                if (isset($cleanData->$field)) {
+                    $setParts[] = "$field = ?";
+                    $params[]   = ($field === 'member_number' && empty($cleanData->$field)) ? null : $cleanData->$field;
+                }
+            }
 
-            $stmt = $db->prepare("UPDATE {$prefix}members SET name=?, surname=?, member_number=?, 
-                                  active=? WHERE member_id=?");
-            if($stmt->execute([$cleanData->name, $cleanData->surname, $cleanData->member_number ?? null, 
-                               $cleanData->active, $id])) {
-                // Aktualisiere Gruppen-Zuordnungen
-                if(isset($cleanData->group_ids)) {
-                    // Lösche alte Zuordnungen
-                    $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
-                    
-                    // Füge neue Zuordnungen hinzu
-                    if(is_array($cleanData->group_ids)) {
-                        $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-                        foreach($cleanData->group_ids as $groupId) {
-                            $groupStmt->execute([$id, $groupId]);
-                        }
+            if (empty($setParts) && !isset($cleanData->group_ids)) {
+                http_response_code(400);
+                echo json_encode(["message" => "Keine gültigen Felder zum Aktualisieren angegeben"]);
+                break;
+            }
+
+            if (!empty($setParts)) {
+                $params[] = $id;
+                $stmt = $db->prepare("UPDATE {$prefix}members SET " . implode(', ', $setParts) . " WHERE member_id = ?");
+                $stmt->execute($params);
+
+                if ($stmt->rowCount() === 0) {
+                    // Prüfen ob member existiert
+                    $exists = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ?");
+                    $exists->execute([$id]);
+                    if (!$exists->fetch()) {
+                        http_response_code(404);
+                        echo json_encode(["message" => "Member not found"]);
+                        break;
                     }
                 }
-                echo json_encode(["message" => "Member updated"]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["message" => "Failed to update member"]);
             }
+
+            // Gruppen-Zuordnungen aktualisieren (wenn group_ids geliefert)
+            if (isset($cleanData->group_ids)) {
+                $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
+                if (is_array($cleanData->group_ids)) {
+                    $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
+                    foreach ($cleanData->group_ids as $groupId) {
+                        $groupStmt->execute([$id, $groupId]);
+                    }
+                }
+            }
+
+            echo json_encode(["message" => "Member updated"]);
             break;
             
         case 'DELETE':
