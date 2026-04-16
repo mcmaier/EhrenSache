@@ -367,34 +367,49 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
         case 'DELETE':
             requireAdminOrManager();
 
-            // Nur inaktive Mitglieder löschen
-            $checkStmt = $db->prepare("SELECT active FROM {$prefix}members WHERE member_id = ?");
-            $checkStmt->execute([$id]);
-            $member = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if($member && $member['active'] == 1) {
+            if (!$id) {
                 http_response_code(400);
-                echo json_encode([
-                    "message" => "Aktives Mitglied zuerst deaktivieren."
-                ]);
+                echo json_encode(["message" => "id ist erforderlich"]);
                 break;
             }
 
-            // Lösche zuerst abhängige Datensätze
-            $db->prepare("DELETE FROM {$prefix}records WHERE member_id = ?")->execute([$id]);
-            $db->prepare("DELETE FROM {$prefix}exceptions WHERE member_id = ?")->execute([$id]);
-            $db->prepare("DELETE FROM {$prefix}membership_dates WHERE member_id = ?")->execute([$id]);
-            $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
+            // Existenz prüfen
+            $checkStmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ?");
+            $checkStmt->execute([$id]);
+            if (!$checkStmt->fetch()) {
+                http_response_code(404);
+                echo json_encode(["message" => "Member not found"]);
+                break;
+            }
 
-            $db->prepare("UPDATE {$prefix}users SET member_id = NULL WHERE member_id = ?")->execute([$id]);
-            
-            // Dann das Mitglied selbst
-            $stmt = $db->prepare("DELETE FROM {$prefix}members WHERE member_id = ?");
-            if($stmt->execute([$id])) {
+            // Hinweis: active-Prüfung entfernt – Mitgliedschaftszeiträume verwalten
+            // den Aktivstatus; die Löschbestätigung im Frontend ist ausreichend.
+
+            try {
+                $db->beginTransaction();
+
+                $db->prepare("DELETE FROM {$prefix}records                  WHERE member_id = ?")->execute([$id]);
+                $db->prepare("DELETE FROM {$prefix}exceptions               WHERE member_id = ?")->execute([$id]);
+                $db->prepare("DELETE FROM {$prefix}membership_dates         WHERE member_id = ?")->execute([$id]);
+                $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
+                $db->prepare("UPDATE {$prefix}users SET member_id = NULL    WHERE member_id = ?")->execute([$id]);
+                $db->prepare("DELETE FROM {$prefix}members                  WHERE member_id = ?")->execute([$id]);
+
+                $db->commit();
+
                 echo json_encode(["message" => "Member and all associated data deleted"]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["message" => "Failed to delete member"]);
+
+            } catch (PDOException $e) {
+                $db->rollBack();
+                // Deadlock (1213) oder Lock-Timeout (1205): Client kann sofort wiederholen
+                $isDeadlock = in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
+                http_response_code($isDeadlock ? 503 : 500);
+                echo json_encode([
+                    "message" => $isDeadlock
+                        ? "Temporärer Datenbankkonflikt. Bitte erneut versuchen."
+                        : "Fehler beim Löschen des Mitglieds",
+                ]);
+                error_log("DELETE member $id failed: " . $e->getMessage());
             }
             break;
     }
