@@ -1,0 +1,13 @@
+# Export-Einstellungen für GitHub-Archiv-Downloads (git archive / GitHub ZIP)
+# Dateien mit export-ignore werden im automatischen ZIP-Download nicht enthalten.
+
+# Entwicklungs- und CI-Dateien
+.gitattributes              export-ignore
+.gitignore                  export-ignore
+CLAUDE.md                   export-ignore
+test_credentials.md         export-ignore
+docs/                       export-ignore
+temporary_screenshots/      export-ignore
+
+# Migrations-Testdateien (Prefix _)
+private/migrations/_*       export-ignore
