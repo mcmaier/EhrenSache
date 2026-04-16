@@ -1,0 +1,3 @@
+# private/.htaccess
+# Blockiert jeden direkten HTTP-Zugriff auf dieses Verzeichnis
+Require all denied
