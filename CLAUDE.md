@@ -131,7 +131,7 @@ Hilfsfunktionen in `private/helpers/auth.php`: `isAdmin()`, `isManager()`, `isDe
 ## Caching (Frontend)
 
 - Speicher: `localStorage`
-- Schlüssel-Schema: `appointments_<year>`, `records_<year>`, `members`, `groups`
+- Schlüssel-Schema: `appointments_<year>`, `records_<year>`, `members_<year>`, `groups`
 - Termine/Anwesenheiten werden jahresweise gecacht
 - Mitglieder/Gruppen global gecacht
 - Invalidierung über Event-System bei Datenänderungen
@@ -172,9 +172,9 @@ Hilfsfunktionen in `private/helpers/auth.php`: `isAdmin()`, `isManager()`, `isDe
 
 ## Offene Aufgaben (ToDo)
 
-- Aktiv/Inaktiv-Zeiträume im Frontend integrieren
-- Mitgliederliste: Jahresfilter + Inaktive ein-/ausblenden (Admin)
-- Bug: Dropdowns Records/Exceptions nicht gegenseitig gefiltert → unerlaubte Records möglich
+- Testing und Validierung
+- Exceptions nur erlauben, wenn kein Record vorliegt
+- Beim Anlegen eines Records eines Mitglieds auf parallele Exceptions prüfen (Fehlerbehandlung definieren!)
 
 ## Geplante Features
 
