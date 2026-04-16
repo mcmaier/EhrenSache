@@ -31,6 +31,10 @@ Options -Indexes
     Require all denied
 </Files>
 
+# Authorization-Header an PHP durchreichen (XAMPP/Apache strippt ihn sonst)
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # ============================================
 # INDEX Rewrite
 # ============================================

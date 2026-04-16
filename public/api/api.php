@@ -308,21 +308,22 @@ if($apiToken) {
     }
     
     $isTokenAuth = true;
-    $authUserId = intval($tokenUser['user_id']);
+    $authUserId   = intval($tokenUser['user_id']);
     $authUserRole = $tokenUser['role'];
     $authMemberId = $tokenUser['member_id'] ? intval($tokenUser['member_id']) : null;
-    
-    //error_log("Token Auth: SUCCESS - User ID: $authUserId, Role: $authUserRole, Member ID: " . ($authMemberId ?? 'NULL'));
 
-    // Session für Token-Auth NICHT starten, aber Variablen setzen für Kompatibilität
-    // (Falls Code $_SESSION abfragt, auch wenn es Token-Auth ist)
+    // Für Kompatibilität mit auth-Hilfsfunktionen (isAdmin(), isAdminOrManager() etc.)
+    // die $_SESSION['role'] lesen: Session starten und mit Token-Daten befüllen.
+    // Vorhandene Session dabei IMMER überschreiben, damit keine alte Admin-Session
+    // die Rechte des Token-Users ausweitet.
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
-    
-    $_SESSION['user_id'] = $authUserId;
-    $_SESSION['role'] = $authUserRole;
-    $_SESSION['email'] = $tokenUser['email'];
+    // Alte Session-Daten explizit leeren bevor Token-Daten geschrieben werden
+    session_unset();
+    $_SESSION['user_id']   = $authUserId;
+    $_SESSION['role']      = $authUserRole;
+    $_SESSION['email']     = $tokenUser['email'];
     $_SESSION['logged_in'] = true;
     $_SESSION['auth_type'] = 'token';
 } else {
