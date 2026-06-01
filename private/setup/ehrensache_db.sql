@@ -156,7 +156,8 @@ DEALLOCATE PREPARE stmt;
 --
 SET @sql = 'ALTER TABLE `{PREFIX}users` ADD CONSTRAINT `{PREFIX}users_ibfk_pending` FOREIGN KEY (`pending_member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE SET NULL';
 SET @exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}users' AND CONSTRAINT_NAME = '{PREFIX}users_ibfk_pending');
-PREPARE stmt FROM IF(@exists = 0, @sql, 'SELECT 1');
+SET @prep_sql = IF(@exists = 0, @sql, 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
@@ -169,7 +170,8 @@ SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAI
     WHERE CONSTRAINT_SCHEMA = DATABASE() 
     AND TABLE_NAME = '{PREFIX}appointments'
     AND CONSTRAINT_NAME = '{PREFIX}appointments_ibfk_1');
-PREPARE stmt FROM IF(@constraint_exists = 0, @sql, 'SELECT 1');
+SET @prep_sql = IF(@constraint_exists = 0, @sql, 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
@@ -178,25 +180,29 @@ DEALLOCATE PREPARE stmt;
 --
 SET @sql1 = 'ALTER TABLE `{PREFIX}exceptions` ADD CONSTRAINT `{PREFIX}exceptions_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE CASCADE';
 SET @exists1 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}exceptions' AND CONSTRAINT_NAME = '{PREFIX}exceptions_ibfk_1');
-PREPARE stmt1 FROM IF(@exists1 = 0, @sql1, 'SELECT 1');
+SET @prep_sql = IF(@exists1 = 0, @sql1, 'SELECT 1');
+PREPARE stmt1 FROM @prep_sql;
 EXECUTE stmt1;
 DEALLOCATE PREPARE stmt1;
 
 SET @sql2 = 'ALTER TABLE `{PREFIX}exceptions` ADD CONSTRAINT `{PREFIX}exceptions_ibfk_2` FOREIGN KEY (`appointment_id`) REFERENCES `{PREFIX}appointments` (`appointment_id`) ON DELETE CASCADE';
 SET @exists2 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}exceptions' AND CONSTRAINT_NAME = '{PREFIX}exceptions_ibfk_2');
-PREPARE stmt2 FROM IF(@exists2 = 0, @sql2, 'SELECT 1');
+SET @prep_sql = IF(@exists2 = 0, @sql2, 'SELECT 1');
+PREPARE stmt2 FROM @prep_sql;
 EXECUTE stmt2;
 DEALLOCATE PREPARE stmt2;
 
 SET @sql3 = 'ALTER TABLE `{PREFIX}exceptions` ADD CONSTRAINT `{PREFIX}exceptions_ibfk_3` FOREIGN KEY (`created_by`) REFERENCES `{PREFIX}users` (`user_id`) ON DELETE CASCADE';
 SET @exists3 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}exceptions' AND CONSTRAINT_NAME = '{PREFIX}exceptions_ibfk_3');
-PREPARE stmt3 FROM IF(@exists3 = 0, @sql3, 'SELECT 1');
+SET @prep_sql = IF(@exists3 = 0, @sql3, 'SELECT 1');
+PREPARE stmt3 FROM @prep_sql;
 EXECUTE stmt3;
 DEALLOCATE PREPARE stmt3;
 
 SET @sql4 = 'ALTER TABLE `{PREFIX}exceptions` ADD CONSTRAINT `{PREFIX}exceptions_ibfk_4` FOREIGN KEY (`approved_by`) REFERENCES `{PREFIX}users` (`user_id`) ON DELETE SET NULL';
 SET @exists4 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}exceptions' AND CONSTRAINT_NAME = '{PREFIX}exceptions_ibfk_4');
-PREPARE stmt4 FROM IF(@exists4 = 0, @sql4, 'SELECT 1');
+SET @prep_sql = IF(@exists4 = 0, @sql4, 'SELECT 1');
+PREPARE stmt4 FROM @prep_sql;
 EXECUTE stmt4;
 DEALLOCATE PREPARE stmt4;
 
@@ -205,7 +211,8 @@ DEALLOCATE PREPARE stmt4;
 --
 SET @sql = 'ALTER TABLE `{PREFIX}membership_dates` ADD CONSTRAINT `{PREFIX}membership_dates_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE CASCADE';
 SET @exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}membership_dates' AND CONSTRAINT_NAME = '{PREFIX}membership_dates_ibfk_1');
-PREPARE stmt FROM IF(@exists = 0, @sql, 'SELECT 1');
+SET @prep_sql = IF(@exists = 0, @sql, 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
@@ -214,13 +221,15 @@ DEALLOCATE PREPARE stmt;
 --
 SET @sql1 = 'ALTER TABLE `{PREFIX}records` ADD CONSTRAINT `{PREFIX}records_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE CASCADE';
 SET @exists1 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND CONSTRAINT_NAME = '{PREFIX}records_ibfk_1');
-PREPARE stmt1 FROM IF(@exists1 = 0, @sql1, 'SELECT 1');
+SET @prep_sql = IF(@exists1 = 0, @sql1, 'SELECT 1');
+PREPARE stmt1 FROM @prep_sql;
 EXECUTE stmt1;
 DEALLOCATE PREPARE stmt1;
 
 SET @sql2 = 'ALTER TABLE `{PREFIX}records` ADD CONSTRAINT `{PREFIX}records_ibfk_2` FOREIGN KEY (`appointment_id`) REFERENCES `{PREFIX}appointments` (`appointment_id`) ON DELETE CASCADE';
 SET @exists2 = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND CONSTRAINT_NAME = '{PREFIX}records_ibfk_2');
-PREPARE stmt2 FROM IF(@exists2 = 0, @sql2, 'SELECT 1');
+SET @prep_sql = IF(@exists2 = 0, @sql2, 'SELECT 1');
+PREPARE stmt2 FROM @prep_sql;
 EXECUTE stmt2;
 DEALLOCATE PREPARE stmt2;
 
@@ -229,7 +238,8 @@ DEALLOCATE PREPARE stmt2;
 --
 SET @sql = 'ALTER TABLE `{PREFIX}users` ADD CONSTRAINT `{PREFIX}users_ibfk_member_id1` FOREIGN KEY (`member_id`) REFERENCES `{PREFIX}members` (`member_id`) ON DELETE SET NULL';
 SET @exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}users' AND CONSTRAINT_NAME = '{PREFIX}users_ibfk_member_id1');
-PREPARE stmt FROM IF(@exists = 0, @sql, 'SELECT 1');
+SET @prep_sql = IF(@exists = 0, @sql, 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
@@ -299,27 +309,32 @@ DEALLOCATE PREPARE stmt;
 
 -- Zusätzliche Indizes nur hinzufügen wenn nicht vorhanden
 SET @idx1 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND INDEX_NAME = '{PREFIX}idx_member_year');
-PREPARE stmt FROM IF(@idx1 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX {PREFIX}idx_member_year (member_id, arrival_time)', 'SELECT 1');
+SET @prep_sql = IF(@idx1 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX {PREFIX}idx_member_year (member_id, arrival_time)', 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @idx2 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND INDEX_NAME = '{PREFIX}idx_year');
-PREPARE stmt FROM IF(@idx2 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX {PREFIX}idx_year (arrival_time)', 'SELECT 1');
+SET @prep_sql = IF(@idx2 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX {PREFIX}idx_year (arrival_time)', 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @idx3 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}appointments' AND INDEX_NAME = '{PREFIX}idx_year');
-PREPARE stmt FROM IF(@idx3 = 0, 'ALTER TABLE `{PREFIX}appointments` ADD INDEX {PREFIX}idx_year (date)', 'SELECT 1');
+SET @prep_sql = IF(@idx3 = 0, 'ALTER TABLE `{PREFIX}appointments` ADD INDEX {PREFIX}idx_year (date)', 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @idx4 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}member_group_assignments' AND INDEX_NAME = '{PREFIX}idx_member');
-PREPARE stmt FROM IF(@idx4 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX {PREFIX}idx_member (member_id)', 'SELECT 1');
+SET @prep_sql = IF(@idx4 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX {PREFIX}idx_member (member_id)', 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @idx5 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}member_group_assignments' AND INDEX_NAME = '{PREFIX}idx_group');
-PREPARE stmt FROM IF(@idx5 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX {PREFIX}idx_group (group_id)', 'SELECT 1');
+SET @prep_sql = IF(@idx5 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX {PREFIX}idx_group (group_id)', 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
