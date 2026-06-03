@@ -145,7 +145,7 @@ SET @check_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
     AND CONSTRAINT_NAME = '{PREFIX}check_device_email');
 
 SET @sql = IF(@check_exists = 0,
-    'ALTER TABLE `{PREFIX}users` ADD CONSTRAINT {PREFIX}check_device_email CHECK ((role = ''device'' AND email IS NULL) OR (role != ''device'' AND email IS NOT NULL))',
+    'ALTER TABLE `{PREFIX}users` ADD CONSTRAINT `{PREFIX}check_device_email` CHECK ((role = ''device'' AND email IS NULL) OR (role != ''device'' AND email IS NOT NULL))',
     'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
@@ -309,31 +309,31 @@ DEALLOCATE PREPARE stmt;
 
 -- Zusätzliche Indizes nur hinzufügen wenn nicht vorhanden
 SET @idx1 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND INDEX_NAME = '{PREFIX}idx_member_year');
-SET @prep_sql = IF(@idx1 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX {PREFIX}idx_member_year (member_id, arrival_time)', 'SELECT 1');
+SET @prep_sql = IF(@idx1 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX `{PREFIX}idx_member_year` (member_id, arrival_time)', 'SELECT 1');
 PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @idx2 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND INDEX_NAME = '{PREFIX}idx_year');
-SET @prep_sql = IF(@idx2 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX {PREFIX}idx_year (arrival_time)', 'SELECT 1');
+SET @prep_sql = IF(@idx2 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX `{PREFIX}idx_year` (arrival_time)', 'SELECT 1');
 PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @idx3 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}appointments' AND INDEX_NAME = '{PREFIX}idx_year');
-SET @prep_sql = IF(@idx3 = 0, 'ALTER TABLE `{PREFIX}appointments` ADD INDEX {PREFIX}idx_year (date)', 'SELECT 1');
+SET @prep_sql = IF(@idx3 = 0, 'ALTER TABLE `{PREFIX}appointments` ADD INDEX `{PREFIX}idx_year` (date)', 'SELECT 1');
 PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @idx4 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}member_group_assignments' AND INDEX_NAME = '{PREFIX}idx_member');
-SET @prep_sql = IF(@idx4 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX {PREFIX}idx_member (member_id)', 'SELECT 1');
+SET @prep_sql = IF(@idx4 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX `{PREFIX}idx_member` (member_id)', 'SELECT 1');
 PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 SET @idx5 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}member_group_assignments' AND INDEX_NAME = '{PREFIX}idx_group');
-SET @prep_sql = IF(@idx5 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX {PREFIX}idx_group (group_id)', 'SELECT 1');
+SET @prep_sql = IF(@idx5 = 0, 'ALTER TABLE `{PREFIX}member_group_assignments` ADD INDEX `{PREFIX}idx_group` (group_id)', 'SELECT 1');
 PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
