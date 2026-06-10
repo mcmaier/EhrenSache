@@ -72,11 +72,17 @@ $id = $_GET['id'] ?? null;
 // 4. SESSION-START (nur wo nötig)
 // ============================================
 
+// Secure-Flag nur über HTTPS setzen; berücksichtigt auch TLS-Terminierung am Proxy (Shared Hosting)
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+        || (($_SERVER['SERVER_PORT'] ?? null) == 443);
+
 // Session-Konfiguration (nur wenn Session gestartet wird)
 ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_secure', 1);
+ini_set('session.cookie_secure', $isHttps ? 1 : 0);   // war: fix 1
 ini_set('session.cookie_samesite', 'Lax');
 ini_set('session.use_strict_mode', 1);
+
 
 // Liste der Endpoints die Session brauchen (ohne Token)
 $sessionEndpoints = ['login', 'logout', 'register'];
