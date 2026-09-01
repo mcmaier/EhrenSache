@@ -230,7 +230,8 @@ function fillWorktimeFilters() {
 
     const memberSelect = document.getElementById('filterWorktimeMember');
     if (memberSelect && isAdminOrManager) {
-        const members = dataCache.members?.data || [];
+        // Der Members-Cache ist jahresbasiert: dataCache.members[jahr].data
+        const members = dataCache.members?.[currentYear]?.data || [];
         const current = memberSelect.value;
         memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>'
             + members.map(m =>
@@ -321,7 +322,8 @@ export async function openWorkSessionModal(sessionId = null) {
 
     if (isAdminOrManager && memberSelect) {
         memberGroup.style.display = '';
-        const members = dataCache.members?.data || [];
+        // Der Members-Cache ist jahresbasiert: dataCache.members[jahr].data
+        const members = dataCache.members?.[currentYear]?.data || [];
         memberSelect.innerHTML = members.map(m =>
             `<option value="${m.member_id}">${escapeHtml(m.surname)}, ${escapeHtml(m.name)}</option>`).join('');
     } else if (memberGroup) {
