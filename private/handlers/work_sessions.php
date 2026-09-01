@@ -125,7 +125,7 @@ function workSessionsGet($db, $database, $id, $authUserRole, $authMemberId) {
             echo json_encode(null);
             return;
         }
-        $running = getRunningSession($db, $database, (int)$authMemberId);
+        $running = getRunningSessionChecked($db, $database, (int)$authMemberId, null);
         echo json_encode($running === null ? null : withDuration($running));
         return;
     }
@@ -250,8 +250,9 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
         $appointmentId = (int)$data->appointment_id;
     }
 
-    // Bereits laufende Sitzung?
-    $running = getRunningSession($db, $database, $memberId);
+    // Bereits laufende Sitzung? Eine ueberfaellige wird dabei geschlossen,
+    // damit ein vergessener Stopp den naechsten Start nicht blockiert.
+    $running = getRunningSessionChecked($db, $database, $memberId, $authUserId);
     if($running !== null) {
         http_response_code(409);
         echo json_encode([
@@ -319,7 +320,7 @@ function workSessionRequireRunning($db, $database, $data, $authMemberId) {
         return null;
     }
 
-    $running = getRunningSession($db, $database, $memberId);
+    $running = getRunningSessionChecked($db, $database, $memberId, null);
     if($running === null) {
         http_response_code(409);
         echo json_encode(["message" => "No running session"]);
@@ -611,6 +612,22 @@ function workSessionDelete($db, $database, $id, $authUserId) {
     $db->prepare("DELETE FROM {$prefix}work_sessions WHERE session_id = ?")->execute([$id]);
 
     echo json_encode(["message" => "Session deleted"]);
+}
+
+/**
+ * Wie getRunningSession(), schliesst aber eine ueberfaellige Sitzung zuvor ab.
+ * Der Aufruf gehoert an jeden Einstiegspunkt, an dem das Mitglied aktiv wird —
+ * ein Cronjob ist nicht noetig, weil eine vergessene Sitzung erst dann
+ * relevant wird, wenn jemand wieder etwas tut.
+ */
+function getRunningSessionChecked($db, $database, $memberId, $authUserId) {
+    $running = getRunningSession($db, $database, (int)$memberId);
+
+    if($running !== null && closeStaleSession($db, $database, $running, $authUserId)) {
+        return null;
+    }
+
+    return $running;
 }
 
 ?>

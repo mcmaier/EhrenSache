@@ -222,3 +222,36 @@ function withDuration(array $session): array
 
     return $session;
 }
+
+/**
+ * Schließt eine überfällige Sitzung: gekappt auf start_time + Obergrenze,
+ * Status auf 'submitted', damit sie beim Mitglied zur Korrektur und beim
+ * Manager zur Freigabe landet statt automatisch zu zählen.
+ *
+ * @param array<string, mixed> $session
+ * @return bool true, wenn geschlossen wurde
+ */
+function closeStaleSession($db, $database, array $session, ?int $userId): bool
+{
+    $maxHours = (int) worktimeSetting($db, $database, 'worktime_max_session_hours', '12');
+
+    if ($maxHours <= 0 || !isSessionStale($session, $maxHours, time())) {
+        return false;
+    }
+
+    $prefix  = $database->table('');
+    $endTime = staleEndTime((string) $session['start_time'], $maxHours);
+
+    $db->prepare("UPDATE {$prefix}work_sessions
+                  SET end_time = ?, break_started_at = NULL, status = 'submitted'
+                  WHERE session_id = ? AND end_time IS NULL")
+       ->execute([$endTime, $session['session_id']]);
+
+    logSessionChange($db, $database, (int) $session['session_id'], $userId, 'update', [
+        'auto_closed' => ['old' => null, 'new' => true],
+        'end_time'    => ['old' => null, 'new' => $endTime],
+        'status'      => ['old' => $session['status'], 'new' => 'submitted'],
+    ]);
+
+    return true;
+}
