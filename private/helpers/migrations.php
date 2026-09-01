@@ -124,3 +124,37 @@ function resolveMigrationChain(string $from, string $to, array $manifest): array
 
     return $chain;
 }
+
+/** Legt die schema_version-Tabelle an, falls sie fehlt. */
+function ensureSchemaVersionTable(PDO $pdo, string $prefix): void
+{
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `{$prefix}schema_version` (
+            `version`    VARCHAR(20) NOT NULL,
+            `applied_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`version`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+}
+
+/** Trägt eine erreichte Version ein. Mehrfachaufruf ist folgenlos. */
+function stampSchemaVersion(PDO $pdo, string $prefix, string $version): void
+{
+    $stmt = $pdo->prepare(
+        "INSERT IGNORE INTO `{$prefix}schema_version` (`version`) VALUES (?)"
+    );
+    $stmt->execute([$version]);
+}
+
+/**
+ * Liest alle eingetragenen Versionen.
+ *
+ * @return array<int, string>
+ */
+function readSchemaVersions(PDO $pdo, string $prefix): array
+{
+    $rows = $pdo->query("SELECT version FROM `{$prefix}schema_version`")
+                ->fetchAll(PDO::FETCH_COLUMN);
+
+    return is_array($rows) ? $rows : [];
+}

@@ -258,19 +258,8 @@ function migrate_1_0_0(PDO $pdo, string $prefix, string $configPath): array
         $warn[] = "config.php konnte nicht gelesen werden – bitte manuell aktualisieren";
     }
 
-    // ----------------------------------------------------------------
-    // Schritt 8: Schema-Versions-Tabelle anlegen und Version eintragen
-    // ----------------------------------------------------------------
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS `{$prefix}schema_version` (
-            `version`    VARCHAR(20) NOT NULL,
-            `applied_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`version`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-    $pdo->exec("INSERT IGNORE INTO `{$prefix}schema_version` (`version`) VALUES ('1.0.0')");
-    $pdo->exec("INSERT IGNORE INTO `{$prefix}schema_version` (`version`) VALUES ('1.1.3')");
-    $log[] = "Schema-Version auf <strong>1.1.3</strong> gesetzt";
+    // Der Versionsstempel wird vom Aufrufer gesetzt (public/update/index.php),
+    // damit ihn nicht jede Migration einzeln setzen muss.
 
     return ['log' => $log, 'warnings' => $warn];
 }
