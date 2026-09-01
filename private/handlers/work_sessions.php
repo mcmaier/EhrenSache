@@ -557,11 +557,18 @@ function workSessionCreateManual($db, $database, $data, $authUserId, $authMember
         $appointmentId = (int)$data->appointment_id;
     }
 
-    // Manuelle Eintraege gelten erst nach Freigabe.
+    // Manuelle Eintraege gelten erst nach Freigabe — es sei denn, die freigebende
+    // Instanz legt sie selbst an. Manager und Admin muessen sich nicht selbst
+    // genehmigen; dieselbe Regel gilt bereits fuer ihre Aenderungen.
+    $isApprover = isAdminOrManager();
+    $source     = $isApprover ? 'admin' : 'manual';
+    $status     = $isApprover ? 'confirmed' : 'submitted';
+
     $stmt = $db->prepare("INSERT INTO {$prefix}work_sessions
                           (member_id, activity_id, appointment_id, start_time, end_time,
-                           break_minutes, note, status, source, created_by)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, 'submitted', 'manual', ?)");
+                           break_minutes, note, status, source, created_by,
+                           approved_by, approved_at)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([
         $memberId,
         (int)$input['activity_id'],
@@ -570,12 +577,17 @@ function workSessionCreateManual($db, $database, $data, $authUserId, $authMember
         date('Y-m-d H:i:s', strtotime((string)$input['end_time'])),
         (int)$input['break_minutes'],
         trim((string)$input['note']) !== '' ? trim((string)$input['note']) : null,
-        $authUserId
+        $status,
+        $source,
+        $authUserId,
+        $isApprover ? $authUserId : null,
+        $isApprover ? date('Y-m-d H:i:s') : null
     ]);
     $sessionId = (int)$db->lastInsertId();
 
     logSessionChange($db, $database, $sessionId, $authUserId, 'create',
-                     ['source' => ['old' => null, 'new' => 'manual']]);
+                     ['source' => ['old' => null, 'new' => $source],
+                      'status' => ['old' => null, 'new' => $status]]);
 
     $stmt = $db->prepare(workSessionsSelect($prefix) . " WHERE ws.session_id = ?");
     $stmt->execute([$sessionId]);

@@ -8,6 +8,7 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+import { API_BASE } from '../config.js';
 import { apiCall, isAdmin, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear } from './ui.js';
 import { debug } from '../app.js';
@@ -171,9 +172,9 @@ function renderWorktimeActions(session) {
     const buttons = [];
 
     if (isAdminOrManager && session.status === 'submitted' && session.end_time) {
-        buttons.push(`<button class="action-btn btn-icon btn-edit" title="Freigeben"
+        buttons.push(`<button class="action-btn btn-icon btn-approve" title="Freigeben"
             onclick="approveWorkSession(${session.session_id})">✓</button>`);
-        buttons.push(`<button class="action-btn btn-icon btn-delete" title="Ablehnen"
+        buttons.push(`<button class="action-btn btn-icon btn-reject" title="Ablehnen"
             onclick="rejectWorkSession(${session.session_id})">✗</button>`);
     }
 
@@ -317,6 +318,15 @@ export async function openWorkSessionModal(sessionId = null) {
     document.getElementById('workSessionModalTitle').textContent =
         sessionId ? 'Eintrag bearbeiten' : 'Zeit nachtragen';
 
+    // Der Hinweis muss zur Rolle passen: Manager und Admin sind die freigebende
+    // Instanz, ihre Eintraege gelten sofort.
+    const hint = document.getElementById('workSessionHint');
+    if (hint) {
+        hint.textContent = isAdminOrManager
+            ? 'Als Manager erfasste Zeiten gelten sofort und brauchen keine Freigabe.'
+            : 'Nachträglich erfasste Zeiten gelten erst nach Freigabe durch einen Manager.';
+    }
+
     const memberGroup = document.getElementById('workSessionMemberGroup');
     const memberSelect = document.getElementById('workSessionMember');
 
@@ -408,14 +418,14 @@ export async function saveWorkSession() {
 
 export function exportWorktimeMember() {
     const member = document.getElementById('filterWorktimeMember')?.value || '';
-    let url = `../api/api.php?resource=export&type=worktime_member&year=${currentYear}`;
+    let url = `${API_BASE}?resource=export&type=worktime_member&year=${currentYear}`;
     if (member) url += `&member_id=${member}`;
     window.location.href = url;
 }
 
 export function exportWorktimeActivity() {
     window.location.href =
-        `../api/api.php?resource=export&type=worktime_activity&year=${currentYear}`;
+        `${API_BASE}?resource=export&type=worktime_activity&year=${currentYear}`;
 }
 
 // ============================================

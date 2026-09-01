@@ -757,6 +757,76 @@ test('work_sessions: nur Admin darf loeschen', function () {
     ]));
 });
 
+test('work_sessions: Nachtrag eines Mitglieds braucht Freigabe', function () {
+    enableWorktime();
+    $activityId = createActivityType('Nachtrag user ' . uniqid());
+    $res = createManualSession('user', $activityId);
+    assertStatus(201, $res);
+
+    $id  = (int) $res['body']['session']['session_id'];
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertSame('submitted', $get['body']['status']);
+    assertSame('manual',    $get['body']['source']);
+
+    deleteSession($id);
+});
+
+test('work_sessions: Nachtrag eines Managers gilt sofort', function () {
+    enableWorktime();
+    $activityId = createActivityType('Nachtrag manager ' . uniqid());
+
+    // Der Manager ist die freigebende Instanz und genehmigt sich nicht selbst.
+    $res = createManualSession('manager', $activityId, ['member_id' => apiMemberId('user')]);
+    assertStatus(201, $res);
+
+    $id  = (int) $res['body']['session']['session_id'];
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('manager'), 'query' => ['id' => $id]]);
+    assertSame('confirmed', $get['body']['status']);
+    assertSame('admin',     $get['body']['source'], 'Herkunft muss als admin erkennbar bleiben');
+    assertTrue(!empty($get['body']['approved_at']), 'approved_at erwartet');
+
+    deleteSession($id);
+});
+
+test('work_sessions: ein Manager-Nachtrag zaehlt sofort in der Auswertung', function () {
+    enableWorktime();
+    $year       = (int) date('Y');
+    $memberId   = apiMemberId('user');
+    $activityId = createActivityType('Sofort zaehlend ' . uniqid());
+
+    $vorher = 0;
+    $res = apiRequest('GET', 'statistics', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => $year, 'include' => 'worktime'],
+    ]);
+    foreach (($res['body']['worktime']['members'] ?? []) as $m) {
+        if ((int) $m['member_id'] === $memberId) { $vorher = (int) $m['worked_minutes']; }
+    }
+
+    // Zwei Stunden mit 30 Minuten Pause = 90 Minuten netto
+    $created = createManualSession('manager', $activityId, [
+        'member_id'     => $memberId,
+        'start_time'    => date('Y-m-d H:i:s', strtotime('-4 hours')),
+        'end_time'      => date('Y-m-d H:i:s', strtotime('-2 hours')),
+        'break_minutes' => 30,
+    ]);
+    assertStatus(201, $created);
+    $id = (int) $created['body']['session']['session_id'];
+
+    $nachher = 0;
+    $res = apiRequest('GET', 'statistics', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => $year, 'include' => 'worktime'],
+    ]);
+    foreach (($res['body']['worktime']['members'] ?? []) as $m) {
+        if ((int) $m['member_id'] === $memberId) { $nachher = (int) $m['worked_minutes']; }
+    }
+
+    assertSame(90, $nachher - $vorher, 'Ohne Freigabe wuerde die Zeit nicht zaehlen');
+
+    deleteSession($id);
+});
+
 test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
     enableWorktime();
     stopRunningIfAny();

@@ -1945,47 +1945,49 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="workSessionModalTitle">Zeit nachtragen</h2>
-                <span class="close" onclick="closeWorkSessionModal()">&times;</span>
+                <button class="close-modal" onclick="closeWorkSessionModal()">×</button>
             </div>
-            <input type="hidden" id="workSessionId">
+            <div class="modal-body">
+                <form id="workSessionForm">
+                    <input type="hidden" id="workSessionId">
 
-            <div class="form-group" id="workSessionMemberGroup">
-                <label for="workSessionMember">Mitglied *</label>
-                <select id="workSessionMember"></select>
+                    <div class="form-group" id="workSessionMemberGroup">
+                        <label for="workSessionMember">Mitglied*</label>
+                        <select id="workSessionMember" required></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="workSessionActivity">Tätigkeit*</label>
+                        <select id="workSessionActivity" required></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="workSessionStart">Beginn*</label>
+                        <input type="datetime-local" id="workSessionStart" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="workSessionEnd">Ende*</label>
+                        <input type="datetime-local" id="workSessionEnd" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="workSessionBreak">Pause in Minuten</label>
+                        <input type="number" id="workSessionBreak" min="0" step="1" value="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="workSessionNote">Notiz</label>
+                        <input type="text" id="workSessionNote" maxlength="255">
+                        <small class="input-hint" id="workSessionHint">
+                            Nachträglich erfasste Zeiten gelten erst nach Freigabe durch einen Manager.
+                        </small>
+                    </div>
+                </form>
             </div>
-
-            <div class="form-group">
-                <label for="workSessionActivity">Tätigkeit *</label>
-                <select id="workSessionActivity"></select>
-            </div>
-
-            <div class="form-group">
-                <label for="workSessionStart">Beginn *</label>
-                <input type="datetime-local" id="workSessionStart">
-            </div>
-
-            <div class="form-group">
-                <label for="workSessionEnd">Ende *</label>
-                <input type="datetime-local" id="workSessionEnd">
-            </div>
-
-            <div class="form-group">
-                <label for="workSessionBreak">Pause in Minuten</label>
-                <input type="number" id="workSessionBreak" min="0" step="1" value="0">
-            </div>
-
-            <div class="form-group">
-                <label for="workSessionNote">Notiz</label>
-                <input type="text" id="workSessionNote" maxlength="255">
-            </div>
-
-            <small class="input-hint">
-                Nachträglich erfasste Zeiten gelten erst nach Freigabe durch einen Manager.
-            </small>
-
-            <div class="modal-buttons">
-                <button class="btn-secondary" onclick="closeWorkSessionModal()">Abbrechen</button>
-                <button class="btn-primary" onclick="saveWorkSession()">Speichern</button>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeWorkSessionModal()">Abbrechen</button>
+                <button class="btn-save" onclick="saveWorkSession()">Speichern</button>
             </div>
         </div>
     </div>
@@ -1995,49 +1997,51 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="activityTypeModalTitle">Neue Tätigkeitsart</h2>
-                <span class="close" onclick="closeActivityTypeModal()">&times;</span>
+                <button class="close-modal" onclick="closeActivityTypeModal()">×</button>
             </div>
-            <input type="hidden" id="activityTypeId">
+            <div class="modal-body">
+                <form id="activityTypeForm">
+                    <input type="hidden" id="activityTypeId">
 
-            <div class="form-group">
-                <label for="activityTypeName">Bezeichnung *</label>
-                <input type="text" id="activityTypeName" maxlength="100">
+                    <div class="form-group">
+                        <label for="activityTypeName">Bezeichnung*</label>
+                        <input type="text" id="activityTypeName" maxlength="100" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="activityTypeDescription">Beschreibung</label>
+                        <input type="text" id="activityTypeDescription">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="activityTypeColor">Farbe</label>
+                        <input type="color" id="activityTypeColor" value="#1F5FBF">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="activityTypeVerification">Ortsnachweis</label>
+                        <select id="activityTypeVerification">
+                            <option value="none">Kein Nachweis</option>
+                            <option value="start">Start an einer Station belegen</option>
+                            <option value="start_end">Start und Ende belegen</option>
+                        </select>
+                        <small class="input-hint">
+                            Erst wenn Start <em>und</em> Ende belegt sind, ist die Dauer
+                            nachgewiesen — sonst nur die Anwesenheit zu Beginn.
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="activityTypeActive" checked>
+                            Aktiv (zur Auswahl anbieten)
+                        </label>
+                    </div>
+                </form>
             </div>
-
-            <div class="form-group">
-                <label for="activityTypeDescription">Beschreibung</label>
-                <input type="text" id="activityTypeDescription">
-            </div>
-
-            <div class="form-group">
-                <label for="activityTypeColor">Farbe</label>
-                <input type="color" id="activityTypeColor" value="#1F5FBF">
-            </div>
-
-            <div class="form-group">
-                <label for="activityTypeVerification">Ortsnachweis</label>
-                <select id="activityTypeVerification">
-                    <option value="none">Kein Nachweis</option>
-                    <option value="start">Start an einer Station belegen</option>
-                    <option value="start_end">Start und Ende belegen</option>
-                </select>
-            </div>
-
-            <small class="input-hint">
-                Erst wenn Start <em>und</em> Ende belegt sind, ist die Dauer nachgewiesen —
-                sonst nur die Anwesenheit zu Beginn.
-            </small>
-
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="activityTypeActive" checked>
-                    Aktiv (zur Auswahl anbieten)
-                </label>
-            </div>
-
-            <div class="modal-buttons">
-                <button class="btn-secondary" onclick="closeActivityTypeModal()">Abbrechen</button>
-                <button class="btn-primary" onclick="saveActivityType()">Speichern</button>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeActivityTypeModal()">Abbrechen</button>
+                <button class="btn-save" onclick="saveActivityType()">Speichern</button>
             </div>
         </div>
     </div>

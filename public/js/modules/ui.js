@@ -753,6 +753,8 @@ async function loadYearDependentData() {
         await showStatisticsSection();
     } else if(section === 'mitglieder') {
         await showMemberSection();
+    } else if (section === 'zeiterfassung') {
+        await showWorktimeSection();
     }
 }
 
