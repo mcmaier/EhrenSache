@@ -10,6 +10,7 @@ private/config/install.lock
 docs
 CLAUDE.md
 
+tests/config.php
 tests/db/tmp/
 
 test_credentials.md
