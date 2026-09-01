@@ -105,6 +105,12 @@ Sie benötigen eine **Rechtsgrundlage** für die Datenverarbeitung (Art. 6 DSGVO
 - **Gruppenzugehörigkeit** (z.B. "Vorstand", "Jugend")
 - **Anwesenheitszeiten** (Datum, Uhrzeit, Dauer)
 - **Ausnahmen** (Urlaub, Krankheit - optional)
+- **Arbeitszeiten** (nur bei aktivierter Zeiterfassung, siehe Abschnitt 10):
+  Beginn, Ende, Pausendauer, Tätigkeitsart, freie Notiz
+- **Ortsnachweise** (nur bei aktivierter Zeiterfassung): Name der Station, an
+  der Beginn oder Ende bestätigt wurde
+- **Änderungshistorie der Arbeitszeiten**: wer wann welchen Wert geändert,
+  freigegeben, abgelehnt oder gelöscht hat
 
 ### Technische Daten
 
@@ -120,7 +126,7 @@ Mitglieder haben folgende Rechte:
 
 | Recht | Umsetzung in EhrenSache |
 |-------|-------------------------|
-| **Auskunft** (Art. 15) | Export-Funktion nutzen |
+| **Auskunft** (Art. 15) | Export-Funktion nutzen; enthält auch Arbeitszeiten und deren Änderungshistorie |
 | **Berichtigung** (Art. 16) | Editier-Funktion nutzen |
 | **Löschung** (Art. 17) | Lösch-Funktion nutzen |
 | **Einschränkung** (Art. 18) | Deaktivierung des Accounts |
@@ -289,7 +295,100 @@ Je nach Bundesland → Google: "Datenschutzbeauftragte [Bundesland]"
 
 ---
 
-## 10. Hilfreiche Links & Ressourcen
+## 10. Zeiterfassung (optionales Modul)
+
+Die Zeiterfassung ist **standardmäßig abgeschaltet**. Solange die Einstellung
+`worktime_enabled` auf `0` steht, werden keinerlei Arbeitszeitdaten erhoben, und
+die Funktion ist weder im Dashboard noch in der PWA sichtbar. Alles in diesem
+Abschnitt gilt erst, wenn Sie sie einschalten.
+
+### 10.1 Warum dieser Abschnitt eigenständig ist
+
+Eine Anwesenheitsliste hält fest, *dass* jemand da war. Eine Zeiterfassung mit
+Beginn, Ende und Pausen hält fest, *wie lange* und *mit welchen Unterbrechungen*.
+Das ist eine deutlich tiefere Verarbeitung — sie erlaubt Rückschlüsse auf
+Arbeitstempo, Belastung und Tagesablauf. Bewerten Sie sie nicht als Nebensache
+der Anwesenheitserfassung.
+
+### 10.2 Zweckbindung
+
+Legen Sie den Zweck **vor** der Aktivierung schriftlich fest. Üblich sind:
+
+- **Nachweis geleisteter Stunden** gegenüber dem Mitglied selbst, für
+  Ehrenamtskarte, Ehrungen oder Bescheinigungen
+- **Verwendungsnachweis** gegenüber Fördergebern, aufgeschlüsselt nach
+  Tätigkeitsart
+
+Nicht gedeckt ist ohne gesonderte Grundlage: Leistungsvergleiche zwischen
+Mitgliedern, Ableitung von Anwesenheitsprofilen oder die Weitergabe an Dritte
+außerhalb des festgelegten Nachweiszwecks.
+
+### 10.3 Rechtsgrundlage
+
+Für den Nachweis gegenüber Fördergebern kommt regelmäßig ein berechtigtes
+Interesse (Art. 6 Abs. 1 lit. f) in Betracht — der Verein muss die Mittelverwendung
+belegen können. Für den personenbezogenen Stundennachweis, der dem Mitglied
+selbst nützt, ist eine Einwilligung (Art. 6 Abs. 1 lit. a) oft der sauberere Weg,
+weil die Erfassung dann freiwillig bleibt.
+
+Prüfen Sie das für Ihren Fall. Ein Verein, der Stunden erfasst, ohne dass jemand
+sie braucht, hat keinen Zweck — und damit keine Rechtsgrundlage.
+
+### 10.4 Speicherdauer und Löschung
+
+| Daten | Empfohlene Frist | Begründung |
+|-------|------------------|------------|
+| Arbeitszeiten (`work_sessions`) | Bis zum Ablauf der Nachweispflicht gegenüber dem Fördergeber, sonst 3 Jahre | Verwendungsnachweise werden meist mehrere Jahre nach Bewilligung geprüft |
+| Änderungshistorie (`work_session_log`) | Wie die zugehörige Arbeitszeit | Sie belegt die Unverfälschtheit des Nachweises |
+| Ortsnachweise | Wie die zugehörige Arbeitszeit | Ohne sie verliert der Nachweis seine Aussagekraft |
+
+**Wichtig:** Die Änderungshistorie überlebt das Löschen einer Arbeitszeit
+**absichtlich** — sonst würde ausgerechnet die Löschung nicht dokumentiert. Sie
+enthält damit personenbezogene Daten, die den eigentlichen Datensatz überdauern.
+Legen Sie dafür eine eigene Löschfrist fest und setzen Sie sie um; ein
+automatisches Löschen der Historie ist derzeit **nicht** eingebaut.
+
+### 10.5 Abgrenzung zum Beschäftigungsverhältnis
+
+Eine Erfassung von Arbeits- **und Pausenzeiten** ist ein typisches Merkmal eines
+Beschäftigungsverhältnisses. Wird sie im Ehrenamt eingeführt, kann das
+zusammen mit weiteren Merkmalen — Weisungsgebundenheit, feste Dienstpläne,
+Vergütung über die Aufwandsentschädigung hinaus — die Abgrenzung verwischen.
+
+Die Folgen träfen den Verein, nicht die Software: Sozialversicherungspflicht,
+Lohnsteuer, Arbeitszeitgesetz. Dies ist **keine Rechtsberatung**. Lassen Sie den
+Punkt prüfen, bevor Sie die Zeiterfassung scharf schalten, insbesondere wenn
+Übungsleiter- oder Ehrenamtspauschalen gezahlt werden.
+
+### 10.6 Was Sie den Mitgliedern sagen müssen
+
+Informieren Sie **vor** der Aktivierung, mindestens über:
+
+- dass Beginn, Ende und Pausen erfasst werden
+- ob die Erfassung freiwillig ist und was passiert, wenn jemand nicht mitmacht
+- wofür die Stunden verwendet werden und wer sie sieht (Manager sehen die
+  Einträge **aller** Mitglieder)
+- dass Manager Einträge korrigieren können und jede Änderung protokolliert wird
+- wie lange die Daten gespeichert bleiben
+- dass bei Tätigkeiten mit Ortsnachweis festgehalten wird, an welcher Station
+  jemand war
+
+### 10.7 Technische Hinweise
+
+- Der Ortsnachweis beruht auf einem gemeinsamen Geheimnis der Station. Dieses
+  liegt derzeit unverschlüsselt in der Datenbank und ist in der
+  Geräte-Verwaltung lesbar. Wer Administrator- oder Manager-Zugang hat, könnte
+  Ortsnachweise erzeugen. Der Nachweis schützt daher gegen Nachlässigkeit, nicht
+  gegen Vorsatz von innen — beschreiben Sie ihn gegenüber Fördergebern nicht
+  stärker, als er ist.
+- Alle Zeitstempel stammen vom Server, nicht vom Gerät des Mitglieds.
+- Die Zeiterfassung lässt sich jederzeit wieder abschalten. Bereits erfasste
+  Daten bleiben dabei in der Datenbank; löschen Sie sie gesondert, wenn der
+  Zweck entfallen ist.
+
+---
+
+## 11. Hilfreiche Links & Ressourcen
 
 ### Gesetzestexte
 - **DSGVO**: https://dsgvo-gesetz.de
@@ -309,7 +408,7 @@ Je nach Bundesland → Google: "Datenschutzbeauftragte [Bundesland]"
 
 ---
 
-## 11. Häufige Fragen (FAQ)
+## 12. Häufige Fragen (FAQ)
 
 **Q: Müssen wir einen Datenschutzbeauftragten bestellen?**  
 A: Nur falls mind. 20 Personen ständig mit automatisierter Datenverarbeitung 
@@ -328,7 +427,7 @@ aber Abmahnungen möglich).
 
 ---
 
-## 12. Disclaimer
+## 13. Disclaimer
 
 **Keine Rechtsberatung**: Diese Hinweise dienen der Orientierung und 
 ersetzen keine individuelle Rechtsberatung. Im Zweifel konsultieren Sie 

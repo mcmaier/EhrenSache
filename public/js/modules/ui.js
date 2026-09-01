@@ -19,6 +19,8 @@ import {loadRecords, showRecordsSection, initRecordEventHandlers, resetRecordFil
 import {loadMembers, showMemberSection} from'./members.js';
 import {loadGroups, loadTypes, showGroupSection} from './management.js';
 import {initStatisticsEventHandlers, showStatisticsSection} from './statistics.js';
+import {showWorktimeSection, loadWorkSessions, loadActivityTypes, renderActivityTypes,
+        checkWorktimeEnabled, initWorktimeEventHandlers} from './worktime.js';
 import {debug} from '../app.js'
 import {renderSystemSettings} from './settings.js';
 import {loadImportLogs} from './import_export.js';
@@ -48,7 +50,8 @@ export const dataCache = {
     members: {},
     appointments: {},
     records: {},
-    exceptions: {}
+    exceptions: {},
+    workSessions: {}
 };
 
 const CACHE_TTL = 10 * 60 * 1000; // 10 Minuten
@@ -156,7 +159,8 @@ export async function initAllYearFilters() {
         'appointmentYearFilter',
         'recordYearFilter', 
         'exceptionYearFilter',
-        'statisticYearFilter'
+        'statisticYearFilter',
+        'worktimeYearFilter'
     ];
 
     debug.log("Initializing Year Filters");
@@ -630,6 +634,18 @@ export async function initEventHandlers()
     initStatisticsEventHandlers();
     initUsersEventHandlers();
     initProfileEventHandler();
+    initWorktimeEventHandlers();
+
+    // Blendet Navigationspunkt und Stammdatenblock ein, sofern die
+    // Zeiterfassung freigeschaltet ist. Ist sie es nicht, antwortet
+    // activity_types mit 404 und beides bleibt verborgen.
+    if (await checkWorktimeEnabled()) {
+        const block = document.getElementById('activityTypesBlock');
+        if (block && isAdmin) {
+            block.style.display = '';
+            await loadActivityTypes(true);
+        }
+    }
 }
 
 
@@ -674,6 +690,9 @@ export async function loadAllData() {
             break;
         case 'statistik':            
             await showStatisticsSection();            
+            break;
+        case 'zeiterfassung':
+            await showWorktimeSection(true);
             break;
         case  'einstellungen':
             if(isAdmin){

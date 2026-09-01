@@ -88,6 +88,9 @@
                 <li class="nav-item" data-section="antraege">
                     <span>📋 Anträge</span>
                 </li>  
+                <li class="nav-item" data-section="zeiterfassung" style="display: none;">
+                    <span>⏱️ Zeiterfassung</span>
+                </li>
                 <li class="nav-item" data-section="statistik">
                     <span>📊 Statistik</span>
                 </li>                                
@@ -927,6 +930,107 @@
                         </thead>
                         <tbody id="typesTableBody">
                             <tr><td colspan="6" class="loading">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Taetigkeitsarten (nur bei aktiver Zeiterfassung sichtbar) -->
+                <div class="data-table" style="margin-top: 30px; display: none;" id="activityTypesBlock">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h2 style="margin: 0;">⏱️ Tätigkeitsarten</h2>
+                        <button class="btn-add" onclick="openActivityTypeModal()">+ Neue Tätigkeitsart</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tätigkeit</th>
+                                <th>Beschreibung</th>
+                                <th>Farbe</th>
+                                <th>Ortsnachweis</th>
+                                <th>Status</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activityTypesTableBody">
+                            <tr><td colspan="6" class="loading">Lade Daten...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Zeiterfassung Section -->
+            <div class="content-section" id="zeiterfassung">
+                <div class="content-header">
+                    <h1>Zeiterfassung</h1>
+                    <div class="header-actions">
+                        <button class="btn-secondary" data-role="manager" onclick="exportWorktimeMember()">💾 Stundennachweis</button>
+                        <button class="btn-secondary" data-role="manager" onclick="exportWorktimeActivity()">💾 Nach Tätigkeit</button>
+                        <button class="btn-add" onclick="openWorkSessionModal()">+ Zeit nachtragen</button>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Bestätigte Stunden</h3>
+                        <div class="number" id="statWorktimeTotal">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Wartet auf Freigabe</h3>
+                        <div class="number" id="statWorktimePending">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Laufende Sitzungen</h3>
+                        <div class="number" id="statWorktimeOpen">-</div>
+                    </div>
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
+                        <h3>Jahr filtern</h3>
+                        <select id="worktimeYearFilter"
+                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
+                        </select>
+                    </div>
+                </div>
+
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="filterWorktimeStatus">Status:</label>
+                        <select id="filterWorktimeStatus">
+                            <option value="">Alle</option>
+                            <option value="submitted">Wartet auf Freigabe</option>
+                            <option value="confirmed">Bestätigt</option>
+                            <option value="rejected">Abgelehnt</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filterWorktimeActivity">Tätigkeit:</label>
+                        <select id="filterWorktimeActivity">
+                            <option value="">Alle Tätigkeiten</option>
+                        </select>
+                    </div>
+                    <div class="form-group" data-role="manager">
+                        <label for="filterWorktimeMember">Mitglied:</label>
+                        <select id="filterWorktimeMember">
+                            <option value="">Alle Mitglieder</option>
+                        </select>
+                    </div>
+                    <button onclick="resetWorktimeFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
+                </div>
+
+                <div class="data-table">
+                    <table id="worktimeTable">
+                        <thead>
+                            <tr>
+                                <th>Mitglied</th>
+                                <th>Tätigkeit</th>
+                                <th>Beginn</th>
+                                <th>Dauer</th>
+                                <th>Termin</th>
+                                <th>Nachweis</th>
+                                <th>Status</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="worktimeTableBody">
+                            <tr><td colspan="8" class="loading">Lade Daten...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1836,6 +1940,108 @@
     </div>
     
     <!-- QR Code Generator -->
+    <!-- Modal: Zeit nachtragen / bearbeiten -->
+    <div class="modal" id="workSessionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="workSessionModalTitle">Zeit nachtragen</h2>
+                <span class="close" onclick="closeWorkSessionModal()">&times;</span>
+            </div>
+            <input type="hidden" id="workSessionId">
+
+            <div class="form-group" id="workSessionMemberGroup">
+                <label for="workSessionMember">Mitglied *</label>
+                <select id="workSessionMember"></select>
+            </div>
+
+            <div class="form-group">
+                <label for="workSessionActivity">Tätigkeit *</label>
+                <select id="workSessionActivity"></select>
+            </div>
+
+            <div class="form-group">
+                <label for="workSessionStart">Beginn *</label>
+                <input type="datetime-local" id="workSessionStart">
+            </div>
+
+            <div class="form-group">
+                <label for="workSessionEnd">Ende *</label>
+                <input type="datetime-local" id="workSessionEnd">
+            </div>
+
+            <div class="form-group">
+                <label for="workSessionBreak">Pause in Minuten</label>
+                <input type="number" id="workSessionBreak" min="0" step="1" value="0">
+            </div>
+
+            <div class="form-group">
+                <label for="workSessionNote">Notiz</label>
+                <input type="text" id="workSessionNote" maxlength="255">
+            </div>
+
+            <small class="input-hint">
+                Nachträglich erfasste Zeiten gelten erst nach Freigabe durch einen Manager.
+            </small>
+
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="closeWorkSessionModal()">Abbrechen</button>
+                <button class="btn-primary" onclick="saveWorkSession()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Taetigkeitsart -->
+    <div class="modal" id="activityTypeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="activityTypeModalTitle">Neue Tätigkeitsart</h2>
+                <span class="close" onclick="closeActivityTypeModal()">&times;</span>
+            </div>
+            <input type="hidden" id="activityTypeId">
+
+            <div class="form-group">
+                <label for="activityTypeName">Bezeichnung *</label>
+                <input type="text" id="activityTypeName" maxlength="100">
+            </div>
+
+            <div class="form-group">
+                <label for="activityTypeDescription">Beschreibung</label>
+                <input type="text" id="activityTypeDescription">
+            </div>
+
+            <div class="form-group">
+                <label for="activityTypeColor">Farbe</label>
+                <input type="color" id="activityTypeColor" value="#1F5FBF">
+            </div>
+
+            <div class="form-group">
+                <label for="activityTypeVerification">Ortsnachweis</label>
+                <select id="activityTypeVerification">
+                    <option value="none">Kein Nachweis</option>
+                    <option value="start">Start an einer Station belegen</option>
+                    <option value="start_end">Start und Ende belegen</option>
+                </select>
+            </div>
+
+            <small class="input-hint">
+                Erst wenn Start <em>und</em> Ende belegt sind, ist die Dauer nachgewiesen —
+                sonst nur die Anwesenheit zu Beginn.
+            </small>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="activityTypeActive" checked>
+                    Aktiv (zur Auswahl anbieten)
+                </label>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="btn-secondary" onclick="closeActivityTypeModal()">Abbrechen</button>
+                <button class="btn-primary" onclick="saveActivityType()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <!-- Konfiguration -->
@@ -1856,6 +2062,7 @@
     <script type="module" src="./js/modules/profile.js"></script>
     <script type="module" src="./js/modules/management.js"></script>
     <script type="module" src="./js/modules/statistics.js"></script>
+    <script type="module" src="./js/modules/worktime.js"></script>
     <script type="module" src="./js/modules/import_export.js"></script>
 
     <!-- Hauptdatei -->
