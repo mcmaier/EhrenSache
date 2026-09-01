@@ -20,4 +20,10 @@ return [
         'file'     => '1.0.0.php',
         'function' => 'migrate_1_0_0',
     ],
+    [
+        'from'     => '1.1.3',
+        'to'       => '1.2.0',
+        'file'     => '1.1.3.php',
+        'function' => 'migrate_1_1_3',
+    ],
 ];

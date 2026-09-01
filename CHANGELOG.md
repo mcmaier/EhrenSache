@@ -7,6 +7,32 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.2.0] – 2026-09-01
+
+### Neu
+- **Zeiterfassung** für ehrenamtliche Arbeit (standardmäßig deaktiviert, siehe Einstellung `worktime_enabled`)
+  - Live-Timer in der PWA mit Start, Pause und Stopp
+  - Nachträgliche Erfassung über ein Formular, mit Freigabe durch Manager
+  - Tätigkeitsarten als Stammdaten (`activity_types`)
+  - Optionaler Terminbezug: Der Timer-Start erzeugt den Anwesenheits-Eintrag mit
+  - Auditspur aller Änderungen (`work_session_log`)
+- **Migrationskette**: Der Update-Wizard führt beliebig viele aufeinanderfolgende
+  Migrationen aus, statt fest verdrahtet genau eine. Neue Schritte werden in
+  `private/migrations/manifest.php` deklariert
+- **Schema-Versionierung bei Neuinstallation**: Der Installer stempelt die Version
+  aus `version.json`, sodass der Update-Wizard den Ausgangsstand kennt
+- **Testharness** unter `tests/` – abhängigkeitsfrei, Aufruf über `php tests/run.php`
+
+### Geändert
+- `records.checkin_source` kennt zusätzlich den Wert `timer`
+
+### Behoben
+- Der Update-Wizard bestimmte die installierte Version über `ORDER BY applied_at`.
+  Bei mehreren Einträgen in derselben Sekunde war das Ergebnis zufällig, und
+  `1.10.0` hätte als kleiner als `1.9.0` gegolten. Jetzt entscheidet `version_compare`
+
+---
+
 ## [1.1.3] – 2026-04-16
 
 ### Neu

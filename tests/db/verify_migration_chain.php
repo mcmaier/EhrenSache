@@ -195,13 +195,25 @@ check('Ausgangslage wird als 1.0.0 erkannt', '1.0.0', detectDbVersion($pdo, PREF
 
 $res = runWizardStep3($pdo, PREFIX, $target);
 check('Kette startet bei 1.0.0', '1.0.0', $res['from']);
-check('Migrationsschritt wurde ausgefuehrt', true,
-      in_array('1.0.0 -> 1.1.3 (1.0.0.php)', $res['log'], true));
-check('Zielversion wurde gestempelt', true, in_array('gestempelt: 1.1.3', $res['log'], true));
+
+// Erwartung aus dem Manifest ableiten, damit dieser Test bei jeder neuen
+// Migration mitwaechst statt zu veralten.
+$manifest = loadMigrationManifest($repo . '/private/migrations/manifest.php');
+$expectedChain = resolveMigrationChain('1.0.0', $target, $manifest);
+
+foreach ($expectedChain as $step) {
+    check("Schritt {$step['from']} -> {$step['to']} wurde ausgefuehrt", true,
+          in_array("{$step['from']} -> {$step['to']} ({$step['file']})", $res['log'], true));
+    check("Version {$step['to']} wurde gestempelt", true,
+          in_array("gestempelt: {$step['to']}", $res['log'], true));
+}
+
+$expectedVersions = array_merge(['1.0.0'], array_column($expectedChain, 'to'));
+sort($expectedVersions);
 
 $versions = readSchemaVersions($pdo, PREFIX);
 sort($versions);
-check('schema_version enthaelt Ausgangs- und Zielstand', ['1.0.0', '1.1.3'], $versions);
+check('schema_version enthaelt Ausgangsstand und jede Zwischenversion', $expectedVersions, $versions);
 
 check('Tabellen wurden auf das Prefix umbenannt', true,
       (bool) $pdo->query("SHOW TABLES LIKE '" . PREFIX . "users'")->rowCount());
