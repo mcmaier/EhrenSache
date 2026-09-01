@@ -151,6 +151,34 @@ body {
     border-color: var(--primary-color);
  }
 
+/* Auswahlfelder wie Eingabefelder behandeln. Bisher war nur
+   .modal-content .form-group select gestylt; ausserhalb von Modals
+   erschienen Auswahlboxen im rohen Betriebssystem-Look. Die Modal-Regel
+   ist spezifischer und bleibt unberuehrt. */
+.form-group select {
+    width: 100%;
+    padding: 12px 36px 12px 12px;
+    border: 2px solid var(--border);
+    border-radius: 5px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text);
+    background-color: var(--card-bg);
+    /* Eigener Pfeil, damit das Feld nicht wie ein OS-Widget aussieht */
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236B7280' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    transition: border 0.3s;
+}
+
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
 .form-group input[type="checkbox"] {
     margin-right: 8px;
 }
@@ -1786,4 +1814,100 @@ body {
         font-size: 16px;
     }
     
+}
+
+/* ========================================
+   ZEITERFASSUNG
+   ======================================== */
+
+/* .tab-content.active ist ein zentrierendes Flex-Layout — ohne eigene Breite
+   schrumpfen Kinder auf ihre Inhaltsbreite. 400px ist die Breite, die
+   .action-buttons und .history-section im Rest der App verwenden. */
+.worktime-section {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card-bg);
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.worktime-section .form-group {
+    margin-bottom: 16px;
+}
+
+.worktime-section .form-group:last-of-type {
+    margin-bottom: 20px;
+}
+
+/* Laufender Timer */
+.worktime-timer {
+    text-align: center;
+    padding: 18px 12px;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, rgba(39,174,96,0.08) 0%, rgba(39,174,96,0.18) 100%);
+    border-radius: 10px;
+    transition: background 0.3s;
+}
+
+/* Pausiert: gedaempft und in Warnfarbe, damit der Zustand nicht nur an der
+   Beschriftung des Knopfes haengt. Die Anzeige steht dabei still. */
+.worktime-timer.paused {
+    background: linear-gradient(135deg, rgba(243,156,18,0.08) 0%, rgba(243,156,18,0.20) 100%);
+}
+
+.worktime-timer.paused #worktimeElapsed {
+    color: var(--text-light);
+}
+
+#worktimeActivityName {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-light);
+    margin-bottom: 6px;
+}
+
+#worktimeElapsed {
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--text);
+    /* Gleich breite Ziffern, sonst zappelt die Anzeige im Sekundentakt */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
+#worktimeBreakInfo {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 6px;
+    min-height: 15px;
+}
+
+#worktimeStatus {
+    text-align: center;
+    font-size: 14px;
+    color: var(--text-light);
+    min-height: 20px;
+    margin-top: 12px;
+}
+
+.worktime-item-note {
+    color: var(--text-light);
+    font-style: italic;
+}
+
+.worktime-item-status {
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+@media (max-width: 380px) {
+    #worktimeElapsed {
+        font-size: 28px;
+    }
+
+    .worktime-section {
+        padding: 12px;
+    }
 }

@@ -2046,9 +2046,20 @@ function renderWorktime() {
         pauseBtn.querySelector('.icon').textContent =
             worktimeSession.is_paused ? '▶️' : '⏸️';
 
+        const timer = document.querySelector('.worktime-timer');
+        if (timer) timer.classList.toggle('paused', !!worktimeSession.is_paused);
+
         const breakMinutes = parseInt(worktimeSession.break_minutes, 10) || 0;
-        document.getElementById('worktimeBreakInfo').textContent =
-            breakMinutes > 0 ? `Pause bisher: ${breakMinutes} Min.` : '';
+        const breakInfo = document.getElementById('worktimeBreakInfo');
+
+        if (worktimeSession.is_paused) {
+            breakInfo.textContent = breakMinutes > 0
+                ? `⏸ Pausiert · bisher ${breakMinutes} Min. Pause`
+                : '⏸ Pausiert';
+        } else {
+            breakInfo.textContent = breakMinutes > 0
+                ? `Pause bisher: ${breakMinutes} Min.` : '';
+        }
 
         startWorktimeTicker();
     } else {
@@ -2074,9 +2085,21 @@ function stopWorktimeTicker() {
 function updateWorktimeElapsed() {
     if (!worktimeSession || !worktimeSession.is_running) return;
 
-    // start_time kommt ohne Zeitzone; als lokale Zeit interpretieren.
+    // Angezeigt wird die NETTO-Zeit: brutto minus bereits gezaehlter Pausen
+    // minus der gerade laufenden Pause. Waehrend einer Pause heben sich die
+    // beiden letzten Terme gegen die verstreichende Zeit auf, die Anzeige
+    // steht also still — sonst zaehlte sie etwas hoch, das nicht erfasst wird.
     const start = new Date(String(worktimeSession.start_time).replace(' ', 'T'));
-    const seconds = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+    let seconds = Math.floor((Date.now() - start.getTime()) / 1000);
+
+    seconds -= (parseInt(worktimeSession.break_minutes, 10) || 0) * 60;
+
+    if (worktimeSession.is_paused && worktimeSession.break_started_at) {
+        const pauseStart = new Date(String(worktimeSession.break_started_at).replace(' ', 'T'));
+        seconds -= Math.floor((Date.now() - pauseStart.getTime()) / 1000);
+    }
+
+    seconds = Math.max(0, seconds);
 
     const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
     const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
@@ -2186,14 +2209,15 @@ async function loadWorktimeList() {
         const cls = s.status === 'confirmed' ? 'history-item verified' : 'history-item pending';
         const breakInfo = (parseInt(s.break_minutes, 10) || 0) > 0
             ? ` (${s.break_minutes} Min. Pause)` : '';
-        const note = s.note ? `<div>${escapeHtml(s.note)}</div>` : '';
+        const note = s.note
+            ? `<div class="worktime-item-note">${escapeHtml(s.note)}</div>` : '';
 
         return `<div class="${cls}">
             <strong>${escapeHtml(s.activity_name || 'Tätigkeit')}</strong>
             <div>${escapeHtml(String(s.start_time).substring(0, 16))}</div>
             <div>${s.duration_minutes} Min.${breakInfo}</div>
             ${note}
-            <div>${statusLabel[s.status] || escapeHtml(s.status)}</div>
+            <div class="worktime-item-status">${statusLabel[s.status] || escapeHtml(s.status)}</div>
         </div>`;
     }).join('');
 }
