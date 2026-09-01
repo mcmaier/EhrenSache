@@ -158,3 +158,36 @@ function readSchemaVersions(PDO $pdo, string $prefix): array
 
     return is_array($rows) ? $rows : [];
 }
+
+/** Prüft ob eine Tabelle in der aktuellen DB existiert. */
+function tableExists(PDO $pdo, string $table): bool
+{
+    return (bool) $pdo->query("SHOW TABLES LIKE " . $pdo->quote($table))->rowCount();
+}
+
+/**
+ * Ermittelt die installierte DB-Version anhand der vorhandenen Tabellen.
+ *
+ * Rückgabe '1.1.x' heißt: Prefix-Tabellen da, aber keine schema_version.
+ * 'unbekannt' heißt: nicht bestimmbar. Beides behandelt normalizeDetectedVersion().
+ */
+function detectDbVersion(PDO $pdo, string $prefix): string
+{
+    // Die hoechste Version gewinnt, nicht die zuletzt eingetragene: mehrere
+    // Zeilen koennen dieselbe Sekunde tragen, und eine Textsortierung stellt
+    // '1.10.0' vor '1.9.0'.
+    if (tableExists($pdo, $prefix . 'schema_version')) {
+        $latest = latestSchemaVersion(readSchemaVersions($pdo, $prefix));
+        return $latest ?? '1.1.x';
+    }
+    // Alte Tabellen ohne Prefix vorhanden → 1.0.0
+    if (tableExists($pdo, 'users') && !tableExists($pdo, $prefix . 'users')) {
+        return '1.0.0';
+    }
+    // Prefix-Tabellen ohne Schema-Versions-Tabelle → kurz nach 1.1.0 installiert
+    if (!empty($prefix) && tableExists($pdo, $prefix . 'users')) {
+        return '1.1.x';
+    }
+
+    return 'unbekannt';
+}
