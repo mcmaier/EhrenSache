@@ -55,41 +55,23 @@ function handleTotpCheckin($db, $database, $request_method, $authUserId, $authUs
         return;
     }        
     
-    // Hole alle aktiven TOTP-Location Devices aus users Tabelle
-    $stmt = $db->query("SELECT u.user_id, u.email, u.device_type, u.totp_secret
-                        FROM {$prefix}users u
-                        WHERE u.role = 'device' 
-                        AND u.device_type = 'totp_location'
-                        AND u.is_active = 1
-                        AND u.totp_secret IS NOT NULL");
-    
-    $locations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    if(empty($locations)) {
+    // Auflösung liegt in private/helpers/totp.php, damit work_sessions
+    // dieselbe Logik nutzt statt die Schleife zu duplizieren.
+    if(countTotpLocations($db, $database) === 0) {
         http_response_code(400);
         echo json_encode([  "message" => "Keine TOTP-Stationen konfiguriert.",
                             "hint" => "Admin must configure device with TOTP secret"]);
         return;
     }
 
-    $validLocation = null;
-    
-    foreach($locations as $location) {
-    // Erstelle TOTP-Objekt mit Secret
-    $totp = new TOTP($location['totp_secret']);
+    $validLocation = resolveTotpLocation($db, $database, $totpCode);
 
-    if($totp->verify($totpCode, null, 1)) {
-        $validLocation = $location;
-        break;
-    }
-}
-    
     if($validLocation) {
         //error_log("Valid check-in from location: " . $validLocation);
         // Code gültig → Auto-Checkin mit verified Flag
         handleAutoCheckin($db, $database, 'POST', $authUserId, $authUserRole, $authMemberId, $isTokenAuth, 'user_totp',
                                                                         [
-                                                                            'location_name' => $validLocation['email'],
+                                                                            'location_name' => $validLocation['location_name'],
                                                                             'device_name' => $sourceDevice
                                                                         ]
                                                                         );
@@ -97,7 +79,7 @@ function handleTotpCheckin($db, $database, $request_method, $authUserId, $authUs
         http_response_code(401);
         echo json_encode([
             "message" => "Ungültiger oder abgelaufener TOTP Code",
-            "tested_locations" => count($locations)
+            "tested_locations" => countTotpLocations($db, $database)
         ]);
     }
 }

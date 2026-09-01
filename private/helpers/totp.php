@@ -129,3 +129,54 @@ class TOTP {
         return $secret;
     }
 }
+
+/**
+ * Löst einen TOTP-Code gegen alle aktiven Stationen auf.
+ *
+ * Belegt den ORT, nicht die Identität: Wer den Code einreicht, ist bereits über
+ * Session oder Token authentifiziert. Der Treffer sagt, an welcher Station die
+ * Person war.
+ *
+ * Herausgelöst aus handleTotpCheckin(), damit totp_checkin und work_sessions
+ * dieselbe Auflösung verwenden statt die Schleife zu duplizieren.
+ *
+ * @return array{user_id: int, location_name: string}|null  null, wenn kein Code passt
+ */
+function resolveTotpLocation($db, $database, string $code): ?array
+{
+    if (!preg_match('/^\d{6}$/', trim($code))) {
+        return null;
+    }
+
+    $prefix = $database->table('');
+
+    $stmt = $db->query("SELECT u.user_id, u.email, u.device_name, u.totp_secret
+                        FROM {$prefix}users u
+                        WHERE u.role = 'device'
+                          AND u.device_type = 'totp_location'
+                          AND u.is_active = 1
+                          AND u.totp_secret IS NOT NULL");
+
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $location) {
+        $totp = new TOTP($location['totp_secret']);
+
+        if ($totp->verify(trim($code), null, 1)) {
+            return [
+                'user_id'       => (int) $location['user_id'],
+                'location_name' => $location['device_name'] ?: $location['email'],
+            ];
+        }
+    }
+
+    return null;
+}
+
+/** Zählt die aktiven TOTP-Stationen. */
+function countTotpLocations($db, $database): int
+{
+    $prefix = $database->table('');
+
+    return (int) $db->query("SELECT COUNT(*) FROM {$prefix}users
+                             WHERE role = 'device' AND device_type = 'totp_location'
+                               AND is_active = 1 AND totp_secret IS NOT NULL")->fetchColumn();
+}

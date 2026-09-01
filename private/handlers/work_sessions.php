@@ -222,7 +222,8 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
     }
 
     // Tätigkeitsart muss existieren und nutzbar sein
-    $stmt = $db->prepare("SELECT activity_id, is_active FROM {$prefix}activity_types WHERE activity_id = ?");
+    $stmt = $db->prepare("SELECT activity_id, is_active, verification
+                          FROM {$prefix}activity_types WHERE activity_id = ?");
     $stmt->execute([(int)$data->activity_id]);
     $activity = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -234,6 +235,50 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
     if(!$activity['is_active']) {
         http_response_code(400);
         echo json_encode(["message" => "Activity type is retired"]);
+        return;
+    }
+
+    // Ortsnachweis. Ein mitgesendeter Code wird IMMER aufgeloest und
+    // festgehalten, auch wenn die Taetigkeitsart ihn nicht verlangt (E10):
+    // festzuhalten, welche Stunden ortsbelegt sind, ist wertvoller als ein
+    // Gate, das sich durch Wahl einer anderen Taetigkeitsart umgehen laesst.
+    $startLocation = null;
+    $verification  = $activity['verification'] ?? 'none';
+    $code          = isset($data->totp_code) ? trim((string)$data->totp_code) : '';
+
+    if($code !== '') {
+        if(countTotpLocations($db, $database) === 0) {
+            http_response_code(409);
+            echo json_encode(["message" => "No TOTP station configured",
+                              "hint"    => "Ask an administrator to set one up"]);
+            return;
+        }
+
+        $resolved = resolveTotpLocation($db, $database, $code);
+        if($resolved === null) {
+            http_response_code(401);
+            echo json_encode(["message" => "Invalid or expired TOTP code"]);
+            return;
+        }
+        $startLocation = $resolved['location_name'];
+
+    } elseif($verification !== 'none') {
+        // Kein force-Weg beim Start: Ein unbelegter Start bei
+        // nachweispflichtiger Taetigkeit soll gar nicht erst als Timer laufen.
+        // Wer keinen Code hat, erfasst nachtraeglich — das geht in die Freigabe.
+        if(countTotpLocations($db, $database) === 0) {
+            http_response_code(409);
+            echo json_encode(["message" => "No TOTP station configured",
+                              "hint"    => "This activity type requires a location proof"]);
+            return;
+        }
+
+        http_response_code(403);
+        echo json_encode([
+            "message"      => "This activity type requires a TOTP code to start",
+            "verification" => $verification,
+            "hint"         => "Scan the station code, or record the time afterwards"
+        ]);
         return;
     }
 
@@ -267,25 +312,32 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
 
         $stmt = $db->prepare("INSERT INTO {$prefix}work_sessions
                               (member_id, activity_id, appointment_id, start_time,
-                               status, source, created_by)
-                              VALUES (?, ?, ?, NOW(), 'confirmed', 'timer', ?)");
-        $stmt->execute([$memberId, (int)$data->activity_id, $appointmentId, $authUserId]);
+                               start_location_name, status, source, created_by)
+                              VALUES (?, ?, ?, NOW(), ?, 'confirmed', 'timer', ?)");
+        $stmt->execute([$memberId, (int)$data->activity_id, $appointmentId,
+                        $startLocation, $authUserId]);
         $sessionId = (int)$db->lastInsertId();
 
         // Bei Terminbezug den Anwesenheits-Eintrag miterzeugen.
         // ON DUPLICATE KEY UPDATE mit einer Zuweisung auf sich selbst: ein
         // frueherer Check-in behaelt seine arrival_time.
         if($appointmentId !== null) {
+            // Ist der Start ortsbelegt, ist der Check-in ein user_totp und
+            // traegt den Stationsnamen — sonst ein schlichter timer-Eintrag.
+            $checkinSource = $startLocation !== null ? 'user_totp' : 'timer';
+
             $db->prepare("INSERT INTO {$prefix}records
-                          (member_id, appointment_id, arrival_time, status, checkin_source)
-                          VALUES (?, ?, NOW(), 'present', 'timer')
+                          (member_id, appointment_id, arrival_time, status,
+                           checkin_source, location_name)
+                          VALUES (?, ?, NOW(), 'present', ?, ?)
                           ON DUPLICATE KEY UPDATE record_id = record_id")
-               ->execute([$memberId, $appointmentId]);
+               ->execute([$memberId, $appointmentId, $checkinSource, $startLocation]);
         }
 
         logSessionChange($db, $database, $sessionId, $authUserId, 'create', [
-            'source'      => ['old' => null, 'new' => 'timer'],
-            'activity_id' => ['old' => null, 'new' => (int)$data->activity_id],
+            'source'              => ['old' => null, 'new' => 'timer'],
+            'activity_id'         => ['old' => null, 'new' => (int)$data->activity_id],
+            'start_location_name' => ['old' => null, 'new' => $startLocation],
         ]);
 
         $db->commit();
@@ -395,22 +447,65 @@ function workSessionStop($db, $database, $data, $authUserId, $authMemberId) {
         return;
     }
 
+    // Ortsnachweis beim Beenden
+    $endLocation  = null;
+    $verification = $running['verification'] ?? 'none';
+    $code         = isset($data->totp_code) ? trim((string)$data->totp_code) : '';
+    $force        = !empty($data->force);
+    $downgrade    = false;
+
+    if($code !== '') {
+        $resolved = resolveTotpLocation($db, $database, $code);
+        if($resolved === null) {
+            http_response_code(401);
+            echo json_encode(["message" => "Invalid or expired TOTP code"]);
+            return;
+        }
+        $endLocation = $resolved['location_name'];
+
+    } elseif($verification === 'start_end') {
+        if(!$force) {
+            // Anders als beim Start gibt es hier einen Ausweg: Ist die Station
+            // abgebaut oder endet der Einsatz woanders, duerfte das Mitglied
+            // sonst gar nicht stoppen und saesse bis zum automatischen
+            // Abschluss in einer laufenden Sitzung fest.
+            http_response_code(409);
+            echo json_encode([
+                "message" => "This activity type requires a TOTP code to stop",
+                "hint"    => "Send force: true to stop without one; the entry then needs approval"
+            ]);
+            return;
+        }
+        // Ohne Nachweis beendet: der Eintrag zaehlt erst nach Freigabe.
+        $downgrade = true;
+    }
+
     // Eine laufende Pause wird zuerst beendet und aufaddiert.
     $db->prepare("UPDATE {$prefix}work_sessions
                   SET break_minutes = break_minutes + IF(break_started_at IS NULL, 0,
                           GREATEST(0, TIMESTAMPDIFF(MINUTE, break_started_at, NOW()))),
                       break_started_at = NULL,
                       end_time = NOW(),
-                      note = COALESCE(NULLIF(?, ''), note)
+                      note = COALESCE(NULLIF(?, ''), note),
+                      end_location_name = ?,
+                      status = IF(? = 1, 'submitted', status)
                   WHERE session_id = ?")
-       ->execute([$note, $running['session_id']]);
+       ->execute([$note, $endLocation, $downgrade ? 1 : 0, $running['session_id']]);
 
     $stmt = $db->prepare(workSessionsSelect($prefix) . " WHERE ws.session_id = ?");
     $stmt->execute([$running['session_id']]);
     $session = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    logSessionChange($db, $database, (int)$running['session_id'], $authUserId, 'update',
-                     ['end_time' => ['old' => null, 'new' => $session['end_time']]]);
+    $changes = ['end_time' => ['old' => null, 'new' => $session['end_time']]];
+    if($endLocation !== null) {
+        $changes['end_location_name'] = ['old' => null, 'new' => $endLocation];
+    }
+    if($downgrade) {
+        $changes['status'] = ['old' => 'confirmed', 'new' => 'submitted'];
+        $changes['stopped_without_proof'] = ['old' => null, 'new' => true];
+    }
+
+    logSessionChange($db, $database, (int)$running['session_id'], $authUserId, 'update', $changes);
 
     echo json_encode(["message" => "Stopped", "session" => withDuration($session)]);
 }
