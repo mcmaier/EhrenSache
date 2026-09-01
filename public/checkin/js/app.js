@@ -560,7 +560,11 @@ let success = false;
                     
                     // Anwesenheitsliste initialisieren wenn Admin/Manager
                     await initAttendanceList();
-                    
+
+                    // Zeiterfassung initialisieren; blendet sich selbst aus,
+                    // wenn das Feature nicht freigeschaltet ist
+                    await initWorktime();
+
                     return success;
                 }
             } catch (error) {
@@ -1553,6 +1557,7 @@ async function loadAppointments() {
             option.textContent = `${apt.title} (${apt.date} ${apt.start_time})`;
             elements.exceptionAppointment.appendChild(option);
         });
+        fillWorktimeAppointments();
     } catch (error) {
         debug.error('Fehler beim Laden der Termine:', error);
     }
@@ -1970,6 +1975,244 @@ function addNewActivityToHistory(data) {
 }
 
 // ========================================
+// ZEITERFASSUNG
+// ========================================
+
+/** Minimales HTML-Escaping fuer Werte aus der Datenbank. */
+function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = value == null ? '' : String(value);
+    return div.innerHTML;
+}
+
+let worktimeSession = null;
+let worktimeTicker = null;
+let worktimeActivities = [];
+
+/**
+ * Prueft, ob die Zeiterfassung freigeschaltet ist, und blendet den Tab ein.
+ * Ist das Feature aus, antwortet die Ressource mit 404 — dann bleibt der
+ * Tab verborgen und nichts weiter passiert.
+ */
+async function initWorktime() {
+    const result = await apiCall('activity_types', 'GET');
+
+    if (!result.success) {
+        debug.log('Zeiterfassung nicht verfuegbar:', result.error);
+        return;
+    }
+
+    worktimeActivities = result.data || [];
+
+    const tab = document.getElementById('worktimeTab');
+    if (tab) tab.style.display = '';
+
+    const select = document.getElementById('worktimeActivity');
+    if (select) {
+        select.innerHTML = worktimeActivities
+            .map(a => `<option value="${a.activity_id}">${escapeHtml(a.activity_name)}</option>`)
+            .join('');
+    }
+
+    document.getElementById('worktimeStartBtn')?.addEventListener('click', worktimeStart);
+    document.getElementById('worktimePauseBtn')?.addEventListener('click', worktimeTogglePause);
+    document.getElementById('worktimeStopBtn')?.addEventListener('click', worktimeStop);
+}
+
+/** Holt den Zustand IMMER vom Server — nie aus dem Browser-Speicher. */
+async function loadWorktimeState() {
+    const result = await apiCall('work_sessions', 'GET', null, { running: 1 });
+    worktimeSession = result.success ? result.data : null;
+
+    renderWorktime();
+    await loadWorktimeList();
+}
+
+function renderWorktime() {
+    const idle = document.getElementById('worktimeIdle');
+    const running = document.getElementById('worktimeRunning');
+    if (!idle || !running) return;
+
+    if (worktimeSession && worktimeSession.is_running) {
+        idle.style.display = 'none';
+        running.style.display = '';
+
+        document.getElementById('worktimeActivityName').textContent =
+            worktimeSession.activity_name || 'Tätigkeit';
+
+        const pauseBtn = document.getElementById('worktimePauseBtn');
+        pauseBtn.querySelector('span:last-child').textContent =
+            worktimeSession.is_paused ? 'Weiter' : 'Pause';
+        pauseBtn.querySelector('.icon').textContent =
+            worktimeSession.is_paused ? '▶️' : '⏸️';
+
+        const breakMinutes = parseInt(worktimeSession.break_minutes, 10) || 0;
+        document.getElementById('worktimeBreakInfo').textContent =
+            breakMinutes > 0 ? `Pause bisher: ${breakMinutes} Min.` : '';
+
+        startWorktimeTicker();
+    } else {
+        idle.style.display = '';
+        running.style.display = 'none';
+        stopWorktimeTicker();
+    }
+}
+
+function startWorktimeTicker() {
+    stopWorktimeTicker();
+    updateWorktimeElapsed();
+    worktimeTicker = setInterval(updateWorktimeElapsed, 1000);
+}
+
+function stopWorktimeTicker() {
+    if (worktimeTicker) {
+        clearInterval(worktimeTicker);
+        worktimeTicker = null;
+    }
+}
+
+function updateWorktimeElapsed() {
+    if (!worktimeSession || !worktimeSession.is_running) return;
+
+    // start_time kommt ohne Zeitzone; als lokale Zeit interpretieren.
+    const start = new Date(String(worktimeSession.start_time).replace(' ', 'T'));
+    const seconds = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+
+    const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+    const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+    const sec = String(seconds % 60).padStart(2, '0');
+
+    const el = document.getElementById('worktimeElapsed');
+    if (el) el.textContent = `${h}:${m}:${sec}`;
+}
+
+function showWorktimeStatus(message, isError = false) {
+    const el = document.getElementById('worktimeStatus');
+    if (!el) return;
+    el.textContent = message;
+    el.style.color = isError ? '#c62828' : '';
+    setTimeout(() => { el.textContent = ''; }, 4000);
+}
+
+async function worktimeStart() {
+    const activityId = document.getElementById('worktimeActivity')?.value;
+    if (!activityId) {
+        showWorktimeStatus('Bitte eine Tätigkeit wählen', true);
+        return;
+    }
+
+    const body = { action: 'start', activity_id: parseInt(activityId, 10) };
+
+    const appointmentId = document.getElementById('worktimeAppointment')?.value;
+    if (appointmentId) body.appointment_id = parseInt(appointmentId, 10);
+
+    const result = await apiCall('work_sessions', 'POST', body);
+
+    if (!result.success) {
+        showWorktimeStatus('Start fehlgeschlagen: ' + result.error, true);
+        await loadWorktimeState();
+        return;
+    }
+
+    worktimeSession = result.data.session;
+    renderWorktime();
+    showWorktimeStatus('Zeiterfassung gestartet');
+}
+
+async function worktimeTogglePause() {
+    const action = worktimeSession && worktimeSession.is_paused ? 'resume' : 'pause';
+    const result = await apiCall('work_sessions', 'POST', { action });
+
+    if (!result.success) {
+        showWorktimeStatus('Aktion fehlgeschlagen: ' + result.error, true);
+        await loadWorktimeState();
+        return;
+    }
+
+    worktimeSession = result.data.session;
+    renderWorktime();
+}
+
+async function worktimeStop() {
+    // Bewusst ein Eingabefeld statt prompt(): ein blockierender Dialog wird in
+    // einer installierten PWA teils unterdrueckt und ist auf Mobilgeraeten
+    // unbrauchbar.
+    const noteField = document.getElementById('worktimeNote');
+    const note = noteField ? noteField.value.trim() : '';
+
+    const result = await apiCall('work_sessions', 'POST', { action: 'stop', note });
+
+    if (!result.success) {
+        showWorktimeStatus('Stoppen fehlgeschlagen: ' + result.error, true);
+        await loadWorktimeState();
+        return;
+    }
+
+    if (noteField) noteField.value = '';
+
+    const minutes = result.data.session.duration_minutes;
+    showWorktimeStatus(`Beendet: ${minutes} ${minutes === 1 ? 'Minute' : 'Minuten'} erfasst`);
+    worktimeSession = null;
+    renderWorktime();
+    await loadWorktimeList();
+}
+
+async function loadWorktimeList() {
+    const el = document.getElementById('worktimeList');
+    if (!el) return;
+
+    const year = new Date().getFullYear();
+    const result = await apiCall('work_sessions', 'GET', null, { year });
+
+    if (!result.success) {
+        el.innerHTML = '<div class="history-empty">Zeiten konnten nicht geladen werden.</div>';
+        return;
+    }
+
+    const sessions = (result.data || []).filter(s => !s.is_running);
+
+    if (!sessions.length) {
+        el.innerHTML = '<div class="history-empty">Noch keine erfassten Zeiten in diesem Jahr.</div>';
+        return;
+    }
+
+    const statusLabel = {
+        confirmed: '✓ bestätigt',
+        submitted: '⏳ wartet auf Freigabe',
+        rejected: '✗ abgelehnt'
+    };
+
+    el.innerHTML = sessions.map(s => {
+        const cls = s.status === 'confirmed' ? 'history-item verified' : 'history-item pending';
+        const breakInfo = (parseInt(s.break_minutes, 10) || 0) > 0
+            ? ` (${s.break_minutes} Min. Pause)` : '';
+        const note = s.note ? `<div>${escapeHtml(s.note)}</div>` : '';
+
+        return `<div class="${cls}">
+            <strong>${escapeHtml(s.activity_name || 'Tätigkeit')}</strong>
+            <div>${escapeHtml(String(s.start_time).substring(0, 16))}</div>
+            <div>${s.duration_minutes} Min.${breakInfo}</div>
+            ${note}
+            <div>${statusLabel[s.status] || escapeHtml(s.status)}</div>
+        </div>`;
+    }).join('');
+}
+
+/** Termine des heutigen Tages in die optionale Auswahl fuellen. */
+function fillWorktimeAppointments() {
+    const select = document.getElementById('worktimeAppointment');
+    if (!select) return;
+
+    const today = new Date().toISOString().substring(0, 10);
+    const todays = (appointments || []).filter(a => a.date === today);
+
+    select.innerHTML = '<option value="">— kein Termin —</option>'
+        + todays.map(a =>
+            `<option value="${a.appointment_id}">${escapeHtml(a.title)} (${a.start_time})</option>`
+        ).join('');
+}
+
+// ========================================
 // TAB MANAGEMENT
 // ========================================
 function initTabs() {
@@ -2003,6 +2246,11 @@ function initTabs() {
             {
                 debug.log("Loading History");
                 loadHistory();
+            }
+            else if(targetTab === 'worktime')
+            {
+                debug.log("Loading Worktime");
+                loadWorktimeState();
             }
             else if(targetTab === 'attendance-list')
             {

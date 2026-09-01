@@ -104,6 +104,10 @@
                     <span class="icon">📋</span>
                     <span>Verlauf</span>
                 </button>                
+                <button class="tab-button" data-tab="worktime" id="worktimeTab" style="display: none;">
+                    <span class="icon">⏱️</span>
+                    <span>Zeit</span>
+                </button>
                 <button class="tab-button" data-tab="stats">
                     <span class="icon">📊</span>
                     <span>Statistik</span>
@@ -180,6 +184,59 @@
                         <h3>📋 Letzte Aktivitäten</h3>                                               
                     </div>
                     <div class="history-list" id="historyList"></div>
+                </div>
+            </div>
+
+            <!-- TAB: ZEITERFASSUNG -->
+            <div class="tab-content" data-tab="worktime">
+                <div class="checkin-section">
+                    <div id="worktimeIdle">
+                        <div class="form-group">
+                            <label for="worktimeActivity">Tätigkeit</label>
+                            <select id="worktimeActivity"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="worktimeAppointment">Termin (optional)</label>
+                            <select id="worktimeAppointment">
+                                <option value="">— kein Termin —</option>
+                            </select>
+                        </div>
+                        <div class="action-buttons">
+                            <button id="worktimeStartBtn" class="action-button">
+                                <span class="icon">▶️</span><span>Start</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="worktimeRunning" style="display: none;">
+                        <div class="datetime-display">
+                            <div id="worktimeActivityName">-</div>
+                            <div id="worktimeElapsed">00:00:00</div>
+                            <div id="worktimeBreakInfo"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="worktimeNote">Notiz (optional)</label>
+                            <input type="text" id="worktimeNote" maxlength="255"
+                                   placeholder="z. B. Bühne für das Frühjahrskonzert">
+                        </div>
+                        <div class="action-buttons">
+                            <button id="worktimePauseBtn" class="action-button">
+                                <span class="icon">⏸️</span><span>Pause</span>
+                            </button>
+                            <button id="worktimeStopBtn" class="action-button">
+                                <span class="icon">⏹️</span><span>Stopp</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="worktimeStatus"></div>
+                </div>
+
+                <div class="history-section" style="display: block;">
+                    <div id="worktime-header">
+                        <h3>⏱️ Erfasste Zeiten</h3>
+                    </div>
+                    <div class="history-list" id="worktimeList"></div>
                 </div>
             </div>
 
