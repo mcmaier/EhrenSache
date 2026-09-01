@@ -285,7 +285,15 @@ async function saveAllSettings() {
         }
 
         applyTheme(systemSettings);
-        
+
+        // Wurde die Zeiterfassung ein- oder ausgeschaltet, muss die Navigation
+        // sofort folgen — sonst bliebe der Punkt bis zum Neuladen falsch.
+        if (updates.some(u => u.key === 'worktime_enabled')) {
+            const { resetWorktimeEnabled, checkWorktimeEnabled } = await import('./worktime.js');
+            resetWorktimeEnabled();
+            await checkWorktimeEnabled();
+        }
+
         hasUnsavedChanges = false;
         updateSaveButtonState();
         showToast(`${updates.length} Einstellung(en) gespeichert`, 'success');

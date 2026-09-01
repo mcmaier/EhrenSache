@@ -304,6 +304,57 @@
                         </div>
                     </div>
 
+                    <!-- Zeiterfassung -->
+                    <div class="settings-card">
+                        <h3>⏱️ Zeiterfassung</h3>
+                        <div class="settings-item">
+                            <label class="checkbox-label">
+                                <input type="checkbox"
+                                    id="setting_worktime_enabled"
+                                    class="setting-input"
+                                    data-key="worktime_enabled">
+                                Zeiterfassung aktivieren
+                            </label>
+                            <small class="input-hint">
+                                Erfassung von Arbeitszeiten mit Beginn, Ende und Pause — für
+                                Stundennachweise und Verwendungsnachweise. Ist die Funktion aus,
+                                werden keinerlei Arbeitszeitdaten erhoben und sie ist weder im
+                                Dashboard noch in der PWA sichtbar.
+                                <strong>Vor dem Aktivieren Abschnitt 10 der DATENSCHUTZ.md lesen:</strong>
+                                Zweckbindung, Löschfristen und die Abgrenzung zum
+                                Beschäftigungsverhältnis sind zu klären.
+                            </small>
+                        </div>
+                        <div class="settings-item">
+                            <label>Obergrenze je Sitzung (Stunden)</label>
+                            <input type="number"
+                                id="setting_worktime_max_session_hours"
+                                class="setting-input"
+                                data-key="worktime_max_session_hours"
+                                min="1"
+                                max="24"
+                                step="1">
+                            <small class="input-hint">
+                                Eine vergessene Sitzung wird nach dieser Zeit automatisch beendet,
+                                auf die Obergrenze gekappt und zur Freigabe vorgelegt — sie zählt
+                                also nicht ungeprüft.
+                            </small>
+                        </div>
+                        <div class="settings-item">
+                            <label class="checkbox-label">
+                                <input type="checkbox"
+                                    id="setting_worktime_require_note"
+                                    class="setting-input"
+                                    data-key="worktime_require_note">
+                                Notiz verpflichtend
+                            </label>
+                            <small class="input-hint">
+                                Verlangt beim Stoppen des Timers und bei nachträglichen Einträgen
+                                eine Beschreibung der Tätigkeit.
+                            </small>
+                        </div>
+                    </div>
+
                     <div class="settings-card">
                         <h3>📋 DSGVO Datenverwaltung</h3>        
                         <div class="settings-item">

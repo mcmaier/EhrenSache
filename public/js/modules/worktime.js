@@ -67,6 +67,16 @@ function proofOf(session) {
  * Ist die Zeiterfassung freigeschaltet? Ist sie es nicht, antwortet die
  * Ressource mit 404 — dann bleibt der Navigationspunkt verborgen.
  */
+/**
+ * Verwirft das gemerkte Ergebnis, damit checkWorktimeEnabled() neu prueft.
+ * Wird nach dem Speichern der Einstellungen aufgerufen: sonst bliebe der
+ * Navigationspunkt bis zum naechsten Neuladen verborgen bzw. sichtbar.
+ */
+export function resetWorktimeEnabled() {
+    worktimeEnabled = null;
+    activityTypes = [];
+}
+
 export async function checkWorktimeEnabled() {
     if (worktimeEnabled !== null) return worktimeEnabled;
 
@@ -80,6 +90,11 @@ export async function checkWorktimeEnabled() {
     document.querySelectorAll('[data-section="zeiterfassung"]').forEach(el => {
         el.style.display = worktimeEnabled ? '' : 'none';
     });
+
+    const block = document.getElementById('activityTypesBlock');
+    if (block) {
+        block.style.display = (worktimeEnabled && isAdmin) ? '' : 'none';
+    }
 
     return worktimeEnabled;
 }
