@@ -33,3 +33,28 @@ function latestSchemaVersion(array $versions): ?string
 
     return $latest;
 }
+
+/**
+ * Bildet das Ergebnis von detectDbVersion() auf einen kettenfähigen Versionsstring ab.
+ *
+ * '1.1.x' bedeutet: Prefix-Tabellen vorhanden, aber keine schema_version-Tabelle.
+ * Das trifft Installationen, die zwischen 1.1.0 und 1.1.3 frisch eingerichtet wurden.
+ * Schemaseitig sind diese Stände gleichwertig zu 1.1.3, weil ehrensache_db.sql dort
+ * bereits alles anlegt, was die Migration 1.0.0 nachrüstet.
+ *
+ * @throws RuntimeException wenn die Version nicht bestimmbar ist
+ */
+function normalizeDetectedVersion(string $detected): string
+{
+    if ($detected === '1.1.x') {
+        return '1.1.3';
+    }
+    if ($detected === '' || $detected === 'unbekannt') {
+        throw new RuntimeException(
+            'Die installierte Datenbankversion konnte nicht bestimmt werden. '
+            . 'Bitte die Datenbank prüfen, bevor ein Update ausgeführt wird.'
+        );
+    }
+
+    return $detected;
+}

@@ -24,3 +24,24 @@ test('latestSchemaVersion liefert null bei leerer Liste', function () {
 test('latestSchemaVersion ignoriert leere und nicht-String-Werte', function () {
     assertSame('1.1.3', latestSchemaVersion(['', '1.1.3', null, 42]));
 });
+
+test('normalizeDetectedVersion bildet 1.1.x auf 1.1.3 ab', function () {
+    assertSame('1.1.3', normalizeDetectedVersion('1.1.x'));
+});
+
+test('normalizeDetectedVersion laesst konkrete Versionen unveraendert', function () {
+    assertSame('1.0.0', normalizeDetectedVersion('1.0.0'));
+    assertSame('1.2.0', normalizeDetectedVersion('1.2.0'));
+});
+
+test('normalizeDetectedVersion lehnt unbekannt ab', function () {
+    assertThrows(function () {
+        normalizeDetectedVersion('unbekannt');
+    });
+});
+
+test('normalizeDetectedVersion lehnt Leerstring ab', function () {
+    assertThrows(function () {
+        normalizeDetectedVersion('');
+    });
+});
