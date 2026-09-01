@@ -80,3 +80,52 @@ test('Manifest enthaelt den bestehenden Schritt ab 1.0.0', function () {
     $froms    = array_column($manifest, 'from');
     assertTrue(in_array('1.0.0', $froms, true), 'Schritt ab 1.0.0 fehlt');
 });
+
+/** Festes Testmanifest — unabhängig vom echten, damit die Tests nicht mitwandern. */
+function fixtureManifest(): array
+{
+    return [
+        ['from' => '1.0.0', 'to' => '1.1.3', 'file' => 'a.php', 'function' => 'migrate_a'],
+        ['from' => '1.1.3', 'to' => '1.2.0', 'file' => 'b.php', 'function' => 'migrate_b'],
+        ['from' => '1.2.0', 'to' => '1.3.0', 'file' => 'c.php', 'function' => 'migrate_c'],
+    ];
+}
+
+test('resolveMigrationChain liefert alle Schritte von der aeltesten Version', function () {
+    $chain = resolveMigrationChain('1.0.0', '1.3.0', fixtureManifest());
+    assertSame(['a.php', 'b.php', 'c.php'], array_column($chain, 'file'));
+});
+
+test('resolveMigrationChain liefert nur die noch fehlenden Schritte', function () {
+    $chain = resolveMigrationChain('1.1.3', '1.3.0', fixtureManifest());
+    assertSame(['b.php', 'c.php'], array_column($chain, 'file'));
+});
+
+test('resolveMigrationChain haelt bei der Zielversion an', function () {
+    $chain = resolveMigrationChain('1.0.0', '1.2.0', fixtureManifest());
+    assertSame(['a.php', 'b.php'], array_column($chain, 'file'));
+});
+
+test('resolveMigrationChain liefert nichts, wenn schon aktuell', function () {
+    assertSame([], resolveMigrationChain('1.3.0', '1.3.0', fixtureManifest()));
+});
+
+test('resolveMigrationChain liefert nichts, wenn die DB neuer ist als der Code', function () {
+    assertSame([], resolveMigrationChain('1.4.0', '1.3.0', fixtureManifest()));
+});
+
+test('resolveMigrationChain wirft bei einer Luecke im Manifest', function () {
+    assertThrows(function () {
+        // 1.0.5 kommt in keinem 'from' vor
+        resolveMigrationChain('1.0.5', '1.3.0', fixtureManifest());
+    });
+});
+
+test('resolveMigrationChain wirft bei einem Schritt, der nicht vorwaerts fuehrt', function () {
+    $broken = [
+        ['from' => '1.0.0', 'to' => '1.0.0', 'file' => 'loop.php', 'function' => 'migrate_loop'],
+    ];
+    assertThrows(function () use ($broken) {
+        resolveMigrationChain('1.0.0', '1.3.0', $broken);
+    });
+});

@@ -79,3 +79,48 @@ function loadMigrationManifest(string $path): array
 
     return $manifest;
 }
+
+/**
+ * Bestimmt die Migrationsschritte, die von $from nach $to auszuführen sind.
+ *
+ * @param array<int, array{from: string, to: string, file: string, function: string}> $manifest
+ * @return array<int, array{from: string, to: string, file: string, function: string}>
+ * @throws RuntimeException bei einer Lücke oder einem nicht vorwärts führenden Schritt
+ */
+function resolveMigrationChain(string $from, string $to, array $manifest): array
+{
+    if (version_compare($from, $to, '>=')) {
+        return [];
+    }
+
+    $byFrom = [];
+    foreach ($manifest as $step) {
+        $byFrom[$step['from']] = $step;
+    }
+
+    $chain   = [];
+    $current = $from;
+
+    while (version_compare($current, $to, '<')) {
+        if (!isset($byFrom[$current])) {
+            throw new RuntimeException(
+                "Keine Migration ab Version {$current} vorhanden. "
+                . 'Das Manifest hat eine Lücke oder die Datenbankversion ist unerwartet.'
+            );
+        }
+
+        $step = $byFrom[$current];
+
+        // Schutz vor einer Endlosschleife durch ein fehlerhaftes Manifest
+        if (version_compare($step['to'], $current, '<=')) {
+            throw new RuntimeException(
+                "Migration {$step['file']} führt von {$current} nicht vorwärts."
+            );
+        }
+
+        $chain[] = $step;
+        $current = $step['to'];
+    }
+
+    return $chain;
+}
