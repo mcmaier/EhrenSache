@@ -58,3 +58,24 @@ function normalizeDetectedVersion(string $detected): string
 
     return $detected;
 }
+
+/**
+ * Lädt das Migrationsmanifest.
+ *
+ * @return array<int, array{from: string, to: string, file: string, function: string}>
+ * @throws RuntimeException wenn die Datei fehlt oder kein Array liefert
+ */
+function loadMigrationManifest(string $path): array
+{
+    if (!file_exists($path)) {
+        throw new RuntimeException("Migrationsmanifest nicht gefunden: {$path}");
+    }
+
+    $manifest = require $path;
+
+    if (!is_array($manifest)) {
+        throw new RuntimeException("Migrationsmanifest liefert kein Array: {$path}");
+    }
+
+    return $manifest;
+}

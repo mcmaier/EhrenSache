@@ -45,3 +45,38 @@ test('normalizeDetectedVersion lehnt Leerstring ab', function () {
         normalizeDetectedVersion('');
     });
 });
+
+test('loadMigrationManifest liefert wohlgeformte Schritte', function () {
+    $manifest = loadMigrationManifest(__DIR__ . '/../../private/migrations/manifest.php');
+
+    assertTrue(count($manifest) >= 1, 'Manifest darf nicht leer sein');
+
+    foreach ($manifest as $i => $step) {
+        foreach (['from', 'to', 'file', 'function'] as $key) {
+            assertTrue(
+                isset($step[$key]) && is_string($step[$key]) && $step[$key] !== '',
+                "Schritt {$i}: Feld '{$key}' fehlt oder ist leer"
+            );
+        }
+        assertTrue(
+            version_compare($step['to'], $step['from'], '>'),
+            "Schritt {$i}: 'to' muss groesser als 'from' sein"
+        );
+        assertTrue(
+            file_exists(__DIR__ . '/../../private/migrations/' . $step['file']),
+            "Schritt {$i}: Datei {$step['file']} existiert nicht"
+        );
+    }
+});
+
+test('loadMigrationManifest wirft bei fehlender Datei', function () {
+    assertThrows(function () {
+        loadMigrationManifest(__DIR__ . '/gibt-es-nicht.php');
+    });
+});
+
+test('Manifest enthaelt den bestehenden Schritt ab 1.0.0', function () {
+    $manifest = loadMigrationManifest(__DIR__ . '/../../private/migrations/manifest.php');
+    $froms    = array_column($manifest, 'from');
+    assertTrue(in_array('1.0.0', $froms, true), 'Schritt ab 1.0.0 fehlt');
+});
