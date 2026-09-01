@@ -125,6 +125,19 @@ if ($step == 4) {
         $stmt = $pdo->prepare("INSERT INTO {$usersTable} (email, password_hash, role, is_active, account_status, api_token, api_token_expires_at) 
                                VALUES (?, ?, 'admin', 1, 'active', ?, ?)");
         $stmt->execute([$admin['email'], $passwordHash, $apiToken, $tokenExpires]);
+
+        // Schema-Version stempeln, damit der Update-Wizard den Stand kennt
+        $versionFile = '../../version.json';
+        $installedVersion = '1.1.3';
+        if (file_exists($versionFile)) {
+            $versionData = json_decode(file_get_contents($versionFile), true);
+            if (is_array($versionData) && !empty($versionData['version'])) {
+                $installedVersion = $versionData['version'];
+            }
+        }
+        $schemaTable = $cfg['prefix'] . 'schema_version';
+        $pdo->prepare("INSERT IGNORE INTO {$schemaTable} (version) VALUES (?)")
+            ->execute([$installedVersion]);
                
         // Prüfen ob config.php bereits existiert
         if (file_exists('../../private/config/config.php')) {

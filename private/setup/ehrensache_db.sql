@@ -432,6 +432,16 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('smtp_configured', '0', 'boolean', 'general', 'SMTP-Server konfiguriert');
 
 
+--
+-- Schema-Versionierung
+--
+CREATE TABLE IF NOT EXISTS `{PREFIX}schema_version` (
+  `version`    VARCHAR(20) NOT NULL,
+  `applied_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
 CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS
 SELECT 
     u.user_id,
