@@ -41,11 +41,19 @@ function assertTrue($cond, string $msg = ''): void
     }
 }
 
+/**
+ * Erwartet eine Exception.
+ *
+ * Fängt bewusst nur Exception, nicht Throwable: Ein PHP-Error wie
+ * "Call to undefined function" ist ein Programmierfehler und muss den Test
+ * scheitern lassen, nicht bestehen. Sonst meldet die Suite bei einem
+ * Tippfehler im Funktionsnamen grün.
+ */
 function assertThrows(callable $fn, string $msg = ''): void
 {
     try {
         $fn();
-    } catch (Throwable $e) {
+    } catch (Exception $e) {
         return;
     }
     throw new RuntimeException($msg !== '' ? $msg : 'Es wurde keine Exception geworfen');
