@@ -33,6 +33,7 @@ require_once '../../private/helpers/totp.php';
 require_once '../../private/helpers/utils.php';
 require_once '../../private/helpers/mailer.php';
 require_once '../../private/helpers/version.php';
+require_once '../../private/helpers/worktime.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';
@@ -54,6 +55,7 @@ require_once '../../private/handlers/settings.php';
 require_once '../../private/handlers/user_mailer.php';
 require_once '../../private/handlers/attendance_list.php';
 require_once '../../private/handlers/my_data.php';
+require_once '../../private/handlers/activity_types.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -472,6 +474,9 @@ switch($resource) {
         break;        
     case 'appointment_types':
         handleAppointmentTypes($db, $database, $request_method, $id);
+        break;
+    case 'activity_types':
+        handleActivityTypes($db, $database, $request_method, $id);
         break;        
     case 'statistics':
         handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId);        
