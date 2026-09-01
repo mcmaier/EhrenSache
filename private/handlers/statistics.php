@@ -147,9 +147,19 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
     //$totalPossible = $totalAppointments * $totalMembers;
     $overallAverage = $totalPossible > 0 ? round(($totalPresent / $totalPossible) * 100, 1)  : 0;
     
+    // Zeiterfassung als eigener Block. Anwesenheitsquote und geleistete Stunden
+    // sind verschiedene Fragen; sie in dieselbe Aggregation zu pressen macht
+    // beide unklarer. Die bisherige Logik bleibt deshalb unberuehrt.
+    $worktime = null;
+    if (isset($_GET['include']) && $_GET['include'] === 'worktime'
+        && isWorktimeEnabled($db, $database)) {
+        $worktime = worktimeStatistics($db, $database, $year, $memberId);
+    }
+
     echo json_encode([
         "warning" => isset($warning) ? $warning : null,
         'year' => $year,
+        'worktime' => $worktime,
         'summary' => [
             'total_appointments' => $totalAppointments,
             'total_members' => $totalMembers,

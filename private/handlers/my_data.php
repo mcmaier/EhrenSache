@@ -110,7 +110,46 @@ function handleMyData($db, $database, $request_method, $authUserId)
     $stmt->execute([$member_id]);
     $data['membership_dates'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // 7. Metadaten
+    // 7. Zeiterfassung
+    // Gehoert zur Auskunft nach Art. 15 DSGVO wie jede andere Verarbeitung.
+    // Auch die Aenderungshistorie: sie enthaelt personenbezogene Daten und
+    // ueberlebt bewusst die Loeschung einer Sitzung.
+    $stmt = $db->prepare("
+        SELECT
+            ws.session_id,
+            ws.start_time,
+            ws.end_time,
+            ws.break_minutes,
+            ws.note,
+            ws.status,
+            ws.source,
+            ws.start_location_name,
+            ws.end_location_name,
+            ws.created_at,
+            ws.approved_at,
+            at.activity_name,
+            a.title as appointment_title,
+            a.date as appointment_date
+        FROM {$prefix}work_sessions ws
+        LEFT JOIN {$prefix}activity_types at ON ws.activity_id = at.activity_id
+        LEFT JOIN {$prefix}appointments a    ON ws.appointment_id = a.appointment_id
+        WHERE ws.member_id = ?
+        ORDER BY ws.start_time DESC
+    ");
+    $stmt->execute([$member_id]);
+    $data['work_sessions'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $db->prepare("
+        SELECT l.log_id, l.session_id, l.changed_at, l.action, l.changes
+        FROM {$prefix}work_session_log l
+        JOIN {$prefix}work_sessions ws ON l.session_id = ws.session_id
+        WHERE ws.member_id = ?
+        ORDER BY l.changed_at DESC
+    ");
+    $stmt->execute([$member_id]);
+    $data['work_session_log'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 8. Metadaten
     $data['export_info'] = [
         'export_date' => date('Y-m-d H:i:s'),
         'format' => 'JSON',

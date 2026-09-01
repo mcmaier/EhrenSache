@@ -255,3 +255,150 @@ function closeStaleSession($db, $database, array $session, ?int $userId): bool
 
     return true;
 }
+
+// ============================================
+// AUSWERTUNG
+// ============================================
+
+/**
+ * SQL-Ausdruck für den Nachweisgrad einer Sitzung.
+ *
+ * stundenbelegt = Start UND Ende an einer Station belegt; erst dann ist die
+ * DAUER belegt und nicht bloß die Anwesenheit zu Beginn.
+ */
+function worktimeProofExpression(string $alias = 'ws'): string
+{
+    return "CASE
+                WHEN {$alias}.start_location_name IS NOT NULL
+                 AND {$alias}.end_location_name   IS NOT NULL THEN 'hours'
+                WHEN {$alias}.start_location_name IS NOT NULL THEN 'start'
+                ELSE 'none'
+            END";
+}
+
+/** SQL-Ausdruck für die Nettodauer in Minuten. */
+function worktimeDurationExpression(string $alias = 'ws'): string
+{
+    return "GREATEST(0, TIMESTAMPDIFF(MINUTE, {$alias}.start_time, {$alias}.end_time)
+                        - {$alias}.break_minutes)";
+}
+
+/**
+ * Stunden je Mitglied für ein Jahr, aufgeschlüsselt nach Tätigkeitsart und
+ * Nachweisgrad. Gezählt wird ausschließlich, was bestätigt und beendet ist.
+ *
+ * @param int|null $memberId  Auf ein Mitglied einschränken
+ * @return array{summary: array<string, int>, members: array<int, array<string, mixed>>}
+ */
+function worktimeStatistics($db, $database, int $year, ?int $memberId = null): array
+{
+    $prefix   = $database->table('');
+    $duration = worktimeDurationExpression();
+    $proof    = worktimeProofExpression();
+
+    $where  = "ws.status = 'confirmed' AND ws.end_time IS NOT NULL AND YEAR(ws.start_time) = ?";
+    $params = [$year];
+
+    if ($memberId !== null) {
+        $where .= " AND ws.member_id = ?";
+        $params[] = $memberId;
+    }
+
+    $stmt = $db->prepare("
+        SELECT ws.member_id,
+               m.name, m.surname, m.member_number,
+               ws.activity_id, at.activity_name,
+               {$proof} AS proof,
+               COUNT(*)        AS sessions,
+               SUM({$duration}) AS minutes
+        FROM {$prefix}work_sessions ws
+        LEFT JOIN {$prefix}members m         ON ws.member_id  = m.member_id
+        LEFT JOIN {$prefix}activity_types at ON ws.activity_id = at.activity_id
+        WHERE {$where}
+        GROUP BY ws.member_id, ws.activity_id, proof
+        ORDER BY m.surname, m.name, at.activity_name
+    ");
+    $stmt->execute($params);
+
+    $members = [];
+    $summary = ['total_minutes' => 0, 'hours_proven' => 0, 'start_proven' => 0, 'unproven' => 0,
+                'sessions' => 0];
+
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $id      = (int) $row['member_id'];
+        $minutes = (int) $row['minutes'];
+        $count   = (int) $row['sessions'];
+
+        if (!isset($members[$id])) {
+            $members[$id] = [
+                'member_id'     => $id,
+                'name'          => $row['name'],
+                'surname'       => $row['surname'],
+                'member_number' => $row['member_number'],
+                'worked_minutes' => 0,
+                'sessions'      => 0,
+                'by_proof'      => ['hours' => 0, 'start' => 0, 'none' => 0],
+                'by_activity'   => [],
+            ];
+        }
+
+        $members[$id]['worked_minutes'] += $minutes;
+        $members[$id]['sessions']       += $count;
+        $members[$id]['by_proof'][$row['proof']] += $minutes;
+
+        $activityId = (int) $row['activity_id'];
+        if (!isset($members[$id]['by_activity'][$activityId])) {
+            $members[$id]['by_activity'][$activityId] = [
+                'activity_id'   => $activityId,
+                'activity_name' => $row['activity_name'],
+                'minutes'       => 0,
+                'sessions'      => 0,
+            ];
+        }
+        $members[$id]['by_activity'][$activityId]['minutes']  += $minutes;
+        $members[$id]['by_activity'][$activityId]['sessions'] += $count;
+
+        $summary['total_minutes'] += $minutes;
+        $summary['sessions']      += $count;
+        $summary[$row['proof'] === 'hours' ? 'hours_proven'
+                : ($row['proof'] === 'start' ? 'start_proven' : 'unproven')] += $minutes;
+    }
+
+    // Assoziative Zwischenschluessel entfernen, damit JSON Arrays liefert
+    foreach ($members as &$member) {
+        $member['by_activity'] = array_values($member['by_activity']);
+    }
+    unset($member);
+
+    return ['summary' => $summary, 'members' => array_values($members)];
+}
+
+/**
+ * Summen je Tätigkeitsart für einen Zeitraum — Grundlage des
+ * Verwendungsnachweises gegenüber Fördergebern.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function worktimeByActivity($db, $database, int $year): array
+{
+    $prefix   = $database->table('');
+    $duration = worktimeDurationExpression();
+    $proof    = worktimeProofExpression();
+
+    $stmt = $db->prepare("
+        SELECT at.activity_id, at.activity_name, at.verification,
+               {$proof} AS proof,
+               COUNT(*)         AS sessions,
+               COUNT(DISTINCT ws.member_id) AS members,
+               SUM({$duration}) AS minutes
+        FROM {$prefix}work_sessions ws
+        LEFT JOIN {$prefix}activity_types at ON ws.activity_id = at.activity_id
+        WHERE ws.status = 'confirmed' AND ws.end_time IS NOT NULL
+          AND YEAR(ws.start_time) = ?
+        GROUP BY at.activity_id, proof
+        ORDER BY at.activity_name
+    ");
+    $stmt->execute([$year]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
