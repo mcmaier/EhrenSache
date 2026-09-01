@@ -56,6 +56,7 @@ require_once '../../private/handlers/user_mailer.php';
 require_once '../../private/handlers/attendance_list.php';
 require_once '../../private/handlers/my_data.php';
 require_once '../../private/handlers/activity_types.php';
+require_once '../../private/handlers/work_sessions.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -477,6 +478,10 @@ switch($resource) {
         break;
     case 'activity_types':
         handleActivityTypes($db, $database, $request_method, $id);
+        break;
+    case 'work_sessions':
+        handleWorkSessions($db, $database, $request_method, $id,
+                           $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
         break;        
     case 'statistics':
         handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId);        

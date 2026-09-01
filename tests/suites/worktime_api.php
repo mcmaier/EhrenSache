@@ -143,3 +143,36 @@ test('Feature-Schalter: bei worktime_enabled=0 antwortet activity_types mit 404'
         setSetting('worktime_enabled', '1');
     }
 });
+
+test('work_sessions: leere Liste fuer einen Nutzer ohne Sitzungen', function () {
+    enableWorktime();
+    $res = apiRequest('GET', 'work_sessions', ['token' => apiToken('user')]);
+    assertStatus(200, $res);
+    assertTrue(is_array($res['body']), 'Liste erwartet');
+});
+
+test('work_sessions: running=1 liefert null ohne laufende Sitzung', function () {
+    enableWorktime();
+    $res = apiRequest('GET', 'work_sessions', [
+        'token' => apiToken('user'),
+        'query' => ['running' => 1],
+    ]);
+    assertStatus(200, $res);
+    assertSame(null, $res['body']);
+});
+
+test('work_sessions: unbekannte id liefert 404', function () {
+    enableWorktime();
+    $res = apiRequest('GET', 'work_sessions', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => 999999],
+    ]);
+    assertStatus(404, $res);
+});
+
+test('work_sessions: Zugriff ohne Token wird abgewiesen', function () {
+    enableWorktime();
+    $res = apiRequest('GET', 'work_sessions');
+    assertTrue($res['status'] === 401 || $res['status'] === 403,
+        "401 oder 403 erwartet, {$res['status']} erhalten");
+});
