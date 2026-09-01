@@ -18,6 +18,8 @@ define('MIGRATION_PATH', __DIR__ . '/../../private/migrations/');
 define('VERSION_PATH',   __DIR__ . '/../../version.json');
 define('HTACCESS_PATH',  __DIR__ . '/.htaccess');
 
+require_once __DIR__ . '/../../private/helpers/migrations.php';
+
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
 /** Liest die relevanten Werte aus config.php via Regex (sicher für 1.0.0 ohne $prefix). */
@@ -53,17 +55,12 @@ function tableExists(PDO $pdo, string $table): bool
 /** Ermittelt die installierte DB-Version anhand der vorhandenen Tabellen. */
 function detectDbVersion(PDO $pdo, string $prefix): string
 {
-    // Schema-Versions-Tabelle (mit Prefix, wie sie die Migration anlegt)
-    if (!empty($prefix) && tableExists($pdo, $prefix . 'schema_version')) {
-        $row = $pdo->query("SELECT version FROM `{$prefix}schema_version`
-                            ORDER BY applied_at DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-        return $row['version'] ?? '1.1.x';
-    }
-    // Kein Prefix: schema_version ohne Prefix
-    if (empty($prefix) && tableExists($pdo, 'schema_version')) {
-        $row = $pdo->query("SELECT version FROM `schema_version`
-                            ORDER BY applied_at DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-        return $row['version'] ?? '1.1.x';
+    // Schema-Versions-Tabelle. Die hoechste Version gewinnt, nicht die zuletzt
+    // eingetragene: mehrere Zeilen koennen dieselbe Sekunde tragen, und eine
+    // Textsortierung stellt '1.10.0' vor '1.9.0'.
+    if (tableExists($pdo, $prefix . 'schema_version')) {
+        $latest = latestSchemaVersion(readSchemaVersions($pdo, $prefix));
+        return $latest ?? '1.1.x';
     }
     // Alte Tabellen ohne Prefix vorhanden → 1.0.0
     if (tableExists($pdo, 'users') && !tableExists($pdo, $prefix . 'users')) {
@@ -156,11 +153,42 @@ if ($step == 3 && $_SERVER['REQUEST_METHOD'] !== 'POST') {
         $pdo = connectDb($configCfg);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        require_once MIGRATION_PATH . '1.0.0.php';
-        $result       = migrate_1_0_0($pdo, $prefix, CONFIG_PATH);
-        $migrationLog  = $result['log'];
-        $migrationWarn = $result['warnings'];
-        $migrationOk   = true;
+        $manifest = loadMigrationManifest(MIGRATION_PATH . 'manifest.php');
+        $chain    = resolveMigrationChain(
+            normalizeDetectedVersion($fromVer),
+            $targetVersion,
+            $manifest
+        );
+
+        ensureSchemaVersionTable($pdo, $prefix);
+
+        // Ausgangsstand festhalten, damit die Historie vollstaendig ist
+        stampSchemaVersion($pdo, $prefix, normalizeDetectedVersion($fromVer));
+
+        if ($chain === []) {
+            $migrationLog[] = "Die Datenbank ist bereits auf Stand <strong>{$targetVersion}</strong> – nichts zu tun.";
+        }
+
+        foreach ($chain as $step) {
+            require_once MIGRATION_PATH . $step['file'];
+
+            if (!function_exists($step['function'])) {
+                throw new RuntimeException(
+                    "Funktion {$step['function']}() fehlt in {$step['file']}"
+                );
+            }
+
+            $migrationLog[] = "<strong>{$step['from']} → {$step['to']}</strong> ({$step['file']})";
+
+            $result        = ($step['function'])($pdo, $prefix, CONFIG_PATH);
+            $migrationLog  = array_merge($migrationLog, $result['log']);
+            $migrationWarn = array_merge($migrationWarn, $result['warnings']);
+
+            stampSchemaVersion($pdo, $prefix, $step['to']);
+            $migrationLog[] = "Schema-Version auf <strong>{$step['to']}</strong> gesetzt";
+        }
+
+        $migrationOk = true;
 
         // Update-Wizard wieder sperren
         $htaccessContent = "# Update abgeschlossen – Zugriff gesperrt\nOrder Deny,Allow\nDeny from all\n";
