@@ -35,6 +35,31 @@ function enableWorktime(): void
     $done = true;
 }
 
+/**
+ * Sammelt alles, was die Suite anlegt, damit der Abschlusstest es wieder
+ * entfernen kann. Tests, die ihre Spuren nicht beseitigen, muellen die
+ * Entwicklungsdatenbank mit jedem Lauf weiter zu.
+ */
+function trackCreated(string $kind, int $id): int
+{
+    static $created = ['activity' => [], 'appointment_type' => []];
+    if ($id > 0) {
+        $created[$kind][] = $id;
+    }
+
+    return $id;
+}
+
+/** @return array<int, int> */
+function createdIds(string $kind): array
+{
+    static $dummy = 0;
+    $ref = new ReflectionFunction('trackCreated');
+    $statics = $ref->getStaticVariables();
+
+    return $statics['created'][$kind] ?? [];
+}
+
 /** Legt eine Taetigkeitsart an und liefert ihre id. */
 function createActivityType(string $name): int
 {
@@ -44,7 +69,7 @@ function createActivityType(string $name): int
     ]);
     assertStatus(201, $res, "Anlegen von '{$name}' fehlgeschlagen");
 
-    return (int) $res['body']['id'];
+    return trackCreated('activity', (int) $res['body']['id']);
 }
 
 test('activity_types: Admin kann anlegen und lesen', function () {
@@ -364,19 +389,46 @@ test('work_sessions: nach dem Stoppen ist ein neuer Start moeglich', function ()
 });
 
 /**
+ * Eigene Terminart fuer die Tests. Die Konfliktpruefung in appointments
+ * arbeitet je Terminart — mit einer eigenen Art kollidieren Testtermine
+ * nie mit echten Terminen des Vereins.
+ */
+function testAppointmentTypeId(): int
+{
+    static $id = null;
+    if ($id !== null) {
+        return $id;
+    }
+
+    $res = apiRequest('POST', 'appointment_types', [
+        'token' => apiToken('admin'),
+        'body'  => ['type_name' => 'Zeiterfassungstest ' . uniqid()],
+    ]);
+    assertStatus(201, $res, 'Test-Terminart konnte nicht angelegt werden');
+
+    return $id = trackCreated('appointment_type', (int) $res['body']['id']);
+}
+
+/**
  * Legt einen Termin am heutigen Tag an und liefert seine id.
- * Die Uhrzeit wird zufaellig gewaehlt, weil appointments einen
- * Konflikt-Check gegen zeitnahe Termine hat.
+ *
+ * Die Uhrzeiten liegen fuenf Stunden auseinander, weil appointments
+ * Termine derselben Art im Fenster von +/- AUTO_CHECKIN_TOLERANCE_HOURS
+ * (Standard: 2h) als Konflikt abweist.
  */
 function createTodayAppointment(string $title): int
 {
-    $time = sprintf('%02d:%02d:00', random_int(1, 4), random_int(0, 59));
-    $res  = apiRequest('POST', 'appointments', [
+    static $slot = 0;
+    $hour = 1 + ($slot++ * 5);
+    assertTrue($hour < 24, 'Zu viele Testtermine an einem Tag');
+
+    $res = apiRequest('POST', 'appointments', [
         'token' => apiToken('admin'),
         'body'  => [
             'title'      => $title,
             'date'       => date('Y-m-d'),
-            'start_time' => $time,
+            'start_time' => sprintf('%02d:00:00', $hour),
+            'type_id'    => testAppointmentTypeId(),
         ],
     ]);
     assertStatus(201, $res, "Termin '{$title}' konnte nicht angelegt werden");
@@ -471,4 +523,272 @@ test('work_sessions: Start mit unbekanntem Termin wird abgewiesen', function () 
         'body'  => ['action' => 'start', 'activity_id' => $activityId, 'appointment_id' => 999999],
     ]);
     assertStatus(400, $res);
+});
+
+/** Legt einen manuellen Eintrag an und liefert die Antwort. */
+function createManualSession(string $role, int $activityId, array $overrides = []): array
+{
+    $body = array_merge([
+        'activity_id'   => $activityId,
+        'start_time'    => date('Y-m-d H:i:s', strtotime('-3 hours')),
+        'end_time'      => date('Y-m-d H:i:s', strtotime('-1 hours')),
+        'break_minutes' => 15,
+        'note'          => 'Nachtrag',
+    ], $overrides);
+
+    return apiRequest('POST', 'work_sessions', ['token' => apiToken($role), 'body' => $body]);
+}
+
+/** Loescht eine Sitzung als Admin. */
+function deleteSession(int $id): void
+{
+    apiRequest('DELETE', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+}
+
+test('work_sessions: manueller Eintrag landet in submitted', function () {
+    enableWorktime();
+    $activityId = createActivityType('Manuell ' . uniqid());
+
+    $res = createManualSession('user', $activityId);
+    assertStatus(201, $res);
+
+    $id  = (int) $res['body']['session']['session_id'];
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertSame('submitted', $get['body']['status']);
+    assertSame('manual', $get['body']['source']);
+    assertSame(105, $get['body']['duration_minutes']); // 120 minus 15 Minuten Pause
+
+    deleteSession($id);
+});
+
+test('work_sessions: manueller Eintrag mit Ende vor Beginn wird abgewiesen', function () {
+    enableWorktime();
+    $activityId = createActivityType('Ungueltig ' . uniqid());
+
+    $res = createManualSession('user', $activityId, [
+        'start_time' => date('Y-m-d H:i:s', strtotime('-1 hours')),
+        'end_time'   => date('Y-m-d H:i:s', strtotime('-3 hours')),
+    ]);
+    assertStatus(400, $res);
+});
+
+test('work_sessions: manueller Eintrag in der Zukunft wird abgewiesen', function () {
+    enableWorktime();
+    $activityId = createActivityType('Zukunft ' . uniqid());
+
+    $res = createManualSession('user', $activityId, [
+        'start_time' => date('Y-m-d H:i:s', strtotime('+1 hours')),
+        'end_time'   => date('Y-m-d H:i:s', strtotime('+3 hours')),
+    ]);
+    assertStatus(400, $res);
+});
+
+test('work_sessions: manueller Eintrag mit zu langer Pause wird abgewiesen', function () {
+    enableWorktime();
+    $activityId = createActivityType('Lange Pause ' . uniqid());
+
+    $res = createManualSession('user', $activityId, ['break_minutes' => 180]);
+    assertStatus(400, $res);
+});
+
+test('work_sessions: Manager gibt frei, Eintrag wird confirmed', function () {
+    enableWorktime();
+    $activityId = createActivityType('Freigabe ' . uniqid());
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    $res = apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'),
+        'query' => ['id' => $id],
+        'body'  => ['action' => 'approve'],
+    ]);
+    assertStatus(200, $res);
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertSame('confirmed', $get['body']['status']);
+    assertTrue(!empty($get['body']['approved_at']), 'approved_at erwartet');
+
+    deleteSession($id);
+});
+
+test('work_sessions: Manager kann ablehnen', function () {
+    enableWorktime();
+    $activityId = createActivityType('Ablehnung ' . uniqid());
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    assertStatus(200, apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'), 'query' => ['id' => $id], 'body' => ['action' => 'reject'],
+    ]));
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertSame('rejected', $get['body']['status']);
+
+    deleteSession($id);
+});
+
+test('work_sessions: user darf nicht selbst freigeben', function () {
+    enableWorktime();
+    $activityId = createActivityType('Selbstfreigabe ' . uniqid());
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    $res = apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('user'),
+        'query' => ['id' => $id],
+        'body'  => ['action' => 'approve'],
+    ]);
+    assertStatus(403, $res);
+
+    deleteSession($id);
+});
+
+test('work_sessions: Aenderung durch das Mitglied entzieht die Bestaetigung', function () {
+    enableWorktime();
+    $activityId = createActivityType('Entzug ' . uniqid());
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    assertStatus(200, apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'), 'query' => ['id' => $id], 'body' => ['action' => 'approve'],
+    ]));
+
+    $res = apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('user'),
+        'query' => ['id' => $id],
+        'body'  => ['note' => 'korrigiert'],
+    ]);
+    assertStatus(200, $res);
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertSame('submitted', $get['body']['status']);
+    assertSame('korrigiert', $get['body']['note']);
+
+    deleteSession($id);
+});
+
+test('work_sessions: Manager-Aenderung laesst den Status unveraendert', function () {
+    enableWorktime();
+    $activityId = createActivityType('Managerkorrektur ' . uniqid());
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    assertStatus(200, apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'), 'query' => ['id' => $id], 'body' => ['action' => 'approve'],
+    ]));
+    assertStatus(200, apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'), 'query' => ['id' => $id], 'body' => ['note' => 'geprueft'],
+    ]));
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertSame('confirmed', $get['body']['status']);
+    assertSame('geprueft', $get['body']['note']);
+
+    deleteSession($id);
+});
+
+test('work_sessions: eine laufende Sitzung wird nicht per PUT korrigiert', function () {
+    enableWorktime();
+    stopRunningIfAny();
+    $activityId = createActivityType('Laufend-PUT ' . uniqid());
+
+    $start = apiRequest('POST', 'work_sessions', [
+        'token' => apiToken('user'), 'body' => ['action' => 'start', 'activity_id' => $activityId],
+    ]);
+    assertStatus(201, $start);
+    $id = (int) $start['body']['session']['session_id'];
+
+    $res = apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('user'), 'query' => ['id' => $id], 'body' => ['note' => 'zu frueh'],
+    ]);
+    assertStatus(409, $res);
+
+    stopRunningIfAny();
+    deleteSession($id);
+});
+
+test('work_sessions: Manager darf fremde Sitzung lesen', function () {
+    enableWorktime();
+    $activityId = createActivityType('Managersicht ' . uniqid());
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('manager'), 'query' => ['id' => $id]]);
+    assertStatus(200, $get);
+
+    deleteSession($id);
+});
+
+test('work_sessions: user darf fremde Sitzung nicht lesen', function () {
+    enableWorktime();
+    $ownMemberId = apiMemberId('user');
+
+    // Ein fremdes Mitglied suchen. Bewusst nicht ueber die Rolle 'manager':
+    // dieser Testaccount hat kein verknuepftes Mitglied, und der Test soll
+    // die Rechtepruefung testen, nicht die Testdaten.
+    $members  = apiRequest('GET', 'members', ['token' => apiToken('admin')]);
+    $otherId  = null;
+    foreach (($members['body'] ?? []) as $m) {
+        if ((int) $m['member_id'] !== $ownMemberId) {
+            $otherId = (int) $m['member_id'];
+            break;
+        }
+    }
+    assertTrue($otherId !== null, 'Kein zweites Mitglied fuer den Test vorhanden');
+
+    $activityId = createActivityType('Fremd ' . uniqid());
+    $res = createManualSession('admin', $activityId, ['member_id' => $otherId]);
+    assertStatus(201, $res);
+    $id = (int) $res['body']['session']['session_id'];
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertStatus(403, $get);
+
+    deleteSession($id);
+});
+
+test('work_sessions: nur Admin darf loeschen', function () {
+    enableWorktime();
+    $activityId = createActivityType('Loeschen ' . uniqid());
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    assertStatus(403, apiRequest('DELETE', 'work_sessions', [
+        'token' => apiToken('manager'), 'query' => ['id' => $id],
+    ]));
+    assertStatus(200, apiRequest('DELETE', 'work_sessions', [
+        'token' => apiToken('admin'), 'query' => ['id' => $id],
+    ]));
+    assertStatus(404, apiRequest('GET', 'work_sessions', [
+        'token' => apiToken('admin'), 'query' => ['id' => $id],
+    ]));
+});
+
+test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
+    enableWorktime();
+    stopRunningIfAny();
+
+    $rest = [];
+
+    foreach (createdIds('activity') as $activityId) {
+        // Sitzungen dieser Taetigkeitsart zuerst — ON DELETE RESTRICT
+        // verhindert sonst das Loeschen der Art.
+        $sessions = apiRequest('GET', 'work_sessions', [
+            'token' => apiToken('admin'),
+            'query' => ['activity_id' => $activityId],
+        ]);
+        foreach (($sessions['body'] ?? []) as $session) {
+            deleteSession((int) $session['session_id']);
+        }
+
+        $res = apiRequest('DELETE', 'activity_types', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $activityId],
+        ]);
+        if ($res['status'] !== 200) {
+            $rest[] = "activity_type {$activityId} (HTTP {$res['status']})";
+        }
+    }
+
+    foreach (createdIds('appointment_type') as $typeId) {
+        apiRequest('DELETE', 'appointment_types', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $typeId],
+        ]);
+    }
+
+    assertSame([], $rest, 'Nicht alles konnte entfernt werden');
 });

@@ -46,11 +46,34 @@ function handleWorkSessions($db, $database, $method, $id, $authUserId, $authUser
                 case 'stop':
                     workSessionStop($db, $database, $data, $authUserId, $authMemberId);
                     break;
+                case null:
+                    workSessionCreateManual($db, $database, $data, $authUserId, $authMemberId);
+                    break;
                 default:
                     http_response_code(400);
-                    echo json_encode(["message" => "Unknown or missing action",
+                    echo json_encode(["message" => "Unknown action",
                                       "allowed" => ['start', 'pause', 'resume', 'stop']]);
             }
+            break;
+
+        case 'PUT':
+            if(!$id) {
+                http_response_code(400);
+                echo json_encode(["message" => "id is required"]);
+                return;
+            }
+            $data = json_decode(file_get_contents("php://input"));
+            workSessionUpdate($db, $database, $id, $data, $authUserId, $authMemberId);
+            break;
+
+        case 'DELETE':
+            requireAdmin();
+            if(!$id) {
+                http_response_code(400);
+                echo json_encode(["message" => "id is required"]);
+                return;
+            }
+            workSessionDelete($db, $database, $id, $authUserId);
             break;
 
         default:
@@ -389,6 +412,205 @@ function workSessionStop($db, $database, $data, $authUserId, $authMemberId) {
                      ['end_time' => ['old' => null, 'new' => $session['end_time']]]);
 
     echo json_encode(["message" => "Stopped", "session" => withDuration($session)]);
+}
+
+function workSessionCreateManual($db, $database, $data, $authUserId, $authMemberId) {
+    $prefix   = $database->table('');
+    $memberId = workSessionTargetMember($data, $authMemberId);
+
+    if(!$memberId) {
+        http_response_code(403);
+        echo json_encode(["message" => "No member linked to your account"]);
+        return;
+    }
+
+    $requireNote = worktimeSetting($db, $database, 'worktime_require_note', '0') === '1';
+
+    $input = [
+        'activity_id'   => $data->activity_id   ?? null,
+        'start_time'    => $data->start_time    ?? null,
+        'end_time'      => $data->end_time      ?? null,
+        'break_minutes' => $data->break_minutes ?? 0,
+        'note'          => $data->note          ?? '',
+    ];
+
+    $errors = validateManualSession($input, $requireNote, time());
+    if($errors !== []) {
+        http_response_code(400);
+        echo json_encode(["message" => "Validation failed", "errors" => $errors]);
+        return;
+    }
+
+    $stmt = $db->prepare("SELECT activity_id FROM {$prefix}activity_types WHERE activity_id = ?");
+    $stmt->execute([(int)$input['activity_id']]);
+    if(!$stmt->fetchColumn()) {
+        http_response_code(400);
+        echo json_encode(["message" => "Unknown activity_id"]);
+        return;
+    }
+
+    $appointmentId = null;
+    if(!empty($data->appointment_id)) {
+        $stmt = $db->prepare("SELECT appointment_id FROM {$prefix}appointments WHERE appointment_id = ?");
+        $stmt->execute([(int)$data->appointment_id]);
+        if(!$stmt->fetchColumn()) {
+            http_response_code(400);
+            echo json_encode(["message" => "Unknown appointment_id"]);
+            return;
+        }
+        $appointmentId = (int)$data->appointment_id;
+    }
+
+    // Manuelle Eintraege gelten erst nach Freigabe.
+    $stmt = $db->prepare("INSERT INTO {$prefix}work_sessions
+                          (member_id, activity_id, appointment_id, start_time, end_time,
+                           break_minutes, note, status, source, created_by)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, 'submitted', 'manual', ?)");
+    $stmt->execute([
+        $memberId,
+        (int)$input['activity_id'],
+        $appointmentId,
+        date('Y-m-d H:i:s', strtotime((string)$input['start_time'])),
+        date('Y-m-d H:i:s', strtotime((string)$input['end_time'])),
+        (int)$input['break_minutes'],
+        trim((string)$input['note']) !== '' ? trim((string)$input['note']) : null,
+        $authUserId
+    ]);
+    $sessionId = (int)$db->lastInsertId();
+
+    logSessionChange($db, $database, $sessionId, $authUserId, 'create',
+                     ['source' => ['old' => null, 'new' => 'manual']]);
+
+    $stmt = $db->prepare(workSessionsSelect($prefix) . " WHERE ws.session_id = ?");
+    $stmt->execute([$sessionId]);
+
+    http_response_code(201);
+    echo json_encode(["message" => "Session created",
+                      "session" => withDuration($stmt->fetch(PDO::FETCH_ASSOC))]);
+}
+
+function workSessionUpdate($db, $database, $id, $data, $authUserId, $authMemberId) {
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT * FROM {$prefix}work_sessions WHERE session_id = ?");
+    $stmt->execute([$id]);
+    $before = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if(!$before) {
+        http_response_code(404);
+        echo json_encode(["message" => "Session not found"]);
+        return;
+    }
+
+    $isOwn      = (int)$before['member_id'] === (int)$authMemberId;
+    $isApprover = isAdminOrManager();
+
+    if(!$isOwn && !$isApprover) {
+        http_response_code(403);
+        echo json_encode(["message" => "Access denied"]);
+        return;
+    }
+
+    $action = $data->action ?? null;
+
+    // Freigeben / Ablehnen: nur Manager und Admin
+    if($action === 'approve' || $action === 'reject') {
+        if(!$isApprover) {
+            http_response_code(403);
+            echo json_encode(["message" => "Only managers can approve or reject"]);
+            return;
+        }
+
+        $newStatus = $action === 'approve' ? 'confirmed' : 'rejected';
+        $db->prepare("UPDATE {$prefix}work_sessions
+                      SET status = ?, approved_by = ?, approved_at = NOW()
+                      WHERE session_id = ?")
+           ->execute([$newStatus, $authUserId, $id]);
+
+        logSessionChange($db, $database, (int)$id, $authUserId, $action,
+                         ['status' => ['old' => $before['status'], 'new' => $newStatus]]);
+
+        echo json_encode(["message" => $action === 'approve' ? "Session approved" : "Session rejected"]);
+        return;
+    }
+
+    // Eine laufende Sitzung wird nicht ueber diesen Weg korrigiert:
+    // dafuer gibt es stop.
+    if(empty($before['end_time']) && empty($data->end_time)) {
+        http_response_code(409);
+        echo json_encode(["message" => "Session is still running",
+                          "hint"    => "Stop it before correcting"]);
+        return;
+    }
+
+    // Inhaltliche Korrektur
+    $requireNote = worktimeSetting($db, $database, 'worktime_require_note', '0') === '1';
+
+    $input = [
+        'activity_id'   => $data->activity_id   ?? $before['activity_id'],
+        'start_time'    => $data->start_time    ?? $before['start_time'],
+        'end_time'      => $data->end_time      ?? $before['end_time'],
+        'break_minutes' => $data->break_minutes ?? $before['break_minutes'],
+        'note'          => $data->note          ?? $before['note'],
+    ];
+
+    $errors = validateManualSession($input, $requireNote, time());
+    if($errors !== []) {
+        http_response_code(400);
+        echo json_encode(["message" => "Validation failed", "errors" => $errors]);
+        return;
+    }
+
+    // Eine Aenderung durch das Mitglied entzieht die Bestaetigung.
+    // Manager und Admin sind die freigebende Instanz und muessen sich
+    // nicht selbst genehmigen.
+    $newStatus = $isApprover ? $before['status'] : 'submitted';
+
+    $db->prepare("UPDATE {$prefix}work_sessions
+                  SET activity_id = ?, start_time = ?, end_time = ?,
+                      break_minutes = ?, note = ?, status = ?
+                  WHERE session_id = ?")
+       ->execute([
+           (int)$input['activity_id'],
+           date('Y-m-d H:i:s', strtotime((string)$input['start_time'])),
+           date('Y-m-d H:i:s', strtotime((string)$input['end_time'])),
+           (int)$input['break_minutes'],
+           trim((string)$input['note']) !== '' ? trim((string)$input['note']) : null,
+           $newStatus,
+           $id
+       ]);
+
+    $stmt = $db->prepare("SELECT * FROM {$prefix}work_sessions WHERE session_id = ?");
+    $stmt->execute([$id]);
+    $after = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    logSessionChange($db, $database, (int)$id, $authUserId, 'update',
+                     sessionChangeSet($before, $after));
+
+    echo json_encode(["message" => "Session updated", "session" => withDuration($after)]);
+}
+
+function workSessionDelete($db, $database, $id, $authUserId) {
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT * FROM {$prefix}work_sessions WHERE session_id = ?");
+    $stmt->execute([$id]);
+    $before = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if(!$before) {
+        http_response_code(404);
+        echo json_encode(["message" => "Session not found"]);
+        return;
+    }
+
+    // Zuerst protokollieren, dann loeschen: der Logeintrag haelt den
+    // letzten Stand fest und ueberlebt die Loeschung (kein Fremdschluessel).
+    logSessionChange($db, $database, (int)$id, $authUserId, 'delete',
+                     ['deleted' => ['old' => $before, 'new' => null]]);
+
+    $db->prepare("DELETE FROM {$prefix}work_sessions WHERE session_id = ?")->execute([$id]);
+
+    echo json_encode(["message" => "Session deleted"]);
 }
 
 ?>
