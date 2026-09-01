@@ -1133,6 +1133,40 @@ function updateClock() {
 // CHECKIN-API CALL
 // ========================================
 
+// Wohin ein eingelesener TOTP-Code geht. Ist nichts angemeldet, ist es der
+// Check-in — das ist der bisherige und haeufigste Fall. Die Zeiterfassung
+// meldet sich vor dem Scan an und bekommt den Code dann statt des Check-ins.
+let totpCodeConsumer = null;
+
+/**
+ * Meldet Interesse am naechsten eingelesenen Code an.
+ * @param {(code: string, inputMethod: string) => Promise<void>} consumer
+ * @param {string} hint  Text, der ueber dem Scanner erscheint
+ */
+function requestTotpCode(consumer, hint) {
+    totpCodeConsumer = { consumer, hint };
+}
+
+/** Nimmt die Anmeldung zurueck, z. B. wenn der Scan abgebrochen wird. */
+function cancelTotpCodeRequest() {
+    totpCodeConsumer = null;
+}
+
+/**
+ * Liefert einen eingelesenen Code an den angemeldeten Empfaenger, sonst an
+ * den Check-in. Alle drei Eingabewege (QR, NFC, manuell) laufen hierdurch.
+ */
+async function deliverTotpCode(code, inputMethod) {
+    if (totpCodeConsumer) {
+        const { consumer } = totpCodeConsumer;
+        totpCodeConsumer = null;
+        await consumer(code, inputMethod);
+        return;
+    }
+
+    await verifyCheckin(code, inputMethod);
+}
+
 async function verifyCheckin(code, inputMethod = 'unknown') {
     elements.scanButton.disabled = true;
 
@@ -1332,7 +1366,7 @@ async function onQRScanned(decodedText) {
         return;
     }
     
-    await verifyCheckin(totpCode, 'QR');
+    await deliverTotpCode(totpCode, 'QR');
 }
 
 // Helper-Funktion zum Stoppen des Scanners
@@ -1369,7 +1403,7 @@ async function submitManualCode() {
         return;
     }
         
-    await verifyCheckin(code,'CODE');
+    await deliverTotpCode(code, 'CODE');
 }
 
 
@@ -1503,7 +1537,7 @@ async function onNFCTagRead(message, serialNumber) {
     }
     
     if (checkinCode) {
-        await verifyCheckin(checkinCod,'NFC');
+        await deliverTotpCode(checkinCod, 'NFC');
     } 
 }
 
@@ -2014,9 +2048,21 @@ async function initWorktime() {
             .join('');
     }
 
-    document.getElementById('worktimeStartBtn')?.addEventListener('click', worktimeStart);
+    // Ohne Wrapper bekaeme worktimeStart das Event-Objekt als totpCode
+    document.getElementById('worktimeStartBtn')?.addEventListener('click', () => worktimeStart());
     document.getElementById('worktimePauseBtn')?.addEventListener('click', worktimeTogglePause);
-    document.getElementById('worktimeStopBtn')?.addEventListener('click', worktimeStop);
+    document.getElementById('worktimeStopBtn')?.addEventListener('click', () => worktimeStop());
+    document.getElementById('worktimeStopForceBtn')?.addEventListener('click', () => {
+        // Das eigene Modal der App statt confirm(): blockierende Browserdialoge
+        // werden in einer installierten PWA teils unterdrueckt — genau daran
+        // ist der urspruengliche prompt() fuer die Notiz gescheitert.
+        showNavigationConfirm(
+            'Ohne Ortsnachweis beenden?',
+            'Der Eintrag zählt dann nicht sofort, sondern muss von einem Manager '
+            + 'freigegeben werden.',
+            () => worktimeStop(null, true)
+        );
+    });
 }
 
 /** Holt den Zustand IMMER vom Server — nie aus dem Browser-Speicher. */
@@ -2048,6 +2094,13 @@ function renderWorktime() {
 
         const timer = document.querySelector('.worktime-timer');
         if (timer) timer.classList.toggle('paused', !!worktimeSession.is_paused);
+
+        // Der Ausweg erscheint nur, wenn zum Beenden ein Nachweis verlangt wird
+        const forceBtn = document.getElementById('worktimeStopForceBtn');
+        if (forceBtn) {
+            forceBtn.style.display =
+                worktimeSession.verification === 'start_end' ? '' : 'none';
+        }
 
         const breakMinutes = parseInt(worktimeSession.break_minutes, 10) || 0;
         const breakInfo = document.getElementById('worktimeBreakInfo');
@@ -2117,10 +2170,41 @@ function showWorktimeStatus(message, isError = false) {
     setTimeout(() => { el.textContent = ''; }, 4000);
 }
 
-async function worktimeStart() {
+/** Nachweispflicht der aktuell gewaehlten Taetigkeitsart. */
+function selectedActivityVerification() {
+    const id = document.getElementById('worktimeActivity')?.value;
+    const activity = worktimeActivities.find(a => String(a.activity_id) === String(id));
+
+    return activity ? (activity.verification || 'none') : 'none';
+}
+
+/**
+ * Schickt das Mitglied zum Check-in-Tab, wo Scanner, NFC und manuelle Eingabe
+ * bereits stehen. Der eingelesene Code geht dank requestTotpCode an den Timer
+ * statt an den Check-in.
+ */
+function askForTotpCode(consumer, hint) {
+    requestTotpCode(consumer, hint);
+
+    document.querySelector('.tab-button[data-tab="checkin"]')?.click();
+    showMessage(hint, 'info');
+}
+
+async function worktimeStart(totpCode = null) {
     const activityId = document.getElementById('worktimeActivity')?.value;
     if (!activityId) {
         showWorktimeStatus('Bitte eine Tätigkeit wählen', true);
+        return;
+    }
+
+    // Verlangt die Taetigkeitsart einen Ortsnachweis, wird zuerst ein Code
+    // geholt. Der Server prueft das ohnehin erneut — das hier erspart dem
+    // Mitglied nur den Fehlschlag.
+    if (!totpCode && selectedActivityVerification() !== 'none') {
+        askForTotpCode(
+            code => worktimeStart(code),
+            '⏱️ Code für den Start der Zeiterfassung scannen'
+        );
         return;
     }
 
@@ -2128,6 +2212,7 @@ async function worktimeStart() {
 
     const appointmentId = document.getElementById('worktimeAppointment')?.value;
     if (appointmentId) body.appointment_id = parseInt(appointmentId, 10);
+    if (totpCode) body.totp_code = totpCode;
 
     const result = await apiCall('work_sessions', 'POST', body);
 
@@ -2138,8 +2223,14 @@ async function worktimeStart() {
     }
 
     worktimeSession = result.data.session;
+
+    // Zurueck zur Zeiterfassung, falls der Code im Check-in-Tab geholt wurde
+    document.querySelector('.tab-button[data-tab="worktime"]')?.click();
     renderWorktime();
-    showWorktimeStatus('Zeiterfassung gestartet');
+
+    showWorktimeStatus(worktimeSession.start_location_name
+        ? `Gestartet · Ort belegt: ${worktimeSession.start_location_name}`
+        : 'Zeiterfassung gestartet');
 }
 
 async function worktimeTogglePause() {
@@ -2156,14 +2247,28 @@ async function worktimeTogglePause() {
     renderWorktime();
 }
 
-async function worktimeStop() {
+async function worktimeStop(totpCode = null, force = false) {
     // Bewusst ein Eingabefeld statt prompt(): ein blockierender Dialog wird in
     // einer installierten PWA teils unterdrueckt und ist auf Mobilgeraeten
     // unbrauchbar.
     const noteField = document.getElementById('worktimeNote');
     const note = noteField ? noteField.value.trim() : '';
 
-    const result = await apiCall('work_sessions', 'POST', { action: 'stop', note });
+    // Verlangt die laufende Sitzung einen Nachweis zum Beenden, wird zuerst
+    // ein Code geholt — es sei denn, das Mitglied hat bewusst ohne gewaehlt.
+    if (!totpCode && !force && worktimeSession && worktimeSession.verification === 'start_end') {
+        askForTotpCode(
+            code => worktimeStop(code),
+            '⏱️ Code für das Beenden der Zeiterfassung scannen'
+        );
+        return;
+    }
+
+    const body = { action: 'stop', note };
+    if (totpCode) body.totp_code = totpCode;
+    if (force) body.force = true;
+
+    const result = await apiCall('work_sessions', 'POST', body);
 
     if (!result.success) {
         showWorktimeStatus('Stoppen fehlgeschlagen: ' + result.error, true);
@@ -2173,8 +2278,16 @@ async function worktimeStop() {
 
     if (noteField) noteField.value = '';
 
-    const minutes = result.data.session.duration_minutes;
-    showWorktimeStatus(`Beendet: ${minutes} ${minutes === 1 ? 'Minute' : 'Minuten'} erfasst`);
+    const session = result.data.session;
+    const minutes = session.duration_minutes;
+    const zeit = `${minutes} ${minutes === 1 ? 'Minute' : 'Minuten'}`;
+
+    document.querySelector('.tab-button[data-tab="worktime"]')?.click();
+
+    showWorktimeStatus(session.status === 'submitted'
+        ? `Beendet ohne Nachweis: ${zeit} — wartet auf Freigabe`
+        : `Beendet: ${zeit} erfasst`);
+
     worktimeSession = null;
     renderWorktime();
     await loadWorktimeList();
@@ -2259,6 +2372,12 @@ function initTabs() {
             if (targetTab !== 'checkin') {
                 stopScannerIfRunning();
                 stopNFCReader();
+
+                // Eine offene Code-Anforderung der Zeiterfassung verfaellt.
+                // Sonst finge sie den naechsten Check-in-Scan ab.
+                if (targetTab !== 'worktime') {
+                    cancelTotpCodeRequest();
+                }
             }
 
             // Lade Daten wenn nötig

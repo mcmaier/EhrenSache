@@ -655,6 +655,34 @@ body {
     flex-shrink: 0;
 }
 
+/* Hinweis-Variante. Ohne sie waere showMessage(text, 'info') unsichtbar:
+   .status-message ist per Default display:none, und nur die Varianten
+   schalten sie sichtbar. */
+.status-message.info {
+    background: white;
+    color: #0b3d61;
+    border-left: 4px solid var(--info);
+    display: flex;
+    align-items: center;
+}
+
+.status-message.info::before {
+    content: 'i';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: var(--info);
+    color: white;
+    border-radius: 50%;
+    margin-right: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    font-style: normal;
+    flex-shrink: 0;
+}
+
 .status-message.error {
     background: white;
     color: #721c24;
