@@ -442,6 +442,101 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}schema_version` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
+-- --------------------------------------------------------
+--
+-- Zeiterfassung: Tätigkeitsarten
+--
+CREATE TABLE IF NOT EXISTS `{PREFIX}activity_types` (
+  activity_id   INT PRIMARY KEY AUTO_INCREMENT,
+  activity_name VARCHAR(100) NOT NULL,
+  description   TEXT,
+  color         VARCHAR(7) DEFAULT '#1F5FBF',
+  is_default    BOOLEAN DEFAULT 0,
+  is_active     BOOLEAN DEFAULT 1,
+  verification  ENUM('none','start','start_end') NOT NULL DEFAULT 'none',
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Zeiterfassung: Arbeitssitzungen
+--
+-- Laeuft gerade:    end_time IS NULL
+-- Pausiert gerade:  break_started_at IS NOT NULL
+-- Zaehlbar:         status = 'confirmed' AND end_time IS NOT NULL
+--
+CREATE TABLE IF NOT EXISTS `{PREFIX}work_sessions` (
+  session_id          INT PRIMARY KEY AUTO_INCREMENT,
+  member_id           INT NOT NULL,
+  activity_id         INT NOT NULL,
+  appointment_id      INT DEFAULT NULL,
+  start_time          DATETIME NOT NULL,
+  end_time            DATETIME DEFAULT NULL,
+  break_minutes       INT NOT NULL DEFAULT 0,
+  break_started_at    DATETIME DEFAULT NULL,
+  note                VARCHAR(255) DEFAULT NULL,
+  start_location_name VARCHAR(100) DEFAULT NULL,
+  end_location_name   VARCHAR(100) DEFAULT NULL,
+  status              ENUM('confirmed','submitted','rejected') NOT NULL DEFAULT 'submitted',
+  source              ENUM('timer','manual','admin','import') NOT NULL DEFAULT 'manual',
+  created_by          INT DEFAULT NULL,
+  approved_by         INT DEFAULT NULL,
+  approved_at         DATETIME DEFAULT NULL,
+  created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  active_member       INT AS (IF(end_time IS NULL, member_id, NULL)) VIRTUAL,
+  UNIQUE KEY `{PREFIX}uq_running_session` (active_member),
+  KEY `{PREFIX}idx_ws_member_start` (member_id, start_time),
+  KEY `{PREFIX}idx_ws_appointment` (appointment_id),
+  KEY `{PREFIX}idx_ws_activity` (activity_id),
+  KEY `{PREFIX}idx_ws_status_start` (status, start_time),
+  CONSTRAINT `{PREFIX}ws_member_fk`   FOREIGN KEY (member_id)      REFERENCES `{PREFIX}members`(member_id)           ON DELETE CASCADE,
+  CONSTRAINT `{PREFIX}ws_activity_fk` FOREIGN KEY (activity_id)    REFERENCES `{PREFIX}activity_types`(activity_id)  ON DELETE RESTRICT,
+  CONSTRAINT `{PREFIX}ws_apt_fk`      FOREIGN KEY (appointment_id) REFERENCES `{PREFIX}appointments`(appointment_id) ON DELETE SET NULL,
+  CONSTRAINT `{PREFIX}ws_creator_fk`  FOREIGN KEY (created_by)     REFERENCES `{PREFIX}users`(user_id)               ON DELETE SET NULL,
+  CONSTRAINT `{PREFIX}ws_approver_fk` FOREIGN KEY (approved_by)    REFERENCES `{PREFIX}users`(user_id)               ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Zeiterfassung: Auditspur
+--
+-- Bewusst OHNE Fremdschluessel auf session_id: eine Spur, die beim Loeschen
+-- des Datensatzes mitgeloescht wird, dokumentiert die Loeschung nicht.
+--
+CREATE TABLE IF NOT EXISTS `{PREFIX}work_session_log` (
+  log_id     INT PRIMARY KEY AUTO_INCREMENT,
+  session_id INT NOT NULL,
+  changed_by INT DEFAULT NULL,
+  changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  action     ENUM('create','update','approve','reject','delete') NOT NULL,
+  changes    TEXT,
+  KEY `{PREFIX}idx_wsl_session` (session_id),
+  KEY `{PREFIX}idx_wsl_changed` (changed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- records.checkin_source um 'timer' erweitern
+--
+SET @has_timer = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = '{PREFIX}records'
+      AND COLUMN_NAME  = 'checkin_source'
+      AND COLUMN_TYPE LIKE '%timer%');
+SET @prep_sql = IF(@has_timer = 0,
+    'ALTER TABLE `{PREFIX}records` MODIFY `checkin_source` ENUM(''admin'',''user_totp'',''device_auth'',''auto_checkin'',''import'',''timer'') DEFAULT ''admin''',
+    'SELECT 1');
+PREPARE stmt FROM @prep_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+--
+-- Systemeinstellungen der Zeiterfassung
+--
+INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `setting_type`, `category`, `description`) VALUES
+('worktime_enabled', '0', 'boolean', 'general', 'Zeiterfassung aktiviert'),
+('worktime_max_session_hours', '12', 'number', 'general', 'Obergrenze in Stunden, ab der eine laufende Sitzung automatisch beendet wird'),
+('worktime_require_note', '0', 'boolean', 'general', 'Notiz beim Stoppen und bei manuellen Einträgen erzwingen');
+
+
 CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS
 SELECT 
     u.user_id,
