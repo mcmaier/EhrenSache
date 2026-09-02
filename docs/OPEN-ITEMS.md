@@ -4,7 +4,8 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Stand:** 2026-09-02 · **Branch:** `dev` (31 Commits vor `main`) · **Version:** 1.2.0
+**Zuletzt geprüft:** 2026-09-02 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
+**Version:** 1.2.1
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
@@ -89,10 +90,15 @@ der Check-in entsteht nur noch, wenn der Termin heute ist. Es fehlt:
 - **Terminfeld im Dashboard-Nachtrag.** `saveWorkSession()` sendet kein `appointment_id`; das
   Modal hat kein Feld. Der Server akzeptiert es. Deshalb steht in der Spalte „Termin" bei jedem
   im Dashboard erfassten Eintrag „—".
-- **PWA bietet nur heutige Termine an.** `fillWorktimeAppointments()` filtert auf `date === heute`.
-  An Tagen ohne Termin wirkt das Feld funktionslos. Vorbereitungsarbeit für eine spätere
-  Veranstaltung lässt sich gar nicht zuordnen.
+- **PWA bietet nur heutige Termine an.** `loadWorktimeAppointments()` fragt `from_date = to_date
+  = heute` ab. An Tagen ohne Termin wirkt das Feld funktionslos. Vorbereitungsarbeit für eine
+  spätere Veranstaltung lässt sich gar nicht zuordnen.
 - **Dritter Export-Knopf** für `worktime_appointment` fehlt im Dashboard.
+
+**Teilweise erledigt am 2026-09-02:** Die Auswahl war zusätzlich schlicht leer, weil sie nur
+beim Öffnen des Antragsdialogs befüllt wurde, und das Tagesdatum kam aus UTC — abends ab 22:00
+MESZ zeigte sie den Folgetag. Beides behoben (`d7ee191`). Die Beschränkung auf den heutigen Tag
+ist davon unberührt und bleibt offen.
 
 ---
 
@@ -145,11 +151,15 @@ Bewusst unverändert. Nur dokumentieren, nicht als stärker beschreiben, als es 
 ## Kleinere Funde
 
 ### OI-8 · Doppelte `id="scannerContainer"` in der PWA
-**Priorität:** niedrig · Bestandsfehler, nicht durch die Zeiterfassung entstanden
+**Priorität:** erledigt am 2026-09-02
 
-`public/checkin/index.html` enthält das Element zweimal mit derselben Id (im Check-in-Tab, Zeilen
-~126 und ~142). `getElementById` liefert nur das erste; das zweite ist toter Markup. Nicht
-angefasst, weil eine Änderung das Verhalten des Check-in-Scanners berühren könnte.
+`public/checkin/index.html` enthielt das Element zweimal mit derselben Id. `getElementById`
+lieferte nur das erste; das zweite war toter Markup.
+
+**Behoben** beim Zusammenführen von Check-in und Zeiterfassung zum Erfassen-Tab (Branch
+`feat/pwa-capture-tab`): Der Scanner steht nun einmal, eine Ebene über den Ansichten, weil beide
+Absichten ihn brauchen. Ein Skript über alle `id`-Attribute der Datei bestätigt, dass keine Id
+mehr doppelt vorkommt.
 
 ---
 
@@ -228,6 +238,27 @@ Installation zieht.
 
 **Offene Folge:** Diese Datei ist damit öffentlich. Für sicherheitsrelevante Einträge gilt
 die Grenze im Abschnitt [Sicherheit](#sicherheit) und der Ablauf in `SECURITY.md`.
+
+---
+
+### OI-15 · `mainScreen` wird nie geschlossen
+**Priorität:** niedrig · Bestandsfehler, seit Langem vorhanden
+
+`public/checkin/index.html` öffnet in Zeile 70 `<div id="mainScreen">`, schließt es aber nie —
+über die ganze Datei bleibt genau ein `<div>` offen. Browser ergänzen das fehlende Tag
+stillschweigend am `</body>`, deshalb ist bisher nichts aufgefallen.
+
+Gefunden am 2026-09-02 beim Umbau zum Erfassen-Tab durch eine Zählung der `div`-Tags; die
+Differenz bestand schon vor diesem Umbau (nachgeprüft gegen den vorherigen Commit).
+
+**Warum nicht nebenbei behoben:** Die Stelle, an der das `</div>` eingefügt wird, entscheidet,
+ob die Modals (`exceptionModal`, `appointmentModal`, `manualCodeModal`) innerhalb oder außerhalb
+von `mainScreen` liegen. `mainScreen` wird über `showScreen()` ein- und ausgeblendet — eine
+falsche Platzierung macht die Modals unsichtbar oder lässt sie beim Abmelden stehen. Das
+gehört bewusst entschieden und einmal durchgeklickt, nicht beiläufig geraten.
+
+**Absicherung wäre möglich:** Ein Test in `tests/suites/assets.php`, der die `div`-Bilanz jeder
+ausgelieferten HTML-Datei prüft, würde solche Fälle künftig beim Entstehen melden.
 
 ---
 
