@@ -246,9 +246,7 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
             }
             else {
                 requireAdmin();          
-                
-                
-
+                                
                 // Nur erlaubte Felder extrahieren
                 $allowedFields = ['email', 'name', 'password', 'role', 'member_id'];
                 $data = new stdClass();

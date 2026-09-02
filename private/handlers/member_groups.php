@@ -51,7 +51,7 @@ function handleMemberGroups($db, $database, $method, $id) {
             break;
             
         case 'POST':
-            requireAdminOrManager();
+            requireAdmin();
 
             $data = json_decode(file_get_contents("php://input"));
 
@@ -76,7 +76,7 @@ function handleMemberGroups($db, $database, $method, $id) {
             break;
             
         case 'PUT':
-            requireAdminOrManager();
+            requireAdmin();
 
             $data = json_decode(file_get_contents("php://input"));
 
@@ -102,7 +102,7 @@ function handleMemberGroups($db, $database, $method, $id) {
             break;
             
         case 'DELETE':
-            requireAdminOrManager();
+            requireAdmin();
 
             $stmt = $db->prepare("DELETE FROM {$prefix}member_groups WHERE group_id = ?");
             if($stmt->execute([$id])) {
