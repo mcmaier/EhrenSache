@@ -402,3 +402,38 @@ function worktimeByActivity($db, $database, int $year): array
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+/**
+ * Stunden je Termin — beantwortet "Was hat diese Veranstaltung an
+ * ehrenamtlicher Arbeit gekostet?".
+ *
+ * Sitzungen ohne Terminbezug erscheinen gesammelt als eine Zeile ohne Termin;
+ * sie einfach wegzulassen wuerde die Gesamtsumme still verfaelschen.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function worktimeByAppointment($db, $database, int $year): array
+{
+    $prefix   = $database->table('');
+    $duration = worktimeDurationExpression();
+    $proof    = worktimeProofExpression();
+
+    $stmt = $db->prepare("
+        SELECT a.appointment_id, a.title, a.date, a.start_time,
+               at.type_name AS appointment_type,
+               {$proof} AS proof,
+               COUNT(*)                     AS sessions,
+               COUNT(DISTINCT ws.member_id) AS members,
+               SUM({$duration})             AS minutes
+        FROM {$prefix}work_sessions ws
+        LEFT JOIN {$prefix}appointments a       ON ws.appointment_id = a.appointment_id
+        LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
+        WHERE ws.status = 'confirmed' AND ws.end_time IS NOT NULL
+          AND YEAR(ws.start_time) = ?
+        GROUP BY a.appointment_id, proof
+        ORDER BY a.date IS NULL, a.date, a.start_time
+    ");
+    $stmt->execute([$year]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}

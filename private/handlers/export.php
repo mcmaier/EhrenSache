@@ -40,6 +40,9 @@ function handleExport($db, $database, $request_method, $authUserRole) {
         case 'worktime_activity':
             exportWorktimeActivity($db, $database);
             break;
+        case 'worktime_appointment':
+            exportWorktimeAppointment($db, $database);
+            break;
         default:
             http_response_code(400);
             echo json_encode(["message" => "Invalid export type"]);
@@ -295,6 +298,46 @@ function exportWorktimeActivity($db, $database) {
 
     fputcsv($output, [], ';');
     fputcsv($output, ['GESAMT', '', '', '', '', $total,
+                      number_format($total / 60, 2, ',', '')], ';');
+
+    fclose($output);
+    exit();
+}
+
+/**
+ * Summen je Termin, getrennt nach Nachweisgrad.
+ * Beantwortet, was eine einzelne Veranstaltung an ehrenamtlicher Arbeit
+ * gekostet hat — die Zahl, die F\u00f6rderantr\u00e4ge oft verlangen.
+ */
+function exportWorktimeAppointment($db, $database) {
+    requireWorktimeEnabled($db, $database);
+
+    $year = (int) ($_GET['year'] ?? date('Y'));
+    $rows = worktimeByAppointment($db, $database, $year);
+
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="termine_' . $year . '.csv"');
+    echo "\xEF\xBB\xBF";
+
+    $output = fopen('php://output', 'w');
+    fputcsv($output, ['appointment_date', 'appointment', 'appointment_type', 'proof',
+                      'sessions', 'members', 'minutes', 'hours'], ';');
+
+    $total = 0;
+    foreach ($rows as $r) {
+        $total += (int) $r['minutes'];
+        fputcsv($output, [
+            $r['date'],
+            $r['title'] ?? '(ohne Termin)',
+            $r['appointment_type'],
+            worktimeProofLabel($r['proof']),
+            $r['sessions'], $r['members'],
+            $r['minutes'], number_format($r['minutes'] / 60, 2, ',', ''),
+        ], ';');
+    }
+
+    fputcsv($output, [], ';');
+    fputcsv($output, ['GESAMT', '', '', '', '', '', $total,
                       number_format($total / 60, 2, ',', '')], ';');
 
     fclose($output);

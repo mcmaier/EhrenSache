@@ -827,6 +827,47 @@ test('work_sessions: ein Manager-Nachtrag zaehlt sofort in der Auswertung', func
     deleteSession($id);
 });
 
+test('work_sessions: Start fuer einen kuenftigen Termin erzeugt KEINEN Check-in', function () {
+    enableWorktime();
+    stopRunningIfAny();
+
+    $memberId   = apiMemberId('user');
+    $activityId = createActivityType('Vorbereitung ' . uniqid());
+
+    // Termin in drei Tagen — etwa der Buehnenaufbau fuer ein spaeteres Konzert
+    $res = apiRequest('POST', 'appointments', [
+        'token' => apiToken('admin'),
+        'body'  => [
+            'title'      => 'Kuenftig ' . uniqid(),
+            'date'       => date('Y-m-d', strtotime('+3 days')),
+            'start_time' => '19:00:00',
+            'type_id'    => testAppointmentTypeId(),
+        ],
+    ]);
+    assertStatus(201, $res);
+    $appointmentId = (int) ($res['body']['id'] ?? $res['body']['appointment_id']);
+
+    assertStatus(201, apiRequest('POST', 'work_sessions', [
+        'token' => apiToken('user'),
+        'body'  => ['action' => 'start', 'activity_id' => $activityId,
+                    'appointment_id' => $appointmentId],
+    ]));
+
+    // Die Verknuepfung besteht, ein Check-in aber nicht: Sonst waere das
+    // Mitglied bei einer Veranstaltung anwesend, die noch nicht war.
+    assertSame(null, findRecord($appointmentId, $memberId),
+        'Ein kuenftiger Termin darf keinen Check-in erzeugen');
+
+    $run = apiRequest('GET', 'work_sessions', [
+        'token' => apiToken('user'), 'query' => ['running' => 1],
+    ]);
+    assertSame($appointmentId, (int) $run['body']['appointment_id'],
+        'Der Terminbezug muss trotzdem gespeichert sein');
+
+    stopRunningIfAny();
+    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+});
+
 test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
     enableWorktime();
     stopRunningIfAny();
