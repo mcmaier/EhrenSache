@@ -283,16 +283,23 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
     }
 
     // Termin prüfen, falls angegeben
-    $appointmentId = null;
+    $appointmentId   = null;
+    $appointmentToday = false;
+
     if(!empty($data->appointment_id)) {
-        $stmt = $db->prepare("SELECT appointment_id FROM {$prefix}appointments WHERE appointment_id = ?");
+        $stmt = $db->prepare("SELECT appointment_id, date FROM {$prefix}appointments
+                              WHERE appointment_id = ?");
         $stmt->execute([(int)$data->appointment_id]);
-        if(!$stmt->fetchColumn()) {
+        $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if(!$appointment) {
             http_response_code(400);
             echo json_encode(["message" => "Unknown appointment_id"]);
             return;
         }
-        $appointmentId = (int)$data->appointment_id;
+
+        $appointmentId    = (int)$appointment['appointment_id'];
+        $appointmentToday = ($appointment['date'] === date('Y-m-d'));
     }
 
     // Bereits laufende Sitzung? Eine ueberfaellige wird dabei geschlossen,
@@ -321,7 +328,12 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
         // Bei Terminbezug den Anwesenheits-Eintrag miterzeugen.
         // ON DUPLICATE KEY UPDATE mit einer Zuweisung auf sich selbst: ein
         // frueherer Check-in behaelt seine arrival_time.
-        if($appointmentId !== null) {
+        // Der Check-in entsteht NUR, wenn der Termin heute ist. Zeit laesst sich
+        // auch fuer eine kuenftige Veranstaltung erfassen — Buehnenaufbau am
+        // Donnerstag fuer das Konzert am Samstag. Daraus einen Check-in zu
+        // machen wuerde das Mitglied als anwesend bei etwas fuehren, das noch
+        // gar nicht stattgefunden hat.
+        if($appointmentId !== null && $appointmentToday) {
             // Ist der Start ortsbelegt, ist der Check-in ein user_totp und
             // traegt den Stationsnamen — sonst ein schlichter timer-Eintrag.
             $checkinSource = $startLocation !== null ? 'user_totp' : 'timer';
@@ -352,10 +364,20 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
         if($db->inTransaction()) {
             $db->rollBack();
         }
-        // Der Unique-Index auf active_member greift, wenn zwei Anfragen
-        // gleichzeitig starten wollen.
-        http_response_code(409);
-        echo json_encode(["message" => "A session is already running"]);
+
+        // Nur der Unique-Index auf active_member ist ein Konflikt — er greift,
+        // wenn zwei Anfragen gleichzeitig starten wollen. Jeder andere
+        // Datenbankfehler als 409 auszugeben, verbirgt echte Fehler hinter
+        // einer plausiblen Meldung.
+        if($e->getCode() === '23000') {
+            http_response_code(409);
+            echo json_encode(["message" => "A session is already running"]);
+            return;
+        }
+
+        error_log("work_sessions start failed: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(["message" => "Session konnte nicht gestartet werden"]);
     }
 }
 
