@@ -623,3 +623,81 @@ falschen Grund fehl.
 | AW-D6 | „Zeit nachtragen" speichern | Eintrag erscheint mit Status „wartet auf Freigabe" |
 | AW-D7 | Tätigkeitsart mit erfassten Zeiten löschen | Fehlermeldung; Ausmustern über „Aktiv"-Haken bleibt möglich |
 | AW-D8 | Beide Export-Knöpfe | CSV-Download mit korrektem Dateinamen |
+
+---
+
+## Gruppenbindung der Tätigkeitsarten (ab 1.2.1)
+
+**Vorbereitung:** Zwei Gruppen anlegen, das Testmitglied nur einer davon zuordnen.
+Eine Tätigkeitsart der Gruppe des Mitglieds zuordnen, eine zweite ausschließlich der
+anderen Gruppe.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| GB-1 | Dashboard: Tätigkeitsart anlegen, eine Gruppe ankreuzen | Übersicht zeigt die Gruppe als Badge |
+| GB-2 | Dieselbe Art erneut öffnen | Die Checkbox ist gesetzt |
+| GB-3 | Häkchen entfernen, speichern | Übersicht zeigt „Keine" |
+| GB-4 | PWA als Mitglied öffnen | Nur die Tätigkeitsart der eigenen Gruppe steht zur Wahl |
+| GB-5 | Start der fremden Art per Direktaufruf der API | 403 `"Activity type not allowed for this member"` |
+| GB-6 | Nachtrag der fremden Art durch das Mitglied selbst | 403, gleiche Meldung |
+| GB-7 | Nachtrag durch Manager **für dieses Mitglied** | 201 — Stellvertretung bleibt erlaubt |
+| GB-8 | Mitglied in eine Gruppe **ohne** Tätigkeitsarten setzen, PWA laden | Kein Kachel-Einstieg, direkt der Anwesenheits-Scanner; im Dashboard fehlt der Menüpunkt „Zeiterfassung" |
+| GB-9 | Als Admin dieselbe Lage | Menüpunkt und Stammdatenblock bleiben sichtbar — sonst ließe sich die erste Art nie anlegen |
+
+---
+
+## PWA: Erfassen-Tab (ab 1.2.1)
+
+**Diese Reihe ist vor jedem Merge nach `main` vollständig zu durchlaufen.** Sie berührt
+den Check-in, die meistgenutzte Funktion der Anwendung, und kein automatisierter Test
+deckt sie ab.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| ERF-1 | Beide Absichten verfügbar, Tab öffnen | Zwei Kacheln: Anwesenheit, Arbeitszeit |
+| ERF-2 | Nur Anwesenheit verfügbar | Direkt der Scanner, keine Kachelseite, kein „Zurück" |
+| ERF-3 | Kachel Anwesenheit → QR scannen | Anwesenheitseintrag entsteht |
+| ERF-4 | Kachel Arbeitszeit, nachweisfreie Tätigkeit, Start | Sitzung läuft, Timer sichtbar |
+| ERF-5 | **Fehlerweg:** Arbeitszeit → nachweispflichtige Art → Start → nicht scannen → Zurück → Anwesenheit → scannen | **Anwesenheitseintrag**, KEINE Arbeitszeitsitzung |
+| ERF-6 | Sucher läuft: „Abbrechen" | Kamera aus, zurück zum Ausgangsformular |
+| ERF-7 | Sucher läuft: „Code eingeben" | Kamera aus, Eingabefeld erscheint; eingegebener Code wirkt für die Absicht, aus der gestartet wurde |
+| ERF-8 | Sucher läuft | „← Zurück" ist ausgeblendet; beide Knöpfe gleich hoch, „Abbrechen" farblich abgesetzt |
+| ERF-9 | Zweck über dem Sucher | „📍 Anwesenheit erfassen" bzw. „⏱️ Zeiterfassung starten" — passend zur Absicht |
+| ERF-10 | Tätigkeit mit `start_end` beenden | Sucher öffnet erneut, Zweck weist auf das Beenden hin |
+| ERF-11 | Breiten prüfen (360 px und 320 px) | Knöpfe und „Zurück" fluchten; Terminauswahl ändert die Breite nicht |
+
+---
+
+## PWA: Laufende Sitzung und Verlauf (ab 1.2.1)
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| LS-1 | Sitzung starten | Leiste über der Tab-Leiste zeigt Tätigkeit und laufende Zeit |
+| LS-2 | Auf Verlauf und Statistik wechseln | Leiste bleibt sichtbar und zählt weiter |
+| LS-3 | **App neu laden, Arbeitszeit-Ansicht NICHT öffnen** | Leiste steht sofort — der eigentliche Zweck |
+| LS-4 | Pause | Symbol wechselt zu ⏸, die Zeit steht still |
+| LS-5 | Leiste antippen | Führt zur Arbeitszeit-Ansicht, aus jedem Tab |
+| LS-6 | Stoppen | Leiste verschwindet |
+| VL-1 | Verlauf öffnen | Anwesenheiten (📍), Anträge (📋) und Arbeitszeiten (⏱️) in einer Zeitachse |
+| VL-2 | Sortierung | Neuester Eintrag oben, quellenübergreifend |
+| VL-3 | Laufende Sitzung | Erscheint als „läuft", ohne Freigabestatus |
+| VL-4 | Antrag mit Status „pending" | Liest sich als „Wartet auf Freigabe" — gleicher Wortlaut wie bei Arbeitszeiten |
+| VL-5 | Mitglied ohne Zeiterfassung | Nur Anwesenheiten und Anträge, keine Fehlermeldung |
+| VL-6 | Arbeitszeit-Ansicht | Enthält KEINE eigene Liste „Erfasste Zeiten" mehr |
+
+---
+
+## PWA: Fehlermeldungen (ab 1.2.1)
+
+Jede Meldung mindestens einmal auslösen und den Text lesen. Der Schlüssel ist die
+englische Servermeldung, nicht der Statuscode — siehe `API.md`, Abschnitt Arbeitszeiten.
+
+| ID | Auslöser | Erwarteter Text |
+|----|----------|-----------------|
+| FM-1 | Zweiter Start bei laufender Sitzung | „Es läuft bereits eine Zeiterfassung. Bitte zuerst beenden." |
+| FM-2 | Start ohne Code bei `verification != none` | „Diese Tätigkeit verlangt beim Start den QR-Code der Station." |
+| FM-3 | Start einer Art aus fremder Gruppe | „Diese Tätigkeit ist für deine Gruppe nicht vorgesehen." |
+| FM-4 | Falscher Code beim Timer | „Der Code ist ungültig oder abgelaufen." |
+| FM-5 | Pause ohne laufende Sitzung | „Es läuft gerade keine Zeiterfassung." |
+| FM-6 | Tätigkeit gelöscht, App noch offen, Start | „Diese Tätigkeit gibt es nicht mehr. Bitte die App neu laden." |
+| FM-7 | Unbekannte Meldung vom Server | Fällt auf den allgemeinen Statustext zurück; Rohmeldung steht im `debug.log` |

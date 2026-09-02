@@ -886,6 +886,21 @@ body {
     background: #f0f2f5;
 }
 
+/* Dauer und Notiz einer Arbeitszeitsitzung. Leiser als Titel und Status —
+   sie ergaenzen den Eintrag, tragen ihn aber nicht. */
+.history-duration {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+
+.history-note {
+    font-size: 12px;
+    color: var(--text-light);
+    font-style: italic;
+    margin-top: 2px;
+}
+
 /* Border Farben je nach Status */
 .history-item.verified {
     border-left-color: var(--success);
@@ -1876,6 +1891,191 @@ body {
 
 .worktime-section .form-group:last-of-type {
     margin-bottom: 20px;
+}
+
+/* ============================================
+   LAUFENDE SITZUNG
+   ============================================ */
+
+/* Eine laufende Sitzung ist ein Zustand des Mitglieds, kein Inhalt eines
+   Tabs — deshalb ueber allen Ansichten. Gruen wie der laufende Timer, damit
+   der Zusammenhang ohne Text erkennbar ist. */
+.running-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(39, 174, 96, 0.15);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.running-bar[hidden] {
+    display: none;
+}
+
+.running-bar-time {
+    /* Gleich breite Ziffern, sonst zappelt die Leiste im Sekundentakt */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ============================================
+   ERFASSEN-TAB: ABSICHTSWAHL
+   ============================================ */
+
+/* Bedienung des laufenden Suchers: abbrechen oder Code eintippen.
+   Nebeneinander, weil beides Auswege sind und keiner der Hauptweg. */
+.scanner-actions {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+    max-width: 400px;
+}
+
+/* Beide Knoepfe erben Regeln, die fuer grossflaechige Vollbreiten-Knoepfe
+   gedacht sind — mit unterschiedlichem Ergebnis in der Hoehe. Hier werden
+   Hoehe, Schrift und Abstand deshalb ausdruecklich gleich gesetzt, statt
+   sich auf das Geerbte zu verlassen. */
+.scanner-actions .action-button,
+.scanner-actions #stopScanButton {
+    flex: 1 1 0;
+    margin: 0;
+    min-height: 52px;
+    height: auto;
+    max-width: none;
+    padding: 10px 8px;
+    gap: 8px;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.scanner-actions .action-button .icon,
+.scanner-actions #stopScanButton .icon {
+    font-size: 18px;
+    /* Ohne das pulsiert das Stopp-Symbol weiter — auffaellig war sinnvoll,
+       solange es der einzige Ausweg war. */
+    animation: none;
+}
+
+/* Farblich unterschieden, damit die beiden Auswege auf einen Blick
+   auseinanderzuhalten sind: Abbrechen bricht den Vorgang ab, die manuelle
+   Eingabe fuehrt ihn auf anderem Weg weiter. */
+.scanner-actions #stopScanButton:hover {
+    transform: none;
+}
+
+/* Die Ansichten uebernehmen das zentrierende Flex-Layout von
+   .tab-content.active. Ohne das schrumpfen sie als Kinder eben dieses
+   Layouts auf ihre Inhaltsbreite — Knoepfe und Karten waeren dann schmaler
+   als der Schirm, und ein laengerer Termintitel im Auswahlfeld liesse die
+   ganze Ansicht auf einmal breiter werden. */
+#captureAttendance,
+#captureWorktime {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+#captureAttendance[hidden],
+#captureWorktime[hidden] {
+    display: none;
+}
+
+/* Die Kacheln sind der Einstieg, nicht ein Bedienelement unter vielen:
+   gross genug fuer den Daumen und ohne Konkurrenz auf dem Schirm. */
+.capture-chooser {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.capture-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 28px 16px;
+    border: none;
+    border-radius: 12px;
+    background: var(--card-bg);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.capture-tile:active {
+    transform: scale(0.99);
+}
+
+.capture-tile-icon  { font-size: 34px; }
+.capture-tile-label { font-size: 18px; font-weight: 600; color: var(--text); }
+.capture-tile-hint  { font-size: 12px; color: var(--text-light); }
+
+/* Fluchtet mit dem Inhalt darunter: die Ansichten sind auf 400px begrenzt und
+   zentriert, ein linksbuendiger Knopf ohne diese Breite haenge daneben. */
+.capture-back {
+    display: block;
+    width: 100%;
+    max-width: 400px;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text-light);
+    font-size: 14px;
+    font-family: inherit;
+    padding: 4px 0 12px;
+    cursor: pointer;
+}
+
+/* Ohne diese Regeln schlaegt das display der Klasse das [hidden] des Browsers
+   und die Ansicht bliebe sichtbar. */
+.capture-chooser[hidden],
+.capture-tile[hidden],
+.capture-back[hidden] {
+    display: none;
+}
+
+/* Zweck des Scans, dauerhaft ueber dem Sucher. Er beantwortet die Frage
+   „wofuer zaehlt der naechste Scan" — die Frage, an der die fruehere
+   unsichtbare Umleitung gescheitert ist.
+
+   Absolut positioniert wie .scanner-hint, nur oben: im normalen Fluss wuerde
+   der Text das Kamerabild nach unten schieben. Heller Text auf abgedunkeltem
+   Grund, weil der Container schwarz ist und darin ein Live-Bild laeuft. */
+.scanner-purpose {
+    margin: 0;
+    text-align: center;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 101;
+}
+
+.scanner-purpose:empty {
+    display: none;
 }
 
 /* Erklaerung unter einem Auswahlfeld: was die Wahl auslöst. Bewusst leise —

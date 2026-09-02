@@ -7,6 +7,41 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.2.1] – 2026-09-02
+
+### Neu
+- **Gruppenbindung der Tätigkeitsarten**: Eine Tätigkeitsart lässt sich Mitgliedergruppen
+  zuordnen (`activity_type_groups`), analog zu den Terminarten. Nur Mitglieder dieser Gruppen
+  sehen und erfassen sie — geprüft wird auch serverseitig beim Start und beim Selbst-Nachtrag,
+  nicht nur in der Anzeige
+- **Erfassen-Tab in der PWA**: Check-in und Zeiterfassung sind ein Tab. Stehen beide Absichten
+  offen, erscheint zuerst eine Auswahl; wer nur eine hat, landet direkt beim Werkzeug
+- **Laufende Sitzung über allen Tabs sichtbar**: Eine schmale Leiste zeigt Tätigkeit und
+  laufende Zeit und führt auf Tippen zur Sitzung zurück
+- **Zusammengeführter Verlauf**: Anwesenheiten, Anträge und Arbeitszeiten in einer Zeitachse
+
+### Geändert
+- Tätigkeitsarten sind nur noch für Mitglieder der zugeordneten Gruppen erfassbar. Die Migration
+  ordnet den Bestand **allen** Gruppen zu — es ändert sich also nichts, bis ein Administrator die
+  Zuordnung pflegt
+- Die Liste „Erfasste Zeiten" in der Zeiterfassung ist entfallen; der Verlauf führt sie mit
+- Fehlermeldungen der PWA benennen die Ursache, statt sie durch einen Statustext zu ersetzen
+- Antrag und Arbeitszeit verwenden im Verlauf denselben Wortlaut für die Freigabe
+
+### Behoben
+- Ein Scan für den Check-in konnte versehentlich eine Arbeitszeitsitzung starten: Die Umleitung
+  des nächsten Codes war unsichtbar, ohne Zeitlimit und überlebte den Tabwechsel. Der Zweck
+  eines Scans folgt jetzt aus der sichtbaren Ansicht
+- Der Start einer nachweispflichtigen Tätigkeit führte in eine Sackgasse — kein Abbruch, keine
+  manuelle Eingabe
+- Die Terminauswahl der Zeiterfassung blieb leer, wenn zuvor nicht der Antragsdialog geöffnet
+  worden war; das Tagesdatum wurde zudem aus UTC gebildet und sprang abends auf den Folgetag
+- Anwesenheitseinträge aus dem Timer zeigten im Dashboard keine Quelle
+- Bei abgeschalteter Zeiterfassung meldete das Dashboard bei jedem Neuladen einen Fehler
+- `id="scannerContainer"` existierte zweimal in der PWA
+
+---
+
 ## [1.2.0] – 2026-09-01
 
 ### Neu

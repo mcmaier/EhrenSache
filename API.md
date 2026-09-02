@@ -769,6 +769,160 @@ Wird automatisch für Authorisierten User durchgeführt (z.B. User über PWA).
 
 ---
 
+## Tätigkeitsarten (activity_types)
+
+Stammdaten der Arbeitszeiterfassung. Ist die Zeiterfassung abgeschaltet
+(`worktime_enabled = 0`), antwortet die Ressource mit **404** — ein
+abgeschaltetes Feature verrät nicht, dass es existiert.
+
+### Tätigkeitsarten abrufen
+**Endpoint:** `GET /api.php?resource=activity_types`
+
+**Filterung nach Mitgliedergruppen.** Eine Tätigkeitsart ist nur für Mitglieder
+der zugeordneten Gruppen erfassbar (`activity_type_groups`, seit 1.2.1):
+
+| Aufrufer | Parameter | Ergebnis |
+|---|---|---|
+| Rolle `user` | egal | nur Arten aus den Gruppen des **eigenen** Mitglieds |
+| Admin / Manager | ohne `member_id` | alle Arten — sie erfassen Nachträge zugunsten anderer |
+| Admin / Manager | `member_id=<id>` | nur Arten aus den Gruppen dieses Mitglieds |
+
+Ein Mitglied ohne passende Gruppe erhält ein **leeres Array mit Status 200**,
+nicht 404. Die beiden Fälle sind so unterscheidbar: leere Auswahl gegen
+abgeschaltetes Feature.
+
+Nicht-Admins sehen zusätzlich nur Arten mit `is_active = 1`.
+
+**Response:**
+```json
+[
+  {
+    "activity_id": 1,
+    "activity_name": "Vereinsheim-Pflege",
+    "description": "Pflege und Instandhaltung",
+    "color": "#1F5FBF",
+    "is_default": 0,
+    "is_active": 1,
+    "verification": "start_end",
+    "groups": [
+      { "group_id": 1, "group_name": "Aktive" }
+    ]
+  }
+]
+```
+
+`verification` steuert den Ortsnachweis: `none` (kein Code), `start` (Code beim
+Start) oder `start_end` (Code beim Start und beim Beenden).
+
+---
+
+### Tätigkeitsart erstellen
+**Endpoint:** `POST /api.php?resource=activity_types`
+
+**Berechtigung:** Admin
+
+**Request:**
+```json
+{
+  "activity_name": "Bühnenaufbau",
+  "description": "Auf- und Abbau",
+  "color": "#8E44AD",
+  "is_default": false,
+  "is_active": true,
+  "verification": "none",
+  "group_ids": [1, 2]
+}
+```
+
+---
+
+### Tätigkeitsart aktualisieren
+**Endpoint:** `PUT /api.php?resource=activity_types&id=<id>`
+
+**Berechtigung:** Admin
+
+Ein **fehlendes** `group_ids` lässt die Zuordnung unangetastet, ein **leeres
+Array** löscht sie.
+
+---
+
+### Tätigkeitsart löschen
+**Endpoint:** `DELETE /api.php?resource=activity_types&id=<id>`
+
+**Berechtigung:** Admin
+
+Hängen Sitzungen an der Art, antwortet der Server mit **409** — Löschen würde
+bestätigten Nachweisstunden ihre Zuordnung nehmen. Stattdessen `is_active = 0`
+setzen.
+
+---
+
+## Arbeitszeiten (work_sessions)
+
+Erfassung geleisteter Arbeitszeit. Wie `activity_types` mit **404**, wenn die
+Zeiterfassung abgeschaltet ist. Geräte (Rolle `device`) haben keinen Zugriff.
+
+Je Mitglied kann höchstens **eine** Sitzung offen sein; ein zweiter Start
+antwortet mit **409**. Eine vergessene Sitzung wird beim nächsten Zugriff
+automatisch geschlossen, sobald `worktime_max_session_hours` überschritten ist —
+gekappt auf Start plus Obergrenze, Status `submitted`.
+
+### Sitzungen abrufen
+**Endpoint:** `GET /api.php?resource=work_sessions`
+
+**Parameter:** `id`, `running=1` (nur die laufende Sitzung, sonst `null`),
+`year`, `month` (nur zusammen mit `year`), `from_date`, `to_date`, `member_id`,
+`activity_id`, `appointment_id`, `status`
+
+---
+
+### Sitzung steuern
+**Endpoint:** `POST /api.php?resource=work_sessions`
+
+**Request** (`action` bestimmt den Vorgang):
+```json
+{
+  "action": "start",
+  "activity_id": 1,
+  "appointment_id": 196,
+  "totp_code": "123456"
+}
+```
+
+`action` kennt `start`, `pause`, `resume` und `stop`. Beim Stoppen sind `note`
+und `force` möglich; `force` beendet ohne Ortsnachweis und setzt den Eintrag auf
+`submitted`, also freigabepflichtig.
+
+**Terminbezug:** Ist `appointment_id` gesetzt **und** der Termin heute, entsteht
+zugleich ein Anwesenheitseintrag mit `checkin_source = 'timer'`. Für einen
+künftigen Termin entsteht keiner — sonst gälte das Mitglied als anwesend bei
+etwas, das noch nicht stattgefunden hat.
+
+---
+
+### Nachtrag, Korrektur, Löschung
+**Endpoints:** `POST` (ohne `action`), `PUT ...&id=<id>`, `DELETE ...&id=<id>`
+
+Ein Nachtrag durch das Mitglied selbst landet in `submitted` und braucht eine
+Freigabe; ein Nachtrag durch Admin oder Manager gilt sofort. Löschen darf nur
+der Admin. Jede Änderung wird in `work_session_log` protokolliert.
+
+---
+
+### Meldungstexte sind eine Schnittstelle
+
+Die PWA ordnet den **englischen Meldungstexten** dieser Ressource deutsche
+Anzeigetexte zu (`SERVER_MESSAGES` in `public/checkin/js/app.js`). Der Schlüssel
+ist die Meldung, nicht der Statuscode: Ein 403 trägt hier mehrere Ursachen —
+fehlender Ortsnachweis und fremde Mitgliedergruppe —, die Meldung dagegen ist
+eindeutig.
+
+**Wer einen dieser Texte ändert, muss die Zuordnung dort mitziehen.** Für den
+Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
+`tests/suites/worktime_api.php` den Wortlaut ab.
+
+---
+
 ## Statistiken (statistics)
 
 ### Statistik abrufen

@@ -155,7 +155,10 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.submitExceptionBtn.addEventListener('click', submitException);  
     elements.closeConfirmDeleteBtn.addEventListener('click', closeConfirmDeleteModal);
     elements.submitConfirmDeleteBtn.addEventListener('click', submitConfirmDelete);   
-    elements.stopScanButton.addEventListener('click', toggleScanner);      
+    elements.stopScanButton.addEventListener('click', toggleScanner);
+    // Ausweg aus dem laufenden Sucher, in beiden Absichten. openManualCodeInput
+    // stoppt die Kamera selbst, bevor das Eingabefeld erscheint.
+    document.getElementById('scanManualBtn')?.addEventListener('click', openManualCodeInput);
     elements.nfcButton.addEventListener('click', toggleNFCReader);        
     toDashboardBtn.addEventListener('click', handleDashboardNavigation);
 
@@ -1194,34 +1197,26 @@ function updateClock() {
 // CHECKIN-API CALL
 // ========================================
 
-// Wohin ein eingelesener TOTP-Code geht. Ist nichts angemeldet, ist es der
-// Check-in — das ist der bisherige und haeufigste Fall. Die Zeiterfassung
-// meldet sich vor dem Scan an und bekommt den Code dann statt des Check-ins.
-let totpCodeConsumer = null;
-
 /**
- * Meldet Interesse am naechsten eingelesenen Code an.
- * @param {(code: string, inputMethod: string) => Promise<void>} consumer
- * @param {string} hint  Text, der ueber dem Scanner erscheint
- */
-function requestTotpCode(consumer, hint) {
-    totpCodeConsumer = { consumer, hint };
-}
-
-/** Nimmt die Anmeldung zurueck, z. B. wenn der Scan abgebrochen wird. */
-function cancelTotpCodeRequest() {
-    totpCodeConsumer = null;
-}
-
-/**
- * Liefert einen eingelesenen Code an den angemeldeten Empfaenger, sonst an
- * den Check-in. Alle drei Eingabewege (QR, NFC, manuell) laufen hierdurch.
+ * Liefert einen eingelesenen Code an den Zweck der sichtbaren Ansicht.
+ * Alle drei Eingabewege (QR, NFC, manuell) laufen hierdurch.
+ *
+ * Frueher entschied das eine Modulvariable, die der Zeiterfassung gehoerte,
+ * sobald sie einen Code angefordert hatte. Sie war unsichtbar, hatte kein
+ * Zeitlimit und ueberlebte den Tabwechsel: Wer den Start abbrach und danach
+ * ganz normal einchecken wollte, startete mit seinem Scan versehentlich eine
+ * Arbeitszeitsitzung. Der Zustand ist ersatzlos entfallen — der Zweck ergibt
+ * sich daraus, welche Ansicht offen ist, und die sieht das Mitglied.
  */
 async function deliverTotpCode(code, inputMethod) {
-    if (totpCodeConsumer) {
-        const { consumer } = totpCodeConsumer;
-        totpCodeConsumer = null;
-        await consumer(code, inputMethod);
+    if (isCaptureViewVisible('worktime')) {
+        // Laeuft eine Sitzung, kann der Code nur ihr Ende belegen, sonst den
+        // Start. Auch dieser Unterschied ist sichtbar: der Timer steht auf dem
+        // Schirm oder das Startformular.
+        const laeuft = document.getElementById('worktimeRunning');
+        const istGestartet = laeuft && getComputedStyle(laeuft).display !== 'none';
+
+        await (istGestartet ? worktimeStop(code) : worktimeStart(code));
         return;
     }
 
@@ -1282,14 +1277,53 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
 // UI STATE HELPER
 // ========================================
 
+/**
+ * Beschriftet den Sucher mit dem Zweck des Scans.
+ *
+ * Der Text steht dauerhaft ueber dem Sucher — anders als eine Meldung, die
+ * nach fuenf Sekunden verschwindet und den Nutzer im Unklaren laesst, wofuer
+ * der naechste Scan zaehlt.
+ *
+ * Er wird beim Anzeigen des Suchers gesetzt und nirgends gespeichert: der
+ * Zweck ergibt sich aus der Ansicht, in der der Scanner steht, nicht aus einer
+ * Variablen, die einen Ansichtswechsel ueberlebt.
+ */
+function setScannerPurpose(text) {
+    const el = document.getElementById('scannerPurpose');
+    if (el) el.textContent = text || '';
+}
+
+/**
+ * Wofuer der Sucher gerade laeuft — abgeleitet aus der sichtbaren Ansicht,
+ * derselben Quelle, aus der auch deliverTotpCode() den Zweck nimmt. Anzeige
+ * und Wirkung koennen so nicht auseinanderlaufen.
+ */
+function scannerPurposeText() {
+    return isCaptureViewVisible('worktime')
+        ? '⏱️ Zeiterfassung starten'
+        : '📍 Anwesenheit erfassen';
+}
+
+/**
+ * Blendet Abbrechen und manuelle Eingabe ein, solange der Sucher laeuft.
+ *
+ * Beides gehoert zum Scanner, nicht zu einer Absicht: Wer die Zeiterfassung
+ * mit Ortsnachweis startet, landete frueher ohne Ausweg im Sucher — kein
+ * Abbruch, keine Eingabe von Hand.
+ */
+function setScannerActionsVisible(visible) {
+    const el = document.getElementById('scannerActions');
+    if (el) el.style.display = visible ? 'flex' : 'none';
+}
+
 function setCheckinUIState(state) {
     currentUIState = state;
-    
+
     switch(state) {
         case UI_STATE.IDLE:
             // Ruhezustand: Alle Optionen anzeigen
             elements.scannerContainer.style.display = 'none';
-            elements.stopScanButton.style.display = 'none';
+            setScannerActionsVisible(false);
             elements.scanButton.style.display = 'flex';
             elements.manualCodeBtn.style.display = 'flex';
             elements.exceptionBtn.style.display = 'flex';
@@ -1306,18 +1340,22 @@ function setCheckinUIState(state) {
             
             isScanning = false;
             isNFCScanning = false;
+            updateCaptureBackVisible();
             break;
             
         case UI_STATE.QR_SCANNING:
             // QR-Scanner aktiv: Nur Scanner und Stop-Button
+            //
+            setScannerPurpose(scannerPurposeText());
             elements.scannerContainer.style.display = 'block';
-            elements.stopScanButton.style.display = 'flex';
+            setScannerActionsVisible(true);
             elements.scanButton.style.display = 'none';
             elements.manualCodeBtn.style.display = 'none';
             elements.exceptionBtn.style.display = 'none';
             elements.checkinDivider.style.display = 'none';            
             elements.nfcButton.style.display = 'none';                        
             isScanning = true;
+            updateCaptureBackVisible();
             break;
             
         case UI_STATE.NFC_SCANNING:
@@ -1773,7 +1811,18 @@ async function loadHistory() {
         }
 
         let exceptions = result.data;
-        
+
+        // Arbeitszeiten nur abrufen, wenn das Mitglied ueberhaupt welche
+        // erfassen darf — sonst antwortet die Ressource mit 404 und der
+        // Abruf waere verschenkt.
+        let sessions = [];
+        if (worktimeActivities.length > 0) {
+            const ws = await apiCall('work_sessions', 'GET');
+            if (ws.success && Array.isArray(ws.data)) {
+                sessions = ws.data;
+            }
+        }
+
         // Kombiniere und sortiere nach Datum (neueste zuerst)
         const combined = [
             ...records.slice(0, 10).map(r => ({
@@ -1785,16 +1834,24 @@ async function loadHistory() {
                 type: 'exception',
                 data: e,
                 timestamp: new Date(e.created_at)
+            })),
+            ...sessions.slice(0, 10).map(s => ({
+                type: 'session',
+                data: s,
+                // Der Beginn, nicht das Ende: eine laufende Sitzung hat noch
+                // kein Ende und faende sonst keinen Platz in der Zeitachse.
+                timestamp: new Date(String(s.start_time).replace(' ', 'T'))
             }))
         ];
 
-        combined.sort((a, b) => b.timestamp - a.timestamp);       
-        
+        combined.sort((a, b) => b.timestamp - a.timestamp);
+
         // Debug
         debug.log("Loading History", combined);
-        
-        // Zeige die letzten 10 Einträge
-        renderHistory(combined.slice(0, 10));
+
+        // Zeige die letzten Einträge. Mit drei Quellen statt zwei waeren zehn
+        // je Art zu knapp fuer einen brauchbaren Ueberblick.
+        renderHistory(combined.slice(0, 20));
         
     } catch (error) {
         debug.error('Fehler beim Laden der History:', error);
@@ -1814,10 +1871,61 @@ function renderHistory(items) {
     items.forEach(item => {
         if (item.type === 'record') {
             addRecordToHistory(item.data);
+        } else if (item.type === 'session') {
+            addWorkSessionToHistory(item.data);
         } else {
             addExceptionToHistory(item.data);
         }
     });
+}
+
+/**
+ * Fuegt eine Arbeitszeitsitzung in die Zeitachse ein.
+ *
+ * Zweiter Nutzen neben der Uebersicht: Eine vergessene laufende Sitzung wird
+ * hier sichtbar, auch wenn niemand die Arbeitszeit-Ansicht oeffnet.
+ */
+function addWorkSessionToHistory(session) {
+    const item = document.createElement('div');
+    const laeuft = !session.end_time;
+
+    item.className = session.status === 'confirmed'
+        ? 'history-item verified'
+        : 'history-item pending';
+
+    const start = new Date(String(session.start_time).replace(' ', 'T'));
+    const dateStr = start.toLocaleDateString('de-DE', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+    const timeStr = start.toLocaleTimeString('de-DE', {
+        hour: '2-digit', minute: '2-digit'
+    });
+
+    const dauer = laeuft
+        ? 'läuft'
+        : `${session.duration_minutes} Min.`
+          + ((parseInt(session.break_minutes, 10) || 0) > 0
+             ? ` · ${session.break_minutes} Min. Pause` : '');
+
+    // Solange die Sitzung laeuft, sagt der Freigabestatus nichts: sie ist noch
+    // nicht abgeschlossen. „läuft" allein ist die ehrlichere Auskunft.
+    const status = laeuft
+        ? ''
+        : `<span class="status ${session.status === 'confirmed' ? 'verified' : 'pending'}">`
+          + `${translateWorkSessionStatus(session.status)}</span>`;
+
+    const note = session.note
+        ? `<div class="history-note">${escapeHtml(session.note)}</div>` : '';
+
+    item.innerHTML = `
+        <div class="time">⏱️ ${dateStr} ${timeStr}</div>
+        <div class="appointment">${escapeHtml(session.activity_name || 'Tätigkeit')}</div>
+        <div class="history-duration">${escapeHtml(dauer)}</div>
+        ${note}
+        ${status}
+    `;
+
+    elements.historyList.appendChild(item);
 }
 
 // Fügt Record zur History hinzu
@@ -2096,10 +2204,10 @@ async function initWorktime() {
         return;
     }
 
+    // Es gibt keinen eigenen Zeit-Tab mehr, den man einblenden koennte: ob die
+    // Arbeitszeit ueberhaupt zur Wahl steht, entscheidet availableIntents()
+    // anhand genau dieser Liste.
     worktimeActivities = result.data || [];
-
-    const tab = document.getElementById('worktimeTab');
-    if (tab) tab.style.display = '';
 
     const select = document.getElementById('worktimeActivity');
     if (select) {
@@ -2134,6 +2242,30 @@ async function initWorktime() {
             () => worktimeStop(null, true)
         );
     });
+
+    // Laeuft gerade eine Sitzung? Diese eine Frage wird beim Start gestellt,
+    // damit die Leiste sofort steht. Die uebrigen Abrufe von
+    // loadWorktimeState() — Termine und erfasste Zeiten — kann sich der Start
+    // sparen, sie werden erst beim Oeffnen der Ansicht gebraucht.
+    await loadRunningSession();
+}
+
+/**
+ * Holt nur die laufende Sitzung und aktualisiert die Leiste.
+ *
+ * Ohne diesen Abruf beim Start erfuhr niemand von einer laufenden Sitzung,
+ * der nicht zufaellig die Arbeitszeit-Ansicht oeffnete — eine vergessene
+ * Sitzung lief so bis zur Obergrenze weiter.
+ */
+async function loadRunningSession() {
+    const result = await apiCall('work_sessions', 'GET', null, { running: 1 });
+    worktimeSession = result.success ? result.data : null;
+
+    renderRunningBar();
+
+    if (worktimeSession && worktimeSession.is_running) {
+        startWorktimeTicker();
+    }
 }
 
 /** Holt den Zustand IMMER vom Server — nie aus dem Browser-Speicher. */
@@ -2148,8 +2280,6 @@ async function loadWorktimeState() {
     if (!(worktimeSession && worktimeSession.is_running)) {
         await loadWorktimeAppointments();
     }
-
-    await loadWorktimeList();
 }
 
 function renderWorktime() {
@@ -2198,6 +2328,28 @@ function renderWorktime() {
         running.style.display = 'none';
         stopWorktimeTicker();
     }
+
+    renderRunningBar();
+}
+
+/**
+ * Die Leiste ueber allen Tabs. Folgt demselben worktimeSession wie die
+ * Ansicht, damit beide nicht auseinanderlaufen koennen.
+ */
+function renderRunningBar() {
+    const bar = document.getElementById('runningSessionBar');
+    if (!bar) return;
+
+    const laeuft = !!(worktimeSession && worktimeSession.is_running);
+    bar.hidden = !laeuft;
+
+    if (!laeuft) return;
+
+    const name = document.getElementById('runningSessionActivity');
+    if (name) {
+        name.textContent = (worktimeSession.is_paused ? '⏸ ' : '⏱️ ')
+            + (worktimeSession.activity_name || 'Tätigkeit');
+    }
 }
 
 function startWorktimeTicker() {
@@ -2236,8 +2388,15 @@ function updateWorktimeElapsed() {
     const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
     const sec = String(seconds % 60).padStart(2, '0');
 
+    const zeit = `${h}:${m}:${sec}`;
+
     const el = document.getElementById('worktimeElapsed');
-    if (el) el.textContent = `${h}:${m}:${sec}`;
+    if (el) el.textContent = zeit;
+
+    // Dieselbe Zeit in der Leiste: ein Ticker, zwei Anzeigen — zwei Ticker
+    // wuerden mit der Zeit auseinanderlaufen.
+    const bar = document.getElementById('runningSessionElapsed');
+    if (bar) bar.textContent = zeit;
 }
 
 function showWorktimeStatus(message, isError = false) {
@@ -2289,18 +2448,6 @@ function renderWorktimeAppointmentHint() {
     hint.hidden = !select.value;
 }
 
-/**
- * Schickt das Mitglied zum Check-in-Tab, wo Scanner, NFC und manuelle Eingabe
- * bereits stehen. Der eingelesene Code geht dank requestTotpCode an den Timer
- * statt an den Check-in.
- */
-function askForTotpCode(consumer, hint) {
-    requestTotpCode(consumer, hint);
-
-    document.querySelector('.tab-button[data-tab="checkin"]')?.click();
-    showMessage(hint, 'info');
-}
-
 async function worktimeStart(totpCode = null) {
     const activityId = document.getElementById('worktimeActivity')?.value;
     if (!activityId) {
@@ -2311,11 +2458,12 @@ async function worktimeStart(totpCode = null) {
     // Verlangt die Taetigkeitsart einen Ortsnachweis, wird zuerst ein Code
     // geholt. Der Server prueft das ohnehin erneut — das hier erspart dem
     // Mitglied nur den Fehlschlag.
+    //
+    // Der Sucher geht HIER auf, in der Arbeitszeit-Ansicht. Frueher wurde das
+    // Mitglied in den Check-in-Tab geschickt und dort der Zweck des naechsten
+    // Scans heimlich umgebogen — daher die Verwechslungen.
     if (!totpCode && selectedActivityVerification() !== 'none') {
-        askForTotpCode(
-            code => worktimeStart(code),
-            '⏱️ Code für den Start der Zeiterfassung scannen'
-        );
+        toggleScanner();
         return;
     }
 
@@ -2335,8 +2483,7 @@ async function worktimeStart(totpCode = null) {
 
     worktimeSession = result.data.session;
 
-    // Zurueck zur Zeiterfassung, falls der Code im Check-in-Tab geholt wurde
-    document.querySelector('.tab-button[data-tab="worktime"]')?.click();
+    // Kein Tabwechsel mehr noetig: der Scan fand in dieser Ansicht statt.
     renderWorktime();
 
     showWorktimeStatus(worktimeSession.start_location_name
@@ -2368,10 +2515,7 @@ async function worktimeStop(totpCode = null, force = false) {
     // Verlangt die laufende Sitzung einen Nachweis zum Beenden, wird zuerst
     // ein Code geholt — es sei denn, das Mitglied hat bewusst ohne gewaehlt.
     if (!totpCode && !force && worktimeSession && worktimeSession.verification === 'start_end') {
-        askForTotpCode(
-            code => worktimeStop(code),
-            '⏱️ Code für das Beenden der Zeiterfassung scannen'
-        );
+        toggleScanner();
         return;
     }
 
@@ -2393,59 +2537,13 @@ async function worktimeStop(totpCode = null, force = false) {
     const minutes = session.duration_minutes;
     const zeit = `${minutes} ${minutes === 1 ? 'Minute' : 'Minuten'}`;
 
-    document.querySelector('.tab-button[data-tab="worktime"]')?.click();
-
     showWorktimeStatus(session.status === 'submitted'
         ? `Beendet ohne Nachweis: ${zeit} — wartet auf Freigabe`
         : `Beendet: ${zeit} erfasst`);
 
     worktimeSession = null;
     renderWorktime();
-    await loadWorktimeList();
 }
-
-async function loadWorktimeList() {
-    const el = document.getElementById('worktimeList');
-    if (!el) return;
-
-    const year = new Date().getFullYear();
-    const result = await apiCall('work_sessions', 'GET', null, { year });
-
-    if (!result.success) {
-        el.innerHTML = '<div class="history-empty">Zeiten konnten nicht geladen werden.</div>';
-        return;
-    }
-
-    const sessions = (result.data || []).filter(s => !s.is_running);
-
-    if (!sessions.length) {
-        el.innerHTML = '<div class="history-empty">Noch keine erfassten Zeiten in diesem Jahr.</div>';
-        return;
-    }
-
-    const statusLabel = {
-        confirmed: '✓ bestätigt',
-        submitted: '⏳ wartet auf Freigabe',
-        rejected: '✗ abgelehnt'
-    };
-
-    el.innerHTML = sessions.map(s => {
-        const cls = s.status === 'confirmed' ? 'history-item verified' : 'history-item pending';
-        const breakInfo = (parseInt(s.break_minutes, 10) || 0) > 0
-            ? ` (${s.break_minutes} Min. Pause)` : '';
-        const note = s.note
-            ? `<div class="worktime-item-note">${escapeHtml(s.note)}</div>` : '';
-
-        return `<div class="${cls}">
-            <strong>${escapeHtml(s.activity_name || 'Tätigkeit')}</strong>
-            <div>${escapeHtml(String(s.start_time).substring(0, 16))}</div>
-            <div>${s.duration_minutes} Min.${breakInfo}</div>
-            ${note}
-            <div class="worktime-item-status">${statusLabel[s.status] || escapeHtml(s.status)}</div>
-        </div>`;
-    }).join('');
-}
-
 /**
  * Termine des heutigen Tages in die optionale Auswahl fuellen.
  *
@@ -2495,12 +2593,121 @@ async function loadWorktimeAppointments() {
 }
 
 // ========================================
+// ERFASSEN-TAB: ABSICHT VOR WERKZEUG
+// ========================================
+
+// Die drei Ansichten des Erfassen-Tabs und ihre Container.
+const CAPTURE_VIEWS = {
+    chooser:    'captureChooser',
+    attendance: 'captureAttendance',
+    worktime:   'captureWorktime'
+};
+
+/** Ist diese Ansicht gerade sichtbar? Einzige Quelle fuer den Zweck eines Scans. */
+function isCaptureViewVisible(view) {
+    const el = document.getElementById(CAPTURE_VIEWS[view]);
+    return !!el && !el.hidden;
+}
+
+/**
+ * Welche Absichten stehen diesem Mitglied offen?
+ *
+ * Anwesenheit immer. Arbeitszeit nur, wenn das Feature freigeschaltet ist UND
+ * mindestens eine Taetigkeitsart in den eigenen Gruppen liegt — genau das
+ * steht nach initWorktime() in worktimeActivities.
+ */
+function availableIntents() {
+    const intents = ['attendance'];
+
+    if (worktimeActivities.length > 0) {
+        intents.push('worktime');
+    }
+
+    return intents;
+}
+
+/**
+ * Wann der Zurueck-Weg sichtbar ist.
+ *
+ * Nur wenn es eine Auswahl zu treffen gab — und nicht, solange der Sucher
+ * laeuft: Der Scanner steht ueber den Ansichten, „Zurueck" saesse darunter und
+ * waere ein zweiter, fast gleicher Ausweg neben „Abbrechen". Waehrend des
+ * Scannens ist Abbrechen der richtige.
+ */
+function updateCaptureBackVisible() {
+    const zeigen = availableIntents().length > 1
+        && currentUIState !== UI_STATE.QR_SCANNING;
+
+    document.querySelectorAll('.capture-back').forEach(b => { b.hidden = !zeigen; });
+}
+
+/**
+ * Zeigt eine Ansicht des Erfassen-Tabs.
+ *
+ * Beim Verlassen der Anwesenheit werden Scanner und NFC gestoppt: ein
+ * weiterlaufender Sucher in einer unsichtbaren Ansicht wuerde Kamera und Akku
+ * beanspruchen und koennte einen Code entgegennehmen, den niemand erwartet.
+ */
+function showCaptureView(view) {
+    Object.entries(CAPTURE_VIEWS).forEach(([name, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.hidden = (name !== view);
+    });
+
+    updateCaptureBackVisible();
+
+    if (view !== 'attendance') {
+        stopScannerIfRunning();
+        stopNFCReader();
+    }
+
+    if (view === 'worktime') {
+        loadWorktimeState();
+    }
+}
+
+/**
+ * Einstieg in den Erfassen-Tab: fragt nur, wenn es etwas zu fragen gibt.
+ *
+ * Wer nur eine Absicht hat — der Regelfall nach der Gruppenbindung — landet
+ * direkt beim Werkzeug und zahlt keinen zusaetzlichen Klick.
+ */
+function enterCaptureTab() {
+    const intents = availableIntents();
+
+    showCaptureView(intents.length > 1 ? 'chooser' : intents[0]);
+}
+
+function initCaptureTab() {
+    document.querySelectorAll('.capture-tile').forEach(tile => {
+        tile.addEventListener('click', () => showCaptureView(tile.dataset.intent));
+    });
+
+    document.querySelectorAll('.capture-back').forEach(btn => {
+        btn.addEventListener('click', () => showCaptureView('chooser'));
+    });
+
+    // Die Leiste ist der Weg zurueck zur laufenden Sitzung, aus jedem Tab.
+    document.getElementById('runningSessionBar')?.addEventListener('click', () => {
+        document.querySelector('.tab-button[data-tab="capture"]')?.click();
+        showCaptureView('worktime');
+    });
+
+    enterCaptureTab();
+}
+
+// ========================================
 // TAB MANAGEMENT
 // ========================================
 function initTabs() {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
-    
+
+    // Der Erfassen-Tab ist beim Start offen. initWorktime() lief in
+    // loadUserData() bereits durch, worktimeActivities ist also gefuellt und
+    // availableIntents() liefert die richtige Antwort.
+    initCaptureTab();
+
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
             const targetTab = button.dataset.tab;
@@ -2513,20 +2720,19 @@ function initTabs() {
             button.classList.add('active');
             document.querySelector(`.tab-content[data-tab="${targetTab}"]`).classList.add('active');
             
-            // Scanner stoppen wenn Tab gewechselt wird
-            if (targetTab !== 'checkin') {
+            // Scanner stoppen, sobald der Erfassen-Tab verlassen wird.
+            // Aufraeumen einer Code-Umleitung entfaellt: es gibt keine mehr.
+            if (targetTab !== 'capture') {
                 stopScannerIfRunning();
                 stopNFCReader();
-
-                // Eine offene Code-Anforderung der Zeiterfassung verfaellt.
-                // Sonst finge sie den naechsten Check-in-Scan ab.
-                if (targetTab !== 'worktime') {
-                    cancelTotpCodeRequest();
-                }
             }
 
             // Lade Daten wenn nötig
-            if (targetTab === 'stats') {
+            if (targetTab === 'capture') {
+                debug.log("Entering Capture");
+                enterCaptureTab();
+            }
+            else if (targetTab === 'stats') {
                 debug.log("Loading Stats");
                 loadStatistics();
             }
@@ -2534,11 +2740,6 @@ function initTabs() {
             {
                 debug.log("Loading History");
                 loadHistory();
-            }
-            else if(targetTab === 'worktime')
-            {
-                debug.log("Loading Worktime");
-                loadWorktimeState();
             }
             else if(targetTab === 'attendance-list')
             {
@@ -2716,13 +2917,29 @@ function translateStatus(status) {
     return translations[status] || status;
 }
 
+/**
+ * Antrag und Arbeitszeit durchlaufen dieselbe Freigabe, hiessen im Verlauf
+ * aber verschieden („Ausstehend" gegen „Wartet auf Freigabe"). In einer
+ * gemeinsamen Zeitachse liest sich das wie zwei verschiedene Sachverhalte,
+ * darum ein Wortlaut fuer beide.
+ *
+ * „Anwesend" und „Entschuldigt" bleiben, wie sie sind: sie beschreiben nicht
+ * den Bearbeitungsstand, sondern die Tatsache selbst.
+ */
+const FREIGABE_STATUS = {
+    'pending':   'Wartet auf Freigabe',
+    'submitted': 'Wartet auf Freigabe',
+    'approved':  'Bestätigt',
+    'confirmed': 'Bestätigt',
+    'rejected':  'Abgelehnt'
+};
+
 function translateExceptionStatus(status) {
-    const translations = {
-        'pending': 'Ausstehend',
-        'approved': 'Genehmigt',
-        'rejected': 'Abgelehnt'
-    };
-    return translations[status] || status;
+    return FREIGABE_STATUS[status] || status;
+}
+
+function translateWorkSessionStatus(status) {
+    return FREIGABE_STATUS[status] || status;
 }
 
 function formatDate(date) {

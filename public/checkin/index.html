@@ -94,19 +94,25 @@
                 </div>                                
             </div>             
 
+            <!-- Laufende Sitzung.
+                 Ein Zustand des Mitglieds, kein Inhalt eines Tabs — deshalb
+                 ueber allen Ansichten sichtbar. Ohne sie erfuhr niemand von
+                 einer laufenden Sitzung, der nicht zufaellig die
+                 Arbeitszeit-Ansicht oeffnete. -->
+            <button id="runningSessionBar" class="running-bar" hidden>
+                <span id="runningSessionActivity"></span>
+                <span id="runningSessionElapsed" class="running-bar-time"></span>
+            </button>
+
             <!-- TAB NAVIGATION -->
             <div class="tabs">
-                <button class="tab-button active" data-tab="checkin">
+                <button class="tab-button active" data-tab="capture">
                     <span class="icon">📍</span>
-                    <span>Check-in</span>
+                    <span>Erfassen</span>
                 </button>
                 <button class="tab-button" data-tab="history">
                     <span class="icon">📋</span>
                     <span>Verlauf</span>
-                </button>                
-                <button class="tab-button" data-tab="worktime" id="worktimeTab" style="display: none;">
-                    <span class="icon">⏱️</span>
-                    <span>Zeit</span>
                 </button>
                 <button class="tab-button" data-tab="stats">
                     <span class="icon">📊</span>
@@ -120,33 +126,59 @@
 
             <div id="statusMessage"></div>
 
-            <!-- TAB 1: CHECK-IN -->
-            <div class="tab-content active" data-tab="checkin">                
-                    <!-- Scanner Container -->
-                    <div class="scanner-container" id="scannerContainer" style="display: none;">
-                        <div id="qr-reader"></div>
-                        <div class="scanner-overlay">
-                            <div class="scanner-overlay-corner"></div>
-                        </div>
-                        <div class="scanner-hint">QR-Code im grünen Rahmen positionieren</div>
-                    </div>
-                    
-                <div class="action-buttons">
-                    <!-- Stop-Button beim Scannen -->
-                    <button id="stopScanButton" class="action-button" style="display: none;">
-                        <span class="icon">⏹️</span>
-                        <span>Scan beenden</span>
+            <!-- TAB 1: ERFASSEN
+                 Absicht zuerst, Werkzeug danach. Der Scanner ist nur ueber eine
+                 Absicht erreichbar; der Zweck eines Scans folgt damit aus der
+                 sichtbaren Ansicht statt aus einer verborgenen Variablen. -->
+            <div class="tab-content active" data-tab="capture">
+
+                <!-- Ansicht 1: Absichtswahl. Erscheint nur, wenn beide
+                     Absichten offenstehen — sonst geht es direkt zum Werkzeug. -->
+                <div id="captureChooser" class="capture-chooser" hidden>
+                    <button class="capture-tile" data-intent="attendance">
+                        <span class="capture-tile-icon">📍</span>
+                        <span class="capture-tile-label">Anwesenheit</span>
+                        <span class="capture-tile-hint">Bei einem Termin einchecken</span>
                     </button>
+                    <button class="capture-tile" data-intent="worktime">
+                        <span class="capture-tile-icon">⏱️</span>
+                        <span class="capture-tile-label">Arbeitszeit</span>
+                        <span class="capture-tile-hint">Zeit für eine Tätigkeit erfassen</span>
+                    </button>
+                </div>
 
-                    <!-- Scanner mit Overlay -->
-                    <div class="scanner-container" id="scannerContainer" style="display: none;">
-                        <div id="qr-reader"></div>
-                        <div class="scanner-overlay">
-                            <div class="scanner-overlay-corner"></div>
-                        </div>
-                        <div class="scanner-hint">QR-Code im Rahmen positionieren</div>
+                <!-- Scanner Container.
+                     Steht ueber den Ansichten, nicht in einer: beide Absichten
+                     brauchen ihn, und zwei Instanzen waeren zwei gleiche Ids
+                     (OI-8). Wofuer er gerade laeuft, sagt scannerPurpose. -->
+                <div class="scanner-container" id="scannerContainer" style="display: none;">
+                    <p id="scannerPurpose" class="scanner-purpose"></p>
+                    <div id="qr-reader"></div>
+                    <div class="scanner-overlay">
+                        <div class="scanner-overlay-corner"></div>
                     </div>
+                    <div class="scanner-hint">QR-Code im grünen Rahmen positionieren</div>
+                </div>
 
+                <!-- Bedienung des Scanners. Steht wie der Sucher ueber den
+                     Ansichten: wer scannt, braucht in jeder Absicht denselben
+                     Ausweg — abbrechen oder den Code eintippen. -->
+                <div class="scanner-actions" id="scannerActions" style="display: none;">
+                    <button id="scanManualBtn" class="action-button secondary">
+                        <span class="icon">🔢</span>
+                        <span>Code eingeben</span>
+                    </button>
+                    <button id="stopScanButton" class="action-button secondary">
+                        <span class="icon">⏹️</span>
+                        <span>Abbrechen</span>
+                    </button>
+                </div>
+
+                <!-- Ansicht 2: Anwesenheit -->
+                <div id="captureAttendance" hidden>
+                    <button class="capture-back" hidden>← Zurück</button>
+
+                <div class="action-buttons">
                     <button id="scanButton" class="action-button">
                         <span class="icon">📷</span>
                         <span>QR-Code scannen</span>
@@ -173,22 +205,14 @@
                     <button id="exceptionBtn" class="action-button secondary">
                         <span class="icon">📋</span>
                         <span>Erfassungsantrag stellen</span>
-                    </button>        
-                </div>     
-            </div>            
-
-            <!-- TAB 2: HISTORY -->
-            <div class="tab-content" data-tab="history">
-                <div class="history-section" style="display: block;">
-                    <div id="history-header">                        
-                        <h3>📋 Letzte Aktivitäten</h3>                                               
-                    </div>
-                    <div class="history-list" id="historyList"></div>
+                    </button>
                 </div>
             </div>
+            <!-- Ende Ansicht 2 -->
 
-            <!-- TAB: ZEITERFASSUNG -->
-            <div class="tab-content" data-tab="worktime">
+            <!-- Ansicht 3: Arbeitszeit -->
+            <div id="captureWorktime" hidden>
+                <button class="capture-back" hidden>← Zurück</button>
                 <div class="worktime-section">
                     <div id="worktimeIdle">
                         <div class="form-group">
@@ -236,12 +260,24 @@
 
                     <div id="worktimeStatus"></div>
                 </div>
+            </div>
+            <!-- Ende Ansicht 3.
+                 Die frueher hier stehende Liste „Erfasste Zeiten" ist
+                 entfallen: der Verlauf-Tab fuehrt die Arbeitszeiten seit der
+                 Zusammenfuehrung ohnehin, zusammen mit Anwesenheiten und
+                 Antraegen. Zweimal dasselbe an zwei Orten zu pflegen heisst,
+                 dass eines davon irgendwann abweicht. -->
 
+            </div>
+            <!-- Ende TAB 1: ERFASSEN -->
+
+            <!-- TAB 2: HISTORY -->
+            <div class="tab-content" data-tab="history">
                 <div class="history-section" style="display: block;">
-                    <div id="worktime-header">
-                        <h3>⏱️ Erfasste Zeiten</h3>
+                    <div id="history-header">                        
+                        <h3>📋 Letzte Aktivitäten</h3>                                               
                     </div>
-                    <div class="history-list" id="worktimeList"></div>
+                    <div class="history-list" id="historyList"></div>
                 </div>
             </div>
 
