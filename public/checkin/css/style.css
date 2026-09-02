@@ -1878,6 +1878,66 @@ body {
     margin-bottom: 20px;
 }
 
+/* ============================================
+   ERFASSEN-TAB: ABSICHTSWAHL
+   ============================================ */
+
+/* Die Kacheln sind der Einstieg, nicht ein Bedienelement unter vielen:
+   gross genug fuer den Daumen und ohne Konkurrenz auf dem Schirm. */
+.capture-chooser {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.capture-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 28px 16px;
+    border: none;
+    border-radius: 12px;
+    background: var(--card-bg);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.capture-tile:active {
+    transform: scale(0.99);
+}
+
+.capture-tile-icon  { font-size: 34px; }
+.capture-tile-label { font-size: 18px; font-weight: 600; color: var(--text); }
+.capture-tile-hint  { font-size: 12px; color: var(--text-light); }
+
+/* Fluchtet mit dem Inhalt darunter: die Ansichten sind auf 400px begrenzt und
+   zentriert, ein linksbuendiger Knopf ohne diese Breite haenge daneben. */
+.capture-back {
+    display: block;
+    width: 100%;
+    max-width: 400px;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text-light);
+    font-size: 14px;
+    font-family: inherit;
+    padding: 4px 0 12px;
+    cursor: pointer;
+}
+
+/* Ohne diese Regeln schlaegt das display der Klasse das [hidden] des Browsers
+   und die Ansicht bliebe sichtbar. */
+.capture-chooser[hidden],
+.capture-tile[hidden],
+.capture-back[hidden] {
+    display: none;
+}
+
 /* Zweck des Scans, dauerhaft ueber dem Sucher. Er beantwortet die Frage
    „wofuer zaehlt der naechste Scan" — die Frage, an der die fruehere
    unsichtbare Umleitung gescheitert ist.

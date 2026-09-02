@@ -96,17 +96,13 @@
 
             <!-- TAB NAVIGATION -->
             <div class="tabs">
-                <button class="tab-button active" data-tab="checkin">
+                <button class="tab-button active" data-tab="capture">
                     <span class="icon">📍</span>
-                    <span>Check-in</span>
+                    <span>Erfassen</span>
                 </button>
                 <button class="tab-button" data-tab="history">
                     <span class="icon">📋</span>
                     <span>Verlauf</span>
-                </button>                
-                <button class="tab-button" data-tab="worktime" id="worktimeTab" style="display: none;">
-                    <span class="icon">⏱️</span>
-                    <span>Zeit</span>
                 </button>
                 <button class="tab-button" data-tab="stats">
                     <span class="icon">📊</span>
@@ -120,20 +116,43 @@
 
             <div id="statusMessage"></div>
 
-            <!-- TAB 1: CHECK-IN -->
-            <div class="tab-content active" data-tab="checkin">                
-                    <!-- Scanner Container.
-                         Genau EINE Instanz: derselbe Block stand hier zweimal
-                         mit derselben Id, was ungültiges HTML ist und
-                         getElementById zum Glücksspiel macht (OI-8). -->
-                    <div class="scanner-container" id="scannerContainer" style="display: none;">
-                        <p id="scannerPurpose" class="scanner-purpose"></p>
-                        <div id="qr-reader"></div>
-                        <div class="scanner-overlay">
-                            <div class="scanner-overlay-corner"></div>
-                        </div>
-                        <div class="scanner-hint">QR-Code im grünen Rahmen positionieren</div>
+            <!-- TAB 1: ERFASSEN
+                 Absicht zuerst, Werkzeug danach. Der Scanner ist nur ueber eine
+                 Absicht erreichbar; der Zweck eines Scans folgt damit aus der
+                 sichtbaren Ansicht statt aus einer verborgenen Variablen. -->
+            <div class="tab-content active" data-tab="capture">
+
+                <!-- Ansicht 1: Absichtswahl. Erscheint nur, wenn beide
+                     Absichten offenstehen — sonst geht es direkt zum Werkzeug. -->
+                <div id="captureChooser" class="capture-chooser" hidden>
+                    <button class="capture-tile" data-intent="attendance">
+                        <span class="capture-tile-icon">📍</span>
+                        <span class="capture-tile-label">Anwesenheit</span>
+                        <span class="capture-tile-hint">Bei einem Termin einchecken</span>
+                    </button>
+                    <button class="capture-tile" data-intent="worktime">
+                        <span class="capture-tile-icon">⏱️</span>
+                        <span class="capture-tile-label">Arbeitszeit</span>
+                        <span class="capture-tile-hint">Zeit für eine Tätigkeit erfassen</span>
+                    </button>
+                </div>
+
+                <!-- Scanner Container.
+                     Steht ueber den Ansichten, nicht in einer: beide Absichten
+                     brauchen ihn, und zwei Instanzen waeren zwei gleiche Ids
+                     (OI-8). Wofuer er gerade laeuft, sagt scannerPurpose. -->
+                <div class="scanner-container" id="scannerContainer" style="display: none;">
+                    <p id="scannerPurpose" class="scanner-purpose"></p>
+                    <div id="qr-reader"></div>
+                    <div class="scanner-overlay">
+                        <div class="scanner-overlay-corner"></div>
                     </div>
+                    <div class="scanner-hint">QR-Code im grünen Rahmen positionieren</div>
+                </div>
+
+                <!-- Ansicht 2: Anwesenheit -->
+                <div id="captureAttendance" hidden>
+                    <button class="capture-back" hidden>← Zurück</button>
 
                 <div class="action-buttons">
                     <!-- Stop-Button beim Scannen -->
@@ -168,22 +187,14 @@
                     <button id="exceptionBtn" class="action-button secondary">
                         <span class="icon">📋</span>
                         <span>Erfassungsantrag stellen</span>
-                    </button>        
-                </div>     
-            </div>            
-
-            <!-- TAB 2: HISTORY -->
-            <div class="tab-content" data-tab="history">
-                <div class="history-section" style="display: block;">
-                    <div id="history-header">                        
-                        <h3>📋 Letzte Aktivitäten</h3>                                               
-                    </div>
-                    <div class="history-list" id="historyList"></div>
+                    </button>
                 </div>
             </div>
+            <!-- Ende Ansicht 2 -->
 
-            <!-- TAB: ZEITERFASSUNG -->
-            <div class="tab-content" data-tab="worktime">
+            <!-- Ansicht 3: Arbeitszeit -->
+            <div id="captureWorktime" hidden>
+                <button class="capture-back" hidden>← Zurück</button>
                 <div class="worktime-section">
                     <div id="worktimeIdle">
                         <div class="form-group">
@@ -237,6 +248,20 @@
                         <h3>⏱️ Erfasste Zeiten</h3>
                     </div>
                     <div class="history-list" id="worktimeList"></div>
+                </div>
+            </div>
+            <!-- Ende Ansicht 3 -->
+
+            </div>
+            <!-- Ende TAB 1: ERFASSEN -->
+
+            <!-- TAB 2: HISTORY -->
+            <div class="tab-content" data-tab="history">
+                <div class="history-section" style="display: block;">
+                    <div id="history-header">                        
+                        <h3>📋 Letzte Aktivitäten</h3>                                               
+                    </div>
+                    <div class="history-list" id="historyList"></div>
                 </div>
             </div>
 
