@@ -729,7 +729,9 @@ function getSourceBadge(record) {
         'user_totp': { icon: '📱', label: 'App', color: '#65c48c' },
         'device_auth': { icon: '🔐', label: 'Gerät', color: '#d89c57' },        
         'auto_checkin': { icon: '🤖', label: 'Auto', color: '#95a5a6' },
-        'import':{icon: '📤', label: 'Import', color: 'rgb(231, 209, 109)'}
+        'import':{icon: '📤', label: 'Import', color: 'rgb(231, 209, 109)'},
+        // Entsteht, wenn eine Arbeitszeitsitzung mit Terminbezug startet
+        'timer': { icon: '⏱️', label: 'Timer', color: '#a98bd0' }
     };
     
     const source = sources[record.checkin_source] || sources['none'];
