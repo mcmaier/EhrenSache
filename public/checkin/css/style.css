@@ -1939,39 +1939,42 @@ body {
    Nebeneinander, weil beides Auswege sind und keiner der Hauptweg. */
 .scanner-actions {
     display: flex;
+    align-items: stretch;
     gap: 10px;
     width: 100%;
     max-width: 400px;
 }
 
-.scanner-actions .action-button {
+/* Beide Knoepfe erben Regeln, die fuer grossflaechige Vollbreiten-Knoepfe
+   gedacht sind — mit unterschiedlichem Ergebnis in der Hoehe. Hier werden
+   Hoehe, Schrift und Abstand deshalb ausdruecklich gleich gesetzt, statt
+   sich auf das Geerbte zu verlassen. */
+.scanner-actions .action-button,
+.scanner-actions #stopScanButton {
     flex: 1 1 0;
     margin: 0;
-    font-size: 14px;
-    padding: 12px 8px;
-}
-
-/* Der Stopp-Knopf traegt sonst ein kraeftiges Rot — sinnvoll, solange er
-   allein und gross dastand. Als einer von zwei gleichrangigen Auswegen wuerde
-   er den eigentlichen Zweck des Bildschirms uebertoenen; rot heisst ausserdem
-   „gefaehrlich", und Abbrechen ist harmlos. */
-.scanner-actions #stopScanButton {
+    min-height: 52px;
+    height: auto;
     max-width: none;
-    background: var(--button-bg);
-    color: var(--text);
-    box-shadow: none;
+    padding: 10px 8px;
+    gap: 8px;
     font-size: 14px;
-    padding: 12px 8px;
+    white-space: nowrap;
 }
 
+.scanner-actions .action-button .icon,
+.scanner-actions #stopScanButton .icon {
+    font-size: 18px;
+    /* Ohne das pulsiert das Stopp-Symbol weiter — auffaellig war sinnvoll,
+       solange es der einzige Ausweg war. */
+    animation: none;
+}
+
+/* Farblich unterschieden, damit die beiden Auswege auf einen Blick
+   auseinanderzuhalten sind: Abbrechen bricht den Vorgang ab, die manuelle
+   Eingabe fuehrt ihn auf anderem Weg weiter. */
 .scanner-actions #stopScanButton:hover {
     transform: none;
-    box-shadow: none;
-}
-
-.scanner-actions .icon {
-    font-size: 18px;
-    animation: none;
 }
 
 /* Die Ansichten uebernehmen das zentrierende Flex-Layout von
