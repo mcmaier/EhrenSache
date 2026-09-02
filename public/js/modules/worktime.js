@@ -85,11 +85,20 @@ export async function checkWorktimeEnabled() {
     // Mitglied etwas anginge.
     const result = await apiCall('activity_types', 'GET', null, {},
                                  { silentStatuses: [404] });
-    worktimeEnabled = Array.isArray(result);
+    const freigeschaltet = Array.isArray(result);
 
-    if (worktimeEnabled) {
+    if (freigeschaltet) {
         activityTypes = result;
     }
+
+    // Eine leere Liste heisst fuer ein Mitglied: freigeschaltet, aber in seinen
+    // Gruppen liegt keine Taetigkeitsart — der Bereich waere leer.
+    //
+    // Fuer Administrator und Manager gilt das NICHT: sie bekommen ungefiltert
+    // alles, eine leere Liste bedeutet dort schlicht, dass noch keine Art
+    // angelegt ist. Blendete man ihnen den Bereich aus, koennten sie die erste
+    // nie anlegen — eine Sackgasse direkt nach der Freischaltung.
+    worktimeEnabled = freigeschaltet && (isAdminOrManager || result.length > 0);
 
     document.querySelectorAll('[data-section="zeiterfassung"]').forEach(el => {
         el.style.display = worktimeEnabled ? '' : 'none';
