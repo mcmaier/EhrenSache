@@ -435,6 +435,27 @@ function memberGroupIds(int $memberId): array
     return array_map(static fn ($group) => (int) $group['group_id'], $res['body']['groups'] ?? []);
 }
 
+/**
+ * Setzt die Gruppen eines Mitglieds fuer die Dauer des Callbacks und stellt
+ * den Ausgangszustand IMMER wieder her — auch wenn eine Assertion wirft.
+ *
+ * Ohne das finally bleibt bei einem fehlgeschlagenen Test die Zuordnung eines
+ * echten Mitglieds veraendert zurueck: assert* wirft, test() faengt die
+ * Exception, und der Rest des Testkoerpers laeuft nie. Genau so hat ein
+ * TDD-Lauf schon einmal ein Mitglied ohne jede Gruppe hinterlassen.
+ */
+function withMemberGroups(int $memberId, array $groupIds, callable $fn): void
+{
+    $original = memberGroupIds($memberId);
+    setMemberGroups($memberId, $groupIds);
+
+    try {
+        $fn();
+    } finally {
+        setMemberGroups($memberId, $original);
+    }
+}
+
 /** Ordnet eine Taetigkeitsart genau den angegebenen Gruppen zu. */
 function setActivityGroups(int $activityId, array $groupIds, string $name): void
 {
@@ -955,7 +976,6 @@ test('activity_types: user sieht nur Arten aus den eigenen Gruppen', function ()
     enableWorktime();
 
     $memberId = apiMemberId('user');
-    $original = memberGroupIds($memberId);
 
     $meine   = createGroup('Meine ' . uniqid());
     $fremde  = createGroup('Fremde ' . uniqid());
@@ -967,43 +987,39 @@ test('activity_types: user sieht nur Arten aus den eigenen Gruppen', function ()
 
     setActivityGroups($idA, [$meine], $sichtbar);
     setActivityGroups($idB, [$fremde], $unsichtbar);
-    setMemberGroups($memberId, [$meine]);
 
-    $res = apiRequest('GET', 'activity_types', ['token' => apiToken('user')]);
-    assertStatus(200, $res);
+    withMemberGroups($memberId, [$meine], function () use ($idA, $idB) {
+        $res = apiRequest('GET', 'activity_types', ['token' => apiToken('user')]);
+        assertStatus(200, $res);
 
-    $ids = array_map(static fn($r) => (int) $r['activity_id'], $res['body']);
+        $ids = array_map(static fn($r) => (int) $r['activity_id'], $res['body']);
 
-    assertTrue(in_array($idA, $ids, true), 'Eigene Taetigkeitsart fehlt');
-    assertTrue(!in_array($idB, $ids, true), 'Fremde Taetigkeitsart ist sichtbar');
-
-    setMemberGroups($memberId, $original);
+        assertTrue(in_array($idA, $ids, true), 'Eigene Taetigkeitsart fehlt');
+        assertTrue(!in_array($idB, $ids, true), 'Fremde Taetigkeitsart ist sichtbar');
+    });
 });
 
 test('activity_types: Mitglied ohne passende Gruppe erhaelt [] mit Status 200', function () {
     enableWorktime();
 
     $memberId = apiMemberId('user');
-    $original = memberGroupIds($memberId);
 
     $leer = createGroup('Ohne Taetigkeiten ' . uniqid());
-    setMemberGroups($memberId, [$leer]);
 
-    $res = apiRequest('GET', 'activity_types', ['token' => apiToken('user')]);
+    withMemberGroups($memberId, [$leer], function () {
+        $res = apiRequest('GET', 'activity_types', ['token' => apiToken('user')]);
 
-    // 200 mit leerer Liste, NICHT 404: der 404 bleibt dem
-    // abgeschalteten Feature vorbehalten.
-    assertStatus(200, $res, 'Leere Auswahl darf kein 404 sein');
-    assertSame(0, count($res['body']), 'Es darf keine Taetigkeitsart sichtbar sein');
-
-    setMemberGroups($memberId, $original);
+        // 200 mit leerer Liste, NICHT 404: der 404 bleibt dem
+        // abgeschalteten Feature vorbehalten.
+        assertStatus(200, $res, 'Leere Auswahl darf kein 404 sein');
+        assertSame(0, count($res['body']), 'Es darf keine Taetigkeitsart sichtbar sein');
+    });
 });
 
 test('activity_types: Admin sieht ohne member_id alles, mit member_id gefiltert', function () {
     enableWorktime();
 
     $memberId = apiMemberId('user');
-    $original = memberGroupIds($memberId);
 
     $meine  = createGroup('AdminSicht ' . uniqid());
     $fremde = createGroup('AdminFremd ' . uniqid());
@@ -1015,24 +1031,23 @@ test('activity_types: Admin sieht ohne member_id alles, mit member_id gefiltert'
 
     setActivityGroups($idA, [$meine], $nameA);
     setActivityGroups($idB, [$fremde], $nameB);
-    setMemberGroups($memberId, [$meine]);
 
-    $alle = apiRequest('GET', 'activity_types', ['token' => apiToken('admin')]);
-    assertStatus(200, $alle);
-    $alleIds = array_map(static fn($r) => (int) $r['activity_id'], $alle['body']);
-    assertTrue(in_array($idA, $alleIds, true) && in_array($idB, $alleIds, true),
-        'Admin muss ohne Filter alles sehen');
+    withMemberGroups($memberId, [$meine], function () use ($idA, $idB, $memberId) {
+        $alle = apiRequest('GET', 'activity_types', ['token' => apiToken('admin')]);
+        assertStatus(200, $alle);
+        $alleIds = array_map(static fn($r) => (int) $r['activity_id'], $alle['body']);
+        assertTrue(in_array($idA, $alleIds, true) && in_array($idB, $alleIds, true),
+            'Admin muss ohne Filter alles sehen');
 
-    $gefiltert = apiRequest('GET', 'activity_types', [
-        'token' => apiToken('admin'),
-        'query' => ['member_id' => $memberId],
-    ]);
-    assertStatus(200, $gefiltert);
-    $gefilterteIds = array_map(static fn($r) => (int) $r['activity_id'], $gefiltert['body']);
-    assertTrue(in_array($idA, $gefilterteIds, true), 'Eigene Art fehlt im gefilterten Abruf');
-    assertTrue(!in_array($idB, $gefilterteIds, true), 'Fremde Art im gefilterten Abruf');
-
-    setMemberGroups($memberId, $original);
+        $gefiltert = apiRequest('GET', 'activity_types', [
+            'token' => apiToken('admin'),
+            'query' => ['member_id' => $memberId],
+        ]);
+        assertStatus(200, $gefiltert);
+        $gefilterteIds = array_map(static fn($r) => (int) $r['activity_id'], $gefiltert['body']);
+        assertTrue(in_array($idA, $gefilterteIds, true), 'Eigene Art fehlt im gefilterten Abruf');
+        assertTrue(!in_array($idB, $gefilterteIds, true), 'Fremde Art im gefilterten Abruf');
+    });
 });
 
 test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
