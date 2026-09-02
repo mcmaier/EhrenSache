@@ -1282,9 +1282,25 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
 // UI STATE HELPER
 // ========================================
 
+/**
+ * Beschriftet den Sucher mit dem Zweck des Scans.
+ *
+ * Der Text steht dauerhaft ueber dem Sucher — anders als eine Meldung, die
+ * nach fuenf Sekunden verschwindet und den Nutzer im Unklaren laesst, wofuer
+ * der naechste Scan zaehlt.
+ *
+ * Er wird beim Anzeigen des Suchers gesetzt und nirgends gespeichert: der
+ * Zweck ergibt sich aus der Ansicht, in der der Scanner steht, nicht aus einer
+ * Variablen, die einen Ansichtswechsel ueberlebt.
+ */
+function setScannerPurpose(text) {
+    const el = document.getElementById('scannerPurpose');
+    if (el) el.textContent = text || '';
+}
+
 function setCheckinUIState(state) {
     currentUIState = state;
-    
+
     switch(state) {
         case UI_STATE.IDLE:
             // Ruhezustand: Alle Optionen anzeigen
@@ -1310,6 +1326,11 @@ function setCheckinUIState(state) {
             
         case UI_STATE.QR_SCANNING:
             // QR-Scanner aktiv: Nur Scanner und Stop-Button
+            //
+            // Solange der Scanner nur im Check-in steht, ist der Zweck fest.
+            // Mit dem zusammengefuehrten Erfassen-Tab leitet ihn die sichtbare
+            // Ansicht ab.
+            setScannerPurpose('📍 Anwesenheit erfassen');
             elements.scannerContainer.style.display = 'block';
             elements.stopScanButton.style.display = 'flex';
             elements.scanButton.style.display = 'none';

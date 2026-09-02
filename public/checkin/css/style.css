@@ -1878,6 +1878,32 @@ body {
     margin-bottom: 20px;
 }
 
+/* Zweck des Scans, dauerhaft ueber dem Sucher. Er beantwortet die Frage
+   „wofuer zaehlt der naechste Scan" — die Frage, an der die fruehere
+   unsichtbare Umleitung gescheitert ist.
+
+   Absolut positioniert wie .scanner-hint, nur oben: im normalen Fluss wuerde
+   der Text das Kamerabild nach unten schieben. Heller Text auf abgedunkeltem
+   Grund, weil der Container schwarz ist und darin ein Live-Bild laeuft. */
+.scanner-purpose {
+    margin: 0;
+    text-align: center;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 101;
+}
+
+.scanner-purpose:empty {
+    display: none;
+}
+
 /* Erklaerung unter einem Auswahlfeld: was die Wahl auslöst. Bewusst leise —
    sie soll gelesen werden, wenn jemand zögert, und sonst nicht stören. */
 .field-hint {

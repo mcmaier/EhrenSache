@@ -122,30 +122,25 @@
 
             <!-- TAB 1: CHECK-IN -->
             <div class="tab-content active" data-tab="checkin">                
-                    <!-- Scanner Container -->
+                    <!-- Scanner Container.
+                         Genau EINE Instanz: derselbe Block stand hier zweimal
+                         mit derselben Id, was ungültiges HTML ist und
+                         getElementById zum Glücksspiel macht (OI-8). -->
                     <div class="scanner-container" id="scannerContainer" style="display: none;">
+                        <p id="scannerPurpose" class="scanner-purpose"></p>
                         <div id="qr-reader"></div>
                         <div class="scanner-overlay">
                             <div class="scanner-overlay-corner"></div>
                         </div>
                         <div class="scanner-hint">QR-Code im grünen Rahmen positionieren</div>
                     </div>
-                    
+
                 <div class="action-buttons">
                     <!-- Stop-Button beim Scannen -->
                     <button id="stopScanButton" class="action-button" style="display: none;">
                         <span class="icon">⏹️</span>
                         <span>Scan beenden</span>
                     </button>
-
-                    <!-- Scanner mit Overlay -->
-                    <div class="scanner-container" id="scannerContainer" style="display: none;">
-                        <div id="qr-reader"></div>
-                        <div class="scanner-overlay">
-                            <div class="scanner-overlay-corner"></div>
-                        </div>
-                        <div class="scanner-hint">QR-Code im Rahmen positionieren</div>
-                    </div>
 
                     <button id="scanButton" class="action-button">
                         <span class="icon">📷</span>
