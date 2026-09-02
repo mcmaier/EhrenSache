@@ -180,6 +180,52 @@ document.addEventListener('DOMContentLoaded', function() {
 // ========================================
 // API HELPER
 // ========================================
+
+/**
+ * Uebersetzt Servermeldungen, statt sie durch einen Statustext zu ersetzen.
+ *
+ * Schluessel ist die englische Servermeldung, NICHT der HTTP-Status: Ein 403
+ * traegt mehrere Ursachen — Nachweispflicht der Taetigkeitsart und fremde
+ * Mitgliedergruppe —, die Meldung dagegen ist eindeutig. Beide landeten vorher
+ * unter „Keine Berechtigung fuer diese Aktion", was in keinem der Faelle
+ * zutrifft.
+ *
+ * Damit sind die Servertexte eine Schnittstelle. Wer einen aendert, aendert ihn
+ * hier mit; ein Test in tests/suites/worktime_api.php sichert den Wortlaut des
+ * Gruppen-403 ab.
+ */
+const SERVER_MESSAGES = {
+    'A session is already running':
+        'Es läuft bereits eine Zeiterfassung. Bitte zuerst beenden.',
+    'This activity type requires a TOTP code to start':
+        'Diese Tätigkeit verlangt beim Start den QR-Code der Station.',
+    'This activity type requires a TOTP code to stop':
+        'Diese Tätigkeit verlangt auch beim Beenden den QR-Code der Station.',
+    'Activity type not allowed for this member':
+        'Diese Tätigkeit ist für deine Gruppe nicht vorgesehen.',
+    'Invalid or expired TOTP code':
+        'Der Code ist ungültig oder abgelaufen.',
+    'No TOTP station configured':
+        'Es ist keine Station eingerichtet. Bitte an die Verwaltung wenden.',
+    'Activity type is retired':
+        'Diese Tätigkeit wird nicht mehr angeboten.',
+    'A note is required to stop a session':
+        'Für diese Erfassung ist eine Notiz erforderlich.',
+    'No running session':
+        'Es läuft gerade keine Zeiterfassung.',
+    'No member linked to your account':
+        'Dein Konto ist mit keinem Mitglied verknüpft. Bitte an die Verwaltung wenden.',
+
+    // Tritt auf, wenn die Auswahl im Geraet veraltet ist — etwa weil ein
+    // Administrator die Taetigkeit geloescht hat, waehrend die App offen lag.
+    // Ohne Eintrag bliebe hier die englische Rohmeldung stehen: Status 400 ist
+    // im Statuswerk unten auskommentiert.
+    'Unknown activity_id':
+        'Diese Tätigkeit gibt es nicht mehr. Bitte die App neu laden.',
+    'Unknown appointment_id':
+        'Diesen Termin gibt es nicht mehr. Bitte die App neu laden.'
+};
+
 async function apiCall(resource, method = 'GET', data = null, params = {}) {
    
     const url = new URL(API_BASE);
@@ -227,6 +273,21 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
 
         // Fehlerhafte Antwort
         let errorMessage = responseData?.message || `HTTP ${response.status}`;
+
+        // Eine bekannte Servermeldung ist genauer als jeder Statustext.
+        const translated = SERVER_MESSAGES[responseData?.message];
+        if (translated) {
+            // Die Rohmeldung bleibt im Protokoll, sonst ist sie fuer die
+            // Fehlersuche verloren.
+            debug.log('Servermeldung:', responseData.message);
+
+            return {
+                success: false,
+                status: response.status,
+                error: translated,
+                data: responseData
+            };
+        }
 
         // Spezifische Fehlermeldungen
         switch (response.status) {
