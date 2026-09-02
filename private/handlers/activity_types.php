@@ -27,6 +27,14 @@ function handleActivityTypes($db, $database, $method, $id) {
                 $type = $stmt->fetch(PDO::FETCH_ASSOC);
 
                 if($type) {
+                    // Lade zugehörige Gruppen
+                    $groupStmt = $db->prepare("SELECT g.* FROM {$prefix}member_groups g
+                                               INNER JOIN {$prefix}activity_type_groups atg
+                                                       ON g.group_id = atg.group_id
+                                               WHERE atg.activity_id = ?");
+                    $groupStmt->execute([$id]);
+                    $type['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+
                     echo json_encode($type);
                 } else {
                     http_response_code(404);
@@ -40,8 +48,22 @@ function handleActivityTypes($db, $database, $method, $id) {
                 }
                 $sql .= " ORDER BY activity_name";
 
-                $stmt = $db->query($sql);
-                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                $stmt  = $db->query($sql);
+                $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // Für jeden Type die Gruppen laden
+                $groupStmt = $db->prepare("SELECT g.* FROM {$prefix}member_groups g
+                                           INNER JOIN {$prefix}activity_type_groups atg
+                                                   ON g.group_id = atg.group_id
+                                           WHERE atg.activity_id = ?");
+
+                foreach ($types as &$type) {
+                    $groupStmt->execute([$type['activity_id']]);
+                    $type['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+                }
+                unset($type);
+
+                echo json_encode($types);
             }
             break;
 
@@ -79,8 +101,19 @@ function handleActivityTypes($db, $database, $method, $id) {
                 isset($data->is_active) ? (int)(bool)$data->is_active : 1,
                 $verification
             ])) {
+                $newId = (int)$db->lastInsertId();
+
+                // Verknüpfe mit Gruppen
+                if(!empty($data->group_ids) && is_array($data->group_ids)) {
+                    $linkStmt = $db->prepare("INSERT INTO {$prefix}activity_type_groups
+                                              (activity_id, group_id) VALUES (?, ?)");
+                    foreach($data->group_ids as $gid) {
+                        $linkStmt->execute([$newId, (int)$gid]);
+                    }
+                }
+
                 http_response_code(201);
-                echo json_encode(["message" => "Activity type created", "id" => (int)$db->lastInsertId()]);
+                echo json_encode(["message" => "Activity type created", "id" => $newId]);
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to create activity type"]);
@@ -124,6 +157,19 @@ function handleActivityTypes($db, $database, $method, $id) {
                 $verification,
                 $id
             ])) {
+                // Aktualisiere Gruppen-Verknüpfungen: fehlendes Feld lässt sie unangetastet,
+                // ein leeres Array löscht sie bewusst — daher isset() statt !empty().
+                if(isset($data->group_ids) && is_array($data->group_ids)) {
+                    $db->prepare("DELETE FROM {$prefix}activity_type_groups WHERE activity_id = ?")
+                       ->execute([$id]);
+
+                    $linkStmt = $db->prepare("INSERT INTO {$prefix}activity_type_groups
+                                              (activity_id, group_id) VALUES (?, ?)");
+                    foreach($data->group_ids as $gid) {
+                        $linkStmt->execute([$id, (int)$gid]);
+                    }
+                }
+
                 echo json_encode(["message" => "Activity type updated"]);
             } else {
                 http_response_code(500);

@@ -926,6 +926,31 @@ test('work_sessions: Start fuer einen kuenftigen Termin erzeugt KEINEN Check-in'
     apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
 });
 
+test('activity_types: GET liefert die zugeordneten Gruppen mit', function () {
+    enableWorktime();
+
+    $groupId    = createGroup('Zeittest-Gruppe ' . uniqid());
+    $name       = 'Gruppenprobe ' . uniqid();
+    $activityId = createActivityType($name);
+
+    setActivityGroups($activityId, [$groupId], $name);
+
+    $res = apiRequest('GET', 'activity_types', ['token' => apiToken('admin')]);
+    assertStatus(200, $res);
+
+    $found = null;
+    foreach ($res['body'] as $row) {
+        if ((int) $row['activity_id'] === $activityId) {
+            $found = $row;
+        }
+    }
+
+    assertTrue($found !== null, 'Angelegte Taetigkeitsart nicht in der Liste');
+    assertTrue(isset($found['groups']), 'Feld groups fehlt');
+    assertSame(1, count($found['groups']), 'Genau eine Gruppe erwartet');
+    assertSame($groupId, (int) $found['groups'][0]['group_id'], 'Falsche Gruppe');
+});
+
 test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
     enableWorktime();
     stopRunningIfAny();
