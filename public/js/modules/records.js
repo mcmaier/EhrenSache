@@ -1359,7 +1359,15 @@ function updateTableHeader(mode) {
         thead.innerHTML = '<th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
     } else {
         // ALL_RECORDS: Alle Felder
-        thead.innerHTML = '<th>Termin</th><th>Typ</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+        if(isAdminOrManager)
+        {
+            thead.innerHTML = '<th>Termin</th><th>Typ</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+        }
+        else
+        {   
+            // Keine Aktionen für User            
+            thead.innerHTML = '<th>Termin</th><th>Typ</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th>';
+        }
     }
 }
 
