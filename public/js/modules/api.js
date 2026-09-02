@@ -47,8 +47,16 @@ export function setInitialLoad(value) {
     //isInitialLoad = value;
 }
 
-// API Helper Funktion
-export async function apiCall(resource, method = 'GET', data = null, params = {}) {
+/**
+ * API Helper Funktion
+ *
+ * @param callOptions.silentStatuses HTTP-Stati, die der Aufrufer selbst
+ *        auswertet. Fuer sie unterbleibt der Fehler-Toast — die Antwort wird
+ *        trotzdem zurueckgegeben. Gedacht fuer Faelle, in denen ein
+ *        Fehlerstatus eine gueltige Auskunft ist: ein abgeschaltetes Feature
+ *        antwortet bewusst mit 404, statt seine Existenz preiszugeben.
+ */
+export async function apiCall(resource, method = 'GET', data = null, params = {}, callOptions = {}) {
     const url = new URL(API_BASE, window.location.origin);
     url.searchParams.append('resource', resource);
 
@@ -117,10 +125,13 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
                 500: 'Serverfehler'
             };
 
-            const errorTitle = errorMessages[response.status] || 'Fehler';
-            const errorMessage = result.message || result.hint || 'Ein unbekannter Fehler ist aufgetreten';
-            const { showToast } = await import('./ui.js');
-            showToast(errorMessage, 'error');
+            if (!(callOptions.silentStatuses || []).includes(response.status)) {
+                const errorTitle = errorMessages[response.status] || 'Fehler';
+                const errorMessage = result.message || result.hint || 'Ein unbekannter Fehler ist aufgetreten';
+                const { showToast } = await import('./ui.js');
+                showToast(errorMessage, 'error');
+            }
+
             return result;
         }
         

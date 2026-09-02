@@ -80,7 +80,10 @@ export function resetWorktimeEnabled() {
 export async function checkWorktimeEnabled() {
     if (worktimeEnabled !== null) return worktimeEnabled;
 
-    const result = await apiCall('activity_types', 'GET');
+    // Der 404 IST hier die Antwort „Feature aus" — kein Fehler, der das
+    // Mitglied etwas anginge.
+    const result = await apiCall('activity_types', 'GET', null, {},
+                                 { silentStatuses: [404] });
     worktimeEnabled = Array.isArray(result);
 
     if (worktimeEnabled) {
