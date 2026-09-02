@@ -238,6 +238,15 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
         return;
     }
 
+    if(!memberMayUseActivity($db, $database, (int)$memberId, (int)$data->activity_id)) {
+        http_response_code(403);
+        echo json_encode([
+            "message" => "Activity type not allowed for this member",
+            "hint"    => "The activity type belongs to other member groups"
+        ]);
+        return;
+    }
+
     // Ortsnachweis. Ein mitgesendeter Code wird IMMER aufgeloest und
     // festgehalten, auch wenn die Taetigkeitsart ihn nicht verlangt (E10):
     // festzuhalten, welche Stunden ortsbelegt sind, ist wertvoller als ein
@@ -542,6 +551,21 @@ function workSessionCreateManual($db, $database, $data, $authUserId, $authMember
         return;
     }
 
+    // Nur ein Selbst-Nachtrag wird auf die Gruppenzuordnung geprueft.
+    // Admin/Manager erfassen hier stellvertretend fuer andere und brauchen
+    // dafuer vollen Zugriff auf alle Taetigkeitsarten.
+    $fuerSichSelbst = ((int)$memberId === (int)$authMemberId);
+
+    if($fuerSichSelbst && !empty($data->activity_id)
+       && !memberMayUseActivity($db, $database, (int)$memberId, (int)$data->activity_id)) {
+        http_response_code(403);
+        echo json_encode([
+            "message" => "Activity type not allowed for this member",
+            "hint"    => "The activity type belongs to other member groups"
+        ]);
+        return;
+    }
+
     $requireNote = worktimeSetting($db, $database, 'worktime_require_note', '0') === '1';
 
     $input = [
@@ -741,6 +765,26 @@ function workSessionDelete($db, $database, $id, $authUserId) {
     $db->prepare("DELETE FROM {$prefix}work_sessions WHERE session_id = ?")->execute([$id]);
 
     echo json_encode(["message" => "Session deleted"]);
+}
+
+/**
+ * Darf dieses Mitglied diese Taetigkeitsart selbst erfassen?
+ *
+ * Gilt fuer den Timer-Start und den Selbst-Nachtrag. Nachtraege von
+ * Administrator oder Manager zugunsten anderer pruefen das bewusst nicht.
+ */
+function memberMayUseActivity($db, $database, int $memberId, int $activityId): bool
+{
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT 1 FROM {$prefix}activity_type_groups atg
+                          INNER JOIN {$prefix}member_group_assignments mga
+                                  ON mga.group_id = atg.group_id
+                          WHERE atg.activity_id = ? AND mga.member_id = ?
+                          LIMIT 1");
+    $stmt->execute([$activityId, $memberId]);
+
+    return (bool) $stmt->fetchColumn();
 }
 
 /**

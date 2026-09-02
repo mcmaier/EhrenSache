@@ -60,7 +60,16 @@ function createdIds(string $kind): array
     return $statics['created'][$kind] ?? [];
 }
 
-/** Legt eine Taetigkeitsart an und liefert ihre id. */
+/**
+ * Legt eine Taetigkeitsart an und liefert ihre id.
+ *
+ * Seit work_sessions die Gruppenbindung durchsetzt, waere eine frisch
+ * angelegte Taetigkeitsart ohne Gruppe fuer NIEMANDEN nutzbar — auch nicht
+ * fuer die Testrolle 'user', mit der der Grossteil dieser Suite arbeitet.
+ * Sie wird daher an deren aktuelle Gruppen gebunden, so wie es ein Admin in
+ * der Praxis taete. Tests, die gezielt Gruppenkonflikte pruefen, ersetzen
+ * das ohnehin per setActivityGroups().
+ */
 function createActivityType(string $name): int
 {
     $res = apiRequest('POST', 'activity_types', [
@@ -69,7 +78,14 @@ function createActivityType(string $name): int
     ]);
     assertStatus(201, $res, "Anlegen von '{$name}' fehlgeschlagen");
 
-    return trackCreated('activity', (int) $res['body']['id']);
+    $id = trackCreated('activity', (int) $res['body']['id']);
+
+    $groupIds = memberGroupIds(apiMemberId('user'));
+    if ($groupIds !== []) {
+        setActivityGroups($id, $groupIds, $name);
+    }
+
+    return $id;
 }
 
 test('activity_types: Admin kann anlegen und lesen', function () {
@@ -1047,6 +1063,74 @@ test('activity_types: Admin sieht ohne member_id alles, mit member_id gefiltert'
         $gefilterteIds = array_map(static fn($r) => (int) $r['activity_id'], $gefiltert['body']);
         assertTrue(in_array($idA, $gefilterteIds, true), 'Eigene Art fehlt im gefilterten Abruf');
         assertTrue(!in_array($idB, $gefilterteIds, true), 'Fremde Art im gefilterten Abruf');
+    });
+});
+
+test('work_sessions: Start mit fremder Taetigkeit wird abgelehnt', function () {
+    enableWorktime();
+    stopRunningIfAny();
+
+    $memberId = apiMemberId('user');
+
+    $meine  = createGroup('StartEigen ' . uniqid());
+    $fremde = createGroup('StartFremd ' . uniqid());
+
+    $name = 'Nicht erlaubt ' . uniqid();
+    $activityId = createActivityType($name);
+    setActivityGroups($activityId, [$fremde], $name);
+
+    withMemberGroups($memberId, [$meine], function () use ($activityId) {
+        $res = apiRequest('POST', 'work_sessions', [
+            'token' => apiToken('user'),
+            'body'  => ['action' => 'start', 'activity_id' => $activityId],
+        ]);
+
+        assertStatus(403, $res, 'Start mit fremder Taetigkeit muss 403 liefern');
+
+        // Der Wortlaut ist eine Schnittstelle: die PWA ordnet ihm einen
+        // deutschen Text zu. Wer ihn aendert, muss dort mitziehen.
+        assertSame('Activity type not allowed for this member',
+            $res['body']['message'] ?? '', 'Meldungswortlaut ist eine Schnittstelle');
+    });
+});
+
+test('work_sessions: Selbst-Nachtrag mit fremder Taetigkeit wird abgelehnt', function () {
+    enableWorktime();
+
+    $memberId = apiMemberId('user');
+
+    $meine  = createGroup('NachtragEigen ' . uniqid());
+    $fremde = createGroup('NachtragFremd ' . uniqid());
+
+    $name = 'Nachtrag fremd ' . uniqid();
+    $activityId = createActivityType($name);
+    setActivityGroups($activityId, [$fremde], $name);
+
+    withMemberGroups($memberId, [$meine], function () use ($activityId) {
+        // Ohne diese Pruefung waere die Filterung im GET zu umgehen.
+        $res = createManualSession('user', $activityId);
+        assertStatus(403, $res, 'Selbst-Nachtrag mit fremder Taetigkeit muss 403 liefern');
+    });
+});
+
+test('work_sessions: Manager-Nachtrag zugunsten anderer ignoriert die Gruppen', function () {
+    enableWorktime();
+
+    $memberId = apiMemberId('user');
+
+    $meine  = createGroup('MgrEigen ' . uniqid());
+    $fremde = createGroup('MgrFremd ' . uniqid());
+
+    $name = 'Managernachtrag ' . uniqid();
+    $activityId = createActivityType($name);
+    setActivityGroups($activityId, [$fremde], $name);
+
+    withMemberGroups($memberId, [$meine], function () use ($activityId, $memberId) {
+        // createManualSession liefert die volle Antwort, nicht die id.
+        $res = createManualSession('manager', $activityId, ['member_id' => $memberId]);
+        assertStatus(201, $res, 'Manager-Nachtrag muss erlaubt bleiben');
+
+        deleteSession((int) $res['body']['session']['session_id']);
     });
 });
 
