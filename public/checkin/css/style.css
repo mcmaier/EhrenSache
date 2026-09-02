@@ -1879,6 +1879,44 @@ body {
 }
 
 /* ============================================
+   LAUFENDE SITZUNG
+   ============================================ */
+
+/* Eine laufende Sitzung ist ein Zustand des Mitglieds, kein Inhalt eines
+   Tabs — deshalb ueber allen Ansichten. Gruen wie der laufende Timer, damit
+   der Zusammenhang ohne Text erkennbar ist. */
+.running-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(39, 174, 96, 0.15);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.running-bar[hidden] {
+    display: none;
+}
+
+.running-bar-time {
+    /* Gleich breite Ziffern, sonst zappelt die Leiste im Sekundentakt */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ============================================
    ERFASSEN-TAB: ABSICHTSWAHL
    ============================================ */
 

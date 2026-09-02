@@ -2155,6 +2155,30 @@ async function initWorktime() {
             () => worktimeStop(null, true)
         );
     });
+
+    // Laeuft gerade eine Sitzung? Diese eine Frage wird beim Start gestellt,
+    // damit die Leiste sofort steht. Die uebrigen Abrufe von
+    // loadWorktimeState() — Termine und erfasste Zeiten — kann sich der Start
+    // sparen, sie werden erst beim Oeffnen der Ansicht gebraucht.
+    await loadRunningSession();
+}
+
+/**
+ * Holt nur die laufende Sitzung und aktualisiert die Leiste.
+ *
+ * Ohne diesen Abruf beim Start erfuhr niemand von einer laufenden Sitzung,
+ * der nicht zufaellig die Arbeitszeit-Ansicht oeffnete — eine vergessene
+ * Sitzung lief so bis zur Obergrenze weiter.
+ */
+async function loadRunningSession() {
+    const result = await apiCall('work_sessions', 'GET', null, { running: 1 });
+    worktimeSession = result.success ? result.data : null;
+
+    renderRunningBar();
+
+    if (worktimeSession && worktimeSession.is_running) {
+        startWorktimeTicker();
+    }
 }
 
 /** Holt den Zustand IMMER vom Server — nie aus dem Browser-Speicher. */
@@ -2219,6 +2243,28 @@ function renderWorktime() {
         running.style.display = 'none';
         stopWorktimeTicker();
     }
+
+    renderRunningBar();
+}
+
+/**
+ * Die Leiste ueber allen Tabs. Folgt demselben worktimeSession wie die
+ * Ansicht, damit beide nicht auseinanderlaufen koennen.
+ */
+function renderRunningBar() {
+    const bar = document.getElementById('runningSessionBar');
+    if (!bar) return;
+
+    const laeuft = !!(worktimeSession && worktimeSession.is_running);
+    bar.hidden = !laeuft;
+
+    if (!laeuft) return;
+
+    const name = document.getElementById('runningSessionActivity');
+    if (name) {
+        name.textContent = (worktimeSession.is_paused ? '⏸ ' : '⏱️ ')
+            + (worktimeSession.activity_name || 'Tätigkeit');
+    }
 }
 
 function startWorktimeTicker() {
@@ -2257,8 +2303,15 @@ function updateWorktimeElapsed() {
     const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
     const sec = String(seconds % 60).padStart(2, '0');
 
+    const zeit = `${h}:${m}:${sec}`;
+
     const el = document.getElementById('worktimeElapsed');
-    if (el) el.textContent = `${h}:${m}:${sec}`;
+    if (el) el.textContent = zeit;
+
+    // Dieselbe Zeit in der Leiste: ein Ticker, zwei Anzeigen — zwei Ticker
+    // wuerden mit der Zeit auseinanderlaufen.
+    const bar = document.getElementById('runningSessionElapsed');
+    if (bar) bar.textContent = zeit;
 }
 
 function showWorktimeStatus(message, isError = false) {
@@ -2578,6 +2631,12 @@ function initCaptureTab() {
 
     document.querySelectorAll('.capture-back').forEach(btn => {
         btn.addEventListener('click', () => showCaptureView('chooser'));
+    });
+
+    // Die Leiste ist der Weg zurueck zur laufenden Sitzung, aus jedem Tab.
+    document.getElementById('runningSessionBar')?.addEventListener('click', () => {
+        document.querySelector('.tab-button[data-tab="capture"]')?.click();
+        showCaptureView('worktime');
     });
 
     enterCaptureTab();

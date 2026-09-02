@@ -94,6 +94,16 @@
                 </div>                                
             </div>             
 
+            <!-- Laufende Sitzung.
+                 Ein Zustand des Mitglieds, kein Inhalt eines Tabs — deshalb
+                 ueber allen Ansichten sichtbar. Ohne sie erfuhr niemand von
+                 einer laufenden Sitzung, der nicht zufaellig die
+                 Arbeitszeit-Ansicht oeffnete. -->
+            <button id="runningSessionBar" class="running-bar" hidden>
+                <span id="runningSessionActivity"></span>
+                <span id="runningSessionElapsed" class="running-bar-time"></span>
+            </button>
+
             <!-- TAB NAVIGATION -->
             <div class="tabs">
                 <button class="tab-button active" data-tab="capture">
