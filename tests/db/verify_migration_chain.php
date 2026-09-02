@@ -218,6 +218,18 @@ check('schema_version enthaelt Ausgangsstand und jede Zwischenversion', $expecte
 check('Tabellen wurden auf das Prefix umbenannt', true,
       (bool) $pdo->query("SHOW TABLES LIKE '" . PREFIX . "users'")->rowCount());
 
+// --- Migration 1.2.0: Gruppenbindung der Taetigkeitsarten -------------------
+check('Tabelle activity_type_groups wurde angelegt', true,
+      (bool) $pdo->query("SHOW TABLES LIKE '" . PREFIX . "activity_type_groups'")->rowCount());
+
+// Der Bestand muss ALLEN Gruppen zugeordnet sein, sonst verschwaenden
+// Taetigkeiten in bestehenden Installationen.
+$arten   = (int) $pdo->query("SELECT COUNT(*) FROM `" . PREFIX . "activity_types`")->fetchColumn();
+$gruppen = (int) $pdo->query("SELECT COUNT(*) FROM `" . PREFIX . "member_groups`")->fetchColumn();
+$zuord   = (int) $pdo->query("SELECT COUNT(*) FROM `" . PREFIX . "activity_type_groups`")->fetchColumn();
+
+check('jede Taetigkeitsart ist jeder Gruppe zugeordnet', $arten * $gruppen, $zuord);
+
 $cfg = file_get_contents(testConfigPath());
 check('config.php erhielt das Feld $prefix', true, str_contains($cfg, 'private $prefix = "' . PREFIX . '"'));
 check('config.php erhielt die Methode table()', true, str_contains($cfg, 'function table('));

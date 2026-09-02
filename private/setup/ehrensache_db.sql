@@ -458,6 +458,22 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}activity_types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
+-- Zeiterfassung: Tätigkeitsart ↔ Mitgliedergruppe
+--
+-- Wer keiner Gruppe mit Tätigkeitsarten angehört, erfasst keine Arbeitszeit.
+-- Gegenstück zu {PREFIX}appointment_type_groups.
+--
+CREATE TABLE IF NOT EXISTS `{PREFIX}activity_type_groups` (
+  activity_id INT NOT NULL,
+  group_id    INT NOT NULL,
+  PRIMARY KEY (activity_id, group_id),
+  CONSTRAINT `{PREFIX}atg_activity_fk` FOREIGN KEY (activity_id)
+      REFERENCES `{PREFIX}activity_types`(activity_id) ON DELETE CASCADE,
+  CONSTRAINT `{PREFIX}atg_group_fk` FOREIGN KEY (group_id)
+      REFERENCES `{PREFIX}member_groups`(group_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
 -- Zeiterfassung: Arbeitssitzungen
 --
 -- Laeuft gerade:    end_time IS NULL
