@@ -286,6 +286,10 @@ Response: Array of members with groups
 - Device-Tokens niemals im Code hardcoden
 - Backup-Strategie für Datenbank implementieren
 
+**Sicherheitslücke gefunden?** Bitte kein öffentliches Issue eröffnen, sondern den Meldeweg
+in [SECURITY.md](SECURITY.md) nutzen. Bekannte, bewusst offene Punkte sind in
+[docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md) dokumentiert.
+
 ## Entwicklung
 
 ### Lokale Entwicklungsumgebung

@@ -6,11 +6,16 @@ private/uploads/*.*
 private/config/config.php
 private/config/mail_config.php
 private/config/install.lock
+# Lokale Werkzeugkonfiguration
 .claude
-docs
-CLAUDE.md
+
+# Dokumentation: versioniert sind CLAUDE.md, docs/OPEN-ITEMS.md, docs/testplan.md
+# und docs/superpowers/specs/. Umsetzungspläne bleiben lokale Arbeitsdateien.
+docs/superpowers/plans/
 
 tests/config.php
 tests/db/tmp/
 
 test_credentials.md
+
+temporary_screenshots
