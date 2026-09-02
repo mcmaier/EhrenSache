@@ -951,6 +951,90 @@ test('activity_types: GET liefert die zugeordneten Gruppen mit', function () {
     assertSame($groupId, (int) $found['groups'][0]['group_id'], 'Falsche Gruppe');
 });
 
+test('activity_types: user sieht nur Arten aus den eigenen Gruppen', function () {
+    enableWorktime();
+
+    $memberId = apiMemberId('user');
+    $original = memberGroupIds($memberId);
+
+    $meine   = createGroup('Meine ' . uniqid());
+    $fremde  = createGroup('Fremde ' . uniqid());
+
+    $sichtbar   = 'Sichtbar ' . uniqid();
+    $unsichtbar = 'Unsichtbar ' . uniqid();
+    $idA = createActivityType($sichtbar);
+    $idB = createActivityType($unsichtbar);
+
+    setActivityGroups($idA, [$meine], $sichtbar);
+    setActivityGroups($idB, [$fremde], $unsichtbar);
+    setMemberGroups($memberId, [$meine]);
+
+    $res = apiRequest('GET', 'activity_types', ['token' => apiToken('user')]);
+    assertStatus(200, $res);
+
+    $ids = array_map(static fn($r) => (int) $r['activity_id'], $res['body']);
+
+    assertTrue(in_array($idA, $ids, true), 'Eigene Taetigkeitsart fehlt');
+    assertTrue(!in_array($idB, $ids, true), 'Fremde Taetigkeitsart ist sichtbar');
+
+    setMemberGroups($memberId, $original);
+});
+
+test('activity_types: Mitglied ohne passende Gruppe erhaelt [] mit Status 200', function () {
+    enableWorktime();
+
+    $memberId = apiMemberId('user');
+    $original = memberGroupIds($memberId);
+
+    $leer = createGroup('Ohne Taetigkeiten ' . uniqid());
+    setMemberGroups($memberId, [$leer]);
+
+    $res = apiRequest('GET', 'activity_types', ['token' => apiToken('user')]);
+
+    // 200 mit leerer Liste, NICHT 404: der 404 bleibt dem
+    // abgeschalteten Feature vorbehalten.
+    assertStatus(200, $res, 'Leere Auswahl darf kein 404 sein');
+    assertSame(0, count($res['body']), 'Es darf keine Taetigkeitsart sichtbar sein');
+
+    setMemberGroups($memberId, $original);
+});
+
+test('activity_types: Admin sieht ohne member_id alles, mit member_id gefiltert', function () {
+    enableWorktime();
+
+    $memberId = apiMemberId('user');
+    $original = memberGroupIds($memberId);
+
+    $meine  = createGroup('AdminSicht ' . uniqid());
+    $fremde = createGroup('AdminFremd ' . uniqid());
+
+    $nameA = 'AdminA ' . uniqid();
+    $nameB = 'AdminB ' . uniqid();
+    $idA = createActivityType($nameA);
+    $idB = createActivityType($nameB);
+
+    setActivityGroups($idA, [$meine], $nameA);
+    setActivityGroups($idB, [$fremde], $nameB);
+    setMemberGroups($memberId, [$meine]);
+
+    $alle = apiRequest('GET', 'activity_types', ['token' => apiToken('admin')]);
+    assertStatus(200, $alle);
+    $alleIds = array_map(static fn($r) => (int) $r['activity_id'], $alle['body']);
+    assertTrue(in_array($idA, $alleIds, true) && in_array($idB, $alleIds, true),
+        'Admin muss ohne Filter alles sehen');
+
+    $gefiltert = apiRequest('GET', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['member_id' => $memberId],
+    ]);
+    assertStatus(200, $gefiltert);
+    $gefilterteIds = array_map(static fn($r) => (int) $r['activity_id'], $gefiltert['body']);
+    assertTrue(in_array($idA, $gefilterteIds, true), 'Eigene Art fehlt im gefilterten Abruf');
+    assertTrue(!in_array($idB, $gefilterteIds, true), 'Fremde Art im gefilterten Abruf');
+
+    setMemberGroups($memberId, $original);
+});
+
 test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
     enableWorktime();
     stopRunningIfAny();
