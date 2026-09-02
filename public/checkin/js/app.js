@@ -1794,7 +1794,18 @@ async function loadHistory() {
         }
 
         let exceptions = result.data;
-        
+
+        // Arbeitszeiten nur abrufen, wenn das Mitglied ueberhaupt welche
+        // erfassen darf — sonst antwortet die Ressource mit 404 und der
+        // Abruf waere verschenkt.
+        let sessions = [];
+        if (worktimeActivities.length > 0) {
+            const ws = await apiCall('work_sessions', 'GET');
+            if (ws.success && Array.isArray(ws.data)) {
+                sessions = ws.data;
+            }
+        }
+
         // Kombiniere und sortiere nach Datum (neueste zuerst)
         const combined = [
             ...records.slice(0, 10).map(r => ({
@@ -1806,16 +1817,24 @@ async function loadHistory() {
                 type: 'exception',
                 data: e,
                 timestamp: new Date(e.created_at)
+            })),
+            ...sessions.slice(0, 10).map(s => ({
+                type: 'session',
+                data: s,
+                // Der Beginn, nicht das Ende: eine laufende Sitzung hat noch
+                // kein Ende und faende sonst keinen Platz in der Zeitachse.
+                timestamp: new Date(String(s.start_time).replace(' ', 'T'))
             }))
         ];
 
-        combined.sort((a, b) => b.timestamp - a.timestamp);       
-        
+        combined.sort((a, b) => b.timestamp - a.timestamp);
+
         // Debug
         debug.log("Loading History", combined);
-        
-        // Zeige die letzten 10 Einträge
-        renderHistory(combined.slice(0, 10));
+
+        // Zeige die letzten Einträge. Mit drei Quellen statt zwei waeren zehn
+        // je Art zu knapp fuer einen brauchbaren Ueberblick.
+        renderHistory(combined.slice(0, 20));
         
     } catch (error) {
         debug.error('Fehler beim Laden der History:', error);
@@ -1835,10 +1854,61 @@ function renderHistory(items) {
     items.forEach(item => {
         if (item.type === 'record') {
             addRecordToHistory(item.data);
+        } else if (item.type === 'session') {
+            addWorkSessionToHistory(item.data);
         } else {
             addExceptionToHistory(item.data);
         }
     });
+}
+
+/**
+ * Fuegt eine Arbeitszeitsitzung in die Zeitachse ein.
+ *
+ * Zweiter Nutzen neben der Uebersicht: Eine vergessene laufende Sitzung wird
+ * hier sichtbar, auch wenn niemand die Arbeitszeit-Ansicht oeffnet.
+ */
+function addWorkSessionToHistory(session) {
+    const item = document.createElement('div');
+    const laeuft = !session.end_time;
+
+    item.className = session.status === 'confirmed'
+        ? 'history-item verified'
+        : 'history-item pending';
+
+    const start = new Date(String(session.start_time).replace(' ', 'T'));
+    const dateStr = start.toLocaleDateString('de-DE', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+    const timeStr = start.toLocaleTimeString('de-DE', {
+        hour: '2-digit', minute: '2-digit'
+    });
+
+    const dauer = laeuft
+        ? 'läuft'
+        : `${session.duration_minutes} Min.`
+          + ((parseInt(session.break_minutes, 10) || 0) > 0
+             ? ` · ${session.break_minutes} Min. Pause` : '');
+
+    // Solange die Sitzung laeuft, sagt der Freigabestatus nichts: sie ist noch
+    // nicht abgeschlossen. „läuft" allein ist die ehrlichere Auskunft.
+    const status = laeuft
+        ? ''
+        : `<span class="status ${session.status === 'confirmed' ? 'verified' : 'pending'}">`
+          + `${translateWorkSessionStatus(session.status)}</span>`;
+
+    const note = session.note
+        ? `<div class="history-note">${escapeHtml(session.note)}</div>` : '';
+
+    item.innerHTML = `
+        <div class="time">⏱️ ${dateStr} ${timeStr}</div>
+        <div class="appointment">${escapeHtml(session.activity_name || 'Tätigkeit')}</div>
+        <div class="history-duration">${escapeHtml(dauer)}</div>
+        ${note}
+        ${status}
+    `;
+
+    elements.historyList.appendChild(item);
 }
 
 // Fügt Record zur History hinzu
@@ -2863,13 +2933,29 @@ function translateStatus(status) {
     return translations[status] || status;
 }
 
+/**
+ * Antrag und Arbeitszeit durchlaufen dieselbe Freigabe, hiessen im Verlauf
+ * aber verschieden („Ausstehend" gegen „Wartet auf Freigabe"). In einer
+ * gemeinsamen Zeitachse liest sich das wie zwei verschiedene Sachverhalte,
+ * darum ein Wortlaut fuer beide.
+ *
+ * „Anwesend" und „Entschuldigt" bleiben, wie sie sind: sie beschreiben nicht
+ * den Bearbeitungsstand, sondern die Tatsache selbst.
+ */
+const FREIGABE_STATUS = {
+    'pending':   'Wartet auf Freigabe',
+    'submitted': 'Wartet auf Freigabe',
+    'approved':  'Bestätigt',
+    'confirmed': 'Bestätigt',
+    'rejected':  'Abgelehnt'
+};
+
 function translateExceptionStatus(status) {
-    const translations = {
-        'pending': 'Ausstehend',
-        'approved': 'Genehmigt',
-        'rejected': 'Abgelehnt'
-    };
-    return translations[status] || status;
+    return FREIGABE_STATUS[status] || status;
+}
+
+function translateWorkSessionStatus(status) {
+    return FREIGABE_STATUS[status] || status;
 }
 
 function formatDate(date) {
