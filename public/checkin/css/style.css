@@ -1290,6 +1290,16 @@ body {
     }
 }
 
+#worktimePauseBtn {
+    background: linear-gradient(135deg, #f0cc58 0%, #d6aa31 100%);
+    color: white;
+}
+
+#worktimeStopBtn {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+}
+
 .btn-delete {
     background: var(--error);
     color: var(--card-bg);
