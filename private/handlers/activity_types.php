@@ -130,6 +130,17 @@ function handleActivityTypes($db, $database, $method, $id) {
                 return;
             }
 
+            // Ohne Gruppe waere die Taetigkeitsart fuer NIEMANDEN erfassbar —
+            // ein toter Datensatz, den erst ein Administrator wieder findet.
+            // Die Pruefung steht hinter Name und verification, damit deren
+            // Meldungen den genaueren Grund nennen.
+            if(empty($data->group_ids) || !is_array($data->group_ids)) {
+                http_response_code(400);
+                echo json_encode(["message" => "At least one group is required",
+                                  "hint"    => "Without a group the activity type is usable by nobody"]);
+                return;
+            }
+
             if(isset($data->is_default) && $data->is_default) {
                 $db->exec("UPDATE {$prefix}activity_types SET is_default = 0");
             }
@@ -180,6 +191,16 @@ function handleActivityTypes($db, $database, $method, $id) {
                 http_response_code(400);
                 echo json_encode(["message" => "Invalid verification value",
                                   "allowed" => $allowedVerification]);
+                return;
+            }
+
+            // Ein FEHLENDES group_ids laesst die Zuordnung unangetastet — das
+            // ist dokumentiertes Verhalten. Ein LEERES Array wuerde sie
+            // loeschen und die Art fuer niemanden mehr erfassbar machen.
+            if(isset($data->group_ids) && is_array($data->group_ids) && count($data->group_ids) === 0) {
+                http_response_code(400);
+                echo json_encode(["message" => "At least one group is required",
+                                  "hint"    => "Without a group the activity type is usable by nobody"]);
                 return;
             }
 

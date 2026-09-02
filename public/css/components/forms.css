@@ -70,6 +70,28 @@
     flex-shrink: 0;  /* ← Verhindert Schrumpfen */
 }
 
+/* Farbwähler.
+   Die allgemeine Regel oben zieht ihn auf volle Breite und legt 12px
+   Polsterung darum — vom Farbfeld selbst blieb dadurch nur ein Strich, und
+   welche Farbe eingestellt ist, sah man erst beim Anklicken.
+   Entspricht der bereits bewährten Lösung für .setting-input[type="color"]
+   in sections/settings.css. */
+.form-group input[type="color"] {
+    width: 80px;
+    height: 40px;
+    padding: 4px;
+    cursor: pointer;
+}
+
+.form-group input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.form-group input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
+}
+
 /* Text neben Checkbox */
 .form-group label:has(input[type="checkbox"]) span {
     line-height: 1.4;

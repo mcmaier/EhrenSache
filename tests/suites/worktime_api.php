@@ -72,20 +72,18 @@ function createdIds(string $kind): array
  */
 function createActivityType(string $name): int
 {
+    // Die Gruppen gehen gleich beim Anlegen mit: seit der Durchsetzung ist
+    // eine Taetigkeitsart ohne Gruppe fuer niemanden nutzbar, und der Server
+    // weist sie deshalb ab.
+    $groupIds = memberGroupIds(apiMemberId('user'));
+
     $res = apiRequest('POST', 'activity_types', [
         'token' => apiToken('admin'),
-        'body'  => ['activity_name' => $name],
+        'body'  => ['activity_name' => $name, 'group_ids' => $groupIds],
     ]);
     assertStatus(201, $res, "Anlegen von '{$name}' fehlgeschlagen");
 
-    $id = trackCreated('activity', (int) $res['body']['id']);
-
-    $groupIds = memberGroupIds(apiMemberId('user'));
-    if ($groupIds !== []) {
-        setActivityGroups($id, $groupIds, $name);
-    }
-
-    return $id;
+    return trackCreated('activity', (int) $res['body']['id']);
 }
 
 test('activity_types: Admin kann anlegen und lesen', function () {
@@ -1132,6 +1130,52 @@ test('work_sessions: Manager-Nachtrag zugunsten anderer ignoriert die Gruppen', 
 
         deleteSession((int) $res['body']['session']['session_id']);
     });
+});
+
+test('activity_types: Anlegen ohne Gruppe wird abgewiesen', function () {
+    enableWorktime();
+
+    // Ohne Gruppe waere die Art fuer niemanden erfassbar — ein toter
+    // Datensatz, den erst ein Administrator wiederfindet.
+    $res = apiRequest('POST', 'activity_types', [
+        'token' => apiToken('admin'),
+        'body'  => ['activity_name' => 'Ohne Gruppe ' . uniqid()],
+    ]);
+    assertStatus(400, $res, 'Anlegen ohne group_ids muss 400 liefern');
+
+    $leer = apiRequest('POST', 'activity_types', [
+        'token' => apiToken('admin'),
+        'body'  => ['activity_name' => 'Leere Gruppe ' . uniqid(), 'group_ids' => []],
+    ]);
+    assertStatus(400, $leer, 'Anlegen mit leerem group_ids muss 400 liefern');
+});
+
+test('activity_types: PUT mit leerem group_ids wird abgewiesen', function () {
+    enableWorktime();
+
+    $name = 'Gruppen entziehen ' . uniqid();
+    $id   = createActivityType($name);
+
+    $res = apiRequest('PUT', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $id],
+        'body'  => ['activity_name' => $name, 'group_ids' => []],
+    ]);
+    assertStatus(400, $res, 'Alle Gruppen zu entziehen muss 400 liefern');
+
+    // Ein PUT OHNE group_ids laesst die Zuordnung unangetastet — das ist
+    // dokumentiertes Verhalten und muss weiterhin durchgehen.
+    $ohne = apiRequest('PUT', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $id],
+        'body'  => ['activity_name' => $name . ' geaendert'],
+    ]);
+    assertStatus(200, $ohne, 'PUT ohne group_ids muss erlaubt bleiben');
+
+    $get = apiRequest('GET', 'activity_types', [
+        'token' => apiToken('admin'), 'query' => ['id' => $id],
+    ]);
+    assertTrue(count($get['body']['groups']) > 0, 'Zuordnung darf nicht verloren gehen');
 });
 
 test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {

@@ -575,6 +575,13 @@ export async function saveActivityType() {
         return;
     }
 
+    // Der Server weist das ebenfalls ab; hier steht es nur, damit die Meldung
+    // sofort kommt und beim Feld bleibt, statt als Serverfehler zurueck.
+    if (groupIds.length === 0) {
+        showToast('Bitte mindestens eine Gruppe auswählen', 'warning');
+        return;
+    }
+
     const result = activityId
         ? await apiCall('activity_types', 'PUT', body, { id: activityId })
         : await apiCall('activity_types', 'POST', body);
