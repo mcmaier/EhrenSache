@@ -12,6 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdmin, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear } from './ui.js';
 import { debug } from '../app.js';
+import { loadGroups } from './management.js';
 
 // ============================================
 // ZUSTAND
@@ -467,17 +468,23 @@ export function renderActivityTypes() {
     if (!tbody) return;
 
     if (!activityTypes.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="loading">Noch keine Tätigkeitsarten angelegt.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">Noch keine Tätigkeitsarten angelegt.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = activityTypes.map(a => `<tr>
+    tbody.innerHTML = activityTypes.map(a => {
+        const groupBadges = (a.groups && a.groups.length > 0)
+            ? a.groups.map(g => `<span class="type-badge">${escapeHtml(g.group_name)}</span>`).join(' ')
+            : '<span style="color: #7f8c8d;">Keine</span>';
+
+        return `<tr>
         <td>${escapeHtml(a.activity_name)}</td>
         <td>${escapeHtml(a.description || '—')}</td>
         <td><span style="display: inline-block; width: 20px; height: 20px;
             background: ${escapeHtml(a.color || '#1F5FBF')}; border-radius: 3px;
             border: 1px solid #ddd;"></span></td>
         <td>${VERIFICATION_LABEL[a.verification] || escapeHtml(a.verification)}</td>
+        <td>${groupBadges}</td>
         <td>${a.is_active == 1
                 ? '<span class="status-badge status-approved">aktiv</span>'
                 : '<span class="type-badge">ausgemustert</span>'}</td>
@@ -487,7 +494,8 @@ export function renderActivityTypes() {
             <button class="action-btn btn-icon btn-delete" title="Löschen"
                 onclick="deleteActivityType(${a.activity_id}, '${escapeHtml(a.activity_name).replace(/'/g, "\\'")}')">🗑</button>
         </td>
-    </tr>`).join('');
+    </tr>`;
+    }).join('');
 }
 
 export async function openActivityTypeModal(activityId = null) {
@@ -508,7 +516,30 @@ export async function openActivityTypeModal(activityId = null) {
     document.getElementById('activityTypeVerification').value = activity?.verification || 'none';
     document.getElementById('activityTypeActive').checked = activity ? activity.is_active == 1 : true;
 
+    // dataCache.groups.data ist nicht garantiert gefüllt (nur via loadGroups() in
+    // management.js) — die Zeiterfassung kann geöffnet werden, ohne dass die
+    // Mitgliederverwaltung je besucht wurde.
+    await loadGroups();
+    renderActivityGroups(activity ? (activity.groups || []) : []);
+
     modal.classList.add('active');
+}
+
+function renderActivityGroups(selectedGroups) {
+    const container = document.getElementById('activityGroupsList');
+    if (!container) return;
+
+    const selectedIds = (selectedGroups || []).map(g => g.group_id);
+
+    container.innerHTML = dataCache.groups.data.map(group => `
+        <label style="display: block; padding: 8px; cursor: pointer; border-radius: 4px;">
+            <input type="checkbox"
+                   class="activity-group-checkbox"
+                   value="${group.group_id}"
+                   ${selectedIds.includes(group.group_id) ? 'checked' : ''}>
+            <span style="margin-left: 8px;">${escapeHtml(group.group_name)}</span>
+        </label>
+    `).join('');
 }
 
 export function closeActivityTypeModal() {
@@ -518,12 +549,16 @@ export function closeActivityTypeModal() {
 export async function saveActivityType() {
     const activityId = document.getElementById('activityTypeId').value;
 
+    const groupIds = [...document.querySelectorAll('.activity-group-checkbox:checked')]
+        .map(cb => parseInt(cb.value, 10));
+
     const body = {
         activity_name: document.getElementById('activityTypeName').value.trim(),
         description: document.getElementById('activityTypeDescription').value.trim(),
         color: document.getElementById('activityTypeColor').value,
         verification: document.getElementById('activityTypeVerification').value,
-        is_active: document.getElementById('activityTypeActive').checked ? 1 : 0
+        is_active: document.getElementById('activityTypeActive').checked ? 1 : 0,
+        group_ids: groupIds
     };
 
     if (!body.activity_name) {

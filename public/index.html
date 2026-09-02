@@ -998,12 +998,13 @@
                                 <th>Beschreibung</th>
                                 <th>Farbe</th>
                                 <th>Ortsnachweis</th>
+                                <th>Gruppen</th>
                                 <th>Status</th>
                                 <th>Aktionen</th>
                             </tr>
                         </thead>
                         <tbody id="activityTypesTableBody">
-                            <tr><td colspan="6" class="loading">Lade Daten...</td></tr>
+                            <tr><td colspan="7" class="loading">Lade Daten...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2087,6 +2088,16 @@
                             <input type="checkbox" id="activityTypeActive" checked>
                             Aktiv (zur Auswahl anbieten)
                         </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Betroffene Gruppen*</label>
+                        <small style="color: #7f8c8d; display: block; margin-bottom: 10px;">
+                            Nur Mitglieder dieser Gruppen können die Tätigkeit erfassen
+                        </small>
+                        <div id="activityGroupsList" style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+                            <!-- Wird dynamisch gefüllt -->
+                        </div>
                     </div>
                 </form>
             </div>
