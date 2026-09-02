@@ -155,7 +155,10 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.submitExceptionBtn.addEventListener('click', submitException);  
     elements.closeConfirmDeleteBtn.addEventListener('click', closeConfirmDeleteModal);
     elements.submitConfirmDeleteBtn.addEventListener('click', submitConfirmDelete);   
-    elements.stopScanButton.addEventListener('click', toggleScanner);      
+    elements.stopScanButton.addEventListener('click', toggleScanner);
+    // Ausweg aus dem laufenden Sucher, in beiden Absichten. openManualCodeInput
+    // stoppt die Kamera selbst, bevor das Eingabefeld erscheint.
+    document.getElementById('scanManualBtn')?.addEventListener('click', openManualCodeInput);
     elements.nfcButton.addEventListener('click', toggleNFCReader);        
     toDashboardBtn.addEventListener('click', handleDashboardNavigation);
 
@@ -1301,6 +1304,18 @@ function scannerPurposeText() {
         : '📍 Anwesenheit erfassen';
 }
 
+/**
+ * Blendet Abbrechen und manuelle Eingabe ein, solange der Sucher laeuft.
+ *
+ * Beides gehoert zum Scanner, nicht zu einer Absicht: Wer die Zeiterfassung
+ * mit Ortsnachweis startet, landete frueher ohne Ausweg im Sucher — kein
+ * Abbruch, keine Eingabe von Hand.
+ */
+function setScannerActionsVisible(visible) {
+    const el = document.getElementById('scannerActions');
+    if (el) el.style.display = visible ? 'flex' : 'none';
+}
+
 function setCheckinUIState(state) {
     currentUIState = state;
 
@@ -1308,7 +1323,7 @@ function setCheckinUIState(state) {
         case UI_STATE.IDLE:
             // Ruhezustand: Alle Optionen anzeigen
             elements.scannerContainer.style.display = 'none';
-            elements.stopScanButton.style.display = 'none';
+            setScannerActionsVisible(false);
             elements.scanButton.style.display = 'flex';
             elements.manualCodeBtn.style.display = 'flex';
             elements.exceptionBtn.style.display = 'flex';
@@ -1325,6 +1340,7 @@ function setCheckinUIState(state) {
             
             isScanning = false;
             isNFCScanning = false;
+            updateCaptureBackVisible();
             break;
             
         case UI_STATE.QR_SCANNING:
@@ -1332,13 +1348,14 @@ function setCheckinUIState(state) {
             //
             setScannerPurpose(scannerPurposeText());
             elements.scannerContainer.style.display = 'block';
-            elements.stopScanButton.style.display = 'flex';
+            setScannerActionsVisible(true);
             elements.scanButton.style.display = 'none';
             elements.manualCodeBtn.style.display = 'none';
             elements.exceptionBtn.style.display = 'none';
             elements.checkinDivider.style.display = 'none';            
             elements.nfcButton.style.display = 'none';                        
             isScanning = true;
+            updateCaptureBackVisible();
             break;
             
         case UI_STATE.NFC_SCANNING:
@@ -2263,8 +2280,6 @@ async function loadWorktimeState() {
     if (!(worktimeSession && worktimeSession.is_running)) {
         await loadWorktimeAppointments();
     }
-
-    await loadWorktimeList();
 }
 
 function renderWorktime() {
@@ -2528,51 +2543,7 @@ async function worktimeStop(totpCode = null, force = false) {
 
     worktimeSession = null;
     renderWorktime();
-    await loadWorktimeList();
 }
-
-async function loadWorktimeList() {
-    const el = document.getElementById('worktimeList');
-    if (!el) return;
-
-    const year = new Date().getFullYear();
-    const result = await apiCall('work_sessions', 'GET', null, { year });
-
-    if (!result.success) {
-        el.innerHTML = '<div class="history-empty">Zeiten konnten nicht geladen werden.</div>';
-        return;
-    }
-
-    const sessions = (result.data || []).filter(s => !s.is_running);
-
-    if (!sessions.length) {
-        el.innerHTML = '<div class="history-empty">Noch keine erfassten Zeiten in diesem Jahr.</div>';
-        return;
-    }
-
-    const statusLabel = {
-        confirmed: '✓ bestätigt',
-        submitted: '⏳ wartet auf Freigabe',
-        rejected: '✗ abgelehnt'
-    };
-
-    el.innerHTML = sessions.map(s => {
-        const cls = s.status === 'confirmed' ? 'history-item verified' : 'history-item pending';
-        const breakInfo = (parseInt(s.break_minutes, 10) || 0) > 0
-            ? ` (${s.break_minutes} Min. Pause)` : '';
-        const note = s.note
-            ? `<div class="worktime-item-note">${escapeHtml(s.note)}</div>` : '';
-
-        return `<div class="${cls}">
-            <strong>${escapeHtml(s.activity_name || 'Tätigkeit')}</strong>
-            <div>${escapeHtml(String(s.start_time).substring(0, 16))}</div>
-            <div>${s.duration_minutes} Min.${breakInfo}</div>
-            ${note}
-            <div class="worktime-item-status">${statusLabel[s.status] || escapeHtml(s.status)}</div>
-        </div>`;
-    }).join('');
-}
-
 /**
  * Termine des heutigen Tages in die optionale Auswahl fuellen.
  *
@@ -2656,6 +2627,21 @@ function availableIntents() {
 }
 
 /**
+ * Wann der Zurueck-Weg sichtbar ist.
+ *
+ * Nur wenn es eine Auswahl zu treffen gab — und nicht, solange der Sucher
+ * laeuft: Der Scanner steht ueber den Ansichten, „Zurueck" saesse darunter und
+ * waere ein zweiter, fast gleicher Ausweg neben „Abbrechen". Waehrend des
+ * Scannens ist Abbrechen der richtige.
+ */
+function updateCaptureBackVisible() {
+    const zeigen = availableIntents().length > 1
+        && currentUIState !== UI_STATE.QR_SCANNING;
+
+    document.querySelectorAll('.capture-back').forEach(b => { b.hidden = !zeigen; });
+}
+
+/**
  * Zeigt eine Ansicht des Erfassen-Tabs.
  *
  * Beim Verlassen der Anwesenheit werden Scanner und NFC gestoppt: ein
@@ -2668,9 +2654,7 @@ function showCaptureView(view) {
         if (el) el.hidden = (name !== view);
     });
 
-    // Der Zurueck-Weg ergibt nur Sinn, wenn es eine Auswahl zu treffen gab.
-    const mitAuswahl = availableIntents().length > 1;
-    document.querySelectorAll('.capture-back').forEach(b => { b.hidden = !mitAuswahl; });
+    updateCaptureBackVisible();
 
     if (view !== 'attendance') {
         stopScannerIfRunning();

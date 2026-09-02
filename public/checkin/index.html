@@ -160,17 +160,25 @@
                     <div class="scanner-hint">QR-Code im grünen Rahmen positionieren</div>
                 </div>
 
+                <!-- Bedienung des Scanners. Steht wie der Sucher ueber den
+                     Ansichten: wer scannt, braucht in jeder Absicht denselben
+                     Ausweg — abbrechen oder den Code eintippen. -->
+                <div class="scanner-actions" id="scannerActions" style="display: none;">
+                    <button id="scanManualBtn" class="action-button secondary">
+                        <span class="icon">🔢</span>
+                        <span>Code eingeben</span>
+                    </button>
+                    <button id="stopScanButton" class="action-button secondary">
+                        <span class="icon">⏹️</span>
+                        <span>Abbrechen</span>
+                    </button>
+                </div>
+
                 <!-- Ansicht 2: Anwesenheit -->
                 <div id="captureAttendance" hidden>
                     <button class="capture-back" hidden>← Zurück</button>
 
                 <div class="action-buttons">
-                    <!-- Stop-Button beim Scannen -->
-                    <button id="stopScanButton" class="action-button" style="display: none;">
-                        <span class="icon">⏹️</span>
-                        <span>Scan beenden</span>
-                    </button>
-
                     <button id="scanButton" class="action-button">
                         <span class="icon">📷</span>
                         <span>QR-Code scannen</span>
@@ -252,15 +260,13 @@
 
                     <div id="worktimeStatus"></div>
                 </div>
-
-                <div class="history-section" style="display: block;">
-                    <div id="worktime-header">
-                        <h3>⏱️ Erfasste Zeiten</h3>
-                    </div>
-                    <div class="history-list" id="worktimeList"></div>
-                </div>
             </div>
-            <!-- Ende Ansicht 3 -->
+            <!-- Ende Ansicht 3.
+                 Die frueher hier stehende Liste „Erfasste Zeiten" ist
+                 entfallen: der Verlauf-Tab fuehrt die Arbeitszeiten seit der
+                 Zusammenfuehrung ohnehin, zusammen mit Anwesenheiten und
+                 Antraegen. Zweimal dasselbe an zwei Orten zu pflegen heisst,
+                 dass eines davon irgendwann abweicht. -->
 
             </div>
             <!-- Ende TAB 1: ERFASSEN -->

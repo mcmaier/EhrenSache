@@ -1935,6 +1935,64 @@ body {
    ERFASSEN-TAB: ABSICHTSWAHL
    ============================================ */
 
+/* Bedienung des laufenden Suchers: abbrechen oder Code eintippen.
+   Nebeneinander, weil beides Auswege sind und keiner der Hauptweg. */
+.scanner-actions {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.scanner-actions .action-button {
+    flex: 1 1 0;
+    margin: 0;
+    font-size: 14px;
+    padding: 12px 8px;
+}
+
+/* Der Stopp-Knopf traegt sonst ein kraeftiges Rot — sinnvoll, solange er
+   allein und gross dastand. Als einer von zwei gleichrangigen Auswegen wuerde
+   er den eigentlichen Zweck des Bildschirms uebertoenen; rot heisst ausserdem
+   „gefaehrlich", und Abbrechen ist harmlos. */
+.scanner-actions #stopScanButton {
+    max-width: none;
+    background: var(--button-bg);
+    color: var(--text);
+    box-shadow: none;
+    font-size: 14px;
+    padding: 12px 8px;
+}
+
+.scanner-actions #stopScanButton:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.scanner-actions .icon {
+    font-size: 18px;
+    animation: none;
+}
+
+/* Die Ansichten uebernehmen das zentrierende Flex-Layout von
+   .tab-content.active. Ohne das schrumpfen sie als Kinder eben dieses
+   Layouts auf ihre Inhaltsbreite — Knoepfe und Karten waeren dann schmaler
+   als der Schirm, und ein laengerer Termintitel im Auswahlfeld liesse die
+   ganze Ansicht auf einmal breiter werden. */
+#captureAttendance,
+#captureWorktime {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+#captureAttendance[hidden],
+#captureWorktime[hidden] {
+    display: none;
+}
+
 /* Die Kacheln sind der Einstieg, nicht ein Bedienelement unter vielen:
    gross genug fuer den Daumen und ohne Konkurrenz auf dem Schirm. */
 .capture-chooser {
