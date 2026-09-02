@@ -54,3 +54,14 @@
     background: #e9ecef;
     color: #495057;
 }
+/* Farbpunkt einer Tätigkeitsart. Identisch in der PWA (checkin/css/style.css) —
+   dieselbe Tätigkeit soll in beiden Oberflächen gleich aussehen. */
+.activity-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 7px;
+    vertical-align: baseline;
+    flex-shrink: 0;
+}

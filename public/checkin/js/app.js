@@ -1885,6 +1885,14 @@ function renderHistory(items) {
  * Zweiter Nutzen neben der Uebersicht: Eine vergessene laufende Sitzung wird
  * hier sichtbar, auch wenn niemand die Arbeitszeit-Ansicht oeffnet.
  */
+/**
+ * Farbpunkt einer Taetigkeitsart — dieselbe Auszeichnung wie im Dashboard,
+ * damit dieselbe Tätigkeit in beiden Oberflaechen gleich aussieht.
+ */
+function activityDot(color) {
+    return `<span class="activity-dot" style="background: ${escapeHtml(color || '#1F5FBF')}"></span>`;
+}
+
 function addWorkSessionToHistory(session) {
     const item = document.createElement('div');
     const laeuft = !session.end_time;
@@ -1919,7 +1927,7 @@ function addWorkSessionToHistory(session) {
 
     item.innerHTML = `
         <div class="time">⏱️ ${dateStr} ${timeStr}</div>
-        <div class="appointment">${escapeHtml(session.activity_name || 'Tätigkeit')}</div>
+        <div class="appointment">${activityDot(session.color)}${escapeHtml(session.activity_name || 'Tätigkeit')}</div>
         <div class="history-duration">${escapeHtml(dauer)}</div>
         ${note}
         ${status}
@@ -2291,8 +2299,9 @@ function renderWorktime() {
         idle.style.display = 'none';
         running.style.display = '';
 
-        document.getElementById('worktimeActivityName').textContent =
-            worktimeSession.activity_name || 'Tätigkeit';
+        document.getElementById('worktimeActivityName').innerHTML =
+            activityDot(worktimeSession.color)
+            + escapeHtml(worktimeSession.activity_name || 'Tätigkeit');
 
         const pauseBtn = document.getElementById('worktimePauseBtn');
         pauseBtn.querySelector('span:last-child').textContent =
@@ -2347,8 +2356,9 @@ function renderRunningBar() {
 
     const name = document.getElementById('runningSessionActivity');
     if (name) {
-        name.textContent = (worktimeSession.is_paused ? '⏸ ' : '⏱️ ')
-            + (worktimeSession.activity_name || 'Tätigkeit');
+        name.innerHTML = (worktimeSession.is_paused ? '⏸ ' : '⏱️ ')
+            + activityDot(worktimeSession.color)
+            + escapeHtml(worktimeSession.activity_name || 'Tätigkeit');
     }
 }
 

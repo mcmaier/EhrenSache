@@ -57,6 +57,17 @@ export function formatMinutes(minutes) {
     return `${h}:${String(m % 60).padStart(2, '0')} h`;
 }
 
+/**
+ * Farbpunkt einer Taetigkeitsart.
+ *
+ * Die Farbe war bislang nur dort zu sehen, wo man sie einstellt — im
+ * Stammdatenblock. Wiedererkennung stiftet sie erst in den Listen, in denen
+ * viele Eintraege untereinander stehen.
+ */
+function activityDot(color) {
+    return `<span class="activity-dot" style="background: ${escapeHtml(color || '#1F5FBF')}"></span>`;
+}
+
 /** Nachweisgrad einer Sitzung aus den beiden Ortsfeldern. */
 function proofOf(session) {
     if (session.start_location_name && session.end_location_name) return 'hours';
@@ -183,7 +194,7 @@ export function renderWorkSessions(sessions) {
         return `<tr>
             <td>${escapeHtml(s.surname || '')}, ${escapeHtml(s.name || '')}
                 ${s.member_number ? `<br><small>${escapeHtml(s.member_number)}</small>` : ''}</td>
-            <td>${escapeHtml(s.activity_name || '—')}</td>
+            <td>${activityDot(s.color)}${escapeHtml(s.activity_name || '—')}</td>
             <td>${escapeHtml(String(s.start_time || '').substring(0, 16))}</td>
             <td>${running ? '<em>läuft</em>' : formatMinutes(s.duration_minutes)}
                 ${s.break_minutes > 0 ? `<br><small>${s.break_minutes} Min. Pause</small>` : ''}</td>
@@ -487,7 +498,7 @@ export function renderActivityTypes() {
             : '<span style="color: #7f8c8d;">Keine</span>';
 
         return `<tr>
-        <td>${escapeHtml(a.activity_name)}</td>
+        <td>${activityDot(a.color)}${escapeHtml(a.activity_name)}</td>
         <td>${escapeHtml(a.description || '—')}</td>
         <td><span style="display: inline-block; width: 20px; height: 20px;
             background: ${escapeHtml(a.color || '#1F5FBF')}; border-radius: 3px;
