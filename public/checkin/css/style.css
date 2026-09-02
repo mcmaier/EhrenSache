@@ -1878,6 +1878,34 @@ body {
     margin-bottom: 20px;
 }
 
+/* Erklaerung unter einem Auswahlfeld: was die Wahl auslöst. Bewusst leise —
+   sie soll gelesen werden, wenn jemand zögert, und sonst nicht stören. */
+.field-hint {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-light);
+    margin-top: 6px;
+}
+
+/* Nachweispflicht ist keine Erklaerung, sondern eine Bedingung: ohne Code
+   startet der Timer nicht. Darum in Warnfarbe, mit Flaeche statt nur Text. */
+.field-hint-proof {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 7px 9px;
+    border-radius: 6px;
+    color: #8a5a00;
+    background: rgba(243, 156, 18, 0.12);
+    border-left: 3px solid var(--warning);
+}
+
+/* Ohne diese Regel schlaegt das display der Klasse das [hidden] des Browsers
+   und es bliebe ein leerer Warnbalken stehen. */
+.field-hint[hidden] {
+    display: none;
+}
+
 /* Laufender Timer */
 .worktime-timer {
     text-align: center;

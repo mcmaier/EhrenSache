@@ -1591,7 +1591,6 @@ async function loadAppointments() {
             option.textContent = `${apt.title} (${apt.date} ${apt.start_time})`;
             elements.exceptionAppointment.appendChild(option);
         });
-        fillWorktimeAppointments();
     } catch (error) {
         debug.error('Fehler beim Laden der Termine:', error);
     }
@@ -2043,10 +2042,21 @@ async function initWorktime() {
 
     const select = document.getElementById('worktimeActivity');
     if (select) {
+        // Das Schloss steht schon in der aufgeklappten Liste: die Nachweispflicht
+        // ist bei der Wahl zu sehen, nicht erst beim gescheiterten Start.
         select.innerHTML = worktimeActivities
-            .map(a => `<option value="${a.activity_id}">${escapeHtml(a.activity_name)}</option>`)
+            .map(a => {
+                const lock = (a.verification && a.verification !== 'none') ? '🔒 ' : '';
+                return `<option value="${a.activity_id}">${lock}${escapeHtml(a.activity_name)}</option>`;
+            })
             .join('');
+
+        select.addEventListener('change', renderWorktimeActivityHint);
+        renderWorktimeActivityHint();
     }
+
+    document.getElementById('worktimeAppointment')
+        ?.addEventListener('change', renderWorktimeAppointmentHint);
 
     // Ohne Wrapper bekaeme worktimeStart das Event-Objekt als totpCode
     document.getElementById('worktimeStartBtn')?.addEventListener('click', () => worktimeStart());
@@ -2071,6 +2081,13 @@ async function loadWorktimeState() {
     worktimeSession = result.success ? result.data : null;
 
     renderWorktime();
+
+    // Nur im Leerlauf sichtbar — waehrend einer laufenden Sitzung ist die
+    // Auswahl ausgeblendet und ein Abruf waere verschenkt.
+    if (!(worktimeSession && worktimeSession.is_running)) {
+        await loadWorktimeAppointments();
+    }
+
     await loadWorktimeList();
 }
 
@@ -2176,6 +2193,39 @@ function selectedActivityVerification() {
     const activity = worktimeActivities.find(a => String(a.activity_id) === String(id));
 
     return activity ? (activity.verification || 'none') : 'none';
+}
+
+/**
+ * Was die Nachweispflicht konkret verlangt. 'start' und 'start_end'
+ * unterscheiden sich fuer das Mitglied spuerbar: einmal scannen oder zweimal.
+ */
+const PROOF_HINTS = {
+    start: 'Für diese Tätigkeit ist beim Start ein QR-Code der Station nötig.',
+    start_end: 'Für diese Tätigkeit ist beim Start und beim Beenden ein QR-Code '
+        + 'der Station nötig.'
+};
+
+function renderWorktimeActivityHint() {
+    const hint = document.getElementById('worktimeActivityHint');
+    if (!hint) return;
+
+    const text = PROOF_HINTS[selectedActivityVerification()];
+
+    hint.textContent = text ? `🔒 ${text}` : '';
+    hint.hidden = !text;
+}
+
+function renderWorktimeAppointmentHint() {
+    const hint = document.getElementById('worktimeAppointmentHint');
+    const select = document.getElementById('worktimeAppointment');
+    if (!hint || !select) return;
+
+    // Der Check-in entsteht serverseitig nur fuer einen Termin des heutigen
+    // Tages — und die Auswahl fuehrt ausschliesslich heutige Termine.
+    hint.textContent = select.value
+        ? 'Der Start wird zugleich als Anwesenheit bei diesem Termin gewertet.'
+        : '';
+    hint.hidden = !select.value;
 }
 
 /**
@@ -2335,18 +2385,52 @@ async function loadWorktimeList() {
     }).join('');
 }
 
-/** Termine des heutigen Tages in die optionale Auswahl fuellen. */
-function fillWorktimeAppointments() {
+/**
+ * Termine des heutigen Tages in die optionale Auswahl fuellen.
+ *
+ * Holt bewusst selbst vom Server, statt die globale Liste `appointments`
+ * mitzubenutzen: die wird je nach zuletzt besuchtem Tab mit einem anderen
+ * Zeitraum und einem anderen Mitgliedsfilter ueberschrieben.
+ *
+ * Das Tagesdatum wird lokal gebildet — `toISOString()` liefert UTC und haette
+ * abends (MESZ ab 22:00) bereits den Folgetag geliefert, genau dann also,
+ * wenn Vereinsarbeit stattfindet.
+ */
+async function loadWorktimeAppointments() {
     const select = document.getElementById('worktimeAppointment');
     if (!select) return;
 
-    const today = new Date().toISOString().substring(0, 10);
-    const todays = (appointments || []).filter(a => a.date === today);
+    const previous = select.value;
+    const today = formatDate(new Date());
+
+    let todays = [];
+
+    if (userData && userData.member_id) {
+        const result = await apiCall('appointments', 'GET', null, {
+            member_id: userData.member_id,
+            from_date: today,
+            to_date: today
+        });
+
+        if (result.success && Array.isArray(result.data)) {
+            todays = result.data;
+        } else {
+            debug.error('Termine fuer die Zeiterfassung nicht ladbar:', result.error);
+        }
+    }
 
     select.innerHTML = '<option value="">— kein Termin —</option>'
         + todays.map(a =>
-            `<option value="${a.appointment_id}">${escapeHtml(a.title)} (${a.start_time})</option>`
+            `<option value="${a.appointment_id}">${escapeHtml(a.title)} (${String(a.start_time).substring(0, 5)})</option>`
         ).join('');
+
+    // Auswahl ueberlebt ein Neuladen, solange der Termin noch in der Liste steht
+    if (previous && todays.some(a => String(a.appointment_id) === previous)) {
+        select.value = previous;
+    }
+
+    // Ein programmatisch gesetztes value loest kein change aus
+    renderWorktimeAppointmentHint();
 }
 
 // ========================================
