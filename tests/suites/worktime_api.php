@@ -42,7 +42,7 @@ function enableWorktime(): void
  */
 function trackCreated(string $kind, int $id): int
 {
-    static $created = ['activity' => [], 'appointment_type' => []];
+    static $created = ['activity' => [], 'appointment_type' => [], 'group' => []];
     if ($id > 0) {
         $created[$kind][] = $id;
     }
@@ -387,6 +387,64 @@ test('work_sessions: nach dem Stoppen ist ein neuer Start moeglich', function ()
 
     stopRunningIfAny();
 });
+
+/** Legt eine Mitgliedergruppe an und liefert ihre id. */
+function createGroup(string $name): int
+{
+    $res = apiRequest('POST', 'member_groups', [
+        'token' => apiToken('admin'),
+        'body'  => ['group_name' => $name],
+    ]);
+    assertStatus(201, $res, "Gruppe '{$name}' konnte nicht angelegt werden");
+
+    return trackCreated('group', (int) $res['body']['id']);
+}
+
+/**
+ * Setzt die Gruppen eines Mitglieds — ersetzend, nicht ergaenzend.
+ * members PUT erwartet group_ids als Array und schreibt die Zuordnung neu.
+ *
+ * @param array<int, int> $groupIds
+ */
+function setMemberGroups(int $memberId, array $groupIds): void
+{
+    $res = apiRequest('PUT', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $memberId],
+        'body'  => ['group_ids' => $groupIds],
+    ]);
+    assertStatus(200, $res, "Gruppen von Mitglied {$memberId} konnten nicht gesetzt werden");
+}
+
+/**
+ * Liest die aktuellen Gruppen-Ids eines Mitglieds, um sie spaeter wiederherzustellen.
+ *
+ * GET members?id= liefert fuer Admin/Manager NICHT das Feld group_ids (das gibt es
+ * nur in der Mitgliederliste und im "eigene Daten"-Zweig fuer normale User), sondern
+ * ein "groups"-Array mit {group_id, group_name} — siehe private/handlers/members.php,
+ * Zeilen 25-46 vs. 49-72.
+ */
+function memberGroupIds(int $memberId): array
+{
+    $res = apiRequest('GET', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $memberId],
+    ]);
+    assertStatus(200, $res);
+
+    return array_map(static fn ($group) => (int) $group['group_id'], $res['body']['groups'] ?? []);
+}
+
+/** Ordnet eine Taetigkeitsart genau den angegebenen Gruppen zu. */
+function setActivityGroups(int $activityId, array $groupIds, string $name): void
+{
+    $res = apiRequest('PUT', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $activityId],
+        'body'  => ['activity_name' => $name, 'group_ids' => $groupIds],
+    ]);
+    assertStatus(200, $res, "Gruppen der Taetigkeitsart {$activityId} nicht gesetzt");
+}
 
 /**
  * Eigene Terminart fuer die Tests. Die Konfliktpruefung in appointments
@@ -898,6 +956,13 @@ test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
         apiRequest('DELETE', 'appointment_types', [
             'token' => apiToken('admin'),
             'query' => ['id' => $typeId],
+        ]);
+    }
+
+    foreach (createdIds('group') as $groupId) {
+        apiRequest('DELETE', 'member_groups', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $groupId],
         ]);
     }
 
