@@ -358,7 +358,7 @@ die Grenze im Abschnitt [Sicherheit](#sicherheit) und der Ablauf in `SECURITY.md
 ---
 
 ### OI-15 · `mainScreen` wird nie geschlossen
-**Priorität:** niedrig · Bestandsfehler, seit Langem vorhanden
+**Priorität:** erledigt am 2026-09-02
 
 `public/checkin/index.html` öffnet in Zeile 70 `<div id="mainScreen">`, schließt es aber nie —
 über die ganze Datei bleibt genau ein `<div>` offen. Browser ergänzen das fehlende Tag
@@ -367,21 +367,35 @@ stillschweigend am `</body>`, deshalb ist bisher nichts aufgefallen.
 Gefunden am 2026-09-02 beim Umbau zum Erfassen-Tab durch eine Zählung der `div`-Tags; die
 Differenz bestand schon vor diesem Umbau (nachgeprüft gegen den vorherigen Commit).
 
-**Warum nicht nebenbei behoben:** Die Stelle, an der das `</div>` eingefügt wird, entscheidet,
-ob die Modals (`exceptionModal`, `appointmentModal`, `manualCodeModal`) innerhalb oder außerhalb
-von `mainScreen` liegen. `mainScreen` wird über `showScreen()` ein- und ausgeblendet — eine
-falsche Platzierung macht die Modals unsichtbar oder lässt sie beim Abmelden stehen. Das
-gehört bewusst entschieden und einmal durchgeklickt, nicht beiläufig geraten.
+**Tatsächliche Ursache — kein Strukturproblem, sondern ein Tippfehler.** In Zeile 353 stand
+`</div` ohne schließende spitze Klammer. Der HTML-Parser liest die folgende Zeile als Fortsetzung
+desselben Tags und verschluckt sie: aus zwei schließenden Tags wurde eines. Die Einrückung war
+die ganze Zeit korrekt, es fehlte ein einzelnes Zeichen.
+
+**Zweiter Fund derselben Art:** In `public/index.html` fehlte das schließende Tag von
+`<div class="dashboard">` tatsächlich — ebenfalls unbemerkt, weil der Browser es am `</body>`
+ergänzte. Auch dort lagen sämtliche 16 Modals im Dashboard-Container.
+
+**Folge des Fixes:** Die Modals liegen jetzt außerhalb ihrer Bildschirm-Container und sind damit
+von deren `display` unabhängig. Das ist richtig so — sie tragen `position: fixed` und werden
+ohnehin nur über `.active` sichtbar. Es hatte aber eine Konsequenz, die zuvor der Container
+verdeckte: Ein offener Dialog überlebte in der PWA das Abmelden und stünde über dem
+Anmeldebildschirm. `handleLogout()` schließt offene Dialoge deshalb jetzt ausdrücklich. Im
+Dashboard entfällt das, weil der Abmeldevorgang zu `login.html` navigiert.
+
+Geprüft: alle drei ausgelieferten HTML-Dateien sind ausgeglichen, alle 16 Dashboard-Modals und
+alle 4 PWA-Modals öffnen weiterhin, und das offene Modal verschwindet beim Abmelden.
 
 **Absicherung wäre möglich:** Ein Test in `tests/suites/assets.php`, der die `div`-Bilanz jeder
-ausgelieferten HTML-Datei prüft, würde solche Fälle künftig beim Entstehen melden.
+ausgelieferten HTML-Datei prüft, würde solche Fälle künftig beim Entstehen melden — beide hier
+gefundenen wären damit sofort aufgefallen.
 
 ---
 
 ### OI-16 · Zeiterfassung zeigt inaktive Mitglieder zur Auswahl
-**Priorität:** mittel
+**Priorität:** erledigt am 2026-09-02
 
-Die Mitgliederauswahl der Zeiterfassung nimmt den Jahres-Cache ungefiltert:
+Die Mitgliederauswahl der Zeiterfassung nahm den Jahres-Cache ungefiltert:
 
 - **Filterleiste** — `fillWorktimeFilters()`, [worktime.js:274](../public/js/modules/worktime.js)
 - **Nachtrag-Modal** — `openWorkSessionModal()`, [worktime.js:375](../public/js/modules/worktime.js)
@@ -396,16 +410,24 @@ trotzdem zur Wahl — und ein Nachtrag für ein ausgetretenes Mitglied lässt si
 jahresabhängig aus `membership_dates` — es steht im selben Cache, wird in der Zeiterfassung
 nur nicht ausgewertet.
 
-**Nächster Schritt:** Beide Stellen auf dasselbe Filterkriterium ziehen. Vorher zu klären:
+**Behoben** mit unterschiedlicher Regel je Ort, weil die beiden Auswahlen Verschiedenes tun:
 
-- Soll die **Filterleiste** ebenfalls filtern? Dort geht es um das Sichten vorhandener
-  Einträge — Stunden eines inzwischen ausgetretenen Mitglieds bleiben ein gültiger
-  Datensatz und müssen auffindbar bleiben. Möglicherweise ist hier nur eine Kennzeichnung
-  richtig, kein Ausschluss.
-- Im **Nachtrag-Modal** ist der Ausschluss dagegen eindeutig: Für einen Zeitraum ohne
-  Mitgliedschaft sollte gar kein Eintrag entstehen können.
+- **Nachtrag-Modal:** Ausschluss. Für einen Zeitraum ohne Mitgliedschaft soll gar kein
+  Eintrag entstehen können.
+- **Filterleiste:** Kennzeichnung mit „(inaktiv)", kein Ausschluss. Sie dient dem Sichten
+  vorhandener Einträge; geleistete Stunden bleiben ein gültiger Nachweis, auch wenn das
+  Mitglied ausgetreten ist. Wären sie nicht auffindbar, fehlten sie in der Auswertung.
 
-Die Statistik zeigt also die Lösung für den einen Fall, nicht zwingend für beide.
+Die Anwesenheitsverwaltung blendet Einträge inaktiver Mitglieder sogar ganz aus
+([records.js:545](../public/js/modules/records.js)). Für Arbeitszeiten wurde das **bewusst
+nicht** übernommen: Stunden dürfen nicht verschwinden, weil jemand den Verein verlässt.
+
+**Fallstrick beim Bearbeiten:** Das Modal setzt `memberSelect.value = session.member_id`.
+Fiele das zugeordnete Mitglied aus der Liste, bliebe das Feld leer und das Speichern
+verschöbe den Eintrag stillschweigend auf ein anderes Mitglied. Die Sitzung wird deshalb
+**vor** dem Aufbau der Auswahl geladen, und ihr Mitglied bleibt enthalten — gekennzeichnet.
+Am lebenden Objekt geprüft: neuer Eintrag 73 Optionen, Bearbeiten desselben Formulars 74 mit
+korrekter Vorauswahl.
 
 ---
 
