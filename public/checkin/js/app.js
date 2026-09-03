@@ -228,7 +228,13 @@ const SERVER_MESSAGES = {
     'Unknown activity_id':
         'Diese Tätigkeit gibt es nicht mehr. Bitte die App neu laden.',
     'Unknown appointment_id':
-        'Diesen Termin gibt es nicht mehr. Bitte die App neu laden.'
+        'Diesen Termin gibt es nicht mehr. Bitte die App neu laden.',
+    'Kein passender Termin gefunden':
+        'Kein passender Termin gefunden. Bitte beim Vorstand melden.',
+    'Termin liegt an einem anderen Tag':
+        'Dieser Termin ist nicht von heute. Bitte die App neu laden.',
+    'Termin gehoert zu einer anderen Gruppe':
+        'Dieser Termin ist für deine Gruppe nicht vorgesehen.'
 };
 
 async function apiCall(resource, method = 'GET', data = null, params = {}) {
@@ -900,7 +906,10 @@ async function loadAttendanceAppointments() {
         }
         
         // Filter: Nur Termine die in Toleranz sind
-        const toleranceHours = 6;
+        //
+        // Fenster aus den Systemeinstellungen statt einer eigenen Zahl. Hier
+        // stand bis 1.2.4 eine 6, waehrend der Server mit 2 rechnete.
+        const toleranceHours = parseInt(clientSettings.checkin_tolerance_hours, 10) || 2;
         const now = new Date();
         
         const relevantAppointments = appointments.filter(apt => {
@@ -1392,7 +1401,17 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
                              inputMethod === 'NFC' ? '📱 NFC' :
                              inputMethod === 'CODE' ? '⌨️ Manuell' : '';
 
-            showMessage(methodText + ' eingecheckt!', 'success');
+            // Wer einen Termin erzeugt hat, soll das erfahren. Bis 1.2.3 stand
+            // dort dieselbe Meldung wie bei einem Treffer.
+            const text = data.appointment_action === 'created'
+                ? `${methodText} eingecheckt — neuer Termin angelegt: `
+                  + `${data.appointment.title}, ${String(data.appointment.start_time).substring(0, 5)} Uhr`
+                : `${methodText} eingecheckt: ${data.appointment.title}`;
+
+            showMessage(text, 'success');
+
+            // Der neue Termin gehoert in die Auswahl, ohne dass jemand neu lädt.
+            await loadCheckinAppointments();
         }
     } catch (error) {
         showMessage(error.message, 'error');
