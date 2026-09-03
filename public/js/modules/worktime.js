@@ -273,9 +273,18 @@ function fillWorktimeFilters() {
         // Der Members-Cache ist jahresbasiert: dataCache.members[jahr].data
         const members = dataCache.members?.[currentYear]?.data || [];
         const current = memberSelect.value;
+
+        // Hier wird gekennzeichnet, nicht ausgeschlossen: Die Filterleiste
+        // dient dem Sichten vorhandener Eintraege. Geleistete Stunden bleiben
+        // ein gueltiger Nachweis, auch wenn das Mitglied ausgetreten ist —
+        // waeren sie nicht mehr auffindbar, fehlten sie in der Auswertung.
+        // Beim Nachtragen gilt das Gegenteil, siehe openWorkSessionModal().
         memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>'
-            + members.map(m =>
-                `<option value="${m.member_id}">${escapeHtml(m.surname)}, ${escapeHtml(m.name)}</option>`).join('');
+            + members.map(m => {
+                const hinweis = m.is_active_in_period ? '' : ' (inaktiv)';
+                return `<option value="${m.member_id}">`
+                     + `${escapeHtml(m.surname)}, ${escapeHtml(m.name)}${hinweis}</option>`;
+            }).join('');
         memberSelect.value = current;
     }
 
@@ -366,6 +375,14 @@ export async function openWorkSessionModal(sessionId = null) {
             : 'Nachträglich erfasste Zeiten gelten erst nach Freigabe durch einen Manager.';
     }
 
+    // Die Sitzung wird VOR dem Aufbau der Auswahl geholt: ihr Mitglied muss in
+    // der Liste stehen, auch wenn es im gewaehlten Jahr nicht mehr aktiv ist.
+    let session = null;
+    if (sessionId) {
+        session = await apiCall('work_sessions', 'GET', null, { id: sessionId });
+        if (!session || session.success === false) return;
+    }
+
     const memberGroup = document.getElementById('workSessionMemberGroup');
     const memberSelect = document.getElementById('workSessionMember');
 
@@ -373,16 +390,29 @@ export async function openWorkSessionModal(sessionId = null) {
         memberGroup.style.display = '';
         // Der Members-Cache ist jahresbasiert: dataCache.members[jahr].data
         const members = dataCache.members?.[currentYear]?.data || [];
-        memberSelect.innerHTML = members.map(m =>
-            `<option value="${m.member_id}">${escapeHtml(m.surname)}, ${escapeHtml(m.name)}</option>`).join('');
+
+        // Wer im gewaehlten Jahr keine Mitgliedschaft hatte, steht nicht zur
+        // Wahl — fuer einen Zeitraum ohne Mitgliedschaft soll gar kein Eintrag
+        // entstehen koennen. Dasselbe Kriterium nutzen Statistik, Anwesenheit
+        // und Ausnahmen (is_active_in_period).
+        //
+        // Ausnahme ist das Mitglied eines BESTEHENDEN Eintrags: faellt es aus
+        // der Liste, bliebe das Auswahlfeld leer und das Speichern schoebe den
+        // Eintrag stillschweigend auf ein anderes Mitglied. Es bleibt drin und
+        // wird gekennzeichnet.
+        const waehlbar = members.filter(m =>
+            m.is_active_in_period || (session && m.member_id == session.member_id));
+
+        memberSelect.innerHTML = waehlbar.map(m => {
+            const hinweis = m.is_active_in_period ? '' : ' (inaktiv)';
+            return `<option value="${m.member_id}">`
+                 + `${escapeHtml(m.surname)}, ${escapeHtml(m.name)}${hinweis}</option>`;
+        }).join('');
     } else if (memberGroup) {
         memberGroup.style.display = 'none';
     }
 
-    if (sessionId) {
-        const session = await apiCall('work_sessions', 'GET', null, { id: sessionId });
-        if (!session || session.success === false) return;
-
+    if (session) {
         document.getElementById('workSessionActivity').value = session.activity_id;
         document.getElementById('workSessionStart').value = toLocalInput(session.start_time);
         document.getElementById('workSessionEnd').value = toLocalInput(session.end_time);
