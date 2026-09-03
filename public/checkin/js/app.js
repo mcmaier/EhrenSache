@@ -57,7 +57,7 @@ let userData = null;
 let html5QrCode = null;
 let isScanning = false;
 let isNFCScanning = false;
-let clockInterval = null;
+let tickTimer = null;
 let appointments = [];
 let appointmentTypes = [];
 let deleteExceptionId = null;
@@ -446,7 +446,7 @@ async function handleLogin(e) {
 
         debug.log("Showing main screen");        
         showScreen('main');
-        startClock();
+        startTicker();
         
     } catch (error) {
         debug.error('Login Fehler:', error);
@@ -491,7 +491,7 @@ async function handleTokenLogin() {
         
         debug.log("Showing main screen");        
         showScreen('main');
-        startClock();
+        startTicker();
         
     } catch (error) {
         debug.error('Token-Login Fehler:', error);
@@ -533,7 +533,7 @@ async function checkAutoLogin() {
             debug.log("Showing main screen");
                 
             showScreen('main');
-            startClock();
+            startTicker();
             
         } catch (error) {
             debug.log('Auto-Login fehlgeschlagen:', error);
@@ -580,7 +580,7 @@ async function handleLogout() {
     elements.loginError.classList.remove('active');
 
     showScreen('login');
-    stopClock();
+    stopTicker();
 
     debug.log('✓ Abgemeldet');
 }
@@ -1159,19 +1159,48 @@ function requestLogout() {
 }
 
 // ========================================
-// CLOCK
+// MASTER-TICK — eine Quelle fuer Uhr und Arbeitszeit
 // ========================================
-function startClock() {
-    updateClock();
-    clockInterval = setInterval(updateClock, 1000);
+// Ein gemeinsamer Tick fuer alle Sekundenanzeigen, ausgerichtet an der
+// Systemsekunde: alles springt im selben Moment um, und zwar dann, wenn die
+// Sekunde real wechselt. Zwei getrennte Intervalle liefen dagegen um bis zu
+// einer Sekunde versetzt — je nachdem, wann sie gestartet wurden.
+//
+// setTimeout statt setInterval, weil setInterval kumulativ driftet: jede
+// Verzoegerung des Callbacks addiert sich auf, die Anzeige laeuft mit der
+// Zeit weg. Hier wird die Wartezeit vor jedem Tick neu aus der Systemuhr
+// berechnet, ein Rueckstand kann sich also nicht ansammeln.
+function startTicker() {
+    stopTicker();
+    tick();
 }
 
-function stopClock() {
-    if (clockInterval) {
-        clearInterval(clockInterval);
-        clockInterval = null;
+function stopTicker() {
+    if (tickTimer) {
+        clearTimeout(tickTimer);
+        tickTimer = null;
     }
 }
+
+function tick() {
+    updateClock();
+
+    if (worktimeSession && worktimeSession.is_running) {
+        updateWorktimeElapsed();
+    }
+
+    // Bis zum naechsten Sekundenwechsel warten. Die 8 ms Zugabe fangen einen
+    // minimal zu frueh feuernden Timer ab — ohne sie zeigte derselbe Wert
+    // gelegentlich zweimal und die Anzeige stotterte.
+    tickTimer = setTimeout(tick, 1000 - (Date.now() % 1000) + 8);
+}
+
+// Mobile Browser drosseln oder frieren Timer im Hintergrund ein. Beim
+// Zurueckkehren wird deshalb neu ausgerichtet, damit die Anzeige nicht
+// nachhinkt.
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && tickTimer) startTicker();
+});
 
 function updateClock() {
     const now = new Date();
@@ -2196,7 +2225,6 @@ function escapeHtml(value) {
 }
 
 let worktimeSession = null;
-let worktimeTicker = null;
 let worktimeActivities = [];
 
 /**
@@ -2272,7 +2300,7 @@ async function loadRunningSession() {
     renderRunningBar();
 
     if (worktimeSession && worktimeSession.is_running) {
-        startWorktimeTicker();
+        updateWorktimeElapsed();
     }
 }
 
@@ -2331,11 +2359,10 @@ function renderWorktime() {
                 ? `Pause bisher: ${breakMinutes} Min.` : '';
         }
 
-        startWorktimeTicker();
+        updateWorktimeElapsed();
     } else {
         idle.style.display = '';
         running.style.display = 'none';
-        stopWorktimeTicker();
     }
 
     renderRunningBar();
@@ -2359,19 +2386,6 @@ function renderRunningBar() {
         name.innerHTML = (worktimeSession.is_paused ? '⏸ ' : '⏱️ ')
             + activityDot(worktimeSession.color)
             + escapeHtml(worktimeSession.activity_name || 'Tätigkeit');
-    }
-}
-
-function startWorktimeTicker() {
-    stopWorktimeTicker();
-    updateWorktimeElapsed();
-    worktimeTicker = setInterval(updateWorktimeElapsed, 1000);
-}
-
-function stopWorktimeTicker() {
-    if (worktimeTicker) {
-        clearInterval(worktimeTicker);
-        worktimeTicker = null;
     }
 }
 
