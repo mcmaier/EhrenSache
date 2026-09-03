@@ -129,3 +129,60 @@ test('checkin_tolerance_hours steuert die Dublettenpruefung der Termine', functi
             . 'die Toleranz wird also noch aus der Konstante gelesen');
     });
 });
+
+/** Check-in als Rolle 'user' auf die eigene member_id. */
+function ciCheckin(array $body): array
+{
+    return apiRequest('POST', 'auto_checkin', [
+        'token' => apiToken('user'),
+        'body'  => $body,
+    ]);
+}
+
+/** Terminart, die an eine Gruppe gebunden ist, in der die Rolle user NICHT ist. */
+function ciRestrictedTypeId(): int
+{
+    static $id = null;
+    if ($id !== null) {
+        return $id;
+    }
+
+    $group = apiRequest('POST', 'member_groups', [
+        'token' => apiToken('admin'),
+        'body'  => ['group_name' => 'Fremdgruppe ' . uniqid()],
+    ]);
+    assertStatus(201, $group, 'Testgruppe konnte nicht angelegt werden');
+    $groupId = ciTrack('group', (int) $group['body']['id']);
+
+    $type = apiRequest('POST', 'appointment_types', [
+        'token' => apiToken('admin'),
+        'body'  => [
+            'type_name' => 'Fremdart ' . uniqid(),
+            'group_ids' => [$groupId],
+        ],
+    ]);
+    assertStatus(201, $type, 'Eingeschraenkte Terminart konnte nicht angelegt werden');
+
+    return $id = ciTrack('appointment_type', (int) $type['body']['id']);
+}
+
+test('Check-in trifft einen Termin im Toleranzfenster', function () {
+    ciWithReset(['checkin_tolerance_hours' => '2'], function () {
+        ciSetSetting('checkin_tolerance_hours', '2');
+
+        $now  = new DateTime();
+        $time = $now->format('H:i:s');
+
+        [$status, $id] = ciCreateAppointment('Treffer-Probe', date('Y-m-d'), $time);
+        assertSame(201, $status, 'Termin fuer den Treffer konnte nicht angelegt werden');
+
+        $res = ciCheckin(['arrival_time' => $now->format('Y-m-d H:i:s')]);
+
+        assertTrue(in_array($res['status'], [200, 201], true),
+            'Check-in muss gelingen, HTTP ' . $res['status']);
+        assertSame('matched', $res['body']['appointment_action'] ?? null,
+            'Ein vorhandener Termin im Fenster muss getroffen, nicht neu angelegt werden');
+        assertSame($id, (int) ($res['body']['appointment_id'] ?? 0),
+            'Es muss genau der angelegte Termin getroffen werden');
+    });
+});

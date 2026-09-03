@@ -12,6 +12,46 @@
 // ============================================
 // AUTO CHECK-IN Controller
 // ============================================
+/**
+ * Darf dieses Mitglied zu einem Termin dieser Terminart?
+ *
+ * Regel unveraendert aus der Auswahlschleife uebernommen: Ohne Terminart oder
+ * ohne Gruppenbindung der Terminart ist ein Termin fuer alle zugaenglich;
+ * sonst muss das Mitglied in einer der genannten Gruppen sein.
+ *
+ * Die Frage stellt sich seit 1.2.4 an zwei Stellen — beim Suchen eines
+ * passenden Termins und beim Pruefen eines vom Client gewaehlten. Zwei Kopien
+ * derselben Rechtepruefung laufen erfahrungsgemaess auseinander.
+ */
+function memberMayAttendAppointment($db, $prefix, $memberId, $typeId) {
+    if(!$typeId) {
+        return true;
+    }
+
+    $typeGroupsStmt = $db->prepare("
+        SELECT group_id
+        FROM {$prefix}appointment_type_groups
+        WHERE type_id = ?
+    ");
+    $typeGroupsStmt->execute([$typeId]);
+    $groupIds = $typeGroupsStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if(empty($groupIds)) {
+        return true;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+    $memberGroupStmt = $db->prepare("
+        SELECT 1
+        FROM {$prefix}member_group_assignments
+        WHERE member_id = ?
+        AND group_id IN ({$placeholders})
+    ");
+    $memberGroupStmt->execute(array_merge([$memberId], $groupIds));
+
+    return (bool) $memberGroupStmt->fetch();
+}
+
 function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth, $checkinSource = 'auto_checkin', $sourceInfo = []) {
     if($method !== 'POST') {
         http_response_code(405);
@@ -180,65 +220,51 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     $fallbackAppointment = null; // Für nicht-Standard-Gruppen
 
     foreach($potentialAppointments as $appointment) {
-        // Wenn Termin einen Type hat, prüfe Gruppen-Berechtigung
-        if($appointment['type_id']) {
-            // Prüfe ob dieser Termin-Typ Gruppen-Einschränkungen hat
-            $typeGroupsStmt = $db->prepare("
-                SELECT atg.group_id, mg.is_default 
-                FROM {$prefix}appointment_type_groups atg
-                LEFT JOIN {$prefix}member_groups mg ON atg.group_id = mg.group_id
-                WHERE atg.type_id = ?
-            ");
-            $typeGroupsStmt->execute([$appointment['type_id']]);
-            $restrictedGroups = $typeGroupsStmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            if(empty($restrictedGroups)) {
-                // Keine Gruppen-Einschränkung für diesen Typ → Termin für alle
-                $matchedAppointment = $appointment;
-                break;
-            }
-            
-            $groupIds = array_column($restrictedGroups, 'group_id');
-            $hasDefaultGroup = false;
-            foreach($restrictedGroups as $grp) {
-                if($grp['is_default']) {
-                    $hasDefaultGroup = true;
-                    break;
-                }
-            }
-            
-            // Prüfe ob Member in einer der erlaubten Gruppen ist
-            $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
-            $memberGroupStmt = $db->prepare("
-                SELECT 1 
-                FROM {$prefix}member_group_assignments 
-                WHERE member_id = ? 
-                AND group_id IN ({$placeholders})
-            ");
-            
-            $params = array_merge([$memberId], $groupIds);
-            $memberGroupStmt->execute($params);
-            
-            if($memberGroupStmt->fetch()) {
-                // Member ist in einer erlaubten Gruppe
-                if($hasDefaultGroup) {
-                    // Termin mit Standard-Gruppe → sofort nehmen
-                    $matchedAppointment = $appointment;
-                    break;
-                } else {
-                    // Termin ohne Standard-Gruppe → als Fallback merken
-                    if(!$fallbackAppointment) {
-                        $fallbackAppointment = $appointment;
-                    }
-                }
-            } else {
-                continue;
-            }
-            
-        } else {
-            // Kein Type → Kein Filter → Termin für alle
+        if(!memberMayAttendAppointment($db, $prefix, $memberId, $appointment['type_id'])) {
+            continue;
+        }
+
+        // Ohne Terminart: kein Filter, Termin für alle.
+        if(!$appointment['type_id']) {
             $matchedAppointment = $appointment;
             break;
+        }
+
+        // Traegt die Terminart eine Standard-Gruppe, gilt der Termin als der
+        // regulaere und wird sofort genommen. Sonst nur als Rueckfall — ein
+        // Termin einer Spezialgruppe soll den der Gesamtgruppe nicht verdraengen.
+        $typeGroupsStmt = $db->prepare("
+            SELECT mg.is_default
+            FROM {$prefix}appointment_type_groups atg
+            LEFT JOIN {$prefix}member_groups mg ON atg.group_id = mg.group_id
+            WHERE atg.type_id = ?
+        ");
+        $typeGroupsStmt->execute([$appointment['type_id']]);
+        $restrictedGroups = $typeGroupsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if(empty($restrictedGroups)) {
+            // Keine Gruppen-Einschränkung für diesen Typ → Termin für alle
+            $matchedAppointment = $appointment;
+            break;
+        }
+
+        $hasDefaultGroup = false;
+        foreach($restrictedGroups as $grp) {
+            if($grp['is_default']) {
+                $hasDefaultGroup = true;
+                break;
+            }
+        }
+
+        if($hasDefaultGroup) {
+            // Termin mit Standard-Gruppe → sofort nehmen
+            $matchedAppointment = $appointment;
+            break;
+        }
+
+        // Termin ohne Standard-Gruppe → als Fallback merken
+        if(!$fallbackAppointment) {
+            $fallbackAppointment = $appointment;
         }
     }
 
@@ -247,62 +273,6 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
         $matchedAppointment = $fallbackAppointment;
     }
 
-    // ============================================
-    // Filter nach Gruppen-Berechtigung
-    // ============================================
-
-    /*
-    $matchedAppointment = null;
-    foreach($potentialAppointments as $appointment) {
-        // Wenn Termin einen Type hat, prüfe Gruppen-Berechtigung
-        if($appointment['type_id']) {
-
-        // Prüfe ob dieser Termin-Typ Gruppen-Einschränkungen hat
-            $typeGroupsStmt = $db->prepare("SELECT group_id 
-                                            FROM appointment_type_groups 
-                                            WHERE type_id = ?");
-            $typeGroupsStmt->execute([$appointment['type_id']]);
-            $restrictedGroups = $typeGroupsStmt->fetchAll(PDO::FETCH_COLUMN);
-            
-            if(empty($restrictedGroups)) {
-                // Keine Gruppen-Einschränkung für diesen Typ → Termin für alle
-                $matchedAppointment = $appointment;
-                //error_log("✓ Matched appointment #{$appointment['appointment_id']} (type has no group restrictions)");
-                break;
-            }
-            
-            //error_log("  Type {$appointment['type_id']} restricted to groups: " . implode(', ', $restrictedGroups));
-            
-            // Prüfe ob Member in einer der erlaubten Gruppen ist
-            $placeholders = implode(',', array_fill(0, count($restrictedGroups), '?'));
-            $memberGroupStmt = $db->prepare("SELECT 1 
-                                            FROM member_group_assignments 
-                                            WHERE member_id = ? 
-                                            AND group_id IN ({$placeholders})");
-            
-            $params = array_merge([$memberId], $restrictedGroups);
-            $memberGroupStmt->execute($params);
-            
-            if($memberGroupStmt->fetch()) {
-                // Member ist in einer erlaubten Gruppe
-                $matchedAppointment = $appointment;
-                //error_log("✓ Matched appointment #{$appointment['appointment_id']} (member in allowed group)");
-                break;
-            } else {
-                //error_log("✗ Skipped appointment #{$appointment['appointment_id']} (member NOT in allowed groups)");
-                continue;
-            }
-            
-            
-        } else {
-            // Kein Type → Kein Filter → Termin für alle
-            $matchedAppointment = $appointment;
-            //error_log("✓ Matched appointment #{$appointment['appointment_id']} (no type restriction)");
-            break;
-        }
-    }
-    */    
-        
     if($matchedAppointment) {
         // Passender Termin gefunden
         $appointmentId = $matchedAppointment['appointment_id'];
