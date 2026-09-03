@@ -109,5 +109,53 @@ function resolveMemberIdByNumber($db, $database, $memberNumber) {
     return $memberId ? intval($memberId) : null;
 }
 
+// ============================================
+// SYSTEMEINSTELLUNGEN
+// ============================================
+
+/**
+ * Liest eine Einstellung aus system_settings.
+ *
+ * Der Rumpf stammt aus worktimeSetting() in worktime.php — die Funktion war
+ * trotz ihres Namens nie an die Zeiterfassung gebunden. Sie steht jetzt hier,
+ * damit nicht zwei Lesefunktionen nebeneinander wachsen.
+ */
+function systemSetting($db, $database, string $key, string $default): string
+{
+    $prefix = $database->table('');
+    $stmt   = $db->prepare("SELECT setting_value FROM {$prefix}system_settings WHERE setting_key = ?");
+    $stmt->execute([$key]);
+    $value = $stmt->fetchColumn();
+
+    return ($value === false || $value === null) ? $default : (string) $value;
+}
+
+/**
+ * Zeitfenster in Stunden, in dem ein Check-in einem Termin zugeordnet wird.
+ *
+ * Kette: Einstellung → Konstante aus config.php → 2. Die Konstante bleibt der
+ * Rückfall für Installationen, deren Migration noch nicht gelaufen ist.
+ */
+function checkinToleranceHours($db, $database): int
+{
+    $fallback = defined('AUTO_CHECKIN_TOLERANCE_HOURS')
+        ? (int) AUTO_CHECKIN_TOLERANCE_HOURS
+        : 2;
+
+    $hours = (int) systemSetting($db, $database, 'checkin_tolerance_hours', (string) $fallback);
+
+    return ($hours < 0 || $hours > 8) ? $fallback : $hours;
+}
+
+/**
+ * Darf ein Check-in einen Termin anlegen, wenn keiner passt?
+ *
+ * Vorgabe '1', nicht '0': Fehlt die Zeile, ist die Migration nicht gelaufen —
+ * dann gilt das bisherige Verhalten, statt still Check-ins abzuweisen.
+ */
+function checkinCreatesAppointments($db, $database): bool
+{
+    return systemSetting($db, $database, 'checkin_auto_create_appointment', '1') === '1';
+}
 
 ?>

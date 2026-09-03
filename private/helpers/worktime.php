@@ -12,6 +12,11 @@
  * (tests/suites/worktime_unit.php). Der untere Teil berührt die Datenbank.
  */
 
+// worktimeSetting() leitet seit 1.2.4 an systemSetting() in utils.php weiter.
+// Die Abhängigkeit wird hier deklariert und nicht der Ladereihenfolge in
+// api.php überlassen: worktime_unit.php lädt diese Datei allein.
+require_once __DIR__ . '/utils.php';
+
 // ============================================
 // REINE LOGIK
 // ============================================
@@ -252,15 +257,15 @@ function worktimeIsFullMonth(DateTimeImmutable $from, DateTimeImmutable $to): bo
 // DATENBANKZUGRIFF
 // ============================================
 
-/** Liest eine worktime-Einstellung aus system_settings. */
+/**
+ * Liest eine worktime-Einstellung aus system_settings.
+ *
+ * Der Rumpf steht seit 1.2.4 in utils.php als systemSetting(); diese Funktion
+ * bleibt als Weiterleitung, damit die vorhandenen Aufrufer unverändert bleiben.
+ */
 function worktimeSetting($db, $database, string $key, string $default): string
 {
-    $prefix = $database->table('');
-    $stmt   = $db->prepare("SELECT setting_value FROM {$prefix}system_settings WHERE setting_key = ?");
-    $stmt->execute([$key]);
-    $value = $stmt->fetchColumn();
-
-    return ($value === false || $value === null) ? $default : (string) $value;
+    return systemSetting($db, $database, $key, $default);
 }
 
 /** Ist die Zeiterfassung freigeschaltet? */

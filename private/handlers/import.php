@@ -550,8 +550,8 @@ function importRecords($db, $database, $filePath) {
             $memberId = $member['member_id'];
             
             // Finde nächsten Termin innerhalb der Toleranzzeit
-            // Nutze AUTO_CHECKIN_TOLERANCE_HOURS aus config.php
-            $toleranceHours = AUTO_CHECKIN_TOLERANCE_HOURS;
+            // Zeitfenster aus den Systemeinstellungen, Rückfall config.php
+            $toleranceHours = checkinToleranceHours($db, $database);
 
             $stmt = $db->prepare("
                 SELECT appointment_id, date, start_time,
@@ -632,7 +632,7 @@ function importRecords($db, $database, $filePath) {
 
 function extractAppointments($db, $database, $filePath, $minRecords = 5, $roundMinutes = 15, $toleranceHours = null) {
     if ($toleranceHours === null) {
-        $toleranceHours = AUTO_CHECKIN_TOLERANCE_HOURS;
+        $toleranceHours = checkinToleranceHours($db, $database);
     }
     
     $handle = fopen($filePath, 'r');

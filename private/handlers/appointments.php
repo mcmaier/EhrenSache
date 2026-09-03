@@ -159,7 +159,7 @@ function handleAppointments($db, $database, $method, $id) {
             }
 
             // Prüfe ob bereits ein Termin in der Toleranz existiert
-            $tolerance = AUTO_CHECKIN_TOLERANCE_HOURS;
+            $tolerance = checkinToleranceHours($db, $database);
             $toleranceSeconds = $tolerance * 3600;  // Stunden in Sekunden
 
             $newDateTime = $data->date . ' ' . $data->start_time;
@@ -221,7 +221,7 @@ function handleAppointments($db, $database, $method, $id) {
             }
 
             // Prüfe ob bereits ein anderer Termin der gleichen Art in der Toleranzzeit existiert
-            $tolerance = AUTO_CHECKIN_TOLERANCE_HOURS;
+            $tolerance = checkinToleranceHours($db, $database);
             $toleranceSeconds = $tolerance * 3600;
             
             $newDateTime = $data->date . ' ' . $data->start_time;

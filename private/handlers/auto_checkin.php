@@ -119,12 +119,14 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     $arrivalTimeStr = $arrivalTime->format('H:i:s'); 
     $timestamp = $arrivalTime->format('Y-m-d H:i:s');
         
-    // Zeittoleranz aus globaler Config
-    $tolerance = isset($data->tolerance_hours) ? intval($data->tolerance_hours) : AUTO_CHECKIN_TOLERANCE_HOURS;
-    
+    // Zeittoleranz: Einstellung schlaegt Konstante, ein mitgeschickter Wert
+    // schlaegt beides. Der Request-Parameter bleibt fuer Geraete bestehen.
+    $configuredTolerance = checkinToleranceHours($db, $database);
+    $tolerance = isset($data->tolerance_hours) ? intval($data->tolerance_hours) : $configuredTolerance;
+
     // Begrenze Toleranz auf sinnvollen Bereich
     if($tolerance < 0 || $tolerance > 8) {
-        $tolerance = AUTO_CHECKIN_TOLERANCE_HOURS;
+        $tolerance = $configuredTolerance;
     }
 
     $toleranceSeconds = $tolerance * 3600;
