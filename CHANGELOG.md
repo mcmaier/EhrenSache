@@ -7,6 +7,46 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.2.4] – 2026-09-03
+
+### Geändert
+- **Die automatische Terminerzeugung beim Check-in ist abschaltbar.** Findet ein Check-in
+  keinen passenden Termin, entscheidet `checkin_auto_create_appointment`, ob einer angelegt
+  oder der Check-in mit einem Hinweis abgelehnt wird. Die Einstellung gilt für alle
+  Check-in-Wege — PWA, IoT-Station und API
+- **Bestandsinstallationen starten auf „an", Neuinstallationen auf „aus".** Ein Update ändert
+  damit nichts am laufenden Betrieb; wer neu anfängt, entscheidet bewusst
+- **Das Zeitfenster der Terminzuordnung steht in den Einstellungen**
+  (`checkin_tolerance_hours`) statt in `config.php`. Die Migration übernimmt den bisherigen
+  Wert der Konstante `AUTO_CHECKIN_TOLERANCE_HOURS`; die Konstante bleibt als Rückfall
+  bestehen. Der Wert gilt jetzt auch für die Dublettenprüfung beim Anlegen von Terminen und
+  für die Terminauswahl in der PWA, wo bis 1.2.3 eine abweichende Zahl stand
+
+### Neu
+- **Terminauswahl beim Check-in in der PWA.** Ein optionales Feld über dem Scan-Knopf bietet
+  die Termine des Tages an. Ohne Auswahl sucht der Server wie bisher
+- **Automatisch erzeugte Termine sind markiert** (`appointments.is_auto_created`), tragen in
+  der Terminverwaltung ein Badge und lassen sich dort filtern. Die Migration markiert den
+  Altbestand und nennt seine Anzahl im Protokoll
+
+### Behoben
+- Ein vom Client geschickter Termin wird serverseitig gegen Tag und Gruppenzugehörigkeit
+  geprüft. Ohne diese Prüfung ließe sich über den Check-in-Endpunkt rückwirkend Anwesenheit
+  behaupten
+
+### Warum
+Bis 1.2.3 legte ein Check-in ohne passenden Termin unbemerkt einen neuen an — Standard-
+Terminart, Zeit auf fünf Minuten gerundet. `statistics.php` zählt jeden Termin einer Terminart
+bei jedem aktiven Mitglied der verknüpften Gruppen als Solltermin; ein Fehlscan senkte damit
+die Quote aller anderen. Strukturell derselbe Fall, der in 1.2.3 zur Regel „kein Weg der
+Zeiterfassung erzeugt Anwesenheit" geführt hat.
+
+**Automatisch erzeugte Termine zählen weiterhin voll in die Anwesenheitsquote.** Wer die
+Automatik eingeschaltet lässt, sollte den neuen Filter regelmäßig durchsehen — siehe OI-20 in
+`docs/OPEN-ITEMS.md`.
+
+---
+
 ## [1.2.3] – 2026-09-03
 
 ### Geändert

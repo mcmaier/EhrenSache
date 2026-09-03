@@ -259,6 +259,12 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | CIN-8 | Ungültiges `arrival_time`-Format | 400 |
 | CIN-9 | Unbekannte `member_number` | 404 `"Member not found"` |
 | CIN-10 | Zweiter Check-in desselben Mitglieds beim gleichen Termin | 409 Konflikt |
+| CIN-11 | Automatik aus (`checkin_auto_create_appointment='0'`), Check-in ohne Treffer | Toast „Kein passender Termin gefunden", kein neuer Termin |
+| CIN-12 | Automatik an, Check-in ohne Treffer | Toast nennt den angelegten Termin, Badge in der Verwaltung |
+| CIN-13 | Termin in der PWA-Auswahl wählen, einchecken | Record hängt an diesem Termin |
+| CIN-14 | Hinweistext unter der Terminauswahl bei beiden Schalterstellungen prüfen | Zweiter Satz wechselt je nach `checkin_auto_create_appointment` |
+| CIN-15 | PWA nach 22:00 Uhr öffnen | Auswahl zeigt heutige Termine, nicht die von morgen |
+| CIN-16 | `checkin_tolerance_hours` auf 4 setzen, Termin 3 h entfernt | Check-in trifft ihn |
 
 ### 9.2 TOTP-Checkin
 

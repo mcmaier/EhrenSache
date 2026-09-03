@@ -622,6 +622,27 @@ Sucht passenden Termin im Zeitfenster. Kann automatisch einen neuen Termin anleg
 }
 ```
 
+**Zusätzliches Feld (seit 1.2.4):**
+
+| Feld | Typ | Pflicht | Beschreibung |
+|---|---|---|---|
+| `appointment_id` | int | nein | Bewusst gewählter Termin. Muss am selben Tag wie `arrival_time` liegen und für die Gruppen des Mitglieds zugelassen sein. Ohne Angabe sucht der Server im Toleranzfenster. |
+
+**Antworten (seit 1.2.4):**
+
+| Status | `reason` | Bedeutung |
+|---|---|---|
+| `201` / `200` | – | Check-in angelegt oder aktualisiert |
+| `403` | `appointment_not_permitted` | Termin gehört zu einer anderen Gruppe |
+| `404` | `appointment_not_found` | `appointment_id` existiert nicht |
+| `409` | `appointment_wrong_day` | Termin liegt an einem anderen Tag |
+| `409` | `no_matching_appointment` | Kein Treffer und die Automatik ist abgeschaltet |
+
+Das Zeitfenster steht in der Einstellung `checkin_tolerance_hours`, ob ohne Treffer ein Termin
+angelegt wird in `checkin_auto_create_appointment` (siehe
+[Systemeinstellungen](#systemeinstellungen-settings)). Ein automatisch erzeugter Termin trägt
+`is_auto_created = 1`.
+
 ---
 
 ## TOTP Check-In
@@ -1245,6 +1266,29 @@ Importiert Daten aus Excel-Datei.
       "setting_value": "Mein Verein"
     }
   ]
+}
+```
+
+---
+
+### Client-Einstellungen (seit 1.2.4)
+**Endpoint:** `GET /api.php?resource=settings&scope=client`
+
+Liefert eine feste Auswahl an Einstellungen an **jede angemeldete Rolle**, nicht nur an
+Administratoren. Die Liste steht als Whitelist im Handler und umfasst derzeit
+`checkin_auto_create_appointment` und `checkin_tolerance_hours`.
+
+Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
+
+**Berechtigung:** jede angemeldete Rolle
+
+**Response:**
+```json
+{
+  "settings": {
+    "checkin_auto_create_appointment": "1",
+    "checkin_tolerance_hours": "2"
+  }
 }
 ```
 

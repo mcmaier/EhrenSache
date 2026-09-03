@@ -5,7 +5,7 @@ unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nic
 oder noch nicht gebaut.
 
 **Zuletzt geprüft:** 2026-09-03 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
-**Version:** 1.2.3
+**Version:** 1.2.4
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
@@ -76,6 +76,26 @@ Verwendungsnachweis ist das die Stelle, an die ein Prüfer zuerst schaut.
 **Offene Variante:** Nur Nachträge für **fremde** Mitglieder sofort bestätigen, eigene in die
 Freigabe geben. Preis: In einem Verein mit nur einem Manager bleibt dessen Eintrag hängen, bis
 ein Admin ihn freigibt.
+
+---
+
+### OI-20 · Auto-Termine zählen weiter in die Statistik
+**Priorität:** mittel — bewusst so entschieden am 2026-09-03
+
+Seit 1.2.4 ist die automatische Terminerzeugung abschaltbar und ein erzeugter Termin trägt
+`is_auto_created = 1`. **Die Auswertung kennt die Markierung nicht.** Ein Auto-Termin zählt
+bei jedem Mitglied der zugehörigen Gruppen als Solltermin; wer nicht eingecheckt hat,
+erscheint als unentschuldigt abwesend.
+
+Entschieden wurde: erst sichtbar machen, dann sehen, ob es reicht. Der Filter in der
+Terminverwaltung zeigt den Bestand.
+
+**Offene Variante:** Ein Auto-Termin zählt erst, wenn Admin oder Manager ihn bestätigt hat.
+Preis: Eingriffe in `statistics.php` und den Bericht, plus ein Bestätigungsschritt in der
+Oberfläche.
+
+**Nächster Schritt:** Nach einem Halbjahr Betrieb prüfen, wie viele Auto-Termine anfallen und
+wie viele davon nachbearbeitet wurden.
 
 ---
 
