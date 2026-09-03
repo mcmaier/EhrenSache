@@ -374,9 +374,9 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
         $autoTitle = "Automatisch erstellter Termin";
         $timeWithoutSeconds = $arrivalTime->format('H:i:s');
         
-        $createStmt = $db->prepare("INSERT INTO {$prefix}appointments 
-                                    (title, type_id, description, date, start_time, created_by) 
-                                    VALUES (?, ?, ?, ?, ?, ?)");
+        $createStmt = $db->prepare("INSERT INTO {$prefix}appointments
+                                    (title, type_id, description, date, start_time, created_by, is_auto_created)
+                                    VALUES (?, ?, ?, ?, ?, ?, 1)");
         
         $createStmt->execute([
             $autoTitle,
@@ -391,10 +391,11 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
         $action = 'created';
         
         $matchedAppointment = [
-            'appointment_id' => $appointmentId,
-            'title' => $autoTitle,
-            'date' => $arrivalDate,
-            'start_time' => $timeWithoutSeconds
+            'appointment_id'  => $appointmentId,
+            'title'           => $autoTitle,
+            'date'            => $arrivalDate,
+            'start_time'      => $timeWithoutSeconds,
+            'is_auto_created' => 1
         ];
     }    
     

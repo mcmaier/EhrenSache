@@ -297,3 +297,36 @@ test('Unbekannter Termin wird abgewiesen', function () {
 
     assertSame(404, $res['status'], 'Ein nicht existierender Termin muss 404 liefern');
 });
+
+test('Automatisch erzeugter Termin traegt is_auto_created', function () {
+    ciWithReset(['checkin_auto_create_appointment' => '1', 'checkin_tolerance_hours' => '2'], function () {
+        ciSetSetting('checkin_auto_create_appointment', '1');
+        ciSetSetting('checkin_tolerance_hours', '0');
+
+        $res = ciCheckin(['arrival_time' => date('Y-m-d') . ' 09:26:29']);
+        assertSame(201, $res['status'], 'Check-in mit Automatik muss gelingen');
+
+        $id = ciTrack('appointment', (int) $res['body']['appointment_id']);
+        $apt = apiRequest('GET', 'appointments', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $id],
+        ]);
+
+        assertSame(1, (int) ($apt['body']['is_auto_created'] ?? 0),
+            'Ein vom Check-in erzeugter Termin muss markiert sein');
+    });
+});
+
+test('Von Hand angelegter Termin traegt is_auto_created nicht', function () {
+    [$status, $id] = ciCreateAppointment('Handarbeit-Probe', date('Y-m-d'), '23:30:00');
+    assertSame(201, $status, 'Termin konnte nicht angelegt werden');
+
+    $apt = apiRequest('GET', 'appointments', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $id],
+    ]);
+
+    assertSame(0, (int) ($apt['body']['is_auto_created'] ?? 0),
+        'Die Markierung darf sich nicht ueber die Termin-API setzen lassen — '
+        . 'sonst waere sie faelschbar und damit wertlos');
+});
