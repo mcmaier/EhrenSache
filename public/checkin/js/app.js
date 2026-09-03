@@ -1679,22 +1679,6 @@ async function onNFCTagRead(message, serialNumber) {
 // EXCEPTION
 // ========================================
 
-async function loadAppointmentTypes() {
-
-    try {        
-        const result = await apiCall('appointment_types');
-        if (!result.success) {
-            throw new Error(result.error);
-        }
-        appointmentTypes =  result.data;       
-        debug.log('Terminarten geladen', appointmentTypes);
-    }
-    catch (error) {
-        appointmentTypes = [];
-        debug.error('Keine Terminarten gefunden.', error);
-    }
-}
-
 async function loadAppointments() {
     try {
         const result = await apiCall('appointments','GET',null, {member_id:userData.member_id});
