@@ -474,6 +474,28 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}activity_type_groups` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
+-- M:N-Tabelle: Taetigkeitsarten <-> Terminarten
+--
+-- Grenzt die Terminauswahl bei der Zeiterfassung ein: "Buehnenaufbau" bietet
+-- nur Konzerte an, nicht jede Probe des Jahres.
+--
+-- Achtung, andere Semantik als bei activity_type_groups: Dort bedeutet eine
+-- fehlende Zuordnung "niemand", hier bedeutet sie "keine Einschraenkung".
+-- Eine Taetigkeitsart ohne Eintrag in dieser Tabelle bietet alle Termine an.
+-- Grund: Bei Gruppen waere "leer = alle" eine stille Rechteausweitung, bei
+-- Terminarten waere "leer = keine" eine Selbstblockade.
+--
+CREATE TABLE IF NOT EXISTS `{PREFIX}activity_type_appointment_types` (
+  activity_id INT NOT NULL,
+  type_id     INT NOT NULL,
+  PRIMARY KEY (activity_id, type_id),
+  CONSTRAINT `{PREFIX}atat_activity_fk` FOREIGN KEY (activity_id)
+      REFERENCES `{PREFIX}activity_types`(activity_id) ON DELETE CASCADE,
+  CONSTRAINT `{PREFIX}atat_type_fk` FOREIGN KEY (type_id)
+      REFERENCES `{PREFIX}appointment_types`(type_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
 -- Zeiterfassung: Arbeitssitzungen
 --
 -- Laeuft gerade:    end_time IS NULL

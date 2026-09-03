@@ -38,4 +38,10 @@ return [
         'file'     => '1.2.1.php',
         'function' => 'migrate_1_2_1',
     ],
+    [
+        'from'     => '1.2.2',
+        'to'       => '1.2.3',
+        'file'     => '1.2.2.php',
+        'function' => 'migrate_1_2_2',
+    ],
 ];

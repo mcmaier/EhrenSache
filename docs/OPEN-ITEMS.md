@@ -5,7 +5,7 @@ unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nic
 oder noch nicht gebaut.
 
 **Zuletzt geprüft:** 2026-09-03 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
-**Version:** 1.2.2
+**Version:** 1.2.3
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
@@ -82,49 +82,54 @@ ein Admin ihn freigibt.
 ## Restarbeiten
 
 ### OI-4 · Terminbezug: Oberfläche unvollständig
-**Priorität:** mittel
+**Priorität:** erledigt am 2026-09-03 (1.2.2 und 1.2.3)
 
-Backend ist fertig (`7e9ec6a`): `worktimeByAppointment()`, Export `worktime_appointment`, und
-der Check-in entsteht nur noch, wenn der Termin heute ist.
+Backend war fertig seit `7e9ec6a`; es fehlte der Zugang in der Oberfläche. Alle drei
+Teilpunkte sind geschlossen:
 
-**Erledigt am 2026-09-03**
+- **Terminfeld im Dashboard-Nachtrag** (1.2.2). Dabei fiel auf, dass `workSessionUpdate()`
+  `appointment_id` überhaupt nicht verarbeitete — beim **Bearbeiten** wäre die Auswahl
+  stillschweigend verworfen worden. Der Update-Pfad unterscheidet jetzt drei Fälle: Feld
+  fehlt (Termin bleibt), Feld gesetzt (Zuordnung), Feld leer (Zuordnung gelöst).
+- **Zugang zum Termin-Bericht** (1.2.2). Der Berichtsdialog bietet „Summen nach Termin" als
+  CSV und als Druckansicht; ein dritter Knopf war damit nicht mehr nötig.
+- **PWA bietet alle Termine des Jahres an** (1.2.3), nicht mehr nur die heutigen. Die
+  Beschränkung war die falsche: Vorbereitung findet vor der Veranstaltung statt,
+  Nachbereitung danach — genau die Stunden, die der Bericht zeigen soll.
 
-- **Terminfeld im Dashboard-Nachtrag.** Das Modal hat ein optionales Feld, `saveWorkSession()`
-  sendet `appointment_id`. Angeboten werden die Termine des gewählten Jahres, absteigend nach
-  Datum — die Beschränkung auf „heute" entsteht hier bewusst gar nicht erst.
-  Dabei fiel auf, dass `workSessionUpdate()` `appointment_id` überhaupt nicht verarbeitete:
-  Beim **Bearbeiten** wäre die Auswahl stillschweigend verworfen worden. Der Update-Pfad setzt
-  das Feld jetzt, und ein leer gesendetes Feld löst die Zuordnung wieder — sonst ließe sich ein
-  einmal gesetzter Termin nie mehr entfernen. Fehlt das Feld im Payload, bleibt der Termin
-  unangetastet.
-- **Zugang zum Termin-Bericht.** Der Berichtsdialog aus 1.2.2 bietet „Summen nach Termin" als
-  CSV und als Druckansicht. Ein dritter Knopf war damit nicht mehr nötig.
+**Die Anwesenheitskopplung ist ersatzlos entfallen** (1.2.3). Der ursprünglich hier notierte
+„Datumsschutz trifft die Sache nur ungefähr" hat sich damit erledigt, aber anders als gedacht:
+Nicht der Schutz wurde verfeinert, sondern das Geschützte abgeschafft.
 
-**Kein automatischer Check-in aus einem Nachtrag** — bewusst entschieden am 2026-09-03:
+Ausschlaggebend war ein Befund, der beim Abwägen auftauchte: `statistics.php` liest `records`
+**ohne Rücksicht auf `checkin_source`**. Ein vom Timer erzeugter Eintrag zählte damit voll in
+die Anwesenheitsquote und — wegen `arrival_time = NOW()` — auch in die Pünktlichkeit. Wer um
+08:00 die Bühne für das Konzert um 19:00 aufbaute, galt als anwesend **und** als elf Stunden
+zu früh. Beide Kernauswertungen nahmen Schaden, und zwar zugunsten des Mitglieds.
 
-Arbeit *für* einen Termin ist keine Anwesenheit *bei* ihm. Wer den Bühnenaufbau nachträgt, war
-nicht notwendig beim Konzert. Hinzu kommt: Ein Nachtrag ist bis zur Freigabe eine ungeprüfte
-Behauptung; ein daraus erzeugter Check-in umginge genau die Prüfung, die für die Stunden selbst
-verlangt wird. Den `records`-Eintrag erzeugt deshalb weiterhin allein der Timer-Start
-(`workSessionStart()`), und auch die Freigabe erzeugt keinen. Zwei Tests halten das fest.
+Der Datumsschutz sollte das verhindern, wehrte aber nur den Vortag ab und ließ den Regelfall
+durch: Am Veranstaltungstag wird gearbeitet.
 
-**Offen bleibt**
+Seither gilt für alle Erfassungswege ein Satz: **Kein Weg der Zeiterfassung erzeugt
+Anwesenheit.** Die bisherige Regel — der Timer ja, der Nachtrag nein, und der Timer auch nur
+heute — konnte niemand erklären.
 
-- **PWA bietet nur heutige Termine an.** `loadWorktimeAppointments()` fragt `from_date = to_date
-  = heute` ab. An Tagen ohne Termin wirkt das Feld funktionslos. Vorbereitungsarbeit für eine
-  spätere Veranstaltung lässt sich dort weiterhin nicht zuordnen — im Dashboard inzwischen schon.
-- **Der Datumsschutz trifft die Sache nur ungefähr.** Der Timer erzeugt den Check-in, sobald der
-  Termin heute ist. Wer am Konzerttag drei Stunden Bühne aufbaut und vor Beginn geht, gilt damit
-  als beim Konzert anwesend — derselbe Fehler, den der Schutz für den Vortag verhindert, nur
-  einen Tag später. Die Unterscheidung gehört an die **Art** des Termins, nicht an sein Datum:
-  ein Arbeitsdienst ist Anwesenheit, eine Veranstaltung nicht. Erwogen wurde ein Flag an
-  `appointment_types` (dort stehen heute nur `type_name`, `description`, `is_default`, `color`)
-  mit einem Vorgabewert, der das bisherige Verhalten beibehält. Zurückgestellt: eigener Umfang
-  mit Migration, und der Nachtrag löst den dringenderen Teil bereits.
+**Eingrenzung statt Kopplung** (1.2.3): Tätigkeitsarten lassen sich mit Terminarten
+verknüpfen (`activity_type_appointment_types`). Eine leere Zuordnung bedeutet hier **keine
+Einschränkung**, anders als bei den Gruppen — die Migration legt deshalb keine Datenzeile an,
+und wer die Eingrenzung nicht pflegt, verliert nichts. Zusammen mit der Gruppenbindung
+beantwortet das beide Fragen getrennt: die Gruppe **wer** eine Tätigkeit erfassen darf, die
+Terminart **wozu** sie passt.
 
-**Teilweise erledigt am 2026-09-02:** Die Auswahl in der PWA war zusätzlich schlicht leer, weil
-sie nur beim Öffnen des Antragsdialogs befüllt wurde, und das Tagesdatum kam aus UTC — abends ab
-22:00 MESZ zeigte sie den Folgetag. Beides behoben (`d7ee191`).
+**Nicht bereinigt:** Anwesenheitseinträge mit `checkin_source = 'timer'` aus der Zeit vor
+1.2.3 bleiben bestehen und zählen weiter in beide Auswertungen. Ein Teil davon ist korrekt —
+das Mitglied war tatsächlich da —, und welcher, lässt sich nachträglich nicht entscheiden.
+Löschen wäre ein nicht umkehrbarer Eingriff in erfasste Daten. Die Migration nennt ihre
+Anzahl als Warnung im Update-Protokoll.
+
+**Teilweise erledigt am 2026-09-02:** Die Auswahl in der PWA war zusätzlich schlicht leer,
+weil sie nur beim Öffnen des Antragsdialogs befüllt wurde, und das Tagesdatum kam aus UTC —
+abends ab 22:00 MESZ zeigte sie den Folgetag. Beides behoben (`d7ee191`).
 
 ---
 

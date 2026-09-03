@@ -291,12 +291,16 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
         return;
     }
 
-    // Termin prüfen, falls angegeben
-    $appointmentId   = null;
-    $appointmentToday = false;
+    // Termin pruefen, falls angegeben.
+    //
+    // Der Terminbezug ist eine Aussage ueber den AUFWAND, nicht ueber
+    // Anwesenheit: Er beantwortet "wie viel Arbeit ist in diese Veranstaltung
+    // geflossen", nicht "wer war da". Ein Anwesenheitseintrag entsteht deshalb
+    // nicht mehr -- siehe die Entscheidung unten am Ende dieser Funktion.
+    $appointmentId = null;
 
     if(!empty($data->appointment_id)) {
-        $stmt = $db->prepare("SELECT appointment_id, date FROM {$prefix}appointments
+        $stmt = $db->prepare("SELECT appointment_id FROM {$prefix}appointments
                               WHERE appointment_id = ?");
         $stmt->execute([(int)$data->appointment_id]);
         $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -307,8 +311,7 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
             return;
         }
 
-        $appointmentId    = (int)$appointment['appointment_id'];
-        $appointmentToday = ($appointment['date'] === date('Y-m-d'));
+        $appointmentId = (int)$appointment['appointment_id'];
     }
 
     // Bereits laufende Sitzung? Eine ueberfaellige wird dabei geschlossen,
@@ -334,26 +337,25 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
                         $startLocation, $authUserId]);
         $sessionId = (int)$db->lastInsertId();
 
-        // Bei Terminbezug den Anwesenheits-Eintrag miterzeugen.
-        // ON DUPLICATE KEY UPDATE mit einer Zuweisung auf sich selbst: ein
-        // frueherer Check-in behaelt seine arrival_time.
-        // Der Check-in entsteht NUR, wenn der Termin heute ist. Zeit laesst sich
-        // auch fuer eine kuenftige Veranstaltung erfassen — Buehnenaufbau am
-        // Donnerstag fuer das Konzert am Samstag. Daraus einen Check-in zu
-        // machen wuerde das Mitglied als anwesend bei etwas fuehren, das noch
-        // gar nicht stattgefunden hat.
-        if($appointmentId !== null && $appointmentToday) {
-            // Ist der Start ortsbelegt, ist der Check-in ein user_totp und
-            // traegt den Stationsnamen — sonst ein schlichter timer-Eintrag.
-            $checkinSource = $startLocation !== null ? 'user_totp' : 'timer';
-
-            $db->prepare("INSERT INTO {$prefix}records
-                          (member_id, appointment_id, arrival_time, status,
-                           checkin_source, location_name)
-                          VALUES (?, ?, NOW(), 'present', ?, ?)
-                          ON DUPLICATE KEY UPDATE record_id = record_id")
-               ->execute([$memberId, $appointmentId, $checkinSource, $startLocation]);
-        }
+        // KEIN Anwesenheitseintrag. Bis 1.2.2 legte der Timer-Start bei einem
+        // Termin am selben Tag einen records-Eintrag an (E4 der Zeiterfassungs-
+        // Spec, dort seit 1.2.3 als ueberholt vermerkt). Das war eine
+        // Bequemlichkeit mit zwei Nebenwirkungen:
+        //
+        // statistics.php liest records OHNE Ruecksicht auf checkin_source. Ein
+        // so erzeugter Eintrag zaehlte damit voll in die Anwesenheitsquote, und
+        // wegen arrival_time = NOW() auch in die Puenktlichkeit. Wer um 08:00
+        // die Buehne fuer das Konzert um 19:00 aufbaute, galt als anwesend und
+        // als elf Stunden zu frueh -- beides zugunsten des Mitglieds, in einer
+        // Auswertung, die Verlaesslichkeit messen soll.
+        //
+        // Der Datumsschutz sollte das verhindern, traf aber daneben: Am
+        // Veranstaltungstag wird typischerweise gearbeitet. Er wehrte den
+        // Vortag ab und liess den Regelfall durch.
+        //
+        // Seither gilt fuer alle drei Erfassungswege derselbe Satz: Kein Weg
+        // der Zeiterfassung erzeugt Anwesenheit. Wer beides behaupten will,
+        // tut beides; in der PWA liegen die Wege nebeneinander.
 
         logSessionChange($db, $database, $sessionId, $authUserId, 'create', [
             'source'              => ['old' => null, 'new' => 'timer'],

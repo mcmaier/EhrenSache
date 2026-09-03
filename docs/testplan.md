@@ -693,7 +693,40 @@ php tests/run.php worktime_api
 | TB-M5 | Termin auf „Kein Termin" setzen und speichern | Spalte zeigt wieder „—" |
 | TB-M6 | Anwesenheitsliste des Termins prüfen | **kein** Eintrag für dieses Mitglied entstanden |
 | TB-M7 | Bericht „Summen nach Termin" | Die nachgetragenen Stunden erscheinen unter dem Termin, nicht mehr unter „(ohne Termin)" |
-| TB-M8 | Jahresfilter auf ein anderes Jahr stellen, Eintrag mit Termin aus dem Vorjahr öffnen | Der Termin steht mit dem Zusatz „(anderes Jahr)" in der Liste und bleibt vorausgewählt — er darf beim Speichern nicht verlorengehen |
+| TB-M8 | Jahresfilter auf ein anderes Jahr stellen, Eintrag mit Termin aus dem Vorjahr öffnen | Der Termin steht mit dem Zusatz „(zugeordnet)" in der Liste und bleibt vorausgewählt — er darf beim Speichern nicht verlorengehen |
+
+---
+
+## Zeiterfassung ohne Anwesenheitskopplung (ab 1.2.3)
+
+### Automatisiert
+
+```bash
+php tests/run.php worktime_api
+```
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| AK-1 | Timer-Start mit Termin **heute** | **kein** `records`-Eintrag |
+| AK-2 | Timer-Start bei bereits vorhandenem Check-in | Der bestehende Eintrag bleibt unverändert |
+| AK-3 | `GET activity_types` | `appointment_type_ids` vorhanden, leer bei unverknüpfter Art |
+| AK-4 | `POST` mit `appointment_type_ids` | Verknüpfung angelegt |
+| AK-5 | `PUT` mit leerem Array | Verknüpfung gelöst — zulässig, anders als bei `group_ids` |
+| AK-6 | `PUT` ohne das Feld | Verknüpfung unangetastet |
+| AK-7 | `PUT` mit unbekannter `type_id` | `400` |
+
+### Manuell
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| AK-M1 | PWA: Zeiterfassung mit Termin heute starten, danach Anwesenheitsliste des Termins | **kein** neuer Eintrag |
+| AK-M2 | Anwesenheitsquote des Mitglieds vor und nach dem Start vergleichen | unverändert |
+| AK-M3 | PWA: Terminauswahl öffnen | Termine des ganzen Jahres, nächstgelegene zuerst, mit Datum |
+| AK-M4 | PWA: Termin wählen | Hinweis sagt, dass die Stunden zugerechnet werden und **kein** Check-in entsteht |
+| AK-M5 | Tätigkeitsart mit zwei Terminarten verknüpfen, dann in PWA und Nachtrag-Dialog wählen | Terminliste zeigt nur Termine dieser Arten |
+| AK-M6 | Tätigkeitsart ohne Verknüpfung wählen | Terminliste zeigt alle Termine |
+| AK-M7 | Bei gewähltem Termin die Tätigkeitsart wechseln, sodass der Termin nicht mehr passt | Der Termin bleibt gewählt und in der Liste |
+| AK-M8 | Update-Wizard auf einer Installation mit alten Timer-Check-ins | Protokoll nennt deren Anzahl als Warnung; die Einträge bleiben |
 
 ---
 

@@ -34,6 +34,65 @@ function activityFilterMemberId($db, $database): ?int
     return $memberId ? (int)$memberId : 0;
 }
 
+/**
+ * Terminarten, auf die eine Taetigkeitsart eingegrenzt ist.
+ *
+ * Ein leeres Array bedeutet KEINE Einschraenkung — die Taetigkeitsart bietet
+ * dann alle Termine an. Das ist bewusst die andere Semantik als bei den
+ * Gruppen, wo eine leere Zuordnung "niemand" heisst: Bei Gruppen waere
+ * "leer = alle" eine stille Rechteausweitung, bei Terminarten waere
+ * "leer = keine" eine Selbstblockade nach dem Update.
+ *
+ * @return array<int, int>
+ */
+function activityAppointmentTypeIds($db, $database, int $activityId): array
+{
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT type_id FROM {$prefix}activity_type_appointment_types
+                          WHERE activity_id = ? ORDER BY type_id");
+    $stmt->execute([$activityId]);
+
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/**
+ * Setzt die Terminart-Zuordnung neu. Ein leeres Array loest sie.
+ *
+ * @param array<int, mixed> $typeIds
+ * @return bool false, wenn eine der IDs unbekannt ist
+ */
+function setActivityAppointmentTypes($db, $database, int $activityId, array $typeIds): bool
+{
+    $prefix = $database->table('');
+
+    $ids = array_values(array_unique(array_map('intval', $typeIds)));
+
+    if($ids !== []) {
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $check = $db->prepare("SELECT COUNT(*) FROM {$prefix}appointment_types
+                               WHERE type_id IN ({$placeholders})");
+        $check->execute($ids);
+
+        if((int)$check->fetchColumn() !== count($ids)) {
+            return false;
+        }
+    }
+
+    $db->prepare("DELETE FROM {$prefix}activity_type_appointment_types WHERE activity_id = ?")
+       ->execute([$activityId]);
+
+    if($ids !== []) {
+        $insert = $db->prepare("INSERT INTO {$prefix}activity_type_appointment_types
+                                (activity_id, type_id) VALUES (?, ?)");
+        foreach($ids as $typeId) {
+            $insert->execute([$activityId, $typeId]);
+        }
+    }
+
+    return true;
+}
+
 // ============================================
 // ACTIVITY_TYPES Controller
 // ============================================
@@ -59,6 +118,8 @@ function handleActivityTypes($db, $database, $method, $id) {
                                                WHERE atg.activity_id = ?");
                     $groupStmt->execute([$id]);
                     $type['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+                    $type['appointment_type_ids'] =
+                        activityAppointmentTypeIds($db, $database, (int)$id);
 
                     echo json_encode($type);
                 } else {
@@ -104,6 +165,8 @@ function handleActivityTypes($db, $database, $method, $id) {
                 foreach ($types as &$type) {
                     $groupStmt->execute([$type['activity_id']]);
                     $type['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+                    $type['appointment_type_ids'] =
+                        activityAppointmentTypeIds($db, $database, (int)$type['activity_id']);
                 }
                 unset($type);
 
@@ -164,6 +227,17 @@ function handleActivityTypes($db, $database, $method, $id) {
                                               (activity_id, group_id) VALUES (?, ?)");
                     foreach($data->group_ids as $gid) {
                         $linkStmt->execute([$newId, (int)$gid]);
+                    }
+                }
+
+                // Terminarten sind optional: Fehlt das Feld, bleibt die
+                // Taetigkeitsart unverknuepft und bietet alle Termine an.
+                if(isset($data->appointment_type_ids) && is_array($data->appointment_type_ids)) {
+                    if(!setActivityAppointmentTypes($db, $database, $newId,
+                                                    $data->appointment_type_ids)) {
+                        http_response_code(400);
+                        echo json_encode(["message" => "Unknown appointment type id"]);
+                        return;
                     }
                 }
 
@@ -232,6 +306,19 @@ function handleActivityTypes($db, $database, $method, $id) {
                                               (activity_id, group_id) VALUES (?, ?)");
                     foreach($data->group_ids as $gid) {
                         $linkStmt->execute([$id, (int)$gid]);
+                    }
+                }
+
+                // Terminarten: fehlendes Feld laesst die Zuordnung unangetastet,
+                // ein leeres Array loest sie. Anders als bei den Gruppen ist das
+                // leere Array hier ZULAESSIG — es bedeutet "keine Einschraenkung",
+                // nicht "fuer niemanden nutzbar".
+                if(isset($data->appointment_type_ids) && is_array($data->appointment_type_ids)) {
+                    if(!setActivityAppointmentTypes($db, $database, (int)$id,
+                                                    $data->appointment_type_ids)) {
+                        http_response_code(400);
+                        echo json_encode(["message" => "Unknown appointment type id"]);
+                        return;
                     }
                 }
 

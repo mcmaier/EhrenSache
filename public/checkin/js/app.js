@@ -2233,6 +2233,10 @@ function escapeHtml(value) {
 let worktimeSession = null;
 let worktimeActivities = [];
 
+// Termine des laufenden Jahres. Gehalten, damit ein Wechsel der Taetigkeitsart
+// die Auswahl neu aufbauen kann, ohne erneut zu laden.
+let worktimeAppointments = [];
+
 /**
  * Prueft, ob die Zeiterfassung freigeschaltet ist, und blendet den Tab ein.
  * Ist das Feature aus, antwortet die Ressource mit 404 — dann bleibt der
@@ -2262,7 +2266,14 @@ async function initWorktime() {
             })
             .join('');
 
-        select.addEventListener('change', renderWorktimeActivityHint);
+        select.addEventListener('change', () => {
+            renderWorktimeActivityHint();
+            // Die Terminarten der neuen Taetigkeit grenzen die Terminliste
+            // anders ein; die getroffene Auswahl bleibt erhalten, solange sie
+            // noch passt.
+            renderWorktimeAppointmentOptions(
+                document.getElementById('worktimeAppointment')?.value || '');
+        });
         renderWorktimeActivityHint();
     }
 
@@ -2470,10 +2481,13 @@ function renderWorktimeAppointmentHint() {
     const select = document.getElementById('worktimeAppointment');
     if (!hint || !select) return;
 
-    // Der Check-in entsteht serverseitig nur fuer einen Termin des heutigen
-    // Tages — und die Auswahl fuehrt ausschliesslich heutige Termine.
+    // Bis 1.2.2 erzeugte der Start zugleich einen Anwesenheitseintrag. Das ist
+    // entfallen: Arbeit fuer einen Termin ist keine Anwesenheit bei ihm. Der
+    // Hinweis sagt das ausdruecklich, weil die alte Kopplung fuer Mitglieder
+    // sichtbar war und ihr Wegfall sonst wie ein Fehler wirkt.
     hint.textContent = select.value
-        ? 'Der Start wird zugleich als Anwesenheit bei diesem Termin gewertet.'
+        ? 'Die Stunden werden diesem Termin zugerechnet. Ein Check-in entsteht dadurch '
+          + 'nicht — dafür ist die Anwesenheitserfassung da.'
         : '';
     hint.hidden = !select.value;
 }
@@ -2590,36 +2604,82 @@ async function loadWorktimeAppointments() {
     if (!select) return;
 
     const previous = select.value;
-    const today = formatDate(new Date());
 
-    let todays = [];
+    // Alle Termine des laufenden Jahres, nicht nur die heutigen.
+    //
+    // Bis 1.2.2 fragte diese Stelle from_date = to_date = heute ab. Das war
+    // die falsche Einschraenkung: Der Terminbezug dient der Aufwandsbetrachtung,
+    // und Vorbereitung findet vor der Veranstaltung statt, Nachbereitung danach.
+    // Genau diese Stunden zeigt der Bericht "nach Termin" — und genau sie
+    // liessen sich nicht zuordnen.
+    let appointments = [];
 
     if (userData && userData.member_id) {
         const result = await apiCall('appointments', 'GET', null, {
             member_id: userData.member_id,
-            from_date: today,
-            to_date: today
+            year: new Date().getFullYear()
         });
 
         if (result.success && Array.isArray(result.data)) {
-            todays = result.data;
+            appointments = result.data;
         } else {
             debug.error('Termine fuer die Zeiterfassung nicht ladbar:', result.error);
         }
     }
 
+    worktimeAppointments = appointments;
+    renderWorktimeAppointmentOptions(previous);
+}
+
+/**
+ * Baut die Terminauswahl auf: eingegrenzt auf die Terminarten der gewaehlten
+ * Taetigkeit, sortiert nach Abstand zu heute.
+ *
+ * Die Eingrenzung ist leer, wenn die Taetigkeitsart keine Terminarten nennt —
+ * das bedeutet "keine Einschraenkung", nicht "keine Termine".
+ */
+function renderWorktimeAppointmentOptions(previous = '') {
+    const select = document.getElementById('worktimeAppointment');
+    if (!select) return;
+
+    const id       = document.getElementById('worktimeActivity')?.value;
+    const activity = worktimeActivities.find(a => String(a.activity_id) === String(id));
+    const allowed  = (activity?.appointment_type_ids || []).map(Number);
+
+    let options = worktimeAppointments.slice();
+
+    if (allowed.length) {
+        options = options.filter(a => allowed.includes(Number(a.type_id)));
+    }
+
+    // Naechstgelegene zuerst: Arbeit wird einem Termin in ihrer Naehe
+    // zugeordnet, nicht dem ersten des Jahres.
+    const now = Date.now();
+    options.sort((a, b) =>
+        Math.abs(new Date(String(a.date)).getTime() - now)
+        - Math.abs(new Date(String(b.date)).getTime() - now));
+
     select.innerHTML = '<option value="">— kein Termin —</option>'
-        + todays.map(a =>
-            `<option value="${a.appointment_id}">${escapeHtml(a.title)} (${String(a.start_time).substring(0, 5)})</option>`
-        ).join('');
+        + options.map(a => {
+            const datum = formatDateShortDe(a.date);
+            const zeit  = String(a.start_time || '').substring(0, 5);
+            return `<option value="${a.appointment_id}">`
+                 + `${datum} ${escapeHtml(a.title)}${zeit ? ` (${zeit})` : ''}</option>`;
+        }).join('');
 
     // Auswahl ueberlebt ein Neuladen, solange der Termin noch in der Liste steht
-    if (previous && todays.some(a => String(a.appointment_id) === previous)) {
+    if (previous && options.some(a => String(a.appointment_id) === previous)) {
         select.value = previous;
     }
 
     // Ein programmatisch gesetztes value loest kein change aus
     renderWorktimeAppointmentHint();
+}
+
+/** Datum als TT.MM., ohne Zeitzonenversatz — die PWA hat wenig Breite. */
+function formatDateShortDe(isoDateString) {
+    const parts = String(isoDateString).slice(0, 10).split('-');
+    return parts.length === 3 ? `${parts[2]}.${parts[1]}.` : '';
 }
 
 // ========================================

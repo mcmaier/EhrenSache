@@ -45,7 +45,7 @@ Nicht Ziel sind interne Lastverteilungsanalysen oder eine Arbeitszeitkontrolle.
 | E1 | Eine gemeinsame Entität `work_sessions` mit **optionalem** `appointment_id` | Vermeidet zwei parallele Zeitwelten, die später zusammengeführt werden müssten |
 | E2 | Zeitmodell „eine Zeile je Einsatz" mit `break_minutes` + `break_started_at` | Nachweise verlangen Dauer, nicht die Lage der Pausen. Segmente wären Aufwand ohne Gegenwert |
 | E3 | Erfassung per Live-Timer **und** nachträglichem Formular | Timer liefert belastbare Zeitstempel, Formular fängt Vergessenes ab |
-| E4 | Timer-Start mit Terminbezug erzeugt den `records`-Eintrag | Ein Vorgang für das Mitglied, zwei Sichten für die Auswertung; verhindert Doppelerfassung |
+| E4 | ~~Timer-Start mit Terminbezug erzeugt den `records`-Eintrag~~ **Zurückgenommen in 1.2.3** | Siehe Anmerkung unter der Tabelle |
 | E5 | Freigabe nur für `source = 'manual'` und für nachträgliche Änderungen | Hält die Managerlast klein und schafft einen Anreiz, den Timer zu benutzen |
 | E6 | Feature hinter `system_settings.worktime_enabled` | EhrenSache ist ein Produkt für viele Vereine; die meisten brauchen keine Stundenerfassung |
 | E7 | Alle Zeitstempel aus `NOW()` der Datenbank | Die Geräteuhr ist trivial manipulierbar; Client-Zeiten wären als Nachweis wertlos |
@@ -54,6 +54,21 @@ Nicht Ziel sind interne Lastverteilungsanalysen oder eine Arbeitszeitkontrolle.
 | E10 | Der Nachweis wird **protokolliert**, nicht nur erzwungen | Die Tätigkeitsart wählt das Mitglied selbst; eine reine Sperre wäre durch Auswahl einer anderen Art umgehbar *und* unsichtbar. Festgehalten, welche Stunden ortsbelegt sind, wird die Umgehung sichtbar |
 | E11 | Nachweispflicht je Tätigkeitsart, dreistufig (`none` / `start` / `start_end`) | Bandprobe im Vereinsheim kann Start und Ende belegen, ein mobiler Einsatz nur den Start. Global wäre entweder zu streng oder wertlos |
 | E12 | Die Pause verlangt nie einen Nachweis | Eine Pause ist keine Anwesenheitsbehauptung; ein Scan-Zwang dafür wäre Schikane ohne Erkenntnisgewinn |
+
+> **E4 ist am 2026-09-03 zurückgenommen worden** (Version 1.2.3, siehe
+> `2026-09-03-terminbezug-ohne-checkin-design.md`). Der Terminbezug erzeugt keinen
+> `records`-Eintrag mehr — weder beim Timer-Start noch beim Nachtrag.
+>
+> Der Grund lag nicht in der Doppelerfassung, sondern in der Auswertung: `statistics.php`
+> liest `records` ohne Rücksicht auf `checkin_source`. Ein so erzeugter Eintrag zählte damit
+> voll in die Anwesenheitsquote und, wegen `arrival_time = NOW()`, auch in die Pünktlichkeit.
+> Wer morgens die Bühne für das Abendkonzert aufbaute, galt als anwesend und als Stunden zu
+> früh. Der Datumsschutz, der das abfangen sollte, wehrte nur den Vortag ab und ließ den
+> Regelfall durch — am Veranstaltungstag wird gearbeitet.
+>
+> Die Absicht hinter E4 bleibt richtig: Doppelerfassung ist lästig. Sie wiegt aber leichter
+> als zwei verfälschte Kernauswertungen, und „Arbeit für einen Termin" ist ohnehin eine
+> andere Aussage als „Anwesenheit bei ihm".
 
 ### Verworfene Alternativen
 

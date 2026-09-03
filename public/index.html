@@ -15,7 +15,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EhrenSache - Dashboard</title>
 
-    <link rel="stylesheet" href="css/main.css?v=1.2.2">
+    <link rel="stylesheet" href="css/main.css?v=1.2.3">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="robots" content="noindex, nofollow">
     <script type="module" src="js/theme.js"></script>
@@ -2167,6 +2167,18 @@
                             Nur Mitglieder dieser Gruppen können die Tätigkeit erfassen
                         </small>
                         <div id="activityGroupsList" style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
+                            <!-- Wird dynamisch gefüllt -->
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Passende Terminarten</label>
+                        <small style="color: #7f8c8d; display: block; margin-bottom: 10px;">
+                            Grenzt die Terminauswahl beim Erfassen ein — „Bühnenaufbau" bietet
+                            dann nur Konzerte an, nicht jede Probe.
+                            <strong>Ohne Auswahl stehen alle Termine zur Verfügung.</strong>
+                        </small>
+                        <div id="activityAppointmentTypesList" style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
                             <!-- Wird dynamisch gefüllt -->
                         </div>
                     </div>

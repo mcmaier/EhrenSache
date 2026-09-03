@@ -7,6 +7,41 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.2.3] – 2026-09-03
+
+### Geändert
+- **Der Start der Zeiterfassung erzeugt keinen Anwesenheitseintrag mehr.** Bisher legte ein
+  Timer-Start mit Terminbezug einen Check-in an, sofern der Termin am selben Tag lag.
+  Damit gilt jetzt für alle drei Erfassungswege derselbe Satz: Kein Weg der Zeiterfassung
+  erzeugt Anwesenheit. Wer beides festhalten will, tut beides — in der PWA liegen die Wege
+  nebeneinander
+- **Die PWA bietet alle Termine des Jahres an**, nicht mehr nur die des heutigen Tages.
+  Vorbereitung findet vor der Veranstaltung statt, Nachbereitung danach; genau diese Stunden
+  zeigt der Bericht „nach Termin", und genau sie ließen sich bisher nicht zuordnen
+- Terminlisten sind nach zeitlicher Nähe sortiert — in der PWA zu heute, im Nachtrag-Dialog
+  zum eingetragenen Datum
+
+### Neu
+- **Tätigkeitsarten lassen sich mit Terminarten verknüpfen.** „Bühnenaufbau" bietet dann nur
+  noch Konzerte an, nicht jede Probe des Jahres. Ohne Verknüpfung stehen weiterhin alle
+  Termine zur Wahl — die Migration legt deshalb keine einzige Zuordnung an, und wer die
+  Eingrenzung nicht nutzt, merkt nicht, dass es sie gibt
+
+### Warum
+Die Anwesenheitsauswertung liest `records` ohne Rücksicht auf `checkin_source`. Ein vom Timer
+erzeugter Eintrag zählte damit voll in die Anwesenheitsquote und — wegen `arrival_time = NOW()`
+— auch in die Pünktlichkeit. Wer um 08:00 die Bühne für das Konzert um 19:00 aufbaute, galt
+als anwesend und als elf Stunden zu früh. Der Datumsschutz sollte das verhindern, wehrte aber
+nur den Vortag ab und ließ den Regelfall durch: Am Veranstaltungstag wird gearbeitet.
+
+### Hinweis für bestehende Installationen
+Anwesenheitseinträge, die vor dem Update aus der Zeiterfassung entstanden sind
+(`checkin_source = 'timer'`), **bleiben erhalten** und zählen weiterhin in Anwesenheit und
+Pünktlichkeit. Ein Teil davon ist korrekt — das Mitglied war tatsächlich da —, und welcher,
+lässt sich nachträglich nicht entscheiden. Das Update-Protokoll nennt ihre Anzahl.
+
+---
+
 ## [1.2.2] – 2026-09-03
 
 ### Neu

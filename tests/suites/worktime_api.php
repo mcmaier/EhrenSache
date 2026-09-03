@@ -505,29 +505,32 @@ function testAppointmentTypeId(): int
 /**
  * Legt einen Termin am heutigen Tag an und liefert seine id.
  *
- * Die Uhrzeiten liegen fuenf Stunden auseinander, weil appointments
- * Termine derselben Art im Fenster von +/- AUTO_CHECKIN_TOLERANCE_HOURS
- * (Standard: 2h) als Konflikt abweist.
+ * Die Uhrzeiten liegen DREI Stunden auseinander, weil appointments Termine
+ * derselben Art im Fenster von +/- AUTO_CHECKIN_TOLERANCE_HOURS (Standard: 2h)
+ * als Konflikt abweist. Alle Testtermine teilen sich ueber
+ * testAppointmentTypeId() eine Art und kollidieren deshalb untereinander.
+ *
+ * Der Abstand ist damit NICHT frei waehlbar. Er war bis 2026-09-03 auf fuenf
+ * Stunden gesetzt, was vier Plaetze am Tag ergab; drei Stunden halten eine
+ * Stunde Puffer zur Toleranz und ergeben acht. Wird auch das knapp, ist der
+ * naechste Schritt eine eigene Terminart je Testtermin — die Toleranz gilt nur
+ * je Art, verschiedene Arten kollidieren nie.
+ *
+ * Die konkrete Uhrzeit wertet kein Test aus.
  */
 function createTodayAppointment(string $title): int
 {
-    // Jeder Testtermin bekommt eine eigene Uhrzeit, damit sie in der Liste
-    // unterscheidbar bleiben. Fuenf-Minuten-Raster statt volle Stunden: Mit
-    // stuendlichen Slots war bei fuenf Terminen Schluss, was die Suite beim
-    // Hinzufuegen weiterer Tests aus dem falschen Grund scheitern liess.
-    // Die konkrete Uhrzeit wertet kein Test aus.
     static $slot = 0;
-    $hour   = 1 + intdiv($slot, 12);
-    $minute = ($slot % 12) * 5;
-    $slot++;
-    assertTrue($hour < 24, 'Zu viele Testtermine an einem Tag');
+    $hour = 1 + ($slot++ * 3);
+    assertTrue($hour < 24,
+        'Zu viele Testtermine an einem Tag — siehe den Kommentar zum Toleranzfenster');
 
     $res = apiRequest('POST', 'appointments', [
         'token' => apiToken('admin'),
         'body'  => [
             'title'      => $title,
             'date'       => date('Y-m-d'),
-            'start_time' => sprintf('%02d:%02d:00', $hour, $minute),
+            'start_time' => sprintf('%02d:00:00', $hour),
             'type_id'    => testAppointmentTypeId(),
         ],
     ]);
@@ -552,7 +555,13 @@ function findRecord(int $appointmentId, int $memberId): ?array
     return null;
 }
 
-test('work_sessions: Start mit Termin erzeugt den Check-in (E4)', function () {
+test('work_sessions: Start mit Termin erzeugt KEINEN Check-in', function () {
+    // Umkehrung von E4 der Zeiterfassungs-Spec, entschieden am 2026-09-03:
+    // statistics.php liest records ohne Ruecksicht auf checkin_source, ein so
+    // erzeugter Eintrag zaehlte also in Anwesenheitsquote UND Puenktlichkeit.
+    // Der Terminbezug ist eine Aussage ueber den Aufwand, nicht ueber
+    // Anwesenheit. Schlaegt dieser Test fehl, wurde die Kopplung
+    // wiederhergestellt -- siehe OI-4 und die Spec vom selben Tag.
     enableWorktime();
     stopRunningIfAny();
 
@@ -567,15 +576,17 @@ test('work_sessions: Start mit Termin erzeugt den Check-in (E4)', function () {
         'body'  => ['action' => 'start', 'activity_id' => $activityId, 'appointment_id' => $appointmentId],
     ]));
 
-    $record = findRecord($appointmentId, $memberId);
-    assertTrue($record !== null, 'Der Timer-Start haette einen records-Eintrag anlegen muessen');
-    assertSame('timer', $record['checkin_source']);
+    assertSame(null, findRecord($appointmentId, $memberId),
+        'Der Timer-Start hat einen Anwesenheitseintrag erzeugt');
 
     stopRunningIfAny();
     apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
 });
 
-test('work_sessions: Start mit Termin ueberschreibt einen frueheren Check-in nicht (E4)', function () {
+test('work_sessions: Start mit Termin laesst einen bestehenden Check-in unberuehrt', function () {
+    // Nach dem Wegfall der Kopplung trivial erfuellt -- der Test bleibt, weil
+    // er die andere Richtung absichert: Ein Timer-Start darf eine vorhandene
+    // Anwesenheit auch nicht veraendern oder loeschen.
     enableWorktime();
     stopRunningIfAny();
 
@@ -1386,6 +1397,124 @@ test('work_sessions: Korrektur mit unbekanntem Termin wird abgewiesen', function
     assertStatus(400, $res);
 
     deleteSession($id);
+});
+
+// ---- Verknuepfung Taetigkeitsart <-> Terminart ------------------------------
+
+test('activity_types: eine neue Art ist unverknuepft und schraenkt nicht ein', function () {
+    enableWorktime();
+    $id = createActivityType('Unverknuepft ' . uniqid());
+
+    $res = apiRequest('GET', 'activity_types', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    assertSame([], $res['body']['appointment_type_ids'],
+        'Ohne Zuordnung wird ein leeres Array erwartet — das bedeutet: keine Einschraenkung');
+});
+
+test('activity_types: die Liste liefert appointment_type_ids mit', function () {
+    enableWorktime();
+    createActivityType('Listenfeld ' . uniqid());
+
+    $res = apiRequest('GET', 'activity_types', ['token' => apiToken('admin')]);
+    assertTrue(is_array($res['body']) && $res['body'] !== [], 'Liste erwartet');
+    assertTrue(array_key_exists('appointment_type_ids', $res['body'][0]),
+        'appointment_type_ids fehlt in der Liste');
+});
+
+test('activity_types: PUT verknuepft mit einer Terminart', function () {
+    enableWorktime();
+    $id     = createActivityType('Verknuepfen ' . uniqid());
+    $typeId = testAppointmentTypeId();
+
+    $res = apiRequest('PUT', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $id],
+        'body'  => [
+            'activity_name'        => 'Verknuepft ' . uniqid(),
+            'appointment_type_ids' => [$typeId],
+        ],
+    ]);
+    assertStatus(200, $res);
+
+    $get = apiRequest('GET', 'activity_types', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    assertSame([$typeId], $get['body']['appointment_type_ids']);
+});
+
+test('activity_types: PUT mit leerem Array loest die Verknuepfung', function () {
+    // Anders als bei group_ids ist das leere Array hier ZULAESSIG: Es bedeutet
+    // "keine Einschraenkung", nicht "fuer niemanden nutzbar".
+    enableWorktime();
+    $id     = createActivityType('Loesen ' . uniqid());
+    $typeId = testAppointmentTypeId();
+
+    apiRequest('PUT', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $id],
+        'body'  => ['activity_name' => 'Mit Termin', 'appointment_type_ids' => [$typeId]],
+    ]);
+
+    $res = apiRequest('PUT', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $id],
+        'body'  => ['activity_name' => 'Ohne Termin', 'appointment_type_ids' => []],
+    ]);
+    assertStatus(200, $res);
+
+    $get = apiRequest('GET', 'activity_types', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    assertSame([], $get['body']['appointment_type_ids']);
+});
+
+test('activity_types: PUT ohne das Feld laesst die Verknuepfung unangetastet', function () {
+    enableWorktime();
+    $id     = createActivityType('Unangetastet ' . uniqid());
+    $typeId = testAppointmentTypeId();
+
+    apiRequest('PUT', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $id],
+        'body'  => ['activity_name' => 'Mit Termin', 'appointment_type_ids' => [$typeId]],
+    ]);
+
+    // Nur den Namen aendern
+    apiRequest('PUT', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $id],
+        'body'  => ['activity_name' => 'Neuer Name ' . uniqid()],
+    ]);
+
+    $get = apiRequest('GET', 'activity_types', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    assertSame([$typeId], $get['body']['appointment_type_ids']);
+});
+
+test('activity_types: PUT mit unbekannter Terminart wird abgewiesen', function () {
+    enableWorktime();
+    $id = createActivityType('Unbekannte Art ' . uniqid());
+
+    $res = apiRequest('PUT', 'activity_types', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $id],
+        'body'  => ['activity_name' => 'Ungueltig', 'appointment_type_ids' => [999999]],
+    ]);
+    assertStatus(400, $res);
+});
+
+test('activity_types: POST mit Terminarten legt die Verknuepfung an', function () {
+    enableWorktime();
+    $typeId   = testAppointmentTypeId();
+    $groupIds = memberGroupIds(apiMemberId('user'));
+
+    $res = apiRequest('POST', 'activity_types', [
+        'token' => apiToken('admin'),
+        'body'  => [
+            'activity_name'        => 'Mit Terminart ' . uniqid(),
+            'group_ids'            => $groupIds,
+            'appointment_type_ids' => [$typeId],
+        ],
+    ]);
+    assertStatus(201, $res);
+    $id = trackCreated('activity_type', (int) $res['body']['id']);
+
+    $get = apiRequest('GET', 'activity_types', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    assertSame([$typeId], $get['body']['appointment_type_ids']);
 });
 test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
     enableWorktime();

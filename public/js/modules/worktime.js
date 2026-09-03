@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdmin, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear } from './ui.js';
 import { debug } from '../app.js';
-import { loadGroups } from './management.js';
+import { loadGroups, loadTypes } from './management.js';
 
 // ============================================
 // ZUSTAND
@@ -380,17 +380,43 @@ async function fillWorkSessionAppointments(session) {
         appointments = Array.isArray(result) ? result : [];
     }
 
-    const options = appointments
-        .slice()
-        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    // Eingrenzung auf die Terminarten der gewählten Tätigkeit. Leere Liste
+    // heißt keine Einschränkung — siehe renderActivityAppointmentTypes().
+    const activityId = document.getElementById('workSessionActivity')?.value;
+    const activity   = activityTypes.find(a => String(a.activity_id) === String(activityId));
+    const allowed    = (activity?.appointment_type_ids || []).map(Number);
+
+    let options = appointments.slice();
+
+    if (allowed.length) {
+        options = options.filter(a => allowed.includes(Number(a.type_id)));
+    }
+
+    // Nach Abstand zum Bezugsdatum: Man ordnet Arbeit einem Termin in ihrer
+    // Nähe zu. Bezug ist das eingetragene Startdatum, solange keines gesetzt
+    // ist, das heutige.
+    const startValue = document.getElementById('workSessionStart')?.value;
+    const reference  = startValue ? new Date(startValue) : new Date();
+    const refTime    = reference.getTime();
+
+    options.sort((a, b) => {
+        const da = Math.abs(new Date(String(a.date)).getTime() - refTime);
+        const db = Math.abs(new Date(String(b.date)).getTime() - refTime);
+        return da - db;
+    });
 
     const known = options.some(a => session && a.appointment_id == session.appointment_id);
 
+    // Der bereits zugeordnete Termin bleibt immer wählbar, auch wenn er aus
+    // einem anderen Jahr stammt oder nicht zu den Terminarten der Tätigkeit
+    // passt. Fiele er heraus, stünde das Feld auf „Kein Termin" und das
+    // Speichern löste die Zuordnung stillschweigend — derselbe Fallstrick wie
+    // bei der Mitgliedsauswahl in OI-16.
     if (session && session.appointment_id && !known) {
         options.unshift({
             appointment_id: session.appointment_id,
             date:           session.appointment_date || '',
-            title:          (session.appointment_title || 'Termin') + ' (anderes Jahr)',
+            title:          (session.appointment_title || 'Termin') + ' (zugeordnet)',
         });
     }
 
@@ -765,6 +791,9 @@ export async function openActivityTypeModal(activityId = null) {
     await loadGroups();
     renderActivityGroups(activity ? (activity.groups || []) : []);
 
+    await loadTypes();
+    renderActivityAppointmentTypes(activity ? (activity.appointment_type_ids || []) : []);
+
     modal.classList.add('active');
 }
 
@@ -785,6 +814,37 @@ function renderActivityGroups(selectedGroups) {
     `).join('');
 }
 
+/**
+ * Terminarten, auf die eine Tätigkeitsart eingegrenzt ist.
+ *
+ * Keine Auswahl bedeutet keine Einschränkung — nicht „für nichts nutzbar".
+ * Das ist die andere Semantik als bei den Gruppen darüber, und genau deshalb
+ * steht der Hinweis dazu im Formular.
+ */
+function renderActivityAppointmentTypes(selectedIds) {
+    const container = document.getElementById('activityAppointmentTypesList');
+    if (!container) return;
+
+    const selected = (selectedIds || []).map(Number);
+    const types = dataCache.types?.data || [];
+
+    if (!types.length) {
+        container.innerHTML =
+            '<em style="color: #7f8c8d;">Es sind noch keine Terminarten angelegt.</em>';
+        return;
+    }
+
+    container.innerHTML = types.map(type => `
+        <label style="display: block; padding: 8px; cursor: pointer; border-radius: 4px;">
+            <input type="checkbox"
+                   class="activity-appointment-type-checkbox"
+                   value="${type.type_id}"
+                   ${selected.includes(Number(type.type_id)) ? 'checked' : ''}>
+            <span style="margin-left: 8px;">${escapeHtml(type.type_name)}</span>
+        </label>
+    `).join('');
+}
+
 export function closeActivityTypeModal() {
     document.getElementById('activityTypeModal')?.classList.remove('active');
 }
@@ -801,7 +861,12 @@ export async function saveActivityType() {
         color: document.getElementById('activityTypeColor').value,
         verification: document.getElementById('activityTypeVerification').value,
         is_active: document.getElementById('activityTypeActive').checked ? 1 : 0,
-        group_ids: groupIds
+        group_ids: groupIds,
+        // Immer mitsenden, auch leer: Ein leeres Array löst die Eingrenzung und
+        // ist hier zulässig — es bedeutet „alle Termine", nicht „keine".
+        appointment_type_ids:
+            [...document.querySelectorAll('.activity-appointment-type-checkbox:checked')]
+                .map(cb => parseInt(cb.value, 10))
     };
 
     if (!body.activity_name) {
@@ -873,6 +938,26 @@ export function initWorktimeEventHandlers() {
         ?.addEventListener('click', () => runWorktimeReport('html'));
     document.getElementById('reportType')
         ?.addEventListener('change', updateWorktimeReportForm);
+
+    // Wechselt die Tätigkeitsart, ändert sich die Menge passender Termine.
+    // Die getroffene Auswahl überlebt den Neuaufbau: Sie wurde bewusst gesetzt
+    // und darf nicht daran scheitern, dass sie zur neuen Tätigkeit nicht passt.
+    document.getElementById('workSessionActivity')?.addEventListener('change', async () => {
+        const select = document.getElementById('workSessionAppointment');
+        if (!select) return;
+
+        const previous = select.selectedOptions[0]?.cloneNode(true);
+        const value    = select.value;
+
+        await fillWorkSessionAppointments(null);
+
+        if (value) {
+            if (!select.querySelector(`option[value="${value}"]`) && previous) {
+                select.add(previous, 1);
+            }
+            select.value = value;
+        }
+    });
 
     document.querySelectorAll('[data-report-range]').forEach(btn => {
         btn.addEventListener('click', () => setWorktimeReportRange(btn.dataset.reportRange));

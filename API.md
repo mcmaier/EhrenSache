@@ -849,13 +849,30 @@ Nicht-Admins sehen zusätzlich nur Arten mit `is_active = 1`.
     "verification": "start_end",
     "groups": [
       { "group_id": 1, "group_name": "Aktive" }
-    ]
+    ],
+    "appointment_type_ids": [2, 5]
   }
 ]
 ```
 
 `verification` steuert den Ortsnachweis: `none` (kein Code), `start` (Code beim
 Start) oder `start_end` (Code beim Start und beim Beenden).
+
+**Eingrenzung der Terminauswahl** (`activity_type_appointment_types`, seit 1.2.3).
+`appointment_type_ids` nennt die Terminarten, zu denen diese Tätigkeit passt; die Oberfläche
+bietet beim Erfassen dann nur solche Termine an. „Bühnenaufbau" zeigt so nur Konzerte, nicht
+jede Probe des Jahres.
+
+**Ein leeres Array bedeutet keine Einschränkung** — die Tätigkeitsart bietet alle Termine an.
+Das ist die **andere** Semantik als bei `groups`, wo eine fehlende Zuordnung „niemand" heißt.
+Der Unterschied liegt im Schaden der jeweils falschen Vorbelegung: Bei Gruppen wäre
+„leer = alle" eine stille Rechteausweitung, bei Terminarten wäre „leer = keine" eine
+Selbstblockade nach dem Update. Die Migration legt deshalb keine Zuordnungen an.
+
+Die Eingrenzung ist eine Erfassungshilfe, keine Rechteprüfung: Der Server nimmt einen
+Terminbezug auch dann an, wenn er nicht zu den verknüpften Terminarten passt. Ein bereits
+zugeordneter Termin bleibt in der Oberfläche deshalb wählbar, auch wenn er durch den Filter
+fällt — sonst löste ein Speichern die Zuordnung stillschweigend.
 
 ---
 
@@ -873,9 +890,18 @@ Start) oder `start_end` (Code beim Start und beim Beenden).
   "is_default": false,
   "is_active": true,
   "verification": "none",
-  "group_ids": [1, 2]
+  "group_ids": [1, 2],
+  "appointment_type_ids": [2, 5]
 }
 ```
+
+`group_ids` ist **erforderlich** und darf nicht leer sein — ohne Gruppe wäre die
+Tätigkeitsart für niemanden erfassbar. `appointment_type_ids` ist **optional**; fehlt es,
+bleibt die Art unverknüpft und bietet alle Termine an.
+
+Beim `PUT` gilt für beide Felder: Ein fehlendes Feld lässt die Zuordnung unangetastet. Ein
+leeres `group_ids` wird mit `400` abgewiesen, ein leeres `appointment_type_ids` dagegen
+angenommen — es löst die Eingrenzung. Eine unbekannte `type_id` ergibt `400`.
 
 ---
 
@@ -936,10 +962,17 @@ gekappt auf Start plus Obergrenze, Status `submitted`.
 und `force` möglich; `force` beendet ohne Ortsnachweis und setzt den Eintrag auf
 `submitted`, also freigabepflichtig.
 
-**Terminbezug:** Ist `appointment_id` gesetzt **und** der Termin heute, entsteht
-zugleich ein Anwesenheitseintrag mit `checkin_source = 'timer'`. Für einen
-künftigen Termin entsteht keiner — sonst gälte das Mitglied als anwesend bei
-etwas, das noch nicht stattgefunden hat.
+**Terminbezug:** `appointment_id` ordnet die Stunden einem Termin zu — für die Auswertung,
+was eine Veranstaltung an Arbeit gekostet hat.
+
+**Es entsteht dabei kein Anwesenheitseintrag.** Bis 1.2.2 legte ein Start mit einem Termin
+am selben Tag einen `records`-Eintrag mit `checkin_source = 'timer'` an. Das ist seit 1.2.3
+entfallen: Die Anwesenheitsauswertung liest `records` ohne Rücksicht auf `checkin_source`,
+ein so erzeugter Eintrag zählte also voll in Anwesenheitsquote und Pünktlichkeit. Wer
+morgens die Bühne für das Abendkonzert aufbaute, galt als anwesend und als Stunden zu früh.
+
+Damit gilt für alle Erfassungswege dasselbe: Kein Weg der Zeiterfassung erzeugt Anwesenheit.
+Wer beides festhalten will, nutzt zusätzlich den regulären Check-in.
 
 ---
 
