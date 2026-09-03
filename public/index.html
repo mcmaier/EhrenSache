@@ -304,6 +304,45 @@
                         </div>
                     </div>
 
+                    <!-- Anwesenheitserfassung -->
+                    <div class="settings-card">
+                        <h3>📍 Anwesenheitserfassung</h3>
+                        <div class="settings-item">
+                            <label class="checkbox-label">
+                                <input type="checkbox"
+                                    id="setting_checkin_auto_create_appointment"
+                                    class="setting-input"
+                                    data-key="checkin_auto_create_appointment">
+                                Termin automatisch anlegen
+                            </label>
+                            <small class="input-hint">
+                                Findet ein Check-in keinen passenden Termin, wird einer angelegt
+                                und als automatisch erzeugt markiert. Ist die Funktion aus, wird
+                                der Check-in abgelehnt und das Mitglied auf den Vorstand verwiesen.
+                                <strong>Zu bedenken:</strong> Ein so entstandener Termin zählt in
+                                der Statistik bei jedem Mitglied der zugehörigen Gruppen als
+                                Solltermin — wer nicht eingecheckt hat, erscheint dort als
+                                unentschuldigt abwesend.
+                                <em>Bestandsinstallationen starten mit „an", Neuinstallationen mit „aus".</em>
+                            </small>
+                        </div>
+                        <div class="settings-item">
+                            <label>Zeitfenster für die Zuordnung (Stunden)</label>
+                            <input type="number"
+                                id="setting_checkin_tolerance_hours"
+                                class="setting-input"
+                                data-key="checkin_tolerance_hours"
+                                min="0"
+                                max="8"
+                                step="1">
+                            <small class="input-hint">
+                                Wie weit ein Check-in zeitlich von einem Termin entfernt sein darf,
+                                um ihm zugeordnet zu werden. Derselbe Wert verhindert beim Anlegen
+                                von Terminen Dubletten derselben Terminart.
+                            </small>
+                        </div>
+                    </div>
+
                     <!-- Zeiterfassung -->
                     <div class="settings-card">
                         <h3>⏱️ Zeiterfassung</h3>
@@ -514,6 +553,14 @@
                         <select id="appointmentYearFilter"
                                 style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
                         </select>
+                    </div>
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
+                        <h3>Automatisch erzeugte</h3>
+                        <label class="checkbox-label" style="font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="appointmentAutoFilter"
+                                   onchange="showAppointmentSection(false, 1)">
+                            Nur diese anzeigen
+                        </label>
                     </div>
                 </div>
 

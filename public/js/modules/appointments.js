@@ -80,7 +80,15 @@ export async function showAppointmentSection(forceReload = false, page = 1)
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'termine')
     {
-        renderAppointments(appointmentData,page);
+        // Der Filter arbeitet auf den bereits geladenen Daten. Ein eigener
+        // Serverparameter waere hier ohne Gewinn: Die Termine eines Jahres
+        // liegen ohnehin vollstaendig im Cache.
+        const nurAuto = document.getElementById('appointmentAutoFilter')?.checked;
+        const gefiltert = nurAuto
+            ? (appointmentData || []).filter(a => Number(a.is_auto_created) === 1)
+            : appointmentData;
+
+        renderAppointments(gefiltert, page);
     }
 }
 
@@ -123,9 +131,16 @@ async function renderAppointments(appointments, page = 1) {
         // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (apt.appointment_id && apt.title) {
+            // Ein vom Check-in erzeugter Termin ist von einem geplanten nicht zu
+            // unterscheiden — er zaehlt aber genauso in die Anwesenheitsstatistik.
+            const autoBadge = Number(apt.is_auto_created) === 1
+                ? ' <span class="type-badge" style="background: #95a5a6; color: white;" '
+                  + 'title="Beim Check-in automatisch angelegt">🤖 automatisch</span>'
+                : '';
+
             appointmentInfo = `<div style="line-height: 1.4;">
-                <strong>${apt.title}</strong>`;
-            
+                <strong>${apt.title}</strong>${autoBadge}`;
+
             if (apt.date && apt.start_time) {
                 const aptDate = new Date(apt.date + 'T00:00:00');
                 const formattedAptDate = aptDate.toLocaleDateString('de-DE');
@@ -623,3 +638,4 @@ window.deleteAppointment = deleteAppointment;
 window.previousMonth = previousMonth;
 window.nextMonth = nextMonth;
 window.goToToday = goToToday;
+window.showAppointmentSection = showAppointmentSection;
