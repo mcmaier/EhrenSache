@@ -50,9 +50,13 @@ durchschlägt.
 | [FI-11](#fi-11--mehrsprachigkeit-der-oberfläche) | Mehrsprachigkeit der Oberfläche | niedrig | L | — |
 | [FI-12](#fi-12--material--und-instrumentenausleihe) | Material- und Instrumentenausleihe | niedrig | L | — |
 | [FI-13](#fi-13--geburtstagsliste-mit-gratulationsvermerk) | Geburtstagsliste mit Gratulationsvermerk | mittel | M | — |
+| [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht | mittel¹ | M | FI-1 für die Wirkung |
 
-FI-1 bis FI-5 und FI-13 stammen aus der Ideensammlung, FI-6 bis FI-12 sind Ergänzungen aus
-der Sichtung des Bestands.
+¹ hoch in Kombination mit [FI-1](#fi-1--terminzusage-im-vorfeld), für sich allein mittel.
+
+FI-1 bis FI-5, FI-13 und FI-14 stammen aus der Ideensammlung, FI-6 bis FI-12 sind Ergänzungen
+aus der Sichtung des Bestands. Die Nummern folgen dem Eingang, die Abschnitte dem Thema —
+deshalb steht FI-14 unter A und nicht am Ende.
 
 ---
 
@@ -108,6 +112,60 @@ Auswertungsspalte.
 ist eine Bewertung von Personen und keine Betriebsstatistik mehr. Im Ehrenamt kann das
 Stimmung kosten. Möglicherweise nur aggregiert je Termin und je Gruppe zeigen, personenbezogen
 nur dem Mitglied selbst — dieselbe Abwägung, die `my_data` schon einmal getroffen hat.
+
+---
+
+### FI-14 · Untergruppen (Register) und Besetzungsübersicht
+**Nutzen:** mittel — hoch zusammen mit [FI-1](#fi-1--terminzusage-im-vorfeld) · **Aufwand:** M
+
+Feinere Gliederung unterhalb der Gruppe: im Musikverein das Register (Klarinette, Trompete,
+Schlagzeug), im Sportverein die Mannschaft. Zusammen mit der Zusage ergibt das die eigentlich
+interessante Auskunft vor einem Auftritt: nicht „38 von 55 haben zugesagt", sondern „Klarinette
+3 von 6, Horn 0 von 2" — also die Frage, ob das Stück überhaupt spielbar ist.
+
+**Warum interessant:** Eine reine Kopfzahl beantwortet die Besetzungsfrage nicht. Fehlen zehn
+Beliebige, geht die Probe; fehlt die einzige Tuba, klingt sie nicht. Das ist der Punkt, an dem
+[FI-1](#fi-1--terminzusage-im-vorfeld) von einer Umfrage zu einem Planungswerkzeug wird.
+
+**Wichtig vorweg: Register gehen heute schon — flach.** `member_group_assignments` ist eine
+M:N-Tabelle, ein Mitglied kann also bereits jetzt in „Blasorchester" **und** „Klarinette"
+stehen. Die Frage ist deshalb nicht, ob Register abbildbar sind, sondern ob eine echte
+Hierarchie den Preis wert ist. Drei Stufen, aufsteigend:
+
+| Variante | Was sie kostet | Was sie kann |
+|---|---|---|
+| **A: gar nichts** — Register als gewöhnliche Gruppe | nichts | Zuordnung und Filter. Keine Auswertung „nach Register", weil nichts weiß, welche Gruppen Register sind |
+| **B: Gruppenart** — ein Feld `group_kind` (z. B. Ensemble / Register) | eine Spalte, eine Migration, etwas Oberfläche | Besetzungsansicht gruppiert nach Register, ohne dass irgendeine bestehende Logik sich ändert |
+| **C: echte Hierarchie** — `parent_group_id` in `member_groups` | schlägt in Terminarten-Zuordnung, Sichtbarkeitsprüfung, Cross-Filtering, Statistik, Import/Export durch | Vererbung: ein Termin für das Orchester erreicht alle Register automatisch |
+
+Variante B löst den genannten Anwendungsfall vollständig und ist ein Bruchteil des Aufwands von
+C. C lohnt erst, wenn Vererbung wirklich gebraucht wird — und die zieht Folgefragen nach sich,
+die heute niemand stellt (siehe unten).
+
+**Berührt:** `member_groups` (Migration) · `member_groups.php` · `management.js` ·
+Statistik und Filterleisten · bei Variante C zusätzlich `appointment_type_groups`,
+`hasStatisticsGroupAccess()` und die Cross-Filtering-Logik aus
+`docs/superpowers/specs/2026-04-15-dropdown-cross-filtering-design.md`.
+
+**Vorher zu klären:**
+
+- **Wieviel Hierarchie wirklich?** Siehe Tabelle. Wer C baut, muss beantworten: Erbt eine
+  Untergruppe die Terminarten der Obergruppe? Sieht ein Nutzer mit Zugriff auf das Register auch
+  die Orchesterdaten — oder umgekehrt? Zählt eine Statistik über das Orchester die
+  Registermitglieder mit? Jede dieser Antworten ist für sich vertretbar, aber sie müssen
+  zusammenpassen.
+- **Mehrfachzugehörigkeit und Doppelzählung.** Wer Klarinette und Saxophon spielt, steht in
+  beiden Registern — und wird in einer Besetzungsübersicht zweimal gezählt. Es braucht also
+  entweder ein Hauptregister je Mitglied oder eine Übersicht, die das offen ausweist. Das ist
+  der Punkt, an dem die Zahl sonst still falsch wird.
+- **Sollstärke je Register.** „3 von 6" setzt voraus, dass irgendwo 6 steht. Ist das die Zahl
+  der zugeordneten Mitglieder oder eine gepflegte Mindestbesetzung? Ersteres ist geschenkt,
+  Letzteres aussagekräftiger und ein weiteres Pflegefeld.
+- **Reihenfolge.** Register sind in der Partitur geordnet (Flöte, Klarinette, … Schlagzeug),
+  nicht alphabetisch. Für eine Besetzungsansicht, die man ernst nimmt, braucht die Gruppe ein
+  Sortierfeld.
+- **Ohne FI-1 bleibt es Kosmetik.** Für sich allein ist eine Registergliederung nur eine andere
+  Sortierung der Mitgliederliste. Der Nutzen entsteht mit den Zusagen.
 
 ---
 
@@ -394,6 +452,9 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung:
 2. **FI-1 Terminzusage** — das eine Feature mit Wettbewerbswirkung. Vorher muss die Frage zu
    `exceptions` entschieden sein.
 3. **FI-2 Abgleich** — fällt danach fast von selbst an.
+   **FI-14 Register** gehört in dieselbe Runde wie FI-1: Die Besetzungsansicht ist der Grund,
+   warum die Zusagen mehr sind als eine Anwesenheitsprognose. In der kleinen Variante (Gruppenart
+   statt Hierarchie) ist sie fast kostenlos.
 4. **FI-7 Terminserien** und **FI-8 ICS** — unabhängig, klein, jederzeit dazwischen möglich;
    FI-8 ist die günstigste Idee der Liste.
 5. **FI-4 Auth-Geräte**, dann **FI-5 PIN**, dann **FI-3 GPS** — die Check-in-Wege gemeinsam
