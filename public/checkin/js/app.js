@@ -639,14 +639,6 @@ async function checkAutoLogin() {
     }
 }
 
-//=========================================
-// ERROR DISPLAY
-// ========================================
-function showError(message) {
-    elements.loginError.textContent = message;
-    elements.loginError.classList.add('active');
-}
-
 // ========================================
 // TOGGLE TOKEN LOGIN
 // ========================================
