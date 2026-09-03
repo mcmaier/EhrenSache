@@ -950,6 +950,22 @@ Ein Nachtrag durch das Mitglied selbst landet in `submitted` und braucht eine
 Freigabe; ein Nachtrag durch Admin oder Manager gilt sofort. Löschen darf nur
 der Admin. Jede Änderung wird in `work_session_log` protokolliert.
 
+**Terminbezug (`appointment_id`)**
+
+Optional bei `POST` und `PUT`. Beim `PUT` entscheidet die Anwesenheit des Feldes im Payload:
+
+| Payload | Wirkung |
+|---|---|
+| `appointment_id` fehlt | Der bestehende Terminbezug bleibt unverändert |
+| `appointment_id: <id>` | Zuordnung auf diesen Termin; unbekannte ID ergibt `400` |
+| `appointment_id: null` (oder leer) | Die Zuordnung wird gelöst |
+
+**Ein Nachtrag erzeugt keinen Anwesenheitseintrag** — auch nicht bei der Freigabe. Arbeit für
+einen Termin ist keine Anwesenheit bei ihm: Wer den Bühnenaufbau nachträgt, war nicht
+notwendig beim Konzert. Zudem ist ein Nachtrag bis zur Freigabe eine ungeprüfte Behauptung.
+Den `records`-Eintrag erzeugt allein der Timer-Start (`action: 'start'`), und auch dort nur,
+wenn der Termin am selben Tag liegt.
+
 ---
 
 ### Meldungstexte sind eine Schnittstelle

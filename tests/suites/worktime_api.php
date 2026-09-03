@@ -511,8 +511,15 @@ function testAppointmentTypeId(): int
  */
 function createTodayAppointment(string $title): int
 {
+    // Jeder Testtermin bekommt eine eigene Uhrzeit, damit sie in der Liste
+    // unterscheidbar bleiben. Fuenf-Minuten-Raster statt volle Stunden: Mit
+    // stuendlichen Slots war bei fuenf Terminen Schluss, was die Suite beim
+    // Hinzufuegen weiterer Tests aus dem falschen Grund scheitern liess.
+    // Die konkrete Uhrzeit wertet kein Test aus.
     static $slot = 0;
-    $hour = 1 + ($slot++ * 5);
+    $hour   = 1 + intdiv($slot, 12);
+    $minute = ($slot % 12) * 5;
+    $slot++;
     assertTrue($hour < 24, 'Zu viele Testtermine an einem Tag');
 
     $res = apiRequest('POST', 'appointments', [
@@ -520,7 +527,7 @@ function createTodayAppointment(string $title): int
         'body'  => [
             'title'      => $title,
             'date'       => date('Y-m-d'),
-            'start_time' => sprintf('%02d:00:00', $hour),
+            'start_time' => sprintf('%02d:%02d:00', $hour, $minute),
             'type_id'    => testAppointmentTypeId(),
         ],
     ]);
@@ -1247,6 +1254,136 @@ test('export: eine Notiz mit Markup wird im Bericht maskiert', function () {
     assertTrue(strpos($res['raw'], $payload) === false, 'Rohes Markup im Bericht gefunden');
     assertTrue(strpos($res['raw'], '&lt;script&gt;alert(1)&lt;/script&gt;') !== false,
         'Maskierte Notiz nicht gefunden');
+
+    deleteSession($id);
+});
+
+// ---- Terminbezug bei Nachtrag und Korrektur ---------------------------------
+
+test('work_sessions: Nachtrag mit Termin traegt den Terminbezug', function () {
+    enableWorktime();
+    $activityId    = createActivityType('Terminbezug ' . uniqid());
+    $appointmentId = createTodayAppointment('Nachtrag-Termin ' . uniqid());
+
+    $res = createManualSession('user', $activityId, ['appointment_id' => $appointmentId]);
+    assertStatus(201, $res);
+    $id = (int) $res['body']['session']['session_id'];
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertSame($appointmentId, (int) $get['body']['appointment_id']);
+
+    deleteSession($id);
+    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+});
+
+test('work_sessions: Nachtrag mit Termin erzeugt KEINEN Anwesenheitseintrag', function () {
+    // Bewusste Entscheidung, nicht bloss aktuelles Verhalten: Arbeit fuer einen
+    // Termin ist keine Anwesenheit bei ihm, und ein Nachtrag ist bis zur
+    // Freigabe eine ungepruefte Behauptung. Den Check-in erzeugt allein der
+    // Timer-Start. Schlaegt dieser Test fehl, wurde die Entscheidung
+    // zurueckgenommen -- siehe OI-4 in docs/OPEN-ITEMS.md.
+    enableWorktime();
+    $activityId    = createActivityType('Kein Checkin ' . uniqid());
+    $appointmentId = createTodayAppointment('Ohne Checkin ' . uniqid());
+    $memberId      = apiMemberId('user');
+
+    assertSame(null, findRecord($appointmentId, $memberId), 'Vorbedingung: noch kein Eintrag');
+
+    $id = (int) createManualSession('user', $activityId,
+        ['appointment_id' => $appointmentId])['body']['session']['session_id'];
+
+    assertSame(null, findRecord($appointmentId, $memberId),
+        'Der Nachtrag hat einen Anwesenheitseintrag erzeugt');
+
+    // Auch die Freigabe darf keinen erzeugen.
+    apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'),
+        'query' => ['id' => $id],
+        'body'  => ['action' => 'approve'],
+    ]);
+    assertSame(null, findRecord($appointmentId, $memberId),
+        'Die Freigabe hat einen Anwesenheitseintrag erzeugt');
+
+    deleteSession($id);
+    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+});
+
+test('work_sessions: Korrektur traegt einen Termin nach', function () {
+    enableWorktime();
+    $activityId    = createActivityType('Nachtragen ' . uniqid());
+    $appointmentId = createTodayAppointment('Spaeter zugeordnet ' . uniqid());
+
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    $res = apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'),
+        'query' => ['id' => $id],
+        'body'  => ['appointment_id' => $appointmentId],
+    ]);
+    assertStatus(200, $res);
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    assertSame($appointmentId, (int) $get['body']['appointment_id']);
+
+    deleteSession($id);
+    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+});
+
+test('work_sessions: Korrektur mit leerem Termin loest die Zuordnung', function () {
+    enableWorktime();
+    $activityId    = createActivityType('Loesen ' . uniqid());
+    $appointmentId = createTodayAppointment('Wieder geloest ' . uniqid());
+
+    $id = (int) createManualSession('user', $activityId,
+        ['appointment_id' => $appointmentId])['body']['session']['session_id'];
+
+    apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'),
+        'query' => ['id' => $id],
+        'body'  => ['appointment_id' => null],
+    ]);
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    assertSame(null, $get['body']['appointment_id']);
+
+    deleteSession($id);
+    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+});
+
+test('work_sessions: Korrektur ohne Terminfeld laesst den Termin unangetastet', function () {
+    enableWorktime();
+    $activityId    = createActivityType('Unangetastet ' . uniqid());
+    $appointmentId = createTodayAppointment('Bleibt ' . uniqid());
+
+    $id = (int) createManualSession('user', $activityId,
+        ['appointment_id' => $appointmentId])['body']['session']['session_id'];
+
+    // Nur die Pause aendern -- appointment_id kommt gar nicht mit.
+    apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'),
+        'query' => ['id' => $id],
+        'body'  => ['break_minutes' => 20],
+    ]);
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    assertSame($appointmentId, (int) $get['body']['appointment_id']);
+    assertSame(20, (int) $get['body']['break_minutes']);
+
+    deleteSession($id);
+    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+});
+
+test('work_sessions: Korrektur mit unbekanntem Termin wird abgewiesen', function () {
+    enableWorktime();
+    $activityId = createActivityType('Unbekannt ' . uniqid());
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    $res = apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'),
+        'query' => ['id' => $id],
+        'body'  => ['appointment_id' => 999999],
+    ]);
+    assertStatus(400, $res);
 
     deleteSession($id);
 });

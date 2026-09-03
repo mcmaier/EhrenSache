@@ -355,6 +355,59 @@ export async function deleteWorkSession(sessionId) {
 // MANUELLER EINTRAG / KORREKTUR
 // ============================================
 
+/**
+ * Füllt die Terminauswahl des Nachtrag-Modals.
+ *
+ * Angeboten werden die Termine des gewählten Jahres, absteigend nach Datum —
+ * ein Nachtrag betrifft in aller Regel Vergangenes. Die PWA schränkt auf den
+ * heutigen Tag ein; hier entsteht diese Beschränkung bewusst gar nicht erst,
+ * denn Vorbereitungsarbeit für eine spätere Veranstaltung ist der Normalfall.
+ *
+ * Derselbe Fallstrick wie bei der Mitgliedsauswahl (siehe OI-16): Trägt eine
+ * bestehende Sitzung einen Termin, der nicht in der Liste steht — etwa aus
+ * einem anderen Jahr —, stünde das Feld auf „Kein Termin" und das Speichern
+ * löste die Zuordnung stillschweigend. Der Termin der geladenen Sitzung wird
+ * deshalb immer aufgenommen.
+ */
+async function fillWorkSessionAppointments(session) {
+    const select = document.getElementById('workSessionAppointment');
+    if (!select) return;
+
+    let appointments = dataCache.appointments?.[currentYear]?.data || [];
+
+    if (!appointments.length) {
+        const result = await apiCall('appointments', 'GET', null, { year: currentYear });
+        appointments = Array.isArray(result) ? result : [];
+    }
+
+    const options = appointments
+        .slice()
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+    const known = options.some(a => session && a.appointment_id == session.appointment_id);
+
+    if (session && session.appointment_id && !known) {
+        options.unshift({
+            appointment_id: session.appointment_id,
+            date:           session.appointment_date || '',
+            title:          (session.appointment_title || 'Termin') + ' (anderes Jahr)',
+        });
+    }
+
+    select.innerHTML = '<option value="">Kein Termin</option>'
+        + options.map(a => {
+            const datum = a.date ? formatDateShort(a.date) : '';
+            return `<option value="${a.appointment_id}">`
+                 + `${escapeHtml(datum)} — ${escapeHtml(a.title || '(ohne Titel)')}</option>`;
+        }).join('');
+}
+
+/** Datum als TT.MM.JJJJ, ohne Zeitzonenversatz. */
+function formatDateShort(isoDateString) {
+    const parts = String(isoDateString).slice(0, 10).split('-');
+    return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : String(isoDateString);
+}
+
 export async function openWorkSessionModal(sessionId = null) {
     const modal = document.getElementById('workSessionModal');
     if (!modal) return;
@@ -412,8 +465,11 @@ export async function openWorkSessionModal(sessionId = null) {
         memberGroup.style.display = 'none';
     }
 
+    await fillWorkSessionAppointments(session);
+
     if (session) {
         document.getElementById('workSessionActivity').value = session.activity_id;
+        document.getElementById('workSessionAppointment').value = session.appointment_id || '';
         document.getElementById('workSessionStart').value = toLocalInput(session.start_time);
         document.getElementById('workSessionEnd').value = toLocalInput(session.end_time);
         document.getElementById('workSessionBreak').value = session.break_minutes || 0;
@@ -424,6 +480,7 @@ export async function openWorkSessionModal(sessionId = null) {
         document.getElementById('workSessionEnd').value = '';
         document.getElementById('workSessionBreak').value = 0;
         document.getElementById('workSessionNote').value = '';
+        document.getElementById('workSessionAppointment').value = '';
     }
 
     modal.classList.add('active');
@@ -460,6 +517,14 @@ export async function saveWorkSession() {
     if (isAdminOrManager && memberSelect && memberSelect.value) {
         body.member_id = parseInt(memberSelect.value, 10);
     }
+
+    // Immer mitsenden, auch leer: Der Server unterscheidet „Feld nicht dabei"
+    // (Termin bleibt) von „Feld leer" (Zuordnung wird gelöst). Ohne das ließe
+    // sich ein einmal gesetzter Termin nicht mehr entfernen.
+    const appointmentSelect = document.getElementById('workSessionAppointment');
+    body.appointment_id = appointmentSelect && appointmentSelect.value
+        ? parseInt(appointmentSelect.value, 10)
+        : null;
 
     if (!body.start_time || !body.end_time) {
         showToast('Beginn und Ende sind erforderlich', 'error');

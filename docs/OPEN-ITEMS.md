@@ -85,20 +85,46 @@ ein Admin ihn freigibt.
 **Priorität:** mittel
 
 Backend ist fertig (`7e9ec6a`): `worktimeByAppointment()`, Export `worktime_appointment`, und
-der Check-in entsteht nur noch, wenn der Termin heute ist. Es fehlt:
+der Check-in entsteht nur noch, wenn der Termin heute ist.
 
-- **Terminfeld im Dashboard-Nachtrag.** `saveWorkSession()` sendet kein `appointment_id`; das
-  Modal hat kein Feld. Der Server akzeptiert es. Deshalb steht in der Spalte „Termin" bei jedem
-  im Dashboard erfassten Eintrag „—".
+**Erledigt am 2026-09-03**
+
+- **Terminfeld im Dashboard-Nachtrag.** Das Modal hat ein optionales Feld, `saveWorkSession()`
+  sendet `appointment_id`. Angeboten werden die Termine des gewählten Jahres, absteigend nach
+  Datum — die Beschränkung auf „heute" entsteht hier bewusst gar nicht erst.
+  Dabei fiel auf, dass `workSessionUpdate()` `appointment_id` überhaupt nicht verarbeitete:
+  Beim **Bearbeiten** wäre die Auswahl stillschweigend verworfen worden. Der Update-Pfad setzt
+  das Feld jetzt, und ein leer gesendetes Feld löst die Zuordnung wieder — sonst ließe sich ein
+  einmal gesetzter Termin nie mehr entfernen. Fehlt das Feld im Payload, bleibt der Termin
+  unangetastet.
+- **Zugang zum Termin-Bericht.** Der Berichtsdialog aus 1.2.2 bietet „Summen nach Termin" als
+  CSV und als Druckansicht. Ein dritter Knopf war damit nicht mehr nötig.
+
+**Kein automatischer Check-in aus einem Nachtrag** — bewusst entschieden am 2026-09-03:
+
+Arbeit *für* einen Termin ist keine Anwesenheit *bei* ihm. Wer den Bühnenaufbau nachträgt, war
+nicht notwendig beim Konzert. Hinzu kommt: Ein Nachtrag ist bis zur Freigabe eine ungeprüfte
+Behauptung; ein daraus erzeugter Check-in umginge genau die Prüfung, die für die Stunden selbst
+verlangt wird. Den `records`-Eintrag erzeugt deshalb weiterhin allein der Timer-Start
+(`workSessionStart()`), und auch die Freigabe erzeugt keinen. Zwei Tests halten das fest.
+
+**Offen bleibt**
+
 - **PWA bietet nur heutige Termine an.** `loadWorktimeAppointments()` fragt `from_date = to_date
   = heute` ab. An Tagen ohne Termin wirkt das Feld funktionslos. Vorbereitungsarbeit für eine
-  spätere Veranstaltung lässt sich gar nicht zuordnen.
-- **Dritter Export-Knopf** für `worktime_appointment` fehlt im Dashboard.
+  spätere Veranstaltung lässt sich dort weiterhin nicht zuordnen — im Dashboard inzwischen schon.
+- **Der Datumsschutz trifft die Sache nur ungefähr.** Der Timer erzeugt den Check-in, sobald der
+  Termin heute ist. Wer am Konzerttag drei Stunden Bühne aufbaut und vor Beginn geht, gilt damit
+  als beim Konzert anwesend — derselbe Fehler, den der Schutz für den Vortag verhindert, nur
+  einen Tag später. Die Unterscheidung gehört an die **Art** des Termins, nicht an sein Datum:
+  ein Arbeitsdienst ist Anwesenheit, eine Veranstaltung nicht. Erwogen wurde ein Flag an
+  `appointment_types` (dort stehen heute nur `type_name`, `description`, `is_default`, `color`)
+  mit einem Vorgabewert, der das bisherige Verhalten beibehält. Zurückgestellt: eigener Umfang
+  mit Migration, und der Nachtrag löst den dringenderen Teil bereits.
 
-**Teilweise erledigt am 2026-09-02:** Die Auswahl war zusätzlich schlicht leer, weil sie nur
-beim Öffnen des Antragsdialogs befüllt wurde, und das Tagesdatum kam aus UTC — abends ab 22:00
-MESZ zeigte sie den Folgetag. Beides behoben (`d7ee191`). Die Beschränkung auf den heutigen Tag
-ist davon unberührt und bleibt offen.
+**Teilweise erledigt am 2026-09-02:** Die Auswahl in der PWA war zusätzlich schlicht leer, weil
+sie nur beim Öffnen des Antragsdialogs befüllt wurde, und das Tagesdatum kam aus UTC — abends ab
+22:00 MESZ zeigte sie den Folgetag. Beides behoben (`d7ee191`).
 
 ---
 

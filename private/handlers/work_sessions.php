@@ -715,17 +715,47 @@ function workSessionUpdate($db, $database, $id, $data, $authUserId, $authMemberI
         return;
     }
 
+    // Terminbezug: Nur anfassen, wenn das Feld mitgesendet wurde. Ein leerer
+    // Wert loest die Zuordnung -- sonst liesse sich ein einmal gesetzter Termin
+    // nie wieder entfernen.
+    //
+    // Es entsteht dabei KEIN Anwesenheitseintrag. Arbeit fuer einen Termin ist
+    // keine Anwesenheit bei ihm: Wer den Buehnenaufbau nachtraegt, war nicht
+    // notwendig beim Konzert. Ausserdem ist ein Nachtrag bis zur Freigabe eine
+    // ungepruefte Behauptung -- ein Check-in daraus umginge genau die Pruefung,
+    // die fuer die Stunden selbst verlangt wird. Den Check-in erzeugt allein
+    // der Timer-Start, siehe workSessionStart().
+    $appointmentId = $before['appointment_id'];
+
+    if(property_exists($data, 'appointment_id')) {
+        if(empty($data->appointment_id)) {
+            $appointmentId = null;
+        } else {
+            $stmt = $db->prepare("SELECT appointment_id FROM {$prefix}appointments
+                                  WHERE appointment_id = ?");
+            $stmt->execute([(int)$data->appointment_id]);
+
+            if(!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                http_response_code(400);
+                echo json_encode(["message" => "Unknown appointment_id"]);
+                return;
+            }
+            $appointmentId = (int)$data->appointment_id;
+        }
+    }
+
     // Eine Aenderung durch das Mitglied entzieht die Bestaetigung.
     // Manager und Admin sind die freigebende Instanz und muessen sich
     // nicht selbst genehmigen.
     $newStatus = $isApprover ? $before['status'] : 'submitted';
 
     $db->prepare("UPDATE {$prefix}work_sessions
-                  SET activity_id = ?, start_time = ?, end_time = ?,
+                  SET activity_id = ?, appointment_id = ?, start_time = ?, end_time = ?,
                       break_minutes = ?, note = ?, status = ?
                   WHERE session_id = ?")
        ->execute([
            (int)$input['activity_id'],
+           $appointmentId,
            date('Y-m-d H:i:s', strtotime((string)$input['start_time'])),
            date('Y-m-d H:i:s', strtotime((string)$input['end_time'])),
            (int)$input['break_minutes'],

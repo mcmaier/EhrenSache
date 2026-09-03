@@ -21,6 +21,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   und „Laufendes Jahr". Er ersetzt die beiden bisherigen Export-Knöpfe und macht die Auswertung
   nach Termin erstmals über die Oberfläche erreichbar
 - `public/css/print.css` — das Projekt hatte bisher kein Print-Stylesheet
+- **Terminfeld beim Nachtragen von Zeiten** im Dashboard. Damit füllt sich die Spalte „Termin"
+  auch für Einträge, die nicht über die PWA entstanden sind — und der Bericht „nach Termin"
+  beantwortet erstmals vollständig, was eine Veranstaltung an Arbeit gekostet hat.
+  Die Zuordnung erzeugt **keinen** Anwesenheitseintrag: Arbeit für einen Termin ist keine
+  Anwesenheit bei ihm, und ein Nachtrag ist bis zur Freigabe eine ungeprüfte Behauptung. Den
+  Check-in erzeugt weiterhin allein der Timer-Start
 
 ### Geändert
 - Dateinamen der Exporte tragen den Zeitraum: `stundennachweis_2026-01.csv` statt
@@ -29,6 +35,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Die Summenzeile der CSV nennt den Zeitraum, über den sie gebildet wurde
 - Der Zeitraumvergleich nutzt `>=` und `< Ende + 1 Tag` statt `YEAR(start_time)`. Das ist
   indextauglich und verliert keine Sitzung mehr, die am letzten Tag nach Mitternacht beginnt
+
+### Behoben
+- Die Korrektur einer Arbeitszeitsitzung verarbeitete `appointment_id` nicht. Ein über die API
+  mitgesendeter Terminbezug wurde beim Bearbeiten stillschweigend verworfen; ein einmal
+  gesetzter Termin ließ sich weder ändern noch entfernen
 
 ### Sicherheit
 - Jeder Wert der Druckansicht wird maskiert. Notizen und Ortsnamen stammen aus der PWA, also

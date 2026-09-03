@@ -665,6 +665,38 @@ php tests/run.php worktime_api
 
 ---
 
+## Terminbezug beim Nachtragen (ab 1.2.2)
+
+### Automatisiert
+
+```bash
+php tests/run.php worktime_api
+```
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| TB-1 | Nachtrag mit `appointment_id` | Sitzung trägt den Termin |
+| TB-2 | Nachtrag mit Termin, danach Freigabe | **kein** `records`-Eintrag, weder beim Anlegen noch bei der Freigabe |
+| TB-3 | Korrektur trägt einen Termin nach | Termin gesetzt |
+| TB-4 | Korrektur mit leerem `appointment_id` | Zuordnung gelöst |
+| TB-5 | Korrektur ohne das Feld im Payload | Termin bleibt unangetastet |
+| TB-6 | Korrektur mit unbekanntem `appointment_id` | `400` |
+
+### Manuell (Dashboard)
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| TB-M1 | „Zeit nachtragen" öffnen | Feld „Termin" mit „Kein Termin" vorbelegt, darunter der Hinweis, dass kein Anwesenheitseintrag entsteht |
+| TB-M2 | Terminliste aufklappen | Termine des gewählten Jahres, neueste zuerst, mit Datum im Eintrag |
+| TB-M3 | Nachtrag mit Termin speichern, Liste prüfen | Spalte „Termin" zeigt den Titel statt „—" |
+| TB-M4 | Denselben Eintrag erneut öffnen | Der Termin ist vorausgewählt |
+| TB-M5 | Termin auf „Kein Termin" setzen und speichern | Spalte zeigt wieder „—" |
+| TB-M6 | Anwesenheitsliste des Termins prüfen | **kein** Eintrag für dieses Mitglied entstanden |
+| TB-M7 | Bericht „Summen nach Termin" | Die nachgetragenen Stunden erscheinen unter dem Termin, nicht mehr unter „(ohne Termin)" |
+| TB-M8 | Jahresfilter auf ein anderes Jahr stellen, Eintrag mit Termin aus dem Vorjahr öffnen | Der Termin steht mit dem Zusatz „(anderes Jahr)" in der Liste und bleibt vorausgewählt — er darf beim Speichern nicht verlorengehen |
+
+---
+
 ## Gruppenbindung der Tätigkeitsarten (ab 1.2.1)
 
 **Vorbereitung:** Zwei Gruppen anlegen, das Testmitglied nur einer davon zuordnen.
