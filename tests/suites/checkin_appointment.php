@@ -330,3 +330,70 @@ test('Von Hand angelegter Termin traegt is_auto_created nicht', function () {
         'Die Markierung darf sich nicht ueber die Termin-API setzen lassen — '
         . 'sonst waere sie faelschbar und damit wertlos');
 });
+
+test('scope=client liefert genau die Whitelist an eine Rolle user', function () {
+    $res = apiRequest('GET', 'settings', [
+        'token' => apiToken('user'),
+        'query' => ['scope' => 'client'],
+    ]);
+
+    assertStatus(200, $res, 'Rolle user muss die Client-Einstellungen lesen duerfen');
+
+    $keys = array_keys($res['body']['settings'] ?? []);
+    sort($keys);
+
+    assertSame(
+        ['checkin_auto_create_appointment', 'checkin_tolerance_hours'],
+        $keys,
+        'Es duerfen ausschliesslich die zwei freigegebenen Schluessel erscheinen'
+    );
+});
+
+test('settings ohne scope bleibt Administratoren vorbehalten', function () {
+    $res = apiRequest('GET', 'settings', ['token' => apiToken('user')]);
+
+    assertTrue(in_array($res['status'], [401, 403], true),
+        'Ohne scope=client muss die Rolle user abgewiesen werden, HTTP ' . $res['status']);
+});
+
+test('scope=client ohne Anmeldung wird abgewiesen', function () {
+    $res = apiRequest('GET', 'settings', ['query' => ['scope' => 'client']]);
+
+    assertTrue(in_array($res['status'], [401, 403], true),
+        'Unangemeldet darf nichts gelesen werden, HTTP ' . $res['status']);
+});
+
+/**
+ * Muss der LETZTE Test der Datei sein — der Runner laedt Suiten in
+ * Dateireihenfolge, und alles davor legt noch Daten an.
+ *
+ * Reihenfolge der Loeschung: Termine vor Terminarten vor Gruppen. Die
+ * records-Eintraege der Check-ins verschwinden per ON DELETE CASCADE mit ihren
+ * Terminen.
+ */
+test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
+    $token = apiToken('admin');
+
+    foreach (['appointment' => 'appointments',
+              'appointment_type' => 'appointment_types',
+              'group' => 'member_groups'] as $kind => $resource) {
+        foreach (ciCreated($kind) as $id) {
+            apiRequest('DELETE', $resource, ['token' => $token, 'query' => ['id' => $id]]);
+        }
+    }
+
+    // Stichprobe: der erste angelegte Termin ist fort.
+    $appointments = ciCreated('appointment');
+    if ($appointments) {
+        $res = apiRequest('GET', 'appointments', [
+            'token' => $token,
+            'query' => ['id' => $appointments[0]],
+        ]);
+        assertTrue(
+            $res['status'] === 404 || empty($res['body']['appointment_id']),
+            'Der erste Testtermin haette entfernt sein muessen, HTTP ' . $res['status']
+        );
+    }
+
+    assertTrue(true, 'Aufraeumen durchgelaufen');
+});

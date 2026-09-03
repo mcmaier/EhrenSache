@@ -16,6 +16,41 @@ function handleSettings($db, $database, $method, $authUserId, $authUserRole) {
 
     $prefix = $database->table('');
 
+    // Ein schmaler Lesepfad für angemeldete Nutzer. Die PWA muss wissen, ob
+    // ein Check-in einen Termin anlegen darf — sonst kündigt ihr Hinweistext
+    // etwas an, das nicht eintritt.
+    //
+    // Feste Liste im Code, keine Kategorie in der Datenbank: Eine neu
+    // angelegte Einstellung soll nicht dadurch lesbar werden, dass jemand die
+    // falsche Kategorie wählt.
+    //
+    // Die Authentifizierung ist damit nicht umgangen — api.php beendet
+    // unangemeldete Anfragen vor dem Routing. Hier fällt nur die
+    // Administrator-Schranke.
+    if ($method === 'GET' && ($_GET['scope'] ?? null) === 'client') {
+        $whitelist = [
+            'checkin_auto_create_appointment',
+            'checkin_tolerance_hours',
+        ];
+
+        $placeholders = implode(',', array_fill(0, count($whitelist), '?'));
+
+        $stmt = $db->prepare("
+            SELECT setting_key, setting_value
+            FROM {$prefix}system_settings
+            WHERE setting_key IN ({$placeholders})
+        ");
+        $stmt->execute($whitelist);
+
+        $settings = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $settings[$row['setting_key']] = $row['setting_value'];
+        }
+
+        echo json_encode(['settings' => $settings]);
+        return;
+    }
+
     // Nur Admins dürfen auf Einstellungen zugreifen
     requireAdmin();
 
