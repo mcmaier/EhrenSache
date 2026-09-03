@@ -60,6 +60,8 @@ let isNFCScanning = false;
 let tickTimer = null;
 let appointments = [];
 let appointmentTypes = [];
+let checkinAppointments = [];
+let clientSettings = { checkin_auto_create_appointment: '1', checkin_tolerance_hours: '2' };
 let deleteExceptionId = null;
 let nfcAbortController = null;
 let nfcAvailable = false;
@@ -360,6 +362,89 @@ async function loadAppearanceSettings() {
     }
 }
 
+// ========================================
+// CHECK-IN: TERMINWAHL
+// ========================================
+
+/**
+ * Liest die zwei Einstellungen, die der Client kennen muss.
+ *
+ * Ohne sie kuendigt der Hinweistext unter der Terminauswahl womoeglich etwas
+ * an, das nicht eintritt. Schlaegt der Aufruf fehl, bleiben die Vorgaben
+ * stehen — sie entsprechen dem Verhalten vor 1.2.4.
+ */
+async function loadClientSettings() {
+    const result = await apiCall('settings', 'GET', null, { scope: 'client' });
+
+    if (result.success && result.data && result.data.settings) {
+        clientSettings = { ...clientSettings, ...result.data.settings };
+    } else {
+        debug.error('Client-Einstellungen nicht ladbar:', result.error);
+    }
+}
+
+/**
+ * Termine des heutigen Tages fuer die Check-in-Auswahl.
+ *
+ * Bewusst nur heute, anders als bei der Arbeitszeit: Anwesenheit ist an den
+ * Tag gebunden, und der Server weist einen Termin an einem anderen Tag mit 409
+ * ab.
+ *
+ * Das Datum kommt aus der LOKALEN Zeit. toISOString() liefert UTC und zeigte
+ * bis d7ee191 abends ab 22:00 MESZ den Folgetag an.
+ */
+async function loadCheckinAppointments() {
+    const select = document.getElementById('checkinAppointment');
+    if (!select || !userData || !userData.member_id) return;
+
+    const now = new Date();
+    const heute = `${now.getFullYear()}-`
+                + `${String(now.getMonth() + 1).padStart(2, '0')}-`
+                + `${String(now.getDate()).padStart(2, '0')}`;
+
+    const result = await apiCall('appointments', 'GET', null, {
+        member_id: userData.member_id,
+        from_date: heute,
+        to_date: heute
+    });
+
+    checkinAppointments = (result.success && Array.isArray(result.data)) ? result.data : [];
+
+    if (!result.success) {
+        debug.error('Termine fuer den Check-in nicht ladbar:', result.error);
+    }
+
+    renderCheckinAppointmentOptions();
+}
+
+function renderCheckinAppointmentOptions() {
+    const select = document.getElementById('checkinAppointment');
+    const hint   = document.getElementById('checkinAppointmentHint');
+    if (!select) return;
+
+    const previous = select.value;
+
+    // Nach Naehe zur aktuellen Uhrzeit: der wahrscheinlichste Termin steht oben.
+    const now = Date.now();
+    const options = checkinAppointments.slice().sort((a, b) =>
+        Math.abs(new Date(`${a.date}T${a.start_time}`).getTime() - now)
+        - Math.abs(new Date(`${b.date}T${b.start_time}`).getTime() - now));
+
+    select.innerHTML = '<option value="">Termin wählen …</option>'
+        + options.map(apt =>
+            `<option value="${apt.appointment_id}">`
+            + `${escapeHtml(apt.title)} · ${apt.start_time.substring(0, 5)}`
+            + `</option>`).join('');
+
+    select.value = previous;
+
+    if (hint) {
+        hint.textContent = clientSettings.checkin_auto_create_appointment === '1'
+            ? 'Ohne Auswahl wird der passende Termin gesucht — findet sich keiner, wird ein neuer angelegt.'
+            : 'Ohne Auswahl wird der passende Termin gesucht — findet sich keiner, schlägt der Check-in fehl.';
+    }
+}
+
 function applyAppearanceSettings() {
     // Titel setzen
     document.title = appearanceSettings.organization_name || 'EhrenSache';
@@ -434,10 +519,12 @@ async function handleLogin(e) {
         }
         
         debug.log('✓ Login erfolgreich');
-        
+
         // Lade Daten
         await loadAppointmentTypes();
-        await loadUserData();        
+        await loadUserData();
+        await loadClientSettings();
+        await loadCheckinAppointments();
         //await loadHistory();
         await initTabs();
         await initYearNavigation();    
@@ -520,10 +607,12 @@ async function checkAutoLogin() {
             }  
 
             debug.log('✓ Auto-Login erfolgreich');
-                
+
             // Lade Daten
             await loadAppointmentTypes();
             await loadUserData();
+            await loadClientSettings();
+            await loadCheckinAppointments();
             //await loadHistory();
             await initTabs();
             await initYearNavigation();      
@@ -1278,6 +1367,11 @@ async function verifyCheckin(code, inputMethod = 'unknown') {
             source_device: inputMethod,
             member_id: userData.member_id
         };
+
+        const chosenAppointment = document.getElementById('checkinAppointment')?.value;
+        if (chosenAppointment) {
+            requestData.appointment_id = parseInt(chosenAppointment, 10);
+        }
 
         // Admin muss member_id explizit mitschicken
         //if (userData.role === 'admin') {
