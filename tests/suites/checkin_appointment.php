@@ -238,3 +238,62 @@ test('Automatik an: Check-in ohne passenden Termin legt einen Termin an', functi
         ciTrack('appointment', (int) ($res['body']['appointment_id'] ?? 0));
     });
 });
+
+test('Gewaehlter Termin desselben Tages wird uebernommen', function () {
+    ciWithReset(['checkin_auto_create_appointment' => '1', 'checkin_tolerance_hours' => '2'], function () {
+        ciSetSetting('checkin_auto_create_appointment', '0');
+        ciSetSetting('checkin_tolerance_hours', '0');
+
+        [$status, $id] = ciCreateAppointment('Gewaehlt-Probe', date('Y-m-d'), '21:00:00');
+        assertSame(201, $status, 'Termin fuer die Auswahl konnte nicht angelegt werden');
+
+        $res = ciCheckin([
+            'arrival_time'   => date('Y-m-d') . ' 05:21:11',
+            'appointment_id' => $id,
+        ]);
+
+        assertTrue(in_array($res['status'], [200, 201], true),
+            'Gewaehlter Termin muss den Check-in retten, HTTP ' . $res['status']);
+        assertSame($id, (int) ($res['body']['appointment_id'] ?? 0),
+            'Es muss der gewaehlte Termin verwendet werden');
+    });
+});
+
+test('Gewaehlter Termin von gestern wird abgewiesen', function () {
+    $gestern = (new DateTime('-1 day'))->format('Y-m-d');
+
+    [$status, $id] = ciCreateAppointment('Gestern-Probe', $gestern, '20:00:00');
+    assertSame(201, $status, 'Termin von gestern konnte nicht angelegt werden');
+
+    $res = ciCheckin([
+        'arrival_time'   => date('Y-m-d') . ' 06:22:13',
+        'appointment_id' => $id,
+    ]);
+
+    assertSame(409, $res['status'],
+        'Ein Termin an einem anderen Tag darf nicht waehlbar sein — sonst liesse '
+        . 'sich Anwesenheit rueckwirkend behaupten');
+});
+
+test('Gewaehlter Termin einer fremden Gruppe wird abgewiesen', function () {
+    [$status, $id] = ciCreateAppointment(
+        'Fremdgruppe-Probe', date('Y-m-d'), '22:30:00', ciRestrictedTypeId()
+    );
+    assertSame(201, $status, 'Termin der Fremdgruppe konnte nicht angelegt werden');
+
+    $res = ciCheckin([
+        'arrival_time'   => date('Y-m-d') . ' 07:23:17',
+        'appointment_id' => $id,
+    ]);
+
+    assertSame(403, $res['status'], 'Termin einer fremden Gruppe muss 403 liefern');
+});
+
+test('Unbekannter Termin wird abgewiesen', function () {
+    $res = ciCheckin([
+        'arrival_time'   => date('Y-m-d') . ' 08:24:19',
+        'appointment_id' => 999999999,
+    ]);
+
+    assertSame(404, $res['status'], 'Ein nicht existierender Termin muss 404 liefern');
+});

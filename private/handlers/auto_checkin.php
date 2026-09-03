@@ -180,6 +180,56 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     */    
 
     // ===========================================
+    // Vom Client gewaehlter Termin
+    // ===========================================
+    //
+    // Die Tagesgrenze ist keine Bequemlichkeit, sondern die Sicherung: Ohne sie
+    // koennte ein Mitglied der Rolle 'user' eine beliebige appointment_id des
+    // Jahres schicken und sich rueckwirkend anwesend melden. Bis 1.2.3 war das
+    // nur deshalb ausgeschlossen, weil allein das Toleranzfenster die Auswahl
+    // traf. Sie gilt fuer alle Rollen — Admin und Manager korrigieren ueber
+    // records, nicht ueber diesen Endpunkt.
+    $chosenAppointment = null;
+
+    if(isset($data->appointment_id) && $data->appointment_id) {
+        $chosenStmt = $db->prepare("
+            SELECT a.appointment_id, a.title, a.date, a.start_time, a.type_id
+            FROM {$prefix}appointments a
+            WHERE a.appointment_id = ?
+        ");
+        $chosenStmt->execute([intval($data->appointment_id)]);
+        $chosenAppointment = $chosenStmt->fetch(PDO::FETCH_ASSOC);
+
+        if(!$chosenAppointment) {
+            http_response_code(404);
+            echo json_encode([
+                "message" => "Unknown appointment_id",
+                "reason"  => "appointment_not_found"
+            ]);
+            return;
+        }
+
+        if(!memberMayAttendAppointment($db, $prefix, $memberId, $chosenAppointment['type_id'])) {
+            http_response_code(403);
+            echo json_encode([
+                "message" => "Termin gehoert zu einer anderen Gruppe",
+                "reason"  => "appointment_not_permitted"
+            ]);
+            return;
+        }
+
+        if($chosenAppointment['date'] !== $arrivalDate) {
+            http_response_code(409);
+            echo json_encode([
+                "message" => "Termin liegt an einem anderen Tag",
+                "reason"  => "appointment_wrong_day",
+                "hint"    => "Anwesenheit wird am Tag des Termins erfasst"
+            ]);
+            return;
+        }
+    }
+
+    // ===========================================
     // Suche ALLE potentiellen Termine im Fenster
     // ===========================================
     
@@ -271,6 +321,11 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     // Wenn kein Standard-Termin gefunden, nutze Fallback
     if(!$matchedAppointment && $fallbackAppointment) {
         $matchedAppointment = $fallbackAppointment;
+    }
+
+    // Eine bewusste Wahl schlaegt die automatische Suche.
+    if($chosenAppointment) {
+        $matchedAppointment = $chosenAppointment;
     }
 
     if($matchedAppointment) {
