@@ -7,6 +7,42 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.2.2] – 2026-09-03
+
+### Neu
+- **Zeitraum für Arbeitszeitberichte**: Alle drei Auswertungen nehmen `from` und `to` als
+  Datum entgegen, nicht mehr nur ein Kalenderjahr. Damit sind Monats-, Quartals- und
+  Förderzeiträume möglich; das Vereinsjahr von September bis Juni ebenso. `?year=` bleibt
+  gültig und liefert unverändert das bisherige Ergebnis
+- **Druckansicht**: `&format=html` liefert die Berichte als druckbare Seite mit Vereinslogo,
+  Zeitraum, Summen und einer Fußnote, die Zuordnungsregel und Nachweisgrade erklärt. Das PDF
+  entsteht über den Druckdialog des Browsers — ohne zusätzliche Bibliothek
+- **Berichtsdialog** in der Zeiterfassung mit Schnellwahl für „Dieser Monat", „Letzter Monat"
+  und „Laufendes Jahr". Er ersetzt die beiden bisherigen Export-Knöpfe und macht die Auswertung
+  nach Termin erstmals über die Oberfläche erreichbar
+- `public/css/print.css` — das Projekt hatte bisher kein Print-Stylesheet
+
+### Geändert
+- Dateinamen der Exporte tragen den Zeitraum: `stundennachweis_2026-01.csv` statt
+  `stundennachweis_2026.csv`. Ohne das ist ein gespeichertes Monats-CSV von einem Jahres-CSV
+  nicht zu unterscheiden
+- Die Summenzeile der CSV nennt den Zeitraum, über den sie gebildet wurde
+- Der Zeitraumvergleich nutzt `>=` und `< Ende + 1 Tag` statt `YEAR(start_time)`. Das ist
+  indextauglich und verliert keine Sitzung mehr, die am letzten Tag nach Mitternacht beginnt
+
+### Sicherheit
+- Jeder Wert der Druckansicht wird maskiert. Notizen und Ortsnamen stammen aus der PWA, also
+  aus Rollen unterhalb von `admin`; ohne Maskierung wäre der Bericht ein gespeichertes XSS in
+  genau der Ansicht, die ein Administrator zum Prüfen öffnet. Die Berichtsseite enthält
+  keinerlei JavaScript
+
+### Hinweis
+- Sitzungen zählen zu dem Zeitraum, in dem sie **begonnen** haben. Eine Sitzung über
+  Mitternacht erscheint vollständig im Monat ihres Beginns; die Summe über zwölf Monate
+  entspricht deshalb der Jahressumme. Die Regel steht auf jedem Bericht
+
+---
+
 ## [1.2.1] – 2026-09-02
 
 ### Neu

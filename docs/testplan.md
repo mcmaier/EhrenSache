@@ -622,7 +622,46 @@ falschen Grund fehl.
 | AW-D5 | Freigeben klicken | Status wechselt auf „bestätigt", Auditspur erhält `approve` |
 | AW-D6 | „Zeit nachtragen" speichern | Eintrag erscheint mit Status „wartet auf Freigabe" |
 | AW-D7 | Tätigkeitsart mit erfassten Zeiten löschen | Fehlermeldung; Ausmustern über „Aktiv"-Haken bleibt möglich |
-| AW-D8 | Beide Export-Knöpfe | CSV-Download mit korrektem Dateinamen |
+| AW-D8 | Knopf „📄 Bericht" | Dialog öffnet sich, Zeitraum auf das laufende Jahr vorbelegt |
+
+---
+
+## Zeitraum und Druckansicht (ab 1.2.2)
+
+### Automatisiert
+
+```bash
+php tests/run.php worktime_unit
+```
+
+```bash
+php tests/run.php worktime_api
+```
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| ZR-1 | `worktimeResolvePeriod` mit Jahr, Monat, freiem Zeitraum | Grenzen, Label und Slug je Fall korrekt |
+| ZR-2 | `to` vor `from`, unparsbares Datum, 30. Februar, über 24 Monate | jeweils abgewiesen |
+| ZR-3 | `export?type=worktime_member&from=…&to=…` | `200` |
+| ZR-4 | Ungültiger Zeitraum am Export | `400` mit benannter Meldung |
+| ZR-5 | `format=html` | HTML-Dokument mit `print.css` |
+| ZR-6 | Notiz mit `<script>alert(1)</script>` im Bericht | erscheint maskiert, nicht ausgeführt |
+| ZR-7 | Bericht enthält kein `<script>` und kein `window.print` | bestätigt |
+
+### Manuell
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| ZR-M1 | Sitzung 31.01. 22:00 – 01.02. 02:00 anlegen und freigeben | erscheint **vollständig** im Januarbericht, **gar nicht** im Februarbericht |
+| ZR-M2 | Summe Januar + Summe Februar gegen Zeitraum 01.01.–28.02. | identisch |
+| ZR-M3 | Schnellwahl „Dieser Monat", „Letzter Monat", „Laufendes Jahr" | füllt Von/Bis; „Laufendes Jahr" folgt dem Jahresfilter, nicht dem heutigen Datum |
+| ZR-M4 | Berichtsart auf „nach Tätigkeit" wechseln | Mitgliedsauswahl verschwindet |
+| ZR-M5 | „📄 Druckansicht" | öffnet neuen Tab; **kein** Druckdialog beim Laden |
+| ZR-M6 | Im Browser drucken, Vorschau prüfen | Querformat; Kopfzeile wiederholt sich auf Folgeseiten; keine Zeile über den Umbruch zerrissen |
+| ZR-M7 | Fußnote der Druckansicht | Zuordnungsregel und alle drei Nachweisgrade erklärt |
+| ZR-M8 | „💾 CSV" mit Monatszeitraum | Dateiname trägt den Monat, z. B. `stundennachweis_2026-01.csv` |
+| ZR-M9 | Zeitraum über 24 Monate wählen | Meldung, kein Download |
+| ZR-M10 | Bericht ohne Logo (Einstellung leer) | Kopf ohne Bild, kein gebrochenes Bildsymbol |
 
 ---
 

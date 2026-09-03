@@ -15,7 +15,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EhrenSache - Dashboard</title>
 
-    <link rel="stylesheet" href="css/main.css?v=1.2.1">
+    <link rel="stylesheet" href="css/main.css?v=1.2.2">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="robots" content="noindex, nofollow">
     <script type="module" src="js/theme.js"></script>
@@ -1015,8 +1015,7 @@
                 <div class="content-header">
                     <h1>Zeiterfassung</h1>
                     <div class="header-actions">
-                        <button class="btn-secondary" data-role="manager" onclick="exportWorktimeMember()">💾 Stundennachweis</button>
-                        <button class="btn-secondary" data-role="manager" onclick="exportWorktimeActivity()">💾 Nach Tätigkeit</button>
+                        <button class="btn-secondary" data-role="manager" id="btnWorktimeReport">📄 Bericht</button>
                         <button class="btn-add" onclick="openWorkSessionModal()">+ Zeit nachtragen</button>
                     </div>
                 </div>
@@ -2044,6 +2043,62 @@
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="closeWorkSessionModal()">Abbrechen</button>
                 <button class="btn-save" onclick="saveWorkSession()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Arbeitszeitbericht -->
+    <div class="modal" id="worktimeReportModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Arbeitszeitbericht</h2>
+                <button class="close-modal" id="btnWorktimeReportClose">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="worktimeReportForm">
+                    <div class="form-group">
+                        <label for="reportType">Berichtsart</label>
+                        <select id="reportType">
+                            <option value="worktime_member">Stundennachweis je Person</option>
+                            <option value="worktime_activity">Summen nach Tätigkeit</option>
+                            <option value="worktime_appointment">Summen nach Termin</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Zeitraum</label>
+                        <div class="report-quick-select">
+                            <button type="button" class="btn-secondary" data-report-range="this-month">Dieser Monat</button>
+                            <button type="button" class="btn-secondary" data-report-range="last-month">Letzter Monat</button>
+                            <button type="button" class="btn-secondary" data-report-range="year">Laufendes Jahr</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reportFrom">Von*</label>
+                        <input type="date" id="reportFrom" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="reportTo">Bis*</label>
+                        <input type="date" id="reportTo" required>
+                        <small class="input-hint">
+                            Sitzungen zählen zu dem Zeitraum, in dem sie begonnen haben. Höchstens 24 Monate.
+                        </small>
+                    </div>
+
+                    <div class="form-group" id="reportMemberGroup">
+                        <label for="reportMember">Mitglied</label>
+                        <select id="reportMember">
+                            <option value="">Alle Mitglieder</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" id="btnWorktimeReportCancel">Abbrechen</button>
+                <button class="btn-secondary" id="btnWorktimeReportCsv">💾 CSV</button>
+                <button class="btn-save" id="btnWorktimeReportPrint">📄 Druckansicht</button>
             </div>
         </div>
     </div>

@@ -117,6 +117,137 @@ function staleEndTime(string $startTime, int $maxHours): string
     return date('Y-m-d H:i:s', $start + $maxHours * 3600);
 }
 
+/** Obergrenze einer Auswertung in Monaten. */
+const WORKTIME_MAX_PERIOD_MONTHS = 24;
+
+/** Deutsche Monatsnamen -- bewusst als Tabelle statt ueber setlocale(). */
+const WORKTIME_MONTH_NAMES = [
+    1 => 'Januar',   2 => 'Februar', 3 => 'März',      4 => 'April',
+    5 => 'Mai',      6 => 'Juni',    7 => 'Juli',      8 => 'August',
+    9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Dezember',
+];
+
+/**
+ * Prueft ein Datum im Format YYYY-MM-DD streng.
+ *
+ * createFromFormat allein genuegt nicht: Es laesst '2026-02-30' durch und
+ * rollt still auf den 2. Maerz weiter. Der Rueckvergleich faengt das ab.
+ *
+ * @throws InvalidArgumentException
+ */
+function worktimeParseDate(string $value, string $field): DateTimeImmutable
+{
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+    if ($date === false || $date->format('Y-m-d') !== $value) {
+        throw new InvalidArgumentException(
+            "Ungültiges Datum in '{$field}': erwartet wird JJJJ-MM-TT."
+        );
+    }
+
+    return $date;
+}
+
+/**
+ * Loest die Zeitraumparameter einer Auswertung auf.
+ *
+ * Vorrang hat from/to; fehlen beide, gilt das Jahr. Fehlt eines von beiden,
+ * begrenzt das Jahr die offene Seite -- ein einseitig offener Zeitraum wuerde
+ * sonst stillschweigend den gesamten Datenbestand ziehen.
+ *
+ * Der Ruecknahmewert traegt neben den Grenzen auch Beschriftung und
+ * Dateinamen-Slug, damit beide an genau einer Stelle entstehen. Ohne sie ist
+ * ein gespeichertes Monats-CSV von einem Jahres-CSV nicht zu unterscheiden.
+ *
+ * @throws InvalidArgumentException bei ungueltiger oder widerspruechlicher Eingabe
+ * @return array{from: string, to: string, label: string, slug: string}
+ */
+function worktimeResolvePeriod(?string $from, ?string $to, ?int $year): array
+{
+    $from = ($from === null || $from === '') ? null : $from;
+    $to   = ($to   === null || $to   === '') ? null : $to;
+
+    $fromDate = $from !== null ? worktimeParseDate($from, 'from') : null;
+    $toDate   = $to   !== null ? worktimeParseDate($to,   'to')   : null;
+
+    // Das Jahr begrenzt jede Seite, die offen geblieben ist. Fehlt es, ergibt
+    // es sich aus der gesetzten Grenze -- sonst gilt das laufende Jahr.
+    if ($year === null) {
+        $year = (int) ($fromDate ?? $toDate ?? new DateTimeImmutable())->format('Y');
+    }
+
+    if ($year < 1970 || $year > 2200) {
+        throw new InvalidArgumentException("Ungültiges Jahr: {$year}.");
+    }
+
+    $fromDate = $fromDate ?? new DateTimeImmutable(sprintf('%04d-01-01', $year));
+    $toDate   = $toDate   ?? new DateTimeImmutable(sprintf('%04d-12-31', $year));
+
+    if ($toDate < $fromDate) {
+        throw new InvalidArgumentException('Das Ende des Zeitraums liegt vor seinem Beginn.');
+    }
+
+    // Obergrenze, damit ein versehentliches from=1970-01-01 nicht den
+    // gesamten Bestand in eine Druckansicht rendert.
+    $latest = $fromDate->modify('+' . WORKTIME_MAX_PERIOD_MONTHS . ' months')->modify('-1 day');
+    if ($toDate > $latest) {
+        throw new InvalidArgumentException(
+            'Der Zeitraum umfasst mehr als ' . WORKTIME_MAX_PERIOD_MONTHS . ' Monate.'
+        );
+    }
+
+    return [
+        'from'  => $fromDate->format('Y-m-d'),
+        'to'    => $toDate->format('Y-m-d'),
+        'label' => worktimePeriodLabel($fromDate, $toDate),
+        'slug'  => worktimePeriodSlug($fromDate, $toDate),
+    ];
+}
+
+/** Lesbare Beschriftung eines Zeitraums fuer Bericht und Summenzeile. */
+function worktimePeriodLabel(DateTimeImmutable $from, DateTimeImmutable $to): string
+{
+    if (worktimeIsFullYear($from, $to)) {
+        return 'Jahr ' . $from->format('Y');
+    }
+
+    if (worktimeIsFullMonth($from, $to)) {
+        return WORKTIME_MONTH_NAMES[(int) $from->format('n')] . ' ' . $from->format('Y');
+    }
+
+    return $from->format('d.m.Y') . ' – ' . $to->format('d.m.Y');
+}
+
+/** Kurzform eines Zeitraums fuer Dateinamen. */
+function worktimePeriodSlug(DateTimeImmutable $from, DateTimeImmutable $to): string
+{
+    if (worktimeIsFullYear($from, $to)) {
+        return $from->format('Y');
+    }
+
+    if (worktimeIsFullMonth($from, $to)) {
+        return $from->format('Y-m');
+    }
+
+    return $from->format('Y-m-d') . '_' . $to->format('Y-m-d');
+}
+
+/** Deckt der Zeitraum genau ein Kalenderjahr ab? */
+function worktimeIsFullYear(DateTimeImmutable $from, DateTimeImmutable $to): bool
+{
+    return $from->format('m-d') === '01-01'
+        && $to->format('m-d')   === '12-31'
+        && $from->format('Y')   === $to->format('Y');
+}
+
+/** Deckt der Zeitraum genau einen Kalendermonat ab? */
+function worktimeIsFullMonth(DateTimeImmutable $from, DateTimeImmutable $to): bool
+{
+    return $from->format('d') === '01'
+        && $from->format('Y-m') === $to->format('Y-m')
+        && $to->format('Y-m-d') === $to->format('Y-m-t');
+}
+
 // ============================================
 // DATENBANKZUGRIFF
 // ============================================
@@ -276,6 +407,21 @@ function worktimeProofExpression(string $alias = 'ws'): string
             END";
 }
 
+/**
+ * SQL-Bedingung für den Auswertungszeitraum. Erwartet zwei Parameter:
+ * from und to aus worktimeResolvePeriod().
+ *
+ * Halboffen statt BETWEEN: `BETWEEN '2026-01-01' AND '2026-01-31'` schneidet
+ * alles ab, was am 31. nach 00:00:00 beginnt. An einer Jahresgrenze faellt das
+ * fast nie auf, an einer Monatsgrenze jeden Monat einmal. Die Spalte bleibt
+ * dabei unveraendert auf der linken Seite und damit indextauglich -- anders
+ * als beim frueheren YEAR(ws.start_time).
+ */
+function worktimePeriodCondition(string $alias = 'ws'): string
+{
+    return "{$alias}.start_time >= ? AND {$alias}.start_time < DATE_ADD(?, INTERVAL 1 DAY)";
+}
+
 /** SQL-Ausdruck für die Nettodauer in Minuten. */
 function worktimeDurationExpression(string $alias = 'ws'): string
 {
@@ -284,20 +430,22 @@ function worktimeDurationExpression(string $alias = 'ws'): string
 }
 
 /**
- * Stunden je Mitglied für ein Jahr, aufgeschlüsselt nach Tätigkeitsart und
- * Nachweisgrad. Gezählt wird ausschließlich, was bestätigt und beendet ist.
+ * Stunden je Mitglied für einen Zeitraum, aufgeschlüsselt nach Tätigkeitsart
+ * und Nachweisgrad. Gezählt wird ausschließlich, was bestätigt und beendet ist.
  *
+ * @param array{from: string, to: string} $period  aus worktimeResolvePeriod()
  * @param int|null $memberId  Auf ein Mitglied einschränken
  * @return array{summary: array<string, int>, members: array<int, array<string, mixed>>}
  */
-function worktimeStatistics($db, $database, int $year, ?int $memberId = null): array
+function worktimeStatistics($db, $database, array $period, ?int $memberId = null): array
 {
     $prefix   = $database->table('');
     $duration = worktimeDurationExpression();
     $proof    = worktimeProofExpression();
 
-    $where  = "ws.status = 'confirmed' AND ws.end_time IS NOT NULL AND YEAR(ws.start_time) = ?";
-    $params = [$year];
+    $where  = "ws.status = 'confirmed' AND ws.end_time IS NOT NULL
+               AND " . worktimePeriodCondition();
+    $params = [$period['from'], $period['to']];
 
     if ($memberId !== null) {
         $where .= " AND ws.member_id = ?";
@@ -377,9 +525,10 @@ function worktimeStatistics($db, $database, int $year, ?int $memberId = null): a
  * Summen je Tätigkeitsart für einen Zeitraum — Grundlage des
  * Verwendungsnachweises gegenüber Fördergebern.
  *
+ * @param array{from: string, to: string} $period  aus worktimeResolvePeriod()
  * @return array<int, array<string, mixed>>
  */
-function worktimeByActivity($db, $database, int $year): array
+function worktimeByActivity($db, $database, array $period): array
 {
     $prefix   = $database->table('');
     $duration = worktimeDurationExpression();
@@ -394,11 +543,11 @@ function worktimeByActivity($db, $database, int $year): array
         FROM {$prefix}work_sessions ws
         LEFT JOIN {$prefix}activity_types at ON ws.activity_id = at.activity_id
         WHERE ws.status = 'confirmed' AND ws.end_time IS NOT NULL
-          AND YEAR(ws.start_time) = ?
+          AND " . worktimePeriodCondition() . "
         GROUP BY at.activity_id, proof
         ORDER BY at.activity_name
     ");
-    $stmt->execute([$year]);
+    $stmt->execute([$period['from'], $period['to']]);
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
@@ -410,9 +559,10 @@ function worktimeByActivity($db, $database, int $year): array
  * Sitzungen ohne Terminbezug erscheinen gesammelt als eine Zeile ohne Termin;
  * sie einfach wegzulassen wuerde die Gesamtsumme still verfaelschen.
  *
+ * @param array{from: string, to: string} $period  aus worktimeResolvePeriod()
  * @return array<int, array<string, mixed>>
  */
-function worktimeByAppointment($db, $database, int $year): array
+function worktimeByAppointment($db, $database, array $period): array
 {
     $prefix   = $database->table('');
     $duration = worktimeDurationExpression();
@@ -429,11 +579,11 @@ function worktimeByAppointment($db, $database, int $year): array
         LEFT JOIN {$prefix}appointments a       ON ws.appointment_id = a.appointment_id
         LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
         WHERE ws.status = 'confirmed' AND ws.end_time IS NOT NULL
-          AND YEAR(ws.start_time) = ?
+          AND " . worktimePeriodCondition() . "
         GROUP BY a.appointment_id, proof
         ORDER BY a.date IS NULL, a.date, a.start_time
     ");
-    $stmt->execute([$year]);
+    $stmt->execute([$period['from'], $period['to']]);
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }

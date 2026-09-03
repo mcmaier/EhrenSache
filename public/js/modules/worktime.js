@@ -485,16 +485,116 @@ export async function saveWorkSession() {
 // EXPORT
 // ============================================
 
-export function exportWorktimeMember() {
-    const member = document.getElementById('filterWorktimeMember')?.value || '';
-    let url = `${API_BASE}?resource=export&type=worktime_member&year=${currentYear}`;
-    if (member) url += `&member_id=${member}`;
-    window.location.href = url;
+/** ISO-Datum (YYYY-MM-DD) ohne Zeitzonenversatz. */
+function isoDate(date) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-export function exportWorktimeActivity() {
-    window.location.href =
-        `${API_BASE}?resource=export&type=worktime_activity&year=${currentYear}`;
+/**
+ * Belegt die Zeitraumfelder vor.
+ *
+ * Die Schnellwahl ist genau das — eine Vorbelegung zweier Felder. Der Server
+ * kennt nur from/to; ein Monat ist dort kein eigener Fall.
+ */
+export function setWorktimeReportRange(kind) {
+    const now  = new Date();
+    const from = document.getElementById('reportFrom');
+    const to   = document.getElementById('reportTo');
+    if (!from || !to) return;
+
+    let start, end;
+
+    if (kind === 'this-month') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    } else if (kind === 'last-month') {
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end   = new Date(now.getFullYear(), now.getMonth(), 0);
+    } else {
+        // Das laufende Jahr richtet sich nach dem Jahresfilter der Anwendung,
+        // nicht nach dem heutigen Datum -- sonst widerspraeche der Bericht der
+        // Liste, die daneben steht.
+        start = new Date(currentYear, 0, 1);
+        end   = new Date(currentYear, 11, 31);
+    }
+
+    from.value = isoDate(start);
+    to.value   = isoDate(end);
+}
+
+export function openWorktimeReportModal() {
+    const modal = document.getElementById('worktimeReportModal');
+    if (!modal) return;
+
+    // Mitgliederliste aus der Filterleiste uebernehmen: Dort sind die
+    // Mitgliedschaftszeitraeume bereits beruecksichtigt und ausgetretene
+    // Mitglieder gekennzeichnet statt ausgeschlossen.
+    const filterMembers = document.getElementById('filterWorktimeMember');
+    const reportMember  = document.getElementById('reportMember');
+    if (filterMembers && reportMember) {
+        reportMember.innerHTML = filterMembers.innerHTML;
+        reportMember.value     = filterMembers.value || '';
+    }
+
+    setWorktimeReportRange('year');
+    updateWorktimeReportForm();
+    modal.classList.add('active');
+}
+
+export function closeWorktimeReportModal() {
+    document.getElementById('worktimeReportModal')?.classList.remove('active');
+}
+
+/** Die Mitgliedsauswahl gilt nur fuer den Stundennachweis. */
+function updateWorktimeReportForm() {
+    const type  = document.getElementById('reportType')?.value;
+    const group = document.getElementById('reportMemberGroup');
+    if (group) {
+        group.style.display = (type === 'worktime_member') ? '' : 'none';
+    }
+}
+
+/**
+ * Oeffnet den Bericht im gewaehlten Format.
+ *
+ * CSV laedt herunter, die Druckansicht oeffnet eine eigene Seite -- sie soll
+ * gelesen werden koennen, bevor sie gedruckt wird, und das Dashboard soll
+ * dabei stehen bleiben.
+ */
+export function runWorktimeReport(format) {
+    const type = document.getElementById('reportType')?.value || 'worktime_member';
+    const from = document.getElementById('reportFrom')?.value || '';
+    const to   = document.getElementById('reportTo')?.value || '';
+
+    if (!from || !to) {
+        showToast('Bitte einen Zeitraum angeben', 'error');
+        return;
+    }
+    if (to < from) {
+        showToast('Das Ende des Zeitraums liegt vor seinem Beginn', 'error');
+        return;
+    }
+
+    const params = new URLSearchParams({ resource: 'export', type, from, to });
+
+    if (type === 'worktime_member') {
+        const member = document.getElementById('reportMember')?.value || '';
+        if (member) params.set('member_id', member);
+    }
+    if (format === 'html') {
+        params.set('format', 'html');
+    }
+
+    const url = `${API_BASE}?${params.toString()}`;
+
+    if (format === 'html') {
+        window.open(url, '_blank', 'noopener');
+    } else {
+        window.location.href = url;
+    }
+
+    closeWorktimeReportModal();
 }
 
 // ============================================
@@ -664,6 +764,26 @@ export function initWorktimeEventHandlers() {
             renderWorkSessions(sessions);
         });
     });
+
+    // Der Berichtsdialog haengt bewusst an addEventListener statt an
+    // onclick-Attributen: Jedes weitere Inline-Attribut verlaengert den Weg zu
+    // einer wirksamen CSP (OI-17 in docs/OPEN-ITEMS.md).
+    document.getElementById('btnWorktimeReport')
+        ?.addEventListener('click', openWorktimeReportModal);
+    document.getElementById('btnWorktimeReportClose')
+        ?.addEventListener('click', closeWorktimeReportModal);
+    document.getElementById('btnWorktimeReportCancel')
+        ?.addEventListener('click', closeWorktimeReportModal);
+    document.getElementById('btnWorktimeReportCsv')
+        ?.addEventListener('click', () => runWorktimeReport('csv'));
+    document.getElementById('btnWorktimeReportPrint')
+        ?.addEventListener('click', () => runWorktimeReport('html'));
+    document.getElementById('reportType')
+        ?.addEventListener('change', updateWorktimeReportForm);
+
+    document.querySelectorAll('[data-report-range]').forEach(btn => {
+        btn.addEventListener('click', () => setWorktimeReportRange(btn.dataset.reportRange));
+    });
 }
 
 // Global verfügbar machen, weil die Oberfläche onclick-Attribute nutzt
@@ -674,8 +794,8 @@ window.approveWorkSession = approveWorkSession;
 window.rejectWorkSession = rejectWorkSession;
 window.deleteWorkSession = deleteWorkSession;
 window.resetWorktimeFilter = resetWorktimeFilter;
-window.exportWorktimeMember = exportWorktimeMember;
-window.exportWorktimeActivity = exportWorktimeActivity;
+window.openWorktimeReportModal = openWorktimeReportModal;
+window.closeWorktimeReportModal = closeWorktimeReportModal;
 
 window.openActivityTypeModal = openActivityTypeModal;
 window.closeActivityTypeModal = closeActivityTypeModal;

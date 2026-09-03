@@ -1,7 +1,7 @@
 # Design: Zeitraumfilter und Druckansicht für die Arbeitszeitauswertung
 
 **Datum:** 2026-09-03
-**Status:** Draft
+**Status:** Umgesetzt in 1.2.2 (2026-09-03)
 **Betrifft:** `private/helpers/worktime.php`, `private/handlers/export.php`,
 `private/handlers/statistics.php`, `public/js/modules/worktime.js`, `public/index.html`,
 neue Datei `public/css/print.css`, `API.md`, `docs/OPEN-ITEMS.md`
@@ -317,6 +317,30 @@ Druckansicht öffnen. Erwartet wird der Text, nicht die Ausführung.
 
 Für die Druckansicht: Seitenumbruch mit mehr als einer Seite Inhalt prüfen — Kopfzeile muss
 sich wiederholen, keine Zeile darf über den Umbruch zerrissen werden.
+
+---
+
+## Abweichungen bei der Umsetzung
+
+Drei Punkte sind anders gelöst als hier entworfen. Sie stehen hier, damit die Spec nicht
+etwas anderes behauptet als der Code tut:
+
+1. **Doch eine Migration.** Der Kopf sagt „keine Migration". Das stimmt fürs Schema, war aber
+   trotzdem falsch: `resolveMigrationChain()` läuft die Kette über `from`/`to` ab und wirft
+   „Keine Migration ab Version 1.2.1 vorhanden", sobald ein Glied fehlt. Ein Versionssprung
+   auf 1.2.2 ohne Manifest-Eintrag hätte den Update-Wizard in **jeder** bestehenden
+   Installation zerlegt — bei einem Release, das die Datenbank gar nicht anfasst.
+   `private/migrations/1.2.1.php` ist deshalb ein Schritt ohne Schemaänderung, der nur die
+   Kette schließt.
+2. **Der HTML-Bericht trägt zehn Spalten, nicht die vierzehn der CSV.** Ort des Beginns und
+   des Endes entfallen: Der Nachweisgrad fasst genau diese Information bereits zusammen
+   (`stundenbelegt` heißt „beide Orte belegt"), und vierzehn Spalten sind auf A4 nicht mehr
+   lesbar. Die CSV bleibt vollständig.
+3. **Zeitangaben im Bericht sind deutsch formatiert.** `01.09.2026 14:00` statt
+   `2026-09-01 14:00:00`; das Ende zeigt nur die Uhrzeit, solange es auf denselben Tag fällt.
+   Das macht nebenbei sichtbar, welche Sitzung über Mitternacht lief — also genau die, für
+   die die Zuordnungsregel der Fußnote gilt. Die CSV behält ISO: Sie wird eingelesen, nicht
+   gelesen.
 
 ---
 

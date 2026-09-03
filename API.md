@@ -1106,17 +1106,52 @@ Doppelte Eingabeprüfung erfolgt in HTML.
 ## Import/Export
 
 ### Export
-Exportiert Daten als Excel-Datei.
+Exportiert Daten als CSV-Datei oder – für die Arbeitszeitberichte – als druckbare
+HTML-Seite.
 
 **Endpoint:** `GET /api.php?resource=export`
 
 **Berechtigung:** Admin/Manager
 
 **Query-Parameter:**
-- `type`: `members`, `appointments`, `records`
-- `year`: Jahr (für records)
 
-**Response:** CSV-Datei
+| Parameter | Gilt für | Bedeutung |
+|---|---|---|
+| `type` | alle | `members`, `appointments`, `records`, `worktime_member`, `worktime_activity`, `worktime_appointment` |
+| `year` | `appointments`, `records`, Arbeitszeit | Kalenderjahr |
+| `from`, `to` | nur Arbeitszeit | Zeitraum als `JJJJ-MM-TT`, beide Grenzen einschließend |
+| `format` | nur Arbeitszeit | `csv` (Standard) oder `html` für die Druckansicht |
+| `member_id` | nur `worktime_member` | auf ein Mitglied einschränken |
+
+**Zeitraum der Arbeitszeitberichte**
+
+`from`/`to` haben Vorrang vor `year`. Ist nur eine der beiden Grenzen gesetzt, begrenzt das
+Jahr die offene Seite; fehlen alle drei, gilt das laufende Jahr. `?year=2026` allein liefert
+weiterhin genau das bisherige Ergebnis – bestehende Aufrufe brechen nicht.
+
+Ein Monat ist damit kein eigener Parameter, sondern ein Zeitraum:
+`&from=2026-01-01&to=2026-01-31`.
+
+**Sitzungen zählen zu dem Zeitraum, in dem sie begonnen haben.** Eine Sitzung vom 31.01.
+22:00 bis 01.02. 02:00 erscheint vollständig im Januar und gar nicht im Februar. Die Summe
+über zwölf Monate entspricht deshalb der Jahressumme. Gezählt wird nur, was bestätigt
+(`status = confirmed`) und beendet ist.
+
+**Response**
+
+- `format=csv`: CSV-Datei (`;` als Trennzeichen, UTF-8 mit BOM). Der Dateiname trägt den
+  Zeitraum: `stundennachweis_2026-01.csv`, `taetigkeiten_2026.csv`,
+  `termine_2026-02-01_2026-03-31.csv`.
+- `format=html`: HTML-Seite mit Vereinslogo, Zeitraum, Tabelle, Summen und Fußnote, gestaltet
+  über `public/css/print.css`. Enthält kein JavaScript; gedruckt wird über den Browserdialog.
+
+**Fehler:**
+
+| Status | Bedingung |
+|---|---|
+| 400 | `to` liegt vor `from`, ein Datum ist nicht `JJJJ-MM-TT`, oder der Zeitraum umfasst mehr als 24 Monate |
+| 400 | unbekannter `type` |
+| 405 | anderes Verfahren als `GET` |
 
 ---
 

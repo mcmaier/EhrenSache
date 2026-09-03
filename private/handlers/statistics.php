@@ -153,7 +153,11 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
     $worktime = null;
     if (isset($_GET['include']) && $_GET['include'] === 'worktime'
         && isWorktimeEnabled($db, $database)) {
-        $worktime = worktimeStatistics($db, $database, $year, $memberId);
+        // Die Statistikseite bleibt jahresbasiert. Der Zeitraum ist ein
+        // Berichtsparameter der Exporte, siehe worktimeResolvePeriod().
+        $worktime = worktimeStatistics(
+            $db, $database, worktimeResolvePeriod(null, null, $year), $memberId
+        );
     }
 
     echo json_encode([

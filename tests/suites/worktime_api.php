@@ -1178,6 +1178,78 @@ test('activity_types: PUT mit leerem group_ids wird abgewiesen', function () {
     assertTrue(count($get['body']['groups']) > 0, 'Zuordnung darf nicht verloren gehen');
 });
 
+
+// ---- Export: Zeitraum und Druckansicht --------------------------------------
+
+test('export: Zeitraum ueber from/to wird angenommen', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('admin'),
+        'query' => ['type' => 'worktime_member', 'from' => date('Y') . '-01-01', 'to' => date('Y') . '-01-31'],
+    ]);
+    assertStatus(200, $res);
+});
+
+test('export: Ende vor Beginn wird mit 400 abgewiesen', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('admin'),
+        'query' => ['type' => 'worktime_member', 'from' => '2026-03-31', 'to' => '2026-03-01'],
+    ]);
+    assertStatus(400, $res);
+});
+
+test('export: ein Zeitraum ueber 24 Monate wird mit 400 abgewiesen', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('admin'),
+        'query' => ['type' => 'worktime_activity', 'from' => '2015-01-01', 'to' => '2026-12-31'],
+    ]);
+    assertStatus(400, $res);
+});
+
+test('export: format=html liefert eine Berichtsseite', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('admin'),
+        'query' => ['type' => 'worktime_member', 'format' => 'html', 'year' => date('Y')],
+    ]);
+    assertStatus(200, $res);
+    assertTrue(strpos($res['raw'], '<!DOCTYPE html>') === 0, 'HTML-Dokument erwartet');
+    assertTrue(strpos($res['raw'], 'css/print.css') !== false, 'print.css erwartet');
+    assertTrue(strpos($res['raw'], 'Stundennachweis') !== false, 'Titel erwartet');
+});
+
+test('export: der Bericht enthaelt kein JavaScript', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('admin'),
+        'query' => ['type' => 'worktime_activity', 'format' => 'html', 'year' => date('Y')],
+    ]);
+    assertTrue(stripos($res['raw'], '<script') === false, 'kein script-Tag erwartet');
+    assertTrue(stripos($res['raw'], 'window.print') === false, 'kein Auto-Druck erwartet');
+});
+
+test('export: eine Notiz mit Markup wird im Bericht maskiert', function () {
+    enableWorktime();
+    $activityId = createActivityType('XSS ' . uniqid());
+
+    $payload = '<script>alert(1)</script>';
+    $id = (int) createManualSession('user', $activityId, ['note' => $payload])['body']['session']['session_id'];
+
+    // Nur bestaetigte Sitzungen erscheinen im Bericht.
+    apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'),
+        'query' => ['id' => $id],
+        'body'  => ['action' => 'approve'],
+    ]);
+
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('admin'),
+        'query' => ['type' => 'worktime_member', 'format' => 'html', 'year' => date('Y')],
+    ]);
+
+    assertTrue(strpos($res['raw'], $payload) === false, 'Rohes Markup im Bericht gefunden');
+    assertTrue(strpos($res['raw'], '&lt;script&gt;alert(1)&lt;/script&gt;') !== false,
+        'Maskierte Notiz nicht gefunden');
+
+    deleteSession($id);
+});
 test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
     enableWorktime();
     stopRunningIfAny();

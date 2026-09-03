@@ -32,4 +32,10 @@ return [
         'file'     => '1.2.0.php',
         'function' => 'migrate_1_2_0',
     ],
+    [
+        'from'     => '1.2.1',
+        'to'       => '1.2.2',
+        'file'     => '1.2.1.php',
+        'function' => 'migrate_1_2_1',
+    ],
 ];
