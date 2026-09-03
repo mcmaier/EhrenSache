@@ -80,11 +80,24 @@ $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
         || (($_SERVER['SERVER_PORT'] ?? null) == 443);
 
+// Inaktivitaetsgrenze einer Web-Session in Sekunden.
+//
+// Der Wert wird hier gesetzt statt aus session.gc_maxlifetime gelesen: Die
+// Anwendung bringt keine eigene php.ini mit, der Standard haengt also vom
+// Hoster ab (haeufig 1440). Ein Timeout, der sich je nach Installation
+// unterscheidet, ist weder dokumentierbar noch pruefbar.
+define('SESSION_TIMEOUT_SECONDS', 1800);
+
 // Session-Konfiguration (nur wenn Session gestartet wird)
 ini_set('session.cookie_httponly', 1);
 ini_set('session.cookie_secure', $isHttps ? 1 : 0);   // war: fix 1
 ini_set('session.cookie_samesite', 'Lax');
 ini_set('session.use_strict_mode', 1);
+
+// Auch fuer PHPs eigene Aufraeumung setzen, damit die Session-Datei nicht
+// vor Ablauf der Frist entfernt wird. helpers/auth.php liest den Wert fuer
+// session_info aus derselben Quelle.
+ini_set('session.gc_maxlifetime', (string) SESSION_TIMEOUT_SECONDS);
 
 
 // Liste der Endpoints die Session brauchen (ohne Token)
@@ -115,17 +128,11 @@ if(!$apiToken && isset($_GET['api_token'])) {
 // 2. Nicht auf öffentlichem Endpoint (außer login/logout/register)
 if (!$apiToken) {
     session_start();
-    
-    /*
-    // Session-Timeout prüfen
-    if(isset($_SESSION['last_activity']) && 
-       (time() - $_SESSION['last_activity'] > 1800)) {
-        session_unset();
-        session_destroy();
-        session_start(); // Neu starten für Error-Response
-    }
-    $_SESSION['last_activity'] = time();
-    */
+
+    // Die Ablaufpruefung steht bei der Authentifizierung weiter unten. Hier ist
+    // noch nicht entschieden, ob der Aufruf ueberhaupt eine Anmeldung braucht --
+    // ein oeffentlicher Endpoint soll an einer abgelaufenen Session nicht
+    // scheitern.
 }
 
 // ============================================
@@ -345,7 +352,7 @@ if($apiToken) {
     }
 
     // Session-Timeout prüfen (optional, falls du serverseitig auch timeout willst)
-    $sessionLifetime = (int)ini_get('session.gc_maxlifetime'); // z.B. 1800 = 30 Min
+    $sessionLifetime = SESSION_TIMEOUT_SECONDS;
     
     if(isset($_SESSION['last_activity'])) {
         $inactiveTime = time() - $_SESSION['last_activity'];
@@ -529,7 +536,7 @@ switch($resource) {
         handleMyData($db, $database, $request_method, $authUserId);
         break;
     case 'session_info':
-        getSessionDebugInfo($request_method);
+        getSessionStatus($request_method);
         break;
     case 'version':
         getVersion();

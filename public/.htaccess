@@ -31,6 +31,25 @@ Options -Indexes
     Require all denied
 </Files>
 
+# ============================================
+# SICHERHEITS-HEADER
+# ============================================
+# Bewusst OHNE Content-Security-Policy: Die Oberflaeche traegt 95 onclick-
+# Attribute in index.html. Eine CSP ohne 'unsafe-inline' legt sie still, eine
+# CSP mit 'unsafe-inline' waere gegen XSS wirkungslos und damit nur Fassade.
+# Der Weg dorthin steht als OI-17 in docs/OPEN-ITEMS.md.
+<IfModule mod_headers.c>
+    # Kein MIME-Sniffing -- ein hochgeladenes Logo bleibt ein Bild
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Kein Einbetten in fremde Seiten; die Anwendung nutzt selbst keine iframes
+    Header always set X-Frame-Options "DENY"
+
+    # Kein Pfad im Referrer an fremde Ziele -- Termin- und Mitglieds-IDs
+    # stehen in den URLs der Anwendung
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
 # Authorization-Header an PHP durchreichen (XAMPP/Apache strippt ihn sonst)
 SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

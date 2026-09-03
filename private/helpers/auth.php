@@ -254,7 +254,13 @@ function validateCSRFToken($token) {
            hash_equals($_SESSION['csrf_token'], $token);
 }
 
-function getSessionDebugInfo($method) {
+/**
+ * Restlaufzeit der aktuellen Web-Session fuer eine Ablaufwarnung im Frontend.
+ *
+ * Hiess bis 1.2.1 getSessionDebugInfo() und lieferte Session-ID und den
+ * gesamten $_SESSION-Inhalt aus; siehe OI-18 in docs/OPEN-ITEMS.md.
+ */
+function getSessionStatus($method) {
     if($method !== 'GET')
     {
         http_response_code(403);
@@ -269,22 +275,30 @@ function getSessionDebugInfo($method) {
         exit();
     }
 
-    // Session-Informationen sammeln
+    // Gegen dieselbe Grenze rechnen, die api.php durchsetzt -- sonst zeigt die
+    // Oberflaeche eine Restzeit an, die der Server nicht einhaelt.
+    $timeout = defined('SESSION_TIMEOUT_SECONDS')
+        ? SESSION_TIMEOUT_SECONDS
+        : (int) ini_get('session.gc_maxlifetime');
+
+    // Bewusst knapp gehalten: Ausgeliefert wird nur, was der Client fuer eine
+    // Ablaufwarnung braucht.
+    //
+    // Nicht enthalten und nicht wieder aufzunehmen:
+    // - session_id  -- das Cookie ist HttpOnly. Die ID hier herauszugeben, gibt
+    //                  sie genau dem JavaScript, dem HttpOnly sie entzieht.
+    // - $_SESSION   -- enthaelt den CSRF-Token. Ihn per GET lesbar zu machen,
+    //                  entwertet den Schutz, sobald die Antwort lesbar wird.
+    // Siehe OI-18 in docs/OPEN-ITEMS.md.
     $sessionInfo = [
-        'session_id' => session_id(),
-        'session_name' => session_name(),
-        'session_status' => session_status(), // 0=disabled, 1=none, 2=active
-        'cookie_lifetime' => ini_get('session.cookie_lifetime'),
-        'gc_maxlifetime' => ini_get('session.gc_maxlifetime'),
-        'session_data' => $_SESSION,
-        'last_activity' => $_SESSION['last_activity'] ?? null,
-        'current_time' => time(),
-        'time_since_activity' => isset($_SESSION['last_activity']) 
-            ? time() - $_SESSION['last_activity'] 
+        'role'                => $_SESSION['role'] ?? null,
+        'last_activity'       => $_SESSION['last_activity'] ?? null,
+        'time_since_activity' => isset($_SESSION['last_activity'])
+            ? time() - $_SESSION['last_activity']
             : null,
-        'remaining_seconds' => isset($_SESSION['last_activity']) 
-            ? (int)ini_get('session.gc_maxlifetime') - (time() - $_SESSION['last_activity'])
-            : null
+        'remaining_seconds'   => isset($_SESSION['last_activity'])
+            ? $timeout - (time() - $_SESSION['last_activity'])
+            : null,
     ];
 
     echo json_encode([

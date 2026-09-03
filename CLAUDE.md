@@ -218,10 +218,12 @@ exceptions, statistics und work_sessions (siehe `docs/OPEN-ITEMS.md`).
 
 - Prepared Statements für alle DB-Queries (kein SQL-Injection-Risiko)
 - CSRF-Token für alle mutierende Requests via Session
-- Rate Limiting: 100 Requests/Minute pro IP+User
-- Session-Timeout: 3600 Sekunden
+- Rate Limiting: 100 Requests/Minute pro IP+User (`private/helpers/rate_limiter.php`)
+- Session-Timeout: 1800 Sekunden, gesetzt in `public/api/api.php`
 - TOTP für standortgebundene Geräte-Check-ins
-- CSP-Header, HttpOnly + SameSite Cookies
+- HttpOnly + SameSite Cookies, `Secure` nur über HTTPS (`public/api/api.php`)
+- `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` in `public/.htaccess`
+- **Keine CSP** — die Oberfläche nutzt Inline-Handler, siehe OI-17 in `docs/OPEN-ITEMS.md`
 - `private/` nie öffentlich erreichbar
 
 ## Lokale Entwicklung

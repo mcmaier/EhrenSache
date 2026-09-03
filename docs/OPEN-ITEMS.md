@@ -4,7 +4,7 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-02 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
+**Zuletzt geprüft:** 2026-09-03 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
 **Version:** 1.2.1
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
@@ -145,6 +145,87 @@ gilt also rund 90 Sekunden — lange genug, um ihn per Screenshot an einen Abwes
 Toleranz `0` wäre strenger, aber anfällig für Uhrendrift auf dem Mitgliedsgerät.
 
 Bewusst unverändert. Nur dokumentieren, nicht als stärker beschreiben, als es ist.
+
+---
+
+### OI-17 · Keine Content-Security-Policy
+**Priorität:** mittel
+
+Die Anwendung liefert **keine** CSP — weder als Header noch als `<meta http-equiv>`. Am
+2026-09-03 nachgeprüft: keine der neun `.htaccess`-Dateien und kein `header()`-Aufruf setzt
+sie. `CLAUDE.md` behauptete das Gegenteil; die Zeile war schlicht falsch und ist korrigiert.
+
+**Warum sie nicht einfach nachgereicht wird.** `public/index.html` enthält 95
+`onclick`-Attribute und 124 Inline-`style`-Attribute. Jedes davon ist aus Sicht einer CSP
+Inline-Code:
+
+- CSP ohne `'unsafe-inline'` → die Oberfläche funktioniert nicht mehr
+- CSP mit `'unsafe-inline'` für `script-src` → gegen XSS praktisch wirkungslos
+
+Die zweite Variante wäre eine Zeile, die in einem Audit gut aussieht und nichts verhindert.
+Deshalb bewusst keine CSP, statt einer, die nur so heißt.
+
+**Was stattdessen gesetzt wurde** (`public/.htaccess`, seit 2026-09-03):
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin`.
+
+**Weg zu einer echten CSP** — in dieser Reihenfolge, sonst bricht Schritt 3:
+
+1. Die 95 `onclick`-Attribute auf `addEventListener` umstellen. Die PWA unter
+   `public/checkin/` ist bereits frei von Inline-Handlern und taugt als Vorlage.
+2. Inline-`style` auf Klassen aus `public/css/` umstellen, oder `style-src 'unsafe-inline'`
+   als bewusste Ausnahme behalten — Inline-Styles sind das deutlich kleinere Risiko.
+3. `Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none';
+   base-uri 'self'; frame-ancestors 'none'` setzen und gegen alle Sektionen prüfen.
+
+Schritt 1 ist der gesamte Aufwand und gehört in eine eigene Spec.
+
+**Keine Entwarnung.** Eine CSP ist die zweite Verteidigungslinie, nicht die erste. Ihr Fehlen
+ist kein Freibrief für ungeprüfte Ausgabe: Jede neue serverseitig gerenderte HTML-Ansicht
+maskiert ihre Werte selbst. Das betrifft insbesondere die geplante Druckansicht der
+Arbeitszeitauswertung, in die freie Nutzereingaben aus der PWA fließen — siehe
+`docs/superpowers/specs/2026-09-03-zeitraumfilter-druckansicht-design.md`, Abschnitt
+„Sicherheit".
+
+---
+
+### OI-18 · `session_info` gab Session-ID und CSRF-Token heraus
+**Priorität:** erledigt am 2026-09-03
+
+`GET ?resource=session_info` lieferte jeder angemeldeten Rolle — auch `user` — die
+Session-ID im Klartext und das vollständige `$_SESSION`-Array, darin den CSRF-Token,
+`user_id`, `email` und interne Rate-Limit-Schlüssel. Die Funktion hieß
+`getSessionDebugInfo()` ([auth.php:263](../private/helpers/auth.php)) — ein Debug-Werkzeug,
+produktiv geroutet.
+
+**Warum das zählte.** Das Session-Cookie ist `HttpOnly`, JavaScript kommt also nicht daran.
+Dieser Endpoint reichte die ID per `fetch()` an genau dieses JavaScript zurück, zusammen mit
+dem CSRF-Token. Bei einem XSS war der Unterschied zwischen gesetztem und nicht gesetztem
+`HttpOnly` damit aufgehoben: ein Request, und Sitzungsübernahme wie CSRF-Umgehung lagen
+zusammen vor.
+
+**Warum es keine eigenständige Lücke war.** Ohne XSS ist die Antwort nicht auslesbar — die
+Same-Origin-Policy schützt sie, CORS ist nicht aktiv. Der Fund verstärkte andere Lücken,
+öffnete aber keine. Aufgefallen ist er beiläufig bei der Arbeit an OI-17.
+
+**Behoben am 2026-09-03.** Ausgeliefert werden nur noch `role`, `last_activity`,
+`time_since_activity` und `remaining_seconds`. `session_id` und `session_data` sind entfernt;
+ein Kommentar an der Fundstelle und der Abschnitt „Session-Status" in `API.md` halten fest,
+dass sie nicht wieder aufzunehmen sind.
+
+**Fußangel, die bestehen bleibt.** In [public/api/.htaccess](../public/api/.htaccess) liegen
+CORS-Zeilen auskommentiert unter der Überschrift „bei Bedarf". `Access-Control-Allow-Origin: *`
+allein ist harmlos, weil der Browser dann keine Cookies mitsendet. Wer dort je eine konkrete
+Origin zusammen mit `Access-Control-Allow-Credentials: true` einträgt, macht jede
+Session-Antwort für diese Origin lesbar. Vor dem Aktivieren zu prüfen, welche Endpoints dann
+von fremden Seiten lesbar würden.
+
+Die Funktion heißt seit demselben Tag `getSessionStatus()`; der alte Name benannte einen
+Zweck, den sie nach der Kürzung nicht mehr hat.
+
+**Offen geblieben:** Der Endpoint hat **keinen Aufrufer** im Frontend. Bewusst behalten — die
+gekürzte Antwort ist die vorgesehene Grundlage für eine Ablaufwarnung in der Oberfläche.
+Kommt sie nicht, ist der Endpoint ersatzlos entfernbar.
 
 ---
 

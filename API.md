@@ -273,6 +273,49 @@ Gibt Informationen über den aktuell angemeldeten Benutzer zurück.
 
 ---
 
+### Session-Status
+Restlaufzeit der aktuellen Web-Session. Gedacht als Grundlage für eine Ablaufwarnung in der
+Oberfläche.
+
+**Endpoint:** `GET /api.php?resource=session_info`
+
+**Authentifizierung:** Nur Session. Aufrufe mit Bearer-Token erreichen den Endpoint nicht —
+für Token-Aufrufe wird gar keine Session gestartet.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "role": "admin",
+    "last_activity": 1772787600,
+    "time_since_activity": 42,
+    "remaining_seconds": 1758
+  }
+}
+```
+
+`remaining_seconds` rechnet gegen `SESSION_TIMEOUT_SECONDS` aus `public/api/api.php` — also
+gegen dieselbe Grenze, die der Server beim nächsten Aufruf durchsetzt.
+
+**Bewusst nicht enthalten:** `session_id` und der Inhalt von `$_SESSION` (und damit der
+CSRF-Token). Das Session-Cookie ist `HttpOnly`; die ID hier auszugeben, würde sie genau dem
+JavaScript zurückgeben, dem `HttpOnly` sie entzieht. Siehe OI-18 in `docs/OPEN-ITEMS.md` —
+diese Felder sind nicht wieder aufzunehmen.
+
+**Fehler:**
+
+| Status | Bedingung | Antwort |
+|---|---|---|
+| 401 | keine angemeldete Session | `{"message":"Unauthorized"}` |
+| 403 | mutierendes Verfahren ohne gültigen CSRF-Token | `{"message":"Invalid CSRF token"}` |
+
+Beide Fälle fängt die zentrale Prüfung in `public/api/api.php` ab, bevor der Handler läuft.
+Die Prüfungen in `getSessionStatus()` selbst sind zweite Verteidigungslinie und im
+Normalbetrieb nicht erreichbar.
+
+---
+
 ## Mitglieder (members)
 
 ### Alle Mitglieder abrufen
