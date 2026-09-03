@@ -23,6 +23,7 @@ statt sie hier zu duplizieren:
 | `DISCLAIMER.md`, `LICENSE`, `COMMERCIAL-LICENSE.md` | Rechtliches | ja |
 | `public/checkin/README.md` | PWA für mobilen Check-in | ja |
 | `docs/OPEN-ITEMS.md` | **Offene Entscheidungen, Restarbeiten, bewusst Verworfenes** | ja |
+| `docs/FEATURE-IDEAS.md` | **Ideen für künftige Funktionen — unverbindlich, nicht geplant** | ja |
 | `docs/testplan.md` | Manueller Testplan nach Feature-Bereichen | ja |
 | `docs/superpowers/specs/` | Design-Spezifikationen je Feature | ja |
 | `docs/superpowers/plans/` | Umsetzungspläne je Feature (Prozessprotokolle) | nein (ignoriert) |
