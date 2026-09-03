@@ -265,6 +265,7 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | CIN-14 | Hinweistext unter der Terminauswahl bei beiden Schalterstellungen prüfen | Zweiter Satz wechselt je nach `checkin_auto_create_appointment` |
 | CIN-15 | PWA nach 22:00 Uhr öffnen | Auswahl zeigt heutige Termine, nicht die von morgen |
 | CIN-16 | `checkin_tolerance_hours` auf 4 setzen, Termin 3 h entfernt | Check-in trifft ihn |
+| CIN-17 | Termin von 10:00 Uhr in der PWA wählen, um 16:47 Uhr einchecken | 409 `appointment_outside_tolerance`, kein Check-in |
 
 ### 9.2 TOTP-Checkin
 

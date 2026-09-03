@@ -247,8 +247,12 @@ test('Gewaehlter Termin desselben Tages wird uebernommen', function () {
         [$status, $id] = ciCreateAppointment('Gewaehlt-Probe', date('Y-m-d'), '21:00:00');
         assertSame(201, $status, 'Termin fuer die Auswahl konnte nicht angelegt werden');
 
+        // Toleranz 0 heisst hier: nur ein exakter Treffer zaehlt. Die
+        // automatische Suche faende bei 0h nichts (Isolationszweck dieses
+        // Tests), die Ankunft trifft aber exakt die Terminzeit und erfuellt
+        // damit auch die seit dem 2026-09-03 gemeldeten Toleranzpruefung.
         $res = ciCheckin([
-            'arrival_time'   => date('Y-m-d') . ' 05:21:11',
+            'arrival_time'   => date('Y-m-d') . ' 21:00:00',
             'appointment_id' => $id,
         ]);
 
@@ -361,6 +365,75 @@ test('scope=client ohne Anmeldung wird abgewiesen', function () {
 
     assertTrue(in_array($res['status'], [401, 403], true),
         'Unangemeldet darf nichts gelesen werden, HTTP ' . $res['status']);
+});
+
+/**
+ * Neue, eigene Terminart je Aufruf — NICHT statisch zwischengespeichert.
+ *
+ * Zwei Tests, die sich dieselbe Terminart teilen, kollidieren untereinander
+ * an der Dublettenpruefung von appointments.php, sobald ihre Termine
+ * innerhalb der Toleranz liegen — genau das, was diese Tests pruefen sollen.
+ * Jeder Aufruf bekommt deshalb eine frische Terminart.
+ */
+function ciFreshTypeId(): int
+{
+    $res = apiRequest('POST', 'appointment_types', [
+        'token' => apiToken('admin'),
+        'body'  => ['type_name' => 'Toleranz-Auswahl-Art ' . uniqid()],
+    ]);
+    assertSame(201, $res['status'], 'Terminart fuer die Toleranz-Tests konnte nicht angelegt werden');
+
+    return ciTrack('appointment_type', (int) $res['body']['id']);
+}
+
+test('Gewaehlter Termin ausserhalb der Toleranz wird abgewiesen', function () {
+    // Gemeldet am 2026-09-03: Ein Mitglied konnte einen Termin von 10:00 Uhr
+    // waehlen und noch um 16:47 Uhr dafuer einchecken — 6h47 Abstand bei
+    // Standardtoleranz 2h. Der gewaehlte Pfad pruefte bislang nur Existenz,
+    // Gruppe und Tag, nie die Zeitnaehe. Die Tagesgrenze ist eine harte
+    // Sicherung unabhaengig von der Toleranz (siehe Kommentar im Handler);
+    // die Toleranz ist die zusaetzliche, konfigurierbare Schranke dazu.
+    ciWithReset(['checkin_tolerance_hours' => '2'], function () {
+        ciSetSetting('checkin_tolerance_hours', '2');
+
+        [$status, $id] = ciCreateAppointment(
+            'Toleranz-Auswahl weit', date('Y-m-d'), '10:00:00', ciFreshTypeId()
+        );
+        assertSame(201, $status, 'Termin fuer den Toleranztest konnte nicht angelegt werden');
+
+        $res = ciCheckin([
+            'arrival_time'   => date('Y-m-d') . ' 16:47:00',
+            'appointment_id' => $id,
+        ]);
+
+        assertSame(409, $res['status'],
+            'Ein 6h47 entfernter Termin darf bei 2h Toleranz nicht angenommen werden');
+        assertSame('appointment_outside_tolerance', $res['body']['reason'] ?? null,
+            'Die Antwort muss den Grund maschinenlesbar nennen');
+    });
+});
+
+test('Gewaehlter Termin innerhalb der Toleranz wird weiterhin uebernommen', function () {
+    ciWithReset(['checkin_tolerance_hours' => '2'], function () {
+        ciSetSetting('checkin_tolerance_hours', '2');
+
+        [$status, $id] = ciCreateAppointment(
+            'Toleranz-Auswahl nah', date('Y-m-d'), '11:00:00', ciFreshTypeId()
+        );
+        assertSame(201, $status, 'Termin fuer den Toleranztest konnte nicht angelegt werden');
+
+        // 90 Minuten Abstand — innerhalb der 2h-Toleranz.
+        $res = ciCheckin([
+            'arrival_time'   => date('Y-m-d') . ' 12:30:00',
+            'appointment_id' => $id,
+        ]);
+
+        assertTrue(in_array($res['status'], [200, 201], true),
+            'Ein 90 Minuten entfernter Termin muss bei 2h Toleranz weiterhin gelingen, HTTP '
+            . $res['status']);
+        assertSame($id, (int) ($res['body']['appointment_id'] ?? 0),
+            'Es muss der gewaehlte Termin verwendet werden');
+    });
 });
 
 /**

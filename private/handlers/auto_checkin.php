@@ -227,6 +227,25 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
             ]);
             return;
         }
+
+        // Die Tagesgrenze allein reicht nicht: Innerhalb desselben Tages liesse
+        // sich sonst fuer einen laengst vergangenen (oder noch bevorstehenden)
+        // Termin einchecken, unabhaengig von der tatsaechlichen Uhrzeit.
+        // Gemeldet am 2026-09-03 — ein Termin um 10:00 nahm noch um 16:47 einen
+        // Check-in an. Dieselbe Toleranz gilt hier wie bei der automatischen
+        // Suche, nur eben auf genau einen Termin angewandt statt auf die Suche.
+        $chosenAppointmentTime = new DateTime($chosenAppointment['date'] . ' ' . $chosenAppointment['start_time']);
+        $chosenDiffSeconds = abs($arrivalTime->getTimestamp() - $chosenAppointmentTime->getTimestamp());
+
+        if($chosenDiffSeconds > $toleranceSeconds) {
+            http_response_code(409);
+            echo json_encode([
+                "message" => "Termin liegt außerhalb des Zeitfensters",
+                "reason"  => "appointment_outside_tolerance",
+                "hint"    => "Zeitfenster: ±{$tolerance} Stunde(n)"
+            ]);
+            return;
+        }
     }
 
     // ===========================================

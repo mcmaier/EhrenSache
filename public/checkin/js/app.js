@@ -234,7 +234,9 @@ const SERVER_MESSAGES = {
     'Termin liegt an einem anderen Tag':
         'Dieser Termin ist nicht von heute. Bitte die App neu laden.',
     'Termin gehoert zu einer anderen Gruppe':
-        'Dieser Termin ist für deine Gruppe nicht vorgesehen.'
+        'Dieser Termin ist für deine Gruppe nicht vorgesehen.',
+    'Termin liegt außerhalb des Zeitfensters':
+        'Dieser Termin liegt zeitlich zu weit entfernt. Bitte den passenden Termin wählen.'
 };
 
 async function apiCall(resource, method = 'GET', data = null, params = {}) {

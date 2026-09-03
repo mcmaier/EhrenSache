@@ -636,12 +636,18 @@ Sucht passenden Termin im Zeitfenster. Kann automatisch einen neuen Termin anleg
 | `403` | `appointment_not_permitted` | Termin gehört zu einer anderen Gruppe |
 | `404` | `appointment_not_found` | `appointment_id` existiert nicht |
 | `409` | `appointment_wrong_day` | Termin liegt an einem anderen Tag |
+| `409` | `appointment_outside_tolerance` | Termin liegt zeitlich außerhalb von `checkin_tolerance_hours` |
 | `409` | `no_matching_appointment` | Kein Treffer und die Automatik ist abgeschaltet |
 
 Das Zeitfenster steht in der Einstellung `checkin_tolerance_hours`, ob ohne Treffer ein Termin
 angelegt wird in `checkin_auto_create_appointment` (siehe
 [Systemeinstellungen](#systemeinstellungen-settings)). Ein automatisch erzeugter Termin trägt
 `is_auto_created = 1`.
+
+**Die Toleranz gilt auch für einen gewählten Termin** (`appointment_id`), nicht nur für die
+automatische Suche. Die Tagesgrenze allein reicht nicht als Schutz: Ohne die Zeitprüfung ließe
+sich für einen beliebigen Termin desselben Tages einchecken, unabhängig von der tatsächlichen
+Uhrzeit.
 
 ---
 

@@ -30,9 +30,10 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Altbestand und nennt seine Anzahl im Protokoll
 
 ### Behoben
-- Ein vom Client geschickter Termin wird serverseitig gegen Tag und Gruppenzugehörigkeit
-  geprüft. Ohne diese Prüfung ließe sich über den Check-in-Endpunkt rückwirkend Anwesenheit
-  behaupten
+- Ein vom Client geschickter Termin wird serverseitig gegen Tag, Gruppenzugehörigkeit **und
+  Zeitfenster** geprüft. Ohne diese Prüfungen ließe sich über den Check-in-Endpunkt rückwirkend
+  Anwesenheit behaupten — die Tagesgrenze allein erlaubte einen Check-in zu jeder Uhrzeit
+  desselben Tages, ein zeitlich weit entfernter Termin wurde ebenso angenommen wie ein naher
 
 ### Warum
 Bis 1.2.3 legte ein Check-in ohne passenden Termin unbemerkt einen neuen an — Standard-
