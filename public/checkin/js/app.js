@@ -579,6 +579,12 @@ async function handleLogout() {
     elements.passwordInput.value = '';
     elements.loginError.classList.remove('active');
 
+    // Offene Dialoge schliessen. Solange die Modals faelschlich IM mainScreen
+    // lagen, verschwanden sie mit ihm; seit die Verschachtelung stimmt, sind
+    // sie davon unabhaengig und stuenden sonst ueber dem Anmeldebildschirm.
+    document.querySelectorAll('.modal.active, .pwa-confirm-modal.active')
+        .forEach(m => m.classList.remove('active'));
+
     showScreen('login');
     stopTicker();
 
