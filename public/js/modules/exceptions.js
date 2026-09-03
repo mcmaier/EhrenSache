@@ -435,6 +435,10 @@ function buildExceptionAppointmentOptions(appointments) {
         const option = document.createElement('option');
         option.value = appointment.appointment_id;
         option.textContent = displayText;
+        if (appointment.color) {
+            option.style.color = appointment.color;
+            option.style.fontWeight = '500';
+        }
         option.dataset.typeId = appointment.type_id || '';
         option.dataset.typeName = appointment.type_name || '';
         select.appendChild(option);
