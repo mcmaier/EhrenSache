@@ -186,3 +186,55 @@ test('Check-in trifft einen Termin im Toleranzfenster', function () {
             'Es muss genau der angelegte Termin getroffen werden');
     });
 });
+
+/** Zaehlt die heutigen Termine einer Terminart. */
+function ciCountAppointments(int $typeId): int
+{
+    $res = apiRequest('GET', 'appointments', [
+        'token' => apiToken('admin'),
+        'query' => ['from_date' => date('Y-m-d'), 'to_date' => date('Y-m-d')],
+    ]);
+
+    $count = 0;
+    foreach (($res['body'] ?? []) as $apt) {
+        if ((int) ($apt['type_id'] ?? 0) === $typeId) {
+            $count++;
+        }
+    }
+
+    return $count;
+}
+
+test('Automatik aus: Check-in ohne passenden Termin wird abgewiesen', function () {
+    ciWithReset(['checkin_auto_create_appointment' => '1', 'checkin_tolerance_hours' => '2'], function () {
+        ciSetSetting('checkin_auto_create_appointment', '0');
+        ciSetSetting('checkin_tolerance_hours', '0');
+
+        $before = ciCountAppointments(ciTypeId());
+
+        // Toleranz 0 heisst: nur ein sekundengenauer Treffer zaehlt. Eine
+        // Ankunft auf einer krummen Sekunde trifft deshalb sicher nichts.
+        $res = ciCheckin(['arrival_time' => date('Y-m-d') . ' 03:17:43']);
+
+        assertSame(409, $res['status'], 'Ohne Automatik muss der Check-in mit 409 scheitern');
+        assertSame('no_matching_appointment', $res['body']['reason'] ?? null,
+            'Die Antwort muss den Grund maschinenlesbar nennen');
+        assertSame($before, ciCountAppointments(ciTypeId()),
+            'Es darf kein Termin angelegt worden sein');
+    });
+});
+
+test('Automatik an: Check-in ohne passenden Termin legt einen Termin an', function () {
+    ciWithReset(['checkin_auto_create_appointment' => '1', 'checkin_tolerance_hours' => '2'], function () {
+        ciSetSetting('checkin_auto_create_appointment', '1');
+        ciSetSetting('checkin_tolerance_hours', '0');
+
+        $res = ciCheckin(['arrival_time' => date('Y-m-d') . ' 04:19:47']);
+
+        assertSame(201, $res['status'], 'Mit Automatik muss der Check-in gelingen');
+        assertSame('created', $res['body']['appointment_action'] ?? null,
+            'Die Antwort muss melden, dass ein Termin angelegt wurde');
+
+        ciTrack('appointment', (int) ($res['body']['appointment_id'] ?? 0));
+    });
+});

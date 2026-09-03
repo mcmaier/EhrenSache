@@ -279,9 +279,25 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
         $action = 'matched';
         //error_log("==> Final match: Appointment #{$appointmentId}");
     } else {
-        // Kein passender Termin → Erstelle automatischen Termin
+        // Kein passender Termin.
+        //
+        // Ob jetzt einer angelegt wird, entscheidet der Verein. Bis 1.2.3
+        // geschah das immer und unbemerkt — mit der Folge, dass ein Fehlscan
+        // einen Termin erzeugte, der in der Statistik bei jedem anderen
+        // Mitglied der Gruppe als Fehlzeit auftauchte.
+        if(!checkinCreatesAppointments($db, $database)) {
+            http_response_code(409);
+            echo json_encode([
+                "message" => "Kein passender Termin gefunden",
+                "reason"  => "no_matching_appointment",
+                "hint"    => "Bitte beim Vorstand melden"
+            ]);
+            return;
+        }
+
+        // Erstelle automatischen Termin
         //error_log("==> No match found, creating auto appointment");
-        
+
         // Runde auf 5-Minuten-Schritte
         $minutes = (int)$arrivalTime->format('i');
         $roundedMinutes = round($minutes / 5) * 5;
