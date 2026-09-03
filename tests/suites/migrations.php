@@ -129,3 +129,26 @@ test('resolveMigrationChain wirft bei einem Schritt, der nicht vorwaerts fuehrt'
         resolveMigrationChain('1.0.0', '1.3.0', $broken);
     });
 });
+
+test('Das echte Manifest ist lueckenlos verkettet', function () {
+    $manifest = loadMigrationManifest(__DIR__ . '/../../private/migrations/manifest.php');
+
+    for ($i = 1; $i < count($manifest); $i++) {
+        assertSame(
+            $manifest[$i - 1]['to'],
+            $manifest[$i]['from'],
+            "Schritt {$i}: 'from' passt nicht zum 'to' des Vorgaengers"
+        );
+    }
+});
+
+test('Das Manifest endet bei der Version aus version.json', function () {
+    $manifest = loadMigrationManifest(__DIR__ . '/../../private/migrations/manifest.php');
+    $version  = json_decode(file_get_contents(__DIR__ . '/../../version.json'), true);
+
+    assertSame(
+        $version['version'],
+        $manifest[count($manifest) - 1]['to'],
+        'Letzter Migrationsschritt und version.json muessen dieselbe Version nennen'
+    );
+});

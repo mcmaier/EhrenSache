@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}appointments` (
   `start_time` time NOT NULL,
   `created_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_auto_created` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`appointment_id`),
   KEY `created_by` (`created_by`),
   KEY `idx_date` (`date`)
@@ -572,7 +573,9 @@ DEALLOCATE PREPARE stmt;
 INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `setting_type`, `category`, `description`) VALUES
 ('worktime_enabled', '0', 'boolean', 'general', 'Zeiterfassung aktiviert'),
 ('worktime_max_session_hours', '12', 'number', 'general', 'Obergrenze in Stunden, ab der eine laufende Sitzung automatisch beendet wird'),
-('worktime_require_note', '0', 'boolean', 'general', 'Notiz beim Stoppen und bei manuellen Einträgen erzwingen');
+('worktime_require_note', '0', 'boolean', 'general', 'Notiz beim Stoppen und bei manuellen Einträgen erzwingen'),
+('checkin_auto_create_appointment', '0', 'boolean', 'general', 'Beim Check-in einen Termin anlegen, wenn keiner passt'),
+('checkin_tolerance_hours', '2', 'number', 'general', 'Zeitfenster in Stunden, in dem ein Check-in einem Termin zugeordnet wird');
 
 
 CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS
