@@ -5,7 +5,7 @@ unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nic
 oder noch nicht gebaut.
 
 **Zuletzt geprüft:** 2026-09-03 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
-**Version:** 1.2.1
+**Version:** 1.2.2
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
@@ -104,6 +104,41 @@ ist davon unberührt und bleibt offen.
 
 ### OI-5 · Automatisches Löschen der Auditspur
 Siehe [OI-2](#oi-2) — dort zusammengefasst.
+
+---
+
+### OI-19 · Fehler eines Exports erscheinen als JSON-Seite
+**Priorität:** niedrig
+
+Alle Exporte werden über einen Seitenaufruf geholt — `window.location.href` für den
+Download, `window.open` für die Druckansicht. Antwortet der Server mit einem Fehler, ist
+diese Antwort die neue Seite: Der Nutzer sieht `{"message":"…"}` im Vollbild oder in einem
+neuen Tab, statt einer Meldung in der Oberfläche.
+
+**Gefunden** beim manuellen Test ZR-M9 am 2026-09-03 mit einem Zeitraum über 24 Monate.
+
+**Nicht neu.** `exportMembers`, `exportAppointments` und `exportRecords` nutzen dasselbe
+Muster seit jeher. Der Berichtsdialog hat es nur sichtbar gemacht, weil er der erste Export
+mit einer Eingabe ist, die serverseitig scheitern kann.
+
+**Teilweise entschärft.** Der konkrete Fall ist behoben: `runWorktimeReport()` prüft die
+24-Monats-Grenze und das verdrehte Datum vor dem Aufruf und meldet beides als Toast. Die
+Rechnung ist gegen die serverseitige geprüft — für zehn Datumspaare einschließlich
+Schaltjahr liefern PHP und JavaScript denselben letzten zulässigen Tag. Die Prüfung im
+Server bleibt die verbindliche.
+
+**Was offen bleibt:** Läuft die Session ab, während der Dialog offen steht, erscheint
+weiterhin `{"message":"Unauthorized"}` als Seite. Dasselbe gilt für jede von Hand
+zusammengesetzte URL und für die drei älteren Exporte.
+
+**Lösungsweg:** Eine gemeinsame Funktion, die den Export per `fetch` anfordert, den Status
+prüft und erst bei `200` ausliefert. Zwei Fallstricke:
+
+- Der **Download** ließe sich dann aus einem Blob speisen. Das ist der einfache Teil.
+- Die **Druckansicht** darf *nicht* aus einem Blob kommen: Die Seite setzt `<base href="../">`,
+  damit `css/print.css` und das Vereinslogo laden. Unter einer `blob:`-URL greift diese Basis
+  nicht, der Bericht käme ohne Stylesheet und ohne Logo. Hier bliebe nur eine Vorabprüfung
+  per `fetch` und danach ein `window.open` auf die echte URL — also bewusst zwei Anfragen.
 
 ---
 

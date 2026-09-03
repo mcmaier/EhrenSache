@@ -660,7 +660,7 @@ php tests/run.php worktime_api
 | ZR-M6 | Im Browser drucken, Vorschau prüfen | Querformat; Kopfzeile wiederholt sich auf Folgeseiten; keine Zeile über den Umbruch zerrissen |
 | ZR-M7 | Fußnote der Druckansicht | Zuordnungsregel und alle drei Nachweisgrade erklärt |
 | ZR-M8 | „💾 CSV" mit Monatszeitraum | Dateiname trägt den Monat, z. B. `stundennachweis_2026-01.csv` |
-| ZR-M9 | Zeitraum über 24 Monate wählen | Meldung, kein Download |
+| ZR-M9 | Zeitraum über 24 Monate wählen | **Toast im Dialog**, kein Seitenwechsel und kein neuer Tab. Die Meldung darf nicht als JSON-Seite erscheinen |
 | ZR-M10 | Bericht ohne Logo (Einstellung leer) | Kopf ohne Bild, kein gebrochenes Bildsymbol |
 
 ---

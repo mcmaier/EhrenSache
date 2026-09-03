@@ -492,6 +492,29 @@ function isoDate(date) {
 }
 
 /**
+ * Obergrenze eines Auswertungszeitraums in Monaten.
+ *
+ * Spiegelt WORKTIME_MAX_PERIOD_MONTHS aus private/helpers/worktime.php. Die
+ * Prüfung dort bleibt die verbindliche; hier steht sie, damit der Fehler als
+ * Meldung im Dialog erscheint und nicht als nacktes JSON in einem neuen Tab —
+ * der Bericht wird über einen Seitenaufruf geholt, nicht über fetch.
+ */
+const REPORT_MAX_PERIOD_MONTHS = 24;
+
+/**
+ * Letzter zulässiger Tag zu einem Beginn: Beginn + 24 Monate - 1 Tag.
+ * Dieselbe Rechnung wie serverseitig, damit Client und Server nicht an
+ * unterschiedlichen Stellen die Grenze ziehen.
+ */
+function latestAllowedTo(fromIso) {
+    const [y, m, d] = fromIso.split('-').map(Number);
+    const limit = new Date(y, m - 1, d);
+    limit.setMonth(limit.getMonth() + REPORT_MAX_PERIOD_MONTHS);
+    limit.setDate(limit.getDate() - 1);
+    return isoDate(limit);
+}
+
+/**
  * Belegt die Zeitraumfelder vor.
  *
  * Die Schnellwahl ist genau das — eine Vorbelegung zweier Felder. Der Server
@@ -573,6 +596,11 @@ export function runWorktimeReport(format) {
     }
     if (to < from) {
         showToast('Das Ende des Zeitraums liegt vor seinem Beginn', 'error');
+        return;
+    }
+    if (to > latestAllowedTo(from)) {
+        showToast(`Der Zeitraum darf höchstens ${REPORT_MAX_PERIOD_MONTHS} Monate umfassen`,
+                  'error');
         return;
     }
 
