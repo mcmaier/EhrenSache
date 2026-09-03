@@ -262,6 +262,37 @@ ausgelieferten HTML-Datei prüft, würde solche Fälle künftig beim Entstehen m
 
 ---
 
+### OI-16 · Zeiterfassung zeigt inaktive Mitglieder zur Auswahl
+**Priorität:** mittel
+
+Die Mitgliederauswahl der Zeiterfassung nimmt den Jahres-Cache ungefiltert:
+
+- **Filterleiste** — `fillWorktimeFilters()`, [worktime.js:274](../public/js/modules/worktime.js)
+- **Nachtrag-Modal** — `openWorkSessionModal()`, [worktime.js:375](../public/js/modules/worktime.js)
+
+Beide bauen ihre Optionen aus `dataCache.members[currentYear].data`, ohne den
+Mitgliedschaftszeitraum zu berücksichtigen. Wer im gewählten Jahr nicht aktiv war, steht
+trotzdem zur Wahl — und ein Nachtrag für ein ausgetretenes Mitglied lässt sich anlegen.
+
+**Woran es sich messen lassen muss:** Die Statistik löst das bereits. Sie filtert mit
+`allMembers.filter(m => m.is_active_in_period)`
+([statistics.js:130](../public/js/modules/statistics.js)). Das Feld liefert der Server
+jahresabhängig aus `membership_dates` — es steht im selben Cache, wird in der Zeiterfassung
+nur nicht ausgewertet.
+
+**Nächster Schritt:** Beide Stellen auf dasselbe Filterkriterium ziehen. Vorher zu klären:
+
+- Soll die **Filterleiste** ebenfalls filtern? Dort geht es um das Sichten vorhandener
+  Einträge — Stunden eines inzwischen ausgetretenen Mitglieds bleiben ein gültiger
+  Datensatz und müssen auffindbar bleiben. Möglicherweise ist hier nur eine Kennzeichnung
+  richtig, kein Ausschluss.
+- Im **Nachtrag-Modal** ist der Ausschluss dagegen eindeutig: Für einen Zeitraum ohne
+  Mitgliedschaft sollte gar kein Eintrag entstehen können.
+
+Die Statistik zeigt also die Lösung für den einen Fall, nicht zwingend für beide.
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
