@@ -137,3 +137,123 @@ test('validateStationPin klemmt die Mindestlaenge auf 4..8', function () {
     assertTrue(validateStationPin('258', 2) !== null, 'drei Stellen bleiben zu kurz');
     assertSame(null, validateStationPin('20481357', 12), 'Minimum 12 wirkt wie 8');
 });
+
+// ---- stationAuthenticate --------------------------------------------------
+// Laeuft gegen eine SQLite-Datenbank im Speicher und den Session-Limiter:
+// die Sperrlogik wird rot/gruen gefahren, ohne die Entwicklungsdatenbank
+// anzufassen. Braucht pdo_sqlite (in XAMPP standardmaessig aktiv).
+
+if (!extension_loaded('pdo_sqlite')) {
+    test('stationAuthenticate-Tests uebersprungen: pdo_sqlite fehlt', function () {
+        throw new RuntimeException('php_pdo_sqlite aktivieren');
+    });
+} else {
+    /** Minimaler Ersatz fuer die Database-Klasse aus config.php. */
+    final class StationTestDatabase
+    {
+        public function table(string $name): string
+        {
+            return 'ut_' . $name;
+        }
+    }
+
+    /**
+     * Frische Datenbank mit Mitgliedern: 100 (PIN 2580, aktiv),
+     * 200 (PIN 1357, inaktiv), 300 ohne PIN und 400 doppelt vergeben.
+     */
+    function stationTestDb(): array
+    {
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec("CREATE TABLE ut_members (
+                        member_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT, surname TEXT, member_number TEXT,
+                        pin_hash TEXT, active INTEGER DEFAULT 1)");
+        $ins = $pdo->prepare("INSERT INTO ut_members (name, surname, member_number, pin_hash, active)
+                              VALUES (?, ?, ?, ?, ?)");
+        $ins->execute(['Anna', 'Aktiv',   '100', password_hash('2580', PASSWORD_DEFAULT), 1]);
+        $ins->execute(['Ingo', 'Inaktiv', '200', password_hash('1357', PASSWORD_DEFAULT), 0]);
+        $ins->execute(['Olga', 'Ohne',    '300', null, 1]);
+        $ins->execute(['Dora', 'Doppelt', '400', password_hash('2580', PASSWORD_DEFAULT), 1]);
+        $ins->execute(['Dirk', 'Doppelt', '400', password_hash('2580', PASSWORD_DEFAULT), 1]);
+
+        $_SESSION = [];
+
+        return [$pdo, new StationTestDatabase(), new RateLimiter()];
+    }
+
+    test('stationAuthenticate akzeptiert Nummer + richtige PIN', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        $member = stationAuthenticate($db, $database, $limiter, 1, '100', '2580', $failure);
+        assertTrue($member !== null, 'Mitglied erwartet');
+        assertSame('Anna', $member['name']);
+        assertSame(null, $failure);
+    });
+
+    test('stationAuthenticate lehnt falsche PIN ab', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '100', '9999', $failure));
+        assertSame('invalid', $failure);
+    });
+
+    test('stationAuthenticate lehnt unbekannte Nummer ab — gleiche Meldung', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '999', '2580', $failure));
+        assertSame('invalid', $failure);
+    });
+
+    test('stationAuthenticate lehnt inaktives Mitglied ab', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '200', '1357', $failure));
+        assertSame('invalid', $failure);
+    });
+
+    test('stationAuthenticate lehnt Mitglied ohne PIN ab', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '300', '2580', $failure));
+        assertSame('invalid', $failure);
+    });
+
+    test('stationAuthenticate lehnt mehrdeutige Nummer ab', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '400', '2580', $failure));
+        assertSame('ambiguous', $failure);
+    });
+
+    test('stationAuthenticate sperrt das Mitglied nach fuenf Fehlversuchen', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        for ($i = 0; $i < 5; $i++) {
+            stationAuthenticate($db, $database, $limiter, 1, '100', '0001', $failure);
+            assertSame('invalid', $failure, "Versuch " . ($i + 1));
+        }
+        // Sechster Versuch: sogar die RICHTIGE PIN wird abgewiesen
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '100', '2580', $failure));
+        assertSame('locked', $failure);
+    });
+
+    test('stationAuthenticate: Erfolg setzt den Zaehler zurueck', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        for ($i = 0; $i < 4; $i++) {
+            stationAuthenticate($db, $database, $limiter, 1, '100', '0001', $failure);
+        }
+        assertTrue(stationAuthenticate($db, $database, $limiter, 1, '100', '2580', $failure) !== null);
+        for ($i = 0; $i < 4; $i++) {
+            stationAuthenticate($db, $database, $limiter, 1, '100', '0001', $failure);
+        }
+        assertTrue(stationAuthenticate($db, $database, $limiter, 1, '100', '2580', $failure) !== null,
+                   'nach Erfolg zaehlt es wieder von vorn');
+    });
+
+    test('stationAuthenticate sperrt den Kiosk nach dreissig Fehlversuchen', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        // 30 Versuche auf lauter unbekannte Nummern: kein Mitgliedszaehler greift
+        for ($i = 0; $i < 30; $i++) {
+            stationAuthenticate($db, $database, $limiter, 7, 'nr' . $i, '0001', $failure);
+            assertSame('invalid', $failure, "Versuch " . ($i + 1));
+        }
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 7, '100', '2580', $failure));
+        assertSame('locked', $failure);
+        // Ein anderer Kiosk ist nicht betroffen
+        assertTrue(stationAuthenticate($db, $database, $limiter, 8, '100', '2580', $failure) !== null);
+    });
+}
