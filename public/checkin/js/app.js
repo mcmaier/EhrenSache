@@ -446,10 +446,71 @@ function renderCheckinAppointmentOptions() {
 
     select.value = previous;
 
+    // Nur vorbelegen, wenn noch keine Auswahl steht — weder eine
+    // wiederhergestellte (previous) noch eine, deren Termin nicht mehr in
+    // der Liste ist (dann setzt der Browser value bereits auf '').
+    if (!select.value) {
+        const closest = findClosestCheckinAppointment();
+        if (closest) {
+            select.value = String(closest.appointment_id);
+        }
+    }
+
     if (hint) {
         hint.textContent = clientSettings.checkin_auto_create_appointment === '1'
             ? 'Ohne Auswahl wird der passende Termin gesucht — findet sich keiner, wird ein neuer angelegt.'
             : 'Ohne Auswahl wird der passende Termin gesucht — findet sich keiner, schlägt der Check-in fehl.';
+    }
+
+    renderCheckinSuggestion();
+}
+
+/**
+ * Zeitlich naechster Termin im Toleranzfenster, oder null.
+ *
+ * Spiegelt die serverseitige Regel aus auto_checkin.php, ohne die
+ * Standard-Gruppen-Prioritaet bei mehreren Kandidaten im selben Fenster —
+ * fuer einen Hinweis ausreichend, verbindlich bleibt ohnehin der Server.
+ */
+function findClosestCheckinAppointment() {
+    const parsedTolerance = parseInt(clientSettings.checkin_tolerance_hours, 10);
+    const toleranceHours = Number.isNaN(parsedTolerance) ? 2 : parsedTolerance;
+    const toleranceMs = toleranceHours * 60 * 60 * 1000;
+    const now = Date.now();
+
+    let closest = null;
+    let closestDiff = Infinity;
+
+    for (const apt of checkinAppointments) {
+        const diff = Math.abs(new Date(`${apt.date}T${apt.start_time}`).getTime() - now);
+        if (diff <= toleranceMs && diff < closestDiff) {
+            closest = apt;
+            closestDiff = diff;
+        }
+    }
+
+    return closest;
+}
+
+/**
+ * Zeigt oder verbirgt den Banner ueber den Buttons, passend zum aktuellen
+ * Stand der Terminauswahl — nicht nur zum ersten automatischen Treffer.
+ */
+function renderCheckinSuggestion() {
+    const banner = document.getElementById('checkinSuggestion');
+    const select = document.getElementById('checkinAppointment');
+    if (!banner || !select) return;
+
+    const chosen = checkinAppointments.find(
+        apt => String(apt.appointment_id) === select.value
+    );
+
+    if (chosen) {
+        banner.textContent =
+            `📍 Du checkst ein für: ${chosen.title}, ${chosen.start_time.substring(0, 5)} Uhr`;
+        banner.hidden = false;
+    } else {
+        banner.hidden = true;
     }
 }
 
@@ -2826,6 +2887,12 @@ function showCaptureView(view) {
     if (view === 'worktime') {
         loadWorktimeState();
     }
+
+    if (view === 'attendance') {
+        // Die Liste wird nicht neu geladen — nur der Banner an die aktuelle
+        // Auswahl und das fortgeschrittene "jetzt" angeglichen.
+        renderCheckinSuggestion();
+    }
 }
 
 /**
@@ -2850,6 +2917,9 @@ function initCaptureTab() {
         document.querySelector('.tab-button[data-tab="capture"]')?.click();
         showCaptureView('worktime');
     });
+
+    document.getElementById('checkinAppointment')
+        ?.addEventListener('change', renderCheckinSuggestion);
 
     enterCaptureTab();
 }

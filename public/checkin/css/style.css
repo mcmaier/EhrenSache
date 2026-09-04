@@ -2035,6 +2035,25 @@ body {
     display: none;
 }
 
+/* Bestaetigung, keine Bedingung: Primaerfarbe statt Warnfarbe, im Stil von
+   .field-hint-proof, aber ohne dessen Dringlichkeit. */
+.checkin-suggestion {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--primary-dark);
+    background: rgba(31, 95, 191, 0.08);
+    border-left: 3px solid var(--primary-color);
+}
+
+.checkin-suggestion[hidden] {
+    display: none;
+}
+
 /* Zweck des Scans, dauerhaft ueber dem Sucher. Er beantwortet die Frage
    „wofuer zaehlt der naechste Scan" — die Frage, an der die fruehere
    unsichtbare Umleitung gescheitert ist.
