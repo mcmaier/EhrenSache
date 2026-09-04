@@ -462,6 +462,46 @@ test('members: user darf keine PIN setzen', function () {
     assertStatus(403, $res);
 });
 
+// ---- Phase 2: change_pin ----------------------------------------------------
+
+test('change_pin: user mit Mitglied setzt eigene PIN', function () {
+    enableStationPin();
+    if (apiMemberId('user') === null) {
+        throw new RuntimeException('Testrolle user braucht ein verknuepftes Mitglied');
+    }
+    $cfg = testConfig();
+    $res = apiRequest('POST', 'change_pin', [
+        'token' => apiToken('user'),
+        'body'  => ['current_password' => $cfg['user']['password'], 'new_pin' => '2580'],
+    ]);
+    assertStatus(200, $res);
+});
+
+test('change_pin: falsches Passwort → 403', function () {
+    $res = apiRequest('POST', 'change_pin', [
+        'token' => apiToken('user'),
+        'body'  => ['current_password' => 'falsch-' . uniqid(), 'new_pin' => '2580'],
+    ]);
+    assertStatus(403, $res);
+});
+
+test('change_pin: ungueltige PIN → 400', function () {
+    $cfg = testConfig();
+    $res = apiRequest('POST', 'change_pin', [
+        'token' => apiToken('user'),
+        'body'  => ['current_password' => $cfg['user']['password'], 'new_pin' => '1111'],
+    ]);
+    assertStatus(400, $res);
+});
+
+test('change_pin: Kiosk-Token → 403', function () {
+    $res = apiRequest('POST', 'change_pin', [
+        'token' => kioskToken(),
+        'body'  => ['current_password' => 'x', 'new_pin' => '2580'],
+    ]);
+    assertStatus(403, $res);
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 

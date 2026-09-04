@@ -180,6 +180,31 @@
                         </form>
                     </div>
 
+                    <!-- Stations-PIN (nur wenn freigeschaltet und Mitglied verknuepft) -->
+                    <div class="profile-card" id="profilePinCard" style="display: none;">
+                        <h3>Stations-PIN</h3>
+                        <p style="color: #7f8c8d; margin-bottom: 15px; font-size: 14px;">
+                            Mit Mitgliedsnummer und PIN stempelst du an einer Station (Tablet) ohne Smartphone.
+                            Die PIN ist persönlich — gib sie nicht weiter.
+                        </p>
+                        <form id="changePinForm">
+                            <div class="profile-item">
+                                <label for="pin_current_password">Aktuelles Passwort*</label>
+                                <input type="password" id="pin_current_password" required autocomplete="current-password">
+                            </div>
+                            <div class="profile-item">
+                                <label for="new_pin">Neue PIN*</label>
+                                <input type="password" id="new_pin" required inputmode="numeric" autocomplete="off">
+                                <small style="color: #7f8c8d;" id="new_pin_hint">4–8 Ziffern</small>
+                            </div>
+                            <div class="profile-item">
+                                <label for="confirm_pin">PIN bestätigen*</label>
+                                <input type="password" id="confirm_pin" required inputmode="numeric" autocomplete="off">
+                            </div>
+                            <button type="submit" class="btn-add" style="margin-top: 10px;">PIN speichern</button>
+                        </form>
+                    </div>
+
                     <!-- API-Token -->
                     <div class="profile-card">
                         <h3>API-Token für Zeiterfassung</h3>

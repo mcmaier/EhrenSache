@@ -356,9 +356,10 @@ test('scope=client liefert genau die Whitelist an eine Rolle user', function () 
     sort($keys);
 
     assertSame(
-        ['checkin_auto_create_appointment', 'checkin_tolerance_hours'],
+        ['checkin_auto_create_appointment', 'checkin_tolerance_hours',
+         'station_pin_enabled', 'station_pin_min_length'],
         $keys,
-        'Es duerfen ausschliesslich die zwei freigegebenen Schluessel erscheinen'
+        'Es duerfen ausschliesslich die freigegebenen Schluessel erscheinen'
     );
 });
 

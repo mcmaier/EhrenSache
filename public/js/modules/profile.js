@@ -95,7 +95,20 @@ export async function loadProfile(forceReload = false) {
         }
     } else {
         tokenInput.value = '';
-        expiryInfo.style.display = 'none';    
+        expiryInfo.style.display = 'none';
+    }
+
+    // Stations-PIN nur zeigen, wenn freigeschaltet und ein Mitglied verknuepft ist
+    const card = document.getElementById('profilePinCard');
+    try {
+        const res = await apiCall('settings', 'GET', null, { scope: 'client' });
+        const s   = res?.settings || {};
+        const enabled = s.station_pin_enabled === '1' && !!userDetails.member_id;
+        card.style.display = enabled ? 'block' : 'none';
+        document.getElementById('new_pin_hint').textContent =
+            `${parseInt(s.station_pin_min_length || '4', 10)}–8 Ziffern, keine Folge wie 1234, keine Wiederholung wie 0000`;
+    } catch (e) {
+        card.style.display = 'none';
     }
 }
 
@@ -117,7 +130,16 @@ export function initProfileEventHandler()
                 debug.error('Fehler beim Passwort ändern:', error);
             }
         });
-    } 
+    }
+
+    const changePinForm = document.getElementById('changePinForm');
+    if (changePinForm) {
+        changePinForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await handlePinChange();
+        });
+    }
 }
 
 export async function handlePasswordChange(e)
@@ -149,6 +171,33 @@ export async function handlePasswordChange(e)
     } else {
         document.getElementById('changePasswordForm').reset();
         showToast(result?.message || 'Passwort konnte nicht geändert werden', 'error');
+    }
+}
+
+export async function handlePinChange() {
+    const currentPassword = document.getElementById('pin_current_password').value;
+    const newPin          = document.getElementById('new_pin').value;
+    const confirmPin      = document.getElementById('confirm_pin').value;
+
+    if (newPin !== confirmPin) {
+        showToast('Die PINs stimmen nicht überein', 'error');
+        return;
+    }
+    if (!/^\d{4,8}$/.test(newPin)) {
+        showToast('Die PIN besteht aus 4 bis 8 Ziffern', 'error');
+        return;
+    }
+
+    const result = await apiCall('change_pin', 'POST', {
+        current_password: currentPassword,
+        new_pin: newPin
+    });
+
+    document.getElementById('changePinForm').reset();
+    if (result && result.message === 'PIN changed successfully') {
+        showToast('PIN gespeichert', 'success');
+    } else {
+        showToast(result?.message || 'PIN konnte nicht gespeichert werden', 'error');
     }
 }
 

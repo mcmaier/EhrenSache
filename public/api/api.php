@@ -47,6 +47,7 @@ require_once '../../private/handlers/auto_checkin.php';
 require_once '../../private/handlers/totp_checkin.php';
 require_once '../../private/handlers/regenerate_token.php';
 require_once '../../private/handlers/change_password.php';
+require_once '../../private/handlers/change_pin.php';
 require_once '../../private/handlers/member_groups.php';
 require_once '../../private/handlers/appointment_types.php';
 require_once '../../private/handlers/statistics.php';
@@ -541,7 +542,10 @@ switch($resource) {
         handleTokenRegeneration($db, $database, $request_method, $authUserId, $authUserRole);
         break;                
     case 'change_password':
-        handlePasswordChange($db, $database, $request_method, $authUserId);        
+        handlePasswordChange($db, $database, $request_method, $authUserId);
+        break;
+    case 'change_pin':
+        handlePinChange($db, $database, $request_method, $authUserId, $authMemberId);
         break;
     case 'export':
         handleExport($db, $database, $request_method, $authUserRole);
