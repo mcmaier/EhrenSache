@@ -35,3 +35,55 @@ function stationPinMinLength($db, $database): int
 
     return max(STATION_PIN_MIN_LENGTH_FLOOR, min(STATION_PIN_MAX_LENGTH, $value));
 }
+
+/**
+ * Prüft eine PIN gegen die Regeln aus E11: nur Ziffern, Mindestlänge
+ * (4..8, aus der Einstellung), höchstens 8, keine Einheitsziffern, keine
+ * auf- oder absteigende Folge.
+ *
+ * Reine Funktion — Unit-Test in tests/suites/station_unit.php.
+ *
+ * @return string|null Fehlertext für die Oberfläche, null wenn gültig
+ */
+function validateStationPin(string $pin, int $minLength): ?string
+{
+    $minLength = max(STATION_PIN_MIN_LENGTH_FLOOR, min(STATION_PIN_MAX_LENGTH, $minLength));
+
+    if (!preg_match('/^\d+$/', $pin)) {
+        return 'Die PIN darf nur Ziffern enthalten';
+    }
+    $length = strlen($pin);
+    if ($length < $minLength) {
+        return "Die PIN muss mindestens {$minLength} Ziffern haben";
+    }
+    if ($length > STATION_PIN_MAX_LENGTH) {
+        return 'Die PIN darf höchstens ' . STATION_PIN_MAX_LENGTH . ' Ziffern haben';
+    }
+    if (preg_match('/^(\d)\1+$/', $pin)) {
+        return 'Die PIN darf nicht aus lauter gleichen Ziffern bestehen';
+    }
+    if (stationPinIsSequence($pin)) {
+        return 'Die PIN darf keine auf- oder absteigende Zahlenfolge sein';
+    }
+
+    return null;
+}
+
+/** 1234, 456789, 9876 — Schrittweite genau +1 oder genau −1 über die ganze Länge. */
+function stationPinIsSequence(string $pin): bool
+{
+    $ascending  = true;
+    $descending = true;
+
+    for ($i = 1, $n = strlen($pin); $i < $n; $i++) {
+        $step = (int) $pin[$i] - (int) $pin[$i - 1];
+        if ($step !== 1) {
+            $ascending = false;
+        }
+        if ($step !== -1) {
+            $descending = false;
+        }
+    }
+
+    return $ascending || $descending;
+}

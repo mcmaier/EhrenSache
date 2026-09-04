@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../private/helpers/totp.php';
 require_once __DIR__ . '/../../private/helpers/rate_limiter.php';
+require_once __DIR__ . '/../../private/helpers/station.php';
 
 // ---- totpCodesForSecret --------------------------------------------------
 // RFC 6238, Anhang B: Secret "12345678901234567890" (Base32
@@ -81,4 +82,58 @@ test('RateLimiter::reset trifft nur die genannte Action, nicht andere Actions de
 
     assertTrue($limiter->check('x', 'a1', 1, 900), 'a1 nach reset wieder erlaubt');
     assertSame(false, $limiter->check('x', 'a2', 1, 900), 'a2 bleibt gesperrt');
+});
+
+// ---- validateStationPin ---------------------------------------------------
+// Liefert null bei gueltiger PIN, sonst den Fehlertext fuer die Oberflaeche.
+
+test('validateStationPin nimmt vier Ziffern an', function () {
+    assertSame(null, validateStationPin('2580', 4));
+});
+
+test('validateStationPin nimmt acht Ziffern an', function () {
+    assertSame(null, validateStationPin('20481357', 4));
+});
+
+test('validateStationPin lehnt Buchstaben ab', function () {
+    assertTrue(validateStationPin('12a4', 4) !== null);
+});
+
+test('validateStationPin lehnt Leerstring ab', function () {
+    assertTrue(validateStationPin('', 4) !== null);
+});
+
+test('validateStationPin haelt die Mindestlaenge ein', function () {
+    assertTrue(validateStationPin('2580', 6) !== null, 'vier Stellen bei Minimum sechs');
+    assertSame(null, validateStationPin('258013', 6));
+});
+
+test('validateStationPin lehnt mehr als acht Ziffern ab', function () {
+    assertTrue(validateStationPin('204813579', 4) !== null);
+});
+
+test('validateStationPin lehnt lauter gleiche Ziffern ab', function () {
+    assertTrue(validateStationPin('0000', 4) !== null);
+    assertTrue(validateStationPin('777777', 4) !== null);
+});
+
+test('validateStationPin lehnt aufsteigende Folgen ab', function () {
+    assertTrue(validateStationPin('1234', 4) !== null);
+    assertTrue(validateStationPin('456789', 4) !== null);
+});
+
+test('validateStationPin lehnt absteigende Folgen ab', function () {
+    assertTrue(validateStationPin('4321', 4) !== null);
+    assertTrue(validateStationPin('9876', 4) !== null);
+});
+
+test('validateStationPin laesst unterbrochene Folgen zu', function () {
+    assertSame(null, validateStationPin('1235', 4));
+    assertSame(null, validateStationPin('1224', 4));
+});
+
+test('validateStationPin klemmt die Mindestlaenge auf 4..8', function () {
+    assertSame(null, validateStationPin('2580', 2), 'Minimum 2 wirkt wie 4');
+    assertTrue(validateStationPin('258', 2) !== null, 'drei Stellen bleiben zu kurz');
+    assertSame(null, validateStationPin('20481357', 12), 'Minimum 12 wirkt wie 8');
 });
