@@ -555,14 +555,14 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}work_session_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- records.checkin_source um 'timer' erweitern
+-- records.checkin_source um 'timer' und 'station_pin' erweitern
 --
-SET @has_timer = (SELECT COUNT(*) FROM information_schema.COLUMNS
+SET @has_station_pin = (SELECT COUNT(*) FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
       AND TABLE_NAME   = '{PREFIX}records'
       AND COLUMN_NAME  = 'checkin_source'
-      AND COLUMN_TYPE LIKE '%timer%');
-SET @prep_sql = IF(@has_timer = 0,
+      AND COLUMN_TYPE LIKE '%station_pin%');
+SET @prep_sql = IF(@has_station_pin = 0,
     'ALTER TABLE `{PREFIX}records` MODIFY `checkin_source` ENUM(''admin'',''user_totp'',''device_auth'',''auto_checkin'',''import'',''timer'',''station_pin'') DEFAULT ''admin''',
     'SELECT 1');
 PREPARE stmt FROM @prep_sql;
