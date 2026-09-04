@@ -1482,7 +1482,6 @@ function setCheckinUIState(state) {
             
             isScanning = false;
             isNFCScanning = false;
-            updateCaptureBackVisible();
             break;
             
         case UI_STATE.QR_SCANNING:
@@ -1497,7 +1496,6 @@ function setCheckinUIState(state) {
             elements.checkinDivider.style.display = 'none';            
             elements.nfcButton.style.display = 'none';                        
             isScanning = true;
-            updateCaptureBackVisible();
             break;
             
         case UI_STATE.NFC_SCANNING:
@@ -2808,21 +2806,6 @@ function availableIntents() {
 }
 
 /**
- * Wann der Zurueck-Weg sichtbar ist.
- *
- * Nur wenn es eine Auswahl zu treffen gab — und nicht, solange der Sucher
- * laeuft: Der Scanner steht ueber den Ansichten, „Zurueck" saesse darunter und
- * waere ein zweiter, fast gleicher Ausweg neben „Abbrechen". Waehrend des
- * Scannens ist Abbrechen der richtige.
- */
-function updateCaptureBackVisible() {
-    const zeigen = availableIntents().length > 1
-        && currentUIState !== UI_STATE.QR_SCANNING;
-
-    document.querySelectorAll('.capture-back').forEach(b => { b.hidden = !zeigen; });
-}
-
-/**
  * Zeigt eine Ansicht des Erfassen-Tabs.
  *
  * Beim Verlassen der Anwesenheit werden Scanner und NFC gestoppt: ein
@@ -2834,8 +2817,6 @@ function showCaptureView(view) {
         const el = document.getElementById(id);
         if (el) el.hidden = (name !== view);
     });
-
-    updateCaptureBackVisible();
 
     if (view !== 'attendance') {
         stopScannerIfRunning();
@@ -2862,10 +2843,6 @@ function enterCaptureTab() {
 function initCaptureTab() {
     document.querySelectorAll('.capture-tile').forEach(tile => {
         tile.addEventListener('click', () => showCaptureView(tile.dataset.intent));
-    });
-
-    document.querySelectorAll('.capture-back').forEach(btn => {
-        btn.addEventListener('click', () => showCaptureView('chooser'));
     });
 
     // Die Leiste ist der Weg zurueck zur laufenden Sitzung, aus jedem Tab.

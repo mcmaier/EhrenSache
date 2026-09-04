@@ -2028,27 +2028,10 @@ body {
 .capture-tile-label { font-size: 18px; font-weight: 600; color: var(--text); }
 .capture-tile-hint  { font-size: 12px; color: var(--text-light); }
 
-/* Fluchtet mit dem Inhalt darunter: die Ansichten sind auf 400px begrenzt und
-   zentriert, ein linksbuendiger Knopf ohne diese Breite haenge daneben. */
-.capture-back {
-    display: block;
-    width: 100%;
-    max-width: 400px;
-    text-align: left;
-    background: none;
-    border: none;
-    color: var(--text-light);
-    font-size: 14px;
-    font-family: inherit;
-    padding: 4px 0 12px;
-    cursor: pointer;
-}
-
 /* Ohne diese Regeln schlaegt das display der Klasse das [hidden] des Browsers
    und die Ansicht bliebe sichtbar. */
 .capture-chooser[hidden],
-.capture-tile[hidden],
-.capture-back[hidden] {
+.capture-tile[hidden] {
     display: none;
 }
 
