@@ -231,6 +231,15 @@ test('station: totp_location ohne Secret wird abgelehnt', function () {
     assertSame('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', $res['body']['totp_secret'],
         'Secret muss normalisiert (Grossbuchstaben) gespeichert werden');
 
+    // Eine totp_location, die nur Name/is_active aendert (kein totp_action,
+    // kein totp_secret), muss das gespeicherte Secret unangetastet lassen.
+    assertStatus(200, kioskPut(['device_name' => kioskDevice()['device_name']]));
+
+    $res = kioskGet();
+    assertStatus(200, $res);
+    assertSame('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', $res['body']['totp_secret'],
+        'Secret darf ohne totp_action/totp_secret nicht veraendert werden');
+
     // clear auf einer totp_location ist nicht erlaubt — sie braucht ein Secret.
     assertStatus(400, kioskPut(['totp_action' => 'clear']));
 
@@ -296,6 +305,38 @@ test('station: create_device mit is_active=false legt inaktives Geraet an', func
         'query' => ['id' => $deviceId],
     ]);
     assertStatus(200, $del, 'Test-Geraet konnte nicht geloescht werden');
+});
+
+test('station: totp_secret als Array wird sauber mit 400 abgelehnt, kein TypeError', function () {
+    // Der Kiosk ist an dieser Stelle wieder ein kiosk (siehe Tests oben) —
+    // fuer den wird ein mitgeschicktes Secret ohnehin abgelehnt, aber das
+    // muss weiterhin ein sauberes 400 mit JSON-Body sein, kein PHP-Fatal
+    // durch trim() auf einem Array.
+    $res = kioskPut(['totp_secret' => ['a']]);
+    assertStatus(400, $res, 'Array-Secret haette mit 400 abgelehnt werden muessen');
+    assertTrue(is_array($res['body']), 'Antwort muss ein gueltiger JSON-Body sein');
+
+    $name = 'Test-Typfehler ' . uniqid();
+    $res  = apiRequest('POST', 'users', [
+        'token' => apiToken('admin'),
+        'body'  => [
+            'action'      => 'create_device',
+            'device_name' => $name,
+            'device_type' => 'totp_location',
+            'totp_secret' => ['a'],
+        ],
+    ]);
+    assertStatus(400, $res, 'Array-Secret haette beim Anlegen mit 400 abgelehnt werden muessen');
+    assertTrue(is_array($res['body']), 'Antwort muss ein gueltiger JSON-Body sein');
+
+    $list = apiRequest('GET', 'users', [
+        'token' => apiToken('admin'),
+        'query' => ['user_type' => 'device'],
+    ]);
+    assertStatus(200, $list);
+    $names = array_column($list['body'], 'device_name');
+    assertTrue(!in_array($name, $names, true),
+        'Geraet mit Array-Secret haette nicht angelegt werden duerfen');
 });
 
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------

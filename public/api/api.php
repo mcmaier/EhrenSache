@@ -361,8 +361,9 @@ if($apiToken) {
     // umginge sonst alle Einschraenkungen, die am Token haengen (z. B. die
     // Kiosk-Sperre weiter unten). Dieser Zweig laeuft nur ohne Token, das
     // Cookie allein reicht hier also nicht.
-    // Der Browser-Login (login() in helpers/auth.php) setzt kein auth_type,
-    // Dashboard-Sessions sind davon nicht betroffen.
+    // login() in helpers/auth.php entfernt auth_type seit 1.3.0 aktiv per
+    // unset() (Regeneration einer zuvor per Token gestarteten Session),
+    // Dashboard-Sessions sind davon also nicht betroffen.
     if(($_SESSION['auth_type'] ?? null) === 'token') {
         session_unset();
         session_destroy();

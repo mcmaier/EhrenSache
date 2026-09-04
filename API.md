@@ -697,8 +697,8 @@ Stations-Code anzeigt und Mitglieder per Mitgliedsnummer + PIN stempeln lässt.
 
 **Authentifizierung:** ausschließlich Geräte-Token eines Kiosks. Ein Kiosk-Token darf
 **nur** diese Ressource (und `version`) aufrufen — abgesehen von den öffentlichen Endpunkten
-(`ping`, `appearance`, `login`, `register`, `password_reset_request`, die noch vor der
-Authentifizierung laufen) antwortet jede andere Ressource `403`.
+(`ping`, `appearance`, `login`, `register`, `password_reset_request`, `auth`, `logout`, die
+noch vor der Authentifizierung laufen) antwortet jede andere Ressource `403`.
 Eine vom Token erzeugte Session ist ohne den Token nicht nutzbar (`401`).
 Im Unterschied zu `auto_checkin` (das Gerät bürgt für die Identität) prüft hier der Server
 die Identität des Mitglieds; das Gerät ist nur Tastatur und Bildschirm.
@@ -1176,12 +1176,14 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
 
 `device_type` ist `totp_location`, `auth_device` oder `kiosk` (seit 1.3.0, „Virtuelle
 Station“). Für `kiosk` ist `totp_enabled` optional (Standard `false`) und steuert, ob das
-Gerät von Anfang an einen Stations-Code anzeigen darf; ein beim Anlegen mitgeschicktes
-`totp_secret` wird für `kiosk` ignoriert — das Secret erzeugt ausschließlich der Server
-(nur `PUT` lehnt ein eigenes `totp_secret` bei `kiosk` mit `400` ab, siehe unten). Ein
-mitgeschicktes `totp_secret` muss Base32-kodiert sein (Zeichen `A`–`Z`, `2`–`7`) und 16 bis 64
-Zeichen lang sein, sonst antwortet die Anfrage mit `400`. `is_active` ist optional (Standard
-`true`, also aktiv) und wird beim Anlegen direkt übernommen.
+Gerät von Anfang an einen Stations-Code anzeigen darf. Ein beim Anlegen mitgeschicktes
+`totp_secret` wird für `kiosk` und `auth_device` vollständig ignoriert — das Secret entsteht
+für diese beiden Typen ausschließlich serverseitig (nur `PUT` lehnt ein eigenes
+`totp_secret` bei `kiosk` mit `400` ab, siehe unten). Nur für `totp_location` wird ein
+mitgeschicktes `totp_secret` verwendet und validiert: es muss ein String, Base32-kodiert
+(Zeichen `A`–`Z`, `2`–`7`) und 16 bis 64 Zeichen lang sein, sonst antwortet die Anfrage mit
+`400`. `is_active` ist optional (Standard `true`, also aktiv) und wird beim Anlegen direkt
+übernommen.
 
 **Response:**
 ```json
@@ -1219,6 +1221,8 @@ oder `"totp_action": "clear"`, um es zu entfernen. Ein unbekannter Wert antworte
 Eine `kiosk`-Anfrage mit einem eigenen `totp_secret` wird ebenfalls mit `400` abgelehnt. Ein
 mitgeschicktes `totp_secret` muss wie beim Anlegen Base32-kodiert sein (16–64 Zeichen), sonst
 antwortet `400`; gespeichert wird der normalisierte (großgeschriebene, getrimmte) Wert.
+`"totp_secret": null` ist ein No-op — das gespeicherte Secret bleibt unverändert; entfernen
+lässt es sich nur über `"totp_action": "clear"` (bei `totp_location` nicht erlaubt, siehe unten).
 Ein Wechsel des `device_type` verwirft das gespeicherte Secret, außer die gleiche Anfrage
 liefert oder erzeugt ein neues. Eine `totp_location` braucht dabei immer ein Secret: sowohl
 `"totp_action": "clear"` auf einer `totp_location` als auch ein Wechsel zu `totp_location`

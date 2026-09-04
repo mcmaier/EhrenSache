@@ -560,9 +560,16 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     break;
                 }
 
-                // Ein mitgeschicktes Secret muss gueltiges Base32 sein
-                // (16-64 Zeichen), bevor es normalisiert gespeichert wird.
+                // Ein mitgeschicktes Secret muss ein String sein und gueltiges
+                // Base32 (16-64 Zeichen), bevor es normalisiert gespeichert wird.
+                // trim() auf einem Array/Objekt (z. B. aus fehlerhaftem JSON)
+                // wuerde sonst einen TypeError werfen statt sauber 400 zu antworten.
                 if(isset($data->totp_secret)) {
+                    if(!is_string($data->totp_secret)) {
+                        http_response_code(400);
+                        echo json_encode(["message" => "Ungültiges TOTP-Secret (Base32, 16–64 Zeichen)"]);
+                        break;
+                    }
                     $normalizedSecret = strtoupper(trim($data->totp_secret));
                     if(!preg_match('/^[A-Z2-7]{16,64}$/', $normalizedSecret)) {
                         http_response_code(400);
@@ -736,9 +743,21 @@ function createDevice($db, $database, $authUserId) {
 
     $totpSecret = $data->totp_secret ?? null;
 
-    // Ein mitgeschicktes Secret muss gueltiges Base32 sein (16-64 Zeichen),
-    // bevor es normalisiert (Grossbuchstaben, getrimmt) gespeichert wird.
-    if($totpSecret !== null) {
+    // Ein mitgeschicktes Secret wird nur fuer totp_location verwendet — kiosk
+    // und auth_device ignorieren es vollstaendig (das Secret entsteht bei
+    // kiosk ausschliesslich serverseitig, siehe unten). Nur fuer den
+    // tatsaechlich genutzten Fall muss es gueltiges Base32 sein (16-64
+    // Zeichen, als String) bevor es normalisiert (Grossbuchstaben, getrimmt)
+    // gespeichert wird; trim() auf einem Array/Objekt wuerde sonst einen
+    // TypeError werfen statt sauber 400 zu antworten.
+    if($device_type !== 'totp_location') {
+        $totpSecret = null;
+    } elseif($totpSecret !== null) {
+        if(!is_string($totpSecret)) {
+            http_response_code(400);
+            echo json_encode(['message' => 'Ungültiges TOTP-Secret (Base32, 16–64 Zeichen)']);
+            exit();
+        }
         $totpSecret = strtoupper(trim($totpSecret));
         if(!preg_match('/^[A-Z2-7]{16,64}$/', $totpSecret)) {
             http_response_code(400);
