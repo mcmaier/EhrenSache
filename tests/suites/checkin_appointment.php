@@ -170,13 +170,22 @@ test('Check-in trifft einen Termin im Toleranzfenster', function () {
     ciWithReset(['checkin_tolerance_hours' => '2'], function () {
         ciSetSetting('checkin_tolerance_hours', '2');
 
-        $now  = new DateTime();
-        $time = $now->format('H:i:s');
+        // Feste Uhrzeiten statt "jetzt": Die automatische Terminsuche in
+        // auto_checkin.php durchsucht ALLE Termine des Tages im Fenster,
+        // unabhaengig von der Terminart. Der erste Test dieser Datei laesst
+        // Anker um 09:00 und 12:00 stehen. Eine Ankunft, die naeher als die
+        // Toleranz an einer dieser Zeiten liegt, traefe den Anker statt der
+        // frischen Treffer-Probe. 06:00/06:45 haelt beide Seiten sicher
+        // ausserhalb des 2h-Fensters um 09:00 — der Test wird damit
+        // uhrzeitunabhaengig. ciFreshTypeId() isoliert zusaetzlich die
+        // Dublettenpruefung beim Anlegen.
+        $appointmentTime = '06:00:00';
+        $arrivalTime     = '06:45:00';
 
-        [$status, $id] = ciCreateAppointment('Treffer-Probe', date('Y-m-d'), $time);
+        [$status, $id] = ciCreateAppointment('Treffer-Probe', date('Y-m-d'), $appointmentTime, ciFreshTypeId());
         assertSame(201, $status, 'Termin fuer den Treffer konnte nicht angelegt werden');
 
-        $res = ciCheckin(['arrival_time' => $now->format('Y-m-d H:i:s')]);
+        $res = ciCheckin(['arrival_time' => date('Y-m-d') . ' ' . $arrivalTime]);
 
         assertTrue(in_array($res['status'], [200, 201], true),
             'Check-in muss gelingen, HTTP ' . $res['status']);
