@@ -173,13 +173,25 @@ if ($step == 4) {
             file_put_contents('../../private/config/install.lock', date('Y-m-d H:i:s'));
 
             // In Step 4 nach Lock-File:
+            // Wortgleich mit public/install/.htaccess im Repository;
+            // tests/suites/htaccess_locks.php hält beide Fassungen zusammen.
             $htaccessContent = <<<'HTACCESS'
             # Installation abgeschlossen - Zugriff gesperrt
-            Order Deny,Allow
-            Deny from all
+            # Zum erneuten Aufruf des Installers diese Datei leeren oder umbenennen.
+
+            # Zwei Syntaxen, damit die Sperre auf jedem Apache greift: 2.4 kennt
+            # Require, 2.2 kennt es nicht. Ohne den Waechter quittiert ein 2.4 ohne
+            # mod_access_compat die alte Form mit HTTP 500 statt 403.
+            <IfModule mod_authz_core.c>
+                Require all denied
+            </IfModule>
+            <IfModule !mod_authz_core.c>
+                Order Deny,Allow
+                Deny from all
+            </IfModule>
             HTACCESS;
 
-            file_put_contents(__DIR__ . '/.htaccess', $htaccessContent);
+            file_put_contents(__DIR__ . '/.htaccess', $htaccessContent . "\n");
             
             $_SESSION['admin_token'] = $apiToken; 
         }  

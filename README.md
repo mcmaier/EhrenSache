@@ -107,14 +107,22 @@ git clone https://github.com/mcmaier/EhrenSache.git
 
 3. Ggf. Neue Datenbank erstellen.
 
-4. Setup ausführen (Angenommen, Ehrensache ist in der Subdomain ehrensache.meine-domain.de installiert):
+4. Installer freischalten: Inhalt von `public/install/.htaccess` leeren oder die Datei umbenennen.
+
+> [!NOTE]
+> Der Installer wird **gesperrt ausgeliefert**, damit er auf einem hochgeladenen, aber noch
+> nicht eingerichteten Webspace nicht offen im Netz steht. Ohne diesen Schritt antwortet der
+> Server mit `403 Forbidden`. Nach abgeschlossener Installation sperrt sich der Installer
+> automatisch wieder.
+
+5. Setup ausführen (Angenommen, Ehrensache ist in der Subdomain ehrensache.meine-domain.de installiert):
 ```
 https://ehrensache.meine-domain.de/install
 ```
 
 Während der Installation wird ein Admin-Account erstellt.
 
-5. Als Admin Einloggen:
+6. Als Admin Einloggen:
 
 - Gruppenverwaltung --> Mindestens eine Benutzergruppe anlegen
 - Gruppenverwaltung --> Eine Terminart erstellen und Benutzergruppe zuweisen

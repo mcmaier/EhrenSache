@@ -1,5 +1,4 @@
 *.bak
-install/.htaccess
 public/uploads/*.jpg
 public/uploads/*.png
 private/uploads/*.*

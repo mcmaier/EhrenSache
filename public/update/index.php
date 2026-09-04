@@ -146,30 +146,57 @@ if ($step == 3 && $_SERVER['REQUEST_METHOD'] !== 'POST') {
             $migrationLog[] = "Die Datenbank ist bereits auf Stand <strong>{$targetVersion}</strong> – nichts zu tun.";
         }
 
-        foreach ($chain as $step) {
-            require_once MIGRATION_PATH . $step['file'];
+        // NICHT $step als Laufvariable: das ist die Nummer des Wizard-Schritts
+        // aus dem Skriptkopf. Wird sie hier überschrieben, trifft weiter unten
+        // keine der Bedingungen $step == 1|2|3 mehr und die Ergebnisseite
+        // bleibt leer — ohne Fehlermeldung, obwohl die Migration lief.
+        foreach ($chain as $migrationStep) {
+            require_once MIGRATION_PATH . $migrationStep['file'];
 
-            if (!function_exists($step['function'])) {
+            if (!function_exists($migrationStep['function'])) {
                 throw new RuntimeException(
-                    "Funktion {$step['function']}() fehlt in {$step['file']}"
+                    "Funktion {$migrationStep['function']}() fehlt in {$migrationStep['file']}"
                 );
             }
 
-            $migrationLog[] = "<strong>{$step['from']} → {$step['to']}</strong> ({$step['file']})";
+            $migrationLog[] = "<strong>{$migrationStep['from']} → {$migrationStep['to']}</strong> "
+                            . "({$migrationStep['file']})";
 
-            $result        = ($step['function'])($pdo, $prefix, CONFIG_PATH);
+            $result        = ($migrationStep['function'])($pdo, $prefix, CONFIG_PATH);
             $migrationLog  = array_merge($migrationLog, $result['log']);
             $migrationWarn = array_merge($migrationWarn, $result['warnings']);
 
-            stampSchemaVersion($pdo, $prefix, $step['to']);
-            $migrationLog[] = "Schema-Version auf <strong>{$step['to']}</strong> gesetzt";
+            stampSchemaVersion($pdo, $prefix, $migrationStep['to']);
+            $migrationLog[] = "Schema-Version auf <strong>{$migrationStep['to']}</strong> gesetzt";
         }
 
         $migrationOk = true;
 
-        // Update-Wizard wieder sperren
-        $htaccessContent = "# Update abgeschlossen – Zugriff gesperrt\nOrder Deny,Allow\nDeny from all\n";
-        file_put_contents(HTACCESS_PATH, $htaccessContent);
+        // Update-Wizard wieder sperren.
+        //
+        // Wortgleich mit der Fassung im Repository, inklusive der Anleitung zum
+        // Wiederöffnen: Ohne sie steht nach dem ersten Update nirgends mehr,
+        // wie man den Assistenten für das nächste erreichbar macht.
+        // tests/suites/htaccess_locks.php hält beide Fassungen zusammen.
+        $htaccessContent = <<<'HTACCESS'
+            # EhrenSache Update-Assistent
+            # Zugriff standardmäßig gesperrt.
+            # Zum Aktivieren des Updates diese Datei leeren oder umbenennen.
+            # Nach dem Update wird der Zugriff automatisch wieder gesperrt.
+
+            # Zwei Syntaxen, damit die Sperre auf jedem Apache greift: 2.4 kennt
+            # Require, 2.2 kennt es nicht. Ohne den Waechter quittiert ein 2.4 ohne
+            # mod_access_compat die alte Form mit HTTP 500 statt 403.
+            <IfModule mod_authz_core.c>
+                Require all denied
+            </IfModule>
+            <IfModule !mod_authz_core.c>
+                Order Deny,Allow
+                Deny from all
+            </IfModule>
+            HTACCESS;
+
+        file_put_contents(HTACCESS_PATH, $htaccessContent . "\n");
 
         unset($_SESSION['update_prefix'], $_SESSION['update_from'], $_SESSION['update_to']);
 

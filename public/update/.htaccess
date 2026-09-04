@@ -3,5 +3,13 @@
 # Zum Aktivieren des Updates diese Datei leeren oder umbenennen.
 # Nach dem Update wird der Zugriff automatisch wieder gesperrt.
 
-Order Deny,Allow
-Deny from all
+# Zwei Syntaxen, damit die Sperre auf jedem Apache greift: 2.4 kennt
+# Require, 2.2 kennt es nicht. Ohne den Waechter quittiert ein 2.4 ohne
+# mod_access_compat die alte Form mit HTTP 500 statt 403.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order Deny,Allow
+    Deny from all
+</IfModule>
