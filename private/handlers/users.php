@@ -95,7 +95,13 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     echo json_encode(["message" => "User not found"]);
                     return;
                 }
-                
+
+                // Kiosk: das Secret verlaesst den Server nicht (E5)
+                if($isDevice && ($user['device_type'] ?? null) === 'kiosk') {
+                    $user['has_totp_secret'] = !empty($user['totp_secret']);
+                    unset($user['totp_secret']);
+                }
+
                 // Sensitive Daten filtern für Nicht-Admins
                 if(!isAdmin()) {
                     unset($user['totp_secret']);
@@ -167,6 +173,7 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                             CASE u.device_type
                                 WHEN 'totp_location' THEN 'TOTP-Station'
                                 WHEN 'auth_device' THEN 'Auth-Gerät'
+                                WHEN 'kiosk' THEN 'Virtuelle Station'
                                 ELSE 'Gerät'
                             END AS device_type_name,
                             CASE 
@@ -198,7 +205,15 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     $stmt->execute($params);
                     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                    echo json_encode($users);                    
+                    foreach($users as &$row) {
+                        if(($row['device_type'] ?? null) === 'kiosk') {
+                            $row['has_totp_secret'] = !empty($row['totp_secret']);
+                            unset($row['totp_secret']);
+                        }
+                    }
+                    unset($row);
+
+                    echo json_encode($users);
                     
                 } catch (Exception $e) {
                     error_log("Get users error: " . $e->getMessage());
@@ -365,7 +380,7 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
             }
 
             // Hole aktuelle User-Daten (um role zu prüfen)
-            $currentUserStmt = $db->prepare("SELECT role, email FROM {$prefix}users WHERE user_id = ?");
+            $currentUserStmt = $db->prepare("SELECT role, email, device_type FROM {$prefix}users WHERE user_id = ?");
             $currentUserStmt->execute([$id]);
             $currentUser = $currentUserStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -519,6 +534,29 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
             {
                 requireAdmin();
 
+                if(isset($data->device_type)
+                   && !in_array($data->device_type, ['totp_location', 'auth_device', 'kiosk'], true)) {
+                    http_response_code(400);
+                    echo json_encode(["message" => "Ungültiger Gerätetyp"]);
+                    break;
+                }
+
+                // Kiosk: Secret nie aus dem Request uebernehmen (E5), nur
+                // serverseitig erzeugen oder loeschen.
+                $effectiveType = $data->device_type ?? $currentUser['device_type'];
+                if($effectiveType === 'kiosk') {
+                    unset($data->totp_secret);
+
+                    $totpAction = $rawData->totp_action ?? null;
+                    if($totpAction === 'generate') {
+                        require_once __DIR__ . '/../helpers/totp.php';
+                        $updateFields[] = "totp_secret = ?";
+                        $updateParams[] = TOTP::generateSecret();
+                    } elseif($totpAction === 'clear') {
+                        $updateFields[] = "totp_secret = NULL";
+                    }
+                }
+
                 // Device Name
                 if(isset($data->device_name)) {
                     $updateFields[] = "device_name = ?";
@@ -633,7 +671,7 @@ function createDevice($db, $database, $authUserId) {
     
     $device_type = $data->device_type ?? 'totp_location';
 
-    if(!in_array($device_type, ['totp_location', 'auth_device'])) {
+    if(!in_array($device_type, ['totp_location', 'auth_device', 'kiosk'], true)) {
         http_response_code(400);
         echo json_encode(['message' => 'Ungültiger Gerätetyp']);
         exit();
@@ -645,15 +683,18 @@ function createDevice($db, $database, $authUserId) {
 
     $totpSecret = $data->totp_secret ?? null;
 
-    // TOTP-Secret für totp_location Geräte, wenn nicht angegeben
-    if ($device_type === 'totp_location')
-    {
-        if($totpSecret === null){
-            require_once __DIR__ . '/../helpers/totp.php';
-            $totpSecret = TOTP::generateSecret();
-        } 
-    }     
-    
+    require_once __DIR__ . '/../helpers/totp.php';
+
+    // totp_location: Secret Pflicht, aus dem Request oder frisch erzeugt.
+    // kiosk: Secret nur, wenn der Kiosk den Stations-Code zeigen soll — und
+    //        NIE aus dem Request, damit es nirgends ausserhalb des Servers
+    //        entsteht (E5). Der Kiosk holt spaeter nur den Code.
+    if ($device_type === 'totp_location' && $totpSecret === null) {
+        $totpSecret = TOTP::generateSecret();
+    } elseif ($device_type === 'kiosk') {
+        $totpSecret = !empty($data->totp_enabled) ? TOTP::generateSecret() : null;
+    }
+
     try {        
         $db->beginTransaction();                     
         // Gerät anlegen (OHNE Email, OHNE Passwort)
@@ -693,7 +734,8 @@ function createDevice($db, $database, $authUserId) {
                 'device_name' => $data->device_name,
                 'device_type' => $device_type,
                 'api_token' => $apiToken,
-                'totp_secret' => $totpSecret
+                'totp_secret' => $device_type === 'kiosk' ? null : $totpSecret,
+                'has_totp_secret' => $totpSecret !== null
             ]
         ]);
         exit();
