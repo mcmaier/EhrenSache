@@ -148,6 +148,37 @@ function checkinToleranceHours($db, $database): int
 }
 
 /**
+ * Prüft eine Löschfrist in Jahren.
+ *
+ * Liefert die Frist als ganze Zahl oder null, wenn der Wert unbrauchbar ist.
+ * Die Untergrenze ist 1 und nicht 0: Eine Frist von 0 ergibt den heutigen Tag
+ * als Stichtag und löscht damit den gesamten Bestand. Ein unbemerkt
+ * durchgereichtes `0` aus einem leeren Eingabefeld hat genau das schon
+ * angerichtet — deshalb steht die Prüfung hier und nicht nur im Formular.
+ *
+ * @param mixed $value
+ */
+function retentionYears($value): ?int
+{
+    if (is_int($value)) {
+        return $value >= 1 ? $value : null;
+    }
+
+    if (!is_string($value)) {
+        return null;
+    }
+
+    $trimmed = trim($value);
+    if (!preg_match('/^\d+$/', $trimmed)) {
+        return null;
+    }
+
+    $years = (int) $trimmed;
+
+    return $years >= 1 ? $years : null;
+}
+
+/**
  * Darf ein Check-in einen Termin anlegen, wenn keiner passt?
  *
  * Vorgabe '1', nicht '0': Fehlt die Zeile, ist die Migration nicht gelaufen —

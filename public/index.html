@@ -15,7 +15,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EhrenSache - Dashboard</title>
 
-    <link rel="stylesheet" href="css/main.css?v=1.2.4">
+    <link rel="stylesheet" href="css/main.css?v=1.2.5">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="robots" content="noindex, nofollow">
     <script type="module" src="js/theme.js"></script>
@@ -398,13 +398,39 @@
                         <h3>📋 DSGVO Datenverwaltung</h3>        
                         <div class="settings-item">
                             <label>
-                                <strong>Alte Anwesenheitsdaten löschen</strong>
-                                <small>Löscht alle Records älter als X Jahre (empfohlen: 3 Jahre)</small>
+                                <strong>Löschfristen</strong>
+                                <small>
+                                    Je Datenart eine eigene Frist. Die Bereinigung löscht
+                                    endgültig und lässt sich nicht rückgängig machen.
+                                </small>
                             </label>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <input type="number" class="setting-input" id="cleanup_years" data-key="dsgvo-cleanup-years" value="3" min="1" max="10" 
+
+                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                                <input type="number" class="setting-input" id="cleanup_years" data-key="cleanup_years_records" value="3" min="1" max="10"
                                     style="width: 80px;">
-                                <span>Jahre</span>
+                                <span>Jahre — Anwesenheiten und Ausnahmen</span>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                                <input type="number" class="setting-input" id="cleanup_years_worktime" data-key="cleanup_years_worktime" value="3" min="1" max="10"
+                                    style="width: 80px;">
+                                <span>Jahre — Arbeitszeiten samt Änderungshistorie</span>
+                            </div>
+
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <input type="number" class="setting-input" id="cleanup_years_audit" data-key="cleanup_years_audit" value="1" min="1" max="10"
+                                    style="width: 80px;">
+                                <span>Jahre — Änderungshistorie ohne Sitzung (wird anonymisiert)</span>
+                            </div>
+
+                            <small class="input-hint">
+                                Die Änderungshistorie überlebt das Löschen einer Arbeitszeit
+                                absichtlich. Ist die zugehörige Sitzung fort, bleibt der Eintrag
+                                nach Ablauf der dritten Frist bestehen, verliert aber seinen
+                                Personenbezug.
+                            </small>
+
+                            <div style="margin-top: 12px;">
                                 <button onclick="performCleanup()" class="btn-std btn-delete">
                                     🗑️ Alte Daten löschen
                                 </button>

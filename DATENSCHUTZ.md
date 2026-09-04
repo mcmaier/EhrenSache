@@ -345,8 +345,34 @@ sie braucht, hat keinen Zweck — und damit keine Rechtsgrundlage.
 **Wichtig:** Die Änderungshistorie überlebt das Löschen einer Arbeitszeit
 **absichtlich** — sonst würde ausgerechnet die Löschung nicht dokumentiert. Sie
 enthält damit personenbezogene Daten, die den eigentlichen Datensatz überdauern.
-Legen Sie dafür eine eigene Löschfrist fest und setzen Sie sie um; ein
-automatisches Löschen der Historie ist derzeit **nicht** eingebaut.
+
+Seit 1.2.5 setzen Sie die Fristen unter *Einstellungen → DSGVO
+Datenverwaltung*. Es gibt drei, weil die Daten unterschiedlich lange gebraucht
+werden:
+
+| Frist | Wirkung |
+|-------|---------|
+| Anwesenheiten und Ausnahmen | löscht `records` und `exceptions` |
+| Arbeitszeiten samt Änderungshistorie | löscht `work_sessions` und die dazugehörigen `work_session_log`-Einträge |
+| Änderungshistorie ohne Sitzung | **anonymisiert** verwaiste `work_session_log`-Einträge |
+
+Verwaiste Einträge entstehen, wenn eine Sitzung gelöscht wurde, ihre Historie
+aber bestehen blieb. Sie werden nicht gelöscht, sondern anonymisiert: Der
+Inhalt der Änderung und der handelnde Benutzer fallen weg, der Eintrag selbst
+bleibt mit Zeitpunkt und Art der Änderung stehen. So belegt die Spur weiterhin,
+dass an dieser Stelle etwas geschah, ohne noch einen Personenbezug zu haben.
+
+**Die Bereinigung läuft nicht von selbst.** Sie stoßen sie an; die Fristen sind
+nur die Vorgabe dafür. Nehmen Sie den Vorgang in Ihre wiederkehrenden Aufgaben
+auf — einmal im Jahr genügt in der Regel.
+
+**Es gibt kein Zurück.** Die Bereinigung löscht endgültig und kennt keinen
+Probelauf. Legen Sie vorher eine Sicherung der Datenbank an.
+
+**Solange die dritte Frist nicht abgelaufen ist**, enthält ein verwaister
+Eintrag weiterhin die Daten der gelöschten Sitzung, erscheint aber in keiner
+Selbstauskunft — die Auskunft findet ihn ohne seine Sitzung nicht mehr.
+Setzen Sie diese Frist deshalb kurz an.
 
 ### 10.5 Abgrenzung zum Beschäftigungsverhältnis
 

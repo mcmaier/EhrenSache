@@ -83,6 +83,22 @@
     margin-bottom: 15px;
 }
 
+/*
+ * Rückfragetext der Bestätigung: Zeilenumbrüche erhalten.
+ *
+ * showConfirm() setzt textContent, damit nichts aus einer Meldung als HTML
+ * ausgeführt wird. Ohne diese Regel kollabiert der Browser die enthaltenen
+ * \n zu Leerzeichen und macht aus einer Aufzählung einen Fließtext. Über
+ * zwei Dutzend Aufrufe von showConfirm() gliedern ihre Rückfrage so.
+ *
+ * pre-line und nicht pre: Umbrüche bleiben, überlange Zeilen brechen
+ * weiterhin am Rand um, und die Einrückung der Vorlagenliterale im
+ * Quelltext schlägt nicht in den Text durch.
+ */
+#confirmMessage {
+    white-space: pre-line;
+}
+
 .modal-footer {
     padding: 15px 30px;
     border-top: 1px solid #e0e0e0;    

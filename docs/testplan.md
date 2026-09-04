@@ -474,6 +474,18 @@ Reine Logik ohne Datenbank: Versionsbestimmung, Normalisierung, Manifest, Ketten
 php tests/db/verify_migration_chain.php "mysql:host=127.0.0.1;port=3308" root ""
 ```
 
+Die Zugriffssperren von Installer und Assistent:
+
+```bash
+php tests/run.php htaccess_locks
+```
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| SP-1 | `public/update/.htaccess` und `public/install/.htaccess` | beide Syntaxen, je im `<IfModule>`-Wächter |
+| SP-2 | Direktiven der Datei gegen die des erzeugenden Skripts | identisch — sonst laufen beide Fassungen auseinander |
+| SP-3 | `GET /public/update/` und `/public/install/` im Browser | **403**, nicht 500; im Apache-Log `authz_core AH01630` |
+
 Gegen eine echte Datenbank. Legt die Wegwerf-Datenbank `ehrensache_chaintest` an und
 entfernt sie am Ende; bestehende Datenbanken und `private/config/config.php` bleiben
 unberührt. Deckt UPD-1 bis UPD-5 ab.
@@ -820,3 +832,62 @@ englische Servermeldung, nicht der Statuscode — siehe `API.md`, Abschnitt Arbe
 | FM-5 | Pause ohne laufende Sitzung | „Es läuft gerade keine Zeiterfassung." |
 | FM-6 | Tätigkeit gelöscht, App noch offen, Start | „Diese Tätigkeit gibt es nicht mehr. Bitte die App neu laden." |
 | FM-7 | Unbekannte Meldung vom Server | Fällt auf den allgemeinen Statustext zurück; Rohmeldung steht im `debug.log` |
+
+---
+
+## DSGVO-Bereinigung (ab 1.2.5)
+
+> **Warnung:** `cleanup` löscht endgültig, ohne Probelauf und ohne Rückgängig. Vor jedem
+> manuellen Testfall eine Sicherung der Datenbank anlegen. Die automatisierten Tests arbeiten
+> ausschließlich mit Fristen von 30 und 100 Jahren, die nur ihre eigenen Testdaten treffen —
+> eine kleine Frist in diesen Suiten eingetragen, und der Bestand ist weg.
+
+### Automatisiert
+
+```bash
+php tests/run.php cleanup_unit
+```
+
+```bash
+php tests/run.php cleanup_api
+```
+
+Zusätzlich, weil zurückdatierte `start_time`/`changed_at` nötig sind:
+
+```bash
+php tests/db/verify_cleanup_retention.php "mysql:host=127.0.0.1;port=3306;dbname=ehrensache" root "" ez_
+```
+
+DL-11 bis DL-13 laufen im Kettentest mit (Fall UPD-6), auf einer Wegwerf-Datenbank:
+
+```bash
+php tests/db/verify_migration_chain.php "mysql:host=127.0.0.1;port=3308" root ""
+```
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| DL-1 | `retentionYears(0)`, `(-1)`, `('drei')`, `('2.5')` | jeweils `null` — die Fristprüfung schlägt vor jedem `DELETE` zu |
+| DL-2 | `POST cleanup` als `user` bzw. `manager` | `403` |
+| DL-3 | `POST cleanup` mit nicht numerischer Frist | `400`, `field` benennt das Feld |
+| DL-4 | Antwort eines gültigen Laufs | drei Stichtage, fünf Zählwerte |
+| DL-5 | Beendete Sitzung jenseits der Arbeitszeitfrist | gelöscht, ihre Logzeilen mit |
+| DL-6 | Sitzung von heute | bleibt |
+| DL-7 | Laufende Sitzung mit altem `start_time` | bleibt — Fehlerfall, kein Löschfall |
+| DL-8 | Verwaiste Logzeile jenseits der Auditfrist | `changes` und `changed_by` sind `NULL`, die Zeile bleibt |
+| DL-9 | Verwaiste Logzeile innerhalb der Auditfrist | unverändert |
+| DL-10 | Logzeile einer jungen Sitzung | unverändert |
+| DL-11 | Migration 1.2.4 → 1.2.5 mit `dsgvo-cleanup-years` = 7 | Wert steht danach in `cleanup_years_records`, alter Schlüssel entfernt, Protokoll meldet die Übernahme |
+| DL-12 | dieselbe Migration mit unbrauchbarem Wert (0) | Vorgabe 3, Warnung im Protokoll |
+| DL-13 | dieselbe Migration, wenn `cleanup_years_records` bereits existiert | vorhandener Wert bleibt, Protokoll behauptet keine Übernahme, Warnung nennt beide Werte |
+
+### Manuell (Dashboard)
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| DL-M1 | Einstellungen → DSGVO Datenverwaltung | Drei Fristfelder mit Beschriftung, Vorgaben 3/3/1 |
+| DL-M2 | Eine Frist auf 0 setzen und speichern | Feld wird als ungültig markiert, `min="1"` greift |
+| DL-M3 | Fristen ändern, speichern, Seite neu laden | Werte stehen noch — sie liegen in `system_settings` |
+| DL-M4 | Auf „Alte Daten löschen" klicken | Rückfrage nennt **alle drei** Fristen einzeln und den Hinweis auf die Endgültigkeit |
+| DL-M5 | Rückfrage abbrechen | Nichts passiert, keine Meldung |
+| DL-M6 | Rückfrage bestätigen | Ergebnisblock nennt Anwesenheiten, Ausnahmen, Arbeitszeiten, Logzeilen und anonymisierte Einträge mit den jeweiligen Stichtagen |
+| DL-M7 | Update-Wizard durchlaufen (Kern automatisiert als DL-11 bis DL-13) | Schritt 3 nennt die Zeilen zu den drei Fristen; danach stehen die Werte in den Einstellungsfeldern |

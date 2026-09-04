@@ -254,6 +254,97 @@ try {
 }
 check('Wizard bricht mit klarer Meldung ab', true, $threw);
 
+// --- UPD-6: Loeschfrist wandert von dsgvo-cleanup-years mit ------------------
+//
+// Testplan DL-M7. Ein Verein, der die Frist von Hand auf 7 Jahre gestellt hat,
+// darf nach dem Update nicht stillschweigend wieder bei 3 stehen.
+echo "\nUPD-6: Bestandsfrist beim Sprung auf 1.2.5\n";
+resetDb();
+$pdo = db(DB);
+applySchema($pdo, PREFIX);
+
+// Ausgangslage 1.2.4 herstellen: die drei Schluessel aus dem 1.2.5-Schema
+// wieder entfernen und den alten mit einem eigenen Wert setzen.
+$pdo->exec("DELETE FROM `" . PREFIX . "system_settings`
+             WHERE setting_key IN ('cleanup_years_records','cleanup_years_worktime','cleanup_years_audit')");
+$pdo->prepare('INSERT INTO `' . PREFIX . "system_settings`
+                   (setting_key, setting_value, setting_type, category, description)
+               VALUES ('dsgvo-cleanup-years', ?, 'number', 'general', 'Loeschfrist in Jahren')")
+    ->execute(['7']);
+$pdo->exec('DELETE FROM `' . PREFIX . 'schema_version`');
+$pdo->prepare('INSERT INTO `' . PREFIX . 'schema_version` (version) VALUES (?)')->execute(['1.2.4']);
+
+check('Ausgangslage wird als 1.2.4 erkannt', '1.2.4', detectDbVersion($pdo, PREFIX));
+
+$res = runWizardStep3($pdo, PREFIX, $target);
+
+/** Liest eine Einstellung aus der Wegwerf-Datenbank. */
+$setting = static function (PDO $pdo, string $key) {
+    $stmt = $pdo->prepare('SELECT setting_value FROM `' . PREFIX . 'system_settings` WHERE setting_key = ?');
+    $stmt->execute([$key]);
+
+    return $stmt->fetchColumn();
+};
+
+check('eigener Wert 7 wandert nach cleanup_years_records', '7', $setting($pdo, 'cleanup_years_records'));
+check('cleanup_years_worktime steht auf der Vorgabe 3',     '3', $setting($pdo, 'cleanup_years_worktime'));
+check('cleanup_years_audit steht auf der Vorgabe 1',        '1', $setting($pdo, 'cleanup_years_audit'));
+check('alter Schluessel ist entfernt', false, $setting($pdo, 'dsgvo-cleanup-years'));
+
+// runWizardStep3() legt die Protokollzeilen durch strip_tags — die <code>-Tags
+// der Migration stehen hier also nicht mehr drin.
+$protokoll = implode("\n", $res['log']);
+check('Protokoll meldet die Uebernahme', true,
+      str_contains($protokoll, 'cleanup_years_records auf 7 gesetzt')
+      && str_contains($protokoll, 'Wert aus dsgvo-cleanup-years übernommen'));
+check('Protokoll meldet die Entfernung des alten Schluessels', true,
+      str_contains($protokoll, 'Alter Schlüssel dsgvo-cleanup-years entfernt'));
+check('kein unbrauchbarer Wert, also keine Warnung', [], $res['warnings']);
+
+// Unbrauchbarer Bestandswert: Vorgabe statt Uebernahme, mit Warnung.
+resetDb();
+$pdo = db(DB);
+applySchema($pdo, PREFIX);
+$pdo->exec("DELETE FROM `" . PREFIX . "system_settings`
+             WHERE setting_key IN ('cleanup_years_records','cleanup_years_worktime','cleanup_years_audit')");
+$pdo->prepare('INSERT INTO `' . PREFIX . "system_settings`
+                   (setting_key, setting_value, setting_type, category, description)
+               VALUES ('dsgvo-cleanup-years', ?, 'number', 'general', 'Loeschfrist in Jahren')")
+    ->execute(['0']);
+$pdo->exec('DELETE FROM `' . PREFIX . 'schema_version`');
+$pdo->prepare('INSERT INTO `' . PREFIX . 'schema_version` (version) VALUES (?)')->execute(['1.2.4']);
+
+$res = runWizardStep3($pdo, PREFIX, $target);
+
+check('unbrauchbare Bestandsfrist faellt auf 3 zurueck', '3', $setting($pdo, 'cleanup_years_records'));
+check('unbrauchbare Bestandsfrist erzeugt eine Warnung', 1, count($res['warnings']));
+
+// Neuer Schluessel steht schon da. Im Feld kann das nicht vorkommen — wohl
+// aber auf einem Entwicklungsstand, auf dem die 1.2.5-Oberflaeche gegen eine
+// 1.2.4-Datenbank lief und die Schluessel beim Speichern angelegt hat.
+// INSERT IGNORE laesst den vorhandenen Wert stehen; das Protokoll darf dann
+// nicht behaupten, es haette den alten uebernommen.
+resetDb();
+$pdo = db(DB);
+applySchema($pdo, PREFIX);
+$pdo->prepare('UPDATE `' . PREFIX . "system_settings` SET setting_value = ? WHERE setting_key = 'cleanup_years_records'")
+    ->execute(['9']);
+$pdo->prepare('INSERT INTO `' . PREFIX . "system_settings`
+                   (setting_key, setting_value, setting_type, category, description)
+               VALUES ('dsgvo-cleanup-years', ?, 'number', 'general', 'Loeschfrist in Jahren')")
+    ->execute(['7']);
+$pdo->exec('DELETE FROM `' . PREFIX . 'schema_version`');
+$pdo->prepare('INSERT INTO `' . PREFIX . 'schema_version` (version) VALUES (?)')->execute(['1.2.4']);
+
+$res       = runWizardStep3($pdo, PREFIX, $target);
+$protokoll = implode("\n", $res['log']);
+
+check('vorhandener Wert 9 bleibt stehen', '9', $setting($pdo, 'cleanup_years_records'));
+check('Protokoll behauptet keine Uebernahme', false, str_contains($protokoll, 'übernommen'));
+check('Protokoll nennt den vorhandenen Wert', true,
+      str_contains($protokoll, 'cleanup_years_records existiert bereits'));
+check('verworfener Bestandswert erzeugt eine Warnung', 1, count($res['warnings']));
+
 // --- Aufraeumen --------------------------------------------------------------
 db()->exec('DROP DATABASE IF EXISTS `' . DB . '`');
 @unlink(testConfigPath());

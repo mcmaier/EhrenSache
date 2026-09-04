@@ -461,26 +461,113 @@ function handleCleanup($db, $database, $request_method, $authUserRole)
     requireAdmin();
     
     $data = json_decode(file_get_contents("php://input"));
-    $years = $data->years ?? 3; // Standard: 3 Jahre
-    
-    // Datum berechnen (z.B. alles vor 3 Jahren)
-    $cutoffDate = date('Y-m-d', strtotime("-{$years} years"));
-    
-    // Lösche alte Records
-    $stmt = $db->prepare("DELETE FROM {$prefix}records WHERE arrival_time < ?");
-    $stmt->execute([$cutoffDate]);
-    $deletedRecords = $stmt->rowCount();
-    
-    // Lösche alte Exceptions
-    $stmt = $db->prepare("DELETE FROM {$prefix}exceptions WHERE created_at < ?");
-    $stmt->execute([$cutoffDate]);
-    $deletedExceptions = $stmt->rowCount();
-    
+
+    // Drei Fristen, weil die Tabellen unterschiedlich lange gebraucht werden:
+    // Anwesenheiten, Arbeitszeiten (Nachweispflicht gegenüber Fördergebern)
+    // und die Änderungshistorie, die das Löschen ihrer Sitzung überlebt.
+    // Reihenfolge je Frist: Anfrage → Einstellung → Vorgabe.
+    $requested = [
+        'records'  => ['field' => 'years',          'setting' => 'cleanup_years_records',  'default' => '3'],
+        'worktime' => ['field' => 'years_worktime', 'setting' => 'cleanup_years_worktime', 'default' => '3'],
+        'audit'    => ['field' => 'years_audit',    'setting' => 'cleanup_years_audit',    'default' => '1'],
+    ];
+
+    $years = [];
+    foreach ($requested as $name => $spec) {
+        $value = $data->{$spec['field']}
+            ?? systemSetting($db, $database, $spec['setting'], $spec['default']);
+
+        $checked = retentionYears($value);
+        if ($checked === null) {
+            http_response_code(400);
+            echo json_encode([
+                "message" => "Invalid retention period",
+                "field"   => $spec['field'],
+                "hint"    => "Whole number of years, at least 1"
+            ]);
+            return;
+        }
+        $years[$name] = $checked;
+    }
+
+    $cutoff = [];
+    foreach ($years as $name => $value) {
+        $cutoff[$name] = date('Y-m-d', strtotime("-{$value} years"));
+    }
+
+    // Alles oder nichts: Eine Sitzung ohne ihre Historie oder eine Historie
+    // ohne ihre Sitzung wäre ein Zwischenstand, den niemand mehr zuordnen kann.
+    $db->beginTransaction();
+
+    try {
+        // Lösche alte Records
+        $stmt = $db->prepare("DELETE FROM {$prefix}records WHERE arrival_time < ?");
+        $stmt->execute([$cutoff['records']]);
+        $deletedRecords = $stmt->rowCount();
+
+        // Lösche alte Exceptions
+        $stmt = $db->prepare("DELETE FROM {$prefix}exceptions WHERE created_at < ?");
+        $stmt->execute([$cutoff['records']]);
+        $deletedExceptions = $stmt->rowCount();
+
+        // Erst die Historie der betroffenen Sitzungen, dann die Sitzungen:
+        // andersherum wären die Logzeilen im selben Zug verwaist und fielen
+        // in den Anonymisierungszweig statt in ihre eigene Frist.
+        //
+        // end_time IS NOT NULL schützt laufende Sitzungen. Eine Sitzung, die
+        // seit Jahren offen steht, ist ein Fehlerfall — kein Löschfall.
+        $stmt = $db->prepare("
+            DELETE FROM {$prefix}work_session_log
+            WHERE session_id IN (
+                SELECT session_id FROM {$prefix}work_sessions
+                WHERE start_time < ? AND end_time IS NOT NULL
+            )
+        ");
+        $stmt->execute([$cutoff['worktime']]);
+        $deletedLog = $stmt->rowCount();
+
+        $stmt = $db->prepare("
+            DELETE FROM {$prefix}work_sessions
+            WHERE start_time < ? AND end_time IS NOT NULL
+        ");
+        $stmt->execute([$cutoff['worktime']]);
+        $deletedSessions = $stmt->rowCount();
+
+        // Verwaiste Logzeilen werden anonymisiert, nicht gelöscht: Die Spur
+        // soll weiterhin belegen, dass an dieser Stelle etwas geschah — nur
+        // ohne Personenbezug. `changes` hält bei einem delete-Eintrag die
+        // komplette Sitzung samt member_id, Notiz und Ortsnamen.
+        $stmt = $db->prepare("
+            UPDATE {$prefix}work_session_log
+            SET changes = NULL, changed_by = NULL
+            WHERE changed_at < ?
+              AND (changes IS NOT NULL OR changed_by IS NOT NULL)
+              AND session_id NOT IN (
+                  SELECT session_id FROM {$prefix}work_sessions
+              )
+        ");
+        $stmt->execute([$cutoff['audit']]);
+        $anonymizedLog = $stmt->rowCount();
+
+        $db->commit();
+    } catch (PDOException $e) {
+        $db->rollBack();
+        error_log("Cleanup failed: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(["message" => "Cleanup failed"]);
+        return;
+    }
+
     echo json_encode([
         "message" => "Cleanup completed",
-        "cutoff_date" => $cutoffDate,
+        "cutoff_date" => $cutoff['records'],
+        "cutoff_date_worktime" => $cutoff['worktime'],
+        "cutoff_date_audit" => $cutoff['audit'],
         "deleted_records" => $deletedRecords,
-        "deleted_exceptions" => $deletedExceptions
+        "deleted_exceptions" => $deletedExceptions,
+        "deleted_work_sessions" => $deletedSessions,
+        "deleted_work_session_log" => $deletedLog,
+        "anonymized_work_session_log" => $anonymizedLog
     ]);
 }
 

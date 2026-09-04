@@ -5,7 +5,7 @@ unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nic
 oder noch nicht gebaut.
 
 **Zuletzt geprüft:** 2026-09-04 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
-**Version:** 1.2.4
+**Version:** 1.2.5
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
@@ -47,19 +47,33 @@ als Einzelfall schließen.
 ---
 
 ### OI-2 · Löschfrist für die Änderungshistorie
-**Priorität:** hoch
+**Erledigt am 2026-09-04** — mit 1.2.5
 
-`DATENSCHUTZ.md` Abschnitt 10.4 fordert eine eigene Löschfrist für `work_session_log`, weil die
-Auditspur das Löschen einer Sitzung **absichtlich** überlebt und personenbezogene Daten enthält.
-Ein automatisches Löschen gibt es nicht; der vorhandene `cleanup`-Endpunkt kennt die Tabelle
-nicht.
+`cleanup` kennt jetzt drei Fristen statt einer: Anwesenheiten und Ausnahmen, Arbeitszeiten samt
+ihrer Änderungshistorie, und verwaiste Einträge der Historie. Alles läuft in einer Transaktion.
 
-Betreiber müssen die Frist derzeit selbst per SQL durchsetzen — was in der Praxis heißt: niemand
-tut es.
+**Entschieden:** Die Historie einer bestehenden Sitzung wird nicht gesondert gelöscht — sie
+folgt der Frist ihrer Sitzung, wie `DATENSCHUTZ.md` 10.4 es vorgibt. Verwaiste Einträge
+bekommen eine eigene, kürzere Frist und werden dann **anonymisiert statt gelöscht**: `changes`
+und `changed_by` fallen weg, die Zeile bleibt. Die Auditspur soll weiterhin belegen, dass an
+dieser Stelle etwas geschah — ein vollständiges Löschen nähme ihr genau den Zweck.
 
-**Nächster Schritt:** `cleanup` um `work_session_log` und `work_sessions` erweitern, mit eigener
-Frist je Tabelle. Vorher klären, ob die Historie einer noch bestehenden Sitzung überhaupt
-gelöscht werden darf oder nur die verwaister Einträge.
+Laufende Sitzungen (`end_time IS NULL`) fallen nie in die Frist. Eine seit Jahren offene
+Sitzung ist ein Fehlerfall, kein Löschfall.
+
+**Mit erledigt:** Die Fristen wurden serverseitig geprüft. Bis dahin nahm der Endpunkt jeden
+Wert an — `years: 0` ergab den heutigen Tag als Stichtag und löschte damit den gesamten
+Bestand. Das `min="1"` stand nur im Formular. Genau das ist am 2026-09-04 bei einem Testlauf
+gegen die Entwicklungsdatenbank passiert — 1379 Anwesenheiten und 3 Ausnahmen waren weg, ohne
+Sicherung und ohne Binlog nicht wiederherstellbar. Die Prüfung sitzt jetzt in
+`retentionYears()` und greift vor jedem `DELETE`.
+
+**Offen geblieben:** [OI-22](#oi-22) — verwaiste Einträge erscheinen bis zum Ablauf ihrer Frist
+in keiner Selbstauskunft.
+
+**Restrisiko, bewusst so:** Die Bereinigung läuft nicht von selbst; ein Admin stößt sie an.
+Ein Cronlauf hätte keinen Ort im Projekt — es gibt keinen Scheduler, und ein unbeaufsichtigt
+löschender Job ohne Sicherung ist die schlechtere Variante.
 
 ---
 
@@ -190,7 +204,54 @@ abends ab 22:00 MESZ zeigte sie den Folgetag. Beides behoben (`d7ee191`).
 ---
 
 ### OI-5 · Automatisches Löschen der Auditspur
-Siehe [OI-2](#oi-2) — dort zusammengefasst.
+**Erledigt am 2026-09-04** — siehe [OI-2](#oi-2), dort zusammengefasst.
+
+---
+
+### OI-23 · Der Kettentest bildet den Wizard nach, statt ihn auszuführen
+**Priorität:** mittel
+
+`tests/db/verify_migration_chain.php` enthält `runWizardStep3()` — eine Nachbildung von
+Schritt 3 aus `public/update/index.php`. Beide Seiten können auseinanderlaufen, und genau das
+ist am 2026-09-04 passiert: Der Wizard rendete nach einer erfolgreichen Migration eine leere
+Seite, weil `foreach ($chain as $step)` die Nummer des Wizard-Schritts überschrieb. Der
+Kettentest lief grün durch, weil seine Nachbildung diese Variable nicht kennt.
+
+Behoben ist der Fehler; die Ursache für sein Übersehen nicht. `tests/suites/update_wizard.php`
+prüft seither die Quelle statisch — das fängt dieselbe Fehlerklasse, aber keine andere.
+
+**Zu entscheiden:** Schritt 3 aus dem Wizard in eine eigene Funktion ziehen, die beide Seiten
+aufrufen. Preis: Der Wizard ist bewusst eine einzelne, abhängigkeitsfreie Datei, die auch dann
+läuft, wenn der Rest der Installation nicht mehr zusammenpasst.
+
+**Nebenbefund, unabhängig davon:** Der Wizard sperrt sich per `.htaccess` aus, **bevor** er
+sein Ergebnis rendert. Scheitert das Rendern, ist das Ergebnis nicht mehr erreichbar. Die
+Sperre selbst ist richtig — die Reihenfolge macht jeden Fehler in der Ausgabe unauffindbar.
+Wieder öffnen lässt sich der Assistent nur, indem man `public/update/.htaccess` löscht.
+
+---
+
+### OI-22 · Selbstauskunft findet verwaiste Logzeilen nicht
+**Priorität:** mittel
+
+`my_data` liest die Änderungshistorie über einen Join auf `work_sessions`
+(`private/handlers/my_data.php`). Ist die Sitzung gelöscht, taucht ihre Historie in keiner
+Selbstauskunft mehr auf — obwohl der `delete`-Eintrag in `changes` die komplette Sitzung samt
+`member_id`, Notiz und Ortsnamen weiterträgt. Für Art. 15 DSGVO ist das eine Lücke.
+
+Mit [OI-2](#oi-2) ist sie zeitlich begrenzt: Nach Ablauf der Auditfrist wird der Eintrag
+anonymisiert und enthält nichts Personenbezogenes mehr. Bis dahin bleibt sie offen.
+
+**Zu entscheiden:** Die Zuordnung ginge nur über `member_id` aus dem JSON in `changes` —
+`JSON_EXTRACT` in einer Abfrage, die bisher ohne auskommt, für einen Datenbestand, den es in
+den meisten Installationen gar nicht gibt.
+
+- *Dafür:* Die Auskunft wäre vollständig, solange der Eintrag Personenbezug hat.
+- *Dagegen:* Die Abfrage hinge am inneren Aufbau der Logzeilen. Ändert sich das Format der
+  `changes`, liefert die Auskunft still wieder nichts — schlechter als eine bekannte Lücke.
+
+**Alternative:** Die Auditfrist in der Vorgabe kurz halten (steht auf 1 Jahr) und den Punkt
+in `DATENSCHUTZ.md` benennen, statt ihn technisch zu lösen. Das ist der aktuelle Stand.
 
 ---
 
@@ -528,6 +589,7 @@ korrekter Vorauswahl.
 | Kein Segmentmodell für Pausen | So belassen | Nachweise verlangen Dauer, nicht die Lage der Pausen. Nachrüstbar ohne Datenmigration |
 | Kein Offline-Betrieb in der PWA | So belassen | Erzeugte Client-Zeitstempel, die als Nachweis wertlos sind |
 | Kein PDF-Export | So belassen | Würde eine Bibliothek einschleppen, die das Projekt bewusst nicht hat. Der Bedarf ist seit 1.2.2 über die Druckansicht (`&format=html`) gedeckt: Das PDF entsteht im Druckdialog des Browsers |
+| Installer und Update-Assistent werden gesperrt ausgeliefert | So belassen | Ein hochgeladener, aber noch nicht eingerichteter Webspace soll `/install` nicht offen zeigen. Der Freischaltschritt steht für beide in der README; nach dem Lauf sperrt sich jeder Assistent selbst wieder. Die Alternative — ungesperrt ausliefern — nähme dem Ersteinrichter eine Hürde, öffnete aber ein Zeitfenster zwischen Upload und Installation |
 | Statistik getrennt von Anwesenheit | Eigener `worktime`-Block | Anwesenheitsquote und geleistete Stunden sind verschiedene Fragen |
 
 ---

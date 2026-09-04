@@ -394,26 +394,52 @@ function setupLogoUpload() {
 // ============================================
 
 export async function performCleanup() {
-    const years = document.getElementById('cleanup_years').value;
+    const years         = parseInt(document.getElementById('cleanup_years').value, 10);
+    const yearsWorktime = parseInt(document.getElementById('cleanup_years_worktime').value, 10);
+    const yearsAudit    = parseInt(document.getElementById('cleanup_years_audit').value, 10);
 
-    const confirmed = await showConfirm(`Wirklich alle Anwesenheitsdaten älter als ${years} Jahre löschen?\n\nDieser Vorgang kann nicht rückgängig gemacht werden!`,'Warnung');
-    
+    // Eine Frist von 0 ergäbe den heutigen Tag als Stichtag und löschte damit
+    // den gesamten Bestand. Der Server weist das ebenfalls ab; hier steht die
+    // Prüfung, damit der Nutzer eine Meldung statt eines Fehlers bekommt.
+    if ([years, yearsWorktime, yearsAudit].some(v => !Number.isInteger(v) || v < 1)) {
+        document.getElementById('cleanup_result').innerHTML = `
+            <div class="error-message">❌ Jede Frist muss eine ganze Zahl ab 1 Jahr sein.</div>
+        `;
+        return;
+    }
+
+    const confirmed = await showConfirm(
+        'Wirklich endgültig löschen?\n\n'
+        + `• Anwesenheiten und Ausnahmen älter als ${years} Jahre\n`
+        + `• Arbeitszeiten samt Änderungshistorie älter als ${yearsWorktime} Jahre\n`
+        + `• Änderungshistorie ohne Sitzung älter als ${yearsAudit} Jahre wird anonymisiert\n\n`
+        + 'Dieser Vorgang kann nicht rückgängig gemacht werden!',
+        'Warnung'
+    );
+
     if(confirmed)
-    {    
+    {
         try {
-            const result = await apiCall('cleanup', 'POST', { years: parseInt(years) });
-            
+            const result = await apiCall('cleanup', 'POST', {
+                years: years,
+                years_worktime: yearsWorktime,
+                years_audit: yearsAudit
+            });
+
             document.getElementById('cleanup_result').innerHTML = `
                 <div class="success-message">
                     ✅ Bereinigung erfolgreich<br>
-                    Gelöscht: ${result.deleted_records} Anwesenheiten, 
-                    ${result.deleted_exceptions} Ausnahmen<br>
-                    (älter als ${result.cutoff_date})
+                    ${result.deleted_records} Anwesenheiten, ${result.deleted_exceptions} Ausnahmen
+                    (älter als ${result.cutoff_date})<br>
+                    ${result.deleted_work_sessions} Arbeitszeiten, ${result.deleted_work_session_log} Einträge
+                    der Änderungshistorie (älter als ${result.cutoff_date_worktime})<br>
+                    ${result.anonymized_work_session_log} verwaiste Einträge anonymisiert
+                    (älter als ${result.cutoff_date_audit})
                 </div>
             `;
-            
+
             showToast('Datenlöschung erfolgreich','success');
-            
+
         } catch(error) {
             document.getElementById('cleanup_result').innerHTML = `
                 <div class="error-message">❌ Fehler: ${error.message}</div>

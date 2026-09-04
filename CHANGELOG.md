@@ -7,6 +7,70 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.2.5] – 2026-09-04
+
+### Geändert
+- **Die DSGVO-Bereinigung kennt drei Löschfristen statt einer.** Getrennt einstellbar für
+  Anwesenheiten und Ausnahmen (`cleanup_years_records`), für Arbeitszeiten samt ihrer
+  Änderungshistorie (`cleanup_years_worktime`) und für verwaiste Einträge der
+  Änderungshistorie (`cleanup_years_audit`). Alle Schritte laufen in einer Transaktion
+- Der Schlüssel `dsgvo-cleanup-years` heißt jetzt `cleanup_years_records` — die Migration
+  übernimmt den eingestellten Wert
+
+### Neu
+- **`cleanup` löscht Arbeitszeiten und ihre Änderungshistorie.** Bis 1.2.4 kannte der
+  Endpunkt nur `records` und `exceptions`; die Frist aus `DATENSCHUTZ.md` 10.4 musste jeder
+  Betreiber selbst per SQL durchsetzen
+- **Verwaiste Einträge der Änderungshistorie werden anonymisiert, nicht gelöscht.** `changes`
+  und `changed_by` fallen weg, der Eintrag bleibt mit Zeitpunkt und Art der Änderung stehen.
+  Die Spur belegt weiter, dass etwas geschah — ohne Personenbezug
+- `cleanup` ist erstmals in `API.md` dokumentiert
+- Testsuiten `cleanup_unit` und `cleanup_api` sowie `tests/db/verify_cleanup_retention.php`
+
+### Behoben
+- **`cleanup` nahm jede Frist an, auch `0`.** Der Stichtag war dann der heutige Tag, und der
+  Aufruf löschte den gesamten Bestand an Anwesenheiten und Ausnahmen. Die Untergrenze stand
+  nur als `min="1"` im Formular und wirkte bei einem direkten API-Aufruf nicht. Jede Frist
+  muss jetzt eine ganze Zahl ab 1 sein, geprüft vor dem ersten `DELETE`
+- Laufende Sitzungen (`end_time IS NULL`) fallen nicht mehr in die Löschfrist. Eine seit
+  Jahren offene Sitzung ist ein Fehlerfall, kein Löschfall
+- **Der Update-Wizard zeigte in Schritt 3 eine leere Seite.** Die Schleife über die
+  Migrationskette lief mit `foreach ($chain as $step)` und überschrieb damit die Nummer des
+  Wizard-Schritts. Danach traf keine der Bedingungen `$step == 1|2|3` mehr, und weder
+  Protokoll noch Fehlermeldung wurden gerendert — obwohl die Migration sauber durchlief.
+  Da der Wizard sich im selben Durchgang per `.htaccess` aussperrt, war das Ergebnis
+  anschließend auch nicht mehr erreichbar. Der Fehler betraf jedes Update mit mindestens
+  einem Migrationsschritt
+- Der Wizard überschrieb beim Sperren die Anleitung zum Wiederöffnen in
+  `public/update/.htaccess`. Nach dem ersten Update stand nirgends mehr, wie man den
+  Assistenten für das nächste erreichbar macht
+- **Die Zugriffssperren von Installer und Update-Assistent nutzten reine Apache-2.2-Syntax**
+  (`Order Deny,Allow` / `Deny from all`). Auf einem Apache 2.4 ohne `mod_access_compat`
+  beantwortet der Server das mit HTTP 500 statt 403 — gesperrt bleibt das Verzeichnis, es
+  sieht aber nach einem Defekt aus. Beide Dateien und beide erzeugenden Skripte tragen jetzt
+  beide Syntaxen, je in einem `<IfModule>`-Wächter
+- **Der Installer wurde mit der Sperre des `abgeschlossenen` Zustands ausgeliefert.** Die
+  Datei im Repository trug den Text, den der Installer nach seinem Lauf schreibt — wer klonte
+  oder das Paket lud, bekam an Schritt 4 der Anleitung ein `403 Forbidden` und eine Datei,
+  die ihm sagte, er sei fertig. Die Sperre bleibt (ein hochgeladener, noch nicht eingerichteter
+  Webspace soll den Installer nicht offen zeigen); der Text benennt jetzt den
+  Auslieferungszustand, und die README ergänzt den Freischaltschritt — wortgleich zum
+  Update-Ablauf
+- Die `.gitignore` enthielt seit jeher eine wirkungslose Regel `install/.htaccess`: falscher
+  Pfad (nicht `public/install/`) und die Datei ist getrackt, wo `.gitignore` ohnehin nicht
+  greift. Entfernt, damit niemand annimmt, hier wirke etwas
+
+### Warum
+Die Änderungshistorie überlebt das Löschen einer Arbeitszeit absichtlich — sonst wäre
+ausgerechnet die Löschung nicht dokumentiert. Sie enthält damit personenbezogene Daten, die
+den eigentlichen Datensatz überdauern, und braucht eine eigene Frist. Sie am Ende ganz zu
+löschen nähme ihr allerdings den Zweck; deshalb die Anonymisierung.
+
+Die Bereinigung läuft weiterhin nicht von selbst. Ein unbeaufsichtigt löschender Job ohne
+Sicherung wäre die schlechtere Variante — und einen Scheduler hat das Projekt bewusst nicht.
+
+---
+
 ## [1.2.4] – 2026-09-03
 
 ### Geändert

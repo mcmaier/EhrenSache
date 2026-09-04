@@ -1346,6 +1346,71 @@ Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
 
 ---
 
+## Datenlöschung (cleanup)
+
+### Bestand nach Fristen bereinigen
+**Endpoint:** `POST /api.php?resource=cleanup`
+
+**Berechtigung:** Admin
+
+Löscht endgültig. Es gibt keinen Rückgängig-Pfad und keinen Probelauf.
+
+Drei getrennte Fristen, weil die Tabellen unterschiedlich lange gebraucht
+werden. Jede Frist ist eine **ganze Zahl ab 1**; fehlt ein Feld, gilt die
+gleichnamige Einstellung aus `system_settings`, sonst die Vorgabe.
+
+| Feld | Einstellung | Vorgabe | Wirkung |
+|---|---|---|---|
+| `years` | `cleanup_years_records` | 3 | `records` (nach `arrival_time`) und `exceptions` (nach `created_at`) werden gelöscht |
+| `years_worktime` | `cleanup_years_worktime` | 3 | `work_sessions` (nach `start_time`) und deren `work_session_log`-Einträge werden gelöscht |
+| `years_audit` | `cleanup_years_audit` | 1 | Verwaiste `work_session_log`-Einträge (nach `changed_at`) werden **anonymisiert** |
+
+**Laufende Sitzungen** (`end_time IS NULL`) fallen nie in die Frist — eine seit
+Jahren offene Sitzung ist ein Fehlerfall, kein Löschfall.
+
+**Verwaiste Einträge** der Änderungshistorie werden nicht gelöscht, sondern
+anonymisiert: `changes` und `changed_by` werden auf `NULL` gesetzt, die Zeile
+bleibt mit `session_id`, `action` und `changed_at` bestehen. Die Auditspur soll
+weiterhin belegen, dass an dieser Stelle etwas geschah — ohne Personenbezug.
+Siehe `DATENSCHUTZ.md` 10.4.
+
+Alle Schritte laufen in **einer Transaktion**.
+
+**Request:**
+```json
+{
+  "years": 3,
+  "years_worktime": 3,
+  "years_audit": 1
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "Cleanup completed",
+  "cutoff_date": "2023-09-04",
+  "cutoff_date_worktime": "2023-09-04",
+  "cutoff_date_audit": "2025-09-04",
+  "deleted_records": 128,
+  "deleted_exceptions": 4,
+  "deleted_work_sessions": 31,
+  "deleted_work_session_log": 76,
+  "anonymized_work_session_log": 12
+}
+```
+
+**Response (400):** Eine Frist ist keine ganze Zahl ab 1.
+```json
+{
+  "message": "Invalid retention period",
+  "field": "years_worktime",
+  "hint": "Whole number of years, at least 1"
+}
+```
+
+---
+
 ## Logo-Upload
 
 ### Logo hochladen

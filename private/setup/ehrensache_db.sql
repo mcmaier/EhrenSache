@@ -575,7 +575,10 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('worktime_max_session_hours', '12', 'number', 'general', 'Obergrenze in Stunden, ab der eine laufende Sitzung automatisch beendet wird'),
 ('worktime_require_note', '0', 'boolean', 'general', 'Notiz beim Stoppen und bei manuellen Einträgen erzwingen'),
 ('checkin_auto_create_appointment', '0', 'boolean', 'general', 'Beim Check-in einen Termin anlegen, wenn keiner passt'),
-('checkin_tolerance_hours', '2', 'number', 'general', 'Zeitfenster in Stunden, in dem ein Check-in einem Termin zugeordnet wird');
+('checkin_tolerance_hours', '2', 'number', 'general', 'Zeitfenster in Stunden, in dem ein Check-in einem Termin zugeordnet wird'),
+('cleanup_years_records', '3', 'number', 'general', 'Löschfrist in Jahren für Anwesenheiten und Ausnahmen'),
+('cleanup_years_worktime', '3', 'number', 'general', 'Löschfrist in Jahren für Arbeitszeiten und die zugehörige Änderungshistorie'),
+('cleanup_years_audit', '1', 'number', 'general', 'Frist in Jahren, nach der verwaiste Einträge der Änderungshistorie anonymisiert werden');
 
 
 CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS
