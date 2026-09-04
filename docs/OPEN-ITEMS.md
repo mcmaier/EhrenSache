@@ -579,6 +579,19 @@ korrekter Vorauswahl.
 
 ---
 
+### OI-24 · CSV Export kaputt - Import noch ungetestet
+**Priorität:** mittel
+
+Der CSV-Export von Terminen, Mitgliedern und Anwesenheiten funktioniert nicht mehr
+
+- Bei Kalender wird eine Datei heruntergeladen, diese beinhaltet eine JSON-Fehlermeldung {api-token invalid or empty};
+- Bei Members und Records kommt direkt eine Fehlermeldung
+- Import wurde aktuell noch nicht getestet.
+
+Abgleich, dass Export-Daten auch direkt wieder importierbar sind, ist nicht erfolgt.
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
