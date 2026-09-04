@@ -243,19 +243,6 @@ class RateLimiter {
      * Reset Login-Versuche (nach erfolgreichem Login)
      */
     public function resetLoginAttempts($email) {
-        if ($this->useDatabase) {
-            try {
-                $hashedIdentifier = hash('sha256', $email . 'login_attempt');
-                $stmt = $this->db->prepare(
-                    "DELETE FROM {$this->prefix}rate_limits WHERE identifier = ? AND action = 'login_attempt'"
-                );
-                $stmt->execute([$hashedIdentifier]);
-            } catch (PDOException $e) {
-                error_log("RateLimiter reset error: " . $e->getMessage());
-            }
-        } else {
-            $key = 'rate_limit_' . hash('sha256', $email . 'login_attempt');
-            unset($_SESSION[$key]);
-        }
+        $this->reset($email, 'login_attempt');
     }
 }

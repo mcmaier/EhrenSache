@@ -2,37 +2,43 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../private/helpers/totp.php';
+require_once __DIR__ . '/../../private/helpers/rate_limiter.php';
 
 // ---- totpCodesForSecret --------------------------------------------------
 // RFC 6238, Anhang B: Secret "12345678901234567890" (Base32
 // GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ), SHA1, T = 59 s → 94287082, sechsstellig 287082.
-const RFC_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+const STATION_RFC_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 
 test('totpCodesForSecret liefert den RFC-6238-Code fuer T=59', function () {
-    $codes = totpCodesForSecret(RFC_SECRET, 59);
+    $codes = totpCodesForSecret(STATION_RFC_SECRET, 59);
     assertSame('287082', $codes['code']);
 });
 
 test('totpCodesForSecret nennt das Fensterende und die Periode', function () {
-    $codes = totpCodesForSecret(RFC_SECRET, 59);
+    $codes = totpCodesForSecret(STATION_RFC_SECRET, 59);
     assertSame(60, $codes['valid_until']);
     assertSame(30, $codes['period']);
 });
 
 test('totpCodesForSecret liefert als next_code den Code des Folgefensters', function () {
-    $codes = totpCodesForSecret(RFC_SECRET, 59);
-    $totp  = new TOTP(RFC_SECRET);
-    assertSame($totp->getCode(60), $codes['next_code']);
-    assertSame($totp->getCode(89), $codes['next_code'], 'Folgefenster reicht bis 89 s');
+    $codes = totpCodesForSecret(STATION_RFC_SECRET, 59);
+    // Verifiziert mit: (new TOTP('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ'))->getCode(60)
+    assertSame('359152', $codes['next_code']);
+    assertSame('359152', totpCodesForSecret(STATION_RFC_SECRET, 89)['code'], 'Folgefenster reicht bis 89 s');
+});
+
+test('totpCodesForSecret an der Fenstergrenze T=60', function () {
+    $codes = totpCodesForSecret(STATION_RFC_SECRET, 60);
+    assertSame('359152', $codes['code']);
+    assertSame(90, $codes['valid_until']);
 });
 
 test('totpCodesForSecret ohne Zeitstempel nimmt die Serverzeit', function () {
-    $codes = totpCodesForSecret(RFC_SECRET);
+    $before = time();
+    $codes  = totpCodesForSecret(STATION_RFC_SECRET);
     assertTrue(preg_match('/^\d{6}$/', $codes['code']) === 1, 'sechs Ziffern erwartet');
-    assertTrue($codes['valid_until'] > time() - 1, 'valid_until liegt nicht in der Vergangenheit');
+    assertTrue($codes['valid_until'] > $before && $codes['valid_until'] <= $before + 30, 'valid_until liegt im naechsten Fenster');
 });
-
-require_once __DIR__ . '/../../private/helpers/rate_limiter.php';
 
 // ---- RateLimiter::reset ---------------------------------------------------
 // Session-Modus: ohne PDO zaehlt der Limiter in $_SESSION. Im CLI ist das ein
@@ -60,4 +66,19 @@ test('RateLimiter::reset trifft nur das genannte Kennzeichen', function () {
 
     assertTrue($limiter->check('a', 'station_pin', 1, 900));
     assertSame(false, $limiter->check('b', 'station_pin', 1, 900));
+});
+
+test('RateLimiter::reset trifft nur die genannte Action, nicht andere Actions desselben Kennzeichens', function () {
+    $_SESSION = [];
+    $limiter  = new RateLimiter();
+
+    assertTrue($limiter->check('x', 'a1', 1, 900));
+    assertSame(false, $limiter->check('x', 'a1', 1, 900), 'a1 bereits ausgeschoepft');
+    assertTrue($limiter->check('x', 'a2', 1, 900));
+    assertSame(false, $limiter->check('x', 'a2', 1, 900), 'a2 bereits ausgeschoepft');
+
+    $limiter->reset('x', 'a1');
+
+    assertTrue($limiter->check('x', 'a1', 1, 900), 'a1 nach reset wieder erlaubt');
+    assertSame(false, $limiter->check('x', 'a2', 1, 900), 'a2 bleibt gesperrt');
 });

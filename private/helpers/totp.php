@@ -15,12 +15,15 @@
  * Vanilla PHP Implementation (keine Dependencies)
  */
 
+/** Zeitfenster in Sekunden — von allen Stationen und Verifikationen gemeinsam genutzt. */
+const TOTP_PERIOD_SECONDS = 30;
+
 class TOTP {
     private $secret;
     private $period;
     private $digits;
-    
-    public function __construct($secret, $period = 30, $digits = 6) {
+
+    public function __construct($secret, $period = TOTP_PERIOD_SECONDS, $digits = 6) {
         $this->secret = $secret;
         $this->period = $period;
         $this->digits = $digits;
@@ -188,18 +191,23 @@ function countTotpLocations($db, $database): int
  * Bildschirm steht: den Code, sein Fensterende und den Folgecode, damit der
  * Wechsel ohne Lücke gelingt (Spec E5).
  *
+ * Die Periode ist bewusst nicht parametrisierbar: Jede Verifikation
+ * (resolveTotpLocation(), work_sessions.php) instanziiert TOTP mit der
+ * Standardperiode TOTP_PERIOD_SECONDS — ein abweichender Wert hier würde
+ * Codes erzeugen, die nirgends akzeptiert werden.
+ *
  * @return array{code: string, next_code: string, valid_until: int, period: int}
  */
-function totpCodesForSecret(string $secret, ?int $now = null, int $period = 30): array
+function totpCodesForSecret(string $secret, ?int $now = null): array
 {
     $now         = $now ?? time();
-    $totp        = new TOTP($secret, $period);
-    $windowStart = intdiv($now, $period) * $period;
+    $totp        = new TOTP($secret);
+    $windowStart = intdiv($now, TOTP_PERIOD_SECONDS) * TOTP_PERIOD_SECONDS;
 
     return [
         'code'        => $totp->getCode($now),
-        'next_code'   => $totp->getCode($windowStart + $period),
-        'valid_until' => $windowStart + $period,
-        'period'      => $period,
+        'next_code'   => $totp->getCode($windowStart + TOTP_PERIOD_SECONDS),
+        'valid_until' => $windowStart + TOTP_PERIOD_SECONDS,
+        'period'      => TOTP_PERIOD_SECONDS,
     ];
 }
