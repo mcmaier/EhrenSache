@@ -138,6 +138,40 @@ test('validateStationPin klemmt die Mindestlaenge auf 4..8', function () {
     assertSame(null, validateStationPin('20481357', 12), 'Minimum 12 wirkt wie 8');
 });
 
+test('validateStationPin lehnt eine PIN mit angehaengtem Zeilenumbruch ab', function () {
+    assertTrue(validateStationPin("1234\n", 4) !== null, 'trailing newline ist keine Ziffer');
+    assertTrue(validateStationPin("123\n", 4) !== null, 'trailing newline zaehlt nicht als vierte Ziffer');
+});
+
+test('validateStationPin lehnt eine PIN mit fuehrendem Leerzeichen ab', function () {
+    assertTrue(validateStationPin(' 2580', 4) !== null);
+});
+
+// ---- stationPinIsSequence --------------------------------------------------
+
+test('stationPinIsSequence lehnt Strings kuerzer als 2 Zeichen ab', function () {
+    assertSame(false, stationPinIsSequence('5'));
+});
+
+test('stationPinIsSequence erkennt eine zweistellige Folge', function () {
+    assertSame(true, stationPinIsSequence('12'));
+});
+
+test('stationPinIsSequence erkennt eine zweistellige Nicht-Folge', function () {
+    assertSame(false, stationPinIsSequence('13'));
+});
+
+// ---- stationDummyHash -------------------------------------------------------
+
+test('stationDummyHash verifiziert nie gegen einen echten Wert', function () {
+    assertSame(false, password_verify('anything', stationDummyHash()));
+});
+
+test('stationDummyHash liefert einen bcrypt-Hash', function () {
+    $info = password_get_info(stationDummyHash());
+    assertSame('bcrypt', $info['algoName']);
+});
+
 // ---- stationAuthenticate --------------------------------------------------
 // Laeuft gegen eine SQLite-Datenbank im Speicher und den Session-Limiter:
 // die Sperrlogik wird rot/gruen gefahren, ohne die Entwicklungsdatenbank
@@ -163,6 +197,15 @@ if (!extension_loaded('pdo_sqlite')) {
      */
     function stationTestDb(): array
     {
+        // Einmal berechnete Hashes statt pro Aufruf — password_hash() ist mit
+        // Absicht langsam, und stationTestDb() laeuft in etlichen Tests.
+        static $pinHash2580 = null;
+        static $pinHash1357 = null;
+        if ($pinHash2580 === null) {
+            $pinHash2580 = password_hash('2580', PASSWORD_DEFAULT);
+            $pinHash1357 = password_hash('1357', PASSWORD_DEFAULT);
+        }
+
         $pdo = new PDO('sqlite::memory:');
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->exec("CREATE TABLE ut_members (
@@ -171,11 +214,11 @@ if (!extension_loaded('pdo_sqlite')) {
                         pin_hash TEXT, active INTEGER DEFAULT 1)");
         $ins = $pdo->prepare("INSERT INTO ut_members (name, surname, member_number, pin_hash, active)
                               VALUES (?, ?, ?, ?, ?)");
-        $ins->execute(['Anna', 'Aktiv',   '100', password_hash('2580', PASSWORD_DEFAULT), 1]);
-        $ins->execute(['Ingo', 'Inaktiv', '200', password_hash('1357', PASSWORD_DEFAULT), 0]);
+        $ins->execute(['Anna', 'Aktiv',   '100', $pinHash2580, 1]);
+        $ins->execute(['Ingo', 'Inaktiv', '200', $pinHash1357, 0]);
         $ins->execute(['Olga', 'Ohne',    '300', null, 1]);
-        $ins->execute(['Dora', 'Doppelt', '400', password_hash('2580', PASSWORD_DEFAULT), 1]);
-        $ins->execute(['Dirk', 'Doppelt', '400', password_hash('2580', PASSWORD_DEFAULT), 1]);
+        $ins->execute(['Dora', 'Doppelt', '400', $pinHash2580, 1]);
+        $ins->execute(['Dirk', 'Doppelt', '400', $pinHash2580, 1]);
 
         $_SESSION = [];
 
@@ -252,8 +295,41 @@ if (!extension_loaded('pdo_sqlite')) {
             assertSame('invalid', $failure, "Versuch " . ($i + 1));
         }
         assertSame(null, stationAuthenticate($db, $database, $limiter, 7, '100', '2580', $failure));
-        assertSame('locked', $failure);
+        assertSame('device_locked', $failure, 'Kiosk-Sperre ist von der Mitglieds-Sperre unterscheidbar');
         // Ein anderer Kiosk ist nicht betroffen
         assertTrue(stationAuthenticate($db, $database, $limiter, 8, '100', '2580', $failure) !== null);
+    });
+
+    test('stationAuthenticate: Erfolg setzt auch den Kiosk-Zaehler zurueck', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        for ($i = 0; $i < 4; $i++) {
+            stationAuthenticate($db, $database, $limiter, 1, '100', '0001', $failure);
+        }
+        for ($i = 0; $i < 4; $i++) {
+            stationAuthenticate($db, $database, $limiter, 1, 'nr' . $i, '0001', $failure);
+        }
+        assertTrue(stationAuthenticate($db, $database, $limiter, 1, '100', '2580', $failure) !== null,
+                   'Erfolg trotz vier Mitglieds- und vier Kiosk-Fehlversuchen');
+
+        // Waeren die Zaehler nicht zurueckgesetzt, wuerde der Kiosk hier schon
+        // nach 26 weiteren Versuchen sperren (30 minus vier vorherige).
+        for ($i = 0; $i < 29; $i++) {
+            stationAuthenticate($db, $database, $limiter, 1, 'unbekannt' . $i, '0001', $failure);
+            assertSame('invalid', $failure, "Versuch " . ($i + 1) . " nach Erfolg");
+        }
+    });
+
+    test('stationAuthenticate ueberschreibt ein vorbelegtes $failure bei Erfolg mit null', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        $failure = 'x';
+        $member  = stationAuthenticate($db, $database, $limiter, 1, '100', '2580', $failure);
+        assertTrue($member !== null);
+        assertSame(null, $failure);
+    });
+
+    test('stationAuthenticate lehnt leere Mitgliedsnummer und leere PIN ohne Exception ab', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '', '', $failure));
+        assertSame('invalid', $failure);
     });
 }
