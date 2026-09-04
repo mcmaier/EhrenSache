@@ -772,12 +772,15 @@ function createDevice($db, $database, $authUserId) {
                 api_token_expires_at,
                 totp_secret,
                 created_at
-            ) VALUES (?, 'device', ?, 1, 'active', 1, ?, ?, ?, NOW())"
+            ) VALUES (?, 'device', ?, ?, 'active', 1, ?, ?, ?, NOW())"
         );
-        
+
+        $isActive = isset($data->is_active) ? ($data->is_active ? 1 : 0) : 1;
+
         $stmt->execute([
             $data->device_name,
             $device_type,
+            $isActive,
             $apiToken,
             $tokenExpires,
             $totpSecret

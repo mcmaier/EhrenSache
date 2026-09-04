@@ -329,8 +329,6 @@ async function openDeviceModal(deviceId = null) {
     const modal = document.getElementById('deviceModal');
     const title = document.getElementById('deviceModalTitle');
 
-    const deviceType = document.getElementById('device_type').value;
-
     // Event Listener EINMAL registrieren (mit removeEventListener zuerst)
     const typeSelect = document.getElementById('device_type');    
     typeSelect.removeEventListener('change', toggleDeviceTypeFields);
@@ -364,7 +362,7 @@ async function openDeviceModal(deviceId = null) {
         title.textContent = 'Neues Gerät';
         document.getElementById('deviceForm').reset();
 
-        document.getElementById('device_id').value = null;
+        document.getElementById('device_id').value = '';
         document.getElementById('device_active').checked = 1;
 
         const kioskBox = document.getElementById('device_kiosk_totp');
@@ -377,8 +375,8 @@ async function openDeviceModal(deviceId = null) {
         resetTokenDisplay();
     }
             
-    // Hints aktualisieren    
-    toggleDeviceTypeFields(deviceType);    
+    // Hints aktualisieren
+    toggleDeviceTypeFields();
 
     modal.classList.add('active');
 }
@@ -391,7 +389,7 @@ function closeDeviceModal() {
 function toggleDeviceTypeFields() {
     const deviceType = document.getElementById('device_type').value;
     const deviceId   = document.getElementById('device_id').value;
-    const editing    = !!(deviceId && deviceId !== 'null');
+    const editing    = deviceId !== '';
     const totpGroup  = document.getElementById('totpSecretGroup');
     const kioskGroup = document.getElementById('kioskTotpGroup');
     const tokenGroup = document.getElementById('apiTokenGroup');
@@ -426,16 +424,14 @@ export async function saveDevice() {
         return;
     }
 
-    const deviceId = document.getElementById('device_id').value;        
-    
+    const deviceId = document.getElementById('device_id').value;
+    const editing  = deviceId !== '';
+
     const data = {
         device_name: document.getElementById('device_name').value,
         is_active: document.getElementById('device_active').checked,
         device_type: document.getElementById('device_type').value,
     };
- 
-        
-    const editing = !!(deviceId && deviceId !== 'null');
 
     if (data.device_type === 'totp_location') {
         data.totp_secret = document.getElementById('device_totp_secret').value || null;
@@ -454,7 +450,7 @@ export async function saveDevice() {
     debug.log('Saving Device:', data);
 
     let result;
-    if (deviceId) {
+    if (editing) {
         result = await apiCall('users', 'PUT', data, { id: deviceId });
 
     } else {
@@ -463,19 +459,23 @@ export async function saveDevice() {
     }
 
     if (result.success) {
-        closeDeviceModal();
-        showDeviceSection(true, currentDevicesPage);
+        const deviceType = result.device?.device_type;
+        const showsToken = !editing && (deviceType === 'kiosk' || deviceType === 'auth_device') && result.device?.user_id;
 
-        showToast(
-            deviceId ? 'Gerät wurde erfolgreich aktualisiert' : 'Gerät wurde erfolgreich erstellt',
-            'success'
-        );
-
-        if (!editing && result.device?.device_type === 'kiosk' && result.device.api_token) {
-            // Der Token ist nur jetzt in der Antwort; danach ueber das Bearbeiten-Modal erreichbar
-            await showConfirm(
-                `Token für „${result.device.device_name}“:\n\n${result.device.api_token}\n\nDiesen Token im Kiosk unter station/ eingeben. Er ist auch später im Gerät abrufbar.`,
-                'Kiosk angelegt'
+        if (showsToken) {
+            // Der Token steckt nur in dieser Antwort; danach nur noch ueber
+            // das Bearbeiten-Modal (apiTokenGroup) abrufbar — also gleich
+            // dorthin wechseln, statt ihn in einem Wegwerf-Dialog zu zeigen.
+            closeDeviceModal();
+            await showDeviceSection(true, currentDevicesPage);
+            await openDeviceModal(result.device.user_id);
+            showToast('Gerät angelegt – Token jetzt kopieren', 'success');
+        } else {
+            closeDeviceModal();
+            showDeviceSection(true, currentDevicesPage);
+            showToast(
+                editing ? 'Gerät wurde erfolgreich aktualisiert' : 'Gerät wurde erfolgreich erstellt',
+                'success'
             );
         }
     }
@@ -621,4 +621,3 @@ window.copyDeviceToken = copyDeviceToken;
 window.toggleDeviceTokenVisibility = toggleDeviceTokenVisibility;
 window.generateTotpSecret = generateTotpSecret;
 window.applyDeviceFilters = applyDeviceFilters;
-window.toggleDeviceTypeFields = toggleDeviceTypeFields;

@@ -696,7 +696,9 @@ Endpunkt der **virtuellen Station** (Gerätetyp `kiosk`, seit 1.3.0): ein Tablet
 Stations-Code anzeigt und Mitglieder per Mitgliedsnummer + PIN stempeln lässt.
 
 **Authentifizierung:** ausschließlich Geräte-Token eines Kiosks. Ein Kiosk-Token darf
-**nur** diese Ressource (und `version`) aufrufen — jede andere Ressource antwortet `403`.
+**nur** diese Ressource (und `version`) aufrufen — abgesehen von den öffentlichen Endpunkten
+(`ping`, `appearance`, `login`, `register`, `password_reset_request`, die noch vor der
+Authentifizierung laufen) antwortet jede andere Ressource `403`.
 Eine vom Token erzeugte Session ist ohne den Token nicht nutzbar (`401`).
 Im Unterschied zu `auto_checkin` (das Gerät bürgt für die Identität) prüft hier der Server
 die Identität des Mitglieds; das Gerät ist nur Tastatur und Bildschirm.
@@ -1174,10 +1176,12 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
 
 `device_type` ist `totp_location`, `auth_device` oder `kiosk` (seit 1.3.0, „Virtuelle
 Station“). Für `kiosk` ist `totp_enabled` optional (Standard `false`) und steuert, ob das
-Gerät von Anfang an einen Stations-Code anzeigen darf; ein mitgeschicktes `totp_secret` wird
-für `kiosk` mit `400` abgelehnt — das Secret erzeugt ausschließlich der Server. Ein
+Gerät von Anfang an einen Stations-Code anzeigen darf; ein beim Anlegen mitgeschicktes
+`totp_secret` wird für `kiosk` ignoriert — das Secret erzeugt ausschließlich der Server
+(nur `PUT` lehnt ein eigenes `totp_secret` bei `kiosk` mit `400` ab, siehe unten). Ein
 mitgeschicktes `totp_secret` muss Base32-kodiert sein (Zeichen `A`–`Z`, `2`–`7`) und 16 bis 64
-Zeichen lang sein, sonst antwortet die Anfrage mit `400`.
+Zeichen lang sein, sonst antwortet die Anfrage mit `400`. `is_active` ist optional (Standard
+`true`, also aktiv) und wird beim Anlegen direkt übernommen.
 
 **Response:**
 ```json
@@ -1194,10 +1198,11 @@ Zeichen lang sein, sonst antwortet die Anfrage mit `400`.
 }
 ```
 
-Die Create-Antwort enthält `totp_secret` immer, bei `kiosk` aber als `null` — das Secret
-selbst verlässt den Server nie, `has_totp_secret` zeigt an, ob eines hinterlegt wurde. `GET`
-lässt das Feld bei `kiosk` dagegen ganz weg (siehe unten). `api_token` erscheint nur in dieser
-Antwort; danach ist er nur noch über das Bearbeiten-Formular abrufbar.
+Die Create-Antwort enthält für jeden Gerätetyp sowohl `totp_secret` (bei `kiosk` immer
+`null`) als auch `has_totp_secret` — das Secret selbst verlässt den Server nie,
+`has_totp_secret` zeigt an, ob eines hinterlegt wurde. `GET` lässt das Feld `totp_secret` bei
+`kiosk` dagegen ganz weg, sowohl einzeln als auch in der Liste (siehe unten). `api_token`
+erscheint nur in dieser Antwort; danach ist er nur noch über das Bearbeiten-Formular abrufbar.
 
 ### Gerät aktualisieren
 **Endpoint:** `PUT /api.php?resource=users&id={user_id}`

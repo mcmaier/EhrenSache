@@ -269,6 +269,35 @@ test('station: create_device mit ungueltigem Secret legt nichts an', function ()
         'Geraet mit ungueltigem Secret haette nicht angelegt werden duerfen');
 });
 
+test('station: create_device mit is_active=false legt inaktives Geraet an', function () {
+    $name = 'Test-Inaktiv ' . uniqid();
+    $res  = apiRequest('POST', 'users', [
+        'token' => apiToken('admin'),
+        'body'  => [
+            'action'      => 'create_device',
+            'device_name' => $name,
+            'device_type' => 'auth_device',
+            'is_active'   => false,
+        ],
+    ]);
+    assertStatus(200, $res, 'Inaktives Geraet haette angelegt werden muessen');
+    $deviceId = (int) $res['body']['device']['user_id'];
+
+    $get = apiRequest('GET', 'users', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $deviceId],
+    ]);
+    assertStatus(200, $get);
+    assertSame(0, (int) $get['body']['is_active'], 'is_active=false muss uebernommen werden');
+
+    // Aufraeumen — das ist das einzige Geraet, das dieser Test anfasst.
+    $del = apiRequest('DELETE', 'users', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $deviceId],
+    ]);
+    assertStatus(200, $del, 'Test-Geraet konnte nicht geloescht werden');
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 
