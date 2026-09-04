@@ -34,6 +34,7 @@ require_once '../../private/helpers/utils.php';
 require_once '../../private/helpers/mailer.php';
 require_once '../../private/helpers/version.php';
 require_once '../../private/helpers/worktime.php';
+require_once '../../private/helpers/station.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';
@@ -57,6 +58,7 @@ require_once '../../private/handlers/attendance_list.php';
 require_once '../../private/handlers/my_data.php';
 require_once '../../private/handlers/activity_types.php';
 require_once '../../private/handlers/work_sessions.php';
+require_once '../../private/handlers/station.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -289,13 +291,14 @@ $isTokenAuth = false;
 $authUserId = null;
 $authUserRole = null;
 $authMemberId = null;
+$authDeviceType = null;   // nur bei Geraete-Token gesetzt: totp_location | auth_device | kiosk
 
 // Token-Authentifizierung
 if($apiToken) {
     //error_log("Token Auth: Token received, length=" . strlen($apiToken));
     
-    $stmt = $db->prepare("SELECT user_id, member_id, role, is_active, email, api_token_expires_at
-                         FROM {$prefix}users 
+    $stmt = $db->prepare("SELECT user_id, member_id, role, is_active, email, api_token_expires_at, device_type
+                         FROM {$prefix}users
                          WHERE api_token = ?");
     $stmt->execute([$apiToken]);
     $tokenUser = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -327,6 +330,7 @@ if($apiToken) {
     $authUserId   = intval($tokenUser['user_id']);
     $authUserRole = $tokenUser['role'];
     $authMemberId = $tokenUser['member_id'] ? intval($tokenUser['member_id']) : null;
+    $authDeviceType = $tokenUser['device_type'] ?? null;
 
     // Für Kompatibilität mit auth-Hilfsfunktionen (isAdmin(), isAdminOrManager() etc.)
     // die $_SESSION['role'] lesen: Session starten und mit Token-Daten befüllen.
@@ -379,6 +383,20 @@ if($apiToken) {
     $authMemberId = $result && $result['member_id'] ? intval($result['member_id']) : null;
     
     //error_log("Session Auth: User ID: $authUserId, Role: $authUserRole, Member ID: " . ($authMemberId ?? 'NULL'));
+}
+
+// ============================================
+// 7.1 KIOSK-TOKEN: nur die Station selbst
+// ============================================
+// Ein Kiosk ist Tastatur und Bildschirm; die Identitaet des Mitglieds prueft
+// der Server ueber die PIN. Darum darf ein Kiosk-Token weder auto_checkin
+// (dort buergt das Geraet) noch irgendeine Liste aufrufen — ein gestohlenes
+// Token waere sonst ein Generalschluessel (Spec 8).
+if ($authUserRole === 'device' && $authDeviceType === 'kiosk'
+    && !in_array($resource, ['station', 'version'], true)) {
+    http_response_code(403);
+    echo json_encode(["message" => "Kiosk devices may only use the station resource"]);
+    exit();
 }
 
 // ============================================
@@ -541,7 +559,10 @@ switch($resource) {
     case 'version':
         getVersion();
     break;
-                
+    case 'station':
+        handleStation($db, $database, $request_method, $authUserId, $authUserRole, $authDeviceType);
+        break;
+
     default:
         http_response_code(404);
         echo json_encode([
