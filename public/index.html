@@ -1317,6 +1317,15 @@
                         <label for="member_number">Mitgliedsnummer</label>
                         <input type="text" id="member_number">
                     </div>
+                    <div class="form-group" id="memberPinGroup" style="display: none;">
+                        <label for="member_pin">Stations-PIN</label>
+                        <input type="password" id="member_pin" inputmode="numeric" autocomplete="off"
+                               placeholder="neue PIN eingeben, leer lassen = unverändert">
+                        <small id="member_pin_hint" style="color: #7f8c8d; display: block; margin-top: 4px;"></small>
+                        <label style="display: block; margin-top: 6px;">
+                            <input type="checkbox" id="member_pin_clear"> PIN löschen
+                        </label>
+                    </div>
                     <div class="form-group">
                         <label>Gruppenzugehörigkeit</label>
                         <small style="color: #7f8c8d; display: block; margin-bottom: 10px;">

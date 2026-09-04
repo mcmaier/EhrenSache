@@ -46,8 +46,9 @@ function handleMyData($db, $database, $request_method, $authUserId)
     
     // 2. Member-Stammdaten
     $stmt = $db->prepare("
-        SELECT member_id, name, surname, member_number, active, created_at
-        FROM {$prefix}members 
+        SELECT member_id, name, surname, member_number, active, created_at,
+               pin_updated_at, (pin_hash IS NOT NULL) AS has_pin
+        FROM {$prefix}members
         WHERE member_id = ?
     ");
     $stmt->execute([$member_id]);

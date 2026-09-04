@@ -33,6 +33,22 @@ let allFilteredMembers = [];
 let currentMembershipDates = [];
 let currentMemberGroups = [];
 let memberFilterInitialized = false;
+let currentMemberHasPin = false;
+let currentMemberPinUpdatedAt = null;
+
+// Stations-PIN: das Feld erscheint nur, wenn die Anmeldung freigeschaltet ist.
+let stationPinSettings = null;
+
+async function loadStationPinSettings() {
+    if (stationPinSettings) return stationPinSettings;
+    const res = await apiCall('settings', 'GET', null, { scope: 'client' });
+    const s   = res?.settings || {};   // apiCall liefert den JSON-Body direkt
+    stationPinSettings = {
+        enabled:   s.station_pin_enabled === '1',
+        minLength: parseInt(s.station_pin_min_length || '4', 10)
+    };
+    return stationPinSettings;
+}
 
 
 export async function loadMembers(forceReload = false) {
@@ -176,7 +192,7 @@ function renderMembers(members, page = 1) {
         tr.innerHTML = `
                 <td>${member.surname}</td>
                 <td>${member.name}</td>
-                <td>${member.member_number || '-'}</td>
+                <td>${member.member_number || '-'}${member.has_pin ? ' <span title="Stations-PIN gesetzt">🔢</span>' : ''}</td>
                 <td>${groupBadges}</td>
                 <td>${member.is_active_in_period ? 'Aktiv' : 'Inaktiv'}</td>
                 ${actionsHtml}
@@ -384,6 +400,9 @@ export async function openMemberModal(memberId = null) {
         loadGroups(true);
     }
     
+    const pinSettings = await loadStationPinSettings();
+    const pinGroup    = document.getElementById('memberPinGroup');
+
     if (memberId) {
         // Bearbeiten
         title.textContent = 'Mitglied bearbeiten';
@@ -396,6 +415,13 @@ export async function openMemberModal(memberId = null) {
             membershipGroup.style.display = 'block';
             await loadMembershipDates(memberId);
         }
+
+        pinGroup.style.display = pinSettings.enabled ? 'block' : 'none';
+        document.getElementById('member_pin').value = '';
+        document.getElementById('member_pin_clear').checked = false;
+        document.getElementById('member_pin_hint').textContent = currentMemberHasPin
+            ? `PIN gesetzt (${currentMemberPinUpdatedAt ? new Date(currentMemberPinUpdatedAt).toLocaleDateString('de-DE') : '-'}). ${pinSettings.minLength}–8 Ziffern.`
+            : `Keine PIN gesetzt. ${pinSettings.minLength}–8 Ziffern.`;
 
     } else {
         // Neu erstellen
@@ -416,6 +442,11 @@ export async function openMemberModal(memberId = null) {
         // Setze Standard-Gruppe als vorausgewählt
         const defaultGroup = dataCache.groups.data.find(g => g.is_default);
         currentMemberGroups = defaultGroup ? [defaultGroup.group_id] : [];
+
+        pinGroup.style.display = pinSettings.enabled ? 'block' : 'none';
+        document.getElementById('member_pin').value = '';
+        document.getElementById('member_pin_clear').checked = false;
+        document.getElementById('member_pin_hint').textContent = `Keine PIN gesetzt. ${pinSettings.minLength}–8 Ziffern.`;
     }
 
     renderMemberGroups();
@@ -448,7 +479,10 @@ export async function loadMemberData(memberId) {
         }
         // Speichere ausgewählte Gruppen
         currentMemberGroups = member.groups ? member.groups.map(g => g.group_id) : [];
-    
+
+        // Stations-PIN-Status für den Hinweistext im Modal
+        currentMemberHasPin = !!member.has_pin;
+        currentMemberPinUpdatedAt = member.pin_updated_at || null;
     }
 }
 
@@ -502,12 +536,20 @@ export async function saveMember() {
         active: 1,  // Aktivstatus wird über membership_dates gesteuert, nicht direkt
         group_ids: groupIds
     };
-    
+
+    if (document.getElementById('memberPinGroup').style.display !== 'none') {
+        if (document.getElementById('member_pin_clear').checked) {
+            data.pin = null;
+        } else if (document.getElementById('member_pin').value) {
+            data.pin = document.getElementById('member_pin').value;
+        }
+    }
+
     let result;
     if (memberId) {
         // Update
         result = await apiCall('members', 'PUT', data, { id: memberId });
-        
+
         // Update Mitgliedschaftszeiträume (nur Admin)
         if (result && isAdminOrManager && currentMembershipDates.length > 0) {
             await saveMembershipDates(memberId);
@@ -515,7 +557,11 @@ export async function saveMember() {
     } else {
         // Create
         result = await apiCall('members', 'POST', data);
-        
+
+        if (result && result.id && data.pin !== undefined) {
+            await apiCall('members', 'PUT', { pin: data.pin }, { id: result.id });
+        }
+
         // Erstelle Mitgliedschaftszeiträume falls vorhanden
         if (result && result.id && isAdminOrManager && currentMembershipDates.length > 0) {
             await saveMembershipDates(result.id);

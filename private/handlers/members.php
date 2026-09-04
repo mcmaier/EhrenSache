@@ -30,13 +30,14 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
 
                     if($member) {
                         // Lade zugehörige Gruppen
-                        $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name 
+                        $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name
                                                     FROM {$prefix}member_groups g
                                                     INNER JOIN {$prefix}member_group_assignments mga ON g.group_id = mga.group_id
                                                     WHERE mga.member_id = ?");
                         $groupStmt->execute([$id]);
                         $member['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
-        
+                        $member = memberPublicRow($member);
+
                         echo json_encode($member ?: []);
                     }
                     else {
@@ -202,8 +203,9 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                     } else {
                         $stmt = $db->query($sql);
                     }
-             
+
                     $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $members = array_map('memberPublicRow', $members);
                 }
                 else if(isDevice())
                 {
@@ -316,6 +318,27 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                 }
             }
 
+            // Stations-PIN: setzen (Ziffernfolge) oder loeschen (null / '').
+            // property_exists statt isset, weil isset() bei null false liefert.
+            $pinAction = null;
+            if (property_exists($data, 'pin')) {
+                if ($data->pin === null || $data->pin === '') {
+                    $pinAction = 'clear';
+                } elseif (!is_string($data->pin)) {
+                    http_response_code(400);
+                    echo json_encode(["message" => "Die PIN darf nur Ziffern enthalten", "field" => "pin"]);
+                    break;
+                } else {
+                    $pinError = validateStationPin((string) $data->pin, stationPinMinLength($db, $database));
+                    if ($pinError !== null) {
+                        http_response_code(400);
+                        echo json_encode(["message" => $pinError, "field" => "pin"]);
+                        break;
+                    }
+                    $pinAction = 'set';
+                }
+            }
+
             // Dynamisches UPDATE: nur gelieferte Felder
             $updatable = ['name', 'surname', 'member_number', 'active'];
             $setParts  = [];
@@ -325,6 +348,15 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                     $setParts[] = "$field = ?";
                     $params[]   = ($field === 'member_number' && empty($cleanData->$field)) ? null : $cleanData->$field;
                 }
+            }
+
+            if ($pinAction === 'set') {
+                $setParts[] = "pin_hash = ?";
+                $params[]   = password_hash((string) $data->pin, PASSWORD_DEFAULT);
+                $setParts[] = "pin_updated_at = NOW()";
+            } elseif ($pinAction === 'clear') {
+                $setParts[] = "pin_hash = NULL";
+                $setParts[] = "pin_updated_at = NULL";
             }
 
             if (empty($setParts) && !isset($cleanData->group_ids)) {
@@ -348,6 +380,12 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                         break;
                     }
                 }
+            }
+
+            // P2: Eine neue PIN hebt die Sperre auf — sonst wartet das Mitglied
+            // trotz neuer PIN 15 Minuten.
+            if ($pinAction !== null) {
+                (new RateLimiter($db, $database))->reset('station_member_' . (int) $id, 'station_pin');
             }
 
             // Gruppen-Zuordnungen aktualisieren (wenn group_ids geliefert)
@@ -413,6 +451,18 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
             }
             break;
     }
+}
+
+/**
+ * Entfernt den PIN-Hash aus einer Mitgliedszeile und setzt has_pin.
+ * Der Hash verlaesst den Server nie — auch nicht an Administratoren (E11).
+ */
+function memberPublicRow(array $row): array
+{
+    $row['has_pin'] = !empty($row['pin_hash']);
+    unset($row['pin_hash']);
+
+    return $row;
 }
 
 ?>

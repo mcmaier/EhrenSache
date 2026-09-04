@@ -378,10 +378,100 @@ test('station: status spiegelt die eingeschaltete PIN-Anmeldung', function () {
     assertSame(4, $res['body']['pin_min_length']);
 });
 
+// ---- Phase 2: Testmitglied --------------------------------------------------
+
+/**
+ * Legt einmal je Lauf ein Mitglied mit eindeutiger Nummer an. Wird im
+ * Aufraeum-Test geloescht — samt seiner Records und Sitzungen, die alle aus
+ * dieser Suite stammen.
+ *
+ * @return array{member_id: int, member_number: string}
+ */
+function stationMember(): array
+{
+    static $member = null;
+    if ($member !== null) {
+        return $member;
+    }
+
+    $number = 'ST' . substr(uniqid(), -6);
+    $res    = apiRequest('POST', 'members', [
+        'token' => apiToken('admin'),
+        'body'  => ['name' => 'Kiosk', 'surname' => 'Testmitglied ' . $number,
+                    'member_number' => $number, 'active' => 1],
+    ]);
+    assertStatus(201, $res, 'Testmitglied konnte nicht angelegt werden');
+
+    return $member = ['member_id' => (int) $res['body']['id'], 'member_number' => $number];
+}
+
+/** Setzt (oder loescht mit null) die PIN des Testmitglieds als Admin. */
+function stationSetPin(?string $pin): array
+{
+    return apiRequest('PUT', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => stationMember()['member_id']],
+        'body'  => ['pin' => $pin],
+    ]);
+}
+
+test('members: Admin setzt eine PIN, has_pin wird true, pin_hash bleibt verborgen', function () {
+    enableStationPin();
+    assertStatus(200, stationSetPin('2580'));
+
+    $res = apiRequest('GET', 'members', ['token' => apiToken('admin'),
+                                          'query' => ['id' => stationMember()['member_id']]]);
+    assertStatus(200, $res);
+    assertSame(true, $res['body']['has_pin']);
+    assertTrue(!array_key_exists('pin_hash', $res['body']), 'pin_hash darf nicht ausgeliefert werden');
+    assertTrue(!empty($res['body']['pin_updated_at']), 'pin_updated_at gesetzt');
+});
+
+test('members: Liste liefert has_pin und keinen pin_hash', function () {
+    $res = apiRequest('GET', 'members', ['token' => apiToken('admin'),
+                                          'query' => ['include_inactive' => 'true']]);
+    assertStatus(200, $res);
+    $mine = array_values(array_filter($res['body'],
+        static fn ($m) => (int) $m['member_id'] === stationMember()['member_id']));
+    assertTrue(count($mine) === 1, 'Testmitglied in der Liste erwartet');
+    assertSame(true, $mine[0]['has_pin']);
+    assertTrue(!array_key_exists('pin_hash', $mine[0]), 'pin_hash darf nicht in der Liste stehen');
+});
+
+test('members: ungueltige PIN wird mit 400 abgewiesen', function () {
+    $res = stationSetPin('1234');
+    assertStatus(400, $res);
+    assertSame('pin', $res['body']['field']);
+});
+
+test('members: PIN loeschen setzt has_pin auf false', function () {
+    assertStatus(200, stationSetPin(null));
+    $res = apiRequest('GET', 'members', ['token' => apiToken('admin'),
+                                          'query' => ['id' => stationMember()['member_id']]]);
+    assertSame(false, $res['body']['has_pin']);
+    // fuer die folgenden Tests wieder setzen
+    assertStatus(200, stationSetPin('2580'));
+});
+
+test('members: user darf keine PIN setzen', function () {
+    $res = apiRequest('PUT', 'members', [
+        'token' => apiToken('user'),
+        'query' => ['id' => stationMember()['member_id']],
+        'body'  => ['pin' => '2580'],
+    ]);
+    assertStatus(403, $res);
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 
 test('station: Aufraeumen — Kiosk loeschen', function () {
+    $m = apiRequest('DELETE', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => stationMember()['member_id']],
+    ]);
+    assertStatus(200, $m, 'Testmitglied konnte nicht geloescht werden');
+
     $res = apiRequest('DELETE', 'users', [
         'token' => apiToken('admin'),
         'query' => ['id' => kioskDevice()['user_id']],
