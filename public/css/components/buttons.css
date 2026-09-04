@@ -48,7 +48,7 @@
     cursor: pointer;
     font-size: 14px;
     transition: background var(--transition-base);
-    min-height: 40;
+    min-height: 39px;
 }
 
 
@@ -96,7 +96,7 @@
     font-size: 14px;
     transition: background var(--transition-base);
     margin-right: var(--spacing-sm);
-    min-height: 40;
+    min-height: 39px;
 }
 
 .btn-secondary:hover {
