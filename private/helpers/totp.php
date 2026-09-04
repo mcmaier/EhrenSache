@@ -153,7 +153,7 @@ function resolveTotpLocation($db, $database, string $code): ?array
     $stmt = $db->query("SELECT u.user_id, u.email, u.device_name, u.totp_secret
                         FROM {$prefix}users u
                         WHERE u.role = 'device'
-                          AND u.device_type = 'totp_location'
+                          AND u.device_type IN ('totp_location', 'kiosk')
                           AND u.is_active = 1
                           AND u.totp_secret IS NOT NULL");
 
@@ -177,6 +177,29 @@ function countTotpLocations($db, $database): int
     $prefix = $database->table('');
 
     return (int) $db->query("SELECT COUNT(*) FROM {$prefix}users
-                             WHERE role = 'device' AND device_type = 'totp_location'
+                             WHERE role = 'device' AND device_type IN ('totp_location', 'kiosk')
                                AND is_active = 1 AND totp_secret IS NOT NULL")->fetchColumn();
+}
+
+/**
+ * Aktueller und nächster Code einer Station — für die Anzeige am Kiosk.
+ *
+ * Das Secret bleibt auf dem Server. Der Kiosk erhält nur, was ohnehin auf dem
+ * Bildschirm steht: den Code, sein Fensterende und den Folgecode, damit der
+ * Wechsel ohne Lücke gelingt (Spec E5).
+ *
+ * @return array{code: string, next_code: string, valid_until: int, period: int}
+ */
+function totpCodesForSecret(string $secret, ?int $now = null, int $period = 30): array
+{
+    $now         = $now ?? time();
+    $totp        = new TOTP($secret, $period);
+    $windowStart = intdiv($now, $period) * $period;
+
+    return [
+        'code'        => $totp->getCode($now),
+        'next_code'   => $totp->getCode($windowStart + $period),
+        'valid_until' => $windowStart + $period,
+        'period'      => $period,
+    ];
 }
