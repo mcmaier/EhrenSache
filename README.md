@@ -194,6 +194,7 @@ Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 - Token generieren für neue IoT-Geräte
 - TOTP-Secrets für standortbasierte Verifikation
 - Geräte aktivieren/deaktivieren
+- Virtuelle Station (Kiosk): ein Tablet zeigt den Stations-Code und nimmt Mitgliedsnummer + PIN entgegen — siehe `public/station/README.md`
 
 ### Für Manager
 
@@ -238,6 +239,7 @@ Manager haben eingeschränkten Zugriff:
 - QR Code Station mit TOTP Code
 - NFC Station für TOTP Code (geplant)
 - Fingerprint Authentifizierungsgerät (geplant)
+- Virtuelle Station als PWA (`/station/`) — Tablet statt ESP32
 
 
 

@@ -690,6 +690,48 @@ Wird automatisch für Authorisierten User durchgeführt (z.B. User über PWA).
 
 ---
 
+## Station (station)
+
+Endpunkt der **virtuellen Station** (Gerätetyp `kiosk`, seit 1.3.0): ein Tablet, das den
+Stations-Code anzeigt und Mitglieder per Mitgliedsnummer + PIN stempeln lässt.
+
+**Authentifizierung:** ausschließlich Geräte-Token eines Kiosks. Ein Kiosk-Token darf
+**nur** diese Ressource (und `version`) aufrufen — jede andere Ressource antwortet `403`.
+Eine vom Token erzeugte Session ist ohne den Token nicht nutzbar (`401`).
+Im Unterschied zu `auto_checkin` (das Gerät bürgt für die Identität) prüft hier der Server
+die Identität des Mitglieds; das Gerät ist nur Tastatur und Bildschirm.
+
+Steuerung über `?action=`. Andere Methoden als GET und POST antworten `405`.
+
+### Status
+**Endpoint:** `GET /api.php?resource=station&action=status`
+
+```json
+{
+  "device_name": "Tablet Proberaum",
+  "totp_enabled": true,
+  "pin_enabled": true,
+  "pin_min_length": 4,
+  "worktime_enabled": true,
+  "server_time": "2026-09-04 19:02:11",
+  "server_unix": 1788800531
+}
+```
+
+### Stations-Code
+**Endpoint:** `GET /api.php?resource=station&action=totp`
+
+Das Secret verlässt den Server nicht. Der Kiosk erhält den aktuellen Code, den Folgecode und
+das Fensterende (Unix-Sekunden) sowie `now`, um die Restlaufzeit gegen die Serveruhr zu rechnen.
+
+```json
+{ "code": "287082", "next_code": "081620", "valid_until": 1788800550, "period": 30, "now": 1788800531 }
+```
+
+`404` wenn der Kiosk keinen Code anzeigt (Häkchen in der Geräteverwaltung).
+
+---
+
 ## Ausnahmen (exceptions)
 
 ### Ausnahmen abrufen
@@ -1112,6 +1154,65 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
   "member_id": 10
 }
 ```
+
+---
+
+### Gerät anlegen
+**Endpoint:** `POST /api.php?resource=users`
+
+**Berechtigung:** Admin
+
+**Request:**
+```json
+{
+  "action": "create_device",
+  "device_name": "Tablet Proberaum",
+  "device_type": "kiosk",
+  "totp_enabled": true
+}
+```
+
+`device_type` ist `totp_location`, `auth_device` oder `kiosk` (seit 1.3.0, „Virtuelle
+Station“). Für `kiosk` ist `totp_enabled` optional (Standard `false`) und steuert, ob das
+Gerät von Anfang an einen Stations-Code anzeigen darf; ein mitgeschicktes `totp_secret` wird
+für `kiosk` mit `400` abgelehnt — das Secret erzeugt ausschließlich der Server.
+
+**Response:**
+```json
+{
+  "success": true,
+  "device": {
+    "user_id": 12,
+    "device_name": "Tablet Proberaum",
+    "device_type": "kiosk",
+    "api_token": "generated_token_here",
+    "has_totp_secret": true
+  }
+}
+```
+
+Bei `kiosk` liefert die Antwort `has_totp_secret` statt `totp_secret` — das Secret selbst
+verlässt den Server nie. `api_token` erscheint nur in dieser Antwort; danach ist er nur noch
+über das Bearbeiten-Formular abrufbar.
+
+### Gerät aktualisieren
+**Endpoint:** `PUT /api.php?resource=users&id={user_id}`
+
+**Berechtigung:** Admin
+
+Um das TOTP-Secret eines Geräts zu ändern, ohne den Wert selbst zu übertragen:
+```json
+{
+  "totp_action": "generate"
+}
+```
+oder `"totp_action": "clear"`, um es zu entfernen. Ein unbekannter Wert antwortet `400`.
+Eine `kiosk`-Anfrage mit einem eigenen `totp_secret` wird ebenfalls mit `400` abgelehnt.
+Ein Wechsel des `device_type` verwirft das gespeicherte Secret, außer die gleiche Anfrage
+liefert oder erzeugt ein neues.
+
+Für `kiosk`-Geräte liefert `GET` — einzeln wie in der Liste — ebenfalls `has_totp_secret`
+(Boolean) statt `totp_secret`; die anderen Gerätetypen geben `totp_secret` unverändert zurück.
 
 ---
 
