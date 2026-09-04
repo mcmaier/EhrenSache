@@ -52,6 +52,157 @@ function memberMayAttendAppointment($db, $prefix, $memberId, $typeId) {
     return (bool) $memberGroupStmt->fetch();
 }
 
+/**
+ * Sucht den Termin, dem ein Check-in zu diesem Zeitpunkt zugeordnet wird.
+ *
+ * Alle Termine im Toleranzfenster, nach zeitlicher Naehe sortiert; ein Termin
+ * einer Standard-Gruppe schlaegt einen Termin einer Spezialgruppe. Die Logik
+ * stammt unveraendert aus handleAutoCheckin() und wird seit 1.3.0 auch von der
+ * Station (identify, checkin) gebraucht.
+ *
+ * @return array<string, mixed>|null Terminzeile mit appointment_id, title, date,
+ *                                   start_time, type_id, type_name — oder null
+ */
+function findCheckinAppointment($db, $prefix, int $memberId, string $timestamp, int $toleranceSeconds): ?array
+{
+    $sql = "SELECT a.appointment_id, a.title, a.date, a.start_time, a.type_id, at.type_name,
+                ABS(TIMESTAMPDIFF(SECOND,
+                CONCAT(a.date, ' ', a.start_time),
+                ?)) as time_diff_seconds
+            FROM {$prefix}appointments a
+            LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
+            WHERE
+                ABS(TIMESTAMPDIFF(SECOND,
+                CONCAT(a.date, ' ', a.start_time),
+                ?)) <= ?
+            ORDER BY time_diff_seconds ASC";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute([$timestamp, $timestamp, $toleranceSeconds]);
+    $potentialAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $matchedAppointment  = null;
+    $fallbackAppointment = null; // Für nicht-Standard-Gruppen
+
+    foreach($potentialAppointments as $appointment) {
+        if(!memberMayAttendAppointment($db, $prefix, $memberId, $appointment['type_id'])) {
+            continue;
+        }
+
+        // Ohne Terminart: kein Filter, Termin für alle.
+        if(!$appointment['type_id']) {
+            $matchedAppointment = $appointment;
+            break;
+        }
+
+        // Traegt die Terminart eine Standard-Gruppe, gilt der Termin als der
+        // regulaere und wird sofort genommen. Sonst nur als Rueckfall — ein
+        // Termin einer Spezialgruppe soll den der Gesamtgruppe nicht verdraengen.
+        $typeGroupsStmt = $db->prepare("
+            SELECT mg.is_default
+            FROM {$prefix}appointment_type_groups atg
+            LEFT JOIN {$prefix}member_groups mg ON atg.group_id = mg.group_id
+            WHERE atg.type_id = ?
+        ");
+        $typeGroupsStmt->execute([$appointment['type_id']]);
+        $restrictedGroups = $typeGroupsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if(empty($restrictedGroups)) {
+            $matchedAppointment = $appointment;
+            break;
+        }
+
+        $hasDefaultGroup = false;
+        foreach($restrictedGroups as $grp) {
+            if($grp['is_default']) {
+                $hasDefaultGroup = true;
+                break;
+            }
+        }
+
+        if($hasDefaultGroup) {
+            $matchedAppointment = $appointment;
+            break;
+        }
+
+        if(!$fallbackAppointment) {
+            $fallbackAppointment = $appointment;
+        }
+    }
+
+    if(!$matchedAppointment && $fallbackAppointment) {
+        $matchedAppointment = $fallbackAppointment;
+    }
+
+    return $matchedAppointment ?: null;
+}
+
+/**
+ * Schreibt den Anwesenheitseintrag — oder zieht einen bestehenden vor, wenn
+ * die neue Ankunftszeit frueher liegt. Antwortet nicht selbst; der Aufrufer
+ * ergaenzt Terminangaben und gibt aus.
+ *
+ * $arrivalTimestamp ist die UNGERUNDETE Ankunftszeit ('Y-m-d H:i:s'): Die
+ * Auto-Anlage eines Termins rundet auf fuenf Minuten, der Eintrag selbst
+ * traegt weiterhin die Sekunde des Stempels.
+ *
+ * @return array{status: int, body: array<string, mixed>}
+ */
+function writeCheckinRecord($db, $prefix, int $memberId, int $appointmentId, string $arrivalTimestamp,
+                            string $checkinSource, ?string $sourceDevice, ?string $locationName): array
+{
+    $checkStmt = $db->prepare("SELECT record_id, arrival_time FROM {$prefix}records
+                               WHERE member_id = ? AND appointment_id = ?");
+    $checkStmt->execute([$memberId, $appointmentId]);
+    $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    $common = [
+        "appointment_id" => $appointmentId,
+        "member_id"      => $memberId,
+        "checkin_source" => $checkinSource,
+        "source_device"  => $sourceDevice,
+        "location_name"  => $locationName,
+    ];
+
+    if($existingRecord) {
+        $arrivalTime  = new DateTime($arrivalTimestamp);
+        $existingTime = new DateTime($existingRecord['arrival_time']);
+
+        if($arrivalTime < $existingTime) {
+            $db->prepare("UPDATE {$prefix}records
+                          SET arrival_time = ?, status = 'present', checkin_source = ?,
+                              source_device = ?, location_name = ?
+                          WHERE record_id = ?")
+               ->execute([$arrivalTimestamp, $checkinSource, $sourceDevice, $locationName,
+                          $existingRecord['record_id']]);
+            $recordAction = 'updated';
+        } else {
+            $recordAction = 'unchanged';
+        }
+
+        return ['status' => 200, 'body' => array_merge([
+            "message"       => "Check-in " . $recordAction,
+            "record_action" => $recordAction,
+            "record_id"     => (int)$existingRecord['record_id'],
+        ], $common)];
+    }
+
+    $insertStmt = $db->prepare("INSERT INTO {$prefix}records
+                                (member_id, appointment_id, arrival_time, status,
+                                 checkin_source, source_device, location_name)
+                                VALUES (?, ?, ?, 'present', ?, ?, ?)");
+    if(!$insertStmt->execute([$memberId, $appointmentId, $arrivalTimestamp,
+                              $checkinSource, $sourceDevice, $locationName])) {
+        return ['status' => 500, 'body' => ["message" => "Failed to create check-in"]];
+    }
+
+    return ['status' => 201, 'body' => array_merge([
+        "message"       => "Check-in successful",
+        "record_action" => "created",
+        "record_id"     => (int)$db->lastInsertId(),
+    ], $common)];
+}
+
 function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth, $checkinSource = 'auto_checkin', $sourceInfo = []) {
     if($method !== 'POST') {
         http_response_code(405);
@@ -248,99 +399,7 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
         }
     }
 
-    // ===========================================
-    // Suche ALLE potentiellen Termine im Fenster
-    // ===========================================
-    
-    $sql = "SELECT a.appointment_id, a.title, a.date, a.start_time, a.type_id,at.type_name,
-                ABS(TIMESTAMPDIFF(SECOND, 
-                CONCAT(a.date, ' ', a.start_time), 
-                ?)) as time_diff_seconds
-            FROM {$prefix}appointments a
-            LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
-            WHERE 
-                ABS(TIMESTAMPDIFF(SECOND, 
-                CONCAT(a.date, ' ', a.start_time), 
-                ?)) <= ?
-            ORDER BY time_diff_seconds ASC";
-    
-    $stmt = $db->prepare($sql);
-    $stmt->execute([
-        $timestamp,               // Für SELECT
-        $timestamp,               // Für WHERE
-        $toleranceSeconds         // Toleranzeit
-    ]);
-    
-    $potentialAppointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    //error_log("Found " . count($potentialAppointments) . " potential appointments");
-
-    /*
-    foreach($potentialAppointments as $apt) {
-        $typeName = $apt['type_name'] ?: 'no type';
-        //error_log("  - #{$apt['appointment_id']}: {$apt['title']} (Start: {$apt['start_time']}) Type: {$typeName} " . " Diff: {$apt['time_diff_seconds']}s");
-    }*/    
-
-    // ============================================
-    // Filter nach Gruppen-Berechtigung mit Priorisierung
-    // ============================================
-
-    $matchedAppointment = null;
-    $fallbackAppointment = null; // Für nicht-Standard-Gruppen
-
-    foreach($potentialAppointments as $appointment) {
-        if(!memberMayAttendAppointment($db, $prefix, $memberId, $appointment['type_id'])) {
-            continue;
-        }
-
-        // Ohne Terminart: kein Filter, Termin für alle.
-        if(!$appointment['type_id']) {
-            $matchedAppointment = $appointment;
-            break;
-        }
-
-        // Traegt die Terminart eine Standard-Gruppe, gilt der Termin als der
-        // regulaere und wird sofort genommen. Sonst nur als Rueckfall — ein
-        // Termin einer Spezialgruppe soll den der Gesamtgruppe nicht verdraengen.
-        $typeGroupsStmt = $db->prepare("
-            SELECT mg.is_default
-            FROM {$prefix}appointment_type_groups atg
-            LEFT JOIN {$prefix}member_groups mg ON atg.group_id = mg.group_id
-            WHERE atg.type_id = ?
-        ");
-        $typeGroupsStmt->execute([$appointment['type_id']]);
-        $restrictedGroups = $typeGroupsStmt->fetchAll(PDO::FETCH_ASSOC);
-
-        if(empty($restrictedGroups)) {
-            // Keine Gruppen-Einschränkung für diesen Typ → Termin für alle
-            $matchedAppointment = $appointment;
-            break;
-        }
-
-        $hasDefaultGroup = false;
-        foreach($restrictedGroups as $grp) {
-            if($grp['is_default']) {
-                $hasDefaultGroup = true;
-                break;
-            }
-        }
-
-        if($hasDefaultGroup) {
-            // Termin mit Standard-Gruppe → sofort nehmen
-            $matchedAppointment = $appointment;
-            break;
-        }
-
-        // Termin ohne Standard-Gruppe → als Fallback merken
-        if(!$fallbackAppointment) {
-            $fallbackAppointment = $appointment;
-        }
-    }
-
-    // Wenn kein Standard-Termin gefunden, nutze Fallback
-    if(!$matchedAppointment && $fallbackAppointment) {
-        $matchedAppointment = $fallbackAppointment;
-    }
+    $matchedAppointment = findCheckinAppointment($db, $prefix, (int)$memberId, $timestamp, $toleranceSeconds);
 
     // Eine bewusste Wahl schlaegt die automatische Suche.
     if($chosenAppointment) {
@@ -418,108 +477,39 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
         ];
     }    
     
-    // Prüfe ob bereits ein Record existiert
-    $checkStmt = $db->prepare("SELECT record_id, arrival_time FROM {$prefix}records 
-                               WHERE member_id = ? AND appointment_id = ?");
-    $checkStmt->execute([$memberId, $appointmentId]);
-    $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
-
     $sourceDevice = $data->source_device ?? null;
-
+    if(!$sourceDevice) {
+        $sourceDevice = $sourceInfo['source_device'] ?? null;
+    }
     $locationName = $sourceInfo['location_name'] ?? null;
 
-    if(!$sourceDevice)
-    {
-        // Bestimme Source-Informationen
-        $sourceDevice = $sourceInfo['source_device'] ?? null;        
-    }    
-
-     // Bei Device: Hole Device-Info aus users Tabelle
+    // Bei Device: Hole Device-Info aus users Tabelle (unveraendert uebernommen)
     if(isDevice()) {
         $deviceStmt = $db->prepare("SELECT email, device_type FROM {$prefix}users WHERE user_id = ?");
         $deviceStmt->execute([$authUserId]);
         $deviceInfo = $deviceStmt->fetch(PDO::FETCH_ASSOC);
-        
         if($deviceInfo) {
-            $locationName = $deviceInfo['email']; 
+            $locationName = $deviceInfo['email'];
         }
     }
-    
-    if($existingRecord) {
-        // Update bestehenden Record (nur wenn neue Zeit früher ist)
-        $existingTime = new DateTime($existingRecord['arrival_time']);
-        
-        if($arrivalTime < $existingTime) {
-            $updateStmt = $db->prepare("UPDATE {$prefix}records 
-                                        SET arrival_time = ?, 
-                                            status = 'present',
-                                            checkin_source = ?,
-                                            source_device = ?,
-                                            location_name = ?
-                                        WHERE record_id = ?");
-            $updateStmt->execute([
-                $data->arrival_time, 
-                $checkinSource,
-                $sourceDevice,
-                $locationName,
-                $existingRecord['record_id']
-            ]);
-            $recordAction = 'updated';            
-        } else {
-            $recordAction = 'unchanged';
-        }
-        
-        //error_log("Record Action: $recordAction");
-        
-        http_response_code(200);
-        echo json_encode([
-            "message" => "Check-in " . $recordAction,
-            "record_action" => $recordAction,
-            "appointment_action" => $action,
-            "record_id" => $existingRecord['record_id'],
-            "appointment_id" => $appointmentId,
-            "member_id" => $memberId,
-            "checkin_source" => $checkinSource,
-            "source_device" => $sourceDevice,
-            "location_name" => $locationName,
-            "appointment" => $matchedAppointment
-        ]);
-    } else {
-        // Erstelle neuen Record
-        $insertStmt = $db->prepare("INSERT INTO {$prefix}records 
-                                    (member_id, appointment_id, arrival_time, status, 
-                                     checkin_source, source_device, location_name) 
-                                    VALUES (?, ?, ?, 'present', ?, ?, ?)");
-        
-        if($insertStmt->execute([
-            $memberId, 
-            $appointmentId, 
-            $data->arrival_time,
-            $checkinSource,
-            $sourceDevice,
-            $locationName
-        ])) {
-            http_response_code(201);
-            echo json_encode([
-                "message" => "Check-in successful",
-                "record_action" => "created",
-                "appointment_action" => $action,
-                "record_id" => $db->lastInsertId(),
-                "appointment_id" => $appointmentId,
-                "member_id" => $memberId,
-                "checkin_source" => $checkinSource,
-                "source_device" => $sourceDevice,
-                "location_name" => $locationName,
-                "appointment" => $matchedAppointment,
-                "warning" => isset($warning) ? $warning : null
-            ]);
 
-            //error_log("Record Action: Created new Record");
-        } else {
-            http_response_code(500);
-            echo json_encode(["message" => "Failed to create check-in"]);            
+    $result = writeCheckinRecord($db, $prefix, (int)$memberId, (int)$appointmentId, $timestamp,
+                                 $checkinSource, $sourceDevice, $locationName);
+
+    $body = $result['body'];
+
+    // Termin-Angaben und Warnung nur bei Erfolg ergaenzen — die 500-Antwort
+    // bei fehlgeschlagenem INSERT trug schon vor der Extraktion nur "message".
+    if($result['status'] !== 500) {
+        $body['appointment_action'] = $action;
+        $body['appointment']        = $matchedAppointment;
+        if($result['status'] === 201) {
+            $body['warning'] = $warning ?? null;
         }
     }
+
+    http_response_code($result['status']);
+    echo json_encode($body);
 }
 
 ?>
