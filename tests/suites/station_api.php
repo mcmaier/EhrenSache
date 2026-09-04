@@ -120,6 +120,92 @@ test('station: unbekannte action', function () {
     assertStatus(400, stationGet('gibt-es-nicht'));
 });
 
+// ---- Sicherheit: Session-Cookie und Secret-Verwaltung ----------------------
+
+/** PUT users&id=<kiosk> als Admin. */
+function kioskPut(array $body): array
+{
+    return apiRequest('PUT', 'users', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => kioskDevice()['user_id']],
+        'body'  => $body,
+    ]);
+}
+
+/** GET users&id=<kiosk> als Admin. */
+function kioskGet(): array
+{
+    return apiRequest('GET', 'users', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => kioskDevice()['user_id']],
+    ]);
+}
+
+test('station: Session-Cookie eines Token-Aufrufs oeffnet keine Tuer', function () {
+    $res = stationGet('status');
+    assertStatus(200, $res);
+
+    $setCookie = $res['set_cookie'];
+    assertTrue($setCookie !== null, 'Token-Aufruf liefert kein Set-Cookie');
+    assertTrue(strpos((string) $setCookie, 'PHPSESSID') !== false,
+        'Set-Cookie ohne PHPSESSID: ' . (string) $setCookie);
+
+    $cookie = explode(';', (string) $setCookie)[0];
+
+    assertStatus(401, apiRequest('GET', 'members', ['cookie' => $cookie]),
+        'members war allein mit dem Session-Cookie erreichbar');
+    assertStatus(401, apiRequest('GET', 'station', [
+        'cookie' => $cookie,
+        'query'  => ['action' => 'status'],
+    ]), 'station war allein mit dem Session-Cookie erreichbar');
+});
+
+test('station: totp_action clear und generate steuern das Secret', function () {
+    assertStatus(200, kioskPut(['totp_action' => 'clear']));
+    assertStatus(404, stationGet('totp'), 'Kiosk ohne Secret darf keinen Code liefern');
+
+    assertStatus(200, kioskPut(['totp_action' => 'generate']));
+    assertStatus(200, stationGet('totp'), 'Kiosk mit frischem Secret liefert wieder einen Code');
+});
+
+// Beide Requests fuehren ein gueltiges Feld mit (denselben device_name, also
+// ohne Wirkung): Sonst waere die 400 nur das "Keine Daten zum Aktualisieren"
+// eines still verworfenen Feldes.
+test('station: Kiosk nimmt kein Secret aus dem Request', function () {
+    assertStatus(400, kioskPut([
+        'device_name'  => kioskDevice()['device_name'],
+        'totp_secret'  => 'ABCDEFGH',
+    ]));
+});
+
+test('station: unbekannte totp_action wird abgewiesen', function () {
+    assertStatus(400, kioskPut([
+        'device_name' => kioskDevice()['device_name'],
+        'totp_action' => 'x',
+    ]));
+});
+
+test('station: Typwechsel verwirft das gespeicherte Secret', function () {
+    assertStatus(200, kioskPut(['device_type' => 'totp_location']));
+
+    $res = kioskGet();
+    assertStatus(200, $res);
+    assertSame('totp_location', $res['body']['device_type']);
+    assertTrue(array_key_exists('totp_secret', $res['body']),
+        'totp_location liefert das Feld totp_secret');
+    assertSame(null, $res['body']['totp_secret'], 'Secret muss beim Typwechsel verworfen werden');
+
+    // Zurueck zum Kiosk MIT Secret — so, wie spaetere Tests das Geraet erwarten.
+    assertStatus(200, kioskPut(['device_type' => 'kiosk', 'totp_action' => 'generate']));
+
+    $res = kioskGet();
+    assertStatus(200, $res);
+    assertSame('kiosk', $res['body']['device_type']);
+    assertTrue(!array_key_exists('totp_secret', $res['body']),
+        'Kiosk darf das Secret nicht ausliefern');
+    assertSame(true, $res['body']['has_totp_secret']);
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 

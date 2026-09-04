@@ -355,6 +355,22 @@ if($apiToken) {
         exit();
     }
 
+    // Eine Session, die ein Token angelegt hat, darf ohne dieses Token nicht
+    // weiterverwendet werden. Der Token-Zweig oben startet eine Session und
+    // schickt ein PHPSESSID-Cookie mit; wer nur dieses Cookie weiterreicht,
+    // umginge sonst alle Einschraenkungen, die am Token haengen (z. B. die
+    // Kiosk-Sperre weiter unten). Dieser Zweig laeuft nur ohne Token, das
+    // Cookie allein reicht hier also nicht.
+    // Der Browser-Login (login() in helpers/auth.php) setzt kein auth_type,
+    // Dashboard-Sessions sind davon nicht betroffen.
+    if(($_SESSION['auth_type'] ?? null) === 'token') {
+        session_unset();
+        session_destroy();
+        http_response_code(401);
+        echo json_encode(["message" => "Token-created session cannot be used without the token"]);
+        exit();
+    }
+
     // Session-Timeout prüfen (optional, falls du serverseitig auch timeout willst)
     $sessionLifetime = SESSION_TIMEOUT_SECONDS;
     
@@ -377,10 +393,13 @@ if($apiToken) {
     $authUserId = intval($_SESSION['user_id']);
     $authUserRole = $_SESSION['role'];
     
-    $stmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
+    $stmt = $db->prepare("SELECT member_id, device_type FROM {$prefix}users WHERE user_id = ?");
     $stmt->execute([$authUserId]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     $authMemberId = $result && $result['member_id'] ? intval($result['member_id']) : null;
+    // Auch in der Session-Authentifizierung bekannt, damit die Kiosk-Sperre
+    // unten unabhaengig vom Anmeldeweg greift.
+    $authDeviceType = $result['device_type'] ?? null;
     
     //error_log("Session Auth: User ID: $authUserId, Role: $authUserRole, Member ID: " . ($authMemberId ?? 'NULL'));
 }

@@ -24,8 +24,12 @@ function testConfig(): array
 }
 
 /**
- * @param array{query?: array<string, scalar>, body?: mixed, token?: string} $opts
- * @return array{status: int, body: mixed, raw: string}
+ * `cookie` schickt einen Cookie-Header mit ("PHPSESSID=..."), `set_cookie`
+ * liefert den ersten Set-Cookie-Header der Antwort roh zurueck — beides nur
+ * fuer Tests, die eine Session ohne Token pruefen.
+ *
+ * @param array{query?: array<string, scalar>, body?: mixed, token?: string, cookie?: string} $opts
+ * @return array{status: int, body: mixed, raw: string, set_cookie: ?string}
  */
 function apiRequest(string $method, string $resource, array $opts = []): array
 {
@@ -51,6 +55,19 @@ function apiRequest(string $method, string $resource, array $opts = []): array
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($opts['body']));
     }
 
+    if (!empty($opts['cookie'])) {
+        curl_setopt($ch, CURLOPT_COOKIE, $opts['cookie']);
+    }
+
+    $setCookie = null;
+    curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $header) use (&$setCookie): int {
+        if ($setCookie === null && stripos($header, 'Set-Cookie:') === 0) {
+            $setCookie = trim(substr($header, strlen('Set-Cookie:')));
+        }
+
+        return strlen($header);
+    });
+
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $raw = curl_exec($ch);
@@ -64,9 +81,10 @@ function apiRequest(string $method, string $resource, array $opts = []): array
     curl_close($ch);
 
     return [
-        'status' => $status,
-        'body'   => json_decode((string) $raw, true),
-        'raw'    => (string) $raw,
+        'status'     => $status,
+        'body'       => json_decode((string) $raw, true),
+        'raw'        => (string) $raw,
+        'set_cookie' => $setCookie,
     ];
 }
 

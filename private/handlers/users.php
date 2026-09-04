@@ -393,7 +393,7 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
             $isDevice = ($currentUser['role'] === 'device');
 
             // Nur erlaubte Felder extrahieren
-            $allowedFields = ['email', 'name', 'password', 'device_name', 'role', 'member_id','is_active','device_type','totp_secret','account_status'];
+            $allowedFields = ['email', 'name', 'password', 'device_name', 'role', 'member_id','is_active','device_type','totp_secret','totp_action','account_status'];
             $data = new stdClass();
             foreach($allowedFields as $field) {
                 if(isset($rawData->$field)) {
@@ -541,20 +541,43 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     break;
                 }
 
-                // Kiosk: Secret nie aus dem Request uebernehmen (E5), nur
-                // serverseitig erzeugen oder loeschen.
-                $effectiveType = $data->device_type ?? $currentUser['device_type'];
-                if($effectiveType === 'kiosk') {
-                    unset($data->totp_secret);
+                $totpAction = $data->totp_action ?? null;
+                if($totpAction !== null && !in_array($totpAction, ['generate', 'clear'], true)) {
+                    http_response_code(400);
+                    echo json_encode(["message" => "Ungültige totp_action"]);
+                    break;
+                }
 
-                    $totpAction = $rawData->totp_action ?? null;
-                    if($totpAction === 'generate') {
-                        require_once __DIR__ . '/../helpers/totp.php';
-                        $updateFields[] = "totp_secret = ?";
-                        $updateParams[] = TOTP::generateSecret();
-                    } elseif($totpAction === 'clear') {
-                        $updateFields[] = "totp_secret = NULL";
-                    }
+                $effectiveType = $data->device_type ?? $currentUser['device_type'];
+                $typeChanged   = isset($data->device_type)
+                                 && $data->device_type !== $currentUser['device_type'];
+
+                // Kiosk: Das Secret entsteht nur auf dem Server (E5). Ein Secret
+                // im Request wird nicht still verworfen, sondern abgelehnt.
+                if($effectiveType === 'kiosk' && isset($data->totp_secret)) {
+                    http_response_code(400);
+                    echo json_encode(["message" => "Kiosk-Geräte erhalten kein Secret aus dem Request"]);
+                    break;
+                }
+
+                // Genau eine Entscheidung ueber das Secret. 'unchanged' ist der
+                // Marker fuer "nicht anfassen"; NULL bedeutet loeschen.
+                //
+                // Beim Wechsel des Gerätetyps wird das gespeicherte Secret
+                // verworfen, sofern derselbe Request nicht ein neues setzt:
+                // Ein Kiosk-Secret hat den Server nie verlassen und darf nach
+                // dem Wechsel nicht im Klartext ausgeliefert werden; umgekehrt
+                // darf ein bereits offengelegtes Secret nicht zum
+                // Stations-Code eines Kiosks werden.
+                $secretUpdate = 'unchanged';
+                if($totpAction === 'clear') {
+                    $secretUpdate = null;
+                } elseif($totpAction === 'generate') {
+                    $secretUpdate = TOTP::generateSecret();
+                } elseif(isset($data->totp_secret)) {
+                    $secretUpdate = $data->totp_secret;
+                } elseif($typeChanged) {
+                    $secretUpdate = null;
                 }
 
                 // Device Name
@@ -569,12 +592,16 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     $updateParams[] = $data->device_type;
                 }
                     
-                // TOTP Secret (nur für totp_location)
-                if(isset($data->totp_secret)) {                    
-                    $updateFields[] = "totp_secret = ?";
-                    $updateParams[] = $data->totp_secret;
+                // TOTP Secret — genau ein Eintrag, aus der Entscheidung oben
+                if($secretUpdate !== 'unchanged') {
+                    if($secretUpdate === null) {
+                        $updateFields[] = "totp_secret = NULL";
+                    } else {
+                        $updateFields[] = "totp_secret = ?";
+                        $updateParams[] = $secretUpdate;
+                    }
                 }
-                
+
                 // is_active
                 if(isset($data->is_active)) {
                     $updateFields[] = "is_active = ?";
@@ -682,8 +709,6 @@ function createDevice($db, $database, $authUserId) {
     $tokenExpires = date('Y-m-d H:i:s', strtotime('+10 years')); // Geräte-Tokens lange gültig
 
     $totpSecret = $data->totp_secret ?? null;
-
-    require_once __DIR__ . '/../helpers/totp.php';
 
     // totp_location: Secret Pflicht, aus dem Request oder frisch erzeugt.
     // kiosk: Secret nur, wenn der Kiosk den Stations-Code zeigen soll — und

@@ -52,10 +52,12 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
                 stationTotp($device);
                 return;
         }
-    } elseif ($method === 'POST') {
-        $data = json_decode(file_get_contents("php://input")) ?: new stdClass();
-        // POST-Aktionen folgen in Phase 2 (identify, checkin, work_*)
+    } elseif ($method !== 'POST') {
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        return;
     }
+    // POST-Aktionen folgen in Phase 2 (identify, checkin, work_*)
 
     http_response_code(400);
     echo json_encode([
