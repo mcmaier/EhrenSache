@@ -218,6 +218,28 @@ class RateLimiter {
     }
     
     /**
+     * Setzt den Zähler eines Kennzeichens zurück — nach einem Erfolg.
+     *
+     * Allgemeine Form von resetLoginAttempts(): Die Stations-Anmeldung
+     * braucht dieselbe Logik je Mitglied und je Kiosk.
+     */
+    public function reset($identifier, $action) {
+        $hashedIdentifier = hash('sha256', $identifier . $action);
+
+        if ($this->useDatabase) {
+            try {
+                $this->db->prepare(
+                    "DELETE FROM {$this->prefix}rate_limits WHERE identifier = ? AND action = ?"
+                )->execute([$hashedIdentifier, $action]);
+            } catch (PDOException $e) {
+                error_log("RateLimiter reset error: " . $e->getMessage());
+            }
+        } else {
+            unset($_SESSION['rate_limit_' . $hashedIdentifier]);
+        }
+    }
+
+    /**
      * Reset Login-Versuche (nach erfolgreichem Login)
      */
     public function resetLoginAttempts($email) {

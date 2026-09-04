@@ -31,3 +31,33 @@ test('totpCodesForSecret ohne Zeitstempel nimmt die Serverzeit', function () {
     assertTrue(preg_match('/^\d{6}$/', $codes['code']) === 1, 'sechs Ziffern erwartet');
     assertTrue($codes['valid_until'] > time() - 1, 'valid_until liegt nicht in der Vergangenheit');
 });
+
+require_once __DIR__ . '/../../private/helpers/rate_limiter.php';
+
+// ---- RateLimiter::reset ---------------------------------------------------
+// Session-Modus: ohne PDO zaehlt der Limiter in $_SESSION. Im CLI ist das ein
+// gewoehnliches Array — genau richtig fuer einen Test ohne Datenbank.
+
+test('RateLimiter::reset hebt eine erreichte Sperre auf', function () {
+    $_SESSION = [];
+    $limiter  = new RateLimiter();
+
+    assertTrue($limiter->check('m1', 'station_pin', 2, 900));
+    assertTrue($limiter->check('m1', 'station_pin', 2, 900));
+    assertSame(false, $limiter->check('m1', 'station_pin', 2, 900), 'dritter Versuch muss scheitern');
+
+    $limiter->reset('m1', 'station_pin');
+    assertTrue($limiter->check('m1', 'station_pin', 2, 900), 'nach reset wieder erlaubt');
+});
+
+test('RateLimiter::reset trifft nur das genannte Kennzeichen', function () {
+    $_SESSION = [];
+    $limiter  = new RateLimiter();
+
+    $limiter->check('a', 'station_pin', 1, 900);
+    $limiter->check('b', 'station_pin', 1, 900);
+    $limiter->reset('a', 'station_pin');
+
+    assertTrue($limiter->check('a', 'station_pin', 1, 900));
+    assertSame(false, $limiter->check('b', 'station_pin', 1, 900));
+});
