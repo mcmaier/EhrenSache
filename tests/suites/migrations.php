@@ -152,3 +152,10 @@ test('Das Manifest endet bei der Version aus version.json', function () {
         'Letzter Migrationsschritt und version.json muessen dieselbe Version nennen'
     );
 });
+
+test('Migration 1.2.5 definiert migrate_1_2_5', function () {
+    $file = __DIR__ . '/../../private/migrations/1.2.5.php';
+    assertTrue(file_exists($file), '1.2.5.php fehlt');
+    require_once $file;
+    assertTrue(function_exists('migrate_1_2_5'), 'migrate_1_2_5() fehlt');
+});

@@ -65,6 +65,8 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}members` (
   `name` varchar(100) NOT NULL,
   `surname` varchar(100) NOT NULL,
   `member_number` varchar(50) DEFAULT NULL,
+  `pin_hash` varchar(255) DEFAULT NULL,
+  `pin_updated_at` datetime DEFAULT NULL,
   `active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`member_id`)
@@ -99,7 +101,7 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}records` (
   `appointment_id` int(11) NOT NULL,
   `arrival_time` datetime NOT NULL,
   `status` enum('present','excused') DEFAULT 'present',
-  `checkin_source` enum('admin','user_totp','device_auth','auto_checkin','import') DEFAULT 'admin',
+  `checkin_source` enum('admin','user_totp','device_auth','auto_checkin','import','timer','station_pin') DEFAULT 'admin',
   `source_device` varchar(100) DEFAULT NULL,
   `location_name` varchar(100) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -124,7 +126,7 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}users` (
   `account_status` enum('pending', 'active', 'suspended') DEFAULT 'pending',
   `password_hash` varchar(255) NULL,
   `role` enum('admin','manager','user','device') DEFAULT 'user',
-  `device_type` enum('totp_location','auth_device') DEFAULT NULL,
+  `device_type` enum('totp_location','auth_device','kiosk') DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `member_id` int(11) DEFAULT NULL,
   `pending_member_id` INT(11) DEFAULT NULL,
@@ -516,7 +518,7 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}work_sessions` (
   start_location_name VARCHAR(100) DEFAULT NULL,
   end_location_name   VARCHAR(100) DEFAULT NULL,
   status              ENUM('confirmed','submitted','rejected') NOT NULL DEFAULT 'submitted',
-  source              ENUM('timer','manual','admin','import') NOT NULL DEFAULT 'manual',
+  source              ENUM('timer','manual','admin','import','station') NOT NULL DEFAULT 'manual',
   created_by          INT DEFAULT NULL,
   approved_by         INT DEFAULT NULL,
   approved_at         DATETIME DEFAULT NULL,
@@ -561,7 +563,7 @@ SET @has_timer = (SELECT COUNT(*) FROM information_schema.COLUMNS
       AND COLUMN_NAME  = 'checkin_source'
       AND COLUMN_TYPE LIKE '%timer%');
 SET @prep_sql = IF(@has_timer = 0,
-    'ALTER TABLE `{PREFIX}records` MODIFY `checkin_source` ENUM(''admin'',''user_totp'',''device_auth'',''auto_checkin'',''import'',''timer'') DEFAULT ''admin''',
+    'ALTER TABLE `{PREFIX}records` MODIFY `checkin_source` ENUM(''admin'',''user_totp'',''device_auth'',''auto_checkin'',''import'',''timer'',''station_pin'') DEFAULT ''admin''',
     'SELECT 1');
 PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
@@ -578,7 +580,9 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('checkin_tolerance_hours', '2', 'number', 'general', 'Zeitfenster in Stunden, in dem ein Check-in einem Termin zugeordnet wird'),
 ('cleanup_years_records', '3', 'number', 'general', 'Löschfrist in Jahren für Anwesenheiten und Ausnahmen'),
 ('cleanup_years_worktime', '3', 'number', 'general', 'Löschfrist in Jahren für Arbeitszeiten und die zugehörige Änderungshistorie'),
-('cleanup_years_audit', '1', 'number', 'general', 'Frist in Jahren, nach der verwaiste Einträge der Änderungshistorie anonymisiert werden');
+('cleanup_years_audit', '1', 'number', 'general', 'Frist in Jahren, nach der verwaiste Einträge der Änderungshistorie anonymisiert werden'),
+('station_pin_enabled', '0', 'boolean', 'general', 'Anmeldung mit Mitgliedsnummer und PIN an einer Station erlauben'),
+('station_pin_min_length', '4', 'number', 'general', 'Mindestlänge der Stations-PIN (4 bis 8 Ziffern)');
 
 
 CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS
@@ -643,6 +647,7 @@ SELECT
         WHEN 'device' THEN CASE u.device_type
             WHEN 'totp_location' THEN 'TOTP-Station'
             WHEN 'auth_device' THEN 'Auth-Gerät'
+            WHEN 'kiosk' THEN 'Virtuelle Station'
             ELSE 'Gerät'
         END
         ELSE 'Unbekannt'

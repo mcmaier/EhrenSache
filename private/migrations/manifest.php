@@ -56,4 +56,10 @@ return [
         'file'     => '1.2.4.php',
         'function' => 'migrate_1_2_4',
     ],
+    [
+        'from'     => '1.2.5',
+        'to'       => '1.3.0',
+        'file'     => '1.2.5.php',
+        'function' => 'migrate_1_2_5',
+    ],
 ];
