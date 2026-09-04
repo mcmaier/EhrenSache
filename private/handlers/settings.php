@@ -31,6 +31,8 @@ function handleSettings($db, $database, $method, $authUserId, $authUserRole) {
         $whitelist = [
             'checkin_auto_create_appointment',
             'checkin_tolerance_hours',
+            'station_pin_enabled',
+            'station_pin_min_length',
         ];
 
         $placeholders = implode(',', array_fill(0, count($whitelist), '?'));

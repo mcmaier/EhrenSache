@@ -339,6 +339,45 @@ test('station: totp_secret als Array wird sauber mit 400 abgelehnt, kein TypeErr
         'Geraet mit Array-Secret haette nicht angelegt werden duerfen');
 });
 
+// ---- Phase 2: Einstellungen -------------------------------------------------
+
+/** Setzt eine Systemeinstellung (PUT settings erwartet {setting_key, setting_value}). */
+function stationSetSetting(string $key, string $value): void
+{
+    $res = apiRequest('PUT', 'settings', [
+        'token' => apiToken('admin'),
+        'body'  => ['setting_key' => $key, 'setting_value' => $value],
+    ]);
+    assertStatus(200, $res, "Einstellung '{$key}' konnte nicht gesetzt werden");
+}
+
+/** Schaltet die PIN-Anmeldung fuer die Suite ein (bleibt danach an — Entwicklungsinstanz). */
+function enableStationPin(): void
+{
+    static $done = false;
+    if (!$done) {
+        stationSetSetting('station_pin_enabled', '1');
+        stationSetSetting('station_pin_min_length', '4');
+        $done = true;
+    }
+}
+
+test('settings: Client-Scope liefert station_pin_enabled und station_pin_min_length', function () {
+    enableStationPin();
+    $res = apiRequest('GET', 'settings', ['token' => apiToken('user'), 'query' => ['scope' => 'client']]);
+    assertStatus(200, $res);
+    assertSame('1', $res['body']['settings']['station_pin_enabled']);
+    assertSame('4', $res['body']['settings']['station_pin_min_length']);
+});
+
+test('station: status spiegelt die eingeschaltete PIN-Anmeldung', function () {
+    enableStationPin();
+    $res = stationGet('status');
+    assertStatus(200, $res);
+    assertSame(true, $res['body']['pin_enabled']);
+    assertSame(4, $res['body']['pin_min_length']);
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 

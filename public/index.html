@@ -394,8 +394,44 @@
                         </div>
                     </div>
 
+                    <!-- Stations-Anmeldung -->
                     <div class="settings-card">
-                        <h3>📋 DSGVO Datenverwaltung</h3>        
+                        <h3>🖥️ Stations-Anmeldung (PIN)</h3>
+                        <div class="settings-item">
+                            <label class="checkbox-label">
+                                <input type="checkbox"
+                                    id="setting_station_pin_enabled"
+                                    class="setting-input"
+                                    data-key="station_pin_enabled">
+                                Anmeldung mit Mitgliedsnummer und PIN an einer Station erlauben
+                            </label>
+                            <small class="input-hint">
+                                Für Mitglieder ohne Smartphone: Eingabe von Mitgliedsnummer und
+                                persönlicher PIN an einem Tablet (Gerätetyp „Virtuelle Station").
+                                Die PIN vergibt das Mitglied im Profil oder ein Verwalter beim
+                                Mitglied; gespeichert wird nur ein Hash. Eine PIN ist weitergebbar —
+                                Stempel dieser Quelle sind in Auswertungen als „Station (PIN)"
+                                gekennzeichnet.
+                            </small>
+                        </div>
+                        <div class="settings-item">
+                            <label>Mindestlänge der PIN (Ziffern)</label>
+                            <input type="number"
+                                id="setting_station_pin_min_length"
+                                class="setting-input"
+                                data-key="station_pin_min_length"
+                                min="4"
+                                max="8"
+                                step="1">
+                            <small class="input-hint">
+                                Vier bis acht Ziffern. Die Sperre nach fünf Fehlversuchen trägt die
+                                Sicherheit, nicht die Länge.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3>📋 DSGVO Datenverwaltung</h3>
                         <div class="settings-item">
                             <label>
                                 <strong>Löschfristen</strong>
