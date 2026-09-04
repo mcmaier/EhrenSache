@@ -89,9 +89,11 @@ function renderDevices(devices, page = 1)
         const formattedCreated = createdAt.toLocaleDateString('de-DE');
 
         // Typ-Badge
-        const typeText = device.device_type === 'totp_location' 
-            ? '🔢 TOTP-Station' 
-            : '🔐 Auth-Gerät'
+        const typeText = {
+            'totp_location': '🔢 TOTP-Station',
+            'auth_device':   '🔐 Auth-Gerät',
+            'kiosk':         '🖥️ Virtuelle Station'
+        }[device.device_type] || '❓ Unbekannt';
 
         // Status
         const statusBadge = device.is_active 
@@ -346,6 +348,10 @@ async function openDeviceModal(deviceId = null) {
         document.getElementById('device_active').checked = device.is_active == 1;      
         document.getElementById('device_totp_secret').value = device.totp_secret || '';
 
+        const kioskBox = document.getElementById('device_kiosk_totp');
+        kioskBox.checked = !!device.has_totp_secret;
+        kioskBox.dataset.had = device.has_totp_secret ? '1' : '0';
+
         // Token-Anzeige aktualisieren
         if (device.api_token) {
             updateTokenDisplay(device.api_token, device.api_token_expires_at);
@@ -360,6 +366,10 @@ async function openDeviceModal(deviceId = null) {
 
         document.getElementById('device_id').value = null;
         document.getElementById('device_active').checked = 1;
+
+        const kioskBox = document.getElementById('device_kiosk_totp');
+        kioskBox.checked = true;
+        kioskBox.dataset.had = '0';
 
         updateModalId('deviceModal', null);
         
@@ -379,39 +389,26 @@ function closeDeviceModal() {
 
 
 function toggleDeviceTypeFields() {
-    
     const deviceType = document.getElementById('device_type').value;
-    //const totpGroup = document.getElementById('totpSecretGroup');
-    //const apiTokenGroup = document.getElementById('deviceTokenGroup');
-    
-    
-    // Felder je nach Device-Type
-    if (deviceType === 'totp_location') {
-        // TOTP-Location: Secret erforderlich, kein Token
-        totpSecretGroup.style.display = 'block';
-        document.getElementById('device_totp_secret').required = true;
-        apiTokenGroup.style.display = 'none';
-        
-    } else if (deviceType === 'auth_device') {
-        // Auth-Device: Token erforderlich, kein Secret
-        totpSecretGroup.style.display = 'none';
-        document.getElementById('device_totp_secret').required = false;
-        
-        // Token nur bei Bearbeitung anzeigen
-        const deviceId = document.getElementById('device_id').value;
-        apiTokenGroup.style.display = deviceId ? 'block' : 'none';
-        
-    } else {
-        // Kein Type gewählt
-        totpSecretGroup.style.display = 'none';
-        apiTokenGroup.style.display = 'none';
-    }
+    const deviceId   = document.getElementById('device_id').value;
+    const editing    = !!(deviceId && deviceId !== 'null');
+    const totpGroup  = document.getElementById('totpSecretGroup');
+    const kioskGroup = document.getElementById('kioskTotpGroup');
+    const tokenGroup = document.getElementById('apiTokenGroup');
+    const secret     = document.getElementById('device_totp_secret');
+
+    totpGroup.style.display  = deviceType === 'totp_location' ? 'block' : 'none';
+    secret.required          = deviceType === 'totp_location';
+    kioskGroup.style.display = deviceType === 'kiosk' ? 'block' : 'none';
+    // Token nur bei Bearbeitung anzeigen — beim Anlegen kommt er in der Antwort
+    tokenGroup.style.display = (deviceType === 'auth_device' || deviceType === 'kiosk') && editing ? 'block' : 'none';
 
     const hints = {
         'totp_location': '🔢 Zeigt TOTP-Code (QR/NFC/Display), Benutzer authentifizieren sich per App. Benötigt TOTP Secret.',
-        'auth_device': '🔐 Authentifiziert Benutzer (z.B. Fingerabdruck, Karte, PIN). Benötigt API-Token.'
+        'auth_device':   '🔐 Authentifiziert Benutzer selbst (z.B. Fingerabdruck, Karte) und meldet die Mitgliedsnummer. Benötigt API-Token.',
+        'kiosk':         '🖥️ Tablet im Kiosk-Modus: zeigt den Stations-Code und nimmt Mitgliedsnummer + PIN entgegen. Benötigt API-Token.'
     };
-    
+
     const hintElement = document.getElementById('deviceTypeHint');
     hintElement.textContent = hints[deviceType] || '';
     hintElement.style.color = deviceType ? '#667eea' : '#7f8c8d';
@@ -438,23 +435,33 @@ export async function saveDevice() {
     };
  
         
+    const editing = !!(deviceId && deviceId !== 'null');
+
     if (data.device_type === 'totp_location') {
-        data.totp_secret = document.getElementById('device_totp_secret').value || null;        
-    } else {
-        data.totp_secret = null;
+        data.totp_secret = document.getElementById('device_totp_secret').value || null;
+    } else if (data.device_type === 'kiosk') {
+        // Das Secret wird nie mitgeschickt; nur der Wunsch, es zu haben.
+        const box = document.getElementById('device_kiosk_totp');
+        if (editing) {
+            const had = box.dataset.had === '1';
+            if (box.checked && !had) data.totp_action = 'generate';
+            if (!box.checked && had) data.totp_action = 'clear';
+        } else {
+            data.totp_enabled = box.checked;
+        }
     }
-    
+
     debug.log('Saving Device:', data);
-    
+
     let result;
     if (deviceId) {
         result = await apiCall('users', 'PUT', data, { id: deviceId });
 
-    } else {        
-        data.action = 'create_device';        
+    } else {
+        data.action = 'create_device';
         result = await apiCall('users', 'POST', data);
     }
-    
+
     if (result.success) {
         closeDeviceModal();
         showDeviceSection(true, currentDevicesPage);
@@ -462,7 +469,15 @@ export async function saveDevice() {
         showToast(
             deviceId ? 'Gerät wurde erfolgreich aktualisiert' : 'Gerät wurde erfolgreich erstellt',
             'success'
-        );                
+        );
+
+        if (!editing && result.device?.device_type === 'kiosk' && result.device.api_token) {
+            // Der Token ist nur jetzt in der Antwort; danach ueber das Bearbeiten-Modal erreichbar
+            await showConfirm(
+                `Token für „${result.device.device_name}“:\n\n${result.device.api_token}\n\nDiesen Token im Kiosk unter station/ eingeben. Er ist auch später im Gerät abrufbar.`,
+                'Kiosk angelegt'
+            );
+        }
     }
 }
 

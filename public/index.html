@@ -1640,6 +1640,7 @@
                             <option value="">-- Auswählen --</option>
                             <option value="totp_location">🔢 TOTP-Station</option>
                             <option value="auth_device">🔐 Auth-Gerät</option>
+                            <option value="kiosk">🖥️ Virtuelle Station (Kiosk)</option>
                         </select>
                         <small id="deviceTypeHint" style="display: block; margin-top: 5px; color: #7f8c8d;"></small>
                     </div>     
@@ -1661,7 +1662,20 @@
                             </button>
                         </div>
                     </div>
-                    
+
+                    <!-- Kiosk: Code-Anzeige ein/aus, das Secret bleibt auf dem Server -->
+                    <div class="form-group" id="kioskTotpGroup" style="display: none;">
+                        <label>
+                            <input type="checkbox" id="device_kiosk_totp" data-had="0">
+                            Zeigt den Stations-Code (QR und Ziffern) an
+                        </label>
+                        <small style="display: block; color: #7f8c8d; margin-top: 5px;">
+                            Das Secret wird auf dem Server erzeugt und ist hier nicht einsehbar;
+                            der Kiosk holt nur den jeweils gültigen Code.
+                            Einrichtung: <code>station/</code> im Browser des Tablets öffnen und den API-Token eingeben.
+                        </small>
+                    </div>
+
                     <!-- API-Token Anzeige  -->
                     <div class="form-group" id="apiTokenGroup" style="display: none;">
                         <label>API-Token</label>
