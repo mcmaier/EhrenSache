@@ -4,7 +4,7 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-03 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
+**Zuletzt geprüft:** 2026-09-04 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
 **Version:** 1.2.4
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
@@ -96,6 +96,42 @@ Oberfläche.
 
 **Nächster Schritt:** Nach einem Halbjahr Betrieb prüfen, wie viele Auto-Termine anfallen und
 wie viele davon nachbearbeitet wurden.
+
+---
+
+### OI-21 · `checkin_tolerance_hours` kennt nur ganze Stunden
+**Priorität:** niedrig
+
+Das Zuordnungsfenster ist durchgehend ganzzahlig. Das Eingabefeld ist
+`<input type="number" min="0" max="8" step="1">` ([public/index.html](../public/index.html)),
+und jeder Leser schneidet Nachkommastellen ab: `parseInt(…, 10)` in der PWA
+([app.js](../public/checkin/js/app.js), zwei Stellen — seit `7f4d445` mit derselben
+NaN-geprüften Regel, vorher fiel die Anwesenheitsliste bei `'0'` still auf 2 h zurück),
+`(int)` in `checkinToleranceHours()` ([utils.php:145](../private/helpers/utils.php),
+Rückgabetyp `int`), `intval()` in [auto_checkin.php:123](../private/handlers/auto_checkin.php).
+`saveAllSettings()` ([settings.js](../public/js/modules/settings.js)) prüft mit `parseInt`,
+speichert danach aber den Rohstring — wer `0,5` einträgt, bekommt in der Datenbank `"0,5"`
+und überall sonst `0`.
+
+**Folge:** Der kleinste Nicht-Standardwert ist `0` = sekundengenauer Treffer (bewusst erlaubt,
+Range-Check ist nur `< 0 || > 8`, und `tests/suites/checkin_appointment.php` deckt `'0'`
+explizit ab). Praktisch ist das unbrauchbar — die nächste Stufe darüber ist `1` Stunde.
+Ein Verein, der das Fenster enger als die Vorgabe `2` will, aber nicht auf Sekunden, hat
+keine Option. 30 Minuten sind nicht darstellbar.
+
+**Zu entscheiden:** Feld auf **Minuten** umstellen (`step="15"`, Werte 0/15/30/60/120) —
+vermeidet Fließkomma und ist verständlicher — oder Bruchstunden mit `parseFloat`/`floatval`
+durch die ganze Kette ziehen.
+
+**Preis:** ~5 Codestellen (2× `app.js`, `settings.js`, `utils.php`, `auto_checkin.php`),
+Migration (Bestandswert steht in Stunden), `tests/suites/checkin_appointment.php`, und Doku
+(`API.md`, `docs/testplan.md`, Spec). Die Dublettenprüfung beim Terminanlegen
+([appointments.php](../private/handlers/appointments.php)) rechnet noch mit der Konstante
+`AUTO_CHECKIN_TOLERANCE_HOURS` statt der Einstellung — beim Umbau mitnehmen oder bewusst
+trennen.
+
+**Nächster Schritt:** Bedarf abwarten. Meldet ein Verein, dass `1` h zu grob ist, das
+Minuten-Modell in einer eigenen Spec umsetzen.
 
 ---
 
