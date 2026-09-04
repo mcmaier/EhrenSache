@@ -61,8 +61,12 @@ function login($db, $database, $email, $password) {
         $_SESSION['role'] = $user['role'];
         $_SESSION['logged_in'] = true;
         $_SESSION['last_activity'] = time();
-        $_SESSION['created_at'] = time(); 
-        
+        $_SESSION['created_at'] = time();
+        // session_regenerate_id(true) behaelt die Session-Daten - eine zuvor
+        // per Token gestartete Session (auth_type='token') wuerde sonst auch
+        // nach einem echten Dashboard-Login abgelehnt (siehe api.php).
+        unset($_SESSION['auth_type']);
+
         session_regenerate_id(true);
 
         // CSRF-Token generieren

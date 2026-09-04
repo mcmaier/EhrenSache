@@ -560,8 +560,22 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     break;
                 }
 
-                // Genau eine Entscheidung ueber das Secret. 'unchanged' ist der
-                // Marker fuer "nicht anfassen"; NULL bedeutet loeschen.
+                // Ein mitgeschicktes Secret muss gueltiges Base32 sein
+                // (16-64 Zeichen), bevor es normalisiert gespeichert wird.
+                if(isset($data->totp_secret)) {
+                    $normalizedSecret = strtoupper(trim($data->totp_secret));
+                    if(!preg_match('/^[A-Z2-7]{16,64}$/', $normalizedSecret)) {
+                        http_response_code(400);
+                        echo json_encode(["message" => "Ungültiges TOTP-Secret (Base32, 16–64 Zeichen)"]);
+                        break;
+                    }
+                    $data->totp_secret = $normalizedSecret;
+                }
+
+                // Genau eine Entscheidung ueber das Secret: $secretTouched
+                // sagt, ob ueberhaupt etwas passiert, $secretValue ist NULL
+                // (loeschen) oder der neue Wert — ohne Sentinel-Kollision mit
+                // echten Secrets.
                 //
                 // Beim Wechsel des Gerätetyps wird das gespeicherte Secret
                 // verworfen, sofern derselbe Request nicht ein neues setzt:
@@ -569,15 +583,27 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                 // dem Wechsel nicht im Klartext ausgeliefert werden; umgekehrt
                 // darf ein bereits offengelegtes Secret nicht zum
                 // Stations-Code eines Kiosks werden.
-                $secretUpdate = 'unchanged';
+                $secretTouched = false;
+                $secretValue   = null;
                 if($totpAction === 'clear') {
-                    $secretUpdate = null;
+                    $secretTouched = true;
                 } elseif($totpAction === 'generate') {
-                    $secretUpdate = TOTP::generateSecret();
+                    $secretTouched = true;
+                    $secretValue   = TOTP::generateSecret();
                 } elseif(isset($data->totp_secret)) {
-                    $secretUpdate = $data->totp_secret;
+                    $secretTouched = true;
+                    $secretValue   = $data->totp_secret;
                 } elseif($typeChanged) {
-                    $secretUpdate = null;
+                    $secretTouched = true;
+                }
+
+                // Eine TOTP-Station ohne Secret faellt lautlos aus
+                // resolveTotpLocation() heraus — das lehnen wir hier ab, egal
+                // ob durch 'clear' oder einen Typwechsel ohne neues Secret.
+                if($effectiveType === 'totp_location' && $secretTouched && $secretValue === null) {
+                    http_response_code(400);
+                    echo json_encode(["message" => "Eine TOTP-Station braucht ein Secret"]);
+                    break;
                 }
 
                 // Device Name
@@ -593,12 +619,12 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                 }
                     
                 // TOTP Secret — genau ein Eintrag, aus der Entscheidung oben
-                if($secretUpdate !== 'unchanged') {
-                    if($secretUpdate === null) {
+                if($secretTouched) {
+                    if($secretValue === null) {
                         $updateFields[] = "totp_secret = NULL";
                     } else {
                         $updateFields[] = "totp_secret = ?";
-                        $updateParams[] = $secretUpdate;
+                        $updateParams[] = $secretValue;
                     }
                 }
 
@@ -709,6 +735,17 @@ function createDevice($db, $database, $authUserId) {
     $tokenExpires = date('Y-m-d H:i:s', strtotime('+10 years')); // Geräte-Tokens lange gültig
 
     $totpSecret = $data->totp_secret ?? null;
+
+    // Ein mitgeschicktes Secret muss gueltiges Base32 sein (16-64 Zeichen),
+    // bevor es normalisiert (Grossbuchstaben, getrimmt) gespeichert wird.
+    if($totpSecret !== null) {
+        $totpSecret = strtoupper(trim($totpSecret));
+        if(!preg_match('/^[A-Z2-7]{16,64}$/', $totpSecret)) {
+            http_response_code(400);
+            echo json_encode(['message' => 'Ungültiges TOTP-Secret (Base32, 16–64 Zeichen)']);
+            exit();
+        }
+    }
 
     // totp_location: Secret Pflicht, aus dem Request oder frisch erzeugt.
     // kiosk: Secret nur, wenn der Kiosk den Stations-Code zeigen soll — und

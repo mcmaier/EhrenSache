@@ -1175,7 +1175,9 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
 `device_type` ist `totp_location`, `auth_device` oder `kiosk` (seit 1.3.0, „Virtuelle
 Station“). Für `kiosk` ist `totp_enabled` optional (Standard `false`) und steuert, ob das
 Gerät von Anfang an einen Stations-Code anzeigen darf; ein mitgeschicktes `totp_secret` wird
-für `kiosk` mit `400` abgelehnt — das Secret erzeugt ausschließlich der Server.
+für `kiosk` mit `400` abgelehnt — das Secret erzeugt ausschließlich der Server. Ein
+mitgeschicktes `totp_secret` muss Base32-kodiert sein (Zeichen `A`–`Z`, `2`–`7`) und 16 bis 64
+Zeichen lang sein, sonst antwortet die Anfrage mit `400`.
 
 **Response:**
 ```json
@@ -1186,14 +1188,16 @@ für `kiosk` mit `400` abgelehnt — das Secret erzeugt ausschließlich der Serv
     "device_name": "Tablet Proberaum",
     "device_type": "kiosk",
     "api_token": "generated_token_here",
+    "totp_secret": null,
     "has_totp_secret": true
   }
 }
 ```
 
-Bei `kiosk` liefert die Antwort `has_totp_secret` statt `totp_secret` — das Secret selbst
-verlässt den Server nie. `api_token` erscheint nur in dieser Antwort; danach ist er nur noch
-über das Bearbeiten-Formular abrufbar.
+Die Create-Antwort enthält `totp_secret` immer, bei `kiosk` aber als `null` — das Secret
+selbst verlässt den Server nie, `has_totp_secret` zeigt an, ob eines hinterlegt wurde. `GET`
+lässt das Feld bei `kiosk` dagegen ganz weg (siehe unten). `api_token` erscheint nur in dieser
+Antwort; danach ist er nur noch über das Bearbeiten-Formular abrufbar.
 
 ### Gerät aktualisieren
 **Endpoint:** `PUT /api.php?resource=users&id={user_id}`
@@ -1207,9 +1211,13 @@ Um das TOTP-Secret eines Geräts zu ändern, ohne den Wert selbst zu übertragen
 }
 ```
 oder `"totp_action": "clear"`, um es zu entfernen. Ein unbekannter Wert antwortet `400`.
-Eine `kiosk`-Anfrage mit einem eigenen `totp_secret` wird ebenfalls mit `400` abgelehnt.
+Eine `kiosk`-Anfrage mit einem eigenen `totp_secret` wird ebenfalls mit `400` abgelehnt. Ein
+mitgeschicktes `totp_secret` muss wie beim Anlegen Base32-kodiert sein (16–64 Zeichen), sonst
+antwortet `400`; gespeichert wird der normalisierte (großgeschriebene, getrimmte) Wert.
 Ein Wechsel des `device_type` verwirft das gespeicherte Secret, außer die gleiche Anfrage
-liefert oder erzeugt ein neues.
+liefert oder erzeugt ein neues. Eine `totp_location` braucht dabei immer ein Secret: sowohl
+`"totp_action": "clear"` auf einer `totp_location` als auch ein Wechsel zu `totp_location`
+ohne mitgeschicktes oder erzeugtes Secret antworten mit `400`.
 
 Für `kiosk`-Geräte liefert `GET` — einzeln wie in der Liste — ebenfalls `has_totp_secret`
 (Boolean) statt `totp_secret`; die anderen Gerätetypen geben `totp_secret` unverändert zurück.

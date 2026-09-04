@@ -186,13 +186,16 @@ test('station: unbekannte totp_action wird abgewiesen', function () {
 });
 
 test('station: Typwechsel verwirft das gespeicherte Secret', function () {
-    assertStatus(200, kioskPut(['device_type' => 'totp_location']));
+    // totp_location braucht immer ein Secret (siehe eigener Test weiter
+    // unten) — der Typwechsel-ohne-Secret wird hier daher gegen auth_device
+    // geprueft, das keine solche Anforderung hat.
+    assertStatus(200, kioskPut(['device_type' => 'auth_device']));
 
     $res = kioskGet();
     assertStatus(200, $res);
-    assertSame('totp_location', $res['body']['device_type']);
+    assertSame('auth_device', $res['body']['device_type']);
     assertTrue(array_key_exists('totp_secret', $res['body']),
-        'totp_location liefert das Feld totp_secret');
+        'auth_device liefert das Feld totp_secret');
     assertSame(null, $res['body']['totp_secret'], 'Secret muss beim Typwechsel verworfen werden');
 
     // Zurueck zum Kiosk MIT Secret — so, wie spaetere Tests das Geraet erwarten.
@@ -204,6 +207,66 @@ test('station: Typwechsel verwirft das gespeicherte Secret', function () {
     assertTrue(!array_key_exists('totp_secret', $res['body']),
         'Kiosk darf das Secret nicht ausliefern');
     assertSame(true, $res['body']['has_totp_secret']);
+});
+
+test('station: totp_location ohne Secret wird abgelehnt', function () {
+    // Typwechsel zu totp_location ohne Secret und ohne generate.
+    assertStatus(400, kioskPut(['device_type' => 'totp_location']));
+
+    // Ungueltiges Base32-Format.
+    assertStatus(400, kioskPut([
+        'device_type'  => 'totp_location',
+        'totp_secret'  => 'not-base32!',
+    ]));
+
+    // Gueltiges Secret (lowercase, wird normalisiert) setzen.
+    assertStatus(200, kioskPut([
+        'device_type' => 'totp_location',
+        'totp_secret' => 'gezdgnbvgy3tqojqgezdgnbvgy3tqojq',
+    ]));
+
+    $res = kioskGet();
+    assertStatus(200, $res);
+    assertSame('totp_location', $res['body']['device_type']);
+    assertSame('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', $res['body']['totp_secret'],
+        'Secret muss normalisiert (Grossbuchstaben) gespeichert werden');
+
+    // clear auf einer totp_location ist nicht erlaubt — sie braucht ein Secret.
+    assertStatus(400, kioskPut(['totp_action' => 'clear']));
+
+    // Zurueck zum Kiosk MIT frischem Secret — so, wie spaetere Tests das
+    // Geraet erwarten.
+    assertStatus(200, kioskPut(['device_type' => 'kiosk', 'totp_action' => 'generate']));
+
+    $res = kioskGet();
+    assertStatus(200, $res);
+    assertSame('kiosk', $res['body']['device_type']);
+    assertTrue(!array_key_exists('totp_secret', $res['body']),
+        'Kiosk darf das Secret nicht ausliefern');
+    assertSame(true, $res['body']['has_totp_secret']);
+});
+
+test('station: create_device mit ungueltigem Secret legt nichts an', function () {
+    $name = 'Test-Station ' . uniqid();
+    $res  = apiRequest('POST', 'users', [
+        'token' => apiToken('admin'),
+        'body'  => [
+            'action'      => 'create_device',
+            'device_name' => $name,
+            'device_type' => 'totp_location',
+            'totp_secret' => 'abc',
+        ],
+    ]);
+    assertStatus(400, $res, 'Ungueltiges Base32-Secret haette abgelehnt werden muessen');
+
+    $list = apiRequest('GET', 'users', [
+        'token' => apiToken('admin'),
+        'query' => ['user_type' => 'device'],
+    ]);
+    assertStatus(200, $list);
+    $names = array_column($list['body'], 'device_name');
+    assertTrue(!in_array($name, $names, true),
+        'Geraet mit ungueltigem Secret haette nicht angelegt werden duerfen');
 });
 
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
