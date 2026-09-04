@@ -547,20 +547,20 @@
                     <div class="stat-card">
                         <h3>Kommende Termine</h3>
                         <div class="number" id="statUpcomingAppointments">-</div>
-                    </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
-                        <h3>Jahr filtern</h3>
-                        <select id="appointmentYearFilter"
-                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
-                        </select>
-                    </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
+                    </div>                    
+                    <div class="stat-card">
                         <h3>Automatisch erzeugte</h3>
                         <label class="checkbox-label" style="font-weight: 600; cursor: pointer;">
                             <input type="checkbox" id="appointmentAutoFilter"
                                    onchange="showAppointmentSection(false, 1)">
                             Nur diese anzeigen
                         </label>
+                    </div>
+                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
+                        <h3>Jahr filtern</h3>
+                        <select id="appointmentYearFilter"
+                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
+                        </select>
                     </div>
                 </div>
 
@@ -824,6 +824,13 @@
                         <h3>Aktive Mitglieder</h3>
                         <div class="number" id="statActiveMembersCount">-</div>                                             
                     </div>
+                    <div class="stat-card">
+                        <h3>Inaktive Mitglieder</h3>
+                        <label class="checkbox-label" style="font-weight: 600; cursor: pointer;">
+                            <input type="checkbox" id="show_inactive_members">                                   
+                            Anzeigen
+                        </label>
+                    </div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
                         <h3>Jahr filtern</h3>
                         <select id="memberYearFilter"
@@ -840,12 +847,12 @@
                             <option value="">Alle Gruppen</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <!--<div class="form-group">
                         <label>       
                             <input type="checkbox" id="show_inactive_members" class="checkbox-label">
                             <span>Inaktive anzeigen</span>
                         </label>
-                    </div>
+                    </div> -->
                     <button id="resetMemberFilter" onclick="resetMemberFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
                 </div>
 
