@@ -266,6 +266,14 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | CIN-15 | PWA nach 22:00 Uhr öffnen | Auswahl zeigt heutige Termine, nicht die von morgen |
 | CIN-16 | `checkin_tolerance_hours` auf 4 setzen, Termin 3 h entfernt | Check-in trifft ihn |
 | CIN-17 | Termin von 10:00 Uhr in der PWA wählen, um 16:47 Uhr einchecken | 409 `appointment_outside_tolerance`, kein Check-in |
+| CIN-18 | Erfassen-Tab bei zwei Absichten öffnen, dann erneut antippen | Zurück zur Absichtswahl, kein Zurück-Pfeil sichtbar |
+| CIN-19 | Anwesenheits-Ansicht öffnen, Terminauswahl steht am Ende | Scan/NFC/Code/Antrag vor der Auswahl, keine optische Pflichtfeld-Wirkung |
+| CIN-20 | Anwesenheits-Ansicht öffnen, Termin im Toleranzfenster vorhanden | Banner „📍 Du checkst ein für: …" erscheint, Auswahl vorbelegt |
+| CIN-21 | Anwesenheits-Ansicht öffnen, kein Termin im Fenster | Kein Banner, Auswahl leer, bestehender Hinweistext unverändert |
+| CIN-22 | Anderen Termin von Hand wählen | Banner wechselt auf den neu gewählten Termin |
+| CIN-23 | Tab verlassen (z. B. Verlauf) und zu „Erfassen" zurückkehren, nachdem von Hand gewählt wurde | Auswahl bleibt erhalten, wird nicht durch die automatische Suche überschrieben |
+| CIN-24 | Erfolgreichen Check-in durchführen | Liste und Banner aktualisieren sich mit dem neuen Stand |
+| CIN-25 | Antragsdialog öffnen | Unverändert zu 1.2.4, verlangt weiterhin einen bestehenden Termin |
 
 ### 9.2 TOTP-Checkin
 
