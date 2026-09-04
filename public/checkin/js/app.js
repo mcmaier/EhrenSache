@@ -964,7 +964,8 @@ async function loadAttendanceAppointments() {
         //
         // Fenster aus den Systemeinstellungen statt einer eigenen Zahl. Hier
         // stand bis 1.2.4 eine 6, waehrend der Server mit 2 rechnete.
-        const toleranceHours = parseInt(clientSettings.checkin_tolerance_hours, 10) || 2;
+        const parsedTolerance = parseInt(clientSettings.checkin_tolerance_hours, 10);
+        const toleranceHours = Number.isNaN(parsedTolerance) ? 2 : parsedTolerance;
         const now = new Date();
         
         const relevantAppointments = appointments.filter(apt => {
