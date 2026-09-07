@@ -773,13 +773,19 @@ function resetSessionState() {
     worktimeAppointments = [];
     renderWorktime();   // blendet laufende Sitzung und ihre Leiste aus
 
-    ['historyList', 'attendanceListContent', 'groupsList'].forEach(id => {
+    ['historyList', 'attendanceListContent', 'groupsList',
+     'worktimeStatsBody'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.innerHTML = '';
     });
 
     const statsContent = document.getElementById('statsContent');
     if (statsContent) statsContent.style.display = 'none';
+
+    // Der Arbeitszeitblock entscheidet sich beim naechsten Laden neu. Bis
+    // dahin bleibt er verborgen, statt die Stunden des Vorgaengers zu zeigen.
+    const worktimeStats = document.getElementById('worktimeStats');
+    if (worktimeStats) worktimeStats.style.display = 'none';
 
     // Auswahlfelder tragen die Termine und Taetigkeiten des vorigen Mitglieds.
     ['checkinAppointment', 'exceptionAppointment', 'attendanceAppointmentFilter',
