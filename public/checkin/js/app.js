@@ -2170,7 +2170,8 @@ function worktimeStatsNote(pendingMinutes, pendingCount, rejectedCount) {
     const teile = [];
 
     if (pendingCount > 0) {
-        const eintraege = pendingCount === 1 ? '1 Eintrag' : `${pendingCount} Einträge`;
+        // Dativ nach „aus": im Plural „Eintraegen", im Singular „Eintrag".
+        const eintraege = pendingCount === 1 ? '1 Eintrag' : `${pendingCount} Einträgen`;
         const verb      = pendingCount === 1 ? 'wartet' : 'warten';
         teile.push(`${formatMinutes(pendingMinutes)} aus ${eintraege} ${verb} auf Freigabe`);
     }
