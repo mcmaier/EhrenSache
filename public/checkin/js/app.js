@@ -3176,7 +3176,17 @@ async function loadStatistics() {
         
         // Zeige Statistiken an
         displayStatistics(stats);
-        
+
+        // Der Arbeitszeitblock haengt an einem zweiten Abruf. Scheitert der,
+        // bleibt die Hauptzahl stehen und nur die Fussnote fehlt — ein
+        // Nebenabruf darf die Seite nicht kippen.
+        displayWorktimeStats(
+            zeigtArbeitszeit ? (stats.worktime || null) : null,
+            (sessions && sessions.success && Array.isArray(sessions.data))
+                ? sessions.data
+                : []
+        );
+
         // Zeige Inhalt
         statsLoading.style.display = 'none';
         statsContent.style.display = 'block';
@@ -3211,6 +3221,75 @@ function displayStatistics(stats) {
     
     // 4. Gruppen-Übersicht
     displayGroupStats(stats);
+}
+
+/**
+ * Zeigt die Arbeitszeit des Jahres.
+ *
+ * Die grosse Zahl ist die bestaetigte Summe — dieselbe, die in den
+ * Verwendungsnachweis eingeht. Die Fussnote darunter erklaert, was noch nicht
+ * mitzaehlt. Beides zusammen beantwortet „wie viel habe ich geleistet" ohne
+ * die Frage offen zu lassen, wo die fehlenden Stunden geblieben sind.
+ *
+ * @param worktime  Block aus statistics?include=worktime, oder null, wenn das
+ *                  Mitglied gar keine Zeiten erfassen darf
+ * @param sessions  Rohzeilen aus work_sessions fuer dasselbe Jahr
+ */
+function displayWorktimeStats(worktime, sessions) {
+    const box  = document.getElementById('worktimeStats');
+    const body = document.getElementById('worktimeStatsBody');
+    if (!box || !body) return;
+
+    // Kein Block fuer Mitglieder ohne Zeiterfassung: Ein dauerhaftes „0:00 h"
+    // waere fuer sie nur Rauschen.
+    if (!worktime) {
+        box.style.display = 'none';
+        body.innerHTML = '';
+        return;
+    }
+
+    const summary   = worktime.summary || {};
+    const minuten   = parseInt(summary.total_minutes, 10) || 0;
+    const sitzungen = parseInt(summary.sessions, 10) || 0;
+
+    // Dieselbe Statusaufteilung wie updateWorktimeStats() im Dashboard:
+    // bestaetigt zaehlt, eingereicht wartet, abgelehnt zaehlt nie.
+    const wartend = sessions.filter(s => s.status === 'submitted' && s.end_time);
+    const wartendeMinuten = wartend.reduce(
+        (summe, s) => summe + (parseInt(s.duration_minutes, 10) || 0), 0);
+    const abgelehnt = sessions.filter(s => s.status === 'rejected').length;
+
+    box.style.display = 'block';
+
+    // Ein Jahr ganz ohne Sitzungen bekommt eine ruhige Zeile statt einer Null
+    // ueber einer leeren Liste.
+    if (minuten === 0 && wartend.length === 0 && abgelehnt === 0) {
+        body.innerHTML =
+            `<div class="worktime-empty">Keine Stunden in ${currentStatsYear}</div>`;
+        return;
+    }
+
+    const note = worktimeStatsNote(wartendeMinuten, wartend.length, abgelehnt);
+
+    // Bei gesetztem member_id enthaelt members hoechstens einen Eintrag; leer
+    // ist es genau dann, wenn im Jahr nichts bestaetigt wurde.
+    const aktivitaeten = ((worktime.members || [])[0] || {}).by_activity || [];
+
+    const zeilen = [...aktivitaeten]
+        .sort((a, b) => (parseInt(b.minutes, 10) || 0) - (parseInt(a.minutes, 10) || 0))
+        .map(a => `
+            <div class="worktime-activity">
+                <span>${activityDot(activityColor(a.activity_id))}${escapeHtml(a.activity_name || 'Tätigkeit')}</span>
+                <span class="worktime-activity-time">${formatMinutes(a.minutes)}</span>
+            </div>`)
+        .join('');
+
+    body.innerHTML = `
+        <div class="worktime-total">${formatMinutes(minuten)}</div>
+        <div class="worktime-total-label">bestätigt · ${sitzungen} ${sitzungen === 1 ? 'Sitzung' : 'Sitzungen'}</div>
+        ${note ? `<div class="worktime-note">${note}</div>` : ''}
+        ${zeilen ? `<div class="worktime-activities">${zeilen}</div>` : ''}
+    `;
 }
 
 
