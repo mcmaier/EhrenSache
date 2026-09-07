@@ -197,8 +197,9 @@ document.addEventListener('DOMContentLoaded', function() {
  * Anfragen, und einer auf „nächstes Jahr" sprang zwei Jahre weit.
  *
  * Gemerkt wird am Element selbst, nicht in einer Liste im Skript: So gilt die
- * Sperre auch, wenn das Element ausgetauscht wird. initAttendanceList() nutzt
- * dieselbe Idee seit jeher von Hand über `dataset.listenerAdded`.
+ * Sperre auch, wenn das Element ausgetauscht wird. Die Idee stammt aus
+ * initAttendanceList(), wo sie bis 1.3.1 siebenmal von Hand als
+ * `dataset.listenerAdded` ausgeschrieben stand.
  *
  * Ein Element bekommt je Ereignisart genau einen Handler — mehr braucht keine
  * der Ansichten, und das haelt den Schluessel einfach.
@@ -923,98 +924,80 @@ async function initAttendanceList() {
         tab.style.display = 'flex';      
     }
     
-    // Filter Listener
-    const filterSelect = document.getElementById('attendanceAppointmentFilter');
-    if (filterSelect && !filterSelect.dataset.listenerAdded) {
-        filterSelect.addEventListener('change', loadAttendanceList);
-        filterSelect.dataset.listenerAdded = 'true';
-    }
+    // Die Sperre gegen mehrfaches Binden steckt seit 1.3.1 in bindOnce();
+    // vorher stand sie hier siebenmal von Hand als dataset.listenerAdded.
+    bindOnce(document.getElementById('attendanceAppointmentFilter'), 'change',
+        loadAttendanceList);
 
-    // Refresh Button
-    const btnRefresh = document.getElementById('btnRefreshAttendance');
-    if (btnRefresh && !btnRefresh.dataset.listenerAdded) {
-        btnRefresh.addEventListener('click', async () => {
-            await refreshAttendanceList();
-        });
-        btnRefresh.dataset.listenerAdded = 'true';
-    }
-    
-    // Create Appointment Button
-    const btnCreate = document.getElementById('btnCreateAppointment');
-    if (btnCreate && !btnCreate.dataset.listenerAdded) {
-        btnCreate.addEventListener('click', showCreateAppointmentModal);
-        btnCreate.dataset.listenerAdded = 'true';
-    }
-    
-    // Edit Appointment Button
-    const btnEdit = document.getElementById('btnEditAppointment');
-    if (btnEdit && !btnEdit.dataset.listenerAdded) {
-        btnEdit.addEventListener('click', showEditAppointmentModal);
-        btnEdit.dataset.listenerAdded = 'true';
-    }
+    bindOnce(document.getElementById('btnRefreshAttendance'), 'click', async () => {
+        await refreshAttendanceList();
+    });
 
-     // Modal Cancel Button
-    const btnCancelAppointment = document.getElementById('btnCancelAppointment');
-    if (btnCancelAppointment && !btnCancelAppointment.dataset.listenerAdded) {
-        btnCancelAppointment.addEventListener('click', () => {
-            document.getElementById('appointmentModal').classList.remove('active');
-        });
-        btnCancelAppointment.dataset.listenerAdded = 'true';
-    }
-    
-    // Modal Click Outside
+    bindOnce(document.getElementById('btnCreateAppointment'), 'click',
+        showCreateAppointmentModal);
+
+    bindOnce(document.getElementById('btnEditAppointment'), 'click',
+        showEditAppointmentModal);
+
     const appointmentModal = document.getElementById('appointmentModal');
-    if (appointmentModal && !appointmentModal.dataset.listenerAdded) {
-        appointmentModal.addEventListener('click', (e) => {
-            if (e.target.id === 'appointmentModal') {
-                appointmentModal.classList.remove('active');
-            }
-        });
-        appointmentModal.dataset.listenerAdded = 'true';
-    }
-    
-    // Appointment Form Submit
-    const appointmentForm = document.getElementById('appointmentForm');
-    if (appointmentForm && !appointmentForm.dataset.listenerAdded) {
-        appointmentForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = {
-                title: document.getElementById('appointmentTitle').value,
-                date: document.getElementById('appointmentDate').value,
-                start_time: document.getElementById('appointmentTime').value,
-                type_id: document.getElementById('appointmentType').value,                
-            };
-            
-            try {
-                if (currentEditAppointmentId) {
-                    // Update                    
-                    const result = await apiCall('appointments', 'PUT', formData, { id: currentEditAppointmentId });
-                    if(result.success) {showMessage('Termin aktualisiert', 'success');}
-                    else{showMessage(result.error,'error');}
-                } else {
-                    // Create
-                    const result = await apiCall('appointments', 'POST', formData);
-                    if(result.success) {showMessage('Termin erstellt', 'success');}
-                    else{showMessage(result.error,'error');}
-                }
-                
-                // Modal schließen
-                document.getElementById('appointmentModal').classList.remove('active');
-                
-                // Liste aktualisieren
-                await loadAttendanceAppointments();
-                if(currentEditAppointmentId)
-                {
-                    refreshAttendanceList();
-                }
-                
-            } catch (error) {
-                debug.log('Fehler beim Speichern:', error);
-                showMessage('Fehler beim Speichern', 'error');
-            }
-        });
-        appointmentForm.dataset.listenerAdded = 'true';
+
+    bindOnce(document.getElementById('btnCancelAppointment'), 'click', () => {
+        appointmentModal?.classList.remove('active');
+    });
+
+    // Klick neben den Dialog schliesst ihn
+    bindOnce(appointmentModal, 'click', (e) => {
+        if (e.target.id === 'appointmentModal') {
+            appointmentModal.classList.remove('active');
+        }
+    });
+
+    bindOnce(document.getElementById('appointmentForm'), 'submit', submitAppointmentForm);
+}
+
+/**
+ * Speichert den Termin aus dem Dialog der Anwesenheitsliste.
+ *
+ * Steht als benannte Funktion neben initAttendanceList(), nicht als Arrow im
+ * bindOnce()-Aufruf: Der Rumpf ist laenger als die uebrige Bindung zusammen
+ * und verdeckte dort, was die Funktion sonst noch tut.
+ */
+async function submitAppointmentForm(e) {
+    e.preventDefault();
+
+    const formData = {
+        title: document.getElementById('appointmentTitle').value,
+        date: document.getElementById('appointmentDate').value,
+        start_time: document.getElementById('appointmentTime').value,
+        type_id: document.getElementById('appointmentType').value,
+    };
+
+    try {
+        if (currentEditAppointmentId) {
+            // Update
+            const result = await apiCall('appointments', 'PUT', formData, { id: currentEditAppointmentId });
+            if(result.success) {showMessage('Termin aktualisiert', 'success');}
+            else{showMessage(result.error,'error');}
+        } else {
+            // Create
+            const result = await apiCall('appointments', 'POST', formData);
+            if(result.success) {showMessage('Termin erstellt', 'success');}
+            else{showMessage(result.error,'error');}
+        }
+
+        // Modal schließen
+        document.getElementById('appointmentModal').classList.remove('active');
+
+        // Liste aktualisieren
+        await loadAttendanceAppointments();
+        if(currentEditAppointmentId)
+        {
+            refreshAttendanceList();
+        }
+
+    } catch (error) {
+        debug.log('Fehler beim Speichern:', error);
+        showMessage('Fehler beim Speichern', 'error');
     }
 }
 

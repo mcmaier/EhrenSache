@@ -30,6 +30,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ### Intern
 - Neue Testsuite `worktime_frontend` (statische Gegenproben am Zeiterfassungs-Frontend) und
   ein API-Test, der die Eingrenzung per `member_id` festhält
+- `initAttendanceList()` nutzt `bindOnce()` statt siebenmal `dataset.listenerAdded` von Hand;
+  das Speichern des Termindialogs steht als `submitAppointmentForm()` daneben
+- Testplan: Abschnitt 21 zu Sitzungswechsel in der PWA und Mitgliedsfilter
 
 ---
 

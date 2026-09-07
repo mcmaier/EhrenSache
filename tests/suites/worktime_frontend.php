@@ -100,13 +100,19 @@ test('Check-in-PWA: die Abmeldung raeumt die Ansichten des Mitglieds ab', functi
 test('Check-in-PWA: die Anmeldung haengt keine Ereignisse doppelt an', function () use ($repoRoot) {
     $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
 
-    // Diese vier laufen bei JEDER Anmeldung erneut (handleLogin und
-    // checkAutoLogin, initWorktime ueber loadUserData), die Elemente im
-    // Dokument bleiben dieselben. Ein direktes addEventListener mit einer
-    // Arrow-Function haengt dort nach jedem Zyklus Abmelden → Anmelden einen
-    // weiteren Handler an: ein Klick auf „Start" schickte zwei Anfragen, einer
-    // auf „naechstes Jahr" spraenge zwei Jahre weit. bindOnce() sperrt das.
-    foreach (['initTabs', 'initCaptureTab', 'initYearNavigation', 'initWorktime'] as $name) {
+    // Diese fuenf laufen bei JEDER Anmeldung erneut (handleLogin und
+    // checkAutoLogin, initWorktime und initAttendanceList ueber loadUserData),
+    // die Elemente im Dokument bleiben dieselben. Ein direktes addEventListener
+    // mit einer Arrow-Function haengt dort nach jedem Zyklus Abmelden →
+    // Anmelden einen weiteren Handler an: ein Klick auf „Start" schickte zwei
+    // Anfragen, einer auf „naechstes Jahr" spraenge zwei Jahre weit.
+    // bindOnce() sperrt das.
+    $einstiege = [
+        'initTabs', 'initCaptureTab', 'initYearNavigation',
+        'initWorktime', 'initAttendanceList',
+    ];
+
+    foreach ($einstiege as $name) {
         $body = frontendFunctionBody($js, $name);
 
         assertTrue(
