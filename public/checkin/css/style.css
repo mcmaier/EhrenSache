@@ -2192,3 +2192,54 @@ body {
     vertical-align: baseline;
     flex-shrink: 0;
 }
+
+/* ========================================
+   ARBEITSZEIT IN DER STATISTIK
+   ======================================== */
+.worktime-total {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+}
+
+.worktime-total-label {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+
+.worktime-note {
+    font-size: 12px;
+    color: var(--text-light);
+    line-height: 1.5;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.worktime-activities {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.worktime-activity {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text);
+    padding: 4px 0;
+}
+
+.worktime-activity-time {
+    color: var(--text-light);
+    white-space: nowrap;
+    margin-left: 12px;
+}
+
+.worktime-empty {
+    font-size: 13px;
+    color: var(--text-light);
+}
