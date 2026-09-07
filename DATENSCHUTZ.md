@@ -111,7 +111,7 @@ Sie benötigen eine **Rechtsgrundlage** für die Datenverarbeitung (Art. 6 DSGVO
   der Beginn oder Ende bestätigt wurde
 - **Änderungshistorie der Arbeitszeiten**: wer wann welchen Wert geändert,
   freigegeben, abgelehnt oder gelöscht hat
-- Stations-PIN (nur als Hash, `members.pin_hash`; Zeitpunkt der letzten Änderung). Wird mit dem Mitglied gelöscht.
+- **Stations-PIN** (nur als Hash; Zeitpunkt der letzten Änderung): wird mit dem Mitglied gelöscht
 
 ### Technische Daten
 
@@ -137,7 +137,7 @@ Mitglieder haben folgende Rechte:
 **Wichtig:** Sie müssen Anfragen binnen **1 Monat** beantworten.
 
 Die Selbstauskunft (JSON und CSV) enthält seit 1.3.0 zur Stations-PIN nur `has_pin` und
-`pin_updated_at` (bzw. die Zeilen „Stations-PIN gesetzt" und „PIN zuletzt geändert") — nie den
+`pin_updated_at` (bzw. die Zeilen "Stations-PIN gesetzt" und "PIN zuletzt geändert") — nie den
 Hash selbst.
 
 ---

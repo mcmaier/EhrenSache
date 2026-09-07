@@ -394,6 +394,9 @@ GET /api.php?resource=members&id=1
 }
 ```
 
+Ein mitgeschicktes `pin` wird beim Anlegen ignoriert — die Stations-PIN wird erst über ein
+anschließendes `PUT` gesetzt (so verfährt auch das Dashboard).
+
 **Response:**
 ```json
 {
@@ -775,15 +778,20 @@ Anmeldung. `409 "Device has no name"` wenn dem Kiosk der Gerätename fehlt (er i
 }
 ```
 `already_checked_in` ist nur bei einem Eintrag mit Status `present` wahr; `record_status` nennt
-den vorhandenen Status (`present`, `excused`) oder `null`. Alle Zeitstempel stammen von der
-Datenbankuhr des Servers.
+den vorhandenen Status (`present`, `excused`) oder `null`. `identify`, `checkin` und
+`server_time` (Status-Endpunkt) rechnen mit der Datenbankuhr des Servers; `server_unix` und der
+Stations-Code (TOTP) laufen dagegen auf Unix-Zeit, unabhängig von der Zeitzone der Datenbank.
 
 **Fehler:** `400` Nummer oder PIN fehlt · `401 "Invalid member number or PIN"` — dieselbe
 Meldung bei unbekannter Nummer, falscher PIN, fehlender PIN, inaktivem Mitglied und
 mehrdeutiger Nummer · `423 "Too many attempts"` mit `retry_after` (Sekunden): 5 Fehlversuche
 je Mitgliedsnummer (auch unbekannte) innerhalb von 15 Minuten · `423 "Station temporarily
-locked"`: 30 Fehlversuche je Kiosk innerhalb von 15 Minuten. Eine neu gesetzte PIN hebt die
-Mitgliedssperre auf; eine erfolgreiche Anmeldung setzt beide Zähler zurück.
+locked"`: 30 Fehlversuche je Kiosk innerhalb von 15 Minuten. `retry_after` nennt in beiden
+Fällen die volle Fensterlänge (900 Sekunden), nicht die verbleibende Sperrzeit. Eine neu
+gesetzte PIN hebt die Mitgliedssperre auf; eine erfolgreiche Anmeldung setzt beide Zähler
+zurück. Eine Sperre auf eine unbekannte oder mehrdeutige Nummer kennt kein Mitglied, dem eine
+neue PIN die Sperre abnehmen könnte — sie läuft stattdessen 15 Minuten nach dem letzten
+Fehlversuch von selbst ab.
 
 ### Anwesenheit: checkin
 **Endpoint:** `POST /api.php?resource=station&action=checkin`
@@ -792,7 +800,10 @@ Body wie `identify`. Terminwahl serverseitig wie `auto_checkin` (Toleranzfenster
 Gruppenregel), **keine** automatische Terminanlage. Record mit `checkin_source = station_pin`,
 `source_device` und `location_name` = Gerätename des Kiosks. `404 "Kein passender Termin gefunden"`
 (`reason: no_matching_appointment`). Antwort wie `auto_checkin` (`record_action` created /
-updated / unchanged) plus `appointment {appointment_id, title, date, start_time}`.
+updated / unchanged) plus `appointment {appointment_id, title, date, start_time}`. Ein
+bestehender Record mit Status `excused` wird von einem Check-in immer auf `present` mit der
+neuen Ankunftszeit gehoben (`record_action: updated`) — ein tatsächlicher Stempel schlägt eine
+Entschuldigung, unabhängig vom sonst geltenden Zeitvergleich.
 
 ### Arbeitszeit: work_start, work_pause, work_resume, work_stop
 **Endpoint:** `POST /api.php?resource=station&action=work_start` (Body zusätzlich `activity_id`, positive Ganzzahl)
