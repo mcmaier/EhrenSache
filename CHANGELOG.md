@@ -7,6 +7,27 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.3.1] – 2026-09-07
+
+### Behoben
+- **Mitgliedsfilter der Zeiterfassung war beim ersten Öffnen leer.** Die Auswahl wurde aus
+  dem Mitglieder-Cache aufgebaut, den der Bereichswechsel erst 500 ms später im Hintergrund
+  füllt. Filterleiste und Nachtrags-Dialog laden die Liste jetzt selbst (`loadMembers()`)
+- **Check-in-PWA zeigte Administratoren und Managern im Verlauf die Arbeitszeiten aller
+  Mitglieder.** Der Abruf ging ohne `member_id` an `work_sessions`; ohne diese Eingrenzung
+  antwortet die Ressource für beide Rollen absichtlich ungefiltert (so gewollt fürs
+  Dashboard). Der Verlauf grenzt jetzt auf das angemeldete Mitglied ein — die
+  Gesamtübersicht bleibt dem Dashboard vorbehalten
+- **Check-in-PWA behielt nach der Abmeldung die Ansichten des vorigen Mitglieds.** Verlauf,
+  Statistik, Anwesenheitsliste, Auswahlfelder und der zuletzt geöffnete Tab standen unverändert
+  weiter, bis ein Reload dazwischenkam. Die Abmeldung räumt diesen Zustand jetzt ab
+
+### Intern
+- Neue Testsuite `worktime_frontend` (statische Gegenproben am Zeiterfassungs-Frontend) und
+  ein API-Test, der die Eingrenzung per `member_id` festhält
+
+---
+
 ## [1.3.0] – 2026-09-07
 
 ### Neu

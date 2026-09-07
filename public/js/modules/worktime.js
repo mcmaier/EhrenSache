@@ -13,6 +13,7 @@ import { apiCall, isAdmin, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear } from './ui.js';
 import { debug } from '../app.js';
 import { loadGroups, loadTypes } from './management.js';
+import { loadMembers } from './members.js';
 
 // ============================================
 // ZUSTAND
@@ -133,7 +134,7 @@ export async function showWorktimeSection(forceReload = false) {
     }
 
     await loadActivityTypes(forceReload);
-    fillWorktimeFilters();
+    await fillWorktimeFilters();
     await loadWorkSessions(forceReload);
 }
 
@@ -258,7 +259,7 @@ function updateWorktimeStats(all, filtered) {
 }
 
 /** Füllt die Auswahlfelder der Filterleiste. */
-function fillWorktimeFilters() {
+async function fillWorktimeFilters() {
     const activitySelect = document.getElementById('filterWorktimeActivity');
     if (activitySelect) {
         const current = activitySelect.value;
@@ -270,8 +271,13 @@ function fillWorktimeFilters() {
 
     const memberSelect = document.getElementById('filterWorktimeMember');
     if (memberSelect && isAdminOrManager) {
-        // Der Members-Cache ist jahresbasiert: dataCache.members[jahr].data
-        const members = dataCache.members?.[currentYear]?.data || [];
+        // Selbst laden statt den Cache lesen: showSection() fuellt den
+        // Mitglieder-Cache erst 500 ms nach dem Wechsel im Hintergrund. Beim
+        // ERSTEN Oeffnen der Zeiterfassung waere er noch leer — die Auswahl
+        // bliebe bis auf "Alle Mitglieder" leer und der Filter wirkungslos.
+        // loadMembers() nutzt denselben jahresbasierten Cache, holt die Liste
+        // aber nach, wenn sie fehlt.
+        const members = await loadMembers();
         const current = memberSelect.value;
 
         // Hier wird gekennzeichnet, nicht ausgeschlossen: Die Filterleiste
@@ -439,7 +445,7 @@ export async function openWorkSessionModal(sessionId = null) {
     if (!modal) return;
 
     await loadActivityTypes();
-    fillWorktimeFilters();
+    await fillWorktimeFilters();
 
     document.getElementById('workSessionId').value = sessionId || '';
     document.getElementById('workSessionModalTitle').textContent =
@@ -467,8 +473,10 @@ export async function openWorkSessionModal(sessionId = null) {
 
     if (isAdminOrManager && memberSelect) {
         memberGroup.style.display = '';
-        // Der Members-Cache ist jahresbasiert: dataCache.members[jahr].data
-        const members = dataCache.members?.[currentYear]?.data || [];
+        // Wie in fillWorktimeFilters(): selbst laden, nicht den Cache lesen.
+        // Sonst stuende die Auswahl beim ersten Oeffnen des Bereichs leer da
+        // und ein Nachtrag liesse sich keinem Mitglied zuordnen.
+        const members = await loadMembers();
 
         // Wer im gewaehlten Jahr keine Mitgliedschaft hatte, steht nicht zur
         // Wahl — fuer einen Zeitraum ohne Mitgliedschaft soll gar kein Eintrag

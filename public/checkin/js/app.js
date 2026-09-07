@@ -716,14 +716,63 @@ async function checkAutoLogin() {
     }
 }*/
 
+/**
+ * Raeumt alles ab, was zum abgemeldeten Mitglied gehoert.
+ *
+ * Die PWA laeuft ohne Reload weiter: Ohne dieses Aufraeumen behaelt die
+ * naechste Anmeldung auf demselben Geraet die Ansichten der vorigen. Verlauf,
+ * Statistik und Anwesenheitsliste stehen gerendert da, und der zuletzt
+ * geoeffnete Tab zeigt sie unveraendert weiter — fremde Daten, bis erst ein
+ * Reload dazwischenkommt.
+ */
+function resetSessionState() {
+    userData = null;
+
+    appointments = [];
+    appointmentTypes = [];
+    checkinAppointments = [];
+    deleteExceptionId = null;
+    currentEditAppointmentId = null;
+    currentStatsYear = new Date().getFullYear();
+
+    worktimeSession = null;
+    worktimeActivities = [];
+    worktimeAppointments = [];
+    renderWorktime();   // blendet laufende Sitzung und ihre Leiste aus
+
+    ['historyList', 'attendanceListContent', 'groupsList'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
+
+    const statsContent = document.getElementById('statsContent');
+    if (statsContent) statsContent.style.display = 'none';
+
+    // Auswahlfelder tragen die Termine und Taetigkeiten des vorigen Mitglieds.
+    ['checkinAppointment', 'exceptionAppointment', 'attendanceAppointmentFilter',
+     'worktimeActivity', 'worktimeAppointment'].forEach(id => {
+        const select = document.getElementById(id);
+        if (select) select.innerHTML = '';
+    });
+
+    // Zurueck auf den ersten Tab: initTabs() setzt beim naechsten Login nur die
+    // Ereignisse, nicht die Auswahl — sonst startet sie dort, wo die vorige
+    // Sitzung aufgehoert hat.
+    document.querySelectorAll('.tab-button').forEach(b =>
+        b.classList.toggle('active', b.dataset.tab === 'capture'));
+    document.querySelectorAll('.tab-content').forEach(c =>
+        c.classList.toggle('active', c.dataset.tab === 'capture'));
+}
+
 async function handleLogout() {
     await stopScannerIfRunning();
     await stopNFCReader();
 
     localStorage.removeItem('api_token');
     apiToken = null;
-    userData = null;
-    
+
+    resetSessionState();
+
     elements.loginForm.reset();
     elements.emailInput.value = '';
     elements.passwordInput.value = '';
@@ -2001,9 +2050,16 @@ async function loadHistory() {
         // Arbeitszeiten nur abrufen, wenn das Mitglied ueberhaupt welche
         // erfassen darf — sonst antwortet die Ressource mit 404 und der
         // Abruf waere verschenkt.
+        //
+        // member_id muss mit: Ohne die Eingrenzung liefert die Ressource einem
+        // Admin oder Manager die Sitzungen ALLER Mitglieder — im Dashboard so
+        // gewollt, hier falsch. Der Verlauf ist die persoenliche Zeitachse
+        // dieses Mitglieds, genau wie records und exceptions darueber.
         let sessions = [];
-        if (worktimeActivities.length > 0) {
-            const ws = await apiCall('work_sessions', 'GET');
+        if (worktimeActivities.length > 0 && userData.member_id) {
+            const ws = await apiCall('work_sessions', 'GET', null, {
+                member_id: userData.member_id
+            });
             if (ws.success && Array.isArray(ws.data)) {
                 sessions = ws.data;
             }

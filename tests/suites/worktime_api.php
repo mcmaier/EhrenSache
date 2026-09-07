@@ -190,6 +190,40 @@ test('work_sessions: leere Liste fuer einen Nutzer ohne Sitzungen', function () 
     assertTrue(is_array($res['body']), 'Liste erwartet');
 });
 
+/**
+ * Die Eingrenzung, auf die sich jede persoenliche Sicht verlassen muss.
+ *
+ * Ohne member_id ist die Liste fuer Admin und Manager absichtlich ungefiltert —
+ * das Dashboard braucht sie so. Jede Oberflaeche, die nur eigene Zeiten zeigen
+ * soll (Check-in-PWA), muss die Eingrenzung deshalb selbst mitgeben.
+ */
+test('work_sessions: member_id grenzt die Liste auf dieses Mitglied ein', function () {
+    enableWorktime();
+
+    $memberId = apiMemberId('admin');
+    if ($memberId === null) {
+        return; // Ohne verknuepftes Mitglied ist nichts einzugrenzen
+    }
+
+    $alle = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin')]);
+    assertStatus(200, $alle);
+
+    $eigene = apiRequest('GET', 'work_sessions', [
+        'token' => apiToken('admin'),
+        'query' => ['member_id' => $memberId],
+    ]);
+    assertStatus(200, $eigene);
+
+    foreach ($eigene['body'] as $s) {
+        assertSame($memberId, (int) $s['member_id'], 'Fremde Sitzung trotz member_id');
+    }
+
+    assertTrue(
+        count($eigene['body']) <= count($alle['body']),
+        'Die eingegrenzte Liste kann nicht laenger sein als die ungefilterte'
+    );
+});
+
 test('work_sessions: running=1 liefert null ohne laufende Sitzung', function () {
     enableWorktime();
     $res = apiRequest('GET', 'work_sessions', [
