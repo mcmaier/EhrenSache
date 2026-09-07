@@ -2179,10 +2179,6 @@ body {
     .worktime-section {
         padding: 12px;
     }
-
-    .worktime-total {
-        font-size: 24px;
-    }
 }
 
 /* Farbpunkt einer Tätigkeitsart. Dieselbe Auszeichnung wie im Dashboard —
@@ -2246,4 +2242,10 @@ body {
 .worktime-empty {
     font-size: 13px;
     color: var(--text-light);
+}
+
+@media (max-width: 380px) {
+    .worktime-total {
+        font-size: 24px;
+    }
 }
