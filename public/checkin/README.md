@@ -63,7 +63,7 @@ Sobald du dich im Web-Dashboard registriert hast und von einem Admin freigeschal
 - **Installierbar**: Wie native App nutzbar
 - **Responsive**: Optimiert für alle Bildschirmgrößen
 - **QR-Code Scanner**: Schneller Termin-Check-In
-- **Statistiken**: Anwesenheitsquote und letzte Einträge
+- **Statistiken**: Anwesenheitsquote, geleistete Arbeitszeit des Jahres und letzte Einträge
 
 ### ⚠️ Limitierungen
 

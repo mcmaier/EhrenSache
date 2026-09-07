@@ -651,6 +651,21 @@ falschen Grund fehl.
 | AW-D7 | Tätigkeitsart mit erfassten Zeiten löschen | Fehlermeldung; Ausmustern über „Aktiv"-Haken bleibt möglich |
 | AW-D8 | Knopf „📄 Bericht" | Dialog öffnet sich, Zeitraum auf das laufende Jahr vorbelegt |
 
+### Manuell (PWA)
+
+Angemeldet als Mitglied mit verknüpftem `member_id` und mindestens einer Tätigkeitsart.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| AW-P1 | Mitglied ohne Tätigkeitsarten, Tab „Statistik" | Kein Block „Arbeitszeit"; Karten und Gruppenübersicht unverändert |
+| AW-P2 | Mitglied mit bestätigten Stunden | Block zeigt die Jahressumme als `h:mm h`, darunter „bestätigt · N Sitzungen" |
+| AW-P3 | Summe gegen den Bericht desselben Jahres | Beide Zahlen stimmen überein |
+| AW-P4 | Ein Eintrag im Status „wartet auf Freigabe" | Fußnote „… aus 1 Eintrag wartet auf Freigabe"; er zählt nicht in die Summe |
+| AW-P5 | Jahr mit 0 bestätigten, 1 eingereichten Eintrag | „0:00 h" **und** Fußnote — keine kommentarlose Null |
+| AW-P6 | Jahr ohne jede Sitzung | Eine Zeile „Keine Stunden in <Jahr>", keine leere Liste |
+| AW-P7 | Jahreswechsel über ‹ › | Summe, Fußnote und Tätigkeitsliste wechseln mit |
+| AW-P8 | Abmelden, anderes Konto anmelden | Kein Rest des Vorgängers im Statistik-Tab |
+
 ---
 
 ## Zeitraum und Druckansicht (ab 1.2.2)

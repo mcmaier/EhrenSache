@@ -7,6 +7,18 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Nicht veröffentlicht]
+
+### Hinzugefügt
+- **Arbeitszeit in der Statistik der Check-in-PWA.** Der Statistik-Tab zeigt für Mitglieder,
+  die Zeiten erfassen dürfen, die bestätigte Jahressumme, eine Aufschlüsselung nach Tätigkeit
+  und eine Fußnote über eingereichte und abgelehnte Einträge. Die Summe stammt aus derselben
+  Auswertung wie der Verwendungsnachweis (`statistics?include=worktime`); nur bestätigte und
+  beendete Sitzungen zählen. Ohne die Fußnote läse sich eine „0:00 h" nach einem frischen
+  Nachtrag als Fehler. Server, Schema und API bleiben unverändert.
+
+---
+
 ## [1.3.1] – 2026-09-07
 
 ### Behoben

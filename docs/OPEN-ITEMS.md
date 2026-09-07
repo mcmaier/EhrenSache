@@ -448,7 +448,7 @@ nachtragen“ im Arbeitszeit-Tab (`POST`) — ein Formular, zwei Einstiege.
 Server voraussichtlich unberührt.
 
 ### OI-36 · PWA-Statistik ohne geleistete Stunden
-**Priorität:** niedrig — vorgemerkt, vor der Umsetzung zu prüfen
+**Priorität:** erledigt am 2026-09-07 — umgesetzt in `public/checkin/` (Block „Arbeitszeit“ im Statistik-Tab: bestätigte Jahressumme, Fußnote über Eingereichtes und Abgelehntes, Aufschlüsselung nach Tätigkeit)
 
 Der Statistik-Tab der PWA zeigt zwei Karten — Anwesenheitsquote und Terminzahl — und die
 Übersicht nach Gruppen. Die seit 1.2.0 erfassten Stunden kommen darin nicht vor. Ein Mitglied,
