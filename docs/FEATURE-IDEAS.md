@@ -51,12 +51,13 @@ durchschlägt.
 | [FI-12](#fi-12--material--und-instrumentenausleihe) | Material- und Instrumentenausleihe | niedrig | L | — |
 | [FI-13](#fi-13--geburtstagsliste-mit-gratulationsvermerk) | Geburtstagsliste mit Gratulationsvermerk | mittel | M | — |
 | [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht | mittel¹ | M | FI-1 für die Wirkung |
+| [FI-15](#fi-15--rolle-gruppenleiter) | Rolle „Gruppenleiter" | hoch | L | — |
 
 ¹ hoch in Kombination mit [FI-1](#fi-1--terminzusage-im-vorfeld), für sich allein mittel.
 
-FI-1 bis FI-5, FI-13 und FI-14 stammen aus der Ideensammlung, FI-6 bis FI-12 sind Ergänzungen
-aus der Sichtung des Bestands. Die Nummern folgen dem Eingang, die Abschnitte dem Thema —
-deshalb steht FI-14 unter A und nicht am Ende.
+FI-1 bis FI-5 und FI-13 bis FI-15 stammen aus der Ideensammlung, FI-6 bis FI-12 sind
+Ergänzungen aus der Sichtung des Bestands. Die Nummern folgen dem Eingang, die Abschnitte dem
+Thema — deshalb steht FI-14 unter A und nicht am Ende.
 
 ---
 
@@ -450,6 +451,80 @@ Erledigungsvermerk — wenn beides kommt, sollte es **ein** Modell sein und nich
 
 ---
 
+## D · Rollen und Berechtigungen
+
+### FI-15 · Rolle „Gruppenleiter"
+**Nutzen:** hoch · **Aufwand:** L
+
+Eine vierte Rolle zwischen `manager` und `user`: im Wesentlichen die Rechte eines Managers,
+aber nur für die Gruppen, die diese Person leitet. Anwesenheiten und Entschuldigungen der
+eigenen Gruppe sehen und pflegen, Statistik der eigenen Gruppe auswerten — und
+Arbeitszeit-Anträge freigeben, sofern die Arbeitszeiterfassung für diese Gruppe greift.
+
+**Warum interessant:** Es ist die Rolle, die Vereine tatsächlich haben — Registerführer,
+Abteilungs- oder Jugendleiter. Heute bleibt nur die Wahl zwischen zu wenig (`user`: sieht nur
+sich selbst) und zu viel (`manager`: sieht und ändert alles vereinsweit). In größeren Vereinen
+ist das der Grund, warum die Pflege an zwei Personen hängen bleibt, statt sich zu verteilen.
+
+**Der Preis, ehrlich benannt — es fehlt nicht ein Enum-Wert, sondern die halbe Zugriffslogik:**
+
+Eine Gruppengrenze existiert im Backend **nirgends** außer für einfache Nutzer. In
+`hasStatisticsGroupAccess()` ([statistics.php:227](../private/handlers/statistics.php)) steht
+der ganze Mechanismus: Admin und Manager bekommen `true`, alle anderen werden gegen ihre
+Gruppenzugehörigkeit geprüft. Das ist die einzige Stelle dieser Art. Zum Vergleich: `records`,
+`exceptions`, `work_sessions`, `members`, `appointments` und `export` liefern Managern
+schlicht alles, ohne Gruppenbedingung in der Abfrage.
+
+Konkret sind das **41 Prüfungen auf `isAdminOrManager()` oder `requireAdminOrManager()` in
+zwölf Handlern**. Jede davon muss beantwortet werden, und zwar zweimal:
+
+1. *Darf diese Rolle die Aktion überhaupt?* — die einfachere Hälfte, eine Fallunterscheidung.
+2. *Welche Zeilen sieht sie dabei?* — dafür braucht jede Listenabfrage eine Join-Bedingung
+   über `member_group_assignments`, die es heute in keiner dieser Abfragen gibt.
+
+Immerhin ist der Ausgangszustand sicher: `isAdminOrManager()` liefert für eine unbekannte
+Rolle `false`, ein Gruppenleiter fiele also zunächst in den Nutzerpfad. Nichts öffnet sich
+versehentlich — aber jede Fähigkeit muss einzeln freigeschaltet werden.
+
+**Berührt:** `users.role` als ENUM erweitern (Migration) · `auth.php` (neue Helfer, `isAdmin`
+und `isAdminOrManager` bleiben unangetastet) · alle zwölf genannten Handler · `api.js`,
+`ui.js` und die Sichtbarkeit der Bereiche im Dashboard · `API.md` · Rollentabelle in
+`CLAUDE.md` und `README.md`.
+
+**Vorher zu klären:**
+
+- **Leitung ist nicht Mitgliedschaft.** Ein Dirigent leitet mehrere Register, ohne in allen
+  Mitglied zu sein; ein Jugendleiter ist selten selbst in der Jugendgruppe.
+  `member_group_assignments` taugt deshalb nicht als Grundlage — es braucht eine eigene
+  Zuordnung „leitet Gruppe", mehrfach je Person.
+- **Überlappung.** Ein Mitglied gehört zu Blasorchester **und** Jugend. Sieht der Jugendleiter
+  dessen Anwesenheit bei der Orchesterprobe? Datensätze in `records` und `work_sessions` hängen
+  an Mitglied und Termin, nicht an einer Gruppe — die Zuordnung ist also mehrdeutig, und die
+  Antwort muss gesetzt werden, bevor die erste Abfrage geschrieben wird. Die naheliegende
+  Regel: Der Gruppenleiter sieht den Datensatz, wenn der **Termin** seiner Gruppe zugeordnet
+  ist, nicht schon dann, wenn das Mitglied es ist.
+- **„Arbeitszeiterfassung für die Gruppe aktiv" gibt es heute nicht.** `worktime_enabled` ist
+  ein globaler Schalter in `system_settings`. Gruppenbezug existiert nur bei den Tätigkeitsarten
+  über `activity_type_groups` (seit 1.2.0). Also entweder so lesen — „die Gruppe hat mindestens
+  eine Tätigkeitsart" — oder einen echten Schalter je Gruppe einführen. Ersteres ist geschenkt
+  und vermutlich schon die gemeinte Semantik, Letzteres ausdrücklicher.
+- **Freigabe der eigenen Stunden.** [OI-3](OPEN-ITEMS.md#oi-3) ist bereits offen: Ein Manager
+  bestätigt seinen eigenen Nachtrag ohne Kontrolle. Mit einer dritten freigebenden Rolle
+  vervielfacht sich die Frage — und beim Gruppenleiter wiegt sie schwerer, weil er in seiner
+  kleinen Gruppe oft die einzige freigebende Instanz ist. Diese Entscheidung gehört zu OI-3 und
+  sollte dort mitgetroffen werden, nicht hier zum zweiten Mal.
+- **Rückwirkung auf eine bewusste Entscheidung.** „Manager sehen alle Datensätze ohne
+  Gruppengrenze" steht in `CLAUDE.md` und in `OPEN-ITEMS.md` unter *Bewusst entschieden*.
+  FI-15 stellt das nicht infrage — schafft aber erstmals den technischen Weg, eine Grenze zu
+  ziehen. Damit wird die alte Entscheidung erneut zur Wahl, und das sollte man wissen, bevor
+  man anfängt.
+- **Passt zu [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht).** Registerführer
+  ist der wahrscheinlichste Gruppenleiter überhaupt. Wenn beides kommt, sollte die
+  Leitungszuordnung auf demselben Gruppenbegriff aufsetzen — sonst leitet jemand ein Register,
+  das im Berechtigungsmodell keine Gruppe ist.
+
+---
+
 ## Wenn etwas davon kommt: sinnvolle Reihenfolge
 
 Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung:
@@ -470,7 +545,11 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung:
 6. **FI-10 Jubiläen** und **FI-13 Geburtstage** zusammen entwerfen, auch wenn nur eines davon
    gebaut wird — beides ist ein Stichtag mit Erledigungsvermerk. Zwei getrennte Modelle dafür
    wären ein selbstgemachtes Problem.
-7. Alles Übrige nur, wenn ein Verein danach fragt.
+7. **FI-15 Gruppenleiter** eigenständig planen, nicht nebenbei. Die Rolle ist der einzige
+   Punkt der Liste, der jeden Handler anfasst — sie verträgt sich schlecht damit, parallel zu
+   etwas anderem zu laufen. Sinnvoll erst nach [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht),
+   damit feststeht, worauf sich „seine Gruppe" bezieht.
+8. Alles Übrige nur, wenn ein Verein danach fragt.
 
 ---
 

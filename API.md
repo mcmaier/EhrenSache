@@ -1208,6 +1208,7 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
 **Query-Parameter:**
 - `member_id`: Statistik eines Mitglieds (User nur eigene)
 - `year`: Jahr (Standard: aktuelles)
+- `include=worktime`: hängt den Arbeitszeitblock an (siehe unten); jeder andere Wert wird ignoriert
 
 **Response:**
 ```json
@@ -1228,6 +1229,66 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
   ]
 }
 ```
+
+#### Arbeitszeit im Ergebnis (`include=worktime`)
+
+`include=worktime` hängt der Antwort einen eigenen Schlüssel `worktime` an. Ohne den
+Parameter steht dort `null` — ebenso, wenn die Zeiterfassung abgeschaltet ist
+(`worktime_enabled`); der Aufruf bleibt dann trotzdem **200**.
+
+Der Block steht bewusst neben der Anwesenheitsauswertung und nicht in ihr: Anwesenheitsquote
+und geleistete Stunden sind verschiedene Fragen.
+
+Gezählt wird ausschließlich, was **bestätigt und beendet** ist — `status = 'confirmed'` mit
+gesetztem `end_time`. Sitzungen in `submitted`, `rejected` oder noch laufende erscheinen nicht.
+Der Zeitraum ist das Kalenderjahr aus `year`, maßgeblich ist `start_time`. Die Dauer ist netto:
+Ende minus Start minus `break_minutes`, nie negativ.
+
+`by_proof` teilt die Minuten nach dem Ortsnachweis der Sitzung auf:
+
+| Wert | Bedeutung |
+|---|---|
+| `hours` | Start **und** Ende ortsbelegt — die Stunden selbst sind nachgewiesen |
+| `start` | nur der Start ortsbelegt |
+| `none` | kein Ortsnachweis |
+
+Für die Sichtbarkeit gelten dieselben Regeln wie für die übrige Statistik: Ein `user` erhält
+ausschließlich sein eigenes Mitglied, eine fremde `member_id` wird ignoriert und im Feld
+`warning` quittiert. Admin und Manager bekommen ohne `member_id` alle Mitglieder mit Stunden
+im Jahr.
+
+```json
+{
+  "year": 2026,
+  "worktime": {
+    "summary": {
+      "total_minutes": 736,
+      "hours_proven": 365,
+      "start_proven": 194,
+      "unproven": 177,
+      "sessions": 18
+    },
+    "members": [
+      {
+        "member_id": 5,
+        "name": "Anna",
+        "surname": "Muster",
+        "member_number": "M001",
+        "worked_minutes": 736,
+        "sessions": 18,
+        "by_proof": { "hours": 365, "start": 194, "none": 177 },
+        "by_activity": [
+          { "activity_id": 1, "activity_name": "Bühnenaufbau", "minutes": 152, "sessions": 11 },
+          { "activity_id": 3, "activity_name": "Vereinsheim",  "minutes": 584, "sessions": 7 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`summary` summiert über alle enthaltenen Mitglieder; `hours_proven`, `start_proven` und
+`unproven` ergeben zusammen `total_minutes`.
 
 ---
 
@@ -1537,9 +1598,17 @@ Karteileiche.
 {
   "success": true,
   "imported": 25,
+  "updated": 3,
+  "skipped": 0,
+  "appointments_created": 0,
   "errors": []
 }
 ```
+
+**`type=extract_appointments` schreibt nicht.** Es liest nur `arrival_date_time`, gruppiert
+die Zeitstempel und **schlägt** Termine vor — für den Fall, dass eine Anwesenheitsdatei aus
+einem System kommt, das gar keine Termine kennt. Die Antwort enthält `suggestions` mit Datum,
+gerundeter Startzeit und Anzahl der Einträge; angelegt wird nichts.
 
 ---
 
@@ -1598,18 +1667,10 @@ Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
 **Request:**
 ```json
 {
-  "updated": 3,
-  "skipped": 0,
-  "appointments_created": 0,
   "setting_key": "org_name",
   "setting_value": "Neuer Vereinsname"
 }
 ```
-**`type=extract_appointments` schreibt nicht.** Es liest nur `arrival_date_time`, gruppiert
-die Zeitstempel und **schlägt** Termine vor — für den Fall, dass eine Anwesenheitsdatei aus
-einem System kommt, das gar keine Termine kennt. Die Antwort enthält `suggestions` mit Datum,
-gerundeter Startzeit und Anzahl der Einträge; angelegt wird nichts.
-
 
 ---
 
