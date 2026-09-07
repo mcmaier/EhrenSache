@@ -259,6 +259,14 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                 break;
             }
 
+            // Umgebende Leerzeichen entfernen, bevor auf Duplikate geprueft
+            // und gespeichert wird — sonst waeren "AB1" und "AB1 " zwei
+            // "unterschiedliche" Nummern. Leer nach dem Trim faellt wie
+            // bisher auf NULL zurueck (siehe INSERT unten).
+            if (isset($cleanData->member_number) && is_string($cleanData->member_number)) {
+                $cleanData->member_number = trim($cleanData->member_number);
+            }
+
             // Prüfe ob member_number bereits existiert (falls angegeben)
             if(isset($cleanData->member_number) && !empty($cleanData->member_number)) {
                 $checkStmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_number = ?");
@@ -272,9 +280,10 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                 }
             }
 
-            $stmt = $db->prepare("INSERT INTO {$prefix}members (name, surname, member_number, active) 
+            $stmt = $db->prepare("INSERT INTO {$prefix}members (name, surname, member_number, active)
                                   VALUES (?, ?, ?, ?)");
-            if($stmt->execute([$cleanData->name, $cleanData->surname, $cleanData->member_number ?? null, 
+            if($stmt->execute([$cleanData->name, $cleanData->surname,
+                               empty($cleanData->member_number ?? null) ? null : $cleanData->member_number,
                                $cleanData->active ?? true])) {
                 $memberId = $db->lastInsertId();
                 // Speichere Gruppen-Zuordnungen
@@ -304,6 +313,11 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
                 if (isset($data->$field)) {
                     $cleanData->$field = $data->$field;
                 }
+            }
+
+            // Umgebende Leerzeichen entfernen — siehe POST weiter oben.
+            if (isset($cleanData->member_number) && is_string($cleanData->member_number)) {
+                $cleanData->member_number = trim($cleanData->member_number);
             }
 
             // member_number-Duplikat prüfen (wenn angegeben)

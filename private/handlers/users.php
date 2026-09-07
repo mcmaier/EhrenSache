@@ -631,8 +631,15 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     break;
                 }
 
-                // Device Name
+                // Device Name — ein leerer oder reiner Whitespace-Name wird
+                // abgelehnt: der Geraetename ist der Ortsnachweis am Kiosk
+                // (E8), ein Name aus nur Leerzeichen waere effektiv keiner.
                 if(isset($data->device_name)) {
+                    if(!is_string($data->device_name) || trim($data->device_name) === '') {
+                        http_response_code(400);
+                        echo json_encode(["message" => "Gerätename erforderlich"]);
+                        break;
+                    }
                     $updateFields[] = "device_name = ?";
                     $updateParams[] = $data->device_name;
                 }

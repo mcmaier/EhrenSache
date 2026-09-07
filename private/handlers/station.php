@@ -9,6 +9,8 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+declare(strict_types=1);
+
 // ============================================
 // STATION Controller — virtuelle Station (Kiosk)
 // ============================================
@@ -38,6 +40,17 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
     if (!$device || (int) $device['is_active'] !== 1) {
         http_response_code(403);
         echo json_encode(["message" => "Device is inactive"]);
+        return;
+    }
+
+    // Ein Kiosk ohne Namen liefert keinen Ortsnachweis: der Geraetename ist
+    // an jedem Ein-/Ausstiegspunkt der Ort, der in records/work_sessions
+    // landet (E7, E8). Ohne diesen Riegel liesse sich ein Kiosk mit leerem
+    // Namen anlegen (oder auf leer aendern) und wuerde stillschweigend einen
+    // leeren Ort protokollieren.
+    if (trim((string) $device['device_name']) === '') {
+        http_response_code(409);
+        echo json_encode(["message" => "Device has no name"]);
         return;
     }
 
@@ -135,11 +148,21 @@ function stationTotp(array $device)
  * fehlende PIN, inaktives Mitglied und mehrdeutige Nummer dieselbe (E12).
  * Eine gesperrte Station wird als solche benannt — das verraet nichts ueber
  * Mitglieder und erspart fuenf Leuten die Suche nach dem eigenen Fehler.
+ *
+ * member_number und pin werden aus jedem skalaren JSON-Wert gelesen (nicht
+ * nur String): Ein Kiosk, der eine rein numerische Eingabe unbedacht als
+ * JSON-Zahl statt als String verschickt, soll deswegen nicht an einer
+ * verschaerften Typpruefung scheitern. Booleans zaehlen bewusst NICHT als
+ * skalare Eingabe hierfuer — true/false sind keine plausible Mitgliedsnummer
+ * oder PIN und wuerden sonst zu "1"/"" bzw. "" fehlinterpretiert.
  */
 function stationRequireMember($db, $database, array $device, $data): ?array
 {
-    $number = is_string($data->member_number ?? null) ? trim($data->member_number) : '';
-    $pin    = is_string($data->pin ?? null) ? $data->pin : '';
+    $rawNumber = $data->member_number ?? null;
+    $number    = (is_scalar($rawNumber) && !is_bool($rawNumber)) ? trim((string) $rawNumber) : '';
+
+    $rawPin = $data->pin ?? null;
+    $pin    = (is_scalar($rawPin) && !is_bool($rawPin)) ? (string) $rawPin : '';
 
     if ($number === '' || $pin === '') {
         http_response_code(400);
@@ -175,20 +198,28 @@ function stationRequireMember($db, $database, array $device, $data): ?array
 function stationIdentify($db, $database, array $device, array $member)
 {
     $prefix    = $database->table('');
-    $timestamp = (new DateTime())->format('Y-m-d H:i:s');
+    $timestamp = stationNow($db);
 
     $candidate = null;
     $matched   = findCheckinAppointment($db, $prefix, $member['member_id'], $timestamp,
                                         checkinToleranceHours($db, $database) * 3600);
     if ($matched !== null) {
-        $stmt = $db->prepare("SELECT record_id FROM {$prefix}records WHERE member_id = ? AND appointment_id = ?");
+        // status mitlesen statt nur record_id: "bereits eingecheckt" heisst
+        // konkret ein PRAESENTER Eintrag (K2) — ein entschuldigter Termin
+        // soll am Kiosk weiterhin als offen gelten, damit ein Mitglied, das
+        // doch noch kommt, sich einchecken kann. record_status geht
+        // unabhaengig davon mit, damit die PWA "entschuldigt" anzeigen kann.
+        $stmt = $db->prepare("SELECT status FROM {$prefix}records WHERE member_id = ? AND appointment_id = ?");
         $stmt->execute([$member['member_id'], $matched['appointment_id']]);
+        $existingStatus = $stmt->fetchColumn();
+
         $candidate = [
             'appointment_id'     => (int) $matched['appointment_id'],
             'title'              => $matched['title'],
             'date'               => $matched['date'],
             'start_time'         => $matched['start_time'],
-            'already_checked_in' => (bool) $stmt->fetchColumn(),
+            'already_checked_in' => $existingStatus === 'present',
+            'record_status'      => $existingStatus !== false ? (string) $existingStatus : null,
         ];
     }
 
@@ -228,7 +259,7 @@ function stationIdentify($db, $database, array $device, array $member)
 function stationCheckin($db, $database, array $device, array $member)
 {
     $prefix    = $database->table('');
-    $timestamp = (new DateTime())->format('Y-m-d H:i:s');
+    $timestamp = stationNow($db);
 
     $matched = findCheckinAppointment($db, $prefix, $member['member_id'], $timestamp,
                                       checkinToleranceHours($db, $database) * 3600);
@@ -243,12 +274,19 @@ function stationCheckin($db, $database, array $device, array $member)
                                  $timestamp, 'station_pin', $device['device_name'], $device['device_name']);
 
     $body = $result['body'];
-    $body['appointment'] = [
-        'appointment_id' => (int) $matched['appointment_id'],
-        'title'          => $matched['title'],
-        'date'           => $matched['date'],
-        'start_time'     => $matched['start_time'],
-    ];
+
+    // Bei 500 (INSERT fehlgeschlagen) gibt es keinen gesicherten Datensatz,
+    // zu dem ein Termin gehoert — der Body bleibt dann bei der reinen
+    // Fehlermeldung aus writeCheckinRecord() statt einen Termin zu behaupten,
+    // der gar nicht gespeichert wurde (K1).
+    if ($result['status'] !== 500) {
+        $body['appointment'] = [
+            'appointment_id' => (int) $matched['appointment_id'],
+            'title'          => $matched['title'],
+            'date'           => $matched['date'],
+            'start_time'     => $matched['start_time'],
+        ];
+    }
 
     http_response_code($result['status']);
     echo json_encode($body);
@@ -273,13 +311,32 @@ function stationWork($db, $database, array $device, array $member, string $actio
 
     // Nur activity_id wird durchgereicht. workSessionTargetMember() nimmt fuer
     // Geraete ohnehin $authMemberId — trotzdem kein fremdes Feld weiterleiten.
-    $payload = (object) ['activity_id' => $data->activity_id ?? null];
+    $rawActivityId = $data->activity_id ?? null;
+    $payload       = (object) ['activity_id' => $rawActivityId];
 
     switch ($action) {
         case 'work_start':
+            // activity_id muss eine positive Ganzzahl sein — als int oder als
+            // reine Ziffernfolge (JSON schickt Zahlen manchmal als String).
+            // Alles andere (Text, Array, Bool, negativ, null) wird VOR
+            // workSessionStart() abgewiesen: dort wuerde ein ungueltiger Wert
+            // still zu (int) 0 werden und als "Unknown activity_id" durchgehen
+            // statt den eigentlichen Eingabefehler zu benennen.
+            $isValidActivityId = (is_int($rawActivityId) && $rawActivityId > 0)
+                || (is_string($rawActivityId) && $rawActivityId !== '' && ctype_digit($rawActivityId)
+                    && (int) $rawActivityId > 0);
+
+            if (!$isValidActivityId) {
+                http_response_code(400);
+                echo json_encode(["message" => "activity_id must be a positive integer"]);
+                return;
+            }
+
             workSessionStart($db, $database, $payload, $deviceUserId, $memberId, $override);
             return;
         case 'work_pause':
+            // activity_id ist fuer Pause/Fortsetzen/Stopp irrelevant — es wird
+            // nichts davon gelesen, ein mitgeschickter Wert daher ignoriert.
             workSessionPause($db, $database, $payload, $deviceUserId, $memberId);
             return;
         case 'work_resume':
@@ -287,6 +344,10 @@ function stationWork($db, $database, array $device, array $member, string $actio
             return;
         case 'work_stop':
             workSessionStop($db, $database, $payload, $deviceUserId, $memberId, $override);
+            return;
+        default:
+            http_response_code(400);
+            echo json_encode(["message" => "Unknown action"]);
             return;
     }
 }

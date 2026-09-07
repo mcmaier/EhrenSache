@@ -25,6 +25,23 @@ const STATION_PIN_MEMBER_MAX_ATTEMPTS = 5;
 const STATION_PIN_DEVICE_MAX_ATTEMPTS = 30;
 const STATION_PIN_LOCK_SECONDS        = 900;
 
+/**
+ * Aktuelle Serverzeit als 'Y-m-d H:i:s', direkt aus der Datenbank statt aus
+ * PHP: Termine sind Wandzeit-Werte, workSessionStart() schreibt den Start
+ * mit MySQL NOW(). Eine Stationsfunktion, die stattdessen new DateTime()
+ * verwendet (PHP date.timezone, das nirgends per date_default_timezone_set()
+ * gesetzt wird), vergleicht gegen eine andere Uhr als Termine, Records und
+ * Sitzungen — bei einem Versatz zwischen PHP- und DB-Zeitzone koennte ein
+ * Check-in am Kiosk einen Termin verfehlen, den derselbe Termin fuer
+ * workSessionStart() trifft. Eine zusaetzliche Anfrage ist hier
+ * unproblematisch: identify()/checkin() laufen ohnehin schon mit mehreren
+ * Queries.
+ */
+function stationNow($db): string
+{
+    return (string) $db->query("SELECT NOW()")->fetchColumn();
+}
+
 /** Ist die PIN-Anmeldung an Stationen freigeschaltet? (E13) */
 function isStationPinEnabled($db, $database): bool
 {
@@ -121,9 +138,15 @@ function stationPinIsSequence(string $pin): bool
  * abgeschaltet, antwortet der Handler bereits mit 409, bevor diese Funktion
  * aufgerufen wird.
  *
- * Mehrdeutige Nummern (mehrfach vergeben) zählen bewusst nicht gegen den
- * Mitglieds-Zähler — es gibt keine eindeutige member_id, gegen die man
- * zählen könnte —, wohl aber gegen den Kiosk-Zähler.
+ * Ohne eindeutigen Treffer (unbekannte ODER mehrdeutige Nummer) gibt es
+ * keine member_id, gegen die man zählen könnte — dafür zählt ein solcher
+ * Versuch gegen einen eigenen Zähler je NUMMER (Schlüssel
+ * 'station_number_' . hash(Nummer)), mit demselben Limit und Fenster wie der
+ * Mitglieds-Zähler. Ohne das wäre eine unbekannte Nummer beliebig oft
+ * probierbar, während eine bekannte nach fünf Versuchen sperrt — der
+ * Unterschied selbst wäre ein Existenz-Orakel (E12): ein Angreifer könnte
+ * allein am Sperrverhalten erkennen, ob eine Nummer vergeben ist. Der
+ * Kiosk-Zähler zählt in jedem Fall mit.
  *
  * $failure: null | 'invalid' | 'ambiguous' | 'locked' | 'device_locked' — nur
  * für Logging und die Wahl des HTTP-Status. Die Meldung an den Kiosk ist für
@@ -159,6 +182,16 @@ function stationAuthenticate($db, $database, RateLimiter $limiter, int $deviceId
     if ($member !== null) {
         $memberKey = 'station_member_' . (int) $member['member_id'];
         if (!$limiter->check($memberKey, 'station_pin', STATION_PIN_MEMBER_MAX_ATTEMPTS, STATION_PIN_LOCK_SECONDS)) {
+            password_verify($pin, stationDummyHash());
+            $failure = 'locked';
+            return null;
+        }
+    } else {
+        // Unbekannte oder mehrdeutige Nummer: kein member_id, also ein
+        // Zaehler je Nummer statt je Mitglied — sonst bliebe eine unbekannte
+        // Nummer beliebig oft probierbar (E12, siehe Docblock).
+        $numberKey = 'station_number_' . hash('sha256', $memberNumber);
+        if (!$limiter->check($numberKey, 'station_pin', STATION_PIN_MEMBER_MAX_ATTEMPTS, STATION_PIN_LOCK_SECONDS)) {
             password_verify($pin, stationDummyHash());
             $failure = 'locked';
             return null;

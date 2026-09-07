@@ -618,6 +618,24 @@ test('users: device_type-Filter kennt kiosk', function () {
 
 // ---- Phase 2: identify / checkin -------------------------------------------
 
+/**
+ * T4: haelt fest, ob stationAppointment() diesen Lauf tatsaechlich etwas
+ * angelegt hat — nach demselben Muster wie stationSessionId(). Der
+ * Aufraeum-Test darf stationAppointment() nicht blind aufrufen: wuerde
+ * dieser Test als allererster in der Datei laufen (z. B. gezielt einzeln
+ * gestartet), legte er Termin und Terminart erst dort an, nur um sie
+ * sofort wieder zu loeschen — funktional harmlos, aber irrefuehrend als
+ * "Aufraeumen".
+ */
+function stationAppointmentBuilt(?bool $set = null): bool
+{
+    static $built = false;
+    if ($set !== null) {
+        $built = $set;
+    }
+    return $built;
+}
+
 /** Termin JETZT mit eigener, gruppenfreier Terminart — beides wird aufgeraeumt. */
 function stationAppointment(): array
 {
@@ -639,6 +657,8 @@ function stationAppointment(): array
                     'date' => date('Y-m-d'), 'start_time' => date('H:i:s')],
     ]);
     assertStatus(201, $res, 'Termin konnte nicht angelegt werden');
+
+    stationAppointmentBuilt(true);
 
     return $apt = ['appointment_id' => (int) $res['body']['id'], 'type_id' => $typeId];
 }
@@ -668,6 +688,16 @@ test('station: identify liefert Mitglied, Terminkandidat und Zeiterfassungsstand
     assertTrue($res['body']['checkin_candidate'] !== null, 'Terminkandidat erwartet');
     assertSame(stationAppointment()['appointment_id'], (int) $res['body']['checkin_candidate']['appointment_id']);
     assertSame(false, $res['body']['checkin_candidate']['already_checked_in']);
+    assertSame(null, $res['body']['checkin_candidate']['record_status'], 'noch kein Record vorhanden');
+});
+
+// K4: member_number/pin duerfen auch als skalarer JSON-Nicht-String kommen.
+// Die Mitgliedsnummer beginnt mit "ST" (nie rein numerisch) — getestet wird
+// daher die PIN als JSON-Zahl.
+test('station: identify akzeptiert die PIN als JSON-Zahl statt als String', function () {
+    $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => 2580]);
+    assertStatus(200, $res);
+    assertSame('Kiosk', $res['body']['member']['name']);
 });
 
 test('station: checkin schreibt einen Record mit Quelle station_pin', function () {
@@ -680,6 +710,7 @@ test('station: checkin schreibt einen Record mit Quelle station_pin', function (
 
     $again = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
     assertSame(true, $again['body']['checkin_candidate']['already_checked_in']);
+    assertSame('present', $again['body']['checkin_candidate']['record_status']);
 });
 
 test('station: zweiter checkin ist unchanged', function () {
@@ -700,6 +731,21 @@ test('station: Sperre nach fuenf Fehlversuchen, Admin-PIN hebt sie auf', functio
     assertStatus(200, stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']));
 });
 
+// W2/E12: Eine unbekannte Nummer hat keine member_id und damit keinen
+// Mitglieds-Zaehler — sie muss trotzdem nach fuenf Versuchen sperren, sonst
+// waere das Sperrverhalten selbst ein Existenz-Orakel (bekannte Nummer
+// sperrt, unbekannte nicht). Frische, zufaellige Nummer, damit dieser Test
+// unabhaengig von anderen Laeufen ist.
+test('station: unbekannte Nummer sperrt nach fuenf Fehlversuchen wie eine bekannte', function () {
+    $number = 'NX' . uniqid();
+    for ($i = 0; $i < 5; $i++) {
+        assertStatus(401, stationPost('identify', ['member_number' => $number, 'pin' => '0001']));
+    }
+    $res = stationPost('identify', ['member_number' => $number, 'pin' => '0001']);
+    assertStatus(423, $res, 'sechster Versuch auf dieselbe unbekannte Nummer muss gesperrt sein');
+    assertSame('Too many attempts', $res['body']['message']);
+});
+
 test('station: identify bei abgeschalteter PIN-Anmeldung → 409', function () {
     stationSetSetting('station_pin_enabled', '0');
     try {
@@ -713,9 +759,26 @@ test('station: identify bei abgeschalteter PIN-Anmeldung → 409', function () {
 // ---- Phase 2: Arbeitszeit am Kiosk ------------------------------------------
 
 /**
+ * T4: haelt fest, ob stationWorkFixture() diesen Lauf tatsaechlich etwas
+ * angelegt hat — nach demselben Muster wie stationSessionId().
+ */
+function stationWorkFixtureBuilt(?bool $set = null): bool
+{
+    static $built = false;
+    if ($set !== null) {
+        $built = $set;
+    }
+    return $built;
+}
+
+/**
  * Gruppe + Taetigkeitsart (Nachweis 'start') fuer das Testmitglied. Am Kiosk
  * gilt der Kiosk-Name als Ortsnachweis (E8), darum darf die nachweispflichtige
  * Art ohne TOTP-Code starten.
+ *
+ * T2: schaltet worktime_enabled EIN und laesst es an — wie enableStationPin()
+ * bleibt das fuer die Entwicklungsinstanz bestehen, es wird bewusst nirgends
+ * wieder zurueckgesetzt.
  *
  * @return array{group_id: int, activity_id: int}
  */
@@ -749,6 +812,8 @@ function stationWorkFixture(): array
     ]);
     assertStatus(201, $activity, 'Taetigkeitsart konnte nicht angelegt werden');
 
+    stationWorkFixtureBuilt(true);
+
     return $fx = ['group_id' => $groupId, 'activity_id' => (int) $activity['body']['id']];
 }
 
@@ -778,7 +843,23 @@ test('station: identify nennt die erlaubten Taetigkeitsarten', function () {
 });
 
 test('station: work_start ohne activity_id → 400', function () {
+    stationWorkFixture();   // T5: darf nicht von der Reihenfolge anderer Tests abhaengen
     assertStatus(400, stationPost('work_start', stationCreds()));
+});
+
+// W3: activity_id muss eine positive Ganzzahl sein (int oder Ziffernstring).
+test('station: work_start mit activity_id als Text → 400', function () {
+    stationWorkFixture();
+    $res = stationPost('work_start', stationCreds() + ['activity_id' => 'abc']);
+    assertStatus(400, $res);
+    assertSame('activity_id must be a positive integer', $res['body']['message']);
+});
+
+test('station: work_start mit activity_id als Array → 400', function () {
+    stationWorkFixture();
+    $res = stationPost('work_start', stationCreds() + ['activity_id' => [1]]);
+    assertStatus(400, $res);
+    assertSame('activity_id must be a positive integer', $res['body']['message']);
 });
 
 test('station: work_start startet mit Quelle station und Kiosk als Ort', function () {
@@ -789,6 +870,9 @@ test('station: work_start startet mit Quelle station und Kiosk als Ort', functio
     assertSame('station', $s['source']);
     assertSame(kioskDevice()['device_name'], $s['start_location_name']);
     assertSame('confirmed', $s['status']);
+    // T3: created_by muss das Kiosk-Geraet sein, nie das Mitglied selbst —
+    // die member_id stammt aus der PIN-Pruefung, nicht aus dem Request.
+    assertSame(kioskDevice()['user_id'], (int) $s['created_by']);
     stationSessionId((int) $s['session_id']);
 });
 
@@ -893,17 +977,26 @@ test('station: Aufraeumen — Kiosk loeschen', function () {
         assertStatus(200, apiRequest('DELETE', 'work_sessions', ['token' => apiToken('admin'),
                                                                  'query' => ['id' => stationSessionId()]]));
     }
-    $fx = stationWorkFixture();
-    assertStatus(200, apiRequest('DELETE', 'activity_types', ['token' => apiToken('admin'),
-                                                              'query' => ['id' => $fx['activity_id']]]));
-    assertStatus(200, apiRequest('DELETE', 'member_groups', ['token' => apiToken('admin'),
-                                                             'query' => ['id' => $fx['group_id']]]));
 
-    $apt = stationAppointment();
-    assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'),
-                                                            'query' => ['id' => $apt['appointment_id']]]));
-    assertStatus(200, apiRequest('DELETE', 'appointment_types', ['token' => apiToken('admin'),
-                                                                 'query' => ['id' => $apt['type_id']]]));
+    // T4: nur aufraeumen, was dieser Lauf tatsaechlich angelegt hat — ein
+    // blinder Aufruf von stationWorkFixture()/stationAppointment() wuerde
+    // an dieser Stelle sonst selbst noch etwas anlegen, nur um es sofort
+    // wieder zu loeschen.
+    if (stationWorkFixtureBuilt()) {
+        $fx = stationWorkFixture();
+        assertStatus(200, apiRequest('DELETE', 'activity_types', ['token' => apiToken('admin'),
+                                                                  'query' => ['id' => $fx['activity_id']]]));
+        assertStatus(200, apiRequest('DELETE', 'member_groups', ['token' => apiToken('admin'),
+                                                                 'query' => ['id' => $fx['group_id']]]));
+    }
+
+    if (stationAppointmentBuilt()) {
+        $apt = stationAppointment();
+        assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'),
+                                                                'query' => ['id' => $apt['appointment_id']]]));
+        assertStatus(200, apiRequest('DELETE', 'appointment_types', ['token' => apiToken('admin'),
+                                                                     'query' => ['id' => $apt['type_id']]]));
+    }
 
     $m = apiRequest('DELETE', 'members', [
         'token' => apiToken('admin'),

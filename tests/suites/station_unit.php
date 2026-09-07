@@ -332,4 +332,44 @@ if (!extension_loaded('pdo_sqlite')) {
         assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '', '', $failure));
         assertSame('invalid', $failure);
     });
+
+    // ---- stationAuthenticate: Existenz-Orakel durch den Mitglieds-Zaehler (W2/E12) ----
+    // Ohne member_id gibt es keinen Mitglieds-Zaehler — eine unbekannte oder
+    // mehrdeutige Nummer muss deshalb trotzdem nach fuenf Versuchen sperren,
+    // sonst waere das Sperrverhalten selbst ein Existenz-Orakel.
+
+    test('stationAuthenticate sperrt eine unbekannte Nummer nach fuenf Fehlversuchen wie ein Mitglied', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        for ($i = 0; $i < 5; $i++) {
+            assertSame(null, stationAuthenticate($db, $database, $limiter, 1, 'unbekannt-xyz', '0001', $failure));
+            assertSame('invalid', $failure, "Versuch " . ($i + 1));
+        }
+        // Sechster Versuch: dieselbe unbekannte Nummer ist jetzt gesperrt.
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, 'unbekannt-xyz', '0001', $failure));
+        assertSame('locked', $failure);
+    });
+
+    test('stationAuthenticate sperrt eine mehrdeutige Nummer nach fuenf Fehlversuchen wie ein Mitglied', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        for ($i = 0; $i < 5; $i++) {
+            assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '400', '0001', $failure));
+            assertSame('ambiguous', $failure, "Versuch " . ($i + 1));
+        }
+        // Sechster Versuch: sogar mit der richtigen PIN eines der beiden
+        // Mitglieder ist die NUMMER gesperrt, bevor ueberhaupt geprueft wird.
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '400', '2580', $failure));
+        assertSame('locked', $failure);
+    });
+
+    test('stationAuthenticate: eine unbekannte Nummer sperrt eine andere unbekannte Nummer nicht mit', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        for ($i = 0; $i < 5; $i++) {
+            stationAuthenticate($db, $database, $limiter, 1, 'nummer-a', '0001', $failure);
+        }
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, 'nummer-a', '0001', $failure));
+        assertSame('locked', $failure, 'nummer-a muss gesperrt sein');
+
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, 'nummer-b', '0001', $failure));
+        assertSame('invalid', $failure, 'nummer-b ist von der Sperre auf nummer-a nicht betroffen');
+    });
 }
