@@ -868,10 +868,50 @@ in `assets`, der anschlägt, sobald in `api.js` wieder ein Bearer-Header direkt 
 `sessionStorage` gebaut wird. Der Wächter ist gegengeprüft: Mit der alten Fassung von
 `api.js` schlägt er fehl.
 
-**Offen: Import.** Er war von dieser Ursache **nicht** betroffen — die Import-Aufrufe nutzen
+**Import.** Von dieser Ursache **nicht** betroffen — die Import-Aufrufe nutzen
 `credentials: 'same-origin'` und schicken den CSRF-Token im FormData, ohne
-`getAuthHeaders()`. Getestet ist er damit trotzdem nicht, und der Abgleich, dass exportierte
-Daten unverändert wieder importierbar sind, steht weiterhin aus.
+`getAuthHeaders()`. Am 2026-09-07 mit je einem Datensatz manuell geprüft: funktioniert.
+
+---
+
+**Der eigentliche Punkt: Export und Import passten nicht zusammen** (behoben am 2026-09-07)
+
+Die Anforderung hinter diesem Eintrag ist der Round-Trip — ein exportiertes CSV soll ohne
+Umbau wieder importierbar sein. Zwei Spaltennamen standen dem im Weg:
+
+| Bereich | Export schrieb | Import verlangt |
+|---|---|---|
+| Termine | `type` | `type_name` |
+| Anwesenheiten | `arrival_time` | `arrival_date_time` |
+
+Beide Male wurde die Datei mit „missing required columns" abgewiesen, bevor eine Zeile
+gelesen war. **Mitglieder waren immer schon round-trip-fähig**, auch die Gruppen: Der Export
+verkettet mit `GROUP_CONCAT(… SEPARATOR '|')`, der Import zerlegt mit `explode('|', …)`.
+
+Die **Reihenfolge** der Spalten spielt keine Rolle und tat es nie — der Import bildet mit
+`array_combine($header, $data)` ab und liest nach Namen. Zusatzspalten wie `groups` im
+Termin-Export oder `checkin_source` im Anwesenheits-Export werden ignoriert.
+
+**Gelöst durch Angleichung des Exports** an die Namen des Imports; die sind die präziseren
+(`type_name` ist auch die Spalte in der Datenbank, `arrival_date_time` sagt, dass Datum und
+Uhrzeit darinstehen). Der Import akzeptiert die alten Namen weiter als Zweitnamen, damit
+archivierte Dateien einlesbar bleiben.
+
+Abgesichert durch die neue Suite `export_import`: Sie ruft die drei Exporte ab und hält die
+Kopfzeile gegen die Pflichtspalten des Imports — rein lesend, ohne Importlauf, weil ein
+Test, der Datensätze anlegt, nicht in einen beiläufig gestarteten Durchlauf gehört.
+Gegengeprüft: Mit der alten Fassung von `export.php` schlagen genau die zwei betroffenen
+Fälle fehl, Mitglieder bleiben grün.
+
+**Weiterhin offen: Der Reimport von Anwesenheiten trifft den Termin nicht sicher.**
+`importRecords()` ordnet über zeitliche Nähe zu (`ABS(TIMESTAMPDIFF(MINUTE, …))` in einem
+Fenster) und wertet die exportierten Spalten `appointment_date` und `appointment_title`
+nicht aus. Für einen Umzug zwischen Installationen ist das richtig — Termin-IDs passen dort
+ohnehin nicht. Im selben System heißt es aber: Liegen mehrere Termine im Fenster, etwa Probe
+und Vorstandssitzung am selben Abend, kann ein reimportierter Eintrag an einem **anderen**
+Termin landen als dem, aus dem er stammt. Das behebt kein Spaltenname; es verlangt eine
+Entscheidung, ob der Export einen stabilen Terminschlüssel mitführen soll und wie der sich
+beim Umzug verhält.
 
 ---
 

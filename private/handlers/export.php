@@ -118,7 +118,12 @@ function exportAppointments($db, $database) {
     echo "\xEF\xBB\xBF";
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['date', 'start_time', 'title', 'type', 'groups', 'description'], ';');
+    // Spaltennamen sind die Schnittstelle zum Import: importAppointments()
+    // verlangt 'type_name'. Hier stand 'type', wodurch ein exportiertes CSV
+    // beim Reimport mit "missing required columns" abgewiesen wurde, bevor
+    // eine Zeile gelesen war. Reihenfolge und Zusatzspalten sind egal — der
+    // Import liest ueber array_combine() nach Namen. Siehe OI-24.
+    fputcsv($output, ['date', 'start_time', 'title', 'type_name', 'groups', 'description'], ';');
     
     foreach ($appointments as $apt) {
         fputcsv($output, [
@@ -158,7 +163,11 @@ function exportRecords($db, $database) {
     echo "\xEF\xBB\xBF";
     
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['member_name', 'member_surname', 'member_number', 'appointment_date', 'appointment_title', 'arrival_time', 'status', 'checkin_source'], ';');
+    // 'arrival_date_time' statt 'arrival_time': So heisst die Pflichtspalte in
+    // importRecords(), und der Name trifft es besser — die Spalte fuehrt Datum
+    // UND Uhrzeit. Siehe OI-24.
+    fputcsv($output, ['member_name', 'member_surname', 'member_number', 'appointment_date',
+                      'appointment_title', 'arrival_date_time', 'status', 'checkin_source'], ';');
     
     foreach ($records as $record) {
         fputcsv($output, [

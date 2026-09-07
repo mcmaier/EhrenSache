@@ -25,6 +25,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Der Termin-Export lud Fehlermeldungen als CSV-Datei herunter.** Ihm fehlte die Prüfung
   auf `response.ok`, sodass der Fehlerkörper zum Blob wurde und als `.csv` mit JSON darin
   auf der Platte landete.
+- **Exportierte CSV-Dateien ließen sich nicht wieder importieren.** Der Termin-Export
+  schrieb die Spalte `type`, der Import verlangt `type_name`; beim Anwesenheits-Export hieß
+  die Spalte `arrival_time` statt `arrival_date_time`. Beide Dateien wurden mit „missing
+  required columns" abgewiesen, bevor eine Zeile gelesen war. Der Export nutzt jetzt die
+  Namen des Imports; der Import akzeptiert die alten weiter, damit archivierte Dateien
+  einlesbar bleiben. Mitglieder-Exporte waren nie betroffen. Siehe OI-24
 - **Mitgliedsfilter der Zeiterfassung war beim ersten Öffnen leer.** Die Auswahl wurde aus
   dem Mitglieder-Cache aufgebaut, den der Bereichswechsel erst 500 ms später im Hintergrund
   füllt. Filterleiste und Nachtrags-Dialog laden die Liste jetzt selbst (`loadMembers()`)

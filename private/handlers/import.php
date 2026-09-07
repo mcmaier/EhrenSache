@@ -336,7 +336,14 @@ function importAppointments($db, $database, $filePath) {
     
     // Header-Zeile einlesen
     $header = fgetcsv($handle, 0, ';');
-    if (!$header || !in_array('date', $header) || !in_array('start_time', $header) || !in_array('title', $header) || !in_array('type_name', $header)) {
+
+    // 'type' wird als Zweitname akzeptiert: So hiess die Spalte im Export bis
+    // 1.3.1, und solche Dateien sollen einlesbar bleiben. Der Export schreibt
+    // seither 'type_name' — siehe OI-24.
+    $hasType = $header && (in_array('type_name', $header) || in_array('type', $header));
+
+    if (!$header || !in_array('date', $header) || !in_array('start_time', $header)
+        || !in_array('title', $header) || !$hasType) {
         fclose($handle);
         return ["success" => false, "message" => "Invalid CSV format - missing required columns (date, start_time, title, type_name)"];
     }
@@ -372,12 +379,16 @@ function importAppointments($db, $database, $filePath) {
             
             // CSV zu assoziativem Array
             $row = array_combine($header, $data);
-            
+
+            // Zweitname 'type' fuer Dateien aus Exporten bis 1.3.1
+            $typeName = $row['type_name'] ?? ($row['type'] ?? '');
+
             // Validierung
-            if (empty($row['date']) || empty($row['start_time']) || empty($row['title']) || empty($row['type_name'])) {
+            if (empty($row['date']) || empty($row['start_time']) || empty($row['title']) || empty($typeName)) {
                 $errors[] = "Row $rowNumber: date, start_time, title and type_name required";
                 continue;
             }
+            $row['type_name'] = $typeName;
             
             $date = trim($row['date']);
             $startTime = trim($row['start_time']);
@@ -482,7 +493,11 @@ function importRecords($db, $database, $filePath) {
     
     // Header-Zeile einlesen
     $header = fgetcsv($handle, 0, ';');
-    if (!$header || !in_array('member_number', $header) || !in_array('arrival_date_time', $header)) {
+
+    // 'arrival_time' als Zweitname: So hiess die Spalte im Export bis 1.3.1.
+    $hasArrival = $header && (in_array('arrival_date_time', $header) || in_array('arrival_time', $header));
+
+    if (!$header || !in_array('member_number', $header) || !$hasArrival) {
         fclose($handle);
         return ["success" => false, "message" => "Invalid CSV format - missing required columns (member_number, arrival_date_time)"];
     }
@@ -512,7 +527,10 @@ function importRecords($db, $database, $filePath) {
 
             // CSV zu assoziativem Array
             $row = array_combine($header, $data);
-            
+
+            // Zweitname 'arrival_time' fuer Dateien aus Exporten bis 1.3.1
+            $row['arrival_date_time'] = $row['arrival_date_time'] ?? ($row['arrival_time'] ?? '');
+
             // Validierung
             if (empty($row['member_number']) || empty($row['arrival_date_time'])) {
                 $errors[] = "Row $rowNumber: member_number and arrival_date_time required";
