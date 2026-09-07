@@ -23,6 +23,8 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
 
+[hidden] { display: none !important; }
+
 html, body {
     height: 100%;
     overflow: hidden;
@@ -33,12 +35,16 @@ html, body {
 }
 
 .screen { display: none; height: 100%; padding: 24px; }
-.screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; overflow-y: auto; }
 
 .banner {
     position: fixed; top: 0; left: 0; right: 0; z-index: 10;
     padding: 12px 24px; text-align: center; color: #fff; background: var(--error); font-weight: 600;
 }
+
+/* #banner steht im Markup vor allen .screen-Sektionen: Geschwisterselektor verschiebt
+   den Inhalt nach unten, solange das Banner sichtbar ist, statt ihn zu verdecken. */
+.banner:not([hidden]) ~ .screen.active { padding-top: 80px; }
 
 .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
 .card.narrow { width: min(560px, 100%); }
@@ -92,7 +98,7 @@ label { display: block; margin: 12px 0; }
 .keypad button:active { background: var(--border); }
 
 /* Aktion */
-.action { width: min(960px, 100%); }
+.action { width: min(960px, 100%); max-height: 100%; }
 .action h2 { margin-bottom: 16px; }
 .cards { display: flex; gap: 20px; }
 .cards > .card { flex: 1; }
@@ -108,3 +114,7 @@ label { display: block; margin: 12px 0; }
     .idle-main, .cards { flex-direction: column; }
     html { font-size: 17px; }
 }
+
+/* Boot-Fallback: sichtbar, bis app.js eine Sektion aktiviert (siehe index.html) */
+.screen.active ~ #bootFallback,
+body:has(.screen.active) #bootFallback { display: none; }
