@@ -911,3 +911,48 @@ Manuell im Dashboard:
 | ST-8 | Selbstauskunft herunterladen (JSON und CSV) | `has_pin` und `pin_updated_at` bzw. Zeilen „Stations-PIN gesetzt"/„PIN zuletzt geändert", kein Hash |
 | ST-9 | Neues Mitglied mit ungültiger PIN anlegen | Mitglied wird angelegt, Modal bleibt im Bearbeiten-Modus offen, Fehlertoast zur PIN |
 | ST-10 | Im selben Browser erst `station/` mit Token aufrufen, dann am Dashboard anmelden | Dashboard bleibt nutzbar, kein 401 nach dem Login |
+
+---
+
+## 21. Sitzungswechsel in der PWA und Mitgliedsfilter (seit 1.3.1)
+
+Drei Fehlerbilder aus 1.3.1, die alle davon leben, dass die PWA ohne Reload weiterläuft
+und der Bereichswechsel im Dashboard seine Daten im Hintergrund nachlädt. Ein Reload
+verdeckt sie — deshalb steht in jedem Testfall, ob nachgeladen werden darf.
+
+Automatisiert: `php tests/run.php worktime_frontend` (statische Gegenproben) und
+`php tests/run.php worktime_api`.
+
+### Mitgliedsfilter der Zeiterfassung (Dashboard)
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| MF-1 | Als Admin anmelden und **als Erstes** die Zeiterfassung öffnen, ohne vorher die Mitgliederliste zu besuchen | Der Filter „Mitglied" ist gefüllt, nicht nur „Alle Mitglieder" |
+| MF-2 | Im selben Zug „Zeit nachtragen" öffnen | Die Mitgliedsauswahl im Dialog ist gefüllt; Mitglieder ohne Mitgliedschaft im gewählten Jahr fehlen |
+| MF-3 | Ein Mitglied im Filter wählen | Tabelle und Kennzahl „bestätigte Stunden" zeigen nur dessen Einträge |
+| MF-4 | Jahr wechseln, danach den Filter aufklappen | Auswahl passt zum neuen Jahr, ausgetretene Mitglieder tragen „(inaktiv)" |
+| MF-5 | Als Manager statt Admin | Gleiches Verhalten; als einfaches Mitglied ist der Filter gar nicht sichtbar |
+
+### Verlauf der Check-in-PWA
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| PV-1 | Als **Admin** in der PWA anmelden, Verlauf öffnen | Ausschließlich eigene Arbeitszeiten — die Gesamtübersicht gibt es nur im Dashboard |
+| PV-2 | Dasselbe als Manager | Ebenfalls nur eigene Einträge |
+| PV-3 | Als Admin abmelden, als einfaches Mitglied anmelden, **ohne Reload** in den Verlauf | Kein Eintrag des Admins; die Zeitachse gehört dem neu angemeldeten Mitglied |
+| PV-4 | Nach dem Abmelden, **ohne Reload** | Die App startet im Erfassen-Tab, nicht im zuletzt geöffneten; Statistik und Anwesenheitsliste sind leer |
+| PV-5 | Abmelden während einer laufenden Sitzung, neu anmelden | Die Leiste über der Tab-Leiste zeigt keine fremde Sitzung mehr |
+
+### Doppelt gebundene Ereignisse (Check-in-PWA)
+
+> Alle Fälle brauchen **denselben Reiter ohne Reload**: anmelden → abmelden → wieder anmelden.
+> Genau dieser Zyklus hat die Ereignisse zuvor ein zweites Mal angehängt.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| DE-1 | Nach dem Zyklus eine Zeiterfassung starten | Genau eine Sitzung; kein Fehlertoast „Es läuft bereits eine Zeiterfassung" |
+| DE-2 | Sitzung beenden | Läuft einmal durch, keine zweite fehlschlagende Anfrage |
+| DE-3 | In der Statistik einmal auf „◀" oder „▶" | Das Jahr ändert sich um **eins** |
+| DE-4 | Auf „Verlauf" und „Statistik" wechseln | Im `debug.log` je eine „Loading …"-Zeile, nicht zwei |
+| DE-5 | Als Verwalter einen Termin über die Anwesenheitsliste anlegen | Der Termin entsteht **einmal** |
+| DE-6 | „Ohne Ortsnachweis beenden" antippen | Ein Bestätigungsdialog, nicht zwei übereinander |
