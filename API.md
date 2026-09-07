@@ -1485,18 +1485,52 @@ Ein Monat ist damit kein eigener Parameter, sondern ein Zeitraum:
 ---
 
 ### Import
-Importiert Daten aus Excel-Datei.
+Liest eine CSV-Datei ein. Ein Export dieser Anwendung ist ohne Umbau wieder importierbar —
+Spaltenreihenfolge spielt keine Rolle, gelesen wird nach Namen, und unbekannte Spalten werden
+übergangen.
 
 **Endpoint:** `POST /api.php?resource=import`
 
-**Berechtigung:** Admin/Manager
+**Berechtigung:** Admin
 
 **Content-Type:** `multipart/form-data`
 
 **Form-Data:**
-- `file`: CSV-Datei
-- `type`: `members`, `appointments`
-- `csrf_token`: CSRF-Token
+
+| Feld | Bedeutung |
+|---|---|
+| `file` | CSV-Datei, höchstens 5 MB |
+| `type` | `members`, `appointments`, `records`, `extract_appointments` |
+| `csrf_token` | CSRF-Token |
+| `create_missing_appointments` | nur bei `records`, siehe unten |
+| `min_records`, `round_minutes`, `tolerance_hours` | nur bei `extract_appointments` |
+
+**Pflichtspalten**
+
+| `type` | verlangt |
+|---|---|
+| `members` | `name`, `surname` |
+| `appointments` | `date`, `start_time`, `title`, `type_name` |
+| `records` | `member_number`, `arrival_date_time` |
+
+Die früheren Namen `type` und `arrival_time` werden weiterhin akzeptiert, damit archivierte
+Exporte einlesbar bleiben.
+
+**Terminzuordnung bei `records`**
+
+Führt die Datei `appointment_date`, `appointment_start_time` und `appointment_type` — wie der
+Export dieser Anwendung —, wird der Termin darüber **exakt** bestimmt. Das ist derselbe
+Schlüssel, an dem die Anwendung Termine unterscheidet: Zwei Termine derselben Art im
+Toleranzfenster gelten als Konflikt, zwei verschiedene Arten am selben Abend nicht.
+
+Fehlen die Spalten, sucht der Import den zeitlich nächsten Termin im Fenster von
+`AUTO_CHECKIN_TOLERANCE_HOURS`. Das ist der richtige Weg für Daten aus einem Fremdsystem,
+kann aber bei zwei Terminen am selben Abend den anderen treffen.
+
+`create_missing_appointments=1` legt einen fehlenden Termin an — nur bei vollständigem
+Schlüssel, und nur wenn die Terminart im Ziel bereits existiert. Standardmäßig aus: Ein
+Import, der stillschweigend Termine anlegt, macht aus einem Tippfehler im Datum eine
+Karteileiche.
 
 **Response:**
 ```json
@@ -1564,10 +1598,18 @@ Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
 **Request:**
 ```json
 {
+  "updated": 3,
+  "skipped": 0,
+  "appointments_created": 0,
   "setting_key": "org_name",
   "setting_value": "Neuer Vereinsname"
 }
 ```
+**`type=extract_appointments` schreibt nicht.** Es liest nur `arrival_date_time`, gruppiert
+die Zeitstempel und **schlägt** Termine vor — für den Fall, dass eine Anwesenheitsdatei aus
+einem System kommt, das gar keine Termine kennt. Die Antwort enthält `suggestions` mit Datum,
+gerundeter Startzeit und Anzahl der Einträge; angelegt wird nichts.
+
 
 ---
 

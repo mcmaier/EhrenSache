@@ -903,15 +903,48 @@ Test, der Datensätze anlegt, nicht in einen beiläufig gestarteten Durchlauf ge
 Gegengeprüft: Mit der alten Fassung von `export.php` schlagen genau die zwei betroffenen
 Fälle fehl, Mitglieder bleiben grün.
 
-**Weiterhin offen: Der Reimport von Anwesenheiten trifft den Termin nicht sicher.**
-`importRecords()` ordnet über zeitliche Nähe zu (`ABS(TIMESTAMPDIFF(MINUTE, …))` in einem
-Fenster) und wertet die exportierten Spalten `appointment_date` und `appointment_title`
-nicht aus. Für einen Umzug zwischen Installationen ist das richtig — Termin-IDs passen dort
-ohnehin nicht. Im selben System heißt es aber: Liegen mehrere Termine im Fenster, etwa Probe
-und Vorstandssitzung am selben Abend, kann ein reimportierter Eintrag an einem **anderen**
-Termin landen als dem, aus dem er stammt. Das behebt kein Spaltenname; es verlangt eine
-Entscheidung, ob der Export einen stabilen Terminschlüssel mitführen soll und wie der sich
-beim Umzug verhält.
+**Terminzuordnung beim Reimport** (gelöst am 2026-09-07)
+
+`importRecords()` ordnete allein über zeitliche Nähe zu und konnte deshalb Probe und
+Vorstandssitzung am selben Abend verwechseln.
+
+Der Schlüssel dafür musste nicht erfunden werden — die Anwendung hat ihn: Beim Anlegen weist
+`appointments.php` einen Termin **dieser Art** im Toleranzfenster als Konflikt ab, während
+zwei verschiedene Arten am selben Abend erlaubt sind. Termin-Identität ist also
+**Art + Datum + Startzeit**. Genau die Art fehlte der Zuordnung; sie nutzte nur die Hälfte
+des Merkmals, an dem die Anwendung selbst Termine unterscheidet.
+
+`appointment_id` schied aus: beim Umzug in eine andere Installation bedeutungslos.
+`appointment_title` ebenfalls — zwei Proben heißen beide „Probe"; ein Titel benennt, er
+identifiziert nicht. Er dient nur zum Anlegen.
+
+Der Export führt deshalb zusätzlich `appointment_start_time` und `appointment_type`. Der
+Import steigt ab:
+
+1. **Exakt** über Datum + Startzeit + Terminart, wenn die Spalten vorhanden sind
+2. **Zeitliche Nähe** wie bisher — für ältere Dateien und Fremdsysteme, die keine zu unseren
+   passende Terminart kennen
+3. **Anlegen**, nur mit `create_missing_appointments` und nur bei vollständigem Schlüssel
+
+**Verhältnis zu `extract_appointments`** — geklärt, weil beide nach „Termine aus einer
+Anwesenheitsdatei" aussehen:
+
+| | `extract_appointments` | Stufe 3 des Record-Imports |
+|---|---|---|
+| Eingabe | nur `arrival_date_time` | mitgelieferter Schlüssel |
+| Verfahren | raten: clustern, runden, Schwellwert ≥ 5 | übernehmen |
+| Ergebnis | **Vorschläge, kein Schreibzugriff** | Termin wird angelegt |
+| Wofür | Termine sind unbekannt und sollen rekonstruiert werden | Termine sind bekannt und fehlen nur im Ziel |
+
+Sie überschneiden sich nicht, und nur einer der beiden Wege schreibt überhaupt.
+`extractAppointments()` enthält kein einziges `INSERT` — ein Test hält das fest, damit die
+Arbeitsteilung nicht unbemerkt verwischt.
+
+**Restrisiko, bewusst getragen:** Heißt eine Terminart im Zielsystem anders („Gesamtprobe"
+statt „Probe"), greift Stufe 1 nicht und es geht auf Stufe 2 — also auf das bisherige
+Verhalten, nicht schlechter. Wird ein Termin nachträglich um Stunden verschoben, findet ihn
+weder Stufe 1 noch die Toleranz. Der Schlüssel ist genau so belastbar wie die Regel, mit der
+die Anwendung ohnehin arbeitet.
 
 ---
 

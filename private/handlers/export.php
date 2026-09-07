@@ -145,13 +145,23 @@ function exportRecords($db, $database) {
 
     $prefix = $database->table('');
     
+    // Startzeit und Terminart gehen mit, damit der Reimport den Termin exakt
+    // trifft statt ihn ueber zeitliche Naehe zu raten. Zusammen mit dem Datum
+    // sind sie der Schluessel, den die Anwendung ohnehin verwendet: Beim
+    // Anlegen weist appointments.php einen Termin *dieser Art* im Toleranz-
+    // fenster als Konflikt ab. Zwei Arten am selben Abend sind dagegen
+    // erlaubt — und genau die konnte der Import bisher nicht unterscheiden.
+    // Der Titel identifiziert nicht (zwei Proben heissen beide "Probe"), er
+    // dient nur zum Anlegen. Siehe OI-24.
     $stmt = $db->prepare("
         SELECT r.record_id, r.arrival_time, r.status, r.checkin_source,
                m.name, m.surname, m.member_number,
-               a.date as appointment_date, a.title as appointment_title
+               a.date as appointment_date, a.start_time as appointment_start_time,
+               a.title as appointment_title, at.type_name as appointment_type
         FROM {$prefix}records r
         JOIN {$prefix}members m ON r.member_id = m.member_id
         JOIN {$prefix}appointments a ON r.appointment_id = a.appointment_id
+        LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
         WHERE YEAR(a.date) = ?
         ORDER BY a.date, r.arrival_time
     ");
@@ -167,14 +177,17 @@ function exportRecords($db, $database) {
     // importRecords(), und der Name trifft es besser — die Spalte fuehrt Datum
     // UND Uhrzeit. Siehe OI-24.
     fputcsv($output, ['member_name', 'member_surname', 'member_number', 'appointment_date',
-                      'appointment_title', 'arrival_date_time', 'status', 'checkin_source'], ';');
-    
+                      'appointment_start_time', 'appointment_type', 'appointment_title',
+                      'arrival_date_time', 'status', 'checkin_source'], ';');
+
     foreach ($records as $record) {
         fputcsv($output, [
             $record['name'],
             $record['surname'],
             $record['member_number'],
             $record['appointment_date'],
+            $record['appointment_start_time'],
+            $record['appointment_type'],
             $record['appointment_title'],
             $record['arrival_time'],
             $record['status'],

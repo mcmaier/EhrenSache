@@ -119,7 +119,14 @@ function handleImport($db, $database, $request_method, $authUserRole) {
             $result = importMembers($db, $database, $targetPath);
             break;
         case 'records':
-            $result = importRecords($db, $database, $targetPath);
+            // Fehlende Termine anlegen nur auf ausdrückliche Anforderung.
+            // Wer Termine aus bloßen Ankunftszeiten rekonstruieren will, nutzt
+            // `extract_appointments` — das schlägt vor, ohne zu schreiben.
+            $createMissing = !empty($_POST['create_missing_appointments'])
+                && $_POST['create_missing_appointments'] !== 'false'
+                && $_POST['create_missing_appointments'] !== '0';
+
+            $result = importRecords($db, $database, $targetPath, $createMissing);
             break;
         case 'appointments':
             $result = importAppointments($db, $database, $targetPath);
@@ -337,9 +344,9 @@ function importAppointments($db, $database, $filePath) {
     // Header-Zeile einlesen
     $header = fgetcsv($handle, 0, ';');
 
-    // 'type' wird als Zweitname akzeptiert: So hiess die Spalte im Export bis
-    // 1.3.1, und solche Dateien sollen einlesbar bleiben. Der Export schreibt
-    // seither 'type_name' — siehe OI-24.
+    // 'type' wird als Zweitname akzeptiert: So hiess die Spalte im Export vor
+    // dem Round-Trip-Fix, und solche Dateien sollen einlesbar bleiben. Der
+    // Export schreibt seither 'type_name' — siehe OI-24.
     $hasType = $header && (in_array('type_name', $header) || in_array('type', $header));
 
     if (!$header || !in_array('date', $header) || !in_array('start_time', $header)
@@ -380,7 +387,7 @@ function importAppointments($db, $database, $filePath) {
             // CSV zu assoziativem Array
             $row = array_combine($header, $data);
 
-            // Zweitname 'type' fuer Dateien aus Exporten bis 1.3.1
+            // Zweitname 'type' fuer Dateien aus Exporten vor dem Round-Trip-Fix
             $typeName = $row['type_name'] ?? ($row['type'] ?? '');
 
             // Validierung
@@ -477,13 +484,27 @@ function importAppointments($db, $database, $filePath) {
 // IMPORT RECORDS
 // ============================================
 
-function importRecords($db, $database, $filePath) {
+/**
+ * @param bool $createMissingAppointments Fehlende Termine anlegen, wenn die
+ *        Datei den vollständigen Schlüssel führt (Datum, Startzeit, Art).
+ *        Standardmäßig aus — siehe Stufe 3 unten.
+ */
+function importRecords($db, $database, $filePath, $createMissingAppointments = false) {
     $handle = fopen($filePath, 'r');
     if (!$handle) {
         return ["success" => false, "message" => "Could not read file"];
     }
 
     $prefix = $database->table('');
+
+    // Terminarten nach Namen, für Stufe 3. Einmal geladen statt je Zeile.
+    $typeCache = [];
+    $typeStmt  = $db->query("SELECT type_id, type_name FROM {$prefix}appointment_types");
+    while ($t = $typeStmt->fetch(PDO::FETCH_ASSOC)) {
+        $typeCache[$t['type_name']] = $t['type_id'];
+    }
+
+    $appointmentsAdded = 0;
     
     // UTF-8 BOM überspringen falls vorhanden
     $bom = fread($handle, 3);
@@ -494,7 +515,7 @@ function importRecords($db, $database, $filePath) {
     // Header-Zeile einlesen
     $header = fgetcsv($handle, 0, ';');
 
-    // 'arrival_time' als Zweitname: So hiess die Spalte im Export bis 1.3.1.
+    // 'arrival_time' als Zweitname: So hiess die Spalte im Export vor dem Round-Trip-Fix.
     $hasArrival = $header && (in_array('arrival_date_time', $header) || in_array('arrival_time', $header));
 
     if (!$header || !in_array('member_number', $header) || !$hasArrival) {
@@ -528,7 +549,7 @@ function importRecords($db, $database, $filePath) {
             // CSV zu assoziativem Array
             $row = array_combine($header, $data);
 
-            // Zweitname 'arrival_time' fuer Dateien aus Exporten bis 1.3.1
+            // Zweitname 'arrival_time' fuer Dateien aus Exporten vor dem Round-Trip-Fix
             $row['arrival_date_time'] = $row['arrival_date_time'] ?? ($row['arrival_time'] ?? '');
 
             // Validierung
@@ -567,29 +588,97 @@ function importRecords($db, $database, $filePath) {
             }
             $memberId = $member['member_id'];
             
-            // Finde nächsten Termin innerhalb der Toleranzzeit
             // Zeitfenster aus den Systemeinstellungen, Rückfall config.php
             $toleranceHours = checkinToleranceHours($db, $database);
 
-            $stmt = $db->prepare("
-                SELECT appointment_id, date, start_time,
-                    ABS(TIMESTAMPDIFF(MINUTE, CONCAT(date, ' ', start_time), ?)) as time_diff_minutes
-                FROM {$prefix}appointments 
-                WHERE CONCAT(date, ' ', start_time) BETWEEN 
-                    DATE_SUB(?, INTERVAL ? HOUR) AND 
-                    DATE_ADD(?, INTERVAL ? HOUR)
-                ORDER BY time_diff_minutes ASC
-                LIMIT 1
-            ");
-            $stmt->execute([
-                $arrivalDateTime, 
-                $arrivalDateTime, 
-                $toleranceHours, 
-                $arrivalDateTime, 
-                $toleranceHours
-            ]);
+            // --------------------------------------------------------------
+            // Stufe 1: Exakter Treffer über Datum + Startzeit + Terminart
+            //
+            // Diese drei Spalten liefert der Anwesenheits-Export seit dem Round-Trip-Fix
+            // mit. Sie sind der Schlüssel, den die Anwendung selbst verwendet:
+            // Beim Anlegen gilt ein Termin *dieser Art* im Toleranzfenster als
+            // Konflikt, verschiedene Arten am selben Abend sind erlaubt. Ohne
+            // die Art trifft die Suche unten Probe und Vorstandssitzung
+            // gleichermaßen — der Reimport landet dann womöglich am falschen
+            // Termin. Siehe OI-24.
+            // --------------------------------------------------------------
+            $appointment = null;
 
-            $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+            $keyDate = trim((string) ($row['appointment_date'] ?? ''));
+            $keyTime = trim((string) ($row['appointment_start_time'] ?? ''));
+            $keyType = trim((string) ($row['appointment_type'] ?? ''));
+
+            if ($keyDate !== '' && $keyTime !== '' && $keyType !== '') {
+                $stmt = $db->prepare("
+                    SELECT a.appointment_id
+                    FROM {$prefix}appointments a
+                    JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
+                    WHERE a.date = ? AND a.start_time = ? AND at.type_name = ?
+                    LIMIT 1
+                ");
+                $stmt->execute([$keyDate, $keyTime, $keyType]);
+                $appointment = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            }
+
+            // --------------------------------------------------------------
+            // Stufe 2: Zeitliche Nähe — der bisherige Weg
+            //
+            // Greift für Dateien ohne die Schlüsselspalten: ältere Exporte und
+            // alles, was aus einem Fremdsystem kommt. Dort gibt es keine
+            // Terminart, die zu unseren passt, und die Näherung ist das Beste,
+            // was sich aus einer Ankunftszeit ableiten lässt.
+            // --------------------------------------------------------------
+            if (!$appointment) {
+                $stmt = $db->prepare("
+                    SELECT appointment_id, date, start_time,
+                        ABS(TIMESTAMPDIFF(MINUTE, CONCAT(date, ' ', start_time), ?)) as time_diff_minutes
+                    FROM {$prefix}appointments
+                    WHERE CONCAT(date, ' ', start_time) BETWEEN
+                        DATE_SUB(?, INTERVAL ? HOUR) AND
+                        DATE_ADD(?, INTERVAL ? HOUR)
+                    ORDER BY time_diff_minutes ASC
+                    LIMIT 1
+                ");
+                $stmt->execute([
+                    $arrivalDateTime,
+                    $arrivalDateTime,
+                    $toleranceHours,
+                    $arrivalDateTime,
+                    $toleranceHours
+                ]);
+
+                $appointment = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            }
+
+            // --------------------------------------------------------------
+            // Stufe 3: Termin anlegen — nur auf ausdrückliche Anforderung
+            //
+            // Standardmäßig aus. Ein Import, der stillschweigend Termine
+            // anlegt, macht aus einem Tippfehler im Datum eine Karteileiche,
+            // die niemand sucht. Verlangt denselben vollständigen Schlüssel
+            // wie Stufe 1 — geraten wird hier nichts; wer Termine aus bloßen
+            // Ankunftszeiten rekonstruieren will, nutzt `extract_appointments`.
+            // --------------------------------------------------------------
+            if (!$appointment && $createMissingAppointments
+                && $keyDate !== '' && $keyTime !== '' && $keyType !== '') {
+
+                $typeId = $typeCache[$keyType] ?? null;
+
+                if ($typeId === null) {
+                    $errors[] = "Row $rowNumber: Unknown appointment type '{$keyType}' — "
+                              . "create it first or import appointments separately";
+                    continue;
+                }
+
+                $title = trim((string) ($row['appointment_title'] ?? '')) ?: $keyType;
+
+                $insert = $db->prepare("INSERT INTO {$prefix}appointments
+                                        (date, start_time, title, type_id) VALUES (?, ?, ?, ?)");
+                $insert->execute([$keyDate, $keyTime, $title, $typeId]);
+
+                $appointment       = ['appointment_id' => (int) $db->lastInsertId()];
+                $appointmentsAdded++;
+            }
 
             if (!$appointment) {
                 $errors[] = "Row $rowNumber: No appointment found within {$toleranceHours} hours of '$arrivalDateTime'";
@@ -631,9 +720,13 @@ function importRecords($db, $database, $filePath) {
             "imported" => $imported,
             "updated" => $updated,
             "skipped" => $skipped,
+            // Immer mitgeben, auch als 0: Wer den Import mit angehaktem
+            // Anlegen fährt, muss sehen, wie viele Termine dabei entstanden
+            // sind — sonst bemerkt niemand einen Tippfehler im Datum.
+            "appointments_created" => $appointmentsAdded,
             "errors" => $errors
         ];
-        
+
     } catch (Exception $e) {
         $db->rollBack();
         fclose($handle);

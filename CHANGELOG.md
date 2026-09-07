@@ -9,7 +9,25 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Nicht veröffentlicht]
 
+### Geändert
+- **Der Anwesenheits-Export führt den Termin jetzt eindeutig.** Neu sind die Spalten
+  `appointment_start_time` und `appointment_type`; zusammen mit `appointment_date` bilden sie
+  den Schlüssel, den die Anwendung ohnehin verwendet — beim Anlegen gilt ein Termin *dieser
+  Art* im Toleranzfenster als Konflikt, zwei verschiedene Arten am selben Abend sind erlaubt.
+  Der Reimport ordnet damit exakt zu, statt über zeitliche Nähe zu raten und dabei Probe und
+  Vorstandssitzung verwechseln zu können. Fehlen die Spalten — ältere Dateien, Fremdsysteme —,
+  greift unverändert die bisherige Suche
+
 ### Hinzugefügt
+- **Der Anwesenheits-Import kann fehlende Termine anlegen**, auf ausdrückliche Anforderung
+  (`create_missing_appointments`). Verlangt denselben vollständigen Schlüssel und legt nichts
+  auf Verdacht an; die Antwort nennt unter `appointments_created`, wie viele entstanden sind.
+  Standardmäßig aus, damit ein Tippfehler im Datum keine Karteileiche erzeugt. Wer Termine
+  aus bloßen Ankunftszeiten *rekonstruieren* will, nutzt weiterhin `extract_appointments` —
+  das schlägt vor, ohne zu schreiben
+- Neue Testsuite `export_import`: prüft die Kopfzeilen der drei Exporte gegen die
+  Pflichtspalten des Imports, den Terminschlüssel auf Vorhandensein **und** Inhalt, und hält
+  die Arbeitsteilung fest, dass `extract_appointments` nicht schreibt
 - **Arbeitszeit in der Statistik der Check-in-PWA.** Der Statistik-Tab zeigt für Mitglieder,
   die Zeiten erfassen dürfen, die bestätigte Jahressumme, eine Aufschlüsselung nach Tätigkeit
   und eine Fußnote über eingereichte und abgelehnte Einträge. Die Summe stammt aus derselben
