@@ -369,10 +369,11 @@ Diese Tests systematisch mit allen Rollen durchführen:
 
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
-| EXP-1 | Mitglieder exportieren | CSV, UTF-8 BOM; Spalten: name, surname, member_number, active, groups |
-| EXP-2 | Termine exportieren | CSV; Spalten: date, start_time, title, description, type_name, group_names |
-| EXP-3 | Records exportieren (Jahresfilter) | CSV; member, appointment, arrival_time, status |
+| EXP-1 | Mitglieder exportieren | CSV, UTF-8 BOM; `name;surname;member_number;active;groups` |
+| EXP-2 | Termine exportieren | `date;start_time;title;type_name;groups;description` — **`type_name`**, nicht `type` |
+| EXP-3 | Anwesenheiten exportieren (Jahresfilter) | `member_name;member_surname;member_number;appointment_date;appointment_start_time;appointment_type;appointment_title;arrival_date_time;status;checkin_source` |
 | EXP-4 | Gruppen pipe-separiert | `GROUP_CONCAT` korrekt |
+| EXP-5 | Terminschlüssel in EXP-3 gefüllt | `appointment_date`, `appointment_start_time` und `appointment_type` tragen Werte, nicht nur Überschriften |
 
 ### Import
 
@@ -384,6 +385,29 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | IMP-4 | Datei mit `<?php` Tag | 400 `"File contains forbidden code"` |
 | IMP-5 | Ungültiges CSV-Format | Fehler im Log; Partial-Import |
 | IMP-6 | `import_logs` Eintrag | total_rows, successful_rows, failed_rows, errors korrekt |
+
+### Round-Trip: Export → Import
+
+> **Nur auf einem Testsystem durchführen.** Diese Fälle schreiben in die Datenbank, und
+> RT-6 legt bewusst Termine an. Die automatisierte Suite `export_import` prüft deshalb nur
+> die Kopfzeilen — der Beleg, dass eine exportierte Datei tatsächlich wieder eingeht, bleibt
+> dieser manuelle Durchgang.
+
+Vorlage für die Struktur sind die drei Dateien, mit denen der Import zuletzt geprüft wurde
+(je ein Datensatz, Spalten in Projektreihenfolge).
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| RT-1 | Mitglieder exportieren, unverändert reimportieren | Kein neuer Datensatz, keine Fehlerzeile; Gruppen bleiben zugeordnet (`\|`-Trennung greift in beide Richtungen) |
+| RT-2 | Termine exportieren, unverändert reimportieren | Keine Duplikate, keine Fehlerzeile — insbesondere **kein** „missing required columns" |
+| RT-3 | Anwesenheiten exportieren, unverändert reimportieren | Jede Zeile landet wieder an **demselben** Termin wie zuvor |
+| RT-4 | **Kernfall:** Zwei Termine *verschiedener Art* am selben Abend anlegen (z. B. Probe 19:00, Vorstandssitzung 20:00), je eine Anwesenheit erfassen, exportieren, reimportieren | Beide Anwesenheiten kehren an ihren eigenen Termin zurück. Vor dem Terminschlüssel wären beide am zeitlich nächstgelegenen gelandet |
+| RT-5 | Datei mit den alten Spaltennamen `type` bzw. `arrival_time` einlesen | Wird angenommen — archivierte Exporte bleiben lesbar |
+| RT-6 | Anwesenheits-CSV mit einem Termin, den es im Ziel nicht gibt: **ohne** Haken importieren | Fehlerzeile „No appointment found within … hours"; **kein** Termin angelegt |
+| RT-7 | Dieselbe Datei **mit** `create_missing_appointments` | Termin wird mit Datum, Zeit, Art und Titel aus der Datei angelegt; Antwort meldet `appointments_created: 1` |
+| RT-8 | RT-7 mit einer Terminart, die im Ziel **nicht** existiert | Fehlerzeile „Unknown appointment type …"; kein Termin, keine Terminart angelegt |
+| RT-9 | `extract_appointments` auf dieselbe Datei | Liefert nur `suggestions`; die Terminliste ist danach **unverändert** |
+| RT-10 | Verschobener Termin: Startzeit im Ziel um 3 h ändern, dann reimportieren | Weder exakter Treffer noch Toleranzfenster greifen → Fehlerzeile. Bewusst so; siehe Restrisiko in OI-24 |
 
 ---
 
