@@ -111,6 +111,7 @@ Sie benötigen eine **Rechtsgrundlage** für die Datenverarbeitung (Art. 6 DSGVO
   der Beginn oder Ende bestätigt wurde
 - **Änderungshistorie der Arbeitszeiten**: wer wann welchen Wert geändert,
   freigegeben, abgelehnt oder gelöscht hat
+- Stations-PIN (nur als Hash, `members.pin_hash`; Zeitpunkt der letzten Änderung). Wird mit dem Mitglied gelöscht.
 
 ### Technische Daten
 
@@ -134,6 +135,10 @@ Mitglieder haben folgende Rechte:
 | **Widerspruch** (Art. 21) | Löschung oder Einschränkung |
 
 **Wichtig:** Sie müssen Anfragen binnen **1 Monat** beantworten.
+
+Die Selbstauskunft (JSON und CSV) enthält seit 1.3.0 zur Stations-PIN nur `has_pin` und
+`pin_updated_at` (bzw. die Zeilen „Stations-PIN gesetzt" und „PIN zuletzt geändert") — nie den
+Hash selbst.
 
 ---
 
@@ -411,6 +416,12 @@ Informieren Sie **vor** der Aktivierung, mindestens über:
 - Die Zeiterfassung lässt sich jederzeit wieder abschalten. Bereits erfasste
   Daten bleiben dabei in der Datenbank; löschen Sie sie gesondert, wenn der
   Zweck entfallen ist.
+- Stempel an einer virtuellen Station (Mitgliedsnummer + PIN) belegen den **Ort**, nicht
+  sicher die **Person**: Eine PIN ist weitergebbar. Die Quelle ist im Datensatz als
+  `station_pin` bzw. `station` gekennzeichnet und in der Oberfläche als „Station (PIN)"
+  sichtbar. Am Kiosk gilt die Notizpflicht der Zeiterfassung nicht. Fehlversuche werden
+  15 Minuten lang gezählt (Sperre je Mitgliedsnummer und je Station, auch bei unbekannter
+  Nummer); die eingegebene PIN selbst wird dabei nicht gespeichert.
 
 ---
 

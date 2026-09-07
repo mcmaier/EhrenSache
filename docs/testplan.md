@@ -424,6 +424,26 @@ Diese Tests systematisch mit allen Rollen durchführen:
 
 ---
 
+## 20. Virtuelle Station (Kiosk, seit 1.3.0)
+
+Automatisiert: `php tests/run.php station_unit` und `php tests/run.php station_api`.
+Manuell im Dashboard:
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| ST-1 | Gerät vom Typ „Virtuelle Station" mit Code-Anzeige anlegen | Nach dem Speichern öffnet sich das Gerät im Bearbeiten-Modal mit Token (Auge/Kopieren); kein Secret sichtbar, nur das Häkchen |
+| ST-2 | Häkchen „zeigt Stations-Code" entfernen, speichern | `GET station&action=totp` antwortet 404 |
+| ST-3 | Einstellung „Stations-Anmeldung" aus | Profil zeigt keine PIN-Karte; Mitglieds-Modal kein PIN-Feld; `PUT members` mit `pin` → 409 |
+| ST-4 | Einstellung an, Mitglied bearbeiten, PIN `1234` | Fehlermeldung „keine Zahlenfolge", nicht gespeichert |
+| ST-5 | PIN `2580` setzen | Liste zeigt 🔢 an der Mitgliedsnummer; Modal-Hinweis „PIN gesetzt (Datum)" |
+| ST-6 | Profil: PIN mit falschem Passwort ändern | Fehlertoast, Formular behält die Eingaben |
+| ST-7 | Anwesenheiten nach einem Kiosk-Stempel | Badge „🖥️ Station (PIN)" mit Kiosk-Name als Ort |
+| ST-8 | Selbstauskunft herunterladen (JSON und CSV) | `has_pin` und `pin_updated_at` bzw. Zeilen „Stations-PIN gesetzt"/„PIN zuletzt geändert", kein Hash |
+| ST-9 | Neues Mitglied mit ungültiger PIN anlegen | Mitglied wird angelegt, Modal bleibt im Bearbeiten-Modus offen, Fehlertoast zur PIN |
+| ST-10 | Im selben Browser erst `station/` mit Token aufrufen, dann am Dashboard anmelden | Dashboard bleibt nutzbar, kein 401 nach dem Login |
+
+---
+
 ## 18. Kritische End-to-End-Szenarien
 
 | ID | Szenario | Schritte | Erwartetes Ergebnis |

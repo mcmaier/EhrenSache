@@ -365,6 +365,10 @@ Normalbetrieb nicht erreichbar.
 GET /api.php?resource=members&id=1
 ```
 
+**Stations-PIN (seit 1.3.0):** Jede Admin/Manager-Antwort (einzeln und Liste) trägt `has_pin`
+(Boolean) und `pin_updated_at`; der Hash selbst (`pin_hash`) verlässt den Server nie.
+`member_number` wird beim Speichern nicht getrimmt — Leerzeichen am Rand bleiben erhalten.
+
 ---
 
 ### Mitglied erstellen
@@ -405,7 +409,18 @@ GET /api.php?resource=members&id=1
 
 **Berechtigung:** Admin/Manager
 
-**Request:** Wie bei POST
+**Request:** Wie bei POST, zusätzlich optional `pin` für die Stations-PIN (seit 1.3.0):
+
+| Wert | Wirkung |
+|---|---|
+| Ziffernfolge (String) | setzt die PIN — 4 bis 8 Ziffern, Mindestlänge aus `station_pin_min_length`, nicht eine einzige wiederholte Ziffer, keine auf- oder absteigende Zahlenfolge |
+| `null` oder `""` | löscht die PIN |
+
+`409 "Station PIN login is disabled"` (`field: "pin"`) wenn `station_pin_enabled = 0` — die
+Mitgliedsaktualisierung selbst bleibt eine gültige Ressource, daher `409` statt `404` (anders
+als bei `change_pin`, siehe unten). `400` mit Fehlertext und `field: "pin"` bei einem
+Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitglieds
+(`station: identify`) auf.
 
 **Response:**
 ```json
@@ -649,6 +664,11 @@ automatische Suche. Die Tagesgrenze allein reicht nicht als Schutz: Ohne die Zei
 sich für einen beliebigen Termin desselben Tages einchecken, unabhängig von der tatsächlichen
 Uhrzeit.
 
+**Seit 1.3.0:** `record_id`, `member_id` und `appointment_id` sind in den Antworten JSON-Zahlen
+(zuvor teils Strings). Der gespeicherte `arrival_time` ist die normalisierte `Y-m-d H:i:s`-Form
+des Request-Werts — ein ISO-Input mit `T` (z. B. `2026-09-04T19:05:32`) wird ebenso
+normalisiert wie das PWA-Format.
+
 ---
 
 ## TOTP Check-In
@@ -732,6 +752,58 @@ das Fensterende (Unix-Sekunden) sowie `now`, um die Restlaufzeit gegen die Serve
 
 `404` wenn der Kiosk keinen Code anzeigt (Häkchen in der Geräteverwaltung).
 
+### Anmeldung: identify
+**Endpoint:** `POST /api.php?resource=station&action=identify`
+
+Alle POST-Aktionen tragen `member_number` und `pin` im Body (Strings; numerische Werte werden
+angenommen); der Kiosk hält beides nur im Speicher und verwirft es nach der Ruhezeit.
+`409 "Station PIN login is disabled"` wenn `station_pin_enabled = 0` — geprüft vor der
+Anmeldung. `409 "Device has no name"` wenn dem Kiosk der Gerätename fehlt (er ist der Ortsnachweis).
+
+```json
+{ "member_number": "M123", "pin": "2580" }
+```
+
+**Response 200:**
+```json
+{
+  "member": { "name": "Anna", "surname": "Muster" },
+  "checkin_candidate": { "appointment_id": 42, "title": "Probe", "date": "2026-09-04", "start_time": "19:30:00", "already_checked_in": false, "record_status": null },
+  "worktime_enabled": true,
+  "running_session": null,
+  "activities": [ { "activity_id": 3, "activity_name": "Aufbau", "color": "#1F5FBF", "is_default": 1, "verification": "start" } ]
+}
+```
+`already_checked_in` ist nur bei einem Eintrag mit Status `present` wahr; `record_status` nennt
+den vorhandenen Status (`present`, `excused`) oder `null`. Alle Zeitstempel stammen von der
+Datenbankuhr des Servers.
+
+**Fehler:** `400` Nummer oder PIN fehlt · `401 "Invalid member number or PIN"` — dieselbe
+Meldung bei unbekannter Nummer, falscher PIN, fehlender PIN, inaktivem Mitglied und
+mehrdeutiger Nummer · `423 "Too many attempts"` mit `retry_after` (Sekunden): 5 Fehlversuche
+je Mitgliedsnummer (auch unbekannte) innerhalb von 15 Minuten · `423 "Station temporarily
+locked"`: 30 Fehlversuche je Kiosk innerhalb von 15 Minuten. Eine neu gesetzte PIN hebt die
+Mitgliedssperre auf; eine erfolgreiche Anmeldung setzt beide Zähler zurück.
+
+### Anwesenheit: checkin
+**Endpoint:** `POST /api.php?resource=station&action=checkin`
+
+Body wie `identify`. Terminwahl serverseitig wie `auto_checkin` (Toleranzfenster,
+Gruppenregel), **keine** automatische Terminanlage. Record mit `checkin_source = station_pin`,
+`source_device` und `location_name` = Gerätename des Kiosks. `404 "Kein passender Termin gefunden"`
+(`reason: no_matching_appointment`). Antwort wie `auto_checkin` (`record_action` created /
+updated / unchanged) plus `appointment {appointment_id, title, date, start_time}`.
+
+### Arbeitszeit: work_start, work_pause, work_resume, work_stop
+**Endpoint:** `POST /api.php?resource=station&action=work_start` (Body zusätzlich `activity_id`, positive Ganzzahl)
+
+Verhalten wie `work_sessions` mit `action` start/pause/resume/stop, mit drei Unterschieden:
+`source = station`; `start_location_name` und `end_location_name` = Gerätename des Kiosks
+(der Kiosk gilt als Ortsnachweis, auch für nachweispflichtige Tätigkeitsarten); die
+Notizpflicht (`worktime_require_note`) gilt am Kiosk nicht. `created_by` ist das Kioskkonto.
+`404` wenn die Zeiterfassung aus ist · `400` bei fehlender oder ungültiger `activity_id` ·
+`409` bei bereits laufender Sitzung bzw. `work_stop` ohne laufende Sitzung.
+
 ---
 
 ## Ausnahmen (exceptions)
@@ -810,6 +882,15 @@ das Fensterende (Unix-Sekunden) sowie `now`, um die Restlaufzeit gegen die Serve
   }
 ]
 ```
+
+**Einzelne Gruppe mit Mitgliedern:**
+```
+GET /api.php?resource=member_groups&id=1
+```
+Antwort ist die Gruppenzeile mit zusätzlichem Feld `members`: Admin/Manager erhalten je
+Mitglied `member_id`, `name`, `surname`, `member_number`, `active`, `created_at`; andere
+Rollen nur `member_id`, `name`, `surname`. Weder `pin_hash` noch `pin_updated_at` werden hier
+je ausgeliefert.
 
 ---
 
@@ -1124,6 +1205,11 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
 
 **Berechtigung:** Admin
 
+**Query-Parameter (Geräteliste):**
+- `user_type=device`: nur Geräte-Accounts
+- `device_type` (seit 1.3.0, nur zusammen mit `user_type=device`): schränkt auf
+  `totp_location`, `auth_device` oder `kiosk` ein
+
 **Response:**
 ```json
 [
@@ -1228,8 +1314,13 @@ liefert oder erzeugt ein neues. Eine `totp_location` braucht dabei immer ein Sec
 `"totp_action": "clear"` auf einer `totp_location` als auch ein Wechsel zu `totp_location`
 ohne mitgeschicktes oder erzeugtes Secret antworten mit `400`.
 
-Für `kiosk`-Geräte liefert `GET` — einzeln wie in der Liste — ebenfalls `has_totp_secret`
-(Boolean) statt `totp_secret`; die anderen Gerätetypen geben `totp_secret` unverändert zurück.
+`totp_secret` liefert `GET` — einzeln wie in der Liste — nur für `totp_location` unverändert
+zurück. Für `kiosk` **und** `auth_device` steht stattdessen `has_totp_secret` (Boolean); das
+Secret selbst verlässt für diese beiden Typen den Server nie.
+
+Für `auth_device` wird `totp_action: "generate"` mit `400 "Auth-Geräte haben kein Secret"`
+abgelehnt — das Secret einer `auth_device` entsteht nicht am Server; es gibt dort nichts zu
+erzeugen.
 
 ---
 
@@ -1294,6 +1385,17 @@ Doppelte Eingabeprüfung erfolgt in HTML.
   "new_password": "newSecurePass456!",
 }
 ```
+
+---
+
+### Stations-PIN ändern
+**Endpoint:** `POST /api.php?resource=change_pin`
+**Berechtigung:** angemeldeter Nutzer mit verknüpftem Mitglied; `404` wenn `station_pin_enabled = 0`; Geräte `403`
+
+```json
+{ "current_password": "geheim", "new_pin": "2580" }
+```
+`403 "Current password incorrect"` · `400` mit Fehlertext und `field: "new_pin"` · `404 "Member not found"` wenn das verknüpfte Mitglied nicht mehr existiert · `200 "PIN changed successfully"`. Hebt eine bestehende Sperre des Mitglieds auf.
 
 ---
 
@@ -1400,7 +1502,8 @@ Importiert Daten aus Excel-Datei.
 
 Liefert eine feste Auswahl an Einstellungen an **jede angemeldete Rolle**, nicht nur an
 Administratoren. Die Liste steht als Whitelist im Handler und umfasst derzeit
-`checkin_auto_create_appointment` und `checkin_tolerance_hours`.
+`checkin_auto_create_appointment`, `checkin_tolerance_hours`, `station_pin_enabled` und
+`station_pin_min_length` (die beiden letzteren seit 1.3.0).
 
 Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
 
@@ -1411,7 +1514,9 @@ Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
 {
   "settings": {
     "checkin_auto_create_appointment": "1",
-    "checkin_tolerance_hours": "2"
+    "checkin_tolerance_hours": "2",
+    "station_pin_enabled": "1",
+    "station_pin_min_length": "4"
   }
 }
 ```
