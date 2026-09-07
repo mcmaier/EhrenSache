@@ -641,7 +641,7 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                         break;
                     }
                     $updateFields[] = "device_name = ?";
-                    $updateParams[] = $data->device_name;
+                    $updateParams[] = trim($data->device_name);
                 }
 
                 // Device Type
@@ -746,14 +746,17 @@ function createDevice($db, $database, $authUserId) {
     $prefix = $database->table('');
     
     $data = json_decode(file_get_contents("php://input"));
-    
-    // Validierung
-    if(empty($data->device_name)) {
+
+    // Validierung — der Geraetename ist der Ortsnachweis am Kiosk (E7, E8),
+    // ein leerer oder reiner Whitespace-Name (oder ein Nicht-String, z. B.
+    // eine Zahl oder ein Array) waere effektiv keiner.
+    if(!is_string($data->device_name ?? null) || trim($data->device_name) === '') {
         http_response_code(400);
         echo json_encode(['message' => 'Gerätename erforderlich']);
         exit();
     }
-    
+    $deviceName = trim($data->device_name);
+
     $device_type = $data->device_type ?? 'totp_location';
 
     if(!in_array($device_type, ['totp_location', 'auth_device', 'kiosk'], true)) {
@@ -822,25 +825,25 @@ function createDevice($db, $database, $authUserId) {
         $isActive = isset($data->is_active) ? ($data->is_active ? 1 : 0) : 1;
 
         $stmt->execute([
-            $data->device_name,
+            $deviceName,
             $device_type,
             $isActive,
             $apiToken,
             $tokenExpires,
             $totpSecret
         ]);
-        
+
         $deviceId = $db->lastInsertId();
-        
+
         $db->commit();
-        
+
         // Response mit Token (nur einmal sichtbar!)
         echo json_encode([
             'success' => true,
             'message' => 'Gerät erfolgreich erstellt',
             'device' => [
                 'user_id' => $deviceId,
-                'device_name' => $data->device_name,
+                'device_name' => $deviceName,
                 'device_type' => $device_type,
                 'api_token' => $apiToken,
                 'totp_secret' => $device_type === 'kiosk' ? null : $totpSecret,

@@ -190,7 +190,16 @@ function stationAuthenticate($db, $database, RateLimiter $limiter, int $deviceId
         // Unbekannte oder mehrdeutige Nummer: kein member_id, also ein
         // Zaehler je Nummer statt je Mitglied — sonst bliebe eine unbekannte
         // Nummer beliebig oft probierbar (E12, siehe Docblock).
-        $numberKey = 'station_number_' . hash('sha256', $memberNumber);
+        //
+        // Der Schluessel wird wie die Spaltenkollation normalisiert
+        // (utf8mb4_unicode_ci, also case-insensitiv): ohne
+        // mb_strtolower()/trim() waeren 'nx1' und 'NX1' zwei verschiedene
+        // Zaehler, obwohl die vorige DB-Suche (WHERE member_number = ?) sie
+        // als dieselbe Nummer behandelt hat — der Zaehler liesse sich also
+        // einfach durch Gross-/Kleinschreibung umgehen. hash() bleibt trotzdem
+        // bestehen: fester Schluessellaenge, und die Nummer selbst landet nie
+        // im Klartext in der Limiter-Tabelle.
+        $numberKey = 'station_number_' . hash('sha256', mb_strtolower(trim($memberNumber), 'UTF-8'));
         if (!$limiter->check($numberKey, 'station_pin', STATION_PIN_MEMBER_MAX_ATTEMPTS, STATION_PIN_LOCK_SECONDS)) {
             password_verify($pin, stationDummyHash());
             $failure = 'locked';

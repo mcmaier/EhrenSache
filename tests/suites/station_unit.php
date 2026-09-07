@@ -372,4 +372,20 @@ if (!extension_loaded('pdo_sqlite')) {
         assertSame(null, stationAuthenticate($db, $database, $limiter, 1, 'nummer-b', '0001', $failure));
         assertSame('invalid', $failure, 'nummer-b ist von der Sperre auf nummer-a nicht betroffen');
     });
+
+    // C-1: Der Zaehler fuer unbekannte Nummern muss so normalisiert werden wie
+    // die DB-Suche (WHERE member_number = ?), die unter utf8mb4_unicode_ci
+    // case-insensitiv laeuft — sonst waeren 'nx1' und 'NX1' zwei verschiedene
+    // Zaehler und die Sperre liesse sich per Gross-/Kleinschreibung umgehen.
+    test('stationAuthenticate: Zaehler einer unbekannten Nummer ist case-insensitiv wie die DB-Kollation', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        for ($i = 0; $i < 5; $i++) {
+            assertSame(null, stationAuthenticate($db, $database, $limiter, 1, 'nx1', '0001', $failure));
+            assertSame('invalid', $failure, "Versuch " . ($i + 1));
+        }
+        // Sechster Versuch mit anderer Gross-/Kleinschreibung derselben
+        // Nummer: der Zaehler muss trotzdem bereits ausgeschoepft sein.
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, 'NX1', '0001', $failure));
+        assertSame('locked', $failure, 'nx1 und NX1 muessen denselben Zaehler treffen');
+    });
 }

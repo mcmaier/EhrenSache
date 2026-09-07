@@ -663,6 +663,16 @@ function stationAppointment(): array
     return $apt = ['appointment_id' => (int) $res['body']['id'], 'type_id' => $typeId];
 }
 
+/** Merkt sich den beim Kiosk-Checkin angelegten/aktualisierten Record fuer I-2. */
+function stationRecordId(?int $set = null): ?int
+{
+    static $id = null;
+    if ($set !== null) {
+        $id = $set;
+    }
+    return $id;
+}
+
 test('station: identify mit falscher PIN → 401, einheitliche Meldung', function () {
     enableStationPin();
     $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '9999']);
@@ -707,6 +717,7 @@ test('station: checkin schreibt einen Record mit Quelle station_pin', function (
     assertSame(kioskDevice()['device_name'], $res['body']['source_device']);
     assertSame(kioskDevice()['device_name'], $res['body']['location_name']);
     assertSame(stationAppointment()['appointment_id'], (int) $res['body']['appointment_id']);
+    stationRecordId((int) $res['body']['record_id']);
 
     $again = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
     assertSame(true, $again['body']['checkin_candidate']['already_checked_in']);
@@ -754,6 +765,48 @@ test('station: identify bei abgeschalteter PIN-Anmeldung → 409', function () {
     } finally {
         stationSetSetting('station_pin_enabled', '1');
     }
+});
+
+// ---- I-2: ein Stempel schlaegt eine bestehende Entschuldigung ---------------
+
+test('station: checkin macht aus einem entschuldigten Record einen praesenten', function () {
+    $memberId      = stationMember()['member_id'];
+    $appointmentId = stationAppointment()['appointment_id'];
+    $recordId      = stationRecordId();
+
+    // Bestehende arrival_time mitfuehren: records.php PUT verlangt member_id,
+    // appointment_id, arrival_time und status vollstaendig im Body.
+    $existing = apiRequest('GET', 'records', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $recordId],
+    ]);
+    assertStatus(200, $existing);
+
+    assertStatus(200, apiRequest('PUT', 'records', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $recordId],
+        'body'  => [
+            'member_id'      => $memberId,
+            'appointment_id' => $appointmentId,
+            'arrival_time'   => $existing['body']['arrival_time'],
+            'status'         => 'excused',
+        ],
+    ]), 'Record konnte nicht auf excused gesetzt werden');
+
+    $identify = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
+    assertStatus(200, $identify);
+    assertSame(false, $identify['body']['checkin_candidate']['already_checked_in'],
+        'ein entschuldigter Termin gilt am Kiosk weiterhin als offen');
+    assertSame('excused', $identify['body']['checkin_candidate']['record_status']);
+
+    $res = stationPost('checkin', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
+    assertStatus(200, $res);
+    assertSame('updated', $res['body']['record_action'], 'ein Stempel muss die Entschuldigung ueberschreiben');
+
+    $after = apiRequest('GET', 'records', ['token' => apiToken('admin'), 'query' => ['id' => $recordId]]);
+    assertStatus(200, $after);
+    assertSame('present', $after['body']['status']);
+    assertSame('station_pin', $after['body']['checkin_source']);
 });
 
 // ---- Phase 2: Arbeitszeit am Kiosk ------------------------------------------

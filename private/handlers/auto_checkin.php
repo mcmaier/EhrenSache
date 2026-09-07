@@ -142,6 +142,12 @@ function findCheckinAppointment($db, $prefix, int $memberId, string $timestamp, 
  * die neue Ankunftszeit frueher liegt. Antwortet nicht selbst; der Aufrufer
  * ergaenzt Terminangaben und gibt aus.
  *
+ * Ein bestehender Record mit status 'excused' wird IMMER auf 'present'
+ * gehoben, unabhaengig vom Zeitvergleich: ein tatsaechlicher Stempel schlaegt
+ * eine Entschuldigung, auch wenn die Ankunftszeit spaeter liegt als die zuvor
+ * eingetragene. Fuer einen bereits 'present' gefuehrten Record gilt weiter
+ * die alte Regel — nur eine fruehere Ankunft ersetzt die bestehende.
+ *
  * $arrivalTimestamp ist die UNGERUNDETE Ankunftszeit ('Y-m-d H:i:s'): Die
  * Auto-Anlage eines Termins rundet auf fuenf Minuten, der Eintrag selbst
  * traegt weiterhin die Sekunde des Stempels.
@@ -155,7 +161,7 @@ function findCheckinAppointment($db, $prefix, int $memberId, string $timestamp, 
 function writeCheckinRecord($db, $prefix, int $memberId, int $appointmentId, string $arrivalTimestamp,
                             string $checkinSource, ?string $sourceDevice, ?string $locationName): array
 {
-    $checkStmt = $db->prepare("SELECT record_id, arrival_time FROM {$prefix}records
+    $checkStmt = $db->prepare("SELECT record_id, arrival_time, status FROM {$prefix}records
                                WHERE member_id = ? AND appointment_id = ?");
     $checkStmt->execute([$memberId, $appointmentId]);
     $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -172,7 +178,7 @@ function writeCheckinRecord($db, $prefix, int $memberId, int $appointmentId, str
         $arrivalTime  = new DateTime($arrivalTimestamp);
         $existingTime = new DateTime($existingRecord['arrival_time']);
 
-        if($arrivalTime < $existingTime) {
+        if($existingRecord['status'] === 'excused' || $arrivalTime < $existingTime) {
             $db->prepare("UPDATE {$prefix}records
                           SET arrival_time = ?, status = 'present', checkin_source = ?,
                               source_device = ?, location_name = ?

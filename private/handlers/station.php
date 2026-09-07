@@ -119,7 +119,10 @@ function stationStatus($db, $database, array $device)
         'pin_enabled'      => isStationPinEnabled($db, $database),
         'pin_min_length'   => stationPinMinLength($db, $database),
         'worktime_enabled' => isWorktimeEnabled($db, $database),
-        'server_time'      => date('Y-m-d H:i:s'),
+        'server_time'      => stationNow($db),
+        // server_unix bleibt PHP-Zeit (nicht die DB-Uhr): er treibt den
+        // TOTP-Zaehler mit an, und RFC 6238 rechnet mit Unix-Zeit — davon
+        // unabhaengig, in welcher Zeitzone die Datenbank steht.
         'server_unix'      => time(),
     ]);
 }
@@ -219,7 +222,7 @@ function stationIdentify($db, $database, array $device, array $member)
             'date'               => $matched['date'],
             'start_time'         => $matched['start_time'],
             'already_checked_in' => $existingStatus === 'present',
-            'record_status'      => $existingStatus !== false ? (string) $existingStatus : null,
+            'record_status'      => ($existingStatus === false || $existingStatus === null) ? null : (string) $existingStatus,
         ];
     }
 

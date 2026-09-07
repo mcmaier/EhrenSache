@@ -282,8 +282,10 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
 
             $stmt = $db->prepare("INSERT INTO {$prefix}members (name, surname, member_number, active)
                                   VALUES (?, ?, ?, ?)");
+            // === '' statt empty(): "0" ist eine gueltige Mitgliedsnummer,
+            // wuerde von empty() aber faelschlich als leer behandelt.
             if($stmt->execute([$cleanData->name, $cleanData->surname,
-                               empty($cleanData->member_number ?? null) ? null : $cleanData->member_number,
+                               (($cleanData->member_number ?? '') === '') ? null : $cleanData->member_number,
                                $cleanData->active ?? true])) {
                 $memberId = $db->lastInsertId();
                 // Speichere Gruppen-Zuordnungen
@@ -369,7 +371,10 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
             foreach ($updatable as $field) {
                 if (isset($cleanData->$field)) {
                     $setParts[] = "$field = ?";
-                    $params[]   = ($field === 'member_number' && empty($cleanData->$field)) ? null : $cleanData->$field;
+                    // === '' statt empty(): "0" ist eine gueltige
+                    // Mitgliedsnummer, wuerde von empty() faelschlich als
+                    // leer behandelt.
+                    $params[]   = ($field === 'member_number' && $cleanData->$field === '') ? null : $cleanData->$field;
                 }
             }
 
