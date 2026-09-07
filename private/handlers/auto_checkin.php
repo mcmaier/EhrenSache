@@ -413,12 +413,8 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     // $chosenAppointment ist an dieser Stelle bereits vollstaendig geprueft
     // (Gruppe, Tag, Toleranz) — die automatische Suche braeuchte hier nur
     // unnoetig eine weitere Query, deren Ergebnis sofort verworfen wuerde.
-    $matchedAppointment = $chosenAppointment ?: findCheckinAppointment($db, $prefix, (int)$memberId, $timestamp, $toleranceSeconds);
-
     // Eine bewusste Wahl schlaegt die automatische Suche.
-    if($chosenAppointment) {
-        $matchedAppointment = $chosenAppointment;
-    }
+    $matchedAppointment = $chosenAppointment ?: findCheckinAppointment($db, $prefix, (int)$memberId, $timestamp, $toleranceSeconds);
 
     if($matchedAppointment) {
         // Passender Termin gefunden

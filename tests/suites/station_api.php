@@ -194,9 +194,9 @@ test('station: Typwechsel verwirft das gespeicherte Secret', function () {
     $res = kioskGet();
     assertStatus(200, $res);
     assertSame('auth_device', $res['body']['device_type']);
-    assertTrue(array_key_exists('totp_secret', $res['body']),
-        'auth_device liefert das Feld totp_secret');
-    assertSame(null, $res['body']['totp_secret'], 'Secret muss beim Typwechsel verworfen werden');
+    assertTrue(!array_key_exists('totp_secret', $res['body']),
+        'auth_device darf das Secret nicht ausliefern');
+    assertSame(false, $res['body']['has_totp_secret'], 'Secret muss beim Typwechsel verworfen werden');
 
     // Zurueck zum Kiosk MIT Secret — so, wie spaetere Tests das Geraet erwarten.
     assertStatus(200, kioskPut(['device_type' => 'kiosk', 'totp_action' => 'generate']));
@@ -292,19 +292,21 @@ test('station: create_device mit is_active=false legt inaktives Geraet an', func
     assertStatus(200, $res, 'Inaktives Geraet haette angelegt werden muessen');
     $deviceId = (int) $res['body']['device']['user_id'];
 
-    $get = apiRequest('GET', 'users', [
-        'token' => apiToken('admin'),
-        'query' => ['id' => $deviceId],
-    ]);
-    assertStatus(200, $get);
-    assertSame(0, (int) $get['body']['is_active'], 'is_active=false muss uebernommen werden');
-
-    // Aufraeumen — das ist das einzige Geraet, das dieser Test anfasst.
-    $del = apiRequest('DELETE', 'users', [
-        'token' => apiToken('admin'),
-        'query' => ['id' => $deviceId],
-    ]);
-    assertStatus(200, $del, 'Test-Geraet konnte nicht geloescht werden');
+    try {
+        $get = apiRequest('GET', 'users', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $deviceId],
+        ]);
+        assertStatus(200, $get);
+        assertSame(0, (int) $get['body']['is_active'], 'is_active=false muss uebernommen werden');
+    } finally {
+        // Aufraeumen — das ist das einzige Geraet, das dieser Test anfasst.
+        $del = apiRequest('DELETE', 'users', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $deviceId],
+        ]);
+        assertStatus(200, $del, 'Test-Geraet konnte nicht geloescht werden');
+    }
 });
 
 test('station: totp_secret als Array wird sauber mit 400 abgelehnt, kein TypeError', function () {
@@ -515,43 +517,45 @@ test('member_groups: kein pin_hash ueber die Gruppenansicht', function () {
     assertStatus(201, $create, 'Testgruppe konnte nicht angelegt werden');
     $groupId = (int) $create['body']['id'];
 
-    assertStatus(200, apiRequest('PUT', 'members', [
-        'token' => apiToken('admin'),
-        'query' => ['id' => $memberId],
-        'body'  => ['group_ids' => [$groupId]],
-    ]), 'Testmitglied konnte der Testgruppe nicht zugeordnet werden');
+    try {
+        assertStatus(200, apiRequest('PUT', 'members', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $memberId],
+            'body'  => ['group_ids' => [$groupId]],
+        ]), 'Testmitglied konnte der Testgruppe nicht zugeordnet werden');
 
-    $asUser = apiRequest('GET', 'member_groups', [
-        'token' => apiToken('user'),
-        'query' => ['id' => $groupId],
-    ]);
-    assertStatus(200, $asUser);
-    foreach ($asUser['body']['members'] as $row) {
-        assertTrue(!array_key_exists('pin_hash', $row), 'pin_hash darf einem user nicht ausgeliefert werden');
-        assertTrue(!array_key_exists('pin_updated_at', $row), 'pin_updated_at darf einem user nicht ausgeliefert werden');
+        $asUser = apiRequest('GET', 'member_groups', [
+            'token' => apiToken('user'),
+            'query' => ['id' => $groupId],
+        ]);
+        assertStatus(200, $asUser);
+        foreach ($asUser['body']['members'] as $row) {
+            assertTrue(!array_key_exists('pin_hash', $row), 'pin_hash darf einem user nicht ausgeliefert werden');
+            assertTrue(!array_key_exists('pin_updated_at', $row), 'pin_updated_at darf einem user nicht ausgeliefert werden');
+        }
+
+        $asAdmin = apiRequest('GET', 'member_groups', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $groupId],
+        ]);
+        assertStatus(200, $asAdmin);
+        $mine = array_values(array_filter($asAdmin['body']['members'],
+            static fn ($m) => (int) $m['member_id'] === $memberId));
+        assertTrue(count($mine) === 1, 'Testmitglied in der Gruppenansicht erwartet');
+        assertTrue(!array_key_exists('pin_hash', $mine[0]), 'pin_hash darf auch dem admin nicht ausgeliefert werden');
+        assertTrue(!array_key_exists('pin_updated_at', $mine[0]), 'pin_updated_at darf auch dem admin nicht ausgeliefert werden');
+    } finally {
+        // Aufraeumen: Zuordnung und Testgruppe wieder entfernen.
+        assertStatus(200, apiRequest('PUT', 'members', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $memberId],
+            'body'  => ['group_ids' => []],
+        ]));
+        assertStatus(200, apiRequest('DELETE', 'member_groups', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $groupId],
+        ]));
     }
-
-    $asAdmin = apiRequest('GET', 'member_groups', [
-        'token' => apiToken('admin'),
-        'query' => ['id' => $groupId],
-    ]);
-    assertStatus(200, $asAdmin);
-    $mine = array_values(array_filter($asAdmin['body']['members'],
-        static fn ($m) => (int) $m['member_id'] === $memberId));
-    assertTrue(count($mine) === 1, 'Testmitglied in der Gruppenansicht erwartet');
-    assertSame(true, $mine[0]['has_pin']);
-    assertTrue(!array_key_exists('pin_hash', $mine[0]), 'pin_hash darf auch dem admin nicht ausgeliefert werden');
-
-    // Aufraeumen: Zuordnung und Testgruppe wieder entfernen.
-    assertStatus(200, apiRequest('PUT', 'members', [
-        'token' => apiToken('admin'),
-        'query' => ['id' => $memberId],
-        'body'  => ['group_ids' => []],
-    ]));
-    assertStatus(200, apiRequest('DELETE', 'member_groups', [
-        'token' => apiToken('admin'),
-        'query' => ['id' => $groupId],
-    ]));
 });
 
 // ---- Phase 2: members PUT mit ungueltigem Body ------------------------------
@@ -579,10 +583,12 @@ test('members: PUT mit leerem Body -> 400 statt Fatal', function () {
 
 test('members: PIN bei abgeschalteter Anmeldung -> 409', function () {
     stationSetSetting('station_pin_enabled', '0');
-    assertStatus(409, stationSetPin('2580'), 'PUT members mit pin haette bei abgeschalteter Anmeldung 409 liefern muessen');
-
-    // Fuer nachfolgende Tests (und die Entwicklungsinstanz) wieder einschalten.
-    stationSetSetting('station_pin_enabled', '1');
+    try {
+        assertStatus(409, stationSetPin('2580'), 'PUT members mit pin haette bei abgeschalteter Anmeldung 409 liefern muessen');
+    } finally {
+        // Fuer nachfolgende Tests (und die Entwicklungsinstanz) wieder einschalten.
+        stationSetSetting('station_pin_enabled', '1');
+    }
     assertStatus(200, stationSetPin('2580'));
 });
 
@@ -696,9 +702,12 @@ test('station: Sperre nach fuenf Fehlversuchen, Admin-PIN hebt sie auf', functio
 
 test('station: identify bei abgeschalteter PIN-Anmeldung → 409', function () {
     stationSetSetting('station_pin_enabled', '0');
-    $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
-    assertStatus(409, $res);
-    stationSetSetting('station_pin_enabled', '1');
+    try {
+        $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
+        assertStatus(409, $res);
+    } finally {
+        stationSetSetting('station_pin_enabled', '1');
+    }
 });
 
 // ---- Phase 2: Arbeitszeit am Kiosk ------------------------------------------
@@ -800,14 +809,16 @@ test('station: work_pause und work_resume', function () {
 
 test('station: work_stop trotz Notizpflicht (P1), Kiosk als Endort', function () {
     stationSetSetting('worktime_require_note', '1');
-    $res = stationPost('work_stop', stationCreds());
-    stationSetSetting('worktime_require_note', '0');
-
-    assertStatus(200, $res);
-    $s = $res['body']['session'];
-    assertTrue(!empty($s['end_time']), 'end_time gesetzt');
-    assertSame(kioskDevice()['device_name'], $s['end_location_name']);
-    assertSame('confirmed', $s['status'], 'mit beiden Orten bleibt die Sitzung bestaetigt');
+    try {
+        $res = stationPost('work_stop', stationCreds());
+        assertStatus(200, $res);
+        $s = $res['body']['session'];
+        assertTrue(!empty($s['end_time']), 'end_time gesetzt');
+        assertSame(kioskDevice()['device_name'], $s['end_location_name']);
+        assertSame('confirmed', $s['status'], 'mit beiden Orten bleibt die Sitzung bestaetigt');
+    } finally {
+        stationSetSetting('worktime_require_note', '0');
+    }
 });
 
 test('station: work_stop ohne laufende Sitzung → 409', function () {
@@ -817,9 +828,61 @@ test('station: work_stop ohne laufende Sitzung → 409', function () {
 test('station: work_* bei abgeschalteter Zeiterfassung → 404', function () {
     $fx = stationWorkFixture();
     stationSetSetting('worktime_enabled', '0');
-    $res = stationPost('work_start', stationCreds() + ['activity_id' => $fx['activity_id']]);
-    stationSetSetting('worktime_enabled', '1');
-    assertStatus(404, $res);
+    try {
+        $res = stationPost('work_start', stationCreds() + ['activity_id' => $fx['activity_id']]);
+        assertStatus(404, $res);
+    } finally {
+        stationSetSetting('worktime_enabled', '1');
+    }
+});
+
+// ---- Auth-Geraete haben kein Secret -----------------------------------------
+
+test('users: auth_device lehnt totp_action generate ab, clear und GET liefern kein Secret', function () {
+    $name   = 'Test-Auth ' . uniqid();
+    $create = apiRequest('POST', 'users', [
+        'token' => apiToken('admin'),
+        'body'  => [
+            'action'      => 'create_device',
+            'device_name' => $name,
+            'device_type' => 'auth_device',
+        ],
+    ]);
+    assertStatus(200, $create, 'Auth-Geraet konnte nicht angelegt werden');
+    $deviceId = (int) $create['body']['device']['user_id'];
+
+    try {
+        assertStatus(400, apiRequest('PUT', 'users', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $deviceId],
+            'body'  => ['totp_action' => 'generate'],
+        ]), 'Auth-Geraete duerfen kein Secret generieren');
+
+        assertStatus(200, apiRequest('PUT', 'users', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $deviceId],
+            'body'  => ['totp_action' => 'clear'],
+        ]));
+
+        $get = apiRequest('GET', 'users', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $deviceId],
+        ]);
+        assertStatus(200, $get);
+        assertTrue(!array_key_exists('totp_secret', $get['body']), 'auth_device darf kein totp_secret ausliefern');
+    } finally {
+        // Eigenes Geraet — betrifft weder den Suiten-Kiosk noch andere Tests.
+        assertStatus(200, apiRequest('DELETE', 'users', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $deviceId],
+        ]), 'Test-Geraet konnte nicht geloescht werden');
+    }
+
+    // Der Suiten-Kiosk bleibt unveraendert ein Kiosk mit Secret.
+    $kioskCheck = kioskGet();
+    assertStatus(200, $kioskCheck);
+    assertSame('kiosk', $kioskCheck['body']['device_type']);
+    assertSame(true, $kioskCheck['body']['has_totp_secret']);
 });
 
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------

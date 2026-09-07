@@ -96,8 +96,9 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     return;
                 }
 
-                // Kiosk: das Secret verlaesst den Server nicht (E5)
-                if($isDevice && ($user['device_type'] ?? null) === 'kiosk') {
+                // Kiosk und Auth-Geraet liefern nie ein Secret (E5) — nur eine
+                // totp_location zeigt ihren Code.
+                if($isDevice && in_array($user['device_type'] ?? null, ['kiosk', 'auth_device'], true)) {
                     $user['has_totp_secret'] = !empty($user['totp_secret']);
                     unset($user['totp_secret']);
                 }
@@ -206,7 +207,7 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     foreach($users as &$row) {
-                        if(($row['device_type'] ?? null) === 'kiosk') {
+                        if(in_array($row['device_type'] ?? null, ['kiosk', 'auth_device'], true)) {
                             $row['has_totp_secret'] = !empty($row['totp_secret']);
                             unset($row['totp_secret']);
                         }
@@ -565,6 +566,16 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                 // totp_location nutzt ein eigenes Secret.
                 if($effectiveType === 'auth_device') {
                     unset($data->totp_secret);
+                }
+
+                // Auth-Geraete haben kein Secret — 'generate' wuerde eines
+                // erzeugen, das nirgends angezeigt wird (siehe GET-Filterung)
+                // und dennoch im Klartext in der Datenbank laege. Nur 'clear'
+                // oder gar keine totp_action sind fuer sie sinnvoll.
+                if($effectiveType === 'auth_device' && $totpAction === 'generate') {
+                    http_response_code(400);
+                    echo json_encode(["message" => "Auth-Geräte haben kein Secret"]);
+                    break;
                 }
 
                 // Ein mitgeschicktes Secret muss ein String sein und gueltiges

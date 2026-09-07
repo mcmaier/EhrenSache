@@ -587,7 +587,17 @@ export async function saveMember() {
         if (result && result.id && data.pin !== undefined) {
             // Eigener Toast unten statt des generischen Fehler-Toasts von apiCall
             pinResult = await apiCall('members', 'PUT', { pin: data.pin }, { id: result.id }, { silentStatuses: [400, 409] });
-            pinFailed = !pinResult?.success;
+
+            if (pinResult === null) {
+                // 401 -> handleLogout() laeuft bereits (Redirect folgt), hier nichts mehr tun
+                return;
+            }
+
+            // apiCall hat jeden anderen Fehlerstatus bereits selbst als Toast
+            // gezeigt. Nur die beiden hier bewusst stillen Antworten (ungueltige
+            // PIN, PIN-Anmeldung deaktiviert) tragen "field": "pin" und
+            // brauchen noch die eigene, kontextbezogene Meldung unten.
+            pinFailed = pinResult?.success === false && pinResult?.field === 'pin';
         }
 
         // Erstelle Mitgliedschaftszeiträume falls vorhanden
@@ -601,6 +611,11 @@ export async function saveMember() {
             'Mitglied angelegt, aber die PIN wurde abgelehnt: ' + (pinResult?.message || ''),
             'error'
         );
+        // Die Einstellung koennte sich seit dem Oeffnen des Modals geaendert
+        // haben (z.B. 409, weil die PIN-Anmeldung inzwischen abgeschaltet
+        // wurde) — das PIN-Feld soll beim Wiederoeffnen dem aktuellen Stand
+        // folgen statt dem gecachten.
+        resetStationPinSettings();
         // Modal bleibt offen, wechselt aber in den Bearbeiten-Modus für das neu angelegte Mitglied
         await openMemberModal(result.id);
         showMemberSection(true, currentMembersPage);

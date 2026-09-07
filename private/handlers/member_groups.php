@@ -26,10 +26,12 @@ function handleMemberGroups($db, $database, $method, $id) {
                 $group = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if($group) {
-                    // Lade zugehörige Members - nie pin_hash selektieren
+                    // Lade zugehörige Members - nie pin_hash oder pin_updated_at
+                    // selektieren (kein Konsument braucht sie hier; das
+                    // Mitglieder-Modul liefert has_pin bereits über die
+                    // members-Ressource selbst).
                     if(isAdminOrManager()) {
-                        $memberStmt = $db->prepare("SELECT m.member_id, m.name, m.surname, m.member_number, m.active, m.created_at,
-                                                    m.pin_updated_at, (m.pin_hash IS NOT NULL) AS has_pin
+                        $memberStmt = $db->prepare("SELECT m.member_id, m.name, m.surname, m.member_number, m.active, m.created_at
                                                     FROM {$prefix}members m
                                                     JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
                                                     WHERE mga.group_id = ?");
@@ -41,12 +43,6 @@ function handleMemberGroups($db, $database, $method, $id) {
                     }
                     $memberStmt->execute([$id]);
                     $members = $memberStmt->fetchAll(PDO::FETCH_ASSOC);
-                    if(isAdminOrManager()) {
-                        foreach($members as &$m) {
-                            $m['has_pin'] = (bool) $m['has_pin'];
-                        }
-                        unset($m);
-                    }
                     $group['members'] = $members;
 
                     echo json_encode($group);
