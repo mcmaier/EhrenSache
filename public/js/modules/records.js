@@ -731,7 +731,10 @@ function getSourceBadge(record) {
         'auto_checkin': { icon: '🤖', label: 'Auto', color: '#95a5a6' },
         'import':{icon: '📤', label: 'Import', color: 'rgb(231, 209, 109)'},
         // Entsteht, wenn eine Arbeitszeitsitzung mit Terminbezug startet
-        'timer': { icon: '⏱️', label: 'Timer', color: '#a98bd0' }
+        'timer': { icon: '⏱️', label: 'Timer', color: '#a98bd0' },
+        // Mitgliedsnummer + PIN an einer virtuellen Station (Kiosk). Die PIN ist
+        // weitergebbar — darum eigene Kennzeichnung statt 'device_auth'.
+        'station_pin': { icon: '🖥️', label: 'Station (PIN)', color: '#5b8def' }
     };
     
     const source = sources[record.checkin_source] || sources['none'];
