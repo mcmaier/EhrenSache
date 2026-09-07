@@ -25,17 +25,14 @@ import { showConfirm } from './ui.js';
 
 export function exportMembers() {
     const url = `${API_BASE}?resource=export&type=members`;
-    
-    // Download über versteckten Link
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `members_export_${new Date().toISOString().split('T')[0]}.csv`;
-    
-    // Auth-Header kann bei direktem Download nicht gesetzt werden
-    // Daher: Fetch verwenden und als Blob speichern
+
+    // Der Download läuft über fetch + Blob, damit ein Fehler als Meldung
+    // ankommt statt als Datei. credentials sorgt dafür, dass das Session-Cookie
+    // mitgeht — das Dashboard hat keinen API-Token, siehe getAuthHeaders().
     fetch(url, {
         method: 'GET',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'same-origin'
     })
     .then(response => {
         if (!response.ok) throw new Error('Export failed');
@@ -61,12 +58,18 @@ export function exportMembers() {
 export function exportAppointments() {
     const year = document.getElementById('appointmentYearFilter')?.value || new Date().getFullYear();
     const url = `${API_BASE}?resource=export&type=appointments&year=${year}`;
-    
+
     fetch(url, {
         method: 'GET',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'same-origin'
     })
-    .then(response => response.blob())
+    .then(response => {
+        // Ohne diese Prüfung wird der Fehlerkörper zum Blob und landet als
+        // .csv-Datei mit JSON darin auf der Platte — genau das Bild aus OI-24.
+        if (!response.ok) throw new Error('Export failed');
+        return response.blob();
+    })
     .then(blob => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');

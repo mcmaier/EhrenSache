@@ -73,3 +73,22 @@ test('Die .htaccess laesst CSS und JS revalidieren', function () use ($repoRoot)
         'Die Cache-Control-Regel greift nicht fuer css/js/html'
     );
 });
+
+test('getAuthHeaders baut keinen Authorization-Header ohne Token', function () use ($repoRoot) {
+    // Wächter für OI-24. `Bearer ${sessionStorage.getItem('api_token')}` ergibt
+    // im Dashboard buchstäblich "Bearer null" — dort liegt nie ein Token. Ein
+    // solcher Header verdrängt in api.php die Session
+    // (`if (!$apiToken) session_start()`) und lässt jeden Aufruf mit 401 enden.
+    //
+    // Vier Monate blieb das folgenlos, weil Apache den Header verschluckte, bis
+    // 3d1a30e ihn für die Token-Auth durchreichte und die CSV-Exporte lahmlegte.
+    // Ein serverseitiger Test kann das nicht fangen — er sieht nur, was der
+    // Client schickt. Deshalb hier, an der Quelle.
+    $js = (string) file_get_contents($repoRoot . '/public/js/modules/api.js');
+
+    assertTrue(
+        preg_match('/Bearer \$\{\s*sessionStorage\.getItem/', $js) === 0,
+        'api.js baut einen Bearer-Header direkt aus sessionStorage — ohne Prüfung ergibt '
+        . 'das "Bearer null" und bricht jeden Session-Aufruf (OI-24)'
+    );
+});

@@ -177,6 +177,54 @@ navigiert versehentlich weg.
 verfügbar) oder ob das Vereinssache bleibt (Tablet-eigene Kiosk-App, Geräteverwaltung durch
 MDM). Eine native Kiosk-App ist ausdrücklich außerhalb des Projektumfangs.
 
+### OI-37 · Ortsnachweis überlebt jede Zeitkorrektur
+**Priorität:** mittel — betrifft die Aussagekraft des Verwendungsnachweises
+
+`workSessionUpdate()` schreibt `start_time` und `end_time` neu, lässt `start_location_name`
+und `end_location_name` dabei aber unberührt
+([work_sessions.php:770](../private/handlers/work_sessions.php)). Der Nachweisgrad wird aus
+genau diesen beiden Feldern abgeleitet — im Dashboard clientseitig (`proofOf()` in
+[worktime.js:73](../public/js/modules/worktime.js)), in Statistik und Export serverseitig über
+`worktimeProofExpression()`. Er hängt damit daran, dass **irgendwann** ein Ortsnachweis vorlag,
+nicht an dem Zeitraum, für den er gelten soll.
+
+**Folge:** Wer um 10:00 mit TOTP startet, um 11:00 mit TOTP stoppt und den Start danach auf
+06:00 zieht, hat fünf Stunden mit dem Etikett „stundenbelegt“ — nachgewiesen ist davon eine.
+Der Eintrag fällt zwar auf `submitted` zurück und braucht eine Freigabe, aber in der
+Freigabeliste steht dasselbe grüne „stundenbelegt“ wie bei einer sauber gestempelten Sitzung.
+Was geändert wurde, hält `work_session_log` fest — angezeigt wird es nirgends außer in der
+Selbstauskunft (`my_data`). Auch `source` bleibt auf `timer`, obwohl die Zeiten von Hand
+stammen (verwandt: [OI-33](#oi-33)).
+
+Der Weg steht heute jedem Mitglied offen: „✎ Bearbeiten“ an der eigenen abgeschlossenen
+Sitzung im Dashboard. Mit [OI-35](#oi-35) käme er zusätzlich in die PWA — deshalb vorher
+klären. Absicht war er nicht: Der Kommentar an der Stelle begründet den Statuswechsel, den
+Ortsnachweis erwähnt er nicht.
+
+**Vorschlag:** Den betroffenen Nachweis mit der Zeit fallen lassen — `start_time` geändert →
+`start_location_name = NULL`, `end_time` geändert → `end_location_name = NULL`. Der
+Nachweisgrad rutscht damit auf `start` bzw. `none`. Ein Ortsnachweis gilt für den gestempelten
+Zeitpunkt, nicht für den behaupteten; das ist die einzige Lesart, die vor einem Fördergeber
+hält.
+
+**Zu entscheiden:**
+
+- **Gilt das auch für Manager und Admin?** Fachlich ja — die Verschiebung macht den Nachweis
+  sachlich falsch, gleich wer sie vornimmt. Es nimmt der freigebenden Instanz allerdings die
+  Möglichkeit, einen offensichtlichen Vertipper zu heilen, ohne den Nachweis zu opfern.
+- **Toleranz für Minutenkorrekturen?** Hier ohne Empfehlung dafür: Eine Schwelle erzeugt einen
+  Sonderfall, den später niemand mehr erklären kann.
+- **Oder statt dessen:** Geänderte Sitzungen in der Freigabeliste kennzeichnen und das
+  `work_session_log` dort anzeigen. Ehrlicher gegenüber dem Manager, aber deutlich mehr Arbeit
+  — und das Etikett bliebe trotzdem falsch. Beides zusammen wäre das Vollbild.
+- **Bestand.** Ob bereits korrigierte Sitzungen nachträglich herabgestuft werden, ist offen.
+  Ermitteln ließen sie sich über `work_session_log` (Änderungssätze mit `start_time` oder
+  `end_time`), solange die Auditspur nicht schon gelöscht ist — siehe [OI-2](#oi-2).
+
+**Berührt:** `private/handlers/work_sessions.php` (`workSessionUpdate()`),
+`tests/suites/worktime_api.php`. Frontend unberührt: Der Nachweisgrad wird überall aus den
+Ortsfeldern abgeleitet, hier wie dort.
+
 ---
 
 ## Restarbeiten
@@ -295,9 +343,15 @@ neuen Tab, statt einer Meldung in der Oberfläche.
 
 **Gefunden** beim manuellen Test ZR-M9 am 2026-09-03 mit einem Zeitraum über 24 Monate.
 
-**Nicht neu.** `exportMembers`, `exportAppointments` und `exportRecords` nutzen dasselbe
-Muster seit jeher. Der Berichtsdialog hat es nur sichtbar gemacht, weil er der erste Export
-mit einer Eingabe ist, die serverseitig scheitern kann.
+**Korrektur vom 2026-09-07.** Hier stand: „`exportMembers`, `exportAppointments` und
+`exportRecords` nutzen dasselbe Muster seit jeher." **Das war falsch** — ungeprüft aus dem
+Muster der Arbeitszeit-Exporte geschlossen. Die drei nutzen seit ihrer Einführung
+`fetch` + Blob, also genau den Weg, der hier als Lösung vorgeschlagen wird.
+
+Damit dreht sich die Bewertung: Betroffen sind allein die Arbeitszeit-Berichte, die über
+`window.location.href` und `window.open` gehen. Dass ausgerechnet dieses Muster
+funktioniert, während die „bessere" Variante mit `fetch` an einem leeren Auth-Header
+scheiterte (OI-24), ist der Grund, warum der Umbau hier ohne Not nichts gewinnt.
 
 **Teilweise entschärft.** Der konkrete Fall ist behoben: `runWorktimeReport()` prüft die
 24-Monats-Grenze und das verdrehte Datum vor dem Aufruf und meldet beides als Toast. Die
@@ -305,9 +359,10 @@ Rechnung ist gegen die serverseitige geprüft — für zehn Datumspaare einschli
 Schaltjahr liefern PHP und JavaScript denselben letzten zulässigen Tag. Die Prüfung im
 Server bleibt die verbindliche.
 
-**Was offen bleibt:** Läuft die Session ab, während der Dialog offen steht, erscheint
+**Was offen bleibt:** Läuft die Session ab, während der Berichtsdialog offen steht, erscheint
 weiterhin `{"message":"Unauthorized"}` als Seite. Dasselbe gilt für jede von Hand
-zusammengesetzte URL und für die drei älteren Exporte.
+zusammengesetzte URL. Die drei älteren Exporte sind seit 2026-09-07 nicht mehr betroffen —
+sie prüfen den Status und melden über einen Toast (OI-24).
 
 **Lösungsweg:** Eine gemeinsame Funktion, die den Export per `fetch` anfordert, den Status
 prüft und erst bei `200` ausliefert. Zwei Fallstricke:
@@ -338,6 +393,99 @@ Drei Beobachtungen aus dem Probebetrieb der virtuellen Station (`public/station/
 **Berührt:** `public/station/index.html`, `public/station/css/style.css`,
 `public/station/js/app.js` (`renderNumberPad()`, `numberNext`, `showScreen('pin')`).
 Kein Server-Anteil.
+
+### OI-35 · PWA: Arbeitszeit korrigieren und nachtragen
+**Priorität:** niedrig — vorgemerkt, vor der Umsetzung zu prüfen
+
+Der Verlauf-Tab der Check-in-PWA führt Arbeitszeitsitzungen in der Zeitachse mit, aber ohne
+jede Aktion: `addWorkSessionToHistory()` rendert Datum, Tätigkeit, Dauer, Notiz und Status —
+keinen Knopf. Wer einen Vertipper in Start, Ende oder Notiz bemerkt, muss ans Dashboard. Dort
+darf ein einfacher Nutzer seine eigenen abgeschlossenen Sitzungen korrigieren
+([worktime.js:211](../public/js/modules/worktime.js), `renderWorktimeActions()`). Die PWA bleibt
+hinter dieser Möglichkeit zurück — obwohl sie das Gerät ist, mit dem die Zeit erfasst wurde.
+
+**Serverseitig ist der Weg schon da.** `workSessionUpdate()` lässt den Eigentümer seine eigene
+Sitzung ändern und setzt den Status dabei zurück auf `submitted`: Eine Änderung durch das
+Mitglied entzieht die Bestätigung und verlangt eine neue Freigabe
+([work_sessions.php:767](../private/handlers/work_sessions.php)). Ein „Korrektur-Antrag“ ist
+damit kein neuer Datentyp und keine neue Ressource, sondern ein `PUT work_sessions` aus der PWA.
+Zu bauen wäre allein die Oberfläche: Knopf am Verlaufseintrag, ein Formular (Tätigkeit, Start,
+Ende, Pause, Notiz) und danach ein Neuladen des Verlaufs.
+
+**Zweiter Fall: vergessenes Anstempeln.** Wer den Start ganz vergessen hat, hat keine Sitzung
+zu korrigieren, sondern eine anzulegen. Auch dafür ist der Server fertig: `POST work_sessions`
+**ohne** `action` legt über `workSessionCreateManual()` eine vollständige Sitzung an — Status
+`submitted`, `source = manual`, ohne Ortsnachweis, ohne Rückwirkungsgrenze. Das Dashboard hat
+den Dialog dafür („+ Zeit nachtragen“, [index.html:1160](../public/index.html)), die PWA nicht.
+Beides gehört in dieselbe Oberfläche: „Korrigieren“ am Verlaufseintrag (`PUT`), „Zeit
+nachtragen“ im Arbeitszeit-Tab (`POST`) — ein Formular, zwei Einstiege.
+
+**Vor der Umsetzung zu klären:**
+
+- **Welche Sitzungen dürfen korrigiert werden?** `submitted` und `confirmed` liegen nahe. Bei
+  `rejected` ist offen, ob eine Korrektur den Fall wieder öffnen soll oder ob eine Ablehnung
+  endgültig bleibt.
+- **Laufende Sitzungen bleiben außen vor.** Ein `PUT` auf eine laufende Sitzung antwortet
+  **409** („Session is still running“), solange kein `end_time` mitkommt. Wer zu spät
+  angestempelt hat, stoppt also zuerst und korrigiert danach. Ein Sonderweg für laufende
+  Sitzungen wäre nicht ratsam: Eine zurückverlegte Startzeit kann die Sitzung sofort überfällig
+  machen (`worktime_max_session_hours`), der nächste Zugriff kappt sie dann auf Start plus
+  Obergrenze — das Mitglied verlöre genau die Zeit, die es nachtragen wollte.
+- **Rückwirkende Frist.** Eine Korrektur an einer Sitzung aus dem Vorjahr verändert eine bereits
+  abgeschlossene Auswertung und einen womöglich schon eingereichten Verwendungsnachweis. Ob es
+  eine Grenze braucht — und ob sie eine Einstellung wird, analog `checkin_tolerance_hours`
+  ([OI-21](#oi-21)) —, ist offen.
+- **Begründung.** Wer eine bestätigte Zeit ändert, sollte vermutlich sagen warum. Heute gäbe es
+  dafür nur das Notizfeld; `work_session_log` hält zwar jede Änderung fest, aber keinen Grund.
+- **Berührt [OI-3](#oi-3):** Ein Manager, der seine eigene Sitzung über die PWA korrigiert,
+  behält `confirmed` — dieselbe Lücke wie beim Nachtrag, nur an einer weiteren Stelle.
+- **Voraussetzung [OI-37](#oi-37):** Eine Zeitkorrektur lässt den Ortsnachweis heute
+  unangetastet. Solange das so bleibt, vervielfacht jeder neue Korrekturweg die Zahl falsch
+  etikettierter Stunden.
+
+**Berührt:** `public/checkin/index.html`, `public/checkin/js/app.js`
+(`addWorkSessionToHistory()`, `loadHistory()`, Arbeitszeit-Tab), `public/checkin/css/style.css`.
+Server voraussichtlich unberührt.
+
+### OI-36 · PWA-Statistik ohne geleistete Stunden
+**Priorität:** niedrig — vorgemerkt, vor der Umsetzung zu prüfen
+
+Der Statistik-Tab der PWA zeigt zwei Karten — Anwesenheitsquote und Terminzahl — und die
+Übersicht nach Gruppen. Die seit 1.2.0 erfassten Stunden kommen darin nicht vor. Ein Mitglied,
+das seine Arbeitszeit über die PWA erfasst, kann dort seinen Verlauf sehen, aber keine Summe:
+„Wie viele Stunden habe ich dieses Jahr geleistet?“ beantwortet die PWA nicht.
+
+**Der Server liefert die Zahlen bereits.** `statistics` kennt den Parameter `include=worktime`
+und hängt dann einen eigenen `worktime`-Block an
+([statistics.php:153](../private/handlers/statistics.php), `worktimeStatistics()` in
+[worktime.php:445](../private/helpers/worktime.php)): Gesamtminuten, Sitzungszahl, Aufteilung
+nach Nachweisart und nach Tätigkeit, für einen `user` auf das eigene Mitglied begrenzt.
+`loadStatistics()` in der PWA fragt den Parameter schlicht nicht an
+([app.js:3080](../public/checkin/js/app.js)) — und auch das Dashboard nutzt den Block nirgends;
+es rechnet seine Summen in `updateWorktimeStats()` selbst aus der Sitzungsliste. Der Block hat
+damit heute **keinen** Abnehmer im Frontend.
+
+**Vor der Umsetzung zu klären:**
+
+- **Wann die Karte erscheint.** Nur wenn das Mitglied überhaupt Arbeitszeit erfassen darf —
+  dieselbe Bedingung, die der Verlauf schon nutzt (`worktimeActivities.length > 0`). Sonst
+  zeigt die Statistik allen anderen dauerhaft „0 h“.
+- **Was mit `submitted` passiert.** `worktimeStatistics()` summiert ausschließlich `confirmed`
+  mit `end_time` (Testplan AW-2). Wer gestern acht Stunden eingetragen hat und heute „0 h“ liest,
+  hält das für einen Fehler. Ein zweiter Wert „davon x h in Freigabe“ wäre die ehrlichere
+  Anzeige, verlangt aber eine Erweiterung des Blocks oder einen zweiten Abruf auf
+  `work_sessions`.
+- **Wie tief die Aufschlüsselung geht.** `by_activity` und `by_proof` liegen bereit; auf einem
+  Handybildschirm ist die Frage, ob mehr als eine Summe plus Tätigkeitsliste noch lesbar ist.
+- **Getrennt bleiben.** Die Stunden gehören in einen eigenen Block, nicht in die Anwesenheits-
+  quote — siehe „Statistik getrennt von Anwesenheit“ unter *Bewusst entschieden*.
+
+**Erledigt vorab:** `include=worktime` war nur über `docs/testplan.md` (AW-2, AW-5) belegt und
+ist seit 2026-09-07 in `API.md` dokumentiert (Abschnitt *Statistiken → Arbeitszeit im Ergebnis*).
+
+**Berührt:** `public/checkin/index.html` (Statistik-Tab), `public/checkin/js/app.js`
+(`loadStatistics()`, `displayStatistics()`), `public/checkin/css/style.css`.
+Server voraussichtlich unberührt.
 
 ---
 
@@ -673,16 +821,57 @@ korrekter Vorauswahl.
 
 ---
 
-### OI-24 · CSV Export kaputt - Import noch ungetestet
-**Priorität:** mittel
+### OI-24 · CSV-Export war durch einen leeren Auth-Header blockiert
+**Priorität:** erledigt am 2026-09-07 — Import weiterhin ungetestet
 
-Der CSV-Export von Terminen, Mitgliedern und Anwesenheiten funktioniert nicht mehr
+Der CSV-Export von Terminen, Mitgliedern und Anwesenheiten funktionierte nicht:
 
-- Bei Kalender wird eine Datei heruntergeladen, diese beinhaltet eine JSON-Fehlermeldung {api-token invalid or empty};
-- Bei Members und Records kommt direkt eine Fehlermeldung
-- Import wurde aktuell noch nicht getestet.
+- Kalender: heruntergeladene Datei mit einer JSON-Fehlermeldung darin
+- Mitglieder und Anwesenheiten: Fehlermeldung in der Oberfläche
 
-Abgleich, dass Export-Daten auch direkt wieder importierbar sind, ist nicht erfolgt.
+**Ursache.** `getAuthHeaders()` baute den Header
+`Authorization: Bearer ${sessionStorage.getItem('api_token')}` **unbedingt**. Das Dashboard
+legt aber nie einen Token ab — `sessionStorage` hält dort nur `csrf_token` und
+`current_user`. Der Header lautete also wörtlich `Bearer null`.
+
+`api.php` startet die Session nur, wenn **kein** Token mitkommt
+(`if (!$apiToken) session_start()`). Der Aufruf lief damit in die Token-Prüfung, fand
+keinen Nutzer zu `"null"` und endete mit `401 Invalid or inactive API token` — trotz
+gültiger Anmeldung. `getAuthHeaders()` wurde ausschließlich von diesen drei Exporten
+benutzt; deshalb war sonst nichts betroffen.
+
+**Warum es erst spät auffiel — und warum es vorher funktionierte.** Der Fehler steckt seit
+der Einführung des Exports (`8766480`, 2025-12-11) im Code, blieb aber wirkungslos: Apache
+verschluckte den `Authorization`-Header, PHP sah ihn nie, `$apiToken` blieb leer und die
+Session griff.
+
+Geweckt hat ihn `3d1a30e` (2026-04-16),
+*„pass Authorization header through Apache; prevent session shadowing on token auth
+(BUG-4)"* — ein in beiden Teilen berechtigter Fix: Ohne das Durchreichen funktioniert
+Token-Auth unter Apache nicht, und das `session_unset()` verhindert, dass eine alte
+Admin-Session die Rechte eines Token-Nutzers ausweitet. Der Nebeneffekt war, dass
+`Bearer null` von da an ankam.
+
+**Warum eine 1.1.3-Installation betroffen sein kann.** Die Version wurde am 2026-04-15
+gestempelt und blieb bis zum 2026-09-01 stehen. Der Bruch liegt am **zweiten Tag** dieses
+Fensters: Eine 1.1.3 von vor dem 16.04. exportiert einwandfrei, eine von danach nicht — bei
+gleicher Versionsnummer.
+
+**Behoben am 2026-09-07.** `getAuthHeaders()` setzt den Header nur noch, wenn ein Token
+vorliegt. Die drei Exporte senden zusätzlich `credentials: 'same-origin'`, und der
+Termin-Export prüft jetzt `response.ok` — ohne das wurde der Fehlerkörper zum Blob und
+landete als `.csv` mit JSON darin auf der Platte.
+
+Abgesichert durch drei Tests: Export über die Session ohne Auth-Header (`api_selftest`),
+ein leerer Bearer-Header wird abgewiesen (hält das Server-Verhalten fest), und ein Wächter
+in `assets`, der anschlägt, sobald in `api.js` wieder ein Bearer-Header direkt aus
+`sessionStorage` gebaut wird. Der Wächter ist gegengeprüft: Mit der alten Fassung von
+`api.js` schlägt er fehl.
+
+**Offen: Import.** Er war von dieser Ursache **nicht** betroffen — die Import-Aufrufe nutzen
+`credentials: 'same-origin'` und schicken den CSRF-Token im FormData, ohne
+`getAuthHeaders()`. Getestet ist er damit trotzdem nicht, und der Abgleich, dass exportierte
+Daten unverändert wieder importierbar sind, steht weiterhin aus.
 
 ---
 

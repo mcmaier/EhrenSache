@@ -33,6 +33,28 @@ Query-Parameter (nicht empfohlen):
 ?api_token=YOUR_API_TOKEN
 ```
 
+### Die beiden Methoden schließen einander aus
+
+**Sobald ein Token mitgeschickt wird, wird die Session gar nicht erst gestartet.** `api.php`
+prüft `if (!$apiToken) session_start()` — ein vorhandener Token-Header hat also Vorrang, und
+zwar bevor irgendjemand nachsieht, ob er gültig ist.
+
+Daraus folgt ein Fallstrick, der leicht zu übersehen ist:
+
+> **Einen leeren `Authorization`-Header niemals mitsenden.**
+
+Ein Header wie `Authorization: Bearer null` oder `Bearer ` ist für den Server ein Token — er
+sucht danach, findet nichts und antwortet mit `401 Invalid or inactive API token`. Die
+Session wird dabei nie angesehen, obwohl das Cookie gültig ist und mitgeschickt wurde. Der
+Aufruf scheitert also **härter** als ohne jeden Header, denn ohne Header hätte die Session
+gegriffen.
+
+Für Clients heißt das: Den Header nur setzen, wenn tatsächlich ein Token vorliegt. Wer aus
+dem Browser heraus mit Session arbeitet, sendet stattdessen `credentials: 'same-origin'`.
+
+Diese Falle hat die CSV-Exporte des Dashboards vier Monate lang unbrauchbar gemacht, siehe
+OI-24 in `docs/OPEN-ITEMS.md`.
+
 ### CSRF-Schutz
 
 Bei Session-basierter Authentifizierung ist ein CSRF-Token erforderlich:

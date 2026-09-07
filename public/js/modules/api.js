@@ -148,15 +148,36 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
     
 }
 
-// Neue Hilfsfunktion für Auth-Headers (auch für FormData)
+/**
+ * Auth-Header für Aufrufe, die nicht über apiCall() laufen (z. B. FormData,
+ * Blob-Downloads).
+ *
+ * Der Header entsteht NUR, wenn tatsächlich ein Token vorliegt. Ohne diese
+ * Bedingung stand hier `Bearer null` — ein gültig aussehender Header ohne
+ * Inhalt, und der ist schlimmer als gar keiner:
+ *
+ * `api.php` startet die Session nur, wenn KEIN Token mitkommt
+ * (`if (!$apiToken) session_start()`). Ein `Bearer null` verdrängt also die
+ * Session, läuft in den Token-Zweig und endet mit
+ * `401 Invalid or inactive API token` — obwohl der Nutzer angemeldet ist.
+ *
+ * Das Dashboard legt gar keinen Token ab; `sessionStorage` hält hier nur
+ * `csrf_token` und `current_user`. Der Header war deshalb immer leer. Vier
+ * Monate lang blieb das folgenlos, weil Apache den Authorization-Header
+ * verschluckte — bis `3d1a30e` (2026-04-16) ihn für die Token-Auth der PWA
+ * durchreichte und damit die CSV-Exporte lahmlegte. Siehe OI-24.
+ */
 export function getAuthHeaders(skipContentType = false) {
-    const headers = {
-        'Authorization': `Bearer ${sessionStorage.getItem('api_token')}`
-    };
-    
+    const headers = {};
+
+    const token = sessionStorage.getItem('api_token');
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     if (!skipContentType) {
         headers['Content-Type'] = 'application/json';
     }
-    
+
     return headers;
 }

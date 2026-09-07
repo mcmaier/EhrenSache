@@ -10,6 +10,21 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ## [1.3.1] – 2026-09-07
 
 ### Behoben
+- **CSV-Export von Mitgliedern, Terminen und Anwesenheiten war unbenutzbar.** Das Dashboard
+  schickte bei diesen drei Downloads den Header `Authorization: Bearer null` mit — es legt
+  gar keinen API-Token ab, `getAuthHeaders()` baute den Header aber unbedingt. Ein solcher
+  Header verdrängt in `api.php` die Session (`if (!$apiToken) session_start()`), läuft in die
+  Token-Prüfung und endet mit `401`, obwohl der Nutzer angemeldet ist. Der Header entsteht
+  jetzt nur noch, wenn tatsächlich ein Token vorliegt.
+
+  Der Fehler lag seit der Einführung des Exports im Code, blieb aber vier Monate folgenlos,
+  weil Apache den `Authorization`-Header verschluckte. Sichtbar wurde er erst, als dieser
+  Header für die Token-Authentifizierung der PWA durchgereicht wurde — ein berechtigter Fix,
+  der einen schlafenden Fehler geweckt hat. Betroffen waren ausschließlich diese drei
+  Exporte; der Import und alle übrigen Aufrufe laufen über andere Wege. Siehe OI-24.
+- **Der Termin-Export lud Fehlermeldungen als CSV-Datei herunter.** Ihm fehlte die Prüfung
+  auf `response.ok`, sodass der Fehlerkörper zum Blob wurde und als `.csv` mit JSON darin
+  auf der Platte landete.
 - **Mitgliedsfilter der Zeiterfassung war beim ersten Öffnen leer.** Die Auswahl wurde aus
   dem Mitglieder-Cache aufgebaut, den der Bereichswechsel erst 500 ms später im Hintergrund
   füllt. Filterleiste und Nachtrags-Dialog laden die Liste jetzt selbst (`loadMembers()`)
