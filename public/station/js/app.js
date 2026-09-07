@@ -233,6 +233,8 @@ function resetToIdle() {
     // M5: Reste der letzten Sitzung nicht mit ins naechste Ruhebild nehmen.
     $('numberDisplay').textContent = '';
     $('pinDisplay').textContent = '';
+    $('pinFor').textContent = '';
+    showError('numberError', null);
     $('greeting').textContent = '';
     $('attendanceInfo').textContent = '';
     $('worktimeInfo').textContent = '';
@@ -498,7 +500,12 @@ document.addEventListener('visibilitychange', () => {
 // ============================================
 
 const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
-const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ-'.split('').concat(['⌫']);
+// Nummernblock: der Umschalter auf Buchstaben sitzt IN der Tastatur, nicht
+// neben Abbrechen/Weiter (OI-34). MODE_ALPHA/MODE_DIGITS sind keine Zeichen.
+const MODE_ALPHA  = 'ABC';
+const MODE_DIGITS = '123';
+const NUMBER_DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', MODE_ALPHA, '0', '⌫'];
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ-'.split('').concat([MODE_DIGITS, '⌫']);
 
 function renderPad(containerId, keys, onKey, alpha = false) {
     const pad = $(containerId);
@@ -512,6 +519,7 @@ function renderPad(containerId, keys, onKey, alpha = false) {
             btn.disabled = true;
             btn.style.visibility = 'hidden'; // M9: Platzhalter reagiert nicht auf Klicks
         } else {
+            if (key === MODE_ALPHA || key === MODE_DIGITS) btn.classList.add('mode');
             btn.addEventListener('click', () => onKey(key));
         }
         pad.appendChild(btn);
@@ -519,6 +527,12 @@ function renderPad(containerId, keys, onKey, alpha = false) {
 }
 
 function numberKey(key) {
+    showError('numberError', null);
+    if (key === MODE_ALPHA || key === MODE_DIGITS) {
+        state.alpha = key === MODE_ALPHA;   // E3: Mitgliedsnummern duerfen Buchstaben tragen
+        renderNumberPad();
+        return;
+    }
     if (key === '⌫') {
         state.memberNumber = state.memberNumber.slice(0, -1);
     } else if (state.memberNumber.length < 20) {
@@ -537,8 +551,7 @@ function pinKey(key) {
 }
 
 function renderNumberPad() {
-    renderPad('numberPad', state.alpha ? LETTERS : DIGITS, numberKey, state.alpha);
-    $('numberAbc').textContent = state.alpha ? '123' : 'ABC';
+    renderPad('numberPad', state.alpha ? LETTERS : NUMBER_DIGITS, numberKey, state.alpha);
 }
 
 $('stampStart').addEventListener('click', () => {
@@ -548,21 +561,23 @@ $('stampStart').addEventListener('click', () => {
     state.pin = '';
     state.alpha = false;
     $('numberDisplay').textContent = '';
+    showError('numberError', null);
     renderNumberPad();
     showScreen('number');
-});
-
-$('numberAbc').addEventListener('click', () => {
-    state.alpha = !state.alpha;   // E3: Mitgliedsnummern duerfen Buchstaben tragen
-    renderNumberPad();
 });
 
 $('numberCancel').addEventListener('click', resetToIdle);
 
 $('numberNext').addEventListener('click', () => {
-    if (!state.memberNumber) return;
+    if (!state.memberNumber) {
+        showError('numberError', 'Nummer darf nicht leer sein');
+        return;
+    }
     state.pin = '';
     $('pinDisplay').textContent = '';
+    // Die Nummer bleibt sichtbar: wer "Nummer oder PIN falsch" liest, sieht so,
+    // ob der Tippfehler in der Nummer steckt (OI-34).
+    $('pinFor').textContent = `Mitgliedsnummer: ${state.memberNumber}`;
     showError('pinError', null);
     renderPad('pinPad', DIGITS, pinKey);
     showScreen('pin');

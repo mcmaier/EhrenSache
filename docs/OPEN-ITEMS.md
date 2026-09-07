@@ -319,7 +319,7 @@ prüft und erst bei `200` ausliefert. Zwei Fallstricke:
   per `fetch` und danach ein `window.open` auf die echte URL — also bewusst zwei Anfragen.
 
 ### OI-34 · Kiosk: Bedienbarkeit der Nummern- und PIN-Eingabe
-**Priorität:** niedrig — Rückmeldung aus dem ersten Tablet-Test am 2026-09-07, noch nicht umgesetzt
+**Priorität:** erledigt am 2026-09-07 — Rückmeldung aus dem ersten Tablet-Test, umgesetzt in `public/station/` (Umschalter „ABC“/„123“ als Taste im Ziffernblock, Hinweis „Nummer darf nicht leer sein“, Mitgliedsnummer im PIN-Bild)
 
 Drei Beobachtungen aus dem Probebetrieb der virtuellen Station (`public/station/`):
 

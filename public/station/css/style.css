@@ -96,6 +96,9 @@ label { display: block; margin: 12px 0; }
     font-size: 1.6em; padding: 18px 0; border-radius: 12px; border: 1px solid var(--border); background: #fff; cursor: pointer;
 }
 .keypad button:active { background: var(--border); }
+/* Umschalter Ziffern/Buchstaben: Teil der Tastatur, nicht der Navigation (OI-34) */
+.keypad button.mode { background: var(--background-color); color: var(--primary-color); font-size: 1.1em; font-weight: 600; }
+.keypad.alpha button.mode { grid-column: span 2; }
 
 /* Aktion */
 .action { width: min(960px, 100%); max-height: 100%; }

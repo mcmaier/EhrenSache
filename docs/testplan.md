@@ -911,6 +911,9 @@ Manuell im Dashboard:
 | ST-8 | Selbstauskunft herunterladen (JSON und CSV) | `has_pin` und `pin_updated_at` bzw. Zeilen „Stations-PIN gesetzt"/„PIN zuletzt geändert", kein Hash |
 | ST-9 | Neues Mitglied mit ungültiger PIN anlegen | Mitglied wird angelegt, Modal bleibt im Bearbeiten-Modus offen, Fehlertoast zur PIN |
 | ST-10 | Im selben Browser erst `station/` mit Token aufrufen, dann am Dashboard anmelden | Dashboard bleibt nutzbar, kein 401 nach dem Login |
+| ST-11 | Kiosk: „Weiter" ohne Mitgliedsnummer | Roter Hinweis „Nummer darf nicht leer sein" unter dem Ziffernblock; verschwindet beim nächsten Tastendruck |
+| ST-12 | Kiosk: Taste „ABC" im Ziffernblock, dann „123" | Buchstabentastatur mit Bindestrich, Umschalter zurück ist doppelt breit; Navigationszeile zeigt nur Abbrechen/Weiter |
+| ST-13 | Kiosk: PIN-Bild nach Eingabe von „B77" | Unter „PIN" steht „Mitgliedsnummer: B77"; nach Abbruch oder Ruhezeit ist der Text weg |
 
 ---
 
