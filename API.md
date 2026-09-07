@@ -367,7 +367,7 @@ GET /api.php?resource=members&id=1
 
 **Stations-PIN (seit 1.3.0):** Jede Admin/Manager-Antwort (einzeln und Liste) trägt `has_pin`
 (Boolean) und `pin_updated_at`; der Hash selbst (`pin_hash`) verlässt den Server nie.
-`member_number` wird beim Speichern nicht getrimmt — Leerzeichen am Rand bleiben erhalten.
+`member_number` wird beim Speichern getrimmt (seit 1.3.0); ein danach leerer Wert wird als `null` gespeichert.
 
 ---
 
