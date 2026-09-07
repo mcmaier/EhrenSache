@@ -1,0 +1,110 @@
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/* Kiosk: grosse Flaechen, keine Scrollbalken, keine Textauswahl. */
+
+:root {
+    --primary-color: #1F5FBF;
+    --background-color: #f8f9fa;
+    --text: #2F3A45;
+    --text-light: #6B7280;
+    --card-bg: #ffffff;
+    --border: #e0e6ed;
+    --success: #27ae60;
+    --error: #e74c3c;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--background-color);
+    color: var(--text);
+    font-size: 20px;
+}
+
+.screen { display: none; height: 100%; padding: 24px; }
+.screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+.banner {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    padding: 12px 24px; text-align: center; color: #fff; background: var(--error); font-weight: 600;
+}
+
+.card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+.card.narrow { width: min(560px, 100%); }
+.card.center { text-align: center; }
+.muted { color: var(--text-light); font-size: 0.85em; }
+.error { color: var(--error); margin-top: 12px; text-align: center; }
+.logo { max-height: 96px; max-width: 240px; display: block; margin: 0 auto 16px; }
+.logo.small { max-height: 56px; margin: 0; }
+.org { font-weight: 700; font-size: 1.2em; }
+
+input[type="password"], input[type="number"] {
+    width: 100%; padding: 14px; font-size: 1em; border: 1px solid var(--border); border-radius: 10px; margin: 12px 0;
+    -webkit-user-select: text; user-select: text;
+}
+label { display: block; margin: 12px 0; }
+
+.btn {
+    border: 1px solid var(--border); background: #fff; color: var(--text);
+    border-radius: 12px; padding: 14px 22px; font-size: 1em; cursor: pointer; min-width: 120px;
+}
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn.primary { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+.btn.danger { background: var(--error); color: #fff; border-color: var(--error); }
+.btn.big { padding: 20px 28px; font-size: 1.15em; width: 100%; margin-top: 12px; }
+.btn.huge { padding: 40px; font-size: 1.8em; width: 100%; }
+.row { display: flex; gap: 12px; margin-top: 16px; justify-content: center; flex-wrap: wrap; }
+
+/* Ruhebild */
+.idle-header { width: 100%; display: flex; align-items: center; gap: 20px; padding-bottom: 16px; }
+.idle-header > div:nth-child(2) { flex: 1; }
+.clock { font-size: 2.4em; font-weight: 700; font-variant-numeric: tabular-nums; }
+.idle-main { flex: 1; width: 100%; display: flex; gap: 24px; align-items: stretch; justify-content: center; }
+.idle-main > .card { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.qr svg { width: min(38vh, 320px); height: auto; }
+.code { font-size: 3em; font-weight: 700; letter-spacing: 0.15em; font-variant-numeric: tabular-nums; margin: 12px 0 8px; }
+.progress { width: 60%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 12px; }
+.bar { height: 100%; background: var(--primary-color); width: 100%; transition: width 1s linear; }
+
+/* Eingabe */
+.entry { width: min(640px, 100%); text-align: center; }
+.display {
+    min-height: 72px; margin: 16px 0; padding: 12px; font-size: 2em; letter-spacing: 0.1em;
+    border: 2px solid var(--border); border-radius: 12px; background: #fff; font-variant-numeric: tabular-nums;
+}
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.keypad.alpha { grid-template-columns: repeat(7, 1fr); }
+.keypad button {
+    font-size: 1.6em; padding: 18px 0; border-radius: 12px; border: 1px solid var(--border); background: #fff; cursor: pointer;
+}
+.keypad button:active { background: var(--border); }
+
+/* Aktion */
+.action { width: min(960px, 100%); }
+.action h2 { margin-bottom: 16px; }
+.cards { display: flex; gap: 20px; }
+.cards > .card { flex: 1; }
+.cards h3 { margin-bottom: 8px; }
+.activities { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.activities button { border-radius: 999px; padding: 10px 16px; border: 2px solid var(--border); background: #fff; cursor: pointer; font-size: 0.9em; }
+.activities button.selected { border-color: var(--primary-color); background: var(--primary-color); color: #fff; }
+
+/* Bestaetigung */
+.check { font-size: 5em; color: var(--success); line-height: 1; margin-bottom: 8px; }
+
+@media (max-width: 720px) {
+    .idle-main, .cards { flex-direction: column; }
+    html { font-size: 17px; }
+}
