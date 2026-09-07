@@ -318,6 +318,27 @@ prüft und erst bei `200` ausliefert. Zwei Fallstricke:
   nicht, der Bericht käme ohne Stylesheet und ohne Logo. Hier bliebe nur eine Vorabprüfung
   per `fetch` und danach ein `window.open` auf die echte URL — also bewusst zwei Anfragen.
 
+### OI-34 · Kiosk: Bedienbarkeit der Nummern- und PIN-Eingabe
+**Priorität:** niedrig — Rückmeldung aus dem ersten Tablet-Test am 2026-09-07, noch nicht umgesetzt
+
+Drei Beobachtungen aus dem Probebetrieb der virtuellen Station (`public/station/`):
+
+- **„ABC"-Taste absetzen.** Im Nummernbild steht der Umschalter auf die Buchstabentastatur
+  zwischen „Abbrechen" und „Weiter" und sieht aus wie eine dritte Navigationstaste. Er gehört
+  optisch zur Tastatur — abgesetzt von den beiden Aktionen, eher größer, etwa als eigene Taste
+  im Ziffernblock.
+- **Leere Nummer benennen.** Ein Tipp auf „Weiter" ohne Nummer tut heute nichts
+  (`numberNext` bricht still ab). Ein Hinweis „Nummer darf nicht leer sein" gehört ins
+  Nummernbild, analog zum Fehlertext unter dem PIN-Block.
+- **Nummer im PIN-Bild anzeigen.** Wer „Nummer oder PIN falsch" liest, weiß nicht, ob er sich
+  bei der Nummer oder bei der PIN vertippt hat. Die eingegebene Nummer im PIN-Bild als Text
+  zu zeigen, verrät nichts Neues (er hat sie selbst eingetippt) und spart den zweiten
+  Durchlauf. Die Einheitlichkeit der Fehlermeldung (E12) bleibt unberührt.
+
+**Berührt:** `public/station/index.html`, `public/station/css/style.css`,
+`public/station/js/app.js` (`renderNumberPad()`, `numberNext`, `showScreen('pin')`).
+Kein Server-Anteil.
+
 ---
 
 ## Sicherheit
