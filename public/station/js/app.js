@@ -50,6 +50,8 @@ const SERVER_MESSAGES = {
     'Kein passender Termin gefunden':       'Kein Termin im Zeitfenster – bitte beim Vorstand melden.',
     'A session is already running':         'Es läuft bereits eine Zeiterfassung.',
     'No running session':                   'Es läuft keine Zeiterfassung.',
+    'Already paused':                       'Die Zeiterfassung ist bereits pausiert.',
+    'Not paused':                           'Die Zeiterfassung ist nicht pausiert.',
     'Activity type not allowed for this member': 'Diese Tätigkeit ist für deine Gruppe nicht vorgesehen.',
     'activity_id must be a positive integer': 'Bitte eine Tätigkeit wählen.',
     // Generischer 404 von api.php, wenn keine Route passt — im Stations-Kontext

@@ -23,6 +23,7 @@ test('Alle Asset-Links mit ?v= tragen die aktuelle Version', function () use ($r
         '/public/index.html',
         '/public/login.html',
         '/public/checkin/index.html',
+        '/public/station/index.html',
     ];
 
     $found = 0;

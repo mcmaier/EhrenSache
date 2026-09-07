@@ -75,9 +75,11 @@ class RateLimiter {
             $cutoffTime = date('Y-m-d H:i:s', time() - $windowSeconds);
 
             // Alte Einträge aufräumen (vor der Transaktion – kein Deadlock-Risiko)
+            // Nur fuer diese Action – ein kurzes Fenster darf keine laenger
+            // haltbaren Sperren anderer Actions (z.B. Stations-PIN, 900s) loeschen.
             $this->db->prepare(
-                "DELETE FROM {$this->prefix}rate_limits WHERE created_at < ?"
-            )->execute([$cutoffTime]);
+                "DELETE FROM {$this->prefix}rate_limits WHERE created_at < ? AND action = ?"
+            )->execute([$cutoffTime, $action]);
 
             $this->db->beginTransaction();
 

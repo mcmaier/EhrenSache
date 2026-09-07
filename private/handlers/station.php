@@ -71,6 +71,21 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
             $data = new stdClass();
         }
 
+        // Unbekannte Actions werden VOR dem Feature-Schalter und VOR der
+        // PIN-Pruefung abgewiesen: sonst verbraucht ein Tippfehler im Client
+        // einen Sperr-Versuch bzw. wuerde stationRequireMember() faelschlich
+        // aufgerufen, obwohl gar keine bekannte Aktion dahintersteckt.
+        $knownPostActions = ['identify', 'checkin', 'work_start', 'work_pause', 'work_resume', 'work_stop'];
+        if (!in_array($action, $knownPostActions, true)) {
+            http_response_code(400);
+            echo json_encode([
+                "message" => "Unknown action",
+                "allowed" => ["GET status", "GET totp", "POST identify", "POST checkin",
+                              "POST work_start", "POST work_pause", "POST work_resume", "POST work_stop"],
+            ]);
+            return;
+        }
+
         if (!isStationPinEnabled($db, $database)) {
             http_response_code(409);
             echo json_encode(["message" => "Station PIN login is disabled"]);

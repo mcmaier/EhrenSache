@@ -146,8 +146,10 @@ function migrate_1_2_5(PDO $pdo, string $prefix, string $configPath): array
     // damit role_name auch nach einem Wizard-Update den neuen Gerätetyp
     // 'kiosk' als 'Virtuelle Station' anzeigt statt im ELSE-Zweig 'Gerät'.
     //
-    // Extraktion erst prüfen, dann droppen: fehlt die Datei oder passt das
+    // Extraktion erst prüfen, dann erstellen: fehlt die Datei oder passt das
     // Muster nicht, bleibt die bestehende (funktionierende) View unangetastet.
+    // CREATE OR REPLACE VIEW ersetzt die View atomar – ein vorheriges DROP ist
+    // nicht nötig und würde die View kurzzeitig verschwinden lassen.
     // ----------------------------------------------------------------
     $sqlFile = __DIR__ . '/../setup/ehrensache_db.sql';
     if (!file_exists($sqlFile)) {
@@ -156,9 +158,12 @@ function migrate_1_2_5(PDO $pdo, string $prefix, string $configPath): array
         $schema = file_get_contents($sqlFile);
         if (preg_match('/(CREATE OR REPLACE VIEW\s+`\{PREFIX\}v_users_extended`.*?;)\s*$/ms', $schema, $m)) {
             $viewSql = str_replace('{PREFIX}', $prefix, $m[1]);
-            $pdo->exec("DROP VIEW IF EXISTS `{$prefix}v_users_extended`");
-            $pdo->exec($viewSql);
-            $log[] = "View <code>{$prefix}v_users_extended</code> aus Schema erstellt";
+            try {
+                $pdo->exec($viewSql);
+                $log[] = "View <code>{$prefix}v_users_extended</code> aus Schema erstellt";
+            } catch (PDOException $e) {
+                $warn[] = 'View konnte nicht neu erstellt werden: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES);
+            }
         } else {
             $warn[] = 'View-Definition nicht in ehrensache_db.sql gefunden – bitte manuell prüfen';
         }

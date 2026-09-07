@@ -728,6 +728,20 @@ Speicherungen unterscheiden.
 
 ---
 
+### OI-33 · Keine Quellen-Kennzeichnung bei Arbeitszeit-Sitzungen
+**Priorität:** niedrig
+
+Anwesenheits-Datensätze zeigen ihre Quelle als Badge (u. a. „Station (PIN)"), Arbeitszeit-
+Sitzungen dagegen nicht: Weder die Dashboard-Ansicht der Zeiterfassung noch der Export
+zeigen `source` (`timer`/`manual`/`admin`/`import`/`station`) an. Eine Kiosk-Sitzung ist
+bis dahin nur an Start- und Endort (Name der Station) erkennbar, nicht an einem eigenen
+Kennzeichen — siehe `DATENSCHUTZ.md` §10.7.
+
+**Zu tun (optional):** Badge oder Spalte für `source` in Zeiterfassungs-Ansicht und -Export.
+Bis dahin genügen die Ortsfelder zur Einordnung.
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |

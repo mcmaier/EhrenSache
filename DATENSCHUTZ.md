@@ -417,11 +417,14 @@ Informieren Sie **vor** der Aktivierung, mindestens über:
   Daten bleiben dabei in der Datenbank; löschen Sie sie gesondert, wenn der
   Zweck entfallen ist.
 - Stempel an einer virtuellen Station (Mitgliedsnummer + PIN) belegen den **Ort**, nicht
-  sicher die **Person**: Eine PIN ist weitergebbar. Die Quelle ist im Datensatz als
-  `station_pin` bzw. `station` gekennzeichnet und in der Oberfläche als „Station (PIN)"
-  sichtbar. Am Kiosk gilt die Notizpflicht der Zeiterfassung nicht. Fehlversuche werden
-  15 Minuten lang gezählt (Sperre je Mitgliedsnummer und je Station, auch bei unbekannter
-  Nummer); die eingegebene PIN selbst wird dabei nicht gespeichert.
+  sicher die **Person**: Eine PIN ist weitergebbar. Anwesenheits-Datensätze tragen die
+  Quelle `station_pin` und sind in der Oberfläche mit dem Badge „Station (PIN)"
+  gekennzeichnet. Arbeitszeit-Sitzungen vom Kiosk tragen im Datensatz und im Export die
+  Quelle `station`; in der Oberfläche zeigt dafür kein eigenes Badge, sondern der
+  Stations-/Kiosk-Name als Start- und Endort erkennt den Eintrag. Am Kiosk gilt die
+  Notizpflicht der Zeiterfassung nicht. Fehlversuche werden 15 Minuten lang gezählt
+  (Sperre je Mitgliedsnummer und je Station, auch bei unbekannter Nummer); die
+  eingegebene PIN selbst wird dabei nicht gespeichert.
 
 ---
 
