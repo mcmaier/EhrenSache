@@ -85,7 +85,9 @@ const state = {
     blocked: false,        // 403/409 auf Geraeteebene: Token bleibt, es wird auf Besserung gepollt (I1)
     nextCode: null,        // naechster TOTP-Code, fuer einen kurzen Uebergang bei fehlgeschlagenem Refresh (I2)
     nextUntil: 0,
-    clockOffset: 0         // Differenz Server-/Tablet-Uhr, aus der letzten erfolgreichen TOTP-Antwort
+    clockOffset: 0,        // Differenz Server-/Tablet-Uhr, aus der letzten erfolgreichen TOTP-Antwort
+    validUntil: 0,         // Gueltigkeit des aktuell angezeigten Codes (Serverzeit), fuer renderBar()
+    period: 30             // TOTP-Periode aus der letzten erfolgreichen Antwort, fuer renderBar()
 };
 
 const $ = (id) => document.getElementById(id);
@@ -121,8 +123,12 @@ async function api(action, method = 'GET', body = null) {
 
     const raw = data?.message || `HTTP ${response.status}`;
     const translated = SERVER_MESSAGES[raw] || raw;
+    // Eine falsche PIN kommt ebenfalls als 401, meint aber keinen Tokenverlust
+    // (die kommt von stationRequireMember(), nicht von api.php) — sonst wirft
+    // eine vertippte PIN den Kiosk bis zur Einrichtung zurueck.
+    const pinRejected = response.status === 401 && raw === 'Invalid member number or PIN';
 
-    if (response.status === 401) {
+    if (response.status === 401 && !pinRejected) {
         // Token abgelaufen oder Geraet geloescht: zurueck zur Einrichtung.
         // Ist bereits die Einrichtung aktiv (z. B. weil setupSave selbst den
         // 401 ausgeloest hat), nicht erneut umschalten/ueberschreiben — sonst
@@ -157,6 +163,17 @@ function showScreen(name) {
         stopIdleTimer();
     } else {
         restartIdleTimer();
+    }
+    // Die Breiten-Transition der TOTP-Leiste laeuft nicht weiter, waehrend das
+    // Ruhebild versteckt ist (display:none kappt CSS-Transitions) — bei der
+    // Rueckkehr stand die Leiste sonst bis zum naechsten Refresh grau/leer,
+    // obwohl totpTimer im Hintergrund laengst weiter aktualisiert hat.
+    if (name === 'idle' && state.status?.totp_enabled) {
+        if (!state.totpTimer) {
+            refreshTotp(); // Refresh war waehrend des Verstecks fehlgeschlagen — jetzt nachholen
+        } else if ($('totpCode').textContent !== '------') {
+            renderBar();
+        }
     }
 }
 
@@ -400,10 +417,31 @@ async function refreshTotp() {
     state.clockOffset = now - Date.now() / 1000;
     state.nextCode  = typeof next_code === 'string' ? next_code : null;
     state.nextUntil = valid_until + period;
+    state.validUntil = valid_until;
+    state.period = period;
 
     // Restlaufzeit gegen die SERVERuhr; die Tablet-Uhr geht oft falsch
     const fetchedAt = Date.now();
     const remaining = Math.max(1, valid_until - now);
+    renderBar();
+
+    state.totpTimer = setTimeout(refreshTotp, remaining * 1000 - (Date.now() - fetchedAt) + 200);
+}
+
+/**
+ * Zeichnet die Restlaufzeit-Leiste des aktuellen Codes neu. Ausgelagert aus
+ * refreshTotp(), damit showScreen('idle') die Leiste auch dann wieder in
+ * Gang setzen kann, wenn seit dem letzten Refresh Zeit vergangen ist,
+ * waehrend der Bildschirm versteckt war (CSS-Transitions laufen nicht unter
+ * display:none weiter).
+ */
+function renderBar() {
+    const period = state.period || 30;
+    const remaining = state.validUntil - (Date.now() / 1000 + state.clockOffset);
+    if (remaining <= 0) {
+        refreshTotp();
+        return;
+    }
     const bar = $('totpBar');
     bar.style.transition = 'none';
     bar.style.width = `${(remaining / period) * 100}%`;
@@ -411,8 +449,6 @@ async function refreshTotp() {
         bar.style.transition = `width ${remaining}s linear`;
         bar.style.width = '0%';
     });
-
-    state.totpTimer = setTimeout(refreshTotp, remaining * 1000 - (Date.now() - fetchedAt) + 200);
 }
 
 function renderTotp(code) {
