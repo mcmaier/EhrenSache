@@ -7,6 +7,49 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.3.0] – 2026-09-07
+
+### Neu
+- **Virtuelle Station (Kiosk).** Neuer Gerätetyp `kiosk`: ein Tablet zeigt den rotierenden
+  Stations-Code und nimmt Stempel per Mitgliedsnummer + PIN entgegen — Anwesenheit und
+  Arbeitszeit (Start, Pause, Ende). Eigene PWA unter `public/station/`, eigene Ressource
+  `station`. Das TOTP-Secret verlässt den Server nicht; der Kiosk holt nur den gültigen Code
+- **Stations-PIN.** `members.pin_hash` (nur Hash). Mitglieder setzen die PIN im Profil
+  (`change_pin`), Verwalter im Mitglieds-Modal. Regeln: 4–8 Ziffern, keine Einheitsziffern,
+  keine Zahlenfolge. Sperre nach 5 Fehlversuchen je Mitgliedsnummer (auch unbekannte) und
+  30 je Station, jeweils 15 Minuten; eine neue PIN hebt die Mitgliedssperre auf.
+  Einstellungen `station_pin_enabled`, `station_pin_min_length`
+- Neue Quellen `station_pin` (Anwesenheit) und `station` (Arbeitszeit), in der Oberfläche als
+  „Station (PIN)" gekennzeichnet. Der Kiosk-Name gilt als Ortsnachweis an Start und Ende
+- `GET users&user_type=device&device_type=` filtert Geräte; `is_active` wird beim Anlegen
+  eines Geräts berücksichtigt
+- Selbstauskunft (`my_data`) nennt `has_pin` und `pin_updated_at`, auch im CSV
+- Testsuiten `station_unit` (ohne Datenbank, u. a. Sperrlogik gegen SQLite) und `station_api`
+
+### Geändert
+- Ein Geräte-Token vom Typ Kiosk darf ausschließlich `station` (und `version`) aufrufen
+- **Eine vom Token erzeugte PHP-Session ist ohne den Token nicht mehr nutzbar (401).**
+  Der Token-Zweig legte bislang eine vollwertige Session an, deren Cookie allein genügte
+- Beim Wechsel des Gerätetyps wird das gespeicherte TOTP-Secret verworfen; `auth_device`
+  und `kiosk` speichern nie ein Secret aus dem Request; ein Secret muss Base32 (16–64
+  Zeichen) sein; eine `totp_location` kann ihr Secret nicht löschen
+- Die Notizpflicht der Zeiterfassung gilt am Kiosk nicht (keine Tastatur für Fließtext)
+- `auto_checkin`: Terminsuche und Eintrag in `findCheckinAppointment()` und
+  `writeCheckinRecord()` herausgelöst. Ein bestehender Eintrag mit Status `excused` wird
+  durch einen Stempel zu `present`; `record_id`, `member_id`, `appointment_id` sind
+  JSON-Zahlen; `arrival_time` wird normalisiert gespeichert
+- `member_number` wird beim Speichern getrimmt; „0" ist eine gültige Nummer
+- Migration 1.2.5 → 1.3.0 meldet doppelte Mitgliedsnummern als Warnung, sichert alle
+  Spaltenänderungen ab und erzeugt die View `v_users_extended` neu
+
+### Behoben
+- **`GET member_groups&id=` lieferte `m.*` ohne Rollenprüfung** und damit seit der
+  Migration auch den PIN-Hash an jede angemeldete Rolle. Jetzt feste Spaltenlisten je Rolle
+- `login()` löscht `auth_type` aus einer wiederverwendeten Session
+- Geräte-Modal: `toggleDeviceTypeFields()` setzte `required` am Secret-Feld nicht zurück
+
+---
+
 ## [1.2.5] – 2026-09-04
 
 ### Geändert

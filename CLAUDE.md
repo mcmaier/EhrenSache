@@ -22,6 +22,7 @@ statt sie hier zu duplizieren:
 | `DATENSCHUTZ.md` | DSGVO-Anforderungen, Löschfristen, Betroffenenrechte | ja |
 | `DISCLAIMER.md`, `LICENSE`, `COMMERCIAL-LICENSE.md` | Rechtliches | ja |
 | `public/checkin/README.md` | PWA für mobilen Check-in | ja |
+| `public/station/README.md` | PWA für die virtuelle Station (Kiosk) | ja |
 | `docs/OPEN-ITEMS.md` | **Offene Entscheidungen, Restarbeiten, bewusst Verworfenes** | ja |
 | `docs/FEATURE-IDEAS.md` | **Ideen für künftige Funktionen — unverbindlich, nicht geplant** | ja |
 | `docs/testplan.md` | Manueller Testplan nach Feature-Bereichen | ja |
@@ -80,19 +81,20 @@ EhrenSache/
 │   │   ├── work_sessions.php   # Arbeitszeiterfassung
 │   │   ├── statistics.php, export.php, import.php, settings.php
 │   │   ├── attendance_list.php, my_data.php
-│   │   ├── auto_checkin.php, totp_checkin.php
-│   │   └── regenerate_token.php, change_password.php, user_mailer.php
+│   │   ├── auto_checkin.php, totp_checkin.php, station.php
+│   │   └── regenerate_token.php, change_password.php, change_pin.php, user_mailer.php
 │   ├── helpers/
 │   │   ├── auth.php            # login(), requireRole(), isAdmin(), isDevice(), CSRF
 │   │   ├── worktime.php        # Fachlogik Arbeitszeit (Dauer, Validierung, Statistik)
 │   │   ├── member_activity.php # Aktiv/Inaktiv-Zeiträume
+│   │   ├── station.php         # Fachlogik virtuelle Station (Kiosk): Code, PIN-Prüfung, Sperre
 │   │   ├── migrations.php      # Ausführung der Migrationskette
 │   │   ├── version.php         # Liest version.json
 │   │   ├── branding.php, mail_template.php, mailer.php
 │   │   └── rate_limiter.php, totp.php, utils.php
 │   ├── migrations/
 │   │   ├── manifest.php        # Kette from → to; einzige Datei, die beim Anlegen geändert wird
-│   │   └── <von-version>.php   # z. B. 1.1.3.php mit migrate_1_1_3()
+│   │   └── <von-version>.php   # z. B. 1.2.5.php mit migrate_1_2_5()
 │   ├── email_templates/        # base.html + Vorlagen (Aktivierung, Reset, Verifikation)
 │   ├── setup/
 │   │   └── ehrensache_db.sql   # Schema, Tabellennamen als {PREFIX}<name>
@@ -120,6 +122,7 @@ EhrenSache/
     ├── assets/                 # logo-default.png etc.
     ├── uploads/                # Hochgeladenes Logo etc.
     ├── checkin/                # PWA für Mobile Check-in (eigener Service Worker)
+    ├── station/                # PWA virtuelle Station (Kiosk)
     ├── install/index.php       # Setup-Wizard (nach Installation via .htaccess gesperrt)
     └── update/index.php        # Update-Wizard, fährt die Migrationskette
 
@@ -146,9 +149,9 @@ Request-Parameter: `?resource=<name>&id=<id>`
 
 **Ressourcen:** members, appointments, records, exceptions, users, membership_dates,
 member_groups, appointment_types, activity_types, work_sessions, statistics, available_years,
-auto_checkin, totp_checkin, regenerate_token, change_password, export, import, import_logs,
-settings, upload-logo, attendance_list, activate_user, user_status, cleanup, my_data,
-session_info, version, ping — Details in `API.md`.
+auto_checkin, totp_checkin, station, regenerate_token, change_password, change_pin, export,
+import, import_logs, settings, upload-logo, attendance_list, activate_user, user_status,
+cleanup, my_data, session_info, version, ping — Details in `API.md`.
 
 **Authentifizierungsmethoden:**
 - `Authorization: Bearer <token>` Header
@@ -194,7 +197,7 @@ Ausgeführt wird sie über `public/update/index.php`.
 | admin   | Vollzugriff, Systemeinstellungen, Benutzerverwaltung |
 | manager | Mitglieder/Termine bearbeiten, keine Systemkonfiguration |
 | user    | Eigenes Profil, Check-in, Statistik, Ausnahmenanträge |
-| device  | Nur TOTP-Check-in oder Biometrie-Device (IoT-Geräte) |
+| device  | Nur TOTP-Check-in, Biometrie-Device oder virtuelle Station (Kiosk: nur Ressource `station`) |
 
 Hilfsfunktionen in `private/helpers/auth.php`: `isAdmin()`, `isAdminOrManager()`, `isDevice()`,
 `requireAdmin()`, `requireAdminOrManager()`, `requireRole()`, `requireDevice()`.
@@ -248,7 +251,7 @@ php tests/run.php worktime_api
 
 - Harness: `tests/lib/harness.php` (Assertions, Summary), `tests/lib/api.php` (HTTP-Aufrufe)
 - Suites in `tests/suites/`: api_selftest, assets, harness_selftest, migrations,
-  worktime_api, worktime_unit
+  worktime_api, worktime_unit, station_api, station_unit
 - Einzelprüfungen gegen die Datenbank: `tests/db/verify_*.php`
 - Konfiguration: `tests/config.php` aus `tests/config.example.php` kopieren (ignoriert)
 - Manueller Testplan: `docs/testplan.md`

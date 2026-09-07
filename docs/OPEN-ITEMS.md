@@ -4,8 +4,8 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-04 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
-**Version:** 1.2.5
+**Zuletzt geprüft:** 2026-09-07 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
+**Version:** 1.3.0
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
@@ -146,6 +146,36 @@ trennen.
 
 **Nächster Schritt:** Bedarf abwarten. Meldet ein Verein, dass `1` h zu grob ist, das
 Minuten-Modell in einer eigenen Spec umsetzen.
+
+---
+
+### OI-27 · `members.active` vs. `membership_dates` am Kiosk
+**Priorität:** mittel
+
+`stationAuthenticate()` prüft für den Stempel nur `active = 1` auf `members`. Die Statistik
+und die übrige Anwesenheitslogik werten dagegen `getMemberActivityWhere()` gegen
+`membership_dates` aus — ein Mitglied kann `active = 1` sein, aber außerhalb seines aktiven
+Zeitraums liegen (Austritt zu einem künftigen Datum, Karenzzeit, Datenpflegefehler). Ein
+solches Mitglied kann am Kiosk weiterhin stempeln, obwohl es für den fraglichen Zeitraum in
+keiner Auswertung als aktiv zählt.
+
+**Zu entscheiden:** `stationAuthenticate()` auf dieselbe Aktivitätsprüfung wie die Statistik
+umstellen, oder bewusst bei `active` belassen, weil ein Kiosk-Stempel ohnehin nur eine
+Anwesenheit erzeugt und die nachgelagerte Auswertung über `membership_dates` filtert.
+
+---
+
+### OI-32 · Wake Lock / Kiosk-Modus
+**Priorität:** niedrig
+
+Die Station kann den Browser nicht gegen Bildschirmsperre oder Verlassen der Seite
+verriegeln — dokumentiert in `public/station/README.md`. Ohne Wake Lock oder echten
+Kiosk-Modus des Tablets kann der Bildschirm während des Betriebs einschlafen oder jemand
+navigiert versehentlich weg.
+
+**Zu entscheiden:** Ob die Web-App eine Wake-Lock-API anfordert (nicht auf allen Browsern
+verfügbar) oder ob das Vereinssache bleibt (Tablet-eigene Kiosk-App, Geräteverwaltung durch
+MDM). Eine native Kiosk-App ist ausdrücklich außerhalb des Projektumfangs.
 
 ---
 
@@ -315,8 +345,11 @@ es, was „ortsbelegt" aussagt — das steht so auch in `DATENSCHUTZ.md` Abschni
   einmalig an; danach ist es in der Oberfläche nicht mehr lesbar. Einschränkung: TOTP ist
   symmetrisch, der Server muss das Secret kennen. Erreichbar ist einmalige Übertragung,
   verschlüsselte Ablage und kein Rücklesen — nicht: „verlässt das Gerät nie".
-- **PWA im Stations-Modus:** Ein ausgemustertes Tablet meldet sich als Station an und zeigt den
-  rotierenden Code, statt dedizierte Hardware zu erfordern.
+- **PWA im Stations-Modus — seit 1.3.0 gebaut** (`public/station/`, Gerätetyp `kiosk`): Der
+  Kiosk erhält nur den gültigen Code, nie das Secret; für Kiosks und Auth-Geräte zeigt die
+  Geräteverwaltung kein Secret mehr. **Bleibt offen:** die verschlüsselte Ablage in
+  `users.totp_secret` für TOTP-Stationen (Schlüssel in `config.php`, Installer und Updater
+  schreiben ihn, Umschlüsselung im Update).
 
 ---
 
@@ -409,6 +442,46 @@ Zweck, den sie nach der Kürzung nicht mehr hat.
 **Offen geblieben:** Der Endpoint hat **keinen Aufrufer** im Frontend. Bewusst behalten — die
 gekürzte Antwort ist die vorgesehene Grundlage für eine Ablaufwarnung in der Oberfläche.
 Kommt sie nicht, ist der Endpoint ersatzlos entfernbar.
+
+---
+
+### OI-25 · Token-erzeugte Sessions
+**Priorität:** mittel
+
+`api.php` befüllt bei einem Bearer-Token-Request eine vollwertige PHP-Session. Seit 1.3.0 ist
+eine so entstandene Session ohne den Token nicht mehr nutzbar — ein Zugriff allein über das
+Session-Cookie liefert `401`. Das schließt die Lücke, dass ein einmal ausgestelltes
+Session-Cookie eines Geräte-Tokens den Token selbst überflüssig machte.
+
+**Fußangel dabei gefunden:** `public/js/modules/api.js::getAuthHeaders()` sendet
+`Bearer ${sessionStorage.api_token}` — dieser Schlüssel wird im Dashboard nirgends gesetzt,
+der Header lautet also faktisch `Bearer null`. Die Exporte in `import_export.js` scheiterten
+dadurch bereits vor 1.3.0 mit `401`, nur unauffällig, weil der Fehler wie ein normaler
+Session-Timeout aussah ([OI-19](#oi-19)). Einfach einen echten Token in
+`sessionStorage.api_token` zu hinterlegen würde das Problem verschieben statt lösen: Die
+Dashboard-Session liefe dann über den Token-Zweig und würde als `auth_type = 'token'`
+markiert — mit allen Einschränkungen, die seit 1.3.0 für Token-Sessions gelten (siehe oben),
+obwohl der Nutzer per Passwort angemeldet ist.
+
+**Zu entscheiden:** Der Token-Zweig in `api.php` darf eine bereits bestehende
+Browser-Session nicht überschreiben. Sauberer wäre, `getAuthHeaders()` im Dashboard-Kontext
+gar keinen Bearer-Header zu setzen und Exporte über die normale Session laufen zu lassen —
+das API-Token ist für Geräte und die PWA gedacht, nicht für das eigene Dashboard.
+
+---
+
+### OI-28 · `RateLimiter::check()` fail-open
+**Priorität:** niedrig — vorbestehend, nicht durch 1.3.0 verursacht
+
+Der DB-gestützte Zweig von `RateLimiter::check()` gibt bei einer `PDOException` `true`
+zurück — der Aufruf gilt dann als nicht gesperrt. Für einfaches Rate Limiting ist das
+vertretbar (lieber durchlassen als die Anwendung lahmlegen). Für eine Sperre, die
+Brute-Force verhindern soll — Login, seit 1.3.0 auch die Kiosk-PIN — bedeutet ein
+Datenbank-Hänger dasselbe: keine Sperre, solange die Störung andauert.
+
+**Zu entscheiden:** Ob Login- und PIN-Sperren fail-open bleiben (Verfügbarkeit vor Schutz)
+oder bei einer Datenbankstörung sicherheitshalber fail-closed reagieren sollen — mit dem
+Preis, dass ein DB-Hänger dann auch reguläre Logins blockiert.
 
 ---
 
@@ -592,6 +665,69 @@ Abgleich, dass Export-Daten auch direkt wieder importierbar sind, ist nicht erfo
 
 ---
 
+### OI-26 · Schema-Guard nur für `checkin_source`
+**Priorität:** niedrig
+
+In `ehrensache_db.sql` prüft nur die Spalte `checkin_source` vor dem `ALTER TABLE`, ob der
+neue Enum-Wert schon vorhanden ist (Schutz für ein frisches Einspielen des Schemas gegen
+eine bereits migrierte Datenbank). `device_type` und `work_sessions.source` — beide seit
+1.3.0 ebenfalls um neue Werte erweitert (`kiosk` bzw. `station`) — haben keinen
+entsprechenden Guard.
+
+**Folge:** Ein direktes Einspielen von `ehrensache_db.sql` auf eine Datenbank, die diese
+Spalten bereits in der neuen Form hat, kann an diesen beiden Stellen mit einem SQL-Fehler
+abbrechen, während `checkin_source` das abfängt.
+
+**Zu tun:** Denselben Guard (Abfrage gegen `INFORMATION_SCHEMA.COLUMNS`, `ALTER TABLE` nur
+bei Bedarf) für `device_type` und `work_sessions.source` ergänzen.
+
+---
+
+### OI-29 · `devices.js` Altlasten
+**Priorität:** niedrig
+
+Mehrere kleine, voneinander unabhängige Funde in `public/js/modules/devices.js`:
+
+- Fünf `getElementById`-Aufrufe ohne zugehöriges Markup: `devicesPagination`,
+  `filterDeviceRole`, `filterDeviceStatus`, `filterGroup`, `resetDeviceFilters`.
+- `device_name` fließt ungeschützt in `innerHTML`/`onclick` ein — ein Apostroph im Namen
+  bricht den generierten `onclick`-Handler des Lösch-Buttons.
+- `showDeviceSection(true, page)` ignoriert den übergebenen `page`-Parameter.
+- Dieselbe Lücke besteht in der Mitgliederliste: Namen werden ohne `escapeHtml()`
+  interpoliert.
+
+**Zu tun:** Tote `getElementById`-Aufrufe entfernen oder das fehlende Markup ergänzen,
+`device_name` und Mitgliedsnamen konsequent über `escapeHtml()` führen, `page` in
+`showDeviceSection()` auswerten oder den Parameter streichen.
+
+---
+
+### OI-30 · `totp_location` ohne Secret aus der Zeit vor 1.3.0
+**Priorität:** niedrig
+
+Vor 1.3.0 konnte `clear` ein TOTP-Stationsgerät ohne Secret zurücklassen. Ein solches Gerät
+fällt in `resolveTotpLocation()` heute stillschweigend heraus, ohne dass die Geräteliste
+darauf hinweist — für den Betrieb unauffällig, aber schwer zu erklären, wenn eine Station
+plötzlich keine Codes mehr annimmt.
+
+**Zu tun (optional):** Warnhinweis in der Geräteliste für ein `totp_location`-Gerät ohne
+gesetztes Secret.
+
+---
+
+### OI-31 · `settings.js` prüft PUT-Ergebnisse nicht
+**Priorität:** niedrig
+
+Die Speicherschleife in `settings.js` zählt jeden abgesetzten `PUT`-Request als Erfolg und
+meldet am Ende „N gespeichert", ohne die Antwort auszuwerten. Scheitert einer der Requests
+(z. B. Validierungsfehler einer einzelnen Einstellung), meldet die Oberfläche trotzdem
+Erfolg.
+
+**Zu tun:** Antwort jedes `PUT` prüfen und einen Fehlschlag im Toast von den erfolgreichen
+Speicherungen unterscheiden.
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
@@ -604,6 +740,9 @@ Abgleich, dass Export-Daten auch direkt wieder importierbar sind, ist nicht erfo
 | Kein PDF-Export | So belassen | Würde eine Bibliothek einschleppen, die das Projekt bewusst nicht hat. Der Bedarf ist seit 1.2.2 über die Druckansicht (`&format=html`) gedeckt: Das PDF entsteht im Druckdialog des Browsers |
 | Installer und Update-Assistent werden gesperrt ausgeliefert | So belassen | Ein hochgeladener, aber noch nicht eingerichteter Webspace soll `/install` nicht offen zeigen. Der Freischaltschritt steht für beide in der README; nach dem Lauf sperrt sich jeder Assistent selbst wieder. Die Alternative — ungesperrt ausliefern — nähme dem Ersteinrichter eine Hürde, öffnete aber ein Zeitfenster zwischen Upload und Installation |
 | Statistik getrennt von Anwesenheit | Eigener `worktime`-Block | Anwesenheitsquote und geleistete Stunden sind verschiedene Fragen |
+| Kiosk-Sperre als Gruppen-DoS | So belassen (E12) | 30 Fehlversuche je Station sperren die ganze Station 15 Minuten — trifft damit alle, die an ihr stempeln wollen, nicht nur den Angreifer. Die Fehlermeldung unterscheidet Gerät und Konto, damit ein gesperrtes Mitglied von einer gesperrten Station unterscheidbar bleibt. Akzeptiert, weil die Alternative — keine Stationssperre — Nummern-Durchprobieren ohne Bremse erlaubt |
+| Kiosk: Terminwahl serverseitig, keine Auto-Anlage (E9) | So belassen | Der Kiosk wählt den passenden Termin wie `auto_checkin` serverseitig aus, zeigt keine Terminliste zur Auswahl und legt keinen Termin an. Ein Stempel ohne passenden Termin bekommt nur eine Meldung, keinen Datensatz. Ziel ist ein Stempelvorgang in drei Tipps; die Terminauswahl bleibt der Handy-PWA vorbehalten |
+| Kiosk: Notizpflicht entfällt (P1) | So belassen | Der Kiosk hat keine Tastatur für Fließtext. Ist `worktime_require_note` aktiv, verlangt ein Stopp über `station` trotzdem keine Notiz; die Tätigkeitsart bleibt die Beschreibung |
 
 ---
 

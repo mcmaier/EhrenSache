@@ -40,8 +40,8 @@ durchschlägt.
 | [FI-1](#fi-1--terminzusage-im-vorfeld) | Terminzusage im Vorfeld | hoch | M | — |
 | [FI-2](#fi-2--abgleich-zusage--tatsächliche-anwesenheit) | Abgleich Zusage ↔ tatsächliche Anwesenheit | hoch | S | FI-1 |
 | [FI-3](#fi-3--gps-gestützter-check-in) | GPS-gestützter Check-in | mittel | M | — |
-| [FI-4](#fi-4--registrierungsprozess-für-auth-geräte) | Registrierungsprozess für Auth-Geräte | mittel | M | — |
-| [FI-5](#fi-5--pin-anmeldung-am-auth-gerät) | PIN-Anmeldung am Auth-Gerät | mittel | M | FI-4 |
+| [FI-4](#fi-4--registrierungsprozess-für-auth-geräte) | Registrierungsprozess für Auth-Geräte (Rest: NFC/Biometrie) | mittel | M | — |
+| [FI-5](#fi-5--pin-anmeldung-am-auth-gerät) | PIN-Anmeldung am Auth-Gerät — **umgesetzt in 1.3.0** | mittel | M | FI-4 |
 | [FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push) | Benachrichtigungskanal (E-Mail, Web-Push) | hoch | M | — |
 | [FI-7](#fi-7--terminserien-für-wiederkehrende-proben) | Terminserien für wiederkehrende Proben | hoch | M | — |
 | [FI-8](#fi-8--kalender-abo-ics-feed) | Kalender-Abo (ICS-Feed) | mittel | S | — |
@@ -184,7 +184,9 @@ Eine feste Station im Proberaum lohnt sich, für einen einmaligen Auftritt lohnt
 **Berührt:** Koordinaten und Radius am Termin oder an einer eigenen Check-in-Freigabe · neue
 Quelle im `checkin_source`-Enum von `records` (Migration; das Feld ist heute
 `admin|user_totp|device_auth|auto_checkin|import`) · `auto_checkin.php` · PWA-Erfassen-Tab ·
-`DATENSCHUTZ.md`.
+`DATENSCHUTZ.md`. Wie eine neue Quelle sauber gekennzeichnet wird, zeigt seit 1.3.0
+`station_pin` — Enum-Wert, Anzeige „Station (PIN)" in der Oberfläche und Erwähnung in
+`DATENSCHUTZ.md` gehören zusammen.
 
 **Vorher zu klären:**
 
@@ -210,6 +212,9 @@ Der Gerätetyp `auth_device` existiert bereits in `users.device_type` und wird i
 Geräteverwaltung als „Authentifiziert Benutzer (z. B. Fingerabdruck, Karte, PIN)" beschrieben —
 ein festgelegter Registrierungs- und Zuordnungsweg existiert nicht. Diese Idee holt das nach:
 Wie kommt ein Gerät in den Verein, wie lernt es ein Mitglied, wie wird es wieder entzogen?
+
+Das Verfahren *PIN, serverseitig geprüft* und der Registrierungsweg der virtuellen Station
+sind seit 1.3.0 gebaut. Offen bleiben NFC und Biometrie.
 
 **Warum interessant:** Ohne definierten Ablauf ist der Gerätetyp eine Zusage, die die Software
 nicht einlöst. Und der Weg entscheidet mit, ob OI-6 — TOTP-Secret im Klartext — sich bei dieser
@@ -237,6 +242,8 @@ gleichzeitig ist der sichere Weg, keines davon fertig zu bekommen.
 
 ### FI-5 · PIN-Anmeldung am Auth-Gerät
 **Nutzen:** mittel · **Aufwand:** M — **setzt FI-4 voraus**
+
+**Umgesetzt in 1.3.0** — Spec `docs/superpowers/specs/2026-09-04-station-pin-kiosk-design.md`.
 
 Für Mitglieder ohne installierte PWA, ohne NFC-Karte und ohne Fingerabdruck: Eingabe einer
 persönlichen PIN an einem fest installierten Gerät — Prinzip Stempeluhr. Die PIN vergibt sich
@@ -457,7 +464,7 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung:
    statt Hierarchie) ist sie fast kostenlos.
 4. **FI-7 Terminserien** und **FI-8 ICS** — unabhängig, klein, jederzeit dazwischen möglich;
    FI-8 ist die günstigste Idee der Liste.
-5. **FI-4 Auth-Geräte**, dann **FI-5 PIN**, dann **FI-3 GPS** — die Check-in-Wege gemeinsam
+5. **FI-4 Auth-Geräte (Rest: NFC/Biometrie)**, dann **FI-3 GPS** — die Check-in-Wege gemeinsam
    entscheiden, damit Beweiswert und Kennzeichnung der Quellen einmal einheitlich festgelegt
    werden statt dreimal verschieden.
 6. **FI-10 Jubiläen** und **FI-13 Geburtstage** zusammen entwerfen, auch wenn nur eines davon
