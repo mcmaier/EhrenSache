@@ -52,17 +52,41 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
                 stationTotp($device);
                 return;
         }
-    } elseif ($method !== 'POST') {
+    } elseif ($method === 'POST') {
+        $data = json_decode(file_get_contents("php://input")) ?: new stdClass();
+        if (!is_object($data)) {
+            $data = new stdClass();
+        }
+
+        if (!isStationPinEnabled($db, $database)) {
+            http_response_code(409);
+            echo json_encode(["message" => "Station PIN login is disabled"]);
+            return;
+        }
+
+        $member = stationRequireMember($db, $database, $device, $data);
+        if ($member === null) {
+            return; // bereits geantwortet
+        }
+
+        switch ($action) {
+            case 'identify':
+                stationIdentify($db, $database, $device, $member);
+                return;
+            case 'checkin':
+                stationCheckin($db, $database, $device, $member);
+                return;
+        }
+    } else {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
         return;
     }
-    // POST-Aktionen folgen in Phase 2 (identify, checkin, work_*)
 
     http_response_code(400);
     echo json_encode([
         "message" => "Unknown action",
-        "allowed" => ["GET status", "GET totp"],
+        "allowed" => ["GET status", "GET totp", "POST identify", "POST checkin"],
     ]);
 }
 
@@ -96,6 +120,131 @@ function stationTotp(array $device)
     $codes        = totpCodesForSecret($device['totp_secret']);
     $codes['now'] = time();
     echo json_encode($codes);
+}
+
+/**
+ * Prueft member_number + pin aus dem Body. Antwortet selbst bei Fehlern und
+ * liefert dann null. Die Meldung ist fuer falsche Nummer, falsche PIN,
+ * fehlende PIN, inaktives Mitglied und mehrdeutige Nummer dieselbe (E12).
+ * Eine gesperrte Station wird als solche benannt — das verraet nichts ueber
+ * Mitglieder und erspart fuenf Leuten die Suche nach dem eigenen Fehler.
+ */
+function stationRequireMember($db, $database, array $device, $data): ?array
+{
+    $number = is_string($data->member_number ?? null) ? trim($data->member_number) : '';
+    $pin    = is_string($data->pin ?? null) ? $data->pin : '';
+
+    if ($number === '' || $pin === '') {
+        http_response_code(400);
+        echo json_encode(["message" => "member_number and pin are required"]);
+        return null;
+    }
+
+    $failure = null;
+    $limiter = new RateLimiter($db, $database);
+    $member  = stationAuthenticate($db, $database, $limiter, (int) $device['user_id'], $number, $pin, $failure);
+
+    if ($member === null) {
+        error_log("station: authentication failed ({$failure}) at device {$device['user_id']}");
+        if ($failure === 'device_locked') {
+            http_response_code(423);
+            echo json_encode(["message"     => "Station temporarily locked",
+                              "retry_after" => STATION_PIN_LOCK_SECONDS]);
+        } elseif ($failure === 'locked') {
+            http_response_code(423);
+            echo json_encode(["message"     => "Too many attempts",
+                              "retry_after" => STATION_PIN_LOCK_SECONDS]);
+        } else {
+            http_response_code(401);
+            echo json_encode(["message" => "Invalid member number or PIN"]);
+        }
+        return null;
+    }
+
+    return $member;
+}
+
+/** Erste Antwort nach Nummer + PIN: wer bin ich, was kann ich hier tun. */
+function stationIdentify($db, $database, array $device, array $member)
+{
+    $prefix    = $database->table('');
+    $timestamp = (new DateTime())->format('Y-m-d H:i:s');
+
+    $candidate = null;
+    $matched   = findCheckinAppointment($db, $prefix, $member['member_id'], $timestamp,
+                                        checkinToleranceHours($db, $database) * 3600);
+    if ($matched !== null) {
+        $stmt = $db->prepare("SELECT record_id FROM {$prefix}records WHERE member_id = ? AND appointment_id = ?");
+        $stmt->execute([$member['member_id'], $matched['appointment_id']]);
+        $candidate = [
+            'appointment_id'     => (int) $matched['appointment_id'],
+            'title'              => $matched['title'],
+            'date'               => $matched['date'],
+            'start_time'         => $matched['start_time'],
+            'already_checked_in' => (bool) $stmt->fetchColumn(),
+        ];
+    }
+
+    $worktime   = isWorktimeEnabled($db, $database);
+    $running    = null;
+    $activities = [];
+
+    if ($worktime) {
+        // Eine ueberfaellige Sitzung wird hier geschlossen — wie an jedem
+        // anderen Einstiegspunkt, an dem das Mitglied aktiv wird.
+        $running = getRunningSessionChecked($db, $database, $member['member_id'], (int) $device['user_id']);
+
+        $stmt = $db->prepare("SELECT DISTINCT at.activity_id, at.activity_name, at.color,
+                                              at.is_default, at.verification
+                              FROM {$prefix}activity_types at
+                              INNER JOIN {$prefix}activity_type_groups atg ON atg.activity_id = at.activity_id
+                              INNER JOIN {$prefix}member_group_assignments mga ON mga.group_id = atg.group_id
+                              WHERE mga.member_id = ? AND at.is_active = 1
+                              ORDER BY at.is_default DESC, at.activity_name");
+        $stmt->execute([$member['member_id']]);
+        $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    echo json_encode([
+        'member'            => ['name' => $member['name'], 'surname' => $member['surname']],
+        'checkin_candidate' => $candidate,
+        'worktime_enabled'  => $worktime,
+        'running_session'   => $running === null ? null : withDuration($running),
+        'activities'        => $activities,
+    ]);
+}
+
+/**
+ * Anwesenheit stempeln. Terminwahl serverseitig (E9), keine Auto-Anlage am
+ * Kiosk. Quelle station_pin, Ort = Kiosk-Name (E7, E8).
+ */
+function stationCheckin($db, $database, array $device, array $member)
+{
+    $prefix    = $database->table('');
+    $timestamp = (new DateTime())->format('Y-m-d H:i:s');
+
+    $matched = findCheckinAppointment($db, $prefix, $member['member_id'], $timestamp,
+                                      checkinToleranceHours($db, $database) * 3600);
+    if ($matched === null) {
+        http_response_code(404);
+        echo json_encode(["message" => "Kein passender Termin gefunden",
+                          "reason"  => "no_matching_appointment"]);
+        return;
+    }
+
+    $result = writeCheckinRecord($db, $prefix, $member['member_id'], (int) $matched['appointment_id'],
+                                 $timestamp, 'station_pin', $device['device_name'], $device['device_name']);
+
+    $body = $result['body'];
+    $body['appointment'] = [
+        'appointment_id' => (int) $matched['appointment_id'],
+        'title'          => $matched['title'],
+        'date'           => $matched['date'],
+        'start_time'     => $matched['start_time'],
+    ];
+
+    http_response_code($result['status']);
+    echo json_encode($body);
 }
 
 ?>

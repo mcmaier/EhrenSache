@@ -610,10 +610,107 @@ test('users: device_type-Filter kennt kiosk', function () {
     }
 });
 
+// ---- Phase 2: identify / checkin -------------------------------------------
+
+/** Termin JETZT mit eigener, gruppenfreier Terminart — beides wird aufgeraeumt. */
+function stationAppointment(): array
+{
+    static $apt = null;
+    if ($apt !== null) {
+        return $apt;
+    }
+
+    $type = apiRequest('POST', 'appointment_types', [
+        'token' => apiToken('admin'),
+        'body'  => ['type_name' => 'Kiosk-Test ' . uniqid()],
+    ]);
+    assertStatus(201, $type, 'Terminart konnte nicht angelegt werden');
+    $typeId = (int) $type['body']['id'];
+
+    $res = apiRequest('POST', 'appointments', [
+        'token' => apiToken('admin'),
+        'body'  => ['title' => 'Kiosk-Testtermin', 'type_id' => $typeId,
+                    'date' => date('Y-m-d'), 'start_time' => date('H:i:s')],
+    ]);
+    assertStatus(201, $res, 'Termin konnte nicht angelegt werden');
+
+    return $apt = ['appointment_id' => (int) $res['body']['id'], 'type_id' => $typeId];
+}
+
+test('station: identify mit falscher PIN → 401, einheitliche Meldung', function () {
+    enableStationPin();
+    $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '9999']);
+    assertStatus(401, $res);
+    assertSame('Invalid member number or PIN', $res['body']['message']);
+
+    $res = stationPost('identify', ['member_number' => 'gibt-es-nicht', 'pin' => '2580']);
+    assertStatus(401, $res);
+    assertSame('Invalid member number or PIN', $res['body']['message']);
+});
+
+test('station: identify ohne PIN → 400', function () {
+    assertStatus(400, stationPost('identify', ['member_number' => stationMember()['member_number']]));
+});
+
+test('station: identify liefert Mitglied, Terminkandidat und Zeiterfassungsstand', function () {
+    stationAppointment();
+    $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
+    assertStatus(200, $res);
+    assertSame('Kiosk', $res['body']['member']['name']);
+    assertTrue(array_key_exists('running_session', $res['body']), 'running_session fehlt');
+    assertTrue(is_array($res['body']['activities']), 'activities fehlt');
+    assertTrue($res['body']['checkin_candidate'] !== null, 'Terminkandidat erwartet');
+    assertSame(stationAppointment()['appointment_id'], (int) $res['body']['checkin_candidate']['appointment_id']);
+    assertSame(false, $res['body']['checkin_candidate']['already_checked_in']);
+});
+
+test('station: checkin schreibt einen Record mit Quelle station_pin', function () {
+    $res = stationPost('checkin', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
+    assertStatus(201, $res);
+    assertSame('station_pin', $res['body']['checkin_source']);
+    assertSame(kioskDevice()['device_name'], $res['body']['source_device']);
+    assertSame(kioskDevice()['device_name'], $res['body']['location_name']);
+    assertSame(stationAppointment()['appointment_id'], (int) $res['body']['appointment_id']);
+
+    $again = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
+    assertSame(true, $again['body']['checkin_candidate']['already_checked_in']);
+});
+
+test('station: zweiter checkin ist unchanged', function () {
+    $res = stationPost('checkin', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
+    assertStatus(200, $res);
+    assertSame('unchanged', $res['body']['record_action']);
+});
+
+test('station: Sperre nach fuenf Fehlversuchen, Admin-PIN hebt sie auf', function () {
+    for ($i = 0; $i < 5; $i++) {
+        assertStatus(401, stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '0001']));
+    }
+    $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
+    assertStatus(423, $res, 'sechster Versuch muss gesperrt sein');
+    assertSame('Too many attempts', $res['body']['message']);
+
+    assertStatus(200, stationSetPin('2580'));   // P2
+    assertStatus(200, stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']));
+});
+
+test('station: identify bei abgeschalteter PIN-Anmeldung → 409', function () {
+    stationSetSetting('station_pin_enabled', '0');
+    $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
+    assertStatus(409, $res);
+    stationSetSetting('station_pin_enabled', '1');
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 
 test('station: Aufraeumen — Kiosk loeschen', function () {
+    $apt = stationAppointment();
+    assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'),
+                                                            'query' => ['id' => $apt['appointment_id']]]));
+    assertStatus(200, apiRequest('DELETE', 'appointment_types', ['token' => apiToken('admin'),
+                                                                 'query' => ['id' => $apt['type_id']]]));
+
     $m = apiRequest('DELETE', 'members', [
         'token' => apiToken('admin'),
         'query' => ['id' => stationMember()['member_id']],
