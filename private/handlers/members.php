@@ -321,7 +321,7 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole,
             // Stations-PIN: setzen (Ziffernfolge) oder loeschen (null / '').
             // property_exists statt isset, weil isset() bei null false liefert.
             $pinAction = null;
-            if (property_exists($data, 'pin')) {
+            if (is_object($data) && property_exists($data, 'pin')) {
                 if ($data->pin === null || $data->pin === '') {
                     $pinAction = 'clear';
                 } elseif (!is_string($data->pin)) {

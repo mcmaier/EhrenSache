@@ -26,13 +26,29 @@ function handleMemberGroups($db, $database, $method, $id) {
                 $group = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if($group) {
-                    // Lade zugehörige Members
-                    $memberStmt = $db->prepare("SELECT m.* FROM {$prefix}members m
-                                                JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
-                                                WHERE mga.group_id = ?");
+                    // Lade zugehörige Members - nie pin_hash selektieren
+                    if(isAdminOrManager()) {
+                        $memberStmt = $db->prepare("SELECT m.member_id, m.name, m.surname, m.member_number, m.active, m.created_at,
+                                                    m.pin_updated_at, (m.pin_hash IS NOT NULL) AS has_pin
+                                                    FROM {$prefix}members m
+                                                    JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
+                                                    WHERE mga.group_id = ?");
+                    } else {
+                        $memberStmt = $db->prepare("SELECT m.member_id, m.name, m.surname
+                                                    FROM {$prefix}members m
+                                                    JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
+                                                    WHERE mga.group_id = ?");
+                    }
                     $memberStmt->execute([$id]);
-                    $group['members'] = $memberStmt->fetchAll(PDO::FETCH_ASSOC);
-                    
+                    $members = $memberStmt->fetchAll(PDO::FETCH_ASSOC);
+                    if(isAdminOrManager()) {
+                        foreach($members as &$m) {
+                            $m['has_pin'] = (bool) $m['has_pin'];
+                        }
+                        unset($m);
+                    }
+                    $group['members'] = $members;
+
                     echo json_encode($group);
                 } else {
                     http_response_code(404);

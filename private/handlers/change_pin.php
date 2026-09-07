@@ -9,6 +9,8 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+declare(strict_types=1);
+
 // ============================================
 // CHANGE_PIN Controller — Stations-PIN im Profil
 // ============================================

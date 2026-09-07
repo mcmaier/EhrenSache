@@ -502,6 +502,79 @@ test('change_pin: Kiosk-Token → 403', function () {
     assertStatus(403, $res);
 });
 
+// ---- Phase 2: member_groups darf pin_hash nicht ausliefern -----------------
+
+test('member_groups: kein pin_hash ueber die Gruppenansicht', function () {
+    // Testmitglied hat an dieser Stelle eine PIN gesetzt (siehe oben).
+    $memberId = stationMember()['member_id'];
+
+    $create = apiRequest('POST', 'member_groups', [
+        'token' => apiToken('admin'),
+        'body'  => ['group_name' => 'Kiosk-Leak ' . uniqid()],
+    ]);
+    assertStatus(201, $create, 'Testgruppe konnte nicht angelegt werden');
+    $groupId = (int) $create['body']['id'];
+
+    assertStatus(200, apiRequest('PUT', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $memberId],
+        'body'  => ['group_ids' => [$groupId]],
+    ]), 'Testmitglied konnte der Testgruppe nicht zugeordnet werden');
+
+    $asUser = apiRequest('GET', 'member_groups', [
+        'token' => apiToken('user'),
+        'query' => ['id' => $groupId],
+    ]);
+    assertStatus(200, $asUser);
+    foreach ($asUser['body']['members'] as $row) {
+        assertTrue(!array_key_exists('pin_hash', $row), 'pin_hash darf einem user nicht ausgeliefert werden');
+        assertTrue(!array_key_exists('pin_updated_at', $row), 'pin_updated_at darf einem user nicht ausgeliefert werden');
+    }
+
+    $asAdmin = apiRequest('GET', 'member_groups', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $groupId],
+    ]);
+    assertStatus(200, $asAdmin);
+    $mine = array_values(array_filter($asAdmin['body']['members'],
+        static fn ($m) => (int) $m['member_id'] === $memberId));
+    assertTrue(count($mine) === 1, 'Testmitglied in der Gruppenansicht erwartet');
+    assertSame(true, $mine[0]['has_pin']);
+    assertTrue(!array_key_exists('pin_hash', $mine[0]), 'pin_hash darf auch dem admin nicht ausgeliefert werden');
+
+    // Aufraeumen: Zuordnung und Testgruppe wieder entfernen.
+    assertStatus(200, apiRequest('PUT', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $memberId],
+        'body'  => ['group_ids' => []],
+    ]));
+    assertStatus(200, apiRequest('DELETE', 'member_groups', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $groupId],
+    ]));
+});
+
+// ---- Phase 2: members PUT mit ungueltigem Body ------------------------------
+
+test('members: PUT mit leerem Body -> 400 statt Fatal', function () {
+    $memberId = stationMember()['member_id'];
+
+    $empty = apiRequest('PUT', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $memberId],
+    ]);
+    assertStatus(400, $empty, 'Leerer Body haette 400 liefern muessen, nicht Fatal Error');
+    assertTrue(is_array($empty['body']), 'Antwort muss ein gueltiger JSON-Body sein');
+
+    $arrayBody = apiRequest('PUT', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $memberId],
+        'body'  => [],
+    ]);
+    assertStatus(400, $arrayBody, 'Body als JSON-Array haette 400 liefern muessen, nicht Fatal Error');
+    assertTrue(is_array($arrayBody['body']), 'Antwort muss ein gueltiger JSON-Body sein');
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 
