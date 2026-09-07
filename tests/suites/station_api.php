@@ -701,10 +701,141 @@ test('station: identify bei abgeschalteter PIN-Anmeldung → 409', function () {
     stationSetSetting('station_pin_enabled', '1');
 });
 
+// ---- Phase 2: Arbeitszeit am Kiosk ------------------------------------------
+
+/**
+ * Gruppe + Taetigkeitsart (Nachweis 'start') fuer das Testmitglied. Am Kiosk
+ * gilt der Kiosk-Name als Ortsnachweis (E8), darum darf die nachweispflichtige
+ * Art ohne TOTP-Code starten.
+ *
+ * @return array{group_id: int, activity_id: int}
+ */
+function stationWorkFixture(): array
+{
+    static $fx = null;
+    if ($fx !== null) {
+        return $fx;
+    }
+
+    stationSetSetting('worktime_enabled', '1');
+
+    $group = apiRequest('POST', 'member_groups', [
+        'token' => apiToken('admin'),
+        'body'  => ['group_name' => 'Kiosk-Testgruppe ' . uniqid()],
+    ]);
+    assertStatus(201, $group, 'Gruppe konnte nicht angelegt werden');
+    $groupId = (int) $group['body']['id'];
+
+    $assign = apiRequest('PUT', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => stationMember()['member_id']],
+        'body'  => ['group_ids' => [$groupId]],
+    ]);
+    assertStatus(200, $assign);
+
+    $activity = apiRequest('POST', 'activity_types', [
+        'token' => apiToken('admin'),
+        'body'  => ['activity_name' => 'Kiosk-Taetigkeit ' . uniqid(),
+                    'verification' => 'start', 'group_ids' => [$groupId]],
+    ]);
+    assertStatus(201, $activity, 'Taetigkeitsart konnte nicht angelegt werden');
+
+    return $fx = ['group_id' => $groupId, 'activity_id' => (int) $activity['body']['id']];
+}
+
+/** Merkt sich die am Kiosk gestartete Sitzung fuers Aufraeumen. */
+function stationSessionId(?int $set = null): ?int
+{
+    static $id = null;
+    if ($set !== null) {
+        $id = $set;
+    }
+    return $id;
+}
+
+function stationCreds(): array
+{
+    return ['member_number' => stationMember()['member_number'], 'pin' => '2580'];
+}
+
+test('station: identify nennt die erlaubten Taetigkeitsarten', function () {
+    $fx  = stationWorkFixture();
+    $res = stationPost('identify', stationCreds());
+    assertStatus(200, $res);
+    assertSame(true, $res['body']['worktime_enabled']);
+    $ids = array_map(static fn ($a) => (int) $a['activity_id'], $res['body']['activities']);
+    assertTrue(in_array($fx['activity_id'], $ids, true), 'Test-Taetigkeitsart erwartet');
+    assertSame(null, $res['body']['running_session']);
+});
+
+test('station: work_start ohne activity_id → 400', function () {
+    assertStatus(400, stationPost('work_start', stationCreds()));
+});
+
+test('station: work_start startet mit Quelle station und Kiosk als Ort', function () {
+    $fx  = stationWorkFixture();
+    $res = stationPost('work_start', stationCreds() + ['activity_id' => $fx['activity_id']]);
+    assertStatus(201, $res);
+    $s = $res['body']['session'];
+    assertSame('station', $s['source']);
+    assertSame(kioskDevice()['device_name'], $s['start_location_name']);
+    assertSame('confirmed', $s['status']);
+    stationSessionId((int) $s['session_id']);
+});
+
+test('station: zweiter work_start → 409', function () {
+    $fx  = stationWorkFixture();
+    assertStatus(409, stationPost('work_start', stationCreds() + ['activity_id' => $fx['activity_id']]));
+});
+
+test('station: work_pause und work_resume', function () {
+    $res = stationPost('work_pause', stationCreds());
+    assertStatus(200, $res);
+    assertSame(true, $res['body']['session']['is_paused']);
+
+    $res = stationPost('work_resume', stationCreds());
+    assertStatus(200, $res);
+    assertSame(false, $res['body']['session']['is_paused']);
+});
+
+test('station: work_stop trotz Notizpflicht (P1), Kiosk als Endort', function () {
+    stationSetSetting('worktime_require_note', '1');
+    $res = stationPost('work_stop', stationCreds());
+    stationSetSetting('worktime_require_note', '0');
+
+    assertStatus(200, $res);
+    $s = $res['body']['session'];
+    assertTrue(!empty($s['end_time']), 'end_time gesetzt');
+    assertSame(kioskDevice()['device_name'], $s['end_location_name']);
+    assertSame('confirmed', $s['status'], 'mit beiden Orten bleibt die Sitzung bestaetigt');
+});
+
+test('station: work_stop ohne laufende Sitzung → 409', function () {
+    assertStatus(409, stationPost('work_stop', stationCreds()));
+});
+
+test('station: work_* bei abgeschalteter Zeiterfassung → 404', function () {
+    $fx = stationWorkFixture();
+    stationSetSetting('worktime_enabled', '0');
+    $res = stationPost('work_start', stationCreds() + ['activity_id' => $fx['activity_id']]);
+    stationSetSetting('worktime_enabled', '1');
+    assertStatus(404, $res);
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 
 test('station: Aufraeumen — Kiosk loeschen', function () {
+    if (stationSessionId() !== null) {
+        assertStatus(200, apiRequest('DELETE', 'work_sessions', ['token' => apiToken('admin'),
+                                                                 'query' => ['id' => stationSessionId()]]));
+    }
+    $fx = stationWorkFixture();
+    assertStatus(200, apiRequest('DELETE', 'activity_types', ['token' => apiToken('admin'),
+                                                              'query' => ['id' => $fx['activity_id']]]));
+    assertStatus(200, apiRequest('DELETE', 'member_groups', ['token' => apiToken('admin'),
+                                                             'query' => ['id' => $fx['group_id']]]));
+
     $apt = stationAppointment();
     assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'),
                                                             'query' => ['id' => $apt['appointment_id']]]));

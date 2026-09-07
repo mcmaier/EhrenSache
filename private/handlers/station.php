@@ -76,6 +76,12 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
             case 'checkin':
                 stationCheckin($db, $database, $device, $member);
                 return;
+            case 'work_start':
+            case 'work_pause':
+            case 'work_resume':
+            case 'work_stop':
+                stationWork($db, $database, $device, $member, $action, $data);
+                return;
         }
     } else {
         http_response_code(405);
@@ -86,7 +92,8 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
     http_response_code(400);
     echo json_encode([
         "message" => "Unknown action",
-        "allowed" => ["GET status", "GET totp", "POST identify", "POST checkin"],
+        "allowed" => ["GET status", "GET totp", "POST identify", "POST checkin",
+                      "POST work_start", "POST work_pause", "POST work_resume", "POST work_stop"],
     ]);
 }
 
@@ -245,6 +252,43 @@ function stationCheckin($db, $database, array $device, array $member)
 
     http_response_code($result['status']);
     echo json_encode($body);
+}
+
+/**
+ * Zeiterfassung am Kiosk. Die member_id stammt aus der PIN-Pruefung, nie aus
+ * dem Request; created_by ist das Kiosk-Geraet. Quelle 'station', Ort =
+ * Kiosk-Name an Start und Ende (E7, E8), Notiz optional (P1).
+ */
+function stationWork($db, $database, array $device, array $member, string $action, $data)
+{
+    requireWorktimeEnabled($db, $database);   // 404 und Ende, wenn die Zeiterfassung aus ist
+
+    $deviceUserId = (int) $device['user_id'];
+    $memberId     = $member['member_id'];
+    $override     = [
+        'source'        => 'station',
+        'location'      => $device['device_name'],
+        'note_optional' => true,
+    ];
+
+    // Nur activity_id wird durchgereicht. workSessionTargetMember() nimmt fuer
+    // Geraete ohnehin $authMemberId — trotzdem kein fremdes Feld weiterleiten.
+    $payload = (object) ['activity_id' => $data->activity_id ?? null];
+
+    switch ($action) {
+        case 'work_start':
+            workSessionStart($db, $database, $payload, $deviceUserId, $memberId, $override);
+            return;
+        case 'work_pause':
+            workSessionPause($db, $database, $payload, $deviceUserId, $memberId);
+            return;
+        case 'work_resume':
+            workSessionResume($db, $database, $payload, $deviceUserId, $memberId);
+            return;
+        case 'work_stop':
+            workSessionStop($db, $database, $payload, $deviceUserId, $memberId, $override);
+            return;
+    }
 }
 
 ?>

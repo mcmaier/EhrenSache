@@ -204,9 +204,13 @@ function workSessionTargetMember($data, $authMemberId) {
     return $authMemberId ? (int)$authMemberId : null;
 }
 
-function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
+function workSessionStart($db, $database, $data, $authUserId, $authMemberId, array $override = []) {
     $prefix   = $database->table('');
     $memberId = workSessionTargetMember($data, $authMemberId);
+
+    // $override kommt nur von der Station (Kiosk): source und ein feststehender
+    // Ort. Der Kiosk-Name ist der Ortsnachweis — wer dort tippt, war dort (E8).
+    $source = $override['source'] ?? 'timer';
 
     if(!$memberId) {
         http_response_code(403);
@@ -255,7 +259,11 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
     $verification  = $activity['verification'] ?? 'none';
     $code          = isset($data->totp_code) ? trim((string)$data->totp_code) : '';
 
-    if($code !== '') {
+    if(isset($override['location'])) {
+        // Kiosk: der Stations-Name buergt fuer den Ort, kein TOTP-Code noetig.
+        $startLocation = (string)$override['location'];
+
+    } elseif($code !== '') {
         if(countTotpLocations($db, $database) === 0) {
             http_response_code(409);
             echo json_encode(["message" => "No TOTP station configured",
@@ -332,9 +340,9 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
         $stmt = $db->prepare("INSERT INTO {$prefix}work_sessions
                               (member_id, activity_id, appointment_id, start_time,
                                start_location_name, status, source, created_by)
-                              VALUES (?, ?, ?, NOW(), ?, 'confirmed', 'timer', ?)");
+                              VALUES (?, ?, ?, NOW(), ?, 'confirmed', ?, ?)");
         $stmt->execute([$memberId, (int)$data->activity_id, $appointmentId,
-                        $startLocation, $authUserId]);
+                        $startLocation, $source, $authUserId]);
         $sessionId = (int)$db->lastInsertId();
 
         // KEIN Anwesenheitseintrag. Bis 1.2.2 legte der Timer-Start bei einem
@@ -358,7 +366,7 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId) {
         // tut beides; in der PWA liegen die Wege nebeneinander.
 
         logSessionChange($db, $database, $sessionId, $authUserId, 'create', [
-            'source'              => ['old' => null, 'new' => 'timer'],
+            'source'              => ['old' => null, 'new' => $source],
             'activity_id'         => ['old' => null, 'new' => (int)$data->activity_id],
             'start_location_name' => ['old' => null, 'new' => $startLocation],
         ]);
@@ -466,12 +474,15 @@ function workSessionResume($db, $database, $data, $authUserId, $authMemberId) {
     echo json_encode(["message" => "Resumed", "session" => withDuration($updated)]);
 }
 
-function workSessionStop($db, $database, $data, $authUserId, $authMemberId) {
+function workSessionStop($db, $database, $data, $authUserId, $authMemberId, array $override = []) {
     $prefix  = $database->table('');
     $running = workSessionRequireRunning($db, $database, $data, $authMemberId);
     if($running === null) { return; }
 
-    $requireNote = worktimeSetting($db, $database, 'worktime_require_note', '0') === '1';
+    // P1: Am Kiosk gibt es keine Tastatur fuer Fliesstext; die Taetigkeitsart
+    // bleibt die Beschreibung.
+    $requireNote = worktimeSetting($db, $database, 'worktime_require_note', '0') === '1'
+                   && empty($override['note_optional']);
     $note        = isset($data->note) ? trim((string)$data->note) : '';
 
     if($requireNote && $note === '') {
@@ -487,7 +498,11 @@ function workSessionStop($db, $database, $data, $authUserId, $authMemberId) {
     $force        = !empty($data->force);
     $downgrade    = false;
 
-    if($code !== '') {
+    if(isset($override['location'])) {
+        // Kiosk: der Stations-Name buergt fuer den Ort (E8).
+        $endLocation = (string)$override['location'];
+
+    } elseif($code !== '') {
         $resolved = resolveTotpLocation($db, $database, $code);
         if($resolved === null) {
             http_response_code(401);
