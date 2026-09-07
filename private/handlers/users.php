@@ -183,13 +183,13 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                         FROM {$prefix}users u
                         WHERE u.role = 'device'";
                         
-                        /*
                         // Device-Type Filter
-                        if(isset($_GET['device_type']) && in_array($_GET['device_type'], ['totp_location', 'auth_device'])) {
+                        if(isset($_GET['device_type']) && in_array($_GET['device_type'], ['totp_location', 'auth_device', 'kiosk'], true)) {
                             $query .= " AND u.device_type = ?";
                             $params[] = $_GET['device_type'];
-                        }                        
-                        
+                        }
+
+                        /*
                         // is_active Filter
                         if(isset($_GET['is_active'])) {
                             $query .= " AND u.is_active = ?";
@@ -558,6 +558,13 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     http_response_code(400);
                     echo json_encode(["message" => "Kiosk-Geräte erhalten kein Secret aus dem Request"]);
                     break;
+                }
+
+                // auth_device: ein mitgeschicktes Secret wird wie beim Anlegen
+                // (createDevice()) ignoriert statt gespeichert — nur eine
+                // totp_location nutzt ein eigenes Secret.
+                if($effectiveType === 'auth_device') {
+                    unset($data->totp_secret);
                 }
 
                 // Ein mitgeschicktes Secret muss ein String sein und gueltiges

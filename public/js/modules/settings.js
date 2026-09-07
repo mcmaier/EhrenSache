@@ -259,16 +259,16 @@ async function saveAllSettings() {
         }                
     });
     
+    if (hasErrors) {
+            showToast('Bitte korrigiere die ungültigen Eingaben', 'error');
+            return;
+    }
+
     if (updates.length === 0) {
         showToast('Keine Änderungen zum Speichern', 'info');
         return;
     }
 
-    if (hasErrors) {
-            showToast('Bitte korrigiere die ungültigen Eingaben', 'error');
-            return;
-    } 
-    
     try {
         // Alle Änderungen nacheinander speichern
         for (const update of updates) {
@@ -292,6 +292,15 @@ async function saveAllSettings() {
             const { resetWorktimeEnabled, checkWorktimeEnabled } = await import('./worktime.js');
             resetWorktimeEnabled();
             await checkWorktimeEnabled();
+        }
+
+        // Stations-PIN-Einstellungen sind in members.js gecacht (Modal-Feld
+        // erscheint nur bei aktivierter Anmeldung) — nach einer Änderung hier
+        // muss der Cache verworfen werden, sonst zeigt das Modal bis zum
+        // nächsten Neuladen den alten Zustand.
+        if (updates.some(u => u.key === 'station_pin_enabled' || u.key === 'station_pin_min_length')) {
+            const { resetStationPinSettings } = await import('./members.js');
+            resetStationPinSettings();
         }
 
         hasUnsavedChanges = false;

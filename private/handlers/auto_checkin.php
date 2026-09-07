@@ -146,6 +146,10 @@ function findCheckinAppointment($db, $prefix, int $memberId, string $timestamp, 
  * Auto-Anlage eines Termins rundet auf fuenf Minuten, der Eintrag selbst
  * traegt weiterhin die Sekunde des Stempels.
  *
+ * Der gespeicherte arrival_time ist die normalisierte 'Y-m-d H:i:s'-Form des
+ * Request-Werts — fuer das PWA-Format byte-identisch, ein ISO-Input mit 'T'
+ * wird seit 1.3.0 ebenso normalisiert.
+ *
  * @return array{status: int, body: array<string, mixed>}
  */
 function writeCheckinRecord($db, $prefix, int $memberId, int $appointmentId, string $arrivalTimestamp,
@@ -191,8 +195,15 @@ function writeCheckinRecord($db, $prefix, int $memberId, int $appointmentId, str
                                 (member_id, appointment_id, arrival_time, status,
                                  checkin_source, source_device, location_name)
                                 VALUES (?, ?, ?, 'present', ?, ?, ?)");
-    if(!$insertStmt->execute([$memberId, $appointmentId, $arrivalTimestamp,
-                              $checkinSource, $sourceDevice, $locationName])) {
+    // Die PDO-Verbindung laeuft mit ERRMODE_EXCEPTION — execute() liefert bei
+    // einem Fehler nie false, sondern wirft. Ohne dieses catch waere ein
+    // fehlgeschlagener INSERT (z. B. verletzte Fremdschluessel-Constraint)
+    // ein unbehandelter Fatal Error statt der vorgesehenen 500-Antwort.
+    try {
+        $insertStmt->execute([$memberId, $appointmentId, $arrivalTimestamp,
+                              $checkinSource, $sourceDevice, $locationName]);
+    } catch (PDOException $e) {
+        error_log("writeCheckinRecord insert failed: " . $e->getMessage());
         return ['status' => 500, 'body' => ["message" => "Failed to create check-in"]];
     }
 
@@ -399,7 +410,10 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
         }
     }
 
-    $matchedAppointment = findCheckinAppointment($db, $prefix, (int)$memberId, $timestamp, $toleranceSeconds);
+    // $chosenAppointment ist an dieser Stelle bereits vollstaendig geprueft
+    // (Gruppe, Tag, Toleranz) — die automatische Suche braeuchte hier nur
+    // unnoetig eine weitere Query, deren Ergebnis sofort verworfen wuerde.
+    $matchedAppointment = $chosenAppointment ?: findCheckinAppointment($db, $prefix, (int)$memberId, $timestamp, $toleranceSeconds);
 
     // Eine bewusste Wahl schlaegt die automatische Suche.
     if($chosenAppointment) {

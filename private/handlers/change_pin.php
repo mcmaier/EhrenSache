@@ -73,8 +73,16 @@ function handlePinChange($db, $database, $request_method, $authUserId, $authMemb
         return;
     }
 
-    $db->prepare("UPDATE {$prefix}members SET pin_hash = ?, pin_updated_at = NOW() WHERE member_id = ?")
-       ->execute([password_hash($pin, PASSWORD_DEFAULT), $authMemberId]);
+    $stmt = $db->prepare("UPDATE {$prefix}members SET pin_hash = ?, pin_updated_at = NOW() WHERE member_id = ?");
+    $stmt->execute([password_hash($pin, PASSWORD_DEFAULT), $authMemberId]);
+
+    if ($stmt->rowCount() === 0) {
+        // authMemberId zeigt auf kein (mehr) existierendes Mitglied — z. B.
+        // geloescht, waehrend die Session noch offen war.
+        http_response_code(404);
+        echo json_encode(["message" => "Member not found"]);
+        return;
+    }
 
     // P2: neue PIN hebt eine Sperre auf
     (new RateLimiter($db, $database))->reset('station_member_' . (int) $authMemberId, 'station_pin');

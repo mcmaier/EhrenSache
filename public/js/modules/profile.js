@@ -193,12 +193,13 @@ export async function handlePinChange() {
         new_pin: newPin
     });
 
-    document.getElementById('changePinForm').reset();
-    if (result && result.message === 'PIN changed successfully') {
-        showToast('PIN gespeichert', 'success');
-    } else {
-        showToast(result?.message || 'PIN konnte nicht gespeichert werden', 'error');
+    if (!result?.success) {
+        // apiCall hat den Fehler bereits als Toast angezeigt
+        return;
     }
+
+    document.getElementById('changePinForm').reset();
+    showToast('PIN gespeichert', 'success');
 }
 
 // ============================================

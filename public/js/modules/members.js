@@ -43,11 +43,23 @@ async function loadStationPinSettings() {
     if (stationPinSettings) return stationPinSettings;
     const res = await apiCall('settings', 'GET', null, { scope: 'client' });
     const s   = res?.settings || {};   // apiCall liefert den JSON-Body direkt
-    stationPinSettings = {
+    const settings = {
         enabled:   s.station_pin_enabled === '1',
         minLength: parseInt(s.station_pin_min_length || '4', 10)
     };
-    return stationPinSettings;
+
+    // Nur einen erfolgreichen Abruf cachen — sonst haengt ein einzelner
+    // Netzwerkfehler das Feld dauerhaft auf "deaktiviert" fest.
+    if (res?.success) {
+        stationPinSettings = settings;
+    }
+
+    return settings;
+}
+
+/** Verwirft den Cache, z.B. nachdem die Einstellung im Adminbereich geändert wurde. */
+export function resetStationPinSettings() {
+    stationPinSettings = null;
 }
 
 
@@ -389,6 +401,17 @@ export function resetMemberFilter() {
 // MODAL FUNCTIONS
 // ============================================
 
+/**
+ * Formatiert pin_updated_at (MySQL-Datetime "Y-m-d H:i:s") für den Hinweistext.
+ * Safari parst "YYYY-MM-DD HH:MM:SS" (ohne "T") nicht zuverlässig als Date —
+ * daher hier auf ISO 8601 normalisieren und ein ungültiges Ergebnis abfangen.
+ */
+function formatPinUpdatedAt(pinUpdatedAt) {
+    if (!pinUpdatedAt) return '-';
+    const date = new Date(pinUpdatedAt.replace(' ', 'T'));
+    return isNaN(date.getTime()) ? '-' : date.toLocaleDateString('de-DE');
+}
+
 export async function openMemberModal(memberId = null) {
 
     const modal = document.getElementById('memberModal');
@@ -420,7 +443,7 @@ export async function openMemberModal(memberId = null) {
         document.getElementById('member_pin').value = '';
         document.getElementById('member_pin_clear').checked = false;
         document.getElementById('member_pin_hint').textContent = currentMemberHasPin
-            ? `PIN gesetzt (${currentMemberPinUpdatedAt ? new Date(currentMemberPinUpdatedAt).toLocaleDateString('de-DE') : '-'}). ${pinSettings.minLength}–8 Ziffern.`
+            ? `PIN gesetzt (${formatPinUpdatedAt(currentMemberPinUpdatedAt)}). ${pinSettings.minLength}–8 Ziffern.`
             : `Keine PIN gesetzt. ${pinSettings.minLength}–8 Ziffern.`;
 
     } else {
@@ -546,6 +569,9 @@ export async function saveMember() {
     }
 
     let result;
+    let pinFailed = false;
+    let pinResult = null;
+
     if (memberId) {
         // Update
         result = await apiCall('members', 'PUT', data, { id: memberId });
@@ -559,7 +585,9 @@ export async function saveMember() {
         result = await apiCall('members', 'POST', data);
 
         if (result && result.id && data.pin !== undefined) {
-            await apiCall('members', 'PUT', { pin: data.pin }, { id: result.id });
+            // Eigener Toast unten statt des generischen Fehler-Toasts von apiCall
+            pinResult = await apiCall('members', 'PUT', { pin: data.pin }, { id: result.id }, { silentStatuses: [400, 409] });
+            pinFailed = !pinResult?.success;
         }
 
         // Erstelle Mitgliedschaftszeiträume falls vorhanden
@@ -567,7 +595,18 @@ export async function saveMember() {
             await saveMembershipDates(result.id);
         }
     }
-    
+
+    if (pinFailed) {
+        showToast(
+            'Mitglied angelegt, aber die PIN wurde abgelehnt: ' + (pinResult?.message || ''),
+            'error'
+        );
+        // Modal bleibt offen, wechselt aber in den Bearbeiten-Modus für das neu angelegte Mitglied
+        await openMemberModal(result.id);
+        showMemberSection(true, currentMembersPage);
+        return;
+    }
+
     if (result.success) {
         closeMemberModal();
 

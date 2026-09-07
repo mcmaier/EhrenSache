@@ -53,7 +53,12 @@ function handleMyData($db, $database, $request_method, $authUserId)
     ");
     $stmt->execute([$member_id]);
     $data['member'] = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+    if ($data['member']) {
+        // memberPublicRow() liefert has_pin bereits als bool — hier ebenso,
+        // damit die Selbstauskunft nicht vom PDO-Rueckgabetyp (string) abhaengt.
+        $data['member']['has_pin'] = (bool) $data['member']['has_pin'];
+    }
+
     // 3. Gruppenzugehörigkeiten
     $stmt = $db->prepare("
         SELECT mg.group_name, mg.description
@@ -188,6 +193,8 @@ function exportAsCSV($data) {
     fputcsv($output, ['E-Mail', $data['user']['email']]);
     fputcsv($output, ['Rolle', $data['user']['role']]);
     fputcsv($output, ['Aktiv', $data['member']['active'] ? 'Ja' : 'Nein']);
+    fputcsv($output, ['Stations-PIN gesetzt', $data['member']['has_pin'] ? 'Ja' : 'Nein']);
+    fputcsv($output, ['PIN zuletzt geändert', $data['member']['pin_updated_at'] ?? '-']);
     fputcsv($output, []);
     
     // Gruppen

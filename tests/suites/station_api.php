@@ -575,6 +575,41 @@ test('members: PUT mit leerem Body -> 400 statt Fatal', function () {
     assertTrue(is_array($arrayBody['body']), 'Antwort muss ein gueltiger JSON-Body sein');
 });
 
+// ---- Phase 2: PIN bei abgeschalteter Anmeldung, Selbstauskunft, Geraetefilter
+
+test('members: PIN bei abgeschalteter Anmeldung -> 409', function () {
+    stationSetSetting('station_pin_enabled', '0');
+    assertStatus(409, stationSetPin('2580'), 'PUT members mit pin haette bei abgeschalteter Anmeldung 409 liefern muessen');
+
+    // Fuer nachfolgende Tests (und die Entwicklungsinstanz) wieder einschalten.
+    stationSetSetting('station_pin_enabled', '1');
+    assertStatus(200, stationSetPin('2580'));
+});
+
+test('my_data: Selbstauskunft nennt has_pin ohne Hash', function () {
+    $res = apiRequest('GET', 'my_data', ['token' => apiToken('user')]);
+    assertStatus(200, $res);
+    assertTrue(is_bool($res['body']['member']['has_pin']), 'has_pin muss bool sein');
+    assertTrue(!array_key_exists('pin_hash', $res['body']['member']), 'pin_hash darf in der Selbstauskunft nicht auftauchen');
+
+    $csv = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'csv']]);
+    assertStatus(200, $csv);
+    assertTrue(strpos((string) $csv['raw'], 'Stations-PIN gesetzt') !== false,
+        'CSV-Export muss den Stations-PIN-Status enthalten');
+});
+
+test('users: device_type-Filter kennt kiosk', function () {
+    $res = apiRequest('GET', 'users', [
+        'token' => apiToken('admin'),
+        'query' => ['user_type' => 'device', 'device_type' => 'kiosk'],
+    ]);
+    assertStatus(200, $res);
+    assertTrue(count($res['body']) >= 1, 'Mindestens der Suiten-Kiosk wird erwartet');
+    foreach ($res['body'] as $row) {
+        assertSame('kiosk', $row['device_type']);
+    }
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 
