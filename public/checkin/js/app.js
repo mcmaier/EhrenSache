@@ -183,6 +183,38 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========================================
+// EREIGNISSE EINMALIG BINDEN
+// ========================================
+
+/**
+ * Haengt ein Ereignis genau einmal an ein Element.
+ *
+ * Die init*-Funktionen laufen bei JEDER Anmeldung erneut — die Elemente im
+ * Dokument bleiben dabei dieselben. Ein zweites addEventListener mit einer
+ * frisch erzeugten Arrow-Function haengt dort einen weiteren Handler an; nur
+ * identische Funktionsreferenzen weist der Browser von sich aus ab. Nach einem
+ * Zyklus Abmelden → Anmelden schickte deshalb ein Klick auf „Start" zwei
+ * Anfragen, und einer auf „nächstes Jahr" sprang zwei Jahre weit.
+ *
+ * Gemerkt wird am Element selbst, nicht in einer Liste im Skript: So gilt die
+ * Sperre auch, wenn das Element ausgetauscht wird. initAttendanceList() nutzt
+ * dieselbe Idee seit jeher von Hand über `dataset.listenerAdded`.
+ *
+ * Ein Element bekommt je Ereignisart genau einen Handler — mehr braucht keine
+ * der Ansichten, und das haelt den Schluessel einfach.
+ */
+function bindOnce(el, type, handler) {
+    if (!el) return;
+
+    const bound = (el.dataset.boundEvents || '').split(' ').filter(Boolean);
+    if (bound.includes(type)) return;
+
+    el.addEventListener(type, handler);
+    bound.push(type);
+    el.dataset.boundEvents = bound.join(' ');
+}
+
+// ========================================
 // API HELPER
 // ========================================
 
@@ -2473,7 +2505,7 @@ async function initWorktime() {
             })
             .join('');
 
-        select.addEventListener('change', () => {
+        bindOnce(select, 'change', () => {
             renderWorktimeActivityHint();
             // Die Terminarten der neuen Taetigkeit grenzen die Terminliste
             // anders ein; die getroffene Auswahl bleibt erhalten, solange sie
@@ -2484,14 +2516,14 @@ async function initWorktime() {
         renderWorktimeActivityHint();
     }
 
-    document.getElementById('worktimeAppointment')
-        ?.addEventListener('change', renderWorktimeAppointmentHint);
+    bindOnce(document.getElementById('worktimeAppointment'), 'change',
+        renderWorktimeAppointmentHint);
 
     // Ohne Wrapper bekaeme worktimeStart das Event-Objekt als totpCode
-    document.getElementById('worktimeStartBtn')?.addEventListener('click', () => worktimeStart());
-    document.getElementById('worktimePauseBtn')?.addEventListener('click', worktimeTogglePause);
-    document.getElementById('worktimeStopBtn')?.addEventListener('click', () => worktimeStop());
-    document.getElementById('worktimeStopForceBtn')?.addEventListener('click', () => {
+    bindOnce(document.getElementById('worktimeStartBtn'), 'click', () => worktimeStart());
+    bindOnce(document.getElementById('worktimePauseBtn'), 'click', worktimeTogglePause);
+    bindOnce(document.getElementById('worktimeStopBtn'), 'click', () => worktimeStop());
+    bindOnce(document.getElementById('worktimeStopForceBtn'), 'click', () => {
         // Das eigene Modal der App statt confirm(): blockierende Browserdialoge
         // werden in einer installierten PWA teils unterdrueckt — genau daran
         // ist der urspruengliche prompt() fuer die Notiz gescheitert.
@@ -2966,17 +2998,16 @@ function enterCaptureTab() {
 
 function initCaptureTab() {
     document.querySelectorAll('.capture-tile').forEach(tile => {
-        tile.addEventListener('click', () => showCaptureView(tile.dataset.intent));
+        bindOnce(tile, 'click', () => showCaptureView(tile.dataset.intent));
     });
 
     // Die Leiste ist der Weg zurueck zur laufenden Sitzung, aus jedem Tab.
-    document.getElementById('runningSessionBar')?.addEventListener('click', () => {
+    bindOnce(document.getElementById('runningSessionBar'), 'click', () => {
         document.querySelector('.tab-button[data-tab="capture"]')?.click();
         showCaptureView('worktime');
     });
 
-    document.getElementById('checkinAppointment')
-        ?.addEventListener('change', renderCheckinSuggestion);
+    bindOnce(document.getElementById('checkinAppointment'), 'change', renderCheckinSuggestion);
 
     enterCaptureTab();
 }
@@ -2994,7 +3025,7 @@ function initTabs() {
     initCaptureTab();
 
     tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
+        bindOnce(button, 'click', () => {
             const targetTab = button.dataset.tab;
             
             // Deaktiviere alle
@@ -3179,15 +3210,15 @@ function displayGroupStats(stats) {
 // YEAR NAVIGATION
 // ========================================
 function initYearNavigation() {
-    document.getElementById('prevYear').addEventListener('click', async () => {
+    bindOnce(document.getElementById('prevYear'), 'click', async () => {
         currentStatsYear--;
         await loadStatistics();
     });
-    
-    document.getElementById('nextYear').addEventListener('click', async () => {
-            currentStatsYear++;
-            await loadStatistics();
-    });    
+
+    bindOnce(document.getElementById('nextYear'), 'click', async () => {
+        currentStatsYear++;
+        await loadStatistics();
+    });
 }
 
 // ========================================

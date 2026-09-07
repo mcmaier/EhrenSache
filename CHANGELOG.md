@@ -21,6 +21,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Check-in-PWA behielt nach der Abmeldung die Ansichten des vorigen Mitglieds.** Verlauf,
   Statistik, Anwesenheitsliste, Auswahlfelder und der zuletzt geöffnete Tab standen unverändert
   weiter, bis ein Reload dazwischenkam. Die Abmeldung räumt diesen Zustand jetzt ab
+- **Check-in-PWA hängte bei jeder Anmeldung dieselben Ereignisse erneut an.** Nach einem Zyklus
+  Abmelden → Anmelden schickte ein Klick auf „Start" zwei Anfragen, ein Klick auf ein Jahr
+  sprang zwei Jahre weit, und ein Tab-Wechsel lud seine Daten doppelt. Neues `bindOnce()`
+  bindet je Element und Ereignisart nur einmal — dieselbe Sperre, die
+  `initAttendanceList()` schon von Hand hatte
 
 ### Intern
 - Neue Testsuite `worktime_frontend` (statische Gegenproben am Zeiterfassungs-Frontend) und
