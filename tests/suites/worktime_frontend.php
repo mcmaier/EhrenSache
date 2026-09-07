@@ -122,3 +122,27 @@ test('Check-in-PWA: die Anmeldung haengt keine Ereignisse doppelt an', function 
         );
     }
 });
+
+test('Check-in-PWA: die Stundenform stimmt mit dem Dashboard ueberein', function () use ($repoRoot) {
+    // Die PWA ist ein eigenstaendiges Skript und kann formatMinutes() nicht
+    // aus public/js/modules/worktime.js importieren. Die Regel steht deshalb
+    // zweimal da — und muss zweimal dieselbe sein, sonst zeigen Dashboard und
+    // PWA fuer denselben Bestand verschiedene Stunden.
+    $pwa       = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $dashboard = (string) file_get_contents($repoRoot . '/public/js/modules/worktime.js');
+
+    $inPwa       = frontendFunctionBody($pwa, 'formatMinutes');
+    $inDashboard = frontendFunctionBody($dashboard, 'formatMinutes');
+
+    foreach (['Math.floor(m / 60)', "padStart(2, '0')} h"] as $baustein) {
+        assertTrue(
+            strpos($inPwa, $baustein) !== false,
+            "formatMinutes() der PWA enthaelt '{$baustein}' nicht"
+        );
+        assertTrue(
+            strpos($inDashboard, $baustein) !== false,
+            "formatMinutes() des Dashboards enthaelt '{$baustein}' nicht — "
+            . 'die Vorlage hat sich geaendert, die PWA muss nachziehen'
+        );
+    }
+});

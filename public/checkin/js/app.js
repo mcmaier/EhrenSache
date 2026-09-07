@@ -2143,6 +2143,63 @@ function renderHistory(items) {
  * hier sichtbar, auch wenn niemand die Arbeitszeit-Ansicht oeffnet.
  */
 /**
+ * Minuten als „3:45 h" — die Form, in der Vereine ueber Stunden sprechen.
+ *
+ * Dieselbe Regel wie formatMinutes() in public/js/modules/worktime.js. Die
+ * PWA ist ein eigenstaendiges Skript ohne Zugriff auf dessen Module, deshalb
+ * steht sie hier ein zweites Mal. Weichen die beiden je voneinander ab, zeigen
+ * Dashboard und PWA fuer denselben Bestand verschiedene Stunden.
+ */
+function formatMinutes(minutes) {
+    const m = parseInt(minutes, 10) || 0;
+    const h = Math.floor(m / 60);
+    return `${h}:${String(m % 60).padStart(2, '0')} h`;
+}
+
+/**
+ * Fussnote unter der Jahressumme.
+ *
+ * Sie erklaert die Luecke zwischen dem, was das Mitglied erfasst hat, und dem,
+ * was zaehlt: In die Summe gehen nur bestaetigte Sitzungen ein. Ohne diesen
+ * Hinweis liest sich eine „0:00 h" nach einem frischen Nachtrag als Fehler.
+ *
+ * Leerer String heisst: keine Fussnote. Eine Zeile „nichts offen" waere
+ * Rauschen fuer den Normalfall.
+ */
+function worktimeStatsNote(pendingMinutes, pendingCount, rejectedCount) {
+    const teile = [];
+
+    if (pendingCount > 0) {
+        const eintraege = pendingCount === 1 ? '1 Eintrag' : `${pendingCount} Einträge`;
+        const verb      = pendingCount === 1 ? 'wartet' : 'warten';
+        teile.push(`${formatMinutes(pendingMinutes)} aus ${eintraege} ${verb} auf Freigabe`);
+    }
+
+    if (rejectedCount > 0) {
+        teile.push(rejectedCount === 1
+            ? '1 Eintrag abgelehnt'
+            : `${rejectedCount} Einträge abgelehnt`);
+    }
+
+    return teile.join(' · ');
+}
+
+/**
+ * Farbe einer Taetigkeitsart aus der bereits geladenen Liste.
+ *
+ * Der worktime-Block der Statistik liefert im by_activity keine Farbe mit;
+ * sie steht in worktimeActivities. Faellt die Taetigkeit dort heraus — etwa
+ * weil das Mitglied die Gruppe inzwischen verlassen hat —, greift der
+ * Standardton von activityDot().
+ */
+function activityColor(activityId) {
+    const treffer = worktimeActivities.find(
+        a => String(a.activity_id) === String(activityId));
+
+    return treffer ? treffer.color : null;
+}
+
+/**
  * Farbpunkt einer Taetigkeitsart — dieselbe Auszeichnung wie im Dashboard,
  * damit dieselbe Tätigkeit in beiden Oberflaechen gleich aussieht.
  */
