@@ -187,3 +187,23 @@ function () use ($repoRoot) {
         );
     }
 });
+
+test('Check-in-PWA: die Arbeitszeit-Zusaetze der Statistik haengen am Gate',
+function () use ($repoRoot) {
+    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $body = frontendFunctionBody($js, 'loadStatistics');
+
+    // Ein Mitglied ohne Taetigkeitsarten soll dieselbe Statistik bekommen wie
+    // vorher: kein include-Parameter, kein zweiter Abruf. Faellt die Bedingung
+    // weg, loest jede Statistik eine ueberfluessige Anfrage aus — sichtbar
+    // wird das nirgends, deshalb diese Gegenprobe.
+    assertTrue(
+        preg_match("/if\s*\(\s*zeigtArbeitszeit\s*\)\s*\{\s*params\.include\s*=\s*'worktime'/", $body) === 1,
+        'include=worktime haengt nicht an der Bedingung zeigtArbeitszeit'
+    );
+
+    assertTrue(
+        preg_match("/zeigtArbeitszeit\s*\?\s*apiCall\(\s*'work_sessions'/", $body) === 1,
+        'Der Zusatzabruf auf work_sessions haengt nicht an der Bedingung zeigtArbeitszeit'
+    );
+});
