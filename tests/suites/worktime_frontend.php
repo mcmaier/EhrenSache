@@ -134,7 +134,12 @@ test('Check-in-PWA: die Stundenform stimmt mit dem Dashboard ueberein', function
     $inPwa       = frontendFunctionBody($pwa, 'formatMinutes');
     $inDashboard = frontendFunctionBody($dashboard, 'formatMinutes');
 
-    foreach (['Math.floor(m / 60)', "padStart(2, '0')} h"] as $baustein) {
+    // Alle drei Zeilen der Funktion, nicht nur zwei: Ohne den Modulo-Ausdruck
+    // bliebe ein `minutes % 60` statt `m % 60` unbemerkt, ohne den Rueckfall
+    // ein fehlendes `|| 0` — beides ergaebe sichtbaren Unsinn in der Anzeige.
+    foreach (['parseInt(minutes, 10) || 0',
+              'Math.floor(m / 60)',
+              "String(m % 60).padStart(2, '0')} h"] as $baustein) {
         assertTrue(
             strpos($inPwa, $baustein) !== false,
             "formatMinutes() der PWA enthaelt '{$baustein}' nicht"
