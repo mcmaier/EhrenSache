@@ -14,6 +14,7 @@
 //  http://www.denso-wave.com/qrcode/faqpatent-e.html
 //
 //---------------------------------------------------------------------
+// qrcode-generator v1.4.4
 
 var qrcode = function() {
 

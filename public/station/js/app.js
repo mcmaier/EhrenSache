@@ -30,7 +30,7 @@ const debug = {
 
 const API_BASE = (() => {
     // /EhrenSache/public/station/ → /EhrenSache/public/api/api.php
-    const match = window.location.pathname.match(/^(.*?)\/station\//);
+    const match = window.location.pathname.match(/^(.*?)\/station(?:\/|$)/);
     const basePath = match ? match[1] : '';
     return `${window.location.origin}${basePath}/api/api.php`;
 })();
@@ -52,9 +52,16 @@ const SERVER_MESSAGES = {
     'No running session':                   'Es läuft keine Zeiterfassung.',
     'Activity type not allowed for this member': 'Diese Tätigkeit ist für deine Gruppe nicht vorgesehen.',
     'activity_id must be a positive integer': 'Bitte eine Tätigkeit wählen.',
+    // Generischer 404 von api.php, wenn keine Route passt — im Stations-Kontext
+    // kann das nur heissen: die Zeiterfassung ist abgeschaltet.
     'Endpoint not found':                   'Die Zeiterfassung ist abgeschaltet.',
-    'Kiosk devices may only use the station resource': 'Token gehört nicht zu einer virtuellen Station.',
-    'Kiosk device token required':          'Token gehört nicht zu einer virtuellen Station.'
+    'Kiosk device token required':          'Token gehört nicht zu einer virtuellen Station.',
+    'Invalid or inactive API token':        'Token ungültig oder Gerät deaktiviert',
+    'API token expired':                    'Token abgelaufen – bitte neu einrichten',
+    'Device is inactive':                   'Dieses Gerät ist deaktiviert',
+    'Rate limit exceeded':                  'Zu viele Anfragen – bitte kurz warten',
+    'Unknown activity_id':                  'Diese Tätigkeit gibt es nicht mehr',
+    'Activity type is retired':             'Diese Tätigkeit ist stillgelegt'
 };
 
 const state = {
@@ -69,8 +76,14 @@ const state = {
     totpTimer: null,
     statusTimer: null,
     clockTimer: null,
+    autoTimer: null,       // Rueckfall zum Ruhebild nach done()/Sperre (M2)
     wakeLock: null,
-    pressTimer: null
+    wakeLockHintShown: false,
+    pressTimer: null,
+    blocked: false,        // 403/409 auf Geraeteebene: Token bleibt, es wird auf Besserung gepollt (I1)
+    nextCode: null,        // naechster TOTP-Code, fuer einen kurzen Uebergang bei fehlgeschlagenem Refresh (I2)
+    nextUntil: 0,
+    clockOffset: 0         // Differenz Server-/Tablet-Uhr, aus der letzten erfolgreichen TOTP-Antwort
 };
 
 const $ = (id) => document.getElementById(id);
@@ -96,22 +109,36 @@ async function api(action, method = 'GET', body = null) {
         response = await fetch(url, options);
     } catch (e) {
         setBanner('Keine Verbindung zum Server');
+        $('stampStart').disabled = true; // M7: erst wieder erlauben, wenn der Server wieder antwortet
         return { ok: false, status: 0, data: null, error: 'Keine Verbindung zum Server' };
     }
-    setBanner(null);
+    $('stampStart').disabled = false;
 
     let data = null;
     try { data = await response.json(); } catch (e) { /* keine JSON-Antwort */ }
 
+    const raw = data?.message || `HTTP ${response.status}`;
+    const translated = SERVER_MESSAGES[raw] || raw;
+
     if (response.status === 401) {
-        // Token abgelaufen oder Geraet geloescht: zurueck zur Einrichtung
+        // Token abgelaufen oder Geraet geloescht: zurueck zur Einrichtung.
+        // Ist bereits die Einrichtung aktiv (z. B. weil setupSave selbst den
+        // 401 ausgeloest hat), nicht erneut umschalten/ueberschreiben — sonst
+        // verliert setupSave die konkrete Fehlermeldung an diesen Text hier (M1).
         forgetToken();
-        showScreen('setup');
-        showError('setupError', 'Token ungültig oder abgelaufen');
+        if (!$('screen-setup').classList.contains('active')) {
+            showScreen('setup');
+            showError('setupError', translated);
+        }
+    } else if (response.status === 403 || (response.status === 409 && raw === 'Device has no name')) {
+        // Geraet gesperrt/deaktiviert/unbenannt: Token BEHALTEN und auf
+        // Besserung pollen, statt wie bei 401 die Einrichtung zu verlangen (I1).
+        enterBlocked(translated);
+    } else {
+        setBanner(null);
     }
 
-    const raw = data?.message || `HTTP ${response.status}`;
-    return { ok: response.ok, status: response.status, data, error: SERVER_MESSAGES[raw] || raw };
+    return { ok: response.ok, status: response.status, data, error: translated };
 }
 
 // ============================================
@@ -121,11 +148,19 @@ async function api(action, method = 'GET', body = null) {
 function showScreen(name) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     $(`screen-${name}`).classList.add('active');
-    if (name === 'idle') {
+    // C1: 'setup' und 'settings' zeigen keine Ruhezeit-relevante Eingabe — ohne
+    // Verbindung (setup) oder waehrend der Konfiguration (settings) soll kein
+    // Idle-Timer laufen, der spaeter ins Leere feuert.
+    if (name === 'idle' || name === 'setup' || name === 'settings') {
         stopIdleTimer();
-    } else if (name !== 'setup' && name !== 'settings') {
+    } else {
         restartIdleTimer();
     }
+}
+
+function clearCodeDisplay() {
+    $('totpCode').textContent = '------';
+    $('qr').innerHTML = '';
 }
 
 function setBanner(text) {
@@ -133,8 +168,7 @@ function setBanner(text) {
     banner.hidden = !text;
     banner.textContent = text || '';
     if (text) {
-        $('totpCode').textContent = '------';
-        $('qr').innerHTML = '';
+        clearCodeDisplay();
     }
 }
 
@@ -165,12 +199,24 @@ function stopIdleTimer() {
 }
 
 function resetToIdle() {
+    // C1: ohne Token gibt es kein Ruhebild, zu dem zurueckgekehrt werden
+    // koennte — ein noch laufender Timer aus der Zeit vor dem 401 wuerde
+    // sonst ins Leere feuern und einen Screen ohne Verbindung aktivieren.
+    if (state.token === null) return;
+    if (state.autoTimer) clearTimeout(state.autoTimer);
+    state.autoTimer = null;
     state.memberNumber = '';
     state.pin = '';
     state.identity = null;
     state.selectedActivity = null;
     showError('pinError', null);
     showError('actionError', null);
+    // M5: Reste der letzten Sitzung nicht mit ins naechste Ruhebild nehmen.
+    $('numberDisplay').textContent = '';
+    $('pinDisplay').textContent = '';
+    $('greeting').textContent = '';
+    $('attendanceInfo').textContent = '';
+    $('worktimeInfo').textContent = '';
     showScreen('idle');
 }
 
@@ -236,13 +282,17 @@ $('setupSave').addEventListener('click', async () => {
 // ============================================
 
 async function enterIdle() {
+    state.blocked = false;
     showScreen('idle');
     applyStatus();
     startClock();
-    await refreshTotp();
+    // C2: Intervall und Wake Lock VOR dem await auf refreshTotp() scharf
+    // schalten — wirft refreshTotp() (Netzwerk, kaputtes JSON, Rendering),
+    // sollen Status-Polling und Bildschirm-wach trotzdem laufen.
     if (state.statusTimer) clearInterval(state.statusTimer);
     state.statusTimer = setInterval(refreshStatus, STATUS_EVERY);
     requestWakeLock();
+    await refreshTotp();
 }
 
 function stopIdleLoops() {
@@ -250,6 +300,27 @@ function stopIdleLoops() {
     if (state.statusTimer) clearInterval(state.statusTimer);
     if (state.clockTimer) clearInterval(state.clockTimer);
     state.totpTimer = state.statusTimer = state.clockTimer = null;
+}
+
+/**
+ * 403 (Geraet deaktiviert/falscher Typ) oder 409 "Device has no name": Token
+ * bleibt erhalten, Ruhebild-Schleifen stehen still, ein leichtes 60s-Intervall
+ * fragt weiter status ab, bis der Fehler behoben ist (I1).
+ */
+function enterBlocked(message) {
+    setBanner(message);
+    clearCodeDisplay();
+    if (state.blocked) return; // Erholungs-Polling laeuft schon, nur die Banner-Meldung auffrischen
+    state.blocked = true;
+    stopIdleLoops();
+    state.statusTimer = setInterval(async () => {
+        const res = await api('status');
+        if (res.ok) {
+            state.status = res.data;
+            state.blocked = false;
+            enterIdle();
+        }
+    }, 60000);
 }
 
 function applyStatus() {
@@ -285,13 +356,48 @@ async function refreshTotp() {
 
     const res = await api('totp');
     if (!res.ok) {
-        // Bei Verbindungsverlust in 10 s erneut versuchen; bei 404 (Code abgeschaltet) beim naechsten Status
-        if (res.status === 0) state.totpTimer = setTimeout(refreshTotp, 10000);
+        // I2: kurz nach Ablauf des zuletzt gezeigten Codes den bereits
+        // bekannten naechsten Code einmal weiter anzeigen statt sofort auf
+        // Striche zu springen — gegen die SERVERuhr gerechnet (clockOffset).
+        const nowOnServer = Date.now() / 1000 + state.clockOffset;
+        if (state.nextCode && nowOnServer < state.nextUntil) {
+            try {
+                renderTotp(state.nextCode);
+            } catch (e) {
+                debug.error('renderTotp', e);
+                clearCodeDisplay();
+            }
+            state.totpTimer = setTimeout(refreshTotp, 5000);
+            return;
+        }
+
+        clearCodeDisplay();
+        if (res.status === 0) {
+            state.totpTimer = setTimeout(refreshTotp, 10000);
+        } else if (res.status !== 404) {
+            // 404 (Code abgeschaltet): kein eigener Retry, das naechste Status-Intervall reicht
+            state.totpTimer = setTimeout(refreshTotp, 30000);
+        }
         return;
     }
 
-    const { code, valid_until, now, period } = res.data;
-    renderTotp(code);
+    if (!res.data || typeof res.data.code !== 'string') {
+        clearCodeDisplay();
+        state.totpTimer = setTimeout(refreshTotp, 10000);
+        return;
+    }
+
+    const { code, valid_until, now, period, next_code } = res.data;
+    try {
+        renderTotp(code);
+    } catch (e) {
+        debug.error('renderTotp', e);
+        clearCodeDisplay();
+    }
+
+    state.clockOffset = now - Date.now() / 1000;
+    state.nextCode  = typeof next_code === 'string' ? next_code : null;
+    state.nextUntil = valid_until + period;
 
     // Restlaufzeit gegen die SERVERuhr; die Tablet-Uhr geht oft falsch
     const fetchedAt = Date.now();
@@ -321,12 +427,25 @@ function renderTotp(code) {
 // ============================================
 
 async function requestWakeLock() {
-    if (!('wakeLock' in navigator)) return;
+    if (state.wakeLock && !state.wakeLock.released) return; // M4: schon aktiv
+    if (!('wakeLock' in navigator)) {
+        showWakeLockHint();
+        return;
+    }
     try {
         state.wakeLock = await navigator.wakeLock.request('screen');
     } catch (e) {
         debug.log('Wake Lock nicht verfügbar:', e);
+        showWakeLockHint();
     }
+}
+
+/** I5: ohne Wake Lock schlaeft das Tablet frueher oder spaeter ein — einmaliger Hinweis. */
+function showWakeLockHint() {
+    if (state.wakeLockHintShown) return;
+    state.wakeLockHintShown = true;
+    const name = state.status?.device_name || '';
+    $('deviceName').textContent = `${name} · Bildschirm-Timeout im Tablet deaktivieren`;
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -351,8 +470,12 @@ function renderPad(containerId, keys, onKey, alpha = false) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.textContent = key;
-        if (key === '') { btn.disabled = true; btn.style.visibility = 'hidden'; }
-        btn.addEventListener('click', () => onKey(key));
+        if (key === '') {
+            btn.disabled = true;
+            btn.style.visibility = 'hidden'; // M9: Platzhalter reagiert nicht auf Klicks
+        } else {
+            btn.addEventListener('click', () => onKey(key));
+        }
         pad.appendChild(btn);
     });
 }
@@ -381,6 +504,8 @@ function renderNumberPad() {
 }
 
 $('stampStart').addEventListener('click', () => {
+    if (state.autoTimer) clearTimeout(state.autoTimer); // M2
+    state.autoTimer = null;
     state.memberNumber = '';
     state.pin = '';
     state.alpha = false;
@@ -430,7 +555,7 @@ async function identify() {
     if (!res.ok) {
         showError('pinError', res.error);
         if (res.status === 423 || res.status === 409) {
-            setTimeout(resetToIdle, 4000);
+            state.autoTimer = setTimeout(resetToIdle, 4000); // M2
         } else {
             state.pin = '';
             $('pinDisplay').textContent = '';
@@ -508,33 +633,59 @@ function renderAction() {
 $('actionDone').addEventListener('click', resetToIdle);
 
 $('attendanceBtn').addEventListener('click', async () => {
-    const res = await api('checkin', 'POST', creds());
-    if (!res.ok) { showError('actionError', res.error); return; }
-    const apt = res.data.appointment;
-    done('Anwesenheit gespeichert', `${apt.title} – ${String(apt.start_time).slice(0, 5)} Uhr`);
+    const btn = $('attendanceBtn');
+    btn.disabled = true; // M3
+    try {
+        const res = await api('checkin', 'POST', creds());
+        if (!res.ok) { showError('actionError', res.error); return; }
+        const apt = res.data?.appointment; // I3
+        done('Anwesenheit gespeichert', apt ? `${apt.title} – ${String(apt.start_time).slice(0, 5)} Uhr` : '');
+    } finally {
+        btn.disabled = false;
+    }
 });
 
 $('worktimeStartBtn').addEventListener('click', async () => {
     if (!state.selectedActivity) { showError('actionError', 'Bitte eine Tätigkeit wählen.'); return; }
-    const res = await api('work_start', 'POST', { ...creds(), activity_id: Number(state.selectedActivity) });
-    if (!res.ok) { showError('actionError', res.error); return; }
-    done('Arbeitszeit gestartet', res.data.session.activity_name);
+    const btn = $('worktimeStartBtn');
+    btn.disabled = true; // M3
+    try {
+        const res = await api('work_start', 'POST', { ...creds(), activity_id: Number(state.selectedActivity) });
+        if (!res.ok) { showError('actionError', res.error); return; }
+        const s = res.data?.session; // I3
+        done('Arbeitszeit gestartet', s?.activity_name || '');
+    } finally {
+        btn.disabled = false;
+    }
 });
 
 $('worktimePauseBtn').addEventListener('click', async () => {
+    const btn = $('worktimePauseBtn');
     const paused = state.identity?.running_session?.is_paused;
-    const res = await api(paused ? 'work_resume' : 'work_pause', 'POST', creds());
-    if (!res.ok) { showError('actionError', res.error); return; }
-    done(paused ? 'Weiter geht’s' : 'Pause', res.data.session.activity_name);
+    btn.disabled = true; // M3
+    try {
+        const res = await api(paused ? 'work_resume' : 'work_pause', 'POST', creds());
+        if (!res.ok) { showError('actionError', res.error); return; }
+        const s = res.data?.session; // I3
+        done(paused ? 'Weiter geht’s' : 'Pause', s?.activity_name || '');
+    } finally {
+        btn.disabled = false;
+    }
 });
 
 $('worktimeStopBtn').addEventListener('click', async () => {
-    const res = await api('work_stop', 'POST', creds());
-    if (!res.ok) { showError('actionError', res.error); return; }
-    const s = res.data.session;
-    const h = Math.floor((s.duration_minutes || 0) / 60);
-    const m = (s.duration_minutes || 0) % 60;
-    done('Arbeitszeit beendet', `${s.activity_name} – ${h} h ${m} min`);
+    const btn = $('worktimeStopBtn');
+    btn.disabled = true; // M3
+    try {
+        const res = await api('work_stop', 'POST', creds());
+        if (!res.ok) { showError('actionError', res.error); return; }
+        const s = res.data?.session; // I3
+        const h = Math.floor((s?.duration_minutes || 0) / 60);
+        const m = (s?.duration_minutes || 0) % 60;
+        done('Arbeitszeit beendet', s ? `${s.activity_name} – ${h} h ${m} min` : '');
+    } finally {
+        btn.disabled = false;
+    }
 });
 
 function done(title, text) {
@@ -545,7 +696,7 @@ function done(title, text) {
     $('doneTitle').textContent = title;
     $('doneText').textContent = text || '';
     showScreen('done');
-    setTimeout(resetToIdle, DONE_SECONDS * 1000);
+    state.autoTimer = setTimeout(resetToIdle, DONE_SECONDS * 1000); // M2
 }
 
 // ============================================
@@ -560,9 +711,17 @@ $('clock').addEventListener('pointerdown', () => {
 });
 
 function openSettings() {
+    // C1: gegen den gespeicherten Token pruefen, nicht gegen state.token — der
+    // ist nach einem 401 bereits null, waehrend der Nutzer noch den alten
+    // Token im Kopf hat, um die Station wieder einzurichten.
+    const stored = loadToken();
+    if (stored === null) {
+        showScreen('setup');
+        return;
+    }
     const entered = window.prompt('Zum Schutz der Einstellungen: API-Token des Geräts eingeben');
     if (entered === null) return;
-    if (entered.trim() !== state.token) {
+    if (entered.trim() !== stored) {
         window.alert('Token stimmt nicht.');
         return;
     }
@@ -595,7 +754,13 @@ async function loadAppearance() {
     try {
         const url = new URL(API_BASE);
         url.searchParams.set('resource', 'appearance');
-        const res = await fetch(url, { credentials: 'omit' });
+        const fetchOptions = { credentials: 'omit' };
+        // I4: das Branding darf den Boot nicht aufhalten, wenn der oeffentliche
+        // Endpunkt haengt — nach 3 s aufgeben.
+        if (typeof AbortSignal.timeout === 'function') {
+            fetchOptions.signal = AbortSignal.timeout(3000);
+        }
+        const res = await fetch(url, fetchOptions);
         if (!res.ok) return;
         const s = (await res.json()).settings || {};
         if (s.organization_name) $('orgName').textContent = s.organization_name;
@@ -620,7 +785,7 @@ async function loadAppearance() {
         navigator.serviceWorker.register('service-worker.js').catch(e => debug.log('SW', e));
     }
 
-    await loadAppearance();
+    loadAppearance(); // I4: nicht blockierend — der Boot haengt nicht am Branding
 
     const token = loadToken();
     if (token && !(await connect(token))) {

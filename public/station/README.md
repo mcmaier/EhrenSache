@@ -40,9 +40,10 @@ Bildschirm an (Wake Lock), kein Navigationspfad nach außen, Rückfall zum Ruheb
 ## Sicherheit
 
 - Das TOTP-Secret verlässt den Server nicht; die Station holt nur den jeweils gültigen Code.
-- Der Token der Station kann **nur** die Ressource `station` aufrufen. Ohne PIN eines
-  Mitglieds ist er wertlos.
-- Nummer und PIN werden nie gespeichert, nur der Token (localStorage) und die Ruhezeit.
+- Der Token der Station kann nur die Ressource `station` (und `version`) aufrufen. Ohne PIN
+  eines Mitglieds ist er wertlos.
+- Nummer und PIN werden nie gespeichert, nur der Token (localStorage) und die Ruhezeit
+  (10–300 Sekunden, pro Browser gespeichert).
 - Sperre: 5 Fehlversuche je Mitgliedsnummer, 30 je Station, jeweils 15 Minuten.
 - Eine PIN ist weitergebbar. Stempel dieser Quelle sind in allen Auswertungen als
   „Station (PIN)" gekennzeichnet — siehe `DATENSCHUTZ.md` Abschnitt 10.7.
