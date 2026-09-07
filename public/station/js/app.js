@@ -447,10 +447,14 @@ function renderBar() {
     const bar = $('totpBar');
     bar.style.transition = 'none';
     bar.style.width = `${(remaining / period) * 100}%`;
-    requestAnimationFrame(() => {
-        bar.style.transition = `width ${remaining}s linear`;
-        bar.style.width = '0%';
-    });
+    // Erzwungener Reflow: Ohne ihn fasst der Browser beide Zuweisungen zu
+    // einer Stilberechnung zusammen (rAF-Callbacks laufen VOR dem Style-Recalc
+    // desselben Frames) — der Startwert ging verloren, die Transition lief
+    // dann vom alten Wert: nach einem Reload von 100 % (Balken beginnt voll),
+    // nach einem abgelaufenen Code von 0 % nach 0 % (Balken bleibt grau).
+    void bar.offsetWidth;
+    bar.style.transition = `width ${remaining}s linear`;
+    bar.style.width = '0%';
 }
 
 function renderTotp(code) {

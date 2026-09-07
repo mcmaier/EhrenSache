@@ -42,6 +42,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   bindet je Element und Ereignisart nur einmal — dieselbe Sperre, die
   `initAttendanceList()` schon von Hand hatte
 
+- **Kiosk: Restlaufzeit-Balken des TOTP-Codes begann nach einem Reload immer voll und blieb
+  nach dem nächsten Codewechsel grau.** Die Leiste wurde in zwei Schritten gesetzt (Startbreite,
+  dann per `requestAnimationFrame` das Ziel 0 %), doch der Browser fasst beide zu einer
+  Stilberechnung zusammen — rAF-Callbacks laufen vor dem Style-Recalc desselben Frames. Die
+  Transition startete deshalb vom vorigen Wert: nach dem Laden von 100 %, nach einem
+  abgelaufenen Code von 0 % nach 0 %, also gar nicht. Nur ein Klick (Stempeln/Abbrechen)
+  erzwang zufällig einen Flush dazwischen. Jetzt erzwingt `renderBar()` den Reflow selbst.
+
 ### Intern
 - Neue Testsuite `worktime_frontend` (statische Gegenproben am Zeiterfassungs-Frontend) und
   ein API-Test, der die Eingrenzung per `member_id` festhält
