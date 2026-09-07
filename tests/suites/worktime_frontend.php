@@ -151,3 +151,38 @@ test('Check-in-PWA: die Stundenform stimmt mit dem Dashboard ueberein', function
         );
     }
 });
+
+test('Check-in-PWA: die Statistik fragt den Arbeitszeitblock an', function () use ($repoRoot) {
+    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $body = frontendFunctionBody($js, 'loadStatistics');
+
+    // Ohne include=worktime antwortet die Ressource mit worktime: null — der
+    // Block bliebe dauerhaft leer, ohne dass irgendwo ein Fehler auftaucht.
+    assertTrue(
+        strpos($body, "include") !== false && strpos($body, "'worktime'") !== false,
+        'loadStatistics() fragt statistics ohne include=worktime ab'
+    );
+});
+
+test('Check-in-PWA: der Arbeitszeitabruf der Statistik grenzt auf Mitglied und Jahr ein',
+function () use ($repoRoot) {
+    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $body = frontendFunctionBody($js, 'loadStatistics');
+
+    $start = strpos($body, "apiCall('work_sessions'");
+    assertTrue($start !== false, 'loadStatistics() holt keine Sitzungen fuer die Fussnote');
+
+    $ende = strpos($body, ';', $start);
+    $call = substr($body, $start, ($ende === false ? 300 : $ende - $start));
+
+    // Ohne member_id liefert die Ressource einem Admin oder Manager die
+    // Sitzungen ALLER Mitglieder; ohne year passt die Fussnote nicht zu der
+    // Jahreszahl, die darueber steht.
+    foreach (['member_id', 'year'] as $param) {
+        assertTrue(
+            strpos($call, $param) !== false,
+            "Der Arbeitszeitabruf der Statistik grenzt nicht auf {$param} ein: "
+            . preg_replace('/\s+/', ' ', trim($call))
+        );
+    }
+});

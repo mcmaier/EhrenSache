@@ -3134,11 +3134,33 @@ async function loadStatistics() {
             throw new Error('Keine Member-ID verfügbar');
         }
         
-       // Hole Statistik für aktuelles Jahr
-        const result = await apiCall('statistics', 'GET', null, { 
+        // Die Arbeitszeit kommt aus zwei Quellen: die bestaetigte Jahressumme
+        // aus derselben Funktion, die auch den Verwendungsnachweis rechnet
+        // (statistics?include=worktime), die Fussnote aus den Rohzeilen. Beide
+        // nur, wenn das Mitglied ueberhaupt Zeiten erfassen darf — dieselbe
+        // Bedingung, an der schon der Verlauf haengt.
+        const zeigtArbeitszeit = worktimeActivities.length > 0;
+
+        const params = {
             member_id: userData.member_id,
             year: currentStatsYear
-        });
+        };
+        if (zeigtArbeitszeit) {
+            params.include = 'worktime';
+        }
+
+        const zeitAbruf = zeigtArbeitszeit
+            ? apiCall('work_sessions', 'GET', null, {
+                  member_id: userData.member_id,
+                  year: currentStatsYear
+              })
+            : Promise.resolve(null);
+
+        // Parallel, damit der Tab nicht zweimal nacheinander wartet.
+        const [result, sessions] = await Promise.all([
+            apiCall('statistics', 'GET', null, params),
+            zeitAbruf
+        ]);
 
          if (!result.success) {
             throw new Error(result.error);
