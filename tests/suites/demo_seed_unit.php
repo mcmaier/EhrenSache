@@ -145,3 +145,87 @@ test('buildActivityTypes enthaelt mindestens je einen Nachweisgrad', function ()
     sort($grades);
     assertSame(['none', 'start', 'start_end'], array_values($grades));
 });
+
+// ---- Mitglieder ----------------------------------------------------------
+// validateStationPin ist die echte Pruefung aus dem Produktivcode. Wenn der
+// Generator eine PIN erzeugt, die sie ablehnt, koennte sich das Mitglied an der
+// Station nicht anmelden — und niemand faende es vor dem Fototermin heraus.
+require_once __DIR__ . '/../../private/helpers/station.php';
+
+test('buildMembers liefert 40 Mitglieder mit fortlaufender Nummer', function () {
+    $m = buildMembers(new DemoRandom(20260908));
+    assertSame(40, count($m['members']));
+    assertSame('M001', $m['members'][0]['member_number']);
+    assertSame('M040', $m['members'][39]['member_number']);
+});
+
+test('buildMembers vergibt eindeutige Mitgliedsnummern und IDs', function () {
+    $m       = buildMembers(new DemoRandom(20260908));
+    $numbers = array_map(fn ($x) => $x['member_number'], $m['members']);
+    $ids     = array_map(fn ($x) => $x['member_id'], $m['members']);
+    assertSame(40, count(array_unique($numbers)));
+    assertSame(40, count(array_unique($ids)));
+});
+
+test('buildMembers setzt genau drei Mitglieder inaktiv', function () {
+    $m        = buildMembers(new DemoRandom(20260908));
+    $inactive = array_filter($m['members'], fn ($x) => $x['active'] === 0);
+    assertSame(3, count($inactive));
+});
+
+test('buildMembers gibt jedem Mitglied genau einen Mitgliedschaftszeitraum', function () {
+    $m = buildMembers(new DemoRandom(20260908));
+    assertSame(40, count($m['membership_dates']));
+});
+
+test('buildMembers beendet den Zeitraum genau bei den inaktiven Mitgliedern', function () {
+    $m      = buildMembers(new DemoRandom(20260908));
+    $closed = array_filter($m['membership_dates'], fn ($d) => $d['end_date'] !== null);
+    assertSame(3, count($closed));
+    foreach ($closed as $d) {
+        assertSame('inactive', $d['status']);
+    }
+});
+
+test('buildMembers ordnet jedes Mitglied mindestens einer Gruppe zu', function () {
+    $m      = buildMembers(new DemoRandom(20260908));
+    $byMemb = [];
+    foreach ($m['assignments'] as $a) {
+        $byMemb[$a['member_id']] = true;
+    }
+    assertSame(40, count($byMemb));
+});
+
+test('buildMembers haelt die Gruppenstaerken ein', function () {
+    $m     = buildMembers(new DemoRandom(20260908));
+    $count = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
+    foreach ($m['assignments'] as $a) {
+        $count[$a['group_id']]++;
+    }
+    assertSame(28, $count[1], 'Aktive');
+    assertSame(8, $count[2], 'Jugend');
+    assertSame(6, $count[3], 'Vorstandschaft');
+    assertSame(4, $count[4], 'Ehrenmitglieder');
+});
+
+test('buildMembers vergibt genau 15 PINs im Klartext', function () {
+    $m       = buildMembers(new DemoRandom(20260908));
+    $withPin = array_filter($m['members'], fn ($x) => $x['pin'] !== null);
+    assertSame(15, count($withPin));
+});
+
+test('jede erzeugte PIN besteht validateStationPin', function () {
+    $m = buildMembers(new DemoRandom(20260908));
+    foreach ($m['members'] as $x) {
+        if ($x['pin'] === null) {
+            continue;
+        }
+        assertSame(null, validateStationPin($x['pin'], 4), "PIN {$x['pin']} abgelehnt");
+    }
+});
+
+test('buildMembers ist bei gleichem Saat reproduzierbar', function () {
+    $a = buildMembers(new DemoRandom(20260908));
+    $b = buildMembers(new DemoRandom(20260908));
+    assertSame($a, $b);
+});

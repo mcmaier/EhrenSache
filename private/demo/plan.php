@@ -24,6 +24,10 @@
  */
 declare(strict_types=1);
 
+// validateStationPin() prüft die PIN-Regeln. Der Generator nutzt dieselbe
+// Funktion wie die Anwendung, damit erzeugte PINs an der Station funktionieren.
+require_once __DIR__ . '/../helpers/station.php';
+
 /**
  * Linearer Kongruenzgenerator.
  *
@@ -140,4 +144,124 @@ function buildActivityTypes(): array
         ['activity_id' => 5, 'activity_name' => 'Instrumentenpflege',      'description' => 'Wartung der Vereinsinstrumente',     'color' => '#0F4F9F', 'is_default' => 0, 'is_active' => 1, 'verification' => 'none'],
         ['activity_id' => 6, 'activity_name' => 'Jugendbetreuung',         'description' => 'Betreuung des Jugendorchesters',     'color' => '#FFC83D', 'is_default' => 0, 'is_active' => 1, 'verification' => 'none'],
     ];
+}
+
+const DEMO_FIRST_NAMES = [
+    'Andreas', 'Anna', 'Bernd', 'Birgit', 'Christian', 'Claudia', 'Daniel', 'Doris',
+    'Elias', 'Eva', 'Florian', 'Franziska', 'Georg', 'Greta', 'Hannes', 'Heike',
+    'Ingo', 'Irene', 'Jonas', 'Julia', 'Katrin', 'Klaus', 'Lena', 'Lukas',
+    'Marion', 'Martin', 'Nadine', 'Nils', 'Olaf', 'Petra', 'Rainer', 'Sabine',
+    'Simon', 'Sonja', 'Thomas', 'Tanja', 'Ulrich', 'Ursula', 'Volker', 'Wiebke',
+];
+
+const DEMO_LAST_NAMES = [
+    'Albrecht', 'Bauer', 'Becker', 'Brandt', 'Dietrich', 'Ehlers', 'Fischer', 'Frank',
+    'Graf', 'Hartmann', 'Hoffmann', 'Jung', 'Kaiser', 'Keller', 'Koch', 'Kramer',
+    'Lang', 'Lehmann', 'Maier', 'Neumann', 'Ott', 'Peters', 'Reuter', 'Richter',
+    'Sauer', 'Schmidt', 'Schneider', 'Schulz', 'Seidel', 'Sommer', 'Stein', 'Thiel',
+    'Vogel', 'Wagner', 'Weber', 'Werner', 'Wolf', 'Zimmermann', 'Ziegler', 'Zorn',
+];
+
+/**
+ * Gruppenstärken.
+ *
+ * Aktive, Jugend und Ehrenmitglieder decken zusammen genau die 40 Mitglieder ab
+ * (28 + 8 + 4). Die Vorstandschaft kommt obendrauf: Sie besteht aus Aktiven, die
+ * zusätzlich ein Amt tragen. Deshalb liegt die Summe aller Stärken über 40.
+ */
+const DEMO_GROUP_SIZES = [1 => 28, 2 => 8, 3 => 6, 4 => 4];
+
+/**
+ * Mitglieder samt Gruppenzuordnung, Mitgliedschaftszeiträumen und PINs.
+ *
+ * Rückgabe: ['members' => [...], 'assignments' => [...], 'membership_dates' => [...]]
+ * Die PIN steht im Klartext unter 'pin'; seed.php hasht sie. Ohne diese Trennung
+ * wäre der Plan nicht reproduzierbar, weil password_hash() je Aufruf salzt.
+ */
+function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'): array
+{
+    $members     = [];
+    $assignments = [];
+    $dates       = [];
+
+    // Inaktive Mitglieder stehen fest, damit die Menge nicht vom Zufall abhängt.
+    $inactiveIds = [7, 19, 33];
+
+    for ($i = 0; $i < 40; $i++) {
+        $id     = $i + 1;
+        $active = in_array($id, $inactiveIds, true) ? 0 : 1;
+
+        $members[] = [
+            'member_id'     => $id,
+            'name'          => DEMO_FIRST_NAMES[$i],
+            'surname'       => DEMO_LAST_NAMES[$i],
+            'member_number' => sprintf('M%03d', $id),
+            'active'        => $active,
+            'pin'           => null, // wird unten für 15 Mitglieder gesetzt
+        ];
+
+        // Eintritt gestreut über die letzten zwölf Jahre.
+        $joinYear  = (int) substr($referenceDate, 0, 4) - $random->int(1, 12);
+        $startDate = sprintf('%04d-%02d-01', $joinYear, $random->int(1, 12));
+
+        $dates[] = [
+            'member_id'  => $id,
+            'start_date' => $startDate,
+            'end_date'   => $active === 1 ? null : demoShiftDate($referenceDate, -$random->int(60, 400)),
+            'status'     => $active === 1 ? 'active' : 'inactive',
+        ];
+    }
+
+    // Gruppenzuordnung der Reihe nach, damit die Stärken exakt stimmen statt
+    // annähernd und jedes Mitglied genau einmal vorkommt:
+    //   Mitglieder  1– 8  Jugend
+    //   Mitglieder  9–12  Ehrenmitglieder
+    //   Mitglieder 13–40  Aktive
+    $cursor = 0;
+    foreach ([2 => DEMO_GROUP_SIZES[2], 4 => DEMO_GROUP_SIZES[4], 1 => DEMO_GROUP_SIZES[1]] as $groupId => $size) {
+        for ($n = 0; $n < $size; $n++) {
+            $assignments[] = ['member_id' => $cursor + 1, 'group_id' => $groupId];
+            $cursor++;
+        }
+    }
+    // Vorstandschaft: sechs Aktive tragen zusätzlich dieses Amt. Alle sechs IDs
+    // liegen im Bereich 13–40, sind also tatsächlich Aktive.
+    foreach ([13, 16, 21, 27, 30, 35] as $memberId) {
+        $assignments[] = ['member_id' => $memberId, 'group_id' => 3];
+    }
+
+    // PIN für 15 Mitglieder. Vierstellig, keine Einheitsziffern, keine Folge —
+    // die Regeln stehen in validateStationPin().
+    $pinFor = [];
+    while (count($pinFor) < 15) {
+        $candidate = $random->int(1, 40);
+        if (!isset($pinFor[$candidate])) {
+            $pinFor[$candidate] = demoPin($random);
+        }
+    }
+    foreach ($members as $idx => $member) {
+        if (isset($pinFor[$member['member_id']])) {
+            $members[$idx]['pin'] = $pinFor[$member['member_id']];
+        }
+    }
+
+    return ['members' => $members, 'assignments' => $assignments, 'membership_dates' => $dates];
+}
+
+/** Vierstellige PIN, die validateStationPin() besteht. */
+function demoPin(DemoRandom $random): string
+{
+    do {
+        $pin = sprintf('%04d', $random->int(1000, 9999));
+    } while (validateStationPin($pin, 4) !== null);
+
+    return $pin;
+}
+
+/** Datum um $days Tage verschieben. Negativ = in die Vergangenheit. */
+function demoShiftDate(string $date, int $days): string
+{
+    $ts = strtotime($date . ' ' . ($days >= 0 ? '+' : '-') . abs($days) . ' days');
+
+    return date('Y-m-d', $ts === false ? time() : $ts);
 }
