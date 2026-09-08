@@ -64,6 +64,8 @@ Sobald du dich im Web-Dashboard registriert hast und von einem Admin freigeschal
 - **Responsive**: Optimiert für alle Bildschirmgrößen
 - **QR-Code Scanner**: Schneller Termin-Check-In
 - **Statistiken**: Anwesenheitsquote, geleistete Arbeitszeit des Jahres und letzte Einträge
+- **Arbeitszeit korrigieren und nachtragen**: Eigene abgeschlossene Sitzungen über den Verlauf
+  korrigieren, vergessene Sitzungen nachtragen — beides geht erneut in die Freigabe
 
 ### ⚠️ Limitierungen
 

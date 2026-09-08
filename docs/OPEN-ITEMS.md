@@ -178,7 +178,7 @@ verfügbar) oder ob das Vereinssache bleibt (Tablet-eigene Kiosk-App, Gerätever
 MDM). Eine native Kiosk-App ist ausdrücklich außerhalb des Projektumfangs.
 
 ### OI-37 · Ortsnachweis überlebt jede Zeitkorrektur
-**Priorität:** mittel — betrifft die Aussagekraft des Verwendungsnachweises
+**Priorität:** erledigt am 2026-09-08 — `workSessionUpdate()` nullt den Ortsnachweis der geänderten Zeit, Regel in `worktimeProofDrop()` (`private/helpers/worktime.php`), Tests in `tests/suites/worktime_unit.php` und `tests/db/verify_proof_drop.php`
 
 `workSessionUpdate()` schreibt `start_time` und `end_time` neu, lässt `start_location_name`
 und `end_location_name` dabei aber unberührt
@@ -395,7 +395,7 @@ Drei Beobachtungen aus dem Probebetrieb der virtuellen Station (`public/station/
 Kein Server-Anteil.
 
 ### OI-35 · PWA: Arbeitszeit korrigieren und nachtragen
-**Priorität:** niedrig — vorgemerkt, vor der Umsetzung zu prüfen
+**Priorität:** erledigt am 2026-09-08 — umgesetzt in `public/checkin/` (Modal mit zwei Einstiegen: „Korrigieren“ am Verlaufseintrag, „Zeit nachtragen“ im Arbeitszeit-Tab)
 
 Der Verlauf-Tab der Check-in-PWA führt Arbeitszeitsitzungen in der Zeitachse mit, aber ohne
 jede Aktion: `addWorkSessionToHistory()` rendert Datum, Tätigkeit, Dauer, Notiz und Status —

@@ -1168,6 +1168,14 @@ Ein Nachtrag durch das Mitglied selbst landet in `submitted` und braucht eine
 Freigabe; ein Nachtrag durch Admin oder Manager gilt sofort. Löschen darf nur
 der Admin. Jede Änderung wird in `work_session_log` protokolliert.
 
+**Eine Zeitkorrektur nimmt den Ortsnachweis mit.** Ändert ein `PUT` die `start_time`, wird
+`start_location_name` auf `NULL` gesetzt; ändert es die `end_time`, entsprechend
+`end_location_name`. Der Nachweisgrad fällt damit von `hours` auf `start` oder `none`.
+Das gilt für **alle Rollen**: Ein Ortsnachweis gilt für den gestempelten Zeitpunkt, nicht für
+den behaupteten — wird der Zeitpunkt verschoben, verliert das Etikett seine Grundlage.
+Unveränderte Zeiten lassen beide Nachweise stehen, auch wenn sie in einer anderen Schreibweise
+mitkommen (`08:00` gegen `08:00:00`).
+
 **Terminbezug (`appointment_id`)**
 
 Optional bei `POST` und `PUT`. Beim `PUT` entscheidet die Anwesenheit des Feldes im Payload:

@@ -34,6 +34,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Auswertung wie der Verwendungsnachweis (`statistics?include=worktime`); nur bestätigte und
   beendete Sitzungen zählen. Ohne die Fußnote läse sich eine „0:00 h" nach einem frischen
   Nachtrag als Fehler. Server, Schema und API bleiben unverändert.
+- **Arbeitszeit aus der PWA korrigieren und nachtragen.** Eigene abgeschlossene Sitzungen
+  lassen sich über den Verlauf korrigieren, vergessene über den Arbeitszeit-Tab nachtragen.
+  Beides geht erneut in die Freigabe. **Eine Zeitkorrektur nimmt dem Eintrag den Ortsnachweis
+  für die verschobene Zeit** — bisher behielt eine um Stunden zurückdatierte Sitzung das
+  Etikett „stundenbelegt", obwohl für die zusätzliche Zeit nichts belegt war. Das gilt für alle
+  Rollen und wirkt sich auf Statistik, Export und Verwendungsnachweis aus.
 
 ---
 

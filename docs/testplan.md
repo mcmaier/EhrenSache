@@ -648,6 +648,15 @@ Misst bewusst **Differenzen** statt absoluter Summen — in einer benutzten Date
 bereits Sitzungen, und ein Test, der eine leere Tabelle voraussetzt, schlägt aus dem
 falschen Grund fehl.
 
+```bash
+php tests/db/verify_proof_drop.php "mysql:host=127.0.0.1;port=3306;dbname=ehrensache" root "" ez_
+```
+
+Prüft, was über HTTP nicht erreichbar ist: Eine Sitzung mit gesetztem Ortsnachweis verliert bei
+verschobenem Beginn genau `start_location_name`, bei verschobenem Ende genau
+`end_location_name`, behält bei einer reinen Notizkorrektur beide und behält beide auch, wenn
+derselbe Zeitpunkt in anderer Schreibweise mitkommt.
+
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
 | AW-1 | `statistics` ohne `include` | Kein `worktime`-Block |
@@ -689,6 +698,14 @@ Angemeldet als Mitglied mit verknüpftem `member_id` und mindestens einer Tätig
 | AW-P6 | Jahr ohne jede Sitzung | Eine Zeile „Keine Stunden in <Jahr>", keine leere Liste |
 | AW-P7 | Jahreswechsel über ‹ › | Summe, Fußnote und Tätigkeitsliste wechseln mit |
 | AW-P8 | Abmelden, anderes Konto anmelden | Kein Rest des Vorgängers im Statistik-Tab |
+| AW-P9 | Verlauf, „✎ Korrigieren" an einer bestätigten Sitzung, Beginn zwei Stunden zurücksetzen | Status fällt auf „wartet auf Freigabe", Nachweisgrad im Dashboard auf „unbelegt" |
+| AW-P10 | Dieselbe Sitzung, nur die Notiz ändern | Zeiten und Nachweisgrad bleiben unverändert |
+| AW-P11 | „Zeit nachtragen", Beginn und Ende ausfüllen, speichern | Neuer Eintrag im Verlauf mit „wartet auf Freigabe" |
+| AW-P12 | „Zeit nachtragen" mit Ende vor Beginn | Fehlerkasten im Modal mit der Servermeldung, Modal bleibt offen |
+| AW-P13 | `worktime_require_note = 1`, Nachtrag ohne Notiz | Fehlerkasten „Eine Notiz ist erforderlich" |
+| AW-P14 | Laufende Sitzung im Verlauf | Kein Korrigieren-Knopf |
+| AW-P15 | Sitzung mit einer Tätigkeit aus einer inzwischen verlassenen Gruppe korrigieren | Die Tätigkeit steht in der Auswahl und bleibt vorausgewählt |
+| AW-P16 | Modal offen lassen, abmelden, neu anmelden | Kein offenes Modal, keine Werte des Vorgängers |
 
 ---
 
