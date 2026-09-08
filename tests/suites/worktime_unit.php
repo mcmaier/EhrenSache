@@ -311,3 +311,25 @@ test('worktimeProofDrop: eine laufende Sitzung, die per PUT beendet wird', funct
         worktimeProofDrop($before, '2026-09-01 10:00:00', '2026-09-01 12:00:00')
     );
 });
+
+test('worktimeSameInstant: zwei unparsbare Werte gelten als gleich', function () {
+    // Der Rueckfall vergleicht die Zeichen. Zwei gleiche Trümmer sind keine
+    // Aenderung — der Nachweis bleibt, wo er ist.
+    assertTrue(worktimeSameInstant('kein Datum', 'kein Datum'));
+});
+
+test('worktimeSameInstant: ein unparsbarer Wert gegen einen echten Zeitpunkt', function () {
+    // Vorsichtige Richtung: Was sich nicht als derselbe Zeitpunkt belegen
+    // laesst, gilt als Aenderung — der Ortsnachweis faellt lieber einmal zu
+    // viel als einmal zu wenig.
+    assertTrue(!worktimeSameInstant('kein Datum', '2026-09-01 08:00:00'));
+});
+
+test('worktimeSameInstant: leerer String gegen einen echten Zeitpunkt', function () {
+    assertTrue(!worktimeSameInstant('', '2026-09-01 08:00:00'));
+});
+
+test('worktimeSameInstant: zwei leere Strings', function () {
+    // Nicht dasselbe wie null gegen null, aber dieselbe Antwort.
+    assertTrue(worktimeSameInstant('', ''));
+});

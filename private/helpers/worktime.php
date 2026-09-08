@@ -431,7 +431,9 @@ function worktimeSameInstant(?string $a, ?string $b): bool
  * Gilt fuer alle Rollen: Die Verschiebung macht den Nachweis sachlich falsch,
  * gleich wer sie vornimmt.
  *
- * @param array<string, mixed> $before  Datensatz vor der Aenderung
+ * @param array<string, mixed> $before    Datensatz vor der Aenderung
+ * @param string|null          $newStart  Beginn nach der Aenderung
+ * @param string|null          $newEnd    Ende nach der Aenderung
  * @return array{start: bool, end: bool}  true heisst: Nachweis faellt weg
  */
 function worktimeProofDrop(array $before, ?string $newStart, ?string $newEnd): array
