@@ -257,3 +257,54 @@ test('buildMembers: end_date liegt fuer alle Saaten 1..300 nach start_date und n
 test('demoShiftDate wirft bei ungueltigem Datum statt still auf die Systemuhr zurueckzufallen', function () {
     assertThrows(fn () => demoShiftDate('kein-datum', 5));
 });
+
+// ---- Termine -------------------------------------------------------------
+
+test('buildAppointments deckt zwoelf Monate rueckwaerts und vier Wochen vorwaerts ab', function () {
+    $appts = buildAppointments(new DemoRandom(20260908), '2026-09-08');
+    $dates = array_map(fn ($a) => $a['date'], $appts);
+    sort($dates);
+    assertTrue($dates[0] >= '2025-09-08', "frühester Termin {$dates[0]} liegt vor dem Fenster");
+    assertTrue(end($dates) <= '2026-10-06', 'spätester Termin liegt hinter dem Fenster');
+});
+
+test('buildAppointments liefert zwischen 80 und 110 Termine', function () {
+    $count = count(buildAppointments(new DemoRandom(20260908), '2026-09-08'));
+    assertTrue($count >= 80 && $count <= 110, "unerwartete Menge: {$count}");
+});
+
+test('buildAppointments legt genau vier Termine in die Zukunft', function () {
+    $appts  = buildAppointments(new DemoRandom(20260908), '2026-09-08');
+    $future = array_filter($appts, fn ($a) => $a['date'] > '2026-09-08');
+    assertSame(4, count($future));
+});
+
+test('buildAppointments nutzt alle vier Terminarten', function () {
+    $types = array_unique(array_map(fn ($a) => $a['type_id'], buildAppointments(new DemoRandom(20260908), '2026-09-08')));
+    sort($types);
+    assertSame([1, 2, 3, 4], array_values($types));
+});
+
+test('Gesamtproben liegen freitags um 20:00', function () {
+    $appts = buildAppointments(new DemoRandom(20260908), '2026-09-08');
+    foreach ($appts as $a) {
+        if ($a['type_id'] !== 1) {
+            continue;
+        }
+        assertSame('20:00:00', $a['start_time']);
+        assertSame('5', date('N', strtotime($a['date'])), "{$a['date']} ist kein Freitag");
+    }
+});
+
+test('buildAppointments vergibt eindeutige, fortlaufende IDs', function () {
+    $appts = buildAppointments(new DemoRandom(20260908), '2026-09-08');
+    $ids   = array_map(fn ($a) => $a['appointment_id'], $appts);
+    assertSame(count($ids), count(array_unique($ids)));
+    assertSame(1, min($ids));
+});
+
+test('buildAppointments ist bei gleichem Saat reproduzierbar', function () {
+    $a = buildAppointments(new DemoRandom(20260908), '2026-09-08');
+    $b = buildAppointments(new DemoRandom(20260908), '2026-09-08');
+    assertSame($a, $b);
+});

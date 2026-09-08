@@ -294,3 +294,135 @@ function demoShiftDate(string $date, int $days): string
 
     return date('Y-m-d', $ts);
 }
+
+/**
+ * Terminserie über zwölf Monate rückwärts und vier Wochen vorwärts.
+ *
+ * Vier Termine liegen bewusst in der Zukunft — sonst endet die Terminliste im
+ * Screenshot mit der Vergangenheit und wirkt wie ein aufgegebener Verein.
+ */
+function buildAppointments(DemoRandom $random, string $referenceDate): array
+{
+    $from = demoShiftDate($referenceDate, -365);
+    $to   = demoShiftDate($referenceDate, 28);
+
+    $appointments = [];
+    $id           = 1;
+
+    // Gesamtprobe: jeden Freitag, 20:00.
+    foreach (demoWeekdaySeries($from, $to, 5, 1) as $date) {
+        $appointments[] = [
+            'appointment_id' => $id++,
+            'title'          => 'Gesamtprobe',
+            'type_id'        => 1,
+            'description'    => null,
+            'date'           => $date,
+            'start_time'     => '20:00:00',
+        ];
+    }
+
+    // Registerprobe: jeden zweiten Dienstag, 19:30.
+    foreach (demoWeekdaySeries($from, $to, 2, 2) as $date) {
+        $appointments[] = [
+            'appointment_id' => $id++,
+            'title'          => 'Registerprobe',
+            'type_id'        => 2,
+            'description'    => null,
+            'date'           => $date,
+            'start_time'     => '19:30:00',
+        ];
+    }
+
+    // Vorstandssitzung: erster Montag im Monat, 19:00.
+    foreach (demoFirstMondays($from, $to) as $date) {
+        $appointments[] = [
+            'appointment_id' => $id++,
+            'title'          => 'Vorstandssitzung',
+            'type_id'        => 4,
+            'description'    => null,
+            'date'           => $date,
+            'start_time'     => '19:00:00',
+        ];
+    }
+
+    // Auftritte: zehn Samstage, ungleich über das Jahr verteilt.
+    $saturdays = demoWeekdaySeries($from, demoShiftDate($referenceDate, -1), 6, 1);
+    $titles    = ['Frühjahrskonzert', 'Maibaumstellen', 'Dorffest', 'Kirchenkonzert', 'Sommerserenade',
+                  'Umzug Nachbarort', 'Herbstkonzert', 'Kirchweih', 'Volkstrauertag', 'Adventsständchen'];
+    $step      = max(1, intdiv(count($saturdays), 10));
+    for ($n = 0; $n < 10 && $n * $step < count($saturdays); $n++) {
+        $appointments[] = [
+            'appointment_id' => $id++,
+            'title'          => $titles[$n],
+            'type_id'        => 3,
+            'description'    => null,
+            'date'           => $saturdays[$n * $step],
+            'start_time'     => sprintf('%02d:00:00', $random->int(10, 19)),
+        ];
+    }
+
+    // Genau vier Termine in der Zukunft: die nächsten Gesamt- und Registerproben
+    // stehen bereits in den Serien oben. Alles danach wird gekappt.
+    $past   = array_values(array_filter($appointments, fn ($a) => $a['date'] <= $referenceDate));
+    $future = array_values(array_filter($appointments, fn ($a) => $a['date'] > $referenceDate));
+    usort($future, fn ($x, $y) => strcmp($x['date'], $y['date']));
+    $future = array_slice($future, 0, 4);
+
+    $result = array_merge($past, $future);
+    usort($result, fn ($x, $y) => strcmp($x['date'], $y['date']) ?: strcmp($x['start_time'], $y['start_time']));
+
+    // IDs nach der Sortierung neu vergeben, damit sie der Chronologie folgen.
+    foreach ($result as $idx => $row) {
+        $result[$idx]['appointment_id'] = $idx + 1;
+    }
+
+    return $result;
+}
+
+/**
+ * Alle Daten eines Wochentags zwischen zwei Grenzen.
+ *
+ * @param int $weekday 1 = Montag … 7 = Sonntag (wie date('N'))
+ * @param int $every   1 = jede Woche, 2 = jede zweite …
+ * @return array<int, string>
+ */
+function demoWeekdaySeries(string $from, string $to, int $weekday, int $every): array
+{
+    $dates  = [];
+    $cursor = strtotime($from);
+    $end    = strtotime($to);
+
+    // Auf den ersten passenden Wochentag vorrücken.
+    while ((int) date('N', $cursor) !== $weekday) {
+        $cursor = strtotime('+1 day', $cursor);
+    }
+
+    $n = 0;
+    while ($cursor <= $end) {
+        if ($n % $every === 0) {
+            $dates[] = date('Y-m-d', $cursor);
+        }
+        $cursor = strtotime('+1 week', $cursor);
+        $n++;
+    }
+
+    return $dates;
+}
+
+/** @return array<int, string> Erster Montag jedes Monats im Zeitraum. */
+function demoFirstMondays(string $from, string $to): array
+{
+    $dates  = [];
+    $cursor = strtotime(date('Y-m-01', strtotime($from)));
+    $end    = strtotime($to);
+
+    while ($cursor <= $end) {
+        $first = strtotime('first monday of ' . date('F Y', $cursor));
+        if ($first >= strtotime($from) && $first <= $end) {
+            $dates[] = date('Y-m-d', $first);
+        }
+        $cursor = strtotime('+1 month', $cursor);
+    }
+
+    return $dates;
+}
