@@ -458,3 +458,57 @@ test('buildRecords erzeugt keine Anwesenheit ausserhalb des Mitgliedschaftszeitr
         }
     }
 });
+
+// ---- Antraege ------------------------------------------------------------
+
+test('buildExceptions liefert 25 Antraege', function () {
+    $r     = new DemoRandom(20260908);
+    $m     = buildMembers($r, '2026-09-08');
+    $appts = buildAppointments($r, '2026-09-08');
+    assertSame(25, count(buildExceptions($r, $m['members'], $appts, '2026-09-08')));
+});
+
+test('buildExceptions enthaelt mindestens vier offene Antraege', function () {
+    $r       = new DemoRandom(20260908);
+    $m       = buildMembers($r, '2026-09-08');
+    $appts   = buildAppointments($r, '2026-09-08');
+    $pending = array_filter(buildExceptions($r, $m['members'], $appts, '2026-09-08'), fn ($e) => $e['status'] === 'pending');
+    assertTrue(count($pending) >= 4, 'zu wenige offene Antraege: ' . count($pending));
+});
+
+test('buildExceptions nutzt beide Antragsarten', function () {
+    $r     = new DemoRandom(20260908);
+    $m     = buildMembers($r, '2026-09-08');
+    $appts = buildAppointments($r, '2026-09-08');
+    $kinds = array_unique(array_map(fn ($e) => $e['exception_type'], buildExceptions($r, $m['members'], $appts, '2026-09-08')));
+    sort($kinds);
+    assertSame(['absence', 'time_correction'], array_values($kinds));
+});
+
+test('Zeitkorrekturen tragen eine gewuenschte Ankunftszeit, Abwesenheiten nicht', function () {
+    $r     = new DemoRandom(20260908);
+    $m     = buildMembers($r, '2026-09-08');
+    $appts = buildAppointments($r, '2026-09-08');
+    foreach (buildExceptions($r, $m['members'], $appts, '2026-09-08') as $e) {
+        if ($e['exception_type'] === 'time_correction') {
+            assertTrue($e['requested_arrival_time'] !== null, 'Zeitkorrektur ohne Zeit');
+        } else {
+            assertSame(null, $e['requested_arrival_time']);
+        }
+    }
+});
+
+test('entschiedene Antraege tragen Entscheider und Zeitpunkt, offene nicht', function () {
+    $r     = new DemoRandom(20260908);
+    $m     = buildMembers($r, '2026-09-08');
+    $appts = buildAppointments($r, '2026-09-08');
+    foreach (buildExceptions($r, $m['members'], $appts, '2026-09-08') as $e) {
+        if ($e['status'] === 'pending') {
+            assertSame(null, $e['approved_by']);
+            assertSame(null, $e['approved_at']);
+        } else {
+            assertTrue($e['approved_by'] !== null, 'entschiedener Antrag ohne Entscheider');
+            assertTrue($e['approved_at'] !== null, 'entschiedener Antrag ohne Zeitpunkt');
+        }
+    }
+});

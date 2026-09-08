@@ -538,3 +538,60 @@ function buildRecords(
 
     return $records;
 }
+
+/**
+ * Anträge auf Entschuldigung und Zeitkorrektur.
+ *
+ * Mindestens vier bleiben offen — sonst ist der Antrags-Tab im Screenshot leer,
+ * und genau er belegt, dass es einen Freigabeweg gibt.
+ *
+ * created_by und approved_by tragen Platzhalter-IDs; seed.php ersetzt sie durch
+ * die tatsächlichen Benutzer-IDs (2 = Manager). Der Plan kennt keine Konten.
+ */
+const DEMO_EXCEPTION_REASONS = [
+    'Krankheit', 'Beruflich verhindert', 'Urlaub', 'Familienfeier',
+    'Prüfungsvorbereitung', 'Kinderbetreuung', 'Arzttermin', 'Auswärtstermin',
+];
+
+function buildExceptions(DemoRandom $random, array $members, array $appointments, string $referenceDate): array
+{
+    $past = array_values(array_filter($appointments, fn ($a) => $a['date'] <= $referenceDate));
+    if ($past === []) {
+        return [];
+    }
+
+    $exceptions = [];
+    for ($n = 0; $n < 25; $n++) {
+        $member = $random->pick($members);
+        $appt   = $random->pick($past);
+
+        // Die ersten fünf bleiben offen, der Rest ist entschieden.
+        $status = $n < 5
+            ? 'pending'
+            : ($random->chance(0.8) ? 'approved' : 'rejected');
+
+        $kind  = $random->chance(0.65) ? 'absence' : 'time_correction';
+        $start = strtotime($appt['date'] . ' ' . $appt['start_time']);
+
+        $exceptions[] = [
+            'member_id'              => $member['member_id'],
+            'appointment_id'         => $appt['appointment_id'],
+            'exception_type'         => $kind,
+            'reason'                 => $kind === 'absence'
+                ? $random->pick(DEMO_EXCEPTION_REASONS)
+                : 'Ankunft wurde nicht erfasst',
+            'requested_arrival_time' => $kind === 'time_correction'
+                ? date('Y-m-d H:i:s', $start + $random->int(-15, 20) * 60)
+                : null,
+            'status'                 => $status,
+            'created_by'             => 'member',  // seed.php löst auf
+            'approved_by'            => $status === 'pending' ? null : 'manager',
+            'approved_at'            => $status === 'pending'
+                ? null
+                : date('Y-m-d H:i:s', $start + $random->int(1, 5) * 86400),
+            'created_at'             => date('Y-m-d H:i:s', $start - $random->int(1, 6) * 86400),
+        ];
+    }
+
+    return $exceptions;
+}
