@@ -826,3 +826,108 @@ test('buildWorkSessions ist bei gleichem Saat reproduzierbar', function () {
     assertSame($a['sessions'], $b['sessions']);
     assertSame($a['log'], $b['log']);
 });
+
+// ---- Gesamtplan ----------------------------------------------------------
+// buildDemoPlan() fuegt alle Bausteine zu einem Bestand zusammen. Die
+// Reihenfolge der Aufrufe darin ist fest (siehe Kommentar ueber der Funktion) —
+// hier wird nur das Gesamtergebnis geprueft, nicht die Reihenfolge selbst.
+
+test('buildDemoPlan liefert genau die erwarteten Abschnitte', function () {
+    $plan = buildDemoPlan(20260908, '2026-09-08');
+    $keys = array_keys($plan);
+    sort($keys);
+    assertSame([
+        'activity_type_groups', 'activity_types', 'appointment_type_groups', 'appointment_types',
+        'appointments', 'exceptions', 'groups', 'member_group_assignments', 'members',
+        'membership_dates', 'records', 'settings', 'users', 'work_session_log', 'work_sessions',
+    ], $keys);
+});
+
+test('buildDemoPlan ist bei gleichem Saat und Stichtag vollstaendig reproduzierbar', function () {
+    $a = buildDemoPlan(20260908, '2026-09-08');
+    $b = buildDemoPlan(20260908, '2026-09-08');
+    assertSame($a, $b);
+});
+
+test('buildDemoPlan liefert bei anderem Saat einen anderen Bestand', function () {
+    $a = buildDemoPlan(1, '2026-09-08');
+    $b = buildDemoPlan(2, '2026-09-08');
+    assertTrue($a['records'] !== $b['records'], 'Anwesenheiten sind bei verschiedenen Saaten identisch');
+});
+
+test('buildSettings setzt Vereinsname, leeres Logo und aktivierte Arbeitszeit/Station-PIN', function () {
+    $settings = buildDemoPlan(20260908, '2026-09-08')['settings'];
+    assertSame(DEMO_ORG_NAME, $settings['organization_name']);
+    assertSame('', $settings['organization_logo']);
+    assertSame('1', $settings['worktime_enabled']);
+    assertSame('1', $settings['station_pin_enabled']);
+});
+
+test('buildUsers liefert drei Konten und zwei Geraete', function () {
+    $users   = buildDemoPlan(20260908, '2026-09-08')['users'];
+    $regular = array_filter($users, fn ($u) => $u['role'] !== 'device');
+    $devices = array_filter($users, fn ($u) => $u['role'] === 'device');
+    assertSame(3, count($regular));
+    assertSame(2, count($devices));
+});
+
+test('buildUsers legt genau einen Kiosk mit dem Stationsnamen an', function () {
+    $users  = buildDemoPlan(20260908, '2026-09-08')['users'];
+    $kiosks = array_values(array_filter($users, fn ($u) => $u['device_type'] === 'kiosk'));
+    assertSame(1, count($kiosks));
+    assertSame(DEMO_STATION_NAME, $kiosks[0]['device_name']);
+});
+
+test('das Benutzerkonto haengt an Mitglied 1', function () {
+    $users = buildDemoPlan(20260908, '2026-09-08')['users'];
+    $user  = array_values(array_filter($users, fn ($u) => $u['role'] === 'user'));
+    assertSame(1, count($user));
+    assertSame(1, $user[0]['member_id']);
+});
+
+test('alle Zeilen von users tragen dieselben Schluessel in derselben Reihenfolge', function () {
+    // Die Schreibschicht leitet die Spaltenliste aus der ersten Zeile ab — eine
+    // abweichende Zeile wuerde dort stillschweigend falsche Spalten erzeugen.
+    $users        = buildDemoPlan(20260908, '2026-09-08')['users'];
+    $expectedKeys = array_keys($users[0]);
+    foreach ($users as $u) {
+        assertSame($expectedKeys, array_keys($u), 'Schluessel weichen ab');
+    }
+});
+
+test('Fremdschluessel im Gesamtplan zeigen ueberall auf vorhandene Zeilen', function () {
+    foreach ([20260908, 1, 42] as $seed) {
+        $plan = buildDemoPlan($seed, '2026-09-08');
+
+        $memberIds      = array_column($plan['members'], 'member_id');
+        $appointmentIds = array_column($plan['appointments'], 'appointment_id');
+        $activityIds    = array_column($plan['activity_types'], 'activity_id');
+        $groupIds       = array_column($plan['groups'], 'group_id');
+        $sessionIds     = array_column($plan['work_sessions'], 'session_id');
+
+        foreach (['records', 'exceptions', 'work_sessions', 'member_group_assignments'] as $section) {
+            foreach ($plan[$section] as $row) {
+                assertTrue(in_array($row['member_id'], $memberIds, true), "Saat {$seed}, {$section}: member_id {$row['member_id']} unbekannt");
+            }
+        }
+        foreach (['records', 'exceptions'] as $section) {
+            foreach ($plan[$section] as $row) {
+                assertTrue(in_array($row['appointment_id'], $appointmentIds, true), "Saat {$seed}, {$section}: appointment_id {$row['appointment_id']} unbekannt");
+            }
+        }
+        foreach ($plan['work_sessions'] as $row) {
+            if ($row['appointment_id'] !== null) {
+                assertTrue(in_array($row['appointment_id'], $appointmentIds, true), "Saat {$seed}: work_sessions.appointment_id {$row['appointment_id']} unbekannt");
+            }
+            assertTrue(in_array($row['activity_id'], $activityIds, true), "Saat {$seed}: work_sessions.activity_id {$row['activity_id']} unbekannt");
+        }
+        foreach (['member_group_assignments', 'appointment_type_groups', 'activity_type_groups'] as $section) {
+            foreach ($plan[$section] as $row) {
+                assertTrue(in_array($row['group_id'], $groupIds, true), "Saat {$seed}, {$section}: group_id {$row['group_id']} unbekannt");
+            }
+        }
+        foreach ($plan['work_session_log'] as $row) {
+            assertTrue(in_array($row['session_id'], $sessionIds, true), "Saat {$seed}: work_session_log.session_id {$row['session_id']} unbekannt");
+        }
+    }
+});

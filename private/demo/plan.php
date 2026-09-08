@@ -945,3 +945,75 @@ function buildWorkSessions(
 
     return ['sessions' => $sessions, 'log' => $log];
 }
+
+/** Einstellungen, die der Generator setzt. Werte als String wie in system_settings. */
+function buildSettings(): array
+{
+    return [
+        'organization_name'      => DEMO_ORG_NAME,
+        'organization_logo'      => '',
+        'primary_color'          => '#1F5FBF',
+        'secondary_color'        => '#4CAF50',
+        'worktime_enabled'       => '1',
+        'station_pin_enabled'    => '1',
+        'station_pin_min_length' => '4',
+        'pagination_limit'       => '25',
+    ];
+}
+
+/**
+ * Konten und Geräte.
+ *
+ * Passwörter und Token stehen hier NICHT: seed.php hasht bzw. würfelt sie. Der
+ * Plan nennt nur, welche Konten es gibt und woran sie hängen.
+ */
+function buildUsers(): array
+{
+    return [
+        ['user_id' => 1, 'email' => 'admin@musterhausen.example',   'name' => 'Vereinsverwaltung', 'device_name' => null, 'role' => 'admin',   'device_type' => null, 'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 1],
+        ['user_id' => 2, 'email' => 'manager@musterhausen.example', 'name' => 'Schriftführung',    'device_name' => null, 'role' => 'manager', 'device_type' => null, 'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 1],
+        ['user_id' => 3, 'email' => 'user@musterhausen.example',    'name' => 'Mitglied',          'device_name' => null, 'role' => 'user',    'device_type' => null, 'member_id' => 1,    'is_active' => 1, 'account_status' => 'active', 'email_verified' => 1],
+        ['user_id' => 4, 'email' => null, 'name' => null, 'device_name' => DEMO_STATION_NAME, 'role' => 'device', 'device_type' => 'kiosk',          'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 0],
+        ['user_id' => 5, 'email' => null, 'name' => null, 'device_name' => 'Proberaum',        'role' => 'device', 'device_type' => 'totp_location', 'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 0],
+    ];
+}
+
+/**
+ * Der vollständige Bestand.
+ *
+ * Ein Aufruf, ein Zufallsgenerator, eine Reihenfolge — damit derselbe Saat
+ * denselben Bestand ergibt. Wird hier eine Zeile eingefügt, verschiebt sich alles
+ * Nachfolgende; das ist gewollt und der Grund, warum die Reihenfolge feststeht.
+ */
+function buildDemoPlan(int $seed, string $referenceDate): array
+{
+    $random = new DemoRandom($seed);
+
+    $members        = buildMembers($random, $referenceDate);
+    $appointments   = buildAppointments($random, $referenceDate);
+    $activities     = buildActivityTypes();
+    $activityGroups = buildActivityTypeGroups();
+    $typeGroups     = buildAppointmentTypeGroups();
+
+    $records    = buildRecords($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $referenceDate);
+    $exceptions = buildExceptions($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $records, $referenceDate);
+    $work       = buildWorkSessions($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $activityGroups, $referenceDate);
+
+    return [
+        'settings'                 => buildSettings(),
+        'groups'                   => buildGroups(),
+        'members'                  => $members['members'],
+        'member_group_assignments' => $members['assignments'],
+        'membership_dates'         => $members['membership_dates'],
+        'users'                    => buildUsers(),
+        'appointment_types'        => buildAppointmentTypes(),
+        'appointment_type_groups'  => $typeGroups,
+        'activity_types'           => $activities,
+        'activity_type_groups'     => $activityGroups,
+        'appointments'             => $appointments,
+        'records'                  => $records,
+        'exceptions'               => $exceptions,
+        'work_sessions'            => $work['sessions'],
+        'work_session_log'         => $work['log'],
+    ];
+}
