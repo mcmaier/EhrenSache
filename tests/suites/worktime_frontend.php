@@ -90,7 +90,7 @@ test('Check-in-PWA: die Abmeldung raeumt die Ansichten des Mitglieds ab', functi
     $reset = frontendFunctionBody($js, 'resetSessionState');
 
     foreach (['userData = null', 'historyList', 'worktimeActivities',
-              'worktimeStatsBody'] as $spur) {
+              'worktimeStatsBody', 'worktimeHistorySessions'] as $spur) {
         assertTrue(
             strpos($reset, $spur) !== false,
             "resetSessionState setzt '{$spur}' nicht zurueck"

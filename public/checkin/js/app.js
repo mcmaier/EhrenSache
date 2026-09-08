@@ -773,7 +773,11 @@ function resetSessionState() {
     worktimeSession = null;
     worktimeActivities = [];
     worktimeAppointments = [];
+    worktimeHistorySessions = {};
     renderWorktime();   // blendet laufende Sitzung und ihre Leiste aus
+
+    // Ein offenes Korrekturmodal wuerde die Sitzung des Vorgaengers zeigen.
+    closeWorkSessionModal();
 
     ['historyList', 'attendanceListContent', 'groupsList',
      'worktimeStatsBody'].forEach(id => {
