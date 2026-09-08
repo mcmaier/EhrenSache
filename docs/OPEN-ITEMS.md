@@ -487,6 +487,42 @@ ist seit 2026-09-07 in `API.md` dokumentiert (Abschnitt *Statistiken → Arbeits
 (`loadStatistics()`, `displayStatistics()`), `public/checkin/css/style.css`.
 Server voraussichtlich unberührt.
 
+### OI-38 · Die Auditspur ist nirgends zu sehen
+**Priorität:** niedrig — vorgemerkt, entstanden bei der Planung von [OI-35](#oi-35)
+
+Jede Änderung an einer Arbeitszeitsitzung wird protokolliert: `logSessionChange()` schreibt
+Vorher/Nachher-Werte als JSON in `work_session_log.changes`
+([worktime.php:317](../private/helpers/worktime.php)). Angezeigt wird das nirgends. Der einzige
+Weg heraus ist die Selbstauskunft — `my_data` gibt die eigenen Logzeilen aus
+([my_data.php:150](../private/handlers/my_data.php)) —, und die liest niemand zur Freigabe.
+
+**Folge für die Freigabe.** In der Freigabeliste des Dashboards steht ein Eintrag mit Status
+„wartet auf Freigabe". Ob das eine frisch nachgetragene Sitzung ist oder eine bestätigte, deren
+Zeiten das Mitglied nachträglich verschoben hat, ist daran nicht zu erkennen. Der Manager gibt
+also frei, ohne zu wissen, worüber er entscheidet. Mit [OI-35](#oi-35) — Korrigieren und
+Nachtragen aus der PWA — wird dieser Fall vom Sonderfall zum Regelfall.
+
+Zwei Teilsignale gibt es bereits: Der Nachweisgrad fällt bei einer Zeitkorrektur auf
+„teilbelegt" oder „unbelegt" (sobald [OI-37](#oi-37) umgesetzt ist), und `source` unterscheidet
+`timer` von `manual`. Beides sagt aber nur, *dass* etwas anders ist, nicht *was*.
+
+**Zu klären:**
+
+- **Wie viel gehört in die Liste?** Ein Vermerk „geändert am … von …" mit ausklappbarem
+  Vorher/Nachher wäre das Vollbild; ein Badge „geändert" die kleinste brauchbare Stufe.
+- **Wer darf die Spur sehen?** Naheliegend Admin und Manager für alle Sitzungen, das Mitglied
+  für die eigenen. Letzteres gibt es über `my_data` bereits, nur nicht in der Oberfläche.
+- **Neue Ressource oder Erweiterung?** `work_sessions` könnte die Logzeilen bei `GET` mit `id`
+  mitliefern; sauberer wäre `work_session_log` als eigene, lesende Ressource. Die Listenansicht
+  darf davon nicht langsamer werden.
+- **Begründungsfeld.** Bei der Planung von [OI-35](#oi-35) wurde eine Pflichtbegründung für
+  Korrekturen bewusst verworfen: In der Notiz verschmutzte sie den Verwendungsnachweis, in der
+  Auditspur wäre sie unsichtbar geblieben. Wird die Spur sichtbar, ist ein zusätzlicher
+  Schlüssel `reason` im vorhandenen JSON von `changes` der naheliegende Ort — ohne Migration.
+
+**Berührt:** `private/handlers/work_sessions.php`, `public/js/modules/worktime.js`,
+`API.md`, `docs/testplan.md`. Kein Schemabedarf.
+
 ---
 
 ## Sicherheit
