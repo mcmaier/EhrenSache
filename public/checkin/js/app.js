@@ -2918,18 +2918,14 @@ async function loadWorktimeAppointments() {
 }
 
 /**
- * Baut die Terminauswahl auf: eingegrenzt auf die Terminarten der gewaehlten
- * Taetigkeit, sortiert nach Abstand zu heute.
+ * Termine, die zu einer Taetigkeit passen — gefiltert nach ihren Terminarten,
+ * naechstgelegene zuerst.
  *
- * Die Eingrenzung ist leer, wenn die Taetigkeitsart keine Terminarten nennt —
- * das bedeutet "keine Einschraenkung", nicht "keine Termine".
+ * Steht getrennt vom Auswahlfeld, weil zwei Stellen dieselbe Liste brauchen:
+ * die Idle-Ansicht des Erfassen-Tabs und das Korrekturmodal.
  */
-function renderWorktimeAppointmentOptions(previous = '') {
-    const select = document.getElementById('worktimeAppointment');
-    if (!select) return;
-
-    const id       = document.getElementById('worktimeActivity')?.value;
-    const activity = worktimeActivities.find(a => String(a.activity_id) === String(id));
+function worktimeAppointmentsFor(activityId) {
+    const activity = worktimeActivities.find(a => String(a.activity_id) === String(activityId));
     const allowed  = (activity?.appointment_type_ids || []).map(Number);
 
     let options = worktimeAppointments.slice();
@@ -2945,13 +2941,27 @@ function renderWorktimeAppointmentOptions(previous = '') {
         Math.abs(new Date(String(a.date)).getTime() - now)
         - Math.abs(new Date(String(b.date)).getTime() - now));
 
-    select.innerHTML = '<option value="">— kein Termin —</option>'
+    return options;
+}
+
+/** Baut die Optionen eines Terminfeldes aus einer fertigen Liste. */
+function worktimeAppointmentOptionsHtml(options) {
+    return '<option value="">— kein Termin —</option>'
         + options.map(a => {
             const datum = formatDateShortDe(a.date);
             const zeit  = String(a.start_time || '').substring(0, 5);
             return `<option value="${a.appointment_id}">`
                  + `${datum} ${escapeHtml(a.title)}${zeit ? ` (${zeit})` : ''}</option>`;
         }).join('');
+}
+
+function renderWorktimeAppointmentOptions(previous = '') {
+    const select = document.getElementById('worktimeAppointment');
+    if (!select) return;
+
+    const options = worktimeAppointmentsFor(document.getElementById('worktimeActivity')?.value);
+
+    select.innerHTML = worktimeAppointmentOptionsHtml(options);
 
     // Auswahl ueberlebt ein Neuladen, solange der Termin noch in der Liste steht
     if (previous && options.some(a => String(a.appointment_id) === previous)) {
