@@ -330,7 +330,7 @@ test('buildRecords erzeugt nur Eintraege zu vergangenen Terminen', function () {
     $r      = new DemoRandom(20260908);
     $m      = buildMembers($r, '2026-09-08');
     $appts  = buildAppointments($r, '2026-09-08');
-    $recs   = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $recs   = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
     $byId   = [];
     foreach ($appts as $a) {
         $byId[$a['appointment_id']] = $a['date'];
@@ -344,7 +344,7 @@ test('buildRecords erzeugt keine Anwesenheit ausserhalb der Gruppenbindung', fun
     $r     = new DemoRandom(20260908);
     $m     = buildMembers($r, '2026-09-08');
     $appts = buildAppointments($r, '2026-09-08');
-    $recs  = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
 
     $groupsOf = [];
     foreach ($m['assignments'] as $a) {
@@ -370,7 +370,7 @@ test('buildRecords streut die Ankunftszeit um den Terminbeginn', function () {
     $r      = new DemoRandom(20260908);
     $m      = buildMembers($r, '2026-09-08');
     $appts  = buildAppointments($r, '2026-09-08');
-    $recs   = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $recs   = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
     $startOf = [];
     foreach ($appts as $a) {
         $startOf[$a['appointment_id']] = $a['date'] . ' ' . $a['start_time'];
@@ -388,7 +388,7 @@ test('buildRecords nutzt vier verschiedene Check-in-Quellen', function () {
     $r       = new DemoRandom(20260908);
     $m       = buildMembers($r, '2026-09-08');
     $appts   = buildAppointments($r, '2026-09-08');
-    $recs    = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $recs    = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
     $sources = array_unique(array_map(fn ($x) => $x['checkin_source'], $recs));
     sort($sources);
     assertSame(['admin', 'auto_checkin', 'station_pin', 'user_totp'], array_values($sources));
@@ -398,7 +398,7 @@ test('Station-Anwesenheiten tragen den Stationsnamen als Ort', function () {
     $r     = new DemoRandom(20260908);
     $m     = buildMembers($r, '2026-09-08');
     $appts = buildAppointments($r, '2026-09-08');
-    $recs  = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
     foreach ($recs as $rec) {
         if ($rec['checkin_source'] === 'station_pin') {
             assertSame(DEMO_STATION_NAME, $rec['location_name']);
@@ -410,6 +410,51 @@ test('buildRecords erzeugt genug Eintraege fuer eine aussagekraeftige Statistik'
     $r     = new DemoRandom(20260908);
     $m     = buildMembers($r, '2026-09-08');
     $appts = buildAppointments($r, '2026-09-08');
-    $recs  = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
     assertTrue(count($recs) > 1500, 'zu wenige Anwesenheiten: ' . count($recs));
+});
+
+test('buildRecords ist bei gleichem Saat reproduzierbar', function () {
+    $r1 = new DemoRandom(20260908);
+    $m1 = buildMembers($r1, '2026-09-08');
+    $a1 = buildAppointments($r1, '2026-09-08');
+    $x1 = buildRecords($r1, $m1['members'], $m1['assignments'], $m1['membership_dates'], $a1, buildAppointmentTypeGroups(), '2026-09-08');
+
+    $r2 = new DemoRandom(20260908);
+    $m2 = buildMembers($r2, '2026-09-08');
+    $a2 = buildAppointments($r2, '2026-09-08');
+    $x2 = buildRecords($r2, $m2['members'], $m2['assignments'], $m2['membership_dates'], $a2, buildAppointmentTypeGroups(), '2026-09-08');
+
+    assertSame($x1, $x2);
+});
+
+test('buildRecords erzeugt keine Anwesenheit ausserhalb des Mitgliedschaftszeitraums', function () {
+    // Das Mitgliedsprofil nennt das Eintrittsdatum. Steht in der
+    // Anwesenheitsliste ein frueherer Termin, faellt das auf dem Screenshot auf.
+    // Ueber mehrere Saaten geprueft: Beim Vorgabesaat allein waren es 14 Faelle,
+    // ueber 50 Saaten 370.
+    foreach ([20260908, 1, 42, 151] as $seed) {
+        $r      = new DemoRandom($seed);
+        $m      = buildMembers($r, '2026-09-08');
+        $appts  = buildAppointments($r, '2026-09-08');
+        $recs   = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+
+        $period = [];
+        foreach ($m['membership_dates'] as $d) {
+            $period[$d['member_id']] = $d;
+        }
+        $dateOf = [];
+        foreach ($appts as $a) {
+            $dateOf[$a['appointment_id']] = $a['date'];
+        }
+
+        foreach ($recs as $rec) {
+            $p    = $period[$rec['member_id']];
+            $date = $dateOf[$rec['appointment_id']];
+            assertTrue($date >= $p['start_date'], "Saat {$seed}: Mitglied {$rec['member_id']} am {$date}, Eintritt {$p['start_date']}");
+            if ($p['end_date'] !== null) {
+                assertTrue($date <= $p['end_date'], "Saat {$seed}: Mitglied {$rec['member_id']} am {$date}, Austritt {$p['end_date']}");
+            }
+        }
+    }
 });

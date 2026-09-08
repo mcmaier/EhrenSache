@@ -454,11 +454,18 @@ function demoFirstMondays(string $from, string $to): array
  * Statistik aus wie ein Balken auf gleicher Höhe — genau das Bild, das niemanden
  * überzeugt. Die Ankunftszeiten streuen um den Terminbeginn, damit die
  * Pünktlichkeitsauswertung eine Verteilung zeigt statt einer Linie.
+ *
+ * Die Reihenfolge der $random-Aufrufe ist auch hier Teil der Schnittstelle
+ * (siehe Hinweis über buildMembers()): Pro erzeugtem Datensatz stehen vier
+ * Ziehungen (Quote-Vergleich, Verspätungswahrscheinlichkeit, Ankunftsoffset,
+ * Check-in-Quelle) — jede zusätzliche oder verschobene Ziehung verändert die
+ * gesamte Folge und damit bereits erstellte Screenshots.
  */
 function buildRecords(
     DemoRandom $random,
     array $members,
     array $assignments,
+    array $membershipDates,
     array $appointments,
     array $typeGroups,
     string $referenceDate
@@ -470,6 +477,10 @@ function buildRecords(
     $groupsForType = [];
     foreach ($typeGroups as $l) {
         $groupsForType[$l['type_id']][] = $l['group_id'];
+    }
+    $periodOf = [];
+    foreach ($membershipDates as $d) {
+        $periodOf[$d['member_id']] = ['start' => $d['start_date'], 'end' => $d['end_date']];
     }
 
     // Grundquote je Mitglied, einmal gezogen und dann fest.
@@ -487,7 +498,16 @@ function buildRecords(
         $start   = strtotime($appt['date'] . ' ' . $appt['start_time']);
 
         foreach ($members as $m) {
-            if ($m['active'] === 0) {
+            // Der Mitgliedschaftszeitraum entscheidet, nicht das active-Flag:
+            // Das Flag kennt nur "heute", der Bestand reicht zwölf Monate
+            // zurück. Ein im Februar ausgetretenes Mitglied war im Januar
+            // anwesend, und ein im Dezember eingetretenes war es im
+            // September nicht.
+            $period = $periodOf[$m['member_id']];
+            if ($appt['date'] < $period['start']) {
+                continue;
+            }
+            if ($period['end'] !== null && $appt['date'] > $period['end']) {
                 continue;
             }
             if (count(array_intersect($allowed, $groupsOf[$m['member_id']] ?? [])) === 0) {
