@@ -178,6 +178,11 @@ const DEMO_GROUP_SIZES = [1 => 28, 2 => 8, 3 => 6, 4 => 4];
  * Die PIN steht im Klartext unter 'pin'; seed.php hasht sie. Ohne diese Trennung
  * wäre der Plan nicht reproduzierbar, weil password_hash() je Aufruf salzt.
  */
+// Die Reihenfolge der $random-Aufrufe innerhalb (und vor) dieser Funktion ist
+// Teil der Schnittstelle, nicht Implementierungsdetail: Jede zusätzliche oder
+// verschobene Ziehung verändert alle nachfolgenden Werte und damit den
+// gesamten Demo-Bestand — bereits erstellte Screenshots stimmten dann nicht
+// mehr. Neue Ziehungen gehören ans Ende, nie dazwischen.
 function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'): array
 {
     $members     = [];
@@ -204,10 +209,27 @@ function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'):
         $joinYear  = (int) substr($referenceDate, 0, 4) - $random->int(1, 12);
         $startDate = sprintf('%04d-%02d-01', $joinYear, $random->int(1, 12));
 
+        // Austritt aus dem Beginn ableiten statt unabhängig zu ziehen — sonst
+        // könnte das Ende vor dem Beginn liegen (bei manchen Saaten tritt das
+        // tatsächlich auf, und die Folgeaufgaben filtern über diesen Zeitraum).
+        // $random->int() wird nur im Inaktiv-Fall aufgerufen: Bei aktiven
+        // Mitgliedern bleibt end_date null, ohne dass eine Ziehung stattfindet,
+        // damit sich die Reihenfolge für aktive Mitglieder nicht verschiebt.
+        $endDate = null;
+        if ($active === 0) {
+            // Austritt zwischen einem Monat nach Eintritt und 60 Tagen vor dem
+            // Stichtag.
+            $latestEnd = demoShiftDate($referenceDate, -60);
+            $spanDays  = (int) ((strtotime($latestEnd) - strtotime($startDate)) / 86400);
+            $endDate   = $spanDays > 30
+                ? demoShiftDate($startDate, $random->int(30, $spanDays))
+                : $latestEnd;
+        }
+
         $dates[] = [
             'member_id'  => $id,
             'start_date' => $startDate,
-            'end_date'   => $active === 1 ? null : demoShiftDate($referenceDate, -$random->int(60, 400)),
+            'end_date'   => $endDate,
             'status'     => $active === 1 ? 'active' : 'inactive',
         ];
     }
@@ -263,5 +285,12 @@ function demoShiftDate(string $date, int $days): string
 {
     $ts = strtotime($date . ' ' . ($days >= 0 ? '+' : '-') . abs($days) . ' days');
 
-    return date('Y-m-d', $ts === false ? time() : $ts);
+    // Diese Datei kennt keine Uhr außer dem übergebenen Stichtag. Ein stiller
+    // Rückfall auf time() würde das brechen, ohne dass es auffiele — analog zu
+    // DemoRandom::pick(), das bei leerer Liste ebenfalls wirft statt null zu liefern.
+    if ($ts === false) {
+        throw new InvalidArgumentException("demoShiftDate() erhielt ein ungültiges Datum: \"{$date}\".");
+    }
+
+    return date('Y-m-d', $ts);
 }

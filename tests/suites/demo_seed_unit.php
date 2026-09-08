@@ -229,3 +229,31 @@ test('buildMembers ist bei gleichem Saat reproduzierbar', function () {
     $b = buildMembers(new DemoRandom(20260908));
     assertSame($a, $b);
 });
+
+// start_date und end_date wurden unabhaengig gezogen und konnten invertiert sein
+// (z. B. Saat 151, Mitglied 19: start 2025-11-01, end 2025-08-13). Der Vorgabesaat
+// 20260908 zeigt den Fehler nicht -- deshalb hier ueber viele Saaten pruefen statt
+// nur ueber den einen Vorgabewert.
+test('buildMembers: end_date liegt fuer alle Saaten 1..300 nach start_date und nicht nach dem Stichtag', function () {
+    $referenceDate = '2026-09-08';
+    for ($seed = 1; $seed <= 300; $seed++) {
+        $m = buildMembers(new DemoRandom($seed), $referenceDate);
+        foreach ($m['membership_dates'] as $d) {
+            if ($d['end_date'] === null) {
+                continue;
+            }
+            assertTrue(
+                strtotime($d['end_date']) > strtotime($d['start_date']),
+                "Saat {$seed}, Mitglied {$d['member_id']}: end_date {$d['end_date']} liegt nicht nach start_date {$d['start_date']}"
+            );
+            assertTrue(
+                strtotime($d['end_date']) <= strtotime($referenceDate),
+                "Saat {$seed}, Mitglied {$d['member_id']}: end_date {$d['end_date']} liegt nach dem Stichtag {$referenceDate}"
+            );
+        }
+    }
+});
+
+test('demoShiftDate wirft bei ungueltigem Datum statt still auf die Systemuhr zurueckzufallen', function () {
+    assertThrows(fn () => demoShiftDate('kein-datum', 5));
+});
