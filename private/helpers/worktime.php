@@ -448,14 +448,27 @@ function worktimeProofDrop(array $before, ?string $newStart, ?string $newEnd): a
  * SQL-Ausdruck für den Nachweisgrad einer Sitzung.
  *
  * stundenbelegt = Start UND Ende an einer Station belegt; erst dann ist die
- * DAUER belegt und nicht bloß die Anwesenheit zu Beginn.
+ * DAUER belegt und nicht bloß die Anwesenheit an einer der beiden Grenzen.
+ *
+ * Die mittlere Stufe meint „genau eine der beiden Grenzen ist belegt" — gleich
+ * welche. Sie hieß früher nur auf den Start geprüft, weil ein Ortsnachweis
+ * ausschließlich vom Timer kam: Wer stoppt, hat vorher gestartet, und der
+ * Start schreibt zuerst. Seit eine Zeitkorrektur den Nachweis der geänderten
+ * Zeit fallen lässt (OI-37), ist auch das Gegenteil alltäglich — eine Sitzung
+ * mit belegtem Ende und verschobenem Beginn. Ohne das ODER fiele sie auf
+ * „unbelegt" und unterschlüge damit einen Beleg, den es gibt.
+ *
+ * Der Wert heißt weiterhin 'start': Er reist über `by_proof` und
+ * `start_proven` bis in `API.md` und in die Auswertungen der Vereine. Sein
+ * sichtbares Etikett — „teilbelegt" — stimmt für beide Richtungen.
  */
 function worktimeProofExpression(string $alias = 'ws'): string
 {
     return "CASE
                 WHEN {$alias}.start_location_name IS NOT NULL
                  AND {$alias}.end_location_name   IS NOT NULL THEN 'hours'
-                WHEN {$alias}.start_location_name IS NOT NULL THEN 'start'
+                WHEN {$alias}.start_location_name IS NOT NULL
+                  OR {$alias}.end_location_name   IS NOT NULL THEN 'start'
                 ELSE 'none'
             END";
 }

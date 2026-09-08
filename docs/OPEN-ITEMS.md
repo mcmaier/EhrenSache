@@ -180,6 +180,16 @@ MDM). Eine native Kiosk-App ist ausdrücklich außerhalb des Projektumfangs.
 ### OI-37 · Ortsnachweis überlebt jede Zeitkorrektur
 **Priorität:** erledigt am 2026-09-08 — `workSessionUpdate()` nullt den Ortsnachweis der geänderten Zeit, Regel in `worktimeProofDrop()` (`private/helpers/worktime.php`), Tests in `tests/suites/worktime_unit.php` und `tests/db/verify_proof_drop.php`
 
+**Nachtrag vom 2026-09-08.** Beim Nachmessen fiel eine Asymmetrie in der Leiter des
+Nachweisgrades auf: Es gab eine Stufe für „nur der Start ist belegt", aber keine für „nur das
+Ende ist belegt" — letztere fiel bis „unbelegt" durch. Eine voll belegte Sitzung mit
+verschobenem Beginn galt damit als gänzlich unbelegt, obwohl ihr Ende weiter belegt war.
+Tragbar war das, solange Ortsnachweise nur vom Timer kamen (wer stoppt, hat gestartet); mit
+diesem Punkt wurde der Fall alltäglich. `worktimeProofExpression()` prüft die mittlere Stufe
+jetzt mit ODER statt nur auf den Start — „teilbelegt" heißt „genau eine der beiden Grenzen ist
+belegt", gleich welche. Der Wert heißt weiterhin `start`, weil er über `by_proof` und
+`start_proven` bis in `API.md` und in die Auswertungen der Vereine reist.
+
 `workSessionUpdate()` schreibt `start_time` und `end_time` neu, lässt `start_location_name`
 und `end_location_name` dabei aber unberührt
 ([work_sessions.php:770](../private/handlers/work_sessions.php)). Der Nachweisgrad wird aus

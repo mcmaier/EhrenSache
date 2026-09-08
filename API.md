@@ -1257,7 +1257,7 @@ Ende minus Start minus `break_minutes`, nie negativ.
 | Wert | Bedeutung |
 |---|---|
 | `hours` | Start **und** Ende ortsbelegt — die Stunden selbst sind nachgewiesen |
-| `start` | nur der Start ortsbelegt |
+| `start` | genau **eine** der beiden Grenzen ortsbelegt — Start oder Ende |
 | `none` | kein Ortsnachweis |
 
 Für die Sichtbarkeit gelten dieselben Regeln wie für die übrige Statistik: Ein `user` erhält

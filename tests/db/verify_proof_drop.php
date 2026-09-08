@@ -29,6 +29,7 @@ if ($argc < 5) {
 
 require_once __DIR__ . '/../lib/harness.php';
 require_once __DIR__ . '/../lib/api.php';
+require_once __DIR__ . '/../../private/helpers/worktime.php';
 
 $pdo = new PDO($dsn . ';charset=utf8mb4', $dbUser, $dbPass);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -93,6 +94,21 @@ function deleteSession(int $sessionId): void
 }
 
 /**
+ * Der Nachweisgrad, wie ihn Statistik und Export sehen — ueber denselben
+ * SQL-Ausdruck, den sie verwenden.
+ */
+function proofGrade(int $sessionId): string
+{
+    global $pdo, $prefix;
+
+    $stmt = $pdo->prepare("SELECT " . worktimeProofExpression('ws') . " AS grad
+                           FROM {$prefix}work_sessions ws WHERE ws.session_id = ?");
+    $stmt->execute([$sessionId]);
+
+    return (string) $stmt->fetchColumn();
+}
+
+/**
  * Legt eine ortsbelegte Sitzung an, schickt eine Korrektur und prueft, welche
  * Ortsnachweise danach noch stehen. Raeumt in jedem Fall auf.
  *
@@ -103,9 +119,11 @@ function assertProofDrop(
     int $activityId,
     array $correction,
     ?string $expectedStart,
-    ?string $expectedEnd
+    ?string $expectedEnd,
+    string $expectedProof
 ): void {
-    test($name, function () use ($activityId, $correction, $expectedStart, $expectedEnd) {
+    test($name, function () use ($activityId, $correction, $expectedStart, $expectedEnd,
+                                 $expectedProof) {
         $sessionId = createProofedSession($activityId);
 
         try {
@@ -124,6 +142,10 @@ function assertProofDrop(
 
             assertSame($expectedStart, $get['body']['start_location_name'], 'start_location_name');
             assertSame($expectedEnd, $get['body']['end_location_name'], 'end_location_name');
+
+            // Der Grad ist das, was Statistik, Export und Verwendungsnachweis
+            // zeigen. Die Ortsfelder allein sagen noch nicht, wie er ausfaellt.
+            assertSame($expectedProof, proofGrade($sessionId), 'Nachweisgrad');
         } finally {
             deleteSession($sessionId);
         }
@@ -137,7 +159,9 @@ assertProofDrop(
     $activityId,
     ['start_time' => '2026-09-01 06:00:00'],
     null,
-    'Vereinsheim'
+    'Vereinsheim',
+    // Das Ende ist weiterhin belegt — genau eine Grenze, also teilbelegt.
+    'start'
 );
 
 // Ende verschoben: spiegelbildlich.
@@ -146,7 +170,8 @@ assertProofDrop(
     $activityId,
     ['end_time' => '2026-09-01 13:00:00'],
     'Vereinsheim',
-    null
+    null,
+    'start'
 );
 
 // Nur die Notiz geaendert: beide Zeitpunkte bleiben, also bleiben beide Nachweise.
@@ -155,7 +180,8 @@ assertProofDrop(
     $activityId,
     ['note' => 'nur Notiz'],
     'Vereinsheim',
-    'Vereinsheim'
+    'Vereinsheim',
+    'hours'
 );
 
 // Derselbe Zeitpunkt, andere Schreibweise: worktimeSameInstant() vergleicht
@@ -165,7 +191,8 @@ assertProofDrop(
     $activityId,
     ['start_time' => '2026-09-01 10:00'],
     'Vereinsheim',
-    'Vereinsheim'
+    'Vereinsheim',
+    'hours'
 );
 
 exit(harnessSummary());
