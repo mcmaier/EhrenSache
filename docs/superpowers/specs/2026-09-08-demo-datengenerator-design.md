@@ -8,8 +8,9 @@
 
 ## 1. Ziel
 
-Ein Kommandozeilenskript, das eine EhrenSache-Datenbank auf Schemastand 1.3.1 in einen
-reproduzierbaren, vorzeigbaren Zustand versetzt: den fiktiven **Musikverein Musterhausen**.
+Ein Kommandozeilenskript, das eine EhrenSache-Datenbank auf aktuellem Schemastand
+(`schema_version` ≥ 1.3.0, siehe Abschnitt 7) in einen reproduzierbaren, vorzeigbaren Zustand
+versetzt: den fiktiven **Musikverein Musterhausen**.
 
 Zwei Abnehmer:
 
@@ -42,9 +43,9 @@ Die Spaltennamen (`members.name`, `members.surname`) stimmen dagegen weiterhin.
 | # | Entscheidung | Begründung |
 |---|---|---|
 | E1 | **PHP-CLI-Skript**, keine SQL-Datei | Relative Daten, Streuung und Wahrscheinlichkeiten lassen sich in SQL nicht wartbar ausdrücken. Das Skript liest `config.php` und kennt damit Präfix und Zugangsdaten. |
-| E2 | **Fester Zufallssaat**, per Parameter änderbar | Zwei Läufe erzeugen denselben Bestand. Ein Screenshot lässt sich ein halbes Jahr später identisch nachstellen. |
+| E2 | **Fester Zufallssaat**, per Parameter änderbar | Zwei Läufe erzeugen denselben Bestand. Ein Screenshot lässt sich ein halbes Jahr später identisch nachstellen. Ausgenommen sind naturgemäß die Geheimnisse: `pin_hash` und `password_hash` tragen je Lauf ein neues Salz, `api_token` und `totp_secret` stammen aus `random_bytes`. Der Generator trennt deshalb **Plan** (rein, deterministisch, enthält die PIN im Klartext) von **Schreibschicht** (hasht und würfelt Geheimnisse). |
 | E3 | **Alle Zeitpunkte relativ zu einem Stichtag** (Vorgabe: heute) | Die Demo darf nicht altern. Ein fester Stichtag als Parameter erlaubt reproduzierbare Bilder. |
-| E4 | **Leeren statt ergänzen** (`TRUNCATE`, keine `DROP`) | Wiederholbar, und die Testsuiten-Rückstände verschwinden. Tabellen und Schema bleiben unangetastet — der Generator ist keine Migration. |
+| E4 | **Leeren statt ergänzen** (`DELETE`, keine `DROP`) | Wiederholbar, und die Testsuiten-Rückstände verschwinden. Tabellen und Schema bleiben unangetastet — der Generator ist keine Migration. |
 | E5 | **Vereinsname „Musikverein Musterhausen", kein Logo** | Terminarten und Tätigkeiten tragen die Erzählung von selbst. Ohne hinterlegtes Logo greift die Rückfallregel in `private/helpers/branding.php` auf `assets/logo-default.png` — die Bilder zeigen damit nebenbei, wie die Anwendung ohne Vereinswappen aussieht. |
 | E6 | **Ablage in `private/demo/`, mit `export-ignore`** | Der Branch `demo` erbt das Skript aus `dev`, ohne dass es im ZIP-Download eines Vereins landet. Ein Skript, das Tabellen leert, gehört nicht ins Installationspaket. |
 | E7 | **Keine Demo-Restriktionen in diesem Vorhaben** | `checkDemoRestrictions()` und die Wächter in den Handlern sind Vorhaben ③. Der Generator schreibt nur Daten. |
@@ -83,9 +84,10 @@ Farben auf den Standardwerten, `pagination_limit` = 25.
 **Gruppen** (4): Aktive · Jugend · Vorstandschaft · Ehrenmitglieder.
 
 **Mitglieder** (40): häufige deutsche Vor- und Nachnamen aus einer Liste im Skript,
-Mitgliedsnummern `M001`–`M040`. Gruppenstärken: 24 Aktive, 8 Jugend, 6 Vorstandschaft,
-4 Ehrenmitglieder — die Summe liegt bewusst über 40, weil Mitglieder der Vorstandschaft
-zugleich Aktive sind. **3 Mitglieder inaktiv** über
+Mitgliedsnummern `M001`–`M040`. Gruppenstärken: 28 Aktive, 8 Jugend, 6 Vorstandschaft,
+4 Ehrenmitglieder. Aktive, Jugend und Ehrenmitglieder decken zusammen genau die 40 ab; die
+Vorstandschaft kommt obendrauf, weil sie aus Aktiven mit zusätzlichem Amt besteht — daher die
+Summe über 40. **3 Mitglieder inaktiv** über
 `membership_dates` mit gesetztem `end_date` — damit der Aktiv/Inaktiv-Filter und die
 Hervorhebung inaktiver Mitglieder auf einem Bild etwas zeigen. Jedes Mitglied erhält
 mindestens einen `membership_dates`-Eintrag.
@@ -115,7 +117,7 @@ Kiosk-Gerät **„Probenraum-Station"** (`device_type = kiosk`, Token) und ein T
 
 ### 5.2 Bewegungsdaten
 
-**Termine** (~90): Gesamtprobe wöchentlich freitags 20:00 · Registerprobe vierzehntägig
+**Termine** (~105): Gesamtprobe wöchentlich freitags 20:00 · Registerprobe vierzehntägig
 dienstags 19:30 · Vorstandssitzung monatlich · Auftritte 10 im Jahr, ungleich über die
 Monate verteilt. Vier Termine liegen in der Zukunft, damit die Terminliste nicht mit der
 Vergangenheit endet.
@@ -133,7 +135,8 @@ und genau der belegt den Freigabe-Ablauf.
 
 **Arbeitszeiten** (`work_sessions`, ~120 über zwölf Monate):
 
-- Status: ~100 `confirmed`, ~15 `submitted`, ~5 `rejected`
+- Status: 106 `confirmed`, 10 `submitted`, 4 `rejected` — über den Zähler festgelegt, nicht
+  gewürfelt, damit die Menge offener Freigaben nicht von Lauf zu Lauf schwankt
 - `source` gemischt über `timer`, `manual`, `station`
 - rund ein Drittel mit `appointment_id` (Terminbezug), der Rest ohne
 - Sitzungen mit `station`-Quelle tragen `start_location_name` / `end_location_name`
@@ -149,45 +152,68 @@ und genau der belegt den Freigabe-Ablauf.
 
 ## 6. Aufbau des Skripts
 
-Eine Datei, `private/demo/seed.php`, gegliedert in Funktionen mit je einer Zuständigkeit:
+**Zwei Dateien, getrennt nach Prüfbarkeit:**
+
+- `private/demo/plan.php` — **rein**: berechnet den gesamten Bestand als Arrays im Speicher.
+  Keine Datenbank, keine Zufallsquelle des Systems, keine Uhr außer dem übergebenen Stichtag.
+  Genau das lässt sich ohne Datenbank testen — eine Testsuite, die den Generator gegen die
+  Entwicklungsdatenbank fährt, würde sie leeren.
+- `private/demo/seed.php` — **Ein-/Ausgabe**: Kommandozeile, Sicherheitsabfrage,
+  Schemaprüfung, Leeren, `INSERT`, Geheimnisse (Hashes und Token), Protokoll.
+
+`plan.php` ist nach Zuständigkeiten gegliedert:
+
+```
+DemoRandom            eigener Zufallsgenerator (lineare Kongruenz), damit die Folge
+                      unabhängig vom globalen Zustand von mt_rand reproduzierbar ist
+buildGroups()
+buildMembers()        Mitglieder, Gruppenzuordnung, Zeiträume, PIN im Klartext
+buildAppointmentTypes()
+buildActivityTypes()
+buildAppointments()   Terminserie relativ zum Stichtag
+buildRecords()        Anwesenheiten mit Quote und Streuung
+buildExceptions()     Anträge
+buildWorkSessions()   Arbeitszeiten samt Auditspur
+buildDemoPlan()       setzt alles zusammen, gibt den vollständigen Bestand zurück
+```
+
+Jede `build*`-Funktion nimmt den Zufallsgenerator und die Ergebnisse ihrer Vorgänger entgegen
+und gibt Zeilen als assoziative Arrays zurück, benannt wie die Tabellenspalten. Keine globalen
+Zustände. Namenslisten, Terminarten und Tätigkeitsarten stehen als Konstanten am Kopf der
+Datei.
+
+`seed.php` gliedert sich in:
 
 ```
 parseOptions()        Kommandozeile → Konfiguration
-confirmTarget()       Ziel anzeigen, Bestätigung einholen
-truncateAll()         Tabellen in Fremdschlüsselreihenfolge leeren
-seedSettings()        system_settings aktualisieren
-seedGroups()          Gruppen
-seedMembers()         Mitglieder, Gruppenzuordnung, Mitgliedschaftszeiträume, PINs
-seedUsers()           Konten und Geräte
-seedAppointmentTypes()
-seedActivityTypes()
-seedAppointments()    Terminserie über den Zeitraum
-seedRecords()         Anwesenheiten mit Quote und Streuung
-seedExceptions()      Anträge
-seedWorkSessions()    Arbeitszeiten samt Auditspur
+requireCli()          Aufruf über den Webserver abweisen
+assertSchema()        schema_version prüfen (≥ 1.3.0)
+confirmTarget()       Ziel und Zeilenzahlen anzeigen, "LOESCHEN" verlangen
+clearAll()            Tabellen in Fremdschlüsselreihenfolge leeren (DELETE, nicht
+                      TRUNCATE — letzteres committet implizit und macht das Rollback wertlos)
+writePlan()           Bestand schreiben; hasht PINs und Passwörter, würfelt Token
 report()              Zeilenzahlen ausgeben
 ```
-
-Jede `seed*`-Funktion nimmt PDO, Präfix und den Zufallsgenerator entgegen und gibt zurück,
-was nachfolgende Funktionen brauchen (etwa die erzeugten Mitglieds-IDs). Keine globalen
-Zustände. Namenslisten und Terminarten stehen als Konstanten am Kopf der Datei, nicht
-verstreut im Code.
 
 `declare(strict_types=1)` und der Copyright-Header wie in allen neuen Dateien des Projekts.
 Alle Schreibzugriffe über Prepared Statements, Tabellennamen ausschließlich über
 `$database->table(...)`.
 
-**Umfang:** geschätzt 500–600 Zeilen. Sollte die Datei darüber hinauswachsen, werden die
-Namenslisten nach `private/demo/data.php` ausgelagert.
+**Umfang:** geschätzt 450–550 Zeilen für `plan.php`, 200–250 für `seed.php`. Wächst `plan.php`
+darüber hinaus, werden die Namenslisten nach `private/demo/data.php` ausgelagert.
 
 ## 7. Nicht-Ziele
 
 - **Keine Demo-Restriktionen.** Gehört zu ③.
 - **Kein Cron-Job, kein Deployment.** Gehört zu ③.
-- **Keine Schemaänderung, keine Migration.** Der Generator setzt Schemastand **1.3.1 oder
+- **Keine Schemaänderung, keine Migration.** Der Generator setzt Schemastand **1.3.0 oder
   neuer** voraus und prüft das über `schema_version`; liegt die Datenbank darunter, bricht er
-  mit dem Hinweis auf den Update-Assistenten ab. Ein neuerer Stand wird akzeptiert — das
-  Skript wird beim nächsten Versionssprung mitgezogen, nicht die Prüfung aufgeweicht.
+  mit dem Hinweis auf den Update-Assistenten ab.
+
+  Geprüft wird **1.3.0, nicht 1.3.1**: Die Migration `1.3.0.php` ändert das Schema nicht — sie
+  existiert nur, damit die Kette lückenlos bis zur Version aus `version.json` führt. Eine
+  korrekt aktualisierte 1.3.1-Installation kann daher `1.3.0` als letzten Stempel tragen; eine
+  Prüfung auf `1.3.1` würde sie fälschlich abweisen. Die lokale Testdatenbank steht genau so da.
 - **Keine Anpassung der Testsuiten.** Sie erzeugen ihre Daten weiterhin selbst.
 
 ## 8. Risiken
@@ -204,16 +230,21 @@ Namenslisten nach `private/demo/data.php` ausgelagert.
 Das Vorhaben ist fertig, wenn:
 
 1. `php private/demo/seed.php` zweimal hintereinander ohne Fehler durchläuft und beide Male
-   denselben Bestand erzeugt (Zeilenzahlen und Stichproben identisch).
-2. Nach dem Lauf **keine** dieser Ansichten leer ist: Mitgliederliste, Terminübersicht,
+   denselben Bestand erzeugt — verglichen werden Zeilenzahlen und Stichproben **ohne** die
+   Geheimnisfelder `pin_hash`, `password_hash`, `api_token` und `totp_secret`, die je Lauf
+   neu gesalzen bzw. gewürfelt werden (E2).
+2. Eine Testsuite `demo_seed_unit` prüft `plan.php` **ohne Datenbank**: Determinismus des
+   Zufallsgenerators, Wertebereiche, Mengen und Statusverteilungen, und dass jede erzeugte
+   PIN `validateStationPin()` besteht.
+3. Nach dem Lauf **keine** dieser Ansichten leer ist: Mitgliederliste, Terminübersicht,
    Anwesenheitsliste eines vergangenen Termins, Statistik mit Pünktlichkeit,
    Zeiterfassung im Dashboard, Antragsliste, Arbeitszeitbericht als Druckansicht
    (`statistics?include=worktime&format=html`).
-3. Die Check-in-PWA lässt sich mit dem Benutzerkonto anmelden und zeigt eine laufende Sitzung.
-4. Die Station lässt sich mit dem erzeugten Kiosk-Token in Betrieb nehmen und nimmt einen
+4. Die Check-in-PWA lässt sich mit dem Benutzerkonto anmelden und zeigt eine laufende Sitzung.
+5. Die Station lässt sich mit dem erzeugten Kiosk-Token in Betrieb nehmen und nimmt einen
    Stempel mit Mitgliedsnummer und PIN an.
-5. `php tests/run.php` läuft nach dem Generatorlauf unverändert durch.
-6. `private/demo/` steht in `.gitattributes` unter `export-ignore`.
+6. `php tests/run.php` läuft nach dem Generatorlauf unverändert durch.
+7. `private/demo/` steht in `.gitattributes` unter `export-ignore`.
 
 ## 10. Einordnung
 
