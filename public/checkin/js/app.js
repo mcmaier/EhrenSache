@@ -2428,8 +2428,9 @@ function showWorkSessionErrors(messages) {
  * failed" allein waere fuer ein Mitglied wertlos.
  */
 async function saveWorkSession() {
-    const id      = document.getElementById('workSessionId').value;
-    const termin  = document.getElementById('workSessionAppointment').value;
+    const knopf = document.getElementById('saveWorkSessionBtn');
+    const id     = document.getElementById('workSessionId').value;
+    const termin = document.getElementById('workSessionAppointment').value;
 
     const body = {
         activity_id:    parseInt(document.getElementById('workSessionActivity').value, 10),
@@ -2442,25 +2443,34 @@ async function saveWorkSession() {
         appointment_id: termin ? parseInt(termin, 10) : null
     };
 
-    const result = id
-        ? await apiCall('work_sessions', 'PUT', body, { id: id })
-        : await apiCall('work_sessions', 'POST', body);
+    // Zwei schnelle Tipser wuerden beim Nachtrag zwei Sitzungen anlegen — der
+    // Nachtrag hat keine id, also faende der zweite Aufruf nichts vor, was er
+    // aendern koennte. Dasselbe Muster wie bei der Anwesenheitsliste.
+    if (knopf) knopf.disabled = true;
 
-    if (!result.success) {
-        const meldungen = Array.isArray(result.data?.errors)
-            ? result.data.errors
-            : [result.error];
+    try {
+        const result = id
+            ? await apiCall('work_sessions', 'PUT', body, { id: id })
+            : await apiCall('work_sessions', 'POST', body);
 
-        showWorkSessionErrors(meldungen);
-        return;
+        if (!result.success) {
+            const meldungen = Array.isArray(result.data?.errors)
+                ? result.data.errors
+                : [result.error];
+
+            showWorkSessionErrors(meldungen);
+            return;
+        }
+
+        closeWorkSessionModal();
+        showMessage(id ? 'Korrektur gespeichert — wartet auf Freigabe'
+                       : 'Zeit nachgetragen — wartet auf Freigabe', 'success');
+
+        await loadHistory();
+        await loadWorktimeState();
+    } finally {
+        if (knopf) knopf.disabled = false;
     }
-
-    closeWorkSessionModal();
-    showMessage(id ? 'Korrektur gespeichert — wartet auf Freigabe'
-                   : 'Zeit nachgetragen — wartet auf Freigabe', 'success');
-
-    await loadHistory();
-    await loadWorktimeState();
 }
 
 window.openWorkSessionModal = openWorkSessionModal;
