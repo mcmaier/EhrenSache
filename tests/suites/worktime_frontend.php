@@ -213,15 +213,20 @@ function () use ($repoRoot) {
     $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
     $body = frontendFunctionBody($js, 'saveWorkSession');
 
-    // Ohne id waere der PUT ein Aufruf auf die Ressource ohne Ziel; ohne die
-    // Unterscheidung wuerde eine Korrektur eine zweite Sitzung anlegen.
+    // Die Zuordnung muss stimmen, nicht nur das Vorkommen: Waeren die Zweige
+    // vertauscht, legte eine Korrektur still eine zweite Sitzung an, statt die
+    // bestehende zu aendern — und alle drei Wortproben blieben trotzdem gruen.
     assertTrue(
-        strpos($body, "'PUT'") !== false && strpos($body, 'id:') !== false,
-        'saveWorkSession() schickt keinen PUT mit id'
+        preg_match("/\bid\s*\?\s*await\s+apiCall\(\s*'work_sessions'\s*,\s*'PUT'/", $body) === 1,
+        'Der PUT haengt nicht am id-Zweig — Korrektur und Nachtrag koennten vertauscht sein'
     );
     assertTrue(
-        strpos($body, "'POST'") !== false,
-        'saveWorkSession() kennt keinen Nachtrag'
+        preg_match("/:\s*await\s+apiCall\(\s*'work_sessions'\s*,\s*'POST'/", $body) === 1,
+        'Der POST haengt nicht am Zweig ohne id'
+    );
+    assertTrue(
+        strpos($body, '{ id: id }') !== false,
+        'Der PUT grenzt nicht auf eine session_id ein'
     );
     assertTrue(
         strpos($body, 'action') === false,
