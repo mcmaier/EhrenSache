@@ -49,3 +49,46 @@ test('DemoRandom::chance(1.0) ist immer wahr, chance(0.0) immer falsch', functio
         assertSame(false, $r->chance(0.0));
     }
 });
+
+// Ankerwert: haelt einen konkreten Folgewert fest. Ohne diesen Test liefe eine
+// Aenderung der Generatorkonstanten (Multiplikator, Inkrement, Maske) gruen
+// durch die Suite, obwohl damit jeder bereits erstellte Demo-Screenshot nicht
+// mehr reproduzierbar waere.
+test('DemoRandom::int liefert fuer Saat 20260908 den festgehaltenen Wert', function () {
+    $r = new DemoRandom(20260908);
+    assertSame(905, $r->int(0, 999));
+});
+
+// Faengt eine Rueckkehr zu "next() % n" (oder eine aequivalente Ziehung aus den
+// unteren Bits) ab: Bei einem Zweierpotenz-Bereich wie 0..3 wiederholt sich die
+// Folge dann starr mit Periode 4 und enthaelt nie zwei gleiche Werte in Folge.
+test('DemoRandom::int(0,3) zeigt kein starres Wiederholungsmuster', function () {
+    $r    = new DemoRandom(20260908);
+    $seq  = [];
+    for ($i = 0; $i < 40; $i++) {
+        $seq[] = $r->int(0, 3);
+    }
+    $hasAdjacentRepeat = false;
+    for ($i = 1; $i < count($seq); $i++) {
+        if ($seq[$i] === $seq[$i - 1]) {
+            $hasAdjacentRepeat = true;
+            break;
+        }
+    }
+    assertTrue($hasAdjacentRepeat, 'Folge wirkt wie eine starre Zyklusfolge der Periode 4: ' . implode('', $seq));
+});
+
+test('DemoRandom::int(0,4) verteilt ueber 10000 Ziehungen annaehernd gleich', function () {
+    $r      = new DemoRandom(20260908);
+    $counts = array_fill(0, 5, 0);
+    for ($i = 0; $i < 10000; $i++) {
+        $counts[$r->int(0, 4)]++;
+    }
+    foreach ($counts as $value => $count) {
+        assertTrue($count >= 1800 && $count <= 2200, "Wert {$value} kam {$count}x vor, erwartet 1800..2200");
+    }
+});
+
+test('DemoRandom::pick auf leerer Liste wirft', function () {
+    assertThrows(fn () => (new DemoRandom(1))->pick([]));
+});

@@ -54,7 +54,11 @@ final class DemoRandom
             return $min;
         }
 
-        return $min + $this->next() % ($max - $min + 1);
+        // Bewusst über float() und damit über die oberen Bits: Bei einem linearen
+        // Kongruenzgenerator mit Modulus 2^31 hat Bit k nur die Periode 2^(k+1).
+        // Ein "% n" liest genau diese schwachen unteren Bits und liefert bei
+        // Zweierpotenzen eine starre Wiederholung — int(0,3) ergäbe 1230123012...
+        return $min + (int) ($this->float() * ($max - $min + 1));
     }
 
     /** Gleichverteilt in [0, 1). */
@@ -66,6 +70,12 @@ final class DemoRandom
     /** @param array<int, mixed> $list */
     public function pick(array $list)
     {
+        // Leere Liste ist in den Folgeaufgaben ein echter Fall (gefilterte Listen).
+        // Lautloses null wäre dort schwer zu finden — lieber laut scheitern.
+        if ($list === []) {
+            throw new InvalidArgumentException('DemoRandom::pick() erhielt eine leere Liste.');
+        }
+
         return $list[$this->int(0, count($list) - 1)];
     }
 
