@@ -2923,6 +2923,9 @@ async function loadWorktimeAppointments() {
  *
  * Steht getrennt vom Auswahlfeld, weil zwei Stellen dieselbe Liste brauchen:
  * die Idle-Ansicht des Erfassen-Tabs und das Korrekturmodal.
+ *
+ * Die Eingrenzung ist leer, wenn die Taetigkeitsart keine Terminarten nennt —
+ * das bedeutet "keine Einschraenkung", nicht "keine Termine".
  */
 function worktimeAppointmentsFor(activityId) {
     const activity = worktimeActivities.find(a => String(a.activity_id) === String(activityId));
