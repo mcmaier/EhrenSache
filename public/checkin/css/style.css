@@ -2284,3 +2284,13 @@ body {
     border-color: var(--primary-color);
     color: white;
 }
+
+/* Sechs Felder passen auf ein kurzes Display nicht mehr ins Bild. Ohne diese
+   Begrenzung steht „Speichern" unterhalb des Sichtfensters, ohne dass sich der
+   Dialog scrollen liesse — gemessen: Inhalt 798 px, Sichtfenster 455 px.
+   Bewusst nur fuer diesen Dialog: Die uebrigen Modale der PWA haben zwei bis
+   vier Felder und sollen sich nicht anders verhalten als bisher. */
+#workSessionModal .modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+}
