@@ -252,3 +252,62 @@ test('worktimeResolvePeriod: ein unsinniges Jahr wird abgewiesen', function () {
         worktimeResolvePeriod(null, null, 12);
     });
 });
+
+// ---- worktimeSameInstant / worktimeProofDrop --------------------------------
+
+test('worktimeSameInstant: dieselbe Zeit in zwei Schreibweisen', function () {
+    assertTrue(worktimeSameInstant('2026-09-01 08:00:00', '2026-09-01 08:00'));
+});
+
+test('worktimeSameInstant: verschiedene Zeiten', function () {
+    assertTrue(!worktimeSameInstant('2026-09-01 08:00:00', '2026-09-01 06:00:00'));
+});
+
+test('worktimeSameInstant: null gegen einen Zeitpunkt', function () {
+    assertTrue(!worktimeSameInstant(null, '2026-09-01 08:00:00'));
+});
+
+test('worktimeSameInstant: null gegen null', function () {
+    assertTrue(worktimeSameInstant(null, null));
+});
+
+test('worktimeProofDrop: verschobener Beginn nimmt nur den Startnachweis', function () {
+    $before = ['start_time' => '2026-09-01 10:00:00', 'end_time' => '2026-09-01 11:00:00'];
+
+    assertSame(
+        ['start' => true, 'end' => false],
+        worktimeProofDrop($before, '2026-09-01 06:00:00', '2026-09-01 11:00:00')
+    );
+});
+
+test('worktimeProofDrop: verschobenes Ende nimmt nur den Endnachweis', function () {
+    $before = ['start_time' => '2026-09-01 10:00:00', 'end_time' => '2026-09-01 11:00:00'];
+
+    assertSame(
+        ['start' => false, 'end' => true],
+        worktimeProofDrop($before, '2026-09-01 10:00:00', '2026-09-01 13:00:00')
+    );
+});
+
+test('worktimeProofDrop: unveraenderte Zeiten lassen beide Nachweise stehen', function () {
+    $before = ['start_time' => '2026-09-01 10:00:00', 'end_time' => '2026-09-01 11:00:00'];
+
+    // Genau der Fall einer Notiz- oder Taetigkeitskorrektur: Die Zeiten kommen
+    // unveraendert mit, nur in der Schreibweise des Formulars.
+    assertSame(
+        ['start' => false, 'end' => false],
+        worktimeProofDrop($before, '2026-09-01 10:00', '2026-09-01 11:00')
+    );
+});
+
+test('worktimeProofDrop: eine laufende Sitzung, die per PUT beendet wird', function () {
+    // end_time war NULL, kommt jetzt gesetzt: Der Endnachweis kann nicht
+    // fallen, weil es keinen gibt — die Regel meldet ihn trotzdem als
+    // veraendert, das Nullen eines NULL-Feldes ist folgenlos.
+    $before = ['start_time' => '2026-09-01 10:00:00', 'end_time' => null];
+
+    assertSame(
+        ['start' => false, 'end' => true],
+        worktimeProofDrop($before, '2026-09-01 10:00:00', '2026-09-01 12:00:00')
+    );
+});

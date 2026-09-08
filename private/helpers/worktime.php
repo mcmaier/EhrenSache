@@ -397,6 +397,52 @@ function closeStaleSession($db, $database, array $session, ?int $userId): bool
 // ============================================
 
 /**
+ * Meinen zwei Zeitangaben denselben Zeitpunkt?
+ *
+ * Das Formular schickt '2026-09-01 08:00', die Datenbank haelt
+ * '2026-09-01 08:00:00'. Ein Zeichenvergleich wuerde daraus eine Aenderung
+ * machen, die keine ist.
+ */
+function worktimeSameInstant(?string $a, ?string $b): bool
+{
+    if ($a === null || $b === null) {
+        return $a === $b;
+    }
+
+    $ta = strtotime($a);
+    $tb = strtotime($b);
+
+    if ($ta === false || $tb === false) {
+        return $a === $b;
+    }
+
+    return $ta === $tb;
+}
+
+/**
+ * Welche Ortsnachweise verlieren durch eine Zeitkorrektur ihre Grundlage?
+ *
+ * Ein Ortsnachweis gilt fuer den gestempelten Zeitpunkt, nicht fuer den
+ * behaupteten. Wer um 10:00 mit Code startet und den Beginn spaeter auf 06:00
+ * zieht, hat fuer die vier Stunden davor nichts belegt — das Etikett
+ * „stundenbelegt" waere dann eine Behauptung ueber einen Zeitpunkt, den es
+ * nicht mehr gibt.
+ *
+ * Gilt fuer alle Rollen: Die Verschiebung macht den Nachweis sachlich falsch,
+ * gleich wer sie vornimmt.
+ *
+ * @param array<string, mixed> $before  Datensatz vor der Aenderung
+ * @return array{start: bool, end: bool}  true heisst: Nachweis faellt weg
+ */
+function worktimeProofDrop(array $before, ?string $newStart, ?string $newEnd): array
+{
+    return [
+        'start' => !worktimeSameInstant($before['start_time'] ?? null, $newStart),
+        'end'   => !worktimeSameInstant($before['end_time'] ?? null, $newEnd),
+    ];
+}
+
+/**
  * SQL-Ausdruck für den Nachweisgrad einer Sitzung.
  *
  * stundenbelegt = Start UND Ende an einer Station belegt; erst dann ist die
