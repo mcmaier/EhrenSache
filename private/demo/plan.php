@@ -731,9 +731,16 @@ const DEMO_WORK_SESSION_NOTES = [
  *
  * Rückgabe: ['sessions' => [...], 'log' => [...]]
  *
- * Sitzung 120 läuft noch (end_time null, active_member = 1) und gehört fest
- * Mitglied 1 — das Mitglied, mit dem später die PWA fotografiert wird. Alle
- * anderen 119 Sitzungen sind abgeschlossen.
+ * Sitzung 120 läuft noch (end_time null) und gehört fest Mitglied 1 — das
+ * Mitglied, mit dem später die PWA fotografiert wird. Alle anderen 119
+ * Sitzungen sind abgeschlossen.
+ *
+ * Kein Feld active_member: work_sessions.active_member ist in der Datenbank
+ * eine generierte virtuelle Spalte (if(end_time is null, member_id, NULL))
+ * mit UNIQUE-Index. Die Datenbank berechnet den Wert beim Schreiben selbst;
+ * ein INSERT, der ihn mitliefert, würde von MySQL abgewiesen. Der UNIQUE-Index
+ * stellt zugleich sicher, dass je Mitglied höchstens eine Sitzung ohne
+ * end_time im Bestand stehen darf — im Plan also genau die von Sitzung 120.
  *
  * Mitglied und Tätigkeit hängen zusammen: Eine Tätigkeit ohne Gruppenbindung
  * zum gewählten Mitglied wäre in der Oberfläche nicht buchbar (siehe
@@ -900,7 +907,6 @@ function buildWorkSessions(
             'created_by'          => 'member',   // seed.php löst auf
             'approved_by'         => $approvedBy, // seed.php löst auf
             'approved_at'         => $approvedAt,
-            'active_member'       => $isRunning ? $memberId : null,
         ];
 
         // Auditspur: jede Sitzung bekommt ihren create-Eintrag zum Beginn.

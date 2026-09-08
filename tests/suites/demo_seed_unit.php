@@ -670,19 +670,18 @@ test('genau eine Sitzung hat kein end_time, und sie gehoert Mitglied 1', functio
     assertSame(1, $running[0]['member_id']);
 });
 
-test('active_member ist nur bei der laufenden Sitzung gesetzt und nie doppelt', function () {
-    $b      = demoBuildWorkSessionsBundle(20260908);
-    $active = array_filter(array_map(fn ($s) => $s['active_member'], $b['sessions']), fn ($v) => $v !== null);
-    assertSame(1, count($active));
-    assertSame(count($active), count(array_unique($active)), 'active_member kommt doppelt vor (UNIQUE-Spalte)');
-
-    foreach ($b['sessions'] as $s) {
-        if ($s['end_time'] === null) {
-            assertSame($s['member_id'], $s['active_member']);
-        } else {
-            assertSame(null, $s['active_member']);
+test('hoechstens eine laufende Sitzung je Mitglied', function () {
+    // work_sessions.active_member ist eine generierte Spalte mit UNIQUE-Index:
+    // if(end_time is null, member_id, NULL). Zwei offene Sitzungen desselben
+    // Mitglieds liefen daher beim Schreiben in einen Constraint-Fehler. Der
+    // Plan darf sie gar nicht erst erzeugen.
+    $open = [];
+    foreach (demoBuildWorkSessionsBundle(20260908)['sessions'] as $row) {
+        if ($row['end_time'] === null) {
+            $open[] = $row['member_id'];
         }
     }
+    assertSame(count($open), count(array_unique($open)));
 });
 
 test('beendete Sitzungen enden nach ihrem Beginn', function () {
