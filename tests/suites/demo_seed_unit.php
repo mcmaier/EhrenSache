@@ -465,14 +465,16 @@ test('buildExceptions liefert 25 Antraege', function () {
     $r     = new DemoRandom(20260908);
     $m     = buildMembers($r, '2026-09-08');
     $appts = buildAppointments($r, '2026-09-08');
-    assertSame(25, count(buildExceptions($r, $m['members'], $appts, '2026-09-08')));
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    assertSame(25, count(buildExceptions($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), $recs, '2026-09-08')));
 });
 
 test('buildExceptions enthaelt mindestens vier offene Antraege', function () {
     $r       = new DemoRandom(20260908);
     $m       = buildMembers($r, '2026-09-08');
     $appts   = buildAppointments($r, '2026-09-08');
-    $pending = array_filter(buildExceptions($r, $m['members'], $appts, '2026-09-08'), fn ($e) => $e['status'] === 'pending');
+    $recs    = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $pending = array_filter(buildExceptions($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), $recs, '2026-09-08'), fn ($e) => $e['status'] === 'pending');
     assertTrue(count($pending) >= 4, 'zu wenige offene Antraege: ' . count($pending));
 });
 
@@ -480,7 +482,8 @@ test('buildExceptions nutzt beide Antragsarten', function () {
     $r     = new DemoRandom(20260908);
     $m     = buildMembers($r, '2026-09-08');
     $appts = buildAppointments($r, '2026-09-08');
-    $kinds = array_unique(array_map(fn ($e) => $e['exception_type'], buildExceptions($r, $m['members'], $appts, '2026-09-08')));
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $kinds = array_unique(array_map(fn ($e) => $e['exception_type'], buildExceptions($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), $recs, '2026-09-08')));
     sort($kinds);
     assertSame(['absence', 'time_correction'], array_values($kinds));
 });
@@ -489,7 +492,8 @@ test('Zeitkorrekturen tragen eine gewuenschte Ankunftszeit, Abwesenheiten nicht'
     $r     = new DemoRandom(20260908);
     $m     = buildMembers($r, '2026-09-08');
     $appts = buildAppointments($r, '2026-09-08');
-    foreach (buildExceptions($r, $m['members'], $appts, '2026-09-08') as $e) {
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    foreach (buildExceptions($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), $recs, '2026-09-08') as $e) {
         if ($e['exception_type'] === 'time_correction') {
             assertTrue($e['requested_arrival_time'] !== null, 'Zeitkorrektur ohne Zeit');
         } else {
@@ -502,7 +506,8 @@ test('entschiedene Antraege tragen Entscheider und Zeitpunkt, offene nicht', fun
     $r     = new DemoRandom(20260908);
     $m     = buildMembers($r, '2026-09-08');
     $appts = buildAppointments($r, '2026-09-08');
-    foreach (buildExceptions($r, $m['members'], $appts, '2026-09-08') as $e) {
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    foreach (buildExceptions($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), $recs, '2026-09-08') as $e) {
         if ($e['status'] === 'pending') {
             assertSame(null, $e['approved_by']);
             assertSame(null, $e['approved_at']);
@@ -510,5 +515,75 @@ test('entschiedene Antraege tragen Entscheider und Zeitpunkt, offene nicht', fun
             assertTrue($e['approved_by'] !== null, 'entschiedener Antrag ohne Entscheider');
             assertTrue($e['approved_at'] !== null, 'entschiedener Antrag ohne Zeitpunkt');
         }
+    }
+});
+
+test('Antraege liegen im Mitgliedschaftszeitraum des Mitglieds', function () {
+    // Gemessen vor der Behebung: 2 von 25 beim Vorgabesaat, 113 von 1250
+    // ueber 50 Saaten. Ein Antrag fuer einen Termin, an dem das Mitglied noch
+    // nicht im Verein war.
+    foreach ([20260908, 1, 42, 151] as $seed) {
+        $r      = new DemoRandom($seed);
+        $m      = buildMembers($r, '2026-09-08');
+        $appts  = buildAppointments($r, '2026-09-08');
+        $recs   = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+        $exc    = buildExceptions($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), $recs, '2026-09-08');
+
+        $period = [];
+        foreach ($m['membership_dates'] as $d) {
+            $period[$d['member_id']] = $d;
+        }
+        $dateOf = [];
+        foreach ($appts as $a) {
+            $dateOf[$a['appointment_id']] = $a['date'];
+        }
+
+        foreach ($exc as $e) {
+            $p    = $period[$e['member_id']];
+            $date = $dateOf[$e['appointment_id']];
+            assertTrue($date >= $p['start_date'], "Saat {$seed}: Antrag am {$date}, Eintritt {$p['start_date']}");
+            if ($p['end_date'] !== null) {
+                assertTrue($date <= $p['end_date'], "Saat {$seed}: Antrag am {$date}, Austritt {$p['end_date']}");
+            }
+        }
+    }
+});
+
+test('Entschuldigungen betreffen nur Termine ohne erfasste Anwesenheit', function () {
+    // Gemessen vor der Behebung: 9 von 17 Entschuldigungen beim Vorgabesaat
+    // betrafen Termine, an denen das Mitglied anwesend war.
+    foreach ([20260908, 1, 42, 151] as $seed) {
+        $r     = new DemoRandom($seed);
+        $m     = buildMembers($r, '2026-09-08');
+        $appts = buildAppointments($r, '2026-09-08');
+        $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+        $exc   = buildExceptions($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), $recs, '2026-09-08');
+
+        $present = [];
+        foreach ($recs as $rec) {
+            $present[$rec['member_id'] . '-' . $rec['appointment_id']] = true;
+        }
+
+        foreach ($exc as $e) {
+            $key = $e['member_id'] . '-' . $e['appointment_id'];
+            if ($e['exception_type'] === 'absence') {
+                assertTrue(!isset($present[$key]), "Saat {$seed}: Entschuldigung trotz Anwesenheit ({$key})");
+            } else {
+                assertTrue(isset($present[$key]), "Saat {$seed}: Zeitkorrektur ohne Anwesenheit ({$key})");
+            }
+        }
+    }
+});
+
+test('kein Mitglied stellt zweimal denselben Antrag', function () {
+    foreach ([20260908, 1, 42, 151] as $seed) {
+        $r     = new DemoRandom($seed);
+        $m     = buildMembers($r, '2026-09-08');
+        $appts = buildAppointments($r, '2026-09-08');
+        $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+        $exc   = buildExceptions($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), $recs, '2026-09-08');
+
+        $keys = array_map(fn ($e) => $e['member_id'] . '-' . $e['appointment_id'], $exc);
+        assertSame(count($keys), count(array_unique($keys)), "Saat {$seed}: doppelter Antrag");
     }
 });

@@ -448,6 +448,72 @@ function demoFirstMondays(string $from, string $to): array
 }
 
 /**
+ * Alle (Mitglied, Termin)-Paare, zu denen ein Mitglied erwartet wird.
+ *
+ * Erwartet wird, wessen Mitgliedschaft am Termintag lief und wessen Gruppe an
+ * der Terminart hängt. Beide Bedingungen brauchen Anwesenheiten wie Anträge —
+ * eine Entschuldigung für einen Termin, zu dem jemand gar nicht erwartet wurde,
+ * ergibt so wenig Sinn wie eine Anwesenheit dort.
+ *
+ * Die Reihenfolge ist Termin für Termin, darin Mitglied für Mitglied. Sie ist
+ * Teil der Schnittstelle: buildRecords() zieht in genau dieser Reihenfolge aus
+ * dem Zufallsgenerator.
+ *
+ * @return array<int, array{member_id: int, appointment_id: int}>
+ */
+function demoExpectedPairs(
+    array $members,
+    array $assignments,
+    array $membershipDates,
+    array $appointments,
+    array $typeGroups,
+    string $referenceDate
+): array {
+    $groupsOf = [];
+    foreach ($assignments as $a) {
+        $groupsOf[$a['member_id']][] = $a['group_id'];
+    }
+    $groupsForType = [];
+    foreach ($typeGroups as $l) {
+        $groupsForType[$l['type_id']][] = $l['group_id'];
+    }
+    $periodOf = [];
+    foreach ($membershipDates as $d) {
+        $periodOf[$d['member_id']] = ['start' => $d['start_date'], 'end' => $d['end_date']];
+    }
+
+    $pairs = [];
+    foreach ($appointments as $appt) {
+        if ($appt['date'] > $referenceDate) {
+            continue;
+        }
+        $allowed = $groupsForType[$appt['type_id']] ?? [];
+
+        foreach ($members as $m) {
+            // Der Mitgliedschaftszeitraum entscheidet, nicht das active-Flag:
+            // Das Flag kennt nur "heute", der Bestand reicht zwölf Monate
+            // zurück. Ein im Februar ausgetretenes Mitglied war im Januar
+            // anwesend, und ein im Dezember eingetretenes war es im
+            // September nicht.
+            $period = $periodOf[$m['member_id']];
+            if ($appt['date'] < $period['start']) {
+                continue;
+            }
+            if ($period['end'] !== null && $appt['date'] > $period['end']) {
+                continue;
+            }
+            if (count(array_intersect($allowed, $groupsOf[$m['member_id']] ?? [])) === 0) {
+                continue;
+            }
+
+            $pairs[] = ['member_id' => $m['member_id'], 'appointment_id' => $appt['appointment_id']];
+        }
+    }
+
+    return $pairs;
+}
+
+/**
  * Anwesenheiten zu allen vergangenen Terminen.
  *
  * Jedes Mitglied bekommt eine eigene Grundquote. Ohne diese Streuung sähe die
@@ -470,70 +536,40 @@ function buildRecords(
     array $typeGroups,
     string $referenceDate
 ): array {
-    $groupsOf = [];
-    foreach ($assignments as $a) {
-        $groupsOf[$a['member_id']][] = $a['group_id'];
-    }
-    $groupsForType = [];
-    foreach ($typeGroups as $l) {
-        $groupsForType[$l['type_id']][] = $l['group_id'];
-    }
-    $periodOf = [];
-    foreach ($membershipDates as $d) {
-        $periodOf[$d['member_id']] = ['start' => $d['start_date'], 'end' => $d['end_date']];
-    }
-
     // Grundquote je Mitglied, einmal gezogen und dann fest.
     $quota = [];
     foreach ($members as $m) {
         $quota[$m['member_id']] = $random->int(60, 95) / 100;
     }
 
-    $records = [];
+    $startOf = [];
     foreach ($appointments as $appt) {
-        if ($appt['date'] > $referenceDate) {
+        $startOf[$appt['appointment_id']] = strtotime($appt['date'] . ' ' . $appt['start_time']);
+    }
+
+    $pairs   = demoExpectedPairs($members, $assignments, $membershipDates, $appointments, $typeGroups, $referenceDate);
+    $records = [];
+    foreach ($pairs as $pair) {
+        if (!$random->chance($quota[$pair['member_id']])) {
             continue;
         }
-        $allowed = $groupsForType[$appt['type_id']] ?? [];
-        $start   = strtotime($appt['date'] . ' ' . $appt['start_time']);
 
-        foreach ($members as $m) {
-            // Der Mitgliedschaftszeitraum entscheidet, nicht das active-Flag:
-            // Das Flag kennt nur "heute", der Bestand reicht zwölf Monate
-            // zurück. Ein im Februar ausgetretenes Mitglied war im Januar
-            // anwesend, und ein im Dezember eingetretenes war es im
-            // September nicht.
-            $period = $periodOf[$m['member_id']];
-            if ($appt['date'] < $period['start']) {
-                continue;
-            }
-            if ($period['end'] !== null && $appt['date'] > $period['end']) {
-                continue;
-            }
-            if (count(array_intersect($allowed, $groupsOf[$m['member_id']] ?? [])) === 0) {
-                continue;
-            }
-            if (!$random->chance($quota[$m['member_id']])) {
-                continue;
-            }
+        // Ankunft: meist knapp vor bis knapp nach Beginn, selten deutlich später.
+        $offset = $random->chance(0.08)
+            ? $random->int(16, 40)
+            : $random->int(-10, 15);
 
-            // Ankunft: meist knapp vor bis knapp nach Beginn, selten deutlich später.
-            $offset = $random->chance(0.08)
-                ? $random->int(16, 40)
-                : $random->int(-10, 15);
+        $source = $random->pick(['user_totp', 'user_totp', 'station_pin', 'auto_checkin', 'admin']);
 
-            $source = $random->pick(['user_totp', 'user_totp', 'station_pin', 'auto_checkin', 'admin']);
-
-            $records[] = [
-                'member_id'      => $m['member_id'],
-                'appointment_id' => $appt['appointment_id'],
-                'arrival_time'   => date('Y-m-d H:i:s', $start + $offset * 60),
-                'status'         => 'present',
-                'checkin_source' => $source,
-                'source_device'  => $source === 'station_pin' ? DEMO_STATION_NAME : null,
-                'location_name'  => $source === 'station_pin' ? DEMO_STATION_NAME : null,
-            ];
-        }
+        $records[] = [
+            'member_id'      => $pair['member_id'],
+            'appointment_id' => $pair['appointment_id'],
+            'arrival_time'   => date('Y-m-d H:i:s', $startOf[$pair['appointment_id']] + $offset * 60),
+            'status'         => 'present',
+            'checkin_source' => $source,
+            'source_device'  => $source === 'station_pin' ? DEMO_STATION_NAME : null,
+            'location_name'  => $source === 'station_pin' ? DEMO_STATION_NAME : null,
+        ];
     }
 
     return $records;
@@ -541,6 +577,16 @@ function buildRecords(
 
 /**
  * Anträge auf Entschuldigung und Zeitkorrektur.
+ *
+ * Beide Antragsarten setzen voraus, dass das Mitglied zum Termin überhaupt
+ * erwartet wurde (siehe demoExpectedPairs()) — eine `absence` entsteht nur zu
+ * einem erwarteten Termin ohne Anwesenheitseintrag, eine `time_correction` nur
+ * zu einem mit Eintrag. Gezogen wird je Art ohne Zurücklegen: Jedes Paar taucht
+ * höchstens einmal auf.
+ *
+ * Ist eine der beiden Kandidatenlisten leer oder erschöpft, weicht die
+ * Ziehung auf die andere aus. Läuft auch die leer, liefert die Funktion
+ * weniger als 25 Anträge zurück, statt einen ungültigen Antrag zu erzeugen.
  *
  * Mindestens vier bleiben offen — sonst ist der Antrags-Tab im Screenshot leer,
  * und genau er belegt, dass es einen Freigabeweg gibt.
@@ -553,29 +599,78 @@ const DEMO_EXCEPTION_REASONS = [
     'Prüfungsvorbereitung', 'Kinderbetreuung', 'Arzttermin', 'Auswärtstermin',
 ];
 
-function buildExceptions(DemoRandom $random, array $members, array $appointments, string $referenceDate): array
-{
-    $past = array_values(array_filter($appointments, fn ($a) => $a['date'] <= $referenceDate));
-    if ($past === []) {
+function buildExceptions(
+    DemoRandom $random,
+    array $members,
+    array $assignments,
+    array $membershipDates,
+    array $appointments,
+    array $typeGroups,
+    array $records,
+    string $referenceDate
+): array {
+    $pairs = demoExpectedPairs($members, $assignments, $membershipDates, $appointments, $typeGroups, $referenceDate);
+    if ($pairs === []) {
         return [];
+    }
+
+    $present = [];
+    foreach ($records as $rec) {
+        $present[$rec['member_id'] . '-' . $rec['appointment_id']] = true;
+    }
+
+    $absenceCandidates        = [];
+    $timeCorrectionCandidates = [];
+    foreach ($pairs as $pair) {
+        if (isset($present[$pair['member_id'] . '-' . $pair['appointment_id']])) {
+            $timeCorrectionCandidates[] = $pair;
+        } else {
+            $absenceCandidates[] = $pair;
+        }
+    }
+
+    $appointmentById = [];
+    foreach ($appointments as $a) {
+        $appointmentById[$a['appointment_id']] = $a;
     }
 
     $exceptions = [];
     for ($n = 0; $n < 25; $n++) {
-        $member = $random->pick($members);
-        $appt   = $random->pick($past);
+        $kind = $random->chance(0.65) ? 'absence' : 'time_correction';
+
+        // Bevorzugte Liste erschöpft oder von Anfang an leer: auf die andere
+        // ausweichen. Ist auch die leer, bricht die Erzeugung ab — lieber
+        // weniger als 25 Anträge als ein ungültiges Paar.
+        if ($kind === 'absence' && $absenceCandidates === []) {
+            $kind = 'time_correction';
+        } elseif ($kind === 'time_correction' && $timeCorrectionCandidates === []) {
+            $kind = 'absence';
+        }
+        if ($absenceCandidates === [] && $timeCorrectionCandidates === []) {
+            break;
+        }
+
+        $candidates = $kind === 'absence' ? $absenceCandidates : $timeCorrectionCandidates;
+        $index      = $random->int(0, count($candidates) - 1);
+        $pair       = $candidates[$index];
+        // Gezogen ohne Zurücklegen, damit kein Paar zweimal einen Antrag erhält.
+        if ($kind === 'absence') {
+            array_splice($absenceCandidates, $index, 1);
+        } else {
+            array_splice($timeCorrectionCandidates, $index, 1);
+        }
+
+        $appt  = $appointmentById[$pair['appointment_id']];
+        $start = strtotime($appt['date'] . ' ' . $appt['start_time']);
 
         // Die ersten fünf bleiben offen, der Rest ist entschieden.
         $status = $n < 5
             ? 'pending'
             : ($random->chance(0.8) ? 'approved' : 'rejected');
 
-        $kind  = $random->chance(0.65) ? 'absence' : 'time_correction';
-        $start = strtotime($appt['date'] . ' ' . $appt['start_time']);
-
         $exceptions[] = [
-            'member_id'              => $member['member_id'],
-            'appointment_id'         => $appt['appointment_id'],
+            'member_id'              => $pair['member_id'],
+            'appointment_id'         => $pair['appointment_id'],
             'exception_type'         => $kind,
             'reason'                 => $kind === 'absence'
                 ? $random->pick(DEMO_EXCEPTION_REASONS)
