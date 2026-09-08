@@ -2249,3 +2249,38 @@ body {
         font-size: 24px;
     }
 }
+
+/* ========================================
+   ARBEITSZEIT KORRIGIEREN UND NACHTRAGEN
+   ======================================== */
+.form-errors {
+    background: #fdecea;
+    color: #a32d2d;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+.form-errors ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.history-correct-btn {
+    background: var(--button-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 8px;
+}
+
+.history-correct-btn:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}

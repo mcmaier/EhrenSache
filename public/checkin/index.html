@@ -238,6 +238,9 @@
                             <button id="worktimeStartBtn" class="action-button">
                                 <span class="icon">▶️</span><span>Start</span>
                             </button>
+                            <button id="worktimeManualBtn" class="action-button secondary">
+                                <span class="icon">📝</span><span>Zeit nachtragen</span>
+                            </button>
                         </div>
                     </div>
 
@@ -436,6 +439,50 @@
                     <button type="submit" class="btn-modal-confirm" id="btnSaveAppointment">Speichern</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal: Arbeitszeit korrigieren oder nachtragen -->
+    <div class="modal" id="workSessionModal">
+        <div class="modal-content">
+            <h2 id="workSessionModalTitle">Zeit nachtragen</h2>
+            <input type="hidden" id="workSessionId">
+
+            <div class="form-group">
+                <label for="workSessionActivity">Tätigkeit</label>
+                <select id="workSessionActivity" required></select>
+            </div>
+            <div class="form-group">
+                <label for="workSessionStart">Beginn</label>
+                <input type="datetime-local" id="workSessionStart" required>
+            </div>
+            <div class="form-group">
+                <label for="workSessionEnd">Ende</label>
+                <input type="datetime-local" id="workSessionEnd" required>
+            </div>
+            <div class="form-group">
+                <label for="workSessionBreak">Pause in Minuten</label>
+                <input type="number" id="workSessionBreak" min="0" step="1" value="0">
+            </div>
+            <div class="form-group">
+                <label for="workSessionAppointment">Termin (optional)</label>
+                <select id="workSessionAppointment">
+                    <option value="">— kein Termin —</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="workSessionNote">Notiz</label>
+                <input type="text" id="workSessionNote" maxlength="255"
+                       placeholder="z. B. Bühne für das Frühjahrskonzert">
+            </div>
+
+            <div class="field-hint" id="workSessionHint"></div>
+            <div class="form-errors" id="workSessionErrors" hidden></div>
+
+            <div class="modal-buttons">
+                <button class="action-button btn-cancel" id="closeWorkSessionBtn">Abbrechen</button>
+                <button class="action-button" id="saveWorkSessionBtn">Speichern</button>
+            </div>
         </div>
     </div>
 
