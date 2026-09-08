@@ -2246,8 +2246,18 @@ function addWorkSessionToHistory(session) {
     const note = session.note
         ? `<div class="history-note">${escapeHtml(session.note)}</div>` : '';
 
+    // Nur beendete Sitzungen: Eine laufende wird gestoppt, nicht korrigiert.
+    // Die Eigentuemerfrage stellt sich nicht — der Verlauf holt work_sessions
+    // mit dem eigenen member_id und zeigt ausschliesslich eigene Sitzungen.
+    const korrigieren = laeuft
+        ? ''
+        : `<button class="history-correct-btn"
+                   onclick="openWorkSessionModal(${session.session_id})">✎ Korrigieren</button>`;
+
+    worktimeHistorySessions[session.session_id] = session;
+
     item.innerHTML = `
-        <div class="time">⏱️ ${dateStr} ${timeStr}</div>
+        <div class="time">⏱️ ${dateStr} ${timeStr} ${korrigieren}</div>
         <div class="appointment">${activityDot(session.color)}${escapeHtml(session.activity_name || 'Tätigkeit')}</div>
         <div class="history-duration">${escapeHtml(dauer)}</div>
         ${note}
@@ -2256,6 +2266,137 @@ function addWorkSessionToHistory(session) {
 
     elements.historyList.appendChild(item);
 }
+
+// ========================================
+// ARBEITSZEIT KORRIGIEREN UND NACHTRAGEN
+// ========================================
+
+/** Datenbankzeit „2026-09-01 08:00:00" → Feldwert „2026-09-01T08:00". */
+function toDateTimeLocal(value) {
+    return String(value || '').replace(' ', 'T').substring(0, 16);
+}
+
+/** Feldwert „2026-09-01T08:00" → „2026-09-01 08:00" fuer den Server. */
+function fromDateTimeLocal(value) {
+    return String(value || '').replace('T', ' ');
+}
+
+/**
+ * Fuellt die Taetigkeitsauswahl des Modals.
+ *
+ * Eine Sitzung kann zu einer Taetigkeit gehoeren, die das Mitglied heute nicht
+ * mehr waehlen darf — etwa nach einem Gruppenwechsel. Fehlt sie in der Liste,
+ * wird sie ergaenzt: Sonst spraenge die Auswahl still auf eine fremde
+ * Taetigkeit, und das Speichern schriebe eine falsche.
+ */
+function fillWorkSessionActivities(session) {
+    const select = document.getElementById('workSessionActivity');
+    if (!select) return;
+
+    const liste = worktimeActivities.slice();
+
+    if (session && session.activity_id
+        && !liste.some(a => String(a.activity_id) === String(session.activity_id))) {
+        liste.unshift({
+            activity_id:   session.activity_id,
+            activity_name: session.activity_name || 'Tätigkeit'
+        });
+    }
+
+    select.innerHTML = liste
+        .map(a => `<option value="${a.activity_id}">${escapeHtml(a.activity_name)}</option>`)
+        .join('');
+
+    if (session && session.activity_id) {
+        select.value = String(session.activity_id);
+    }
+}
+
+/** Fuellt die Terminauswahl des Modals passend zur gewaehlten Taetigkeit. */
+function fillWorkSessionAppointments(previous = '') {
+    const select = document.getElementById('workSessionAppointment');
+    if (!select) return;
+
+    const options = worktimeAppointmentsFor(document.getElementById('workSessionActivity')?.value);
+
+    select.innerHTML = worktimeAppointmentOptionsHtml(options);
+
+    if (previous && options.some(a => String(a.appointment_id) === String(previous))) {
+        select.value = String(previous);
+    }
+}
+
+/**
+ * Oeffnet das Modal.
+ *
+ * Ohne sessionId ist es ein Nachtrag (POST), mit sessionId eine Korrektur
+ * (PUT). Die Werte kommen aus dem bereits geladenen Verlauf — ein zweiter
+ * Abruf waere verschenkt.
+ */
+function openWorkSessionModal(sessionId = null) {
+    const modal = document.getElementById('workSessionModal');
+    if (!modal) return;
+
+    const session = sessionId ? worktimeHistorySessions[sessionId] : null;
+
+    if (sessionId && !session) {
+        showMessage('Der Eintrag ist nicht mehr geladen. Bitte den Verlauf neu öffnen.', 'error');
+        return;
+    }
+
+    document.getElementById('workSessionId').value = sessionId || '';
+    document.getElementById('workSessionModalTitle').textContent =
+        session ? 'Zeit korrigieren' : 'Zeit nachtragen';
+
+    fillWorkSessionActivities(session);
+
+    document.getElementById('workSessionStart').value =
+        session ? toDateTimeLocal(session.start_time) : '';
+    document.getElementById('workSessionEnd').value =
+        session ? toDateTimeLocal(session.end_time) : '';
+    document.getElementById('workSessionBreak').value =
+        session ? (parseInt(session.break_minutes, 10) || 0) : 0;
+    document.getElementById('workSessionNote').value = session ? (session.note || '') : '';
+
+    fillWorkSessionAppointments(session ? session.appointment_id : '');
+
+    // Der Hinweis nennt die Folge vor dem Speichern, nicht danach. Der Zusatz
+    // zum Ortsnachweis nur, wenn es einen zu verlieren gibt.
+    const hatNachweis = !!(session
+        && (session.start_location_name || session.end_location_name));
+
+    document.getElementById('workSessionHint').textContent = hatNachweis
+        ? 'Die Änderung geht erneut in die Freigabe. Wird Beginn oder Ende geändert, '
+          + 'entfällt der Ortsnachweis dieser Zeit.'
+        : 'Erfasste Zeiten gelten erst nach Freigabe durch einen Manager.';
+
+    showWorkSessionErrors([]);
+    modal.classList.add('active');
+}
+
+function closeWorkSessionModal() {
+    const modal = document.getElementById('workSessionModal');
+    if (modal) modal.classList.remove('active');
+}
+
+/** Zeigt die Meldungen des Servers; eine leere Liste blendet den Kasten aus. */
+function showWorkSessionErrors(messages) {
+    const box = document.getElementById('workSessionErrors');
+    if (!box) return;
+
+    if (!messages || messages.length === 0) {
+        box.hidden = true;
+        box.innerHTML = '';
+        return;
+    }
+
+    box.hidden = false;
+    box.innerHTML = '<ul>'
+        + messages.map(m => `<li>${escapeHtml(m)}</li>`).join('')
+        + '</ul>';
+}
+
+window.openWorkSessionModal = openWorkSessionModal;
 
 // Fügt Record zur History hinzu
 function addRecordToHistory(record) {
@@ -2517,6 +2658,10 @@ function escapeHtml(value) {
 }
 
 let worktimeSession = null;
+
+// Die Sitzungen, die der Verlauf gerade zeigt — nach session_id. Das
+// Korrekturmodal fuellt seine Felder daraus, statt sie erneut zu holen.
+let worktimeHistorySessions = {};
 let worktimeActivities = [];
 
 // Termine des laufenden Jahres. Gehalten, damit ein Wechsel der Taetigkeitsart
