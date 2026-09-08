@@ -207,3 +207,24 @@ function () use ($repoRoot) {
         'Der Zusatzabruf auf work_sessions haengt nicht an der Bedingung zeigtArbeitszeit'
     );
 });
+
+test('Check-in-PWA: das Korrekturmodal schickt PUT mit id und POST ohne action',
+function () use ($repoRoot) {
+    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $body = frontendFunctionBody($js, 'saveWorkSession');
+
+    // Ohne id waere der PUT ein Aufruf auf die Ressource ohne Ziel; ohne die
+    // Unterscheidung wuerde eine Korrektur eine zweite Sitzung anlegen.
+    assertTrue(
+        strpos($body, "'PUT'") !== false && strpos($body, 'id:') !== false,
+        'saveWorkSession() schickt keinen PUT mit id'
+    );
+    assertTrue(
+        strpos($body, "'POST'") !== false,
+        'saveWorkSession() kennt keinen Nachtrag'
+    );
+    assertTrue(
+        strpos($body, 'action') === false,
+        'saveWorkSession() schickt eine action — der Nachtrag darf keine haben'
+    );
+});

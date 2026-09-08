@@ -253,6 +253,8 @@ const SERVER_MESSAGES = {
         'Es läuft gerade keine Zeiterfassung.',
     'No member linked to your account':
         'Dein Konto ist mit keinem Mitglied verknüpft. Bitte an die Verwaltung wenden.',
+    'Session is still running':
+        'Die Sitzung läuft noch — erst beenden, dann korrigieren.',
 
     // Tritt auf, wenn die Auswahl im Geraet veraltet ist — etwa weil ein
     // Administrator die Taetigkeit geloescht hat, waehrend die App offen lag.
@@ -2312,12 +2314,33 @@ function fillWorkSessionActivities(session) {
     }
 }
 
-/** Fuellt die Terminauswahl des Modals passend zur gewaehlten Taetigkeit. */
-function fillWorkSessionAppointments(previous = '') {
+/**
+ * Fuellt die Terminauswahl des Modals passend zur gewaehlten Taetigkeit.
+ *
+ * Beim Oeffnen wird die Sitzung mitgegeben: Fehlt ihr Termin in der
+ * gefilterten Liste, wird er ergaenzt und vorgewaehlt. Sonst stuende die
+ * Auswahl still auf „kein Termin", und das Speichern loeste eine Zuordnung,
+ * die niemand loesen wollte.
+ *
+ * Beim Wechsel der Taetigkeit passiert das bewusst NICHT: Dort hat das
+ * Mitglied selbst gehandelt, und ein Termin, der zur neuen Taetigkeit nicht
+ * passt, gehoert auch nicht mehr dazu.
+ */
+function fillWorkSessionAppointments(previous = '', session = null) {
     const select = document.getElementById('workSessionAppointment');
     if (!select) return;
 
     const options = worktimeAppointmentsFor(document.getElementById('workSessionActivity')?.value);
+
+    if (session && previous
+        && !options.some(a => String(a.appointment_id) === String(previous))) {
+        options.unshift({
+            appointment_id: previous,
+            title:          session.appointment_title || 'Termin',
+            date:           session.appointment_date || '',
+            start_time:     ''
+        });
+    }
 
     select.innerHTML = worktimeAppointmentOptionsHtml(options);
 
@@ -2358,7 +2381,7 @@ function openWorkSessionModal(sessionId = null) {
         session ? (parseInt(session.break_minutes, 10) || 0) : 0;
     document.getElementById('workSessionNote').value = session ? (session.note || '') : '';
 
-    fillWorkSessionAppointments(session ? session.appointment_id : '');
+    fillWorkSessionAppointments(session ? session.appointment_id : '', session);
 
     // Der Hinweis nennt die Folge vor dem Speichern, nicht danach. Der Zusatz
     // zum Ortsnachweis nur, wenn es einen zu verlieren gibt.
@@ -2394,6 +2417,50 @@ function showWorkSessionErrors(messages) {
     box.innerHTML = '<ul>'
         + messages.map(m => `<li>${escapeHtml(m)}</li>`).join('')
         + '</ul>';
+}
+
+/**
+ * Speichert Nachtrag oder Korrektur.
+ *
+ * Der Server ist die pruefende Instanz: Ende vor Beginn, Zeiten in der
+ * Zukunft, zu lange Pause und die Notizpflicht entscheidet er, nicht dieses
+ * Formular. Seine Meldungen stehen in errors[] und werden gezeigt — „Validation
+ * failed" allein waere fuer ein Mitglied wertlos.
+ */
+async function saveWorkSession() {
+    const id      = document.getElementById('workSessionId').value;
+    const termin  = document.getElementById('workSessionAppointment').value;
+
+    const body = {
+        activity_id:    parseInt(document.getElementById('workSessionActivity').value, 10),
+        start_time:     fromDateTimeLocal(document.getElementById('workSessionStart').value),
+        end_time:       fromDateTimeLocal(document.getElementById('workSessionEnd').value),
+        break_minutes:  parseInt(document.getElementById('workSessionBreak').value, 10) || 0,
+        note:           document.getElementById('workSessionNote').value.trim(),
+        // Leer heisst hier bewusst „Zuordnung loesen": Das Formular zeigt den
+        // aktuellen Stand, also ist die fehlende Auswahl eine Aussage.
+        appointment_id: termin ? parseInt(termin, 10) : null
+    };
+
+    const result = id
+        ? await apiCall('work_sessions', 'PUT', body, { id: id })
+        : await apiCall('work_sessions', 'POST', body);
+
+    if (!result.success) {
+        const meldungen = Array.isArray(result.data?.errors)
+            ? result.data.errors
+            : [result.error];
+
+        showWorkSessionErrors(meldungen);
+        return;
+    }
+
+    closeWorkSessionModal();
+    showMessage(id ? 'Korrektur gespeichert — wartet auf Freigabe'
+                   : 'Zeit nachgetragen — wartet auf Freigabe', 'success');
+
+    await loadHistory();
+    await loadWorktimeState();
 }
 
 window.openWorkSessionModal = openWorkSessionModal;
@@ -2707,6 +2774,15 @@ async function initWorktime() {
         });
         renderWorktimeActivityHint();
     }
+
+    // bindOnce, weil initWorktime() bei jeder Anmeldung erneut laeuft.
+    bindOnce(document.getElementById('worktimeManualBtn'), 'click',
+             () => openWorkSessionModal());
+    bindOnce(document.getElementById('closeWorkSessionBtn'), 'click', closeWorkSessionModal);
+    bindOnce(document.getElementById('saveWorkSessionBtn'), 'click', saveWorkSession);
+    bindOnce(document.getElementById('workSessionActivity'), 'change',
+             () => fillWorkSessionAppointments(
+                 document.getElementById('workSessionAppointment')?.value || ''));
 
     bindOnce(document.getElementById('worktimeAppointment'), 'change',
         renderWorktimeAppointmentHint);
