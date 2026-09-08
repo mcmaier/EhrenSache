@@ -1221,16 +1221,27 @@ body {
     transform: translateY(0);
 }
 
+/* Umriss statt Fuellung. .action-button setzt border: none, deshalb lief das
+   border-color im Hover-Zustand bisher ins Leere: Die Klasse wollte immer ein
+   Umriss-Knopf sein, hatte den Rahmen aber nie. Auf der weissen Karte stand
+   ein #f5f5f5-Knopf ohne Rahmen praktisch unsichtbar da.
+
+   Die zwei Pixel Innenabstand weniger gleichen den Rahmen aus: Die Knoepfe
+   haben keine feste Hoehe, also waechst border-box nicht in die Fuellung
+   hinein, sondern der Knopf wuerde vier Pixel hoeher stehen als der gefuellte
+   daneben (gemessen: 64 statt 60). */
 .action-button.secondary {
-    background: var(--button-bg);
-    color: var(--text);
+    background: var(--card-bg);
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+    padding: 12px 18px;
+    box-shadow: none;
     backdrop-filter: blur(10px);
 }
 
 .action-button.secondary:hover {
-    filter: brightness(1.1); 
-    border-color: var(--primary-color);
-    color: var(--primary-color);;
+    background: var(--primary-color);
+    color: white;
 }
 
 /* Container-Anordnung beim Scannen */
@@ -2268,21 +2279,37 @@ body {
     padding-left: 18px;
 }
 
-.history-correct-btn {
-    background: var(--button-bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
+/* Dieselbe Form wie der Loeschen-Knopf eines Antrags, nur in Blau: Beide sind
+   Aktionen am Verlaufseintrag und gehoeren an denselben Platz. Rot bleibt dem
+   Loeschen vorbehalten -- Korrigieren zerstoert nichts. */
+.history-item .history-correct-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(31, 95, 191, 0.1);
+    color: var(--primary-color);
+    border: 1px solid rgba(31, 95, 191, 0.3);
     padding: 4px 8px;
+    border-radius: 5px;
     font-size: 11px;
     cursor: pointer;
-    margin-left: 8px;
+    transition: all 0.2s;
+    font-weight: 600;
 }
 
-.history-correct-btn:hover {
+.history-item .history-correct-btn:hover {
     background: var(--primary-color);
-    border-color: var(--primary-color);
     color: white;
+    border-color: var(--primary-color);
+}
+
+.history-item .history-correct-btn:active {
+    transform: scale(0.95);
+}
+
+/* „Korrigieren" ist breiter als „Loeschen", darum mehr Platz als has-delete. */
+.history-item.has-correct {
+    padding-right: 100px;
 }
 
 /* Sechs Felder passen auf ein kurzes Display nicht mehr ins Bild. Ohne diese

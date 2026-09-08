@@ -2262,12 +2262,20 @@ function addWorkSessionToHistory(session) {
 
     worktimeHistorySessions[session.session_id] = session;
 
+    // Der Knopf sitzt rechts oben, nicht am Datum -- derselbe Platz, den der
+    // Loeschen-Knopf eines Antrags in derselben Liste einnimmt. has-correct
+    // haelt den Text von ihm frei.
+    if (korrigieren) {
+        item.className += ' has-correct';
+    }
+
     item.innerHTML = `
-        <div class="time">⏱️ ${dateStr} ${timeStr} ${korrigieren}</div>
+        <div class="time">⏱️ ${dateStr} ${timeStr}</div>
         <div class="appointment">${activityDot(session.color)}${escapeHtml(session.activity_name || 'Tätigkeit')}</div>
         <div class="history-duration">${escapeHtml(dauer)}</div>
         ${note}
         ${status}
+        ${korrigieren}
     `;
 
     elements.historyList.appendChild(item);
@@ -2514,6 +2522,30 @@ function addRecordToHistory(record) {
     elements.historyList.appendChild(item);
 }
 
+/**
+ * Wie ein Antrag im Verlauf beschriftet wird.
+ *
+ * „Zeitkorrektur" meinte hier die Ankunftszeit. In derselben Liste stehen
+ * inzwischen Arbeitszeit-Eintraege, die ebenfalls auf Freigabe warten — das
+ * Wort war dort mit einer Korrektur der Arbeitszeit zu verwechseln.
+ * „Entschuldigung" bleibt: Das Wort ist eindeutig.
+ *
+ * Der Satz wird gebaut statt zusammengesetzt: FREIGABE_STATUS liefert
+ * „Wartet auf Freigabe" mit grossem W, ein Anhaengen ergaebe „Antrag Wartet
+ * auf Freigabe".
+ */
+function exceptionHistoryLabel(exception) {
+    const wort = exception.exception_type === 'absence' ? 'Entschuldigung' : 'Antrag';
+
+    const lage = {
+        'pending':  'wartet auf Freigabe',
+        'approved': 'bestätigt',
+        'rejected': 'abgelehnt'
+    }[exception.status] || translateExceptionStatus(exception.status);
+
+    return `${wort} ${lage}`;
+}
+
 // Fügt Exception zur History hinzu
 function addExceptionToHistory(exception) {
     const item = document.createElement('div');
@@ -2532,8 +2564,7 @@ function addExceptionToHistory(exception) {
         minute: '2-digit' 
     });
     
-    const typeText = exception.exception_type === 'absence' ? 'Entschuldigung' : 'Zeitkorrektur';
-    const statusText = translateExceptionStatus(exception.status);
+    const antragText = exceptionHistoryLabel(exception);
 
     // Appointment Type Badge hinzufügen (falls vorhanden)
     let typeBadge = '';
@@ -2550,7 +2581,7 @@ function addExceptionToHistory(exception) {
     item.innerHTML = `        
         <div class="time">📋 ${dateStr} ${timeStr} ${deleteBtn}</div>
         <div class="appointment">${exception.appointment_title}</div>
-        <span class="status pending">${statusText} - ${typeText}</span>
+        <span class="status pending">${antragText}</span>
         ${typeBadge}
         
     `;

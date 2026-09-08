@@ -41,8 +41,10 @@ umgekehrt.
 `color: var(--primary-color)`, Hintergrund `var(--card-bg)`. Der Hover-Zustand kehrt sich um —
 gefüllt in der Hausfarbe, weiße Schrift — statt eines `border-color`, das ins Leere lief.
 
-`box-sizing: border-box` gilt global (`style.css:32`), der Rahmen ändert die Knopfgröße also
-nicht; der sekundäre Knopf bleibt so hoch wie der gefüllte daneben.
+Der Innenabstand sinkt dabei von `14px 20px` auf `12px 18px`. `box-sizing: border-box` gilt
+zwar global (`style.css:32`), greift hier aber nicht: Die Knöpfe haben keine feste Höhe,
+sondern wachsen aus ihrem Inhalt — der Rahmen käme also oben drauf. Gemessen: 64 px statt 60 px
+neben dem gefüllten Knopf. Mit dem angepassten Innenabstand stehen beide wieder gleich hoch.
 
 **Das gilt für alle fünf Knöpfe der Klasse** — „Manuell eingeben“ (zweimal), „Scan beenden“,
 „Nachträglicher Antrag“, „Zeit nachtragen“ und „Ohne Nachweis beenden“. Die Alternative, nur

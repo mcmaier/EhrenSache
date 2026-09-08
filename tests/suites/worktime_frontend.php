@@ -233,3 +233,24 @@ function () use ($repoRoot) {
         'saveWorkSession() schickt eine action — der Nachtrag darf keine haben'
     );
 });
+
+test('Check-in-PWA: der Verlauf nennt einen Antrag nicht mehr Zeitkorrektur',
+function () use ($repoRoot) {
+    $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+
+    // „Zeitkorrektur" meinte hier die Ankunftszeit. Seit Arbeitszeit-Eintraege
+    // in derselben Liste stehen, ist das Wort mit einer Korrektur der
+    // Arbeitszeit zu verwechseln. Geprueft wird das Textliteral, nicht das
+    // Wort — im Kommentar der Ersatzfunktion darf es weiter stehen.
+    assertTrue(
+        strpos($js, "'Zeitkorrektur'") === false,
+        'Der Verlauf beschriftet einen Antrag wieder als Zeitkorrektur'
+    );
+
+    $body = frontendFunctionBody($js, 'addExceptionToHistory');
+
+    assertTrue(
+        strpos($body, 'exceptionHistoryLabel(') !== false,
+        'addExceptionToHistory() baut die Beschriftung nicht ueber exceptionHistoryLabel()'
+    );
+});
