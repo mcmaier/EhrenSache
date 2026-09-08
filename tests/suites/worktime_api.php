@@ -1592,3 +1592,48 @@ test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
 
     assertSame([], $rest, 'Nicht alles konnte entfernt werden');
 });
+
+test('work_sessions: eine Zeitkorrektur laesst den Eintrag ohne Ortsnachweis', function () {
+    enableWorktime();
+    $activityId = createActivityType('Nachweiswegfall ' . uniqid());
+    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+
+    // Ein Nachtrag hat nie einen Ortsnachweis. Geprueft wird hier der Weg
+    // ueber HTTP: Die Korrektur laeuft durch, die Ortsfelder bleiben leer und
+    // der Nachweisgrad bleibt „unbelegt". Welches Feld bei welcher Aenderung
+    // faellt, sichert worktime_unit.php ab — dafuer braeuchte es hier ein
+    // Geraet mit TOTP-Secret.
+    $res = apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('user'),
+        'query' => ['id' => $id],
+        'body'  => ['start_time' => '2026-09-01 06:00:00', 'end_time' => '2026-09-01 09:00:00'],
+    ]);
+    assertStatus(200, $res);
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertSame(null, $get['body']['start_location_name']);
+    assertSame(null, $get['body']['end_location_name']);
+    assertSame('submitted', $get['body']['status']);
+
+    deleteSession($id);
+});
+
+test('work_sessions: eine Notizkorrektur laesst die Zeiten unberuehrt', function () {
+    enableWorktime();
+    $activityId = createActivityType('Nurnotiz ' . uniqid());
+    $angelegt = createManualSession('user', $activityId)['body']['session'];
+    $id = (int) $angelegt['session_id'];
+
+    assertStatus(200, apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('user'),
+        'query' => ['id' => $id],
+        'body'  => ['note' => 'nur die Notiz'],
+    ]));
+
+    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    assertSame($angelegt['start_time'], $get['body']['start_time']);
+    assertSame($angelegt['end_time'], $get['body']['end_time']);
+    assertSame('nur die Notiz', $get['body']['note']);
+
+    deleteSession($id);
+});

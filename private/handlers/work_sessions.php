@@ -766,18 +766,31 @@ function workSessionUpdate($db, $database, $id, $data, $authUserId, $authMemberI
     // nicht selbst genehmigen.
     $newStatus = $isApprover ? $before['status'] : 'submitted';
 
+    $neuerStart = date('Y-m-d H:i:s', strtotime((string)$input['start_time']));
+    $neuesEnde  = date('Y-m-d H:i:s', strtotime((string)$input['end_time']));
+
+    // Der Ortsnachweis gilt fuer den gestempelten Zeitpunkt, nicht fuer den
+    // behaupteten: Wer eine Zeit verschiebt, verliert das Etikett fuer diese
+    // Zeit. Welches Feld faellt, entscheidet worktimeProofDrop() -- geprueft
+    // in tests/suites/worktime_unit.php.
+    $verliert = worktimeProofDrop($before, $neuerStart, $neuesEnde);
+
     $db->prepare("UPDATE {$prefix}work_sessions
                   SET activity_id = ?, appointment_id = ?, start_time = ?, end_time = ?,
-                      break_minutes = ?, note = ?, status = ?
+                      break_minutes = ?, note = ?, status = ?,
+                      start_location_name = IF(?, NULL, start_location_name),
+                      end_location_name   = IF(?, NULL, end_location_name)
                   WHERE session_id = ?")
        ->execute([
            (int)$input['activity_id'],
            $appointmentId,
-           date('Y-m-d H:i:s', strtotime((string)$input['start_time'])),
-           date('Y-m-d H:i:s', strtotime((string)$input['end_time'])),
+           $neuerStart,
+           $neuesEnde,
            (int)$input['break_minutes'],
            trim((string)$input['note']) !== '' ? trim((string)$input['note']) : null,
            $newStatus,
+           $verliert['start'] ? 1 : 0,
+           $verliert['end'] ? 1 : 0,
            $id
        ]);
 
