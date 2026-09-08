@@ -84,3 +84,60 @@ final class DemoRandom
         return $this->float() < $probability;
     }
 }
+
+const DEMO_ORG_NAME     = 'Musikverein Musterhausen';
+const DEMO_STATION_NAME = 'Probenraum-Station';
+
+/** Gruppen. Die IDs sind fest, weil alles Weitere sie referenziert. */
+function buildGroups(): array
+{
+    return [
+        ['group_id' => 1, 'group_name' => 'Aktive',          'description' => 'Aktive Musikerinnen und Musiker', 'is_default' => 1],
+        ['group_id' => 2, 'group_name' => 'Jugend',          'description' => 'Jugendorchester und Ausbildung',  'is_default' => 0],
+        ['group_id' => 3, 'group_name' => 'Vorstandschaft',  'description' => 'Gewählte Vorstandschaft',         'is_default' => 0],
+        ['group_id' => 4, 'group_name' => 'Ehrenmitglieder', 'description' => 'Ehrenmitglieder ohne Dienstpflicht', 'is_default' => 0],
+    ];
+}
+
+/** Terminarten. */
+function buildAppointmentTypes(): array
+{
+    return [
+        ['type_id' => 1, 'type_name' => 'Gesamtprobe',      'description' => 'Wöchentliche Probe des Gesamtorchesters', 'is_default' => 1, 'color' => '#1F5FBF'],
+        ['type_id' => 2, 'type_name' => 'Registerprobe',    'description' => 'Probe einzelner Register',                'is_default' => 0, 'color' => '#4CAF50'],
+        ['type_id' => 3, 'type_name' => 'Auftritt',         'description' => 'Konzert, Umzug, Ständchen',               'is_default' => 0, 'color' => '#F5A623'],
+        ['type_id' => 4, 'type_name' => 'Vorstandssitzung', 'description' => 'Sitzung der Vorstandschaft',              'is_default' => 0, 'color' => '#6B7280'],
+    ];
+}
+
+/**
+ * Gruppenbindung der Terminarten.
+ *
+ * Sie entscheidet später, wer zu einem Termin überhaupt erwartet wird — ohne sie
+ * bekämen Ehrenmitglieder Anwesenheitspflicht bei der Vorstandssitzung.
+ */
+function buildAppointmentTypeGroups(): array
+{
+    return [
+        ['type_id' => 1, 'group_id' => 1],
+        ['type_id' => 1, 'group_id' => 2],
+        ['type_id' => 2, 'group_id' => 1],
+        ['type_id' => 2, 'group_id' => 2],
+        ['type_id' => 3, 'group_id' => 1],
+        ['type_id' => 3, 'group_id' => 2],
+        ['type_id' => 4, 'group_id' => 3],
+    ];
+}
+
+/** Tätigkeitsarten der Zeiterfassung, mit gestaffeltem Nachweisgrad. */
+function buildActivityTypes(): array
+{
+    return [
+        ['activity_id' => 1, 'activity_name' => 'Bühnenaufbau',            'description' => 'Auf- und Abbau bei Veranstaltungen', 'color' => '#1F5FBF', 'is_default' => 1, 'is_active' => 1, 'verification' => 'start_end'],
+        ['activity_id' => 2, 'activity_name' => 'Festvorbereitung',        'description' => 'Vorbereitung von Vereinsfesten',     'color' => '#F5A623', 'is_default' => 0, 'is_active' => 1, 'verification' => 'start_end'],
+        ['activity_id' => 3, 'activity_name' => 'Vereinsheim-Renovierung', 'description' => 'Instandhaltung des Vereinsheims',    'color' => '#4CAF50', 'is_default' => 0, 'is_active' => 1, 'verification' => 'start'],
+        ['activity_id' => 4, 'activity_name' => 'Notenarchiv',             'description' => 'Pflege des Notenbestands',           'color' => '#6B7280', 'is_default' => 0, 'is_active' => 1, 'verification' => 'none'],
+        ['activity_id' => 5, 'activity_name' => 'Instrumentenpflege',      'description' => 'Wartung der Vereinsinstrumente',     'color' => '#0F4F9F', 'is_default' => 0, 'is_active' => 1, 'verification' => 'none'],
+        ['activity_id' => 6, 'activity_name' => 'Jugendbetreuung',         'description' => 'Betreuung des Jugendorchesters',     'color' => '#FFC83D', 'is_default' => 0, 'is_active' => 1, 'verification' => 'none'],
+    ];
+}

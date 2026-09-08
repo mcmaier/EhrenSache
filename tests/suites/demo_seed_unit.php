@@ -92,3 +92,56 @@ test('DemoRandom::int(0,4) verteilt ueber 10000 Ziehungen annaehernd gleich', fu
 test('DemoRandom::pick auf leerer Liste wirft', function () {
     assertThrows(fn () => (new DemoRandom(1))->pick([]));
 });
+
+// ---- Stammdaten ----------------------------------------------------------
+
+test('buildGroups liefert die vier Gruppen mit fortlaufenden IDs', function () {
+    $groups = buildGroups();
+    assertSame(4, count($groups));
+    assertSame(1, $groups[0]['group_id']);
+    assertSame('Aktive', $groups[0]['group_name']);
+    assertSame(4, $groups[3]['group_id']);
+    assertSame('Ehrenmitglieder', $groups[3]['group_name']);
+});
+
+test('buildGroups markiert genau eine Gruppe als Vorgabe', function () {
+    $defaults = array_filter(buildGroups(), fn ($g) => $g['is_default'] === 1);
+    assertSame(1, count($defaults));
+});
+
+test('buildAppointmentTypes liefert vier Arten mit Farbe', function () {
+    $types = buildAppointmentTypes();
+    assertSame(4, count($types));
+    assertSame('Gesamtprobe', $types[0]['type_name']);
+    foreach ($types as $t) {
+        assertTrue(preg_match('/^#[0-9A-Fa-f]{6}$/', $t['color']) === 1, "Farbe fehlerhaft: {$t['color']}");
+    }
+});
+
+test('buildAppointmentTypeGroups bindet die Vorstandssitzung nur an die Vorstandschaft', function () {
+    $links = buildAppointmentTypeGroups();
+    $board = array_values(array_filter($links, fn ($l) => $l['type_id'] === 4));
+    assertSame(1, count($board));
+    assertSame(3, $board[0]['group_id']);
+});
+
+test('buildAppointmentTypeGroups bindet die Registerprobe an Aktive und Jugend', function () {
+    $links   = buildAppointmentTypeGroups();
+    $section = array_map(fn ($l) => $l['group_id'], array_filter($links, fn ($l) => $l['type_id'] === 2));
+    sort($section);
+    assertSame([1, 2], array_values($section));
+});
+
+test('buildActivityTypes liefert sechs Taetigkeiten mit gueltigem Nachweisgrad', function () {
+    $acts = buildActivityTypes();
+    assertSame(6, count($acts));
+    foreach ($acts as $a) {
+        assertTrue(in_array($a['verification'], ['none', 'start', 'start_end'], true), "unbekannt: {$a['verification']}");
+    }
+});
+
+test('buildActivityTypes enthaelt mindestens je einen Nachweisgrad', function () {
+    $grades = array_unique(array_map(fn ($a) => $a['verification'], buildActivityTypes()));
+    sort($grades);
+    assertSame(['none', 'start', 'start_end'], array_values($grades));
+});
