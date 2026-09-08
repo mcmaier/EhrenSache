@@ -225,6 +225,57 @@ hält.
 `tests/suites/worktime_api.php`. Frontend unberührt: Der Nachweisgrad wird überall aus den
 Ortsfeldern abgeleitet, hier wie dort.
 
+### OI-39 · Freigaben liegen an zwei Orten
+**Priorität:** niedrig — offen, aufgekommen bei den PWA-Korrekturen am 2026-09-08
+
+Ein Manager, der wissen will, was seine Entscheidung braucht, muss zwei Bereiche öffnen:
+
+| Bereich | Inhalt | Zähler |
+|---|---|---|
+| „📋 Anträge" | Entschuldigungen und Zeitkorrekturen aus `exceptions` | „Ausstehende Anträge" |
+| „Zeiterfassung" | Arbeitszeitsitzungen in `submitted`, Freigabe über ✓/✗ in der Tabellenzeile | keiner |
+
+Beide sind Freigaben desselben Zuschnitts — jemand behauptet etwas, ein Manager entscheidet
+darüber. Sie heißen nur verschieden, liegen an verschiedenen Stellen, und nur eine der beiden
+hat einen Zähler. Wer ausschließlich in die Anträge schaut, übersieht wartende Stunden
+vollständig.
+
+**Der Aufwand ist geringer, als er wirkt.** Für eine gemeinsame Ansicht braucht es **keine**
+Schemaänderung: `exceptions` und `work_sessions` tragen beide einen Status und kennen beide
+den Weg „freigeben / ablehnen". Die Check-in-PWA führt es bereits vor — ihr Verlauf mischt
+`records`, `exceptions` und `work_sessions` in einer Zeitachse und unterscheidet sie über
+Symbol und Beschriftung (`loadHistory()` in `public/checkin/js/app.js`). Dasselbe ließe sich
+für eine Freigabeliste tun.
+
+**Zwei Stufen, die man nicht verwechseln sollte:**
+
+- **Gemeinsame Ansicht** — eine Liste, die beide Quellen liest und je Zeile in die zuständige
+  Ressource schreibt. Frontend und höchstens ein zusammenfassender Lesezugriff. Kein
+  Datenmodell, keine Migration.
+- **Gemeinsame Entität** — ein Antragsdatensatz, auf den beides zurückgeht. Das wäre die
+  aufwendige Variante: Migration, Umbau beider Handler, Auswirkungen auf Export, Statistik und
+  Auditspur. Für den Zweck („ich will an einer Stelle sehen, was offen ist") ist sie nicht
+  nötig.
+
+**Vor der Umsetzung zu klären:**
+
+- **Was heißt „Antrag" dann?** Heute steht das Wort im Dashboard ausschließlich für
+  `exceptions`. Nimmt die Liste Arbeitszeiten auf, ändert sich die Bedeutung des Bereichsnamens
+  und die des Zählers — beides muss dann überall mitgezogen werden.
+- **Getrennte Wortwelten.** Die Anträge sprechen von „genehmigt", die Arbeitszeit von
+  „bestätigt"; die Statuswerte heißen `approved` beziehungsweise `confirmed`. Eine gemeinsame
+  Liste braucht eine gemeinsame Sprache, ohne die Werte in der Datenbank anzufassen.
+- **Nebenwirkung der Freigabe.** Eine genehmigte Zeitkorrektur schreibt in `records` zurück,
+  eine freigegebene Arbeitszeitsitzung nicht. Die Liste darf nicht suggerieren, beide täten
+  dasselbe.
+- **Verhältnis zu [OI-38](#oi-38).** Wird die Auditspur in der Freigabe sichtbar, gehört sie in
+  dieselbe Ansicht. Beide Punkte betreffen denselben Arbeitsplatz und sollten zusammen gedacht
+  werden.
+
+**Berührt:** `public/index.html`, `public/js/modules/exceptions.js`,
+`public/js/modules/worktime.js`, gegebenenfalls `private/handlers/` für einen
+zusammenfassenden Lesezugriff. Kein Schemabedarf für die erste Stufe.
+
 ---
 
 ## Restarbeiten
