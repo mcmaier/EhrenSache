@@ -495,7 +495,7 @@ php tests/run.php
 Reine Logik ohne Datenbank: Versionsbestimmung, Normalisierung, Manifest, Kettenauflösung.
 
 ```bash
-php tests/db/verify_migration_chain.php "mysql:host=127.0.0.1;port=3308" root ""
+php tests/db/verify_migration_chain.php "mysql:host=127.0.0.1;port=3306" root ""
 ```
 
 Die Zugriffssperren von Installer und Assistent:
@@ -551,7 +551,7 @@ php tests/run.php
 gegen die laufende Instanz. Die API-Suite räumt alles wieder ab, was sie anlegt.
 
 ```bash
-php tests/db/verify_stale_sessions.php "mysql:host=127.0.0.1;port=3308;dbname=ehrensache" root "" ez_
+php tests/db/verify_stale_sessions.php "mysql:host=127.0.0.1;port=3306;dbname=ehrensache" root "" ez_
 ```
 
 Der automatische Abschluss überfälliger Sitzungen. Eigenes Skript, weil dafür `start_time`
@@ -603,7 +603,7 @@ Setzt mindestens eine aktive TOTP-Station voraus (Dashboard → Geräte, Typ
 ### Automatisiert
 
 ```bash
-php tests/db/verify_totp_location.php "mysql:host=127.0.0.1;port=3308;dbname=ehrensache" root "" ez_
+php tests/db/verify_totp_location.php "mysql:host=127.0.0.1;port=3306;dbname=ehrensache" root "" ez_
 ```
 
 Eigenes Skript, weil gültige Codes nur mit dem Secret der Station erzeugt werden können.
@@ -641,7 +641,7 @@ Eigenes Skript, weil gültige Codes nur mit dem Secret der Station erzeugt werde
 ### Automatisiert
 
 ```bash
-php tests/db/verify_worktime_reporting.php "mysql:host=127.0.0.1;port=3308;dbname=ehrensache" root "" ez_
+php tests/db/verify_worktime_reporting.php "mysql:host=127.0.0.1;port=3306;dbname=ehrensache" root "" ez_
 ```
 
 Misst bewusst **Differenzen** statt absoluter Summen — in einer benutzten Datenbank liegen
@@ -900,7 +900,7 @@ php tests/db/verify_cleanup_retention.php "mysql:host=127.0.0.1;port=3306;dbname
 DL-11 bis DL-13 laufen im Kettentest mit (Fall UPD-6), auf einer Wegwerf-Datenbank:
 
 ```bash
-php tests/db/verify_migration_chain.php "mysql:host=127.0.0.1;port=3308" root ""
+php tests/db/verify_migration_chain.php "mysql:host=127.0.0.1;port=3306" root ""
 ```
 
 | ID | Testfall | Erwartetes Ergebnis |
