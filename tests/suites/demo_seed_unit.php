@@ -587,3 +587,243 @@ test('kein Mitglied stellt zweimal denselben Antrag', function () {
         assertSame(count($keys), count(array_unique($keys)), "Saat {$seed}: doppelter Antrag");
     }
 });
+
+// ---- Arbeitszeiten ---------------------------------------------------------
+// activity_type_groups entscheidet, wer eine Taetigkeitsart ueberhaupt sieht
+// und buchen darf (siehe activity_types.php und memberMayUseActivity() in
+// work_sessions.php). Eine Taetigkeit ohne Gruppenbindung waere im Bestand
+// vorhanden, aber in der Oberflaeche fuer niemanden erreichbar.
+
+/**
+ * Erzeugt einmalig den vollstaendigen Arbeitszeit-Bestand fuer einen Saat, samt
+ * der Stammdaten, von denen er abhaengt. Buendelt den wiederkehrenden Aufbau
+ * fuer die folgenden Tests.
+ */
+function demoBuildWorkSessionsBundle(int $seed, string $referenceDate = '2026-09-08'): array
+{
+    $r              = new DemoRandom($seed);
+    $m              = buildMembers($r, $referenceDate);
+    $appts          = buildAppointments($r, $referenceDate);
+    $typeGroups     = buildAppointmentTypeGroups();
+    $activityGroups = buildActivityTypeGroups();
+    $ws             = buildWorkSessions(
+        $r,
+        $m['members'],
+        $m['assignments'],
+        $m['membership_dates'],
+        $appts,
+        $typeGroups,
+        $activityGroups,
+        $referenceDate
+    );
+
+    return [
+        'members'         => $m['members'],
+        'assignments'     => $m['assignments'],
+        'membershipDates' => $m['membership_dates'],
+        'appointments'    => $appts,
+        'typeGroups'      => $typeGroups,
+        'activityGroups'  => $activityGroups,
+        'sessions'        => $ws['sessions'],
+        'log'             => $ws['log'],
+    ];
+}
+
+test('buildActivityTypeGroups bindet jede Taetigkeit an mindestens eine Gruppe und jede Gruppe an mindestens eine Taetigkeit', function () {
+    $links = buildActivityTypeGroups();
+
+    $groupsForActivity = [];
+    $activitiesForGroup = [];
+    foreach ($links as $l) {
+        $groupsForActivity[$l['activity_id']][]  = $l['group_id'];
+        $activitiesForGroup[$l['group_id']][]    = $l['activity_id'];
+    }
+
+    foreach (buildActivityTypes() as $a) {
+        assertTrue(!empty($groupsForActivity[$a['activity_id']]), "Taetigkeit {$a['activity_id']} ohne Gruppe");
+    }
+    foreach (buildGroups() as $g) {
+        assertTrue(!empty($activitiesForGroup[$g['group_id']]), "Gruppe {$g['group_id']} ohne Taetigkeit");
+    }
+});
+
+test('buildWorkSessions liefert 120 Sitzungen', function () {
+    $b = demoBuildWorkSessionsBundle(20260908);
+    assertSame(120, count($b['sessions']));
+});
+
+test('buildWorkSessions verteilt den Status ueber den Zaehler: confirmed >= 100, submitted = 10, rejected = 4', function () {
+    $b       = demoBuildWorkSessionsBundle(20260908);
+    $counts  = ['confirmed' => 0, 'submitted' => 0, 'rejected' => 0];
+    foreach ($b['sessions'] as $s) {
+        $counts[$s['status']]++;
+    }
+    assertTrue($counts['confirmed'] >= 100, 'zu wenige confirmed: ' . $counts['confirmed']);
+    assertSame(10, $counts['submitted']);
+    assertSame(4, $counts['rejected']);
+});
+
+test('genau eine Sitzung hat kein end_time, und sie gehoert Mitglied 1', function () {
+    $b       = demoBuildWorkSessionsBundle(20260908);
+    $running = array_values(array_filter($b['sessions'], fn ($s) => $s['end_time'] === null));
+    assertSame(1, count($running));
+    assertSame(1, $running[0]['member_id']);
+});
+
+test('active_member ist nur bei der laufenden Sitzung gesetzt und nie doppelt', function () {
+    $b      = demoBuildWorkSessionsBundle(20260908);
+    $active = array_filter(array_map(fn ($s) => $s['active_member'], $b['sessions']), fn ($v) => $v !== null);
+    assertSame(1, count($active));
+    assertSame(count($active), count(array_unique($active)), 'active_member kommt doppelt vor (UNIQUE-Spalte)');
+
+    foreach ($b['sessions'] as $s) {
+        if ($s['end_time'] === null) {
+            assertSame($s['member_id'], $s['active_member']);
+        } else {
+            assertSame(null, $s['active_member']);
+        }
+    }
+});
+
+test('beendete Sitzungen enden nach ihrem Beginn', function () {
+    $b = demoBuildWorkSessionsBundle(20260908);
+    foreach ($b['sessions'] as $s) {
+        if ($s['end_time'] === null) {
+            continue;
+        }
+        assertTrue(strtotime($s['end_time']) > strtotime($s['start_time']), "Sitzung {$s['session_id']}: end_time nicht nach start_time");
+    }
+});
+
+test('Sitzungen der Quelle station tragen den Stationsnamen', function () {
+    $b = demoBuildWorkSessionsBundle(20260908);
+    foreach ($b['sessions'] as $s) {
+        if ($s['source'] !== 'station') {
+            continue;
+        }
+        assertSame(DEMO_STATION_NAME, $s['start_location_name']);
+        if ($s['end_time'] !== null) {
+            assertSame(DEMO_STATION_NAME, $s['end_location_name']);
+        } else {
+            assertSame(null, $s['end_location_name']);
+        }
+    }
+});
+
+test('buildWorkSessions nutzt alle drei Quellen', function () {
+    $b       = demoBuildWorkSessionsBundle(20260908);
+    $sources = array_unique(array_map(fn ($s) => $s['source'], $b['sessions']));
+    sort($sources);
+    assertSame(['manual', 'station', 'timer'], array_values($sources));
+});
+
+test('jede Sitzung nutzt eine Taetigkeit, die zu einer Gruppe des Mitglieds passt', function () {
+    foreach ([20260908, 1, 42, 151] as $seed) {
+        $b = demoBuildWorkSessionsBundle($seed);
+
+        $groupsOf = [];
+        foreach ($b['assignments'] as $a) {
+            $groupsOf[$a['member_id']][] = $a['group_id'];
+        }
+        $groupsForActivity = [];
+        foreach ($b['activityGroups'] as $l) {
+            $groupsForActivity[$l['activity_id']][] = $l['group_id'];
+        }
+
+        foreach ($b['sessions'] as $s) {
+            $allowed = $groupsForActivity[$s['activity_id']] ?? [];
+            $mine    = $groupsOf[$s['member_id']] ?? [];
+            assertTrue(
+                count(array_intersect($allowed, $mine)) > 0,
+                "Saat {$seed}: Sitzung {$s['session_id']}, Mitglied {$s['member_id']} darf Taetigkeit {$s['activity_id']} nicht nutzen"
+            );
+        }
+    }
+});
+
+test('jede Sitzung liegt im Mitgliedschaftszeitraum ihres Mitglieds', function () {
+    foreach ([20260908, 1, 42, 151] as $seed) {
+        $b = demoBuildWorkSessionsBundle($seed);
+
+        $period = [];
+        foreach ($b['membershipDates'] as $d) {
+            $period[$d['member_id']] = $d;
+        }
+
+        foreach ($b['sessions'] as $s) {
+            $p    = $period[$s['member_id']];
+            $date = substr($s['start_time'], 0, 10);
+            assertTrue($date >= $p['start_date'], "Saat {$seed}: Sitzung {$s['session_id']} am {$date} vor Eintritt {$p['start_date']}");
+            if ($p['end_date'] !== null) {
+                assertTrue($date <= $p['end_date'], "Saat {$seed}: Sitzung {$s['session_id']} am {$date} nach Austritt {$p['end_date']}");
+            }
+        }
+    }
+});
+
+test('gesetzte appointment_id gehoert zu einem Termin, zu dem das Mitglied erwartet wurde', function () {
+    foreach ([20260908, 1, 42, 151] as $seed) {
+        $b = demoBuildWorkSessionsBundle($seed);
+
+        $expected = demoExpectedPairs(
+            $b['members'],
+            $b['assignments'],
+            $b['membershipDates'],
+            $b['appointments'],
+            $b['typeGroups'],
+            '2026-09-08'
+        );
+        $expectedSet = [];
+        foreach ($expected as $pair) {
+            $expectedSet[$pair['member_id'] . '-' . $pair['appointment_id']] = true;
+        }
+
+        foreach ($b['sessions'] as $s) {
+            if ($s['appointment_id'] === null) {
+                continue;
+            }
+            $key = $s['member_id'] . '-' . $s['appointment_id'];
+            assertTrue(isset($expectedSet[$key]), "Saat {$seed}: Sitzung {$s['session_id']} haengt an unerwartetem Termin");
+        }
+    }
+});
+
+test('jede Sitzung hat einen create-Eintrag, confirmed zusaetzlich approve, rejected zusaetzlich reject', function () {
+    $b = demoBuildWorkSessionsBundle(20260908);
+
+    $actionsBySession = [];
+    foreach ($b['log'] as $entry) {
+        $actionsBySession[$entry['session_id']][] = $entry['action'];
+    }
+
+    foreach ($b['sessions'] as $s) {
+        $actions = $actionsBySession[$s['session_id']] ?? [];
+        assertTrue(in_array('create', $actions, true), "Sitzung {$s['session_id']} ohne create-Eintrag");
+
+        if ($s['status'] === 'confirmed' && $s['end_time'] !== null) {
+            assertTrue(in_array('approve', $actions, true), "Sitzung {$s['session_id']} (confirmed) ohne approve-Eintrag");
+        }
+        if ($s['status'] === 'rejected') {
+            assertTrue(in_array('reject', $actions, true), "Sitzung {$s['session_id']} (rejected) ohne reject-Eintrag");
+            $reject = array_values(array_filter($b['log'], fn ($e) => $e['session_id'] === $s['session_id'] && $e['action'] === 'reject'))[0];
+            assertSame('Doppelte Erfassung', $reject['changes']);
+        }
+        if ($s['end_time'] === null) {
+            assertSame(['create'], $actions, "laufende Sitzung {$s['session_id']} hat mehr als nur create");
+        }
+    }
+});
+
+test('der Anteil der Sitzungen mit Terminbezug liegt zwischen 20% und 50%', function () {
+    $b        = demoBuildWorkSessionsBundle(20260908);
+    $withAppt = array_filter($b['sessions'], fn ($s) => $s['appointment_id'] !== null);
+    $share    = count($withAppt) / count($b['sessions']);
+    assertTrue($share >= 0.20 && $share <= 0.50, "Anteil mit Terminbezug: {$share}");
+});
+
+test('buildWorkSessions ist bei gleichem Saat reproduzierbar', function () {
+    $a = demoBuildWorkSessionsBundle(20260908);
+    $b = demoBuildWorkSessionsBundle(20260908);
+    assertSame($a['sessions'], $b['sessions']);
+    assertSame($a['log'], $b['log']);
+});

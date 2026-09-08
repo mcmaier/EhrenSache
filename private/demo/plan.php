@@ -167,6 +167,32 @@ function buildActivityTypes(): array
     ];
 }
 
+/**
+ * Gruppenbindung der Tätigkeitsarten.
+ *
+ * Ohne Eintrag ist eine Tätigkeitsart für niemanden sichtbar: activity_types
+ * filtert über EXISTS auf diese Tabelle, und memberMayUseActivity() weist
+ * Timer-Start und Selbst-Nachtrag ab. Eine ungebundene Tätigkeit wäre in der
+ * Demo also vorhanden, aber unbedienbar.
+ */
+function buildActivityTypeGroups(): array
+{
+    return [
+        ['activity_id' => 1, 'group_id' => 1],   // Bühnenaufbau: Aktive
+        ['activity_id' => 1, 'group_id' => 2],   // und Jugend
+        ['activity_id' => 2, 'group_id' => 1],   // Festvorbereitung: Aktive
+        ['activity_id' => 2, 'group_id' => 2],   // und Jugend
+        ['activity_id' => 2, 'group_id' => 4],   // und Ehrenmitglieder
+        ['activity_id' => 3, 'group_id' => 1],   // Vereinsheim-Renovierung: Aktive
+        ['activity_id' => 4, 'group_id' => 1],   // Notenarchiv: Aktive
+        ['activity_id' => 4, 'group_id' => 4],   // und Ehrenmitglieder
+        ['activity_id' => 5, 'group_id' => 1],   // Instrumentenpflege: Aktive
+        ['activity_id' => 5, 'group_id' => 2],   // und Jugend
+        ['activity_id' => 6, 'group_id' => 1],   // Jugendbetreuung: Aktive
+        ['activity_id' => 6, 'group_id' => 3],   // und Vorstandschaft
+    ];
+}
+
 const DEMO_FIRST_NAMES = [
     'Andreas', 'Anna', 'Bernd', 'Birgit', 'Christian', 'Claudia', 'Daniel', 'Doris',
     'Elias', 'Eva', 'Florian', 'Franziska', 'Georg', 'Greta', 'Hannes', 'Heike',
@@ -689,4 +715,227 @@ function buildExceptions(
     }
 
     return $exceptions;
+}
+
+/** Kurze Freitextnotizen, wie sie in einem Nachtrag realistisch stehen könnten. */
+const DEMO_WORK_SESSION_NOTES = [
+    'Vor dem Auftritt aufgebaut',
+    'Gemeinsam mit weiteren Helfern',
+    'Kurzfristig eingesprungen',
+    'Nacharbeiten am Wochenende',
+    'Vorbereitung für den nächsten Termin',
+];
+
+/**
+ * Arbeitszeitsitzungen samt Auditspur.
+ *
+ * Rückgabe: ['sessions' => [...], 'log' => [...]]
+ *
+ * Sitzung 120 läuft noch (end_time null, active_member = 1) und gehört fest
+ * Mitglied 1 — das Mitglied, mit dem später die PWA fotografiert wird. Alle
+ * anderen 119 Sitzungen sind abgeschlossen.
+ *
+ * Mitglied und Tätigkeit hängen zusammen: Eine Tätigkeit ohne Gruppenbindung
+ * zum gewählten Mitglied wäre in der Oberfläche nicht buchbar (siehe
+ * buildActivityTypeGroups()). Ein gesetzter appointment_id-Wert stammt
+ * ausschließlich aus demoExpectedPairs() — sonst hinge eine Arbeitszeit an
+ * einem Termin, zu dem das Mitglied gar nicht erwartet wurde.
+ *
+ * Der Status entsteht über den Zähler $n, nicht über eine Ziehung: n % 24 = 0
+ * → rejected (24, 48, 72, 96 — vier Sitzungen), sonst n % 8 = 0 → submitted
+ * (zehn Sitzungen), sonst confirmed. Die Reihenfolge der beiden Zweige ist
+ * wesentlich: Jedes Vielfache von 24 ist auch eines von 8 — stünde der
+ * 8er-Zweig zuerst, gäbe es nie eine Ablehnung. Sitzung 120 fällt zwar
+ * ebenfalls auf ein Vielfaches von 24, wird aber danach fest auf confirmed
+ * gesetzt: Eine laufende Sitzung kann nicht zugleich abgelehnt sein, und die
+ * Zählung "106 confirmed inkl. der laufenden" schließt sie ausdrücklich ein.
+ *
+ * Die Reihenfolge der $random-Aufrufe ist wie bei den übrigen Build-Funktionen
+ * Teil der Schnittstelle (siehe Hinweis über buildMembers()).
+ */
+function buildWorkSessions(
+    DemoRandom $random,
+    array $members,
+    array $assignments,
+    array $membershipDates,
+    array $appointments,
+    array $typeGroups,
+    array $activityGroups,
+    string $referenceDate
+): array {
+    $windowStart = demoShiftDate($referenceDate, -360);
+    $windowEnd   = demoShiftDate($referenceDate, -1);
+
+    $groupsOf = [];
+    foreach ($assignments as $a) {
+        $groupsOf[$a['member_id']][] = $a['group_id'];
+    }
+
+    $activitiesForGroup = [];
+    foreach ($activityGroups as $l) {
+        $activitiesForGroup[$l['group_id']][] = $l['activity_id'];
+    }
+
+    $periodOf = [];
+    foreach ($membershipDates as $d) {
+        $periodOf[$d['member_id']] = ['start' => $d['start_date'], 'end' => $d['end_date']];
+    }
+
+    // Auswahlbereich je Mitglied: Schnittmenge aus Mitgliedschaftszeitraum und
+    // dem 360-Tage-Fenster vor dem Stichtag. Mitglieder ohne Schnittmenge (z. B.
+    // vor über einem Jahr ausgetreten) fehlen bewusst im Kandidatenpool — für
+    // sie gäbe es sonst keinen gültigen Sitzungstag.
+    $memberWindow = [];
+    foreach ($members as $m) {
+        $period = $periodOf[$m['member_id']] ?? null;
+        if ($period === null) {
+            continue;
+        }
+        $effEnd = $period['end'] ?? $windowEnd;
+        $effStart = $period['start'] > $windowStart ? $period['start'] : $windowStart;
+        $effEnd   = $effEnd < $windowEnd ? $effEnd : $windowEnd;
+        if ($effStart <= $effEnd) {
+            $memberWindow[$m['member_id']] = ['start' => $effStart, 'end' => $effEnd];
+        }
+    }
+    $eligibleMemberIds = array_keys($memberWindow);
+
+    $expectedByMember = [];
+    foreach (demoExpectedPairs($members, $assignments, $membershipDates, $appointments, $typeGroups, $referenceDate) as $pair) {
+        $expectedByMember[$pair['member_id']][] = $pair['appointment_id'];
+    }
+
+    $sessions = [];
+    $log      = [];
+
+    for ($n = 1; $n <= 120; $n++) {
+        $isRunning = $n === 120;
+
+        if ($isRunning) {
+            // Fest auf Mitglied 1 — kein Zug aus dem Zufallsgenerator.
+            $memberId = 1;
+            $date     = $referenceDate;
+        } else {
+            $memberId = $random->pick($eligibleMemberIds);
+            $window   = $memberWindow[$memberId];
+            $spanDays = (int) ((strtotime($window['end']) - strtotime($window['start'])) / 86400);
+            $date     = demoShiftDate($window['start'], $random->int(0, $spanDays));
+        }
+
+        // Uhrzeit: 08:00 bis 18:45 in Viertelstundenschritten (44 Raster-Werte).
+        $slot      = $random->int(0, 43);
+        $minutes   = $slot * 15;
+        $startTime = sprintf('%s %02d:%02d:00', $date, 8 + intdiv($minutes, 60), $minutes % 60);
+
+        $eligibleActivities = [];
+        foreach ($groupsOf[$memberId] ?? [] as $groupId) {
+            foreach ($activitiesForGroup[$groupId] ?? [] as $activityId) {
+                $eligibleActivities[$activityId] = true;
+            }
+        }
+        $activityId = $random->pick(array_keys($eligibleActivities));
+
+        if ($isRunning) {
+            $breakMinutes = 0;
+            $endTime      = null;
+        } else {
+            $durationMinutes = $random->int(45, 300);
+            $breakMinutes    = $random->chance(0.3) ? $random->pick([15, 30, 45]) : 0;
+            $endTime         = date('Y-m-d H:i:s', strtotime($startTime) + $durationMinutes * 60);
+        }
+
+        $source = $random->pick(['timer', 'timer', 'manual', 'station']);
+
+        $appointmentId = null;
+        if ($random->chance(1 / 3)) {
+            // Nur ein Termin, zu dem dieses Mitglied tatsächlich erwartet wurde
+            // (siehe demoExpectedPairs()). Findet sich keiner, bleibt es beim
+            // null — kein zusätzlicher Zug, sonst würde ein leerer Kandidatenkreis
+            // die Folge für alle nachfolgenden Sitzungen verschieben.
+            $candidates = $expectedByMember[$memberId] ?? [];
+            if ($candidates !== []) {
+                $appointmentId = $random->pick($candidates);
+            }
+        }
+
+        $note = $random->chance(0.4) ? $random->pick(DEMO_WORK_SESSION_NOTES) : null;
+
+        if ($isRunning) {
+            $status = 'confirmed';
+        } elseif ($n % 24 === 0) {
+            $status = 'rejected';
+        } elseif ($n % 8 === 0) {
+            $status = 'submitted';
+        } else {
+            $status = 'confirmed';
+        }
+
+        if ($isRunning) {
+            // Eine laufende Sitzung wurde noch nicht freigegeben — dazu passt,
+            // dass ihre Auditspur unten nur den create-Eintrag erhält.
+            $approvedBy = null;
+            $approvedAt = null;
+        } elseif ($status === 'submitted') {
+            $approvedBy = null;
+            $approvedAt = null;
+        } else {
+            $approvedBy = 'manager';
+            $approvedAt = date('Y-m-d H:i:s', strtotime($startTime) + $random->int(1, 4) * 86400);
+        }
+
+        $sessions[] = [
+            'session_id'          => $n,
+            'member_id'           => $memberId,
+            'activity_id'         => $activityId,
+            'appointment_id'      => $appointmentId,
+            'start_time'          => $startTime,
+            'end_time'            => $endTime,
+            'break_minutes'       => $breakMinutes,
+            'break_started_at'    => null,
+            'note'                => $note,
+            'start_location_name' => $source === 'station' ? DEMO_STATION_NAME : null,
+            'end_location_name'   => ($source === 'station' && $endTime !== null) ? DEMO_STATION_NAME : null,
+            'status'              => $status,
+            'source'              => $source,
+            'created_by'          => 'member',   // seed.php löst auf
+            'approved_by'         => $approvedBy, // seed.php löst auf
+            'approved_at'         => $approvedAt,
+            'active_member'       => $isRunning ? $memberId : null,
+        ];
+
+        // Auditspur: jede Sitzung bekommt ihren create-Eintrag zum Beginn.
+        $log[] = [
+            'session_id' => $n,
+            'changed_by' => 'member',   // seed.php löst auf
+            'changed_at' => $startTime,
+            'action'     => 'create',
+            'changes'    => null,
+        ];
+
+        if (!$isRunning) {
+            // Freigabe oder Ablehnung: einen Tag nach Beginn, fest — anders als
+            // approved_at oben, das über einen eigenen Zug zwischen ein und
+            // vier Tagen streut.
+            $decisionAt = date('Y-m-d H:i:s', strtotime($startTime) + 86400);
+            if ($status === 'confirmed') {
+                $log[] = [
+                    'session_id' => $n,
+                    'changed_by' => 'manager', // seed.php löst auf
+                    'changed_at' => $decisionAt,
+                    'action'     => 'approve',
+                    'changes'    => null,
+                ];
+            } elseif ($status === 'rejected') {
+                $log[] = [
+                    'session_id' => $n,
+                    'changed_by' => 'manager', // seed.php löst auf
+                    'changed_at' => $decisionAt,
+                    'action'     => 'reject',
+                    'changes'    => 'Doppelte Erfassung',
+                ];
+            }
+        }
+    }
+
+    return ['sessions' => $sessions, 'log' => $log];
 }
