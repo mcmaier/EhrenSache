@@ -323,3 +323,93 @@ test('Auftrittstitel passen zum Monat des Termins', function () {
         }
     }
 });
+
+// ---- Anwesenheiten -------------------------------------------------------
+
+test('buildRecords erzeugt nur Eintraege zu vergangenen Terminen', function () {
+    $r      = new DemoRandom(20260908);
+    $m      = buildMembers($r, '2026-09-08');
+    $appts  = buildAppointments($r, '2026-09-08');
+    $recs   = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $byId   = [];
+    foreach ($appts as $a) {
+        $byId[$a['appointment_id']] = $a['date'];
+    }
+    foreach ($recs as $rec) {
+        assertTrue($byId[$rec['appointment_id']] <= '2026-09-08', 'Anwesenheit an einem Zukunftstermin');
+    }
+});
+
+test('buildRecords erzeugt keine Anwesenheit ausserhalb der Gruppenbindung', function () {
+    $r     = new DemoRandom(20260908);
+    $m     = buildMembers($r, '2026-09-08');
+    $appts = buildAppointments($r, '2026-09-08');
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+
+    $groupsOf = [];
+    foreach ($m['assignments'] as $a) {
+        $groupsOf[$a['member_id']][] = $a['group_id'];
+    }
+    $typeOf = [];
+    foreach ($appts as $a) {
+        $typeOf[$a['appointment_id']] = $a['type_id'];
+    }
+    $groupsForType = [];
+    foreach (buildAppointmentTypeGroups() as $l) {
+        $groupsForType[$l['type_id']][] = $l['group_id'];
+    }
+
+    foreach ($recs as $rec) {
+        $allowed = $groupsForType[$typeOf[$rec['appointment_id']]];
+        $mine    = $groupsOf[$rec['member_id']];
+        assertTrue(count(array_intersect($allowed, $mine)) > 0, "Mitglied {$rec['member_id']} gehoert nicht zum Termin");
+    }
+});
+
+test('buildRecords streut die Ankunftszeit um den Terminbeginn', function () {
+    $r      = new DemoRandom(20260908);
+    $m      = buildMembers($r, '2026-09-08');
+    $appts  = buildAppointments($r, '2026-09-08');
+    $recs   = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $startOf = [];
+    foreach ($appts as $a) {
+        $startOf[$a['appointment_id']] = $a['date'] . ' ' . $a['start_time'];
+    }
+    $offsets = [];
+    foreach ($recs as $rec) {
+        $offsets[] = (strtotime($rec['arrival_time']) - strtotime($startOf[$rec['appointment_id']])) / 60;
+    }
+    assertTrue(min($offsets) <= -5, 'niemand kommt zu frueh — Streuung fehlt');
+    assertTrue(max($offsets) >= 15, 'niemand kommt spaet — Streuung fehlt');
+    assertTrue(max($offsets) <= 40, 'Ausreisser ueber 40 Minuten');
+});
+
+test('buildRecords nutzt vier verschiedene Check-in-Quellen', function () {
+    $r       = new DemoRandom(20260908);
+    $m       = buildMembers($r, '2026-09-08');
+    $appts   = buildAppointments($r, '2026-09-08');
+    $recs    = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    $sources = array_unique(array_map(fn ($x) => $x['checkin_source'], $recs));
+    sort($sources);
+    assertSame(['admin', 'auto_checkin', 'station_pin', 'user_totp'], array_values($sources));
+});
+
+test('Station-Anwesenheiten tragen den Stationsnamen als Ort', function () {
+    $r     = new DemoRandom(20260908);
+    $m     = buildMembers($r, '2026-09-08');
+    $appts = buildAppointments($r, '2026-09-08');
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    foreach ($recs as $rec) {
+        if ($rec['checkin_source'] === 'station_pin') {
+            assertSame(DEMO_STATION_NAME, $rec['location_name']);
+        }
+    }
+});
+
+test('buildRecords erzeugt genug Eintraege fuer eine aussagekraeftige Statistik', function () {
+    $r     = new DemoRandom(20260908);
+    $m     = buildMembers($r, '2026-09-08');
+    $appts = buildAppointments($r, '2026-09-08');
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+    assertTrue(count($recs) > 1500, 'zu wenige Anwesenheiten: ' . count($recs));
+});

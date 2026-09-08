@@ -446,3 +446,75 @@ function demoFirstMondays(string $from, string $to): array
 
     return $dates;
 }
+
+/**
+ * Anwesenheiten zu allen vergangenen Terminen.
+ *
+ * Jedes Mitglied bekommt eine eigene Grundquote. Ohne diese Streuung sähe die
+ * Statistik aus wie ein Balken auf gleicher Höhe — genau das Bild, das niemanden
+ * überzeugt. Die Ankunftszeiten streuen um den Terminbeginn, damit die
+ * Pünktlichkeitsauswertung eine Verteilung zeigt statt einer Linie.
+ */
+function buildRecords(
+    DemoRandom $random,
+    array $members,
+    array $assignments,
+    array $appointments,
+    array $typeGroups,
+    string $referenceDate
+): array {
+    $groupsOf = [];
+    foreach ($assignments as $a) {
+        $groupsOf[$a['member_id']][] = $a['group_id'];
+    }
+    $groupsForType = [];
+    foreach ($typeGroups as $l) {
+        $groupsForType[$l['type_id']][] = $l['group_id'];
+    }
+
+    // Grundquote je Mitglied, einmal gezogen und dann fest.
+    $quota = [];
+    foreach ($members as $m) {
+        $quota[$m['member_id']] = $random->int(60, 95) / 100;
+    }
+
+    $records = [];
+    foreach ($appointments as $appt) {
+        if ($appt['date'] > $referenceDate) {
+            continue;
+        }
+        $allowed = $groupsForType[$appt['type_id']] ?? [];
+        $start   = strtotime($appt['date'] . ' ' . $appt['start_time']);
+
+        foreach ($members as $m) {
+            if ($m['active'] === 0) {
+                continue;
+            }
+            if (count(array_intersect($allowed, $groupsOf[$m['member_id']] ?? [])) === 0) {
+                continue;
+            }
+            if (!$random->chance($quota[$m['member_id']])) {
+                continue;
+            }
+
+            // Ankunft: meist knapp vor bis knapp nach Beginn, selten deutlich später.
+            $offset = $random->chance(0.08)
+                ? $random->int(16, 40)
+                : $random->int(-10, 15);
+
+            $source = $random->pick(['user_totp', 'user_totp', 'station_pin', 'auto_checkin', 'admin']);
+
+            $records[] = [
+                'member_id'      => $m['member_id'],
+                'appointment_id' => $appt['appointment_id'],
+                'arrival_time'   => date('Y-m-d H:i:s', $start + $offset * 60),
+                'status'         => 'present',
+                'checkin_source' => $source,
+                'source_device'  => $source === 'station_pin' ? DEMO_STATION_NAME : null,
+                'location_name'  => $source === 'station_pin' ? DEMO_STATION_NAME : null,
+            ];
+        }
+    }
+
+    return $records;
+}
