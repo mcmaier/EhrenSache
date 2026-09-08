@@ -308,3 +308,18 @@ test('buildAppointments ist bei gleichem Saat reproduzierbar', function () {
     $b = buildAppointments(new DemoRandom(20260908), '2026-09-08');
     assertSame($a, $b);
 });
+
+test('Auftrittstitel passen zum Monat des Termins', function () {
+    // Ein "Adventsstaendchen" im Juli faellt auf dem Screenshot der
+    // Terminuebersicht sofort auf. Der Titel muss aus dem Datum folgen,
+    // nicht aus der Position in einer Liste.
+    foreach ([20260908, 1, 77, 4711] as $seed) {
+        foreach (buildAppointments(new DemoRandom($seed), '2026-09-08') as $a) {
+            if ($a['type_id'] !== 3) {
+                continue;
+            }
+            $month = (int) date('n', strtotime($a['date']));
+            assertSame(DEMO_PERFORMANCE_TITLES[$month], $a['title'], "{$a['date']} traegt '{$a['title']}'");
+        }
+    }
+});

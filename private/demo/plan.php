@@ -92,6 +92,27 @@ final class DemoRandom
 const DEMO_ORG_NAME     = 'Musikverein Musterhausen';
 const DEMO_STATION_NAME = 'Probenraum-Station';
 
+/**
+ * Auftrittstitel nach Monat.
+ *
+ * Nach Datum gewählt, nicht nach Reihenfolge: Ein „Adventsständchen" im Juli
+ * fällt auf dem Screenshot der Terminübersicht sofort auf.
+ */
+const DEMO_PERFORMANCE_TITLES = [
+    1  => 'Neujahrskonzert',
+    2  => 'Faschingsumzug',
+    3  => 'Frühjahrskonzert',
+    4  => 'Osterkonzert',
+    5  => 'Maibaumstellen',
+    6  => 'Sommerserenade',
+    7  => 'Dorffest',
+    8  => 'Kirchweih',
+    9  => 'Herbstkonzert',
+    10 => 'Erntedankumzug',
+    11 => 'Volkstrauertag',
+    12 => 'Adventsständchen',
+];
+
 /** Gruppen. Die IDs sind fest, weil alles Weitere sie referenziert. */
 function buildGroups(): array
 {
@@ -345,18 +366,17 @@ function buildAppointments(DemoRandom $random, string $referenceDate): array
         ];
     }
 
-    // Auftritte: zehn Samstage, ungleich über das Jahr verteilt.
+    // Auftritte: zehn Samstage, gleichmäßig über die verfügbaren Samstage verteilt.
     $saturdays = demoWeekdaySeries($from, demoShiftDate($referenceDate, -1), 6, 1);
-    $titles    = ['Frühjahrskonzert', 'Maibaumstellen', 'Dorffest', 'Kirchenkonzert', 'Sommerserenade',
-                  'Umzug Nachbarort', 'Herbstkonzert', 'Kirchweih', 'Volkstrauertag', 'Adventsständchen'];
     $step      = max(1, intdiv(count($saturdays), 10));
     for ($n = 0; $n < 10 && $n * $step < count($saturdays); $n++) {
+        $date           = $saturdays[$n * $step];
         $appointments[] = [
             'appointment_id' => $id++,
-            'title'          => $titles[$n],
+            'title'          => DEMO_PERFORMANCE_TITLES[(int) date('n', strtotime($date))],
             'type_id'        => 3,
             'description'    => null,
-            'date'           => $saturdays[$n * $step],
+            'date'           => $date,
             'start_time'     => sprintf('%02d:00:00', $random->int(10, 19)),
         ];
     }
