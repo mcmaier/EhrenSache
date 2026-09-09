@@ -671,6 +671,21 @@ test('genau eine Sitzung hat kein end_time, und sie gehoert Mitglied 1', functio
     assertSame(1, $running[0]['member_id']);
 });
 
+test('die laufende Sitzung nutzt eine Taetigkeit ohne Nachweispflicht', function () {
+    // Eine Taetigkeit mit verification start/start_end verlangt beim Beenden
+    // einen TOTP-Code. Eine dauerhaft offene Sitzung mit so einer Taetigkeit
+    // bekommt weder die Testsuite noch ein Besucher der Demo wieder zu.
+    $verificationOf = [];
+    foreach (buildActivityTypes() as $a) {
+        $verificationOf[$a['activity_id']] = $a['verification'];
+    }
+    foreach ([20260908, 1, 42, 151] as $seed) {
+        $b       = demoBuildWorkSessionsBundle($seed);
+        $open    = array_values(array_filter($b['sessions'], fn ($s) => $s['end_time'] === null))[0];
+        assertSame('none', $verificationOf[$open['activity_id']], "Saat {$seed}");
+    }
+});
+
 // Faengt eine "laufende" Sitzung, die in Wahrheit noch nicht begonnen hat: In
 // der PWA zeigt das eine negative Laufzeit, und stop() (Ende vor Beginn)
 // weist die Sitzung ab, sodass sie sich gar nicht beenden laesst. Ueber

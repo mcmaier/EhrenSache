@@ -792,6 +792,12 @@ function buildWorkSessions(
         $activitiesForGroup[$l['group_id']][] = $l['activity_id'];
     }
 
+    // Nachweisgrad je Taetigkeit, fuer die Auswahl der laufenden Sitzung unten.
+    $verificationOfActivity = [];
+    foreach (buildActivityTypes() as $activityType) {
+        $verificationOfActivity[$activityType['activity_id']] = $activityType['verification'];
+    }
+
     $periodOf = [];
     foreach ($membershipDates as $d) {
         $periodOf[$d['member_id']] = ['start' => $d['start_date'], 'end' => $d['end_date']];
@@ -855,7 +861,28 @@ function buildWorkSessions(
                 $eligibleActivities[$activityId] = true;
             }
         }
-        $activityId = $random->pick(array_keys($eligibleActivities));
+
+        $activityPool = array_keys($eligibleActivities);
+        if ($isRunning) {
+            // Eine Taetigkeit mit Nachweispflicht (verification start/start_end)
+            // laesst sich ohne TOTP-Code nicht beenden (workSessionStop() weist
+            // das mit 409 ab). Fuer eine Sitzung, die im Demo-Bestand dauerhaft
+            // offen steht, hiesse das: Weder die Testsuite noch ein Besucher der
+            // Demo bekommt sie zu. Der laufende Timer soll etwas zeigen, das man
+            // auch wieder ausschalten kann — deshalb bevorzugt die laufende
+            // Sitzung eine Taetigkeit ohne Nachweispflicht.
+            $noVerificationPool = array_values(array_filter(
+                $activityPool,
+                static fn (int $id): bool => ($verificationOfActivity[$id] ?? null) === 'none'
+            ));
+            if ($noVerificationPool !== []) {
+                // Gibt es fuer die Gruppen des Mitglieds keine Taetigkeit ohne
+                // Nachweispflicht, bleibt es beim bisherigen Verhalten: eine
+                // beliebige erlaubte Taetigkeit.
+                $activityPool = $noVerificationPool;
+            }
+        }
+        $activityId = $random->pick($activityPool);
 
         if ($isRunning) {
             $breakMinutes = 0;
