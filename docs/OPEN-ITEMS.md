@@ -451,11 +451,33 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
      `STORED` um und behebt damit [OI-1](#oi-1). **Er ist Pflicht:** Eine Installation, die
      ihn überspringt, verliert bei einer InnoDB-Crash-Recovery weiterhin den
      AUTO_INCREMENT-Zähler.
+  5. **Die Kette ist von Hand belegt**, am 2026-09-09 auf einer echten Installation über den
+     Assistenten:
 
-  **Offen:**
-  5. Den Fast-Forward auf `main` ausführen.
-  6. Tags setzen: die nachgeholten `v1.2.0` … `v1.3.1` sowie `v1.4.0`.
-  7. In `SECURITY.md` die Zeile „Aktuell veröffentlicht" auf **1.4.0** ziehen und den Absatz
+     | Ausgangsstand | Bezug | Ergebnis |
+     |---|---|---|
+     | 1.1.3 | ZIP von `main` | durchgelaufen |
+     | 1.0.0 | ZIP von `v1.0.0` | **erst gescheitert**, nach der Korrektur durchgelaufen |
+
+     Der Fehlschlag war echt: `detectDbVersion()` erkannte eine 1.0.0-Installation nie, weil
+     der Assistent den Präfix aus der Konfiguration übergibt und eine 1.0.0-`config.php` das
+     Feld `$prefix` nicht kennt. Die Bedingung lautete dann
+     `tableExists('users') && !tableExists('users')` und hob sich selbst auf. Behoben in
+     `af29e63`.
+
+     **Beide automatisierten Skripte waren dabei grün** — sie geben der Erkennung einen
+     Präfix mit, den eine echte 1.0.0-Installation nicht haben kann. Der Fall aus der
+     Wirklichkeit steht jetzt als `UPD-5a` in `tests/db/verify_migration_chain.php`; die
+     Schema-Konvergenz prüft `tests/db/verify_schema_convergence.php` (46 Prüfungen).
+
+     Die Lehre für künftige Releases: Ein manueller Lauf aus einem **echten alten Paket**
+     ersetzt keine Tests, findet aber, was Tests mit selbstgebauten Ausgangslagen nicht
+     sehen können.
+
+  **Beim Release selbst zu tun:**
+  6. Den Fast-Forward auf `main` ausführen.
+  7. Tags setzen: die nachgeholten `v1.2.0` … `v1.3.1` sowie `v1.4.0`.
+  8. In `SECURITY.md` die Zeile „Aktuell veröffentlicht" auf **1.4.0** ziehen und den Absatz
      zum Abstand von `dev` streichen oder anpassen. Solange `main` auf 1.1.3 steht, ist die
      Datei korrekt — sie wird erst mit dem Fast-Forward falsch.
 
