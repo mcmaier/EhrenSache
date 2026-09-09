@@ -409,18 +409,39 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 
 **Vor dem Nachholen zu entscheiden:**
 
-- **Ein Release oder neun?** Alles gesammelt als eine Version herausgeben (dann wäre 1.4.0 die
-  naheliegende Nummer, weil der unveröffentlichte Block neue Funktionen enthält), oder die
-  Zwischenstände nachträglich taggen, damit CHANGELOG und Tags sich decken. Für die zweite
-  Variante spricht, dass der CHANGELOG diese Daten bereits als Tatsachen nennt.
-- **Nachträgliche Tags?** `v1.2.0` bis `v1.3.1` liegen als Commits vor und ließen sich
-  nachträglich setzen. Das macht die Historie ehrlich, datiert die Tags aber anders als der
-  CHANGELOG behauptet.
-- **`SECURITY.md` richtigstellen.** Die Tabelle muss die Versionen nennen, die es wirklich
-  gibt — unabhängig davon, wie der Rückstand aufgeholt wird. Solange dort ein Update auf eine
-  unbeziehbare Version empfohlen wird, ist die Datei irreführend.
+**Entschieden am 2026-09-09:**
+
+- **Die Zwischenstände werden nachträglich getaggt.** `v1.2.0` bis `v1.3.1` liegen als
+  Commits vor; die Tags kommen auf die jeweiligen Commits, damit CHANGELOG und Tags sich
+  decken. Eine **Rückdatierung ist nicht nötig** — der zeitliche Verlauf ergibt sich aus der
+  Historie des `dev`-Branches.
+- **`SECURITY.md` ist richtiggestellt** (2026-09-09). Die Zusage gilt jetzt der jeweils
+  neuesten veröffentlichten Version statt einer Versionsnummer, die es auf `main` nie gab;
+  der Abstand zu `dev` ist dort benannt.
+
+**Offen:**
+
 - **Wann?** Der nächste Versionssprung ist der natürliche Moment. Bis dahin gilt: Wer die
   Anwendung heute installiert, bekommt eine ein halbes Jahr alte Fassung.
+- **Vor dem Fast-Forward abzuarbeiten** — geprüft am 2026-09-09, alles unkritisch, aber in
+  dieser Reihenfolge zu erledigen:
+  1. `version.json` auf die Release-Nummer setzen (**1.4.0**, weil der unveröffentlichte
+     Block neue Funktionen enthält) und das `build`-Datum mitziehen.
+  2. Die `?v=`-Querys in den HTML-Dateien nachziehen — sie stehen geschlossen auf `1.3.1`.
+     Die Suite `assets` wacht darüber und schlägt fehl, wenn eine Datei zurückbleibt.
+  3. Im `CHANGELOG.md` den Block `[Nicht veröffentlicht]` in `[1.4.0] – <Datum>` umbenennen.
+  4. In `SECURITY.md` die Zeile „Aktuell veröffentlicht" und den Absatz zum `dev`-Abstand
+     auf den neuen Stand bringen — beides ist bewusst so formuliert, dass nur diese zwei
+     Stellen zu pflegen sind.
+  5. Tags setzen: die nachgeholten `v1.2.0` … `v1.3.1` sowie `v1.4.0`.
+
+  **Kein Handlungsbedarf besteht bei:** Migrationskette (endet sauber auf `1.3.1`, seit
+  `1.3.1` gab es keine Schemaänderung — `ehrensache_db.sql` und `private/migrations/` sind
+  unberührt, es braucht also keinen neuen Kettenschritt für 1.4.0), Auslieferungsumfang
+  (`.gitattributes` nimmt `docs/`, `CLAUDE.md`, `test_credentials.md` und `private/demo/`
+  aus dem ZIP) und Geheimnissen im Index (`config.php`, `tests/config.php` und
+  `test_credentials.md` sind über `.gitignore` draußen; der Demo-Seeder, der die Tabelle
+  `users` leert, liegt unter `private/` und verweigert den Dienst außerhalb der CLI).
 
 **Berührt:** Branch `main`, Tags, `version.json`, `CHANGELOG.md`, `SECURITY.md`, `README.md`
 (Bezugsweg). Kein Code.

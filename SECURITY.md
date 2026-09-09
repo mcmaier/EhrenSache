@@ -5,11 +5,21 @@ Sicherheitslücken werden deshalb ernst genommen und bevorzugt behandelt.
 
 ## Unterstützte Versionen
 
-| Version | Sicherheitsupdates |
-|---------|--------------------|
-| 1.2.x   | ja                 |
-| 1.1.x   | nein — bitte über den Update-Wizard auf 1.2.x aktualisieren |
-| < 1.1   | nein               |
+Sicherheitsupdates erhält die **jeweils neueste veröffentlichte Version** — veröffentlicht
+heißt: auf dem Branch `main` und mit einem Tag versehen. Ältere Stände erhalten keine
+Korrekturen; das Update läuft über den Update-Wizard (`public/update/`), der die
+Migrationskette der Reihe nach abarbeitet.
+
+**Aktuell veröffentlicht: 1.1.3.**
+
+Der Entwicklungsstand auf `dev` ist deutlich weiter (1.3.1) und enthält unter anderem die
+Arbeitszeiterfassung, die virtuelle Station und den Kiosk-Modus. Diese Versionen sind im
+`CHANGELOG.md` beschrieben, aber **noch nicht veröffentlicht** — sie sind kein unterstützter
+Stand, und ein Update darauf ist über den Wizard derzeit nicht möglich. Das Nachholen ist
+vorgesehen und als `OI-42` in `docs/OPEN-ITEMS.md` festgehalten.
+
+Wer `dev` einsetzt, betreibt eine Vorabfassung auf eigenes Risiko. Meldungen dazu sind
+willkommen, laufen aber ohne die oben genannten Zusagen.
 
 Die installierte Version steht in `version.json` und wird im Dashboard angezeigt.
 
