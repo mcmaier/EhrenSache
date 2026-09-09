@@ -59,8 +59,26 @@ define('DEMO_MODE', true);
 ```
 
 `config_example.php` erhält die Zeile auskommentiert mit Erklärung. Fehlt die Konstante,
-ist der Wächter wirkungslos. Die Prüfung ist streng auf `=== true`, damit ein versehentliches
-`'false'` als Zeichenkette den Modus nicht einschaltet.
+ist der Wächter wirkungslos.
+
+**Ein gesetzter, aber unsauberer Wert fällt zur sicheren Seite:**
+
+| In `config.php` | Ergebnis |
+|---|---|
+| nicht definiert | Wächter aus |
+| `true` | Wächter an |
+| `false` | Wächter aus |
+| alles andere (`1`, `'true'`, `'false'`, …) | **Wächter an**, dazu eine Meldung über `error_log` |
+
+> **Festgelegt am 2026-09-09 nach der zweiten Qualitätsdurchsicht.** Die erste Fassung prüfte
+> streng auf `=== true` — mit der Begründung, ein versehentliches `'false'` als Zeichenkette
+> dürfe den Modus nicht einschalten. Ein Mutationstest deckte die Kehrseite auf: Damit
+> schaltet ein `define('DEMO_MODE', 1);` den Wächter auf dem öffentlichen Demo-Server
+> **stillschweigend ab**. Ein Tippfehler in der Konfigurationsdatei hätte die Demo
+> ungeschützt gelassen, ohne jeden Hinweis — genau die Fehlerklasse, gegen die dieses
+> Vorhaben antritt. `false` bleibt ein gültiges „aus", weil ein Betreiber den Modus
+> ausdrücklich abschalten können muss; jeder andere Wert ist ein Versehen und wird
+> als „an" behandelt.
 
 ## 5. Der Wächter
 
@@ -116,9 +134,10 @@ Alles Übrige ist gesperrt, **ohne dass es aufgezählt werden muss**. Zum Stand 
 | `cleanup` | löscht Daten |
 | `regenerate_token` | erzeugt API-Zugangsmittel |
 
-Ressourcen, die **ausschließlich lesen**, kommen in keiner der beiden Listen vor und werden
-im Wächter nicht betrachtet. Sie müssen für die Vollständigkeitsprüfung (Abschnitt 9) aber
-benannt sein, damit „nicht gelistet" nicht mit „vergessen" verwechselt wird. Zum Stand 1.4.0:
+Ressourcen, die **ausschließlich lesen**, kommen in keiner der beiden Schreiblisten vor.
+Der Wächter führt sie aber sehr wohl — sie machen die Ressource **bekannt**, und nur
+bekannte Ressourcen lassen `GET` und `HEAD` durch. Damit unterscheidet sich „nicht gelistet"
+sichtbar von „vergessen". Zum Stand 1.4.0:
 `ping`, `appearance`, `me`, `version`, `session_info`, `my_data`, `statistics`,
 `available_years`, `attendance_list`, `import_logs`, `export`.
 
