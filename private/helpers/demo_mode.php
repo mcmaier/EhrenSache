@@ -19,10 +19,15 @@ declare(strict_types=1);
  * private/config/config.php — einer Datei, die nicht im Repository liegt.
  * Ohne diese Zeile ist alles hier wirkungslos.
  *
- * Die Regel lautet: GET geht immer durch, jeder schreibende Zugriff muss in
- * DEMO_WRITE_ALLOWED stehen. Eine Erlaubnisliste und keine Sperrliste, damit
- * eine künftig neue Ressource von selbst gesperrt ist, bis jemand bewusst
- * entscheidet. tests/suites/demo_mode.php erzwingt diese Entscheidung.
+ * Die Regel lautet: GET und HEAD gehen durch, sofern die Ressource in einer
+ * der drei Listen steht (DEMO_WRITE_ALLOWED, DEMO_WRITE_DENIED oder
+ * DEMO_READ_ONLY) — eine unbekannte Ressource ist auch lesend gesperrt.
+ * Jeder schreibende Zugriff muss ausdrücklich in DEMO_WRITE_ALLOWED stehen.
+ * Eine künftig neue Ressource ist damit von selbst gesperrt, bis jemand
+ * bewusst entscheidet, in welche Liste sie gehört.
+ *
+ * Eine Vollständigkeitsprüfung, die diese drei Listen gegen die tatsächlich
+ * in api.php geroutete Ressourcen abgleicht, folgt in einer späteren Aufgabe.
  */
 
 /** Schreibende Zugriffe, die ein Demo-Besucher ausführen darf. */
@@ -54,7 +59,8 @@ const DEMO_WRITE_ALLOWED = [
  */
 const DEMO_WRITE_DENIED = [
     'change_password',        // macht die veröffentlichten Zugangsdaten unbrauchbar
-    'change_pin',             // macht die veröffentlichte Kiosk-PIN unbrauchbar
+    'change_pin',             // sperrt den direkten Weg; ueber members PUT bleibt
+                               // pin_hash erreichbar, das faengt der stuendliche Reset auf
     'users',                  // Konten und Rollen
     'activate_user',          // Konten
     'user_status',            // Konten
@@ -94,15 +100,22 @@ function demoModeActive(): bool
 }
 
 /**
- * Darf diese Kombination aus Ressource und Methode schreiben?
+ * Darf diese Kombination aus Ressource und Methode durch?
  *
  * Reine Entscheidung ohne Nebenwirkung und ohne Rücksicht auf DEMO_MODE —
- * deshalb im Test ohne Klimmzüge prüfbar.
+ * deshalb im Test ohne Klimmzüge prüfbar. Der Name sagt bewusst nicht
+ * "Write" — die Funktion entscheidet auch über lesende Anfragen.
  */
-function demoWriteAllowed(string $resource, string $method): bool
+function demoRequestAllowed(string $resource, string $method): bool
 {
-    if ($method === 'GET') {
-        return true;
+    $known = isset(DEMO_WRITE_ALLOWED[$resource])
+          || in_array($resource, DEMO_WRITE_DENIED, true)
+          || in_array($resource, DEMO_READ_ONLY, true);
+
+    // HEAD verhaelt sich wie GET. Ohne diesen Zweig liefe eine Ueberwachung
+    // oder ein Linkpruefer in der Demo in ein 403.
+    if ($method === 'GET' || $method === 'HEAD') {
+        return $known;
     }
 
     return in_array($method, DEMO_WRITE_ALLOWED[$resource] ?? [], true);
@@ -111,12 +124,11 @@ function demoWriteAllowed(string $resource, string $method): bool
 /** Bricht die Anfrage ab, wenn der Demo-Modus sie nicht zulässt. */
 function demoGuard(string $resource, string $method): void
 {
-    if (!demoModeActive() || demoWriteAllowed($resource, $method)) {
+    if (!demoModeActive() || demoRequestAllowed($resource, $method)) {
         return;
     }
 
     http_response_code(403);
-    header('Content-Type: application/json');
     echo json_encode([
         'message' => 'In der Demo ist diese Funktion abgeschaltet. '
                    . 'Die vollständige Anwendung steht zum Herunterladen bereit.',
