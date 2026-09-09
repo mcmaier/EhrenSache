@@ -6,13 +6,25 @@
 RewriteEngine On
 
 # ============================================
-# HTTPS REDIRECT (nur Production)
+# HTTPS REDIRECT
 # ============================================
-# Aktiviere diese Zeilen NUR auf dem Live-Server!
-# Lokal auskommentiert lassen
+# Aktiv ausgeliefert: Die Anwendung verarbeitet personenbezogene Daten, und ein
+# Verein, der die Zeilen von Hand aktiviert, verlöre sie beim naechsten Update
+# wieder -- diese Datei liegt im Paket und wird ueberschrieben.
+#
+# Die drei Ausnahmen sind kein Beiwerk, sondern verhindern eine Endlosschleife:
+# Bei Shared Hosting mit TLS-Terminierung am Proxy steht %{HTTPS} auf off,
+# obwohl der Besucher laengst ueber HTTPS kommt. Dieselbe dreifache Pruefung
+# steht in public/api/api.php fuer das Secure-Flag der Session.
+#
+# Die vierte Ausnahme haelt die lokale Entwicklung lauffaehig; kein Livesystem
+# heisst localhost. Wer lokal mit HTTPS testet, braucht dafuer nichts zu aendern.
 
-# RewriteCond %{HTTPS} off
-# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteCond %{SERVER_PORT} !^443$
+RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1) [NC]
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # ============================================
 # SICHERHEIT

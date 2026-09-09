@@ -289,7 +289,11 @@ Response: Array of members with groups
 
 ## Sicherheitshinweise
 
-- **HTTPS erforderlich** für Produktivbetrieb
+- **HTTPS erforderlich** für Produktivbetrieb. `public/.htaccess` leitet seit 1.4.0 selbst auf
+  HTTPS um. Die Regel überspringt bewusst drei Fälle, damit sie keine Endlosschleife erzeugt:
+  TLS-Terminierung am Proxy (`X-Forwarded-Proto`), Port 443 und `localhost` für die lokale
+  Entwicklung. Wer die Umleitung nicht will, kommentiert den Block aus — beim nächsten Update
+  ist er allerdings wieder aktiv, weil die Datei zum Paket gehört
 - Regelmäßige Updates der Abhängigkeiten
 - Starke Passwörter für Admin-Accounts
 - TOTP-Secrets sicher aufbewahren

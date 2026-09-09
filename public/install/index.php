@@ -13,6 +13,34 @@
 
 session_start();
 
+define('VERSION_PATH', __DIR__ . '/../../version.json');
+
+/**
+ * Die Version, die installiert wird.
+ *
+ * Ohne Rückfallwert: Ein geratener Stand landet in `schema_version` und der
+ * Update-Assistent führte später eine Kette über ein Schema, das längst
+ * aktuell ist. Fehlt die Datei, ist das Paket unvollständig — dann soll die
+ * Installation laut abbrechen und nicht leise etwas Falsches eintragen.
+ */
+function installVersion(): string
+{
+    if (!file_exists(VERSION_PATH)) {
+        die('version.json fehlt — das Paket ist unvollständig. '
+          . 'Bitte die Dateien vollständig hochladen und erneut aufrufen.');
+    }
+
+    $data = json_decode((string) file_get_contents(VERSION_PATH), true);
+
+    if (!is_array($data) || empty($data['version'])) {
+        die('version.json nennt keine Version — bitte das Paket erneut herunterladen.');
+    }
+
+    return (string) $data['version'];
+}
+
+$version = installVersion();
+
 // Prüfe ob bereits installiert
 if (file_exists('../../private/config/install.lock')) {
     die('Installation bereits abgeschlossen. Lösche install.lock zum Neuinstallieren.');
@@ -126,15 +154,10 @@ if ($step == 4) {
                                VALUES (?, ?, 'admin', 1, 'active', ?, ?)");
         $stmt->execute([$admin['email'], $passwordHash, $apiToken, $tokenExpires]);
 
-        // Schema-Version stempeln, damit der Update-Wizard den Stand kennt
-        $versionFile = '../../version.json';
-        $installedVersion = '1.1.3';
-        if (file_exists($versionFile)) {
-            $versionData = json_decode(file_get_contents($versionFile), true);
-            if (is_array($versionData) && !empty($versionData['version'])) {
-                $installedVersion = $versionData['version'];
-            }
-        }
+        // Schema-Version stempeln, damit der Update-Assistent den Stand kennt.
+        // Der Wert stammt aus installVersion() und ist damit derselbe, den der
+        // Kopf dieser Seite nennt -- geraten wird hier nichts mehr.
+        $installedVersion = $version;
         $schemaTable = $cfg['prefix'] . 'schema_version';
         $pdo->prepare("INSERT IGNORE INTO {$schemaTable} (version) VALUES (?)")
             ->execute([$installedVersion]);
@@ -308,7 +331,7 @@ if ($step == 4) {
 <body>
     <div class="container">
         <h1>🎯 EhrenSache Installation</h1>
-        <p>Schritt-für-Schritt Setup für Shared-Hosting</p>
+        <p>Version <?= htmlspecialchars($version) ?> &middot; Schritt-für-Schritt Setup für Shared-Hosting</p>
         
         <div class="progress">
             <div class="progress-step <?= $step >= 1 ? 'active' : '' ?> <?= $step > 1 ? 'done' : '' ?>"></div>
