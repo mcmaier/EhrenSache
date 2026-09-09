@@ -912,12 +912,39 @@ test('buildSettings setzt Vereinsname, leeres Logo und aktivierte Arbeitszeit/St
     assertSame('1', $settings['station_pin_enabled']);
 });
 
-test('buildUsers liefert drei Konten und zwei Geraete', function () {
+test('buildUsers liefert vier Konten und zwei Geraete', function () {
     $users   = buildDemoPlan(20260908, '2026-09-08')['users'];
     $regular = array_filter($users, fn ($u) => $u['role'] !== 'device');
     $devices = array_filter($users, fn ($u) => $u['role'] === 'device');
-    assertSame(3, count($regular));
+    assertSame(4, count($regular));
     assertSame(2, count($devices));
+});
+
+test('Testkonto und Demokonto haengen an verschiedenen Mitgliedern', function () {
+    // Teilten sie sich ein Mitglied, beendete jeder Testlauf die laufende
+    // Sitzung, die das PWA-Bild zeigen soll -- und die Timer-Tests scheiterten
+    // an einer Sitzung, die sie nicht erwarten. Genau das war am 2026-09-09 der
+    // Fall: 16 rote Tests nach dem ersten Generatorlauf.
+    $plan     = buildDemoPlan(20260908, '2026-09-08');
+    $verknuepft = array_values(array_filter($plan['users'], fn ($u) => $u['member_id'] !== null));
+
+    assertSame(2, count($verknuepft), 'zwei Mitgliedskonten erwartet');
+    assertTrue(
+        $verknuepft[0]['member_id'] !== $verknuepft[1]['member_id'],
+        'beide Konten haengen am selben Mitglied'
+    );
+
+    // Das Konto der Testsuite (tests/config.php, Rolle "user") ist user2@ und
+    // darf kein Mitglied mit laufender Sitzung tragen.
+    $test = array_values(array_filter($plan['users'], fn ($u) => $u['email'] === 'user2@musterhausen.example'))[0];
+    foreach ($plan['work_sessions'] as $s) {
+        if ($s['end_time'] === null) {
+            assertTrue(
+                $s['member_id'] !== $test['member_id'],
+                'die laufende Sitzung gehoert dem Testkonto'
+            );
+        }
+    }
 });
 
 test('buildUsers legt genau einen Kiosk mit dem Stationsnamen an', function () {
@@ -927,11 +954,20 @@ test('buildUsers legt genau einen Kiosk mit dem Stationsnamen an', function () {
     assertSame(DEMO_STATION_NAME, $kiosks[0]['device_name']);
 });
 
-test('das Benutzerkonto haengt an Mitglied 1', function () {
+test('das Demokonto haengt an Mitglied 1, das Testkonto an einem anderen', function () {
+    // user@ ist das Konto, mit dem die PWA fotografiert wird — es muss an dem
+    // Mitglied haengen, das die laufende Sitzung traegt. user2@ gehoert der
+    // Testsuite und darf das nicht.
     $users = buildDemoPlan(20260908, '2026-09-08')['users'];
-    $user  = array_values(array_filter($users, fn ($u) => $u['role'] === 'user'));
-    assertSame(1, count($user));
-    assertSame(1, $user[0]['member_id']);
+    $mit   = [];
+    foreach ($users as $u) {
+        if ($u['role'] === 'user') {
+            $mit[$u['email']] = $u['member_id'];
+        }
+    }
+    assertSame(2, count($mit));
+    assertSame(1, $mit['user@musterhausen.example']);
+    assertSame(2, $mit['user2@musterhausen.example']);
 });
 
 test('alle Zeilen von users tragen dieselben Schluessel in derselben Reihenfolge', function () {

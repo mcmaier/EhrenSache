@@ -1024,6 +1024,12 @@ function buildUsers(): array
         ['user_id' => 3, 'email' => 'user@musterhausen.example',    'name' => 'Mitglied',          'device_name' => null, 'role' => 'user',    'device_type' => null, 'member_id' => 1,    'is_active' => 1, 'account_status' => 'active', 'email_verified' => 1],
         ['user_id' => 4, 'email' => null, 'name' => null, 'device_name' => DEMO_STATION_NAME, 'role' => 'device', 'device_type' => 'kiosk',          'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 0],
         ['user_id' => 5, 'email' => null, 'name' => null, 'device_name' => 'Proberaum',        'role' => 'device', 'device_type' => 'totp_location', 'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 0],
+        // Zweites Mitgliedskonto, ausschließlich für die Testsuiten. Es hängt
+        // bewusst an einem Mitglied OHNE laufende Sitzung: Teilten sich Test und
+        // Demo ein Konto, beendete jeder Testlauf den Timer, den das PWA-Bild
+        // zeigen soll — und die Tests scheiterten an einer Sitzung, die sie nicht
+        // erwarten. tests/config.php führt dieses Konto als Rolle "user".
+        ['user_id' => 6, 'email' => 'user2@musterhausen.example',   'name' => 'Testmitglied',      'device_name' => null, 'role' => 'user',    'device_type' => null, 'member_id' => 2,    'is_active' => 1, 'account_status' => 'active', 'email_verified' => 1],
     ];
 }
 

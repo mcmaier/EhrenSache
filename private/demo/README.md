@@ -38,9 +38,12 @@ Stempel; eine Prüfung auf 1.3.1 würde sie fälschlich abweisen.
 2. `php private/demo/seed.php` — Bestand herstellen
 3. Screenshots aufnehmen
 
-Umgekehrt stehen die Rückstände der Testsuiten auf dem Bild. Und ein Testlauf **nach** dem
-Generator beendet die laufende Arbeitszeitsitzung regulär (siehe unten) — dann fehlt sie auf
-dem PWA-Bild.
+Umgekehrt stehen die Rückstände der Testsuiten auf dem Bild.
+
+Ein Testlauf **nach** dem Generator ist dagegen unschädlich: Seit dem 09.09.2026 hängt die
+Testsuite an einem eigenen Mitgliedskonto (`user2@`), sodass sie die laufende Sitzung von
+`user@` nicht mehr anfasst. Vorher teilten sich beide ein Mitglied, und jeder Testlauf
+beendete den Timer, den das PWA-Bild zeigen soll.
 
 ## Aufbau
 
@@ -79,13 +82,18 @@ php -r "require 'private/demo/plan.php'; foreach (buildMembers(new DemoRandom(20
 |---|---|
 | `admin@musterhausen.example` | Administrator |
 | `manager@musterhausen.example` | Manager |
-| `user@musterhausen.example` | Benutzer, verknüpft mit Mitglied **M001** |
+| `user@musterhausen.example` | Benutzer, verknüpft mit Mitglied **M001** — trägt die laufende Sitzung, hiermit wird die PWA fotografiert |
+| `user2@musterhausen.example` | Benutzer, verknüpft mit Mitglied **M002** — nur für die Testsuiten, ohne laufende Sitzung |
 
-Passwort für alle drei: der Wert von `--password`, Vorgabe `demo2025`.
+Passwort für alle vier: der Wert von `--password`, Vorgabe `demo2025`.
 
-**Diese Konten stehen auch in `tests/config.php`.** Der Generator leert `users` — wer die
-Zugänge hier ändert, muss sie dort ändern, sonst scheitert der gesamte Testlauf an der
-Anmeldung.
+**Diese Konten stehen auch in `tests/config.php`**, dort `user2@` als Rolle `user`. Der
+Generator leert `users` — wer die Zugänge hier ändert, muss sie dort ändern, sonst scheitert
+der gesamte Testlauf an der Anmeldung.
+
+Die Trennung ist Absicht: Ein gemeinsames Konto hiesse, dass jeder Testlauf den Timer beendet,
+den das Bild zeigen soll — und dass die Timer-Tests an einer Sitzung scheitern, die sie nicht
+erwarten.
 
 Geräte: `Probenraum-Station` (Kiosk) und `Proberaum` (TOTP). Die Token stehen im Dashboard
 unter Geräte und werden bei jedem Lauf neu gewürfelt.
@@ -115,8 +123,9 @@ Sie stehen als Tests fest, weil jede von ihnen einmal verletzt war:
   Mitglied erwartet wurde.
 - **Auftrittstitel** folgen dem Monat, nicht der Listenposition.
 - Genau **eine** Sitzung läuft, sie gehört Mitglied M001 und nutzt eine Tätigkeit **ohne**
-  Nachweispflicht — sonst ließe sie sich ohne TOTP-Code nicht beenden, weder von der
-  Testsuite noch von einem Besucher der Demo.
+  Nachweispflicht — sonst ließe sie sich ohne TOTP-Code nicht beenden, etwa von einem
+  Besucher der Demo, der den Timer ausprobiert.
+- Das Konto der Testsuite hängt an einem **anderen** Mitglied als die laufende Sitzung.
 
 ## Bekannte Stolperstellen
 
