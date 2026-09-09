@@ -17,6 +17,15 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Verlassen; der Klick bleibt damit der Weg auf Geräten ohne Mauszeiger
 
 ### Geändert
+- **`public/.htaccess` leitet jetzt selbst auf HTTPS um.** Der Block war bisher auskommentiert
+  und musste von Hand aktiviert werden — was beim nächsten Update verloren ging, weil die Datei
+  zum Paket gehört und überschrieben wird. Der sichere Zustand ist deshalb jetzt der
+  Auslieferungszustand. **Nach dem Update gilt die Umleitung ohne weiteres Zutun**; wer sie
+  nicht will, kommentiert den Block aus und muss das nach jedem Update wiederholen.
+  Drei Ausnahmen verhindern eine Endlosschleife dort, wo `%{HTTPS}` trügt: TLS-Terminierung am
+  Proxy (`X-Forwarded-Proto`), Port 443, und `localhost` für die lokale Entwicklung. Es ist
+  dieselbe dreifache Prüfung, die `public/api/api.php` schon für das Secure-Flag der Session
+  verwendet
 - **`work_sessions.active_member` ist jetzt eine gespeicherte statt einer virtuellen Spalte.**
   Die Migration legt Spalte und Unique-Index neu an — MariaDB lehnt die Umstellung per `MODIFY`
   ab (Fehler 1907). Der Wert folgt vollständig aus `end_time` und `member_id` und entsteht beim
