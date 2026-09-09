@@ -18,60 +18,92 @@ oder noch nicht gebaut.
 
 ## Zu klären
 
-### OI-1 · Selbstheilung bei verlorenem AUTO_INCREMENT
-**Priorität:** hoch — Beobachtung läuft
+### OI-1 · Verlorener AUTO_INCREMENT nach Crash-Recovery
+**Priorität:** Ursache belegt, Selbstheilung gebaut · **offen:** ob die virtuelle Spalte bleibt
 
-Am 2026-09-02 nahm `ez_work_sessions` keine Einträge mehr an:
-`SQLSTATE[HY000] 1467 Failed to read auto-increment value from storage engine`.
-`AUTO_INCREMENT` las sich als `0` bei `MAX(session_id) = 1176`. Andere Tabellen derselben
-Datenbank waren unauffällig. Behoben durch `ALTER TABLE ez_work_sessions AUTO_INCREMENT = 1177`.
+`ez_work_sessions` verliert nach einer InnoDB-**Crash-Recovery** seinen AUTO_INCREMENT-Zähler.
+Er liest sich dann als `0`, und jeder `INSERT` scheitert mit
+`SQLSTATE[HY000] 1467 Failed to read auto-increment value from storage engine`. Die
+Zeiterfassung steht damit vollständig still — Timer-Start und Nachtrag antworten mit HTTP 500.
 
-**Nicht reproduzierbar.** Ein sauberer Neustart von MariaDB 10.4.32 am selben Tag ließ alle
-Zähler intakt — auch bei einer eigens angelegten Kontrolltabelle mit derselben Konstruktion
-(virtuelle Spalte `active_member` plus Unique-Index). `FLUSH TABLES` reproduziert es ebenfalls
-nicht. Arbeitshypothese: unsauberes Herunterfahren in der Nacht zuvor; InnoDB verlor den
-Zähler und scheiterte beim Neuberechnen. **Unbelegt.**
+**Zweimal beobachtet:** 2026-09-02 (bei `MAX(session_id) = 1176`) und 2026-09-09 (bei 6200,
+33 von 395 Tests rot). Beide Male war **keine andere Tabelle** betroffen.
 
-**Zu entscheiden:** Soll der Handler bei genau diesem Fehler den Zähler auf `MAX + 1` setzen
-und den Einfügevorgang einmal wiederholen (~15 Zeilen)?
+#### Ursache — seit 2026-09-09 belegt, nicht mehr vermutet
 
-- *Dafür:* Ohne Eingriff steht die Anwendung still und zeichnet nichts mehr auf. Ein Verein
-  ohne Datenbankkenntnisse kann das nicht beheben.
-- *Dagegen:* Behandelt ein Symptom, dessen Ursache unbekannt ist. Ein stiller Reparaturpfad
-  erschwert künftige Diagnosen.
+Das MariaDB-Fehlerprotokoll (`C:\xampp\mysql\data\mysql_error.log`) nennt sie ausdrücklich:
 
-**Zweite Beobachtung am 2026-09-09.** Nach dem morgendlichen Start von XAMPP stand
-`ez_work_sessions.auto_increment` erneut auf `0` bei `MAX(session_id) = 6200`; 33 von 395 Tests
-schlugen fehl, alle mit demselben Fehler 1467 als Wurzel. Wieder war **keine andere Tabelle
-betroffen** — `ez_work_sessions` ist die einzige mit einer indizierten virtuellen Spalte.
-Behoben mit `ALTER TABLE ez_work_sessions AUTO_INCREMENT = 6201`, danach wieder alle Tests grün.
-`FLUSH TABLES` reproduziert es weiterhin nicht: Der Zähler übersteht das Neuöffnen der Tabelle,
-verloren geht er nur über einen Serverneustart.
-
-Damit ist die Bedingung des früheren nächsten Schritts erfüllt — es ist **erneut aufgetreten**.
-
-**Offen und für die Ursache entscheidend:** Wurde XAMPP am Abend des 2026-09-08 sauber
-heruntergefahren? Falls ja, fällt die Arbeitshypothese „unsauberes Herunterfahren", und der
-Verdacht richtet sich wieder auf die Konstruktion der Tabelle.
-
-**Kontrollaufbau steht bereit.** In der Testdatenbank liegen seit dem 2026-09-09 zwei Tabellen:
-`zz_virt` (auto_increment, virtuelle Spalte `active_member`, Unique-Index darauf — dieselbe
-Konstruktion wie `work_sessions`) und `zz_plain` (nur auto_increment). Beide tragen drei Zeilen
-und standen nach dem Anlegen auf `4`. **Beim nächsten Serverneustart genügt ein Blick:**
-
-```sql
-SELECT table_name, auto_increment FROM information_schema.tables
-WHERE table_schema = 'ehrensache' AND table_name IN ('zz_virt', 'zz_plain');
+```
+Assertion failure in file …\os0file.cc line 6132        ← Absturz
+…
+[Note] InnoDB: Starting crash recovery from checkpoint LSN=20592797
+…
+[Note] InnoDB: AUTOINC next value generation is disabled
+                for '`ehrensache`.`ez_work_sessions`'
 ```
 
-Steht `zz_virt` auf `0` und `zz_plain` auf `4`, ist die indizierte virtuelle Spalte die Ursache
-und die Konstruktion gehört ersetzt. Stehen beide auf `4`, liegt es nicht an der Tabelle.
-Danach beide Tabellen löschen.
+InnoDB **schaltet** die Zählergenerierung für diese eine Tabelle ab, weil es die
+AUTOINC-Spalte im eigenen Datenwörterbuch nicht mehr findet — Wörterbuch und
+Tabellendefinition sind auseinandergelaufen. `ez_work_sessions` ist die einzige Tabelle des
+Schemas mit einer **indizierten virtuellen Spalte** (`active_member`, `GENERATED ALWAYS AS
+(if(end_time is null, member_id, NULL)) VIRTUAL`, dazu ein Unique-Index). Virtuelle Spalten
+werden nicht gespeichert und verschieben damit die Spaltenzuordnung zwischen der Definition
+und den tatsächlich abgelegten Spalten.
 
-**Nächster Schritt:** Selbstheilung einbauen, wie oben beschrieben — die Bedingung dafür ist
-eingetreten. Ein Verein, dessen Hoster den Datenbankserver neu startet, findet die
-Zeiterfassung sonst kommentarlos stillstehend vor, und ein `ALTER TABLE` kann er nicht
-absetzen. Parallel die Ursache über den Kontrollaufbau eingrenzen.
+**Der Auslöser ist die Crash-Recovery, nicht der Neustart.** Das erklärt, warum ein sauberer
+Neustart am 2026-09-02 nichts reproduzierte und `FLUSH TABLES` es ebenfalls nicht auslöst:
+Der Zähler übersteht das Neuöffnen einer Tabelle, verloren geht er beim Wiederaufbau des
+Wörterbuchs nach einer Recovery.
+
+Ausgeschlossen wurde: `innodb_force_recovery` ist `0` und steht in keiner `my.ini` —
+der Verdacht, ein erzwungener Wiederherstellungsmodus schalte AUTOINC ab, trifft nicht zu.
+
+Am 2026-09-09 ging dem Absturz voraus, dass MariaDB überhaupt nicht startete (Verdacht
+Virenscanner); erst ein Rechnerneustart und XAMPP mit Administratorrechten brachten den
+Dienst hoch. Auf dem Webspace eines Vereins entsprechen dem Stromausfall, OOM-Kill oder eine
+erzwungene Wartung des Hosters — der Fall ist also nicht auf die Entwicklungsumgebung
+beschränkt.
+
+#### Was gebaut wurde (2026-09-09)
+
+Die Anwendung heilt den Zustand selbst. In `private/helpers/worktime.php`:
+
+- `worktimeIsLostAutoinc(PDOException)` — erkennt genau Fehler 1467
+- `worktimeRepairAutoinc(PDO, table, idColumn)` — setzt den Zähler auf `MAX + 1`, prüft
+  Tabellen- und Spaltenname gegen `/^[A-Za-z0-9_]+$/` (ALTER TABLE erlaubt keine
+  Platzhalter) und **protokolliert den Eingriff laut** über `error_log()`
+- `worktimeWithAutoincRepair(PDO, database, callable)` — fängt 1467, rollt eine offene
+  Transaktion zurück (`ALTER TABLE` ist DDL und würde sie sonst unbemerkt festschreiben),
+  repariert und wiederholt den Schreibvorgang **genau einmal**
+
+Eingehängt an beiden Einfügestellen in `private/handlers/work_sessions.php`: dem Timer-Start
+(transaktional) und dem Nachtrag.
+
+Der Einwand aus der früheren Fassung — *ein stiller Reparaturpfad erschwert künftige
+Diagnosen* — ist durch die Protokollierung beantwortet: Die Meldung nennt Tabelle, gesetzten
+Wert, die Ursache außerhalb der Anwendung und verweist auf diesen Eintrag.
+
+**Nicht End-to-End belegt:** Der Zustand „InnoDB hat AUTOINC abgeschaltet" lässt sich nicht
+auf Kommando herstellen — `ALTER TABLE … AUTO_INCREMENT = 1` hebt MariaDB selbsttätig wieder
+auf `MAX + 1` an. Geprüft sind die Erkennung (Unit) und die Reparatur gegen eine
+Wegwerftabelle (`tests/db/verify_autoinc_repair.php`); der Wiederholungspfad läuft in keinem
+Test durch. Tritt der Fehler erneut auf, ist die Log-Meldung der erste verlässliche Beleg,
+dass er greift.
+
+#### Offen: bleibt `active_member` virtuell?
+
+Die Selbstheilung behandelt die Folge. Die Ursache ließe sich beseitigen, indem die Spalte
+von `VIRTUAL` auf `STORED` umgestellt wird: Gespeicherte Spalten liegen im Zeilenformat und
+verschieben die Zuordnung nicht.
+
+- *Dafür:* Der Auslöser verschwindet, statt abgefangen zu werden. Der Unique-Index und die
+  Garantie „höchstens eine laufende Sitzung je Mitglied" bleiben unverändert.
+- *Dagegen:* Braucht eine Migration, kostet ein paar Bytes je Zeile — und ob es wirklich
+  hilft, ist unbewiesen, solange sich der Fehler nicht gezielt herbeiführen lässt.
+
+Ein früher angelegter Kontrollaufbau (`zz_virt` / `zz_plain` in der Testdatenbank) wurde am
+2026-09-09 wieder entfernt: Er hätte nur nach einem echten Absturz etwas gezeigt, nicht nach
+einem gewöhnlichen Neustart.
 
 ---
 
