@@ -226,6 +226,12 @@ test('work_sessions: member_id grenzt die Liste auf dieses Mitglied ein', functi
 
 test('work_sessions: running=1 liefert null ohne laufende Sitzung', function () {
     enableWorktime();
+    // Vorbedingung herstellen, nicht voraussetzen: Der Test prueft die Antwort
+    // OHNE laufende Sitzung, also muss er dafuer sorgen, dass keine laeuft. Wer
+    // von Hand einen Timer startet oder den Demo-Datengenerator laufen laesst
+    // (der eine offene Sitzung fuer dieses Mitglied anlegt), sah hier sonst rot,
+    // ohne dass etwas kaputt war.
+    stopRunningIfAny('user');
     $res = apiRequest('GET', 'work_sessions', [
         'token' => apiToken('user'),
         'query' => ['running' => 1],
@@ -250,15 +256,33 @@ test('work_sessions: Zugriff ohne Token wird abgewiesen', function () {
         "401 oder 403 erwartet, {$res['status']} erhalten");
 });
 
-/** Beendet eine ggf. laufende Sitzung des Test-Users, damit der naechste Start frei ist. */
+/**
+ * Beendet eine ggf. laufende Sitzung des Test-Users, damit der naechste Start frei ist.
+ *
+ * Prueft nach dem stop, dass wirklich keine Sitzung mehr laeuft, und scheitert
+ * sonst laut mit Statuscode und Antwortkoerper des stop-Aufrufs. Ein stiller
+ * Fehlschlag hier verschiebt die Diagnose nur in die naechsten elf Tests, die
+ * dann alle "409 A session is already running" melden, statt die eigentliche
+ * Ursache (eine Sitzung, die sich nicht beenden liess) zu zeigen.
+ */
 function stopRunningIfAny(string $role = 'user'): void
 {
     $res = apiRequest('GET', 'work_sessions', ['token' => apiToken($role), 'query' => ['running' => 1]]);
-    if (is_array($res['body'] ?? null)) {
-        apiRequest('POST', 'work_sessions', [
-            'token' => apiToken($role),
-            'body'  => ['action' => 'stop'],
-        ]);
+    if (!is_array($res['body'] ?? null)) {
+        return;
+    }
+
+    $stop = apiRequest('POST', 'work_sessions', [
+        'token' => apiToken($role),
+        'body'  => ['action' => 'stop'],
+    ]);
+
+    $check = apiRequest('GET', 'work_sessions', ['token' => apiToken($role), 'query' => ['running' => 1]]);
+    if (is_array($check['body'] ?? null)) {
+        throw new RuntimeException(
+            "stopRunningIfAny('{$role}'): Sitzung liess sich nicht beenden — HTTP {$stop['status']}: "
+            . substr($stop['raw'], 0, 300)
+        );
     }
 }
 

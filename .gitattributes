@@ -11,3 +11,6 @@ temporary_screenshots/      export-ignore
 
 # Migrations-Testdateien (Prefix _)
 private/migrations/_*       export-ignore
+
+# Demo-Datengenerator: leert Tabellen, gehoert nicht ins Installationspaket
+private/demo/               export-ignore
