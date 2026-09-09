@@ -218,6 +218,18 @@ Demo-Modus, damit sie in jedem `php tests/run.php` mitlaufen:
 3. **Die Matrix.** Für jede gesperrte Ressource wird `POST`, `PUT` und `DELETE` abgewiesen,
    für jede erlaubte nicht.
 
+4. **Die Stellung des Wächters.** Der Test verlangt, dass `demoGuard(` in `api.php`
+   **vor** dem ersten `if($resource ===` steht.
+
+   > **Ergänzt am 2026-09-09 nach der Durchsicht von Prüfung 1.** Die Prüfungen 1 bis 3
+   > belegen, dass jede Ressource *eingeordnet* ist — nicht, dass sie den Wächter
+   > überhaupt *durchläuft*. Stünde der Aufruf hinter Abschnitt 6 von `api.php`, liefen
+   > `ping`, `appearance`, `login`, `auth`, `logout`, `register` und
+   > `password_reset_request` daran vorbei; die beiden letzten stehen ausdrücklich in der
+   > Sperrliste, weil sie Mail an fremde Adressen versenden. Die Suite bliebe dabei grün.
+   > Ohne diese vierte Prüfung endet das Schutzversprechen genau an der Stelle, an der es
+   > gebraucht wird.
+
 ## 10. Der `demo`-Branch verschwindet
 
 Nach der Umsetzung hat er nichts Eigenes mehr:
@@ -256,8 +268,16 @@ Nicht Code, aber Voraussetzung dafür, dass der Rest trägt. Einmalig zu prüfen
   Wer welche Rolle hat, regelt weiterhin die normale Rechteprüfung im Handler.
 - **Keine Änderung an den Handlern.** Die zwölf `demoBlockedResponse()`-Aufrufe des Forks
   werden nicht portiert, sondern ersetzt.
-- **Kein Rate Limiting eigens für die Demo.** Die bestehenden 100 Anfragen je Minute und die
+- **Kein Rate Limiting eigens für die Demo.** Die bestehenden 150 Anfragen je Minute und die
   Mail-Grenzen (3 je Adresse, 10 je IP pro Stunde) bleiben unverändert.
+- **Kein Schutz außerhalb von `api.php`.** `public/reset_password.php` und
+  `public/verify_email.php` sind eigene Einstiegspunkte mit Schreibwirkung; der Wächter sitzt
+  im API-Router und sieht sie nicht. Praktisch entschärft, weil beide einen Token voraussetzen,
+  den nur eine Mail liefert — und `register` wie `password_reset_request` sind gesperrt, der
+  Mailversand der Demo ohnehin abgeschaltet. Bei der Durchsicht am 2026-09-09 festgestellt und
+  bewusst so belassen. Wer künftig einen weiteren öffentlichen Einstiegspunkt neben `api.php`
+  schafft, muss ihn eigens bedenken — die Vollständigkeitsprüfung aus Abschnitt 9 kann ihn
+  von Bauart wegen nicht sehen.
 
 ## 13. Einordnung
 
