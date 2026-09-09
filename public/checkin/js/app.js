@@ -1216,10 +1216,6 @@ async function handleAttendanceToggle(event) {
     const recordId = btn.dataset.recordId;
     const isPresent = btn.dataset.isPresent === 'true';
 
-    // Speichere Scroll-Position
-    const scrollContainer = document.querySelector('.attendance-scroll-container');
-    const scrollPosition = scrollContainer ? scrollContainer.scrollTop : 0;
-    
     btn.disabled = true;
 
     // Finde das Listenelement

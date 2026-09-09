@@ -1619,38 +1619,21 @@ body {
     box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
 }
 
+/* Kein eigener Rollbereich, aus demselben Grund wie bei .history-list: Die
+   feste Obergrenze calc(100vh - 320px) beschrieb eine Kopfzone, die je nach
+   Fensterbreite umbricht, und erzwang ein zweites Rollen innerhalb einer
+   Seite, die selbst rollt. Der Container waechst jetzt mit der Mitgliederliste
+   -- bei einem grossen Termin wird die Seite lang, aber jedes Mitglied ist mit
+   einer einzigen Geste erreichbar. */
 .attendance-scroll-container {
     display: block;
     background: white;
     gap: 8px;
-    max-height: calc(100vh - 320px);
     padding: 12px;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     width: 100%;
     max-width: 400px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #bbb #f0f0f0;
-}
-
-/* Scrollbar Styling */
-.attendance-scroll-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-.attendance-scroll-container::-webkit-scrollbar-track {
-    background: var(--bg-light);
-    border-radius: 3px;
-}
-
-.attendance-scroll-container::-webkit-scrollbar-thumb {
-    background: var(--primary-color);
-    border-radius: 3px;
-}
-
-.attendance-scroll-container::-webkit-scrollbar-thumb:hover {
-    background: #5568d3;
 }
 
 .appointment-info {
