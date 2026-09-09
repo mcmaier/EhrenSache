@@ -412,30 +412,69 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false) {
             day.style.borderLeftStyle = 'solid';
         }
         
-        // Tooltip mit allen Terminen
-        day.title = dayAppointments.map(a => {
-            const typeName = a.type_name ? `[${a.type_name}] ` : '';
-            return `${a.start_time} - ${typeName}${a.title}`;
-        }).join('\n');
-        
-        // Click-Handler für Termin-Details
-        day.onclick = (e) => showAppointmentPopup(e, dayAppointments);
+        // Termine des Tages als Vorlesetext.
+        //
+        // Ersetzt das frueher gesetzte title-Attribut: Der native Tooltip kam
+        // erst nach rund einer Sekunde, war unformatiert -- und liefe jetzt
+        // zusaetzlich zum eigenen Popup auf, das dieselben Termine zeigt.
+        day.setAttribute('aria-label', `${dayNum}., ` + dayAppointments.map(a => {
+            const typeName = a.type_name ? `${a.type_name}, ` : '';
+            return `${a.start_time} ${typeName}${a.title}`;
+        }).join('; '));
+
+        // Ueberfahren zeigt dasselbe Popup wie der Klick, nur fluechtig. Die
+        // kleine Verzoegerung verhindert, dass beim Wandern ueber den Kalender
+        // an jedem Tag kurz etwas aufblitzt.
+        day.addEventListener('mouseenter', () => {
+            clearTimeout(kalenderHoverTimer);
+            kalenderHoverTimer = setTimeout(
+                () => showAppointmentPopup(day, dayAppointments, false), 180
+            );
+        });
+
+        day.addEventListener('mouseleave', () => {
+            clearTimeout(kalenderHoverTimer);
+            const popup = document.querySelector('.calendar-event-popup');
+            // Ein per Klick geoeffnetes Popup bleibt stehen -- sonst waere es
+            // nicht lesbar, sobald der Zeiger es erreicht.
+            if (popup && !popup.dataset.fest) popup.remove();
+        });
+
+        // Klick haelt das Popup fest. Auf Touch-Geraeten gibt es kein
+        // Ueberfahren, dort ist das der einzige Weg.
+        day.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearTimeout(kalenderHoverTimer);
+            showAppointmentPopup(day, dayAppointments, true);
+        });
     }
-    
+
     return day;
 }
 
-function showAppointmentPopup(event, appointments) {
-    event.stopPropagation();
-    
+/** Verzoegerung zwischen Ueberfahren und Anzeige. */
+let kalenderHoverTimer = null;
+
+/**
+ * Zeigt die Termine eines Tages neben dem Kalenderfeld.
+ *
+ * @param {HTMLElement} ziel         Das Kalenderfeld, an dem das Popup haengt
+ * @param {Array}       appointments Termine dieses Tages
+ * @param {boolean}     fest         true = bleibt bis zum Klick daneben stehen,
+ *                                   false = verschwindet beim Verlassen
+ */
+function showAppointmentPopup(ziel, appointments, fest = true) {
     // Entferne altes Popup
     const oldPopup = document.querySelector('.calendar-event-popup');
     if (oldPopup) oldPopup.remove();
-    
+
     // Erstelle neues Popup
     const popup = document.createElement('div');
     popup.className = 'calendar-event-popup active';
-    
+    if (fest) {
+        popup.dataset.fest = '1';
+    }
+
     let html = `<h4>${appointments[0].date}</h4>`;
     appointments.forEach(apt => {
         // Terminart-Badge mit Farbe
@@ -456,17 +495,43 @@ function showAppointmentPopup(event, appointments) {
     });
     
     popup.innerHTML = html;
-    
-    // Position berechnen
-    const rect = event.target.getBoundingClientRect();
+
+    // Erst anhängen, dann messen: Vorher steht die Größe nicht fest.
     popup.style.position = 'fixed';
-    popup.style.left = rect.left + 'px';
-    popup.style.top = (rect.bottom + 5) + 'px';
-    
-    // Füge zum Body hinzu
+    popup.style.visibility = 'hidden';
     document.body.appendChild(popup);
-    
-    // Schließen bei Click außerhalb
+
+    // Am Rand des Fensters umklappen statt hinauslaufen. Ohne das verschwindet
+    // das Popup in der rechten Kalenderspalte und in der letzten Zeile aus dem
+    // Bild -- beim Klick selten, beim Ueberfahren staendig.
+    const rand = 8;
+    const feld = ziel.getBoundingClientRect();
+    let links = feld.left;
+    let oben  = feld.bottom + 5;
+
+    if (links + popup.offsetWidth > window.innerWidth - rand) {
+        links = window.innerWidth - popup.offsetWidth - rand;
+    }
+    if (links < rand) {
+        links = rand;
+    }
+    if (oben + popup.offsetHeight > window.innerHeight - rand) {
+        oben = feld.top - popup.offsetHeight - 5;
+    }
+    if (oben < rand) {
+        oben = rand;
+    }
+
+    popup.style.left = links + 'px';
+    popup.style.top = oben + 'px';
+    popup.style.visibility = '';
+
+    // Nur ein festgehaltenes Popup wartet auf einen Klick daneben. Ein
+    // fluechtiges verschwindet ohnehin, sobald der Zeiger das Feld verlaesst.
+    if (!fest) {
+        return;
+    }
+
     setTimeout(() => {
         document.addEventListener('click', function closePopup() {
             popup.remove();
