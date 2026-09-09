@@ -475,7 +475,16 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
         popup.dataset.fest = '1';
     }
 
-    let html = `<h4>${appointments[0].date}</h4>`;
+    // Datum und Uhrzeit wie ueberall sonst in der Oberflaeche: deutsches
+    // Format, Uhrzeit ohne Sekunden. Roh gezeigt las sich der Kopf als
+    // "2026-09-04" und die Zeile als "20:00:00" -- seit das Popup schon beim
+    // Ueberfahren erscheint, faellt das staendig auf.
+    const tag = new Date(appointments[0].date + 'T00:00:00');
+    const kopf = isNaN(tag.getTime())
+        ? appointments[0].date
+        : tag.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    let html = `<h4>${kopf}</h4>`;
     appointments.forEach(apt => {
         // Terminart-Badge mit Farbe
         const typeBadge = apt.type_name 
@@ -484,7 +493,7 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
 
         html += `
             <div class="calendar-event-item">
-                <div class="calendar-event-time">${apt.start_time}</div>
+                <div class="calendar-event-time">${apt.start_time ? apt.start_time.substring(0, 5) : ''}</div>
                 <div>
                     ${apt.title}
                     ${typeBadge}
