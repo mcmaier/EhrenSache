@@ -675,8 +675,6 @@ function displayAppointmentsImportResult(result) {
 // ============================================
 
 export async function initImportLogs() {
-    console.log('Import Logs initialisiert');
-    
     // Filter Event Listener
     const filterSelect = document.getElementById('log-type-filter');
     if (filterSelect) {
