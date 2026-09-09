@@ -7,9 +7,26 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Nicht veröffentlicht]
+## [1.4.0] – 2026-09-09
+
+### Neu
+- **Der Kalender der Terminverwaltung zeigt die Termine schon beim Überfahren.** Bisher öffnete
+  erst ein Klick das Popup; das Überfahren zeigte nur einen nativen Browser-Tooltip —
+  unformatiert und erst nach rund einer Sekunde. Jetzt erscheint dasselbe Popup nach 180
+  Millisekunden. Ein per Klick geöffnetes bleibt stehen, ein überfahrenes verschwindet beim
+  Verlassen; der Klick bleibt damit der Weg auf Geräten ohne Mauszeiger
 
 ### Geändert
+- **`work_sessions.active_member` ist jetzt eine gespeicherte statt einer virtuellen Spalte.**
+  Die Migration legt Spalte und Unique-Index neu an — MariaDB lehnt die Umstellung per `MODIFY`
+  ab (Fehler 1907). Der Wert folgt vollständig aus `end_time` und `member_id` und entsteht beim
+  Neuanlegen aus den vorhandenen Zeilen; verloren geht nichts. Grund ist der Verdacht aus OI-1,
+  dass die indizierte virtuelle Spalte nach einer Crash-Recovery den AUTO_INCREMENT-Zähler der
+  Tabelle kostet. **Bei sehr vielen Sitzungen schreibt der Schritt die Tabelle neu und dauert
+  entsprechend**; der Update-Assistent weist ab 50 000 Zeilen darauf hin
+- **Datum und Uhrzeit im Kalender-Popup sind formatiert.** Statt `2026-09-04` und `20:00:00`
+  steht dort `Fr., 04.09.2026` und `20:00` — dasselbe Muster wie an den übrigen Stellen der
+  Oberfläche. Seit das Popup schon beim Überfahren erscheint, fiel die Rohform ständig auf
 - **Der Anwesenheits-Export führt den Termin jetzt eindeutig.** Neu sind die Spalten
   `appointment_start_time` und `appointment_type`; zusammen mit `appointment_date` bilden sie
   den Schlüssel, den die Anwendung ohnehin verwendet — beim Anlegen gilt ein Termin *dieser
@@ -71,6 +88,34 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   einer Korrektur der *Arbeitszeit* zu verwechseln. Ein Antrag liest sich jetzt als „Antrag
   wartet auf Freigabe", eine Entschuldigung behält ihr eindeutiges Wort. Das Dashboard nennt
   die Antragsart weiterhin „Zeitkorrektur" — die PWA sagt weniger, nicht etwas anderes
+- **Die Zeiterfassung heilt einen verlorenen AUTO_INCREMENT-Zähler selbst.** Nach einer
+  InnoDB-Crash-Recovery las sich der Zähler von `work_sessions` zweimal als `0`; jeder Versuch,
+  eine Sitzung anzulegen, endete mit `1467 Failed to read auto-increment value from storage
+  engine` und HTTP 500. Ein Verein ohne Datenbankkenntnisse kann das nicht beheben. Der Handler
+  erkennt jetzt genau diesen Fehler, setzt den Zähler auf `MAX + 1` und wiederholt den
+  Schreibvorgang einmal. **Der Eingriff wird laut protokolliert** — er behandelt ein Symptom,
+  dessen Ursache außerhalb der Anwendung liegt, und soll künftige Diagnosen nicht erschweren.
+  Siehe OI-1
+- **Das Kalender-Popup lief am Fensterrand aus dem Bild.** Es wurde ohne Rücksicht auf die
+  Fenstergröße positioniert; in der rechten Spalte und in der letzten Zeile war es teilweise
+  unerreichbar. Es klappt jetzt um. Beim Klick fiel das selten auf, beim Überfahren ständig
+- **Datum und Uhrzeit in der Terminliste standen in normaler Textgröße.** Ein fehlendes Wort im
+  Markup (`<style=…>` statt `<small style=…>`) erzeugte ein unbekanntes Element, die
+  Kleinschrift blieb wirkungslos
+
+### Intern
+- **Demo-Datengenerator** (`private/demo/`): Ein CLI-Skript füllt eine Datenbank reproduzierbar
+  mit einem fiktiven Verein — als Bildmaterial für die Werbeseite und als Reset-Bestand der
+  öffentlichen Demo, deren bisheriges SQL-Skript seit 1.1.0 nicht mehr lauffähig war. Getrennt
+  in einen reinen Teil (`plan.php`, 99 Tests ohne Datenbank) und eine Schreibschicht
+  (`seed.php`). Über `export-ignore` nicht im ZIP-Download enthalten
+- `tests/suites/station_api.php` sammelte über Läufe hinweg eine Sperre an: Der Test mit
+  falscher PIN schickte eine **feste** unbekannte Mitgliedsnummer, und die Stationssperre zählt
+  Fehlversuche auch für unbekannte Nummern. Ab dem sechsten Lauf binnen 15 Minuten antwortete
+  der Server `423` statt `401`. Die Nummer trägt jetzt ein `uniqid()`
+- `tests/suites/worktime_api.php`: Zwei Tests setzten einen freien Timer-Zustand voraus, statt
+  ihn herzustellen. Neue Testsuiten `demo_seed_unit`, `demo_seed_cli` und die Einzelprüfung
+  `tests/db/verify_autoinc_repair.php`
 
 ---
 

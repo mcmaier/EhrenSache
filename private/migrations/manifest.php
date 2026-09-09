@@ -68,4 +68,10 @@ return [
         'file'     => '1.3.0.php',
         'function' => 'migrate_1_3_0',
     ],
+    [
+        'from'     => '1.3.1',
+        'to'       => '1.4.0',
+        'file'     => '1.3.1.php',
+        'function' => 'migrate_1_3_1',
+    ],
 ];

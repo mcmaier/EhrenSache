@@ -524,7 +524,10 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}work_sessions` (
   approved_at         DATETIME DEFAULT NULL,
   created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  active_member       INT AS (IF(end_time IS NULL, member_id, NULL)) VIRTUAL,
+  -- STORED, nicht VIRTUAL: Eine indizierte virtuelle Spalte steht im Verdacht,
+  -- nach einer InnoDB-Crash-Recovery den AUTO_INCREMENT-Zaehler dieser Tabelle
+  -- zu verlieren (OI-1). Gespeichert liegt der Wert im Zeilenformat.
+  active_member       INT AS (IF(end_time IS NULL, member_id, NULL)) STORED,
   UNIQUE KEY `{PREFIX}uq_running_session` (active_member),
   KEY `{PREFIX}idx_ws_member_start` (member_id, start_time),
   KEY `{PREFIX}idx_ws_appointment` (appointment_id),

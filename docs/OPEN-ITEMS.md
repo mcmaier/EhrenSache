@@ -5,7 +5,7 @@ unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nic
 oder noch nicht gebaut.
 
 **Zuletzt geprüft:** 2026-09-09 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
-**Version:** 1.3.1
+**Version:** 1.4.0
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
@@ -19,7 +19,8 @@ oder noch nicht gebaut.
 ## Zu klären
 
 ### OI-1 · Verlorener AUTO_INCREMENT nach Crash-Recovery
-**Priorität:** Ursache belegt, Selbstheilung gebaut · **offen:** ob die virtuelle Spalte bleibt
+**Erledigt am 2026-09-09** — mit 1.4.0. Selbstheilung gebaut, Ursache entfernt.
+Beobachtung läuft weiter: Ob die Umstellung wirklich hilft, zeigt erst der nächste Absturz.
 
 `ez_work_sessions` verliert nach einer InnoDB-**Crash-Recovery** seinen AUTO_INCREMENT-Zähler.
 Er liest sich dann als `0`, und jeder `INSERT` scheitert mit
@@ -90,16 +91,31 @@ Wegwerftabelle (`tests/db/verify_autoinc_repair.php`); der Wiederholungspfad lä
 Test durch. Tritt der Fehler erneut auf, ist die Log-Meldung der erste verlässliche Beleg,
 dass er greift.
 
-#### Offen: bleibt `active_member` virtuell?
+#### Umgestellt mit 1.4.0
 
-Die Selbstheilung behandelt die Folge. Die Ursache ließe sich beseitigen, indem die Spalte
-von `VIRTUAL` auf `STORED` umgestellt wird: Gespeicherte Spalten liegen im Zeilenformat und
-verschieben die Zuordnung nicht.
+`active_member` ist seit dem 2026-09-09 **`STORED`** statt `VIRTUAL`. Migration
+`private/migrations/1.3.1.php`, Basisschema nachgezogen. Gespeicherte Spalten liegen im
+Zeilenformat und verschieben die Zuordnung zwischen Definition und abgelegten Spalten nicht —
+genau die Verschiebung, die als Ursache vermutet wird.
+
+Gegen die Testdatenbank belegt: 120 Sitzungen unverändert, die laufende behält ihren Eintrag,
+der Unique-Index weist eine zweite laufende Sitzung weiterhin ab (`Non_unique: 0`, Duplicate
+entry beim Test-Insert), ein zweiter Lauf der Migration erkennt sich als erledigt.
+
+**Die Selbstheilung bleibt.** Sie behandelt die Folge, die Umstellung nimmt dem Fehler die
+*vermutete* Ursache — belegt ist der Zusammenhang nicht, und das lässt sich auch nicht
+belegen, solange der Zustand nicht auf Kommando herbeizuführen ist. Tritt der Fehler erneut
+auf, steht die Meldung der Selbstheilung im Server-Log; dann war die Umstellung nicht die
+Lösung und dieser Eintrag ist wieder zu öffnen.
+
+Die frühere Abwägung, festgehalten für den Fall, dass er wieder aufgemacht werden muss:
 
 - *Dafür:* Der Auslöser verschwindet, statt abgefangen zu werden. Der Unique-Index und die
   Garantie „höchstens eine laufende Sitzung je Mitglied" bleiben unverändert.
 - *Dagegen:* Braucht eine Migration, kostet vier Byte je Zeile — und ob es wirklich hilft,
-  ist unbewiesen, solange sich der Fehler nicht gezielt herbeiführen lässt.
+  ist unbewiesen, solange sich der Fehler nicht gezielt herbeiführen lässt. Bei sehr vielen
+  Sitzungen schreibt der Umbau die Tabelle neu; der Update-Assistent weist ab 50 000 Zeilen
+  darauf hin.
 
 **Verhalten geprüft (2026-09-09), gegen Wegwerftabellen in der Testdatenbank:** `STORED`
 bildet die Regel unverändert ab. Mehrere beendete Sitzungen desselben Mitglieds gehen durch
@@ -130,10 +146,10 @@ Das Löschen der Spalte ist dabei ungefährlich: Ihr Wert folgt vollständig aus
 `member_id` und entsteht beim Neuanlegen aus den vorhandenen Zeilen neu. Das unterscheidet
 eine generierte Spalte von einer gewöhnlichen, bei der ein `DROP COLUMN` Daten vernichtet.
 
-**Empfehlung:** kein eigener Anlauf. Die drei Anweisungen an die nächste ohnehin fällige
-Migration anhängen — dann kostet der Schritt fast nichts. Tritt der Fehler vorher erneut auf,
-steht diesmal die Meldung der Selbstheilung im Server-Log; damit wäre zugleich belegt, dass
-sie greift, und der bessere Zeitpunkt für die Entscheidung gekommen.
+So umgesetzt in `private/migrations/1.3.1.php`, ergänzt um zwei Sicherungen: Der Schritt
+bricht ab, wenn es Mitglieder mit mehr als einer laufenden Sitzung gibt — der Unique-Index
+ließe sich danach nicht wieder anlegen und die Tabelle bliebe ohne Spalte zurück —, und er
+erkennt eine bereits gespeicherte Spalte als erledigt.
 
 Ein früher angelegter Kontrollaufbau (`zz_virt` / `zz_plain` in der Testdatenbank) wurde am
 2026-09-09 wieder entfernt: Er hätte nur nach einem echten Absturz etwas gezeigt, nicht nach
