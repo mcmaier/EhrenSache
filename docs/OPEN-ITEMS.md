@@ -464,6 +464,40 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 
 ---
 
+### OI-43 · Offline-Betrieb der Check-in-PWA
+**Priorität:** niedrig — heute bewusst ohne, aber nie entschieden
+
+Die Check-in-PWA hat **keinen Cache**. Ihr Service Worker reicht jede Anfrage ans Netz durch;
+er dient allein der Installierbarkeit auf dem Startbildschirm. Ohne Verbindung zeigt die App
+also nichts.
+
+**Wie es dazu kam.** Eine Zwischenspeicherung war gebaut und wurde am 2025-12-08 mit `ffe4690`
+stillgelegt — demselben Umbau, der die Web-Root auf `public/` legte. Danach zeigten die
+absoluten Pfade der Vorabladeliste (`/index.html`, `/css/style.css`, `/js/app.js`) nicht mehr
+auf die PWA, sondern auf das Dashboard, und `/manifest.json` gab es dort gar nicht. Ein
+`cache.add()` auf eine 404 scheitert; der Folgecommit desselben Tages heißt „Fixed service
+worker" und behebt es durch Abschalten.
+
+Der abgeschaltete Code stand danach neun Monate auskommentiert in der Datei, zusammen mit
+`CACHE_NAME` und `urlsToCache` — zwei Konstanten, die nach Bedeutung aussahen und keine
+hatten. Am 2026-09-09 entfernt (die Historie hält sie fest), der Verzicht steht jetzt als
+Kommentar in `public/checkin/service-worker.js`.
+
+**Zu entscheiden:** Soll die PWA offline etwas können?
+
+- *Dafür:* Ein Proberaum im Keller hat oft schlechten Empfang. Ein zwischengespeicherter
+  Rahmen lädt sofort und zeigt wenigstens Verlauf und Statistik des letzten Standes.
+- *Dagegen:* Check-in und Zeiterfassung brauchen die API. Ein Rahmen, der lädt und dann bei
+  jeder Aktion scheitert, kann irreführender sein als eine klare Meldung „keine Verbindung".
+  Die virtuelle Station hat sich aus demselben Grund bewusst dagegen entschieden — dort steht
+  zusätzlich, dass eine Offline-Warteschlange keine verlässliche Uhr hätte.
+
+**Falls dafür:** Pfade relativ zum Scope (`./index.html` statt `/index.html`), Cache-Name an
+`version.json` hängen und wie die `?v=`-Links per Test absichern, und einen Weg vorsehen, wie
+ein Nutzer einen veralteten Rahmen loswird.
+
+---
+
 ## Restarbeiten
 
 ### OI-4 · Terminbezug: Oberfläche unvollständig
