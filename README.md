@@ -1,4 +1,4 @@
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0) [![Commercial License](https://img.shields.io/badge/Commercial-License%20Available-green.svg)](COMMERCIAL-LICENSE.md)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0) [![Commercial License](https://img.shields.io/badge/Commercial-License%20Available-green.svg)](COMMERCIAL-LICENSE.md) [![Release](https://img.shields.io/github/v/release/mcmaier/EhrenSache)](https://github.com/mcmaier/EhrenSache/releases/latest)
 
 # EhrenSache
 
@@ -97,10 +97,17 @@ Fachanwalt für IT-Recht, um die DSGVO-Konformität sicherzustellen.
 
 ### Setup
 
-1. Repository klonen oder Paket downloaden:
+1. Paket besorgen — für den Betrieb die **veröffentlichte Version**:
+
+   [**⬇ Aktuelle Version herunterladen**](https://github.com/mcmaier/EhrenSache/releases/latest)
+
+   Der Link führt immer auf das neueste Release. Wer mitentwickeln will, klont stattdessen:
 ```bash
 git clone https://github.com/mcmaier/EhrenSache.git
 ```
+   Der Klon liefert denselben Stand — der Arbeitsstand liegt auf dem Branch `dev` und ist
+   nicht für den Betrieb gedacht.
+
 2. Komplettes Verzeichnis in Webspace hochladen.
 > [!WARNING]
 > Die Web-Root der (Sub-)Domain muss auf den Ordner **EhrenSache/public** zeigen!

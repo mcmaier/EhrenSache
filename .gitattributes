@@ -14,3 +14,4 @@ private/migrations/_*       export-ignore
 
 # Demo-Datengenerator: leert Tabellen, gehoert nicht ins Installationspaket
 private/demo/               export-ignore
+tests/                      export-ignore
