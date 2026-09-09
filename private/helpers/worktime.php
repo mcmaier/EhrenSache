@@ -393,6 +393,113 @@ function closeStaleSession($db, $database, array $session, ?int $userId): bool
 }
 
 // ============================================
+// SELBSTHEILUNG: VERLORENER AUTO_INCREMENT (OI-1)
+// ============================================
+
+/**
+ * Ist das der verlorene AUTO_INCREMENT-Zähler?
+ *
+ * MySQL-Fehler 1467. Tritt auf, wenn InnoDB nach einer Crash-Recovery die
+ * AUTOINC-Spalte im eigenen Wörterbuch nicht mehr findet und die Erzeugung
+ * abschaltet. Siehe OI-1.
+ */
+function worktimeIsLostAutoinc(PDOException $e): bool
+{
+    return isset($e->errorInfo[1]) && (int) $e->errorInfo[1] === 1467;
+}
+
+/**
+ * Setzt den AUTO_INCREMENT-Zähler einer Tabelle auf MAX(<idColumn>) + 1.
+ *
+ * Absichtlich mit Tabelle und Spalte als Parameter statt fest verdrahtet:
+ * So lässt sich die Funktion gegen eine Wegwerftabelle prüfen, ohne die
+ * Zeiterfassung anzufassen.
+ *
+ * @return bool true, wenn der Zähler gesetzt wurde
+ */
+function worktimeRepairAutoinc(PDO $db, string $table, string $idColumn): bool
+{
+    // ALTER TABLE erlaubt keine Platzhalter -- Tabellen- und Spaltenname
+    // muessen deshalb vor der Verwendung im SQL geprueft werden. Sonst
+    // entstuende hier eine Injektionsstelle, wo im ganzen Projekt sonst
+    // Prepared Statements stehen.
+    if (!preg_match('/^[A-Za-z0-9_]+$/', $table)) {
+        throw new InvalidArgumentException("Ungültiger Tabellenname: '{$table}'.");
+    }
+    if (!preg_match('/^[A-Za-z0-9_]+$/', $idColumn)) {
+        throw new InvalidArgumentException("Ungültiger Spaltenname: '{$idColumn}'.");
+    }
+
+    try {
+        $stmt = $db->query("SELECT COALESCE(MAX(`{$idColumn}`), 0) + 1 FROM `{$table}`");
+        $next = (int) $stmt->fetchColumn();
+
+        $db->exec("ALTER TABLE `{$table}` AUTO_INCREMENT = {$next}");
+
+        error_log(
+            "EhrenSache: Der AUTO_INCREMENT-Zaehler der Tabelle '{$table}' wurde " .
+            "automatisch auf {$next} gesetzt. Grund: Der Datenbankserver (InnoDB) hat " .
+            "diesen Zaehler nach einem Absturz und dessen Wiederherstellung " .
+            "(Crash-Recovery) verloren -- ein Fehler des Datenbankservers, nicht der " .
+            "Anwendung. Ohne diesen Eingriff waere jeder INSERT in dieser Tabelle mit " .
+            "MySQL-Fehler 1467 gescheitert. Details: OI-1 in docs/OPEN-ITEMS.md."
+        );
+
+        return true;
+    } catch (PDOException $e) {
+        error_log(
+            "EhrenSache: Automatische Reparatur des AUTO_INCREMENT-Zaehlers von " .
+            "'{$table}' ist fehlgeschlagen: " . $e->getMessage() . ". " .
+            "Bitte manuell pruefen (OI-1 in docs/OPEN-ITEMS.md)."
+        );
+        return false;
+    }
+}
+
+/**
+ * Führt einen Schreibvorgang auf work_sessions aus und heilt dabei einen
+ * verlorenen AUTO_INCREMENT-Zähler (OI-1).
+ *
+ * Der Eingriff geschieht bewusst nicht still: worktimeRepairAutoinc()
+ * protokolliert ihn laut über error_log(), damit künftige Diagnosen nicht
+ * erschwert werden, nur weil die Anwendung sich selbst geholfen hat.
+ *
+ * Nicht End-to-End geprüft: Der Auslöser -- InnoDB schaltet nach einer
+ * Crash-Recovery die AUTOINC-Generierung ab -- lässt sich nicht auf Kommando
+ * herstellen, sondern nur durch einen echten Absturz. Der Wiederholungspfad
+ * unten läuft deshalb in der Testsuite nie durch; belegt ist ausschließlich
+ * worktimeRepairAutoinc() selbst, gegen eine Wegwerftabelle
+ * (tests/db/verify_autoinc_repair.php).
+ *
+ * @param callable $arbeit Schreibvorgang ohne Argumente
+ * @return mixed Rückgabewert von $arbeit()
+ */
+function worktimeWithAutoincRepair(PDO $db, $database, callable $arbeit)
+{
+    try {
+        return $arbeit();
+    } catch (PDOException $e) {
+        if (!worktimeIsLostAutoinc($e)) {
+            throw $e;
+        }
+
+        // ALTER TABLE ist DDL und loest in MySQL ein implizites Commit aus.
+        // Innerhalb einer noch offenen Transaktion wuerde es sie unbemerkt
+        // festschreiben -- deshalb zuerst zurueckrollen.
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
+
+        $repaired = worktimeRepairAutoinc($db, $database->table('work_sessions'), 'session_id');
+        if (!$repaired) {
+            throw $e;
+        }
+
+        return $arbeit();
+    }
+}
+
+// ============================================
 // AUSWERTUNG
 // ============================================
 

@@ -333,3 +333,50 @@ test('worktimeSameInstant: zwei leere Strings', function () {
     // Nicht dasselbe wie null gegen null, aber dieselbe Antwort.
     assertTrue(worktimeSameInstant('', ''));
 });
+
+// ---- worktimeIsLostAutoinc / worktimeRepairAutoinc (OI-1) -------------------
+
+/** Baut eine PDOException mit gesetztem errorInfo, wie PDO sie tatsaechlich liefert. */
+function pdoExceptionWithErrorInfo(string $sqlstate, int $code, string $message): PDOException
+{
+    $e = new PDOException($message);
+    $e->errorInfo = [$sqlstate, $code, $message];
+
+    return $e;
+}
+
+test('worktimeIsLostAutoinc erkennt Fehler 1467', function () {
+    $e = pdoExceptionWithErrorInfo('HY000', 1467,
+        'Failed to read auto-increment value from storage engine');
+
+    assertTrue(worktimeIsLostAutoinc($e));
+});
+
+test('worktimeIsLostAutoinc erkennt einen Duplikat-Konflikt (1062) nicht', function () {
+    $e = pdoExceptionWithErrorInfo('23000', 1062, "Duplicate entry '1' for key 'PRIMARY'");
+
+    assertTrue(!worktimeIsLostAutoinc($e));
+});
+
+test('worktimeIsLostAutoinc vertraegt eine PDOException ohne errorInfo', function () {
+    $e = new PDOException('irgendein Fehler');
+
+    assertTrue(!worktimeIsLostAutoinc($e));
+});
+
+test('worktimeRepairAutoinc wirft bei einem Tabellennamen mit Sonderzeichen', function () {
+    assertThrows(function () {
+        // $db wird nie erreicht -- die Pruefung des Namens greift vorher.
+        worktimeRepairAutoinc(new class extends PDO {
+            public function __construct() {}
+        }, 'ez_work_sessions; DROP TABLE x', 'session_id');
+    }, 'Ein Tabellenname mit Sonderzeichen haette eine Exception ausloesen muessen');
+});
+
+test('worktimeRepairAutoinc wirft bei einem Spaltennamen mit Sonderzeichen', function () {
+    assertThrows(function () {
+        worktimeRepairAutoinc(new class extends PDO {
+            public function __construct() {}
+        }, 'ez_work_sessions', 'session_id; DROP TABLE x');
+    }, 'Ein Spaltenname mit Sonderzeichen haette eine Exception ausloesen muessen');
+});

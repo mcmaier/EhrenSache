@@ -335,43 +335,50 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId, arr
     }
 
     try {
-        $db->beginTransaction();
+        $sessionId = null;
 
-        $stmt = $db->prepare("INSERT INTO {$prefix}work_sessions
-                              (member_id, activity_id, appointment_id, start_time,
-                               start_location_name, status, source, created_by)
-                              VALUES (?, ?, ?, NOW(), ?, 'confirmed', ?, ?)");
-        $stmt->execute([$memberId, (int)$data->activity_id, $appointmentId,
-                        $startLocation, $source, $authUserId]);
-        $sessionId = (int)$db->lastInsertId();
+        worktimeWithAutoincRepair($db, $database, function () use (
+            $db, $database, $prefix, $memberId, $data, $appointmentId,
+            $startLocation, $source, $authUserId, &$sessionId
+        ) {
+            $db->beginTransaction();
 
-        // KEIN Anwesenheitseintrag. Bis 1.2.2 legte der Timer-Start bei einem
-        // Termin am selben Tag einen records-Eintrag an (E4 der Zeiterfassungs-
-        // Spec, dort seit 1.2.3 als ueberholt vermerkt). Das war eine
-        // Bequemlichkeit mit zwei Nebenwirkungen:
-        //
-        // statistics.php liest records OHNE Ruecksicht auf checkin_source. Ein
-        // so erzeugter Eintrag zaehlte damit voll in die Anwesenheitsquote, und
-        // wegen arrival_time = NOW() auch in die Puenktlichkeit. Wer um 08:00
-        // die Buehne fuer das Konzert um 19:00 aufbaute, galt als anwesend und
-        // als elf Stunden zu frueh -- beides zugunsten des Mitglieds, in einer
-        // Auswertung, die Verlaesslichkeit messen soll.
-        //
-        // Der Datumsschutz sollte das verhindern, traf aber daneben: Am
-        // Veranstaltungstag wird typischerweise gearbeitet. Er wehrte den
-        // Vortag ab und liess den Regelfall durch.
-        //
-        // Seither gilt fuer alle drei Erfassungswege derselbe Satz: Kein Weg
-        // der Zeiterfassung erzeugt Anwesenheit. Wer beides behaupten will,
-        // tut beides; in der PWA liegen die Wege nebeneinander.
+            $stmt = $db->prepare("INSERT INTO {$prefix}work_sessions
+                                  (member_id, activity_id, appointment_id, start_time,
+                                   start_location_name, status, source, created_by)
+                                  VALUES (?, ?, ?, NOW(), ?, 'confirmed', ?, ?)");
+            $stmt->execute([$memberId, (int)$data->activity_id, $appointmentId,
+                            $startLocation, $source, $authUserId]);
+            $sessionId = (int)$db->lastInsertId();
 
-        logSessionChange($db, $database, $sessionId, $authUserId, 'create', [
-            'source'              => ['old' => null, 'new' => $source],
-            'activity_id'         => ['old' => null, 'new' => (int)$data->activity_id],
-            'start_location_name' => ['old' => null, 'new' => $startLocation],
-        ]);
+            // KEIN Anwesenheitseintrag. Bis 1.2.2 legte der Timer-Start bei einem
+            // Termin am selben Tag einen records-Eintrag an (E4 der Zeiterfassungs-
+            // Spec, dort seit 1.2.3 als ueberholt vermerkt). Das war eine
+            // Bequemlichkeit mit zwei Nebenwirkungen:
+            //
+            // statistics.php liest records OHNE Ruecksicht auf checkin_source. Ein
+            // so erzeugter Eintrag zaehlte damit voll in die Anwesenheitsquote, und
+            // wegen arrival_time = NOW() auch in die Puenktlichkeit. Wer um 08:00
+            // die Buehne fuer das Konzert um 19:00 aufbaute, galt als anwesend und
+            // als elf Stunden zu frueh -- beides zugunsten des Mitglieds, in einer
+            // Auswertung, die Verlaesslichkeit messen soll.
+            //
+            // Der Datumsschutz sollte das verhindern, traf aber daneben: Am
+            // Veranstaltungstag wird typischerweise gearbeitet. Er wehrte den
+            // Vortag ab und liess den Regelfall durch.
+            //
+            // Seither gilt fuer alle drei Erfassungswege derselbe Satz: Kein Weg
+            // der Zeiterfassung erzeugt Anwesenheit. Wer beides behaupten will,
+            // tut beides; in der PWA liegen die Wege nebeneinander.
 
-        $db->commit();
+            logSessionChange($db, $database, $sessionId, $authUserId, 'create', [
+                'source'              => ['old' => null, 'new' => $source],
+                'activity_id'         => ['old' => null, 'new' => (int)$data->activity_id],
+                'start_location_name' => ['old' => null, 'new' => $startLocation],
+            ]);
+
+            $db->commit();
+        });
 
         $session = getRunningSession($db, $database, $memberId);
 
@@ -632,20 +639,22 @@ function workSessionCreateManual($db, $database, $data, $authUserId, $authMember
                            break_minutes, note, status, source, created_by,
                            approved_by, approved_at)
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([
-        $memberId,
-        (int)$input['activity_id'],
-        $appointmentId,
-        date('Y-m-d H:i:s', strtotime((string)$input['start_time'])),
-        date('Y-m-d H:i:s', strtotime((string)$input['end_time'])),
-        (int)$input['break_minutes'],
-        trim((string)$input['note']) !== '' ? trim((string)$input['note']) : null,
-        $status,
-        $source,
-        $authUserId,
-        $isApprover ? $authUserId : null,
-        $isApprover ? date('Y-m-d H:i:s') : null
-    ]);
+    worktimeWithAutoincRepair($db, $database, function () use ($stmt, $memberId, $input, $appointmentId, $status, $source, $authUserId, $isApprover) {
+        $stmt->execute([
+            $memberId,
+            (int)$input['activity_id'],
+            $appointmentId,
+            date('Y-m-d H:i:s', strtotime((string)$input['start_time'])),
+            date('Y-m-d H:i:s', strtotime((string)$input['end_time'])),
+            (int)$input['break_minutes'],
+            trim((string)$input['note']) !== '' ? trim((string)$input['note']) : null,
+            $status,
+            $source,
+            $authUserId,
+            $isApprover ? $authUserId : null,
+            $isApprover ? date('Y-m-d H:i:s') : null
+        ]);
+    });
     $sessionId = (int)$db->lastInsertId();
 
     logSessionChange($db, $database, $sessionId, $authUserId, 'create',
