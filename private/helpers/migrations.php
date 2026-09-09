@@ -181,7 +181,13 @@ function detectDbVersion(PDO $pdo, string $prefix): string
         return $latest ?? '1.1.x';
     }
     // Alte Tabellen ohne Prefix vorhanden → 1.0.0
-    if (tableExists($pdo, 'users') && !tableExists($pdo, $prefix . 'users')) {
+    //
+    // Der leere Prefix ist der Normalfall, nicht die Ausnahme: 1.0.0 kannte das
+    // Feld $prefix in der config.php noch nicht, parseConfig() im Assistenten
+    // liefert dafuer ''. Ohne die erste Haelfte der Oder-Bedingung stuende hier
+    // tableExists('users') && !tableExists('users') — immer falsch, und keine
+    // einzige 1.0.0-Installation liesse sich aktualisieren.
+    if (tableExists($pdo, 'users') && ($prefix === '' || !tableExists($pdo, $prefix . 'users'))) {
         return '1.0.0';
     }
     // Prefix-Tabellen ohne Schema-Versions-Tabelle → kurz nach 1.1.0 installiert

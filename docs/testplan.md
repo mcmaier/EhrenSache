@@ -528,7 +528,7 @@ php tests/run.php htaccess_locks
 
 Gegen eine echte Datenbank. Legt die Wegwerf-Datenbank `ehrensache_chaintest` an und
 entfernt sie am Ende; bestehende Datenbanken und `private/config/config.php` bleiben
-unberührt. Deckt UPD-1 bis UPD-5 ab.
+unberührt. Deckt UPD-1 bis UPD-5a ab.
 
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
@@ -537,6 +537,7 @@ unberührt. Deckt UPD-1 bis UPD-5 ab.
 | UPD-3 | Kette bei Stand 1.0.0 | `1.0.0 → 1.1.3`, Tabellen erhalten das Prefix, `config.php` bekommt `$prefix` und `table()`, beide Versionen gestempelt |
 | UPD-4 | Zweiter Lauf | Folgenlos, keine Fehler, keine Warnungen |
 | UPD-5 | Leere Datenbank | `detectDbVersion` meldet `unbekannt`, klare Fehlermeldung statt PHP-Fatal |
+| UPD-5a | Echte 1.0.0-Datenbank (Tag `v1.0.0`, Tabellen ohne Präfix), Erkennung mit **leerem** Präfix | `1.0.0` erkannt, Kette läuft bis zur Zielversion. Der Fall aus der Wirklichkeit, den UPD-3 nicht abbildet: Dort wird ein Präfix mitgegeben, obwohl eine 1.0.0-`config.php` keines kennt |
 | UPD-6 | `php tests/run.php` | Alle Suites bestehen, Exit-Code 0 |
 
 ### Manuell (Oberfläche)

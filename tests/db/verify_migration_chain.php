@@ -66,6 +66,31 @@ function resetDb(): void
     $pdo->exec('CREATE DATABASE `' . DB . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 }
 
+/**
+ * Spielt das Setup-Schema eines getaggten Standes ein.
+ *
+ * applySchema() nimmt immer das heutige Schema. Fuer die Versionserkennung
+ * reicht das nicht: Sie unterscheidet die Staende gerade an den Tabellen, die
+ * es damals gab.
+ */
+function applyTaggedSchema(PDO $pdo, string $tag, string $prefix): void
+{
+    global $repo;
+
+    $befehl = sprintf('git -C %s show %s 2>&1', escapeshellarg($repo),
+                      escapeshellarg($tag . ':private/setup/ehrensache_db.sql'));
+    $sql = (string) shell_exec($befehl);
+
+    if (stripos($sql, 'CREATE TABLE') === false) {
+        fwrite(STDERR, "Schema aus {$tag} nicht lesbar:
+{$sql}
+");
+        exit(2);
+    }
+
+    $pdo->exec(str_replace('{PREFIX}', $prefix, $sql));
+}
+
 /** Spielt das Setup-Schema mit dem gegebenen Prefix ein. */
 function applySchema(PDO $pdo, string $prefix): void
 {
@@ -350,6 +375,27 @@ check('Protokoll behauptet keine Uebernahme', false, str_contains($protokoll, 'Ã
 check('Protokoll nennt den vorhandenen Wert', true,
       str_contains($protokoll, 'cleanup_years_records existiert bereits'));
 check('verworfener Bestandswert erzeugt eine Warnung', 1, count($res['warnings']));
+
+// --- UPD-5a: echte 1.0.0-Installation, Prefix leer ---------------------------
+// Der Fall aus der Wirklichkeit, den UPD-3 nicht abbildet: Dort wird ein
+// Prefix mitgegeben, obwohl eine 1.0.0-config.php gar keines kennt. Genau diese
+// Kombination -- Tabellen ohne Prefix, parseConfig() liefert '' -- liess bis
+// 2026-09-09 jede 1.0.0-Installation am Assistenten scheitern.
+echo "
+UPD-5a: echte 1.0.0-Installation mit leerem Prefix
+";
+resetDb();
+$pdo = db(DB);
+applyTaggedSchema($pdo, 'v1.0.0', '');
+
+check('Tabellen liegen ohne Prefix vor', true, (bool) $pdo->query("SHOW TABLES LIKE 'users'")->rowCount());
+check('1.0.0 wird auch ohne Prefix erkannt', '1.0.0', detectDbVersion($pdo, ''));
+check('normalizeDetectedVersion nimmt den Stand an', '1.0.0', normalizeDetectedVersion(detectDbVersion($pdo, '')));
+
+// Die Kette muss danach auch wirklich durchlaufen, nicht nur die Erkennung.
+$res = runWizardStep3($pdo, PREFIX, $target);
+check('Kette startet bei 1.0.0', '1.0.0', $res['from']);
+check('Endstand ist die Zielversion', $target, latestSchemaVersion(readSchemaVersions($pdo, PREFIX)));
 
 // --- Aufraeumen --------------------------------------------------------------
 db()->exec('DROP DATABASE IF EXISTS `' . DB . '`');
