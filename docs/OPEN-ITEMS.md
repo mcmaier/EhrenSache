@@ -118,12 +118,12 @@ ALTER TABLE … MODIFY active_member int(11) GENERATED ALWAYS AS (…) STORED;
 Unique-Index greift danach unverändert:
 
 ```sql
-ALTER TABLE {PREFIX}work_sessions DROP INDEX ez_uq_running_session;
+ALTER TABLE {PREFIX}work_sessions DROP INDEX `{PREFIX}uq_running_session`;
 ALTER TABLE {PREFIX}work_sessions DROP COLUMN active_member;
 ALTER TABLE {PREFIX}work_sessions
   ADD COLUMN active_member int(11) GENERATED ALWAYS AS
       (if(end_time is null, member_id, NULL)) STORED,
-  ADD UNIQUE KEY ez_uq_running_session (active_member);
+  ADD UNIQUE KEY `{PREFIX}uq_running_session` (active_member);
 ```
 
 Das Löschen der Spalte ist dabei ungefährlich: Ihr Wert folgt vollständig aus `end_time` und
