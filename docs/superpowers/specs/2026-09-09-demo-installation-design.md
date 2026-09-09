@@ -75,7 +75,15 @@ und lägen hinter dem `switch` außerhalb der Reichweite.
 Der Wächter braucht nur `$resource` und `$request_method`. Keine Rolle, keine Session, kein
 Handler-Rumpf wird angefasst.
 
-**Regel:** `GET` geht immer durch. Jeder schreibende Zugriff muss gelistet sein.
+**Regel:** `GET` und `HEAD` gehen durch, sofern die Ressource in einer der drei Listen steht.
+Jeder schreibende Zugriff muss ausdrücklich erlaubt sein.
+
+> **Nachgeschärft am 2026-09-09 nach der Qualitätsdurchsicht.** Die erste Fassung lautete
+> „`GET` geht immer durch". Damit wäre eine künftig neue Ressource lesend ohne jede
+> Entscheidung freigegeben gewesen — nur ihre Schreibzugriffe wären gesperrt. Das
+> widerspricht dem Leitgedanken „neu heißt gesperrt" aus Abschnitt 3. Jetzt tragen alle
+> drei Listen Last: Wer eine Ressource ergänzt, ohne sie einzutragen, bekommt in der Demo
+> ein sichtbares 403 statt einer stillen Freigabe.
 
 ## 6. Die Erlaubnisliste
 
@@ -116,10 +124,31 @@ benannt sein, damit „nicht gelistet" nicht mit „vergessen" verwechselt wird.
 
 ### Offengelegte Annahme
 
-„`GET` geht durch" trägt nur, solange kein `GET` etwas verändert. Geprüft wurden die beiden
-gefährlichsten: `cleanup` und `regenerate_token` sind beide `POST` und fallen ohnehin unter
-die Sperre. `export` ist `GET` und bleibt erlaubt — ein Download erfundener Daten, den die
-Werbeseite ohnehin bewirbt. Die Vollständigkeitsprüfung (Abschnitt 9) hält die Annahme fest.
+„`GET` geht durch" trägt nur, solange kein `GET` etwas verändert. Bei der Qualitätsdurchsicht
+am 2026-09-09 wurde jeder schreibende Handler daraufhin einzeln geprüft: `handleCleanup`,
+`handleTokenRegeneration`, `handlePasswordChange`, `handlePinChange`, `handleImport`,
+`handleUserActivation`, `handleUserStatus`, `handleTotpCheckin` und `handleAutoCheckin`
+weisen eine falsche Methode ab; `handleStation` trennt `GET` (`status`, `totp`) sauber von
+`POST`. `get_smtp_config` ist eine `POST`-Aktion von `settings` — die SMTP-Zugangsdaten des
+Betreibers sind nicht über `GET` erreichbar. `export` ist `GET` und bleibt erlaubt: ein
+Download erfundener Daten, den die Werbeseite ohnehin bewirbt.
+
+Die Vollständigkeitsprüfung (Abschnitt 9) hält die Annahme fest.
+
+### Bekannte Lücke: die Kiosk-PIN
+
+`change_pin` ist gesperrt, aber dieselbe Wirkung ist über die **erlaubte** Ressource
+`members` erreichbar: deren `PUT`-Zweig schreibt `pin_hash` (`private/handlers/members.php`,
+etwa Zeile 381). Ein Besucher kann die PIN des Mitglieds ändern oder löschen, dessen PIN auf
+der Demo-Seite steht; die Kiosk-Demo ist dann bis zum nächsten Reset unbrauchbar. Dasselbe
+gilt abgeschwächt für `members` `DELETE`, das `users.member_id` auf `NULL` setzt.
+
+Kein Sicherheitsproblem — keine Rechteausweitung, kein Datenabfluss, nur erfundene Daten.
+Am 2026-09-09 bewusst hingenommen: Der stündliche Reset ist die Gegenmaßnahme. Eine
+Feldsperre im `members`-Handler wurde erwogen und verworfen, weil sie die Grundentscheidung
+„ein Wächter, keine Wächter in den Handlern" aufgäbe. Die Begründung an `change_pin` in der
+Sperrliste ist entsprechend zu formulieren, damit niemand einen Schutz vermutet, den es
+nicht gibt.
 
 ## 7. Der Hinweis im Betrieb
 
