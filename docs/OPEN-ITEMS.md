@@ -381,6 +381,50 @@ für eine Freigabeliste tun.
 `public/js/modules/worktime.js`, gegebenenfalls `private/handlers/` für einen
 zusammenfassenden Lesezugriff. Kein Schemabedarf für die erste Stufe.
 
+### OI-42 · Neun Versionen haben den Release-Branch nie erreicht
+**Priorität:** hoch — offen, aufgefallen am 2026-09-09 bei der Frage nach dem Versionssprung
+
+`main` steht auf **1.1.3** (Build 2026-04-15), `dev` auf **1.3.1**. Dazwischen liegen
+**230 Commits**, und der CHANGELOG führt neun Versionen als veröffentlicht, die es auf dem
+Release-Branch nie gab: 1.2.0 bis 1.3.1, alle datiert zwischen dem 1. und 7. September 2026.
+Tags gibt es nur bis `v1.1.3`.
+
+**Was das für einen Verein bedeutet:**
+
+- `origin/HEAD` zeigt auf `main`. Wer der Anleitung in `README.md` folgt und das Repository
+  klont — oder das ZIP von GitHub lädt —, bekommt **1.1.3**. Alles, was seit September
+  dokumentiert ist (Arbeitszeiterfassung, virtuelle Station, Kiosk, die gesamte PWA-Arbeit),
+  ist für eine Neuinstallation nicht erreichbar.
+- `SECURITY.md` sagt zu: Sicherheitsupdates für **1.2.x**, und 1.1.x-Nutzer sollen „über den
+  Update-Wizard auf 1.2.x aktualisieren". Beides geht nicht: 1.2.x ist nirgends zu beziehen,
+  und die einzige beziehbare Version — 1.1.3 — ist dort als nicht unterstützt geführt. 1.3.x
+  kommt in der Tabelle gar nicht vor.
+- Die Migrationskette in `private/migrations/manifest.php` ist vollständig (1.0.0 → 1.1.3 →
+  … → 1.3.1), aber das hilft niemandem, der bei 1.1.3 steht: Eine Installation führt die
+  Kette aus, die in **ihrem eigenen** Code liegt, und 1.1.3 kennt nur den Schritt bis 1.1.3.
+  Die Kette wirkt erst, nachdem der neue Code angekommen ist.
+
+**Die gute Nachricht:** `main` ist ein reiner Vorfahr von `dev` — 230 Commits voraus, **null**
+zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
+
+**Vor dem Nachholen zu entscheiden:**
+
+- **Ein Release oder neun?** Alles gesammelt als eine Version herausgeben (dann wäre 1.4.0 die
+  naheliegende Nummer, weil der unveröffentlichte Block neue Funktionen enthält), oder die
+  Zwischenstände nachträglich taggen, damit CHANGELOG und Tags sich decken. Für die zweite
+  Variante spricht, dass der CHANGELOG diese Daten bereits als Tatsachen nennt.
+- **Nachträgliche Tags?** `v1.2.0` bis `v1.3.1` liegen als Commits vor und ließen sich
+  nachträglich setzen. Das macht die Historie ehrlich, datiert die Tags aber anders als der
+  CHANGELOG behauptet.
+- **`SECURITY.md` richtigstellen.** Die Tabelle muss die Versionen nennen, die es wirklich
+  gibt — unabhängig davon, wie der Rückstand aufgeholt wird. Solange dort ein Update auf eine
+  unbeziehbare Version empfohlen wird, ist die Datei irreführend.
+- **Wann?** Der nächste Versionssprung ist der natürliche Moment. Bis dahin gilt: Wer die
+  Anwendung heute installiert, bekommt eine ein halbes Jahr alte Fassung.
+
+**Berührt:** Branch `main`, Tags, `version.json`, `CHANGELOG.md`, `SECURITY.md`, `README.md`
+(Bezugsweg). Kein Code.
+
 ---
 
 ## Restarbeiten
