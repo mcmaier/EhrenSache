@@ -25,6 +25,7 @@ statt sie hier zu duplizieren:
 | `public/station/README.md` | PWA für die virtuelle Station (Kiosk) | ja |
 | `docs/OPEN-ITEMS.md` | **Offene Entscheidungen, Restarbeiten, bewusst Verworfenes** | ja |
 | `docs/FEATURE-IDEAS.md` | **Ideen für künftige Funktionen — unverbindlich, nicht geplant** | ja |
+| `docs/project_history.md` | **Warum das System so gebaut ist: Grundsatzentscheidungen und verworfene Wege (11/2025–04/2026)** | ja |
 | `docs/testplan.md` | Manueller Testplan nach Feature-Bereichen | ja |
 | `docs/superpowers/specs/` | Design-Spezifikationen je Feature | ja |
 | `docs/superpowers/plans/` | Umsetzungspläne je Feature (Prozessprotokolle) | nein (ignoriert) |
@@ -36,6 +37,11 @@ Installationspaket eines Vereins.
 
 **Vor dem Start einer Aufgabe:** `docs/OPEN-ITEMS.md` lesen. Dort steht, was bereits
 entschieden und was bewusst verworfen wurde — das verhindert doppelte Diskussionen.
+
+**Bei Architektur-, Technologie- oder Produktfragen** zusätzlich `docs/project_history.md`
+lesen: die Begründungen hinter dem heutigen Aufbau, einschließlich einer Liste verworfener
+Wege, die nicht erneut vorgeschlagen werden sollen. Bei Widerspruch gilt der Code; die Datei
+wird nur ergänzt, wenn eine Grundsatzentscheidung fällt oder gekippt wird.
 
 **Sicherheitsfunde:** `docs/OPEN-ITEMS.md` ist öffentlich. Ungepatchte Lücken, die ohne
 vorherigen Zugang ausnutzbar sind oder eine Rechteausweitung erlauben, dort **nicht**
