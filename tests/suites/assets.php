@@ -162,3 +162,27 @@ test('Kein ungeschuetztes console.log/warn/debug in Auslieferungsskripten', func
         "Ungeschuetzte Konsolenausgabe (console.error ist erlaubt):\n  " . implode("\n  ", $verstoesse)
     );
 });
+
+test('Die Station schaltet im Vereins-LAN nicht auf DEBUG', function () use ($repoRoot) {
+    // Dashboard und PWA laufen bei der Entwicklung oft ueber die LAN-Adresse des
+    // Rechners — dort ist 192.168.* bewusst debug-wuerdig. Die Station nicht:
+    // sie haengt als Kiosk dauerhaft im Vereins-LAN und wird genau so
+    // aufgerufen. Waeren die privaten Netze dort eingeschlossen, liefe jedes
+    // Stationsgeraet im Publikumsbetrieb mit offener Konsole.
+    $js = (string) file_get_contents($repoRoot . '/public/station/js/app.js');
+
+    assertTrue(
+        preg_match('/const\s+DEBUG\s*=(.*?)const\s+debug\s*=/s', $js, $m) === 1,
+        'DEBUG-Definition der Station nicht gefunden'
+    );
+    assertTrue(
+        strpos($m[1], 'startsWith(') === false,
+        'Die Station leitet DEBUG aus einem Adresspraefix ab — im Vereins-LAN '
+        . 'schaltet das jeden Kiosk auf laut'
+    );
+    assertTrue(
+        strpos($m[1], '.local') === false,
+        'Die Station erkennt .local als Entwicklungsumgebung — unter genau diesem '
+        . 'Namen wird ein Kiosk im Vereinsnetz aber im Regelbetrieb aufgerufen'
+    );
+});

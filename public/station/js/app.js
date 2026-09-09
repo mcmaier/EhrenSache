@@ -28,11 +28,16 @@
 // Zum Nachsehen auf einer echten Installation: localStorage.setItem('es_debug', '1')
 // in der Konsole. Bewusst kein URL-Parameter — der waere per Link von aussen
 // ausloesbar und wuerde bei einem Mitglied unbemerkt die Konsole fuellen.
+//
+// Enger gefasst als Dashboard und PWA: die privaten Netze und der mDNS-Name
+// fehlen hier. Die Station haengt als Kiosk dauerhaft im Vereins-LAN und wird
+// genau ueber diese Adressen aufgerufen — ein Geraet im Publikumsbetrieb soll
+// nicht mitloggen, nur weil es privat adressiert ist. Bleibt: der eigene
+// Rechner und .test.
 const DEBUG = (() => {
     const h = location.hostname;
     if (h === 'localhost' || h === '127.0.0.1' || h === '::1'
-        || h.endsWith('.local') || h.endsWith('.test')
-        || h.startsWith('192.168.') || h.startsWith('10.')) {
+        || h.endsWith('.test')) {
         return true;
     }
     try {
