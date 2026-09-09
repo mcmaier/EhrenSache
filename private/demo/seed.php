@@ -423,7 +423,11 @@ if ($isMainScript) {
 
     confirmTarget($db, $prefix, $dbName, $options['yes']);
 
-    $plan = buildDemoPlan($options['seed'], $options['reference_date']);
+    // Uhrzeit des tatsächlichen Laufs, nicht nur das Datum: buildWorkSessions()
+    // braucht sie, damit die eine laufende Sitzung im Bestand vor diesem
+    // Zeitpunkt beginnt statt auf einem gewürfelten Slot zwischen 08:00 und
+    // 18:45 — sonst könnte sie in der Zukunft liegen (siehe Docblock dort).
+    $plan = buildDemoPlan($options['seed'], $options['reference_date'], date('H:i:s'));
 
     try {
         $db->beginTransaction();

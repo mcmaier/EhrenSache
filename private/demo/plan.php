@@ -759,6 +759,14 @@ const DEMO_WORK_SESSION_NOTES = [
  *
  * Die Reihenfolge der $random-Aufrufe ist wie bei den übrigen Build-Funktionen
  * Teil der Schnittstelle (siehe Hinweis über buildMembers()).
+ *
+ * Sitzung 120 (die laufende) beginnt 95 Minuten vor
+ * "$referenceDate $referenceTime", nicht auf dem Raster der übrigen Sitzungen:
+ * Ein Datum allein reicht für eine laufende Sitzung nicht, sie braucht eine
+ * Uhrzeit relativ zum tatsächlichen Lauf des Generators — sonst kann sie in
+ * der Zukunft liegen (bei einem Vormittagslauf mit gewürfelter Uhrzeit
+ * zwischen 08:00 und 18:45) und lässt sich weder in der PWA noch über die API
+ * beenden. Ihr create-Eintrag in der Auditspur trägt denselben Zeitpunkt.
  */
 function buildWorkSessions(
     DemoRandom $random,
@@ -768,7 +776,8 @@ function buildWorkSessions(
     array $appointments,
     array $typeGroups,
     array $activityGroups,
-    string $referenceDate
+    string $referenceDate,
+    string $referenceTime
 ): array {
     $windowStart = demoShiftDate($referenceDate, -360);
     $windowEnd   = demoShiftDate($referenceDate, -1);
@@ -830,9 +839,15 @@ function buildWorkSessions(
         }
 
         // Uhrzeit: 08:00 bis 18:45 in Viertelstundenschritten (44 Raster-Werte).
+        // Für die laufende Sitzung wird trotzdem gezogen — die Reihenfolge der
+        // Ziehungen bleibt so für Sitzung 120 selbst unverändert (siehe
+        // appointmentId und $note unten) —, das Ergebnis aber verworfen: Ihr
+        // Start ergibt sich aus dem Bezugszeitpunkt, nicht aus dem Raster.
         $slot      = $random->int(0, 43);
         $minutes   = $slot * 15;
-        $startTime = sprintf('%s %02d:%02d:00', $date, 8 + intdiv($minutes, 60), $minutes % 60);
+        $startTime = $isRunning
+            ? date('Y-m-d H:i:s', strtotime($referenceDate . ' ' . $referenceTime) - 95 * 60)
+            : sprintf('%s %02d:%02d:00', $date, 8 + intdiv($minutes, 60), $minutes % 60);
 
         $eligibleActivities = [];
         foreach ($groupsOf[$memberId] ?? [] as $groupId) {
@@ -851,7 +866,14 @@ function buildWorkSessions(
             $endTime         = date('Y-m-d H:i:s', strtotime($startTime) + $durationMinutes * 60);
         }
 
-        $source = $random->pick(['timer', 'timer', 'manual', 'station']);
+        // Quelle: Ein manueller Nachtrag hat per Definition ein Ende, eine
+        // laufende Sitzung kann also nicht 'manual' sein — bei ihr fest
+        // 'timer'. Gezogen wird trotzdem, das Ergebnis dann verworfen, damit
+        // sich weder die Folge der übrigen Sitzungen noch die von Sitzung 120
+        // selbst verschobenen Ziehungen (appointment_id, note) gegenüber dem
+        // bisherigen Bestand ändern.
+        $drawnSource = $random->pick(['timer', 'timer', 'manual', 'station']);
+        $source      = $isRunning ? 'timer' : $drawnSource;
 
         $appointmentId = null;
         if ($random->chance(1 / 3)) {
@@ -984,8 +1006,13 @@ function buildUsers(): array
  * Ein Aufruf, ein Zufallsgenerator, eine Reihenfolge — damit derselbe Saat
  * denselben Bestand ergibt. Wird hier eine Zeile eingefügt, verschiebt sich alles
  * Nachfolgende; das ist gewollt und der Grund, warum die Reihenfolge feststeht.
+ *
+ * Reproduzierbarkeit hängt an Saat und Stichtag ($referenceDate) — mit einer
+ * Ausnahme: Der Start der einen laufenden Arbeitszeitsitzung (siehe
+ * buildWorkSessions()) hängt zusätzlich an $referenceTime, dem Zeitpunkt des
+ * Laufs. Alles andere im Bestand ist von $referenceTime unabhängig.
  */
-function buildDemoPlan(int $seed, string $referenceDate): array
+function buildDemoPlan(int $seed, string $referenceDate, string $referenceTime = '12:00:00'): array
 {
     $random = new DemoRandom($seed);
 
@@ -997,7 +1024,7 @@ function buildDemoPlan(int $seed, string $referenceDate): array
 
     $records    = buildRecords($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $referenceDate);
     $exceptions = buildExceptions($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $records, $referenceDate);
-    $work       = buildWorkSessions($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $activityGroups, $referenceDate);
+    $work       = buildWorkSessions($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $activityGroups, $referenceDate, $referenceTime);
 
     return [
         'settings'                 => buildSettings(),

@@ -599,7 +599,7 @@ test('kein Mitglied stellt zweimal denselben Antrag', function () {
  * der Stammdaten, von denen er abhaengt. Buendelt den wiederkehrenden Aufbau
  * fuer die folgenden Tests.
  */
-function demoBuildWorkSessionsBundle(int $seed, string $referenceDate = '2026-09-08'): array
+function demoBuildWorkSessionsBundle(int $seed, string $referenceDate = '2026-09-08', string $referenceTime = '12:00:00'): array
 {
     $r              = new DemoRandom($seed);
     $m              = buildMembers($r, $referenceDate);
@@ -614,7 +614,8 @@ function demoBuildWorkSessionsBundle(int $seed, string $referenceDate = '2026-09
         $appts,
         $typeGroups,
         $activityGroups,
-        $referenceDate
+        $referenceDate,
+        $referenceTime
     );
 
     return [
@@ -668,6 +669,39 @@ test('genau eine Sitzung hat kein end_time, und sie gehoert Mitglied 1', functio
     $running = array_values(array_filter($b['sessions'], fn ($s) => $s['end_time'] === null));
     assertSame(1, count($running));
     assertSame(1, $running[0]['member_id']);
+});
+
+// Faengt eine "laufende" Sitzung, die in Wahrheit noch nicht begonnen hat: In
+// der PWA zeigt das eine negative Laufzeit, und stop() (Ende vor Beginn)
+// weist die Sitzung ab, sodass sie sich gar nicht beenden laesst. Ueber
+// mehrere Uhrzeiten geprueft, weil der Fehler nur auftrat, wenn der
+// Generator vor der gewuerfelten Uhrzeit (bis 18:45) lief.
+test('die laufende Sitzung beginnt vor dem Bezugszeitpunkt, ueber mehrere Uhrzeiten', function () {
+    foreach (['00:30:00', '08:00:00', '23:59:00'] as $referenceTime) {
+        $b       = demoBuildWorkSessionsBundle(20260908, '2026-09-08', $referenceTime);
+        $running = array_values(array_filter($b['sessions'], fn ($s) => $s['end_time'] === null))[0];
+        $reference = strtotime('2026-09-08 ' . $referenceTime);
+        assertTrue(
+            strtotime($running['start_time']) < $reference,
+            "Uhrzeit {$referenceTime}: start_time {$running['start_time']} liegt nicht vor dem Bezugszeitpunkt"
+        );
+    }
+});
+
+test('die laufende Sitzung stammt aus der Quelle timer', function () {
+    $b       = demoBuildWorkSessionsBundle(20260908);
+    $running = array_values(array_filter($b['sessions'], fn ($s) => $s['end_time'] === null))[0];
+    assertSame('timer', $running['source']);
+});
+
+test('der create-Eintrag der laufenden Sitzung stimmt mit ihrem Beginn ueberein', function () {
+    $b       = demoBuildWorkSessionsBundle(20260908);
+    $running = array_values(array_filter($b['sessions'], fn ($s) => $s['end_time'] === null))[0];
+    $create  = array_values(array_filter(
+        $b['log'],
+        fn ($e) => $e['session_id'] === $running['session_id'] && $e['action'] === 'create'
+    ))[0];
+    assertSame($running['start_time'], $create['changed_at']);
 });
 
 test('hoechstens eine laufende Sitzung je Mitglied', function () {
