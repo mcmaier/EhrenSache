@@ -4,8 +4,8 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-07 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
-**Version:** 1.3.0
+**Zuletzt geprüft:** 2026-09-09 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
+**Version:** 1.3.1
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
@@ -40,9 +40,38 @@ und den Einfügevorgang einmal wiederholen (~15 Zeilen)?
 - *Dagegen:* Behandelt ein Symptom, dessen Ursache unbekannt ist. Ein stiller Reparaturpfad
   erschwert künftige Diagnosen.
 
-**Nächster Schritt:** Datenbankverhalten über mehrere Neustarts beobachten (läuft). Tritt es
-erneut auf: Selbstheilung einbauen **und** Ursache weiter eingrenzen. Tritt es nicht mehr auf:
-als Einzelfall schließen.
+**Zweite Beobachtung am 2026-09-09.** Nach dem morgendlichen Start von XAMPP stand
+`ez_work_sessions.auto_increment` erneut auf `0` bei `MAX(session_id) = 6200`; 33 von 395 Tests
+schlugen fehl, alle mit demselben Fehler 1467 als Wurzel. Wieder war **keine andere Tabelle
+betroffen** — `ez_work_sessions` ist die einzige mit einer indizierten virtuellen Spalte.
+Behoben mit `ALTER TABLE ez_work_sessions AUTO_INCREMENT = 6201`, danach wieder alle Tests grün.
+`FLUSH TABLES` reproduziert es weiterhin nicht: Der Zähler übersteht das Neuöffnen der Tabelle,
+verloren geht er nur über einen Serverneustart.
+
+Damit ist die Bedingung des früheren nächsten Schritts erfüllt — es ist **erneut aufgetreten**.
+
+**Offen und für die Ursache entscheidend:** Wurde XAMPP am Abend des 2026-09-08 sauber
+heruntergefahren? Falls ja, fällt die Arbeitshypothese „unsauberes Herunterfahren", und der
+Verdacht richtet sich wieder auf die Konstruktion der Tabelle.
+
+**Kontrollaufbau steht bereit.** In der Testdatenbank liegen seit dem 2026-09-09 zwei Tabellen:
+`zz_virt` (auto_increment, virtuelle Spalte `active_member`, Unique-Index darauf — dieselbe
+Konstruktion wie `work_sessions`) und `zz_plain` (nur auto_increment). Beide tragen drei Zeilen
+und standen nach dem Anlegen auf `4`. **Beim nächsten Serverneustart genügt ein Blick:**
+
+```sql
+SELECT table_name, auto_increment FROM information_schema.tables
+WHERE table_schema = 'ehrensache' AND table_name IN ('zz_virt', 'zz_plain');
+```
+
+Steht `zz_virt` auf `0` und `zz_plain` auf `4`, ist die indizierte virtuelle Spalte die Ursache
+und die Konstruktion gehört ersetzt. Stehen beide auf `4`, liegt es nicht an der Tabelle.
+Danach beide Tabellen löschen.
+
+**Nächster Schritt:** Selbstheilung einbauen, wie oben beschrieben — die Bedingung dafür ist
+eingetreten. Ein Verein, dessen Hoster den Datenbankserver neu startet, findet die
+Zeiterfassung sonst kommentarlos stillstehend vor, und ein `ALTER TABLE` kann er nicht
+absetzen. Parallel die Ursache über den Kontrollaufbau eingrenzen.
 
 ---
 
@@ -1119,6 +1148,49 @@ Kennzeichen — siehe `DATENSCHUTZ.md` §10.7.
 
 **Zu tun (optional):** Badge oder Spalte für `source` in Zeiterfassungs-Ansicht und -Export.
 Bis dahin genügen die Ortsfelder zur Einordnung.
+
+---
+
+### OI-40 · `rate_limits.expires_at` wird nie geschrieben
+**Priorität:** niedrig — folgenlos im Betrieb, riskant bei strengerem SQL-Modus
+
+`RateLimiter` schreibt beim Zählen nur `identifier`, `action` und `created_at`
+([rate_limiter.php:104](../private/helpers/rate_limiter.php)) und rechnet seine Fenster
+ausschließlich über `created_at`. Die Spalte `expires_at` ist im Schema aber `NOT NULL` ohne
+Vorgabewert. Jede Zeile trägt deshalb das ungültige Nulldatum `0000-00-00 00:00:00`.
+
+Solange MariaDB nicht im strengen Modus läuft, bleibt das folgenlos. Unter
+`STRICT_TRANS_TABLES` — auf manchem Hosting die Voreinstellung — scheitert dagegen **jeder**
+Schreibvorgang des Limiters, und damit jeder Anmeldeversuch.
+
+**Zu entscheiden:** Spalte entfernen (sie wird nirgends gelesen) oder beim Einfügen mitfüllen.
+Beides braucht eine Migration; die erste Variante ist ehrlicher, weil die Spalte keine
+Bedeutung hat.
+
+---
+
+### OI-41 · `checkin_appointment` ist am selben Tag nicht wiederholbar
+**Priorität:** niedrig — betrifft nur die Testbarkeit
+
+Die Suite legt ihre Termine mit festen Uhrzeiten am aktuellen Tag an („Nachtrag-Termin" 07:00,
+„Frueher Check-in" 04:00, „Spaeter zugeordnet" 13:00 …) und räumt sie nicht wieder ab. Beim
+zweiten Lauf am selben Tag liegen zwei gleichartige Termine im Toleranzfenster, die Automatik
+trifft den älteren, und der Test „Check-in trifft einen Termin im Toleranzfenster" meldet rot,
+obwohl nichts kaputt ist.
+
+Am 2026-09-09 hinterließen zwei Läufe zwölf solcher Termine. Aufgeräumt über den Titelanhang,
+den die Suite vergibt: Titel mit einem angehängten 13-stelligen Hex-Wert.
+
+**Zu tun:** Entweder räumt die Suite ihre Termine am Ende ab, oder sie legt sie zu einer
+Uhrzeit an, die aus der laufenden Sekunde abgeleitet ist.
+
+Dieselbe Familie wie die Stationssperre in `station_api`, dort am 2026-09-09 behoben: Der Test
+„identify mit falscher PIN" schickte eine **feste** unbekannte Mitgliedsnummer
+(`'gibt-es-nicht'`). Die Sperre zählt Fehlversuche auch für unbekannte Nummern — absichtlich,
+damit sich Nummern nicht durchprobieren lassen —, also sammelte diese eine Zeichenkette über
+Läufe hinweg an und der sechste Lauf binnen 15 Minuten bekam `423` statt `401`. Die Nummer
+trägt jetzt ein `uniqid()`, wie alles andere in der Suite auch. Sieben Läufe hintereinander
+sind seither grün.
 
 ---
 

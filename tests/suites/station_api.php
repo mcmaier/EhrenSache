@@ -679,7 +679,13 @@ test('station: identify mit falscher PIN → 401, einheitliche Meldung', functio
     assertStatus(401, $res);
     assertSame('Invalid member number or PIN', $res['body']['message']);
 
-    $res = stationPost('identify', ['member_number' => 'gibt-es-nicht', 'pin' => '2580']);
+    // Die unbekannte Nummer muss je Lauf eine andere sein. Die Sperre zaehlt
+    // Fehlversuche je Mitgliedsnummer (5 in 15 Minuten) und kennt auch
+    // unbekannte Nummern -- absichtlich, damit sich Nummern nicht durchprobieren
+    // lassen. Eine feste Zeichenkette sammelt daher ueber Laeufe hinweg an: Ab
+    // dem sechsten Lauf binnen 15 Minuten antwortet der Server 423 statt 401,
+    // und der Test meldet rot, obwohl nichts kaputt ist.
+    $res = stationPost('identify', ['member_number' => 'gibt-es-nicht-' . uniqid(), 'pin' => '2580']);
     assertStatus(401, $res);
     assertSame('Invalid member number or PIN', $res['body']['message']);
 });
