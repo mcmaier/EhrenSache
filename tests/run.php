@@ -28,7 +28,7 @@ register_shutdown_function(function () use (&$reachedEnd) {
     if ($reachedEnd) {
         return;
     }
-    fwrite(STDERR, "FEHLER: Testlauf wurde vorzeitig beendet (z. B. durch exit() in einer Suite) - Zusammenfassung nicht erreicht.\n");
+    fwrite(STDERR, "FEHLER: Testlauf wurde vorzeitig beendet (z. B. durch exit() oder einen Fatal Error in einer Suite) - Zusammenfassung nicht erreicht.\n");
     exit(1);
 });
 
@@ -53,5 +53,6 @@ if ($ran === 0) {
     exit(2);
 }
 
+$code = harnessSummary();
 $reachedEnd = true;
-exit(harnessSummary());
+exit($code);
