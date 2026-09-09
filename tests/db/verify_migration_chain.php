@@ -12,6 +12,12 @@
  * CREATE-DATABASE-Recht nötig sind. Bildet nach, was public/update/index.php in
  * Schritt 3 tut, und prüft das Ergebnis.
  *
+ * Geprüft wird die Mechanik, nicht die Schema-Konvergenz: applySchema() spielt
+ * immer das heutige ehrensache_db.sql ein, auch für den Fall „Stand 1.0.0".
+ * Migrationen, die Spalten hinzufügen, laufen hier also gegen ein Schema, das
+ * diese Spalten schon hat. Ob ein wirklich altes Schema am Ende dort ankommt,
+ * wo eine Neuinstallation heute steht, prüft verify_schema_convergence.php.
+ *
  * Aufruf:
  *   php tests/db/verify_migration_chain.php "mysql:host=127.0.0.1;port=3306" root ""
  *

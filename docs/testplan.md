@@ -498,6 +498,22 @@ Reine Logik ohne Datenbank: Versionsbestimmung, Normalisierung, Manifest, Ketten
 php tests/db/verify_migration_chain.php "mysql:host=127.0.0.1;port=3306" root ""
 ```
 
+Bildet UPD-1 bis UPD-6 nach: Versionserkennung, Ausführung und Stempelung der Kette,
+Umbenennung auf das Präfix, Umbau der `config.php`, Folgenlosigkeit eines zweiten Laufs.
+
+```bash
+php tests/db/verify_schema_convergence.php "mysql:host=127.0.0.1;port=3306" root "" ez_
+```
+
+Beantwortet die Frage, die der Kettentest offen lässt: Er spielt für den Fall „Stand 1.0.0"
+das **heutige** Schema ein, Migrationen laufen dort also gegen Spalten, die es schon gibt.
+Dieses Skript startet mit dem echten Schema aus dem Tag `v1.1.3`, füllt es mit Daten in den
+Spalten von damals, fährt die Kette bis zur Version aus `version.json` und vergleicht das
+Ergebnis Tabelle für Tabelle mit einer Neuinstallation — Spalten samt Typ, Nullbarkeit,
+Vorgabe, `EXTRA` und Generierungsausdruck, dazu alle Indizes. Nötig wird das, weil beide Wege
+sonst unbemerkt auseinanderlaufen: Ein Verein, der aktualisiert, und einer, der neu
+installiert, hätten dann verschiedene Schemata.
+
 Die Zugriffssperren von Installer und Assistent:
 
 ```bash
