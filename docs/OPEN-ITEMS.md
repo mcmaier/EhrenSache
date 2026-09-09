@@ -398,7 +398,7 @@ für eine Freigabeliste tun.
 zusammenfassenden Lesezugriff. Kein Schemabedarf für die erste Stufe.
 
 ### OI-42 · Neun Versionen haben den Release-Branch nie erreicht
-**Priorität:** hoch — offen, aufgefallen am 2026-09-09 bei der Frage nach dem Versionssprung
+**Priorität:** erledigt am 2026-09-09 — `main` steht auf **1.4.0** (`fcf0d2e`), die neun Tags liegen auf `origin`, das Release ist angelegt. Der Rückstand von neun Versionen ist damit aufgeholt; `SECURITY.md` nennt wieder eine Version, die es wirklich gibt.
 
 `main` steht auf **1.1.3** (Build 2026-04-15), `dev` auf **1.3.1**. Dazwischen liegen
 **230 Commits**, und der CHANGELOG führt neun Versionen als veröffentlicht, die es auf dem
@@ -474,9 +474,9 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
      ersetzt keine Tests, findet aber, was Tests mit selbstgebauten Ausgangslagen nicht
      sehen können.
 
-  **Beim Release selbst zu tun:**
-  6. Den Fast-Forward auf `main` ausführen.
-  7. Tags setzen. Die Zuordnung ist am 2026-09-09 entschieden und geprüft — an jedem Ziel
+  **Beim Release ausgeführt (2026-09-09):**
+  6. Fast-Forward auf `main` — `fcf0d2e`, 230 Commits, konfliktfrei.
+  7. Tags gesetzt, annotiert, und auf `origin` gepusht. Die Zuordnung ist am 2026-09-09 entschieden und geprüft — an jedem Ziel
      nennt `version.json` die passende Version, und alle sind Vorfahren von `dev`:
 
      | Tag | Commit | | Tag | Commit |
@@ -486,7 +486,15 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
      | `v1.2.2` | `5034860` | | `v1.3.0` | `79e8796` |
      | `v1.2.3` | `72090c0` | | `v1.3.1` | `a849ca7` |
 
-     `v1.4.0` kommt auf `main` nach dem Fast-Forward.
+     `v1.4.0` zeigt auf `fcf0d2e`. Für die acht nachgeholten Stände wurde bewusst **kein**
+     GitHub-Release angelegt: Sie waren nie beziehbar, und leere Einträge verwässerten die
+     Release-Seite. Als Tags bleiben sie auffindbar.
+
+  9. Das Release zu `v1.4.0` ist angelegt und als *Latest* markiert. Die Notizen sind der
+     `[1.4.0]`-Block aus dem `CHANGELOG.md`, davor die Update-Anleitung und ein Hinweis auf
+     die beiden Änderungen, die ohne Zutun wirken: die HTTPS-Umleitung und der veränderte
+     Nachweisgrad bestehender Arbeitszeiten. Das ZIP stammt von GitHub selbst — nur das
+     beachtet die `export-ignore`-Regeln aus `.gitattributes`.
 
      **Warum nicht durchgängig dieselbe Regel?** Für `v1.2.0` bis `v1.3.0` markiert der Tag
      den **letzten** Commit, der diese Version in `version.json` trug — sonst fehlten bis zu
