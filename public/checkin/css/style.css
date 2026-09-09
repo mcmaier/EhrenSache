@@ -842,33 +842,19 @@ body {
     color: var(--text);
 }
 
+/* Kein eigener Rollbereich. Die Liste hatte max-height: calc(100vh - 320px)
+   und overflow-y: auto -- ein zweiter Rollkasten in einer Seite, die selbst
+   rollt. Die 320 waren geraten: Gemessen stehen ueber der Liste 453 px (375 px
+   breit) beziehungsweise 377 px (420 px breit), je nachdem wie die Infozeile
+   umbricht. Der Kasten ragte damit 133 beziehungsweise 57 px aus dem Fenster,
+   und die restlichen Eintraege waren nur ueber eine zweite Geste erreichbar,
+   die im Listenbereich beginnen musste. Ein fester Pixelwert kann eine
+   umbrechende Kopfzone nicht beschreiben; die Seite rollt die Liste jetzt
+   selbst, wie sie es im Statistik-Tab schon immer getan hat. */
 .history-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    max-height: calc(100vh - 320px);
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #bbb #f0f0f0;
-}
-
-/* Webkit Scrollbar */
-.history-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.history-list::-webkit-scrollbar-track {
-    background: #f0f0f0;
-    border-radius: 3px;
-}
-
-.history-list::-webkit-scrollbar-thumb {
-    background: #bbb;
-    border-radius: 3px;
-}
-
-.history-list::-webkit-scrollbar-thumb:hover {
-    background: #999;
 }
 
 /* History Items */
