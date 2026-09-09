@@ -476,7 +476,35 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 
   **Beim Release selbst zu tun:**
   6. Den Fast-Forward auf `main` ausführen.
-  7. Tags setzen: die nachgeholten `v1.2.0` … `v1.3.1` sowie `v1.4.0`.
+  7. Tags setzen. Die Zuordnung ist am 2026-09-09 entschieden und geprüft — an jedem Ziel
+     nennt `version.json` die passende Version, und alle sind Vorfahren von `dev`:
+
+     | Tag | Commit | | Tag | Commit |
+     |---|---|---|---|---|
+     | `v1.2.0` | `c68bbad` | | `v1.2.4` | `70848dd` |
+     | `v1.2.1` | `6520ae7` | | `v1.2.5` | `14ef156` |
+     | `v1.2.2` | `5034860` | | `v1.3.0` | `79e8796` |
+     | `v1.2.3` | `72090c0` | | `v1.3.1` | `a849ca7` |
+
+     `v1.4.0` kommt auf `main` nach dem Fast-Forward.
+
+     **Warum nicht durchgängig dieselbe Regel?** Für `v1.2.0` bis `v1.3.0` markiert der Tag
+     den **letzten** Commit, der diese Version in `version.json` trug — sonst fehlten bis zu
+     42 Commits Arbeit, weil der Sprung jeweils am Anfang der Arbeit an einer Version steht,
+     nicht am Ende. Bei `1.3.1` führt dieselbe Regel in die Irre: Zwischen dem Sprung (`a849ca7`,
+     07.09.) und dem auf 1.4.0 liegen **86 Commits** — der Demo-Datengenerator, die PWA-Arbeit,
+     OI-1 —, die der `CHANGELOG.md` bereits 1.4.0 zurechnet. Dort markiert der Tag deshalb den
+     Punkt, an dem 1.3.1 ausgerufen wurde. Da diese Zwischenstände nie ausgeliefert wurden, hat
+     niemand je einen davon in der Hand gehabt; die Tags sind historische Marken, keine
+     Auslieferungspunkte.
+
+     Gesetzt werden sie **annotiert** (`git tag -a`): Ihr eigenes Datum weist sie als
+     nachträglich gesetzt aus, statt ein Auslieferungsdatum vorzutäuschen.
+
+     **Nebenbefund:** Der `CHANGELOG.md` datiert 1.3.0 auf den 07.09., der Sprung war am 04.09.
+     Vermutlich wurde das Datum beim Schreiben des Eintrags gesetzt. Nicht korrigiert — die
+     Angabe ist harmlos, und eine nachträgliche Änderung veröffentlichter Daten wäre die
+     schlechtere Wahl.
   8. ~~In `SECURITY.md` die Zeile „Aktuell veröffentlicht" ziehen~~ — **erledigt auf `dev`**
      (2026-09-09). Sie nennt bereits 1.4.0, und der Absatz zum Abstand von `dev` ist auf eine
      dauerhafte Formulierung umgestellt, die nach jedem Release stimmt. Das musste **vor** dem
