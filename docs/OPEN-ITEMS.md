@@ -439,25 +439,31 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 
 - **Wann?** Der nächste Versionssprung ist der natürliche Moment. Bis dahin gilt: Wer die
   Anwendung heute installiert, bekommt eine ein halbes Jahr alte Fassung.
-- **Vor dem Fast-Forward abzuarbeiten** — geprüft am 2026-09-09, alles unkritisch, aber in
-  dieser Reihenfolge zu erledigen:
-  1. `version.json` auf die Release-Nummer setzen (**1.4.0**, weil der unveröffentlichte
-     Block neue Funktionen enthält) und das `build`-Datum mitziehen.
-  2. Die `?v=`-Querys in den HTML-Dateien nachziehen — sie stehen geschlossen auf `1.3.1`.
-     Die Suite `assets` wacht darüber und schlägt fehl, wenn eine Datei zurückbleibt.
-  3. Im `CHANGELOG.md` den Block `[Nicht veröffentlicht]` in `[1.4.0] – <Datum>` umbenennen.
-  4. In `SECURITY.md` die Zeile „Aktuell veröffentlicht" und den Absatz zum `dev`-Abstand
-     auf den neuen Stand bringen — beides ist bewusst so formuliert, dass nur diese zwei
-     Stellen zu pflegen sind.
-  5. Tags setzen: die nachgeholten `v1.2.0` … `v1.3.1` sowie `v1.4.0`.
+- **Vorbereitung des Releases** — Stand 2026-09-09:
 
-  **Kein Handlungsbedarf besteht bei:** Migrationskette (endet sauber auf `1.3.1`, seit
-  `1.3.1` gab es keine Schemaänderung — `ehrensache_db.sql` und `private/migrations/` sind
-  unberührt, es braucht also keinen neuen Kettenschritt für 1.4.0), Auslieferungsumfang
-  (`.gitattributes` nimmt `docs/`, `CLAUDE.md`, `test_credentials.md` und `private/demo/`
-  aus dem ZIP) und Geheimnissen im Index (`config.php`, `tests/config.php` und
-  `test_credentials.md` sind über `.gitignore` draußen; der Demo-Seeder, der die Tabelle
-  `users` leert, liegt unter `private/` und verweigert den Dienst außerhalb der CLI).
+  **Erledigt auf `dev`:**
+  1. `version.json` steht auf **1.4.0**, Build `2026-09-09`.
+  2. Die `?v=`-Querys in den HTML-Dateien stehen geschlossen auf `1.4.0`; die Suite `assets`
+     wacht darüber.
+  3. Der `CHANGELOG.md` führt den Block als `[1.4.0] – 2026-09-09`.
+  4. Die Migrationskette reicht durchgängig bis `1.4.0`. Der Schritt `1.3.1 → 1.4.0`
+     (`private/migrations/1.3.1.php`) stellt `work_sessions.active_member` von `VIRTUAL` auf
+     `STORED` um und behebt damit [OI-1](#oi-1). **Er ist Pflicht:** Eine Installation, die
+     ihn überspringt, verliert bei einer InnoDB-Crash-Recovery weiterhin den
+     AUTO_INCREMENT-Zähler.
+
+  **Offen:**
+  5. Den Fast-Forward auf `main` ausführen.
+  6. Tags setzen: die nachgeholten `v1.2.0` … `v1.3.1` sowie `v1.4.0`.
+  7. In `SECURITY.md` die Zeile „Aktuell veröffentlicht" auf **1.4.0** ziehen und den Absatz
+     zum Abstand von `dev` streichen oder anpassen. Solange `main` auf 1.1.3 steht, ist die
+     Datei korrekt — sie wird erst mit dem Fast-Forward falsch.
+
+  **Kein Handlungsbedarf besteht bei:** Auslieferungsumfang (`.gitattributes` nimmt `docs/`,
+  `CLAUDE.md`, `test_credentials.md`, `temporary_screenshots/` und `private/demo/` aus dem
+  ZIP) und Geheimnissen im Index (`config.php`, `tests/config.php` und `test_credentials.md`
+  sind über `.gitignore` draußen; der Demo-Seeder, der die Tabelle `users` leert, liegt unter
+  `private/` und verweigert den Dienst außerhalb der CLI).
 
 **Berührt:** Branch `main`, Tags, `version.json`, `CHANGELOG.md`, `SECURITY.md`, `README.md`
 (Bezugsweg). Kein Code.
