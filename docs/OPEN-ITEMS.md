@@ -1056,11 +1056,53 @@ in die Login-Antwort aufnehmen oder die Lücke hier dokumentiert lassen.
 ---
 
 ### OI-10 · Breite Tabelle in der Zeiterfassung
-**Priorität:** niedrig
+**Priorität:** ~~niedrig~~ → mittel (2026-09-09)
 
 Acht Spalten scrollen auf schmalen Fenstern horizontal. Das ist `overflow-x: auto` aus
 `.data-table` und verhält sich wie jede andere Tabelle der App — fällt hier nur stärker auf.
 Kein Fehler, aber ein Kandidat für Spaltenpriorisierung auf kleinen Bildschirmen.
+
+**Ergänzung 2026-09-09 — der Befund war zu milde.** Beim Aufnehmen der Produktbilder für
+die Werbeseite fiel auf, dass die Tabelle nicht erst auf schmalen Fenstern leidet, sondern
+schon auf gewöhnlichen Notebook-Auflösungen. `public/css/components/tables.css` setzt für
+**jede** Tabelle dieselbe Untergrenze:
+
+```css
+table { width: 100%; border-collapse: collapse; min-width: 600px; }
+```
+
+600px ist für diese acht Spalten viel zu wenig. Gemessen am Demo-Bestand (admin-Ansicht,
+25 Zeilen je Seite):
+
+| Fensterbreite | Platz für die Tabelle | Eigenbedarf der Tabelle | Zeilenhöhe |
+|---|---|---|---|
+| 1280 px | 970 px | ~1570 px | 108 px |
+| 1440 px | 1130 px | ~1570 px | 108 px |
+| 1680 px | 1370 px | ~1570 px | 108 px |
+| 1920 px | 1610 px | ~1570 px | 83 px |
+
+Die Tabelle braucht rund 1570 px Inhaltsbreite. Weil die Seitenleiste etwa 250 px abzieht,
+liefert ein Fenster das erst ab knapp 1900 px. Darunter greift nicht der waagerechte
+Rollbalken — der käme erst unter 600 px —, sondern die automatische Tabellenberechnung des
+Browsers quetscht die Spalten und bricht den Zellinhalt um. Sichtbare Folgen:
+
+- Datumsangaben brechen mitten im Wert: `2026-` / `09-09` / `10:38` auf drei Zeilen
+- Dauerangaben zerfallen: `4:39 h` / `15` / `Min.` / `Pause` auf vier Zeilen
+- Zeilen wachsen von 83 px auf 108 px. Bei 25 Einträgen je Seite sind das gut 600 px
+  zusätzliche Scrollstrecke ohne jeden Informationsgewinn.
+
+Denkbare Wege, noch nicht entschieden:
+
+1. Eine eigene Untergrenze für diese Tabelle (Modifikator-Klasse mit `min-width` um 1550px),
+   damit sie unterhalb davon rollt statt umzubrechen. Kleinster Eingriff, löst aber nur das
+   Umbrechen — die Tabelle bleibt breit.
+2. `white-space: nowrap` auf den Zellen mit Datum und Dauer. Behebt die schlimmsten Brüche,
+   ohne die Gesamtbreite anzufassen.
+3. Spaltenpriorisierung wie oben schon angedacht: `Nachweis` und `Termin` unter einer
+   Schwelle ausblenden oder in die Mitgliedszelle einklappen.
+
+Die Untergrenze von 600px betrifft **alle** Tabellen der Anwendung. Ob andere Ansichten
+mit weniger Spalten ebenfalls unter der Schwelle leiden, ist nicht geprüft.
 
 ---
 
