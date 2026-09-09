@@ -41,6 +41,37 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Etikett „stundenbelegt", obwohl für die zusätzliche Zeit nichts belegt war. Das gilt für alle
   Rollen und wirkt sich auf Statistik, Export und Verwendungsnachweis aus.
 
+### Behoben
+- **„Teilbelegt" gilt jetzt für beide Grenzen einer Sitzung, nicht nur für den Start.** Die
+  Leiter des Nachweisgrades kannte eine Stufe für „nur der Start ist ortsbelegt", aber keine
+  für „nur das Ende ist ortsbelegt" — letztere fiel bis „unbelegt" durch. Eine Sitzung mit
+  verschobenem Beginn galt damit als gänzlich unbelegt, obwohl ihr Ende weiter belegt war.
+  Tragbar war das, solange Ortsnachweise nur vom Timer kamen: Wer stoppt, hat vorher
+  gestartet. Seit eine Zeitkorrektur den Nachweis der geänderten Zeit fallen lässt, ist der
+  umgekehrte Fall alltäglich. **Die Änderung wirkt rückwirkend:** Bestehende Sitzungen mit
+  belegtem Ende und unbelegtem Start rutschen von „unbelegt" auf „teilbelegt" — auch in
+  abgeschlossenen Jahren. Ein neu erzeugter Verwendungsnachweis weicht dort von einem früher
+  eingereichten ab
+- **Verlauf und Anwesenheitsliste der Check-in-PWA rollten in einem eigenen Kasten
+  innerhalb einer Seite, die selbst rollt.** Beide trugen die feste Obergrenze
+  `calc(100vh - 320px)`; die 320 Pixel beschrieben eine Kopfzone, die je nach Fensterbreite
+  umbricht und tatsächlich 377 bis 453 Pixel hoch ist. Der Kasten ragte damit aus dem Fenster,
+  und wer über ihm wischte, bewegte ihn statt der Seite — es sah aus, als höre die Liste dort
+  auf. Im Verlauf waren auf einem Handy 3 von 20 geladenen Einträgen ohne Geste sichtbar.
+  Beide Listen wachsen jetzt mit ihrem Inhalt; eine einzige Geste erreicht alles
+- **Der Knopf „Zeit nachtragen" war auf der weißen Karte kaum zu sehen.** `.action-button`
+  setzt `border: none`, die Variante `secondary` überschrieb nur den Hintergrund — ihr
+  Hover-Zustand setzte seit jeher ein `border-color`, das ins Leere lief. Alle fünf sekundären
+  Knöpfe der PWA sind jetzt Umriss-Knöpfe in der Hausfarbe
+- **Der Knopf „Korrigieren" im Verlauf steht rechts oben**, an derselben Stelle und in
+  derselben Form wie der Löschen-Knopf eines Antrags — blau statt rot, weil Korrigieren nichts
+  zerstört. Zuvor klebte er am Datum
+- **Ein Anwesenheitsantrag heißt im Verlauf der PWA nicht mehr „Zeitkorrektur".** Das Wort
+  meinte dort die Ankunftszeit und war neben den Arbeitszeit-Einträgen derselben Liste mit
+  einer Korrektur der *Arbeitszeit* zu verwechseln. Ein Antrag liest sich jetzt als „Antrag
+  wartet auf Freigabe", eine Entschuldigung behält ihr eindeutiges Wort. Das Dashboard nennt
+  die Antragsart weiterhin „Zeitkorrektur" — die PWA sagt weniger, nicht etwas anderes
+
 ---
 
 ## [1.3.1] – 2026-09-07

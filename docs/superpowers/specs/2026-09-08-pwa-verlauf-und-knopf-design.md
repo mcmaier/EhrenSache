@@ -3,7 +3,7 @@
 **Datum:** 2026-09-08
 **Status:** Entworfen, nicht umgesetzt
 **Betrifft:** `public/checkin/css/style.css`, `public/checkin/js/app.js`
-**Zielversion:** 1.3.2 (Vorschlag)
+**Zielversion:** 1.4.0 (Vorschlag) — der unveröffentlichte Block enthält neue Funktionen, das ist per SemVer ein MINOR-Sprung, kein Patch
 
 ---
 
