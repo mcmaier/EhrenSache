@@ -79,6 +79,48 @@ test('Keine Ressource steht in zwei Listen', function () {
     assertSame([], array_intersect(DEMO_WRITE_DENIED, DEMO_READ_ONLY), 'gesperrt und nur-lesend');
 });
 
+// ---- Die Listen wörtlich gegen die Spezifikation -------------------------
+
+test('Die Erlaubnisliste entspricht der Spezifikation', function () {
+    // Fest verdrahtet, mit Absicht: Die Schleifen weiter oben pruefen, dass
+    // demoRequestAllowed() die Listen richtig liest. Erst dieser Anker haelt
+    // fest, was in den Listen stehen darf. Wer eine Ressource ergaenzt oder
+    // verschiebt, muss hier mit anfassen -- und trifft die Entscheidung damit
+    // sichtbar, statt sie nebenbei zu machen.
+    assertSame([
+        'login'             => ['POST'],
+        'logout'            => ['POST'],
+        'auth'              => ['POST'],
+        'members'           => ['POST', 'PUT', 'DELETE'],
+        'appointments'      => ['POST', 'PUT', 'DELETE'],
+        'records'           => ['POST', 'PUT', 'DELETE'],
+        'exceptions'        => ['POST', 'PUT', 'DELETE'],
+        'work_sessions'     => ['POST', 'PUT', 'DELETE'],
+        'activity_types'    => ['POST', 'PUT', 'DELETE'],
+        'membership_dates'  => ['POST', 'PUT', 'DELETE'],
+        'member_groups'     => ['POST', 'PUT', 'DELETE'],
+        'appointment_types' => ['POST', 'PUT', 'DELETE'],
+        'auto_checkin'      => ['POST'],
+        'totp_checkin'      => ['POST'],
+        'station'           => ['POST'],
+    ], DEMO_WRITE_ALLOWED);
+});
+
+test('Die Sperrliste entspricht der Spezifikation', function () {
+    assertSame([
+        'change_password', 'change_pin', 'users', 'activate_user', 'user_status',
+        'register', 'password_reset_request', 'settings', 'upload-logo',
+        'import', 'cleanup', 'regenerate_token',
+    ], DEMO_WRITE_DENIED);
+});
+
+test('Die Nur-Lesend-Liste entspricht der Spezifikation', function () {
+    assertSame([
+        'ping', 'appearance', 'me', 'version', 'session_info', 'my_data',
+        'statistics', 'available_years', 'attendance_list', 'import_logs', 'export',
+    ], DEMO_READ_ONLY);
+});
+
 // ---- demoModeActive --------------------------------------------------------
 
 test('Ohne DEMO_MODE ist der Modus aus', function () {
@@ -103,21 +145,43 @@ test('Der Waechter ist ohne DEMO_MODE untaetig', function () {
 // Suite selbst zu beenden. Deshalb im Unterprozess.
 
 // Hinweis: Die PHP-Codezeile fuer -r verwendet bewusst nur einfache
-// Anfuehrungszeichen. escapeshellarg() von PHP unter Windows entfernt
-// doppelte Anfuehrungszeichen aus dem Argument ersatzlos statt sie zu
+// Anfuehrungszeichen. escapeshellarg() von PHP unter Windows ersetzt
+// doppelte Anfuehrungszeichen im Argument durch ein Leerzeichen statt sie zu
 // escapen (verifiziert) - mit doppelten Anfuehrungszeichen im Code wuerde
 // der erzeugte PHP-Code kaputtgeschickt. var_export() liefert fuer einen
 // Pfad ohne einfaches Anfuehrungszeichen ebenfalls eine einfach gequotete
 // Zeichenkette, das passt zusammen.
+
+/**
+ * Fuehrt PHP-Code in einem Unterprozess aus und liefert dessen Ausgabe.
+ *
+ * Ist shell_exec() per disable_functions gesperrt, liefert die Funktion
+ * selbst null - ohne diesen Fang wuerde jeder Aufrufer mit einer leeren
+ * Ausgabe weiterrechnen und an einer irrefuehrenden Meldung scheitern
+ * ("Demo-Antwort fehlt: "), die einen Fehler im getesteten Code vortaeuscht,
+ * obwohl in Wahrheit die PHP-Umgebung den Unterprozess-Mechanismus verbietet.
+ */
+function runPhpCodeInSubprocess(string $code): string
+{
+    if (!function_exists('shell_exec')) {
+        throw new RuntimeException(
+            'shell_exec() ist per disable_functions gesperrt - die '
+            . 'Unterprozess-Tests fuer den Waechter koennen in dieser '
+            . 'PHP-Umgebung nicht laufen (kein Fehler im getesteten Code).'
+        );
+    }
+
+    return (string) shell_exec(
+        escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>&1'
+    );
+}
 
 test('Mit DEMO_MODE bricht der Waechter bei Gesperrtem ab', function () {
     $helfer = __DIR__ . '/../../private/helpers/demo_mode.php';
     $code = "define('DEMO_MODE', true); require " . var_export($helfer, true)
           . "; demoGuard('cleanup', 'POST'); echo 'NICHT ERREICHT';";
 
-    $ausgabe = (string) shell_exec(
-        escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>&1'
-    );
+    $ausgabe = runPhpCodeInSubprocess($code);
 
     assertTrue(str_contains($ausgabe, '"demo":true'), 'Demo-Antwort fehlt: ' . $ausgabe);
     assertTrue(!str_contains($ausgabe, 'NICHT ERREICHT'), 'exit() hat nicht gegriffen');
@@ -128,9 +192,43 @@ test('Mit DEMO_MODE laesst der Waechter Erlaubtes durch', function () {
     $code = "define('DEMO_MODE', true); require " . var_export($helfer, true)
           . "; demoGuard('records', 'POST'); echo 'DURCHGELASSEN';";
 
-    $ausgabe = (string) shell_exec(
-        escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>&1'
-    );
+    $ausgabe = runPhpCodeInSubprocess($code);
 
     assertTrue(str_contains($ausgabe, 'DURCHGELASSEN'), 'Erlaubtes wurde abgewiesen: ' . $ausgabe);
+});
+
+// ---- demoModeActive faellt zur sicheren Seite -----------------------------
+//
+// DEMO_MODE ist eine Konstante; jeder Wert braucht seinen eigenen
+// Unterprozess, sonst kollidiert er mit einer bereits definierten Konstante
+// aus einem frueheren Test.
+
+test('DEMO_MODE als Integer 1 zeigt den Waechter aktiv', function () {
+    $helfer = __DIR__ . '/../../private/helpers/demo_mode.php';
+    $code = "define('DEMO_MODE', 1); require " . var_export($helfer, true)
+          . "; echo demoModeActive() ? 'AKTIV' : 'INAKTIV';";
+
+    $ausgabe = runPhpCodeInSubprocess($code);
+
+    assertTrue(str_contains($ausgabe, 'AKTIV'), "DEMO_MODE=1 (int) muss aktiv sein: " . $ausgabe);
+});
+
+test("DEMO_MODE als Zeichenkette 'false' zeigt den Waechter aktiv", function () {
+    $helfer = __DIR__ . '/../../private/helpers/demo_mode.php';
+    $code = "define('DEMO_MODE', 'false'); require " . var_export($helfer, true)
+          . "; echo demoModeActive() ? 'AKTIV' : 'INAKTIV';";
+
+    $ausgabe = runPhpCodeInSubprocess($code);
+
+    assertTrue(str_contains($ausgabe, 'AKTIV'), "DEMO_MODE='false' (String) muss aktiv sein: " . $ausgabe);
+});
+
+test('DEMO_MODE als Boolean false zeigt den Waechter untaetig', function () {
+    $helfer = __DIR__ . '/../../private/helpers/demo_mode.php';
+    $code = "define('DEMO_MODE', false); require " . var_export($helfer, true)
+          . "; echo demoModeActive() ? 'AKTIV' : 'INAKTIV';";
+
+    $ausgabe = runPhpCodeInSubprocess($code);
+
+    assertTrue(str_contains($ausgabe, 'INAKTIV'), 'DEMO_MODE=false (bool) muss untaetig sein: ' . $ausgabe);
 });

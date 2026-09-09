@@ -15,9 +15,11 @@ declare(strict_types=1);
 /**
  * Demo-Modus für öffentlich erreichbare Installationen.
  *
- * Eingeschaltet wird er ausschließlich über `define('DEMO_MODE', true);` in
+ * Eingeschaltet wird er über `define('DEMO_MODE', ...);` in
  * private/config/config.php — einer Datei, die nicht im Repository liegt.
- * Ohne diese Zeile ist alles hier wirkungslos.
+ * Fehlt die Konstante, ist der Wächter wirkungslos. Wie der Wert genau
+ * gelesen wird — auch bei einem unsauberen Wert wie `1` statt `true` —
+ * steht bei demoModeActive().
  *
  * Die Regel lautet: GET und HEAD gehen durch, sofern die Ressource in einer
  * der drei Listen steht (DEMO_WRITE_ALLOWED, DEMO_WRITE_DENIED oder
@@ -27,7 +29,7 @@ declare(strict_types=1);
  * bewusst entscheidet, in welche Liste sie gehört.
  *
  * Eine Vollständigkeitsprüfung, die diese drei Listen gegen die tatsächlich
- * in api.php geroutete Ressourcen abgleicht, folgt in einer späteren Aufgabe.
+ * in api.php gerouteten Ressourcen abgleicht, folgt in einer späteren Aufgabe.
  */
 
 /** Schreibende Zugriffe, die ein Demo-Besucher ausführen darf. */
@@ -52,15 +54,20 @@ const DEMO_WRITE_ALLOWED = [
 /**
  * Ressourcen, deren Schreibzugriffe bewusst gesperrt sind.
  *
- * Diese Liste sperrt nichts — das tut schon das Fehlen in DEMO_WRITE_ALLOWED.
- * Sie hält fest, dass die Entscheidung getroffen wurde, damit die
- * Vollständigkeitsprüfung „bedacht und gesperrt" von „vergessen" unterscheiden
- * kann.
+ * Den Sperreffekt liefert weiterhin allein das Fehlen in DEMO_WRITE_ALLOWED
+ * — diese Liste selbst sperrt keinen Schreibzugriff. Seit demoRequestAllowed()
+ * aber nur bekannte Ressourcen lesend durchlässt, macht ein Eintrag hier die
+ * Ressource bekannt und öffnet damit GET und HEAD. Wer einen Eintrag als rein
+ * kosmetisch entfernt, sperrt damit unbemerkt auch das Lesen dieser Ressource.
+ *
+ * Daneben hält die Liste fest, dass die Entscheidung „gesperrt" bewusst
+ * getroffen wurde, damit die Vollständigkeitsprüfung „bedacht und gesperrt"
+ * von „vergessen" unterscheiden kann.
  */
 const DEMO_WRITE_DENIED = [
     'change_password',        // macht die veröffentlichten Zugangsdaten unbrauchbar
-    'change_pin',             // sperrt den direkten Weg; ueber members PUT bleibt
-                               // pin_hash erreichbar, das faengt der stuendliche Reset auf
+    'change_pin',             // sperrt den direkten Weg; über members PUT bleibt
+                              // pin_hash erreichbar, das fängt der stündliche Reset auf
     'users',                  // Konten und Rollen
     'activate_user',          // Konten
     'user_status',            // Konten
@@ -77,7 +84,8 @@ const DEMO_WRITE_DENIED = [
  * Ressourcen, die ausschließlich lesen.
  *
  * Ein Eintrag hier ist eine Behauptung: „diese Ressource verändert nichts".
- * Sie trägt die Annahme, auf der die Regel „GET geht durch" ruht.
+ * Sie trägt die Annahme, auf der die Regel „GET und HEAD gehen durch, sofern
+ * die Ressource bekannt ist" (demoRequestAllowed()) ruht.
  */
 const DEMO_READ_ONLY = [
     'ping',
@@ -93,10 +101,43 @@ const DEMO_READ_ONLY = [
     'export',
 ];
 
-/** Ist der Demo-Modus eingeschaltet? Streng auf true, damit 'false' als Zeichenkette nicht greift. */
+/**
+ * Ist der Demo-Modus eingeschaltet?
+ *
+ * Fällt zur sicheren Seite: Fehlt die Konstante, ist der Modus aus, und
+ * `false` bleibt ein gültiges „aus" — ein Betreiber muss den Modus
+ * ausdrücklich abschalten können. Aber jeder andere Wert als `true` oder
+ * `false` (z. B. `1`, `'true'`, `'false'` als Zeichenkette) gilt als „an".
+ *
+ * Grund: Ein `define('DEMO_MODE', 1);` in der Konfigurationsdatei sollte den
+ * Wächter nicht stillschweigend abschalten. Ein früherer Entwurf prüfte
+ * streng auf `=== true` — damit hätte ein Tippfehler in config.php die
+ * öffentliche Demo ungeschützt gelassen, ohne jeden Hinweis. Ein unsauberer
+ * Wert ist ein Versehen, kein bewusstes „aus", und wird deshalb als „an"
+ * behandelt; zusätzlich landet ein Hinweis im error_log, damit das Versehen
+ * nicht unbemerkt bleibt.
+ */
 function demoModeActive(): bool
 {
-    return defined('DEMO_MODE') && DEMO_MODE === true;
+    if (!defined('DEMO_MODE')) {
+        return false;
+    }
+
+    if (DEMO_MODE === false) {
+        return false;
+    }
+
+    if (DEMO_MODE === true) {
+        return true;
+    }
+
+    error_log(
+        'DEMO_MODE ist gesetzt, aber weder true noch false (Wert: '
+        . var_export(DEMO_MODE, true) . '). Wird als eingeschaltet behandelt, '
+        . 'weil ein unsauberer Wert zur sicheren Seite fallen muss.'
+    );
+
+    return true;
 }
 
 /**
@@ -112,8 +153,9 @@ function demoRequestAllowed(string $resource, string $method): bool
           || in_array($resource, DEMO_WRITE_DENIED, true)
           || in_array($resource, DEMO_READ_ONLY, true);
 
-    // HEAD verhaelt sich wie GET. Ohne diesen Zweig liefe eine Ueberwachung
-    // oder ein Linkpruefer in der Demo in ein 403.
+    // HEAD ist semantisch ein GET ohne Körper, deshalb behandelt der Wächter
+    // es hier gleich. Ob die Handler dahinter HEAD tatsächlich annehmen, ist
+    // ihre Sache — heute überwiegend nein.
     if ($method === 'GET' || $method === 'HEAD') {
         return $known;
     }
