@@ -477,9 +477,12 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
   **Beim Release selbst zu tun:**
   6. Den Fast-Forward auf `main` ausführen.
   7. Tags setzen: die nachgeholten `v1.2.0` … `v1.3.1` sowie `v1.4.0`.
-  8. In `SECURITY.md` die Zeile „Aktuell veröffentlicht" auf **1.4.0** ziehen und den Absatz
-     zum Abstand von `dev` streichen oder anpassen. Solange `main` auf 1.1.3 steht, ist die
-     Datei korrekt — sie wird erst mit dem Fast-Forward falsch.
+  8. ~~In `SECURITY.md` die Zeile „Aktuell veröffentlicht" ziehen~~ — **erledigt auf `dev`**
+     (2026-09-09). Sie nennt bereits 1.4.0, und der Absatz zum Abstand von `dev` ist auf eine
+     dauerhafte Formulierung umgestellt, die nach jedem Release stimmt. Das musste **vor** dem
+     Fast-Forward geschehen: Er überträgt genau den Stand von `dev`, eine spätere Korrektur
+     bräuchte einen zweiten Durchlauf. Bis dahin trägt `main` weiterhin die für `main`
+     richtige Angabe 1.1.3.
 
   **Kein Handlungsbedarf besteht bei:** Auslieferungsumfang (`.gitattributes` nimmt `docs/`,
   `CLAUDE.md`, `test_credentials.md`, `temporary_screenshots/` und `private/demo/` aus dem
