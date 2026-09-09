@@ -68,6 +68,21 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Rollen und wirkt sich auf Statistik, Export und Verwendungsnachweis aus.
 
 ### Behoben
+- **Eine Installation im Stand 1.0.0 ließ sich über den Update-Assistenten nicht
+  aktualisieren.** Schritt 1 brach mit „Die installierte Datenbankversion konnte nicht
+  bestimmt werden" ab — unabhängig vom Zielstand, und seit es den Assistenten gibt. Der Grund:
+  Er übergibt der Versionserkennung den Präfix aus der Konfiguration, und eine 1.0.0-`config.php`
+  kennt das Feld `$prefix` noch gar nicht. Die Prüfung lautete damit
+  `tableExists('users') && !tableExists('users')` und hob sich selbst auf. Wer es versucht hat,
+  hatte Grund, seine Datenbank zu verdächtigen statt der Software. Der Fall steht jetzt als
+  `UPD-5a` in `tests/db/verify_migration_chain.php` — mit dem echten Schema aus dem Tag
+  `v1.0.0` statt einer nachgebauten Ausgangslage
+- **Der Installer stempelte eine geratene Version in die Datenbank.** Fehlte `version.json`,
+  trug er fest `1.1.3` in `schema_version` ein. Eine frische Installation hätte sich damit als
+  veraltet ausgegeben, und der Update-Assistent wäre später über ein längst aktuelles Schema
+  gelaufen. Jetzt bricht die Installation mit klarer Meldung ab: Ein unvollständiges Paket soll
+  auffallen. Der Kopf des Installers **nennt die Version außerdem sichtbar**, wie der
+  Update-Assistent es schon tat
 - **„Teilbelegt" gilt jetzt für beide Grenzen einer Sitzung, nicht nur für den Start.** Die
   Leiter des Nachweisgrades kannte eine Stufe für „nur der Start ist ortsbelegt", aber keine
   für „nur das Ende ist ortsbelegt" — letztere fiel bis „unbelegt" durch. Eine Sitzung mit
