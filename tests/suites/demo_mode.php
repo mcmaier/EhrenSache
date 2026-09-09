@@ -232,3 +232,66 @@ test('DEMO_MODE als Boolean false zeigt den Waechter untaetig', function () {
 
     assertTrue(str_contains($ausgabe, 'INAKTIV'), 'DEMO_MODE=false (bool) muss untaetig sein: ' . $ausgabe);
 });
+
+// ---- Vollständigkeit gegen api.php -----------------------------------------
+
+/**
+ * Sammelt jede Ressource, die api.php kennt: die Fälle des Routers und die
+ * öffentlichen Endpunkte, die schon davor mit exit() aussteigen.
+ */
+function demoTestRessourcenAusApi(): array
+{
+    $src = (string) file_get_contents(dirname(__DIR__, 2) . '/public/api/api.php');
+
+    preg_match_all('/case\s+\'([a-z0-9_\-]+)\'\s*:/i', $src, $faelle);
+    preg_match_all('/\$resource\s*===\s*\'([a-z0-9_\-]+)\'/', $src, $frueh);
+
+    $alle = array_unique(array_merge($faelle[1], $frueh[1]));
+    sort($alle);
+
+    return $alle;
+}
+
+test('Die Ressourcen lassen sich aus api.php lesen', function () {
+    $gefunden = demoTestRessourcenAusApi();
+
+    // Ohne diese Untergrenze wuerde eine kaputte Regex die naechste Pruefung
+    // leer durchlaufen lassen -- sie waere gruen, ohne etwas geprueft zu haben.
+    assertTrue(
+        count($gefunden) >= 30,
+        'Nur ' . count($gefunden) . ' Ressourcen gefunden — die Regex passt nicht mehr zu api.php'
+    );
+});
+
+test('Jede Ressource aus api.php steht in genau einer Liste', function () {
+    foreach (demoTestRessourcenAusApi() as $r) {
+        $treffer = (int) isset(DEMO_WRITE_ALLOWED[$r])
+                 + (int) in_array($r, DEMO_WRITE_DENIED, true)
+                 + (int) in_array($r, DEMO_READ_ONLY, true);
+
+        assertSame(
+            1,
+            $treffer,
+            "Ressource '{$r}' steht in {$treffer} der drei Listen statt in genau einer. "
+            . 'Neu hinzugekommen? Dann in demo_mode.php entscheiden: schreibend erlaubt, '
+            . 'schreibend gesperrt, oder nur lesend.'
+        );
+    }
+});
+
+test('Keine Liste nennt eine Ressource, die es nicht mehr gibt', function () {
+    $vorhanden = demoTestRessourcenAusApi();
+
+    $gelistet = array_merge(
+        array_keys(DEMO_WRITE_ALLOWED),
+        DEMO_WRITE_DENIED,
+        DEMO_READ_ONLY
+    );
+
+    foreach ($gelistet as $r) {
+        assertTrue(
+            in_array($r, $vorhanden, true),
+            "Liste nennt '{$r}', api.php kennt die Ressource nicht (mehr)"
+        );
+    }
+});
