@@ -226,6 +226,12 @@ test('work_sessions: member_id grenzt die Liste auf dieses Mitglied ein', functi
 
 test('work_sessions: running=1 liefert null ohne laufende Sitzung', function () {
     enableWorktime();
+    // Vorbedingung herstellen, nicht voraussetzen: Der Test prueft die Antwort
+    // OHNE laufende Sitzung, also muss er dafuer sorgen, dass keine laeuft. Wer
+    // von Hand einen Timer startet oder den Demo-Datengenerator laufen laesst
+    // (der eine offene Sitzung fuer dieses Mitglied anlegt), sah hier sonst rot,
+    // ohne dass etwas kaputt war.
+    stopRunningIfAny('user');
     $res = apiRequest('GET', 'work_sessions', [
         'token' => apiToken('user'),
         'query' => ['running' => 1],
