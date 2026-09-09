@@ -98,8 +98,42 @@ verschieben die Zuordnung nicht.
 
 - *Dafür:* Der Auslöser verschwindet, statt abgefangen zu werden. Der Unique-Index und die
   Garantie „höchstens eine laufende Sitzung je Mitglied" bleiben unverändert.
-- *Dagegen:* Braucht eine Migration, kostet ein paar Bytes je Zeile — und ob es wirklich
-  hilft, ist unbewiesen, solange sich der Fehler nicht gezielt herbeiführen lässt.
+- *Dagegen:* Braucht eine Migration, kostet vier Byte je Zeile — und ob es wirklich hilft,
+  ist unbewiesen, solange sich der Fehler nicht gezielt herbeiführen lässt.
+
+**Verhalten geprüft (2026-09-09), gegen Wegwerftabellen in der Testdatenbank:** `STORED`
+bildet die Regel unverändert ab. Mehrere beendete Sitzungen desselben Mitglieds gehen durch
+(der Ausdruck liefert `NULL`, und davon erlaubt ein Unique-Index beliebig viele), eine
+laufende geht durch, die zweite scheitert mit `Duplicate entry '7' for key 'uq_active'`.
+
+**Der direkte Weg ist nicht möglich.** MariaDB 10.4 lehnt die Umstellung einer generierten
+Spalte von `VIRTUAL` auf `STORED` ab:
+
+```
+ALTER TABLE … MODIFY active_member int(11) GENERATED ALWAYS AS (…) STORED;
+→ ERROR 1907 (HY000): This is not yet supported for generated columns
+```
+
+**Was stattdessen geht** — geprüft, die Werte werden dabei korrekt neu berechnet und der
+Unique-Index greift danach unverändert:
+
+```sql
+ALTER TABLE {PREFIX}work_sessions DROP INDEX ez_uq_running_session;
+ALTER TABLE {PREFIX}work_sessions DROP COLUMN active_member;
+ALTER TABLE {PREFIX}work_sessions
+  ADD COLUMN active_member int(11) GENERATED ALWAYS AS
+      (if(end_time is null, member_id, NULL)) STORED,
+  ADD UNIQUE KEY ez_uq_running_session (active_member);
+```
+
+Das Löschen der Spalte ist dabei ungefährlich: Ihr Wert folgt vollständig aus `end_time` und
+`member_id` und entsteht beim Neuanlegen aus den vorhandenen Zeilen neu. Das unterscheidet
+eine generierte Spalte von einer gewöhnlichen, bei der ein `DROP COLUMN` Daten vernichtet.
+
+**Empfehlung:** kein eigener Anlauf. Die drei Anweisungen an die nächste ohnehin fällige
+Migration anhängen — dann kostet der Schritt fast nichts. Tritt der Fehler vorher erneut auf,
+steht diesmal die Meldung der Selbstheilung im Server-Log; damit wäre zugleich belegt, dass
+sie greift, und der bessere Zeitpunkt für die Entscheidung gekommen.
 
 Ein früher angelegter Kontrollaufbau (`zz_virt` / `zz_plain` in der Testdatenbank) wurde am
 2026-09-09 wieder entfernt: Er hätte nur nach einem echten Absturz etwas gezeigt, nicht nach
