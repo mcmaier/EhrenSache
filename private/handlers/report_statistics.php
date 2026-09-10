@@ -316,8 +316,15 @@ function statisticsReportNotes(array $statistics): array
     $notes[] = 'gemessen: Die Ankunftszeit wurde bei der Anmeldung an einer Station oder in der App '
         . 'aufgezeichnet.';
     $notes[] = 'korrigiert: Die Ankunftszeit wurde auf Antrag geändert und genehmigt.';
-    $notes[] = 'nachgetragen: Die Ankunftszeit wurde von Hand erfasst oder eingelesen; sie entspricht '
-        . 'gegebenenfalls der Startzeit des Termins und ist dann keine Messung.';
+    // Bewusst offen formuliert: Neben Eintraegen von Hand und aus dem Import
+    // faellt hierunter auch die Quelle 'timer' aus Installationen vor 1.2.3.
+    // Deren Zeitstempel stammt von einer Maschine, misst aber den Beginn einer
+    // Arbeitssitzung statt der Ankunft am Termin. "Von Hand erfasst" waere fuer
+    // diese Zeilen schlicht falsch, "gemessen" waere irrefuehrend.
+    $notes[] = 'nachgetragen: Die Ankunftszeit wurde nicht bei der Anmeldung zu diesem Termin '
+        . 'aufgezeichnet — sie wurde von Hand erfasst, eingelesen oder stammt aus einem anderen '
+        . 'Vorgang; sie entspricht gegebenenfalls der Startzeit des Termins und ist dann keine '
+        . 'Messung.';
 
     return $notes;
 }
