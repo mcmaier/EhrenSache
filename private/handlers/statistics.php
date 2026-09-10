@@ -166,7 +166,13 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
 
     $prefix = $database->table('');
 
-    $year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
+    // (int) auf date('Y'): Ohne den Cast waere $year hier ein String und wuerde
+    // erst am Typehint von buildStatisticsResult() stillschweigend umgewandelt.
+    // Die Antwort trug in diesem Fall bis 1.4.1 "year":"2026" statt "year":2026.
+    // Kein Aufrufer liest das Feld, und API.md beschreibt year nur als
+    // Anfrageparameter -- die Umwandlung gehoert trotzdem sichtbar hierher und
+    // nicht an eine Funktionsgrenze.
+    $year = isset($_GET['year']) ? intval($_GET['year']) : (int) date('Y');
     $groupId = isset($_GET['group_id']) ? intval($_GET['group_id']) : null;
     $memberId = isset($_GET['member_id']) ? intval($_GET['member_id']) : null;
     $appointmentTypeId = isset($_GET['appointment_type_id']) ? intval($_GET['appointment_type_id']) : null;

@@ -188,6 +188,14 @@ die `warning`-Regel und das Ausgabeformat entschieden werden. Die Funktion rechn
 autorisiert nicht; `$role` und `$authMemberId` gehen nur in `hasStatisticsGroupAccess()` und
 `getStatisticsGroups()` ein.
 
+**Eine kleine, bewusste Abweichung von „die Antwort bleibt gleich":** Ohne `year`-Parameter
+lieferte `handleStatistics()` bisher `"year":"2026"` als **String**, weil `date('Y')` einen
+String zurückgibt. Mit dem Typparameter `int $year` wäre daraus eine stillschweigende
+Umwandlung an der Funktionsgrenze geworden. Stattdessen castet der Handler sichtbar selbst; die
+Antwort trägt in diesem Fall künftig `"year":2026`. Kein Aufrufer liest das Feld (geprüft über
+`public/` und `tests/`), und `API.md` beschreibt `year` nur als Anfrageparameter — gehört aber
+in den Changelog.
+
 `handleStatistics()` behält die Rechteregel für Nicht-Manager (fremde `member_id` wird ignoriert,
 `warning` gesetzt), ruft `buildStatisticsResult()` und gibt dessen Ergebnis als JSON aus.
 Der `worktime`-Block bleibt an `handleStatistics()` gebunden — er hängt am Parameter
