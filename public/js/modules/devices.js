@@ -9,7 +9,7 @@
  */
 
 import { apiCall, currentUser, isAdmin } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQRModal} from './ui.js';
 import { updateModalId } from './utils.js';
 import {debug} from '../app.js'
 
@@ -400,6 +400,10 @@ function toggleDeviceTypeFields() {
     kioskGroup.style.display = deviceType === 'kiosk' ? 'block' : 'none';
     // Token nur bei Bearbeitung anzeigen — beim Anlegen kommt er in der Antwort
     tokenGroup.style.display = (deviceType === 'auth_device' || deviceType === 'kiosk') && editing ? 'block' : 'none';
+    // Die Schnellinbetriebnahme per QR gibt es nur fuer den Kiosk: nur er hat
+    // eine PWA, die einen Token entgegennimmt (public/station/js/app.js).
+    document.getElementById('deviceQRBtn').style.display =
+        deviceType === 'kiosk' && editing ? 'inline-block' : 'none';
 
     const hints = {
         'totp_location': '🔢 Zeigt TOTP-Code (QR/NFC/Display), Benutzer authentifizieren sich per App. Benötigt TOTP Secret.',
@@ -608,6 +612,29 @@ export function generateTotpSecret() {
     showToast('TOTP Secret generiert', 'success');
 }
 
+export function showDeviceQR() {
+    const token = document.getElementById('device_token').value.trim();
+    if (!token) {
+        showToast('Kein Token vorhanden — Gerät zuerst speichern', 'error');
+        return;
+    }
+
+    // Gleiches Muster wie initPWAQuickAccess() in ui.js: das Dashboard liegt in
+    // public/, die Station in public/station/.
+    const baseUrl = window.location.origin + window.location.pathname.replace('index.html', '');
+
+    // Fragment, nicht Query: es wird vom Browser nie gesendet und steht damit in
+    // keinem Zugriffsprotokoll und keinem Referrer.
+    const url = baseUrl + 'station/#t=' + encodeURIComponent(token);
+
+    showQRModal({
+        title: '🖥️ Station in Betrieb nehmen',
+        url,
+        hint: 'Mit der Kamera des Tablets scannen, danach zum Startbildschirm hinzufügen',
+        warning: 'Dieser Code enthält den Zugang der Station. Nicht abfotografieren lassen.'
+    });
+}
+
 // ============================================
 // GLOBAL EXPORTS (für onclick in HTML)
 // ============================================
@@ -620,4 +647,5 @@ window.regenerateDeviceToken = regenerateDeviceToken;
 window.copyDeviceToken = copyDeviceToken;
 window.toggleDeviceTokenVisibility = toggleDeviceTokenVisibility;
 window.generateTotpSecret = generateTotpSecret;
+window.showDeviceQR = showDeviceQR;
 window.applyDeviceFilters = applyDeviceFilters;
