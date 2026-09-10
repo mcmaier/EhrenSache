@@ -261,7 +261,13 @@ test('DEMO_MODE als Boolean false zeigt den Waechter untaetig', function () {
  * faellt: unbekannt heisst gesperrt. Eine so uebersehene Ressource verliert
  * damit Funktion in der Demo, oeffnet aber keine Luecke.
  *
- * @return array{cases: string[], early: string[]}
+ * Liefert seit der vierten Pruefung (Abschnitt "Vollstaendigkeit gegen
+ * api.php" -> "Die Stellung des Waechters") auch den ungeschnittenen
+ * Dateitext mit ('src') - dort wird geprueft, ob demoGuard() vor dem ersten
+ * fruehen Ausstieg aufgerufen wird. Ein zweites file_get_contents() dafuer
+ * waere nur eine unnoetige zweite Wahrheit ueber denselben Dateiinhalt.
+ *
+ * @return array{cases: string[], early: string[], src: string}
  */
 function demoTestResourcesFromApi(): array
 {
@@ -294,6 +300,7 @@ function demoTestResourcesFromApi(): array
     $cache = [
         'cases' => array_values(array_unique($cases[1])),
         'early' => array_values(array_unique($early[1])),
+        'src'   => $src,
     ];
 
     return $cache;
@@ -407,5 +414,66 @@ test('Keine Liste nennt eine Ressource, die es nicht mehr gibt', function () {
         [],
         $stale,
         "Liste(n) nennen Ressource(n), die api.php nicht (mehr) kennt: " . implode(', ', $stale)
+    );
+});
+
+// ---- Die Stellung des Waechters --------------------------------------------
+//
+// Die bisherigen Pruefungen belegen nur, dass jede Ressource in einer der
+// drei Listen einsortiert ist - nicht, dass demoGuard() ueberhaupt im
+// Anfrageweg haengt. Ein demoGuard(), der nirgends aufgerufen wird, oder der
+// erst NACH den fruehen Ausstiegen in Abschnitt 6 steht, waere unsichtbar:
+// alle bisherigen Pruefungen blieben gruen, obwohl register und
+// password_reset_request - beide mit Absicht in DEMO_WRITE_DENIED, weil sie
+// Mail an fremde Adressen verschicken - den Waechter nie erreichen wuerden.
+// Bezugspunkt fuer "vorher" ist das erste Vorkommen von "$resource ===" -
+// das ist der ping-Endpunkt, der erste fruehe Ausstieg in Abschnitt 6.
+
+test('Der Waechter ist vor dem ersten fruehen Ausstieg eingehaengt', function () {
+    $src = demoTestResourcesFromApi()['src'];
+
+    $guardPos = strpos($src, 'demoGuard(');
+
+    assertTrue(
+        $guardPos !== false,
+        'demoGuard(...) wird in api.php nirgends aufgerufen - der Waechter ist '
+        . 'zwar fertig implementiert und getestet, haengt aber nicht im '
+        . 'Anfrageweg. Im Demo-Modus wuerde dann kein einziger Schreibzugriff '
+        . 'gesperrt, auch nicht cleanup, users oder register - die '
+        . 'Vollstaendigkeitspruefungen oben pruefen nur die drei Listen, nicht '
+        . 'diesen Aufruf.'
+    );
+
+    if ($guardPos === false) {
+        return;
+    }
+
+    preg_match('/\$resource\s*===\s*[\'"][a-z0-9_\-]+[\'"]/i', $src, $m, PREG_OFFSET_CAPTURE);
+
+    assertTrue(
+        isset($m[0]),
+        'Kein fruehes "$resource === ..." in api.php gefunden - der '
+        . 'Bezugspunkt fuer die Reihenfolge fehlt. api.php wurde vermutlich '
+        . 'umgebaut; diese Pruefung muss nachziehen.'
+    );
+
+    if (!isset($m[0])) {
+        return;
+    }
+
+    $firstEarlyExitPos = $m[0][1];
+
+    assertTrue(
+        $guardPos < $firstEarlyExitPos,
+        'demoGuard(...) steht in api.php HINTER dem ersten fruehen Ausstieg '
+        . "(Position {$guardPos} statt davor bei {$firstEarlyExitPos}). "
+        . 'Abschnitt 6 beendet register und password_reset_request mit exit(), '
+        . 'bevor das Routing in Abschnitt 10 erreicht wird - beide verschicken '
+        . 'Mail an fremde Adressen und sind deshalb in DEMO_WRITE_DENIED '
+        . 'gelistet. Haengt der Waechter erst nach diesen fruehen Ausstiegen, '
+        . 'laufen genau diese beiden Endpunkte ungeschuetzt an ihm vorbei, '
+        . 'obwohl die Listen sie korrekt als gesperrt fuehren. Der Aufruf '
+        . 'gehoert zwischen Abschnitt 5 (Rate Limiting) und Abschnitt 6 '
+        . '(oeffentliche Endpoints).'
     );
 });
