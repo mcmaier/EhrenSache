@@ -72,7 +72,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // 3. REQUEST VARIABLEN
 // ============================================
 $request_method = $_SERVER['REQUEST_METHOD'];
-$resource = $_GET['resource'] ?? '';
+
+// $_GET['resource'] kann ein Array sein (?resource[]=x). api.php hat kein
+// declare(strict_types=1), aber Array -> string ist auch im schwachen Modus
+// keine gueltige Umwandlung: ohne diese Absicherung wuerde demoGuard() weiter
+// unten mit einem TypeError abbrechen (Argument #1 muss string sein), und der
+// Fehlerrumpf gaebe bei aktiviertem display_errors den Serverpfad preis. Eine
+// leere Zeichenkette steht in keiner der drei Demo-Listen und faellt damit wie
+// jede unbekannte Ressource zur sicheren Seite.
+$resource = is_string($_GET['resource'] ?? null) ? $_GET['resource'] : '';
 $id = $_GET['id'] ?? null;
 
 // ============================================

@@ -49,6 +49,15 @@ test('Unbekannte Ressource ist schreibend gesperrt', function () {
     assertSame(false, demoRequestAllowed('gibt_es_nicht', 'POST'), 'unbekannt POST');
 });
 
+test('Leere Ressource ist gesperrt (Grundlage fuer den Array-Schutz in api.php)', function () {
+    // api.php faengt ?resource[]=x vor dem Waechter mit is_string() ab und
+    // reicht in diesem Fall '' statt eines Arrays weiter (siehe Abschnitt 3).
+    // '' steht in keiner der drei Listen und muss deshalb wie jede unbekannte
+    // Ressource sowohl lesend als auch schreibend gesperrt sein.
+    assertSame(false, demoRequestAllowed('', 'GET'), "leere Ressource GET");
+    assertSame(false, demoRequestAllowed('', 'POST'), "leere Ressource POST");
+});
+
 test('Kleinschreibung und unbekannte Methoden sperren, auch bei erlaubter Ressource', function () {
     // Fail-Safe-Richtung: nur exakt "POST"/"PUT"/"DELETE" (gross) oeffnen etwas.
     assertSame(false, demoRequestAllowed('records', 'post'), 'records post (klein)');
@@ -346,6 +355,26 @@ test('Die fruehen Ausstiege liefern genuegend Treffer', function () {
         . 'Ausstiege legitim abgebaut, oder die $resource===-Regex in '
         . 'demoTestResourcesFromApi() passt nicht mehr zu api.php (z. B. weil '
         . 'die Anfuehrungszeichen vereinheitlicht wurden).'
+    );
+});
+
+test("api.php sichert \$_GET['resource'] mit is_string() ab", function () {
+    // Ohne diese Absicherung ist $resource bei ?resource[]=x ein Array.
+    // demoGuard() verlangt string als ersten Parameter (kein
+    // declare(strict_types=1) in api.php aendert daran nichts -- Array nach
+    // string ist auch im schwachen Modus keine gueltige Umwandlung) und
+    // bricht dann mit einem TypeError samt Serverpfad im Fehlerrumpf ab.
+    // Ein reiner strpos()-Treffer auf 'is_string(' waere zu schwach (koennte
+    // aus jedem anderen Zusammenhang stammen) -- deshalb die konkrete
+    // Fundstelle.
+    $src = demoTestResourcesFromApi()['src'];
+
+    assertTrue(
+        str_contains($src, "is_string(\$_GET['resource']"),
+        "api.php sichert \$_GET['resource'] nicht mehr mit is_string() ab - "
+        . "?resource[]=x waere wieder ein Array und wuerde demoGuard() mit "
+        . "einem TypeError abschiessen (Argument #1 muss string sein), "
+        . "inklusive Pfadpreisgabe im Fehlerrumpf. Siehe Abschnitt 3 in api.php."
     );
 });
 
