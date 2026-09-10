@@ -930,6 +930,21 @@ function showDemoBanner() {
 // Start
 // ============================================
 
+/**
+ * Wird die Station gescannt, waehrend sie bereits offen ist, aendert sich nur
+ * das Fragment. Das ist eine Navigation im selben Dokument: init() laeuft
+ * dabei nicht, und ohne diesen Zuhoerer passierte schlicht nichts.
+ *
+ * Das Neuladen ist Absicht — es gibt weiterhin nur EINEN Weg in den Zustand,
+ * naemlich init(). clearHash() nutzt replaceState und loest kein hashchange
+ * aus, eine Schleife ist damit ausgeschlossen.
+ */
+window.addEventListener('hashchange', () => {
+    if (tokenFromHash()) {
+        window.location.reload();
+    }
+});
+
 (async function init() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('service-worker.js').catch(e => debug.log('SW', e));
