@@ -53,7 +53,7 @@ $success = '';
 // STEP 1: Voraussetzungen prüfen
 if ($step == 1) {
     $checks = [
-        'PHP Version >= 7.4' => version_compare(PHP_VERSION, '7.4.0', '>='),
+        'PHP Version >= 8.0 (läuft: ' . PHP_VERSION . ')' => version_compare(PHP_VERSION, '8.0.0', '>='),
         'PDO Extension' => extension_loaded('pdo'),
         'PDO MySQL' => extension_loaded('pdo_mysql'),
         'JSON Extension' => extension_loaded('json'),
@@ -358,7 +358,11 @@ if ($step == 4) {
                 <div class="success">✓ Alle Voraussetzungen erfüllt!</div>
                 <a href="?step=2"><button class="btn">Weiter zur Datenbank-Konfiguration</button></a>
             <?php else: ?>
-                <div class="error">Bitte kontaktiere deinen Hosting-Provider für fehlende Extensions.</div>
+                <div class="error">
+                    Bitte behebe die fehlgeschlagenen Punkte. Eine zu alte PHP-Version stellst du
+                    meist selbst in der Hosting-Verwaltung um; für fehlende Extensions wende dich
+                    an deinen Hosting-Provider.
+                </div>
             <?php endif; ?>
 
         <?php elseif ($step == 2): ?>

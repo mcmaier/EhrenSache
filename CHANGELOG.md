@@ -84,6 +84,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Konfiguration eine Mail pro Stunde. Ohne `--yes` bleibt die Zielanzeige, weil danach nach
   `LOESCHEN` gefragt wird: Wer das tippen soll, muss sehen, was er löscht.
 
+- **Installations- und Update-Assistent verlangen jetzt PHP 8.0.** Beide prüften bisher nur
+  auf 7.4 — eine Version, die seit November 2022 keine Sicherheitsupdates mehr erhält und die
+  weder README noch Projektdokumentation je als unterstützt genannt haben. Die Prüfzeile nennt
+  zusätzlich die tatsächlich laufende Version, damit im Fehlerfall nicht erst im
+  Hosting-Panel nachgesehen werden muss.
+
+  **Folge für Bestandsinstallationen auf PHP 7.4:** Der Update-Assistent bricht in Schritt 1 ab,
+  bis die PHP-Version im Hosting umgestellt ist. Die bestehende Installation läuft bis dahin
+  unverändert weiter — blockiert ist nur der Weg auf eine neuere Version. Der Hinweistext im
+  Assistenten sagt das jetzt auch.
+
 ### Behoben
 - **`API.md` beschrieb `appearance` falsch.** Das Beispiel zeigte ein flaches Objekt mit
   `org_name` und `logo_url`; ausgeliefert wird seit Langem `{"settings": {…}}` mit anderen

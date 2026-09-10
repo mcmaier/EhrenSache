@@ -71,7 +71,7 @@ $targetVersion = getTargetVersion();
 
 if ($step >= 1) {
     $checks = [
-        'PHP >= 7.4'       => version_compare(PHP_VERSION, '7.4.0', '>='),
+        'PHP >= 8.0 (läuft: ' . PHP_VERSION . ')' => version_compare(PHP_VERSION, '8.0.0', '>='),
         'PDO Extension'    => extension_loaded('pdo'),
         'PDO MySQL'        => extension_loaded('pdo_mysql'),
         'install.lock'     => file_exists(LOCK_PATH),
@@ -437,7 +437,11 @@ $allChecksPassed = !in_array(false, $checks, true);
         <?php if ($allChecksPassed): ?>
             <a href="?step=2"><button class="btn">Weiter zur Konfiguration</button></a>
         <?php else: ?>
-            <div class="error-box">Bitte behebe die oben genannten Probleme, bevor du fortfährst.</div>
+            <div class="error-box">
+                Bitte behebe die oben genannten Probleme, bevor du fortfährst. Läuft der Webspace
+                noch auf PHP 7.4, stellst du die Version meist selbst in der Hosting-Verwaltung um;
+                die bestehende Installation läuft bis dahin unverändert weiter.
+            </div>
         <?php endif; ?>
 
     <?php // ═══════════════════════════════════════════════════════════════
