@@ -134,3 +134,53 @@ Sie stehen als Tests fest, weil jede von ihnen einmal verletzt war:
   `docs/OPEN-ITEMS.md`.
 - **`checkin_appointment` ist am selben Tag nicht wiederholbar** (OI-41). Betrifft den
   Testlauf, nicht den Generator.
+
+## Betrieb der öffentlichen Demo
+
+Der stündliche Reset ruft den Generator ohne Rückfrage:
+
+```
+php /pfad/zur/installation/private/demo/seed.php --yes --quiet
+```
+
+`seed.php` weist einen Aufruf über den Webserver ab und läuft nur auf der Kommandozeile.
+Der gesamte Schreibvorgang liegt in einer Transaktion — ein Besucher mitten in einer Aktion
+bekommt keinen halben Bestand zu sehen. Dass hier `DELETE` und nicht `TRUNCATE` geleert wird,
+ist die Voraussetzung dafür: `TRUNCATE` löst ein implizites COMMIT aus und machte das
+Zurückrollen wirkungslos.
+
+**`--quiet` unterdrückt nur die Schlusszusammenfassung, nicht die Zielanzeige.** Ein Lauf gibt
+weiterhin rund 20 Zeilen aus: Datenbank, Präfix und die Zeilenzahl jeder Tabelle, die geleert
+wird. Für einen stündlichen Cron-Job bedeutet das je nach Konfiguration eine Mail pro Stunde.
+Wer das nicht will, hängt `> /dev/null` an — Fehler gehen auf STDERR und bleiben damit
+sichtbar:
+
+```
+php /pfad/zur/installation/private/demo/seed.php --yes --quiet > /dev/null
+```
+
+`buildSettings()` in `plan.php` schreibt acht Schlüssel und **nicht** `smtp_configured`. Da
+`checkMailStatus()` ein fehlendes `smtp_configured` als „aus" wertet, stellt jeder Reset den
+mailfreien Zustand aktiv wieder her. Das ist der Grund, warum `password_reset_request` auf
+der Demo nichts verschicken kann — und es ist kein Zufall, sondern die Gegenmaßnahme. Wer
+`buildSettings()` ändert, darf sie nicht verlieren.
+
+### Der Demo-Modus ist davon getrennt
+
+Der Generator stellt den **Datenbestand** her. Was ein Besucher damit tun darf, regelt der
+Wächter in `private/helpers/demo_mode.php`, eingeschaltet über `define('DEMO_MODE', true);`
+in `private/config/config.php`. Beides gehört zusammen, ist aber unabhängig: Ein Reset ohne
+Wächter ergäbe eine Demo, in der jeder Konten anlegen kann; ein Wächter ohne Reset eine, die
+nach einem Tag zerfahren aussieht.
+
+### Einmalig am Server zu prüfen
+
+- **`/update/` und `/install/` müssen 403 liefern.** Beide tragen eine `.htaccess` mit
+  `Require all denied`, und `tests/suites/htaccess_locks.php` hält die Fassungen zusammen.
+  Ist `AllowOverride` beim Hoster abgeschaltet, sind beide offen — der Update-Assistent hat
+  keine eigene Anmeldung.
+- Der Datenbankbenutzer der Demo darf **nur** auf die Demo-Datenbank berechtigt sein.
+- `private/config/install.lock` muss vorhanden sein.
+- Keine Mail-Konfiguration hinterlegen.
+- `define('DEMO_MODE', true);` in `private/config/config.php` eintragen.
+- Der Cron muss CLI-PHP aufrufen, nicht den Webserver.
