@@ -211,6 +211,20 @@ function statisticsReportAppointments($db, $database, int $memberId, int $year, 
 }
 
 /**
+ * Die drei Herkunftsstufen als Konstanten.
+ *
+ * Sie stehen in der Tabelle UND in den Fussnoten, die sie erklaeren. Als
+ * Literale an beiden Stellen wuerde eine Umbenennung die Fussnote auf einen
+ * Begriff zeigen lassen, den die Tabelle nicht mehr kennt. Dieses Muster --
+ * dieselbe Angabe zweimal erzeugt statt einmal weitergereicht -- hat in diesem
+ * Zweig bereits zweimal zugeschlagen: bei der Formel fuer 'Entschuldigt' und
+ * bei der Statistik-Aggregation selbst.
+ */
+const REPORT_ORIGIN_MEASURED   = 'gemessen';
+const REPORT_ORIGIN_CORRECTED  = 'korrigiert';
+const REPORT_ORIGIN_BACKFILLED = 'nachgetragen';
+
+/**
  * Herkunft einer Ankunftszeit.
  *
  * arrival_time ist nicht durchgehend eine Messung: Legt ein Admin einen
@@ -229,14 +243,14 @@ function statisticsReportAppointments($db, $database, int $memberId, int $year, 
 function statisticsReportOrigin(?string $source, int $corrected): string
 {
     if ($corrected > 0) {
-        return 'korrigiert';
+        return REPORT_ORIGIN_CORRECTED;
     }
 
     if (in_array($source, ['station_pin', 'device_auth', 'user_totp', 'auto_checkin'], true)) {
-        return 'gemessen';
+        return REPORT_ORIGIN_MEASURED;
     }
 
-    return 'nachgetragen';
+    return REPORT_ORIGIN_BACKFILLED;
 }
 
 /** Terminliste eines Mitglieds als Abschnitt. */
@@ -301,8 +315,8 @@ function statisticsReportNotes(array $statistics): array
 
     // Ohne diese Zeile bliebe unsichtbar, dass je Gruppe nur eine einzige
     // Terminart in die Quote eingeht (OI-48) -- das Blatt soll ohne Vorwissen
-    // erkennbar machen, worauf die Zahl beruht. Deshalb liefert Schritt 1
-    // den Namen der Terminart mit.
+    // erkennbar machen, worauf die Zahl beruht. Deshalb liefert
+    // calculateGroupStatistics() das Feld appointment_type_name mit.
     if ($statistics !== []) {
         $perGroup = [];
         foreach ($statistics as $group) {
@@ -313,15 +327,15 @@ function statisticsReportNotes(array $statistics): array
             . implode('; ', $perGroup) . '.';
     }
 
-    $notes[] = 'gemessen: Die Ankunftszeit wurde bei der Anmeldung an einer Station oder in der App '
+    $notes[] = REPORT_ORIGIN_MEASURED . ': Die Ankunftszeit wurde bei der Anmeldung an einer Station oder in der App '
         . 'aufgezeichnet.';
-    $notes[] = 'korrigiert: Die Ankunftszeit wurde auf Antrag geändert und genehmigt.';
+    $notes[] = REPORT_ORIGIN_CORRECTED . ': Die Ankunftszeit wurde auf Antrag geändert und genehmigt.';
     // Bewusst offen formuliert: Neben Eintraegen von Hand und aus dem Import
     // faellt hierunter auch die Quelle 'timer' aus Installationen vor 1.2.3.
     // Deren Zeitstempel stammt von einer Maschine, misst aber den Beginn einer
     // Arbeitssitzung statt der Ankunft am Termin. "Von Hand erfasst" waere fuer
     // diese Zeilen schlicht falsch, "gemessen" waere irrefuehrend.
-    $notes[] = 'nachgetragen: Die Ankunftszeit wurde nicht bei der Anmeldung zu diesem Termin '
+    $notes[] = REPORT_ORIGIN_BACKFILLED . ': Die Ankunftszeit wurde nicht bei der Anmeldung zu diesem Termin '
         . 'aufgezeichnet — sie wurde von Hand erfasst, eingelesen oder stammt aus einem anderen '
         . 'Vorgang; sie entspricht gegebenenfalls der Startzeit des Termins und ist dann keine '
         . 'Messung.';

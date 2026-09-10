@@ -215,7 +215,11 @@ test('statistics_report: die Terminliste deckt genau die gezaehlten Termine ab',
     assertTrue($start !== false, 'Terminliste erwartet');
     $end     = strpos($html['raw'], '</table>', $start);
     $section = substr($html['raw'], $start, $end - $start);
-    $rows    = substr_count($section, '<tr>') - 1; // Kopfzeile abziehen
+    // Gezaehlt wird die Datumsspalte, nicht <tr>: Das Muster kommt nur in
+    // Datenzeilen vor, nie in der Kopfzeile -- kein Abzug noetig. Eine
+    // spaetere Summen- oder Zwischenzeile im Abschnitt wuerde diesen Test
+    // sonst rot faerben, ohne dass am Bericht etwas falsch waere.
+    $rows = preg_match_all('#<td>\d{2}\.\d{2}\.\d{4}</td>#', $section);
 
     assertSame($expected, $rows,
         "Terminliste soll genau die gezaehlten Termine zeigen (Quote rechnet mit {$expected})");
