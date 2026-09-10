@@ -10,6 +10,30 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ## [Nicht veröffentlicht]
 
 ### Neu
+- **Schnellinbetriebnahme des Kiosks per QR-Code.** Der Gerätedialog einer virtuellen Station
+  zeigt neben Token und Kopieren einen QR-Code mit der Adresse `…/station/#t=<token>`. Statt
+  48 Hex-Zeichen auf einem Tablet ohne Tastatur abzutippen, scannt man ihn mit der Kamera; die
+  Station verbindet sich und entfernt den Token aus Adresszeile und Verlauf.
+
+  Bewusst das **Fragment** und nicht der Query: Es wird vom Browser nie gesendet und steht damit
+  in keinem Zugriffsprotokoll, keinem Referrer und keinem Reverse-Proxy-Log. Der Token bleibt
+  ohne Mitglieds-PIN wertlos und darf weiterhin nur die Ressource `station` aufrufen — der
+  QR-Code macht ihn nicht angreifbarer, als er im Gerätedialog ohnehin ist.
+
+  Ein fehlgeschlagener Scan lässt die Station verbunden: Der bisherige Token wird
+  wiederhergestellt, der Bildschirm zeigt den Fehler, ein Neuladen stellt den Zustand vor dem
+  Scan wieder her.
+
+  **Reihenfolge beachten:** erst koppeln, dann zum Startbildschirm hinzufügen. Unter iPadOS hat
+  eine installierte Web-App einen eigenen Speichercontainer; ein später gescannter Code landet
+  in Safari und erreicht die installierte Station nicht.
+
+- **Der QR-Code des Dashboards funktioniert ohne Internetzugang.** Die Bibliothek kam bisher von
+  cdnjs und fiel in einem Netz ohne Internetzugang still aus — der QR-Code des PWA-Quicklinks
+  fehlte dort einfach. Sie liegt jetzt als `public/js/vendor/qrcode.js` im Paket und dient
+  Dashboard und Station gemeinsam. Zwei Tests halten fest, dass jedes Skript auf eine vorhandene
+  Datei zeigt und weder Dashboard noch Station etwas von außen laden.
+
 - **Demo-Modus für öffentlich erreichbare Installationen.** `define('DEMO_MODE', true);` in
   `private/config/config.php` begrenzt schreibende Zugriffe auf eine feste Erlaubnisliste:
   Mitglieder, Termine, Anwesenheit, Anträge, Arbeitszeit, Check-in und Kiosk bleiben nutzbar;
