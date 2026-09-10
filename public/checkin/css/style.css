@@ -12,7 +12,7 @@
     --primary-color:#1F5FBF;
     --primary-dark: #0F4F9F;
     --secondary-color: #4CAF50;
-    --background-color:#e0e0e0;    
+    --background-color:#e0e0e0;
     --text: #2F3A45;
     --text-light: #6B7280;
 
@@ -24,6 +24,9 @@
     --bg: #e0e0e0;
     --card-bg: #ffffff;
     --border: #e0e6ed;
+    /* K3: Farbe des Demo-Hinweisbands, lokal statt in variables.css -- die
+       PWA hat keine. Damit steht sie je Datei an genau einer Stelle. */
+    --demo-color: #e67e22;
 }
 
 * {
@@ -2294,7 +2297,7 @@ body {
 /* Hinweisband der Demo-Installation, eingesetzt von app.js.
    Knapper als in der Hauptanwendung: auf dem Telefon ist der Platz knapp. */
 .demo-banner {
-    background: #e67e22;
+    background: var(--demo-color);
     color: #fff;
     padding: 6px 12px;
     text-align: center;

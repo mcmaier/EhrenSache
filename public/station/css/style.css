@@ -19,6 +19,9 @@
     --border: #e0e6ed;
     --success: #27ae60;
     --error: #e74c3c;
+    /* K3: Farbe des Demo-Hinweisbands, lokal statt in variables.css -- der
+       Kiosk hat keine. Damit steht sie je Datei an genau einer Stelle. */
+    --demo-color: #e67e22;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; }
@@ -122,12 +125,52 @@ label { display: block; margin: 12px 0; }
 .screen.active ~ #bootFallback,
 body:has(.screen.active) #bootFallback { display: none; }
 
+/* W3: Hoehe des Demo-Bands, gemessen bei 13px Schrift und 6px/12px
+   Innenabstand -- fuer die Versatzberechnung der Screens unten. Eigene
+   Variable statt eines Zahlenwerts an drei Stellen. */
+:root {
+    --demo-banner-h: 29px;
+}
+
 /* Hinweisband der Demo-Installation, eingesetzt von app.js.
-   Knapper als in der Hauptanwendung: auf dem Telefon ist der Platz knapp. */
+   Knapper als in der Hauptanwendung: auf dem Telefon ist der Platz knapp.
+   W3: fixiert wie .banner oben, aus demselben Grund: im normalen Fluss
+   addiert sich seine Hoehe zur height:100% von .screen, und body {
+   overflow: hidden } schneidet den ueberstehenden Rest ab -- derselbe
+   Fehler, der .banner schon vorher zu diesem Muster gefuehrt hat. */
 .demo-banner {
-    background: #e67e22;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9;
+    background: var(--demo-color);
     color: #fff;
     padding: 6px 12px;
     text-align: center;
     font-size: 13px;
+}
+
+/* Stapelreihenfolge: Der Offline-Hinweis (rot, .banner, z-index: 10) meldet
+   einen Zustand, der sofortiges Handeln verlangt (keine Verbindung, kein
+   Stempeln moeglich) -- er bleibt deshalb der optisch obere/dringlichere und
+   behaelt den hoeheren z-index. Verdeckt wird dabei aber nichts: faellt die
+   Verbindung waehrend das Demo-Band steht, wird der Offline-Hinweis unter das
+   Demo-Band GESCHOBEN (top-Versatz), nicht dahinter versteckt -- beide bleiben
+   gleichzeitig lesbar. */
+body.has-demo-banner .banner {
+    top: var(--demo-banner-h);
+}
+
+/* Nur das Demo-Band ist sichtbar: der aktive Screen ruemt Platz fuer dessen
+   Hoehe plus den normalen Innenabstand. */
+body.has-demo-banner .screen.active {
+    padding-top: calc(var(--demo-banner-h) + 24px);
+}
+
+/* Beide Baender sichtbar: die Demo-Bandhoehe kommt zum bestehenden Versatz
+   des Offline-Hinweises hinzu. Hoehere Spezifitaet als die beiden Regeln
+   oben, damit sie in diesem Fall gewinnt. */
+body.has-demo-banner .banner:not([hidden]) ~ .screen.active {
+    padding-top: calc(80px + var(--demo-banner-h));
 }

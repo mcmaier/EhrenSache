@@ -87,7 +87,8 @@ const state = {
     nextUntil: 0,
     clockOffset: 0,        // Differenz Server-/Tablet-Uhr, aus der letzten erfolgreichen TOTP-Antwort
     validUntil: 0,         // Gueltigkeit des aktuell angezeigten Codes (Serverzeit), fuer renderBar()
-    period: 30             // TOTP-Periode aus der letzten erfolgreichen Antwort, fuer renderBar()
+    period: 30,            // TOTP-Periode aus der letzten erfolgreichen Antwort, fuer renderBar()
+    appearanceLoaded: false // K4: erst true nach einer erfolgreichen appearance-Antwort
 };
 
 const $ = (id) => document.getElementById(id);
@@ -357,6 +358,14 @@ async function refreshStatus() {
         state.status = res.data;
         applyStatus();
         if (state.status.totp_enabled && !state.totpTimer) refreshTotp();
+    }
+    // K4: ein Kiosk laeuft tagelang durch -- ein einzelner Fehlschlag von
+    // loadAppearance() beim Boot (siehe unten) darf das Demo-Band nicht bis
+    // zum naechsten Neuladen unterdruecken. Statt einer eigenen Schleife
+    // haengt der Wiederholungsversuch an der ohnehin laufenden Status-Schleife
+    // mit, bis appearance einmal erfolgreich beantwortet wurde.
+    if (!state.appearanceLoaded) {
+        loadAppearance();
     }
 }
 
@@ -833,6 +842,9 @@ async function loadAppearance() {
             $('idleLogo').src = src;
             $('setupLogo').src = src;
         }
+        // K4: erst ab hier gilt appearance als beantwortet -- refreshStatus()
+        // versucht es sonst weiter, alle 5 Minuten, mit der Status-Schleife mit.
+        state.appearanceLoaded = true;
     } catch (e) {
         debug.log('appearance nicht geladen', e);
     }
@@ -850,6 +862,9 @@ function showDemoBanner() {
     banner.textContent = 'Demo — erfundene Daten, stündlicher Reset.';
 
     document.body.prepend(banner);
+    // W3: Klasse, an der die CSS-Gegenregeln fuer .banner und .screen.active
+    // haengen -- siehe body.has-demo-banner in style.css.
+    document.body.classList.add('has-demo-banner');
 }
 
 // ============================================
