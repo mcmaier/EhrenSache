@@ -328,6 +328,20 @@ function renderWorktimeReport($db, $database, array $report): void
     echo "<link rel=\"stylesheet\" href=\"css/print.css\">\n";
     echo "</head>\n<body>\n";
 
+    // W5: export steht in DEMO_READ_ONLY und ist auf der Demo erreichbar. Der
+    // Bericht verlaesst als einzige der fuenf Oberflaechen den Bildschirm --
+    // ausgedruckt waere er von einem echten Nachweis aeusserlich nicht zu
+    // unterscheiden. demo_mode.php ist an dieser Stelle bereits ueber
+    // api.php geladen. Fester Text ohne Nutzerdaten, kein exportEscape()
+    // noetig -- dieselbe Begruendung wie bei showDemoBanner() in theme.js.
+    if (demoModeActive()) {
+        echo '<div class="report-demo-notice" role="alert">'
+           . '<strong>Demo-Installation — kein gültiger Nachweis.</strong> '
+           . 'Alle Personen, Zeiten und Beträge auf diesem Blatt sind erfunden. '
+           . 'Nicht zur Vorlage bei Dritten oder zur Abrechnung verwenden.'
+           . "</div>\n";
+    }
+
     echo "<header class=\"report-head\">\n";
     if ($logo !== '') {
         echo '<img class="report-logo" src="' . exportEscape($logo) . '" alt="' . exportEscape($orgName) . "\">\n";

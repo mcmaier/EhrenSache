@@ -46,6 +46,28 @@ body {
    KOPF
    ============================================ */
 
+/* ============================================
+   DEMO-HINWEIS
+
+   Nur vorhanden, wenn demoModeActive() in renderWorktimeReport() (export.php)
+   wahr ist -- siehe dort. Farbe hart codiert wie der Rest dieser Datei
+   (bewusst ohne variables.css, siehe Kopf). print-color-adjust: exact haelt
+   die Flaeche auch im Druck: ohne die Regel optimieren Browser Hintergrund-
+   farben beim Drucken standardmaessig weg, und aus dem Hinweisband wuerde
+   unbemerkt ein normaler schwarzer Text.
+   ============================================ */
+
+.report-demo-notice {
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    background: #e67e22;
+    color: #fff;
+    font-weight: 600;
+    border-radius: 4px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
 .report-head {
     display: flex;
     align-items: flex-start;
