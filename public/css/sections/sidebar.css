@@ -307,6 +307,19 @@
     cursor: pointer;
 }
 
+/* qrcode-generator liefert ein SVG, nicht ein Canvas — ohne Deckelung
+   sprengt ein langer Inhalt (Stations-Adresse mit Token) das Modal. */
+.qr-modal-content #qrcode svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+.qr-modal-content .qr-modal-warning {
+    color: var(--danger-color);
+    font-weight: 600;
+}
+
 
 /*----------------------------*/
 /*      LOGO                  */

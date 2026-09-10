@@ -809,71 +809,70 @@ export function initPWAQuickAccess() {
             window.open(pwaUrl, '_blank');
         } else {
             // QR-Code auf Desktop
-            showPWAQRCode(pwaUrl);
+            showQRModal({
+                title: '📱 Check-In App öffnen',
+                url: pwaUrl,
+                hint: 'Scanne den QR-Code mit deinem Smartphone'
+            });
         }
     });
 }
 
-function showPWAQRCode(url) {
-    // Modal erstellen falls nicht vorhanden
+/**
+ * QR-Modal für beliebige Adressen. Wird vom PWA-Quicklink und von der
+ * Schnellinbetriebnahme des Kiosks benutzt.
+ *
+ * @param {{title: string, url: string, hint?: string, warning?: string}} options
+ */
+export function showQRModal({ title, url, hint, warning }) {
     let modal = document.getElementById('qrModal');
-    
+
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'qrModal';
         modal.className = 'qr-modal';
         modal.innerHTML = `
             <div class="qr-modal-content">
-                <h2>📱 Check-In App öffnen</h2>
+                <h2 id="qrModalTitle"></h2>
                 <div id="qrcode"></div>
-                <p>Scanne den QR-Code mit deinem Smartphone</p>
+                <p id="qrModalHint"></p>
+                <p id="qrModalWarning" class="qr-modal-warning"></p>
                 <p style="font-size: 12px; margin-top: 10px;">
                     <strong>Oder kopiere:</strong><br>
-                    <input type="text" value="${url}" readonly 
+                    <input type="text" id="qrModalUrl" readonly
                            style="width: 100%; padding: 8px; margin-top: 5px; font-size: 12px; text-align: center;">
                 </p>
                 <button class="btn-close-qr">Schließen</button>
             </div>
         `;
         document.body.appendChild(modal);
-        
-        // Close-Handler
+
         modal.querySelector('.btn-close-qr').addEventListener('click', () => {
             modal.classList.remove('active');
         });
-        
+
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.classList.remove('active');
             }
         });
     }
-    
-    // QR-Code generieren (benötigt qrcode.js)
-    const qrContainer = document.getElementById('qrcode');
-    qrContainer.innerHTML = ''; // Clear previous
-    
-    // Prüfe ob QRCode Library verfügbar
-    if (typeof QRCode !== 'undefined') {
-        new QRCode(qrContainer, {
-            text: url,
-            width: 200,
-            height: 200,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.H
-        });
-    } else {
-        // Fallback: Text-Link
-        qrContainer.innerHTML = `
-            <p style="color: #e74c3c; margin: 20px;">
-                QR-Code Library fehlt<br>
-                <a href="${url}" target="_blank" style="color: #667eea;">
-                    Direkt zur App →
-                </a>
-            </p>
-        `;
-    }
-    
+
+    // Inhalt bei JEDEM Aufruf setzen, nicht nur beim ersten: das Modal wird von
+    // mehreren Stellen benutzt und behielte sonst Titel, Adresse und QR-Bild
+    // des vorigen Aufrufers.
+    document.getElementById('qrModalTitle').textContent = title;
+    document.getElementById('qrModalHint').textContent = hint || '';
+    document.getElementById('qrModalUrl').value = url;
+
+    const warningEl = document.getElementById('qrModalWarning');
+    warningEl.textContent = warning || '';
+    warningEl.style.display = warning ? 'block' : 'none';
+
+    const qr = qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    document.getElementById('qrcode').innerHTML = qr.createSvgTag(5, 2);
+
     modal.classList.add('active');
 }
