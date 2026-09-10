@@ -329,8 +329,15 @@ function getAppearance($db, $database)
         $settings[$row['setting_key']] = $row['setting_value'];
     }
     
-    echo json_encode(['settings' => $settings]);
-    
+    // 'demo' liegt bewusst neben 'settings' und nicht darin: settings kommt
+    // aus der Datenbank, demo aus config.php. Alle vier Oberflaechen
+    // (Hauptanwendung, Anmeldung, Check-in-PWA, Kiosk) holen diesen Endpunkt
+    // ohnehin schon fuer das Branding.
+    echo json_encode([
+        'settings' => $settings,
+        'demo'     => demoModeActive(),
+    ]);
+
     } catch (Exception $e) {
         http_response_code(500);
         echo json_encode(['error' => 'Fehler beim Laden']);
