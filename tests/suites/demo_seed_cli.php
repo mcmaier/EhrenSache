@@ -9,7 +9,7 @@ test('parseOptions liefert die Vorgaben ohne weitere Argumente', function () {
     $options = parseOptions(['seed.php']);
     assertSame(false, $options['yes']);
     assertSame(20260908, $options['seed']);
-    assertSame('demo2025', $options['password']);
+    assertSame('probelauf', $options['password']);
     assertSame(false, $options['quiet']);
     assertSame(1, preg_match('/^\d{4}-\d{2}-\d{2}$/', $options['reference_date']), 'reference_date im Format YYYY-MM-DD');
 });

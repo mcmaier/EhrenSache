@@ -72,7 +72,7 @@ function parseOptions(array $argv): array
         'yes'            => false,
         'seed'           => 20260908,
         'reference_date' => date('Y-m-d'),
-        'password'       => 'demo2025',
+        'password'       => 'probelauf',
         'quiet'          => false,
     ];
 

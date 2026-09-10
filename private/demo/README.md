@@ -18,7 +18,7 @@ php private/demo/seed.php [Optionen]
 | `--yes` | ohne Rückfrage ausführen (für den Cron-Job) |
 | `--seed=<int>` | Zufallssaat, Vorgabe `20260908` |
 | `--reference-date=<Y-m-d>` | Stichtag aller Zeitpunkte, Vorgabe: heute |
-| `--password=<klartext>` | Passwort der drei Konten, Vorgabe `demo2025` |
+| `--password=<klartext>` | Passwort der drei Konten, Vorgabe `probelauf` |
 | `--quiet` | unterdrückt den Abschlussbericht; zusammen mit `--yes` auch die Zielanzeige (die Sicherheitsabfrage bleibt) |
 
 Ohne `--yes` nennt das Skript Datenbank, Präfix und die Zeilenzahl jeder Tabelle, die es
@@ -85,7 +85,7 @@ php -r "require 'private/demo/plan.php'; foreach (buildMembers(new DemoRandom(20
 | `user@musterhausen.example` | Benutzer, verknüpft mit Mitglied **M001** — trägt die laufende Sitzung, hiermit wird die PWA fotografiert |
 | `user2@musterhausen.example` | Benutzer, verknüpft mit Mitglied **M002** — nur für die Testsuiten, ohne laufende Sitzung |
 
-Passwort für alle vier: der Wert von `--password`, Vorgabe `demo2025`.
+Passwort für alle vier: der Wert von `--password`, Vorgabe `probelauf`.
 
 **Diese Konten stehen auch in `tests/config.php`**, dort `user2@` als Rolle `user`. Der
 Generator leert `users` — wer die Zugänge hier ändert, muss sie dort ändern, sonst scheitert

@@ -2340,6 +2340,12 @@ body {
     padding: 6px 12px;
     text-align: center;
     font-size: 13px;
+    /* Haftend wie in der Hauptanwendung: Der Hinweis darf beim Scrollen
+       nicht verschwinden. Der Kiosk loest dasselbe mit position: fixed,
+       weil er einen Schirm mit overflow: hidden fuellt. */
+    position: sticky;
+    top: 0;
+    z-index: 90;
 }
 
 

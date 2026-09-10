@@ -59,7 +59,7 @@ Demo nicht stillschweigend ungeschützt.
 | `user@musterhausen.example` | Mitglied M001, trägt die laufende Arbeitszeitsitzung |
 | `user2@musterhausen.example` | Mitglied M002 |
 
-Passwort für alle: `demo2025`, änderbar über `--password=`. `change_password` ist gesperrt —
+Passwort für alle: `probelauf`, änderbar über `--password=`. `change_password` ist gesperrt —
 ein Besucher kann die veröffentlichten Zugänge also nicht unbrauchbar machen.
 
 ---

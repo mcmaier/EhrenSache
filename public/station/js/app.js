@@ -882,7 +882,7 @@ function showDemoBanner() {
     const banner = document.createElement('div');
     banner.className = 'demo-banner';
     banner.setAttribute('role', 'status');
-    banner.textContent = 'Demo — erfundene Daten, stündlicher Reset.';
+    banner.textContent = 'Demo — erfundene Daten, stündlicher Reset, Funktion eingeschränkt.';
 
     document.body.prepend(banner);
     // W3: Klasse, an der die CSS-Gegenregeln fuer .banner und .screen.active

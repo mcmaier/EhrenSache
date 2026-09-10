@@ -147,12 +147,32 @@ function showDemoBanner() {
     // Wortlaut wie in den beiden PWAs (public/checkin, public/station). Die
     // fruehere lange Fassung brach schon knapp unterhalb 900px um und war der
     // Grund fuer die per --demo-banner-h festgenagelte Hoehe unten.
-    banner.innerHTML = '<strong>Demo-Installation.</strong> Erfundene Daten, stündlicher Reset.';
+    banner.innerHTML = '<strong>Demo-Installation.</strong> Erfundene Daten, stündlicher Reset, Funktionsumfang eingeschränkt.';
 
     document.body.prepend(banner);
     // W1: .sidebar und .mobile-menu-btn sind fixiert und kennen das Band sonst
     // nicht -- siehe components/demo-banner.css fuer die Gegenregeln.
     document.body.classList.add('has-demo-banner');
+
+    measureDemoBanner(banner);
+    window.addEventListener('resize', () => measureDemoBanner(banner));
+}
+
+/**
+ * Schreibt die tatsächliche Höhe des Bands nach --demo-banner-h.
+ *
+ * Die fixierten Elemente (.sidebar, .mobile-menu-btn) rücken um diesen Wert
+ * nach unten. Ein fest verdrahteter Wert hat sich zweimal als falsch erwiesen:
+ * Sobald der Text länger wird oder das Fenster schmaler, bricht das Band um
+ * und die Annahme stimmt nicht mehr — zuletzt 52px statt der angenommenen 35.
+ * Gemessen statt geraten trägt die Regel jede Textlänge und jede Breite.
+ */
+function measureDemoBanner(banner) {
+    const hoehe = Math.ceil(banner.getBoundingClientRect().height);
+
+    if (hoehe > 0) {
+        document.documentElement.style.setProperty('--demo-banner-h', hoehe + 'px');
+    }
 }
 
 export { loadTheme, applyTheme }

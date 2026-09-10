@@ -18,6 +18,10 @@
    plus 14px * 1.4 Zeilenhoehe ergeben rechnerisch 39,6px, aufgerundet 40px.
    Als Variable, damit .sidebar und .mobile-menu-btn unten denselben Wert
    verwenden und nicht zwei Stellen synchron halten muessen. */
+/* Ausgangswert fuer den Fall, dass das Band noch nicht eingesetzt ist.
+   Sobald theme.js es einsetzt, ueberschreibt measureDemoBanner() diesen Wert
+   mit der TATSAECHLICHEN Hoehe. Ein fest verdrahteter Wert war zweimal falsch:
+   Sobald der Text laenger wird oder das Fenster schmaler, bricht das Band um. */
 :root {
     --demo-banner-h: 40px;
 }
@@ -29,7 +33,13 @@
     text-align: center;
     font-size: 14px;
     line-height: 1.4;
-    position: relative;
+    /* Haftend, nicht bloss im Fluss: Der Hinweis muss auch nach dem Scrollen
+       sichtbar bleiben -- er sagt dem Besucher, dass die Daten erfunden und
+       Funktionen abgeschaltet sind. Ein Balken, der nach dem ersten
+       Scrollschritt verschwindet, erfuellt das nicht.
+       body ist hier der Scroll-Container, deshalb genuegt top: 0. */
+    position: sticky;
+    top: 0;
     z-index: 90;
 }
 
@@ -42,10 +52,9 @@
    Schrift statt eines zweiten Hoehenwerts fuer .sidebar und .mobile-menu-btn:
    dieselbe Groesse, die die PWAs ohnehin fuer schmale Bildschirme verwenden. */
 @media (max-width: 400px) {
-    :root {
-        --demo-banner-h: 35px;
-    }
-
+    /* Nur die Schriftgroesse -- die Hoehe misst measureDemoBanner() in
+       theme.js. Stuende hier wieder ein fester Wert, ueberschriebe die
+       Media Query die Messung und der Fehler waere zurueck. */
     .demo-banner {
         font-size: 13px;
         padding: 8px 12px;
