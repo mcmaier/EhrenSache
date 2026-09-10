@@ -137,24 +137,45 @@ function assertSchema(PDO $db, string $prefix): void
 }
 
 /**
+ * Entscheidet, ob die Zielanzeige erscheint.
+ *
+ * Unterdrückt wird sie nur, wenn beides gesetzt ist: `--quiet` **und** `--yes`.
+ * Das ist der Cron-Fall — dort liest die Anzeige niemand, und rund zwanzig
+ * Zeilen je Lauf bedeuten bei einem stündlichen Job je nach Konfiguration eine
+ * Mail pro Stunde.
+ *
+ * Ohne `--yes` erscheint sie **immer**, auch mit `--quiet`: Wer aufgefordert
+ * wird, LOESCHEN zu tippen, muss sehen, was er löscht. Eine stille Rückfrage
+ * wäre gefährlicher als eine laute Ausgabe lästig ist.
+ */
+function showTargetListing(bool $yes, bool $quiet): bool
+{
+    return !$quiet || !$yes;
+}
+
+/**
  * Nennt das Ziel und verlangt eine Bestätigung.
  *
  * Ohne diese Anzeige wäre nicht erkennbar, welche Datenbank getroffen wird —
- * und das Skript löscht.
+ * und das Skript löscht. Zur Ausnahme siehe showTargetListing().
  */
-function confirmTarget(PDO $db, string $prefix, string $dbName, bool $yes): void
+function confirmTarget(PDO $db, string $prefix, string $dbName, bool $yes, bool $quiet = false): void
 {
-    echo "Ziel:      Datenbank '{$dbName}', Präfix '{$prefix}'\n";
-    echo "Folgende Tabellen werden GELEERT:\n";
+    if (showTargetListing($yes, $quiet)) {
+        echo "Ziel:      Datenbank '{$dbName}', Präfix '{$prefix}'\n";
+        echo "Folgende Tabellen werden GELEERT:\n";
 
-    foreach (DEMO_TABLES as $table) {
-        $stmt  = $db->query("SELECT COUNT(*) FROM {$prefix}{$table}");
-        $count = $stmt !== false ? (int) $stmt->fetchColumn() : 0;
-        printf("  %-32s %6d Zeile(n)\n", $table, $count);
+        foreach (DEMO_TABLES as $table) {
+            $stmt  = $db->query("SELECT COUNT(*) FROM {$prefix}{$table}");
+            $count = $stmt !== false ? (int) $stmt->fetchColumn() : 0;
+            printf("  %-32s %6d Zeile(n)\n", $table, $count);
+        }
     }
 
     if ($yes) {
-        echo "\n--yes gesetzt, keine Rückfrage.\n";
+        if (!$quiet) {
+            echo "\n--yes gesetzt, keine Rückfrage.\n";
+        }
 
         return;
     }
@@ -421,7 +442,7 @@ if ($isMainScript) {
 
     $dbName = (string) $db->query('SELECT DATABASE()')->fetchColumn();
 
-    confirmTarget($db, $prefix, $dbName, $options['yes']);
+    confirmTarget($db, $prefix, $dbName, $options['yes'], $options['quiet']);
 
     // Uhrzeit des tatsächlichen Laufs, nicht nur das Datum: buildWorkSessions()
     // braucht sie, damit die eine laufende Sitzung im Bestand vor diesem

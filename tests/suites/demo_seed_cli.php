@@ -230,3 +230,20 @@ test('jeder Abschnitt des Gesamtplans traegt in allen Zeilen dieselben Schluesse
         }
     }
 });
+
+// ---- showTargetListing ----------------------------------------------------
+
+/**
+ * Die Regel ist sicherheitsrelevant und deshalb festgenagelt: Unterdrueckt
+ * wird die Zielanzeige nur im Cron-Fall (--quiet zusammen mit --yes). Sobald
+ * jemand LOESCHEN tippen soll, erscheint sie -- auch mit --quiet.
+ */
+test('showTargetListing unterdrueckt nur im Cron-Fall', function () {
+    assertSame(false, showTargetListing(true, true), '--yes --quiet: Cron, keine Anzeige');
+});
+
+test('showTargetListing zeigt an, sobald zurueckgefragt wird', function () {
+    assertSame(true, showTargetListing(false, true), '--quiet ohne --yes: Rueckfrage braucht die Anzeige');
+    assertSame(true, showTargetListing(false, false), 'ohne beides');
+    assertSame(true, showTargetListing(true, false), '--yes ohne --quiet');
+});

@@ -149,15 +149,15 @@ bekommt keinen halben Bestand zu sehen. Dass hier `DELETE` und nicht `TRUNCATE` 
 ist die Voraussetzung dafür: `TRUNCATE` löst ein implizites COMMIT aus und machte das
 Zurückrollen wirkungslos.
 
-**`--quiet` unterdrückt nur die Schlusszusammenfassung, nicht die Zielanzeige.** Ein Lauf gibt
-weiterhin rund 20 Zeilen aus: Datenbank, Präfix und die Zeilenzahl jeder Tabelle, die geleert
-wird. Für einen stündlichen Cron-Job bedeutet das je nach Konfiguration eine Mail pro Stunde.
-Wer das nicht will, hängt `> /dev/null` an — Fehler gehen auf STDERR und bleiben damit
-sichtbar:
+**`--quiet` zusammen mit `--yes` schweigt vollständig** — kein Zeichen auf STDOUT, damit ein
+stündlicher Cron-Job nicht stündlich eine Mail auslöst. Fehler gehen weiterhin auf STDERR und
+bleiben sichtbar; der Rückgabewert ist 0 bei Erfolg und 1 beim Abbruch.
 
-```
-php /pfad/zur/installation/private/demo/seed.php --yes --quiet > /dev/null
-```
+`--quiet` **allein** unterdrückt nur die Schlusszusammenfassung. Die Zielanzeige mit Datenbank,
+Präfix und der Zeilenzahl jeder zu leerenden Tabelle erscheint weiterhin, weil ohne `--yes`
+gleich nach `LOESCHEN` gefragt wird — wer das tippen soll, muss sehen, was er löscht. Die Regel
+steht als `showTargetListing()` im Skript und ist in `tests/suites/demo_seed_cli.php`
+festgehalten.
 
 `buildSettings()` in `plan.php` schreibt acht Schlüssel und **nicht** `smtp_configured`. Da
 `checkMailStatus()` ein fehlendes `smtp_configured` als „aus" wertet, stellt jeder Reset den
