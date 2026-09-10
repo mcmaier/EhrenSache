@@ -1033,3 +1033,29 @@ Automatisiert: `php tests/run.php worktime_frontend` (statische Gegenproben) und
 | DE-4 | Auf „Verlauf" und „Statistik" wechseln | Im `debug.log` je eine „Loading …"-Zeile, nicht zwei |
 | DE-5 | Als Verwalter einen Termin über die Anwesenheitsliste anlegen | Der Termin entsteht **einmal** |
 | DE-6 | „Ohne Ortsnachweis beenden" antippen | Ein Bestätigungsdialog, nicht zwei übereinander |
+
+---
+
+## 22. Schnellinbetriebnahme des Kiosks per QR-Code (seit 1.5.0)
+
+Automatisiert: `php tests/run.php assets` (Skriptpfade und externe Skripte).
+Manuell — Dashboard und Station:
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| QR-1 | Kiosk bearbeiten, 📱 drücken | Modal „🖥️ Station in Betrieb nehmen" mit QR und der Adresse `…/station/#t=…`; rote Warnzeile sichtbar |
+| QR-2 | Gerät vom Typ „TOTP-Standort" oder „Auth-Gerät" bearbeiten | Kein 📱 |
+| QR-3 | „Neues Gerät", Typ „Virtuelle Station" wählen, nicht speichern | Kein 📱 — es gibt noch keinen Token |
+| QR-4 | Station ohne gespeicherten Token, `station/#t=<gültig>` aufrufen | Ruhebild mit Uhr und Stations-Code; Adresszeile ohne `#` |
+| QR-5 | Auf einer bereits gekoppelten Station den QR eines zweiten Kiosks scannen | Überschreibt still; das Ruhebild zeigt den zweiten Gerätenamen |
+| QR-6 | `station/#t=abc123` aufrufen | Einrichtungs-Bildschirm mit „Token ungültig oder Gerät deaktiviert"; Adresszeile ohne `#`; der bisherige Token bleibt erhalten |
+| QR-7 | Direkt nach QR-6 die Seite neu laden | Station ist wieder mit dem bisherigen Token verbunden, Ruhebild |
+| QR-8 | Station offen lassen und **ohne Neuladen** die Adresse auf `station/#t=<gültig>` ändern | Die Seite lädt von selbst neu und übernimmt den Token |
+| QR-9 | Nach einem Scan im Verlauf zurückgehen | Kein Eintrag mit Token in der Adresszeile |
+| QR-10 | Ohne Neuladen erst QR-1, dann den PWA-Quicklink der Seitenleiste | Titel „📱 Check-In App öffnen", `checkin/`-Adresse, **keine** Warnzeile |
+| QR-11 | Dashboard bei getrennter Internetverbindung (Server erreichbar) öffnen, QR-1 wiederholen | QR-Code wird weiterhin erzeugt |
+| QR-12 | `station/#t=` (leerer Wert) aufrufen | Bestandsverhalten: gespeicherter Token wird geladen |
+| QR-13 | Demo: Reset abwarten, als Admin den Kiosk öffnen, neu scannen | Station läuft nach einem Scan wieder |
+| QR-14 | Neues Kiosk-Gerät anlegen und speichern | Das Modal öffnet sich sofort im Bearbeiten-Modus, 📱 ist ohne Zwischenschritt da und liefert einen QR mit dem neuen Token |
+| QR-15 | **Nur mit echtem Tablet:** QR-1 aufrufen, mit der Kamera-App eines Tablets scannen, auf dem die Station bereits in einem Reiter offen ist | Der Bediener sieht die Kopplung **auf dem Gerät, das er vor Augen hat**. Öffnet der Browser stattdessen einen zweiten Reiter, koppelt sich dieser, während der sichtbare Reiter unverändert bleibt — dann greift OI-45 |
+| QR-16 | Mitgliedsnummer oder PIN eintippen und **währenddessen** die Adresse auf `station/#t=<gültig>` ändern | Die Seite lädt neu, die Eingabe ist weg. Bewusst so — siehe „Bewusst entschieden" in `docs/OPEN-ITEMS.md` |

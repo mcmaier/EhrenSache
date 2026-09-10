@@ -297,6 +297,42 @@ function forgetToken() {
     stopIdleLoops();
 }
 
+/**
+ * Token aus dem Adressfragment: /station/#t=<token>.
+ *
+ * Bewusst das Fragment und nicht der Query: es wird vom Browser nie gesendet
+ * und steht damit in keinem Zugriffsprotokoll, keinem Referrer und keinem
+ * Reverse-Proxy-Log.
+ *
+ * Kein Formatcheck (kein Hex-Muster): die Token-Erzeugung sitzt in
+ * private/handlers/users.php, nicht hier. Ueber gueltig entscheidet der Server
+ * beim status-Aufruf.
+ */
+function tokenFromHash() {
+    let raw = '';
+    try {
+        raw = new URLSearchParams(window.location.hash.slice(1)).get('t') || '';
+    } catch (e) {
+        return null;
+    }
+
+    const token = raw.trim();
+    if (!token || token.length > 255) {
+        return null;
+    }
+
+    return token;
+}
+
+/** Entfernt das Fragment aus Adresszeile und Verlaufseintrag. */
+function clearHash() {
+    try {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    } catch (e) {
+        /* kein Verlauf verfuegbar — dann bleibt der Hash stehen */
+    }
+}
+
 async function connect(token) {
     state.token = token;
     const res = await api('status');
@@ -894,12 +930,59 @@ function showDemoBanner() {
 // Start
 // ============================================
 
+/**
+ * Wird die Station gescannt, waehrend sie bereits offen ist, aendert sich nur
+ * das Fragment. Das ist eine Navigation im selben Dokument: init() laeuft
+ * dabei nicht, und ohne diesen Zuhoerer passierte schlicht nichts.
+ *
+ * Das Neuladen ist Absicht — es gibt weiterhin nur EINEN Weg in den Zustand,
+ * naemlich init(). clearHash() nutzt replaceState und loest kein hashchange
+ * aus, eine Schleife ist damit ausgeschlossen.
+ */
+window.addEventListener('hashchange', () => {
+    if (tokenFromHash()) {
+        window.location.reload();
+    }
+});
+
 (async function init() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('service-worker.js').catch(e => debug.log('SW', e));
     }
 
     loadAppearance(); // I4: nicht blockierend — der Boot haengt nicht am Branding
+
+    // Schnellinbetriebnahme per QR: ein Token im Fragment gewinnt gegen den
+    // gespeicherten. Der Hash wird in jedem Fall entfernt, auch bei Misserfolg —
+    // er soll nicht im Verlauf stehenbleiben.
+    const scanned = tokenFromHash();
+    if (scanned) {
+        clearHash();
+
+        // Vor dem Versuch sichern: api() ruft bei JEDEM 401 forgetToken() auf
+        // (siehe dort) und wuerde damit den bisherigen Token der Station
+        // wegwerfen, nur weil jemand einen veralteten QR-Code gescannt hat.
+        const previous = loadToken();
+
+        const error = await connect(scanned);
+        if (error) {
+            // Der bisherige Token wird wiederhergestellt und bewusst NICHT
+            // ersatzweise probiert: der Bildschirm zeigt ehrlich, dass der Scan
+            // fehlschlug, und ein Neuladen bringt die Station in den Zustand
+            // vor dem Scan zurueck.
+            if (previous) {
+                saveToken(previous);
+            }
+            // Bei 401 hat api() den Einrichtungsbildschirm samt Meldung schon
+            // gesetzt; hier steht es ein zweites Mal, damit auch jeder andere
+            // Fehlschlag sichtbar wird. Beide Aufrufe sind idempotent.
+            showScreen('setup');
+            showError('setupError', error);
+        } else {
+            await enterIdle();
+        }
+        return;
+    }
 
     const token = loadToken();
     if (token && !(await connect(token))) {

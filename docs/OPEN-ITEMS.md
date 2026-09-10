@@ -565,6 +565,90 @@ ein Nutzer einen veralteten Rahmen loswird.
 
 ---
 
+### OI-45 · Kamera-Scanner in der Station
+**Priorität:** niedrig — heute über die Kamera-App des Tablets gelöst
+
+Die Schnellinbetriebnahme (ab 1.5.0) setzt darauf, dass die **Kamera-App des Tablets** den
+QR-Code scannt und die Station öffnet. Die Station selbst hat keinen Scanner.
+
+Das trägt, solange gekoppelt wird, **bevor** die Station zum Startbildschirm hinzugefügt wird.
+Danach greift unter **iPadOS** der eigene Speichercontainer der installierten Web-App: ein
+später gescannter Code landet in Safari, die installierte Station sieht ihn nie. Unter Android
+teilen sich installierte PWA und Chrome den Speicher, dort besteht das Problem nicht.
+
+**Zu entscheiden:** Bekommt der Einrichtungs- und Einstellungs-Bildschirm der Station einen
+eigenen Kamera-Scanner?
+
+- *Dafür:* Eine installierte iPadOS-Station ließe sich ohne Tippen neu koppeln — der Fall
+  tritt bei jedem neuen Token auf, in der öffentlichen Demo stündlich.
+- *Dagegen:* Eine zweite Fremdbibliothek (`html5-qrcode`, ~350 kB, in der Check-in-PWA heute
+  über unpkg statt vendored), Kamerarechte auf einem Kiosk-Tablet, mehr Testfläche. Der Weg
+  über die Kamera-App kostet nichts davon.
+
+**Heutiger Ausweg:** 5 Sekunden auf die Uhr drücken und den Token eingeben. Die Reihenfolge
+„erst koppeln, dann installieren" steht in `public/station/README.md`.
+
+**Ungeprüft, weil kein Tablet zur Hand war:** Ist die Station bereits in einem Reiter offen,
+hängt es vom Browser ab, ob ein aus der Kamera-App geöffneter Link **diesen** Reiter aktualisiert
+oder einen zweiten öffnet. Im zweiten Fall koppelt sich der neue Reiter erfolgreich, während der
+sichtbare — womöglich angeheftete — Reiter unverändert das alte Bild zeigt: Der Scan wirkt dann
+folgenlos, obwohl er funktioniert hat. Der `hashchange`-Zuhörer in `public/station/js/app.js`
+greift nur im ersten Fall. Verifiziert ist bislang nur die Änderung des Fragments im selben
+Reiter. **Vor einem produktiven Rollout auf einem echten Tablet nachstellen** (Testfall QR-15 in
+`docs/testplan.md`); bestätigt sich das Zwei-Reiter-Verhalten, ist die manuelle Token-Eingabe
+über die Einstellungen der verlässlichere Weg für eine bereits laufende Station.
+
+---
+
+### OI-46 · Einmal-Kopplungscode statt Token im QR-Bild
+**Priorität:** niedrig — bewusst zurückgestellt, siehe Abwägung
+
+Der QR-Code zur Inbetriebnahme enthält den API-Token der Station im Klartext. Wer den Bildschirm
+abfotografiert, hat ihn.
+
+**Warum das heute vertretbar ist:** Der Token darf nur die Ressource `station` aufrufen
+(`public/api/api.php`), `handleStation()` prüft zusätzlich `device_type = kiosk`, und ohne die
+PIN eines Mitglieds bewirkt er nichts. Er ist nur für Admins lesbar
+(`private/handlers/users.php`) und steht im Gerätedialog ohnehin im Klartextfeld — der QR-Code
+macht ihn nicht exponierter, als er dort schon ist. Das Modal warnt ausdrücklich.
+
+**Die Alternative:** Der QR enthält nur einen kurzlebigen Einmal-Code (etwa 8 Zeichen, 5 Minuten,
+einmal einlösbar), den die Station an einem neuen, unauthentifizierten Endpunkt gegen den echten
+Token tauscht. Der Token stünde dann nie in einem Bild.
+
+**Was das kostet:** neue Spalte oder Tabelle samt Migration, ein Endpunkt ohne Authentifizierung,
+ein eigenes Rate-Limit, Ablauflogik, Tests — und in der öffentlichen Demo eine zusätzliche
+Freischaltung in `private/helpers/demo_mode.php`, also genau an der Stelle, die dort alles trägt.
+
+**Zu entscheiden, falls das je gebaut wird:** Der Aufnahmeweg in der Station
+(`tokenFromHash()` in `public/station/js/app.js`) ist bewusst eine einzige Eintrittsstelle. Ein
+Kopplungscode kann dieselbe nutzen und muss keine zweite aufmachen.
+
+---
+
+### OI-47 · Gesperrtes Gerät: totes Polling nach fehlgeschlagenem Verbindungsversuch
+**Priorität:** niedrig — Bestandsverhalten, seit 1.5.0 über einen weiteren Weg erreichbar
+
+`api()` in `public/station/js/app.js` behandelt 403 und „Device has no name" (409) bewusst anders
+als 401: Der Token wird **behalten** und `enterBlocked()` pollt im Minutentakt auf Besserung
+(Entscheidung I1). `connect()` setzt bei jedem Fehlschlag jedoch `state.token = null`.
+
+Trifft ein Verbindungsversuch auf ein gesperrtes Gerät, laufen beide Mechanismen gegeneinander:
+`enterBlocked()` registriert ein 60-Sekunden-Intervall, das anschließend mit
+`Authorization: Bearer null` abfragt und deshalb nie wieder greift, während der Aufrufer den
+Einrichtungs-Bildschirm zeigt. Ein Banner-Rest und der Einrichtungs-Bildschirm liegen dabei
+übereinander.
+
+**Das ist kein neuer Fehler:** Derselbe Ablauf besteht schon im Kaltstart (`init()`, Zweig mit
+`loadToken()`) und in `setupSave`. Seit der Schnellinbetriebnahme ist er zusätzlich über einen
+gescannten QR-Code erreichbar.
+
+**Zu entscheiden:** Soll `connect()` den Sperrfall vom Tokenverlust trennen — etwa indem es
+`state.token` nur bei 401 verwirft — oder soll `enterBlocked()` bei fehlendem Token gar nicht
+erst starten? Gefunden im Codequalitäts-Review zur Schnellinbetriebnahme.
+
+---
+
 ## Restarbeiten
 
 ### OI-4 · Terminbezug: Oberfläche unvollständig
@@ -1499,6 +1583,9 @@ sind seither grün.
 | Kiosk-Sperre als Gruppen-DoS | So belassen (E12) | 30 Fehlversuche je Station sperren die ganze Station 15 Minuten — trifft damit alle, die an ihr stempeln wollen, nicht nur den Angreifer. Die Fehlermeldung unterscheidet Gerät und Konto, damit ein gesperrtes Mitglied von einer gesperrten Station unterscheidbar bleibt. Akzeptiert, weil die Alternative — keine Stationssperre — Nummern-Durchprobieren ohne Bremse erlaubt |
 | Kiosk: Terminwahl serverseitig, keine Auto-Anlage (E9) | So belassen | Der Kiosk wählt den passenden Termin wie `auto_checkin` serverseitig aus, zeigt keine Terminliste zur Auswahl und legt keinen Termin an. Ein Stempel ohne passenden Termin bekommt nur eine Meldung, keinen Datensatz. Ziel ist ein Stempelvorgang in drei Tipps; die Terminauswahl bleibt der Handy-PWA vorbehalten |
 | Kiosk: Notizpflicht entfällt (P1) | So belassen | Der Kiosk hat keine Tastatur für Fließtext. Ist `worktime_require_note` aktiv, verlangt ein Stopp über `station` trotzdem keine Notiz; die Tätigkeitsart bleibt die Beschreibung |
+| Token im Fragment, nicht im Query (ab 1.5.0) | So belassen | `…/station/#t=<token>` statt `?t=`: Das Fragment wird vom Browser nie gesendet und steht damit in keinem Zugriffsprotokoll, keinem Referrer und keinem Reverse-Proxy-Log. Ein Query-Parameter landet in jedem davon. Die Station entfernt den Hash nach der Übernahme per `replaceState`, damit er auch nicht im Verlauf bleibt |
+| QR-Übernahme überschreibt still (ab 1.5.0) | So belassen | Wer den Code vor das Tablet hält, steht physisch davor — dieselbe Schwelle wie beim Einstellungsdialog der Station. Eine Rückfrage kostet in der Demo bei jedem stündlichen Reset einen zusätzlichen Tipp und schützt vor nichts, was nicht schon durch den physischen Zugang gedeckt wäre |
+| Der Scan-Reload unterbricht auch eine laufende Eingabe (ab 1.5.0) | So belassen | Der `hashchange`-Zuhörer lädt neu, ohne zu prüfen, ob gerade jemand Mitgliedsnummer oder PIN tippt — die Eingabe ist dann weg. Die Alternative, den Reload auf Ruhebild und Einrichtung zu beschränken, holt den Fehler zurück, den er behebt: Ein Scan täte dann in genau diesem Zustand wieder sichtbar nichts. Eine verlorene Eingabe kostet zwei Tipps und ist selbsterklärend; ein folgenloser Scan ist es nicht. Es geht dabei nichts verloren, was schon gespeichert wäre — gestempelt wird erst nach der PIN-Prüfung |
 
 ---
 

@@ -162,9 +162,11 @@ der Satz steht fest verdrahtet in `public/js/theme.js`, `public/checkin/js/app.j
 ### Was der Reset mit sich bringt
 
 - **Geräte-Token werden bei jedem Lauf neu gewürfelt.** Ein Kiosk oder ein TOTP-Gerät, das ein
-  Besucher eingerichtet hat, verliert seine Verbindung spätestens nach einer Stunde und muss
-  mit dem neuen Token aus der Geräteverwaltung neu verbunden werden. Für eine Demo ist das
-  hinnehmbar; als Dauerbetrieb taugt es nicht.
+  Besucher eingerichtet hat, verliert seine Verbindung spätestens nach einer Stunde. Für den
+  Kiosk ist das ein Scan: als Admin anmelden, Geräte → die virtuelle Station bearbeiten → 📱,
+  den QR-Code mit dem Tablet scannen. Läuft die Station in einem Browser-Reiter statt als
+  installierte App, genügt ein Klick auf die Adresse im Modal. Für einen Dauerbetrieb taugt
+  das trotzdem nicht.
 - Die PINs der Mitglieder werden ebenfalls neu gesetzt. Wer eine PIN für die Kiosk-Vorführung
   veröffentlicht, muss sie nach jedem Reset neu ablesen — oder `--seed` festhalten, dann
   bleiben die Klartext-PINs gleich (`private/demo/README.md` zeigt, wie man sie ausliest).
