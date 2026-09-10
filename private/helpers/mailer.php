@@ -9,6 +9,40 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+/**
+ * Liefert die Mailkonfiguration — und eine leere Rückfallkonfiguration, solange
+ * es noch keine gibt.
+ *
+ * mail_config.php wird nicht vom Installer angelegt, sondern erst geschrieben,
+ * wenn ein Admin die SMTP-Einstellungen speichert (settings.php, saveSmtpConfig).
+ * Auf einer frischen Installation fehlt sie also. getMailConfig() in config.php
+ * lädt sie ungeprüft per `require` und bricht dann mit einem Fatal error ab —
+ * an Stellen, die den Mailer nur bauen, um gleich danach checkMailStatus() zu
+ * fragen. Zwei davon stehen direkt hinter einem commit(), dort war der Vorgang
+ * schon gespeichert, während der Nutzer eine Fehlerseite sah.
+ *
+ * Die Rückfallwerte entsprechen dem, was getSmtpConfig() der Oberfläche liefert,
+ * wenn keine Konfiguration hinterlegt ist.
+ */
+function loadMailConfig(?string $configPath = null): array
+{
+    $configPath = $configPath ?? __DIR__ . '/../config/mail_config.php';
+
+    if (is_file($configPath)) {
+        return require $configPath;
+    }
+
+    return [
+        'smtp_host'  => '',
+        'smtp_port'  => 587,
+        'smtp_user'  => '',
+        'smtp_pass'  => '',
+        'from_email' => '',
+        'from_name'  => '',
+        'use_tls'    => true,
+    ];
+}
+
 class Mailer {
     private $smtp_host;
     private $smtp_port;

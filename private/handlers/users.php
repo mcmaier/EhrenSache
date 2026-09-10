@@ -359,7 +359,9 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
 
                 } 
                 catch (Exception $e) {
-                        $db->rollBack();
+                        if ($db->inTransaction()) {
+                            $db->rollBack();
+                        }
                         error_log("Create user error: " . $e->getMessage());
                         http_response_code(500);
                         echo json_encode(['message' => 'Fehler beim Erstellen']);
@@ -853,7 +855,9 @@ function createDevice($db, $database, $authUserId) {
         exit();
         
     } catch (Exception $e) {
-        $db->rollBack();
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
         error_log("Create device error: " . $e->getMessage());
         http_response_code(500);
         echo json_encode(['message' => 'Fehler beim Erstellen des Geräts']);
@@ -938,7 +942,7 @@ function handleUserActivation($db, $database, $method, $authUserRole) {
         : 'Kein Mitglied verknüpft';
             
         // Mail-Status prüfen
-        $mailer = new Mailer(getMailConfig(), $db, $database);
+        $mailer = new Mailer(loadMailConfig(), $db, $database);
         $mailStatus = $mailer->checkMailStatus('activation');
 
         if($mailStatus)
@@ -1077,7 +1081,7 @@ function resendVerificationEmail($db, $database, $userId) {
         }
         
         // Mail-System prüfen
-        $mailer = new Mailer(getMailConfig(), $db, $database);
+        $mailer = new Mailer(loadMailConfig(), $db, $database);
         $mailStatus = $mailer->checkMailStatus('registration');
         
         if (!$mailStatus['enabled']) {

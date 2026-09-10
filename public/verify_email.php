@@ -84,7 +84,7 @@ try {
         // Mail-Status prüfen BEVOR User gesucht wird.
         // Der dritte Parameter ist Pflicht, sobald ein PDO mitgegeben wird:
         // der Konstruktor ruft damit $database->table('').
-        $mailer = new Mailer(getMailConfig(), $db, $database);
+        $mailer = new Mailer(loadMailConfig(), $db, $database);
         $mailStatus = $mailer->checkMailStatus();
 
         if ($mailStatus['enabled']) {

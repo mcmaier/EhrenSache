@@ -83,3 +83,83 @@ test('Jede Mailer-Instanziierung uebergibt Konfiguration, PDO und Database', fun
         . implode("\n  ", $verstoesse)
     );
 });
+
+test('Keine Mailer-Aufrufstelle laedt die Mailkonfiguration ungeprueft', function () use ($repoRoot) {
+    // mail_config.php entsteht erst, wenn ein Admin die SMTP-Einstellungen
+    // speichert (settings.php, saveSmtpConfig). Auf einer frischen Installation
+    // gibt es sie also nicht — und getMailConfig() in config.php laedt sie
+    // ungeprueft per `require`. Jede Stelle, die den Mailer davor baut, stirbt
+    // dann mit einem Fatal error, noch bevor checkMailStatus() gefragt werden
+    // kann. Zwei dieser Stellen stehen direkt hinter einem commit().
+    $dir = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($repoRoot, FilesystemIterator::SKIP_DOTS)
+    );
+
+    $verstoesse = [];
+    foreach ($dir as $file) {
+        if ($file->getExtension() !== 'php') {
+            continue;
+        }
+        $rel = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot)));
+        // config.php und ihr Muster duerfen die Funktion definieren
+        if (strpos($rel, '/tests/') === 0 || strpos($rel, '/.git/') === 0
+            || strpos($rel, '/private/config/') === 0) {
+            continue;
+        }
+
+        foreach (file($file->getPathname(), FILE_IGNORE_NEW_LINES) as $i => $line) {
+            $trimmed = ltrim($line);
+            // Kommentare erwaehnen die Funktion, sie rufen sie nicht auf
+            if ($trimmed === '' || $trimmed[0] === '*' || strpos($trimmed, '//') === 0
+                || strpos($trimmed, '/*') === 0) {
+                continue;
+            }
+            if (strpos($line, 'getMailConfig()') !== false) {
+                $verstoesse[] = $rel . ':' . ($i + 1) . ' — ' . trim($line);
+            }
+        }
+    }
+
+    assertTrue(
+        $verstoesse === [],
+        "Direkter getMailConfig()-Aufruf statt loadMailConfig():\n  " . implode("\n  ", $verstoesse)
+    );
+});
+
+test('loadMailConfig liefert ohne Datei eine vollstaendige Rueckfallkonfiguration', function () use ($repoRoot) {
+    require_once $repoRoot . '/private/helpers/mailer.php';
+
+    $config = loadMailConfig($repoRoot . '/private/config/gibt-es-nicht.php');
+
+    foreach (['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'from_email', 'from_name'] as $key) {
+        assertTrue(array_key_exists($key, $config), "Schluessel {$key} fehlt in der Rueckfallkonfiguration");
+    }
+});
+
+test('Der Mailer laesst sich mit der Rueckfallkonfiguration bauen', function () use ($repoRoot) {
+    require_once $repoRoot . '/private/helpers/mailer.php';
+
+    // Ohne PDO, wie auf einer Installation ohne Mailkonfiguration: der
+    // Konstruktor darf weder eine Warning werfen noch abbrechen.
+    $fehler = null;
+    set_error_handler(function ($no, $str) use (&$fehler) { $fehler = $str; return true; });
+    $mailer = new Mailer(loadMailConfig($repoRoot . '/private/config/gibt-es-nicht.php'));
+    restore_error_handler();
+
+    assertTrue($fehler === null, "Konstruktor meldete: {$fehler}");
+    assertTrue($mailer instanceof Mailer, 'Kein Mailer-Objekt');
+});
+
+test('config_example.php laedt die Mailkonfiguration nicht ungeprueft', function () use ($repoRoot) {
+    // Neuinstallationen erben ihre config.php aus dieser Vorlage.
+    $php = (string) file_get_contents($repoRoot . '/private/config/config_example.php');
+
+    assertTrue(
+        preg_match('/function getMailConfig\(\).*?\}/s', $php, $m) === 1,
+        'getMailConfig() nicht gefunden'
+    );
+    assertTrue(
+        strpos($m[0], 'is_file') !== false || strpos($m[0], 'file_exists') !== false,
+        'getMailConfig() prueft nicht, ob mail_config.php ueberhaupt existiert'
+    );
+});

@@ -278,7 +278,7 @@ function sendTestMail($db, $database, $recipient) {
     try {
         require_once __DIR__ . '/../helpers/mailer.php';
         
-        $mailer = new Mailer(getMailConfig(), $db, $database);
+        $mailer = new Mailer(loadMailConfig(), $db, $database);
         
         $subject = 'Test-Email von EhrenSache';
         $body = "Dies ist eine Test-Email.\n\n";

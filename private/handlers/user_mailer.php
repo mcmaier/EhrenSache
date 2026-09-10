@@ -90,8 +90,15 @@ function registerNewUser($db, $database) {
 
         $db->commit();  
 
+        // Ab hier ist der Nutzer angelegt und der commit durch. Alles Weitere —
+        // Statusprüfung, Token, Versand — ist Beiwerk. Schlägt es fehl, bleibt
+        // die Registrierung gültig; der Aufrufer bekommt die dafür ohnehin
+        // vorgesehene Teilerfolgsmeldung statt eines 500ers. Ohne diese Klammer
+        // landete ein Versandfehler im äußeren catch, das blind zurückrollte —
+        // und weil es nichts mehr zurückzurollen gab, endete das im Fatal error.
+        try {
         // Mail-Status prüfen BEVOR Token erstellt wird
-        $mailer = new Mailer(getMailConfig(), $db, $database);
+        $mailer = new Mailer(loadMailConfig(), $db, $database);
         $mailStatus = $mailer->checkMailStatus('registration');        
         
         if (!$mailStatus['enabled']) {
@@ -136,10 +143,23 @@ function registerNewUser($db, $database) {
             'message' => 'Registrierung erfolgreich! Bitte prüfen Sie Ihre Email zur Bestätigung.',
             'user_id' => $userId
         ];
-        exit();
-        
-    } catch (Exception $e) {
-        $db->rollBack();
+
+        } catch (Throwable $mailError) {
+            error_log('Registration: E-Mail-Schritt fehlgeschlagen: ' . $mailError->getMessage());
+
+            http_response_code(201);
+            return [
+                'success' => true,
+                'partial' => true,
+                'message' => 'Registrierung erfolgreich, aber E-Mail konnte nicht versendet werden. Bitte kontaktieren Sie einen Administrator.',
+                'user_id' => $userId
+            ];
+        }
+
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
         error_log("Registration error: " . $e->getMessage());
         http_response_code(500);
         echo json_encode(['message' => 'Registrierung fehlgeschlagen']);
@@ -174,7 +194,7 @@ function handlePasswordResetRequest($db, $database, $method) {
     }
 
     // Mail-Status prüfen BEVOR User gesucht wird
-    $mailer = new Mailer(getMailConfig(), $db, $database);
+    $mailer = new Mailer(loadMailConfig(), $db, $database);
     $mailStatus = $mailer->checkMailStatus('password_reset');
     
     if (!$mailStatus['enabled']) {
