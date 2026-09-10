@@ -62,45 +62,44 @@ function handleAvailableYears($db, $database, $request_method, $id) {
 }
 
 
-function handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId) {
+/**
+ * Rechnet die Anwesenheitsstatistik und gibt sie als Array zurueck.
+ *
+ * Herausgeloest aus handleStatistics(), damit der Anwesenheitsbericht
+ * dieselbe Rechnung benutzt statt einer zweiten. Zwei Aggregationen, die
+ * dasselbe behaupten, laufen bei der ersten Aenderung auseinander.
+ *
+ * Die Funktion rechnet, sie autorisiert nicht: $memberId ist bereits
+ * aufgeloest. Wer die eigene Person erzwingen muss, tut das im Handler,
+ * dort wo auch das Ausgabeformat entschieden wird. $role und $authMemberId
+ * gehen nur in die Gruppenaufloesung ein.
+ *
+ * @return array{warning: ?string, year: int, worktime: null,
+ *               summary: array<string, mixed>, statistics: array<int, mixed>}
+ */
+function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $memberId,
+                               ?int $appointmentTypeId, string $role, ?int $authMemberId): array
+{
     require_once __DIR__ . '/../helpers/member_activity.php';
 
-    if ($request_method !== 'GET') {
-        http_response_code(405);
-        echo json_encode(["message" => "Method not allowed"]);
-        exit();
-    }
-
-    $prefix = $database->table('');
-    
-    $year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
-    $groupId = isset($_GET['group_id']) ? intval($_GET['group_id']) : null;
-    $memberId = isset($_GET['member_id']) ? intval($_GET['member_id']) : null;
-    $appointmentTypeId = isset($_GET['appointment_type_id']) ? intval($_GET['appointment_type_id']) : null;
-    
-    // Normale User können nur ihre eigene Statistik sehen
-    if (!isAdminOrManager()) {        
-        // Warnung wenn andere member_id angegeben wurde
-        $warning = null;
-        if(isset($memberId) && ($memberId != $authMemberId)) {
-            $warning = "member_id ignored - you can only request your own statistics";
-        }
-        $memberId = $authMemberId;
-    }
-    
-    // Gruppen ermitteln
     if ($groupId !== null) {
-        // Prüfe Gruppenzugriff
-        if (!hasStatisticsGroupAccess($db, $database, $authMemberId, $authUserRole, $groupId)) {
-            http_response_code(403);
-            echo json_encode(["message" => "No access to this group"]);
-            exit();
+        if (!hasStatisticsGroupAccess($db, $database, $authMemberId, $role, $groupId)) {
+            return [
+                'warning'    => 'group not accessible',
+                'year'       => $year,
+                'worktime'   => null,
+                'summary'    => [
+                    'total_appointments' => 0, 'total_members' => 0, 'total_present' => 0,
+                    'total_excused' => 0, 'total_unexcused' => 0, 'overall_average' => 0,
+                ],
+                'statistics' => [],
+            ];
         }
         $groups = [$groupId];
     } else {
-        $groups = getStatisticsGroups($db, $database, $authMemberId, $authUserRole);
+        $groups = getStatisticsGroups($db, $database, $authMemberId, $role);
     }
-    
+
     $statistics = [];
     $totalAppointments = 0;
     $totalPresent = 0;
@@ -110,26 +109,23 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
     $countedAppointmentTypes = [];
 
     foreach ($groups as $gid) {
-        $stats = calculateGroupStatistics($db, $database, $gid, $year, $memberId, $authUserRole, $appointmentTypeId);
+        $stats = calculateGroupStatistics($db, $database, $gid, $year, $memberId, $role, $appointmentTypeId);
         if ($stats) {
             $statistics[] = $stats;
 
-            // Sammle Gesamtwerte
-            // Termine nur einmal pro Gruppe zählen
             $groupAppointments = 0;
             if (count($stats['members']) > 0) {
                 $groupAppointments = $stats['members'][0]['total_appointments'];
-                //$totalAppointments += $groupAppointments;
             }
 
-            // NEU: Nur unique Termine zählen (nach appointment_type_id gruppiert)
+            // Termine nur einmal je Terminart zaehlen: Mehrere Gruppen koennen
+            // an derselben Terminart haengen.
             if (!isset($countedAppointmentTypes[$stats['appointment_type_id']])) {
                 $totalAppointments += $groupAppointments;
                 $countedAppointmentTypes[$stats['appointment_type_id']] = true;
             }
 
             $groupMembers = count($stats['members']);
-            // Pro Gruppe: mögliche Anwesenheiten = Termine * Mitglieder
             $totalPossible += ($groupAppointments * $groupMembers);
 
             foreach ($stats['members'] as $member) {
@@ -140,41 +136,76 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
         }
     }
 
-    // Mitglieder korrekt aus DB zählen (keine Duplikate)
     $totalMembers = getActiveMemberCount($db, $database, $groups, $year, $memberId);
+    $overallAverage = $totalPossible > 0 ? round(($totalPresent / $totalPossible) * 100, 1) : 0;
 
-    // Gesamtdurchschnitt berechnen
-    //$totalPossible = $totalAppointments * $totalMembers;
-    $overallAverage = $totalPossible > 0 ? round(($totalPresent / $totalPossible) * 100, 1)  : 0;
-    
+    return [
+        'warning'    => null,
+        'year'       => $year,
+        'worktime'   => null,
+        'summary'    => [
+            'total_appointments' => $totalAppointments,
+            'total_members'      => $totalMembers,
+            'total_present'      => $totalPresent,
+            'total_excused'      => $totalExcused,
+            'total_unexcused'    => $totalUnexcused,
+            'overall_average'    => $overallAverage,
+        ],
+        'statistics' => $statistics,
+    ];
+}
+
+function handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId) {
+    require_once __DIR__ . '/../helpers/member_activity.php';
+
+    if ($request_method !== 'GET') {
+        http_response_code(405);
+        echo json_encode(["message" => "Method not allowed"]);
+        exit();
+    }
+
+    $prefix = $database->table('');
+
+    $year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
+    $groupId = isset($_GET['group_id']) ? intval($_GET['group_id']) : null;
+    $memberId = isset($_GET['member_id']) ? intval($_GET['member_id']) : null;
+    $appointmentTypeId = isset($_GET['appointment_type_id']) ? intval($_GET['appointment_type_id']) : null;
+
+    $warning = null;
+
+    if (!isAdminOrManager()) {
+        // Fremde member_id wird ignoriert, nicht abgewiesen: Eine Fehlermeldung
+        // waere ein Orakel darueber, welche IDs existieren.
+        if ($memberId !== null && $memberId != $authMemberId) {
+            $warning = "member_id ignored - you can only request your own statistics";
+        }
+        $memberId = $authMemberId;
+
+        if ($groupId !== null && !hasStatisticsGroupAccess($db, $database, $authMemberId, $authUserRole, $groupId)) {
+            http_response_code(403);
+            echo json_encode(["message" => "No access to this group"]);
+            return;
+        }
+    }
+
+    $result = buildStatisticsResult($db, $database, $year, $groupId, $memberId,
+                                    $appointmentTypeId, $authUserRole, $authMemberId);
+
     // Zeiterfassung als eigener Block. Anwesenheitsquote und geleistete Stunden
     // sind verschiedene Fragen; sie in dieselbe Aggregation zu pressen macht
-    // beide unklarer. Die bisherige Logik bleibt deshalb unberuehrt.
-    $worktime = null;
+    // beide unklarer.
     if (isset($_GET['include']) && $_GET['include'] === 'worktime'
         && isWorktimeEnabled($db, $database)) {
         // Die Statistikseite bleibt jahresbasiert. Der Zeitraum ist ein
         // Berichtsparameter der Exporte, siehe worktimeResolvePeriod().
-        $worktime = worktimeStatistics(
+        $result['worktime'] = worktimeStatistics(
             $db, $database, worktimeResolvePeriod(null, null, $year), $memberId
         );
     }
 
-    echo json_encode([
-        "warning" => isset($warning) ? $warning : null,
-        'year' => $year,
-        'worktime' => $worktime,
-        'summary' => [
-            'total_appointments' => $totalAppointments,
-            'total_members' => $totalMembers,
-            'total_present' => $totalPresent,
-            'total_excused' => $totalExcused,
-            'total_unexcused' => $totalUnexcused,
-            'overall_average' => $overallAverage
-        ],
-        'statistics' => $statistics
-    ]);
-    
+    $result['warning'] = $warning ?? $result['warning'];
+
+    echo json_encode($result);
 }
 
 function getActiveMemberCount($db, $database, $groupIds, $year, $specificMemberId = null) {
