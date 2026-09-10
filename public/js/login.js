@@ -248,7 +248,6 @@ async function checkAuth() {
         }
     } catch (error) {
         // Nicht eingeloggt = OK, auf Login-Seite bleiben
-         console.log('Not logged in');
     }
 }
 

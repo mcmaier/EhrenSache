@@ -68,7 +68,19 @@ class Database {
 function getMailConfig() {
     static $config = null;
     if ($config === null) {
-        $config = require 'mail_config.php';
+        // mail_config.php entsteht erst beim Speichern der SMTP-Einstellungen.
+        // Bis dahin darf das Laden keinen Fatal error auslösen — die Aufrufer
+        // fragen ohnehin erst danach, ob der Mailversand aktiviert ist.
+        $path = __DIR__ . '/mail_config.php';
+        $config = is_file($path) ? require $path : [
+            'smtp_host'  => '',
+            'smtp_port'  => 587,
+            'smtp_user'  => '',
+            'smtp_pass'  => '',
+            'from_email' => '',
+            'from_name'  => '',
+            'use_tls'    => true,
+        ];
     }
     return $config;
 }

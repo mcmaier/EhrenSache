@@ -7,6 +7,41 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.4.1] – 2026-09-09
+
+### Sicherheit
+- **Dashboard und Check-in-PWA liefen mit eingeschaltetem Debug-Modus aus.** `DEBUG` stand in
+  `public/js/app.js` und `public/checkin/js/app.js` fest auf `true` — eine Konstante, die vor
+  einer Veröffentlichung von Hand umzustellen war. Das ist seit 1.1.3 in **jeder**
+  veröffentlichten Version unterblieben — 1.4.0 ist nicht der Anfang, nur das Ende; einzig
+  1.0.0 wurde stumm ausgeliefert. Folge: die PWA schrieb bei jeder Anmeldung die
+  vollständige Serverantwort in die Browserkonsole, einschließlich des Bearer-Tokens, mit
+  dem sich das Gerät danach dauerhaft ausweist.
+
+  Das Token verließ das Gerät dabei nicht — es stand in der Konsole des Browsers, in dem die
+  Anmeldung stattfand. Wer die Entwicklerwerkzeuge dieses Geräts öffnen kann, konnte es
+  jedoch im Klartext mitlesen: relevant vor allem bei Geräten, die sich mehrere Personen
+  teilen, und bei Fernwartungssitzungen mit geteiltem Bildschirm. **Wer solche Geräte im
+  Einsatz hat, sollte die betroffenen Token nach dem Update neu erzeugen** (Profil →
+  „Token neu generieren"; für Geräte derselbe Weg in der Geräteverwaltung).
+
+  Der Schalter wird jetzt nicht mehr gesetzt, sondern aus `location.hostname` abgeleitet:
+  lokal laut, auf jeder echten Domain still. Damit gibt es nichts mehr umzustellen, was
+  vergessen werden könnte. Die virtuelle Station ist bewusst enger gefasst als Dashboard und
+  PWA — sie hängt als Kiosk dauerhaft im Vereinsnetz und bleibt auch unter privaten Adressen
+  und `.local`-Namen stumm. Für den Bedarfsfall lässt sich die Ausgabe an jedem Gerät
+  einzeln über `localStorage.setItem('es_debug', '1')` in der Konsole zuschalten.
+
+### Intern
+- Zwei Prüfungen in der Suite `assets` halten den Zustand fest: kein hart gesetztes `DEBUG`
+  mehr, und keine ungeschützte `console.log`/`warn`/`debug` in den ausgelieferten Skripten.
+  `console.error` bleibt erlaubt — eine Fehlermeldung soll auch produktiv sichtbar sein und
+  trägt keine Sitzungsdaten. Eine dritte Prüfung hält die engere Regel der Station fest
+- Die Migration `1.4.0 → 1.4.1` ändert nichts am Schema. Sie existiert, damit die Kette
+  lückenlos bis `version.json` reicht und der Update-Wizard für eine 1.4.0-Installation einen
+  Weg findet
+
+---
 ## [1.4.0] – 2026-09-09
 
 ### Neu

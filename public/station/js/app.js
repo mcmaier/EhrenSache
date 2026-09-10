@@ -22,7 +22,30 @@
 // - Die Antwort einer Aktion ist massgeblich, nicht der Kandidat aus identify:
 //   an der Toleranzgrenze koennen beide auseinanderlaufen.
 
-const DEBUG = false;
+// Der Schalter wird nicht gesetzt, sondern aus der Herkunft abgeleitet: lokal
+// laut, auf jeder echten Domain still. Damit gibt es beim Merge dev -> main
+// nichts mehr umzuschalten, und bei allem Unbekannten faellt der Wert auf false.
+// Zum Nachsehen auf einer echten Installation: localStorage.setItem('es_debug', '1')
+// in der Konsole. Bewusst kein URL-Parameter — der waere per Link von aussen
+// ausloesbar und wuerde bei einem Mitglied unbemerkt die Konsole fuellen.
+//
+// Enger gefasst als Dashboard und PWA: die privaten Netze und der mDNS-Name
+// fehlen hier. Die Station haengt als Kiosk dauerhaft im Vereins-LAN und wird
+// genau ueber diese Adressen aufgerufen — ein Geraet im Publikumsbetrieb soll
+// nicht mitloggen, nur weil es privat adressiert ist. Bleibt: der eigene
+// Rechner und .test.
+const DEBUG = (() => {
+    const h = location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '::1'
+        || h.endsWith('.test')) {
+        return true;
+    }
+    try {
+        return localStorage.getItem('es_debug') === '1';
+    } catch (e) {
+        return false;
+    }
+})();
 const debug = {
     log:   (...a) => DEBUG && console.log(...a),
     error: (...a) => DEBUG && console.error(...a)

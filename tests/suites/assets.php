@@ -92,3 +92,97 @@ test('getAuthHeaders baut keinen Authorization-Header ohne Token', function () u
         . 'das "Bearer null" und bricht jeden Session-Aufruf (OI-24)'
     );
 });
+
+test('DEBUG wird aus der Umgebung abgeleitet, nicht hart gesetzt', function () use ($repoRoot) {
+    // Waechter fuer den Debug-Schalter. Solange DEBUG eine handgesetzte
+    // Konstante war, hing die Ruhe einer Produktivinstallation daran, dass beim
+    // Merge dev -> main jemand daran denkt. In 1.4.0 hat das nicht geklappt:
+    // die Check-in-PWA schrieb `debug.log("Login response:", result)` — und
+    // damit das Bearer-Token — in die Konsole jedes Mitglieds.
+    //
+    // Der Wert wird deshalb nicht mehr gesetzt, sondern aus location.hostname
+    // abgeleitet und faellt bei allem Unbekannten auf false. Dieser Test haelt
+    // fest, dass niemand zum Literal zurueckkehrt.
+    $files = [
+        '/public/js/app.js',
+        '/public/checkin/js/app.js',
+        '/public/station/js/app.js',
+    ];
+
+    foreach ($files as $rel) {
+        $js = (string) file_get_contents($repoRoot . $rel);
+
+        assertTrue(
+            preg_match('/const\s+DEBUG\s*=\s*(?:true|false)\s*;/', $js) === 0,
+            "{$rel}: DEBUG ist hart gesetzt — auf einer Produktivinstallation "
+            . 'entscheidet dann der Zufall des letzten Merges ueber die Konsolenausgabe'
+        );
+
+        assertTrue(
+            preg_match('/const\s+DEBUG\s*=(.*?)const\s+debug\s*=/s', $js, $m) === 1
+            && strpos($m[1], 'location.hostname') !== false,
+            "{$rel}: die DEBUG-Definition wertet location.hostname nicht aus"
+        );
+    }
+});
+
+test('Kein ungeschuetztes console.log/warn/debug in Auslieferungsskripten', function () use ($repoRoot) {
+    // Der debug-Wrapper nuetzt nichts, solange direkt daneben ungeschuetzt
+    // geloggt wird. console.error bleibt erlaubt: eine Fehlermeldung soll auch
+    // produktiv sichtbar sein, sie traegt keine Sitzungsdaten.
+    $fremdcode = ['qrcode.js'];
+
+    $dir = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($repoRoot . '/public', FilesystemIterator::SKIP_DOTS)
+    );
+
+    $verstoesse = [];
+    foreach ($dir as $file) {
+        if ($file->getExtension() !== 'js' || in_array($file->getFilename(), $fremdcode, true)) {
+            continue;
+        }
+
+        $rel   = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot)));
+        $lines = file($file->getPathname(), FILE_IGNORE_NEW_LINES);
+
+        foreach ($lines as $i => $line) {
+            if (preg_match('/console\.(log|warn|debug)\s*\(/', $line) !== 1) {
+                continue;
+            }
+            // Die Wrapper-Definition selbst ist der erlaubte Aufrufer.
+            if (strpos($line, 'DEBUG &&') !== false) {
+                continue;
+            }
+            $verstoesse[] = $rel . ':' . ($i + 1) . ' — ' . trim($line);
+        }
+    }
+
+    assertTrue(
+        $verstoesse === [],
+        "Ungeschuetzte Konsolenausgabe (console.error ist erlaubt):\n  " . implode("\n  ", $verstoesse)
+    );
+});
+
+test('Die Station schaltet im Vereins-LAN nicht auf DEBUG', function () use ($repoRoot) {
+    // Dashboard und PWA laufen bei der Entwicklung oft ueber die LAN-Adresse des
+    // Rechners — dort ist 192.168.* bewusst debug-wuerdig. Die Station nicht:
+    // sie haengt als Kiosk dauerhaft im Vereins-LAN und wird genau so
+    // aufgerufen. Waeren die privaten Netze dort eingeschlossen, liefe jedes
+    // Stationsgeraet im Publikumsbetrieb mit offener Konsole.
+    $js = (string) file_get_contents($repoRoot . '/public/station/js/app.js');
+
+    assertTrue(
+        preg_match('/const\s+DEBUG\s*=(.*?)const\s+debug\s*=/s', $js, $m) === 1,
+        'DEBUG-Definition der Station nicht gefunden'
+    );
+    assertTrue(
+        strpos($m[1], 'startsWith(') === false,
+        'Die Station leitet DEBUG aus einem Adresspraefix ab — im Vereins-LAN '
+        . 'schaltet das jeden Kiosk auf laut'
+    );
+    assertTrue(
+        strpos($m[1], '.local') === false,
+        'Die Station erkennt .local als Entwicklungsumgebung — unter genau diesem '
+        . 'Namen wird ein Kiosk im Vereinsnetz aber im Regelbetrieb aufgerufen'
+    );
+});
