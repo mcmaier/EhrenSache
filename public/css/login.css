@@ -25,26 +25,27 @@ body {
     align-items: center;
     justify-content: center;
     padding: 20px;
-    /* Bezugsrahmen fuer das Hinweisband der Demo, siehe unten. */
-    position: relative;
+    /* W2: Spaltenrichtung statt eines Bezugsrahmens fuer position: absolute.
+       Das Hinweisband setzt theme.js an den Anfang des body und bleibt jetzt
+       im Fluss -- .login-container zentriert sich per margin: auto im Raum,
+       der nach dem Band uebrig bleibt, statt dass sich beide ueberlappen. */
+    flex-direction: column;
 }
 
-/* Das Hinweisband setzt theme.js an den Anfang des body. Der ist hier aber
-   ein zentrierender Flex-Container -- das Band wuerde sonst als zweites
-   Flex-Kind NEBEN der Anmeldekarte landen statt darueber. Aus dem Fluss
-   genommen liegt es am oberen Rand, und die Karte bleibt mittig.
-   Die uebrigen drei Oberflaechen haben keinen Flex-body und brauchen das
-   nicht. */
+/* W2: align-items: center wuerde das Band (ohne eigene Breite) auf seine
+   Textbreite schrumpfen und mittig setzen statt es ueber die volle Breite zu
+   spannen -- align-self hebt das gezielt fuer das Band auf. */
 .demo-banner {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    align-self: stretch;
 }
 
 .login-container {
     width: 100%;
     max-width: 450px;
+    /* W2: zentriert die Karte vertikal im Raum unterhalb des Bands, statt wie
+       zuvor per body { justify-content: center } ueber die volle Hoehe --
+       das war der Grund fuer die Ueberdeckung. */
+    margin: auto;
 }
 
 .login-box {
