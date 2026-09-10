@@ -943,11 +943,21 @@ function showDemoBanner() {
     const scanned = tokenFromHash();
     if (scanned) {
         clearHash();
+
+        // Vor dem Versuch sichern: api() ruft bei JEDEM 401 forgetToken() auf
+        // (siehe dort) und wuerde damit den bisherigen Token der Station
+        // wegwerfen, nur weil jemand einen veralteten QR-Code gescannt hat.
+        const previous = loadToken();
+
         const error = await connect(scanned);
         if (error) {
-            // Der gespeicherte Token bleibt unangetastet und wird bewusst nicht
-            // ersatzweise probiert: ein Neuladen bringt die Station in den
-            // Zustand vor dem Scan zurueck.
+            // Der bisherige Token wird wiederhergestellt und bewusst NICHT
+            // ersatzweise probiert: der Bildschirm zeigt ehrlich, dass der Scan
+            // fehlschlug, und ein Neuladen bringt die Station in den Zustand
+            // vor dem Scan zurueck.
+            if (previous) {
+                saveToken(previous);
+            }
             showScreen('setup');
             showError('setupError', error);
         } else {
