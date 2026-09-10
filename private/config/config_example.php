@@ -22,11 +22,15 @@
 define('AUTO_CHECKIN_TOLERANCE_HOURS', 2);
 
 // Demo-Modus für öffentlich erreichbare Installationen.
-// Eingeschaltet werden schreibende Zugriffe auf eine feste Erlaubnisliste
-// begrenzt: Mitglieder, Termine, Anwesenheit, Anträge, Arbeitszeit, Check-in
-// und Kiosk bleiben nutzbar; Konten, Rechte, Mailversand, Dateiannahme und
-// Systemeinstellungen sind gesperrt.
-// Details in private/helpers/demo_mode.php.
+// Eingeschaltet begrenzt er alle Zugriffe ÜBER DIE REST-API auf feste Listen:
+// schreibend sind nur Mitglieder, Termine, Anwesenheit, Anträge, Arbeitszeit,
+// Check-in und Kiosk erlaubt; Konten, Rechte, Mailversand, Dateiannahme und
+// Systemeinstellungen sind gesperrt. Lesend geht nur, was in einer der drei
+// Listen in private/helpers/demo_mode.php steht — eine dort nicht eingetragene
+// Ressource ist auch lesend gesperrt.
+// Eigene Einstiegspunkte neben public/api/api.php erfasst der Wächter NICHT.
+// Ausschalten: Zeile auskommentieren oder auf false setzen. Jeder andere Wert
+// (auch 0 oder 'false' als Zeichenkette) gilt absichtlich als eingeschaltet.
 // Für eine normale Vereinsinstallation auskommentiert lassen.
 //------------------------------------------------------------------
 // define('DEMO_MODE', true);

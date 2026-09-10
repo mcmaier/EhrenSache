@@ -170,7 +170,7 @@ if (!$rateLimiter->check($identifier, 'api_request', 150, 60)) {
 }
 
 // ============================================
-// 5b. DEMO-MODUS
+// 5.1 DEMO-MODUS
 // ============================================
 // Wirkungslos, solange config.php DEMO_MODE nicht setzt.
 //
@@ -180,8 +180,9 @@ if (!$rateLimiter->check($identifier, 'api_request', 150, 60)) {
 // die Mail an fremde Adressen verschicken. tests/suites/demo_mode.php
 // haelt diese Reihenfolge fest.
 //
-// Der Abschnitt heisst 5b und nicht 6, damit die gewachsene Nummerierung
-// der uebrigen Abschnitte nicht verrutscht.
+// Der Abschnitt heisst 5.1 und nicht 6, damit die gewachsene Nummerierung
+// der uebrigen Abschnitte nicht verrutscht (Muster wie 6.1 und 7.1: ein
+// eingeschobener Unterabschnitt haengt sich an die vorangehende Ganzzahl).
 
 demoGuard($resource, $request_method);
 
