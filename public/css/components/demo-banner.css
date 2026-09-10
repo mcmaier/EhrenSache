@@ -13,8 +13,17 @@
    Ohne dieses Merkmal existiert das Element nicht — die Regel ist dann
    wirkungslos und kostet nichts. */
 
+/* W1: Festgenagelt statt gemessen. Die knappe Fassung des Bandtexts (siehe
+   theme.js) bleibt bis herab zu etwa 400px einzeilig -- 10px+10px Innenabstand
+   plus 14px * 1.4 Zeilenhoehe ergeben rechnerisch 39,6px, aufgerundet 40px.
+   Als Variable, damit .sidebar und .mobile-menu-btn unten denselben Wert
+   verwenden und nicht zwei Stellen synchron halten muessen. */
+:root {
+    --demo-banner-h: 40px;
+}
+
 .demo-banner {
-    background: #e67e22;
+    background: var(--demo-color);
     color: #fff;
     padding: 10px 16px;
     text-align: center;
@@ -26,4 +35,34 @@
 
 .demo-banner strong {
     font-weight: 700;
+}
+
+/* W1: Nachgemessen bei 375px -- selbst die knappe Fassung bricht dort in zwei
+   Zeilen um (59,2px statt 39,6px), 400px ist bereits einzeilig. Kleinere
+   Schrift statt eines zweiten Hoehenwerts fuer .sidebar und .mobile-menu-btn:
+   dieselbe Groesse, die die PWAs ohnehin fuer schmale Bildschirme verwenden. */
+@media (max-width: 400px) {
+    :root {
+        --demo-banner-h: 35px;
+    }
+
+    .demo-banner {
+        font-size: 13px;
+        padding: 8px 12px;
+    }
+}
+
+/* W1: .sidebar ist "position: fixed; height: 100vh" ohne top -- ohne Gegenregel
+   sitzt sie an ihrer statischen Position, die sich durch das vorangestellte
+   Band nach unten verschiebt. Die 100vh-Box endet dann unterhalb des Fensters,
+   und der Abmelden-Knopf ist grossteils nicht mehr klickbar. */
+body.has-demo-banner .sidebar {
+    top: var(--demo-banner-h);
+    height: calc(100vh - var(--demo-banner-h));
+}
+
+/* W1: .mobile-menu-btn liegt mit z-index:101 ueber dem Band (z-index:90) und
+   verdeckt sonst dessen erste Zeile auf schmalen Bildschirmen. */
+body.has-demo-banner .mobile-menu-btn {
+    top: calc(var(--spacing-md) + var(--demo-banner-h));
 }

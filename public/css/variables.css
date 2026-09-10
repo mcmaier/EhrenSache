@@ -33,7 +33,12 @@
     --ehren-gruen: #4CAF50;
     --ehren-orange: #F5A623;
     --ehren-gelb: #FFC83D;
-    
+
+    /* K3: Farbe des Demo-Hinweisbands, siehe components/demo-banner.css.
+       Kein --ehren-orange (#F5A623) -- eigener, kraeftigerer Ton fuer eine
+       Systemmeldung, keine Markenfarbe. */
+    --demo-color: #e67e22;
+
     /* Grays */
     --text-dark: #2F3A45;
     --text-medium: #555;

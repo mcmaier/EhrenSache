@@ -1,14 +1,14 @@
 /**
  * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
- * 
+ *
  * Copyright (c) 2026 Martin Maier
- * 
+ *
  * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-async function loadTheme() {    
+async function loadTheme() {
 
     try {
         // Direkte fetch-Anfrage OHNE api.js (kein Session-Check!)
@@ -22,7 +22,7 @@ async function loadTheme() {
         if (!response.ok) {
             throw new Error('Theme konnte nicht geladen werden');
         }
-        
+
         const data = await response.json();
         const settings = data.settings;
 
@@ -34,8 +34,8 @@ async function loadTheme() {
 
         // Settings im SessionStorage cachen (60 Minuten)
         sessionStorage.setItem('theme-settings', JSON.stringify(settings));
-        sessionStorage.setItem('theme-loaded', Date.now());        
-        
+        sessionStorage.setItem('theme-loaded', Date.now());
+
     } catch (error) {
         console.error('Theme-Laden fehlgeschlagen:', error);
     }
@@ -44,18 +44,18 @@ async function loadTheme() {
 
 async function applyTheme(settings) {
     const root = document.documentElement;
-    
+
     // CSS-Variablen
     if (settings.primary_color) {
         root.style.setProperty('--primary-color', settings.primary_color);
     }
     if (settings.secondary_color) {
         root.style.setProperty('--secondary-color', settings.secondary_color);
-    }        
+    }
     if (settings.background_color) {
         root.style.setProperty('--background-color', settings.background_color);
     }
-    
+
     // Organisations-Name
     if (settings.organization_name) {
         document.title = settings.organization_name;
@@ -63,14 +63,14 @@ async function applyTheme(settings) {
             el.textContent = settings.organization_name;
         });
     }
-    
+
     if(settings.privacy_policy_url)
     {
         const privacyGroup = document.getElementById('privacyPolicyGroup');
         const privacyLink = document.getElementById('privacyPolicyLink');
 
         try
-        {            
+        {
             privacyLink.href = settings.privacy_policy_url;
             privacyGroup.style.display = 'block';
         }
@@ -102,7 +102,7 @@ function isThemeCacheValid() {
 
     const loadTime = sessionStorage.getItem('theme-loaded');
     if (!loadTime) return false;
-    
+
     const age = Date.now() - parseInt(loadTime);
     return age < 60 * 60 * 1000; // 60 Minuten
 }
@@ -131,11 +131,16 @@ function showDemoBanner() {
     const banner = document.createElement('div');
     banner.className = 'demo-banner';
     banner.setAttribute('role', 'status');
-    banner.innerHTML = '<strong>Demo-Installation.</strong> '
-        + 'Alle Daten sind erfunden und werden stündlich zurückgesetzt. '
-        + 'Konten, Rechte, Mailversand und Systemeinstellungen sind abgeschaltet.';
+    // W1: knappe Fassung, einzeilig bis herab zu etwa 900px Breite -- derselbe
+    // Wortlaut wie in den beiden PWAs (public/checkin, public/station). Die
+    // fruehere lange Fassung brach schon knapp unterhalb 900px um und war der
+    // Grund fuer die per --demo-banner-h festgenagelte Hoehe unten.
+    banner.innerHTML = '<strong>Demo-Installation.</strong> Erfundene Daten, stündlicher Reset.';
 
     document.body.prepend(banner);
+    // W1: .sidebar und .mobile-menu-btn sind fixiert und kennen das Band sonst
+    // nicht -- siehe components/demo-banner.css fuer die Gegenregeln.
+    document.body.classList.add('has-demo-banner');
 }
 
 export { loadTheme, applyTheme }
