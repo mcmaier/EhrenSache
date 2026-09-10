@@ -19,7 +19,7 @@ php private/demo/seed.php [Optionen]
 | `--seed=<int>` | Zufallssaat, Vorgabe `20260908` |
 | `--reference-date=<Y-m-d>` | Stichtag aller Zeitpunkte, Vorgabe: heute |
 | `--password=<klartext>` | Passwort der drei Konten, Vorgabe `demo2025` |
-| `--quiet` | unterdrückt den Abschlussbericht (die Sicherheitsabfrage bleibt) |
+| `--quiet` | unterdrückt den Abschlussbericht; zusammen mit `--yes` auch die Zielanzeige (die Sicherheitsabfrage bleibt) |
 
 Ohne `--yes` nennt das Skript Datenbank, Präfix und die Zeilenzahl jeder Tabelle, die es
 leeren wird, und verlangt die Eingabe `LOESCHEN`. Aufruf nur über die Kommandozeile; über
@@ -140,8 +140,17 @@ Sie stehen als Tests fest, weil jede von ihnen einmal verletzt war:
 Der stündliche Reset ruft den Generator ohne Rückfrage:
 
 ```
-php /pfad/zur/installation/private/demo/seed.php --yes --quiet
+0 * * * * /usr/bin/php /pfad/zur/installation/private/demo/seed.php --yes --quiet
 ```
+
+**Der Takt muss stündlich sein.** Das Hinweisband sagt dem Besucher „stündlicher Reset", und
+der Satz steht fest verdrahtet an **drei** Stellen: `public/js/theme.js` (Hauptanwendung und
+Anmeldung), `public/checkin/js/app.js` und `public/station/js/app.js`. Der Hinweis auf dem
+Arbeitszeitnachweis (`private/handlers/export.php`) nennt den Takt bewusst nicht — auf Papier
+wäre er ohne Zeitstempel wertlos.
+
+Wer seltener zurücksetzt, lässt die Oberfläche lügen; wer den Takt ändern will, muss die drei
+Stellen mitziehen.
 
 `seed.php` weist einen Aufruf über den Webserver ab und läuft nur auf der Kommandozeile.
 Der gesamte Schreibvorgang liegt in einer Transaktion — ein Besucher mitten in einer Aktion
@@ -151,7 +160,7 @@ Zurückrollen wirkungslos.
 
 **`--quiet` zusammen mit `--yes` schweigt vollständig** — kein Zeichen auf STDOUT, damit ein
 stündlicher Cron-Job nicht stündlich eine Mail auslöst. Fehler gehen weiterhin auf STDERR und
-bleiben sichtbar; der Rückgabewert ist 0 bei Erfolg und 1 beim Abbruch.
+bleiben sichtbar; der Rückgabewert ist 0 bei Erfolg und 1 bei einem Fehler.
 
 `--quiet` **allein** unterdrückt nur die Schlusszusammenfassung. Die Zielanzeige mit Datenbank,
 Präfix und der Zeilenzahl jeder zu leerenden Tabelle erscheint weiterhin, weil ohne `--yes`
@@ -159,11 +168,22 @@ gleich nach `LOESCHEN` gefragt wird — wer das tippen soll, muss sehen, was er 
 steht als `showTargetListing()` im Skript und ist in `tests/suites/demo_seed_cli.php`
 festgehalten.
 
-`buildSettings()` in `plan.php` schreibt acht Schlüssel und **nicht** `smtp_configured`. Da
-`checkMailStatus()` ein fehlendes `smtp_configured` als „aus" wertet, stellt jeder Reset den
-mailfreien Zustand aktiv wieder her. Das ist der Grund, warum `password_reset_request` auf
-der Demo nichts verschicken kann — und es ist kein Zufall, sondern die Gegenmaßnahme. Wer
-`buildSettings()` ändert, darf sie nicht verlieren.
+### Der Reset räumt die Mail-Einstellungen nicht ab
+
+`system_settings` steht **nicht** in `DEMO_TABLES`. Der Generator leert die Tabelle nie;
+`writePlan()` führt lediglich ein `UPDATE` für die acht Schlüssel aus `buildSettings()` aus.
+`smtp_configured` und `mail_enabled` sind keine davon und werden **nicht angefasst**. Steht
+dort einmal `1` — weil die Installation vorher Mail konfiguriert hatte oder aus einem Abzug
+stammt —, überlebt der Wert jeden Reset.
+
+Dass `password_reset_request` auf der Demo nichts verschickt, liegt deshalb **allein** am
+Sperrlisteneintrag in `private/helpers/demo_mode.php`: Der Wächter weist die Ressource mit
+403 ab, bevor ein Handler läuft. Die fehlende Mail-Konfiguration ist **kein** zweiter Riegel.
+
+Wer den Sperreintrag lockert im Vertrauen darauf, dass „der Reset das schon abfängt", öffnet
+damit unmittelbar den Versand an beliebige Adressen. Die Prüfung der beiden Schlüssel steht
+deshalb unten in der Checkliste — sie ist eine Aufgabe am Server, keine Eigenschaft des
+Generators.
 
 ### Der Demo-Modus ist davon getrennt
 
@@ -181,6 +201,7 @@ nach einem Tag zerfahren aussieht.
   keine eigene Anmeldung.
 - Der Datenbankbenutzer der Demo darf **nur** auf die Demo-Datenbank berechtigt sein.
 - `private/config/install.lock` muss vorhanden sein.
-- Keine Mail-Konfiguration hinterlegen.
+- Keine Mail-Konfiguration hinterlegen. **In `system_settings` prüfen, dass `mail_enabled`
+  und `smtp_configured` nicht auf `1` stehen** — der Reset räumt sie nicht ab.
 - `define('DEMO_MODE', true);` in `private/config/config.php` eintragen.
 - Der Cron muss CLI-PHP aufrufen, nicht den Webserver.

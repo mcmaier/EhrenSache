@@ -134,13 +134,28 @@ Lädt Branding-Einstellungen (Logo, Farben, Name).
 **Response:**
 ```json
 {
-  "org_name": "Mein Verein",
-  "privacy_policy_url": "https://meine-domain.de/datenschutzerklaerung/"
-  "primary_color": "#667eea",
-  "secondary_color": "#764ba2",
-  "logo_url": "/uploads/logos/logo.png"
+  "settings": {
+    "organization_name": "Mein Verein",
+    "primary_color": "#1F5FBF",
+    "secondary_color": "#4CAF50",
+    "background_color": "#f8f9fa",
+    "organization_logo": "uploads/logos/logo.png",
+    "privacy_policy_url": "https://meine-domain.de/datenschutzerklaerung/"
+  },
+  "demo": false
 }
 ```
+
+`settings` enthält alle Einträge aus `system_settings` mit `category = 'public'` — welche
+Schlüssel das sind, hängt von der Installation ab. Ein Client darf keinen davon voraussetzen.
+
+`demo` liegt bewusst **neben** `settings` und nicht darin: `settings` kommt aus der Datenbank,
+`demo` aus `config.php`. Der Wert ist nur auf einer Demo-Installation `true` (siehe
+`DEMO_MODE` in `private/config/config_example.php`) und steuert das Hinweisband, das alle
+Oberflächen daraufhin einblenden.
+
+> Bis 1.4.0 zeigte dieser Abschnitt ein flaches Objekt mit den Schlüsseln `org_name` und
+> `logo_url`. Das war nie die ausgelieferte Form — korrigiert am 2026-09-10.
 
 ---
 
