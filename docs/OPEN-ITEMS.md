@@ -4,8 +4,8 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-10 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
-**Version:** 1.4.0
+**Zuletzt geprüft:** 2026-09-10 · **Bezugsstand:** `dev`, mit `main` gleichgezogen, drei
+Korrekturen und der unveröffentlichte Demo-Modus darüber · **Version:** 1.4.1
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
