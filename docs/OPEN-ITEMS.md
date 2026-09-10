@@ -1625,3 +1625,91 @@ normale Rechteprüfung, die einen anonymen Besucher gar nicht erst schreiben lä
 Fällt OI-17, fällt dieser Punkt mit.
 
 ---
+
+### OI-48 · Statistik zählt je Gruppe nur **eine** Terminart
+**Priorität:** hoch — verfälscht jede Anwesenheitsquote, sobald eine Gruppe an mehreren
+Terminarten hängt
+
+`calculateGroupStatistics()` in `private/handlers/statistics.php` ermittelt die Terminart einer
+Gruppe so:
+
+```php
+SELECT atg.type_id, mg.group_name
+FROM {PREFIX}appointment_type_groups atg
+JOIN {PREFIX}member_groups mg ON atg.group_id = mg.group_id
+WHERE atg.group_id = ?
+```
+
+und liest davon **eine** Zeile (`fetch()`). Die gesamte folgende Auswertung filtert dann auf
+`WHERE a.type_id = ?`.
+
+`appointment_type_groups` ist aber eine M:N-Tabelle. Sie beantwortet die Frage „welche Gruppen
+betrifft diese Terminart" — in der Gegenrichtung gelesen hängt eine Gruppe damit
+selbstverständlich an mehreren Terminarten. Genau so ist der Bestand aufgebaut.
+
+**Wirkung im Demo-Datenbestand (Stand 2026-09-10):**
+
+| Gruppe | verknüpfte Terminarten | in der Statistik gezählt |
+|---|---|---|
+| Aktive | Gesamtprobe, Registerprobe, Auftritt | nur eine davon |
+| Jugend | Gesamtprobe, Registerprobe, Auftritt | nur eine davon |
+| Vorstandschaft | Vorstandssitzung | vollständig |
+
+Für 2026 sind das 37 gezählte gegenüber 61 erfassten Terminen — **24 Termine, knapp 40 %,
+bleiben unsichtbar**. Die Abfrage trägt kein `ORDER BY`; welche Terminart gewinnt, entscheidet
+die Datenbank.
+
+Die Quoten sind dadurch nicht in sich falsch, sie beantworten nur eine engere Frage als die,
+die die Oberfläche stellt: nicht „wie zuverlässig erscheint dieses Mitglied", sondern „wie
+zuverlässig erscheint es bei einer nicht näher bestimmten der ihm zugeordneten Terminarten".
+
+**Wie es aufgefallen ist:** Beim Bau des Anwesenheitsberichts (1.5.0) stand die Spalte
+„Entschuldigt" für jedes Mitglied und jedes Jahr auf null. Der einzige verwertbare
+`excused`-Eintrag im Bestand hängt an einer Registerprobe — einer Terminart, die für die Gruppe
+des Mitglieds nicht ausgewertet wird.
+
+**Dass die Summenbildung in `buildStatisticsResult()` doppelte Terminarten über
+`$countedAppointmentTypes` entschärft, zeigt die ursprüngliche Annahme:** je Gruppe genau eine
+Terminart. Das Datenmodell hat diese Annahme nie getragen.
+
+**Zu tun:** `calculateGroupStatistics()` muss alle Terminarten einer Gruppe auswerten
+(`fetchAll()` statt `fetch()`, `IN (…)` statt `= ?`), und die Terminzählung in
+`buildStatisticsResult()` muss entsprechend nachziehen — `$stats['appointment_type_id']` ist
+dann kein einzelner Wert mehr.
+
+**Vorher zu entscheiden, deshalb nicht nebenbei behoben:** Die Korrektur verschiebt **jede
+bestehende Anwesenheitsquote in jeder Installation**, in unvorhersehbare Richtung — je nachdem,
+wie diszipliniert bei den bisher ignorierten Terminarten erfasst wurde. Das braucht eine eigene
+Spec, eine Aussage im Changelog und vermutlich einen Hinweis für Vereine, die ihre Zahlen über
+Jahre verfolgen.
+
+**Bis dahin** benennt der Anwesenheitsbericht (1.5.0) in einer Fußnote je Gruppe die Terminart,
+über die gerechnet wurde. Das Blatt behauptet damit keine Vollständigkeit, die es nicht hat.
+
+**Nicht sicherheitsrelevant:** ohne vorherigen Zugang nicht auslösbar, keine Rechteausweitung,
+keine Preisgabe fremder Daten. Betroffen ist allein die Aussagekraft der Zahlen.
+
+---
+
+### OI-49 · Demo-Generator legt genehmigte Entschuldigungen ohne Anwesenheitseintrag an
+**Priorität:** niedrig — betrifft nur die Demo- und Testdaten
+
+Im Bestand vom 2026-09-10 stehen 14 genehmigte Ausnahmen vom Typ `absence`, aber nur **eine**
+davon hat einen zugehörigen `records`-Eintrag mit `status = 'excused'`. Die übrigen 13
+Mitglieder erscheinen in der Statistik als **unentschuldigt** — das Gegenteil dessen, was die
+Demo erzählen will.
+
+Der Produktivpfad ist in Ordnung: `handleApprovedAbsence()` in `private/helpers/utils.php` legt
+den Eintrag beim Genehmigen korrekt an. Der Demo-Generator schreibt die Ausnahmen jedoch direkt
+in die Tabelle und geht an dieser Funktion vorbei.
+
+**Zu tun:** Der Generator legt für jede genehmigte `absence` zusätzlich den `records`-Eintrag
+mit `status = 'excused'` an — oder er ruft beim Erzeugen denselben Weg wie die Oberfläche.
+
+**Am Rande aufgefallen:** `handleApprovedAbsence()` arbeitet mit `INSERT IGNORE`. Existiert
+bereits ein Eintrag — etwa weil das Mitglied vorher als anwesend erfasst wurde —, verpufft die
+Genehmigung wirkungslos, und das Mitglied bleibt „anwesend". `handleApprovedTimeCorrection()`
+aktualisiert in derselben Lage einen vorhandenen Eintrag. Ob dieser Unterschied Absicht ist,
+ist ungeklärt; er ist von diesem Punkt getrennt zu bewerten.
+
+---
