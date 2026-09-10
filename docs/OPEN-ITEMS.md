@@ -1713,3 +1713,39 @@ aktualisiert in derselben Lage einen vorhandenen Eintrag. Ob dieser Unterschied 
 ist ungeklärt; er ist von diesem Punkt getrennt zu bewerten.
 
 ---
+
+### OI-50 · `my_data` als CSV enthält keine Arbeitszeiten
+**Priorität:** mittel — betrifft das Auskunftsrecht, nicht die Sicherheit
+
+`?resource=my_data` gibt einer angemeldeten Person ihre eigenen Daten heraus. Der Handler holt
+dabei auch `work_sessions` und `work_session_log` (`private/handlers/my_data.php`, ab der
+Sitzungsabfrage), und die **JSON**-Form gibt beides vollständig aus.
+
+`exportAsCSV()` in derselben Datei schreibt dagegen nur vier Blöcke:
+`=== STAMMDATEN ===`, `=== GRUPPEN ===`, `=== ANWESENHEITEN ===` und
+`=== AUSNAHMEN/ANTRÄGE ===`. **Die Arbeitszeitsitzungen fehlen**, obwohl sie im Datensatz
+stehen, den die Funktion entgegennimmt.
+
+Zwei Formate desselben Auskunftsersuchens liefern damit unterschiedlich viel. Wer die CSV wählt
+— das naheliegende Format für jemanden, der seine Daten in einer Tabelle ansehen will —,
+bekommt einen unvollständigen Auszug, ohne dass irgendwo steht, dass etwas fehlt.
+
+**Aufgefallen am 2026-09-10** beim Review der Berichtsrechte: Dort wird der Rolle `user` das
+CSV des Stundennachweises verweigert, mit der Begründung, der Selbstexport über `my_data` decke
+das bereits ab. Für die CSV-Form stimmt das nicht.
+
+**Zu tun:** `exportAsCSV()` um einen Block `=== ARBEITSZEITEN ===` ergänzen — Beginn, Ende,
+Pause, Dauer, Tätigkeit, Termin, Status, Nachweisgrad. Die Aufbereitung dafür gibt es bereits in
+`private/handlers/export.php` (`worktimeHours()`, `worktimeProofLabel()`,
+`worktimeReportTimes()`); sie ist nicht neu zu erfinden.
+
+**Zu prüfen dabei:** ob auch `work_session_log` in die CSV gehört. Die Änderungshistorie ist
+Teil dessen, was über eine Person gespeichert ist; in der JSON-Form steht sie drin.
+
+**Berührt** `DATENSCHUTZ.md`: Dort ist zu prüfen, ob die Beschreibung des Auskunftswegs die
+beiden Formate als gleichwertig darstellt. Falls ja, ist sie bis zur Behebung ungenau.
+
+**Nicht sicherheitsrelevant:** Es werden keine fremden Daten preisgegeben, sondern eigene
+zurückgehalten. Kein Zugang, keine Rechteausweitung.
+
+---

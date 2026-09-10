@@ -589,7 +589,7 @@ try {
         handlePinChange($db, $database, $request_method, $authUserId, $authMemberId);
         break;
     case 'export':
-        handleExport($db, $database, $request_method, $authUserRole, $authMemberId);
+        handleExport($db, $database, $request_method, $authMemberId);
         break;
     case 'import':
         handleImport($db, $database, $request_method, $authUserRole);

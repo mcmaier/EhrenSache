@@ -70,10 +70,19 @@ Das ist der einzige Eingriff in bestehende Rechenwege. Die SQL-Abfragen selbst b
 
 ### 3.4 Kein CSV für die Rolle `user`
 
-Der Datenexport der eigenen Person ist über `?resource=my_data&format=csv` bereits gelöst
-(Stammdaten, Gruppen, Anwesenheiten, Arbeitszeiten). Ein zweiter CSV-Pfad wäre eine Dublette mit
-eigener Rechteprüfung. Das Backlog verlangt einen Bericht zum Ansehen und Drucken — genau das
-bekommt die Rolle.
+Der Datenexport der eigenen Person ist über `?resource=my_data` bereits gelöst. Ein zweiter
+CSV-Pfad wäre eine Dublette mit eigener Rechteprüfung. Das Backlog verlangt einen Bericht zum
+Ansehen und Drucken — genau das bekommt die Rolle.
+
+**Korrektur vom 2026-09-10, beim Review von Abschnitt 5 aufgefallen:** Hier stand zunächst,
+`my_data&format=csv` decke „Stammdaten, Gruppen, Anwesenheiten, **Arbeitszeiten**" ab. Das
+stimmt nur für die JSON-Form. `exportAsCSV()` in `private/handlers/my_data.php` gibt Stammdaten,
+Gruppen, Anwesenheiten und Anträge aus — **keine Arbeitszeitsitzungen**. Ein Mitglied, das die
+403 bekommt und dem Verweis folgt, findet dort also nicht, was ihm hier verweigert wurde.
+
+Die Entscheidung selbst bleibt: Der Bericht ist zum Lesen und Drucken da, und die eigenen
+Rohdaten gibt es vollständig über `my_data&format=json`. Die Lücke in der CSV-Form ist als
+**OI-50** festgehalten und getrennt zu entscheiden — sie besteht unabhängig von diesem Vorhaben.
 
 ### 3.5 Kein CSV für den Statistikbericht
 

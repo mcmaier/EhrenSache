@@ -13,7 +13,7 @@
 // EXPORT Handler
 // ============================================
 
-function handleExport($db, $database, $request_method, $authUserRole, $authMemberId) {
+function handleExport($db, $database, $request_method, $authMemberId) {
     if ($request_method !== 'GET') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
@@ -41,8 +41,13 @@ function handleExport($db, $database, $request_method, $authUserRole, $authMembe
 
         if (exportFormat() !== 'html') {
             // Kein stilles Umbiegen auf HTML: Der Aufrufer soll wissen, dass er
-            // nicht bekommt, was er angefordert hat. Der Selbstexport der
-            // eigenen Daten laeuft ueber my_data.
+            // nicht bekommt, was er angefordert hat.
+            //
+            // Der Selbstexport der eigenen Daten laeuft ueber my_data -- aber
+            // nur dessen JSON-Form enthaelt die Arbeitszeiten. exportAsCSV()
+            // in my_data.php gibt Stammdaten, Gruppen, Anwesenheiten und
+            // Antraege aus, keine Sitzungen (OI-50). Wer hier also auf my_data
+            // verweist, verweist auf format=json, nicht auf format=csv.
             http_response_code(403);
             echo json_encode(["message" => "Nur die Druckansicht ist verfügbar (format=html)"],
                              JSON_UNESCAPED_UNICODE);
@@ -360,7 +365,12 @@ function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
                AND " . worktimePeriodCondition();
     $params = [$period['from'], $period['to']];
 
-    if ($memberId) {
+    // !== null statt truthy: Diese Zeile traegt seit der Oeffnung fuer die
+    // Rolle user eine Rechteentscheidung mit. Waere $memberId je 0 oder "0",
+    // entfiele der Filter stillschweigend und der Nachweis zeigte alle
+    // Personen. member_id ist AUTO_INCREMENT ab 1, das ist also heute nicht
+    // ausloesbar -- die Bedingung kostet aber nichts und schliesst es aus.
+    if ($memberId !== null && $memberId !== '') {
         $where   .= " AND ws.member_id = ?";
         $params[] = $memberId;
     }
