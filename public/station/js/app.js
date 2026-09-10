@@ -973,6 +973,9 @@ window.addEventListener('hashchange', () => {
             if (previous) {
                 saveToken(previous);
             }
+            // Bei 401 hat api() den Einrichtungsbildschirm samt Meldung schon
+            // gesetzt; hier steht es ein zweites Mal, damit auch jeder andere
+            // Fehlschlag sichtbar wird. Beide Aufrufe sind idempotent.
             showScreen('setup');
             showError('setupError', error);
         } else {
