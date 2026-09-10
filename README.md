@@ -11,7 +11,7 @@ Kostenlos unter AGPL-3.0 nutzbar.
 
 ## Features
 
-**Anwesenheit ist EhrenSache!** 
+**Einsatz ist EhrenSache!** 
 
 Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder sich eigenverantwortlich anmeldet oder der Schriftführer die Anwesenheit prüft. EhrenSache erfasst Anwesenheit und Entschuldigungen inklusive nachträglicher Korrekturmöglichkeit. 
 

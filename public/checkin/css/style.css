@@ -27,6 +27,16 @@
     /* K3: Farbe des Demo-Hinweisbands, lokal statt in variables.css -- die
        PWA hat keine. Damit steht sie je Datei an genau einer Stelle. */
     --demo-color: #e67e22;
+
+    /* Anmeldebildschirm der PWA. Bewusst spiegelverkehrt zum Dashboard:
+       dort traegt die Primaerfarbe die Flaeche, hier die Sekundaerfarbe --
+       so ist auf einen Blick zu sehen, welche der beiden Oberflaechen man
+       vor sich hat. Diese Werte sind der Rueckfall, abgeleitet werden sie
+       weiter unten. */
+    --login-bg: #123222;
+    --login-glow: rgba(31, 95, 191, .24);
+    --badge-bg: #EEF1F4;
+    --badge-fg: #2F3A45;
 }
 
 * {
@@ -54,7 +64,13 @@ body {
     justify-content: center;
     min-height: 100vh;
     padding: 20px;
-    background: linear-gradient(135deg, var(--secondary-color) 0%, var(--primary-color) 100%);
+    background-color: var(--login-bg);
+    background-image:
+        radial-gradient(75rem 50rem at 8% -10%, rgba(255,255,255,.12), transparent 65%),
+        radial-gradient(70rem 50rem at 92% 100%, var(--login-glow), transparent 70%),
+        radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size: auto, auto, 24px 24px;
+    background-attachment: fixed;
 }
 
 #loginScreen.active {
@@ -66,10 +82,14 @@ body {
 }
 
 .login-box {
-    background: white;
+    background: var(--card-bg);
     padding: 40px;
-    border-radius: 10px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.6);
+    box-shadow:
+        0 1px 2px rgba(16,24,40,.06),
+        0 12px 24px -8px rgba(16,24,40,.14),
+        0 40px 64px -32px rgba(16,24,40,.28);
     width: 100%;
     max-width: 400px;
     color: #2c3e50;
@@ -113,6 +133,24 @@ body {
     font-weight: 400;
     color: gray;
     letter-spacing: 0.5px;
+}
+
+/* Kennzeichnet die Anmeldung als die der Check-in-App. Der Hauptbildschirm
+   fuehrt dieselbe Beschriftung in seiner Kopfzeile. */
+.app-badge {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+    padding: 3px 11px;
+    border-radius: 999px;
+    background: var(--badge-bg);
+    color: var(--badge-fg);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
 }
 
 .login-box h2 {
@@ -2302,4 +2340,17 @@ body {
     padding: 6px 12px;
     text-align: center;
     font-size: 13px;
+}
+
+
+/* Wo color-mix verfuegbar ist, folgen Flaeche, Schimmer und Kennzeichnung den
+   eingestellten Vereinsfarben -- mit vertauschten Rollen gegenueber dem
+   Dashboard: die Sekundaerfarbe traegt, die Primaerfarbe klingt an. */
+@supports (background: color-mix(in oklab, red, blue)) {
+    :root {
+        --login-bg: color-mix(in oklab, var(--secondary-color) 60%, #0C1216);
+        --login-glow: color-mix(in oklab, var(--primary-color) 46%, transparent);
+        --badge-bg: color-mix(in oklab, var(--secondary-color) 13%, #ffffff);
+        --badge-fg: color-mix(in oklab, var(--secondary-color) 62%, #10181F);
+    }
 }

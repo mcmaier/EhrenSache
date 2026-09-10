@@ -33,6 +33,18 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   nicht zu unterscheiden.
 
 ### Geändert
+- **Die Anmeldeseite trägt jetzt „Einsatz ist EhrenSache".** „Anwesenheit" beschrieb die
+  Anwendung nicht mehr vollständig, seit sie auch Arbeitszeit erfasst; „Einsatz" deckt beide
+  Erfassungsarten ab. Derselbe Claim steht in der README
+- **Anmeldeseite: ruhige Fläche statt Zweifarb-Verlauf.** Der lineare Verlauf stellte die beiden
+  frei einstellbaren Vereinsfarben unvermittelt nebeneinander — bei fremden Farbpaaren
+  (Rot/Orange, Gelb/Anthrazit) wurde das unruhig bis grell. Jetzt trägt eine aus der Primärfarbe
+  abgeleitete, abgedunkelte Fläche den Bildschirm, überlagert von zwei weichen Lichtern und einem
+  feinen Punktraster gegen Streifenbildung; die Sekundärfarbe klingt nur noch als Schimmer an.
+  Neue Tokens `--login-bg` und `--login-glow` in `variables.css`, per `color-mix` aus den
+  eingestellten Farben abgeleitet, mit festem Rückfallwert für Browser ohne Unterstützung. Die
+  Anmeldekarte bekommt gestaffelte Schatten und 16 px Radius, damit sie auf der Fläche aufliegt
+  statt wie ein Ausschnitt zu wirken
 - `private/demo/seed.php`: `--quiet` schweigt zusammen mit `--yes` vollständig. Zuvor gab auch
   ein stiller Lauf rund zwanzig Zeilen aus — bei einem stündlichen Cron-Job je nach
   Konfiguration eine Mail pro Stunde. Ohne `--yes` bleibt die Zielanzeige, weil danach nach

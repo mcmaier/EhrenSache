@@ -34,6 +34,11 @@
     --ehren-orange: #F5A623;
     --ehren-gelb: #FFC83D;
 
+    /* Anmeldebildschirm: Grundton und Schimmer. Diese Werte sind der
+       Rueckfall; abgeleitet werden sie unten aus den Vereinsfarben. */
+    --login-bg: #10243D;
+    --login-glow: rgba(76, 175, 80, .22);
+
     /* K3: Farbe des Demo-Hinweisbands, siehe components/demo-banner.css.
        Kein --ehren-orange (#F5A623) -- eigener, kraeftigerer Ton fuer eine
        Systemmeldung, keine Markenfarbe. */
@@ -86,4 +91,14 @@
     --z-modal: 1000;
     --z-toast: 9999;
 
+}
+
+/* Wo color-mix verfuegbar ist, folgt der Anmeldebildschirm den eingestellten
+   Vereinsfarben: die Primaerfarbe wird gegen ein sehr dunkles Blauschwarz
+   gemischt und dadurch abgedunkelt, die Sekundaerfarbe bleibt als Schimmer. */
+@supports (background: color-mix(in oklab, red, blue)) {
+    :root {
+        --login-bg: color-mix(in oklab, var(--primary-color) 72%, #08101E);
+        --login-glow: color-mix(in oklab, var(--secondary-color) 34%, transparent);
+    }
 }
