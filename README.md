@@ -18,26 +18,40 @@ Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder si
 Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen.
 
 ### Kernfunktionen
-- **Mehrstufiges Rollensystem**: Admin, Manager und Benutzer mit differenzierten Berechtigungen
-- **Flexible Zeiterfassung**: Unterstützung für Web-Dashboard, Mobile PWA, QR-Codes, NFC-Tags und IoT-Geräte
-- **Terminverwaltung**: Planung von Terminen mit Gruppenzuordnung und Teilnehmerverwaltung
-- **Ausnahmenverwaltung**: Erfassung von Abwesenheiten, Urlaub und Sonderregelungen
-- **Gruppenverwaltung**: Organisation von Mitgliedern in verschiedenen Gruppen
+- **Mehrstufiges Rollensystem**: Admin, Manager, Benutzer und Gerät mit differenzierten Berechtigungen
+- **Mehrere Erfassungswege**: Web-Dashboard, Mobile PWA, QR-Code mit Einmalpasswort, virtuelle
+  Station am Tablet (Kiosk) und IoT-Geräte
+- **Terminverwaltung**: Planung von Terminen mit Terminarten, Gruppenzuordnung und Teilnehmerverwaltung
+- **Ausnahmenverwaltung**: Entschuldigungen und Zeitkorrekturen, beantragt vom Mitglied,
+  genehmigt von Admin oder Manager
+- **Gruppenverwaltung**: Organisation von Mitgliedern in Gruppen, inklusive Aktiv- und Inaktiv-Zeiträumen
+- **Arbeitszeiterfassung** (seit 1.2.0, abschaltbar): Beginn, Ende und Pause je Tätigkeitsart,
+  mit Änderungshistorie — für Vereine, die geleistete Stunden nachweisen müssen
+- **Statistik und Export**: Auswertung nach Termin, Gruppe und Jahr; CSV-Import und -Export
+  für Mitglieder, Termine und Anwesenheiten
 
 ### Technische Highlights
 - **Sichere Authentifizierung**: Session-basiert für Web, Token-basiert für Geräte
 - **TOTP-Standortverifikation**: Zeitbasierte Einmalpasswörter für sichere Check-ins
-- **Intelligentes Caching**: ~90% Reduktion der API-Anfragen durch Jahr-basiertes Caching
+- **Sparsame API-Nutzung**: jahresweiser Zwischenspeicher im Browser, der wiederholte
+  Abfragen desselben Jahres einspart
 - **Progressive Web App**: Installation auf Mobilgeräten möglich
 - **Responsive Design**: Optimiert für Desktop, Tablet und Smartphone
 
 ### Sicherheit
-- XSS-Schutz durch Content Security Policy
 - SQL-Injection-Prävention mit Prepared Statements
-- CSRF-Schutz für Dateneingaben
-- Sichere Session-Verwaltung mit HttpOnly und SameSite Cookies
+- CSRF-Schutz für alle verändernden Anfragen aus dem Browser
+- Sichere Session-Verwaltung mit HttpOnly- und SameSite-Cookies, Timeout nach 30 Minuten
+- Rate Limiting: 100 Anfragen pro Minute je IP und Konto
+- Sicherheits-Header: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
+- HTTPS-Umleitung ab Werk (seit 1.4.0)
 - Input-Validierung auf Client- und Server-Seite
-- Sichere Datei-Upload-Verifikation
+- Datei-Uploads werden über den tatsächlichen MIME-Typ geprüft, nicht über die Endung
+
+> [!NOTE]
+> EhrenSache liefert **bewusst keine Content-Security-Policy** aus: die Oberfläche arbeitet mit
+> Inline-Handlern, eine strikte CSP würde sie lahmlegen. Begründung und geplanter Weg dorthin
+> stehen als OI-17 in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
 ---
 
@@ -62,7 +76,7 @@ datenschutzkonforme Nutzung sorgen.
 - ❌ Gibt KEINE Rechtsberatung
 
 📄 **Ausführliche Informationen**: [DATENSCHUTZ.md](DATENSCHUTZ.md)  
-⚖️ **Haftungsausschluss**: [HAFTUNGSAUSSCHLUSS.md](DISCLAIMER.md)
+⚖️ **Haftungsausschluss**: [DISCLAIMER.md](DISCLAIMER.md)
 
 ### Empfehlung
 
@@ -74,24 +88,26 @@ Fachanwalt für IT-Recht, um die DSGVO-Konformität sicherzustellen.
 ## Technologie-Stack
 
 **Backend:**
-- PHP 8+ (Vanilla)
-- MySQL 5.7+
-- REST API Architektur
+- PHP 8+ (Vanilla, kein Framework)
+- MySQL 5.7+ oder MariaDB 10.4+
+- REST-API, ein einziger Einstiegspunkt (`public/api/api.php`)
 
 **Frontend:**
-- Vanilla HTML + JavaScript
+- Vanilla HTML + JavaScript (ES6-Module, kein Build-Schritt)
 - CSS3 (Grid, Flexbox)
+- Zwei Progressive Web Apps: Check-in (`/checkin/`) und virtuelle Station (`/station/`)
 
 **IoT-Integration (WIP):**
-- TOTP-Device für QR-Checkin via App
-- (geplant) Fingerprint-Scanner für Biometrie-Checkin
+- TOTP-Gerät für QR-Check-in via App (ESP32)
+- Virtuelle Station als PWA — ein Tablet ersetzt das Gerät
+- (geplant) Fingerprint-Scanner für Biometrie-Check-in
 
 ---
 
 ## Installation
 
 ### Voraussetzungen
-- Webserver mit PHP 8+ und MySQL 5.7+
+- Webserver mit PHP 8+ und MySQL 5.7+ oder MariaDB 10.4+
 - SSL-Zertifikat (für PWA und sichere Authentifizierung)
 - Schreibrechte für Upload-Verzeichnisse
 
@@ -131,8 +147,8 @@ Während der Installation wird ein Admin-Account erstellt.
 
 6. Als Admin Einloggen:
 
-- Gruppenverwaltung --> Mindestens eine Benutzergruppe anlegen
-- Gruppenverwaltung --> Eine Terminart erstellen und Benutzergruppe zuweisen
+- Dashboard → Gruppen --> Mindestens eine Benutzergruppe anlegen
+- Dashboard → Gruppen --> Eine Terminart erstellen und Benutzergruppe zuweisen
 - Datenschutz konfigurieren
   - **Datenschutzerklärung** erstellen und verlinken
   - **Mitglieder informieren** (Rundmail, Mitgliederversammlung)
@@ -149,7 +165,8 @@ Während der Installation wird ein Admin-Account erstellt.
 
 ### Update-Prozess
 
-1. Neue Dateien auf den Server hochladen (bestehende Dateien überschreiben).
+1. [**Aktuelle Version herunterladen**](https://github.com/mcmaier/EhrenSache/releases/latest)
+   und die Dateien auf den Server hochladen (bestehende Dateien überschreiben).
 
 > [!WARNING]
 > `private/config/config.php` **nicht** überschreiben – sie enthält die Zugangsdaten der Installation!
@@ -229,6 +246,11 @@ Manager haben eingeschränkten Zugriff:
 2. Link öffnet direkt den Check-in
 3. Automatische Erfassung
 
+**Check-in an der virtuellen Station:**
+1. Am Tablet im Vereinsheim Mitgliedsnummer und PIN eingeben
+2. Die Station ordnet den Check-in dem passenden Termin zu
+3. Kein eigenes Smartphone nötig — Details in [`public/station/README.md`](public/station/README.md)
+
 **Check-in NFC/IoT (geplant)**
 - NFC-Tag an NFC-Station halten
 - RFID-Karte an Lesegerät
@@ -236,10 +258,27 @@ Manager haben eingeschränkten Zugriff:
 - Automatische Erfassung durch verknüpftes Gerät
 
 **Ausnahmen beantragen:**
-1. Dashboard → Meine Anträge
+1. Dashboard → Anträge
 2. Neue Ausnahme → Typ wählen (Zeitkorrektur, Entschuldigt)
 3. Datum angeben und Begründung
 4. Absenden → Wartet auf Genehmigung durch Admin/Manager
+
+### Arbeitszeiterfassung
+
+Seit Version 1.2.0 kann EhrenSache neben der Anwesenheit auch **geleistete Arbeitszeit**
+erfassen — gedacht für Vereine, die Arbeitsstunden nachweisen oder abrechnen müssen.
+
+Die Funktion ist **standardmäßig aus**. Solange sie aus ist, werden keinerlei Arbeitszeitdaten
+erhoben, und der Bereich taucht in der Oberfläche nicht auf.
+
+**Einschalten:** Dashboard → Einstellungen → Zeiterfassung → *Zeiterfassung aktivieren*.
+Dort lassen sich außerdem die maximale Dauer einer Sitzung und eine Notizpflicht festlegen.
+
+**Danach:**
+- Dashboard → Gruppen → Tätigkeitsarten anlegen (z. B. Instandhaltung, Festbetrieb, Fahrdienst)
+- Mitglieder erfassen unter Dashboard → Zeiterfassung Beginn, Ende und Pause je Tätigkeit
+- Jede nachträgliche Änderung wird protokolliert; die Historie überlebt das Löschen einer Sitzung
+- Aufbewahrungsfristen für Arbeitszeiten und Historie stehen unter Einstellungen → Datenbereinigung
 
 ## IoT-Integration
 
@@ -259,7 +298,7 @@ Manager haben eingeschränkten Zugriff:
 
 **Web-Login:**
 ```
-POST /api/api.php&resource=login
+POST /api/api.php?resource=login
 Body: { "email": "email", "password": "pass" }
 Response: Session-Cookie
 ```
@@ -273,7 +312,7 @@ Header: Authorization: Bearer {token}
 
 **Check-in:**
 ```
-POST /api/api.php&resource=totp_checkin
+POST /api/api.php?resource=totp_checkin
 Body: {
   "appointment_id": 123,
   "member_id": 456,
@@ -284,13 +323,13 @@ Body: {
 
 **Termine abrufen:**
 ```
-GET /api/api.php&resource=appointments&year=2025
+GET /api/api.php?resource=appointments&year=2026
 Response: Array of appointments
 ```
 
 **Mitglieder abrufen:**
 ```
-GET /api/api.php&resource=members
+GET /api/api.php?resource=members
 Response: Array of members with groups
 ```
 
@@ -324,30 +363,50 @@ in [SECURITY.md](SECURITY.md) nutzen. Bekannte, bewusst offene Punkte sind in
 ### Code-Struktur
 ```
 EhrenSache/
-├── private/              # Interne Dateien
-|   ├── config/           # Config Dateien
-|   ├── handlers/         # API Endpunkt-Handler
-|   └── ...             
+├── version.json          # Version und Build-Datum
+├── private/              # Interne Dateien -- nie öffentlich erreichbar!
+|   ├── config/           # Zugangsdaten, Mail-Konfiguration
+|   ├── handlers/         # API-Endpunkt-Handler, je Ressource eine Datei
+|   ├── helpers/          # Auth, Arbeitszeit, Station, Mailer, TOTP
+|   ├── migrations/       # Update-Kette von Version zu Version
+|   ├── setup/            # Datenbankschema
+|   └── ...
 └── public/               # Öffentlich zugänglich <-- Web Root!
-    ├── checkin/          # PWA
-    ├── api/              # REST API Endpoints
-    ├── js/               # Frontend JavaScript
+    ├── api/              # REST-API, einziger Einstiegspunkt
+    ├── checkin/          # PWA für den mobilen Check-in
+    ├── station/          # PWA für die virtuelle Station (Kiosk)
+    ├── install/          # Setup-Assistent (nach Installation gesperrt)
+    ├── update/           # Update-Assistent (nach Migration gesperrt)
+    ├── js/               # Frontend-JavaScript (ES6-Module)
     ├── css/              # Stylesheets
-    ├── ...             
+    ├── ...
     └── index.html        # Hauptanwendung
 ```
 
 ### Caching-System
 
-Das System verwendet ein Jahr-basiertes Caching:
-- Termine/Anwesenheiten: Pro Jahr gecacht
-- Mitglieder/Gruppen: Global gecacht
-- Invalidierung bei Änderungen über Event-System
-- Cache-Keys im localStorage
+Das System verwendet ein jahresbasiertes Caching:
+- Termine, Anwesenheiten, Ausnahmen und Arbeitszeiten: pro Jahr zwischengespeichert
+- Benutzer, Geräte, Gruppen und Terminarten: global zwischengespeichert
+- Gültigkeit: 10 Minuten; nach einer Änderung wird der betroffene Schlüssel verworfen
+- Der Speicher liegt **im Arbeitsspeicher** (`dataCache` in `public/js/modules/ui.js`) und ist
+  nach jedem Neuladen leer — kein `localStorage`
 
 ### API-Dokumentation
 
 Siehe **[API Dokumentation](API.md)**
+
+## Weitere Dokumentation
+
+| Datei | Inhalt |
+|---|---|
+| [CHANGELOG.md](CHANGELOG.md) | Was sich in welcher Version geändert hat |
+| [API.md](API.md) | Vollständige REST-Referenz |
+| [SECURITY.md](SECURITY.md) | Meldeweg für Sicherheitslücken, unterstützte Versionen |
+| [DATENSCHUTZ.md](DATENSCHUTZ.md) | DSGVO-Pflichten, Löschfristen, Betroffenenrechte |
+| [DISCLAIMER.md](DISCLAIMER.md) | Haftungsausschluss |
+| [public/checkin/README.md](public/checkin/README.md) | Check-in-PWA einrichten |
+| [public/station/README.md](public/station/README.md) | Virtuelle Station (Kiosk) einrichten |
 
 ## Support
 
