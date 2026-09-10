@@ -869,10 +869,20 @@ export function showQRModal({ title, url, hint, warning }) {
     warningEl.textContent = warning || '';
     warningEl.style.display = warning ? 'block' : 'none';
 
-    const qr = qrcode(0, 'M');
-    qr.addData(url);
-    qr.make();
-    document.getElementById('qrcode').innerHTML = qr.createSvgTag(5, 2);
-
+    // Erst zeigen, dann zeichnen: schlaegt die QR-Erzeugung fehl, bleibt das
+    // Modal mit der kopierbaren Adresse offen und sagt, was fehlt. Vor dem
+    // Vendoring fing der Fallback-Zweig genau das ab — ohne Ersatz waere ein
+    // defektes Deployment nur ein Knopf, der sichtbar nichts tut.
     modal.classList.add('active');
+
+    try {
+        const qr = qrcode(0, 'M');
+        qr.addData(url);
+        qr.make();
+        document.getElementById('qrcode').innerHTML = qr.createSvgTag(5, 2);
+    } catch (e) {
+        console.error('QR-Erzeugung fehlgeschlagen:', e);
+        document.getElementById('qrcode').textContent =
+            'QR-Code konnte nicht erzeugt werden — bitte die Adresse unten verwenden.';
+    }
 }
