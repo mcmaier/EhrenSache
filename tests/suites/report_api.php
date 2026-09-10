@@ -264,3 +264,125 @@ test('statistics_report: entschuldigte Termine tragen keine Ankunftszeit', funct
         }
     }
 });
+
+// ============================================
+// EXPORT: Stundennachweis fuer die eigene Person
+// ============================================
+
+test('export: user erhaelt den eigenen Stundennachweis als HTML', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'worktime_member', 'format' => 'html', 'year' => date('Y')],
+    ]);
+    assertStatus(200, $res);
+    assertTrue(strpos($res['raw'], 'Stundennachweis') !== false, 'Titel erwartet');
+});
+
+test('export: user ohne format bekommt kein CSV', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'worktime_member', 'year' => date('Y')],
+    ]);
+    assertStatus(403, $res);
+});
+
+test('export: user bekommt auch mit format=csv kein CSV', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'worktime_member', 'format' => 'csv', 'year' => date('Y')],
+    ]);
+    assertStatus(403, $res);
+});
+
+test('export: user darf keine Summen nach Taetigkeit holen', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'worktime_activity', 'format' => 'html', 'year' => date('Y')],
+    ]);
+    assertStatus(403, $res);
+});
+
+test('export: user darf keine Summen nach Termin holen', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'worktime_appointment', 'format' => 'html', 'year' => date('Y')],
+    ]);
+    assertStatus(403, $res);
+});
+
+test('export: user darf keine Mitgliederliste holen', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'members'],
+    ]);
+    assertStatus(403, $res);
+});
+
+test('export: user darf keine Anwesenheitsliste holen', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'records'],
+    ]);
+    assertStatus(403, $res);
+});
+
+test('export: user darf keine Terminliste holen', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'appointments'],
+    ]);
+    assertStatus(403, $res);
+});
+
+test('export: user darf keinen unbekannten Typ holen', function () {
+    $res = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'gibt_es_nicht', 'format' => 'html'],
+    ]);
+    // 403, nicht 400: Ein unbekannter Typ ist fuer diese Rolle zuerst einmal
+    // verboten. Die Typpruefung ist nicht ihre Sache.
+    assertStatus(403, $res);
+});
+
+test('export: eine fremde member_id im Stundennachweis wird ignoriert', function () {
+    $ownId = apiMemberId('user');
+    assertTrue($ownId !== null, 'Testkonto user braucht ein verknuepftes Mitglied');
+
+    $ohne = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'worktime_member', 'format' => 'html', 'year' => date('Y')],
+    ]);
+    $mit = apiRequest('GET', 'export', [
+        'token' => apiToken('user'),
+        'query' => ['type' => 'worktime_member', 'format' => 'html', 'year' => date('Y'),
+                    'member_id' => (string) ($ownId + 1)],
+    ]);
+
+    // Kein 403: Der Parameter wird ignoriert, nicht abgewiesen. Eine
+    // Fehlermeldung waere ein Orakel darueber, welche IDs existieren.
+    assertStatus(200, $mit);
+
+    // Und er darf wirklich wirkungslos sein -- nicht nur den Status, auch den
+    // Inhalt. Das Erstellungsdatum faellt raus, es koennte zwischen den beiden
+    // Abrufen umspringen.
+    $norm = fn(string $html) => preg_replace('/Erstellt am [0-9.]+/', '', $html);
+    assertSame($norm($ohne['raw']), $norm($mit['raw']),
+               'fremde member_id darf den Bericht nicht veraendern');
+});
+
+test('export: der Stundennachweis eines Managers bleibt vollstaendig', function () {
+    // Gegenprobe zur Einschraenkung: Was fuer user beschnitten wird, muss fuer
+    // manager unveraendert funktionieren -- auch als CSV.
+    $html = apiRequest('GET', 'export', [
+        'token' => apiToken('manager'),
+        'query' => ['type' => 'worktime_member', 'format' => 'html', 'year' => date('Y')],
+    ]);
+    assertStatus(200, $html);
+
+    $csv = apiRequest('GET', 'export', [
+        'token' => apiToken('manager'),
+        'query' => ['type' => 'worktime_member', 'year' => date('Y')],
+    ]);
+    assertStatus(200, $csv);
+    assertTrue(strpos($csv['raw'], 'member_name') !== false, 'CSV-Kopfzeile erwartet');
+});

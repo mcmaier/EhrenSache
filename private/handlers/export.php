@@ -13,17 +13,53 @@
 // EXPORT Handler
 // ============================================
 
-function handleExport($db, $database, $request_method, $authUserRole) {
+function handleExport($db, $database, $request_method, $authUserRole, $authMemberId) {
     if ($request_method !== 'GET') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
         exit();
     }
-    
-    requireAdminOrManager();
-    
+
     $type = $_GET['type'] ?? 'members';
-    
+
+    // Rechte je Exporttyp statt pauschal: Der Stundennachweis ist der einzige
+    // Typ, der sich sinnvoll auf eine Person einschraenken laesst. Alle
+    // uebrigen aggregieren ueber Personen hinweg und bleiben admin/manager.
+    //
+    // $forceMemberId wird weiter unten an exportWorktimeMember() gereicht.
+    // Bewusst als Parameter statt ueber $_GET: Eine Rechtepruefung, die
+    // darauf baut, dass eine andere Funktion zufaellig aus $_GET liest, faellt
+    // lautlos aus, sobald jene Funktion umgebaut wird.
+    $forceMemberId = null;
+
+    if (!isAdminOrManager()) {
+        if ($type !== 'worktime_member') {
+            http_response_code(403);
+            echo json_encode(["message" => "Access denied"]);
+            exit();
+        }
+
+        if (exportFormat() !== 'html') {
+            // Kein stilles Umbiegen auf HTML: Der Aufrufer soll wissen, dass er
+            // nicht bekommt, was er angefordert hat. Der Selbstexport der
+            // eigenen Daten laeuft ueber my_data.
+            http_response_code(403);
+            echo json_encode(["message" => "Nur die Druckansicht ist verfügbar (format=html)"],
+                             JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        if ($authMemberId === null) {
+            // Trifft auch Geraetekonten: Sie tragen kein Mitglied.
+            http_response_code(403);
+            echo json_encode(["message" => "Kein Mitglied mit diesem Benutzer verknüpft"],
+                             JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        $forceMemberId = (int) $authMemberId;
+    }
+
     switch($type) {
         case 'members':
             exportMembers($db, $database);
@@ -35,7 +71,7 @@ function handleExport($db, $database, $request_method, $authUserRole) {
             exportRecords($db, $database);
             break;
         case 'worktime_member':
-            exportWorktimeMember($db, $database);
+            exportWorktimeMember($db, $database, $forceMemberId);
             break;
         case 'worktime_activity':
             exportWorktimeActivity($db, $database);
@@ -307,11 +343,15 @@ function worktimeReportNotes(): array
  * Stundennachweis je Person: eine Zeile pro Sitzung, mit Nachweisgrad.
  * Grundlage fuer Ehrenamtskarte und Bescheinigung.
  */
-function exportWorktimeMember($db, $database) {
+function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
     requireWorktimeEnabled($db, $database);
 
-    $period   = exportPeriodOrFail();
-    $memberId = $_GET['member_id'] ?? null;
+    $period = exportPeriodOrFail();
+    // Fuer Nicht-Manager kommt die ID aus der Rechtepruefung in handleExport()
+    // und ueberschreibt alles, was die Anfrage mitschickt. Der Parameter aus
+    // der Anfrage wird dann ignoriert, nicht abgewiesen: Eine Fehlermeldung
+    // waere ein Orakel darueber, welche IDs existieren.
+    $memberId = $forceMemberId ?? ($_GET['member_id'] ?? null);
     $prefix   = $database->table('');
     $duration = worktimeDurationExpression();
     $proof    = worktimeProofExpression();
