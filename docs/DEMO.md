@@ -17,6 +17,31 @@ aus. Details zum Generator: `private/demo/README.md`.
 
 ## 1. Installation
 
+> ### Nicht aus dem ZIP-Download aufsetzen
+>
+> **Der ZIP-Download enthält `private/demo/` nicht** — `.gitattributes` schließt den Ordner
+> per `export-ignore` aus, und `seed.php` schlägt dann fehl, weil es die Datei gar nicht gibt.
+>
+> Das ist Absicht und wird nicht geändert: Ein Skript, das alle Fachtabellen leert,
+> einschließlich `users`, hat im Installationspaket eines Vereins nichts zu suchen. Ein
+> Verein, der es versehentlich ausführt, verliert seinen Bestand.
+>
+> **Der Wächter dagegen ist im Paket.** Gegen ein echtes `git archive` nachgemessen:
+> `private/helpers/demo_mode.php` liegt bei, `private/demo/` und `docs/DEMO.md` nicht. Eine
+> aus dem ZIP aufgesetzte Demo wäre also durchaus abgesichert — sie hätte nur keinen
+> Datenbestand und würde sich nie zurücksetzen. Das ist die unangenehmere Sorte Fehler, weil
+> sie erst nach einer Stunde auffällt.
+>
+> **Für eine Demo also aus dem Git-Klon arbeiten:**
+>
+> ```
+> git clone https://github.com/mcmaier/EhrenSache.git
+> ```
+>
+> Wer die Installation lieber aus dem ZIP macht, kopiert `private/demo/` anschließend von Hand
+> aus einem Klon nach — zwei Dateien plus README genügen. Dasselbe gilt bei jedem Update: Ein
+> ZIP-Update überschreibt den Ordner nicht, es bringt ihn nur nicht mit.
+
 1. **Eigene Datenbank und eigenen Datenbankbenutzer anlegen.** Der Benutzer darf **nur** auf
    die Demo-Datenbank berechtigt sein — er ist der einzige Ring um alles, was ein Besucher
    anrichten kann.

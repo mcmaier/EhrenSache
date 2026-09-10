@@ -12,6 +12,9 @@ temporary_screenshots/      export-ignore
 # Migrations-Testdateien (Prefix _)
 private/migrations/_*       export-ignore
 
-# Demo-Datengenerator: leert Tabellen, gehoert nicht ins Installationspaket
+# Demo-Datengenerator: leert Tabellen, gehoert nicht ins Installationspaket.
+# Folge: Wer eine oeffentliche Demo aufsetzt, kann das ZIP dafuer nicht
+# verwenden -- der Ordner fehlt darin und seed.php schlaegt fehl. Das ist
+# Absicht; der Weg ueber den Git-Klon steht in docs/DEMO.md, Abschnitt 1.
 private/demo/               export-ignore
 tests/                      export-ignore
