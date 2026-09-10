@@ -386,3 +386,149 @@ test('export: der Stundennachweis eines Managers bleibt vollstaendig', function 
     assertStatus(200, $csv);
     assertTrue(strpos($csv['raw'], 'member_name') !== false, 'CSV-Kopfzeile erwartet');
 });
+
+// ============================================
+// BERICHTE: Anwesenheitsbericht in der Rolle user
+// ============================================
+//
+// Die Rechtelogik in handleStatisticsReport() ist bereits gebaut und wurde
+// beim Review von Hand nachgestellt -- alle bisherigen Tests dieser Ressource
+// liefen aber mit dem Admin-Token. Die folgenden Tests verankern das
+// Verhalten fuer user (und als Gegenprobe fuer manager), damit ein spaeterer
+// Umbau es nicht stillschweigend aendern kann.
+
+test('statistics_report: user bekommt den eigenen Bericht', function () {
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Testkonto user braucht ein verknuepftes Mitglied');
+
+    $res = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('user'),
+        'query' => ['year' => date('Y')],
+    ]);
+    assertStatus(200, $res);
+    assertTrue(strpos($res['raw'], '<!DOCTYPE html>') === 0, 'HTML-Dokument erwartet');
+    assertTrue(strpos($res['raw'], 'Anwesenheitsbericht') !== false, 'Titel erwartet');
+    // Fuer diese Rolle ist die Person immer festgelegt (memberId = authMemberId
+    // in handleStatisticsReport()), die Terminliste erscheint deshalb immer --
+    // auch ganz ohne member_id-Parameter.
+    assertTrue(strpos($res['raw'], 'Termine im Einzelnen') !== false, 'Terminliste erwartet');
+});
+
+test('statistics_report: eine fremde member_id bleibt wirkungslos', function () {
+    $ownId = apiMemberId('user');
+    assertTrue($ownId !== null, 'Testkonto user braucht ein verknuepftes Mitglied');
+
+    // Eine echte, existierende fremde ID besorgen -- nicht einfach eigene+1,
+    // die muss nicht existieren. Wuerde sie nicht existieren, prueft dieser
+    // Test gar nichts (member_id waere so oder so wirkungslos).
+    $admin   = apiToken('admin');
+    $members = apiRequest('GET', 'members', ['token' => $admin]);
+    assertStatus(200, $members);
+    $foreignId = null;
+    foreach ($members['body'] as $m) {
+        if ((int) $m['member_id'] !== $ownId) {
+            $foreignId = (int) $m['member_id'];
+            break;
+        }
+    }
+    assertTrue($foreignId !== null, 'Bestand braucht mindestens ein zweites Mitglied');
+
+    $ohne = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('user'),
+        'query' => ['year' => date('Y')],
+    ]);
+    $mit = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('user'),
+        'query' => ['year' => date('Y'), 'member_id' => $foreignId],
+    ]);
+
+    // Ein assertStatus(200) allein waere hier kein Beweis: Er waere auch gruen,
+    // wenn der Bericht tatsaechlich die fremde Person zeigte. Deshalb den
+    // Inhalt vergleichen, nicht nur den Status. Das Erstellungsdatum faellt
+    // vorher raus, es koennte zwischen den beiden Abrufen umspringen.
+    assertStatus(200, $mit);
+    $norm = fn(string $html) => preg_replace('/Erstellt am [0-9.]+/', '', $html);
+    assertSame($norm($ohne['raw']), $norm($mit['raw']),
+               'fremde member_id darf den Bericht nicht veraendern');
+});
+
+test('statistics_report: eine fremde group_id wird abgewiesen', function () {
+    $ownId = apiMemberId('user');
+    assertTrue($ownId !== null, 'Testkonto user braucht ein verknuepftes Mitglied');
+
+    // Gruppen des Testmitglieds als admin ermitteln, um daraus eine echte
+    // fremde group_id abzuleiten -- nicht geraten.
+    $admin  = apiToken('admin');
+    $detail = apiRequest('GET', 'members', ['token' => $admin, 'query' => ['id' => $ownId]]);
+    assertStatus(200, $detail);
+    $ownGroupIds = array_map(fn($g) => (int) $g['group_id'], $detail['body']['groups'] ?? []);
+
+    $groups = apiRequest('GET', 'member_groups', ['token' => $admin]);
+    assertStatus(200, $groups);
+    $foreignGroupId = null;
+    foreach ($groups['body'] as $g) {
+        if (!in_array((int) $g['group_id'], $ownGroupIds, true)) {
+            $foreignGroupId = (int) $g['group_id'];
+            break;
+        }
+    }
+    assertTrue($foreignGroupId !== null,
+        'Bestand braucht eine Gruppe, der das Testmitglied nicht angehoert');
+
+    $res = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('user'),
+        'query' => ['year' => date('Y'), 'group_id' => $foreignGroupId],
+    ]);
+    assertStatus(403, $res);
+});
+
+test('statistics_report: mit der eigenen group_id liefert der Bericht 200', function () {
+    // Gegenstueck zum vorigen Test: Die Ablehnung darf sich nicht auf jede
+    // group_id erstrecken, nur auf fremde -- sonst waere hasStatisticsGroupAccess()
+    // versehentlich zu streng geworden.
+    $ownId = apiMemberId('user');
+    assertTrue($ownId !== null, 'Testkonto user braucht ein verknuepftes Mitglied');
+
+    $admin  = apiToken('admin');
+    $detail = apiRequest('GET', 'members', ['token' => $admin, 'query' => ['id' => $ownId]]);
+    assertStatus(200, $detail);
+    $ownGroupIds = array_map(fn($g) => (int) $g['group_id'], $detail['body']['groups'] ?? []);
+    assertTrue($ownGroupIds !== [], 'Testmitglied braucht mindestens eine eigene Gruppe');
+
+    $res = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('user'),
+        'query' => ['year' => date('Y'), 'group_id' => $ownGroupIds[0]],
+    ]);
+    assertStatus(200, $res);
+});
+
+test('statistics_report: manager sieht weiterhin alle Mitglieder', function () {
+    // Gegenprobe zur Einschraenkung fuer user: Wer bereits alles sehen darf,
+    // muss das auch nach dieser Aenderung noch duerfen. Zwei tatsaechliche
+    // Mitgliedsnamen aus der JSON-Antwort im Bericht wiederfinden, statt nur
+    // auf 200 zu pruefen -- ein Bericht mit nur der eigenen Person waere sonst
+    // auch gruen.
+    $manager = apiToken('manager');
+
+    $json = apiRequest('GET', 'statistics', [
+        'token' => $manager,
+        'query' => ['year' => date('Y')],
+    ]);
+    assertStatus(200, $json);
+    $names = [];
+    foreach ($json['body']['statistics'] as $group) {
+        foreach ($group['members'] as $m) {
+            $names[$m['member_name']] = true;
+        }
+    }
+    $names = array_keys($names);
+    assertTrue(count($names) > 1, 'Bestand braucht mehr als ein Mitglied fuer diese Pruefung');
+
+    $res = apiRequest('GET', 'statistics_report', [
+        'token' => $manager,
+        'query' => ['year' => date('Y')],
+    ]);
+    assertStatus(200, $res);
+    assertTrue(strpos($res['raw'], $names[0]) !== false, "Mitglied '{$names[0]}' im Bericht erwartet");
+    assertTrue(strpos($res['raw'], $names[1]) !== false, "Mitglied '{$names[1]}' im Bericht erwartet");
+});
