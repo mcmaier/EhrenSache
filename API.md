@@ -1230,28 +1230,59 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
 
 **Query-Parameter:**
 - `member_id`: Statistik eines Mitglieds (User nur eigene)
+- `group_id`: auf eine Gruppe einschränken; ohne Zugriff **403**
 - `year`: Jahr (Standard: aktuelles)
+- `appointment_type_id`: auf eine Terminart einschränken
 - `include=worktime`: hängt den Arbeitszeitblock an (siehe unten); jeder andere Wert wird ignoriert
 
 **Response:**
 ```json
 {
-  "total_appointments": 48,
-  "attended": 42,
-  "absent": 3,
-  "excused": 3,
-  "attendance_rate": 87.5,
-  "late_count": 5,
-  "avg_arrival_minutes": -3.2,
-  "monthly_stats": [
+  "warning": null,
+  "year": 2026,
+  "worktime": null,
+  "summary": {
+    "total_appointments": 37,
+    "total_members": 33,
+    "total_present": 751,
+    "total_excused": 0,
+    "total_unexcused": 211,
+    "overall_average": 78.1
+  },
+  "statistics": [
     {
-      "month": "2024-01",
-      "appointments": 4,
-      "attended": 4
+      "group_id": 1,
+      "group_name": "Aktive",
+      "appointment_type_id": 1,
+      "appointment_type_name": "Gesamtprobe",
+      "members": [
+        {
+          "member_id": 5,
+          "member_name": "Muster, Anna",
+          "total_appointments": 37,
+          "attended": 32,
+          "unexcused_absences": 5,
+          "excused": 0,
+          "attendance_rate": 86.5
+        }
+      ]
     }
   ]
 }
 ```
+
+`warning` trägt einen Hinweis, wenn ein Parameter ignoriert wurde — etwa eine fremde
+`member_id` bei einem `user`. `excused` ergibt sich aus
+`total_appointments − attended − unexcused_absences`, wird aber serverseitig gerechnet und
+mitgeliefert: Jeder Verbraucher, der es selbst ausrechnet, ist eine Stelle mehr, an der die
+Formel auseinanderlaufen kann.
+
+**Ein Termin zählt nur, wenn er bereits begonnen hat** (`date <= CURDATE() + 2h`), und nur
+innerhalb der Mitgliedschaftszeiträume des Mitglieds.
+
+> **Einschränkung:** Je Gruppe wird nur **eine** Terminart ausgewertet, obwohl eine Gruppe an
+> mehreren hängen kann. `appointment_type_name` benennt, welche es war. Siehe OI-48 in
+> `docs/OPEN-ITEMS.md`.
 
 #### Arbeitszeit im Ergebnis (`include=worktime`)
 
@@ -1312,6 +1343,61 @@ im Jahr.
 
 `summary` summiert über alle enthaltenen Mitglieder; `hours_proven`, `start_proven` und
 `unproven` ergeben zusammen `total_minutes`.
+
+---
+
+## Anwesenheitsbericht (statistics_report)
+
+### Bericht abrufen
+Liefert die Anwesenheitsstatistik als **druckbare HTML-Seite** — nicht als JSON. Gedacht zum
+Lesen, Drucken und Vorlegen; die Zahlen selbst holt man über `resource=statistics`.
+
+**Endpoint:** `GET /api.php?resource=statistics_report`
+
+**Berechtigung:** Admin, Manager und User. Ein `user` erhält ausschließlich die eigene Person;
+eine mitgeschickte fremde `member_id` wird **ignoriert, nicht abgewiesen**. Ein Gerätekonto
+erhält 403, weil ihm kein Mitglied zugeordnet ist.
+
+**Query-Parameter:**
+
+| Parameter | Bedeutung |
+|---|---|
+| `year` | Kalenderjahr, Standard: laufendes |
+| `group_id` | auf eine Gruppe einschränken; ohne Zugriff **403** |
+| `member_id` | auf ein Mitglied einschränken; für `user` wirkungslos |
+
+**Antwort:** `Content-Type: text/html`. Die Seite lädt `css/print.css` über ein
+`<base href="../">` und enthält **kein JavaScript** — sie druckt sich nicht selbst, sondern
+will vor dem Drucken gelesen werden. Auf einer Demo-Installation trägt sie einen Hinweisblock,
+dass es sich um erfundene Daten handelt.
+
+**Aufbau:**
+1. Kennzahlen des Gesamtergebnisses
+2. je Gruppe eine Tabelle: Mitglied, Termine, Anwesend, Entschuldigt, Unentschuldigt, Quote
+3. **nur bei genau einem Mitglied** — für `user` also immer — der Abschnitt
+   „Termine im Einzelnen": Datum, Termin, Terminart, Status, Ankunft, Herkunft
+
+**Die Spalte Herkunft** sagt, worauf eine Ankunftszeit beruht. `records.arrival_time` ist keine
+durchgehende Messung: Wird ein Eintrag ohne Uhrzeit angelegt, setzt das System die Startzeit des
+Termins.
+
+| Wert | Bedingung |
+|---|---|
+| `gemessen` | `checkin_source` ist `station_pin`, `device_auth`, `user_totp` oder `auto_checkin` |
+| `korrigiert` | zum Paar Mitglied/Termin existiert eine genehmigte Zeitkorrektur |
+| `nachgetragen` | alles Übrige — `admin`, `import`, `timer` |
+
+`korrigiert` schlägt `gemessen`: Eine genehmigte Zeitkorrektur überschreibt die Ankunftszeit,
+lässt `checkin_source` aber unverändert.
+
+Ankunft und Herkunft bleiben leer, außer bei Status `present` mit gesetzter Ankunftszeit.
+
+**Kein CSV.** Anwesenheitsdaten liefert `resource=export&type=records` bereits als CSV; ein
+zweiter Weg dorthin wäre eine Dublette mit eigener Rechteprüfung.
+
+**Fehler:** `405` bei anderem Verfahren als `GET`, `403` ohne verknüpftes Mitglied oder ohne
+Gruppenzugriff, `500` bei einem Fehler im Berichtsaufbau (die Einzelheiten stehen im Serverlog,
+nicht in der Antwort).
 
 ---
 
@@ -1524,7 +1610,22 @@ HTML-Seite.
 
 **Endpoint:** `GET /api.php?resource=export`
 
-**Berechtigung:** Admin/Manager
+**Berechtigung:** je Exporttyp verschieden.
+
+| Typ | Admin/Manager | User |
+|---|---|---|
+| `members`, `appointments`, `records` | ja | **nein** (403) |
+| `worktime_activity`, `worktime_appointment` | ja | **nein** (403) |
+| `worktime_member` | ja, auch als CSV, auch für fremde `member_id` | ja — **nur** die eigene Person, **nur** mit `format=html` |
+
+Ein `user` bekommt den eigenen Stundennachweis also ausschließlich als Druckansicht. Ohne
+`format=html` antwortet der Server mit **403**, nicht mit einer stillen HTML-Ausgabe: Der
+Aufrufer soll wissen, dass er nicht bekommt, was er angefordert hat. Eine mitgeschickte fremde
+`member_id` wird **ignoriert, nicht abgewiesen** — eine Fehlermeldung wäre ein Orakel darüber,
+welche IDs existieren. Gerätekonten erhalten 403, weil ihnen kein Mitglied zugeordnet ist.
+
+Die eigenen Rohdaten gibt es über `resource=my_data` (beachte dort OI-50: die CSV-Form enthält
+derzeit keine Arbeitszeiten, die JSON-Form schon).
 
 **Query-Parameter:**
 

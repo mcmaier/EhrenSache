@@ -1625,3 +1625,260 @@ normale Rechteprüfung, die einen anonymen Besucher gar nicht erst schreiben lä
 Fällt OI-17, fällt dieser Punkt mit.
 
 ---
+
+### OI-48 · Statistik zählt je Gruppe nur **eine** Terminart
+**Priorität:** hoch — verfälscht jede Anwesenheitsquote, sobald eine Gruppe an mehreren
+Terminarten hängt
+
+`calculateGroupStatistics()` in `private/handlers/statistics.php` ermittelt die Terminart einer
+Gruppe so:
+
+```php
+SELECT atg.type_id, mg.group_name
+FROM {PREFIX}appointment_type_groups atg
+JOIN {PREFIX}member_groups mg ON atg.group_id = mg.group_id
+WHERE atg.group_id = ?
+```
+
+und liest davon **eine** Zeile (`fetch()`). Die gesamte folgende Auswertung filtert dann auf
+`WHERE a.type_id = ?`.
+
+`appointment_type_groups` ist aber eine M:N-Tabelle. Sie beantwortet die Frage „welche Gruppen
+betrifft diese Terminart" — in der Gegenrichtung gelesen hängt eine Gruppe damit
+selbstverständlich an mehreren Terminarten. Genau so ist der Bestand aufgebaut.
+
+**Wirkung im Demo-Datenbestand (Stand 2026-09-10):**
+
+| Gruppe | verknüpfte Terminarten | in der Statistik gezählt |
+|---|---|---|
+| Aktive | Gesamtprobe, Registerprobe, Auftritt | nur eine davon |
+| Jugend | Gesamtprobe, Registerprobe, Auftritt | nur eine davon |
+| Vorstandschaft | Vorstandssitzung | vollständig |
+
+Für 2026 sind das 37 gezählte gegenüber 61 erfassten Terminen — **24 Termine, knapp 40 %,
+bleiben unsichtbar**. Die Abfrage trägt kein `ORDER BY`; welche Terminart gewinnt, entscheidet
+die Datenbank.
+
+Die Quoten sind dadurch nicht in sich falsch, sie beantworten nur eine engere Frage als die,
+die die Oberfläche stellt: nicht „wie zuverlässig erscheint dieses Mitglied", sondern „wie
+zuverlässig erscheint es bei einer nicht näher bestimmten der ihm zugeordneten Terminarten".
+
+**Wie es aufgefallen ist:** Beim Bau des Anwesenheitsberichts (1.5.0) stand die Spalte
+„Entschuldigt" für jedes Mitglied und jedes Jahr auf null. Der einzige verwertbare
+`excused`-Eintrag im Bestand hängt an einer Registerprobe — einer Terminart, die für die Gruppe
+des Mitglieds nicht ausgewertet wird.
+
+**Dass die Summenbildung in `buildStatisticsResult()` doppelte Terminarten über
+`$countedAppointmentTypes` entschärft, zeigt die ursprüngliche Annahme:** je Gruppe genau eine
+Terminart. Das Datenmodell hat diese Annahme nie getragen.
+
+**Zu tun:** `calculateGroupStatistics()` muss alle Terminarten einer Gruppe auswerten
+(`fetchAll()` statt `fetch()`, `IN (…)` statt `= ?`), und die Terminzählung in
+`buildStatisticsResult()` muss entsprechend nachziehen — `$stats['appointment_type_id']` ist
+dann kein einzelner Wert mehr.
+
+**Vorher zu entscheiden, deshalb nicht nebenbei behoben:** Die Korrektur verschiebt **jede
+bestehende Anwesenheitsquote in jeder Installation**, in unvorhersehbare Richtung — je nachdem,
+wie diszipliniert bei den bisher ignorierten Terminarten erfasst wurde. Das braucht eine eigene
+Spec, eine Aussage im Changelog und vermutlich einen Hinweis für Vereine, die ihre Zahlen über
+Jahre verfolgen.
+
+**Bis dahin** benennt der Anwesenheitsbericht (1.5.0) in einer Fußnote je Gruppe die Terminart,
+über die gerechnet wurde. Das Blatt behauptet damit keine Vollständigkeit, die es nicht hat.
+
+**Nicht sicherheitsrelevant:** ohne vorherigen Zugang nicht auslösbar, keine Rechteausweitung,
+keine Preisgabe fremder Daten. Betroffen ist allein die Aussagekraft der Zahlen.
+
+---
+
+### OI-49 · Demo-Generator legt genehmigte Entschuldigungen ohne Anwesenheitseintrag an
+**Priorität:** niedrig — betrifft nur die Demo- und Testdaten
+
+Im Bestand vom 2026-09-10 stehen 14 genehmigte Ausnahmen vom Typ `absence`, aber nur **eine**
+davon hat einen zugehörigen `records`-Eintrag mit `status = 'excused'`. Die übrigen 13
+Mitglieder erscheinen in der Statistik als **unentschuldigt** — das Gegenteil dessen, was die
+Demo erzählen will.
+
+Der Produktivpfad ist in Ordnung: `handleApprovedAbsence()` in `private/helpers/utils.php` legt
+den Eintrag beim Genehmigen korrekt an. Der Demo-Generator schreibt die Ausnahmen jedoch direkt
+in die Tabelle und geht an dieser Funktion vorbei.
+
+**Zu tun:** Der Generator legt für jede genehmigte `absence` zusätzlich den `records`-Eintrag
+mit `status = 'excused'` an — oder er ruft beim Erzeugen denselben Weg wie die Oberfläche.
+
+**Am Rande aufgefallen:** `handleApprovedAbsence()` arbeitet mit `INSERT IGNORE`. Existiert
+bereits ein Eintrag — etwa weil das Mitglied vorher als anwesend erfasst wurde —, verpufft die
+Genehmigung wirkungslos, und das Mitglied bleibt „anwesend". `handleApprovedTimeCorrection()`
+aktualisiert in derselben Lage einen vorhandenen Eintrag. Ob dieser Unterschied Absicht ist,
+ist ungeklärt; er ist von diesem Punkt getrennt zu bewerten.
+
+---
+
+### OI-50 · `my_data` als CSV enthält keine Arbeitszeiten
+**Priorität:** mittel — betrifft das Auskunftsrecht, nicht die Sicherheit
+
+`?resource=my_data` gibt einer angemeldeten Person ihre eigenen Daten heraus. Der Handler holt
+dabei auch `work_sessions` und `work_session_log` (`private/handlers/my_data.php`, ab der
+Sitzungsabfrage), und die **JSON**-Form gibt beides vollständig aus.
+
+`exportAsCSV()` in derselben Datei schreibt dagegen nur vier Blöcke:
+`=== STAMMDATEN ===`, `=== GRUPPEN ===`, `=== ANWESENHEITEN ===` und
+`=== AUSNAHMEN/ANTRÄGE ===`. **Die Arbeitszeitsitzungen fehlen**, obwohl sie im Datensatz
+stehen, den die Funktion entgegennimmt.
+
+Zwei Formate desselben Auskunftsersuchens liefern damit unterschiedlich viel. Wer die CSV wählt
+— das naheliegende Format für jemanden, der seine Daten in einer Tabelle ansehen will —,
+bekommt einen unvollständigen Auszug, ohne dass irgendwo steht, dass etwas fehlt.
+
+**Aufgefallen am 2026-09-10** beim Review der Berichtsrechte: Dort wird der Rolle `user` das
+CSV des Stundennachweises verweigert, mit der Begründung, der Selbstexport über `my_data` decke
+das bereits ab. Für die CSV-Form stimmt das nicht.
+
+**Zu tun:** `exportAsCSV()` um einen Block `=== ARBEITSZEITEN ===` ergänzen — Beginn, Ende,
+Pause, Dauer, Tätigkeit, Termin, Status, Nachweisgrad. Die Aufbereitung dafür gibt es bereits in
+`private/handlers/export.php` (`worktimeHours()`, `worktimeProofLabel()`,
+`worktimeReportTimes()`); sie ist nicht neu zu erfinden.
+
+**Zu prüfen dabei:** ob auch `work_session_log` in die CSV gehört. Die Änderungshistorie ist
+Teil dessen, was über eine Person gespeichert ist; in der JSON-Form steht sie drin.
+
+**Berührt** `DATENSCHUTZ.md`: Dort ist zu prüfen, ob die Beschreibung des Auskunftswegs die
+beiden Formate als gleichwertig darstellt. Falls ja, ist sie bis zur Behebung ungenau.
+
+**Nicht sicherheitsrelevant:** Es werden keine fremden Daten preisgegeben, sondern eigene
+zurückgehalten. Kein Zugang, keine Rechteausweitung.
+
+---
+
+### OI-51 · Pünktlichkeit wird beworben, aber nirgends ausgewertet
+**Priorität:** hoch — eine Zusage, die das Projekt an vier Stellen macht und an keiner einlöst
+
+`README.md` schreibt „Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen".
+`CLAUDE.md` beschreibt das Projekt als „Statistische Auswertung von Anwesenheit **und
+Pünktlichkeit**". `API.md` führte bis 2026-09-10 die Antwortfelder `late_count` und
+`avg_arrival_minutes` auf. Die Werbeseite nennt es ebenfalls.
+
+**Im Code gibt es davon nichts.** `records.arrival_time` wird erfasst und — außer zur
+Terminzuordnung im Toleranzfenster — nirgends verwendet. Keine Verspätung wird berechnet, keine
+Quote gebildet, keine Kennzahl ausgegeben.
+
+Die falschen Felder sind am 2026-09-10 aus `API.md` entfernt worden; eine Referenz, die
+Nichtvorhandenes beschreibt, ist schlimmer als eine Lücke. Die Zusage selbst bleibt offen.
+
+**Was vorher entschieden werden muss — und warum es nicht einfach „nachgebaut" werden kann:**
+
+`arrival_time` ist keine verlässliche Messung. Legt ein Admin einen Anwesenheitseintrag ohne
+Uhrzeit an, setzt `private/handlers/records.php` die **Startzeit des Termins**. Der Datensatz ist
+damit konstruiert pünktlich. In vielen Vereinen dürfte das die Mehrheit sein — wer eine Liste
+abhakt, tippt keine Uhrzeiten. Eine Pünktlichkeitsquote über diesen Bestand läge nahe 100 % und
+wäre Fiktion.
+
+| `checkin_source` | Herkunft der Zeit | Messung? |
+|---|---|---|
+| `station_pin`, `device_auth`, `user_totp` | Serverzeit bei der Authentifizierung | ja, belastbar |
+| `auto_checkin` | vom Client mitgeschickt | ja, aber fremde Uhr |
+| `admin` ohne mitgegebene Zeit | **Startzeit des Termins** | nein |
+| `import` | aus der CSV | unbekannte Güte |
+| `timer` | historisch `NOW()`; erzeugt seit 1.2.3 keine Einträge mehr | nein — misst Arbeitsbeginn, nicht Ankunft |
+
+**Vorentscheidungen, beim Entwurf der Berichte am 2026-09-10 getroffen** (ausführlich in
+`docs/superpowers/specs/2026-09-10-berichte-statistik-und-nutzerrolle-design.md`, Abschnitt 11):
+
+1. **Herkunft dauerhaft speichern**, nicht heuristisch ableiten: eine Spalte `arrival_measured`
+   in `records`, von jedem Schreibpfad gesetzt, per Migration rückwirkend befüllt. Der
+   Anwesenheitsbericht (1.5.0) leitet sie bis dahin aus `checkin_source` ab — das ist die
+   Übergangslösung, nicht das Ziel.
+2. **Zwei getrennte Kennzahlen, niemals multipliziert.** Ein zusammengerechneter „Score"
+   verbirgt, was tatsächlich passiert ist, und lädt zum Missbrauch ein.
+   - *Pünktlichkeit* nur über gemessene Ankünfte: Quote innerhalb einer Karenz plus der
+     **Median** der Verspätung — der Mittelwert kippt bei einem einzigen Ausreißer. Immer mit
+     Bezugsgröße; unter fünf Messungen keine Quote, sondern „zu wenige Messungen".
+   - *Zuverlässigkeit* über alle Termine, mit drei Ausgängen: **erschienen**, **abgemeldet**
+     (Ausnahme vor Terminbeginn angelegt, ablesbar an `exceptions.created_at`), **ausgefallen**.
+     Quote = (erschienen + abgemeldet) / Termine. Die heutige Anwesenheitsquote bestraft eine
+     rechtzeitige Absage wie unentschuldigtes Fehlen; das ist der Punkt, den sie verfehlt.
+3. **Eigene Einstellung für die Karenz**, Vorgabe 5 Minuten. `checkin_tolerance_hours` wird
+   **nicht** wiederverwendet: Die zwei Stunden dort sind das Fenster für die *Terminzuordnung*.
+   Wer 90 Minuten zu spät kommt, wird korrekt zugeordnet und ist trotzdem zu spät.
+4. **Vor der Umsetzung** gehört eine personenbezogene Verhaltenskennzahl nach `DATENSCHUTZ.md` —
+   Zweck, Aufbewahrung, Sichtbarkeit für andere Rollen. Eine Zahl, die aussagt, wie verlässlich
+   ein einzelnes Mitglied ist, ist etwas anderes als eine Anwesenheitsliste.
+
+**Zusammenhang mit [OI-48](#oi-48):** Solange die Statistik je Gruppe nur eine Terminart
+auswertet, würde eine Pünktlichkeitsquote denselben Ausschnitt erben. OI-48 gehört davor.
+
+---
+
+### OI-52 · Anwesenheitsbericht kennt nur ganze Jahre
+**Priorität:** niedrig · bewusst verschoben
+
+Der Anwesenheitsbericht (1.5.0) übernimmt die Filter der Statistik-Sektion: Jahr, Gruppe,
+Mitglied. Einen freien Zeitraum wie der Arbeitszeitbericht (`from`/`to`, höchstens 24 Monate)
+kennt er nicht.
+
+Das ist keine Nachlässigkeit, sondern eine Entscheidung beim Entwurf am 2026-09-10: Die Statistik
+rechnet durchgehend über `YEAR(a.date) = ?`, und die Mitgliedschaftszeiträume kommen über
+`getMemberActivityWhereYear()` dazu. Ein freier Zeitraum würde `calculateGroupStatistics()`, die
+Terminzählung und die Aktivitätsprüfung umbauen — ein Eingriff in Zahlen, die Vereine seit Jahren
+kennen, für einen Bedarf, den niemand geäußert hat.
+
+Solange der Bericht dieselben Filter benutzt wie der Bildschirm, können beide sich nicht
+widersprechen. Das ist der eigentliche Gewinn der Beschränkung.
+
+**Zu tun, falls der Bedarf entsteht:** Monat, Quartal oder Vereinsjahr auswerten zu können, hieße
+die Jahresbasis der gesamten Statistik aufzugeben — nicht nur die des Berichts. Dann besser
+gemeinsam mit [OI-48](#oi-48) entscheiden, das ohnehin an derselben Funktion ansetzt.
+
+---
+
+### OI-53 · Navigation im Querformat auf dem Telefon kaum bedienbar
+**Priorität:** mittel — betrifft die tägliche Bedienung auf dem Gerät, das Mitglieder dabeihaben
+
+**Gemeldet am 2026-09-10** vom Betreiber: In der mobilen Ansicht im **Querformat** ist das
+Navigationsmenü zu klein und lässt sich nicht bedienen.
+
+**Noch nicht nachgestellt.** Die folgenden Punkte sind am Code geprüft, die Ursache selbst ist
+eine begründete Vermutung und kein Befund — wer den Punkt angeht, sollte zuerst reproduzieren.
+
+**Was am Code gesichert ist:**
+
+- Die mobile Darstellung hängt **allein an der Breite**: `public/css/responsive.css` kennt
+  `@media (max-width: 768px)` und `@media (max-width: 480px)`, dazu `@media (min-width: 1200px)`.
+- **Im gesamten Projekt gibt es keine einzige `orientation`-Medienabfrage** (`print.css` nutzt
+  `size: A4 landscape`, das ist etwas anderes).
+- Unterhalb von 768 px erscheint `.mobile-menu-btn`, und `.sidebar` wird über
+  `transform: translateX(-100%)` ausgeblendet, bis `.mobile-open` sie hereinschiebt.
+- `.sidebar` ist `position: fixed`, `width: 250px`, **`height: 100vh`**, ein Flex-Container in
+  Spaltenrichtung; die Navigationsliste darin trägt `overflow-y: auto`.
+- Das Dashboard hat **12 Navigationspunkte**.
+
+**Vermutete Ursache:** Ein heutiges Telefon ist im Querformat **breiter als 768 px** — 844, 915
+oder 926 px sind übliche Werte. Damit greift die Mobilregel nicht mehr: Der Menüknopf
+verschwindet, und die Seitenleiste steht wieder dauerhaft im Layout wie auf einem Rechner. Die
+verfügbare **Höhe** beträgt in dieser Lage aber nur noch rund 390 bis 430 px. `height: 100vh`
+verteilt 12 Punkte plus Kopfbereich auf diese Höhe; die Liste scrollt zwar, aber die Trefferflächen
+werden winzig, und vom Inhalt bleibt neben 250 px Seitenleiste wenig übrig.
+
+Das erklärt auch, warum der Fehler ausgerechnet im Querformat auftritt und im Hochformat nicht:
+Es ist nicht die Drehung, es ist der Sprung über den Breiten-Haltepunkt.
+
+**Zu tun:**
+
+1. **Zuerst reproduzieren** und die tatsächliche Viewport-Breite notieren — auf einem echten
+   Gerät, nicht nur im Geräte-Emulator des Browsers.
+2. Den Haltepunkt um eine Höhenbedingung ergänzen, statt allein auf die Breite zu setzen. In der
+   Art `@media (max-width: 768px), (max-height: 500px)` — dann bleibt die mobile Bedienung mit
+   Menüknopf auch im flachen Querformat erhalten.
+3. Prüfen, ob `height: 100vh` bei geöffneter Adressleiste mobiler Browser das Richtige tut;
+   `100dvh` gibt es dafür, bringt aber eigene Fallstricke und ältere Browser kennen es nicht.
+4. Gegenprobe auf dem Tablet im Querformat: Dort ist die Seitenleiste **erwünscht** und darf
+   nicht versehentlich hinter einem Menüknopf verschwinden. Ein Tablet ist quer typischerweise
+   deutlich höher als 500 px — die Bedingung aus Punkt 2 trifft es also nicht, das ist aber zu
+   belegen und nicht anzunehmen.
+
+**Berührt:** `public/css/responsive.css`, `public/css/sections/sidebar.css`, dazu die
+Kiosk- und Check-in-PWA, falls sie dieselben Regeln erben — das ist zu prüfen.
+
+**Nicht sicherheitsrelevant.**
+
+---

@@ -361,6 +361,39 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | STAT-7 | Prozentberechnung | `(present / total) * 100` korrekt |
 | STAT-8 | Verfügbare Jahre | Aktuelles Jahr immer enthalten; sortiert DESC |
 
+### 13.1 Anwesenheitsbericht (Druckansicht)
+
+Automatisiert abgedeckt in `tests/suites/report_api.php`. Hier steht, was ein Testlauf nicht
+sehen kann: das Druckbild, das Verhalten echter Browser und die Rolle `device`.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| BER-1 | Admin: Statistik öffnen, Jahr und Gruppe wählen, „📄 Bericht" | Neuer Tab; die Kennzahlen des Berichts stimmen mit den Karten auf dem Bildschirm überein |
+| BER-2 | Gruppe wechseln, erneut öffnen | Der Bericht folgt der Filterauswahl |
+| BER-3 | Admin: ein Mitglied im Filter wählen | Abschnitt „Termine im Einzelnen" erscheint; ohne Mitgliedsfilter fehlt er |
+| BER-4 | User: Statistik öffnen, „📄 Bericht" | Knopf sichtbar; Bericht zeigt nur die eigene Person, mit Terminliste |
+| BER-5 | Herkunftsspalte an einem von Hand angelegten Eintrag | `nachgetragen`; bei einem Stations-Check-in `gemessen`; bei genehmigter Zeitkorrektur `korrigiert` |
+| BER-6 | Zeile mit Status „Entschuldigt" | Ankunft und Herkunft bleiben leer |
+| BER-7 | Druckvorschau in Chrome **und** Firefox | Kopfzeile, Logo, Tabellen und Fußnoten sitzen; keine abgeschnittenen Spalten |
+| BER-8 | Bericht ohne hinterlegtes Vereinslogo | Kopfzeile bleibt sauber, kein leeres Bild |
+| BER-9 | Bericht auf einer Demo-Installation | Hinweisblock „kein gültiger Nachweis" erscheint |
+| BER-10 | Fußnote zur ausgewerteten Terminart | Nennt je Gruppe eine Terminart; **keine** interne Vorgangsnummer auf dem Blatt |
+| BER-11 | **Geräte-Token:** `?resource=statistics_report` aufrufen | 403 |
+| BER-12 | **Geräte-Token:** `?resource=export&type=worktime_member&format=html` | 403 |
+
+BER-11 und BER-12 haben bewusst keinen automatischen Test: `apiToken()` meldet sich mit E-Mail
+und Passwort an, Gerätekonten authentifizieren sich per Token. Ein erfundener `device`-Eintrag
+in `tests/config.php` zerbräche beim nächsten Lauf des Demo-Generators.
+
+### 13.2 Stundennachweis in der Rolle `user`
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| BER-13 | User: Zeiterfassung → „📄 Bericht" | Dialogtitel „Mein Stundennachweis"; keine Berichtsart-Auswahl, kein Mitgliedsfeld, kein CSV-Knopf |
+| BER-14 | User: Druckansicht auslösen, Adresse ansehen | Enthält `format=html`, **kein** `member_id` |
+| BER-15 | Im selben Tab abmelden, als Admin anmelden, Dialog öffnen | Dialog wieder vollständig — keine Einschränkung bleibt hängen |
+| BER-16 | Admin: Berichtsart auf „Summen nach Tätigkeit" und zurück | Mitgliedsfeld verschwindet und erscheint wieder |
+
 ---
 
 ## 14. Import / Export

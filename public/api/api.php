@@ -35,6 +35,7 @@ require_once '../../private/helpers/mailer.php';
 require_once '../../private/helpers/version.php';
 require_once '../../private/helpers/worktime.php';
 require_once '../../private/helpers/station.php';
+require_once '../../private/helpers/report.php';
 require_once '../../private/helpers/demo_mode.php';
 
 // Handler laden
@@ -52,6 +53,7 @@ require_once '../../private/handlers/change_pin.php';
 require_once '../../private/handlers/member_groups.php';
 require_once '../../private/handlers/appointment_types.php';
 require_once '../../private/handlers/statistics.php';
+require_once '../../private/handlers/report_statistics.php';
 require_once '../../private/handlers/export.php';
 require_once '../../private/handlers/import.php';
 require_once '../../private/handlers/settings.php';
@@ -520,7 +522,17 @@ if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 // 10. ROUTING
 // ============================================
 
-switch($resource) {
+// renderReport() (private/helpers/report.php) wirft InvalidArgumentException,
+// wenn einem Bericht ein Pflichtschluessel fehlt -- ein Vertragsbruch zwischen
+// Handler und Renderer, kein Nutzerfehler. Ungefangen wuerde sie den Dispatch
+// verlassen: bei display_errors=Off eine leere 500-Antwort, bei
+// display_errors=On der Serverpfad samt Zeilennummer. Derselbe Grundsatz wie
+// bei der $resource-Absicherung oben, nur dass sich der Fehler hier nicht
+// durch Validieren vor dem Aufruf vermeiden laesst -- der Fang muss zentral
+// um den Dispatch stehen, weil mehrere Ressourcen (statistics_report, export)
+// ueber renderReport() ausliefern.
+try {
+    switch($resource) {
     case 'available_years':
         handleAvailableYears($db, $database, $request_method, $id);
         break;
@@ -556,7 +568,10 @@ switch($resource) {
                            $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
         break;        
     case 'statistics':
-        handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId);        
+        handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId);
+        break;
+    case 'statistics_report':
+        handleStatisticsReport($db, $database, $request_method, $authUserRole, $authMemberId);
         break;
     case 'auto_checkin':
         handleAutoCheckin($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
@@ -574,7 +589,7 @@ switch($resource) {
         handlePinChange($db, $database, $request_method, $authUserId, $authMemberId);
         break;
     case 'export':
-        handleExport($db, $database, $request_method, $authUserRole);
+        handleExport($db, $database, $request_method, $authMemberId);
         break;
     case 'import':
         handleImport($db, $database, $request_method, $authUserRole);
@@ -620,6 +635,12 @@ switch($resource) {
             "resource" => $resource
         ]);
         exit();
+    }
+} catch (InvalidArgumentException $e) {
+    error_log("Report error (resource={$resource}): " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(["message" => "Fehler beim Erstellen des Berichts"]);
+    exit();
 }
 
 ?>

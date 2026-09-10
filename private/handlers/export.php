@@ -13,17 +13,58 @@
 // EXPORT Handler
 // ============================================
 
-function handleExport($db, $database, $request_method, $authUserRole) {
+function handleExport($db, $database, $request_method, $authMemberId) {
     if ($request_method !== 'GET') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
         exit();
     }
-    
-    requireAdminOrManager();
-    
+
     $type = $_GET['type'] ?? 'members';
-    
+
+    // Rechte je Exporttyp statt pauschal: Der Stundennachweis ist der einzige
+    // Typ, der sich sinnvoll auf eine Person einschraenken laesst. Alle
+    // uebrigen aggregieren ueber Personen hinweg und bleiben admin/manager.
+    //
+    // $forceMemberId wird weiter unten an exportWorktimeMember() gereicht.
+    // Bewusst als Parameter statt ueber $_GET: Eine Rechtepruefung, die
+    // darauf baut, dass eine andere Funktion zufaellig aus $_GET liest, faellt
+    // lautlos aus, sobald jene Funktion umgebaut wird.
+    $forceMemberId = null;
+
+    if (!isAdminOrManager()) {
+        if ($type !== 'worktime_member') {
+            http_response_code(403);
+            echo json_encode(["message" => "Access denied"]);
+            exit();
+        }
+
+        if (exportFormat() !== 'html') {
+            // Kein stilles Umbiegen auf HTML: Der Aufrufer soll wissen, dass er
+            // nicht bekommt, was er angefordert hat.
+            //
+            // Der Selbstexport der eigenen Daten laeuft ueber my_data -- aber
+            // nur dessen JSON-Form enthaelt die Arbeitszeiten. exportAsCSV()
+            // in my_data.php gibt Stammdaten, Gruppen, Anwesenheiten und
+            // Antraege aus, keine Sitzungen (OI-50). Wer hier also auf my_data
+            // verweist, verweist auf format=json, nicht auf format=csv.
+            http_response_code(403);
+            echo json_encode(["message" => "Nur die Druckansicht ist verfügbar (format=html)"],
+                             JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        if ($authMemberId === null) {
+            // Trifft auch Geraetekonten: Sie tragen kein Mitglied.
+            http_response_code(403);
+            echo json_encode(["message" => "Kein Mitglied mit diesem Benutzer verknüpft"],
+                             JSON_UNESCAPED_UNICODE);
+            exit();
+        }
+
+        $forceMemberId = (int) $authMemberId;
+    }
+
     switch($type) {
         case 'members':
             exportMembers($db, $database);
@@ -35,7 +76,7 @@ function handleExport($db, $database, $request_method, $authUserRole) {
             exportRecords($db, $database);
             break;
         case 'worktime_member':
-            exportWorktimeMember($db, $database);
+            exportWorktimeMember($db, $database, $forceMemberId);
             break;
         case 'worktime_activity':
             exportWorktimeActivity($db, $database);
@@ -243,20 +284,6 @@ function exportFormat(): string
     return (($_GET['format'] ?? 'csv') === 'html') ? 'html' : 'csv';
 }
 
-/**
- * Maskiert einen Wert fuer die HTML-Ausgabe.
- *
- * In die Berichte fliessen freie Nutzereingaben: Notizen und Ortsnamen
- * stammen aus der PWA, also aus Rollen unterhalb von admin. CSV ist gegenueber
- * Markup gleichgueltig, HTML ist es nicht -- ohne Maskierung waere das ein
- * gespeichertes XSS, das genau in der Ansicht zuendet, die ein Administrator
- * zum Pruefen oeffnet. Jeder Wert laeuft durch diese Funktion.
- */
-function exportEscape($value): string
-{
-    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
-}
-
 /** Minuten als Stundenwert mit zwei Nachkommastellen, deutsches Komma. */
 function worktimeHours(int $minutes): string
 {
@@ -296,114 +323,6 @@ function worktimeReportTimes(?string $start, ?string $end): array
 }
 
 /**
- * Gibt einen Bericht als druckbare HTML-Seite aus und beendet die Anfrage.
- *
- * Bewusst ohne JavaScript und ohne window.print() beim Laden: Der Bericht
- * soll vor dem Drucken gelesen werden koennen.
- *
- * @param array{
- *   title: string, period: string, columns: array<int, string>,
- *   rows: array<int, array<int, string>>,
- *   summary_title?: string, summary_columns?: array<int, string>,
- *   summary_rows?: array<int, array<int, string>>,
- *   notes: array<int, string>
- * } $report
- */
-function renderWorktimeReport($db, $database, array $report): void
-{
-    require_once __DIR__ . '/../helpers/branding.php';
-    $branding = getBrandingSettings($db, $database);
-
-    $orgName = $branding['organization_name'] ?? '';
-    $logo    = $branding['organization_logo'] ?? '';
-
-    header('Content-Type: text/html; charset=utf-8');
-
-    // <base>, weil der Bericht unter /api/ ausgeliefert wird, die Logo-Pfade
-    // aus den Einstellungen aber relativ zum Web-Root stehen.
-    echo "<!DOCTYPE html>\n<html lang=\"de\">\n<head>\n";
-    echo "<meta charset=\"utf-8\">\n";
-    echo "<base href=\"../\">\n";
-    echo '<title>' . exportEscape($report['title']) . ' – ' . exportEscape($report['period']) . "</title>\n";
-    echo "<link rel=\"stylesheet\" href=\"css/print.css\">\n";
-    echo "</head>\n<body>\n";
-
-    // W5: export steht in DEMO_READ_ONLY und ist auf der Demo erreichbar. Der
-    // Bericht verlaesst als einzige der fuenf Oberflaechen den Bildschirm --
-    // ausgedruckt waere er von einem echten Nachweis aeusserlich nicht zu
-    // unterscheiden. demo_mode.php ist an dieser Stelle bereits ueber
-    // api.php geladen. Fester Text ohne Nutzerdaten, kein exportEscape()
-    // noetig -- dieselbe Begruendung wie bei showDemoBanner() in theme.js.
-    if (demoModeActive()) {
-        echo '<div class="report-demo-notice" role="alert">'
-           . '<strong>Demo-Installation — kein gültiger Nachweis.</strong> '
-           . 'Alle Personen, Zeiten und Beträge auf diesem Blatt sind erfunden. '
-           . 'Nicht zur Vorlage bei Dritten oder zur Abrechnung verwenden.'
-           . "</div>\n";
-    }
-
-    echo "<header class=\"report-head\">\n";
-    if ($logo !== '') {
-        echo '<img class="report-logo" src="' . exportEscape($logo) . '" alt="' . exportEscape($orgName) . "\">\n";
-    }
-    echo "<div class=\"report-title\">\n";
-    if ($orgName !== '') {
-        echo '<p class="report-org">' . exportEscape($orgName) . "</p>\n";
-    }
-    echo '<h1>' . exportEscape($report['title']) . "</h1>\n";
-    echo '<p class="report-period">' . exportEscape($report['period']) . "</p>\n";
-    echo '<p class="report-created">Erstellt am ' . exportEscape(date('d.m.Y')) . "</p>\n";
-    echo "</div>\n</header>\n";
-
-    echo "<table class=\"report-table\">\n<thead>\n<tr>";
-    foreach ($report['columns'] as $col) {
-        echo '<th>' . exportEscape($col) . '</th>';
-    }
-    echo "</tr>\n</thead>\n<tbody>\n";
-
-    if ($report['rows'] === []) {
-        $span = count($report['columns']);
-        echo '<tr><td class="report-empty" colspan="' . $span . '">'
-           . 'Für diesen Zeitraum sind keine bestätigten Sitzungen erfasst.</td></tr>' . "\n";
-    }
-
-    foreach ($report['rows'] as $row) {
-        echo '<tr>';
-        foreach ($row as $cell) {
-            echo '<td>' . exportEscape($cell) . '</td>';
-        }
-        echo "</tr>\n";
-    }
-    echo "</tbody>\n</table>\n";
-
-    if (!empty($report['summary_rows'])) {
-        echo '<h2 class="report-subhead">' . exportEscape($report['summary_title'] ?? 'Summen') . "</h2>\n";
-        echo "<table class=\"report-table report-summary\">\n<thead>\n<tr>";
-        foreach ($report['summary_columns'] ?? [] as $col) {
-            echo '<th>' . exportEscape($col) . '</th>';
-        }
-        echo "</tr>\n</thead>\n<tbody>\n";
-        foreach ($report['summary_rows'] as $row) {
-            echo '<tr>';
-            foreach ($row as $cell) {
-                echo '<td>' . exportEscape($cell) . '</td>';
-            }
-            echo "</tr>\n";
-        }
-        echo "</tbody>\n</table>\n";
-    }
-
-    echo "<footer class=\"report-foot\">\n<ul>\n";
-    foreach ($report['notes'] as $note) {
-        echo '<li>' . exportEscape($note) . "</li>\n";
-    }
-    echo "</ul>\n</footer>\n";
-
-    echo "</body>\n</html>\n";
-    exit();
-}
-
-/**
  * Fussnoten, die in jeden Arbeitszeitbericht gehoeren.
  *
  * Ohne die Zuordnungsregel behauptet der Bericht eine Genauigkeit, die er
@@ -429,11 +348,15 @@ function worktimeReportNotes(): array
  * Stundennachweis je Person: eine Zeile pro Sitzung, mit Nachweisgrad.
  * Grundlage fuer Ehrenamtskarte und Bescheinigung.
  */
-function exportWorktimeMember($db, $database) {
+function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
     requireWorktimeEnabled($db, $database);
 
-    $period   = exportPeriodOrFail();
-    $memberId = $_GET['member_id'] ?? null;
+    $period = exportPeriodOrFail();
+    // Fuer Nicht-Manager kommt die ID aus der Rechtepruefung in handleExport()
+    // und ueberschreibt alles, was die Anfrage mitschickt. Der Parameter aus
+    // der Anfrage wird dann ignoriert, nicht abgewiesen: Eine Fehlermeldung
+    // waere ein Orakel darueber, welche IDs existieren.
+    $memberId = $forceMemberId ?? ($_GET['member_id'] ?? null);
     $prefix   = $database->table('');
     $duration = worktimeDurationExpression();
     $proof    = worktimeProofExpression();
@@ -442,7 +365,12 @@ function exportWorktimeMember($db, $database) {
                AND " . worktimePeriodCondition();
     $params = [$period['from'], $period['to']];
 
-    if ($memberId) {
+    // !== null statt truthy: Diese Zeile traegt seit der Oeffnung fuer die
+    // Rolle user eine Rechteentscheidung mit. Waere $memberId je 0 oder "0",
+    // entfiele der Filter stillschweigend und der Nachweis zeigte alle
+    // Personen. member_id ist AUTO_INCREMENT ab 1, das ist also heute nicht
+    // ausloesbar -- die Bedingung kostet aber nichts und schliesst es aus.
+    if ($memberId !== null && $memberId !== '') {
         $where   .= " AND ws.member_id = ?";
         $params[] = $memberId;
     }
@@ -496,16 +424,26 @@ function exportWorktimeMember($db, $database) {
             $summaryRows[] = [trim($surname . ', ' . $name), $number, worktimeHours($minutes)];
         }
 
-        renderWorktimeReport($db, $database, [
-            'title'   => 'Stundennachweis',
-            'period'  => $period['label'],
-            'columns' => ['Mitglied', 'Mitgliedsnr.', 'Tätigkeit', 'Beginn', 'Ende',
-                          'Pause (min)', 'Stunden', 'Nachweis', 'Termin', 'Notiz'],
-            'rows'    => $reportRows,
-            'summary_title'   => 'Summen je Person',
-            'summary_columns' => ['Mitglied', 'Mitgliedsnr.', 'Stunden'],
-            'summary_rows'    => $summaryRows,
-            'notes'   => worktimeReportNotes(),
+        renderReport($db, $database, [
+            'title'    => 'Stundennachweis',
+            'period'   => $period['label'],
+            'sections' => [
+                [
+                    'heading' => null,
+                    'columns' => ['Mitglied', 'Mitgliedsnr.', 'Tätigkeit', 'Beginn', 'Ende',
+                                  'Pause (min)', 'Stunden', 'Nachweis', 'Termin', 'Notiz'],
+                    'rows'    => $reportRows,
+                    'empty'   => 'Für diesen Zeitraum sind keine bestätigten Sitzungen erfasst.',
+                ],
+                [
+                    'heading' => 'Summen je Person',
+                    'class'   => 'report-summary',
+                    'columns' => ['Mitglied', 'Mitgliedsnr.', 'Stunden'],
+                    'rows'    => $summaryRows,
+                    'empty'   => 'Keine Summen für diesen Zeitraum.',
+                ],
+            ],
+            'notes'    => worktimeReportNotes(),
         ]);
     }
 
@@ -571,15 +509,25 @@ function exportWorktimeActivity($db, $database) {
             ];
         }
 
-        renderWorktimeReport($db, $database, [
-            'title'   => 'Arbeitszeit nach Tätigkeit',
-            'period'  => $period['label'],
-            'columns' => ['Tätigkeit', 'Nachweis', 'Sitzungen', 'Personen', 'Stunden'],
-            'rows'    => $reportRows,
-            'summary_title'   => 'Gesamt',
-            'summary_columns' => ['Zeitraum', 'Stunden'],
-            'summary_rows'    => [[$period['label'], worktimeHours($total)]],
-            'notes'   => worktimeReportNotes(),
+        renderReport($db, $database, [
+            'title'    => 'Arbeitszeit nach Tätigkeit',
+            'period'   => $period['label'],
+            'sections' => [
+                [
+                    'heading' => null,
+                    'columns' => ['Tätigkeit', 'Nachweis', 'Sitzungen', 'Personen', 'Stunden'],
+                    'rows'    => $reportRows,
+                    'empty'   => 'Für diesen Zeitraum sind keine bestätigten Sitzungen erfasst.',
+                ],
+                [
+                    'heading' => 'Gesamt',
+                    'class'   => 'report-summary',
+                    'columns' => ['Zeitraum', 'Stunden'],
+                    'rows'    => [[$period['label'], worktimeHours($total)]],
+                    'empty'   => 'Keine Summe für diesen Zeitraum.',
+                ],
+            ],
+            'notes'    => worktimeReportNotes(),
         ]);
     }
 
@@ -638,16 +586,26 @@ function exportWorktimeAppointment($db, $database) {
             ];
         }
 
-        renderWorktimeReport($db, $database, [
-            'title'   => 'Arbeitszeit nach Termin',
-            'period'  => $period['label'],
-            'columns' => ['Datum', 'Termin', 'Terminart', 'Nachweis', 'Sitzungen',
-                          'Personen', 'Stunden'],
-            'rows'    => $reportRows,
-            'summary_title'   => 'Gesamt',
-            'summary_columns' => ['Zeitraum', 'Stunden'],
-            'summary_rows'    => [[$period['label'], worktimeHours($total)]],
-            'notes'   => array_merge(worktimeReportNotes(), [
+        renderReport($db, $database, [
+            'title'    => 'Arbeitszeit nach Termin',
+            'period'   => $period['label'],
+            'sections' => [
+                [
+                    'heading' => null,
+                    'columns' => ['Datum', 'Termin', 'Terminart', 'Nachweis', 'Sitzungen',
+                                  'Personen', 'Stunden'],
+                    'rows'    => $reportRows,
+                    'empty'   => 'Für diesen Zeitraum sind keine bestätigten Sitzungen erfasst.',
+                ],
+                [
+                    'heading' => 'Gesamt',
+                    'class'   => 'report-summary',
+                    'columns' => ['Zeitraum', 'Stunden'],
+                    'rows'    => [[$period['label'], worktimeHours($total)]],
+                    'empty'   => 'Keine Summe für diesen Zeitraum.',
+                ],
+            ],
+            'notes'    => array_merge(worktimeReportNotes(), [
                 'Sitzungen ohne Terminbezug erscheinen gesammelt in einer Zeile "(ohne Termin)". '
                     . 'Sie wegzulassen würde die Gesamtsumme still verfälschen.',
             ]),

@@ -58,6 +58,27 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Erzeugnis, das den Bildschirm verlässt, und wäre sonst von einem echten Nachweis äußerlich
   nicht zu unterscheiden.
 
+- **Die Anwesenheitsstatistik hat einen Druckbericht.** `GET ?resource=statistics_report`
+  liefert eine eigenständige HTML-Seite mit Vereinslogo, Kennzahlen, einer Tabelle je Gruppe und
+  Fußnoten — dasselbe Papierformat, das die Arbeitszeit seit 1.2.2 kennt. In der
+  Statistik-Sektion öffnet der Knopf „📄 Bericht" ihn mit der aktuellen Filterauswahl in einem
+  neuen Tab. Bewusst ohne eigenen Dialog: Die Sektion trägt Jahr, Gruppe und Mitglied bereits in
+  der Filterleiste, ein zweites Formular hätte nur die Frage aufgeworfen, welche der beiden
+  Auswahlen gilt.
+
+  Ist genau ein Mitglied gewählt, folgt ein Abschnitt **„Termine im Einzelnen"**: Datum, Termin,
+  Terminart, Status, Ankunft und Herkunft. Erst diese Liste macht das Blatt zum Nachweis statt
+  zur Kennzahl.
+
+- **Mitglieder drucken ihre Nachweise selbst.** Anwesenheitsbericht und Stundennachweis stehen
+  jetzt auch der Rolle `user` offen — ausschließlich über die eigene Person, ausschließlich als
+  Druckansicht. Wer eine Ehrenamtskarte beantragt oder dem Arbeitgeber etwas vorlegen muss,
+  braucht dafür niemanden mehr.
+
+  Der Server erzwingt die eigene Person; eine mitgeschickte fremde `member_id` wird ignoriert,
+  nicht abgewiesen. CSV bleibt Admin und Manager vorbehalten — die eigenen Rohdaten gibt es über
+  `?resource=my_data`.
+
 ### Geändert
 - **Neues Zeichen, neuer Icon-Satz.** Logo, Favicon und die PWA-Icons stammen jetzt aus einer
   überarbeiteten Vorlage: zwei Farben statt vier, der Haken sitzt in einem eigenen Kreis. Neu
@@ -95,6 +116,46 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   unverändert weiter — blockiert ist nur der Weg auf eine neuere Version. Der Hinweistext im
   Assistenten sagt das jetzt auch.
 
+- **Der Bericht sagt, worauf seine Ankunftszeiten beruhen.** `records.arrival_time` ist keine
+  durchgehende Messung: Hakt jemand eine Anwesenheitsliste ab, ohne eine Uhrzeit einzutragen,
+  setzt das System die **Startzeit des Termins** — der Eintrag ist damit konstruiert pünktlich.
+  Diese Uhrzeit ununterschieden auf einen Nachweis zu drucken, hieße eine Messung zu behaupten,
+  die nie stattgefunden hat. Die Terminliste trägt deshalb eine Spalte **Herkunft** mit drei
+  Stufen, erklärt in den Fußnoten:
+
+  | Wert | Bedeutung |
+  |---|---|
+  | `gemessen` | bei der Anmeldung an einer Station oder in der App aufgezeichnet |
+  | `korrigiert` | auf Antrag geändert und genehmigt |
+  | `nachgetragen` | nicht bei der Anmeldung erfasst — von Hand, eingelesen oder aus einem anderen Vorgang |
+
+  `korrigiert` schlägt `gemessen`: Eine genehmigte Zeitkorrektur überschreibt die Ankunftszeit,
+  lässt die Quelle aber unverändert. Ohne diese Vorrangregel trüge eine korrigierte Zeit weiter
+  das Etikett der ursprünglichen Messung.
+
+- **Eine Fußnote nennt je Gruppe die ausgewertete Terminart.** Die Statistik rechnet je Gruppe
+  nur über eine Terminart, obwohl eine Gruppe an mehreren hängen kann — ein Fehler im Bestand,
+  der beim Bau dieses Berichts auffiel (OI-48) und der eine eigene Entscheidung braucht, weil
+  seine Behebung sämtliche bestehenden Quoten verschiebt. Bis dahin behauptet das Blatt
+  wenigstens keine Vollständigkeit, die es nicht hat.
+
+- **Berichtsausgabe an einer Stelle.** Die HTML-Ausgabe der Arbeitszeitberichte lag in
+  `handlers/export.php` und konnte eine Tabelle plus einen Summenblock. Sie liegt jetzt als
+  `renderReport()` in `helpers/report.php` und kennt beliebig viele Abschnitte — der
+  Anwesenheitsbericht braucht einen je Gruppe. Die drei Arbeitszeitberichte sehen unverändert
+  aus; das ist byteweise nachgewiesen.
+
+- **Bildschirm und Papier rechnen dasselbe.** Die Aggregation der Statistik lag als Schleife
+  mitten im Handler und war für nichts anderes benutzbar. Sie steht jetzt als
+  `buildStatisticsResult()` daneben, und der Bericht benutzt sie. Zwei Rechnungen, die dasselbe
+  behaupten, laufen bei der ersten Änderung auseinander.
+
+- **`?resource=statistics` liefert zwei Felder mehr.** Je Mitglied `excused` — bisher musste
+  jeder Verbraucher es aus drei anderen Zahlen selbst ausrechnen, zuletzt an zwei Stellen
+  gleichzeitig —, je Gruppe `appointment_type_name`. Beides additiv, bestehende Aufrufer sind
+  unberührt. Ohne `year`-Parameter trägt die Antwort jetzt `"year": 2026` als Zahl statt
+  `"year": "2026"` als Zeichenkette.
+
 ### Behoben
 - **`API.md` beschrieb `appearance` falsch.** Das Beispiel zeigte ein flaches Objekt mit
   `org_name` und `logo_url`; ausgeliefert wird seit Langem `{"settings": {…}}` mit anderen
@@ -107,6 +168,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   `?resource=` auf, das Rollensystem habe drei statt vier Rollen, und „~90 % Reduktion der
   API-Anfragen" war eine unbelegte Zahl. Ergänzt wurden die seit 1.2.0 vorhandene
   Arbeitszeiterfassung und die virtuelle Station, die beide bisher nirgends erwähnt waren.
+
+- **`API.md` beschrieb auch die Statistik-Antwort falsch.** Dasselbe Muster, andere Stelle: Das
+  dokumentierte Beispiel führte `attended`, `absent`, `attendance_rate` und `monthly_stats` auf;
+  die tatsächliche Antwort trägt `summary` und `statistics`. Wer nach dieser Referenz baute,
+  baute gegen etwas, das nie existiert hat. Das Beispiel entspricht jetzt der Wirklichkeit.
+
+  Darin standen auch `late_count` und `avg_arrival_minutes` — die Pünktlichkeitsauswertung, die
+  das Projekt an mehreren Stellen bewirbt und nirgends einlöst. Sie sind aus der Referenz
+  entfernt, statt eine Zusage stehen zu lassen, die kein Code erfüllt; als offener Punkt ist
+  die Metrik in `docs/OPEN-ITEMS.md` festgehalten.
 
 ### Intern
 - `tests/run.php` meldet einen vorzeitigen Abbruch. Bisher lud es alle Suiten in **einem**

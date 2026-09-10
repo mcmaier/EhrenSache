@@ -8,6 +8,7 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { loadGroups } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
@@ -263,20 +264,49 @@ function updateOverallStats(summary) {
     document.getElementById('statOverallAverage').textContent = summary.overall_average + '%';
 }
 
+/**
+ * Öffnet den Anwesenheitsbericht mit der aktuellen Filterauswahl.
+ *
+ * Kein fetch: Der Bericht ist eine Seite, kein Datensatz. Er öffnet in einem
+ * eigenen Tab, damit das Dashboard stehen bleibt und der Bericht vor dem
+ * Drucken gelesen werden kann.
+ *
+ * Für ein Mitglied ist #statMember leer und unbefüllt -- es wird dann kein
+ * member_id mitgeschickt, und der Server setzt die eigene Person ein. Hier
+ * steht bewusst keine Rollenabfrage: Die Rechteentscheidung gehört an genau
+ * eine Stelle, und die liegt im Server.
+ */
+export function openStatisticsReport() {
+    const year   = document.getElementById('statisticYearFilter')?.value || '';
+    const group  = document.getElementById('statGroup')?.value || '';
+    const member = document.getElementById('statMember')?.value || '';
+
+    const params = new URLSearchParams({ resource: 'statistics_report' });
+
+    if (year)   params.set('year', year);
+    if (group)  params.set('group_id', group);
+    if (member) params.set('member_id', member);
+
+    window.open(`${API_BASE}?${params.toString()}`, '_blank', 'noopener');
+}
+
 export async function initStatisticsEventHandlers() {
 
     // Change-Listener für automatische Aktualisierung
     document.getElementById('statGroup').addEventListener('change', () => {
             updateStatisticsFilters();
-            applyStatisticsFilters();      
+            applyStatisticsFilters();
         });
 
     if (isAdminOrManager) {
         document.getElementById('statMember').addEventListener('change', () => {
             updateStatisticsFilters();
-            applyStatisticsFilters(); 
+            applyStatisticsFilters();
         });
     }
+
+    document.getElementById('btnStatisticsReport')
+        ?.addEventListener('click', openStatisticsReport);
 }
 
 window.updateStatisticsFilters = updateStatisticsFilters;

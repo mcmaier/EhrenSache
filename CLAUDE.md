@@ -271,8 +271,11 @@ php tests/run.php worktime_api
 
 - PHP: Vanilla, keine Frameworks, Prepared Statements, `declare(strict_types=1)` in neuen Dateien
 - JS: ES6 Module (`import`/`export`), kein Build-Step, kein Framework
-- Neue API-Ressource: Handler in `private/handlers/<name>.php` + `case` in `api.php` Switch
-  + Abschnitt in `API.md`
+- Neue API-Ressource: Handler in `private/handlers/<name>.php` + `require_once` und `case` in
+  `api.php` + **Eintrag in einer der drei Listen in `private/helpers/demo_mode.php`** +
+  Abschnitt in `API.md`. Die Registrierung im Demo-Modus wird durch einen Test erzwungen:
+  `tests/suites/demo_mode.php` gleicht jede geroutete Ressource gegen diese Listen ab und meldet
+  eine unbekannte als vergessen
 - Neues Frontend-Feature: Modul in `public/js/modules/<name>.js`
 - Neues CSS: in `components/` oder `sections/` einsortieren, Farben nur über `variables.css`
 - Schemaänderung: Migration anlegen **und** `private/setup/ehrensache_db.sql` nachziehen
