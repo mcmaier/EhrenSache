@@ -451,58 +451,180 @@ test('Keine Liste nennt eine Ressource, die es nicht mehr gibt', function () {
 // Die bisherigen Pruefungen belegen nur, dass jede Ressource in einer der
 // drei Listen einsortiert ist - nicht, dass demoGuard() ueberhaupt im
 // Anfrageweg haengt. Ein demoGuard(), der nirgends aufgerufen wird, oder der
-// erst NACH den fruehen Ausstiegen in Abschnitt 6 steht, waere unsichtbar:
-// alle bisherigen Pruefungen blieben gruen, obwohl register und
-// password_reset_request - beide mit Absicht in DEMO_WRITE_DENIED, weil sie
-// Mail an fremde Adressen verschicken - den Waechter nie erreichen wuerden.
-// Bezugspunkt fuer "vorher" ist das erste Vorkommen von "$resource ===" -
-// das ist der ping-Endpunkt, der erste fruehe Ausstieg in Abschnitt 6.
+// erst NACH einem fruehen Ausstieg steht, waere unsichtbar: alle bisherigen
+// Pruefungen blieben gruen, obwohl z. B. register und password_reset_request
+// - beide mit Absicht in DEMO_WRITE_DENIED, weil sie Mail an fremde Adressen
+// verschicken - den Waechter dann nie erreichen wuerden.
+//
+// Eine fruehere Fassung dieser Pruefung suchte mit strpos($src, 'demoGuard(')
+// im rohen Dateitext. Das belegt nur, dass die Zeichenfolge irgendwo steht -
+// nicht, dass ein Aufruf tatsaechlich ausgefuehrt wird. Vier von fuenf
+// realistischen Mutationen blieben damit gruen: der Aufruf auskommentiert,
+// in ein totes if(...) { ... } gekapselt, hinter einen fruehen Ausstieg
+// verschoben (waehrend oben ein Kommentar "demoGuard(" liegenblieb), oder mit
+// fest verdrahteten Argumenten wie demoGuard('ping', 'GET'). Nur das
+// vollstaendige Entfernen des Aufrufs fiel auf.
+//
+// token_get_all() statt strpos() faengt alle fuenf:
+//   - Kommentare sind eigene Tokens (T_COMMENT, T_DOC_COMMENT) und werden
+//     uebersprungen. Ein auskommentierter Aufruf zerfaellt dadurch nie in die
+//     Tokenfolge "demoGuard", "(", "$resource", ... - er ist fuer die
+//     Pruefung unsichtbar, genau wie fuer den PHP-Interpreter.
+//   - Die geschweifte-Klammer-Tiefe wird mitgezaehlt; nur ein Aufruf auf
+//     Tiefe 0 (nicht in einem if/for/function/... verschachtelt) zaehlt. Ein
+//     Aufruf in einem toten if-Block liegt auf Tiefe > 0 und faellt raus.
+//   - Es wird geprueft, dass die beiden Argumente Variablen sind ($resource,
+//     $request_method) und keine fest verdrahteten Literale.
+//   - K2: Bezugspunkt ist nicht mehr nur der ERSTE fruehe Ausstieg, sondern
+//     JEDES "$resource === '...'" in der Datei. Ein frueher Ausstieg, der vor
+//     Zeile 178 eingefuegt wird, faellt damit ebenfalls auf - vorher waere
+//     die Pruefung daran vorbeigelaufen, weil sie nur den ersten Treffer
+//     kannte.
+//
+// K1 - der Anker bleibt lueckenhaft, wie schon der Docblock von
+// demoTestResourcesFromApi() festhaelt: er erkennt nur "$resource === '...'"
+// (mit einem $resource-Token unmittelbar vor ===). Ein frueher Ausstieg ueber
+// in_array($resource, [...]), match($resource) { ... }, lockeres
+// $resource == 'x' oder Yoda-Schreibweise ('x' === $resource) bleibt
+// unerkannt. Das ist tragbar, weil der Waechter zur geschlossenen Seite
+// faellt: unbekannt heisst gesperrt, ein so uebersehener fruehe Ausstieg
+// oeffnet also keine Luecke, sondern bliebe hoechstens unbemerkt strenger als
+// noetig.
 
-test('Der Waechter ist vor dem ersten fruehen Ausstieg eingehaengt', function () {
+/** Naechster Tokenindex ab (und ggf. einschliesslich) $from, der kein T_WHITESPACE ist. */
+function demoTestNextNonWhitespace(array $tokens, int $from): int
+{
+    $j = $from;
+    while (isset($tokens[$j]) && is_array($tokens[$j]) && $tokens[$j][0] === T_WHITESPACE) {
+        $j++;
+    }
+
+    return $j;
+}
+
+/**
+ * Wertet den Tokenstrom von api.php aus (siehe Erlaeuterung oben).
+ *
+ * @return array{callFound: bool, callIndex: int|null, anchorIndices: int[], callBeforeAllAnchors: bool}
+ */
+function demoTestGuardTokenPosition(): array
+{
     $src = demoTestResourcesFromApi()['src'];
+    $tokens = token_get_all($src);
+    $count = count($tokens);
 
-    $guardPos = strpos($src, 'demoGuard(');
+    $depth = 0;
+    $callIndex = null;
+    $anchorIndices = [];
 
-    assertTrue(
-        $guardPos !== false,
-        'demoGuard(...) wird in api.php nirgends aufgerufen - der Waechter ist '
-        . 'zwar fertig implementiert und getestet, haengt aber nicht im '
-        . 'Anfrageweg. Im Demo-Modus wuerde dann kein einziger Schreibzugriff '
-        . 'gesperrt, auch nicht cleanup, users oder register - die '
-        . 'Vollstaendigkeitspruefungen oben pruefen nur die drei Listen, nicht '
-        . 'diesen Aufruf.'
-    );
+    for ($i = 0; $i < $count; $i++) {
+        $t = $tokens[$i];
 
-    if ($guardPos === false) {
-        return;
+        if (is_array($t) && ($t[0] === T_COMMENT || $t[0] === T_DOC_COMMENT)) {
+            continue; // Kommentare zaehlen nicht als Code
+        }
+
+        // Oeffnende geschweifte Klammer: der normale Block-Fall ('{' als
+        // Rohtoken) UND die komplexe String-Interpolation "{$var}" /
+        // "${var}" - deren OEFFNENDE Klammer ist ein eigenes benanntes Token
+        // (T_CURLY_OPEN bzw. T_DOLLAR_OPEN_CURLY_BRACES), deren SCHLIESSENDE
+        // aber ein ganz normales rohes '}' ist. Ohne diesen Fall zaehlt jede
+        // Stelle wie "{$prefix}" in einem String (in api.php mehrfach, z. B.
+        // "SHOW TABLES LIKE '{$prefix}users'") die Tiefe einseitig herunter,
+        // und jeder danach folgende echte Aufruf auf Tiefe 0 wuerde
+        // faelschlich als "nicht auf oberster Ebene" verworfen.
+        if ($t === '{' || (is_array($t) && ($t[0] === T_CURLY_OPEN || $t[0] === T_DOLLAR_OPEN_CURLY_BRACES))) {
+            $depth++;
+            continue;
+        }
+        if ($t === '}') {
+            $depth--;
+            continue;
+        }
+
+        // Anker: ein $resource-Token, direkt (ueber Whitespace hinweg) gefolgt von ===
+        if (is_array($t) && $t[0] === T_VARIABLE && $t[1] === '$resource') {
+            $j = demoTestNextNonWhitespace($tokens, $i + 1);
+            if (isset($tokens[$j]) && is_array($tokens[$j]) && $tokens[$j][0] === T_IS_IDENTICAL) {
+                $anchorIndices[] = $i;
+            }
+        }
+
+        // Wirksamer Aufruf: demoGuard($resource, $request_method) auf Tiefe 0
+        if ($callIndex === null && $depth === 0 && is_array($t) && $t[0] === T_STRING && $t[1] === 'demoGuard') {
+            $j = demoTestNextNonWhitespace($tokens, $i + 1);
+
+            if (($tokens[$j] ?? null) === '(') {
+                $j = demoTestNextNonWhitespace($tokens, $j + 1);
+
+                if (is_array($tokens[$j] ?? null) && $tokens[$j][0] === T_VARIABLE && $tokens[$j][1] === '$resource') {
+                    $j = demoTestNextNonWhitespace($tokens, $j + 1);
+
+                    if (($tokens[$j] ?? null) === ',') {
+                        $j = demoTestNextNonWhitespace($tokens, $j + 1);
+
+                        if (is_array($tokens[$j] ?? null) && $tokens[$j][0] === T_VARIABLE && $tokens[$j][1] === '$request_method') {
+                            $callIndex = $i;
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    preg_match('/\$resource\s*===\s*[\'"][a-z0-9_\-]+[\'"]/i', $src, $m, PREG_OFFSET_CAPTURE);
+    return [
+        'callFound'            => $callIndex !== null,
+        'callIndex'            => $callIndex,
+        'anchorIndices'        => $anchorIndices,
+        'callBeforeAllAnchors' => $callIndex !== null && $anchorIndices !== [] && $callIndex < min($anchorIndices),
+    ];
+}
+
+test('Der Waechter wird tatsaechlich aufgerufen (Tokenpruefung, nicht Textsuche)', function () {
+    $pos = demoTestGuardTokenPosition();
 
     assertTrue(
-        isset($m[0]),
-        'Kein fruehes "$resource === ..." in api.php gefunden - der '
+        $pos['callFound'],
+        'Im Tokenstrom von api.php findet sich kein wirksamer Aufruf '
+        . 'demoGuard($resource, $request_method) auf oberster Ebene. Entweder '
+        . 'fehlt der Aufruf ganz, er ist auskommentiert, in einen toten Zweig '
+        . '(z. B. if (...) { ... }) gekapselt, oder die Argumente sind nicht '
+        . 'mehr die Variablen $resource und $request_method (z. B. fest '
+        . "verdrahtet wie demoGuard('ping', 'GET')). In jedem dieser Faelle "
+        . 'wirkt der Waechter im Demo-Modus nicht, obwohl er fertig '
+        . 'implementiert und fuer sich getestet ist.'
+    );
+});
+
+test('Der Waechter steht vor JEDEM "$resource === ..."-Vergleich', function () {
+    $pos = demoTestGuardTokenPosition();
+
+    if (!$pos['callFound']) {
+        return; // bereits im vorigen Test gemeldet, hier nicht doppelt fehlschlagen
+    }
+
+    assertTrue(
+        $pos['anchorIndices'] !== [],
+        'Kein "$resource === ...\'-Vergleich in api.php gefunden - der '
         . 'Bezugspunkt fuer die Reihenfolge fehlt. api.php wurde vermutlich '
-        . 'umgebaut; diese Pruefung muss nachziehen.'
+        . 'umgebaut; demoTestGuardTokenPosition() muss nachziehen.'
     );
 
-    if (!isset($m[0])) {
+    if ($pos['anchorIndices'] === []) {
         return;
     }
 
-    $firstEarlyExitPos = $m[0][1];
-
     assertTrue(
-        $guardPos < $firstEarlyExitPos,
-        'demoGuard(...) steht in api.php HINTER dem ersten fruehen Ausstieg '
-        . "(Position {$guardPos} statt davor bei {$firstEarlyExitPos}). "
-        . 'Abschnitt 6 beendet register und password_reset_request mit exit(), '
-        . 'bevor das Routing in Abschnitt 10 erreicht wird - beide verschicken '
-        . 'Mail an fremde Adressen und sind deshalb in DEMO_WRITE_DENIED '
-        . 'gelistet. Haengt der Waechter erst nach diesen fruehen Ausstiegen, '
-        . 'laufen genau diese beiden Endpunkte ungeschuetzt an ihm vorbei, '
-        . 'obwohl die Listen sie korrekt als gesperrt fuehren. Der Aufruf '
-        . 'gehoert zwischen Abschnitt 5 (Rate Limiting) und Abschnitt 6 '
-        . '(oeffentliche Endpoints).'
+        $pos['callBeforeAllAnchors'],
+        'demoGuard(...) steht in api.php NICHT vor allen "$resource === ...\'"'
+        . '-Vergleichen (Aufruf-Tokenindex ' . $pos['callIndex'] . ', fruehester '
+        . 'Vergleich bei Index ' . min($pos['anchorIndices']) . '). Abschnitt 6 '
+        . 'beendet register und password_reset_request mit exit(), bevor das '
+        . 'Routing in Abschnitt 10 erreicht wird - beide verschicken Mail an '
+        . 'fremde Adressen und sind deshalb in DEMO_WRITE_DENIED gelistet. '
+        . 'Steht der Waechter erst nach einem fruehen Ausstieg, laeuft dieser '
+        . 'ungeschuetzt an ihm vorbei, obwohl die Listen ihn korrekt als '
+        . 'gesperrt fuehren. Der Aufruf gehoert zwischen Abschnitt 5 (Rate '
+        . 'Limiting) und Abschnitt 6 (oeffentliche Endpoints).'
     );
 });
