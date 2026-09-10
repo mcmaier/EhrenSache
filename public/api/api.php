@@ -35,6 +35,7 @@ require_once '../../private/helpers/mailer.php';
 require_once '../../private/helpers/version.php';
 require_once '../../private/helpers/worktime.php';
 require_once '../../private/helpers/station.php';
+require_once '../../private/helpers/report.php';
 require_once '../../private/helpers/demo_mode.php';
 
 // Handler laden
