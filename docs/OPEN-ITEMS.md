@@ -1830,3 +1830,55 @@ die Jahresbasis der gesamten Statistik aufzugeben — nicht nur die des Berichts
 gemeinsam mit [OI-48](#oi-48) entscheiden, das ohnehin an derselben Funktion ansetzt.
 
 ---
+
+### OI-53 · Navigation im Querformat auf dem Telefon kaum bedienbar
+**Priorität:** mittel — betrifft die tägliche Bedienung auf dem Gerät, das Mitglieder dabeihaben
+
+**Gemeldet am 2026-09-10** vom Betreiber: In der mobilen Ansicht im **Querformat** ist das
+Navigationsmenü zu klein und lässt sich nicht bedienen.
+
+**Noch nicht nachgestellt.** Die folgenden Punkte sind am Code geprüft, die Ursache selbst ist
+eine begründete Vermutung und kein Befund — wer den Punkt angeht, sollte zuerst reproduzieren.
+
+**Was am Code gesichert ist:**
+
+- Die mobile Darstellung hängt **allein an der Breite**: `public/css/responsive.css` kennt
+  `@media (max-width: 768px)` und `@media (max-width: 480px)`, dazu `@media (min-width: 1200px)`.
+- **Im gesamten Projekt gibt es keine einzige `orientation`-Medienabfrage** (`print.css` nutzt
+  `size: A4 landscape`, das ist etwas anderes).
+- Unterhalb von 768 px erscheint `.mobile-menu-btn`, und `.sidebar` wird über
+  `transform: translateX(-100%)` ausgeblendet, bis `.mobile-open` sie hereinschiebt.
+- `.sidebar` ist `position: fixed`, `width: 250px`, **`height: 100vh`**, ein Flex-Container in
+  Spaltenrichtung; die Navigationsliste darin trägt `overflow-y: auto`.
+- Das Dashboard hat **12 Navigationspunkte**.
+
+**Vermutete Ursache:** Ein heutiges Telefon ist im Querformat **breiter als 768 px** — 844, 915
+oder 926 px sind übliche Werte. Damit greift die Mobilregel nicht mehr: Der Menüknopf
+verschwindet, und die Seitenleiste steht wieder dauerhaft im Layout wie auf einem Rechner. Die
+verfügbare **Höhe** beträgt in dieser Lage aber nur noch rund 390 bis 430 px. `height: 100vh`
+verteilt 12 Punkte plus Kopfbereich auf diese Höhe; die Liste scrollt zwar, aber die Trefferflächen
+werden winzig, und vom Inhalt bleibt neben 250 px Seitenleiste wenig übrig.
+
+Das erklärt auch, warum der Fehler ausgerechnet im Querformat auftritt und im Hochformat nicht:
+Es ist nicht die Drehung, es ist der Sprung über den Breiten-Haltepunkt.
+
+**Zu tun:**
+
+1. **Zuerst reproduzieren** und die tatsächliche Viewport-Breite notieren — auf einem echten
+   Gerät, nicht nur im Geräte-Emulator des Browsers.
+2. Den Haltepunkt um eine Höhenbedingung ergänzen, statt allein auf die Breite zu setzen. In der
+   Art `@media (max-width: 768px), (max-height: 500px)` — dann bleibt die mobile Bedienung mit
+   Menüknopf auch im flachen Querformat erhalten.
+3. Prüfen, ob `height: 100vh` bei geöffneter Adressleiste mobiler Browser das Richtige tut;
+   `100dvh` gibt es dafür, bringt aber eigene Fallstricke und ältere Browser kennen es nicht.
+4. Gegenprobe auf dem Tablet im Querformat: Dort ist die Seitenleiste **erwünscht** und darf
+   nicht versehentlich hinter einem Menüknopf verschwinden. Ein Tablet ist quer typischerweise
+   deutlich höher als 500 px — die Bedingung aus Punkt 2 trifft es also nicht, das ist aber zu
+   belegen und nicht anzunehmen.
+
+**Berührt:** `public/css/responsive.css`, `public/css/sections/sidebar.css`, dazu die
+Kiosk- und Check-in-PWA, falls sie dieselben Regeln erben — das ist zu prüfen.
+
+**Nicht sicherheitsrelevant.**
+
+---
