@@ -28,6 +28,14 @@ async function loadTheme() {
 
         applyTheme(settings);
 
+        // W4: Das Demo-Merkmal wird zusaetzlich EIGENSTAENDIG im SessionStorage
+        // abgelegt, nicht nur ueber den showDemoBanner()-Aufruf hier. Der
+        // Cache-Zweig unten (isThemeCacheValid()) laedt applyTheme() aus dem
+        // Cache, OHNE diese Funktion erneut aufzurufen -- ohne den eigenen
+        // Merker wuesste er nichts von "demo" und das Band bliebe fuer bis zu
+        // 60 Minuten pro Sitzung weg, sobald der Cache greift. Auf einer Demo,
+        // auf der Besucher schreiben duerfen, ist das der falsche Ausfall.
+        sessionStorage.setItem('theme-demo', data.demo === true ? '1' : '0');
         if (data.demo === true) {
             showDemoBanner();
         }
@@ -112,6 +120,10 @@ if (isThemeCacheValid()) {
     // Aus Cache laden (sofort)
     const settings = JSON.parse(sessionStorage.getItem('theme-settings'));
     applyTheme(settings);
+    // W4: unabhaengig vom Cache-Zweig gepflegt, siehe Kommentar in loadTheme().
+    if (sessionStorage.getItem('theme-demo') === '1') {
+        showDemoBanner();
+    }
 } else {
     // Frisch von API laden
     await loadTheme();
