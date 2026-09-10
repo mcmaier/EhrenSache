@@ -100,6 +100,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   `org_name` und `logo_url`; ausgeliefert wird seit Langem `{"settings": {…}}` mit anderen
   Schlüsselnamen. Gegen die laufende Installation geprüft und ersetzt.
 
+- **Die README beschrieb einen Stand, den es nicht gibt.** Am schwersten wog das Versprechen
+  „XSS-Schutz durch Content Security Policy" — ausgeliefert wird bewusst keine CSP (OI-17).
+  Ebenfalls falsch: der Zwischenspeicher liege im `localStorage` (er liegt im Arbeitsspeicher
+  und ist nach jedem Neuladen leer), vier API-Beispiele riefen `api.php&resource=` statt
+  `?resource=` auf, das Rollensystem habe drei statt vier Rollen, und „~90 % Reduktion der
+  API-Anfragen" war eine unbelegte Zahl. Ergänzt wurden die seit 1.2.0 vorhandene
+  Arbeitszeiterfassung und die virtuelle Station, die beide bisher nirgends erwähnt waren.
+
 ### Intern
 - `tests/run.php` meldet einen vorzeitigen Abbruch. Bisher lud es alle Suiten in **einem**
   Prozess und rief die Zusammenfassung erst am Ende — ein `exit()` in irgendeiner Suite
