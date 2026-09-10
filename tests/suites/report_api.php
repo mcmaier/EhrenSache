@@ -155,3 +155,108 @@ test('statistics_report: Sonderzeichen im Gruppennamen werden maskiert', functio
         ]), 'Testgruppe konnte nicht geloescht werden');
     }
 });
+
+// ============================================
+// BERICHTE: Terminliste je Person
+// ============================================
+
+test('statistics_report: ohne Mitgliedsfilter gibt es keine Terminliste', function () {
+    $res = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => date('Y')],
+    ]);
+    assertStatus(200, $res);
+    assertTrue(strpos($res['raw'], 'Termine im Einzelnen') === false,
+               'ohne Mitgliedsfilter keine Terminliste erwartet');
+});
+
+test('statistics_report: mit Mitgliedsfilter erscheint die Terminliste', function () {
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Testkonto user braucht ein verknuepftes Mitglied');
+
+    $res = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => date('Y'), 'member_id' => $memberId],
+    ]);
+    assertStatus(200, $res);
+    assertTrue(strpos($res['raw'], 'Termine im Einzelnen') !== false, 'Terminliste erwartet');
+    assertTrue(strpos($res['raw'], 'Herkunft') !== false, 'Spalte Herkunft erwartet');
+});
+
+test('statistics_report: die Terminliste deckt genau die gezaehlten Termine ab', function () {
+    $memberId = apiMemberId('user');
+
+    $json = apiRequest('GET', 'statistics', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => date('Y'), 'member_id' => $memberId],
+    ]);
+    assertStatus(200, $json);
+
+    // Summe der gezaehlten Termine ueber alle Gruppen des Mitglieds. Mehrere
+    // Gruppen koennen an derselben Terminart haengen -- dann zaehlt der Termin
+    // in der Liste nur einmal, deshalb wird nach Terminart entdoppelt.
+    $perType = [];
+    foreach ($json['body']['statistics'] as $group) {
+        $typeId = $group['appointment_type_id'];
+        $total  = $group['members'][0]['total_appointments'] ?? 0;
+        $perType[$typeId] = $total;
+    }
+    $expected = array_sum($perType);
+
+    $html = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => date('Y'), 'member_id' => $memberId],
+    ]);
+    assertStatus(200, $html);
+
+    // Zeilen der Terminliste zaehlen: der Abschnitt ab der Ueberschrift bis
+    // zum schliessenden </table>.
+    $start = strpos($html['raw'], 'Termine im Einzelnen');
+    assertTrue($start !== false, 'Terminliste erwartet');
+    $end     = strpos($html['raw'], '</table>', $start);
+    $section = substr($html['raw'], $start, $end - $start);
+    $rows    = substr_count($section, '<tr>') - 1; // Kopfzeile abziehen
+
+    assertSame($expected, $rows,
+        "Terminliste soll genau die gezaehlten Termine zeigen (Quote rechnet mit {$expected})");
+});
+
+test('statistics_report: die Fussnote nennt die ausgewertete Terminart', function () {
+    $res = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => date('Y')],
+    ]);
+    assertStatus(200, $res);
+    assertTrue(strpos($res['raw'], 'Ausgewertet wurden je Gruppe') !== false,
+               'Fussnote zur Terminart erwartet');
+});
+
+test('statistics_report: die Herkunftsstufen sind erklaert', function () {
+    $res = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => date('Y')],
+    ]);
+    foreach (['gemessen:', 'korrigiert:', 'nachgetragen:'] as $begriff) {
+        assertTrue(strpos($res['raw'], $begriff) !== false, "Fussnote '{$begriff}' erwartet");
+    }
+});
+
+test('statistics_report: entschuldigte Termine tragen keine Ankunftszeit', function () {
+    // Im Bestand gibt es genau einen verwertbaren excused-Eintrag; faellt er
+    // aus der Auswertung (siehe OI-48), greift dieser Test ins Leere. Er prueft
+    // deshalb die Regel, nicht das Vorhandensein: Wo 'Entschuldigt' steht,
+    // duerfen Ankunft und Herkunft nicht gefuellt sein.
+    $memberId = apiMemberId('user');
+    $res = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => date('Y'), 'member_id' => $memberId],
+    ]);
+    assertStatus(200, $res);
+
+    if (preg_match_all('#<td>Entschuldigt</td><td>([^<]*)</td><td>([^<]*)</td>#', $res['raw'], $m)) {
+        foreach ($m[1] as $i => $ankunft) {
+            assertSame('', $ankunft, 'entschuldigt: Ankunft muss leer sein');
+            assertSame('', $m[2][$i], 'entschuldigt: Herkunft muss leer sein');
+        }
+    }
+});

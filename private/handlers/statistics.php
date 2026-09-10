@@ -289,10 +289,14 @@ function calculateGroupStatistics($db, $database, $groupId, $year, $memberId, $r
     $prefix = $database->table('');
 
     // 1 Query: Gruppeninfo (typeId + group_name)
+    // LEFT JOIN, nicht INNER: Der Join dient allein der Beschriftung. Ein
+    // INNER JOIN koennte bei einer verwaisten type_id die Zeile schlucken und
+    // damit aendern, welche Terminart diese Funktion auswertet -- siehe OI-48.
     $stmt = $db->prepare("
-        SELECT atg.type_id, mg.group_name
+        SELECT atg.type_id, mg.group_name, at.type_name
         FROM {$prefix}appointment_type_groups atg
         JOIN {$prefix}member_groups mg ON atg.group_id = mg.group_id
+        LEFT JOIN {$prefix}appointment_types at ON at.type_id = atg.type_id
         WHERE atg.group_id = ?
     ");
     $stmt->execute([$groupId]);
@@ -382,10 +386,11 @@ function calculateGroupStatistics($db, $database, $groupId, $year, $memberId, $r
     }
 
     return [
-        'group_id'            => $groupId,
-        'group_name'          => $group['group_name'],
-        'appointment_type_id' => $typeId,
-        'members'             => $memberStats,
+        'group_id'              => $groupId,
+        'group_name'            => $group['group_name'],
+        'appointment_type_id'   => $typeId,
+        'appointment_type_name' => $group['type_name'],
+        'members'               => $memberStats,
     ];
 }
 
