@@ -20,9 +20,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   ohne Mitglieds-PIN wertlos und darf weiterhin nur die Ressource `station` aufrufen — der
   QR-Code macht ihn nicht angreifbarer, als er im Gerätedialog ohnehin ist.
 
-  Ein fehlgeschlagener Scan lässt die Station verbunden: Der bisherige Token wird
-  wiederhergestellt, der Bildschirm zeigt den Fehler, ein Neuladen stellt den Zustand vor dem
-  Scan wieder her.
+  Ein fehlgeschlagener Scan kostet die Station nicht ihre Kopplung: Der bisherige Token wird
+  wiederhergestellt. Die Station wechselt aber sichtbar auf den Einrichtungs-Bildschirm mit der
+  Fehlermeldung und **bleibt dort, bis jemand die Seite neu lädt** — in dieser Zeit nimmt sie
+  keine Stempel an. Das ist Absicht: Ein stiller Rückfall auf den alten Token würde einen
+  fehlgeschlagenen Scan verschweigen.
 
   **Reihenfolge beachten:** erst koppeln, dann zum Startbildschirm hinzufügen. Unter iPadOS hat
   eine installierte Web-App einen eigenen Speichercontainer; ein später gescannter Code landet

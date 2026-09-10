@@ -588,6 +588,16 @@ eigenen Kamera-Scanner?
 **Heutiger Ausweg:** 5 Sekunden auf die Uhr drücken und den Token eingeben. Die Reihenfolge
 „erst koppeln, dann installieren" steht in `public/station/README.md`.
 
+**Ungeprüft, weil kein Tablet zur Hand war:** Ist die Station bereits in einem Reiter offen,
+hängt es vom Browser ab, ob ein aus der Kamera-App geöffneter Link **diesen** Reiter aktualisiert
+oder einen zweiten öffnet. Im zweiten Fall koppelt sich der neue Reiter erfolgreich, während der
+sichtbare — womöglich angeheftete — Reiter unverändert das alte Bild zeigt: Der Scan wirkt dann
+folgenlos, obwohl er funktioniert hat. Der `hashchange`-Zuhörer in `public/station/js/app.js`
+greift nur im ersten Fall. Verifiziert ist bislang nur die Änderung des Fragments im selben
+Reiter. **Vor einem produktiven Rollout auf einem echten Tablet nachstellen** (Testfall QR-15 in
+`docs/testplan.md`); bestätigt sich das Zwei-Reiter-Verhalten, ist die manuelle Token-Eingabe
+über die Einstellungen der verlässlichere Weg für eine bereits laufende Station.
+
 ---
 
 ### OI-46 · Einmal-Kopplungscode statt Token im QR-Bild
@@ -1575,6 +1585,7 @@ sind seither grün.
 | Kiosk: Notizpflicht entfällt (P1) | So belassen | Der Kiosk hat keine Tastatur für Fließtext. Ist `worktime_require_note` aktiv, verlangt ein Stopp über `station` trotzdem keine Notiz; die Tätigkeitsart bleibt die Beschreibung |
 | Token im Fragment, nicht im Query (ab 1.5.0) | So belassen | `…/station/#t=<token>` statt `?t=`: Das Fragment wird vom Browser nie gesendet und steht damit in keinem Zugriffsprotokoll, keinem Referrer und keinem Reverse-Proxy-Log. Ein Query-Parameter landet in jedem davon. Die Station entfernt den Hash nach der Übernahme per `replaceState`, damit er auch nicht im Verlauf bleibt |
 | QR-Übernahme überschreibt still (ab 1.5.0) | So belassen | Wer den Code vor das Tablet hält, steht physisch davor — dieselbe Schwelle wie beim Einstellungsdialog der Station. Eine Rückfrage kostet in der Demo bei jedem stündlichen Reset einen zusätzlichen Tipp und schützt vor nichts, was nicht schon durch den physischen Zugang gedeckt wäre |
+| Der Scan-Reload unterbricht auch eine laufende Eingabe (ab 1.5.0) | So belassen | Der `hashchange`-Zuhörer lädt neu, ohne zu prüfen, ob gerade jemand Mitgliedsnummer oder PIN tippt — die Eingabe ist dann weg. Die Alternative, den Reload auf Ruhebild und Einrichtung zu beschränken, holt den Fehler zurück, den er behebt: Ein Scan täte dann in genau diesem Zustand wieder sichtbar nichts. Eine verlorene Eingabe kostet zwei Tipps und ist selbsterklärend; ein folgenloser Scan ist es nicht. Es geht dabei nichts verloren, was schon gespeichert wäre — gestempelt wird erst nach der PIN-Prüfung |
 
 ---
 

@@ -1056,3 +1056,6 @@ Manuell — Dashboard und Station:
 | QR-11 | Dashboard bei getrennter Internetverbindung (Server erreichbar) öffnen, QR-1 wiederholen | QR-Code wird weiterhin erzeugt |
 | QR-12 | `station/#t=` (leerer Wert) aufrufen | Bestandsverhalten: gespeicherter Token wird geladen |
 | QR-13 | Demo: Reset abwarten, als Admin den Kiosk öffnen, neu scannen | Station läuft nach einem Scan wieder |
+| QR-14 | Neues Kiosk-Gerät anlegen und speichern | Das Modal öffnet sich sofort im Bearbeiten-Modus, 📱 ist ohne Zwischenschritt da und liefert einen QR mit dem neuen Token |
+| QR-15 | **Nur mit echtem Tablet:** QR-1 aufrufen, mit der Kamera-App eines Tablets scannen, auf dem die Station bereits in einem Reiter offen ist | Der Bediener sieht die Kopplung **auf dem Gerät, das er vor Augen hat**. Öffnet der Browser stattdessen einen zweiten Reiter, koppelt sich dieser, während der sichtbare Reiter unverändert bleibt — dann greift OI-45 |
+| QR-16 | Mitgliedsnummer oder PIN eintippen und **währenddessen** die Adresse auf `station/#t=<gültig>` ändern | Die Seite lädt neu, die Eingabe ist weg. Bewusst so — siehe „Bewusst entschieden" in `docs/OPEN-ITEMS.md` |

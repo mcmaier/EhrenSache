@@ -238,3 +238,26 @@ test('Jedes Script-Tag zeigt auf eine vorhandene Datei', function () use ($repoR
 
     assertTrue($fehlend === [], "Script-Tag ohne Datei:\n  " . implode("\n  ", $fehlend));
 });
+test('Die Station raeumt das Fragment mit replaceState ab', function () use ($repoRoot) {
+    // Waechter gegen eine Neulade-Schleife. `location.hash = ''` waere die
+    // naheliegende Vereinfachung von clearHash() und genau falsch: Sie loest
+    // ein hashchange aus, der Zuhoerer daneben laedt daraufhin neu, beim Laden
+    // wird der Hash erneut abgeraeumt — die Station laedt sich im Kreis.
+    // replaceState loest kein hashchange aus und haengt zudem keinen
+    // Verlaufseintrag mit dem Token an.
+    $js = (string) file_get_contents($repoRoot . '/public/station/js/app.js');
+
+    assertTrue(
+        preg_match('/function clearHash\(\)\s*\{(.*?)\n\}/s', $js, $m) === 1,
+        'clearHash() in public/station/js/app.js nicht gefunden'
+    );
+    assertTrue(
+        strpos($m[1], 'replaceState') !== false,
+        'clearHash() raeumt den Hash nicht mit replaceState ab'
+    );
+    assertTrue(
+        preg_match('/location\.hash\s*=[^=]/', $m[1]) === 0,
+        'clearHash() schreibt location.hash — das loest hashchange aus und ergibt '
+        . 'zusammen mit dem Zuhoerer eine Neulade-Schleife'
+    );
+});
