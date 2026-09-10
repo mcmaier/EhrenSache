@@ -297,6 +297,42 @@ function forgetToken() {
     stopIdleLoops();
 }
 
+/**
+ * Token aus dem Adressfragment: /station/#t=<token>.
+ *
+ * Bewusst das Fragment und nicht der Query: es wird vom Browser nie gesendet
+ * und steht damit in keinem Zugriffsprotokoll, keinem Referrer und keinem
+ * Reverse-Proxy-Log.
+ *
+ * Kein Formatcheck (kein Hex-Muster): die Token-Erzeugung sitzt in
+ * private/handlers/users.php, nicht hier. Ueber gueltig entscheidet der Server
+ * beim status-Aufruf.
+ */
+function tokenFromHash() {
+    let raw = '';
+    try {
+        raw = new URLSearchParams(window.location.hash.slice(1)).get('t') || '';
+    } catch (e) {
+        return null;
+    }
+
+    const token = raw.trim();
+    if (!token || token.length > 255) {
+        return null;
+    }
+
+    return token;
+}
+
+/** Entfernt das Fragment aus Adresszeile und Verlaufseintrag. */
+function clearHash() {
+    try {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    } catch (e) {
+        /* kein Verlauf verfuegbar — dann bleibt der Hash stehen */
+    }
+}
+
 async function connect(token) {
     state.token = token;
     const res = await api('status');
@@ -900,6 +936,25 @@ function showDemoBanner() {
     }
 
     loadAppearance(); // I4: nicht blockierend — der Boot haengt nicht am Branding
+
+    // Schnellinbetriebnahme per QR: ein Token im Fragment gewinnt gegen den
+    // gespeicherten. Der Hash wird in jedem Fall entfernt, auch bei Misserfolg —
+    // er soll nicht im Verlauf stehenbleiben.
+    const scanned = tokenFromHash();
+    if (scanned) {
+        clearHash();
+        const error = await connect(scanned);
+        if (error) {
+            // Der gespeicherte Token bleibt unangetastet und wird bewusst nicht
+            // ersatzweise probiert: ein Neuladen bringt die Station in den
+            // Zustand vor dem Scan zurueck.
+            showScreen('setup');
+            showError('setupError', error);
+        } else {
+            await enterIdle();
+        }
+        return;
+    }
 
     const token = loadToken();
     if (token && !(await connect(token))) {
