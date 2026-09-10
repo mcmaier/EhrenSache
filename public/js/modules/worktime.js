@@ -649,6 +649,28 @@ export function openWorktimeReportModal() {
     const modal = document.getElementById('worktimeReportModal');
     if (!modal) return;
 
+    // Fuer Mitglieder ist der Bericht der eigene Stundennachweis: Die anderen
+    // beiden Berichtsarten aggregieren ueber alle Personen, und CSV weist der
+    // Server fuer diese Rolle ab. Hier wird nichts entschieden, nur nichts
+    // angeboten, was ohnehin abgelehnt wuerde.
+    const restricted = !isAdminOrManager;
+
+    const typeField = document.getElementById('reportType');
+    const typeGroup = typeField?.closest('.form-group');
+    const csvButton = document.getElementById('btnWorktimeReportCsv');
+    const title     = modal.querySelector('.modal-header h2');
+
+    if (restricted) {
+        if (typeField) typeField.value = 'worktime_member';
+        if (typeGroup) typeGroup.style.display = 'none';
+        if (csvButton) csvButton.style.display = 'none';
+        if (title)     title.textContent = 'Mein Stundennachweis';
+    } else {
+        if (typeGroup) typeGroup.style.display = '';
+        if (csvButton) csvButton.style.display = '';
+        if (title)     title.textContent = 'Arbeitszeitbericht';
+    }
+
     // Mitgliederliste aus der Filterleiste uebernehmen: Dort sind die
     // Mitgliedschaftszeitraeume bereits beruecksichtigt und ausgetretene
     // Mitglieder gekennzeichnet statt ausgeschlossen.
@@ -673,7 +695,10 @@ function updateWorktimeReportForm() {
     const type  = document.getElementById('reportType')?.value;
     const group = document.getElementById('reportMemberGroup');
     if (group) {
-        group.style.display = (type === 'worktime_member') ? '' : 'none';
+        // Fuer Mitglieder steht die Person fest -- die Auswahl waere eine
+        // Behauptung, sie liesse sich aendern.
+        const visible = (type === 'worktime_member') && isAdminOrManager;
+        group.style.display = visible ? '' : 'none';
     }
 }
 
@@ -703,9 +728,17 @@ export function runWorktimeReport(format) {
         return;
     }
 
+    // Der CSV-Knopf ist fuer Mitglieder ausgeblendet; wer trotzdem hierher
+    // gelangt, bekaeme vom Server 403. Dann lieber eine verstaendliche
+    // Meldung im Dialog als ein nackter Fehler in einem neuen Tab.
+    if (format !== 'html' && !isAdminOrManager) {
+        showToast('Für den eigenen Nachweis steht die Druckansicht zur Verfügung', 'error');
+        return;
+    }
+
     const params = new URLSearchParams({ resource: 'export', type, from, to });
 
-    if (type === 'worktime_member') {
+    if (type === 'worktime_member' && isAdminOrManager) {
         const member = document.getElementById('reportMember')?.value || '';
         if (member) params.set('member_id', member);
     }
