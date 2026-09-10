@@ -1749,3 +1749,84 @@ beiden Formate als gleichwertig darstellt. Falls ja, ist sie bis zur Behebung un
 zurückgehalten. Kein Zugang, keine Rechteausweitung.
 
 ---
+
+### OI-51 · Pünktlichkeit wird beworben, aber nirgends ausgewertet
+**Priorität:** hoch — eine Zusage, die das Projekt an vier Stellen macht und an keiner einlöst
+
+`README.md` schreibt „Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen".
+`CLAUDE.md` beschreibt das Projekt als „Statistische Auswertung von Anwesenheit **und
+Pünktlichkeit**". `API.md` führte bis 2026-09-10 die Antwortfelder `late_count` und
+`avg_arrival_minutes` auf. Die Werbeseite nennt es ebenfalls.
+
+**Im Code gibt es davon nichts.** `records.arrival_time` wird erfasst und — außer zur
+Terminzuordnung im Toleranzfenster — nirgends verwendet. Keine Verspätung wird berechnet, keine
+Quote gebildet, keine Kennzahl ausgegeben.
+
+Die falschen Felder sind am 2026-09-10 aus `API.md` entfernt worden; eine Referenz, die
+Nichtvorhandenes beschreibt, ist schlimmer als eine Lücke. Die Zusage selbst bleibt offen.
+
+**Was vorher entschieden werden muss — und warum es nicht einfach „nachgebaut" werden kann:**
+
+`arrival_time` ist keine verlässliche Messung. Legt ein Admin einen Anwesenheitseintrag ohne
+Uhrzeit an, setzt `private/handlers/records.php` die **Startzeit des Termins**. Der Datensatz ist
+damit konstruiert pünktlich. In vielen Vereinen dürfte das die Mehrheit sein — wer eine Liste
+abhakt, tippt keine Uhrzeiten. Eine Pünktlichkeitsquote über diesen Bestand läge nahe 100 % und
+wäre Fiktion.
+
+| `checkin_source` | Herkunft der Zeit | Messung? |
+|---|---|---|
+| `station_pin`, `device_auth`, `user_totp` | Serverzeit bei der Authentifizierung | ja, belastbar |
+| `auto_checkin` | vom Client mitgeschickt | ja, aber fremde Uhr |
+| `admin` ohne mitgegebene Zeit | **Startzeit des Termins** | nein |
+| `import` | aus der CSV | unbekannte Güte |
+| `timer` | historisch `NOW()`; erzeugt seit 1.2.3 keine Einträge mehr | nein — misst Arbeitsbeginn, nicht Ankunft |
+
+**Vorentscheidungen, beim Entwurf der Berichte am 2026-09-10 getroffen** (ausführlich in
+`docs/superpowers/specs/2026-09-10-berichte-statistik-und-nutzerrolle-design.md`, Abschnitt 11):
+
+1. **Herkunft dauerhaft speichern**, nicht heuristisch ableiten: eine Spalte `arrival_measured`
+   in `records`, von jedem Schreibpfad gesetzt, per Migration rückwirkend befüllt. Der
+   Anwesenheitsbericht (1.5.0) leitet sie bis dahin aus `checkin_source` ab — das ist die
+   Übergangslösung, nicht das Ziel.
+2. **Zwei getrennte Kennzahlen, niemals multipliziert.** Ein zusammengerechneter „Score"
+   verbirgt, was tatsächlich passiert ist, und lädt zum Missbrauch ein.
+   - *Pünktlichkeit* nur über gemessene Ankünfte: Quote innerhalb einer Karenz plus der
+     **Median** der Verspätung — der Mittelwert kippt bei einem einzigen Ausreißer. Immer mit
+     Bezugsgröße; unter fünf Messungen keine Quote, sondern „zu wenige Messungen".
+   - *Zuverlässigkeit* über alle Termine, mit drei Ausgängen: **erschienen**, **abgemeldet**
+     (Ausnahme vor Terminbeginn angelegt, ablesbar an `exceptions.created_at`), **ausgefallen**.
+     Quote = (erschienen + abgemeldet) / Termine. Die heutige Anwesenheitsquote bestraft eine
+     rechtzeitige Absage wie unentschuldigtes Fehlen; das ist der Punkt, den sie verfehlt.
+3. **Eigene Einstellung für die Karenz**, Vorgabe 5 Minuten. `checkin_tolerance_hours` wird
+   **nicht** wiederverwendet: Die zwei Stunden dort sind das Fenster für die *Terminzuordnung*.
+   Wer 90 Minuten zu spät kommt, wird korrekt zugeordnet und ist trotzdem zu spät.
+4. **Vor der Umsetzung** gehört eine personenbezogene Verhaltenskennzahl nach `DATENSCHUTZ.md` —
+   Zweck, Aufbewahrung, Sichtbarkeit für andere Rollen. Eine Zahl, die aussagt, wie verlässlich
+   ein einzelnes Mitglied ist, ist etwas anderes als eine Anwesenheitsliste.
+
+**Zusammenhang mit [OI-48](#oi-48):** Solange die Statistik je Gruppe nur eine Terminart
+auswertet, würde eine Pünktlichkeitsquote denselben Ausschnitt erben. OI-48 gehört davor.
+
+---
+
+### OI-52 · Anwesenheitsbericht kennt nur ganze Jahre
+**Priorität:** niedrig · bewusst verschoben
+
+Der Anwesenheitsbericht (1.5.0) übernimmt die Filter der Statistik-Sektion: Jahr, Gruppe,
+Mitglied. Einen freien Zeitraum wie der Arbeitszeitbericht (`from`/`to`, höchstens 24 Monate)
+kennt er nicht.
+
+Das ist keine Nachlässigkeit, sondern eine Entscheidung beim Entwurf am 2026-09-10: Die Statistik
+rechnet durchgehend über `YEAR(a.date) = ?`, und die Mitgliedschaftszeiträume kommen über
+`getMemberActivityWhereYear()` dazu. Ein freier Zeitraum würde `calculateGroupStatistics()`, die
+Terminzählung und die Aktivitätsprüfung umbauen — ein Eingriff in Zahlen, die Vereine seit Jahren
+kennen, für einen Bedarf, den niemand geäußert hat.
+
+Solange der Bericht dieselben Filter benutzt wie der Bildschirm, können beide sich nicht
+widersprechen. Das ist der eigentliche Gewinn der Beschränkung.
+
+**Zu tun, falls der Bedarf entsteht:** Monat, Quartal oder Vereinsjahr auswerten zu können, hieße
+die Jahresbasis der gesamten Statistik aufzugeben — nicht nur die des Berichts. Dann besser
+gemeinsam mit [OI-48](#oi-48) entscheiden, das ohnehin an derselben Funktion ansetzt.
+
+---
