@@ -134,9 +134,27 @@ const url     = baseUrl + 'station/#t=' + encodeURIComponent(token);
 Ein Hash-Token gewinnt immer gegen ein gespeichertes (Q8). Bei Misserfolg wird der gespeicherte
 Token **nicht** angefasst und **nicht** ersatzweise probiert (Q9).
 
-**Kein `hashchange`-Zuhörer.** Der Hash wird ausschließlich beim Start gelesen. Eine laufende
-Station, deren Adresse sich zur Laufzeit ändert, ignoriert das — ein Zuhörer wäre eine zweite
-Eintrittsstelle in denselben Zustand und damit eine zweite Fehlerquelle ohne Gegenwert.
+### 5.3.1 Zwei Korrekturen aus der Verifikation am laufenden System
+
+Beide Punkte widerlegen Annahmen, die weiter oben in dieser Spec standen. Sie sind hier
+festgehalten, damit niemand sie erneut aufmacht.
+
+**`api()` vergisst den Token bei jedem 401** (`public/station/js/app.js:160`, Commit `eda7f54`).
+Die ursprüngliche Fassung dieses Abschnitts behauptete, `connect()` lasse `localStorage` bei
+Misserfolg in Ruhe. Das stimmt für `connect()` selbst — aber `api('status')` darin ruft bei
+einem 401 `forgetToken()` auf. Ein veralteter QR-Code hätte damit einen laufenden Kiosk
+dauerhaft in die Einrichtung geworfen, also genau das Gegenteil von Q9. `init()` sichert den
+bisherigen Token deshalb **vor** dem Versuch und stellt ihn bei Misserfolg wieder her. Die
+Sonderbehandlung in `api()` bleibt unangetastet: Sie ist dort bewusst so gebaut (siehe der
+`pinRejected`-Kommentar) und trägt eigene Tests.
+
+**Es gibt doch einen `hashchange`-Zuhörer** (Commit `52aa80d`). Ursprünglich verworfen mit der
+Begründung, er wäre „eine zweite Eintrittsstelle in denselben Zustand". Das Argument trägt
+nicht: Ist die Station bereits offen und ändert sich nur das Fragment, ist das eine Navigation
+im selben Dokument — `init()` läuft nicht, und es passiert **sichtbar nichts**. Der Zuhörer
+ruft deshalb `window.location.reload()`, sobald ein Token im Fragment steht. Damit bleibt
+`init()` der einzige Weg in den Zustand, statt einen zweiten zu schaffen. Eine Schleife ist
+ausgeschlossen, weil `clearHash()` `replaceState` benutzt und das kein `hashchange` auslöst.
 
 ### 5.4 Dokumentation
 
