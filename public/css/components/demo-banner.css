@@ -1,0 +1,29 @@
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/* Hinweisband der Demo-Installation.
+   Wird von theme.js eingesetzt, sobald appearance demo: true meldet.
+   Ohne dieses Merkmal existiert das Element nicht — die Regel ist dann
+   wirkungslos und kostet nichts. */
+
+.demo-banner {
+    background: #e67e22;
+    color: #fff;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.4;
+    position: relative;
+    z-index: 90;
+}
+
+.demo-banner strong {
+    font-weight: 700;
+}

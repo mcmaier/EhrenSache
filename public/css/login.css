@@ -9,6 +9,7 @@
  */
 
  @import url('variables.css');
+ @import url('components/demo-banner.css');
 
 * {
     margin: 0;

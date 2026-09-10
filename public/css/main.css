@@ -26,6 +26,7 @@
 @import url('components/calendar.css');
 @import url('components/toast.css');
 @import url('components/pagination.css');
+@import url('components/demo-banner.css');
 
 /* Sections */
 @import url('sections/sidebar.css');

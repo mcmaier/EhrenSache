@@ -26,7 +26,11 @@ async function loadTheme() {
         const data = await response.json();
         const settings = data.settings;
 
-        applyTheme(settings); 
+        applyTheme(settings);
+
+        if (data.demo === true) {
+            showDemoBanner();
+        }
 
         // Settings im SessionStorage cachen (60 Minuten)
         sessionStorage.setItem('theme-settings', JSON.stringify(settings));
@@ -111,6 +115,27 @@ if (isThemeCacheValid()) {
 } else {
     // Frisch von API laden
     await loadTheme();
+}
+
+/**
+ * Setzt das Hinweisband der Demo-Installation an den Anfang der Seite.
+ *
+ * Der Text ist fest verdrahtet und enthält keine Daten aus der Antwort —
+ * innerHTML ist hier deshalb unbedenklich.
+ */
+function showDemoBanner() {
+    if (document.querySelector('.demo-banner')) {
+        return;
+    }
+
+    const banner = document.createElement('div');
+    banner.className = 'demo-banner';
+    banner.setAttribute('role', 'status');
+    banner.innerHTML = '<strong>Demo-Installation.</strong> '
+        + 'Alle Daten sind erfunden und werden stündlich zurückgesetzt. '
+        + 'Konten, Rechte, Mailversand und Systemeinstellungen sind abgeschaltet.';
+
+    document.body.prepend(banner);
 }
 
 export { loadTheme, applyTheme }
