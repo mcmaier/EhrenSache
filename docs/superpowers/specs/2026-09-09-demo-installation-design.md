@@ -178,8 +178,28 @@ Stattdessen meldet `getAppearance()` — ein öffentlicher `GET`, den `theme.js`
 jeder Anmeldung holt — zusätzlich `"demo": true`. Das Banner wird im ausgelieferten CSS
 definiert und nur bei gesetztem Merkmal eingeblendet.
 
-Bei der Umsetzung zu prüfen: ob `theme.js` in `public/checkin/` und `public/station/` läuft.
-Falls nicht, gilt dort dieselbe Abfrage gegen `appearance`.
+Bei der Umsetzung geprüft: `theme.js` läuft **nicht** in den beiden PWAs, beide holen
+`appearance` aber selbst. Dort steht die Abfrage deshalb in ihrer eigenen Ladefunktion.
+
+### Es sind fünf Oberflächen, nicht vier
+
+> **Ergänzt am 2026-09-10 nach der Durchsicht.** Die erste Fassung zählte vier auf. Übersehen
+> wurde die einzige, deren Erzeugnis den Bildschirm verlässt.
+
+`renderWorktimeReport()` in `private/handlers/export.php` liefert eine eigenständige
+HTML-Seite mit Vereinslogo, Vereinsname, Zeitraum und „Erstellt am …", ausgelegt zum
+Ausdrucken als Nachweis. Sie hängt an der Ressource `export`, die in `DEMO_READ_ONLY` steht
+und auf der Demo damit erreichbar ist. Sie lädt `css/print.css` und keines der vier Bänder.
+
+Ein ausgedruckter Arbeitszeitnachweis über erfundene Personen wäre äußerlich nicht von einem
+echten zu unterscheiden. Der Nachweis bekommt deshalb einen eigenen Hinweis, und `print.css`
+muss ihn mit `print-color-adjust: exact` aufs Papier bringen — ein Streifen, den der Drucker
+wegoptimiert, ist keiner.
+
+**Das bedeutet einen Eingriff in einen Handler** und weicht damit von Abschnitt 12 ab
+(„Keine Änderung an den Handlern"). Die Abweichung ist bewusst: Diese Regel richtete sich
+gegen das Portieren der zwölf `demoBlockedResponse()`-Aufrufe des Forks. Ein gedrucktes
+Dokument ohne Kennzeichnung wiegt schwerer als ihre buchstabengetreue Einhaltung.
 
 ## 8. Der Reset
 
@@ -194,10 +214,26 @@ php private/demo/seed.php --yes --quiet
 Er arbeitet in einer Transaktion; ein Besucher mitten in einer Aktion sieht keinen halben
 Bestand.
 
-`buildSettings()` in `plan.php` schreibt acht Schlüssel und **nicht** `smtp_configured`.
-Da `checkMailStatus()` ein fehlendes `smtp_configured` als „aus" wertet, stellt jeder Reset
-den mailfreien Zustand aktiv wieder her. Diese Eigenschaft ist beabsichtigt und darf bei
-Änderungen an `buildSettings()` nicht verlorengehen.
+> **Korrigiert am 2026-09-10.** Hier stand: „`buildSettings()` schreibt acht Schlüssel und
+> nicht `smtp_configured`. Da `checkMailStatus()` ein fehlendes `smtp_configured` als ‚aus'
+> wertet, stellt jeder Reset den mailfreien Zustand aktiv wieder her." **Das war falsch**,
+> und zwar in der gefährlichen Richtung — es behauptete eine zweite Verteidigungslinie, die
+> es nicht gibt.
+
+`system_settings` steht **nicht** in `DEMO_TABLES` (`seed.php`). Der Generator leert die
+Tabelle nie; `writePlan()` führt lediglich ein `UPDATE` für die acht Schlüssel aus
+`buildSettings()` aus. `smtp_configured` und `mail_enabled` werden dabei **nicht angefasst**.
+Steht dort einmal `1` — etwa weil die Installation vorher Mail konfiguriert hatte oder aus
+einem Abzug stammt —, überlebt der Wert jeden Reset. Nachgemessen am 2026-09-10: In der
+Entwicklungsdatenbank stehen beide auf `1`.
+
+**Der Mailversand wird allein durch die Sperrliste verhindert.** `register` und
+`password_reset_request` stehen in `DEMO_WRITE_DENIED`; der Wächter weist sie mit 403 ab,
+bevor ein Handler läuft. Das ist die einzige wirksame Linie — nicht eine von zweien.
+
+Wer den Sperreintrag lockert, öffnet damit unmittelbar den Versand an beliebige Adressen.
+Die fehlende Mail-Konfiguration ist deshalb **kein Ersatz**, sondern eine Betriebsbedingung,
+die eigens geprüft werden muss: siehe Abschnitt 11.
 
 ## 9. Prüfung
 
@@ -254,7 +290,9 @@ Nicht Code, aber Voraussetzung dafür, dass der Rest trägt. Einmalig zu prüfen
   der Update-Assistent hat keine eigene Anmeldung.
 - Der Datenbankbenutzer der Demo darf **nur** auf die Demo-Datenbank berechtigt sein.
 - `install.lock` vorhanden.
-- Keine Mail-Konfiguration hinterlegen; `smtp_configured` ungesetzt lassen.
+- Keine Mail-Konfiguration hinterlegen. **In `system_settings` prüfen, dass `mail_enabled`
+  und `smtp_configured` nicht auf `1` stehen** — der Reset räumt sie nicht ab (Abschnitt 8).
+  Das ist eine Prüfung am Server, keine Eigenschaft des Generators.
 - Der Cron muss CLI-PHP aufrufen — `seed.php` weist einen Aufruf über den Webserver ab.
 
 ## 12. Nicht enthalten
@@ -266,8 +304,15 @@ Nicht Code, aber Voraussetzung dafür, dass der Rest trägt. Einmalig zu prüfen
 - **Keine Rollenabstufung im Wächter.** Die alte Idee `DEMO_RESTRICTED_ACTIONS`
   („nur für Manager") entfällt. Der Wächter entscheidet allein nach Ressource und Methode.
   Wer welche Rolle hat, regelt weiterhin die normale Rechteprüfung im Handler.
-- **Keine Änderung an den Handlern.** Die zwölf `demoBlockedResponse()`-Aufrufe des Forks
-  werden nicht portiert, sondern ersetzt.
+- **Keine Änderung an den Handlern**, mit **einer** benannten Ausnahme. Die zwölf
+  `demoBlockedResponse()`-Aufrufe des Forks werden nicht portiert, sondern ersetzt. Die
+  Ausnahme ist der Hinweis im ausdruckbaren Arbeitszeitnachweis (`export.php`), begründet in
+  Abschnitt 7.
+- **Keine Änderung am Generator aus Vorhaben ①** — auch hier eine Ausnahme: `--quiet`
+  unterdrückt seit dem 2026-09-10 zusammen mit `--yes` auch die Zielanzeige. Grund war, dass
+  ein stündlicher Cron-Job sonst je nach Konfiguration stündlich eine Mail auslöst. Die Regel
+  steht als `showTargetListing()` im Skript und ist geprüft; ohne `--yes` erscheint die
+  Anzeige weiterhin, weil danach nach `LOESCHEN` gefragt wird.
 - **Kein Rate Limiting eigens für die Demo.** Die bestehenden 150 Anfragen je Minute und die
   Mail-Grenzen (3 je Adresse, 10 je IP pro Stunde) bleiben unverändert.
 - **Kein Schutz außerhalb von `api.php`.** `public/reset_password.php` und
