@@ -53,6 +53,27 @@ function reportEscape($value): string
  */
 function renderReport($db, $database, array $report): void
 {
+    // Pflichtschluessel frueh und laut abfangen. Ab dem Anwesenheitsbericht
+    // werden Abschnitte dynamisch gebaut; ein vertippter Schluessel erzeugte
+    // sonst eine Tabelle mit Kopfzeile und ohne Inhalt -- einen Ausdruck, der
+    // falsch ist und richtig aussieht. Auf einem Nachweis ist das schlimmer
+    // als ein Abbruch.
+    foreach (['title', 'period', 'sections', 'notes'] as $key) {
+        if (!array_key_exists($key, $report)) {
+            throw new InvalidArgumentException("Bericht ohne Schluessel '{$key}'");
+        }
+    }
+
+    foreach ($report['sections'] as $index => $section) {
+        foreach (['columns', 'rows'] as $key) {
+            if (!array_key_exists($key, $section)) {
+                throw new InvalidArgumentException(
+                    "Abschnitt {$index} des Berichts hat keinen Schluessel '{$key}'"
+                );
+            }
+        }
+    }
+
     require_once __DIR__ . '/branding.php';
     $branding = getBrandingSettings($db, $database);
 

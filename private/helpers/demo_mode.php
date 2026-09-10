@@ -97,6 +97,7 @@ const DEMO_READ_ONLY = [
     'session_info',
     'my_data',
     'statistics',
+    'statistics_report',
     'available_years',
     'attendance_list',
     'import_logs',

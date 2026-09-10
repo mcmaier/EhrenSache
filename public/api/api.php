@@ -53,6 +53,7 @@ require_once '../../private/handlers/change_pin.php';
 require_once '../../private/handlers/member_groups.php';
 require_once '../../private/handlers/appointment_types.php';
 require_once '../../private/handlers/statistics.php';
+require_once '../../private/handlers/report_statistics.php';
 require_once '../../private/handlers/export.php';
 require_once '../../private/handlers/import.php';
 require_once '../../private/handlers/settings.php';
@@ -557,7 +558,10 @@ switch($resource) {
                            $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
         break;        
     case 'statistics':
-        handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId);        
+        handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId);
+        break;
+    case 'statistics_report':
+        handleStatisticsReport($db, $database, $request_method, $authUserRole, $authMemberId);
         break;
     case 'auto_checkin':
         handleAutoCheckin($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
