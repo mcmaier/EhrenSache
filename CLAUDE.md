@@ -23,6 +23,7 @@ statt sie hier zu duplizieren:
 | `DISCLAIMER.md`, `LICENSE`, `COMMERCIAL-LICENSE.md` | Rechtliches | ja |
 | `public/checkin/README.md` | PWA für mobilen Check-in | ja |
 | `public/station/README.md` | PWA für die virtuelle Station (Kiosk) | ja |
+| `docs/DEMO.md` | **Öffentliche Demo betreiben: Installation, Einstellungen, Cronjob, Prüfliste** | ja |
 | `docs/OPEN-ITEMS.md` | **Offene Entscheidungen, Restarbeiten, bewusst Verworfenes** | ja |
 | `docs/FEATURE-IDEAS.md` | **Ideen für künftige Funktionen — unverbindlich, nicht geplant** | ja |
 | `docs/project_history.md` | **Warum das System so gebaut ist: Grundsatzentscheidungen und verworfene Wege (11/2025–04/2026)** | ja |

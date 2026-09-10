@@ -137,71 +137,26 @@ Sie stehen als Tests fest, weil jede von ihnen einmal verletzt war:
 
 ## Betrieb der öffentlichen Demo
 
-Der stündliche Reset ruft den Generator ohne Rückfrage:
+Wie eine öffentlich erreichbare Demo aufgesetzt, abgesichert und stündlich zurückgesetzt wird,
+steht in **`docs/DEMO.md`** — Installation, Einstellungen, Cronjob und Prüfliste.
+
+Hier nur, was den Generator selbst betrifft:
+
+Der Cron ruft ihn ohne Rückfrage und ohne Ausgabe:
 
 ```
 0 * * * * /usr/bin/php /pfad/zur/installation/private/demo/seed.php --yes --quiet
 ```
 
-**Der Takt muss stündlich sein.** Das Hinweisband sagt dem Besucher „stündlicher Reset", und
-der Satz steht fest verdrahtet an **drei** Stellen: `public/js/theme.js` (Hauptanwendung und
-Anmeldung), `public/checkin/js/app.js` und `public/station/js/app.js`. Der Hinweis auf dem
-Arbeitszeitnachweis (`private/handlers/export.php`) nennt den Takt bewusst nicht — auf Papier
-wäre er ohne Zeitstempel wertlos.
+`--quiet` **zusammen mit** `--yes` schweigt vollständig — sonst löste ein stündlicher Job je
+nach Konfiguration stündlich eine Mail aus. `--quiet` **allein** unterdrückt nur die
+Schlusszusammenfassung: Die Zielanzeige bleibt, weil ohne `--yes` gleich nach `LOESCHEN`
+gefragt wird — und wer das tippen soll, muss sehen, was er löscht. Die Regel steht als
+`showTargetListing()` im Skript und ist in `tests/suites/demo_seed_cli.php` festgehalten.
 
-Wer seltener zurücksetzt, lässt die Oberfläche lügen; wer den Takt ändern will, muss die drei
-Stellen mitziehen.
+Fehler gehen auf STDERR und bleiben sichtbar; Rückgabewert 0 bei Erfolg, 1 bei einem Fehler.
 
-`seed.php` weist einen Aufruf über den Webserver ab und läuft nur auf der Kommandozeile.
-Der gesamte Schreibvorgang liegt in einer Transaktion — ein Besucher mitten in einer Aktion
-bekommt keinen halben Bestand zu sehen. Dass hier `DELETE` und nicht `TRUNCATE` geleert wird,
-ist die Voraussetzung dafür: `TRUNCATE` löst ein implizites COMMIT aus und machte das
-Zurückrollen wirkungslos.
-
-**`--quiet` zusammen mit `--yes` schweigt vollständig** — kein Zeichen auf STDOUT, damit ein
-stündlicher Cron-Job nicht stündlich eine Mail auslöst. Fehler gehen weiterhin auf STDERR und
-bleiben sichtbar; der Rückgabewert ist 0 bei Erfolg und 1 bei einem Fehler.
-
-`--quiet` **allein** unterdrückt nur die Schlusszusammenfassung. Die Zielanzeige mit Datenbank,
-Präfix und der Zeilenzahl jeder zu leerenden Tabelle erscheint weiterhin, weil ohne `--yes`
-gleich nach `LOESCHEN` gefragt wird — wer das tippen soll, muss sehen, was er löscht. Die Regel
-steht als `showTargetListing()` im Skript und ist in `tests/suites/demo_seed_cli.php`
-festgehalten.
-
-### Der Reset räumt die Mail-Einstellungen nicht ab
-
-`system_settings` steht **nicht** in `DEMO_TABLES`. Der Generator leert die Tabelle nie;
-`writePlan()` führt lediglich ein `UPDATE` für die acht Schlüssel aus `buildSettings()` aus.
-`smtp_configured` und `mail_enabled` sind keine davon und werden **nicht angefasst**. Steht
-dort einmal `1` — weil die Installation vorher Mail konfiguriert hatte oder aus einem Abzug
-stammt —, überlebt der Wert jeden Reset.
-
-Dass `password_reset_request` auf der Demo nichts verschickt, liegt deshalb **allein** am
-Sperrlisteneintrag in `private/helpers/demo_mode.php`: Der Wächter weist die Ressource mit
-403 ab, bevor ein Handler läuft. Die fehlende Mail-Konfiguration ist **kein** zweiter Riegel.
-
-Wer den Sperreintrag lockert im Vertrauen darauf, dass „der Reset das schon abfängt", öffnet
-damit unmittelbar den Versand an beliebige Adressen. Die Prüfung der beiden Schlüssel steht
-deshalb unten in der Checkliste — sie ist eine Aufgabe am Server, keine Eigenschaft des
-Generators.
-
-### Der Demo-Modus ist davon getrennt
-
-Der Generator stellt den **Datenbestand** her. Was ein Besucher damit tun darf, regelt der
-Wächter in `private/helpers/demo_mode.php`, eingeschaltet über `define('DEMO_MODE', true);`
-in `private/config/config.php`. Beides gehört zusammen, ist aber unabhängig: Ein Reset ohne
-Wächter ergäbe eine Demo, in der jeder Konten anlegen kann; ein Wächter ohne Reset eine, die
-nach einem Tag zerfahren aussieht.
-
-### Einmalig am Server zu prüfen
-
-- **`/update/` und `/install/` müssen 403 liefern.** Beide tragen eine `.htaccess` mit
-  `Require all denied`, und `tests/suites/htaccess_locks.php` hält die Fassungen zusammen.
-  Ist `AllowOverride` beim Hoster abgeschaltet, sind beide offen — der Update-Assistent hat
-  keine eigene Anmeldung.
-- Der Datenbankbenutzer der Demo darf **nur** auf die Demo-Datenbank berechtigt sein.
-- `private/config/install.lock` muss vorhanden sein.
-- Keine Mail-Konfiguration hinterlegen. **In `system_settings` prüfen, dass `mail_enabled`
-  und `smtp_configured` nicht auf `1` stehen** — der Reset räumt sie nicht ab.
-- `define('DEMO_MODE', true);` in `private/config/config.php` eintragen.
-- Der Cron muss CLI-PHP aufrufen, nicht den Webserver.
+**Der Reset überschreibt in `system_settings` nur acht Schlüssel** und leert die Tabelle nie.
+`mail_enabled` und `smtp_configured` gehören **nicht** dazu — sie überleben jeden Lauf. Was
+das für den Mailversand bedeutet, steht in `docs/DEMO.md`; die Kurzfassung: Der Versand wird
+allein durch die Sperrliste des Wächters verhindert, nicht durch die fehlende Konfiguration.
