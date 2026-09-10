@@ -186,3 +186,55 @@ test('Die Station schaltet im Vereins-LAN nicht auf DEBUG', function () use ($re
         . 'Namen wird ein Kiosk im Vereinsnetz aber im Regelbetrieb aufgerufen'
     );
 });
+
+test('Dashboard und Station laden keine externen Skripte', function () use ($repoRoot) {
+    // Eine Vereinsinstallation steht oft in einem Netz ohne Internetzugang. Ein
+    // Skript von einem CDN faellt dort still aus — kein Fehler, der QR-Code
+    // fehlt einfach. Deshalb liegt die Bibliothek im Paket.
+    //
+    // public/checkin/index.html ist bewusst ausgenommen: dort kommt
+    // html5-qrcode weiterhin von unpkg. Das ist eine eigene Baustelle und
+    // wuerde diesen Test sofort rot faerben.
+    foreach (['/public/index.html', '/public/station/index.html'] as $rel) {
+        $html = (string) file_get_contents($repoRoot . $rel);
+
+        preg_match_all('/<script[^>]*\ssrc="((?:https?:)?\/\/[^"]+)"/', $html, $m);
+
+        assertTrue(
+            $m[1] === [],
+            "{$rel}: laedt Skripte von aussen: " . implode(', ', $m[1])
+        );
+    }
+});
+
+test('Jedes Script-Tag zeigt auf eine vorhandene Datei', function () use ($repoRoot) {
+    // Ohne Build-Kette faellt ein verschobenes Skript erst im Browser auf — und
+    // dort nur, wenn jemand genau diese Seite oeffnet. Der Fallback-Zweig, der
+    // das frueher abgefangen haette, ist mit dem CDN entfallen.
+    $files = [
+        '/public/index.html',
+        '/public/login.html',
+        '/public/checkin/index.html',
+        '/public/station/index.html',
+    ];
+
+    $fehlend = [];
+    foreach ($files as $rel) {
+        $html = (string) file_get_contents($repoRoot . $rel);
+        $dir  = dirname($repoRoot . $rel);
+
+        preg_match_all('/<script[^>]*\ssrc="([^"]+)"/', $html, $m);
+        foreach ($m[1] as $src) {
+            // Externe Quellen deckt der Test darueber ab.
+            if (preg_match('#^(?:https?:)?//#', $src) === 1) {
+                continue;
+            }
+            $pfad = $dir . '/' . explode('?', $src)[0];
+            if (!is_file($pfad)) {
+                $fehlend[] = $rel . ' -> ' . $src;
+            }
+        }
+    }
+
+    assertTrue($fehlend === [], "Script-Tag ohne Datei:\n  " . implode("\n  ", $fehlend));
+});
