@@ -7,6 +7,57 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Nicht veröffentlicht]
+
+### Neu
+- **Demo-Modus für öffentlich erreichbare Installationen.** `define('DEMO_MODE', true);` in
+  `private/config/config.php` begrenzt schreibende Zugriffe auf eine feste Erlaubnisliste:
+  Mitglieder, Termine, Anwesenheit, Anträge, Arbeitszeit, Check-in und Kiosk bleiben nutzbar;
+  Konten, Rechte, Mailversand, Dateiannahme und Systemeinstellungen sind gesperrt. Ohne die
+  Zeile ist der Modus wirkungslos — eine Vereinsinstallation merkt nichts davon.
+
+  Der Wächter steht an **einer** Stelle im Router, nicht in den Handlern, und die Liste ist
+  eine **Erlaubnis**- und keine Sperrliste: Eine künftig neue Ressource ist damit von selbst
+  gesperrt, bis jemand bewusst entscheidet. Genau daran ist der Vorgänger gescheitert — der
+  alte `demo`-Branch schützte über zwölf harte `exit`-Aufrufe in Handler-Rümpfen, und als
+  danach neun Ressourcen dazukamen, bemerkte das niemand.
+
+  Ein gesetzter, aber unsauberer Wert fällt zur sicheren Seite: `true` heißt an, `false` aus,
+  jeder andere Wert ebenfalls **an**, dazu eine Meldung im Protokoll. Ein Tippfehler lässt die
+  öffentliche Demo also nicht stillschweigend ungeschützt.
+
+- **Hinweisband auf allen Oberflächen.** `appearance` meldet zusätzlich `demo`; Dashboard,
+  Anmeldung, Check-in-PWA und Kiosk blenden daraufhin ein Band ein. Der ausdruckbare
+  Arbeitszeitnachweis trägt einen eigenen, deutlicheren Hinweis — er ist das einzige
+  Erzeugnis, das den Bildschirm verlässt, und wäre sonst von einem echten Nachweis äußerlich
+  nicht zu unterscheiden.
+
+### Geändert
+- `private/demo/seed.php`: `--quiet` schweigt zusammen mit `--yes` vollständig. Zuvor gab auch
+  ein stiller Lauf rund zwanzig Zeilen aus — bei einem stündlichen Cron-Job je nach
+  Konfiguration eine Mail pro Stunde. Ohne `--yes` bleibt die Zielanzeige, weil danach nach
+  `LOESCHEN` gefragt wird: Wer das tippen soll, muss sehen, was er löscht.
+
+### Behoben
+- **`API.md` beschrieb `appearance` falsch.** Das Beispiel zeigte ein flaches Objekt mit
+  `org_name` und `logo_url`; ausgeliefert wird seit Langem `{"settings": {…}}` mit anderen
+  Schlüsselnamen. Gegen die laufende Installation geprüft und ersetzt.
+
+### Intern
+- `tests/run.php` meldet einen vorzeitigen Abbruch. Bisher lud es alle Suiten in **einem**
+  Prozess und rief die Zusammenfassung erst am Ende — ein `exit()` in irgendeiner Suite
+  beendete den Lauf mit Rückgabewert **0** und übersprang stillschweigend alle späteren
+  Suiten. Von außen sah das wie ein Erfolg aus.
+- `tests/suites/demo_mode.php` liest `public/api/api.php` und verlangt, dass jede dort
+  geroutete Ressource in genau einer der drei Listen steht, und dass der Wächter vor dem
+  ersten öffentlichen Endpunkt aufgerufen wird — geprüft über den Tokenstrom, nicht über eine
+  Textsuche.
+- `$_GET['resource']` wird auf eine Zeichenkette geprüft. `?resource[]=x` lieferte sonst ein
+  Array, das die Typprüfung des Wächters mit einem Fatal Error zerlegt hätte.
+- Der `demo`-Branch entfällt. Sein Stand liegt als Tag `demo-legacy`.
+
+---
+
 ## [1.4.1] – 2026-09-09
 
 ### Sicherheit

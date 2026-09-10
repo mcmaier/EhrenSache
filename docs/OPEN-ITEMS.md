@@ -4,7 +4,7 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-09 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
+**Zuletzt geprüft:** 2026-09-10 · **Bezugsstand:** `dev`, noch nicht nach `main` übernommen ·
 **Version:** 1.4.0
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
@@ -1517,3 +1517,24 @@ Punkte, bei denen eine frühere Einschätzung revidiert wurde — als Warnung vo
   kamen von gewöhnlichem HTTP-Caching.
 - **`location_name` war immer `NULL`.** Der Bestandscode las `users.email` von Gerätekonten —
   ein Feld, das die Check-Constraint auf `NULL` zwingt.
+
+### OI-44 · Demo: gespeichertes XSS zwischen zwei Resets
+**Priorität:** niedrig · bewusst in Kauf genommen
+
+Der Demo-Modus lässt Schreibzugriffe auf Mitglieder, Termine, Anwesenheiten, Anträge und
+Arbeitszeiten zu — das ist sein Zweck. Was ein Besucher dabei in ein Freitextfeld schreibt,
+bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Die Oberfläche nutzt
+Inline-Handler und führt bewusst keine CSP (siehe [OI-17](#oi-17)).
+
+Beim Entwurf am 2026-09-09 erwogen und für die Ausbaustufe „Sandkasten mit Grenzen"
+hingenommen. Die Alternative wäre eine reine Schaufenster-Demo gewesen, die weder Check-in
+noch Zeiterfassung zeigen kann — also genau die Funktionen, für die die Werbeseite gebaut
+wurde. Der stündliche Reset begrenzt die Wirkung zeitlich, hebt sie nicht auf.
+
+**Betroffen ist ausschließlich die Demo-Installation mit erfundenen Daten.** Eine
+Vereinsinstallation setzt `DEMO_MODE` nicht und ist unberührt; dort schützt weiterhin die
+normale Rechteprüfung, die einen anonymen Besucher gar nicht erst schreiben lässt.
+
+Fällt OI-17, fällt dieser Punkt mit.
+
+---
