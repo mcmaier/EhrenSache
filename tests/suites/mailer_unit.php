@@ -163,3 +163,20 @@ test('config_example.php laedt die Mailkonfiguration nicht ungeprueft', function
         'getMailConfig() prueft nicht, ob mail_config.php ueberhaupt existiert'
     );
 });
+test('Versandte Mails tragen einen To-Header', function () use ($repoRoot) {
+    // Der Empfaenger stand bisher nur im SMTP-Envelope (RCPT TO). Ohne
+    // Destination-Header zeigen Clients "undisclosed recipients", und ein
+    // fehlender To-Header ist ein klassisches Spam-Merkmal — ausgerechnet bei
+    // Registrierungs- und Reset-Mails, die ankommen muessen. RFC 5322 verlangt
+    // ihn ebenfalls.
+    $code = (string) file_get_contents($repoRoot . '/private/helpers/mailer.php');
+
+    assertTrue(
+        preg_match('/public function send\(.*?fputs\(\$socket, \$body/s', $code, $m) === 1,
+        'send() nicht gefunden'
+    );
+    assertTrue(
+        preg_match('/\$headers\s*\.?=\s*"To:/', $m[0]) === 1,
+        'send() baut keinen To-Header — der Empfaenger steht nur im SMTP-Envelope'
+    );
+});

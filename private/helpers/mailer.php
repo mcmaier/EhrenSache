@@ -241,6 +241,11 @@ class Mailer {
             
             // Headers
             $headers = "From: {$this->from_name} <{$this->from_email}>\r\n";
+            // Der Empfaenger gehoert nicht nur in den Envelope (RCPT TO), sondern
+            // auch in den Kopf der Nachricht: ohne To-Header zeigen Clients
+            // "undisclosed recipients", und Spamfilter werten das ab. $to ist oben
+            // durch FILTER_VALIDATE_EMAIL gegangen, kann also keine Kopfzeile brechen.
+            $headers .= "To: <$to>\r\n";
             $headers .= "Reply-To: {$this->from_email}\r\n";
             $headers .= "MIME-Version: 1.0\r\n";
             $headers .= "Content-Type: " . ($isHtml ? "text/html" : "text/plain") . "; charset=UTF-8\r\n";
