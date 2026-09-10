@@ -75,39 +75,49 @@ try {
     
     $db->commit();
 
-    // Mail-Status prüfen BEVOR User gesucht wird
-    $mailer = new Mailer(getMailConfig(), $db);
-    $mailStatus = $mailer->checkMailStatus();
+    // Ab hier ist die Verifikation abgeschlossen: das Konto ist bestätigt, der
+    // Token verbraucht. Was jetzt noch folgt, ist Beiwerk — die Benachrichtigung
+    // der Admins. Sie darf die Erfolgsmeldung unter keinen Umständen mehr kippen,
+    // sonst sieht der Nutzer eine Fehlerseite für einen Vorgang, der geglückt ist,
+    // und sein Token ist beim zweiten Versuch bereits verbraucht.
+    try {
+        // Mail-Status prüfen BEVOR User gesucht wird.
+        // Der dritte Parameter ist Pflicht, sobald ein PDO mitgegeben wird:
+        // der Konstruktor ruft damit $database->table('').
+        $mailer = new Mailer(getMailConfig(), $db, $database);
+        $mailStatus = $mailer->checkMailStatus();
 
-    if (!$mailStatus['enabled']) {
-        exit();
-    }
+        if ($mailStatus['enabled']) {
+            // Admin benachrichtigen
+            // Hole Benutzerinformationen für die Admin-Benachrichtigung
+            $user_stmt = $db->prepare("SELECT name, email FROM {$prefix}users WHERE user_id = ?");
+            $user_stmt->execute([$result['user_id']]);
+            $user_data = $user_stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Admin benachrichtigen
-    // Hole Benutzerinformationen für die Admin-Benachrichtigung
-    $user_stmt = $db->prepare("SELECT name, email FROM {$prefix}users WHERE user_id = ?");
-    $user_stmt->execute([$result['user_id']]);
-    $user_data = $user_stmt->fetch(PDO::FETCH_ASSOC);
+            // Benachrichtige alle Admins
+            $admin_stmt = $db->prepare("SELECT email FROM {$prefix}users WHERE role = 'admin' AND is_active = 1");
+            $admin_stmt->execute();
 
-    // Benachrichtige alle Admins
-    $admin_stmt = $db->prepare("SELECT email FROM {$prefix}users WHERE role = 'admin' AND is_active = 1");
-    $admin_stmt->execute();
+            while ($admin = $admin_stmt->fetch(PDO::FETCH_ASSOC)) {
+                $subject = "Neue Registrierung: {$user_data['name']}";
+                $message = "Ein neuer Benutzer hat seine E-Mail-Adresse bestätigt:\n\n";
+                $message .= "Name: {$user_data['name']}\n";
+                $message .= "E-Mail: {$user_data['email']}\n\n";
+                $message .= "Bitte aktivieren Sie den Benutzer über die Mitgliederverwaltung.";
 
-    while ($admin = $admin_stmt->fetch(PDO::FETCH_ASSOC)) {
-        $subject = "Neue Registrierung: {$user_data['name']}";
-        $message = "Ein neuer Benutzer hat seine E-Mail-Adresse bestätigt:\n\n";
-        $message .= "Name: {$user_data['name']}\n";
-        $message .= "E-Mail: {$user_data['email']}\n\n";
-        $message .= "Bitte aktivieren Sie den Benutzer über die Mitgliederverwaltung.";
-        
-        $mailer->send($admin['email'], $subject, $message);
+                $mailer->send($admin['email'], $subject, $message);
+            }
+        }
+    } catch (Throwable $mailError) {
+        // Nur protokollieren. Der Nutzer hat mit dem Mailversand nichts zu tun.
+        error_log('Email verification: Admin-Benachrichtigung fehlgeschlagen: ' . $mailError->getMessage());
     }
 
     // Erfolg anzeigen
     showSuccess($result['name'],$branding);
     exit();
     
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if ($db->inTransaction()) {
         $db->rollBack();
     }
@@ -228,7 +238,7 @@ function showSuccess($name, $branding) {
     <?php
 }
 
-function showError($title, $message = '', $branding) {
+function showError($title, $message, $branding) {
     $brandingCSS = getBrandingCSS($branding);
     $brandingLogo = getBrandingLogo($branding);
     $orgName = htmlspecialchars($branding['organization_name'])
