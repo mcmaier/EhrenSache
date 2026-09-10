@@ -59,6 +59,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   nicht zu unterscheiden.
 
 ### Geändert
+- **Neues Zeichen, neuer Icon-Satz.** Logo, Favicon und die PWA-Icons stammen jetzt aus einer
+  überarbeiteten Vorlage: zwei Farben statt vier, der Haken sitzt in einem eigenen Kreis. Neu
+  sind eigene **maskable**-Icons — bisher trugen `icon-192/512` die Kennzeichnung
+  `any maskable`, weshalb Android das Zeichen beim runden Zuschnitt an den Rändern abschnitt.
+  Das Apple-Touch-Icon ist nicht mehr das 192er-Icon, sondern eine eigene Datei mit weißem
+  Grund, weil iOS keine Transparenz kennt. Das Favicon zeigt unter 48 px nur noch den
+  Haken-Kreis; das vollständige Zeichen war dort nicht mehr lesbar. Die Check-in-PWA meldet
+  zudem `#1F5FBF` als Themenfarbe statt des alten `#667eea` aus der ersten Entwurfspalette
 - **Die Anmeldeseite trägt jetzt „Einsatz ist EhrenSache".** „Anwesenheit" beschrieb die
   Anwendung nicht mehr vollständig, seit sie auch Arbeitszeit erfasst; „Einsatz" deckt beide
   Erfassungsarten ab. Derselbe Claim steht in der README
