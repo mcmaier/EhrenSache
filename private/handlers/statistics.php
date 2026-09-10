@@ -83,6 +83,11 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
     require_once __DIR__ . '/../helpers/member_activity.php';
 
     if ($groupId !== null) {
+        // Wiederholt bewusst die Pruefung, die handleStatistics() vor dem Aufruf
+        // bereits macht: Diese Funktion muss auch ohne vorgelagertes Gate
+        // aufrufbar sein -- der Anwesenheitsbericht ruft sie so. Das kostet fuer
+        // Nicht-Manager mit Gruppenfilter eine zusaetzliche, indizierte
+        // COUNT-Abfrage. Wer hier "bereinigt", macht den Bericht angreifbar.
         if (!hasStatisticsGroupAccess($db, $database, $authMemberId, $role, $groupId)) {
             return [
                 'warning'    => 'group not accessible',
@@ -164,8 +169,6 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
         exit();
     }
 
-    $prefix = $database->table('');
-
     // (int) auf date('Y'): Ohne den Cast waere $year hier ein String und wuerde
     // erst am Typehint von buildStatisticsResult() stillschweigend umgewandelt.
     // Die Antwort trug in diesem Fall bis 1.4.1 "year":"2026" statt "year":2026.
@@ -209,6 +212,11 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
         );
     }
 
+    // $result['warning'] ist an dieser Aufrufstelle stets null: Den einzigen
+    // Fall, in dem buildStatisticsResult() selbst eine Warnung setzt (kein
+    // Gruppenzugriff), hat der Handler oben schon mit 403 abgefangen. $warning
+    // gewinnt hier also immer. Der Null-Coalesce bleibt trotzdem stehen, damit
+    // die Zeile richtig bleibt, falls sich das Gate oben einmal aendert.
     $result['warning'] = $warning ?? $result['warning'];
 
     echo json_encode($result);
