@@ -49,8 +49,10 @@ body {
 /* ============================================
    DEMO-HINWEIS
 
-   Nur vorhanden, wenn demoModeActive() in renderWorktimeReport() (export.php)
-   wahr ist -- siehe dort. Farbe hart codiert wie der Rest dieser Datei
+   Nur vorhanden, wenn demoModeActive() in renderReport()
+   (private/helpers/report.php) wahr ist -- siehe dort. Bis 1.4.1 hiess die
+   Funktion renderWorktimeReport() und lag in handlers/export.php.
+   Farbe hart codiert wie der Rest dieser Datei
    (bewusst ohne variables.css, siehe Kopf). print-color-adjust: exact haelt
    die Flaeche auch im Druck: ohne die Regel optimieren Browser Hintergrund-
    farben beim Drucken standardmaessig weg, und aus dem Hinweisband wuerde
