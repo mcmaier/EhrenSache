@@ -29,7 +29,9 @@ declare(strict_types=1);
  * bewusst entscheidet, in welche Liste sie gehört.
  *
  * Eine Vollständigkeitsprüfung, die diese drei Listen gegen die tatsächlich
- * in api.php gerouteten Ressourcen abgleicht, folgt in einer späteren Aufgabe.
+ * in api.php gerouteten Ressourcen abgleicht, führt `tests/suites/demo_mode.php`
+ * durch (Abschnitt „Vollständigkeit gegen api.php") — dort auch die Kopplung
+ * im Detail.
  */
 
 /** Schreibende Zugriffe, die ein Demo-Besucher ausführen darf. */

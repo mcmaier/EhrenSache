@@ -66,8 +66,8 @@ test('Jede gesperrte Ressource weist jeden Schreibzugriff ab', function () {
 });
 
 test('Jede erlaubte Ressource nimmt ihre gelisteten Methoden an', function () {
-    foreach (DEMO_WRITE_ALLOWED as $r => $methoden) {
-        foreach ($methoden as $m) {
+    foreach (DEMO_WRITE_ALLOWED as $r => $methods) {
+        foreach ($methods as $m) {
             assertTrue(demoRequestAllowed($r, $m), "{$r} {$m}");
         }
     }
@@ -177,24 +177,24 @@ function runPhpCodeInSubprocess(string $code): string
 }
 
 test('Mit DEMO_MODE bricht der Waechter bei Gesperrtem ab', function () {
-    $helfer = __DIR__ . '/../../private/helpers/demo_mode.php';
-    $code = "define('DEMO_MODE', true); require " . var_export($helfer, true)
+    $helperFile = __DIR__ . '/../../private/helpers/demo_mode.php';
+    $code = "define('DEMO_MODE', true); require " . var_export($helperFile, true)
           . "; demoGuard('cleanup', 'POST'); echo 'NICHT ERREICHT';";
 
-    $ausgabe = runPhpCodeInSubprocess($code);
+    $output = runPhpCodeInSubprocess($code);
 
-    assertTrue(str_contains($ausgabe, '"demo":true'), 'Demo-Antwort fehlt: ' . $ausgabe);
-    assertTrue(!str_contains($ausgabe, 'NICHT ERREICHT'), 'exit() hat nicht gegriffen');
+    assertTrue(str_contains($output, '"demo":true'), 'Demo-Antwort fehlt: ' . $output);
+    assertTrue(!str_contains($output, 'NICHT ERREICHT'), 'exit() hat nicht gegriffen');
 });
 
 test('Mit DEMO_MODE laesst der Waechter Erlaubtes durch', function () {
-    $helfer = __DIR__ . '/../../private/helpers/demo_mode.php';
-    $code = "define('DEMO_MODE', true); require " . var_export($helfer, true)
+    $helperFile = __DIR__ . '/../../private/helpers/demo_mode.php';
+    $code = "define('DEMO_MODE', true); require " . var_export($helperFile, true)
           . "; demoGuard('records', 'POST'); echo 'DURCHGELASSEN';";
 
-    $ausgabe = runPhpCodeInSubprocess($code);
+    $output = runPhpCodeInSubprocess($code);
 
-    assertTrue(str_contains($ausgabe, 'DURCHGELASSEN'), 'Erlaubtes wurde abgewiesen: ' . $ausgabe);
+    assertTrue(str_contains($output, 'DURCHGELASSEN'), 'Erlaubtes wurde abgewiesen: ' . $output);
 });
 
 // ---- demoModeActive faellt zur sicheren Seite -----------------------------
@@ -204,94 +204,208 @@ test('Mit DEMO_MODE laesst der Waechter Erlaubtes durch', function () {
 // aus einem frueheren Test.
 
 test('DEMO_MODE als Integer 1 zeigt den Waechter aktiv', function () {
-    $helfer = __DIR__ . '/../../private/helpers/demo_mode.php';
-    $code = "define('DEMO_MODE', 1); require " . var_export($helfer, true)
+    $helperFile = __DIR__ . '/../../private/helpers/demo_mode.php';
+    $code = "define('DEMO_MODE', 1); require " . var_export($helperFile, true)
           . "; echo demoModeActive() ? 'AKTIV' : 'INAKTIV';";
 
-    $ausgabe = runPhpCodeInSubprocess($code);
+    $output = runPhpCodeInSubprocess($code);
 
-    assertTrue(str_contains($ausgabe, 'AKTIV'), "DEMO_MODE=1 (int) muss aktiv sein: " . $ausgabe);
+    assertTrue(str_contains($output, 'AKTIV'), "DEMO_MODE=1 (int) muss aktiv sein: " . $output);
 });
 
 test("DEMO_MODE als Zeichenkette 'false' zeigt den Waechter aktiv", function () {
-    $helfer = __DIR__ . '/../../private/helpers/demo_mode.php';
-    $code = "define('DEMO_MODE', 'false'); require " . var_export($helfer, true)
+    $helperFile = __DIR__ . '/../../private/helpers/demo_mode.php';
+    $code = "define('DEMO_MODE', 'false'); require " . var_export($helperFile, true)
           . "; echo demoModeActive() ? 'AKTIV' : 'INAKTIV';";
 
-    $ausgabe = runPhpCodeInSubprocess($code);
+    $output = runPhpCodeInSubprocess($code);
 
-    assertTrue(str_contains($ausgabe, 'AKTIV'), "DEMO_MODE='false' (String) muss aktiv sein: " . $ausgabe);
+    assertTrue(str_contains($output, 'AKTIV'), "DEMO_MODE='false' (String) muss aktiv sein: " . $output);
 });
 
 test('DEMO_MODE als Boolean false zeigt den Waechter untaetig', function () {
-    $helfer = __DIR__ . '/../../private/helpers/demo_mode.php';
-    $code = "define('DEMO_MODE', false); require " . var_export($helfer, true)
+    $helperFile = __DIR__ . '/../../private/helpers/demo_mode.php';
+    $code = "define('DEMO_MODE', false); require " . var_export($helperFile, true)
           . "; echo demoModeActive() ? 'AKTIV' : 'INAKTIV';";
 
-    $ausgabe = runPhpCodeInSubprocess($code);
+    $output = runPhpCodeInSubprocess($code);
 
-    assertTrue(str_contains($ausgabe, 'INAKTIV'), 'DEMO_MODE=false (bool) muss untaetig sein: ' . $ausgabe);
+    assertTrue(str_contains($output, 'INAKTIV'), 'DEMO_MODE=false (bool) muss untaetig sein: ' . $output);
 });
 
 // ---- Vollständigkeit gegen api.php -----------------------------------------
 
 /**
- * Sammelt jede Ressource, die api.php kennt: die Fälle des Routers und die
- * öffentlichen Endpunkte, die schon davor mit exit() aussteigen.
+ * Liest api.php einmal und liefert getrennt zurueck, was der Ressourcen-
+ * Router (der `switch($resource)`-Block) und was die fruehen Ausstiege davor
+ * (die oeffentlichen Endpunkte, die schon vor der Authentifizierung mit
+ * exit() aussteigen) an Ressourcennamen enthalten.
+ *
+ * Die Trennung ist notwendig, nicht nur schoen: Die case-Regex liest sonst
+ * den ganzen Dateitext und findet auch Treffer in fremden switch-Bloecken,
+ * z. B. einem `switch($request_method) { case 'GET': ... }` irgendwo in
+ * api.php. Ein solcher Treffer waere gar keine Ressource, wuerde aber als
+ * "steht in 0 von 3 Listen" gemeldet und dazu einladen, ihn wie eine
+ * vergessene Ressource in eine der Listen einzutragen -- der Weg, auf dem
+ * Muell in die Listen geraet. Deshalb schneidet diese Funktion bei der Zeile
+ * `switch($resource) {` durch: Die case-Regex laeuft nur ueber das, was
+ * danach kommt, die $resource===-Regex nur ueber das, was davor kommt.
+ * Fehlt die Trennzeile (api.php wurde umgebaut), wird das eine Ausnahme statt
+ * eines stillen "durchsucht eben alles".
+ *
+ * Nicht erkannt werden bewusst: doppelte Anfuehrungszeichen bei case/===
+ * werden zwar erkannt (siehe Regex unten), aber nicht: match($resource) {
+ * 'name' => ... }, in_array($resource, [...]), lockeres $resource == 'x',
+ * Yoda-Schreibweise ('x' === $resource) und Routing-Tabellen (Arrays statt
+ * switch/if). Das ist tragbar, weil der Waechter zur geschlossenen Seite
+ * faellt: unbekannt heisst gesperrt. Eine so uebersehene Ressource verliert
+ * damit Funktion in der Demo, oeffnet aber keine Luecke.
+ *
+ * @return array{cases: string[], early: string[]}
  */
-function demoTestRessourcenAusApi(): array
+function demoTestResourcesFromApi(): array
 {
+    static $cache = null;
+
+    if ($cache !== null) {
+        return $cache;
+    }
+
     $src = (string) file_get_contents(dirname(__DIR__, 2) . '/public/api/api.php');
 
-    preg_match_all('/case\s+\'([a-z0-9_\-]+)\'\s*:/i', $src, $faelle);
-    preg_match_all('/\$resource\s*===\s*\'([a-z0-9_\-]+)\'/', $src, $frueh);
+    $marker = 'switch($resource) {';
+    $cut = strpos($src, $marker);
 
-    $alle = array_unique(array_merge($faelle[1], $frueh[1]));
-    sort($alle);
+    if ($cut === false) {
+        throw new RuntimeException(
+            "Trennzeile '{$marker}' nicht in api.php gefunden - "
+            . 'demoTestResourcesFromApi() kann den Ressourcen-Router nicht mehr '
+            . 'von den fruehen Ausstiegen trennen. api.php wurde vermutlich '
+            . 'umgebaut; die Suche in dieser Funktion muss nachziehen.'
+        );
+    }
 
-    return $alle;
+    $earlyExitsSrc = substr($src, 0, $cut);
+    $routerSrc = substr($src, $cut);
+
+    preg_match_all('/\$resource\s*===\s*[\'"]([a-z0-9_\-]+)[\'"]/i', $earlyExitsSrc, $early);
+    preg_match_all('/case\s+[\'"]([a-z0-9_\-]+)[\'"]\s*:/i', $routerSrc, $cases);
+
+    $cache = [
+        'cases' => array_values(array_unique($cases[1])),
+        'early' => array_values(array_unique($early[1])),
+    ];
+
+    return $cache;
 }
 
-test('Die Ressourcen lassen sich aus api.php lesen', function () {
-    $gefunden = demoTestRessourcenAusApi();
+/** Alle Ressourcen aus api.php, Router und fruehe Ausstiege zusammen, sortiert. */
+function demoTestAllResourcesFromApi(): array
+{
+    $found = demoTestResourcesFromApi();
+    $all = array_unique(array_merge($found['cases'], $found['early']));
+    sort($all);
 
-    // Ohne diese Untergrenze wuerde eine kaputte Regex die naechste Pruefung
-    // leer durchlaufen lassen -- sie waere gruen, ohne etwas geprueft zu haben.
+    return $all;
+}
+
+test('Der Ressourcen-Router liefert genuegend Treffer', function () {
+    $found = demoTestResourcesFromApi();
+
+    // Stand heute (09/2026): 38 Ressourcen insgesamt (vereinigt und
+    // dedupliziert), davon 30 Rohtreffer aus dem switch($resource) und 9
+    // Rohtreffer aus den fruehen Ausstiegen (einer davon, 'import', deckt
+    // sich mit einem case im switch und faellt bei der Vereinigung raus).
+    // Je eine eigene Untergrenze mit Puffer nach unten, damit ein Ausfall
+    // der jeweils ANDEREN Regex nicht unbemerkt bleibt (siehe Docblock oben)
+    // und ein legitimer Abbau von Ressourcen nicht faelschlich als
+    // Regex-Bruch gemeldet wird.
     assertTrue(
-        count($gefunden) >= 30,
-        'Nur ' . count($gefunden) . ' Ressourcen gefunden — die Regex passt nicht mehr zu api.php'
+        count($found['cases']) >= 25,
+        'Nur ' . count($found['cases']) . ' Ressourcen aus dem switch($resource) '
+        . 'gefunden (erwartet mindestens 25) - entweder wurden neun oder mehr '
+        . 'Ressourcen legitim abgebaut, oder die case-Regex in '
+        . 'demoTestResourcesFromApi() passt nicht mehr zu api.php.'
     );
 });
 
-test('Jede Ressource aus api.php steht in genau einer Liste', function () {
-    foreach (demoTestRessourcenAusApi() as $r) {
-        $treffer = (int) isset(DEMO_WRITE_ALLOWED[$r])
-                 + (int) in_array($r, DEMO_WRITE_DENIED, true)
-                 + (int) in_array($r, DEMO_READ_ONLY, true);
+test('Die fruehen Ausstiege liefern genuegend Treffer', function () {
+    $found = demoTestResourcesFromApi();
 
-        assertSame(
-            1,
-            $treffer,
-            "Ressource '{$r}' steht in {$treffer} der drei Listen statt in genau einer. "
-            . 'Neu hinzugekommen? Dann in demo_mode.php entscheiden: schreibend erlaubt, '
-            . 'schreibend gesperrt, oder nur lesend.'
-        );
+    assertTrue(
+        count($found['early']) >= 6,
+        'Nur ' . count($found['early']) . ' Ressourcen aus den fruehen Ausstiegen '
+        . 'gefunden (erwartet mindestens 6) - entweder wurden mehrere fruehe '
+        . 'Ausstiege legitim abgebaut, oder die $resource===-Regex in '
+        . 'demoTestResourcesFromApi() passt nicht mehr zu api.php (z. B. weil '
+        . 'die Anfuehrungszeichen vereinheitlicht wurden).'
+    );
+});
+
+test('Keine Ressource aus api.php fehlt in den drei Listen', function () {
+    $missing = [];
+
+    foreach (demoTestAllResourcesFromApi() as $r) {
+        $hits = (int) isset(DEMO_WRITE_ALLOWED[$r])
+              + (int) in_array($r, DEMO_WRITE_DENIED, true)
+              + (int) in_array($r, DEMO_READ_ONLY, true);
+
+        if ($hits === 0) {
+            $missing[] = $r;
+        }
     }
+
+    assertSame(
+        [],
+        $missing,
+        'Ressource(n) in keiner der drei Listen: ' . implode(', ', $missing) . '. '
+        . 'Neu hinzugekommen? Dann in demo_mode.php entscheiden: schreibend '
+        . 'erlaubt, schreibend gesperrt, oder nur lesend. Oder der Fund stammt '
+        . 'gar nicht aus dem Ressourcen-Router - dann die Suche in '
+        . 'demoTestResourcesFromApi() eingrenzen.'
+    );
+});
+
+test('Keine Ressource aus api.php steht in mehr als einer Liste', function () {
+    $duplicated = [];
+
+    foreach (demoTestAllResourcesFromApi() as $r) {
+        $hits = (int) isset(DEMO_WRITE_ALLOWED[$r])
+              + (int) in_array($r, DEMO_WRITE_DENIED, true)
+              + (int) in_array($r, DEMO_READ_ONLY, true);
+
+        if ($hits > 1) {
+            $duplicated[] = "{$r} ({$hits}x)";
+        }
+    }
+
+    assertSame(
+        [],
+        $duplicated,
+        'Ressource(n) in mehr als einer Liste zugleich: ' . implode(', ', $duplicated) . '. '
+        . 'Doppelnennung in demo_mode.php entfernen.'
+    );
 });
 
 test('Keine Liste nennt eine Ressource, die es nicht mehr gibt', function () {
-    $vorhanden = demoTestRessourcenAusApi();
+    $found = demoTestAllResourcesFromApi();
 
-    $gelistet = array_merge(
+    $listed = array_merge(
         array_keys(DEMO_WRITE_ALLOWED),
         DEMO_WRITE_DENIED,
         DEMO_READ_ONLY
     );
 
-    foreach ($gelistet as $r) {
-        assertTrue(
-            in_array($r, $vorhanden, true),
-            "Liste nennt '{$r}', api.php kennt die Ressource nicht (mehr)"
-        );
+    $stale = [];
+    foreach ($listed as $r) {
+        if (!in_array($r, $found, true)) {
+            $stale[] = $r;
+        }
     }
+
+    assertSame(
+        [],
+        $stale,
+        "Liste(n) nennen Ressource(n), die api.php nicht (mehr) kennt: " . implode(', ', $stale)
+    );
 });
