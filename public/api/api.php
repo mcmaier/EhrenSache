@@ -35,6 +35,7 @@ require_once '../../private/helpers/mailer.php';
 require_once '../../private/helpers/version.php';
 require_once '../../private/helpers/worktime.php';
 require_once '../../private/helpers/station.php';
+require_once '../../private/helpers/demo_mode.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';
@@ -159,6 +160,22 @@ if (!$rateLimiter->check($identifier, 'api_request', 150, 60)) {
     ]);
     exit();
 }
+
+// ============================================
+// 5b. DEMO-MODUS
+// ============================================
+// Wirkungslos, solange config.php DEMO_MODE nicht setzt.
+//
+// Diese Stelle ist nicht beliebig: Abschnitt 6 beendet register und
+// password_reset_request mit exit(). Stuende der Waechter erst vor dem
+// switch in Abschnitt 10, blieben genau die beiden Endpunkte ungeschuetzt,
+// die Mail an fremde Adressen verschicken. tests/suites/demo_mode.php
+// haelt diese Reihenfolge fest.
+//
+// Der Abschnitt heisst 5b und nicht 6, damit die gewachsene Nummerierung
+// der uebrigen Abschnitte nicht verrutscht.
+
+demoGuard($resource, $request_method);
 
 // ============================================
 // 6. ÖFFENTLICHE ENDPOINTS

@@ -21,6 +21,16 @@
 
 define('AUTO_CHECKIN_TOLERANCE_HOURS', 2);
 
+// Demo-Modus für öffentlich erreichbare Installationen.
+// Eingeschaltet werden schreibende Zugriffe auf eine feste Erlaubnisliste
+// begrenzt: Mitglieder, Termine, Anwesenheit, Anträge, Arbeitszeit, Check-in
+// und Kiosk bleiben nutzbar; Konten, Rechte, Mailversand, Dateiannahme und
+// Systemeinstellungen sind gesperrt.
+// Details in private/helpers/demo_mode.php.
+// Für eine normale Vereinsinstallation auskommentiert lassen.
+//------------------------------------------------------------------
+// define('DEMO_MODE', true);
+
 class Database {
     private $host = "your_host";
     private $db_name = "your_database";
