@@ -2290,3 +2290,13 @@ body {
     max-height: 90vh;
     overflow-y: auto;
 }
+
+/* Hinweisband der Demo-Installation, eingesetzt von app.js.
+   Knapper als in der Hauptanwendung: auf dem Telefon ist der Platz knapp. */
+.demo-banner {
+    background: #e67e22;
+    color: #fff;
+    padding: 6px 12px;
+    text-align: center;
+    font-size: 13px;
+}

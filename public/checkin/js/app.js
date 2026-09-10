@@ -397,6 +397,10 @@ async function loadAppearanceSettings() {
             const data = await response.json();
             appearanceSettings = data.settings;
             applyAppearanceSettings();
+
+            if (data.demo === true) {
+                showDemoBanner();
+            }
         }
     } catch (error) {
         debug.error('Appearance Settings laden fehlgeschlagen:', error);
@@ -3712,4 +3716,18 @@ function getTypeColor(typeName) {
     );
     
     return type ? type.color : '#95a5a6'; // Fallback wenn nicht gefunden
+}
+
+/** Hinweisband der Demo-Installation. Fester Text, keine Daten aus der Antwort. */
+function showDemoBanner() {
+    if (document.querySelector('.demo-banner')) {
+        return;
+    }
+
+    const banner = document.createElement('div');
+    banner.className = 'demo-banner';
+    banner.setAttribute('role', 'status');
+    banner.textContent = 'Demo — erfundene Daten, stündlicher Reset.';
+
+    document.body.prepend(banner);
 }

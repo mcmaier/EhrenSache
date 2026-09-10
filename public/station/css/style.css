@@ -121,3 +121,13 @@ label { display: block; margin: 12px 0; }
 /* Boot-Fallback: sichtbar, bis app.js eine Sektion aktiviert (siehe index.html) */
 .screen.active ~ #bootFallback,
 body:has(.screen.active) #bootFallback { display: none; }
+
+/* Hinweisband der Demo-Installation, eingesetzt von app.js.
+   Knapper als in der Hauptanwendung: auf dem Telefon ist der Platz knapp. */
+.demo-banner {
+    background: #e67e22;
+    color: #fff;
+    padding: 6px 12px;
+    text-align: center;
+    font-size: 13px;
+}

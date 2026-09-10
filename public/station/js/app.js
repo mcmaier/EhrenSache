@@ -819,7 +819,12 @@ async function loadAppearance() {
         }
         const res = await fetch(url, fetchOptions);
         if (!res.ok) return;
-        const s = (await res.json()).settings || {};
+        const response = await res.json();
+        const s = response.settings || {};
+
+        if (response.demo === true) {
+            showDemoBanner();
+        }
         if (s.organization_name) $('orgName').textContent = s.organization_name;
         if (s.primary_color) document.documentElement.style.setProperty('--primary-color', s.primary_color);
         if (s.background_color) document.documentElement.style.setProperty('--background-color', s.background_color);
@@ -831,6 +836,20 @@ async function loadAppearance() {
     } catch (e) {
         debug.log('appearance nicht geladen', e);
     }
+}
+
+/** Hinweisband der Demo-Installation. Fester Text, keine Daten aus der Antwort. */
+function showDemoBanner() {
+    if (document.querySelector('.demo-banner')) {
+        return;
+    }
+
+    const banner = document.createElement('div');
+    banner.className = 'demo-banner';
+    banner.setAttribute('role', 'status');
+    banner.textContent = 'Demo — erfundene Daten, stündlicher Reset.';
+
+    document.body.prepend(banner);
 }
 
 // ============================================
