@@ -136,7 +136,7 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
             foreach ($stats['members'] as $member) {
                 $totalPresent += $member['attended'];
                 $totalUnexcused += $member['unexcused_absences'];
-                $totalExcused += ($member['total_appointments'] - $member['attended'] - $member['unexcused_absences']);
+                $totalExcused += $member['excused'];
             }
         }
     }
@@ -358,12 +358,25 @@ function calculateGroupStatistics($db, $database, $groupId, $year, $memberId, $r
         $total     = (int)$row['total_appointments'];
         $attended  = (int)$row['attended'];
         $unexcused = (int)$row['unexcused_absences'];
+
+        // 'excused' ergibt sich aus den drei Zahlen, die diese Aggregation
+        // ohnehin liefert. Es steht hier und nur hier: Die Gesamtsumme und der
+        // Anwesenheitsbericht lesen es, statt es jeweils neu zu rechnen.
+        //
+        // max(0, ...) ist aktuell rechnerisch ueberfluessig -- total, attended
+        // und unexcused stammen aus derselben GROUP BY-Aggregation ueber
+        // dieselben Zeilen, attended und unexcused sind disjunkte Teilmengen
+        // von total. Die Klammer steht als Absicherung fuer den Tag, an dem
+        // jemand die drei Zahlen aus getrennten Abfragen zusammensetzt.
+        $excused = max(0, $total - $attended - $unexcused);
+
         $memberStats[] = [
             'member_id'          => (int)$row['member_id'],
             'member_name'        => $row['surname'] . ', ' . $row['name'],
             'total_appointments' => $total,
             'attended'           => $attended,
             'unexcused_absences' => $unexcused,
+            'excused'            => $excused,
             'attendance_rate'    => $total > 0 ? round(($attended / $total) * 100, 1) : 0,
         ];
     }

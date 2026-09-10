@@ -108,17 +108,11 @@ function statisticsReportGroupSection(array $group): array
     $rows = [];
 
     foreach ($group['members'] as $member) {
-        // 'Entschuldigt' steht nicht in der Antwort -- dieselbe Rechnung wie
-        // in der Gesamtsumme, damit beide nicht auseinanderlaufen koennen.
-        $excused = $member['total_appointments']
-                 - $member['attended']
-                 - $member['unexcused_absences'];
-
         $rows[] = [
             $member['member_name'],
             (string) $member['total_appointments'],
             (string) $member['attended'],
-            (string) $excused,
+            (string) $member['excused'],
             (string) $member['unexcused_absences'],
             statisticsReportRate($member['attendance_rate']),
         ];

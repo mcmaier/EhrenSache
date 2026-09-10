@@ -522,7 +522,17 @@ if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 // 10. ROUTING
 // ============================================
 
-switch($resource) {
+// renderReport() (private/helpers/report.php) wirft InvalidArgumentException,
+// wenn einem Bericht ein Pflichtschluessel fehlt -- ein Vertragsbruch zwischen
+// Handler und Renderer, kein Nutzerfehler. Ungefangen wuerde sie den Dispatch
+// verlassen: bei display_errors=Off eine leere 500-Antwort, bei
+// display_errors=On der Serverpfad samt Zeilennummer. Derselbe Grundsatz wie
+// bei der $resource-Absicherung oben, nur dass sich der Fehler hier nicht
+// durch Validieren vor dem Aufruf vermeiden laesst -- der Fang muss zentral
+// um den Dispatch stehen, weil mehrere Ressourcen (statistics_report, export)
+// ueber renderReport() ausliefern.
+try {
+    switch($resource) {
     case 'available_years':
         handleAvailableYears($db, $database, $request_method, $id);
         break;
@@ -625,6 +635,12 @@ switch($resource) {
             "resource" => $resource
         ]);
         exit();
+    }
+} catch (InvalidArgumentException $e) {
+    error_log("Report error (resource={$resource}): " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(["message" => "Fehler beim Erstellen des Berichts"]);
+    exit();
 }
 
 ?>
