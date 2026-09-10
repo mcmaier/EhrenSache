@@ -163,13 +163,10 @@ ausgeschlossen, weil `clearHash()` `replaceState` benutzt und das kein `hashchan
 | `public/station/README.md` | Einrichtung Schritt 1 und 4: QR-Code statt Token abtippen; Reihenfolge „erst koppeln, dann zum Startbildschirm" mit iPadOS-Begründung; Abschnitt „Sicherheit" um den QR-Hinweis ergänzen |
 | `docs/DEMO.md` Abschnitt 3 | „Was der Reset mit sich bringt": Neukopplung des Kiosks per Scan aus der Geräteverwaltung |
 | `docs/OPEN-ITEMS.md` | Zwei neue Einträge: **Scanner in der Station** (zurückgestellt, iPadOS-Container als Begründung) und **Einmal-Kopplungscode** (zurückgestellt, Q2). Ferner unter „Bewusst entschieden": Token im Fragment statt im Query |
-| `CHANGELOG.md`, `version.json` | 1.4.1 → 1.5.0 |
+| `CHANGELOG.md` | Eintrag unter `## [Nicht veröffentlicht]` |
+| `version.json` | **unverändert.** Der Bump gehört zum Release, nicht zu diesem Feature: Unter „Nicht veröffentlicht" steht bereits der komplette Demo-Modus, den ein Sprung auf 1.5.0 mitveröffentlichen würde |
 | `API.md` | keine Änderung — kein neuer Endpunkt, kein geändertes Verhalten |
 | `docs/testplan.md` | Neue Fälle, siehe Abschnitt 6.2 |
-
-**Zum Versionssprung:** `tests/suites/assets.php` prüft, dass jeder `?v=`-Query zu `version.json`
-passt. Mit 1.5.0 sind daher alle `?v=1.4.1` in `public/index.html`, `public/login.html`,
-`public/checkin/index.html` und `public/station/index.html` mitzuziehen.
 
 ---
 
@@ -240,7 +237,6 @@ und dessen Lebensdauer wird bereits in der Geräteverwaltung verwaltet.
 
 ## 9 Aufwand
 
-Ein Vormittag. Drei JS-Dateien (`ui.js`, `devices.js`, `station/js/app.js`), vier HTML-Dateien
-— zwei inhaltlich (`index.html`, `station/index.html`), zwei nur für den Versionsquery
-(`login.html`, `checkin/index.html`) —, eine CSS-Ergänzung, eine verschobene Datei, zwei neue
-Tests, Dokumentation und Versionssprung. Keine Migration, kein Schema, kein Endpunkt.
+Ein Vormittag. Drei JS-Dateien (`ui.js`, `devices.js`, `station/js/app.js`), zwei HTML-Dateien
+(`index.html`, `station/index.html`), eine CSS-Ergänzung, eine verschobene Datei, zwei neue
+Tests und Dokumentation. Keine Migration, kein Schema, kein Endpunkt, kein Versionssprung.

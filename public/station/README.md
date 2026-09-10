@@ -8,13 +8,22 @@ entgegen — Anwesenheit sowie Arbeitszeit (Start, Pause, Ende).
 
 1. **Gerät anlegen:** Dashboard → Geräte → Neues Gerät → Typ „Virtuelle Station (Kiosk)".
    Häkchen „zeigt den Stations-Code" setzen, wenn das Tablet den QR-Code anzeigen soll.
-   Nach dem Speichern öffnet sich das Gerät im Bearbeiten-Modus; dort den API-Token kopieren.
+   Nach dem Speichern öffnet sich das Gerät im Bearbeiten-Modus.
    Der Gerätename ist Pflicht — er wird als Ort in jeden Stempel geschrieben.
 2. **PIN-Anmeldung freischalten:** Dashboard → Einstellungen → „Stations-Anmeldung (PIN)".
 3. **Mitglieder:** PIN im Profil (Mitglieder mit Konto) oder im Mitglieds-Modal (Verwalter).
    Jedes Mitglied braucht eine eindeutige Mitgliedsnummer.
-4. **Tablet:** `https://deine-domain/…/station/` im Browser öffnen, Token eingeben.
-   Anschließend „Zum Startbildschirm hinzufügen" (Android Chrome ⋮-Menü, iPadOS Teilen-Symbol).
+4. **Tablet koppeln:** Im Gerätedialog auf 📱 drücken und den QR-Code mit der Kamera des
+   Tablets scannen. Die Station öffnet sich und verbindet sich von selbst. Wer lieber tippt:
+   `https://deine-domain/…/station/` öffnen und den API-Token aus dem Gerätedialog eingeben.
+5. **Erst danach** „Zum Startbildschirm hinzufügen" (Android Chrome ⋮-Menü, iPadOS Teilen-Symbol).
+
+> **Die Reihenfolge ist nicht beliebig.** Unter iPadOS hat eine zum Startbildschirm hinzugefügte
+> Web-App einen eigenen Speichercontainer, getrennt von Safari. Ein *nach* der Installation
+> gescannter QR-Code landet in Safari; die installierte Station sieht ihn nie. Unter Android
+> teilen sich installierte App und Chrome den Speicher, dort geht auch das spätere Scannen.
+> Zum erneuten Koppeln einer installierten iPadOS-Station: 5 Sekunden auf die Uhr drücken und
+> den Token eingeben.
 
 ## Kiosk-Modus
 
@@ -42,6 +51,9 @@ Bildschirm an (Wake Lock), kein Navigationspfad nach außen, Rückfall zum Ruheb
 - Das TOTP-Secret verlässt den Server nicht; die Station holt nur den jeweils gültigen Code.
 - Der Token der Station kann nur die Ressource `station` (und `version`) aufrufen. Ohne PIN
   eines Mitglieds ist er wertlos.
+- Der QR-Code zur Inbetriebnahme **enthält den Token**. Er gehört nicht auf einen Beamer und
+  nicht in eine Bildschirmaufnahme. Bei Verdacht: im Gerätedialog einen neuen Token erzeugen,
+  der alte wird damit ungültig.
 - Nummer und PIN werden nie gespeichert, nur der Token (localStorage) und die Ruhezeit
   (10–300 Sekunden, pro Browser gespeichert).
 - Sperre: 5 Fehlversuche je Mitgliedsnummer, 30 je Station, jeweils 15 Minuten.
@@ -56,9 +68,11 @@ public/station/
   ├── manifest.json
   ├── service-worker.js
   ├── css/style.css
-  └── js/
-      ├── app.js
-      └── qrcode.js      (qrcode-generator 1.4.4, Kazuhiko Arase, MIT-Lizenz)
+  └── js/app.js
+
+public/js/vendor/
+  └── qrcode.js        (qrcode-generator 1.4.4, Kazuhiko Arase, MIT-Lizenz —
+                        gemeinsam von Dashboard und Station genutzt)
 ```
 
 ## Lizenz & Copyright
