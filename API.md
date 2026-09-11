@@ -594,6 +594,14 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
 ]
 ```
 
+**`arrival_time` kann seit 1.5.0 `null` sein** und heißt dann: keine Aussage über die Ankunft.
+Vorher trug die Spalte in diesem Fall die Startzeit des Termins — ein Eintrag, der wie eine
+Messung aussah, ohne eine zu sein. Wer die Spalte auswertet, muss `null` behandeln; das Datum
+eines Eintrags steht am Termin (`appointments.date`), nicht an der Ankunft.
+
+`checkin_source` kennt zusätzlich `exception_request` für Einträge aus einem genehmigten
+Zeitkorrektur-Antrag. Die Uhrzeit stammt dort aus der Selbstauskunft des Mitglieds.
+
 ---
 
 ### Anwesenheit erfassen (manuell)
@@ -1419,17 +1427,17 @@ dass es sich um erfundene Daten handelt.
    „Termine im Einzelnen": Datum, Termin, Terminart, Status, Ankunft, Herkunft
 
 **Die Spalte Herkunft** sagt, worauf eine Ankunftszeit beruht. `records.arrival_time` ist keine
-durchgehende Messung: Wird ein Eintrag ohne Uhrzeit angelegt, setzt das System die Startzeit des
-Termins.
+durchgehende Messung — seit 1.5.0 darf sie aber `null` sein und sagt dann aus, dass keine Ankunft
+bekannt ist, statt die Startzeit des Termins zu behaupten.
 
 | Wert | Bedingung |
 |---|---|
-| `gemessen` | `checkin_source` ist `station_pin`, `device_auth`, `user_totp` oder `auto_checkin` |
-| `korrigiert` | zum Paar Mitglied/Termin existiert eine genehmigte Zeitkorrektur |
-| `nachgetragen` | alles Übrige — `admin`, `import`, `timer` |
+| `gemessen` | Ankunftszeit vorhanden **und** `checkin_source` ist `station_pin`, `device_auth`, `user_totp` oder `auto_checkin` |
+| `korrigiert` | `checkin_source` ist `exception_request` — der Eintrag stammt aus einem genehmigten Zeitkorrektur-Antrag |
+| `nachgetragen` | alles Übrige — `admin`, `import`, `timer`, und jeder Eintrag ohne Ankunftszeit |
 
-`korrigiert` schlägt `gemessen`: Eine genehmigte Zeitkorrektur überschreibt die Ankunftszeit,
-lässt `checkin_source` aber unverändert.
+Eine Quelle allein macht noch keine Messung: Ohne Uhrzeit gilt `nachgetragen`, auch wenn der
+Datensatz von einem Kiosk stammt.
 
 Ankunft und Herkunft bleiben leer, außer bei Status `present` mit gesetzter Ankunftszeit.
 
@@ -1737,7 +1745,12 @@ Spaltenreihenfolge spielt keine Rolle, gelesen wird nach Namen, und unbekannte S
 |---|---|
 | `members` | `name`, `surname` |
 | `appointments` | `date`, `start_time`, `title`, `type_name` |
-| `records` | `member_number`, `arrival_date_time` |
+| `records` | `member_number`, `arrival_date_time`¹ |
+
+¹ `arrival_date_time` darf seit 1.5.0 **leer bleiben**, wenn `appointment_date`,
+`appointment_start_time` und `appointment_type` den Termin treffen — der Export dieser Anwendung
+führt alle drei. Der Eintrag entsteht dann ohne Ankunftszeit. Fehlt der Terminschlüssel, bleibt
+die Spalte Pflicht: Sie spannt dann das Toleranzfenster auf, über das der Termin gefunden wird.
 
 Die früheren Namen `type` und `arrival_time` werden weiterhin akzeptiert, damit archivierte
 Exporte einlesbar bleiben.

@@ -177,6 +177,22 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | REC-GET-5 | Filter `status=excused` | Nur entschuldigte Einträge |
 | REC-GET-6 | User ohne Mitglied | Leeres Array |
 
+### 7.1a Fehlende Ankunftszeit (ab 1.5.0)
+
+Vor 1.5.0 setzte das System in diesen Fällen die Startzeit des Termins ein — der Eintrag sah aus
+wie eine Messung, ohne eine zu sein.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| REC-NUL-1 | Anwesenheitsliste abhaken, ohne Uhrzeit einzutragen | Eintrag entsteht, Ankunftsspalte bleibt **leer** — nicht die Terminzeit |
+| REC-NUL-2 | Bei diesem Eintrag im Anwesenheitsbericht die Spalte Herkunft prüfen | `nachgetragen`, keine Uhrzeit |
+| REC-NUL-3 | Vorhandene Ankunftszeit im Dialog löschen und speichern | Spalte bleibt leer; **kein** 01.01.1970 und kein 00:00 |
+| REC-NUL-4 | Danach per Kiosk oder PWA einchecken | Die gemessene Zeit ersetzt die leere Angabe |
+| REC-NUL-5 | Zeitkorrektur-Antrag stellen und genehmigen | Ankunft steht, Herkunft im Bericht ist `korrigiert` |
+| REC-NUL-6 | Eigene Daten als CSV herunterladen (`my_data`) | Datum aus dem Termin, Ankunftsspalte leer, kein 01.01.1970 |
+| REC-NUL-7 | Anwesenheiten exportieren und dieselbe Datei wieder importieren | Keine Fehlerzeile; leere Ankunftszeit bleibt leer |
+| REC-NUL-8 | Termin am 31.12. spät abends, Check-in nach Mitternacht | Das Folgejahr erscheint **nicht** in der Jahresauswahl |
+
 ### 7.2 Erstellen
 
 | ID | Testfall | Erwartetes Ergebnis |
