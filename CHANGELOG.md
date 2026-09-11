@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Nicht veröffentlicht]
+## [1.5.0] – 2026-09-11
 
 ### Geändert
 - **Die Ankunftszeit darf fehlen.** Wer eine Anwesenheitsliste abhakt, erzeugte bisher einen
@@ -175,12 +175,6 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   `korrigiert` schlägt `gemessen`: Eine genehmigte Zeitkorrektur überschreibt die Ankunftszeit,
   lässt die Quelle aber unverändert. Ohne diese Vorrangregel trüge eine korrigierte Zeit weiter
   das Etikett der ursprünglichen Messung.
-
-- **Eine Fußnote nennt je Gruppe die ausgewertete Terminart.** Die Statistik rechnet je Gruppe
-  nur über eine Terminart, obwohl eine Gruppe an mehreren hängen kann — ein Fehler im Bestand,
-  der beim Bau dieses Berichts auffiel (OI-48) und der eine eigene Entscheidung braucht, weil
-  seine Behebung sämtliche bestehenden Quoten verschiebt. Bis dahin behauptet das Blatt
-  wenigstens keine Vollständigkeit, die es nicht hat.
 
 - **Berichtsausgabe an einer Stelle.** Die HTML-Ausgabe der Arbeitszeitberichte lag in
   `handlers/export.php` und konnte eine Tabelle plus einen Summenblock. Sie liegt jetzt als

@@ -10,7 +10,7 @@ heißt: auf dem Branch `main` und mit einem Tag versehen. Ältere Stände erhalt
 Korrekturen; das Update läuft über den Update-Wizard (`public/update/`), der die
 Migrationskette der Reihe nach abarbeitet.
 
-**Aktuell veröffentlicht: 1.4.1.**
+**Aktuell veröffentlicht: 1.5.0.**
 
 Der Branch `dev` trägt den Entwicklungsstand und ist der veröffentlichten Version in der Regel
 voraus. Er ist kein unterstützter Stand: Wer ihn einsetzt, betreibt eine Vorabfassung auf
