@@ -105,7 +105,11 @@
     font-variant-numeric: tabular-nums;
 }
 
-.stat-colgroup th {
+/* tr.stat-colgroup statt nur .stat-colgroup: Die Rechtsbuendigkeit oben
+   trifft th:not(:first-child) und waere sonst die spezifischere Regel --
+   die Gruppentitel standen dann am rechten Rand ihrer Spannweite statt
+   mittig darueber. */
+.statistics-group tr.stat-colgroup th {
     text-align: center;
     font-size: 0.85em;
     font-weight: 500;
@@ -114,7 +118,7 @@
     border-bottom: 1px solid var(--border-light);
 }
 
-.stat-colgroup th:first-child {
+.statistics-group tr.stat-colgroup th:first-child {
     border-bottom: none;
 }
 
@@ -131,7 +135,13 @@
 
 /* Terminartspalten: ein schwacher Anteilsbalken hinter der Zahl. Neutral
    grau und nicht im Farbverlauf der Gesamtquote -- die Farbcodierung bleibt
-   der einen Zahl vorbehalten, die sie tragen soll. */
+   der einen Zahl vorbehalten, die sie tragen soll.
+
+   Die Breite ist prozentual zur Spalte. Vergleichbar sind die Balken deshalb
+   innerhalb einer Spalte (Mitglied gegen Mitglied bei derselben Terminart),
+   nicht ueber Spalten hinweg -- die Spaltenbreite haengt an der Laenge des
+   Terminartnamens. Die vertikale Lesart ist die gemeinte; der genaue Wert
+   steht ohnehin daneben. */
 .stat-type {
     position: relative;
 }
@@ -154,4 +164,4 @@
 
 .stat-type-empty {
     color: var(--text-light);
-}
+}

@@ -165,12 +165,16 @@ body {
 /* Gruppierte Kopfzeile des Anwesenheitsberichts. Ohne sie stehen die
    Terminartspalten unbeschriftet da -- "Auftritt" allein sagt nicht, dass
    darunter eine Quote steht. */
-.report-colgroup th {
+/* tr.report-colgroup statt nur .report-colgroup: Die Rechtsbuendigkeit der
+   Anwesenheitstabelle trifft th:not(:first-child) und waere sonst die
+   spezifischere Regel -- die Gruppentitel standen dann am rechten Rand
+   ihrer Spannweite statt mittig darueber. */
+.report-table tr.report-colgroup th {
     text-align: center;
     background: #e4e4e4;
 }
 
-.report-colgroup th.report-colgroup-empty {
+.report-table tr.report-colgroup th.report-colgroup-empty {
     background: #fff;
     border-left: none;
     border-top: none;
