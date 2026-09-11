@@ -434,6 +434,13 @@ Vorentscheidungen, damit die Berichts-Spec nicht später umgedeutet werden muss:
   - *Pünktlichkeit* nur über gemessene Ankünfte: Quote der Ankünfte innerhalb einer Karenz plus
     **Median** der Verspätung — der Mittelwert kippt bei einem einzigen Ausreißer. Immer mit
     Bezugsgröße; unter fünf Messungen keine Quote, sondern „zu wenige Messungen".
+
+    > **Überholt am 2026-09-11.** Die Vorentscheidung zum Median ist beim Entwurf der Metrik
+    > selbst revidiert worden: Leitzahl ist die Quote, die Verspätungsdauer wird nur über die
+    > Zuspätkommer gebildet. Begründung mit Vergleichstabelle in
+    > `2026-09-11-puenktlichkeit-und-zuverlaessigkeit-design.md`, Abschnitt 3.1 und 3.4.
+    > Dieser Absatz bleibt als Ausgangspunkt stehen, damit die Revision nachvollziehbar ist —
+    > **maßgeblich ist die neuere Spec.**
   - *Zuverlässigkeit* über alle Termine, mit drei Ausgängen: **erschienen**, **abgemeldet**
     (Ausnahme vor Terminbeginn angelegt, ablesbar an `exceptions.created_at`), **ausgefallen**.
     Quote = (erschienen + abgemeldet) / Termine. Die heutige Anwesenheitsquote bestraft eine
