@@ -159,3 +159,18 @@ test('Migration 1.2.5 definiert migrate_1_2_5', function () {
     require_once $file;
     assertTrue(function_exists('migrate_1_2_5'), 'migrate_1_2_5() fehlt');
 });
+
+test('Zu jedem Manifest-Eintrag existiert die Migrationsfunktion', function () {
+    // Die Datei wird bereits weiter oben geprueft; hier geht es um die
+    // Funktion darin. Fehlt sie, faellt das heute erst beim Update auf --
+    // nach dem Dateitausch, auf der Maschine des Vereins.
+    $manifest = loadMigrationManifest(__DIR__ . '/../../private/migrations/manifest.php');
+
+    foreach ($manifest as $step) {
+        require_once __DIR__ . '/../../private/migrations/' . $step['file'];
+        assertTrue(
+            function_exists($step['function']),
+            "Funktion {$step['function']}() fehlt in {$step['file']}"
+        );
+    }
+});
