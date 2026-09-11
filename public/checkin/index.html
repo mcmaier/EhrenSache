@@ -399,9 +399,18 @@
                     <option value="">Lädt...</option>
                 </select>
             </div>
+            <!-- Wann warst du da? Bis 1.5.0 wurde hier ungefragt der Zeitpunkt
+                 der Antragstellung eingetragen — wer erst eine halbe Stunde
+                 später merkte, dass das Stempeln nicht geklappt hat, galt
+                 damit als eine halbe Stunde zu spät. -->
+            <div class="form-group">
+                <label for="exceptionArrivalTime">Wann warst du da?</label>
+                <input type="datetime-local" id="exceptionArrivalTime" required>
+                <small class="input-hint" id="exceptionArrivalHint"></small>
+            </div>
             <div class="form-group">
                 <label for="exceptionReason">Begründung</label>
-                <input type="text" id="exceptionReason" required 
+                <input type="text" id="exceptionReason" required
                        placeholder="z.B. QR-Scanner nicht verfügbar">
             </div>
             <div class="modal-buttons">

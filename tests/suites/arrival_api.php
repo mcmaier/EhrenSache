@@ -232,3 +232,39 @@ test('Ein Record ohne Ankunftszeit wird nicht auf 1970 datiert', function () {
         arrDropAppointment($admin, $aptId);
     }
 });
+
+test('Eine beantragte Ankunft weit vom Termin wird abgewiesen', function () {
+    $token    = apiToken('admin');
+    $memberId = arrAnyMemberId($token);
+    $aptId    = arrTempAppointment($token, '2031-03-08');   // 20:00 Uhr
+
+    try {
+        // Fuenf Stunden vor dem Termin -- ausserhalb jedes Toleranzfensters.
+        $res = apiRequest('POST', 'exceptions', [
+            'token' => $token,
+            'body'  => ['member_id'              => $memberId,
+                        'appointment_id'         => $aptId,
+                        'exception_type'         => 'time_correction',
+                        'reason'                 => 'Ankunftszeit-Test',
+                        'requested_arrival_time' => '2031-03-08 15:00:00',
+                        'status'                 => 'pending'],
+        ]);
+
+        assertStatus(400, $res,
+            'Ohne Grenze liesse sich eine Puenktlichkeit behaupten, die niemand pruefen kann');
+
+        // Innerhalb des Fensters geht es weiterhin.
+        $ok = apiRequest('POST', 'exceptions', [
+            'token' => $token,
+            'body'  => ['member_id'              => $memberId,
+                        'appointment_id'         => $aptId,
+                        'exception_type'         => 'time_correction',
+                        'reason'                 => 'Ankunftszeit-Test',
+                        'requested_arrival_time' => '2031-03-08 19:55:00',
+                        'status'                 => 'pending'],
+        ]);
+        assertStatus(201, $ok);
+    } finally {
+        arrDropAppointment($token, $aptId);
+    }
+});

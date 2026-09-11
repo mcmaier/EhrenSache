@@ -149,6 +149,8 @@ document.addEventListener('DOMContentLoaded', function() {
         closeExceptionBtn: document.getElementById('closeExceptionBtn'),
         submitExceptionBtn: document.getElementById('submitExceptionBtn'),
         exceptionAppointment: document.getElementById('exceptionAppointment'),
+        exceptionArrivalTime: document.getElementById('exceptionArrivalTime'),
+        exceptionArrivalHint: document.getElementById('exceptionArrivalHint'),
         exceptionReason: document.getElementById('exceptionReason'),
         confirmDeleteModal: document.getElementById('confirmDeleteModal'),
         closeConfirmDeleteBtn: document.getElementById('closeConfirmDeleteBtn'),
@@ -172,6 +174,8 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.closeManualCodeBtn.addEventListener('click', closeManualCodeModal);
     elements.submitManualCodeBtn.addEventListener('click', submitManualCode);
     elements.closeExceptionBtn.addEventListener('click', closeExceptionModal);
+    // Das Fenster der Ankunftszeit haengt am gewaehlten Termin.
+    elements.exceptionAppointment.addEventListener('change', updateExceptionArrivalBounds);
     elements.submitExceptionBtn.addEventListener('click', submitException);  
     elements.closeConfirmDeleteBtn.addEventListener('click', closeConfirmDeleteModal);
     elements.submitConfirmDeleteBtn.addEventListener('click', submitConfirmDelete);   
@@ -1968,6 +1972,10 @@ async function loadAppointments() {
             const option = document.createElement('option');
             option.value = apt.appointment_id;
             option.textContent = `${apt.title} (${apt.date} ${apt.start_time})`;
+            // Datum und Startzeit am Eintrag: Daraus ergibt sich das Fenster
+            // fuer die Ankunftszeit, ohne die Terminliste erneut zu befragen.
+            option.dataset.date = apt.date;
+            option.dataset.startTime = apt.start_time;
             elements.exceptionAppointment.appendChild(option);
         });
     } catch (error) {
@@ -1982,6 +1990,59 @@ async function openExceptionModal() {
     await loadAppointments();
     elements.exceptionModal.classList.add('active');
     elements.exceptionReason.value = '';
+    updateExceptionArrivalBounds();
+}
+
+/** Zeitstempel im Format eines datetime-local-Feldes, in Ortszeit. */
+function toDatetimeLocalValue(date) {
+    const pad = (n) => String(n).padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+         + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/**
+ * Grenzt die Ankunftszeit auf das Fenster des gewählten Termins ein.
+ *
+ * Dasselbe Fenster wie beim Check-in, symmetrisch um die Startzeit — der
+ * Server prüft es ebenso, hier geht es nur darum, dem Mitglied eine
+ * Fehlermeldung zu ersparen.
+ *
+ * Vorbelegt wird „jetzt", solange das hineinpasst, sonst der Terminbeginn: Wer
+ * den Antrag erst am nächsten Tag stellt, meinte nicht „jetzt". Bis 1.5.0 wurde
+ * ungefragt der Zeitpunkt der Antragstellung eingetragen.
+ */
+function updateExceptionArrivalBounds() {
+    const select = elements.exceptionAppointment;
+    const input  = elements.exceptionArrivalTime;
+    const hint   = elements.exceptionArrivalHint;
+
+    const option = select.selectedOptions[0];
+
+    if (!option || !option.dataset.date) {
+        input.value = '';
+        input.removeAttribute('min');
+        input.removeAttribute('max');
+        hint.textContent = 'Zuerst einen Termin wählen.';
+        return;
+    }
+
+    const parsedTolerance = parseInt(clientSettings.checkin_tolerance_hours, 10);
+    const toleranceHours  = Number.isNaN(parsedTolerance) ? 2 : parsedTolerance;
+    const toleranceMs     = toleranceHours * 60 * 60 * 1000;
+
+    const start = new Date(`${option.dataset.date}T${option.dataset.startTime}`);
+    const min   = new Date(start.getTime() - toleranceMs);
+    const max   = new Date(start.getTime() + toleranceMs);
+
+    input.min = toDatetimeLocalValue(min);
+    input.max = toDatetimeLocalValue(max);
+
+    const now = new Date();
+    input.value = toDatetimeLocalValue(now >= min && now <= max ? now : start);
+
+    const uhrzeit = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    hint.textContent = `Möglich zwischen ${uhrzeit(min)} und ${uhrzeit(max)} Uhr.`;
 }
 
 function closeExceptionModal() {
@@ -2010,9 +2071,19 @@ async function submitException() {
         return;
     }
     
+    // Die angegebene Ankunftszeit, nicht der Zeitpunkt des Antrags. Bis 1.5.0
+    // stand hier new Date() — wer erst eine halbe Stunde nach dem gescheiterten
+    // Stempeln daran dachte, beantragte damit eine halbe Stunde Verspätung.
+    const arrivalInput = elements.exceptionArrivalTime.value;
+
+    if (!arrivalInput) {
+        closeExceptionModal();
+        showMessage('Bitte angeben, wann du da warst', 'error');
+        return;
+    }
+
     try {
-        const now = new Date();
-        const arrivalTime = formatDateTime(now);             
+        const arrivalTime = arrivalInput.replace('T', ' ') + ':00';
 
         const result = await apiCall('exceptions', 'POST', {
             member_id: userData.member_id,

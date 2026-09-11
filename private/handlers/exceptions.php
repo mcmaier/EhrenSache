@@ -162,7 +162,22 @@ function handleExceptions($db, $database, $method, $id) {
             
             $requested_time = isset($data->requested_arrival_time) ? $data->requested_arrival_time : null;
             $status = $data->status ?? 'pending';
-            
+
+            // Die beantragte Ankunft muss zum Termin passen. Ohne diese Grenze
+            // liesse sich für einen 20-Uhr-Termin 17:00 beantragen — eine
+            // Pünktlichkeit, die niemand nachprüfen kann. Das Fenster ist
+            // dasselbe wie beim Check-in.
+            if (($data->exception_type ?? '') === 'time_correction' && $requested_time !== null
+                && !arrivalWithinAppointmentWindow($db, $database, (int) $data->appointment_id,
+                                                   (string) $requested_time,
+                                                   checkinToleranceHours($db, $database))) {
+                http_response_code(400);
+                echo json_encode([
+                    "message" => "Die angegebene Ankunftszeit liegt zu weit vom Termin entfernt"
+                ], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+
             if($stmt->execute([
                 $data->member_id, 
                 $data->appointment_id, 
@@ -189,16 +204,34 @@ function handleExceptions($db, $database, $method, $id) {
             $data = json_decode(file_get_contents("php://input"));
             
             // Hole Exception Info
-            $checkStmt = $db->prepare("SELECT member_id, status FROM {$prefix}exceptions WHERE exception_id = ?");
+            $checkStmt = $db->prepare("SELECT member_id, status, appointment_id, exception_type
+                                       FROM {$prefix}exceptions WHERE exception_id = ?");
             $checkStmt->execute([$id]);
             $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            
+
             if(!$existing) {
                 http_response_code(404);
                 echo json_encode(["message" => "Exception not found"]);
                 return;
             }
-            
+
+            // Dieselbe Grenze wie beim Anlegen, hier für beide Pfade: Das
+            // Mitglied bessert seinen Antrag nach, der Admin korrigiert ihn vor
+            // der Freigabe. Der Termin kommt aus dem Bestand, nicht aus dem
+            // Anfragekörper — er lässt sich nachträglich nicht wechseln.
+            $neueWunschzeit = $data->requested_arrival_time ?? null;
+
+            if ($existing['exception_type'] === 'time_correction' && $neueWunschzeit !== null
+                && !arrivalWithinAppointmentWindow($db, $database, (int) $existing['appointment_id'],
+                                                   (string) $neueWunschzeit,
+                                                   checkinToleranceHours($db, $database))) {
+                http_response_code(400);
+                echo json_encode([
+                    "message" => "Die angegebene Ankunftszeit liegt zu weit vom Termin entfernt"
+                ], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+
             // User dürfen nur ihre eigenen pending Anträge bearbeiten
             if(!isAdminOrManager()) {
                 $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");

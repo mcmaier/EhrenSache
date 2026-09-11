@@ -151,6 +151,52 @@ function checkinToleranceHours($db, $database): int
 }
 
 /**
+ * Liegt eine beantragte Ankunftszeit im Zeitfenster ihres Termins?
+ *
+ * Dasselbe Fenster wie beim Check-in, symmetrisch um die Startzeit. Ein
+ * Terminende gibt es nicht — `appointments` führt nur `date` und `start_time` —,
+ * und das Check-in-Fenster ist die naheliegende Schranke: Beantragen lässt sich
+ * damit genau das, wozu auch ein Stempel möglich gewesen wäre.
+ *
+ * Ohne diese Grenze ließe sich für einen 20-Uhr-Termin eine Ankunft um 17:00
+ * beantragen — eine Pünktlichkeit, die niemand nachprüfen kann. Die Prüfung
+ * steht deshalb hier und nicht nur im Formular: Die PWA ist ein Client.
+ *
+ * Ein unbekannter Termin oder eine unlesbare Zeit gilt als ungültig, nicht als
+ * unbedenklich.
+ */
+function arrivalWithinAppointmentWindow($db, $database, int $appointmentId,
+                                        string $arrivalTime, int $toleranceHours): bool
+{
+    if (trim($arrivalTime) === '') {
+        return false;
+    }
+
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT date, start_time FROM {$prefix}appointments
+                          WHERE appointment_id = ?");
+    $stmt->execute([$appointmentId]);
+    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$appointment) {
+        return false;
+    }
+
+    try {
+        $arrival = new DateTimeImmutable($arrivalTime);
+        $start   = new DateTimeImmutable($appointment['date'] . ' ' . $appointment['start_time']);
+    } catch (Exception $e) {
+        return false;
+    }
+
+    $interval = new DateInterval('PT' . $toleranceHours . 'H');
+
+    return $arrival >= $start->sub($interval)
+        && $arrival <= $start->add($interval);
+}
+
+/**
  * Prüft eine Löschfrist in Jahren.
  *
  * Liefert die Frist als ganze Zahl oder null, wenn der Wert unbrauchbar ist.

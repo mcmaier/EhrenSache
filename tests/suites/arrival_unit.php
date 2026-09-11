@@ -129,3 +129,32 @@ test('Ein spaeterer Stempel laesst eine fruehere Messung stehen', function () {
                ->fetch(PDO::FETCH_ASSOC);
     assertSame('2031-03-04 19:50:00', $row['arrival_time']);
 });
+
+// ---- Fenster fuer eine beantragte Ankunftszeit ------------------------------
+
+test('Eine beantragte Zeit innerhalb des Fensters wird angenommen', function () {
+    [$pdo, $database] = arrivalTestDb();
+
+    // Termin 7: 2031-03-04, 20:00 Uhr. Fenster bei 2 Stunden: 18:00 bis 22:00.
+    assertTrue(arrivalWithinAppointmentWindow($pdo, $database, 7, '2031-03-04 19:55:00', 2));
+    assertTrue(arrivalWithinAppointmentWindow($pdo, $database, 7, '2031-03-04 18:00:00', 2));
+    assertTrue(arrivalWithinAppointmentWindow($pdo, $database, 7, '2031-03-04 22:00:00', 2));
+});
+
+test('Eine beantragte Zeit ausserhalb des Fensters wird abgelehnt', function () {
+    [$pdo, $database] = arrivalTestDb();
+
+    // Ohne Schranke liesse sich fuer einen 20-Uhr-Termin 17:00 beantragen und
+    // damit eine Puenktlichkeit behaupten, die niemand pruefen kann.
+    assertTrue(!arrivalWithinAppointmentWindow($pdo, $database, 7, '2031-03-04 17:59:00', 2));
+    assertTrue(!arrivalWithinAppointmentWindow($pdo, $database, 7, '2031-03-04 22:01:00', 2));
+    assertTrue(!arrivalWithinAppointmentWindow($pdo, $database, 7, '2031-03-05 19:55:00', 2));
+});
+
+test('Ein unbekannter Termin oder eine unlesbare Zeit gilt nicht als gueltig', function () {
+    [$pdo, $database] = arrivalTestDb();
+
+    assertTrue(!arrivalWithinAppointmentWindow($pdo, $database, 999, '2031-03-04 19:55:00', 2));
+    assertTrue(!arrivalWithinAppointmentWindow($pdo, $database, 7, 'kein Datum', 2));
+    assertTrue(!arrivalWithinAppointmentWindow($pdo, $database, 7, '', 2));
+});

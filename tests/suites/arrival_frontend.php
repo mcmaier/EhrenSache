@@ -167,3 +167,61 @@ test('Jeder Wert von checkin_source hat ein Abzeichen im Dashboard', function ()
         );
     }
 });
+
+test('Der PWA-Antrag fragt nach der Ankunftszeit, statt sie zu setzen', function () use ($arrivalRoot) {
+    // Bis 1.5.0 stand in submitException() new Date() -- der Zeitpunkt der
+    // Antragstellung wurde als Ankunft beantragt. Wer erst eine halbe Stunde
+    // nach dem gescheiterten Stempeln daran dachte, beantragte damit eine
+    // halbe Stunde Verspaetung. Mit der Puenktlichkeitskennzahl wuerde genau
+    // das bestraft, was der Antrag heilen soll.
+    $html = (string) file_get_contents($arrivalRoot . '/public/checkin/index.html');
+    $js   = (string) file_get_contents($arrivalRoot . '/public/checkin/js/app.js');
+
+    assertTrue(
+        strpos($html, 'id="exceptionArrivalTime"') !== false,
+        'Im Antragsdialog der PWA fehlt das Feld fuer die Ankunftszeit'
+    );
+
+    $start = strpos($js, 'async function submitException(');
+    assertTrue($start !== false, 'submitException() nicht gefunden');
+    $ende = strpos($js, "\n}", $start);
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(
+        strpos($body, 'elements.exceptionArrivalTime.value') !== false,
+        'Der Antrag liest die Ankunftszeit nicht aus dem Feld'
+    );
+    assertTrue(
+        strpos($body, 'formatDateTime(now)') === false,
+        'Der Antrag setzt weiterhin den Zeitpunkt der Antragstellung als Ankunft'
+    );
+});
+
+test('Das Fenster der beantragten Ankunftszeit haengt am Termin', function () use ($arrivalRoot) {
+    $js = (string) file_get_contents($arrivalRoot . '/public/checkin/js/app.js');
+
+    $start = strpos($js, 'function updateExceptionArrivalBounds(');
+    assertTrue($start !== false, 'updateExceptionArrivalBounds() nicht gefunden');
+    $ende = strpos($js, "\n}", $start);
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(strpos($body, 'input.min') !== false && strpos($body, 'input.max') !== false,
+        'Das Feld bekommt keine Grenzen');
+    assertTrue(strpos($body, 'checkin_tolerance_hours') !== false,
+        'Das Fenster benutzt nicht die Check-in-Toleranz');
+    assertTrue(
+        strpos($js, "elements.exceptionAppointment.addEventListener('change', updateExceptionArrivalBounds)") !== false,
+        'Ein Terminwechsel zieht das Fenster nicht nach'
+    );
+});
+
+test('Der Server prueft das Fenster selbst', function () use ($arrivalRoot) {
+    // Die PWA ist ein Client; die Grenze muss im Handler stehen, nicht nur im
+    // Formular.
+    $php = (string) file_get_contents($arrivalRoot . '/private/handlers/exceptions.php');
+
+    assertTrue(
+        substr_count($php, 'arrivalWithinAppointmentWindow') === 2,
+        'Die Fensterpruefung fehlt beim Anlegen oder beim Bearbeiten eines Antrags'
+    );
+});
