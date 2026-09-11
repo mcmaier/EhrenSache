@@ -92,6 +92,43 @@ test('Ein Record ohne Ankunftszeit bekommt keine erfundene Uhrzeit', function ()
     }
 });
 
+test('Eine genehmigte Entschuldigung erzeugt keine Ankunftszeit', function () {
+    $token    = apiToken('admin');
+    $memberId = arrAnyMemberId($token);
+    $aptId    = arrTempAppointment($token, '2031-03-06');
+
+    try {
+        $create = apiRequest('POST', 'exceptions', [
+            'token' => $token,
+            'body'  => ['member_id'      => $memberId,
+                        'appointment_id' => $aptId,
+                        'exception_type' => 'absence',
+                        'reason'         => 'Ankunftszeit-Test',
+                        'status'         => 'pending'],
+        ]);
+        assertStatus(201, $create);
+        $exceptionId = (int) $create['body']['id'];
+
+        // Erst die Genehmigung legt den Record an (handleApprovedAbsence).
+        $approve = apiRequest('PUT', 'exceptions', [
+            'token' => $token,
+            'query' => ['id' => $exceptionId],
+            'body'  => ['exception_type' => 'absence',
+                        'reason'         => 'Ankunftszeit-Test',
+                        'status'         => 'approved'],
+        ]);
+        assertStatus(200, $approve);
+
+        $records = arrRecordsOf($token, $aptId);
+        assertSame(1, count($records), 'Die Genehmigung sollte einen Record anlegen');
+        assertSame('excused', $records[0]['status']);
+        assertSame(null, $records[0]['arrival_time'],
+            'Entschuldigt heisst nicht "um 20:00 erschienen"');
+    } finally {
+        arrDropAppointment($token, $aptId);
+    }
+});
+
 test('Eine geleerte Ankunftszeit wird als leer gespeichert', function () {
     $token    = apiToken('admin');
     $memberId = arrAnyMemberId($token);

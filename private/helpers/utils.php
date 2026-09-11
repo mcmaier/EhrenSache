@@ -78,29 +78,25 @@ function handleApprovedAbsence($db, $database, $exceptionId, $data) {
     
     if(!$exception) return;
     
-    // Appointment-Datum holen für arrival_time
+    // Keine Ankunftszeit: Der Eintrag sagt „entschuldigt", nicht „um 20:00
+    // erschienen". Früher wurde dafür eigens die Startzeit des Termins
+    // abgefragt — eine Uhrzeit, die niemand gemessen hat und die in einer
+    // Auswertung wie eine Anwesenheit aussah.
+    //
+    // Die Terminabfrage entfällt damit ersatzlos. Sie diente allein dazu,
+    // diese Zeit zu bilden; dass der Termin existiert, sichert bereits der
+    // Fremdschlüssel exceptions_ibfk_2.
+    //
+    // INSERT IGNORE bleibt: Wer schon gestempelt hat, behält seinen Eintrag —
+    // eine nachträgliche Entschuldigung überschreibt keine Anwesenheit.
     $stmt = $db->prepare(
-        "SELECT date, start_time 
-         FROM {$prefix}appointments 
-         WHERE appointment_id = ?"
-    );
-    $stmt->execute([$exception['appointment_id']]);
-    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if(!$appointment) return;
-    
-    $arrivalTime = $appointment['date'] . ' ' . $appointment['start_time'];
-    
-    // Record erstellen (INSERT IGNORE falls bereits vorhanden)
-    $stmt = $db->prepare(
-        "INSERT IGNORE INTO {$prefix}records 
-         (member_id, appointment_id, arrival_time, status, checkin_source) 
-         VALUES (?, ?, ?, 'excused', 'admin')"
+        "INSERT IGNORE INTO {$prefix}records
+         (member_id, appointment_id, arrival_time, status, checkin_source)
+         VALUES (?, ?, NULL, 'excused', 'admin')"
     );
     $stmt->execute([
         $exception['member_id'],
-        $exception['appointment_id'],
-        $arrivalTime
+        $exception['appointment_id']
     ]);
 }
 

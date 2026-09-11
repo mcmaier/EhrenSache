@@ -68,6 +68,13 @@ test('Ein genehmigter Zeitkorrektur-Antrag kennzeichnet seine Herkunft', functio
         'Eine Selbstauskunft darf nicht als station_pin weiterlaufen');
 });
 
+/*
+ * handleApprovedAbsence() wird nicht hier geprueft, sondern in arrival_api:
+ * Die Funktion benutzt INSERT IGNORE, und das kennt SQLite nicht (dort hiesse
+ * es INSERT OR IGNORE). Die Syntax steht in der Produktionsfunktion und wird
+ * nicht fuer einen Test umgeschrieben.
+ */
+
 test('Ein Antrag ohne vorhandenen Record legt ihn mit der richtigen Quelle an', function () {
     [$pdo, $database] = arrivalTestDb();
 
