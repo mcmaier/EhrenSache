@@ -9,6 +9,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../private/helpers/utils.php';
+require_once __DIR__ . '/../../private/handlers/auto_checkin.php';
 
 /** Stub fuer das Database-Objekt: gebraucht wird nur table(). */
 class ArrivalTestDatabase
@@ -91,4 +92,40 @@ test('Ein Antrag ohne vorhandenen Record legt ihn mit der richtigen Quelle an', 
     assertSame('2031-03-04 19:50:00', $row['arrival_time']);
     assertSame('exception_request', $row['checkin_source']);
     assertSame('present', $row['status']);
+});
+
+test('Ein Stempel ersetzt einen Eintrag ohne Ankunftszeit', function () {
+    [$pdo, $database] = arrivalTestDb();
+
+    // Liste abgehakt: Record ohne Uhrzeit
+    $pdo->exec("INSERT INTO ut_records (member_id, appointment_id, arrival_time, status, checkin_source)
+                VALUES (6, 7, NULL, 'present', 'admin')");
+
+    $res = writeCheckinRecord($pdo, 'ut_', 6, 7, '2031-03-04 19:58:00',
+                              'station_pin', null, null);
+
+    assertSame('updated', $res['body']['record_action'],
+        'Eine Messung muss eine fehlende Zeit immer ersetzen');
+
+    $row = $pdo->query("SELECT arrival_time, checkin_source FROM ut_records WHERE member_id = 6")
+               ->fetch(PDO::FETCH_ASSOC);
+    assertSame('2031-03-04 19:58:00', $row['arrival_time']);
+    assertSame('station_pin', $row['checkin_source']);
+});
+
+test('Ein spaeterer Stempel laesst eine fruehere Messung stehen', function () {
+    [$pdo, $database] = arrivalTestDb();
+
+    $pdo->exec("INSERT INTO ut_records (member_id, appointment_id, arrival_time, status, checkin_source)
+                VALUES (8, 7, '2031-03-04 19:50:00', 'present', 'station_pin')");
+
+    $res = writeCheckinRecord($pdo, 'ut_', 8, 7, '2031-03-04 20:05:00',
+                              'station_pin', null, null);
+
+    assertSame('unchanged', $res['body']['record_action'],
+        'Die frueheste Ankunft gilt — daran aendert dieser Umbau nichts');
+
+    $row = $pdo->query("SELECT arrival_time FROM ut_records WHERE member_id = 8")
+               ->fetch(PDO::FETCH_ASSOC);
+    assertSame('2031-03-04 19:50:00', $row['arrival_time']);
 });

@@ -175,10 +175,18 @@ function writeCheckinRecord($db, $prefix, int $memberId, int $appointmentId, str
     ];
 
     if($existingRecord) {
-        $arrivalTime  = new DateTime($arrivalTimestamp);
-        $existingTime = new DateTime($existingRecord['arrival_time']);
+        // Eine fehlende Ankunftszeit ist keine Zeit, sondern das Fehlen einer
+        // Aussage — jede echte Messung ersetzt sie. Ohne diesen Zweig liefe
+        // new DateTime(null) auf "jetzt" hinaus: Das Ergebnis haenge dann vom
+        // Tag des Laufs ab statt von den Daten, und seit PHP 8.1 gaebe es
+        // zusaetzlich eine Deprecation-Meldung.
+        $arrivalTime = new DateTime($arrivalTimestamp);
 
-        if($existingRecord['status'] === 'excused' || $arrivalTime < $existingTime) {
+        $replace = $existingRecord['status'] === 'excused'
+                || $existingRecord['arrival_time'] === null
+                || $arrivalTime < new DateTime($existingRecord['arrival_time']);
+
+        if($replace) {
             $db->prepare("UPDATE {$prefix}records
                           SET arrival_time = ?, status = 'present', checkin_source = ?,
                               source_device = ?, location_name = ?
