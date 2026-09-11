@@ -2024,3 +2024,41 @@ eine Skala nach Wertebereich wurde die Vorgabe überhaupt erst zu einer Aussage.
 **Nicht sicherheitsrelevant:** reine Darstellung, keine Datenänderung, kein Rechtebezug.
 
 ---
+
+### OI-56 · DELETE ohne `id` meldet Erfolg, ohne zu löschen
+**Priorität:** niedrig — folgenlos für die Daten, aber irreführend für jeden Aufrufer
+
+Ein `DELETE` ohne `id`-Parameter führt in den meisten Handlern
+`DELETE FROM <tabelle> WHERE <spalte> = NULL` aus. Das trifft **keine Zeile** — `= NULL` ist in
+SQL niemals wahr —, aber `PDOStatement::execute()` liefert trotzdem `true`. Der Handler antwortet
+mit `200` und einer Erfolgsmeldung wie „Appointment deleted".
+
+**Kein Datenverlustrisiko.** Es wird zu wenig gelöscht, nicht zu viel; ein `WHERE` steht überall.
+Auch keine Rechteausweitung: Die Rollenprüfung (`requireAdmin()` bzw. `requireAdminOrManager()`)
+läuft davor und bleibt wirksam.
+
+**Das Problem ist die Antwort.** Ein Client kann nicht erkennen, dass sein Aufruf wirkungslos
+war — er bekommt dieselbe Antwort wie bei einer erfolgreichen Löschung.
+
+**Wie es aufgefallen ist:** beim Schreiben der Suite `arrival_api` (1.5.0). Ein Testtermin
+verschwand nicht, obwohl der Aufruf `200 "Appointment deleted"` meldete. Ursache war dort ein
+Fehler im Test — `apiRequest()` kennt keinen Schlüssel `id`, die Angabe gehört in `query` —, aber
+der Handler hätte es sagen müssen.
+
+**Betroffen** (geprüft am 2026-09-11, `DELETE`-Zweig ohne vorherige `id`-Prüfung):
+`appointments.php`, `records.php`, `users.php`, `exceptions.php`, `activity_types.php`,
+`appointment_types.php`, `member_groups.php`, `membership_dates.php`.
+
+Es geht auch anders: `import.php`, `members.php` und `work_sessions.php` prüfen die `id` vorher
+und antworten mit `400`.
+
+**Zu tun:** In den betroffenen Zweigen vor dem Löschen auf eine vorhandene `id` prüfen und sonst
+`400` liefern. Wo es fachlich passt, zusätzlich `rowCount()` auswerten und `404` melden, wenn kein
+Datensatz getroffen wurde — das fängt auch den Fall einer gültigen, aber unbekannten ID.
+
+**Vorsicht bei `records.php`:** Der Zweig kennt zwei Betriebsarten — einzelner Datensatz über
+`id` und Massenlöschung über `member_id`. Eine Prüfung auf `id` allein würde die zweite
+abwürgen.
+
+**Nicht sicherheitsrelevant:** keine Rechteausweitung, kein Zugriff ohne Anmeldung, kein
+zusätzlicher Datenabfluss.
