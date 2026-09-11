@@ -91,3 +91,39 @@ test('Ein Record ohne Ankunftszeit bekommt keine erfundene Uhrzeit', function ()
         arrDropAppointment($token, $aptId);
     }
 });
+
+test('Eine geleerte Ankunftszeit wird als leer gespeichert', function () {
+    $token    = apiToken('admin');
+    $memberId = arrAnyMemberId($token);
+    $aptId    = arrTempAppointment($token, '2031-03-05');
+
+    try {
+        $create = apiRequest('POST', 'records', [
+            'token' => $token,
+            'body'  => ['member_id'      => $memberId,
+                        'appointment_id' => $aptId,
+                        'arrival_time'   => '2031-03-05 19:58:00'],
+        ]);
+        assertStatus(201, $create);
+        assertSame('2031-03-05 19:58:00', $create['body']['arrival_time']);
+        $recordId = (int) $create['body']['id'];
+
+        // Vollstaendiger Koerper, wie ihn das Dashboard schickt. Ein Teilaufruf
+        // liefe in records.php gegen undefinierte Felder -- siehe OI-54.
+        $res = apiRequest('PUT', 'records', [
+            'token' => $token,
+            'query' => ['id' => $recordId],
+            'body'  => ['member_id'      => $memberId,
+                        'appointment_id' => $aptId,
+                        'arrival_time'   => '',
+                        'status'         => 'present'],
+        ]);
+        assertStatus(200, $res);
+
+        $records = arrRecordsOf($token, $aptId);
+        assertSame(null, $records[0]['arrival_time'],
+            'Ein Leerstring muss als fehlende Zeit ankommen, nicht als Nulldatum');
+    } finally {
+        arrDropAppointment($token, $aptId);
+    }
+});

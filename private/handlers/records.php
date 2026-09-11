@@ -224,29 +224,35 @@ function handleRecords($db, $database, $method, $id) {
             $memberChanged = ($data->member_id != $originalRecord['member_id']);
             $appointmentChanged = ($data->appointment_id != $originalRecord['appointment_id']);
             
+            // Ein Leerstring ist keine Uhrzeit, sondern das Löschen einer
+            // Angabe. Ohne diese Normalisierung landet er je nach SQL-Modus
+            // als '0000-00-00 00:00:00' in der Spalte — ein Datum, das es
+            // nicht gibt, und das jede spätere Auswertung mitschleppt.
+            $arrival_time = ($data->arrival_time ?? '') !== '' ? $data->arrival_time : null;
+
             if ($memberChanged || $appointmentChanged) {
                 // Prüfe ob bereits ein anderer Record für neue Kombination existiert
-                $checkStmt = $db->prepare("SELECT record_id FROM {$prefix}records 
+                $checkStmt = $db->prepare("SELECT record_id FROM {$prefix}records
                                         WHERE member_id = ? AND appointment_id = ? AND record_id != ?");
                 $checkStmt->execute([$data->member_id, $data->appointment_id, $id]);
-                
+
                 if ($checkStmt->fetch()) {
-                    http_response_code(409); 
+                    http_response_code(409);
                     echo json_encode(["message" => "Record for this member and appointment already exists"]);
                     break;
                 }
-                
+
                 // Kein Konflikt - komplettes Update
-                $stmt = $db->prepare("UPDATE {$prefix}records 
-                                    SET member_id=?, appointment_id=?, arrival_time=?, status=? 
+                $stmt = $db->prepare("UPDATE {$prefix}records
+                                    SET member_id=?, appointment_id=?, arrival_time=?, status=?
                                     WHERE record_id=?");
-                $success = $stmt->execute([$data->member_id, $data->appointment_id, $data->arrival_time, $data->status, $id]);
+                $success = $stmt->execute([$data->member_id, $data->appointment_id, $arrival_time, $data->status, $id]);
             } else {
                 // Nur Zeit/Status ändern - kein Konfliktrisiko
-                $stmt = $db->prepare("UPDATE {$prefix}records 
-                                    SET arrival_time=?, status=? 
+                $stmt = $db->prepare("UPDATE {$prefix}records
+                                    SET arrival_time=?, status=?
                                     WHERE record_id=?");
-                $success = $stmt->execute([$data->arrival_time, $data->status, $id]);
+                $success = $stmt->execute([$arrival_time, $data->status, $id]);
             }
             
             if ($success) {
