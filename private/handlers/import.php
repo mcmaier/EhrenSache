@@ -553,8 +553,25 @@ function importRecords($db, $database, $filePath, $createMissingAppointments = f
             $row['arrival_date_time'] = $row['arrival_date_time'] ?? ($row['arrival_time'] ?? '');
 
             // Validierung
-            if (empty($row['member_number']) || empty($row['arrival_date_time'])) {
-                $errors[] = "Row $rowNumber: member_number and arrival_date_time required";
+            if (empty($row['member_number'])) {
+                $errors[] = "Row $rowNumber: member_number required";
+                continue;
+            }
+
+            // arrival_date_time darf seit 1.5.0 leer sein: Es gibt Records ohne
+            // Ankunftszeit, und der eigene Export schreibt dafür eine leere
+            // Zelle -- ohne diese Ausnahme lehnte der Import den eigenen Export
+            // ab. Die Spalte trägt aber einen zweiten Zweck: Fehlt der
+            // Terminschlüssel, ist sie die einzige Zuordnung zum Termin, über
+            // das Toleranzfenster weiter unten.
+            $hasAppointmentKey = !empty($row['appointment_date'])
+                              && !empty($row['appointment_start_time'])
+                              && !empty($row['appointment_type']);
+
+            if (empty($row['arrival_date_time']) && !$hasAppointmentKey) {
+                $errors[] = "Row $rowNumber: arrival_date_time required unless "
+                          . "appointment_date, appointment_start_time and "
+                          . "appointment_type identify the appointment";
                 continue;
             }
             
@@ -568,13 +585,20 @@ function importRecords($db, $database, $filePath, $createMissingAppointments = f
                 continue;
             }
 
-            // Parse arrival_date_time zu Datum und Zeit
-            try {
-                $dateTime = new DateTime($arrivalDateTime);
-                $arrivalTime = $dateTime->format('Y-m-d H:i:s');
-            } catch (Exception $e) {
-                $errors[] = "Row $rowNumber: Invalid date/time format '$arrivalTime' (expected: YYYY-MM-DD HH:MM:SS)";
-                continue;
+            // Parse arrival_date_time zu Datum und Zeit.
+            // Eine leere Zelle bleibt leer -- sie heisst "keine Aussage ueber
+            // die Ankunft" und wird nicht zu "jetzt" oder zum Terminbeginn
+            // ergaenzt.
+            if ($arrivalDateTime === '') {
+                $arrivalTime = null;
+            } else {
+                try {
+                    $dateTime = new DateTime($arrivalDateTime);
+                    $arrivalTime = $dateTime->format('Y-m-d H:i:s');
+                } catch (Exception $e) {
+                    $errors[] = "Row $rowNumber: Invalid date/time format '$arrivalDateTime' (expected: YYYY-MM-DD HH:MM:SS)";
+                    continue;
+                }
             }
             
             // Finde Mitglied anhand member_number
@@ -628,7 +652,10 @@ function importRecords($db, $database, $filePath, $createMissingAppointments = f
             // Terminart, die zu unseren passt, und die Näherung ist das Beste,
             // was sich aus einer Ankunftszeit ableiten lässt.
             // --------------------------------------------------------------
-            if (!$appointment) {
+            // Ohne Ankunftszeit gibt es hier nichts zu suchen: Das Fenster
+            // spannt sich um genau diese Zeit auf. Solche Zeilen brauchen den
+            // Terminschluessel, was die Validierung oben bereits sicherstellt.
+            if (!$appointment && $arrivalDateTime !== '') {
                 $stmt = $db->prepare("
                     SELECT appointment_id, date, start_time,
                         ABS(TIMESTAMPDIFF(MINUTE, CONCAT(date, ' ', start_time), ?)) as time_diff_minutes

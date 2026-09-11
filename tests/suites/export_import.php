@@ -153,3 +153,28 @@ test('export/import: der Import akzeptiert die alten Spaltennamen weiter', funct
     assertTrue(strpos($src, "in_array('arrival_time', \$header)") !== false,
         "importRecords akzeptiert den Zweitnamen 'arrival_time' nicht mehr");
 });
+
+test('export/import: eine leere Ankunftszeit ist zulaessig, wenn der Terminschluessel steht', function () {
+    // Seit 1.5.0 exportiert die Anwendung Records ohne Ankunftszeit als leere
+    // Zelle. Bliebe arrival_date_time Pflichtspalte, lehnte der Import den
+    // eigenen Export ab -- genau der Round-Trip-Bruch, den diese Suite
+    // verhindern soll.
+    //
+    // Die Zelle darf aber nur fehlen, wenn der Terminschluessel den Termin
+    // trifft: Ohne ihn ist die Ankunftszeit die einzige Zuordnung, ueber das
+    // Toleranzfenster.
+    $src = (string) file_get_contents(__DIR__ . '/../../private/handlers/import.php');
+
+    assertTrue(
+        strpos($src, 'member_number and arrival_date_time required') === false,
+        'Die Ankunftszeit ist noch unbedingte Pflichtspalte'
+    );
+    assertTrue(
+        strpos($src, '$hasAppointmentKey') !== false,
+        'Die Ausnahme prueft den Terminschluessel nicht'
+    );
+    assertTrue(
+        strpos($src, "!\$appointment && \$arrivalDateTime !== ''") !== false,
+        'Das Toleranzfenster laeuft auch ohne Ankunftszeit an'
+    );
+});
