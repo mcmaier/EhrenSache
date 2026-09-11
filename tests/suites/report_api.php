@@ -192,14 +192,13 @@ test('statistics_report: die Terminliste deckt genau die gezaehlten Termine ab',
     ]);
     assertStatus(200, $json);
 
-    // Summe der gezaehlten Termine ueber alle Gruppen des Mitglieds. Mehrere
-    // Gruppen koennen an derselben Terminart haengen -- dann zaehlt der Termin
-    // in der Liste nur einmal, deshalb wird nach Terminart entdoppelt.
+    // Termine je Terminart, entdoppelt: Mehrere Gruppen koennen an derselben
+    // Terminart haengen, der Termin zaehlt in der Liste trotzdem einmal.
     $perType = [];
     foreach ($json['body']['statistics'] as $group) {
-        $typeId = $group['appointment_type_id'];
-        $total  = $group['members'][0]['total_appointments'] ?? 0;
-        $perType[$typeId] = $total;
+        foreach ($group['members'][0]['by_type'] ?? [] as $typ) {
+            $perType[$typ['type_id']] = $typ['total_appointments'];
+        }
     }
     $expected = array_sum($perType);
 
@@ -225,14 +224,42 @@ test('statistics_report: die Terminliste deckt genau die gezaehlten Termine ab',
         "Terminliste soll genau die gezaehlten Termine zeigen (Quote rechnet mit {$expected})");
 });
 
-test('statistics_report: die Fussnote nennt die ausgewertete Terminart', function () {
+test('statistics_report: keine Fussnote zur einzelnen Terminart mehr', function () {
+    // Bis OI-48 nannte der Bericht je Gruppe die eine ausgewertete Terminart.
+    // Seit alle ausgewertet werden, waere dieser Satz falsch.
     $res = apiRequest('GET', 'statistics_report', [
         'token' => apiToken('admin'),
         'query' => ['year' => date('Y')],
     ]);
     assertStatus(200, $res);
-    assertTrue(strpos($res['raw'], 'Ausgewertet wurden je Gruppe') !== false,
-               'Fussnote zur Terminart erwartet');
+    assertTrue(strpos($res['raw'], 'Ausgewertet wurden je Gruppe') === false,
+               'die alte Fussnote darf nicht mehr erscheinen');
+});
+
+test('statistics_report: je Terminart eine Spalte', function () {
+    $json = apiRequest('GET', 'statistics', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => date('Y')],
+    ]);
+    assertStatus(200, $json);
+
+    $gruppe = $json['body']['statistics'][0] ?? null;
+    assertTrue($gruppe !== null, 'mindestens eine Gruppe erwartet');
+    assertTrue(count($gruppe['appointment_types']) > 0, 'mindestens eine Terminart erwartet');
+
+    $html = apiRequest('GET', 'statistics_report', [
+        'token' => apiToken('admin'),
+        'query' => ['year' => date('Y')],
+    ]);
+    assertStatus(200, $html);
+
+    foreach ($gruppe['appointment_types'] as $type) {
+        $name = $type['type_name'] ?? 'ohne Terminart';
+        assertTrue(
+            strpos($html['raw'], '<th>' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . '</th>') !== false,
+            "Spalte '{$name}' im Bericht erwartet"
+        );
+    }
 });
 
 test('statistics_report: die Herkunftsstufen sind erklaert', function () {

@@ -81,7 +81,9 @@ function handleStatisticsReport($db, $database, $request_method, $authUserRole, 
         // nicht neu abgeleitet, siehe statisticsReportAppointments().
         $typeIds = [];
         foreach ($result['statistics'] as $group) {
-            $typeIds[(int) $group['appointment_type_id']] = true;
+            foreach ($group['appointment_types'] as $type) {
+                $typeIds[(int) $type['type_id']] = true;
+            }
         }
 
         $appointments = statisticsReportAppointments(
@@ -94,7 +96,7 @@ function handleStatisticsReport($db, $database, $request_method, $authUserRole, 
         'title'    => 'Anwesenheitsbericht',
         'period'   => 'Jahr ' . $year,
         'sections' => $sections,
-        'notes'    => statisticsReportNotes($result['statistics']),
+        'notes'    => statisticsReportNotes(),
     ]);
 }
 
@@ -116,13 +118,19 @@ function statisticsReportSummarySection(array $summary): array
     ];
 }
 
-/** Ein Abschnitt je Gruppe: eine Zeile je Mitglied. */
+/** Ein Abschnitt je Gruppe: eine Zeile je Mitglied, Spalten je Terminart. */
 function statisticsReportGroupSection(array $group): array
 {
+    $columns = ['Mitglied', 'Termine', 'Anwesend', 'Entschuldigt', 'Unentschuldigt', 'Quote'];
+
+    foreach ($group['appointment_types'] as $type) {
+        $columns[] = $type['type_name'] ?? 'ohne Terminart';
+    }
+
     $rows = [];
 
     foreach ($group['members'] as $member) {
-        $rows[] = [
+        $row = [
             $member['member_name'],
             (string) $member['total_appointments'],
             (string) $member['attended'],
@@ -130,11 +138,21 @@ function statisticsReportGroupSection(array $group): array
             (string) $member['unexcused_absences'],
             statisticsReportRate($member['attendance_rate']),
         ];
+
+        // Die Reihenfolge von by_type folgt appointment_types -- die Spalten
+        // stimmen deshalb ohne Nachschlagen.
+        foreach ($member['by_type'] as $type) {
+            $row[] = $type['total_appointments'] > 0
+                ? statisticsReportRate($type['attendance_rate'])
+                : '–';
+        }
+
+        $rows[] = $row;
     }
 
     return [
         'heading' => $group['group_name'],
-        'columns' => ['Mitglied', 'Termine', 'Anwesend', 'Entschuldigt', 'Unentschuldigt', 'Quote'],
+        'columns' => $columns,
         'rows'    => $rows,
         'empty'   => 'Für dieses Jahr sind in dieser Gruppe keine Termine erfasst.',
     ];
@@ -301,11 +319,9 @@ function statisticsReportDetailSection(array $appointments): array
  * das noch laeuft. Ohne die dritte verschweigt er, dass automatisch erzeugte
  * Eintraege mitzaehlen (OI-20).
  *
- * @param array<int, array<string, mixed>> $statistics Gruppenergebnisse aus
- *                                                      buildStatisticsResult()
  * @return array<int, string>
  */
-function statisticsReportNotes(array $statistics): array
+function statisticsReportNotes(): array
 {
     $notes = [
         'Gezählt werden nur Termine, die zum Zeitpunkt der Erstellung bereits begonnen haben.',
@@ -313,20 +329,6 @@ function statisticsReportNotes(array $statistics): array
         'Automatisch erzeugte Check-ins zählen wie erfasste Anwesenheiten.',
         'Der Bericht berücksichtigt die Zeiträume der Mitgliedschaft.',
     ];
-
-    // Ohne diese Zeile bliebe unsichtbar, dass je Gruppe nur eine einzige
-    // Terminart in die Quote eingeht (OI-48) -- das Blatt soll ohne Vorwissen
-    // erkennbar machen, worauf die Zahl beruht. Deshalb liefert
-    // calculateGroupStatistics() das Feld appointment_type_name mit.
-    if ($statistics !== []) {
-        $perGroup = [];
-        foreach ($statistics as $group) {
-            $typeName   = $group['appointment_type_name'] ?? null;
-            $perGroup[] = $group['group_name'] . ' — ' . ($typeName ?? 'ohne Terminart');
-        }
-        $notes[] = 'Ausgewertet wurden je Gruppe die Termine einer Terminart: '
-            . implode('; ', $perGroup) . '.';
-    }
 
     $notes[] = REPORT_ORIGIN_MEASURED . ': Die Ankunftszeit wurde bei der Anmeldung an einer Station oder in der App '
         . 'aufgezeichnet.';
