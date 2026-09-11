@@ -203,6 +203,32 @@ function attendanceBuildSummary(array $memberTotals, int $appointmentCount, int 
     ];
 }
 
+/**
+ * Schraenkt die Terminartliste einer Gruppe auf eine angefragte Terminart ein.
+ *
+ * Ohne Filter bleibt die Liste, wie sie ist. Mit Filter bleibt hoechstens ein
+ * Eintrag uebrig -- und bleibt keiner uebrig, fuehrt die Gruppe diese Terminart
+ * nicht und faellt beim Aufrufer ganz heraus.
+ *
+ * Das stand zunaechst im Handler und war dort falsch: Die Gruppe blieb mit
+ * leerer Mitgliederliste stehen und wies dabei ihre *eigenen* Terminarten aus
+ * statt der angefragten. Hier ist es pruefbar.
+ *
+ * @param array<int, array{type_id: int, type_name: ?string}> $types
+ * @return array<int, array{type_id: int, type_name: ?string}>
+ */
+function attendanceFilterTypes(array $types, ?int $appointmentTypeId): array
+{
+    if ($appointmentTypeId === null) {
+        return $types;
+    }
+
+    return array_values(array_filter(
+        $types,
+        static fn(array $type): bool => (int) $type['type_id'] === $appointmentTypeId
+    ));
+}
+
 // ============================================
 // HOLEND
 // ============================================
@@ -240,16 +266,39 @@ function attendanceGroupTypes($db, $database, int $groupId): array
     return $types;
 }
 
-/** Name einer Gruppe, oder null wenn es sie nicht gibt. */
-function attendanceGroupName($db, $database, int $groupId): ?string
+/**
+ * Namen mehrerer Gruppen auf einmal, als Zuordnung group_id => group_name.
+ *
+ * Eine Abfrage statt einer je Gruppe: Der Name haengt weder an Terminart noch
+ * an Jahr, er muss nicht in der Gruppenschleife geholt werden. Fehlt eine
+ * group_id im Ergebnis, gibt es die Gruppe nicht mehr -- der Aufrufer
+ * ueberspringt sie dann.
+ *
+ * @param array<int, int> $groupIds
+ * @return array<int, string>
+ */
+function attendanceGroupNames($db, $database, array $groupIds): array
 {
-    $prefix = $database->table('');
+    if ($groupIds === []) {
+        return [];
+    }
 
-    $stmt = $db->prepare("SELECT group_name FROM {$prefix}member_groups WHERE group_id = ?");
-    $stmt->execute([$groupId]);
-    $name = $stmt->fetchColumn();
+    $prefix       = $database->table('');
+    $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
 
-    return $name === false ? null : (string) $name;
+    $stmt = $db->prepare("
+        SELECT group_id, group_name
+        FROM {$prefix}member_groups
+        WHERE group_id IN ({$placeholders})
+    ");
+    $stmt->execute($groupIds);
+
+    $names = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $names[(int) $row['group_id']] = (string) $row['group_name'];
+    }
+
+    return $names;
 }
 
 /**

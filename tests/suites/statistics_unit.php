@@ -255,3 +255,44 @@ test('attendanceBuildGroup verarbeitet drei Terminarten', function () {
     assertSame(0,  $member['excused']);
     assertSame(67.7, $member['attendance_rate']);
 });
+
+// ---- attendanceFilterTypes --------------------------------------------------
+
+test('attendanceFilterTypes laesst ohne Filter alles durch', function () {
+    $types = [
+        ['type_id' => 1, 'type_name' => 'Gesamtprobe'],
+        ['type_id' => 2, 'type_name' => 'Registerprobe'],
+    ];
+    assertSame($types, attendanceFilterTypes($types, null));
+});
+
+test('attendanceFilterTypes behaelt nur die angefragte Terminart', function () {
+    $types = [
+        ['type_id' => 1, 'type_name' => 'Gesamtprobe'],
+        ['type_id' => 2, 'type_name' => 'Registerprobe'],
+    ];
+    $gefiltert = attendanceFilterTypes($types, 2);
+
+    assertSame(1, count($gefiltert));
+    assertSame(2, $gefiltert[0]['type_id']);
+});
+
+test('attendanceFilterTypes liefert leer, wenn die Gruppe die Terminart nicht fuehrt', function () {
+    // Das ist der Fall, den der Handler zunaechst falsch hatte: Die Gruppe
+    // blieb stehen und wies ihre eigenen Terminarten aus.
+    $types = [['type_id' => 4, 'type_name' => 'Vorstandssitzung']];
+    assertSame([], attendanceFilterTypes($types, 3));
+});
+
+test('attendanceFilterTypes nummeriert die Schluessel neu', function () {
+    // array_filter behaelt die Schluessel -- ohne array_values waere das
+    // Ergebnis ein Objekt statt eines Arrays im JSON.
+    $types = [
+        ['type_id' => 1, 'type_name' => 'Gesamtprobe'],
+        ['type_id' => 2, 'type_name' => 'Registerprobe'],
+        ['type_id' => 3, 'type_name' => 'Auftritt'],
+    ];
+    $gefiltert = attendanceFilterTypes($types, 3);
+
+    assertSame([0], array_keys($gefiltert));
+});

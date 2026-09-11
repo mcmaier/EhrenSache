@@ -86,7 +86,9 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
     if ($groupId !== null) {
         // Wiederholt bewusst die Pruefung, die handleStatistics() vor dem Aufruf
         // bereits macht: Diese Funktion muss auch ohne vorgelagertes Gate
-        // aufrufbar sein -- der Anwesenheitsbericht ruft sie so.
+        // aufrufbar sein -- der Anwesenheitsbericht ruft sie so. Das kostet fuer
+        // Nicht-Manager mit Gruppenfilter eine zusaetzliche, indizierte
+        // COUNT-Abfrage. Wer hier "bereinigt", macht den Bericht angreifbar.
         if (!hasStatisticsGroupAccess($db, $database, $authMemberId, $role, $groupId)) {
             return [
                 'warning'    => 'group not accessible',
@@ -104,25 +106,16 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
     $groups = array_map('intval', $groups);
 
     $statistics = [];
+    $groupNames = attendanceGroupNames($db, $database, $groups);
 
     foreach ($groups as $gid) {
-        $types = attendanceGroupTypes($db, $database, $gid);
+        // Gruppe ohne Terminart -- oder ohne die angefragte -- hat keine
+        // Anwesenheit, ueber die sich reden liesse. Sie entfaellt, wie bisher.
+        $types = attendanceFilterTypes(
+            attendanceGroupTypes($db, $database, $gid),
+            $appointmentTypeId
+        );
 
-        // Ist auf eine Terminart gefiltert, zaehlt nur sie -- und eine Gruppe,
-        // die sie nicht fuehrt, faellt ganz heraus. Ohne diese Filterung
-        // erschiene sie mit leerer Mitgliederliste und wiese dabei ihre
-        // *eigenen* Terminarten aus statt der angefragten. Das alte
-        // calculateGroupStatistics() gab in diesem Fall null zurueck; das
-        // Verhalten war beim Umbau zunaechst verlorengegangen.
-        if ($appointmentTypeId !== null) {
-            $types = array_values(array_filter(
-                $types,
-                static fn(array $type): bool => (int) $type['type_id'] === $appointmentTypeId
-            ));
-        }
-
-        // Gruppe ohne (passende) Terminart hat keine Anwesenheit, ueber die
-        // sich reden liesse -- sie entfaellt, wie bisher.
         if ($types === []) {
             continue;
         }
@@ -135,7 +128,7 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
             continue;
         }
 
-        $groupName = attendanceGroupName($db, $database, $gid);
+        $groupName = $groupNames[$gid] ?? null;
         if ($groupName === null) {
             continue;
         }
