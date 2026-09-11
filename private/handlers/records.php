@@ -275,9 +275,15 @@ function handleRecords($db, $database, $method, $id) {
                 $before_date = $_GET['before_date'] ?? null; // Format: YYYY-MM-DD
                 
                 if($before_date) {
-                    // Nur Records vor bestimmtem Datum löschen
-                    $stmt = $db->prepare("DELETE FROM {$prefix}records 
-                                        WHERE member_id = ? AND arrival_time < ?");
+                    // Nur Records vor bestimmtem Datum löschen — über das
+                    // Termindatum, nicht über die Ankunftszeit. Seit 1.5.0 darf
+                    // arrival_time NULL sein, und NULL < '2023-01-01' ist
+                    // niemals wahr: Solche Records liessen sich sonst nicht
+                    // mehr löschen.
+                    $stmt = $db->prepare("DELETE r FROM {$prefix}records r
+                                        JOIN {$prefix}appointments a
+                                          ON a.appointment_id = r.appointment_id
+                                        WHERE r.member_id = ? AND a.date < ?");
                     $params = [$member_id, $before_date];
                 } else {
                     // Alle Records des Mitglieds löschen

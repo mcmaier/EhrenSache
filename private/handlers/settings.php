@@ -509,8 +509,17 @@ function handleCleanup($db, $database, $request_method)
     $db->beginTransaction();
 
     try {
-        // Lösche alte Records
-        $stmt = $db->prepare("DELETE FROM {$prefix}records WHERE arrival_time < ?");
+        // Lösche alte Records — über das Termindatum, nicht über die Ankunft.
+        //
+        // Seit 1.5.0 darf arrival_time NULL sein, und NULL < '2023-01-01' ist
+        // niemals wahr: Ein Record ohne Ankunftszeit fiele dauerhaft aus jeder
+        // Frist und bliebe unbegrenzt liegen. Das Termindatum ist ohnehin die
+        // fachlich richtige Bezugsgröße — der Eintrag gehört zu dem Termin, an
+        // dem er entstanden ist.
+        $stmt = $db->prepare("DELETE r FROM {$prefix}records r
+                              JOIN {$prefix}appointments a
+                                ON a.appointment_id = r.appointment_id
+                              WHERE a.date < ?");
         $stmt->execute([$cutoff['records']]);
         $deletedRecords = $stmt->rowCount();
 
