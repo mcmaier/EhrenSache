@@ -619,10 +619,21 @@ Zeitkorrektur-Antrag. Die Uhrzeit stammt dort aus der Selbstauskunft des Mitglie
 }
 ```
 
-**Status-Werte:**
-- `present`: Anwesend
-- `late`: Verspätet
-- `absent`: Abwesend
+**Status-Werte:** `present` (anwesend) und `excused` (entschuldigt) — mehr kennt die Spalte
+nicht. Unentschuldigtes Fehlen wird nicht gespeichert, sondern aus dem Fehlen eines Eintrags
+abgeleitet.
+
+**`arrival_time` ist optional.** Fehlt sie oder ist sie leer, entsteht der Eintrag ohne
+Ankunftszeit. Bei Status `excused` ist das der Regelfall: Wer nicht da war, ist nicht angekommen.
+
+**Toleranzband:** Eine angegebene Ankunftszeit muss innerhalb von `checkin_tolerance_hours`
+(Vorgabe 2) um die Startzeit des Termins liegen, sonst `400`. Dasselbe Fenster gilt für den
+nachträglichen Antrag — ohne diese Grenze ließe sich über den direkten Weg eintragen, was
+`resource=exceptions` abweist.
+
+**Fehler:** `400` bei fehlender `member_id`/`appointment_id` oder einer Ankunftszeit außerhalb
+des Toleranzbands · `409` wenn für dieses Paar aus Mitglied und Termin bereits ein Eintrag
+besteht.
 
 ---
 
@@ -630,6 +641,10 @@ Zeitkorrektur-Antrag. Die Uhrzeit stammt dort aus der Selbstauskunft des Mitglie
 **Endpoint:** `PUT /api.php?resource=records&id=1`
 
 **Berechtigung:** Admin/Manager
+
+Dieselben Regeln wie beim Anlegen: `arrival_time` darf leer sein (ein Leerstring löscht die
+Angabe), und das Toleranzband wird geprüft — gegen den Termin aus dem Anfragekörper, denn ein
+`PUT` darf den Termin wechseln.
 
 ---
 
@@ -895,16 +910,25 @@ Notizpflicht (`worktime_require_note`) gilt am Kiosk nicht. `created_by` ist das
 ```json
 {
   "member_id": 5,
-  "exception_date": "2024-03-20",
-  "type": "excused",
-  "reason": "Krankheit"
+  "appointment_id": 10,
+  "exception_type": "time_correction",
+  "reason": "QR-Scanner nicht verfügbar",
+  "requested_arrival_time": "2024-03-20 19:55:00",
+  "status": "pending"
 }
 ```
 
-**Exception-Typen:**
-- `excused`: Entschuldigt
-- `vacation`: Urlaub
-- `correction`: Zeitkorrektur
+**Exception-Typen:** `absence` (Abmeldung) und `time_correction` (nachgetragene Ankunftszeit) —
+mehr kennt die Spalte nicht. Ein Antrag hängt immer an einem Termin, nicht an einem freien Datum.
+
+**`requested_arrival_time`** gehört zu `time_correction` und muss innerhalb von
+`checkin_tolerance_hours` (Vorgabe 2) um die Startzeit des Termins liegen, sonst `400`. Die Zeit
+ist die **Ankunft des Mitglieds**, nicht der Zeitpunkt des Antrags — wer erst später merkt, dass
+das Stempeln misslungen ist, würde sich sonst selbst eine Verspätung eintragen.
+
+Genehmigt ein Admin den Antrag, entsteht daraus ein Eintrag in `records` mit
+`checkin_source = 'exception_request'`. Die Grenze gilt auch beim Bearbeiten — für das Mitglied,
+das seinen Antrag nachbessert, wie für den Admin, der ihn vor der Freigabe korrigiert.
 
 ---
 

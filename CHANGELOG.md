@@ -34,6 +34,24 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Der Import verträgt eine leere Ankunftszeit**, sofern die Terminspalten den Termin treffen.
   Ohne diese Ausnahme hätte der Import den eigenen Export abgelehnt.
 
+- **Im Anwesenheitsdialog steht der Status jetzt vor der Ankunftszeit.** Bei „Entschuldigt" wird
+  die Ankunft ausgeblendet — wer nicht da war, ist nicht angekommen. Bei „Anwesend" bleibt das
+  Feld leer und ist kein Pflichtfeld mehr; ein Knopf setzt den Terminbeginn ein, wenn der Nachtrag
+  von dort ausgehen soll.
+
+  Zuvor trug der Dialog beim Wechsel des Termins **stillschweigend dessen Startzeit** ein. Wer
+  danach speicherte, erzeugte eine Ankunftszeit, die niemand gemessen und niemand gewollt hat.
+
+- **Der nachträgliche Antrag fragt, wann man da war.** Die Check-in-App hat bisher ungefragt den
+  Zeitpunkt der Antragstellung als Ankunft eingetragen: Wer um 19:55 kam, das gescheiterte
+  Stempeln erst um 20:30 bemerkte und dann den Antrag stellte, beantragte damit 20:30. Das
+  Mitglied gibt die Zeit jetzt selbst an.
+
+- **Ein Toleranzband für Ankunftszeiten.** Eine eingetragene oder beantragte Ankunft muss
+  innerhalb der Check-in-Toleranz (Vorgabe: zwei Stunden) um den Terminbeginn liegen. Das gilt
+  für alle Wege gleichermaßen — Dialog, Antrag, Bearbeitung durch das Mitglied und durch die
+  Verwaltung.
+
 ### Neu
 - **Schnellinbetriebnahme des Kiosks per QR-Code.** Der Gerätedialog einer virtuellen Station
   zeigt neben Token und Kopieren einen QR-Code mit der Adresse `…/station/#t=<token>`. Statt
