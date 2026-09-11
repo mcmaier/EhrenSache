@@ -157,6 +157,31 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   `"year": "2026"` als Zeichenkette.
 
 ### Behoben
+- **Die Statistik wertete je Gruppe nur eine einzige Terminart aus (OI-48) — die Quoten ändern
+  sich dadurch in jeder bestehenden Installation.** In welche Richtung, hängt davon ab, wie
+  diszipliniert bisher bei den ignorierten Terminarten erfasst wurde: Ein Verein, der seine
+  Zahlen über Jahre verfolgt, sollte das wissen, bevor er sich über einen Sprung wundert, statt
+  einen Rechenfehler zu vermuten.
+
+  Der Grund lag in `calculateGroupStatistics()`: `appointment_type_groups` ist eine M:N-Tabelle
+  — eine Gruppe kann an mehreren Terminarten hängen —, aber die Funktion las mit `fetch()` nur
+  eine einzige Zeile davon, **ohne `ORDER BY`**. Welche Terminart damit gewann, entschied die
+  Datenbank, nicht die Fachlogik. Im Demo-Bestand blieben dadurch **24 Termine — knapp 40 Prozent
+  aller erfassten Termine — unsichtbar** (Stand 2026-09-11: 47 von 71 gezählt).
+
+  Jetzt werden alle Terminarten einer Gruppe ausgewertet, je Mitglied unter `by_type` einzeln
+  ausgewiesen, und die Kopfzahlen sind entdoppelt: Erreicht ein Mitglied denselben Termin über
+  zwei Gruppen, zählt er in `summary.total_appointments` einmal statt doppelt.
+
+  Wie irreführend die alte Zahl war, zeigt ein Befund aus dem Demo-Bestand: Die bisherige
+  „Anwesenheitsquote" eines Mitglieds stimmt auf die Nachkommastelle mit seiner neuen Quote für
+  die Terminart „Gesamtprobe" überein. Es war also nie eine Gesamtquote — nur die Quote einer
+  einzelnen Terminart unter falschem Namen.
+
+  Die Check-in-PWA war von dem Fehler nicht separat betroffen und braucht auch keine eigene
+  Änderung, um korrekt zu werden: Ihre Gruppenkacheln beruhen auf derselben Statistik-Ressource
+  und zeigen ab sofort automatisch die vollständige Auswertung.
+
 - **`API.md` beschrieb `appearance` falsch.** Das Beispiel zeigte ein flaches Objekt mit
   `org_name` und `logo_url`; ausgeliefert wird seit Langem `{"settings": {…}}` mit anderen
   Schlüsselnamen. Gegen die laufende Installation geprüft und ersetzt.

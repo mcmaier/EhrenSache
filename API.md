@@ -1253,17 +1253,39 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
     {
       "group_id": 1,
       "group_name": "Aktive",
-      "appointment_type_id": 1,
-      "appointment_type_name": "Gesamtprobe",
+      "appointment_types": [
+        { "type_id": 1, "type_name": "Gesamtprobe" },
+        { "type_id": 2, "type_name": "Registerprobe" }
+      ],
       "members": [
         {
           "member_id": 5,
           "member_name": "Muster, Anna",
           "total_appointments": 37,
           "attended": 32,
-          "unexcused_absences": 5,
           "excused": 0,
-          "attendance_rate": 86.5
+          "unexcused_absences": 5,
+          "attendance_rate": 86.5,
+          "by_type": [
+            {
+              "type_id": 1,
+              "type_name": "Gesamtprobe",
+              "total_appointments": 25,
+              "attended": 22,
+              "excused": 0,
+              "unexcused_absences": 3,
+              "attendance_rate": 88.0
+            },
+            {
+              "type_id": 2,
+              "type_name": "Registerprobe",
+              "total_appointments": 12,
+              "attended": 10,
+              "excused": 0,
+              "unexcused_absences": 2,
+              "attendance_rate": 83.3
+            }
+          ]
         }
       ]
     }
@@ -1280,9 +1302,25 @@ Formel auseinanderlaufen kann.
 **Ein Termin zählt nur, wenn er bereits begonnen hat** (`date <= CURDATE() + 2h`), und nur
 innerhalb der Mitgliedschaftszeiträume des Mitglieds.
 
-> **Einschränkung:** Je Gruppe wird nur **eine** Terminart ausgewertet, obwohl eine Gruppe an
-> mehreren hängen kann. `appointment_type_name` benennt, welche es war. Siehe OI-48 in
-> `docs/OPEN-ITEMS.md`.
+`appointment_types` listet **alle** Terminarten, an denen die Gruppe hängt. `by_type` führt sie
+je Mitglied in **derselben Länge und derselben Reihenfolge** — Eintrag *n* von `by_type` gehört
+zu Eintrag *n* von `appointment_types`. Wer die Spalten einer Terminart sucht, muss also nicht
+nach `type_id` filtern, sondern kann beide Listen parallel durchlaufen.
+
+Ein `by_type`-Eintrag mit `total_appointments: 0` heißt „diese Terminart hatte im gewählten Jahr
+keinen Termin" — das ist etwas anderes als eine Quote von 0 %, bei der Termine stattfanden und
+das Mitglied bei keinem anwesend war. `attendance_rate` steht in beiden Fällen auf `0.0`; wer die
+beiden unterscheiden will, muss auf `total_appointments` schauen.
+
+`summary.total_appointments` ist **entdoppelt**: Gezählt werden unterschiedliche Termine, nicht
+Zeilen. Erreicht ein Mitglied denselben Termin über zwei Gruppen — weil es beiden angehört —,
+zählt dieser Termin in der Kopfzahl einmal. Die Gruppentabellen darunter zählen dagegen je
+Gruppe, ohne Rücksicht auf andere Gruppen. Deshalb kann die **Summe der Gruppentabellen größer
+sein als `summary.total_appointments`**, ohne dass das ein Widerspruch wäre — es ist der
+Unterschied zwischen „je Gruppe gezählt" und „unterschiedliche Termine gezählt". Im Bestand vom
+2026-09-11 etwa tragen „Aktive" und „Jugend" je 62 Termine, die Vorstandschaft 9 — macht 133 in
+der Summe der Gruppentabellen, während die Kopfzahl bei 71 steht, weil sich Aktive und Jugend
+dieselben 62 Termine teilen.
 
 #### Arbeitszeit im Ergebnis (`include=worktime`)
 
@@ -1373,7 +1411,10 @@ dass es sich um erfundene Daten handelt.
 
 **Aufbau:**
 1. Kennzahlen des Gesamtergebnisses
-2. je Gruppe eine Tabelle: Mitglied, Termine, Anwesend, Entschuldigt, Unentschuldigt, Quote
+2. je Gruppe eine Tabelle: Mitglied, Termine, Anwesend, Entschuldigt, Unentschuldigt, Quote —
+   danach **je Terminart der Gruppe eine weitere Spalte** mit der Quote des Mitglieds für
+   genau diese Terminart. Hat eine Terminart im Berichtsjahr keine Termine, steht dort ein
+   Strich statt „0 %": Eine Null läse sich auf einem Nachweis wie ein Vorwurf.
 3. **nur bei genau einem Mitglied** — für `user` also immer — der Abschnitt
    „Termine im Einzelnen": Datum, Termin, Terminart, Status, Ankunft, Herkunft
 

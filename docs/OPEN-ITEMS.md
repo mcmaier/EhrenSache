@@ -1627,8 +1627,12 @@ Fällt OI-17, fällt dieser Punkt mit.
 ---
 
 ### OI-48 · Statistik zählt je Gruppe nur **eine** Terminart
-**Priorität:** hoch — verfälscht jede Anwesenheitsquote, sobald eine Gruppe an mehreren
-Terminarten hängt
+**Priorität:** erledigt am 2026-09-11 — alle Terminarten einer Gruppe werden jetzt ausgewertet,
+Kopfzahlen sind entdoppelt; Fundstellen: `private/helpers/attendance.php` (neu, trennt holende
+von formenden Funktionen), `private/handlers/statistics.php`,
+`private/handlers/report_statistics.php`, `public/js/modules/statistics.js`, Tests in
+`tests/suites/statistics_unit.php`, `tests/suites/report_unit.php` und
+`tests/suites/report_api.php`
 
 `calculateGroupStatistics()` in `private/handlers/statistics.php` ermittelt die Terminart einer
 Gruppe so:
@@ -1688,6 +1692,15 @@ Jahre verfolgen.
 
 **Nicht sicherheitsrelevant:** ohne vorherigen Zugang nicht auslösbar, keine Rechteausweitung,
 keine Preisgabe fremder Daten. Betroffen ist allein die Aussagekraft der Zahlen.
+
+**Umsetzung vom 2026-09-11.** Die Rechnung liegt jetzt in einem eigenen Helfer
+(`private/helpers/attendance.php`), getrennt in holende Funktionen (SQL) und formende Funktionen
+(reine Funktionen ohne Datenbankzugriff) — Letztere sind ohne Datenbank prüfbar. Die Entdopplung
+über zwei Gruppen hinweg ist durch einen eigens dafür geschriebenen HTTP-Test belegt, weil dieser
+Fall im bestehenden Datenbestand nicht vorkommt. **Die oben genannten Zahlen (37 von 61) sind
+stichtagsabhängig** und bezeichnen den Stand vom 10.09.2026; am 11.09.2026 waren es bereits 47
+von 71 — jeden Tag rutschen weitere Termine in die Zählung, weil nur bereits begonnene Termine
+zählen. Konstant ist allein die Differenz von 24 Terminen.
 
 ---
 
