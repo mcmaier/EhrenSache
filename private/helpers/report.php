@@ -45,6 +45,7 @@ function reportEscape($value): string
  *   sections: array<int, array{
  *     heading?: ?string, class?: ?string,
  *     columns: array<int, string>,
+ *     column_groups?: array<int, array{label: string, span: int}>,
  *     rows: array<int, array<int, string>>,
  *     empty?: string
  *   }>,
@@ -69,6 +70,23 @@ function renderReport($db, $database, array $report): void
             if (!array_key_exists($key, $section)) {
                 throw new InvalidArgumentException(
                     "Abschnitt {$index} des Berichts hat keinen Schluessel '{$key}'"
+                );
+            }
+        }
+
+        // Eine Gruppenzeile, die nicht genau ueber der Tabelle liegt,
+        // verschiebt jede Ueberschrift um eine Spalte -- der Ausdruck ist
+        // dann falsch und sieht richtig aus. Auf einem Nachweis ist ein
+        // Abbruch besser, und zwar hier, vor der ersten Ausgabe.
+        if (array_key_exists('column_groups', $section)) {
+            $span = 0;
+            foreach ($section['column_groups'] as $group) {
+                $span += (int) ($group['span'] ?? 0);
+            }
+            if ($span !== count($section['columns'])) {
+                throw new InvalidArgumentException(
+                    "Abschnitt {$index}: Spaltengruppen decken {$span} Spalten ab, "
+                    . 'die Tabelle hat ' . count($section['columns'])
                 );
             }
         }
@@ -130,7 +148,20 @@ function renderReport($db, $database, array $report): void
             $class .= ' ' . $section['class'];
         }
 
-        echo '<table class="' . reportEscape($class) . "\">\n<thead>\n<tr>";
+        echo '<table class="' . reportEscape($class) . "\">\n<thead>\n";
+
+        if (!empty($section['column_groups'])) {
+            echo "<tr class=\"report-colgroup\">";
+            foreach ($section['column_groups'] as $group) {
+                $label = (string) ($group['label'] ?? '');
+                $css   = $label === '' ? ' class="report-colgroup-empty"' : '';
+                echo '<th colspan="' . (int) $group['span'] . '"' . $css . '>'
+                   . reportEscape($label) . '</th>';
+            }
+            echo "</tr>\n";
+        }
+
+        echo "<tr>";
         foreach ($section['columns'] as $col) {
             echo '<th>' . reportEscape($col) . '</th>';
         }

@@ -150,12 +150,29 @@ function statisticsReportGroupSection(array $group): array
         $rows[] = $row;
     }
 
-    return [
+    $section = [
         'heading' => $group['group_name'],
+        'class'   => 'report-attendance',
         'columns' => $columns,
         'rows'    => $rows,
         'empty'   => 'Für dieses Jahr sind in dieser Gruppe keine Termine erfasst.',
     ];
+
+    // Eine Gruppe ohne Terminarten kann hier nicht ankommen: appointment_types
+    // stammt aus demselben Ergebnis wie die Spalten oben, und ohne Eintrag
+    // darin ist die foreach-Schleife, die $columns fuellt, ein No-op --
+    // $columns bliebe bei den sechs festen Spalten. Trotzdem wird geprueft,
+    // statt es anzunehmen: Eine Gruppe mit span 0 waere eine leere Spalten-
+    // gruppe, die renderReport() zu Recht ablehnen wuerde.
+    if ($group['appointment_types'] !== []) {
+        $section['column_groups'] = [
+            ['label' => '', 'span' => 1],
+            ['label' => 'Anwesenheit', 'span' => 5],
+            ['label' => 'Quote je Terminart', 'span' => count($group['appointment_types'])],
+        ];
+    }
+
+    return $section;
 }
 
 /** Quote mit deutschem Komma und Prozentzeichen. */

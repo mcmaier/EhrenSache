@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../private/handlers/report_statistics.php';
+require_once __DIR__ . '/../../private/helpers/report.php';
 
 // ---- statisticsReportGroupSection -------------------------------------------
 
@@ -26,6 +27,57 @@ test('statisticsReportGroupSection zeigt einen Strich statt null Prozent', funct
     // Spalte 7 die zweite (Auftritt, keine Termine).
     assertSame('80,0 %', $zeile[6]);
     assertSame('–',      $zeile[7]);
+});
+
+test('statisticsReportGroupSection gruppiert die Spaltenkoepfe', function () {
+    $section = statisticsReportGroupSection(gruppeMitTypen());
+
+    assertTrue(isset($section['column_groups']), 'Spaltengruppen erwartet');
+
+    $span = 0;
+    foreach ($section['column_groups'] as $group) {
+        $span += $group['span'];
+    }
+
+    // Die Gruppenzeile muss genau ueber der Tabelle liegen. Deckt sie zu
+    // wenige oder zu viele Spalten ab, verschiebt sich jede Ueberschrift.
+    assertSame(count($section['columns']), $span);
+});
+
+test('statisticsReportGroupSection benennt die Terminartspalten als Quoten', function () {
+    $section = statisticsReportGroupSection(gruppeMitTypen());
+    $labels  = array_map(fn(array $g): string => $g['label'], $section['column_groups']);
+
+    assertTrue(in_array('Quote je Terminart', $labels, true),
+        'ohne diese Ueberschrift stehen die Terminartspalten unbeschriftet da');
+});
+
+// ---- renderReport: Vorabpruefung der Spaltengruppen -------------------------
+
+test('renderReport wirft bei falscher Spannweite der Spaltengruppen', function () {
+    // Die Pruefung liegt in der Vorabschleife, vor jeder Ausgabe und vor dem
+    // ersten Zugriff auf $db/$database (Branding wird erst danach geladen) --
+    // deshalb ohne Datenbank und ohne abgefangene Ausgabe pruefbar. $db und
+    // $database bleiben null: Ein Fehler, der sie doch anfasst, wuerde als
+    // TypeError durchschlagen statt als grosszuegig gruener Test.
+    $report = [
+        'title'    => 'Test',
+        'period'   => 'Jahr 2026',
+        'sections' => [[
+            'columns'       => ['Mitglied', 'Termine'],
+            'column_groups' => [
+                ['label' => '', 'span' => 1],
+                ['label' => 'Anwesenheit', 'span' => 5],
+            ],
+            'rows' => [],
+        ]],
+        'notes' => [],
+    ];
+
+    assertThrows(
+        fn() => renderReport(null, null, $report),
+        'Spannweite 6 gegen 2 Spalten muss abgelehnt werden'
+    );
 });
 
 /** Eine Gruppe mit einer belegten und einer unbelegten Terminart. */
