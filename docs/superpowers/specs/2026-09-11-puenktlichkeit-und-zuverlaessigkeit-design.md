@@ -272,7 +272,7 @@ die Kette einen Manifest-Eintrag mit passendem `from`:
 [`getTargetVersion()`](../../../public/update/index.php) (`update/index.php:54`) liest schlicht
 `version.json` und reicht den Wert in Zeile 134–136 an
 [`resolveMigrationChain()`](../../../private/helpers/migrations.php)
-(`migrations.php:87`) weiter. Fehlt der Einstieg, bricht das Update mit
+(`migrations.php:90`, Abbruch in Zeile 107) weiter. Fehlt der Einstieg, bricht das Update mit
 *„Keine Migration ab Version 1.4.1 vorhanden"* ab.
 
 Das gilt **unabhängig von dieser Spec und unabhängig davon, ob sich am Schema etwas ändert.**
