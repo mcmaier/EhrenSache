@@ -32,23 +32,30 @@ function handleApprovedTimeCorrection($db, $database, $exceptionId, $exceptionDa
     $checkStmt->execute([$exception['member_id'], $exception['appointment_id']]);
     $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
     
+    // checkin_source wird ausdrücklich mitgeschrieben: Die Uhrzeit stammt ab
+    // hier aus der Selbstauskunft des Mitglieds (exceptions.requested_arrival_time),
+    // nicht mehr aus der ursprünglichen Quelle. Ohne diese Angabe trug ein
+    // korrigierter Record weiter das Etikett der Messung, die er gerade
+    // überschrieben hat — eine per Antrag gesetzte Zeit wäre als Kiosk-Stempel
+    // durchgegangen.
     if($existingRecord) {
         // Update bestehenden Record
-        $updateStmt = $db->prepare("UPDATE {$prefix}records 
-                                    SET arrival_time = ?, status = 'present' 
+        $updateStmt = $db->prepare("UPDATE {$prefix}records
+                                    SET arrival_time = ?, status = 'present',
+                                        checkin_source = 'exception_request'
                                     WHERE record_id = ?");
         $updateStmt->execute([
-            $exception['requested_arrival_time'], 
+            $exception['requested_arrival_time'],
             $existingRecord['record_id']
         ]);
     } else {
         // Erstelle neuen Record
-        $insertStmt = $db->prepare("INSERT INTO {$prefix}records 
-                                    (member_id, appointment_id, arrival_time, status) 
-                                    VALUES (?, ?, ?, 'present')");
+        $insertStmt = $db->prepare("INSERT INTO {$prefix}records
+                                    (member_id, appointment_id, arrival_time, status, checkin_source)
+                                    VALUES (?, ?, ?, 'present', 'exception_request')");
         $insertStmt->execute([
-            $exception['member_id'], 
-            $exception['appointment_id'], 
+            $exception['member_id'],
+            $exception['appointment_id'],
             $exception['requested_arrival_time']
         ]);
     }
