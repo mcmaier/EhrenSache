@@ -152,8 +152,9 @@ function attendanceBuildGroup(int $groupId, string $groupName, array $types, arr
  *
  * $memberTotals kommt aus attendanceFetchMemberTotals(). Die Entdopplung
  * geschieht dort im SQL ueber COUNT(DISTINCT ...) -- diese Funktion summiert
- * nur. Deshalb laesst sich die Entdopplung hier nicht pruefen; dafuer gibt es
- * einen HTTP-Test.
+ * nur. Ein Unit-Test kann die Entdopplung hier deshalb nicht belegen; er
+ * wuerde pruefen, dass Addition addiert. Dafuer ist ein HTTP-Test vorgesehen,
+ * der einen Termin ueber zwei Gruppen an dasselbe Mitglied fuehrt.
  *
  * 'unexcused' wird als total - attended - excused gerechnet. Die Richtung ist
  * umgekehrt zu attendanceBuildGroup(): Dort ist 'kein Eintrag vorhanden'
