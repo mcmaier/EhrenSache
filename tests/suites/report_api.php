@@ -559,3 +559,115 @@ test('statistics_report: manager sieht weiterhin alle Mitglieder', function () {
     assertTrue(strpos($res['raw'], $names[0]) !== false, "Mitglied '{$names[0]}' im Bericht erwartet");
     assertTrue(strpos($res['raw'], $names[1]) !== false, "Mitglied '{$names[1]}' im Bericht erwartet");
 });
+
+// ============================================
+// ENTDOPPLUNG DER KOPFZAHLEN (OI-48)
+// ============================================
+
+test('statistics: ein Termin ueber zwei Gruppen zaehlt einmal', function () {
+    $admin    = apiToken('admin');
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Testkonto user braucht ein verknuepftes Mitglied');
+
+    // Ausgangswert: die Kopfzahl des Mitglieds vor dem Eingriff.
+    $vorher = apiRequest('GET', 'statistics', [
+        'token' => $admin,
+        'query' => ['year' => date('Y'), 'member_id' => $memberId],
+    ]);
+    assertStatus(200, $vorher);
+    $vorherTermine = $vorher['body']['summary']['total_appointments'];
+
+    // Eine Terminart, die das Mitglied ueber seine bestehende Gruppe schon
+    // erreicht -- genau die soll gleich ueber einen zweiten Weg kommen.
+    $typeId = $vorher['body']['statistics'][0]['appointment_types'][0]['type_id'] ?? null;
+    assertTrue($typeId !== null, 'mindestens eine Terminart erwartet');
+
+    $gruppe = apiRequest('POST', 'member_groups', [
+        'token' => $admin,
+        'body'  => ['group_name' => 'Entdopplung ' . uniqid()],
+    ]);
+    assertStatus(201, $gruppe, 'Testgruppe konnte nicht angelegt werden');
+    $groupId = (int) $gruppe['body']['id'];
+
+    try {
+        // Die vorhandene Terminart zusaetzlich an die neue Gruppe haengen.
+        //
+        // GET /appointment_types?id=N liefert die Gruppen NICHT als
+        // group_ids-Array, sondern als 'groups' -- ein Array voller
+        // Gruppenobjekte (siehe handleAppointmentTypes(), GET mit $id).
+        // Ausserdem ist das PUT hier kein Teil-Update: Es schreibt
+        // type_name/description/is_default/color bei jedem Aufruf komplett
+        // neu (kein isset-Filter wie bei members). Wuerde man nur group_ids
+        // schicken, liefe type_name auf NULL -- die Spalte ist NOT NULL,
+        // das UPDATE schlaegt fehl. Deshalb alle Felder unveraendert
+        // mitschicken.
+        $typ = apiRequest('GET', 'appointment_types', ['token' => $admin, 'query' => ['id' => $typeId]]);
+        assertStatus(200, $typ);
+        $bisher = array_map(fn($g) => (int) $g['group_id'], $typ['body']['groups'] ?? []);
+
+        assertStatus(200, apiRequest('PUT', 'appointment_types', [
+            'token' => $admin,
+            'query' => ['id' => $typeId],
+            'body'  => [
+                'type_name'   => $typ['body']['type_name'],
+                'description' => $typ['body']['description'],
+                'is_default'  => $typ['body']['is_default'],
+                'color'       => $typ['body']['color'],
+                'group_ids'   => array_values(array_unique(array_merge($bisher, [$groupId]))),
+            ],
+        ]), 'Terminart konnte nicht verknuepft werden');
+
+        // Das Mitglied zusaetzlich in die neue Gruppe. PUT /members ersetzt die
+        // Zuordnungen vollstaendig (DELETE dann INSERT) -- die bestehenden
+        // muessen also mitgeschickt werden, sonst verliert das Mitglied seine
+        // urspruengliche Gruppe und der Test misst etwas anderes als gemeint.
+        //
+        // GET /members?id=N liefert als admin ebenfalls kein group_ids-Feld,
+        // sondern 'groups' (Array aus {group_id, group_name}) -- siehe
+        // handleMembers(), GET mit $id im Admin/Manager-Zweig. Das
+        // kommaseparierte group_ids (GROUP_CONCAT) gibt es nur auf dem
+        // Nicht-Admin-Zweig (Selbstauskunft) und in der Listenabfrage.
+        $mitglied = apiRequest('GET', 'members', ['token' => $admin, 'query' => ['id' => $memberId]]);
+        assertStatus(200, $mitglied);
+
+        $alteGruppen = array_map(fn($g) => (int) $g['group_id'], $mitglied['body']['groups'] ?? []);
+        assertTrue($alteGruppen !== [], 'Testmitglied braucht mindestens eine Gruppe');
+
+        assertStatus(200, apiRequest('PUT', 'members', [
+            'token' => $admin,
+            'query' => ['id' => $memberId],
+            'body'  => ['group_ids' => array_merge($alteGruppen, [$groupId])],
+        ]), 'Mitglied konnte der Testgruppe nicht zugewiesen werden');
+
+        $nachher = apiRequest('GET', 'statistics', [
+            'token' => $admin,
+            'query' => ['year' => date('Y'), 'member_id' => $memberId],
+        ]);
+        assertStatus(200, $nachher);
+
+        assertSame($vorherTermine, $nachher['body']['summary']['total_appointments'],
+            'derselbe Termin darf ueber zwei Gruppen nur einmal zaehlen'
+            . " (vorher: {$vorherTermine}, nachher: {$nachher['body']['summary']['total_appointments']})");
+    } finally {
+        // Erst die Zuordnung des Mitglieds zuruecksetzen, dann die Gruppe
+        // loeschen -- in dieser Reihenfolge, damit das Mitglied nicht ohne
+        // Gruppe zurueckbleibt, falls das Loeschen scheitert.
+        //
+        // Die Terminart-Gruppen-Verknuepfung (appointment_type_groups) muss
+        // hier nicht explizit zurueckgesetzt werden: group_id verweist dort
+        // mit ON DELETE CASCADE auf member_groups (siehe
+        // private/setup/ehrensache_db.sql) -- das Loeschen der Testgruppe
+        // raeumt die Verknuepfung automatisch mit ab.
+        if (isset($alteGruppen) && $alteGruppen !== []) {
+            apiRequest('PUT', 'members', [
+                'token' => $admin,
+                'query' => ['id' => $memberId],
+                'body'  => ['group_ids' => $alteGruppen],
+            ]);
+        }
+
+        assertStatus(200, apiRequest('DELETE', 'member_groups', [
+            'token' => $admin, 'query' => ['id' => $groupId],
+        ]), 'Testgruppe konnte nicht geloescht werden');
+    }
+});
