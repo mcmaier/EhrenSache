@@ -164,3 +164,40 @@ test('Eine geleerte Ankunftszeit wird als leer gespeichert', function () {
         arrDropAppointment($token, $aptId);
     }
 });
+
+test('Die Jahresliste kennt kein Jahr ohne Termin', function () {
+    $token = apiToken('admin');
+
+    $before = apiRequest('GET', 'available_years', ['token' => $token]);
+    assertStatus(200, $before);
+    assertTrue(!empty($before['body']), 'Keine Jahre im Bestand');
+
+    // Ein Jahr jenseits des Bestands, damit der Test niemandem ins Gehege kommt.
+    $silvester = max(array_map('intval', $before['body'])) + 5;
+    $folgejahr = $silvester + 1;
+
+    $memberId = arrAnyMemberId($token);
+    $aptId    = arrTempAppointment($token, "{$silvester}-12-31", '23:00:00');
+
+    try {
+        // Ankunft nach Mitternacht: Der Record faellt ins Folgejahr, der
+        // Termin bleibt im alten.
+        $rec = apiRequest('POST', 'records', [
+            'token' => $token,
+            'body'  => ['member_id'      => $memberId,
+                        'appointment_id' => $aptId,
+                        'arrival_time'   => "{$folgejahr}-01-01 00:15:00"],
+        ]);
+        assertStatus(201, $rec);
+
+        $after = apiRequest('GET', 'available_years', ['token' => $token]);
+        $years = array_map('intval', $after['body']);
+
+        assertTrue(in_array($silvester, $years, true),
+            "Jahr {$silvester} hat einen Termin und muss waehlbar sein");
+        assertTrue(!in_array($folgejahr, $years, true),
+            "Jahr {$folgejahr} hat keinen Termin und darf nicht waehlbar sein");
+    } finally {
+        arrDropAppointment($token, $aptId);
+    }
+});

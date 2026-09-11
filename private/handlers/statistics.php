@@ -23,15 +23,20 @@ function handleAvailableYears($db, $database, $request_method, $id) {
     $prefix = $database->table('');
 
     try {
-        // Jahre aus verschiedenen Tabellen sammeln
+        // Die Jahresliste kommt allein aus den Terminen.
+        //
+        // Früher stand hier zusätzlich YEAR(arrival_time) aus den Records.
+        // Damit fiel eine Ankunft um 00:15 nach einem Termin am 31.12. ins
+        // Folgejahr, während die Statistik sie über YEAR(a.date) ins alte
+        // zählte — zwei Wahrheiten über denselben Datensatz, und ein wählbares
+        // Jahr, in dem gar kein Termin stattfand.
+        //
+        // Seit 1.5.0 kann arrival_time ohnehin NULL sein; als Datumsträger
+        // taugt die Spalte nicht mehr.
         $stmt = $db->query("
-            SELECT DISTINCT YEAR(date) as year 
-            FROM {$prefix}appointments 
+            SELECT DISTINCT YEAR(date) as year
+            FROM {$prefix}appointments
             WHERE date IS NOT NULL
-            UNION
-            SELECT DISTINCT YEAR(arrival_time) as year 
-            FROM {$prefix}records 
-            WHERE arrival_time IS NOT NULL
             ORDER BY year DESC
         ");
         $years = $stmt->fetchAll(PDO::FETCH_COLUMN);
