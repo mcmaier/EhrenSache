@@ -177,24 +177,19 @@ function handleRecords($db, $database, $method, $id) {
                 break;
             }
 
-            // Bestimme arrival_time: 
-            // 1. Nutze übergebenen Wert falls vorhanden
-            // 2. Sonst: Termin-Startzeit
-            $arrival_time = $data->arrival_time ?? null;
-            
-            if(!$arrival_time) {
-                // Hole Termin-Startzeit
-                $aptStmt = $db->prepare("SELECT date, start_time FROM {$prefix}appointments WHERE appointment_id = ?");
-                $aptStmt->execute([$appointment_id]);
-                $apt = $aptStmt->fetch(PDO::FETCH_ASSOC);
-                
-                if($apt && $apt['date'] && $apt['start_time']) {
-                    $arrival_time = $apt['date'] . ' ' . $apt['start_time'];
-                } else {
-                    // Fallback: NOW()
-                    $arrival_time = date('Y-m-d H:i:s');
-                }
-            }
+            // Ohne übergebene Zeit bleibt die Ankunft leer.
+            //
+            // Früher stand hier die Startzeit des Termins: Wer eine Liste
+            // abhakte, erzeugte damit einen Datensatz, der konstruiert pünktlich
+            // war — und keine Auswertung konnte ihn von einer echten Messung
+            // unterscheiden. Seit 1.5.0 darf arrival_time NULL sein und heißt
+            // dann: keine Aussage über die Ankunft.
+            //
+            // Der zweite Fallback auf NOW() ist ersatzlos entfallen. Er war
+            // unerreichbar: appointment_id ist Pflicht (oben), date und
+            // start_time sind in appointments NOT NULL, und der Fremdschlüssel
+            // records_ibfk_2 lässt eine unbekannte ID gar nicht erst zu.
+            $arrival_time = ($data->arrival_time ?? '') !== '' ? $data->arrival_time : null;
 
             // Erstelle Record (manuell durch Admin)
             $stmt = $db->prepare("INSERT INTO {$prefix}records (member_id, appointment_id, arrival_time, status, checkin_source) VALUES (?, ?, ?, ?, 'admin')");
