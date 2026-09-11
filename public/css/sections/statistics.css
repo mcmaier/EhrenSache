@@ -53,19 +53,14 @@
     overflow: hidden;
 }
 
-.rate-fill-gradient {
+/* Einfarbig statt Verlauf: siehe rateBand() in statistics.js. Die Farbe
+   kommt aus dem Wert, nicht aus der Position im Balken. */
+.rate-fill {
     position: absolute;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, var(--danger-color) 0%, var(--warning-color) 50%, var(--success-color) 100%);
-    clip-path: inset(0 0 0 0); /* Wird dynamisch angepasst */
-}
-
-.rate-fill-mask {
-    position: absolute;
-    height: 100%;
-    background: var(--border-light);
-    right: 0;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: var(--radius-sm);
     transition: width 0.3s ease;
 }
 
@@ -74,4 +69,139 @@
     text-align: right;
     font-weight: 600;
     color: var(--text-dark);
+}
+
+/* ============================================
+   TABELLENKOPF UND SPALTENBREITEN
+   ============================================ */
+
+/* Die Kopfzeile bestimmt die Spaltenbreite, und sie ist genau dort am
+   laengsten, wo die Daten am kuerzesten sind: "Unentschuldigt" belegt rund
+   135 px, um eine zweistellige Zahl zu zeigen. tables.css verbietet global
+   den Umbruch -- hier ist er erwuenscht. Abgekuerzt wird bewusst nicht, die
+   Woerter bleiben lesbar und werden stattdessen zweizeilig. */
+.statistics-group thead th {
+    white-space: normal;
+    vertical-align: bottom;
+    line-height: 1.25;
+}
+
+.statistics-group td,
+.statistics-group th {
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+/* Zahlen rechtsbuendig mit gleichbreiten Ziffern: Linksbuendig lassen sich
+   Spalten nicht vergleichen, weil 46 und 5 an derselben Stelle beginnen und
+   verschieden enden. Die erste Spalte traegt den Namen. */
+.statistics-group th:not(:first-child),
+.statistics-group td:not(:first-child) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* tr.stat-colgroup statt nur .stat-colgroup: Die Rechtsbuendigkeit oben
+   trifft th:not(:first-child) und waere sonst die spezifischere Regel --
+   die Gruppentitel standen dann am rechten Rand ihrer Spannweite statt
+   mittig darueber. */
+.statistics-group tr.stat-colgroup th {
+    text-align: center;
+    font-size: 0.85em;
+    font-weight: 500;
+    color: var(--text-light);
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.statistics-group tr.stat-colgroup th:first-child {
+    border-bottom: none;
+}
+
+/* Der Balken hatte bisher nur, was nach dem Text uebrig blieb -- bemessen an
+   einer fuenf Buchstaben langen Kopfzeile waren das etwa 30 px. So schmal
+   ist er als Balken nicht mehr lesbar. */
+.stat-rate {
+    min-width: 130px;
+}
+
+.rate-bar {
+    min-width: 60px;
+}
+
+/* Zaehlspalten auf Inhaltsbreite. Ohne width:1% verteilt der Browser den
+   Ueberschuss einer Tabelle mit width:100% gleichmaessig auf alle Spalten --
+   vier Spalten mit je zwei Ziffern standen dadurch weit auseinander. Der
+   freiwerdende Platz geht an die Namensspalte, wo er gebraucht wird.
+
+   Die weichen Trennstellen in den Kopfzeilen ("Unent&shy;schuldigt") gehoeren
+   dazu: Ohne sie ist das Wort eine einzige unteilbare Einheit und bestimmt
+   die Spaltenbreite trotz width:1%. */
+.statistics-group .stat-count {
+    width: 1%;
+}
+
+/* Der Name bleibt einzeilig. Bei schmalem Fenster gehen alle Spalten auf
+   Mindestbreite, und "Kaiser, Georg" zerfiel dann in zwei Zeilen -- die
+   Tabelle scrollt in ihrem Kasten ohnehin, ein Umbruch im Namen bringt
+   nichts ein. */
+.statistics-group tbody td:first-child {
+    white-space: nowrap;
+}
+
+/* Terminartspalten: ein schmaler Balken unter dem Wert, in derselben
+   Farbskala wie die Gesamtquote. Zuerst war er neutral grau, um die
+   Farbcodierung der Gesamtquote vorzubehalten -- das war falsch herum
+   gedacht: In derselben Zeile stand dieselbe Groesse einmal farbig und
+   dreimal grau, und die grauen Flaechen lasen sich wie leere Eingabefelder.
+   Gleiche Groesse, gleiche Codierung.
+
+   Der Balken liegt unter dem Wert und nicht hinter ihm, weil dunkler Text
+   auf gesaettigtem Gruen oder Rot zu wenig Kontrast hat -- die Lesbarkeit
+   haenge sonst vom angezeigten Wert ab.
+
+   Vergleichbar sind die Balken innerhalb einer Spalte (Mitglied gegen
+   Mitglied bei derselben Terminart); die Spaltenbreiten unterscheiden sich,
+   der genaue Wert steht ohnehin darueber. */
+.stat-type {
+    position: relative;
+    padding-bottom: calc(var(--spacing-md) + 8px);
+}
+
+.type-value {
+    display: block;
+}
+
+/* left/right statt width in Prozent: Die absolute Positionierung bezieht
+   sich auf die Polsterbox der Zelle. Ein Balken mit width:100% lief deshalb
+   bis unter das Polster und stiess an den Balken der Nachbarspalte. */
+.type-track {
+    position: absolute;
+    left: var(--spacing-md);
+    right: var(--spacing-md);
+    bottom: var(--spacing-sm);
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--border-light);
+}
+
+.type-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 3px;
+}
+
+/* Die vier Baender. Schwellen bei 40, 60 und 80 -- siehe rateBand() in
+   statistics.js und OI-55. Nicht bei 20er-Schritten: Die realen Quoten
+   liegen ueberwiegend oberhalb von 50 Prozent, und eine Skala, die dort
+   nicht mehr unterscheidet, hilft beim Ueberfliegen nicht. */
+.rate-low  { background: var(--danger-color); }
+.rate-mid  { background: var(--warning-color); }
+.rate-fair { background: var(--ehren-gelb); }
+.rate-good { background: var(--success-color); }
+
+.stat-type-empty {
+    color: var(--text-light);
 }

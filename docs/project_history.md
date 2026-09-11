@@ -137,6 +137,13 @@ Repositories.)*
 
 - **Der Gesamtdurchschnitt wird pro Gruppe gebildet** (`groupAppointments × groupMembers`) und
   aufaddiert — nie global, weil jede Gruppe unterschiedlich viele Termine und Mitglieder hat.
+
+  > *Abgelöst am 2026-09-11 (OI-48):* Die Bezugsgröße entsteht jetzt **je Mitglied** aus dessen
+  > entdoppelter Terminmenge, nicht mehr je Gruppe. Der Grund der alten Regel bleibt gültig —
+  > sie warnte vor `totalAppointments × totalMembers`, einem globalen Produkt. Die neue
+  > Rechnung bildet kein Produkt, sondern summiert, was jedes Mitglied tatsächlich an Terminen
+  > hatte, und löst zusätzlich den Fall eines Mitglieds in zwei Gruppen mit überlappenden
+  > Terminarten.
 - **Mitglieder werden in der Datenbank gezählt** (`COUNT(DISTINCT member_id)`), sonst zählt
   ein Mitglied in mehreren Gruppen mehrfach.
 - **Nur vergangene Termine zählen**, sonst verdirbt das Restjahr die Quote. *(im Code

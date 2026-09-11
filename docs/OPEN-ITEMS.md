@@ -1627,8 +1627,12 @@ Fällt OI-17, fällt dieser Punkt mit.
 ---
 
 ### OI-48 · Statistik zählt je Gruppe nur **eine** Terminart
-**Priorität:** hoch — verfälscht jede Anwesenheitsquote, sobald eine Gruppe an mehreren
-Terminarten hängt
+**Priorität:** erledigt am 2026-09-11 — alle Terminarten einer Gruppe werden jetzt ausgewertet,
+Kopfzahlen sind entdoppelt; Fundstellen: `private/helpers/attendance.php` (neu, trennt holende
+von formenden Funktionen), `private/handlers/statistics.php`,
+`private/handlers/report_statistics.php`, `public/js/modules/statistics.js`, Tests in
+`tests/suites/statistics_unit.php`, `tests/suites/report_unit.php` und
+`tests/suites/report_api.php`
 
 `calculateGroupStatistics()` in `private/handlers/statistics.php` ermittelt die Terminart einer
 Gruppe so:
@@ -1688,6 +1692,15 @@ Jahre verfolgen.
 
 **Nicht sicherheitsrelevant:** ohne vorherigen Zugang nicht auslösbar, keine Rechteausweitung,
 keine Preisgabe fremder Daten. Betroffen ist allein die Aussagekraft der Zahlen.
+
+**Umsetzung vom 2026-09-11.** Die Rechnung liegt jetzt in einem eigenen Helfer
+(`private/helpers/attendance.php`), getrennt in holende Funktionen (SQL) und formende Funktionen
+(reine Funktionen ohne Datenbankzugriff) — Letztere sind ohne Datenbank prüfbar. Die Entdopplung
+über zwei Gruppen hinweg ist durch einen eigens dafür geschriebenen HTTP-Test belegt, weil dieser
+Fall im bestehenden Datenbestand nicht vorkommt. **Die oben genannten Zahlen (37 von 61) sind
+stichtagsabhängig** und bezeichnen den Stand vom 10.09.2026; am 11.09.2026 waren es bereits 47
+von 71 — jeden Tag rutschen weitere Termine in die Zählung, weil nur bereits begonnene Termine
+zählen. Konstant ist allein die Differenz von 24 Terminen.
 
 ---
 
@@ -1900,5 +1913,106 @@ Querformat. Ein Anzeigefehler, keine Bedienhürde, und älter als dieser Punkt.
 sind **nicht** betroffen — beide laden ein eigenes `css/style.css` und erben diese Regeln nicht.
 
 **Nicht sicherheitsrelevant.**
+
+---
+
+### OI-54 · PUT auf Terminarten überschreibt nicht mitgeschickte Felder
+**Priorität:** mittel — führt zu Datenverlust, ist aber nur von einem angemeldeten Admin
+auslösbar, und die eigene Oberfläche schickt derzeit bei jedem PUT ohnehin alle Felder mit
+
+`handleAppointmentTypes()` in `private/handlers/appointment_types.php:110` schreibt bei `PUT`
+alle vier Grundfelder bedingungslos, ohne zu prüfen, ob sie im Request überhaupt enthalten
+waren:
+
+```php
+$stmt = $db->prepare("UPDATE {$prefix}appointment_types
+                      SET type_name = ?, description = ?, is_default = ?, color = ?
+                      WHERE type_id = ?");
+$stmt->execute([
+    $data->type_name,
+    $data->description ?? null,
+    $data->is_default ?? false,
+    $data->color ?? '#667eea',
+    $id
+]);
+```
+
+Ein PUT, das nur `color` ändern will, verliert dadurch `description` (wird `null`) und
+`is_default` (wird `false`); fehlt `type_name` ganz, scheitert die Abfrage sogar, weil die
+Spalte `NOT NULL` ist. Es gibt keine `isset`-Prüfung je Feld — das PUT ist eine stille
+Vollersetzung, obwohl nichts in `API.md` das ausweist.
+
+**Im Gegensatz dazu `handleMembers()`** (`private/handlers/members.php`, ab Zeile 367): Dort
+baut ein dynamisches `UPDATE` das `SET` ausschließlich aus den tatsächlich gelieferten Feldern
+(`$updatable` plus `isset()`-Prüfung je Feld). Zwei Ressourcen desselben Projekts mit
+gegensätzlichem PUT-Verhalten sind für jeden Verbraucher eine Falle — was bei der einen
+Ressource ein harmloses Teil-Update ist, löscht bei der anderen still Daten.
+
+**Nachgeprüft, ob weitere Handler dasselbe Muster zeigen:** `private/handlers/activity_types.php`
+ist derselbe Fall. Der `PUT`-Zweig (ab Zeile 286) schreibt `activity_name`, `description`,
+`color`, `is_default`, `is_active` und `verification` ebenfalls bedingungslos in einem
+UPDATE-Statement — mit denselben `?? null` / `?? false`-Rückfällen. Einzig `group_ids` und
+`appointment_type_ids` sind dort bereits sauber über `isset()` abgesichert und bleiben bei
+fehlendem Feld unangetastet (mit Kommentar, der das Verhalten bewusst begründet) — nur die
+Grundfelder der Terminart selbst tragen den Fehler. Bemerkenswert: Fehlt `is_active`, fällt es
+auf `1` zurück — ein PUT ohne dieses Feld kann eine deaktivierte Tätigkeitsart also still
+wieder aktivieren.
+
+**Zu tun:** Entweder ein dynamisches `UPDATE` wie bei `members` (nur gelieferte Felder
+schreiben), oder das heutige Verhalten in `API.md` ausdrücklich als Vollersetzung dokumentieren
+— beides ist vertretbar, es muss aber **eines** von beiden sein, statt der stillen Lücke, die
+heute besteht.
+
+**Wie es aufgefallen ist:** beim Schreiben des Entdopplungstests für OI-48 — ein PUT, das
+zunächst nur `group_ids` schickte, setzte `type_name` auf `NULL` und scheiterte an der
+`NOT NULL`-Spalte. `description` und `is_default` wären ohne diesen Fehlschlag still verloren
+gegangen.
+
+**Nicht sicherheitsrelevant:** setzt ein angemeldetes Adminkonto voraus und erweitert keine
+Rechte — es zerstört nur Daten, die derselbe Admin ohnehin ändern dürfte.
+
+---
+
+### OI-55 · Farbschwellen der Anwesenheitsquote sind fest verdrahtet
+
+**Priorität:** niedrig — die Zahlen bleiben richtig, nur ihre Einfärbung ist eine Vorgabe
+
+Die Statistiktabelle färbt jeden Quotenbalken nach vier Bändern ein, gesetzt in `rateBand()`
+in `public/js/modules/statistics.js`:
+
+| Band | Quote | Farbe |
+|---|---|---|
+| `rate-low` | unter 40 % | Rot |
+| `rate-mid` | 40 bis 59 % | Orange |
+| `rate-fair` | 60 bis 79 % | Gelb |
+| `rate-good` | 80 % und mehr | Grün |
+
+**Das ist ein Urteil darüber, was gute Anwesenheit ist** — und es fällt je nach Organisation
+verschieden aus. Ein Blasorchester mit wöchentlicher Probe bewertet 65 % anders als eine
+Feuerwehr mit Monatsdienst oder ein Verein, dessen Mitglieder berufsbedingt schichten. Fest
+verdrahtet gibt EhrenSache jedem Verein dieselbe Meinung vor und färbt Mitglieder rot, die
+nach dem Maßstab ihres Vereins unauffällig sind.
+
+**Warum die Schwellen trotzdem nicht bei 20er-Schritten liegen:** Die naheliegende Einteilung
+(20/40/60/80) wurde verworfen, weil die realen Quoten überwiegend oberhalb von 50 % liegen.
+Eine Skala, die genau dort nicht mehr unterscheidet, wo die Daten sich sammeln, hilft beim
+Überfliegen nicht. 40/60/80 verteilt den vorhandenen Bestand über alle vier Bänder.
+
+**Zu tun:** Die drei Schwellen als Systemeinstellung führen (`system_settings`, analog zu den
+übrigen Darstellungsoptionen), mit den heutigen Werten als Vorgabe. Die Farben selbst sollten
+nicht mitkonfigurierbar sein — Rot für „schlecht" ist eine Konvention, an der zu drehen mehr
+schadet als nützt.
+
+**Vorher zu klären:** ob die Schwellen je Terminart gelten sollen. Für einen Auftritt ist eine
+andere Erwartung angemessen als für eine Registerprobe, und die Statistik weist beide
+inzwischen getrennt aus. Das spricht für Schwellen je Terminart — kostet aber eine
+Zuordnungstabelle statt dreier Zahlen.
+
+**Wie es aufgefallen ist:** bei der Überarbeitung der Statistiktabelle. Der Vorgänger war ein
+Farbverlauf von Rot nach Grün, den eine Maske beschnitt — dort begann *jeder* Balken bei Rot,
+auch der eines Mitglieds mit 92 %. Die Farbe trug damit keine Information. Beim Ersetzen durch
+eine Skala nach Wertebereich wurde die Vorgabe überhaupt erst zu einer Aussage.
+
+**Nicht sicherheitsrelevant:** reine Darstellung, keine Datenänderung, kein Rechtebezug.
 
 ---

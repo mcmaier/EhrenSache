@@ -360,6 +360,10 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | STAT-6 | Kein Datenjahr | Nullwerte zurück |
 | STAT-7 | Prozentberechnung | `(present / total) * 100` korrekt |
 | STAT-8 | Verfügbare Jahre | Aktuelles Jahr immer enthalten; sortiert DESC |
+| STAT-9 | Gruppe mit mehreren Terminarten öffnen | Je Terminart eine Spalte, Namen stimmen |
+| STAT-10 | Terminart ohne Termine im gewählten Jahr | Spalte vorhanden, Wert „–" |
+| STAT-11 | Summe der `by_type`-Werte eines Mitglieds | ergibt seine Gesamtzahlen |
+| STAT-12 | Kopfzahlen gegen die Summe der Gruppentabellen | gleich, solange sich keine Terminarten überschneiden |
 
 ### 13.1 Anwesenheitsbericht (Druckansicht)
 

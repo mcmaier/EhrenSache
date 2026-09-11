@@ -196,7 +196,7 @@ Neuer Schritt 0 in `public/update/index.php`, vor der bestehenden Systemprüfung
    `SSL_VERIFYPEER` hart an.
 3. **Entpacken**, Wrapper-Ordner abstreifen, Paket plausibilisieren: Enthält es
    `version.json`, `public/api/api.php` und `private/migrations/manifest.php`? Ist die Version
-   darin höher als die installierte?
+   darin höher als die installierte? **Führt die Migrationskette durch?** — siehe 8.1.
 4. **Wartungsflag setzen.** `private/config/maintenance.lock` mit Zeitstempel; `api.php`
    prüft es früh und antwortet mit 503. Der Zeitstempel ist wesentlich: Nach 15 Minuten
    ignoriert `api.php` das Flag, damit ein abgebrochener Lauf die Installation nicht dauerhaft
@@ -207,12 +207,90 @@ Neuer Schritt 0 in `public/update/index.php`, vor der bestehenden Systemprüfung
 7. **Bei Fehler:** Sicherung zurückspielen, Wartungsflag entfernen, Protokoll zeigen.
    Scheitert auch der Rückweg, bleibt das Flag stehen und der Text nennt den Pfad der
    Sicherung — dann ist Handarbeit nötig, aber der Admin weiß, wo alles liegt.
-8. **Erfolg:** Wartungsflag entfernen, `private/.update-tmp/` aufräumen, weiter in die
+8. **Kettenprüfung wiederholen**, jetzt mit dem getauschten Code gegen dasselbe Manifest —
+   Begründung in 8.2. Fällt sie durch, greift Schritt 7: Sicherung zurück, Flag weg,
+   Protokoll. Die Installation steht dann wieder auf dem alten, lauffähigen Stand.
+9. **Erfolg:** Wartungsflag entfernen, `private/.update-tmp/` aufräumen, weiter in die
    bestehende Systemprüfung. Ab hier läuft der Assistent unverändert, einschließlich
    Migrationskette und Selbstsperre.
 
 Der laufende Updater-Request überlebt das Überschreiben seiner eigenen Datei — PHP hat sie
 längst geladen. Parallele Requests sind der Grund für das Wartungsflag.
+
+### 8.1 Die Migrationskette wird vor dem Tausch geprüft
+
+**Jeder Versionssprung braucht einen Manifest-Eintrag, auch ohne Schemaänderung.**
+`getTargetVersion()` in `public/update/index.php:54` liest schlicht `version.json` und reicht
+den Wert an `resolveMigrationChain()` (`private/helpers/migrations.php:90`). Die Funktion
+folgt der Kette über `$byFrom[$current]`, solange `$current` kleiner als das Ziel ist, und
+wirft bei einer Lücke „Keine Migration ab Version … vorhanden." (Zeile 107). Sobald
+`version.json` über die höchste erreichbare `schema_version` hinausgeht, muss also ein Eintrag
+mit passendem `from` existieren — unabhängig davon, ob sich am Schema etwas ändert.
+`private/migrations/1.4.0.php` ist genau das: 25 Zeilen, kein DDL, und der Kommentar dort sagt
+es wörtlich.
+
+**Für den Updater ist das keine Randnotiz.** Spielt er ein Paket ein, dessen `version.json`
+erhöht wurde, ohne dass der passende Manifest-Eintrag mitkommt, steht der Verein vor einem
+abbrechenden Assistenten — und zwar, nachdem die neuen Dateien bereits liegen. Der
+unangenehmste denkbare Zeitpunkt.
+
+**Die Prüfung ist billig, weil alles schon vorliegt:** die erkannte Datenbankversion aus
+`detectDbVersion()`, das Manifest **aus dem entpackten Paket** und die Zielversion aus dessen
+`version.json`. Ein Aufruf von `resolveMigrationChain()` gegen diese drei Werte beantwortet
+die Frage, bevor eine einzige Datei angefasst wird; die passende Exception wirft die Funktion
+ohnehin schon. Schlägt die Prüfung fehl, bricht der Updater vor dem Tausch ab und nennt das
+fehlerhaft geschnürte Paket als Ursache — die Installation bleibt unberührt.
+
+### 8.2 Warum dieselbe Prüfung ein zweites Mal läuft
+
+Die Prüfung aus 8.1 benutzt die **installierte** `resolveMigrationChain()` gegen das **neue**
+Manifest. Änderte eine künftige Version die Semantik der Kettenauflösung, prüfte der Updater
+also nach der alten Regel. Die beiden möglichen Fehlausgänge sind unterschiedlich schlimm:
+
+- **Falsche Ablehnung** — die alte Regel hält ein gültiges Paket für lückenhaft. Es wurde
+  noch keine Datei angefasst; der Verein sieht eine Meldung und steht auf dem alten,
+  lauffähigen Stand. Ärgerlich, nicht schädlich.
+- **Falsche Annahme** — die alte Regel lässt ein Paket durch, das die neue ablehnen würde.
+  Der Tausch läuft, der Assistent scheitert danach.
+
+Entscheidend ist, welcher Fall eintritt, und die Zuordnung ist gegenläufig zur naheliegenden
+Vermutung: Geprüft wird mit der **alten** Logik, migriert wird mit der **neuen**. Ist die neue
+Regel **strenger**, dann ist die alte lockerer — sie lässt zu viel durch, und es kommt zur
+**falschen Annahme**, dem schlechten Fall. Nur wenn die neue Regel **lockerer** wird, irrt die
+Prüfung in die harmlose Richtung.
+
+Der schlechte Fall ist damit nicht der unwahrscheinlichere. Verschärfungen sind die typische
+Richtung einer solchen Änderung — etwa eine zusätzliche Bedingung, dass zu jedem
+Manifest-Eintrag die Migrationsdatei auch wirklich existiert.
+
+**Deshalb wird die Prüfung nach dem Tausch wiederholt**, bevor der Assistent in die
+Migrationskette geht — dann mit dem neuen Code gegen dasselbe Manifest.
+
+Dabei geht es ausdrücklich **nicht** darum, den Fehler früher zu bemerken. Der Assistent
+bemerkt ihn ohnehin rechtzeitig: `resolveMigrationChain()` läuft in
+`public/update/index.php:133-138` vollständig durch, bevor `ensureSchemaVersionTable()` in
+Zeile 140, `stampSchemaVersion()` in 143 und die Ausführungsschleife ab 153 die Datenbank
+überhaupt anfassen. Bei einer Lücke bleibt sie unberührt, ohne jedes DDL.
+
+Der Unterschied liegt darin, **wer die Exception fängt und was daraufhin geschieht**:
+
+- Wirft sie der Assistent, sieht der Verein eine Fehlerseite und steht mit neuen Dateien auf
+  alter Datenbank — ohne Rückweg, und ohne dass jemand die Sicherung einspielt.
+- Ruft der Updater sie selbst auf, liegt die Sicherung aus Schritt 5 noch, das Wartungsflag
+  steht, und der Rückweg aus Schritt 7 greift.
+
+Der Randfall wird damit nicht wegargumentiert, sondern aufgefangen: Die erste Prüfung spart
+den unnötigen Tausch, die zweite verwandelt einen Abbruch mit halbem Ergebnis in einen
+kontrollierten Rückweg.
+
+Die naheliegende Alternative — die Kettenlogik **aus dem Paket** laden und damit prüfen —
+ist ausgeschlossen: Das hieße, fremden Code auszuführen, um zu entscheiden, ob man ihm
+trauen kann.
+
+*Befund aus der Parallelsitzung zu OI-51, am Code nachgeprüft; die Betrachtung der
+Fehlerrichtung in 8.2 stammt aus demselben Austausch, ihre Zuordnung ist hier umgedreht.
+Derselbe Sachverhalt steht aus anderer Blickrichtung in Abschnitt 4.5 von
+`2026-09-11-puenktlichkeit-und-zuverlaessigkeit-design.md`.*
 
 ## 9. Neue und geänderte Bausteine
 
@@ -237,6 +315,8 @@ ausgehenden Abruf und schreibt `system_settings`) und gehört dort auf die gespe
 | `updater` (Unit) | Wrapper-Ordner abstreifen; Tauschplan gegen eine nachgebaute Verzeichnisstruktur; die Regel aus Abschnitt 7 lässt `docs/`, `tests/`, `private/demo/` unberührt; Ausschlussliste greift; Plausibilisierung weist ein Paket ohne `version.json` ab und eines mit niedrigerer Version |
 | `updater` (Unit) | Preflight meldet eine nicht schreibbare Datei, **bevor** irgendetwas getauscht wird |
 | `updater` (Unit) | Rückweg stellt den Ausgangszustand her, wenn der Tausch in der Mitte abbricht |
+| `updater` (Unit) | Ein Paket, dessen `version.json` über die Kette im mitgelieferten Manifest hinausgeht, wird **vor** dem Tausch abgewiesen (Abschnitt 8.1); ein lückenloses Paket wird durchgelassen |
+| `updater` (Unit) | Fällt die **zweite** Kettenprüfung durch (Abschnitt 8.2), löst das den Rückweg aus Schritt 7 aus — Sicherung zurückgespielt, Wartungsflag entfernt |
 | `update_check` (API) | nur `admin`; im Demo-Modus gesperrt; Ergebnis landet in `system_settings` |
 | Wartungsflag (API) | gesetztes Flag ergibt 503; ein Flag älter als 15 Minuten wird ignoriert |
 | `htaccess_locks` (Regression) | die beiden Sperrdateien stehen auf der Ausschlussliste |

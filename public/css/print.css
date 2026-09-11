@@ -162,6 +162,39 @@ body {
     color: #444;
 }
 
+/* Gruppierte Kopfzeile des Anwesenheitsberichts. Ohne sie stehen die
+   Terminartspalten unbeschriftet da -- "Auftritt" allein sagt nicht, dass
+   darunter eine Quote steht. */
+/* tr.report-colgroup statt nur .report-colgroup: Die Rechtsbuendigkeit der
+   Anwesenheitstabelle trifft th:not(:first-child) und waere sonst die
+   spezifischere Regel -- die Gruppentitel standen dann am rechten Rand
+   ihrer Spannweite statt mittig darueber. */
+.report-table tr.report-colgroup th {
+    text-align: center;
+    background: #e4e4e4;
+}
+
+.report-table tr.report-colgroup th.report-colgroup-empty {
+    background: #fff;
+    border-left: none;
+    border-top: none;
+}
+
+/* Zahlen rechtsbuendig: Linksbuendige Ziffern lassen sich nicht spaltenweise
+   vergleichen, weil 46 und 5 an derselben Stelle beginnen und verschieden
+   enden. Die erste Spalte traegt den Namen und bleibt linksbuendig. */
+.report-attendance th:not(:first-child),
+.report-attendance td:not(:first-child) {
+    text-align: right;
+}
+
+/* Die Kopfzeilen duerfen umbrechen. "Unentschuldigt" bestimmt sonst die
+   Breite einer Spalte, die zwei Ziffern zeigt. Gilt nur hier -- der
+   Stundennachweis braucht seine Zeitangaben einzeilig. */
+.report-attendance thead th {
+    white-space: normal;
+}
+
 /* ============================================
    FUSSNOTEN
 
@@ -227,7 +260,8 @@ body {
     /* Zebrastreifen und Kopfzeilenhintergrund auch im Druck erhalten;
        ohne diese Regel verwerfen Browser Hintergruende standardmaessig. */
     .report-table th,
-    .report-table tbody tr:nth-child(even) {
+    .report-table tbody tr:nth-child(even),
+    .report-colgroup th {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
