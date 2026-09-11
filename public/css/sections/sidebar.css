@@ -14,7 +14,11 @@
     background: var(--sidebar-bg);
     color: white;
     padding: var(--spacing-lg) 0;
+    /* 100vh ist auf dem Telefon die Hoehe OHNE Adressleiste — steht sie da,
+       ragt die Leiste unten aus dem Bild. 100dvh misst den sichtbaren Teil;
+       aeltere Browser ueberlesen die Zeile und behalten den Wert darueber. */
     height: 100vh;
+    height: 100dvh;
     position: fixed;
     transition: transform var(--transition-base);
     z-index: var(--z-sidebar, 100); /* Klar definiert */

@@ -1844,52 +1844,60 @@ gemeinsam mit [OI-48](#oi-48) entscheiden, das ohnehin an derselben Funktion ans
 ---
 
 ### OI-53 · Navigation im Querformat auf dem Telefon kaum bedienbar
-**Priorität:** mittel — betrifft die tägliche Bedienung auf dem Gerät, das Mitglieder dabeihaben
+**Priorität:** erledigt am 2026-09-11 — Ursache war eine andere als hier vermutet, siehe unten
 
 **Gemeldet am 2026-09-10** vom Betreiber: In der mobilen Ansicht im **Querformat** ist das
 Navigationsmenü zu klein und lässt sich nicht bedienen.
 
-**Noch nicht nachgestellt.** Die folgenden Punkte sind am Code geprüft, die Ursache selbst ist
-eine begründete Vermutung und kein Befund — wer den Punkt angeht, sollte zuerst reproduzieren.
+**Nachgestellt am 2026-09-11** in der laufenden Instanz, und der Befund fiel deutlicher aus als
+die Meldung: Das Menü war nicht zu klein, es war **nicht vorhanden**. Gemessen bei 667x375 mit
+aufgeklappter Leiste — Kopfbereich 213 px, Reiter 33 px, Fußbereich 145 px, zusammen 391 px in
+einem 375 px hohen Fenster. `.nav-menu` trägt `flex: 1`, bekommt also den Rest, und der ist
+null. Die sieben Einträge zu je 56 px waren im Baum vorhanden und auf 0 px Höhe zusammengelegt.
 
-**Was am Code gesichert ist:**
+Die hier notierte Vermutung — Sprung über den Breiten-Haltepunkt, dadurch winzige Trefferflächen
+— war **zur Hälfte richtig und zur Hälfte irreführend.** Richtig war der Haltepunkt: Quer ist ein
+Telefon 844 bis 926 px breit, die Mobilregel greift nicht, die Leiste steht fest im Layout; dort
+kollabierte dieselbe Liste auf 17 px. Irreführend war „winzige Trefferflächen": Die Einträge
+behalten ihre 56 px, sie bekommen nur keinen Platz. Wer nur den Haltepunkt erweitert hätte,
+hätte einen Menüknopf gebaut, der eine leere Leiste aufklappt.
 
-- Die mobile Darstellung hängt **allein an der Breite**: `public/css/responsive.css` kennt
-  `@media (max-width: 768px)` und `@media (max-width: 480px)`, dazu `@media (min-width: 1200px)`.
-- **Im gesamten Projekt gibt es keine einzige `orientation`-Medienabfrage** (`print.css` nutzt
-  `size: A4 landscape`, das ist etwas anderes).
-- Unterhalb von 768 px erscheint `.mobile-menu-btn`, und `.sidebar` wird über
-  `transform: translateX(-100%)` ausgeblendet, bis `.mobile-open` sie hereinschiebt.
-- `.sidebar` ist `position: fixed`, `width: 250px`, **`height: 100vh`**, ein Flex-Container in
-  Spaltenrichtung; die Navigationsliste darin trägt `overflow-y: auto`.
-- Das Dashboard hat **12 Navigationspunkte**.
+**Dritte Ursache, hier nicht vermutet:** Über die Sichtbarkeit des Menüknopfs entscheidet gar
+nicht das Stylesheet, sondern ein Inline-Style aus `updateMobileMenuVisibility()`
+(`public/js/modules/ui.js`), der `window.innerWidth <= 768` selbst prüft. Inline-Styles schlagen
+jede CSS-Regel — die Regeln für `.mobile-menu-btn` in `responsive.css` waren wirkungslos, und die
+Schwelle stand ein zweites Mal im JavaScript.
 
-**Vermutete Ursache:** Ein heutiges Telefon ist im Querformat **breiter als 768 px** — 844, 915
-oder 926 px sind übliche Werte. Damit greift die Mobilregel nicht mehr: Der Menüknopf
-verschwindet, und die Seitenleiste steht wieder dauerhaft im Layout wie auf einem Rechner. Die
-verfügbare **Höhe** beträgt in dieser Lage aber nur noch rund 390 bis 430 px. `height: 100vh`
-verteilt 12 Punkte plus Kopfbereich auf diese Höhe; die Liste scrollt zwar, aber die Trefferflächen
-werden winzig, und vom Inhalt bleibt neben 250 px Seitenleiste wenig übrig.
+**Umgesetzt:**
 
-Das erklärt auch, warum der Fehler ausgerechnet im Querformat auftritt und im Hochformat nicht:
-Es ist nicht die Drehung, es ist der Sprung über den Breiten-Haltepunkt.
+1. Eigener Block `@media (max-height: 500px)` in `public/css/responsive.css`: Menüknopf,
+   ausfahrbare Leiste, Inhalt über die volle Breite. Bewusst ein eigener Block statt einer
+   Komma-Erweiterung des 768-px-Blocks — dessen übrige Regeln (Statistik einspaltig,
+   Filterleiste gestapelt) wären auf einem breiten, flachen Fenster eine Verschlechterung.
+2. Im selben Block behält die Liste ihre Höhe (`flex: none`), und die Leiste scrollt als Ganzes
+   (`overflow-y: auto`). Kopf- und Fußbereich sind dort kompakt, damit nach dem Aufklappen
+   sofort Einträge zu sehen sind; die Trefferfläche bleibt bei 50 px.
+3. `ui.js` wertet über `matchMedia` **dieselbe** Bedingung aus wie das Stylesheet. Die Schwelle
+   steht weiterhin zwangsläufig zweimal da — ein Test hält die beiden deckungsgleich.
+4. `.sidebar` rechnet mit `100dvh` als Nachzug zu `100vh`; ältere Browser überlesen die Zeile.
+5. `@media (min-width: 1200px)` trägt jetzt `and (min-height: 501px)`. **Das war die Falle:**
+   Der Block steht in der Datei nach der neuen Regel und hätte bei einem flach gezogenen
+   Fenster gewonnen — Leiste ausgefahren, Menüknopf versteckt, Inhalt mit 250 px Rand ins Leere.
 
-**Zu tun:**
+**Gegenproben** in der laufenden Instanz, jeweils frisch geladen: 844x390 und 667x375 (Telefon
+quer) zeigen Menüknopf und eine Liste von 347 px, drei Einträge ohne Scrollen sichtbar, der
+Abmelden-Knopf über die scrollende Leiste erreichbar. 1024x768 (Tablet quer) behält Leiste und
+250 px Inhaltsrand, kein Menüknopf. 1400x450 (flach gezogenes Fenster) verhält sich mobil,
+1400x900 und 390x844 sind unverändert. Beim Flachziehen ohne Neuladen schaltet der
+`resize`-Handler den Knopf korrekt ein.
 
-1. **Zuerst reproduzieren** und die tatsächliche Viewport-Breite notieren — auf einem echten
-   Gerät, nicht nur im Geräte-Emulator des Browsers.
-2. Den Haltepunkt um eine Höhenbedingung ergänzen, statt allein auf die Breite zu setzen. In der
-   Art `@media (max-width: 768px), (max-height: 500px)` — dann bleibt die mobile Bedienung mit
-   Menüknopf auch im flachen Querformat erhalten.
-3. Prüfen, ob `height: 100vh` bei geöffneter Adressleiste mobiler Browser das Richtige tut;
-   `100dvh` gibt es dafür, bringt aber eigene Fallstricke und ältere Browser kennen es nicht.
-4. Gegenprobe auf dem Tablet im Querformat: Dort ist die Seitenleiste **erwünscht** und darf
-   nicht versehentlich hinter einem Menüknopf verschwinden. Ein Tablet ist quer typischerweise
-   deutlich höher als 500 px — die Bedingung aus Punkt 2 trifft es also nicht, das ist aber zu
-   belegen und nicht anzunehmen.
+**Nicht Teil dieses Punktes, dabei aufgefallen:** Der Menüknopf liegt als `position: fixed` bei
+15/15 über dem Vereinsnamen in der aufgeklappten Leiste — im Hochformat genauso wie im
+Querformat. Ein Anzeigefehler, keine Bedienhürde, und älter als dieser Punkt.
 
-**Berührt:** `public/css/responsive.css`, `public/css/sections/sidebar.css`, dazu die
-Kiosk- und Check-in-PWA, falls sie dieselben Regeln erben — das ist zu prüfen.
+**Berührt:** `public/css/responsive.css`, `public/css/sections/sidebar.css`,
+`public/js/modules/ui.js`, `tests/suites/responsive_nav.php`. Die Kiosk- und die Check-in-PWA
+sind **nicht** betroffen — beide laden ein eigenes `css/style.css` und erben diese Regeln nicht.
 
 **Nicht sicherheitsrelevant.**
 

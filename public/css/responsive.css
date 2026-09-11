@@ -88,10 +88,6 @@
 
 /* Mobile */
 @media (max-width: 480px) {
-    .mobile-menu-btn {
-        display: flex;
-    }
-
     .login-box {
         padding: var(--spacing-lg);
     }
@@ -138,8 +134,12 @@
     }
 }
 
-/* Desktop Large */
-@media (min-width: 1200px) {
+/* Desktop Large
+   Die Hoehenbedingung ist kein Beiwerk: Ohne sie gewinnt dieser Block bei einem
+   flach gezogenen Fenster gegen die Querformat-Regel weiter unten (gleiche
+   Spezifitaet, spaeter in der Datei) und nimmt den Menueknopf wieder weg —
+   waehrend die Leiste dort bereits ausgefahren ist. */
+@media (min-width: 1200px) and (min-height: 501px) {
     .mobile-menu-btn {
         display: none;
     }
@@ -155,4 +155,89 @@
         min-height: 30px;
         aspect-ratio: 2;
    }
+}
+
+/* ============================================
+   FLACHES QUERFORMAT (OI-53)
+   ============================================
+   Ein Telefon ist quer 844 bis 926 px breit — oberhalb des Haltepunkts von
+   768 px — aber nur rund 390 bis 430 px hoch. Der Breitenhaltepunkt greift
+   dort also nicht mehr, obwohl gerade die Hoehe fehlt.
+
+   Bewusst ein eigener Block statt einer Komma-Erweiterung des 768-px-Blocks:
+   Dessen uebrige Regeln (Statistik einspaltig, Filterleiste gestapelt) waeren
+   auf einem breiten, flachen Fenster eine Verschlechterung.
+
+   Nicht betroffen ist das Tablet im Querformat — quer misst es 744 px Hoehe
+   und mehr, behaelt seine Leiste also wie bisher. */
+@media (max-height: 500px) {
+    .mobile-menu-btn {
+        display: flex;
+    }
+
+    .sidebar {
+        transform: translateX(-100%);
+        /* Die Leiste scrollt als Ganzes. Ohne das bleibt unerreichbar, was
+           nicht mehr hineinpasst — der Abmelden-Knopf zuerst. */
+        overflow-y: auto;
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: var(--spacing-lg);
+    }
+
+    /* Der eigentliche Fehler: Mit `flex: 1` bekommt die Liste den Rest, und
+       der ist bei 375 px Fensterhoehe null — die Eintraege verschwinden
+       vollstaendig. Sie behaelt hier ihre Hoehe, gescrollt wird darueber. */
+    .nav-menu {
+        flex: none;
+        overflow-y: visible;
+    }
+
+    /* Kopf- und Fussbereich kompakt, damit nach dem Aufklappen sofort
+       Eintraege zu sehen sind und nicht erst gescrollt werden muss.
+       Die Trefferflaeche der Eintraege bleibt bei 50 px. */
+    .sidebar {
+        padding: var(--spacing-sm) 0;
+    }
+
+    .sidebar-header {
+        padding: var(--spacing-sm);
+        margin-bottom: 0;
+    }
+
+    .org-branding {
+        margin-bottom: var(--spacing-sm);
+    }
+
+    .org-logo {
+        width: 32px;
+        height: 32px;
+    }
+
+    .org-name {
+        font-size: 15px;
+    }
+
+    .user-info {
+        padding: var(--spacing-xs);
+    }
+
+    .nav-item {
+        padding: 12px 20px;
+    }
+
+    .quick-access-bar {
+        padding-top: var(--spacing-sm);
+    }
+
+    .btn-logout {
+        margin-top: var(--spacing-sm);
+    }
 }

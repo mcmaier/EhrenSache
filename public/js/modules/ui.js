@@ -419,13 +419,24 @@ export function updateUIForRole() {
     }
 }
 
+/**
+ * Wortgleich mit der Bedingung in public/css/responsive.css.
+ *
+ * Die Sichtbarkeit des Knopfes setzt diese Datei als Inline-Style, und der
+ * schlaegt jede CSS-Regel — die Schwelle steht damit zwangslaeufig zweimal da.
+ * Wer sie hier aendert, aendert sie auch dort, sonst blendet das eine ein, was
+ * das andere ausgeblendet laesst. Der Hoehenteil ist fuer das Querformat:
+ * Ein Telefon ist quer breiter als 768 px, aber nur rund 400 px hoch.
+ */
+const MOBILE_NAV_QUERY = '(max-width: 768px), (max-height: 500px)';
+
 // Separate Funktion für Sichtbarkeit
 export function updateMobileMenuVisibility() {
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
     if (!mobileMenuBtn) return;
     
     const isLoggedIn = document.getElementById('dashboard').classList.contains('active');
-    const isMobile = window.innerWidth <= 768;
+    const isMobile = window.matchMedia(MOBILE_NAV_QUERY).matches;
     
     mobileMenuBtn.style.display = (isLoggedIn && isMobile) ? 'flex' : 'none';
 }

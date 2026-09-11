@@ -157,6 +157,31 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   `"year": "2026"` als Zeichenkette.
 
 ### Behoben
+- **Die Navigation war im Querformat nicht bedienbar, sondern unsichtbar** (OI-53). Gemeldet
+  war ein „zu kleines" Menü; gemessen wurde etwas anderes. Die Seitenleiste ist ein
+  Flex-Container über die volle Fensterhöhe, in dem Kopf- und Fußbereich ihre Höhe behalten
+  und allein die Navigationsliste nachgibt (`flex: 1`). Bei einem quer gehaltenen Telefon —
+  rund 390 px hoch — beanspruchen Kopf (213 px), Reiter (33 px) und Fußbereich (145 px)
+  bereits mehr als das ganze Fenster. Die Liste bekam **0 px**: Alle Einträge waren da, keiner
+  war zu sehen.
+
+  Dazu kam der Haltepunkt. Quer ist ein Telefon 844 bis 926 px breit und damit oberhalb der
+  768 px, an denen die mobile Bedienung hing — der Menüknopf verschwand, die 250 px breite
+  Leiste stand fest im Layout, und dieselbe Liste kollabierte dort auf 17 px. Entschieden hat
+  das ohnehin nicht das Stylesheet, sondern ein Inline-Style aus `ui.js`, der die Fensterbreite
+  selbst gegen 768 prüfte; die zugehörigen CSS-Regeln waren wirkungslos.
+
+  Behoben an allen drei Stellen: Ein eigener Block `@media (max-height: 500px)` in
+  `responsive.css` bringt Menüknopf und ausfahrbare Leiste ins flache Querformat, die Liste
+  behält dort ihre Eintragshöhe (50 px Trefferfläche) und die Leiste scrollt als Ganzes;
+  `ui.js` wertet über `matchMedia` dieselbe Bedingung aus wie das Stylesheet; und
+  `.sidebar` rechnet mit `100dvh` statt `100vh`, damit die eingeblendete Adressleiste des
+  Telefons die Leiste nicht unten abschneidet. Der Block `min-width: 1200px` trägt jetzt
+  zusätzlich `min-height: 501px` — ohne das hätte er bei einem flach gezogenen Fenster gegen
+  die neue Regel gewonnen und den Menüknopf wieder versteckt, während die Leiste bereits
+  ausgefahren war. Das Tablet im Querformat ist nicht betroffen: Es misst quer 744 px Höhe
+  und mehr und behält seine Leiste. Festgehalten in `tests/suites/responsive_nav.php`
+
 - **`API.md` beschrieb `appearance` falsch.** Das Beispiel zeigte ein flaches Objekt mit
   `org_name` und `logo_url`; ausgeliefert wird seit Langem `{"settings": {…}}` mit anderen
   Schlüsselnamen. Gegen die laufende Installation geprüft und ersetzt.
