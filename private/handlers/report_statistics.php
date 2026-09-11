@@ -218,12 +218,7 @@ function statisticsReportAppointments($db, $database, int $memberId, int $year, 
             at.type_name,
             r.arrival_time,
             r.status,
-            r.checkin_source,
-            (SELECT COUNT(*) FROM {$prefix}exceptions e
-              WHERE e.member_id      = m.member_id
-                AND e.appointment_id = a.appointment_id
-                AND e.exception_type = 'time_correction'
-                AND e.status         = 'approved') AS corrected
+            r.checkin_source
         FROM {$prefix}appointments a
         JOIN {$prefix}appointment_types at ON at.type_id = a.type_id
         JOIN {$prefix}members m
@@ -268,21 +263,23 @@ const REPORT_ORIGIN_BACKFILLED = 'nachgetragen';
  * Datensatz ist damit konstruiert puenktlich. Diese Uhrzeit ununterschieden
  * auf einen Nachweis zu drucken, behauptet eine Messung, die nie stattfand.
  *
- * 'korrigiert' schlaegt 'gemessen': Eine genehmigte Zeitkorrektur ueber-
- * schreibt arrival_time, laesst checkin_source aber unveraendert
- * (handleApprovedTimeCorrection() in helpers/utils.php). Ohne diese
- * Vorrangregel truege eine korrigierte Zeit weiter das Etikett der
- * urspruenglichen Messung.
+ * Seit 1.5.0 sagt checkin_source die Wahrheit: handleApprovedTimeCorrection()
+ * setzt 'exception_request', und eine fehlende Uhrzeit ist NULL statt der
+ * erfundenen Terminstartzeit. Der frueher noetige Zaehler aus einem Join auf
+ * exceptions entfaellt damit -- er war die Uebergangsloesung, solange die
+ * Quelle nach einer Korrektur unveraendert stehen blieb.
  *
- * Uebergangsloesung: Kuenftig traegt records eine eigene Spalte dafuer.
+ * Eine Quelle allein macht noch keine Messung: Ohne Uhrzeit gibt es nichts zu
+ * etikettieren, auch wenn der Datensatz von einem Kiosk stammt.
  */
-function statisticsReportOrigin(?string $source, int $corrected): string
+function statisticsReportOrigin(?string $source, ?string $arrivalTime): string
 {
-    if ($corrected > 0) {
+    if ($source === 'exception_request') {
         return REPORT_ORIGIN_CORRECTED;
     }
 
-    if (in_array($source, ['station_pin', 'device_auth', 'user_totp', 'auto_checkin'], true)) {
+    if ($arrivalTime !== null
+        && in_array($source, ['station_pin', 'device_auth', 'user_totp', 'auto_checkin'], true)) {
         return REPORT_ORIGIN_MEASURED;
     }
 
@@ -308,7 +305,7 @@ function statisticsReportDetailSection(array $appointments): array
         $origin  = '';
         if ($row['status'] === 'present' && !empty($row['arrival_time'])) {
             $arrival = date('H:i', strtotime((string) $row['arrival_time']));
-            $origin  = statisticsReportOrigin($row['checkin_source'], (int) $row['corrected']);
+            $origin  = statisticsReportOrigin($row['checkin_source'], $row['arrival_time']);
         }
 
         $rows[] = [
