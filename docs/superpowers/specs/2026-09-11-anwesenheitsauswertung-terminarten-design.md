@@ -137,6 +137,7 @@ attendanceFetchMemberTotals($db, $database, array $groupIds, int $year,
 attendanceDistinctAppointmentCount($db, $database, array $groupIds, int $year,
                                    ?int $appointmentTypeId): int
 attendanceActiveMemberCount($db, $database, array $groupIds, int $year, ?int $memberId): int
+attendanceGroupName($db, $database, int $groupId): ?string
 
 // --- formend (rein, ohne DB) ---
 attendanceBuildGroup(int $groupId, string $groupName, array $types, array $rows): array
@@ -394,11 +395,17 @@ eigentliche Zweck des Umbaus.
 | Keine Zeilen | `members` leer (heutiges Verhalten) |
 | Quote bei `total = 0` | 0, keine Division durch null |
 | `by_type`-Reihenfolge folgt der Typenliste | auch wenn die Zeilen anders sortiert hereinkommen |
-| Kopfzahlen: Mitglied über zwei Gruppen mit gemeinsamer Terminart | Termin zählt **einmal** |
 | Kopfzahlen: `unexcused` aus `total − attended − excused` | nie negativ |
 | **Gegenprobe der beiden Rechenwege:** dieselben Zeilen ohne Überschneidung durch 5.2 und 5.3 | Gruppensumme und Kopfzahl sind gleich |
 
-Der drittletzte Fall ist der, den heute nichts prüft und den der Demo-Bestand nicht enthält.
+**Korrektur am 2026-09-11 beim Schreiben des Umsetzungsplans:** Hier stand ursprünglich auch
+„Mitglied über zwei Gruppen mit gemeinsamer Terminart → Termin zählt einmal". Das lässt sich
+**nicht** als Unit-Test prüfen: Die Entdopplung geschieht im SQL über `COUNT(DISTINCT …)`, die
+formende Funktion summiert nur bereits entdoppelte Zeilen. Ein Unit-Test hätte dort geprüft,
+dass Addition addiert.
+
+Der Fall gehört deshalb als **HTTP-Test** in die Suite — mit einer zweiten Gruppe, die
+testweise an eine vorhandene Terminart gehängt wird, und einem Mitglied in beiden. Siehe 7.2.
 
 Die Gegenprobe am Ende ist die wichtigste: `excused` und `unexcused` werden an den beiden
 Stellen in entgegengesetzter Richtung hergeleitet (5.2 gegen 5.3). Solange sich keine
@@ -411,6 +418,14 @@ Wege falsch — und ohne diesen Test fiele es niemandem auf.
 - Die bestehende Prüfung „die Terminliste deckt genau die gezählten Termine ab" muss weiter
   aufgehen — sie ist jetzt der Beweis, dass Liste und Quote dieselbe Terminmenge benutzen.
 - Die Fußnote zur ausgewerteten Terminart darf **nicht mehr** erscheinen.
+- **Die Entdopplung je Mitglied** (aus 3.3): Der Test legt eine zweite Gruppe an, hängt sie an
+  eine Terminart, die das Testmitglied über seine bestehende Gruppe bereits erreicht, und weist
+  das Mitglied zu. Danach muss die Kopfzahl `total_appointments` des Mitglieds **unverändert**
+  sein — der Termin zählt einmal, obwohl er es jetzt über zwei Wege erreicht. Aufräumen im
+  `finally`, nach dem Muster des Maskierungstests in derselben Suite.
+
+  Das ist der einzige Weg, die Entdopplung zu belegen: Sie geschieht im SQL, nicht in der
+  formenden Funktion.
 
 ### 7.3 Bestandsschutz
 
