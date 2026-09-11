@@ -1907,3 +1907,60 @@ Kiosk- und Check-in-PWA, falls sie dieselben Regeln erben — das ist zu prüfen
 **Nicht sicherheitsrelevant.**
 
 ---
+
+### OI-54 · PUT auf Terminarten überschreibt nicht mitgeschickte Felder
+**Priorität:** mittel — führt zu Datenverlust, ist aber nur von einem angemeldeten Admin
+auslösbar, und die eigene Oberfläche schickt derzeit bei jedem PUT ohnehin alle Felder mit
+
+`handleAppointmentTypes()` in `private/handlers/appointment_types.php:110` schreibt bei `PUT`
+alle vier Grundfelder bedingungslos, ohne zu prüfen, ob sie im Request überhaupt enthalten
+waren:
+
+```php
+$stmt = $db->prepare("UPDATE {$prefix}appointment_types
+                      SET type_name = ?, description = ?, is_default = ?, color = ?
+                      WHERE type_id = ?");
+$stmt->execute([
+    $data->type_name,
+    $data->description ?? null,
+    $data->is_default ?? false,
+    $data->color ?? '#667eea',
+    $id
+]);
+```
+
+Ein PUT, das nur `color` ändern will, verliert dadurch `description` (wird `null`) und
+`is_default` (wird `false`); fehlt `type_name` ganz, scheitert die Abfrage sogar, weil die
+Spalte `NOT NULL` ist. Es gibt keine `isset`-Prüfung je Feld — das PUT ist eine stille
+Vollersetzung, obwohl nichts in `API.md` das ausweist.
+
+**Im Gegensatz dazu `handleMembers()`** (`private/handlers/members.php`, ab Zeile 367): Dort
+baut ein dynamisches `UPDATE` das `SET` ausschließlich aus den tatsächlich gelieferten Feldern
+(`$updatable` plus `isset()`-Prüfung je Feld). Zwei Ressourcen desselben Projekts mit
+gegensätzlichem PUT-Verhalten sind für jeden Verbraucher eine Falle — was bei der einen
+Ressource ein harmloses Teil-Update ist, löscht bei der anderen still Daten.
+
+**Nachgeprüft, ob weitere Handler dasselbe Muster zeigen:** `private/handlers/activity_types.php`
+ist derselbe Fall. Der `PUT`-Zweig (ab Zeile 286) schreibt `activity_name`, `description`,
+`color`, `is_default`, `is_active` und `verification` ebenfalls bedingungslos in einem
+UPDATE-Statement — mit denselben `?? null` / `?? false`-Rückfällen. Einzig `group_ids` und
+`appointment_type_ids` sind dort bereits sauber über `isset()` abgesichert und bleiben bei
+fehlendem Feld unangetastet (mit Kommentar, der das Verhalten bewusst begründet) — nur die
+Grundfelder der Terminart selbst tragen den Fehler. Bemerkenswert: Fehlt `is_active`, fällt es
+auf `1` zurück — ein PUT ohne dieses Feld kann eine deaktivierte Tätigkeitsart also still
+wieder aktivieren.
+
+**Zu tun:** Entweder ein dynamisches `UPDATE` wie bei `members` (nur gelieferte Felder
+schreiben), oder das heutige Verhalten in `API.md` ausdrücklich als Vollersetzung dokumentieren
+— beides ist vertretbar, es muss aber **eines** von beiden sein, statt der stillen Lücke, die
+heute besteht.
+
+**Wie es aufgefallen ist:** beim Schreiben des Entdopplungstests für OI-48 — ein PUT, das
+zunächst nur `group_ids` schickte, setzte `type_name` auf `NULL` und scheiterte an der
+`NOT NULL`-Spalte. `description` und `is_default` wären ohne diesen Fehlschlag still verloren
+gegangen.
+
+**Nicht sicherheitsrelevant:** setzt ein angemeldetes Adminkonto voraus und erweitert keine
+Rechte — es zerstört nur Daten, die derselbe Admin ohnehin ändern dürfte.
+
+---
