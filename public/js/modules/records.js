@@ -731,7 +731,12 @@ function getSourceBadge(record) {
         'timer': { icon: '⏱️', label: 'Timer', color: '#a98bd0' },
         // Mitgliedsnummer + PIN an einer virtuellen Station (Kiosk). Die PIN ist
         // weitergebbar — darum eigene Kennzeichnung statt 'device_auth'.
-        'station_pin': { icon: '🖥️', label: 'Station (PIN)', color: '#5b8def' }
+        'station_pin': { icon: '🖥️', label: 'Station (PIN)', color: '#5b8def' },
+        // Genehmigter Zeitkorrektur-Antrag. Admin-Farbe, weil die Freigabe vom
+        // Admin kommt — eigenes Label, weil die Uhrzeit es nicht tut: Sie
+        // stammt aus der Angabe des Mitglieds. Ohne diese Unterscheidung sähe
+        // eine beantragte Zeit aus wie eine vom Verwalter beobachtete.
+        'exception_request': { icon: '📝', label: 'Antrag', color: '#72afd8' }
     };
     
     const source = sources[record.checkin_source] || sources['none'];

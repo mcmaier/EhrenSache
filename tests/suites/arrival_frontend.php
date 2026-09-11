@@ -145,3 +145,25 @@ test('Keine ungeschuetzte Datumskonvertierung der Ankunftszeit', function () use
         }
     }
 });
+
+test('Jeder Wert von checkin_source hat ein Abzeichen im Dashboard', function () use ($arrivalRoot) {
+    // getSourceBadge() faellt bei unbekannten Werten auf 'none' zurueck und
+    // zeigt einen grauen Strich. Ein neuer ENUM-Wert ohne Eintrag sieht damit
+    // aus wie "keine Quelle" -- genau das ist bei exception_request passiert.
+    $sql = (string) file_get_contents($arrivalRoot . '/private/setup/ehrensache_db.sql');
+    $js  = (string) file_get_contents($arrivalRoot . '/public/js/modules/records.js');
+
+    assertTrue(
+        preg_match("/`checkin_source` enum\(([^)]*)\)/", $sql, $treffer) === 1,
+        'ENUM checkin_source im Schema nicht gefunden'
+    );
+
+    preg_match_all("/'([a-z_]+)'/", $treffer[1], $werte);
+
+    foreach ($werte[1] as $wert) {
+        assertTrue(
+            strpos($js, "'{$wert}':") !== false,
+            "getSourceBadge() kennt '{$wert}' nicht -- die Quelle erschiene als leerer Strich"
+        );
+    }
+});
