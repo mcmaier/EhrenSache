@@ -2062,3 +2062,35 @@ abwürgen.
 
 **Nicht sicherheitsrelevant:** keine Rechteausweitung, kein Zugriff ohne Anmeldung, kein
 zusätzlicher Datenabfluss.
+
+---
+
+### OI-57 · ID-Badge fehlt in den Modals der Zeiterfassung
+**Priorität:** niedrig — reine Darstellung
+
+Die Bearbeitungsdialoge zeigen oben rechts im Kopf die Datenbank-ID des bearbeiteten
+Datensatzes (`updateModalId()` in `public/js/modules/utils.js`, Stil `.modal-id-badge` in
+`public/css/components/modals.css`). Das erleichtert das Zuordnen zwischen Oberfläche,
+Exporten und Datenbank.
+
+**Zwei Dialoge machen es nicht mit** — beide in `public/js/modules/worktime.js`:
+
+| Dialog | Funktion | Modal-ID | vorhandene ID |
+|---|---|---|---|
+| Arbeitszeiteintrag | `openWorkSessionModal()` (ab Zeile 443) | `workSessionModal` | `sessionId` |
+| Tätigkeitsart | `openActivityTypeModal()` (ab Zeile 811) | `activityTypeModal` | `activityId` |
+
+Beide Funktionen kennen die ID bereits — sie schreiben sie in ein verstecktes Feld und
+schalten den Titel auf „bearbeiten" — und `worktime.js` importiert `updateModalId` bisher
+nicht.
+
+**Zu tun:** `updateModalId` in `worktime.js` importieren und in beiden Funktionen aufrufen:
+beim Bearbeiten mit der ID, beim Neuanlegen mit `null` (sonst bleibt der Badge des zuvor
+bearbeiteten Datensatzes stehen — die Funktion entfernt einen alten Badge zwar, aber nur,
+wenn sie überhaupt gerufen wird).
+
+**Vollständig ist die Liste damit:** members, appointments, records, exceptions, users,
+devices, groups und Terminarten rufen `updateModalId` bereits.
+
+**Nicht sicherheitsrelevant:** keine Datenänderung, kein Rechtebezug; die IDs sind für den
+Bearbeitenden ohnehin über die API sichtbar.
