@@ -652,8 +652,23 @@ test('work_sessions: Start mit Termin laesst einen bestehenden Check-in unberueh
     $activityId    = createActivityType('Kein-Ueberschreiben ' . uniqid());
     $appointmentId = createTodayAppointment('Frueher Check-in ' . uniqid());
 
-    // Check-in eine Stunde vor dem Timer-Start, ueber den bestehenden Weg
-    $early = date('Y-m-d H:i:s', strtotime('-1 hour'));
+    // Check-in kurz vor Terminbeginn, ueber den bestehenden Weg.
+    //
+    // Die Zeit haengt am Termin und nicht am Zeitpunkt des Testlaufs: Seit
+    // 1.5.0 prueft records.php, ob eine Ankunftszeit im Toleranzband um den
+    // Termin liegt. Die Testtermine liegen gestreut ueber den Tag (01:00,
+    // 04:00, ...), damit sich ihre Fenster nicht ueberlappen -- "vor jetzt"
+    // traf dieses Fenster nur zufaellig.
+    $apt = apiRequest('GET', 'appointments', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $appointmentId],
+    ]);
+    assertStatus(200, $apt, 'Testtermin nicht lesbar');
+
+    $early = date(
+        'Y-m-d H:i:s',
+        strtotime($apt['body']['date'] . ' ' . $apt['body']['start_time'] . ' -5 minutes')
+    );
     assertStatus(201, apiRequest('POST', 'records', [
         'token' => apiToken('admin'),
         'body'  => [

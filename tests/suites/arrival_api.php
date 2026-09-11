@@ -268,3 +268,42 @@ test('Eine beantragte Ankunft weit vom Termin wird abgewiesen', function () {
         arrDropAppointment($token, $aptId);
     }
 });
+
+test('Eine Ankunftszeit weit vom Termin wird auch im Record abgewiesen', function () {
+    $token    = apiToken('admin');
+    $memberId = arrAnyMemberId($token);
+    $aptId    = arrTempAppointment($token, '2031-03-09');   // 20:00 Uhr
+
+    try {
+        // Dasselbe Toleranzband wie beim Antrag -- sonst waere der direkte Weg
+        // ueber den Record-Dialog die Luecke im Zaun.
+        $res = apiRequest('POST', 'records', [
+            'token' => $token,
+            'body'  => ['member_id'      => $memberId,
+                        'appointment_id' => $aptId,
+                        'arrival_time'   => '2031-03-09 15:00:00'],
+        ]);
+        assertStatus(400, $res, 'Eine Ankunft fuenf Stunden vor dem Termin muss auffallen');
+
+        // Ohne Zeit bleibt es erlaubt -- das ist der Hauptfall des Umbaus.
+        $ohne = apiRequest('POST', 'records', [
+            'token' => $token,
+            'body'  => ['member_id' => $memberId, 'appointment_id' => $aptId],
+        ]);
+        assertStatus(201, $ohne);
+        $recordId = (int) $ohne['body']['id'];
+
+        // Nachtraeglich eine unsinnige Zeit setzen: ebenfalls abgewiesen.
+        $put = apiRequest('PUT', 'records', [
+            'token' => $token,
+            'query' => ['id' => $recordId],
+            'body'  => ['member_id'      => $memberId,
+                        'appointment_id' => $aptId,
+                        'arrival_time'   => '2031-03-09 03:00:00',
+                        'status'         => 'present'],
+        ]);
+        assertStatus(400, $put);
+    } finally {
+        arrDropAppointment($token, $aptId);
+    }
+});

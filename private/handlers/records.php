@@ -194,6 +194,21 @@ function handleRecords($db, $database, $method, $id) {
             // records_ibfk_2 lässt eine unbekannte ID gar nicht erst zu.
             $arrival_time = ($data->arrival_time ?? '') !== '' ? $data->arrival_time : null;
 
+            // Dasselbe Toleranzband wie beim nachträglichen Antrag. Ohne diese
+            // Prüfung wäre der direkte Weg die Lücke im Zaun: Was über
+            // resource=exceptions abgewiesen wird, ließe sich hier eintragen.
+            // Eine fehlende Zeit bleibt unberührt — sie behauptet nichts.
+            if ($arrival_time !== null
+                && !arrivalWithinAppointmentWindow($db, $database, (int) $appointment_id,
+                                                   (string) $arrival_time,
+                                                   checkinToleranceHours($db, $database))) {
+                http_response_code(400);
+                echo json_encode([
+                    "message" => "Die Ankunftszeit liegt zu weit vom Termin entfernt"
+                ], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+
             // Erstelle Record (manuell durch Admin)
             $stmt = $db->prepare("INSERT INTO {$prefix}records (member_id, appointment_id, arrival_time, status, checkin_source) VALUES (?, ?, ?, ?, 'admin')");
             if($stmt->execute([$member_id, $appointment_id, $arrival_time, $data->status ?? 'present'])) {
@@ -232,6 +247,20 @@ function handleRecords($db, $database, $method, $id) {
             // als '0000-00-00 00:00:00' in der Spalte — ein Datum, das es
             // nicht gibt, und das jede spätere Auswertung mitschleppt.
             $arrival_time = ($data->arrival_time ?? '') !== '' ? $data->arrival_time : null;
+
+            // Toleranzband wie beim Anlegen. Geprüft wird gegen den Termin aus
+            // dem Anfragekörper, nicht gegen den bisherigen: Ein PUT darf den
+            // Termin wechseln, und dann gilt dessen Fenster.
+            if ($arrival_time !== null
+                && !arrivalWithinAppointmentWindow($db, $database, (int) $data->appointment_id,
+                                                   (string) $arrival_time,
+                                                   checkinToleranceHours($db, $database))) {
+                http_response_code(400);
+                echo json_encode([
+                    "message" => "Die Ankunftszeit liegt zu weit vom Termin entfernt"
+                ], JSON_UNESCAPED_UNICODE);
+                break;
+            }
 
             if ($memberChanged || $appointmentChanged) {
                 // Prüfe ob bereits ein anderer Record für neue Kombination existiert
