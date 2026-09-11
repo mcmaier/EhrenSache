@@ -108,8 +108,21 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
     foreach ($groups as $gid) {
         $types = attendanceGroupTypes($db, $database, $gid);
 
-        // Gruppe ohne Terminart hat keine Anwesenheit, ueber die sich reden
-        // liesse -- sie entfaellt, wie bisher.
+        // Ist auf eine Terminart gefiltert, zaehlt nur sie -- und eine Gruppe,
+        // die sie nicht fuehrt, faellt ganz heraus. Ohne diese Filterung
+        // erschiene sie mit leerer Mitgliederliste und wiese dabei ihre
+        // *eigenen* Terminarten aus statt der angefragten. Das alte
+        // calculateGroupStatistics() gab in diesem Fall null zurueck; das
+        // Verhalten war beim Umbau zunaechst verlorengegangen.
+        if ($appointmentTypeId !== null) {
+            $types = array_values(array_filter(
+                $types,
+                static fn(array $type): bool => (int) $type['type_id'] === $appointmentTypeId
+            ));
+        }
+
+        // Gruppe ohne (passende) Terminart hat keine Anwesenheit, ueber die
+        // sich reden liesse -- sie entfaellt, wie bisher.
         if ($types === []) {
             continue;
         }
