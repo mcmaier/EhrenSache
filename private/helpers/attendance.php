@@ -189,3 +189,234 @@ function attendanceBuildSummary(array $memberTotals, int $appointmentCount, int 
         'overall_average'    => attendanceRate($present, $possible),
     ];
 }
+
+// ============================================
+// HOLEND
+// ============================================
+
+/**
+ * Alle Terminarten einer Gruppe, sortiert.
+ *
+ * LEFT JOIN, damit eine verwaiste type_id die Zeile nicht schluckt: Der Join
+ * dient der Beschriftung, nicht der Auswahl. type_name ist dann null und wird
+ * von der Oberflaeche als "ohne Terminart" ausgegeben.
+ *
+ * @return array<int, array{type_id: int, type_name: ?string}>
+ */
+function attendanceGroupTypes($db, $database, int $groupId): array
+{
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("
+        SELECT atg.type_id, at.type_name
+        FROM {$prefix}appointment_type_groups atg
+        LEFT JOIN {$prefix}appointment_types at ON at.type_id = atg.type_id
+        WHERE atg.group_id = ?
+        ORDER BY at.type_name, atg.type_id
+    ");
+    $stmt->execute([$groupId]);
+
+    $types = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $types[] = [
+            'type_id'   => (int) $row['type_id'],
+            'type_name' => $row['type_name'],
+        ];
+    }
+
+    return $types;
+}
+
+/** Name einer Gruppe, oder null wenn es sie nicht gibt. */
+function attendanceGroupName($db, $database, int $groupId): ?string
+{
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT group_name FROM {$prefix}member_groups WHERE group_id = ?");
+    $stmt->execute([$groupId]);
+    $name = $stmt->fetchColumn();
+
+    return $name === false ? null : (string) $name;
+}
+
+/**
+ * Je Mitglied und Terminart eine Zeile innerhalb einer Gruppe.
+ *
+ * Der Join auf appointment_type_groups ist an die feste group_id gebunden --
+ * dadurch entsteht kein Faecher, jeder Termin trifft jedes Mitglied der Gruppe
+ * genau einmal. Die Gruppierung nach member_id und type_id ist die
+ * Voraussetzung, die attendanceBuildGroup() prueft: keine doppelte Zeile fuer
+ * dieselbe Kombination.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function attendanceFetchGroupRows($db, $database, int $groupId, int $year,
+                                  ?int $memberId, ?int $appointmentTypeId): array
+{
+    require_once __DIR__ . '/member_activity.php';
+
+    $prefix        = $database->table('');
+    $activityWhere = getMemberActivityWhereYear($year, 'm');
+
+    $sql = "
+        SELECT m.member_id, m.name, m.surname, a.type_id,
+               COUNT(a.appointment_id)                                   AS total,
+               SUM(CASE WHEN r.status = 'present' THEN 1 ELSE 0 END)     AS attended,
+               SUM(CASE WHEN r.appointment_id IS NULL THEN 1 ELSE 0 END) AS unexcused
+        FROM {$prefix}appointments a
+        JOIN {$prefix}appointment_type_groups atg
+             ON atg.type_id = a.type_id AND atg.group_id = ?
+        JOIN {$prefix}member_group_assignments mga ON mga.group_id = atg.group_id
+        JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activityWhere}
+        LEFT JOIN {$prefix}records r
+             ON r.appointment_id = a.appointment_id AND r.member_id = m.member_id
+        WHERE YEAR(a.date) = ?
+          AND a.date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)
+    ";
+
+    $params = [$groupId, $year];
+
+    if ($memberId !== null) {
+        $sql .= " AND m.member_id = ?";
+        $params[] = $memberId;
+    }
+    if ($appointmentTypeId !== null) {
+        $sql .= " AND a.type_id = ?";
+        $params[] = $appointmentTypeId;
+    }
+
+    $sql .= " GROUP BY m.member_id, a.type_id ORDER BY m.surname, m.name, a.type_id";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Je Mitglied eine Zeile, ueber alle Gruppen, entdoppelt.
+ *
+ * COUNT(DISTINCT a.appointment_id) ist die Entdopplung: Erreicht ein Termin
+ * ein Mitglied ueber zwei Gruppen, zaehlt er einmal. Ohne das waeren die
+ * Kopfzahlen die Summe der Gruppentabellen und wuerden die Wirklichkeit
+ * uebersteigen.
+ *
+ * @param array<int, int> $groupIds
+ * @return array<int, array<string, mixed>>
+ */
+function attendanceFetchMemberTotals($db, $database, array $groupIds, int $year,
+                                     ?int $memberId, ?int $appointmentTypeId): array
+{
+    if ($groupIds === []) {
+        return [];
+    }
+
+    require_once __DIR__ . '/member_activity.php';
+
+    $prefix        = $database->table('');
+    $activityWhere = getMemberActivityWhereYear($year, 'm');
+    $placeholders  = implode(',', array_fill(0, count($groupIds), '?'));
+
+    $sql = "
+        SELECT m.member_id,
+               COUNT(DISTINCT a.appointment_id) AS total,
+               COUNT(DISTINCT CASE WHEN r.status = 'present' THEN a.appointment_id END) AS attended,
+               COUNT(DISTINCT CASE WHEN r.status = 'excused' THEN a.appointment_id END) AS excused
+        FROM {$prefix}appointments a
+        JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
+        JOIN {$prefix}member_group_assignments mga
+             ON mga.group_id = atg.group_id AND mga.group_id IN ({$placeholders})
+        JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activityWhere}
+        LEFT JOIN {$prefix}records r
+             ON r.appointment_id = a.appointment_id AND r.member_id = m.member_id
+        WHERE YEAR(a.date) = ?
+          AND a.date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)
+    ";
+
+    $params = $groupIds;
+    $params[] = $year;
+
+    if ($memberId !== null) {
+        $sql .= " AND m.member_id = ?";
+        $params[] = $memberId;
+    }
+    if ($appointmentTypeId !== null) {
+        $sql .= " AND a.type_id = ?";
+        $params[] = $appointmentTypeId;
+    }
+
+    $sql .= " GROUP BY m.member_id";
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/** Zahl der Termine im Auswertungsbereich, jeder einmal. */
+function attendanceDistinctAppointmentCount($db, $database, array $groupIds, int $year,
+                                            ?int $appointmentTypeId): int
+{
+    if ($groupIds === []) {
+        return 0;
+    }
+
+    $prefix       = $database->table('');
+    $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+
+    $sql = "
+        SELECT COUNT(DISTINCT a.appointment_id)
+        FROM {$prefix}appointments a
+        JOIN {$prefix}appointment_type_groups atg
+             ON atg.type_id = a.type_id AND atg.group_id IN ({$placeholders})
+        WHERE YEAR(a.date) = ?
+          AND a.date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)
+    ";
+
+    $params = $groupIds;
+    $params[] = $year;
+
+    if ($appointmentTypeId !== null) {
+        $sql .= " AND a.type_id = ?";
+        $params[] = $appointmentTypeId;
+    }
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+
+    return (int) $stmt->fetchColumn();
+}
+
+/**
+ * Zahl der aktiven Mitglieder im Auswertungsbereich.
+ *
+ * Unveraendert uebernommen aus getActiveMemberCount() in handlers/statistics.php.
+ */
+function attendanceActiveMemberCount($db, $database, array $groupIds, int $year,
+                                     ?int $memberId): int
+{
+    if ($memberId !== null) {
+        return 1;
+    }
+
+    require_once __DIR__ . '/member_activity.php';
+
+    $prefix        = $database->table('');
+    $activityWhere = getMemberActivityWhereYear($year, 'm');
+
+    if (!empty($groupIds)) {
+        $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+        $stmt = $db->prepare("
+            SELECT COUNT(DISTINCT mga.member_id)
+            FROM {$prefix}member_group_assignments mga
+            JOIN {$prefix}members m ON mga.member_id = m.member_id
+            WHERE mga.group_id IN ({$placeholders})
+              AND {$activityWhere}
+        ");
+        $stmt->execute($groupIds);
+        return (int) $stmt->fetchColumn();
+    }
+
+    $stmt = $db->query("SELECT COUNT(*) FROM {$prefix}members m WHERE {$activityWhere}");
+    return (int) $stmt->fetchColumn();
+}
