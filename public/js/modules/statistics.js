@@ -185,6 +185,27 @@ export async function showStatisticsSection()
     await applyStatisticsFilters();
 }
 
+/**
+ * Ordnet eine Quote einem von vier Farbbaendern zu.
+ *
+ * Frueher trug der Balken einen Verlauf von Rot ueber Gelb nach Gruen, den
+ * eine Maske von rechts beschnitt. Die Farbe sagte damit nichts: Jeder
+ * Balken begann bei Rot, auch der eines Mitglieds mit 92 Prozent, und bei
+ * ihm war gut die Haelfte der Flaeche rot. Unterscheidbar war allein die
+ * Laenge. Jetzt sagen Laenge und Farbe dasselbe.
+ *
+ * Die Schwellen sind ein Urteil darueber, was gute Anwesenheit ist, und das
+ * faellt je nach Verein verschieden aus -- ein Blasorchester mit
+ * Wochenprobe sieht 65 Prozent anders als eine Feuerwehr mit Monatsdienst.
+ * Siehe OI-55. Sie stehen deshalb an genau einer Stelle.
+ */
+function rateBand(rate) {
+    if (rate < 40) return 'rate-low';
+    if (rate < 60) return 'rate-mid';
+    if (rate < 80) return 'rate-fair';
+    return 'rate-good';
+}
+
 export async function renderStatistics(statsData) {
     const container = document.getElementById('statisticsContainer');
 
@@ -251,8 +272,7 @@ export async function renderStatistics(statsData) {
                                     <td class="stat-rate">
                                         <div class="attendance-rate">
                                             <div class="rate-bar">
-                                                <div class="rate-fill-gradient"></div>
-                                                <div class="rate-fill-mask" style="width: ${100 - member.attendance_rate}%"></div>
+                                                <div class="rate-fill ${rateBand(member.attendance_rate)}" style="width: ${member.attendance_rate}%"></div>
                                             </div>
                                             <span class="rate-text">${member.attendance_rate}%</span>
                                         </div>
@@ -261,8 +281,7 @@ export async function renderStatistics(statsData) {
                                         ? `<td class="stat-type" title="${t.attended} von ${t.total_appointments}">
                                                <span class="type-value">${t.attendance_rate}%</span>
                                                <span class="type-track">
-                                                   <span class="type-grad"></span>
-                                                   <span class="type-mask" style="width: ${100 - t.attendance_rate}%"></span>
+                                                   <span class="type-fill ${rateBand(t.attendance_rate)}" style="width: ${t.attendance_rate}%"></span>
                                                </span>
                                            </td>`
                                         : `<td class="stat-type stat-type-empty" title="keine Termine dieser Art">–</td>`
@@ -346,4 +365,4 @@ export async function initStatisticsEventHandlers() {
 }
 
 window.updateStatisticsFilters = updateStatisticsFilters;
-window.applyStatisticsFilters = applyStatisticsFilters;
+window.applyStatisticsFilters = applyStatisticsFilters;

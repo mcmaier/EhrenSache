@@ -53,19 +53,14 @@
     overflow: hidden;
 }
 
-.rate-fill-gradient {
+/* Einfarbig statt Verlauf: siehe rateBand() in statistics.js. Die Farbe
+   kommt aus dem Wert, nicht aus der Position im Balken. */
+.rate-fill {
     position: absolute;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, var(--danger-color) 0%, var(--warning-color) 50%, var(--success-color) 100%);
-    clip-path: inset(0 0 0 0); /* Wird dynamisch angepasst */
-}
-
-.rate-fill-mask {
-    position: absolute;
-    height: 100%;
-    background: var(--border-light);
-    right: 0;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: var(--radius-sm);
     transition: width 0.3s ease;
 }
 
@@ -190,22 +185,22 @@
     background: var(--border-light);
 }
 
-.type-grad {
+.type-fill {
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
     left: 0;
-    background: linear-gradient(90deg, var(--danger-color) 0%, var(--warning-color) 50%, var(--success-color) 100%);
+    top: 0;
+    bottom: 0;
+    border-radius: 3px;
 }
 
-.type-mask {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--border-light);
-}
+/* Die vier Baender. Schwellen bei 40, 60 und 80 -- siehe rateBand() in
+   statistics.js und OI-55. Nicht bei 20er-Schritten: Die realen Quoten
+   liegen ueberwiegend oberhalb von 50 Prozent, und eine Skala, die dort
+   nicht mehr unterscheidet, hilft beim Ueberfliegen nicht. */
+.rate-low  { background: var(--danger-color); }
+.rate-mid  { background: var(--warning-color); }
+.rate-fair { background: var(--ehren-gelb); }
+.rate-good { background: var(--success-color); }
 
 .stat-type-empty {
     color: var(--text-light);

@@ -1964,3 +1964,47 @@ gegangen.
 Rechte — es zerstört nur Daten, die derselbe Admin ohnehin ändern dürfte.
 
 ---
+
+### OI-55 · Farbschwellen der Anwesenheitsquote sind fest verdrahtet
+
+**Priorität:** niedrig — die Zahlen bleiben richtig, nur ihre Einfärbung ist eine Vorgabe
+
+Die Statistiktabelle färbt jeden Quotenbalken nach vier Bändern ein, gesetzt in `rateBand()`
+in `public/js/modules/statistics.js`:
+
+| Band | Quote | Farbe |
+|---|---|---|
+| `rate-low` | unter 40 % | Rot |
+| `rate-mid` | 40 bis 59 % | Orange |
+| `rate-fair` | 60 bis 79 % | Gelb |
+| `rate-good` | 80 % und mehr | Grün |
+
+**Das ist ein Urteil darüber, was gute Anwesenheit ist** — und es fällt je nach Organisation
+verschieden aus. Ein Blasorchester mit wöchentlicher Probe bewertet 65 % anders als eine
+Feuerwehr mit Monatsdienst oder ein Verein, dessen Mitglieder berufsbedingt schichten. Fest
+verdrahtet gibt EhrenSache jedem Verein dieselbe Meinung vor und färbt Mitglieder rot, die
+nach dem Maßstab ihres Vereins unauffällig sind.
+
+**Warum die Schwellen trotzdem nicht bei 20er-Schritten liegen:** Die naheliegende Einteilung
+(20/40/60/80) wurde verworfen, weil die realen Quoten überwiegend oberhalb von 50 % liegen.
+Eine Skala, die genau dort nicht mehr unterscheidet, wo die Daten sich sammeln, hilft beim
+Überfliegen nicht. 40/60/80 verteilt den vorhandenen Bestand über alle vier Bänder.
+
+**Zu tun:** Die drei Schwellen als Systemeinstellung führen (`system_settings`, analog zu den
+übrigen Darstellungsoptionen), mit den heutigen Werten als Vorgabe. Die Farben selbst sollten
+nicht mitkonfigurierbar sein — Rot für „schlecht" ist eine Konvention, an der zu drehen mehr
+schadet als nützt.
+
+**Vorher zu klären:** ob die Schwellen je Terminart gelten sollen. Für einen Auftritt ist eine
+andere Erwartung angemessen als für eine Registerprobe, und die Statistik weist beide
+inzwischen getrennt aus. Das spricht für Schwellen je Terminart — kostet aber eine
+Zuordnungstabelle statt dreier Zahlen.
+
+**Wie es aufgefallen ist:** bei der Überarbeitung der Statistiktabelle. Der Vorgänger war ein
+Farbverlauf von Rot nach Grün, den eine Maske beschnitt — dort begann *jeder* Balken bei Rot,
+auch der eines Mitglieds mit 92 %. Die Farbe trug damit keine Information. Beim Ersetzen durch
+eine Skala nach Wertebereich wurde die Vorgabe überhaupt erst zu einer Aussage.
+
+**Nicht sicherheitsrelevant:** reine Darstellung, keine Datenänderung, kein Rechtebezug.
+
+---
