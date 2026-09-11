@@ -140,6 +140,16 @@ als der umgekehrte Fall: Wem das Stempeln technisch misslungen ist, darf dafür 
 werden. Die Verantwortung liegt bei der Freigabe, nicht beim Algorithmus. Der Bericht weist die
 Zahl getrennt aus („davon 3 nachträglich genehmigt"), damit die Freigabepraxis sichtbar bleibt.
 
+**Verhältnis zu den Herkunftsklassen des Berichts:** `report_statistics.php` kennt bereits
+`gemessen`, `korrigiert` und `nachgetragen` (Konstanten in Zeile 259–261). Die Einteilung hier ist
+feiner, weil sie eine Entscheidung tragen muss und nicht nur eine Zelle beschriftet:
+*bezeugt* und *gemessen* fallen dort zusammen, obwohl das eine eine Serverzeit und das andere eine
+Notiz ist. **Für die Anzeige bleiben die drei Wörter des Berichts maßgeblich** — zwei Vokabulare
+für dieselbe Sache auf benachbarten Bildschirmen wären der schlechtere Tausch. Die vierte
+Unterscheidung lebt in der Berechnung, nicht in der Beschriftung. Die dortige Vorrangregel
+(`korrigiert` schlägt `gemessen`) deckt sich mit der Entscheidung oben, den `utils.php`-Pfad
+ausdrücklich als `exception_request` zu kennzeichnen.
+
 **Zum Import:** Er zählt nicht. Die Pflichtspalte `arrival_date_time` ([`import.php:555`](../../../private/handlers/import.php))
 erzwingt zwar eine Zeit, sagt aber nichts über deren Güte — ein Altsystem, das nur Datum kannte,
 liefert „20:00" für alle. Ein Import ist ein einmaliger Altbestandstransfer und soll die laufende
@@ -213,8 +223,10 @@ Termin (`unique_member_appointment`, Fremdschlüssel, `date` NOT NULL) — das D
 verfügbar.
 
 **Nebengewinn:** Die Jahresbasis ist heute uneinheitlich.
-[`statistics.php:338`](../../../private/handlers/statistics.php) rechnet über `YEAR(a.date)`, die
-Jahresauswahl daneben zieht zusätzlich `YEAR(arrival_time)`. Ein Termin am 31.12. um 22:00 mit
+[`attendance.php`](../../../private/helpers/attendance.php) rechnet über `YEAR(a.date)` (Zeilen
+335, 394, 434), die Jahresauswahl in
+[`statistics.php:32`](../../../private/handlers/statistics.php) zieht zusätzlich
+`YEAR(arrival_time)`. Ein Termin am 31.12. um 22:00 mit
 Ankunft um 00:15 erzeugt heute einen Record im Folgejahr — die Statistik zählt ihn ins alte, die
 Jahresliste kennt ihn im neuen. Der Umbau räumt das mit auf.
 
@@ -325,6 +337,20 @@ Datensätze im Protokoll.
 Alles in `private/helpers/punctuality.php` (neu), damit es ohne HTTP testbar ist — dieselbe
 Trennung wie bei `worktime.php` und `station.php`.
 
+**Die Soll-Menge wird nicht neu gebaut.** Seit OI-48 (Merge `6696c07`, 2026-09-11) liegt die
+Anwesenheitsrechnung in [`private/helpers/attendance.php`](../../../private/helpers/attendance.php),
+getrennt in holende und formende Funktionen. Wiederzuverwenden sind mindestens
+`attendanceDistinctAppointmentCount()` für die Terminzahl und `attendanceActiveMemberCount()`;
+`getMemberActivityWhereYear()` bleibt in `member_activity.php`. Eine zweite Soll-Mengen-Rechnung
+daneben würde über kurz oder lang andere Zahlen liefern als die Anwesenheitsquote auf demselben
+Bildschirm.
+
+**Entdopplung beachten.** Ein Mitglied kann denselben Termin über zwei Gruppen erreichen. Die
+Kopfzahlen zählen deshalb seit OI-48 mit `COUNT(DISTINCT a.appointment_id)`. Für jede Zählung „je
+Termin" in Abschnitt 5.1 und 5.2 gilt dieselbe Falle — der Nachweis dazu steht in
+`tests/suites/report_api.php` unter „ein Termin ueber zwei Gruppen zaehlt einmal"; er stellt den
+Fall her, weil er im Bestand nicht vorkommt.
+
 ### 5.1 Pünktlichkeit
 
 Grundmenge je Mitglied und Zeitraum:
@@ -358,8 +384,8 @@ Minuten zu spät" ist keine Aussage über eine leere Menge.
 ### 5.2 Zuverlässigkeit
 
 Soll-Menge je Mitglied: Termine im Zeitraum, deren Terminart eine Gruppe des Mitglieds trifft,
-eingeschränkt auf dessen aktive Zeiträume (`getMemberActivityWhereYear()`, wie die heutige
-Anwesenheitsquote).
+eingeschränkt auf dessen aktive Zeiträume — über `attendanceDistinctAppointmentCount()` und
+`getMemberActivityWhereYear()`, nicht als eigene Abfrage (siehe Kopf von Abschnitt 5).
 
 | Größe | Formel |
 |---|---|
@@ -446,6 +472,12 @@ die eine abgeschaltete Kennzahl wie eine leere aussehen lassen.
 Unterzeile. Im Statistikbericht zusätzliche Zeilen im ersten Abschnitt — additiv, ein älterer
 Ausdruck wird dadurch nicht falsch. In `my_data` die eigenen Werte.
 
+**Farbschwellen gehören zu [OI-55](../../OPEN-ITEMS.md#oi-55--farbschwellen-der-anwesenheitsquote-sind-fest-verdrahtet).**
+Bekommt die Pünktlichkeitsquote einen farbigen Balken, ist dessen Skala dieselbe Frage, die dort
+offen ist — und sie ist einmal zu entscheiden, nicht zweimal. Eine Pünktlichkeitsquote von 70 %
+bedeutet außerdem etwas anderes als eine Anwesenheitsquote von 70 %; die Schwellen der
+Anwesenheit unbesehen zu übernehmen wäre eine stille Aussage, die niemand getroffen hat.
+
 Formulierungen, wörtlich so:
 
 - „Pünktlich bei 12 von 15 gemessenen Ankünften (80 %)"
@@ -473,10 +505,14 @@ Kennzahl ignoriert den Datensatz.
 
 ## 10 Reihenfolge und Abhängigkeit
 
-**[OI-48](../../OPEN-ITEMS.md#oi-48--statistik-zählt-je-gruppe-nur-eine-terminart) gehört davor.** Solange die Statistik je Gruppe nur eine
-Terminart auswertet, erbt jede neue Kennzahl denselben Ausschnitt — die Zahl stünde dann unter
-einer Überschrift, die mehr verspricht, als sie zeigt. Diese Spec ist unabhängig davon umsetzbar,
-sollte aber **nicht vor OI-48 ausgeliefert** werden.
+**[OI-48](../../OPEN-ITEMS.md#oi-48--statistik-zählt-je-gruppe-nur-eine-terminart) ist erledigt**
+(Merge `6696c07` nach `dev` am 2026-09-11, 531/531 grün). Die Sperre, die hier ursprünglich stand,
+ist damit aufgehoben: Die Statistik wertet je Gruppe alle Terminarten aus und weist sie je Mitglied
+unter `by_type` einzeln aus. Eine Pünktlichkeitsquote erbt den willkürlichen Ausschnitt nicht mehr
+— zuvor las die Abfrage mit `fetch()` eine Zeile ohne `ORDER BY`, die Datenbank entschied also,
+welche Terminart zählte.
+
+Der Versionssprung ist weiterhin nicht gemacht; die Release-Frage aus 4.5 bleibt offen.
 
 Sinnvolle Teilung in zwei Schritte:
 
