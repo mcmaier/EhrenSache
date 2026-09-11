@@ -204,9 +204,24 @@ export async function renderStatistics(statsData) {
     let html = '';
 
     statsData.statistics.forEach(group => {
+        const typeCount = group.appointment_types.length;
+
         const typeHeaders = group.appointment_types
             .map(t => `<th>${escapeHtml(t.type_name || 'ohne Terminart')}</th>`)
             .join('');
+
+        // Gruppenzeile: Ohne sie stehen die Terminartspalten unbeschriftet
+        // neben "Quote" -- "Auftritt" allein sagt nicht, dass darunter
+        // ebenfalls eine Quote steht. Dieselbe Gliederung wie im Ausdruck.
+        // Eine Gruppe ohne Terminart erreicht diese Stelle nicht (der Handler
+        // ueberspringt sie), die Pruefung steht trotzdem da.
+        const groupRow = typeCount > 0
+            ? `<tr class="stat-colgroup">
+                   <th></th>
+                   <th colspan="5">Anwesenheit</th>
+                   <th colspan="${typeCount}">Quote je Terminart</th>
+               </tr>`
+            : '';
 
         html += `
             <div class="statistics-group">
@@ -214,6 +229,7 @@ export async function renderStatistics(statsData) {
                 <div class="statistics-table-wrapper">
                     <table class="data-table">
                         <thead>
+                            ${groupRow}
                             <tr>
                                 <th>Mitglied</th>
                                 <th>Termine</th>
@@ -232,7 +248,7 @@ export async function renderStatistics(statsData) {
                                     <td class="stat-present">${member.attended}</td>
                                     <td>${member.excused}</td>
                                     <td class="stat-unexcused">${member.unexcused_absences}</td>
-                                    <td>
+                                    <td class="stat-rate">
                                         <div class="attendance-rate">
                                             <div class="rate-bar">
                                                 <div class="rate-fill-gradient"></div>
@@ -242,8 +258,11 @@ export async function renderStatistics(statsData) {
                                         </div>
                                     </td>
                                     ${member.by_type.map(t => t.total_appointments > 0
-                                        ? `<td title="${t.attended} von ${t.total_appointments}">${t.attendance_rate}%</td>`
-                                        : `<td title="keine Termine dieser Art">–</td>`
+                                        ? `<td class="stat-type" title="${t.attended} von ${t.total_appointments}">
+                                               <span class="type-fill" style="width: ${t.attendance_rate}%"></span>
+                                               <span class="type-value">${t.attendance_rate}%</span>
+                                           </td>`
+                                        : `<td class="stat-type stat-type-empty" title="keine Termine dieser Art">–</td>`
                                     ).join('')}
                                 </tr>
                             `).join('')}

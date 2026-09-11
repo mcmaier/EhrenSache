@@ -75,3 +75,83 @@
     font-weight: 600;
     color: var(--text-dark);
 }
+
+/* ============================================
+   TABELLENKOPF UND SPALTENBREITEN
+   ============================================ */
+
+/* Die Kopfzeile bestimmt die Spaltenbreite, und sie ist genau dort am
+   laengsten, wo die Daten am kuerzesten sind: "Unentschuldigt" belegt rund
+   135 px, um eine zweistellige Zahl zu zeigen. tables.css verbietet global
+   den Umbruch -- hier ist er erwuenscht. Abgekuerzt wird bewusst nicht, die
+   Woerter bleiben lesbar und werden stattdessen zweizeilig. */
+.statistics-group thead th {
+    white-space: normal;
+    vertical-align: bottom;
+    line-height: 1.25;
+}
+
+.statistics-group td,
+.statistics-group th {
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+/* Zahlen rechtsbuendig mit gleichbreiten Ziffern: Linksbuendig lassen sich
+   Spalten nicht vergleichen, weil 46 und 5 an derselben Stelle beginnen und
+   verschieden enden. Die erste Spalte traegt den Namen. */
+.statistics-group th:not(:first-child),
+.statistics-group td:not(:first-child) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-colgroup th {
+    text-align: center;
+    font-size: 0.85em;
+    font-weight: 500;
+    color: var(--text-light);
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.stat-colgroup th:first-child {
+    border-bottom: none;
+}
+
+/* Der Balken hatte bisher nur, was nach dem Text uebrig blieb -- bemessen an
+   einer fuenf Buchstaben langen Kopfzeile waren das etwa 30 px. So schmal
+   ist er als Balken nicht mehr lesbar. */
+.stat-rate {
+    min-width: 130px;
+}
+
+.rate-bar {
+    min-width: 60px;
+}
+
+/* Terminartspalten: ein schwacher Anteilsbalken hinter der Zahl. Neutral
+   grau und nicht im Farbverlauf der Gesamtquote -- die Farbcodierung bleibt
+   der einen Zahl vorbehalten, die sie tragen soll. */
+.stat-type {
+    position: relative;
+}
+
+.type-fill {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 22px;
+    background: var(--bg-gray);
+    border-radius: var(--radius-sm);
+    z-index: 0;
+}
+
+.type-value {
+    position: relative;
+    z-index: 1;
+}
+
+.stat-type-empty {
+    color: var(--text-light);
+}
