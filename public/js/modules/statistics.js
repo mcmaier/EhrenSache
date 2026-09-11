@@ -232,10 +232,10 @@ export async function renderStatistics(statsData) {
                             ${groupRow}
                             <tr>
                                 <th>Mitglied</th>
-                                <th>Termine</th>
-                                <th>Anwesend</th>
-                                <th>Entschuldigt</th>
-                                <th>Unentschuldigt</th>
+                                <th class="stat-count">Termine</th>
+                                <th class="stat-count">Anwesend</th>
+                                <th class="stat-count">Ent&shy;schuldigt</th>
+                                <th class="stat-count">Unent&shy;schuldigt</th>
                                 <th>Quote</th>
                                 ${typeHeaders}
                             </tr>
@@ -244,10 +244,10 @@ export async function renderStatistics(statsData) {
                             ${group.members.map(member => `
                                 <tr>
                                     <td>${escapeHtml(member.member_name)}</td>
-                                    <td>${member.total_appointments}</td>
-                                    <td class="stat-present">${member.attended}</td>
-                                    <td>${member.excused}</td>
-                                    <td class="stat-unexcused">${member.unexcused_absences}</td>
+                                    <td class="stat-count">${member.total_appointments}</td>
+                                    <td class="stat-count stat-present">${member.attended}</td>
+                                    <td class="stat-count">${member.excused}</td>
+                                    <td class="stat-count stat-unexcused">${member.unexcused_absences}</td>
                                     <td class="stat-rate">
                                         <div class="attendance-rate">
                                             <div class="rate-bar">
@@ -259,8 +259,11 @@ export async function renderStatistics(statsData) {
                                     </td>
                                     ${member.by_type.map(t => t.total_appointments > 0
                                         ? `<td class="stat-type" title="${t.attended} von ${t.total_appointments}">
-                                               <span class="type-fill" style="width: ${t.attendance_rate}%"></span>
                                                <span class="type-value">${t.attendance_rate}%</span>
+                                               <span class="type-track">
+                                                   <span class="type-grad"></span>
+                                                   <span class="type-mask" style="width: ${100 - t.attendance_rate}%"></span>
+                                               </span>
                                            </td>`
                                         : `<td class="stat-type stat-type-empty" title="keine Termine dieser Art">–</td>`
                                     ).join('')}
@@ -343,4 +346,4 @@ export async function initStatisticsEventHandlers() {
 }
 
 window.updateStatisticsFilters = updateStatisticsFilters;
-window.applyStatisticsFilters = applyStatisticsFilters;
+window.applyStatisticsFilters = applyStatisticsFilters;

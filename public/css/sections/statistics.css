@@ -133,35 +133,80 @@
     min-width: 60px;
 }
 
-/* Terminartspalten: ein schwacher Anteilsbalken hinter der Zahl. Neutral
-   grau und nicht im Farbverlauf der Gesamtquote -- die Farbcodierung bleibt
-   der einen Zahl vorbehalten, die sie tragen soll.
+/* Zaehlspalten auf Inhaltsbreite. Ohne width:1% verteilt der Browser den
+   Ueberschuss einer Tabelle mit width:100% gleichmaessig auf alle Spalten --
+   vier Spalten mit je zwei Ziffern standen dadurch weit auseinander. Der
+   freiwerdende Platz geht an die Namensspalte, wo er gebraucht wird.
 
-   Die Breite ist prozentual zur Spalte. Vergleichbar sind die Balken deshalb
-   innerhalb einer Spalte (Mitglied gegen Mitglied bei derselben Terminart),
-   nicht ueber Spalten hinweg -- die Spaltenbreite haengt an der Laenge des
-   Terminartnamens. Die vertikale Lesart ist die gemeinte; der genaue Wert
-   steht ohnehin daneben. */
-.stat-type {
-    position: relative;
+   Die weichen Trennstellen in den Kopfzeilen ("Unent&shy;schuldigt") gehoeren
+   dazu: Ohne sie ist das Wort eine einzige unteilbare Einheit und bestimmt
+   die Spaltenbreite trotz width:1%. */
+.statistics-group .stat-count {
+    width: 1%;
 }
 
-.type-fill {
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    height: 22px;
-    background: var(--bg-gray);
-    border-radius: var(--radius-sm);
-    z-index: 0;
+/* Der Name bleibt einzeilig. Bei schmalem Fenster gehen alle Spalten auf
+   Mindestbreite, und "Kaiser, Georg" zerfiel dann in zwei Zeilen -- die
+   Tabelle scrollt in ihrem Kasten ohnehin, ein Umbruch im Namen bringt
+   nichts ein. */
+.statistics-group tbody td:first-child {
+    white-space: nowrap;
+}
+
+/* Terminartspalten: ein schmaler Balken unter dem Wert, in derselben
+   Farbskala wie die Gesamtquote. Zuerst war er neutral grau, um die
+   Farbcodierung der Gesamtquote vorzubehalten -- das war falsch herum
+   gedacht: In derselben Zeile stand dieselbe Groesse einmal farbig und
+   dreimal grau, und die grauen Flaechen lasen sich wie leere Eingabefelder.
+   Gleiche Groesse, gleiche Codierung.
+
+   Der Balken liegt unter dem Wert und nicht hinter ihm, weil dunkler Text
+   auf gesaettigtem Gruen oder Rot zu wenig Kontrast hat -- die Lesbarkeit
+   haenge sonst vom angezeigten Wert ab.
+
+   Vergleichbar sind die Balken innerhalb einer Spalte (Mitglied gegen
+   Mitglied bei derselben Terminart); die Spaltenbreiten unterscheiden sich,
+   der genaue Wert steht ohnehin darueber. */
+.stat-type {
+    position: relative;
+    padding-bottom: calc(var(--spacing-md) + 8px);
 }
 
 .type-value {
-    position: relative;
-    z-index: 1;
+    display: block;
+}
+
+/* left/right statt width in Prozent: Die absolute Positionierung bezieht
+   sich auf die Polsterbox der Zelle. Ein Balken mit width:100% lief deshalb
+   bis unter das Polster und stiess an den Balken der Nachbarspalte. */
+.type-track {
+    position: absolute;
+    left: var(--spacing-md);
+    right: var(--spacing-md);
+    bottom: var(--spacing-sm);
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--border-light);
+}
+
+.type-grad {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(90deg, var(--danger-color) 0%, var(--warning-color) 50%, var(--success-color) 100%);
+}
+
+.type-mask {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--border-light);
 }
 
 .stat-type-empty {
     color: var(--text-light);
-}
+}
