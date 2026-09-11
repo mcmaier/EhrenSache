@@ -81,22 +81,18 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
                                ?int $appointmentTypeId, string $role, ?int $authMemberId): array
 {
     require_once __DIR__ . '/../helpers/member_activity.php';
+    require_once __DIR__ . '/../helpers/attendance.php';
 
     if ($groupId !== null) {
         // Wiederholt bewusst die Pruefung, die handleStatistics() vor dem Aufruf
         // bereits macht: Diese Funktion muss auch ohne vorgelagertes Gate
-        // aufrufbar sein -- der Anwesenheitsbericht ruft sie so. Das kostet fuer
-        // Nicht-Manager mit Gruppenfilter eine zusaetzliche, indizierte
-        // COUNT-Abfrage. Wer hier "bereinigt", macht den Bericht angreifbar.
+        // aufrufbar sein -- der Anwesenheitsbericht ruft sie so.
         if (!hasStatisticsGroupAccess($db, $database, $authMemberId, $role, $groupId)) {
             return [
                 'warning'    => 'group not accessible',
                 'year'       => $year,
                 'worktime'   => null,
-                'summary'    => [
-                    'total_appointments' => 0, 'total_members' => 0, 'total_present' => 0,
-                    'total_excused' => 0, 'total_unexcused' => 0, 'overall_average' => 0,
-                ],
+                'summary'    => attendanceBuildSummary([], 0, 0),
                 'statistics' => [],
             ];
         }
@@ -105,57 +101,46 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
         $groups = getStatisticsGroups($db, $database, $authMemberId, $role);
     }
 
+    $groups = array_map('intval', $groups);
+
     $statistics = [];
-    $totalAppointments = 0;
-    $totalPresent = 0;
-    $totalExcused = 0;
-    $totalUnexcused = 0;
-    $totalPossible = 0;
-    $countedAppointmentTypes = [];
 
     foreach ($groups as $gid) {
-        $stats = calculateGroupStatistics($db, $database, $gid, $year, $memberId, $role, $appointmentTypeId);
-        if ($stats) {
-            $statistics[] = $stats;
+        $types = attendanceGroupTypes($db, $database, $gid);
 
-            $groupAppointments = 0;
-            if (count($stats['members']) > 0) {
-                $groupAppointments = $stats['members'][0]['total_appointments'];
-            }
-
-            // Termine nur einmal je Terminart zaehlen: Mehrere Gruppen koennen
-            // an derselben Terminart haengen.
-            if (!isset($countedAppointmentTypes[$stats['appointment_type_id']])) {
-                $totalAppointments += $groupAppointments;
-                $countedAppointmentTypes[$stats['appointment_type_id']] = true;
-            }
-
-            $groupMembers = count($stats['members']);
-            $totalPossible += ($groupAppointments * $groupMembers);
-
-            foreach ($stats['members'] as $member) {
-                $totalPresent += $member['attended'];
-                $totalUnexcused += $member['unexcused_absences'];
-                $totalExcused += $member['excused'];
-            }
+        // Gruppe ohne Terminart hat keine Anwesenheit, ueber die sich reden
+        // liesse -- sie entfaellt, wie bisher.
+        if ($types === []) {
+            continue;
         }
+
+        $rows = attendanceFetchGroupRows($db, $database, $gid, $year,
+                                         $memberId, $appointmentTypeId);
+
+        // Mitglied nicht in dieser Gruppe -> Gruppe ueberspringen (wie bisher).
+        if ($memberId !== null && $rows === []) {
+            continue;
+        }
+
+        $groupName = attendanceGroupName($db, $database, $gid);
+        if ($groupName === null) {
+            continue;
+        }
+
+        $statistics[] = attendanceBuildGroup($gid, $groupName, $types, $rows);
     }
 
-    $totalMembers = getActiveMemberCount($db, $database, $groups, $year, $memberId);
-    $overallAverage = $totalPossible > 0 ? round(($totalPresent / $totalPossible) * 100, 1) : 0;
+    $memberTotals = attendanceFetchMemberTotals($db, $database, $groups, $year,
+                                                $memberId, $appointmentTypeId);
+    $appointments = attendanceDistinctAppointmentCount($db, $database, $groups, $year,
+                                                       $appointmentTypeId);
+    $memberCount  = attendanceActiveMemberCount($db, $database, $groups, $year, $memberId);
 
     return [
         'warning'    => null,
         'year'       => $year,
         'worktime'   => null,
-        'summary'    => [
-            'total_appointments' => $totalAppointments,
-            'total_members'      => $totalMembers,
-            'total_present'      => $totalPresent,
-            'total_excused'      => $totalExcused,
-            'total_unexcused'    => $totalUnexcused,
-            'overall_average'    => $overallAverage,
-        ],
+        'summary'    => attendanceBuildSummary($memberTotals, $appointments, $memberCount),
         'statistics' => $statistics,
     ];
 }
@@ -222,34 +207,6 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
     echo json_encode($result);
 }
 
-function getActiveMemberCount($db, $database, $groupIds, $year, $specificMemberId = null) {
-    // Wenn ein spezifisches Mitglied angegeben ist
-    if ($specificMemberId !== null) {
-        return 1;
-    }
-    
-    $prefix = $database->table('');
-
-    // Wenn Gruppen angegeben sind
-    if (!empty($groupIds)) {
-        $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
-        $stmt = $db->prepare("
-            SELECT COUNT(DISTINCT mga.member_id)
-            FROM {$prefix}member_group_assignments mga
-            JOIN {$prefix}members m ON mga.member_id = m.member_id
-            WHERE mga.group_id IN ($placeholders)
-            AND " . getMemberActivityWhereYear($year, 'm') . "
-        ");
-        $stmt->execute($groupIds);
-        return $stmt->fetchColumn();
-    }
-    
-    // Alle aktiven Mitglieder
-    $activityWhere = getMemberActivityWhereYear($year, 'm');
-    $stmt = $db->query("SELECT COUNT(*) FROM {$prefix}members m WHERE {$activityWhere}");
-    return $stmt->fetchColumn();
-}
-
 function getStatisticsGroups($db, $database, $memberId, $role) {
 
     $prefix = $database->table('');
@@ -284,115 +241,5 @@ function hasStatisticsGroupAccess($db, $database, $memberId, $role, $groupId) {
     $stmt->execute([$memberId, $groupId]);
     return $stmt->fetchColumn() > 0;
 }
-
-function calculateGroupStatistics($db, $database, $groupId, $year, $memberId, $role, $appointmentTypeId = null) {
-    $prefix = $database->table('');
-
-    // 1 Query: Gruppeninfo (typeId + group_name)
-    // LEFT JOIN, nicht INNER: Der Join dient allein der Beschriftung. Ein
-    // INNER JOIN koennte bei einer verwaisten type_id die Zeile schlucken und
-    // damit aendern, welche Terminart diese Funktion auswertet -- siehe OI-48.
-    $stmt = $db->prepare("
-        SELECT atg.type_id, mg.group_name, at.type_name
-        FROM {$prefix}appointment_type_groups atg
-        JOIN {$prefix}member_groups mg ON atg.group_id = mg.group_id
-        LEFT JOIN {$prefix}appointment_types at ON at.type_id = atg.type_id
-        WHERE atg.group_id = ?
-    ");
-    $stmt->execute([$groupId]);
-    $group = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$group) {
-        return null;
-    }
-
-    $typeId = $group['type_id'];
-
-    if ($appointmentTypeId !== null && (int)$typeId !== $appointmentTypeId) {
-        return null;
-    }
-
-    // 1 Query: Alle Mitglieds-Statistiken datenbanksei­tig aggregieren.
-    // Die DB berechnet für jedes Mitglied die Gesamtzahl der Termine,
-    // Anwesenheiten (status = 'present') und unentschuldigten Fehlzeiten
-    // (kein Record-Eintrag) in einem einzigen LEFT-JOIN-Durchlauf.
-    $activityWhere = getMemberActivityWhereYear($year, 'm');
-
-    $sql = "
-        SELECT
-            m.member_id,
-            m.name,
-            m.surname,
-            COUNT(a.appointment_id)                                       AS total_appointments,
-            SUM(CASE WHEN r.appointment_id IS NULL THEN 1 ELSE 0 END)     AS unexcused_absences,
-            SUM(CASE WHEN r.status = 'present'     THEN 1 ELSE 0 END)     AS attended
-        FROM {$prefix}appointments a
-        JOIN {$prefix}member_group_assignments mga ON mga.group_id = ?
-        JOIN {$prefix}members m
-            ON m.member_id = mga.member_id
-            AND {$activityWhere}
-        LEFT JOIN {$prefix}records r
-            ON r.appointment_id = a.appointment_id
-            AND r.member_id = m.member_id
-        WHERE a.type_id = ?
-          AND YEAR(a.date) = ?
-          AND a.date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)
-    ";
-
-    $params = [$groupId, $typeId, $year];
-
-    if ($memberId !== null) {
-        $sql .= " AND m.member_id = ?";
-        $params[] = $memberId;
-    }
-
-    $sql .= " GROUP BY m.member_id, m.name, m.surname ORDER BY m.surname, m.name";
-
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Mitglied nicht in dieser Gruppe → Gruppe überspringen
-    if ($memberId !== null && empty($rows)) {
-        return null;
-    }
-
-    $memberStats = [];
-    foreach ($rows as $row) {
-        $total     = (int)$row['total_appointments'];
-        $attended  = (int)$row['attended'];
-        $unexcused = (int)$row['unexcused_absences'];
-
-        // 'excused' ergibt sich aus den drei Zahlen, die diese Aggregation
-        // ohnehin liefert. Es steht hier und nur hier: Die Gesamtsumme und der
-        // Anwesenheitsbericht lesen es, statt es jeweils neu zu rechnen.
-        //
-        // max(0, ...) ist aktuell rechnerisch ueberfluessig -- total, attended
-        // und unexcused stammen aus derselben GROUP BY-Aggregation ueber
-        // dieselben Zeilen, attended und unexcused sind disjunkte Teilmengen
-        // von total. Die Klammer steht als Absicherung fuer den Tag, an dem
-        // jemand die drei Zahlen aus getrennten Abfragen zusammensetzt.
-        $excused = max(0, $total - $attended - $unexcused);
-
-        $memberStats[] = [
-            'member_id'          => (int)$row['member_id'],
-            'member_name'        => $row['surname'] . ', ' . $row['name'],
-            'total_appointments' => $total,
-            'attended'           => $attended,
-            'unexcused_absences' => $unexcused,
-            'excused'            => $excused,
-            'attendance_rate'    => $total > 0 ? round(($attended / $total) * 100, 1) : 0,
-        ];
-    }
-
-    return [
-        'group_id'              => $groupId,
-        'group_name'            => $group['group_name'],
-        'appointment_type_id'   => $typeId,
-        'appointment_type_name' => $group['type_name'],
-        'members'               => $memberStats,
-    ];
-}
-
 
 ?>

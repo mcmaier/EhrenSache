@@ -168,6 +168,7 @@ function statisticsReportAppointments($db, $database, int $memberId, int $year, 
     }
 
     require_once __DIR__ . '/../helpers/member_activity.php';
+    require_once __DIR__ . '/../helpers/attendance.php';
 
     $prefix        = $database->table('');
     $activityWhere = getMemberActivityWhereYear($year, 'm');
@@ -198,7 +199,7 @@ function statisticsReportAppointments($db, $database, int $memberId, int $year, 
             AND r.member_id     = m.member_id
         WHERE a.type_id IN ({$placeholders})
           AND YEAR(a.date) = ?
-          AND a.date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)
+          AND a.date <= " . ATTENDANCE_STARTED_CUTOFF_SQL . "
         ORDER BY a.date, a.start_time
     ";
 

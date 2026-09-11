@@ -26,6 +26,18 @@ declare(strict_types=1);
 // Datenbestand vorkommen.
 // ============================================
 
+/**
+ * Karenz, mit der ein Termin noch als "bereits begonnen" zaehlt.
+ *
+ * Stand bis 1.5.0 an fuenf Stellen hart codiert. Der Wert hat ueberall
+ * dieselbe Bedeutung, unabhaengig von der Abfrage, in der er steht -- anders
+ * als die Datums- und Jahresbedingungen daneben, die zum jeweiligen
+ * Abfragekontext gehoeren und bewusst ausgeschrieben bleiben.
+ *
+ * Kein Nutzerwert -- die Verkettung im SQL ist deshalb unbedenklich.
+ */
+const ATTENDANCE_STARTED_CUTOFF_SQL = 'DATE_ADD(CURDATE(), INTERVAL 2 HOUR)';
+
 /** Quote in Prozent, eine Nachkommastelle, ohne Division durch null. */
 function attendanceRate(int $attended, int $total): float
 {
@@ -272,7 +284,7 @@ function attendanceFetchGroupRows($db, $database, int $groupId, int $year,
         LEFT JOIN {$prefix}records r
              ON r.appointment_id = a.appointment_id AND r.member_id = m.member_id
         WHERE YEAR(a.date) = ?
-          AND a.date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)
+          AND a.date <= " . ATTENDANCE_STARTED_CUTOFF_SQL . "
     ";
 
     $params = [$groupId, $year];
@@ -331,7 +343,7 @@ function attendanceFetchMemberTotals($db, $database, array $groupIds, int $year,
         LEFT JOIN {$prefix}records r
              ON r.appointment_id = a.appointment_id AND r.member_id = m.member_id
         WHERE YEAR(a.date) = ?
-          AND a.date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)
+          AND a.date <= " . ATTENDANCE_STARTED_CUTOFF_SQL . "
     ";
 
     $params = $groupIds;
@@ -371,7 +383,7 @@ function attendanceDistinctAppointmentCount($db, $database, array $groupIds, int
         JOIN {$prefix}appointment_type_groups atg
              ON atg.type_id = a.type_id AND atg.group_id IN ({$placeholders})
         WHERE YEAR(a.date) = ?
-          AND a.date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)
+          AND a.date <= " . ATTENDANCE_STARTED_CUTOFF_SQL . "
     ";
 
     $params = $groupIds;
