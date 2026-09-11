@@ -13,7 +13,7 @@
 // REGENERATE TOKEN Controller
 // ============================================
 
-function handleTokenRegeneration($db, $database, $request_method, $authUserId, $authUserRole)
+function handleTokenRegeneration($db, $database, $request_method, $authUserId)
 {
     if($request_method !== 'POST') {
         http_response_code(405);

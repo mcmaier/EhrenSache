@@ -12,7 +12,7 @@
 // ============================================
 // WORK_SESSIONS Controller
 // ============================================
-function handleWorkSessions($db, $database, $method, $id, $authUserId, $authUserRole, $authMemberId, $isTokenAuth) {
+function handleWorkSessions($db, $database, $method, $id, $authUserId, $authMemberId, $isTokenAuth) {
 
     requireWorktimeEnabled($db, $database);
 
@@ -26,7 +26,7 @@ function handleWorkSessions($db, $database, $method, $id, $authUserId, $authUser
 
     switch($method) {
         case 'GET':
-            workSessionsGet($db, $database, $id, $authUserRole, $authMemberId);
+            workSessionsGet($db, $database, $id, $authMemberId);
             break;
 
         case 'POST':
@@ -94,7 +94,7 @@ function workSessionsSelect($prefix) {
             LEFT JOIN {$prefix}appointments a    ON ws.appointment_id = a.appointment_id";
 }
 
-function workSessionsGet($db, $database, $id, $authUserRole, $authMemberId) {
+function workSessionsGet($db, $database, $id, $authMemberId) {
     $prefix = $database->table('');
 
     // Einzelsatz

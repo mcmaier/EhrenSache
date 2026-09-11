@@ -13,7 +13,7 @@
 // IMPORT Handler
 // ============================================
 
-function handleImport($db, $database, $request_method, $authUserRole) {
+function handleImport($db, $database, $request_method) {
     if ($request_method !== 'POST') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
@@ -918,7 +918,7 @@ function saveImportLog($db, $database, $data) {
 }
 
 
-function handleImportLogs($db, $database, $method, $authUserRole, $id) {
+function handleImportLogs($db, $database, $method, $id) {
     
     $prefix = $database->table('');
 

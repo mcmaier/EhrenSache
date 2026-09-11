@@ -537,7 +537,7 @@ try {
         handleAvailableYears($db, $database, $request_method, $id);
         break;
     case 'members':
-        handleMembers($db, $database, $request_method, $id, $authUserId, $authUserRole, $authMemberId);
+        handleMembers($db, $database, $request_method, $id, $authUserId, $authMemberId);
         break;
     case 'appointments':
         handleAppointments($db, $database, $request_method, $id);
@@ -565,7 +565,7 @@ try {
         break;
     case 'work_sessions':
         handleWorkSessions($db, $database, $request_method, $id,
-                           $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
+                           $authUserId, $authMemberId, $isTokenAuth);
         break;        
     case 'statistics':
         handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId);
@@ -580,7 +580,7 @@ try {
         handleTotpCheckin($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth);
         break;        
     case 'regenerate_token':
-        handleTokenRegeneration($db, $database, $request_method, $authUserId, $authUserRole);
+        handleTokenRegeneration($db, $database, $request_method, $authUserId);
         break;                
     case 'change_password':
         handlePasswordChange($db, $database, $request_method, $authUserId);
@@ -592,28 +592,28 @@ try {
         handleExport($db, $database, $request_method, $authMemberId);
         break;
     case 'import':
-        handleImport($db, $database, $request_method, $authUserRole);
+        handleImport($db, $database, $request_method);
         break;
     case 'settings':
-        handleSettings($db, $database, $request_method,$authUserId, $authUserRole);
+        handleSettings($db, $database, $request_method,$authUserId);
         break;
     case 'upload-logo':
-        uploadLogo($db, $database, $request_method,$authUserId,$authUserRole);
+        uploadLogo($db, $database, $request_method,$authUserId);
         break;
     case 'attendance_list':
         handleAttendanceList($db, $database, $request_method, $id);
         break;
     case 'activate_user':
-        handleUserActivation($db, $database, $request_method, $authUserRole);
+        handleUserActivation($db, $database, $request_method);
         break;    
     case 'user_status':
-        handleUserStatus($db, $database, $request_method, $authUserRole);
+        handleUserStatus($db, $database, $request_method);
         break;    
     case 'import_logs':
-        handleImportLogs($db, $database, $request_method, $authUserRole, $id);
+        handleImportLogs($db, $database, $request_method, $id);
         break;
     case 'cleanup':
-        handleCleanup($db, $database, $request_method, $authUserRole);
+        handleCleanup($db, $database, $request_method);
         break;
     case 'my_data':
         handleMyData($db, $database, $request_method, $authUserId);

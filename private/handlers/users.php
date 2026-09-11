@@ -865,7 +865,7 @@ function createDevice($db, $database, $authUserId) {
     }
 }
 
-function handleUserActivation($db, $database, $method, $authUserRole) {
+function handleUserActivation($db, $database, $method) {
     // Nur Admins
     requireAdmin();
     
@@ -972,7 +972,7 @@ function handleUserActivation($db, $database, $method, $authUserRole) {
     }
 }
 
-function handleUserStatus($db, $database, $method, $authUserRole) {
+function handleUserStatus($db, $database, $method) {
     // Nur Admins
     requireAdmin();
     

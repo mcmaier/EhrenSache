@@ -12,7 +12,7 @@
 // MEMBERS Controller
 // ============================================
 
-function handleMembers($db, $database, $method, $id, $authUserId, $authUserRole, $authMemberId) {
+function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId) {
     
     require_once __DIR__ . '/../helpers/member_activity.php';
 

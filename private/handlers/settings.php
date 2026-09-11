@@ -12,7 +12,7 @@
 // ============================================
 // SETTINGS Controller
 // ============================================
-function handleSettings($db, $database, $method, $authUserId, $authUserRole) {
+function handleSettings($db, $database, $method, $authUserId) {
 
     $prefix = $database->table('');
 
@@ -345,7 +345,7 @@ function getAppearance($db, $database)
 }
 
 
-function uploadLogo($db, $database, $method, $authUserId, $authUserRole)
+function uploadLogo($db, $database, $method, $authUserId)
 {
     $prefix = $database->table('');
 
@@ -456,7 +456,7 @@ function uploadLogo($db, $database, $method, $authUserId, $authUserRole)
 // CLEANUP - DSGVO-konforme Datenlöschung
 // ============================================
 
-function handleCleanup($db, $database, $request_method, $authUserRole)
+function handleCleanup($db, $database, $request_method)
 {
     if($request_method !== 'POST') {
         http_response_code(405);
