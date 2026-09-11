@@ -14,6 +14,7 @@ import { loadGroups } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, currentYear} from './ui.js';
 import {debug} from '../app.js'
+import { escapeHtml } from './utils.js';
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -185,42 +186,51 @@ export async function showStatisticsSection()
 }
 
 export async function renderStatistics(statsData) {
-    const container = document.getElementById('statisticsContainer');    
+    const container = document.getElementById('statisticsContainer');
 
     debug.log("Rendering stats:", statsData)
 
-    if (!statsData || !statsData.statistics === 0) {        
-        // Stats auf 0 setzen
+    // Die Pruefung hiess frueher `!statsData.statistics === 0` und war dadurch
+    // immer falsch: `!x === 0` vergleicht einen Boolean mit einer Zahl und ist
+    // nie wahr. Der Leerfall fiel durch und lief in einen Fehler beim forEach.
+    if (!statsData || !Array.isArray(statsData.statistics) || statsData.statistics.length === 0) {
         container.innerHTML = '<p class="info-message">Keine Daten für die ausgewählten Filter vorhanden.</p>';
-        updateOverallStats(null);
+        updateOverallStats(statsData ? statsData.summary : null);
         return;
     }
 
     updateOverallStats(statsData.summary);
-    
+
     let html = '';
-    
+
     statsData.statistics.forEach(group => {
+        const typeHeaders = group.appointment_types
+            .map(t => `<th>${escapeHtml(t.type_name || 'ohne Terminart')}</th>`)
+            .join('');
+
         html += `
             <div class="statistics-group">
-                <h2>${group.group_name}</h2>
+                <h2>${escapeHtml(group.group_name)}</h2>
                 <div class="statistics-table-wrapper">
                     <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Mitglied</th>
-                                <th>Termine gesamt</th>
+                                <th>Termine</th>
                                 <th>Anwesend</th>
+                                <th>Entschuldigt</th>
                                 <th>Unentschuldigt</th>
-                                <th>Anwesenheitsquote</th>
+                                <th>Quote</th>
+                                ${typeHeaders}
                             </tr>
                         </thead>
                         <tbody>
                             ${group.members.map(member => `
                                 <tr>
-                                    <td>${member.member_name}</td>
+                                    <td>${escapeHtml(member.member_name)}</td>
                                     <td>${member.total_appointments}</td>
                                     <td class="stat-present">${member.attended}</td>
+                                    <td>${member.excused}</td>
                                     <td class="stat-unexcused">${member.unexcused_absences}</td>
                                     <td>
                                         <div class="attendance-rate">
@@ -231,6 +241,10 @@ export async function renderStatistics(statsData) {
                                             <span class="rate-text">${member.attendance_rate}%</span>
                                         </div>
                                     </td>
+                                    ${member.by_type.map(t => t.total_appointments > 0
+                                        ? `<td title="${t.attended} von ${t.total_appointments}">${t.attendance_rate}%</td>`
+                                        : `<td title="keine Termine dieser Art">–</td>`
+                                    ).join('')}
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -239,7 +253,7 @@ export async function renderStatistics(statsData) {
             </div>
         `;
     });
-    
+
     container.innerHTML = html;
 }
 
