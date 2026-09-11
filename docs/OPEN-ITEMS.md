@@ -1753,6 +1753,17 @@ zurückgehalten. Kein Zugang, keine Rechteausweitung.
 ### OI-51 · Pünktlichkeit wird beworben, aber nirgends ausgewertet
 **Priorität:** hoch — eine Zusage, die das Projekt an vier Stellen macht und an keiner einlöst
 
+**Entwurf liegt vor (2026-09-11):**
+`docs/superpowers/specs/2026-09-11-puenktlichkeit-und-zuverlaessigkeit-design.md`. Er entscheidet
+die unten offenen Punkte und **revidiert zwei der Vorentscheidungen** — statt des Medians eine
+Quote als Leitzahl (Abschnitt 3.1), und statt der Spalte `arrival_measured` eine Ankunftszeit, die
+`NULL` sein darf (Abschnitt 4.1). Die Spec ist maßgeblich; die Punkte unten bleiben stehen, damit
+die Revision nachvollziehbar ist.
+
+Die Umsetzung ist in zwei Schritte geteilt: das Datenmodell zuerst (für sich wertvoll, behebt
+einen Fehler in `handleApprovedTimeCorrection()`), die Kennzahlen danach — **und die erst nach
+[OI-48](#oi-48)**.
+
 `README.md` schreibt „Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen".
 `CLAUDE.md` beschreibt das Projekt als „Statistische Auswertung von Anwesenheit **und
 Pünktlichkeit**". `API.md` führte bis 2026-09-10 die Antwortfelder `late_count` und
@@ -1782,7 +1793,8 @@ wäre Fiktion.
 | `timer` | historisch `NOW()`; erzeugt seit 1.2.3 keine Einträge mehr | nein — misst Arbeitsbeginn, nicht Ankunft |
 
 **Vorentscheidungen, beim Entwurf der Berichte am 2026-09-10 getroffen** (ausführlich in
-`docs/superpowers/specs/2026-09-10-berichte-statistik-und-nutzerrolle-design.md`, Abschnitt 11):
+`docs/superpowers/specs/2026-09-10-berichte-statistik-und-nutzerrolle-design.md`, Abschnitt 11) —
+Punkt 1 und der Median in Punkt 2 sind durch den Entwurf vom 2026-09-11 überholt, siehe oben:
 
 1. **Herkunft dauerhaft speichern**, nicht heuristisch ableiten: eine Spalte `arrival_measured`
    in `records`, von jedem Schreibpfad gesetzt, per Migration rückwirkend befüllt. Der
