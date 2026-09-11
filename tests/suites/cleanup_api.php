@@ -186,3 +186,53 @@ test('cleanup: aufraeumen der Testtaetigkeitsart', function () {
     ]);
     assertStatus(200, $res);
 });
+
+/*
+ * Die Loeschfrist laeuft seit 1.5.0 ueber appointments.date statt ueber
+ * records.arrival_time. Der Grund steht im Test: Eine fehlende Ankunftszeit
+ * ist NULL, und NULL < '1926-...' ist niemals wahr -- solche Records fielen
+ * dauerhaft aus jeder Frist und blieben unbegrenzt liegen.
+ *
+ * Der Testtermin liegt 1900, also weit vor dem Stichtag aus CL_SAFE_YEARS
+ * (heute minus 100 Jahre) und weit hinter allem, was sonst im Bestand steht.
+ */
+test('cleanup: die Loeschfrist erfasst auch Records ohne Ankunftszeit', function () {
+    $token = apiToken('admin');
+
+    $apt = apiRequest('POST', 'appointments', [
+        'token' => $token,
+        'body'  => ['title' => 'Loeschfrist-Test', 'date' => '1900-01-01',
+                    'start_time' => '20:00:00'],
+    ]);
+    assertStatus(201, $apt);
+    $aptId = (int) $apt['body']['id'];
+
+    try {
+        $members = apiRequest('GET', 'members', ['token' => $token]);
+        assertStatus(200, $members);
+        $memberId = (int) $members['body'][0]['member_id'];
+
+        // Ohne Uhrzeit -- der Fall, um den es geht.
+        $rec = apiRequest('POST', 'records', [
+            'token' => $token,
+            'body'  => ['member_id' => $memberId, 'appointment_id' => $aptId],
+        ]);
+        assertStatus(201, $rec);
+        assertSame(null, $rec['body']['arrival_time']);
+
+        $vorher = apiRequest('GET', 'records', [
+            'token' => $token, 'query' => ['appointment_id' => $aptId],
+        ]);
+        assertSame(1, count($vorher['body']), 'Der Testrecord fehlt vor der Bereinigung');
+
+        assertStatus(200, clCleanup());
+
+        $nachher = apiRequest('GET', 'records', [
+            'token' => $token, 'query' => ['appointment_id' => $aptId],
+        ]);
+        assertSame(0, count($nachher['body']),
+            'Ein Record ohne Ankunftszeit faellt sonst dauerhaft aus der Loeschfrist');
+    } finally {
+        apiRequest('DELETE', 'appointments', ['token' => $token, 'query' => ['id' => $aptId]]);
+    }
+});

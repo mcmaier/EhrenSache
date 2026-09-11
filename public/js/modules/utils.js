@@ -42,11 +42,28 @@ export function translateExceptionType(type) {
 }
 
 
+/**
+ * Leeres Eingabefeld → null, nicht ':00'.
+ *
+ * Ohne die Prüfung lieferte ein leeres datetime-local den String ':00' — ein
+ * Wert, den niemand eingegeben hat und der auf dem Server als ungültiges Datum
+ * ankommt. Seit 1.5.0 darf eine Ankunftszeit fehlen; sie muss dann auch als
+ * fehlend übertragen werden.
+ */
 export function datetimeLocalToMysql(datetimeLocalValue) {
+    if (!datetimeLocalValue) return null;
     return datetimeLocalValue.replace('T', ' ') + ':00';
 }
 
+/**
+ * Fehlender Zeitstempel → leeres Feld.
+ *
+ * `null.slice()` wirft. Betroffen sind Anwesenheitseinträge ohne Ankunftszeit
+ * und Anträge ohne Wunschzeit — beim Öffnen des Dialogs brach sonst das Skript
+ * ab, und der Dialog blieb unbefüllt stehen.
+ */
 export function mysqlToDatetimeLocal(mysqlDateTime) {
+    if (!mysqlDateTime) return '';
     return mysqlDateTime.slice(0, 16).replace(' ', 'T');
 }
 

@@ -43,6 +43,17 @@ function enableWorktime(): void
 function trackCreated(string $kind, int $id): int
 {
     static $created = ['activity' => [], 'appointment_type' => [], 'group' => []];
+
+    // Ein unbekannter Schluessel ist ein Tippfehler, kein neues Fach: PHP legt
+    // ihn stillschweigend an, der Abschlusstest liest ihn nie aus, und die
+    // angelegten Daten bleiben nach jedem Lauf liegen. Genau so haben sich
+    // Taetigkeitsarten aus 'activity_type' statt 'activity' angesammelt.
+    assertTrue(
+        array_key_exists($kind, $created),
+        "trackCreated(): unbekannte Art '{$kind}' — erlaubt sind "
+        . implode(', ', array_keys($created))
+    );
+
     if ($id > 0) {
         $created[$kind][] = $id;
     }
@@ -652,8 +663,23 @@ test('work_sessions: Start mit Termin laesst einen bestehenden Check-in unberueh
     $activityId    = createActivityType('Kein-Ueberschreiben ' . uniqid());
     $appointmentId = createTodayAppointment('Frueher Check-in ' . uniqid());
 
-    // Check-in eine Stunde vor dem Timer-Start, ueber den bestehenden Weg
-    $early = date('Y-m-d H:i:s', strtotime('-1 hour'));
+    // Check-in kurz vor Terminbeginn, ueber den bestehenden Weg.
+    //
+    // Die Zeit haengt am Termin und nicht am Zeitpunkt des Testlaufs: Seit
+    // 1.5.0 prueft records.php, ob eine Ankunftszeit im Toleranzband um den
+    // Termin liegt. Die Testtermine liegen gestreut ueber den Tag (01:00,
+    // 04:00, ...), damit sich ihre Fenster nicht ueberlappen -- "vor jetzt"
+    // traf dieses Fenster nur zufaellig.
+    $apt = apiRequest('GET', 'appointments', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $appointmentId],
+    ]);
+    assertStatus(200, $apt, 'Testtermin nicht lesbar');
+
+    $early = date(
+        'Y-m-d H:i:s',
+        strtotime($apt['body']['date'] . ' ' . $apt['body']['start_time'] . ' -5 minutes')
+    );
     assertStatus(201, apiRequest('POST', 'records', [
         'token' => apiToken('admin'),
         'body'  => [
@@ -1569,52 +1595,10 @@ test('activity_types: POST mit Terminarten legt die Verknuepfung an', function (
         ],
     ]);
     assertStatus(201, $res);
-    $id = trackCreated('activity_type', (int) $res['body']['id']);
+    $id = trackCreated('activity', (int) $res['body']['id']);
 
     $get = apiRequest('GET', 'activity_types', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
     assertSame([$typeId], $get['body']['appointment_type_ids']);
-});
-test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
-    enableWorktime();
-    stopRunningIfAny();
-
-    $rest = [];
-
-    foreach (createdIds('activity') as $activityId) {
-        // Sitzungen dieser Taetigkeitsart zuerst — ON DELETE RESTRICT
-        // verhindert sonst das Loeschen der Art.
-        $sessions = apiRequest('GET', 'work_sessions', [
-            'token' => apiToken('admin'),
-            'query' => ['activity_id' => $activityId],
-        ]);
-        foreach (($sessions['body'] ?? []) as $session) {
-            deleteSession((int) $session['session_id']);
-        }
-
-        $res = apiRequest('DELETE', 'activity_types', [
-            'token' => apiToken('admin'),
-            'query' => ['id' => $activityId],
-        ]);
-        if ($res['status'] !== 200) {
-            $rest[] = "activity_type {$activityId} (HTTP {$res['status']})";
-        }
-    }
-
-    foreach (createdIds('appointment_type') as $typeId) {
-        apiRequest('DELETE', 'appointment_types', [
-            'token' => apiToken('admin'),
-            'query' => ['id' => $typeId],
-        ]);
-    }
-
-    foreach (createdIds('group') as $groupId) {
-        apiRequest('DELETE', 'member_groups', [
-            'token' => apiToken('admin'),
-            'query' => ['id' => $groupId],
-        ]);
-    }
-
-    assertSame([], $rest, 'Nicht alles konnte entfernt werden');
 });
 
 test('work_sessions: eine Zeitkorrektur laesst den Eintrag ohne Ortsnachweis', function () {
@@ -1660,4 +1644,73 @@ test('work_sessions: eine Notizkorrektur laesst die Zeiten unberuehrt', function
     assertSame('nur die Notiz', $get['body']['note']);
 
     deleteSession($id);
+});
+
+test('Aufraeumen steht am Ende der Datei', function () {
+    // Ein Test hinter dem Aufraeumen legt Daten an, die niemand mehr
+    // entfernt -- und faellt nicht auf, weil das Aufraeumen davor gruen war.
+    // strrpos, nicht strpos: Der gesuchte Text steht auch in diesem Test hier,
+    // und das erste Vorkommen waere er selbst.
+    $quelle = (string) file_get_contents(__FILE__);
+    $marke  = strrpos($quelle, "test('Aufraeumen: die Suite entfernt alles");
+    assertTrue($marke !== false, 'Aufraeumtest nicht gefunden');
+
+    $danach = substr($quelle, $marke + 40);
+    assertTrue(
+        strpos($danach, "
+test(") === false,
+        'Nach dem Aufraeumtest steht ein weiterer Test; seine Daten bleiben liegen'
+    );
+});
+
+/*
+ * Dieser Test raeumt auf und MUSS der letzte der Datei bleiben.
+ *
+ * trackCreated() sammelt nur, was bis zu seinem Lauf angelegt wurde. Zwei
+ * Tests standen zeitweise dahinter; ihre Taetigkeitsarten blieben nach jedem
+ * Lauf in der Entwicklungsdatenbank liegen, waehrend der Test PASS meldete --
+ * er wusste von ihnen nichts. Der Waechter darueber haelt die Reihenfolge
+ * fest.
+ */
+test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
+    enableWorktime();
+    stopRunningIfAny();
+
+    $rest = [];
+
+    foreach (createdIds('activity') as $activityId) {
+        // Sitzungen dieser Taetigkeitsart zuerst — ON DELETE RESTRICT
+        // verhindert sonst das Loeschen der Art.
+        $sessions = apiRequest('GET', 'work_sessions', [
+            'token' => apiToken('admin'),
+            'query' => ['activity_id' => $activityId],
+        ]);
+        foreach (($sessions['body'] ?? []) as $session) {
+            deleteSession((int) $session['session_id']);
+        }
+
+        $res = apiRequest('DELETE', 'activity_types', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $activityId],
+        ]);
+        if ($res['status'] !== 200) {
+            $rest[] = "activity_type {$activityId} (HTTP {$res['status']})";
+        }
+    }
+
+    foreach (createdIds('appointment_type') as $typeId) {
+        apiRequest('DELETE', 'appointment_types', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $typeId],
+        ]);
+    }
+
+    foreach (createdIds('group') as $groupId) {
+        apiRequest('DELETE', 'member_groups', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $groupId],
+        ]);
+    }
+
+    assertSame([], $rest, 'Nicht alles konnte entfernt werden');
 });

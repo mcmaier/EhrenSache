@@ -177,6 +177,36 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | REC-GET-5 | Filter `status=excused` | Nur entschuldigte Einträge |
 | REC-GET-6 | User ohne Mitglied | Leeres Array |
 
+### 7.1a Fehlende Ankunftszeit (ab 1.5.0)
+
+Vor 1.5.0 setzte das System in diesen Fällen die Startzeit des Termins ein — der Eintrag sah aus
+wie eine Messung, ohne eine zu sein.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| REC-NUL-1 | Anwesenheitsliste abhaken, ohne Uhrzeit einzutragen | Eintrag entsteht, Ankunftsspalte bleibt **leer** — nicht die Terminzeit |
+| REC-NUL-2 | Bei diesem Eintrag im Anwesenheitsbericht die Spalte Herkunft prüfen | `nachgetragen`, keine Uhrzeit |
+| REC-NUL-3 | Vorhandene Ankunftszeit im Dialog löschen und speichern | Spalte bleibt leer; **kein** 01.01.1970 und kein 00:00 |
+| REC-NUL-4 | Danach per Kiosk oder PWA einchecken | Die gemessene Zeit ersetzt die leere Angabe |
+| REC-NUL-5 | Zeitkorrektur-Antrag stellen und genehmigen | Ankunft steht, Herkunft im Bericht ist `korrigiert` |
+| REC-NUL-6 | Eigene Daten als CSV herunterladen (`my_data`) | Datum aus dem Termin, Ankunftsspalte leer, kein 01.01.1970 |
+| REC-NUL-7 | Anwesenheiten exportieren und dieselbe Datei wieder importieren | Keine Fehlerzeile; leere Ankunftszeit bleibt leer |
+| REC-NUL-8 | Termin am 31.12. spät abends, Check-in nach Mitternacht | Das Folgejahr erscheint **nicht** in der Jahresauswahl |
+| REC-NUL-9 | Im Dialog Status auf „Entschuldigt" stellen | Ankunftsfeld verschwindet; nach Zurückstellen auf „Anwesend" ist es wieder da und leer |
+| REC-NUL-10 | Termin im Dialog wechseln | Die Ankunftszeit bleibt unverändert — sie wird **nicht** automatisch gesetzt |
+| REC-NUL-11 | Knopf „Terminbeginn" drücken | Startzeit des gewählten Termins steht im Feld, Fokus dort |
+| REC-NUL-12 | Ankunft weit außerhalb eintragen (z. B. 15:00 bei 20-Uhr-Termin) | Abweisung mit „liegt zu weit vom Termin entfernt" |
+
+### 7.1b Nachträglicher Antrag mit Ankunftszeit (ab 1.5.0)
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| ANT-1 | In der Check-in-App einen Antrag stellen | Feld „Wann warst du da?" erscheint, vorbelegt mit der aktuellen Zeit |
+| ANT-2 | Antrag für einen Termin von gestern stellen | Vorbelegung ist der **Terminbeginn**, nicht die aktuelle Zeit |
+| ANT-3 | Im Feld eine Zeit weit außerhalb wählen | Browser verhindert die Eingabe (Grenzen am Feld); über die API abgewiesen |
+| ANT-4 | Antrag genehmigen, danach den Eintrag ansehen | Ankunft entspricht der beantragten Zeit, Quelle zeigt **„📝 Antrag"** |
+| ANT-5 | Als Admin die Wunschzeit vor der Freigabe ändern | Übernommen, solange sie im Toleranzband liegt |
+
 ### 7.2 Erstellen
 
 | ID | Testfall | Erwartetes Ergebnis |

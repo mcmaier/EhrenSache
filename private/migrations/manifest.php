@@ -80,4 +80,10 @@ return [
         'file'     => '1.4.0.php',
         'function' => 'migrate_1_4_0',
     ],
+    [
+        'from'     => '1.4.1',
+        'to'       => '1.5.0',
+        'file'     => '1.4.1.php',
+        'function' => 'migrate_1_4_1',
+    ],
 ];

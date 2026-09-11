@@ -81,7 +81,7 @@ function handleMyData($db, $database, $request_method, $authUserId)
         FROM {$prefix}records r
         LEFT JOIN {$prefix}appointments a ON r.appointment_id = a.appointment_id
         WHERE r.member_id = ?
-        ORDER BY r.arrival_time DESC
+        ORDER BY a.date DESC, r.arrival_time IS NULL, r.arrival_time DESC
     ");
     $stmt->execute([$member_id]);
     $data['records'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -209,9 +209,13 @@ function exportAsCSV($data) {
     fputcsv($output, ['=== ANWESENHEITEN ===']);
     fputcsv($output, ['Datum', 'Ankunft', 'Termin', 'Status']);
     foreach($data['records'] as $record) {
+        // Das Datum steht am Termin, nicht an der Ankunft: Seit 1.5.0 darf
+        // arrival_time NULL sein, und strtotime(null) ergaebe den 01.01.1970 —
+        // ein Datum, das in einer Auskunft nach Art. 15 DSGVO nichts zu suchen
+        // hat. Eine fehlende Uhrzeit bleibt eine leere Zelle.
         fputcsv($output, [
-            date('d.m.Y', strtotime($record['arrival_time'])),
-            date('H:i', strtotime($record['arrival_time'])),
+            $record['appointment_date'] ? date('d.m.Y', strtotime($record['appointment_date'])) : '',
+            $record['arrival_time'] ? date('H:i', strtotime($record['arrival_time'])) : '',
             $record['appointment_title'] ?? '-',
             $record['status'] ?? ''
         ]);

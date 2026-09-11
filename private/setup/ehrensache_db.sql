@@ -99,9 +99,9 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}records` (
   `record_id` int(11) NOT NULL AUTO_INCREMENT,
   `member_id` int(11) NOT NULL,
   `appointment_id` int(11) NOT NULL,
-  `arrival_time` datetime NOT NULL,
+  `arrival_time` datetime DEFAULT NULL,
   `status` enum('present','excused') DEFAULT 'present',
-  `checkin_source` enum('admin','user_totp','device_auth','auto_checkin','import','timer','station_pin') DEFAULT 'admin',
+  `checkin_source` enum('admin','user_totp','device_auth','auto_checkin','import','timer','station_pin','exception_request') DEFAULT 'admin',
   `source_device` varchar(100) DEFAULT NULL,
   `location_name` varchar(100) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -317,11 +317,10 @@ PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
-SET @idx2 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}records' AND INDEX_NAME = '{PREFIX}idx_year');
-SET @prep_sql = IF(@idx2 = 0, 'ALTER TABLE `{PREFIX}records` ADD INDEX `{PREFIX}idx_year` (arrival_time)', 'SELECT 1');
-PREPARE stmt FROM @prep_sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
+-- Kein Index auf records(arrival_time) mehr: Er stuetzte allein
+-- YEAR(arrival_time) in handleAvailableYears(), und diese Abfrage entfaellt
+-- seit 1.5.0 -- die Jahresliste kommt aus appointments.date. Migration
+-- 1.4.1.php entfernt ihn in bestehenden Installationen.
 
 SET @idx3 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}appointments' AND INDEX_NAME = '{PREFIX}idx_year');
 SET @prep_sql = IF(@idx3 = 0, 'ALTER TABLE `{PREFIX}appointments` ADD INDEX `{PREFIX}idx_year` (date)', 'SELECT 1');

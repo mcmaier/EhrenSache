@@ -2360,3 +2360,13 @@ body {
         --badge-fg: color-mix(in oklab, var(--secondary-color) 62%, #10181F);
     }
 }
+
+/* Hinweis unter einem Eingabefeld — etwa das Zeitfenster, in dem eine
+   nachträglich beantragte Ankunftszeit liegen darf. Gleiche Anmutung wie
+   .capture-tile-hint, nur im normalen Formularfluss. */
+.input-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-light);
+}

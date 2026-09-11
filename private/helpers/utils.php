@@ -32,23 +32,30 @@ function handleApprovedTimeCorrection($db, $database, $exceptionId, $exceptionDa
     $checkStmt->execute([$exception['member_id'], $exception['appointment_id']]);
     $existingRecord = $checkStmt->fetch(PDO::FETCH_ASSOC);
     
+    // checkin_source wird ausdrücklich mitgeschrieben: Die Uhrzeit stammt ab
+    // hier aus der Selbstauskunft des Mitglieds (exceptions.requested_arrival_time),
+    // nicht mehr aus der ursprünglichen Quelle. Ohne diese Angabe trug ein
+    // korrigierter Record weiter das Etikett der Messung, die er gerade
+    // überschrieben hat — eine per Antrag gesetzte Zeit wäre als Kiosk-Stempel
+    // durchgegangen.
     if($existingRecord) {
         // Update bestehenden Record
-        $updateStmt = $db->prepare("UPDATE {$prefix}records 
-                                    SET arrival_time = ?, status = 'present' 
+        $updateStmt = $db->prepare("UPDATE {$prefix}records
+                                    SET arrival_time = ?, status = 'present',
+                                        checkin_source = 'exception_request'
                                     WHERE record_id = ?");
         $updateStmt->execute([
-            $exception['requested_arrival_time'], 
+            $exception['requested_arrival_time'],
             $existingRecord['record_id']
         ]);
     } else {
         // Erstelle neuen Record
-        $insertStmt = $db->prepare("INSERT INTO {$prefix}records 
-                                    (member_id, appointment_id, arrival_time, status) 
-                                    VALUES (?, ?, ?, 'present')");
+        $insertStmt = $db->prepare("INSERT INTO {$prefix}records
+                                    (member_id, appointment_id, arrival_time, status, checkin_source)
+                                    VALUES (?, ?, ?, 'present', 'exception_request')");
         $insertStmt->execute([
-            $exception['member_id'], 
-            $exception['appointment_id'], 
+            $exception['member_id'],
+            $exception['appointment_id'],
             $exception['requested_arrival_time']
         ]);
     }
@@ -71,29 +78,25 @@ function handleApprovedAbsence($db, $database, $exceptionId, $data) {
     
     if(!$exception) return;
     
-    // Appointment-Datum holen für arrival_time
+    // Keine Ankunftszeit: Der Eintrag sagt „entschuldigt", nicht „um 20:00
+    // erschienen". Früher wurde dafür eigens die Startzeit des Termins
+    // abgefragt — eine Uhrzeit, die niemand gemessen hat und die in einer
+    // Auswertung wie eine Anwesenheit aussah.
+    //
+    // Die Terminabfrage entfällt damit ersatzlos. Sie diente allein dazu,
+    // diese Zeit zu bilden; dass der Termin existiert, sichert bereits der
+    // Fremdschlüssel exceptions_ibfk_2.
+    //
+    // INSERT IGNORE bleibt: Wer schon gestempelt hat, behält seinen Eintrag —
+    // eine nachträgliche Entschuldigung überschreibt keine Anwesenheit.
     $stmt = $db->prepare(
-        "SELECT date, start_time 
-         FROM {$prefix}appointments 
-         WHERE appointment_id = ?"
-    );
-    $stmt->execute([$exception['appointment_id']]);
-    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if(!$appointment) return;
-    
-    $arrivalTime = $appointment['date'] . ' ' . $appointment['start_time'];
-    
-    // Record erstellen (INSERT IGNORE falls bereits vorhanden)
-    $stmt = $db->prepare(
-        "INSERT IGNORE INTO {$prefix}records 
-         (member_id, appointment_id, arrival_time, status, checkin_source) 
-         VALUES (?, ?, ?, 'excused', 'admin')"
+        "INSERT IGNORE INTO {$prefix}records
+         (member_id, appointment_id, arrival_time, status, checkin_source)
+         VALUES (?, ?, NULL, 'excused', 'admin')"
     );
     $stmt->execute([
         $exception['member_id'],
-        $exception['appointment_id'],
-        $arrivalTime
+        $exception['appointment_id']
     ]);
 }
 
@@ -145,6 +148,52 @@ function checkinToleranceHours($db, $database): int
     $hours = (int) systemSetting($db, $database, 'checkin_tolerance_hours', (string) $fallback);
 
     return ($hours < 0 || $hours > 8) ? $fallback : $hours;
+}
+
+/**
+ * Liegt eine beantragte Ankunftszeit im Zeitfenster ihres Termins?
+ *
+ * Dasselbe Fenster wie beim Check-in, symmetrisch um die Startzeit. Ein
+ * Terminende gibt es nicht — `appointments` führt nur `date` und `start_time` —,
+ * und das Check-in-Fenster ist die naheliegende Schranke: Beantragen lässt sich
+ * damit genau das, wozu auch ein Stempel möglich gewesen wäre.
+ *
+ * Ohne diese Grenze ließe sich für einen 20-Uhr-Termin eine Ankunft um 17:00
+ * beantragen — eine Pünktlichkeit, die niemand nachprüfen kann. Die Prüfung
+ * steht deshalb hier und nicht nur im Formular: Die PWA ist ein Client.
+ *
+ * Ein unbekannter Termin oder eine unlesbare Zeit gilt als ungültig, nicht als
+ * unbedenklich.
+ */
+function arrivalWithinAppointmentWindow($db, $database, int $appointmentId,
+                                        string $arrivalTime, int $toleranceHours): bool
+{
+    if (trim($arrivalTime) === '') {
+        return false;
+    }
+
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT date, start_time FROM {$prefix}appointments
+                          WHERE appointment_id = ?");
+    $stmt->execute([$appointmentId]);
+    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$appointment) {
+        return false;
+    }
+
+    try {
+        $arrival = new DateTimeImmutable($arrivalTime);
+        $start   = new DateTimeImmutable($appointment['date'] . ' ' . $appointment['start_time']);
+    } catch (Exception $e) {
+        return false;
+    }
+
+    $interval = new DateInterval('PT' . $toleranceHours . 'H');
+
+    return $arrival >= $start->sub($interval)
+        && $arrival <= $start->add($interval);
 }
 
 /**

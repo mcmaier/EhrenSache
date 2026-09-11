@@ -109,3 +109,30 @@ function gruppeMitTypen(): array
         ]],
     ];
 }
+
+// ---- statisticsReportOrigin -------------------------------------------------
+
+test('statisticsReportOrigin liest die Herkunft aus der Quelle', function () {
+    // Seit 1.5.0 sagt checkin_source die Wahrheit: Ein genehmigter Antrag
+    // traegt exception_request. Der frueher noetige Zaehler aus einem Join auf
+    // exceptions entfaellt damit -- er war die Uebergangsloesung, solange
+    // handleApprovedTimeCorrection() die Quelle unveraendert liess.
+    assertSame(REPORT_ORIGIN_CORRECTED,
+        statisticsReportOrigin('exception_request', '2031-03-04 19:55:00'));
+
+    assertSame(REPORT_ORIGIN_MEASURED,
+        statisticsReportOrigin('station_pin', '2031-03-04 19:58:00'));
+    assertSame(REPORT_ORIGIN_MEASURED,
+        statisticsReportOrigin('auto_checkin', '2031-03-04 19:58:00'));
+
+    // Vom Admin eingetippt: eine Aussage, aber keine Messung.
+    assertSame(REPORT_ORIGIN_BACKFILLED,
+        statisticsReportOrigin('admin', '2031-03-04 20:05:00'));
+});
+
+test('statisticsReportOrigin nennt eine fehlende Uhrzeit nicht gemessen', function () {
+    // Der Fall, den es vor 1.5.0 nicht geben konnte: kein Stempel, keine
+    // Uhrzeit. Eine Quelle allein macht daraus keine Messung.
+    assertSame(REPORT_ORIGIN_BACKFILLED, statisticsReportOrigin('admin', null));
+    assertSame(REPORT_ORIGIN_BACKFILLED, statisticsReportOrigin('station_pin', null));
+});

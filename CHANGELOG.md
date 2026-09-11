@@ -9,6 +9,49 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Nicht veröffentlicht]
 
+### Geändert
+- **Die Ankunftszeit darf fehlen.** Wer eine Anwesenheitsliste abhakt, erzeugte bisher einen
+  Eintrag mit der **Startzeit des Termins** als Ankunft. Der Datensatz war damit konstruiert
+  pünktlich, und keine Auswertung konnte ihn von einer echten Messung unterscheiden. `arrival_time`
+  darf jetzt leer sein und heißt dann: keine Aussage über die Ankunft.
+
+  Das betrifft mehr als das Anlegen: Die Jahresauswahl der Statistik kommt jetzt allein aus den
+  Terminen, und die DSGVO-Löschfrist rechnet über das Termindatum statt über die Ankunftszeit —
+  ein Eintrag ohne Uhrzeit wäre sonst von keiner Frist mehr erfasst worden. Im Auskunftsexport
+  nach Art. 15 DSGVO steht bei fehlender Uhrzeit eine leere Zelle statt des 01.01.1970.
+
+  **Die Migration ist nicht umkehrbar.** Sie leert Ankunftszeiten, die exakt auf der Startminute
+  liegen und von einem Listeneintrag stammen (`admin`, `timer`). Kiosk- und Gerätestempel bleiben
+  unangetastet, auch wenn sie zufällig punktgenau fielen. Eine vom Verwalter *bewusst* auf die
+  Startminute gesetzte Zeit ist davon nicht unterscheidbar und geht mit verloren — zulasten der
+  Messabdeckung, nicht zulasten einer Quote.
+
+- **Ein genehmigter Zeitkorrektur-Antrag kennzeichnet seine Herkunft.** Bisher behielt ein so
+  überschriebener Eintrag die Quelle der Messung, die er ersetzt hat — eine vom Mitglied selbst
+  angegebene Zeit lief als Kiosk-Stempel weiter. Neuer Wert `exception_request` in
+  `checkin_source`; der Anwesenheitsbericht weist solche Zeiten als *korrigiert* aus.
+
+- **Der Import verträgt eine leere Ankunftszeit**, sofern die Terminspalten den Termin treffen.
+  Ohne diese Ausnahme hätte der Import den eigenen Export abgelehnt.
+
+- **Im Anwesenheitsdialog steht der Status jetzt vor der Ankunftszeit.** Bei „Entschuldigt" wird
+  die Ankunft ausgeblendet — wer nicht da war, ist nicht angekommen. Bei „Anwesend" bleibt das
+  Feld leer und ist kein Pflichtfeld mehr; ein Knopf setzt den Terminbeginn ein, wenn der Nachtrag
+  von dort ausgehen soll.
+
+  Zuvor trug der Dialog beim Wechsel des Termins **stillschweigend dessen Startzeit** ein. Wer
+  danach speicherte, erzeugte eine Ankunftszeit, die niemand gemessen und niemand gewollt hat.
+
+- **Der nachträgliche Antrag fragt, wann man da war.** Die Check-in-App hat bisher ungefragt den
+  Zeitpunkt der Antragstellung als Ankunft eingetragen: Wer um 19:55 kam, das gescheiterte
+  Stempeln erst um 20:30 bemerkte und dann den Antrag stellte, beantragte damit 20:30. Das
+  Mitglied gibt die Zeit jetzt selbst an.
+
+- **Ein Toleranzband für Ankunftszeiten.** Eine eingetragene oder beantragte Ankunft muss
+  innerhalb der Check-in-Toleranz (Vorgabe: zwei Stunden) um den Terminbeginn liegen. Das gilt
+  für alle Wege gleichermaßen — Dialog, Antrag, Bearbeitung durch das Mitglied und durch die
+  Verwaltung.
+
 ### Neu
 - **Schnellinbetriebnahme des Kiosks per QR-Code.** Der Gerätedialog einer virtuellen Station
   zeigt neben Token und Kopieren einen QR-Code mit der Adresse `…/station/#t=<token>`. Statt

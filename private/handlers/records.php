@@ -137,7 +137,10 @@ function handleRecords($db, $database, $method, $id) {
                     $params[] = $appointment_type_id;
                 }
                 
-                $sql .= " ORDER BY a.date DESC, r.arrival_time DESC, m.surname ASC, m.name ASC";
+                // "arrival_time IS NULL" zuerst: In MySQL sortiert NULL vor
+                // jedem Wert, Eintraege ohne Ankunftszeit stuenden sonst an der
+                // Spitze ihres Tages, als waeren sie die fruehesten.
+                $sql .= " ORDER BY a.date DESC, r.arrival_time IS NULL, r.arrival_time DESC, m.surname ASC, m.name ASC";
                 
                 // Query ausführen
                 if(count($params) > 0) {
@@ -177,23 +180,33 @@ function handleRecords($db, $database, $method, $id) {
                 break;
             }
 
-            // Bestimme arrival_time: 
-            // 1. Nutze übergebenen Wert falls vorhanden
-            // 2. Sonst: Termin-Startzeit
-            $arrival_time = $data->arrival_time ?? null;
-            
-            if(!$arrival_time) {
-                // Hole Termin-Startzeit
-                $aptStmt = $db->prepare("SELECT date, start_time FROM {$prefix}appointments WHERE appointment_id = ?");
-                $aptStmt->execute([$appointment_id]);
-                $apt = $aptStmt->fetch(PDO::FETCH_ASSOC);
-                
-                if($apt && $apt['date'] && $apt['start_time']) {
-                    $arrival_time = $apt['date'] . ' ' . $apt['start_time'];
-                } else {
-                    // Fallback: NOW()
-                    $arrival_time = date('Y-m-d H:i:s');
-                }
+            // Ohne übergebene Zeit bleibt die Ankunft leer.
+            //
+            // Früher stand hier die Startzeit des Termins: Wer eine Liste
+            // abhakte, erzeugte damit einen Datensatz, der konstruiert pünktlich
+            // war — und keine Auswertung konnte ihn von einer echten Messung
+            // unterscheiden. Seit 1.5.0 darf arrival_time NULL sein und heißt
+            // dann: keine Aussage über die Ankunft.
+            //
+            // Der zweite Fallback auf NOW() ist ersatzlos entfallen. Er war
+            // unerreichbar: appointment_id ist Pflicht (oben), date und
+            // start_time sind in appointments NOT NULL, und der Fremdschlüssel
+            // records_ibfk_2 lässt eine unbekannte ID gar nicht erst zu.
+            $arrival_time = ($data->arrival_time ?? '') !== '' ? $data->arrival_time : null;
+
+            // Dasselbe Toleranzband wie beim nachträglichen Antrag. Ohne diese
+            // Prüfung wäre der direkte Weg die Lücke im Zaun: Was über
+            // resource=exceptions abgewiesen wird, ließe sich hier eintragen.
+            // Eine fehlende Zeit bleibt unberührt — sie behauptet nichts.
+            if ($arrival_time !== null
+                && !arrivalWithinAppointmentWindow($db, $database, (int) $appointment_id,
+                                                   (string) $arrival_time,
+                                                   checkinToleranceHours($db, $database))) {
+                http_response_code(400);
+                echo json_encode([
+                    "message" => "Die Ankunftszeit liegt zu weit vom Termin entfernt"
+                ], JSON_UNESCAPED_UNICODE);
+                break;
             }
 
             // Erstelle Record (manuell durch Admin)
@@ -229,29 +242,49 @@ function handleRecords($db, $database, $method, $id) {
             $memberChanged = ($data->member_id != $originalRecord['member_id']);
             $appointmentChanged = ($data->appointment_id != $originalRecord['appointment_id']);
             
+            // Ein Leerstring ist keine Uhrzeit, sondern das Löschen einer
+            // Angabe. Ohne diese Normalisierung landet er je nach SQL-Modus
+            // als '0000-00-00 00:00:00' in der Spalte — ein Datum, das es
+            // nicht gibt, und das jede spätere Auswertung mitschleppt.
+            $arrival_time = ($data->arrival_time ?? '') !== '' ? $data->arrival_time : null;
+
+            // Toleranzband wie beim Anlegen. Geprüft wird gegen den Termin aus
+            // dem Anfragekörper, nicht gegen den bisherigen: Ein PUT darf den
+            // Termin wechseln, und dann gilt dessen Fenster.
+            if ($arrival_time !== null
+                && !arrivalWithinAppointmentWindow($db, $database, (int) $data->appointment_id,
+                                                   (string) $arrival_time,
+                                                   checkinToleranceHours($db, $database))) {
+                http_response_code(400);
+                echo json_encode([
+                    "message" => "Die Ankunftszeit liegt zu weit vom Termin entfernt"
+                ], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+
             if ($memberChanged || $appointmentChanged) {
                 // Prüfe ob bereits ein anderer Record für neue Kombination existiert
-                $checkStmt = $db->prepare("SELECT record_id FROM {$prefix}records 
+                $checkStmt = $db->prepare("SELECT record_id FROM {$prefix}records
                                         WHERE member_id = ? AND appointment_id = ? AND record_id != ?");
                 $checkStmt->execute([$data->member_id, $data->appointment_id, $id]);
-                
+
                 if ($checkStmt->fetch()) {
-                    http_response_code(409); 
+                    http_response_code(409);
                     echo json_encode(["message" => "Record for this member and appointment already exists"]);
                     break;
                 }
-                
+
                 // Kein Konflikt - komplettes Update
-                $stmt = $db->prepare("UPDATE {$prefix}records 
-                                    SET member_id=?, appointment_id=?, arrival_time=?, status=? 
+                $stmt = $db->prepare("UPDATE {$prefix}records
+                                    SET member_id=?, appointment_id=?, arrival_time=?, status=?
                                     WHERE record_id=?");
-                $success = $stmt->execute([$data->member_id, $data->appointment_id, $data->arrival_time, $data->status, $id]);
+                $success = $stmt->execute([$data->member_id, $data->appointment_id, $arrival_time, $data->status, $id]);
             } else {
                 // Nur Zeit/Status ändern - kein Konfliktrisiko
-                $stmt = $db->prepare("UPDATE {$prefix}records 
-                                    SET arrival_time=?, status=? 
+                $stmt = $db->prepare("UPDATE {$prefix}records
+                                    SET arrival_time=?, status=?
                                     WHERE record_id=?");
-                $success = $stmt->execute([$data->arrival_time, $data->status, $id]);
+                $success = $stmt->execute([$arrival_time, $data->status, $id]);
             }
             
             if ($success) {
@@ -274,9 +307,15 @@ function handleRecords($db, $database, $method, $id) {
                 $before_date = $_GET['before_date'] ?? null; // Format: YYYY-MM-DD
                 
                 if($before_date) {
-                    // Nur Records vor bestimmtem Datum löschen
-                    $stmt = $db->prepare("DELETE FROM {$prefix}records 
-                                        WHERE member_id = ? AND arrival_time < ?");
+                    // Nur Records vor bestimmtem Datum löschen — über das
+                    // Termindatum, nicht über die Ankunftszeit. Seit 1.5.0 darf
+                    // arrival_time NULL sein, und NULL < '2023-01-01' ist
+                    // niemals wahr: Solche Records liessen sich sonst nicht
+                    // mehr löschen.
+                    $stmt = $db->prepare("DELETE r FROM {$prefix}records r
+                                        JOIN {$prefix}appointments a
+                                          ON a.appointment_id = r.appointment_id
+                                        WHERE r.member_id = ? AND a.date < ?");
                     $params = [$member_id, $before_date];
                 } else {
                     // Alle Records des Mitglieds löschen

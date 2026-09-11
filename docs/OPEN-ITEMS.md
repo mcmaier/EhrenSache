@@ -1773,9 +1773,17 @@ Quote als Leitzahl (Abschnitt 3.1), und statt der Spalte `arrival_measured` eine
 `NULL` sein darf (Abschnitt 4.1). Die Spec ist maßgeblich; die Punkte unten bleiben stehen, damit
 die Revision nachvollziehbar ist.
 
-Die Umsetzung ist in zwei Schritte geteilt: das Datenmodell zuerst (für sich wertvoll, behebt
-einen Fehler in `handleApprovedTimeCorrection()`), die Kennzahlen danach — **und die erst nach
-[OI-48](#oi-48)**.
+Die Umsetzung ist in zwei Schritte geteilt.
+
+**Schritt 1 (Datenmodell) ist umgesetzt und liegt in 1.5.0.** `records.arrival_time` darf leer
+sein, statt die Startzeit des Termins zu behaupten; ein genehmigter Zeitkorrektur-Antrag trägt
+`checkin_source = 'exception_request'`; Jahresauswahl und Löschfrist rechnen über
+`appointments.date`. Die Spalte `arrival_measured` aus den Vorentscheidungen wird damit nicht
+gebraucht.
+
+**Schritt 2 (die Kennzahlen selbst) ist offen** — Quote, Verspätungsmaß, Zuverlässigkeit,
+Einstellungen, Anzeige und der Abschnitt in `DATENSCHUTZ.md`. Die Sperre durch
+[OI-48](#oi-48--statistik-zählt-je-gruppe-nur-eine-terminart) ist seit dem 2026-09-11 aufgehoben.
 
 `README.md` schreibt „Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen".
 `CLAUDE.md` beschreibt das Projekt als „Statistische Auswertung von Anwesenheit **und
