@@ -49,10 +49,28 @@ function attendanceRate(int $attended, int $total): float
  */
 function attendanceBuildGroup(int $groupId, string $groupName, array $types, array $rows): array
 {
+    // Bekannte Terminarten als Nachschlagetabelle. Die beiden Pruefungen
+    // darunter sind Vertragspruefungen, keine Fehlerbehandlung: Das SQL
+    // liefert nur Zeilen zu Terminarten dieser Gruppe, und es gruppiert nach
+    // member_id und type_id. Verletzt eine Zeile das, ist die Voraussetzung
+    // kaputt -- und genau dann soll es auffallen statt zu verschwinden.
+    // Stiller Datenverlust ist der Fehler, den dieses Vorhaben behebt (OI-48).
+    $knownTypes = [];
+    foreach ($types as $type) {
+        $knownTypes[(int) $type['type_id']] = true;
+    }
+
     $byMember = [];
 
     foreach ($rows as $row) {
-        $id = (int) $row['member_id'];
+        $id     = (int) $row['member_id'];
+        $typeId = (int) $row['type_id'];
+
+        if (!isset($knownTypes[$typeId])) {
+            throw new InvalidArgumentException(
+                "Zeile mit Terminart {$typeId}, die nicht zur Gruppe {$groupId} gehoert"
+            );
+        }
 
         if (!isset($byMember[$id])) {
             $byMember[$id] = [
@@ -62,11 +80,17 @@ function attendanceBuildGroup(int $groupId, string $groupName, array $types, arr
             ];
         }
 
+        if (isset($byMember[$id]['per_type'][$typeId])) {
+            throw new InvalidArgumentException(
+                "Doppelte Zeile fuer Mitglied {$id} und Terminart {$typeId}"
+            );
+        }
+
         $total     = (int) $row['total'];
         $attended  = (int) $row['attended'];
         $unexcused = (int) $row['unexcused'];
 
-        $byMember[$id]['per_type'][(int) $row['type_id']] = [
+        $byMember[$id]['per_type'][$typeId] = [
             'total_appointments' => $total,
             'attended'           => $attended,
             'unexcused_absences' => $unexcused,

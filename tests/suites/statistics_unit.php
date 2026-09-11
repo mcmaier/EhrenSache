@@ -163,3 +163,95 @@ test('attendanceBuildSummary ohne Mitglieder teilt nicht durch null', function (
     assertSame(0, $summary['total_present']);
     assertSame(0.0, $summary['overall_average']);
 });
+
+// ---- Gegenprobe der beiden Rechenwege ---------------------------------------
+
+test('attendanceBuildGroup und attendanceBuildSummary rechnen dasselbe', function () {
+    // excused und unexcused werden an den beiden Stellen in entgegengesetzter
+    // Richtung hergeleitet. Ohne Ueberschneidung der Terminarten muessen
+    // Gruppensumme und Kopfzahl uebereinstimmen -- weichen sie ab, ist einer
+    // der beiden Wege falsch.
+    $types = [
+        ['type_id' => 1, 'type_name' => 'Gesamtprobe'],
+        ['type_id' => 2, 'type_name' => 'Registerprobe'],
+    ];
+    $rows = [
+        ['member_id' => 5, 'name' => 'Anna', 'surname' => 'Bauer',
+         'type_id' => 1, 'total' => 10, 'attended' => 8, 'unexcused' => 1],
+        ['member_id' => 5, 'name' => 'Anna', 'surname' => 'Bauer',
+         'type_id' => 2, 'total' => 4,  'attended' => 1, 'unexcused' => 3],
+    ];
+
+    $member = attendanceBuildGroup(7, 'Aktive', $types, $rows)['members'][0];
+
+    // So saehe die entdoppelte Zeile aus attendanceFetchMemberTotals() aus,
+    // wenn sich die Terminarten nicht ueberschneiden: dieselben Summen.
+    $summary = attendanceBuildSummary([[
+        'member_id' => 5,
+        'total'     => $member['total_appointments'],
+        'attended'  => $member['attended'],
+        'excused'   => $member['excused'],
+    ]], $member['total_appointments'], 1);
+
+    assertSame($member['total_appointments'], $summary['total_appointments']);
+    assertSame($member['attended'],           $summary['total_present']);
+    assertSame($member['excused'],            $summary['total_excused']);
+    assertSame($member['unexcused_absences'], $summary['total_unexcused']);
+    assertSame($member['attendance_rate'],    $summary['overall_average']);
+});
+
+// ---- Vertragspruefungen ------------------------------------------------------
+
+test('attendanceBuildGroup weist eine fremde Terminart zurueck', function () {
+    assertThrows(function () {
+        attendanceBuildGroup(7, 'Aktive',
+            [['type_id' => 1, 'type_name' => 'Probe']],
+            [['member_id' => 5, 'name' => 'Anna', 'surname' => 'Bauer',
+              'type_id' => 99, 'total' => 3, 'attended' => 3, 'unexcused' => 0]]);
+    });
+});
+
+test('attendanceBuildGroup weist eine doppelte Zeile zurueck', function () {
+    assertThrows(function () {
+        attendanceBuildGroup(7, 'Aktive',
+            [['type_id' => 1, 'type_name' => 'Probe']],
+            [
+                ['member_id' => 5, 'name' => 'Anna', 'surname' => 'Bauer',
+                 'type_id' => 1, 'total' => 3, 'attended' => 3, 'unexcused' => 0],
+                ['member_id' => 5, 'name' => 'Anna', 'surname' => 'Bauer',
+                 'type_id' => 1, 'total' => 2, 'attended' => 1, 'unexcused' => 1],
+            ]);
+    });
+});
+
+// ---- Drei Terminarten --------------------------------------------------------
+
+test('attendanceBuildGroup verarbeitet drei Terminarten', function () {
+    $types = [
+        ['type_id' => 3, 'type_name' => 'Auftritt'],
+        ['type_id' => 1, 'type_name' => 'Gesamtprobe'],
+        ['type_id' => 2, 'type_name' => 'Registerprobe'],
+    ];
+    $rows = [
+        ['member_id' => 2, 'name' => 'Anna', 'surname' => 'Bauer',
+         'type_id' => 1, 'total' => 38, 'attended' => 21, 'unexcused' => 17],
+        ['member_id' => 2, 'name' => 'Anna', 'surname' => 'Bauer',
+         'type_id' => 2, 'total' => 18, 'attended' => 15, 'unexcused' => 3],
+        ['member_id' => 2, 'name' => 'Anna', 'surname' => 'Bauer',
+         'type_id' => 3, 'total' => 6,  'attended' => 6,  'unexcused' => 0],
+    ];
+
+    $member = attendanceBuildGroup(2, 'Jugend', $types, $rows)['members'][0];
+
+    assertSame(3, count($member['by_type']));
+    // Reihenfolge folgt der Typenliste, nicht den Zeilen
+    assertSame(3, $member['by_type'][0]['type_id']);
+    assertSame(1, $member['by_type'][1]['type_id']);
+    assertSame(2, $member['by_type'][2]['type_id']);
+
+    assertSame(62, $member['total_appointments']);
+    assertSame(42, $member['attended']);
+    assertSame(20, $member['unexcused_absences']);
+    assertSame(0,  $member['excused']);
+    assertSame(67.7, $member['attendance_rate']);
+});
