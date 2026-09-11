@@ -1452,15 +1452,27 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="record_arrival_time">Ankunftszeit*</label>
-                        <input type="datetime-local" id="record_arrival_time" required>
-                    </div>
-                    <div class="form-group">
                         <label for="record_status">Status*</label>
-                        <select id="record_status" required>
+                        <select id="record_status" required onchange="toggleArrivalTimeField()">
                             <option value="present">Anwesend</option>
                             <option value="excused">Entschuldigt</option>
                         </select>
+                    </div>
+                    <!-- Ankunftszeit steht nach dem Status: Bei "Entschuldigt"
+                         wird sie ausgeblendet, denn wer nicht da war, ist nicht
+                         angekommen. Sie ist bewusst kein Pflichtfeld — eine
+                         unbekannte Ankunft bleibt leer, statt die Terminzeit zu
+                         behaupten. Der Knopf setzt den Terminbeginn ein, wenn
+                         der Nachtrag von dort ausgehen soll. -->
+                    <div class="form-group" id="recordArrivalTimeGroup">
+                        <label for="record_arrival_time">Ankunftszeit</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="datetime-local" id="record_arrival_time" style="flex: 1;">
+                            <button type="button" class="btn-secondary" id="recordArrivalFromAppointment"
+                                    onclick="setArrivalTimeFromAppointment()"
+                                    title="Startzeit des gewählten Termins übernehmen">Terminbeginn</button>
+                        </div>
+                        <small class="input-hint">Leer lassen, wenn die Ankunft nicht bekannt ist.</small>
                     </div>
                 </form>
             </div>

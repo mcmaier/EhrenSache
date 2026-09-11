@@ -2115,7 +2115,10 @@ async function loadHistory() {
             ...records.slice(0, 10).map(r => ({
                 type: 'record',
                 data: r,
-                timestamp: new Date(r.arrival_time)
+                // Ohne Ankunftszeit das Termindatum: new Date(null) ergaebe
+                // ein ungueltiges Datum, und der Eintrag rutschte beim
+                // Sortieren an eine zufaellige Stelle.
+                timestamp: new Date(r.arrival_time ?? (r.date ? r.date + 'T00:00:00' : 0))
             })),
             ...exceptions.map(e => ({
                 type: 'exception',
@@ -2510,17 +2513,27 @@ function addRecordToHistory(record) {
     const item = document.createElement('div');
     item.className = 'history-item verified';    
     
-    const arrivalTime = new Date(record.arrival_time);
-    const dateStr = arrivalTime.toLocaleDateString('de-DE', { 
-        day: '2-digit', 
-        month: '2-digit',
-        year: 'numeric'
-    });
-    const timeStr = arrivalTime.toLocaleTimeString('de-DE', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
-    
+    // Seit 1.5.0 kann eine Ankunftszeit fehlen — ein Eintrag, den jemand ohne
+    // Uhrzeit nachgetragen hat. Das Datum steht dann am Termin, die Uhrzeit
+    // entfällt. Ohne diese Unterscheidung stünde hier "Invalid Date".
+    const arrivalTime = record.arrival_time ? new Date(record.arrival_time) : null;
+    const fallbackDate = record.date ? new Date(record.date + 'T00:00:00') : null;
+    const shownDate = arrivalTime ?? fallbackDate;
+
+    const dateStr = shownDate
+        ? shownDate.toLocaleDateString('de-DE', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        })
+        : '';
+    const timeStr = arrivalTime
+        ? arrivalTime.toLocaleTimeString('de-DE', {
+            hour: '2-digit',
+            minute: '2-digit'
+        })
+        : '';
+
     const statusText = translateStatus(record.status);
 
     // Appointment Type Badge hinzufügen (falls vorhanden)

@@ -138,9 +138,6 @@ export async function renderRecords(records, page = 1)
      pageRecords.forEach(record => {
         const tr = document.createElement('tr');
         
-        const arrivalTime = new Date(record.arrival_time);
-        const formattedTime = arrivalTime.toLocaleString('de-DE');
-
          // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (record.appointment_id && record.title) {
@@ -797,14 +794,22 @@ export async function openRecordModal(recordId = null) {
         // Keine ID anzeigen
         updateModalId('recordModal', null);
         
-        // Setze aktuelle Zeit als Standard
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('record_arrival_time').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+        // Status zurueck auf den Vorgabewert, danach die Sichtbarkeit des
+        // Ankunftsfelds nachziehen -- sonst bliebe es versteckt, wenn zuvor
+        // ein entschuldigter Eintrag bearbeitet wurde.
+        document.getElementById('record_status').value = 'present';
+
+        // Keine Vorbelegung der Ankunftszeit.
+        //
+        // Frueher stand hier die aktuelle Uhrzeit. Ein Nachtrag im Dashboard
+        // geschieht aber meist spaeter: Fuer die Erfassung im Moment gibt es
+        // die Anwesenheitsliste der PWA, fuer vergessenes Stempeln den Antrag
+        // des Mitglieds. Eine vorbelegte Zeit waere hier die Uhrzeit des
+        // Abhakens, nicht die der Ankunft -- und niemand sieht ihr das an.
+        //
+        // Wer vom Terminbeginn ausgehen will, benutzt den Knopf daneben.
+        document.getElementById('record_arrival_time').value = '';
+        toggleArrivalTimeField();
 
         // Verstecke Terminart-Anzeige
         document.getElementById('recordAppointmentTypeGroup').style.display = 'none';            
@@ -835,8 +840,12 @@ export async function loadRecordData(recordId) {
         document.getElementById('record_appointment').value = record.appointment_id;
         
         // Konvertiere Timestamp zu datetime-local Format
-        document.getElementById('record_arrival_time').value = mysqlToDatetimeLocal(record.arrival_time);        
+        document.getElementById('record_arrival_time').value = mysqlToDatetimeLocal(record.arrival_time);
         document.getElementById('record_status').value = record.status;
+
+        // Sichtbarkeit nachziehen: Bei einem entschuldigten Eintrag gehoert
+        // das Ankunftsfeld weg, auch wenn der Dialog gerade erst befuellt wurde.
+        toggleArrivalTimeField();
 
         document.getElementById('record_member').disabled = true;
         document.getElementById('record_appointment').disabled = true;
@@ -896,7 +905,10 @@ function onRecordMemberChange() {
 }
 
 function onRecordAppointmentChange() {
-    updateArrivalTimeFromAppointment();
+    // Die Ankunftszeit wird hier bewusst NICHT mehr gesetzt. Bis 1.5.0 trug
+    // der Terminwechsel die Startzeit des Termins ein — wer danach speicherte,
+    // erzeugte einen Datensatz, der konstruiert puenktlich war, ohne es zu
+    // merken. Den Terminbeginn gibt es jetzt auf Knopfdruck.
     const appointmentSelect = document.getElementById('record_appointment');
     const selectedAppointment = _recordAllAppointments.find(a => a.appointment_id == appointmentSelect.value);
     if (!selectedAppointment) {
@@ -1165,9 +1177,6 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
     appointmentsData.forEach(appointment => {
         const tr = document.createElement('tr');        
         
-        const arrivalTime = new Date(appointment.arrival_time);
-        const formattedTime = arrivalTime.toLocaleString('de-DE');
-
          // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (appointment.appointment_id && appointment.title) {
@@ -1379,22 +1388,49 @@ function updateTableHeader(mode) {
 // HELPERS
 // ============================================
 
-// Neue Funktion: Aktualisiere Ankunftszeit basierend auf gewähltem Termin
-function updateArrivalTimeFromAppointment() {
+/**
+ * Setzt den Terminbeginn als Ankunftszeit — nur auf Knopfdruck.
+ *
+ * Bis 1.5.0 geschah das automatisch beim Terminwechsel. Der Unterschied ist
+ * nicht kosmetisch: Wer den Knopf drückt, trifft eine Aussage und passt die
+ * Minuten an; wer ihn nicht drückt, lässt die Ankunft leer. Vorher entstand
+ * dieselbe Uhrzeit, ohne dass jemand sie gewollt hätte.
+ */
+function setArrivalTimeFromAppointment() {
     const appointmentSelect = document.getElementById('record_appointment');
     const arrivalTimeInput = document.getElementById('record_arrival_time');
-    
+
     const selectedAppointmentId = appointmentSelect.value;
-    
-    if (!selectedAppointmentId) return;
-    
-    // Finde den gewählten Termin im Cache
+
+    if (!selectedAppointmentId) {
+        showToast('Bitte zuerst einen Termin wählen', 'warning');
+        return;
+    }
+
     const appointment = dataCache.appointments[currentYear].data.find(apt => apt.appointment_id == selectedAppointmentId);
-    
+
     if (appointment && appointment.date && appointment.start_time) {
-        // Konvertiere zu datetime-local Format
-        const dateTime = `${appointment.date}T${appointment.start_time.substring(0, 5)}`;
-        arrivalTimeInput.value = dateTime;
+        arrivalTimeInput.value = `${appointment.date}T${appointment.start_time.substring(0, 5)}`;
+        arrivalTimeInput.focus();
+    }
+}
+
+/**
+ * Blendet die Ankunftszeit aus, wenn der Status "entschuldigt" lautet.
+ *
+ * Wer nicht da war, ist nicht angekommen. Das Feld wird dabei geleert, damit
+ * eine zuvor eingetippte Zeit nicht unsichtbar mitgespeichert wird.
+ */
+function toggleArrivalTimeField() {
+    const status = document.getElementById('record_status').value;
+    const group  = document.getElementById('recordArrivalTimeGroup');
+    const input  = document.getElementById('record_arrival_time');
+
+    if (status === 'excused') {
+        group.style.display = 'none';
+        input.value = '';
+    } else {
+        group.style.display = '';
     }
 }
 
@@ -1405,6 +1441,8 @@ function updateArrivalTimeFromAppointment() {
 // Globale Funktionen für HTML onclick
 window.openRecordModal = openRecordModal;
 window.saveRecord = saveRecord;
+window.toggleArrivalTimeField = toggleArrivalTimeField;
+window.setArrivalTimeFromAppointment = setArrivalTimeFromAppointment;
 window.closeRecordModal = () => document.getElementById('recordModal').classList.remove('active');
 window.deleteRecord = deleteRecord;
 window.resetRecordFilter = resetRecordFilter;
