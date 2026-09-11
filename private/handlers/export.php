@@ -204,7 +204,7 @@ function exportRecords($db, $database) {
         JOIN {$prefix}appointments a ON r.appointment_id = a.appointment_id
         LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
         WHERE YEAR(a.date) = ?
-        ORDER BY a.date, r.arrival_time
+        ORDER BY a.date, r.arrival_time IS NULL, r.arrival_time
     ");
     $stmt->execute([$year]);
     $records = $stmt->fetchAll(PDO::FETCH_ASSOC);

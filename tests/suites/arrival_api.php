@@ -201,3 +201,34 @@ test('Die Jahresliste kennt kein Jahr ohne Termin', function () {
         arrDropAppointment($token, $aptId);
     }
 });
+
+test('Ein Record ohne Ankunftszeit wird nicht auf 1970 datiert', function () {
+    $admin    = apiToken('admin');
+    $memberId = (int) apiMemberId('user');
+    $aptId    = arrTempAppointment($admin, '2031-03-07');
+
+    try {
+        $rec = apiRequest('POST', 'records', [
+            'token' => $admin,
+            'body'  => ['member_id' => $memberId, 'appointment_id' => $aptId],
+        ]);
+        assertStatus(201, $rec);
+
+        $csv = apiRequest('GET', 'my_data', [
+            'token' => apiToken('user'),
+            'query' => ['format' => 'csv'],
+        ]);
+        assertStatus(200, $csv);
+
+        assertTrue(
+            !str_contains($csv['raw'], '01.01.1970'),
+            'strtotime(null) hat den 01.01.1970 in den Auskunftsexport geschrieben'
+        );
+        assertTrue(
+            str_contains($csv['raw'], '07.03.2031'),
+            'Das Termindatum sollte im Auskunftsexport stehen'
+        );
+    } finally {
+        arrDropAppointment($admin, $aptId);
+    }
+});

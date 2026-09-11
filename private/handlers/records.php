@@ -137,7 +137,10 @@ function handleRecords($db, $database, $method, $id) {
                     $params[] = $appointment_type_id;
                 }
                 
-                $sql .= " ORDER BY a.date DESC, r.arrival_time DESC, m.surname ASC, m.name ASC";
+                // "arrival_time IS NULL" zuerst: In MySQL sortiert NULL vor
+                // jedem Wert, Eintraege ohne Ankunftszeit stuenden sonst an der
+                // Spitze ihres Tages, als waeren sie die fruehesten.
+                $sql .= " ORDER BY a.date DESC, r.arrival_time IS NULL, r.arrival_time DESC, m.surname ASC, m.name ASC";
                 
                 // Query ausführen
                 if(count($params) > 0) {
