@@ -39,7 +39,7 @@ aus. Details zum Generator: `private/demo/README.md`.
 > ```
 >
 > Wer die Installation lieber aus dem ZIP macht, kopiert `private/demo/` anschließend von Hand
-> aus einem Klon nach — zwei Dateien plus README genügen. Dasselbe gilt bei jedem Update: Ein
+> aus einem Klon nach — drei Dateien plus README genügen. Dasselbe gilt bei jedem Update: Ein
 > ZIP-Update überschreibt den Ordner nicht, es bringt ihn nur nicht mit.
 
 1. **Eigene Datenbank und eigenen Datenbankbenutzer anlegen.** Der Benutzer darf **nur** auf
@@ -144,14 +144,30 @@ Ressource nicht unbemerkt offen steht.
 ## 3. Der Cronjob
 
 ```
+0 * * * * /usr/bin/php /pfad/zur/installation/private/demo/cron.php
+```
+
+`cron.php` ist gleichbedeutend mit `seed.php --yes --quiet`, braucht aber keine Argumente —
+viele Aufgabenplaner im Shared Hosting nehmen nur einen Dateipfad an. Wo Argumente gehen,
+funktioniert der direkte Aufruf genauso:
+
+```
 0 * * * * /usr/bin/php /pfad/zur/installation/private/demo/seed.php --yes --quiet
 ```
 
-- **CLI-PHP aufrufen, nicht den Webserver.** `seed.php` bricht über HTTP mit 403 ab.
+- **CLI-PHP aufrufen, nicht den Webserver.** `seed.php` bricht über HTTP mit 403 ab. Startet
+  das Panel Skripte über **php-cgi**, bricht es dort ebenfalls ab — mit Rückgabewert 1 und
+  „Nur über die Kommandozeile aufrufbar." in der Ausgabe. Dann im Panel die CLI-Variante
+  wählen oder den Pfad zur CLI-Binärdatei ausdrücklich angeben.
 - `--yes` überspringt die Rückfrage, `--quiet` zusammen mit `--yes` unterdrückt jede Ausgabe.
   Ohne `--quiet` gäbe es rund zwanzig Zeilen je Lauf, also stündlich eine Mail vom Cron.
-- Fehler gehen weiterhin auf STDERR und bleiben sichtbar. Rückgabewert 0 bei Erfolg, 1 bei
-  einem Fehler.
+- Rückgabewert 0 bei Erfolg, 1 bei einem Fehler; Fehler gehen auf STDERR. Das gilt auch für
+  eine **nicht erreichbare Datenbank** — die Datenbankklasse aus `config.php` beendet dort
+  ohne Rückgabewert, ein Wächter in `seed.php` macht daraus eine 1. Ihre JSON-Meldung
+  erscheint trotzdem auf STDOUT.
+- **`cron.php` und `seed.php` gehören zusammen hochgeladen.** Liegt neben einer neuen
+  `cron.php` noch eine ältere `seed.php`, meldet der Cron das mit Rückgabewert 1, statt still
+  ins Leere zu laufen.
 - Der Schreibvorgang liegt in einer Transaktion — ein Besucher mitten in einer Aktion sieht
   keinen halben Bestand.
 

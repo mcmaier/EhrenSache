@@ -142,11 +142,21 @@ steht in **`docs/DEMO.md`** — Installation, Einstellungen, Cronjob und Prüfli
 
 Hier nur, was den Generator selbst betrifft:
 
-Der Cron ruft ihn ohne Rückfrage und ohne Ausgabe:
+Der Cron ruft ihn ohne Rückfrage und ohne Ausgabe — über `cron.php`, die dieselben
+Argumente selbst setzt, weil viele Aufgabenplaner im Shared Hosting keine annehmen:
+
+```
+0 * * * * /usr/bin/php /pfad/zur/installation/private/demo/cron.php
+```
+
+Gleichbedeutend, wo Argumente möglich sind:
 
 ```
 0 * * * * /usr/bin/php /pfad/zur/installation/private/demo/seed.php --yes --quiet
 ```
+
+`seed.php` erkennt den Einstieg über `cron.php` an der Konstante `DEMO_SEED_ENTRY`. Die
+Rückfrage bleibt damit für jeden Aufruf von Hand erhalten.
 
 `--quiet` **zusammen mit** `--yes` schweigt vollständig — sonst löste ein stündlicher Job je
 nach Konfiguration stündlich eine Mail aus. `--quiet` **allein** unterdrückt nur die
@@ -155,6 +165,10 @@ gefragt wird — und wer das tippen soll, muss sehen, was er löscht. Die Regel 
 `showTargetListing()` im Skript und ist in `tests/suites/demo_seed_cli.php` festgehalten.
 
 Fehler gehen auf STDERR und bleiben sichtbar; Rückgabewert 0 bei Erfolg, 1 bei einem Fehler.
+Jedes geplante Ende läuft über `finishRun()`. Alles andere — etwa das `exit()` ohne Code, mit
+dem die Datenbankklasse einen Verbindungsfehler beantwortet — fängt ein Wächter aus
+`registerExitGuard()` ab und macht daraus eine 1. Neue Abbruchstellen im Ablauf also über
+`finishRun()` beenden, nicht über `exit()`, sonst meldet der Wächter sie als unerwartet.
 
 **Der Reset überschreibt in `system_settings` nur acht Schlüssel** und leert die Tabelle nie.
 `mail_enabled` und `smtp_configured` gehören **nicht** dazu — sie überleben jeden Lauf. Was
