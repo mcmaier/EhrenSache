@@ -87,6 +87,7 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
 {
     require_once __DIR__ . '/../helpers/member_activity.php';
     require_once __DIR__ . '/../helpers/attendance.php';
+    require_once __DIR__ . '/../helpers/punctuality.php';
 
     if ($groupId !== null) {
         // Wiederholt bewusst die Pruefung, die handleStatistics() vor dem Aufruf
@@ -95,13 +96,15 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
         // Nicht-Manager mit Gruppenfilter eine zusaetzliche, indizierte
         // COUNT-Abfrage. Wer hier "bereinigt", macht den Bericht angreifbar.
         if (!hasStatisticsGroupAccess($db, $database, $authMemberId, $role, $groupId)) {
+            // Auch hier beide Bloecke: eine eingeschaltete Kennzahl ueber einen
+            // leeren Bereich ist leer, nicht abgeschaltet.
             return [
                 'warning'    => 'group not accessible',
                 'year'       => $year,
                 'worktime'   => null,
                 'summary'    => attendanceBuildSummary([], 0, 0),
                 'statistics' => [],
-            ];
+            ] + punctualityBlocks($db, $database, [], $year, $memberId, $appointmentTypeId, 0);
         }
         $groups = [$groupId];
     } else {
@@ -147,13 +150,17 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
                                                        $appointmentTypeId);
     $memberCount  = attendanceActiveMemberCount($db, $database, $groups, $year, $memberId);
 
+    // Soll-Paare aus derselben Rechnung wie die Zusammenfassung -- die
+    // Messabdeckung der Puenktlichkeit bezieht sich auf genau diese Zahl.
+    $totalPairs = array_sum(array_map('intval', array_column($memberTotals, 'total')));
+
     return [
         'warning'    => null,
         'year'       => $year,
         'worktime'   => null,
         'summary'    => attendanceBuildSummary($memberTotals, $appointments, $memberCount),
         'statistics' => $statistics,
-    ];
+    ] + punctualityBlocks($db, $database, $groups, $year, $memberId, $appointmentTypeId, $totalPairs);
 }
 
 function handleStatistics($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId) {
