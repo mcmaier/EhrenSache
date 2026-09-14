@@ -510,6 +510,7 @@ $allChecksPassed = !in_array(false, $checks, true);
         }
         .version-old { background: #ffebee; color: #c62828; }
         .version-new { background: #e8f5e9; color: #2e7d32; }
+        .version-current { background: #e3f2fd; color: #1565c0; }
         .version-arrow { color: #666; margin: 0 6px; }
     </style>
 </head>
@@ -535,9 +536,16 @@ $allChecksPassed = !in_array(false, $checks, true);
 
         <h2>Schritt 0: Dateien aktualisieren</h2>
 
+        <?php // Rot nur, wenn eine neuere Version tatsächlich bekannt ist -- vorher weiß der
+              // Assistent das nicht, und eine aktuelle Installation ist nicht veraltet.
+              $veraltet = $updateInfo !== null && $updateInfo['available'] !== null; ?>
         <div class="info-box">
             <strong>Installierte Version:</strong>
-            <span class="version-badge version-old"><?= htmlspecialchars(updateReadVersionFile(INSTALL_ROOT) ?? 'unbekannt') ?></span>
+            <span class="version-badge <?= $veraltet ? 'version-old' : 'version-current' ?>"><?= htmlspecialchars(updateReadVersionFile(INSTALL_ROOT) ?? 'unbekannt') ?></span>
+            <?php if ($veraltet): ?>
+                <span class="version-arrow">&#8594;</span>
+                <span class="version-badge version-new"><?= htmlspecialchars($updateInfo['version']) ?></span>
+            <?php endif; ?>
         </div>
 
         <?php foreach ($updateErrors as $zeile): ?>
