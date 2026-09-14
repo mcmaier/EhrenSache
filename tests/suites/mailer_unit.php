@@ -150,17 +150,29 @@ test('Der Mailer laesst sich mit der Rueckfallkonfiguration bauen', function () 
     assertTrue($mailer instanceof Mailer, 'Kein Mailer-Objekt');
 });
 
-test('config_example.php laedt die Mailkonfiguration nicht ungeprueft', function () use ($repoRoot) {
-    // Neuinstallationen erben ihre config.php aus dieser Vorlage.
+test('config_example.php enthaelt keinen Programmcode mehr', function () use ($repoRoot) {
+    // Neuinstallationen erben ihre config.php aus dieser Vorlage. Seit 1.6.0
+    // darf sie nur noch Daten enthalten -- Code darin veraltete still, weil die
+    // Datei nie ueberschrieben wird. Die Mailkonfiguration laedt allein
+    // loadMailConfig() in private/helpers/mailer.php, geprueft in den Tests
+    // darueber; getMailConfig() gibt es nicht mehr.
     $php = (string) file_get_contents($repoRoot . '/private/config/config_example.php');
 
     assertTrue(
-        preg_match('/function getMailConfig\(\).*?\}/s', $php, $m) === 1,
-        'getMailConfig() nicht gefunden'
+        strpos($php, 'function getMailConfig(') === false,
+        'getMailConfig() steht noch in der Vorlage'
     );
     assertTrue(
-        strpos($m[0], 'is_file') !== false || strpos($m[0], 'file_exists') !== false,
-        'getMailConfig() prueft nicht, ob mail_config.php ueberhaupt existiert'
+        preg_match('/\bclass\s+Database\b/', $php) === 0,
+        'class Database steht noch in der Vorlage -- sie gehoert nach private/helpers/database.php'
+    );
+    assertTrue(
+        strpos($php, 'function getBaseUrl(') === false,
+        'getBaseUrl() steht noch in der Vorlage -- die Logik liegt in guessBaseUrl()'
+    );
+    assertTrue(
+        preg_match('/^\s*return\s*\[/m', $php) === 1,
+        'Die Vorlage liefert kein Array zurueck'
     );
 });
 test('Versandte Mails tragen einen To-Header', function () use ($repoRoot) {

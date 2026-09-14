@@ -7,6 +7,52 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.6.0] – unveröffentlicht
+
+### Neu
+- **Der Update-Assistent holt das Paket selbst von GitHub.** Ein neuer Schritt 0 fragt auf
+  Knopfdruck nach der neuesten Version, lädt das Paket, prüft Aufbau und Migrationskette,
+  sichert jede ersetzte Datei nach `private/backup/` und tauscht die Dateien. Während des Tauschs
+  antwortet die API mit 503. Nach dem Tausch prüft der getauschte Code die Kette ein zweites Mal
+  und spielt bei einem Fehler die Sicherung zurück. Der Weg von Hand bleibt.
+- **Updates prüfen in den Einstellungen.** Nur auf Knopfdruck; es gibt keinen automatischen
+  Abruf. Ist eine neuere Version bekannt, weist das Dashboard Administratoren darauf hin.
+- Ressource `update_check`; `version` meldet der Rolle `admin` zusätzlich `update_available`.
+
+### Geändert
+- **`config.php` enthält nur noch Daten.** Zugangsdaten, `base_url` und `demo_mode` als Array;
+  die Klasse `Database`, die Ermittlung der Basis-URL und das Laden der Konfiguration liegen
+  jetzt in `private/helpers/` (`database.php`, `bootstrap.php`, `config_reader.php`) und werden
+  bei jedem Update mit ausgetauscht. Bisher veraltete dieser Code bei jedem Release still,
+  weil `config.php` nie überschrieben wird.
+- **Der Update-Assistent stellt bestehende Dateien um.** Er legt vorher
+  `config.php.bak-1.5.1` an, liest das Ergebnis gegen und spielt die Sicherung zurück, falls
+  die Werte abweichen. Ein gesetztes `BASE_URL` und `DEMO_MODE` werden übernommen, `DEMO_MODE`
+  mitsamt Rohwert. Kann er die Datei nicht schreiben, läuft die Installation weiter; das
+  Dashboard weist Administratoren darauf hin.
+- **Künftige Konfigurationsschalter brauchen keinen Eingriff mehr** in die `config.php` einer
+  bestehenden Installation — fehlende Schlüssel erhalten einen Default.
+- Die Ressource `version` meldet der Rolle `admin` zusätzlich `config_format`.
+- Der Update-Assistent prüft die Migrationskette schon in Schritt 1 und listet in Schritt 2 die
+  tatsächlich anstehenden Migrationen. Die Warnung „weicht von der erwarteten Ausgangsversion
+  (1.0.0) ab" und die feste Liste aus der 1.0.0-Zeit entfallen — beide erschienen bei jedem
+  regulären Update.
+
+### Behoben
+- Der Installer setzte das Datenbankpasswort unmaskiert in `config.php`: Ein `"` darin ergab
+  eine kaputte Datei, ein `$` wurde von PHP still verändert.
+- Bei fehlender `config.php` brach `api.php` mit einem Fatal Error ab; `ping` meldet jetzt wie
+  vorgesehen `not_installed`.
+
+### Entfernt
+- `getMailConfig()` — seit `loadMailConfig()` nirgends mehr aufgerufen.
+- Der wirkungslose Installer-Patch, der ein `require_once 'config.php'` in `api.php`
+  umschreiben sollte.
+- `AUTO_CHECKIN_TOLERANCE_HOURS` aus der Vorlage; der Wert steht seit 1.2.3 in den
+  Einstellungen.
+
+---
+
 ## [1.5.1] – 2026-09-14
 
 ### Neu

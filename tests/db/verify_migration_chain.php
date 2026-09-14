@@ -261,9 +261,22 @@ $zuord   = (int) $pdo->query("SELECT COUNT(*) FROM `" . PREFIX . "activity_type_
 
 check('jede Taetigkeitsart ist jeder Gruppe zugeordnet', $arten * $gruppen, $zuord);
 
-$cfg = file_get_contents(testConfigPath());
-check('config.php erhielt das Feld $prefix', true, str_contains($cfg, 'private $prefix = "' . PREFIX . '"'));
-check('config.php erhielt die Methode table()', true, str_contains($cfg, 'function table('));
+// --- config.php: Migration 1.0.0 und 1.5.1 ------------------------------------
+// 1.0.0 ergaenzt $prefix und table() in der alten Klassenform; 1.5.1 schreibt
+// die Datei danach auf reine Daten um. Am Ende der Kette steht deshalb keine
+// Klasse mehr -- belegt wird beides trotzdem: Das Praefix im Endstand kann nur
+// stimmen, wenn 1.0.0 das Feld ergaenzt hat (sonst haette 1.5.1 ein leeres
+// uebernommen), und die Sicherung, die 1.5.1 vor dem Umschreiben anlegt, zeigt
+// die alte Form mit table().
+require_once $repo . '/private/helpers/config_reader.php';
+$endCfg    = readConfigFile(testConfigPath());
+$sicherung = (string) @file_get_contents(testConfigPath() . '.bak-1.5.1');
+check('config.php liegt am Ende der Kette in der Datenform vor', CONFIG_FORMAT_ARRAY, $endCfg['format']);
+check('das von 1.0.0 ergaenzte Prefix reicht bis in die Datenform', PREFIX, $endCfg['db']['prefix']);
+check('die Sicherung vor 1.5.1 enthaelt das von 1.0.0 ergaenzte Feld $prefix', true,
+      str_contains($sicherung, 'private $prefix = "' . PREFIX . '"'));
+check('die Sicherung vor 1.5.1 enthaelt die von 1.0.0 ergaenzte Methode table()', true,
+      str_contains($sicherung, 'function table('));
 
 // --- UPD-4: zweiter Lauf ist folgenlos --------------------------------------
 echo "\nUPD-4: zweiter Lauf\n";
@@ -400,6 +413,7 @@ check('Endstand ist die Zielversion', $target, latestSchemaVersion(readSchemaVer
 // --- Aufraeumen --------------------------------------------------------------
 db()->exec('DROP DATABASE IF EXISTS `' . DB . '`');
 @unlink(testConfigPath());
+@unlink(testConfigPath() . '.bak-1.5.1');
 echo "\nWegwerf-Datenbank " . DB . " entfernt.\n";
 
 echo "\n", ($fails === 0 ? 'ALLE PRUEFUNGEN BESTANDEN' : "{$fails} PRUEFUNG(EN) FEHLGESCHLAGEN"), "\n";

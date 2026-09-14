@@ -126,6 +126,14 @@ Sie benötigen eine **Rechtsgrundlage** für die Datenverarbeitung (Art. 6 DSGVO
 
 ---
 
+### Update-Prüfung
+
+Die Update-Prüfung in den Einstellungen und Schritt 0 des Update-Assistenten fragen
+`api.github.com` nach der neuesten Version und laden gegebenenfalls das Paket. Dabei erfährt
+GitHub die IP-Adresse des **Servers** — nicht die eines Mitglieds. Beides geschieht nur, wenn ein
+Administrator den Knopf drückt; einen automatischen Abruf gibt es nicht. Wer das nicht möchte,
+lädt Updates von Hand herunter.
+
 ## 5. Betroffenenrechte
 
 Mitglieder haben folgende Rechte:

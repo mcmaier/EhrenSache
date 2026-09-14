@@ -15,11 +15,13 @@
  *
  * mail_config.php wird nicht vom Installer angelegt, sondern erst geschrieben,
  * wenn ein Admin die SMTP-Einstellungen speichert (settings.php, saveSmtpConfig).
- * Auf einer frischen Installation fehlt sie also. getMailConfig() in config.php
- * lädt sie ungeprüft per `require` und bricht dann mit einem Fatal error ab —
- * an Stellen, die den Mailer nur bauen, um gleich danach checkMailStatus() zu
- * fragen. Zwei davon stehen direkt hinter einem commit(), dort war der Vorgang
- * schon gespeichert, während der Nutzer eine Fehlerseite sah.
+ * Auf einer frischen Installation fehlt sie also. Das frühere getMailConfig()
+ * in config.php lud sie ungeprüft per `require` und brach dann mit einem Fatal
+ * error ab — an Stellen, die den Mailer nur bauen, um gleich danach
+ * checkMailStatus() zu fragen. Zwei davon stehen direkt hinter einem commit(),
+ * dort war der Vorgang schon gespeichert, während der Nutzer eine Fehlerseite
+ * sah. Seit 1.6.0 gibt es getMailConfig() nicht mehr; diese Funktion ist der
+ * einzige Weg zur Mailkonfiguration.
  *
  * Die Rückfallwerte entsprechen dem, was getSmtpConfig() der Oberfläche liefert,
  * wenn keine Konfiguration hinterlegt ist.

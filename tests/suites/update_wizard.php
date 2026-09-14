@@ -47,11 +47,38 @@ test('Update-Wizard: $step bleibt eine Schrittnummer', function () use ($wizardS
     }
 });
 
-test('Update-Wizard: die drei Ansichten haengen an $step', function () use ($wizardSource) {
-    foreach ([1, 2, 3] as $view) {
+test('Update-Wizard: die vier Ansichten haengen an $step', function () use ($wizardSource) {
+    // Schritt 0 (Dateien von GitHub holen) kam mit 1.6.0 dazu.
+    foreach ([0, 1, 2, 3] as $view) {
         assertTrue(
             str_contains($wizardSource, "\$step == {$view}"),
             "Ansicht fuer Schritt {$view} nicht gefunden — Suche oben anpassen"
         );
+    }
+});
+
+test('Update-Wizard: die Warnung zur Ausgangsversion 1.0.0 ist entfernt', function () use ($wizardSource) {
+    assertSame(false, strpos($wizardSource, 'erwarteten Ausgangsversion'),
+        'Die Warnung erschien bei jedem regulaeren Update');
+});
+
+test('Update-Wizard: geplante Aenderungen kommen aus der Migrationskette', function () use ($wizardSource) {
+    assertSame(false, strpos($wizardSource, 'import_logs'), 'Feste Liste aus der 1.0.0-Zeit steht noch drin');
+    assertTrue(strpos($wizardSource, '$plannedChain') !== false, 'Schritt 2 liest die Kette nicht');
+});
+
+test('Update-Wizard: POST in Schritt 0 prueft ein Sitzungstoken', function () use ($wizardSource) {
+    assertSame(1, preg_match('/hash_equals\(\s*\$_SESSION\[\'update_csrf\'\]/', $wizardSource));
+});
+
+test('Update-Wizard: Werte aus der GitHub-Antwort werden maskiert ausgegeben', function () use ($wizardSource) {
+    // Jede Ausgabe von $updateInfo, $updateErrors, $updateLog und der
+    // Schleifenvariable $zeile steht in htmlspecialchars().
+    preg_match_all('/<\?=\s*(.*?)\s*\?>/s', $wizardSource, $treffer);
+    foreach ($treffer[1] as $ausdruck) {
+        if (strpos($ausdruck, '$updateInfo') !== false || strpos($ausdruck, '$updateErrors') !== false
+            || strpos($ausdruck, '$updateLog') !== false || strpos($ausdruck, '$zeile') !== false) {
+            assertSame(0, strpos($ausdruck, 'htmlspecialchars('), "Unmaskiert: {$ausdruck}");
+        }
     }
 });

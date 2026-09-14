@@ -15,7 +15,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EhrenSache - Dashboard</title>
 
-    <link rel="stylesheet" href="css/main.css?v=1.5.1">
+    <link rel="stylesheet" href="css/main.css?v=1.6.0">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="robots" content="noindex, nofollow">
     <script type="module" src="js/theme.js"></script>
@@ -667,6 +667,29 @@
                             <small class="input-hint">Sendet eine Test-Email um die Einstellungen zu prüfen</small>
                         </div>
                     </div>                    
+
+                    <!-- Updates -->
+                    <div class="settings-card">
+                        <h3>🔄 Updates</h3>
+                        <div class="settings-item">
+                            <label>
+                                <strong>Installierte Version: <span id="update_installed">–</span></strong>
+                                <small>Zuletzt geprüft: <span id="update_last_checked">noch nie</span></small>
+                            </label>
+                            <small class="input-hint">
+                                Die Prüfung fragt GitHub nach der neuesten Version und läuft nur, wenn du
+                                den Knopf drückst. Dabei erfährt GitHub die IP-Adresse dieses Servers.
+                                Zuverlässig von neuen Versionen erfährst du, indem du die Releases des
+                                Projekts auf GitHub abonnierst.
+                            </small>
+                            <div style="margin-top: 12px;">
+                                <button type="button" id="update_check_btn" class="btn btn-secondary" onclick="checkForUpdates()">
+                                    🔍 Auf Updates prüfen
+                                </button>
+                            </div>
+                            <div id="update_check_result" style="margin-top: 10px;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

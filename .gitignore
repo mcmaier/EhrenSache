@@ -18,3 +18,13 @@ tests/db/tmp/
 test_credentials.md
 
 temporary_screenshots
+
+# Sicherung, die die Migration auf 1.6.0 vor dem Umschreiben von config.php anlegt.
+# Enthaelt die Zugangsdaten der Installation.
+private/config/*.bak-*
+
+# Laufzeitdateien des Update-Assistenten (1.6.0): Wartungsflag, Sicherungen
+# ersetzter Dateien, Arbeitsverzeichnis fuer das entpackte Paket.
+private/config/maintenance.lock
+private/backup/
+private/.update-tmp/

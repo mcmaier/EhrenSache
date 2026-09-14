@@ -167,27 +167,26 @@ if ($step == 4) {
             die('Installation bereits durchgeführt. Lösche config.php für Neuinstallation.');
         }
 
-        // config.php erstellen aus Template
-        $configTemplate = file_get_contents('../../private/config/config_example.php');
-        $configContent = str_replace(
-            ['your_host','your_database', 'your_username', 'your_password','your_prefix'],
-            [$cfg['host'], $cfg['name'], $cfg['user'], $cfg['pass'], $cfg['prefix']],
-            $configTemplate
-        );
-        file_put_contents('../../private/config/config.php', $configContent);
+        // config.php schreiben -- über denselben Erzeuger wie die Migration,
+        // damit es nur einen Weg gibt, diese Datei zu schreiben. var_export()
+        // maskiert das Passwort; das frühere str_replace auf die Vorlage setzte
+        // es roh in einen PHP-String und brach bei " oder $ darin.
+        require_once '../../private/helpers/config_reader.php';
+        file_put_contents('../../private/config/config.php', renderConfigFile([
+            'db' => [
+                'host'   => $cfg['host'],
+                'name'   => $cfg['name'],
+                'user'   => $cfg['user'],
+                'pass'   => $cfg['pass'],
+                'prefix' => $cfg['prefix'],
+            ],
+            'base_url'  => null,
+            'demo_mode' => false,
+        ]));
         
         // Erstelle Lock-File
         file_put_contents('../../private/config/install.lock', date('Y-m-d H:i:s'));
         
-        // Update api.php require_once
-        $apiPath = '../api/api.php';
-        $apiContent = file_get_contents($apiPath);
-        $apiContent = str_replace(
-            "require_once 'config.php';",
-            "require_once '../../private/config/config.php';",
-            $apiContent
-        );
-        file_put_contents($apiPath, $apiContent);
         
         $success = true;
 

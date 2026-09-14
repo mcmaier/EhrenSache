@@ -25,8 +25,21 @@ header("Access-Control-Allow-Credentials: true");
 // 2. INCLUDES
 // ============================================
 
+// Wartung: Während der Update-Assistent Dateien tauscht, würde ein Request alten
+// und neuen Code mischen. Deshalb steht diese Prüfung vor allen übrigen Includes.
+require_once '../../private/helpers/maintenance.php';
+if (maintenanceActive(maintenanceFlagPath())) {
+    http_response_code(503);
+    header('Retry-After: 60');
+    echo json_encode([
+        'status'  => 'maintenance',
+        'message' => 'Ein Update wird eingespielt. Bitte in einer Minute erneut versuchen.',
+    ]);
+    exit();
+}
+
 //Module laden
-require_once '../../private/config/config.php';
+require_once '../../private/helpers/bootstrap.php';
 require_once '../../private/helpers/auth.php';
 require_once '../../private/helpers/rate_limiter.php';
 require_once '../../private/helpers/totp.php';
@@ -64,6 +77,8 @@ require_once '../../private/handlers/my_data.php';
 require_once '../../private/handlers/activity_types.php';
 require_once '../../private/handlers/work_sessions.php';
 require_once '../../private/handlers/station.php';
+require_once '../../private/helpers/update_status.php';
+require_once '../../private/handlers/update_check.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -220,8 +235,7 @@ if($resource === 'ping' && $request_method === 'GET') {
     
     // Prüfe DB-Verbindung
     try {
-        require_once $configPath;
-        $database = new Database();
+        $database = new Database(appConfig()['db']);
         $testDb = $database->getConnection();
         $prefix = $database->table('');
 
@@ -261,7 +275,7 @@ if($resource === 'ping' && $request_method === 'GET') {
 // ============================================
 
 //Datenbank verbinden
-$database = new Database();
+$database = new Database(appConfig()['db']);
 $db = $database->getConnection();
 $prefix = $database->table('');
 
@@ -623,8 +637,11 @@ try {
         getSessionStatus($request_method);
         break;
     case 'version':
-        getVersion();
+        getVersion($authUserRole, $db, $database);
     break;
+    case 'update_check':
+        handleUpdateCheck($db, $database, $request_method);
+        break;
     case 'station':
         handleStation($db, $database, $request_method, $authUserId, $authUserRole, $authDeviceType);
         break;

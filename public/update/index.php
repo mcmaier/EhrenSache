@@ -19,19 +19,34 @@ define('VERSION_PATH',   __DIR__ . '/../../version.json');
 define('HTACCESS_PATH',  __DIR__ . '/.htaccess');
 
 require_once __DIR__ . '/../../private/helpers/migrations.php';
+require_once __DIR__ . '/../../private/helpers/config_reader.php';
+require_once __DIR__ . '/../../private/helpers/updater.php';
+
+define('INSTALL_ROOT',       dirname(__DIR__, 2));
+define('UPDATE_TMP_ROOT',    INSTALL_ROOT . '/private/.update-tmp');
+define('UPDATE_BACKUP_ROOT', INSTALL_ROOT . '/private/backup');
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
-/** Liest die relevanten Werte aus config.php via Regex (sicher für 1.0.0 ohne $prefix). */
-function parseConfig(string $file): array
+/**
+ * Liest config.php über den gemeinsamen Leser -- in der alten Klassenform
+ * (auch 1.0.0 ohne $prefix) wie in der Array-Form ab 1.6.0 -- und liefert die
+ * flachen Schlüssel, mit denen dieser Assistent arbeitet.
+ *
+ * Bis 1.5.1 stand hier eine eigene Regex-Fassung. Nach der Migration auf 1.6.0
+ * hätte sie die umgeschriebene Datei nicht mehr lesen können.
+ */
+function readWizardConfig(string $file): array
 {
-    if (!file_exists($file)) return [];
-    $c = file_get_contents($file);
-    $result = [];
-    foreach (['host', 'db_name', 'username', 'password', 'prefix'] as $key) {
-        $result[$key] = preg_match('/private\s+\$' . $key . '\s*=\s*"([^"]*)"/', $c, $m) ? $m[1] : '';
-    }
-    return $result;
+    $cfg = readConfigFile($file);
+    return [
+        'host'     => $cfg['db']['host'],
+        'db_name'  => $cfg['db']['name'],
+        'username' => $cfg['db']['user'],
+        'password' => $cfg['db']['pass'],
+        'prefix'   => $cfg['db']['prefix'],
+        'format'   => $cfg['format'],
+    ];
 }
 
 /** Verbindet zur DB anhand der geparsten Config-Werte. */
@@ -60,8 +75,104 @@ function getTargetVersion(): string
 
 // ── Schritt-Logik ─────────────────────────────────────────────────────────────
 
-$step  = (int) ($_GET['step'] ?? 1);
+$step  = (int) ($_GET['step'] ?? 0);
 $error = '';
+
+// ── SCHRITT 0: Dateien von GitHub holen ─────────────────────────────────────
+//
+// Zwei Phasen in zwei Requests. POST tauscht die Dateien und leitet weiter; der
+// Folgerequest läuft mit dem GETAUSCHTEN Code und prüft die Migrationskette ein
+// zweites Mal (Spezifikation 8.2). Der Weg von Hand bleibt: „Dateien bereits
+// hochgeladen" führt direkt zu Schritt 1.
+$updateInfo   = null;
+$updateErrors = [];
+$updateLog    = [];
+
+if (empty($_SESSION['update_csrf'])) {
+    $_SESSION['update_csrf'] = bin2hex(random_bytes(16));
+}
+
+if ($step === 0 && ($_GET['phase'] ?? '') === 'verify') {
+    $backupDir = (string) ($_SESSION['update_backup_dir'] ?? '');
+    unset($_SESSION['update_backup_dir']);
+    $backupNorm = str_replace('\\', '/', $backupDir);
+    $wurzelNorm = str_replace('\\', '/', UPDATE_BACKUP_ROOT) . '/';
+
+    if ($backupDir === '' || strpos($backupNorm, $wurzelNorm) !== 0) {
+        $updateErrors[] = 'Kein laufendes Update gefunden. Bitte von vorn beginnen.';
+    } else {
+        $ergebnis = updaterVerify([
+            'install_root'     => INSTALL_ROOT,
+            'backup_dir'       => $backupDir,
+            'maintenance_file' => maintenanceFlagPath(),
+        ]);
+        if ($ergebnis['ok']) {
+            $_SESSION['update_done'] = ['version' => $ergebnis['version'], 'backup_dir' => $backupDir];
+            header('Location: ?step=1');
+            exit;
+        }
+        $updateErrors = $ergebnis['errors'];
+    }
+}
+
+if ($step === 0 && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!hash_equals($_SESSION['update_csrf'], (string) ($_POST['csrf'] ?? ''))) {
+        $updateErrors[] = 'Die Sitzung ist abgelaufen. Bitte die Seite neu laden.';
+    } else {
+        @set_time_limit(300);
+        $updateErrors = updateEnvironmentErrors();
+
+        if ($updateErrors === []) {
+            try {
+                $release     = updateFetchLatest();
+                $installiert = updateReadVersionFile(INSTALL_ROOT) ?? '0.0.0';
+                $aktion      = (string) ($_POST['action'] ?? '');
+
+                if ($aktion === 'check') {
+                    $updateInfo = $release + ['available' => updateAvailable($installiert, $release)];
+                } elseif ($aktion === 'apply') {
+                    // Die Adresse kommt nie aus dem Formular, sondern aus einem
+                    // frischen Abruf; das Formular bestätigt nur die Version.
+                    if (($_POST['expected'] ?? '') !== $release['version']) {
+                        throw new RuntimeException('Die neueste Version hat sich inzwischen geändert – bitte erneut abfragen.');
+                    }
+                    if (updateAvailable($installiert, $release) === null) {
+                        throw new RuntimeException("Version {$release['version']} ist nicht neuer als die installierte {$installiert}.");
+                    }
+
+                    $cfg       = readWizardConfig(CONFIG_PATH);
+                    $dbVersion = detectDbVersion(connectDb($cfg), $cfg['prefix']);
+
+                    if (!is_dir(UPDATE_TMP_ROOT) && !@mkdir(UPDATE_TMP_ROOT, 0775, true)) {
+                        throw new RuntimeException('Arbeitsverzeichnis nicht anlegbar: private/.update-tmp');
+                    }
+                    $zip = UPDATE_TMP_ROOT . '/paket.zip';
+                    updateDownloadPackage($release['zipball_url'], $zip);
+
+                    $ergebnis = updaterApply([
+                        'install_root'     => INSTALL_ROOT,
+                        'zip'              => $zip,
+                        'db_version'       => $dbVersion,
+                        'tmp_root'         => UPDATE_TMP_ROOT,
+                        'backup_root'      => UPDATE_BACKUP_ROOT,
+                        'maintenance_file' => maintenanceFlagPath(),
+                    ]);
+                    @unlink($zip);
+
+                    if ($ergebnis['ok']) {
+                        $_SESSION['update_backup_dir'] = $ergebnis['backup_dir'];
+                        header('Location: ?step=0&phase=verify');
+                        exit;
+                    }
+                    $updateErrors = $ergebnis['errors'];
+                    $updateLog    = $ergebnis['log'];
+                }
+            } catch (Throwable $e) {
+                $updateErrors[] = $e->getMessage();
+            }
+        }
+    }
+}
 
 // ── SCHRITT 1: Systemprüfung ─────────────────────────────────────────────────
 $checks       = [];
@@ -80,11 +191,21 @@ if ($step >= 1) {
     ];
 
     if ($checks['config.php']) {
-        $configValues = parseConfig(CONFIG_PATH);
+        $configValues = readWizardConfig(CONFIG_PATH);
         try {
             $pdo       = connectDb($configValues);
             $dbVersion = detectDbVersion($pdo, $configValues['prefix'] ?? '');
             $checks['Datenbankverbindung'] = true;
+
+            $kettenLabel = "Migrationskette {$dbVersion} → {$targetVersion}";
+            try {
+                resolveMigrationChain(normalizeDetectedVersion($dbVersion), $targetVersion,
+                    loadMigrationManifest(MIGRATION_PATH . 'manifest.php'));
+                $checks[$kettenLabel] = true;
+            } catch (RuntimeException $e) {
+                $checks[$kettenLabel] = false;
+                $error = htmlspecialchars($e->getMessage());
+            }
         } catch (Exception $e) {
             $checks['Datenbankverbindung'] = false;
             $error = "DB-Verbindung fehlgeschlagen: " . htmlspecialchars($e->getMessage());
@@ -111,6 +232,16 @@ if ($step == 2 && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$plannedChain = [];
+if ($step == 2 && isset($pdo)) {
+    try {
+        $plannedChain = resolveMigrationChain(normalizeDetectedVersion($dbVersion), $targetVersion,
+            loadMigrationManifest(MIGRATION_PATH . 'manifest.php'));
+    } catch (RuntimeException $e) {
+        $error = htmlspecialchars($e->getMessage());
+    }
+}
+
 // ── SCHRITT 3: Migration ausführen ───────────────────────────────────────────
 $migrationLog  = [];
 $migrationWarn = [];
@@ -124,7 +255,7 @@ if ($step == 3 && $_SERVER['REQUEST_METHOD'] !== 'POST') {
 
     $prefix    = $_SESSION['update_prefix'];
     $fromVer   = $_SESSION['update_from'] ?? 'unbekannt';
-    $configCfg = parseConfig(CONFIG_PATH);
+    $configCfg = readWizardConfig(CONFIG_PATH);
 
     try {
         $pdo = connectDb($configCfg);
@@ -379,6 +510,7 @@ $allChecksPassed = !in_array(false, $checks, true);
         }
         .version-old { background: #ffebee; color: #c62828; }
         .version-new { background: #e8f5e9; color: #2e7d32; }
+        .version-current { background: #e3f2fd; color: #1565c0; }
         .version-arrow { color: #666; margin: 0 6px; }
     </style>
 </head>
@@ -398,11 +530,87 @@ $allChecksPassed = !in_array(false, $checks, true);
     <?php endif; ?>
 
     <?php // ═══════════════════════════════════════════════════════════════
+          // SCHRITT 0: Dateien von GitHub holen
+          // ═══════════════════════════════════════════════════════════════
+    if ($step == 0): ?>
+
+        <h2>Schritt 0: Dateien aktualisieren</h2>
+
+        <?php // Rot nur, wenn eine neuere Version tatsächlich bekannt ist -- vorher weiß der
+              // Assistent das nicht, und eine aktuelle Installation ist nicht veraltet.
+              $veraltet = $updateInfo !== null && $updateInfo['available'] !== null; ?>
+        <div class="info-box">
+            <strong>Installierte Version:</strong>
+            <span class="version-badge <?= $veraltet ? 'version-old' : 'version-current' ?>"><?= htmlspecialchars(updateReadVersionFile(INSTALL_ROOT) ?? 'unbekannt') ?></span>
+            <?php if ($veraltet): ?>
+                <span class="version-arrow">&#8594;</span>
+                <span class="version-badge version-new"><?= htmlspecialchars($updateInfo['version']) ?></span>
+            <?php endif; ?>
+        </div>
+
+        <?php foreach ($updateErrors as $zeile): ?>
+            <div class="error-box">&#10060; <?= htmlspecialchars($zeile) ?></div>
+        <?php endforeach; ?>
+
+        <?php if ($updateLog !== []): ?>
+            <ul class="log-list">
+                <?php foreach ($updateLog as $zeile): ?>
+                    <li><?= htmlspecialchars($zeile) ?></li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+
+        <?php if ($updateInfo === null): ?>
+            <p>
+                Der Assistent kann das neueste Paket selbst von GitHub holen, prüfen, jede ersetzte
+                Datei sichern und die Dateien tauschen. Dabei nimmt dieser Server Kontakt zu GitHub auf.
+            </p>
+            <form method="POST">
+                <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['update_csrf']) ?>">
+                <input type="hidden" name="action" value="check">
+                <button type="submit" class="btn">Neueste Version abfragen</button>
+            </form>
+        <?php elseif ($updateInfo['available'] !== null): ?>
+            <div class="success-box">
+                Version <strong><?= htmlspecialchars($updateInfo['version']) ?></strong> ist verfügbar
+                (veröffentlicht am <?= htmlspecialchars(substr($updateInfo['published_at'], 0, 10)) ?>).
+            </div>
+            <div class="warn-box">
+                &#9888; Vorher die Datenbank sichern. Während des Tauschs ist die Anwendung einige
+                Sekunden im Wartungsmodus.
+            </div>
+            <form method="POST">
+                <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['update_csrf']) ?>">
+                <input type="hidden" name="action" value="apply">
+                <input type="hidden" name="expected" value="<?= htmlspecialchars($updateInfo['version']) ?>">
+                <button type="submit" class="btn">Update auf <?= htmlspecialchars($updateInfo['version']) ?> einspielen</button>
+            </form>
+        <?php else: ?>
+            <div class="info-box">
+                Diese Installation ist aktuell (neueste Version auf GitHub:
+                <?= htmlspecialchars($updateInfo['version']) ?>).
+            </div>
+        <?php endif; ?>
+
+        <p style="margin-top: 20px;">
+            <a href="?step=1"><button class="btn btn-secondary">Dateien bereits hochgeladen – weiter zur Systemprüfung</button></a>
+        </p>
+
+    <?php // ═══════════════════════════════════════════════════════════════
           // SCHRITT 1: Systemprüfung
           // ═══════════════════════════════════════════════════════════════
-    if ($step == 1): ?>
+    elseif ($step == 1): ?>
 
         <h2>Schritt 1: Systemprüfung</h2>
+
+        <?php if (!empty($_SESSION['update_done'])): ?>
+            <div class="success-box">
+                &#10003; Dateien auf Version <strong><?= htmlspecialchars((string) $_SESSION['update_done']['version']) ?></strong>
+                aktualisiert. Sicherung der ersetzten Dateien:
+                <code><?= htmlspecialchars((string) $_SESSION['update_done']['backup_dir']) ?></code>
+            </div>
+            <?php unset($_SESSION['update_done']); ?>
+        <?php endif; ?>
 
         <ul class="check-list">
             <?php foreach ($checks as $label => $passed): ?>
@@ -424,14 +632,6 @@ $allChecksPassed = !in_array(false, $checks, true);
                 &nbsp;&nbsp;<strong>Prefix in config.php:</strong> <em>nicht vorhanden (v1.0.0)</em>
             <?php endif; ?>
         </div>
-        <?php endif; ?>
-
-        <?php if ($dbVersion !== '1.0.0' && $dbVersion !== 'unbekannt' && strpos($dbVersion, '1.0') === false): ?>
-            <div class="warn-box">
-                &#9888; Die erkannte Datenbankversion <strong><?= htmlspecialchars($dbVersion) ?></strong>
-                weicht von der erwarteten Ausgangsversion (1.0.0) ab.
-                Das Update kann trotzdem ausgeführt werden – alle Schritte sind idempotent.
-            </div>
         <?php endif; ?>
 
         <?php if ($allChecksPassed): ?>
@@ -484,13 +684,14 @@ $allChecksPassed = !in_array(false, $checks, true);
                 <li>&#128260; Alle Tabellen umbenennen (Prefix hinzufügen)</li>
                 <li>&#128260; config.php: Feld <code>$prefix</code> ergänzen</li>
                 <?php endif; ?>
-                <li>&#10133; Neue Tabelle: <code>import_logs</code></li>
-                <li>&#10133; Neue Spalte: <code>appointments.type_id</code></li>
-                <li>&#10133; Neue Indizes auf <code>records</code>, <code>appointments</code>, <code>member_group_assignments</code></li>
-                <li>&#128260; system_settings: ENUM <code>appearance</code> → <code>public</code></li>
-                <li>&#10133; Neue Einstellung: <code>privacy_policy_url</code></li>
-                <li>&#128260; View <code>v_users_extended</code> → <code><?= htmlspecialchars(($configValues['prefix'] ?? '') . 'v_users_extended') ?></code></li>
-                <li>&#10133; Schema-Versionstabelle anlegen &amp; Version eintragen</li>
+                <?php foreach ($plannedChain as $kettenSchritt): ?>
+                <li>&#10133; Migration <?= htmlspecialchars($kettenSchritt['from']) ?> → <?= htmlspecialchars($kettenSchritt['to']) ?>
+                    <small>(<code><?= htmlspecialchars($kettenSchritt['file']) ?></code>)</small></li>
+                <?php endforeach; ?>
+                <?php if ($plannedChain === []): ?>
+                <li>Keine Migration nötig – die Datenbank steht auf <?= htmlspecialchars($targetVersion) ?>.</li>
+                <?php endif; ?>
+                <li>&#10133; Schema-Version eintragen</li>
             </ul>
 
             <div class="checkbox-group">

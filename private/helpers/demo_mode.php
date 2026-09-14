@@ -80,6 +80,7 @@ const DEMO_WRITE_DENIED = [
     'import',                 // Dateiannahme
     'cleanup',                // löscht Daten
     'regenerate_token',       // erzeugt API-Zugangsmittel
+    'update_check',           // fragt GitHub an und schreibt Einstellungen
 ];
 
 /**
