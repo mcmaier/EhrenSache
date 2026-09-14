@@ -38,6 +38,8 @@ verpflichtet, die datenschutzrechtlichen Vorgaben eigenständig umzusetzen.
 - [ ] **Mitglieder informieren** (z.B. Mitgliederversammlung, Rundmail)
 - [ ] Falls erforderlich: **Datenschutzbeauftragten** bestellen
 - [ ] **Auftragsverarbeitungsvertrag (AVV)** mit Hosting-Provider abschließen
+- [ ] Nur falls **Pünktlichkeit oder Zuverlässigkeit** eingeschaltet werden sollen: Abschnitt 11
+      lesen und den Zweck festlegen, **bevor** der Schalter umgelegt wird
 
 ### Phase 2: Technische Maßnahmen
 
@@ -112,6 +114,9 @@ Sie benötigen eine **Rechtsgrundlage** für die Datenverarbeitung (Art. 6 DSGVO
 - **Änderungshistorie der Arbeitszeiten**: wer wann welchen Wert geändert,
   freigegeben, abgelehnt oder gelöscht hat
 - **Stations-PIN** (nur als Hash; Zeitpunkt der letzten Änderung): wird mit dem Mitglied gelöscht
+- **Pünktlichkeit und Zuverlässigkeit** (nur wenn eingeschaltet, siehe Abschnitt 11): keine
+  gespeicherten Daten, sondern Kennzahlen, die bei jedem Aufruf aus Anwesenheiten und Abmeldungen
+  berechnet werden
 
 ### Technische Daten
 
@@ -428,7 +433,91 @@ Informieren Sie **vor** der Aktivierung, mindestens über:
 
 ---
 
-## 11. Hilfreiche Links & Ressourcen
+## 11. Pünktlichkeit und Zuverlässigkeit (optionale Kennzahlen)
+
+Beide Kennzahlen sind **standardmäßig abgeschaltet** (`punctuality_enabled` und
+`reliability_enabled` stehen auf `0`). Solange das so bleibt, werden sie weder berechnet noch
+angezeigt. Ein Update schaltet sie nicht ein. Alles in diesem Abschnitt gilt erst, wenn Sie einen
+der Schalter umlegen.
+
+### 11.1 Warum dieser Abschnitt eigenständig ist
+
+Eine Anwesenheitsliste hält fest, *dass* jemand da war. Diese Kennzahlen **bewerten**, *wie*:
+wie oft jemand rechtzeitig kam und ob er abgesagt hat, wenn er nicht kommen konnte. Die DSGVO
+nennt bei der Begriffsbestimmung des Profilings (Art. 4 Nr. 4) ausdrücklich die Analyse von
+„Zuverlässigkeit" und „Verhalten". Behandeln Sie die Kennzahlen deshalb nicht als Anzeigevariante
+der Anwesenheit.
+
+Gespeichert wird dabei nichts Neues. Die Werte entstehen bei jedem Aufruf aus Daten, die ohnehin
+vorliegen: Ankunftszeiten, Abmeldungen, Entschuldigungen.
+
+### 11.2 Zweckbindung
+
+Legen Sie den Zweck **vor** dem Einschalten fest und halten Sie ihn im Verzeichnis von
+Verarbeitungstätigkeiten fest. Naheliegend ist:
+
+- **Planung** — wie verlässlich ist eine Gruppe besetzt, reicht die Probezeit
+- **Rückmeldung an das Mitglied selbst**, das seine eigenen Werte sieht
+
+Nicht gedeckt ist ohne gesonderte Grundlage: öffentliche Vergleiche zwischen Mitgliedern,
+Aushänge, Ranglisten, oder Entscheidungen über Mitgliedschaft, Besetzung oder Ämter, die **allein**
+auf der Kennzahl beruhen. Letzteres berührt Art. 22 DSGVO (automatisierte Einzelentscheidung) —
+eine Kennzahl darf einer Entscheidung zuarbeiten, sie aber nicht ersetzen.
+
+### 11.3 Rechtsgrundlage
+
+In Betracht kommt regelmäßig ein berechtigtes Interesse (Art. 6 Abs. 1 lit. f) an einem
+verlässlichen Proben- oder Spielbetrieb, oder eine entsprechende Regelung in der Satzung. Beim
+berechtigten Interesse haben Mitglieder ein **Widerspruchsrecht** (Art. 21) — planen Sie, wie Sie
+damit umgehen, bevor der erste Widerspruch kommt.
+
+Prüfen Sie das für Ihren Verein. Wer die Werte nicht nutzt, braucht sie nicht einzuschalten.
+
+### 11.4 Was die Kennzahlen aussagen — und was nicht
+
+- **Pünktlichkeit** wird nur über Ankünfte mit bekannter Uhrzeit gerechnet: Stempel an Station,
+  Gerät oder App, vom Verwalter eingetragene Uhrzeiten und genehmigte Zeitkorrekturen. Einträge
+  ohne Uhrzeit, importierte Daten und abgehakte Listen zählen nicht. Unter fünf Messungen gibt es
+  keine Quote.
+- **Zuverlässigkeit** zählt, wer erschienen ist oder rechtzeitig abgesagt hat. Eine Abmeldung
+  zählt nach dem Zeitpunkt, zu dem sie eingegangen ist, nicht nach dem Zeitpunkt der Freigabe.
+
+Beide Werte sind so gut wie die Erfassung dahinter. Ein Verein, der überwiegend Listen abhakt, hat
+wenige Messungen und damit eine wenig belastbare Pünktlichkeit — das zeigt die Oberfläche als
+Messabdeckung an.
+
+### 11.5 Wer was sieht
+
+| Rolle | Sicht |
+|---|---|
+| Admin, Manager | Werte für den gewählten Bereich (Verein, Gruppe) und für jede einzelne Person, die sie gezielt aufrufen |
+| Mitglied | ausschließlich die eigenen Werte |
+| Gerät | nichts |
+
+Eine Liste, in der alle Mitglieder nach Pünktlichkeit nebeneinanderstehen, erzeugt EhrenSache
+nicht. Wer eine solche Übersicht selbst anfertigt, verlässt den in 11.2 beschriebenen Rahmen.
+
+### 11.6 Speicherdauer und Auskunft
+
+Eine eigene Speicherdauer gibt es nicht: Die Kennzahlen verschwinden mit den Anwesenheiten und
+Abmeldungen, aus denen sie berechnet werden (Löschfrist für Anwesenheiten und Ausnahmen unter
+*Einstellungen → DSGVO Datenverwaltung*).
+
+Die eigenen Werte je Jahr erscheinen in der Selbstauskunft des Mitglieds (Profil → „Meine Daten",
+JSON und CSV) — solange die jeweilige Kennzahl eingeschaltet ist.
+
+### 11.7 Was Sie den Mitgliedern sagen sollten
+
+Vor dem Einschalten, zum Beispiel in der Rundmail aus Abschnitt 6.3:
+
+- dass und wozu Pünktlichkeit bzw. Zuverlässigkeit ausgewertet werden
+- wer die Werte sieht (11.5)
+- dass jedes Mitglied seine eigenen Werte einsehen kann
+- wie ein Widerspruch eingelegt werden kann
+
+---
+
+## 12. Hilfreiche Links & Ressourcen
 
 ### Gesetzestexte
 - **DSGVO**: https://dsgvo-gesetz.de
@@ -448,7 +537,7 @@ Informieren Sie **vor** der Aktivierung, mindestens über:
 
 ---
 
-## 12. Häufige Fragen (FAQ)
+## 13. Häufige Fragen (FAQ)
 
 **Q: Müssen wir einen Datenschutzbeauftragten bestellen?**  
 A: Nur falls mind. 20 Personen ständig mit automatisierter Datenverarbeitung 
@@ -467,7 +556,7 @@ aber Abmahnungen möglich).
 
 ---
 
-## 13. Disclaimer
+## 14. Disclaimer
 
 **Keine Rechtsberatung**: Diese Hinweise dienen der Orientierung und 
 ersetzen keine individuelle Rechtsberatung. Im Zweifel konsultieren Sie 
