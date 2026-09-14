@@ -326,3 +326,27 @@ test('Ein Mitglied sieht nur die eigenen Werte', function () {
         assertSame($alsAdmin['body']['punctuality'], $alsUser['body']['punctuality']);
     });
 });
+
+test('Die Selbstauskunft enthaelt die eigenen Werte je Jahr, solange eingeschaltet', function () {
+    puWithSettings(['punctuality_enabled' => '0', 'reliability_enabled' => '0'], function () {
+        $aus = apiRequest('GET', 'my_data', ['token' => apiToken('user')]);
+        assertStatus(200, $aus);
+        assertSame([], $aus['body']['behavior'], 'Ausgeschaltet enthaelt die Auskunft keine Kennzahl');
+    });
+
+    puWithSettings(['punctuality_enabled' => '1', 'reliability_enabled' => '1'], function () {
+        $an = apiRequest('GET', 'my_data', ['token' => apiToken('user')]);
+        assertStatus(200, $an);
+
+        $jahr = (int) date('Y');
+        assertTrue(isset($an['body']['behavior'][$jahr]), 'Das laufende Jahr fehlt in der Auskunft');
+
+        $stats = apiRequest('GET', 'statistics', ['token' => apiToken('user'), 'query' => ['year' => $jahr]]);
+        assertSame($stats['body']['reliability'], $an['body']['behavior'][$jahr]['reliability'],
+            'Auskunft und Statistik muessen dieselben Werte nennen');
+
+        $csv = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'csv']]);
+        assertTrue(str_contains($csv['raw'], '=== PÜNKTLICHKEIT UND ZUVERLÄSSIGKEIT ==='),
+            'Der CSV-Auskunft fehlt der Abschnitt');
+    });
+});
