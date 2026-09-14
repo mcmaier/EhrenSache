@@ -368,6 +368,60 @@
                         </div>
                     </div>
 
+                    <!-- Pünktlichkeit und Zuverlässigkeit (OI-51) -->
+                    <div class="settings-card">
+                        <h3>📏 Pünktlichkeit und Zuverlässigkeit</h3>
+                        <p class="input-hint">
+                            Beide Kennzahlen bewerten das Verhalten einzelner Mitglieder und sind
+                            deshalb ab Werk ausgeschaltet. <strong>Vor dem Einschalten</strong>
+                            Abschnitt 11 in <code>DATENSCHUTZ.md</code> lesen und den Zweck festlegen.
+                        </p>
+                        <div class="settings-item">
+                            <label class="checkbox-label">
+                                <input type="checkbox"
+                                    id="setting_punctuality_enabled"
+                                    class="setting-input"
+                                    data-key="punctuality_enabled">
+                                Pünktlichkeit auswerten
+                            </label>
+                            <small class="input-hint">
+                                Anteil der Ankünfte bis zur Karenzgrenze, dazu die durchschnittliche
+                                Verspätung der Zuspätkommer. Gerechnet wird nur über Ankünfte mit
+                                bekannter Uhrzeit; unter fünf Messungen gibt es keine Quote.
+                            </small>
+                        </div>
+                        <div class="settings-item">
+                            <label>Karenz gegenüber dem Terminbeginn (Minuten)</label>
+                            <input type="number"
+                                id="setting_punctuality_grace_minutes"
+                                class="setting-input"
+                                data-key="punctuality_grace_minutes"
+                                min="-60"
+                                max="60"
+                                step="1">
+                            <small class="input-hint">
+                                0 heißt: pünktlich ist, wer zum Beginn da ist. Negative Werte verlangen
+                                Anwesenheit vor dem Beginn — −5 heißt „fünf Minuten vorher da".
+                                Die durchschnittliche Verspätung misst unabhängig davon ab Beginn.
+                            </small>
+                        </div>
+                        <div class="settings-item">
+                            <label class="checkbox-label">
+                                <input type="checkbox"
+                                    id="setting_reliability_enabled"
+                                    class="setting-input"
+                                    data-key="reliability_enabled">
+                                Zuverlässigkeit auswerten
+                            </label>
+                            <small class="input-hint">
+                                Anteil der Termine, zu denen jemand erschienen ist oder sich vor
+                                Beginn abgemeldet hat. Eine Abmeldung nach Beginn zählt als
+                                ausgefallen, auch wenn sie später genehmigt wird. Braucht keine
+                                gemessenen Uhrzeiten.
+                            </small>
+                        </div>
+                    </div>
+
                     <!-- Zeiterfassung -->
                     <div class="settings-card">
                         <h3>⏱️ Zeiterfassung</h3>
