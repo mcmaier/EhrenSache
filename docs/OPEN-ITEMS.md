@@ -2066,7 +2066,7 @@ zusätzlicher Datenabfluss.
 ---
 
 ### OI-57 · ID-Badge fehlt in den Modals der Zeiterfassung
-**Priorität:** niedrig — reine Darstellung
+**Erledigt am 2026-09-14** — beide Dialoge rufen `updateModalId()`.
 
 Die Bearbeitungsdialoge zeigen oben rechts im Kopf die Datenbank-ID des bearbeiteten
 Datensatzes (`updateModalId()` in `public/js/modules/utils.js`, Stil `.modal-id-badge` in
