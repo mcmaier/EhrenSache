@@ -584,7 +584,10 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('cleanup_years_worktime', '3', 'number', 'general', 'Löschfrist in Jahren für Arbeitszeiten und die zugehörige Änderungshistorie'),
 ('cleanup_years_audit', '1', 'number', 'general', 'Frist in Jahren, nach der verwaiste Einträge der Änderungshistorie anonymisiert werden'),
 ('station_pin_enabled', '0', 'boolean', 'general', 'Anmeldung mit Mitgliedsnummer und PIN an einer Station erlauben'),
-('station_pin_min_length', '4', 'number', 'general', 'Mindestlänge der Stations-PIN (4 bis 8 Ziffern)');
+('station_pin_min_length', '4', 'number', 'general', 'Mindestlänge der Stations-PIN (4 bis 8 Ziffern)'),
+('punctuality_enabled', '0', 'boolean', 'general', 'Pünktlichkeitskennzahl berechnen und anzeigen'),
+('reliability_enabled', '0', 'boolean', 'general', 'Zuverlässigkeitskennzahl berechnen und anzeigen'),
+('punctuality_grace_minutes', '0', 'number', 'general', 'Karenz in Minuten relativ zum Terminbeginn (-60 bis 60)');
 
 
 CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS

@@ -70,7 +70,9 @@ function handleStatisticsReport($db, $database, $request_method, $authUserRole, 
         authMemberId:      $authMemberId
     );
 
-    $sections = [statisticsReportSummarySection($result['summary'])];
+    $sections = [statisticsReportSummarySection(
+        $result['summary'], $result['punctuality'], $result['reliability']
+    )];
 
     foreach ($result['statistics'] as $group) {
         $sections[] = statisticsReportGroupSection($group);
@@ -100,20 +102,70 @@ function handleStatisticsReport($db, $database, $request_method, $authUserRole, 
     ]);
 }
 
-/** Kennzahlen des Gesamtergebnisses, zweispaltig. */
-function statisticsReportSummarySection(array $summary): array
+/**
+ * Kennzahlen des Gesamtergebnisses, zweispaltig.
+ *
+ * Puenktlichkeit und Zuverlaessigkeit kommen als zusaetzliche Zeilen, wenn sie
+ * eingeschaltet sind -- additiv, damit ein aelterer Ausdruck nicht falsch wird.
+ * Die Formulierungen nennen immer die Bezugsgroesse (Spec, Abschnitt 8).
+ */
+function statisticsReportSummarySection(array $summary,
+                                        array $punctuality = ['enabled' => false],
+                                        array $reliability = ['enabled' => false]): array
 {
+    $rows = [
+        ['Termine gesamt',   (string) $summary['total_appointments']],
+        ['Anwesend',         (string) $summary['total_present']],
+        ['Entschuldigt',     (string) $summary['total_excused']],
+        ['Unentschuldigt',   (string) $summary['total_unexcused']],
+        ['Durchschnittliche Anwesenheitsquote', statisticsReportRate($summary['overall_average'])],
+    ];
+
+    if (!empty($punctuality['enabled']) && $punctuality['total_count'] === 0) {
+        // Ohne Termine weder "zu wenige Messungen" noch "0 von 0" -- beides
+        // klaenge nach einer Erfassungsluecke.
+        $rows[] = ['Pünktlichkeit', 'Keine Termine im gewählten Zeitraum'];
+    } elseif (!empty($punctuality['enabled'])) {
+        if ($punctuality['sufficient']) {
+            $rows[] = ['Pünktlichkeit', sprintf(
+                'Pünktlich bei %d von %d gemessenen Ankünften (%s)',
+                $punctuality['on_time_count'], $punctuality['measured_count'],
+                statisticsReportRate($punctuality['rate'])
+            )];
+        } else {
+            $rows[] = ['Pünktlichkeit', sprintf(
+                'Zu wenige Messungen (%d von mindestens %d)',
+                $punctuality['measured_count'], $punctuality['min_measurements']
+            )];
+        }
+
+        $rows[] = ['Messabdeckung', sprintf(
+            'Gemessen bei %d von %d Terminen',
+            $punctuality['measured_count'], $punctuality['total_count']
+        )];
+
+        if ($punctuality['sufficient'] && $punctuality['avg_late_minutes'] !== null) {
+            $rows[] = ['Verspätung', sprintf(
+                'Wenn zu spät, dann im Schnitt %s Minuten',
+                number_format((float) $punctuality['avg_late_minutes'], 1, ',', '')
+            )];
+        }
+    }
+
+    if (!empty($reliability['enabled'])) {
+        $rows[] = ['Zuverlässigkeit', $reliability['total'] > 0
+            ? sprintf('Erschienen oder rechtzeitig abgemeldet: %d von %d (%s)',
+                      $reliability['appeared'] + $reliability['excused_in_time'],
+                      $reliability['total'],
+                      statisticsReportRate($reliability['rate']))
+            : 'Keine Termine im gewählten Zeitraum'];
+    }
+
     return [
         'heading' => null,
         'class'   => 'report-summary',
         'columns' => ['Kennzahl', 'Wert'],
-        'rows'    => [
-            ['Termine gesamt',   (string) $summary['total_appointments']],
-            ['Anwesend',         (string) $summary['total_present']],
-            ['Entschuldigt',     (string) $summary['total_excused']],
-            ['Unentschuldigt',   (string) $summary['total_unexcused']],
-            ['Durchschnittliche Anwesenheitsquote', statisticsReportRate($summary['overall_average'])],
-        ],
+        'rows'    => $rows,
         'empty'   => 'Keine Kennzahlen für dieses Jahr.',
     ];
 }

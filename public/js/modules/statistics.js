@@ -217,10 +217,12 @@ export async function renderStatistics(statsData) {
     if (!statsData || !Array.isArray(statsData.statistics) || statsData.statistics.length === 0) {
         container.innerHTML = '<p class="info-message">Keine Daten für die ausgewählten Filter vorhanden.</p>';
         updateOverallStats(statsData ? statsData.summary : null);
+        updateBehaviorStats(statsData);
         return;
     }
 
     updateOverallStats(statsData.summary);
+    updateBehaviorStats(statsData);
 
     let html = '';
 
@@ -316,7 +318,68 @@ function updateOverallStats(summary) {
     document.getElementById('statTotalPresent').textContent = summary.total_present;
     document.getElementById('statTotalExcused').textContent = summary.total_excused;
     document.getElementById('statTotalUnexcused').textContent = summary.total_unexcused;
-    document.getElementById('statOverallAverage').textContent = summary.overall_average + '%';
+    document.getElementById('statOverallAverage').textContent = `${formatGerman(summary.overall_average)} %`;
+}
+
+/** Zahl in deutscher Schreibweise, hoechstens eine Nachkommastelle. */
+function formatGerman(value) {
+    return Number(value).toLocaleString('de-DE', { maximumFractionDigits: 1 });
+}
+
+/**
+ * Kacheln fuer Puenktlichkeit und Zuverlaessigkeit.
+ *
+ * Eine abgeschaltete Kennzahl liefert der Server als {enabled: false}; ihre
+ * Kachel verschwindet dann ganz, statt leer dazustehen. Die Formulierungen
+ * folgen der Spec (Abschnitt 8) und nennen immer die Bezugsgroesse.
+ */
+function updateBehaviorStats(statsData) {
+    const punctuality = statsData?.punctuality ?? { enabled: false };
+    const reliability = statsData?.reliability ?? { enabled: false };
+
+    const pCard = document.getElementById('statPunctualityCard');
+    const rCard = document.getElementById('statReliabilityCard');
+
+    pCard.hidden = !punctuality.enabled;
+    rCard.hidden = !reliability.enabled;
+
+    if (punctuality.enabled) {
+        const value  = document.getElementById('statPunctuality');
+        const detail = document.getElementById('statPunctualityDetail');
+
+        if (punctuality.total_count === 0) {
+            // "0 von mindestens 5 Messungen" klaenge nach einer Erfassungsluecke.
+            value.textContent  = '–';
+            detail.textContent = 'Keine Termine im gewählten Zeitraum';
+        } else if (!punctuality.sufficient) {
+            value.textContent  = '–';
+            detail.textContent = `Zu wenige Messungen (${punctuality.measured_count} von mindestens ${punctuality.min_measurements})`;
+        } else {
+            value.textContent = `${formatGerman(punctuality.rate)} %`;
+
+            const lines = [
+                `Pünktlich bei ${punctuality.on_time_count} von ${punctuality.measured_count} gemessenen Ankünften`,
+                `Gemessen bei ${punctuality.measured_count} von ${punctuality.total_count} Terminen`,
+            ];
+            if (punctuality.avg_late_minutes !== null) {
+                lines.push(`Wenn zu spät, dann im Schnitt ${formatGerman(punctuality.avg_late_minutes)} Minuten`);
+            }
+            detail.textContent = lines.join(' · ');
+        }
+    }
+
+    if (reliability.enabled) {
+        const value  = document.getElementById('statReliability');
+        const detail = document.getElementById('statReliabilityDetail');
+
+        if (reliability.total === 0) {
+            value.textContent  = '–';
+            detail.textContent = 'Keine Termine im gewählten Zeitraum';
+        } else {
+            value.textContent  = `${formatGerman(reliability.rate)} %`;
+            detail.textContent = `Erschienen oder rechtzeitig abgemeldet: ${reliability.appeared + reliability.excused_in_time} von ${reliability.total}`;
+        }
+    }
 }
 
 /**

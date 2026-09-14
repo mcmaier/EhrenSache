@@ -296,7 +296,9 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                     }
                 }
                 http_response_code(201);
-                echo json_encode(["message" => "Member created", "id" => $db->lastInsertId()]);
+                // $memberId, nicht lastInsertId(): Nach dem Insert der
+                // Gruppenzuordnung (ohne AUTO_INCREMENT) liefert es 0.
+                echo json_encode(["message" => "Member created", "id" => $memberId]);
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to create member"]);

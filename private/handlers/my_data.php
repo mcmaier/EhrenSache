@@ -155,6 +155,18 @@ function handleMyData($db, $database, $request_method, $authUserId)
     $stmt->execute([$member_id]);
     $data['work_session_log'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Puenktlichkeit und Zuverlaessigkeit je Jahr -- abgeleitete Kennzahlen,
+    // keine gespeicherten Daten. Sie gehoeren trotzdem in die Auskunft: Die
+    // DSGVO nennt Zuverlaessigkeit und Verhalten bei der Begriffsbestimmung
+    // des Profilings (DATENSCHUTZ.md, Abschnitt 11). Ausgeschaltet: leer.
+    require_once __DIR__ . '/../helpers/punctuality.php';
+
+    $groupStmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?");
+    $groupStmt->execute([$member_id]);
+    $ownGroupIds = array_map('intval', $groupStmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $data['behavior'] = punctualityByYear($db, $database, (int) $member_id, $ownGroupIds);
+
     // 8. Metadaten
     $data['export_info'] = [
         'export_date' => date('Y-m-d H:i:s'),
@@ -234,7 +246,36 @@ function exportAsCSV($data) {
             $exception['appointment_title'] ?? '-'
         ]);
     }
-    
+
+    if ($data['behavior'] !== []) {
+        fputcsv($output, []);
+        fputcsv($output, ['=== PÜNKTLICHKEIT UND ZUVERLÄSSIGKEIT ===']);
+        fputcsv($output, ['Jahr', 'Kennzahl', 'Wert']);
+
+        foreach ($data['behavior'] as $jahr => $blocks) {
+            $p = $blocks['punctuality'];
+            if (!empty($p['enabled'])) {
+                fputcsv($output, [$jahr, 'Pünktlichkeit', $p['sufficient']
+                    ? sprintf('Pünktlich bei %d von %d gemessenen Ankünften (%s %%)',
+                              $p['on_time_count'], $p['measured_count'],
+                              number_format((float) $p['rate'], 1, ',', ''))
+                    : sprintf('Zu wenige Messungen (%d von mindestens %d)',
+                              $p['measured_count'], $p['min_measurements'])]);
+                fputcsv($output, [$jahr, 'Messabdeckung',
+                    sprintf('Gemessen bei %d von %d Terminen', $p['measured_count'], $p['total_count'])]);
+            }
+
+            $r = $blocks['reliability'];
+            if (!empty($r['enabled'])) {
+                fputcsv($output, [$jahr, 'Zuverlässigkeit', $r['total'] > 0
+                    ? sprintf('Erschienen oder rechtzeitig abgemeldet: %d von %d (%s %%)',
+                              $r['appeared'] + $r['excused_in_time'], $r['total'],
+                              number_format((float) $r['rate'], 1, ',', ''))
+                    : 'Keine Termine']);
+            }
+        }
+    }
+
     fclose($output);
 }
 

@@ -7,6 +7,42 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.5.1] – 2026-09-14
+
+### Neu
+- **Pünktlichkeit und Zuverlässigkeit.** Zwei getrennte Kennzahlen in Statistik,
+  Anwesenheitsbericht und Selbstauskunft, **beide ab Werk ausgeschaltet**. Eingeschaltet werden
+  sie in den Einstellungen; vorher gehört `DATENSCHUTZ.md` Abschnitt 11 gelesen — eine Kennzahl,
+  die aussagt, wie verlässlich ein Mitglied ist, ist etwas anderes als eine Anwesenheitsliste.
+
+  **Pünktlichkeit** ist der Anteil der Ankünfte bis zu einer einstellbaren Karenz (Vorgabe:
+  Terminbeginn; negative Werte verlangen Anwesenheit davor), dazu die durchschnittliche Verspätung
+  der Zuspätkommer, je Ankunft gekappt bei 20 Minuten. Gerechnet wird nur über Ankünfte mit
+  bekannter Uhrzeit, und unter fünf Messungen gibt es keine Quote. Die Messabdeckung steht immer
+  daneben.
+
+  **Zuverlässigkeit** ist der Anteil der Termine, zu denen jemand erschienen ist oder sich vor
+  Beginn abgemeldet hat. Die heutige Anwesenheitsquote bestraft eine rechtzeitige Absage wie
+  unentschuldigtes Fehlen; das behebt diese Kennzahl. Eine Abmeldung nach Beginn zählt als
+  ausgefallen, auch wenn sie später genehmigt wird.
+
+  Beide gelten für den gewählten Bereich — Verein, Gruppe oder eine einzelne, gezielt aufgerufene
+  Person. Eine Liste, in der alle Mitglieder nach Pünktlichkeit nebeneinanderstehen, gibt es nicht.
+
+  Grundlage war ein in einem Verein praktiziertes Verfahren; warum es nicht eins zu eins
+  übernommen wurde, steht in der Spec.
+
+### Geändert
+- **`DATENSCHUTZ.md`** hat einen Abschnitt 11 zu den neuen Kennzahlen. Die bisherigen Abschnitte
+  11 bis 13 heißen jetzt 12 bis 14.
+
+### Behoben
+- **Neues Mitglied mit Gruppe verlor PIN und Mitgliedschaftszeiträume.** Beim Anlegen lieferte die
+  API die ID `0`, sobald Gruppen mitgeschickt wurden — sie wurde erst nach dem Speichern der
+  Gruppenzuordnung gelesen. Die Oberfläche schickte PIN und Zeiträume dann an ein Mitglied, das es
+  nicht gibt, ohne Fehlermeldung. Wer seit dem Anlegen eines Mitglieds eine fehlende PIN oder
+  einen fehlenden Zeitraum bemerkt hat: nachtragen.
+
 ## [1.5.0] – 2026-09-11
 
 ### Geändert

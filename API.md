@@ -1414,6 +1414,42 @@ im Jahr.
 `summary` summiert über alle enthaltenen Mitglieder; `hours_proven`, `start_proven` und
 `unproven` ergeben zusammen `total_minutes`.
 
+#### Pünktlichkeit und Zuverlässigkeit im Ergebnis (ab 1.5.1)
+
+**Pünktlichkeit und Zuverlässigkeit** stehen als zwei Blöcke auf der obersten Ebene,
+neben `summary`. Beide gelten für den **gefilterten Bereich** — ohne `member_id` für Verein oder
+Gruppe, mit `member_id` für diese Person. Für die Rolle `user` ist das immer die eigene Person.
+
+```json
+"punctuality": {
+  "enabled": true, "sufficient": true, "min_measurements": 5,
+  "measured_count": 15, "total_count": 22,
+  "on_time_count": 12, "rate": 80.0,
+  "late_count": 3, "avg_late_minutes": 7.3,
+  "self_reported_count": 1
+},
+"reliability": {
+  "enabled": true,
+  "total": 22, "appeared": 15, "excused_in_time": 4, "missed": 3, "rate": 86.4
+}
+```
+
+Ist eine Kennzahl ausgeschaltet (`punctuality_enabled` bzw. `reliability_enabled`, ab Werk `0`),
+steht dort nur `{"enabled": false}`.
+
+| Feld | Bedeutung |
+|---|---|
+| `rate` | Prozent, eine Nachkommastelle — dieselbe Einheit wie `summary.overall_average`. `null` unter `min_measurements` Messungen bzw. ohne Termine |
+| `measured_count` | Ankünfte mit Uhrzeit, ohne Import und Timer |
+| `total_count`, `total` | Soll-Paare aus Mitglied und Termin im Bereich |
+| `on_time_count` | Ankünfte bis `punctuality_grace_minutes` nach Beginn (negativ: vor Beginn) |
+| `avg_late_minutes` | Mittel der Verspätung **ab Beginn**, je Ankunft gekappt bei 20 Minuten, nur über Zuspätkommer; `null` ohne Verspätung |
+| `self_reported_count` | davon aus genehmigten Zeitkorrektur-Anträgen |
+| `excused_in_time` | vor Beginn abgemeldet (`absence`, nicht abgelehnt) oder vom Verwalter ohne Abmeldung entschuldigt |
+| `missed` | weder erschienen noch rechtzeitig abgemeldet — auch eine nach Beginn gemeldete, später genehmigte Abmeldung |
+
+Minuten werden abgerundet: 20:00:59 gilt als 20:00.
+
 ---
 
 ## Anwesenheitsbericht (statistics_report)
