@@ -136,3 +136,52 @@ test('statisticsReportOrigin nennt eine fehlende Uhrzeit nicht gemessen', functi
     assertSame(REPORT_ORIGIN_BACKFILLED, statisticsReportOrigin('admin', null));
     assertSame(REPORT_ORIGIN_BACKFILLED, statisticsReportOrigin('station_pin', null));
 });
+
+// ---- statisticsReportSummarySection: Puenktlichkeit und Zuverlaessigkeit ----
+
+function puSummary(): array
+{
+    return ['total_appointments' => 22, 'total_present' => 15, 'total_excused' => 4,
+            'total_unexcused' => 3, 'overall_average' => 68.2];
+}
+
+test('statisticsReportSummarySection bleibt ohne Kennzahlen wie bisher', function () {
+    // Additiv: Ein aelterer Ausdruck darf durch 1.5.1 nicht falsch werden.
+    assertSame(5, count(statisticsReportSummarySection(puSummary())['rows']));
+    assertSame(5, count(statisticsReportSummarySection(
+        puSummary(), ['enabled' => false], ['enabled' => false])['rows']));
+});
+
+test('statisticsReportSummarySection ergaenzt Puenktlichkeit mit Bezugsgroessen', function () {
+    $p = ['enabled' => true, 'sufficient' => true, 'min_measurements' => 5,
+          'measured_count' => 15, 'total_count' => 22, 'on_time_count' => 12, 'rate' => 80.0,
+          'late_count' => 3, 'avg_late_minutes' => 7.3, 'self_reported_count' => 1];
+
+    $rows = statisticsReportSummarySection(puSummary(), $p, ['enabled' => false])['rows'];
+
+    assertTrue(in_array(['Pünktlichkeit', 'Pünktlich bei 12 von 15 gemessenen Ankünften (80,0 %)'], $rows, true));
+    assertTrue(in_array(['Messabdeckung', 'Gemessen bei 15 von 22 Terminen'], $rows, true));
+    assertTrue(in_array(['Verspätung', 'Wenn zu spät, dann im Schnitt 7,3 Minuten'], $rows, true));
+});
+
+test('statisticsReportSummarySection meldet zu wenige Messungen statt einer Quote', function () {
+    $p = ['enabled' => true, 'sufficient' => false, 'min_measurements' => 5,
+          'measured_count' => 3, 'total_count' => 22, 'on_time_count' => 3, 'rate' => null,
+          'late_count' => 0, 'avg_late_minutes' => null, 'self_reported_count' => 0];
+
+    $rows = statisticsReportSummarySection(puSummary(), $p, ['enabled' => false])['rows'];
+
+    assertTrue(in_array(['Pünktlichkeit', 'Zu wenige Messungen (3 von mindestens 5)'], $rows, true));
+    foreach ($rows as $row) {
+        assertTrue($row[0] !== 'Verspätung', 'Ohne Quote auch keine Verspaetungszeile');
+    }
+});
+
+test('statisticsReportSummarySection ergaenzt die Zuverlaessigkeit', function () {
+    $r = ['enabled' => true, 'total' => 22, 'appeared' => 15, 'excused_in_time' => 4,
+          'missed' => 3, 'rate' => 86.4];
+
+    $rows = statisticsReportSummarySection(puSummary(), ['enabled' => false], $r)['rows'];
+
+    assertTrue(in_array(['Zuverlässigkeit', 'Erschienen oder rechtzeitig abgemeldet: 19 von 22 (86,4 %)'], $rows, true));
+});
