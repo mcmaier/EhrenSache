@@ -52,12 +52,11 @@ $success = '';
 
 // STEP 1: Voraussetzungen prüfen
 if ($step == 1) {
-    $checks = [
-        'PHP Version >= 8.0 (läuft: ' . PHP_VERSION . ')' => version_compare(PHP_VERSION, '8.0.0', '>='),
-        'PDO Extension' => extension_loaded('pdo'),
-        'PDO MySQL' => extension_loaded('pdo_mysql'),
-        'JSON Extension' => extension_loaded('json'),
-        'Session Support' => function_exists('session_start')
+    // Anforderungen der Anwendung aus version.json -- dieselbe Quelle wie im
+    // Update-Assistenten und im Updater.
+    require_once '../../private/helpers/requirements.php';
+    $checks = requirementsChecks(requirementsRead(dirname(__DIR__, 2))) + [
+        'Session Support' => function_exists('session_start'),
     ];
     
     $allPassed = !in_array(false, $checks, true);

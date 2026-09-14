@@ -82,3 +82,11 @@ test('Update-Wizard: Werte aus der GitHub-Antwort werden maskiert ausgegeben', f
         }
     }
 });
+
+test('Installer und Update-Assistent lesen die Anforderungen aus version.json', function () use ($wizardSource) {
+    $installer = (string) file_get_contents(dirname(__DIR__, 2) . '/public/install/index.php');
+    foreach (['public/update/index.php' => $wizardSource, 'public/install/index.php' => $installer] as $datei => $quelle) {
+        assertSame(false, strpos($quelle, 'version_compare(PHP_VERSION'), "{$datei} prueft die PHP-Version noch selbst");
+        assertTrue(strpos($quelle, 'requirementsChecks(') !== false, "{$datei} nutzt requirementsChecks() nicht");
+    }
+});
