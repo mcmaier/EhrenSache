@@ -74,7 +74,7 @@ Dateien übernehmen.
 
 ```
 EhrenSache/
-├── version.json                # Version, Build-Datum – Quelle für private/helpers/version.php
+├── version.json                # Version, Build-Datum, requires (PHP, Erweiterungen) – einzige Quelle
 ├── private/                    # NICHT öffentlich zugänglich
 │   ├── config/
 │   │   ├── config.php          # Zugangsdaten und Schalter, reine Daten (nicht im Repo!)
@@ -99,6 +99,7 @@ EhrenSache/
 │   │   ├── maintenance.php     # Wartungsflag, api.php prüft es vor allen Includes
 │   │   ├── updater.php         # Updater: Phasen apply und verify
 │   │   ├── update_source.php, update_package.php, update_swap.php, update_status.php  # dessen Bausteine
+│   │   ├── requirements.php    # requires aus version.json: PHP-Version, Erweiterungen
 │   │   ├── worktime.php        # Fachlogik Arbeitszeit (Dauer, Validierung, Statistik)
 │   │   ├── member_activity.php # Aktiv/Inaktiv-Zeiträume
 │   │   ├── station.php         # Fachlogik virtuelle Station (Kiosk): Code, PIN-Prüfung, Sperre
@@ -290,6 +291,12 @@ php tests/run.php worktime_api
   (`private/helpers/config_reader.php`) und in `config_example.php`. Die `config.php` bestehender
   Installationen wird dafür **nicht** angefasst — der Default greift. Seit 1.6.0 enthält
   `config.php` nur Daten; Programmcode gehört nach `private/helpers/`
+- Update-Pfad (`public/update/index.php` und die Helfer, die er lädt — Liste in
+  `tests/suites/update_path_syntax.php`): **nur Syntax bis PHP 8.0**, auch wenn die Anwendung
+  selbst mehr verlangt. Neue Anforderungen der Anwendung gehören nach `requires` in
+  `version.json`, nicht in eigene Prüfungen
+- Migrationen lesen die `config.php` nur über `private/helpers/config_reader.php`, nie per
+  `require`/`include`; Migrationsdateien werden nie gelöscht
 - Sprache: Deutsch (UI, Kommentare), Englisch (Code/Variablen)
 - Versionssprung: `version.json` und `CHANGELOG.md` gemeinsam pflegen
 

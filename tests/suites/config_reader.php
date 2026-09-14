@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../private/helpers/config_reader.php';
 
+// Die Tests zur alten Klassenform bleiben dauerhaft: migrate_1_5_1() und der
+// Update-Assistent lesen die config.php einer Installation bis 1.5.1 ueber diesen
+// Leser. Ohne ihn waere der direkte Sprung von dort auf eine spaetere Version
+// unmoeglich (docs/superpowers/specs/2026-09-14-direktsprung-requires-design.md).
+
 /** Legt eine Konfigurationsdatei mit dem gegebenen Inhalt an und gibt den Pfad zurueck. */
 function configReaderFixture(string $inhalt): string
 {

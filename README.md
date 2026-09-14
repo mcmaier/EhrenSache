@@ -107,7 +107,9 @@ Fachanwalt für IT-Recht, um die DSGVO-Konformität sicherzustellen.
 ## Installation
 
 ### Voraussetzungen
-- Webserver mit PHP 8+ und MySQL 5.7+ oder MariaDB 10.4+
+- Webserver mit PHP 8+ und MySQL 5.7+ oder MariaDB 10.4+ — die genaue PHP-Version und die
+  nötigen PHP-Erweiterungen stehen unter `requires` in `version.json`; Installer und
+  Update-Assistent prüfen sie
 - SSL-Zertifikat (für PWA und sichere Authentifizierung)
 - Schreibrechte für Upload-Verzeichnisse
 
@@ -168,6 +170,10 @@ Während der Installation wird ein Admin-Account erstellt.
 Ab 1.6.0 kann der Update-Assistent das Paket selbst von GitHub holen. Der Weg von Hand bleibt
 unverändert möglich — der Assistent prüft vorher, ob er die Dateien schreiben darf, und nennt
 den Grund, wenn nicht.
+
+Jede Version lässt sich direkt von jedem älteren Stand aus einspielen — ein Zwischenschritt über
+eine bestimmte Version ist nicht nötig. Für den Weg über GitHub braucht die Installation einmal
+eine Version ab 1.6.0; auch dieser eine Upload von Hand kann gleich die neueste sein.
 
 1. Update-Wizard freischalten: Inhalt von `public/update/.htaccess` leeren oder die Datei löschen.
 

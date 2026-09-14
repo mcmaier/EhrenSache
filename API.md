@@ -363,10 +363,14 @@ Versionsstand der Installation. Das Dashboard zeigt daraus die Versionsnummer an
 **Response:**
 ```json
 {
-  "version": "1.6.0",
+  "version": "1.6.1",
   "build": "2026-09-14",
   "commit": "auto",
   "name": "EhrenSache",
+  "requires": {
+    "php": "8.0.0",
+    "extensions": ["pdo", "pdo_mysql", "json"]
+  },
   "server_time": "2026-09-14 13:05:00",
   "php_version": "8.2.12",
   "config_format": "array",
