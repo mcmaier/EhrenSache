@@ -185,3 +185,18 @@ test('statisticsReportSummarySection ergaenzt die Zuverlaessigkeit', function ()
 
     assertTrue(in_array(['Zuverlässigkeit', 'Erschienen oder rechtzeitig abgemeldet: 19 von 22 (86,4 %)'], $rows, true));
 });
+
+test('statisticsReportSummarySection nennt ohne Termine keine fehlenden Messungen', function () {
+    // "Zu wenige Messungen (0 von mindestens 5)" klingt nach einer
+    // Erfassungsluecke, wo es schlicht keine Termine gab.
+    $p = ['enabled' => true, 'sufficient' => false, 'min_measurements' => 5,
+          'measured_count' => 0, 'total_count' => 0, 'on_time_count' => 0, 'rate' => null,
+          'late_count' => 0, 'avg_late_minutes' => null, 'self_reported_count' => 0];
+
+    $rows = statisticsReportSummarySection(puSummary(), $p, ['enabled' => false])['rows'];
+
+    assertTrue(in_array(['Pünktlichkeit', 'Keine Termine im gewählten Zeitraum'], $rows, true));
+    foreach ($rows as $row) {
+        assertTrue($row[0] !== 'Messabdeckung', 'Ohne Termine keine Messabdeckung "0 von 0"');
+    }
+});

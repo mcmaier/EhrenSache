@@ -318,7 +318,7 @@ function updateOverallStats(summary) {
     document.getElementById('statTotalPresent').textContent = summary.total_present;
     document.getElementById('statTotalExcused').textContent = summary.total_excused;
     document.getElementById('statTotalUnexcused').textContent = summary.total_unexcused;
-    document.getElementById('statOverallAverage').textContent = summary.overall_average + '%';
+    document.getElementById('statOverallAverage').textContent = `${formatGerman(summary.overall_average)} %`;
 }
 
 /** Zahl in deutscher Schreibweise, hoechstens eine Nachkommastelle. */
@@ -347,7 +347,11 @@ function updateBehaviorStats(statsData) {
         const value  = document.getElementById('statPunctuality');
         const detail = document.getElementById('statPunctualityDetail');
 
-        if (!punctuality.sufficient) {
+        if (punctuality.total_count === 0) {
+            // "0 von mindestens 5 Messungen" klaenge nach einer Erfassungsluecke.
+            value.textContent  = '–';
+            detail.textContent = 'Keine Termine im gewählten Zeitraum';
+        } else if (!punctuality.sufficient) {
             value.textContent  = '–';
             detail.textContent = `Zu wenige Messungen (${punctuality.measured_count} von mindestens ${punctuality.min_measurements})`;
         } else {

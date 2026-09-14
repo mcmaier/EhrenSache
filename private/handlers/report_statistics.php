@@ -121,7 +121,11 @@ function statisticsReportSummarySection(array $summary,
         ['Durchschnittliche Anwesenheitsquote', statisticsReportRate($summary['overall_average'])],
     ];
 
-    if (!empty($punctuality['enabled'])) {
+    if (!empty($punctuality['enabled']) && $punctuality['total_count'] === 0) {
+        // Ohne Termine weder "zu wenige Messungen" noch "0 von 0" -- beides
+        // klaenge nach einer Erfassungsluecke.
+        $rows[] = ['Pünktlichkeit', 'Keine Termine im gewählten Zeitraum'];
+    } elseif (!empty($punctuality['enabled'])) {
         if ($punctuality['sufficient']) {
             $rows[] = ['Pünktlichkeit', sprintf(
                 'Pünktlich bei %d von %d gemessenen Ankünften (%s)',

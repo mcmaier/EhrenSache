@@ -90,3 +90,23 @@ test('Die Kachel nennt die Mindestzahl aus der Serverantwort', function () use (
         'Die Mindestzahl muss aus der Antwort kommen, nicht als 5 im Skript stehen');
     assertSame(5, PUNCTUALITY_MIN_MEASUREMENTS);
 });
+
+test('Durchschnitt und neue Kacheln nutzen dasselbe Zahlenformat', function () use ($puRoot) {
+    // "77.2%" neben "21,3 %" in derselben Kachelreihe.
+    $js = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+
+    assertTrue(strpos($js, "summary.overall_average + '%'") === false,
+        'statOverallAverage nutzt noch Punkt und kein Leerzeichen');
+    assertTrue(strpos($js, 'formatGerman(summary.overall_average)') !== false,
+        'statOverallAverage muss ueber formatGerman() laufen');
+});
+
+test('Ohne Termine nennt die Puenktlichkeitskachel keine fehlenden Messungen', function () use ($puRoot) {
+    $js    = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+    $start = strpos($js, 'function updateBehaviorStats(');
+    assertTrue($start !== false, 'updateBehaviorStats() fehlt');
+    $body  = substr($js, $start, strpos($js, "\n}", $start) - $start);
+
+    assertTrue(strpos($body, 'punctuality.total_count === 0') !== false,
+        'Der Fall ohne Termine muss vor "Zu wenige Messungen" stehen');
+});
