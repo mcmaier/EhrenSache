@@ -2,19 +2,23 @@
 /**
  * EhrenSache - Durchstich des Updaters gegen Wegwerf-Installationen.
  *
- * Installation und Paket entstehen per git archive aus HEAD; nichts im
- * Arbeitsverzeichnis wird angefasst. Beide Phasen laufen in eigenen
- * PHP-Prozessen mit dem Code der Installation -- die zweite also, wie im
- * Assistenten, mit dem getauschten Code.
+ * Installation und Paket entstehen per git archive; nichts im Arbeitsverzeichnis
+ * wird angefasst. Beide Phasen laufen in eigenen PHP-Prozessen mit dem Code der
+ * Installation -- die zweite also, wie im Assistenten, mit dem getauschten Code.
+ *
+ * Die Versionen leitet der Pruefer aus HEAD ab: installiert ist die Version aus
+ * HEAD, das Paket traegt die naechste Patch-Version.
  *
  * Faelle:
- *   A  gueltiges Paket 1.6.1         -> getauscht, Kette mit neuem Code geprueft
- *   B  Paket ohne Manifest-Eintrag   -> vor dem Tausch abgewiesen (Spec 8.1)
- *   C  neue Kettenlogik strenger     -> nach dem Tausch abgewiesen, Rueckweg (Spec 8.2)
- *   D  Schreibhindernis              -> Preflight weist ab, nichts veraendert
+ *   A  gueltiges Paket                -> getauscht, Kette mit neuem Code geprueft
+ *   B  Paket ohne Manifest-Eintrag    -> vor dem Tausch abgewiesen (Spec 8.1)
+ *   C  neue Kettenlogik strenger      -> nach dem Tausch abgewiesen, Rueckweg (Spec 8.2)
+ *   D  Schreibhindernis               -> Preflight weist ab, nichts veraendert
+ *   E  Paket verlangt PHP 99          -> vor dem Tausch abgewiesen (1.6.1)
+ *   F  wie E, Installation aus v1.6.0 -> alter Updater tauscht, neuer Code rollt zurueck (1.6.1)
  *
  * Aufruf: php tests/db/verify_updater_e2e.php [--keep]
- * Braucht git im PATH und einen committeten Stand von private/helpers/updater.php.
+ * Braucht git im PATH, den Tag v1.6.0 und einen committeten Stand der Updater-Dateien.
  */
 declare(strict_types=1);
 
@@ -66,15 +70,15 @@ function e2eRemoveTree(string $dir): void
     @rmdir($dir);
 }
 
-/** HEAD als Verzeichnis; mit $prefix wie GitHubs zipball in einem Wrapper-Ordner. */
-function e2eArchiveTo(string $repo, string $ziel, string $prefix = ''): void
+/** $ref als Verzeichnis; mit $prefix wie GitHubs zipball in einem Wrapper-Ordner. */
+function e2eArchiveTo(string $repo, string $ziel, string $prefix = '', string $ref = 'HEAD'): void
 {
     $zip = $ziel . '.zip';
     $befehl = ['git', '-C', $repo, 'archive', '--format=zip', '-o', $zip];
     if ($prefix !== '') {
         $befehl[] = '--prefix=' . $prefix;
     }
-    $befehl[] = 'HEAD';
+    $befehl[] = $ref;
     e2eRun($befehl);
 
     $archiv = new ZipArchive();
@@ -98,11 +102,11 @@ function e2eZipDir(string $dir, string $zip): void
     $archiv->close();
 }
 
-/** Installation aus HEAD plus Dateien, die ein echter Betrieb mitbringt. */
-function e2eInstallation(string $repo, string $basis, string $name): string
+/** Installation aus $ref plus Dateien, die ein echter Betrieb mitbringt. */
+function e2eInstallation(string $repo, string $basis, string $name, string $ref = 'HEAD'): string
 {
     $root = "{$basis}/{$name}";
-    e2eArchiveTo($repo, $root);
+    e2eArchiveTo($repo, $root, '', $ref);
     copy("{$repo}/.gitattributes", "{$root}/.gitattributes");     // wie ein Git-Klon
     e2eWrite("{$root}/CLAUDE.md", 'lokal');
     e2eWrite("{$root}/docs/notiz.md", 'lokal');
@@ -122,18 +126,35 @@ function e2eAppendManifest(string $wurzel, string $eintrag): void
     file_put_contents($datei, substr($text, 0, $pos) . $eintrag . substr($text, $pos));
 }
 
-/** Paket 1.6.1 aus HEAD im Wrapper-Ordner, $eingriff darf es veraendern. */
-function e2ePaket(string $repo, string $basis, string $name, callable $eingriff): string
+function e2eNextPatch(string $version): string
+{
+    [$haupt, $neben, $patch] = array_map('intval', explode('.', $version));
+    return "{$haupt}.{$neben}." . ($patch + 1);
+}
+
+/** Setzt requires.php in der version.json des Pakets. */
+function e2eRequirePhp(string $wurzel, string $php): void
+{
+    $datei = "{$wurzel}/version.json";
+    $daten = json_decode((string) file_get_contents($datei), true);
+    $daten['requires']['php'] = $php;
+    file_put_contents($datei, json_encode($daten, JSON_PRETTY_PRINT) . "\n");
+}
+
+/** Paket aus HEAD im Wrapper-Ordner. $version null behaelt die Version aus HEAD. */
+function e2ePaket(string $repo, string $basis, string $name, ?string $version, callable $eingriff): string
 {
     $stage  = "{$basis}/{$name}-stage";
     $wrap   = 'mcmaier-EhrenSache-e2e0001';
     e2eArchiveTo($repo, $stage, $wrap . '/');
     $wurzel = "{$stage}/{$wrap}";
 
-    $version = json_decode((string) file_get_contents("{$wurzel}/version.json"), true);
-    $version['version'] = '1.6.1';
-    file_put_contents("{$wurzel}/version.json", json_encode($version, JSON_PRETTY_PRINT) . "\n");
-    e2eWrite("{$wurzel}/private/helpers/neu_im_paket.php", '<?php // neu in 1.6.1');
+    if ($version !== null) {
+        $daten = json_decode((string) file_get_contents("{$wurzel}/version.json"), true);
+        $daten['version'] = $version;
+        file_put_contents("{$wurzel}/version.json", json_encode($daten, JSON_PRETTY_PRINT) . "\n");
+    }
+    e2eWrite("{$wurzel}/private/helpers/neu_im_paket.php", '<?php // neu im Paket');
 
     $eingriff($wurzel);
 
@@ -164,42 +185,58 @@ function e2eUpdater(string $root, string $phase, array $ctx): array
     return $ergebnis;
 }
 
-function e2eCtx(string $root, string $zip): array
+function e2eCtx(string $root, string $zip, string $dbVersion): array
 {
     return [
         'install_root'     => $root,
         'zip'              => $zip,
-        'db_version'       => '1.6.0',
+        'db_version'       => $dbVersion,
         'tmp_root'         => "{$root}/private/.update-tmp",
         'backup_root'      => "{$root}/private/backup",
         'maintenance_file' => "{$root}/private/config/maintenance.lock",
     ];
 }
 
-$mitMigration = static function (string $wurzel): void {
-    e2eAppendManifest($wurzel, "    [\n        'from'     => '1.6.0',\n        'to'       => '1.6.1',\n"
-        . "        'file'     => '1.6.0.php',\n        'function' => 'migrate_1_6_0',\n    ],\n");
-    e2eWrite("{$wurzel}/private/migrations/1.6.0.php",
-        "<?php\nfunction migrate_1_6_0(PDO \$pdo, string \$prefix, string \$configPath): array\n"
+function e2eVerifyCtx(string $root, string $backupDir): array
+{
+    return [
+        'install_root'     => $root,
+        'backup_dir'       => $backupDir,
+        'maintenance_file' => "{$root}/private/config/maintenance.lock",
+    ];
+}
+
+$aktuell  = (string) (json_decode(e2eRun(['git', '-C', $repo, 'show', 'HEAD:version.json']), true)['version'] ?? '');
+$naechste = e2eNextPatch($aktuell);
+$funktion = 'migrate_' . str_replace('.', '_', $aktuell);
+
+$manifestEintrag = "    [\n        'from'     => '{$aktuell}',\n        'to'       => '{$naechste}',\n"
+    . "        'file'     => '{$aktuell}.php',\n        'function' => '{$funktion}',\n    ],\n";
+
+$mitMigration = static function (string $wurzel) use ($manifestEintrag, $aktuell, $funktion): void {
+    e2eAppendManifest($wurzel, $manifestEintrag);
+    e2eWrite("{$wurzel}/private/migrations/{$aktuell}.php",
+        "<?php\nfunction {$funktion}(PDO \$pdo, string \$prefix, string \$configPath): array\n"
         . "{\n    return ['log' => [], 'warnings' => []];\n}\n");
 };
 
 $version = static fn(string $root): ?string =>
     json_decode((string) @file_get_contents("{$root}/version.json"), true)['version'] ?? null;
 
+echo "Installiert: {$aktuell}, Paket: {$naechste}\n";
+
 try {
     // ---- Fall A -------------------------------------------------------------
     echo "Fall A: gueltiges Paket\n";
     $root = e2eInstallation($repo, $basis, 'a');
-    $zip  = e2ePaket($repo, $basis, 'paket-a', $mitMigration);
+    $zip  = e2ePaket($repo, $basis, 'paket-a', $naechste, $mitMigration);
 
-    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip));
+    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip, $aktuell));
     $melde($apply['ok'] === true, 'Tausch erfolgreich' . ($apply['ok'] ? '' : ': ' . implode(' | ', $apply['errors'])));
-    $verify = $apply['ok'] ? e2eUpdater($root, 'verify', [
-        'install_root' => $root, 'backup_dir' => $apply['backup_dir'], 'maintenance_file' => e2eCtx($root, $zip)['maintenance_file'],
-    ]) : ['ok' => false, 'errors' => ['nicht ausgefuehrt']];
+    $verify = $apply['ok'] ? e2eUpdater($root, 'verify', e2eVerifyCtx($root, (string) $apply['backup_dir']))
+        : ['ok' => false, 'errors' => ['nicht ausgefuehrt']];
     $melde($verify['ok'] === true, 'Kettenpruefung mit neuem Code bestanden' . ($verify['ok'] ? '' : ': ' . implode(' | ', $verify['errors'])));
-    $melde($version($root) === '1.6.1', 'version.json steht auf 1.6.1');
+    $melde($version($root) === $naechste, "version.json steht auf {$naechste}");
     $melde(is_file("{$root}/private/helpers/neu_im_paket.php"), 'Neue Datei aus dem Paket liegt vor');
     $melde(!is_file("{$root}/private/handlers/veraltet.php"), 'Veraltete PHP-Datei ist entfernt');
     foreach (['CLAUDE.md', 'docs/notiz.md', 'private/migrations/_probe.php', 'public/google1234.html',
@@ -214,23 +251,22 @@ try {
     // ---- Fall B -------------------------------------------------------------
     echo "Fall B: Manifest-Eintrag fehlt\n";
     $root = e2eInstallation($repo, $basis, 'b');
-    $zip  = e2ePaket($repo, $basis, 'paket-b', static function (string $w): void {});
+    $zip  = e2ePaket($repo, $basis, 'paket-b', $naechste, static function (string $w): void {});
 
-    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip));
+    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip, $aktuell));
     $melde($apply['ok'] === false, 'Paket abgewiesen');
     $melde(strpos(implode(' ', $apply['errors']), 'Migration') !== false, 'Meldung nennt die Migrationskette');
-    $melde($version($root) === '1.6.0', 'version.json unveraendert');
+    $melde($version($root) === $aktuell, 'version.json unveraendert');
     $melde(!is_file("{$root}/private/config/maintenance.lock"), 'Kein Wartungsflag');
     $melde(!is_dir("{$root}/private/backup"), 'Keine Sicherung angelegt -- nichts wurde angefasst');
 
     // ---- Fall C -------------------------------------------------------------
     echo "Fall C: neue Kettenlogik ist strenger (Spec 8.2)\n";
     $root = e2eInstallation($repo, $basis, 'c');
-    $zip  = e2ePaket($repo, $basis, 'paket-c', static function (string $w): void {
+    $zip  = e2ePaket($repo, $basis, 'paket-c', $naechste, static function (string $w) use ($manifestEintrag): void {
         // Manifest-Eintrag ja, Migrationsdatei nein. Die installierte Logik prueft
         // nur den Eintrag und laesst durch; die neue verlangt auch die Datei.
-        e2eAppendManifest($w, "    [\n        'from'     => '1.6.0',\n        'to'       => '1.6.1',\n"
-            . "        'file'     => '1.6.0.php',\n        'function' => 'migrate_1_6_0',\n    ],\n");
+        e2eAppendManifest($w, $manifestEintrag);
         $datei = "{$w}/private/helpers/migrations.php";
         $text  = str_replace("\r\n", "\n", (string) file_get_contents($datei));
         $anker = "    return \$manifest;\n}";
@@ -245,14 +281,12 @@ try {
     });
     $vorher = (string) file_get_contents("{$root}/private/helpers/migrations.php");
 
-    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip));
+    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip, $aktuell));
     $melde($apply['ok'] === true, 'Installierte Kettenlogik laesst das Paket durch');
-    $verify = e2eUpdater($root, 'verify', [
-        'install_root' => $root, 'backup_dir' => (string) $apply['backup_dir'], 'maintenance_file' => e2eCtx($root, $zip)['maintenance_file'],
-    ]);
+    $verify = e2eUpdater($root, 'verify', e2eVerifyCtx($root, (string) $apply['backup_dir']));
     $melde($verify['ok'] === false, 'Neue Kettenlogik weist ab');
     $melde(strpos(implode(' ', $verify['errors']), 'Migrationsdatei fehlt') !== false, 'Meldung stammt aus der neuen Logik');
-    $melde($version($root) === '1.6.0', 'Rueckweg: version.json wieder 1.6.0');
+    $melde($version($root) === $aktuell, "Rueckweg: version.json wieder {$aktuell}");
     $melde(!is_file("{$root}/private/helpers/neu_im_paket.php"), 'Rueckweg: neue Datei entfernt');
     $melde(is_file("{$root}/private/handlers/veraltet.php"), 'Rueckweg: geloeschte Datei zurueck');
     $melde(file_get_contents("{$root}/private/helpers/migrations.php") === $vorher, 'Rueckweg: alte migrations.php zurueck');
@@ -262,17 +296,50 @@ try {
     echo "Fall D: Schreibhindernis\n";
     $root = e2eInstallation($repo, $basis, 'd');
     e2eWrite("{$root}/private/neuer_bereich", 'ich bin eine Datei');
-    $zip  = e2ePaket($repo, $basis, 'paket-d', static function (string $w) use ($mitMigration): void {
+    $zip  = e2ePaket($repo, $basis, 'paket-d', $naechste, static function (string $w) use ($mitMigration): void {
         $mitMigration($w);
         e2eWrite("{$w}/private/neuer_bereich/datei.php", '<?php');
     });
 
-    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip));
+    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip, $aktuell));
     $melde($apply['ok'] === false, 'Preflight weist ab');
     $melde(strpos(implode(' ', $apply['errors']), 'neuer_bereich') !== false, 'Meldung nennt das Hindernis');
-    $melde($version($root) === '1.6.0', 'version.json unveraendert');
+    $melde($version($root) === $aktuell, 'version.json unveraendert');
     $melde(!is_file("{$root}/private/config/maintenance.lock"), 'Kein Wartungsflag');
     $melde(!is_dir("{$root}/private/backup"), 'Keine Sicherung angelegt');
+
+    // ---- Fall E -------------------------------------------------------------
+    echo "Fall E: Paket verlangt PHP 99\n";
+    $root = e2eInstallation($repo, $basis, 'e');
+    $zip  = e2ePaket($repo, $basis, 'paket-e', $naechste, static function (string $w) use ($mitMigration): void {
+        $mitMigration($w);
+        e2eRequirePhp($w, '99.0.0');
+    });
+
+    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip, $aktuell));
+    $melde($apply['ok'] === false, 'Vor dem Tausch abgewiesen');
+    $melde(strpos(implode(' ', $apply['errors']), '99.0.0') !== false, 'Meldung nennt die PHP-Anforderung');
+    $melde($version($root) === $aktuell, 'version.json unveraendert');
+    $melde(!is_file("{$root}/private/config/maintenance.lock"), 'Kein Wartungsflag');
+    $melde(!is_dir("{$root}/private/backup"), 'Keine Sicherung angelegt');
+
+    // ---- Fall F -------------------------------------------------------------
+    echo "Fall F: Installation aus v1.6.0, Paket verlangt PHP 99\n";
+    $root = e2eInstallation($repo, $basis, 'f', 'v1.6.0');
+    $zip  = e2ePaket($repo, $basis, 'paket-f', null, static function (string $w): void {
+        e2eRequirePhp($w, '99.0.0');
+    });
+
+    $apply = e2eUpdater($root, 'apply', e2eCtx($root, $zip, '1.6.0'));
+    $melde($apply['ok'] === true, 'Updater von 1.6.0 kennt requires nicht und tauscht'
+        . ($apply['ok'] ? '' : ': ' . implode(' | ', $apply['errors'])));
+    $verify = $apply['ok'] ? e2eUpdater($root, 'verify', e2eVerifyCtx($root, (string) $apply['backup_dir']))
+        : ['ok' => true, 'errors' => []];
+    $melde($verify['ok'] === false, 'Neuer Code im Folgeaufruf weist ab');
+    $melde(strpos(implode(' ', $verify['errors']), '99.0.0') !== false, 'Meldung nennt die PHP-Anforderung');
+    $melde($version($root) === '1.6.0', 'Rueckweg: version.json wieder 1.6.0');
+    $melde(!is_file("{$root}/private/helpers/neu_im_paket.php"), 'Rueckweg: neue Datei entfernt');
+    $melde(!is_file("{$root}/private/config/maintenance.lock"), 'Wartungsflag ist entfernt');
 } finally {
     if ($keep) {
         echo "\nWegwerf-Installationen bleiben stehen (--keep): {$basis}\n";

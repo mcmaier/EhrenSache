@@ -22,6 +22,10 @@
  *                 frühere Erkennung -- der Assistent bemerkte die Lücke ohnehin,
  *                 bevor er die Datenbank anfasst --, sondern darum, dass der
  *                 Updater die Ausnahme fängt und den Rückweg geht.
+ *
+ * Beide Phasen prüfen zusätzlich requires aus version.json (1.6.1): apply die
+ * des Pakets vor dem Tausch, verify die der getauschten Dateien -- letzteres
+ * fängt auch Installationen ab, deren Updater requires nicht kannte.
  */
 declare(strict_types=1);
 
@@ -29,6 +33,7 @@ require_once __DIR__ . '/maintenance.php';
 require_once __DIR__ . '/update_source.php';
 require_once __DIR__ . '/update_package.php';
 require_once __DIR__ . '/update_swap.php';
+require_once __DIR__ . '/requirements.php';
 
 /** Fehlende Voraussetzungen für den Weg über GitHub. */
 function updateEnvironmentErrors(): array
@@ -75,6 +80,14 @@ function updaterApply(array $ctx): array
     }
     $ziel  = (string) updateReadVersionFile($paket);
     $log[] = "Paket enthält Version {$ziel}";
+
+    $anforderungen = requirementsErrors(requirementsRead($paket));
+    if ($anforderungen !== []) {
+        updateRemoveTree($paket);
+        return updaterResult(false, array_merge([
+            "Version {$ziel} stellt Anforderungen, die dieser Server nicht erfüllt. Es wurde nichts verändert.",
+        ], $anforderungen), $log, null, null);
+    }
 
     $kette = updateCheckChain($ctx['db_version'], $ziel, $paket . '/private/migrations/manifest.php');
     if ($kette !== null) {
@@ -154,7 +167,12 @@ function updaterVerify(array $ctx): array
         }
     };
 
-    $kette = updateCheckChain($plan['db_version'], $plan['to'], $ctx['install_root'] . '/private/migrations/manifest.php');
+    // Zuerst die Anforderungen der getauschten Version gegen das laufende PHP --
+    // das schützt auch Installationen, deren Updater requires nicht kannte.
+    $anforderungen = requirementsErrors(requirementsRead($ctx['install_root']));
+    $kette = $anforderungen !== []
+        ? "Version {$plan['to']} stellt Anforderungen, die dieser Server nicht erfüllt: " . implode('; ', $anforderungen)
+        : updateCheckChain($plan['db_version'], $plan['to'], $ctx['install_root'] . '/private/migrations/manifest.php');
     if ($kette === null) {
         maintenanceEnd($ctx['maintenance_file']);
         $aufraeumen();

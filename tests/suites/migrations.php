@@ -174,3 +174,42 @@ test('Zu jedem Manifest-Eintrag existiert die Migrationsfunktion', function () {
         );
     }
 });
+
+test('Migration 1.2.3 liest die Toleranz aus dem Text der config.php', function () {
+    require_once __DIR__ . '/../../private/migrations/1.2.3.php';
+
+    $vorlage = (string) file_get_contents(__DIR__ . '/../fixtures/config_legacy_1_5_1.php');
+    $pfad    = sys_get_temp_dir() . '/es_tol_' . uniqid() . '.php';
+    $faelle  = [
+        "define('AUTO_CHECKIN_TOLERANCE_HOURS', 2);"         => [2, false],
+        "define('AUTO_CHECKIN_TOLERANCE_HOURS', 5);"         => [5, false],
+        "define('AUTO_CHECKIN_TOLERANCE_HOURS', '3');"       => [3, false],
+        "define('AUTO_CHECKIN_TOLERANCE_HOURS', 12);"        => [2, true],
+        "define('AUTO_CHECKIN_TOLERANCE_HOURS', getTol());"  => [2, true],
+        "// define('AUTO_CHECKIN_TOLERANCE_HOURS', 5);"      => [2, false],
+    ];
+
+    foreach ($faelle as $zeile => [$wert, $warnung]) {
+        file_put_contents($pfad, str_replace("define('AUTO_CHECKIN_TOLERANCE_HOURS', 2);", $zeile, $vorlage));
+        [$ergebnis, $hinweis] = migrate_1_2_3_tolerance($pfad);
+        assertSame($wert, $ergebnis, "Fall: {$zeile}");
+        assertSame($warnung, $hinweis !== null, "Warnung, Fall: {$zeile}");
+    }
+    unlink($pfad);
+
+    assertSame([2, null], migrate_1_2_3_tolerance(sys_get_temp_dir() . '/gibt-es-nicht-' . uniqid() . '.php'));
+});
+
+test('Keine Migration bindet die config.php ein', function () {
+    // Ein Einbinden der alten Klassenform definiert im Assistenten class Database
+    // und braeche den Direktsprung von alten Versionen, sobald der Assistent
+    // database.php laedt (Spec 2026-09-14-direktsprung-requires-design.md, 3.4).
+    $verstoesse = [];
+    foreach (glob(__DIR__ . '/../../private/migrations/*.php') ?: [] as $datei) {
+        $quelle = (string) file_get_contents($datei);
+        if (preg_match('/\b(require|require_once|include|include_once)\b[^;]*\$configPath/', $quelle)) {
+            $verstoesse[] = basename($datei);
+        }
+    }
+    assertSame([], $verstoesse, 'Migrationen binden $configPath ein');
+});

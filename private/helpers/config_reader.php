@@ -152,17 +152,31 @@ function configLegacyBaseUrl(string $text): ?string
 /**
  * Der Rohwert eines aktiven define('DEMO_MODE', ...), oder null wenn keins da ist.
  *
- * true/false und ganze Zahlen werden zu ihrem PHP-Typ, ein String-Literal zur
- * Zeichenkette. Alles andere bleibt als Text stehen -- das ist ein Wert ungleich
- * false und schaltet den Modus damit zur sicheren Seite ein, wie demoModeActive()
- * es für unsaubere Werte vorsieht.
+ * Ein Wert, der weder true noch false ist, ist ein Wert ungleich false und
+ * schaltet den Modus damit zur sicheren Seite ein, wie demoModeActive() es für
+ * unsaubere Werte vorsieht.
  *
  * @return mixed
  */
 function configLegacyDemoMode(string $text)
 {
+    return configLegacyDefineRaw($text, 'DEMO_MODE');
+}
+
+/**
+ * Der Rohwert eines aktiven define('NAME', ...), oder null wenn keins da ist.
+ *
+ * true/false und ganze Zahlen werden zu ihrem PHP-Typ, ein String-Literal zur
+ * Zeichenkette. Alles andere bleibt als Text stehen -- ein Ausdruck lässt sich
+ * ohne Einbinden der Datei nicht auswerten.
+ *
+ * @return mixed
+ */
+function configLegacyDefineRaw(string $text, string $name)
+{
+    $muster = '/define\s*\(\s*[\'"]' . preg_quote($name, '/') . '[\'"]\s*,\s*(.+?)\s*\)\s*;/';
     foreach (configLegacyActiveLines($text) as $zeile) {
-        if (!preg_match('/define\s*\(\s*[\'"]DEMO_MODE[\'"]\s*,\s*(.+?)\s*\)\s*;/', $zeile, $m)) {
+        if (!preg_match($muster, $zeile, $m)) {
             continue;
         }
         $roh = trim($m[1]);

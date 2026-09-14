@@ -21,6 +21,7 @@ define('HTACCESS_PATH',  __DIR__ . '/.htaccess');
 require_once __DIR__ . '/../../private/helpers/migrations.php';
 require_once __DIR__ . '/../../private/helpers/config_reader.php';
 require_once __DIR__ . '/../../private/helpers/updater.php';
+require_once __DIR__ . '/../../private/helpers/requirements.php';
 
 define('INSTALL_ROOT',       dirname(__DIR__, 2));
 define('UPDATE_TMP_ROOT',    INSTALL_ROOT . '/private/.update-tmp');
@@ -181,10 +182,8 @@ $dbVersion    = 'unbekannt';
 $targetVersion = getTargetVersion();
 
 if ($step >= 1) {
-    $checks = [
-        'PHP >= 8.0 (läuft: ' . PHP_VERSION . ')' => version_compare(PHP_VERSION, '8.0.0', '>='),
-        'PDO Extension'    => extension_loaded('pdo'),
-        'PDO MySQL'        => extension_loaded('pdo_mysql'),
+    // Anforderungen der hochgeladenen bzw. getauschten Version aus version.json.
+    $checks = requirementsChecks(requirementsRead(INSTALL_ROOT)) + [
         'install.lock'     => file_exists(LOCK_PATH),
         'config.php'       => file_exists(CONFIG_PATH),
         'Schreibrecht config.php' => file_exists(CONFIG_PATH) && is_writable(CONFIG_PATH),

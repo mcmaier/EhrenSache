@@ -20,6 +20,44 @@
  * Der Versionsstempel wird vom Aufrufer gesetzt (public/update/index.php).
  */
 
+require_once __DIR__ . '/../helpers/config_reader.php';
+
+/**
+ * Toleranz in Stunden aus AUTO_CHECKIN_TOLERANCE_HOURS in der config.php.
+ *
+ * Gelesen wird der Text, die Datei wird nicht eingebunden: Ein require der alten
+ * Klassenform definierte im Update-Assistenten class Database und bräche den
+ * Direktsprung von alten Versionen, sobald der Assistent database.php lädt.
+ *
+ * Nur ganzzahlige Werte werden übernommen, auch als String-Literal aus Ziffern.
+ * Ein Ausdruck ließe sich ohne Einbinden nicht auswerten; (int) machte daraus
+ * still die 0 -- einen gültigen, aber falschen Wert. Dann gilt 2 mit Warnung.
+ *
+ * @return array{0:int, 1:?string} Toleranz und gegebenenfalls eine Warnung
+ */
+function migrate_1_2_3_tolerance(string $configPath): array
+{
+    $roh = is_file($configPath)
+        ? configLegacyDefineRaw((string) file_get_contents($configPath), 'AUTO_CHECKIN_TOLERANCE_HOURS')
+        : null;
+
+    if ($roh === null) {
+        return [2, null];
+    }
+    if (is_string($roh) && preg_match('/^-?\d+$/', $roh)) {
+        $roh = (int) $roh;
+    }
+    if (!is_int($roh)) {
+        return [2, 'AUTO_CHECKIN_TOLERANCE_HOURS ist kein ganzzahliger Wert ('
+            . htmlspecialchars(var_export($roh, true)) . ') – es wird 2 übernommen'];
+    }
+    if ($roh < 0 || $roh > 8) {
+        return [2, "AUTO_CHECKIN_TOLERANCE_HOURS steht auf {$roh} – "
+            . 'außerhalb des gültigen Bereichs 0–8, es wird 2 übernommen'];
+    }
+    return [$roh, null];
+}
+
 function migrate_1_2_3(PDO $pdo, string $prefix, string $configPath): array
 {
     $log  = [];
@@ -81,17 +119,9 @@ function migrate_1_2_3(PDO $pdo, string $prefix, string $configPath): array
            . '– bisheriges Verhalten bleibt erhalten';
 
     // ---- Einstellung: Toleranz ----
-    $constant = 2;
-    if (is_file($configPath)) {
-        require_once $configPath;
-    }
-    if (defined('AUTO_CHECKIN_TOLERANCE_HOURS')) {
-        $constant = (int) AUTO_CHECKIN_TOLERANCE_HOURS;
-    }
-    if ($constant < 0 || $constant > 8) {
-        $warn[]   = "AUTO_CHECKIN_TOLERANCE_HOURS steht auf {$constant} – "
-                  . 'außerhalb des gültigen Bereichs 0–8, es wird 2 übernommen';
-        $constant = 2;
+    [$constant, $hinweis] = migrate_1_2_3_tolerance($configPath);
+    if ($hinweis !== null) {
+        $warn[] = $hinweis;
     }
 
     $insert->execute([

@@ -184,8 +184,11 @@ samt `theme.js`. Zwei Gründe: Es richtet sich an jeden Besucher, nicht an den A
 `--demo-banner-h` kennt genau einen Wert, zwei haftende Bänder übereinander würden Sidebar und
 Mobilmenü verschieben.
 
-Der Altform-Zweig in `config_reader` und der Hinweisstreifen fliegen zwei Minor-Versionen
-später wieder heraus.
+Der Hinweisstreifen darf später wieder entfallen. **Der Altform-Zweig in `config_reader` bleibt
+dauerhaft** — korrigiert am 2026-09-14: Ohne ihn könnte eine Installation bis 1.5.1 beim
+direkten Sprung auf eine spätere Version weder ihre Zugangsdaten im Update-Assistenten lesen noch
+`migrate_1_5_1()` ihre `config.php` umstellen. Siehe
+`2026-09-14-direktsprung-requires-design.md`.
 
 ## 7. Abrissliste
 

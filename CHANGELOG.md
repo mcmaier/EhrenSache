@@ -7,6 +7,22 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.6.1] – unveröffentlicht
+
+### Geändert
+- **Anforderungen stehen in `version.json`.** `requires` nennt PHP-Version und PHP-Erweiterungen;
+  Installer, Update-Assistent und Updater prüfen dieselbe Angabe.
+- **Der Updater spielt keine Version ein, deren Anforderungen der Server nicht erfüllt.** Er
+  prüft vor dem Tausch; der neue Code prüft im Folgeaufruf noch einmal und spielt sonst die
+  Sicherung zurück — das schützt auch Installationen auf 1.6.0.
+
+### Behoben
+- Migration 1.2.3 band die `config.php` per `require` ein. Das hätte den direkten Sprung von
+  Versionen bis 1.2.2 abgebrochen, sobald der Update-Assistent die Datenbankklasse lädt. Sie liest
+  die Toleranz jetzt als Text; ein Ausdruck statt einer Zahl ergibt die Vorgabe 2 mit Warnung.
+
+---
+
 ## [1.6.0] – 2026-09-14
 
 > **Dieses Update noch von Hand.** Der Assistent holt Pakete erst ab 1.6.0 selbst von GitHub.
