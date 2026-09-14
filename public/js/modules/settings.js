@@ -111,6 +111,9 @@ export async function renderSystemSettings() {
         saveBtn.removeEventListener('click', saveAllSettings);
         saveBtn.addEventListener('click', saveAllSettings);
     }
+
+    // Stand der Update-Prüfung anzeigen, ohne GitHub zu fragen
+    loadUpdateStatus();
 }
 
 function setupColorReset() {
@@ -607,4 +610,95 @@ window.togglePasswordVisibility = function(inputId) {
     }
 };
 
+// ============================================
+// UPDATES
+// ============================================
+
+/** Gespeicherten Stand laden -- geht nicht nach außen. */
+export async function loadUpdateStatus() {
+    const status = await apiCall('update_check');
+    if (status && status.success) {
+        renderUpdateStatus(status);
+    }
+}
+
+/** Auf Knopfdruck GitHub fragen. */
+export async function checkForUpdates() {
+    const knopf = document.getElementById('update_check_btn');
+    const box   = document.getElementById('update_check_result');
+    if (!box) {
+        return;
+    }
+
+    if (knopf) knopf.disabled = true;
+    box.textContent = 'Frage GitHub an …';
+
+    try {
+        const status = await apiCall('update_check', 'POST', {}, {}, { silentStatuses: [502] });
+        if (status && status.success) {
+            renderUpdateStatus(status);
+        } else {
+            box.textContent = '❌ ' + (status?.message || 'Die Prüfung ist fehlgeschlagen.');
+        }
+    } finally {
+        if (knopf) knopf.disabled = false;
+    }
+}
+
+/**
+ * Setzt den Stand ein. Alles, was aus der GitHub-Antwort stammt, geht nur über
+ * textContent in die Seite.
+ */
+function renderUpdateStatus(status) {
+    const installiert = document.getElementById('update_installed');
+    const zuletzt     = document.getElementById('update_last_checked');
+    const box         = document.getElementById('update_check_result');
+    if (!installiert || !zuletzt || !box) {
+        return;
+    }
+
+    installiert.textContent = 'v' + status.installed;
+    zuletzt.textContent     = status.last_checked ? status.last_checked.slice(0, 16) : 'noch nie';
+    box.replaceChildren();
+
+    if (!status.latest) {
+        return;
+    }
+
+    const meldung = document.createElement('div');
+    if (!status.update_available) {
+        meldung.className   = 'alert alert-info';
+        meldung.textContent = `Diese Installation ist aktuell (neueste Version: ${status.latest.version}).`;
+        box.append(meldung);
+        return;
+    }
+
+    const datum = status.latest.published_at ? `, veröffentlicht am ${status.latest.published_at.slice(0, 10)}` : '';
+    meldung.className   = 'alert alert-warning';
+    meldung.textContent = `Version ${status.update_available} ist verfügbar${datum}.`;
+    box.append(meldung);
+
+    const anleitung = document.createElement('ol');
+    [
+        'Datenbank sichern.',
+        'Auf dem Server den Inhalt von public/update/.htaccess leeren.',
+        'Den Update-Assistenten unter /update aufrufen und „Neueste Version abfragen" wählen.',
+    ].forEach(text => {
+        const punkt = document.createElement('li');
+        punkt.textContent = text;
+        anleitung.append(punkt);
+    });
+    box.append(anleitung);
+
+    if (typeof status.latest.html_url === 'string' && status.latest.html_url.startsWith('https://github.com/')) {
+        const link = document.createElement('a');
+        link.href        = status.latest.html_url;
+        link.target      = '_blank';
+        link.rel         = 'noopener noreferrer';
+        link.textContent = 'Änderungen auf GitHub ansehen';
+        box.append(link);
+    }
+}
+
+window.checkForUpdates = checkForUpdates;
 window.performCleanup = performCleanup;

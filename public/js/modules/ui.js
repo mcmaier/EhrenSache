@@ -796,6 +796,7 @@ export async function loadVersion() {
         {
             document.getElementById('app-version').textContent = `v${version.version}`;
             showConfigFormatHint(version.config_format);
+            showUpdateHint(version.update_available);
         }
 
     } catch (error) {
@@ -825,6 +826,28 @@ function showConfigFormatHint(format) {
     hinweis.textContent = 'Die Konfigurationsdatei liegt noch in der alten Form vor. '
         + 'Bitte den Update-Assistenten erneut ausführen oder '
         + 'private/config/config.php beschreibbar machen.';
+    ziel.prepend(hinweis);
+}
+
+/**
+ * Nennt dem Admin eine verfügbare neuere Version. Die Nummer stammt aus der
+ * zuletzt auf Knopfdruck gespeicherten Prüfung; der Server liefert sie nur,
+ * solange sie höher ist als die installierte.
+ */
+function showUpdateHint(available) {
+    if (!available || document.getElementById('update-available-hint')) {
+        return;
+    }
+
+    const ziel = document.querySelector('.main-content');
+    if (!ziel) {
+        return;
+    }
+
+    const hinweis = document.createElement('div');
+    hinweis.id          = 'update-available-hint';
+    hinweis.className   = 'alert alert-info';
+    hinweis.textContent = `Version ${available} ist verfügbar. Anleitung unter Einstellungen → Updates.`;
     ziel.prepend(hinweis);
 }
 
