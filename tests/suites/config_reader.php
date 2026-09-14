@@ -203,3 +203,16 @@ test('guessBaseUrl baut die Adresse aus dem Request', function () {
 
     $_SERVER = $sicherung;
 });
+
+test('configLegacyDefineRaw liefert den Rohwert eines beliebigen defines', function () {
+    $text = "<?php\n"
+        . "// define('AUTO_CHECKIN_TOLERANCE_HOURS', 7);\n"
+        . "define('AUTO_CHECKIN_TOLERANCE_HOURS', 4);\n"
+        . "define('ALS_TEXT', '3');\n"
+        . "define('AUSDRUCK', getTol());\n";
+
+    assertSame(4, configLegacyDefineRaw($text, 'AUTO_CHECKIN_TOLERANCE_HOURS'));
+    assertSame('3', configLegacyDefineRaw($text, 'ALS_TEXT'));
+    assertSame('getTol()', configLegacyDefineRaw($text, 'AUSDRUCK'));
+    assertSame(null, configLegacyDefineRaw($text, 'FEHLT'));
+});
