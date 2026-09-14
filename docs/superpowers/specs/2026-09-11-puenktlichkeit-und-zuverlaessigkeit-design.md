@@ -4,8 +4,10 @@
 **Status:** Entwurf, abgestimmt
 **Löst ein:** [OI-51](../../OPEN-ITEMS.md#oi-51--pünktlichkeit-wird-beworben-aber-nirgends-ausgewertet)
 **Vorgänger:** `2026-09-10-berichte-statistik-und-nutzerrolle-design.md`, Abschnitt 11
-**Zielversion:** offen — hängt an einer Release-Entscheidung, die vor der Umsetzung fällt. Siehe
-4.5.
+**Zielversion:** Teil 1 (Datenmodell, Abschnitt 4) erschienen in **1.5.0**. Teil 2 (Kennzahlen,
+Abschnitte 5–8) erscheint als **1.5.1**, Migration `1.5.0.php`.
+**Präzisiert am 2026-09-14:** Abschnitte 5.2, 5.3 und 8 — Quelle der Abmeldung, Typfilter,
+Ebene der Ausgabe.
 
 ---
 
@@ -387,15 +389,62 @@ Soll-Menge je Mitglied: Termine im Zeitraum, deren Terminart eine Gruppe des Mit
 eingeschränkt auf dessen aktive Zeiträume — über `attendanceDistinctAppointmentCount()` und
 `getMemberActivityWhereYear()`, nicht als eigene Abfrage (siehe Kopf von Abschnitt 5).
 
+Jedes Soll-Paar aus Mitglied und Termin fällt in **genau einen** Ausgang, geprüft in dieser
+Reihenfolge:
+
+1. **erschienen** — es gibt einen Record mit `status = 'present'`. Wer trotz Abmeldung kam, war da.
+2. Sonst: Gibt es zu dem Paar eine **Abmeldung** — `exceptions.exception_type = 'absence'` und
+   `status ≠ 'rejected'`?
+   - Liegt ihr `created_at` vor Terminbeginn → **abgemeldet**.
+   - Sonst → **ausgefallen**. Das gilt auch, wenn sie später genehmigt wurde und daraus ein
+     `excused`-Record entstand: Es entscheidet der Zeitpunkt der Meldung, nicht der Freigabe.
+3. Sonst: Gibt es einen Record mit `status = 'excused'` → **abgemeldet**. Der Verwalter hat
+   ohne Abmeldung entschuldigt, etwa nach einem Anruf; über dessen Zeitpunkt weiß das System
+   nichts, und ein Nachtrag des Verwalters darf nicht beim Mitglied als Versäumnis landen.
+4. Sonst → **ausgefallen**.
+
 | Größe | Formel |
 |---|---|
-| `appeared` | Records mit `status = 'present'` |
-| `excused_in_time` | Ausnahmen mit `created_at < appointment.date + start_time` und `status ≠ 'rejected'` |
+| `total` | Soll-Paare im Zeitraum |
+| `appeared` | Paare im Ausgang 1 |
+| `excused_in_time` | Paare in den Ausgängen 2 (vor Beginn) und 3 |
 | `missed` | `total − appeared − excused_in_time` |
 | `rate` | `(appeared + excused_in_time) / total` |
 
-Erscheint jemand trotz Abmeldung, zählt `appeared` — er war da. Doppelzählung wird über die
-Reihenfolge verhindert: erst `appeared`, dann `excused_in_time` nur für Termine ohne Record.
+**Der Typfilter ist Pflicht.** Die erste Fassung dieses Abschnitts nannte nur „Ausnahmen" — ohne
+`exception_type = 'absence'` zählten Zeitkorrektur-Anträge als Abmeldung. Im Bestand vom
+2026-09-14 wären das 13 von 28 Ausnahmen gewesen.
+
+**Warum Stufe 3 nötig ist:** Die Anwesenheitsstatistik zählt „entschuldigt" aus
+`records.status`. Ohne Stufe 3 führte die Anwesenheitskachel einen Eintrag als entschuldigt,
+während die Zuverlässigkeit daneben ihn als ausgefallen wertet — im Bestand drei von vier
+entschuldigten Einträgen.
+
+Offene Abmeldungen (`pending`) zählen wie genehmigte (Abschnitt 3.6). Gibt es mehrere Abmeldungen
+zu einem Paar, genügt eine vor Terminbeginn.
+
+Wie die Anwesenheitsstatistik zählen nur Termine, die bereits begonnen haben
+(`ATTENDANCE_STARTED_CUTOFF_SQL` in `attendance.php`) — ein Termin von morgen ist weder erschienen
+noch ausgefallen.
+
+### 5.3 Ebene: Zusammenfassung, Person nur gefiltert
+
+Beide Kennzahlen werden für den **gefilterten Bereich** berechnet, nicht als Liste je Mitglied:
+
+- **Ohne Mitgliedsfilter** — ein Wert für den Verein oder die gewählte Gruppe. Das ist eine
+  Betriebszahl („wie pünktlich ist die Jugendgruppe"), keine Bewertung einzelner Personen.
+- **Mit Mitgliedsfilter** — die Werte dieser Person. Der Verwalter kann jede Person einzeln
+  aufrufen; eine Liste aller, die sich nach Pünktlichkeit sortieren ließe, entsteht nicht.
+
+Aggregiert wird über **Ereignisse, nicht über Personen**: Die Pünktlichkeitsquote eines Bereichs
+ist `on_time_count / measured_count` über alle Messungen darin, nicht der Mittelwert der
+Personenquoten. Sonst wöge ein Mitglied mit einer einzigen Messung so viel wie eines mit dreißig.
+`total` bzw. `total_count` sind entsprechend Soll-Paare aus Mitglied und Termin; für eine
+einzelne Person sind das ihre Termine.
+
+**Entdopplung:** Ein Paar zählt einmal, auch wenn der Termin das Mitglied über zwei Gruppen
+erreicht — dieselbe Regel wie `COUNT(DISTINCT a.appointment_id)` in
+`attendanceFetchMemberTotals()`.
 
 ---
 
@@ -468,6 +517,13 @@ vermeidet einen Eintrag in `demo_mode.php` und hält die Filterlogik an einer St
 Ist der jeweilige Schalter aus, steht dort `{"enabled": false}` und sonst nichts — keine Nullwerte,
 die eine abgeschaltete Kennzahl wie eine leere aussehen lassen.
 
+**Beide Blöcke stehen auf der obersten Ebene der Antwort**, neben `summary` — nicht in den
+Gruppentabellen unter `statistics[]` und nicht je Mitglied (Abschnitt 5.3). Sie folgen denselben
+Filtern wie die übrige Antwort: Jahr, Gruppe, Mitglied, Terminart.
+
+Für die Rolle `user` erzwingt `handleStatistics()` bereits heute den eigenen Mitgliedsfilter; die
+Blöcke enthalten damit ausschließlich die eigenen Werte, ohne eigene Rechteprüfung.
+
 **Oberfläche:** zusätzliche Kennzahlenkacheln in der Statistik-Sektion, mit der Messabdeckung als
 Unterzeile. Im Statistikbericht zusätzliche Zeilen im ersten Abschnitt — additiv, ein älterer
 Ausdruck wird dadurch nicht falsch. In `my_data` die eigenen Werte.
@@ -477,6 +533,9 @@ Bekommt die Pünktlichkeitsquote einen farbigen Balken, ist dessen Skala dieselb
 offen ist — und sie ist einmal zu entscheiden, nicht zweimal. Eine Pünktlichkeitsquote von 70 %
 bedeutet außerdem etwas anderes als eine Anwesenheitsquote von 70 %; die Schwellen der
 Anwesenheit unbesehen zu übernehmen wäre eine stille Aussage, die niemand getroffen hat.
+
+**Entschieden für 1.5.1: Kacheln ohne Farbskala.** Zahl und Bezugsgröße, kein Balken, keine
+Ampel. OI-55 bleibt damit unberührt und kann beide Quoten später gemeinsam entscheiden.
 
 Formulierungen, wörtlich so:
 
