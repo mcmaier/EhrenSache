@@ -188,6 +188,9 @@ Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 > [!NOTE]
 > Bei Update von **v1.0.0 → v1.1.x**: Der Wizard ergänzt `config.php` automatisch um das Prefix-Feld und benennt alle Tabellen entsprechend um. Es ist kein manueller Eingriff in die Konfiguration nötig.
 
+> [!NOTE]
+> Bei Update auf **v1.6.0**: Der Wizard stellt `config.php` auf eine reine Datendatei um und legt vorher die Sicherung `config.php.bak-1.5.1` daneben. Nach einer erfolgreichen Anmeldung kann sie gelöscht werden — sie enthält die Zugangsdaten. Kann der Wizard die Datei nicht schreiben, läuft die Installation unverändert weiter, und das Dashboard weist Administratoren darauf hin.
+
 ---
 
 ## Funktionen

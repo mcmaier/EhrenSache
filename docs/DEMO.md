@@ -48,11 +48,15 @@ aus. Details zum Generator: `private/demo/README.md`.
 2. Installation wie üblich über `/install` durchführen. Danach existiert
    `private/config/install.lock`; ohne diese Datei bleibt der Assistent offen.
 3. Die Subdomain muss auf `public/` zeigen, nicht auf das Projektwurzelverzeichnis.
-4. In `private/config/config.php` ergänzen:
+4. In `private/config/config.php` den Schlüssel setzen:
 
    ```php
-   define('DEMO_MODE', true);
+   'demo_mode' => true,
    ```
+
+   Installationen, die vor 1.6.0 eingerichtet wurden, trugen stattdessen
+   `define('DEMO_MODE', true);`. Der Update-Assistent übernimmt den Wert beim Umstellen auf
+   1.6.0 mitsamt seinem Rohwert.
 
 5. Einmal den Bestand herstellen:
 
@@ -67,9 +71,9 @@ aus. Details zum Generator: `private/demo/README.md`.
 
 | In `config.php` | Ergebnis |
 |---|---|
-| Zeile fehlt | Wächter **aus** |
-| `define('DEMO_MODE', true);` | Wächter **an** |
-| `define('DEMO_MODE', false);` | Wächter **aus** |
+| Schlüssel fehlt oder `'demo_mode' => null` | Wächter **aus** |
+| `'demo_mode' => true` | Wächter **an** |
+| `'demo_mode' => false` | Wächter **aus** |
 | jeder andere Wert (`1`, `'true'`, `'false'`, `0`) | Wächter **an**, dazu eine Meldung im `error_log` |
 
 Ein unsauberer Wert fällt absichtlich zur sicheren Seite: Ein Tippfehler lässt die öffentliche
@@ -162,7 +166,7 @@ funktioniert der direkte Aufruf genauso:
 - `--yes` überspringt die Rückfrage, `--quiet` zusammen mit `--yes` unterdrückt jede Ausgabe.
   Ohne `--quiet` gäbe es rund zwanzig Zeilen je Lauf, also stündlich eine Mail vom Cron.
 - Rückgabewert 0 bei Erfolg, 1 bei einem Fehler; Fehler gehen auf STDERR. Das gilt auch für
-  eine **nicht erreichbare Datenbank** — die Datenbankklasse aus `config.php` beendet dort
+  eine **nicht erreichbare Datenbank** — die Datenbankklasse aus `private/helpers/database.php` beendet dort
   ohne Rückgabewert, ein Wächter in `seed.php` macht daraus eine 1. Ihre JSON-Meldung
   erscheint trotzdem auf STDOUT.
 - **`cron.php` und `seed.php` gehören zusammen hochgeladen.** Liegt neben einer neuen
@@ -197,7 +201,7 @@ der Satz steht fest verdrahtet in `public/js/theme.js`, `public/checkin/js/app.j
 - [ ] `private/config/install.lock` vorhanden.
 - [ ] Datenbankbenutzer nur auf die Demo-Datenbank berechtigt.
 - [ ] `mail_enabled` und `smtp_configured` stehen nicht auf `1`.
-- [ ] `define('DEMO_MODE', true);` steht in `config.php`.
+- [ ] `'demo_mode' => true` steht in `config.php`.
 - [ ] Ein Aufruf von `?resource=cleanup` per POST liefert **403** mit `"demo":true`.
 - [ ] Das orange Hinweisband erscheint auf Anmeldung, Dashboard, Check-in-PWA und Kiosk.
 - [ ] Der Cron läuft und der Bestand erneuert sich zur vollen Stunde.
@@ -230,5 +234,5 @@ Wächter. Das ist die korrekte Wirkung, sieht aber wie ein Regress aus. Tests ge
 Installation ohne `DEMO_MODE`.
 
 **`config.php` liegt nicht im Repository.** Ein `git checkout` holt die Datei nicht zurück und
-entfernt auch keine testweise eingetragene `DEMO_MODE`-Zeile. Wer den Modus zum Ausprobieren
-einschaltet, muss die Zeile von Hand wieder löschen.
+setzt auch keinen testweise eingeschalteten `demo_mode` zurück. Wer den Modus zum Ausprobieren
+einschaltet, muss ihn von Hand wieder auf `false` stellen.

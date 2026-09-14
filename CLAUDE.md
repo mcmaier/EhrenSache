@@ -77,8 +77,8 @@ EhrenSache/
 ├── version.json                # Version, Build-Datum – Quelle für private/helpers/version.php
 ├── private/                    # NICHT öffentlich zugänglich
 │   ├── config/
-│   │   ├── config.php          # DB-Zugangsdaten + Tabellenpräfix (nicht im Repo!)
-│   │   ├── config_example.php  # Template für config.php
+│   │   ├── config.php          # Zugangsdaten und Schalter, reine Daten (nicht im Repo!)
+│   │   ├── config_example.php  # Vorlage für config.php (Array-Form)
 │   │   ├── install.lock        # Existiert nach erfolgreicher Installation
 │   │   └── mail_config.php
 │   ├── handlers/               # API-Logik, je ein File pro Ressource
@@ -92,6 +92,9 @@ EhrenSache/
 │   │   └── regenerate_token.php, change_password.php, change_pin.php, user_mailer.php
 │   ├── helpers/
 │   │   ├── auth.php            # login(), requireRole(), isAdmin(), isDevice(), CSRF
+│   │   ├── bootstrap.php       # appConfig(), BASE_URL, DEMO_MODE – ersetzt require auf config.php
+│   │   ├── config_reader.php   # liest config.php in beiden Formen, Defaults, schreibt die neue
+│   │   ├── database.php        # Klasse Database (bis 1.5.1 in config.php)
 │   │   ├── worktime.php        # Fachlogik Arbeitszeit (Dauer, Validierung, Statistik)
 │   │   ├── member_activity.php # Aktiv/Inaktiv-Zeiträume
 │   │   ├── station.php         # Fachlogik virtuelle Station (Kiosk): Code, PIN-Prüfung, Sperre
@@ -145,7 +148,7 @@ Request-Parameter: `?resource=<name>&id=<id>`
 
 **Ablauf in api.php:**
 1. Headers setzen
-2. Includes laden (config, helpers, alle handlers)
+2. Includes laden (Bootstrap, helpers, alle handlers)
 3. Request-Variablen lesen (`$resource`, `$id`, `$request_method`)
 4. Session starten (nur ohne Bearer Token)
 5. Rate Limiting prüfen
@@ -279,6 +282,10 @@ php tests/run.php worktime_api
 - Neues Frontend-Feature: Modul in `public/js/modules/<name>.js`
 - Neues CSS: in `components/` oder `sections/` einsortieren, Farben nur über `variables.css`
 - Schemaänderung: Migration anlegen **und** `private/setup/ehrensache_db.sql` nachziehen
+- Neuer Konfigurationsschalter: Schlüssel mit Default in `configWithDefaults()`
+  (`private/helpers/config_reader.php`) und in `config_example.php`. Die `config.php` bestehender
+  Installationen wird dafür **nicht** angefasst — der Default greift. Seit 1.6.0 enthält
+  `config.php` nur Daten; Programmcode gehört nach `private/helpers/`
 - Sprache: Deutsch (UI, Kommentare), Englisch (Code/Variablen)
 - Versionssprung: `version.json` und `CHANGELOG.md` gemeinsam pflegen
 

@@ -353,6 +353,38 @@ Normalbetrieb nicht erreichbar.
 
 ---
 
+### Version
+Versionsstand der Installation. Das Dashboard zeigt daraus die Versionsnummer an.
+
+**Endpoint:** `GET /api.php?resource=version`
+
+**Authentifizierung:** Session oder Token, jede Rolle
+
+**Response:**
+```json
+{
+  "version": "1.6.0",
+  "build": "2026-09-14",
+  "commit": "auto",
+  "name": "EhrenSache",
+  "server_time": "2026-09-14 13:05:00",
+  "php_version": "8.2.12",
+  "config_format": "array"
+}
+```
+
+`config_format` wird **nur an die Rolle `admin`** ausgeliefert und nennt die Form von
+`private/config/config.php`:
+
+| Wert | Bedeutung |
+|---|---|
+| `array` | reine Datendatei, Stand ab 1.6.0 |
+| `legacy` | alte Klassenform — die Umstellung beim Update ist nicht gelungen; das Dashboard zeigt einen Hinweis |
+| `missing` | keine Datei gefunden |
+| `unknown` | Datei vorhanden, aber keine der beiden Formen |
+
+---
+
 ## Mitglieder (members)
 
 ### Alle Mitglieder abrufen
