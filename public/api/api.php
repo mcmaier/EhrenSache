@@ -26,7 +26,7 @@ header("Access-Control-Allow-Credentials: true");
 // ============================================
 
 //Module laden
-require_once '../../private/config/config.php';
+require_once '../../private/helpers/bootstrap.php';
 require_once '../../private/helpers/auth.php';
 require_once '../../private/helpers/rate_limiter.php';
 require_once '../../private/helpers/totp.php';
@@ -220,8 +220,7 @@ if($resource === 'ping' && $request_method === 'GET') {
     
     // Prüfe DB-Verbindung
     try {
-        require_once $configPath;
-        $database = new Database();
+        $database = new Database(appConfig()['db']);
         $testDb = $database->getConnection();
         $prefix = $database->table('');
 
@@ -261,7 +260,7 @@ if($resource === 'ping' && $request_method === 'GET') {
 // ============================================
 
 //Datenbank verbinden
-$database = new Database();
+$database = new Database(appConfig()['db']);
 $db = $database->getConnection();
 $prefix = $database->table('');
 

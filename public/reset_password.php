@@ -13,12 +13,12 @@
 
 header("Content-Type: text/html; charset=UTF-8");
 
-require_once '../private/config/config.php';
+require_once '../private/helpers/bootstrap.php';
 require_once '../private/helpers/branding.php';
 
 session_start();
 
-$database = new Database();
+$database = new Database(appConfig()['db']);
 $db = $database->getConnection();
 
 $branding = getBrandingSettings($db, $database);

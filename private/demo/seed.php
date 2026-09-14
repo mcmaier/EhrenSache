@@ -25,7 +25,7 @@
  */
 declare(strict_types=1);
 
-require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../helpers/bootstrap.php';
 require_once __DIR__ . '/plan.php';
 
 const DEMO_MIN_SCHEMA = '1.3.0';
@@ -477,7 +477,7 @@ if ($isMainScript) {
         finishRun(1);
     }
 
-    $database = new Database();
+    $database = new Database(appConfig()['db']);
     $db       = $database->getConnection();
     $prefix   = $database->table('');
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
