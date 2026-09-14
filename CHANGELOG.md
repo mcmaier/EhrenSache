@@ -7,7 +7,13 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [1.6.0] – unveröffentlicht
+## [1.6.0] – 2026-09-14
+
+> **Dieses Update noch von Hand.** Der Assistent holt Pakete erst ab 1.6.0 selbst von GitHub.
+> Wer von 1.5.1 oder älter kommt, lädt die Dateien dieses eine Mal wie bisher hoch und startet
+> dann den Update-Assistenten. Er stellt dabei `config.php` auf die neue Form um und legt vorher
+> `config.php.bak-1.5.1` an; die Sicherung enthält die Zugangsdaten und kann nach einer
+> erfolgreichen Anmeldung gelöscht werden.
 
 ### Neu
 - **Der Update-Assistent holt das Paket selbst von GitHub.** Ein neuer Schritt 0 fragt auf
