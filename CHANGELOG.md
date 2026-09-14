@@ -7,7 +7,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [1.6.1] – unveröffentlicht
+## [1.6.1] – 2026-09-14
+
+> **Ab 1.6.0 über den Assistenten.** Schritt 0 des Update-Assistenten holt dieses Paket selbst.
+> Wer von einer älteren Version kommt, lädt es wie bisher von Hand hoch — ein Zwischenschritt
+> über 1.6.0 ist nicht nötig.
 
 ### Geändert
 - **Anforderungen stehen in `version.json`.** `requires` nennt PHP-Version und PHP-Erweiterungen;
