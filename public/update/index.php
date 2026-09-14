@@ -19,19 +19,29 @@ define('VERSION_PATH',   __DIR__ . '/../../version.json');
 define('HTACCESS_PATH',  __DIR__ . '/.htaccess');
 
 require_once __DIR__ . '/../../private/helpers/migrations.php';
+require_once __DIR__ . '/../../private/helpers/config_reader.php';
 
 // ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
-/** Liest die relevanten Werte aus config.php via Regex (sicher für 1.0.0 ohne $prefix). */
-function parseConfig(string $file): array
+/**
+ * Liest config.php über den gemeinsamen Leser -- in der alten Klassenform
+ * (auch 1.0.0 ohne $prefix) wie in der Array-Form ab 1.6.0 -- und liefert die
+ * flachen Schlüssel, mit denen dieser Assistent arbeitet.
+ *
+ * Bis 1.5.1 stand hier eine eigene Regex-Fassung. Nach der Migration auf 1.6.0
+ * hätte sie die umgeschriebene Datei nicht mehr lesen können.
+ */
+function readWizardConfig(string $file): array
 {
-    if (!file_exists($file)) return [];
-    $c = file_get_contents($file);
-    $result = [];
-    foreach (['host', 'db_name', 'username', 'password', 'prefix'] as $key) {
-        $result[$key] = preg_match('/private\s+\$' . $key . '\s*=\s*"([^"]*)"/', $c, $m) ? $m[1] : '';
-    }
-    return $result;
+    $cfg = readConfigFile($file);
+    return [
+        'host'     => $cfg['db']['host'],
+        'db_name'  => $cfg['db']['name'],
+        'username' => $cfg['db']['user'],
+        'password' => $cfg['db']['pass'],
+        'prefix'   => $cfg['db']['prefix'],
+        'format'   => $cfg['format'],
+    ];
 }
 
 /** Verbindet zur DB anhand der geparsten Config-Werte. */
@@ -80,7 +90,7 @@ if ($step >= 1) {
     ];
 
     if ($checks['config.php']) {
-        $configValues = parseConfig(CONFIG_PATH);
+        $configValues = readWizardConfig(CONFIG_PATH);
         try {
             $pdo       = connectDb($configValues);
             $dbVersion = detectDbVersion($pdo, $configValues['prefix'] ?? '');
@@ -124,7 +134,7 @@ if ($step == 3 && $_SERVER['REQUEST_METHOD'] !== 'POST') {
 
     $prefix    = $_SESSION['update_prefix'];
     $fromVer   = $_SESSION['update_from'] ?? 'unbekannt';
-    $configCfg = parseConfig(CONFIG_PATH);
+    $configCfg = readWizardConfig(CONFIG_PATH);
 
     try {
         $pdo = connectDb($configCfg);
