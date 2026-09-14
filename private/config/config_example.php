@@ -2,9 +2,9 @@
 
 /**
  * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
- * 
+ *
  * Copyright (c) 2026 Martin Maier
- * 
+ *
  * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
  * oder unter einer kommerziellen Lizenz verfügbar.
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
@@ -13,111 +13,40 @@
 // ============================================
 // CONFIG EXAMPLE PHP
 // ============================================
+//
+// Vorlage für private/config/config.php. Seit 1.6.0 enthält diese Datei
+// ausschließlich Daten -- der Programmcode dazu liegt in
+// private/helpers/bootstrap.php und private/helpers/database.php und wird bei
+// jedem Update mit ausgetauscht.
+//
+// Fehlende Schlüssel sind unkritisch: Der Bootstrap füllt sie mit Defaults.
+// Der Installer schreibt config.php über renderConfigFile() in
+// private/helpers/config_reader.php; von Hand kopieren und anpassen geht ebenso.
 
-// Manuelles define der BASE_URL für Email-Links, API-Calls, etc. -
-// Auskommentieren, falls automatische Erkennung nicht funktioniert
-//------------------------------------------------------------------
-// define('BASE_URL', 'http://localhost/ehrensache');
+return [
+    'db' => [
+        'host'   => 'your_host',
+        'name'   => 'your_database',
+        'user'   => 'your_username',
+        'pass'   => 'your_password',
+        'prefix' => 'your_prefix',
+    ],
 
-define('AUTO_CHECKIN_TOLERANCE_HOURS', 2);
+    // Basis-URL für Mail-Links und API-Aufrufe.
+    // null = automatisch aus dem Request ermitteln. Nur setzen, wenn die
+    // Erkennung nicht funktioniert, z. B. 'http://localhost/ehrensache'.
+    'base_url' => null,
 
-// Demo-Modus für öffentlich erreichbare Installationen.
-// Eingeschaltet begrenzt er alle Zugriffe ÜBER DIE REST-API auf feste Listen:
-// schreibend sind nur Mitglieder, Termine, Anwesenheit, Anträge, Arbeitszeit,
-// Check-in und Kiosk erlaubt; Konten, Rechte, Mailversand, Dateiannahme und
-// Systemeinstellungen sind gesperrt. Lesend geht nur, was in einer der drei
-// Listen in private/helpers/demo_mode.php steht — eine dort nicht eingetragene
-// Ressource ist auch lesend gesperrt.
-// Eigene Einstiegspunkte neben public/api/api.php erfasst der Wächter NICHT.
-// Ausschalten: Zeile auskommentieren oder auf false setzen. Jeder andere Wert
-// (auch 0 oder 'false' als Zeichenkette) gilt absichtlich als eingeschaltet.
-// Für eine normale Vereinsinstallation auskommentiert lassen.
-//------------------------------------------------------------------
-// define('DEMO_MODE', true);
-
-class Database {
-    private $host = "your_host";
-    private $db_name = "your_database";
-    private $username = "your_username";
-    private $password = "your_password";
-    private $prefix ="your_prefix";
-    public $conn;
-
-    public function getConnection() {
-        $this->conn = null;
-        try {
-            $this->conn = new PDO("mysql:host=" . $this->host . ";dbname=" . $this->db_name, 
-                                  $this->username, $this->password);
-            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $this->conn->exec("set names utf8mb4");
-        } catch(PDOException $e) {
-            http_response_code(500);
-            echo json_encode(["message" => "Database connection error"]);
-            exit();
-        }
-        return $this->conn;
-    }
-
-    // Helper-Methode für Tabellennamen
-    public function table($tableName) {
-        return $this->prefix . $tableName;
-    }
-}
-
-// Helper-Funktion für Mail-Config
-function getMailConfig() {
-    static $config = null;
-    if ($config === null) {
-        // mail_config.php entsteht erst beim Speichern der SMTP-Einstellungen.
-        // Bis dahin darf das Laden keinen Fatal error auslösen — die Aufrufer
-        // fragen ohnehin erst danach, ob der Mailversand aktiviert ist.
-        $path = __DIR__ . '/mail_config.php';
-        $config = is_file($path) ? require $path : [
-            'smtp_host'  => '',
-            'smtp_port'  => 587,
-            'smtp_user'  => '',
-            'smtp_pass'  => '',
-            'from_email' => '',
-            'from_name'  => '',
-            'use_tls'    => true,
-        ];
-    }
-    return $config;
-}
-
-function getBaseUrl() {
-    static $baseUrl = null;
-    
-    if ($baseUrl === null) {
-        // Protokoll
-        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') 
-            ? 'https' 
-            : 'http';
-        
-        // Host
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        
-        // Pfad ermitteln (bis /public)
-        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';        
-        
-        // Entferne /public/... vom Pfad
-        $basePath = dirname(dirname($scriptName)); // Zwei Ebenen hoch
-        
-        // Bereinige mehrfache Slashes
-        $basePath = str_replace('//', '/', $basePath);
-        
-        // Falls am Root
-        if ($basePath === '/' || $basePath === '.') {
-            $basePath = '';
-        }
-        
-        $baseUrl = $protocol . '://' . $host . $basePath;
-    }
-    
-    return $baseUrl;
-}
-
-// Als Konstante definieren (für einfachen Zugriff)
-if (!defined('BASE_URL')) {
-    define('BASE_URL', getBaseUrl());
-}
+    // Demo-Modus für öffentlich erreichbare Installationen.
+    // Eingeschaltet begrenzt er alle Zugriffe ÜBER DIE REST-API auf feste Listen:
+    // schreibend sind nur Mitglieder, Termine, Anwesenheit, Anträge, Arbeitszeit,
+    // Check-in und Kiosk erlaubt; Konten, Rechte, Mailversand, Dateiannahme und
+    // Systemeinstellungen sind gesperrt. Lesend geht nur, was in einer der drei
+    // Listen in private/helpers/demo_mode.php steht — eine dort nicht eingetragene
+    // Ressource ist auch lesend gesperrt.
+    // Eigene Einstiegspunkte neben public/api/api.php erfasst der Wächter NICHT.
+    // Aus: false oder null. Jeder andere Wert (auch 0 oder 'false' als
+    // Zeichenkette) gilt absichtlich als eingeschaltet.
+    // Für eine normale Vereinsinstallation false lassen.
+    'demo_mode' => false,
+];
