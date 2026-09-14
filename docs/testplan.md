@@ -207,6 +207,21 @@ wie eine Messung, ohne eine zu sein.
 | ANT-4 | Antrag genehmigen, danach den Eintrag ansehen | Ankunft entspricht der beantragten Zeit, Quelle zeigt **„📝 Antrag"** |
 | ANT-5 | Als Admin die Wunschzeit vor der Freigabe ändern | Übernommen, solange sie im Toleranzband liegt |
 
+### 7.1c Pünktlichkeit und Zuverlässigkeit (ab 1.5.1)
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| PZ-1 | Frische Installation oder Update: Statistik öffnen | Keine Kacheln für Pünktlichkeit oder Zuverlässigkeit — beide ab Werk aus |
+| PZ-2 | Einstellungen: nur die neue Karte ansehen, dann eine andere Einstellung speichern | Speichern gelingt; die Karenz steht auf 0, nicht leer |
+| PZ-3 | Pünktlichkeit einschalten, Statistik ohne Mitgliedsfilter | Eine Kachel für den ganzen Bereich, keine Liste je Person |
+| PZ-4 | Mitgliedsfilter auf eine Person mit weniger als fünf Messungen | „Zu wenige Messungen (n von mindestens 5)", keine Prozentzahl |
+| PZ-5 | Karenz auf −5 stellen | Die Quote sinkt; die Verspätungszeile ändert sich nicht |
+| PZ-6 | Als Mitglied anmelden, Statistik öffnen | Nur die eigenen Werte |
+| PZ-7 | Benutzer ohne verknüpftes Mitglied, Statistik öffnen | Keine Werte anderer Personen, keine Fehlermeldung |
+| PZ-8 | Abmeldung **nach** Terminbeginn stellen und genehmigen | Zuverlässigkeit zählt den Termin als ausgefallen, die Anwesenheit als entschuldigt |
+| PZ-9 | Anwesenheitsbericht drucken | Zusätzliche Zeilen im ersten Abschnitt, nur für eingeschaltete Kennzahlen |
+| PZ-10 | „Meine Daten" als CSV | Abschnitt „PÜNKTLICHKEIT UND ZUVERLÄSSIGKEIT" je Jahr; ausgeschaltet fehlt er |
+
 ### 7.2 Erstellen
 
 | ID | Testfall | Erwartetes Ergebnis |

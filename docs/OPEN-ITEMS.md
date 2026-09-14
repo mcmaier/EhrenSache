@@ -1764,7 +1764,7 @@ zurückgehalten. Kein Zugang, keine Rechteausweitung.
 ---
 
 ### OI-51 · Pünktlichkeit wird beworben, aber nirgends ausgewertet
-**Priorität:** hoch — eine Zusage, die das Projekt an vier Stellen macht und an keiner einlöst
+**Priorität:** erledigt am 2026-09-14 — mit 1.5.1. Pünktlichkeit und Zuverlässigkeit in Statistik, Anwesenheitsbericht und Selbstauskunft, beide ab Werk ausgeschaltet; `DATENSCHUTZ.md` Abschnitt 11.
 
 **Entwurf liegt vor (2026-09-11):**
 `docs/superpowers/specs/2026-09-11-puenktlichkeit-und-zuverlaessigkeit-design.md`. Er entscheidet
@@ -1781,9 +1781,12 @@ sein, statt die Startzeit des Termins zu behaupten; ein genehmigter Zeitkorrektu
 `appointments.date`. Die Spalte `arrival_measured` aus den Vorentscheidungen wird damit nicht
 gebraucht.
 
-**Schritt 2 (die Kennzahlen selbst) ist offen** — Quote, Verspätungsmaß, Zuverlässigkeit,
-Einstellungen, Anzeige und der Abschnitt in `DATENSCHUTZ.md`. Die Sperre durch
-[OI-48](#oi-48--statistik-zählt-je-gruppe-nur-eine-terminart) ist seit dem 2026-09-11 aufgehoben.
+**Schritt 2 (die Kennzahlen selbst) ist umgesetzt und liegt in 1.5.1.** Pünktlichkeit und
+Zuverlässigkeit stehen in Statistik, Anwesenheitsbericht und Selbstauskunft, beide ab Werk
+ausgeschaltet; `DATENSCHUTZ.md` Abschnitt 11 beschreibt Zweck, Sichtbarkeit und Auskunft.
+Die Farbskala der Quoten bleibt bei [OI-55](#oi-55--farbschwellen-der-anwesenheitsquote-sind-fest-verdrahtet).
+
+**OI-51 ist damit erledigt.**
 
 `README.md` schreibt „Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen".
 `CLAUDE.md` beschreibt das Projekt als „Statistische Auswertung von Anwesenheit **und

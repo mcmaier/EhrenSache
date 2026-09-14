@@ -502,17 +502,22 @@ vermeidet einen Eintrag in `demo_mode.php` und hält die Filterlogik an einer St
 
 ```json
 "punctuality": {
-  "enabled": true, "sufficient": true,
+  "enabled": true, "sufficient": true, "min_measurements": 5,
   "measured_count": 15, "total_count": 22,
-  "on_time_count": 12, "rate": 0.8,
+  "on_time_count": 12, "rate": 80.0,
   "late_count": 3, "avg_late_minutes": 7.3,
   "self_reported_count": 1
 },
 "reliability": {
   "enabled": true,
-  "total": 22, "appeared": 15, "excused_in_time": 4, "missed": 3, "rate": 0.864
+  "total": 22, "appeared": 15, "excused_in_time": 4, "missed": 3, "rate": 86.4
 }
 ```
+
+**Umgesetzt in 1.5.1 mit zwei Abweichungen vom ursprünglichen Beispiel:** `rate` ist eine
+Prozentzahl wie `summary.overall_average`, nicht ein Anteil — zwei Einheiten in einer Antwort
+wären eine Fehlerquelle. Und der Block nennt `min_measurements`, damit Oberfläche, Bericht und
+Auskunft die Schwelle nicht je selbst hart kodieren.
 
 Ist der jeweilige Schalter aus, steht dort `{"enabled": false}` und sonst nichts — keine Nullwerte,
 die eine abgeschaltete Kennzahl wie eine leere aussehen lassen.
