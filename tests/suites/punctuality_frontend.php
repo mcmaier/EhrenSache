@@ -43,3 +43,50 @@ test('Jeder Schluessel der Karte ist fuer Neuinstallationen angelegt', function 
         assertTrue(strpos($sql, "('{$key}',") !== false, "{$key} fehlt im Insert-Block des Schemas");
     }
 });
+
+test('Beide Kacheln sind vorhanden und zunaechst verborgen', function () use ($puRoot) {
+    $html = (string) file_get_contents($puRoot . '/public/index.html');
+
+    foreach (['statPunctualityCard', 'statReliabilityCard'] as $id) {
+        $pos = strpos($html, "id=\"{$id}\"");
+        assertTrue($pos !== false, "Kachel {$id} fehlt");
+
+        $tagEnde = strpos($html, '>', $pos);
+        assertTrue(strpos(substr($html, $pos, $tagEnde - $pos), 'hidden') !== false,
+            "{$id} muss ohne Serverantwort verborgen sein");
+    }
+});
+
+test('Die Kacheln tragen keine Farbskala', function () use ($puRoot) {
+    // Spec 8 / OI-55: Die Skala einer Quote wird einmal entschieden, fuer
+    // Anwesenheit und Puenktlichkeit gemeinsam -- nicht hier nebenbei.
+    $js    = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+    $start = strpos($js, 'function updateBehaviorStats(');
+    assertTrue($start !== false, 'updateBehaviorStats() fehlt');
+    $body  = substr($js, $start, strpos($js, "\n}", $start) - $start);
+
+    assertTrue(strpos($body, 'rate-') === false, 'Farbklasse in den Kacheln -- das ist OI-55');
+});
+
+test('Beide Pfade von renderStatistics befuellen die Kacheln', function () use ($puRoot) {
+    // Der Leerpfad kehrt frueh zurueck. Fehlte der Aufruf dort, blieben nach
+    // einem Filterwechsel die Werte der vorherigen Auswahl stehen.
+    $js    = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+    $start = strpos($js, 'export async function renderStatistics(');
+    // Bis zur Schleife ueber die Gruppen -- dort beginnt der Tabellenaufbau,
+    // und beide Aufrufe muessen davor stehen.
+    $ende  = strpos($js, 'statsData.statistics.forEach', $start);
+    assertTrue($start !== false && $ende !== false, 'renderStatistics() nicht auffindbar');
+    $body  = substr($js, $start, $ende - $start);
+
+    assertSame(2, substr_count($body, 'updateBehaviorStats('),
+        'updateBehaviorStats() muss im Leerpfad und im Normalpfad stehen');
+});
+
+test('Die Kachel nennt die Mindestzahl aus der Serverantwort', function () use ($puRoot) {
+    $js = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+
+    assertTrue(strpos($js, 'min_measurements') !== false,
+        'Die Mindestzahl muss aus der Antwort kommen, nicht als 5 im Skript stehen');
+    assertSame(5, PUNCTUALITY_MIN_MEASUREMENTS);
+});

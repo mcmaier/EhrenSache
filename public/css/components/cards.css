@@ -35,3 +35,18 @@
     font-weight: bold;
     color: var(--text-dark);
 }
+
+/* Unterzeile einer Kennzahl: Bezugsgroesse, Messabdeckung, Verspaetung. */
+.stat-card .stat-detail {
+    display: block;
+    margin-top: var(--spacing-sm);
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-light);
+}
+
+/* Ohne diese Regel schluege ein spaeteres display der Klasse das hidden des
+   Browsers, und eine abgeschaltete Kennzahl stuende als leere Kachel da. */
+.stat-card[hidden] {
+    display: none;
+}
