@@ -116,10 +116,13 @@ test('Die Erlaubnisliste entspricht der Spezifikation', function () {
 });
 
 test('Die Sperrliste entspricht der Spezifikation', function () {
+    // update_check kam mit 1.6.0 dazu: Der POST fragt GitHub an und schreibt
+    // Einstellungen (docs/superpowers/specs/2026-09-11-integrierter-updater-design.md).
+    // Der Eintrag macht die Ressource bekannt und oeffnet damit GET.
     assertSame([
         'change_password', 'change_pin', 'users', 'activate_user', 'user_status',
         'register', 'password_reset_request', 'settings', 'upload-logo',
-        'import', 'cleanup', 'regenerate_token',
+        'import', 'cleanup', 'regenerate_token', 'update_check',
     ], DEMO_WRITE_DENIED);
 });
 

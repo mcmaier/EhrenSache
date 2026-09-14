@@ -25,6 +25,7 @@ test('version meldet dem Admin die Form der Konfigurationsdatei', function () {
         in_array($res['body']['config_format'], ['array', 'legacy', 'missing', 'unknown'], true),
         'Unbekannter Wert: ' . var_export($res['body']['config_format'], true)
     );
+    assertTrue(array_key_exists('update_available', $res['body'] ?? []), 'update_available fehlt fuer admin');
 });
 
 test('version verschweigt config_format gegenueber manager und user', function () {
@@ -34,6 +35,10 @@ test('version verschweigt config_format gegenueber manager und user', function (
         assertTrue(
             !array_key_exists('config_format', $res['body'] ?? []),
             "config_format wurde an die Rolle {$rolle} ausgeliefert"
+        );
+        assertTrue(
+            !array_key_exists('update_available', $res['body'] ?? []),
+            "update_available wurde an die Rolle {$rolle} ausgeliefert"
         );
     }
 });

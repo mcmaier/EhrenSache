@@ -12,11 +12,12 @@
 /**
  * Meldet den Systemzustand.
  *
- * config_format nur für Rolle admin: Liegt config.php noch in der alten
- * Klassenform vor, zeigt das Dashboard dem Admin einen Hinweis. Ein
- * Vereinsmitglied kann damit nichts anfangen und würde nur beunruhigt.
+ * config_format und update_available nur für Rolle admin: Liegt config.php
+ * noch in der alten Klassenform vor oder ist aus der letzten Update-Prüfung
+ * eine neuere Version bekannt, zeigt das Dashboard dem Admin einen Hinweis.
+ * Ein Vereinsmitglied kann damit nichts anfangen und würde nur beunruhigt.
  */
-function getVersion(?string $role = null)
+function getVersion(?string $role = null, $db = null, $database = null)
 {
     $versionFile = __DIR__ . '/../../version.json';
     if (!file_exists($versionFile)) {
@@ -31,6 +32,9 @@ function getVersion(?string $role = null)
 
     if ($role === 'admin') {
         $version['config_format'] = appConfig()['format'];
+        if ($db !== null && $database !== null) {
+            $version['update_available'] = updateCheckStatus($db, $database, (string) $version['version'])['update_available'];
+        }
     }
 
     echo json_encode($version);

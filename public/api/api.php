@@ -77,6 +77,8 @@ require_once '../../private/handlers/my_data.php';
 require_once '../../private/handlers/activity_types.php';
 require_once '../../private/handlers/work_sessions.php';
 require_once '../../private/handlers/station.php';
+require_once '../../private/helpers/update_status.php';
+require_once '../../private/handlers/update_check.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -635,8 +637,11 @@ try {
         getSessionStatus($request_method);
         break;
     case 'version':
-        getVersion($authUserRole);
+        getVersion($authUserRole, $db, $database);
     break;
+    case 'update_check':
+        handleUpdateCheck($db, $database, $request_method);
+        break;
     case 'station':
         handleStation($db, $database, $request_method, $authUserId, $authUserRole, $authDeviceType);
         break;
