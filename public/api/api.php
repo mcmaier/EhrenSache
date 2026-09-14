@@ -25,6 +25,19 @@ header("Access-Control-Allow-Credentials: true");
 // 2. INCLUDES
 // ============================================
 
+// Wartung: Während der Update-Assistent Dateien tauscht, würde ein Request alten
+// und neuen Code mischen. Deshalb steht diese Prüfung vor allen übrigen Includes.
+require_once '../../private/helpers/maintenance.php';
+if (maintenanceActive(maintenanceFlagPath())) {
+    http_response_code(503);
+    header('Retry-After: 60');
+    echo json_encode([
+        'status'  => 'maintenance',
+        'message' => 'Ein Update wird eingespielt. Bitte in einer Minute erneut versuchen.',
+    ]);
+    exit();
+}
+
 //Module laden
 require_once '../../private/helpers/bootstrap.php';
 require_once '../../private/helpers/auth.php';
