@@ -40,8 +40,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Neues Mitglied mit Gruppe verlor PIN und Mitgliedschaftszeiträume.** Beim Anlegen lieferte die
   API die ID `0`, sobald Gruppen mitgeschickt wurden — sie wurde erst nach dem Speichern der
   Gruppenzuordnung gelesen. Die Oberfläche schickte PIN und Zeiträume dann an ein Mitglied, das es
-  nicht gibt, ohne Fehlermeldung. Wer seit dem Anlegen eines Mitglieds eine fehlende PIN oder
-  einen fehlenden Zeitraum bemerkt hat: nachtragen.
+  nicht gibt, und meldete einen Fehler wie „Member not found" — obwohl das Mitglied selbst angelegt
+  war. Wer diese Meldung beim Anlegen gesehen hat: PIN und Zeitraum beim Mitglied nachtragen.
+- **Die Dialoge der Zeiterfassung zeigen die ID des Eintrags** (OI-57). „Zeit nachtragen" bzw.
+  „Eintrag bearbeiten" und der Dialog für Tätigkeitsarten trugen als einzige Bearbeitungsdialoge
+  kein ID-Badge im Kopf.
 
 ## [1.5.0] – 2026-09-11
 
