@@ -156,3 +156,211 @@ function reliabilityBuild(array $pairs): array
             : null,
     ];
 }
+
+/**
+ * FROM ... WHERE der Soll-Menge und seine Parameter.
+ *
+ * Derselbe Join wie attendanceFetchMemberTotals(): Terminart -> Gruppe ->
+ * Mitglied, aktiv im Jahr, Termin begonnen. Die beiden duerfen nicht
+ * auseinanderlaufen -- tests/suites/punctuality_api.php prueft das gegen den
+ * Bestand, statt die OI-48-Rechnung fuer eine gemeinsame Funktion aufzubrechen.
+ *
+ * @param array<int, int> $groupIds nicht leer
+ * @return array{0: string, 1: array<int, mixed>}
+ */
+function punctualityScope($database, array $groupIds, int $year, ?int $memberId,
+                          ?int $appointmentTypeId): array
+{
+    require_once __DIR__ . '/member_activity.php';
+
+    $prefix        = $database->table('');
+    $activityWhere = getMemberActivityWhereYear($year, 'm');
+    $placeholders  = implode(',', array_fill(0, count($groupIds), '?'));
+
+    $sql = "
+        FROM {$prefix}appointments a
+        JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
+        JOIN {$prefix}member_group_assignments mga
+             ON mga.group_id = atg.group_id AND mga.group_id IN ({$placeholders})
+        JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activityWhere}
+        LEFT JOIN {$prefix}records r
+             ON r.appointment_id = a.appointment_id AND r.member_id = m.member_id
+        WHERE YEAR(a.date) = ?
+          AND a.date <= " . ATTENDANCE_STARTED_CUTOFF_SQL . "
+    ";
+
+    $params   = array_values(array_map('intval', $groupIds));
+    $params[] = $year;
+
+    if ($memberId !== null) {
+        $sql .= " AND m.member_id = ?";
+        $params[] = $memberId;
+    }
+    if ($appointmentTypeId !== null) {
+        $sql .= " AND a.type_id = ?";
+        $params[] = $appointmentTypeId;
+    }
+
+    return [$sql, $params];
+}
+
+/**
+ * Gemessene Ankuenfte im Bereich, je Record einmal.
+ *
+ * DISTINCT r.record_id ist die Entdopplung: Erreicht ein Termin ein Mitglied
+ * ueber zwei Gruppen, liefert der Join denselben Record zweimal.
+ *
+ * Gemessen heisst: anwesend, mit Uhrzeit, und nicht aus Import oder Timer
+ * (Spec 3.5). Eine genehmigte Zeitkorrektur zaehlt mit -- ihre Herkunft steht
+ * als exception_request in der Antwort.
+ *
+ * @return array<int, array{delta_seconds: string, checkin_source: string}>
+ */
+function punctualityFetchMeasurements($db, $database, array $groupIds, int $year,
+                                      ?int $memberId, ?int $appointmentTypeId): array
+{
+    if ($groupIds === []) {
+        return [];
+    }
+
+    [$scope, $params] = punctualityScope($database, $groupIds, $year, $memberId, $appointmentTypeId);
+
+    $stmt = $db->prepare("
+        SELECT DISTINCT r.record_id,
+               TIMESTAMPDIFF(SECOND, CONCAT(a.date, ' ', a.start_time), r.arrival_time) AS delta_seconds,
+               r.checkin_source
+        {$scope}
+          AND r.status = 'present'
+          AND r.arrival_time IS NOT NULL
+          AND r.checkin_source NOT IN ('import', 'timer')
+    ");
+    $stmt->execute($params);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Soll-Paare im Bereich mit den Fakten, die reliabilityOutcome() braucht.
+ *
+ * GROUP BY Mitglied und Termin entdoppelt. a.date und a.start_time stehen mit
+ * im GROUP BY: MariaDB erkennt die funktionale Abhaengigkeit vom Primaerschluessel
+ * unter ONLY_FULL_GROUP_BY nicht, und die Unterabfragen lesen beide.
+ *
+ * Abmeldungen nur vom Typ 'absence' -- ohne diesen Filter zaehlten
+ * Zeitkorrektur-Antraege als Absage (Spec 5.2). Offene zaehlen wie genehmigte.
+ *
+ * @return array<int, array<string, string>>
+ */
+function reliabilityFetchPairs($db, $database, array $groupIds, int $year,
+                               ?int $memberId, ?int $appointmentTypeId): array
+{
+    if ($groupIds === []) {
+        return [];
+    }
+
+    $prefix = $database->table('');
+    [$scope, $params] = punctualityScope($database, $groupIds, $year, $memberId, $appointmentTypeId);
+
+    $absence = "
+        FROM {$prefix}exceptions e
+        WHERE e.member_id = m.member_id
+          AND e.appointment_id = a.appointment_id
+          AND e.exception_type = 'absence'
+          AND e.status <> 'rejected'
+    ";
+
+    $stmt = $db->prepare("
+        SELECT m.member_id, a.appointment_id,
+               MAX(CASE WHEN r.status = 'present' THEN 1 ELSE 0 END) AS has_present,
+               MAX(CASE WHEN r.status = 'excused' THEN 1 ELSE 0 END) AS has_excused_record,
+               (SELECT COUNT(*) {$absence}) AS absence_count,
+               (SELECT COUNT(*) {$absence}
+                  AND e.created_at < CONCAT(a.date, ' ', a.start_time)) AS absence_in_time_count
+        {$scope}
+        GROUP BY m.member_id, a.appointment_id, a.date, a.start_time
+    ");
+    $stmt->execute($params);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Beide Bloecke fuer einen Bereich, jeweils nur wenn eingeschaltet.
+ *
+ * Ausgeschaltet heisst {"enabled": false} und sonst nichts -- keine Nullwerte,
+ * die eine abgeschaltete Kennzahl wie eine leere aussehen liessen (Spec 8).
+ *
+ * @param int $totalPairs Soll-Paare, aus attendanceFetchMemberTotals() summiert
+ * @return array{punctuality: array, reliability: array}
+ */
+function punctualityBlocks($db, $database, array $groupIds, int $year, ?int $memberId,
+                           ?int $appointmentTypeId, int $totalPairs): array
+{
+    require_once __DIR__ . '/utils.php';
+
+    $blocks = [
+        'punctuality' => ['enabled' => false],
+        'reliability' => ['enabled' => false],
+    ];
+
+    if (systemSetting($db, $database, 'punctuality_enabled', '0') === '1') {
+        $grace = punctualityGraceFromSetting(
+            systemSetting($db, $database, 'punctuality_grace_minutes', '0')
+        );
+
+        $blocks['punctuality'] = punctualityBuild(
+            punctualityFetchMeasurements($db, $database, $groupIds, $year, $memberId, $appointmentTypeId),
+            $totalPairs,
+            $grace
+        );
+    }
+
+    if (systemSetting($db, $database, 'reliability_enabled', '0') === '1') {
+        $blocks['reliability'] = reliabilityBuild(
+            reliabilityFetchPairs($db, $database, $groupIds, $year, $memberId, $appointmentTypeId)
+        );
+    }
+
+    return $blocks;
+}
+
+/**
+ * Eigene Werte eines Mitglieds je Jahr, fuer die Selbstauskunft.
+ *
+ * Nur Jahre mit mindestens einem Soll-Termin, und nur wenn wenigstens eine
+ * der Kennzahlen eingeschaltet ist -- sonst ein leeres Array.
+ *
+ * @param array<int, int> $groupIds Gruppen des Mitglieds
+ * @return array<int, array{punctuality: array, reliability: array}>
+ */
+function punctualityByYear($db, $database, int $memberId, array $groupIds): array
+{
+    require_once __DIR__ . '/utils.php';
+
+    $anyOn = systemSetting($db, $database, 'punctuality_enabled', '0') === '1'
+          || systemSetting($db, $database, 'reliability_enabled', '0') === '1';
+
+    if (!$anyOn || $groupIds === []) {
+        return [];
+    }
+
+    $prefix = $database->table('');
+    $years  = $db->query("SELECT DISTINCT YEAR(date) FROM {$prefix}appointments ORDER BY 1")
+                 ->fetchAll(PDO::FETCH_COLUMN);
+
+    $result = [];
+
+    foreach ($years as $year) {
+        $year   = (int) $year;
+        $totals = attendanceFetchMemberTotals($db, $database, $groupIds, $year, $memberId, null);
+        $pairs  = array_sum(array_map('intval', array_column($totals, 'total')));
+
+        if ($pairs === 0) {
+            continue;
+        }
+
+        $result[$year] = punctualityBlocks($db, $database, $groupIds, $year, $memberId, null, $pairs);
+    }
+
+    return $result;
+}
