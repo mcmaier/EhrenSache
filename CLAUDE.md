@@ -89,12 +89,16 @@ EhrenSache/
 │   │   ├── statistics.php, export.php, import.php, settings.php
 │   │   ├── attendance_list.php, my_data.php
 │   │   ├── auto_checkin.php, totp_checkin.php, station.php
-│   │   └── regenerate_token.php, change_password.php, change_pin.php, user_mailer.php
+│   │   ├── regenerate_token.php, change_password.php, change_pin.php, user_mailer.php
+│   │   └── update_check.php    # Update-Prüfung auf Knopfdruck
 │   ├── helpers/
 │   │   ├── auth.php            # login(), requireRole(), isAdmin(), isDevice(), CSRF
 │   │   ├── bootstrap.php       # appConfig(), BASE_URL, DEMO_MODE – ersetzt require auf config.php
 │   │   ├── config_reader.php   # liest config.php in beiden Formen, Defaults, schreibt die neue
 │   │   ├── database.php        # Klasse Database (bis 1.5.1 in config.php)
+│   │   ├── maintenance.php     # Wartungsflag, api.php prüft es vor allen Includes
+│   │   ├── updater.php         # Updater: Phasen apply und verify
+│   │   ├── update_source.php, update_package.php, update_swap.php, update_status.php  # dessen Bausteine
 │   │   ├── worktime.php        # Fachlogik Arbeitszeit (Dauer, Validierung, Statistik)
 │   │   ├── member_activity.php # Aktiv/Inaktiv-Zeiträume
 │   │   ├── station.php         # Fachlogik virtuelle Station (Kiosk): Code, PIN-Prüfung, Sperre
@@ -134,7 +138,7 @@ EhrenSache/
     ├── checkin/                # PWA für Mobile Check-in (eigener Service Worker)
     ├── station/                # PWA virtuelle Station (Kiosk)
     ├── install/index.php       # Setup-Wizard (nach Installation via .htaccess gesperrt)
-    └── update/index.php        # Update-Wizard, fährt die Migrationskette
+    └── update/index.php        # Update-Wizard: holt das Paket (Schritt 0), fährt die Migrationskette
 
 tests/                          # PHP-Testharness, siehe Abschnitt Testing
 docs/                           # Specs, Pläne, offene Punkte – NICHT im Repo
@@ -161,7 +165,7 @@ Request-Parameter: `?resource=<name>&id=<id>`
 member_groups, appointment_types, activity_types, work_sessions, statistics, available_years,
 auto_checkin, totp_checkin, station, regenerate_token, change_password, change_pin, export,
 import, import_logs, settings, upload-logo, attendance_list, activate_user, user_status,
-cleanup, my_data, session_info, version, ping — Details in `API.md`.
+cleanup, my_data, session_info, version, update_check, ping — Details in `API.md`.
 
 **Authentifizierungsmethoden:**
 - `Authorization: Bearer <token>` Header

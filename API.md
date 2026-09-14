@@ -369,7 +369,8 @@ Versionsstand der Installation. Das Dashboard zeigt daraus die Versionsnummer an
   "name": "EhrenSache",
   "server_time": "2026-09-14 13:05:00",
   "php_version": "8.2.12",
-  "config_format": "array"
+  "config_format": "array",
+  "update_available": null
 }
 ```
 
@@ -382,6 +383,51 @@ Versionsstand der Installation. Das Dashboard zeigt daraus die Versionsnummer an
 | `legacy` | alte Klassenform — die Umstellung beim Update ist nicht gelungen; das Dashboard zeigt einen Hinweis |
 | `missing` | keine Datei gefunden |
 | `unknown` | Datei vorhanden, aber keine der beiden Formen |
+
+`update_available` wird ebenfalls **nur an `admin`** ausgeliefert: die Versionsnummer aus der
+zuletzt gespeicherten Update-Prüfung, sofern sie höher ist als die installierte, sonst `null`.
+
+---
+
+### Update-Prüfung
+Fragt auf Knopfdruck nach einer neueren Version. Es gibt **keinen** automatischen Abruf.
+
+**Endpoint:** `GET|POST /api.php?resource=update_check`
+
+**Authentifizierung:** Session oder Token, nur `admin`
+
+- `GET` liefert den gespeicherten Stand, ohne nach außen zu gehen.
+- `POST` fragt `api.github.com` nach dem neuesten Release und speichert das Ergebnis in
+  `system_settings` (`update_check_last`, `update_check_result`). Dabei erfährt GitHub die
+  IP-Adresse des Servers.
+
+**Response (beide Methoden):**
+```json
+{
+  "installed": "1.6.0",
+  "last_checked": "2026-09-14 13:05:00",
+  "latest": {
+    "version": "1.7.0",
+    "tag": "v1.7.0",
+    "published_at": "2026-10-01T08:00:00Z",
+    "html_url": "https://github.com/mcmaier/EhrenSache/releases/tag/v1.7.0",
+    "zipball_url": "https://api.github.com/repos/mcmaier/EhrenSache/zipball/v1.7.0",
+    "notes": "…"
+  },
+  "update_available": "1.7.0"
+}
+```
+
+`latest` ist `null`, solange nie geprüft wurde. `notes` stammt von GitHub und ist als Text zu
+behandeln, nie als HTML.
+
+**Fehler:**
+
+| Status | Bedingung |
+|---|---|
+| 403 | nicht `admin`; im Demo-Modus `POST` |
+| 405 | andere Methode als `GET` oder `POST` |
+| 502 | GitHub nicht erreichbar, Anfragen begrenzt oder Antwort unbrauchbar — `message` nennt den Grund |
 
 ---
 

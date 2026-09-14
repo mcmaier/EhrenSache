@@ -9,6 +9,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [1.6.0] – unveröffentlicht
 
+### Neu
+- **Der Update-Assistent holt das Paket selbst von GitHub.** Ein neuer Schritt 0 fragt auf
+  Knopfdruck nach der neuesten Version, lädt das Paket, prüft Aufbau und Migrationskette,
+  sichert jede ersetzte Datei nach `private/backup/` und tauscht die Dateien. Während des Tauschs
+  antwortet die API mit 503. Nach dem Tausch prüft der getauschte Code die Kette ein zweites Mal
+  und spielt bei einem Fehler die Sicherung zurück. Der Weg von Hand bleibt.
+- **Updates prüfen in den Einstellungen.** Nur auf Knopfdruck; es gibt keinen automatischen
+  Abruf. Ist eine neuere Version bekannt, weist das Dashboard Administratoren darauf hin.
+- Ressource `update_check`; `version` meldet der Rolle `admin` zusätzlich `update_available`.
+
 ### Geändert
 - **`config.php` enthält nur noch Daten.** Zugangsdaten, `base_url` und `demo_mode` als Array;
   die Klasse `Database`, die Ermittlung der Basis-URL und das Laden der Konfiguration liegen
@@ -23,6 +33,10 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Künftige Konfigurationsschalter brauchen keinen Eingriff mehr** in die `config.php` einer
   bestehenden Installation — fehlende Schlüssel erhalten einen Default.
 - Die Ressource `version` meldet der Rolle `admin` zusätzlich `config_format`.
+- Der Update-Assistent prüft die Migrationskette schon in Schritt 1 und listet in Schritt 2 die
+  tatsächlich anstehenden Migrationen. Die Warnung „weicht von der erwarteten Ausgangsversion
+  (1.0.0) ab" und die feste Liste aus der 1.0.0-Zeit entfallen — beide erschienen bei jedem
+  regulären Update.
 
 ### Behoben
 - Der Installer setzte das Datenbankpasswort unmaskiert in `config.php`: Ein `"` darin ergab

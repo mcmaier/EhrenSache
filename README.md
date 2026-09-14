@@ -165,22 +165,32 @@ Während der Installation wird ein Admin-Account erstellt.
 
 ### Update-Prozess
 
-1. [**Aktuelle Version herunterladen**](https://github.com/mcmaier/EhrenSache/releases/latest)
-   und die Dateien auf den Server hochladen (bestehende Dateien überschreiben).
+Ab 1.6.0 kann der Update-Assistent das Paket selbst von GitHub holen. Der Weg von Hand bleibt
+unverändert möglich — der Assistent prüft vorher, ob er die Dateien schreiben darf, und nennt
+den Grund, wenn nicht.
 
-> [!WARNING]
-> `private/config/config.php` **nicht** überschreiben – sie enthält die Zugangsdaten der Installation!
+1. Update-Wizard freischalten: Inhalt von `public/update/.htaccess` leeren oder die Datei löschen.
 
-2. Update-Wizard freischalten: Inhalt von `public/update/.htaccess` leeren oder die Datei löschen.
-
-3. Update-Wizard aufrufen:
+2. Update-Wizard aufrufen:
 ```
 https://ehrensache.meine-domain.de/update
 ```
 
+3. **Schritt 0 — Dateien:** „Neueste Version abfragen", dann „Update einspielen". Der Assistent
+   lädt das Paket, prüft es und die Migrationskette, sichert jede ersetzte Datei nach
+   `private/backup/` und tauscht die Dateien. Die Anwendung ist dabei einige Sekunden im
+   Wartungsmodus. Scheitert ein Schritt, spielt er die Sicherung zurück.
+
+   **Von Hand stattdessen:** [Aktuelle Version herunterladen](https://github.com/mcmaier/EhrenSache/releases/latest),
+   die Dateien auf den Server hochladen (bestehende überschreiben) und im Assistenten
+   „Dateien bereits hochgeladen" wählen.
+
+> [!WARNING]
+> Beim Hochladen von Hand `private/config/config.php` **nicht** überschreiben – sie enthält die Zugangsdaten der Installation! Der Assistent lässt sie beim Tausch unberührt.
+
 4. Wizard durchlaufen:
-   - **Schritt 1:** Systemprüfung und automatische Versionserkennung
-   - **Schritt 2:** Prefix eingeben (nur bei Update von v1.0.0), Änderungen prüfen, Backup bestätigen
+   - **Schritt 1:** Systemprüfung, automatische Versionserkennung und Prüfung der Migrationskette
+   - **Schritt 2:** Prefix eingeben (nur bei Update von v1.0.0), geplante Migrationen prüfen, Backup bestätigen
    - **Schritt 3:** Migration wird ausgeführt, Protokoll wird angezeigt
 
 Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
@@ -190,6 +200,12 @@ Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 
 > [!NOTE]
 > Bei Update auf **v1.6.0**: Der Wizard stellt `config.php` auf eine reine Datendatei um und legt vorher die Sicherung `config.php.bak-1.5.1` daneben. Nach einer erfolgreichen Anmeldung kann sie gelöscht werden — sie enthält die Zugangsdaten. Kann der Wizard die Datei nicht schreiben, läuft die Installation unverändert weiter, und das Dashboard weist Administratoren darauf hin.
+
+### Von neuen Versionen erfahren
+
+EhrenSache fragt nicht von selbst nach Updates. In den Einstellungen gibt es unter „Updates"
+einen Knopf, der auf Wunsch GitHub fragt. Zuverlässig benachrichtigt wirst du, wenn du auf
+GitHub die Releases des Projekts abonnierst: **Watch → Custom → Releases**.
 
 ---
 
