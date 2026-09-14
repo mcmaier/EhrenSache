@@ -247,3 +247,56 @@ test('showTargetListing zeigt an, sobald zurueckgefragt wird', function () {
     assertSame(true, showTargetListing(false, false), 'ohne beides');
     assertSame(true, showTargetListing(true, false), '--yes ohne --quiet');
 });
+
+// ---- Rueckgabewert fuer den Cron ------------------------------------------
+
+/**
+ * Fuehrt $body in einem eigenen PHP-Prozess aus, nachdem seed.php geladen ist.
+ *
+ * Ein eigener Prozess ist noetig, weil jeder Pruefling mit exit() endet. Der
+ * Ablaufblock von seed.php laeuft dabei nicht - es wird keine Datenbank
+ * geoeffnet.
+ *
+ * @return array{code: int, stderr: string}
+ */
+function demoSeedCliRunExit(string $body): array
+{
+    $script = tempnam(sys_get_temp_dir(), 'seedexit') . '.php';
+    $seed   = var_export(realpath(__DIR__ . '/../../private/demo/seed.php'), true);
+    file_put_contents($script, "<?php\nrequire {$seed};\n{$body}\n");
+
+    $proc = proc_open(
+        [PHP_BINARY, $script],
+        [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes
+    );
+    stream_get_contents($pipes[1]);
+    $stderr = (string) stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $code = proc_close($proc);
+    unlink($script);
+
+    return ['code' => $code, 'stderr' => $stderr];
+}
+
+/**
+ * Database::getConnection() beendet bei einem Verbindungsfehler mit exit()
+ * ohne Code. Ohne Waechter meldete der stuendliche Cron dann Erfolg, obwohl
+ * nichts geschrieben wurde - nachgemessen, bevor der Waechter kam.
+ */
+test('ein ungeplantes exit() ohne Code wird zum Rueckgabewert 1', function () {
+    $run = demoSeedCliRunExit("registerExitGuard();\necho '{\"message\":\"Database connection error\"}';\nexit();");
+    assertSame(1, $run['code'], 'exit() ohne Code nach registerExitGuard()');
+    assertTrue(str_contains($run['stderr'], 'unerwartet beendet'), 'Hinweis auf STDERR');
+});
+
+test('ein geplantes Ende behaelt seinen Rueckgabewert', function () {
+    $ok = demoSeedCliRunExit("registerExitGuard();\nfinishRun(0);");
+    assertSame(0, $ok['code'], 'finishRun(0)');
+    assertSame('', $ok['stderr'], 'Erfolg bleibt still');
+
+    $fail = demoSeedCliRunExit("registerExitGuard();\nfinishRun(1);");
+    assertSame(1, $fail['code'], 'finishRun(1)');
+    assertSame('', $fail['stderr'], 'keine zweite Meldung des Waechters zum geplanten Fehler');
+});

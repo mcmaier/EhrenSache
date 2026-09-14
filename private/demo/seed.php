@@ -99,13 +99,57 @@ function parseOptions(array $argv): array
     return $options;
 }
 
-/** Ein Aufruf über den Webserver würde die Datenbank eines Besuchers leeren. */
+/**
+ * Ein Aufruf über den Webserver würde die Datenbank eines Besuchers leeren.
+ *
+ * Rückgabewert 1 statt exit('…'): Ein exit mit Text endet mit 0. Manche
+ * Aufgabenplaner im Shared Hosting starten Skripte über php-cgi — dort landet
+ * der Cron genau hier und meldete sonst stündlich Erfolg, ohne je etwas
+ * geschrieben zu haben.
+ */
 function requireCli(): void
 {
     if (php_sapi_name() !== 'cli') {
         http_response_code(403);
-        exit('Nur über die Kommandozeile aufrufbar.');
+        echo 'Nur über die Kommandozeile aufrufbar.';
+        exit(1);
     }
+}
+
+/**
+ * Beendet den Lauf mit einem geplanten Rückgabewert.
+ *
+ * Jedes Ende des Ablaufs geht hierüber, damit der Wächter aus
+ * registerExitGuard() geplante von ungeplanten Enden unterscheiden kann.
+ */
+function finishRun(int $code): void
+{
+    if (!defined('DEMO_SEED_EXIT_PLANNED')) {
+        define('DEMO_SEED_EXIT_PLANNED', true);
+    }
+
+    exit($code);
+}
+
+/**
+ * Macht aus einem ungeplanten Ende einen Fehler.
+ *
+ * Database::getConnection() aus config.php beantwortet einen Verbindungsfehler
+ * mit einer JSON-Meldung auf STDOUT und exit() ohne Code — für die API richtig,
+ * für den Cron fatal: Er meldete Erfolg, obwohl nichts geschrieben wurde.
+ * Nachgemessen. Ein exit(1) in einer Shutdown-Funktion überschreibt den
+ * Rückgabewert des vorherigen exit().
+ */
+function registerExitGuard(): void
+{
+    register_shutdown_function(static function (): void {
+        if (defined('DEMO_SEED_EXIT_PLANNED')) {
+            return;
+        }
+
+        fwrite(STDERR, "seed.php: Lauf unerwartet beendet, der Demo-Bestand wurde nicht geschrieben.\n");
+        exit(1);
+    });
 }
 
 /**
@@ -185,7 +229,7 @@ function confirmTarget(PDO $db, string $prefix, string $dbName, bool $yes, bool 
 
     if ($answer !== 'LOESCHEN') {
         echo "Abgebrochen.\n";
-        exit(0);
+        finishRun(0);
     }
 }
 
@@ -415,17 +459,22 @@ function writePlan(PDO $db, string $prefix, array $plan, string $password): arra
 // der Testsuite parseOptions() mit den Argumenten des Testrunners aufrufen,
 // eine echte Datenbankverbindung öffnen und mit exit() den gesamten
 // Testlauf abwürgen.
-$isMainScript = isset($_SERVER['SCRIPT_FILENAME'])
-    && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__;
+//
+// Zweiter Einstieg: cron.php definiert DEMO_SEED_ENTRY und setzt $argv, weil
+// viele Aufgabenplaner im Shared Hosting keine Argumente übergeben können.
+$isMainScript = (isset($_SERVER['SCRIPT_FILENAME'])
+        && realpath($_SERVER['SCRIPT_FILENAME']) === __FILE__)
+    || (defined('DEMO_SEED_ENTRY') && DEMO_SEED_ENTRY === true);
 
 if ($isMainScript) {
     requireCli();
+    registerExitGuard();
 
     try {
         $options = parseOptions($argv);
     } catch (InvalidArgumentException $e) {
         fwrite(STDERR, $e->getMessage() . "\n");
-        exit(1);
+        finishRun(1);
     }
 
     $database = new Database();
@@ -437,7 +486,7 @@ if ($isMainScript) {
         assertSchema($db, $prefix);
     } catch (RuntimeException $e) {
         fwrite(STDERR, $e->getMessage() . "\n");
-        exit(1);
+        finishRun(1);
     }
 
     $dbName = (string) $db->query('SELECT DATABASE()')->fetchColumn();
@@ -460,7 +509,7 @@ if ($isMainScript) {
             $db->rollBack();
         }
         fwrite(STDERR, 'Fehler beim Schreiben, Transaktion zurückgerollt: ' . $e->getMessage() . "\n");
-        exit(1);
+        finishRun(1);
     }
 
     if (!$options['quiet']) {
@@ -479,5 +528,5 @@ if ($isMainScript) {
         echo "\nDer Stations-Token steht im Dashboard unter Geräte.\n";
     }
 
-    exit(0);
+    finishRun(0);
 }
