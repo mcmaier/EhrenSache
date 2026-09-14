@@ -14,6 +14,7 @@ import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, curre
 import { debug } from '../app.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
+import { updateModalId } from './utils.js';
 
 // ============================================
 // ZUSTAND
@@ -450,6 +451,7 @@ export async function openWorkSessionModal(sessionId = null) {
     document.getElementById('workSessionId').value = sessionId || '';
     document.getElementById('workSessionModalTitle').textContent =
         sessionId ? 'Eintrag bearbeiten' : 'Zeit nachtragen';
+    updateModalId('workSessionModal', sessionId);
 
     // Der Hinweis muss zur Rolle passen: Manager und Admin sind die freigebende
     // Instanz, ihre Eintraege gelten sofort.
@@ -815,6 +817,7 @@ export async function openActivityTypeModal(activityId = null) {
     document.getElementById('activityTypeId').value = activityId || '';
     document.getElementById('activityTypeModalTitle').textContent =
         activityId ? 'Tätigkeitsart bearbeiten' : 'Neue Tätigkeitsart';
+    updateModalId('activityTypeModal', activityId);
 
     const activity = activityId
         ? activityTypes.find(a => String(a.activity_id) === String(activityId))
