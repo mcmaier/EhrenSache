@@ -622,7 +622,7 @@ try {
         getSessionStatus($request_method);
         break;
     case 'version':
-        getVersion();
+        getVersion($authUserRole);
     break;
     case 'station':
         handleStation($db, $database, $request_method, $authUserId, $authUserRole, $authDeviceType);

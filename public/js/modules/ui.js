@@ -795,11 +795,37 @@ export async function loadVersion() {
         if(version.success)
         {
             document.getElementById('app-version').textContent = `v${version.version}`;
+            showConfigFormatHint(version.config_format);
         }
-        
+
     } catch (error) {
         console.error('Version load failed:', error);
     }
+}
+
+/**
+ * Weist den Admin darauf hin, dass private/config/config.php noch in der alten
+ * Form vorliegt. Das passiert, wenn die Migration auf 1.6.0 sie nicht schreiben
+ * konnte -- die Anwendung laeuft dann weiter, aber die Umstellung fehlt noch.
+ * Das Feld kommt nur fuer die Rolle admin aus der API.
+ */
+function showConfigFormatHint(format) {
+    if (format !== 'legacy' || document.getElementById('config-format-hint')) {
+        return;
+    }
+
+    const ziel = document.querySelector('.main-content');
+    if (!ziel) {
+        return;
+    }
+
+    const hinweis = document.createElement('div');
+    hinweis.id = 'config-format-hint';
+    hinweis.className = 'alert alert-warning';
+    hinweis.textContent = 'Die Konfigurationsdatei liegt noch in der alten Form vor. '
+        + 'Bitte den Update-Assistenten erneut ausführen oder '
+        + 'private/config/config.php beschreibbar machen.';
+    ziel.prepend(hinweis);
 }
 
 // ============================================

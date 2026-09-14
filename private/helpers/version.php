@@ -9,7 +9,14 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-function getVersion()
+/**
+ * Meldet den Systemzustand.
+ *
+ * config_format nur für Rolle admin: Liegt config.php noch in der alten
+ * Klassenform vor, zeigt das Dashboard dem Admin einen Hinweis. Ein
+ * Vereinsmitglied kann damit nichts anfangen und würde nur beunruhigt.
+ */
+function getVersion(?string $role = null)
 {
     $versionFile = __DIR__ . '/../../version.json';
     if (!file_exists($versionFile)) {
@@ -21,6 +28,10 @@ function getVersion()
     $version = json_decode(file_get_contents($versionFile), true);
     $version['server_time'] = date('Y-m-d H:i:s');
     $version['php_version'] = PHP_VERSION;
+
+    if ($role === 'admin') {
+        $version['config_format'] = appConfig()['format'];
+    }
 
     echo json_encode($version);
     exit();
