@@ -361,6 +361,9 @@ try {
         $server->exec('DROP DATABASE IF EXISTS `' . DB_FRISCH . '`');
     }
     @unlink($konfig);
+    // Migration 1.5.1 legt neben der Kopie eine Sicherung an. Sie enthaelt die
+    // Zugangsdaten der Installation und darf nicht im Temp-Verzeichnis bleiben.
+    @unlink($konfig . '.bak-1.5.1');
 }
 
 exit(harnessSummary());
