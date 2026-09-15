@@ -1,14 +1,14 @@
 # Terminrückmeldung: Zusage, Absage, Unsicher
 
 **Datum:** 2026-09-14
-**Status:** Entwurf, abgestimmt
+**Status:** Umgesetzt in 1.7.0 (Branch feat/1.7.0-terminrueckmeldung)
 **Setzt um:** [FI-1](../../FEATURE-IDEAS.md#fi-1--terminzusage-im-vorfeld) vollständig,
 [FI-2](../../FEATURE-IDEAS.md#fi-2--abgleich-zusage--tatsächliche-anwesenheit) teilweise (nur je Termin)
 **Baut auf:** `2026-09-11-puenktlichkeit-und-zuverlaessigkeit-design.md` (Zuverlässigkeit, 1.5.1)
 **Zielversion:** **1.7.0**, Migration `1.6.1.php` (1.6.1 → 1.7.0)
 **Voraussetzung:** Der parallel vorbereitete Stand **1.6.1** ist auf `dev` gemergt, einschließlich
 seines Manifest-Eintrags 1.6.0 → 1.6.1. Vorher wird der Eintrag dieses Vorhabens nicht angehängt.
-**Präzisiert am 2026-09-15:** 3.5, 4.1, 5.4 (Entscheidungen nach Umsetzung)
+**Präzisiert am 2026-09-15:** 3.5, 4.1, 5.4, 5.6, 6.1, 6.2, 7.4 (Entscheidungen nach Umsetzung)
 
 ---
 
@@ -236,23 +236,38 @@ Hat die Terminart `responses_require_excuse`:
   nicht abgelehnten `absence`-Antrag zum Termin gestellt (z. B. direkt über `exceptions`), wird
   kein zweiter angelegt — dieser wird nur **verknüpft**. Sonst entsteht ein neuer
   `exceptions`-Eintrag `absence`, `status = 'pending'`, `reason = comment`, `created_by` =
-  handelnder Nutzer; seine ID steht in `appointment_responses.exception_id`.
+  handelnder Nutzer; seine ID steht in `appointment_responses.exception_id`. Ein **abgelehnter**
+  verknüpfter Antrag zählt dabei wie keiner (**Entscheidung A1**, ergänzt am 2026-09-15) — siehe
+  unten.
 - **Bemerkung einer bestehenden Absage geändert, Status bleibt `no`:** Nur wenn der verknüpfte
   Antrag **von der Rückmeldung selbst angelegt** wurde (`exception_created = 1`) und noch `pending`
   ist, wird `reason` mitgezogen. Ein nur verknüpfter Antrag (`exception_created = 0`) bleibt immer
-  unverändert, auch wenn er noch `pending` ist — er gehört dem Mitglied, nicht der Rückmeldung
-  (**Entscheidung 3b**, ergänzt am 2026-09-15).
+  unverändert, auch wenn er noch `pending` oder `rejected` ist — er gehört dem Mitglied, nicht der
+  Rückmeldung (**Entscheidung 3b**, ergänzt am 2026-09-15).
 - **Wechsel von `no` auf `yes`/`maybe` oder Rücknahme:** Ein `pending`-Antrag wird nur gelöscht,
   wenn ihn die Rückmeldung selbst angelegt hat (`exception_created = 1`); ein nur verknüpfter
-  bleibt bestehen (**Entscheidung 3b**). Ein genehmigter oder abgelehnter bleibt ohnehin immer
-  bestehen; die Antwort liefert `excuse_state` mit, und die Detailansicht des Verwalters zeigt
-  einen Hinweis.
+  bleibt bestehen (**Entscheidung 3b**). Ein genehmigter Antrag bleibt in jedem Fall verknüpft
+  bestehen. Ein **abgelehnter** Antrag bleibt als Datensatz ebenfalls bestehen, wird aber
+  **entknüpft** (`exception_id` wird `NULL`, `excuse_state` also `null`) — **Entscheidung A1**,
+  ergänzt am 2026-09-15, siehe unten. Die Antwort liefert `excuse_state` mit, und die
+  Detailansicht des Verwalters zeigt einen Hinweis.
 - **Entscheidung 4b** (ergänzt am 2026-09-15): Ein neuer Antrag entsteht **nur bei einem echten
   Statuswechsel auf `no`**, nicht bei einer reinen Bemerkungsänderung, während der Status schon
   `no` ist. Das greift, wenn ein Verwalter den zuvor erzeugten Antrag gelöscht hat
   (`appointment_responses.exception_id` steht dann per Fremdschlüssel wieder auf `NULL`) und das
   Mitglied danach nur die Bemerkung ändert: Ohne diese Regel würde jede solche Änderung
-  stillschweigend einen neuen Antrag anlegen.
+  stillschweigend einen neuen Antrag anlegen. Dieselbe Regel greift auch, wenn ein Admin
+  `responses_require_excuse` nachträglich einschaltet: Eine bereits bestehende Absage (`no`) ohne
+  Antrag bekommt durch eine reine Bemerkungsänderung ebenfalls keinen nachträglichen Antrag — erst
+  ein echter Statuswechsel auf `no` legt einen an.
+- **Entscheidung A1** (Review, ergänzt am 2026-09-15): Ein **abgelehnter** Antrag blockiert keinen
+  neuen. Bei einem echten Statuswechsel auf `no` zählt ein abgelehnter verknüpfter Antrag wie
+  keiner — es entsteht ein neuer Antrag, oder ein eigener, nicht abgelehnter Antrag wird verknüpft,
+  genau wie bei `excuse_state = null`. Wechselt das Mitglied danach von `no` weg, löst sich nur die
+  Verknüpfung (Aktion `unlink`: `exception_id = NULL`, `exception_created = 0`); der abgelehnte
+  Antrag selbst bleibt unverändert bestehen — er gehört, einmal abgelehnt, ohnehin nicht mehr zur
+  laufenden Rückmeldung. Bei einer reinen Bemerkungsänderung (`no` → `no`, kein echter
+  Statuswechsel) bleibt ein abgelehnter Antrag hingegen verknüpft (`keep`).
 
 Ohne Entschuldigungspflicht entsteht nie ein Antrag.
 
@@ -293,10 +308,15 @@ Mitgliedern, die nicht mehr erwartet sind (Gruppe gewechselt, inaktiv), zählen 
 | `yes_present` | zugesagt und gekommen |
 | `yes_absent` | zugesagt und nicht gekommen |
 | `no_present` | abgesagt und trotzdem da |
-| `no_response` | keine Antwort (mit Aufteilung gekommen / nicht gekommen) |
+| `no_absent` | abgesagt und nicht gekommen |
+| `maybe_present` | unsicher und gekommen |
+| `maybe_absent` | unsicher und nicht gekommen |
+| `none_present` | keine Antwort und trotzdem gekommen |
+| `none_absent` | keine Antwort und nicht gekommen |
 
 `maybe` wird mit Aufteilung gekommen / nicht gekommen ausgewiesen, aber nicht als Abweichung
-gewertet. Namen gibt es zu `yes_absent`, `no_present` und `no_response`.
+gewertet. Die Kachel „Keine Antwort“ der Oberfläche (7.2) ist die Summe aus `none_present` und
+`none_absent`. Namen gibt es zu `yes_absent`, `no_present`, `none_present` und `none_absent`.
 
 ### 5.7 Löschfrist
 
@@ -333,19 +353,26 @@ Eintrag in `DEMO_WRITE_ALLOWED` (`PUT`, `DELETE`) in `private/helpers/demo_mode.
 
 | Code | Anlass |
 |---|---|
-| `400` | ungültiger `status`, Bemerkung länger als 255 Zeichen |
-| `403` | Rolle darf nicht; Mitglied nicht erwartet; Nutzer ohne Mitglied (mit Klartextmeldung) |
+| `400` | `appointment_id` fehlt oder ungültig; ungültiger `status`; Bemerkung länger als 255 Zeichen |
+| `403` | Rolle darf nicht; Mitglied nicht erwartet; Nutzer ohne Mitglied (mit Klartextmeldung); `member_id` gesetzt, aber Rolle `user` |
 | `404` | Termin oder Mitglied unbekannt |
-| `409` | Terminart ohne Rückmeldung; Termin hat begonnen (nur Mitglied) |
+| `409` | Terminart ohne Rückmeldung (nur bei `GET` und `PUT`, nicht bei `DELETE` — eine vorhandene Antwort lässt sich immer zurücknehmen); Termin hat begonnen (nur Mitglied) |
 | `422` | Absage ohne Bemerkung bei Entschuldigungspflicht |
 
 ### 6.2 Bestehende Ressourcen
 
 - **`appointment_types`**: die vier Felder aus 4.2 lesen (alle) und schreiben (wie heute nur Admin);
   Validierung der Frist 0–720 oder leer.
-- **`appointments`** (Liste): je Termin `responses: {yes, no, maybe, open, own}` — `own` ist die
-  eigene Antwort oder `null` —, oder `responses: null` bei Terminarten ohne Rückmeldung. Ermittelt in
-  einer gruppierten Abfrage über alle Termine der Liste, nicht einmal je Termin.
+- **`appointments`** (Liste): je Termin `responses: {yes, no, maybe, open, own, expected}` — `own`
+  ist die eigene Antwort oder `null`, `expected` sagt, ob der Betrachter selbst zu diesem Termin
+  erwartet wird —, oder `responses: null` bei Terminarten ohne Rückmeldung. Ermittelt in einer
+  gruppierten Abfrage über alle Termine der Liste, nicht einmal je Termin. Der Schlüssel `responses`
+  erscheint nur, wenn die Anfrage mindestens eines von `year`, `from_date` oder `to_date` mitgibt —
+  ohne einen dieser Filter fehlt er ganz (nicht `null`). Grund: Ohne Datumsgrenze läuft die Abfrage
+  über die **unbegrenzte Historie** aller Termine, und die Check-in-PWA ruft die Liste genau so ab
+  (`member_id` allein, über die ganze Historie, für den Verlauf) — dort wären die je Termin
+  korrelierten Unterabfragen zu teuer. Die PWA holt Rückmeldungen stattdessen eigens über
+  `appointment_responses&upcoming=1` (6.1).
 - **`settings`**: Schlüssel `response_deadline_hours`.
 - **`my_data`**: Die eigenen Antworten (Termin, Status, Bemerkung, Zeitpunkte) gehören zur
   Selbstauskunft und zum Export.
@@ -391,8 +418,8 @@ solange „Rückmeldung erbeten“ aus ist. Neben „Namen für Mitglieder sicht
 
 ### 7.4 Einstellungen
 
-Feld „Frist für Rückmeldungen (Stunden vor Beginn)“ in der bestehenden Karte zu Terminen bzw.
-Anwesenheit.
+Eigene Karte „🗓️ Terminrückmeldungen“ mit dem Feld „Frist für Rückmeldungen (Stunden vor Beginn)“ —
+nicht in der bestehenden Karte zu Terminen bzw. Anwesenheit untergebracht.
 
 ### 7.5 Technik
 

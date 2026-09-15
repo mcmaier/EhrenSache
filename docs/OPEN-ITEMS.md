@@ -2157,12 +2157,15 @@ kein Zugriff ohne vorherige Anmeldung, keine Rechteausweitung innerhalb von Ehre
 ### OI-60 · Zeitbasis der Terminrückmeldung: PHP-Uhr statt MySQL-Uhr
 **Priorität:** niedrig
 
-Frist- und Beginn-Prüfungen der Terminrückmeldung (`responseDeadline()`, `responseHasStarted()`
-in `private/helpers/responses.php`) sowie `status_changed_at` rechnen mit PHP `date()` — also der
-Zeitzone des PHP-Prozesses. `exceptions.created_at` dagegen ist ein MySQL-`TIMESTAMP`, geschrieben
-in der Sitzungszeitzone der Datenbankverbindung. Stehen PHP und MySQL auf unterschiedlichen
-Zeitzonen, können Fristvergleiche zwischen einer Rückmeldung und einem daraus entstandenen Antrag
-um den Zeitunterschied auseinanderlaufen.
+`responseDeadline()` selbst rechnet **in UTC** — bewusst nur als Rechenhilfsmittel, um über eine
+Zeitumstellung hinweg dieselbe Wanduhr-Arithmetik wie MySQLs `DATE_SUB` auf `DATETIME` zu liefern
+(siehe Kommentar dort); die Funktion liest keine Systemzeitzone. Die eigentliche Abhängigkeit von
+der PHP-Uhr steckt in ihren **Eingaben**: `$now` (`date('Y-m-d H:i:s')` in
+`handleAppointmentResponses()`) und `status_changed_at` (ebenfalls mit `date()` geschrieben) sind
+Wanduhrzeit der Zeitzone des PHP-Prozesses. `exceptions.created_at` dagegen ist ein MySQL-
+`TIMESTAMP`, geschrieben in der Sitzungszeitzone der Datenbankverbindung. Stehen PHP und MySQL auf
+unterschiedlichen Zeitzonen, können Fristvergleiche zwischen einer Rückmeldung und einem daraus
+entstandenen Antrag um den Zeitunterschied auseinanderlaufen.
 
 Aktuell ist nirgends in der Anwendung eine Zeitzone konfiguriert; PHP und MySQL laufen beide auf
 der Serveruhr. Der Fall tritt also nicht auf, solange Webserver und Datenbank auf derselben

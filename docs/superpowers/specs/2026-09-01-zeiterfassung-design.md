@@ -496,7 +496,7 @@ Vier Stufen, jede für sich lauffähig und testbar:
 3. **Auswertung** — `worktime.js` im Dashboard inklusive Freigabe-Ansicht, `?include=worktime`
    in der Statistik, die beiden Export-Typen mit Nachweisgrad, Ergänzung von `my_data.php`.
 
-Die Ergänzungen an `DATENSCHUTZ.md` (Abschnitt 12) gehören zu Stufe 3, weil das Feature vor
+Die Ergänzungen an `DATENSCHUTZ.md` (Abschnitt 10) gehören zu Stufe 3, weil das Feature vor
 der Freischaltung in einer echten Installation dokumentiert sein muss.
 
 ## 11. Testplan

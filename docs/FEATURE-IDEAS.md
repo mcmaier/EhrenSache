@@ -83,6 +83,14 @@ ein eigener Anwendungsfall.
 responded_at, unique je Paar) · neue Ressource in `api.php` · Terminansicht im Dashboard ·
 Erfassen-Tab der PWA · Statistik (Zusagequote als eigene Kennzahl).
 
+**Umgesetzt in 1.7.0 mit einer Abweichung von dieser ursprünglichen Idee:** Die gebaute Tabelle
+trägt statt eines einzelnen `responded_at` zwei Zeitstempel — `status_changed_at` (ändert sich nur
+bei einem echten Statuswechsel) und `updated_at` (jede Änderung, auch nur der Bemerkung) —, siehe
+Spec 3.8 und 4.1. Eine „Zusagequote als eigene Kennzahl" der Statistik wurde bewusst nicht gebaut
+(Entscheidung 3.7 der Spec: das beantwortet schon die Zuverlässigkeit). Der Rest dieses Abschnitts
+ist die ursprüngliche Idee, nicht der umgesetzte Stand — Einzelheiten stehen in
+`docs/superpowers/specs/2026-09-14-terminrueckmeldung-design.md`.
+
 **Vorher zu klären — der eigentliche Knackpunkt:**
 
 - **Verhältnis zu `exceptions`.** Eine Abmeldung im Vorfeld gibt es bereits: `exceptions` mit

@@ -1189,7 +1189,8 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
 
 - `members` — **Admin/Manager:** alle erwarteten Mitglieder nach Gruppen mit `status` (`null` =
   keine Antwort), `comment`, `status_changed_at`, `is_late`, `excuse_state` und nach Beginn
-  `present`. **Mitglied:** nur bei `names_visible`, dann ausschließlich Name, Gruppe und Status.
+  `present`. **Mitglied:** nur bei `names_visible`, dann ausschließlich `member_id`, Name, Gruppe
+  und Status.
 - `comparison` — nur Admin/Manager, nur nach Beginn: Anzahl je `yes_present`, `yes_absent`,
   `no_present`, `no_absent`, `maybe_present`, `maybe_absent`, `none_present`, `none_absent`.
 - `is_late` — die letzte **Statusänderung** liegt nach der Frist (Frist = Beginn minus
@@ -1229,6 +1230,13 @@ wenn ein Verwalter einen zuvor erzeugten Antrag direkt über `exceptions` lösch
 bleibt danach bei `no` stehen, `excuse_state` wird `null`, aber erst ein echter Wechsel (z. B. über
 `yes` und zurück auf `no`) legt wieder einen Antrag an.
 
+**Ein abgelehnter Antrag blockiert keinen neuen** (A1): Ist der verknüpfte Antrag `rejected`, zählt
+er bei einem echten Statuswechsel auf `no` wie kein Antrag — es entsteht ein neuer, oder ein
+eigener, nicht abgelehnter Antrag wird verknüpft. Wechselt das Mitglied danach von `no` weg
+(`yes`, `maybe` oder Rücknahme), löst sich nur die Verknüpfung (`excuse_state` wird `null`); der
+abgelehnte Antrag selbst bleibt unverändert bestehen. Bei einer reinen Bemerkungsänderung
+(`no` → `no`) bleibt ein abgelehnter Antrag hingegen verknüpft — das ist kein echter Statuswechsel.
+
 Schreibzugriffe auf denselben Termin sind serialisiert (Zeilensperre auf den Termin) — zwei
 gleichzeitige Erstantworten laufen damit nacheinander statt in einen Deadlock.
 
@@ -1236,16 +1244,19 @@ gleichzeitige Erstantworten laufen damit nacheinander statt in einen Deadlock.
 **Endpoint:** `DELETE /api.php?resource=appointment_responses&appointment_id=42[&member_id=7]`
 
 Löscht die Antwort und einen offenen, **von der Rückmeldung selbst angelegten** Antrag. Ein nur
-verknüpfter Antrag bleibt bestehen (Entscheidung 3b). Rechte wie beim PUT.
+verknüpfter Antrag bleibt bestehen (Entscheidung 3b). Rechte wie beim PUT. Anders als bei `GET` und
+`PUT` prüft das `DELETE` nicht, ob die Terminart überhaupt `responses_enabled` hat — eine
+vorhandene Antwort lässt sich immer zurücknehmen, auch wenn die Terminart die Rückmeldung
+zwischenzeitlich abgeschaltet hat.
 
 ### Fehler
 
 | Code | Anlass |
 |---|---|
-| `400` | `appointment_id` fehlt, ungültiger `status`, Bemerkung zu lang |
+| `400` | `appointment_id` fehlt oder ungültig, ungültiger `status`, Bemerkung zu lang |
 | `403` | Mitglied nicht erwartet; `member_id` ohne Admin/Manager; Konto ohne Mitglied; Gerät |
 | `404` | Termin oder Mitglied unbekannt; beim DELETE keine Antwort vorhanden |
-| `409` | Terminart ohne Rückmeldung; Termin hat begonnen (Mitglied für sich selbst) |
+| `409` | Terminart ohne Rückmeldung (nur `GET` und `PUT`, siehe oben); Termin hat begonnen (Mitglied für sich selbst) |
 | `422` | Absage ohne Begründung bei Entschuldigungspflicht |
 
 ---

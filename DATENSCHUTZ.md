@@ -630,7 +630,7 @@ einen Datenschutzbeauftragten oder Fachanwalt für IT-Recht.
 **Keine Garantie**: Der Entwickler von EhrenSache übernimmt keine Haftung 
 für die DSGVO-Konformität Ihrer Datenverarbeitung.
 
-**Stand**: Februar 2026
+**Stand**: September 2026
 
 ---
 
