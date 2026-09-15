@@ -64,20 +64,35 @@ function handleAppointmentTypes($db, $database, $method, $id) {
             requireAdmin();
 
             $data = json_decode(file_get_contents("php://input"));
+            $data = (object) ($data ?? []);
+
+            try {
+                $responseSettings = responseTypeSettings($data, RESPONSE_TYPE_DEFAULTS);
+            } catch (InvalidArgumentException $e) {
+                http_response_code(400);
+                echo json_encode(["message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+                return;
+            }
 
             // Wenn is_default=true, setze alle anderen auf false
             if(isset($data->is_default) && $data->is_default) {
                 $db->exec("UPDATE {$prefix}appointment_types SET is_default = 0");
             }
-            
-            $stmt = $db->prepare("INSERT INTO {$prefix}appointment_types 
-                                  (type_name, description, is_default, color) 
-                                  VALUES (?, ?, ?, ?)");
+
+            $stmt = $db->prepare("INSERT INTO {$prefix}appointment_types
+                                  (type_name, description, is_default, color,
+                                   responses_enabled, responses_names_visible,
+                                   responses_require_excuse, response_deadline_hours)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             if($stmt->execute([
                 $data->type_name,
                 $data->description ?? null,
                 $data->is_default ?? false,
-                $data->color ?? '#667eea'
+                $data->color ?? '#667eea',
+                $responseSettings['responses_enabled'],
+                $responseSettings['responses_names_visible'],
+                $responseSettings['responses_require_excuse'],
+                $responseSettings['response_deadline_hours'],
             ])) {
                 $typeId = $db->lastInsertId();
                 
@@ -101,20 +116,48 @@ function handleAppointmentTypes($db, $database, $method, $id) {
             requireAdmin();
 
             $data = json_decode(file_get_contents("php://input"));
+            $data = (object) ($data ?? []);
+
+            $currentStmt = $db->prepare("SELECT responses_enabled, responses_names_visible,
+                                                responses_require_excuse, response_deadline_hours
+                                         FROM {$prefix}appointment_types WHERE type_id = ?");
+            $currentStmt->execute([$id]);
+            $currentRow = $currentStmt->fetch(PDO::FETCH_ASSOC);
+            $current = $currentRow ? [
+                'responses_enabled'        => (int) $currentRow['responses_enabled'],
+                'responses_names_visible'  => (int) $currentRow['responses_names_visible'],
+                'responses_require_excuse' => (int) $currentRow['responses_require_excuse'],
+                'response_deadline_hours'  => $currentRow['response_deadline_hours'] === null
+                    ? null : (int) $currentRow['response_deadline_hours'],
+            ] : RESPONSE_TYPE_DEFAULTS;
+
+            try {
+                $responseSettings = responseTypeSettings($data, $current);
+            } catch (InvalidArgumentException $e) {
+                http_response_code(400);
+                echo json_encode(["message" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+                return;
+            }
 
             // Wenn is_default=true, setze alle anderen auf false (außer dieser)
             if(isset($data->is_default) && $data->is_default) {
                 $db->prepare("UPDATE {$prefix}appointment_types SET is_default = 0 WHERE type_id != ?")->execute([$id]);
             }
-            
-            $stmt = $db->prepare("UPDATE {$prefix}appointment_types 
-                                  SET type_name = ?, description = ?, is_default = ?, color = ?
+
+            $stmt = $db->prepare("UPDATE {$prefix}appointment_types
+                                  SET type_name = ?, description = ?, is_default = ?, color = ?,
+                                      responses_enabled = ?, responses_names_visible = ?,
+                                      responses_require_excuse = ?, response_deadline_hours = ?
                                   WHERE type_id = ?");
             if($stmt->execute([
                 $data->type_name,
                 $data->description ?? null,
                 $data->is_default ?? false,
                 $data->color ?? '#667eea',
+                $responseSettings['responses_enabled'],
+                $responseSettings['responses_names_visible'],
+                $responseSettings['responses_require_excuse'],
+                $responseSettings['response_deadline_hours'],
                 $id
             ])) {
                 // Aktualisiere Gruppen-Verknüpfungen
