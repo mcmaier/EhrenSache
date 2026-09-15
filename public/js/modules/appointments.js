@@ -495,7 +495,14 @@ function calendarResponseLineHtml(apt, fest) {
     const clickable = fest && (r.expected || isAdminOrManager);
 
     if (!clickable) {
-        return `<div class="calendar-event-responses"><span class="response-summary-text" title="${escapeHtml(title)}">${chips}</span>${own}</div>`;
+        // Im festgehaltenen Popup zusaetzlich sagen, warum die Zeile nicht
+        // anklickbar ist -- sonst wirkt sie wie eine tote Schaltflaeche.
+        // Im fluechtigen (Hover-)Popup faellt der Hinweis weg, dort ist
+        // ohnehin nichts anklickbar.
+        const hinweis = fest && !r.expected && !isAdminOrManager
+            ? ' <span class="response-not-invited">nicht eingeladen</span>'
+            : '';
+        return `<div class="calendar-event-responses"><span class="response-summary-text" title="${escapeHtml(title)}">${chips}</span>${own}${hinweis}</div>`;
     }
 
     // Der Dokument-Klick-Handler in showAppointmentPopup() entfernt das Popup
@@ -519,7 +526,22 @@ function calendarResponseLineHtml(apt, fest) {
 function showAppointmentPopup(ziel, appointments, fest = true) {
     // Entferne altes Popup
     const oldPopup = document.querySelector('.calendar-event-popup');
-    if (oldPopup) oldPopup.remove();
+    if (oldPopup) {
+        // FEHLERBEHEBUNG (FI-1): Ein bereits festgehaltenes Popup (fest=true)
+        // darf nicht von einem bloss fluechtigen Hover-Popup eines anderen
+        // Tages verdraengt werden -- der mouseleave-Handler unten laesst ein
+        // festes Popup aus genau diesem Grund stehen, showAppointmentPopup()
+        // selbst pruefte das bislang nicht. Wanderte der Mauszeiger beim Weg
+        // vom Kalendertag zur angepinnten Ampel-Zeile ueber einen
+        // Nachbartag mit Terminen, ersetzte dessen 180ms-Hover-Timer das
+        // gerade angepinnte Popup durch sein eigenes -- die eigentlich
+        // angeklickte Rueckmeldungs-Zeile verschwand unter dem Mauszeiger,
+        // der Klick traf ins Leere und wirkte, als taete er nichts.
+        if (!fest && oldPopup.dataset.fest) {
+            return;
+        }
+        oldPopup.remove();
+    }
 
     // Erstelle neues Popup
     const popup = document.createElement('div');
@@ -575,13 +597,21 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
     let links = feld.left;
     let oben  = feld.bottom + 5;
 
-    if (links + popup.offsetWidth > window.innerWidth - rand) {
-        links = window.innerWidth - popup.offsetWidth - rand;
+    // Klammerung gegen die Groesse des Sichtbereichs OHNE Scrollbalken
+    // (documentElement.clientWidth/clientHeight). Die frueher genutzte
+    // Fenstergroesse schloss die Breite eines sichtbaren Scrollbalkens mit
+    // ein -- das Popup lief dort in der letzten Spalte unter dem
+    // Scrollbalken hinaus statt daneben umzuklappen.
+    const viewportBreite = document.documentElement.clientWidth;
+    const viewportHoehe = document.documentElement.clientHeight;
+
+    if (links + popup.offsetWidth > viewportBreite - rand) {
+        links = viewportBreite - popup.offsetWidth - rand;
     }
     if (links < rand) {
         links = rand;
     }
-    if (oben + popup.offsetHeight > window.innerHeight - rand) {
+    if (oben + popup.offsetHeight > viewportHoehe - rand) {
         oben = feld.top - popup.offsetHeight - 5;
     }
     if (oben < rand) {

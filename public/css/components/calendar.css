@@ -199,6 +199,30 @@
     font-size: 11px;
 }
 
+/* FI-1 Fehlerbehebung: Hover- (span, .response-summary-text) und Pin-
+   Variante (button, .response-summary-btn) sollen im Popup optisch
+   identisch wirken. Die allgemeine Button-Optik aus buttons.css
+   (.response-summary-btn: Rahmen, Hintergrund) wird hier zurueckgesetzt;
+   erkennbar bleibt die anklickbare Variante nur an Cursor und Hover. */
+.calendar-event-responses .response-summary-btn {
+    border: none;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.calendar-event-responses .response-summary-btn:hover {
+    text-decoration: underline;
+}
+
+/* Hinweis in der nicht anklickbaren Zeile eines nicht eingeladenen
+   Mitglieds (fest=true, r.expected=false, keine Verwaltungsrechte). */
+.response-not-invited {
+    color: var(--text-light);
+    font-size: 10px;
+    margin-left: 4px;
+}
+
 .calendar-day.today.has-event {
     background: var(--primary-color);
 }

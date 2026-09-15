@@ -386,6 +386,89 @@ export async function showConfirm(message, title = 'Bestätigung') {
     });
 }
 
+/**
+ * Eigener Begruendungsdialog als Ersatz fuer window.prompt(): blockierende
+ * Browserdialoge passen sich nicht an die Optik der Oberflaeche an und
+ * werden z.B. in installierten PWAs teils unterdrueckt.
+ *
+ * @param {Object}   options
+ * @param {string}   options.title         Modal-Titel
+ * @param {string}   [options.message]     Erlaeuternder Text ueber dem Feld
+ * @param {string}   [options.value]       Vorbelegter Text (z.B. bestehende Bemerkung)
+ * @param {string}   [options.placeholder] Platzhaltertext des Feldes
+ * @param {string}   [options.confirmLabel] Beschriftung des Bestaetigen-Buttons
+ * @returns {Promise<string|null>} Getrimmter Text bei Bestaetigung, null bei
+ *          Abbruch/Escape/Schliessen
+ */
+export async function showReasonDialog({ title = 'Begründung', message = '', value = '', placeholder = '', confirmLabel = 'Bestätigen' } = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('reasonModal');
+        const titleEl = document.getElementById('reasonTitle');
+        const messageEl = document.getElementById('reasonMessage');
+        const textarea = document.getElementById('reasonText');
+        const okBtn = document.getElementById('reasonOk');
+        const cancelBtn = document.getElementById('reasonCancel');
+
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        messageEl.hidden = !message;
+        textarea.value = value ?? '';
+        textarea.placeholder = placeholder ?? '';
+        okBtn.textContent = confirmLabel;
+
+        function updateOkState() {
+            okBtn.disabled = textarea.value.trim() === '';
+        }
+        updateOkState();
+
+        modal.classList.add('active');
+        textarea.focus();
+        textarea.select();
+
+        function cleanup() {
+            modal.classList.remove('active');
+            textarea.removeEventListener('input', updateOkState);
+            textarea.removeEventListener('keydown', textareaKeyHandler);
+            document.removeEventListener('keydown', escHandler);
+            okBtn.replaceWith(okBtn.cloneNode(true));  // Remove event listeners
+            cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+        }
+
+        function confirmAction() {
+            if (textarea.value.trim() === '') return;
+            const text = textarea.value.trim();
+            cleanup();
+            resolve(text);
+        }
+
+        function cancelAction() {
+            cleanup();
+            resolve(null);
+        }
+
+        // Enter ohne Umschalt bestaetigt, mit Umschalt bleibt es ein Umbruch.
+        function textareaKeyHandler(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                confirmAction();
+            }
+        }
+
+        function escHandler(e) {
+            if (e.key === 'Escape') {
+                cancelAction();
+            }
+        }
+
+        textarea.addEventListener('input', updateOkState);
+        textarea.addEventListener('keydown', textareaKeyHandler);
+        document.addEventListener('keydown', escHandler);
+
+        document.getElementById('reasonOk').addEventListener('click', confirmAction, { once: true });
+        document.getElementById('reasonCancel').addEventListener('click', cancelAction, { once: true });
+    });
+}
+
 export function updateUIForRole() {
 
     // Sections für Admin und Manager sichtbar

@@ -205,3 +205,53 @@ test('Kalendertag zeigt einen Rueckmeldungs-Punkt und die Hervorhebung fuer offe
     assertTrue(str_contains($css, '.calendar-response-dot'), 'calendar.css enthaelt keine Regel fuer calendar-response-dot');
     assertTrue(str_contains($css, '.calendar-response-dot--open'), 'calendar.css enthaelt keine Regel fuer calendar-response-dot--open');
 });
+
+test('responses.js nutzt keinen window.prompt mehr fuer die Begruendung', function () use ($rsRoot) {
+    // Ersetzt durch den eigenen Begruendungsdialog (showReasonDialog) --
+    // window.prompt() wird in einer installierten PWA teils unterdrueckt und
+    // passt sich nicht der Optik der Oberflaeche an.
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    assertTrue(!str_contains($js, 'window.prompt'), 'responses.js ruft noch window.prompt() auf');
+    assertTrue(!preg_match('/(?<!window\\.)\\bprompt\\(/', $js), 'responses.js ruft noch prompt() auf');
+    assertTrue(str_contains($js, 'showReasonDialog'), 'setMemberResponse nutzt showReasonDialog nicht');
+});
+
+test('ui.js stellt showReasonDialog bereit und index.html fuehrt das zugehoerige Modal', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/ui.js');
+    assertTrue(str_contains($js, 'export async function showReasonDialog') || str_contains($js, 'export function showReasonDialog'),
+        'ui.js exportiert showReasonDialog nicht');
+
+    $html = (string) file_get_contents($rsRoot . '/public/index.html');
+    assertTrue(str_contains($html, 'id="reasonModal"'), 'reasonModal fehlt in index.html');
+});
+
+test('showAppointmentPopup klammert gegen documentElement.clientWidth/clientHeight statt window.innerWidth/innerHeight', function () use ($rsRoot) {
+    // window.innerWidth/innerHeight schliessen die Breite eines sichtbaren
+    // Scrollbalkens mit ein -- das Popup lief dort unter dem Scrollbalken
+    // hinaus statt daneben umzuklappen.
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+
+    $start = strpos($js, 'function showAppointmentPopup');
+    assertTrue($start !== false, 'showAppointmentPopup fehlt');
+    $ende = strpos($js, 'function previousMonth', $start);
+    assertTrue($ende !== false, 'Ende von showAppointmentPopup nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'documentElement.clientWidth'), 'Klammerung nutzt nicht documentElement.clientWidth');
+    assertTrue(str_contains($body, 'documentElement.clientHeight'), 'Klammerung nutzt nicht documentElement.clientHeight');
+    assertTrue(!str_contains($body, 'window.innerWidth') && !str_contains($body, 'window.innerHeight'),
+        'showAppointmentPopup verwendet noch window.innerWidth/innerHeight');
+});
+
+test('deadlineText() erklaert vergangene Termine als abgeschlossen', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+
+    $start = strpos($js, 'function deadlineText');
+    assertTrue($start !== false, 'deadlineText fehlt');
+    $ende = strpos($js, 'function renderResponsesModal', $start);
+    assertTrue($ende !== false, 'Ende von deadlineText nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'vorbei'), "Text fuer laengst vergangene Termine fehlt ('vorbei')");
+    assertTrue(str_contains($body, 'Der Termin hat begonnen.'), 'Text fuer heute begonnene Termine fehlt');
+});

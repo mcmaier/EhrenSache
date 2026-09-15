@@ -10,7 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, invalidateCache } from './ui.js';
+import { showToast, showConfirm, showReasonDialog, invalidateCache } from './ui.js';
 import { escapeHtml, translateExceptionStatus } from './utils.js';
 
 // ============================================
@@ -148,7 +148,18 @@ async function reloadResponses(appointmentId) {
 }
 
 function deadlineText(data) {
-    if (data.started) return 'Der Termin hat begonnen.';
+    if (data.started) {
+        // Unterscheidung nach Kalendertag, nicht nach Uhrzeit: ein heute
+        // begonnener Termin bekommt weiterhin den alten Text, ein laengst
+        // vergangener einen eigenen -- der bisherige Text wirkte sonst auch
+        // Wochen spaeter noch, als koennte man gleich mitmachen.
+        const heute = new Date();
+        const heuteStr = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, '0')}-${String(heute.getDate()).padStart(2, '0')}`;
+        if (data.appointment.date < heuteStr) {
+            return 'Der Termin ist vorbei – Rückmeldungen sind abgeschlossen.';
+        }
+        return 'Der Termin hat begonnen.';
+    }
     const deadline = new Date(data.settings.deadline.replace(' ', 'T'));
     return deadline < new Date()
         ? 'Frist abgelaufen – Änderung wird als kurzfristig vermerkt.'
@@ -188,10 +199,12 @@ function ownResponseHtml(data) {
         <div class="response-own-block">
             <h3>Meine Rückmeldung ${own?.status === 'no' && own?.is_late ? '<span class="response-late">kurzfristig</span>' : ''}</h3>
             <div class="response-segment">${buttons}</div>
-            <label for="responseOwnComment">Bemerkung</label>
-            <textarea id="responseOwnComment" rows="2" maxlength="255" ${disabled}>${escapeHtml(own?.comment ?? '')}</textarea>
-            ${data.settings.require_excuse ? '<small class="input-hint">Eine Absage wird als Entschuldigung eingereicht und braucht eine Begründung.</small>' : ''}
-            ${own?.excuse_state ? `<small class="input-hint">Entschuldigung: ${escapeHtml(translateExceptionStatus(own.excuse_state))}</small>` : ''}
+            <div class="form-group">
+                <label for="responseOwnComment">Bemerkung</label>
+                <textarea id="responseOwnComment" rows="2" maxlength="255" ${disabled}>${escapeHtml(own?.comment ?? '')}</textarea>
+                ${data.settings.require_excuse ? '<small class="input-hint">Eine Absage wird als Entschuldigung eingereicht und braucht eine Begründung.</small>' : ''}
+                ${own?.excuse_state ? `<small class="input-hint">Entschuldigung: ${escapeHtml(translateExceptionStatus(own.excuse_state))}</small>` : ''}
+            </div>
             ${own && !data.started ? `
                 <div class="response-own-actions">
                     <button type="button" class="btn-secondary" onclick="saveOwnComment()">Bemerkung speichern</button>
@@ -429,15 +442,22 @@ export async function setMemberResponse(memberId, value) {
 
     // W1: Ein Verwalter, der nur den Status setzt, darf die bestehende
     // Bemerkung des Mitglieds nicht loeschen -- sie wird mitgeschickt, bei
-    // einer Absage mit Entschuldigungspflicht als Vorgabe im Prompt.
+    // einer Absage mit Entschuldigungspflicht als Vorgabe im Dialog.
     const existingComment = member?.comment ?? null;
     let comment = existingComment;
     if (value === 'no' && current.settings.require_excuse) {
-        comment = (window.prompt('Begründung der Absage (wird als Entschuldigung eingereicht):', existingComment ?? '') ?? '').trim();
-        if (comment === '') {
-            showToast('Ohne Begründung wird die Absage nicht gespeichert', 'warning');
-            return;
-        }
+        const memberLabel = member ? `${member.name} ${member.surname}` : 'das Mitglied';
+        // Eigenes Dialogfeld statt eines blockierenden Browser-Prompts: passt
+        // sich der Optik der Oberflaeche an und ist einheitlich bedienbar.
+        const begruendung = await showReasonDialog({
+            title: 'Absage mit Begründung',
+            message: `Die Absage für ${memberLabel} wird als Entschuldigung eingereicht.`,
+            value: existingComment ?? '',
+            placeholder: 'Begründung der Absage',
+            confirmLabel: 'Absage speichern',
+        });
+        if (begruendung === null) return;
+        comment = begruendung;
     }
     await submitResponse({ status: value, comment }, memberId);
 }

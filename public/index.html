@@ -2075,6 +2075,26 @@
         </div>
     </div>
 
+    <!-- Begründungsdialog (Ersatz für window.prompt, FI-1) -->
+    <div class="modal" id="reasonModal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2 id="reasonTitle">Begründung</h2>
+            </div>
+            <div class="modal-body">
+                <p id="reasonMessage"></p>
+                <div class="form-group">
+                    <label for="reasonText">Begründung</label>
+                    <textarea id="reasonText" rows="3" maxlength="255"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" id="reasonCancel">Abbrechen</button>
+                <button class="btn-confirm-delete" id="reasonOk">Bestätigen</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Member Import Modal -->
     <div class="modal" id="importModal">
         <div class="modal-content">
