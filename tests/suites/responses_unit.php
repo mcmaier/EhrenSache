@@ -148,6 +148,42 @@ test('responseExcuseAction: weitere Randfaelle', function () {
     assertSame('link', responseExcuseAction(true, 'maybe', 'no', null, true, false));
 });
 
+test('responseExcuseAction: echter Wechsel auf \'no\' mit bestehendem offenem Antrag (Luecke der Wahrheitstabelle)', function () {
+    assertSame('update_reason', responseExcuseAction(true, 'yes', 'no', 'pending', false, true),
+        'echter Wechsel, von der Rueckmeldung erzeugter Antrag -- Bemerkung wird mitgezogen');
+    assertSame('keep', responseExcuseAction(true, 'yes', 'no', 'pending', false, false),
+        'echter Wechsel, nur verknuepfter Antrag -- bleibt unangetastet');
+});
+
+test('responseExcuseAction: Wechsel auf \'maybe\' mit offenem Antrag bleibt \'keep\' (Luecke der Wahrheitstabelle)', function () {
+    assertSame('keep', responseExcuseAction(true, 'yes', 'maybe', 'pending', false, true));
+});
+
+// ---- A1 (Review 2026-09-15): ein abgelehnter Antrag blockiert keinen neuen ----
+
+test('responseExcuseAction: A1 -- abgelehnter Antrag zaehlt bei echtem Wechsel auf \'no\' wie keiner', function () {
+    assertSame('create', responseExcuseAction(true, 'yes', 'no', 'rejected', false, false),
+        'kein eigener Antrag -- ein neuer entsteht, der abgelehnte blockiert nicht');
+    assertSame('link', responseExcuseAction(true, 'yes', 'no', 'rejected', true, false),
+        'eigener, nicht abgelehnter Antrag vorhanden -- wird verknuepft');
+    assertSame('create', responseExcuseAction(true, null, 'no', 'rejected', false, false),
+        'erste Antwort ueberhaupt ist ebenfalls ein echter Wechsel');
+});
+
+test('responseExcuseAction: A1 -- Wechsel weg von \'no\' bei abgelehntem Antrag loest nur die Verknuepfung', function () {
+    assertSame('unlink', responseExcuseAction(true, 'no', 'yes', 'rejected', false, false));
+    assertSame('unlink', responseExcuseAction(true, 'no', 'maybe', 'rejected', false, false));
+    assertSame('unlink', responseExcuseAction(true, 'no', null, 'rejected', false, false),
+        'null = Ruecknahme, ebenfalls unlink');
+});
+
+test('responseExcuseAction: A1 -- reine Bemerkungsaenderung bei \'no\' -> \'no\' mit abgelehntem Antrag bleibt \'keep\'', function () {
+    assertSame('keep', responseExcuseAction(true, 'no', 'no', 'rejected', false, false),
+        'kein echter Statuswechsel -- der abgelehnte Antrag bleibt verknuepft, kein neuer entsteht');
+    assertSame('keep', responseExcuseAction(true, 'no', 'no', 'rejected', true, false),
+        'gilt auch, wenn das Mitglied anderswo schon einen eigenen Antrag haette');
+});
+
 // ---- Summen und Gegenueberstellung ------------------------------------------
 
 test('responseSummary zaehlt nur erwartete Mitglieder, offen = ohne Antwort', function () {

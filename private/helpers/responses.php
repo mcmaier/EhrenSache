@@ -134,7 +134,7 @@ function responseNormalizeComment(mixed $comment): ?string
 }
 
 /**
- * Was mit dem Abwesenheitsantrag geschieht (Spec 5.4, Entscheidungen 3b und 4b).
+ * Was mit dem Abwesenheitsantrag geschieht (Spec 5.4, Entscheidungen 3b, 4b und A1).
  *
  * Entscheidung 3b: Ein Antrag, den das Mitglied unabhaengig ueber exceptions
  * gestellt hat (nur verknuepft, $excuseCreatedByResponse = false), wird von
@@ -145,11 +145,20 @@ function responseNormalizeComment(mixed $comment): ?string
  * 'no'. Bleibt der Status 'no' (z. B. weil ein Verwalter den zuvor erzeugten
  * Antrag geloescht hat und nur die Bemerkung geaendert wird), entsteht keiner.
  *
+ * Entscheidung A1 (Review, ergaenzt am 2026-09-15): Ein abgelehnter Antrag
+ * blockiert keinen neuen. Bei einem echten Wechsel auf 'no' zaehlt ein
+ * abgelehnter verknuepfter Antrag wie keiner -- es entsteht ein neuer bzw.
+ * wird ein eigener, nicht abgelehnter Antrag verknuepft. Wechselt das Mitglied
+ * danach von 'no' weg, loest 'unlink' die Verknuepfung; der abgelehnte Antrag
+ * selbst bleibt unangetastet. Bei reiner Bemerkungsaenderung ('no' -> 'no')
+ * bleibt ein abgelehnter Antrag verknuepft ('keep') -- das ist kein echter
+ * Statuswechsel.
+ *
  * @param ?string $newStatus null heisst: Antwort wird zurueckgenommen
  * @param ?string $excuseState Status des verknuepften Antrags, null ohne
  * @param bool $ownAbsenceExists Mitglied hat schon einen eigenen, nicht abgelehnten Antrag
  * @param bool $excuseCreatedByResponse Der verknuepfte Antrag wurde von einer Rueckmeldung angelegt, nicht nur verknuepft
- * @return 'none'|'create'|'link'|'update_reason'|'delete'|'keep'
+ * @return 'none'|'create'|'link'|'update_reason'|'delete'|'unlink'|'keep'
  */
 function responseExcuseAction(bool $requireExcuse, ?string $oldStatus, ?string $newStatus,
                               ?string $excuseState, bool $ownAbsenceExists,
@@ -159,12 +168,16 @@ function responseExcuseAction(bool $requireExcuse, ?string $oldStatus, ?string $
         return 'none';
     }
 
+    $realChangeToNo = $newStatus === 'no' && $oldStatus !== 'no';
+
     if ($newStatus === 'no') {
-        if ($excuseState === null) {
+        // A1: ein abgelehnter Antrag zaehlt bei einem echten Statuswechsel wie
+        // keiner -- er blockiert weder einen neuen Antrag noch eine Verknuepfung.
+        if ($excuseState === null || ($excuseState === 'rejected' && $realChangeToNo)) {
             // 4b: keine echte Statusaenderung -- der alte Antrag wurde entfernt
             // (etwa durch den Verwalter), eine reine Bemerkungsaenderung legt
             // keinen neuen an.
-            if ($oldStatus === 'no') {
+            if (!$realChangeToNo) {
                 return 'none';
             }
 
@@ -182,6 +195,11 @@ function responseExcuseAction(bool $requireExcuse, ?string $oldStatus, ?string $
     if ($oldStatus === 'no' && $excuseState === 'pending') {
         // 3b: nur ein von der Rueckmeldung selbst angelegter Antrag wird geloescht.
         return $excuseCreatedByResponse ? 'delete' : 'keep';
+    }
+
+    if ($oldStatus === 'no' && $excuseState === 'rejected') {
+        // A1: die Verknuepfung loest sich, der abgelehnte Antrag selbst bleibt bestehen.
+        return 'unlink';
     }
 
     return $excuseState === null ? 'none' : 'keep';
@@ -409,7 +427,16 @@ function responsesFetchUpcomingIds($db, $database, int $memberId, string $now): 
     return array_map(static fn ($r) => (int) $r['appointment_id'], $stmt->fetchAll(PDO::FETCH_ASSOC));
 }
 
-/** Eine Antwort mit Antragsstatus, gesperrt fuer die laufende Transaktion. */
+/**
+ * Eine Antwort mit Antragsstatus, gesperrt fuer die laufende Transaktion.
+ *
+ * Die JOIN-Bedingung bindet den verknuepften Antrag zusaetzlich an Mitglied,
+ * Termin und exception_type = 'absence' (A2, Review): exception_id ist eine
+ * fortlaufende ID -- geht ein Antrag verloren und eine andere Zeile erbt
+ * zufaellig dieselbe ID (z. B. nach Loeschen und Neuanlegen), darf sie nie als
+ * excuse_state eines fremden Antrags erscheinen. Passt sie nicht, liefert die
+ * JOIN-Spalte NULL, exakt wie ohne Verknuepfung.
+ */
 function responsesFetchOneForUpdate($db, $database, int $appointmentId, int $memberId): ?array
 {
     $prefix = $database->table('');
@@ -418,6 +445,8 @@ function responsesFetchOneForUpdate($db, $database, int $appointmentId, int $mem
                r.exception_created, e.status AS excuse_state
         FROM {$prefix}appointment_responses r
         LEFT JOIN {$prefix}exceptions e ON e.exception_id = r.exception_id
+            AND e.member_id = r.member_id AND e.appointment_id = r.appointment_id
+            AND e.exception_type = 'absence'
         WHERE r.appointment_id = ? AND r.member_id = ?
         FOR UPDATE
     ");

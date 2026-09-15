@@ -415,15 +415,20 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
                 break;
 
             case 'update_reason':
+                // A2: zusaetzlich an Mitglied, Termin und exception_type gebunden --
+                // eine wiederverwendete exception_id darf nie einen fremden Antrag treffen.
                 $db->prepare("UPDATE {$prefix}exceptions SET reason = ?
-                              WHERE exception_id = ? AND status = 'pending'")
-                   ->execute([$comment, $exceptionId]);
+                              WHERE exception_id = ? AND status = 'pending'
+                                AND member_id = ? AND appointment_id = ? AND exception_type = 'absence'")
+                   ->execute([$comment, $exceptionId, $memberId, $appointmentId]);
                 break;
 
             case 'delete':
+                // A2: dieselbe zusaetzliche Bindung wie bei 'update_reason'.
                 $stmt = $db->prepare("DELETE FROM {$prefix}exceptions
-                              WHERE exception_id = ? AND status = 'pending'");
-                $stmt->execute([$exceptionId]);
+                              WHERE exception_id = ? AND status = 'pending'
+                                AND member_id = ? AND appointment_id = ? AND exception_type = 'absence'");
+                $stmt->execute([$exceptionId, $memberId, $appointmentId]);
                 // Nur loesen, wenn wirklich geloescht wurde -- ist der Antrag
                 // inzwischen genehmigt (nicht mehr 'pending'), hat eine
                 // gleichzeitige Genehmigung gewonnen, und die Verknuepfung bleibt.
@@ -431,6 +436,13 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
                     $exceptionId      = null;
                     $exceptionCreated = 0;
                 }
+                break;
+
+            case 'unlink':
+                // A1: die Verknuepfung zu einem abgelehnten Antrag loest sich --
+                // der abgelehnte Antrag selbst bleibt unveraendert bestehen.
+                $exceptionId      = null;
+                $exceptionCreated = 0;
                 break;
         }
 
@@ -494,9 +506,13 @@ function responsesDelete($db, $database, bool $isManager, ?int $authMemberId, st
                                        $existing['status'], null, $existing['excuse_state'], false,
                                        $exceptionCreated === 1);
         if ($action === 'delete') {
-            $db->prepare("DELETE FROM {$prefix}exceptions WHERE exception_id = ? AND status = 'pending'")
-               ->execute([(int) $existing['exception_id']]);
+            // A2: dieselbe zusaetzliche Bindung wie in responsesPut().
+            $db->prepare("DELETE FROM {$prefix}exceptions WHERE exception_id = ? AND status = 'pending'
+                          AND member_id = ? AND appointment_id = ? AND exception_type = 'absence'")
+               ->execute([(int) $existing['exception_id'], $memberId, $appointmentId]);
         }
+        // 'unlink' braucht hier keine Sonderbehandlung: Die ganze Antwortzeile wird
+        // gleich geloescht, die Verknuepfung verschwindet mit ihr von selbst.
 
         $db->prepare("DELETE FROM {$prefix}appointment_responses WHERE response_id = ?")
            ->execute([(int) $existing['response_id']]);

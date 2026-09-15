@@ -785,6 +785,118 @@ test('PUT: nach geloeschtem, von der Rueckmeldung erzeugtem Antrag legt eine rei
     }
 });
 
+test('PUT: Gefahrensequenz -- geloeschter erzeugter Antrag, eigener Antrag, mehrfacher Wechsel (A2)', function () {
+    // A2 (Review): responsesFetchOneForUpdate() bindet den verknuepften Antrag
+    // zusaetzlich an Mitglied, Termin und exception_type = 'absence', damit eine
+    // wiederverwendete exception_id (etwa nach einem AUTO_INCREMENT-Verlust,
+    // siehe docs/OPEN-ITEMS.md OI-1) nie als fremder Antrag gelesen wird. Diese
+    // Sequenz durchlaeuft 'create' -> Loeschung durch den Admin (FK setzt
+    // exception_id zurueck) -> eigener, unabhaengig gestellter Antrag -> 'link'
+    // -> reine Bemerkungsaenderung ('keep') -> Zusage ('keep', nur verknuepft).
+    $welt = rsWorld('Gefahr', ['responses_enabled' => 1, 'responses_require_excuse' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt) {
+            $antraege = static function () use ($userMember, $apt): array {
+                $liste = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+                    'query' => ['member_id' => $userMember, 'type' => 'absence']]);
+                assertStatus(200, $liste);
+
+                return array_values(array_filter($liste['body'],
+                    static fn ($e) => (int) $e['appointment_id'] === $apt));
+            };
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-A']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state']);
+            assertSame(1, count($antraege()), 'Vorbedingung: der von der Rueckmeldung erzeugte Antrag X');
+            $x = (int) $antraege()[0]['exception_id'];
+
+            assertStatus(200, apiRequest('DELETE', 'exceptions', ['token' => apiToken('admin'),
+                'query' => ['id' => $x]]));
+            assertSame(0, count($antraege()), 'Admin hat X geloescht');
+
+            $ownId = rsCreate('exceptions', [
+                'member_id' => $userMember, 'appointment_id' => $apt,
+                'exception_type' => 'absence', 'reason' => 'RS-eigener', 'status' => 'pending',
+            ]);
+            assertSame(1, count($antraege()), 'eigener, unabhaengig gestellter Antrag');
+
+            assertStatus(200, rsPut('user', $apt, ['status' => 'yes']));
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-B']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state'], 'eigener Antrag wird verknuepft');
+            assertSame(1, count($antraege()), 'keine Verdopplung -- nur verknuepft');
+            assertSame($ownId, (int) $antraege()[0]['exception_id']);
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-C']);
+            assertStatus(200, $res);
+            assertSame(1, count($antraege()));
+            assertSame('RS-eigener', $antraege()[0]['reason'],
+                'nur verknuepfter Antrag behaelt seine Begruendung, auch bei geaenderter Bemerkung');
+
+            assertStatus(200, rsPut('user', $apt, ['status' => 'yes']));
+            assertSame(1, count($antraege()), 'eigener Antrag bleibt bei Zusage bestehen');
+            assertSame('pending', $antraege()[0]['status']);
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('PUT: A1 -- ein abgelehnter Antrag blockiert keinen neuen', function () {
+    $welt = rsWorld('A1', ['responses_enabled' => 1, 'responses_require_excuse' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt) {
+            $antraege = static function () use ($userMember, $apt): array {
+                $liste = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+                    'query' => ['member_id' => $userMember, 'type' => 'absence']]);
+                assertStatus(200, $liste);
+
+                return array_values(array_filter($liste['body'],
+                    static fn ($e) => (int) $e['appointment_id'] === $apt));
+            };
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-D']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state']);
+            assertSame(1, count($antraege()));
+            $x1 = (int) $antraege()[0]['exception_id'];
+
+            assertStatus(200, apiRequest('PUT', 'exceptions', ['token' => apiToken('admin'),
+                'query' => ['id' => $x1],
+                'body'  => ['exception_type' => 'absence', 'reason' => 'RS-D', 'status' => 'rejected']]));
+            assertSame('rejected', $antraege()[0]['status']);
+
+            $res = rsPut('user', $apt, ['status' => 'yes']);
+            assertStatus(200, $res, 'abgelehnter Antrag darf den Wechsel auf Zusage nicht behindern');
+            assertSame(null, $res['body']['own']['excuse_state'], 'Verknuepfung geloest, X1 bleibt unangetastet');
+            assertSame(1, count($antraege()), 'X1 bleibt bestehen');
+            assertSame('rejected', $antraege()[0]['status']);
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-E']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state'],
+                'ein neuer Antrag entsteht -- der abgelehnte X1 blockiert nicht (A1)');
+            assertSame(2, count($antraege()), 'zwei Antraege: X1 (abgelehnt) und der neue (offen)');
+
+            $status = array_column($antraege(), 'status');
+            sort($status);
+            assertSame(['pending', 'rejected'], $status);
+
+            $neu = array_values(array_filter($antraege(), static fn ($e) => $e['status'] === 'pending'))[0];
+            assertSame('RS-E', $neu['reason']);
+            assertTrue((int) $neu['exception_id'] !== $x1, 'der neue Antrag ist nicht X1');
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
 test('PUT: Terminart ohne Rueckmeldung bleibt 409, auch fuer ein Mitglied per member_id', function () {
     $welt = rsWorld('AusPut');
     try {
