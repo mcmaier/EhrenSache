@@ -152,6 +152,50 @@ test('reliabilityOutcome vertraegt Zahlen als Zeichenketten', function () {
     ]));
 });
 
+// ---- Zuverlaessigkeit bei Terminarten mit Rueckmeldung ------------------------
+
+/** Soll-Paar einer Terminart mit Rueckmeldung (Spec Terminrueckmeldung 5.5). */
+function puResponsePair(int $present, int $excusedRecord, int $absences, int $absencesInDeadline,
+                        int $noResponse, int $noInTime): array
+{
+    return [
+        'has_present'               => $present,
+        'has_excused_record'        => $excusedRecord,
+        'absence_count'             => $absences,
+        'absence_in_time_count'     => $absences,   // vor Beginn -- darf hier nicht zaehlen
+        'responses_enabled'         => 1,
+        'absence_in_deadline_count' => $absencesInDeadline,
+        'response_no_count'         => $noResponse,
+        'response_no_in_time'       => $noInTime,
+    ];
+}
+
+test('reliabilityOutcome: rechtzeitige Absage ohne Antrag zaehlt als abgemeldet', function () {
+    assertSame('excused', reliabilityOutcome(puResponsePair(0, 0, 0, 0, 1, 1)));
+});
+
+test('reliabilityOutcome: kurzfristige Absage ist ausgefallen', function () {
+    assertSame('missed', reliabilityOutcome(puResponsePair(0, 0, 0, 0, 1, 0)));
+});
+
+test('reliabilityOutcome: bei Rueckmeldung entscheidet fuer Antraege die Frist, nicht der Beginn', function () {
+    assertSame('missed',  reliabilityOutcome(puResponsePair(0, 0, 1, 0, 0, 0)), 'vor Beginn, nach der Frist');
+    assertSame('excused', reliabilityOutcome(puResponsePair(0, 0, 1, 1, 0, 0)), 'vor der Frist');
+});
+
+test('reliabilityOutcome: kurzfristig abgesagt und spaeter genehmigt bleibt ausgefallen', function () {
+    assertSame('missed', reliabilityOutcome(puResponsePair(0, 1, 1, 0, 1, 0)));
+});
+
+test('reliabilityOutcome: bei Rueckmeldung ohne Absage zaehlt die Entschuldigung des Verwalters', function () {
+    assertSame('excused', reliabilityOutcome(puResponsePair(0, 1, 0, 0, 0, 0)));
+    assertSame('missed',  reliabilityOutcome(puResponsePair(0, 0, 0, 0, 0, 0)));
+});
+
+test('reliabilityOutcome: wer trotz Absage kam, ist erschienen', function () {
+    assertSame('appeared', reliabilityOutcome(puResponsePair(1, 0, 0, 0, 1, 1)));
+});
+
 test('reliabilityBuild zaehlt jeden Ausgang und die Quote', function () {
     $r = reliabilityBuild([
         puPair(1, 0, 0, 0),   // erschienen

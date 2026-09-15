@@ -23,6 +23,7 @@ declare(strict_types=1);
 // Funktionen und ist ohne Datenbank pruefbar (tests/suites/punctuality_unit.php).
 
 require_once __DIR__ . '/attendance.php';
+require_once __DIR__ . '/responses.php';
 
 /** Unter dieser Zahl gemessener Ankuenfte gibt es keine Quote (Spec 5.1). */
 const PUNCTUALITY_MIN_MEASUREMENTS = 5;
@@ -121,6 +122,23 @@ function reliabilityOutcome(array $pair): string
 {
     if ((int) $pair['has_present'] > 0) {
         return 'appeared';
+    }
+
+    // Terminart mit Rueckmeldung: Fuer Absage und Antrag gilt die Frist, nicht
+    // der Beginn -- sonst zaehlte eine kurzfristige Absage mit Pflicht-
+    // Entschuldigung ueber ihren Antrag doch als rechtzeitig
+    // (Spec Terminrueckmeldung 3.5). Paare ohne diese Schluessel stammen aus
+    // Terminarten ohne Rueckmeldung und laufen unten weiter wie in 1.5.1.
+    if ((int) ($pair['responses_enabled'] ?? 0) === 1) {
+        if ((int) ($pair['response_no_in_time'] ?? 0) > 0
+            || (int) ($pair['absence_in_deadline_count'] ?? 0) > 0) {
+            return 'excused';
+        }
+        if ((int) ($pair['response_no_count'] ?? 0) > 0 || (int) $pair['absence_count'] > 0) {
+            return 'missed';
+        }
+
+        return (int) $pair['has_excused_record'] > 0 ? 'excused' : 'missed';
     }
 
     if ((int) $pair['absence_count'] > 0) {
@@ -242,9 +260,10 @@ function punctualityFetchMeasurements($db, $database, array $groupIds, int $year
 /**
  * Soll-Paare im Bereich mit den Fakten, die reliabilityOutcome() braucht.
  *
- * GROUP BY Mitglied und Termin entdoppelt. a.date und a.start_time stehen mit
- * im GROUP BY: MariaDB erkennt die funktionale Abhaengigkeit vom Primaerschluessel
- * unter ONLY_FULL_GROUP_BY nicht, und die Unterabfragen lesen beide.
+ * GROUP BY Mitglied und Termin entdoppelt. a.date, a.start_time und a.type_id
+ * stehen mit im GROUP BY: MariaDB erkennt die funktionale Abhaengigkeit vom
+ * Primaerschluessel unter ONLY_FULL_GROUP_BY nicht, und die Unterabfragen und
+ * die Frist lesen alle drei.
  *
  * Abmeldungen nur vom Typ 'absence' -- ohne diesen Filter zaehlten
  * Zeitkorrektur-Antraege als Absage (Spec 5.2). Offene zaehlen wie genehmigte.
@@ -258,6 +277,8 @@ function reliabilityFetchPairs($db, $database, array $groupIds, int $year,
         return [];
     }
 
+    require_once __DIR__ . '/utils.php';
+
     $prefix = $database->table('');
     [$scope, $params] = punctualityScope($database, $groupIds, $year, $memberId, $appointmentTypeId);
 
@@ -269,17 +290,37 @@ function reliabilityFetchPairs($db, $database, array $groupIds, int $year,
           AND e.status <> 'rejected'
     ";
 
+    // Frist wie responseDeadline(): Terminart vor Einstellung. DATE_SUB auf
+    // DATETIME rechnet ohne Zeitzone, genau wie die PHP-Seite.
+    $globalHours = responseDeadlineHours(null, systemSetting(
+        $db, $database, 'response_deadline_hours', (string) RESPONSE_DEADLINE_DEFAULT_HOURS
+    ));
+    $deadline = "DATE_SUB(CONCAT(a.date, ' ', a.start_time), INTERVAL COALESCE(
+        (SELECT t.response_deadline_hours FROM {$prefix}appointment_types t WHERE t.type_id = a.type_id), ?
+    ) HOUR)";
+
     $stmt = $db->prepare("
         SELECT m.member_id, a.appointment_id,
                MAX(CASE WHEN r.status = 'present' THEN 1 ELSE 0 END) AS has_present,
                MAX(CASE WHEN r.status = 'excused' THEN 1 ELSE 0 END) AS has_excused_record,
                (SELECT COUNT(*) {$absence}) AS absence_count,
                (SELECT COUNT(*) {$absence}
-                  AND e.created_at < CONCAT(a.date, ' ', a.start_time)) AS absence_in_time_count
+                  AND e.created_at < CONCAT(a.date, ' ', a.start_time)) AS absence_in_time_count,
+               (SELECT COALESCE(MAX(t.responses_enabled), 0)
+                  FROM {$prefix}appointment_types t WHERE t.type_id = a.type_id) AS responses_enabled,
+               (SELECT COUNT(*) {$absence}
+                  AND e.created_at <= {$deadline}) AS absence_in_deadline_count,
+               (SELECT COUNT(*) FROM {$prefix}appointment_responses ar
+                 WHERE ar.appointment_id = a.appointment_id AND ar.member_id = m.member_id
+                   AND ar.status = 'no') AS response_no_count,
+               (SELECT COUNT(*) FROM {$prefix}appointment_responses ar
+                 WHERE ar.appointment_id = a.appointment_id AND ar.member_id = m.member_id
+                   AND ar.status = 'no' AND ar.status_changed_at <= {$deadline}) AS response_no_in_time
         {$scope}
-        GROUP BY m.member_id, a.appointment_id, a.date, a.start_time
+        GROUP BY m.member_id, a.appointment_id, a.date, a.start_time, a.type_id
     ");
-    $stmt->execute($params);
+    // Die zwei ? der Frist stehen im SELECT und damit vor den Platzhaltern des Scopes.
+    $stmt->execute(array_merge([$globalHours, $globalHours], $params));
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
