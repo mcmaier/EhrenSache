@@ -255,3 +255,55 @@ test('deadlineText() erklaert vergangene Termine als abgeschlossen', function ()
     assertTrue(str_contains($body, 'vorbei'), "Text fuer laengst vergangene Termine fehlt ('vorbei')");
     assertTrue(str_contains($body, 'Der Termin hat begonnen.'), 'Text fuer heute begonnene Termine fehlt');
 });
+
+test('ownResponseHtml zeigt bei begonnenen Terminen die kompakte, nur lesende Zeile', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+
+    $start = strpos($js, 'function ownResponseHtml');
+    assertTrue($start !== false, 'ownResponseHtml fehlt');
+    $ende = strpos($js, 'function ownResponseCompactHtml', $start);
+    assertTrue($ende !== false, 'Ende von ownResponseHtml nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'data.started'), 'ownResponseHtml prueft data.started nicht');
+    assertTrue(str_contains($body, 'ownResponseCompactHtml'), 'ownResponseHtml ruft die kompakte Variante nicht auf');
+    assertTrue(!str_contains($body, 'disabled'),
+        'Segmentgruppe/Textfeld des vollen Blocks brauchen kein disabled mehr -- der Block erscheint nur noch vor Terminbeginn');
+
+    $compactStart = strpos($js, 'function ownResponseCompactHtml');
+    assertTrue($compactStart !== false, 'ownResponseCompactHtml fehlt');
+    $compactEnde = strpos($js, 'function comparisonHtml', $compactStart);
+    assertTrue($compactEnde !== false, 'Ende von ownResponseCompactHtml nicht gefunden');
+    $compactBody = substr($js, $compactStart, $compactEnde - $compactStart);
+
+    assertTrue(str_contains($compactBody, 'Meine Rückmeldung:'), "Kompakte Zeile fuehrt 'Meine Rückmeldung:' nicht");
+    assertTrue(str_contains($compactBody, 'statusBadge('), 'Kompakte Zeile nutzt den bestehenden Status-Badge nicht');
+    assertTrue(str_contains($compactBody, 'response-own-compact__comment'), 'Kompakte Zeile zeigt die Bemerkung nicht in eigener Klasse');
+    assertTrue(str_contains($compactBody, 'Entschuldigung:'), 'Kompakte Zeile fuehrt den Entschuldigungsstatus nicht');
+    assertTrue(str_contains($compactBody, "own?.status === 'no' && own?.is_late"), "'kurzfristig' bleibt nicht auf Absage+is_late beschraenkt");
+});
+
+test('namesListHtml gliedert Antworten anderer Mitglieder nach Gruppe als Chips', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+
+    $start = strpos($js, 'function namesListHtml');
+    assertTrue($start !== false, 'namesListHtml fehlt');
+    $ende = strpos($js, 'export function filterResponses', $start);
+    assertTrue($ende !== false, 'Ende von namesListHtml nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(!str_contains($body, '<ul'), 'namesListHtml rendert noch eine <ul>-Liste mit Aufzaehlungspunkten');
+    assertTrue(str_contains($body, 'response-name-chip'), "namesListHtml nutzt die Klasse 'response-name-chip' nicht");
+    assertTrue(str_contains($body, 'response-names-grouped'), "Aeusserer Rahmen 'response-names-grouped' fehlt");
+    assertTrue(str_contains($body, 'escapeHtml(label)'), 'Gruppenname wird nicht maskiert');
+    assertTrue(str_contains($body, 'Ohne Gruppe'), "Mitglieder ohne Gruppe fehlt 'Ohne Gruppe'");
+    assertTrue(str_contains($body, 'responseChipsHtml('), 'Gruppenkopf nutzt responseChipsHtml() nicht fuer die Ampel-Zeile');
+
+    $css = (string) file_get_contents($rsRoot . '/public/css/components/badges.css');
+    foreach (['--yes', '--maybe', '--no', '--open'] as $suffix) {
+        assertTrue(str_contains($css, "response-name-chip{$suffix}"), "badges.css fuehrt response-name-chip{$suffix} nicht");
+    }
+
+    $modalsCss = (string) file_get_contents($rsRoot . '/public/css/components/modals.css');
+    assertTrue(str_contains($modalsCss, 'response-names-grouped'), 'modals.css fuehrt das Layout response-names-grouped nicht');
+});

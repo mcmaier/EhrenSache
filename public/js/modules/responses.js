@@ -186,12 +186,17 @@ function renderResponsesModal() {
 }
 
 function ownResponseHtml(data) {
+    // G7: Ein vergangener Termin bekommt keine Bedienelemente mehr (Formular
+    // waere nutzlos), nur noch eine kompakte, lesende Zeile.
+    if (data.started) {
+        return ownResponseCompactHtml(data);
+    }
+
     const own = data.own;
-    const disabled = data.started ? 'disabled' : '';
     const buttons = ['yes', 'maybe', 'no'].map(s => `
         <button type="button" class="response-segment__btn response-segment__btn--${s}${own?.status === s ? ' is-active' : ''}"
                 aria-pressed="${own?.status === s ? 'true' : 'false'}"
-                ${disabled} onclick="setOwnResponse('${s}')">${RESPONSE_ICONS[s]} ${RESPONSE_LABELS[s]}</button>`).join('');
+                onclick="setOwnResponse('${s}')">${RESPONSE_ICONS[s]} ${RESPONSE_LABELS[s]}</button>`).join('');
 
     // G6: "kurzfristig" nur bei einer Absage zeigen -- Spec 3.4 spricht von
     // Absagen, is_late bleibt in der API fuer jeden Status unveraendert.
@@ -201,15 +206,36 @@ function ownResponseHtml(data) {
             <div class="response-segment">${buttons}</div>
             <div class="form-group">
                 <label for="responseOwnComment">Bemerkung</label>
-                <textarea id="responseOwnComment" rows="2" maxlength="255" ${disabled}>${escapeHtml(own?.comment ?? '')}</textarea>
+                <textarea id="responseOwnComment" rows="2" maxlength="255">${escapeHtml(own?.comment ?? '')}</textarea>
                 ${data.settings.require_excuse ? '<small class="input-hint">Eine Absage wird als Entschuldigung eingereicht und braucht eine Begründung.</small>' : ''}
                 ${own?.excuse_state ? `<small class="input-hint">Entschuldigung: ${escapeHtml(translateExceptionStatus(own.excuse_state))}</small>` : ''}
             </div>
-            ${own && !data.started ? `
+            ${own ? `
                 <div class="response-own-actions">
                     <button type="button" class="btn-secondary" onclick="saveOwnComment()">Bemerkung speichern</button>
                     <button type="button" class="btn-cancel" onclick="withdrawOwnResponse()">Zurücknehmen</button>
                 </div>` : ''}
+        </div>`;
+}
+
+/**
+ * G7: Kompakte, nur lesende Zeile der eigenen Rueckmeldung fuer einen
+ * bereits begonnenen/vergangenen Termin -- ersetzt Segmentgruppe, Textfeld
+ * und Aktionen dort vollstaendig. statusBadge() liefert denselben Badge wie
+ * die Verwaltungstabelle, auch "keine Antwort" fuer einen fehlenden Datensatz.
+ */
+function ownResponseCompactHtml(data) {
+    const own = data.own;
+    const late = own?.status === 'no' && own?.is_late
+        ? ' <span class="response-late">kurzfristig</span>' : '';
+    const comment = own?.comment
+        ? ` <span class="response-own-compact__comment">${escapeHtml(own.comment)}</span>` : '';
+    const excuse = own?.excuse_state
+        ? ` <span class="response-own-compact__excuse">Entschuldigung: ${escapeHtml(translateExceptionStatus(own.excuse_state))}</span>` : '';
+
+    return `
+        <div class="response-own-block response-own-block--compact">
+            <p class="response-own-compact"><strong>Meine Rückmeldung:</strong> ${statusBadge(own?.status ?? null)}${late}${comment}${excuse}</p>
         </div>`;
 }
 
@@ -313,10 +339,60 @@ function managerTableHtml(data) {
         </div>`;
 }
 
+/** Gruppenname eines Mitglieds, null statt leer/undefiniert fuer "Ohne Gruppe" --
+ * wie responseGroupKey() in der PWA (public/checkin/js/app.js). */
+function responseGroupKey(m) {
+    return m.group_name && String(m.group_name).trim() !== '' ? m.group_name : null;
+}
+
+/** Nachname vor Vorname zur Sortierung, "Vorname Nachname" bleibt die Anzeige --
+ * wie sortByNameSurname() in der PWA. */
+function sortByNameSurname(members) {
+    return [...members].sort((a, b) =>
+        a.surname.localeCompare(b.surname, 'de') || a.name.localeCompare(b.name, 'de'));
+}
+
+/** Ein Namens-Chip, nach Status eingefaerbt und mit Icon-Praefix statt nur
+ * Farbe (Kontrast/Nicht-nur-Farbe) -- wie responseNameChip() in der PWA. */
+function responseNameChip(m) {
+    const key = m.status ?? 'open';
+    return `<span class="response-name-chip response-name-chip--${key}">${RESPONSE_ICONS[key]} ${escapeHtml(m.name)} ${escapeHtml(m.surname)}</span>`;
+}
+
+/**
+ * Antworten anderer Mitglieder (Rolle user, names_visible): nach Gruppe
+ * gegliedert statt einer flachen Liste mit Aufzaehlungspunkten -- analog zu
+ * responseNamesHtml() in der PWA (public/checkin/js/app.js). Gruppen
+ * alphabetisch, Mitglieder ohne Gruppe zuletzt als "Ohne Gruppe"; je Gruppe
+ * eine Ampel-Zeile aus responseChipsHtml() und darunter Namens-Chips
+ * Zusage -> Unsicher -> Absage -> ohne Antwort (CHIP_ORDER), darin nach
+ * Nachname/Vorname.
+ */
 function namesListHtml(members) {
-    return `<ul class="response-names">${members.map(m =>
-        `<li>${escapeHtml(m.name)} ${escapeHtml(m.surname)}: ${m.status ? RESPONSE_LABELS[m.status] : 'keine Antwort'}</li>`
-    ).join('')}</ul>`;
+    const groupNames = [...new Set(members.map(responseGroupKey))].sort((a, b) => {
+        if (a === null) return 1;
+        if (b === null) return -1;
+        return a.localeCompare(b, 'de');
+    });
+
+    const groups = groupNames.map(groupName => {
+        const groupMembers = members.filter(m => responseGroupKey(m) === groupName);
+        const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
+        groupMembers.forEach(m => counts[m.status ?? 'open']++);
+
+        const chips = CHIP_ORDER.map(key =>
+            sortByNameSurname(groupMembers.filter(m => (m.status ?? 'open') === key)).map(responseNameChip).join('')
+        ).join('');
+
+        const label = groupName === null ? 'Ohne Gruppe' : groupName;
+
+        return `<div class="response-name-group">
+            <div class="response-name-group__heading"><span class="response-name-group__label">${escapeHtml(label)}</span> ${responseChipsHtml(counts)}</div>
+            <div class="response-name-chips">${chips}</div>
+        </div>`;
+    }).join('');
+
+    return `<div class="response-names-grouped">${groups}</div>`;
 }
 
 export function filterResponses(filter) {

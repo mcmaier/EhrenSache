@@ -113,3 +113,24 @@
 .response-chip-group--lg { gap: 8px; flex-wrap: wrap; }
 .response-chip-group--lg .response-chip { font-size: 0.95em; padding: 4px 10px; gap: 5px; }
 .response-chip__label { font-weight: 600; }
+
+/* Terminrueckmeldung (FI-1): Namens-Chips "Wer hat geantwortet?" (Mitgliedsansicht,
+   namesListHtml() in responses.js). Getoenter Hintergrund plus farbiger linker
+   Rand, Icon-Praefix im Chiptext sorgt dafuer, dass der Status nicht allein an
+   der Farbe haengt -- wie response-name-chip in der PWA (checkin/css/style.css). */
+.response-name-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px 3px 7px;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--border-light);
+    background: var(--bg-gray);
+    color: var(--text-medium);
+    font-size: 0.85em;
+}
+
+.response-name-chip--yes   { background: color-mix(in srgb, var(--success-color) 15%, transparent); border-left-color: var(--success-color); color: var(--success-color); }
+.response-name-chip--maybe { background: color-mix(in srgb, var(--warning-color) 15%, transparent); border-left-color: var(--warning-color); color: var(--warning-color); }
+.response-name-chip--no    { background: color-mix(in srgb, var(--danger-color) 15%, transparent);  border-left-color: var(--danger-color);  color: var(--danger-color); }
+.response-name-chip--open  { background: var(--bg-gray); border-left-color: var(--border-light); color: var(--text-light); }
