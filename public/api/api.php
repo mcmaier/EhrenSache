@@ -80,6 +80,7 @@ require_once '../../private/handlers/work_sessions.php';
 require_once '../../private/handlers/station.php';
 require_once '../../private/helpers/update_status.php';
 require_once '../../private/handlers/update_check.php';
+require_once '../../private/handlers/appointment_responses.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -575,6 +576,9 @@ try {
         break;        
     case 'appointment_types':
         handleAppointmentTypes($db, $database, $request_method, $id);
+        break;
+    case 'appointment_responses':
+        handleAppointmentResponses($db, $database, $request_method, $authUserId, $authUserRole, $authMemberId);
         break;
     case 'activity_types':
         handleActivityTypes($db, $database, $request_method, $id);

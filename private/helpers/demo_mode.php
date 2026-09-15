@@ -43,6 +43,7 @@ const DEMO_WRITE_ALLOWED = [
     'appointments'      => ['POST', 'PUT', 'DELETE'],
     'records'           => ['POST', 'PUT', 'DELETE'],
     'exceptions'        => ['POST', 'PUT', 'DELETE'],
+    'appointment_responses' => ['PUT', 'DELETE'],
     'work_sessions'     => ['POST', 'PUT', 'DELETE'],
     'activity_types'    => ['POST', 'PUT', 'DELETE'],
     'membership_dates'  => ['POST', 'PUT', 'DELETE'],

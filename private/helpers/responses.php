@@ -272,3 +272,115 @@ function responseTypeSettings(object $data, array $current): array
 
     return $out;
 }
+
+// ---- holend ----------------------------------------------------------------
+
+/** Termin mit den Einstellungen seiner Terminart, oder null. */
+function responsesFetchAppointment($db, $database, int $appointmentId): ?array
+{
+    $prefix = $database->table('');
+    $stmt = $db->prepare("
+        SELECT a.appointment_id, a.title, a.date, a.start_time, a.type_id,
+               t.type_name, t.color,
+               COALESCE(t.responses_enabled, 0)        AS responses_enabled,
+               COALESCE(t.responses_names_visible, 0)  AS responses_names_visible,
+               COALESCE(t.responses_require_excuse, 0) AS responses_require_excuse,
+               t.response_deadline_hours
+        FROM {$prefix}appointments a
+        LEFT JOIN {$prefix}appointment_types t ON t.type_id = a.type_id
+        WHERE a.appointment_id = ?
+    ");
+    $stmt->execute([$appointmentId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row === false ? null : $row;
+}
+
+/**
+ * Erwartete Mitglieder: Terminart -> Gruppe -> Mitglied, aktiv am Termindatum.
+ * Derselbe Weg wie punctualityScope(). Ein Mitglied in zwei Gruppen kommt
+ * zweimal -- entdoppelt wird mit responsesDedupeExpected().
+ */
+function responsesFetchExpected($db, $database, int $appointmentId): array
+{
+    $prefix   = $database->table('');
+    $activity = getMemberActivityWhere('m', 'a.date');
+
+    $stmt = $db->prepare("
+        SELECT m.member_id, m.name, m.surname, g.group_id, g.group_name
+        FROM {$prefix}appointments a
+        JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
+        JOIN {$prefix}member_group_assignments mga ON mga.group_id = atg.group_id
+        JOIN {$prefix}member_groups g ON g.group_id = mga.group_id
+        JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activity}
+        WHERE a.appointment_id = ?
+        ORDER BY g.group_name, m.surname, m.name
+    ");
+    $stmt->execute([$appointmentId]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Antworten eines Termins, member_id => Zeile, mit dem Status des verknuepften Antrags.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function responsesFetchForAppointment($db, $database, int $appointmentId): array
+{
+    $prefix = $database->table('');
+    $stmt = $db->prepare("
+        SELECT r.member_id, r.status, r.comment, r.status_changed_at, r.updated_at,
+               r.exception_id, e.status AS excuse_state
+        FROM {$prefix}appointment_responses r
+        LEFT JOIN {$prefix}exceptions e ON e.exception_id = r.exception_id
+        WHERE r.appointment_id = ?
+    ");
+    $stmt->execute([$appointmentId]);
+
+    $out = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $out[(int) $row['member_id']] = $row;
+    }
+
+    return $out;
+}
+
+/** @return array<int, int> */
+function responsesFetchPresentMemberIds($db, $database, int $appointmentId): array
+{
+    $prefix = $database->table('');
+    $stmt = $db->prepare("SELECT DISTINCT member_id FROM {$prefix}records
+                          WHERE appointment_id = ? AND status = 'present'");
+    $stmt->execute([$appointmentId]);
+
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/**
+ * Kommende Termine mit Rueckmeldung, zu denen das Mitglied erwartet ist.
+ * Begrenzt auf 50: Die Liste ist zum Antworten da, nicht als Jahresplan.
+ *
+ * @return array<int, int>
+ */
+function responsesFetchUpcomingIds($db, $database, int $memberId, string $now): array
+{
+    $prefix   = $database->table('');
+    $activity = getMemberActivityWhere('m', 'a.date');
+
+    $stmt = $db->prepare("
+        SELECT DISTINCT a.appointment_id, a.date, a.start_time
+        FROM {$prefix}appointments a
+        JOIN {$prefix}appointment_types t ON t.type_id = a.type_id AND t.responses_enabled = 1
+        JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
+        JOIN {$prefix}member_group_assignments mga
+             ON mga.group_id = atg.group_id AND mga.member_id = ?
+        JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activity}
+        WHERE CONCAT(a.date, ' ', a.start_time) > ?
+        ORDER BY a.date, a.start_time
+        LIMIT 50
+    ");
+    $stmt->execute([$memberId, $now]);
+
+    return array_map(static fn ($r) => (int) $r['appointment_id'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+}

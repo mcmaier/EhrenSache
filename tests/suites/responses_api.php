@@ -274,3 +274,86 @@ test('settings: Frist ausserhalb 0..720 wird abgewiesen', function () {
             'body' => ['setting_key' => 'response_deadline_hours', 'setting_value' => $vorher]]));
     }
 });
+
+// ---- appointment_responses: Lesen -----------------------------------------
+
+function rsGet(string $role, array $query): array
+{
+    return apiRequest('GET', 'appointment_responses', ['token' => apiToken($role), 'query' => $query]);
+}
+
+test('appointment_responses: unbekannte Ressource ist es nicht mehr, auch nicht im Demo-Modus', function () {
+    $res = rsGet('admin', ['appointment_id' => 999999999]);
+    assertStatus(404, $res, 'Ein unbekannter Termin ist 404, nicht "unbekannte Ressource"');
+});
+
+test('appointment_responses: Terminart ohne Rueckmeldung ist 409', function () {
+    $welt = rsWorld('Aus');
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+        assertStatus(409, rsGet('admin', ['appointment_id' => $apt]));
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('appointment_responses: Mitglied ausserhalb der Gruppen bekommt 403', function () {
+    $welt = rsWorld('Fremd', ['responses_enabled' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+        assertStatus(403, rsGet('user', ['appointment_id' => $apt]));
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('appointment_responses: Verwalter sieht alle Erwarteten, Mitglied ohne Freigabe nur Summen', function () {
+    $welt = rsWorld('Sicht', ['responses_enabled' => 1, 'response_deadline_hours' => 24]);
+    try {
+        $tag = rsDateInDays(3);
+        $apt = rsAppointment($welt, $tag, '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt, $welt, $tag) {
+            $admin = rsGet('manager', ['appointment_id' => $apt]);
+            assertStatus(200, $admin);
+            assertSame(['yes' => 0, 'no' => 0, 'maybe' => 0, 'open' => 2], $admin['body']['summary']);
+            assertSame(2, count($admin['body']['members']));
+            assertSame(false, $admin['body']['started']);
+            assertTrue(!array_key_exists('comparison', $admin['body']), 'Vor Beginn keine Gegenueberstellung');
+            assertSame(date('Y-m-d', strtotime("{$tag} -1 day")) . ' 19:00:00', $admin['body']['settings']['deadline']);
+
+            $user = rsGet('user', ['appointment_id' => $apt]);
+            assertStatus(200, $user);
+            assertSame(true, $user['body']['expected']);
+            assertSame(null, $user['body']['own']);
+            assertTrue(!array_key_exists('members', $user['body']), 'Ohne Freigabe keine Namen');
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('appointment_responses: upcoming listet nur Termine mit Rueckmeldung, zu denen man erwartet ist', function () {
+    $mit  = rsWorld('UpMit', ['responses_enabled' => 1]);
+    $ohne = rsWorld('UpOhne');
+    try {
+        $kommend  = rsAppointment($mit, rsDateInDays(4), '19:00:00');
+        $vorbei   = rsAppointment($mit, rsDateInDays(-4), '19:00:00');
+        $ohneRm   = rsAppointment($ohne, rsDateInDays(4), '19:00:00');
+
+        rsWithUserInWorld($mit, function () use ($ohne, $kommend, $vorbei, $ohneRm) {
+            rsWithUserInWorld($ohne, function () use ($kommend, $vorbei, $ohneRm) {
+                $res = rsGet('user', ['upcoming' => 1]);
+                assertStatus(200, $res);
+                $ids = array_map(static fn ($i) => (int) $i['appointment']['appointment_id'], $res['body']['appointments']);
+
+                assertTrue(in_array($kommend, $ids, true), 'Kommender Termin fehlt');
+                assertTrue(!in_array($vorbei, $ids, true), 'Vergangener Termin gehoert nicht hinein');
+                assertTrue(!in_array($ohneRm, $ids, true), 'Terminart ohne Rueckmeldung gehoert nicht hinein');
+            });
+        });
+    } finally {
+        rsDropWorld($mit);
+        rsDropWorld($ohne);
+    }
+});
