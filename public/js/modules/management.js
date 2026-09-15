@@ -303,6 +303,37 @@ async function loadTypeGroup(typeId) {
 }
 
 // ============================================
+// TYPES - Rueckmeldung (FI-1)
+// ============================================
+
+/** Die drei abhaengigen Felder wirken nur bei eingeschalteter Rueckmeldung. */
+export function toggleTypeResponseFields() {
+    const enabled = document.getElementById('type_responses_enabled').checked;
+    const dependent = document.getElementById('typeResponseDependent');
+
+    dependent.classList.toggle('is-disabled', !enabled);
+    dependent.querySelectorAll('input').forEach(input => { input.disabled = !enabled; });
+}
+
+/** Platzhalter der Frist mit dem aktuell gueltigen globalen Wert. */
+async function setDeadlinePlaceholder() {
+    const input = document.getElementById('type_response_deadline_hours');
+    const result = await apiCall('settings');
+    const setting = result?.settings?.find(s => s.setting_key === 'response_deadline_hours');
+    input.placeholder = setting ? `global (${setting.setting_value} h)` : 'global';
+}
+
+function fillTypeResponseFields(type) {
+    document.getElementById('type_responses_enabled').checked = Number(type?.responses_enabled) === 1;
+    document.getElementById('type_responses_names_visible').checked = Number(type?.responses_names_visible) === 1;
+    document.getElementById('type_responses_require_excuse').checked = Number(type?.responses_require_excuse) === 1;
+    document.getElementById('type_response_deadline_hours').value =
+        type?.response_deadline_hours === null || type?.response_deadline_hours === undefined
+            ? '' : type.response_deadline_hours;
+    toggleTypeResponseFields();
+}
+
+// ============================================
 // TYPES - Modal Functions
 // ============================================
 
@@ -328,9 +359,11 @@ export async function openTypeModal(typeId = null) {
         document.getElementById('type_is_default').checked = false;
         document.getElementById('type_color').value = '#667eea';
         renderTypeGroups([]);
+        fillTypeResponseFields(null);
         updateModalId('typeModal', null);
     }
-    
+
+    setDeadlinePlaceholder();
     modal.classList.add('active');
 }
 
@@ -351,6 +384,7 @@ async function loadTypeData(typeId) {
         document.getElementById('type_is_default').checked = type.is_default == 1;
         
         renderTypeGroups(type.groups || []);
+        fillTypeResponseFields(type);
     }
 }
 
@@ -408,13 +442,23 @@ export async function saveType() {
         }
     }
     
+    const deadlineRaw = document.getElementById('type_response_deadline_hours').value.trim();
+    if (deadlineRaw !== '' && (!/^\d+$/.test(deadlineRaw) || Number(deadlineRaw) > 720)) {
+        showToast('Die Frist muss leer oder eine ganze Zahl von 0 bis 720 sein', 'warning');
+        return;
+    }
+
     const typeId = document.getElementById('type_id').value;
     const data = {
         type_name: document.getElementById('type_name').value,
         description: document.getElementById('type_description').value || null,
         color: document.getElementById('type_color').value,
         is_default: isDefault,
-        group_ids: groupIds
+        group_ids: groupIds,
+        responses_enabled: document.getElementById('type_responses_enabled').checked,
+        responses_names_visible: document.getElementById('type_responses_names_visible').checked,
+        responses_require_excuse: document.getElementById('type_responses_require_excuse').checked,
+        response_deadline_hours: deadlineRaw === '' ? null : Number(deadlineRaw)
     };
     
     let result;
@@ -467,3 +511,4 @@ window.openTypeModal = openTypeModal;
 window.closeTypeModal = closeTypeModal;
 window.saveType = saveType;
 window.deleteType = deleteType;
+window.toggleTypeResponseFields = toggleTypeResponseFields;

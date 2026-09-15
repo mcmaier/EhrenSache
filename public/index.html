@@ -1994,6 +1994,44 @@
                             <!-- Wird dynamisch gefüllt -->
                         </div>
                     </div>
+                    <fieldset class="form-group response-settings">
+                        <legend>Rückmeldung</legend>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="type_responses_enabled" onchange="toggleTypeResponseFields()">
+                            Rückmeldung erbeten
+                        </label>
+                        <small class="input-hint">
+                            Mitglieder sagen vor Terminen dieser Art zu, ab oder „unsicher“.
+                            Für die wöchentliche Probe meist nicht nötig.
+                        </small>
+
+                        <div id="typeResponseDependent" class="response-settings__dependent">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="type_responses_names_visible">
+                                Namen für Mitglieder sichtbar
+                            </label>
+                            <small class="input-hint">
+                                Mitglieder sehen, wer wie geantwortet hat — Bemerkungen nie.
+                                Vorher <code>DATENSCHUTZ.md</code>, Abschnitt 12 lesen.
+                            </small>
+
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="type_responses_require_excuse">
+                                Absage braucht Entschuldigung
+                            </label>
+                            <small class="input-hint">
+                                Eine Absage verlangt eine Begründung und wird als Abwesenheitsantrag
+                                zur Freigabe eingereicht.
+                            </small>
+
+                            <label for="type_response_deadline_hours">Frist (Stunden vor Beginn)</label>
+                            <input type="number" id="type_response_deadline_hours" min="0" max="720" step="1"
+                                   placeholder="global">
+                            <small class="input-hint">
+                                Leer = globale Frist aus den Einstellungen. Eine Absage danach gilt als kurzfristig.
+                            </small>
+                        </div>
+                    </fieldset>
                 </form>
             </div>
             <div class="modal-footer">
