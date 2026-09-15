@@ -25,6 +25,11 @@ test('responseHoursFromRaw lehnt alles andere ab', function () {
     assertSame(null, responseHoursFromRaw('24 Stunden'));
 });
 
+test('responseHoursFromRaw trimmt umschliessenden Leerraum, aber nicht innenliegenden', function () {
+    assertSame(null, responseHoursFromRaw('2 4'));
+    assertSame(48,   responseHoursFromRaw(' 48 '));
+});
+
 test('responseDeadlineHours: die Terminart ueberschreibt die globale Frist', function () {
     assertSame(168, responseDeadlineHours('168', '24'));
     assertSame(0,   responseDeadlineHours(0, '24'), '0 ist ein Wert, nicht leer');
@@ -42,6 +47,10 @@ test('responseDeadline rechnet in Wanduhrzeit, auch ueber die Zeitumstellung', f
     // 25.10.2026 ist Umstellung auf Winterzeit. MySQL DATE_SUB auf DATETIME
     // kennt keine Zeitzone -- PHP muss dasselbe Ergebnis liefern.
     assertSame('2026-10-24 19:00:00', responseDeadline('2026-10-25', '19:00:00', 24));
+});
+
+test('responseDeadline: negative Stunden werden auf 0 gekappt', function () {
+    assertSame('2026-09-19 19:30:00', responseDeadline('2026-09-19', '19:30:00', -5));
 });
 
 test('responseIsLate: genau auf der Frist ist rechtzeitig', function () {
@@ -105,6 +114,13 @@ test('responseExcuseAction: Zusage oder Ruecknahme loescht nur einen offenen Ant
     assertSame('none',   responseExcuseAction(true, 'yes', 'maybe', null, false));
 });
 
+test('responseExcuseAction: weitere Randfaelle', function () {
+    // Der verknuepfte Antrag wurde zwischenzeitlich geloescht -- neue Absage legt neu an.
+    assertSame('create', responseExcuseAction(true, 'no', 'no', null, false));
+    // Erste Absage nach einer Vielleicht-Antwort, Mitglied hat schon einen eigenen Antrag.
+    assertSame('link', responseExcuseAction(true, 'maybe', 'no', null, true));
+});
+
 // ---- Summen und Gegenueberstellung ------------------------------------------
 
 test('responseSummary zaehlt nur erwartete Mitglieder, offen = ohne Antwort', function () {
@@ -132,6 +148,18 @@ test('responseComparison ordnet jedes erwartete Mitglied genau einem Feld zu', f
     assertSame([],  $felder['maybe_absent']);
     assertSame([6], $felder['none_present']);
     assertSame([7], $felder['none_absent']);
+});
+
+test('responseComparison: ein Status ausserhalb RESPONSE_STATUSES faellt auf none', function () {
+    $felder = responseComparison([1], [1 => 'bogus'], []);
+
+    assertSame([1], $felder['none_absent']);
+    assertSame(
+        ['yes_present', 'yes_absent', 'no_present', 'no_absent',
+         'maybe_present', 'maybe_absent', 'none_present', 'none_absent'],
+        array_keys($felder),
+        'kein zusaetzliches Feld bogus_absent'
+    );
 });
 
 test('responsesDedupeExpected behaelt die erste Zeile je Mitglied', function () {
@@ -164,4 +192,15 @@ test('responseTypeSettings uebernimmt nur mitgeschickte Felder', function () {
 test('responseTypeSettings wirft bei ungueltiger Frist', function () {
     assertThrows(fn () => responseTypeSettings((object) ['response_deadline_hours' => 721], RESPONSE_TYPE_DEFAULTS));
     assertThrows(fn () => responseTypeSettings((object) ['response_deadline_hours' => 2.5], RESPONSE_TYPE_DEFAULTS));
+});
+
+test('responseTypeSettings: der String \'false\' schaltet ein Flag aus', function () {
+    $neu = responseTypeSettings((object) ['responses_enabled' => 'false'], RESPONSE_TYPE_DEFAULTS);
+    assertSame(0, $neu['responses_enabled']);
+
+    $neu = responseTypeSettings((object) ['responses_enabled' => true], RESPONSE_TYPE_DEFAULTS);
+    assertSame(1, $neu['responses_enabled']);
+
+    $neu = responseTypeSettings((object) ['responses_enabled' => '1'], RESPONSE_TYPE_DEFAULTS);
+    assertSame(1, $neu['responses_enabled']);
 });

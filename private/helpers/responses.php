@@ -49,8 +49,8 @@ function responseHoursFromRaw(mixed $raw): ?int
 {
     if (is_int($raw)) {
         $value = $raw;
-    } elseif (is_string($raw) && preg_match('/^\d+$/', $raw) === 1) {
-        $value = (int) $raw;
+    } elseif (is_string($raw) && preg_match('/^\d+\z/', trim($raw)) === 1) {
+        $value = (int) trim($raw);
     } else {
         return null;
     }
@@ -79,18 +79,29 @@ function responseDeadlineHours(mixed $typeHours, string $globalRaw): int
 function responseDeadline(string $date, string $startTime, int $hours): string
 {
     $utc = new DateTimeZone('UTC');
+    $hours = max(0, $hours);
 
     return (new DateTimeImmutable("{$date} {$startTime}", $utc))
         ->modify("-{$hours} hours")
         ->format('Y-m-d H:i:s');
 }
 
-/** Beide Werte als 'Y-m-d H:i:s' -- der Textvergleich ist dann chronologisch. */
+/**
+ * Beide Werte als 'Y-m-d H:i:s' -- der Textvergleich ist dann chronologisch.
+ *
+ * $statusChangedAt ist lokale Wanduhrzeit, wie sie date('Y-m-d H:i:s') liefert
+ * -- das UTC in responseDeadline() ist nur ein Rechenhilfsmittel, keine
+ * eigene Zeitbasis.
+ */
 function responseIsLate(string $statusChangedAt, string $deadline): bool
 {
     return $statusChangedAt > $deadline;
 }
 
+/**
+ * $now ist lokale Wanduhrzeit, wie sie date('Y-m-d H:i:s') liefert -- das UTC
+ * in responseDeadline() ist nur ein Rechenhilfsmittel, keine eigene Zeitbasis.
+ */
 function responseHasStarted(string $date, string $startTime, string $now): bool
 {
     return $now >= "{$date} {$startTime}";
@@ -192,7 +203,10 @@ function responseComparison(array $expectedMemberIds, array $statusByMember, arr
     $present = array_flip($presentMemberIds);
 
     foreach (array_unique($expectedMemberIds) as $memberId) {
-        $status = $statusByMember[$memberId] ?? 'none';
+        $status = $statusByMember[$memberId] ?? null;
+        if (!in_array($status, RESPONSE_STATUSES, true)) {
+            $status = 'none';
+        }
         $fields[$status . (isset($present[$memberId]) ? '_present' : '_absent')][] = $memberId;
     }
 
@@ -236,7 +250,7 @@ function responseTypeSettings(object $data, array $current): array
 
     foreach (['responses_enabled', 'responses_names_visible', 'responses_require_excuse'] as $flag) {
         if (property_exists($data, $flag)) {
-            $out[$flag] = !empty($data->$flag) ? 1 : 0;
+            $out[$flag] = filter_var($data->$flag, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
         }
     }
 
