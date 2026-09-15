@@ -2174,3 +2174,29 @@ Verbindungsparameter bei PDO).
 
 **Nicht sicherheitsrelevant:** keine Rechteausweitung, kein zusätzlicher Datenabfluss — im
 schlechtesten Fall eine falsch eingeordnete Frist, kein Zugriff auf fremde Daten.
+
+---
+
+### OI-61 · Terminrückmeldung: Einstellungen der Terminart wirken rückwirkend auf die Zuverlässigkeit
+**Priorität:** niedrig — bewusst so entschieden am 2026-09-15
+
+`responseDeadlineHours()` und `responses_enabled` (`private/helpers/responses.php`,
+`reliabilityFetchPairs()`) lesen die Einstellungen der Terminart zum Zeitpunkt der Auswertung, nicht
+als Schnappschuss je Termin. Ändert der Admin sie später — etwa schaltet er Rückmeldungen für eine
+Terminart erst nachträglich ein oder verschiebt die Frist —, wertet das auch **vergangene** Termine
+neu aus. Die Zuverlässigkeit eines Mitglieds für einen bereits gelaufenen Termin kann sich dadurch
+nachträglich verschieben, ohne dass sich am tatsächlichen Verhalten des Mitglieds etwas geändert
+hätte.
+
+Entschieden wurde, das bewusst in Kauf zu nehmen (Spec
+`2026-09-14-terminrueckmeldung-design.md`, Abschnitt 3.5):
+
+- Die Kennzahl ist ab Werk aus (`reliability_enabled`, seit 1.5.1) und wird nur bewusst
+  eingeschaltet — wer sie nutzt, sieht auch, wenn sich ihre Grundlage ändert.
+- Terminarten ändern sich in der Praxis selten, meist einmalig beim Einrichten.
+- Ein Schnappschuss je Termin würde das nachträgliche Bearbeiten einer Terminart verkomplizieren
+  (welcher Termin bekäme welchen Stand der Einstellungen?), ohne dass dafür bisher ein Bedarf
+  erkennbar wäre.
+
+**Nicht sicherheitsrelevant:** keine Rechteausweitung, kein zusätzlicher Datenabfluss — im
+schlechtesten Fall eine nachträglich verschobene Kennzahl.

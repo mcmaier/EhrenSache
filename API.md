@@ -1209,10 +1209,25 @@ Bemerkung danach leer. Antwort wie „Ein Termin", `own` ist die gespeicherte An
 
 Admin und Manager tragen mit `&member_id=7` für ein Mitglied ein, auch nach Beginn.
 
-**Entschuldigungspflicht** (`require_excuse`): Eine Absage braucht `comment` und legt einen
-Abwesenheitsantrag (`exceptions`, `pending`) an. Hat das Mitglied schon einen eigenen offenen oder
-genehmigten Antrag zum Termin, wird dieser verknüpft. Eine spätere Zusage löscht einen noch offenen
-Antrag; ein entschiedener bleibt.
+**Entschuldigungspflicht** (`require_excuse`): Ein echter Wechsel auf `no` (der vorherige Status war
+nicht schon `no`) braucht `comment` und legt einen Abwesenheitsantrag (`exceptions`, `pending`) an.
+Hat das Mitglied schon einen eigenen offenen oder genehmigten Antrag zum Termin — etwa direkt über
+`exceptions` gestellt —, wird dieser nur **verknüpft**, statt einen zweiten anzulegen.
+
+Ob der verknüpfte Antrag der Rückmeldung „gehört", entscheidet, was mit ihm geschieht:
+
+- **Von der Rückmeldung selbst angelegt:** Eine spätere Bemerkungsänderung bei weiterhin `no` zieht
+  `reason` mit (solange der Antrag noch `pending` ist); eine Zusage oder Rücknahme löscht ihn, wenn
+  er noch `pending` ist. Ein genehmigter oder abgelehnter Antrag bleibt in jedem Fall bestehen.
+- **Nur verknüpft** (eigenständig über `exceptions` gestellt): Er bleibt immer unverändert — weder
+  eine geänderte Bemerkung noch eine Zusage wirkt sich auf ihn aus. Er gehört dem Mitglied, nicht
+  der Rückmeldung (Entscheidung 3b, Spec `2026-09-14-terminrueckmeldung-design.md` Abschnitt 5.4).
+
+Ein neuer Antrag entsteht **nur bei einem echten Statuswechsel auf `no`**, nie bei einer reinen
+Bemerkungsänderung während der Status schon `no` ist (Entscheidung 4b) — das greift insbesondere,
+wenn ein Verwalter einen zuvor erzeugten Antrag direkt über `exceptions` löscht: Die Rückmeldung
+bleibt danach bei `no` stehen, `excuse_state` wird `null`, aber erst ein echter Wechsel (z. B. über
+`yes` und zurück auf `no`) legt wieder einen Antrag an.
 
 Schreibzugriffe auf denselben Termin sind serialisiert (Zeilensperre auf den Termin) — zwei
 gleichzeitige Erstantworten laufen damit nacheinander statt in einen Deadlock.
@@ -1220,7 +1235,8 @@ gleichzeitige Erstantworten laufen damit nacheinander statt in einen Deadlock.
 ### Zurücknehmen
 **Endpoint:** `DELETE /api.php?resource=appointment_responses&appointment_id=42[&member_id=7]`
 
-Löscht die Antwort und einen verknüpften offenen Antrag. Rechte wie beim PUT.
+Löscht die Antwort und einen offenen, **von der Rückmeldung selbst angelegten** Antrag. Ein nur
+verknüpfter Antrag bleibt bestehen (Entscheidung 3b). Rechte wie beim PUT.
 
 ### Fehler
 

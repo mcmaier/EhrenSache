@@ -30,6 +30,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   bis 14 heißen jetzt 13 bis 15.
 - **Demo:** Auftritte fragen Rückmeldungen ab, dazu ein kommendes Konzert. Der Generator verlangt
   Schemastand 1.7.0.
+- `mbstring` ist jetzt eine geprüfte Anforderung (war bereits für den Kiosk nötig).
 
 ---
 

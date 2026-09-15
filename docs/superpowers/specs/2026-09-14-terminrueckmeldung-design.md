@@ -8,6 +8,7 @@
 **Zielversion:** **1.7.0**, Migration `1.6.1.php` (1.6.1 → 1.7.0)
 **Voraussetzung:** Der parallel vorbereitete Stand **1.6.1** ist auf `dev` gemergt, einschließlich
 seines Manifest-Eintrags 1.6.0 → 1.6.1. Vorher wird der Eintrag dieses Vorhabens nicht angehängt.
+**Präzisiert am 2026-09-15:** 3.5, 4.1, 5.4 (Entscheidungen nach Umsetzung)
 
 ---
 
@@ -86,6 +87,16 @@ doch als rechtzeitig zählen. Deshalb: **Hat die Terminart `responses_enabled`, 
 Antrag gleichermaßen die Frist maßgeblich.** Bei Terminarten ohne Rückmeldung bleibt die Regel aus
 1.5.1 („vor Beginn“) unverändert.
 
+**Rückwirkung, bewusst:** `responses_enabled` und die Frist werden zum Auswertungszeitpunkt aus
+der Terminart gelesen, nicht als Schnappschuss je Termin gespeichert. Ändert der Admin diese
+Einstellungen später, wertet das auch **vergangene** Termine rückwirkend neu aus — die
+Zuverlässigkeit eines Mitglieds für einen bereits gelaufenen Termin kann sich also nachträglich
+verschieben. Das ist gewollt in Kauf genommen: Die Kennzahl ist ab Werk aus (`reliability_enabled`,
+1.5.1) und wird nur bewusst eingeschaltet; Terminarten ändern sich in der Praxis selten, meist
+einmalig beim Einrichten; und ein Schnappschuss je Termin würde das nachträgliche Bearbeiten einer
+Terminart verkomplizieren (welcher Termin bekäme welchen Stand?), ohne einen erkennbaren Bedarf zu
+bedienen. Siehe `docs/OPEN-ITEMS.md`.
+
 ### 3.6 Namen sieht, wer planen muss — Mitglieder nur, wenn die Terminart es freigibt
 
 Admin und Manager sehen alle Antworten mit Bemerkung. Mitglieder sehen die eigene Antwort und die
@@ -132,6 +143,7 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_responses` (
   status            ENUM('yes','no','maybe') NOT NULL,
   comment           VARCHAR(255) DEFAULT NULL,
   exception_id      INT DEFAULT NULL,
+  exception_created TINYINT(1) NOT NULL DEFAULT 0,
   status_changed_at DATETIME NOT NULL,
   updated_at        DATETIME NOT NULL,
   UNIQUE KEY uq_response (appointment_id, member_id),
@@ -147,6 +159,12 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_responses` (
 
 Zeitstempel werden von PHP gesetzt (`DATETIME`, keine `ON UPDATE`-Automatik), damit
 `status_changed_at` nur beim Statuswechsel wandert.
+
+**`exception_created`** (ergänzt am 2026-09-15, Entscheidung 3b): 1, wenn der verknüpfte
+`exceptions`-Eintrag von der Rückmeldung selbst angelegt wurde; 0, wenn er nur verknüpft ist — ein
+Antrag, den das Mitglied unabhängig über `exceptions` gestellt hat. Nur mit 1 darf die Rückmeldung
+den Antrag später ändern (Bemerkung mitziehen) oder löschen; ein nur verknüpfter Antrag gehört dem
+Mitglied und bleibt in beiden Fällen unangetastet. Siehe 5.4.
 
 Vor dem Anlegen der Fremdschlüssel prüft die Migration, dass `appointments`, `members` und
 `exceptions` InnoDB sind und die referenzierten Spalten denselben Typ haben; scheitert das, wird
@@ -213,16 +231,28 @@ Genau auf der Frist gilt als rechtzeitig. `is_late` wird serverseitig berechnet 
 
 Hat die Terminart `responses_require_excuse`:
 
-- **Wechsel auf `no`:** `comment` ist Pflicht (sonst `422`). Es entsteht ein `exceptions`-Eintrag
-  `absence`, `status = 'pending'`, `reason = comment`, `created_by` = handelnder Nutzer; seine ID
-  steht in `appointment_responses.exception_id`.
-- **Bemerkung einer bestehenden Absage geändert:** Ist der Antrag noch `pending`, wird `reason`
-  mitgezogen; sonst bleibt der Antrag unverändert.
-- **Wechsel von `no` auf `yes`/`maybe` oder Rücknahme:** Ein `pending`-Antrag wird gelöscht. Ein
-  genehmigter oder abgelehnter bleibt bestehen; die Antwort liefert `excuse_state` mit, und die
-  Detailansicht des Verwalters zeigt einen Hinweis.
-- Hat ein Mitglied bereits vorher einen eigenen `absence`-Antrag zum Termin gestellt, wird kein
-  zweiter angelegt; dieser wird verknüpft.
+- **Echter Wechsel auf `no`** (der vorherige Status war nicht schon `no`, siehe Entscheidung 4b
+  unten)**:** `comment` ist Pflicht (sonst `422`). Hat das Mitglied bereits vorher einen eigenen,
+  nicht abgelehnten `absence`-Antrag zum Termin gestellt (z. B. direkt über `exceptions`), wird
+  kein zweiter angelegt — dieser wird nur **verknüpft**. Sonst entsteht ein neuer
+  `exceptions`-Eintrag `absence`, `status = 'pending'`, `reason = comment`, `created_by` =
+  handelnder Nutzer; seine ID steht in `appointment_responses.exception_id`.
+- **Bemerkung einer bestehenden Absage geändert, Status bleibt `no`:** Nur wenn der verknüpfte
+  Antrag **von der Rückmeldung selbst angelegt** wurde (`exception_created = 1`) und noch `pending`
+  ist, wird `reason` mitgezogen. Ein nur verknüpfter Antrag (`exception_created = 0`) bleibt immer
+  unverändert, auch wenn er noch `pending` ist — er gehört dem Mitglied, nicht der Rückmeldung
+  (**Entscheidung 3b**, ergänzt am 2026-09-15).
+- **Wechsel von `no` auf `yes`/`maybe` oder Rücknahme:** Ein `pending`-Antrag wird nur gelöscht,
+  wenn ihn die Rückmeldung selbst angelegt hat (`exception_created = 1`); ein nur verknüpfter
+  bleibt bestehen (**Entscheidung 3b**). Ein genehmigter oder abgelehnter bleibt ohnehin immer
+  bestehen; die Antwort liefert `excuse_state` mit, und die Detailansicht des Verwalters zeigt
+  einen Hinweis.
+- **Entscheidung 4b** (ergänzt am 2026-09-15): Ein neuer Antrag entsteht **nur bei einem echten
+  Statuswechsel auf `no`**, nicht bei einer reinen Bemerkungsänderung, während der Status schon
+  `no` ist. Das greift, wenn ein Verwalter den zuvor erzeugten Antrag gelöscht hat
+  (`appointment_responses.exception_id` steht dann per Fremdschlüssel wieder auf `NULL`) und das
+  Mitglied danach nur die Bemerkung ändert: Ohne diese Regel würde jede solche Änderung
+  stillschweigend einen neuen Antrag anlegen.
 
 Ohne Entschuldigungspflicht entsteht nie ein Antrag.
 

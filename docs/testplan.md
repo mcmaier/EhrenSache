@@ -1169,3 +1169,6 @@ Automatisiert: `php tests/run.php responses_unit`, `responses_api`, `responses_f
 | RM-16 | Zuverlässigkeit eingeschaltet, Mitglied sagt vor der Frist ab und kommt nicht | Statistik der Person: als rechtzeitig abgemeldet gezählt |
 | RM-17 | Selbstauskunft als Mitglied, CSV | Abschnitt „TERMINRÜCKMELDUNGEN" mit den eigenen Antworten |
 | RM-18 | Update von 1.6.1 über den Assistenten | Log nennt vier Spalten, Tabelle, drei Fremdschlüssel, Einstellung; zweiter Lauf ohne Fehler |
+| RM-19 | Eigenständig über „Anträge" gestellten Antrag zum Termin verknüpfen: Absage mit Bemerkung, dann Bemerkung ändern, dann Zusage | Bemerkungsänderung ändert die Begründung des Antrags nicht; Zusage löscht den Antrag nicht — er bleibt offen |
+| RM-20 | Admin löscht einen von der Rückmeldung erzeugten Antrag unter „Anträge"; danach nur die Bemerkung zur Absage ändern; danach Zusage, dann erneut Absage mit Bemerkung | Bemerkungsänderung legt keinen neuen Antrag an; nach dem Wechsel Zusage → Absage entsteht ein neuer, offener Antrag |
+| RM-21 | Entschuldigungspflicht nachträglich für eine Terminart ausschalten, die bereits offene Anträge aus Absagen hat | Die bestehenden Anträge bleiben verknüpft und offen, sichtbar unter „Anträge"; keine automatische Änderung |
