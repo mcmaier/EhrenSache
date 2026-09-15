@@ -114,8 +114,19 @@ function punctualityBuild(array $measurements, int $totalCount, int $graceMinute
  *     eines Anrufs weiss das System nichts
  *  4. sonst ausgefallen
  *
+ * Bei Terminarten mit Rueckmeldung (`responses_enabled`) gilt statt des
+ * Beginns die Frist (Spec Terminrueckmeldung 5.5):
+ *  1. erschienen -- wie oben
+ *  2. Absage oder Antrag vor der Frist -> excused
+ *  3. Absage oder Antrag, aber erst nach der Frist -> missed
+ *  4. sonst zaehlt die Entschuldigung des Verwalters, sonst ausgefallen
+ * Paare ohne diese Schluessel stammen aus Terminarten ohne Rueckmeldung und
+ * laufen nach der Regel oben (1.5.1).
+ *
  * @param array{has_present: int|string, has_excused_record: int|string,
- *              absence_count: int|string, absence_in_time_count: int|string} $pair
+ *              absence_count: int|string, absence_in_time_count: int|string,
+ *              responses_enabled?: int|string, absence_in_deadline_count?: int|string,
+ *              response_no_count?: int|string, response_no_in_time?: int|string} $pair
  * @return 'appeared'|'excused'|'missed'
  */
 function reliabilityOutcome(array $pair): string
