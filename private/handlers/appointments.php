@@ -131,16 +131,27 @@ function handleAppointments($db, $database, $method, $id) {
                 }
 
                 //$stmt = $db->query("SELECT * FROM appointments ORDER BY date DESC, start_time");
-                // Eigene Antwort je Termin: das Mitglied des angemeldeten Kontos,
-                // auch bei Admin und Manager, wenn eines verknuepft ist.
-                $viewerStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
-                $viewerStmt->execute([getCurrentUserId()]);
-                $viewerMemberId = $viewerStmt->fetchColumn();
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                echo json_encode(responsesAttachSummaries(
-                    $db, $database, $stmt->fetchAll(PDO::FETCH_ASSOC),
-                    $viewerMemberId ? (int) $viewerMemberId : null
-                ));
+                // Summen nur bei eingegrenztem Zeitraum anhaengen: Ohne Jahres- oder
+                // Datumsfilter laeuft die Liste ueber die ganze Historie (so ruft die
+                // Check-in-PWA sie mit member_id allein ab) -- dort waeren die je Termin
+                // korrelierten Aktivitaets-Unterabfragen zu teuer. Die PWA holt sich
+                // Rueckmeldungen stattdessen ueber resource=appointment_responses&upcoming=1.
+                if ($year || $from_date || $to_date) {
+                    // Eigene Antwort je Termin: das Mitglied des angemeldeten Kontos,
+                    // auch bei Admin und Manager, wenn eines verknuepft ist.
+                    $viewerStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
+                    $viewerStmt->execute([getCurrentUserId()]);
+                    $viewerMemberId = $viewerStmt->fetchColumn();
+
+                    $rows = responsesAttachSummaries(
+                        $db, $database, $rows,
+                        $viewerMemberId ? (int) $viewerMemberId : null
+                    );
+                }
+
+                echo json_encode($rows);
             }
             break;
             

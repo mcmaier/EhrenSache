@@ -407,6 +407,10 @@ function responsesFetchOneForUpdate($db, $database, int $appointmentId, int $mem
  * Haengt jedem Termin 'responses' an: Summen und eigene Antwort, oder null bei
  * Terminarten ohne Rueckmeldung. Zwei Abfragen fuer die ganze Liste, nicht je Termin.
  *
+ * 'own' bezieht sich immer auf das Mitglied des angemeldeten Kontos, unabhaengig von
+ * einem etwaigen member_id-Filter der Liste, und kann eine Antwort zeigen, die nicht
+ * mehr zaehlt, weil das Mitglied nicht mehr erwartet ist.
+ *
  * @param array<int, array<string, mixed>> $appointments Zeilen mit responses_enabled
  * @return array<int, array<string, mixed>>
  */

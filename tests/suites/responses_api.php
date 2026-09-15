@@ -771,3 +771,70 @@ test('appointments: Liste traegt Summen und die eigene Antwort, ohne Rueckmeldun
         rsDropWorld($ohne);
     }
 });
+
+test('appointments: ohne Datumsfilter bleibt die Liste wie vor der Rueckmeldung, kein Schluessel responses', function () {
+    // Die Check-in-PWA ruft die Liste mit member_id allein ueber die ganze Historie
+    // ab -- dort waeren die je Termin korrelierten Unterabfragen zu teuer, deshalb
+    // bleibt der Schluessel dort ganz weg (nicht etwa null).
+    $welt = rsWorld('OhneJahr', ['responses_enabled' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(5), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt) {
+            $liste = apiRequest('GET', 'appointments', ['token' => apiToken('user'),
+                'query' => ['member_id' => $userMember]]);
+            assertStatus(200, $liste);
+            $zeile = array_values(array_filter($liste['body'],
+                static fn ($r) => (int) $r['appointment_id'] === $apt))[0] ?? null;
+            assertTrue($zeile !== null, 'Termin muss in der ungebundenen Liste stehen');
+            assertTrue(!array_key_exists('responses', $zeile),
+                'Ohne Jahres-/Datumsfilter darf der Schluessel responses gar nicht erst auftauchen');
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('appointments: Antwort eines nicht mehr erwarteten Mitglieds zaehlt nicht mehr mit', function () {
+    // Der Zaehler bildet die aktuell erwarteten Mitglieder ab: Verlaesst ein
+    // Mitglied die Gruppe der Terminart, faellt seine Antwort aus der Summe,
+    // obwohl die Antwort in der Datenbank stehen bleibt.
+    $welt = rsWorld('Austritt', ['responses_enabled' => 1]);
+    $ersatzGruppe = null;
+    try {
+        $tag = rsDateInDays(5);
+        $apt = rsAppointment($welt, $tag, '19:00:00');
+
+        assertStatus(200, rsPut('manager', $apt, ['status' => 'yes'], $welt['member']));
+
+        $leer = apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $welt['member']], 'body' => ['group_ids' => []]]);
+        if ($leer['status'] === 200) {
+            assertSame([], rsMemberGroupIds($welt['member']));
+        } else {
+            // PUT lehnt eine leere Gruppenliste ab -- Ersatzgruppe statt Austritt ins Leere.
+            $ersatzGruppe = rsCreate('member_groups', ['group_name' => 'RS Ersatz ' . uniqid()]);
+            rsSetMemberGroups($welt['member'], [$ersatzGruppe]);
+        }
+
+        $liste = apiRequest('GET', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['year' => substr($tag, 0, 4)]]);
+        assertStatus(200, $liste);
+        $byId = [];
+        foreach ($liste['body'] as $row) {
+            $byId[(int) $row['appointment_id']] = $row;
+        }
+        assertSame(0, $byId[$apt]['responses']['yes'], 'Antwort zaehlt nicht mehr, Mitglied nicht mehr erwartet');
+        assertSame(0, $byId[$apt]['responses']['open']);
+
+        $einzeln = apiRequest('GET', 'appointment_responses', ['token' => apiToken('admin'),
+            'query' => ['appointment_id' => $apt]]);
+        assertStatus(200, $einzeln);
+        assertSame(0, $einzeln['body']['summary']['yes']);
+    } finally {
+        rsDropWorld($welt);
+        if ($ersatzGruppe !== null) {
+            rsDelete('member_groups', $ersatzGruppe);
+        }
+    }
+});
