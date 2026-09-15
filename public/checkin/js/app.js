@@ -3477,6 +3477,21 @@ function pendingStatusFor(id) {
     return responsesPending.get(id) || null;
 }
 
+// Merkt sich, welche "Bemerkung"-Details und welche "Wer hat geantwortet?"-
+// Details offen stehen -- ueberlebt renderResponses(), weil ein Neuaufbau
+// das <details>-Element ersetzt und sein natives "open" damit verliert.
+// Einmal geoeffnet (vom Nutzer oder automatisch) bleibt ein Eintrag hier
+// stehen, bis der Nutzer ihn selbst wieder zuklappt (Toggle-Listener in
+// renderResponses()). Geleert in resetResponsesTab().
+const responsesOpenComments = new Set();
+const responsesOpenNames = new Set();
+
+// Letzter Speicherversuch dieser Karte ist gescheitert -- oeffnet die
+// Bemerkung automatisch, damit die Fehlermeldung nicht hinter einer
+// zugeklappten Karte verschwindet. Wird bei Erfolg wieder geloescht, bei
+// resetResponsesTab() geleert.
+const responsesSaveFailed = new Set();
+
 // Steigt bei jedem resetResponsesTab() (Start und Abmeldung). Eine Antwort von
 // loadResponses(), die noch fuer die vorige Generation unterwegs war, wird
 // verworfen -- sonst zeigt ein neu angemeldetes Konto kurz die Termine des
@@ -3488,6 +3503,9 @@ function resetResponsesTab() {
     upcomingResponses = [];
     responsesInFlight.clear();
     responsesPending.clear();
+    responsesOpenComments.clear();
+    responsesOpenNames.clear();
+    responsesSaveFailed.clear();
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
     if (tab) tab.hidden = true;
     updateResponsesBadge();
@@ -3572,10 +3590,29 @@ function updateResponsesBadge() {
     badge.hidden = open === 0;
 }
 
+// Kurzform ohne Jahr und ohne "Uhr" -- die Karte ist jetzt kompakt, ein
+// Vereinsjahr ist bei einer Rueckmeldung ohnehin immer das laufende.
 function formatResponseDeadline(mysql) {
     const d = new Date(mysql.replace(' ', 'T'));
     const weekday = d.toLocaleDateString('de-DE', { weekday: 'short' });
-    return `${weekday} ${d.toLocaleDateString('de-DE')} ${d.toTimeString().substring(0, 5)} Uhr`;
+    return `${weekday} ${formatDateShortDe(mysql)} ${d.toTimeString().substring(0, 5)}`;
+}
+
+// Kopfzeile der Karte: Wochentag, Datum, Uhrzeit -- ebenfalls ohne "Uhr", aus
+// demselben Grund wie formatResponseDeadline().
+function formatResponseCardHead(date, startTime) {
+    const d = new Date(`${String(date).slice(0, 10)}T00:00:00`);
+    const weekday = d.toLocaleDateString('de-DE', { weekday: 'short' });
+    return `${weekday} ${formatDateShortDe(date)} · ${String(startTime).substring(0, 5)}`;
+}
+
+/** Ampel-Chipreihe zu einer Zaehlung {yes, maybe, no, open} -- geteilt von der
+ * Kartenkopfzeile, der Zusammenfassung in "Wer hat geantwortet?" und den
+ * Gruppenkoepfen darin, damit alle drei Stellen optisch gleich bleiben. */
+function responseCountChipsHtml(counts) {
+    return RESPONSE_NAME_GROUPS.map(g =>
+        `<span class="response-count-chip response-count-chip--${g.key}${counts[g.key] === 0 ? ' is-zero' : ''}">${g.icon} ${counts[g.key]}</span>`
+    ).join('');
 }
 
 /** Alle bedienbaren Elemente einer Rueckmeldungskarte. */
@@ -3647,8 +3684,32 @@ function renderResponses(justSavedId, drafts) {
         const textarea = card?.querySelector('.response-comment textarea');
         if (!textarea) return;
         textarea.value = value;
-        const commentBox = card.querySelector('.response-comment');
-        if (commentBox) commentBox.hidden = false;
+        // Ein Entwurf haelt die Bemerkung offen -- sonst verschwaende der
+        // eingetippte Text hinter einer zugeklappten Karte.
+        responsesOpenComments.add(id);
+        const details = card.querySelector('.response-comment-details');
+        if (details) details.open = true;
+    });
+
+    // Offen-Status von "Bemerkung" und "Wer hat geantwortet?" nachfuehren --
+    // jede Karte ist nach dem Neuaufbau ein frisches <details>-Element, das
+    // sein natives "open" nicht aus dem alten Knoten erbt. Das Attribut in
+    // responseCardHtml()/responseNamesHtml() setzt nur den Anfangszustand;
+    // dieser Listener haelt responsesOpenComments/-Names ab jetzt mit dem
+    // synchron, was der Nutzer tatsaechlich auf- und zuklappt.
+    list.querySelectorAll('.response-comment-details').forEach(el => {
+        el.addEventListener('toggle', () => {
+            const cid = Number(el.dataset.appointmentId);
+            if (el.open) responsesOpenComments.add(cid);
+            else responsesOpenComments.delete(cid);
+        });
+    });
+    list.querySelectorAll('.response-names').forEach(el => {
+        el.addEventListener('toggle', () => {
+            const cid = Number(el.dataset.appointmentId);
+            if (el.open) responsesOpenNames.add(cid);
+            else responsesOpenNames.delete(cid);
+        });
     });
 
     // Ein Neuaufbau kennt keine laufenden Anfragen -- Karten, die noch
@@ -3656,10 +3717,12 @@ function renderResponses(justSavedId, drafts) {
     refreshAllResponseCards();
 }
 
-/** Ein Namens-Chip, Werte maskiert -- kein CSP, also nie ungemaskiert einbauen. */
-function responseNameChip(m, extraClass) {
-    const cls = extraClass ? ` response-name-chip--${extraClass}` : '';
-    return `<span class="response-name-chip${cls}">${escapeHtml(m.name)} ${escapeHtml(m.surname)}</span>`;
+/** Ein Namens-Chip, nach Status eingefaerbt und mit Icon-Praefix statt nur
+ * Farbe (Kontrast/Nicht-nur-Farbe) -- Werte maskiert, kein CSP, also nie
+ * ungemaskiert einbauen. */
+function responseNameChip(m, status) {
+    const meta = RESPONSE_NAME_GROUPS.find(g => g.status === (status ?? null));
+    return `<span class="response-name-chip response-name-chip--${meta.key}">${meta.icon} ${escapeHtml(m.name)} ${escapeHtml(m.surname)}</span>`;
 }
 
 /** Nachname vor Vorname, "Vorname Nachname" bleibt aber die Anzeige. */
@@ -3668,37 +3731,62 @@ function sortByNameSurname(members) {
         a.surname.localeCompare(b.surname, 'de') || a.name.localeCompare(b.name, 'de'));
 }
 
+/** Gruppenname eines Mitglieds, null statt leer/undefiniert fuer "Ohne Gruppe". */
+function responseGroupKey(m) {
+    return m.group_name && String(m.group_name).trim() !== '' ? m.group_name : null;
+}
+
 /**
- * "Wer hat geantwortet?" (G?): Ampel-Zeile in der Summary (Zaehlung direkt
- * aus item.members, nicht aus item.summary -- beide muessten sonst synchron
- * gehalten werden), Details nach Status gruppiert statt einer Bullet-Liste.
+ * "Wer hat geantwortet?" (Nutzer-Entscheidung): primaer nach Gruppe
+ * gegliedert statt nach Status -- Ampel-Zeile in der Summary bleibt die
+ * Gesamtzaehlung (direkt aus item.members, nicht aus item.summary, sonst
+ * muessten beide synchron gehalten werden), je Gruppe eine eigene
+ * Ampel-Zeile in der Ueberschrift und die Chips darunter Zusage -> Unsicher
+ * -> Absage -> ohne Antwort, darin nach Nachname/Vorname.
  */
-function responseNamesHtml(members) {
+function responseNamesHtml(members, appointmentId) {
     const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
     members.forEach(m => counts[m.status || 'open']++);
 
-    const countRow = RESPONSE_NAME_GROUPS.map(g =>
-        `<span class="response-count-chip response-count-chip--${g.key}${counts[g.key] === 0 ? ' is-zero' : ''}">${g.icon} ${counts[g.key]}</span>`
-    ).join('');
+    // Gruppen alphabetisch, Mitglieder ohne Gruppe zuletzt als "Ohne Gruppe".
+    const groupNames = [...new Set(members.map(responseGroupKey))].sort((a, b) => {
+        if (a === null) return 1;
+        if (b === null) return -1;
+        return a.localeCompare(b, 'de');
+    });
 
-    const groups = RESPONSE_NAME_GROUPS.map(g => {
-        const inGroup = sortByNameSurname(members.filter(m => (m.status || null) === g.status));
-        if (inGroup.length === 0) return '';
+    const groups = groupNames.map(groupName => {
+        const groupMembers = members.filter(m => responseGroupKey(m) === groupName);
+        const groupCounts = { yes: 0, maybe: 0, no: 0, open: 0 };
+        groupMembers.forEach(m => groupCounts[m.status || 'open']++);
 
-        const overflow = g.status === null && inGroup.length > RESPONSE_NAMES_OPEN_LIMIT;
-        const shown = overflow ? inGroup.slice(0, RESPONSE_NAMES_OPEN_LIMIT) : inGroup;
-        const moreChip = overflow
-            ? `<span class="response-name-chip response-name-chip--more">+ ${inGroup.length - RESPONSE_NAMES_OPEN_LIMIT} weitere</span>`
-            : '';
+        const chips = RESPONSE_NAME_GROUPS.map(g => {
+            const inStatus = sortByNameSurname(groupMembers.filter(m => (m.status || null) === g.status));
+            if (inStatus.length === 0) return '';
 
-        return `<div class="response-name-group response-name-group--${g.key}">
-            <div class="response-name-group__heading">${g.icon} ${escapeHtml(g.label)} · ${inGroup.length}</div>
-            <div class="response-name-chips">${shown.map(m => responseNameChip(m)).join('')}${moreChip}</div>
+            // "+ n weitere" nur innerhalb dieser Gruppe, nicht ueber die
+            // Termin-Karte hinweg gezaehlt -- eine kleine Gruppe darf ihre
+            // "ohne Antwort" vollstaendig zeigen, auch wenn andere Gruppen
+            // zusammen mehr als 12 haben.
+            const overflow = g.status === null && inStatus.length > RESPONSE_NAMES_OPEN_LIMIT;
+            const shown = overflow ? inStatus.slice(0, RESPONSE_NAMES_OPEN_LIMIT) : inStatus;
+            const moreChip = overflow
+                ? `<span class="response-name-chip response-name-chip--more">+ ${inStatus.length - RESPONSE_NAMES_OPEN_LIMIT} weitere</span>`
+                : '';
+
+            return shown.map(m => responseNameChip(m, g.status)).join('') + moreChip;
+        }).join('');
+
+        const label = groupName === null ? 'Ohne Gruppe' : groupName;
+
+        return `<div class="response-name-group">
+            <div class="response-name-group__heading"><span class="response-name-group__label">${escapeHtml(label)}</span> · <span class="response-count-row">${responseCountChipsHtml(groupCounts)}</span></div>
+            <div class="response-name-chips">${chips}</div>
         </div>`;
     }).join('');
 
-    return `<details class="response-names">
-        <summary>Wer hat geantwortet? <span class="response-count-row">${countRow}</span></summary>
+    return `<details class="response-names"${responsesOpenNames.has(appointmentId) ? ' open' : ''} data-appointment-id="${appointmentId}">
+        <summary>Wer hat geantwortet? <span class="response-count-row">${responseCountChipsHtml(counts)}</span></summary>
         <div class="response-names__body">${groups}</div>
     </details>`;
 }
@@ -3716,7 +3804,7 @@ function responseCardHtml(item) {
 
     const deadlinePassed = new Date(item.settings.deadline.replace(' ', 'T')) < new Date();
     const deadlineText = deadlinePassed
-        ? 'Frist abgelaufen – Änderung wird als kurzfristig vermerkt'
+        ? 'Frist abgelaufen'
         : `Rückmeldung bis ${formatResponseDeadline(item.settings.deadline)}`;
 
     // Vorgemerkte, aber noch nicht gespeicherte Absage sichtbar machen (G6) --
@@ -3728,14 +3816,24 @@ function responseCardHtml(item) {
         `<button type="button" class="response-btn response-btn--${s}${status === s ? ' is-active' : ''}${s === 'no' && isPendingNo ? ' is-pending' : ''}" data-appointment-id="${id}" data-status="${s}"${off}>${RESPONSE_LABELS[s]}</button>`
     ).join('');
 
-    const names = item.members ? responseNamesHtml(item.members) : '';
+    const names = item.members ? responseNamesHtml(item.members, id) : '';
 
     const s = item.summary;
+    const lateMarker = (item.own?.status === 'no' && item.own?.is_late)
+        ? ' <span class="response-late">kurzfristig</span>' : '';
 
-    // Eine vorgemerkte, aber noch nicht gespeicherte Absage (own === null)
-    // haelt das Bemerkungsfeld ebenfalls offen -- sonst verschwaende es beim
-    // naechsten Neuaufbau, obwohl der Nutzer gerade eine Begruendung eintippt.
-    const commentOpen = status !== null || pendingStatus !== null;
+    // "Bemerkung" bleibt zugeklappt (Nutzer-Entscheidung: Details erst auf
+    // Wunsch), ausser: eine vorgemerkte, noch nicht gespeicherte Absage
+    // braucht eine Begruendung, oder der letzte Speicherversuch scheiterte.
+    // Ein Entwurf oeffnet sie ueber renderResponses() (dort steht der
+    // gespeicherte Serverstand noch nicht zur Verfuegung). Einmal offen
+    // (automatisch oder vom Nutzer) bleibt sie es, bis der Nutzer selbst
+    // zuklappt -- responsesOpenComments ist die alleinige Quelle dafuer.
+    if (isPendingNo || responsesSaveFailed.has(id)) {
+        responsesOpenComments.add(id);
+    }
+    const commentOpen = responsesOpenComments.has(id);
+    const hasSavedComment = !!(item.own?.comment);
     const placeholder = item.settings.require_excuse && (status === 'no' || isPendingNo)
         ? 'Begründung (Pflicht)'
         : 'Bemerkung (optional)';
@@ -3745,17 +3843,22 @@ function responseCardHtml(item) {
         <div class="response-card${status === null ? ' is-open' : ''}" data-appointment-id="${id}" style="border-left-color: ${color}">
             <div class="response-card__head">
                 <strong>${escapeHtml(apt.title)}</strong>
-                <span>${formatDateShortDe(apt.date)} · ${escapeHtml(apt.start_time.substring(0, 5))} Uhr</span>
+                <span>${escapeHtml(formatResponseCardHead(apt.date, apt.start_time))}</span>
             </div>
             <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
             <div class="response-segment">${buttons}</div>
-            <div class="response-comment"${commentOpen ? '' : ' hidden'}>
-                <textarea rows="2" maxlength="255" placeholder="${placeholder}"${off}>${escapeHtml(item.own?.comment ?? '')}</textarea>
-                ${item.settings.require_excuse ? '<small>Eine Absage wird als Entschuldigung eingereicht.</small>' : ''}
-                <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>${saveLabel}</button>
+            <div class="response-status">
+                <span class="response-status__deadline${deadlinePassed ? ' is-passed' : ''}">${escapeHtml(deadlineText)}</span>
+                <span class="response-count-row">${responseCountChipsHtml(s)}</span>${lateMarker}
             </div>
-            <div class="response-card__meta">${escapeHtml(deadlineText)}${item.own?.status === 'no' && item.own?.is_late ? ' · <span class="response-late">kurzfristig</span>' : ''}</div>
-            <div class="response-card__summary">Zusage ${s.yes} · Unsicher ${s.maybe} · Absage ${s.no} · offen ${s.open}</div>
+            <details class="response-comment-details"${commentOpen ? ' open' : ''} data-appointment-id="${id}">
+                <summary>Bemerkung${hasSavedComment ? ' 💬' : ''}</summary>
+                <div class="response-comment">
+                    <textarea rows="2" maxlength="255" placeholder="${placeholder}"${off}>${escapeHtml(item.own?.comment ?? '')}</textarea>
+                    ${item.settings.require_excuse ? '<small>Eine Absage wird als Entschuldigung eingereicht.</small>' : ''}
+                    <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>${saveLabel}</button>
+                </div>
+            </details>
             ${names}
             ${offline ? '<div class="response-card__offline">Ohne Netz ist keine Rückmeldung möglich.</div>' : ''}
         </div>`;
@@ -3772,8 +3875,8 @@ async function onResponsesClick(event) {
     if (!item) return;
 
     const card = btn.closest('.response-card');
-    const commentBox = card.querySelector('.response-comment');
-    const textarea = commentBox.querySelector('textarea');
+    const detailsEl = card.querySelector('.response-comment-details');
+    const textarea = detailsEl.querySelector('textarea');
     const comment = textarea.value.trim();
 
     if (btn.classList.contains('response-btn')) {
@@ -3784,7 +3887,8 @@ async function onResponsesClick(event) {
             // gewuenschte Absage merkt sich responsesPending, damit
             // "Bemerkung speichern" gleich weiss, welchen Status es sendet.
             responsesPending.set(appointmentId, status);
-            commentBox.hidden = false;
+            responsesOpenComments.add(appointmentId);
+            detailsEl.open = true;
             textarea.placeholder = 'Begründung (Pflicht)';
             textarea.focus();
             showMessage('Bitte zuerst eine Begründung für die Absage eintragen', 'error');
@@ -3842,6 +3946,14 @@ async function submitResponse(item, status, comment, card) {
         if (generation !== responsesGeneration) return;
 
         if (!result.success) {
+            // Fehlschlag oeffnet die Bemerkung, sonst verschwindet die
+            // Fehlermeldung hinter einer zugeklappten Karte (Nutzer-Vorgabe).
+            responsesSaveFailed.add(key);
+            responsesOpenComments.add(key);
+            if (card && card.isConnected) {
+                const detailsEl = card.querySelector('.response-comment-details');
+                if (detailsEl) detailsEl.open = true;
+            }
             showMessage(result.error || 'Rückmeldung konnte nicht gespeichert werden', 'error');
             return;
         }
@@ -3850,6 +3962,7 @@ async function submitResponse(item, status, comment, card) {
         if (index >= 0) upcomingResponses[index] = result.data;
 
         responsesPending.delete(key);
+        responsesSaveFailed.delete(key);
 
         // VOR dem Neuaufbau freigeben (K1): renderResponses() ersetzt die
         // Karte durch einen neuen Knoten und ruft an seinem Ende

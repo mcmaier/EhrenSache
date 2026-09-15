@@ -89,3 +89,67 @@ test('PWA: "Wer hat geantwortet?" zeigt Namen als Chips statt Bullet-Liste, mask
     assertTrue(str_contains($js, 'escapeHtml(m.name)') && str_contains($js, 'escapeHtml(m.surname)'),
         'Name/Nachname werden nicht (mehr) maskiert');
 });
+
+test('PWA: "Wer hat geantwortet?" ist primaer nach Mitgliedsgruppe gegliedert, Gruppenname maskiert', function () use ($rspRoot) {
+    // Nutzer-Entscheidung: Gruppe vor Status, alphabetisch, Mitglieder ohne
+    // Gruppe zuletzt als "Ohne Gruppe".
+    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+
+    assertTrue(str_contains($js, 'responseGroupKey'), 'Keine eigene Gruppierung nach group_name gefunden');
+    assertTrue(str_contains($js, "'Ohne Gruppe'"), 'Mitglieder ohne Gruppe landen nicht in "Ohne Gruppe"');
+    assertTrue(str_contains($js, 'escapeHtml(label)'), 'Gruppenname wird nicht maskiert');
+});
+
+test('PWA: Namens-Chips tragen Status-Icon und eigene Farbklasse, nicht nur Farbe', function () use ($rspRoot) {
+    // Kontrast/Nicht-nur-Farbe: jeder Chip traegt zusaetzlich zur getoenten
+    // Klasse ein Icon-Praefix (✓/?/✗/—) im Text.
+    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+
+    assertTrue((bool) preg_match('/response-name-chip response-name-chip--\$\{meta\.key\}"[^`]*\$\{meta\.icon\}/', $js),
+        'Chip traegt weder eine statusabhaengige Klasse noch ein vorangestelltes Icon');
+
+    $css = (string) file_get_contents($rspRoot . '/public/checkin/css/style.css');
+    foreach (['yes', 'maybe', 'no', 'open'] as $key) {
+        assertTrue(str_contains($css, ".response-name-chip--{$key}"), "Farbklasse fuer '{$key}' fehlt in der CSS");
+    }
+});
+
+test('PWA: Offen-Status von "Bemerkung" und "Wer hat geantwortet?" ueberlebt einen Neuaufbau, wird bei Abmeldung geleert', function () use ($rspRoot) {
+    // Nutzer-Vorgabe: Details bleiben zugeklappt, bis der Nutzer sie selbst
+    // oeffnet oder eine der drei Bedingungen (Pflichtbegruendung, Entwurf,
+    // Fehlschlag) sie automatisch oeffnet -- ein Neuaufbau (renderResponses)
+    // ersetzt das <details>-Element, ein modulweites Set haelt den Zustand
+    // deshalb ausserhalb des DOM fest.
+    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+
+    assertTrue((bool) preg_match('/const\s+responsesOpenComments\s*=\s*new Set\(\)/', $js),
+        'responsesOpenComments fehlt als Set');
+    assertTrue((bool) preg_match('/const\s+responsesOpenNames\s*=\s*new Set\(\)/', $js),
+        'responsesOpenNames fehlt als Set');
+
+    assertTrue((bool) preg_match('/function resetResponsesTab\(\)[\s\S]{0,400}responsesOpenComments\.clear\(\)/', $js),
+        'resetResponsesTab() leert responsesOpenComments nicht');
+    assertTrue((bool) preg_match('/function resetResponsesTab\(\)[\s\S]{0,400}responsesOpenNames\.clear\(\)/', $js),
+        'resetResponsesTab() leert responsesOpenNames nicht');
+});
+
+test('PWA: "Bemerkung" oeffnet automatisch bei Pflichtbegruendung und bei Speicherfehler', function () use ($rspRoot) {
+    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+
+    assertTrue((bool) preg_match('/isPendingNo\s*\|\|\s*responsesSaveFailed\.has\(id\)\)\s*\{\s*\n\s*responsesOpenComments\.add\(id\)/', $js),
+        'Vorgemerkte Absage mit Pflichtbegruendung oder ein fehlgeschlagener Speicherversuch oeffnen die Bemerkung nicht automatisch');
+    assertTrue(str_contains($js, 'responsesSaveFailed.add(key)') && str_contains($js, 'responsesSaveFailed.delete(key)'),
+        'responsesSaveFailed wird nicht bei Fehlschlag gesetzt und bei Erfolg wieder geloescht');
+});
+
+test('PWA: Termine-Tab bekommt denselben weissen Rahmen wie der Verlauf-Tab, Karten werden hellgrau', function () use ($rspRoot) {
+    // Nutzer-Feedback: die Ueberschrift sass zu nah am Kartenrand -- Fix ist
+    // derselbe weisse Container wie .history-section, die Karten darin
+    // werden hellgrau wie .history-item statt weiss.
+    $css = (string) file_get_contents($rspRoot . '/public/checkin/css/style.css');
+
+    assertTrue((bool) preg_match('/\.responses-section\s*\{[^}]*background:\s*var\(--card-bg\)/', $css),
+        '.responses-section ist kein weisser Container wie .history-section');
+    assertTrue((bool) preg_match('/\.response-card\s*\{[^}]*background:\s*#f8f9fa/', $css),
+        '.response-card ist nicht hellgrau wie .history-item');
+});

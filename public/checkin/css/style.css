@@ -2401,53 +2401,92 @@ body {
     display: none;
 }
 
+/* Weisser Rahmen mit Ueberschrift innen -- dasselbe Muster wie
+   .history-section/.history-section h3 (Verlauf) und .stats-section, damit
+   alle drei Tabs gleich aussehen. Eigene Regeln statt gemeinsamer Selektoren
+   mit .history-section: eigene Datei-Zustaendigkeit dieser Aufgabe, kein
+   Eingriff in den Verlauf-Tab. */
+.responses-section {
+    display: block;
+    background: var(--card-bg);
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    width: 100%;
+    max-width: 400px;
+}
+
+.responses-section h3 {
+    margin: 0 0 16px 0;
+    font-weight: 600;
+    font-size: 16px;
+    text-align: center;
+    color: var(--text);
+}
+
 .responses-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
+/* Hellgrauer Listeneintrag statt weisser Karte -- gleiche Aufmachung wie
+   .history-item (Verlauf), nur der Rand links bleibt farbig je Terminart. */
 .response-card {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
+    background: #f8f9fa;
     border-left: 5px solid var(--primary-color);
     border-radius: 8px;
-    padding: 12px 14px;
+    padding: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
+/* Ring zusaetzlich zum Schatten, nicht statt ihm -- sonst wirkt die Karte auf
+   grauem Grund flach, sobald sie unbeantwortet ist. */
 .response-card.is-open {
-    box-shadow: 0 0 0 2px var(--warning);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1), 0 0 0 2px var(--warning);
 }
 
 .response-card__head {
     display: flex;
     justify-content: space-between;
+    align-items: baseline;
     gap: 8px;
     flex-wrap: wrap;
 }
 
-.response-card__type,
-.response-card__meta,
-.response-card__summary {
+.response-card__head strong {
+    font-size: 14px;
+}
+
+.response-card__head span {
+    font-size: 12px;
     color: var(--text-light);
-    font-size: 13px;
-    margin-top: 4px;
+    white-space: nowrap;
+}
+
+.response-card__type {
+    color: var(--text-light);
+    font-size: 12px;
+    margin-top: 2px;
 }
 
 .response-segment {
     display: flex;
     gap: 6px;
-    margin: 10px 0;
+    margin: 8px 0;
 }
 
+/* Kompakter (Nutzer-Feedback: Knoepfe wirkten zu gross) -- 38px haelt das
+   Ziel weiterhin bequem ueber der 36px-Mindestgroesse fuer Touch. */
 .response-btn {
     flex: 1;
-    min-height: 48px;
+    min-height: 38px;
+    padding: 6px 4px;
     border: 2px solid var(--border);
     border-radius: 8px;
     background: var(--button-bg);
     color: var(--text);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
 }
 
@@ -2467,8 +2506,42 @@ body {
     border-style: dashed;
 }
 
-.response-comment[hidden] {
-    display: none;
+/* Kompakte, immer sichtbare Statuszeile -- ersetzt die fruehere Trennung in
+   .response-card__meta (Frist) und .response-card__summary (Zaehlung als
+   Fliesstext); die Zaehlung nutzt jetzt dieselben Chips wie "Wer hat
+   geantwortet?" (responseCountChipsHtml()). */
+.response-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.response-status__deadline.is-passed {
+    color: var(--error);
+}
+
+/* "Bemerkung" zugeklappt (Nutzer-Entscheidung: Details erst auf Wunsch). */
+.response-comment-details {
+    margin-top: 8px;
+}
+
+.response-comment-details summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-light);
+    padding-left: 0;
+}
+
+.response-comment-details summary::marker {
+    color: var(--text-light);
+}
+
+.response-comment {
+    margin-top: 8px;
 }
 
 .response-comment textarea {
@@ -2524,9 +2597,11 @@ body {
     color: var(--text-light);
 }
 
-/* Ampel-Zeile in der Summary -- Zaehlung je Status, gleiche Farben wie die
-   Antwort-Knoepfe (response-btn). Nullwerte gedimmt statt ausgeblendet, damit
-   die Reihenfolge der vier Chips immer gleich bleibt. */
+/* Ampel-Zeile -- Zaehlung je Status, gleiche Farben wie die Antwort-Knoepfe
+   (response-btn). Nullwerte gedimmt statt ausgeblendet, damit die
+   Reihenfolge der vier Chips immer gleich bleibt. Wird an drei Stellen
+   verwendet: Kartenkopf (response-status), Summary von "Wer hat
+   geantwortet?" und Ueberschrift je Gruppe darin. */
 .response-count-row {
     display: inline-flex;
     gap: 6px;
@@ -2561,16 +2636,20 @@ body {
     gap: 10px;
 }
 
+/* Je Mitgliedsgruppe ein Block (Nutzer-Entscheidung) -- die Ueberschrift
+   traegt keine eigene Statusfarbe mehr, sie steht ja fuer eine Gruppe, nicht
+   fuer einen Antwortstatus. Die Faerbung nach Status sitzt jetzt an den
+   einzelnen Namens-Chips darunter. */
 .response-name-group__heading {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
     font-size: 12px;
     font-weight: 600;
+    color: var(--text);
     margin-bottom: 4px;
 }
-
-.response-name-group--yes   .response-name-group__heading { color: var(--success); }
-.response-name-group--maybe .response-name-group__heading { color: var(--warning); }
-.response-name-group--no    .response-name-group__heading { color: var(--error); }
-.response-name-group--open  .response-name-group__heading { color: var(--text-light); }
 
 /* Chips statt Bullet-Liste (Nutzer-Feedback: Punkte sassen zu weit links am
    Kartenrand) -- keine ul/li mehr, daher auch kein list-style noetig. */
@@ -2580,17 +2659,27 @@ body {
     gap: 6px;
 }
 
+/* Je Status eingefaerbt (Nutzer-Entscheidung): getoenter Hintergrund plus
+   farbiger linker Rand -- das Icon im Chiptext (responseNameChip()) sorgt
+   dafuer, dass der Status nicht allein an der Farbe haengt. */
 .response-name-chip {
     display: inline-block;
-    padding: 3px 9px;
-    border-radius: 999px;
+    padding: 3px 9px 3px 7px;
+    border-radius: 6px;
+    border-left: 3px solid var(--border);
     background: var(--badge-bg);
     color: var(--badge-fg);
     font-size: 12px;
 }
 
+.response-name-chip--yes   { background: rgba(39, 174, 96, 0.15);  border-left-color: var(--success); }
+.response-name-chip--maybe { background: rgba(243, 156, 18, 0.15); border-left-color: var(--warning); }
+.response-name-chip--no    { background: rgba(231, 76, 60, 0.15);  border-left-color: var(--error); }
+.response-name-chip--open  { background: var(--badge-bg);          border-left-color: var(--border); }
+
 .response-name-chip--more {
     background: transparent;
+    border-left-color: transparent;
     color: var(--text-light);
     font-style: italic;
 }
