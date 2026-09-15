@@ -72,27 +72,28 @@ test('assertSchema wirft, wenn schema_version leer ist', function () {
 });
 
 test('assertSchema wirft bei zu altem Schemastand', function () {
-    $db = demoSeedCliMakeSchemaDb(['1.2.5']);
+    // 1.7.0 bringt appointment_responses; ohne die Tabelle scheitert writePlan().
+    $db = demoSeedCliMakeSchemaDb(['1.6.1']);
     assertThrows(fn () => assertSchema($db, 'test_'));
 });
 
-test('assertSchema laesst 1.3.0 durch', function () {
-    $db = demoSeedCliMakeSchemaDb(['1.3.0']);
+test('assertSchema laesst 1.7.0 durch', function () {
+    $db = demoSeedCliMakeSchemaDb(['1.7.0']);
     assertSchema($db, 'test_');
 });
 
-test('assertSchema laesst 1.3.1 durch', function () {
-    $db = demoSeedCliMakeSchemaDb(['1.3.1']);
+test('assertSchema laesst 1.7.1 durch', function () {
+    $db = demoSeedCliMakeSchemaDb(['1.7.1']);
     assertSchema($db, 'test_');
 });
 
-// Versionen absichtlich in falscher Reihenfolge eingetragen (1.3.0 vor
-// 1.2.5): assertSchema sortiert selbst ueber version_compare und darf sich
+// Versionen absichtlich in falscher Reihenfolge eingetragen (1.7.0 vor
+// 1.6.1): assertSchema sortiert selbst ueber version_compare und darf sich
 // nicht auf die Einfuegereihenfolge oder eine string-alphabetische Sortierung
-// verlassen (die wuerde bei "1.10.0" vor "1.3.0" zu falschen Ergebnissen
+// verlassen (die wuerde bei "1.10.0" vor "1.7.0" zu falschen Ergebnissen
 // fuehren).
 test('assertSchema ermittelt den hoechsten Stand unabhaengig von der Reihenfolge', function () {
-    $db = demoSeedCliMakeSchemaDb(['1.3.0', '1.2.5']);
+    $db = demoSeedCliMakeSchemaDb(['1.7.0', '1.6.1']);
     assertSchema($db, 'test_');
 });
 

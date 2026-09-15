@@ -124,14 +124,25 @@ function buildGroups(): array
     ];
 }
 
-/** Terminarten. */
+/**
+ * Terminarten.
+ *
+ * Nur der Auftritt fragt Rueckmeldungen ab (FI-1) -- wie im Verein: Zur Probe
+ * kommt man, fuer das Konzert muss der Dirigent wissen, wer spielt. Die
+ * Entschuldigungspflicht bleibt aus, weil die Demo-Antraege getrennt in
+ * buildExceptions() entstehen und sonst nicht zu den Absagen passten.
+ * Alle Zeilen tragen dieselben Schluessel -- insertRows() verlangt das.
+ */
 function buildAppointmentTypes(): array
 {
+    $none = ['responses_enabled' => 0, 'responses_names_visible' => 0, 'responses_require_excuse' => 0, 'response_deadline_hours' => null];
+
     return [
-        ['type_id' => 1, 'type_name' => 'Gesamtprobe',      'description' => 'Wöchentliche Probe des Gesamtorchesters', 'is_default' => 1, 'color' => '#1F5FBF'],
-        ['type_id' => 2, 'type_name' => 'Registerprobe',    'description' => 'Probe einzelner Register',                'is_default' => 0, 'color' => '#4CAF50'],
-        ['type_id' => 3, 'type_name' => 'Auftritt',         'description' => 'Konzert, Umzug, Ständchen',               'is_default' => 0, 'color' => '#F5A623'],
-        ['type_id' => 4, 'type_name' => 'Vorstandssitzung', 'description' => 'Sitzung der Vorstandschaft',              'is_default' => 0, 'color' => '#6B7280'],
+        ['type_id' => 1, 'type_name' => 'Gesamtprobe',      'description' => 'Wöchentliche Probe des Gesamtorchesters', 'is_default' => 1, 'color' => '#1F5FBF'] + $none,
+        ['type_id' => 2, 'type_name' => 'Registerprobe',    'description' => 'Probe einzelner Register',                'is_default' => 0, 'color' => '#4CAF50'] + $none,
+        ['type_id' => 3, 'type_name' => 'Auftritt',         'description' => 'Konzert, Umzug, Ständchen',               'is_default' => 0, 'color' => '#F5A623',
+         'responses_enabled' => 1, 'responses_names_visible' => 0, 'responses_require_excuse' => 0, 'response_deadline_hours' => 168],
+        ['type_id' => 4, 'type_name' => 'Vorstandssitzung', 'description' => 'Sitzung der Vorstandschaft',              'is_default' => 0, 'color' => '#6B7280'] + $none,
     ];
 }
 
@@ -995,6 +1006,121 @@ function buildWorkSessions(
     return ['sessions' => $sessions, 'log' => $log];
 }
 
+/**
+ * Ein kommender Auftritt, damit die Terminrueckmeldung in der Demo etwas zu
+ * beantworten hat (FI-1).
+ *
+ * Kein Zufall: Der Termin haengt nur am Stichtag. Samstag, mindestens zehn
+ * Tage Vorlauf -- so liegt er bei jedem Stichtag hinter der Frist von sieben
+ * Tagen, und Antworten sind noch rechtzeitig.
+ *
+ * @param array<int, array<string, mixed>> $appointments
+ */
+function buildFutureConcert(array $appointments, string $referenceDate): array
+{
+    $date = (new DateTimeImmutable($referenceDate))->modify('+10 days');
+    while ((int) $date->format('N') !== 6) {
+        $date = $date->modify('+1 day');
+    }
+
+    return [
+        'appointment_id' => max(array_column($appointments, 'appointment_id')) + 1,
+        'title'          => DEMO_PERFORMANCE_TITLES[(int) $date->format('n')],
+        'type_id'        => 3,
+        'description'    => null,
+        'date'           => $date->format('Y-m-d'),
+        'start_time'     => '19:00:00',
+    ];
+}
+
+/**
+ * Rueckmeldungen zu allen Auftritten (FI-1).
+ *
+ * Laeuft als letzter Baustein: Seine Ziehungen duerfen die Folge der anderen
+ * nicht verschieben (siehe Hinweis ueber buildMembers()).
+ *
+ * Vergangene Auftritte folgen der Anwesenheit, damit die Gegenueberstellung
+ * ein glaubwuerdiges Bild zeigt -- die meisten Zusagen kamen, einige nicht,
+ * einzelne Absagen waren doch da. Beim kommenden Auftritt fehlt ein Viertel
+ * der Antworten, damit der Zaehler "offen" etwas zeigt.
+ *
+ * Zeitpunkt: 1 bis 14 Tage vor Beginn, bei jeder zehnten Antwort 1 bis 20
+ * Stunden vorher (kurzfristig bei einer Frist von 168 Stunden). Nie nach dem
+ * Zeitpunkt des Laufs.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function buildAppointmentResponses(
+    DemoRandom $random,
+    array $members,
+    array $assignments,
+    array $membershipDates,
+    array $appointments,
+    array $typeGroups,
+    array $records,
+    string $referenceDate,
+    string $referenceTime
+): array {
+    $performances = array_values(array_filter($appointments, fn ($a) => $a['type_id'] === 3));
+    // '9999-12-31': demoExpectedPairs() laesst sonst alle kommenden Termine aus.
+    $pairs = demoExpectedPairs($members, $assignments, $membershipDates, $performances, $typeGroups, '9999-12-31');
+
+    $present = [];
+    foreach ($records as $rec) {
+        if ($rec['status'] === 'present') {
+            $present[$rec['member_id'] . '-' . $rec['appointment_id']] = true;
+        }
+    }
+
+    $startOf = [];
+    foreach ($performances as $a) {
+        $startOf[$a['appointment_id']] = "{$a['date']} {$a['start_time']}";
+    }
+
+    $now  = new DateTimeImmutable("{$referenceDate} {$referenceTime}");
+    $rows = [];
+    $id   = 1;
+
+    foreach ($pairs as $pair) {
+        $start = $startOf[$pair['appointment_id']];
+        $roll  = $random->int(1, 100);
+
+        if ($start <= $now->format('Y-m-d H:i:s')) {
+            $status = isset($present[$pair['member_id'] . '-' . $pair['appointment_id']])
+                ? ($roll <= 85 ? 'yes' : ($roll <= 95 ? 'maybe' : null))
+                : ($roll <= 55 ? 'no' : ($roll <= 70 ? 'yes' : ($roll <= 80 ? 'maybe' : null)));
+        } else {
+            $status = $roll <= 55 ? 'yes' : ($roll <= 65 ? 'maybe' : ($roll <= 75 ? 'no' : null));
+        }
+
+        if ($status === null) {
+            continue;
+        }
+
+        $hoursBefore = $random->chance(0.1) ? $random->int(1, 20) : $random->int(24, 24 * 14);
+        $changed     = (new DateTimeImmutable($start))->modify("-{$hoursBefore} hours");
+        if ($changed > $now) {
+            $changed = $now->modify('-' . $random->int(1, 72) . ' hours');
+        }
+
+        $comment = ($status === 'no' && $random->chance(0.5)) ? $random->pick(DEMO_EXCEPTION_REASONS) : null;
+        $stamp   = $changed->format('Y-m-d H:i:s');
+
+        $rows[] = [
+            'response_id'       => $id++,
+            'appointment_id'    => $pair['appointment_id'],
+            'member_id'         => $pair['member_id'],
+            'status'            => $status,
+            'comment'           => $comment,
+            'exception_id'      => null,
+            'status_changed_at' => $stamp,
+            'updated_at'        => $stamp,
+        ];
+    }
+
+    return $rows;
+}
+
 /** Einstellungen, die der Generator setzt. Werte als String wie in system_settings. */
 function buildSettings(): array
 {
@@ -1059,6 +1185,10 @@ function buildDemoPlan(int $seed, string $referenceDate, string $referenceTime =
     $exceptions = buildExceptions($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $records, $referenceDate);
     $work       = buildWorkSessions($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $activityGroups, $referenceDate, $referenceTime);
 
+    // Erst nach allen Ziehungen oben -- siehe buildAppointmentResponses().
+    $appointments[] = buildFutureConcert($appointments, $referenceDate);
+    $responses      = buildAppointmentResponses($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $records, $referenceDate, $referenceTime);
+
     return [
         'settings'                 => buildSettings(),
         'groups'                   => buildGroups(),
@@ -1073,6 +1203,7 @@ function buildDemoPlan(int $seed, string $referenceDate, string $referenceTime =
         'appointments'             => $appointments,
         'records'                  => $records,
         'exceptions'               => $exceptions,
+        'appointment_responses'    => $responses,
         'work_sessions'            => $work['sessions'],
         'work_session_log'         => $work['log'],
     ];

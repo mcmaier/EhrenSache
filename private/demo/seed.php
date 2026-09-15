@@ -28,13 +28,16 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers/bootstrap.php';
 require_once __DIR__ . '/plan.php';
 
-const DEMO_MIN_SCHEMA = '1.3.0';
+// Seit 1.7.0 schreibt der Generator appointment_responses; ältere Schemata
+// haben die Tabelle nicht.
+const DEMO_MIN_SCHEMA = '1.7.0';
 
 /**
  * Reihenfolge beim Leeren: Kinder vor Eltern.
  * system_settings fehlt bewusst — dort wird aktualisiert, nicht gelöscht.
  */
 const DEMO_TABLES = [
+    'appointment_responses',
     'work_session_log',
     'work_sessions',
     'exceptions',
@@ -427,6 +430,10 @@ function writePlan(PDO $db, string $prefix, array $plan, string $password): arra
         $exceptionRows[] = $exception;
     }
     $written['exceptions'] = insertRows($db, $prefix, 'exceptions', $exceptionRows);
+
+    // appointment_responses, unverändert. Nach exceptions, weil exception_id
+    // dorthin zeigen dürfte; der Plan setzt es durchweg auf null.
+    $written['appointment_responses'] = insertRows($db, $prefix, 'appointment_responses', $plan['appointment_responses']);
 
     // work_sessions: kein Feld active_member — es ist eine generierte
     // virtuelle Spalte (siehe Kommentar über buildWorkSessions() in

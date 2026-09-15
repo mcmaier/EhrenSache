@@ -886,9 +886,9 @@ test('buildDemoPlan liefert genau die erwarteten Abschnitte', function () {
     $keys = array_keys($plan);
     sort($keys);
     assertSame([
-        'activity_type_groups', 'activity_types', 'appointment_type_groups', 'appointment_types',
-        'appointments', 'exceptions', 'groups', 'member_group_assignments', 'members',
-        'membership_dates', 'records', 'settings', 'users', 'work_session_log', 'work_sessions',
+        'activity_type_groups', 'activity_types', 'appointment_responses', 'appointment_type_groups',
+        'appointment_types', 'appointments', 'exceptions', 'groups', 'member_group_assignments',
+        'members', 'membership_dates', 'records', 'settings', 'users', 'work_session_log', 'work_sessions',
     ], $keys);
 });
 
@@ -990,12 +990,12 @@ test('Fremdschluessel im Gesamtplan zeigen ueberall auf vorhandene Zeilen', func
         $groupIds       = array_column($plan['groups'], 'group_id');
         $sessionIds     = array_column($plan['work_sessions'], 'session_id');
 
-        foreach (['records', 'exceptions', 'work_sessions', 'member_group_assignments'] as $section) {
+        foreach (['records', 'exceptions', 'work_sessions', 'member_group_assignments', 'appointment_responses'] as $section) {
             foreach ($plan[$section] as $row) {
                 assertTrue(in_array($row['member_id'], $memberIds, true), "Saat {$seed}, {$section}: member_id {$row['member_id']} unbekannt");
             }
         }
-        foreach (['records', 'exceptions'] as $section) {
+        foreach (['records', 'exceptions', 'appointment_responses'] as $section) {
             foreach ($plan[$section] as $row) {
                 assertTrue(in_array($row['appointment_id'], $appointmentIds, true), "Saat {$seed}, {$section}: appointment_id {$row['appointment_id']} unbekannt");
             }
@@ -1015,4 +1015,91 @@ test('Fremdschluessel im Gesamtplan zeigen ueberall auf vorhandene Zeilen', func
             assertTrue(in_array($row['session_id'], $sessionIds, true), "Saat {$seed}: work_session_log.session_id {$row['session_id']} unbekannt");
         }
     }
+});
+
+// ---- Terminrueckmeldungen (FI-1) ---------------------------------------------
+
+test('buildAppointmentTypes: nur der Auftritt fragt Rueckmeldungen ab', function () {
+    foreach (buildAppointmentTypes() as $type) {
+        assertSame($type['type_id'] === 3 ? 1 : 0, $type['responses_enabled'], "Terminart {$type['type_id']}");
+        assertSame(0, $type['responses_require_excuse'], 'Demo-Antraege entstehen getrennt in buildExceptions()');
+    }
+});
+
+test('buildFutureConcert legt einen Auftritt an einem Samstag mindestens zehn Tage nach dem Stichtag an', function () {
+    $appts   = buildAppointments(new DemoRandom(20260908), '2026-09-08');
+    $concert = buildFutureConcert($appts, '2026-09-08');
+
+    assertSame(3, $concert['type_id']);
+    assertSame('6', date('N', strtotime($concert['date'])), 'kein Samstag');
+    assertTrue($concert['date'] >= '2026-09-18', 'weniger als zehn Tage Vorlauf');
+    assertSame(max(array_column($appts, 'appointment_id')) + 1, $concert['appointment_id']);
+});
+
+test('buildDemoPlan: der Gesamtplan enthaelt genau einen kommenden Auftritt', function () {
+    $plan   = buildDemoPlan(20260908, '2026-09-08');
+    $future = array_filter($plan['appointments'], fn ($a) => $a['type_id'] === 3 && $a['date'] > '2026-09-08');
+    assertSame(1, count($future));
+});
+
+test('buildDemoPlan: die bestehenden Abschnitte bleiben durch die Rueckmeldungen unveraendert', function () {
+    // Die neuen Bausteine ziehen erst nach allen anderen aus dem Zufall. Aendert
+    // sich hier etwas, verschiebt sich der ganze Demo-Bestand.
+    $plan = buildDemoPlan(20260908, '2026-09-08');
+    $r    = new DemoRandom(20260908);
+    $m    = buildMembers($r, '2026-09-08');
+    $appts = buildAppointments($r, '2026-09-08');
+    $recs  = buildRecords($r, $m['members'], $m['assignments'], $m['membership_dates'], $appts, buildAppointmentTypeGroups(), '2026-09-08');
+
+    assertSame($recs, $plan['records']);
+});
+
+test('buildAppointmentResponses: nur Auftritte, gueltige Status, jedes Paar hoechstens einmal', function () {
+    foreach ([20260908, 1, 42] as $seed) {
+        $plan  = buildDemoPlan($seed, '2026-09-08');
+        $types = array_column($plan['appointments'], 'type_id', 'appointment_id');
+        $seen  = [];
+
+        assertTrue(count($plan['appointment_responses']) > 0, "Saat {$seed}: keine Rueckmeldungen");
+
+        foreach ($plan['appointment_responses'] as $row) {
+            assertSame(3, $types[$row['appointment_id']], "Saat {$seed}: Rueckmeldung zu einer Probe");
+            assertTrue(in_array($row['status'], ['yes', 'no', 'maybe'], true), "Saat {$seed}: Status {$row['status']}");
+            assertSame(null, $row['exception_id']);
+
+            $key = $row['member_id'] . '-' . $row['appointment_id'];
+            assertTrue(!isset($seen[$key]), "Saat {$seed}: Paar {$key} doppelt");
+            $seen[$key] = true;
+        }
+    }
+});
+
+test('buildAppointmentResponses: Zeitpunkt nie nach Beginn und nie nach dem Lauf', function () {
+    foreach ([20260908, 1, 42] as $seed) {
+        $plan    = buildDemoPlan($seed, '2026-09-08', '12:00:00');
+        $startOf = [];
+        foreach ($plan['appointments'] as $a) {
+            $startOf[$a['appointment_id']] = "{$a['date']} {$a['start_time']}";
+        }
+
+        foreach ($plan['appointment_responses'] as $row) {
+            assertTrue($row['status_changed_at'] <= $startOf[$row['appointment_id']],
+                "Saat {$seed}: Antwort nach Beginn");
+            assertTrue($row['status_changed_at'] <= '2026-09-08 12:00:00', "Saat {$seed}: Antwort in der Zukunft");
+            assertSame($row['status_changed_at'], $row['updated_at']);
+        }
+    }
+});
+
+test('buildAppointmentResponses: der kommende Auftritt hat Zusagen und offene Antworten', function () {
+    $plan    = buildDemoPlan(20260908, '2026-09-08');
+    $concert = array_values(array_filter($plan['appointments'], fn ($a) => $a['type_id'] === 3 && $a['date'] > '2026-09-08'))[0];
+    $rows    = array_filter($plan['appointment_responses'], fn ($r) => $r['appointment_id'] === $concert['appointment_id']);
+    $status  = array_count_values(array_column($rows, 'status'));
+
+    assertTrue(($status['yes'] ?? 0) > 0, 'keine Zusage zum Konzert');
+
+    $expected = demoExpectedPairs($plan['members'], $plan['member_group_assignments'], $plan['membership_dates'],
+        [$concert], $plan['appointment_type_groups'], '9999-12-31');
+    assertTrue(count($rows) < count($expected), 'Alle haben geantwortet -- die Demo zeigt dann keine offenen');
 });
