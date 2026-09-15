@@ -34,10 +34,20 @@ test('PWA: Tab Termine ist vorhanden und zunaechst verborgen', function () use (
 test('PWA: Tab wird beim Start und beim Wechsel geladen, maskiert Freitext', function () use ($rspRoot) {
     $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
 
-    assertTrue(str_contains($js, 'initResponsesTab()'), 'initResponsesTab wird nicht aufgerufen');
+    // Substring-Zaehlung statt einmaligem str_contains: die Definition allein
+    // beweist noch keinen Aufruf. initResponsesTab() muss also mindestens
+    // Definition + Aufruf in initTabs() liefern (>= 2), resetResponsesTab()
+    // Definition + Aufruf in initResponsesTab() + Aufruf bei der Abmeldung (>= 3).
+    assertTrue(substr_count($js, 'initResponsesTab()') >= 2, 'initResponsesTab wird nicht definiert UND aufgerufen');
+    assertTrue(substr_count($js, 'resetResponsesTab()') >= 3, 'resetResponsesTab wird nicht definiert, beim Start und bei der Abmeldung aufgerufen');
+
+    assertTrue((bool) preg_match('/initCaptureTab\(\);[\s\S]{0,200}initResponsesTab\(\);/', $js),
+        'initTabs() ruft initResponsesTab() nicht nach initCaptureTab() auf');
+    assertTrue((bool) preg_match('/userData = null;\s*\n\s*resetResponsesTab\(\);/', $js),
+        'Die Abmeldung (resetSessionState) raeumt den Termine-Tab nicht ab');
+
     assertTrue(str_contains($js, "targetTab === 'responses'"), 'Tab-Wechsel laedt nicht nach');
     assertTrue(str_contains($js, 'escapeHtml(item.own?.comment'), 'Bemerkung wird nicht maskiert');
-    assertTrue(str_contains($js, 'resetResponsesTab()'), 'Abmeldung setzt den Tab nicht zurueck');
 });
 
 test('PWA: hidden schlaegt display:flex der Tab-Knoepfe', function () use ($rspRoot) {

@@ -3452,8 +3452,20 @@ const RESPONSE_LABELS = { yes: 'Zusage', maybe: 'Unsicher', no: 'Absage' };
 let upcomingResponses = [];
 let responsesNetworkBound = false;
 
+// Verhindert doppelte PUTs bei Doppeltipp und markiert, welche Karte gerade
+// speichert. Schluessel ist appointment_id als Number.
+const responsesInFlight = new Set();
+
+// Steigt bei jedem resetResponsesTab() (Start und Abmeldung). Eine Antwort von
+// loadResponses(), die noch fuer die vorige Generation unterwegs war, wird
+// verworfen -- sonst zeigt ein neu angemeldetes Konto kurz die Termine des
+// vorigen.
+let responsesGeneration = 0;
+
 function resetResponsesTab() {
+    responsesGeneration++;
     upcomingResponses = [];
+    responsesInFlight.clear();
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
     if (tab) tab.hidden = true;
     updateResponsesBadge();
@@ -3468,8 +3480,11 @@ async function initResponsesTab() {
     if (list) bindOnce(list, 'click', onResponsesClick);
 
     if (!responsesNetworkBound) {
-        window.addEventListener('online', renderResponses);
-        window.addEventListener('offline', renderResponses);
+        // Kein Neuaufbau der Karten -- nur Knoepfe/Textfelder sperren und den
+        // Hinweis je Karte ein-/ausblenden. Ein renderResponses() hier wuerde
+        // ungespeicherten Text in offenen Bemerkungsfeldern verwerfen.
+        window.addEventListener('online', refreshAllResponseCards);
+        window.addEventListener('offline', refreshAllResponseCards);
         responsesNetworkBound = true;
     }
 
@@ -3478,15 +3493,27 @@ async function initResponsesTab() {
 }
 
 async function loadResponses() {
+    const generation = responsesGeneration;
     const result = await apiCall('appointment_responses', 'GET', null, { upcoming: 1 });
+    if (generation !== responsesGeneration) return; // Abgemeldet/neu gestartet, waehrend die Antwort unterwegs war.
+
     if (!result.success) {
         debug.log('Rückmeldungen nicht geladen:', result.error);
         return;
     }
 
     upcomingResponses = result.data.appointments || [];
+    const hasResponses = upcomingResponses.length > 0;
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
-    if (tab) tab.hidden = upcomingResponses.length === 0;
+    if (tab) {
+        const wasActiveTab = tab.classList.contains('active');
+        tab.hidden = !hasResponses;
+        // Der Tab, den man gerade ansieht, verschwindet nicht unter einem weg --
+        // ohne Inhalt geht es zurueck zum Erfassen-Tab.
+        if (!hasResponses && wasActiveTab) {
+            document.querySelector('.tab-button[data-tab="capture"]')?.click();
+        }
+    }
 
     updateResponsesBadge();
     renderResponses();
@@ -3506,7 +3533,37 @@ function formatResponseDeadline(mysql) {
     return `${weekday} ${d.toLocaleDateString('de-DE')} ${d.toTimeString().substring(0, 5)} Uhr`;
 }
 
-function renderResponses() {
+/** Alle bedienbaren Elemente einer Rueckmeldungskarte. */
+function responseCardControls(card) {
+    return card.querySelectorAll('.response-btn, .response-comment__save, .response-comment textarea');
+}
+
+/** Setzt Sperre und Offline-Hinweis einer einzelnen Karte nach aktuellem Stand. */
+function refreshResponseCardState(card) {
+    if (!card || !card.isConnected) return;
+    const id = Number(card.dataset.appointmentId);
+    const offline = !navigator.onLine;
+    const busy = responsesInFlight.has(id);
+
+    responseCardControls(card).forEach(el => { el.disabled = offline || busy; });
+
+    let notice = card.querySelector('.response-card__offline');
+    if (offline && !notice) {
+        notice = document.createElement('div');
+        notice.className = 'response-card__offline';
+        notice.textContent = 'Ohne Netz ist keine Rückmeldung möglich.';
+        card.appendChild(notice);
+    } else if (!offline && notice) {
+        notice.remove();
+    }
+}
+
+/** Wird bei online/offline aufgerufen -- baut die Liste NICHT neu auf. */
+function refreshAllResponseCards() {
+    document.querySelectorAll('#responsesList .response-card').forEach(refreshResponseCardState);
+}
+
+function renderResponses(justSavedId) {
     const list = document.getElementById('responsesList');
     if (!list) return;
 
@@ -3515,12 +3572,36 @@ function renderResponses() {
         return;
     }
 
+    // Ungesicherter Text ueberlebt den Neuaufbau: Wer mitten im Tippen ist, soll
+    // ihn nicht verlieren, nur weil eine andere Karte fertig gespeichert hat.
+    // Die gerade gespeicherte Karte selbst zaehlt nicht als Entwurf -- ihr
+    // Text kommt frisch vom Server.
+    const drafts = new Map();
+    list.querySelectorAll('.response-card').forEach(card => {
+        const id = Number(card.dataset.appointmentId);
+        if (id === justSavedId) return;
+        const textarea = card.querySelector('.response-comment textarea');
+        if (!textarea) return;
+        const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === id);
+        const saved = item?.own?.comment ?? '';
+        if (textarea.value !== saved) drafts.set(id, textarea.value);
+    });
+
     // Unbeantwortete zuerst, darin nach Beginn.
     const sorted = [...upcomingResponses].sort((a, b) =>
         (a.own ? 1 : 0) - (b.own ? 1 : 0)
         || `${a.appointment.date} ${a.appointment.start_time}`.localeCompare(`${b.appointment.date} ${b.appointment.start_time}`));
 
     list.innerHTML = sorted.map(responseCardHtml).join('');
+
+    drafts.forEach((value, id) => {
+        const card = list.querySelector(`.response-card[data-appointment-id="${id}"]`);
+        const textarea = card?.querySelector('.response-comment textarea');
+        if (!textarea) return;
+        textarea.value = value;
+        const commentBox = card.querySelector('.response-comment');
+        if (commentBox) commentBox.hidden = false;
+    });
 }
 
 function responseCardHtml(item) {
@@ -3529,6 +3610,9 @@ function responseCardHtml(item) {
     const status = item.own ? item.own.status : null;
     const offline = !navigator.onLine;
     const off = offline ? ' disabled' : '';
+    // apt.color kommt vom Server frei waehlbar (Terminart-Einstellung) --
+    // nur ein gueltiger Hexwert darf ungemaskiert in ein style-Attribut.
+    const color = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#1F5FBF';
 
     const deadlinePassed = new Date(item.settings.deadline.replace(' ', 'T')) < new Date();
     const deadlineText = deadlinePassed
@@ -3548,7 +3632,7 @@ function responseCardHtml(item) {
     const s = item.summary;
 
     return `
-        <div class="response-card${status === null ? ' is-open' : ''}" style="border-left-color: ${escapeHtml(apt.color || '#1F5FBF')}">
+        <div class="response-card${status === null ? ' is-open' : ''}" data-appointment-id="${id}" style="border-left-color: ${color}">
             <div class="response-card__head">
                 <strong>${escapeHtml(apt.title)}</strong>
                 <span>${formatDateShortDe(apt.date)} · ${escapeHtml(apt.start_time.substring(0, 5))} Uhr</span>
@@ -3572,6 +3656,8 @@ async function onResponsesClick(event) {
     if (!btn || btn.disabled) return;
 
     const appointmentId = Number(btn.dataset.appointmentId);
+    if (responsesInFlight.has(appointmentId)) return; // Speichert schon -- Doppeltipp ignorieren.
+
     const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === appointmentId);
     if (!item) return;
 
@@ -3584,34 +3670,68 @@ async function onResponsesClick(event) {
         const status = btn.dataset.status;
 
         if (status === 'no' && item.settings.require_excuse && comment === '') {
+            // Antwort ist noch nicht gespeichert (own bleibt null) -- die
+            // gewuenschte Absage merkt sich die Karte selbst, damit
+            // "Bemerkung speichern" gleich weiss, welchen Status es sendet.
+            card.dataset.pendingStatus = status;
             commentBox.hidden = false;
             textarea.placeholder = 'Begründung (Pflicht)';
             textarea.focus();
             showMessage('Bitte zuerst eine Begründung für die Absage eintragen', 'error');
             return;
         }
-        await submitResponse(item, status, comment);
-    } else if (btn.classList.contains('response-comment__save') && item.own) {
-        await submitResponse(item, item.own.status, comment);
+
+        // Wechsel von einer Absage zu Zusage/Unsicher: die Begruendung der
+        // Absage haengt sonst unveraendert an der neuen Antwort. Nur loeschen,
+        // wenn sie seither nicht bearbeitet wurde -- eine bewusst angepasste
+        // Bemerkung bleibt stehen.
+        const previousStatus = item.own ? item.own.status : null;
+        const previousComment = item.own?.comment ?? '';
+        const effectiveComment = (status !== 'no' && previousStatus === 'no' && comment === previousComment)
+            ? ''
+            : comment;
+
+        await submitResponse(item, status, effectiveComment, card);
+    } else if (btn.classList.contains('response-comment__save')) {
+        const targetStatus = item.own ? item.own.status : card.dataset.pendingStatus;
+        if (!targetStatus) {
+            showMessage('Bitte zuerst Zusage, Unsicher oder Absage wählen', 'error');
+            return;
+        }
+        await submitResponse(item, targetStatus, comment, card);
     }
 }
 
-async function submitResponse(item, status, comment) {
+async function submitResponse(item, status, comment, card) {
     const id = item.appointment.appointment_id;
-    const result = await apiCall('appointment_responses', 'PUT',
-        { status, comment: comment || null }, { appointment_id: id });
+    const key = Number(id);
 
-    if (!result.success) {
-        showMessage(result.error || 'Rückmeldung konnte nicht gespeichert werden', 'error');
-        return;
+    if (responsesInFlight.has(key)) return;
+    responsesInFlight.add(key);
+    refreshResponseCardState(card);
+
+    try {
+        const result = await apiCall('appointment_responses', 'PUT',
+            { status, comment: comment || null }, { appointment_id: id });
+
+        if (!result.success) {
+            showMessage(result.error || 'Rückmeldung konnte nicht gespeichert werden', 'error');
+            return;
+        }
+
+        const index = upcomingResponses.findIndex(i => Number(i.appointment.appointment_id) === key);
+        if (index >= 0) upcomingResponses[index] = result.data;
+
+        updateResponsesBadge();
+        renderResponses(key);
+        showMessage('Rückmeldung gespeichert', 'success');
+    } finally {
+        // Bei Erfolg baut renderResponses() die Karte bereits neu auf (dann
+        // ohne Sperre); bei Fehler bleibt die alte Karte stehen und wird hier
+        // wieder freigegeben.
+        responsesInFlight.delete(key);
+        refreshResponseCardState(card);
     }
-
-    const index = upcomingResponses.findIndex(i => i.appointment.appointment_id === id);
-    if (index >= 0) upcomingResponses[index] = result.data;
-
-    updateResponsesBadge();
-    renderResponses();
-    showMessage('Rückmeldung gespeichert', 'success');
 }
 
 // ========================================
