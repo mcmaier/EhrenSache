@@ -152,3 +152,56 @@ test('Modal setzt Mitglieder-Rueckmeldungen ueber die bestehenden Icon-Aktionen 
     assertTrue(!str_contains($js, '<select class="response-set"'), 'Das fruehere Auswahlfeld response-set ist noch vorhanden');
     assertTrue(!str_contains($js, 'type="radio"'), 'responses.js enthaelt noch ein Radio-Eingabefeld -- der Filter muss die Segmentgruppe sein');
 });
+
+test('Kalender-Popup zeigt die Rueckmeldung ueber responseChipsHtml und maskiert Termindaten', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+
+    assertTrue(str_contains($js, "import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS } from './responses.js';"),
+        'appointments.js importiert die Ampel-Bausteine nicht aus responses.js');
+
+    $start = strpos($js, 'function showAppointmentPopup');
+    assertTrue($start !== false, 'showAppointmentPopup fehlt');
+    $ende = strpos($js, 'function previousMonth', $start);
+    assertTrue($ende !== false, 'Ende von showAppointmentPopup nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'escapeHtml(apt.title)'), 'apt.title wird im Popup nicht maskiert');
+    assertTrue(str_contains($body, 'escapeHtml(apt.type_name)'), 'apt.type_name wird im Popup nicht maskiert');
+    assertTrue(str_contains($body, 'escapeHtml(apt.description)'), 'apt.description wird im Popup nicht maskiert');
+    assertTrue(str_contains($body, 'calendarResponseLineHtml'), 'Popup ruft calendarResponseLineHtml() nicht auf');
+
+    $responses = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    assertTrue(str_contains($responses, 'export function responseChipsHtml'), 'responseChipsHtml ist nicht exportiert');
+    assertTrue(str_contains($responses, 'export function responseSummaryTitle'), 'responseSummaryTitle ist nicht exportiert');
+});
+
+test('calendarResponseLineHtml() macht die Ampel nur im festgehaltenen Popup anklickbar', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+
+    $start = strpos($js, 'function calendarResponseLineHtml');
+    assertTrue($start !== false, 'calendarResponseLineHtml fehlt');
+    $ende = strpos($js, 'function ', $start + strlen('function calendarResponseLineHtml'));
+    assertTrue($ende !== false, 'Ende von calendarResponseLineHtml nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'fest && (r.expected || isAdminOrManager)'),
+        'Klickbarkeit folgt nicht derselben Regel wie responseSummaryCell() (erwartet oder Verwaltung, nur im festen Popup)');
+    assertTrue(str_contains($body, "document.querySelector('.calendar-event-popup')?.remove()"),
+        'Der Klick auf die Ampel im Popup entfernt das Popup nicht explizit, bevor das Modal oeffnet');
+    assertTrue(str_contains($body, 'window.openResponsesModal('), 'Klick oeffnet das Rueckmeldungs-Modal nicht');
+});
+
+test('Kalendertag zeigt einen Rueckmeldungs-Punkt und die Hervorhebung fuer offene Rueckmeldungen', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+
+    assertTrue(str_contains($js, "'calendar-response-dot'"), 'createCalendarDay() setzt keine calendar-response-dot-Klasse');
+    assertTrue(str_contains($js, 'calendar-response-dot--open'), 'Hervorhebungs-Variante fuer offene Rueckmeldungen fehlt');
+    assertTrue(str_contains($js, 'responses.expected === true && !a.responses.own'),
+        'Bedingung fuer offene Rueckmeldung (erwartet, keine eigene Antwort) fehlt');
+    assertTrue(str_contains($js, 'Rückmeldung offen'), 'aria-label-Zusatz fuer offene Rueckmeldung fehlt');
+    assertTrue(str_contains($js, 'responseSummaryTitle(a.responses)'), 'aria-label fuehrt responseSummaryTitle je Termin nicht mit');
+
+    $css = (string) file_get_contents($rsRoot . '/public/css/components/calendar.css');
+    assertTrue(str_contains($css, '.calendar-response-dot'), 'calendar.css enthaelt keine Regel fuer calendar-response-dot');
+    assertTrue(str_contains($css, '.calendar-response-dot--open'), 'calendar.css enthaelt keine Regel fuer calendar-response-dot--open');
+});

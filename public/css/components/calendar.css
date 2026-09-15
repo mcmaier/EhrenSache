@@ -115,6 +115,33 @@
     display: none; /* Entferne alten Punkt-Indikator */
 }
 
+/* Terminrueckmeldung (FI-1): Markierung am Kalendertag, wenn mindestens ein
+   Termin des Tages eine Ampel fuehrt. Absolut positioniert -- veraendert die
+   Zellengroesse nicht. --open hebt hervor, wenn mindestens eine Rueckmeldung
+   noch aussteht (erwartet, noch keine eigene Antwort, Termin noch nicht
+   begonnen). */
+.calendar-response-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-light);
+}
+
+.calendar-response-dot--open {
+    background: var(--warning-color);
+}
+
+.calendar-day.today .calendar-response-dot {
+    background: var(--bg-white);
+}
+
+.calendar-day.today .calendar-response-dot--open {
+    background: var(--warning-color);
+}
+
 /* Terminart-Badge im Popup */
 .calendar-type-badge {
     display: inline-block;
@@ -159,6 +186,17 @@
     margin-top: 3px;
     font-size: 11px;
     color: var(--text-light);
+}
+
+/* Terminrueckmeldung (FI-1): Ampel-Zeile je Termin im Kalender-Popup. */
+.calendar-event-responses {
+    margin-top: 5px;
+}
+
+.calendar-event-responses .response-summary-btn,
+.calendar-event-responses .response-summary-text {
+    padding: 2px 6px;
+    font-size: 11px;
 }
 
 .calendar-day.today.has-event {

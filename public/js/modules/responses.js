@@ -23,7 +23,7 @@ import { escapeHtml, translateExceptionStatus } from './utils.js';
 // ============================================
 
 export const RESPONSE_LABELS = { yes: 'Zusage', maybe: 'Unsicher', no: 'Absage', open: 'Ohne Antwort' };
-const RESPONSE_ICONS = { yes: '✓', maybe: '?', no: '✗', open: '—' };
+export const RESPONSE_ICONS = { yes: '✓', maybe: '?', no: '✗', open: '—' };
 
 // Reihenfolge der Ampel-Chips in Terminliste und Modal (yes/maybe/no/open).
 const CHIP_ORDER = ['yes', 'maybe', 'no', 'open'];
@@ -52,7 +52,7 @@ function formatDateTimeDe(mysql) {
 }
 
 /** Ausgeschriebener Tooltip-Text der Ampel, z.B. fuer title/aria-label. */
-function responseSummaryTitle(summary) {
+export function responseSummaryTitle(summary) {
     return `${Number(summary.yes)} Zusagen · ${Number(summary.maybe)} unsicher · `
         + `${Number(summary.no)} Absagen · ${Number(summary.open)} ohne Antwort`;
 }
@@ -61,7 +61,7 @@ function responseSummaryTitle(summary) {
  * Chip-Gruppe der Ampel (Zusage/Unsicher/Absage/Ohne Antwort). `large` schaltet
  * die beschriftete Modal-Variante ein (Terminliste bleibt bei Icon + Zahl).
  */
-function responseChipsHtml(summary, { large = false } = {}) {
+export function responseChipsHtml(summary, { large = false } = {}) {
     const chips = CHIP_ORDER.map(key => {
         const count = Number(summary[key] ?? 0);
         const zero = count === 0 ? ' is-zero' : '';

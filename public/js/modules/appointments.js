@@ -11,11 +11,11 @@
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
-import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId } from './utils.js';
+import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml } from './utils.js';
 import { loadTypes } from './management.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
-import { responseSummaryCell } from './responses.js';
+import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS } from './responses.js';
 
 // ============================================
 // APPOINTMENTS
@@ -414,6 +414,25 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false) {
             day.style.borderLeftStyle = 'solid';
         }
         
+        // Rueckmeldungs-Markierung (FI-1): kleiner Punkt, wenn mindestens ein
+        // Termin des Tages eine Ampel fuehrt. Hervorgehoben, wenn davon
+        // mindestens einer noch offen ist -- vom Anwesenden erwartet, noch
+        // ohne eigene Antwort und noch nicht begonnen. Als eigenes Element
+        // angehaengt, NACH dem textContent oben, damit die Tageszahl davon
+        // unberuehrt bleibt (sie wird an anderer Stelle nirgends mehr gelesen).
+        const withResponses = dayAppointments.filter(a => a.responses);
+        let responseOpen = false;
+        if (withResponses.length > 0) {
+            const now = new Date();
+            responseOpen = withResponses.some(a => a.responses.expected === true && !a.responses.own
+                && new Date(`${a.date}T${a.start_time}`) > now);
+
+            const dot = document.createElement('span');
+            dot.className = 'calendar-response-dot' + (responseOpen ? ' calendar-response-dot--open' : '');
+            dot.setAttribute('aria-hidden', 'true');
+            day.appendChild(dot);
+        }
+
         // Termine des Tages als Vorlesetext.
         //
         // Ersetzt das frueher gesetzte title-Attribut: Der native Tooltip kam
@@ -422,7 +441,9 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false) {
         day.setAttribute('aria-label', `${dayNum}., ` + dayAppointments.map(a => {
             const typeName = a.type_name ? `${a.type_name}, ` : '';
             return `${a.start_time} ${typeName}${a.title}`;
-        }).join('; '));
+        }).join('; ')
+            + withResponses.map(a => `; ${responseSummaryTitle(a.responses)}`).join('')
+            + (responseOpen ? '; Rückmeldung offen' : ''));
 
         // Ueberfahren zeigt dasselbe Popup wie der Klick, nur fluechtig. Die
         // kleine Verzoegerung verhindert, dass beim Wandern ueber den Kalender
@@ -458,6 +479,36 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false) {
 let kalenderHoverTimer = null;
 
 /**
+ * Rueckmeldungs-Zeile eines Termins im Kalender-Popup: dieselbe Chip-Gruppe
+ * wie die Terminliste (responseChipsHtml), dazu die eigene Antwort. Nur im
+ * festgehaltenen Popup (fest=true) anklickbar, und auch dort nur, wenn
+ * responseSummaryCell() fuer denselben Termin ebenfalls einen Button liefern
+ * wuerde (erwartet oder Verwaltung) -- sonst wie in der Terminliste nur Text.
+ */
+function calendarResponseLineHtml(apt, fest) {
+    const r = apt.responses;
+    const title = responseSummaryTitle(r);
+    const chips = responseChipsHtml(r);
+    const own = r.own
+        ? ` <span class="response-own response-own--${r.own}" title="Eigene Rückmeldung: ${RESPONSE_LABELS[r.own]}">${RESPONSE_ICONS[r.own]}</span>`
+        : '';
+    const clickable = fest && (r.expected || isAdminOrManager);
+
+    if (!clickable) {
+        return `<div class="calendar-event-responses"><span class="response-summary-text" title="${escapeHtml(title)}">${chips}</span>${own}</div>`;
+    }
+
+    // Der Dokument-Klick-Handler in showAppointmentPopup() entfernt das Popup
+    // ohnehin beim Bubbling -- aber erst danach, und nur, wenn er ueberhaupt
+    // registriert ist (10ms Verzoegerung). Hier explizit vorher entfernen,
+    // damit ein schneller Klick nicht ins Leere modaliert.
+    return `<div class="calendar-event-responses">
+        <button type="button" class="response-summary-btn" title="${escapeHtml(title)}"
+            onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openResponsesModal(${Number(apt.appointment_id)})">${chips}</button>${own}
+    </div>`;
+}
+
+/**
  * Zeigt die Termine eines Tages neben dem Kalenderfeld.
  *
  * @param {HTMLElement} ziel         Das Kalenderfeld, an dem das Popup haengt
@@ -488,23 +539,27 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
 
     let html = `<h4>${kopf}</h4>`;
     appointments.forEach(apt => {
-        // Terminart-Badge mit Farbe
-        const typeBadge = apt.type_name 
-            ? `<span class="calendar-type-badge" style="background: ${apt.color || '#667eea'}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 5px;">${apt.type_name}</span>`
+        // Terminart-Badge mit Farbe. apt.color kommt aus der Terminart und
+        // landet ungeprueft in einem style-Attribut -- ohne CSP (OI-17) muss
+        // das selbst geschehen. Bei ungueltigem Wert bleibt es beim Default.
+        const color = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#667eea';
+        const typeBadge = apt.type_name
+            ? `<span class="calendar-type-badge" style="background: ${color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 5px;">${escapeHtml(apt.type_name)}</span>`
             : '';
 
         html += `
             <div class="calendar-event-item">
                 <div class="calendar-event-time">${apt.start_time ? apt.start_time.substring(0, 5) : ''}</div>
                 <div>
-                    ${apt.title}
+                    ${escapeHtml(apt.title)}
                     ${typeBadge}
                 </div>
-                ${apt.description ? `<div style="font-size: 11px; color: #7f8c8d;">${apt.description}</div>` : ''}
+                ${apt.description ? `<div style="font-size: 11px; color: #7f8c8d;">${escapeHtml(apt.description)}</div>` : ''}
+                ${apt.responses ? calendarResponseLineHtml(apt, fest) : ''}
             </div>
         `;
     });
-    
+
     popup.innerHTML = html;
 
     // Erst anhängen, dann messen: Vorher steht die Größe nicht fest.
