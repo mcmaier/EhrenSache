@@ -838,3 +838,42 @@ test('appointments: Antwort eines nicht mehr erwarteten Mitglieds zaehlt nicht m
         }
     }
 });
+
+test('my_data: eigene Rueckmeldungen in JSON und CSV', function () {
+    $welt = rsWorld('Auskunft', ['responses_enabled' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(6), '19:00:00');
+        rsWithUserInWorld($welt, function () use ($apt) {
+            assertStatus(200, rsPut('user', $apt, ['status' => 'yes', 'comment' => 'RS-Auskunft']));
+
+            $json = apiRequest('GET', 'my_data', ['token' => apiToken('user')]);
+            assertStatus(200, $json);
+            $kommentare = array_column($json['body']['appointment_responses'], 'comment');
+            assertTrue(in_array('RS-Auskunft', $kommentare, true), 'Rueckmeldung fehlt in der Auskunft');
+
+            $csv = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'csv']]);
+            assertTrue(str_contains($csv['raw'], '=== TERMINRÜCKMELDUNGEN ==='), 'CSV-Abschnitt fehlt');
+            assertTrue(str_contains($csv['raw'], 'RS-Auskunft'));
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('cleanup: Rueckmeldungen alter Termine werden mit geloescht', function () {
+    // ACHTUNG, wie cleanup_api.php: nur mit Fristen, die ausschliesslich die
+    // eigenen Testdaten treffen. Der Termin liegt 1920, die Frist 100 Jahre.
+    $welt = rsWorld('Cleanup', ['responses_enabled' => 1]);
+    try {
+        $apt = rsAppointment($welt, '1920-05-01', '19:00:00');
+        assertStatus(200, rsPut('manager', $apt, ['status' => 'yes'], $welt['member']));
+
+        $res = apiRequest('POST', 'cleanup', ['token' => apiToken('admin'),
+            'body' => ['years' => 100, 'years_worktime' => 30, 'years_audit' => 100]]);
+        assertStatus(200, $res);
+        assertTrue((int) $res['body']['deleted_appointment_responses'] >= 1,
+            'Die Rueckmeldung zum Termin von 1920 haette geloescht werden muessen');
+    } finally {
+        rsDropWorld($welt);
+    }
+});

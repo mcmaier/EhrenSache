@@ -155,6 +155,19 @@ function handleMyData($db, $database, $request_method, $authUserId)
     $stmt->execute([$member_id]);
     $data['work_session_log'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Terminrueckmeldungen (FI-1). Gespeicherte Angaben des Mitglieds wie
+    // Anwesenheiten, deshalb Teil der Auskunft nach Art. 15 DSGVO.
+    $stmt = $db->prepare("
+        SELECT r.status, r.comment, r.status_changed_at, r.updated_at,
+               a.title AS appointment_title, a.date AS appointment_date
+        FROM {$prefix}appointment_responses r
+        JOIN {$prefix}appointments a ON a.appointment_id = r.appointment_id
+        WHERE r.member_id = ?
+        ORDER BY a.date DESC
+    ");
+    $stmt->execute([$member_id]);
+    $data['appointment_responses'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     // Puenktlichkeit und Zuverlaessigkeit je Jahr -- abgeleitete Kennzahlen,
     // keine gespeicherten Daten. Sie gehoeren trotzdem in die Auskunft: Die
     // DSGVO nennt Zuverlaessigkeit und Verhalten bei der Begriffsbestimmung
@@ -244,6 +257,20 @@ function exportAsCSV($data) {
             $exception['reason'],
             $exception['status'],
             $exception['appointment_title'] ?? '-'
+        ]);
+    }
+
+    fputcsv($output, []);
+    fputcsv($output, ['=== TERMINRÜCKMELDUNGEN ===']);
+    fputcsv($output, ['Termindatum', 'Termin', 'Rückmeldung', 'Bemerkung', 'Zuletzt geändert']);
+    $responseLabels = ['yes' => 'Zusage', 'no' => 'Absage', 'maybe' => 'Unsicher'];
+    foreach ($data['appointment_responses'] as $response) {
+        fputcsv($output, [
+            date('d.m.Y', strtotime($response['appointment_date'])),
+            $response['appointment_title'] ?? '-',
+            $responseLabels[$response['status']] ?? $response['status'],
+            $response['comment'] ?? '',
+            date('d.m.Y H:i', strtotime($response['status_changed_at'])),
         ]);
     }
 

@@ -527,6 +527,15 @@ function handleCleanup($db, $database, $request_method)
     $db->beginTransaction();
 
     try {
+        // Rueckmeldungen nach derselben Frist wie Records und ueber das
+        // Termindatum, nicht den Antwortzeitpunkt (Spec Terminrueckmeldung 5.7).
+        $stmt = $db->prepare("DELETE r FROM {$prefix}appointment_responses r
+                              JOIN {$prefix}appointments a
+                                ON a.appointment_id = r.appointment_id
+                              WHERE a.date < ?");
+        $stmt->execute([$cutoff['records']]);
+        $deletedResponses = $stmt->rowCount();
+
         // Lösche alte Records — über das Termindatum, nicht über die Ankunft.
         //
         // Seit 1.5.0 darf arrival_time NULL sein, und NULL < '2023-01-01' ist
@@ -601,6 +610,7 @@ function handleCleanup($db, $database, $request_method)
         "cutoff_date_audit" => $cutoff['audit'],
         "deleted_records" => $deletedRecords,
         "deleted_exceptions" => $deletedExceptions,
+        "deleted_appointment_responses" => $deletedResponses,
         "deleted_work_sessions" => $deletedSessions,
         "deleted_work_session_log" => $deletedLog,
         "anonymized_work_session_log" => $anonymizedLog
