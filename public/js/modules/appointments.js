@@ -15,6 +15,7 @@ import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalI
 import { loadTypes } from './management.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
+import { responseSummaryCell } from './responses.js';
 
 // ============================================
 // APPOINTMENTS
@@ -96,7 +97,7 @@ async function renderAppointments(appointments, page = 1) {
     
     const tbody = document.getElementById('appointmentsTableBody');
     if (!appointments){
-        tbody.innerHTML = '<tr><td colspan="4" class="loading">Keine Einträge gefunden</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="loading">Keine Einträge gefunden</td></tr>';
         updateAppointmentStats(0);
         return;
     }
@@ -173,6 +174,7 @@ async function renderAppointments(appointments, page = 1) {
                 <td>${appointmentInfo}</td>
                 <td>${typeBadge}</td>
                 <td>${apt.description || '-'}</td>
+                <td class="response-cell">${responseSummaryCell(apt)}</td>
                 ${actionsHtml}
                 `;
         fragment.appendChild(tr);

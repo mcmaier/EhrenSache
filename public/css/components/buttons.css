@@ -225,3 +225,56 @@
         margin: 0 1px;
     }
 }
+
+/* Terminrueckmeldung (FI-1): Segmentgruppe und Listenzelle */
+.response-segment {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin: var(--spacing-sm) 0;
+}
+
+.response-segment__btn {
+    flex: 1;
+    padding: var(--spacing-sm);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-white);
+    color: var(--text-dark);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.response-segment__btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.response-segment__btn--yes.is-active   { background: var(--success-color); border-color: var(--success-color); color: var(--bg-white); }
+.response-segment__btn--maybe.is-active { background: var(--warning-color); border-color: var(--warning-color); color: var(--bg-white); }
+.response-segment__btn--no.is-active    { background: var(--danger-color);  border-color: var(--danger-color);  color: var(--bg-white); }
+
+.response-summary-btn {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-light);
+    padding: 4px 8px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.response-own { font-weight: 700; margin-left: 4px; }
+.response-own--yes   { color: var(--success-color); }
+.response-own--maybe { color: var(--warning-color); }
+.response-own--no    { color: var(--danger-color); }
+.response-none       { color: var(--text-light); }
+
+.response-badge { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: 0.85em; }
+.response-badge--yes   { background: var(--success-color); color: var(--bg-white); }
+.response-badge--maybe { background: var(--warning-color); color: var(--bg-white); }
+.response-badge--no    { background: var(--danger-color);  color: var(--bg-white); }
+.response-badge--none  { background: var(--bg-gray); color: var(--text-medium); }
+
+.response-late {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--danger-color);
+    border-radius: var(--radius-sm);
+    color: var(--danger-color);
+    font-size: 0.8em;
+}

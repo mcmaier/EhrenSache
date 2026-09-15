@@ -572,3 +572,5 @@
         min-width: 0;
     }
 }
+
+.modal-content--wide { max-width: 900px; }

@@ -70,3 +70,29 @@ test('management.js schickt die vier Felder beim Speichern', function () use ($r
         assertTrue(str_contains($js, $key), "{$key} fehlt in saveType()");
     }
 });
+
+test('Terminliste hat die Spalte Rueckmeldung und passende colspan', function () use ($rsRoot) {
+    $html = (string) file_get_contents($rsRoot . '/public/index.html');
+    assertTrue(str_contains($html, '<th>Rückmeldung</th>'), 'Spaltenkopf fehlt');
+
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+    assertTrue(!str_contains($js, 'colspan="4"'), 'appointments.js rendert noch vier Spalten');
+});
+
+test('Rueckmeldungs-Modal ist eingebunden', function () use ($rsRoot) {
+    $html = (string) file_get_contents($rsRoot . '/public/index.html');
+    assertTrue(str_contains($html, 'id="responsesModal"'), 'Modal fehlt');
+    assertTrue(str_contains($html, 'src="./js/modules/responses.js"'), 'Modul nicht geladen');
+
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    foreach (['openResponsesModal', 'closeResponsesModal', 'setOwnResponse', 'setMemberResponse'] as $fn) {
+        assertTrue(str_contains($js, "window.{$fn} = {$fn}"), "{$fn} ist nicht global erreichbar");
+    }
+});
+
+test('responses.js maskiert Namen und Bemerkungen', function () use ($rsRoot) {
+    // Keine CSP (OI-17): Bemerkungen sind freie Eingaben von Mitgliedern.
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    assertTrue(str_contains($js, 'escapeHtml(m.comment'), 'Bemerkung wird nicht maskiert');
+    assertTrue(str_contains($js, 'escapeHtml(m.surname'), 'Name wird nicht maskiert');
+});
