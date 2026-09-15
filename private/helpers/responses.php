@@ -384,3 +384,38 @@ function responsesFetchUpcomingIds($db, $database, int $memberId, string $now): 
 
     return array_map(static fn ($r) => (int) $r['appointment_id'], $stmt->fetchAll(PDO::FETCH_ASSOC));
 }
+
+/** Eine Antwort mit Antragsstatus, gesperrt fuer die laufende Transaktion. */
+function responsesFetchOneForUpdate($db, $database, int $appointmentId, int $memberId): ?array
+{
+    $prefix = $database->table('');
+    $stmt = $db->prepare("
+        SELECT r.response_id, r.status, r.comment, r.status_changed_at, r.exception_id,
+               e.status AS excuse_state
+        FROM {$prefix}appointment_responses r
+        LEFT JOIN {$prefix}exceptions e ON e.exception_id = r.exception_id
+        WHERE r.appointment_id = ? AND r.member_id = ?
+        FOR UPDATE
+    ");
+    $stmt->execute([$appointmentId, $memberId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row === false ? null : $row;
+}
+
+/** Juengster eigener, nicht abgelehnter Abwesenheitsantrag zum Termin, oder null. */
+function responsesFetchOwnAbsence($db, $database, int $appointmentId, int $memberId): ?array
+{
+    $prefix = $database->table('');
+    $stmt = $db->prepare("
+        SELECT exception_id, status FROM {$prefix}exceptions
+        WHERE appointment_id = ? AND member_id = ?
+          AND exception_type = 'absence' AND status <> 'rejected'
+        ORDER BY created_at DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$appointmentId, $memberId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row === false ? null : $row;
+}

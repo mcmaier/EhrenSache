@@ -168,6 +168,45 @@ function rsSettingValue(string $key): ?string
     return null;
 }
 
+function rsPut(string $role, int $appointmentId, array $body, ?int $memberId = null): array
+{
+    $query = ['appointment_id' => $appointmentId];
+    if ($memberId !== null) {
+        $query['member_id'] = $memberId;
+    }
+
+    return apiRequest('PUT', 'appointment_responses', ['token' => apiToken($role), 'query' => $query, 'body' => $body]);
+}
+
+function rsDeleteResponse(string $role, int $appointmentId, ?int $memberId = null): array
+{
+    $query = ['appointment_id' => $appointmentId];
+    if ($memberId !== null) {
+        $query['member_id'] = $memberId;
+    }
+
+    return apiRequest('DELETE', 'appointment_responses', ['token' => apiToken($role), 'query' => $query]);
+}
+
+function rsWithSettings(array $settings, callable $fn): void
+{
+    $vorher = [];
+    foreach ($settings as $key => $value) {
+        $vorher[$key] = rsSettingValue($key) ?? '0';
+        assertStatus(200, apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+            'body' => ['setting_key' => $key, 'setting_value' => $value]]));
+    }
+
+    try {
+        $fn();
+    } finally {
+        foreach ($vorher as $key => $value) {
+            apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+                'body' => ['setting_key' => $key, 'setting_value' => $value]]);
+        }
+    }
+}
+
 test('appointment_types: neue Terminart traegt die Rueckmeldungs-Einstellungen', function () {
     $welt = rsWorld('Typ', [
         'responses_enabled' => 1, 'responses_names_visible' => 1,
@@ -359,5 +398,292 @@ test('appointment_responses: upcoming listet nur Termine mit Rueckmeldung, zu de
     } finally {
         rsDropWorld($mit);
         rsDropWorld($ohne);
+    }
+});
+
+// ---- appointment_responses: Schreiben --------------------------------------
+
+test('PUT: Mitglied sagt zu, aendert die Bemerkung, sagt ab', function () {
+    $welt = rsWorld('Put', ['responses_enabled' => 1, 'response_deadline_hours' => 0]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+
+        rsWithUserInWorld($welt, function () use ($apt) {
+            $res = rsPut('user', $apt, ['status' => 'yes']);
+            assertStatus(200, $res);
+            assertSame('yes', $res['body']['own']['status']);
+            assertSame(false, $res['body']['own']['is_late'], 'Frist 0, Termin in drei Tagen');
+            assertSame(1, $res['body']['summary']['yes']);
+            $zeitpunkt = $res['body']['own']['status_changed_at'];
+
+            sleep(1);
+            $res = rsPut('user', $apt, ['status' => 'yes', 'comment' => 'komme 10 Minuten spaeter']);
+            assertStatus(200, $res);
+            assertSame('komme 10 Minuten spaeter', $res['body']['own']['comment']);
+            assertSame($zeitpunkt, $res['body']['own']['status_changed_at'],
+                'Eine reine Bemerkungsaenderung verschiebt den Statuszeitpunkt nicht');
+
+            sleep(1);
+            $res = rsPut('user', $apt, ['status' => 'no']);
+            assertStatus(200, $res);
+            assertTrue($res['body']['own']['status_changed_at'] > $zeitpunkt, 'Statuswechsel setzt den Zeitpunkt neu');
+            assertSame(null, $res['body']['own']['comment'], 'Ohne comment im Koerper ist die Bemerkung leer');
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('PUT: nach der Frist gespeichert und als kurzfristig markiert', function () {
+    $welt = rsWorld('Spaet', ['responses_enabled' => 1, 'response_deadline_hours' => 720]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+        rsWithUserInWorld($welt, function () use ($apt) {
+            $res = rsPut('user', $apt, ['status' => 'no']);
+            assertStatus(200, $res);
+            assertSame(true, $res['body']['own']['is_late']);
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('PUT: Eingaben und Rechte werden geprueft', function () {
+    $welt = rsWorld('Rechte', ['responses_enabled' => 1]);
+    try {
+        $kommend = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+        $begonnen = rsAppointment($welt, rsDateInDays(-3), '19:00:00');
+
+        assertStatus(403, rsPut('user', $kommend, ['status' => 'yes']), 'nicht erwartet');
+
+        rsWithUserInWorld($welt, function () use ($kommend, $begonnen, $welt) {
+            assertStatus(400, rsPut('user', $kommend, ['status' => 'vielleicht']));
+            assertStatus(400, rsPut('user', $kommend, ['status' => 'yes', 'comment' => str_repeat('x', 256)]));
+            assertStatus(409, rsPut('user', $begonnen, ['status' => 'yes']), 'Mitglied nach Beginn');
+            assertStatus(403, rsPut('user', $kommend, ['status' => 'yes'], $welt['member']), 'user fuer andere');
+
+            $nachtrag = rsPut('manager', $begonnen, ['status' => 'no', 'comment' => 'angerufen'], $welt['member']);
+            assertStatus(200, $nachtrag, 'Manager darf nach Beginn fuer ein Mitglied eintragen');
+            assertSame(true, $nachtrag['body']['started']);
+            assertTrue(array_key_exists('comparison', $nachtrag['body']), 'Nach Beginn gibt es die Gegenueberstellung');
+            assertSame(1, $nachtrag['body']['comparison']['no_absent']);
+        });
+
+        assertStatus(404, rsPut('manager', $kommend, ['status' => 'yes'], 999999999), 'unbekanntes Mitglied');
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('PUT: Konto ohne Mitglied kann nicht fuer sich antworten', function () {
+    $ohneMitglied = null;
+    foreach (['admin', 'manager'] as $rolle) {
+        if (apiMemberId($rolle) === null) {
+            $ohneMitglied = $rolle;
+            break;
+        }
+    }
+    if ($ohneMitglied === null) {
+        assertTrue(true, 'Kein Testkonto ohne Mitglied -- Test uebersprungen');
+        return;
+    }
+
+    $welt = rsWorld('OhneMitglied', ['responses_enabled' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+        assertStatus(403, rsPut($ohneMitglied, $apt, ['status' => 'yes']));
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('PUT: Entschuldigungspflicht erzeugt, loescht und bewahrt den Antrag', function () {
+    $welt = rsWorld('Pflicht', ['responses_enabled' => 1, 'responses_require_excuse' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt) {
+            assertStatus(422, rsPut('user', $apt, ['status' => 'no']), 'Absage ohne Begruendung');
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'Urlaub']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state']);
+
+            $antraege = static function () use ($userMember, $apt): array {
+                $liste = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+                    'query' => ['member_id' => $userMember, 'type' => 'absence']]);
+                assertStatus(200, $liste);
+
+                return array_values(array_filter($liste['body'],
+                    static fn ($e) => (int) $e['appointment_id'] === $apt));
+            };
+            assertSame(1, count($antraege()));
+            assertSame('Urlaub', $antraege()[0]['reason']);
+
+            assertStatus(200, rsPut('user', $apt, ['status' => 'yes']));
+            assertSame(0, count($antraege()), 'Zusage loescht den offenen Antrag');
+
+            assertStatus(200, rsPut('user', $apt, ['status' => 'no', 'comment' => 'doch Urlaub']));
+            $antrag = $antraege()[0];
+            assertStatus(200, apiRequest('PUT', 'exceptions', ['token' => apiToken('admin'),
+                'query' => ['id' => (int) $antrag['exception_id']],
+                'body'  => ['exception_type' => 'absence', 'reason' => 'doch Urlaub', 'status' => 'approved']]));
+
+            $res = rsPut('user', $apt, ['status' => 'yes']);
+            assertStatus(200, $res);
+            assertSame('approved', $res['body']['own']['excuse_state'], 'Genehmigter Antrag bleibt verknuepft');
+            assertSame(1, count($antraege()), 'Genehmigter Antrag bleibt bestehen');
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('DELETE: Ruecknahme entfernt Antwort und offenen Antrag', function () {
+    $welt = rsWorld('Loeschen', ['responses_enabled' => 1, 'responses_require_excuse' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt) {
+            assertStatus(404, rsDeleteResponse('user', $apt), 'Nichts zum Zuruecknehmen');
+            assertStatus(200, rsPut('user', $apt, ['status' => 'no', 'comment' => 'krank']));
+            assertStatus(200, rsDeleteResponse('user', $apt));
+
+            $nachher = rsGet('user', ['appointment_id' => $apt]);
+            assertSame(null, $nachher['body']['own']);
+
+            $liste = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+                'query' => ['member_id' => $userMember, 'type' => 'absence']]);
+            assertSame([], array_values(array_filter($liste['body'],
+                static fn ($e) => (int) $e['appointment_id'] === $apt)));
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('Namen fuer Mitglieder: nur mit Freigabe, Bemerkungen nie', function () {
+    $welt = rsWorld('Namen', ['responses_enabled' => 1, 'responses_names_visible' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+        assertStatus(200, rsPut('manager', $apt, ['status' => 'no', 'comment' => 'privat'], $welt['member']));
+
+        rsWithUserInWorld($welt, function () use ($apt, $welt) {
+            $res = rsGet('user', ['appointment_id' => $apt]);
+            assertStatus(200, $res);
+            $zeile = array_values(array_filter($res['body']['members'],
+                static fn ($m) => $m['member_id'] === $welt['member']))[0];
+
+            assertSame('no', $zeile['status']);
+            foreach (['comment', 'status_changed_at', 'is_late', 'excuse_state', 'present'] as $verbotenesFeld) {
+                assertTrue(!array_key_exists($verbotenesFeld, $zeile),
+                    "Feld '{$verbotenesFeld}' darf fuer Mitglieder nie erscheinen");
+            }
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('Zuverlaessigkeit: rechtzeitige Absage zaehlt, kurzfristige und Antrag nach der Frist nicht', function () {
+    // Termine heute spaeter: noch nicht begonnen, zaehlen aber schon zur
+    // Statistik (vgl. punctuality_api.php). Ab 20:57 stimmt die Zeitlage nicht.
+    if (date('H:i') >= '20:57') {
+        assertTrue(true, 'Zeitlage ungeeignet -- Test uebersprungen');
+        return;
+    }
+
+    $frist0   = rsWorld('Frist0', ['responses_enabled' => 1, 'response_deadline_hours' => 0]);
+    $frist720 = rsWorld('Frist720', ['responses_enabled' => 1, 'response_deadline_hours' => 720]);
+    $heute    = date('Y-m-d');
+
+    try {
+        $a = rsAppointment($frist0, $heute, '23:59:00');
+        assertStatus(200, rsPut('manager', $a, ['status' => 'no'], $frist0['member']));
+
+        $b = rsAppointment($frist720, $heute, '23:59:00');
+        assertStatus(200, rsPut('manager', $b, ['status' => 'no'], $frist720['member']));
+
+        $c = rsAppointment($frist720, $heute, '20:59:00');
+        rsCreate('exceptions', [
+            'member_id' => $frist720['member'], 'appointment_id' => $c,
+            'exception_type' => 'absence', 'reason' => 'RS-Test', 'status' => 'pending',
+        ]);
+
+        rsWithSettings(['reliability_enabled' => '1'], function () use ($frist0, $frist720) {
+            $stats = static function (array $welt): array {
+                $res = apiRequest('GET', 'statistics', ['token' => apiToken('admin'),
+                    'query' => ['year' => date('Y'), 'group_id' => $welt['group'], 'member_id' => $welt['member']]]);
+                assertStatus(200, $res);
+
+                return $res['body']['reliability'];
+            };
+
+            $r0 = $stats($frist0);
+            assertSame(1, $r0['total']);
+            assertSame(1, $r0['excused_in_time'], 'Absage vor der Frist 0');
+
+            $r720 = $stats($frist720);
+            assertSame(2, $r720['total']);
+            assertSame(0, $r720['excused_in_time']);
+            assertSame(2, $r720['missed'], 'kurzfristige Absage und Antrag nach der Frist');
+        });
+    } finally {
+        rsDropWorld($frist0);
+        rsDropWorld($frist720);
+    }
+});
+
+test('Zuverlaessigkeit: globale Frist greift, wenn die Terminart keine eigene hat; Antrag vor der Frist zaehlt', function () {
+    // Gleiche Zeitlage-Absicherung wie beim Test oben -- Termine heute spaeter.
+    if (date('H:i') >= '20:57') {
+        assertTrue(true, 'Zeitlage ungeeignet -- Test uebersprungen');
+        return;
+    }
+
+    $weltG = rsWorld('Global', ['responses_enabled' => 1]);   // keine eigene Frist -> global
+    $weltA = rsWorld('Antrag', ['responses_enabled' => 1, 'response_deadline_hours' => 0]);
+    $heute = date('Y-m-d');
+
+    try {
+        $g = rsAppointment($weltG, $heute, '23:59:00');
+        assertStatus(200, rsPut('manager', $g, ['status' => 'no'], $weltG['member']));
+
+        $a = rsAppointment($weltA, $heute, '22:59:00');
+        rsCreate('exceptions', [
+            'member_id' => $weltA['member'], 'appointment_id' => $a,
+            'exception_type' => 'absence', 'reason' => 'RS-Test', 'status' => 'pending',
+        ]);
+
+        $stats = static function (array $welt): array {
+            $res = apiRequest('GET', 'statistics', ['token' => apiToken('admin'),
+                'query' => ['year' => date('Y'), 'group_id' => $welt['group'], 'member_id' => $welt['member']]]);
+            assertStatus(200, $res);
+
+            return $res['body']['reliability'];
+        };
+
+        rsWithSettings(['reliability_enabled' => '1', 'response_deadline_hours' => '0'], function () use ($weltG, $weltA, $stats) {
+            $rG = $stats($weltG);
+            assertSame(1, $rG['excused_in_time'], 'Globale Frist 0 -- Absage vor Terminbeginn zaehlt rechtzeitig');
+
+            $rA = $stats($weltA);
+            assertSame(1, $rA['excused_in_time'], 'Antrag vor der globalen Frist 0 zaehlt rechtzeitig');
+        });
+
+        rsWithSettings(['reliability_enabled' => '1', 'response_deadline_hours' => '720'], function () use ($weltG, $weltA, $stats) {
+            $rG = $stats($weltG);
+            assertSame(1, $rG['missed'], 'Globale Frist 720 ist nun verstrichen');
+            assertSame(0, $rG['excused_in_time']);
+
+            // Die Terminart von A traegt eine eigene Frist (0) -- die globale
+            // Einstellung wirkt hier nicht, der Antrag bleibt rechtzeitig.
+            $rA = $stats($weltA);
+            assertSame(1, $rA['excused_in_time'], 'Terminart-eigene Frist ueberstimmt die globale Einstellung');
+            assertSame(0, $rA['missed']);
+        });
+    } finally {
+        rsDropWorld($weltG);
+        rsDropWorld($weltA);
     }
 });

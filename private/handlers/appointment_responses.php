@@ -42,6 +42,14 @@ function handleAppointmentResponses($db, $database, $method, $authUserId, $authU
             }
             return;
 
+        case 'PUT':
+            responsesPut($db, $database, (int) $authUserId, $isManager, $authMemberId, $now, $globalHours);
+            return;
+
+        case 'DELETE':
+            responsesDelete($db, $database, $isManager, $authMemberId, $now);
+            return;
+
         default:
             responsesFail(405, 'Methode nicht erlaubt');
     }
@@ -254,4 +262,218 @@ function responsesRenderPrint($db, $database, array $payload): void
             'Frist: ' . date('d.m.Y H:i', strtotime($payload['settings']['deadline'])) . ' Uhr',
         ],
     ]);
+}
+
+/**
+ * Fuer wen geschrieben wird. Sendet bei einem Fehler die Antwort selbst und liefert null.
+ *
+ * @return ?array{member_id: int, for_other: bool}
+ */
+function responsesResolveTarget($db, $database, bool $isManager, ?int $authMemberId): ?array
+{
+    $memberParam = responsesQueryInt('member_id');
+
+    if ($memberParam !== null) {
+        if (!$isManager) {
+            responsesFail(403, 'Nur Admin und Manager dürfen für andere Mitglieder eintragen');
+            return null;
+        }
+        if ($memberParam < 0) {
+            responsesFail(400, 'member_id ist ungültig');
+            return null;
+        }
+        $prefix = $database->table('');
+        $stmt = $db->prepare("SELECT 1 FROM {$prefix}members WHERE member_id = ?");
+        $stmt->execute([$memberParam]);
+        if ($stmt->fetchColumn() === false) {
+            responsesFail(404, 'Mitglied nicht gefunden');
+            return null;
+        }
+
+        return ['member_id' => $memberParam, 'for_other' => true];
+    }
+
+    if ($authMemberId === null) {
+        responsesFail(403, 'Mit diesem Benutzerkonto ist kein Mitglied verknüpft');
+        return null;
+    }
+
+    return ['member_id' => $authMemberId, 'for_other' => false];
+}
+
+/**
+ * Termin, Ziel und Erwartung pruefen -- gemeinsam fuer PUT und DELETE.
+ *
+ * @return ?array{apt: array, member_id: int}
+ */
+function responsesPrepareWrite($db, $database, bool $isManager, ?int $authMemberId, string $now,
+                               bool $requireEnabled): ?array
+{
+    $appointmentId = responsesQueryInt('appointment_id');
+    if ($appointmentId === null || $appointmentId < 0) {
+        responsesFail(400, 'appointment_id fehlt oder ist ungültig');
+        return null;
+    }
+
+    $apt = responsesFetchAppointment($db, $database, $appointmentId);
+    if ($apt === null) {
+        responsesFail(404, 'Termin nicht gefunden');
+        return null;
+    }
+    if ($requireEnabled && (int) $apt['responses_enabled'] !== 1) {
+        responsesFail(409, 'Für diese Terminart sind keine Rückmeldungen vorgesehen');
+        return null;
+    }
+
+    $target = responsesResolveTarget($db, $database, $isManager, $authMemberId);
+    if ($target === null) {
+        return null;
+    }
+
+    $expected = responsesDedupeExpected(responsesFetchExpected($db, $database, $appointmentId));
+    if (!isset($expected[$target['member_id']])) {
+        responsesFail(403, 'Für dieses Mitglied ist zu diesem Termin keine Rückmeldung vorgesehen');
+        return null;
+    }
+
+    // Nach Beginn nur noch Verwalter fuer ein Mitglied, etwa nach einem Anruf (Spec 5.2).
+    if (!$target['for_other'] && responseHasStarted($apt['date'], $apt['start_time'], $now)) {
+        responsesFail(409, 'Der Termin hat bereits begonnen');
+        return null;
+    }
+
+    return ['apt' => $apt, 'member_id' => $target['member_id']];
+}
+
+function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $authMemberId, string $now,
+                      int $globalHours): void
+{
+    $ctx = responsesPrepareWrite($db, $database, $isManager, $authMemberId, $now, true);
+    if ($ctx === null) {
+        return;
+    }
+    $apt           = $ctx['apt'];
+    $memberId      = $ctx['member_id'];
+    $appointmentId = (int) $apt['appointment_id'];
+
+    $data       = json_decode((string) file_get_contents('php://input'), true);
+    $status     = is_array($data) ? ($data['status'] ?? null) : null;
+    $commentRaw = is_array($data) ? ($data['comment'] ?? null) : null;
+
+    $error = responseInputError($status, $commentRaw);
+    if ($error !== null) {
+        responsesFail(400, $error);
+        return;
+    }
+    $comment       = responseNormalizeComment($commentRaw);
+    $requireExcuse = (int) $apt['responses_require_excuse'] === 1;
+
+    if ($requireExcuse && $status === 'no' && $comment === null) {
+        responsesFail(422, 'Eine Absage zu diesem Termin braucht eine Begründung');
+        return;
+    }
+
+    $prefix = $database->table('');
+    $db->beginTransaction();
+
+    try {
+        $existing   = responsesFetchOneForUpdate($db, $database, $appointmentId, $memberId);
+        $ownAbsence = responsesFetchOwnAbsence($db, $database, $appointmentId, $memberId);
+
+        $exceptionId = $existing['exception_id'] ?? null;
+        $action = responseExcuseAction($requireExcuse, $existing['status'] ?? null, $status,
+                                       $existing['excuse_state'] ?? null, $ownAbsence !== null);
+
+        switch ($action) {
+            case 'create':
+                $db->prepare("INSERT INTO {$prefix}exceptions
+                              (member_id, appointment_id, exception_type, reason,
+                               requested_arrival_time, status, created_by)
+                              VALUES (?, ?, 'absence', ?, NULL, 'pending', ?)")
+                   ->execute([$memberId, $appointmentId, $comment, $authUserId]);
+                $exceptionId = (int) $db->lastInsertId();
+                break;
+
+            case 'link':
+                $exceptionId = (int) $ownAbsence['exception_id'];
+                break;
+
+            case 'update_reason':
+                $db->prepare("UPDATE {$prefix}exceptions SET reason = ?
+                              WHERE exception_id = ? AND status = 'pending'")
+                   ->execute([$comment, $exceptionId]);
+                break;
+
+            case 'delete':
+                $db->prepare("DELETE FROM {$prefix}exceptions
+                              WHERE exception_id = ? AND status = 'pending'")
+                   ->execute([$exceptionId]);
+                $exceptionId = null;
+                break;
+        }
+
+        $statusChangedAt = ($existing !== null && $existing['status'] === $status)
+            ? $existing['status_changed_at']
+            : $now;
+
+        $db->prepare("INSERT INTO {$prefix}appointment_responses
+                      (appointment_id, member_id, status, comment, exception_id, status_changed_at, updated_at)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)
+                      ON DUPLICATE KEY UPDATE status = VALUES(status), comment = VALUES(comment),
+                          exception_id = VALUES(exception_id),
+                          status_changed_at = VALUES(status_changed_at), updated_at = VALUES(updated_at)")
+           ->execute([$appointmentId, $memberId, $status, $comment, $exceptionId, $statusChangedAt, $now]);
+
+        $db->commit();
+    } catch (PDOException $e) {
+        $db->rollBack();
+        error_log('appointment_responses PUT: ' . $e->getMessage());
+        responsesFail(500, 'Rückmeldung konnte nicht gespeichert werden');
+        return;
+    }
+
+    // "own" traegt die Antwort des betroffenen Mitglieds, auch wenn ein Verwalter schrieb.
+    echo json_encode(responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours), JSON_UNESCAPED_UNICODE);
+}
+
+function responsesDelete($db, $database, bool $isManager, ?int $authMemberId, string $now): void
+{
+    $ctx = responsesPrepareWrite($db, $database, $isManager, $authMemberId, $now, false);
+    if ($ctx === null) {
+        return;
+    }
+    $apt           = $ctx['apt'];
+    $memberId      = $ctx['member_id'];
+    $appointmentId = (int) $apt['appointment_id'];
+    $prefix        = $database->table('');
+
+    $db->beginTransaction();
+
+    try {
+        $existing = responsesFetchOneForUpdate($db, $database, $appointmentId, $memberId);
+        if ($existing === null) {
+            $db->rollBack();
+            responsesFail(404, 'Keine Rückmeldung vorhanden');
+            return;
+        }
+
+        $action = responseExcuseAction((int) $apt['responses_require_excuse'] === 1,
+                                       $existing['status'], null, $existing['excuse_state'], false);
+        if ($action === 'delete') {
+            $db->prepare("DELETE FROM {$prefix}exceptions WHERE exception_id = ? AND status = 'pending'")
+               ->execute([(int) $existing['exception_id']]);
+        }
+
+        $db->prepare("DELETE FROM {$prefix}appointment_responses WHERE response_id = ?")
+           ->execute([(int) $existing['response_id']]);
+
+        $db->commit();
+    } catch (PDOException $e) {
+        $db->rollBack();
+        error_log('appointment_responses DELETE: ' . $e->getMessage());
+        responsesFail(500, 'Rückmeldung konnte nicht zurückgenommen werden');
+        return;
+    }
+
+    echo json_encode(['message' => 'Rückmeldung zurückgenommen'], JSON_UNESCAPED_UNICODE);
 }
