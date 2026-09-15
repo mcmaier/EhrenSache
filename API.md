@@ -602,6 +602,18 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
 ]
 ```
 
+**Feld `responses` (seit 1.7.0):** Nur wenn die Anfrage `year`, `from_date` oder `to_date`
+mitschickt — ohne einen dieser Filter fehlt der Schlüssel ganz, damit die je Termin korrelierten
+Abfragen nicht bei jedem ungefilterten Abruf der gesamten Historie laufen (so ruft die
+Check-in-PWA die Liste mit `member_id` allein ab; sie holt Rückmeldungen stattdessen über
+`resource=appointment_responses&upcoming=1`). Bei Terminarten mit Rückmeldung
+`{"yes": 12, "no": 3, "maybe": 2, "open": 8, "own": "yes", "expected": true}` — `open` zählt
+erwartete Mitglieder ohne Antwort, `own` ist die Antwort des Mitglieds, das mit dem angemeldeten
+Konto verknüpft ist (sonst `null`) — **unabhängig von einer `member_id`-Filterung**, immer das
+eigene Mitglied des Kontos, auch für Admin und Manager; die Zusage kann dadurch eine Antwort
+zeigen, die inzwischen gar nicht mehr zählt (Mitglied nicht mehr erwartet). `expected` (Boolean)
+sagt, ob dieses Mitglied für den Termin erwartet ist. Bei Terminarten ohne Rückmeldung `null`.
+
 ---
 
 ### Termin erstellen
@@ -1096,6 +1108,10 @@ je ausgeliefert.
     "description": "Wöchentliche Probe",
     "color": "#667eea",
     "is_default": 1,
+    "responses_enabled": 0,
+    "responses_names_visible": 0,
+    "responses_require_excuse": 0,
+    "response_deadline_hours": null,
     "groups": [
       {
         "group_id": 1,
@@ -1123,6 +1139,98 @@ je ausgeliefert.
   "group_ids": [1, 2]
 }
 ```
+
+**Rückmeldung (seit 1.7.0):** Optional `responses_enabled`, `responses_names_visible`,
+`responses_require_excuse` (je `true`/`false`) und `response_deadline_hours` (0–720 oder `null` für
+die globale Frist). Beim Aktualisieren ändern nur mitgeschickte Felder etwas; ein PUT ohne sie
+lässt die Einstellungen stehen. Eine Frist außerhalb 0–720 ergibt `400`. Ein `PUT` auf eine
+unbekannte `id` ergibt `404 {"message": "Type not found"}`.
+
+---
+
+## Terminrückmeldungen (appointment_responses)
+
+Seit 1.7.0. Mitglieder melden sich zu kommenden Terminen zu, ab oder unsicher. Nur bei
+Terminarten mit `responses_enabled`. Erwartet ist, wer über Terminart → Gruppe erreicht wird und
+am Termindatum aktiv ist. Geräte haben keinen Zugriff (`403`).
+
+### Kommende Termine
+**Endpoint:** `GET /api.php?resource=appointment_responses&upcoming=1`
+
+**Berechtigung:** jede angemeldete Rolle außer Gerät. Liefert die Termine, zu denen das Mitglied
+des Kontos erwartet ist — auch für Admin und Manager in der Sicht eines Mitglieds. Ohne
+verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
+
+**Response:**
+```json
+{ "appointments": [ { "appointment": {…}, "settings": {…}, "started": false,
+                      "expected": true, "own": null, "summary": {…} } ] }
+```
+
+### Ein Termin
+**Endpoint:** `GET /api.php?resource=appointment_responses&appointment_id=42`
+
+**Response:**
+```json
+{
+  "appointment": { "appointment_id": 42, "title": "Herbstkonzert", "date": "2026-09-26",
+                   "start_time": "19:00:00", "type_id": 3, "type_name": "Auftritt", "color": "#F5A623" },
+  "settings": { "names_visible": false, "require_excuse": true, "deadline_hours": 168,
+                "deadline": "2026-09-19 19:00:00" },
+  "started": false,
+  "expected": true,
+  "own": { "status": "no", "comment": "Urlaub", "status_changed_at": "2026-09-15 08:12:00",
+           "is_late": false, "excuse_state": "pending" },
+  "summary": { "yes": 21, "no": 4, "maybe": 3, "open": 9 },
+  "members": [ … ],
+  "comparison": { … }
+}
+```
+
+- `members` — **Admin/Manager:** alle erwarteten Mitglieder nach Gruppen mit `status` (`null` =
+  keine Antwort), `comment`, `status_changed_at`, `is_late`, `excuse_state` und nach Beginn
+  `present`. **Mitglied:** nur bei `names_visible`, dann ausschließlich Name, Gruppe und Status.
+- `comparison` — nur Admin/Manager, nur nach Beginn: Anzahl je `yes_present`, `yes_absent`,
+  `no_present`, `no_absent`, `maybe_present`, `maybe_absent`, `none_present`, `none_absent`.
+- `is_late` — die letzte **Statusänderung** liegt nach der Frist (Frist = Beginn minus
+  `deadline_hours`). Eine geänderte Bemerkung verschiebt den Zeitpunkt nicht.
+- `&format=html` (Admin/Manager): Druckansicht der Besetzung je Gruppe.
+
+### Antworten
+**Endpoint:** `PUT /api.php?resource=appointment_responses&appointment_id=42`
+
+**Request:**
+```json
+{ "status": "no", "comment": "Urlaub" }
+```
+
+`status`: `yes`, `no` oder `maybe`. `comment`: optional, höchstens 255 Zeichen; fehlt er, ist die
+Bemerkung danach leer. Antwort wie „Ein Termin", `own` ist die gespeicherte Antwort.
+
+Admin und Manager tragen mit `&member_id=7` für ein Mitglied ein, auch nach Beginn.
+
+**Entschuldigungspflicht** (`require_excuse`): Eine Absage braucht `comment` und legt einen
+Abwesenheitsantrag (`exceptions`, `pending`) an. Hat das Mitglied schon einen eigenen offenen oder
+genehmigten Antrag zum Termin, wird dieser verknüpft. Eine spätere Zusage löscht einen noch offenen
+Antrag; ein entschiedener bleibt.
+
+Schreibzugriffe auf denselben Termin sind serialisiert (Zeilensperre auf den Termin) — zwei
+gleichzeitige Erstantworten laufen damit nacheinander statt in einen Deadlock.
+
+### Zurücknehmen
+**Endpoint:** `DELETE /api.php?resource=appointment_responses&appointment_id=42[&member_id=7]`
+
+Löscht die Antwort und einen verknüpften offenen Antrag. Rechte wie beim PUT.
+
+### Fehler
+
+| Code | Anlass |
+|---|---|
+| `400` | `appointment_id` fehlt, ungültiger `status`, Bemerkung zu lang |
+| `403` | Mitglied nicht erwartet; `member_id` ohne Admin/Manager; Konto ohne Mitglied; Gerät |
+| `404` | Termin oder Mitglied unbekannt; beim DELETE keine Antwort vorhanden |
+| `409` | Terminart ohne Rückmeldung; Termin hat begonnen (Mitglied für sich selbst) |
+| `422` | Absage ohne Begründung bei Entschuldigungspflicht |
 
 ---
 
@@ -1816,7 +1924,10 @@ Aufrufer soll wissen, dass er nicht bekommt, was er angefordert hat. Eine mitges
 welche IDs existieren. Gerätekonten erhalten 403, weil ihnen kein Mitglied zugeordnet ist.
 
 Die eigenen Rohdaten gibt es über `resource=my_data` (beachte dort OI-50: die CSV-Form enthält
-derzeit keine Arbeitszeiten, die JSON-Form schon).
+derzeit keine Arbeitszeiten, die JSON-Form schon). **Seit 1.7.0** trägt die JSON-Antwort
+zusätzlich `appointment_responses` (Termin, Status, Bemerkung, Zeitpunkte der letzten Status- und
+der letzten Änderung), die CSV-Form einen Abschnitt „TERMINRÜCKMELDUNGEN" mit den Spalten
+Termindatum, Termin, Rückmeldung, Bemerkung, Status geändert, Zuletzt geändert.
 
 **Query-Parameter:**
 
@@ -1992,6 +2103,9 @@ Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
 }
 ```
 
+**`response_deadline_hours` (seit 1.7.0):** Vorgabe 24, zulässig eine ganze Zahl (auch als
+getrimmter String) von 0 bis 720, sonst `400`. Gilt als globale Frist für Terminarten ohne eigene.
+
 ---
 
 ### SMTP-Konfiguration
@@ -2040,7 +2154,7 @@ gleichnamige Einstellung aus `system_settings`, sonst die Vorgabe.
 
 | Feld | Einstellung | Vorgabe | Wirkung |
 |---|---|---|---|
-| `years` | `cleanup_years_records` | 3 | `records` (nach `arrival_time`) und `exceptions` (nach `created_at`) werden gelöscht |
+| `years` | `cleanup_years_records` | 3 | `records` (nach `arrival_time`), `exceptions` (nach `created_at`) und `appointment_responses` (nach dem Termindatum, seit 1.7.0) werden gelöscht |
 | `years_worktime` | `cleanup_years_worktime` | 3 | `work_sessions` (nach `start_time`) und deren `work_session_log`-Einträge werden gelöscht |
 | `years_audit` | `cleanup_years_audit` | 1 | Verwaiste `work_session_log`-Einträge (nach `changed_at`) werden **anonymisiert** |
 
@@ -2073,6 +2187,7 @@ Alle Schritte laufen in **einer Transaktion**.
   "cutoff_date_audit": "2025-09-04",
   "deleted_records": 128,
   "deleted_exceptions": 4,
+  "deleted_appointment_responses": 17,
   "deleted_work_sessions": 31,
   "deleted_work_session_log": 76,
   "anonymized_work_session_log": 12

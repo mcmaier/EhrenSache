@@ -84,7 +84,7 @@ EhrenSache/
 │   ├── handlers/               # API-Logik, je ein File pro Ressource
 │   │   ├── members.php, appointments.php, records.php, exceptions.php
 │   │   ├── users.php, membership_dates.php, member_groups.php
-│   │   ├── appointment_types.php, activity_types.php
+│   │   ├── appointment_types.php, appointment_responses.php, activity_types.php
 │   │   ├── work_sessions.php   # Arbeitszeiterfassung
 │   │   ├── statistics.php, export.php, import.php, settings.php
 │   │   ├── attendance_list.php, my_data.php
@@ -101,6 +101,7 @@ EhrenSache/
 │   │   ├── update_source.php, update_package.php, update_swap.php, update_status.php  # dessen Bausteine
 │   │   ├── requirements.php    # requires aus version.json: PHP-Version, Erweiterungen
 │   │   ├── worktime.php        # Fachlogik Arbeitszeit (Dauer, Validierung, Statistik)
+│   │   ├── responses.php       # Regeln und Abfragen der Terminrückmeldung (FI-1)
 │   │   ├── member_activity.php # Aktiv/Inaktiv-Zeiträume
 │   │   ├── station.php         # Fachlogik virtuelle Station (Kiosk): Code, PIN-Prüfung, Sperre
 │   │   ├── migrations.php      # Ausführung der Migrationskette
@@ -128,7 +129,7 @@ EhrenSache/
     │   ├── login.js
     │   └── modules/            # api, auth, ui, members, appointments, records,
     │                           # exceptions, users, devices, profile, management,
-    │                           # settings, statistics, worktime, import_export, utils
+    │                           # settings, statistics, worktime, responses, import_export, utils
     ├── css/
     │   ├── variables.css, reset.css, main.css, responsive.css, utilities.css, login.css
     │   ├── components/         # buttons, cards, forms, modals, tables, badges,
@@ -163,7 +164,8 @@ Request-Parameter: `?resource=<name>&id=<id>`
 9. Routing via `switch($resource)` → Handler-Funktion aufrufen
 
 **Ressourcen:** members, appointments, records, exceptions, users, membership_dates,
-member_groups, appointment_types, activity_types, work_sessions, statistics, available_years,
+member_groups, appointment_types, appointment_responses, activity_types, work_sessions,
+statistics, available_years,
 auto_checkin, totp_checkin, station, regenerate_token, change_password, change_pin, export,
 import, import_logs, settings, upload-logo, attendance_list, activate_user, user_status,
 cleanup, my_data, session_info, version, update_check, ping — Details in `API.md`.
@@ -190,6 +192,7 @@ Tabellennamen nie hart codieren.
 | `membership_dates` | Aktiv/Inaktiv-Zeiträume pro Mitglied |
 | `appointments` | Termine mit Typ und Gruppenzuordnung |
 | `appointment_types`, `appointment_type_groups` | Terminarten und ihre Gruppen |
+| `appointment_responses` | Terminrückmeldungen: Zusage, Absage, Unsicher je Mitglied und Termin |
 | `records` | Anwesenheitserfassungen |
 | `exceptions` | Entschuldigungen, Zeitkorrekturen |
 | `activity_types` | Tätigkeitsarten der Arbeitszeiterfassung |

@@ -7,6 +7,32 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.7.0] – 2026-09-15
+
+### Neu
+- **Terminrückmeldung.** Mitglieder sagen vor einem Termin zu, ab oder „unsicher", mit
+  optionaler Bemerkung — im Dashboard und im neuen Tab „Termine" der Check-in-App. Admin und
+  Manager sehen je Termin, wer wie geantwortet hat und wer noch nicht, und drucken die Besetzung.
+  Nach dem Termin stellt die Terminansicht Zusage und Anwesenheit gegenüber.
+
+  Eingeschaltet wird die Rückmeldung **je Terminart** (Verwaltung → Terminarten), ab Werk ist sie
+  überall aus. Dort außerdem: ob Mitglieder die Namen sehen, ob eine Absage eine Entschuldigung
+  braucht (dann entsteht ein Abwesenheitsantrag zur Freigabe) und eine eigene Frist.
+
+  Die Antwort bleibt bis Terminbeginn änderbar. Eine Absage nach der Frist (Vorgabe 24 Stunden,
+  Einstellungen → Terminrückmeldungen) wird gespeichert und als kurzfristig markiert.
+
+### Geändert
+- **Zuverlässigkeit** zählt eine rechtzeitige Absage als abgemeldet, auch ohne Antrag. Bei
+  Terminarten mit Rückmeldung entscheidet für Absage **und** Antrag die Frist statt des
+  Terminbeginns. Bei allen anderen Terminarten bleibt es bei der Regel aus 1.5.1.
+- **`DATENSCHUTZ.md`** hat einen Abschnitt 12 zur Terminrückmeldung. Die bisherigen Abschnitte 12
+  bis 14 heißen jetzt 13 bis 15.
+- **Demo:** Auftritte fragen Rückmeldungen ab, dazu ein kommendes Konzert. Der Generator verlangt
+  Schemastand 1.7.0.
+
+---
+
 ## [1.6.1] – 2026-09-14
 
 > **Ab 1.6.0 über den Assistenten.** Schritt 0 des Update-Assistenten holt dieses Paket selbst.

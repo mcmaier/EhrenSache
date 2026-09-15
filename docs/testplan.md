@@ -1141,3 +1141,31 @@ Manuell — Dashboard und Station:
 | QR-14 | Neues Kiosk-Gerät anlegen und speichern | Das Modal öffnet sich sofort im Bearbeiten-Modus, 📱 ist ohne Zwischenschritt da und liefert einen QR mit dem neuen Token |
 | QR-15 | **Nur mit echtem Tablet:** QR-1 aufrufen, mit der Kamera-App eines Tablets scannen, auf dem die Station bereits in einem Reiter offen ist | Der Bediener sieht die Kopplung **auf dem Gerät, das er vor Augen hat**. Öffnet der Browser stattdessen einen zweiten Reiter, koppelt sich dieser, während der sichtbare Reiter unverändert bleibt — dann greift OI-45 |
 | QR-16 | Mitgliedsnummer oder PIN eintippen und **währenddessen** die Adresse auf `station/#t=<gültig>` ändern | Die Seite lädt neu, die Eingabe ist weg. Bewusst so — siehe „Bewusst entschieden" in `docs/OPEN-ITEMS.md` |
+
+---
+
+## 23. Terminrückmeldung (seit 1.7.0)
+
+Automatisiert: `php tests/run.php responses_unit`, `responses_api`, `responses_frontend`,
+`punctuality_unit`, `demo_seed_unit`. Manuell:
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| RM-1 | Terminart „Konzert" mit „Rückmeldung erbeten" anlegen, Probe unverändert | Terminliste: Konzert zeigt `✓ 0 · ? 0 · ✗ 0 · — n`, Probe `–` |
+| RM-2 | Terminart-Modal: „Rückmeldung erbeten" aus | Drei abhängige Felder ausgegraut und nicht bedienbar |
+| RM-3 | Frist `800` im Terminart-Modal speichern | Warnung, nichts gespeichert |
+| RM-4 | PWA als Mitglied: Tab „Termine" | Tab mit Zähler; Konzert oben; nach Zusage sinkt der Zähler |
+| RM-5 | Entschuldigungspflicht an, PWA „Absage" ohne Text | Hinweis, Bemerkungsfeld fokussiert, nichts gespeichert |
+| RM-6 | wie RM-5 mit Text | Gespeichert; Dashboard → Anträge zeigt den offenen Antrag |
+| RM-7 | danach „Zusage" | Antrag verschwindet |
+| RM-8 | Absage mit Text, Antrag genehmigen, dann Zusage | Antrag bleibt genehmigt; Modal zeigt „Entschuldigung: genehmigt" |
+| RM-9 | Terminart-Frist `720`, Termin in drei Tagen, Absage | Markierung „kurzfristig" in PWA und Dashboard |
+| RM-10 | PWA ohne Netz (Flugmodus bzw. Netzwerk im Browser trennen) | Knöpfe gesperrt, Hinweis „Ohne Netz …"; nach Wiederverbindung wieder bedienbar |
+| RM-11 | Mitglied ohne „Namen sichtbar" öffnet im Dashboard die Rückmeldungen | nur Summen und eigene Antwort |
+| RM-12 | „Namen sichtbar" an | Liste mit Namen und Status, keine Bemerkungen |
+| RM-13 | Manager: vergangener Termin | vier Kacheln; „Keine Antwort" filtert die Tabelle |
+| RM-14 | Manager: „Setzen …" → Absage bei Entschuldigungspflicht | Dialog fragt Begründung; ohne Text nichts gespeichert |
+| RM-15 | Druckansicht | neuer Tab, Tabellen je Gruppe, Summen und Frist unten |
+| RM-16 | Zuverlässigkeit eingeschaltet, Mitglied sagt vor der Frist ab und kommt nicht | Statistik der Person: als rechtzeitig abgemeldet gezählt |
+| RM-17 | Selbstauskunft als Mitglied, CSV | Abschnitt „TERMINRÜCKMELDUNGEN" mit den eigenen Antworten |
+| RM-18 | Update von 1.6.1 über den Assistenten | Log nennt vier Spalten, Tabelle, drei Fremdschlüssel, Einstellung; zweiter Lauf ohne Fehler |

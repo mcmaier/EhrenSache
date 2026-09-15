@@ -489,6 +489,8 @@ Prüfen Sie das für Ihren Verein. Wer die Werte nicht nutzt, braucht sie nicht 
   keine Quote.
 - **Zuverlässigkeit** zählt, wer erschienen ist oder rechtzeitig abgesagt hat. Eine Abmeldung
   zählt nach dem Zeitpunkt, zu dem sie eingegangen ist, nicht nach dem Zeitpunkt der Freigabe.
+  Seit 1.7.0 gilt auch eine Terminrückmeldung „Absage" als Abmeldung. Bei Terminarten mit
+  Rückmeldung ist „rechtzeitig" die dort eingestellte Frist, sonst der Terminbeginn.
 
 Beide Werte sind so gut wie die Erfassung dahinter. Ein Verein, der überwiegend Listen abhakt, hat
 wenige Messungen und damit eine wenig belastbare Pünktlichkeit — das zeigt die Oberfläche als
@@ -525,7 +527,62 @@ Vor dem Einschalten, zum Beispiel in der Rundmail aus Abschnitt 6.3:
 
 ---
 
-## 12. Hilfreiche Links & Ressourcen
+## 12. Terminrückmeldungen (optional je Terminart)
+
+Die Rückmeldung ist **ab Werk bei jeder Terminart ausgeschaltet**. Ein Update schaltet sie nicht
+ein. Alles in diesem Abschnitt gilt für Terminarten, bei denen Sie „Rückmeldung erbeten" setzen.
+
+### 12.1 Was gespeichert wird
+
+Je Mitglied und Termin der aktuelle Stand: Zusage, Absage oder „unsicher", eine freiwillige
+Bemerkung und die Zeitpunkte der letzten Status- und der letzten Änderung. Ein Verlauf früherer
+Antworten wird nicht geführt. Bei Terminarten mit Entschuldigungspflicht entsteht aus einer Absage
+zusätzlich ein Abwesenheitsantrag, der wie jeder Antrag behandelt wird.
+
+### 12.2 Zweck und Rechtsgrundlage
+
+Zweck ist die **Planung** eines Termins: ob die Besetzung reicht, wo Aushilfen nötig sind. Als
+Rechtsgrundlage kommt dieselbe in Betracht wie für die Anwesenheit (Abschnitt 3) — in der Regel
+das berechtigte Interesse an einem geordneten Proben- und Spielbetrieb.
+
+Die Bemerkung ist ein Freitext. Weisen Sie darauf hin, dass dort **keine Gesundheitsangaben**
+nötig sind: „verhindert" genügt. Eine Diagnose in der Bemerkung wäre ein Gesundheitsdatum nach
+Art. 9 DSGVO.
+
+### 12.3 Wer was sieht
+
+| Rolle | Sicht |
+|---|---|
+| Admin, Manager | alle Antworten mit Bemerkung und Zeitpunkt, nach Beginn den Abgleich mit der Anwesenheit |
+| Mitglied | die eigene Antwort und die Summen; Namen und Status der anderen **nur**, wenn die Terminart „Namen für Mitglieder sichtbar" hat — Bemerkungen nie |
+| Gerät | nichts |
+
+„Namen für Mitglieder sichtbar" legt innerhalb des Vereins offen, wer zu- oder abgesagt hat. Das
+kann die Verbindlichkeit erhöhen, ist aber eine Offenlegung personenbezogener Daten gegenüber
+anderen Mitgliedern. Schalten Sie es nur ein, wenn Sie das den Mitgliedern vorher mitgeteilt
+haben und der Zweck es trägt.
+
+### 12.4 Zuverlässigkeit
+
+Ist die Zuverlässigkeit (Abschnitt 11) eingeschaltet, zählt eine rechtzeitige Absage als
+Abmeldung. Eine eigene Kennzahl „Zusagetreue" je Person gibt es nicht; der Abgleich von Zusage und
+Anwesenheit wird nur je Termin angezeigt.
+
+### 12.5 Speicherdauer und Auskunft
+
+Rückmeldungen werden mit derselben Frist gelöscht wie Anwesenheiten, bezogen auf das
+Termindatum (*Einstellungen → DSGVO Datenverwaltung*), und mit dem Termin oder dem Mitglied. Die
+eigenen Rückmeldungen stehen in der Selbstauskunft (Profil → „Meine Daten", JSON und CSV).
+
+### 12.6 Was Sie den Mitgliedern sagen sollten
+
+- für welche Terminarten Rückmeldungen erbeten sind und wozu
+- wer die Antworten sieht (12.3), insbesondere ob andere Mitglieder Namen sehen
+- dass die Bemerkung freiwillig ist und keine Gründe im Einzelnen verlangt
+
+---
+
+## 13. Hilfreiche Links & Ressourcen
 
 ### Gesetzestexte
 - **DSGVO**: https://dsgvo-gesetz.de
@@ -545,7 +602,7 @@ Vor dem Einschalten, zum Beispiel in der Rundmail aus Abschnitt 6.3:
 
 ---
 
-## 13. Häufige Fragen (FAQ)
+## 14. Häufige Fragen (FAQ)
 
 **Q: Müssen wir einen Datenschutzbeauftragten bestellen?**  
 A: Nur falls mind. 20 Personen ständig mit automatisierter Datenverarbeitung 
@@ -564,7 +621,7 @@ aber Abmahnungen möglich).
 
 ---
 
-## 14. Disclaimer
+## 15. Disclaimer
 
 **Keine Rechtsberatung**: Diese Hinweise dienen der Orientierung und 
 ersetzen keine individuelle Rechtsberatung. Im Zweifel konsultieren Sie 

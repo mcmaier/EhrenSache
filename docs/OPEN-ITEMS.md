@@ -2100,3 +2100,77 @@ devices, groups und Terminarten rufen `updateModalId` bereits.
 
 **Nicht sicherheitsrelevant:** keine Datenänderung, kein Rechtebezug; die IDs sind für den
 Bearbeitenden ohnehin über die API sichtbar.
+
+---
+
+### OI-58 · Terminrückmeldung: bewusst nicht gebaut
+**Priorität:** niedrig — Entscheidungen, keine Mängel
+
+Mit 1.7.0 (Spec `2026-09-14-terminrueckmeldung-design.md`, Abschnitt 12) bewusst weggelassen,
+damit es nicht erneut vorgeschlagen wird, ohne dass sich an den Gründen etwas geändert hat:
+
+| Punkt | Grund | Wo es weitergeht |
+|---|---|---|
+| Erinnerung an offene Rückmeldungen | braucht einen Versandweg | FI-6 |
+| Besetzungsansicht nach Registern | braucht Untergruppen | FI-14 |
+| Rolle „Gruppenleiter" | der Dirigent erhält ein Manager-Konto | FI-15 |
+| Kennzahl „Zusagetreue" je Person | Personenbewertung; die Zuverlässigkeit deckt die Frage ab | — |
+| Verlauf der Antwortänderungen | mehr Datenbestand, eigene Löschfrist, wäre wieder eine Personenauswertung | — |
+| Rückmeldung je Termin abweichend von der Terminart | kein Bedarf erkennbar | — |
+| Offline-Warteschlange in der PWA | die PWA arbeitet onlinebasiert | OI-43 |
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-59 · CSV-Exporte entschärfen führende Formelzeichen nicht
+**Priorität:** niedrig–mittel
+
+Freitextfelder, die mit `=`, `+`, `-`, `@` (oder einem führenden Tab/CR) beginnen, werden von
+Tabellenkalkulationen (Excel, LibreOffice Calc, Google Sheets) beim Öffnen einer CSV-Datei als
+Formel ausgewertet („CSV-/Formel-Injection", CWE-1236). Betroffen sind Freitextfelder, die
+Mitglieder oder Manager selbst setzen — Rückmeldungs- und Ausnahme-Bemerkungen, Ausnahmegründe,
+Terminstitel — und unverändert in eine CSV-Datei gelangen: die Selbstauskunft
+(`resource=my_data`, `private/handlers/my_data.php`) und die allgemeinen Exporte
+(`private/handlers/export.php`).
+
+**Wirkung:** Öffnet ein Empfänger — typischerweise ein Vorstandsmitglied, das den Export prüft
+oder weiterverarbeitet — die Datei in einer Tabellenkalkulation mit Standardeinstellungen, kann
+eine präparierte Zelle eine Formel ausführen. Das Risiko trifft den **Öffnenden**, nicht den
+Schreibenden der Datenbank.
+
+**Warum ein öffentlicher Eintrag zulässig ist** (`SECURITY.md`, „Umgang mit bekannten
+Schwachstellen"): Ausnutzbar ist die Lücke nur über ein Konto, das ein solches Feld beschreiben
+darf (`user`, `manager` oder `admin`, je nach Feld) — kein anonymer Zugriff — und sie erlaubt
+innerhalb der Anwendung selbst keine Rechteausweitung; die eigentliche Wirkung entsteht
+ausschließlich außerhalb, in der Tabellenkalkulation des Empfängers.
+
+**Zu tun:** ein gemeinsamer Helfer, der eine CSV-Zelle mit führendem `=`, `+`, `-`, `@`, Tab oder
+CR mit einem Apostroph maskiert, angewendet auf alle CSV-Exporte (`my_data.php` und
+`export.php`).
+
+**Sicherheitsrelevanz:** real, aber nach der Grenze in `SECURITY.md` öffentlich dokumentierbar —
+kein Zugriff ohne vorherige Anmeldung, keine Rechteausweitung innerhalb von EhrenSache.
+
+---
+
+### OI-60 · Zeitbasis der Terminrückmeldung: PHP-Uhr statt MySQL-Uhr
+**Priorität:** niedrig
+
+Frist- und Beginn-Prüfungen der Terminrückmeldung (`responseDeadline()`, `responseHasStarted()`
+in `private/helpers/responses.php`) sowie `status_changed_at` rechnen mit PHP `date()` — also der
+Zeitzone des PHP-Prozesses. `exceptions.created_at` dagegen ist ein MySQL-`TIMESTAMP`, geschrieben
+in der Sitzungszeitzone der Datenbankverbindung. Stehen PHP und MySQL auf unterschiedlichen
+Zeitzonen, können Fristvergleiche zwischen einer Rückmeldung und einem daraus entstandenen Antrag
+um den Zeitunterschied auseinanderlaufen.
+
+Aktuell ist nirgends in der Anwendung eine Zeitzone konfiguriert; PHP und MySQL laufen beide auf
+der Serveruhr. Der Fall tritt also nicht auf, solange Webserver und Datenbank auf derselben
+Maschine mit derselben Systemzeitzone stehen — der übliche Fall bei einer Vereinsinstallation.
+
+**Zu tun:** entweder dokumentieren, dass PHP- und MySQL-Zeitzone übereinstimmen müssen, oder
+beide explizit auf denselben Wert setzen (`date.timezone` in PHP, `SET time_zone` bzw.
+Verbindungsparameter bei PDO).
+
+**Nicht sicherheitsrelevant:** keine Rechteausweitung, kein zusätzlicher Datenabfluss — im
+schlechtesten Fall eine falsch eingeordnete Frist, kein Zugriff auf fremde Daten.

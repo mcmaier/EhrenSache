@@ -37,8 +37,8 @@ durchschlägt.
 
 | ID | Idee | Nutzen | Aufwand | Hängt ab von |
 |---|---|---|---|---|
-| [FI-1](#fi-1--terminzusage-im-vorfeld) | Terminzusage im Vorfeld | hoch | M | — |
-| [FI-2](#fi-2--abgleich-zusage--tatsächliche-anwesenheit) | Abgleich Zusage ↔ tatsächliche Anwesenheit | hoch | S | FI-1 |
+| [FI-1](#fi-1--terminzusage-im-vorfeld) | Terminzusage im Vorfeld — **umgesetzt in 1.7.0** | hoch | M | — |
+| [FI-2](#fi-2--abgleich-zusage--tatsächliche-anwesenheit) | Abgleich Zusage ↔ tatsächliche Anwesenheit — **je Termin umgesetzt in 1.7.0** | hoch | S | FI-1 |
 | [FI-3](#fi-3--gps-gestützter-check-in) | GPS-gestützter Check-in | mittel | M | — |
 | [FI-4](#fi-4--registrierungsprozess-für-auth-geräte) | Registrierungsprozess für Auth-Geräte (Rest: NFC/Biometrie) | mittel | M | — |
 | [FI-5](#fi-5--pin-anmeldung-am-auth-gerät) | PIN-Anmeldung am Auth-Gerät — **umgesetzt in 1.3.0** | mittel | M | FI-4 |
@@ -65,6 +65,11 @@ Thema — deshalb steht FI-14 unter A und nicht am Ende.
 
 ### FI-1 · Terminzusage im Vorfeld
 **Nutzen:** hoch · **Aufwand:** M
+
+**Umgesetzt in 1.7.0** — Spec `docs/superpowers/specs/2026-09-14-terminrueckmeldung-design.md`.
+Die Fragen unten sind dort entschieden: Rückmeldung als Planungswerkzeug ohne Freigabe,
+Entschuldigungspflicht und Namenssichtbarkeit je Terminart, Frist für „rechtzeitig". Ohne
+Benachrichtigung (FI-6) gebaut.
 
 Mitglieder geben vor einem Termin an, ob sie kommen: *zugesagt / abgesagt / unsicher*, mit
 optionaler Bemerkung. Dirigent oder Vorstand sehen die Besetzung, bevor die Probe stattfindet.
@@ -97,6 +102,10 @@ Erfassen-Tab der PWA · Statistik (Zusagequote als eigene Kennzahl).
 
 ### FI-2 · Abgleich Zusage ↔ tatsächliche Anwesenheit
 **Nutzen:** hoch · **Aufwand:** S — **setzt FI-1 voraus**
+
+**Teilweise umgesetzt in 1.7.0** — nur als Gegenüberstellung je Termin für Admin und Manager.
+Eine personenbezogene Kennzahl gibt es bewusst nicht; die Frage „auf wen ist Verlass"
+beantwortet die Zuverlässigkeit (1.5.1), die rechtzeitige Absagen seit 1.7.0 mitzählt.
 
 Gegenüberstellung von angekündigtem und eingetretenem Verhalten: zugesagt und gekommen,
 zugesagt und nicht gekommen, abgesagt und trotzdem da, gar nicht geantwortet.
@@ -531,9 +540,9 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung:
 
 1. **FI-6 Benachrichtigungen** — für sich schon nützlich und Voraussetzung dafür, dass eine
    Zusageabfrage überhaupt beantwortet wird.
-2. **FI-1 Terminzusage** — das eine Feature mit Wettbewerbswirkung. Vorher muss die Frage zu
-   `exceptions` entschieden sein.
-3. **FI-2 Abgleich** — fällt danach fast von selbst an.
+2. **FI-1 Terminzusage** (umgesetzt in 1.7.0, ohne FI-6) — das eine Feature mit
+   Wettbewerbswirkung. Vorher muss die Frage zu `exceptions` entschieden sein.
+3. **FI-2 Abgleich** (je Termin umgesetzt) — fällt danach fast von selbst an.
    **FI-14 Register** gehört in dieselbe Runde wie FI-1: Die Besetzungsansicht ist der Grund,
    warum die Zusagen mehr sind als eine Anwesenheitsprognose. In der kleinen Variante (Gruppenart
    statt Hierarchie) ist sie fast kostenlos.

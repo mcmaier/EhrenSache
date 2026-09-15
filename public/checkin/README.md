@@ -66,6 +66,8 @@ Sobald du dich im Web-Dashboard registriert hast und von einem Admin freigeschal
 - **Statistiken**: Anwesenheitsquote, geleistete Arbeitszeit des Jahres und letzte Einträge
 - **Arbeitszeit korrigieren und nachtragen**: Eigene abgeschlossene Sitzungen über den Verlauf
   korrigieren, vergessene Sitzungen nachtragen — beides geht erneut in die Freigabe
+- **Termine zu- und absagen**: Tab „Termine" mit Zusage, Unsicher, Absage und Bemerkung;
+  erscheint nur, wenn es kommende Termine mit Rückmeldung gibt. Ohne Netz gesperrt
 
 ### ⚠️ Limitierungen
 

@@ -250,6 +250,7 @@ GitHub die Releases des Projekts abonnierst: **Watch → Custom → Releases**.
 Manager haben eingeschränkten Zugriff:
 - Einsehen und Bearbeiten aller Mitglieder und Termine
 - Teilnehmerverwaltung bei Terminen
+- Rückmeldungen zu Terminen einsehen, für Mitglieder eintragen und die Besetzung drucken
 - Keine Systemkonfiguration oder Rollenverwaltung
 
 ### Für Mitglieder
@@ -287,6 +288,12 @@ Manager haben eingeschränkten Zugriff:
 2. Neue Ausnahme → Typ wählen (Zeitkorrektur, Entschuldigt)
 3. Datum angeben und Begründung
 4. Absenden → Wartet auf Genehmigung durch Admin/Manager
+
+**Termine zu- oder absagen:**
+1. Check-in-App → Tab „Termine" oder Dashboard → Termine → Spalte „Rückmeldung"
+2. Zusage, Unsicher oder Absage wählen, optional eine Bemerkung
+3. Bis Terminbeginn änderbar; nach der Frist wird eine Absage als kurzfristig vermerkt
+4. Nur bei Terminarten, für die der Verein Rückmeldungen eingeschaltet hat
 
 ### Arbeitszeiterfassung
 
