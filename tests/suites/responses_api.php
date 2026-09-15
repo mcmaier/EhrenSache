@@ -853,6 +853,7 @@ test('my_data: eigene Rueckmeldungen in JSON und CSV', function () {
 
             $csv = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'csv']]);
             assertTrue(str_contains($csv['raw'], '=== TERMINRÜCKMELDUNGEN ==='), 'CSV-Abschnitt fehlt');
+            assertTrue(str_contains($csv['raw'], 'Status geändert'), 'Spalte Status geaendert fehlt');
             assertTrue(str_contains($csv['raw'], 'RS-Auskunft'));
         });
     } finally {
@@ -862,17 +863,29 @@ test('my_data: eigene Rueckmeldungen in JSON und CSV', function () {
 
 test('cleanup: Rueckmeldungen alter Termine werden mit geloescht', function () {
     // ACHTUNG, wie cleanup_api.php: nur mit Fristen, die ausschliesslich die
-    // eigenen Testdaten treffen. Der Termin liegt 1920, die Frist 100 Jahre.
+    // eigenen Testdaten treffen. Der alte Termin liegt 1920, die Frist 100 Jahre.
     $welt = rsWorld('Cleanup', ['responses_enabled' => 1]);
     try {
-        $apt = rsAppointment($welt, '1920-05-01', '19:00:00');
-        assertStatus(200, rsPut('manager', $apt, ['status' => 'yes'], $welt['member']));
+        $alt = rsAppointment($welt, '1920-05-01', '19:00:00');
+        assertStatus(200, rsPut('manager', $alt, ['status' => 'yes'], $welt['member']));
+
+        // Gegenprobe: ein junger Termin in derselben Welt ueberlebt.
+        $jung = rsAppointment($welt, rsDateInDays(10), '19:00:00');
+        assertStatus(200, rsPut('manager', $jung, ['status' => 'yes'], $welt['member']));
 
         $res = apiRequest('POST', 'cleanup', ['token' => apiToken('admin'),
             'body' => ['years' => 100, 'years_worktime' => 30, 'years_audit' => 100]]);
         assertStatus(200, $res);
         assertTrue((int) $res['body']['deleted_appointment_responses'] >= 1,
             'Die Rueckmeldung zum Termin von 1920 haette geloescht werden muessen');
+
+        $alteAntwort = rsGet('admin', ['appointment_id' => $alt]);
+        assertStatus(200, $alteAntwort);
+        assertSame(0, $alteAntwort['body']['summary']['yes'], 'Alte Rueckmeldung haette geloescht werden muessen');
+
+        $jungeAntwort = rsGet('admin', ['appointment_id' => $jung]);
+        assertStatus(200, $jungeAntwort);
+        assertSame(1, $jungeAntwort['body']['summary']['yes'], 'Junge Rueckmeldung haette ueberleben muessen');
     } finally {
         rsDropWorld($welt);
     }

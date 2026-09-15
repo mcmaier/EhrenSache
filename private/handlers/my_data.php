@@ -262,7 +262,7 @@ function exportAsCSV($data) {
 
     fputcsv($output, []);
     fputcsv($output, ['=== TERMINRÜCKMELDUNGEN ===']);
-    fputcsv($output, ['Termindatum', 'Termin', 'Rückmeldung', 'Bemerkung', 'Zuletzt geändert']);
+    fputcsv($output, ['Termindatum', 'Termin', 'Rückmeldung', 'Bemerkung', 'Status geändert', 'Zuletzt geändert']);
     $responseLabels = ['yes' => 'Zusage', 'no' => 'Absage', 'maybe' => 'Unsicher'];
     foreach ($data['appointment_responses'] as $response) {
         fputcsv($output, [
@@ -271,6 +271,7 @@ function exportAsCSV($data) {
             $responseLabels[$response['status']] ?? $response['status'],
             $response['comment'] ?? '',
             date('d.m.Y H:i', strtotime($response['status_changed_at'])),
+            date('d.m.Y H:i', strtotime($response['updated_at'])),
         ]);
     }
 
