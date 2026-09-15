@@ -171,11 +171,12 @@ function markAsChanged(event) {
     
     // Validierung für Number-Inputs
     if (input.type === 'number') {
-        const value = parseInt(input.value);
+        const raw = input.value.trim();
+        const value = parseInt(raw);
         const min = parseInt(input.min);
         const max = parseInt(input.max);
-        
-        if (isNaN(value) || value < min || value > max) {
+
+        if (!/^-?\d+$/.test(raw) || isNaN(value) || value < min || value > max) {
             input.classList.add('invalid');
             input.setCustomValidity(`Wert muss zwischen ${min} und ${max} liegen`);
             return; // Nicht als geändert markieren
@@ -225,11 +226,12 @@ async function saveAllSettings() {
         }
 
         else if (input.type === 'number') {
-            value = parseInt(input.value);
+            const raw = input.value.trim();
+            value = parseInt(raw);
             const min = parseInt(input.min);
             const max = parseInt(input.max);
-            
-            if (isNaN(value) || value < min || value > max) {
+
+            if (!/^-?\d+$/.test(raw) || isNaN(value) || value < min || value > max) {
                 input.classList.add('invalid');
                 hasErrors = true;
                 return;
@@ -238,7 +240,7 @@ async function saveAllSettings() {
             {
                 value = input.value;
             }
-        }        
+        }
         else if(input.type === 'hidden' && key === 'organization_logo'){
             value = input.value;
 
@@ -275,14 +277,20 @@ async function saveAllSettings() {
     try {
         // Alle Änderungen nacheinander speichern
         for (const update of updates) {
-            await apiCall('settings', 'PUT', {
+            const result = await apiCall('settings', 'PUT', {
                 setting_key: update.key,
                 setting_value: update.value
             });
-            
+
+            // Eine serverseitige Ablehnung (z. B. ungültige Frist) darf nicht als
+            // gespeichert gelten — apiCall() zeigt den Fehler-Toast bereits an.
+            if (!result || !result.success) {
+                return;
+            }
+
             // Lokalen Cache aktualisieren
-            systemSettings[update.key] = update.value;            
-            
+            systemSettings[update.key] = update.value;
+
             // Theme-Einstellungen sofort anwenden
             //applyNewThemeSetting(update.key, update.value);
         }

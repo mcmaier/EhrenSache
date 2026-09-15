@@ -155,6 +155,19 @@ function rsType(int $typeId): array
     return $res['body'];
 }
 
+/** Wie puSettingValue() in punctuality_api.php, nur mit dem Praefix dieser Suite. */
+function rsSettingValue(string $key): ?string
+{
+    $res = apiRequest('GET', 'settings', ['token' => apiToken('admin')]);
+    foreach ($res['body']['settings'] ?? [] as $setting) {
+        if ($setting['setting_key'] === $key) {
+            return (string) $setting['setting_value'];
+        }
+    }
+
+    return null;
+}
+
 test('appointment_types: neue Terminart traegt die Rueckmeldungs-Einstellungen', function () {
     $welt = rsWorld('Typ', [
         'responses_enabled' => 1, 'responses_names_visible' => 1,
@@ -239,9 +252,25 @@ test('appointment_types: PUT auf unbekannte Terminart liefert 404', function () 
 });
 
 test('settings: Frist ausserhalb 0..720 wird abgewiesen', function () {
-    foreach (['721', '-1', 'zwei'] as $wert) {
-        $res = apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
-            'body' => ['setting_key' => 'response_deadline_hours', 'setting_value' => $wert]]);
-        assertStatus(400, $res, "Wert {$wert}");
+    $vorher = rsSettingValue('response_deadline_hours') ?? '24';
+
+    try {
+        // '721' als Text und 721 als JSON-Zahl muessen beide abgelehnt werden --
+        // responseHoursFromRaw() prueft is_int() vor dem Regex auf Strings.
+        foreach (['721', '-1', 'zwei', '24.5', 721] as $wert) {
+            $res = apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+                'body' => ['setting_key' => 'response_deadline_hours', 'setting_value' => $wert]]);
+            assertStatus(400, $res, "Wert {$wert}");
+        }
+        assertSame($vorher, rsSettingValue('response_deadline_hours'),
+            'abgewiesene Werte duerfen die gespeicherte Frist nicht veraendern');
+
+        foreach (['0', '720', 48] as $wert) {
+            assertStatus(200, apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+                'body' => ['setting_key' => 'response_deadline_hours', 'setting_value' => $wert]]), "Wert {$wert}");
+        }
+    } finally {
+        assertStatus(200, apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+            'body' => ['setting_key' => 'response_deadline_hours', 'setting_value' => $vorher]]));
     }
 });

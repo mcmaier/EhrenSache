@@ -36,3 +36,19 @@ test('Die Frist ist fuer Neuinstallationen angelegt', function () use ($rsRoot) 
     $sql = (string) file_get_contents($rsRoot . '/private/setup/ehrensache_db.sql');
     assertTrue(str_contains($sql, "('response_deadline_hours',"), 'Schluessel fehlt im Insert-Block');
 });
+
+test('saveAllSettings meldet eine serverseitige Ablehnung nicht als gespeichert', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/settings.js');
+
+    // Die Funktion wird schon vorher als Event-Listener referenziert
+    // ("saveBtn.addEventListener('click', saveAllSettings)") -- die Definition
+    // beginnt erst bei "function saveAllSettings".
+    $start = strpos($js, 'function saveAllSettings');
+    assertTrue($start !== false, 'saveAllSettings() fehlt');
+    $ende  = strpos($js, 'function ', $start + strlen('function saveAllSettings'));
+    assertTrue($ende !== false, 'Ende von saveAllSettings() nicht gefunden');
+    $body  = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, '.success'),
+        'saveAllSettings() muss result.success (oder !result) pruefen, bevor es Erfolg meldet');
+});

@@ -96,12 +96,18 @@ function handleSettings($db, $database, $method, $authUserId) {
 
                 // Die Frist wirkt in die Zuverlaessigkeit; ein Unsinnswert soll
                 // gar nicht erst gespeichert werden. Gelesen wird ohnehin ueber
-                // responseDeadlineHours() mit Rueckfall auf 24.
-                if (($data['setting_key'] ?? null) === 'response_deadline_hours'
-                    && responseHoursFromRaw((string) ($data['setting_value'] ?? '')) === null) {
-                    http_response_code(400);
-                    echo json_encode(['message' => 'Die Frist muss eine ganze Zahl von 0 bis 720 sein'],
-                                     JSON_UNESCAPED_UNICODE);
+                // responseDeadlineHours() mit Rueckfall auf 24. Gespeichert wird
+                // der normalisierte Wert, damit ein JSON-Int oder ein Wert mit
+                // Leerzeichen nicht unveraendert in der Datenbank landet.
+                if (($data['setting_key'] ?? null) === 'response_deadline_hours') {
+                    $hours = responseHoursFromRaw($data['setting_value'] ?? null);
+                    if ($hours === null) {
+                        http_response_code(400);
+                        echo json_encode(['message' => 'Die Frist muss eine ganze Zahl von 0 bis 720 sein'],
+                                         JSON_UNESCAPED_UNICODE);
+                        break;
+                    }
+                    updateSetting($db, $database, $data['setting_key'], (string) $hours);
                     break;
                 }
 
