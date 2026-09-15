@@ -37,6 +37,11 @@
     --login-glow: rgba(31, 95, 191, .24);
     --badge-bg: #EEF1F4;
     --badge-fg: #2F3A45;
+
+    /* Neutrale Grundflaeche fuer die Ampel-Chips der Terminrueckmeldung.
+       Bewusst nicht --badge-bg: das folgt der Vereinsfarbe und wird damit
+       gruenlich -- neben gruen/gelb/rot als Ampel wuerde das mitsprechen. */
+    --chip-neutral-bg: #EEF1F4;
 }
 
 * {
@@ -2614,8 +2619,8 @@ body {
     gap: 3px;
     padding: 2px 7px;
     border-radius: 999px;
-    background: var(--badge-bg);
-    color: var(--badge-fg);
+    background: var(--chip-neutral-bg);
+    color: var(--text);
     font-size: 12px;
     font-weight: 600;
 }
@@ -2667,15 +2672,15 @@ body {
     padding: 3px 9px 3px 7px;
     border-radius: 6px;
     border-left: 3px solid var(--border);
-    background: var(--badge-bg);
-    color: var(--badge-fg);
+    background: var(--chip-neutral-bg);
+    color: var(--text);
     font-size: 12px;
 }
 
 .response-name-chip--yes   { background: rgba(39, 174, 96, 0.15);  border-left-color: var(--success); }
 .response-name-chip--maybe { background: rgba(243, 156, 18, 0.15); border-left-color: var(--warning); }
 .response-name-chip--no    { background: rgba(231, 76, 60, 0.15);  border-left-color: var(--error); }
-.response-name-chip--open  { background: var(--badge-bg);          border-left-color: var(--border); }
+.response-name-chip--open  { background: var(--chip-neutral-bg);   border-left-color: var(--border); }
 
 .response-name-chip--more {
     background: transparent;
