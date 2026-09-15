@@ -687,3 +687,52 @@ test('Zuverlaessigkeit: globale Frist greift, wenn die Terminart keine eigene ha
         rsDropWorld($weltA);
     }
 });
+
+test('PUT: bereits vorhandener eigener Antrag wird verknuepft, nicht verdoppelt', function () {
+    // Spec 5.4, Pfad 'link': Existiert schon ein eigener, nicht abgelehnter
+    // Abwesenheitsantrag zum Termin (z. B. ueber exceptions direkt gestellt),
+    // haengt sich die Absage daran an, statt einen zweiten Antrag anzulegen.
+    $welt = rsWorld('Verknuepft', ['responses_enabled' => 1, 'responses_require_excuse' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt) {
+            rsCreate('exceptions', [
+                'member_id' => $userMember, 'appointment_id' => $apt,
+                'exception_type' => 'absence', 'reason' => 'RS-eigener-Antrag', 'status' => 'pending',
+            ]);
+
+            $antraege = static function () use ($userMember, $apt): array {
+                $liste = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+                    'query' => ['member_id' => $userMember, 'type' => 'absence']]);
+                assertStatus(200, $liste);
+
+                return array_values(array_filter($liste['body'],
+                    static fn ($e) => (int) $e['appointment_id'] === $apt));
+            };
+            assertSame(1, count($antraege()), 'Vorbedingung: genau der eine, direkt angelegte Antrag');
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-Absage']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state']);
+            assertSame(1, count($antraege()), 'Verknuepfung darf keinen zweiten Antrag anlegen');
+            assertSame('RS-eigener-Antrag', $antraege()[0]['reason'], 'Verknuepfter Antrag behaelt seine Begruendung');
+
+            // Zusage loescht den offenen, verknuepften Antrag wieder (Spec 5.4).
+            assertStatus(200, rsPut('user', $apt, ['status' => 'yes']));
+            assertSame(0, count($antraege()), 'Zusage loescht den verknuepften offenen Antrag');
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('PUT: Terminart ohne Rueckmeldung bleibt 409, auch fuer ein Mitglied per member_id', function () {
+    $welt = rsWorld('AusPut');
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+        assertStatus(409, rsPut('manager', $apt, ['status' => 'yes'], $welt['member']));
+    } finally {
+        rsDropWorld($welt);
+    }
+});

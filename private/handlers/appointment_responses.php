@@ -377,6 +377,15 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
     $db->beginTransaction();
 
     try {
+        // Termin zuerst sperren: Ohne diese Sperre nehmen zwei gleichzeitige
+        // Erst-PUTs auf denselben Termin je eine Luecken-Sperre in uq_response
+        // auf eine noch nicht vorhandene Zeile, und beide INSERTs verklemmen
+        // sich gegenseitig (Deadlock 1213). Die Termin-Sperre serialisiert
+        // Schreibzugriffe je Termin und macht daraus ein Warten statt eines
+        // Deadlocks.
+        $db->prepare("SELECT appointment_id FROM {$prefix}appointments WHERE appointment_id = ? FOR UPDATE")
+           ->execute([$appointmentId]);
+
         $existing   = responsesFetchOneForUpdate($db, $database, $appointmentId, $memberId);
         $ownAbsence = responsesFetchOwnAbsence($db, $database, $appointmentId, $memberId);
 
@@ -405,10 +414,15 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
                 break;
 
             case 'delete':
-                $db->prepare("DELETE FROM {$prefix}exceptions
-                              WHERE exception_id = ? AND status = 'pending'")
-                   ->execute([$exceptionId]);
-                $exceptionId = null;
+                $stmt = $db->prepare("DELETE FROM {$prefix}exceptions
+                              WHERE exception_id = ? AND status = 'pending'");
+                $stmt->execute([$exceptionId]);
+                // Nur loesen, wenn wirklich geloescht wurde -- ist der Antrag
+                // inzwischen genehmigt (nicht mehr 'pending'), hat eine
+                // gleichzeitige Genehmigung gewonnen, und die Verknuepfung bleibt.
+                if ($stmt->rowCount() > 0) {
+                    $exceptionId = null;
+                }
                 break;
         }
 
@@ -425,8 +439,10 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
            ->execute([$appointmentId, $memberId, $status, $comment, $exceptionId, $statusChangedAt, $now]);
 
         $db->commit();
-    } catch (PDOException $e) {
-        $db->rollBack();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
         error_log('appointment_responses PUT: ' . $e->getMessage());
         responsesFail(500, 'Rückmeldung konnte nicht gespeichert werden');
         return;
@@ -450,6 +466,13 @@ function responsesDelete($db, $database, bool $isManager, ?int $authMemberId, st
     $db->beginTransaction();
 
     try {
+        // Termin zuerst sperren -- derselbe Grund wie in responsesPut(): Ohne
+        // diese Sperre koennen gleichzeitige Schreibzugriffe auf denselben
+        // Termin ueber die Luecken-Sperren in uq_response in einen Deadlock
+        // laufen. Die Termin-Sperre serialisiert sie stattdessen.
+        $db->prepare("SELECT appointment_id FROM {$prefix}appointments WHERE appointment_id = ? FOR UPDATE")
+           ->execute([$appointmentId]);
+
         $existing = responsesFetchOneForUpdate($db, $database, $appointmentId, $memberId);
         if ($existing === null) {
             $db->rollBack();
@@ -468,8 +491,10 @@ function responsesDelete($db, $database, bool $isManager, ?int $authMemberId, st
            ->execute([(int) $existing['response_id']]);
 
         $db->commit();
-    } catch (PDOException $e) {
-        $db->rollBack();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
         error_log('appointment_responses DELETE: ' . $e->getMessage());
         responsesFail(500, 'Rückmeldung konnte nicht zurückgenommen werden');
         return;
