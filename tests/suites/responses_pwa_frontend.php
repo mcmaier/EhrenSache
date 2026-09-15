@@ -78,3 +78,14 @@ test('PWA: vorgemerkte Absage hat Vorrang vor gespeicherter Antwort, gespeichert
     assertTrue((bool) preg_match('/responsesInFlight\.delete\(key\);[\s\S]{0,300}renderResponses\(key\)/', $js),
         'responsesInFlight.delete(key) erfolgt nicht vor renderResponses(key) -- die gespeicherte Karte bleibt gesperrt');
 });
+
+test('PWA: "Wer hat geantwortet?" zeigt Namen als Chips statt Bullet-Liste, maskiert', function () use ($rspRoot) {
+    // Nutzer-Feedback: die fruehere <ul><li>-Liste wirkte bei vielen
+    // Mitgliedern unuebersichtlich und die Punkte sassen zu weit links am
+    // Kartenrand. Ersetzt durch nach Status gruppierte, umbrechende Chips.
+    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+
+    assertTrue(str_contains($js, 'response-name-chip'), 'Namen tragen keine Chip-Klasse mehr');
+    assertTrue(str_contains($js, 'escapeHtml(m.name)') && str_contains($js, 'escapeHtml(m.surname)'),
+        'Name/Nachname werden nicht (mehr) maskiert');
+});

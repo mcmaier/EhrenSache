@@ -2505,10 +2505,94 @@ body {
     font-size: 13px;
 }
 
+.response-names {
+    margin-top: 6px;
+    padding-left: 0;
+}
+
 .response-names summary {
     cursor: pointer;
-    margin-top: 6px;
     font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-left: 0;
+}
+
+.response-names summary::marker {
+    color: var(--text-light);
+}
+
+/* Ampel-Zeile in der Summary -- Zaehlung je Status, gleiche Farben wie die
+   Antwort-Knoepfe (response-btn). Nullwerte gedimmt statt ausgeblendet, damit
+   die Reihenfolge der vier Chips immer gleich bleibt. */
+.response-count-row {
+    display: inline-flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.response-count-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--badge-bg);
+    color: var(--badge-fg);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.response-count-chip.is-zero {
+    opacity: 0.45;
+}
+
+.response-count-chip--yes   { color: var(--success); }
+.response-count-chip--maybe { color: var(--warning); }
+.response-count-chip--no    { color: var(--error); }
+.response-count-chip--open  { color: var(--text-light); }
+
+.response-names__body {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.response-name-group__heading {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.response-name-group--yes   .response-name-group__heading { color: var(--success); }
+.response-name-group--maybe .response-name-group__heading { color: var(--warning); }
+.response-name-group--no    .response-name-group__heading { color: var(--error); }
+.response-name-group--open  .response-name-group__heading { color: var(--text-light); }
+
+/* Chips statt Bullet-Liste (Nutzer-Feedback: Punkte sassen zu weit links am
+   Kartenrand) -- keine ul/li mehr, daher auch kein list-style noetig. */
+.response-name-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.response-name-chip {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--badge-bg);
+    color: var(--badge-fg);
+    font-size: 12px;
+}
+
+.response-name-chip--more {
+    background: transparent;
+    color: var(--text-light);
+    font-style: italic;
 }
 
 .responses-empty {

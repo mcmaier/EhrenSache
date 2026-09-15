@@ -3449,6 +3449,17 @@ function initCaptureTab() {
 // Warteschlange gibt es bewusst nicht (OI-43, Spec 7.1).
 
 const RESPONSE_LABELS = { yes: 'Zusage', maybe: 'Unsicher', no: 'Absage' };
+
+// Reihenfolge und Aufmachung der Gruppen unter "Wer hat geantwortet?" --
+// status: null steht fuer "Ohne Antwort" (Mitglied ohne Datensatz).
+const RESPONSE_NAME_GROUPS = [
+    { status: 'yes',   key: 'yes',   icon: '✓', label: 'Zusage' },
+    { status: 'maybe', key: 'maybe', icon: '?', label: 'Unsicher' },
+    { status: 'no',    key: 'no',    icon: '✗', label: 'Absage' },
+    { status: null,    key: 'open',  icon: '—', label: 'Ohne Antwort' },
+];
+const RESPONSE_NAMES_OPEN_LIMIT = 12; // "Ohne Antwort" waechst schnell -- Rest hinter "+ n weitere".
+
 let upcomingResponses = [];
 let responsesNetworkBound = false;
 
@@ -3645,6 +3656,53 @@ function renderResponses(justSavedId, drafts) {
     refreshAllResponseCards();
 }
 
+/** Ein Namens-Chip, Werte maskiert -- kein CSP, also nie ungemaskiert einbauen. */
+function responseNameChip(m, extraClass) {
+    const cls = extraClass ? ` response-name-chip--${extraClass}` : '';
+    return `<span class="response-name-chip${cls}">${escapeHtml(m.name)} ${escapeHtml(m.surname)}</span>`;
+}
+
+/** Nachname vor Vorname, "Vorname Nachname" bleibt aber die Anzeige. */
+function sortByNameSurname(members) {
+    return [...members].sort((a, b) =>
+        a.surname.localeCompare(b.surname, 'de') || a.name.localeCompare(b.name, 'de'));
+}
+
+/**
+ * "Wer hat geantwortet?" (G?): Ampel-Zeile in der Summary (Zaehlung direkt
+ * aus item.members, nicht aus item.summary -- beide muessten sonst synchron
+ * gehalten werden), Details nach Status gruppiert statt einer Bullet-Liste.
+ */
+function responseNamesHtml(members) {
+    const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
+    members.forEach(m => counts[m.status || 'open']++);
+
+    const countRow = RESPONSE_NAME_GROUPS.map(g =>
+        `<span class="response-count-chip response-count-chip--${g.key}${counts[g.key] === 0 ? ' is-zero' : ''}">${g.icon} ${counts[g.key]}</span>`
+    ).join('');
+
+    const groups = RESPONSE_NAME_GROUPS.map(g => {
+        const inGroup = sortByNameSurname(members.filter(m => (m.status || null) === g.status));
+        if (inGroup.length === 0) return '';
+
+        const overflow = g.status === null && inGroup.length > RESPONSE_NAMES_OPEN_LIMIT;
+        const shown = overflow ? inGroup.slice(0, RESPONSE_NAMES_OPEN_LIMIT) : inGroup;
+        const moreChip = overflow
+            ? `<span class="response-name-chip response-name-chip--more">+ ${inGroup.length - RESPONSE_NAMES_OPEN_LIMIT} weitere</span>`
+            : '';
+
+        return `<div class="response-name-group response-name-group--${g.key}">
+            <div class="response-name-group__heading">${g.icon} ${escapeHtml(g.label)} · ${inGroup.length}</div>
+            <div class="response-name-chips">${shown.map(m => responseNameChip(m)).join('')}${moreChip}</div>
+        </div>`;
+    }).join('');
+
+    return `<details class="response-names">
+        <summary>Wer hat geantwortet? <span class="response-count-row">${countRow}</span></summary>
+        <div class="response-names__body">${groups}</div>
+    </details>`;
+}
+
 function responseCardHtml(item) {
     const apt = item.appointment;
     const id = Number(apt.appointment_id);
@@ -3670,11 +3728,7 @@ function responseCardHtml(item) {
         `<button type="button" class="response-btn response-btn--${s}${status === s ? ' is-active' : ''}${s === 'no' && isPendingNo ? ' is-pending' : ''}" data-appointment-id="${id}" data-status="${s}"${off}>${RESPONSE_LABELS[s]}</button>`
     ).join('');
 
-    const names = item.members
-        ? `<details class="response-names"><summary>Wer hat geantwortet?</summary><ul>${item.members.map(m =>
-            `<li>${escapeHtml(m.name)} ${escapeHtml(m.surname)}: ${m.status ? RESPONSE_LABELS[m.status] : 'keine Antwort'}</li>`
-          ).join('')}</ul></details>`
-        : '';
+    const names = item.members ? responseNamesHtml(item.members) : '';
 
     const s = item.summary;
 
