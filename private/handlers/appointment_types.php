@@ -123,13 +123,18 @@ function handleAppointmentTypes($db, $database, $method, $id) {
                                          FROM {$prefix}appointment_types WHERE type_id = ?");
             $currentStmt->execute([$id]);
             $currentRow = $currentStmt->fetch(PDO::FETCH_ASSOC);
-            $current = $currentRow ? [
+            if (!$currentRow) {
+                http_response_code(404);
+                echo json_encode(["message" => "Type not found"]);
+                return;
+            }
+            $current = [
                 'responses_enabled'        => (int) $currentRow['responses_enabled'],
                 'responses_names_visible'  => (int) $currentRow['responses_names_visible'],
                 'responses_require_excuse' => (int) $currentRow['responses_require_excuse'],
                 'response_deadline_hours'  => $currentRow['response_deadline_hours'] === null
                     ? null : (int) $currentRow['response_deadline_hours'],
-            ] : RESPONSE_TYPE_DEFAULTS;
+            ];
 
             try {
                 $responseSettings = responseTypeSettings($data, $current);
