@@ -272,3 +272,39 @@
 .response-own--maybe { color: var(--warning-color); }
 .response-own--no    { color: var(--danger-color); }
 .response-none       { color: var(--text-light); }
+
+/* Terminrueckmeldung (FI-1): Icon-Aktionen im Modal (ersetzen das fruehere
+   <select>) -- Grundform kommt von .action-btn.btn-icon, hier nur die Farben.
+   Aktiver Status (is-active): gefuellt mit Farbe und weisser Schrift. */
+.response-action--yes   { color: var(--success-color); border-color: var(--success-color); }
+.response-action--yes:hover,   .response-action--yes.is-active   { background: var(--success-color); color: var(--bg-white); }
+
+.response-action--maybe { color: var(--warning-color); border-color: var(--warning-color); }
+.response-action--maybe:hover, .response-action--maybe.is-active { background: var(--warning-color); color: var(--bg-white); }
+
+.response-action--no    { color: var(--danger-color); border-color: var(--danger-color); }
+.response-action--no:hover,    .response-action--no.is-active    { background: var(--danger-color); color: var(--bg-white); }
+
+.response-action--reset { color: var(--text-light); border-color: var(--border-color); }
+.response-action--reset:hover { background: var(--bg-gray); }
+
+/* Segmentgruppe des Antwort-Filters im Modal (ersetzt die fruehere Radio-Liste). */
+.response-filter {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin: var(--spacing-sm) 0;
+}
+
+.response-filter__btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-white);
+    color: var(--text-dark);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.response-filter__btn:hover { opacity: 0.8; }
+.response-filter__btn.is-active { background: var(--primary-color); border-color: var(--primary-color); color: var(--bg-white); }

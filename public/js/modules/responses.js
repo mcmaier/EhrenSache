@@ -22,8 +22,11 @@ import { escapeHtml, translateExceptionStatus } from './utils.js';
 // Jahres invalidiert, damit ihre Summen stimmen.
 // ============================================
 
-export const RESPONSE_LABELS = { yes: 'Zusage', maybe: 'Unsicher', no: 'Absage' };
-const RESPONSE_ICONS = { yes: '✓', maybe: '?', no: '✗' };
+export const RESPONSE_LABELS = { yes: 'Zusage', maybe: 'Unsicher', no: 'Absage', open: 'Ohne Antwort' };
+const RESPONSE_ICONS = { yes: '✓', maybe: '?', no: '✗', open: '—' };
+
+// Reihenfolge der Ampel-Chips in Terminliste und Modal (yes/maybe/no/open).
+const CHIP_ORDER = ['yes', 'maybe', 'no', 'open'];
 
 let current = null;          // letzte API-Antwort des offenen Modals
 let currentFilter = 'all';
@@ -48,9 +51,38 @@ function formatDateTimeDe(mysql) {
     return `${d.toLocaleDateString('de-DE')} ${d.toTimeString().substring(0, 5)}`;
 }
 
-export function formatResponseSummary(summary) {
-    if (!summary) return '';
-    return `✓ ${summary.yes} · ? ${summary.maybe} · ✗ ${summary.no} · — ${summary.open}`;
+/** Ausgeschriebener Tooltip-Text der Ampel, z.B. fuer title/aria-label. */
+function responseSummaryTitle(summary) {
+    return `${Number(summary.yes)} Zusagen · ${Number(summary.maybe)} unsicher · `
+        + `${Number(summary.no)} Absagen · ${Number(summary.open)} ohne Antwort`;
+}
+
+/**
+ * Chip-Gruppe der Ampel (Zusage/Unsicher/Absage/Ohne Antwort). `large` schaltet
+ * die beschriftete Modal-Variante ein (Terminliste bleibt bei Icon + Zahl).
+ */
+function responseChipsHtml(summary, { large = false } = {}) {
+    const chips = CHIP_ORDER.map(key => {
+        const count = Number(summary[key] ?? 0);
+        const zero = count === 0 ? ' is-zero' : '';
+        const label = large ? `<span class="response-chip__label">${RESPONSE_LABELS[key]}</span>` : '';
+        return `<span class="response-chip response-chip--${key}${zero}">${label}`
+            + `<span class="response-chip__icon" aria-hidden="true">${RESPONSE_ICONS[key]}</span>`
+            + `<span class="response-chip__count">${count}</span></span>`;
+    }).join('');
+    return `<span class="response-chip-group${large ? ' response-chip-group--lg' : ''}">${chips}</span>`;
+}
+
+/** Summenblock des Modals: beschriftete Chips plus gestapelter Balken. */
+function responseSummaryBlock(summary) {
+    const total = CHIP_ORDER.reduce((sum, key) => sum + Number(summary[key] ?? 0), 0);
+    const bar = total > 0 ? `
+        <div class="response-bar" role="img" aria-label="${responseSummaryTitle(summary)}">
+            ${CHIP_ORDER.filter(key => Number(summary[key]) > 0).map(key =>
+                `<span class="response-bar__seg response-bar__seg--${key}" style="width:${(Number(summary[key]) / total * 100).toFixed(2)}%"></span>`
+            ).join('')}
+        </div>` : '';
+    return `<div class="response-summary">${responseChipsHtml(summary, { large: true })}</div>${bar}`;
 }
 
 /** Zelle der Terminliste. */
@@ -61,15 +93,17 @@ export function responseSummaryCell(apt) {
     const own = apt.responses.own
         ? ` <span class="response-own response-own--${apt.responses.own}" title="Eigene Rückmeldung: ${RESPONSE_LABELS[apt.responses.own]}">${RESPONSE_ICONS[apt.responses.own]}</span>`
         : '';
+    const title = responseSummaryTitle(apt.responses);
+    const chips = responseChipsHtml(apt.responses);
 
     // Wer selbst nicht zu diesem Termin erwartet wird und auch nicht
     // verwaltet, bekommt keine anklickbare Zelle -- das Modal wuerde ihm
     // ohnehin nur eine leere oder fremde Mitgliederliste zeigen.
     if (!apt.responses.expected && !isAdminOrManager) {
-        return `<span class="response-summary-text">${formatResponseSummary(apt.responses)}</span>${own}`;
+        return `<span class="response-summary-text" title="${title}">${chips}</span>${own}`;
     }
 
-    return `<button type="button" class="response-summary-btn" onclick="openResponsesModal(${Number(apt.appointment_id)})" title="Rückmeldungen anzeigen">${formatResponseSummary(apt.responses)}</button>${own}`;
+    return `<button type="button" class="response-summary-btn" onclick="openResponsesModal(${Number(apt.appointment_id)})" title="${title}">${chips}</button>${own}`;
 }
 
 export async function openResponsesModal(appointmentId) {
@@ -130,7 +164,7 @@ function renderResponsesModal() {
         `Rückmeldungen: ${apt.title} (${date}, ${apt.start_time.substring(0, 5)})`;
 
     let html = `<p class="response-deadline">${escapeHtml(deadlineText(data))}</p>`;
-    html += `<div class="response-summary">${formatResponseSummary(data.summary)}</div>`;
+    html += responseSummaryBlock(data.summary);
 
     if (data.expected) html += ownResponseHtml(data);
     if (data.comparison) html += comparisonHtml(data.comparison);
@@ -198,10 +232,34 @@ function statusBadge(status) {
         : `<span class="response-badge response-badge--${status}">${RESPONSE_LABELS[status]}</span>`;
 }
 
+/** Vier quadratische Icon-Aktionen (Zusage/Unsicher/Absage/Zuruecknehmen) je Mitgliederzeile. */
+function memberActionButtons(m) {
+    const memberLabel = `${escapeHtml(m.name)} ${escapeHtml(m.surname)}`;
+    const buttons = ['yes', 'maybe', 'no'].map(s => {
+        const active = m.status === s;
+        return `<button type="button" class="action-btn btn-icon response-action response-action--${s}${active ? ' is-active' : ''}"
+                    aria-pressed="${active ? 'true' : 'false'}"
+                    title="${RESPONSE_LABELS[s]} für ${memberLabel} setzen"
+                    aria-label="${RESPONSE_LABELS[s]} für ${memberLabel} setzen"
+                    onclick="setMemberResponse(${Number(m.member_id)}, '${s}')">${RESPONSE_ICONS[s]}</button>`;
+    }).join('');
+
+    const reset = m.status !== null
+        ? `<button type="button" class="action-btn btn-icon response-action response-action--reset"
+                title="Rückmeldung für ${memberLabel} zurücknehmen"
+                aria-label="Rückmeldung für ${memberLabel} zurücknehmen"
+                onclick="setMemberResponse(${Number(m.member_id)}, 'delete')">↺</button>`
+        : '';
+
+    return buttons + reset;
+}
+
 function managerTableHtml(data) {
     const started = data.started;
     let lastGroup = null;
     const colspan = started ? 6 : 5;
+    const allCount = data.members.length;
+    const openCount = data.members.filter(m => m.status === null).length;
 
     const rows = data.members.filter(m => matchesFilter(m, currentFilter)).map(m => {
         let groupRow = '';
@@ -211,7 +269,6 @@ function managerTableHtml(data) {
         }
         const excuse = m.excuse_state
             ? `<br><small>Entschuldigung: ${escapeHtml(translateExceptionStatus(m.excuse_state))}</small>` : '';
-        const memberLabel = `${escapeHtml(m.name)} ${escapeHtml(m.surname)}`;
 
         // G6: "kurzfristig" nur bei einer Absage.
         return `${groupRow}
@@ -221,23 +278,16 @@ function managerTableHtml(data) {
                 <td>${escapeHtml(m.comment ?? '')}</td>
                 <td>${escapeHtml(formatDateTimeDe(m.status_changed_at))}</td>
                 ${started ? `<td>${m.present ? 'anwesend' : '–'}</td>` : ''}
-                <td>
-                    <select class="response-set" aria-label="Rückmeldung für ${memberLabel} setzen"
-                            onchange="setMemberResponse(${Number(m.member_id)}, this.value); this.value = '';">
-                        <option value="">Setzen …</option>
-                        <option value="yes">Zusage</option>
-                        <option value="maybe">Unsicher</option>
-                        <option value="no">Absage</option>
-                        ${m.status !== null ? '<option value="delete">Zurücknehmen</option>' : ''}
-                    </select>
-                </td>
+                <td class="actions-cell">${memberActionButtons(m)}</td>
             </tr>`;
     }).join('');
 
     return `
         <div class="response-filter">
-            <label><input type="radio" name="responseFilter" ${currentFilter === 'all' ? 'checked' : ''} onchange="filterResponses('all')"> Alle</label>
-            <label><input type="radio" name="responseFilter" ${currentFilter === 'open' ? 'checked' : ''} onchange="filterResponses('open')"> Keine Antwort</label>
+            <button type="button" class="response-filter__btn${currentFilter === 'all' ? ' is-active' : ''}"
+                    aria-pressed="${currentFilter === 'all' ? 'true' : 'false'}" onclick="filterResponses('all')">Alle (${allCount})</button>
+            <button type="button" class="response-filter__btn${currentFilter === 'open' ? ' is-active' : ''}"
+                    aria-pressed="${currentFilter === 'open' ? 'true' : 'false'}" onclick="filterResponses('open')">Keine Antwort (${openCount})</button>
         </div>
         <div class="data-table">
             <table>
@@ -359,6 +409,9 @@ export async function setMemberResponse(memberId, value) {
     const year = Number(current.appointment.date.substring(0, 4));
 
     const member = current.members?.find(m => Number(m.member_id) === Number(memberId));
+
+    // Klick auf den bereits aktiven Status der Zeile: kein erneuter Request.
+    if (value !== 'delete' && member?.status === value) return;
 
     if (value === 'delete') {
         const confirmed = await showConfirm(withdrawConfirmText(member?.excuse_state, member?.excuse_created));

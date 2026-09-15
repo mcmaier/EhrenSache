@@ -519,7 +519,7 @@ export function showDashboard() {
 export function updateTableHeaders() {
     const tables = [
         { id: 'membersTableBody', headers: ['Name', 'Vorname', 'Mitgliedsnummer', 'Gruppen','Status'] },
-        { id: 'appointmentsTableBody', headers: ['Termin', 'Terminart', 'Beschreibung',] },
+        { id: 'appointmentsTableBody', headers: ['Termin', 'Terminart', 'Beschreibung', 'Rückmeldung'] },
         { id: 'recordsTableBody', headers: ['Termin', 'Terminart', 'Mitglied', 'Ankunftszeit', 'Status','Quelle'] },
         { id: 'exceptionsTableBody', headers: ['Typ', 'Mitglied', 'Termin', 'Begründung', 'Gewünschte Zeit', 'Status', 'Erstellt am'] }
     ];

@@ -81,3 +81,35 @@
     color: var(--danger-color);
     font-size: 0.8em;
 }
+
+/* Terminrueckmeldung (FI-1): Ampel-Chips in Terminliste und Modal.
+   Kleine Variante (Terminliste): nur Icon + Zahl. --lg (Modal): mit Label. */
+.response-chip-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    vertical-align: middle;
+}
+
+.response-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85em;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: opacity var(--transition-fast);
+}
+
+.response-chip.is-zero { opacity: 0.45; }
+
+.response-chip--yes   { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); }
+.response-chip--maybe { background: color-mix(in srgb, var(--warning-color) 15%, transparent); color: var(--warning-color); }
+.response-chip--no    { background: color-mix(in srgb, var(--danger-color) 15%, transparent);  color: var(--danger-color); }
+.response-chip--open  { background: color-mix(in srgb, var(--text-light) 15%, transparent);     color: var(--text-light); }
+
+.response-chip-group--lg { gap: 8px; flex-wrap: wrap; }
+.response-chip-group--lg .response-chip { font-size: 0.95em; padding: 4px 10px; gap: 5px; }
+.response-chip__label { font-weight: 600; }

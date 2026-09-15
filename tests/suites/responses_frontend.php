@@ -79,6 +79,20 @@ test('Terminliste hat die Spalte Rueckmeldung und passende colspan', function ()
     assertTrue(!str_contains($js, 'colspan="4"'), 'appointments.js rendert noch vier Spalten');
 });
 
+test('updateTableHeaders() in ui.js fuehrt Rueckmeldung fuer die Terminliste', function () use ($rsRoot) {
+    // updateTableHeaders() baut das thead nach jedem Login neu auf und
+    // ueberschrieb dabei den korrekten Header aus index.html -- ohne
+    // 'Rückmeldung' in diesem Array verschieben sich die Spalten gegen die
+    // Zeilen aus appointments.js.
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/ui.js');
+    $start = strpos($js, "id: 'appointmentsTableBody'");
+    assertTrue($start !== false, 'appointmentsTableBody fehlt in updateTableHeaders()');
+    $end = strpos($js, ']', $start);
+    assertTrue($end !== false, 'Ende der headers-Liste nicht gefunden');
+    $entry = substr($js, $start, $end - $start);
+    assertTrue(str_contains($entry, 'Rückmeldung'), "'Rückmeldung' fehlt im headers-Array von appointmentsTableBody");
+});
+
 test('Rueckmeldungs-Modal ist eingebunden', function () use ($rsRoot) {
     $html = (string) file_get_contents($rsRoot . '/public/index.html');
     assertTrue(str_contains($html, 'id="responsesModal"'), 'Modal fehlt');
@@ -124,4 +138,17 @@ test('responses.js sichert sich gegen ueberholte Antworten ab und laedt die List
         'appointments.js stellt refreshAppointmentsKeepPage nicht global bereit');
     assertTrue(str_contains($js, 'refreshAppointmentsKeepPage'),
         'responses.js ruft refreshAppointmentsKeepPage nicht auf');
+});
+
+test('Terminliste und Modal zeigen die Ampel als Chips', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    assertTrue(str_contains($js, 'response-chip'), "'response-chip' fehlt -- die Ampel wird nicht mehr als Chip-Gruppe gerendert");
+});
+
+test('Modal setzt Mitglieder-Rueckmeldungen ueber die bestehenden Icon-Aktionen statt eines Auswahlfelds', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    assertTrue(str_contains($js, 'action-btn btn-icon'),
+        "Mitglieder-Aktionen im Modal nutzen nicht die bestehenden Klassen 'action-btn btn-icon'");
+    assertTrue(!str_contains($js, '<select class="response-set"'), 'Das fruehere Auswahlfeld response-set ist noch vorhanden');
+    assertTrue(!str_contains($js, 'type="radio"'), 'responses.js enthaelt noch ein Radio-Eingabefeld -- der Filter muss die Segmentgruppe sein');
 });

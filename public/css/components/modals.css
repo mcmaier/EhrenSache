@@ -582,7 +582,23 @@
 .response-summary { font-weight: 600; margin-bottom: var(--spacing-sm); }
 .response-deadline { color: var(--text-medium); }
 .response-group-row td { background: var(--bg-gray); font-weight: 600; }
-.response-filter { display: flex; gap: var(--spacing-md); margin: var(--spacing-sm) 0; }
+/* Segmentgruppe .response-filter: siehe components/buttons.css */
+
+/* Gestapelter Anteilsbalken der Rueckmeldungen (nur im Modal gebraucht). */
+.response-bar {
+    display: flex;
+    height: 8px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--bg-gray);
+    margin: 0 0 var(--spacing-md);
+}
+
+.response-bar__seg { height: 100%; }
+.response-bar__seg--yes   { background: var(--success-color); }
+.response-bar__seg--maybe { background: var(--warning-color); }
+.response-bar__seg--no    { background: var(--danger-color); }
+.response-bar__seg--open  { background: var(--text-light); }
 
 /* Die Tabelle sitzt schon im gepolsterten modal-body -- ohne diese Regel
    haette sie zusaetzlich ihr eigenes .data-table-Polster und einen zweiten
