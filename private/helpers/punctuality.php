@@ -117,16 +117,24 @@ function punctualityBuild(array $measurements, int $totalCount, int $graceMinute
  * Bei Terminarten mit Rueckmeldung (`responses_enabled`) gilt statt des
  * Beginns die Frist (Spec Terminrueckmeldung 5.5):
  *  1. erschienen -- wie oben
- *  2. Absage oder Antrag vor der Frist -> excused
- *  3. Absage oder Antrag, aber erst nach der Frist -> missed
+ *  2. Absage oder Antrag vor der Frist -> excused -- bei Entschuldigungspflicht
+ *     (`responses_require_excuse`) zaehlt eine rechtzeitige Absage nur mit
+ *     einem verknuepften, nicht abgelehnten Antrag (Entscheidung W3); ein
+ *     eigener Antrag vor der Frist zaehlt unabhaengig davon weiter ueber
+ *     absence_in_deadline_count
+ *  3. Absage oder Antrag, aber erst nach der Frist, oder eine rechtzeitige
+ *     Absage ohne den bei Entschuldigungspflicht geforderten gueltigen
+ *     Antrag -> missed
  *  4. sonst zaehlt die Entschuldigung des Verwalters, sonst ausgefallen
  * Paare ohne diese Schluessel stammen aus Terminarten ohne Rueckmeldung und
  * laufen nach der Regel oben (1.5.1).
  *
  * @param array{has_present: int|string, has_excused_record: int|string,
  *              absence_count: int|string, absence_in_time_count: int|string,
- *              responses_enabled?: int|string, absence_in_deadline_count?: int|string,
- *              response_no_count?: int|string, response_no_in_time?: int|string} $pair
+ *              responses_enabled?: int|string, responses_require_excuse?: int|string,
+ *              absence_in_deadline_count?: int|string,
+ *              response_no_count?: int|string, response_no_in_time?: int|string,
+ *              response_no_in_time_with_request?: int|string} $pair
  * @return 'appeared'|'excused'|'missed'
  */
 function reliabilityOutcome(array $pair): string
@@ -141,8 +149,14 @@ function reliabilityOutcome(array $pair): string
     // (Spec Terminrueckmeldung 3.5). Paare ohne diese Schluessel stammen aus
     // Terminarten ohne Rueckmeldung und laufen unten weiter wie in 1.5.1.
     if ((int) ($pair['responses_enabled'] ?? 0) === 1) {
-        if ((int) ($pair['response_no_in_time'] ?? 0) > 0
-            || (int) ($pair['absence_in_deadline_count'] ?? 0) > 0) {
+        // W3: Bei Entschuldigungspflicht zaehlt die rechtzeitige Absage nur mit
+        // einem verknuepften, nicht abgelehnten Antrag. Ohne Pflicht bleibt es
+        // bei der reinen Rechtzeitigkeit der Absage.
+        $requireExcuse = (int) ($pair['responses_require_excuse'] ?? 0);
+        $timelyNo = (int) ($pair['response_no_in_time'] ?? 0) > 0
+            && ($requireExcuse !== 1 || (int) ($pair['response_no_in_time_with_request'] ?? 0) > 0);
+
+        if ($timelyNo || (int) ($pair['absence_in_deadline_count'] ?? 0) > 0) {
             return 'excused';
         }
         if ((int) ($pair['response_no_count'] ?? 0) > 0 || (int) $pair['absence_count'] > 0) {
@@ -319,6 +333,8 @@ function reliabilityFetchPairs($db, $database, array $groupIds, int $year,
                   AND e.created_at < CONCAT(a.date, ' ', a.start_time)) AS absence_in_time_count,
                (SELECT COALESCE(MAX(t.responses_enabled), 0)
                   FROM {$prefix}appointment_types t WHERE t.type_id = a.type_id) AS responses_enabled,
+               (SELECT COALESCE(MAX(t.responses_require_excuse), 0)
+                  FROM {$prefix}appointment_types t WHERE t.type_id = a.type_id) AS responses_require_excuse,
                (SELECT COUNT(*) {$absence}
                   AND e.created_at <= {$deadline}) AS absence_in_deadline_count,
                (SELECT COUNT(*) FROM {$prefix}appointment_responses ar
@@ -326,12 +342,21 @@ function reliabilityFetchPairs($db, $database, array $groupIds, int $year,
                    AND ar.status = 'no') AS response_no_count,
                (SELECT COUNT(*) FROM {$prefix}appointment_responses ar
                  WHERE ar.appointment_id = a.appointment_id AND ar.member_id = m.member_id
-                   AND ar.status = 'no' AND ar.status_changed_at <= {$deadline}) AS response_no_in_time
+                   AND ar.status = 'no' AND ar.status_changed_at <= {$deadline}) AS response_no_in_time,
+               (SELECT COUNT(*) FROM {$prefix}appointment_responses ar
+                 WHERE ar.appointment_id = a.appointment_id AND ar.member_id = m.member_id
+                   AND ar.status = 'no' AND ar.status_changed_at <= {$deadline}
+                   AND EXISTS (
+                       SELECT 1 FROM {$prefix}exceptions e
+                       WHERE e.exception_id = ar.exception_id AND e.member_id = ar.member_id
+                         AND e.appointment_id = ar.appointment_id AND e.exception_type = 'absence'
+                         AND e.status <> 'rejected'
+                   )) AS response_no_in_time_with_request
         {$scope}
         GROUP BY m.member_id, a.appointment_id, a.date, a.start_time, a.type_id
     ");
-    // Die zwei ? der Frist stehen im SELECT und damit vor den Platzhaltern des Scopes.
-    $stmt->execute(array_merge([$globalHours, $globalHours], $params));
+    // Die drei ? der Frist stehen im SELECT und damit vor den Platzhaltern des Scopes.
+    $stmt->execute(array_merge([$globalHours, $globalHours, $globalHours], $params));
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }

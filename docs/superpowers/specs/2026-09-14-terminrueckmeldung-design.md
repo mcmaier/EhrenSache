@@ -8,7 +8,7 @@
 **Zielversion:** **1.7.0**, Migration `1.6.1.php` (1.6.1 → 1.7.0)
 **Voraussetzung:** Der parallel vorbereitete Stand **1.6.1** ist auf `dev` gemergt, einschließlich
 seines Manifest-Eintrags 1.6.0 → 1.6.1. Vorher wird der Eintrag dieses Vorhabens nicht angehängt.
-**Präzisiert am 2026-09-15:** 3.5, 4.1, 5.4, 5.6, 6.1, 6.2, 7.4 (Entscheidungen nach Umsetzung)
+**Präzisiert am 2026-09-15:** 3.5, 4.1, 5.4, 5.5, 5.6, 6.1, 6.2, 7.4 (Entscheidungen nach Umsetzung)
 
 ---
 
@@ -278,20 +278,34 @@ Alle Schreibvorgänge eines Aufrufs laufen in einer Transaktion.
 `reliabilityFetchPairs()` liefert je Paar zusätzlich:
 
 - `responses_enabled` der Terminart,
+- `responses_require_excuse` der Terminart,
 - `response_no_in_time` — 1, wenn eine Antwort `no` existiert und `status_changed_at` vor der Frist
   liegt,
+- `response_no_in_time_with_request` — wie `response_no_in_time`, zusätzlich `EXISTS`-geprüft gegen
+  einen verknüpften (`appointment_responses.exception_id`), nicht abgelehnten Antrag desselben
+  Mitglieds und Termins,
 - `absence_in_deadline_count` — Anträge (nicht abgelehnt) mit `created_at` vor der Frist.
 
 `reliabilityOutcome()`:
 
 1. erschienen → `appeared`
-2. **Terminart mit Rückmeldung:** `response_no_in_time` oder `absence_in_deadline_count > 0` →
+2. **Terminart mit Rückmeldung:** Eine rechtzeitige Absage (`response_no_in_time`) zählt bei
+   Entschuldigungspflicht (`responses_require_excuse`) nur mit gültigem, verknüpftem Antrag
+   (`response_no_in_time_with_request > 0`, Entscheidung W3, präzisiert am 2026-09-15) — ohne
+   Pflicht genügt die Rechtzeitigkeit allein. Zählt sie oder ist `absence_in_deadline_count > 0` →
    `excused`; sonst, wenn eine Antwort `no` oder ein nicht abgelehnter Antrag existiert (also nur
-   nach der Frist) → `missed`; sonst weiter mit 4
+   nach der Frist, oder eine rechtzeitige Absage ohne den bei Pflicht geforderten Antrag) →
+   `missed`; sonst weiter mit 4
 3. **Terminart ohne Rückmeldung:** Regel aus 1.5.1 unverändert — gibt es einen Antrag, entscheidet
    „vor Beginn“; sonst weiter mit 4. Eine Antwort wird hier nicht gelesen (es kann keine geben)
 4. sonst Entschuldigung des Verwalters (`excused`-Record) → `excused`
 5. sonst `missed`
+
+Ein abgelehnter oder gelöschter Antrag zählt in `response_no_in_time_with_request` wie kein Antrag
+— eine rechtzeitige Absage mit Entschuldigungspflicht wird dann `missed`, sofern keine andere Regel
+(etwa ein eigener, nicht abgelehnter Antrag vor der Frist über `absence_in_deadline_count`) sie
+rettet. Ein erst nach der Frist genehmigter Antrag bleibt `missed` (3.4 gilt unverändert). Bei
+Terminarten ohne Entschuldigungspflicht ändert sich nichts.
 
 Die Ausgabe der Kennzahl ändert sich nicht.
 

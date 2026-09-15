@@ -154,19 +154,27 @@ test('reliabilityOutcome vertraegt Zahlen als Zeichenketten', function () {
 
 // ---- Zuverlaessigkeit bei Terminarten mit Rueckmeldung ------------------------
 
-/** Soll-Paar einer Terminart mit Rueckmeldung (Spec Terminrueckmeldung 5.5). */
+/**
+ * Soll-Paar einer Terminart mit Rueckmeldung (Spec Terminrueckmeldung 5.5).
+ *
+ * $requireExcuse und $noInTimeWithRequest sind optional und betreffen nur W3
+ * (Entschuldigungspflicht): ohne sie verhaelt sich das Paar wie zuvor.
+ */
 function puResponsePair(int $present, int $excusedRecord, int $absences, int $absencesInDeadline,
-                        int $noResponse, int $noInTime): array
+                        int $noResponse, int $noInTime, int $requireExcuse = 0,
+                        int $noInTimeWithRequest = 0): array
 {
     return [
-        'has_present'               => $present,
-        'has_excused_record'        => $excusedRecord,
-        'absence_count'             => $absences,
-        'absence_in_time_count'     => $absences,   // vor Beginn -- darf hier nicht zaehlen
-        'responses_enabled'         => 1,
-        'absence_in_deadline_count' => $absencesInDeadline,
-        'response_no_count'         => $noResponse,
-        'response_no_in_time'       => $noInTime,
+        'has_present'                       => $present,
+        'has_excused_record'                => $excusedRecord,
+        'absence_count'                     => $absences,
+        'absence_in_time_count'             => $absences,   // vor Beginn -- darf hier nicht zaehlen
+        'responses_enabled'                 => 1,
+        'responses_require_excuse'          => $requireExcuse,
+        'absence_in_deadline_count'         => $absencesInDeadline,
+        'response_no_count'                 => $noResponse,
+        'response_no_in_time'               => $noInTime,
+        'response_no_in_time_with_request'  => $noInTimeWithRequest,
     ];
 }
 
@@ -194,6 +202,30 @@ test('reliabilityOutcome: bei Rueckmeldung ohne Absage zaehlt die Entschuldigung
 
 test('reliabilityOutcome: wer trotz Absage kam, ist erschienen', function () {
     assertSame('appeared', reliabilityOutcome(puResponsePair(1, 0, 0, 0, 1, 1)));
+});
+
+// ---- Zuverlaessigkeit bei Entschuldigungspflicht (W3) -----------------------
+
+test('reliabilityOutcome: bei Entschuldigungspflicht zaehlt eine rechtzeitige Absage nur mit gueltigem Antrag', function () {
+    assertSame('excused', reliabilityOutcome(puResponsePair(0, 0, 0, 0, 1, 1, 1, 1)),
+        'rechtzeitige Absage mit verknuepftem, nicht abgelehntem Antrag');
+});
+
+test('reliabilityOutcome: bei Entschuldigungspflicht ist eine rechtzeitige Absage ohne gueltigen Antrag ausgefallen', function () {
+    // Der Antrag fehlt (nie gestellt) oder ist abgelehnt/geloescht --
+    // response_no_in_time_with_request bleibt in beiden Faellen 0.
+    assertSame('missed', reliabilityOutcome(puResponsePair(0, 0, 0, 0, 1, 1, 1, 0)),
+        'kein verknuepfter, gueltiger Antrag');
+});
+
+test('reliabilityOutcome: eigener nicht abgelehnter Antrag vor der Frist zaehlt trotz Entschuldigungspflicht ohne Absage', function () {
+    // absence_in_deadline_count deckt das schon ab -- unabhaengig von
+    // responses_require_excuse und ohne Rueckmeldung (noResponse = 0).
+    assertSame('excused', reliabilityOutcome(puResponsePair(0, 0, 1, 1, 0, 0, 1, 0)));
+});
+
+test('reliabilityOutcome: ohne Entschuldigungspflicht zaehlt die rechtzeitige Absage weiter ohne Antrag', function () {
+    assertSame('excused', reliabilityOutcome(puResponsePair(0, 0, 0, 0, 1, 1, 0, 0)));
 });
 
 test('reliabilityBuild zaehlt jeden Ausgang und die Quote', function () {

@@ -490,7 +490,9 @@ Prüfen Sie das für Ihren Verein. Wer die Werte nicht nutzt, braucht sie nicht 
 - **Zuverlässigkeit** zählt, wer erschienen ist oder rechtzeitig abgesagt hat. Eine Abmeldung
   zählt nach dem Zeitpunkt, zu dem sie eingegangen ist, nicht nach dem Zeitpunkt der Freigabe.
   Seit 1.7.0 gilt auch eine Terminrückmeldung „Absage" als Abmeldung. Bei Terminarten mit
-  Rückmeldung ist „rechtzeitig" die dort eingestellte Frist, sonst der Terminbeginn.
+  Rückmeldung ist „rechtzeitig" die dort eingestellte Frist, sonst der Terminbeginn. Verlangt die
+  Terminart zur Absage zusätzlich einen Antrag, zählt eine rechtzeitige Absage nur mit einem
+  gültigen, nicht abgelehnten Antrag als Abmeldung.
 
 Beide Werte sind so gut wie die Erfassung dahinter. Ein Verein, der überwiegend Listen abhakt, hat
 wenige Messungen und damit eine wenig belastbare Pünktlichkeit — das zeigt die Oberfläche als
@@ -565,8 +567,9 @@ haben und der Zweck es trägt.
 ### 12.4 Zuverlässigkeit
 
 Ist die Zuverlässigkeit (Abschnitt 11) eingeschaltet, zählt eine rechtzeitige Absage als
-Abmeldung. Eine eigene Kennzahl „Zusagetreue" je Person gibt es nicht; der Abgleich von Zusage und
-Anwesenheit wird nur je Termin angezeigt.
+Abmeldung. Verlangt die Terminart zur Absage einen Antrag, gilt das nur mit einem gültigen,
+nicht abgelehnten Antrag. Eine eigene Kennzahl „Zusagetreue" je Person gibt es nicht; der Abgleich
+von Zusage und Anwesenheit wird nur je Termin angezeigt.
 
 ### 12.5 Speicherdauer und Auskunft
 

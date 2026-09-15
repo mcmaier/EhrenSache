@@ -757,6 +757,56 @@ test('Zuverlaessigkeit: globale Frist greift, wenn die Terminart keine eigene ha
     }
 });
 
+test('Zuverlaessigkeit: bei Entschuldigungspflicht zaehlt die rechtzeitige Absage nur mit gueltigem Antrag (W3)', function () {
+    // Gleiche Zeitlage-Absicherung wie bei den Tests oben -- Termine heute spaeter.
+    if (date('H:i') >= '20:57') {
+        assertTrue(true, 'Zeitlage ungeeignet -- Test uebersprungen');
+        return;
+    }
+
+    $welt  = rsWorld('Pflicht720', [
+        'responses_enabled' => 1, 'responses_require_excuse' => 1, 'response_deadline_hours' => 0,
+    ]);
+    $heute = date('Y-m-d');
+
+    try {
+        $apt = rsAppointment($welt, $heute, '23:59:00');
+        $res = rsPut('manager', $apt, ['status' => 'no', 'comment' => 'RS-W3'], $welt['member']);
+        assertStatus(200, $res);
+
+        $liste = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+            'query' => ['member_id' => $welt['member'], 'type' => 'absence']]);
+        assertStatus(200, $liste);
+        $antrag = array_values(array_filter($liste['body'],
+            static fn ($e) => (int) $e['appointment_id'] === $apt))[0];
+        assertSame('pending', $antrag['status'], 'Absage vor der Frist legt einen Antrag an');
+
+        $stats = static function () use ($welt): array {
+            $res = apiRequest('GET', 'statistics', ['token' => apiToken('admin'),
+                'query' => ['year' => date('Y'), 'group_id' => $welt['group'], 'member_id' => $welt['member']]]);
+            assertStatus(200, $res);
+
+            return $res['body']['reliability'];
+        };
+
+        rsWithSettings(['reliability_enabled' => '1'], function () use ($stats, $antrag) {
+            $r = $stats();
+            assertSame(1, $r['excused_in_time'], 'gueltiger, verknuepfter Antrag vor der Frist');
+            assertSame(0, $r['missed']);
+
+            assertStatus(200, apiRequest('PUT', 'exceptions', ['token' => apiToken('admin'),
+                'query' => ['id' => (int) $antrag['exception_id']],
+                'body'  => ['exception_type' => 'absence', 'reason' => 'RS-W3', 'status' => 'rejected']]));
+
+            $r = $stats();
+            assertSame(1, $r['missed'], 'abgelehnter Antrag -- die rechtzeitige Absage zaehlt nicht mehr');
+            assertSame(0, $r['excused_in_time']);
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
 test('PUT: bereits vorhandener eigener Antrag wird verknuepft, nicht verdoppelt, aber nie veraendert (3b)', function () {
     // Spec 5.4, Pfad 'link', Entscheidung 3b: Existiert schon ein eigener, nicht
     // abgelehnter Abwesenheitsantrag zum Termin (z. B. ueber exceptions direkt
