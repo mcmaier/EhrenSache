@@ -3456,6 +3456,16 @@ let responsesNetworkBound = false;
 // speichert. Schluessel ist appointment_id als Number.
 const responsesInFlight = new Set();
 
+// Absage, die wegen fehlender Begruendung noch nicht gespeichert ist (own
+// bleibt bis dahin null). Lebt in einer Map statt im dataset der Karte, weil
+// ein Neuaufbau (renderResponses) das DOM-Element ersetzt und ein dataset
+// damit verliert -- die Map ueberlebt das.
+const responsesPending = new Map();
+
+function pendingStatusFor(id) {
+    return responsesPending.get(id) || null;
+}
+
 // Steigt bei jedem resetResponsesTab() (Start und Abmeldung). Eine Antwort von
 // loadResponses(), die noch fuer die vorige Generation unterwegs war, wird
 // verworfen -- sonst zeigt ein neu angemeldetes Konto kurz die Termine des
@@ -3466,6 +3476,7 @@ function resetResponsesTab() {
     responsesGeneration++;
     upcomingResponses = [];
     responsesInFlight.clear();
+    responsesPending.clear();
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
     if (tab) tab.hidden = true;
     updateResponsesBadge();
@@ -3494,6 +3505,7 @@ async function initResponsesTab() {
 
 async function loadResponses() {
     const generation = responsesGeneration;
+    const previousResponses = upcomingResponses;
     const result = await apiCall('appointment_responses', 'GET', null, { upcoming: 1 });
     if (generation !== responsesGeneration) return; // Abgemeldet/neu gestartet, waehrend die Antwort unterwegs war.
 
@@ -3502,7 +3514,29 @@ async function loadResponses() {
         return;
     }
 
-    upcomingResponses = result.data.appointments || [];
+    const nextResponses = result.data.appointments || [];
+
+    // Entwuerfe gegen den ALTEN Stand sammeln, bevor er ueberschrieben wird.
+    // Ein Entwurf ueberlebt nur, wenn sich der gespeicherte Kommentar seit dem
+    // letzten Laden nicht geaendert hat -- hat er sich geaendert (etwa eine
+    // Bearbeitung ueber das Dashboard), gewinnt der frische Serverstand.
+    const drafts = new Map();
+    document.querySelectorAll('#responsesList .response-card').forEach(card => {
+        const id = Number(card.dataset.appointmentId);
+        const textarea = card.querySelector('.response-comment textarea');
+        if (!textarea) return;
+
+        const before = previousResponses.find(i => Number(i.appointment.appointment_id) === id);
+        const after  = nextResponses.find(i => Number(i.appointment.appointment_id) === id);
+        const oldComment = before?.own?.comment ?? '';
+        const newComment = after?.own?.comment ?? '';
+
+        if (textarea.value !== oldComment && oldComment === newComment) {
+            drafts.set(id, textarea.value);
+        }
+    });
+
+    upcomingResponses = nextResponses;
     const hasResponses = upcomingResponses.length > 0;
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
     if (tab) {
@@ -3516,7 +3550,7 @@ async function loadResponses() {
     }
 
     updateResponsesBadge();
-    renderResponses();
+    renderResponses(null, drafts);
 }
 
 function updateResponsesBadge() {
@@ -3563,7 +3597,7 @@ function refreshAllResponseCards() {
     document.querySelectorAll('#responsesList .response-card').forEach(refreshResponseCardState);
 }
 
-function renderResponses(justSavedId) {
+function renderResponses(justSavedId, drafts) {
     const list = document.getElementById('responsesList');
     if (!list) return;
 
@@ -3572,20 +3606,23 @@ function renderResponses(justSavedId) {
         return;
     }
 
-    // Ungesicherter Text ueberlebt den Neuaufbau: Wer mitten im Tippen ist, soll
-    // ihn nicht verlieren, nur weil eine andere Karte fertig gespeichert hat.
-    // Die gerade gespeicherte Karte selbst zaehlt nicht als Entwurf -- ihr
-    // Text kommt frisch vom Server.
-    const drafts = new Map();
-    list.querySelectorAll('.response-card').forEach(card => {
-        const id = Number(card.dataset.appointmentId);
-        if (id === justSavedId) return;
-        const textarea = card.querySelector('.response-comment textarea');
-        if (!textarea) return;
-        const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === id);
-        const saved = item?.own?.comment ?? '';
-        if (textarea.value !== saved) drafts.set(id, textarea.value);
-    });
+    // Ohne uebergebene Entwuerfe (Aufruf nach dem Speichern einer einzelnen
+    // Karte) hier gegen den aktuellen Stand sammeln -- fuer alle Karten AUSSER
+    // der gerade gespeicherten, deren Text frisch vom Server kommt. Ein Aufruf
+    // MIT drafts (aus loadResponses) hat die Entwuerfe bereits gegen den alten
+    // Stand geprueft.
+    if (!drafts) {
+        drafts = new Map();
+        list.querySelectorAll('.response-card').forEach(card => {
+            const id = Number(card.dataset.appointmentId);
+            if (id === justSavedId) return;
+            const textarea = card.querySelector('.response-comment textarea');
+            if (!textarea) return;
+            const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === id);
+            const saved = item?.own?.comment ?? '';
+            if (textarea.value !== saved) drafts.set(id, textarea.value);
+        });
+    }
 
     // Unbeantwortete zuerst, darin nach Beginn.
     const sorted = [...upcomingResponses].sort((a, b) =>
@@ -3602,12 +3639,17 @@ function renderResponses(justSavedId) {
         const commentBox = card.querySelector('.response-comment');
         if (commentBox) commentBox.hidden = false;
     });
+
+    // Ein Neuaufbau kennt keine laufenden Anfragen -- Karten, die noch
+    // speichern, muessen danach erneut gesperrt werden (G1).
+    refreshAllResponseCards();
 }
 
 function responseCardHtml(item) {
     const apt = item.appointment;
     const id = Number(apt.appointment_id);
     const status = item.own ? item.own.status : null;
+    const pendingStatus = pendingStatusFor(id);
     const offline = !navigator.onLine;
     const off = offline ? ' disabled' : '';
     // apt.color kommt vom Server frei waehlbar (Terminart-Einstellung) --
@@ -3631,6 +3673,14 @@ function responseCardHtml(item) {
 
     const s = item.summary;
 
+    // Eine vorgemerkte, aber noch nicht gespeicherte Absage (own === null)
+    // haelt das Bemerkungsfeld ebenfalls offen -- sonst verschwaende es beim
+    // naechsten Neuaufbau, obwohl der Nutzer gerade eine Begruendung eintippt.
+    const commentOpen = status !== null || pendingStatus !== null;
+    const placeholder = item.settings.require_excuse && (status === 'no' || pendingStatus === 'no')
+        ? 'Begründung (Pflicht)'
+        : 'Bemerkung (optional)';
+
     return `
         <div class="response-card${status === null ? ' is-open' : ''}" data-appointment-id="${id}" style="border-left-color: ${color}">
             <div class="response-card__head">
@@ -3639,8 +3689,8 @@ function responseCardHtml(item) {
             </div>
             <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
             <div class="response-segment">${buttons}</div>
-            <div class="response-comment"${status === null ? ' hidden' : ''}>
-                <textarea rows="2" maxlength="255" placeholder="${item.settings.require_excuse && status === 'no' ? 'Begründung (Pflicht)' : 'Bemerkung (optional)'}"${off}>${escapeHtml(item.own?.comment ?? '')}</textarea>
+            <div class="response-comment"${commentOpen ? '' : ' hidden'}>
+                <textarea rows="2" maxlength="255" placeholder="${placeholder}"${off}>${escapeHtml(item.own?.comment ?? '')}</textarea>
                 ${item.settings.require_excuse ? '<small>Eine Absage wird als Entschuldigung eingereicht.</small>' : ''}
                 <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>Bemerkung speichern</button>
             </div>
@@ -3671,9 +3721,9 @@ async function onResponsesClick(event) {
 
         if (status === 'no' && item.settings.require_excuse && comment === '') {
             // Antwort ist noch nicht gespeichert (own bleibt null) -- die
-            // gewuenschte Absage merkt sich die Karte selbst, damit
+            // gewuenschte Absage merkt sich responsesPending, damit
             // "Bemerkung speichern" gleich weiss, welchen Status es sendet.
-            card.dataset.pendingStatus = status;
+            responsesPending.set(appointmentId, status);
             commentBox.hidden = false;
             textarea.placeholder = 'Begründung (Pflicht)';
             textarea.focus();
@@ -3693,7 +3743,10 @@ async function onResponsesClick(event) {
 
         await submitResponse(item, status, effectiveComment, card);
     } else if (btn.classList.contains('response-comment__save')) {
-        const targetStatus = item.own ? item.own.status : card.dataset.pendingStatus;
+        // Eine vorgemerkte Absage geht vor: wer bei bestehender Zusage auf
+        // "Absage" tippt, dann eine Begruendung eintippt und speichert, will
+        // die Absage speichern -- nicht die alte Zusage bestaetigen.
+        const targetStatus = pendingStatusFor(appointmentId) || item.own?.status;
         if (!targetStatus) {
             showMessage('Bitte zuerst Zusage, Unsicher oder Absage wählen', 'error');
             return;
@@ -3705,6 +3758,7 @@ async function onResponsesClick(event) {
 async function submitResponse(item, status, comment, card) {
     const id = item.appointment.appointment_id;
     const key = Number(id);
+    const generation = responsesGeneration;
 
     if (responsesInFlight.has(key)) return;
     responsesInFlight.add(key);
@@ -3714,6 +3768,11 @@ async function submitResponse(item, status, comment, card) {
         const result = await apiCall('appointment_responses', 'PUT',
             { status, comment: comment || null }, { appointment_id: id });
 
+        // Abgemeldet oder neu gestartet, waehrend die Anfrage unterwegs war --
+        // weder upcomingResponses noch das DOM (gehoert zur alten Ansicht)
+        // noch anfassen.
+        if (generation !== responsesGeneration) return;
+
         if (!result.success) {
             showMessage(result.error || 'Rückmeldung konnte nicht gespeichert werden', 'error');
             return;
@@ -3722,15 +3781,20 @@ async function submitResponse(item, status, comment, card) {
         const index = upcomingResponses.findIndex(i => Number(i.appointment.appointment_id) === key);
         if (index >= 0) upcomingResponses[index] = result.data;
 
+        responsesPending.delete(key);
         updateResponsesBadge();
         renderResponses(key);
         showMessage('Rückmeldung gespeichert', 'success');
     } finally {
         // Bei Erfolg baut renderResponses() die Karte bereits neu auf (dann
         // ohne Sperre); bei Fehler bleibt die alte Karte stehen und wird hier
-        // wieder freigegeben.
-        responsesInFlight.delete(key);
-        refreshResponseCardState(card);
+        // wieder freigegeben. Bei gewechselter Generation gehoert die Karte
+        // nicht mehr zur aktuellen Ansicht -- responsesInFlight wurde bereits
+        // durch resetResponsesTab() geleert, hier nichts mehr anfassen.
+        if (generation === responsesGeneration) {
+            responsesInFlight.delete(key);
+            refreshResponseCardState(card);
+        }
     }
 }
 

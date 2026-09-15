@@ -56,3 +56,16 @@ test('PWA: hidden schlaegt display:flex der Tab-Knoepfe', function () use ($rspR
     $css = (string) file_get_contents($rspRoot . '/public/checkin/css/style.css');
     assertTrue(str_contains($css, '.tab-button[hidden]'), 'Regel .tab-button[hidden] fehlt');
 });
+
+test('PWA: vorgemerkte Absage hat Vorrang vor gespeicherter Antwort', function () use ($rspRoot) {
+    // Regression: "Bemerkung speichern" bevorzugte frueher item.own.status
+    // (die gespeicherte Antwort) vor der gerade eingetippten, noch nicht
+    // gespeicherten Absage -- eine bestehende Zusage ueberlebte damit einen
+    // Absage-mit-Begruendung-Versuch unveraendert.
+    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+
+    assertTrue(!str_contains($js, 'item.own ? item.own.status : card.dataset.pendingStatus'),
+        'Die gespeicherte Antwort schlaegt weiterhin die vorgemerkte Absage');
+    assertTrue(str_contains($js, 'responsesPending'),
+        'responsesPending fehlt -- die Vormerkung ueberlebt sonst keinen Neuaufbau der Liste');
+});
