@@ -88,37 +88,64 @@ test('responseNormalizeComment macht Leeres zu null', function () {
     assertSame('Urlaub', responseNormalizeComment('  Urlaub '));
 });
 
-// ---- Entschuldigungspflicht --------------------------------------------------
+// ---- Entschuldigungspflicht (Spec 5.4, Entscheidungen 3b und 4b) -----------
+//
+// Neuer sechster Parameter $excuseCreatedByResponse (3b): Nur ein Antrag, den
+// die Rueckmeldung selbst angelegt hat, darf sie spaeter aendern oder
+// loeschen. Ein Antrag, den das Mitglied eigenstaendig ueber exceptions
+// gestellt hat, wird nur verknuepft ($excuseCreatedByResponse = false) und
+// bleibt danach unangetastet.
 
 test('responseExcuseAction: ohne Pflicht entsteht nie ein Antrag', function () {
-    assertSame('none', responseExcuseAction(false, null, 'no', null, false));
-    assertSame('none', responseExcuseAction(false, 'no', 'yes', null, false));
+    assertSame('none', responseExcuseAction(false, null, 'no', null, false, false));
+    assertSame('none', responseExcuseAction(false, 'no', 'yes', null, false, false));
 });
 
-test('responseExcuseAction: Absage legt an oder verknuepft einen eigenen Antrag', function () {
-    assertSame('create', responseExcuseAction(true, null, 'no', null, false));
-    assertSame('create', responseExcuseAction(true, 'yes', 'no', null, false));
-    assertSame('link',   responseExcuseAction(true, 'yes', 'no', null, true));
+test('responseExcuseAction: echter Wechsel auf \'no\' legt an oder verknuepft einen eigenen Antrag', function () {
+    assertSame('create', responseExcuseAction(true, null, 'no', null, false, false));
+    assertSame('create', responseExcuseAction(true, 'yes', 'no', null, false, false));
+    assertSame('link',   responseExcuseAction(true, 'yes', 'no', null, true, false));
 });
 
-test('responseExcuseAction: offene Absage bekommt die neue Begruendung, entschiedene bleibt', function () {
-    assertSame('update_reason', responseExcuseAction(true, 'no', 'no', 'pending', false));
-    assertSame('keep',          responseExcuseAction(true, 'no', 'no', 'approved', false));
-    assertSame('keep',          responseExcuseAction(true, 'no', 'no', 'rejected', false));
+test('responseExcuseAction: 4b -- \'no\' -> \'no\' ohne Antrag erzeugt keinen neuen', function () {
+    // Ersetzt einen frueheren Test, der hier fuer (true, 'no', 'no', null, false)
+    // 'create' erwartete: Seit Entscheidung 4b entsteht ein neuer Antrag nur bei
+    // einem echten Statuswechsel auf 'no'. Bleibt der Status 'no' -- etwa weil ein
+    // Verwalter den zuvor erzeugten Antrag ueber exceptions geloescht hat und das
+    // Mitglied danach nur die Bemerkung aendert --, waere ein neuer Antrag eine
+    // ungewollte Nebenwirkung der Bemerkungsaenderung.
+    assertSame('none', responseExcuseAction(true, 'no', 'no', null, false, false));
+    assertSame('none', responseExcuseAction(true, 'no', 'no', null, true, false),
+        'gilt auch, wenn das Mitglied anderswo schon einen eigenen Antrag haette');
 });
 
-test('responseExcuseAction: Zusage oder Ruecknahme loescht nur einen offenen Antrag', function () {
-    assertSame('delete', responseExcuseAction(true, 'no', 'yes', 'pending', false));
-    assertSame('delete', responseExcuseAction(true, 'no', null, 'pending', false), 'null = Ruecknahme');
-    assertSame('keep',   responseExcuseAction(true, 'no', 'maybe', 'approved', false));
-    assertSame('none',   responseExcuseAction(true, 'yes', 'maybe', null, false));
+test('responseExcuseAction: 3b -- nur ein von der Rueckmeldung angelegter Antrag bekommt die neue Begruendung', function () {
+    assertSame('update_reason', responseExcuseAction(true, 'no', 'no', 'pending', false, true),
+        'erzeugter Antrag: offen, wird mitgezogen');
+    assertSame('keep', responseExcuseAction(true, 'no', 'no', 'pending', false, false),
+        'nur verknuepfter Antrag: offen, bleibt trotzdem unangetastet');
+    assertSame('keep', responseExcuseAction(true, 'no', 'no', 'approved', false, true),
+        'entschieden -> bleibt, unabhaengig von der Herkunft');
+    assertSame('keep', responseExcuseAction(true, 'no', 'no', 'rejected', false, false));
+});
+
+test('responseExcuseAction: 3b -- nur ein von der Rueckmeldung angelegter Antrag wird bei Zusage/Ruecknahme geloescht', function () {
+    assertSame('delete', responseExcuseAction(true, 'no', 'yes', 'pending', false, true),
+        'erzeugter, offener Antrag wird bei Zusage geloescht');
+    assertSame('delete', responseExcuseAction(true, 'no', null, 'pending', false, true),
+        'null = Ruecknahme, ebenfalls geloescht');
+    assertSame('keep', responseExcuseAction(true, 'no', 'yes', 'pending', false, false),
+        'nur verknuepfter, offener Antrag bleibt bei Zusage bestehen');
+    assertSame('keep', responseExcuseAction(true, 'no', null, 'pending', false, false),
+        'nur verknuepfter Antrag bleibt auch bei Ruecknahme bestehen');
+    assertSame('keep', responseExcuseAction(true, 'no', 'maybe', 'approved', false, false),
+        'entschiedener Antrag bleibt ohnehin immer bestehen');
+    assertSame('none', responseExcuseAction(true, 'yes', 'maybe', null, false, false));
 });
 
 test('responseExcuseAction: weitere Randfaelle', function () {
-    // Der verknuepfte Antrag wurde zwischenzeitlich geloescht -- neue Absage legt neu an.
-    assertSame('create', responseExcuseAction(true, 'no', 'no', null, false));
     // Erste Absage nach einer Vielleicht-Antwort, Mitglied hat schon einen eigenen Antrag.
-    assertSame('link', responseExcuseAction(true, 'maybe', 'no', null, true));
+    assertSame('link', responseExcuseAction(true, 'maybe', 'no', null, true, false));
 });
 
 // ---- Summen und Gegenueberstellung ------------------------------------------

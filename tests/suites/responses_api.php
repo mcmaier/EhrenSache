@@ -688,10 +688,13 @@ test('Zuverlaessigkeit: globale Frist greift, wenn die Terminart keine eigene ha
     }
 });
 
-test('PUT: bereits vorhandener eigener Antrag wird verknuepft, nicht verdoppelt', function () {
-    // Spec 5.4, Pfad 'link': Existiert schon ein eigener, nicht abgelehnter
-    // Abwesenheitsantrag zum Termin (z. B. ueber exceptions direkt gestellt),
-    // haengt sich die Absage daran an, statt einen zweiten Antrag anzulegen.
+test('PUT: bereits vorhandener eigener Antrag wird verknuepft, nicht verdoppelt, aber nie veraendert (3b)', function () {
+    // Spec 5.4, Pfad 'link', Entscheidung 3b: Existiert schon ein eigener, nicht
+    // abgelehnter Abwesenheitsantrag zum Termin (z. B. ueber exceptions direkt
+    // gestellt), haengt sich die Absage daran an, statt einen zweiten Antrag
+    // anzulegen -- aendert oder loescht ihn danach aber nie: Der Antrag gehoert
+    // dem Mitglied, nicht der Rueckmeldung. Nur ein von der Rueckmeldung selbst
+    // angelegter Antrag wird mitgezogen bzw. geloescht (siehe responses_unit.php).
     $welt = rsWorld('Verknuepft', ['responses_enabled' => 1, 'responses_require_excuse' => 1]);
     try {
         $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
@@ -718,9 +721,64 @@ test('PUT: bereits vorhandener eigener Antrag wird verknuepft, nicht verdoppelt'
             assertSame(1, count($antraege()), 'Verknuepfung darf keinen zweiten Antrag anlegen');
             assertSame('RS-eigener-Antrag', $antraege()[0]['reason'], 'Verknuepfter Antrag behaelt seine Begruendung');
 
-            // Zusage loescht den offenen, verknuepften Antrag wieder (Spec 5.4).
+            // 3b: eine geaenderte Bemerkung bei weiterhin 'no' darf den nur
+            // verknuepften Antrag nicht veraendern.
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-Absage geaendert']);
+            assertStatus(200, $res);
+            assertSame('RS-Absage geaendert', $res['body']['own']['comment'], 'Die Rueckmeldung selbst speichert die neue Bemerkung');
+            assertSame(1, count($antraege()));
+            assertSame('RS-eigener-Antrag', $antraege()[0]['reason'], 'Der verknuepfte Antrag behaelt seine eigene Begruendung');
+
+            // 3b: eine Zusage loescht einen nur verknuepften Antrag nicht.
             assertStatus(200, rsPut('user', $apt, ['status' => 'yes']));
-            assertSame(0, count($antraege()), 'Zusage loescht den verknuepften offenen Antrag');
+            assertSame(1, count($antraege()), 'Zusage darf einen nur verknuepften Antrag nicht loeschen');
+            assertSame('pending', $antraege()[0]['status'], 'bleibt unveraendert offen');
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('PUT: nach geloeschtem, von der Rueckmeldung erzeugtem Antrag legt eine reine Bemerkungsaenderung keinen neuen an (4b)', function () {
+    // Spec 5.4, Entscheidung 4b: Loescht ein Verwalter den von der Rueckmeldung
+    // erzeugten Antrag direkt ueber exceptions, setzt resp_exception_fk (ON
+    // DELETE SET NULL) die Verknuepfung zurueck. Bleibt der Status 'no' und
+    // aendert sich nur die Bemerkung, ist das kein echter Statuswechsel -- es
+    // entsteht kein neuer Antrag. Erst ein echter Wechsel auf 'no' legt wieder
+    // einen an.
+    $welt = rsWorld('Geloescht', ['responses_enabled' => 1, 'responses_require_excuse' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt) {
+            $antraege = static function () use ($userMember, $apt): array {
+                $liste = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+                    'query' => ['member_id' => $userMember, 'type' => 'absence']]);
+                assertStatus(200, $liste);
+
+                return array_values(array_filter($liste['body'],
+                    static fn ($e) => (int) $e['appointment_id'] === $apt));
+            };
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'Erkaeltung']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state']);
+            assertSame(1, count($antraege()), 'Vorbedingung: der von der Rueckmeldung erzeugte Antrag');
+
+            assertStatus(200, apiRequest('DELETE', 'exceptions', ['token' => apiToken('admin'),
+                'query' => ['id' => (int) $antraege()[0]['exception_id']]]));
+            assertSame(0, count($antraege()), 'Vorbedingung: Antrag vom Verwalter geloescht');
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'Erkaeltung, immer noch']);
+            assertStatus(200, $res);
+            assertSame(null, $res['body']['own']['excuse_state'], 'keine Verknuepfung mehr');
+            assertSame(0, count($antraege()), 'reine Bemerkungsaenderung darf keinen neuen Antrag anlegen');
+
+            assertStatus(200, rsPut('user', $apt, ['status' => 'yes']));
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'jetzt doch']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state']);
+            assertSame(1, count($antraege()), 'echter Wechsel auf no legt einen neuen Antrag an');
         });
     } finally {
         rsDropWorld($welt);

@@ -9,7 +9,10 @@
  * 1. appointment_types bekommt vier Einstellungen, alle ab Werk aus. Eine
  *    Probe soll nach dem Update genau so funktionieren wie vorher.
  * 2. Neue Tabelle appointment_responses: der aktuelle Stand je Mitglied und
- *    Termin, kein Verlauf (Spec 3.8).
+ *    Termin, kein Verlauf (Spec 3.8). Spalte exception_created (Entscheidung
+ *    3b, nach der ersten Fassung dieser Datei ergaenzt): nur ein Antrag, den
+ *    die Rueckmeldung selbst angelegt hat, darf sie spaeter aendern oder
+ *    loeschen -- ein eigenstaendig gestellter Antrag wird nur verknuepft.
  * 3. Die Fremdschluessel werden einzeln angehaengt. Scheitert einer -- etwa
  *    weil eine alte Installation eine Tabelle noch als MyISAM fuehrt --, bleibt
  *    die Tabelle ohne ihn nutzbar, und der Assistent zeigt eine Warnung.
@@ -60,6 +63,7 @@ function migrate_1_6_1(PDO $pdo, string $prefix, string $configPath): array
           status            ENUM('yes','no','maybe') NOT NULL,
           comment           VARCHAR(255) DEFAULT NULL,
           exception_id      INT DEFAULT NULL,
+          exception_created TINYINT(1) NOT NULL DEFAULT 0,
           status_changed_at DATETIME NOT NULL,
           updated_at        DATETIME NOT NULL,
           UNIQUE KEY uq_response (appointment_id, member_id),
@@ -67,6 +71,19 @@ function migrate_1_6_1(PDO $pdo, string $prefix, string $configPath): array
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     $log[] = 'Tabelle appointment_responses vorhanden';
+
+    // 2b. Spalte exception_created -- deckt Datenbanken ab, die schon auf
+    // 1.7.0 stehen, aber vor der Ergaenzung von Entscheidung 3b migriert
+    // wurden (die CREATE TABLE oben traegt sie bei einer frischen Installation
+    // schon).
+    $columnExists->execute(["{$prefix}appointment_responses", 'exception_created']);
+    if ((int) $columnExists->fetchColumn() > 0) {
+        $log[] = 'Spalte appointment_responses.exception_created bestand bereits — unverändert';
+    } else {
+        $pdo->exec("ALTER TABLE `{$prefix}appointment_responses`
+                     ADD COLUMN `exception_created` TINYINT(1) NOT NULL DEFAULT 0 AFTER `exception_id`");
+        $log[] = 'Spalte appointment_responses.exception_created angelegt';
+    }
 
     // 3. Fremdschluessel einzeln
     $foreignKeys = [

@@ -389,9 +389,11 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
         $existing   = responsesFetchOneForUpdate($db, $database, $appointmentId, $memberId);
         $ownAbsence = responsesFetchOwnAbsence($db, $database, $appointmentId, $memberId);
 
-        $exceptionId = $existing['exception_id'] ?? null;
+        $exceptionId      = $existing['exception_id'] ?? null;
+        $exceptionCreated = (int) ($existing['exception_created'] ?? 0);
         $action = responseExcuseAction($requireExcuse, $existing['status'] ?? null, $status,
-                                       $existing['excuse_state'] ?? null, $ownAbsence !== null);
+                                       $existing['excuse_state'] ?? null, $ownAbsence !== null,
+                                       $exceptionCreated === 1);
 
         switch ($action) {
             case 'create':
@@ -400,11 +402,16 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
                                requested_arrival_time, status, created_by)
                               VALUES (?, ?, 'absence', ?, NULL, 'pending', ?)")
                    ->execute([$memberId, $appointmentId, $comment, $authUserId]);
-                $exceptionId = (int) $db->lastInsertId();
+                $exceptionId      = (int) $db->lastInsertId();
+                $exceptionCreated = 1;
                 break;
 
             case 'link':
-                $exceptionId = (int) $ownAbsence['exception_id'];
+                // Ein unabhaengig gestellter Antrag wird nur verknuepft (Spec
+                // 5.4), 3b: er gehoert weiterhin dem Mitglied, nicht der
+                // Rueckmeldung, und wird deshalb nie durch sie geaendert.
+                $exceptionId      = (int) $ownAbsence['exception_id'];
+                $exceptionCreated = 0;
                 break;
 
             case 'update_reason':
@@ -421,7 +428,8 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
                 // inzwischen genehmigt (nicht mehr 'pending'), hat eine
                 // gleichzeitige Genehmigung gewonnen, und die Verknuepfung bleibt.
                 if ($stmt->rowCount() > 0) {
-                    $exceptionId = null;
+                    $exceptionId      = null;
+                    $exceptionCreated = 0;
                 }
                 break;
         }
@@ -431,12 +439,13 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
             : $now;
 
         $db->prepare("INSERT INTO {$prefix}appointment_responses
-                      (appointment_id, member_id, status, comment, exception_id, status_changed_at, updated_at)
-                      VALUES (?, ?, ?, ?, ?, ?, ?)
+                      (appointment_id, member_id, status, comment, exception_id, exception_created,
+                       status_changed_at, updated_at)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                       ON DUPLICATE KEY UPDATE status = VALUES(status), comment = VALUES(comment),
-                          exception_id = VALUES(exception_id),
+                          exception_id = VALUES(exception_id), exception_created = VALUES(exception_created),
                           status_changed_at = VALUES(status_changed_at), updated_at = VALUES(updated_at)")
-           ->execute([$appointmentId, $memberId, $status, $comment, $exceptionId, $statusChangedAt, $now]);
+           ->execute([$appointmentId, $memberId, $status, $comment, $exceptionId, $exceptionCreated, $statusChangedAt, $now]);
 
         $db->commit();
     } catch (Throwable $e) {
@@ -480,8 +489,10 @@ function responsesDelete($db, $database, bool $isManager, ?int $authMemberId, st
             return;
         }
 
+        $exceptionCreated = (int) ($existing['exception_created'] ?? 0);
         $action = responseExcuseAction((int) $apt['responses_require_excuse'] === 1,
-                                       $existing['status'], null, $existing['excuse_state'], false);
+                                       $existing['status'], null, $existing['excuse_state'], false,
+                                       $exceptionCreated === 1);
         if ($action === 'delete') {
             $db->prepare("DELETE FROM {$prefix}exceptions WHERE exception_id = ? AND status = 'pending'")
                ->execute([(int) $existing['exception_id']]);

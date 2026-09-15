@@ -134,15 +134,26 @@ function responseNormalizeComment(mixed $comment): ?string
 }
 
 /**
- * Was mit dem Abwesenheitsantrag geschieht (Spec 5.4).
+ * Was mit dem Abwesenheitsantrag geschieht (Spec 5.4, Entscheidungen 3b und 4b).
+ *
+ * Entscheidung 3b: Ein Antrag, den das Mitglied unabhaengig ueber exceptions
+ * gestellt hat (nur verknuepft, $excuseCreatedByResponse = false), wird von
+ * einer Rueckmeldung nie geaendert oder geloescht -- nur ein Antrag, den die
+ * Rueckmeldung selbst angelegt hat.
+ *
+ * Entscheidung 4b: Ein neuer Antrag entsteht nur bei einem echten Wechsel auf
+ * 'no'. Bleibt der Status 'no' (z. B. weil ein Verwalter den zuvor erzeugten
+ * Antrag geloescht hat und nur die Bemerkung geaendert wird), entsteht keiner.
  *
  * @param ?string $newStatus null heisst: Antwort wird zurueckgenommen
  * @param ?string $excuseState Status des verknuepften Antrags, null ohne
  * @param bool $ownAbsenceExists Mitglied hat schon einen eigenen, nicht abgelehnten Antrag
+ * @param bool $excuseCreatedByResponse Der verknuepfte Antrag wurde von einer Rueckmeldung angelegt, nicht nur verknuepft
  * @return 'none'|'create'|'link'|'update_reason'|'delete'|'keep'
  */
 function responseExcuseAction(bool $requireExcuse, ?string $oldStatus, ?string $newStatus,
-                              ?string $excuseState, bool $ownAbsenceExists): string
+                              ?string $excuseState, bool $ownAbsenceExists,
+                              bool $excuseCreatedByResponse): string
 {
     if (!$requireExcuse) {
         return 'none';
@@ -150,14 +161,27 @@ function responseExcuseAction(bool $requireExcuse, ?string $oldStatus, ?string $
 
     if ($newStatus === 'no') {
         if ($excuseState === null) {
+            // 4b: keine echte Statusaenderung -- der alte Antrag wurde entfernt
+            // (etwa durch den Verwalter), eine reine Bemerkungsaenderung legt
+            // keinen neuen an.
+            if ($oldStatus === 'no') {
+                return 'none';
+            }
+
             return $ownAbsenceExists ? 'link' : 'create';
         }
 
-        return $excuseState === 'pending' ? 'update_reason' : 'keep';
+        if ($excuseState !== 'pending') {
+            return 'keep';
+        }
+
+        // 3b: nur ein von der Rueckmeldung selbst angelegter Antrag wird mitgezogen.
+        return $excuseCreatedByResponse ? 'update_reason' : 'keep';
     }
 
     if ($oldStatus === 'no' && $excuseState === 'pending') {
-        return 'delete';
+        // 3b: nur ein von der Rueckmeldung selbst angelegter Antrag wird geloescht.
+        return $excuseCreatedByResponse ? 'delete' : 'keep';
     }
 
     return $excuseState === null ? 'none' : 'keep';
@@ -391,7 +415,7 @@ function responsesFetchOneForUpdate($db, $database, int $appointmentId, int $mem
     $prefix = $database->table('');
     $stmt = $db->prepare("
         SELECT r.response_id, r.status, r.comment, r.status_changed_at, r.exception_id,
-               e.status AS excuse_state
+               r.exception_created, e.status AS excuse_state
         FROM {$prefix}appointment_responses r
         LEFT JOIN {$prefix}exceptions e ON e.exception_id = r.exception_id
         WHERE r.appointment_id = ? AND r.member_id = ?

@@ -570,6 +570,7 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_responses` (
   status            ENUM('yes','no','maybe') NOT NULL,
   comment           VARCHAR(255) DEFAULT NULL,
   exception_id      INT DEFAULT NULL,
+  exception_created TINYINT(1) NOT NULL DEFAULT 0,
   status_changed_at DATETIME NOT NULL,
   updated_at        DATETIME NOT NULL,
   UNIQUE KEY uq_response (appointment_id, member_id),
