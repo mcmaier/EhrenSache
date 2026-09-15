@@ -32,6 +32,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Schemastand 1.7.0.
 - `mbstring` ist jetzt eine geprüfte Anforderung (war bereits für den Kiosk nötig).
 
+### Behoben
+- Beim Anlegen eines Antrags übernimmt der Server den Status nur noch von Admin und Manager.
+
 ---
 
 ## [1.6.1] – 2026-09-14

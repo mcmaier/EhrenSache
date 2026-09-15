@@ -1180,3 +1180,43 @@ test('cleanup: Rueckmeldungen alter Termine werden mit geloescht', function () {
         rsDropWorld($welt);
     }
 });
+
+test('POST exceptions: den Status aus dem Koerper uebernehmen nur Verwalter', function () {
+    // Nicht Terminrueckmeldung, sondern exceptions.php direkt -- eine eigene
+    // Welt reicht, die Terminart braucht keine Rueckmeldungs-Einstellungen.
+    // exceptions POST prueft keine Erwartung, rsWorld/rsWithUserInWorld dienen
+    // hier nur dazu, dem Konto "user" ein passendes Mitglied zu leihen.
+    $welt = rsWorld('StatusPOST');
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(5), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt) {
+            $res = apiRequest('POST', 'exceptions', ['token' => apiToken('user'), 'body' => [
+                'member_id' => $userMember, 'appointment_id' => $apt,
+                'exception_type' => 'absence', 'reason' => 'RS-Status', 'status' => 'approved',
+            ]]);
+            assertStatus(201, $res);
+
+            $stored = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+                'query' => ['id' => (int) $res['body']['id']]]);
+            assertStatus(200, $stored);
+            assertSame('pending', $stored['body']['status'],
+                'user darf den Status beim Anlegen nicht setzen, egal was der Koerper sagt');
+        });
+
+        $res = apiRequest('POST', 'exceptions', ['token' => apiToken('admin'), 'body' => [
+            'member_id' => $welt['member'], 'appointment_id' => $apt,
+            'exception_type' => 'absence', 'reason' => 'RS-Status-Admin', 'status' => 'approved',
+        ]]);
+        assertStatus(201, $res);
+
+        $stored = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+            'query' => ['id' => (int) $res['body']['id']]]);
+        assertStatus(200, $stored);
+        assertSame('approved', $stored['body']['status'], 'Admin darf den Status beim Anlegen setzen');
+    } finally {
+        // Loescht die Termine der Welt und damit per ON DELETE CASCADE auch
+        // die hier angelegten exceptions.
+        rsDropWorld($welt);
+    }
+});

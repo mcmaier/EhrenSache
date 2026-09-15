@@ -161,7 +161,9 @@ function handleExceptions($db, $database, $method, $id) {
                                   VALUES (?, ?, ?, ?, ?, ?, ?)");
             
             $requested_time = isset($data->requested_arrival_time) ? $data->requested_arrival_time : null;
-            $status = $data->status ?? 'pending';
+            // Den Status aus dem Anfragekoerper duerfen nur Verwalter setzen --
+            // sonst koennte sich ein Mitglied seinen eigenen Antrag selbst genehmigen.
+            $status = isAdminOrManager() ? ($data->status ?? 'pending') : 'pending';
 
             // Die beantragte Ankunft muss zum Termin passen. Ohne diese Grenze
             // liesse sich für einen 20-Uhr-Termin 17:00 beantragen — eine
