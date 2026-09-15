@@ -2370,3 +2370,140 @@ body {
     font-size: 12px;
     color: var(--text-light);
 }
+
+/* ========================================
+   TERMINRUECKMELDUNG (FI-1)
+   ======================================== */
+
+.tab-button[hidden] {
+    display: none;
+}
+
+.tab-button {
+    position: relative;
+}
+
+.tab-badge {
+    position: absolute;
+    top: 4px;
+    right: 10px;
+    min-width: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--error);
+    color: #fff;
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+}
+
+.tab-badge[hidden] {
+    display: none;
+}
+
+.responses-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.response-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--primary-color);
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.response-card.is-open {
+    box-shadow: 0 0 0 2px var(--warning);
+}
+
+.response-card__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.response-card__type,
+.response-card__meta,
+.response-card__summary {
+    color: var(--text-light);
+    font-size: 13px;
+    margin-top: 4px;
+}
+
+.response-segment {
+    display: flex;
+    gap: 6px;
+    margin: 10px 0;
+}
+
+.response-btn {
+    flex: 1;
+    min-height: 48px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    background: var(--button-bg);
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.response-btn:disabled {
+    opacity: 0.5;
+}
+
+.response-btn--yes.is-active   { background: var(--success); border-color: var(--success); color: #fff; }
+.response-btn--maybe.is-active { background: var(--warning); border-color: var(--warning); color: #fff; }
+.response-btn--no.is-active    { background: var(--error);   border-color: var(--error);   color: #fff; }
+
+.response-comment[hidden] {
+    display: none;
+}
+
+.response-comment textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    font: inherit;
+}
+
+.response-comment small {
+    display: block;
+    color: var(--text-light);
+    margin: 4px 0;
+}
+
+.response-comment__save {
+    margin-top: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--button-bg);
+}
+
+.response-late {
+    color: var(--error);
+    font-weight: 600;
+}
+
+.response-card__offline {
+    margin-top: 6px;
+    color: var(--error);
+    font-size: 13px;
+}
+
+.response-names summary {
+    cursor: pointer;
+    margin-top: 6px;
+    font-size: 13px;
+}
+
+.responses-empty {
+    color: var(--text-light);
+    text-align: center;
+}

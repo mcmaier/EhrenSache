@@ -110,6 +110,11 @@
                     <span class="icon">📍</span>
                     <span>Erfassen</span>
                 </button>
+                <button class="tab-button" data-tab="responses" hidden>
+                    <span class="icon">🗓️</span>
+                    <span>Termine</span>
+                    <span class="tab-badge" id="responsesTabBadge" hidden>0</span>
+                </button>
                 <button class="tab-button" data-tab="history">
                     <span class="icon">📋</span>
                     <span>Verlauf</span>
@@ -280,6 +285,14 @@
 
             </div>
             <!-- Ende TAB 1: ERFASSEN -->
+
+            <!-- TAB: TERMINE (Rückmeldungen, FI-1) -->
+            <div class="tab-content" data-tab="responses">
+                <div class="responses-section">
+                    <h3>🗓️ Kommende Termine</h3>
+                    <div id="responsesList" class="responses-list"></div>
+                </div>
+            </div>
 
             <!-- TAB 2: HISTORY -->
             <div class="tab-content" data-tab="history">

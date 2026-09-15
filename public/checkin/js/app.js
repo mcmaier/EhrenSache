@@ -788,6 +788,7 @@ async function checkAutoLogin() {
  */
 function resetSessionState() {
     userData = null;
+    resetResponsesTab();
 
     appointments = [];
     appointmentTypes = [];
@@ -3441,6 +3442,179 @@ function initCaptureTab() {
 }
 
 // ========================================
+// TERMINRUECKMELDUNG (FI-1)
+// ========================================
+//
+// Ein Tipp speichert sofort. Ohne Netz sind die Knoepfe gesperrt -- eine
+// Warteschlange gibt es bewusst nicht (OI-43, Spec 7.1).
+
+const RESPONSE_LABELS = { yes: 'Zusage', maybe: 'Unsicher', no: 'Absage' };
+let upcomingResponses = [];
+let responsesNetworkBound = false;
+
+function resetResponsesTab() {
+    upcomingResponses = [];
+    const tab = document.querySelector('.tab-button[data-tab="responses"]');
+    if (tab) tab.hidden = true;
+    updateResponsesBadge();
+    const list = document.getElementById('responsesList');
+    if (list) list.innerHTML = '';
+}
+
+async function initResponsesTab() {
+    resetResponsesTab();
+
+    const list = document.getElementById('responsesList');
+    if (list) bindOnce(list, 'click', onResponsesClick);
+
+    if (!responsesNetworkBound) {
+        window.addEventListener('online', renderResponses);
+        window.addEventListener('offline', renderResponses);
+        responsesNetworkBound = true;
+    }
+
+    if (!userData || !userData.member_id) return;
+    await loadResponses();
+}
+
+async function loadResponses() {
+    const result = await apiCall('appointment_responses', 'GET', null, { upcoming: 1 });
+    if (!result.success) {
+        debug.log('Rückmeldungen nicht geladen:', result.error);
+        return;
+    }
+
+    upcomingResponses = result.data.appointments || [];
+    const tab = document.querySelector('.tab-button[data-tab="responses"]');
+    if (tab) tab.hidden = upcomingResponses.length === 0;
+
+    updateResponsesBadge();
+    renderResponses();
+}
+
+function updateResponsesBadge() {
+    const badge = document.getElementById('responsesTabBadge');
+    if (!badge) return;
+    const open = upcomingResponses.filter(item => !item.own).length;
+    badge.textContent = String(open);
+    badge.hidden = open === 0;
+}
+
+function formatResponseDeadline(mysql) {
+    const d = new Date(mysql.replace(' ', 'T'));
+    const weekday = d.toLocaleDateString('de-DE', { weekday: 'short' });
+    return `${weekday} ${d.toLocaleDateString('de-DE')} ${d.toTimeString().substring(0, 5)} Uhr`;
+}
+
+function renderResponses() {
+    const list = document.getElementById('responsesList');
+    if (!list) return;
+
+    if (upcomingResponses.length === 0) {
+        list.innerHTML = '<p class="responses-empty">Keine kommenden Termine mit Rückmeldung.</p>';
+        return;
+    }
+
+    // Unbeantwortete zuerst, darin nach Beginn.
+    const sorted = [...upcomingResponses].sort((a, b) =>
+        (a.own ? 1 : 0) - (b.own ? 1 : 0)
+        || `${a.appointment.date} ${a.appointment.start_time}`.localeCompare(`${b.appointment.date} ${b.appointment.start_time}`));
+
+    list.innerHTML = sorted.map(responseCardHtml).join('');
+}
+
+function responseCardHtml(item) {
+    const apt = item.appointment;
+    const id = Number(apt.appointment_id);
+    const status = item.own ? item.own.status : null;
+    const offline = !navigator.onLine;
+    const off = offline ? ' disabled' : '';
+
+    const deadlinePassed = new Date(item.settings.deadline.replace(' ', 'T')) < new Date();
+    const deadlineText = deadlinePassed
+        ? 'Frist abgelaufen – Änderung wird als kurzfristig vermerkt'
+        : `Rückmeldung bis ${formatResponseDeadline(item.settings.deadline)}`;
+
+    const buttons = ['yes', 'maybe', 'no'].map(s =>
+        `<button type="button" class="response-btn response-btn--${s}${status === s ? ' is-active' : ''}" data-appointment-id="${id}" data-status="${s}"${off}>${RESPONSE_LABELS[s]}</button>`
+    ).join('');
+
+    const names = item.members
+        ? `<details class="response-names"><summary>Wer hat geantwortet?</summary><ul>${item.members.map(m =>
+            `<li>${escapeHtml(m.name)} ${escapeHtml(m.surname)}: ${m.status ? RESPONSE_LABELS[m.status] : 'keine Antwort'}</li>`
+          ).join('')}</ul></details>`
+        : '';
+
+    const s = item.summary;
+
+    return `
+        <div class="response-card${status === null ? ' is-open' : ''}" style="border-left-color: ${escapeHtml(apt.color || '#1F5FBF')}">
+            <div class="response-card__head">
+                <strong>${escapeHtml(apt.title)}</strong>
+                <span>${formatDateShortDe(apt.date)} · ${escapeHtml(apt.start_time.substring(0, 5))} Uhr</span>
+            </div>
+            <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
+            <div class="response-segment">${buttons}</div>
+            <div class="response-comment"${status === null ? ' hidden' : ''}>
+                <textarea rows="2" maxlength="255" placeholder="${item.settings.require_excuse && status === 'no' ? 'Begründung (Pflicht)' : 'Bemerkung (optional)'}"${off}>${escapeHtml(item.own?.comment ?? '')}</textarea>
+                ${item.settings.require_excuse ? '<small>Eine Absage wird als Entschuldigung eingereicht.</small>' : ''}
+                <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>Bemerkung speichern</button>
+            </div>
+            <div class="response-card__meta">${escapeHtml(deadlineText)}${item.own?.is_late ? ' · <span class="response-late">kurzfristig</span>' : ''}</div>
+            <div class="response-card__summary">Zusage ${s.yes} · Unsicher ${s.maybe} · Absage ${s.no} · offen ${s.open}</div>
+            ${names}
+            ${offline ? '<div class="response-card__offline">Ohne Netz ist keine Rückmeldung möglich.</div>' : ''}
+        </div>`;
+}
+
+async function onResponsesClick(event) {
+    const btn = event.target.closest('button');
+    if (!btn || btn.disabled) return;
+
+    const appointmentId = Number(btn.dataset.appointmentId);
+    const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === appointmentId);
+    if (!item) return;
+
+    const card = btn.closest('.response-card');
+    const commentBox = card.querySelector('.response-comment');
+    const textarea = commentBox.querySelector('textarea');
+    const comment = textarea.value.trim();
+
+    if (btn.classList.contains('response-btn')) {
+        const status = btn.dataset.status;
+
+        if (status === 'no' && item.settings.require_excuse && comment === '') {
+            commentBox.hidden = false;
+            textarea.placeholder = 'Begründung (Pflicht)';
+            textarea.focus();
+            showMessage('Bitte zuerst eine Begründung für die Absage eintragen', 'error');
+            return;
+        }
+        await submitResponse(item, status, comment);
+    } else if (btn.classList.contains('response-comment__save') && item.own) {
+        await submitResponse(item, item.own.status, comment);
+    }
+}
+
+async function submitResponse(item, status, comment) {
+    const id = item.appointment.appointment_id;
+    const result = await apiCall('appointment_responses', 'PUT',
+        { status, comment: comment || null }, { appointment_id: id });
+
+    if (!result.success) {
+        showMessage(result.error || 'Rückmeldung konnte nicht gespeichert werden', 'error');
+        return;
+    }
+
+    const index = upcomingResponses.findIndex(i => i.appointment.appointment_id === id);
+    if (index >= 0) upcomingResponses[index] = result.data;
+
+    updateResponsesBadge();
+    renderResponses();
+    showMessage('Rückmeldung gespeichert', 'success');
+}
+
+// ========================================
 // TAB MANAGEMENT
 // ========================================
 function initTabs() {
@@ -3451,6 +3625,9 @@ function initTabs() {
     // loadUserData() bereits durch, worktimeActivities ist also gefuellt und
     // availableIntents() liefert die richtige Antwort.
     initCaptureTab();
+
+    // Rueckmeldungen laden im Hintergrund; der Tab erscheint erst mit Inhalt.
+    initResponsesTab();
 
     tabButtons.forEach(button => {
         bindOnce(button, 'click', () => {
@@ -3479,6 +3656,10 @@ function initTabs() {
             else if (targetTab === 'stats') {
                 debug.log("Loading Stats");
                 loadStatistics();
+            }
+            else if (targetTab === 'responses') {
+                debug.log("Loading Responses");
+                loadResponses();
             }
             else if(targetTab === 'history')
             {
