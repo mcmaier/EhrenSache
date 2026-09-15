@@ -158,10 +158,11 @@ function registerExitGuard(): void
 /**
  * Prüft den Schemastand.
  *
- * Verlangt wird 1.3.0, nicht 1.3.1: Die Migration 1.3.0.php ändert das Schema
- * nicht, sie schließt nur die Kette bis zur Version aus version.json. Eine
- * korrekt aktualisierte 1.3.1-Installation trägt daher 1.3.0 als letzten
- * Stempel — eine Prüfung auf 1.3.1 würde sie fälschlich abweisen.
+ * Verlangt wird 1.7.0: Seit dieser Version schreibt der Generator
+ * appointment_responses, eine Tabelle, die ältere Schemata nicht kennen. Der
+ * Update-Assistent stempelt bei jeder Migration deren to-Version in
+ * schema_version — eine aktualisierte Installation trägt daher mindestens
+ * 1.7.0 als letzten Stempel.
  */
 function assertSchema(PDO $db, string $prefix): void
 {

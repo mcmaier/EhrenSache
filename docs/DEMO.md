@@ -172,6 +172,13 @@ funktioniert der direkte Aufruf genauso:
 - **`cron.php` und `seed.php` gehören zusammen hochgeladen.** Liegt neben einer neuen
   `cron.php` noch eine ältere `seed.php`, meldet der Cron das mit Rückgabewert 1, statt still
   ins Leere zu laufen.
+- **Update auf 1.7.0:** `private/demo/cron.php` und `seed.php` gehören zu den Dateien, die
+  ein ZIP-Update nicht mitbringt (siehe Abschnitt 1) — beim Aktualisieren der Demo also
+  zusammen mit dem Rest von Hand ersetzen. Der Generator verlangt ab dieser Version
+  Schemastand 1.7.0 (siehe `private/demo/README.md`, Abschnitt „Voraussetzung") und bricht
+  auf einem älteren Stand laut mit Rückgabewert 1 ab, statt in eine fehlende Tabelle zu
+  schreiben. Deshalb vor dem nächsten Cron-Lauf erst den Update-Assistenten unter `/update`
+  ausführen, dann `cron.php`/`seed.php` ersetzen.
 - Der Schreibvorgang liegt in einer Transaktion — ein Besucher mitten in einer Aktion sieht
   keinen halben Bestand.
 

@@ -1091,6 +1091,33 @@ test('buildAppointmentResponses: Zeitpunkt nie nach Beginn und nie nach dem Lauf
     }
 });
 
+test('buildAppointmentResponses: nur ein kleiner Teil antwortet kurzfristig, innerhalb der Frist von 168 Stunden', function () {
+    // Vorher zog der Grossteil aus 24..336 Stunden vor Beginn -- bei einer
+    // Frist von 168 Stunden waren so fast die Haelfte aller Antworten
+    // "kurzfristig" (nach Fristablauf). Jetzt liegt der Regelfall vor der
+    // Frist, nur jede zehnte Antwort danach.
+    foreach ([20260908, 1, 42] as $seed) {
+        $plan    = buildDemoPlan($seed, '2026-09-08');
+        $startOf = [];
+        foreach ($plan['appointments'] as $a) {
+            $startOf[$a['appointment_id']] = new DateTimeImmutable("{$a['date']} {$a['start_time']}");
+        }
+
+        $total       = count($plan['appointment_responses']);
+        $kurzfristig = 0;
+        foreach ($plan['appointment_responses'] as $row) {
+            $threshold = $startOf[$row['appointment_id']]->modify('-168 hours');
+            if (new DateTimeImmutable($row['status_changed_at']) > $threshold) {
+                $kurzfristig++;
+            }
+        }
+
+        assertTrue($kurzfristig > 0, "Saat {$seed}: keine kurzfristige Antwort");
+        $share = $kurzfristig / $total;
+        assertTrue($share <= 0.20, "Saat {$seed}: Anteil kurzfristig {$share} (" . $kurzfristig . '/' . $total . ')');
+    }
+});
+
 test('buildAppointmentResponses: der kommende Auftritt hat Zusagen und offene Antworten', function () {
     $plan    = buildDemoPlan(20260908, '2026-09-08');
     $concert = array_values(array_filter($plan['appointments'], fn ($a) => $a['type_id'] === 3 && $a['date'] > '2026-09-08'))[0];

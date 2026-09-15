@@ -27,10 +27,11 @@ den Webserver bricht es mit 403 ab.
 
 ## Voraussetzung
 
-`schema_version` ≥ **1.3.0**. Geprüft wird 1.3.0 und nicht 1.3.1, weil die Migration
-`1.3.0.php` das Schema nicht ändert — sie schließt nur die Kette bis zur Version aus
-`version.json`. Eine korrekt aktualisierte 1.3.1-Installation trägt daher 1.3.0 als letzten
-Stempel; eine Prüfung auf 1.3.1 würde sie fälschlich abweisen.
+`schema_version` ≥ **1.7.0**. Seit dieser Version schreibt der Generator
+`appointment_responses` — eine Tabelle, die ältere Schemata nicht kennen. Der
+Update-Assistent stempelt bei jeder Migration deren `to`-Version in `schema_version`; eine
+aktualisierte Installation trägt daher mindestens 1.7.0 als letzten Stempel. Auf einem älteren
+Stand bricht der Generator laut ab, statt in eine fehlende Tabelle zu schreiben.
 
 ## Reihenfolge im Alltag
 

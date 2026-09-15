@@ -358,6 +358,10 @@ function demoShiftDate(string $date, int $days): string
  *
  * Vier Termine liegen bewusst in der Zukunft — sonst endet die Terminliste im
  * Screenshot mit der Vergangenheit und wirkt wie ein aufgegebener Verein.
+ *
+ * buildDemoPlan() hängt danach über buildFutureConcert() einen fünften
+ * zukünftigen Termin an — einen Auftritt, eigens für die Terminrückmeldung
+ * (FI-1). Diese Funktion selbst kennt ihn nicht und bleibt bei genau vier.
  */
 function buildAppointments(DemoRandom $random, string $referenceDate): array
 {
@@ -419,7 +423,10 @@ function buildAppointments(DemoRandom $random, string $referenceDate): array
     }
 
     // Genau vier Termine in der Zukunft: die nächsten Gesamt- und Registerproben
-    // stehen bereits in den Serien oben. Alles danach wird gekappt.
+    // stehen bereits in den Serien oben. Alles danach wird gekappt. (Der fünfte
+    // zukünftige Termin des Gesamtplans, der Auftritt aus buildFutureConcert(),
+    // entsteht getrennt und erst in buildDemoPlan() — diese Funktion liefert
+    // ihn nicht mit.)
     $past   = array_values(array_filter($appointments, fn ($a) => $a['date'] <= $referenceDate));
     $future = array_values(array_filter($appointments, fn ($a) => $a['date'] > $referenceDate));
     usort($future, fn ($x, $y) => strcmp($x['date'], $y['date']));
@@ -1044,8 +1051,9 @@ function buildFutureConcert(array $appointments, string $referenceDate): array
  * einzelne Absagen waren doch da. Beim kommenden Auftritt fehlt ein Viertel
  * der Antworten, damit der Zaehler "offen" etwas zeigt.
  *
- * Zeitpunkt: 1 bis 14 Tage vor Beginn, bei jeder zehnten Antwort 1 bis 20
- * Stunden vorher (kurzfristig bei einer Frist von 168 Stunden). Nie nach dem
+ * Zeitpunkt: ueberwiegend innerhalb der Frist von 168 Stunden vor Beginn (168
+ * bis 336 Stunden, also 7 bis 14 Tage vorher), bei jeder zehnten Antwort erst
+ * 1 bis 20 Stunden vorher -- kurzfristig, nach Ablauf der Frist. Nie nach dem
  * Zeitpunkt des Laufs.
  *
  * @return array<int, array<string, mixed>>
@@ -1087,7 +1095,7 @@ function buildAppointmentResponses(
 
         if ($start <= $now->format('Y-m-d H:i:s')) {
             $status = isset($present[$pair['member_id'] . '-' . $pair['appointment_id']])
-                ? ($roll <= 85 ? 'yes' : ($roll <= 95 ? 'maybe' : null))
+                ? ($roll <= 82 ? 'yes' : ($roll <= 92 ? 'maybe' : ($roll <= 95 ? 'no' : null)))
                 : ($roll <= 55 ? 'no' : ($roll <= 70 ? 'yes' : ($roll <= 80 ? 'maybe' : null)));
         } else {
             $status = $roll <= 55 ? 'yes' : ($roll <= 65 ? 'maybe' : ($roll <= 75 ? 'no' : null));
@@ -1097,7 +1105,9 @@ function buildAppointmentResponses(
             continue;
         }
 
-        $hoursBefore = $random->chance(0.1) ? $random->int(1, 20) : $random->int(24, 24 * 14);
+        // Ueberwiegend rechtzeitig (innerhalb der Frist von 168 Stunden), nur
+        // jede zehnte Antwort kurzfristig (1 bis 20 Stunden vorher).
+        $hoursBefore = $random->chance(0.1) ? $random->int(1, 20) : $random->int(168, 24 * 14);
         $changed     = (new DateTimeImmutable($start))->modify("-{$hoursBefore} hours");
         if ($changed > $now) {
             $changed = $now->modify('-' . $random->int(1, 72) . ' hours');
@@ -1170,6 +1180,10 @@ function buildUsers(): array
  * Ausnahme: Der Start der einen laufenden Arbeitszeitsitzung (siehe
  * buildWorkSessions()) hängt zusätzlich an $referenceTime, dem Zeitpunkt des
  * Laufs. Alles andere im Bestand ist von $referenceTime unabhängig.
+ *
+ * Nach allen Ziehungen hängt diese Funktion einen fünften zukünftigen Termin
+ * an — den Auftritt aus buildFutureConcert() (FI-1). buildAppointments()
+ * allein liefert weiterhin genau vier; der Gesamtplan enthält fünf.
  */
 function buildDemoPlan(int $seed, string $referenceDate, string $referenceTime = '12:00:00'): array
 {
