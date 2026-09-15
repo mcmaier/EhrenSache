@@ -403,6 +403,69 @@ function responsesFetchOneForUpdate($db, $database, int $appointmentId, int $mem
     return $row === false ? null : $row;
 }
 
+/**
+ * Haengt jedem Termin 'responses' an: Summen und eigene Antwort, oder null bei
+ * Terminarten ohne Rueckmeldung. Zwei Abfragen fuer die ganze Liste, nicht je Termin.
+ *
+ * @param array<int, array<string, mixed>> $appointments Zeilen mit responses_enabled
+ * @return array<int, array<string, mixed>>
+ */
+function responsesAttachSummaries($db, $database, array $appointments, ?int $viewerMemberId): array
+{
+    $ids = [];
+    foreach ($appointments as $a) {
+        if ((int) ($a['responses_enabled'] ?? 0) === 1) {
+            $ids[] = (int) $a['appointment_id'];
+        }
+    }
+
+    $expectedBy = [];
+    $statusBy   = [];
+
+    if ($ids !== []) {
+        $prefix       = $database->table('');
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $activity     = getMemberActivityWhere('m', 'a.date');
+
+        $stmt = $db->prepare("
+            SELECT DISTINCT a.appointment_id, m.member_id
+            FROM {$prefix}appointments a
+            JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
+            JOIN {$prefix}member_group_assignments mga ON mga.group_id = atg.group_id
+            JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activity}
+            WHERE a.appointment_id IN ({$placeholders})
+        ");
+        $stmt->execute($ids);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $expectedBy[(int) $row['appointment_id']][] = (int) $row['member_id'];
+        }
+
+        $stmt = $db->prepare("SELECT appointment_id, member_id, status
+                              FROM {$prefix}appointment_responses
+                              WHERE appointment_id IN ({$placeholders})");
+        $stmt->execute($ids);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $statusBy[(int) $row['appointment_id']][(int) $row['member_id']] = $row['status'];
+        }
+    }
+
+    $enabled = array_flip($ids);
+    foreach ($appointments as &$appointment) {
+        $appointmentId = (int) $appointment['appointment_id'];
+        if (!isset($enabled[$appointmentId])) {
+            $appointment['responses'] = null;
+            continue;
+        }
+
+        $summary = responseSummary($expectedBy[$appointmentId] ?? [], $statusBy[$appointmentId] ?? []);
+        $summary['own'] = $viewerMemberId !== null ? ($statusBy[$appointmentId][$viewerMemberId] ?? null) : null;
+        $appointment['responses'] = $summary;
+    }
+    unset($appointment);
+
+    return $appointments;
+}
+
 /** Juengster eigener, nicht abgelehnter Abwesenheitsantrag zum Termin, oder null. */
 function responsesFetchOwnAbsence($db, $database, int $appointmentId, int $memberId): ?array
 {

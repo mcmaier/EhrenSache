@@ -45,11 +45,12 @@ function handleAppointments($db, $database, $method, $id) {
                 $member_id = $_GET['member_id'] ?? null;
                 
                 // Baue Query dynamisch - MIT Alias für type_description
-                $sql = "SELECT a.*, 
-                        at.type_name, 
-                        at.color, 
+                $sql = "SELECT a.*,
+                        at.type_name,
+                        at.color,
                         at.type_id,
-                        at.description as type_description
+                        at.description as type_description,
+                        COALESCE(at.responses_enabled, 0) as responses_enabled
                         FROM {$prefix}appointments a
                         LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
                         WHERE 1=1";
@@ -130,7 +131,16 @@ function handleAppointments($db, $database, $method, $id) {
                 }
 
                 //$stmt = $db->query("SELECT * FROM appointments ORDER BY date DESC, start_time");
-                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                // Eigene Antwort je Termin: das Mitglied des angemeldeten Kontos,
+                // auch bei Admin und Manager, wenn eines verknuepft ist.
+                $viewerStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
+                $viewerStmt->execute([getCurrentUserId()]);
+                $viewerMemberId = $viewerStmt->fetchColumn();
+
+                echo json_encode(responsesAttachSummaries(
+                    $db, $database, $stmt->fetchAll(PDO::FETCH_ASSOC),
+                    $viewerMemberId ? (int) $viewerMemberId : null
+                ));
             }
             break;
             

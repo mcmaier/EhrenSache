@@ -736,3 +736,38 @@ test('PUT: Terminart ohne Rueckmeldung bleibt 409, auch fuer ein Mitglied per me
         rsDropWorld($welt);
     }
 });
+
+test('appointments: Liste traegt Summen und die eigene Antwort, ohne Rueckmeldung null', function () {
+    $mit  = rsWorld('ListeMit', ['responses_enabled' => 1]);
+    $ohne = rsWorld('ListeOhne');
+    try {
+        $tag  = rsDateInDays(5);
+        $aptM = rsAppointment($mit, $tag, '19:00:00');
+        $aptO = rsAppointment($ohne, $tag, '19:00:00');
+
+        rsWithUserInWorld($mit, function () use ($aptM, $aptO, $tag) {
+            assertStatus(200, rsPut('user', $aptM, ['status' => 'maybe']));
+
+            $liste = apiRequest('GET', 'appointments', ['token' => apiToken('admin'),
+                'query' => ['year' => substr($tag, 0, 4)]]);
+            assertStatus(200, $liste);
+            $byId = [];
+            foreach ($liste['body'] as $row) {
+                $byId[(int) $row['appointment_id']] = $row;
+            }
+
+            assertSame(['yes' => 0, 'no' => 0, 'maybe' => 1, 'open' => 1, 'own' => null],
+                       $byId[$aptM]['responses'], 'Admin hat hier keine eigene Antwort');
+            assertSame(null, $byId[$aptO]['responses']);
+
+            $alsUser = apiRequest('GET', 'appointments', ['token' => apiToken('user'),
+                'query' => ['year' => substr($tag, 0, 4)]]);
+            $eigen = array_values(array_filter($alsUser['body'],
+                static fn ($r) => (int) $r['appointment_id'] === $aptM))[0];
+            assertSame('maybe', $eigen['responses']['own']);
+        });
+    } finally {
+        rsDropWorld($mit);
+        rsDropWorld($ohne);
+    }
+});
