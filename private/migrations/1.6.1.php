@@ -70,9 +70,18 @@ function migrate_1_6_1(PDO $pdo, string $prefix, string $configPath): array
 
     // 3. Fremdschluessel einzeln
     $foreignKeys = [
-        "{$prefix}resp_appointment_fk" => ['appointment_id', 'appointments', 'appointment_id', 'CASCADE'],
-        "{$prefix}resp_member_fk"      => ['member_id', 'members', 'member_id', 'CASCADE'],
-        "{$prefix}resp_exception_fk"   => ['exception_id', 'exceptions', 'exception_id', 'SET NULL'],
+        "{$prefix}resp_appointment_fk" => [
+            'appointment_id', 'appointments', 'appointment_id', 'CASCADE',
+            'beim Löschen von Terminen bzw. Mitgliedern bleiben ihre Rückmeldungen stehen',
+        ],
+        "{$prefix}resp_member_fk" => [
+            'member_id', 'members', 'member_id', 'CASCADE',
+            'beim Löschen von Terminen bzw. Mitgliedern bleiben ihre Rückmeldungen stehen',
+        ],
+        "{$prefix}resp_exception_fk" => [
+            'exception_id', 'exceptions', 'exception_id', 'SET NULL',
+            'nach dem Löschen eines Antrags zeigt exception_id auf einen nicht mehr vorhandenen Antrag',
+        ],
     ];
 
     $fkExists = $pdo->prepare("
@@ -81,21 +90,23 @@ function migrate_1_6_1(PDO $pdo, string $prefix, string $configPath): array
           AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'
     ");
 
-    foreach ($foreignKeys as $name => [$column, $refTable, $refColumn, $onDelete]) {
+    foreach ($foreignKeys as $name => [$column, $refTable, $refColumn, $onDelete, $consequence]) {
         $fkExists->execute(["{$prefix}appointment_responses", $name]);
         if ((int) $fkExists->fetchColumn() > 0) {
             $log[] = "Fremdschlüssel {$name} bestand bereits";
             continue;
         }
+        $alterSql = "ALTER TABLE `{$prefix}appointment_responses` "
+            . "ADD CONSTRAINT `{$name}` FOREIGN KEY (`{$column}`) "
+            . "REFERENCES `{$prefix}{$refTable}` (`{$refColumn}`) ON DELETE {$onDelete}";
         try {
-            $pdo->exec("ALTER TABLE `{$prefix}appointment_responses`
-                        ADD CONSTRAINT `{$name}` FOREIGN KEY (`{$column}`)
-                        REFERENCES `{$prefix}{$refTable}` (`{$refColumn}`) ON DELETE {$onDelete}");
+            $pdo->exec($alterSql);
             $log[] = "Fremdschlüssel {$name} angelegt";
         } catch (PDOException $e) {
             $warnings[] = "Fremdschlüssel {$name} konnte nicht angelegt werden ("
                 . htmlspecialchars($e->getMessage()) . '). Rückmeldungen funktionieren trotzdem; '
-                . 'beim Löschen von ' . htmlspecialchars($refTable) . ' bleiben sie jedoch stehen.';
+                . htmlspecialchars($consequence) . '. Nach Behebung der Ursache manuell nachtragen: <code>'
+                . htmlspecialchars($alterSql) . '</code>';
         }
     }
 
