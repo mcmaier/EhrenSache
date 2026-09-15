@@ -3786,7 +3786,7 @@ function responseNamesHtml(members, appointmentId) {
     }).join('');
 
     return `<details class="response-names"${responsesOpenNames.has(appointmentId) ? ' open' : ''} data-appointment-id="${appointmentId}">
-        <summary>Wer hat geantwortet? <span class="response-count-row">${responseCountChipsHtml(counts)}</span></summary>
+        <summary><span class="response-summary-label">Wer hat geantwortet?</span> <span class="response-count-row">${responseCountChipsHtml(counts)}</span></summary>
         <div class="response-names__body">${groups}</div>
     </details>`;
 }

@@ -2534,15 +2534,44 @@ body {
     margin-top: 8px;
 }
 
-.response-comment-details summary {
+/* Aufklappbare Bereiche der Karte ("Bemerkung", "Wer hat geantwortet?") mit
+   eigenem Pfeil statt des Browser-Markers: Der fehlt, sobald die Summary
+   display:flex traegt, und war auch sonst leicht zu uebersehen. */
+.response-comment-details summary,
+.response-names summary {
     cursor: pointer;
+    list-style: none;
     font-size: 13px;
-    color: var(--text-light);
-    padding-left: 0;
+    padding: 4px 0;
 }
 
-.response-comment-details summary::marker {
+.response-comment-details summary::-webkit-details-marker,
+.response-names summary::-webkit-details-marker {
+    display: none;
+}
+
+.response-comment-details summary::before,
+.response-names summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    color: var(--primary-color);
+    font-size: 14px;
+    transition: transform 0.15s ease;
+}
+
+.response-comment-details[open] summary::before,
+.response-names[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.response-comment-details summary {
     color: var(--text-light);
+}
+
+.response-summary-label {
+    color: var(--primary-color);
+    font-weight: 600;
 }
 
 .response-comment {
@@ -2589,21 +2618,14 @@ body {
 }
 
 .response-names summary {
-    cursor: pointer;
-    font-size: 13px;
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
-    padding-left: 0;
-}
-
-.response-names summary::marker {
-    color: var(--text-light);
 }
 
 /* Ampel-Zeile -- Zaehlung je Status, gleiche Farben wie die Antwort-Knoepfe
-   (response-btn). Nullwerte gedimmt statt ausgeblendet, damit die
+   (response-btn). Nullwerte neutral grau statt ausgeblendet, damit die
    Reihenfolge der vier Chips immer gleich bleibt. Wird an drei Stellen
    verwendet: Kartenkopf (response-status), Summary von "Wer hat
    geantwortet?" und Ueberschrift je Gruppe darin. */
@@ -2625,8 +2647,9 @@ body {
     font-weight: 600;
 }
 
+/* Nullwerte neutral grau statt blass-farbig (gleiche Regel wie im Dashboard). */
 .response-count-chip.is-zero {
-    opacity: 0.45;
+    color: var(--text-light);
 }
 
 .response-count-chip--yes   { color: var(--success); }

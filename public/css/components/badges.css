@@ -103,7 +103,11 @@
     transition: opacity var(--transition-fast);
 }
 
-.response-chip.is-zero { opacity: 0.45; }
+/* Nullwerte neutral grau statt blass-farbig: Die Ampelfarbe steht nur dort,
+   wo es tatsaechlich Antworten gibt, und alle Zeilen wirken gleichmaessig.
+   Zwei Klassen schlagen die Farbmodifikatoren darunter unabhaengig von der
+   Reihenfolge. */
+.response-chip.is-zero { background: var(--bg-gray); color: var(--text-light); }
 
 .response-chip--yes   { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); }
 .response-chip--maybe { background: color-mix(in srgb, var(--warning-color) 15%, transparent); color: var(--warning-color); }
