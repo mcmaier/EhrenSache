@@ -376,11 +376,11 @@ function responsesFetchUpcomingIds($db, $database, int $memberId, string $now): 
         JOIN {$prefix}member_group_assignments mga
              ON mga.group_id = atg.group_id AND mga.member_id = ?
         JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activity}
-        WHERE CONCAT(a.date, ' ', a.start_time) > ?
+        WHERE a.date >= DATE(?) AND CONCAT(a.date, ' ', a.start_time) > ?
         ORDER BY a.date, a.start_time
         LIMIT 50
     ");
-    $stmt->execute([$memberId, $now]);
+    $stmt->execute([$memberId, $now, $now]);
 
     return array_map(static fn ($r) => (int) $r['appointment_id'], $stmt->fetchAll(PDO::FETCH_ASSOC));
 }

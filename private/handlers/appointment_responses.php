@@ -27,12 +27,18 @@ function handleAppointmentResponses($db, $database, $method, $authUserId, $authU
     $isManager    = in_array($authUserRole, ['admin', 'manager'], true);
     $authMemberId = $authMemberId === null ? null : (int) $authMemberId;
 
+    // Einmal je Anfrage gelesen, nicht je Termin -- responsesPayload() bekommt
+    // den Wert durchgereicht, statt selbst systemSetting() aufzurufen.
+    $globalHours = responseDeadlineHours(null, systemSetting(
+        $db, $database, 'response_deadline_hours', (string) RESPONSE_DEADLINE_DEFAULT_HOURS
+    ));
+
     switch ($method) {
         case 'GET':
             if (isset($_GET['upcoming'])) {
-                responsesGetUpcoming($db, $database, $authMemberId, $now);
+                responsesGetUpcoming($db, $database, $authMemberId, $now, $globalHours);
             } else {
-                responsesGetOne($db, $database, $isManager, $authMemberId, $now);
+                responsesGetOne($db, $database, $isManager, $authMemberId, $now, $globalHours);
             }
             return;
 
@@ -54,11 +60,14 @@ function responsesQueryInt(string $key): ?int
     if ($raw === null || $raw === '') {
         return null;
     }
+    if (!is_string($raw)) {
+        return -1;   // z. B. appointment_id[]=1 -- ein Array, keine Zahl
+    }
 
-    return (ctype_digit((string) $raw) && (int) $raw > 0) ? (int) $raw : -1;
+    return (ctype_digit($raw) && (int) $raw > 0) ? (int) $raw : -1;
 }
 
-function responsesGetUpcoming($db, $database, ?int $memberId, string $now): void
+function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $globalHours): void
 {
     if ($memberId === null) {
         echo json_encode(['appointments' => []]);
@@ -71,14 +80,14 @@ function responsesGetUpcoming($db, $database, ?int $memberId, string $now): void
         if ($apt !== null) {
             // Auch Admin und Manager bekommen hier die Sicht des Mitglieds:
             // Die Liste ist zum Antworten da, die Planung sitzt im Dashboard.
-            $items[] = responsesPayload($db, $database, $apt, false, $memberId, $now);
+            $items[] = responsesPayload($db, $database, $apt, false, $memberId, $now, $globalHours);
         }
     }
 
     echo json_encode(['appointments' => $items], JSON_UNESCAPED_UNICODE);
 }
 
-function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string $now): void
+function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string $now, int $globalHours): void
 {
     $appointmentId = responsesQueryInt('appointment_id');
     if ($appointmentId === null || $appointmentId < 0) {
@@ -96,7 +105,12 @@ function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string
         return;
     }
 
-    $payload = responsesPayload($db, $database, $apt, $isManager, $memberId, $now);
+    if (!$isManager && $memberId === null) {
+        responsesFail(403, 'Mit diesem Benutzerkonto ist kein Mitglied verknüpft');
+        return;
+    }
+
+    $payload = responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours);
 
     if (!$isManager && !$payload['expected']) {
         responsesFail(403, 'Für dieses Mitglied ist zu diesem Termin keine Rückmeldung vorgesehen');
@@ -104,7 +118,8 @@ function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string
     }
 
     if ($isManager && ($_GET['format'] ?? '') === 'html') {
-        responsesRenderPrint($db, $database, $payload);   // beendet die Anfrage
+        responsesRenderPrint($db, $database, $payload);
+        return;   // renderReport() beendet die Anfrage normalerweise per exit()
     }
 
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
@@ -114,13 +129,12 @@ function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string
  * Antwortstruktur eines Termins (Spec 6.1).
  *
  * @param ?int $viewerMemberId Mitglied, dessen Antwort als "own" erscheint
+ * @param int $globalHours Globale Frist-Einstellung, einmal je Anfrage gelesen
  */
-function responsesPayload($db, $database, array $apt, bool $isManager, ?int $viewerMemberId, string $now): array
+function responsesPayload($db, $database, array $apt, bool $isManager, ?int $viewerMemberId, string $now, int $globalHours): array
 {
     $appointmentId = (int) $apt['appointment_id'];
-    $hours = responseDeadlineHours($apt['response_deadline_hours'], systemSetting(
-        $db, $database, 'response_deadline_hours', (string) RESPONSE_DEADLINE_DEFAULT_HOURS
-    ));
+    $hours = responseDeadlineHours($apt['response_deadline_hours'], (string) $globalHours);
     $deadline = responseDeadline($apt['date'], $apt['start_time'], $hours);
     $started  = responseHasStarted($apt['date'], $apt['start_time'], $now);
 

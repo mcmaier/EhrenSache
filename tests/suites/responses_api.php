@@ -287,6 +287,10 @@ test('appointment_responses: unbekannte Ressource ist es nicht mehr, auch nicht 
     assertStatus(404, $res, 'Ein unbekannter Termin ist 404, nicht "unbekannte Ressource"');
 });
 
+test('appointment_responses: appointment_id ohne Zahl ist 400', function () {
+    assertStatus(400, rsGet('user', ['appointment_id' => 'abc']));
+});
+
 test('appointment_responses: Terminart ohne Rueckmeldung ist 409', function () {
     $welt = rsWorld('Aus');
     try {
