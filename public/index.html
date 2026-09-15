@@ -422,6 +422,31 @@
                         </div>
                     </div>
 
+                    <!-- Terminrückmeldung (FI-1) -->
+                    <div class="settings-card">
+                        <h3>🗓️ Terminrückmeldungen</h3>
+                        <p class="input-hint">
+                            Ob Mitglieder zu- oder absagen, wird je Terminart eingeschaltet
+                            (Verwaltung → Terminarten). Hier steht nur die Frist, die gilt, wenn die
+                            Terminart keine eigene hat.
+                        </p>
+                        <div class="settings-item">
+                            <label for="setting_response_deadline_hours">Frist für Rückmeldungen (Stunden vor Beginn)</label>
+                            <input type="number"
+                                id="setting_response_deadline_hours"
+                                class="setting-input"
+                                data-key="response_deadline_hours"
+                                min="0"
+                                max="720"
+                                step="1">
+                            <small class="input-hint">
+                                Eine Absage nach der Frist wird gespeichert und angezeigt, aber als
+                                kurzfristig markiert und zählt in der Zuverlässigkeit nicht als
+                                abgemeldet. 0 heißt: bis zum Beginn.
+                            </small>
+                        </div>
+                    </div>
+
                     <!-- Zeiterfassung -->
                     <div class="settings-card">
                         <h3>⏱️ Zeiterfassung</h3>

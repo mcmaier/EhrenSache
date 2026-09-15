@@ -93,7 +93,19 @@ function handleSettings($db, $database, $method, $authUserId) {
             case 'PUT':
                 // Einstellung aktualisieren
                 $data = json_decode(file_get_contents('php://input'), true);
-                updateSetting($db, $database, $data['setting_key'], $data['setting_value']);                                            
+
+                // Die Frist wirkt in die Zuverlaessigkeit; ein Unsinnswert soll
+                // gar nicht erst gespeichert werden. Gelesen wird ohnehin ueber
+                // responseDeadlineHours() mit Rueckfall auf 24.
+                if (($data['setting_key'] ?? null) === 'response_deadline_hours'
+                    && responseHoursFromRaw((string) ($data['setting_value'] ?? '')) === null) {
+                    http_response_code(400);
+                    echo json_encode(['message' => 'Die Frist muss eine ganze Zahl von 0 bis 720 sein'],
+                                     JSON_UNESCAPED_UNICODE);
+                    break;
+                }
+
+                updateSetting($db, $database, $data['setting_key'], $data['setting_value']);
                 break;
 
             default:

@@ -237,3 +237,11 @@ test('appointment_types: PUT auf unbekannte Terminart liefert 404', function () 
                     'is_default' => 0, 'group_ids' => []]]);
     assertStatus(404, $res, 'unbekannte Terminart muss 404 liefern');
 });
+
+test('settings: Frist ausserhalb 0..720 wird abgewiesen', function () {
+    foreach (['721', '-1', 'zwei'] as $wert) {
+        $res = apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+            'body' => ['setting_key' => 'response_deadline_hours', 'setting_value' => $wert]]);
+        assertStatus(400, $res, "Wert {$wert}");
+    }
+});
