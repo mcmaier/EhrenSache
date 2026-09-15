@@ -10,7 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, invalidateCache } from './ui.js';
+import { showToast, showConfirm, invalidateCache } from './ui.js';
 import { escapeHtml, translateExceptionStatus } from './utils.js';
 
 // ============================================
@@ -27,6 +27,20 @@ const RESPONSE_ICONS = { yes: '✓', maybe: '?', no: '✗' };
 
 let current = null;          // letzte API-Antwort des offenen Modals
 let currentFilter = 'all';
+
+// Race-Schutz: reloadResponses() wird mehrfach ueberlappend aufgerufen
+// (schneller Klick auf mehrere Termine, Aenderung waehrend ein Abruf laeuft).
+// loadToken zaehlt jeden Abruf durch, openAppointmentId haelt fest, welcher
+// Termin gerade im Modal steht -- nur die aktuellste Antwort fuer den noch
+// offenen Termin darf current ueberschreiben.
+let loadToken = 0;
+let openAppointmentId = null;
+
+// Nach einer Aenderung wird NICHT sofort die ganze Terminliste neu geladen
+// (das waere pro Klick in der Tabelle ein weiterer API-Aufruf). Stattdessen
+// nur die Anfrage-Zwischenspeicher des Jahres verwerfen und einmal beim
+// Schliessen des Modals nachladen, wenn sich tatsaechlich etwas geaendert hat.
+let listDirty = false;
 
 function formatDateTimeDe(mysql) {
     if (!mysql) return '';
@@ -48,11 +62,19 @@ export function responseSummaryCell(apt) {
         ? ` <span class="response-own response-own--${apt.responses.own}" title="Eigene Rückmeldung: ${RESPONSE_LABELS[apt.responses.own]}">${RESPONSE_ICONS[apt.responses.own]}</span>`
         : '';
 
+    // Wer selbst nicht zu diesem Termin erwartet wird und auch nicht
+    // verwaltet, bekommt keine anklickbare Zelle -- das Modal wuerde ihm
+    // ohnehin nur eine leere oder fremde Mitgliederliste zeigen.
+    if (!apt.responses.expected && !isAdminOrManager) {
+        return `<span class="response-summary-text">${formatResponseSummary(apt.responses)}</span>${own}`;
+    }
+
     return `<button type="button" class="response-summary-btn" onclick="openResponsesModal(${Number(apt.appointment_id)})" title="Rückmeldungen anzeigen">${formatResponseSummary(apt.responses)}</button>${own}`;
 }
 
 export async function openResponsesModal(appointmentId) {
     currentFilter = 'all';
+    openAppointmentId = appointmentId;
     document.getElementById('responsesModalBody').innerHTML = '<p class="loading">Lade Rückmeldungen...</p>';
     document.getElementById('responsesModal').classList.add('active');
     await reloadResponses(appointmentId);
@@ -61,10 +83,28 @@ export async function openResponsesModal(appointmentId) {
 export function closeResponsesModal() {
     document.getElementById('responsesModal').classList.remove('active');
     current = null;
+    openAppointmentId = null;
+
+    // Erst jetzt, statt nach jeder einzelnen Aenderung, die Terminliste
+    // nachladen -- auf der bereits angezeigten Seite, ohne den Aufruf,
+    // wenn im Modal gar nichts geaendert wurde.
+    if (listDirty) {
+        listDirty = false;
+        window.refreshAppointmentsKeepPage?.();
+    }
 }
 
 async function reloadResponses(appointmentId) {
+    const token = ++loadToken;
     const result = await apiCall('appointment_responses', 'GET', null, { appointment_id: appointmentId });
+
+    // Waehrend des Abrufs wurde das Modal geschlossen, ein anderer Termin
+    // geoeffnet, oder ein neuerer Abruf fuer denselben Termin gestartet:
+    // diese Antwort ist ueberholt und darf current nicht mehr anfassen.
+    if (token !== loadToken || openAppointmentId !== appointmentId) {
+        return;
+    }
+
     if (!result || !result.success) {
         closeResponsesModal();   // apiCall hat den Fehler bereits gemeldet
         return;
@@ -77,7 +117,7 @@ function deadlineText(data) {
     if (data.started) return 'Der Termin hat begonnen.';
     const deadline = new Date(data.settings.deadline.replace(' ', 'T'));
     return deadline < new Date()
-        ? 'Frist abgelaufen – Änderungen werden als kurzfristig vermerkt.'
+        ? 'Frist abgelaufen – Änderung wird als kurzfristig vermerkt.'
         : `Rückmeldung bis ${formatDateTimeDe(data.settings.deadline)} Uhr`;
 }
 
@@ -105,6 +145,7 @@ function ownResponseHtml(data) {
     const disabled = data.started ? 'disabled' : '';
     const buttons = ['yes', 'maybe', 'no'].map(s => `
         <button type="button" class="response-segment__btn response-segment__btn--${s}${own?.status === s ? ' is-active' : ''}"
+                aria-pressed="${own?.status === s ? 'true' : 'false'}"
                 ${disabled} onclick="setOwnResponse('${s}')">${RESPONSE_ICONS[s]} ${RESPONSE_LABELS[s]}</button>`).join('');
 
     return `
@@ -132,7 +173,8 @@ function comparisonHtml(c) {
     ];
 
     return `<div class="response-tiles">${tiles.map(([filter, label, count]) => `
-        <button type="button" class="response-tile${currentFilter === filter ? ' is-active' : ''}" onclick="filterResponses('${filter}')">
+        <button type="button" class="response-tile${currentFilter === filter ? ' is-active' : ''}"
+                aria-pressed="${currentFilter === filter ? 'true' : 'false'}" onclick="filterResponses('${filter}')">
             <span class="response-tile__count">${Number(count)}</span>
             <span class="response-tile__label">${label}</span>
         </button>`).join('')}</div>`;
@@ -167,6 +209,7 @@ function managerTableHtml(data) {
         }
         const excuse = m.excuse_state
             ? `<br><small>Entschuldigung: ${escapeHtml(translateExceptionStatus(m.excuse_state))}</small>` : '';
+        const memberLabel = `${escapeHtml(m.name)} ${escapeHtml(m.surname)}`;
 
         return `${groupRow}
             <tr>
@@ -176,7 +219,8 @@ function managerTableHtml(data) {
                 <td>${escapeHtml(formatDateTimeDe(m.status_changed_at))}</td>
                 ${started ? `<td>${m.present ? 'anwesend' : '–'}</td>` : ''}
                 <td>
-                    <select class="response-set" onchange="setMemberResponse(${Number(m.member_id)}, this.value); this.value = '';">
+                    <select class="response-set" aria-label="Rückmeldung für ${memberLabel} setzen"
+                            onchange="setMemberResponse(${Number(m.member_id)}, this.value); this.value = '';">
                         <option value="">Setzen …</option>
                         <option value="yes">Zusage</option>
                         <option value="maybe">Unsicher</option>
@@ -196,7 +240,7 @@ function managerTableHtml(data) {
             <table>
                 <thead><tr>
                     <th>Name</th><th>Rückmeldung</th><th>Bemerkung</th><th>Zeitpunkt</th>
-                    ${started ? '<th>Anwesenheit</th>' : ''}<th></th>
+                    ${started ? '<th>Anwesenheit</th>' : ''}<th>Aktion</th>
                 </tr></thead>
                 <tbody>${rows || `<tr><td colspan="${colspan}" class="loading">Keine Einträge</td></tr>`}</tbody>
             </table>
@@ -214,26 +258,39 @@ export function filterResponses(filter) {
     renderResponsesModal();
 }
 
-async function afterChange() {
-    const apt = current.appointment;
-    invalidateCache('appointments', Number(apt.date.substring(0, 4)));
-    await reloadResponses(apt.appointment_id);
-    // window statt Import: appointments.js importiert dieses Modul bereits.
-    await window.showAppointmentSection?.(true);
+/**
+ * Nach einer erfolgreichen Aenderung: Terminliste als veraltet markieren
+ * (einmalig beim Schliessen nachgeladen, siehe closeResponsesModal) und,
+ * falls das Modal noch denselben Termin zeigt, dessen Rueckmeldungen neu
+ * laden. appointmentId/year kommen als Parameter vom Aufrufer, der sie VOR
+ * seinem eigenen await aus current gelesen hat -- current kann sich waehrend
+ * eines await veraendert haben (anderer Termin geoeffnet, Modal geschlossen).
+ */
+async function afterChange(appointmentId, year) {
+    invalidateCache('appointments', year);
+    listDirty = true;
+    if (openAppointmentId === appointmentId) {
+        await reloadResponses(appointmentId);
+    }
 }
 
 async function submitResponse(body, memberId = null) {
-    const params = { appointment_id: current.appointment.appointment_id };
+    if (!current) return;
+    const appointmentId = current.appointment.appointment_id;
+    const year = Number(current.appointment.date.substring(0, 4));
+
+    const params = { appointment_id: appointmentId };
     if (memberId !== null) params.member_id = memberId;
 
     const result = await apiCall('appointment_responses', 'PUT', body, params);
     if (!result || !result.success) return;
 
     showToast('Rückmeldung gespeichert', 'success');
-    await afterChange();
+    await afterChange(appointmentId, year);
 }
 
 export async function setOwnResponse(status) {
+    if (!current) return;
     const comment = document.getElementById('responseOwnComment')?.value.trim() ?? '';
     if (status === 'no' && current.settings.require_excuse && comment === '') {
         showToast('Bitte eine Begründung für die Absage eintragen', 'warning');
@@ -249,22 +306,46 @@ export async function saveOwnComment() {
 }
 
 export async function withdrawOwnResponse() {
-    const result = await apiCall('appointment_responses', 'DELETE', null,
-        { appointment_id: current.appointment.appointment_id });
+    if (!current) return;
+    const appointmentId = current.appointment.appointment_id;
+    const year = Number(current.appointment.date.substring(0, 4));
+    const pendingExcuse = current.own?.excuse_state === 'pending';
+
+    const confirmed = await showConfirm(pendingExcuse
+        ? 'Rückmeldung zurücknehmen? Der offene Entschuldigungsantrag wird ebenfalls gelöscht.'
+        : 'Rückmeldung zurücknehmen?');
+    if (!confirmed) return;
+    // Waehrend des Confirm-Dialogs kann das Modal geschlossen oder ein
+    // anderer Termin geoeffnet worden sein -- mit den vorher erfassten
+    // Werten weiterarbeiten, aber nur, wenn dieser Termin noch offen ist.
+    if (openAppointmentId !== appointmentId) return;
+
+    const result = await apiCall('appointment_responses', 'DELETE', null, { appointment_id: appointmentId });
     if (!result || !result.success) return;
     showToast('Rückmeldung zurückgenommen', 'success');
-    await afterChange();
+    await afterChange(appointmentId, year);
 }
 
 export async function setMemberResponse(memberId, value) {
-    if (value === '') return;
+    if (value === '' || !current) return;
+    const appointmentId = current.appointment.appointment_id;
+    const year = Number(current.appointment.date.substring(0, 4));
 
     if (value === 'delete') {
+        const member = current.members?.find(m => Number(m.member_id) === Number(memberId));
+        const pendingExcuse = member?.excuse_state === 'pending';
+
+        const confirmed = await showConfirm(pendingExcuse
+            ? 'Rückmeldung zurücknehmen? Der offene Entschuldigungsantrag wird ebenfalls gelöscht.'
+            : 'Rückmeldung zurücknehmen?');
+        if (!confirmed) return;
+        if (openAppointmentId !== appointmentId) return;
+
         const result = await apiCall('appointment_responses', 'DELETE', null,
-            { appointment_id: current.appointment.appointment_id, member_id: memberId });
+            { appointment_id: appointmentId, member_id: memberId });
         if (result && result.success) {
             showToast('Rückmeldung zurückgenommen', 'success');
-            await afterChange();
+            await afterChange(appointmentId, year);
         }
         return;
     }

@@ -463,6 +463,11 @@ function responsesAttachSummaries($db, $database, array $appointments, ?int $vie
 
         $summary = responseSummary($expectedBy[$appointmentId] ?? [], $statusBy[$appointmentId] ?? []);
         $summary['own'] = $viewerMemberId !== null ? ($statusBy[$appointmentId][$viewerMemberId] ?? null) : null;
+        // Ob der Betrachter selbst zu diesem Termin erwartet wird -- Grundlage
+        // dafuer, ob die Zelle in der Terminliste anklickbar ist (Nicht-Erwartete
+        // ohne Verwaltungsrechte sehen nur die Summen, kein Modal).
+        $summary['expected'] = $viewerMemberId !== null
+            && in_array($viewerMemberId, $expectedBy[$appointmentId] ?? [], true);
         $appointment['responses'] = $summary;
     }
     unset($appointment);

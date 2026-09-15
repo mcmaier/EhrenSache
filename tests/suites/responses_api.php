@@ -756,8 +756,8 @@ test('appointments: Liste traegt Summen und die eigene Antwort, ohne Rueckmeldun
                 $byId[(int) $row['appointment_id']] = $row;
             }
 
-            assertSame(['yes' => 0, 'no' => 0, 'maybe' => 1, 'open' => 1, 'own' => null],
-                       $byId[$aptM]['responses'], 'Admin hat hier keine eigene Antwort');
+            assertSame(['yes' => 0, 'no' => 0, 'maybe' => 1, 'open' => 1, 'own' => null, 'expected' => false],
+                       $byId[$aptM]['responses'], 'Admin hat hier keine eigene Antwort und ist nicht erwartet');
             assertSame(null, $byId[$aptO]['responses']);
 
             $alsUser = apiRequest('GET', 'appointments', ['token' => apiToken('user'),
@@ -765,6 +765,7 @@ test('appointments: Liste traegt Summen und die eigene Antwort, ohne Rueckmeldun
             $eigen = array_values(array_filter($alsUser['body'],
                 static fn ($r) => (int) $r['appointment_id'] === $aptM))[0];
             assertSame('maybe', $eigen['responses']['own']);
+            assertSame(true, $eigen['responses']['expected'], 'Das Testmitglied ist in dieser Welt erwartet');
         });
     } finally {
         rsDropWorld($mit);

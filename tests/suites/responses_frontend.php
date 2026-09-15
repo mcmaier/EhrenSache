@@ -96,3 +96,14 @@ test('responses.js maskiert Namen und Bemerkungen', function () use ($rsRoot) {
     assertTrue(str_contains($js, 'escapeHtml(m.comment'), 'Bemerkung wird nicht maskiert');
     assertTrue(str_contains($js, 'escapeHtml(m.surname'), 'Name wird nicht maskiert');
 });
+
+test('responses.js sichert sich gegen ueberholte Antworten ab und laedt die Liste nur einmal neu', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    assertTrue(str_contains($js, 'loadToken'), 'Kein Zaehler gegen ueberholte reloadResponses()-Antworten');
+
+    $appointmentsJs = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+    assertTrue(str_contains($appointmentsJs, 'window.refreshAppointmentsKeepPage'),
+        'appointments.js stellt refreshAppointmentsKeepPage nicht global bereit');
+    assertTrue(str_contains($js, 'refreshAppointmentsKeepPage'),
+        'responses.js ruft refreshAppointmentsKeepPage nicht auf');
+});

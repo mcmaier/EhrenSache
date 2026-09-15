@@ -258,23 +258,17 @@
     cursor: pointer;
 }
 
+/* Nicht erwartete Mitglieder ohne Verwaltungsrechte: gleiche Optik wie der
+   Button, aber nicht anklickbar -- responseSummaryCell() liefert hier keinen
+   <button>, sondern ein <span>. */
+.response-summary-text {
+    display: inline-block;
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+
 .response-own { font-weight: 700; margin-left: 4px; }
 .response-own--yes   { color: var(--success-color); }
 .response-own--maybe { color: var(--warning-color); }
 .response-own--no    { color: var(--danger-color); }
 .response-none       { color: var(--text-light); }
-
-.response-badge { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: 0.85em; }
-.response-badge--yes   { background: var(--success-color); color: var(--bg-white); }
-.response-badge--maybe { background: var(--warning-color); color: var(--bg-white); }
-.response-badge--no    { background: var(--danger-color);  color: var(--bg-white); }
-.response-badge--none  { background: var(--bg-gray); color: var(--text-medium); }
-
-.response-late {
-    display: inline-block;
-    padding: 1px 6px;
-    border: 1px solid var(--danger-color);
-    border-radius: var(--radius-sm);
-    color: var(--danger-color);
-    font-size: 0.8em;
-}

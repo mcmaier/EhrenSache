@@ -715,3 +715,9 @@ window.previousMonth = previousMonth;
 window.nextMonth = nextMonth;
 window.goToToday = goToToday;
 window.showAppointmentSection = showAppointmentSection;
+
+// Fuer responses.js (FI-1): Terminliste auf der aktuell gezeigten Seite neu
+// laden, ohne die Seite zu wechseln. Der Cache wurde vorher per
+// invalidateCache('appointments', jahr) geleert, forceReload=false reicht
+// deshalb -- loadAppointments() faellt automatisch auf den API-Abruf zurueck.
+window.refreshAppointmentsKeepPage = () => showAppointmentSection(false, currentAppointmentsPage);

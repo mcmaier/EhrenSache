@@ -75,10 +75,3 @@
 .response-tile.is-active { background: var(--bg-light); border-left-color: var(--secondary-color); }
 .response-tile__count { font-size: 1.6em; font-weight: 700; }
 .response-tile__label { color: var(--text-medium); font-size: 0.85em; }
-
-.response-own-block { margin: var(--spacing-md) 0; padding: var(--spacing-md); background: var(--bg-light); border-radius: var(--radius-md); }
-.response-own-actions { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); }
-.response-summary { font-weight: 600; margin-bottom: var(--spacing-sm); }
-.response-deadline { color: var(--text-medium); }
-.response-group-row td { background: var(--bg-gray); font-weight: 600; }
-.response-filter { display: flex; gap: var(--spacing-md); margin: var(--spacing-sm) 0; }

@@ -574,3 +574,17 @@
 }
 
 .modal-content--wide { max-width: 900px; }
+
+/* Terminrueckmeldung (FI-1): Inhalte des Rueckmeldungs-Modals. Nur hier
+   gebraucht, deshalb keine Karten- oder Button-Datei. */
+.response-own-block { margin: var(--spacing-md) 0; padding: var(--spacing-md); background: var(--bg-light); border-radius: var(--radius-md); }
+.response-own-actions { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); }
+.response-summary { font-weight: 600; margin-bottom: var(--spacing-sm); }
+.response-deadline { color: var(--text-medium); }
+.response-group-row td { background: var(--bg-gray); font-weight: 600; }
+.response-filter { display: flex; gap: var(--spacing-md); margin: var(--spacing-sm) 0; }
+
+/* Die Tabelle sitzt schon im gepolsterten modal-body -- ohne diese Regel
+   haette sie zusaetzlich ihr eigenes .data-table-Polster und einen zweiten
+   Schatten. */
+#responsesModal .data-table { padding: 0; box-shadow: none; }
