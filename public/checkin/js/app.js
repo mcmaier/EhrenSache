@@ -3661,8 +3661,13 @@ function responseCardHtml(item) {
         ? 'Frist abgelaufen – Änderung wird als kurzfristig vermerkt'
         : `Rückmeldung bis ${formatResponseDeadline(item.settings.deadline)}`;
 
+    // Vorgemerkte, aber noch nicht gespeicherte Absage sichtbar machen (G6) --
+    // sonst wirkt der Absage-Knopf unbeteiligt, waehrend im Hintergrund schon
+    // eine Begruendung erwartet wird.
+    const isPendingNo = pendingStatus === 'no';
+
     const buttons = ['yes', 'maybe', 'no'].map(s =>
-        `<button type="button" class="response-btn response-btn--${s}${status === s ? ' is-active' : ''}" data-appointment-id="${id}" data-status="${s}"${off}>${RESPONSE_LABELS[s]}</button>`
+        `<button type="button" class="response-btn response-btn--${s}${status === s ? ' is-active' : ''}${s === 'no' && isPendingNo ? ' is-pending' : ''}" data-appointment-id="${id}" data-status="${s}"${off}>${RESPONSE_LABELS[s]}</button>`
     ).join('');
 
     const names = item.members
@@ -3677,9 +3682,10 @@ function responseCardHtml(item) {
     // haelt das Bemerkungsfeld ebenfalls offen -- sonst verschwaende es beim
     // naechsten Neuaufbau, obwohl der Nutzer gerade eine Begruendung eintippt.
     const commentOpen = status !== null || pendingStatus !== null;
-    const placeholder = item.settings.require_excuse && (status === 'no' || pendingStatus === 'no')
+    const placeholder = item.settings.require_excuse && (status === 'no' || isPendingNo)
         ? 'Begründung (Pflicht)'
         : 'Bemerkung (optional)';
+    const saveLabel = isPendingNo ? 'Absage mit Begründung speichern' : 'Bemerkung speichern';
 
     return `
         <div class="response-card${status === null ? ' is-open' : ''}" data-appointment-id="${id}" style="border-left-color: ${color}">
@@ -3692,7 +3698,7 @@ function responseCardHtml(item) {
             <div class="response-comment"${commentOpen ? '' : ' hidden'}>
                 <textarea rows="2" maxlength="255" placeholder="${placeholder}"${off}>${escapeHtml(item.own?.comment ?? '')}</textarea>
                 ${item.settings.require_excuse ? '<small>Eine Absage wird als Entschuldigung eingereicht.</small>' : ''}
-                <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>Bemerkung speichern</button>
+                <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>${saveLabel}</button>
             </div>
             <div class="response-card__meta">${escapeHtml(deadlineText)}${item.own?.is_late ? ' · <span class="response-late">kurzfristig</span>' : ''}</div>
             <div class="response-card__summary">Zusage ${s.yes} · Unsicher ${s.maybe} · Absage ${s.no} · offen ${s.open}</div>
@@ -3729,6 +3735,14 @@ async function onResponsesClick(event) {
             textarea.focus();
             showMessage('Bitte zuerst eine Begründung für die Absage eintragen', 'error');
             return;
+        }
+
+        // Eine vorgemerkte Absage gilt nur, solange "Absage" tatsaechlich der
+        // naechste gesendete Status ist. Tippt der Nutzer stattdessen
+        // Zusage/Unsicher, verfaellt die Vormerkung sofort -- schon VOR dem
+        // PUT, nicht erst nach dessen Erfolg (G7).
+        if (status !== 'no') {
+            responsesPending.delete(appointmentId);
         }
 
         // Wechsel von einer Absage zu Zusage/Unsicher: die Begruendung der
@@ -3782,18 +3796,29 @@ async function submitResponse(item, status, comment, card) {
         if (index >= 0) upcomingResponses[index] = result.data;
 
         responsesPending.delete(key);
+
+        // VOR dem Neuaufbau freigeben (K1): renderResponses() ersetzt die
+        // Karte durch einen neuen Knoten und ruft an seinem Ende
+        // refreshAllResponseCards() auf. Bliebe der Schluessel bis danach in
+        // responsesInFlight, wuerde genau dieser Aufruf die frisch gebaute
+        // Karte fuer immer gesperrt lassen.
+        responsesInFlight.delete(key);
+
         updateResponsesBadge();
         renderResponses(key);
         showMessage('Rückmeldung gespeichert', 'success');
     } finally {
-        // Bei Erfolg baut renderResponses() die Karte bereits neu auf (dann
-        // ohne Sperre); bei Fehler bleibt die alte Karte stehen und wird hier
-        // wieder freigegeben. Bei gewechselter Generation gehoert die Karte
-        // nicht mehr zur aktuellen Ansicht -- responsesInFlight wurde bereits
-        // durch resetResponsesTab() geleert, hier nichts mehr anfassen.
+        // Bei Fehler bleibt die alte Karte stehen und wird hier freigegeben;
+        // bei Erfolg ist das delete() bereits oben passiert (hier idempotent).
+        // refreshAllResponseCards() statt refreshResponseCardState(card): nach
+        // einem Neuaufbau ist "card" ein losgeloester alter Knoten
+        // (isConnected === false), an dem nichts mehr sichtbar waere. Bei
+        // gewechselter Generation gehoert die Karte nicht mehr zur aktuellen
+        // Ansicht -- responsesInFlight wurde bereits durch resetResponsesTab()
+        // geleert, hier nichts mehr anfassen.
         if (generation === responsesGeneration) {
             responsesInFlight.delete(key);
-            refreshResponseCardState(card);
+            refreshAllResponseCards();
         }
     }
 }

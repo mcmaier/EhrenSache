@@ -2459,6 +2459,14 @@ body {
 .response-btn--maybe.is-active { background: var(--warning); border-color: var(--warning); color: #fff; }
 .response-btn--no.is-active    { background: var(--error);   border-color: var(--error);   color: #fff; }
 
+/* Absage angetippt, aber noch nicht gespeichert -- wartet auf eine
+   Begruendung (G6). Gestrichelt statt gefuellt: unterscheidet sich bewusst
+   von is-active, das die bereits gespeicherte Antwort markiert. */
+.response-btn--no.is-pending {
+    border-color: var(--error);
+    border-style: dashed;
+}
+
 .response-comment[hidden] {
     display: none;
 }

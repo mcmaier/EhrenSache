@@ -57,15 +57,24 @@ test('PWA: hidden schlaegt display:flex der Tab-Knoepfe', function () use ($rspR
     assertTrue(str_contains($css, '.tab-button[hidden]'), 'Regel .tab-button[hidden] fehlt');
 });
 
-test('PWA: vorgemerkte Absage hat Vorrang vor gespeicherter Antwort', function () use ($rspRoot) {
-    // Regression: "Bemerkung speichern" bevorzugte frueher item.own.status
+test('PWA: vorgemerkte Absage hat Vorrang vor gespeicherter Antwort, gespeicherte Karte bleibt nicht gesperrt', function () use ($rspRoot) {
+    // Regression 1: "Bemerkung speichern" bevorzugte frueher item.own.status
     // (die gespeicherte Antwort) vor der gerade eingetippten, noch nicht
     // gespeicherten Absage -- eine bestehende Zusage ueberlebte damit einen
-    // Absage-mit-Begruendung-Versuch unveraendert.
+    // Absage-mit-Begruendung-Versuch unveraendert. Reihenfolge im Code
+    // entscheidet: pendingStatusFor() muss VOR item.own stehen.
+    //
+    // Regression 2: renderResponses(key) baut die gespeicherte Karte neu auf
+    // und ruft an seinem Ende refreshAllResponseCards() auf. Stand der
+    // gespeicherte appointment_id-Schluessel dabei noch in responsesInFlight,
+    // sperrte genau dieser Aufruf die frisch gebaute Karte dauerhaft.
+    // responsesInFlight.delete(key) muss deshalb VOR renderResponses(key)
+    // erfolgen, nicht erst danach im finally.
     $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
 
-    assertTrue(!str_contains($js, 'item.own ? item.own.status : card.dataset.pendingStatus'),
-        'Die gespeicherte Antwort schlaegt weiterhin die vorgemerkte Absage');
-    assertTrue(str_contains($js, 'responsesPending'),
-        'responsesPending fehlt -- die Vormerkung ueberlebt sonst keinen Neuaufbau der Liste');
+    assertTrue((bool) preg_match('/pendingStatusFor\(appointmentId\)\s*\|\|\s*item\.own/', $js),
+        'Die gespeicherte Antwort (item.own) schlaegt weiterhin die vorgemerkte Absage');
+
+    assertTrue((bool) preg_match('/responsesInFlight\.delete\(key\);[\s\S]{0,300}renderResponses\(key\)/', $js),
+        'responsesInFlight.delete(key) erfolgt nicht vor renderResponses(key) -- die gespeicherte Karte bleibt gesperrt');
 });
