@@ -97,6 +97,24 @@ test('responses.js maskiert Namen und Bemerkungen', function () use ($rsRoot) {
     assertTrue(str_contains($js, 'escapeHtml(m.surname'), 'Name wird nicht maskiert');
 });
 
+test('setMemberResponse sendet die bestehende Bemerkung des Mitglieds mit (W1)', function () use ($rsRoot) {
+    // Ein Verwalter, der nur den Status setzt, darf die Bemerkung des Mitglieds
+    // nicht loeschen. Statischer Beleg statt eines echten JS-Testlaufs: die
+    // Funktion muss current.members nach der bestehenden Bemerkung durchsuchen
+    // und sie in existingComment/comment weiterreichen, statt fest null zu senden.
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+
+    $start = strpos($js, 'export async function setMemberResponse');
+    assertTrue($start !== false, 'setMemberResponse fehlt');
+    $ende = strpos($js, 'export function', $start + 1);
+    assertTrue($ende !== false, 'Ende von setMemberResponse nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'member?.comment'), 'die bestehende Bemerkung des Mitglieds wird nicht gelesen');
+    assertTrue(str_contains($body, 'existingComment'), 'existingComment fehlt -- Vorgabe fuer den Prompt bei Absage');
+    assertTrue(!preg_match('/let comment = null;/', $body), 'comment darf nicht mehr fest auf null gesetzt werden');
+});
+
 test('responses.js sichert sich gegen ueberholte Antworten ab und laedt die Liste nur einmal neu', function () use ($rsRoot) {
     $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
     assertTrue(str_contains($js, 'loadToken'), 'Kein Zaehler gegen ueberholte reloadResponses()-Antworten');

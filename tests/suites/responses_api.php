@@ -562,6 +562,75 @@ test('DELETE: Ruecknahme entfernt Antwort und offenen Antrag', function () {
     }
 });
 
+test('DELETE members: Rueckmeldungen des Mitglieds werden explizit entfernt (W2)', function () {
+    $welt = rsWorld('DelMember', ['responses_enabled' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+        assertStatus(200, rsPut('manager', $apt, ['status' => 'yes'], $welt['member']));
+
+        $vorher = rsGet('admin', ['appointment_id' => $apt]);
+        assertStatus(200, $vorher);
+        assertSame(1, $vorher['body']['summary']['yes']);
+        assertSame(1, count($vorher['body']['members']));
+
+        assertStatus(200, apiRequest('DELETE', 'members',
+            ['token' => apiToken('admin'), 'query' => ['id' => $welt['member']]]));
+        $welt['member'] = null;   // schon geloescht -- rsDropWorld soll es nicht nochmal versuchen
+
+        $nachher = rsGet('admin', ['appointment_id' => $apt]);
+        assertStatus(200, $nachher);
+        assertSame(0, $nachher['body']['summary']['yes'], 'Rueckmeldung des geloeschten Mitglieds zaehlt nicht mehr mit');
+        assertSame(0, count($nachher['body']['members']), 'geloeschtes Mitglied nicht mehr aufgefuehrt');
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('DELETE appointments: Rueckmeldungen des Termins werden explizit entfernt (W2)', function () {
+    $welt = rsWorld('DelAppointment', ['responses_enabled' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+        assertStatus(200, rsPut('manager', $apt, ['status' => 'yes'], $welt['member']));
+
+        assertStatus(200, apiRequest('DELETE', 'appointments',
+            ['token' => apiToken('admin'), 'query' => ['id' => $apt]]));
+        $welt['appointments'] = array_values(array_diff($welt['appointments'], [$apt]));
+
+        assertStatus(404, rsGet('admin', ['appointment_id' => $apt]),
+            'Termin ist weg -- die zugehoerige Rueckmeldung darf das Loeschen nicht behindert haben');
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('own.excuse_created: wahr nach eigenem Anlegen, falsch nach reiner Verknuepfung (G3)', function () {
+    $welt = rsWorld('ExcuseCreated', ['responses_enabled' => 1, 'responses_require_excuse' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(3), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt) {
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-G3']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state']);
+            assertSame(true, $res['body']['own']['excuse_created'], 'von der Rueckmeldung selbst angelegt');
+
+            assertStatus(200, rsPut('user', $apt, ['status' => 'yes']));
+
+            rsCreate('exceptions', [
+                'member_id' => $userMember, 'appointment_id' => $apt,
+                'exception_type' => 'absence', 'reason' => 'RS-G3-eigener', 'status' => 'pending',
+            ]);
+
+            $res = rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-G3-verknuepft']);
+            assertStatus(200, $res);
+            assertSame('pending', $res['body']['own']['excuse_state']);
+            assertSame(false, $res['body']['own']['excuse_created'], 'nur verknuepft, nicht selbst angelegt');
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
 test('Namen fuer Mitglieder: nur mit Freigabe, Bemerkungen nie', function () {
     $welt = rsWorld('Namen', ['responses_enabled' => 1, 'responses_names_visible' => 1]);
     try {

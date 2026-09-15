@@ -181,6 +181,11 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
             'status_changed_at' => $own['status_changed_at'],
             'is_late'           => responseIsLate($own['status_changed_at'], $deadline),
             'excuse_state'      => $own['excuse_state'],
+            // G3: nur wahr, wenn die Rueckmeldung den Antrag selbst angelegt
+            // hat UND ihre Verknuepfung noch besteht (excuse_state !== null) --
+            // sonst duerfte die Oberflaeche eine Loeschung ankuendigen, die gar
+            // nicht mehr stattfindet.
+            'excuse_created'    => $own['excuse_state'] !== null && (int) $own['exception_created'] === 1,
         ];
     }
 
@@ -201,6 +206,8 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
                 'status_changed_at' => $r['status_changed_at'] ?? null,
                 'is_late'           => $r === null ? null : responseIsLate($r['status_changed_at'], $deadline),
                 'excuse_state'      => $r['excuse_state'] ?? null,
+                // G3: wie bei 'own' -- angelegt UND noch verknuepft.
+                'excuse_created'    => $r !== null && $r['excuse_state'] !== null && (int) $r['exception_created'] === 1,
                 'present'           => $started ? isset($presentLookup[$memberId]) : null,
             ];
         }
@@ -232,7 +239,8 @@ function responsesRenderPrint($db, $database, array $payload): void
     $byGroup = [];
     foreach ($payload['members'] as $m) {
         $status = $m['status'] === null ? 'keine Antwort' : $labels[$m['status']];
-        if ($m['is_late']) {
+        // G6: "kurzfristig" nur bei einer Absage.
+        if ($m['status'] === 'no' && $m['is_late']) {
             $status .= ' (kurzfristig)';
         }
         $byGroup[$m['group_name']][] = [
@@ -397,11 +405,15 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
 
         switch ($action) {
             case 'create':
+                // G1: created_at explizit auf $now -- Anfrage und Antwort teilen
+                // dieselbe PHP-Zeitbasis, statt sich auf CURRENT_TIMESTAMP() der
+                // Datenbank zu verlassen (koennte in derselben Millisekunde,
+                // aber auf einem anderen Server als $now entstehen).
                 $db->prepare("INSERT INTO {$prefix}exceptions
                               (member_id, appointment_id, exception_type, reason,
-                               requested_arrival_time, status, created_by)
-                              VALUES (?, ?, 'absence', ?, NULL, 'pending', ?)")
-                   ->execute([$memberId, $appointmentId, $comment, $authUserId]);
+                               requested_arrival_time, status, created_by, created_at)
+                              VALUES (?, ?, 'absence', ?, NULL, 'pending', ?, ?)")
+                   ->execute([$memberId, $appointmentId, $comment, $authUserId, $now]);
                 $exceptionId      = (int) $db->lastInsertId();
                 $exceptionCreated = 1;
                 break;

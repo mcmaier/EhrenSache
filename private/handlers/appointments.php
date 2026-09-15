@@ -298,6 +298,9 @@ function handleAppointments($db, $database, $method, $id) {
             
             // Lösche zuerst abhängige Datensätze
             $db->prepare("DELETE FROM {$prefix}records WHERE appointment_id = ?")->execute([$id]);
+            // Explizit vor exceptions (W2): appointment_responses.exception_id zeigt
+            // sonst kurzzeitig auf einen bereits geloeschten Antrag.
+            $db->prepare("DELETE FROM {$prefix}appointment_responses WHERE appointment_id = ?")->execute([$id]);
             $db->prepare("DELETE FROM {$prefix}exceptions WHERE appointment_id = ?")->execute([$id]);
             
             // Dann den Termin selbst

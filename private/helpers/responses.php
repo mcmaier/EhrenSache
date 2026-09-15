@@ -366,6 +366,11 @@ function responsesFetchExpected($db, $database, int $appointmentId): array
 /**
  * Antworten eines Termins, member_id => Zeile, mit dem Status des verknuepften Antrags.
  *
+ * G2: dieselbe zusaetzliche JOIN-Bindung an Mitglied, Termin und
+ * exception_type wie responsesFetchOneForUpdate() -- aus demselben Grund
+ * (A2): eine wiederverwendete exception_id darf auch hier nie als
+ * excuse_state eines fremden Antrags erscheinen.
+ *
  * @return array<int, array<string, mixed>>
  */
 function responsesFetchForAppointment($db, $database, int $appointmentId): array
@@ -373,9 +378,11 @@ function responsesFetchForAppointment($db, $database, int $appointmentId): array
     $prefix = $database->table('');
     $stmt = $db->prepare("
         SELECT r.member_id, r.status, r.comment, r.status_changed_at, r.updated_at,
-               r.exception_id, e.status AS excuse_state
+               r.exception_id, r.exception_created, e.status AS excuse_state
         FROM {$prefix}appointment_responses r
         LEFT JOIN {$prefix}exceptions e ON e.exception_id = r.exception_id
+            AND e.member_id = r.member_id AND e.appointment_id = r.appointment_id
+            AND e.exception_type = 'absence'
         WHERE r.appointment_id = ?
     ");
     $stmt->execute([$appointmentId]);

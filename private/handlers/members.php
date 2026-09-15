@@ -457,6 +457,9 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 $db->beginTransaction();
 
                 $db->prepare("DELETE FROM {$prefix}records                  WHERE member_id = ?")->execute([$id]);
+                // Explizit vor exceptions (W2): appointment_responses.exception_id zeigt
+                // sonst kurzzeitig auf einen bereits geloeschten Antrag.
+                $db->prepare("DELETE FROM {$prefix}appointment_responses    WHERE member_id = ?")->execute([$id]);
                 $db->prepare("DELETE FROM {$prefix}exceptions               WHERE member_id = ?")->execute([$id]);
                 $db->prepare("DELETE FROM {$prefix}membership_dates         WHERE member_id = ?")->execute([$id]);
                 $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);

@@ -3700,7 +3700,7 @@ function responseCardHtml(item) {
                 ${item.settings.require_excuse ? '<small>Eine Absage wird als Entschuldigung eingereicht.</small>' : ''}
                 <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>${saveLabel}</button>
             </div>
-            <div class="response-card__meta">${escapeHtml(deadlineText)}${item.own?.is_late ? ' · <span class="response-late">kurzfristig</span>' : ''}</div>
+            <div class="response-card__meta">${escapeHtml(deadlineText)}${item.own?.status === 'no' && item.own?.is_late ? ' · <span class="response-late">kurzfristig</span>' : ''}</div>
             <div class="response-card__summary">Zusage ${s.yes} · Unsicher ${s.maybe} · Absage ${s.no} · offen ${s.open}</div>
             ${names}
             ${offline ? '<div class="response-card__offline">Ohne Netz ist keine Rückmeldung möglich.</div>' : ''}

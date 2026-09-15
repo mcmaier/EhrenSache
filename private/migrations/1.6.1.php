@@ -89,11 +89,11 @@ function migrate_1_6_1(PDO $pdo, string $prefix, string $configPath): array
     $foreignKeys = [
         "{$prefix}resp_appointment_fk" => [
             'appointment_id', 'appointments', 'appointment_id', 'CASCADE',
-            'beim Löschen von Terminen bzw. Mitgliedern bleiben ihre Rückmeldungen stehen',
+            'Datenkonsistenz hängt an den Handlern; direkte Löschungen in der Datenbank lassen Rückmeldungen stehen',
         ],
         "{$prefix}resp_member_fk" => [
             'member_id', 'members', 'member_id', 'CASCADE',
-            'beim Löschen von Terminen bzw. Mitgliedern bleiben ihre Rückmeldungen stehen',
+            'Datenkonsistenz hängt an den Handlern; direkte Löschungen in der Datenbank lassen Rückmeldungen stehen',
         ],
         "{$prefix}resp_exception_fk" => [
             'exception_id', 'exceptions', 'exception_id', 'SET NULL',

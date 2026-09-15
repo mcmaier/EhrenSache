@@ -1180,7 +1180,7 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
   "started": false,
   "expected": true,
   "own": { "status": "no", "comment": "Urlaub", "status_changed_at": "2026-09-15 08:12:00",
-           "is_late": false, "excuse_state": "pending" },
+           "is_late": false, "excuse_state": "pending", "excuse_created": true },
   "summary": { "yes": 21, "no": 4, "maybe": 3, "open": 9 },
   "members": [ … ],
   "comparison": { … }
@@ -1188,13 +1188,19 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
 ```
 
 - `members` — **Admin/Manager:** alle erwarteten Mitglieder nach Gruppen mit `status` (`null` =
-  keine Antwort), `comment`, `status_changed_at`, `is_late`, `excuse_state` und nach Beginn
-  `present`. **Mitglied:** nur bei `names_visible`, dann ausschließlich `member_id`, Name, Gruppe
-  und Status.
+  keine Antwort), `comment`, `status_changed_at`, `is_late`, `excuse_state`, `excuse_created` und
+  nach Beginn `present`. **Mitglied:** nur bei `names_visible`, dann ausschließlich `member_id`,
+  Name, Gruppe und Status.
 - `comparison` — nur Admin/Manager, nur nach Beginn: Anzahl je `yes_present`, `yes_absent`,
   `no_present`, `no_absent`, `maybe_present`, `maybe_absent`, `none_present`, `none_absent`.
 - `is_late` — die letzte **Statusänderung** liegt nach der Frist (Frist = Beginn minus
-  `deadline_hours`). Eine geänderte Bemerkung verschiebt den Zeitpunkt nicht.
+  `deadline_hours`). Eine geänderte Bemerkung verschiebt den Zeitpunkt nicht. Wird für jeden Status
+  geliefert; die Oberflächen (Dashboard, Druckansicht, PWA) kennzeichnen „kurzfristig" nur bei einer
+  Absage (`status = 'no'`).
+- `excuse_created` (bei `own` und in `members`) — wahr, wenn der verknüpfte Antrag von der
+  Rückmeldung selbst angelegt wurde (`appointment_responses.exception_created`) **und** die
+  Verknüpfung noch besteht (`excuse_state` nicht `null`). Entscheidet, ob eine Rücknahme den Antrag
+  mitlöscht oder ein nur verknüpfter Antrag bestehen bleibt.
 - `&format=html` (Admin/Manager): Druckansicht der Besetzung je Gruppe.
 
 ### Antworten

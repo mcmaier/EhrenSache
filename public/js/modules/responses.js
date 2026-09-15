@@ -148,9 +148,11 @@ function ownResponseHtml(data) {
                 aria-pressed="${own?.status === s ? 'true' : 'false'}"
                 ${disabled} onclick="setOwnResponse('${s}')">${RESPONSE_ICONS[s]} ${RESPONSE_LABELS[s]}</button>`).join('');
 
+    // G6: "kurzfristig" nur bei einer Absage zeigen -- Spec 3.4 spricht von
+    // Absagen, is_late bleibt in der API fuer jeden Status unveraendert.
     return `
         <div class="response-own-block">
-            <h3>Meine Rückmeldung ${own?.is_late ? '<span class="response-late">kurzfristig</span>' : ''}</h3>
+            <h3>Meine Rückmeldung ${own?.status === 'no' && own?.is_late ? '<span class="response-late">kurzfristig</span>' : ''}</h3>
             <div class="response-segment">${buttons}</div>
             <label for="responseOwnComment">Bemerkung</label>
             <textarea id="responseOwnComment" rows="2" maxlength="255" ${disabled}>${escapeHtml(own?.comment ?? '')}</textarea>
@@ -211,10 +213,11 @@ function managerTableHtml(data) {
             ? `<br><small>Entschuldigung: ${escapeHtml(translateExceptionStatus(m.excuse_state))}</small>` : '';
         const memberLabel = `${escapeHtml(m.name)} ${escapeHtml(m.surname)}`;
 
+        // G6: "kurzfristig" nur bei einer Absage.
         return `${groupRow}
             <tr>
                 <td>${escapeHtml(m.surname)}, ${escapeHtml(m.name)}</td>
-                <td>${statusBadge(m.status)}${m.is_late ? ' <span class="response-late">kurzfristig</span>' : ''}${excuse}</td>
+                <td>${statusBadge(m.status)}${m.status === 'no' && m.is_late ? ' <span class="response-late">kurzfristig</span>' : ''}${excuse}</td>
                 <td>${escapeHtml(m.comment ?? '')}</td>
                 <td>${escapeHtml(formatDateTimeDe(m.status_changed_at))}</td>
                 ${started ? `<td>${m.present ? 'anwesend' : '–'}</td>` : ''}
@@ -274,6 +277,22 @@ async function afterChange(appointmentId, year) {
     }
 }
 
+/**
+ * Text der Ruecknahme-Bestaetigung (G3): Die Loeschung eines Antrags wird nur
+ * angekuendigt, wenn die Rueckmeldung ihn selbst angelegt hat und er noch
+ * offen ist. Ein nur verknuepfter, offener Antrag bleibt bei der Ruecknahme
+ * bestehen -- das wird stattdessen gesagt.
+ */
+function withdrawConfirmText(excuseState, excuseCreated) {
+    if (excuseState === 'pending' && excuseCreated) {
+        return 'Rückmeldung zurücknehmen? Der offene Entschuldigungsantrag wird ebenfalls gelöscht.';
+    }
+    if (excuseState === 'pending') {
+        return 'Rückmeldung zurücknehmen? Der verknüpfte Antrag bleibt bestehen.';
+    }
+    return 'Rückmeldung zurücknehmen?';
+}
+
 async function submitResponse(body, memberId = null) {
     if (!current) return;
     const appointmentId = current.appointment.appointment_id;
@@ -297,7 +316,18 @@ export async function setOwnResponse(status) {
         document.getElementById('responseOwnComment')?.focus();
         return;
     }
-    await submitResponse({ status, comment: comment || null });
+
+    // G4: Wechsel von einer Absage zu Zusage/Unsicher, waehrend das Feld noch
+    // unveraendert die gespeicherte Begruendung der Absage traegt -- wie in
+    // der PWA (public/checkin/js/app.js submitResponse()) nicht automatisch
+    // an die neue Antwort haengen. Eine bewusst angepasste Bemerkung bleibt.
+    const previousStatus = current.own?.status ?? null;
+    const previousComment = current.own?.comment ?? '';
+    const effectiveComment = (status !== 'no' && previousStatus === 'no' && comment === previousComment)
+        ? ''
+        : comment;
+
+    await submitResponse({ status, comment: effectiveComment || null });
 }
 
 export async function saveOwnComment() {
@@ -309,11 +339,8 @@ export async function withdrawOwnResponse() {
     if (!current) return;
     const appointmentId = current.appointment.appointment_id;
     const year = Number(current.appointment.date.substring(0, 4));
-    const pendingExcuse = current.own?.excuse_state === 'pending';
 
-    const confirmed = await showConfirm(pendingExcuse
-        ? 'Rückmeldung zurücknehmen? Der offene Entschuldigungsantrag wird ebenfalls gelöscht.'
-        : 'Rückmeldung zurücknehmen?');
+    const confirmed = await showConfirm(withdrawConfirmText(current.own?.excuse_state, current.own?.excuse_created));
     if (!confirmed) return;
     // Waehrend des Confirm-Dialogs kann das Modal geschlossen oder ein
     // anderer Termin geoeffnet worden sein -- mit den vorher erfassten
@@ -331,13 +358,10 @@ export async function setMemberResponse(memberId, value) {
     const appointmentId = current.appointment.appointment_id;
     const year = Number(current.appointment.date.substring(0, 4));
 
-    if (value === 'delete') {
-        const member = current.members?.find(m => Number(m.member_id) === Number(memberId));
-        const pendingExcuse = member?.excuse_state === 'pending';
+    const member = current.members?.find(m => Number(m.member_id) === Number(memberId));
 
-        const confirmed = await showConfirm(pendingExcuse
-            ? 'Rückmeldung zurücknehmen? Der offene Entschuldigungsantrag wird ebenfalls gelöscht.'
-            : 'Rückmeldung zurücknehmen?');
+    if (value === 'delete') {
+        const confirmed = await showConfirm(withdrawConfirmText(member?.excuse_state, member?.excuse_created));
         if (!confirmed) return;
         if (openAppointmentId !== appointmentId) return;
 
@@ -350,9 +374,13 @@ export async function setMemberResponse(memberId, value) {
         return;
     }
 
-    let comment = null;
+    // W1: Ein Verwalter, der nur den Status setzt, darf die bestehende
+    // Bemerkung des Mitglieds nicht loeschen -- sie wird mitgeschickt, bei
+    // einer Absage mit Entschuldigungspflicht als Vorgabe im Prompt.
+    const existingComment = member?.comment ?? null;
+    let comment = existingComment;
     if (value === 'no' && current.settings.require_excuse) {
-        comment = (window.prompt('Begründung der Absage (wird als Entschuldigung eingereicht):') ?? '').trim();
+        comment = (window.prompt('Begründung der Absage (wird als Entschuldigung eingereicht):', existingComment ?? '') ?? '').trim();
         if (comment === '') {
             showToast('Ohne Begründung wird die Absage nicht gespeichert', 'warning');
             return;
