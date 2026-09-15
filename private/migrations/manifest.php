@@ -104,4 +104,10 @@ return [
         'file'     => '1.6.0.php',
         'function' => 'migrate_1_6_0',
     ],
+    [
+        'from'     => '1.6.1',
+        'to'       => '1.7.0',
+        'file'     => '1.6.1.php',
+        'function' => 'migrate_1_6_1',
+    ],
 ];

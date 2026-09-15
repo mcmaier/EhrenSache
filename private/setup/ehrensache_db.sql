@@ -271,6 +271,10 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_types` (
   description TEXT,
   is_default BOOLEAN DEFAULT 0,
   color VARCHAR(7) DEFAULT '#667eea',
+  responses_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  responses_names_visible TINYINT(1) NOT NULL DEFAULT 0,
+  responses_require_excuse TINYINT(1) NOT NULL DEFAULT 0,
+  response_deadline_hours SMALLINT UNSIGNED NULL DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -557,6 +561,28 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}work_session_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
+-- Terminrueckmeldungen (FI-1): aktueller Stand je Mitglied und Termin
+--
+CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_responses` (
+  response_id       INT PRIMARY KEY AUTO_INCREMENT,
+  appointment_id    INT NOT NULL,
+  member_id         INT NOT NULL,
+  status            ENUM('yes','no','maybe') NOT NULL,
+  comment           VARCHAR(255) DEFAULT NULL,
+  exception_id      INT DEFAULT NULL,
+  status_changed_at DATETIME NOT NULL,
+  updated_at        DATETIME NOT NULL,
+  UNIQUE KEY uq_response (appointment_id, member_id),
+  KEY idx_member (member_id),
+  CONSTRAINT `{PREFIX}resp_appointment_fk` FOREIGN KEY (appointment_id)
+      REFERENCES `{PREFIX}appointments`(appointment_id) ON DELETE CASCADE,
+  CONSTRAINT `{PREFIX}resp_member_fk` FOREIGN KEY (member_id)
+      REFERENCES `{PREFIX}members`(member_id) ON DELETE CASCADE,
+  CONSTRAINT `{PREFIX}resp_exception_fk` FOREIGN KEY (exception_id)
+      REFERENCES `{PREFIX}exceptions`(exception_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
 -- records.checkin_source um 'timer' und 'station_pin' erweitern
 --
 SET @has_station_pin = (SELECT COUNT(*) FROM information_schema.COLUMNS
@@ -587,7 +613,8 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('station_pin_min_length', '4', 'number', 'general', 'Mindestlänge der Stations-PIN (4 bis 8 Ziffern)'),
 ('punctuality_enabled', '0', 'boolean', 'general', 'Pünktlichkeitskennzahl berechnen und anzeigen'),
 ('reliability_enabled', '0', 'boolean', 'general', 'Zuverlässigkeitskennzahl berechnen und anzeigen'),
-('punctuality_grace_minutes', '0', 'number', 'general', 'Karenz in Minuten relativ zum Terminbeginn (-60 bis 60)');
+('punctuality_grace_minutes', '0', 'number', 'general', 'Karenz in Minuten relativ zum Terminbeginn (-60 bis 60)'),
+('response_deadline_hours', '24', 'number', 'general', 'Frist für Terminrückmeldungen in Stunden vor Beginn (0 bis 720)');
 
 
 CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS
