@@ -659,6 +659,9 @@ sagt, ob dieses Mitglied für den Termin erwartet ist. Bei Terminarten ohne Rüc
 
 **Berechtigung:** Admin/Manager
 
+**Seit 1.8.0:** Trifft `id` keinen Datensatz (bereits gelöscht, erfundene ID), antwortet der
+Endpunkt mit `404` statt wie zuvor mit `200`.
+
 ---
 
 ## Anwesenheit (records)

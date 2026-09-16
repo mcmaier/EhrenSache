@@ -208,6 +208,36 @@ test('DELETE records: unbekannte oder bereits geloeschte id liefert 404, kein Be
     }
 });
 
+test('DELETE appointments: unbekannte oder bereits geloeschte id liefert 404, kein Bestand geht verloren', function () {
+    // Derselbe Mangel wie bei records (siehe Test oben), hier fuer
+    // appointments.php: execute() liefert unabhaengig von der Trefferzahl
+    // true, eine erfundene oder bereits geloeschte id sah bisher wie ein
+    // Erfolg aus.
+    $token = apiToken('admin');
+    $aptId = arrTempAppointment($token, '2031-03-08');
+
+    // Eine erfundene ID trifft nichts.
+    assertStatus(404, apiRequest('DELETE', 'appointments', [
+        'token' => $token,
+        'query' => ['id' => 999999],
+    ]), 'Erfundene id muss 404 liefern, nicht 200');
+
+    // Ein echter Termin: einmal loeschen klappt (200), ein zweites Mal auf
+    // dieselbe id trifft nichts mehr (404).
+    assertStatus(200, apiRequest('DELETE', 'appointments', [
+        'token' => $token,
+        'query' => ['id' => $aptId],
+    ]), 'Der erste Loeschversuch auf einen bestehenden Termin muss 200 liefern');
+
+    assertStatus(404, apiRequest('DELETE', 'appointments', [
+        'token' => $token,
+        'query' => ['id' => $aptId],
+    ]), 'Derselbe Termin ist jetzt weg -- ein zweiter Loeschversuch muss 404 liefern');
+
+    $nachher = apiRequest('GET', 'appointments', ['token' => $token, 'query' => ['id' => $aptId]]);
+    assertStatus(404, $nachher, 'Der Termin darf nach beiden Versuchen nicht mehr existieren');
+});
+
 test('Die Jahresliste kennt kein Jahr ohne Termin', function () {
     $token = apiToken('admin');
 
