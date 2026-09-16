@@ -113,16 +113,33 @@ const DEMO_PERFORMANCE_TITLES = [
     12 => 'Adventsständchen',
 ];
 
-/** Gruppen. Die IDs sind fest, weil alles Weitere sie referenziert. */
+/**
+ * Gruppen. Die IDs sind fest, weil alles Weitere sie referenziert.
+ *
+ * Gruppen 1–4 sind die Zugehörigkeit (Aktive, Jugend, ...), an der die
+ * Terminarten hängen. Gruppen 5–9 sind die Register — als Untergruppe markiert
+ * (`is_subgroup`), gliedern sie Listen (Abschnitt 8 der Spezifikation),
+ * hängen aber an keiner Terminart. `sort_order` steht in Partiturreihenfolge,
+ * nicht alphabetisch: Flöte vor Klarinette vor Trompete vor Tenorhorn vor
+ * Schlagzeug.
+ */
 function buildGroups(): array
 {
     return [
-        ['group_id' => 1, 'group_name' => 'Aktive',          'description' => 'Aktive Musikerinnen und Musiker', 'is_default' => 1],
-        ['group_id' => 2, 'group_name' => 'Jugend',          'description' => 'Jugendorchester und Ausbildung',  'is_default' => 0],
-        ['group_id' => 3, 'group_name' => 'Vorstandschaft',  'description' => 'Gewählte Vorstandschaft',         'is_default' => 0],
-        ['group_id' => 4, 'group_name' => 'Ehrenmitglieder', 'description' => 'Ehrenmitglieder ohne Dienstpflicht', 'is_default' => 0],
+        ['group_id' => 1, 'group_name' => 'Aktive',          'description' => 'Aktive Musikerinnen und Musiker', 'is_default' => 1, 'is_subgroup' => 0, 'sort_order' => 0],
+        ['group_id' => 2, 'group_name' => 'Jugend',          'description' => 'Jugendorchester und Ausbildung',  'is_default' => 0, 'is_subgroup' => 0, 'sort_order' => 0],
+        ['group_id' => 3, 'group_name' => 'Vorstandschaft',  'description' => 'Gewählte Vorstandschaft',         'is_default' => 0, 'is_subgroup' => 0, 'sort_order' => 0],
+        ['group_id' => 4, 'group_name' => 'Ehrenmitglieder', 'description' => 'Ehrenmitglieder ohne Dienstpflicht', 'is_default' => 0, 'is_subgroup' => 0, 'sort_order' => 0],
+        ['group_id' => 5, 'group_name' => 'Flöte',           'description' => 'Register Flöte',      'is_default' => 0, 'is_subgroup' => 1, 'sort_order' => 10],
+        ['group_id' => 6, 'group_name' => 'Klarinette',      'description' => 'Register Klarinette', 'is_default' => 0, 'is_subgroup' => 1, 'sort_order' => 20],
+        ['group_id' => 7, 'group_name' => 'Trompete',        'description' => 'Register Trompete',   'is_default' => 0, 'is_subgroup' => 1, 'sort_order' => 30],
+        ['group_id' => 8, 'group_name' => 'Tenorhorn',       'description' => 'Register Tenorhorn',  'is_default' => 0, 'is_subgroup' => 1, 'sort_order' => 40],
+        ['group_id' => 9, 'group_name' => 'Schlagzeug',      'description' => 'Register Schlagzeug', 'is_default' => 0, 'is_subgroup' => 1, 'sort_order' => 50],
     ];
 }
+
+/** Feste Reihenfolge der Register-IDs, Partiturreihenfolge — Flöte zuerst. */
+const DEMO_SUBGROUP_IDS = [5, 6, 7, 8, 9];
 
 /**
  * Terminarten.
@@ -323,6 +340,26 @@ function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'):
         if (isset($pinFor[$member['member_id']])) {
             $members[$idx]['pin'] = $pinFor[$member['member_id']];
         }
+    }
+
+    // Register (Untergruppen): acht Mitglieder je Register, der Reihe nach --
+    // dieselbe Herleitung wie bei der Zugehörigkeit oben, keine Ziehung aus
+    // $random, damit sich die Reihenfolge der bestehenden Ziehungen nicht
+    // verschiebt. Mitglied 1–8 Flöte, 9–16 Klarinette, 17–24 Trompete,
+    // 25–32 Tenorhorn, 33–40 Schlagzeug.
+    foreach ($members as $member) {
+        $registerIndex = intdiv($member['member_id'] - 1, 8);
+        $assignments[] = ['member_id' => $member['member_id'], 'group_id' => DEMO_SUBGROUP_IDS[$registerIndex]];
+    }
+    // Etwa jedes zehnte Mitglied spielt ein zweites Register -- die
+    // Doppelnennung, die die Oberfläche als solche ausweist (6.4 der
+    // Spezifikation). Vier von 40 Mitgliedern (10 %), je das letzte jedes
+    // Registers ab Klarinette, zusätzlich im vorherigen Register. Flöte hat
+    // kein vorheriges Register, deshalb beginnt die Auswahl erst bei
+    // Klarinette (Mitglied 16).
+    foreach ([16, 24, 32, 40] as $memberId) {
+        $registerIndex = intdiv($memberId - 1, 8);
+        $assignments[] = ['member_id' => $memberId, 'group_id' => DEMO_SUBGROUP_IDS[$registerIndex - 1]];
     }
 
     return ['members' => $members, 'assignments' => $assignments, 'membership_dates' => $dates];

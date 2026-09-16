@@ -28,9 +28,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers/bootstrap.php';
 require_once __DIR__ . '/plan.php';
 
-// Seit 1.7.0 schreibt der Generator appointment_responses; ältere Schemata
-// haben die Tabelle nicht.
-const DEMO_MIN_SCHEMA = '1.7.0';
+// Seit 1.8.0 schreibt der Generator member_groups mit is_subgroup/sort_order
+// (Register); ältere Schemata kennen die Spalten nicht. 1.7.0 war die
+// vorherige Schwelle, weil der Generator seitdem appointment_responses
+// schreibt.
+const DEMO_MIN_SCHEMA = '1.8.0';
 
 /**
  * Reihenfolge beim Leeren: Kinder vor Eltern.

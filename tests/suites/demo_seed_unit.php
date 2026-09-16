@@ -95,18 +95,60 @@ test('DemoRandom::pick auf leerer Liste wirft', function () {
 
 // ---- Stammdaten ----------------------------------------------------------
 
-test('buildGroups liefert die vier Gruppen mit fortlaufenden IDs', function () {
+test('buildGroups liefert neun Gruppen mit fortlaufenden IDs, die ersten vier ohne Untergruppe', function () {
     $groups = buildGroups();
-    assertSame(4, count($groups));
+    assertSame(9, count($groups));
     assertSame(1, $groups[0]['group_id']);
     assertSame('Aktive', $groups[0]['group_name']);
     assertSame(4, $groups[3]['group_id']);
     assertSame('Ehrenmitglieder', $groups[3]['group_name']);
+    foreach (array_slice($groups, 0, 4) as $g) {
+        assertSame(0, $g['is_subgroup'], "Gruppe {$g['group_name']} sollte keine Untergruppe sein");
+    }
 });
 
 test('buildGroups markiert genau eine Gruppe als Vorgabe', function () {
     $defaults = array_filter(buildGroups(), fn ($g) => $g['is_default'] === 1);
     assertSame(1, count($defaults));
+});
+
+// ---- Register (Untergruppen) ----------------------------------------------
+// Erste echte Untergruppen im Demo-Bestand -- vorher liess sich die dritte
+// Stufe des Umschalters nur mit eingeschleusten Testdaten pruefen.
+
+test('buildGroups enthaelt fuenf Untergruppen mit is_subgroup=1 und aufsteigender sort_order', function () {
+    $subgroups = array_values(array_filter(buildGroups(), fn ($g) => $g['is_subgroup'] === 1));
+    assertSame(5, count($subgroups));
+
+    $expectedNames = ['Flöte', 'Klarinette', 'Trompete', 'Tenorhorn', 'Schlagzeug'];
+    $lastOrder     = -1;
+    foreach ($subgroups as $idx => $g) {
+        assertSame(1, $g['is_subgroup']);
+        assertSame($expectedNames[$idx], $g['group_name']);
+        assertTrue($g['sort_order'] > $lastOrder, "sort_order von {$g['group_name']} ist nicht aufsteigend");
+        $lastOrder = $g['sort_order'];
+    }
+});
+
+test('jedes Mitglied hat hoechstens zwei Register, mindestens eines hat zwei', function () {
+    $subgroupIds = array_map(fn ($g) => $g['group_id'], array_filter(buildGroups(), fn ($g) => $g['is_subgroup'] === 1));
+
+    $r              = new DemoRandom(20260908);
+    $m              = buildMembers($r, '2026-09-08');
+    $countPerMember = [];
+    foreach ($m['assignments'] as $a) {
+        if (in_array($a['group_id'], $subgroupIds, true)) {
+            $countPerMember[$a['member_id']] = ($countPerMember[$a['member_id']] ?? 0) + 1;
+        }
+    }
+
+    foreach ($m['members'] as $member) {
+        $count = $countPerMember[$member['member_id']] ?? 0;
+        assertTrue($count <= 2, "Mitglied {$member['member_id']} hat {$count} Register, erwartet hoechstens 2");
+    }
+
+    $withTwo = array_filter($countPerMember, fn ($c) => $c === 2);
+    assertTrue(count($withTwo) >= 1, 'Kein Mitglied mit zwei Registern -- die Doppelnennung waere ungeprueft');
 });
 
 test('buildAppointmentTypes liefert vier Arten mit Farbe', function () {
@@ -643,7 +685,10 @@ test('buildActivityTypeGroups bindet jede Taetigkeit an mindestens eine Gruppe u
     foreach (buildActivityTypes() as $a) {
         assertTrue(!empty($groupsForActivity[$a['activity_id']]), "Taetigkeit {$a['activity_id']} ohne Gruppe");
     }
-    foreach (buildGroups() as $g) {
+    // Register (is_subgroup=1) sind absichtlich aussen vor: Sie gliedern nur
+    // Listen und haengen an keiner Taetigkeit -- siehe buildGroups().
+    $nonSubgroups = array_filter(buildGroups(), fn ($g) => $g['is_subgroup'] === 0);
+    foreach ($nonSubgroups as $g) {
         assertTrue(!empty($activitiesForGroup[$g['group_id']]), "Gruppe {$g['group_id']} ohne Taetigkeit");
     }
 });
