@@ -10,6 +10,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unreleased]
 
 ### Behoben
+- **Verknüpftes Mitglied beim Anlegen eines Benutzers.** Die im Dialog gewählte Verknüpfung kam
+  nicht beim Server an; sie musste nach dem Anlegen im Bearbeiten-Dialog noch einmal gesetzt
+  werden. Der Server prüft die Verknüpfung jetzt auch beim Anlegen — ein bereits vergebenes
+  Mitglied wird abgewiesen statt doppelt verknüpft.
+- **`PUT` auf Terminarten und Tätigkeitsarten ändert nur mitgeschickte Felder.** Bisher schrieb
+  der Server alle Grundfelder bedingungslos: Ein Aufruf, der nur die Farbe ändern wollte, verlor
+  Beschreibung und Vorgabe-Kennzeichen, löste bei Terminarten die Gruppenzuordnung und
+  aktivierte bei Tätigkeitsarten eine ausgemusterte Art still wieder (OI-54).
 - **Selbstauskunft als CSV war unvollständig.** „Meine Daten" lieferte als CSV weder
   Arbeitszeiten noch deren Änderungshistorie noch die Mitgliedschaftszeiträume, während die
   JSON-Form sie enthielt — zwei Formate desselben Auskunftsersuchens mit unterschiedlichem

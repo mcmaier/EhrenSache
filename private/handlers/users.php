@@ -12,6 +12,54 @@
 // ============================================
 // USERS Controller
 // ============================================
+/**
+ * Prueft eine Mitgliedsverknuepfung, bevor sie geschrieben wird.
+ *
+ * Dieselbe Schranke fuer POST und PUT: Ein Mitglied gehoert zu hoechstens
+ * einem Benutzer, und es muss existieren. Der POST-Zweig hatte diese Pruefung
+ * frueher nicht -- das fiel nur deshalb nicht auf, weil die Oberflaeche die
+ * Auswahl aus dem Anlegen-Dialog gar nicht mitschickte. Ein UNIQUE auf
+ * users.member_id gibt es nicht (siehe ehrensache_db.sql), die Pruefung ist
+ * also die einzige Schranke.
+ *
+ * @param int|null $exceptUserId Beim Bearbeiten der eigene Datensatz, der
+ *                               seine bestehende Verknuepfung behalten darf.
+ * @return array{status: int, message: string}|null null = in Ordnung
+ */
+function usersCheckMemberLink($db, string $prefix, $memberId, ?int $exceptUserId): ?array
+{
+    if ($memberId === null || $memberId === '') {
+        return null;
+    }
+
+    $memberId = (int) $memberId;
+
+    $sql    = "SELECT user_id FROM {$prefix}users WHERE member_id = ?";
+    $params = [$memberId];
+
+    if ($exceptUserId !== null) {
+        $sql     .= " AND user_id != ?";
+        $params[] = $exceptUserId;
+    }
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+
+    if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+        return ['status' => 409,
+                'message' => 'Dieses Mitglied ist bereits mit einem anderen Benutzer verknüpft'];
+    }
+
+    $stmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ?");
+    $stmt->execute([$memberId]);
+
+    if (!$stmt->fetch()) {
+        return ['status' => 404, 'message' => 'Mitglied nicht gefunden'];
+    }
+
+    return null;
+}
+
 function handleUsers($db, $database, $method, $id, $authUserId) {
 
     $prefix = $database->table('');
@@ -315,6 +363,15 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                     $role = 'user';
                 }
 
+                // Mitgliedsverknuepfung wie beim Bearbeiten pruefen
+                $memberFehler = usersCheckMemberLink($db, $prefix, $data->member_id ?? null, null);
+                if ($memberFehler !== null) {
+                    http_response_code($memberFehler['status']);
+                    echo json_encode(['success' => false, 'message' => $memberFehler['message']],
+                                     JSON_UNESCAPED_UNICODE);
+                    return;
+                }
+
                 $password_hash = password_hash($data->password, PASSWORD_DEFAULT);                
 
                 // Generiere API-Token
@@ -439,38 +496,14 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                 }
             }                      
             
-            // Member-ID Validierung (nur wenn geändert wird)
+            // Member-ID Validierung (nur wenn geändert wird) — dieselbe
+            // Schranke wie beim Anlegen, siehe usersCheckMemberLink().
             if (isset($data->member_id) && $data->member_id !== null) {
-                // Prüfe ob Member-ID bereits von anderem User verwendet wird
-                $checkMemberStmt = $db->prepare(
-                    "SELECT user_id, name, email 
-                    FROM {$prefix}users 
-                    WHERE member_id = ? AND user_id != ?"
-                );
-                $checkMemberStmt->execute([$data->member_id, $id]);
-                $existingUser = $checkMemberStmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($existingUser) {
-                    http_response_code(409);
-                    echo json_encode([
-                        "success" => false,
-                        "message" => "Dieses Mitglied ist bereits mit einem anderen Benutzer verknüpft"
-                    ]);
-                    return;
-                }
-                
-                // Prüfe ob Member-ID existiert
-                $checkMemberExists = $db->prepare(
-                    "SELECT member_id FROM {$prefix}members WHERE member_id = ?"
-                );
-                $checkMemberExists->execute([$data->member_id]);
-                
-                if (!$checkMemberExists->fetch()) {
-                    http_response_code(404);
-                    echo json_encode([
-                        "success" => false,
-                        "message" => "Mitglied nicht gefunden"
-                    ]);
+                $memberFehler = usersCheckMemberLink($db, $prefix, $data->member_id, (int) $id);
+                if ($memberFehler !== null) {
+                    http_response_code($memberFehler['status']);
+                    echo json_encode(['success' => false, 'message' => $memberFehler['message']],
+                                     JSON_UNESCAPED_UNICODE);
                     return;
                 }
             }

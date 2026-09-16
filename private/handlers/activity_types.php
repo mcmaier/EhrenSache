@@ -254,14 +254,18 @@ function handleActivityTypes($db, $database, $method, $id) {
 
             $data = json_decode(file_get_contents("php://input"));
 
-            if(empty($data->activity_name)) {
+            // Ein PUT aendert seit OI-54 nur, was es mitschickt. Der Name ist
+            // deshalb nicht mehr Pflicht -- aber wenn er kommt, darf er nicht
+            // leer sein: Eine Taetigkeitsart ohne Namen ist in keiner Liste
+            // wiederzufinden.
+            if(property_exists($data, 'activity_name') && trim((string) $data->activity_name) === '') {
                 http_response_code(400);
-                echo json_encode(["message" => "activity_name is required"]);
+                echo json_encode(["message" => "activity_name must not be empty"]);
                 return;
             }
 
-            $verification = $data->verification ?? 'none';
-            if(!in_array($verification, $allowedVerification, true)) {
+            if(isset($data->verification)
+               && !in_array($data->verification, $allowedVerification, true)) {
                 http_response_code(400);
                 echo json_encode(["message" => "Invalid verification value",
                                   "allowed" => $allowedVerification]);
@@ -283,19 +287,39 @@ function handleActivityTypes($db, $database, $method, $id) {
                    ->execute([$id]);
             }
 
+            // Nur schreiben, was mitgeschickt wurde (OI-54). Vorher schrieb das
+            // UPDATE alle Grundfelder bedingungslos -- am folgenreichsten bei
+            // is_active: Ein fehlendes Feld fiel auf 1 zurueck und aktivierte
+            // eine ausgemusterte Taetigkeitsart still wieder.
+            $updateFields = [];
+            $updateParams = [];
+
+            foreach (['activity_name', 'description', 'color', 'verification'] as $feld) {
+                if (isset($data->$feld)) {
+                    $updateFields[] = "{$feld} = ?";
+                    $updateParams[] = $data->$feld;
+                }
+            }
+
+            foreach (['is_default', 'is_active'] as $feld) {
+                if (isset($data->$feld)) {
+                    $updateFields[] = "{$feld} = ?";
+                    $updateParams[] = $data->$feld ? 1 : 0;
+                }
+            }
+
+            if ($updateFields === []) {
+                // Nichts an der Art selbst: Gruppen und Terminarten unten
+                // koennen trotzdem gemeint sein, deshalb kein Fehler.
+                $updateFields[] = "activity_id = activity_id";
+            }
+
+            $updateParams[] = $id;
+
             $stmt = $db->prepare("UPDATE {$prefix}activity_types
-                                  SET activity_name = ?, description = ?, color = ?,
-                                      is_default = ?, is_active = ?, verification = ?
+                                  SET " . implode(', ', $updateFields) . "
                                   WHERE activity_id = ?");
-            if($stmt->execute([
-                $data->activity_name,
-                $data->description ?? null,
-                $data->color ?? '#1F5FBF',
-                !empty($data->is_default) ? 1 : 0,
-                isset($data->is_active) ? (int)(bool)$data->is_active : 1,
-                $verification,
-                $id
-            ])) {
+            if($stmt->execute($updateParams)) {
                 // Aktualisiere Gruppen-Verknüpfungen: fehlendes Feld lässt sie unangetastet,
                 // ein leeres Array löscht sie bewusst — daher isset() statt !empty().
                 if(isset($data->group_ids) && is_array($data->group_ids)) {

@@ -149,26 +149,49 @@ function handleAppointmentTypes($db, $database, $method, $id) {
                 $db->prepare("UPDATE {$prefix}appointment_types SET is_default = 0 WHERE type_id != ?")->execute([$id]);
             }
 
+            // Nur schreiben, was mitgeschickt wurde (OI-54). Vorher schrieb das
+            // UPDATE alle Grundfelder bedingungslos: Ein PUT mit nur der Farbe
+            // loeschte die Beschreibung, setzte is_default zurueck und liess
+            // type_name leer zuruecke -- MySQL ohne STRICT_TRANS_TABLES nimmt
+            // NULL fuer eine NOT NULL-Spalte als leeren String an, der Verlust
+            // blieb also unbemerkt. Die Rueckmeldefelder machen es ueber
+            // responseTypeSettings() seit 1.7.0 bereits richtig.
+            $updateFields = [];
+            $updateParams = [];
+
+            foreach (['type_name', 'description', 'color'] as $feld) {
+                if (isset($data->$feld)) {
+                    $updateFields[] = "{$feld} = ?";
+                    $updateParams[] = $data->$feld;
+                }
+            }
+
+            if (isset($data->is_default)) {
+                $updateFields[] = "is_default = ?";
+                $updateParams[] = $data->is_default ? 1 : 0;
+            }
+
+            $updateFields[] = "responses_enabled = ?";
+            $updateParams[] = $responseSettings['responses_enabled'];
+            $updateFields[] = "responses_names_visible = ?";
+            $updateParams[] = $responseSettings['responses_names_visible'];
+            $updateFields[] = "responses_require_excuse = ?";
+            $updateParams[] = $responseSettings['responses_require_excuse'];
+            $updateFields[] = "response_deadline_hours = ?";
+            $updateParams[] = $responseSettings['response_deadline_hours'];
+
+            $updateParams[] = $id;
+
             $stmt = $db->prepare("UPDATE {$prefix}appointment_types
-                                  SET type_name = ?, description = ?, is_default = ?, color = ?,
-                                      responses_enabled = ?, responses_names_visible = ?,
-                                      responses_require_excuse = ?, response_deadline_hours = ?
+                                  SET " . implode(', ', $updateFields) . "
                                   WHERE type_id = ?");
-            if($stmt->execute([
-                $data->type_name,
-                $data->description ?? null,
-                $data->is_default ?? false,
-                $data->color ?? '#667eea',
-                $responseSettings['responses_enabled'],
-                $responseSettings['responses_names_visible'],
-                $responseSettings['responses_require_excuse'],
-                $responseSettings['response_deadline_hours'],
-                $id
-            ])) {
-                // Aktualisiere Gruppen-Verknüpfungen
-                $db->prepare("DELETE FROM {$prefix}appointment_type_groups WHERE type_id = ?")->execute([$id]);
-                
+            if($stmt->execute($updateParams)) {
+                // Gruppen-Verknuepfungen: fehlendes Feld laesst sie unangetastet.
+                // Das DELETE lief frueher bedingungslos -- ein PUT ohne
+                // group_ids loeste damit still alle Gruppen.
                 if(isset($data->group_ids) && is_array($data->group_ids)) {
+                    $db->prepare("DELETE FROM {$prefix}appointment_type_groups WHERE type_id = ?")->execute([$id]);
+
                     $linkStmt = $db->prepare("INSERT INTO {$prefix}appointment_type_groups (type_id, group_id) VALUES (?, ?)");
                     foreach($data->group_ids as $groupId) {
                         $linkStmt->execute([$id, $groupId]);

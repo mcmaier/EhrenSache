@@ -355,6 +355,9 @@ wie eine Messung, ohne eine zu sein.
 | USR-POST-5 | Passwort < 6 Zeichen | 400 `"Passwort muss mindestens 6 Zeichen lang sein"` |
 | USR-POST-6 | Ungültige Rolle | 400 |
 | DEV-POST-1 | Gerät erstellen (`action=create_device`) | 201, `role=device`, TOTP-Secret generiert |
+| USR-POST-7 | Benutzer mit gewähltem Mitglied anlegen | Die Verknüpfung steht sofort am Benutzer — kein zweiter Gang über „Bearbeiten“ |
+| USR-POST-8 | Benutzer mit bereits verknüpftem Mitglied anlegen | 409 „bereits mit einem anderen Benutzer verknüpft“, kein Benutzer entsteht |
+| USR-POST-9 | Benutzer mit unbekannter `member_id` anlegen | 404 „Mitglied nicht gefunden“ |
 
 ### 10.3 Bearbeiten & Löschen
 
@@ -380,6 +383,8 @@ wie eine Messung, ohne eine zu sein.
 | APTTYPE-1 | Termintyp erstellen | `type_name`, `color`, `is_default` |
 | APTTYPE-2 | Termintyp mit Gruppen verknüpfen | `appointment_type_groups` befüllt |
 | APTTYPE-3 | Termine nach Typ filtern | Korrekt auf Gruppen gefiltert |
+| APTTYPE-4 | `PUT` nur mit `color` | Name, Beschreibung, Vorgabe-Kennzeichen und Gruppen bleiben stehen (OI-54) |
+| ACTTYPE-1 | `PUT` einer ausgemusterten Tätigkeitsart nur mit `description` | Die Art bleibt ausgemustert, `verification` unverändert (OI-54) |
 
 ---
 

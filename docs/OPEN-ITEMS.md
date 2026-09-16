@@ -1958,8 +1958,29 @@ sind **nicht** betroffen — beide laden ein eigenes `css/style.css` und erben d
 ---
 
 ### OI-54 · PUT auf Terminarten überschreibt nicht mitgeschickte Felder
-**Priorität:** mittel — führt zu Datenverlust, ist aber nur von einem angemeldeten Admin
-auslösbar, und die eigene Oberfläche schickt derzeit bei jedem PUT ohnehin alle Felder mit
+**Priorität:** erledigt am 2026-09-16 — beide Handler schreiben nur noch mitgeschickte Felder
+
+**Umgesetzt** in `private/handlers/appointment_types.php` und
+`private/handlers/activity_types.php` (Branch `fix/api-korrekturen`): dynamisches `UPDATE` wie
+bei `members`, `API.md` weist die Teiländerung bei beiden Ressourcen ausdrücklich aus.
+`activity_name` ist beim `PUT` damit nicht mehr Pflicht — mitgeschickt darf es aber nicht leer
+sein.
+
+**Zusätzlich gefunden:** Bei den Terminarten lief das `DELETE` auf
+`appointment_type_groups` **bedingungslos** vor dem bedingten Neuanlegen. Ein `PUT` ohne
+`group_ids` löste damit sämtliche Gruppen der Terminart — schwerer als der ursprüngliche Befund,
+weil die Terminart danach niemanden mehr erreicht. Der Punkt hatte das nur für
+`activity_types` geprüft, wo es bereits richtig war.
+
+**Am Rande bestätigt:** Der Datenverlust blieb unbemerkt, weil MySQL ohne `STRICT_TRANS_TABLES`
+ein fehlendes `type_name` als leeren String annimmt statt die Abfrage abzuweisen — der Name war
+danach `''`, nicht `NULL`.
+
+**Abgesichert durch** `tests/suites/partial_update_api.php` (vier Fälle, vor der Korrektur alle
+rot).
+
+<details>
+<summary>Ursprünglicher Befund</summary>
 
 `handleAppointmentTypes()` in `private/handlers/appointment_types.php:110` schreibt bei `PUT`
 alle vier Grundfelder bedingungslos, ohne zu prüfen, ob sie im Request überhaupt enthalten
@@ -2011,6 +2032,7 @@ gegangen.
 
 **Nicht sicherheitsrelevant:** setzt ein angemeldetes Adminkonto voraus und erweitert keine
 Rechte — es zerstört nur Daten, die derselbe Admin ohnehin ändern dürfte.
+</details>
 
 ---
 

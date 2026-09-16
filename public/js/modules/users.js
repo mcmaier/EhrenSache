@@ -822,11 +822,19 @@ export async function saveUser() {
         userData.password = password;
     }
 
-    // Member-ID: Edit-Modus hat Vorrang, sonst aktueller Wert
+    // Member-ID: drei Felder meinen dasselbe, je nach Modus ist ein anderes
+    // sichtbar. Beim ANLEGEN ist es #user_member — das wurde hier frueher
+    // nicht gelesen, weshalb die im Dialog gewaehlte Verknuepfung nie beim
+    // Server ankam und erst ein spaeteres Bearbeiten sie setzte.
+    const userMemberGroup = document.getElementById('userMemberGroup');
     const editMemberId = document.getElementById('editMemberId');
     const currentMemberId = document.getElementById('currentMemberId');
 
-    if (editMemberId.parentElement.style.display !== 'none') {
+    if (!userId && userMemberGroup && userMemberGroup.style.display !== 'none') {
+        // Anlegen-Modus → sichtbare Auswahl des Modals
+        const memberId = document.getElementById('user_member').value;
+        userData.member_id = memberId ? parseInt(memberId) : null;
+    } else if (editMemberId.parentElement.style.display !== 'none') {
         // Edit-Modus aktiv → Wert aus Edit-Select
         const memberId = editMemberId.value;
         userData.member_id = memberId ? parseInt(memberId) : null;

@@ -1151,9 +1151,14 @@ je ausgeliefert.
 
 **Rückmeldung (seit 1.7.0):** Optional `responses_enabled`, `responses_names_visible`,
 `responses_require_excuse` (je `true`/`false`) und `response_deadline_hours` (0–720 oder `null` für
-die globale Frist). Beim Aktualisieren ändern nur mitgeschickte Felder etwas; ein PUT ohne sie
-lässt die Einstellungen stehen. Eine Frist außerhalb 0–720 ergibt `400`. Ein `PUT` auf eine
+die globale Frist). Eine Frist außerhalb 0–720 ergibt `400`. Ein `PUT` auf eine
 unbekannte `id` ergibt `404 {"message": "Type not found"}`.
+
+**`PUT` ist eine Teiländerung, keine Vollersetzung.** Geschrieben wird nur, was im Request steht;
+`type_name`, `description`, `color` und `is_default` bleiben unberührt, wenn sie fehlen. Auch ein
+fehlendes `group_ids` lässt die Gruppenzuordnung stehen — ein leeres Array löscht sie. Bis
+einschließlich 1.7.0 schrieb der Server alle Grundfelder bedingungslos und löste die Gruppen bei
+jedem `PUT` ohne `group_ids` (OI-54).
 
 ---
 
@@ -1373,6 +1378,12 @@ angenommen — es löst die Eingrenzung. Eine unbekannte `type_id` ergibt `400`.
 **Endpoint:** `PUT /api.php?resource=activity_types&id=<id>`
 
 **Berechtigung:** Admin
+
+**`PUT` ist eine Teiländerung, keine Vollersetzung.** Geschrieben wird nur, was im Request steht —
+`activity_name`, `description`, `color`, `verification`, `is_default` und `is_active` bleiben
+unberührt, wenn sie fehlen. `activity_name` ist damit beim `PUT` nicht mehr Pflicht; mitgeschickt
+darf es aber nicht leer sein (`400`). Bis einschließlich 1.7.0 schrieb der Server alle Grundfelder
+bedingungslos — ein `PUT` ohne `is_active` aktivierte eine ausgemusterte Art still wieder (OI-54).
 
 Ein **fehlendes** `group_ids` lässt die Zuordnung unangetastet, ein **leeres
 Array** löscht sie.
@@ -1786,6 +1797,11 @@ nicht in der Antwort).
   "member_id": 10
 }
 ```
+
+`member_id` ist optional und wird **beim Anlegen** geprüft wie beim Bearbeiten: **409**, wenn das
+Mitglied bereits an einem anderen Benutzer hängt, **404**, wenn es nicht existiert. Ein Mitglied
+gehört zu höchstens einem Benutzer; in der Datenbank steht darauf kein `UNIQUE`, die Prüfung ist
+also die einzige Schranke.
 
 ---
 
