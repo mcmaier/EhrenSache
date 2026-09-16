@@ -64,3 +64,68 @@ function groupsSortForDisplay(array $groups): array
 
     return $groups;
 }
+
+/**
+ * Gruppen und Untergruppen je Mitglied, für Anwesenheitslisten und die
+ * Namensliste der Terminrückmeldung.
+ *
+ * `groups` sind die Mitgliedschaften aus $termGroupIds (z. B. die Gruppen der
+ * Terminart) -- die Beschaffung dieser IDs bleibt beim Aufrufer, denn beide
+ * bisherigen Aufrufer haben sie schon zur Hand (attendance_list.php aus der
+ * Termin-Abfrage, responses.php aus den noch nicht entdoppelten erwarteten
+ * Mitgliedern). `subgroups` sind alle als Untergruppe markierten Gruppen des
+ * Mitglieds, unabhängig von $termGroupIds. Beide Listen sortiert nach
+ * groupSortCompare().
+ *
+ * @param PDO $db Datenbankverbindung
+ * @param Database $database Liefert den Tabellenpräfix über table()
+ * @param array<int, array<string, mixed>> $members Zeilen mit member_id, werden um groups/subgroups ergänzt
+ * @param array<int, int|string> $termGroupIds Gruppen-IDs, die als `groups` gelten
+ * @return array<int, array<string, mixed>>
+ */
+function groupsAttachToMembers($db, $database, array $members, array $termGroupIds): array
+{
+    if (empty($members)) {
+        return $members;
+    }
+
+    $prefix    = $database->table('');
+    $memberIds = array_map(static fn ($m) => (int) $m['member_id'], $members);
+    $inMembers = str_repeat('?,', count($memberIds) - 1) . '?';
+
+    $stmt = $db->prepare("
+        SELECT mga.member_id, g.group_id, g.group_name, g.sort_order, g.is_subgroup
+        FROM {$prefix}member_group_assignments mga
+        JOIN {$prefix}member_groups g ON g.group_id = mga.group_id
+        WHERE mga.member_id IN ($inMembers)
+    ");
+    $stmt->execute($memberIds);
+
+    $termGroups = array_map('intval', $termGroupIds);
+    $byMember   = [];
+
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $eintrag = [
+            'group_id'   => (int) $row['group_id'],
+            'group_name' => $row['group_name'],
+            'sort_order' => (int) $row['sort_order'],
+        ];
+        $mid = (int) $row['member_id'];
+
+        if (in_array($eintrag['group_id'], $termGroups, true)) {
+            $byMember[$mid]['groups'][] = $eintrag;
+        }
+        if ((int) $row['is_subgroup'] === 1) {
+            $byMember[$mid]['subgroups'][] = $eintrag;
+        }
+    }
+
+    foreach ($members as &$member) {
+        $mid = (int) $member['member_id'];
+        $member['groups']    = groupsSortForDisplay($byMember[$mid]['groups'] ?? []);
+        $member['subgroups'] = groupsSortForDisplay($byMember[$mid]['subgroups'] ?? []);
+    }
+    unset($member);
+
+    return $members;
+}
