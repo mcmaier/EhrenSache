@@ -294,25 +294,15 @@ function memberActionButtons(m) {
     return buttons + reset;
 }
 
-function managerTableHtml(data) {
-    const started = data.started;
-    let lastGroup = null;
-    const colspan = started ? 6 : 5;
-    const allCount = data.members.length;
-    const openCount = data.members.filter(m => m.status === null).length;
+/** Baut die volle Tabellenzeile eines Mitglieds -- steht ein Mitglied in
+ * mehreren Abschnitten (Gruppe/Untergruppe), bekommt es je Abschnitt eine
+ * eigene, vollstaendige Zeile mit Aktionsknoepfen statt nur einen Namen. */
+function managerMemberRowHtml(m, started) {
+    const excuse = m.excuse_state
+        ? `<br><small>Entschuldigung: ${escapeHtml(translateExceptionStatus(m.excuse_state))}</small>` : '';
 
-    const rows = data.members.filter(m => matchesFilter(m, currentFilter)).map(m => {
-        let groupRow = '';
-        if (m.group_name !== lastGroup) {
-            lastGroup = m.group_name;
-            groupRow = `<tr class="response-group-row"><td colspan="${colspan}">${escapeHtml(m.group_name)}</td></tr>`;
-        }
-        const excuse = m.excuse_state
-            ? `<br><small>Entschuldigung: ${escapeHtml(translateExceptionStatus(m.excuse_state))}</small>` : '';
-
-        // G6: "kurzfristig" nur bei einer Absage.
-        return `${groupRow}
-            <tr>
+    // G6: "kurzfristig" nur bei einer Absage.
+    return `<tr>
                 <td>${escapeHtml(m.surname)}, ${escapeHtml(m.name)}</td>
                 <td>${statusBadge(m.status)}${m.status === 'no' && m.is_late ? ' <span class="response-late">kurzfristig</span>' : ''}${excuse}</td>
                 <td>${escapeHtml(m.comment ?? '')}</td>
@@ -320,6 +310,45 @@ function managerTableHtml(data) {
                 ${started ? `<td>${m.present ? 'anwesend' : '–'}</td>` : ''}
                 <td class="actions-cell">${memberActionButtons(m)}</td>
             </tr>`;
+}
+
+/**
+ * Verwalter-Tabelle (admin/manager): derselbe Umschalter, derselbe
+ * Speicherschluessel (GROUPING_KEY_RESPONSES) und dieselbe Vorgabe ('group')
+ * wie namesListHtml() -- der Dirigent mit Manager-Konto ist der eigentliche
+ * Anlass des Vorhabens, und die Wahl darf beim Rollenwechsel zwischen
+ * Verwalter- und Namensliste nicht springen. Die Stufen-Verfuegbarkeit
+ * richtet sich nach ALLEN Mitgliedern (data.members), nicht nach dem
+ * aktuellen Filter -- sonst wuerde "Untergruppe" verschwinden, sobald der
+ * Filter "Keine Antwort" zufaellig niemanden mit Untergruppe zeigt.
+ */
+function managerTableHtml(data) {
+    const started = data.started;
+    const colspan = started ? 6 : 5;
+    const allCount = data.members.length;
+    const openCount = data.members.filter(m => m.status === null).length;
+
+    const filtered = data.members.filter(m => matchesFilter(m, currentFilter));
+
+    const stages = groupingAvailableStages(data.members);
+    const stage  = groupingStored(GROUPING_KEY_RESPONSES, stages, 'group');
+    // "Ohne Gruppe" nur bei der Stufe 'group' -- bei 'subgroup' zeigt der
+    // Sammelabschnitt das eingestellte Wort (z.B. "Ohne Register").
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const sections = groupingSections(filtered, stage, emptyLabel);
+    const duplicates = groupingDuplicateCount(filtered, stage);
+
+    let hint = '';
+    if (duplicates > 0) {
+        const text = duplicates === 1 ? '1 Mitglied steht' : `${duplicates} Mitglieder stehen`;
+        hint = `<p class="list-grouping-hint">${text} in mehreren Abschnitten.</p>`;
+    }
+
+    const rows = sections.map(section => {
+        const groupRow = section.label !== null
+            ? `<tr class="response-group-row"><td colspan="${colspan}">${escapeHtml(section.label)} · ${section.members.length}</td></tr>`
+            : '';
+        return groupRow + section.members.map(m => managerMemberRowHtml(m, started)).join('');
     }).join('');
 
     return `
@@ -329,6 +358,7 @@ function managerTableHtml(data) {
             <button type="button" class="response-filter__btn${currentFilter === 'open' ? ' is-active' : ''}"
                     aria-pressed="${currentFilter === 'open' ? 'true' : 'false'}" onclick="filterResponses('open')">Keine Antwort (${openCount})</button>
         </div>
+        ${responsesGroupingSwitcher(stages, stage)}${hint}
         <div class="data-table">
             <table>
                 <thead><tr>
@@ -347,8 +377,9 @@ function responseNameChip(m) {
     return `<span class="response-name-chip response-name-chip--${key}">${RESPONSE_ICONS[key]} ${escapeHtml(m.name)} ${escapeHtml(m.surname)}</span>`;
 }
 
-/** Umschalter Alphabetisch/Gruppe/Untergruppe ueber der Namensliste (Spec 6.1). */
-function namesListGroupingSwitcher(stages, stage) {
+/** Umschalter Alphabetisch/Gruppe/Untergruppe -- ueber der Namensliste UND
+ * der Verwalter-Tabelle, dieselbe Gestaltung an beiden Stellen (Spec 6.1). */
+function responsesGroupingSwitcher(stages, stage) {
     if (stages.length <= 1) return '';
     const stageLabels = { alpha: 'Alphabetisch', group: 'Gruppe', subgroup: escapeHtml(subgroupLabel()) };
     const buttons = stages.map(s => `
@@ -400,7 +431,7 @@ function namesListHtml(members) {
         </div>`;
     }).join('');
 
-    return `${namesListGroupingSwitcher(stages, stage)}${hint}<div class="response-names-grouped">${groups}</div>`;
+    return `${responsesGroupingSwitcher(stages, stage)}${hint}<div class="response-names-grouped">${groups}</div>`;
 }
 
 /** Umschalter-Klick: merkt die Wahl und rendert das offene Modal aus den
