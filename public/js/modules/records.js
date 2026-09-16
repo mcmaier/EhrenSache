@@ -197,7 +197,7 @@ export async function renderRecords(records, page = 1)
                                 ✎
                             </button>
                             <button class="action-btn btn-icon btn-delete" 
-                                    onclick="deleteRecord(${record.record_id},'${record.name}','${record.title}')"
+                                    onclick="deleteRecord(${record.record_id})"
                                     title="Löschen">
                                 🗑
                             </button>
@@ -989,16 +989,27 @@ export async function saveRecord() {
 }
 
 export async function deleteRecord(recordId, memberName, appointmentTitle) {
-    // buildAttendanceRow() uebergibt nur die ID (Spec-Pruefung 16.09.2026):
-    // ein Mitgliedsname mit Apostroph oder Anfuehrungszeichen sprengte sonst
+    // Alle Aufrufstellen uebergeben nur noch die ID (Spec-Pruefung 16.09.2026):
+    // ein Mitglieds- oder Terminname mit Apostroph oder HTML sprengte dort sonst
     // den onclick-Aufruf bzw. liesse sich als Code einschleusen (kein CSP im
     // Projekt) -- Muster aus deleteGroup()/deleteType() in management.js
-    // (Commit ad200ba). Name kommt stattdessen aus den bereits geladenen
-    // Anwesenheitsdaten der aktuell offenen Anwesenheitsliste.
+    // (Commit ad200ba). Name und Termin kommen stattdessen aus den bereits
+    // geladenen Daten der jeweils aktuell angezeigten Liste.
     if (memberName === undefined) {
-        const member = _lastAttendanceData?.find(m => m.record_id == recordId);
-        memberName = member ? `${member.name} ${member.surname}` : 'diesem Mitglied';
-        appointmentTitle = appointmentTitle ?? 'diesem Termin';
+        if (currentMode === RecordMode.ATTENDANCE_BY_MEMBER) {
+            const appointment = _lastMemberAttendanceData?.appointments?.find(a => a.record_id == recordId);
+            const member = _lastMemberAttendanceData?.memberInfo;
+            memberName = member ? `${member.name} ${member.surname}` : 'diesem Mitglied';
+            appointmentTitle = appointment?.title ?? 'diesem Termin';
+        } else if (currentMode === RecordMode.ALL_RECORDS) {
+            const record = allFilteredRecords?.find(r => r.record_id == recordId);
+            memberName = record ? `${record.name} ${record.surname}` : 'diesem Mitglied';
+            appointmentTitle = record?.title ?? 'diesem Termin';
+        } else {
+            const member = _lastAttendanceData?.find(m => m.record_id == recordId);
+            memberName = member ? `${member.name} ${member.surname}` : 'diesem Mitglied';
+            appointmentTitle = appointmentTitle ?? 'diesem Termin';
+        }
     }
 
      const confirmed = await showConfirm(
@@ -1052,6 +1063,11 @@ async function updateAppointmentTypeDisplay() {
 // Zuletzt geladene Anwesenheitsliste -- der Gruppierungs-Umschalter rendert
 // aus diesen Daten neu, ohne einen weiteren API-Aufruf (Spec 3.5).
 let _lastAttendanceData = null;
+
+// Zuletzt geladene Anwesenheitshistorie eines einzelnen Mitglieds (Modus
+// ATTENDANCE_BY_MEMBER) -- deleteRecord() holt Mitglieds- und Terminnamen
+// fuer den Bestaetigungsdialog von hier statt aus dem onclick-Attribut.
+let _lastMemberAttendanceData = null;
 
 // Spalten der Anwesenheitsliste im Modus 'appointment' (siehe updateTableHeader()).
 const ATTENDANCE_LIST_COLSPAN = 5;
@@ -1251,6 +1267,8 @@ async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
 }
 
 function renderMemberAttendanceList(appointmentsData, memberInfo) {
+    _lastMemberAttendanceData = { appointments: appointmentsData, memberInfo };
+
     const tbody = document.getElementById('recordsTableBody');
 
     updateRecordStats(appointmentsData);
@@ -1337,7 +1355,7 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
                     ✎
                 </button>
                 <button class="action-btn btn-icon btn-delete" 
-                        onclick="deleteRecord(${appointment.record_id},'${escapeHtml(memberInfo.name)}','diesem Termin')"
+                        onclick="deleteRecord(${appointment.record_id})"
                         title="Löschen">
                     🗑
                 </button>
