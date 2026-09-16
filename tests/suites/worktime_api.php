@@ -1646,6 +1646,45 @@ test('work_sessions: eine Notizkorrektur laesst die Zeiten unberuehrt', function
     deleteSession($id);
 });
 
+test('my_data: Arbeitszeiten stehen in JSON UND in der CSV (OI-50)', function () {
+    // Zwei Formate desselben Auskunftsersuchens muessen dasselbe enthalten.
+    // Die CSV war bis 1.8.0 unvollstaendig: Arbeitszeiten, Aenderungshistorie
+    // und Mitgliedschaftszeitraeume standen nur in der JSON-Form.
+    enableWorktime();
+    $activityId = createActivityType('Auskunft ' . uniqid());
+    $marke      = 'OI50-' . uniqid();
+
+    $angelegt = createManualSession('user', $activityId, ['note' => $marke]);
+    assertStatus(201, $angelegt);
+    $id = (int) $angelegt['body']['session']['session_id'];
+
+    try {
+        $json = apiRequest('GET', 'my_data', ['token' => apiToken('user')]);
+        assertStatus(200, $json);
+        assertTrue(
+            in_array($marke, array_column($json['body']['work_sessions'], 'note'), true),
+            'Sitzung fehlt in der JSON-Auskunft'
+        );
+
+        $csv = apiRequest('GET', 'my_data', [
+            'token' => apiToken('user'),
+            'query' => ['format' => 'csv'],
+        ]);
+        assertStatus(200, $csv);
+        assertTrue(str_contains($csv['raw'], '=== ARBEITSZEITEN ==='),
+                   'CSV-Abschnitt Arbeitszeiten fehlt');
+        assertTrue(str_contains($csv['raw'], $marke),
+                   'Die Sitzung selbst fehlt in der CSV');
+        assertTrue(str_contains($csv['raw'], '=== AENDERUNGSHISTORIE ARBEITSZEIT ===')
+                   || str_contains($csv['raw'], '=== ÄNDERUNGSHISTORIE ARBEITSZEIT ==='),
+                   'CSV-Abschnitt Aenderungshistorie fehlt');
+        assertTrue(str_contains($csv['raw'], '=== MITGLIEDSCHAFTSZEITRÄUME ==='),
+                   'CSV-Abschnitt Mitgliedschaftszeitraeume fehlt');
+    } finally {
+        deleteSession($id);
+    }
+});
+
 test('Aufraeumen steht am Ende der Datei', function () {
     // Ein Test hinter dem Aufraeumen legt Daten an, die niemand mehr
     // entfernt -- und faellt nicht auf, weil das Aufraeumen davor gruen war.

@@ -1732,7 +1732,32 @@ ist ungeklärt; er ist von diesem Punkt getrennt zu bewerten.
 ---
 
 ### OI-50 · `my_data` als CSV enthält keine Arbeitszeiten
-**Priorität:** mittel — betrifft das Auskunftsrecht, nicht die Sicherheit
+**Priorität:** erledigt am 2026-09-16 — die CSV führt jetzt dieselben Daten wie die JSON-Form
+
+**Umgesetzt** in `private/handlers/my_data.php` (Branch `fix/my-data-csv`): drei neue Abschnitte
+— `=== MITGLIEDSCHAFTSZEITRÄUME ===`, `=== ARBEITSZEITEN ===` (Beginn, Ende, Pause, Dauer,
+Tätigkeit, Termin, Status, Nachweis, Quelle, Notiz) und
+`=== ÄNDERUNGSHISTORIE ARBEITSZEIT ===` (Zeitpunkt, Sitzung, Vorgang, Änderungen als JSON).
+Die Aufbereitung kommt aus `export.php` und `worktime.php` (`worktimeReportTimes()`,
+`sessionDurationMinutes()`, `worktimeHours()`, `worktimeProofLabel()`), der Nachweisgrad über
+`worktimeProofExpression()` aus der Abfrage — der Nachweis rechnet damit nicht anders als der
+Stundennachweis des Vereins.
+
+**Beim Umsetzen zusätzlich gefunden:** Auch die **Mitgliedschaftszeiträume** fehlten in der CSV,
+obwohl der Handler sie holt und die JSON-Form sie ausgibt. Sie sind mit aufgenommen; der
+ursprüngliche Befund nannte nur die Arbeitszeiten. Die offene Frage zur Änderungshistorie ist
+mit „gehört hinein" entschieden: Sie enthält personenbezogene Daten und überlebt die Löschung
+einer Sitzung bewusst.
+
+**`DATENSCHUTZ.md` war damit ungenau, ist es jetzt nicht mehr:** Abschnitt 9 beschreibt die
+Auskunft als „enthält auch Arbeitszeiten und deren Änderungshistorie" und die
+Datenübertragbarkeit als „CSV-Export nutzen". Beides stimmt erst mit dieser Änderung.
+
+**Abgesichert durch** `tests/suites/worktime_api.php` („my_data: Arbeitszeiten stehen in JSON UND
+in der CSV") und `docs/testplan.md` AW-12.
+
+<details>
+<summary>Ursprünglicher Befund</summary>
 
 `?resource=my_data` gibt einer angemeldeten Person ihre eigenen Daten heraus. Der Handler holt
 dabei auch `work_sessions` und `work_session_log` (`private/handlers/my_data.php`, ab der
@@ -1764,6 +1789,7 @@ beiden Formate als gleichwertig darstellt. Falls ja, ist sie bis zur Behebung un
 
 **Nicht sicherheitsrelevant:** Es werden keine fremden Daten preisgegeben, sondern eigene
 zurückgehalten. Kein Zugang, keine Rechteausweitung.
+</details>
 
 ---
 

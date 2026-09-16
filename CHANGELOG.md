@@ -10,6 +10,10 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unreleased]
 
 ### Behoben
+- **Selbstauskunft als CSV war unvollständig.** „Meine Daten" lieferte als CSV weder
+  Arbeitszeiten noch deren Änderungshistorie noch die Mitgliedschaftszeiträume, während die
+  JSON-Form sie enthielt — zwei Formate desselben Auskunftsersuchens mit unterschiedlichem
+  Inhalt. Die CSV führt jetzt dieselben Daten (OI-50).
 - **Ein Antrag je Termin und Antragsart.** Über die Absage einer Terminrückmeldung und über den
   Antragsdialog ließen sich zwei Abwesenheitsanträge zum selben Termin stellen, die einzeln
   beschieden werden mussten. Der Server weist den zweiten jetzt ab und nennt den vorhandenen.

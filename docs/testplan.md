@@ -768,7 +768,8 @@ derselbe Zeitpunkt in anderer Schreibweise mitkommt.
 | AW-8 | Export enthält keine `submitted`-Einträge | Nicht bestätigte Zeiten fehlen im Nachweis |
 | AW-9 | `export?type=worktime_activity` | Summen je Tätigkeitsart plus Gesamtzeile |
 | AW-10 | Export als `user` | `403` — Auswertungen sind Managern vorbehalten |
-| AW-11 | `my_data` | Enthält `work_sessions` **und** `work_session_log` |
+| AW-11 | `my_data` (JSON) | Enthält `work_sessions` **und** `work_session_log` |
+| AW-12 | `my_data` als CSV | Abschnitte „ARBEITSZEITEN“ und „ÄNDERUNGSHISTORIE ARBEITSZEIT“ mit denselben Sitzungen wie die JSON-Form (OI-50) |
 
 ### Manuell (Dashboard)
 

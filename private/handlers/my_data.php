@@ -133,6 +133,7 @@ function handleMyData($db, $database, $request_method, $authUserId)
             ws.end_location_name,
             ws.created_at,
             ws.approved_at,
+            " . worktimeProofExpression('ws') . " AS proof,
             at.activity_name,
             a.title as appointment_title,
             a.date as appointment_date
@@ -229,6 +230,19 @@ function exportAsCSV($data) {
         fputcsv($output, [$group['group_name']]);
     }
     fputcsv($output, []);
+
+    // Mitgliedschaftszeitraeume. Standen frueher nur in der JSON-Form —
+    // beide Formate beantworten dasselbe Auskunftsersuchen (OI-50).
+    fputcsv($output, ['=== MITGLIEDSCHAFTSZEITRÄUME ===']);
+    fputcsv($output, ['Beginn', 'Ende', 'Status']);
+    foreach ($data['membership_dates'] as $zeitraum) {
+        fputcsv($output, [
+            $zeitraum['start_date'] ? date('d.m.Y', strtotime($zeitraum['start_date'])) : '',
+            $zeitraum['end_date']   ? date('d.m.Y', strtotime($zeitraum['end_date']))   : '',
+            $zeitraum['status'] ?? '',
+        ]);
+    }
+    fputcsv($output, []);
     
     // Anwesenheiten
     fputcsv($output, ['=== ANWESENHEITEN ===']);
@@ -272,6 +286,47 @@ function exportAsCSV($data) {
             $response['comment'] ?? '',
             date('d.m.Y H:i', strtotime($response['status_changed_at'])),
             date('d.m.Y H:i', strtotime($response['updated_at'])),
+        ]);
+    }
+
+    // Arbeitszeiten. Die Aufbereitung ist dieselbe wie im Arbeitszeitbericht
+    // (private/handlers/export.php) — eine Auskunft soll nicht anders rechnen
+    // als der Nachweis, den der Verein in der Hand haelt.
+    fputcsv($output, []);
+    fputcsv($output, ['=== ARBEITSZEITEN ===']);
+    fputcsv($output, ['Beginn', 'Ende', 'Pause (Min)', 'Dauer (h)', 'Tätigkeit',
+                      'Termin', 'Status', 'Nachweis', 'Quelle', 'Notiz']);
+    foreach ($data['work_sessions'] as $session) {
+        [$beginn, $ende] = worktimeReportTimes($session['start_time'], $session['end_time']);
+        $minuten = sessionDurationMinutes($session);
+
+        fputcsv($output, [
+            $beginn,
+            $ende,
+            (int) ($session['break_minutes'] ?? 0),
+            $minuten === null ? 'läuft' : worktimeHours($minuten),
+            $session['activity_name'] ?? '-',
+            $session['appointment_title'] ?? '-',
+            $session['status'] ?? '',
+            worktimeProofLabel((string) ($session['proof'] ?? 'none')),
+            $session['source'] ?? '',
+            $session['note'] ?? '',
+        ]);
+    }
+
+    // Aenderungshistorie: Sie enthaelt personenbezogene Daten und ueberlebt
+    // die Loeschung einer Sitzung bewusst, gehoert also in die Auskunft. Die
+    // Vorher/Nachher-Werte bleiben als JSON in einer Spalte — eine Aufloesung
+    // in Spalten haette fuer jede Aenderungsart ein anderes Format.
+    fputcsv($output, []);
+    fputcsv($output, ['=== ÄNDERUNGSHISTORIE ARBEITSZEIT ===']);
+    fputcsv($output, ['Zeitpunkt', 'Sitzung', 'Vorgang', 'Änderungen']);
+    foreach ($data['work_session_log'] as $eintrag) {
+        fputcsv($output, [
+            $eintrag['changed_at'] ? date('d.m.Y H:i', strtotime($eintrag['changed_at'])) : '',
+            $eintrag['session_id'] ?? '',
+            $eintrag['action'] ?? '',
+            $eintrag['changes'] ?? '',
         ]);
     }
 

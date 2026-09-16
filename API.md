@@ -1965,8 +1965,11 @@ Aufrufer soll wissen, dass er nicht bekommt, was er angefordert hat. Eine mitges
 `member_id` wird **ignoriert, nicht abgewiesen** — eine Fehlermeldung wäre ein Orakel darüber,
 welche IDs existieren. Gerätekonten erhalten 403, weil ihnen kein Mitglied zugeordnet ist.
 
-Die eigenen Rohdaten gibt es über `resource=my_data` (beachte dort OI-50: die CSV-Form enthält
-derzeit keine Arbeitszeiten, die JSON-Form schon). **Seit 1.7.0** trägt die JSON-Antwort
+Die eigenen Rohdaten gibt es über `resource=my_data`. **JSON und CSV enthalten dasselbe** — die
+CSV-Form führt neben Stammdaten, Gruppen, Anwesenheiten und Ausnahmen auch die Abschnitte
+„MITGLIEDSCHAFTSZEITRÄUME", „ARBEITSZEITEN" (Beginn, Ende, Pause, Dauer, Tätigkeit, Termin,
+Status, Nachweis, Quelle, Notiz) und „ÄNDERUNGSHISTORIE ARBEITSZEIT" (Zeitpunkt, Sitzung,
+Vorgang, Änderungen als JSON). **Seit 1.7.0** trägt die JSON-Antwort
 zusätzlich `appointment_responses` (Termin, Status, Bemerkung, Zeitpunkte der letzten Status- und
 der letzten Änderung), die CSV-Form einen Abschnitt „TERMINRÜCKMELDUNGEN" mit den Spalten
 Termindatum, Termin, Rückmeldung, Bemerkung, Status geändert, Zuletzt geändert.
