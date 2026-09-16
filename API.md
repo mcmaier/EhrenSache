@@ -363,8 +363,8 @@ Versionsstand der Installation. Das Dashboard zeigt daraus die Versionsnummer an
 **Response:**
 ```json
 {
-  "version": "1.6.1",
-  "build": "2026-09-14",
+  "version": "1.7.0",
+  "build": "2026-09-16",
   "commit": "auto",
   "name": "EhrenSache",
   "requires": {

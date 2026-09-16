@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [1.7.0] – 2026-09-15
+## [1.7.0] – 2026-09-16
 
 ### Neu
 - **Terminrückmeldung.** Mitglieder sagen vor einem Termin zu, ab oder „unsicher", mit
