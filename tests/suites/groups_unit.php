@@ -53,10 +53,22 @@ test('groupSortCompare: fehlende sort_order zaehlt als 0', function () {
     assertTrue(groupSortCompare($a, $b) < 0, 'ohne Angabe wie 0');
 });
 
+// Zwei Faelle zu sort_order als Zeichenkette, bewusst getrennt: der erste haelt
+// die Absicht fest (numerisch statt alphabetisch vergleichen), der zweite
+// schuetzt den (int)-Cast. Fuer wohlgeformte numerische Strings wie '10'/'9'
+// vergleicht PHPs <=> bereits numerisch -- der Cast waere dort nicht noetig,
+// faellt also beim ersten Fall nicht auf. Erst bei nicht-numerischem Inhalt
+// wie 'abc' greift der Cast tatsaechlich ein.
 test('groupSortCompare: sort_order als Zeichenkette (wie von PDO geliefert)', function () {
     $a = ['group_name' => 'Flöte', 'sort_order' => '10'];
     $b = ['group_name' => 'Flöte', 'sort_order' => '9'];
     assertTrue(groupSortCompare($a, $b) > 0, 'numerisch, nicht alphabetisch: 10 nach 9');
+});
+
+test('groupSortCompare: nicht-numerische sort_order zaehlt als 0', function () {
+    $a = ['group_name' => 'Flöte', 'sort_order' => 'abc'];
+    $b = ['group_name' => 'Flöte', 'sort_order' => 5];
+    assertTrue(groupSortCompare($a, $b) < 0, "'abc' zaehlt wie 0 und steht vor 5");
 });
 
 test('groupsSortForDisplay: sortiert eine Liste nach derselben Regel', function () {
