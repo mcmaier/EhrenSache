@@ -84,7 +84,7 @@ const tbody = document.getElementById('groupsTableBody');
                     <button class="action-btn btn-icon btn-edit" onclick="openGroupModal(${group.group_id})" title="Bearbeiten">
                         ✎
                     </button>
-                    <button class="action-btn btn-icon btn-delete" onclick="deleteGroup(${group.group_id}, '${group.group_name}')" title="Löschen">
+                    <button class="action-btn btn-icon btn-delete" onclick="deleteGroup(${group.group_id})" title="Löschen">
                         🗑
                     </button>
                 </td>                
@@ -233,7 +233,13 @@ export async function saveGroup() {
     }
 }
 
-export async function deleteGroup(groupId, groupName) {
+export async function deleteGroup(groupId) {
+    // Name aus dem Cache holen statt aus dem onclick-Attribut: ein Gruppenname mit
+    // Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als Code
+    // einschleusen (kein CSP im Projekt).
+    const group = dataCache.groups.data.find(g => g.group_id == groupId);
+    const groupName = group ? group.group_name : '';
+
     const confirmed = await showConfirm(
         `Gruppe "${groupName}" wirklich löschen?`,
         'Gruppe löschen'
@@ -297,7 +303,7 @@ export async function renderTypeGroupOverview(typeData)
                     <button class="action-btn btn-icon btn-edit" onclick="openTypeModal(${type.type_id})" title="Bearbeiten">
                         ✎
                     </button>
-                    <button class="action-btn btn-icon btn-delete" onclick="deleteType(${type.type_id}, '${type.type_name}')" title="Löschen">
+                    <button class="action-btn btn-icon btn-delete" onclick="deleteType(${type.type_id})" title="Löschen">
                         🗑
                     </button>
                 </td>
@@ -503,7 +509,10 @@ export async function saveType() {
     }
 }
 
-export async function deleteType(typeId, typeName) {
+export async function deleteType(typeId) {
+    const type = dataCache.types.data.find(t => t.type_id == typeId);
+    const typeName = type ? type.type_name : '';
+
     const confirmed = await showConfirm(
         `Terminart "${typeName}" wirklich löschen?`,
         'Terminart löschen'
