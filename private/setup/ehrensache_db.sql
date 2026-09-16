@@ -252,6 +252,8 @@ CREATE TABLE  IF NOT EXISTS `{PREFIX}member_groups` (
   group_name VARCHAR(100) NOT NULL,
   description TEXT,
   is_default BOOLEAN DEFAULT 0,
+  is_subgroup TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -616,6 +618,9 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('reliability_enabled', '0', 'boolean', 'general', 'Zuverlässigkeitskennzahl berechnen und anzeigen'),
 ('punctuality_grace_minutes', '0', 'number', 'general', 'Karenz in Minuten relativ zum Terminbeginn (-60 bis 60)'),
 ('response_deadline_hours', '24', 'number', 'general', 'Frist für Terminrückmeldungen in Stunden vor Beginn (0 bis 720)');
+
+INSERT IGNORE INTO `{PREFIX}system_settings` (setting_key, setting_value, category) VALUES
+('subgroup_label', 'Untergruppe', 'public');
 
 
 CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS

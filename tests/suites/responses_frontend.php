@@ -71,6 +71,29 @@ test('management.js schickt die vier Felder beim Speichern', function () use ($r
     }
 });
 
+test('renderTypeGroupOverview maskiert Terminart-Werte und die Gruppennamen aus loadTypeGroup', function () use ($rsRoot) {
+    // Keine CSP (OI-17): type_name/description kommen frei aus der DB, ebenso
+    // die Gruppennamen, die loadTypeGroup() nachtraeglich in die Zelle rendert.
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/management.js');
+
+    $start = strpos($js, 'export async function renderTypeGroupOverview');
+    assertTrue($start !== false, 'renderTypeGroupOverview fehlt');
+    $ende = strpos($js, 'async function loadTypeGroup', $start);
+    assertTrue($ende !== false, 'Ende von renderTypeGroupOverview nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'escapeHtml(type.type_name)'), 'type.type_name wird nicht maskiert');
+    assertTrue(str_contains($body, 'escapeHtml(type.description)'), 'type.description wird nicht maskiert');
+    assertTrue(!preg_match('/background:\s*\$\{type\.color\}/', $body),
+        'type.color landet ungeprueft im style-Attribut -- muss gegen ein Hexformat geprueft werden (wie in appointments.js)');
+
+    $groupFnStart = strpos($js, 'async function loadTypeGroup');
+    $groupFnEnde = strpos($js, 'function ', $groupFnStart + strlen('async function loadTypeGroup'));
+    assertTrue($groupFnEnde !== false, 'Ende von loadTypeGroup nicht gefunden');
+    $groupFnBody = substr($js, $groupFnStart, $groupFnEnde - $groupFnStart);
+    assertTrue(str_contains($groupFnBody, 'escapeHtml(g.group_name)'), 'Gruppenname in loadTypeGroup() wird nicht maskiert');
+});
+
 test('Terminliste hat die Spalte Rueckmeldung und passende colspan', function () use ($rsRoot) {
     $html = (string) file_get_contents($rsRoot . '/public/index.html');
     assertTrue(str_contains($html, '<th>Rückmeldung</th>'), 'Spaltenkopf fehlt');

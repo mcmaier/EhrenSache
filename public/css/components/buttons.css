@@ -293,14 +293,17 @@
 .response-action--reset { color: var(--text-light); border-color: var(--border-color); }
 .response-action--reset:hover { background: var(--bg-gray); }
 
-/* Segmentgruppe des Antwort-Filters im Modal (ersetzt die fruehere Radio-Liste). */
-.response-filter {
+/* Segmentgruppe des Antwort-Filters im Modal (ersetzt die fruehere Radio-Liste).
+   .list-grouping ist derselbe Baustein, wiederverwendet fuer den Gruppierungs-
+   Umschalter (Anwesenheitsliste, Namensliste -- Untergruppen, FI-14/1.8.0),
+   der jetzt auch ausserhalb der Rueckmeldungen steht. */
+.response-filter, .list-grouping {
     display: flex;
     gap: var(--spacing-xs);
     margin: var(--spacing-sm) 0;
 }
 
-.response-filter__btn {
+.response-filter__btn, .list-grouping__btn {
     padding: 6px 14px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -311,5 +314,13 @@
     transition: all var(--transition-fast);
 }
 
-.response-filter__btn:hover { opacity: 0.8; }
-.response-filter__btn.is-active { background: var(--primary-color); border-color: var(--primary-color); color: var(--bg-white); }
+.response-filter__btn:hover, .list-grouping__btn:hover { opacity: 0.8; }
+.response-filter__btn.is-active, .list-grouping__btn.is-active { background: var(--primary-color); border-color: var(--primary-color); color: var(--bg-white); }
+
+/* Hinweiszeile bei Mehrfachnennung (Spec 6.4): wer in zwei Gruppen/Untergruppen
+   steht, erscheint absichtlich in beiden Abschnitten -- das wird ausgewiesen. */
+.list-grouping-hint {
+    color: var(--text-medium);
+    font-size: 0.9em;
+    margin: 0 0 var(--spacing-sm);
+}

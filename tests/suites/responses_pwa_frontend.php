@@ -90,14 +90,30 @@ test('PWA: "Wer hat geantwortet?" zeigt Namen als Chips statt Bullet-Liste, mask
         'Name/Nachname werden nicht (mehr) maskiert');
 });
 
-test('PWA: "Wer hat geantwortet?" ist primaer nach Mitgliedsgruppe gegliedert, Gruppenname maskiert', function () use ($rspRoot) {
-    // Nutzer-Entscheidung: Gruppe vor Status, alphabetisch, Mitglieder ohne
-    // Gruppe zuletzt als "Ohne Gruppe".
+test('PWA: "Wer hat geantwortet?" gliedert ueber groupingSections() (Vorgabe Gruppe), Gruppenname maskiert', function () use ($rspRoot) {
+    // Nutzer-Entscheidung bleibt gueltig: primaer nach Gruppe vor Status,
+    // Mitglieder ohne Gruppe zuletzt als "Ohne Gruppe". Seit Task 8 (1.8.0,
+    // Untergruppen/FI-14) laeuft die Gliederung nicht mehr ueber eine eigene
+    // responseGroupKey() nach group_name (die Zeichenkette gibt es serverseitig
+    // nicht mehr), sondern -- wie die Anwesenheitsliste -- ueber die geteilte
+    // groupingSections(). Die Verdrahtung des Umschalters selbst (Speicher-
+    // schluessel, verfuegbare Stufen, window.setResponsesGrouping) sichert
+    // tests/suites/subgroups_frontend.php ab; hier bleibt nur, was dort NICHT
+    // geprueft wird: der Ohne-Gruppe-Sammelabschnitt und die Maskierung der
+    // Abschnittsueberschrift selbst.
     $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
 
-    assertTrue(str_contains($js, 'responseGroupKey'), 'Keine eigene Gruppierung nach group_name gefunden');
-    assertTrue(str_contains($js, "'Ohne Gruppe'"), 'Mitglieder ohne Gruppe landen nicht in "Ohne Gruppe"');
-    assertTrue(str_contains($js, 'escapeHtml(label)'), 'Gruppenname wird nicht maskiert');
+    assertTrue(!str_contains($js, 'responseGroupKey'), 'responseGroupKey() ist wieder da -- sollte durch groupingSections() ersetzt bleiben');
+
+    $start = strpos($js, 'function responseNamesHtml');
+    assertTrue($start !== false, 'responseNamesHtml() fehlt');
+    $end = strpos($js, 'window.setResponsesGrouping', $start);
+    assertTrue($end !== false, 'window.setResponsesGrouping nach responseNamesHtml() nicht gefunden');
+    $body = substr($js, $start, $end - $start);
+
+    assertTrue(str_contains($body, 'groupingSections('), 'responseNamesHtml() bildet die Abschnitte nicht ueber groupingSections()');
+    assertTrue(str_contains($body, "'Ohne Gruppe'"), 'Mitglieder ohne Gruppe landen nicht in "Ohne Gruppe"');
+    assertTrue(str_contains($body, 'escapeHtml(label)'), 'Gruppenname wird nicht maskiert');
 });
 
 test('PWA: Namens-Chips tragen Status-Icon und eigene Farbklasse, nicht nur Farbe', function () use ($rspRoot) {

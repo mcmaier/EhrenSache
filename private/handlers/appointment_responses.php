@@ -146,7 +146,9 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
     $deadline = responseDeadline($apt['date'], $apt['start_time'], $hours);
     $started  = responseHasStarted($apt['date'], $apt['start_time'], $now);
 
-    $expected       = responsesDedupeExpected(responsesFetchExpected($db, $database, $appointmentId));
+    $expectedRows   = responsesFetchExpected($db, $database, $appointmentId);
+    $expected       = responsesDedupeExpected($expectedRows);
+    $termGroupIds   = responsesTermGroupIds($expectedRows);
     $responses      = responsesFetchForAppointment($db, $database, $appointmentId);
     $expectedIds    = array_keys($expected);
     $statusByMember = array_map(static fn ($r) => $r['status'], $responses);
@@ -211,20 +213,21 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
                 'present'           => $started ? isset($presentLookup[$memberId]) : null,
             ];
         }
-        $payload['members'] = $members;
+        $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds);
 
         if ($started) {
             $payload['comparison'] = array_map('count', responseComparison($expectedIds, $statusByMember, $present));
         }
     } elseif ($payload['settings']['names_visible']) {
         // Bemerkungen, Zeitpunkte und Antraege anderer sieht ein Mitglied nie (Spec 3.6).
-        $payload['members'] = array_values(array_map(static fn ($m, $id) => [
+        $members = array_values(array_map(static fn ($m, $id) => [
             'member_id'  => $id,
             'name'       => $m['name'],
             'surname'    => $m['surname'],
             'group_name' => $m['group_name'],
             'status'     => $responses[$id]['status'] ?? null,
         ], $expected, array_keys($expected)));
+        $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds);
     }
 
     return $payload;

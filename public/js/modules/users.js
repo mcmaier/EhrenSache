@@ -116,7 +116,7 @@ function renderUsers(users, page = 1)
     let memberInfo = '';
 
      // User-Info mit verknüpftem Mitglied       
-    let userInfo = `<div style="line-height: 1.3;">${user.email}`;    
+    let userInfo = `<div style="line-height: 1.3;">${escapeHtml(user.email)}`;
     if (user.user_name) {
        // userInfo += `<br><small><style="color: #7f8c8d;">${user.user_name}</small>`;
         userInfo += `<br><div class="linked-member">${escapeHtml(user.user_name)}</div>`;
@@ -159,7 +159,7 @@ function renderUsers(users, page = 1)
     
     // Lösch-Button nicht für den eigenen Account anzeigen
     const deleteBtn = (currentUser && user.user_id !== currentUser.user_id) ? `
-        <button class="action-btn btn-icon btn-delete" onclick="deleteUser(${user.user_id}, '${user.email}')">
+        <button class="action-btn btn-icon btn-delete" onclick="deleteUser(${user.user_id})">
             🗑
         </button>
     ` : '';
@@ -449,7 +449,7 @@ export async function openUserModal(userId = null) {
     
     if (members) {
         members.forEach(member => {
-            memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+            memberSelect.innerHTML += `<option value="${member.member_id}">${escapeHtml(member.surname)}, ${escapeHtml(member.name)}</option>`;
         });
     }
 
@@ -899,7 +899,17 @@ export async function saveUser() {
     }
 }
 
-export async function deleteUser(userId, email) {
+export async function deleteUser(userId) {
+    // Email aus dem Cache holen statt aus dem onclick-Attribut: die Email ist
+    // vom eigenen Account her selbst waehlbar (users.php PUT erlaubt "Admin
+    // oder eigener Account"), FILTER_VALIDATE_EMAIL laesst dabei Anfuehrungs-
+    // zeichen im local-part einer quoted-string-Adresse zu -- ein Mitglied
+    // koennte damit sonst Code in die Verwalteransicht einschleusen (kein CSP
+    // im Projekt). Muster aus deleteGroup()/deleteType() in management.js
+    // (Commit ad200ba).
+    const user = dataCache.users.data.find(u => u.user_id == userId);
+    const email = user ? user.email : 'diesem Benutzer';
+
     const confirmed = await showConfirm(
         `Benutzer "${email}" wirklich löschen?`,
         'Benutzer löschen'
@@ -909,7 +919,7 @@ export async function deleteUser(userId, email) {
         const result = await apiCall('users', 'DELETE', null, { id: userId });
         if (result) {
             showUserSection(true, currentUsersPage);
-            showToast(`User "${email}" wurde gelöscht`, 'success');        
+            showToast(`User "${escapeHtml(email)}" wurde gelöscht`, 'success');
         }
     }
 }

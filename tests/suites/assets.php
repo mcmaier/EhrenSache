@@ -261,3 +261,90 @@ test('Die Station raeumt das Fragment mit replaceState ab', function () use ($re
         . 'zusammen mit dem Zuhoerer eine Neulade-Schleife'
     );
 });
+
+test('Farbwerte aus der DB landen nur ueber eine Hex-Whitelist im style-Attribut', function () use ($repoRoot) {
+    // Waechter gegen die Sicherheitskorrektur vom 16.09.2026 (Terminart-/
+    // Aktivitaetsfarbe in appointments.js, records.js, management.js): ohne CSP
+    // (OI-17) muss ein Farbwert aus der DB vor der Verwendung in einem
+    // style-Attribut gegen /^#[0-9a-f]{3,8}$/i geprueft werden, sonst sprengt
+    // ein Wert wie `#fff" onmouseover="alert(1)` das Attribut. Das Muster im
+    // Projekt: erst pruefen und in eine eigene Variable legen, dann erst
+    // interpolieren — nie das Objektfeld selbst (${apt.color}, ${type.color})
+    // direkt in den style-String schreiben.
+    $ausnahmen = [
+        // getSourceBadge() in records.js: 'source' ist eine im Code fest
+        // verdrahtete Lookup-Tabelle (checkin_source -> Icon/Label/Farbe),
+        // keine DB-Spalte — der Wert ist nicht von aussen erreichbar.
+        'public/js/modules/records.js' => ['${source.color}'],
+    ];
+
+    $dir = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($repoRoot . '/public/js', FilesystemIterator::SKIP_DOTS)
+    );
+
+    $verstoesse = [];
+    foreach ($dir as $file) {
+        if ($file->getExtension() !== 'js') {
+            continue;
+        }
+        $rel   = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot) + 1));
+        $lines = file($file->getPathname(), FILE_IGNORE_NEW_LINES);
+
+        foreach ($lines as $i => $line) {
+            if (preg_match('/style="[^"]*\$\{[a-zA-Z_][a-zA-Z0-9_]*\.color\b/', $line) !== 1) {
+                continue;
+            }
+            $erlaubt = false;
+            foreach ($ausnahmen[$rel] ?? [] as $muster) {
+                if (strpos($line, $muster) !== false) {
+                    $erlaubt = true;
+                }
+            }
+            if (!$erlaubt) {
+                $verstoesse[] = $rel . ':' . ($i + 1) . ' — ' . trim($line);
+            }
+        }
+    }
+
+    assertTrue(
+        $verstoesse === [],
+        "Farbwert direkt (ohne Whitelist-Variable) im style-Attribut:\n  " . implode("\n  ", $verstoesse)
+    );
+});
+
+test('Mitgliedsname landet in <option>-Listen nur maskiert', function () use ($repoRoot) {
+    // Waechter gegen die Sicherheitskorrektur vom 16.09.2026: das Muster
+    // `<option value="${m.member_id}">${m.surname}, ${m.name}</option>` per
+    // innerHTML(+=) fand sich unabhaengig voneinander in records.js,
+    // statistics.js und users.js — member.surname/member.name kommen aus der
+    // DB, innerHTML maskiert nicht von selbst. Haelt fest, dass der Name dabei
+    // immer durch escapeHtml() (utils.js) läuft.
+    $dir = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($repoRoot . '/public/js', FilesystemIterator::SKIP_DOTS)
+    );
+
+    $verstoesse = [];
+    foreach ($dir as $file) {
+        if ($file->getExtension() !== 'js') {
+            continue;
+        }
+        $rel   = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot) + 1));
+        $lines = file($file->getPathname(), FILE_IGNORE_NEW_LINES);
+
+        foreach ($lines as $i => $line) {
+            if (preg_match('/<option[^>]*>\$\{/', $line) !== 1) {
+                continue;
+            }
+            // Unmaskiert waere z.B. "${member.surname}" -- maskiert steht dort
+            // "${escapeHtml(member.surname)}" (kein "}" direkt nach ".surname").
+            if (preg_match('/\.surname\}|\.name\}/', $line) === 1) {
+                $verstoesse[] = $rel . ':' . ($i + 1) . ' — ' . trim($line);
+            }
+        }
+    }
+
+    assertTrue(
+        $verstoesse === [],
+        "<option> mit unmaskiertem Mitgliedsnamen:\n  " . implode("\n  ", $verstoesse)
+    );
+});

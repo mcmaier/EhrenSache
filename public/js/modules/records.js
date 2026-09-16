@@ -12,10 +12,11 @@ import { apiCall, isAdminOrManager } from './api.js';
 import { loadAppointments } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, currentYear, subgroupLabel } from './ui.js';
 import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers } from './utils.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
+import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_ATTENDANCE } from './grouping.js';
 
 // ============================================
 // RECORDS
@@ -37,6 +38,26 @@ let currentAppointmentId = null;
 let currentMemberId = null;
 let currentAppointmentType = null;
 let isLoadingFilters = false;
+
+/**
+ * Einziger Weg, currentMode zu aendern.
+ *
+ * #recordsGroupingBar (Untergruppen-Umschalter) gehoert nur zur Terminansicht
+ * ATTENDANCE_BY_APPOINTMENT -- er wurde bisher ausschliesslich in
+ * renderAttendanceList() befuellt und sonst nirgends geleert. Beim Wechsel in
+ * eine andere Ansicht (Terminart, Mitglied, Filter zuruecksetzen) blieb er
+ * dadurch stehen und filterte die dort gezeigten Daten fälschlich mit.
+ *
+ * Statt das Aufraeumen an jeder der Stellen zu wiederholen, die currentMode
+ * setzen, laeuft jede davon durch diese Funktion.
+ */
+function setRecordMode(mode) {
+    currentMode = mode;
+    if (mode !== RecordMode.ATTENDANCE_BY_APPOINTMENT) {
+        const bar = document.getElementById('recordsGroupingBar');
+        if (bar) bar.innerHTML = '';
+    }
+}
 
 // State für Cross-Filtering im Record-Modal
 let _recordAllMembers = [];
@@ -142,7 +163,7 @@ export async function renderRecords(records, page = 1)
         let appointmentInfo = '-';
         if (record.appointment_id && record.title) {
             appointmentInfo = `<div style="line-height: 1.4;">
-                <strong>${record.title}</strong>`;
+                <strong>${escapeHtml(record.title)}</strong>`;
             
             if (record.date && record.start_time) {
                 const aptDate = new Date(record.date + 'T00:00:00');
@@ -159,7 +180,7 @@ export async function renderRecords(records, page = 1)
         const appointmentTypeBadge = createAppointmentTypeBadge(typeId);                
 
         // Member-Info mit Mitgliedsnr. wenn vorhanden       
-        let memberInfo = `<div style="line-height: 1.4;">${record.surname}, ${record.name}`;    
+        let memberInfo = `<div style="line-height: 1.4;">${escapeHtml(record.surname)}, ${escapeHtml(record.name)}`;
         if (record.member_number) {            
             memberInfo += `<br><small style="color: #7f8c8d;">${escapeHtml(record.member_number)}</small>`;
         }    
@@ -196,7 +217,7 @@ export async function renderRecords(records, page = 1)
                                 ✎
                             </button>
                             <button class="action-btn btn-icon btn-delete" 
-                                    onclick="deleteRecord(${record.record_id},'${record.name}','${record.title}')"
+                                    onclick="deleteRecord(${record.record_id})"
                                     title="Löschen">
                                 🗑
                             </button>
@@ -500,7 +521,7 @@ async function loadMemberFilter(forceReload = false, appointmentType = null)
         filtered
             .filter(m => m.is_active_in_period)
             .forEach(member => {
-                memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+                memberSelect.innerHTML += `<option value="${member.member_id}">${escapeHtml(member.surname)}, ${escapeHtml(member.name)}</option>`;
             });
     }
     memberSelect.value = currentMemberValue;
@@ -581,14 +602,14 @@ export async function initRecordEventHandlers() {
             currentAppointmentType = null;
         }
                 
-        currentMode = RecordMode.ALL_RECORDS;      
+        setRecordMode(RecordMode.ALL_RECORDS);
         currentAppointmentId = null;
         currentMemberId = null;
         appointmentFilter.disabled = false;
         appointmentFilter.value = '';
         memberFilter.disabled = false;
         memberFilter.value = '';
-        
+
         loadAppointmentFilter(false,appointmentTypeId);
         loadMemberFilter(false,appointmentTypeId);
 
@@ -603,16 +624,16 @@ export async function initRecordEventHandlers() {
         
         if (appointmentId && appointmentId !== '') {
             // Attendance-Modus: Member-Filter deaktivieren
-            currentMode = RecordMode.ATTENDANCE_BY_APPOINTMENT;
+            setRecordMode(RecordMode.ATTENDANCE_BY_APPOINTMENT);
             currentAppointmentId = appointmentId;
             currentMemberId = null;
             memberFilter.disabled = true;
             memberFilter.value = '';
-            aptTypeFilter.disabled = true;            
+            aptTypeFilter.disabled = true;
             await loadAttendanceList(appointmentId);
         } else {
             // Records-Modus: Member-Filter aktivieren
-            currentMode = RecordMode.ALL_RECORDS;
+            setRecordMode(RecordMode.ALL_RECORDS);
             currentAppointmentId = null;
             currentMemberId = null;
             memberFilter.disabled = false;
@@ -629,7 +650,7 @@ export async function initRecordEventHandlers() {
         
         if (memberId && memberId !== '') {
             // Attendance-by-Member-Modus
-            currentMode = RecordMode.ATTENDANCE_BY_MEMBER;
+            setRecordMode(RecordMode.ATTENDANCE_BY_MEMBER);
             currentMemberId = memberId;
             currentAppointmentId = null;
             aptTypeFilter.disabled = true;
@@ -638,7 +659,7 @@ export async function initRecordEventHandlers() {
             await loadMemberAttendanceList(memberId, currentAppointmentType);
         } else {
             // Zurück zu ALL_RECORDS falls kein Appointment gewählt
-            currentMode = RecordMode.ALL_RECORDS;
+            setRecordMode(RecordMode.ALL_RECORDS);
             currentMemberId = null;
             currentAppointmentId = null;
             appointmentFilter.disabled = false;
@@ -687,14 +708,14 @@ export async function resetRecordFilter()
         appointmentFilter.value = '';
         memberFilter.value = '';
         //isAttendanceMode = false;
-        currentMode = RecordMode.ALL_RECORDS;
+        setRecordMode(RecordMode.ALL_RECORDS);
         currentAppointmentId = null;
         currentMemberId = null;
         currentAppointmentType = null;
 
         loadAppointmentFilter(false);
         loadMemberFilter(false);
-        
+
         await applyRecordFilters();
 }
 
@@ -746,12 +767,17 @@ function getSourceBadge(record) {
                  </span>`;
     
     // Zusatzinfo
+    // location_name/source_device kommen bei auto_checkin/totp_checkin direkt aus dem
+    // Client-Request (private/handlers/auto_checkin.php, totp_checkin.php) -- jedes
+    // angemeldete Konto (auch Rolle "user") kann sie beim eigenen Check-in setzen, hier
+    // sieht sie aber Admin/Manager in der Anwesenheitsliste. Ohne CSP (OI-17) daher
+    // zwingend escapeHtml().
     const details = [];
     if (record.location_name) {
-        details.push(`📍 ${record.location_name}`);
+        details.push(`📍 ${escapeHtml(record.location_name)}`);
     }
     if (record.source_device) {
-        details.push(`🔧 ${record.source_device}`);
+        details.push(`🔧 ${escapeHtml(record.source_device)}`);
     }
     
     if (details.length > 0) {
@@ -987,7 +1013,30 @@ export async function saveRecord() {
     }
 }
 
-export async function deleteRecord(recordId, memberName, appointmentTitle) {    
+export async function deleteRecord(recordId, memberName, appointmentTitle) {
+    // Alle Aufrufstellen uebergeben nur noch die ID (Spec-Pruefung 16.09.2026):
+    // ein Mitglieds- oder Terminname mit Apostroph oder HTML sprengte dort sonst
+    // den onclick-Aufruf bzw. liesse sich als Code einschleusen (kein CSP im
+    // Projekt) -- Muster aus deleteGroup()/deleteType() in management.js
+    // (Commit ad200ba). Name und Termin kommen stattdessen aus den bereits
+    // geladenen Daten der jeweils aktuell angezeigten Liste.
+    if (memberName === undefined) {
+        if (currentMode === RecordMode.ATTENDANCE_BY_MEMBER) {
+            const appointment = _lastMemberAttendanceData?.appointments?.find(a => a.record_id == recordId);
+            const member = _lastMemberAttendanceData?.memberInfo;
+            memberName = member ? `${member.name} ${member.surname}` : 'diesem Mitglied';
+            appointmentTitle = appointment?.title ?? 'diesem Termin';
+        } else if (currentMode === RecordMode.ALL_RECORDS) {
+            const record = allFilteredRecords?.find(r => r.record_id == recordId);
+            memberName = record ? `${record.name} ${record.surname}` : 'diesem Mitglied';
+            appointmentTitle = record?.title ?? 'diesem Termin';
+        } else {
+            const member = _lastAttendanceData?.find(m => m.record_id == recordId);
+            memberName = member ? `${member.name} ${member.surname}` : 'diesem Mitglied';
+            appointmentTitle = appointmentTitle ?? 'diesem Termin';
+        }
+    }
+
      const confirmed = await showConfirm(
         `Anwesenheit von ${memberName} bei ${appointmentTitle} wirklich löschen?`,
         'Anwesenheit löschen'
@@ -1036,6 +1085,18 @@ async function updateAppointmentTypeDisplay() {
 // ATTENDANCE LIST
 // ============================================
 
+// Zuletzt geladene Anwesenheitsliste -- der Gruppierungs-Umschalter rendert
+// aus diesen Daten neu, ohne einen weiteren API-Aufruf (Spec 3.5).
+let _lastAttendanceData = null;
+
+// Zuletzt geladene Anwesenheitshistorie eines einzelnen Mitglieds (Modus
+// ATTENDANCE_BY_MEMBER) -- deleteRecord() holt Mitglieds- und Terminnamen
+// fuer den Bestaetigungsdialog von hier statt aus dem onclick-Attribut.
+let _lastMemberAttendanceData = null;
+
+// Spalten der Anwesenheitsliste im Modus 'appointment' (siehe updateTableHeader()).
+const ATTENDANCE_LIST_COLSPAN = 5;
+
 async function loadAttendanceList(appointmentId) {
     try {
         const attendance = await apiCall('attendance_list', 'GET', null, {appointment_id:appointmentId});
@@ -1050,6 +1111,8 @@ async function loadAttendanceList(appointmentId) {
 }
 
 function renderAttendanceList(attendanceData) {
+    _lastAttendanceData = attendanceData;
+
     const tbody = document.getElementById('recordsTableBody');
 
     updateRecordStats(attendanceData);
@@ -1057,96 +1120,159 @@ function renderAttendanceList(attendanceData) {
     const container = document.getElementById('recordsPagination');
     if (!container) return;
 
-    container.innerHTML = '';    
+    container.innerHTML = '';
 
-    tbody.innerHTML = '';    
-    
+    tbody.innerHTML = '';
+
     updateTableHeader('appointment');
 
-    attendanceData.forEach(member => {
-        const tr = document.createElement('tr'); 
+    renderAttendanceGroupingBar(attendanceData);
 
-        // Member-Info mit Mitgliedsnr. wenn vorhanden       
-        let memberInfo = `<div style="line-height: 1.4;">${member.surname}, ${member.name}`;    
-        if (member.member_number) {            
-            memberInfo += `<br><small style="color: #7f8c8d;">${escapeHtml(member.member_number)}</small>`;                            
-        }    
-        memberInfo += '</div>'        
-        
-        let arrivalHtml = '-';
-        if (member.arrival_time) {
-            const arrivalDate = new Date(member.arrival_time);
-            const formattedDate = arrivalDate.toLocaleDateString('de-DE');
-            const formattedTime = arrivalDate.toLocaleTimeString('de-DE', { 
-                hour: '2-digit', 
-                minute: '2-digit' ,
-                second: '2-digit'
-            });
-            
-            arrivalHtml = `<div style="line-height: 1.4;">${formattedTime}<br>
-                <small style="color: #7f8c8d;">${formattedDate}</small>
-            </div>`;
+    // Umschalter-Stufen und gemerkte Wahl (Spec 6.1/6.2). Fuer den Abschnitt
+    // ohne Gruppe passt "Ohne Gruppe" nur bei 'group' -- bei 'subgroup' zeigt
+    // er das eingestellte Wort (z.B. "Ohne Register").
+    const stages = groupingAvailableStages(attendanceData);
+    const stage  = groupingStored(GROUPING_KEY_ATTENDANCE, stages, 'alpha');
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const sections = groupingSections(attendanceData, stage, emptyLabel);
+
+    const fragment = document.createDocumentFragment();
+
+    sections.forEach(section => {
+        if (section.label !== null) {
+            const kopf = document.createElement('tr');
+            kopf.className = 'response-group-row';
+            kopf.innerHTML = `<td colspan="${ATTENDANCE_LIST_COLSPAN}">${escapeHtml(section.label)} · ${section.members.length}</td>`;
+            fragment.appendChild(kopf);
         }
-
-        // Check-in Source Badge
-        const sourceInfo = getSourceBadge(member);
-        
-        // Status-Icon und Styling
-        let statusHtml, rowClass;
-        if (member.status === 'present') {
-            statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span';
-            rowClass = '';
-        } else if (member.status === 'excused') {
-            statusHtml = '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
-            rowClass = '';
-        } else {
-            statusHtml = '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>';
-            rowClass = 'table-secondary'; // Grau ausgegraut
-        }
-
-        let actionsHtml;
-        if (member.record_id) {
-            // Eintrag vorhanden → Edit & Delete
-            actionsHtml = `
-                <button class="action-btn btn-icon btn-edit" 
-                        onclick="openRecordModal(${member.record_id})"
-                        title="Bearbeiten">
-                    ✎
-                </button>
-                <button class="action-btn btn-icon btn-delete" 
-                        onclick="deleteRecord(${member.record_id},'${member.name}','diesem Termin')"
-                        title="Löschen">
-                    🗑
-                </button>
-            `;
-        } else {
-            // Kein Eintrag → Anwesend & Entschuldigt
-            actionsHtml = `
-                <button class="action-btn btn-icon btn-approve" 
-                        onclick="quickCreateRecordForMember(${member.member_id}, 'present')"
-                        title="Anwesend">
-                    ✓
-                </button>
-                <button class="action-btn btn-icon btn-edit" 
-                        onclick="quickCreateRecordForMember(${member.member_id}, 'excused')"
-                        title="Entschuldigt">
-                    ⚠
-                </button>
-            `;
-        }   
-        
-        tr.className = rowClass;
-        tr.innerHTML = `
-            <td>${memberInfo}</td>     
-            <td>${arrivalHtml}</td>
-            <td>${statusHtml}</td>
-            <td>${sourceInfo}</td>
-            <td>${actionsHtml}</td>
-        `;
-        
-        tbody.appendChild(tr);
+        section.members.forEach(member => fragment.appendChild(buildAttendanceRow(member)));
     });
+
+    tbody.appendChild(fragment);
 }
+
+/** Umschalter Alphabetisch/Gruppe/Untergruppe + Hinweiszeile bei Mehrfachnennung (Spec 6.1, 6.4). */
+function renderAttendanceGroupingBar(attendanceData) {
+    const bar = document.getElementById('recordsGroupingBar');
+    if (!bar) return;
+
+    const stages = groupingAvailableStages(attendanceData);
+    if (stages.length <= 1) {
+        bar.innerHTML = '';
+        return;
+    }
+
+    const stage = groupingStored(GROUPING_KEY_ATTENDANCE, stages, 'alpha');
+    const duplicates = groupingDuplicateCount(attendanceData, stage);
+
+    const stageLabels = { alpha: 'Alphabetisch', group: 'Gruppe', subgroup: escapeHtml(subgroupLabel()) };
+    const buttons = stages.map(s => `
+        <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
+                aria-pressed="${stage === s ? 'true' : 'false'}"
+                onclick="setAttendanceGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+
+    let hint = '';
+    if (duplicates > 0) {
+        const text = duplicates === 1 ? '1 Mitglied steht' : `${duplicates} Mitglieder stehen`;
+        hint = `<p class="list-grouping-hint">${text} in mehreren Abschnitten.</p>`;
+    }
+
+    bar.innerHTML = `<div class="list-grouping">${buttons}</div>${hint}`;
+}
+
+/** Baut eine Tabellenzeile der Anwesenheitsliste fuer ein Mitglied. */
+function buildAttendanceRow(member) {
+    const tr = document.createElement('tr');
+
+    // Member-Info mit Mitgliedsnr. wenn vorhanden
+    let memberInfo = `<div style="line-height: 1.4;">${escapeHtml(member.surname)}, ${escapeHtml(member.name)}`;
+    if (member.member_number) {
+        memberInfo += `<br><small style="color: #7f8c8d;">${escapeHtml(member.member_number)}</small>`;
+    }
+    memberInfo += '</div>'
+
+    let arrivalHtml = '-';
+    if (member.arrival_time) {
+        const arrivalDate = new Date(member.arrival_time);
+        const formattedDate = arrivalDate.toLocaleDateString('de-DE');
+        const formattedTime = arrivalDate.toLocaleTimeString('de-DE', {
+            hour: '2-digit',
+            minute: '2-digit' ,
+            second: '2-digit'
+        });
+
+        arrivalHtml = `<div style="line-height: 1.4;">${formattedTime}<br>
+            <small style="color: #7f8c8d;">${formattedDate}</small>
+        </div>`;
+    }
+
+    // Check-in Source Badge
+    const sourceInfo = getSourceBadge(member);
+
+    // Status-Icon und Styling
+    let statusHtml, rowClass;
+    if (member.status === 'present') {
+        statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span';
+        rowClass = '';
+    } else if (member.status === 'excused') {
+        statusHtml = '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
+        rowClass = '';
+    } else {
+        statusHtml = '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>';
+        rowClass = 'table-secondary'; // Grau ausgegraut
+    }
+
+    let actionsHtml;
+    if (member.record_id) {
+        // Eintrag vorhanden → Edit & Delete
+        actionsHtml = `
+            <button class="action-btn btn-icon btn-edit"
+                    onclick="openRecordModal(${member.record_id})"
+                    title="Bearbeiten">
+                ✎
+            </button>
+            <button class="action-btn btn-icon btn-delete"
+                    onclick="deleteRecord(${member.record_id})"
+                    title="Löschen">
+                🗑
+            </button>
+        `;
+    } else {
+        // Kein Eintrag → Anwesend & Entschuldigt
+        actionsHtml = `
+            <button class="action-btn btn-icon btn-approve"
+                    onclick="quickCreateRecordForMember(${member.member_id}, 'present')"
+                    title="Anwesend">
+                ✓
+            </button>
+            <button class="action-btn btn-icon btn-edit"
+                    onclick="quickCreateRecordForMember(${member.member_id}, 'excused')"
+                    title="Entschuldigt">
+                ⚠
+            </button>
+        `;
+    }
+
+    tr.className = rowClass;
+    tr.innerHTML = `
+        <td>${memberInfo}</td>
+        <td>${arrivalHtml}</td>
+        <td>${statusHtml}</td>
+        <td>${sourceInfo}</td>
+        <td>${actionsHtml}</td>
+    `;
+
+    return tr;
+}
+
+/** Umschalter-Klick (Spec 6.2): merkt die Wahl und rendert aus den vorliegenden
+ * Daten neu -- kein erneuter API-Aufruf. */
+window.setAttendanceGrouping = function(stage) {
+    groupingStore(GROUPING_KEY_ATTENDANCE, stage);
+    if (_lastAttendanceData) {
+        renderAttendanceList(_lastAttendanceData);
+    }
+};
 
 async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
     try {        
@@ -1166,6 +1292,8 @@ async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
 }
 
 function renderMemberAttendanceList(appointmentsData, memberInfo) {
+    _lastMemberAttendanceData = { appointments: appointmentsData, memberInfo };
+
     const tbody = document.getElementById('recordsTableBody');
 
     updateRecordStats(appointmentsData);
@@ -1186,7 +1314,7 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
         let appointmentInfo = '-';
         if (appointment.appointment_id && appointment.title) {
             appointmentInfo = `<div style="line-height: 1.4;">
-                <strong>${appointment.title}</strong>`;
+                <strong>${escapeHtml(appointment.title)}</strong>`;
             
             if (appointment.date && appointment.start_time) {
                 const aptDate = new Date(appointment.date + 'T00:00:00');
@@ -1252,7 +1380,7 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
                     ✎
                 </button>
                 <button class="action-btn btn-icon btn-delete" 
-                        onclick="deleteRecord(${appointment.record_id},'${escapeHtml(memberInfo.name)}','diesem Termin')"
+                        onclick="deleteRecord(${appointment.record_id})"
                         title="Löschen">
                     🗑
                 </button>
@@ -1296,8 +1424,11 @@ function createAppointmentTypeBadge(appointment_type_id = null)
         const type = types.find(t => t.type_id == appointment_type_id);
         
         if (type) {
-            return `<span class="type-badge" style="background: ${type.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                        ${type.type_name}
+            // type.color/type.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
+            // muss hier selbst maskiert werden: Farbe per Whitelist, Text per escapeHtml().
+            const safeTypeColor = /^#[0-9a-f]{3,8}$/i.test(type.color || '') ? type.color : '#667eea';
+            return `<span class="type-badge" style="background: ${safeTypeColor}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                        ${escapeHtml(type.type_name)}
                     </span>`;
         }
     }

@@ -10,8 +10,9 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, showReasonDialog, invalidateCache } from './ui.js';
+import { showToast, showConfirm, showReasonDialog, invalidateCache, subgroupLabel } from './ui.js';
 import { escapeHtml, translateExceptionStatus } from './utils.js';
+import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_RESPONSES } from './grouping.js';
 
 // ============================================
 // TERMINRUECKMELDUNG (FI-1)
@@ -293,25 +294,15 @@ function memberActionButtons(m) {
     return buttons + reset;
 }
 
-function managerTableHtml(data) {
-    const started = data.started;
-    let lastGroup = null;
-    const colspan = started ? 6 : 5;
-    const allCount = data.members.length;
-    const openCount = data.members.filter(m => m.status === null).length;
+/** Baut die volle Tabellenzeile eines Mitglieds -- steht ein Mitglied in
+ * mehreren Abschnitten (Gruppe/Untergruppe), bekommt es je Abschnitt eine
+ * eigene, vollstaendige Zeile mit Aktionsknoepfen statt nur einen Namen. */
+function managerMemberRowHtml(m, started) {
+    const excuse = m.excuse_state
+        ? `<br><small>Entschuldigung: ${escapeHtml(translateExceptionStatus(m.excuse_state))}</small>` : '';
 
-    const rows = data.members.filter(m => matchesFilter(m, currentFilter)).map(m => {
-        let groupRow = '';
-        if (m.group_name !== lastGroup) {
-            lastGroup = m.group_name;
-            groupRow = `<tr class="response-group-row"><td colspan="${colspan}">${escapeHtml(m.group_name)}</td></tr>`;
-        }
-        const excuse = m.excuse_state
-            ? `<br><small>Entschuldigung: ${escapeHtml(translateExceptionStatus(m.excuse_state))}</small>` : '';
-
-        // G6: "kurzfristig" nur bei einer Absage.
-        return `${groupRow}
-            <tr>
+    // G6: "kurzfristig" nur bei einer Absage.
+    return `<tr>
                 <td>${escapeHtml(m.surname)}, ${escapeHtml(m.name)}</td>
                 <td>${statusBadge(m.status)}${m.status === 'no' && m.is_late ? ' <span class="response-late">kurzfristig</span>' : ''}${excuse}</td>
                 <td>${escapeHtml(m.comment ?? '')}</td>
@@ -319,6 +310,45 @@ function managerTableHtml(data) {
                 ${started ? `<td>${m.present ? 'anwesend' : '–'}</td>` : ''}
                 <td class="actions-cell">${memberActionButtons(m)}</td>
             </tr>`;
+}
+
+/**
+ * Verwalter-Tabelle (admin/manager): derselbe Umschalter, derselbe
+ * Speicherschluessel (GROUPING_KEY_RESPONSES) und dieselbe Vorgabe ('group')
+ * wie namesListHtml() -- der Dirigent mit Manager-Konto ist der eigentliche
+ * Anlass des Vorhabens, und die Wahl darf beim Rollenwechsel zwischen
+ * Verwalter- und Namensliste nicht springen. Die Stufen-Verfuegbarkeit
+ * richtet sich nach ALLEN Mitgliedern (data.members), nicht nach dem
+ * aktuellen Filter -- sonst wuerde "Untergruppe" verschwinden, sobald der
+ * Filter "Keine Antwort" zufaellig niemanden mit Untergruppe zeigt.
+ */
+function managerTableHtml(data) {
+    const started = data.started;
+    const colspan = started ? 6 : 5;
+    const allCount = data.members.length;
+    const openCount = data.members.filter(m => m.status === null).length;
+
+    const filtered = data.members.filter(m => matchesFilter(m, currentFilter));
+
+    const stages = groupingAvailableStages(data.members);
+    const stage  = groupingStored(GROUPING_KEY_RESPONSES, stages, 'group');
+    // "Ohne Gruppe" nur bei der Stufe 'group' -- bei 'subgroup' zeigt der
+    // Sammelabschnitt das eingestellte Wort (z.B. "Ohne Register").
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const sections = groupingSections(filtered, stage, emptyLabel);
+    const duplicates = groupingDuplicateCount(filtered, stage);
+
+    let hint = '';
+    if (duplicates > 0) {
+        const text = duplicates === 1 ? '1 Mitglied steht' : `${duplicates} Mitglieder stehen`;
+        hint = `<p class="list-grouping-hint">${text} in mehreren Abschnitten.</p>`;
+    }
+
+    const rows = sections.map(section => {
+        const groupRow = section.label !== null
+            ? `<tr class="response-group-row"><td colspan="${colspan}">${escapeHtml(section.label)} · ${section.members.length}</td></tr>`
+            : '';
+        return groupRow + section.members.map(m => managerMemberRowHtml(m, started)).join('');
     }).join('');
 
     return `
@@ -328,6 +358,7 @@ function managerTableHtml(data) {
             <button type="button" class="response-filter__btn${currentFilter === 'open' ? ' is-active' : ''}"
                     aria-pressed="${currentFilter === 'open' ? 'true' : 'false'}" onclick="filterResponses('open')">Keine Antwort (${openCount})</button>
         </div>
+        ${responsesGroupingSwitcher(stages, stage)}${hint}
         <div class="data-table">
             <table>
                 <thead><tr>
@@ -339,19 +370,6 @@ function managerTableHtml(data) {
         </div>`;
 }
 
-/** Gruppenname eines Mitglieds, null statt leer/undefiniert fuer "Ohne Gruppe" --
- * wie responseGroupKey() in der PWA (public/checkin/js/app.js). */
-function responseGroupKey(m) {
-    return m.group_name && String(m.group_name).trim() !== '' ? m.group_name : null;
-}
-
-/** Nachname vor Vorname zur Sortierung, "Vorname Nachname" bleibt die Anzeige --
- * wie sortByNameSurname() in der PWA. */
-function sortByNameSurname(members) {
-    return [...members].sort((a, b) =>
-        a.surname.localeCompare(b.surname, 'de') || a.name.localeCompare(b.name, 'de'));
-}
-
 /** Ein Namens-Chip, nach Status eingefaerbt und mit Icon-Praefix statt nur
  * Farbe (Kontrast/Nicht-nur-Farbe) -- wie responseNameChip() in der PWA. */
 function responseNameChip(m) {
@@ -359,32 +377,54 @@ function responseNameChip(m) {
     return `<span class="response-name-chip response-name-chip--${key}">${RESPONSE_ICONS[key]} ${escapeHtml(m.name)} ${escapeHtml(m.surname)}</span>`;
 }
 
+/** Umschalter Alphabetisch/Gruppe/Untergruppe -- ueber der Namensliste UND
+ * der Verwalter-Tabelle, dieselbe Gestaltung an beiden Stellen (Spec 6.1). */
+function responsesGroupingSwitcher(stages, stage) {
+    if (stages.length <= 1) return '';
+    const stageLabels = { alpha: 'Alphabetisch', group: 'Gruppe', subgroup: escapeHtml(subgroupLabel()) };
+    const buttons = stages.map(s => `
+        <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
+                aria-pressed="${stage === s ? 'true' : 'false'}"
+                onclick="setResponsesGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+    return `<div class="list-grouping">${buttons}</div>`;
+}
+
 /**
- * Antworten anderer Mitglieder (Rolle user, names_visible): nach Gruppe
- * gegliedert statt einer flachen Liste mit Aufzaehlungspunkten -- analog zu
- * responseNamesHtml() in der PWA (public/checkin/js/app.js). Gruppen
- * alphabetisch, Mitglieder ohne Gruppe zuletzt als "Ohne Gruppe"; je Gruppe
- * eine Ampel-Zeile aus responseChipsHtml() und darunter Namens-Chips
+ * Antworten anderer Mitglieder (Rolle user, names_visible): gegliedert nach
+ * dem gewaehlten Umschalter statt fest nach Terminart-Gruppe -- denselben
+ * Umschalter fuehrt seit Commit 6d08a05 auch die PWA (public/checkin/js/app.js),
+ * dort als eigene, absichtlich gleich gehaltene Fassung der grouping.js-
+ * Funktionen, weil die PWA kein Modulsystem hat. Vorgabe 'group', ausser es
+ * gibt Untergruppen (groupingStored()). Je
+ * Abschnitt eine Ampel-Zeile aus responseChipsHtml() und darunter Namens-Chips
  * Zusage -> Unsicher -> Absage -> ohne Antwort (CHIP_ORDER), darin nach
- * Nachname/Vorname.
+ * Nachname/Vorname (schon durch groupingSections() sortiert). Wer in
+ * mehreren Abschnitten steht (Gruppe/Untergruppe), erscheint mehrfach --
+ * groupingDuplicateCount() macht das ueber der Liste sichtbar (Spec 6.4).
  */
 function namesListHtml(members) {
-    const groupNames = [...new Set(members.map(responseGroupKey))].sort((a, b) => {
-        if (a === null) return 1;
-        if (b === null) return -1;
-        return a.localeCompare(b, 'de');
-    });
+    const stages = groupingAvailableStages(members);
+    const stage  = groupingStored(GROUPING_KEY_RESPONSES, stages, 'group');
+    // "Ohne Gruppe" nur bei der Stufe 'group' -- bei 'subgroup' zeigt der
+    // Sammelabschnitt das eingestellte Wort (z.B. "Ohne Register").
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const sections = groupingSections(members, stage, emptyLabel);
+    const duplicates = groupingDuplicateCount(members, stage);
 
-    const groups = groupNames.map(groupName => {
-        const groupMembers = members.filter(m => responseGroupKey(m) === groupName);
+    let hint = '';
+    if (duplicates > 0) {
+        const text = duplicates === 1 ? '1 Mitglied steht' : `${duplicates} Mitglieder stehen`;
+        hint = `<p class="list-grouping-hint">${text} in mehreren Abschnitten.</p>`;
+    }
+
+    const groups = sections.map(section => {
+        const label = section.label === null ? 'Alle Mitglieder' : section.label;
         const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
-        groupMembers.forEach(m => counts[m.status ?? 'open']++);
+        section.members.forEach(m => counts[m.status ?? 'open']++);
 
         const chips = CHIP_ORDER.map(key =>
-            sortByNameSurname(groupMembers.filter(m => (m.status ?? 'open') === key)).map(responseNameChip).join('')
+            section.members.filter(m => (m.status ?? 'open') === key).map(responseNameChip).join('')
         ).join('');
-
-        const label = groupName === null ? 'Ohne Gruppe' : groupName;
 
         return `<div class="response-name-group">
             <div class="response-name-group__heading"><span class="response-name-group__label">${escapeHtml(label)}</span> ${responseChipsHtml(counts)}</div>
@@ -392,8 +432,15 @@ function namesListHtml(members) {
         </div>`;
     }).join('');
 
-    return `<div class="response-names-grouped">${groups}</div>`;
+    return `${responsesGroupingSwitcher(stages, stage)}${hint}<div class="response-names-grouped">${groups}</div>`;
 }
+
+/** Umschalter-Klick: merkt die Wahl und rendert das offene Modal aus den
+ * vorliegenden Daten neu -- kein erneuter API-Aufruf. */
+window.setResponsesGrouping = function(stage) {
+    groupingStore(GROUPING_KEY_RESPONSES, stage);
+    if (current) renderResponsesModal();
+};
 
 export function filterResponses(filter) {
     currentFilter = filter;

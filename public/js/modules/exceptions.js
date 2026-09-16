@@ -16,6 +16,7 @@ import { loadMembers } from './members.js';
 import { loadTypes } from './management.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
+import { escapeHtml } from './utils.js';
 
 // ============================================
 // EXCEPTIONS
@@ -109,7 +110,7 @@ export async function renderExceptions(exceptions, page = 1)
                 a => a.appointment_id == exception.appointment_id
             );
             if (appointment) {
-                appointmentInfo = `${appointment.title} (${appointment.date})`;
+                appointmentInfo = `${escapeHtml(appointment.title)} (${appointment.date})`;
             }
         }
 
@@ -178,9 +179,9 @@ export async function renderExceptions(exceptions, page = 1)
         const row = 
         tr.innerHTML = `            
             <td>${typeBadge}</td>
-            <td>${exception.surname}, ${exception.name}</td>
+            <td>${escapeHtml(exception.surname)}, ${escapeHtml(exception.name)}</td>
             <td>${appointmentInfo}</td>
-            <td>${exception.reason}</td>
+            <td>${escapeHtml(exception.reason)}</td>
             <td>${requestedTime}</td>
             <td>${statusBadge}</td>
             <td>${formattedCreated}</td>

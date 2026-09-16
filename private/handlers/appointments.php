@@ -306,7 +306,15 @@ function handleAppointments($db, $database, $method, $id) {
             // Dann den Termin selbst
             $stmt = $db->prepare("DELETE FROM {$prefix}appointments WHERE appointment_id = ?");
             if($stmt->execute([$id])) {
-                echo json_encode(["message" => "Appointment deleted"]);
+                if($stmt->rowCount() === 0) {
+                    // execute() liefert true, auch wenn keine Zeile traf --
+                    // eine erfundene oder bereits geloeschte ID sah bisher
+                    // wie ein Erfolg aus.
+                    http_response_code(404);
+                    echo json_encode(["message" => "Appointment not found"]);
+                } else {
+                    echo json_encode(["message" => "Appointment deleted"]);
+                }
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to delete appointment"]);

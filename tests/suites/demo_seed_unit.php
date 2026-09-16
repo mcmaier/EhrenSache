@@ -95,18 +95,79 @@ test('DemoRandom::pick auf leerer Liste wirft', function () {
 
 // ---- Stammdaten ----------------------------------------------------------
 
-test('buildGroups liefert die vier Gruppen mit fortlaufenden IDs', function () {
+test('buildGroups liefert neun Gruppen mit fortlaufenden IDs, die ersten vier ohne Untergruppe', function () {
     $groups = buildGroups();
-    assertSame(4, count($groups));
+    assertSame(9, count($groups));
     assertSame(1, $groups[0]['group_id']);
     assertSame('Aktive', $groups[0]['group_name']);
     assertSame(4, $groups[3]['group_id']);
     assertSame('Ehrenmitglieder', $groups[3]['group_name']);
+    foreach (array_slice($groups, 0, 4) as $g) {
+        assertSame(0, $g['is_subgroup'], "Gruppe {$g['group_name']} sollte keine Untergruppe sein");
+    }
 });
 
 test('buildGroups markiert genau eine Gruppe als Vorgabe', function () {
     $defaults = array_filter(buildGroups(), fn ($g) => $g['is_default'] === 1);
     assertSame(1, count($defaults));
+});
+
+// ---- Register (Untergruppen) ----------------------------------------------
+// Erste echte Untergruppen im Demo-Bestand -- vorher liess sich die dritte
+// Stufe des Umschalters nur mit eingeschleusten Testdaten pruefen.
+
+test('buildGroups enthaelt fuenf Untergruppen mit is_subgroup=1 und aufsteigender sort_order', function () {
+    $subgroups = array_values(array_filter(buildGroups(), fn ($g) => $g['is_subgroup'] === 1));
+    assertSame(5, count($subgroups));
+
+    $expectedNames = ['Flöte', 'Klarinette', 'Trompete', 'Tenorhorn', 'Schlagzeug'];
+    $lastOrder     = -1;
+    foreach ($subgroups as $idx => $g) {
+        assertSame(1, $g['is_subgroup']);
+        assertSame($expectedNames[$idx], $g['group_name']);
+        assertTrue($g['sort_order'] > $lastOrder, "sort_order von {$g['group_name']} ist nicht aufsteigend");
+        $lastOrder = $g['sort_order'];
+    }
+});
+
+test('jedes Mitglied hat hoechstens zwei Register, mindestens eines hat zwei', function () {
+    $subgroupIds = array_map(fn ($g) => $g['group_id'], array_filter(buildGroups(), fn ($g) => $g['is_subgroup'] === 1));
+
+    $r              = new DemoRandom(20260908);
+    $m              = buildMembers($r, '2026-09-08');
+    $countPerMember = [];
+    foreach ($m['assignments'] as $a) {
+        if (in_array($a['group_id'], $subgroupIds, true)) {
+            $countPerMember[$a['member_id']] = ($countPerMember[$a['member_id']] ?? 0) + 1;
+        }
+    }
+
+    foreach ($m['members'] as $member) {
+        $count = $countPerMember[$member['member_id']] ?? 0;
+        assertTrue($count <= 2, "Mitglied {$member['member_id']} hat {$count} Register, erwartet hoechstens 2");
+    }
+
+    $withTwo = array_filter($countPerMember, fn ($c) => $c === 2);
+    assertTrue(count($withTwo) >= 1, 'Kein Mitglied mit zwei Registern -- die Doppelnennung waere ungeprueft');
+});
+
+// Ohne mindestens ein Mitglied ganz ohne Register bliebe der Sammelabschnitt
+// ("Ohne " . subgroup_label) im Demo-Bestand leer -- die Oberfläche liesse
+// sich dann nie mit echten Daten pruefen, nur mit eingeschleusten Testdaten.
+test('mindestens ein Mitglied hat kein Register -- der Sammelabschnitt ist mit echten Daten pruefbar', function () {
+    $subgroupIds = array_map(fn ($g) => $g['group_id'], array_filter(buildGroups(), fn ($g) => $g['is_subgroup'] === 1));
+
+    $r              = new DemoRandom(20260908);
+    $m              = buildMembers($r, '2026-09-08');
+    $countPerMember = [];
+    foreach ($m['assignments'] as $a) {
+        if (in_array($a['group_id'], $subgroupIds, true)) {
+            $countPerMember[$a['member_id']] = ($countPerMember[$a['member_id']] ?? 0) + 1;
+        }
+    }
+
+    $withoutRegister = array_filter($m['members'], fn ($member) => ($countPerMember[$member['member_id']] ?? 0) === 0);
+    assertTrue(count($withoutRegister) >= 1, 'Kein Mitglied ohne Register -- der Sammelabschnitt bliebe ungeprueft');
 });
 
 test('buildAppointmentTypes liefert vier Arten mit Farbe', function () {
@@ -200,7 +261,14 @@ test('buildMembers haelt die Gruppenstaerken ein', function () {
     $m     = buildMembers(new DemoRandom(20260908));
     $count = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
     foreach ($m['assignments'] as $a) {
-        $count[$a['group_id']]++;
+        // Nur die vier Zugehoerigkeits-Gruppen zaehlen. Seit den Registern
+        // (Gruppe 5-9, is_subgroup=1) enthaelt $m['assignments'] eine
+        // zweite, unabhaengige Zuordnung je Mitglied -- DEMO_GROUP_SIZES
+        // beschreibt nur die Staerke von Aktive/Jugend/Vorstandschaft/
+        // Ehrenmitglieder, Register haben hier keine erwartete Staerke.
+        if (isset($count[$a['group_id']])) {
+            $count[$a['group_id']]++;
+        }
     }
     assertSame(28, $count[1], 'Aktive');
     assertSame(8, $count[2], 'Jugend');
@@ -643,7 +711,10 @@ test('buildActivityTypeGroups bindet jede Taetigkeit an mindestens eine Gruppe u
     foreach (buildActivityTypes() as $a) {
         assertTrue(!empty($groupsForActivity[$a['activity_id']]), "Taetigkeit {$a['activity_id']} ohne Gruppe");
     }
-    foreach (buildGroups() as $g) {
+    // Register (is_subgroup=1) sind absichtlich aussen vor: Sie gliedern nur
+    // Listen und haengen an keiner Taetigkeit -- siehe buildGroups().
+    $nonSubgroups = array_filter(buildGroups(), fn ($g) => $g['is_subgroup'] === 0);
+    foreach ($nonSubgroups as $g) {
         assertTrue(!empty($activitiesForGroup[$g['group_id']]), "Gruppe {$g['group_id']} ohne Taetigkeit");
     }
 });
@@ -910,6 +981,15 @@ test('buildSettings setzt Vereinsname, leeres Logo und aktivierte Arbeitszeit/St
     assertSame('', $settings['organization_logo']);
     assertSame('1', $settings['worktime_enabled']);
     assertSame('1', $settings['station_pin_enabled']);
+});
+
+// Ohne diesen Schlüssel zeigt eine frisch aufgesetzte Demo ueberall die
+// Vorgabe "Untergruppe" statt der fuenf angelegten Register beim Namen zu
+// nennen -- subgroup_label gehoert zu den Einstellungen, die der Generator
+// aktualisiert (Kategorie 'public' in system_settings).
+test('buildSettings setzt subgroup_label auf Register', function () {
+    $settings = buildDemoPlan(20260908, '2026-09-08')['settings'];
+    assertSame('Register', $settings['subgroup_label']);
 });
 
 test('buildUsers liefert vier Konten und zwei Geraete', function () {

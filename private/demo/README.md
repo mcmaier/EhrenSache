@@ -27,11 +27,13 @@ den Webserver bricht es mit 403 ab.
 
 ## Voraussetzung
 
-`schema_version` ≥ **1.7.0**. Seit dieser Version schreibt der Generator
-`appointment_responses` — eine Tabelle, die ältere Schemata nicht kennen. Der
-Update-Assistent stempelt bei jeder Migration deren `to`-Version in `schema_version`; eine
-aktualisierte Installation trägt daher mindestens 1.7.0 als letzten Stempel. Auf einem älteren
-Stand bricht der Generator laut ab, statt in eine fehlende Tabelle zu schreiben.
+`schema_version` ≥ **1.8.0**. Seit dieser Version schreibt der Generator `member_groups` mit
+den Spalten `is_subgroup` und `sort_order` (Register) — Spalten, die ältere Schemata nicht
+kennen. 1.7.0 war die vorherige Schwelle, weil der Generator seitdem `appointment_responses`
+schreibt, eine Tabelle, die noch ältere Schemata nicht kennen. Der Update-Assistent stempelt
+bei jeder Migration deren `to`-Version in `schema_version`; eine aktualisierte Installation
+trägt daher mindestens 1.8.0 als letzten Stempel. Auf einem älteren Stand bricht der Generator
+laut ab, statt in eine fehlende Tabelle oder Spalte zu schreiben.
 
 ## Reihenfolge im Alltag
 
@@ -50,7 +52,7 @@ beendete den Timer, den das PWA-Bild zeigen soll.
 
 | Datei | Zuständigkeit |
 |---|---|
-| `plan.php` | **rein**: berechnet den Bestand als Arrays. Keine Datenbank, keine Uhr außer dem übergebenen Stichtag. Geprüft von `tests/suites/demo_seed_unit.php` (80 Tests). |
+| `plan.php` | **rein**: berechnet den Bestand als Arrays. Keine Datenbank, keine Uhr außer dem übergebenen Stichtag. Geprüft von `tests/suites/demo_seed_unit.php` (92 Tests). |
 | `seed.php` | **Ein-/Ausgabe**: Optionen, Sicherheitsabfrage, Leeren, `INSERT`, Geheimnisse. Geprüft von `tests/suites/demo_seed_cli.php` (19 Tests). |
 
 Die Trennung ist der Grund, warum es überhaupt Tests gibt: Eine Suite, die den Schreibteil
@@ -102,11 +104,14 @@ unter Geräte und werden bei jedem Lauf neu gewürfelt.
 ## Was der Bestand enthält
 
 40 Mitglieder in vier Gruppen (Aktive, Jugend, Vorstandschaft, Ehrenmitglieder), davon drei
-mit beendeter Mitgliedschaft und 15 mit Stations-PIN · vier Terminarten und rund 105 Termine
-über zwölf Monate rückwärts und vier Wochen vorwärts · rund 2400 Anwesenheiten mit
-gestreuter Quote und Ankunftszeit · 25 Anträge, davon fünf offen · sechs Tätigkeitsarten mit
-Gruppenbindung · 120 Arbeitszeiten (106 bestätigt, 10 eingereicht, 4 abgelehnt) samt
-Auditspur.
+mit beendeter Mitgliedschaft und 15 mit Stations-PIN · fünf Register als Untergruppe markiert
+(Flöte, Klarinette, Trompete, Tenorhorn, Schlagzeug, in dieser `sort_order`), 38 der 40
+Mitglieder darin (Flöte 6, die übrigen vier Register je 8), vier davon zusätzlich in einem
+zweiten Register, zwei Mitglieder bewusst ohne Register — damit der Sammelabschnitt der
+Gliederung auch mit echten Daten zu sehen ist · vier Terminarten und rund 105 Termine über
+zwölf Monate rückwärts und vier Wochen vorwärts · rund 2400 Anwesenheiten mit gestreuter Quote
+und Ankunftszeit · 25 Anträge, davon fünf offen · sechs Tätigkeitsarten mit Gruppenbindung ·
+120 Arbeitszeiten (106 bestätigt, 10 eingereicht, 4 abgelehnt) samt Auditspur.
 
 ## Regeln, die der Bestand einhält
 
@@ -171,7 +176,7 @@ dem die Datenbankklasse einen Verbindungsfehler beantwortet — fängt ein Wäch
 `registerExitGuard()` ab und macht daraus eine 1. Neue Abbruchstellen im Ablauf also über
 `finishRun()` beenden, nicht über `exit()`, sonst meldet der Wächter sie als unerwartet.
 
-**Der Reset überschreibt in `system_settings` nur acht Schlüssel** und leert die Tabelle nie.
+**Der Reset überschreibt in `system_settings` nur neun Schlüssel** und leert die Tabelle nie.
 `mail_enabled` und `smtp_configured` gehören **nicht** dazu — sie überleben jeden Lauf. Was
 das für den Mailversand bedeutet, steht in `docs/DEMO.md`; die Kurzfassung: Der Versand wird
 allein durch die Sperrliste des Wächters verhindert, nicht durch die fehlende Konfiguration.

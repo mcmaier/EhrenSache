@@ -79,8 +79,13 @@ async function applyTheme(settings) {
 
         try
         {
-            privacyLink.href = settings.privacy_policy_url;
-            privacyGroup.style.display = 'block';
+            // Admin-gesetzter Wert ohne Server-seitige Format-Pruefung, landet als
+            // href auf der oeffentlichen Registrierungsseite -- ohne Whitelist waere
+            // z.B. "javascript:..." fuer jeden Besucher ausfuehrbar.
+            if (/^https?:\/\//i.test(settings.privacy_policy_url) || settings.privacy_policy_url.startsWith('/')) {
+                privacyLink.href = settings.privacy_policy_url;
+                privacyGroup.style.display = 'block';
+            }
         }
         catch(error)
         {}

@@ -9,6 +9,7 @@
  */
 
 import {TOAST_DURATION} from '../config.js';
+import {escapeHtml} from './utils.js';
 import {apiCall, isAdmin, isAdminOrManager, currentUser} from './api.js';
 import {loadProfile, initProfileEventHandler} from './profile.js';
 import {loadUsers, showUserSection, initUsersEventHandlers} from'./users.js';
@@ -51,7 +52,12 @@ export const dataCache = {
     appointments: {},
     records: {},
     exceptions: {},
-    workSessions: {}
+    workSessions: {},
+
+    // Systemeinstellungen (nur admin-lesbar; subgroupLabel() liest NICHT von
+    // hier, siehe dort — settings.js pflegt diesen Eintrag für seine eigenen
+    // admin-only Zwecke weiter)
+    settings: { data: {}, timestamp: null }
 };
 
 const CACHE_TTL = 10 * 60 * 1000; // 10 Minuten
@@ -101,6 +107,73 @@ export async function invalidateCache(cacheKey = null, year = null) {
             }
         });
     }
+}
+
+// ============================================
+// Untergruppen-Bezeichnung
+// ============================================
+
+/**
+ * Liefert das eingestellte Wort für Untergruppen (z. B. "Register").
+ * `subgroup_label` liegt in der Kategorie 'public' (wie Vereinsname, Farben,
+ * Datenschutz-URL) und kommt deshalb über denselben Weg wie diese: theme.js
+ * lädt beim Seitenaufruf `resource=appearance` — ohne Anmeldung, ohne
+ * Adminrechte — und legt das Ergebnis unter sessionStorage 'theme-settings'
+ * ab (siehe public/js/theme.js, loadTheme()). Kein eigener, admin-only
+ * Ladeweg nötig; gilt deshalb für alle Rollen gleich.
+ */
+export function subgroupLabel() {
+    let wert = '';
+    try {
+        const raw = sessionStorage.getItem('theme-settings');
+        if (raw) {
+            const settings = JSON.parse(raw);
+            wert = (settings?.subgroup_label || '').trim();
+        }
+    } catch (error) {
+        wert = '';
+    }
+    return wert === '' ? 'Untergruppe' : wert;
+}
+
+/** Füllt alle [data-subgroup-label]-Elemente im Dokument mit dem aktuellen Wort. */
+export function updateSubgroupLabelElements() {
+    const label = subgroupLabel();
+    document.querySelectorAll('[data-subgroup-label]').forEach(el => {
+        el.textContent = label;
+    });
+}
+
+/**
+ * Baut die <option>-Einträge für ein Gruppen-Auswahlfeld. Zugehörigkeitsgruppen
+ * und Untergruppen (`is_subgroup`) erscheinen fachlich getrennt: native
+ * <optgroup>-Überschriften statt Farbe oder Trennzeichen, ohne Zusatzaufwand
+ * barrierefrei und ohne CSS. Erwartet `groups` bereits serverseitig sortiert
+ * (sort_order, group_name — siehe member_groups.php), sortiert hier nicht neu,
+ * filtert nur in zwei Töpfe.
+ *
+ * Gibt es keine Untergruppe in der Liste, bleibt die Ausgabe eine flache
+ * Options-Liste wie vor 1.8.0 — keine leere zweite Überschrift, keine
+ * Optgroup nur für die erste.
+ */
+export function groupSelectOptionsHtml(groups) {
+    const list = Array.isArray(groups) ? groups : [];
+    // g.group_name kommt aus der Gruppenverwaltung (DB) -- ohne CSP (OI-17)
+    // muss hier selbst maskiert werden.
+    const option = g => `<option value="${g.group_id}">${escapeHtml(g.group_name)}</option>`;
+    const subgroups = list.filter(g => g.is_subgroup == 1);
+
+    if (subgroups.length === 0) {
+        return list.map(option).join('');
+    }
+
+    const main = list.filter(g => g.is_subgroup != 1);
+    // subgroupLabel() ist Freitext aus den Einstellungen -- für den
+    // Attribut-Kontext reicht das Escaping von escapeHtml() (utils.js) nicht,
+    // da es Anführungszeichen im Textknoten nicht kodiert.
+    const attrLabel = subgroupLabel().replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    return `<optgroup label="Gruppen">${main.map(option).join('')}</optgroup>`
+        + `<optgroup label="${attrLabel}">${subgroups.map(option).join('')}</optgroup>`;
 }
 
 // ============================================

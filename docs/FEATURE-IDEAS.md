@@ -51,7 +51,7 @@ durchschlägt.
 | [FI-11](#fi-11--mehrsprachigkeit-der-oberfläche) | Mehrsprachigkeit der Oberfläche | niedrig | L | — |
 | [FI-12](#fi-12--material--und-instrumentenausleihe) | Material- und Instrumentenausleihe | niedrig | L | — |
 | [FI-13](#fi-13--geburtstagsliste-mit-gratulationsvermerk) | Geburtstagsliste mit Gratulationsvermerk | mittel | M | — |
-| [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht | mittel¹ | M | FI-1 für die Wirkung |
+| [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht — **Variante B teilweise umgesetzt in 1.8.0** | mittel¹ | M | FI-1 für die Wirkung |
 | [FI-15](#fi-15--rolle-gruppenleiter) | Rolle „Gruppenleiter" | hoch | L | — |
 | [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) | Feiertage und Ferien im Terminkalender | mittel | M | FI-7 für die Wirkung |
 | [FI-17](#fi-17--offene-punkte-unter-mein-konto) | Offene Punkte unter „Mein Konto" | hoch | S | — |
@@ -150,54 +150,55 @@ nur dem Mitglied selbst — dieselbe Abwägung, die `my_data` schon einmal getro
 ### FI-14 · Untergruppen (Register) und Besetzungsübersicht
 **Nutzen:** mittel — hoch zusammen mit [FI-1](#fi-1--terminzusage-im-vorfeld) · **Aufwand:** M
 
-Feinere Gliederung unterhalb der Gruppe: im Musikverein das Register (Klarinette, Trompete,
-Schlagzeug), im Sportverein die Mannschaft. Zusammen mit der Zusage ergibt das die eigentlich
-interessante Auskunft vor einem Auftritt: nicht „38 von 55 haben zugesagt", sondern „Klarinette
-3 von 6, Horn 0 von 2" — also die Frage, ob das Stück überhaupt spielbar ist.
+**Teilweise umgesetzt in 1.8.0** — Spec
+`docs/superpowers/specs/2026-09-16-untergruppen-gliederung-design.md`. Gebaut ist Variante B
+(Gruppenart, siehe Tabelle unten): eine Gruppe lässt sich als Untergruppe markieren
+(`is_subgroup`) und bekommt eine pflegbare Reihenfolge (`sort_order`); Anwesenheitslisten und
+die Namensliste der Terminrückmeldung lassen sich per Umschalter „Alphabetisch · Gruppe ·
+<Wort>" danach gliedern, der Oberbegriff ist frei wählbar (Einstellung `subgroup_label`, z. B.
+„Register" oder „Mannschaft"). Offen bleibt aus der ursprünglichen Idee weiterhin die
+**Besetzungsübersicht mit Sollstärke** — „Klarinette 3 von 6" statt nur der Gliederung nach
+Register. Der Rest dieses Abschnitts beschreibt diesen offenen Teil.
+
+Zusammen mit der Zusage ([FI-1](#fi-1--terminzusage-im-vorfeld), umgesetzt in 1.7.0) ergäbe das
+die eigentlich interessante Auskunft vor einem Auftritt: nicht „38 von 55 haben zugesagt",
+sondern „Klarinette 3 von 6, Horn 0 von 2" — also die Frage, ob das Stück überhaupt spielbar
+ist.
 
 **Warum interessant:** Eine reine Kopfzahl beantwortet die Besetzungsfrage nicht. Fehlen zehn
-Beliebige, geht die Probe; fehlt die einzige Tuba, klingt sie nicht. Das ist der Punkt, an dem
-[FI-1](#fi-1--terminzusage-im-vorfeld) von einer Umfrage zu einem Planungswerkzeug wird.
-
-**Wichtig vorweg: Register gehen heute schon — flach.** `member_group_assignments` ist eine
-M:N-Tabelle, ein Mitglied kann also bereits jetzt in „Blasorchester" **und** „Klarinette"
-stehen. Die Frage ist deshalb nicht, ob Register abbildbar sind, sondern ob eine echte
-Hierarchie den Preis wert ist. Drei Stufen, aufsteigend:
+Beliebige, geht die Probe; fehlt die einzige Tuba, klingt sie nicht.
 
 | Variante | Was sie kostet | Was sie kann |
 |---|---|---|
-| **A: gar nichts** — Register als gewöhnliche Gruppe | nichts | Zuordnung und Filter. Keine Auswertung „nach Register", weil nichts weiß, welche Gruppen Register sind |
-| **B: Gruppenart** — ein Feld `group_kind` (z. B. Ensemble / Register) | eine Spalte, eine Migration, etwas Oberfläche | Besetzungsansicht gruppiert nach Register, ohne dass irgendeine bestehende Logik sich ändert |
+| **A: gar nichts** — Register als gewöhnliche Gruppe | nichts | Zuordnung und Filter. Keine Auswertung „nach Register" |
+| **B: Gruppenart** — Häkchen `is_subgroup` und `sort_order` an `member_groups` | eine Migration, etwas Oberfläche | **Umgesetzt in 1.8.0:** Listen nach Register gliedern, ohne dass bestehende Logik sich ändert. Keine Besetzungsübersicht |
 | **C: echte Hierarchie** — `parent_group_id` in `member_groups` | schlägt in Terminarten-Zuordnung, Sichtbarkeitsprüfung, Cross-Filtering, Statistik, Import/Export durch | Vererbung: ein Termin für das Orchester erreicht alle Register automatisch |
 
-Variante B löst den genannten Anwendungsfall vollständig und ist ein Bruchteil des Aufwands von
-C. C lohnt erst, wenn Vererbung wirklich gebraucht wird — und die zieht Folgefragen nach sich,
-die heute niemand stellt (siehe unten).
+Variante C bleibt bewusst weggelassen (Spec-Abschnitt 10): Ein Mitglied in mehreren
+Untergruppen wird mehrfach angezeigt, statt es einem Hauptregister zuzuordnen oder Ebenen zu
+vererben — die Doppelnennung ist die gewählte Antwort auf Mehrfachzugehörigkeit, nicht eine
+Hierarchie.
 
-**Berührt:** `member_groups` (Migration) · `member_groups.php` · `management.js` ·
-Statistik und Filterleisten · bei Variante C zusätzlich `appointment_type_groups`,
+**Berührt (für die Besetzungsübersicht):** `statistics.php`, Filterleisten der
+Mitgliederliste, Druckbericht der Besetzung (bleibt bewusst nach Terminart-Gruppe gegliedert,
+Spec-Abschnitt 10) · bei Variante C zusätzlich `appointment_type_groups`,
 `hasStatisticsGroupAccess()` und die Cross-Filtering-Logik aus
 `docs/superpowers/specs/2026-04-15-dropdown-cross-filtering-design.md`.
 
-**Vorher zu klären:**
+**Vorher zu klären, noch offen:**
 
-- **Wieviel Hierarchie wirklich?** Siehe Tabelle. Wer C baut, muss beantworten: Erbt eine
-  Untergruppe die Terminarten der Obergruppe? Sieht ein Nutzer mit Zugriff auf das Register auch
-  die Orchesterdaten — oder umgekehrt? Zählt eine Statistik über das Orchester die
-  Registermitglieder mit? Jede dieser Antworten ist für sich vertretbar, aber sie müssen
-  zusammenpassen.
-- **Mehrfachzugehörigkeit und Doppelzählung.** Wer Klarinette und Saxophon spielt, steht in
-  beiden Registern — und wird in einer Besetzungsübersicht zweimal gezählt. Es braucht also
-  entweder ein Hauptregister je Mitglied oder eine Übersicht, die das offen ausweist. Das ist
-  der Punkt, an dem die Zahl sonst still falsch wird.
 - **Sollstärke je Register.** „3 von 6" setzt voraus, dass irgendwo 6 steht. Ist das die Zahl
   der zugeordneten Mitglieder oder eine gepflegte Mindestbesetzung? Ersteres ist geschenkt,
   Letzteres aussagekräftiger und ein weiteres Pflegefeld.
-- **Reihenfolge.** Register sind in der Partitur geordnet (Flöte, Klarinette, … Schlagzeug),
-  nicht alphabetisch. Für eine Besetzungsansicht, die man ernst nimmt, braucht die Gruppe ein
-  Sortierfeld.
-- **Ohne FI-1 bleibt es Kosmetik.** Für sich allein ist eine Registergliederung nur eine andere
-  Sortierung der Mitgliederliste. Der Nutzen entsteht mit den Zusagen.
+- **Zählweise bei Doppelspielern.** 1.8.0 zeigt, wer in zwei Registern steht, zweimal an —
+  gewollt für die Gliederung (Spec 3.2), aber ungelöst für eine Auswertung: Zählt „Klarinette 3
+  von 6" einen Doppelspieler mit, der schon bei „Saxophon 2 von 4" mitgezählt wurde? Eine
+  Besetzungsübersicht muss das entscheiden, die entdoppelten Kennzahlen der Rückmeldung
+  (`responseSummary()`) helfen hier nicht weiter.
+- **Wieviel Hierarchie für Variante C wirklich?** Nur relevant, falls C doch einmal verfolgt
+  wird: Erbt eine Untergruppe die Terminarten der Obergruppe? Sieht ein Nutzer mit Zugriff auf
+  das Register auch die Orchesterdaten — oder umgekehrt? Jede Antwort ist für sich vertretbar,
+  muss aber zusammenpassen.
 
 ---
 

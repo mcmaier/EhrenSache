@@ -2565,13 +2565,17 @@ body {
     transform: rotate(90deg);
 }
 
-.response-comment-details summary {
+/* Gleiche Aufmachung wie "Bemerkung" (Nutzer-Feedback: "Wer hat
+   geantwortet?" wirkte als Fremdkoerper) -- kein eigener Blauton/Fettdruck
+   mehr fuer das Label, nur noch der gemeinsame Pfeil hebt beide Bereiche
+   vom Fliesstext ab. */
+.response-comment-details summary,
+.response-names summary {
     color: var(--text-light);
 }
 
 .response-summary-label {
-    color: var(--primary-color);
-    font-weight: 600;
+    font-weight: normal;
 }
 
 .response-comment {
@@ -2617,18 +2621,14 @@ body {
     padding-left: 0;
 }
 
-.response-names summary {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
 /* Ampel-Zeile -- Zaehlung je Status, gleiche Farben wie die Antwort-Knoepfe
    (response-btn). Nullwerte neutral grau statt ausgeblendet, damit die
-   Reihenfolge der vier Chips immer gleich bleibt. Wird an drei Stellen
-   verwendet: Kartenkopf (response-status), Summary von "Wer hat
-   geantwortet?" und Ueberschrift je Gruppe darin. */
+   Reihenfolge der vier Chips immer gleich bleibt. Wird an zwei Stellen
+   verwendet: Fristzeile (.response-status) und Ueberschrift je Gruppe unter
+   "Wer hat geantwortet?". Die Summary von "Wer hat geantwortet?" traegt
+   bewusst keine eigene Zaehlung -- die Fristzeile direkt darueber ist die
+   einzige immer sichtbare Gesamtzaehlung der Karte (Nutzer-Feedback: vorher
+   doppelt). */
 .response-count-row {
     display: inline-flex;
     gap: 6px;
@@ -2715,4 +2715,67 @@ body {
 .responses-empty {
     color: var(--text-light);
     text-align: center;
+}
+
+/* ========================================
+   GRUPPIERUNGS-UMSCHALTER (FI-14, Untergruppen, 1.8.0)
+   ======================================== */
+/* Segmentleiste Alphabetisch/Gruppe/<Wort> -- ueber der Anwesenheitsliste
+   (#attendanceGroupingBar) und ueber "Wer hat geantwortet?"
+   (responsesGroupingSwitcher()). Gleiche Bausteine wie .response-filter/
+   .list-grouping in public/css/components/buttons.css, hier eigenstaendig,
+   weil die PWA ihre CSS-Datei nicht mit dem Dashboard teilt. */
+.list-grouping {
+    display: flex;
+    gap: 6px;
+    margin: 8px 0;
+    width: 100%;
+    max-width: 400px;
+}
+
+/* Volle Breite statt schmal am linken Rand (Nutzer-Feedback) -- zu
+   gleichen Teilen, min-width:0 dazu, damit ein laengeres eingestelltes
+   Wort (z. B. "Altersklasse") im Zweifel abgeschnitten statt umgebrochen
+   wird oder ueberlaeuft (geprueft bei 360px Fensterbreite). */
+.list-grouping__btn {
+    flex: 1 1 0;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.list-grouping__btn:hover {
+    opacity: 0.8;
+}
+
+.list-grouping__btn.is-active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+/* Hinweiszeile bei Mehrfachnennung (Spec 6.4): wer in zwei Gruppen/
+   Untergruppen steht, erscheint absichtlich in beiden Abschnitten. */
+.list-grouping-hint {
+    width: 100%;
+    max-width: 400px;
+    color: var(--text-light);
+    font-size: 12px;
+    margin: 0 0 8px;
+}
+
+#attendanceGroupingBar {
+    width: 100%;
+    max-width: 400px;
 }

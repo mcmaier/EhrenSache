@@ -140,7 +140,7 @@ async function renderAppointments(appointments, page = 1) {
                 : '';
 
             appointmentInfo = `<div style="line-height: 1.4;">
-                <strong>${apt.title}</strong>${autoBadge}`;
+                <strong>${escapeHtml(apt.title)}</strong>${autoBadge}`;
 
             if (apt.date && apt.start_time) {
                 const aptDate = new Date(apt.date + 'T00:00:00');
@@ -151,8 +151,11 @@ async function renderAppointments(appointments, page = 1) {
             appointmentInfo += '</div>';
         }
 
-        const typeBadge = apt.type_name 
-            ? `<span class="type-badge" style="background: ${apt.color || '#667eea'}; color: white;">${apt.type_name}</span>`
+        // apt.color/apt.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
+        // muss hier selbst maskiert werden: Farbe per Whitelist, Text per escapeHtml().
+        const safeAptColor = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#667eea';
+        const typeBadge = apt.type_name
+            ? `<span class="type-badge" style="background: ${safeAptColor}; color: white;">${escapeHtml(apt.type_name)}</span>`
             : '<span class="type-badge">-</span>';
 
         const actionsHtml = isAdminOrManager ? `
@@ -162,8 +165,8 @@ async function renderAppointments(appointments, page = 1) {
                             title="Bearbeiten">
                         ✎
                     </button>
-                    <button class="action-btn btn-icon btn-delete" 
-                            onclick="deleteAppointment(${apt.appointment_id}, '${apt.title}')"
+                    <button class="action-btn btn-icon btn-delete"
+                            onclick="deleteAppointment(${apt.appointment_id})"
                             title="Löschen">
                         🗑
                     </button>
@@ -173,7 +176,7 @@ async function renderAppointments(appointments, page = 1) {
         tr.innerHTML = `
                 <td>${appointmentInfo}</td>
                 <td>${typeBadge}</td>
-                <td>${apt.description || '-'}</td>
+                <td>${apt.description ? escapeHtml(apt.description) : '-'}</td>
                 <td class="response-cell">${responseSummaryCell(apt)}</td>
                 ${actionsHtml}
                 `;
@@ -727,7 +730,14 @@ export async function saveAppointment() {
     }
 }
 
-export async function deleteAppointment(appointmentId, title) {
+export async function deleteAppointment(appointmentId) {
+    // Titel aus dem Cache holen statt aus dem onclick-Attribut: ein Termin-Titel
+    // mit Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als
+    // Code einschleusen (kein CSP im Projekt) -- Muster aus deleteGroup()/
+    // deleteType() in management.js (Commit ad200ba).
+    const cached = dataCache.appointments[currentYear]?.data?.find(a => a.appointment_id == appointmentId);
+    const title = cached ? cached.title : 'diesem Termin';
+
     const confirmed = await showConfirm(
         `Termin "${title}" wirklich löschen?`,
         'Termin löschen'
@@ -739,7 +749,9 @@ export async function deleteAppointment(appointmentId, title) {
             // Cache invalidieren und neu laden            
             showAppointmentSection(true, currentAppointmentsPage);
 
-            showToast(`Termin "${title}" wurde gelöscht`, 'success');
+            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Titel
+            // kommt aus der Terminverwaltung (Admin/Manager) und muss daher escaped werden.
+            showToast(`Termin "${escapeHtml(title)}" wurde gelöscht`, 'success');
         }
     }
 }

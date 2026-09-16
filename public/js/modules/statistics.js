@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { loadGroups } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
-import { showToast, showConfirm, currentYear} from './ui.js';
+import { showToast, showConfirm, currentYear, groupSelectOptionsHtml, subgroupLabel, dataCache} from './ui.js';
 import {debug} from '../app.js'
 import { escapeHtml } from './utils.js';
 
@@ -59,12 +59,8 @@ export async function loadStatisticsFilters() {
     if (groupSelect) {
         const currentValue = groupSelect.value;
 
-        groupSelect.innerHTML = '<option value="">Alle Gruppen</option>';
-        if (groups && groups.length > 0) {
-            groups.forEach(group => {
-                groupSelect.innerHTML += `<option value="${group.group_id}">${group.group_name}</option>`;
-            });
-        }
+        groupSelect.innerHTML = '<option value="">Alle Gruppen</option>'
+            + groupSelectOptionsHtml(groups || []);
 
         if (currentValue) groupSelect.value = currentValue;
 
@@ -75,6 +71,10 @@ export async function loadStatisticsFilters() {
                 if (opt.value !== '' && !userGroupIds.includes(parseInt(opt.value))) {
                     opt.remove();
                 }
+            });
+            // Leere Optgroup-Überschrift hinterlässt keine Gruppe ohne Einträge
+            Array.from(groupSelect.querySelectorAll('optgroup')).forEach(optgroup => {
+                if (optgroup.options.length === 0) optgroup.remove();
             });
             // Automatisch vorauswählen wenn nur eine Gruppe vorhanden
             if (!groupSelect.value && groupSelect.options.length === 2) {
@@ -140,7 +140,7 @@ export async function updateStatisticsFilters() {
     // Dropdown neu befüllen
     memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
     filteredMembers.forEach(member => {
-        memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+        memberSelect.innerHTML += `<option value="${member.member_id}">${escapeHtml(member.surname)}, ${escapeHtml(member.name)}</option>`;
     });    
     
     if (currentMemberId && filteredMembers.some(m => m.member_id == currentMemberId)) {
@@ -199,6 +199,20 @@ export async function showStatisticsSection()
  * Wochenprobe sieht 65 Prozent anders als eine Feuerwehr mit Monatsdienst.
  * Siehe OI-55. Sie stehen deshalb an genau einer Stelle.
  */
+/**
+ * Ist das aktuell gewählte statGroup eine Untergruppe? Die Statistik rechnet
+ * über Terminarten und deren Gruppen -- einer Untergruppe sind nie
+ * Terminarten zugeordnet, sie bleibt deshalb immer ergebnislos. Erkennung
+ * über dataCache.groups.data (von loadGroups() in loadStatisticsFilters()
+ * gefüllt), nicht über den Options-HTML, der nur die Darstellung trägt.
+ */
+function isSubgroupSelected() {
+    const groupId = document.getElementById('statGroup')?.value;
+    if (!groupId) return false;
+    const group = dataCache.groups.data.find(g => String(g.group_id) === String(groupId));
+    return !!group && group.is_subgroup == 1;
+}
+
 function rateBand(rate) {
     if (rate < 40) return 'rate-low';
     if (rate < 60) return 'rate-mid';
@@ -215,7 +229,11 @@ export async function renderStatistics(statsData) {
     // immer falsch: `!x === 0` vergleicht einen Boolean mit einer Zahl und ist
     // nie wahr. Der Leerfall fiel durch und lief in einen Fehler beim forEach.
     if (!statsData || !Array.isArray(statsData.statistics) || statsData.statistics.length === 0) {
-        container.innerHTML = '<p class="info-message">Keine Daten für die ausgewählten Filter vorhanden.</p>';
+        container.innerHTML = isSubgroupSelected()
+            ? `<p class="info-message">Für ${escapeHtml(subgroupLabel())} gibt es noch keine Auswertung: `
+                + `Die Statistik rechnet über Terminarten, und ${escapeHtml(subgroupLabel())} sind keinen `
+                + `Terminarten zugeordnet.</p>`
+            : '<p class="info-message">Keine Daten für die ausgewählten Filter vorhanden.</p>';
         updateOverallStats(statsData ? statsData.summary : null);
         updateBehaviorStats(statsData);
         return;

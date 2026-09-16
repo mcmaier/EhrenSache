@@ -551,3 +551,21 @@ function responsesFetchOwnAbsence($db, $database, int $appointmentId, int $membe
 
     return $row === false ? null : $row;
 }
+
+/**
+ * Menge der Terminart-Gruppen aus den noch nicht entdoppelten erwarteten
+ * Mitgliedern (responsesFetchExpected()).
+ *
+ * responsesFetchExpected() joint atg.group_id = mga.group_id = g.group_id --
+ * jede Zeile traegt also bereits eine Gruppe der Terminart, eine eigene
+ * Abfrage dafuer waere redundant. Vor responsesDedupeExpected() aufrufen,
+ * sonst fehlen Gruppen der Mitglieder, die in mehreren Terminart-Gruppen
+ * stehen und deren Zeile dedupliziert wurde.
+ *
+ * @param array<int, array<string, mixed>> $rows Rohzeilen aus responsesFetchExpected()
+ * @return array<int, int>
+ */
+function responsesTermGroupIds(array $rows): array
+{
+    return array_values(array_unique(array_map(static fn ($r) => (int) $r['group_id'], $rows)));
+}

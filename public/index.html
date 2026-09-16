@@ -15,7 +15,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EhrenSache - Dashboard</title>
 
-    <link rel="stylesheet" href="css/main.css?v=1.7.0">
+    <link rel="stylesheet" href="css/main.css?v=1.8.0">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="robots" content="noindex, nofollow">
     <script type="module" src="js/theme.js"></script>
@@ -256,11 +256,25 @@
                             <label for="privacyPolicyUrl">
                                 Datenschutzerklärung (URL) für Registrierung
                             </label>
-                            <input type="url" 
-                                class="setting-input" 
-                                id="setting_privacy_url" 
+                            <input type="url"
+                                class="setting-input"
+                                id="setting_privacy_url"
                                 data-key="privacy_policy_url"
                                 placeholder="https://example.com/datenschutz">
+                        </div>
+                        <div class="settings-item">
+                            <label for="setting_subgroup_label">Bezeichnung der Untergruppen</label>
+                            <input type="text" id="setting_subgroup_label" class="setting-input"
+                                   data-key="subgroup_label" maxlength="30"
+                                   list="subgroupLabelVorschlaege" placeholder="Untergruppe">
+                            <datalist id="subgroupLabelVorschlaege">
+                                <option value="Register"><option value="Mannschaft">
+                                <option value="Stimme"><option value="Abteilung">
+                                <option value="Altersklasse">
+                            </datalist>
+                            <small class="input-hint">Wie heißen die Gruppen, nach denen Listen
+                                gegliedert werden? Erscheint im Umschalter und in der
+                                Gruppenverwaltung.</small>
                         </div>
                     </div>
 
@@ -851,6 +865,9 @@
 
                  <!-- Pagination OBEN -->
                 <div id="recordsPagination"></div>
+
+                <!-- Gruppierung der Anwesenheitsliste (alphabetisch/Gruppe/Untergruppe, FI-14) -->
+                <div id="recordsGroupingBar"></div>
 
                 <div class="data-table">
                     <table id="recordsTable">
@@ -1933,12 +1950,34 @@
                     </div>
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="group_is_default">
-                            <span>Standard-Gruppe (gilt für alle neuen Mitglieder)</span>                            
+                            <input type="checkbox" id="group_is_default" onchange="toggleGroupExclusivity()">
+                            <span>Standard-Gruppe (gilt für alle neuen Mitglieder)</span>
                         </label>
                         <small style="color: #e67e22; display: block; margin-top: 5px;">
                             ⚠️ Nur eine Gruppe kann Standard sein. Diese sollte alle Mitglieder umfassen.
                         </small>
+                        <small class="input-hint" id="group_is_default_conflict_hint" style="display: none;">
+                            Als Untergruppe markiert -- eine Untergruppe kann nicht gleichzeitig
+                            Standardgruppe sein.
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="group_is_subgroup" onchange="toggleGroupExclusivity()">
+                            Gliedert Listen als <span data-subgroup-label>Untergruppe</span>
+                        </label>
+                        <small class="input-hint">Anwesenheitslisten und Rückmeldungen lassen sich
+                            nach solchen Gruppen gliedern.</small>
+                        <small class="input-hint" id="group_is_subgroup_conflict_hint" style="display: none;">
+                            Als Standardgruppe markiert -- eine Standardgruppe kann nicht gleichzeitig
+                            Untergruppe sein.
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label for="group_sort_order">Reihenfolge</label>
+                        <input type="number" id="group_sort_order" value="0" step="1">
+                        <small class="input-hint">Kleinere Zahl steht weiter oben. 0 überall
+                            bedeutet alphabetisch.</small>
                     </div>
                     <div class="form-group" id="groupMembersGroup" style="display: none;">
                         <label>Mitglieder in dieser Gruppe</label>
@@ -2578,6 +2617,7 @@
     <script type="module" src="./js/modules/auth.js"></script>
     <script type="module" src="./js/modules/members.js"></script>
     <script type="module" src="./js/modules/appointments.js"></script>
+    <script type="module" src="./js/modules/grouping.js"></script>
     <script type="module" src="./js/modules/responses.js"></script>
     <script type="module" src="./js/modules/records.js"></script>
     <script type="module" src="./js/modules/exceptions.js"></script>

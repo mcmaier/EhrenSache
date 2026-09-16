@@ -9,9 +9,9 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, currentYear, groupSelectOptionsHtml} from './ui.js';
 import { loadUserData } from './users.js';
-import { updateModalId } from './utils.js';
+import { updateModalId, escapeHtml } from './utils.js';
 import { loadGroups } from './management.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
@@ -184,9 +184,11 @@ function renderMembers(members, page = 1) {
         }
 
         // Gruppen-Badges erstellen
-        const groupBadges = member.group_names 
-            ? member.group_names.split(', ').map(name => 
-                `<span class="type-badge" style="margin: 2px;">${name}</span>`
+        // member.group_names kommt aus der Gruppenverwaltung (DB) -- ohne CSP
+        // (OI-17) muss hier selbst maskiert werden.
+        const groupBadges = member.group_names
+            ? member.group_names.split(', ').map(name =>
+                `<span class="type-badge" style="margin: 2px;">${escapeHtml(name)}</span>`
               ).join('')
             : '<span style="color: #7f8c8d;">Keine</span>';
 
@@ -195,16 +197,16 @@ function renderMembers(members, page = 1) {
                       <button class="action-btn btn-icon btn-edit" onclick="openMemberModal(${member.member_id})" title="Bearbeiten">
                     ✎
                 </button>
-                <button class="action-btn btn-icon btn-delete" onclick="deleteMember(${member.member_id}, '${member.name} ${member.surname}')" title="Löschen">
+                <button class="action-btn btn-icon btn-delete" onclick="deleteMember(${member.member_id})" title="Löschen">
                     🗑
                 </button>
             </td>
         ` : '';
 
         tr.innerHTML = `
-                <td>${member.surname}</td>
-                <td>${member.name}</td>
-                <td>${member.member_number || '-'}${member.has_pin ? ' <span title="Stations-PIN gesetzt">🔢</span>' : ''}</td>
+                <td>${escapeHtml(member.surname)}</td>
+                <td>${escapeHtml(member.name)}</td>
+                <td>${member.member_number ? escapeHtml(member.member_number) : '-'}${member.has_pin ? ' <span title="Stations-PIN gesetzt">🔢</span>' : ''}</td>
                 <td>${groupBadges}</td>
                 <td>${member.is_active_in_period ? 'Aktiv' : 'Inaktiv'}</td>
                 ${actionsHtml}
@@ -362,10 +364,8 @@ export async function showMemberSection(forceReload = false, page = 1) {
     if (isAdminOrManager) {
         const groupFilter = document.getElementById('filterMemberGroup');
         if (groupFilter && groupFilter.options.length <= 1) {
-            groupFilter.innerHTML = '<option value="">Alle Gruppen</option>';
-            dataCache.groups.data.forEach(g => {
-                groupFilter.innerHTML += `<option value="${g.group_id}">${g.group_name}</option>`;
-            });
+            groupFilter.innerHTML = '<option value="">Alle Gruppen</option>'
+                + groupSelectOptionsHtml(dataCache.groups.data);
         }
     }
 
@@ -526,9 +526,9 @@ function renderMemberGroups() {
                    value="${group.group_id}" 
                    ${currentMemberGroups.includes(group.group_id) ? 'checked' : ''}>
             <span style="margin-left: 8px; flex: 1;">
-                <strong>${group.group_name}</strong>
+                <strong>${escapeHtml(group.group_name)}</strong>
                 ${group.is_default ? ' <span class="status-badge status-approved" style="font-size: 10px; padding: 2px 6px;">Standard</span>' : ''}
-                ${group.description ? `<br><small style="color: #7f8c8d;">${group.description}</small>` : ''}
+                ${group.description ? `<br><small style="color: #7f8c8d;">${escapeHtml(group.description)}</small>` : ''}
             </span>
         </label>
     `).join('');
@@ -637,7 +637,14 @@ export async function saveMember() {
     }    
 }
 
-export async function deleteMember(memberId, name) {
+export async function deleteMember(memberId) {
+    // Name aus dem Cache holen statt aus dem onclick-Attribut: ein Mitgliedsname
+    // mit Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als
+    // Code einschleusen (kein CSP im Projekt) -- Muster aus deleteGroup()/
+    // deleteType() in management.js (Commit ad200ba).
+    const member = dataCache.members[currentYear]?.data?.find(m => m.member_id == memberId);
+    const name = member ? `${member.name} ${member.surname}` : 'diesem Mitglied';
+
     const confirmed = await showConfirm(
         `Mitglied "${name}" wirklich löschen?`,
         'Mitglied löschen'

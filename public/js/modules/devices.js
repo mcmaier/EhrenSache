@@ -10,7 +10,7 @@
 
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQRModal} from './ui.js';
-import { updateModalId } from './utils.js';
+import { updateModalId, escapeHtml } from './utils.js';
 import {debug} from '../app.js'
 
 // ============================================
@@ -106,14 +106,14 @@ function renderDevices(devices, page = 1)
             : '-';            
                             
             tr.innerHTML = `
-                <td>${device.device_name}</td>
+                <td>${escapeHtml(device.device_name)}</td>
                 <td>${typeText}</td>
                 <td>${statusBadge}</td>
                 <td>${tokenExpiry}</td>
                 <td>${formattedCreated}</td>
                 <td class="actions-cell">
                     <button class="action-btn btn-icon btn-edit" onclick="openDeviceModal(${device.user_id})">✎</button>
-                    <button class="action-btn btn-icon btn-delete" onclick="deleteDevice(${device.user_id}, '${device.device_name}')">🗑</button>
+                    <button class="action-btn btn-icon btn-delete" onclick="deleteDevice(${device.user_id})">🗑</button>
                 </td> `;                     
                 fragment.appendChild(tr);
         });
@@ -485,7 +485,14 @@ export async function saveDevice() {
     }
 }
 
-export async function deleteDevice(deviceId, name) {
+export async function deleteDevice(deviceId) {
+    // Name aus dem Cache holen statt aus dem onclick-Attribut: ein Geraetename mit
+    // Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als Code
+    // einschleusen (kein CSP im Projekt) -- Muster aus deleteGroup()/deleteType()
+    // in management.js (Commit ad200ba).
+    const device = dataCache.devices.data.find(d => d.user_id == deviceId);
+    const name = device ? device.device_name : 'diesem Gerät';
+
     const confirmed = await showConfirm(
         `Gerät "${name}" wirklich löschen?`,
         'Gerät löschen'
