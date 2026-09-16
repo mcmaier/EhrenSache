@@ -9,6 +9,7 @@
  */
 
 import {TOAST_DURATION} from '../config.js';
+import {escapeHtml} from './utils.js';
 import {apiCall, isAdmin, isAdminOrManager, currentUser} from './api.js';
 import {loadProfile, initProfileEventHandler} from './profile.js';
 import {loadUsers, showUserSection, initUsersEventHandlers} from'./users.js';
@@ -157,7 +158,9 @@ export function updateSubgroupLabelElements() {
  */
 export function groupSelectOptionsHtml(groups) {
     const list = Array.isArray(groups) ? groups : [];
-    const option = g => `<option value="${g.group_id}">${g.group_name}</option>`;
+    // g.group_name kommt aus der Gruppenverwaltung (DB) -- ohne CSP (OI-17)
+    // muss hier selbst maskiert werden.
+    const option = g => `<option value="${g.group_id}">${escapeHtml(g.group_name)}</option>`;
     const subgroups = list.filter(g => g.is_subgroup == 1);
 
     if (subgroups.length === 0) {

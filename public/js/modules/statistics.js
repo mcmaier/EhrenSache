@@ -140,7 +140,7 @@ export async function updateStatisticsFilters() {
     // Dropdown neu befüllen
     memberSelect.innerHTML = '<option value="">Alle Mitglieder</option>';
     filteredMembers.forEach(member => {
-        memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+        memberSelect.innerHTML += `<option value="${member.member_id}">${escapeHtml(member.surname)}, ${escapeHtml(member.name)}</option>`;
     });    
     
     if (currentMemberId && filteredMembers.some(m => m.member_id == currentMemberId)) {

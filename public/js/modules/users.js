@@ -426,7 +426,7 @@ export async function openUserModal(userId = null) {
     
     if (members) {
         members.forEach(member => {
-            memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+            memberSelect.innerHTML += `<option value="${member.member_id}">${escapeHtml(member.surname)}, ${escapeHtml(member.name)}</option>`;
         });
     }
 
