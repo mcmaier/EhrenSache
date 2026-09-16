@@ -346,8 +346,19 @@ function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'):
     // dieselbe Herleitung wie bei der Zugehörigkeit oben, keine Ziehung aus
     // $random, damit sich die Reihenfolge der bestehenden Ziehungen nicht
     // verschiebt. Mitglied 1–8 Flöte, 9–16 Klarinette, 17–24 Trompete,
-    // 25–32 Tenorhorn, 33–40 Schlagzeug.
+    // 25–32 Tenorhorn, 33–40 Schlagzeug -- bis auf zwei Ausnahmen direkt
+    // darunter.
+    //
+    // Mitglieder 1 und 2 (Jugend, aktiv) bekommen bewusst KEIN Register: Ohne
+    // mindestens ein Mitglied ohne Untergruppe bliebe der Sammelabschnitt
+    // ("Ohne " . subgroup_label) im Demo-Bestand leer und ließe sich nie mit
+    // echten Daten zeigen -- genau der Fall, den Abschnitt 3.2 der
+    // Spezifikation als eigenen Abschnitt vorsieht.
+    $noSubgroupMemberIds = [1, 2];
     foreach ($members as $member) {
+        if (in_array($member['member_id'], $noSubgroupMemberIds, true)) {
+            continue;
+        }
         $registerIndex = intdiv($member['member_id'] - 1, 8);
         $assignments[] = ['member_id' => $member['member_id'], 'group_id' => DEMO_SUBGROUP_IDS[$registerIndex]];
     }

@@ -151,6 +151,25 @@ test('jedes Mitglied hat hoechstens zwei Register, mindestens eines hat zwei', f
     assertTrue(count($withTwo) >= 1, 'Kein Mitglied mit zwei Registern -- die Doppelnennung waere ungeprueft');
 });
 
+// Ohne mindestens ein Mitglied ganz ohne Register bliebe der Sammelabschnitt
+// ("Ohne " . subgroup_label) im Demo-Bestand leer -- die Oberfläche liesse
+// sich dann nie mit echten Daten pruefen, nur mit eingeschleusten Testdaten.
+test('mindestens ein Mitglied hat kein Register -- der Sammelabschnitt ist mit echten Daten pruefbar', function () {
+    $subgroupIds = array_map(fn ($g) => $g['group_id'], array_filter(buildGroups(), fn ($g) => $g['is_subgroup'] === 1));
+
+    $r              = new DemoRandom(20260908);
+    $m              = buildMembers($r, '2026-09-08');
+    $countPerMember = [];
+    foreach ($m['assignments'] as $a) {
+        if (in_array($a['group_id'], $subgroupIds, true)) {
+            $countPerMember[$a['member_id']] = ($countPerMember[$a['member_id']] ?? 0) + 1;
+        }
+    }
+
+    $withoutRegister = array_filter($m['members'], fn ($member) => ($countPerMember[$member['member_id']] ?? 0) === 0);
+    assertTrue(count($withoutRegister) >= 1, 'Kein Mitglied ohne Register -- der Sammelabschnitt bliebe ungeprueft');
+});
+
 test('buildAppointmentTypes liefert vier Arten mit Farbe', function () {
     $types = buildAppointmentTypes();
     assertSame(4, count($types));
