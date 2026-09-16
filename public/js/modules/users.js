@@ -411,6 +411,29 @@ export async function initUsersEventHandlers()
 // USER MODAL FUNCTIONS
 // ============================================
 
+/**
+ * Beschriftung und Hinweis des Passwortfelds je Modus.
+ *
+ * Beim Anlegen ist das Feld Pflicht -- das stand weder am Label noch im
+ * Hinweis darunter, der stattdessen die Regel des Bearbeiten-Modus nannte
+ * ("leer lassen"). Das Sternchen folgt der Schreibweise der uebrigen
+ * Pflichtfelder im Dialog.
+ */
+function setPasswordFieldMode(isNew) {
+    const label = document.getElementById('user_password_label');
+    const hint  = document.getElementById('user_password_hint');
+
+    if (label) {
+        label.textContent = isNew ? 'Passwort *' : 'Passwort';
+    }
+
+    if (hint) {
+        hint.textContent = isNew
+            ? 'Mindestens 6 Zeichen'
+            : 'Leer lassen um bestehendes Passwort zu behalten.';
+    }
+}
+
 export async function openUserModal(userId = null) {
     const modal = document.getElementById('userModal');
     const title = document.getElementById('userModalTitle');
@@ -433,7 +456,8 @@ export async function openUserModal(userId = null) {
     if (userId) {
         title.textContent = 'Benutzer bearbeiten';
         await loadUserFormData(userId);
-        document.getElementById('user_password').required = false;        
+        document.getElementById('user_password').required = false;
+        setPasswordFieldMode(false);
 
         //Status-Section anzeigen (nur beim Bearbeiten)
         statusSection.style.display = 'block';
@@ -457,6 +481,7 @@ export async function openUserModal(userId = null) {
         document.getElementById('user_id').value = '';
         //document.getElementById('user_active').checked = true;
         document.getElementById('user_password').required = true;
+        setPasswordFieldMode(true);
 
         updateModalId('userModal', null);
         statusSection.style.display = 'none';

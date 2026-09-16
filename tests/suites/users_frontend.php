@@ -47,6 +47,22 @@ test('saveUser liest beim Anlegen das sichtbare Auswahlfeld', function () use ($
     assertTrue(str_contains($body, 'userData.member_id'), 'member_id wird nicht gesetzt');
 });
 
+test('Passwortfeld: Pflichtkennzeichen und Hinweis je Modus', function () use ($ufRoot) {
+    $html = (string) file_get_contents($ufRoot . '/public/index.html');
+    assertTrue(str_contains($html, 'id="user_password_label"'), 'Label ohne id — nicht umschaltbar');
+    assertTrue(str_contains($html, 'id="user_password_hint"'), 'Hinweis ohne id — nicht umschaltbar');
+    assertTrue(str_contains($html, 'id="user_password" minlength="6"'),
+               'Die Mindestlaenge des Servers fehlt am Feld');
+
+    $js = (string) file_get_contents($ufRoot . '/public/js/modules/users.js');
+    assertTrue(str_contains($js, "'Passwort *'"), 'Beim Anlegen fehlt das Pflichtkennzeichen');
+    assertTrue(str_contains($js, "'Mindestens 6 Zeichen'"), 'Beim Anlegen fehlt der passende Hinweis');
+
+    $body = ufFunctionBody($js, 'export async function openUserModal(userId = null)');
+    assertTrue(str_contains($body, 'setPasswordFieldMode(true)'), 'Anlegen-Zweig schaltet nicht um');
+    assertTrue(str_contains($body, 'setPasswordFieldMode(false)'), 'Bearbeiten-Zweig schaltet nicht zurueck');
+});
+
 test('openUserModal zeigt das Auswahlfeld beim Anlegen', function () use ($ufRoot) {
     $js   = (string) file_get_contents($ufRoot . '/public/js/modules/users.js');
     $body = ufFunctionBody($js, 'export async function openUserModal(userId = null)');
