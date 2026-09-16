@@ -235,6 +235,8 @@ function handleAttendanceList($db, $database, $method, $id) {
  * (alle als Untergruppe markierten Gruppen) an, beide nach groupSortCompare()
  * sortiert.
  *
+ * @param PDO    $db       Datenbank-Connection
+ * @param object $database Database-Instanz (liefert table())
  * @param array<int, array<string, mixed>> $members
  * @param array<int, string|int>           $groupIds Gruppen der Terminart
  * @return array<int, array<string, mixed>>

@@ -94,11 +94,28 @@ function handleMemberGroups($db, $database, $method, $id) {
             requireAdmin();
 
             $data = json_decode(file_get_contents("php://input"));
+            $data = (object) ($data ?? []);
 
             // Wenn is_default=true, setze alle anderen auf false (außer dieser)
             if(isset($data->is_default) && $data->is_default) {
                 $db->prepare("UPDATE {$prefix}member_groups SET is_default = 0 WHERE group_id != ?")->execute([$id]);
             }
+
+            // is_subgroup/sort_order: Dieses PUT ist ein Voll-Update wie das der
+            // Terminarten (OI-54, vgl. responseTypeSettings() in responses.php) --
+            // fehlen die Felder im Koerper, bleibt der gespeicherte Wert stehen,
+            // statt still auf 0 zurueckzufallen und die gepflegte Reihenfolge zu
+            // loeschen. description/is_default bleiben Altbestand (?? wie bisher).
+            $currentStmt = $db->prepare("SELECT is_subgroup, sort_order FROM {$prefix}member_groups WHERE group_id = ?");
+            $currentStmt->execute([$id]);
+            $currentRow = $currentStmt->fetch(PDO::FETCH_ASSOC) ?: ['is_subgroup' => 0, 'sort_order' => 0];
+
+            $isSubgroup = property_exists($data, 'is_subgroup')
+                ? (!empty($data->is_subgroup) ? 1 : 0)
+                : (int) $currentRow['is_subgroup'];
+            $sortOrder = property_exists($data, 'sort_order')
+                ? (int) $data->sort_order
+                : (int) $currentRow['sort_order'];
 
             $stmt = $db->prepare("UPDATE {$prefix}member_groups
                                   SET group_name = ?, description = ?, is_default = ?,
@@ -108,8 +125,8 @@ function handleMemberGroups($db, $database, $method, $id) {
                 $data->group_name,
                 $data->description ?? null,
                 $data->is_default ?? false,
-                !empty($data->is_subgroup) ? 1 : 0,
-                (int) ($data->sort_order ?? 0),
+                $isSubgroup,
+                $sortOrder,
                 $id
             ])) {
                 echo json_encode(["message" => "Group updated"]);
