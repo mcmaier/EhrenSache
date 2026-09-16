@@ -1417,11 +1417,21 @@ async function handleAttendanceToggle(event) {
     const recordId = btn.dataset.recordId;
     const isPresent = btn.dataset.isPresent === 'true';
 
-    btn.disabled = true;
+    // Ein Mitglied mit mehreren Untergruppen steht in mehreren Abschnitten
+    // der Liste (Spec 3.2) -- jede seiner Zeilen traegt denselben
+    // data-member-id und muss denselben Zustand zeigen. Ohne dieses Abgleichen
+    // blieb eine zweite Zeile stehen, und ein Klick dort schickte einen
+    // zweiten, widerspruechlichen Request (409).
+    const content = document.getElementById('attendanceListContent');
+    const memberItems = content
+        ? Array.from(content.querySelectorAll(`.attendance-item[data-member-id="${memberId}"]`))
+        : [btn.closest('.attendance-item')];
+    const memberButtons = memberItems
+        .map(item => item.querySelector('.btn-toggle-attendance'))
+        .filter(Boolean);
 
-    // Finde das Listenelement
-    const listItem = btn.closest('.attendance-item');
-    
+    memberButtons.forEach(b => b.disabled = true);
+
     try {
         if (isPresent) {
             // Bestätigung vor dem Löschen
@@ -1429,7 +1439,7 @@ async function handleAttendanceToggle(event) {
                 'Anwesenheit entfernen',
                 `Anwesenheit wirklich entfernen?`,
                 async () => {
-                    btn.disabled = true;
+                    memberButtons.forEach(b => b.disabled = true);
 
                     try{
                         // Entfernen der Anwesenheit
@@ -1438,27 +1448,35 @@ async function handleAttendanceToggle(event) {
                         if (!result.success) {
                             throw new Error(result.error);
                         }
-                        
-                        // Optimistisches UI-Update
-                        listItem.classList.remove('present');
-                        listItem.classList.add('absent');
-                        listItem.querySelector('.status-icon').textContent = '○';
-                        listItem.querySelector('.status-icon').style.color = '#bdc3c7';
-                        btn.textContent = '✓';
-                        btn.dataset.isPresent = 'false';
-                        btn.dataset.recordId = '';
-                        
-                        // Entferne Ankunftszeit
-                        const arrivalTime = listItem.querySelector('.arrival-time');
-                        if (arrivalTime) arrivalTime.remove();
-                        
+
+                        // Optimistisches UI-Update -- in ALLEN Zeilen dieses Mitglieds
+                        memberItems.forEach(listItem => {
+                            listItem.classList.remove('present');
+                            listItem.classList.add('absent');
+                            const icon = listItem.querySelector('.status-icon');
+                            if (icon) {
+                                icon.textContent = '○';
+                                icon.style.color = '#bdc3c7';
+                            }
+                            const arrivalTime = listItem.querySelector('.arrival-time');
+                            if (arrivalTime) arrivalTime.remove();
+                        });
+                        memberButtons.forEach(b => {
+                            b.textContent = '✓';
+                            b.dataset.isPresent = 'false';
+                            b.dataset.recordId = '';
+                        });
+
                         showMessage('Anwesenheit entfernt', 'warning');
-                        btn.disabled = false;
                     }
                     catch(error) {
                         debug.log('Fehler beim Entfernen:', error);
                         showMessage('Fehler beim Entfernen', 'error');
-                        btn.disabled = false;
+                    }
+                    finally {
+                        // Alle Zeilen wieder freigeben -- auch bei einem Fehlschlag,
+                        // sonst bleibt eine der Zeilen taub.
+                        memberButtons.forEach(b => b.disabled = false);
                     }
                 });
         } else {
@@ -1471,17 +1489,24 @@ async function handleAttendanceToggle(event) {
             if (!result.success) {
                 throw new Error(result.error);
             }
-            
-            // Optimistisches UI-Update
-            listItem.classList.remove('absent');
-            listItem.classList.add('present');
-            listItem.querySelector('.status-icon').textContent = '✓';
-            listItem.querySelector('.status-icon').style.color = '#27ae60';
-            btn.textContent = '✗';
-            btn.dataset.isPresent = 'true';
-            btn.dataset.recordId = result.id;
-            
-            // Füge Ankunftszeit hinzu (aus API-Response)
+
+            // Optimistisches UI-Update -- in ALLEN Zeilen dieses Mitglieds
+            memberItems.forEach(listItem => {
+                listItem.classList.remove('absent');
+                listItem.classList.add('present');
+                const icon = listItem.querySelector('.status-icon');
+                if (icon) {
+                    icon.textContent = '✓';
+                    icon.style.color = '#27ae60';
+                }
+            });
+            memberButtons.forEach(b => {
+                b.textContent = '✗';
+                b.dataset.isPresent = 'true';
+                b.dataset.recordId = result.id;
+            });
+
+            // Füge Ankunftszeit hinzu (aus API-Response), in jeder Zeile
             if (result.data.arrival_time) {
                 const arrivalDate = new Date(result.data.arrival_time);
                 const timeStr = arrivalDate.toLocaleTimeString('de-DE', {
@@ -1489,16 +1514,26 @@ async function handleAttendanceToggle(event) {
                     minute: '2-digit'
                 });
                 const arrivalTimeHtml = `<span class="arrival-time">Ankunft: ${timeStr}</span>`;
-                listItem.querySelector('.member-info-row').insertAdjacentHTML('beforeend', arrivalTimeHtml);
+                memberItems.forEach(listItem => {
+                    const row = listItem.querySelector('.member-info-row');
+                    if (row && !row.querySelector('.arrival-time')) {
+                        row.insertAdjacentHTML('beforeend', arrivalTimeHtml);
+                    }
+                });
             }
         }
-        
-        btn.disabled = false;
-        
+
+        // Bei isPresent oeffnet sich nur das Bestaetigungsmodal (asynchron ueber
+        // onConfirm) -- an dieser Stelle also noch vor der eigentlichen
+        // Entscheidung. Entspricht dem bisherigen Verhalten: die Zeilen bleiben
+        // waehrend des offenen Dialogs bedienbar; der Klick auf "Weiter" sperrt
+        // sie im onConfirm-Zweig erneut fuer die Dauer des Requests.
+        memberButtons.forEach(b => b.disabled = false);
+
     } catch (error) {
         debug.log('Fehler beim Umschalten:', error);
         showMessage('Fehler beim Aktualisieren', 'error');
-        btn.disabled = false;
+        memberButtons.forEach(b => b.disabled = false);
     }
 }
 

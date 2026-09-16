@@ -204,3 +204,41 @@ test('checkin/css/style.css und index.html tragen die Gruppierungsleiste der PWA
     $html = (string) file_get_contents($ugfRoot . '/public/checkin/index.html');
     assertTrue(str_contains($html, 'id="attendanceGroupingBar"'), 'attendanceGroupingBar fehlt in index.html');
 });
+
+// ----------------------------------------------------------------------
+// Manueller Test 16.09.2026: Fehler 1 (PWA-Anwesenheitsliste, Doppeleintrag)
+// und Fehler 2 (Dashboard, Gruppierungs-Umschalter bleibt in fremder
+// Ansicht stehen) -- beide aus dem gerade gebauten Untergruppen-Vorhaben.
+// ----------------------------------------------------------------------
+
+test('app.js: handleAttendanceToggle() spricht ALLE Zeilen eines Mitglieds ueber data-member-id an, nicht nur btn.closest()', function () use ($ugfRoot) {
+    // Fehler 1: Ein Mitglied mit mehreren Registern steht in mehreren
+    // Zeilen derselben Liste (Spec 3.2). Vorher aktualisierte das
+    // optimistische UI-Update nur "const listItem = btn.closest('.attendance-item')"
+    // -- also genau eine Zeile. Die zweite blieb stehen, ein Klick dort
+    // schickte einen zweiten, widerspruechlichen Request (409 vom Server).
+    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+
+    $body = ugfBody($js, 'async function handleAttendanceToggle', 'function handleDashboardNavigation');
+
+    assertTrue(
+        !str_contains($body, "btn.closest('.attendance-item')") || str_contains($body, 'content.querySelectorAll'),
+        'handleAttendanceToggle() darf sich nicht mehr allein auf btn.closest(\'.attendance-item\') verlassen'
+    );
+    assertTrue(
+        str_contains($body, 'querySelectorAll(`.attendance-item[data-member-id="${memberId}"]`)'),
+        'handleAttendanceToggle() ermittelt nicht mehr alle Zeilen desselben Mitglieds ueber data-member-id'
+    );
+    assertTrue(str_contains($body, 'memberItems.forEach'), 'Die gefundenen Zeilen (memberItems) werden nicht fuer alle Aktualisierungen verwendet');
+    assertTrue(str_contains($body, 'memberButtons.forEach'), 'Die Knoepfe aller Zeilen (memberButtons) werden nicht gemeinsam behandelt');
+
+    // Freigabe nach einem Fehlschlag: in BEIDEN Zweigen (Entfernen ueber das
+    // Bestaetigungsmodal, Hinzufuegen direkt) muss der Fehlerpfad wieder auf
+    // memberButtons.forEach(... disabled = false) zurueckkommen -- nicht nur
+    // auf den einen angeklickten Knopf, sonst bleibt eine Zeile taub.
+    assertTrue(
+        substr_count($body, 'memberButtons.forEach(b => b.disabled = false)') >= 3,
+        'Nicht in allen Pfaden (Erfolg Hinzufuegen, Erfolg/Fehler Entfernen, aeusserer Fehlerfall) werden alle Knoepfe wieder freigegeben'
+    );
+});
+
