@@ -988,7 +988,19 @@ export async function saveRecord() {
     }
 }
 
-export async function deleteRecord(recordId, memberName, appointmentTitle) {    
+export async function deleteRecord(recordId, memberName, appointmentTitle) {
+    // buildAttendanceRow() uebergibt nur die ID (Spec-Pruefung 16.09.2026):
+    // ein Mitgliedsname mit Apostroph oder Anfuehrungszeichen sprengte sonst
+    // den onclick-Aufruf bzw. liesse sich als Code einschleusen (kein CSP im
+    // Projekt) -- Muster aus deleteGroup()/deleteType() in management.js
+    // (Commit ad200ba). Name kommt stattdessen aus den bereits geladenen
+    // Anwesenheitsdaten der aktuell offenen Anwesenheitsliste.
+    if (memberName === undefined) {
+        const member = _lastAttendanceData?.find(m => m.record_id == recordId);
+        memberName = member ? `${member.name} ${member.surname}` : 'diesem Mitglied';
+        appointmentTitle = appointmentTitle ?? 'diesem Termin';
+    }
+
      const confirmed = await showConfirm(
         `Anwesenheit von ${memberName} bei ${appointmentTitle} wirklich löschen?`,
         'Anwesenheit löschen'
@@ -1179,7 +1191,7 @@ function buildAttendanceRow(member) {
                 ✎
             </button>
             <button class="action-btn btn-icon btn-delete"
-                    onclick="deleteRecord(${member.record_id},'${member.name}','diesem Termin')"
+                    onclick="deleteRecord(${member.record_id})"
                     title="Löschen">
                 🗑
             </button>
