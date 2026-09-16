@@ -261,7 +261,14 @@ test('buildMembers haelt die Gruppenstaerken ein', function () {
     $m     = buildMembers(new DemoRandom(20260908));
     $count = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
     foreach ($m['assignments'] as $a) {
-        $count[$a['group_id']]++;
+        // Nur die vier Zugehoerigkeits-Gruppen zaehlen. Seit den Registern
+        // (Gruppe 5-9, is_subgroup=1) enthaelt $m['assignments'] eine
+        // zweite, unabhaengige Zuordnung je Mitglied -- DEMO_GROUP_SIZES
+        // beschreibt nur die Staerke von Aktive/Jugend/Vorstandschaft/
+        // Ehrenmitglieder, Register haben hier keine erwartete Staerke.
+        if (isset($count[$a['group_id']])) {
+            $count[$a['group_id']]++;
+        }
     }
     assertSame(28, $count[1], 'Aktive');
     assertSame(8, $count[2], 'Jugend');
