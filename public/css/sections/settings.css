@@ -346,8 +346,13 @@
     display: none;
 }
 
+/* Der Abstand zwischen den Karten sass frueher am .settings-container, dessen
+   direkte Kinder die Karten waren. Seit den Tabs stehen die Panels dazwischen
+   — der Abstand gehoert deshalb hierher, sonst kleben die Karten aneinander. */
 .settings-panel.active {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
 /* Ausgegraute Felder eines abgeschalteten Bereichs: sichtbar, aber nicht
