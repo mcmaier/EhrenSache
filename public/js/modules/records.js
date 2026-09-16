@@ -12,10 +12,11 @@ import { apiCall, isAdminOrManager } from './api.js';
 import { loadAppointments } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, currentYear, subgroupLabel } from './ui.js';
 import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers } from './utils.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
+import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_ATTENDANCE } from './grouping.js';
 
 // ============================================
 // RECORDS
@@ -1036,6 +1037,13 @@ async function updateAppointmentTypeDisplay() {
 // ATTENDANCE LIST
 // ============================================
 
+// Zuletzt geladene Anwesenheitsliste -- der Gruppierungs-Umschalter rendert
+// aus diesen Daten neu, ohne einen weiteren API-Aufruf (Spec 3.5).
+let _lastAttendanceData = null;
+
+// Spalten der Anwesenheitsliste im Modus 'appointment' (siehe updateTableHeader()).
+const ATTENDANCE_LIST_COLSPAN = 5;
+
 async function loadAttendanceList(appointmentId) {
     try {
         const attendance = await apiCall('attendance_list', 'GET', null, {appointment_id:appointmentId});
@@ -1050,6 +1058,8 @@ async function loadAttendanceList(appointmentId) {
 }
 
 function renderAttendanceList(attendanceData) {
+    _lastAttendanceData = attendanceData;
+
     const tbody = document.getElementById('recordsTableBody');
 
     updateRecordStats(attendanceData);
@@ -1057,96 +1067,159 @@ function renderAttendanceList(attendanceData) {
     const container = document.getElementById('recordsPagination');
     if (!container) return;
 
-    container.innerHTML = '';    
+    container.innerHTML = '';
 
-    tbody.innerHTML = '';    
-    
+    tbody.innerHTML = '';
+
     updateTableHeader('appointment');
 
-    attendanceData.forEach(member => {
-        const tr = document.createElement('tr'); 
+    renderAttendanceGroupingBar(attendanceData);
 
-        // Member-Info mit Mitgliedsnr. wenn vorhanden       
-        let memberInfo = `<div style="line-height: 1.4;">${member.surname}, ${member.name}`;    
-        if (member.member_number) {            
-            memberInfo += `<br><small style="color: #7f8c8d;">${escapeHtml(member.member_number)}</small>`;                            
-        }    
-        memberInfo += '</div>'        
-        
-        let arrivalHtml = '-';
-        if (member.arrival_time) {
-            const arrivalDate = new Date(member.arrival_time);
-            const formattedDate = arrivalDate.toLocaleDateString('de-DE');
-            const formattedTime = arrivalDate.toLocaleTimeString('de-DE', { 
-                hour: '2-digit', 
-                minute: '2-digit' ,
-                second: '2-digit'
-            });
-            
-            arrivalHtml = `<div style="line-height: 1.4;">${formattedTime}<br>
-                <small style="color: #7f8c8d;">${formattedDate}</small>
-            </div>`;
+    // Umschalter-Stufen und gemerkte Wahl (Spec 6.1/6.2). Fuer den Abschnitt
+    // ohne Gruppe passt "Ohne Gruppe" nur bei 'group' -- bei 'subgroup' zeigt
+    // er das eingestellte Wort (z.B. "Ohne Register").
+    const stages = groupingAvailableStages(attendanceData);
+    const stage  = groupingStored(GROUPING_KEY_ATTENDANCE, stages, 'alpha');
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const sections = groupingSections(attendanceData, stage, emptyLabel);
+
+    const fragment = document.createDocumentFragment();
+
+    sections.forEach(section => {
+        if (section.label !== null) {
+            const kopf = document.createElement('tr');
+            kopf.className = 'response-group-row';
+            kopf.innerHTML = `<td colspan="${ATTENDANCE_LIST_COLSPAN}">${escapeHtml(section.label)} · ${section.members.length}</td>`;
+            fragment.appendChild(kopf);
         }
-
-        // Check-in Source Badge
-        const sourceInfo = getSourceBadge(member);
-        
-        // Status-Icon und Styling
-        let statusHtml, rowClass;
-        if (member.status === 'present') {
-            statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span';
-            rowClass = '';
-        } else if (member.status === 'excused') {
-            statusHtml = '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
-            rowClass = '';
-        } else {
-            statusHtml = '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>';
-            rowClass = 'table-secondary'; // Grau ausgegraut
-        }
-
-        let actionsHtml;
-        if (member.record_id) {
-            // Eintrag vorhanden → Edit & Delete
-            actionsHtml = `
-                <button class="action-btn btn-icon btn-edit" 
-                        onclick="openRecordModal(${member.record_id})"
-                        title="Bearbeiten">
-                    ✎
-                </button>
-                <button class="action-btn btn-icon btn-delete" 
-                        onclick="deleteRecord(${member.record_id},'${member.name}','diesem Termin')"
-                        title="Löschen">
-                    🗑
-                </button>
-            `;
-        } else {
-            // Kein Eintrag → Anwesend & Entschuldigt
-            actionsHtml = `
-                <button class="action-btn btn-icon btn-approve" 
-                        onclick="quickCreateRecordForMember(${member.member_id}, 'present')"
-                        title="Anwesend">
-                    ✓
-                </button>
-                <button class="action-btn btn-icon btn-edit" 
-                        onclick="quickCreateRecordForMember(${member.member_id}, 'excused')"
-                        title="Entschuldigt">
-                    ⚠
-                </button>
-            `;
-        }   
-        
-        tr.className = rowClass;
-        tr.innerHTML = `
-            <td>${memberInfo}</td>     
-            <td>${arrivalHtml}</td>
-            <td>${statusHtml}</td>
-            <td>${sourceInfo}</td>
-            <td>${actionsHtml}</td>
-        `;
-        
-        tbody.appendChild(tr);
+        section.members.forEach(member => fragment.appendChild(buildAttendanceRow(member)));
     });
+
+    tbody.appendChild(fragment);
 }
+
+/** Umschalter Alphabetisch/Gruppe/Untergruppe + Hinweiszeile bei Mehrfachnennung (Spec 6.1, 6.4). */
+function renderAttendanceGroupingBar(attendanceData) {
+    const bar = document.getElementById('recordsGroupingBar');
+    if (!bar) return;
+
+    const stages = groupingAvailableStages(attendanceData);
+    if (stages.length <= 1) {
+        bar.innerHTML = '';
+        return;
+    }
+
+    const stage = groupingStored(GROUPING_KEY_ATTENDANCE, stages, 'alpha');
+    const duplicates = groupingDuplicateCount(attendanceData, stage);
+
+    const stageLabels = { alpha: 'Alphabetisch', group: 'Gruppe', subgroup: escapeHtml(subgroupLabel()) };
+    const buttons = stages.map(s => `
+        <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
+                aria-pressed="${stage === s ? 'true' : 'false'}"
+                onclick="setAttendanceGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+
+    let hint = '';
+    if (duplicates > 0) {
+        const text = duplicates === 1 ? '1 Mitglied steht' : `${duplicates} Mitglieder stehen`;
+        hint = `<p class="list-grouping-hint">${text} in mehreren Abschnitten.</p>`;
+    }
+
+    bar.innerHTML = `<div class="list-grouping">${buttons}</div>${hint}`;
+}
+
+/** Baut eine Tabellenzeile der Anwesenheitsliste fuer ein Mitglied. */
+function buildAttendanceRow(member) {
+    const tr = document.createElement('tr');
+
+    // Member-Info mit Mitgliedsnr. wenn vorhanden
+    let memberInfo = `<div style="line-height: 1.4;">${escapeHtml(member.surname)}, ${escapeHtml(member.name)}`;
+    if (member.member_number) {
+        memberInfo += `<br><small style="color: #7f8c8d;">${escapeHtml(member.member_number)}</small>`;
+    }
+    memberInfo += '</div>'
+
+    let arrivalHtml = '-';
+    if (member.arrival_time) {
+        const arrivalDate = new Date(member.arrival_time);
+        const formattedDate = arrivalDate.toLocaleDateString('de-DE');
+        const formattedTime = arrivalDate.toLocaleTimeString('de-DE', {
+            hour: '2-digit',
+            minute: '2-digit' ,
+            second: '2-digit'
+        });
+
+        arrivalHtml = `<div style="line-height: 1.4;">${formattedTime}<br>
+            <small style="color: #7f8c8d;">${formattedDate}</small>
+        </div>`;
+    }
+
+    // Check-in Source Badge
+    const sourceInfo = getSourceBadge(member);
+
+    // Status-Icon und Styling
+    let statusHtml, rowClass;
+    if (member.status === 'present') {
+        statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span';
+        rowClass = '';
+    } else if (member.status === 'excused') {
+        statusHtml = '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
+        rowClass = '';
+    } else {
+        statusHtml = '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>';
+        rowClass = 'table-secondary'; // Grau ausgegraut
+    }
+
+    let actionsHtml;
+    if (member.record_id) {
+        // Eintrag vorhanden → Edit & Delete
+        actionsHtml = `
+            <button class="action-btn btn-icon btn-edit"
+                    onclick="openRecordModal(${member.record_id})"
+                    title="Bearbeiten">
+                ✎
+            </button>
+            <button class="action-btn btn-icon btn-delete"
+                    onclick="deleteRecord(${member.record_id},'${member.name}','diesem Termin')"
+                    title="Löschen">
+                🗑
+            </button>
+        `;
+    } else {
+        // Kein Eintrag → Anwesend & Entschuldigt
+        actionsHtml = `
+            <button class="action-btn btn-icon btn-approve"
+                    onclick="quickCreateRecordForMember(${member.member_id}, 'present')"
+                    title="Anwesend">
+                ✓
+            </button>
+            <button class="action-btn btn-icon btn-edit"
+                    onclick="quickCreateRecordForMember(${member.member_id}, 'excused')"
+                    title="Entschuldigt">
+                ⚠
+            </button>
+        `;
+    }
+
+    tr.className = rowClass;
+    tr.innerHTML = `
+        <td>${memberInfo}</td>
+        <td>${arrivalHtml}</td>
+        <td>${statusHtml}</td>
+        <td>${sourceInfo}</td>
+        <td>${actionsHtml}</td>
+    `;
+
+    return tr;
+}
+
+/** Umschalter-Klick (Spec 6.2): merkt die Wahl und rendert aus den vorliegenden
+ * Daten neu -- kein erneuter API-Aufruf. */
+window.setAttendanceGrouping = function(stage) {
+    groupingStore(GROUPING_KEY_ATTENDANCE, stage);
+    if (_lastAttendanceData) {
+        renderAttendanceList(_lastAttendanceData);
+    }
+};
 
 async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
     try {        
