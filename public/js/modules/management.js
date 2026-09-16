@@ -311,9 +311,13 @@ export async function renderTypeGroupOverview(typeData)
         // Lade Gruppen für diese Terminart
         const groupsText = '-'; // Wird später gefüllt
         
+        const responsesBadge = Number(type.responses_enabled) === 1
+            ? ' <span title="Rückmeldung aktiv">💬</span>'
+            : '';
+
         const row = `
             <tr>
-                <td><strong>${type.type_name}</strong></td>
+                <td><strong>${type.type_name}</strong>${responsesBadge}</td>
                 <td>${type.description || '-'}</td>
                 <td>${colorBadge}</td>
                 <td id="type_groups_${type.type_id}">Lädt...</td>
