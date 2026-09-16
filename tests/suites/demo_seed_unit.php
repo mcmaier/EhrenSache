@@ -983,6 +983,15 @@ test('buildSettings setzt Vereinsname, leeres Logo und aktivierte Arbeitszeit/St
     assertSame('1', $settings['station_pin_enabled']);
 });
 
+// Ohne diesen Schlüssel zeigt eine frisch aufgesetzte Demo ueberall die
+// Vorgabe "Untergruppe" statt der fuenf angelegten Register beim Namen zu
+// nennen -- subgroup_label gehoert zu den Einstellungen, die der Generator
+// aktualisiert (Kategorie 'public' in system_settings).
+test('buildSettings setzt subgroup_label auf Register', function () {
+    $settings = buildDemoPlan(20260908, '2026-09-08')['settings'];
+    assertSame('Register', $settings['subgroup_label']);
+});
+
 test('buildUsers liefert vier Konten und zwei Geraete', function () {
     $users   = buildDemoPlan(20260908, '2026-09-08')['users'];
     $regular = array_filter($users, fn ($u) => $u['role'] !== 'device');

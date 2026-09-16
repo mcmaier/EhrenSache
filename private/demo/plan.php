@@ -1191,6 +1191,11 @@ function buildSettings(): array
         'station_pin_enabled'    => '1',
         'station_pin_min_length' => '4',
         'pagination_limit'       => '25',
+        // Kategorie 'public' -- passend zu den fünf Registern, die der
+        // Generator anlegt. Ohne diesen Schlüssel zeigt eine frisch
+        // aufgesetzte Demo ueberall die Vorgabe "Untergruppe" ueber einer
+        // Liste aus Floete, Klarinette, Trompete, Tenorhorn und Schlagzeug.
+        'subgroup_label'         => 'Register',
     ];
 }
 

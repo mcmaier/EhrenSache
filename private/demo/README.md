@@ -176,7 +176,7 @@ dem die Datenbankklasse einen Verbindungsfehler beantwortet — fängt ein Wäch
 `registerExitGuard()` ab und macht daraus eine 1. Neue Abbruchstellen im Ablauf also über
 `finishRun()` beenden, nicht über `exit()`, sonst meldet der Wächter sie als unerwartet.
 
-**Der Reset überschreibt in `system_settings` nur acht Schlüssel** und leert die Tabelle nie.
+**Der Reset überschreibt in `system_settings` nur neun Schlüssel** und leert die Tabelle nie.
 `mail_enabled` und `smtp_configured` gehören **nicht** dazu — sie überleben jeden Lauf. Was
 das für den Mailversand bedeutet, steht in `docs/DEMO.md`; die Kurzfassung: Der Versand wird
 allein durch die Sperrliste des Wächters verhindert, nicht durch die fehlende Konfiguration.
