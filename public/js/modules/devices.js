@@ -10,7 +10,7 @@
 
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQRModal} from './ui.js';
-import { updateModalId } from './utils.js';
+import { updateModalId, escapeHtml } from './utils.js';
 import {debug} from '../app.js'
 
 // ============================================
@@ -106,7 +106,7 @@ function renderDevices(devices, page = 1)
             : '-';            
                             
             tr.innerHTML = `
-                <td>${device.device_name}</td>
+                <td>${escapeHtml(device.device_name)}</td>
                 <td>${typeText}</td>
                 <td>${statusBadge}</td>
                 <td>${tokenExpiry}</td>
