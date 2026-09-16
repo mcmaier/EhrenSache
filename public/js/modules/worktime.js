@@ -804,7 +804,7 @@ export function renderActivityTypes() {
             <button class="action-btn btn-icon btn-edit" title="Bearbeiten"
                 onclick="openActivityTypeModal(${a.activity_id})">✎</button>
             <button class="action-btn btn-icon btn-delete" title="Löschen"
-                onclick="deleteActivityType(${a.activity_id}, '${escapeHtml(a.activity_name).replace(/'/g, "\\'")}')">🗑</button>
+                onclick="deleteActivityType(${a.activity_id})">🗑</button>
         </td>
     </tr>`;
     }).join('');
@@ -938,7 +938,16 @@ export async function saveActivityType() {
     await loadActivityTypes(true);
 }
 
-export async function deleteActivityType(activityId, name) {
+export async function deleteActivityType(activityId) {
+    // Name aus dem geladenen Bestand holen statt aus dem onclick-Attribut: ein
+    // Name mit Apostroph oder Anfuehrungszeichen sprengte dort sonst den Aufruf
+    // bzw. das Attribut (kein CSP im Projekt) -- Muster aus deleteGroup()/
+    // deleteType() in management.js (Commit ad200ba). Das bisherige manuelle
+    // Escaping des Apostrophs (replace(/'/g, "\\'")) liess Anfuehrungszeichen im
+    // Namen unberuehrt und haette das Attribut trotzdem gesprengt.
+    const activity = activityTypes.find(a => String(a.activity_id) === String(activityId));
+    const name = activity ? activity.activity_name : 'dieser Tätigkeitsart';
+
     const ok = await showConfirm(
         `„${name}" wird entfernt. Hängen bereits erfasste Zeiten daran, ist das Löschen `
         + 'nicht möglich — dann die Art stattdessen ausmustern.',
