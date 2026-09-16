@@ -2565,13 +2565,17 @@ body {
     transform: rotate(90deg);
 }
 
-.response-comment-details summary {
+/* Gleiche Aufmachung wie "Bemerkung" (Nutzer-Feedback: "Wer hat
+   geantwortet?" wirkte als Fremdkoerper) -- kein eigener Blauton/Fettdruck
+   mehr fuer das Label, nur noch der gemeinsame Pfeil hebt beide Bereiche
+   vom Fliesstext ab. */
+.response-comment-details summary,
+.response-names summary {
     color: var(--text-light);
 }
 
 .response-summary-label {
-    color: var(--primary-color);
-    font-weight: 600;
+    font-weight: normal;
 }
 
 .response-comment {
@@ -2626,9 +2630,12 @@ body {
 
 /* Ampel-Zeile -- Zaehlung je Status, gleiche Farben wie die Antwort-Knoepfe
    (response-btn). Nullwerte neutral grau statt ausgeblendet, damit die
-   Reihenfolge der vier Chips immer gleich bleibt. Wird an drei Stellen
-   verwendet: Kartenkopf (response-status), Summary von "Wer hat
-   geantwortet?" und Ueberschrift je Gruppe darin. */
+   Reihenfolge der vier Chips immer gleich bleibt. Wird an zwei Stellen
+   verwendet: Fristzeile (.response-status) und Ueberschrift je Gruppe unter
+   "Wer hat geantwortet?". Die Summary von "Wer hat geantwortet?" traegt
+   bewusst keine eigene Zaehlung -- die Fristzeile direkt darueber ist die
+   einzige immer sichtbare Gesamtzaehlung der Karte (Nutzer-Feedback: vorher
+   doppelt). */
 .response-count-row {
     display: inline-flex;
     gap: 6px;
@@ -2727,20 +2734,30 @@ body {
    weil die PWA ihre CSS-Datei nicht mit dem Dashboard teilt. */
 .list-grouping {
     display: flex;
-    flex-wrap: wrap;
     gap: 6px;
     margin: 8px 0;
     width: 100%;
     max-width: 400px;
 }
 
+/* Volle Breite statt schmal am linken Rand (Nutzer-Feedback) -- zu
+   gleichen Teilen, min-width:0 dazu, damit ein laengeres eingestelltes
+   Wort (z. B. "Altersklasse") im Zweifel abgeschnitten statt umgebrochen
+   wird oder ueberlaeuft (geprueft bei 360px Fensterbreite). */
 .list-grouping__btn {
-    padding: 6px 14px;
+    flex: 1 1 0;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 6px 8px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--card-bg);
     color: var(--text);
     font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
     cursor: pointer;
     transition: all 0.2s;
 }

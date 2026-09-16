@@ -3851,8 +3851,11 @@ function formatResponseCardHead(date, startTime) {
 }
 
 /** Ampel-Chipreihe zu einer Zaehlung {yes, maybe, no, open} -- geteilt von der
- * Kartenkopfzeile, der Zusammenfassung in "Wer hat geantwortet?" und den
- * Gruppenkoepfen darin, damit alle drei Stellen optisch gleich bleiben. */
+ * Fristzeile (.response-status, die einzige immer sichtbare Gesamtzaehlung)
+ * und den Gruppenkoepfen in "Wer hat geantwortet?", damit beide Stellen
+ * optisch gleich bleiben. Die Summary von "Wer hat geantwortet?" traegt
+ * bewusst keine eigene Zaehlung mehr -- das waere dieselbe Gesamtzahl ein
+ * zweites Mal auf derselben Karte (Nutzer-Feedback). */
 function responseCountChipsHtml(counts) {
     return RESPONSE_NAME_GROUPS.map(g =>
         `<span class="response-count-chip response-count-chip--${g.key}${counts[g.key] === 0 ? ' is-zero' : ''}">${g.icon} ${counts[g.key]}</span>`
@@ -3986,18 +3989,17 @@ function responsesGroupingSwitcher(stages, stage) {
  * Umschalter gegliedert statt fest nach Terminart-Gruppe -- analog zu
  * namesListHtml() im Dashboard (public/js/modules/responses.js). Vorgabe
  * 'group', außer es gibt Untergruppen (groupingStored() fällt dann auf
- * 'subgroup' zurück). Ampel-Zeile in der Summary bleibt die Gesamtzählung
- * (direkt aus item.members, nicht aus item.summary, sonst müssten beide
- * synchron gehalten werden), je Abschnitt eine eigene Ampel-Zeile in der
- * Überschrift und die Chips darunter Zusage -> Unsicher -> Absage -> ohne
- * Antwort, darin nach Nachname/Vorname (schon durch groupingSections()
- * sortiert). Wer in mehreren Abschnitten steht (Gruppe/Untergruppe),
- * erscheint mehrfach -- groupingDuplicateCount() macht das sichtbar (Spec 6.4).
+ * 'subgroup' zurück). Die Summary traegt bewusst KEINE eigene Ampel-Zeile
+ * mehr (Nutzer-Feedback: doppelt mit .response-status in der Fristzeile,
+ * die direkt darueber steht und immer sichtbar ist) -- je Abschnitt bleibt
+ * eine eigene Ampel-Zeile in der Ueberschrift, das ist eine Aufschluesselung,
+ * keine Wiederholung derselben Gesamtzahl. Chips darunter Zusage -> Unsicher
+ * -> Absage -> ohne Antwort, darin nach Nachname/Vorname (schon durch
+ * groupingSections() sortiert). Wer in mehreren Abschnitten steht
+ * (Gruppe/Untergruppe), erscheint mehrfach -- groupingDuplicateCount() macht
+ * das sichtbar (Spec 6.4).
  */
 function responseNamesHtml(members, appointmentId) {
-    const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
-    members.forEach(m => counts[m.status || 'open']++);
-
     const stages = groupingAvailableStages(members);
     const stage  = groupingStored(GROUPING_KEY_RESPONSES, stages, 'group');
     // "Ohne Gruppe" nur bei der Stufe 'group' -- bei 'subgroup' zeigt der
@@ -4041,7 +4043,7 @@ function responseNamesHtml(members, appointmentId) {
     }).join('');
 
     return `<details class="response-names"${responsesOpenNames.has(appointmentId) ? ' open' : ''} data-appointment-id="${appointmentId}">
-        <summary><span class="response-summary-label">Wer hat geantwortet?</span> <span class="response-count-row">${responseCountChipsHtml(counts)}</span></summary>
+        <summary><span class="response-summary-label">Wer hat geantwortet?</span></summary>
         ${responsesGroupingSwitcher(stages, stage)}${hint}
         <div class="response-names__body">${groups}</div>
     </details>`;
