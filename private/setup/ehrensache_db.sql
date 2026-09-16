@@ -619,8 +619,8 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('punctuality_grace_minutes', '0', 'number', 'general', 'Karenz in Minuten relativ zum Terminbeginn (-60 bis 60)'),
 ('response_deadline_hours', '24', 'number', 'general', 'Frist für Terminrückmeldungen in Stunden vor Beginn (0 bis 720)');
 
-INSERT IGNORE INTO `{PREFIX}system_settings` (setting_key, setting_value) VALUES
-('subgroup_label', 'Untergruppe');
+INSERT IGNORE INTO `{PREFIX}system_settings` (setting_key, setting_value, category) VALUES
+('subgroup_label', 'Untergruppe', 'public');
 
 
 CREATE OR REPLACE VIEW `{PREFIX}v_users_extended` AS
