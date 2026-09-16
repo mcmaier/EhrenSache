@@ -39,6 +39,26 @@ let currentMemberId = null;
 let currentAppointmentType = null;
 let isLoadingFilters = false;
 
+/**
+ * Einziger Weg, currentMode zu aendern.
+ *
+ * #recordsGroupingBar (Untergruppen-Umschalter) gehoert nur zur Terminansicht
+ * ATTENDANCE_BY_APPOINTMENT -- er wurde bisher ausschliesslich in
+ * renderAttendanceList() befuellt und sonst nirgends geleert. Beim Wechsel in
+ * eine andere Ansicht (Terminart, Mitglied, Filter zuruecksetzen) blieb er
+ * dadurch stehen und filterte die dort gezeigten Daten fälschlich mit.
+ *
+ * Statt das Aufraeumen an jeder der Stellen zu wiederholen, die currentMode
+ * setzen, laeuft jede davon durch diese Funktion.
+ */
+function setRecordMode(mode) {
+    currentMode = mode;
+    if (mode !== RecordMode.ATTENDANCE_BY_APPOINTMENT) {
+        const bar = document.getElementById('recordsGroupingBar');
+        if (bar) bar.innerHTML = '';
+    }
+}
+
 // State für Cross-Filtering im Record-Modal
 let _recordAllMembers = [];
 let _recordAllAppointments = [];
@@ -582,14 +602,14 @@ export async function initRecordEventHandlers() {
             currentAppointmentType = null;
         }
                 
-        currentMode = RecordMode.ALL_RECORDS;      
+        setRecordMode(RecordMode.ALL_RECORDS);
         currentAppointmentId = null;
         currentMemberId = null;
         appointmentFilter.disabled = false;
         appointmentFilter.value = '';
         memberFilter.disabled = false;
         memberFilter.value = '';
-        
+
         loadAppointmentFilter(false,appointmentTypeId);
         loadMemberFilter(false,appointmentTypeId);
 
@@ -604,16 +624,16 @@ export async function initRecordEventHandlers() {
         
         if (appointmentId && appointmentId !== '') {
             // Attendance-Modus: Member-Filter deaktivieren
-            currentMode = RecordMode.ATTENDANCE_BY_APPOINTMENT;
+            setRecordMode(RecordMode.ATTENDANCE_BY_APPOINTMENT);
             currentAppointmentId = appointmentId;
             currentMemberId = null;
             memberFilter.disabled = true;
             memberFilter.value = '';
-            aptTypeFilter.disabled = true;            
+            aptTypeFilter.disabled = true;
             await loadAttendanceList(appointmentId);
         } else {
             // Records-Modus: Member-Filter aktivieren
-            currentMode = RecordMode.ALL_RECORDS;
+            setRecordMode(RecordMode.ALL_RECORDS);
             currentAppointmentId = null;
             currentMemberId = null;
             memberFilter.disabled = false;
@@ -630,7 +650,7 @@ export async function initRecordEventHandlers() {
         
         if (memberId && memberId !== '') {
             // Attendance-by-Member-Modus
-            currentMode = RecordMode.ATTENDANCE_BY_MEMBER;
+            setRecordMode(RecordMode.ATTENDANCE_BY_MEMBER);
             currentMemberId = memberId;
             currentAppointmentId = null;
             aptTypeFilter.disabled = true;
@@ -639,7 +659,7 @@ export async function initRecordEventHandlers() {
             await loadMemberAttendanceList(memberId, currentAppointmentType);
         } else {
             // Zurück zu ALL_RECORDS falls kein Appointment gewählt
-            currentMode = RecordMode.ALL_RECORDS;
+            setRecordMode(RecordMode.ALL_RECORDS);
             currentMemberId = null;
             currentAppointmentId = null;
             appointmentFilter.disabled = false;
@@ -688,14 +708,14 @@ export async function resetRecordFilter()
         appointmentFilter.value = '';
         memberFilter.value = '';
         //isAttendanceMode = false;
-        currentMode = RecordMode.ALL_RECORDS;
+        setRecordMode(RecordMode.ALL_RECORDS);
         currentAppointmentId = null;
         currentMemberId = null;
         currentAppointmentType = null;
 
         loadAppointmentFilter(false);
         loadMemberFilter(false);
-        
+
         await applyRecordFilters();
 }
 

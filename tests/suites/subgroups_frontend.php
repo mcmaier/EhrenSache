@@ -242,3 +242,32 @@ test('app.js: handleAttendanceToggle() spricht ALLE Zeilen eines Mitglieds ueber
     );
 });
 
+test('records.js: currentMode wird ausschliesslich ueber setRecordMode() geaendert, das recordsGroupingBar ausserhalb der Terminansicht leert', function () use ($ugfRoot) {
+    // Fehler 2: #recordsGroupingBar (Gruppierungs-Umschalter) gehoert nur
+    // zur Terminansicht (RecordMode.ATTENDANCE_BY_APPOINTMENT) und wurde
+    // bisher ausschliesslich in renderAttendanceList() befuellt, nirgends
+    // aber geleert. Beim Wechsel in eine andere Ansicht (Terminart,
+    // Mitglied, Filter zuruecksetzen) blieb er stehen.
+    $js = (string) file_get_contents($ugfRoot . '/public/js/modules/records.js');
+
+    assertTrue(str_contains($js, 'function setRecordMode(mode)'), 'setRecordMode() fehlt -- der einzige Weg, currentMode zu aendern');
+
+    $setter = ugfBody($js, 'function setRecordMode(mode)', 'let _recordAllMembers');
+    assertTrue(str_contains($setter, 'currentMode = mode'), 'setRecordMode() setzt currentMode nicht');
+    assertTrue(
+        str_contains($setter, "mode !== RecordMode.ATTENDANCE_BY_APPOINTMENT"),
+        'setRecordMode() unterscheidet nicht zwischen der Terminansicht und den anderen'
+    );
+    assertTrue(str_contains($setter, "getElementById('recordsGroupingBar')"), 'setRecordMode() leert recordsGroupingBar nicht');
+
+    // Jede aktive Stelle, die den Modus wechselt, muss durch den Setter
+    // gehen -- sonst reicht eine vergessene Stelle, damit der Fehler
+    // zurueckkommt. Nur die Deklaration (let currentMode = ...) und die
+    // auskommentierte Altlast (Reset-Button, seit 1.8.0 durch
+    // resetRecordFilter() ersetzt) duerfen currentMode noch direkt setzen.
+    $direct = substr_count($js, 'currentMode = RecordMode.');
+    assertTrue($direct === 2, "Erwartet genau 2 direkte currentMode-Zuweisungen (Deklaration + auskommentierter Altcode), gefunden: {$direct}. Jede aktive Zuweisung muss ueber setRecordMode() laufen.");
+
+    $setterCalls = substr_count($js, 'setRecordMode(RecordMode.');
+    assertTrue($setterCalls >= 6, "Erwartet mindestens 6 Aufrufe von setRecordMode() (Terminart-, Termin-, Mitglied-Filter je zwei Zweige, resetRecordFilter()), gefunden: {$setterCalls}");
+});
