@@ -211,20 +211,21 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
                 'present'           => $started ? isset($presentLookup[$memberId]) : null,
             ];
         }
-        $payload['members'] = $members;
+        $payload['members'] = responsesAttachGroups($db, $database, $appointmentId, $members);
 
         if ($started) {
             $payload['comparison'] = array_map('count', responseComparison($expectedIds, $statusByMember, $present));
         }
     } elseif ($payload['settings']['names_visible']) {
         // Bemerkungen, Zeitpunkte und Antraege anderer sieht ein Mitglied nie (Spec 3.6).
-        $payload['members'] = array_values(array_map(static fn ($m, $id) => [
+        $members = array_values(array_map(static fn ($m, $id) => [
             'member_id'  => $id,
             'name'       => $m['name'],
             'surname'    => $m['surname'],
             'group_name' => $m['group_name'],
             'status'     => $responses[$id]['status'] ?? null,
         ], $expected, array_keys($expected)));
+        $payload['members'] = responsesAttachGroups($db, $database, $appointmentId, $members);
     }
 
     return $payload;

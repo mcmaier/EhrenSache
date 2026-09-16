@@ -131,6 +131,44 @@ function ugDropWorld(array $world): void
     }
 }
 
+/**
+ * Haengt das Mitglied des Kontos "user" fuer $fn in die Gruppe der Welt.
+ * Wie rsWithUserInWorld() in responses_api.php -- eigene Kopie, weil jede
+ * Suite fuer sich allein laufen koennen muss (tests/run.php subgroups_api
+ * laedt responses_api.php nicht mit).
+ */
+function ugWithUserInWorld(array $world, callable $fn): void
+{
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Testkonto user braucht ein verknuepftes Mitglied');
+
+    $original  = ugMemberGroupIds($memberId);
+    $bodyError = null;
+
+    try {
+        ugSetMemberGroups($memberId, array_values(array_unique(array_merge($original, [$world['group']]))));
+        $fn($memberId);
+    } catch (Throwable $e) {
+        $bodyError = $e;
+    } finally {
+        try {
+            ugSetMemberGroups($memberId, $original);
+        } catch (Throwable $restoreError) {
+            if ($bodyError !== null) {
+                throw new RuntimeException(
+                    'Testkoerper: ' . $bodyError->getMessage()
+                    . ' | Wiederherstellung der Gruppen: ' . $restoreError->getMessage()
+                );
+            }
+            throw $restoreError;
+        }
+    }
+
+    if ($bodyError !== null) {
+        throw $bodyError;
+    }
+}
+
 /** Holt die attendance_list-Zeile genau eines Mitglieds zu einem Termin. */
 function ugAttendanceRow(int $appointmentId, int $memberId): array
 {
@@ -189,6 +227,56 @@ test('attendance_list: eine nicht markierte Gruppe steht nicht in subgroups', fu
         $ids = array_map(static fn ($g) => (int) $g['group_id'], $zeile['subgroups']);
         assertTrue(!in_array($gewoehnlich, $ids, true), 'nicht markierte Gruppe darf nicht in subgroups stehen');
         assertSame([], $zeile['subgroups'], 'subgroups muss leer bleiben, wenn keine Untergruppe zugeordnet ist');
+    } finally {
+        ugDropWorld($welt);
+    }
+});
+
+test('appointment_responses: erwartete Mitglieder tragen Gruppen und Untergruppen', function () {
+    $welt = ugWorld('Antwort');
+    try {
+        $welt['sub'] = ugAddGroupToMember($welt, 'Antwort-Sub', true, 15);
+
+        // Terminart auf Rueckmeldung mit sichtbaren Namen stellen
+        assertStatus(200, apiRequest('PUT', 'appointment_types', ['token' => apiToken('admin'),
+            'query' => ['id' => $welt['type']],
+            'body'  => ['type_name' => 'UG-Antwort-Art', 'group_ids' => [$welt['group']],
+                        'responses_enabled' => 1, 'responses_names_visible' => 1]]));
+
+        $res = apiRequest('GET', 'appointment_responses', ['token' => apiToken('admin'),
+                                                          'query' => ['appointment_id' => $welt['appointment']]]);
+        assertStatus(200, $res);
+
+        $treffer = array_values(array_filter($res['body']['members'],
+            static fn ($m) => (int) $m['member_id'] === $welt['member']));
+        assertSame(1, count($treffer), 'das Mitglied steht genau einmal in der Antwort');
+        assertSame(1, count($treffer[0]['subgroups']));
+        assertSame($welt['sub'], (int) $treffer[0]['subgroups'][0]['group_id']);
+        assertSame($welt['group'], (int) $treffer[0]['groups'][0]['group_id']);
+    } finally {
+        ugDropWorld($welt);
+    }
+});
+
+test('appointment_responses: ohne sichtbare Namen bleiben Gruppen und Untergruppen aus', function () {
+    $welt = ugWorld('Verdeckt');
+    try {
+        $welt['sub'] = ugAddGroupToMember($welt, 'Verdeckt-Sub', true, 5);
+
+        // Rueckmeldung aktiv, aber Namen NICHT sichtbar -- also auch keine
+        // Zugehoerigkeiten, weder fuer die eigene Rueckmeldung noch als member.
+        assertStatus(200, apiRequest('PUT', 'appointment_types', ['token' => apiToken('admin'),
+            'query' => ['id' => $welt['type']],
+            'body'  => ['type_name' => 'UG-Verdeckt-Art', 'group_ids' => [$welt['group']],
+                        'responses_enabled' => 1, 'responses_names_visible' => 0]]));
+
+        ugWithUserInWorld($welt, function () use ($welt) {
+            $res = apiRequest('GET', 'appointment_responses', ['token' => apiToken('user'),
+                                                              'query' => ['appointment_id' => $welt['appointment']]]);
+            assertStatus(200, $res);
+            assertTrue(!isset($res['body']['members']),
+                'ohne responses_names_visible darf ein Mitgliedskonto keine Mitgliederliste sehen');
+        });
     } finally {
         ugDropWorld($welt);
     }
