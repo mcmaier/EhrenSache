@@ -158,7 +158,10 @@ function buildAppointmentTypes(): array
         ['type_id' => 1, 'type_name' => 'Gesamtprobe',      'description' => 'Wöchentliche Probe des Gesamtorchesters', 'is_default' => 1, 'color' => '#1F5FBF'] + $none,
         ['type_id' => 2, 'type_name' => 'Registerprobe',    'description' => 'Probe einzelner Register',                'is_default' => 0, 'color' => '#4CAF50'] + $none,
         ['type_id' => 3, 'type_name' => 'Auftritt',         'description' => 'Konzert, Umzug, Ständchen',               'is_default' => 0, 'color' => '#F5A623',
-         'responses_enabled' => 1, 'responses_names_visible' => 0, 'responses_require_excuse' => 0, 'response_deadline_hours' => 168],
+         // Namen sichtbar: erfundene Demo-Mitglieder, kein Datenschutzproblem --
+         // sonst sieht ein Mitgliedskonto "Wer hat geantwortet?" nie und damit
+         // auch nicht die Gliederung nach Register, die die Demo zeigen soll.
+         'responses_enabled' => 1, 'responses_names_visible' => 1, 'responses_require_excuse' => 0, 'response_deadline_hours' => 168],
         ['type_id' => 4, 'type_name' => 'Vorstandssitzung', 'description' => 'Sitzung der Vorstandschaft',              'is_default' => 0, 'color' => '#6B7280'] + $none,
     ];
 }
