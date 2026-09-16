@@ -2716,3 +2716,56 @@ body {
     color: var(--text-light);
     text-align: center;
 }
+
+/* ========================================
+   GRUPPIERUNGS-UMSCHALTER (FI-14, Untergruppen, 1.8.0)
+   ======================================== */
+/* Segmentleiste Alphabetisch/Gruppe/<Wort> -- ueber der Anwesenheitsliste
+   (#attendanceGroupingBar) und ueber "Wer hat geantwortet?"
+   (responsesGroupingSwitcher()). Gleiche Bausteine wie .response-filter/
+   .list-grouping in public/css/components/buttons.css, hier eigenstaendig,
+   weil die PWA ihre CSS-Datei nicht mit dem Dashboard teilt. */
+.list-grouping {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0;
+    width: 100%;
+    max-width: 400px;
+}
+
+.list-grouping__btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.list-grouping__btn:hover {
+    opacity: 0.8;
+}
+
+.list-grouping__btn.is-active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+/* Hinweiszeile bei Mehrfachnennung (Spec 6.4): wer in zwei Gruppen/
+   Untergruppen steht, erscheint absichtlich in beiden Abschnitten. */
+.list-grouping-hint {
+    width: 100%;
+    max-width: 400px;
+    color: var(--text-light);
+    font-size: 12px;
+    margin: 0 0 8px;
+}
+
+#attendanceGroupingBar {
+    width: 100%;
+    max-width: 400px;
+}

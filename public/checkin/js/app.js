@@ -432,6 +432,127 @@ async function loadAppearanceSettings() {
 }
 
 // ========================================
+// GRUPPIERUNG DER LISTEN (FI-14, Untergruppen, 1.8.0)
+// ========================================
+//
+// Klassische Fassung von public/js/modules/grouping.js -- die PWA hat kein
+// Modulsystem, dieselbe Doppelung hat 1.7.0 schon fuer die Terminrueckmeldung
+// in Kauf genommen (RESPONSE_NAME_GROUPS etc. weiter unten). Namen und
+// Verhalten bleiben identisch zur Modul-Fassung, damit eine Aenderung an
+// einer Stelle in der anderen wiederzufinden ist.
+//
+// Abschnitte fuer Listen: alphabetisch, nach Gruppe, nach Untergruppe. Der
+// Server liefert je Mitglied `groups` und `subgroups`; hier entstehen daraus
+// die Abschnitte. Wer in zwei Gruppen steht, erscheint in beiden -- das ist
+// Absicht (Spec 3.2).
+
+const GROUPING_STAGES = ['alpha', 'group', 'subgroup'];
+
+function sortMembers(members) {
+    return [...members].sort((a, b) =>
+        (a.surname || '').localeCompare(b.surname || '', 'de') ||
+        (a.name || '').localeCompare(b.name || '', 'de'));
+}
+
+function listFor(member, stage) {
+    const list = stage === 'group' ? member.groups : member.subgroups;
+    return Array.isArray(list) ? list : [];
+}
+
+/** Welche Stufen lohnen sich fuer diese Liste? 'alpha' immer. */
+function groupingAvailableStages(members) {
+    const stages = ['alpha'];
+    if (members.some(m => listFor(m, 'group').length > 0)) stages.push('group');
+    if (members.some(m => listFor(m, 'subgroup').length > 0)) stages.push('subgroup');
+    return stages;
+}
+
+/**
+ * @returns {{key: string, label: string|null, members: object[]}[]}
+ *   Bei 'alpha' ein einziger Abschnitt ohne Ueberschrift.
+ */
+function groupingSections(members, stage, emptyLabel) {
+    if (stage !== 'group' && stage !== 'subgroup') {
+        return [{ key: 'all', label: null, members: sortMembers(members) }];
+    }
+
+    const buckets = new Map();
+    const without = [];
+
+    members.forEach(member => {
+        const list = listFor(member, stage);
+        if (list.length === 0) {
+            without.push(member);
+            return;
+        }
+        list.forEach(group => {
+            const key = String(group.group_id);
+            if (!buckets.has(key)) {
+                buckets.set(key, { key, label: group.group_name,
+                                   sort: Number(group.sort_order) || 0, members: [] });
+            }
+            buckets.get(key).members.push(member);
+        });
+    });
+
+    const sections = [...buckets.values()]
+        .sort((a, b) => a.sort - b.sort || a.label.localeCompare(b.label, 'de'))
+        .map(section => ({ ...section, members: sortMembers(section.members) }));
+
+    if (without.length > 0) {
+        sections.push({ key: 'none', label: emptyLabel, members: sortMembers(without) });
+    }
+
+    return sections;
+}
+
+/** Wie viele Mitglieder stehen in mehr als einem Abschnitt? */
+function groupingDuplicateCount(members, stage) {
+    if (stage !== 'group' && stage !== 'subgroup') return 0;
+    return members.filter(m => listFor(m, stage).length > 1).length;
+}
+
+/**
+ * Gemerkte Wahl. Faellt auf die erste sinnvolle Stufe zurueck: Untergruppe,
+ * wenn es sie gibt, sonst die Vorgabe des Aufrufers. Jeder Zugriff ist
+ * gekapselt -- im privaten Fenster wirft localStorage.
+ */
+function groupingStored(key, available, fallback) {
+    let gespeichert = null;
+    try {
+        gespeichert = window.localStorage.getItem(key);
+    } catch (e) {
+        gespeichert = null;
+    }
+    if (gespeichert && available.includes(gespeichert)) return gespeichert;
+    if (available.includes('subgroup')) return 'subgroup';
+    return available.includes(fallback) ? fallback : 'alpha';
+}
+
+function groupingStore(key, stage) {
+    try {
+        window.localStorage.setItem(key, stage);
+    } catch (e) {
+        /* ohne Gedaechtnis weiterarbeiten */
+    }
+}
+
+const GROUPING_KEY_ATTENDANCE = 'es_grouping_attendance';
+const GROUPING_KEY_RESPONSES  = 'es_grouping_responses';
+
+/**
+ * Eingestelltes Wort fuer Untergruppen (z. B. "Register"), Vorgabe
+ * "Untergruppe". `subgroup_label` liegt wie Vereinsname und Farben in der
+ * Einstellungskategorie 'public' und kommt deshalb ueber denselben Weg:
+ * loadAppearanceSettings() laedt resource=appearance ohne Anmeldung und legt
+ * das Ergebnis in appearanceSettings ab -- kein eigener Ladeweg noetig.
+ */
+function subgroupLabel() {
+    const wert = (appearanceSettings.subgroup_label || '').trim();
+    return wert === '' ? 'Untergruppe' : wert;
+}
+
+// ========================================
 // CHECK-IN: TERMINWAHL
 // ========================================
 
@@ -1163,34 +1284,47 @@ function refreshAttendanceList()
     }    
 }
 
+// Zuletzt geladene Anwesenheitsliste -- der Gruppierungs-Umschalter rendert
+// aus diesen Daten neu, ohne einen weiteren API-Aufruf (Spec 3.5, wie
+// _lastAttendanceData in records.js).
+let _lastAttendanceData = null;
+
 function renderAttendanceList(data) {
+    _lastAttendanceData = data;
+
     const content = document.getElementById('attendanceListContent');
-    
+
     if (!data.members || data.members.length === 0) {
         content.innerHTML = '<div class="info-box"><p>Keine Mitglieder für diesen Termin gefunden.</p></div>';
+        renderAttendanceGroupingBar([]);
         return;
     }
-    
-    // Gruppiere Mitglieder nach Gruppen
-    const groupedMembers = {};
-    data.members.forEach(member => {
-        const groups = member.groups || 'Keine Gruppe';
-        if (!groupedMembers[groups]) {
-            groupedMembers[groups] = [];
-        }
-        groupedMembers[groups].push(member);
-    });
-    
-let html =``;    
-    // Render jede Gruppe
-    Object.keys(groupedMembers).sort().forEach(groupName => {
-        const members = groupedMembers[groupName];
-        
+
+    renderAttendanceGroupingBar(data.members);
+
+    // Umschalter-Stufen und gemerkte Wahl (Spec 6.1/6.2). Vorgabe 'group':
+    // ohne gepflegte Untergruppen sieht die PWA aus wie bisher (ein
+    // Abschnitt je Terminart-Gruppe). Fuer den Sammelabschnitt passt "Ohne
+    // Gruppe" nur bei 'group' -- bei 'subgroup' zeigt er das eingestellte
+    // Wort (z. B. "Ohne Register").
+    const stages = groupingAvailableStages(data.members);
+    const stage  = groupingStored(GROUPING_KEY_ATTENDANCE, stages, 'group');
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const sections = groupingSections(data.members, stage, emptyLabel);
+
+    // Abschnitte bleiben aufgeklappt (kein <details>): Beim Abhaken darf
+    // niemand hinter einem zugeklappten Titel verschwinden.
+    let html = ``;
+    sections.forEach(section => {
+        const heading = section.label !== null
+            ? `<h4 class="group-header">${escapeHtml(section.label)} · ${section.members.length}</h4>`
+            : '';
+
         html += `<div class="group-section">
-            <h4 class="group-header">${groupName}</h4>
+            ${heading}
             <div class="attendance-list">`;
-        
-        members.forEach(member => {
+
+        section.members.forEach(member => {
             const isPresent = member.record_id !== null;
             const statusClass = isPresent ? 'present' : 'absent';
             const statusIcon = isPresent ? '✓' : '○';
@@ -1203,19 +1337,19 @@ let html =``;
                     hour: '2-digit',
                     minute: '2-digit'
                 });
-                arrivalTimeHtml = `<span class="arrival-time">Ankunft: ${timeStr}</span>`;
+                arrivalTimeHtml = `<span class="arrival-time">Ankunft: ${escapeHtml(timeStr)}</span>`;
             }
-            
+
             html += `
                 <div class="attendance-item ${statusClass}" data-member-id="${member.member_id}">
                     <div class="member-info">
                     <span class="status-icon">${statusIcon}</span>
-                        <div class="member-info-row">                            
-                            <span class="member-name">${member.surname}, ${member.name}</span>
+                        <div class="member-info-row">
+                            <span class="member-name">${escapeHtml(member.surname)}, ${escapeHtml(member.name)}</span>
                             ${arrivalTimeHtml}
-                        </div>                        
+                        </div>
                     </div>
-                    <button class="btn-toggle-attendance" 
+                    <button class="btn-toggle-attendance"
                             data-member-id="${member.member_id}"
                             data-appointment-id="${data.appointment.appointment_id}"
                             data-record-id="${member.record_id || ''}"
@@ -1224,17 +1358,57 @@ let html =``;
                     </button>
                 </div>`;
         });
-        
+
         html += `</div></div>`;
     });
-    
+
     content.innerHTML = html;
-    
+
     // Event Listener für Toggle-Buttons
     content.querySelectorAll('.btn-toggle-attendance').forEach(btn => {
         btn.addEventListener('click', handleAttendanceToggle);
     });
 }
+
+/** Umschalter Alphabetisch/Gruppe/<Wort> + Hinweiszeile bei Mehrfachnennung
+ * (Spec 6.1, 6.4) -- ueber der Anwesenheitsliste, gleiche Gestaltung wie bei
+ * "Wer hat geantwortet?" weiter unten. */
+function renderAttendanceGroupingBar(members) {
+    const bar = document.getElementById('attendanceGroupingBar');
+    if (!bar) return;
+
+    const stages = groupingAvailableStages(members);
+    if (stages.length <= 1) {
+        bar.innerHTML = '';
+        return;
+    }
+
+    const stage = groupingStored(GROUPING_KEY_ATTENDANCE, stages, 'group');
+    const duplicates = groupingDuplicateCount(members, stage);
+
+    const stageLabels = { alpha: 'Alphabetisch', group: 'Gruppe', subgroup: escapeHtml(subgroupLabel()) };
+    const buttons = stages.map(s => `
+        <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
+                aria-pressed="${stage === s ? 'true' : 'false'}"
+                onclick="setAttendanceGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+
+    let hint = '';
+    if (duplicates > 0) {
+        const text = duplicates === 1 ? '1 Mitglied steht' : `${duplicates} Mitglieder stehen`;
+        hint = `<p class="list-grouping-hint">${text} in mehreren Abschnitten.</p>`;
+    }
+
+    bar.innerHTML = `<div class="list-grouping">${buttons}</div>${hint}`;
+}
+
+/** Umschalter-Klick (Spec 6.2): merkt die Wahl und rendert aus den
+ * vorliegenden Daten neu -- kein erneuter API-Aufruf. */
+window.setAttendanceGrouping = function(stage) {
+    groupingStore(GROUPING_KEY_ATTENDANCE, stage);
+    if (_lastAttendanceData) {
+        renderAttendanceList(_lastAttendanceData);
+    }
+};
 
 async function handleAttendanceToggle(event) {
     const btn = event.target;
@@ -3725,48 +3899,61 @@ function responseNameChip(m, status) {
     return `<span class="response-name-chip response-name-chip--${meta.key}">${meta.icon} ${escapeHtml(m.name)} ${escapeHtml(m.surname)}</span>`;
 }
 
-/** Nachname vor Vorname, "Vorname Nachname" bleibt aber die Anzeige. */
-function sortByNameSurname(members) {
-    return [...members].sort((a, b) =>
-        a.surname.localeCompare(b.surname, 'de') || a.name.localeCompare(b.name, 'de'));
-}
-
-/** Gruppenname eines Mitglieds, null statt leer/undefiniert fuer "Ohne Gruppe". */
-function responseGroupKey(m) {
-    return m.group_name && String(m.group_name).trim() !== '' ? m.group_name : null;
+/** Umschalter Alphabetisch/Gruppe/<Wort> ueber "Wer hat geantwortet?" --
+ * dieselbe Gestaltung wie bei der Anwesenheitsliste (list-grouping). */
+function responsesGroupingSwitcher(stages, stage) {
+    if (stages.length <= 1) return '';
+    const stageLabels = { alpha: 'Alphabetisch', group: 'Gruppe', subgroup: escapeHtml(subgroupLabel()) };
+    const buttons = stages.map(s => `
+        <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
+                aria-pressed="${stage === s ? 'true' : 'false'}"
+                onclick="setResponsesGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+    return `<div class="list-grouping">${buttons}</div>`;
 }
 
 /**
- * "Wer hat geantwortet?" (Nutzer-Entscheidung): primaer nach Gruppe
- * gegliedert statt nach Status -- Ampel-Zeile in der Summary bleibt die
- * Gesamtzaehlung (direkt aus item.members, nicht aus item.summary, sonst
- * muessten beide synchron gehalten werden), je Gruppe eine eigene
- * Ampel-Zeile in der Ueberschrift und die Chips darunter Zusage -> Unsicher
- * -> Absage -> ohne Antwort, darin nach Nachname/Vorname.
+ * "Wer hat geantwortet?" (Nutzer-Entscheidung): primaer nach dem gewaehlten
+ * Umschalter gegliedert statt fest nach Terminart-Gruppe -- analog zu
+ * namesListHtml() im Dashboard (public/js/modules/responses.js). Vorgabe
+ * 'group', ausser es gibt Untergruppen (groupingStored() faellt dann auf
+ * 'subgroup' zurueck). Ampel-Zeile in der Summary bleibt die Gesamtzaehlung
+ * (direkt aus item.members, nicht aus item.summary, sonst muessten beide
+ * synchron gehalten werden), je Abschnitt eine eigene Ampel-Zeile in der
+ * Ueberschrift und die Chips darunter Zusage -> Unsicher -> Absage -> ohne
+ * Antwort, darin nach Nachname/Vorname (schon durch groupingSections()
+ * sortiert). Wer in mehreren Abschnitten steht (Gruppe/Untergruppe),
+ * erscheint mehrfach -- groupingDuplicateCount() macht das sichtbar (Spec 6.4).
  */
 function responseNamesHtml(members, appointmentId) {
     const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
     members.forEach(m => counts[m.status || 'open']++);
 
-    // Gruppen alphabetisch, Mitglieder ohne Gruppe zuletzt als "Ohne Gruppe".
-    const groupNames = [...new Set(members.map(responseGroupKey))].sort((a, b) => {
-        if (a === null) return 1;
-        if (b === null) return -1;
-        return a.localeCompare(b, 'de');
-    });
+    const stages = groupingAvailableStages(members);
+    const stage  = groupingStored(GROUPING_KEY_RESPONSES, stages, 'group');
+    // "Ohne Gruppe" nur bei der Stufe 'group' -- bei 'subgroup' zeigt der
+    // Sammelabschnitt das eingestellte Wort (z. B. "Ohne Register").
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const sections = groupingSections(members, stage, emptyLabel);
+    const duplicates = groupingDuplicateCount(members, stage);
 
-    const groups = groupNames.map(groupName => {
-        const groupMembers = members.filter(m => responseGroupKey(m) === groupName);
+    let hint = '';
+    if (duplicates > 0) {
+        const text = duplicates === 1 ? '1 Mitglied steht' : `${duplicates} Mitglieder stehen`;
+        hint = `<p class="list-grouping-hint">${text} in mehreren Abschnitten.</p>`;
+    }
+
+    const groups = sections.map(section => {
+        const label = section.label === null ? 'Alle Mitglieder' : section.label;
         const groupCounts = { yes: 0, maybe: 0, no: 0, open: 0 };
-        groupMembers.forEach(m => groupCounts[m.status || 'open']++);
+        section.members.forEach(m => groupCounts[m.status || 'open']++);
 
         const chips = RESPONSE_NAME_GROUPS.map(g => {
-            const inStatus = sortByNameSurname(groupMembers.filter(m => (m.status || null) === g.status));
+            const inStatus = section.members.filter(m => (m.status || null) === g.status);
             if (inStatus.length === 0) return '';
 
-            // "+ n weitere" nur innerhalb dieser Gruppe, nicht ueber die
-            // Termin-Karte hinweg gezaehlt -- eine kleine Gruppe darf ihre
-            // "ohne Antwort" vollstaendig zeigen, auch wenn andere Gruppen
+            // "+ n weitere" nur innerhalb dieses Abschnitts, nicht ueber die
+            // Termin-Karte hinweg gezaehlt -- ein kleiner Abschnitt darf seine
+            // "ohne Antwort" vollstaendig zeigen, auch wenn andere Abschnitte
             // zusammen mehr als 12 haben.
             const overflow = g.status === null && inStatus.length > RESPONSE_NAMES_OPEN_LIMIT;
             const shown = overflow ? inStatus.slice(0, RESPONSE_NAMES_OPEN_LIMIT) : inStatus;
@@ -3777,8 +3964,6 @@ function responseNamesHtml(members, appointmentId) {
             return shown.map(m => responseNameChip(m, g.status)).join('') + moreChip;
         }).join('');
 
-        const label = groupName === null ? 'Ohne Gruppe' : groupName;
-
         return `<div class="response-name-group">
             <div class="response-name-group__heading"><span class="response-name-group__label">${escapeHtml(label)}</span> · <span class="response-count-row">${responseCountChipsHtml(groupCounts)}</span></div>
             <div class="response-name-chips">${chips}</div>
@@ -3787,9 +3972,17 @@ function responseNamesHtml(members, appointmentId) {
 
     return `<details class="response-names"${responsesOpenNames.has(appointmentId) ? ' open' : ''} data-appointment-id="${appointmentId}">
         <summary><span class="response-summary-label">Wer hat geantwortet?</span> <span class="response-count-row">${responseCountChipsHtml(counts)}</span></summary>
+        ${responsesGroupingSwitcher(stages, stage)}${hint}
         <div class="response-names__body">${groups}</div>
     </details>`;
 }
+
+/** Umschalter-Klick (Spec 6.2): merkt die Wahl und baut die Termine-Liste neu
+ * auf -- kein erneuter API-Aufruf. */
+window.setResponsesGrouping = function(stage) {
+    groupingStore(GROUPING_KEY_RESPONSES, stage);
+    renderResponses(null);
+};
 
 function responseCardHtml(item) {
     const apt = item.appointment;
