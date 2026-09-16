@@ -2431,3 +2431,63 @@ kein Nebenprodukt der Sichtung.
 allerdings, ob irgendwo **mehr** Felder beschrieben sind als der Server herausgibt — dann steht
 dort ein Versprechen, das eine spätere Umsetzung einzulösen versuchen könnte.
 
+
+---
+
+### OI-67 · Offene Ansichten merken nicht, dass sich Daten geändert haben
+**Priorität:** mittel · aufgenommen am 2026-09-16
+
+Legt ein Manager im Dashboard einen Termin für heute an, während auf dem Telefon die
+Check-in-PWA bereits geöffnet ist, fehlt dieser Termin in der Auswahl „Termin wählen …". Er
+erscheint erst, wenn die Seite neu geladen wird.
+
+**Der Service Worker ist es nicht.** `public/checkin/service-worker.js` speichert nichts
+zwischen — jede Anfrage geht ans Netz (Zwischenspeicherung stillgelegt 2025-12-08, siehe
+[OI-43](#oi-43--offline-betrieb-der-check-in-pwa)). Der veraltete Stand steckt im
+JavaScript-Zustand der laufenden Seite: `loadCheckinAppointments()`
+(`public/checkin/js/app.js`) läuft genau zweimal — beim Anmelden bzw. beim Start mit
+gespeichertem Token und nach einem erfolgreichen Check-in. Danach nie wieder. Der einzige
+`visibilitychange`-Hörer der Datei richtet den Sekundentakt der Uhr neu aus und holt keine
+Daten. Eine PWA ist als Dauergast gebaut — sie bleibt auf dem Telefon tagelang offen —, und
+genau dort fällt das auf.
+
+**Gegenprobe im selben Modul:** Der Entschuldigungsdialog macht es richtig, `openExceptionModal()`
+ruft `loadAppointments()` bei jedem Öffnen. Es fehlt also keine Technik, sondern eine Regel,
+wann nachgeladen wird.
+
+**Dasselbe Thema im Dashboard, andere Wurzel:** `dataCache` in `public/js/modules/ui.js` hält
+Mitglieder, Termine, Aufzeichnungen, Ausnahmen und Arbeitszeiten zehn Minuten (`CACHE_TTL`).
+`invalidateCache()` greift nach **eigenen** Mutationen; ändert ein *anderer* Benutzer etwas,
+greift nichts. Zwei Manager an zwei Rechnern sehen bis zu zehn Minuten lang verschiedene Listen.
+Bisher nicht als Fehler gemeldet, aber derselbe Sachverhalt — und der Grund, warum das hier als
+eine Frage steht und nicht als zwei.
+
+**Zu tun, vor jeder Lösung:** sichten, an welchen Stellen ein einmal geladener Stand beliebig
+alt werden kann. Kandidaten sind alle Listen, die beim Start einmal gefüllt und danach nur nach
+eigener Mutation erneuert werden — in der Check-in-PWA neben der Terminauswahl auch
+Tätigkeitsarten und Einstellungen (`clientSettings`), in der Station die Mitgliederliste, im
+Dashboard jeder Schlüssel des `dataCache`.
+
+**Zu entscheiden,** aufsteigend im Aufwand:
+
+1. **Beim Zurückkehren neu laden** — `visibilitychange` und `pageshow` lösen einen Nachlauf der
+   Ladefunktionen aus. Wenige Zeilen, keine API-Änderung, deckt den beobachteten Fall
+   vollständig ab (das Telefon wird aus der Tasche geholt, *dann* wird eingecheckt). Deckt
+   **nicht** den Fall ab, dass die Seite ununterbrochen im Vordergrund liegt.
+2. **Kurzes Nachladeintervall für die Terminauswahl**, etwa alle paar Minuten, solange die Seite
+   sichtbar ist. Der Master-Tick (`tick()`) ist vorhanden und wäre der Aufhänger.
+3. **Änderungsstempel serverseitig** — die Frage nach dem Dirty-Flag. Ein Flag *pro Client* gibt
+   es nicht ohne Zustand auf dem Server; realistisch ist ein Stempel je Ressource, den eine
+   offene Seite billig abfragt und nur bei Abweichung die volle Liste nachlädt. Der Haken ist
+   die Datenbank: `appointments`, `members`, `records` und `exceptions` haben **kein**
+   `updated_at` (nur `system_settings`, `work_sessions` und `appointment_responses` führen
+   eines). Ein belastbarer Stempel bedeutet also eine Schemaänderung samt Migration; der billige
+   Ersatz aus `MAX(id)` und Zeilenzahl erkennt Anlegen und Löschen, aber keine Bearbeitung.
+
+**Verworfen, bevor es vorgeschlagen wird:** Push über SSE oder WebSocket. Das setzt einen
+dauerhaft laufenden Prozess voraus und passt nicht zu PHP auf dem Standard-Hosting, für das
+diese Anwendung gebaut ist.
+
+**Nicht sicherheitsrelevant:** veraltete Anzeige, keine falsche Berechtigung. Der Server prüft
+jeden Check-in unabhängig von dem, was die Auswahlliste zeigt — ein fehlender Eintrag führt
+höchstens dazu, dass der automatische Terminabgleich greift oder der Check-in abgewiesen wird.
