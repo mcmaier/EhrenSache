@@ -111,6 +111,22 @@ function handleSettings($db, $database, $method, $authUserId) {
                     break;
                 }
 
+                // Das Wort steht in Überschriften und im Umschalter. Zu lang
+                // bricht die Darstellung, deshalb abweisen statt kürzen -- wer
+                // 60 Zeichen eintippt, hat sich vertan und soll es merken.
+                if (($data['setting_key'] ?? null) === 'subgroup_label') {
+                    $roh = (string) ($data['setting_value'] ?? '');
+                    if (mb_strlen(trim($roh)) > GROUP_SUBGROUP_LABEL_MAX) {
+                        http_response_code(400);
+                        echo json_encode(['message' => 'Die Bezeichnung darf höchstens '
+                                            . GROUP_SUBGROUP_LABEL_MAX . ' Zeichen haben'],
+                                         JSON_UNESCAPED_UNICODE);
+                        break;
+                    }
+                    updateSetting($db, $database, 'subgroup_label', groupSubgroupLabel($roh));
+                    break;
+                }
+
                 updateSetting($db, $database, $data['setting_key'], $data['setting_value']);
                 break;
 

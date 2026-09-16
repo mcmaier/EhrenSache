@@ -281,3 +281,49 @@ test('appointment_responses: ohne sichtbare Namen bleiben Gruppen und Untergrupp
         ugDropWorld($welt);
     }
 });
+
+/**
+ * GET settings liefert `{"settings": [{"setting_key":..., "setting_value":...}, ...]}`
+ * -- eine Liste, kein flaches Objekt. Erst gegen die echte API geprueft, dann
+ * hier nachgebildet, statt die Form zu raten.
+ */
+function ugSettingValue(string $key): string
+{
+    $res = apiRequest('GET', 'settings', ['token' => apiToken('admin')]);
+    assertStatus(200, $res);
+
+    $treffer = array_values(array_filter($res['body']['settings'] ?? [],
+        static fn ($s) => ($s['setting_key'] ?? null) === $key));
+
+    return (string) ($treffer[0]['setting_value'] ?? '');
+}
+
+test('settings: subgroup_label wird normalisiert und begrenzt', function () {
+    $vorher = ugSettingValue('subgroup_label');
+
+    try {
+        assertStatus(200, apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+            'body' => ['setting_key' => 'subgroup_label', 'setting_value' => '  Register ']]));
+        assertSame('Register', ugSettingValue('subgroup_label'), 'getrimmt gespeichert');
+
+        assertStatus(200, apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+            'body' => ['setting_key' => 'subgroup_label', 'setting_value' => '   ']]));
+        assertSame('Untergruppe', ugSettingValue('subgroup_label'), 'leer ergibt die Vorgabe');
+
+        assertStatus(400, apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+            'body' => ['setting_key' => 'subgroup_label',
+                       'setting_value' => str_repeat('A', 60)]]),
+            'zu lang wird abgewiesen, nicht stillschweigend gekuerzt');
+
+        assertStatus(200, apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+            'body' => ['setting_key' => 'subgroup_label', 'setting_value' => "Regi\nster"]]));
+        assertSame('Register', ugSettingValue('subgroup_label'),
+            'Steuerzeichen und Zeilenumbruch fallen weg, nicht roh gespeichert');
+    } finally {
+        // Geht ueber denselben Pruefpfad wie oben: ein leeres $vorher (Einstellung
+        // existierte noch nicht) normalisiert sich dabei selbst zur Vorgabe --
+        // kein Sonderfall noetig, damit der Zustand danach brauchbar bleibt.
+        apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+            'body' => ['setting_key' => 'subgroup_label', 'setting_value' => $vorher]]);
+    }
+});
