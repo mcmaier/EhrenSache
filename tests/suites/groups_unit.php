@@ -27,6 +27,14 @@ test('groupSubgroupLabel: entfernt Steuerzeichen und Zeilenumbrueche', function 
     assertSame('Register', groupSubgroupLabel("Register\t"));
 });
 
+test('groupSubgroupLabel: ungueltiges UTF-8 ergibt die Vorgabe', function () {
+    assertSame('Untergruppe', groupSubgroupLabel("Kaputt\xFFUTF8"));
+});
+
+test('groupSubgroupLabel: escaped kein HTML, das macht die Oberflaeche', function () {
+    assertSame('<b>Register</b>', groupSubgroupLabel('<b>Register</b>'));
+});
+
 test('groupSortCompare: sort_order entscheidet vor dem Namen', function () {
     $a = ['group_name' => 'Zither', 'sort_order' => 10];
     $b = ['group_name' => 'Althorn', 'sort_order' => 20];
@@ -43,6 +51,12 @@ test('groupSortCompare: fehlende sort_order zaehlt als 0', function () {
     $a = ['group_name' => 'Flöte'];
     $b = ['group_name' => 'Flöte', 'sort_order' => 5];
     assertTrue(groupSortCompare($a, $b) < 0, 'ohne Angabe wie 0');
+});
+
+test('groupSortCompare: sort_order als Zeichenkette (wie von PDO geliefert)', function () {
+    $a = ['group_name' => 'Flöte', 'sort_order' => '10'];
+    $b = ['group_name' => 'Flöte', 'sort_order' => '9'];
+    assertTrue(groupSortCompare($a, $b) > 0, 'numerisch, nicht alphabetisch: 10 nach 9');
 });
 
 test('groupsSortForDisplay: sortiert eine Liste nach derselben Regel', function () {

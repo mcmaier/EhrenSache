@@ -19,6 +19,9 @@ const GROUP_SUBGROUP_LABEL_MAX = 30;
 /**
  * Bezeichnung der Untergruppen aus der Einstellung: getrimmt, ohne
  * Steuerzeichen, höchstens 30 Zeichen. Leer ergibt die Vorgabe.
+ *
+ * Escaped kein HTML: Escaping geschieht beim Anzeigen in der Oberfläche,
+ * das Projekt hat bewusst keine CSP (siehe OI-17 in docs/OPEN-ITEMS.md).
  */
 function groupSubgroupLabel(?string $raw): string
 {
