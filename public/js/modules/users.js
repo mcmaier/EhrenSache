@@ -116,7 +116,7 @@ function renderUsers(users, page = 1)
     let memberInfo = '';
 
      // User-Info mit verknüpftem Mitglied       
-    let userInfo = `<div style="line-height: 1.3;">${user.email}`;    
+    let userInfo = `<div style="line-height: 1.3;">${escapeHtml(user.email)}`;
     if (user.user_name) {
        // userInfo += `<br><small><style="color: #7f8c8d;">${user.user_name}</small>`;
         userInfo += `<br><div class="linked-member">${escapeHtml(user.user_name)}</div>`;
@@ -886,7 +886,7 @@ export async function deleteUser(userId) {
         const result = await apiCall('users', 'DELETE', null, { id: userId });
         if (result) {
             showUserSection(true, currentUsersPage);
-            showToast(`User "${email}" wurde gelöscht`, 'success');        
+            showToast(`User "${escapeHtml(email)}" wurde gelöscht`, 'success');
         }
     }
 }
