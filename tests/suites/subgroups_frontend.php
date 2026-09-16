@@ -271,3 +271,56 @@ test('records.js: currentMode wird ausschliesslich ueber setRecordMode() geaende
     $setterCalls = substr_count($js, 'setRecordMode(RecordMode.');
     assertTrue($setterCalls >= 6, "Erwartet mindestens 6 Aufrufe von setRecordMode() (Terminart-, Termin-, Mitglied-Filter je zwei Zweige, resetRecordFilter()), gefunden: {$setterCalls}");
 });
+
+// ----------------------------------------------------------------------
+// Manueller Test 16.09.2026, Nachtrag: dritter Fehler im selben Block wie
+// Fehler 1 (handleAttendanceToggle), aber aelter und unabhaengig vom
+// Untergruppen-Vorhaben -- keine Gruppierungslogik betroffen.
+// ----------------------------------------------------------------------
+
+test('checkin/js/app.js: apiCall()-Ergebnisse (Konvention: Variable "result") werden nur ueber success/status/data/error ausgewertet', function () use ($ugfRoot) {
+    // apiCall() in der PWA verpackt den Serverkoerper unter .data --
+    // {success, status, data, error}. handleAttendanceToggle() griff nach
+    // dem Check-in aber auf result.id statt result.data.id zu (immer
+    // undefined). Der folgende DELETE mit id=undefined traf serverseitig
+    // keine Zeile; execute() gab trotzdem true zurueck, und der 200er
+    // verschleierte, dass die Anwesenheit in der Datenbank stehen blieb
+    // (live nachgestellt: Mitglied 32, Termin 8537, record_id 45099 blieb
+    // in ez_records, obwohl die Oberflaeche "entfernt" zeigte).
+    //
+    // Statt nur die eine Stelle zu pruefen: JEDE result.<Feld>-Auswertung
+    // im gesamten File -- "result" ist hier die weit ueberwiegende
+    // Namenskonvention fuer apiCall()-Rueckgaben -- muss eines der vier
+    // Felder der Huellstruktur sein. Ein kuenftiges result.<irgendwas aus
+    // dem Serverkoerper> waere derselbe Fehler und faellt hier auf.
+    //
+    // Nicht uebertragbar auf records.js (Dashboard): dessen apiCall() in
+    // public/js/modules/api.js hat eine andere Form -- der Serverkoerper
+    // wird dort direkt mit einem zusaetzlichen .success-Feld zurueckgegeben,
+    // nicht unter .data verschachtelt. Ein result.members o. ae. ist dort
+    // richtig und keine Instanz dieses Fehlers.
+    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+
+    preg_match_all('/\bresult\.([a-zA-Z_][a-zA-Z0-9_]*)/', $js, $matches);
+    $erlaubt = ['success', 'status', 'data', 'error'];
+    $unerwartet = array_values(array_unique(array_diff($matches[1], $erlaubt)));
+
+    assertTrue(
+        $unerwartet === [],
+        'result.<Feld> ausserhalb von success/status/data/error gefunden: ' . implode(', ', $unerwartet)
+    );
+});
+
+test('checkin/js/app.js: handleAttendanceToggle() liest die neue Datensatz-ID aus result.data.id, nicht aus result.id', function () use ($ugfRoot) {
+    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+    $body = ugfBody($js, 'async function handleAttendanceToggle', 'function handleDashboardNavigation');
+
+    assertTrue(
+        str_contains($body, 'b.dataset.recordId = result.data.id;'),
+        'Die neue Datensatz-ID wird nicht (mehr) aus result.data.id gelesen'
+    );
+    assertTrue(
+        !preg_match('/dataset\.recordId\s*=\s*result\.id\b/', $body),
+        'dataset.recordId wird wieder direkt aus result.id gelesen (immer undefined)'
+    );
+});

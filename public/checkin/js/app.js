@@ -1503,7 +1503,14 @@ async function handleAttendanceToggle(event) {
             memberButtons.forEach(b => {
                 b.textContent = '✗';
                 b.dataset.isPresent = 'true';
-                b.dataset.recordId = result.id;
+                // apiCall() liefert den Serverkoerper unter .data -- die ID
+                // steht dort verschachtelt, nicht direkt am Ergebnis (das
+                // waere immer undefined). Ein DELETE mit dataset.recordId
+                // "undefined" traf serverseitig keine Zeile, execute() gab
+                // trotzdem true zurueck, und der 200er liess den Fehler
+                // unbemerkt: die Anwesenheit blieb in der Datenbank stehen,
+                // obwohl die Oberflaeche sie als entfernt zeigte.
+                b.dataset.recordId = result.data.id;
             });
 
             // Füge Ankunftszeit hinzu (aus API-Response), in jeder Zeile
