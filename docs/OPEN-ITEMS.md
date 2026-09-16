@@ -2404,6 +2404,14 @@ die der Fund aufwirft: **Wie viele der übrigen Abschnitte beschreiben Wunschden
 Beispiel sah plausibel aus und stand vermutlich seit der ersten Fassung darin; niemand hat es je
 gegen eine laufende Instanz gehalten.
 
+**Zweiter Fall, am selben Tag bestätigt:** Der Abschnitt „Anwesenheitsliste für Termin"
+dokumentiert ein Array `attendance` mit `member_name` und `group_name`. Geliefert wird
+`members`, und die Einträge tragen `name`, `surname`, `groups`, `record_id`, `checkin_source`.
+Gegen die Testinstanz nachgestellt (Termin 104, HTTP 200): Schlüssel `appointment` und
+`members`. Gemeldet aus dem parallelen Untergruppen-Vorhaben, das diesen Abschnitt in seiner
+Dokumentationsaufgabe mitzieht — zwei unabhängige Funde an zwei Abschnitten machen den
+Verdacht zur Regel.
+
 **Warum das mehr als Kosmetik ist:** `API.md` ist die einzige Beschreibung der Schnittstelle für
 alles, was nicht die mitgelieferte Oberfläche ist — eigene Skripte, die ESP32-Geräte, ein
 späterer Fremdzugriff. Ein erfundenes Antwortformat fällt dort erst zur Laufzeit auf, und zwar
