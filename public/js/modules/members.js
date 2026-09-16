@@ -195,7 +195,7 @@ function renderMembers(members, page = 1) {
                       <button class="action-btn btn-icon btn-edit" onclick="openMemberModal(${member.member_id})" title="Bearbeiten">
                     ✎
                 </button>
-                <button class="action-btn btn-icon btn-delete" onclick="deleteMember(${member.member_id}, '${member.name} ${member.surname}')" title="Löschen">
+                <button class="action-btn btn-icon btn-delete" onclick="deleteMember(${member.member_id})" title="Löschen">
                     🗑
                 </button>
             </td>
@@ -637,7 +637,14 @@ export async function saveMember() {
     }    
 }
 
-export async function deleteMember(memberId, name) {
+export async function deleteMember(memberId) {
+    // Name aus dem Cache holen statt aus dem onclick-Attribut: ein Mitgliedsname
+    // mit Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als
+    // Code einschleusen (kein CSP im Projekt) -- Muster aus deleteGroup()/
+    // deleteType() in management.js (Commit ad200ba).
+    const member = dataCache.members[currentYear]?.data?.find(m => m.member_id == memberId);
+    const name = member ? `${member.name} ${member.surname}` : 'diesem Mitglied';
+
     const confirmed = await showConfirm(
         `Mitglied "${name}" wirklich löschen?`,
         'Mitglied löschen'
