@@ -54,10 +54,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Antragsdialog ließen sich zwei Abwesenheitsanträge zum selben Termin stellen, die einzeln
   beschieden werden mussten. Der Server weist den zweiten jetzt ab und nennt den vorhandenen.
   Ein abgelehnter Antrag blockiert wie bisher keinen neuen.
-- **Namen erschienen an drei Stellen ungeschützt im Seitencode.** In der Gruppenliste, der
-  Terminartenliste und der Anwesenheitsliste stand der Name direkt in einem Klick-Attribut. Ein
-  Name mit bestimmten Sonderzeichen hätte die Darstellung stören können. Diese Stellen geben
-  jetzt nur noch eine interne Nummer weiter, keinen Namen mehr.
+- **Eingetragene Texte erschienen vielerorts ungeschützt im Seitencode.** Namen, Titel,
+  Bemerkungen und Begründungen wurden in Dashboard und Check-in-App an zahlreichen Stellen
+  unmaskiert ausgegeben; Farben und der Link zur Datenschutzerklärung wurden ohne Formatprüfung
+  übernommen. An einigen dieser Stellen konnte ein gewöhnliches Mitgliedskonto Inhalte
+  hinterlegen, die Admin und Manager in ihren Ansichten zu sehen bekamen. Alle bekannten
+  Stellen sind abgesichert; Einzelheiten stehen im Security Advisory (siehe Release-Hinweise).
 
 ---
 
