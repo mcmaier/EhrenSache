@@ -436,12 +436,12 @@ async function loadAppearanceSettings() {
 // ========================================
 //
 // Klassische Fassung von public/js/modules/grouping.js -- die PWA hat kein
-// Modulsystem, dieselbe Doppelung hat 1.7.0 schon fuer die Terminrueckmeldung
+// Modulsystem, dieselbe Doppelung hat 1.7.0 schon für die Terminrückmeldung
 // in Kauf genommen (RESPONSE_NAME_GROUPS etc. weiter unten). Namen und
-// Verhalten bleiben identisch zur Modul-Fassung, damit eine Aenderung an
+// Verhalten bleiben identisch zur Modul-Fassung, damit eine Änderung an
 // einer Stelle in der anderen wiederzufinden ist.
 //
-// Abschnitte fuer Listen: alphabetisch, nach Gruppe, nach Untergruppe. Der
+// Abschnitte für Listen: alphabetisch, nach Gruppe, nach Untergruppe. Der
 // Server liefert je Mitglied `groups` und `subgroups`; hier entstehen daraus
 // die Abschnitte. Wer in zwei Gruppen steht, erscheint in beiden -- das ist
 // Absicht (Spec 3.2).
@@ -459,7 +459,7 @@ function listFor(member, stage) {
     return Array.isArray(list) ? list : [];
 }
 
-/** Welche Stufen lohnen sich fuer diese Liste? 'alpha' immer. */
+/** Welche Stufen lohnen sich für diese Liste? 'alpha' immer. */
 function groupingAvailableStages(members) {
     const stages = ['alpha'];
     if (members.some(m => listFor(m, 'group').length > 0)) stages.push('group');
@@ -469,7 +469,7 @@ function groupingAvailableStages(members) {
 
 /**
  * @returns {{key: string, label: string|null, members: object[]}[]}
- *   Bei 'alpha' ein einziger Abschnitt ohne Ueberschrift.
+ *   Bei 'alpha' ein einziger Abschnitt ohne Überschrift.
  */
 function groupingSections(members, stage, emptyLabel) {
     if (stage !== 'group' && stage !== 'subgroup') {
@@ -513,7 +513,7 @@ function groupingDuplicateCount(members, stage) {
 }
 
 /**
- * Gemerkte Wahl. Faellt auf die erste sinnvolle Stufe zurueck: Untergruppe,
+ * Gemerkte Wahl. Fällt auf die erste sinnvolle Stufe zurück: Untergruppe,
  * wenn es sie gibt, sonst die Vorgabe des Aufrufers. Jeder Zugriff ist
  * gekapselt -- im privaten Fenster wirft localStorage.
  */
@@ -533,7 +533,7 @@ function groupingStore(key, stage) {
     try {
         window.localStorage.setItem(key, stage);
     } catch (e) {
-        /* ohne Gedaechtnis weiterarbeiten */
+        /* ohne Gedächtnis weiterarbeiten */
     }
 }
 
@@ -541,11 +541,11 @@ const GROUPING_KEY_ATTENDANCE = 'es_grouping_attendance';
 const GROUPING_KEY_RESPONSES  = 'es_grouping_responses';
 
 /**
- * Eingestelltes Wort fuer Untergruppen (z. B. "Register"), Vorgabe
+ * Eingestelltes Wort für Untergruppen (z. B. "Register"), Vorgabe
  * "Untergruppe". `subgroup_label` liegt wie Vereinsname und Farben in der
- * Einstellungskategorie 'public' und kommt deshalb ueber denselben Weg:
- * loadAppearanceSettings() laedt resource=appearance ohne Anmeldung und legt
- * das Ergebnis in appearanceSettings ab -- kein eigener Ladeweg noetig.
+ * Einstellungskategorie 'public' und kommt deshalb über denselben Weg:
+ * loadAppearanceSettings() lädt resource=appearance ohne Anmeldung und legt
+ * das Ergebnis in appearanceSettings ab -- kein eigener Ladeweg nötig.
  */
 function subgroupLabel() {
     const wert = (appearanceSettings.subgroup_label || '').trim();
@@ -1304,7 +1304,7 @@ function renderAttendanceList(data) {
 
     // Umschalter-Stufen und gemerkte Wahl (Spec 6.1/6.2). Vorgabe 'group':
     // ohne gepflegte Untergruppen sieht die PWA aus wie bisher (ein
-    // Abschnitt je Terminart-Gruppe). Fuer den Sammelabschnitt passt "Ohne
+    // Abschnitt je Terminart-Gruppe). Für den Sammelabschnitt passt "Ohne
     // Gruppe" nur bei 'group' -- bei 'subgroup' zeigt er das eingestellte
     // Wort (z. B. "Ohne Register").
     const stages = groupingAvailableStages(data.members);
@@ -1371,7 +1371,7 @@ function renderAttendanceList(data) {
 }
 
 /** Umschalter Alphabetisch/Gruppe/<Wort> + Hinweiszeile bei Mehrfachnennung
- * (Spec 6.1, 6.4) -- ueber der Anwesenheitsliste, gleiche Gestaltung wie bei
+ * (Spec 6.1, 6.4) -- über der Anwesenheitsliste, gleiche Gestaltung wie bei
  * "Wer hat geantwortet?" weiter unten. */
 function renderAttendanceGroupingBar(members) {
     const bar = document.getElementById('attendanceGroupingBar');
@@ -3899,7 +3899,7 @@ function responseNameChip(m, status) {
     return `<span class="response-name-chip response-name-chip--${meta.key}">${meta.icon} ${escapeHtml(m.name)} ${escapeHtml(m.surname)}</span>`;
 }
 
-/** Umschalter Alphabetisch/Gruppe/<Wort> ueber "Wer hat geantwortet?" --
+/** Umschalter Alphabetisch/Gruppe/<Wort> über "Wer hat geantwortet?" --
  * dieselbe Gestaltung wie bei der Anwesenheitsliste (list-grouping). */
 function responsesGroupingSwitcher(stages, stage) {
     if (stages.length <= 1) return '';
@@ -3912,14 +3912,14 @@ function responsesGroupingSwitcher(stages, stage) {
 }
 
 /**
- * "Wer hat geantwortet?" (Nutzer-Entscheidung): primaer nach dem gewaehlten
+ * "Wer hat geantwortet?" (Nutzer-Entscheidung): primär nach dem gewählten
  * Umschalter gegliedert statt fest nach Terminart-Gruppe -- analog zu
  * namesListHtml() im Dashboard (public/js/modules/responses.js). Vorgabe
- * 'group', ausser es gibt Untergruppen (groupingStored() faellt dann auf
- * 'subgroup' zurueck). Ampel-Zeile in der Summary bleibt die Gesamtzaehlung
- * (direkt aus item.members, nicht aus item.summary, sonst muessten beide
+ * 'group', außer es gibt Untergruppen (groupingStored() fällt dann auf
+ * 'subgroup' zurück). Ampel-Zeile in der Summary bleibt die Gesamtzählung
+ * (direkt aus item.members, nicht aus item.summary, sonst müssten beide
  * synchron gehalten werden), je Abschnitt eine eigene Ampel-Zeile in der
- * Ueberschrift und die Chips darunter Zusage -> Unsicher -> Absage -> ohne
+ * Überschrift und die Chips darunter Zusage -> Unsicher -> Absage -> ohne
  * Antwort, darin nach Nachname/Vorname (schon durch groupingSections()
  * sortiert). Wer in mehreren Abschnitten steht (Gruppe/Untergruppe),
  * erscheint mehrfach -- groupingDuplicateCount() macht das sichtbar (Spec 6.4).
@@ -3951,9 +3951,9 @@ function responseNamesHtml(members, appointmentId) {
             const inStatus = section.members.filter(m => (m.status || null) === g.status);
             if (inStatus.length === 0) return '';
 
-            // "+ n weitere" nur innerhalb dieses Abschnitts, nicht ueber die
-            // Termin-Karte hinweg gezaehlt -- ein kleiner Abschnitt darf seine
-            // "ohne Antwort" vollstaendig zeigen, auch wenn andere Abschnitte
+            // "+ n weitere" nur innerhalb dieses Abschnitts, nicht über die
+            // Termin-Karte hinweg gezählt -- ein kleiner Abschnitt darf seine
+            // "ohne Antwort" vollständig zeigen, auch wenn andere Abschnitte
             // zusammen mehr als 12 haben.
             const overflow = g.status === null && inStatus.length > RESPONSE_NAMES_OPEN_LIMIT;
             const shown = overflow ? inStatus.slice(0, RESPONSE_NAMES_OPEN_LIMIT) : inStatus;
