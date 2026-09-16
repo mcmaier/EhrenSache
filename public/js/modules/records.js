@@ -163,7 +163,7 @@ export async function renderRecords(records, page = 1)
         let appointmentInfo = '-';
         if (record.appointment_id && record.title) {
             appointmentInfo = `<div style="line-height: 1.4;">
-                <strong>${record.title}</strong>`;
+                <strong>${escapeHtml(record.title)}</strong>`;
             
             if (record.date && record.start_time) {
                 const aptDate = new Date(record.date + 'T00:00:00');
@@ -180,7 +180,7 @@ export async function renderRecords(records, page = 1)
         const appointmentTypeBadge = createAppointmentTypeBadge(typeId);                
 
         // Member-Info mit Mitgliedsnr. wenn vorhanden       
-        let memberInfo = `<div style="line-height: 1.4;">${record.surname}, ${record.name}`;    
+        let memberInfo = `<div style="line-height: 1.4;">${escapeHtml(record.surname)}, ${escapeHtml(record.name)}`;
         if (record.member_number) {            
             memberInfo += `<br><small style="color: #7f8c8d;">${escapeHtml(record.member_number)}</small>`;
         }    
@@ -521,7 +521,7 @@ async function loadMemberFilter(forceReload = false, appointmentType = null)
         filtered
             .filter(m => m.is_active_in_period)
             .forEach(member => {
-                memberSelect.innerHTML += `<option value="${member.member_id}">${member.surname}, ${member.name}</option>`;
+                memberSelect.innerHTML += `<option value="${member.member_id}">${escapeHtml(member.surname)}, ${escapeHtml(member.name)}</option>`;
             });
     }
     memberSelect.value = currentMemberValue;
@@ -767,12 +767,17 @@ function getSourceBadge(record) {
                  </span>`;
     
     // Zusatzinfo
+    // location_name/source_device kommen bei auto_checkin/totp_checkin direkt aus dem
+    // Client-Request (private/handlers/auto_checkin.php, totp_checkin.php) -- jedes
+    // angemeldete Konto (auch Rolle "user") kann sie beim eigenen Check-in setzen, hier
+    // sieht sie aber Admin/Manager in der Anwesenheitsliste. Ohne CSP (OI-17) daher
+    // zwingend escapeHtml().
     const details = [];
     if (record.location_name) {
-        details.push(`📍 ${record.location_name}`);
+        details.push(`📍 ${escapeHtml(record.location_name)}`);
     }
     if (record.source_device) {
-        details.push(`🔧 ${record.source_device}`);
+        details.push(`🔧 ${escapeHtml(record.source_device)}`);
     }
     
     if (details.length > 0) {
@@ -1309,7 +1314,7 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
         let appointmentInfo = '-';
         if (appointment.appointment_id && appointment.title) {
             appointmentInfo = `<div style="line-height: 1.4;">
-                <strong>${appointment.title}</strong>`;
+                <strong>${escapeHtml(appointment.title)}</strong>`;
             
             if (appointment.date && appointment.start_time) {
                 const aptDate = new Date(appointment.date + 'T00:00:00');
@@ -1419,8 +1424,11 @@ function createAppointmentTypeBadge(appointment_type_id = null)
         const type = types.find(t => t.type_id == appointment_type_id);
         
         if (type) {
-            return `<span class="type-badge" style="background: ${type.color}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                        ${type.type_name}
+            // type.color/type.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
+            // muss hier selbst maskiert werden: Farbe per Whitelist, Text per escapeHtml().
+            const safeTypeColor = /^#[0-9a-f]{3,8}$/i.test(type.color || '') ? type.color : '#667eea';
+            return `<span class="type-badge" style="background: ${safeTypeColor}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                        ${escapeHtml(type.type_name)}
                     </span>`;
         }
     }
