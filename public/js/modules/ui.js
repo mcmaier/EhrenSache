@@ -143,6 +143,36 @@ export function updateSubgroupLabelElements() {
     });
 }
 
+/**
+ * Baut die <option>-Einträge für ein Gruppen-Auswahlfeld. Zugehörigkeitsgruppen
+ * und Untergruppen (`is_subgroup`) erscheinen fachlich getrennt: native
+ * <optgroup>-Überschriften statt Farbe oder Trennzeichen, ohne Zusatzaufwand
+ * barrierefrei und ohne CSS. Erwartet `groups` bereits serverseitig sortiert
+ * (sort_order, group_name — siehe member_groups.php), sortiert hier nicht neu,
+ * filtert nur in zwei Töpfe.
+ *
+ * Gibt es keine Untergruppe in der Liste, bleibt die Ausgabe eine flache
+ * Options-Liste wie vor 1.8.0 — keine leere zweite Überschrift, keine
+ * Optgroup nur für die erste.
+ */
+export function groupSelectOptionsHtml(groups) {
+    const list = Array.isArray(groups) ? groups : [];
+    const option = g => `<option value="${g.group_id}">${g.group_name}</option>`;
+    const subgroups = list.filter(g => g.is_subgroup == 1);
+
+    if (subgroups.length === 0) {
+        return list.map(option).join('');
+    }
+
+    const main = list.filter(g => g.is_subgroup != 1);
+    // subgroupLabel() ist Freitext aus den Einstellungen -- für den
+    // Attribut-Kontext reicht das Escaping von escapeHtml() (utils.js) nicht,
+    // da es Anführungszeichen im Textknoten nicht kodiert.
+    const attrLabel = subgroupLabel().replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    return `<optgroup label="Gruppen">${main.map(option).join('')}</optgroup>`
+        + `<optgroup label="${attrLabel}">${subgroups.map(option).join('')}</optgroup>`;
+}
+
 // ============================================
 // Jahresabhängige Filterung
 // ============================================

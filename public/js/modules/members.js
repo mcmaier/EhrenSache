@@ -9,7 +9,7 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, currentYear} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, currentYear, groupSelectOptionsHtml} from './ui.js';
 import { loadUserData } from './users.js';
 import { updateModalId } from './utils.js';
 import { loadGroups } from './management.js';
@@ -362,10 +362,8 @@ export async function showMemberSection(forceReload = false, page = 1) {
     if (isAdminOrManager) {
         const groupFilter = document.getElementById('filterMemberGroup');
         if (groupFilter && groupFilter.options.length <= 1) {
-            groupFilter.innerHTML = '<option value="">Alle Gruppen</option>';
-            dataCache.groups.data.forEach(g => {
-                groupFilter.innerHTML += `<option value="${g.group_id}">${g.group_name}</option>`;
-            });
+            groupFilter.innerHTML = '<option value="">Alle Gruppen</option>'
+                + groupSelectOptionsHtml(dataCache.groups.data);
         }
     }
 

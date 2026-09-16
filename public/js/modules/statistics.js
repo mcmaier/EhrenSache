@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { loadGroups } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
-import { showToast, showConfirm, currentYear} from './ui.js';
+import { showToast, showConfirm, currentYear, groupSelectOptionsHtml} from './ui.js';
 import {debug} from '../app.js'
 import { escapeHtml } from './utils.js';
 
@@ -59,12 +59,8 @@ export async function loadStatisticsFilters() {
     if (groupSelect) {
         const currentValue = groupSelect.value;
 
-        groupSelect.innerHTML = '<option value="">Alle Gruppen</option>';
-        if (groups && groups.length > 0) {
-            groups.forEach(group => {
-                groupSelect.innerHTML += `<option value="${group.group_id}">${group.group_name}</option>`;
-            });
-        }
+        groupSelect.innerHTML = '<option value="">Alle Gruppen</option>'
+            + groupSelectOptionsHtml(groups || []);
 
         if (currentValue) groupSelect.value = currentValue;
 
@@ -75,6 +71,10 @@ export async function loadStatisticsFilters() {
                 if (opt.value !== '' && !userGroupIds.includes(parseInt(opt.value))) {
                     opt.remove();
                 }
+            });
+            // Leere Optgroup-Überschrift hinterlässt keine Gruppe ohne Einträge
+            Array.from(groupSelect.querySelectorAll('optgroup')).forEach(optgroup => {
+                if (optgroup.options.length === 0) optgroup.remove();
             });
             // Automatisch vorauswählen wenn nur eine Gruppe vorhanden
             if (!groupSelect.value && groupSelect.options.length === 2) {
