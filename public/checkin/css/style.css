@@ -2621,13 +2621,6 @@ body {
     padding-left: 0;
 }
 
-.response-names summary {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
 /* Ampel-Zeile -- Zaehlung je Status, gleiche Farben wie die Antwort-Knoepfe
    (response-btn). Nullwerte neutral grau statt ausgeblendet, damit die
    Reihenfolge der vier Chips immer gleich bleibt. Wird an zwei Stellen
