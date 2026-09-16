@@ -256,11 +256,25 @@
                             <label for="privacyPolicyUrl">
                                 Datenschutzerklärung (URL) für Registrierung
                             </label>
-                            <input type="url" 
-                                class="setting-input" 
-                                id="setting_privacy_url" 
+                            <input type="url"
+                                class="setting-input"
+                                id="setting_privacy_url"
                                 data-key="privacy_policy_url"
                                 placeholder="https://example.com/datenschutz">
+                        </div>
+                        <div class="settings-item">
+                            <label for="setting_subgroup_label">Bezeichnung der Untergruppen</label>
+                            <input type="text" id="setting_subgroup_label" class="setting-input"
+                                   data-key="subgroup_label" maxlength="30"
+                                   list="subgroupLabelVorschlaege" placeholder="Untergruppe">
+                            <datalist id="subgroupLabelVorschlaege">
+                                <option value="Register"><option value="Mannschaft">
+                                <option value="Stimme"><option value="Abteilung">
+                                <option value="Altersklasse">
+                            </datalist>
+                            <small class="input-hint">Wie heißen die Gruppen, nach denen Listen
+                                gegliedert werden? Erscheint im Umschalter und in der
+                                Gruppenverwaltung.</small>
                         </div>
                     </div>
 
@@ -1939,6 +1953,20 @@
                         <small style="color: #e67e22; display: block; margin-top: 5px;">
                             ⚠️ Nur eine Gruppe kann Standard sein. Diese sollte alle Mitglieder umfassen.
                         </small>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="group_is_subgroup">
+                            Gliedert Listen als <span data-subgroup-label>Untergruppe</span>
+                        </label>
+                        <small class="input-hint">Anwesenheitslisten und Rückmeldungen lassen sich
+                            nach solchen Gruppen gliedern.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="group_sort_order">Reihenfolge</label>
+                        <input type="number" id="group_sort_order" value="0" step="1">
+                        <small class="input-hint">Kleinere Zahl steht weiter oben. 0 überall
+                            bedeutet alphabetisch.</small>
                     </div>
                     <div class="form-group" id="groupMembersGroup" style="display: none;">
                         <label>Mitglieder in dieser Gruppe</label>

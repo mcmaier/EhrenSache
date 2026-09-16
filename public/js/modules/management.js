@@ -9,9 +9,11 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, subgroupLabel,
+         updateSubgroupLabelElements } from './ui.js';
 import { loadMembers } from './members.js';
-import { formatDateTime, updateModalId } from './utils.js';
+import { formatDateTime, updateModalId, escapeHtml } from './utils.js';
+import { loadSystemSettings } from './settings.js';
 import {debug} from '../app.js'
 
 // ============================================
@@ -20,6 +22,14 @@ import {debug} from '../app.js'
 
 export async function showGroupSection(forceReload = false)
 {
+    // subgroup_label ist admin-only (loadSystemSettings() no-op fuer Manager);
+    // ohne diesen Vorlauf zeigten Dialog und Liste erst nach einem Besuch der
+    // Einstellungen das echte Wort statt der Vorgabe "Untergruppe".
+    if (!isCacheValid('settings')) {
+        await loadSystemSettings();
+    }
+    updateSubgroupLabelElements();
+
     const groupData = await loadGroups(forceReload);
     renderGroups(groupData);
 
@@ -53,17 +63,21 @@ const tbody = document.getElementById('groupsTableBody');
     tbody.innerHTML = '';
     
     groupData.forEach(group => {
-        const isDefaultBadge = group.is_default 
-            ? '<span class="status-badge status-approved">✓ Ja</span>' 
+        const isDefaultBadge = group.is_default
+            ? '<span class="status-badge status-approved">✓ Ja</span>'
             : '<span class="type-badge">Nein</span>';
+
+        const subgroupBadge = group.is_subgroup == 1
+            ? ` <span class="status-badge status-approved" style="font-size: 10px; padding: 2px 6px;">${escapeHtml(subgroupLabel())}</span>`
+            : '';
 
         // Mitgliederanzahl anzeigen
         const memberCount = group.member_count || 0;
-        
+
         const row = `
             <tr>
-                <td><strong>${group.group_name}</strong></td>
-                <td>${group.description || '-'}</td>                
+                <td><strong>${escapeHtml(group.group_name)}</strong>${subgroupBadge}</td>
+                <td>${group.description ? escapeHtml(group.description) : '-'}</td>
                 <td>${memberCount}</td>
                 <td>${isDefaultBadge}</td>
                 <td class="actions-cell">
@@ -102,6 +116,8 @@ export async function openGroupModal(groupId = null) {
         document.getElementById('groupForm').reset();
         document.getElementById('group_id').value = '';
         document.getElementById('group_is_default').checked = false;
+        document.getElementById('group_is_subgroup').checked = false;
+        document.getElementById('group_sort_order').value = 0;
         membersGroup.style.display = 'none';
         updateModalId('groupModal', null)
     }
@@ -121,7 +137,9 @@ async function loadGroupData(groupId) {
         document.getElementById('group_name').value = group.group_name;
         document.getElementById('group_description').value = group.description || '';
         document.getElementById('group_is_default').checked = group.is_default == 1;
-        
+        document.getElementById('group_is_subgroup').checked = group.is_subgroup == 1;
+        document.getElementById('group_sort_order').value = group.sort_order ?? 0;
+
         // Zeige Mitglieder in dieser Gruppe
         renderGroupMembers(group.members || []);
     }
@@ -186,10 +204,14 @@ export async function saveGroup() {
         }
     }
 
+    const sortOrderRaw = parseInt(document.getElementById('group_sort_order').value, 10);
+
     const data = {
         group_name: document.getElementById('group_name').value,
         description: document.getElementById('group_description').value || null,
-        is_default: isDefault
+        is_default: isDefault,
+        is_subgroup: document.getElementById('group_is_subgroup').checked ? 1 : 0,
+        sort_order: Number.isFinite(sortOrderRaw) ? sortOrderRaw : 0
     };
     
     let result;

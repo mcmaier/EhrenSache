@@ -10,7 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdmin } from './api.js';
-import { showConfirm, showToast } from './ui.js';
+import { showConfirm, showToast, dataCache, updateSubgroupLabelElements } from './ui.js';
 import { debug } from '../app.js';
 import { applyTheme } from '../theme.js';
 
@@ -37,7 +37,11 @@ export async function loadSystemSettings() {
     response.settings.forEach(setting => {
         systemSettings[setting.setting_key] = setting.setting_value;
     });
-    
+
+    // Für subgroupLabel() etc. auch außerhalb der Einstellungen zugänglich machen
+    dataCache.settings.data = systemSettings;
+    dataCache.settings.timestamp = Date.now();
+
     return systemSettings;
 }
 
@@ -67,7 +71,10 @@ export async function renderSystemSettings() {
             }
         }
     });
-    
+
+    // Gruppendialog, Gruppenliste etc. mit dem aktuellen Wort versehen
+    updateSubgroupLabelElements();
+
     // Logo-Vorschau anzeigen
     if (settings.organization_logo) {
         const preview = document.getElementById('logo-preview');
@@ -312,6 +319,11 @@ async function saveAllSettings() {
         if (updates.some(u => u.key === 'station_pin_enabled' || u.key === 'station_pin_min_length')) {
             const { resetStationPinSettings } = await import('./members.js');
             resetStationPinSettings();
+        }
+
+        // Gruppendialog und Gruppenliste zeigen das Wort ohne Neuladen der Seite
+        if (updates.some(u => u.key === 'subgroup_label')) {
+            updateSubgroupLabelElements();
         }
 
         hasUnsavedChanges = false;

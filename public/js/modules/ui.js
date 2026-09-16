@@ -51,7 +51,10 @@ export const dataCache = {
     appointments: {},
     records: {},
     exceptions: {},
-    workSessions: {}
+    workSessions: {},
+
+    // Systemeinstellungen (nur admin-lesbar, siehe subgroupLabel())
+    settings: { data: {}, timestamp: null }
 };
 
 const CACHE_TTL = 10 * 60 * 1000; // 10 Minuten
@@ -101,6 +104,29 @@ export async function invalidateCache(cacheKey = null, year = null) {
             }
         });
     }
+}
+
+// ============================================
+// Untergruppen-Bezeichnung
+// ============================================
+
+/**
+ * Liefert das eingestellte Wort für Untergruppen (z. B. "Register").
+ * `dataCache.settings.data` wird nur für Admins gefüllt (settings.js,
+ * requireAdmin() auf dem Server) — Manager sehen deshalb bis auf Weiteres
+ * die Vorgabe "Untergruppe", nicht das konfigurierte Wort.
+ */
+export function subgroupLabel() {
+    const wert = (dataCache.settings.data?.subgroup_label || '').trim();
+    return wert === '' ? 'Untergruppe' : wert;
+}
+
+/** Füllt alle [data-subgroup-label]-Elemente im Dokument mit dem aktuellen Wort. */
+export function updateSubgroupLabelElements() {
+    const label = subgroupLabel();
+    document.querySelectorAll('[data-subgroup-label]').forEach(el => {
+        el.textContent = label;
+    });
 }
 
 // ============================================
