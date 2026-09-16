@@ -391,10 +391,11 @@ function responsesGroupingSwitcher(stages, stage) {
 
 /**
  * Antworten anderer Mitglieder (Rolle user, names_visible): gegliedert nach
- * dem gewaehlten Umschalter statt fest nach Terminart-Gruppe -- analog zu
- * responseNamesHtml() in der PWA (public/checkin/js/app.js), die weiterhin
- * fest nach Gruppe gliedert (Task fuer die PWA ist eigenstaendig, Spec 9).
- * Vorgabe 'group', ausser es gibt Untergruppen (groupingStored()). Je
+ * dem gewaehlten Umschalter statt fest nach Terminart-Gruppe -- denselben
+ * Umschalter fuehrt seit Commit 6d08a05 auch die PWA (public/checkin/js/app.js),
+ * dort als eigene, absichtlich gleich gehaltene Fassung der grouping.js-
+ * Funktionen, weil die PWA kein Modulsystem hat. Vorgabe 'group', ausser es
+ * gibt Untergruppen (groupingStored()). Je
  * Abschnitt eine Ampel-Zeile aus responseChipsHtml() und darunter Namens-Chips
  * Zusage -> Unsicher -> Absage -> ohne Antwort (CHIP_ORDER), darin nach
  * Nachname/Vorname (schon durch groupingSections() sortiert). Wer in
