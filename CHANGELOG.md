@@ -7,6 +7,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Behoben
+- **Ein Antrag je Termin und Antragsart.** Über die Absage einer Terminrückmeldung und über den
+  Antragsdialog ließen sich zwei Abwesenheitsanträge zum selben Termin stellen, die einzeln
+  beschieden werden mussten. Der Server weist den zweiten jetzt ab und nennt den vorhandenen.
+  Ein abgelehnter Antrag blockiert wie bisher keinen neuen.
+
+---
+
 ## [1.7.0] – 2026-09-16
 
 ### Neu

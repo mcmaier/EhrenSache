@@ -1220,3 +1220,72 @@ test('POST exceptions: den Status aus dem Koerper uebernehmen nur Verwalter', fu
         rsDropWorld($welt);
     }
 });
+
+test('POST exceptions: kein zweiter offener Antrag zum selben Termin (G7)', function () {
+    // Bis 1.7.0 konnte dasselbe Mitglied zweimal denselben Termin beantragen:
+    // einmal ueber die Absage der Rueckmeldung, einmal ueber den Antragsdialog.
+    // Beide Antraege waren echt und mussten einzeln beschieden werden.
+    $welt = rsWorld('DoppelAntrag', ['responses_enabled' => 1, 'responses_require_excuse' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(5), '19:00:00');
+
+        rsWithUserInWorld($welt, function (int $userMember) use ($apt, $welt) {
+            $antraege = static function (string $typ) use ($userMember, $apt): array {
+                $liste = apiRequest('GET', 'exceptions', ['token' => apiToken('admin'),
+                    'query' => ['member_id' => $userMember, 'type' => $typ]]);
+                assertStatus(200, $liste);
+
+                return array_values(array_filter($liste['body'],
+                    static fn ($e) => (int) $e['appointment_id'] === $apt));
+            };
+
+            assertStatus(200, rsPut('user', $apt, ['status' => 'no', 'comment' => 'RS-G7']));
+            assertSame(1, count($antraege('absence')), 'die Absage legt den Antrag an');
+
+            $zweiter = apiRequest('POST', 'exceptions', ['token' => apiToken('user'), 'body' => [
+                'member_id' => $userMember, 'appointment_id' => $apt,
+                'exception_type' => 'absence', 'reason' => 'RS-G7-zweiter',
+            ]]);
+            assertStatus(409, $zweiter);
+            assertSame(1, count($antraege('absence')), 'es bleibt bei einem Antrag');
+
+            $vomVerwalter = apiRequest('POST', 'exceptions', ['token' => apiToken('admin'), 'body' => [
+                'member_id' => $userMember, 'appointment_id' => $apt,
+                'exception_type' => 'absence', 'reason' => 'RS-G7-Verwalter', 'status' => 'approved',
+            ]]);
+            assertStatus(409, $vomVerwalter, 'auch der Verwalter legt keinen zweiten an');
+
+            // Die Sperre gilt je Antragsart: eine Zeitkorrektur ist etwas anderes
+            // als eine Abmeldung und bleibt daneben moeglich.
+            $korrektur = apiRequest('POST', 'exceptions', ['token' => apiToken('user'), 'body' => [
+                'member_id' => $userMember, 'appointment_id' => $apt,
+                'exception_type' => 'time_correction', 'reason' => 'RS-G7-Korrektur',
+                'requested_arrival_time' => rsDateInDays(5) . ' 19:15:00',
+            ]]);
+            assertStatus(201, $korrektur);
+
+            // Ein anderes Mitglied ist von der Sperre nicht betroffen.
+            $anderes = apiRequest('POST', 'exceptions', ['token' => apiToken('admin'), 'body' => [
+                'member_id' => $welt['member'], 'appointment_id' => $apt,
+                'exception_type' => 'absence', 'reason' => 'RS-G7-anderes-Mitglied',
+            ]]);
+            assertStatus(201, $anderes);
+
+            // Ein abgelehnter Antrag blockiert nicht -- dieselbe Regel wie in der
+            // Rueckmeldung (A1): die Ablehnung zaehlt wie kein Antrag.
+            $antrag = $antraege('absence')[0];
+            assertStatus(200, apiRequest('PUT', 'exceptions', ['token' => apiToken('admin'),
+                'query' => ['id' => (int) $antrag['exception_id']],
+                'body'  => ['exception_type' => 'absence', 'reason' => 'RS-G7', 'status' => 'rejected']]));
+
+            $nachAblehnung = apiRequest('POST', 'exceptions', ['token' => apiToken('user'), 'body' => [
+                'member_id' => $userMember, 'appointment_id' => $apt,
+                'exception_type' => 'absence', 'reason' => 'RS-G7-nach-Ablehnung',
+            ]]);
+            assertStatus(201, $nachAblehnung, 'nach einer Ablehnung ist ein neuer Antrag moeglich');
+            assertSame(2, count($antraege('absence')), 'der abgelehnte bleibt liegen, der neue kommt dazu');
+        });
+    } finally {
+        rsDropWorld($welt);
+    }
+});

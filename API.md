@@ -1024,6 +1024,15 @@ Genehmigt ein Admin den Antrag, entsteht daraus ein Eintrag in `records` mit
 `checkin_source = 'exception_request'`. Die Grenze gilt auch beim Bearbeiten — für das Mitglied,
 das seinen Antrag nachbessert, wie für den Admin, der ihn vor der Freigabe korrigiert.
 
+**`status`** übernimmt der Server nur von Admin und Manager; jeder andere Antrag entsteht als
+`pending`, unabhängig davon, was im Körper steht.
+
+**Ein Antrag je Termin und Art.** Existiert zu Mitglied, Termin und `exception_type` bereits ein
+Antrag, der nicht abgelehnt ist, antwortet der Server mit `409` und nennt im Feld `exception_id`
+den vorhandenen Antrag. Das betrifft vor allem Terminarten mit Rückmeldung: dort entsteht aus
+einer Absage bereits ein Antrag, der im Antragsdialog kein zweites Mal gestellt werden soll. Ein
+abgelehnter Antrag blockiert nicht — nach einem Nein ist ein neuer Versuch möglich.
+
 ---
 
 ### Ausnahme genehmigen/ablehnen

@@ -154,10 +154,32 @@ function handleExceptions($db, $database, $method, $id) {
                     return;
                 }
             }
-            
-            $stmt = $db->prepare("INSERT INTO {$prefix}exceptions 
-                                  (member_id, appointment_id, exception_type, reason, 
-                                   requested_arrival_time, status, created_by) 
+
+            // Zu einem Termin reicht ein Antrag je Art. Ohne diese Grenze stellt
+            // dasselbe Mitglied über die Absage der Terminrückmeldung und über
+            // den Antragsdialog zwei echte Anträge, die einzeln beschieden
+            // werden müssten. Ein abgelehnter Antrag blockiert nicht -- dieselbe
+            // Regel wie in responseExcuseAction(): die Ablehnung zählt wie kein
+            // Antrag, sonst gäbe es nach einem Nein keinen zweiten Versuch.
+            $duplicateStmt = $db->prepare("SELECT exception_id FROM {$prefix}exceptions
+                                           WHERE member_id = ? AND appointment_id = ?
+                                             AND exception_type = ? AND status <> 'rejected'
+                                           LIMIT 1");
+            $duplicateStmt->execute([$data->member_id, $data->appointment_id, $data->exception_type]);
+            $existingId = $duplicateStmt->fetchColumn();
+
+            if($existingId !== false) {
+                http_response_code(409);
+                echo json_encode([
+                    "message"      => "Zu diesem Termin gibt es bereits einen Antrag dieser Art",
+                    "exception_id" => (int) $existingId
+                ], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+
+            $stmt = $db->prepare("INSERT INTO {$prefix}exceptions
+                                  (member_id, appointment_id, exception_type, reason,
+                                   requested_arrival_time, status, created_by)
                                   VALUES (?, ?, ?, ?, ?, ?, ?)");
             
             $requested_time = isset($data->requested_arrival_time) ? $data->requested_arrival_time : null;
