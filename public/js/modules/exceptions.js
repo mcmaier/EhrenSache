@@ -16,6 +16,7 @@ import { loadMembers } from './members.js';
 import { loadTypes } from './management.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
+import { escapeHtml } from './utils.js';
 
 // ============================================
 // EXCEPTIONS
@@ -180,7 +181,7 @@ export async function renderExceptions(exceptions, page = 1)
             <td>${typeBadge}</td>
             <td>${exception.surname}, ${exception.name}</td>
             <td>${appointmentInfo}</td>
-            <td>${exception.reason}</td>
+            <td>${escapeHtml(exception.reason)}</td>
             <td>${requestedTime}</td>
             <td>${statusBadge}</td>
             <td>${formattedCreated}</td>
