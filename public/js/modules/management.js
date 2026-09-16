@@ -13,7 +13,6 @@ import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, subgro
          updateSubgroupLabelElements } from './ui.js';
 import { loadMembers } from './members.js';
 import { formatDateTime, updateModalId, escapeHtml } from './utils.js';
-import { loadSystemSettings } from './settings.js';
 import {debug} from '../app.js'
 
 // ============================================
@@ -22,12 +21,10 @@ import {debug} from '../app.js'
 
 export async function showGroupSection(forceReload = false)
 {
-    // subgroup_label ist admin-only (loadSystemSettings() no-op fuer Manager);
-    // ohne diesen Vorlauf zeigten Dialog und Liste erst nach einem Besuch der
-    // Einstellungen das echte Wort statt der Vorgabe "Untergruppe".
-    if (!isCacheValid('settings')) {
-        await loadSystemSettings();
-    }
+    // subgroup_label liegt (Kategorie 'public') bereits global in
+    // sessionStorage, von theme.js beim Seitenaufruf geladen — subgroupLabel()
+    // liest direkt von dort. Hier nur die [data-subgroup-label]-Elemente im
+    // Gruppendialog synchronisieren, kein eigener Ladeschritt mehr nötig.
     updateSubgroupLabelElements();
 
     const groupData = await loadGroups(forceReload);

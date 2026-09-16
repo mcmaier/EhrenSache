@@ -53,7 +53,9 @@ export const dataCache = {
     exceptions: {},
     workSessions: {},
 
-    // Systemeinstellungen (nur admin-lesbar, siehe subgroupLabel())
+    // Systemeinstellungen (nur admin-lesbar; subgroupLabel() liest NICHT von
+    // hier, siehe dort — settings.js pflegt diesen Eintrag für seine eigenen
+    // admin-only Zwecke weiter)
     settings: { data: {}, timestamp: null }
 };
 
@@ -112,12 +114,24 @@ export async function invalidateCache(cacheKey = null, year = null) {
 
 /**
  * Liefert das eingestellte Wort für Untergruppen (z. B. "Register").
- * `dataCache.settings.data` wird nur für Admins gefüllt (settings.js,
- * requireAdmin() auf dem Server) — Manager sehen deshalb bis auf Weiteres
- * die Vorgabe "Untergruppe", nicht das konfigurierte Wort.
+ * `subgroup_label` liegt in der Kategorie 'public' (wie Vereinsname, Farben,
+ * Datenschutz-URL) und kommt deshalb über denselben Weg wie diese: theme.js
+ * lädt beim Seitenaufruf `resource=appearance` — ohne Anmeldung, ohne
+ * Adminrechte — und legt das Ergebnis unter sessionStorage 'theme-settings'
+ * ab (siehe public/js/theme.js, loadTheme()). Kein eigener, admin-only
+ * Ladeweg nötig; gilt deshalb für alle Rollen gleich.
  */
 export function subgroupLabel() {
-    const wert = (dataCache.settings.data?.subgroup_label || '').trim();
+    let wert = '';
+    try {
+        const raw = sessionStorage.getItem('theme-settings');
+        if (raw) {
+            const settings = JSON.parse(raw);
+            wert = (settings?.subgroup_label || '').trim();
+        }
+    } catch (error) {
+        wert = '';
+    }
     return wert === '' ? 'Untergruppe' : wert;
 }
 
