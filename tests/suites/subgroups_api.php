@@ -265,6 +265,20 @@ test('appointment_responses: ohne sichtbare Namen bleiben Gruppen und Untergrupp
 
         // Rueckmeldung aktiv, aber Namen NICHT sichtbar -- also auch keine
         // Zugehoerigkeiten, weder fuer die eigene Rueckmeldung noch als member.
+        //
+        // Achtung, Tautologie: Ohne responses_names_visible baut
+        // responsesPayload() ueberhaupt keine 'members'-Liste (weder der
+        // Admin/Manager- noch der Namen-Zweig greift), also kann sie auch
+        // keine groups/subgroups enthalten -- unabhaengig davon, ob
+        // groupsAttachToMembers() ueberhaupt existiert oder korrekt arbeitet.
+        // Dieser Test waere schon vor deren Einfuehrung gruen gewesen. Er
+        // bleibt trotzdem stehen, weil er einen dritten, heute nicht
+        // existierenden Pfad absichert: eine kuenftige Aenderung, die
+        // 'members' auch ohne Namensfreigabe fuellt (etwa fuer eine neue
+        // Zusammenfassung), OHNE die Sichtbarkeitspruefung fuer
+        // groups/subgroups nachzuziehen. Der Pfad, den dieser Commit
+        // tatsaechlich neu versorgt -- Mitgliedskonto MIT Freigabe --, wird
+        // vom naechsten Test geprueft.
         assertStatus(200, apiRequest('PUT', 'appointment_types', ['token' => apiToken('admin'),
             'query' => ['id' => $welt['type']],
             'body'  => ['type_name' => 'UG-Verdeckt-Art', 'group_ids' => [$welt['group']],
@@ -276,6 +290,38 @@ test('appointment_responses: ohne sichtbare Namen bleiben Gruppen und Untergrupp
             assertStatus(200, $res);
             assertTrue(!isset($res['body']['members']),
                 'ohne responses_names_visible darf ein Mitgliedskonto keine Mitgliederliste sehen');
+        });
+    } finally {
+        ugDropWorld($welt);
+    }
+});
+
+test('appointment_responses: Mitgliedskonto mit Freigabe sieht Gruppen und Untergruppen', function () {
+    $welt = ugWorld('Freigegeben');
+    try {
+        $welt['sub'] = ugAddGroupToMember($welt, 'Freigegeben-Sub', true, 8);
+
+        // Rueckmeldung aktiv UND Namen sichtbar -- genau der Pfad, den
+        // responsesPayload() seit diesem Vorhaben mit groupsAttachToMembers()
+        // versorgt (vorher gab es dort nur member_id, Name, Gruppe, Status).
+        assertStatus(200, apiRequest('PUT', 'appointment_types', ['token' => apiToken('admin'),
+            'query' => ['id' => $welt['type']],
+            'body'  => ['type_name' => 'UG-Freigegeben-Art', 'group_ids' => [$welt['group']],
+                        'responses_enabled' => 1, 'responses_names_visible' => 1]]));
+
+        ugWithUserInWorld($welt, function () use ($welt) {
+            $res = apiRequest('GET', 'appointment_responses', ['token' => apiToken('user'),
+                                                              'query' => ['appointment_id' => $welt['appointment']]]);
+            assertStatus(200, $res);
+            assertTrue(isset($res['body']['members']) && is_array($res['body']['members']),
+                'mit responses_names_visible muss ein Mitgliedskonto die Mitgliederliste sehen: ' . $res['raw']);
+
+            $treffer = array_values(array_filter($res['body']['members'],
+                static fn ($m) => (int) $m['member_id'] === $welt['member']));
+            assertSame(1, count($treffer), 'das erwartete Mitglied steht genau einmal in der Liste');
+            assertSame(1, count($treffer[0]['subgroups'] ?? []));
+            assertSame($welt['sub'], (int) $treffer[0]['subgroups'][0]['group_id']);
+            assertSame($welt['group'], (int) $treffer[0]['groups'][0]['group_id']);
         });
     } finally {
         ugDropWorld($welt);
