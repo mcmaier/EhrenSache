@@ -1083,6 +1083,15 @@ Anwesenheitslisten und Namenslisten der Terminrückmeldung gliedert — siehe `a
 Untergruppen, und bestimmt die Reihenfolge der Abschnitte; bei Gleichstand entscheidet
 `group_name`.
 
+Eine Untergruppe darf ganz normal einer Terminart zugeordnet werden (`group_ids` bei
+`appointment_types`) — Anwendungsfall ist die Registerprobe: Die Terminart „Registerprobe
+Klarinette" bekommt nur das Register Klarinette zugewiesen, erwartet werden dann genau dessen
+Mitglieder, und Statistik/Berichte rechnen entsprechend nur für dieses Register.
+
+`is_subgroup=1` und `is_default=1` schließen sich aus (400 bei Verstoß, auch wenn nur eines der
+beiden Felder im Request-Körper steht und das andere bereits gespeichert ist) — eine Untergruppe
+als Standardgruppe würde jedes neue Mitglied ungefragt einem Register zuordnen.
+
 **Einzelne Gruppe mit Mitgliedern:**
 ```
 GET /api.php?resource=member_groups&id=1

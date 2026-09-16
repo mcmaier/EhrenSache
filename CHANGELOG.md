@@ -25,6 +25,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Wie die Untergruppen heißen sollen, ist in den Einstellungen frei wählbar — ein Musikverein
   trägt „Register" ein, ein Sportverein „Mannschaft". Vorgabe ist „Untergruppe".
 
+  Eine Untergruppe lässt sich wie jede andere Gruppe auch einer Terminart zuordnen — zum
+  Beispiel die Terminart „Registerprobe Klarinette" mit dem Register Klarinette: Erwartet
+  werden dann genau dessen Mitglieder, und die Statistik rechnet für diese Terminart auch
+  nur für dieses Register.
+
   Ohne einen einzigen gesetzten Haken verhält sich die Anwendung wie bisher.
 
 ### Geändert
