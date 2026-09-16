@@ -337,7 +337,16 @@ function handleRecords($db, $database, $method, $id) {
 
                     $stmt = $db->prepare("DELETE FROM {$prefix}records WHERE record_id = ?");
                     if($stmt->execute([$id])) {
-                        echo json_encode(["message" => "Record deleted"]);
+                        if($stmt->rowCount() === 0) {
+                            // execute() liefert true, auch wenn keine Zeile traf --
+                            // eine erfundene oder bereits geloeschte ID sah bisher
+                            // wie ein Erfolg aus (verdeckte z. B. id=undefined aus
+                            // der PWA).
+                            http_response_code(404);
+                            echo json_encode(["message" => "Record not found"]);
+                        } else {
+                            echo json_encode(["message" => "Record deleted"]);
+                        }
                     } else {
                         http_response_code(500);
                         echo json_encode(["message" => "Failed to delete record"]);

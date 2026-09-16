@@ -750,6 +750,9 @@ Angabe), und das Toleranzband wird geprüft — gegen den Termin aus dem Anfrage
 
 **Berechtigung:** Admin/Manager
 
+**Seit 1.8.0:** Trifft `id` keinen Datensatz (bereits gelöscht, erfundene ID), antwortet der
+Endpunkt mit `404` statt wie zuvor mit `200`.
+
 ---
 
 ## Auto Check-In
