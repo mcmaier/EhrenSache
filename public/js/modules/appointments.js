@@ -162,8 +162,8 @@ async function renderAppointments(appointments, page = 1) {
                             title="Bearbeiten">
                         ✎
                     </button>
-                    <button class="action-btn btn-icon btn-delete" 
-                            onclick="deleteAppointment(${apt.appointment_id}, '${apt.title}')"
+                    <button class="action-btn btn-icon btn-delete"
+                            onclick="deleteAppointment(${apt.appointment_id})"
                             title="Löschen">
                         🗑
                     </button>
@@ -727,7 +727,14 @@ export async function saveAppointment() {
     }
 }
 
-export async function deleteAppointment(appointmentId, title) {
+export async function deleteAppointment(appointmentId) {
+    // Titel aus dem Cache holen statt aus dem onclick-Attribut: ein Termin-Titel
+    // mit Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als
+    // Code einschleusen (kein CSP im Projekt) -- Muster aus deleteGroup()/
+    // deleteType() in management.js (Commit ad200ba).
+    const cached = dataCache.appointments[currentYear]?.data?.find(a => a.appointment_id == appointmentId);
+    const title = cached ? cached.title : 'diesem Termin';
+
     const confirmed = await showConfirm(
         `Termin "${title}" wirklich löschen?`,
         'Termin löschen'
