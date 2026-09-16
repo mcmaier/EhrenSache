@@ -103,6 +103,7 @@ EhrenSache/
 │   │   ├── worktime.php        # Fachlogik Arbeitszeit (Dauer, Validierung, Statistik)
 │   │   ├── responses.php       # Regeln und Abfragen der Terminrückmeldung (FI-1)
 │   │   ├── member_activity.php # Aktiv/Inaktiv-Zeiträume
+│   │   ├── groups.php          # Fachlogik Untergruppen: Bezeichnung, Sortierung (FI-14, 1.8.0)
 │   │   ├── station.php         # Fachlogik virtuelle Station (Kiosk): Code, PIN-Prüfung, Sperre
 │   │   ├── migrations.php      # Ausführung der Migrationskette
 │   │   ├── version.php         # Liest version.json
@@ -129,7 +130,8 @@ EhrenSache/
     │   ├── login.js
     │   └── modules/            # api, auth, ui, members, appointments, records,
     │                           # exceptions, users, devices, profile, management,
-    │                           # settings, statistics, worktime, responses, import_export, utils
+    │                           # settings, statistics, worktime, responses, grouping,
+    │                           # import_export, utils
     ├── css/
     │   ├── variables.css, reset.css, main.css, responsive.css, utilities.css, login.css
     │   ├── components/         # buttons, cards, forms, modals, tables, badges,

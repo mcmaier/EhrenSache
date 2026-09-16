@@ -7,13 +7,40 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.8.0] – 2026-09-16
+
+### Neu
+- **Untergruppen.** Eine Gruppe lässt sich jetzt als Untergruppe markieren — im Musikverein zum
+  Beispiel das Register (Klarinette, Trompete, Tenorhorn), im Sportverein die Mannschaft. Die
+  Reihenfolge der Untergruppen ist frei pflegbar (Verwaltung → Gruppen), sodass sie zum Beispiel
+  in Partiturreihenfolge statt alphabetisch erscheinen.
+
+  Die Anwesenheitsliste (Dashboard und Check-in-App) und die Namensliste der Terminrückmeldung
+  „Wer hat geantwortet?" (Dashboard und Check-in-App) zeigen darüber einen Umschalter
+  „Alphabetisch · Gruppe · <Bezeichnung>" — mit einem Klick lässt sich die Liste nach Register
+  gliedern, statt nur alphabetisch nach Nachname zu sortieren. Die gewählte Ansicht wird je
+  Liste gemerkt und bleibt auch nach einem Neuladen erhalten. Wer mehreren Registern angehört,
+  erscheint in jedem davon; eine Hinweiszeile macht das kenntlich, damit niemand übersehen wird.
+
+  Wie die Untergruppen heißen sollen, ist in den Einstellungen frei wählbar — ein Musikverein
+  trägt „Register" ein, ein Sportverein „Mannschaft". Vorgabe ist „Untergruppe".
+
+  Ohne einen einzigen gesetzten Haken verhält sich die Anwendung wie bisher.
+
+### Geändert
+- **Demo:** Der Beispielbestand des „Musikverein Musterhausen" hat jetzt fünf Register (Flöte,
+  Klarinette, Trompete, Tenorhorn, Schlagzeug) in Partiturreihenfolge, auf die fast alle
+  Mitglieder verteilt sind — einige davon bewusst auf zwei Register, einige bewusst auf keines.
 
 ### Behoben
 - **Ein Antrag je Termin und Antragsart.** Über die Absage einer Terminrückmeldung und über den
   Antragsdialog ließen sich zwei Abwesenheitsanträge zum selben Termin stellen, die einzeln
   beschieden werden mussten. Der Server weist den zweiten jetzt ab und nennt den vorhandenen.
   Ein abgelehnter Antrag blockiert wie bisher keinen neuen.
+- **Namen erschienen an drei Stellen ungeschützt im Seitencode.** In der Gruppenliste, der
+  Terminartenliste und der Anwesenheitsliste stand der Name direkt in einem Klick-Attribut. Ein
+  Name mit bestimmten Sonderzeichen hätte die Darstellung stören können. Diese Stellen geben
+  jetzt nur noch eine interne Nummer weiter, keinen Namen mehr.
 
 ---
 

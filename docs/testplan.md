@@ -1174,3 +1174,19 @@ Automatisiert: `php tests/run.php responses_unit`, `responses_api`, `responses_f
 | RM-21 | Entschuldigungspflicht nachträglich für eine Terminart ausschalten, die bereits offene Anträge aus Absagen hat | Die bestehenden Anträge bleiben verknüpft und offen, sichtbar unter „Anträge"; keine automatische Änderung |
 | RM-22 | Absage mit Begründung, Admin lehnt den Antrag unter „Anträge" ab, danach Zusage, danach erneut Absage mit Begründung | Zusage nach abgelehntem Antrag gelingt (kein Fehler); der abgelehnte Antrag bleibt sichtbar unverändert; die erneute Absage legt einen neuen, offenen Antrag an — zwei Anträge insgesamt, einer abgelehnt, einer offen |
 | RM-23 | Absage mit Begründung bei einer Terminart mit Entschuldigungspflicht, danach unter „Anträge" einen zweiten Abwesenheitsantrag zum selben Termin stellen | Der zweite Antrag wird abgewiesen, der Dialog bleibt offen und meldet, dass es zu diesem Termin bereits einen Antrag dieser Art gibt; unter „Anträge" steht weiterhin genau einer |
+
+---
+
+## 24. Untergruppen (seit 1.8.0)
+
+Automatisiert: `php tests/run.php groups_unit`, `subgroups_api`, `subgroups_frontend`,
+`migrations`. Manuell:
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| UG-1 | Keine Gruppe als Untergruppe markiert: Anwesenheitsliste (Dashboard und PWA) und Namensliste der Terminrückmeldung öffnen | Verhalten wie vor 1.8.0 — kein Umschalter bzw. Umschalter nur mit „Alphabetisch" und „Gruppe"; alphabetisch nach Nachname sortiert |
+| UG-2 | Ein Mitglied zwei als Untergruppe markierten Gruppen zuordnen (z. B. Klarinette **und** Saxophon), Anwesenheitsliste eines gemeinsamen Termins auf die dritte Umschalterstufe stellen | Das Mitglied erscheint in **beiden** Abschnitten; darüber steht die Hinweiszeile, dass Mitglieder in mehreren Abschnitten stehen |
+| UG-3 | `sort_order` zweier Untergruppen in der Verwaltung vertauschen, Liste neu laden | Die Abschnitte erscheinen in der neuen Reihenfolge, nicht mehr alphabetisch |
+| UG-4 | In den Einstellungen die Bezeichnung ändern (z. B. „Register" → „Stimme") | Die dritte Umschalterstufe, der Sammelabschnitt „Ohne <Wort>" und das Feld in der Gruppenverwaltung zeigen das neue Wort — im Dashboard **und** in der Check-in-PWA |
+| UG-5 | Umschalter auf „Untergruppe" stellen, Seite neu laden (Dashboard und PWA je einmal) | Die Wahl bleibt erhalten, kein Rücksprung auf „Alphabetisch" |
+| UG-6 | Mitglied ohne Untergruppenzuordnung in einer Liste mit aktivem Umschalter „Untergruppe" | Es erscheint im Abschnitt „Ohne <Wort>" am Ende der Liste |

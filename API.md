@@ -140,7 +140,8 @@ Lädt Branding-Einstellungen (Logo, Farben, Name).
     "secondary_color": "#4CAF50",
     "background_color": "#f8f9fa",
     "organization_logo": "uploads/logos/logo.png",
-    "privacy_policy_url": "https://meine-domain.de/datenschutzerklaerung/"
+    "privacy_policy_url": "https://meine-domain.de/datenschutzerklaerung/",
+    "subgroup_label": "Register"
   },
   "demo": false
 }
@@ -148,6 +149,8 @@ Lädt Branding-Einstellungen (Logo, Farben, Name).
 
 `settings` enthält alle Einträge aus `system_settings` mit `category = 'public'` — welche
 Schlüssel das sind, hängt von der Installation ab. Ein Client darf keinen davon voraussetzen.
+`subgroup_label` (seit 1.8.0, Vorgabe „Untergruppe") gehört dazu, weil der Umschalter und die
+Gruppenverwaltung aller Rollen ihn brauchen — Details bei `settings` unten.
 
 `demo` liegt bewusst **neben** `settings` und nicht darin: `settings` kommt aus der Datenbank,
 `demo` aus `config.php`. Der Wert ist nur auf einer Demo-Installation `true` (siehe
@@ -1061,10 +1064,21 @@ abgelehnter Antrag blockiert nicht — nach einem Nein ist ein neuer Versuch mö
     "group_id": 1,
     "group_name": "Trompeten",
     "description": "Trompetenregister",
-    "is_default": 0
+    "is_default": 0,
+    "is_subgroup": 1,
+    "sort_order": 20,
+    "member_count": 9
   }
 ]
 ```
+
+Sortiert nach `sort_order`, bei Gleichstand nach `group_name`.
+
+**Seit 1.8.0:** `is_subgroup` (0/1) markiert eine Gruppe als Untergruppe (z. B. Register), die
+Anwesenheitslisten und Namenslisten der Terminrückmeldung gliedert — siehe `attendance_list` und
+`appointment_responses`. `sort_order` (Ganzzahl, Vorgabe 0) gilt für **alle** Gruppen, nicht nur
+Untergruppen, und bestimmt die Reihenfolge der Abschnitte; bei Gleichstand entscheidet
+`group_name`.
 
 **Einzelne Gruppe mit Mitgliedern:**
 ```
@@ -1080,26 +1094,42 @@ je ausgeliefert.
 ### Gruppe erstellen
 **Endpoint:** `POST /api.php?resource=member_groups`
 
-**Berechtigung:** Admin/Manager
+**Berechtigung:** Admin
 
 **Request:**
 ```json
 {
   "group_name": "Posaunen",
   "description": "Posaunenregister",
-  "is_default": false
+  "is_default": false,
+  "is_subgroup": true,
+  "sort_order": 60
 }
 ```
+
+`is_subgroup` und `sort_order` sind optional, Vorgabe `false`/`0`.
 
 ---
 
 ### Gruppe aktualisieren
 **Endpoint:** `PUT /api.php?resource=member_groups&id=1`
 
+**Berechtigung:** Admin
+
+**Request:** wie beim Erstellen. `group_name`, `description` und `is_default` sind ein
+Voll-Update: Fehlen sie im Körper, werden sie auf ihren Leerwert zurückgesetzt (`description`
+auf `null`, `is_default` auf `false`) statt unverändert zu bleiben.
+
+**Seit 1.8.0 abweichend:** `is_subgroup` und `sort_order` bleiben unverändert, wenn sie im
+Körper fehlen — ein `PUT`, das nur `group_name` ändert, löscht damit nicht still die gepflegte
+Reihenfolge (gleiches Muster wie bei Terminarten, OI-54).
+
 ---
 
 ### Gruppe löschen
 **Endpoint:** `DELETE /api.php?resource=member_groups&id=1`
+
+**Berechtigung:** Admin
 
 ---
 
@@ -1199,7 +1229,15 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
 - `members` — **Admin/Manager:** alle erwarteten Mitglieder nach Gruppen mit `status` (`null` =
   keine Antwort), `comment`, `status_changed_at`, `is_late`, `excuse_state`, `excuse_created` und
   nach Beginn `present`. **Mitglied:** nur bei `names_visible`, dann ausschließlich `member_id`,
-  Name, Gruppe und Status.
+  Name, Gruppe und Status. Ohne `names_visible` und ohne Admin/Manager-Rechte fehlt `members`
+  ganz — keine Namen, keine Zugehörigkeiten.
+
+  Jedes Element trägt außerdem `group_name` (die Gruppe der Terminart, über die das Mitglied
+  erwartet wird) sowie **seit 1.8.0** `groups` und `subgroups` — dieselbe Struktur wie bei
+  `attendance_list`: `groups` sind die Gruppen des Mitglieds, die zur Terminart gehören,
+  `subgroups` alle als Untergruppe markierten Gruppen des Mitglieds, unabhängig vom Termin.
+  Beide unterliegen denselben Sichtbarkeitsregeln wie die Namen selbst — ohne Namen keine
+  Zugehörigkeiten.
 - `comparison` — nur Admin/Manager, nur nach Beginn: Anzahl je `yes_present`, `yes_absent`,
   `no_present`, `no_absent`, `maybe_present`, `maybe_absent`, `none_present`, `none_absent`.
 - `is_late` — die letzte **Statusänderung** liegt nach der Frist (Frist = Beginn minus
@@ -2148,6 +2186,12 @@ Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
 **`response_deadline_hours` (seit 1.7.0):** Vorgabe 24, zulässig eine ganze Zahl (auch als
 getrimmter String) von 0 bis 720, sonst `400`. Gilt als globale Frist für Terminarten ohne eigene.
 
+**`subgroup_label` (seit 1.8.0):** Die Bezeichnung der Untergruppen (z. B. „Register",
+„Mannschaft") in Überschriften, Umschalter und Verwaltung. Wird beim Speichern normalisiert:
+getrimmt, Steuerzeichen entfernt. Ein leerer oder nur aus Leerraum bestehender Wert ergibt die
+Vorgabe `Untergruppe`. Länger als 30 Zeichen (nach dem Trimmen) wird mit `400`
+(`{"message": "Die Bezeichnung darf höchstens 30 Zeichen haben"}`) abgewiesen.
+
 ---
 
 ### SMTP-Konfiguration
@@ -2281,21 +2325,50 @@ Alle Schritte laufen in **einer Transaktion**.
   "appointment": {
     "appointment_id": 10,
     "title": "Probe",
-    "appointment_date": "2024-03-15",
-    "start_time": "19:00:00"
+    "type_id": 1,
+    "description": null,
+    "date": "2024-03-15",
+    "start_time": "19:00:00",
+    "created_by": 1,
+    "created_at": "2024-03-01 10:00:00",
+    "is_auto_created": 0,
+    "type_name": "Probe",
+    "color": "#1F5FBF",
+    "group_ids": "1,2"
   },
-  "attendance": [
+  "members": [
     {
       "member_id": 5,
-      "member_name": "Max Mustermann",
-      "group_name": "Trompeten",
-      "status": "present",
-      "arrival_time": "2024-03-15 19:05:00"
-    },
-    ...
+      "name": "Max",
+      "surname": "Mustermann",
+      "member_number": "M005",
+      "record_id": null,
+      "arrival_time": null,
+      "checkin_source": null,
+      "status": null,
+      "groups":    [{ "group_id": 1, "group_name": "Aktive",     "sort_order": 0 }],
+      "subgroups": [{ "group_id": 9, "group_name": "Klarinette", "sort_order": 20 }]
+    }
   ]
 }
 ```
+
+`group_ids` am Termin sind die Gruppen-IDs seiner Terminart, kommagetrennt. `record_id`,
+`arrival_time`, `checkin_source` und `status` (`present`/`excused`) bleiben `null`, solange
+für das Mitglied noch kein Anwesenheitseintrag zu diesem Termin vorliegt.
+
+**Seit 1.8.0** treten je Mitglied zwei strukturierte Listen an die Stelle der früheren
+Zeichenkette `groups`:
+- `groups`: die Gruppen des Mitglieds, **die zur Terminart gehören** — dieselbe Bedeutung wie
+  die frühere Zeichenkette, nur strukturiert statt als ein kommagetrennter Name.
+- `subgroups`: **alle** als Untergruppe markierten Gruppen des Mitglieds (z. B. das Register),
+  unabhängig davon, ob die Terminart selbst nach diesen Gruppen eingeteilt ist.
+
+Beide Listen sind nach `sort_order`, bei Gleichstand nach `group_name` sortiert.
+
+> Bis 1.8.0 zeigte dieser Abschnitt eine Antwort mit einem `attendance`-Array und Feldern
+> `member_name`/`appointment_date`/`group_name`, die der Server so nie geliefert hat — geliefert
+> wurde und wird ein `members`-Array mit `name`/`surname`/`date`. Korrigiert am 2026-09-16.
 
 ### Anwesenheitsliste für Mitglied
 **Endpoint:** `GET /api.php?resource=attendance_list&member_id=10`
@@ -2306,24 +2379,44 @@ Alle Schritte laufen in **einer Transaktion**.
 **Response:**
 ```json
 {
-  "member_id": {
-      "member_id": 5,
-      "member_name": "Max Mustermann",
-      "group_name": "Trompeten",
+  "member": {
+    "member_id": 5,
+    "name": "Max",
+    "surname": "Mustermann",
+    "member_number": "M005",
+    "groups": "Aktive, Klarinette",
+    "group_ids": "1,9"
   },
-  "attendance": [
+  "year": "2024",
+  "appointments": [
     {
       "appointment_id": 10,
       "title": "Probe",
-      "appointment_date": "2024-03-15",
+      "date": "2024-03-15",
       "start_time": "19:00:00",
+      "description": null,
+      "type_id": 1,
+      "type_name": "Probe",
+      "color": "#1F5FBF",
+      "record_id": 42,
+      "arrival_time": "2024-03-15 19:05:00",
+      "checkin_source": "admin",
       "status": "present",
-      "arrival_time": "2024-03-15 19:05:00"
+      "member_was_active": 1
     },
     ...
   ]
 }
 ```
+
+`member.groups` bleibt hier die kommagetrennte Zeichenkette aller Gruppen des Mitglieds — diese
+Ansicht wurde von der Untergruppen-Gliederung (1.8.0) nicht angefasst, da sie zum Ausfüllen
+einer Mitgliedskarte dient, nicht zum Gliedern einer Liste. `member_was_active` zeigt, ob das
+Mitglied am Termindatum aktiv war (siehe `membership_dates`).
+
+> Bis 1.8.0 zeigte dieser Abschnitt eine Antwort mit dem Schlüssel `member_id` statt `member`
+> und einem `attendance`-Array statt `appointments`, mit Feldern (`member_name`,
+> `appointment_date`), die der Server so nie geliefert hat. Korrigiert am 2026-09-16.
 
 ---
 
