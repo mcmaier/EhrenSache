@@ -4,7 +4,8 @@ Ideensammlung für mögliche künftige Funktionen. **Nichts hier ist beschlossen
 terminiert.** Der Zweck ist, Einfälle festzuhalten, bevor sie verloren gehen, und ihre Kosten
 grob abzuschätzen — nicht, sie zu versprechen.
 
-**Angelegt:** 2026-09-02 · **Bezugsstand:** `dev`, Version 1.2.1
+**Angelegt:** 2026-09-02 · **Zuletzt abgeglichen:** 2026-09-16 · **Bezugsstand:** `dev`,
+Version 1.7.0
 
 ## Abgrenzung zu `docs/OPEN-ITEMS.md`
 
@@ -52,12 +53,25 @@ durchschlägt.
 | [FI-13](#fi-13--geburtstagsliste-mit-gratulationsvermerk) | Geburtstagsliste mit Gratulationsvermerk | mittel | M | — |
 | [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht | mittel¹ | M | FI-1 für die Wirkung |
 | [FI-15](#fi-15--rolle-gruppenleiter) | Rolle „Gruppenleiter" | hoch | L | — |
+| [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) | Feiertage und Ferien im Terminkalender | mittel | M | FI-7 für die Wirkung |
+| [FI-17](#fi-17--offene-punkte-unter-mein-konto) | Offene Punkte unter „Mein Konto" | hoch | S | — |
+| [FI-18](#fi-18--kalender-import-ics) | Kalender-Import (ICS) | niedrig | M | — |
+| [FI-19](#fi-19--terminvorlagen) | Terminvorlagen | niedrig | S | — |
+| [FI-20](#fi-20--einfache-umfragen) | Einfache Umfragen | niedrig | M | FI-6 |
+| [FI-21](#fi-21--aufgaben-mit-zuweisung-und-fälligkeit) | Aufgaben mit Zuweisung und Fälligkeit | niedrig | L | FI-6 |
+| [FI-22](#fi-22--musikstücke-und-programme) | Musikstücke und Programme | niedrig | L | — |
 
 ¹ hoch in Kombination mit [FI-1](#fi-1--terminzusage-im-vorfeld), für sich allein mittel.
 
 FI-1 bis FI-5 und FI-13 bis FI-15 stammen aus der Ideensammlung, FI-6 bis FI-12 sind
 Ergänzungen aus der Sichtung des Bestands. Die Nummern folgen dem Eingang, die Abschnitte dem
 Thema — deshalb steht FI-14 unter A und nicht am Ende.
+
+FI-16 bis FI-22 kamen am 2026-09-16 aus einem getrennt geführten Ideen-Backlog dazu, teils aus
+einem Vergleich mit `konzertmeister.app`. Aus demselben Abgleich stammen die Ergänzungen an
+[FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push), [FI-7](#fi-7--terminserien-für-wiederkehrende-proben)
+und [FI-8](#fi-8--kalender-abo-ics-feed); was davon Bestandsarbeit war, ging nach
+`OPEN-ITEMS.md` (OI-62 bis OI-65).
 
 ---
 
@@ -307,10 +321,29 @@ Die Bausteine liegen bereits: Mailer, Vorlagensystem mit `base.html`, Service Wo
 **Berührt:** `mailer.php` · `private/email_templates/` · Benachrichtigungseinstellungen in
 `system_settings` und je Mitglied · Service Worker für Web-Push (VAPID-Schlüssel, Abo-Tabelle).
 
+**Anlässe, die es heute schon gäbe:** offene Rückmeldung vor Ablauf der Frist (die Frist selbst
+ist seit 1.7.0 gebaut, `responseDeadlineHours()`), Absage eines Mitglieds an Admin und Manager,
+Entscheidung über einen Antrag, Freigabe einer Arbeitszeit.
+
+**Rückmeldung direkt aus der Mail** — ein signierter Einmal-Link je Mitglied und Termin, der
+ohne Anmeldung auf Zusage oder Absage führt. Das ist der Unterschied zwischen einer Mail, die
+gelesen wird, und einer, die beantwortet wird. Es ist zugleich der heikelste Teil: Der Link ist
+ein Zugangsmittel im Postfach. Zu entscheiden wären Gültigkeitsdauer, Einmaligkeit,
+Widerrufbarkeit und was der Link außer der einen Antwort erlaubt — nach heutigem Stand nichts,
+insbesondere kein Einloggen. Vor dem Bau gehört das durch dieselbe Prüfung wie die
+Passwort-Reset-Token.
+
 **Vorher zu klären:** Der Versand braucht einen Auslöser zur richtigen Zeit — ohne Cron auf dem
 Hosting bleibt nur ein Anstoß beim nächsten Seitenaufruf, was unzuverlässig ist. Außerdem:
 E-Mail zuerst (funktioniert überall) oder Push zuerst (auffälliger, aber an die PWA gebunden)?
 Und wer schaltet was ab — sonst empfindet ein Teil der Mitglieder das Ganze als Belästigung.
+
+**Was den Cron-Teil entschärft:** `private/demo/cron.php` zeigt seit 1.6.x, dass ein
+argumentloser Dateiaufruf als Aufhänger im Shared Hosting trägt. Das löst die Frage nicht — ein
+Verein ohne Aufgabenplaner bleibt ohne Versand —, aber das Muster ist erprobt und muss nicht
+erfunden werden. Solange FI-6 nicht steht, deckt [FI-17](#fi-17--offene-punkte-unter-mein-konto)
+denselben Bedarf als Holschuld: ohne Infrastruktur, ohne Zustellrisiko und mit einem Bruchteil
+des Aufwands.
 
 ---
 
@@ -327,10 +360,33 @@ im System und ein guter Grund, es gar nicht erst zu benutzen.
 **Berührt:** `appointments` um einen Serienbezug erweitern (Migration) · `appointments.php` ·
 `appointments.js` · Kalenderansicht.
 
-**Vorher zu klären:** Materialisieren oder berechnen? Einzeltermine anzulegen ist einfacher und
-verträgt sich mit `records`, `exceptions` und allen Fremdschlüsseln; eine berechnete Serie wäre
-sparsamer, kollidiert aber mit jedem Datensatz, der auf eine `appointment_id` zeigt. Zweitens:
-Was passiert beim Ändern der Serie, wenn an einzelnen Terminen bereits Anwesenheiten hängen?
+**Entwurfsstand vom 2026-09-16.** Die beiden Fragen, die hier bis dahin offen standen —
+materialisieren oder berechnen, und was beim Ändern mit bereits erfassten Anwesenheiten
+geschieht — sind aus dem Ideen-Backlog beantwortet. Sie sind damit **nicht** beschlossen; sie
+sind ein durchgerechneter Vorschlag, der in eine Spec gehört, bevor eine Zeile entsteht:
+
+| Frage | Vorschlag | Begründung |
+|---|---|---|
+| Speicherform | Serie als Regel, dazu **echte Einzeltermine** mit `series_id` | `records`, `exceptions` und `appointment_responses` zeigen alle auf eine `appointment_id`. Eine berechnete Serie hätte keine |
+| Horizont | offene Serien bis ca. 12 Monate erzeugen, ein Cron verlängert | Ohne Cron bleibt der Verein im ersten Jahr trotzdem vollständig bedient — die Verlängerung ist Komfort, kein Blocker (anders als bei [FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push)) |
+| Regelformat | Teilmenge von RFC 5545, z. B. `FREQ=WEEKLY;INTERVAL=2;BYDAY=TU` | Direkt verwendbar für [FI-8](#fi-8--kalender-abo-ics-feed), kein eigenes Format zu pflegen |
+| Bearbeiten | „nur dieser" / „dieser und alle folgenden" / „alle" | Der Bedienstandard jedes Kalenders; alles andere überrascht |
+| Einzeln Geänderte | Kennzeichen `is_detached`, wird von der Serie nicht mehr überschrieben | Sonst überschreibt eine Serienänderung genau die Termine, die jemand bewusst angefasst hat |
+| Ausfälle | übersprungene Daten in `exdates` der Serie | Ein gestrichener Termin ist eine Eigenschaft der Regel, kein gelöschter Datensatz |
+| Löschen | Termine mit Anwesenheiten oder Rückmeldungen nie hart löschen, nur `is_cancelled` | Erfasste Anwesenheit ist die Primärdatei des Systems |
+| Zeitzone | lokale Zeit speichern (`DATE` + `TIME`), Erzeugung über `DateTimeImmutable` | „Jeden Dienstag 19:30" heißt auch nach der Zeitumstellung 19:30 |
+| Gruppen | Zuordnung an der Serie, Vererbung auf die Einzeltermine | Ansonsten pflegt jemand vierzigmal dieselbe Gruppe |
+
+**Weiterhin offen:** Was geschieht bei „dieser und alle folgenden", wenn an einem der folgenden
+Termine schon Anwesenheiten hängen — mitziehen, abhängen (`is_detached`) oder die Änderung
+verweigern? Der Vorschlag oben legt das Abhängen nahe, entschieden ist es nicht. Zweitens die
+Rückwirkung auf [FI-1](#fi-1--terminzusage-im-vorfeld): Erbt ein neu erzeugter Serientermin die
+Rückmeldepflicht seiner Terminart, und was passiert mit den Antworten, wenn ein Termin
+verschoben wird?
+
+**Gehört zusammen mit** [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) entworfen: Eine
+Wochenserie ohne die Option „Feiertage überspringen" legt den Termin zuverlässig auf
+Fronleichnam.
 
 ---
 
@@ -350,6 +406,116 @@ Profilbereich für die URL.
 **Vorher zu klären:** Ein Abo-Link wird zwangsläufig weitergegeben oder landet in einem
 Cloud-Kalender. Deshalb ein eigenes, separat widerrufbares Token — nicht das API-Token
 wiederverwenden, das schreibenden Zugriff hätte.
+
+**Nur die Abo-Richtung.** FI-8 gibt Termine nach außen. Die Gegenrichtung — fremde Kalender
+einlesen, etwa Schulferien — ist ein anderes Feature mit anderen Problemen und steht als
+[FI-18](#fi-18--kalender-import-ics). Gemeinsam ist beiden nur das Dateiformat. Wird
+[FI-7](#fi-7--terminserien-für-wiederkehrende-proben) vorher gebaut, fällt der Export der
+Wiederholungsregel hier ohne Zusatzarbeit an, weil die Serie ohnehin in RFC-5545-Schreibweise
+vorliegt.
+
+---
+
+### FI-16 · Feiertage und Ferien im Terminkalender
+**Nutzen:** mittel · **Aufwand:** M — **entfaltet sich erst mit [FI-7](#fi-7--terminserien-für-wiederkehrende-proben)**
+
+Der Kalender kennt gesetzliche Feiertage und, optional, Schulferien. Eine Terminserie bekommt
+dadurch die Optionen „Feiertage überspringen" und „Ferien überspringen".
+
+**Warum interessant:** Ohne das legt jede Wochenserie zuverlässig Proben auf Karfreitag und in
+die Sommerferien, und jemand räumt sie von Hand wieder ab — womit der Hauptnutzen von FI-7 zur
+Hälfte wieder verloren ist. Für sich allein ist es dagegen nur Kalenderdekoration; deshalb
+gemeinsam entwerfen, auch wenn nur FI-7 gebaut wird.
+
+**Berechnen statt importieren.** Die beweglichen Feiertage hängen alle am Osterdatum, und das
+lässt sich rechnen (Gauß/Meeus). Damit braucht es keine Datenquelle, keinen jährlichen Import
+und keine Internetverbindung — und ausdrücklich **nicht** `ext-calendar`: `easter_days()` ist an
+diese Erweiterung gebunden, die auf einem Teil der Hostings fehlt, und stünde damit im
+Widerspruch zu `requires` in `version.json`. Eine eigene kleine Klasse (Arbeitstitel
+`HolidayCalculator`) ist ein paar Dutzend Zeilen und hat keine Abhängigkeit.
+
+**Berührt:** neuer Helfer in `private/helpers/` · Bundesland als Einstellung in
+`system_settings` · Kalenderansicht in `appointments.js` · bei FI-7 zwei Serienoptionen.
+
+**Vorher zu klären:**
+
+- **Wie weit geht der Feiertagsteil?** Bundesweite Feiertage plus das eigene Bundesland deckt
+  den Normalfall. Die Sonderfälle sind zwei: Buß- und Bettag ist nur in Sachsen gesetzlich, und
+  Mariä Himmelfahrt gilt in Bayern nur in Gemeinden mit überwiegend katholischer Bevölkerung —
+  Letzteres ist auf Bundeslandebene gar nicht korrekt abbildbar. Ehrlicher wäre, das offen zu
+  benennen und zusätzlich eigene Termine als Feiertag markierbar zu machen, als eine Tabelle zu
+  pflegen, die stillschweigend falsch liegt.
+- **Ein Bundesland oder mehrere?** Ein Verein an einer Landesgrenze hat Mitglieder aus zwei
+  Bundesländern. Voraussichtlich trotzdem eine Einstellung je Installation — alles andere zieht
+  eine Zuordnung je Mitglied nach sich.
+- **Ferien sind keine Feiertage.** Sie sind nicht berechenbar, ändern sich jährlich und müssten
+  eingelesen werden — das ist [FI-18](#fi-18--kalender-import-ics) und sollte FI-16 nicht
+  blockieren. Feiertage zuerst, Ferien später oder nie.
+- **Was heißt „überspringen"?** Den Termin gar nicht erzeugen oder ihn als abgesagt anlegen?
+  Ersteres ist sauberer, Letzteres zeigt dem Mitglied, dass an dem Tag bewusst nichts ist.
+  Berührt `is_cancelled` und `exdates` aus FI-7 und ist dort mitzuentscheiden.
+
+---
+
+### FI-17 · Offene Punkte unter „Mein Konto"
+**Nutzen:** hoch · **Aufwand:** S
+
+Eine Übersicht im eigenen Bereich, die zeigt, was das System gerade von einem will: Termine
+ohne Rückmeldung, deren Frist läuft; ein abgelehnter oder noch offener Entschuldigungsantrag;
+eine Arbeitszeit, die auf Freigabe wartet; ein Hinweis, den ein Admin hinterlegt hat.
+
+**Warum interessant:** Es ist die billigste Antwort auf das Problem, das
+[FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push) teuer löst. EhrenSache ist heute eine
+Holschuld — wer hineinschaut, erfährt nichts Gebündeltes, sondern muss vier Bereiche einzeln
+durchsehen. Eine Sammelansicht braucht dafür keinen Versandweg, keinen Cron, keine
+VAPID-Schlüssel und kein Opt-out je Mitglied: Die Daten liegen alle schon da, es ist im Kern
+eine Abfrage und eine Karte. Wer beides baut, speist FI-6 später aus derselben Quelle.
+
+**Berührt:** Profilbereich in `public/index.html` und `public/js/modules/profile.js` · eine
+sammelnde Abfrage (entweder neue Ressource oder Erweiterung von `session_info`) ·
+`responses.php` für die offenen Rückmeldungen · PWA, wenn die Übersicht auch dort erscheinen
+soll.
+
+**Vorher zu klären:**
+
+- **Eine Ressource oder vier Abfragen?** Vier vorhandene Endpunkte nacheinander aufzurufen ist
+  ohne neuen Code zu haben, kostet aber vier Anfragen bei jedem Aufruf des Profils. Eine eigene
+  Ressource ist sauberer und der Ort, an dem später auch FI-6 nachsieht.
+- **Was ist eine „Nachricht eines Admins"?** Das ist der Punkt, an dem der Eintrag kippen kann.
+  Ein vom Admin gesetzter Hinweistext, den jeder sieht, ist eine Einstellung und harmlos. Eine
+  Nachricht **an ein bestimmtes Mitglied** ist der Anfang eines Postfachs — und damit genau das,
+  was unter „Nicht auf dieser Liste" als Chat ausgeschlossen ist. Vorschlag: nur systemerzeugte
+  Punkte plus ein globaler Hinweistext; alles Adressierte bleibt draußen, bis jemand einen
+  belegten Bedarf nennt.
+- **Leerer Zustand.** Die Ansicht muss gut aussehen, wenn nichts offen ist — das ist der
+  Normalfall. „Nichts zu tun" ist eine Aussage, keine leere Liste.
+- **Nur eigene Daten.** Die Übersicht zeigt ausschließlich den angemeldeten Benutzer. Für
+  Manager ist sie keine Arbeitsliste — deren offene Freigaben sind eine andere Frage und
+  gehören nicht hierher.
+
+---
+
+### FI-18 · Kalender-Import (ICS)
+**Nutzen:** niedrig · **Aufwand:** M
+
+Eine `.ics`-Datei oder eine abonnierte URL einlesen und daraus Termine oder Sperrzeiten
+erzeugen — in erster Linie Schulferien und Schließtage, die kein Mensch von Hand einträgt.
+
+**Warum interessant:** Die Gegenrichtung zu [FI-8](#fi-8--kalender-abo-ics-feed) und die
+einzige praktikable Quelle für Ferien, die sich nicht berechnen lassen (siehe
+[FI-16](#fi-16--feiertage-und-ferien-im-terminkalender)).
+
+**Warum eher nicht, jedenfalls nicht bald:** Lesen ist um ein Vielfaches aufwendiger als
+Schreiben. ICS erlaubt Zeitzonen, Wiederholungsregeln, Ausnahmen, Anhänge und beliebig große
+Dateien; ein Import muss entscheiden, was er davon ignoriert, was ein Termin wird und was
+passiert, wenn dieselbe Datei ein zweites Mal kommt. Dazu ist es eine Datei aus fremder Hand —
+Größenbegrenzung, Zeitbudget und strikte Feldprüfung gehören von Anfang an dazu, nicht später.
+
+**Vorher zu klären:** Einmaliger Upload oder dauerhaftes Abo mit erneutem Abruf? Werden
+importierte Termine zu gewöhnlichen `appointments` (dann brauchen sie eine Herkunft und dürfen
+nicht in die Anwesenheitsstatistik zählen) oder zu einer eigenen Kategorie „Sperrzeit", die nur
+FI-7 beim Erzeugen berücksichtigt? Die zweite Variante ist kleiner und beantwortet den
+eigentlichen Bedarf.
 
 ---
 
@@ -542,31 +708,113 @@ und `isAdminOrManager` bleiben unangetastet) · alle zwölf genannten Handler ·
 
 ---
 
+## E · Module, die eigene Produkte wären
+
+Vier Ideen aus dem Vergleich mit `konzertmeister.app`, festgehalten, damit sie bei der nächsten
+Nennung nicht neu diskutiert werden. Allen gemeinsam: Sie berühren Anwesenheit, Pünktlichkeit
+und Arbeitszeit nicht, hätten also nichts vom vorhandenen Datenmodell — und wenn eine davon
+kommt, dann als abschaltbares Modul (siehe OI-62 in `OPEN-ITEMS.md`, ohne das jede weitere
+Funktion die Oberfläche für Vereine zumüllt, die sie nicht brauchen).
+
+### FI-19 · Terminvorlagen
+**Nutzen:** niedrig · **Aufwand:** S
+
+Ein benannter Satz Vorbelegungen (Terminart, Uhrzeit, Gruppen, Ort), aus dem sich ein neuer
+Termin mit einem Klick füllt. Die kleinste Idee der Liste — im Kern eine Tabelle und ein
+Auswahlfeld im Anlegen-Dialog.
+
+**Warum eher nicht zuerst:** [FI-7](#fi-7--terminserien-für-wiederkehrende-proben) nimmt ihr den
+Anlass. Was sich regelmäßig wiederholt, ist dann eine Serie; was einmalig ist, lohnt keine
+Vorlage. Sinnvoll bleibt sie höchstens für unregelmäßig wiederkehrende Terminarten — Auftritte,
+Ständchen — und erst, nachdem FI-7 gezeigt hat, was übrig bleibt.
+
+---
+
+### FI-20 · Einfache Umfragen
+**Nutzen:** niedrig · **Aufwand:** M — **wirkt erst mit [FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push)**
+
+Eine Frage an alle oder an eine Gruppe, mit ein paar Antwortmöglichkeiten und einer Auswertung
+— etwa zur Terminfindung oder zur Auswahl des Ausflugsziels.
+
+**Warum eher nicht:** Es ist [FI-1](#fi-1--terminzusage-im-vorfeld) noch einmal, nur ohne
+Termin — dieselbe Mechanik aus Frage, Antwort je Mitglied, Frist und Auswertung. Wer das baut,
+hat entweder zwei Umsetzungen desselben Musters oder muss die vorhandene verallgemeinern, und
+das ist der eigentliche Aufwand. Ohne Versandweg beantwortet außerdem niemand eine Umfrage, von
+der er nichts erfährt.
+
+---
+
+### FI-21 · Aufgaben mit Zuweisung und Fälligkeit
+**Nutzen:** niedrig · **Aufwand:** L — **wirkt erst mit [FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push)**
+
+Aufgabenliste mit Zuständigem, Fälligkeitsdatum, Wiederholung und Erledigungsvermerk.
+
+**Warum eher nicht:** Ein eigenständiges Produkt, für das es gute kostenlose Alternativen gibt,
+und das mit der Anwesenheitserfassung nur das Mitglied gemeinsam hat. Es überschneidet sich
+zudem mit [FI-9](#fi-9--dienst--und-schichtplanung-für-veranstaltungen) (Schicht = zugewiesene
+Aufgabe mit Zeitfenster) und mit dem Erledigungsvermerk aus
+[FI-10](#fi-10--jubiläen-und-ehrungen-automatisch-ermitteln) und
+[FI-13](#fi-13--geburtstagsliste-mit-gratulationsvermerk). Wenn überhaupt, dann ein Modell für
+alle drei — sonst entstehen drei.
+
+---
+
+### FI-22 · Musikstücke und Programme
+**Nutzen:** niedrig · **Aufwand:** L
+
+Notenarchiv und Programmzusammenstellung je Auftritt.
+
+**Warum eher nicht:** Als einzige Idee der Liste spartenspezifisch — für einen Sportverein
+wertlos, während EhrenSache ausdrücklich für ehrenamtliche Organisationen allgemein gebaut ist.
+Berührungspunkt zur Anwesenheit gäbe es nur über [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht)
+(„ist das Stück mit den Zusagen besetzbar?"), und das ist eine Auswertung, kein Archiv.
+Verwandt mit [FI-12](#fi-12--material--und-instrumentenausleihe) und aus demselben Grund
+zurückgestellt.
+
+---
+
 ## Wenn etwas davon kommt: sinnvolle Reihenfolge
 
-Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung:
+Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
 
-1. **FI-6 Benachrichtigungen** — für sich schon nützlich und Voraussetzung dafür, dass eine
-   Zusageabfrage überhaupt beantwortet wird.
-2. **FI-1 Terminzusage** (umgesetzt in 1.7.0, ohne FI-6) — das eine Feature mit
-   Wettbewerbswirkung. Vorher muss die Frage zu `exceptions` entschieden sein.
-3. **FI-2 Abgleich** (je Termin umgesetzt) — fällt danach fast von selbst an.
-   **FI-14 Register** gehört in dieselbe Runde wie FI-1: Die Besetzungsansicht ist der Grund,
-   warum die Zusagen mehr sind als eine Anwesenheitsprognose. In der kleinen Variante (Gruppenart
-   statt Hierarchie) ist sie fast kostenlos.
-4. **FI-7 Terminserien** und **FI-8 ICS** — unabhängig, klein, jederzeit dazwischen möglich;
-   FI-8 ist die günstigste Idee der Liste.
-5. **FI-4 Auth-Geräte (Rest: NFC/Biometrie)**, dann **FI-3 GPS** — die Check-in-Wege gemeinsam
+> **Geändert am 2026-09-16.** Bis dahin stand hier FI-6 an erster und FI-7 an vierter Stelle,
+> mit der Begründung, ohne Versandweg werde eine Zusageabfrage nicht beantwortet. Das Argument
+> stimmt, trägt die Reihenfolge aber nicht mehr: FI-1 ist seit 1.7.0 gebaut — **ohne** FI-6 —,
+> und FI-6 hängt weiterhin an einer Frage, die das Projekt gar nicht entscheiden kann, nämlich
+> ob die Installation eines Vereins einen Aufgabenplaner hat. FI-7 hängt an nichts, und die
+> Lücke, die FI-6 füllen sollte, deckt FI-17 zum Bruchteil des Aufwands. Die alte Reihenfolge
+> steht in der Versionshistorie, falls die Begründung noch einmal gebraucht wird.
+
+1. **FI-7 Terminserien** — die lästigste wiederkehrende Arbeit im System und der häufigste
+   Grund, es gar nicht erst zu benutzen. Es hängt von nichts ab, der Entwurf steht (siehe dort),
+   und es beschafft FI-1 überhaupt erst die Termine, zu denen jemand etwas zurückmeldet.
+   Zusammen mit **FI-16 Feiertage** entwerfen, sonst legt die erste Wochenserie Proben auf
+   Karfreitag.
+2. **FI-17 Offene Punkte unter „Mein Konto"** — kleinster sinnvoller Schritt gegen die
+   Holschuld. Kein Cron, kein Zustellrisiko, keine Einwilligung; bündelt, was FI-6 später
+   verschickt, und speist sich aus derselben Abfrage.
+3. **FI-14 Register** in der kleinen Variante (Gruppenart statt Hierarchie) — die
+   Besetzungsansicht ist der Grund, warum die Zusagen aus 1.7.0 mehr sind als eine
+   Anwesenheitsprognose. Fast kostenlos, solange niemand echte Vererbung verlangt.
+4. **FI-6 Benachrichtigungen** — erst jetzt, und erst nachdem die Auslöserfrage beantwortet ist.
+   Danach wird alles Vorherige wirksamer, FI-1 am deutlichsten. Die Einmal-Links aus der Mail
+   gehören in dieselbe Runde, weil sie dieselbe Sicherheitsprüfung brauchen.
+5. **FI-8 ICS-Abo** — jederzeit dazwischen möglich und die günstigste Idee der Liste; nach FI-7
+   noch günstiger, weil die Wiederholungsregel dann schon in der richtigen Schreibweise
+   vorliegt. **FI-18 ICS-Import** ist davon unabhängig und deutlich teurer — nicht zusammen
+   einplanen, nur weil beide „ICS" heißen.
+6. **FI-4 Auth-Geräte (Rest: NFC/Biometrie)**, dann **FI-3 GPS** — die Check-in-Wege gemeinsam
    entscheiden, damit Beweiswert und Kennzeichnung der Quellen einmal einheitlich festgelegt
    werden statt dreimal verschieden.
-6. **FI-10 Jubiläen** und **FI-13 Geburtstage** zusammen entwerfen, auch wenn nur eines davon
+7. **FI-10 Jubiläen** und **FI-13 Geburtstage** zusammen entwerfen, auch wenn nur eines davon
    gebaut wird — beides ist ein Stichtag mit Erledigungsvermerk. Zwei getrennte Modelle dafür
-   wären ein selbstgemachtes Problem.
-7. **FI-15 Gruppenleiter** eigenständig planen, nicht nebenbei. Die Rolle ist der einzige
+   wären ein selbstgemachtes Problem. **FI-21 Aufgaben** gehört, falls es je kommt, in dasselbe
+   Modell.
+8. **FI-15 Gruppenleiter** eigenständig planen, nicht nebenbei. Die Rolle ist der einzige
    Punkt der Liste, der jeden Handler anfasst — sie verträgt sich schlecht damit, parallel zu
    etwas anderem zu laufen. Sinnvoll erst nach [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht),
    damit feststeht, worauf sich „seine Gruppe" bezieht.
-8. Alles Übrige nur, wenn ein Verein danach fragt.
+9. Alles Übrige — Abschnitt E, FI-9, FI-11, FI-12 — nur, wenn ein Verein danach fragt.
 
 ---
 
@@ -574,7 +822,14 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung:
 
 Bereits verworfen und hier nicht erneut aufzunehmen — Begründungen in `OPEN-ITEMS.md`,
 Abschnitt „Bewusst entschieden — nicht erneut aufmachen": PDF-Export, Offline-Betrieb der PWA,
-Segmentmodell für Pausen, Gruppengrenze für Manager.
+Segmentmodell für Pausen, Gruppengrenze für Manager sowie **Pinnwand, Chat und Dateiablage**
+(seit 2026-09-16 dort eingetragen).
+
+Ebenfalls schon gebaut und deshalb keine Idee mehr, auch wenn es gelegentlich noch als eine
+genannt wird: Kommentar zur Rückmeldung (`appointment_responses.comment`, 1.7.0),
+Rückmeldefrist je Terminart (`responseDeadlineHours()`, 1.7.0) und der Druckbericht der
+Statistik (`openStatisticsReport()`, seit 1.2.2 — ein PDF entsteht daraus im Druckdialog des
+Browsers).
 
 Ebenfalls nicht hierher gehören Fehler und Restarbeiten am Bestehenden — die stehen in
 `OPEN-ITEMS.md`.

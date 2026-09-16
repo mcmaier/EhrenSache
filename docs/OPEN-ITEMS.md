@@ -4,11 +4,11 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-10 · **Bezugsstand:** `dev`, mit `main` gleichgezogen, drei
-Korrekturen und der unveröffentlichte Demo-Modus darüber · **Version:** 1.4.1
+**Zuletzt geprüft:** 2026-09-16 · **Bezugsstand:** `dev`, Terminrückmeldung gemergt ·
+**Version:** 1.7.0
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
-> [OI-14](#oi-14)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
+> [OI-14](#oi-14--dokumentation-liegt-unversioniert)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
 > Einträge regelt der Abschnitt [Sicherheit](#sicherheit) und `SECURITY.md`.
 
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
@@ -179,7 +179,7 @@ gegen die Entwicklungsdatenbank passiert — 1379 Anwesenheiten und 3 Ausnahmen 
 Sicherung und ohne Binlog nicht wiederherstellbar. Die Prüfung sitzt jetzt in
 `retentionYears()` und greift vor jedem `DELETE`.
 
-**Offen geblieben:** [OI-22](#oi-22) — verwaiste Einträge erscheinen bis zum Ablauf ihrer Frist
+**Offen geblieben:** [OI-22](#oi-22--selbstauskunft-findet-verwaiste-logzeilen-nicht) — verwaiste Einträge erscheinen bis zum Ablauf ihrer Frist
 in keiner Selbstauskunft.
 
 **Restrisiko, bewusst so:** Die Bereinigung läuft nicht von selbst; ein Admin stößt sie an.
@@ -315,10 +315,10 @@ Der Eintrag fällt zwar auf `submitted` zurück und braucht eine Freigabe, aber 
 Freigabeliste steht dasselbe grüne „stundenbelegt“ wie bei einer sauber gestempelten Sitzung.
 Was geändert wurde, hält `work_session_log` fest — angezeigt wird es nirgends außer in der
 Selbstauskunft (`my_data`). Auch `source` bleibt auf `timer`, obwohl die Zeiten von Hand
-stammen (verwandt: [OI-33](#oi-33)).
+stammen (verwandt: [OI-33](#oi-33--keine-quellen-kennzeichnung-bei-arbeitszeit-sitzungen)).
 
 Der Weg steht heute jedem Mitglied offen: „✎ Bearbeiten“ an der eigenen abgeschlossenen
-Sitzung im Dashboard. Mit [OI-35](#oi-35) käme er zusätzlich in die PWA — deshalb vorher
+Sitzung im Dashboard. Mit [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen) käme er zusätzlich in die PWA — deshalb vorher
 klären. Absicht war er nicht: Der Kommentar an der Stelle begründet den Statuswechsel, den
 Ortsnachweis erwähnt er nicht.
 
@@ -340,7 +340,7 @@ hält.
   — und das Etikett bliebe trotzdem falsch. Beides zusammen wäre das Vollbild.
 - **Bestand.** Ob bereits korrigierte Sitzungen nachträglich herabgestuft werden, ist offen.
   Ermitteln ließen sie sich über `work_session_log` (Änderungssätze mit `start_time` oder
-  `end_time`), solange die Auditspur nicht schon gelöscht ist — siehe [OI-2](#oi-2).
+  `end_time`), solange die Auditspur nicht schon gelöscht ist — siehe [OI-2](#oi-2--löschfrist-für-die-änderungshistorie).
 
 **Berührt:** `private/handlers/work_sessions.php` (`workSessionUpdate()`),
 `tests/suites/worktime_api.php`. Frontend unberührt: Der Nachweisgrad wird überall aus den
@@ -389,7 +389,7 @@ für eine Freigabeliste tun.
 - **Nebenwirkung der Freigabe.** Eine genehmigte Zeitkorrektur schreibt in `records` zurück,
   eine freigegebene Arbeitszeitsitzung nicht. Die Liste darf nicht suggerieren, beide täten
   dasselbe.
-- **Verhältnis zu [OI-38](#oi-38).** Wird die Auditspur in der Freigabe sichtbar, gehört sie in
+- **Verhältnis zu [OI-38](#oi-38--die-auditspur-ist-nirgends-zu-sehen).** Wird die Auditspur in der Freigabe sichtbar, gehört sie in
   dieselbe Ansicht. Beide Punkte betreffen denselben Arbeitsplatz und sollten zusammen gedacht
   werden.
 
@@ -448,7 +448,7 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
   3. Der `CHANGELOG.md` führt den Block als `[1.4.0] – 2026-09-09`.
   4. Die Migrationskette reicht durchgängig bis `1.4.0`. Der Schritt `1.3.1 → 1.4.0`
      (`private/migrations/1.3.1.php`) stellt `work_sessions.active_member` von `VIRTUAL` auf
-     `STORED` um und behebt damit [OI-1](#oi-1). **Er ist Pflicht:** Eine Installation, die
+     `STORED` um und behebt damit [OI-1](#oi-1--verlorener-auto_increment-nach-crash-recovery). **Er ist Pflicht:** Eine Installation, die
      ihn überspringt, verliert bei einer InnoDB-Crash-Recovery weiterhin den
      AUTO_INCREMENT-Zähler.
   5. **Die Kette ist von Hand belegt**, am 2026-09-09 auf einer echten Installation über den
@@ -704,7 +704,7 @@ abends ab 22:00 MESZ zeigte sie den Folgetag. Beides behoben (`d7ee191`).
 ---
 
 ### OI-5 · Automatisches Löschen der Auditspur
-**Erledigt am 2026-09-04** — siehe [OI-2](#oi-2), dort zusammengefasst.
+**Erledigt am 2026-09-04** — siehe [OI-2](#oi-2--löschfrist-für-die-änderungshistorie), dort zusammengefasst.
 
 ---
 
@@ -739,7 +739,7 @@ Wieder öffnen lässt sich der Assistent nur, indem man `public/update/.htaccess
 Selbstauskunft mehr auf — obwohl der `delete`-Eintrag in `changes` die komplette Sitzung samt
 `member_id`, Notiz und Ortsnamen weiterträgt. Für Art. 15 DSGVO ist das eine Lücke.
 
-Mit [OI-2](#oi-2) ist sie zeitlich begrenzt: Nach Ablauf der Auditfrist wird der Eintrag
+Mit [OI-2](#oi-2--löschfrist-für-die-änderungshistorie) ist sie zeitlich begrenzt: Nach Ablauf der Auditfrist wird der Eintrag
 anonymisiert und enthält nichts Personenbezogenes mehr. Bis dahin bleibt sie offen.
 
 **Zu entscheiden:** Die Zuordnung ginge nur über `member_id` aus dem JSON in `changes` —
@@ -856,12 +856,12 @@ nachtragen“ im Arbeitszeit-Tab (`POST`) — ein Formular, zwei Einstiege.
 - **Rückwirkende Frist.** Eine Korrektur an einer Sitzung aus dem Vorjahr verändert eine bereits
   abgeschlossene Auswertung und einen womöglich schon eingereichten Verwendungsnachweis. Ob es
   eine Grenze braucht — und ob sie eine Einstellung wird, analog `checkin_tolerance_hours`
-  ([OI-21](#oi-21)) —, ist offen.
+  ([OI-21](#oi-21--checkin_tolerance_hours-kennt-nur-ganze-stunden)) —, ist offen.
 - **Begründung.** Wer eine bestätigte Zeit ändert, sollte vermutlich sagen warum. Heute gäbe es
   dafür nur das Notizfeld; `work_session_log` hält zwar jede Änderung fest, aber keinen Grund.
-- **Berührt [OI-3](#oi-3):** Ein Manager, der seine eigene Sitzung über die PWA korrigiert,
+- **Berührt [OI-3](#oi-3--vier-augen-prinzip-bei-manager-nachträgen):** Ein Manager, der seine eigene Sitzung über die PWA korrigiert,
   behält `confirmed` — dieselbe Lücke wie beim Nachtrag, nur an einer weiteren Stelle.
-- **Voraussetzung [OI-37](#oi-37):** Eine Zeitkorrektur lässt den Ortsnachweis heute
+- **Voraussetzung [OI-37](#oi-37--ortsnachweis-überlebt-jede-zeitkorrektur):** Eine Zeitkorrektur lässt den Ortsnachweis heute
   unangetastet. Solange das so bleibt, vervielfacht jeder neue Korrekturweg die Zahl falsch
   etikettierter Stunden.
 
@@ -910,7 +910,7 @@ ist seit 2026-09-07 in `API.md` dokumentiert (Abschnitt *Statistiken → Arbeits
 Server voraussichtlich unberührt.
 
 ### OI-38 · Die Auditspur ist nirgends zu sehen
-**Priorität:** niedrig — vorgemerkt, entstanden bei der Planung von [OI-35](#oi-35)
+**Priorität:** niedrig — vorgemerkt, entstanden bei der Planung von [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen)
 
 Jede Änderung an einer Arbeitszeitsitzung wird protokolliert: `logSessionChange()` schreibt
 Vorher/Nachher-Werte als JSON in `work_session_log.changes`
@@ -921,11 +921,11 @@ Weg heraus ist die Selbstauskunft — `my_data` gibt die eigenen Logzeilen aus
 **Folge für die Freigabe.** In der Freigabeliste des Dashboards steht ein Eintrag mit Status
 „wartet auf Freigabe". Ob das eine frisch nachgetragene Sitzung ist oder eine bestätigte, deren
 Zeiten das Mitglied nachträglich verschoben hat, ist daran nicht zu erkennen. Der Manager gibt
-also frei, ohne zu wissen, worüber er entscheidet. Mit [OI-35](#oi-35) — Korrigieren und
+also frei, ohne zu wissen, worüber er entscheidet. Mit [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen) — Korrigieren und
 Nachtragen aus der PWA — wird dieser Fall vom Sonderfall zum Regelfall.
 
 Zwei Teilsignale gibt es bereits: Der Nachweisgrad fällt bei einer Zeitkorrektur auf
-„teilbelegt" oder „unbelegt" (sobald [OI-37](#oi-37) umgesetzt ist), und `source` unterscheidet
+„teilbelegt" oder „unbelegt" (sobald [OI-37](#oi-37--ortsnachweis-überlebt-jede-zeitkorrektur) umgesetzt ist), und `source` unterscheidet
 `timer` von `manual`. Beides sagt aber nur, *dass* etwas anders ist, nicht *was*.
 
 **Zu klären:**
@@ -937,7 +937,7 @@ Zwei Teilsignale gibt es bereits: Der Nachweisgrad fällt bei einer Zeitkorrektu
 - **Neue Ressource oder Erweiterung?** `work_sessions` könnte die Logzeilen bei `GET` mit `id`
   mitliefern; sauberer wäre `work_session_log` als eigene, lesende Ressource. Die Listenansicht
   darf davon nicht langsamer werden.
-- **Begründungsfeld.** Bei der Planung von [OI-35](#oi-35) wurde eine Pflichtbegründung für
+- **Begründungsfeld.** Bei der Planung von [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen) wurde eine Pflichtbegründung für
   Korrekturen bewusst verworfen: In der Notiz verschmutzte sie den Verwendungsnachweis, in der
   Auditspur wäre sie unsichtbar geblieben. Wird die Spur sichtbar, ist ein zusätzlicher
   Schlüssel `reason` im vorhandenen JSON von `changes` der naheliegende Ort — ohne Migration.
@@ -1084,7 +1084,7 @@ Session-Cookie eines Geräte-Tokens den Token selbst überflüssig machte.
 `Bearer ${sessionStorage.api_token}` — dieser Schlüssel wird im Dashboard nirgends gesetzt,
 der Header lautet also faktisch `Bearer null`. Die Exporte in `import_export.js` scheiterten
 dadurch bereits vor 1.3.0 mit `401`, nur unauffällig, weil der Fehler wie ein normaler
-Session-Timeout aussah ([OI-19](#oi-19)). Einfach einen echten Token in
+Session-Timeout aussah ([OI-19](#oi-19--fehler-eines-exports-erscheinen-als-json-seite)). Einfach einen echten Token in
 `sessionStorage.api_token` zu hinterlegen würde das Problem verschieben statt lösen: Die
 Dashboard-Session liefe dann über den Token-Zweig und würde als `auth_type = 'token'`
 markiert — mit allen Einschränkungen, die seit 1.3.0 für Token-Sessions gelten (siehe oben),
@@ -1577,6 +1577,7 @@ sind seither grün.
 | Kein `force` beim Timer-Start | So belassen | Ein unbelegter Start bei nachweispflichtiger Tätigkeit soll gar nicht erst als Timer laufen; der Weg ist die nachträgliche Erfassung mit Freigabe |
 | Kein Segmentmodell für Pausen | So belassen | Nachweise verlangen Dauer, nicht die Lage der Pausen. Nachrüstbar ohne Datenmigration |
 | Kein Offline-Betrieb in der PWA | So belassen | Erzeugte Client-Zeitstempel, die als Nachweis wertlos sind |
+| Keine Pinnwand, kein Chat, keine Dateiablage | Bleibt draußen (2026-09-16) | Drei Funktionen, die jede Vereins-App mitbringt und die hier bewusst fehlen. Sie haben keine Datenberührung zu Anwesenheit, Pünktlichkeit oder Arbeitszeit, kosten aber jeweils ein eigenes Datenmodell mit Moderation, Löschfristen und Missbrauchsfällen. Eine Dateiablage bringt zusätzlich Uploads fremder Herkunft in ein System, das heute nur ein Vereinslogo entgegennimmt; ein Chat macht aus einer Anwesenheitserfassung einen Nachrichtendienst mit allem, was die DSGVO daran hängt. Wer Kommunikation braucht, hat sie bereits — EhrenSache tritt nicht gegen Messenger an. Die Grenze berührt auch FI-17: systemerzeugte offene Punkte ja, an einzelne Mitglieder adressierte Nachrichten nein |
 | Kein PDF-Export | So belassen | Würde eine Bibliothek einschleppen, die das Projekt bewusst nicht hat. Der Bedarf ist seit 1.2.2 über die Druckansicht (`&format=html`) gedeckt: Das PDF entsteht im Druckdialog des Browsers |
 | Installer und Update-Assistent werden gesperrt ausgeliefert | So belassen | Ein hochgeladener, aber noch nicht eingerichteter Webspace soll `/install` nicht offen zeigen. Der Freischaltschritt steht für beide in der README; nach dem Lauf sperrt sich jeder Assistent selbst wieder. Die Alternative — ungesperrt ausliefern — nähme dem Ersteinrichter eine Hürde, öffnete aber ein Zeitfenster zwischen Upload und Installation |
 | Statistik getrennt von Anwesenheit | Eigener `worktime`-Block | Anwesenheitsquote und geleistete Stunden sind verschiedene Fragen |
@@ -1598,7 +1599,7 @@ Punkte, bei denen eine frühere Einschätzung revidiert wurde — als Warnung vo
 
 - **R1 „entschärft" war zu früh.** Am 2026-09-01 als geprüft vermerkt, nachdem Anlegen und
   Sperrwirkung des Unique-Index auf der virtuellen Spalte funktionierten. Nicht geprüft war das
-  Verhalten nach einem Neustart. Am Folgetag trat [OI-1](#oi-1) auf. Ein sauberer Neustart hat
+  Verhalten nach einem Neustart. Am Folgetag trat [OI-1](#oi-1--verlorener-auto_increment-nach-crash-recovery) auf. Ein sauberer Neustart hat
   die Konstruktion inzwischen entlastet, die Ursache bleibt offen.
 - **Gruppengrenze für Manager gab es nie.** Die Spec berief sich auf
   `hasStatisticsGroupAccess()`; diese Funktion liefert für Admin **und** Manager `true` und
@@ -1614,7 +1615,7 @@ Punkte, bei denen eine frühere Einschätzung revidiert wurde — als Warnung vo
 Der Demo-Modus lässt Schreibzugriffe auf Mitglieder, Termine, Anwesenheiten, Anträge und
 Arbeitszeiten zu — das ist sein Zweck. Was ein Besucher dabei in ein Freitextfeld schreibt,
 bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Die Oberfläche nutzt
-Inline-Handler und führt bewusst keine CSP (siehe [OI-17](#oi-17)).
+Inline-Handler und führt bewusst keine CSP (siehe [OI-17](#oi-17--keine-content-security-policy)).
 
 Beim Entwurf am 2026-09-09 erwogen und für die Ausbaustufe „Sandkasten mit Grenzen"
 hingenommen. Die Alternative wäre eine reine Schaufenster-Demo gewesen, die weder Check-in
@@ -1843,7 +1844,7 @@ Punkt 1 und der Median in Punkt 2 sind durch den Entwurf vom 2026-09-11 überhol
    Zweck, Aufbewahrung, Sichtbarkeit für andere Rollen. Eine Zahl, die aussagt, wie verlässlich
    ein einzelnes Mitglied ist, ist etwas anderes als eine Anwesenheitsliste.
 
-**Zusammenhang mit [OI-48](#oi-48):** Solange die Statistik je Gruppe nur eine Terminart
+**Zusammenhang mit [OI-48](#oi-48--statistik-zählt-je-gruppe-nur-eine-terminart):** Solange die Statistik je Gruppe nur eine Terminart
 auswertet, würde eine Pünktlichkeitsquote denselben Ausschnitt erben. OI-48 gehört davor.
 
 ---
@@ -1866,7 +1867,7 @@ widersprechen. Das ist der eigentliche Gewinn der Beschränkung.
 
 **Zu tun, falls der Bedarf entsteht:** Monat, Quartal oder Vereinsjahr auswerten zu können, hieße
 die Jahresbasis der gesamten Statistik aufzugeben — nicht nur die des Berichts. Dann besser
-gemeinsam mit [OI-48](#oi-48) entscheiden, das ohnehin an derselben Funktion ansetzt.
+gemeinsam mit [OI-48](#oi-48--statistik-zählt-je-gruppe-nur-eine-terminart) entscheiden, das ohnehin an derselben Funktion ansetzt.
 
 ---
 
@@ -2203,3 +2204,133 @@ Entschieden wurde, das bewusst in Kauf zu nehmen (Spec
 
 **Nicht sicherheitsrelevant:** keine Rechteausweitung, kein zusätzlicher Datenabfluss — im
 schlechtesten Fall eine nachträglich verschobene Kennzahl.
+
+---
+
+### OI-62 · Feature-Schalter ohne gemeinsame Prüfstelle
+**Priorität:** niedrig–mittel · aufgenommen am 2026-09-16
+
+Abschaltbare Grundfunktionen gibt es bereits, aber jede wurde einzeln nachgerüstet und wird
+anders geprüft:
+
+| Schalter | Prüfung |
+|---|---|
+| `worktime_enabled` | `isWorktimeEnabled()` über `worktimeSetting()` (`private/helpers/worktime.php`) |
+| `punctuality_enabled`, `reliability_enabled` | direkt über `systemSetting()` in `private/helpers/punctuality.php` |
+| `responses_enabled` | je Terminart, an mehreren Stellen als Spalte der Zeile geprüft (`appointment_responses.php`, `responses.php`, `punctuality.php`) |
+| `station_pin_enabled`, `mail_enabled` | jeweils an ihrem Ort |
+
+Es fehlt eine gemeinsame Stelle — Arbeitstitel `isFeatureEnabled()` —, über die Menü, Routing
+und API dieselbe Antwort bekommen. Für Terminplanung und Anwesenheitserfassung, die beiden
+Grundfunktionen, gibt es gar keinen Schalter; ein Verein, der EhrenSache nur zur
+Arbeitszeiterfassung nutzt, sieht trotzdem die volle Oberfläche.
+
+**Warum das zunehmend drückt:** Jede weitere Funktion aus `FEATURE-IDEAS.md` vergrößert die
+Oberfläche für alle Vereine, auch die, die sie nicht brauchen. Ohne zentrale Prüfung wächst
+zudem die Wahrscheinlichkeit, dass eine abgeschaltete Funktion im Menü verschwindet, ihr
+Endpunkt aber weiter antwortet — das ist dann keine Kosmetik mehr.
+
+**Zu entscheiden:**
+
+- **Eine Prüfstelle oder eine Registrierung?** Eine Funktion `isFeatureEnabled(string $key)`
+  wäre schnell gebaut, verlagert die Vollständigkeit aber weiter auf die Aufrufer. Eine Liste
+  aller Funktionen mit ihren Ressourcen — analog zu den drei Listen in
+  `private/helpers/demo_mode.php`, deren Vollständigkeit ein Test erzwingt — wäre die
+  belastbarere Variante und passt zur bestehenden Konvention.
+- **Was heißt „aus"?** Nur im Menü verbergen, oder der Endpunkt antwortet mit 403? Nur Letzteres
+  ist eine Zusage.
+- **Bestehende Daten.** Wird die Arbeitszeit abgeschaltet, sind die erfassten Sitzungen nicht
+  weg. Bleiben sie über `my_data` und den Export erreichbar? Vermutlich ja — Abschalten ist
+  keine Löschung, und der Auskunftsanspruch endet nicht mit einem Schalter.
+- **Reihenfolge.** Sinnvoll gemeinsam mit der am 2026-09-15 beschlossenen Gruppierung der
+  Einstellungen in Untertabs, deren Spec noch aussteht: Die Schalter sind genau das, was in
+  einen solchen Tab je Funktionsbereich gehört. Getrennt gebaut wird die Einstellungsseite
+  zweimal angefasst.
+
+**Nicht sicherheitsrelevant:** Alle heutigen Prüfungen greifen, nur eben je Funktion
+verschieden. Es geht um die Vollständigkeit künftiger Schalter, nicht um eine Lücke am Bestand.
+
+---
+
+### OI-63 · Rückmeldung für andere: kein Schutzschritt, keine Spur
+**Priorität:** mittel · aufgenommen am 2026-09-16
+
+`responsesResolveTarget()` (`private/handlers/appointment_responses.php`) erlaubt Admin und
+Manager, mit `?member_id=<id>` die Rückmeldung eines **anderen** Mitglieds zu setzen oder zu
+löschen. Das ist gewollt — jemand ruft an und sagt ab, der Dirigent trägt es ein. Zwei Dinge
+fehlen drumherum:
+
+1. **Kein Schutzschritt in der Oberfläche.** Die fremde Antwort ist so bearbeitbar wie die
+   eigene. Ein Fehlklick in der Terminliste ändert die Zusage einer anderen Person, ohne dass
+   irgendetwas darauf hinweist.
+2. **Keine Spur.** Weder `appointment_responses` noch ein Protokoll hält fest, dass *jemand
+   anderes* geschrieben hat. Nachträglich ist nicht unterscheidbar, ob ein Mitglied selbst
+   abgesagt oder der Manager es für es getan hat — und auch nicht, wer. Die Arbeitszeit löst
+   dieselbe Frage seit 1.2.0 über `work_session_log`.
+
+Das wiegt schwerer, seit die Rückmeldung in die Zuverlässigkeitskennzahl einfließt (1.7.0): Ein
+fremder Eintrag verschiebt eine Kennzahl, die einer Person zugerechnet wird.
+
+**Zu entscheiden:**
+
+- **Schutzschritt:** Eine Rückfrage vor dem Bearbeiten fremder Antworten („für Anna Beispiel
+  eintragen?") oder ein ausdrückliches Entsperren je Termin. Ersteres ist billiger und
+  vermutlich ausreichend; Letzteres ist die stärkere Bremse und passt zum Vier-Augen-Gedanken
+  aus [OI-3](#oi-3--vier-augen-prinzip-bei-manager-nachträgen). Die Prüfung gehört in jedem Fall
+  **serverseitig** dazu, nicht nur in die Oberfläche.
+- **Spur:** Reicht ein Feld `entered_by` in `appointment_responses` (billig, beantwortet „wer
+  war es") oder braucht es ein Protokoll wie `work_session_log` (beantwortet zusätzlich „was
+  stand vorher da")? Der Verlauf von Antwortänderungen ist in
+  [OI-58](#oi-58--terminrückmeldung-bewusst-nicht-gebaut) bewusst abgelehnt worden — ein Feld
+  für die Herkunft ist davon zu unterscheiden und widerspricht dem nicht.
+- **Anzeige:** Wird ein fremder Eintrag dem Mitglied gegenüber kenntlich gemacht? Ohne das
+  erfährt jemand nie, dass in seinem Namen geantwortet wurde. Mit FI-17
+  (`docs/FEATURE-IDEAS.md`) wäre das der natürliche Ort dafür.
+
+**Nicht sicherheitsrelevant im Sinne von `SECURITY.md`:** keine Rechteausweitung — wer das
+kann, darf es bereits, und Rolle wie Mitgliedsprüfung greifen. Es fehlt die Nachvollziehbarkeit
+einer erlaubten Handlung, nicht ihre Begrenzung.
+
+---
+
+### OI-64 · Im Kalender lässt sich kein Termin anlegen
+**Priorität:** niedrig · aufgenommen am 2026-09-16
+
+`createCalendarDay()` (`public/js/modules/appointments.js`) hängt an einen Tag ohne Termine
+keinen Handler. Ein Klick auf den 14. tut nichts; der Weg zu einem neuen Termin führt immer über
+den Knopf und das Datumsfeld im Dialog. Erwartet wird von jedem Kalender das Gegenteil.
+
+**Zu entscheiden:** Klick auf einen leeren Tag öffnet den Anlegen-Dialog mit vorbelegtem Datum —
+sichtbar nur für Admin und Manager, da ein einfacher Nutzer keine Termine anlegt. Zu beachten
+ist, dass Tage **mit** Terminen bereits ein Klickverhalten haben (Popup mit der Terminliste);
+beides muss sich vertragen, statt einander zu überlagern.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-65 · Station: das Ruhebild leuchtet unvermindert weiter
+**Priorität:** niedrig · aufgenommen am 2026-09-16
+
+Die Station fällt nach `station_idle_seconds` auf das Ruhebild zurück
+(`public/station/js/app.js`), zeigt dort aber unverändert helle Flächen in der Vereinsfarbe.
+Ein Tablet, das im Probenraum dauerhaft hängt, brennt damit über Monate dasselbe Bild ein und
+zieht rund um die Uhr Strom.
+
+**Zu entscheiden:** Was im Ruhezustand passiert. Drei Stufen, aufsteigend im Aufwand:
+
+1. **Gedämpftes Ruhebild** — nach einer zweiten, längeren Frist dunkle Darstellung mit
+   reduzierter Helligkeit. Reines CSS, kein neues Recht, keine API.
+2. **Bewegtes Ruhebild** — die Uhr wandert langsam über den Bildschirm, damit nichts einbrennt.
+   Wenige Zeilen mehr.
+3. **Dunkle Darstellung für die ganze Station** — als Einstellung oder über
+   `prefers-color-scheme`. Das berührt die Vereinsfarben und das Branding und ist deshalb eine
+   Gestaltungsentscheidung, keine technische.
+
+Zur Energiefrage ehrlich bleiben: Spürbar spart eine dunkle Darstellung nur bei OLED. Die
+üblichen Tablets im Vereinsheim haben LCD, dort hilft nur geringere Helligkeit oder ein
+abgeschalteter Bildschirm — und Letzteres kann die Web-App nicht, siehe
+[OI-32](#oi-32--wake-lock--kiosk-modus). Beides gehört zusammen entschieden: Es wäre
+widersprüchlich, den Bildschirm per Wake Lock wachzuhalten und zugleich Strom sparen zu wollen.
+
+**Nicht sicherheitsrelevant.**
