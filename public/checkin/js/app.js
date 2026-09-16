@@ -1289,6 +1289,25 @@ function refreshAttendanceList()
 // _lastAttendanceData in records.js).
 let _lastAttendanceData = null;
 
+/**
+ * Traegt eine Ein-/Austragung in den gehaltenen Bestand nach, aus dem
+ * renderAttendanceList() zeichnet -- nicht nur in die Anzeige.
+ *
+ * Der Server liefert einen Mitglieds-Datensatz einmal (GROUP BY m.member_id
+ * in attendance_list.php); groupingSections() verteilt dieselbe Objekt-
+ * Referenz auf mehrere Abschnitte (Spec 3.2), ein einziges Nachfuehren hier
+ * reicht deshalb fuer alle Zeilen eines Mitglieds. member_id kommt aus einem
+ * data-Attribut (String) und muss deshalb locker mit dem Feld aus der
+ * API-Antwort verglichen werden.
+ */
+function syncAttendanceMemberRecord(memberId, recordId, arrivalTime) {
+    const member = _lastAttendanceData?.members?.find(
+        m => String(m.member_id) === String(memberId));
+    if (!member) return;
+    member.record_id = recordId;
+    member.arrival_time = arrivalTime;
+}
+
 function renderAttendanceList(data) {
     _lastAttendanceData = data;
 
@@ -1467,6 +1486,12 @@ async function handleAttendanceToggle(event) {
                             b.dataset.recordId = '';
                         });
 
+                        // Gehaltenen Bestand nachfuehren (_lastAttendanceData): renderAttendanceList()
+                        // zeichnet bei jedem Gliederungswechsel aus GENAU diesen Daten neu, nicht aus
+                        // dem DOM. Ohne dieses Nachfuehren stand nach dem Umschalten wieder der Stand
+                        // vom Laden da, obwohl die Anzeige laengst den entfernten Eintrag zeigte.
+                        syncAttendanceMemberRecord(memberId, null, null);
+
                         showMessage('Anwesenheit entfernt', 'warning');
                     }
                     catch(error) {
@@ -1528,6 +1553,9 @@ async function handleAttendanceToggle(event) {
                     }
                 });
             }
+
+            // Gehaltenen Bestand nachfuehren -- siehe Begruendung beim Entfernen oben.
+            syncAttendanceMemberRecord(memberId, result.data.id, result.data.arrival_time || null);
         }
 
         // Bei isPresent oeffnet sich nur das Bestaetigungsmodal (asynchron ueber

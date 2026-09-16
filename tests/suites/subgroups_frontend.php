@@ -324,3 +324,50 @@ test('checkin/js/app.js: handleAttendanceToggle() liest die neue Datensatz-ID au
         'dataset.recordId wird wieder direkt aus result.id gelesen (immer undefined)'
     );
 });
+
+// ----------------------------------------------------------------------
+// Manueller Test 16.09.2026, weiterer Nachtrag: vierter Fehler im selben
+// Block -- Umschalten der Gliederung liess abgehakte Mitglieder auf den
+// Stand vom Laden zurueckfallen.
+// ----------------------------------------------------------------------
+
+test('checkin/js/app.js: handleAttendanceToggle() fuehrt _lastAttendanceData nach, aus dem renderAttendanceList() bei jedem Gliederungswechsel neu zeichnet', function () use ($ugfRoot) {
+    // Fehler 4: renderAttendanceList() zeichnet ausschliesslich aus
+    // _lastAttendanceData.members (siehe window.setAttendanceGrouping()
+    // weiter unten, das ohne erneuten API-Aufruf daraus neu aufbaut).
+    // handleAttendanceToggle() aktualisierte bisher nur das DOM (Klassen,
+    // Icon, data-Attribute) -- nicht dieses Objekt. Ein Wechsel der Stufe
+    // (Register -> Alphabetisch) rief renderAttendanceList() erneut mit dem
+    // dabei unveraenderten, veralteten Stand auf: jede eben eingetragene
+    // oder entfernte Anwesenheit fiel auf den Ladezustand zurueck.
+    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+
+    assertTrue(
+        str_contains($js, 'function syncAttendanceMemberRecord('),
+        'syncAttendanceMemberRecord() fehlt -- das Nachfuehren des gehaltenen Bestands'
+    );
+
+    $sync = ugfBody($js, 'function syncAttendanceMemberRecord(', 'function renderAttendanceList');
+    assertTrue(str_contains($sync, '_lastAttendanceData'), 'syncAttendanceMemberRecord() greift nicht auf _lastAttendanceData zu');
+    assertTrue(str_contains($sync, 'member.record_id'), 'syncAttendanceMemberRecord() schreibt record_id nicht fort');
+    assertTrue(str_contains($sync, 'member.arrival_time'), 'syncAttendanceMemberRecord() schreibt arrival_time nicht fort');
+
+    $body = ugfBody($js, 'async function handleAttendanceToggle', 'function handleDashboardNavigation');
+    assertTrue(
+        substr_count($body, 'syncAttendanceMemberRecord(') === 2,
+        'handleAttendanceToggle() muss syncAttendanceMemberRecord() in beiden Zweigen (Eintragen und Entfernen) aufrufen, gefunden: ' . substr_count($body, 'syncAttendanceMemberRecord(')
+    );
+
+    // Entfernen setzt beide Felder auf null zurueck (record_id null macht
+    // renderAttendanceList() wieder "abwesend" -- member.record_id !== null).
+    assertTrue(
+        (bool) preg_match('/syncAttendanceMemberRecord\(memberId,\s*null,\s*null\)/', $body),
+        'Der Entfernen-Zweig setzt record_id/arrival_time nicht ueber syncAttendanceMemberRecord() auf null zurueck'
+    );
+    // Eintragen schreibt die vom Server gelieferten Werte fort, nicht
+    // irgendeinen Platzhalter.
+    assertTrue(
+        str_contains($body, 'syncAttendanceMemberRecord(memberId, result.data.id,'),
+        'Der Eintragen-Zweig fuehrt record_id nicht mit result.data.id nach'
+    );
+});
