@@ -115,6 +115,7 @@ export async function openGroupModal(groupId = null) {
         document.getElementById('group_is_default').checked = false;
         document.getElementById('group_is_subgroup').checked = false;
         document.getElementById('group_sort_order').value = 0;
+        toggleGroupExclusivity();
         membersGroup.style.display = 'none';
         updateModalId('groupModal', null)
     }
@@ -126,9 +127,29 @@ export function closeGroupModal() {
     document.getElementById('groupModal').classList.remove('active');
 }
 
+/**
+ * Untergruppe und Standardgruppe schliessen sich aus (Server weist die
+ * Kombination mit 400 ab, siehe handleMemberGroups() in member_groups.php).
+ * Hier nur die sichtbare Seite davon: das jeweils andere Haekchen sperren,
+ * sobald eines gesetzt ist, mit kurzem Hinweis, warum -- statt erst beim
+ * Speichern auf die Fehlermeldung zu laufen.
+ */
+export function toggleGroupExclusivity() {
+    const isDefault = document.getElementById('group_is_default');
+    const isSubgroup = document.getElementById('group_is_subgroup');
+    const defaultHint = document.getElementById('group_is_default_conflict_hint');
+    const subgroupHint = document.getElementById('group_is_subgroup_conflict_hint');
+
+    isSubgroup.disabled = isDefault.checked;
+    subgroupHint.style.display = isDefault.checked ? 'block' : 'none';
+
+    isDefault.disabled = isSubgroup.checked;
+    defaultHint.style.display = isSubgroup.checked ? 'block' : 'none';
+}
+
 async function loadGroupData(groupId) {
     const group = await apiCall('member_groups', 'GET', null, { id: groupId });
-    
+
     if (group) {
         document.getElementById('group_id').value = group.group_id;
         document.getElementById('group_name').value = group.group_name;
@@ -136,6 +157,7 @@ async function loadGroupData(groupId) {
         document.getElementById('group_is_default').checked = group.is_default == 1;
         document.getElementById('group_is_subgroup').checked = group.is_subgroup == 1;
         document.getElementById('group_sort_order').value = group.sort_order ?? 0;
+        toggleGroupExclusivity();
 
         // Zeige Mitglieder in dieser Gruppe
         renderGroupMembers(group.members || []);
@@ -532,6 +554,7 @@ export async function deleteType(typeId) {
 
 window.openGroupModal = openGroupModal;
 window.closeGroupModal = closeGroupModal;
+window.toggleGroupExclusivity = toggleGroupExclusivity;
 window.saveGroup = saveGroup;
 window.deleteGroup = deleteGroup;
 

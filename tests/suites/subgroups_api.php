@@ -373,3 +373,146 @@ test('settings: subgroup_label wird normalisiert und begrenzt', function () {
             'body' => ['setting_key' => 'subgroup_label', 'setting_value' => $vorher]]);
     }
 });
+
+// ----------------------------------------------------------------------
+// Untergruppe und Standardgruppe schliessen sich aus (1.8.0). Eine
+// Untergruppe als Standard wuerde jedes neue Mitglied ungefragt einem
+// Register zuordnen.
+// ----------------------------------------------------------------------
+
+/** Die group_id der aktuell gespeicherten Standardgruppe, falls vorhanden. */
+function ugCurrentDefaultGroupId(): ?int
+{
+    $res = apiRequest('GET', 'member_groups', ['token' => apiToken('admin')]);
+    assertStatus(200, $res);
+
+    foreach ($res['body'] as $group) {
+        if ((int) $group['is_default'] === 1) {
+            return (int) $group['group_id'];
+        }
+    }
+
+    return null;
+}
+
+/** Voller Datensatz einer Gruppe, als Grundlage fuer ugRestoreGroup(). */
+function ugSnapshotGroup(int $groupId): array
+{
+    $res = apiRequest('GET', 'member_groups', ['token' => apiToken('admin'), 'query' => ['id' => $groupId]]);
+    assertStatus(200, $res);
+
+    return $res['body'];
+}
+
+/**
+ * Schreibt eine Gruppe wieder auf einen fruehren Stand zurueck. group_name/
+ * description/is_default sind ein Voll-Update (s. API.md) -- deshalb wird
+ * hier immer der komplette Snapshot mitgeschickt, nicht nur is_default.
+ */
+function ugRestoreGroup(array $snapshot): void
+{
+    assertStatus(200, apiRequest('PUT', 'member_groups', ['token' => apiToken('admin'),
+        'query' => ['id' => $snapshot['group_id']],
+        'body'  => [
+            'group_name'  => $snapshot['group_name'],
+            'description' => $snapshot['description'],
+            'is_default'  => (bool) $snapshot['is_default'],
+            'is_subgroup' => (bool) $snapshot['is_subgroup'],
+            'sort_order'  => (int) $snapshot['sort_order'],
+        ],
+    ]), 'Wiederherstellung der vorherigen Standardgruppe fehlgeschlagen');
+}
+
+test('member_groups POST: Untergruppe und Standardgruppe zusammen wird mit 400 abgewiesen', function () {
+    $res = apiRequest('POST', 'member_groups', ['token' => apiToken('admin'), 'body' => [
+        'group_name'  => 'UG Konflikt POST ' . uniqid(),
+        'is_subgroup' => true,
+        'is_default'  => true,
+    ]]);
+    assertStatus(400, $res, 'is_subgroup und is_default gemeinsam beim Anlegen muessen abgewiesen werden');
+});
+
+test('member_groups PUT: Untergruppe und Standardgruppe zusammen wird mit 400 abgewiesen, beide Felder gesendet', function () {
+    $groupId = ugCreate('member_groups', ['group_name' => 'UG Konflikt PUT ' . uniqid()]);
+
+    try {
+        $res = apiRequest('PUT', 'member_groups', ['token' => apiToken('admin'),
+            'query' => ['id' => $groupId],
+            'body'  => ['group_name' => 'UG Konflikt PUT geaendert', 'is_subgroup' => true, 'is_default' => true],
+        ]);
+        assertStatus(400, $res, 'is_subgroup und is_default gemeinsam beim Aendern muessen abgewiesen werden');
+    } finally {
+        ugDelete('member_groups', $groupId);
+    }
+});
+
+test('member_groups PUT: is_subgroup=1 wird abgewiesen, wenn die Gruppe bereits gespeicherte Standardgruppe ist', function () {
+    // Nur is_subgroup wird gesendet -- is_default fehlt im Koerper. Die
+    // Pruefung muss trotzdem greifen, weil sie gegen den gespeicherten Wert
+    // geht, nicht nur gegen das gesendete Feld.
+    $vorherigerDefaultId = ugCurrentDefaultGroupId();
+    $vorherigerDefault    = $vorherigerDefaultId !== null ? ugSnapshotGroup($vorherigerDefaultId) : null;
+
+    $suffix  = uniqid();
+    $groupId = ugCreate('member_groups', [
+        'group_name' => "UG Default-Bestand {$suffix}",
+        'is_default' => true,
+    ]);
+
+    try {
+        $res = apiRequest('PUT', 'member_groups', ['token' => apiToken('admin'),
+            'query' => ['id' => $groupId],
+            'body'  => ['group_name' => "UG Default-Bestand {$suffix}", 'is_subgroup' => true],
+        ]);
+        assertStatus(400, $res,
+            'is_subgroup=1 gegen eine bereits gespeicherte Standardgruppe muss abgewiesen werden, auch ohne gesendetes is_default');
+
+        $nachher = ugSnapshotGroup($groupId);
+        assertSame(1, (int) $nachher['is_default'], 'is_default darf nach dem abgewiesenen PUT unveraendert bleiben');
+        assertSame(0, (int) $nachher['is_subgroup'], 'is_subgroup darf nach dem abgewiesenen PUT nicht gesetzt worden sein');
+    } finally {
+        ugDelete('member_groups', $groupId);
+        if ($vorherigerDefault !== null) {
+            ugRestoreGroup($vorherigerDefault);
+        }
+    }
+});
+
+test('member_groups PUT: is_default=1 wird abgewiesen, wenn die Gruppe bereits gespeicherte Untergruppe ist', function () {
+    // Spiegelbild des vorigen Tests: nur is_default wird gesendet, is_subgroup
+    // steht bereits im Bestand.
+    $suffix  = uniqid();
+    $groupId = ugCreate('member_groups', [
+        'group_name'  => "UG Sub-Bestand {$suffix}",
+        'is_subgroup' => true,
+    ]);
+
+    try {
+        $res = apiRequest('PUT', 'member_groups', ['token' => apiToken('admin'),
+            'query' => ['id' => $groupId],
+            'body'  => ['group_name' => "UG Sub-Bestand {$suffix}", 'is_default' => true],
+        ]);
+        assertStatus(400, $res,
+            'is_default=1 gegen eine bereits gespeicherte Untergruppe muss abgewiesen werden, auch ohne gesendetes is_subgroup');
+
+        $nachher = ugSnapshotGroup($groupId);
+        assertSame(0, (int) $nachher['is_default'], 'is_default darf nach dem abgewiesenen PUT nicht gesetzt worden sein');
+        assertSame(1, (int) $nachher['is_subgroup'], 'is_subgroup darf nach dem abgewiesenen PUT unveraendert bleiben');
+    } finally {
+        ugDelete('member_groups', $groupId);
+    }
+});
+
+test('member_groups PUT: is_subgroup allein bleibt weiter erlaubt, wenn kein Standard-Konflikt besteht', function () {
+    $groupId = ugCreate('member_groups', ['group_name' => 'UG Ok ' . uniqid()]);
+
+    try {
+        $res = apiRequest('PUT', 'member_groups', ['token' => apiToken('admin'),
+            'query' => ['id' => $groupId],
+            'body'  => ['group_name' => 'UG Ok geaendert', 'is_subgroup' => true],
+        ]);
+        assertStatus(200, $res, 'is_subgroup allein, ohne Standard-Konflikt, muss weiter funktionieren');
+    } finally {
+        ugDelete('member_groups', $groupId);
+    }
+});

@@ -1950,20 +1950,28 @@
                     </div>
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="group_is_default">
-                            <span>Standard-Gruppe (gilt für alle neuen Mitglieder)</span>                            
+                            <input type="checkbox" id="group_is_default" onchange="toggleGroupExclusivity()">
+                            <span>Standard-Gruppe (gilt für alle neuen Mitglieder)</span>
                         </label>
                         <small style="color: #e67e22; display: block; margin-top: 5px;">
                             ⚠️ Nur eine Gruppe kann Standard sein. Diese sollte alle Mitglieder umfassen.
                         </small>
+                        <small class="input-hint" id="group_is_default_conflict_hint" style="display: none;">
+                            Als Untergruppe markiert -- eine Untergruppe kann nicht gleichzeitig
+                            Standardgruppe sein.
+                        </small>
                     </div>
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="group_is_subgroup">
+                            <input type="checkbox" id="group_is_subgroup" onchange="toggleGroupExclusivity()">
                             Gliedert Listen als <span data-subgroup-label>Untergruppe</span>
                         </label>
                         <small class="input-hint">Anwesenheitslisten und Rückmeldungen lassen sich
                             nach solchen Gruppen gliedern.</small>
+                        <small class="input-hint" id="group_is_subgroup_conflict_hint" style="display: none;">
+                            Als Standardgruppe markiert -- eine Standardgruppe kann nicht gleichzeitig
+                            Untergruppe sein.
+                        </small>
                     </div>
                     <div class="form-group">
                         <label for="group_sort_order">Reihenfolge</label>
