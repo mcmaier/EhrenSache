@@ -181,7 +181,7 @@ function renderGroupMembers(members) {
     
     container.innerHTML = sortedMembers.map(m => `
         <div style="padding: 5px 0; border-bottom: 1px solid #eee;">
-            ${m.surname}, ${m.name} ${m.member_number ? `(${m.member_number})` : ''}
+            ${escapeHtml(m.surname)}, ${escapeHtml(m.name)} ${m.member_number ? `(${escapeHtml(m.member_number)})` : ''}
         </div>
     `).join('');
 }
@@ -270,7 +270,9 @@ export async function deleteGroup(groupId) {
             //invalidateCache('groups'); 
             //await loadGroups(true);
             await showGroupSection(true);
-            showToast(`Gruppe "${groupName}" wurde gelöscht`, 'success');
+            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Gruppenname
+            // muss deshalb wie jeder andere HTML-Textinhalt maskiert werden.
+            showToast(`Gruppe "${escapeHtml(groupName)}" wurde gelöscht`, 'success');
         }
     }
 }
@@ -306,19 +308,24 @@ export async function renderTypeGroupOverview(typeData)
             ? '<span class="status-badge status-approved">✓ Ja</span>' 
             : '<span class="type-badge">Nein</span>';
         
-        const colorBadge = `<span style="display: inline-block; width: 20px; height: 20px; background: ${type.color}; border-radius: 3px; border: 1px solid #ddd;"></span>`;
-        
+        // Farbwert kommt frei aus der DB (kein Server-seitiger Format-Zwang) und landet
+        // in einem style-Attribut -- escapeHtml() maskiert dort keine Anführungszeichen
+        // und würde das Attribut nicht schützen. Stattdessen wie in appointments.js:
+        // nur ein gültiger Hexcode wird übernommen, sonst der Default.
+        const safeColor = /^#[0-9a-f]{3,8}$/i.test(type.color || '') ? type.color : '#667eea';
+        const colorBadge = `<span style="display: inline-block; width: 20px; height: 20px; background: ${safeColor}; border-radius: 3px; border: 1px solid #ddd;"></span>`;
+
         // Lade Gruppen für diese Terminart
         const groupsText = '-'; // Wird später gefüllt
-        
+
         const responsesBadge = Number(type.responses_enabled) === 1
             ? ' <span title="Rückmeldung aktiv">💬</span>'
             : '';
 
         const row = `
             <tr>
-                <td><strong>${type.type_name}</strong>${responsesBadge}</td>
-                <td>${type.description || '-'}</td>
+                <td><strong>${escapeHtml(type.type_name)}</strong>${responsesBadge}</td>
+                <td>${type.description ? escapeHtml(type.description) : '-'}</td>
                 <td>${colorBadge}</td>
                 <td id="type_groups_${type.type_id}">Lädt...</td>
                 <td>${isDefaultBadge}</td>
@@ -347,7 +354,7 @@ async function loadTypeGroup(typeId) {
     const cell = document.getElementById(`type_groups_${typeId}`);
     
     if (type && type.groups && type.groups.length > 0) {
-        cell.innerHTML = type.groups.map(g => `<span class="type-badge">${g.group_name}</span>`).join(' ');
+        cell.innerHTML = type.groups.map(g => `<span class="type-badge">${escapeHtml(g.group_name)}</span>`).join(' ');
     } else {
         cell.innerHTML = '<span style="color: #7f8c8d;">Keine</span>';
     }
@@ -451,8 +458,8 @@ function renderTypeGroups(selectedGroups) {
                    class="type-group-checkbox" 
                    value="${group.group_id}" 
                    ${selectedIds.includes(group.group_id) ? 'checked' : ''}>
-            <span style="margin-left: 8px;">${group.group_name}</span>
-            ${group.description ? `<small style="color: #7f8c8d; display: block; margin-left: 28px;">${group.description}</small>` : ''}
+            <span style="margin-left: 8px;">${escapeHtml(group.group_name)}</span>
+            ${group.description ? `<small style="color: #7f8c8d; display: block; margin-left: 28px;">${escapeHtml(group.description)}</small>` : ''}
         </label>
     `).join('');
 }
@@ -547,7 +554,9 @@ export async function deleteType(typeId) {
             //invalidateCache('types');
             //await loadTypes(true);
             await showGroupSection(true);
-            showToast(`Terminart "${typeName}" wurde gelöscht`, 'success');
+            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Terminartname
+            // muss deshalb wie jeder andere HTML-Textinhalt maskiert werden.
+            showToast(`Terminart "${escapeHtml(typeName)}" wurde gelöscht`, 'success');
         }
     }
 }
