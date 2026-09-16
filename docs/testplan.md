@@ -398,6 +398,22 @@ wie eine Messung, ohne eine zu sein.
 
 ---
 
+## 12a. Systemeinstellungen (Untertabs, ab 1.9.0)
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| SET-1 | Einstellungen öffnen, Reiter wechseln, Bereich verlassen und zurückkehren | Der zuletzt gewählte Reiter ist wieder offen |
+| SET-2 | Auf Reiter A etwas ändern, auf Reiter B wechseln, speichern | Beides wird gespeichert; der Punkt am Reiter verschwindet |
+| SET-3 | Farbschwellen verdreht eintragen (z. B. 90/60/80) und speichern | Nichts wird gespeichert, alle drei Felder rot, Sprung auf den Reiter |
+| SET-4 | Einen serverseitig unzulässigen Wert zusammen mit einem gültigen speichern | Hinweis „n gespeichert, 1 abgelehnt“, Sprung auf den Reiter mit dem Fehler |
+| SET-5 | Mit offener Änderung den Bereich verlassen | Rückfrage; „Abbrechen“ bleibt im Bereich, der Wert steht noch im Feld |
+| SET-6 | Zeiterfassung abschalten | Obergrenze und Notizpflicht sind ausgegraut |
+| SET-7 | Schwelle „Ab hier Gelb“ auf 70 setzen | Eine Quote von 65 % wird im Dashboard **und** in der Check-in-App orange statt gelb |
+| SET-8 | Löschfrist ändern, ohne zu speichern, dann bereinigen | Die Rückfrage weist darauf hin, dass nach dem angezeigten Wert gelöscht wird |
+| SET-9 | Einstellungen am Telefon (375 px) | Die Reiterleiste scrollt waagerecht, die Seite selbst nicht |
+
+---
+
 ## 13. Statistik
 
 | ID | Testfall | Erwartetes Ergebnis |

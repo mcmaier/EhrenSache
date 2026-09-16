@@ -617,7 +617,10 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('punctuality_enabled', '0', 'boolean', 'general', 'Pünktlichkeitskennzahl berechnen und anzeigen'),
 ('reliability_enabled', '0', 'boolean', 'general', 'Zuverlässigkeitskennzahl berechnen und anzeigen'),
 ('punctuality_grace_minutes', '0', 'number', 'general', 'Karenz in Minuten relativ zum Terminbeginn (-60 bis 60)'),
-('response_deadline_hours', '24', 'number', 'general', 'Frist für Terminrückmeldungen in Stunden vor Beginn (0 bis 720)');
+('response_deadline_hours', '24', 'number', 'general', 'Frist für Terminrückmeldungen in Stunden vor Beginn (0 bis 720)'),
+('rate_threshold_mid', '40', 'number', 'general', 'Ab dieser Quote Orange statt Rot'),
+('rate_threshold_fair', '60', 'number', 'general', 'Ab dieser Quote Gelb'),
+('rate_threshold_good', '80', 'number', 'general', 'Ab dieser Quote Grün');
 
 INSERT IGNORE INTO `{PREFIX}system_settings` (setting_key, setting_value, category) VALUES
 ('subgroup_label', 'Untergruppe', 'public');

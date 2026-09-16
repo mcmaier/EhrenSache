@@ -15,7 +15,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EhrenSache - Dashboard</title>
 
-    <link rel="stylesheet" href="css/main.css?v=1.8.0">
+    <link rel="stylesheet" href="css/main.css?v=1.9.0">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="robots" content="noindex, nofollow">
     <script type="module" src="js/theme.js"></script>
@@ -244,491 +244,577 @@
                     <button class="btn-add" id="saveSettingsBtn">💾 Speichern</button>
                 </div>
 
+                <div class="settings-tabs" role="tablist">
+                    <button type="button" class="settings-tab-btn active" data-settings-tab="allgemein">⚙️ Allgemein</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="termine">📅 Termine &amp; Anwesenheit</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="zeit">⏱️ Zeiterfassung</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="stationen">🖥️ Stationen</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="datenschutz">📋 Datenschutz</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="email">📧 E-Mail</button>
+                    <button type="button" class="settings-tab-btn" data-settings-tab="system">🔄 System</button>
+                </div>
+
                 <div class="settings-container">
-                    <!-- Allgemein -->
-                    <div class="settings-card">
-                        <h3>Organisation</h3>
-                        <div class="settings-item">
-                            <label>Name der Organisation</label>
-                            <input type="text" id="setting_organization_name" class="setting-input" data-key="organization_name">
-                        </div>
-                        <div class="settings-item">
-                            <label for="privacyPolicyUrl">
-                                Datenschutzerklärung (URL) für Registrierung
-                            </label>
-                            <input type="url"
-                                class="setting-input"
-                                id="setting_privacy_url"
-                                data-key="privacy_policy_url"
-                                placeholder="https://example.com/datenschutz">
-                        </div>
-                        <div class="settings-item">
-                            <label for="setting_subgroup_label">Bezeichnung der Untergruppen</label>
-                            <input type="text" id="setting_subgroup_label" class="setting-input"
-                                   data-key="subgroup_label" maxlength="30"
-                                   list="subgroupLabelVorschlaege" placeholder="Untergruppe">
-                            <datalist id="subgroupLabelVorschlaege">
-                                <option value="Register"><option value="Mannschaft">
-                                <option value="Stimme"><option value="Abteilung">
-                                <option value="Altersklasse">
-                            </datalist>
-                            <small class="input-hint">Wie heißen die Gruppen, nach denen Listen
-                                gegliedert werden? Erscheint im Umschalter und in der
-                                Gruppenverwaltung.</small>
-                        </div>
-                    </div>
-
-                    <!-- Erscheinungsbild -->
-                    <div class="settings-card">
-                        <h3>Erscheinungsbild</h3>
-
-                        <!-- Logo Upload -->
-                        <div class="settings-item">
-                            <label>Logo</label>
-                            <div class="logo-upload-container">
-                                <img id="logo-preview" class="logo-preview" src="" alt="Logo Vorschau" style="display: none;">
-                                <input type="file" id="logo-upload" accept="image/png,image/jpeg,image/svg+xml" style="display: none;">
-                                <button type="button" class="btn-secondary" id="upload-logo-btn">📁 Logo hochladen</button>
-                                <button type="button" class="btn-secondary" id="remove-logo-btn" style="display: none;">🗑️ Entfernen</button>
-                                <input type="hidden" id="setting_organization_logo" class="setting-input" data-key="organization_logo">
-                            </div>
-                            <small class="input-hint">PNG, JPG oder SVG • Max. 500KB • Empfohlen: 200x60 Pixel</small>
-                        </div>
-
-                        <div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: var(--spacing-lg);">
+                    <div class="settings-panel active" data-settings-panel="allgemein">
+                        <div class="settings-card">
+                            <h3>Organisation</h3>
                             <div class="settings-item">
-                                <label for="setting_primary_color">Primärfarbe</label>
-                                <div class="color-input-group">
-                                    <input type="color" id="setting_primary_color" class="setting-input" data-key="primary_color">
-                                    <button type="button" class="btn-reset-color" data-input="setting_primary_color" data-default="#1F5FBF" title="Standard wiederherstellen">
-                                        ↺
-                                    </button>
-                                </div>
-                        </div>
-                            <div class="settings-item">
-                                <label for="setting_secondary_color">Sekundärfarbe</label>
-                                <div class="color-input-group">
-                                    <input type="color" id="setting_secondary_color" class="setting-input" data-key="secondary_color">
-                                    <button type="button" class="btn-reset-color" data-input="setting_secondary_color" data-default="#4CAF50" title="Standard wiederherstellen">
-                                        ↺
-                                    </button>
-                                </div>
+                                <label>Name der Organisation</label>
+                                <input type="text" id="setting_organization_name" class="setting-input" data-key="organization_name">
                             </div>
                             <div class="settings-item">
-                                <label for="setting_background_color">Hintergrundfarbe</label>
-                                <div class="color-input-group">
-                                    <input type="color" id="setting_background_color" class="setting-input" data-key="background_color">
-                                    <button type="button" class="btn-reset-color" data-input="setting_background_color" data-default="#f8f9fa" title="Standard wiederherstellen">
-                                        ↺
-                                    </button>
+                                <label for="setting_subgroup_label">Bezeichnung der Untergruppen</label>
+                                <input type="text" id="setting_subgroup_label" class="setting-input"
+                                       data-key="subgroup_label" maxlength="30"
+                                       list="subgroupLabelVorschlaege" placeholder="Untergruppe">
+                                <datalist id="subgroupLabelVorschlaege">
+                                    <option value="Register"><option value="Mannschaft">
+                                    <option value="Stimme"><option value="Abteilung">
+                                    <option value="Altersklasse">
+                                </datalist>
+                                <small class="input-hint">Wie heißen die Gruppen, nach denen Listen
+                                    gegliedert werden? Erscheint im Umschalter und in der
+                                    Gruppenverwaltung.</small>
+                            </div>
+                        </div>
+
+                        <!-- Erscheinungsbild -->
+
+                        <div class="settings-card">
+                            <h3>Erscheinungsbild</h3>
+
+                            <!-- Logo Upload -->
+                            <div class="settings-item">
+                                <label>Logo</label>
+                                <div class="logo-upload-container">
+                                    <img id="logo-preview" class="logo-preview" src="" alt="Logo Vorschau" style="display: none;">
+                                    <input type="file" id="logo-upload" accept="image/png,image/jpeg,image/svg+xml" style="display: none;">
+                                    <button type="button" class="btn-secondary" id="upload-logo-btn">📁 Logo hochladen</button>
+                                    <button type="button" class="btn-secondary" id="remove-logo-btn" style="display: none;">🗑️ Entfernen</button>
+                                    <input type="hidden" id="setting_organization_logo" class="setting-input" data-key="organization_logo">
                                 </div>
-                            </div>
-                        </div>                        
-                    </div>   
-
-                    <!-- Paginierung  -->
-                    <div class="settings-card">
-                        <h3>Paginierung</h3>
-                        <div class="settings-item">
-                            <label>Datenreihen pro Seite</label>
-                            <input type="number" 
-                                id="entries_per_page" 
-                                class="setting-input" 
-                                data-key="pagination_limit" 
-                                min="10" 
-                                max="100" 
-                                step="5"
-                                required>
-                            <small class="input-hint">(Werte zwischen 10 und 100 in 5er Schritten)</small>
-                        </div>
-                    </div>
-
-                    <!-- Anwesenheitserfassung -->
-                    <div class="settings-card">
-                        <h3>📍 Anwesenheitserfassung</h3>
-                        <div class="settings-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox"
-                                    id="setting_checkin_auto_create_appointment"
-                                    class="setting-input"
-                                    data-key="checkin_auto_create_appointment">
-                                Termin automatisch anlegen
-                            </label>
-                            <small class="input-hint">
-                                Findet ein Check-in keinen passenden Termin, wird einer angelegt
-                                und als automatisch erzeugt markiert. Ist die Funktion aus, wird
-                                der Check-in abgelehnt und das Mitglied auf den Vorstand verwiesen.
-                                <strong>Zu bedenken:</strong> Ein so entstandener Termin zählt in
-                                der Statistik bei jedem Mitglied der zugehörigen Gruppen als
-                                Solltermin — wer nicht eingecheckt hat, erscheint dort als
-                                unentschuldigt abwesend.
-                                <em>Bestandsinstallationen starten mit „an", Neuinstallationen mit „aus".</em>
-                            </small>
-                        </div>
-                        <div class="settings-item">
-                            <label>Zeitfenster für die Zuordnung (Stunden)</label>
-                            <input type="number"
-                                id="setting_checkin_tolerance_hours"
-                                class="setting-input"
-                                data-key="checkin_tolerance_hours"
-                                min="0"
-                                max="8"
-                                step="1">
-                            <small class="input-hint">
-                                Wie weit ein Check-in zeitlich von einem Termin entfernt sein darf,
-                                um ihm zugeordnet zu werden. Derselbe Wert verhindert beim Anlegen
-                                von Terminen Dubletten derselben Terminart.
-                            </small>
-                        </div>
-                    </div>
-
-                    <!-- Pünktlichkeit und Zuverlässigkeit (OI-51) -->
-                    <div class="settings-card">
-                        <h3>📏 Pünktlichkeit und Zuverlässigkeit</h3>
-                        <p class="input-hint">
-                            Beide Kennzahlen bewerten das Verhalten einzelner Mitglieder und sind
-                            deshalb ab Werk ausgeschaltet. <strong>Vor dem Einschalten</strong>
-                            Abschnitt 11 in <code>DATENSCHUTZ.md</code> lesen und den Zweck festlegen.
-                        </p>
-                        <div class="settings-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox"
-                                    id="setting_punctuality_enabled"
-                                    class="setting-input"
-                                    data-key="punctuality_enabled">
-                                Pünktlichkeit auswerten
-                            </label>
-                            <small class="input-hint">
-                                Anteil der Ankünfte bis zur Karenzgrenze, dazu die durchschnittliche
-                                Verspätung der Zuspätkommer. Gerechnet wird nur über Ankünfte mit
-                                bekannter Uhrzeit; unter fünf Messungen gibt es keine Quote.
-                            </small>
-                        </div>
-                        <div class="settings-item">
-                            <label>Karenz gegenüber dem Terminbeginn (Minuten)</label>
-                            <input type="number"
-                                id="setting_punctuality_grace_minutes"
-                                class="setting-input"
-                                data-key="punctuality_grace_minutes"
-                                min="-60"
-                                max="60"
-                                step="1">
-                            <small class="input-hint">
-                                0 heißt: pünktlich ist, wer zum Beginn da ist. Negative Werte verlangen
-                                Anwesenheit vor dem Beginn — −5 heißt „fünf Minuten vorher da".
-                                Die durchschnittliche Verspätung misst unabhängig davon ab Beginn.
-                            </small>
-                        </div>
-                        <div class="settings-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox"
-                                    id="setting_reliability_enabled"
-                                    class="setting-input"
-                                    data-key="reliability_enabled">
-                                Zuverlässigkeit auswerten
-                            </label>
-                            <small class="input-hint">
-                                Anteil der Termine, zu denen jemand erschienen ist oder sich vor
-                                Beginn abgemeldet hat. Eine Abmeldung nach Beginn zählt als
-                                ausgefallen, auch wenn sie später genehmigt wird. Braucht keine
-                                gemessenen Uhrzeiten.
-                            </small>
-                        </div>
-                    </div>
-
-                    <!-- Terminrückmeldung (FI-1) -->
-                    <div class="settings-card">
-                        <h3>🗓️ Terminrückmeldungen</h3>
-                        <p class="input-hint">
-                            Ob Mitglieder zu- oder absagen, wird je Terminart eingeschaltet
-                            (Verwaltung → Terminarten). Hier steht nur die Frist, die gilt, wenn die
-                            Terminart keine eigene hat.
-                        </p>
-                        <div class="settings-item">
-                            <label for="setting_response_deadline_hours">Frist für Rückmeldungen (Stunden vor Beginn)</label>
-                            <input type="number"
-                                id="setting_response_deadline_hours"
-                                class="setting-input"
-                                data-key="response_deadline_hours"
-                                min="0"
-                                max="720"
-                                step="1">
-                            <small class="input-hint">
-                                Eine Absage nach der Frist wird gespeichert und angezeigt, aber als
-                                kurzfristig markiert und zählt in der Zuverlässigkeit nicht als
-                                abgemeldet. 0 heißt: bis zum Beginn.
-                            </small>
-                        </div>
-                    </div>
-
-                    <!-- Zeiterfassung -->
-                    <div class="settings-card">
-                        <h3>⏱️ Zeiterfassung</h3>
-                        <div class="settings-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox"
-                                    id="setting_worktime_enabled"
-                                    class="setting-input"
-                                    data-key="worktime_enabled">
-                                Zeiterfassung aktivieren
-                            </label>
-                            <small class="input-hint">
-                                Erfassung von Arbeitszeiten mit Beginn, Ende und Pause — für
-                                Stundennachweise und Verwendungsnachweise. Ist die Funktion aus,
-                                werden keinerlei Arbeitszeitdaten erhoben und sie ist weder im
-                                Dashboard noch in der PWA sichtbar.
-                                <strong>Vor dem Aktivieren Abschnitt 10 der DATENSCHUTZ.md lesen:</strong>
-                                Zweckbindung, Löschfristen und die Abgrenzung zum
-                                Beschäftigungsverhältnis sind zu klären.
-                            </small>
-                        </div>
-                        <div class="settings-item">
-                            <label>Obergrenze je Sitzung (Stunden)</label>
-                            <input type="number"
-                                id="setting_worktime_max_session_hours"
-                                class="setting-input"
-                                data-key="worktime_max_session_hours"
-                                min="1"
-                                max="24"
-                                step="1">
-                            <small class="input-hint">
-                                Eine vergessene Sitzung wird nach dieser Zeit automatisch beendet,
-                                auf die Obergrenze gekappt und zur Freigabe vorgelegt — sie zählt
-                                also nicht ungeprüft.
-                            </small>
-                        </div>
-                        <div class="settings-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox"
-                                    id="setting_worktime_require_note"
-                                    class="setting-input"
-                                    data-key="worktime_require_note">
-                                Notiz verpflichtend
-                            </label>
-                            <small class="input-hint">
-                                Verlangt beim Stoppen des Timers und bei nachträglichen Einträgen
-                                eine Beschreibung der Tätigkeit.
-                            </small>
-                        </div>
-                    </div>
-
-                    <!-- Stations-Anmeldung -->
-                    <div class="settings-card">
-                        <h3>🖥️ Stations-Anmeldung (PIN)</h3>
-                        <div class="settings-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox"
-                                    id="setting_station_pin_enabled"
-                                    class="setting-input"
-                                    data-key="station_pin_enabled">
-                                Anmeldung mit Mitgliedsnummer und PIN an einer Station erlauben
-                            </label>
-                            <small class="input-hint">
-                                Für Mitglieder ohne Smartphone: Eingabe von Mitgliedsnummer und
-                                persönlicher PIN an einem Tablet (Gerätetyp „Virtuelle Station").
-                                Die PIN vergibt das Mitglied im Profil oder ein Verwalter beim
-                                Mitglied; gespeichert wird nur ein Hash. Eine PIN ist weitergebbar —
-                                Stempel dieser Quelle sind in Auswertungen als „Station (PIN)"
-                                gekennzeichnet.
-                            </small>
-                        </div>
-                        <div class="settings-item">
-                            <label>Mindestlänge der PIN (Ziffern)</label>
-                            <input type="number"
-                                id="setting_station_pin_min_length"
-                                class="setting-input"
-                                data-key="station_pin_min_length"
-                                min="4"
-                                max="8"
-                                step="1">
-                            <small class="input-hint">
-                                Vier bis acht Ziffern. Die Sperre nach fünf Fehlversuchen trägt die
-                                Sicherheit, nicht die Länge.
-                            </small>
-                        </div>
-                    </div>
-
-                    <div class="settings-card">
-                        <h3>📋 DSGVO Datenverwaltung</h3>
-                        <div class="settings-item">
-                            <label>
-                                <strong>Löschfristen</strong>
-                                <small>
-                                    Je Datenart eine eigene Frist. Die Bereinigung löscht
-                                    endgültig und lässt sich nicht rückgängig machen.
-                                </small>
-                            </label>
-
-                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
-                                <input type="number" class="setting-input" id="cleanup_years" data-key="cleanup_years_records" value="3" min="1" max="10"
-                                    style="width: 80px;">
-                                <span>Jahre — Anwesenheiten und Ausnahmen</span>
+                                <small class="input-hint">PNG, JPG oder SVG • Max. 500KB • Empfohlen: 200x60 Pixel</small>
                             </div>
 
-                            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
-                                <input type="number" class="setting-input" id="cleanup_years_worktime" data-key="cleanup_years_worktime" value="3" min="1" max="10"
-                                    style="width: 80px;">
-                                <span>Jahre — Arbeitszeiten samt Änderungshistorie</span>
+                            <div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: var(--spacing-lg);">
+                                <div class="settings-item">
+                                    <label for="setting_primary_color">Primärfarbe</label>
+                                    <div class="color-input-group">
+                                        <input type="color" id="setting_primary_color" class="setting-input" data-key="primary_color">
+                                        <button type="button" class="btn-reset-color" data-input="setting_primary_color" data-default="#1F5FBF" title="Standard wiederherstellen">
+                                            ↺
+                                        </button>
+                                    </div>
                             </div>
+                                <div class="settings-item">
+                                    <label for="setting_secondary_color">Sekundärfarbe</label>
+                                    <div class="color-input-group">
+                                        <input type="color" id="setting_secondary_color" class="setting-input" data-key="secondary_color">
+                                        <button type="button" class="btn-reset-color" data-input="setting_secondary_color" data-default="#4CAF50" title="Standard wiederherstellen">
+                                            ↺
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="settings-item">
+                                    <label for="setting_background_color">Hintergrundfarbe</label>
+                                    <div class="color-input-group">
+                                        <input type="color" id="setting_background_color" class="setting-input" data-key="background_color">
+                                        <button type="button" class="btn-reset-color" data-input="setting_background_color" data-default="#f8f9fa" title="Standard wiederherstellen">
+                                            ↺
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>                        
+                        </div>   
 
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <input type="number" class="setting-input" id="cleanup_years_audit" data-key="cleanup_years_audit" value="1" min="1" max="10"
-                                    style="width: 80px;">
-                                <span>Jahre — Änderungshistorie ohne Sitzung (wird anonymisiert)</span>
-                            </div>
+                        <!-- Paginierung  -->
 
-                            <small class="input-hint">
-                                Die Änderungshistorie überlebt das Löschen einer Arbeitszeit
-                                absichtlich. Ist die zugehörige Sitzung fort, bleibt der Eintrag
-                                nach Ablauf der dritten Frist bestehen, verliert aber seinen
-                                Personenbezug.
-                            </small>
-
-                            <div style="margin-top: 12px;">
-                                <button onclick="performCleanup()" class="btn-std btn-delete">
-                                    🗑️ Alte Daten löschen
-                                </button>
-                            </div>
-                            <div id="cleanup_result" style="margin-top: 10px;"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- E-Mail-Einstellungen -->
-                    <div class="settings-card">
-                        <h3>📧 E-Mail-Einstellungen</h3>
-                        
-                        <!-- Mail-System aktivieren/deaktivieren -->
-                        <div class="settings-item">
-                            <label class="checkbox-label">
-                                <input type="checkbox" 
-                                    id="setting_mail_enabled" 
+                        <div class="settings-card">
+                            <h3>Paginierung</h3>
+                            <div class="settings-item">
+                                <label>Datenreihen pro Seite</label>
+                                <input type="number" 
+                                    id="entries_per_page" 
                                     class="setting-input" 
-                                    data-key="mail_enabled">
-                                E-Mail-System aktivieren
-                            </label>
-                            <small class="input-hint">Aktiviert/Deaktiviert den gesamten E-Mail-Versand</small>
-                        </div>
-                        
-                        <!-- Absender-Informationen -->
-                        <div class="settings-item">
-                            <label for="setting_mail_from_email">Absender-Email</label>
-                            <input type="email" 
-                                id="setting_mail_from_email" 
-                                class="setting-input" 
-                                data-key="mail_from_email"
-                                placeholder="noreply@example.com">
-                            <small class="input-hint">Email-Adresse als Absender</small>
-                        </div>
-                        
-                        <div class="settings-item">
-                            <label for="setting_mail_from_name">Absender-Name</label>
-                            <input type="text" 
-                                id="setting_mail_from_name" 
-                                class="setting-input" 
-                                data-key="mail_from_name"
-                                placeholder="EhrenSache System">
-                            <small class="input-hint">Name der in Emails angezeigt wird</small>
-                        </div>
-                        
-                        <!-- Mail-Typen aktivieren/deaktivieren -->
-                        <div class="settings-item" style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 15px;">
-                            <label style="font-weight: 600; margin-bottom: 10px; display: block;">
-                                E-Mail-Typen
-                            </label>
-
-                            <div class="checkbox-group">                            
-                                <label class="checkbox-label">
-                                    <input type="checkbox" 
-                                        id="setting_mail_registration_enabled" 
-                                        class="setting-input" 
-                                        data-key="mail_registration_enabled">
-                                    Registrierungs-Mails (Email-Verifikation)
-                                </label>
-                                
-                                <label class="checkbox-label">
-                                    <input type="checkbox" 
-                                        id="setting_mail_password_reset_enabled" 
-                                        class="setting-input" 
-                                        data-key="mail_password_reset_enabled">
-                                    Passwort-Reset-Mails
-                                </label>
-                                
-                                <label class="checkbox-label">
-                                    <input type="checkbox" 
-                                        id="setting_mail_activation_enabled" 
-                                        class="setting-input" 
-                                        data-key="mail_activation_enabled">
-                                    Account-Aktivierungs-Mails
-                                </label>
+                                    data-key="pagination_limit" 
+                                    min="10" 
+                                    max="100" 
+                                    step="5"
+                                    required>
+                                <small class="input-hint">(Werte zwischen 10 und 100 in 5er Schritten)</small>
                             </div>
                         </div>
+
+                        <!-- Anwesenheitserfassung -->
+                    </div>
+
+                    <div class="settings-panel" data-settings-panel="termine">
+                        <div class="settings-card">
+                            <h3>📍 Anwesenheitserfassung</h3>
+                            <div class="settings-item">
+                                <label class="checkbox-label">
+                                    <input type="checkbox"
+                                        id="setting_checkin_auto_create_appointment"
+                                        class="setting-input"
+                                        data-key="checkin_auto_create_appointment">
+                                    Termin automatisch anlegen
+                                </label>
+                                <small class="input-hint">
+                                    Findet ein Check-in keinen passenden Termin, wird einer angelegt
+                                    und als automatisch erzeugt markiert. Ist die Funktion aus, wird
+                                    der Check-in abgelehnt und das Mitglied auf den Vorstand verwiesen.
+                                    <strong>Zu bedenken:</strong> Ein so entstandener Termin zählt in
+                                    der Statistik bei jedem Mitglied der zugehörigen Gruppen als
+                                    Solltermin — wer nicht eingecheckt hat, erscheint dort als
+                                    unentschuldigt abwesend.
+                                    <em>Bestandsinstallationen starten mit „an", Neuinstallationen mit „aus".</em>
+                                </small>
+                            </div>
+                            <div class="settings-item">
+                                <label>Zeitfenster für die Zuordnung (Stunden)</label>
+                                <input type="number"
+                                    id="setting_checkin_tolerance_hours"
+                                    class="setting-input"
+                                    data-key="checkin_tolerance_hours"
+                                    min="0"
+                                    max="8"
+                                    step="1">
+                                <small class="input-hint">
+                                    Wie weit ein Check-in zeitlich von einem Termin entfernt sein darf,
+                                    um ihm zugeordnet zu werden. Derselbe Wert verhindert beim Anlegen
+                                    von Terminen Dubletten derselben Terminart.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Pünktlichkeit und Zuverlässigkeit (OI-51) -->
+
+                        <div class="settings-card">
+                            <h3>🗓️ Terminrückmeldungen</h3>
+                            <p class="input-hint">
+                                Ob Mitglieder zu- oder absagen, wird je Terminart eingeschaltet
+                                (Verwaltung → Terminarten). Hier steht nur die Frist, die gilt, wenn die
+                                Terminart keine eigene hat.
+                            </p>
+                            <div class="settings-item">
+                                <label for="setting_response_deadline_hours">Frist für Rückmeldungen (Stunden vor Beginn)</label>
+                                <input type="number"
+                                    id="setting_response_deadline_hours"
+                                    class="setting-input"
+                                    data-key="response_deadline_hours"
+                                    min="0"
+                                    max="720"
+                                    step="1">
+                                <small class="input-hint">
+                                    Eine Absage nach der Frist wird gespeichert und angezeigt, aber als
+                                    kurzfristig markiert und zählt in der Zuverlässigkeit nicht als
+                                    abgemeldet. 0 heißt: bis zum Beginn.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Zeiterfassung -->
+
+                        <div class="settings-card">
+                            <h3>📏 Pünktlichkeit und Zuverlässigkeit</h3>
+                            <p class="input-hint">
+                                Beide Kennzahlen bewerten das Verhalten einzelner Mitglieder und sind
+                                deshalb ab Werk ausgeschaltet. <strong>Vor dem Einschalten</strong>
+                                Abschnitt 11 in <code>DATENSCHUTZ.md</code> lesen und den Zweck festlegen.
+                            </p>
+                            <div class="settings-item">
+                                <label class="checkbox-label">
+                                    <input type="checkbox"
+                                        id="setting_punctuality_enabled"
+                                        class="setting-input"
+                                        data-key="punctuality_enabled">
+                                    Pünktlichkeit auswerten
+                                </label>
+                                <small class="input-hint">
+                                    Anteil der Ankünfte bis zur Karenzgrenze, dazu die durchschnittliche
+                                    Verspätung der Zuspätkommer. Gerechnet wird nur über Ankünfte mit
+                                    bekannter Uhrzeit; unter fünf Messungen gibt es keine Quote.
+                                </small>
+                            </div>
+                            <div class="settings-item">
+                                <label>Karenz gegenüber dem Terminbeginn (Minuten)</label>
+                                <input type="number"
+                                    id="setting_punctuality_grace_minutes"
+                                    class="setting-input"
+                                    data-key="punctuality_grace_minutes"
+                                    min="-60"
+                                    max="60"
+                                    step="1">
+                                <small class="input-hint">
+                                    0 heißt: pünktlich ist, wer zum Beginn da ist. Negative Werte verlangen
+                                    Anwesenheit vor dem Beginn — −5 heißt „fünf Minuten vorher da".
+                                    Die durchschnittliche Verspätung misst unabhängig davon ab Beginn.
+                                </small>
+                            </div>
+                            <div class="settings-item">
+                                <label class="checkbox-label">
+                                    <input type="checkbox"
+                                        id="setting_reliability_enabled"
+                                        class="setting-input"
+                                        data-key="reliability_enabled">
+                                    Zuverlässigkeit auswerten
+                                </label>
+                                <small class="input-hint">
+                                    Anteil der Termine, zu denen jemand erschienen ist oder sich vor
+                                    Beginn abgemeldet hat. Eine Abmeldung nach Beginn zählt als
+                                    ausgefallen, auch wenn sie später genehmigt wird. Braucht keine
+                                    gemessenen Uhrzeiten.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Terminrückmeldung (FI-1) -->
+
+                        <div class="settings-card">
+                            <h3>📊 Bewertung der Anwesenheitsquote</h3>
+                            <p class="input-hint">
+                                Ab welcher Quote ein Balken in der Statistik die Farbe wechselt.
+                                Was gute Anwesenheit ist, entscheidet der Verein — eine
+                                Wochenprobe verlangt einen anderen Maßstab als ein Monatsdienst.
+                                Die Farben selbst sind fest: Rot für „schlecht“ ist eine
+                                Konvention, an der zu drehen mehr schadet als nützt.
+                            </p>
+                            <div class="rate-band-preview" aria-hidden="true">
+                                <span class="rate-band-swatch rate-low"></span>
+                                <span class="rate-band-swatch rate-mid"></span>
+                                <span class="rate-band-swatch rate-fair"></span>
+                                <span class="rate-band-swatch rate-good"></span>
+                            </div>
+                            <div class="settings-item">
+                                <label for="setting_rate_threshold_mid">Ab hier Orange statt Rot (%)</label>
+                                <input type="number"
+                                    id="setting_rate_threshold_mid"
+                                    class="setting-input"
+                                    data-key="rate_threshold_mid"
+                                    min="1" max="99" step="1">
+                            </div>
+                            <div class="settings-item">
+                                <label for="setting_rate_threshold_fair">Ab hier Gelb (%)</label>
+                                <input type="number"
+                                    id="setting_rate_threshold_fair"
+                                    class="setting-input"
+                                    data-key="rate_threshold_fair"
+                                    min="1" max="99" step="1">
+                            </div>
+                            <div class="settings-item">
+                                <label for="setting_rate_threshold_good">Ab hier Grün (%)</label>
+                                <input type="number"
+                                    id="setting_rate_threshold_good"
+                                    class="setting-input"
+                                    data-key="rate_threshold_good"
+                                    min="1" max="99" step="1">
+                                <small class="input-hint">Die drei Werte müssen aufsteigend sein.
+                                    Vorgabe: 40, 60 und 80. Dieselben Schwellen gelten im
+                                    Dashboard und in der Check-in-App.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-panel" data-settings-panel="zeit">
+                        <div class="settings-card">
+                            <h3>⏱️ Zeiterfassung</h3>
+                            <div class="settings-item">
+                                <label class="checkbox-label">
+                                    <input type="checkbox"
+                                        id="setting_worktime_enabled"
+                                        class="setting-input"
+                                        data-key="worktime_enabled">
+                                    Zeiterfassung aktivieren
+                                </label>
+                                <small class="input-hint">
+                                    Erfassung von Arbeitszeiten mit Beginn, Ende und Pause — für
+                                    Stundennachweise und Verwendungsnachweise. Ist die Funktion aus,
+                                    werden keinerlei Arbeitszeitdaten erhoben und sie ist weder im
+                                    Dashboard noch in der PWA sichtbar.
+                                    <strong>Vor dem Aktivieren Abschnitt 10 der DATENSCHUTZ.md lesen:</strong>
+                                    Zweckbindung, Löschfristen und die Abgrenzung zum
+                                    Beschäftigungsverhältnis sind zu klären.
+                                </small>
+                            </div>
+                            <div class="settings-item">
+                                <label>Obergrenze je Sitzung (Stunden)</label>
+                                <input type="number"
+                                    id="setting_worktime_max_session_hours"
+                                    class="setting-input"
+                                    data-key="worktime_max_session_hours"
+                                    min="1"
+                                    max="24"
+                                    step="1">
+                                <small class="input-hint">
+                                    Eine vergessene Sitzung wird nach dieser Zeit automatisch beendet,
+                                    auf die Obergrenze gekappt und zur Freigabe vorgelegt — sie zählt
+                                    also nicht ungeprüft.
+                                </small>
+                            </div>
+                            <div class="settings-item">
+                                <label class="checkbox-label">
+                                    <input type="checkbox"
+                                        id="setting_worktime_require_note"
+                                        class="setting-input"
+                                        data-key="worktime_require_note">
+                                    Notiz verpflichtend
+                                </label>
+                                <small class="input-hint">
+                                    Verlangt beim Stoppen des Timers und bei nachträglichen Einträgen
+                                    eine Beschreibung der Tätigkeit.
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Stations-Anmeldung -->
+                    </div>
+
+                    <div class="settings-panel" data-settings-panel="stationen">
+                        <div class="settings-card">
+                            <h3>🖥️ Stations-Anmeldung (PIN)</h3>
+                            <div class="settings-item">
+                                <label class="checkbox-label">
+                                    <input type="checkbox"
+                                        id="setting_station_pin_enabled"
+                                        class="setting-input"
+                                        data-key="station_pin_enabled">
+                                    Anmeldung mit Mitgliedsnummer und PIN an einer Station erlauben
+                                </label>
+                                <small class="input-hint">
+                                    Für Mitglieder ohne Smartphone: Eingabe von Mitgliedsnummer und
+                                    persönlicher PIN an einem Tablet (Gerätetyp „Virtuelle Station").
+                                    Die PIN vergibt das Mitglied im Profil oder ein Verwalter beim
+                                    Mitglied; gespeichert wird nur ein Hash. Eine PIN ist weitergebbar —
+                                    Stempel dieser Quelle sind in Auswertungen als „Station (PIN)"
+                                    gekennzeichnet.
+                                </small>
+                            </div>
+                            <div class="settings-item">
+                                <label>Mindestlänge der PIN (Ziffern)</label>
+                                <input type="number"
+                                    id="setting_station_pin_min_length"
+                                    class="setting-input"
+                                    data-key="station_pin_min_length"
+                                    min="4"
+                                    max="8"
+                                    step="1">
+                                <small class="input-hint">
+                                    Vier bis acht Ziffern. Die Sperre nach fünf Fehlversuchen trägt die
+                                    Sicherheit, nicht die Länge.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-panel" data-settings-panel="datenschutz">
+                        <div class="settings-card">
+                            <h3>🔗 Datenschutzerklärung</h3>
+                            <div class="settings-item">
+                                <label for="setting_privacy_url">
+                                    Datenschutzerklärung (URL) für Registrierung
+                                </label>
+                                <input type="url"
+                                    class="setting-input"
+                                    id="setting_privacy_url"
+                                    data-key="privacy_policy_url"
+                                    placeholder="https://example.com/datenschutz">
+                                <small class="input-hint">Wird im Registrierungsformular verlinkt.
+                                    Nur <code>http</code> und <code>https</code> werden übernommen.</small>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h3>📋 DSGVO Datenverwaltung</h3>
+                            <div class="settings-item">
+                                <label>
+                                    <strong>Löschfristen</strong>
+                                    <small>
+                                        Je Datenart eine eigene Frist. Die Bereinigung löscht
+                                        endgültig und lässt sich nicht rückgängig machen.
+                                    </small>
+                                </label>
+
+                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                                    <input type="number" class="setting-input" id="cleanup_years" data-key="cleanup_years_records" value="3" min="1" max="10"
+                                        style="width: 80px;">
+                                    <span>Jahre — Anwesenheiten und Ausnahmen</span>
+                                </div>
+
+                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+                                    <input type="number" class="setting-input" id="cleanup_years_worktime" data-key="cleanup_years_worktime" value="3" min="1" max="10"
+                                        style="width: 80px;">
+                                    <span>Jahre — Arbeitszeiten samt Änderungshistorie</span>
+                                </div>
+
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <input type="number" class="setting-input" id="cleanup_years_audit" data-key="cleanup_years_audit" value="1" min="1" max="10"
+                                        style="width: 80px;">
+                                    <span>Jahre — Änderungshistorie ohne Sitzung (wird anonymisiert)</span>
+                                </div>
+
+                                <small class="input-hint">
+                                    Die Änderungshistorie überlebt das Löschen einer Arbeitszeit
+                                    absichtlich. Ist die zugehörige Sitzung fort, bleibt der Eintrag
+                                    nach Ablauf der dritten Frist bestehen, verliert aber seinen
+                                    Personenbezug.
+                                </small>
+
+                                <div style="margin-top: 12px;">
+                                    <button onclick="performCleanup()" class="btn-std btn-delete">
+                                        🗑️ Alte Daten löschen
+                                    </button>
+                                    <span class="acts-now-hint">wirkt sofort, ohne Speichern</span>
+                                </div>
+                                <div id="cleanup_result" style="margin-top: 10px;"></div>
+                            </div>
+                        </div>
+                    
+                        <!-- E-Mail-Einstellungen -->
+                    </div>
+
+                    <div class="settings-panel" data-settings-panel="email">
+                        <div class="settings-card">
+                            <h3>📧 E-Mail-Einstellungen</h3>
                         
-                        <!-- SMTP Status und Konfiguration -->
-                        <div class="settings-item" style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 15px;">
-                            <label style="font-weight: 600; margin-bottom: 10px; display: block;">
-                                SMTP-Konfiguration
-                            </label>
-                            
-                            <div id="smtpStatusDisplay" style="padding: 12px; background: #f8f9fa; border-radius: 4px; margin-bottom: 15px;">
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <span id="smtpStatusIcon">⚠️</span>
-                                    <span id="smtpStatusText">Status wird geladen...</span>
+                            <!-- Mail-System aktivieren/deaktivieren -->
+                            <div class="settings-item">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" 
+                                        id="setting_mail_enabled" 
+                                        class="setting-input" 
+                                        data-key="mail_enabled">
+                                    E-Mail-System aktivieren
+                                </label>
+                                <small class="input-hint">Aktiviert/Deaktiviert den gesamten E-Mail-Versand</small>
+                            </div>
+                        
+                            <!-- Absender-Informationen -->
+                            <div class="settings-item">
+                                <label for="setting_mail_from_email">Absender-Email</label>
+                                <input type="email" 
+                                    id="setting_mail_from_email" 
+                                    class="setting-input" 
+                                    data-key="mail_from_email"
+                                    placeholder="noreply@example.com">
+                                <small class="input-hint">Email-Adresse als Absender</small>
+                            </div>
+                        
+                            <div class="settings-item">
+                                <label for="setting_mail_from_name">Absender-Name</label>
+                                <input type="text" 
+                                    id="setting_mail_from_name" 
+                                    class="setting-input" 
+                                    data-key="mail_from_name"
+                                    placeholder="EhrenSache System">
+                                <small class="input-hint">Name der in Emails angezeigt wird</small>
+                            </div>
+                        
+                            <!-- Mail-Typen aktivieren/deaktivieren -->
+                            <div class="settings-item" style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 15px;">
+                                <label style="font-weight: 600; margin-bottom: 10px; display: block;">
+                                    E-Mail-Typen
+                                </label>
+
+                                <div class="checkbox-group">                            
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" 
+                                            id="setting_mail_registration_enabled" 
+                                            class="setting-input" 
+                                            data-key="mail_registration_enabled">
+                                        Registrierungs-Mails (Email-Verifikation)
+                                    </label>
+                                
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" 
+                                            id="setting_mail_password_reset_enabled" 
+                                            class="setting-input" 
+                                            data-key="mail_password_reset_enabled">
+                                        Passwort-Reset-Mails
+                                    </label>
+                                
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" 
+                                            id="setting_mail_activation_enabled" 
+                                            class="setting-input" 
+                                            data-key="mail_activation_enabled">
+                                        Account-Aktivierungs-Mails
+                                    </label>
                                 </div>
                             </div>
-                            
-                            <button type="button" 
-                                    class="btn btn-secondary" 
-                                    onclick="openSmtpConfigModal()"
-                                    style="width: 100%;">
-                                ⚙️ SMTP-Server konfigurieren
-                            </button>
-                            
-                            <small class="input-hint">
-                                SMTP-Zugangsdaten werden sicher in einer separaten Konfigurationsdatei gespeichert
-                            </small>
-                        </div>
                         
-                        <!-- Test-Mail -->
-                        <div class="settings-item" style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 15px;">
-                            <label for="test_mail_recipient">Test-Email senden</label>
-                            <div style="display: flex; gap: 10px;">
-                                <input type="email" 
-                                    id="test_mail_recipient" 
-                                    placeholder="ihre.email@example.com"
-                                    style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                            <!-- SMTP Status und Konfiguration -->
+                            <div class="settings-item" style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 15px;">
+                                <label style="font-weight: 600; margin-bottom: 10px; display: block;">
+                                    SMTP-Konfiguration
+                                </label>
+                            
+                                <div id="smtpStatusDisplay" style="padding: 12px; background: #f8f9fa; border-radius: 4px; margin-bottom: 15px;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span id="smtpStatusIcon">⚠️</span>
+                                        <span id="smtpStatusText">Status wird geladen...</span>
+                                    </div>
+                                </div>
+                            
                                 <button type="button" 
                                         class="btn btn-secondary" 
-                                        onclick="sendTestMail()"
-                                        id="testMailBtn">
-                                    📤 Test senden
+                                        onclick="openSmtpConfigModal()"
+                                        style="width: 100%;">
+                                    ⚙️ SMTP-Server konfigurieren
                                 </button>
+                            
+                                <small class="input-hint">
+                                    SMTP-Zugangsdaten werden sicher in einer separaten Konfigurationsdatei gespeichert
+                                </small>
                             </div>
-                            <small class="input-hint">Sendet eine Test-Email um die Einstellungen zu prüfen</small>
-                        </div>
-                    </div>                    
+                        
+                            <!-- Test-Mail -->
+                            <div class="settings-item" style="border-top: 1px solid #e0e0e0; padding-top: 15px; margin-top: 15px;">
+                                <label for="test_mail_recipient">Test-Email senden</label>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="email" 
+                                        id="test_mail_recipient" 
+                                        placeholder="ihre.email@example.com"
+                                        style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                                    <button type="button" 
+                                            class="btn btn-secondary" 
+                                            onclick="sendTestMail()"
+                                            id="testMailBtn">
+                                        📤 Test senden
+                                    </button>
+                                </div>
+                                <small class="input-hint">Sendet eine Test-Email um die Einstellungen zu prüfen
+                                    <span class="acts-now-hint">wirkt sofort</span></small>
+                            </div>
+                        </div>                    
 
-                    <!-- Updates -->
-                    <div class="settings-card">
-                        <h3>🔄 Updates</h3>
-                        <div class="settings-item">
-                            <label>
-                                <strong>Installierte Version: <span id="update_installed">–</span></strong>
-                                <small>Zuletzt geprüft: <span id="update_last_checked">noch nie</span></small>
-                            </label>
-                            <small class="input-hint">
-                                Die Prüfung fragt GitHub nach der neuesten Version und läuft nur, wenn du
-                                den Knopf drückst. Dabei erfährt GitHub die IP-Adresse dieses Servers.
-                                Zuverlässig von neuen Versionen erfährst du, indem du die Releases des
-                                Projekts auf GitHub abonnierst.
-                            </small>
-                            <div style="margin-top: 12px;">
-                                <button type="button" id="update_check_btn" class="btn btn-secondary" onclick="checkForUpdates()">
-                                    🔍 Auf Updates prüfen
-                                </button>
+                        <!-- Updates -->
+                    </div>
+
+                    <div class="settings-panel" data-settings-panel="system">
+                        <div class="settings-card">
+                            <h3>🔄 Updates</h3>
+                            <div class="settings-item">
+                                <label>
+                                    <strong>Installierte Version: <span id="update_installed">–</span></strong>
+                                    <small>Zuletzt geprüft: <span id="update_last_checked">noch nie</span></small>
+                                </label>
+                                <small class="input-hint">
+                                    Die Prüfung fragt GitHub nach der neuesten Version und läuft nur, wenn du
+                                    den Knopf drückst. Dabei erfährt GitHub die IP-Adresse dieses Servers.
+                                    Zuverlässig von neuen Versionen erfährst du, indem du die Releases des
+                                    Projekts auf GitHub abonnierst.
+                                </small>
+                                <div style="margin-top: 12px;">
+                                    <button type="button" id="update_check_btn" class="btn btn-secondary" onclick="checkForUpdates()">
+                                        🔍 Auf Updates prüfen
+                                    </button>
+                                    <span class="acts-now-hint">wirkt sofort</span>
+                                </div>
+                                <div id="update_check_result" style="margin-top: 10px;"></div>
                             </div>
-                            <div id="update_check_result" style="margin-top: 10px;"></div>
                         </div>
                     </div>
+
                 </div>
             </div>
 

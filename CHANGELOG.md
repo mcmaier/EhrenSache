@@ -7,6 +7,29 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Neu
+- **Systemeinstellungen in sieben Untertabs**: Allgemein, Termine & Anwesenheit, Zeiterfassung,
+  Stationen, Datenschutz, E-Mail und System. Statt einer Spalte aus zwölf Karten ist immer nur
+  ein Bereich sichtbar; der zuletzt gewählte Tab wird gemerkt. Knöpfe, die ohne Speichern wirken
+  (Bereinigung, Test-Mail, Update-Prüfung), sind als solche gekennzeichnet, und wer den Bereich
+  mit ungespeicherten Änderungen verlässt, wird gefragt.
+- **Farbschwellen der Anwesenheitsquote einstellbar** (Termine & Anwesenheit). Ab wann ein Balken
+  orange, gelb oder grün wird, entscheidet der Verein — eine Wochenprobe verlangt einen anderen
+  Maßstab als ein Monatsdienst. Vorgabe bleibt 40/60/80. Dashboard und Check-in-App nutzen jetzt
+  dieselbe Skala; die App färbte bisher nach eigenen Werten (OI-55).
+
+### Behoben
+- **Ein fehlgeschlagenes Speichern wird benannt.** Lehnte der Server einen Wert ab, sagte die
+  Oberfläche nichts über die übrigen. Jetzt nennt der Hinweis beides („2 gespeichert,
+  1 abgelehnt“), das betroffene Feld wird markiert und sein Tab angesprungen (OI-31).
+- Zahlenfelder der Einstellungen schicken den geprüften Wert statt der Roheingabe.
+- Die Bereinigung weist darauf hin, wenn die angezeigten Löschfristen nicht gespeichert sind —
+  gelöscht wird nach den angezeigten Werten.
+
+---
+
 ## [1.8.0] – 2026-09-16
 
 ### Neu

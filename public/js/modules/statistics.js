@@ -213,15 +213,42 @@ function isSubgroupSelected() {
     return !!group && group.is_subgroup == 1;
 }
 
-function rateBand(rate) {
-    if (rate < 40) return 'rate-low';
-    if (rate < 60) return 'rate-mid';
-    if (rate < 80) return 'rate-fair';
+/** Vorgabe, wenn die Antwort keine Baender traegt (alter Server, Fehlerfall). */
+const RATE_BANDS_DEFAULT = { mid: 40, fair: 60, good: 80 };
+
+/**
+ * Die Schwellen kommen seit 1.9.0 aus den Einstellungen und reisen im
+ * Statistik-Payload mit (`rate_bands`) -- loadSystemSettings() waere Admins
+ * vorbehalten, die Statistik sehen alle Rollen.
+ */
+function rateBandsFrom(statsData) {
+    const bands = statsData && statsData.rate_bands ? statsData.rate_bands : null;
+
+    if (!bands) {
+        return RATE_BANDS_DEFAULT;
+    }
+
+    const werte = ['mid', 'fair', 'good']
+        .map(k => parseInt(bands[k], 10))
+        .map((w, i) => (Number.isInteger(w) && w >= 1 && w <= 99)
+            ? w
+            : RATE_BANDS_DEFAULT[['mid', 'fair', 'good'][i]]);
+
+    werte.sort((a, b) => a - b);
+
+    return { mid: werte[0], fair: werte[1], good: werte[2] };
+}
+
+function rateBand(rate, bands = RATE_BANDS_DEFAULT) {
+    if (rate < bands.mid)  return 'rate-low';
+    if (rate < bands.fair) return 'rate-mid';
+    if (rate < bands.good) return 'rate-fair';
     return 'rate-good';
 }
 
 export async function renderStatistics(statsData) {
     const container = document.getElementById('statisticsContainer');
+    const bands = rateBandsFrom(statsData);
 
     debug.log("Rendering stats:", statsData)
 
@@ -292,7 +319,7 @@ export async function renderStatistics(statsData) {
                                     <td class="stat-rate">
                                         <div class="attendance-rate">
                                             <div class="rate-bar">
-                                                <div class="rate-fill ${rateBand(member.attendance_rate)}" style="width: ${member.attendance_rate}%"></div>
+                                                <div class="rate-fill ${rateBand(member.attendance_rate, bands)}" style="width: ${member.attendance_rate}%"></div>
                                             </div>
                                             <span class="rate-text">${member.attendance_rate}%</span>
                                         </div>
@@ -301,7 +328,7 @@ export async function renderStatistics(statsData) {
                                         ? `<td class="stat-type" title="${t.attended} von ${t.total_appointments}">
                                                <span class="type-value">${t.attendance_rate}%</span>
                                                <span class="type-track">
-                                                   <span class="type-fill ${rateBand(t.attendance_rate)}" style="width: ${t.attendance_rate}%"></span>
+                                                   <span class="type-fill ${rateBand(t.attendance_rate, bands)}" style="width: ${t.attendance_rate}%"></span>
                                                </span>
                                            </td>`
                                         : `<td class="stat-type stat-type-empty" title="keine Termine dieser Art">–</td>`

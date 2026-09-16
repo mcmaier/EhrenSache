@@ -104,6 +104,7 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
                 'worktime'   => null,
                 'summary'    => attendanceBuildSummary([], 0, 0),
                 'statistics' => [],
+                'rate_bands' => rateBands($db, $database),
             ] + punctualityBlocks($db, $database, [], $year, $memberId, $appointmentTypeId, 0);
         }
         $groups = [$groupId];
@@ -160,6 +161,10 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
         'worktime'   => null,
         'summary'    => attendanceBuildSummary($memberTotals, $appointments, $memberCount),
         'statistics' => $statistics,
+        // Die Faerbung der Quote gehoert zu den Zahlen, nicht in einen eigenen
+        // Lesepfad: loadSystemSettings() ist Admins vorbehalten, die Statistik
+        // sehen alle Rollen (Spec 3.8).
+        'rate_bands' => rateBands($db, $database),
     ] + punctualityBlocks($db, $database, $groups, $year, $memberId, $appointmentTypeId, $totalPairs);
 }
 

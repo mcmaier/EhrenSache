@@ -1,7 +1,7 @@
 # Systemeinstellungen in Untertabs, Farbschwellen konfigurierbar
 
 **Datum:** 2026-09-16
-**Status:** Entwurf
+**Status:** Umgesetzt in 1.9.0 (Branch `feat/1.9.0-einstellungen`)
 **Erledigt damit:** [OI-31](../../OPEN-ITEMS.md#oi-31--settingsjs-prüft-put-ergebnisse-nicht) (Restarbeit),
 [OI-55](../../OPEN-ITEMS.md#oi-55--farbschwellen-der-anwesenheitsquote-sind-fest-verdrahtet) (global, nicht je Terminart)
 **Bereitet vor:** [OI-62](../../OPEN-ITEMS.md#oi-62--feature-schalter-ohne-gemeinsame-prüfstelle) — diese Spec legt
@@ -139,8 +139,14 @@ mitgeschickt.
 
 „Alte Daten löschen“, „Test senden“, „Auf Updates prüfen“, Logo-Upload und der SMTP-Dialog
 wirken ohne Speichern. Sie bekommen eine einheitliche Kennzeichnung („wirkt sofort“) direkt am
-Knopf. Die Bereinigung prüft zusätzlich vor dem Start, ob im selben Tab ungespeicherte Fristen
-stehen, und weist darauf hin — sie würde sonst mit den alten Werten laufen.
+Knopf. Die Bereinigung weist zusätzlich darauf hin, wenn die angezeigten Fristen von den
+gespeicherten abweichen.
+
+**Korrektur beim Umsetzen (2026-09-16):** Der letzte Satz dieser Entscheidung war falsch. Er
+behauptete, die Bereinigung liefe „mit den alten Werten“. Tatsächlich liest `performCleanup()`
+die Zahlen aus den **Formularfeldern** — gelöscht wird also nach einem Wert, der nirgends
+hinterlegt ist. Das ist der gefährlichere Fall, und genau so steht der Hinweis jetzt im
+Bestätigungsdialog.
 
 ### 3.7 Farbschwellen: drei Zahlen, global, mit Vorgabe wie heute
 

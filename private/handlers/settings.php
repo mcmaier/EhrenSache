@@ -111,6 +111,26 @@ function handleSettings($db, $database, $method, $authUserId) {
                     break;
                 }
 
+                // Die Farbschwellen der Anwesenheitsquote: ganze Zahl 1..99.
+                // Die Reihenfolge untereinander kann hier NICHT geprueft
+                // werden -- jeder Schluessel kommt einzeln, ein Zwischenstand
+                // verletzt sie zwangslaeufig. Das leistet die Oberflaeche vor
+                // dem Absenden, und rateBands() sortiert beim Lesen.
+                if (in_array($data['setting_key'] ?? null,
+                             ['rate_threshold_mid', 'rate_threshold_fair', 'rate_threshold_good'], true)) {
+                    $roh = trim((string) ($data['setting_value'] ?? ''));
+
+                    if (!preg_match('/^\d+$/', $roh) || (int) $roh < 1 || (int) $roh > 99) {
+                        http_response_code(400);
+                        echo json_encode(['message' => 'Die Schwelle muss eine ganze Zahl von 1 bis 99 sein'],
+                                         JSON_UNESCAPED_UNICODE);
+                        break;
+                    }
+
+                    updateSetting($db, $database, $data['setting_key'], (string) (int) $roh);
+                    break;
+                }
+
                 // Das Wort steht in Überschriften und im Umschalter. Zu lang
                 // bricht die Darstellung, deshalb abweisen statt kürzen -- wer
                 // 60 Zeichen eintippt, hat sich vertan und soll es merken.

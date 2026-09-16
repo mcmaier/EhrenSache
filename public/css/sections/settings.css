@@ -274,3 +274,126 @@
         margin-left: 10px;
     }
 }
+
+/* ============================================
+   UNTERTABS DER EINSTELLUNGEN
+   ============================================
+   Eigene Klassen statt der .nav-tab-btn der Seitenleiste: Die beiden Leisten
+   stehen an verschiedenen Orten und sollen sich unabhaengig aendern lassen.
+*/
+.settings-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: var(--spacing-lg, 20px);
+    padding-bottom: 2px;
+    border-bottom: 2px solid #e0e0e0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+
+.settings-tab-btn {
+    position: relative;
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 6px 6px 0 0;
+    background: none;
+    color: #555;
+    font-size: 15px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.settings-tab-btn:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: #222;
+}
+
+.settings-tab-btn.active {
+    color: var(--primary-color, #1F5FBF);
+    border-bottom-color: var(--primary-color, #1F5FBF);
+    font-weight: 600;
+}
+
+.settings-tab-btn:focus-visible {
+    outline: 2px solid var(--primary-color, #1F5FBF);
+    outline-offset: -2px;
+}
+
+/* Punkt am Reiter: ungespeicherte Aenderung (gelb) oder abgelehnter Wert (rot).
+   Ohne ihn bliebe eine Meldung unsichtbar, solange ihr Tab nicht offen ist. */
+.settings-tab-btn.has-changes::after,
+.settings-tab-btn.has-error::after {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--warning-color, #f39c12);
+}
+
+.settings-tab-btn.has-error::after {
+    background: var(--danger-color, #e74c3c);
+}
+
+.settings-panel {
+    display: none;
+}
+
+.settings-panel.active {
+    display: block;
+}
+
+/* Ausgegraute Felder eines abgeschalteten Bereichs: sichtbar, aber nicht
+   bedienbar — ein gespeicherter Wert, den niemand liest, verwirrt mehr. */
+.settings-item input:disabled,
+.settings-item select:disabled,
+.setting-input:disabled {
+    background: #f1f3f5;
+    color: #868e96;
+    cursor: not-allowed;
+}
+
+.settings-card.is-disabled .input-hint {
+    opacity: 0.7;
+}
+
+/* Knoepfe, die ohne Speichern wirken */
+.acts-now-hint {
+    display: inline-block;
+    margin-left: 8px;
+    color: #7f8c8d;
+    font-size: 13px;
+    font-style: italic;
+}
+
+/* Farbbaender der Anwesenheitsquote als Vorschau */
+.rate-band-preview {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.rate-band-swatch {
+    height: 10px;
+    flex: 1;
+    border-radius: 3px;
+}
+
+.rate-band-swatch.rate-low  { background: var(--danger-color, #e74c3c); }
+.rate-band-swatch.rate-mid  { background: var(--warning-color, #f39c12); }
+.rate-band-swatch.rate-fair { background: var(--ehren-gelb, #FFC83D); }
+.rate-band-swatch.rate-good { background: var(--success-color, #27ae60); }
+
+@media (max-width: 768px) {
+    .settings-tab-btn {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+}

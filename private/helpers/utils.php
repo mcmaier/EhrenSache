@@ -134,6 +134,59 @@ function systemSetting($db, $database, string $key, string $default): string
 }
 
 /**
+ * Die drei Farbschwellen der Anwesenheitsquote (OI-55).
+ *
+ * Was gute Anwesenheit ist, entscheidet der Verein — deshalb sind die
+ * Schwellen seit 1.9.0 eine Einstellung statt fester Zahlen in
+ * public/js/modules/statistics.js.
+ *
+ * Defensiv beim Lesen: Jeder Schluessel wird auf 1..99 geklammert, fehlende
+ * oder unbrauchbare Werte fallen auf 40/60/80 zurueck, und die drei Zahlen
+ * werden aufsteigend sortiert. Der Grund steht in der Spec (3.7): Jede
+ * Einstellung wird einzeln per PUT geschrieben, ein Zwischenstand verletzt die
+ * Reihenfolge zwangslaeufig. Die Oberflaeche prueft sie vor dem Absenden; hier
+ * steht die Schranke, die eine von Hand verdrehte Datenbank auffaengt.
+ *
+ * @return array{mid: int, fair: int, good: int}
+ */
+function rateBands($db, $database): array
+{
+    return rateBandsFromValues([
+        'mid'  => systemSetting($db, $database, 'rate_threshold_mid', '40'),
+        'fair' => systemSetting($db, $database, 'rate_threshold_fair', '60'),
+        'good' => systemSetting($db, $database, 'rate_threshold_good', '80'),
+    ]);
+}
+
+/**
+ * Die reine Rechnung hinter rateBands() -- ohne Datenbank, damit pruefbar.
+ *
+ * @param array{mid: mixed, fair: mixed, good: mixed} $roh
+ * @return array{mid: int, fair: int, good: int}
+ */
+function rateBandsFromValues(array $roh): array
+{
+    $vorgaben = ['mid' => 40, 'fair' => 60, 'good' => 80];
+    $werte    = [];
+
+    foreach ($vorgaben as $name => $default) {
+        $wert = trim((string) ($roh[$name] ?? ''));
+
+        if (!preg_match('/^\d+$/', $wert)) {
+            $werte[] = $default;
+            continue;
+        }
+
+        $zahl    = (int) $wert;
+        $werte[] = ($zahl < 1 || $zahl > 99) ? $default : $zahl;
+    }
+
+    sort($werte);
+
+    return ['mid' => $werte[0], 'fair' => $werte[1], 'good' => $werte[2]];
+}
+
+/**
  * Zeitfenster in Stunden, in dem ein Check-in einem Termin zugeordnet wird.
  *
  * Kette: Einstellung → Konstante aus config.php → 2. Die Konstante bleibt der

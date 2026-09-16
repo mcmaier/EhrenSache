@@ -1764,6 +1764,13 @@ steht dort nur `{"enabled": false}`.
 
 Minuten werden abgerundet: 20:00:59 gilt als 20:00.
 
+**Farbschwellen (seit 1.9.0):** Jede Antwort trägt `rate_bands` mit den drei Schwellen der
+Anwesenheitsquote — `{ "mid": 40, "fair": 60, "good": 80 }`. Darunter färbt die Oberfläche rot,
+ab `mid` orange, ab `fair` gelb, ab `good` grün. Die Werte kommen aus `system_settings`
+(`rate_threshold_mid`, `_fair`, `_good`); der Server klammert sie auf 1–99, fällt bei
+unbrauchbaren Werten auf 40/60/80 zurück und sortiert sie aufsteigend. Sie reisen im Payload,
+weil `settings` Admins vorbehalten ist, die Statistik aber jede Rolle sieht.
+
 ---
 
 ## Anwesenheitsbericht (statistics_report)

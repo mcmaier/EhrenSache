@@ -234,9 +234,10 @@ und jeder Leser schneidet Nachkommastellen ab: `parseInt(…, 10)` in der PWA
 NaN-geprüften Regel, vorher fiel die Anwesenheitsliste bei `'0'` still auf 2 h zurück),
 `(int)` in `checkinToleranceHours()` ([utils.php:145](../private/helpers/utils.php),
 Rückgabetyp `int`), `intval()` in [auto_checkin.php:123](../private/handlers/auto_checkin.php).
-`saveAllSettings()` ([settings.js](../public/js/modules/settings.js)) prüft mit `parseInt`,
-speichert danach aber den Rohstring — wer `0,5` einträgt, bekommt in der Datenbank `"0,5"`
-und überall sonst `0`.
+`saveAllSettings()` ([settings.js](../public/js/modules/settings.js)) prüfte mit `parseInt`,
+speicherte danach aber den Rohstring — wer `0,5` eintrug, bekam in der Datenbank `"0,5"`
+und überall sonst `0`. **Dieser Teilbefund ist seit 1.9.0 behoben:** Zahlenfelder senden den
+geprüften Wert. Die Frage Stunden gegen Minuten bleibt offen.
 
 **Folge:** Der kleinste Nicht-Standardwert ist `0` = sekundengenauer Treffer (bewusst erlaubt,
 Range-Check ist nur `< 0 || > 8`, und `tests/suites/checkin_appointment.php` deckt `'0'`
@@ -1499,7 +1500,20 @@ gesetztes Secret.
 ---
 
 ### OI-31 · `settings.js` prüft PUT-Ergebnisse nicht
-**Priorität:** niedrig
+**Priorität:** erledigt am 2026-09-16 — Teilerfolg wird benannt, Feld und Reiter markiert
+
+**Umgesetzt** mit den Untertabs (1.9.0): Die Speicherschleife bricht bei einer Ablehnung nicht
+mehr ab, sondern arbeitet die übrigen Schlüssel ab und sammelt die gescheiterten. Der Hinweis
+nennt beide Zahlen („2 gespeichert, 1 abgelehnt“), das abgelehnte Feld bekommt `invalid`, sein
+Reiter einen roten Punkt, und die Ansicht springt dorthin — mit Tabs läge der Fehler sonst auf
+einer Seite, die niemand ansieht.
+
+**Zwischenstand, der hier fehlte:** Die Prüfung auf `result.success` gab es bereits; was fehlte,
+war die Behandlung danach. Die Schleife verließ sich stumm mit `return`, nachdem frühere
+Schlüssel schon gespeichert waren.
+
+<details>
+<summary>Ursprünglicher Befund</summary>
 
 Die Speicherschleife in `settings.js` zählt jeden abgesetzten `PUT`-Request als Erfolg und
 meldet am Ende „N gespeichert", ohne die Antwort auszuwerten. Scheitert einer der Requests
@@ -1508,6 +1522,7 @@ Erfolg.
 
 **Zu tun:** Antwort jedes `PUT` prüfen und einen Fehlschlag im Toast von den erfolgreichen
 Speicherungen unterscheiden.
+</details>
 
 ---
 
@@ -2038,7 +2053,27 @@ Rechte — es zerstört nur Daten, die derselbe Admin ohnehin ändern dürfte.
 
 ### OI-55 · Farbschwellen der Anwesenheitsquote sind fest verdrahtet
 
-**Priorität:** niedrig — die Zahlen bleiben richtig, nur ihre Einfärbung ist eine Vorgabe
+**Priorität:** erledigt am 2026-09-16 — drei Schwellen als Systemeinstellung, global
+
+**Umgesetzt** in 1.9.0 (Migration `1.8.0.php`): `rate_threshold_mid`, `_fair` und `_good` mit den
+bisherigen Werten 40/60/80 als Vorgabe, einzustellen im Tab „Termine & Anwesenheit“. Der Server
+klammert jeden Wert auf 1–99 und sortiert die drei beim Lesen (`rateBands()` in
+`private/helpers/utils.php`); die Reihenfolge prüft die Oberfläche vor dem Absenden, weil jede
+Einstellung einzeln geschrieben wird und ein Zwischenstand sie zwangsläufig verletzt. Ausgeliefert
+werden die Werte im Statistik-Payload (`rate_bands`) — `settings` ist Admins vorbehalten, die
+Statistik sehen alle Rollen.
+
+**Entschieden:** global, **nicht je Terminart**. Das wäre fachlich verteidigbar, kostet aber eine
+Zuordnungstabelle samt Pflegeoberfläche statt dreier Zahlen. Die Farben bleiben fest.
+
+**Beim Umsetzen gefunden, hier nicht vermerkt:** Die Check-in-PWA färbte dieselbe Quote nach einer
+**eigenen** Skala — drei Bänder bei 50/75 mit fest eingetragenen Hex-Werten
+(`public/checkin/js/app.js`). Ein Mitglied mit 65,6 % war im Dashboard gelb und in der PWA orange.
+Die PWA nutzt jetzt dieselben vier Bänder und dieselben Schwellen; nachgestellt in der laufenden
+Instanz: Mit `fair = 70` wechselt dieselbe Quote dort von Gelb auf Orange.
+
+<details>
+<summary>Ursprünglicher Befund</summary>
 
 Die Statistiktabelle färbt jeden Quotenbalken nach vier Bändern ein, gesetzt in `rateBand()`
 in `public/js/modules/statistics.js`:
@@ -2077,6 +2112,7 @@ auch der eines Mitglieds mit 92 %. Die Farbe trug damit keine Information. Beim 
 eine Skala nach Wertebereich wurde die Vorgabe überhaupt erst zu einer Aussage.
 
 **Nicht sicherheitsrelevant:** reine Darstellung, keine Datenänderung, kein Rechtebezug.
+</details>
 
 ---
 
@@ -2290,10 +2326,14 @@ Endpunkt aber weiter antwortet — das ist dann keine Kosmetik mehr.
 - **Bestehende Daten.** Wird die Arbeitszeit abgeschaltet, sind die erfassten Sitzungen nicht
   weg. Bleiben sie über `my_data` und den Export erreichbar? Vermutlich ja — Abschalten ist
   keine Löschung, und der Auskunftsanspruch endet nicht mit einem Schalter.
-- **Reihenfolge.** Sinnvoll gemeinsam mit der am 2026-09-15 beschlossenen Gruppierung der
-  Einstellungen in Untertabs, deren Spec noch aussteht: Die Schalter sind genau das, was in
-  einen solchen Tab je Funktionsbereich gehört. Getrennt gebaut wird die Einstellungsseite
-  zweimal angefasst.
+- **Reihenfolge.** ~~Sinnvoll gemeinsam mit der Gruppierung der Einstellungen in Untertabs.~~
+  **Erledigt am 2026-09-16, soweit die Oberfläche betroffen ist:** Die Untertabs stehen (1.9.0),
+  und das Muster ist in ihrer Spec (3.2) festgeschrieben — ein Tab je Funktion, die erste Karte
+  trägt den Schalter, abhängige Parameter darunter werden bei „aus“ per `disabled` gesperrt
+  (umgesetzt für Zeiterfassung, Stations-PIN und Pünktlichkeit). Offen bleibt der Backend-Teil
+  dieses Punktes: die gemeinsame Prüfstelle, 403 statt bloßem Verstecken und Schalter für
+  Terminplanung und Anwesenheitserfassung. Die Einstellungsseite muss dafür nur ergänzt, nicht
+  erneut umgebaut werden.
 
 **Nicht sicherheitsrelevant:** Alle heutigen Prüfungen greifen, nur eben je Funktion
 verschieden. Es geht um die Vollständigkeit künftiger Schalter, nicht um eine Lücke am Bestand.

@@ -1580,6 +1580,14 @@ body {
     font-weight: 700;
 }
 
+/* Dieselben vier Baender wie im Dashboard (css/sections/statistics.css).
+   Die PWA erbt dessen Stylesheets nicht, die Werte stehen deshalb hier
+   noch einmal -- die Schwellen dazu kommen aus der Statistik-Antwort. */
+.group-rate.rate-low  { color: #e74c3c; }
+.group-rate.rate-mid  { color: #f39c12; }
+.group-rate.rate-fair { color: #FFC83D; }
+.group-rate.rate-good { color: #27ae60; }
+
 .group-details {
     display: flex;
     gap: 12px;

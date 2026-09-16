@@ -4506,6 +4506,38 @@ function displayWorktimeStats(worktime, sessions) {
 // ========================================
 // GROUP STATS DISPLAY
 // ========================================
+
+/** Vorgabe, wenn die Antwort keine Baender traegt. */
+const PWA_RATE_BANDS_DEFAULT = { mid: 40, fair: 60, good: 80 };
+
+/** Die Schwellen aus der Statistik-Antwort, defensiv geprueft und sortiert. */
+function pwaRateBands(stats) {
+    const bands = stats && stats.rate_bands ? stats.rate_bands : null;
+
+    if (!bands) {
+        return PWA_RATE_BANDS_DEFAULT;
+    }
+
+    const namen = ['mid', 'fair', 'good'];
+    const werte = namen
+        .map(k => parseInt(bands[k], 10))
+        .map((w, i) => (Number.isInteger(w) && w >= 1 && w <= 99)
+            ? w
+            : PWA_RATE_BANDS_DEFAULT[namen[i]]);
+
+    werte.sort((a, b) => a - b);
+
+    return { mid: werte[0], fair: werte[1], good: werte[2] };
+}
+
+/** Dieselben vier Klassen wie im Dashboard (statistics.js: rateBand). */
+function pwaRateBand(rate, bands) {
+    if (rate < bands.mid)  return 'rate-low';
+    if (rate < bands.fair) return 'rate-mid';
+    if (rate < bands.good) return 'rate-fair';
+    return 'rate-good';
+}
+
 function displayGroupStats(stats) {
     const groupsList = document.getElementById('groupsList');
     
@@ -4534,19 +4566,18 @@ function displayGroupStats(stats) {
         const attended = member.attended || 0;
         const attendanceRate = member.attendance_rate || 0;
         
-        // Farbe basierend auf Quote
-        let rateColor = '#27ae60'; // Grün (>= 75%)
-        if (attendanceRate < 50) {
-            rateColor = '#e74c3c'; // Rot
-        } else if (attendanceRate < 75) {
-            rateColor = '#f39c12'; // Orange
-        }
+        // Faerbung nach denselben vier Baendern wie das Dashboard. Die PWA
+        // hatte bis 1.9.0 eine eigene Skala (50/75, drei Stufen, feste
+        // Hex-Werte): Dasselbe Mitglied mit 55 Prozent erschien hier orange
+        // und im Dashboard gelb. Die Schwellen kommen jetzt aus der Antwort
+        // (rate_bands) und damit aus den Einstellungen.
+        const bandKlasse = pwaRateBand(attendanceRate, pwaRateBands(stats));
         
         return `
             <div class="group-item">
                 <div class="group-header">
                     <div class="group-name">${groupName}</div>
-                    <div class="group-rate" style="color: ${rateColor};">${attendanceRate.toFixed(1)}%</div>
+                    <div class="group-rate ${bandKlasse}">${attendanceRate.toFixed(1)}%</div>
                 </div>
                 <div class="group-details">
                     <span class="group-stat">📅 ${appointments} Termin${appointments !== 1 ? 'e' : ''}</span>

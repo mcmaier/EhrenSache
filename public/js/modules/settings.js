@@ -16,6 +16,8 @@ import { applyTheme } from '../theme.js';
 
 
 let systemSettings = {};
+const SETTINGS_TAB_KEY = 'settingsTab';
+let settingsTabsInitialized = false;
 let hasUnsavedChanges = false;
 let logoUploadInitialized = false;
 let colorResetInitialized = false;
@@ -105,11 +107,27 @@ export async function renderSystemSettings() {
     // Reset unsaved changes flag
     hasUnsavedChanges = false;
     updateSaveButtonState();
-    
+    clearTabMarks('has-changes');
+    clearTabMarks('has-error');
+
+    // Untertabs: Verdrahtung einmalig, danach den zuletzt gewaehlten Tab
+    setupSettingsTabs();
+    let gemerkt = null;
+    try {
+        gemerkt = sessionStorage.getItem(SETTINGS_TAB_KEY);
+    } catch (e) {
+        gemerkt = null;
+    }
+    showSettingsTab(gemerkt);
+
+    applyFeatureSwitchState();
+
     // Event-Listener für Änderungen (nur markieren, nicht speichern)
     document.querySelectorAll('.setting-input').forEach(input => {
         input.removeEventListener('input', markAsChanged);
         input.addEventListener('input', markAsChanged);
+        input.removeEventListener('change', markAsChanged);
+        input.addEventListener('change', markAsChanged);
     });
 
     // Event-Listener für Speichern-Button
@@ -121,6 +139,109 @@ export async function renderSystemSettings() {
 
     // Stand der Update-Prüfung anzeigen, ohne GitHub zu fragen
     loadUpdateStatus();
+}
+
+/**
+ * Untertabs der Einstellungsseite.
+ *
+ * Der gewaehlte Tab lebt in sessionStorage — die Anwendung kennt keine
+ * Adress-Navigation (der Bereich steht in sessionStorage['currentSection']),
+ * und Hash-Routing nur fuer diese Seite waeren zwei Zustandsmodelle
+ * nebeneinander. Siehe Spec 3.4.
+ */
+function setupSettingsTabs() {
+    if (settingsTabsInitialized) {
+        return;
+    }
+
+    document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => showSettingsTab(btn.dataset.settingsTab));
+    });
+
+    settingsTabsInitialized = true;
+}
+
+/** Schaltet auf einen Tab um. Unbekannter Schluessel → erster Tab. */
+export function showSettingsTab(key) {
+    const buttons = Array.from(document.querySelectorAll('.settings-tab-btn'));
+    const panels  = Array.from(document.querySelectorAll('.settings-panel'));
+
+    if (buttons.length === 0) {
+        return;
+    }
+
+    const gueltig = buttons.some(b => b.dataset.settingsTab === key)
+        ? key
+        : buttons[0].dataset.settingsTab;
+
+    buttons.forEach(b => b.classList.toggle('active', b.dataset.settingsTab === gueltig));
+    panels.forEach(p => p.classList.toggle('active', p.dataset.settingsPanel === gueltig));
+
+    try {
+        sessionStorage.setItem(SETTINGS_TAB_KEY, gueltig);
+    } catch (e) {
+        // Privater Modus ohne sessionStorage: der Tab wird dann nicht gemerkt,
+        // die Seite funktioniert trotzdem.
+    }
+}
+
+/** Der Tab, in dem ein Feld liegt. */
+function tabOfInput(input) {
+    const panel = input ? input.closest('.settings-panel') : null;
+
+    return panel ? panel.dataset.settingsPanel : null;
+}
+
+/** Setzt die Markierung eines Tabs. */
+function markTab(key, klasse, an) {
+    const btn = document.querySelector(`.settings-tab-btn[data-settings-tab="${key}"]`);
+    if (btn) {
+        btn.classList.toggle(klasse, an);
+    }
+}
+
+function clearTabMarks(klasse) {
+    document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove(klasse));
+}
+
+/** Fuer ui.js: Ist im Einstellungsbereich etwas ungespeichert? */
+export function hasUnsavedSettings() {
+    return hasUnsavedChanges;
+}
+
+/**
+ * Graut die Parameter eines abgeschalteten Bereichs aus.
+ *
+ * Muster aus Spec 3.2: Die erste Karte eines Tabs traegt den Schalter, die
+ * abhaengigen Felder stehen darunter. `disabled` statt blasser Farbe — sonst
+ * wird ein Wert gespeichert, den niemand liest.
+ */
+const FEATURE_SWITCHES = {
+    worktime_enabled:    ['worktime_max_session_hours', 'worktime_require_note'],
+    station_pin_enabled: ['station_pin_min_length'],
+    punctuality_enabled: ['punctuality_grace_minutes'],
+};
+
+function applyFeatureSwitchState() {
+    Object.entries(FEATURE_SWITCHES).forEach(([schalter, abhaengige]) => {
+        const box = document.querySelector(`[data-key="${schalter}"]`);
+        if (!box) {
+            return;
+        }
+
+        abhaengige.forEach(key => {
+            const feld = document.querySelector(`[data-key="${key}"]`);
+            if (!feld) {
+                return;
+            }
+
+            feld.disabled = !box.checked;
+            const karte = feld.closest('.settings-card');
+            if (karte) {
+                karte.classList.toggle('is-disabled', !box.checked);
+            }
+        });
+    });
 }
 
 function setupColorReset() {
@@ -194,7 +315,18 @@ function markAsChanged(event) {
     }
     
     hasUnsavedChanges = true;
-    updateSaveButtonState();    
+    updateSaveButtonState();
+
+    // Der Punkt am Reiter zeigt, wo etwas offen ist — mit Tabs ist die
+    // Aenderung sonst unsichtbar, sobald jemand weiterblaettert.
+    const tab = tabOfInput(input);
+    if (tab) {
+        markTab(tab, 'has-changes', true);
+    }
+
+    if (input.type === 'checkbox' && Object.prototype.hasOwnProperty.call(FEATURE_SWITCHES, input.dataset.key)) {
+        applyFeatureSwitchState();
+    }
 }
 
 
@@ -211,9 +343,46 @@ function updateSaveButtonState() {
     }
 }
 
+/**
+ * Die drei Farbschwellen muessen aufsteigend sein (Spec 3.7).
+ *
+ * Der Server kann das nicht erzwingen: Jede Einstellung wird einzeln per PUT
+ * geschrieben, ein Zwischenstand verletzt die Regel zwangslaeufig. Geprueft
+ * wird deshalb hier, bevor irgendetwas hinausgeht; der lesende Helfer auf dem
+ * Server sortiert zusaetzlich defensiv.
+ */
+function rateThresholdsOrdered() {
+    const felder = ['rate_threshold_mid', 'rate_threshold_fair', 'rate_threshold_good']
+        .map(key => document.querySelector(`[data-key="${key}"]`));
+
+    if (felder.some(f => !f)) {
+        return true;
+    }
+
+    const werte = felder.map(f => parseInt(f.value, 10));
+    if (werte.some(w => isNaN(w))) {
+        return true; // Leere Felder faengt die Bereichspruefung ab
+    }
+
+    const inOrdnung = werte[0] < werte[1] && werte[1] < werte[2];
+
+    if (!inOrdnung) {
+        felder.forEach(f => {
+            f.classList.add('invalid');
+            markTab(tabOfInput(f), 'has-error', true);
+        });
+    }
+
+    return inOrdnung;
+}
+
 async function saveAllSettings() {
     const inputs = document.querySelectorAll('.setting-input');
     const updates = [];
+
+    // Alte Markierungen weg: Was jetzt rot wird, stammt aus diesem Versuch.
+    document.querySelectorAll('.setting-input.invalid').forEach(i => i.classList.remove('invalid'));
+    clearTabMarks('has-error');
 
     // Validierung vor dem Speichern
     let hasErrors = false;
@@ -240,12 +409,15 @@ async function saveAllSettings() {
 
             if (!/^-?\d+$/.test(raw) || isNaN(value) || value < min || value > max) {
                 input.classList.add('invalid');
+                markTab(tabOfInput(input), 'has-error', true);
                 hasErrors = true;
                 return;
             }
             else
             {
-                value = input.value;
+                // Den GEPRUEFTEN Wert schicken, nicht den Rohstring: Frueher
+                // ging input.value ungetrimmt hinaus (Teilbefund aus OI-21).
+                value = String(value);
             }
         }
         else if(input.type === 'hidden' && key === 'organization_logo'){
@@ -271,9 +443,14 @@ async function saveAllSettings() {
         }                
     });
     
+    if (!rateThresholdsOrdered()) {
+        hasErrors = true;
+    }
+
     if (hasErrors) {
-            showToast('Bitte korrigiere die ungültigen Eingaben', 'error');
-            return;
+        springZumErstenFehler();
+        showToast('Bitte korrigiere die ungültigen Eingaben', 'error');
+        return;
     }
 
     if (updates.length === 0) {
@@ -281,25 +458,33 @@ async function saveAllSettings() {
         return;
     }
 
+    const abgelehnt = [];
+
     try {
-        // Alle Änderungen nacheinander speichern
+        // Alle Änderungen nacheinander speichern. Ein Fehlschlag bricht NICHT
+        // ab (OI-31): Die uebrigen Schluessel werden abgearbeitet, die
+        // gescheiterten gesammelt und am Ende benannt — sonst bliebe
+        // unklar, was gespeichert wurde und was nicht.
         for (const update of updates) {
             const result = await apiCall('settings', 'PUT', {
                 setting_key: update.key,
                 setting_value: update.value
             });
 
-            // Eine serverseitige Ablehnung (z. B. ungültige Frist) darf nicht als
-            // gespeichert gelten — apiCall() zeigt den Fehler-Toast bereits an.
             if (!result || !result.success) {
-                return;
+                abgelehnt.push(update.key);
+
+                const feld = document.querySelector(`[data-key="${update.key}"]`);
+                if (feld) {
+                    feld.classList.add('invalid');
+                    markTab(tabOfInput(feld), 'has-error', true);
+                }
+
+                continue;
             }
 
             // Lokalen Cache aktualisieren
             systemSettings[update.key] = update.value;
-
-            // Theme-Einstellungen sofort anwenden
-            //applyNewThemeSetting(update.key, update.value);
         }
 
         applyTheme(systemSettings);
@@ -326,15 +511,39 @@ async function saveAllSettings() {
             updateSubgroupLabelElements();
         }
 
-        hasUnsavedChanges = false;
+        const gespeichert = updates.length - abgelehnt.length;
+
+        hasUnsavedChanges = abgelehnt.length > 0;
         updateSaveButtonState();
-        showToast(`${updates.length} Einstellung(en) gespeichert`, 'success');
+
+        if (abgelehnt.length === 0) {
+            clearTabMarks('has-changes');
+            showToast(`${gespeichert} Einstellung(en) gespeichert`, 'success');
+        } else {
+            springZumErstenFehler();
+            showToast(`${gespeichert} gespeichert, ${abgelehnt.length} abgelehnt`, 'error');
+        }
         
     } catch (error) {
         showToast('Fehler beim Speichern', 'error');
     }
 }
 
+
+/** Zeigt den ersten Tab, auf dem ein Feld beanstandet wurde. */
+function springZumErstenFehler() {
+    const fehler = document.querySelector('.settings-tab-btn.has-error');
+    if (fehler) {
+        showSettingsTab(fehler.dataset.settingsTab);
+        return;
+    }
+
+    const feld = document.querySelector('.setting-input.invalid');
+    const tab  = tabOfInput(feld);
+    if (tab) {
+        showSettingsTab(tab);
+    }
+}
 
 function setupLogoUpload() {
     const uploadBtn = document.getElementById('upload-logo-btn');
@@ -440,12 +649,28 @@ export async function performCleanup() {
         return;
     }
 
+    // Die Bereinigung rechnet mit den Werten, die im Formular STEHEN — nicht
+    // mit den gespeicherten. Wer eine Frist geaendert und nicht gespeichert
+    // hat, loescht also nach einer Zahl, die nirgends hinterlegt ist. Das
+    // gehoert in die Rueckfrage, sonst faellt es niemandem auf.
+    const ungespeicherteFristen = [
+        ['cleanup_years_records',  years],
+        ['cleanup_years_worktime', yearsWorktime],
+        ['cleanup_years_audit',    yearsAudit],
+    ].some(([key, wert]) => String(systemSettings[key] ?? '') !== String(wert));
+
+    const fristHinweis = ungespeicherteFristen
+        ? '\n⚠️ Die angezeigten Fristen sind nicht gespeichert. Gelöscht wird nach den '
+          + 'Werten oben, nicht nach den hinterlegten.\n'
+        : '';
+
     const confirmed = await showConfirm(
         'Wirklich endgültig löschen?\n\n'
         + `• Anwesenheiten und Ausnahmen älter als ${years} Jahre\n`
         + `• Arbeitszeiten samt Änderungshistorie älter als ${yearsWorktime} Jahre\n`
-        + `• Änderungshistorie ohne Sitzung älter als ${yearsAudit} Jahre wird anonymisiert\n\n`
-        + 'Dieser Vorgang kann nicht rückgängig gemacht werden!',
+        + `• Änderungshistorie ohne Sitzung älter als ${yearsAudit} Jahre wird anonymisiert\n`
+        + fristHinweis
+        + '\nDieser Vorgang kann nicht rückgängig gemacht werden!',
         'Warnung'
     );
 

@@ -296,3 +296,36 @@ test('attendanceFilterTypes nummeriert die Schluessel neu', function () {
 
     assertSame([0], array_keys($gefiltert));
 });
+
+// ---- rateBandsFromValues (OI-55) -------------------------------------------
+
+require_once __DIR__ . '/../../private/helpers/utils.php';
+
+test('rateBandsFromValues nimmt gueltige Werte unveraendert', function () {
+    assertSame(['mid' => 30, 'fair' => 55, 'good' => 70],
+               rateBandsFromValues(['mid' => '30', 'fair' => '55', 'good' => '70']));
+});
+
+test('rateBandsFromValues faellt bei fehlendem Wert auf die Vorgabe zurueck', function () {
+    // Fehlt 'fair', bleibt 60 -- die Reihenfolge stimmt damit weiterhin.
+    assertSame(['mid' => 30, 'fair' => 60, 'good' => 70],
+               rateBandsFromValues(['mid' => '30', 'good' => '70']));
+});
+
+test('rateBandsFromValues weist Werte ausserhalb 1..99 ab', function () {
+    // 0 und 100 sind unbrauchbar: ein Band waere leer.
+    assertSame(['mid' => 40, 'fair' => 60, 'good' => 80],
+               rateBandsFromValues(['mid' => '0', 'fair' => '60', 'good' => '100']));
+});
+
+test('rateBandsFromValues vertraegt Text und Leerzeichen', function () {
+    assertSame(['mid' => 40, 'fair' => 55, 'good' => 80],
+               rateBandsFromValues(['mid' => 'viel', 'fair' => ' 55 ', 'good' => '']));
+});
+
+test('rateBandsFromValues sortiert eine verdrehte Reihenfolge', function () {
+    // Von Hand in der Datenbank verdreht: Die Statistik soll trotzdem eine
+    // sinnvolle Skala zeigen statt leerer Baender.
+    assertSame(['mid' => 20, 'fair' => 50, 'good' => 90],
+               rateBandsFromValues(['mid' => '90', 'fair' => '20', 'good' => '50']));
+});

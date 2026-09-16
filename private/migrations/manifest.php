@@ -116,4 +116,10 @@ return [
         'file'     => '1.7.0.php',
         'function' => 'migrate_1_7_0',
     ],
+    [
+        'from'     => '1.8.0',
+        'to'       => '1.9.0',
+        'file'     => '1.8.0.php',
+        'function' => 'migrate_1_8_0',
+    ],
 ];
