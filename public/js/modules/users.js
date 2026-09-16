@@ -159,7 +159,7 @@ function renderUsers(users, page = 1)
     
     // Lösch-Button nicht für den eigenen Account anzeigen
     const deleteBtn = (currentUser && user.user_id !== currentUser.user_id) ? `
-        <button class="action-btn btn-icon btn-delete" onclick="deleteUser(${user.user_id}, '${user.email}')">
+        <button class="action-btn btn-icon btn-delete" onclick="deleteUser(${user.user_id})">
             🗑
         </button>
     ` : '';
@@ -866,7 +866,17 @@ export async function saveUser() {
     }
 }
 
-export async function deleteUser(userId, email) {
+export async function deleteUser(userId) {
+    // Email aus dem Cache holen statt aus dem onclick-Attribut: die Email ist
+    // vom eigenen Account her selbst waehlbar (users.php PUT erlaubt "Admin
+    // oder eigener Account"), FILTER_VALIDATE_EMAIL laesst dabei Anfuehrungs-
+    // zeichen im local-part einer quoted-string-Adresse zu -- ein Mitglied
+    // koennte damit sonst Code in die Verwalteransicht einschleusen (kein CSP
+    // im Projekt). Muster aus deleteGroup()/deleteType() in management.js
+    // (Commit ad200ba).
+    const user = dataCache.users.data.find(u => u.user_id == userId);
+    const email = user ? user.email : 'diesem Benutzer';
+
     const confirmed = await showConfirm(
         `Benutzer "${email}" wirklich löschen?`,
         'Benutzer löschen'
