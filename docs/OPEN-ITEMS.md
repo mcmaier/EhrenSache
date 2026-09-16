@@ -2382,3 +2382,44 @@ abgeschalteter Bildschirm — und Letzteres kann die Web-App nicht, siehe
 widersprüchlich, den Bildschirm per Wake Lock wachzuhalten und zugleich Strom sparen zu wollen.
 
 **Nicht sicherheitsrelevant.**
+
+---
+
+### OI-66 · `API.md` gegen die echten Antworten prüfen
+**Priorität:** mittel · aufgenommen am 2026-09-16
+
+Beim Durchsehen der Dokumentation fiel auf, dass der Abschnitt „Alle Mitglieder abrufen" einen
+Endpunkt beschrieb, den es so **nie gab**: eine Antwort `{"members": [...], "pagination": {…}}`
+mit Seitenzahl, Gesamtzahl und Einträgen pro Seite, dazu verschachtelte `groups` und
+`membership_dates`.
+
+Tatsächlich liefert `GET ?resource=members` ein **nacktes Array**, ohne Umschlag und ohne jede
+Paginierung — `private/handlers/members.php` enthält weder `LIMIT` noch `OFFSET` —, und die
+Felder heißen anders (`group_ids` und `group_names` als kommagetrennte Zeichenketten,
+`is_active_in_period`, `has_pin`, `pin_updated_at`). Serverseitig paginiert im ganzen Projekt
+einzig `import_logs`; die Einstellung „Datenreihen pro Seite" wirkt allein im Browser.
+
+**Der Mitglieder-Abschnitt ist korrigiert** (Branch `fix/api-korrekturen`). Offen ist die Frage,
+die der Fund aufwirft: **Wie viele der übrigen Abschnitte beschreiben Wunschdenken?** Das
+Beispiel sah plausibel aus und stand vermutlich seit der ersten Fassung darin; niemand hat es je
+gegen eine laufende Instanz gehalten.
+
+**Warum das mehr als Kosmetik ist:** `API.md` ist die einzige Beschreibung der Schnittstelle für
+alles, was nicht die mitgelieferte Oberfläche ist — eigene Skripte, die ESP32-Geräte, ein
+späterer Fremdzugriff. Ein erfundenes Antwortformat fällt dort erst zur Laufzeit auf, und zwar
+beim Anwender, nicht beim Entwickler.
+
+**Zu tun:** Ressource für Ressource gegen die Testinstanz abrufen und Form, Feldnamen und
+Statuscodes abgleichen. Der Weg steht schon: `tests/lib/api.php` spricht mit jeder Rolle, ein
+kurzes Skript genügt je Endpunkt. Vorrangig die Lesepfade mit Beispielantwort in der
+Dokumentation; Schreibpfade brauchen eine Welt zum Anlegen und Aufräumen.
+
+**Zu entscheiden:** ob am Ende ein **Test** die Übereinstimmung festhält — etwa eine Suite, die
+jeden in `API.md` ausgewiesenen Antwortschlüssel gegen eine echte Antwort prüft. Das wäre der
+einzige Weg, der die Dokumentation dauerhaft ehrlich hält; es ist aber ein eigenes Vorhaben und
+kein Nebenprodukt der Sichtung.
+
+**Nicht sicherheitsrelevant:** falsche Dokumentation, keine falsche Berechtigung. Zu prüfen ist
+allerdings, ob irgendwo **mehr** Felder beschrieben sind als der Server herausgibt — dann steht
+dort ein Versprechen, das eine spätere Umsetzung einzulösen versuchen könnte.
+

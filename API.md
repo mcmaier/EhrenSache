@@ -443,46 +443,64 @@ behandeln, nie als HTML.
 **Query-Parameter:**
 - `id` (optional): Einzelnes Mitglied abrufen
 - `group_id` (optional): Mitglieder einer Gruppe abrufen
+- `year`, `date` (optional): Aktivitätsfilter über die Mitgliedschaftszeiträume
+- `include_inactive` (optional): `true` nimmt inaktive Mitglieder mit auf
 
-**Response:**
+**Response:** ein **Array**, kein Objekt — es gibt weder einen `members`-Umschlag noch eine
+Paginierung. Die Liste kommt vollständig; die Einstellung „Datenreihen pro Seite“ wirkt allein
+im Browser (`globalPaginationValue` in `settings.js`). Serverseitig paginiert einzig
+`import_logs`.
+
 ```json
-{
-  "members": [
-    {
-      "member_id": 1,
-      "name": "Max",
-      "surname": "Mustermann",
-      "member_number": "M001",
-      "active": 1,
-      "groups": [
-        {
-          "group_id": 1,
-          "group_name": "Trompeten"
-        }
-      ],
-      "membership_dates": [
-        {
-          "membership_date_id": 1,
-          "start_date": "2020-01-01",
-          "end_date": null,
-          "status": "active"
-        }
-      ]
-    }
-  ],
-  "pagination": {
-    "total": 150,
-    "page": 1,
-    "per_page": 50,
-    "total_pages": 3
+[
+  {
+    "member_id": 1,
+    "name": "Max",
+    "surname": "Mustermann",
+    "member_number": "M001",
+    "pin_updated_at": null,
+    "active": 1,
+    "created_at": "2026-09-10 11:41:55",
+    "group_ids": "2, 5720",
+    "group_names": "Jugend, Klarinetten",
+    "is_active_in_period": 1,
+    "has_pin": false
   }
-}
+]
 ```
+
+`group_ids` und `group_names` sind **Zeichenketten** mit `, ` als Trenner, keine Arrays.
+`is_active_in_period` bezieht sich auf den über `year` oder `date` gewählten Zeitraum.
+Mitgliedschaftszeiträume liefert die Liste nicht — dafür gibt es die eigene Ressource
+`membership_dates`.
 
 **Einzelnes Mitglied:**
 ```
 GET /api.php?resource=members&id=1
 ```
+
+Die Einzelantwort ist ein Objekt und trägt statt der beiden Zeichenketten ein `groups`-Array:
+
+```json
+{
+  "member_id": 1,
+  "name": "Max",
+  "surname": "Mustermann",
+  "member_number": "M001",
+  "pin_updated_at": null,
+  "active": 1,
+  "created_at": "2026-09-10 11:41:55",
+  "groups": [
+    { "group_id": 2, "group_name": "Jugend" },
+    { "group_id": 5720, "group_name": "Klarinetten" }
+  ],
+  "has_pin": false
+}
+```
+
+Ein `user` ohne Admin- oder Managerrolle bekommt auf denselben Endpunkt nur die eigenen
+Stammdaten (`name`, `surname`, `member_number`, `group_ids`) und bei fremder `id` zusätzlich ein
+`warning`; die fremde `id` wird ignoriert, nicht abgewiesen.
 
 **Stations-PIN (seit 1.3.0):** Jede Admin/Manager-Antwort (einzeln und Liste) trägt `has_pin`
 (Boolean) und `pin_updated_at`; der Hash selbst (`pin_hash`) verlässt den Server nie.
