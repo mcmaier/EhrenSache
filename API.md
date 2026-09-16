@@ -1668,7 +1668,7 @@ steht dort nur `{"enabled": false}`.
 | `on_time_count` | Ankünfte bis `punctuality_grace_minutes` nach Beginn (negativ: vor Beginn) |
 | `avg_late_minutes` | Mittel der Verspätung **ab Beginn**, je Ankunft gekappt bei 20 Minuten, nur über Zuspätkommer; `null` ohne Verspätung |
 | `self_reported_count` | davon aus genehmigten Zeitkorrektur-Anträgen |
-| `excused_in_time` | vor Beginn abgemeldet (`absence`, nicht abgelehnt) oder vom Verwalter ohne Abmeldung entschuldigt |
+| `excused_in_time` | rechtzeitig abgemeldet oder vom Verwalter ohne Abmeldung entschuldigt. Maßgeblich ist bei Terminarten **ohne** Rückmeldung der Terminbeginn (nicht abgelehnter `absence`-Antrag davor), bei Terminarten **mit** Rückmeldung die Frist — Absage oder Antrag davor; verlangt die Terminart eine Entschuldigung (`responses_require_excuse`), zählt die rechtzeitige Absage nur mit verknüpftem, nicht abgelehntem Antrag |
 | `missed` | weder erschienen noch rechtzeitig abgemeldet — auch eine nach Beginn gemeldete, später genehmigte Abmeldung |
 
 Minuten werden abgerundet: 20:00:59 gilt als 20:00.
