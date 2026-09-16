@@ -2,7 +2,7 @@
 
 # EhrenSache
 
-**Moderne Anwesenheitserfassung für ehrenamtliche Organisationen**
+**Moderne Zeit- und Anwesenheitserfassung für ehrenamtliche Organisationen**
 
 Entwickelt für gemeinnützige Organisationen, wie z.B. Musikvereine, Sportvereine, ... 
 Kostenlos unter AGPL-3.0 nutzbar.
@@ -13,22 +13,22 @@ Kostenlos unter AGPL-3.0 nutzbar.
 
 **Einsatz ist EhrenSache!** 
 
-Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder sich eigenverantwortlich anmeldet oder der Schriftführer die Anwesenheit prüft. EhrenSache erfasst Anwesenheit und Entschuldigungen inklusive nachträglicher Korrekturmöglichkeit. 
+Und jetzt einfach und überall erfassbar ohne Zettel und Stift. Egal ob jeder sich eigenverantwortlich anmeldet oder der Schriftführer die Anwesenheit prüft. EhrenSache ermöglicht Terminplanung, erfasst Anwesenheit und Entschuldigungen inklusive nachträglicher Korrekturmöglichkeit und kann auch Arbeitszeiten messen.
 
 Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusive Ankunftszeit, für alle die Pünktlichkeit belohnen wollen.
 
 ### Kernfunktionen
 - **Mehrstufiges Rollensystem**: Admin, Manager, Benutzer und Gerät mit differenzierten Berechtigungen
-- **Mehrere Erfassungswege**: Web-Dashboard, Mobile PWA, QR-Code mit Einmalpasswort, virtuelle
-  Station am Tablet (Kiosk) und IoT-Geräte
-- **Terminverwaltung**: Planung von Terminen mit Terminarten, Gruppenzuordnung und Teilnehmerverwaltung
+- **Mehrere Erfassungswege**: Web-Dashboard, Mobile PWA mit QR-Code, virtuelle
+  Station am Tablet (Kiosk) mit PIN und IoT-Geräte
+- **Terminverwaltung**: Planung von Terminen mit Terminarten, Gruppenzuordnung und Teilnehmerverwaltung inklusive Zu- und Absage-Abfrage im Voraus
 - **Ausnahmenverwaltung**: Entschuldigungen und Zeitkorrekturen, beantragt vom Mitglied,
   genehmigt von Admin oder Manager
 - **Gruppenverwaltung**: Organisation von Mitgliedern in Gruppen, inklusive Aktiv- und Inaktiv-Zeiträumen
 - **Arbeitszeiterfassung** (seit 1.2.0, abschaltbar): Beginn, Ende und Pause je Tätigkeitsart,
   mit Änderungshistorie — für Vereine, die geleistete Stunden nachweisen müssen
 - **Statistik und Export**: Auswertung nach Termin, Gruppe und Jahr; CSV-Import und -Export
-  für Mitglieder, Termine und Anwesenheiten
+  für Mitglieder, Termine, Anwesenheiten und Arbeitszeit
 
 ### Technische Highlights
 - **Sichere Authentifizierung**: Session-basiert für Web, Token-basiert für Geräte
@@ -44,7 +44,7 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 - Sichere Session-Verwaltung mit HttpOnly- und SameSite-Cookies, Timeout nach 30 Minuten
 - Rate Limiting: 100 Anfragen pro Minute je IP und Konto
 - Sicherheits-Header: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`
-- HTTPS-Umleitung ab Werk (seit 1.4.0)
+- HTTPS-Umleitung ab Werk
 - Input-Validierung auf Client- und Server-Seite
 - Datei-Uploads werden über den tatsächlichen MIME-Typ geprüft, nicht über die Endung
 
@@ -255,7 +255,7 @@ Manager haben eingeschränkten Zugriff:
 
 ### Für Mitglieder
 
-**Check-in Web:**
+**Web-Dashboard:**
 1. Login → Dashboard
 2. Termine und eigene Anwesenheiten einsehen
 3. Eigene Statistik einsehen
@@ -264,13 +264,7 @@ Manager haben eingeschränkten Zugriff:
 **Check-in Mobile (PWA):**
 1. App auf Smartphone installieren (Browser-Menü → "Zum Startbildschirm")
 2. Öffnen der App
-3. QR-Code scannen an TOTP-Station oder manueller Check-in 
-4. Korrekturantrag stellen
-
-**Check-in QR-Code:**
-1. QR-Code am Veranstaltungsort scannen (z.B. mit Smartphone-Kamera)
-2. Link öffnet direkt den Check-in
-3. Automatische Erfassung
+3. QR-Code scannen an TOTP-Station, manueller Check-in oder Korrekturantrag stellen
 
 **Check-in an der virtuellen Station:**
 1. Am Tablet im Vereinsheim Mitgliedsnummer und PIN eingeben
@@ -319,51 +313,6 @@ Dort lassen sich außerdem die maximale Dauer einer Sitzung und eine Notizpflich
 - Fingerprint Authentifizierungsgerät (geplant)
 - Virtuelle Station als PWA (`/station/`) — Tablet statt ESP32
 
-
-
-## API-Dokumentation
-
-> [!NOTE]
-> (Work in Progress)
-
-### Authentifizierung
-
-**Web-Login:**
-```
-POST /api/api.php?resource=login
-Body: { "email": "email", "password": "pass" }
-Response: Session-Cookie
-```
-
-**Device-Auth:**
-```
-Header: Authorization: Bearer {token}
-```
-
-### Endpoints (Doku unvollständig!)
-
-**Check-in:**
-```
-POST /api/api.php?resource=totp_checkin
-Body: {
-  "appointment_id": 123,
-  "member_id": 456,
-  "source": "nfc",
-  "totp_code": "123456"
-}
-```
-
-**Termine abrufen:**
-```
-GET /api/api.php?resource=appointments&year=2026
-Response: Array of appointments
-```
-
-**Mitglieder abrufen:**
-```
-GET /api/api.php?resource=members
-Response: Array of members with groups
-```
 
 ## Sicherheitshinweise
 
