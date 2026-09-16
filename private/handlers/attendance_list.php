@@ -87,37 +87,13 @@ function handleAttendanceList($db, $database, $method, $id) {
         
         // Hole alle Mitglieder der relevanten Gruppen
         $placeholders = str_repeat('?,', count($group_ids) - 1) . '?';
-        /*
-        $stmt = $db->prepare("
-            SELECT DISTINCT 
-                m.member_id,
-                m.name,
-                m.surname,
-                m.member_number,
-                GROUP_CONCAT(DISTINCT mg.group_name ORDER BY mg.group_name SEPARATOR ', ') as groups,
-                r.record_id,
-                r.arrival_time,
-                r.checkin_source,
-                r.status
-            FROM {$prefix}members m
-            JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
-            JOIN {$prefix}member_groups mg ON mga.group_id = mg.group_id
-            LEFT JOIN {$prefix}records r ON m.member_id = r.member_id 
-                AND r.appointment_id = ?
-            WHERE mga.group_id IN ($placeholders)
-                AND m.active = 1
-            GROUP BY m.member_id
-            ORDER BY m.surname, m.name
-        ");*/
 
-        
         $stmt = $db->prepare("
-            SELECT DISTINCT 
+            SELECT DISTINCT
                 m.member_id,
                 m.name,
                 m.surname,
                 m.member_number,
-                GROUP_CONCAT(DISTINCT mg.group_name ORDER BY mg.group_name SEPARATOR ', ') as groups,
                 r.record_id,
                 r.arrival_time,
                 r.checkin_source,
@@ -126,7 +102,7 @@ function handleAttendanceList($db, $database, $method, $id) {
             JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
             JOIN {$prefix}member_groups mg ON mga.group_id = mg.group_id
             CROSS JOIN {$prefix}appointments a
-            LEFT JOIN {$prefix}records r ON m.member_id = r.member_id 
+            LEFT JOIN {$prefix}records r ON m.member_id = r.member_id
                 AND r.appointment_id = ?
             WHERE mga.group_id IN ($placeholders)
                 AND a.appointment_id = ?
@@ -134,11 +110,17 @@ function handleAttendanceList($db, $database, $method, $id) {
             GROUP BY m.member_id
             ORDER BY m.surname, m.name
         ");
-        
+
         $params = array_merge([$appointment_id], $group_ids, [$appointment_id]);
         $stmt->execute($params);
         $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
+        // Zugehörigkeiten in zwei Listen: die Gruppen des Termins (wie bisher,
+        // nur strukturiert) und alle Untergruppen des Mitglieds -- Letztere
+        // bewusst ohne die Einschränkung auf die Gruppen der Terminart, denn
+        // genau daran fehlte die Gliederung nach Register bis 1.8.0.
+        $members = attendanceAttachGroups($db, $database, $members, $group_ids);
+
         echo json_encode([
             'appointment' => $appointment,
             'members' => $members
@@ -243,7 +225,63 @@ function handleAttendanceList($db, $database, $method, $id) {
             'year' => $year,
             'appointments' => $appointments
         ]);
-        
+
         exit();
     }
+}
+
+/**
+ * Hängt jedem Mitglied `groups` (Gruppen des Termins) und `subgroups`
+ * (alle als Untergruppe markierten Gruppen) an, beide nach groupSortCompare()
+ * sortiert.
+ *
+ * @param array<int, array<string, mixed>> $members
+ * @param array<int, string|int>           $groupIds Gruppen der Terminart
+ * @return array<int, array<string, mixed>>
+ */
+function attendanceAttachGroups($db, $database, array $members, array $groupIds): array
+{
+    if (empty($members)) {
+        return $members;
+    }
+
+    $prefix    = $database->table('');
+    $memberIds = array_map(static fn ($m) => (int) $m['member_id'], $members);
+    $inMembers = str_repeat('?,', count($memberIds) - 1) . '?';
+
+    $stmt = $db->prepare("
+        SELECT mga.member_id, g.group_id, g.group_name, g.sort_order, g.is_subgroup
+        FROM {$prefix}member_group_assignments mga
+        JOIN {$prefix}member_groups g ON g.group_id = mga.group_id
+        WHERE mga.member_id IN ($inMembers)
+    ");
+    $stmt->execute($memberIds);
+
+    $byMember = [];
+    $termGroups = array_map('intval', $groupIds);
+
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $eintrag = [
+            'group_id'   => (int) $row['group_id'],
+            'group_name' => $row['group_name'],
+            'sort_order' => (int) $row['sort_order'],
+        ];
+        $mid = (int) $row['member_id'];
+
+        if (in_array($eintrag['group_id'], $termGroups, true)) {
+            $byMember[$mid]['groups'][] = $eintrag;
+        }
+        if ((int) $row['is_subgroup'] === 1) {
+            $byMember[$mid]['subgroups'][] = $eintrag;
+        }
+    }
+
+    foreach ($members as &$member) {
+        $mid = (int) $member['member_id'];
+        $member['groups']    = groupsSortForDisplay($byMember[$mid]['groups'] ?? []);
+        $member['subgroups'] = groupsSortForDisplay($byMember[$mid]['subgroups'] ?? []);
+    }
+    unset($member);
+
+    return $members;
 }

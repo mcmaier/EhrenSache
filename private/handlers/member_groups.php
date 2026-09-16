@@ -52,16 +52,16 @@ function handleMemberGroups($db, $database, $method, $id) {
                 }
             } else {
                     // Liste aller Gruppen MIT Mitgliederanzahl
-                    $stmt = $db->query("SELECT g.*, 
+                    $stmt = $db->query("SELECT g.*,
                                     COUNT(mga.member_id) as member_count
                                     FROM {$prefix}member_groups g
                                     LEFT JOIN {$prefix}member_group_assignments mga ON g.group_id = mga.group_id
                                     GROUP BY g.group_id
-                                    ORDER BY g.group_name");
+                                    ORDER BY g.sort_order, g.group_name");
                     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
             }
             break;
-            
+
         case 'POST':
             requireAdmin();
 
@@ -71,13 +71,16 @@ function handleMemberGroups($db, $database, $method, $id) {
             if(isset($data->is_default) && $data->is_default) {
                 $db->exec("UPDATE {$prefix}member_groups SET is_default = 0");
             }
-            
-            $stmt = $db->prepare("INSERT INTO {$prefix}member_groups (group_name, description, is_default) 
-                                  VALUES (?, ?, ?)");
+
+            $stmt = $db->prepare("INSERT INTO {$prefix}member_groups
+                                  (group_name, description, is_default, is_subgroup, sort_order)
+                                  VALUES (?, ?, ?, ?, ?)");
             if($stmt->execute([
                 $data->group_name,
                 $data->description ?? null,
-                $data->is_default ?? false
+                $data->is_default ?? false,
+                !empty($data->is_subgroup) ? 1 : 0,
+                (int) ($data->sort_order ?? 0)
             ])) {
                 http_response_code(201);
                 echo json_encode(["message" => "Group created", "id" => $db->lastInsertId()]);
@@ -86,7 +89,7 @@ function handleMemberGroups($db, $database, $method, $id) {
                 echo json_encode(["message" => "Failed to create group"]);
             }
             break;
-            
+
         case 'PUT':
             requireAdmin();
 
@@ -96,14 +99,17 @@ function handleMemberGroups($db, $database, $method, $id) {
             if(isset($data->is_default) && $data->is_default) {
                 $db->prepare("UPDATE {$prefix}member_groups SET is_default = 0 WHERE group_id != ?")->execute([$id]);
             }
-            
-            $stmt = $db->prepare("UPDATE {$prefix}member_groups 
-                                  SET group_name = ?, description = ?, is_default = ?
+
+            $stmt = $db->prepare("UPDATE {$prefix}member_groups
+                                  SET group_name = ?, description = ?, is_default = ?,
+                                      is_subgroup = ?, sort_order = ?
                                   WHERE group_id = ?");
             if($stmt->execute([
                 $data->group_name,
                 $data->description ?? null,
                 $data->is_default ?? false,
+                !empty($data->is_subgroup) ? 1 : 0,
+                (int) ($data->sort_order ?? 0),
                 $id
             ])) {
                 echo json_encode(["message" => "Group updated"]);
