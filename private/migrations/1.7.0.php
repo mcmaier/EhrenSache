@@ -44,10 +44,12 @@ function migrate_1_7_0(PDO $pdo, string $prefix, string $configPath): array
 
     // Der Schlüssel muss existieren, sonst zeigt die Oberfläche ein leeres Feld
     // und speichert beim nächsten Sichern einen leeren Wert.
-    $stmt = $pdo->prepare("INSERT IGNORE INTO `{$prefix}system_settings` (setting_key, setting_value)
-                           VALUES ('subgroup_label', 'Untergruppe')");
-    $stmt->execute();
-    $log[] = 'Einstellung subgroup_label vorhanden (Vorgabe: Untergruppe)';
+    $insert = $pdo->prepare("INSERT IGNORE INTO `{$prefix}system_settings` (setting_key, setting_value)
+                             VALUES ('subgroup_label', 'Untergruppe')");
+    $insert->execute();
+    $log[] = $insert->rowCount() > 0
+        ? 'Einstellung subgroup_label angelegt (Vorgabe: Untergruppe)'
+        : 'Einstellung subgroup_label bestand bereits — unverändert';
 
     return ['log' => $log, 'warnings' => $warnings];
 }
