@@ -143,4 +143,57 @@ test('Ein Eintrag trägt eine brauchbare Zeit', function () use ($pdo, $prefix, 
     $pdo->prepare("DELETE FROM `{$prefix}rate_limits` WHERE action = ?")->execute([$aktion]);
 });
 
+test('Eine Stoerung wird fuer die Einstellungsseite vermerkt', function () use ($pdo, $prefix, $database) {
+    // Der echte Fehlerpfad, nicht nachgestellt: Ohne die Tabelle scheitert
+    // jedes Statement des Limiters. Umbenennen statt Loeschen -- der Bestand
+    // (laufende Sperren) bleibt dabei erhalten.
+    $limiter = new RateLimiter($pdo, $database);
+    $weg     = $prefix . 'rate_limits_verify_tmp';
+
+    $pdo->prepare("DELETE FROM `{$prefix}system_settings` WHERE setting_key IN (?, ?)")
+        ->execute(['rate_limiter_last_error_at', 'rate_limiter_last_error_code']);
+
+    $pdo->exec("RENAME TABLE `{$prefix}rate_limits` TO `{$weg}`");
+
+    try {
+        $durchgelassen = $limiter->check('notice-' . uniqid(), 'notice_probe_' . uniqid(), 1, 60);
+    } finally {
+        // Auch wenn oben etwas wirft: Die Instanz darf nicht ohne ihre
+        // Tabelle zurueckbleiben.
+        $pdo->exec("RENAME TABLE `{$weg}` TO `{$prefix}rate_limits`");
+    }
+
+    assertTrue($durchgelassen, 'Der Limiter soll bei einer Stoerung durchlassen (fail-open, bewusst)');
+
+    $stmt = $pdo->prepare("SELECT setting_key, setting_value FROM `{$prefix}system_settings`
+                           WHERE setting_key IN (?, ?)");
+    $stmt->execute(['rate_limiter_last_error_at', 'rate_limiter_last_error_code']);
+    $vermerk = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $vermerk[$row['setting_key']] = $row['setting_value'];
+    }
+
+    assertTrue(
+        isset($vermerk['rate_limiter_last_error_at']),
+        'Die Stoerung wurde nirgends vermerkt -- die Einstellungsseite kann sie nicht zeigen'
+    );
+    assertTrue(
+        abs(time() - strtotime((string) $vermerk['rate_limiter_last_error_at'])) < 120,
+        'Der Zeitstempel der Stoerung liegt nicht in der Gegenwart'
+    );
+    assertTrue(
+        isset($vermerk['rate_limiter_last_error_code']) && $vermerk['rate_limiter_last_error_code'] !== '',
+        'Die Fehlernummer fehlt'
+    );
+    assertTrue(
+        stripos((string) $vermerk['rate_limiter_last_error_code'], 'rate_limits') === false,
+        'Der Vermerk traegt Tabellennamen aus dem Meldungstext -- nur die Fehlernummer gehoert hinein'
+    );
+
+    // Kein Rueckstand: Sonst zeigt die Einstellungsseite nach jedem Testlauf
+    // 24 Stunden lang eine Warnung.
+    $pdo->prepare("DELETE FROM `{$prefix}system_settings` WHERE setting_key IN (?, ?)")
+        ->execute(['rate_limiter_last_error_at', 'rate_limiter_last_error_code']);
+});
+
 exit(harnessSummary());

@@ -112,7 +112,55 @@ class RateLimiter {
                 $this->db->rollBack();
             }
             error_log("RateLimiter DB error: " . $e->getMessage());
-            return true; // fail-open
+            $this->noteFailure($e);
+            return true; // fail-open, siehe noteFailure()
+        }
+    }
+
+    /**
+     * Haelt fest, dass der Limiter gerade nicht arbeitet (OI-28).
+     *
+     * Der Durchlass darueber ist Absicht und bleibt es: Eine gestoerte
+     * Datenbank darf die Anmeldung nicht unmoeglich machen. Unsichtbar darf
+     * die Stoerung aber nicht sein -- solange sie anhaelt, fehlen der Schutz
+     * gegen das Durchprobieren von Passwoertern und die Sperre der
+     * Stations-PIN vollstaendig. Genau das ist am 2026-09-17 bei OI-40
+     * aufgefallen: Der Limiter war unter strengem SQL-Modus seit jeher aus,
+     * und ausser einer Zeile im Fehlerprotokoll von PHP wies nichts darauf
+     * hin.
+     *
+     * Abgelegt werden nur Zeitpunkt und Fehlernummer, nie der Meldungstext:
+     * Der traegt Tabellen- und Spaltennamen und ist ueber resource=settings
+     * fuer jeden Admin lesbar. Die vollstaendige Meldung steht im
+     * Fehlerprotokoll.
+     */
+    private function noteFailure($e) {
+        try {
+            $info = ($e instanceof PDOException) ? $e->errorInfo : null;
+            $code = is_array($info)
+                ? trim((string)($info[0] ?? '?') . ' ' . (string)($info[1] ?? '?'))
+                : '?';
+
+            $stmt = $this->db->prepare(
+                "INSERT INTO {$this->prefix}system_settings
+                     (setting_key, setting_value, setting_type, category, description)
+                 VALUES (?, ?, 'text', 'security', ?)
+                 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
+            );
+            $stmt->execute([
+                'rate_limiter_last_error_at',
+                date('Y-m-d H:i:s'),
+                'Zeitpunkt der letzten Stoerung des Rate Limiting (automatisch gesetzt)'
+            ]);
+            $stmt->execute([
+                'rate_limiter_last_error_code',
+                substr($code, 0, 50),
+                'Fehlernummer der letzten Stoerung des Rate Limiting (automatisch gesetzt)'
+            ]);
+        } catch (PDOException $ignored) {
+            // Scheitert auch das, ist die Datenbank ganz weg. Dann bleibt es
+            // beim Fehlerprotokoll -- ein zweiter Fehler hier duerfte den
+            // Aufrufer auf keinen Fall treffen.
         }
     }
     

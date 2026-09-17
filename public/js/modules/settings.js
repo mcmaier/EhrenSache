@@ -11,6 +11,7 @@
 import { API_BASE } from '../config.js';
 import { apiCall, isAdmin } from './api.js';
 import { showConfirm, showToast, dataCache, updateSubgroupLabelElements } from './ui.js';
+import { escapeHtml } from './utils.js';
 import { debug } from '../app.js';
 import { applyTheme } from '../theme.js';
 
@@ -103,6 +104,9 @@ export async function renderSystemSettings() {
 
     // SMTP Status anzeigen
     updateSmtpStatus(settings.smtp_configured === '1');
+
+    // Stoerungen des Rate Limiting sichtbar machen (OI-28)
+    updateRateLimiterStatus(settings);
 
     // Reset unsaved changes flag
     hasUnsavedChanges = false;
@@ -947,3 +951,57 @@ function renderUpdateStatus(status) {
 
 window.checkForUpdates = checkForUpdates;
 window.performCleanup = performCleanup;
+
+
+// ============================================
+// RATE LIMITING
+// ============================================
+
+/** Fenster, in dem eine Stoerung als aktuell gilt. */
+const RATE_LIMITER_ALERT_HOURS = 24;
+
+/**
+ * Zeigt, ob der Schutz vor zu vielen Anfragen gerade arbeitet (OI-28).
+ *
+ * Der Server laesst eine Anfrage bewusst durch, wenn er seine Zaehler nicht
+ * schreiben kann -- eine gestoerte Datenbank soll niemanden aussperren.
+ * Sichtbar war das bisher nirgends: Bei OI-40 lief der Limiter unter strengem
+ * SQL-Modus seit jeher ins Leere, ohne dass es jemandem auffiel. Die beiden
+ * Schluessel setzt ausschliesslich der Server (rate_limiter.php).
+ */
+function updateRateLimiterStatus(settings) {
+    const ziel = document.getElementById('rate_limiter_status');
+    if (!ziel) return;
+
+    const stempel = settings.rate_limiter_last_error_at;
+
+    if (!stempel) {
+        ziel.className = 'alert-success';
+        ziel.style.padding = '12px';
+        ziel.textContent = 'Arbeitet normal. Bisher keine Störung verzeichnet.';
+        return;
+    }
+
+    // 'YYYY-MM-DD HH:MM:SS' ist Wanduhrzeit des Servers; Safari verlangt das T.
+    const zeitpunkt = new Date(String(stempel).replace(' ', 'T'));
+    const gueltig = !isNaN(zeitpunkt.getTime());
+    const alterStunden = gueltig ? (Date.now() - zeitpunkt.getTime()) / 3600000 : Infinity;
+    const wann = gueltig ? zeitpunkt.toLocaleString('de-DE') : escapeHtml(String(stempel));
+    const code = settings.rate_limiter_last_error_code;
+
+    if (alterStunden <= RATE_LIMITER_ALERT_HOURS) {
+        ziel.className = 'alert-warning';
+        ziel.style.padding = '12px';
+        ziel.innerHTML = '<strong>Der Schutz greift derzeit nicht.</strong><br>'
+            + 'Letzte Störung: ' + escapeHtml(wann)
+            + (code ? ' (Fehler ' + escapeHtml(String(code)) + ')' : '')
+            + '.<br>Anfragen werden unbegrenzt durchgelassen, bis die Datenbank die Zähler '
+            + 'wieder annimmt. Die vollständige Meldung steht im Fehlerprotokoll von PHP.';
+        return;
+    }
+
+    ziel.className = 'alert-success';
+    ziel.style.padding = '12px';
+    ziel.innerHTML = 'Arbeitet normal. Letzte Störung: ' + escapeHtml(wann)
+        + (code ? ' (Fehler ' + escapeHtml(String(code)) + ')' : '') + '.';
+}
