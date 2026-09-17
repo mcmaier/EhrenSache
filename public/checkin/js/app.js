@@ -4415,6 +4415,9 @@ function displayStatistics(stats) {
     if (!stats || !stats.summary) {
         document.getElementById('statAttendanceRate').textContent = '0%';
         document.getElementById('statTotalAppointments').textContent = '0';
+        // Ohne Zahl kein Balken: ein leerer Trog unter "0%" behauptet eine
+        // Einordnung, die es nicht gibt.
+        setAttendanceBar(null, null);
         document.getElementById('groupsList').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Keine Daten verfügbar</p>';
         return;
     }
@@ -4424,6 +4427,7 @@ function displayStatistics(stats) {
     // 1. Anwesenheitsquote
     const attendanceRate = summary.overall_average || 0;
     document.getElementById('statAttendanceRate').textContent = `${attendanceRate.toFixed(1)}%`;
+    setAttendanceBar(attendanceRate, pwaRateBands(stats));
     
     // 2. Gesamtanzahl Termine
     const totalAppointments = summary.total_appointments || 0;
@@ -4528,6 +4532,38 @@ function pwaRateBands(stats) {
     werte.sort((a, b) => a - b);
 
     return { mid: werte[0], fair: werte[1], good: werte[2] };
+}
+
+/**
+ * Faerbt den Balken unter der Anwesenheitsquote.
+ *
+ * Die Zahl darueber bleibt bewusst schwarz -- in dieser Groesse liest sie
+ * sich gefaerbt schlechter. Die Einordnung in die vier Baender uebernimmt
+ * allein der Balken, mit denselben Schwellen wie die Gruppenliste darunter
+ * und die Tabelle im Dashboard.
+ *
+ * @param rate   Quote in Prozent, oder null, wenn es keine gibt
+ * @param bands  Schwellen aus pwaRateBands(), oder null
+ */
+function setAttendanceBar(rate, bands) {
+    const trog = document.getElementById('statAttendanceBar');
+    const fill = document.getElementById('statAttendanceBarFill');
+    if (!trog || !fill) return;
+
+    if (rate === null || bands === null) {
+        trog.hidden = true;
+        fill.className = 'stat-bar-fill';
+        fill.style.width = '0';
+        return;
+    }
+
+    // Gegen Ausreisser aus der Antwort: eine Breite jenseits von 0..100
+    // waere im Trog nicht sichtbar, im Zweifel aber irrefuehrend.
+    const breite = Math.max(0, Math.min(100, rate));
+
+    trog.hidden = false;
+    fill.className = `stat-bar-fill ${pwaRateBand(rate, bands)}`;
+    fill.style.width = `${breite}%`;
 }
 
 /** Dieselben vier Klassen wie im Dashboard (statistics.js: rateBand). */

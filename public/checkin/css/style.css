@@ -38,6 +38,15 @@
     --badge-bg: #EEF1F4;
     --badge-fg: #2F3A45;
 
+    /* Die vier Baender der Anwesenheitsquote. Dieselben Werte wie im
+       Dashboard (css/sections/statistics.css); die PWA erbt dessen
+       Stylesheets nicht. Die Schwellen dazu kommen aus der Statistik-Antwort
+       und damit aus den Einstellungen (OI-55). */
+    --rate-low: #e74c3c;
+    --rate-mid: #f39c12;
+    --rate-fair: #FFC83D;
+    --rate-good: #27ae60;
+
     /* Neutrale Grundflaeche fuer die Ampel-Chips der Terminrueckmeldung.
        Bewusst nicht --badge-bg: das folgt der Vereinsfarbe und wird damit
        gruenlich -- neben gruen/gelb/rot als Ampel wuerde das mitsprechen. */
@@ -1119,8 +1128,17 @@ body {
     margin-top: 20px;
 }
 
-.modal-buttons .btn {
+/* Gleiche Breite fuer beide Knoepfe eines Dialogs. Die Regel stand bis
+   1.9.1 auf .btn -- eine Klasse, die in der PWA nirgends vergeben wird, und
+   lief damit ins Leere: In vier der fuenf Dialoge richtete sich die Breite
+   nach der Beschriftung, weshalb "Antrag stellen" in seinem Knopf umbrach. */
+.modal-buttons .action-button {
     flex: 1;
+    /* Enger und eine Spur kleiner als die grossflaechigen Knoepfe im
+       Erfassen-Tab: bei 20px Innenabstand und 16px Schrift brach "Antrag
+       stellen" als einziger der fuenf Dialoge auf zwei Zeilen um. */
+    padding: 14px 10px;
+    font-size: 15px;
 }
 
 
@@ -1503,6 +1521,33 @@ body {
     font-weight: 500;
 }
 
+/* Balken unter der Quote. Er traegt die Farbe, die Zahl darueber bleibt
+   schwarz: eine gefaerbte Zahl dieser Groesse liest sich schlechter, und die
+   Einordnung braucht keine zweite Stimme. */
+.stat-bar {
+    height: 6px;
+    margin-top: 10px;
+    border-radius: 3px;
+    background: var(--border);
+    overflow: hidden;
+}
+
+.stat-bar[hidden] {
+    display: none;
+}
+
+.stat-bar-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.stat-bar-fill.rate-low  { background: var(--rate-low); }
+.stat-bar-fill.rate-mid  { background: var(--rate-mid); }
+.stat-bar-fill.rate-fair { background: var(--rate-fair); }
+.stat-bar-fill.rate-good { background: var(--rate-good); }
+
 /* Stats Section */
 .stats-section {
     background: white;
@@ -1608,13 +1653,10 @@ body {
     font-weight: 700;
 }
 
-/* Dieselben vier Baender wie im Dashboard (css/sections/statistics.css).
-   Die PWA erbt dessen Stylesheets nicht, die Werte stehen deshalb hier
-   noch einmal -- die Schwellen dazu kommen aus der Statistik-Antwort. */
-.group-rate.rate-low  { color: #e74c3c; }
-.group-rate.rate-mid  { color: #f39c12; }
-.group-rate.rate-fair { color: #FFC83D; }
-.group-rate.rate-good { color: #27ae60; }
+.group-rate.rate-low  { color: var(--rate-low); }
+.group-rate.rate-mid  { color: var(--rate-mid); }
+.group-rate.rate-fair { color: var(--rate-fair); }
+.group-rate.rate-good { color: var(--rate-good); }
 
 .group-details {
     display: flex;
@@ -1689,16 +1731,27 @@ body {
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-.btn-create-appointment,
-.btn-edit-appointment {
-    background: var(--warning);
+/* Bis 1.9.1 waren beide orange -- das ist in dieser Oberflaeche die
+   Warnfarbe (--warning), und weder ein neuer noch ein zu bearbeitender Termin
+   ist eine Warnung. "Anlegen" ist die Hauptaktion, solange kein Termin
+   gewaehlt ist, und traegt die Vereinsfarbe; "Bearbeiten" steht spaeter neben
+   "Aktualisieren" ueber einer gefuellten Liste und bleibt als Umriss
+   zurueckhaltend. */
+.btn-create-appointment {
+    background: var(--primary-color);
     color: white;
+}
+
+.btn-edit-appointment {
+    background: var(--card-bg);
+    color: var(--primary-color);
+    box-shadow: inset 0 0 0 2px var(--primary-color);
 }
 
 .btn-create-appointment:hover,
 .btn-edit-appointment:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+    box-shadow: 0 4px 12px rgba(31, 95, 191, 0.3);
 }
 
 /* Kein eigener Rollbereich, aus demselben Grund wie bei .history-list: Die
@@ -1851,31 +1904,6 @@ body {
     font-size: 12px;
     color: var(--text-light);
     font-weight: 400;
-}
-
-/* ========================================
-   APPOINTMENT MODAL
-   ======================================== */
-
-.btn-modal-cancel,
-.btn-modal-confirm {
-    flex: 1;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.btn-modal-cancel {
-    background: var(--text-light);
-    color: white;
-}
-
-.btn-modal-confirm {
-    background: var(--primary-color);
-    color: white;
 }
 
 /* ========================================
@@ -2709,6 +2737,15 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+}
+
+/* Trennlinie zwischen den Abschnitten, nicht um jeden herum: Die Karte
+   liegt bereits in zwei Kaesten (Abschnitt und Terminkarte), ein dritter
+   Rahmen je Gruppe waere eine Schachtelungsebene zu viel. Nur zwischen den
+   Gruppen, nicht ueber der ersten -- dort steht schon der Umschalter. */
+.response-name-group + .response-name-group {
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
 }
 
 /* Je Mitgliedsgruppe ein Block (Nutzer-Entscheidung) -- die Ueberschrift

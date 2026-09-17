@@ -38,6 +38,29 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Überschrift, und die Überschrift im Termine-Tab steht nicht mehr mittig, sondern links wie
   alle anderen. Der Erfassen-Tab selbst bleibt ohne Überschrift: die beiden großen Kacheln
   sagen bereits, worum es geht.
+- **Die Überschrift im Termin-Modal der PWA sieht aus wie die der übrigen vier.** Sie stand als
+  `h3` im Markup und fiel damit auf die Vorgabe des Browsers zurück, während „Code manuell
+  eingeben", „Nachträglicher Antrag", „Zeit nachtragen" und „Löschen bestätigen" blau und
+  fett erscheinen.
+- **Auch die Knöpfe sehen in allen fünf Dialogen gleich aus.** Das Termin-Modal hatte eigene
+  Knopfklassen mit blauer Bestätigung, die übrigen vier eine grüne. Grün bleibt — es ist in
+  der Check-in-App die Farbe der Hauptaktion, so wie Blau im Dashboard. Beide Knöpfe eines
+  Dialogs sind jetzt außerdem gleich breit: die Regel dafür stand auf einer Klasse, die in
+  dieser Oberfläche nirgends vergeben wird, weshalb sich die Breite nach der Beschriftung
+  richtete und „Antrag stellen" in seinem Knopf umbrach.
+- **Unter „Wer hat geantwortet?" trennt eine feine Linie die Gruppen.** Bei mehreren Registern
+  liefen Überschriften und Namens-Chips bisher als ein Block ineinander. Bewusst eine Linie und
+  kein Kasten je Gruppe: Die Liste steckt schon in zwei Kästen, ein dritter Rahmen wäre eine
+  Schachtelungsebene zu viel.
+- **„Termin anlegen" und „Termin bearbeiten" sind nicht mehr orange.** Orange ist in dieser
+  Oberfläche die Warnfarbe, und keiner der beiden Knöpfe warnt vor etwas. „Anlegen" trägt
+  jetzt die Vereinsfarbe, „Bearbeiten" steht als Umriss daneben, weil es zusammen mit
+  „Aktualisieren" über einer bereits gefüllten Liste erscheint.
+- **Die Anwesenheitsquote in der Statistik der PWA bekommt einen Farbbalken.** Bisher war die
+  Einordnung in die vier Bänder nur in der Gruppenliste darunter zu sehen, nicht bei der
+  Gesamtquote. Die Zahl selbst bleibt schwarz — in dieser Größe liest sie sich gefärbt
+  schlechter; die Farbe trägt der Balken, mit denselben Schwellen wie Gruppenliste und
+  Dashboard.
 
 ### Behoben
 - **Ein `PUT` löscht keine Felder mehr, die gar nicht mitgeschickt wurden.** Wer über die

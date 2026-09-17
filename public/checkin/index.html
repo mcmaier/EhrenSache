@@ -334,6 +334,13 @@
                             <div class="stat-icon">✓</div>
                             <div class="stat-value" id="statAttendanceRate">-</div>
                             <div class="stat-label">Anwesenheit</div>
+                            <!-- Der Wert bleibt schwarz und damit lesbar; die Einordnung
+                                 in die vier Baender uebernimmt der Balken darunter --
+                                 dasselbe Mittel wie in der Gruppenliste und im
+                                 Dashboard (.rate-bar/.rate-fill). -->
+                            <div class="stat-bar" id="statAttendanceBar" hidden>
+                                <div class="stat-bar-fill" id="statAttendanceBarFill"></div>
+                            </div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon">📅</div>
@@ -448,7 +455,7 @@
     <!-- Appointment Modal -->
     <div class="modal" id="appointmentModal">
         <div class="modal-content">
-            <h3 id="appointmentModalTitle">Termin anlegen</h3>
+            <h2 id="appointmentModalTitle">Termin anlegen</h2>
             <form id="appointmentForm">
                 <div class="form-group">
                     <label for="appointmentTitle">Titel *</label>
@@ -469,8 +476,8 @@
                     </select>
                 </div>
                 <div class="modal-buttons">
-                    <button type="button" class="btn-modal-cancel" id="btnCancelAppointment">Abbrechen</button>
-                    <button type="submit" class="btn-modal-confirm" id="btnSaveAppointment">Speichern</button>
+                    <button type="button" class="action-button btn-cancel" id="btnCancelAppointment">Abbrechen</button>
+                    <button type="submit" class="action-button" id="btnSaveAppointment">Speichern</button>
                 </div>
             </form>
         </div>
