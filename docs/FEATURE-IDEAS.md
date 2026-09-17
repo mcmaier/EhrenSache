@@ -45,7 +45,7 @@ durchschlägt.
 | [FI-5](#fi-5--pin-anmeldung-am-auth-gerät) | PIN-Anmeldung am Auth-Gerät — **umgesetzt in 1.3.0** | mittel | M | FI-4 |
 | [FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push) | Benachrichtigungskanal (E-Mail, Web-Push) | hoch | M | — |
 | [FI-7](#fi-7--terminserien-für-wiederkehrende-proben) | Terminserien für wiederkehrende Proben | hoch | M | — |
-| [FI-8](#fi-8--kalender-abo-ics-feed) | Kalender-Abo (ICS-Feed) | mittel | S | — |
+| [FI-8](#fi-8--kalender-abo-ics-feed) | Kalender-Abo (ICS-Feed) | mittel | S | FI-23 für die Wirkung |
 | [FI-9](#fi-9--dienst--und-schichtplanung-für-veranstaltungen) | Dienst- und Schichtplanung für Veranstaltungen | mittel | L | FI-1 |
 | [FI-10](#fi-10--jubiläen-und-ehrungen-automatisch-ermitteln) | Jubiläen und Ehrungen automatisch ermitteln | mittel | S | — |
 | [FI-11](#fi-11--mehrsprachigkeit-der-oberfläche) | Mehrsprachigkeit der Oberfläche | niedrig | L | — |
@@ -60,12 +60,17 @@ durchschlägt.
 | [FI-20](#fi-20--einfache-umfragen) | Einfache Umfragen | niedrig | M | FI-6 |
 | [FI-21](#fi-21--aufgaben-mit-zuweisung-und-fälligkeit) | Aufgaben mit Zuweisung und Fälligkeit | niedrig | L | FI-6 |
 | [FI-22](#fi-22--musikstücke-und-programme) | Musikstücke und Programme | niedrig | L | — |
+| [FI-23](#fi-23--ort-und-ende-am-termin) | Ort und Ende am Termin (rein informativ) | mittel | M | — |
 
 ¹ hoch in Kombination mit [FI-1](#fi-1--terminzusage-im-vorfeld), für sich allein mittel.
 
 FI-1 bis FI-5 und FI-13 bis FI-15 stammen aus der Ideensammlung, FI-6 bis FI-12 sind
 Ergänzungen aus der Sichtung des Bestands. Die Nummern folgen dem Eingang, die Abschnitte dem
 Thema — deshalb steht FI-14 unter A und nicht am Ende.
+
+FI-23 kam am 2026-09-17 aus der Sichtung der Terminverwaltung dazu (Spec
+`2026-09-17-dashboard-filterleisten-design.md`) — nicht als eigener Wunsch, sondern weil drei
+bestehende Einträge die Felder stillschweigend voraussetzten.
 
 FI-16 bis FI-22 kamen am 2026-09-16 aus einem getrennt geführten Ideen-Backlog dazu, teils aus
 einem Vergleich mit `konzertmeister.app`. Aus demselben Abgleich stammen die Ergänzungen an
@@ -213,6 +218,11 @@ Radius befindet, kann sich in der PWA eintragen.
 
 **Warum interessant:** Deckt genau die Lücke, für die keine TOTP-Station aufgebaut werden kann.
 Eine feste Station im Proberaum lohnt sich, für einen einmaligen Auftritt lohnt sie sich nicht.
+
+**Wo die Koordinaten sitzen, entscheidet [FI-23](#fi-23--ort-und-ende-am-termin)** — und zwar
+vorher. Dort fällt die Wahl zwischen einem Ortsfeld am Termin und einer eigenen Ortstabelle.
+Fällt sie auf die Tabelle, hängen Koordinaten und Radius dort; fällt sie auf das Freitextfeld,
+braucht FI-3 eine eigene Ablage. Diese Frage hier nicht ein zweites Mal aufmachen.
 
 **Berührt:** Koordinaten und Radius am Termin oder an einer eigenen Check-in-Freigabe · neue
 Quelle im `checkin_source`-Enum von `records` (Migration; das Feld ist heute
@@ -391,11 +401,81 @@ Fronleichnam.
 
 ---
 
+### FI-23 · Ort und Ende am Termin
+**Nutzen:** mittel · **Aufwand:** M — *der Ort allein wäre S*
+
+Ein Termin trägt heute Titel, Beschreibung, Datum und Startzeit — mehr nicht
+(`{PREFIX}appointments`). Es fehlen **wo** und **wie lange**. Wer den Ort eines Auftritts
+mitteilen will, schreibt ihn in die Beschreibung; wer die Dauer angeben will, gar nicht.
+
+**Rein informativ.** Beide Felder sind eine Mitteilung an die Mitglieder und **nichts
+weiter**. Das Ende wird nicht ausgewertet, beeinflusst die Anwesenheit nicht und verändert die
+Pünktlichkeitsrechnung nicht — ein Check-in nach Terminende bleibt genau das, was er heute ist.
+Das ist die wichtigste Festlegung dieses Eintrags, weil sie den Aufwand begrenzt: Ohne sie
+zöge das Feld `statistics.php`, den Druckbericht und die Zeitkorrektur nach sich.
+
+**Warum interessant:** Weniger wegen des eigenen Nutzens als deshalb, weil **drei Einträge
+dieser Liste die Felder bereits voraussetzen, ohne es zu sagen**:
+
+- [FI-8](#fi-8--kalender-abo-ics-feed) braucht `LOCATION` und `DTEND`. Ohne sie liefert das
+  Kalender-Abo ortlose Termine mit geratener Länge — und verliert genau den Nutzen, der es zur
+  günstigsten Idee der Liste macht. Die Einstufung „Aufwand S" bei FI-8 gilt nur, wenn die
+  Felder vorher existieren.
+- [FI-19](#fi-19--terminvorlagen) nennt „Ort" wörtlich als eines der Vorbelegungsfelder.
+- [FI-3](#fi-3--gps-gestützter-check-in) hängt Koordinaten an den Termin. Anderer Datentyp,
+  aber dieselbe Stelle im Modell — wird beides getrennt entschieden, steht später ein
+  Ortsname neben einem Koordinatenpaar, das nichts von ihm weiß.
+
+Für die Mitglieder zählt der Unterschied zwischen Probenabend und Auftritt: Die wöchentliche
+Probe ist immer am selben Ort und ungefähr gleich lang, ein Auftritt oder Arbeitseinsatz nicht.
+Gerade dort steht die Information heute im Fließtext oder nirgends.
+
+**Berührt:** Migration plus `private/setup/ehrensache_db.sql` ·
+`private/handlers/appointments.php` (SELECT, `$allowedFields` in POST und PUT,
+Dublettenprüfung) · `public/js/modules/appointments.js` (Tabelle, Modal, Kalender-Popup) ·
+PWA: Terminwahl beim Check-in und Terminliste · CSV-Import und -Export samt Spaltenzuordnung ·
+`API.md`. **Nicht berührt:** `statistics.php`, Pünktlichkeit, Druckberichte.
+
+**Vorher zu klären:**
+
+- **Kein zweites Freitextfeld.** `description` gibt es bereits und steht im Dashboard als
+  eigene Tabellenspalte. Ein zusätzliches „Anmerkungen" wären zwei Felder ohne trennscharfe
+  Bedeutung — die füllt auf Dauer niemand konsistent, und die Anzeige muss beide unterbringen.
+  Vorschlag: Ort und Ende als benannte Felder, Beschreibung bleibt, wie sie ist.
+- **Dauer als Endzeit oder als Minutenzahl?** `end_time TIME NULL` liegt an ICS (`DTEND`) näher
+  und liest sich im Formular natürlicher, braucht aber eine Regel für den Überlauf über
+  Mitternacht (Vorschlag: `end_time < start_time` bedeutet Folgetag — kleinster Eingriff, weil
+  `date` und `start_time` ohnehin getrennt liegen). `duration_minutes` hat das Problem nicht,
+  zwingt aber jede Anzeige zum Rechnen und jede Eingabe zum Umdenken.
+- **Ort als Freitext oder als eigene Tabelle?** Freitext ist eine Spalte und fertig. Eine
+  Ortsliste (`locations`) wäre dagegen die Stelle, an der [FI-3](#fi-3--gps-gestützter-check-in)
+  später Koordinaten und Radius anhängt, statt sie ein zweites Mal am Termin zu führen. Die
+  Entscheidung gehört deshalb **vor** FI-3, nicht danach.
+- **Beide Felder optional.** Alles andere bricht jeden Bestandstermin und jeden automatisch
+  erzeugten Check-in-Termin, der weder Ort noch Ende kennt und auch keins bekommen kann.
+  Anzeige und Export müssen den leeren Fall sauber darstellen — das ist der Normalfall, nicht
+  die Ausnahme.
+- **Reimport-Identität bleibt unberührt.** Ein Termin wird beim CSV-Reimport über Datum,
+  Uhrzeit und Terminart wiedererkannt (siehe `OPEN-ITEMS.md`, Abschnitt zur Terminzuordnung).
+  Weder Ort noch Ende dürfen in dieses Merkmal einfließen, sonst erzeugt derselbe Bestand nach
+  einer Ortskorrektur Dubletten.
+
+**Aufteilbar.** Der Ort zuerst ist der lohnendste Schritt: eine optionale Spalte, keine
+Berührung der Auswertung, und er hebt sofort den Wert von FI-8 und FI-19. Das Ende kann mit
+FI-8 zusammen kommen oder warten, bis ein Verein danach fragt.
+
+---
+
 ### FI-8 · Kalender-Abo (ICS-Feed)
-**Nutzen:** mittel · **Aufwand:** S
+**Nutzen:** mittel · **Aufwand:** S — **setzt [FI-23](#fi-23--ort-und-ende-am-termin) voraus**
 
 Persönliche, mit Token geschützte Kalender-URL, die jedes Mitglied in Telefon oder
 Mail-Programm abonniert. Nur lesend, nur die Termine der eigenen Gruppen.
+
+**Der Aufwand „S" gilt nur mit FI-23.** Ohne `location` und `end_time` am Termin exportiert der
+Feed Einträge ohne Ort und mit geratener Länge — technisch ein gültiger Kalender, praktisch
+eine Liste von Titeln. Die Felder nachzuliefern ist Arbeit an `appointments`, nicht am Feed,
+und gehört deshalb dorthin.
 
 **Warum interessant:** Sehr viel Wirkung für sehr wenig Code — ICS ist Textausgabe, keine
 Bibliothek nötig, was zur Linie des Projekts passt (kein PDF-Export, „würde eine Bibliothek
@@ -724,6 +804,10 @@ Ein benannter Satz Vorbelegungen (Terminart, Uhrzeit, Gruppen, Ort), aus dem sic
 Termin mit einem Klick füllt. Die kleinste Idee der Liste — im Kern eine Tabelle und ein
 Auswahlfeld im Anlegen-Dialog.
 
+Das Feld „Ort" gibt es am Termin noch nicht; es kommt mit
+[FI-23](#fi-23--ort-und-ende-am-termin). Ohne dieses bleiben als Vorbelegung nur Terminart,
+Uhrzeit und Gruppen — womit die Vorlage noch weniger hergibt als ohnehin schon.
+
 **Warum eher nicht zuerst:** [FI-7](#fi-7--terminserien-für-wiederkehrende-proben) nimmt ihr den
 Anlass. Was sich regelmäßig wiederholt, ist dann eine Serie; was einmalig ist, lohnt keine
 Vorlage. Sinnvoll bleibt sie höchstens für unregelmäßig wiederkehrende Terminarten — Auftritte,
@@ -800,10 +884,13 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
 4. **FI-6 Benachrichtigungen** — erst jetzt, und erst nachdem die Auslöserfrage beantwortet ist.
    Danach wird alles Vorherige wirksamer, FI-1 am deutlichsten. Die Einmal-Links aus der Mail
    gehören in dieselbe Runde, weil sie dieselbe Sicherheitsprüfung brauchen.
-5. **FI-8 ICS-Abo** — jederzeit dazwischen möglich und die günstigste Idee der Liste; nach FI-7
-   noch günstiger, weil die Wiederholungsregel dann schon in der richtigen Schreibweise
-   vorliegt. **FI-18 ICS-Import** ist davon unabhängig und deutlich teurer — nicht zusammen
-   einplanen, nur weil beide „ICS" heißen.
+5. **FI-23 Ort und Ende**, dann **FI-8 ICS-Abo** — in dieser Reihenfolge. FI-8 ist weiterhin
+   die günstigste Idee der Liste, aber ein Feed ohne Ort und ohne Dauer ist eine Liste von
+   Titeln; die zwei Felder davor gebaut, macht aus derselben Arbeit einen brauchbaren Kalender.
+   FI-23 nützt außerdem für sich allein und hebt nebenbei FI-19. Nach FI-7 wird FI-8 noch
+   günstiger, weil die Wiederholungsregel dann schon in der richtigen Schreibweise vorliegt.
+   **FI-18 ICS-Import** ist davon unabhängig und deutlich teurer — nicht zusammen einplanen,
+   nur weil beide „ICS" heißen.
 6. **FI-4 Auth-Geräte (Rest: NFC/Biometrie)**, dann **FI-3 GPS** — die Check-in-Wege gemeinsam
    entscheiden, damit Beweiswert und Kennzeichnung der Quellen einmal einheitlich festgelegt
    werden statt dreimal verschieden.
