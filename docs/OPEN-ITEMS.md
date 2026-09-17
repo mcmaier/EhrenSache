@@ -2863,14 +2863,15 @@ Aus der Arbeit an der Check-in-PWA für 1.9.1 (`8f47006`, `044797d`), dort bewus
 zurückgestellt und nicht release-blockierend. Hier festgehalten, damit sie nicht allein in
 einer Sitzungsnachricht stehen.
 
-1. **Die Trennlinie zwischen den Antwortgruppen fehlt im Dashboard.** `namesListHtml()`
+1. ~~**Die Trennlinie zwischen den Antwortgruppen fehlt im Dashboard.**~~ **Verworfen am
+   2026-09-17 (Nutzerentscheidung): Im Dashboard genügt die vorhandene graue Zeile.** Der
+   Befund als solcher stimmte und wurde bestätigt: `namesListHtml()`
    ([responses.js](../public/js/modules/responses.js)) erzeugt dieselben
-   `.response-name-group`-Blöcke wie die PWA. Die PWA trennt sie seit 1.9.1 mit
-   `.response-name-group + .response-name-group { border-top: ... }`
-   ([checkin/css/style.css](../public/checkin/css/style.css)); die Dashboard-Styles
-   ([css/components/modals.css](../public/css/components/modals.css)) haben dafür kein
-   Gegenstück. **Geprüft am 2026-09-17:** beides bestätigt — gleiche Klassen, Regel nur in der
-   PWA.
+   `.response-name-group`-Blöcke wie die PWA, und die Regel
+   `.response-name-group + .response-name-group { border-top: ... }` steht allein in
+   ([checkin/css/style.css](../public/checkin/css/style.css)). Nachgezogen wird sie trotzdem
+   nicht — im Dashboard gliedern der größere Abstand und die graue Gruppenzeile
+   (`.response-group-row`) bereits ausreichend.
 
    Dieselbe Frage wie bei OI-68: Zwei Oberflächen teilen sich ein Markup, aber nicht sein CSS.
    Beim nächsten gemeinsamen Baustein gehören die Klassen nach `css/components/`, statt sie zu
