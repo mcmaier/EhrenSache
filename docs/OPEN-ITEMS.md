@@ -2584,3 +2584,55 @@ sind heute an die Einstellungsseite gebunden. Für eine zweite Seite gehören di
 Rechtebezug. Punkt 3 berührt allerdings die Auskunftspflicht und ist deshalb der wichtigste der
 drei.
 
+---
+
+### OI-70 · Statistik nach Untergruppe rechnet nicht
+**Priorität:** mittel — Entscheidung getroffen, Umsetzung offen · aufgenommen am 2026-09-17
+
+Wählt man in der Statistik eine Gruppe, die als Untergruppe markiert ist (im Musikverein das
+Register), bleibt die Auswertung leer. Das ist kein Fehler, sondern die Folge der Datenlage: Die
+Statistik ermittelt ihren Bereich über Terminarten und deren Gruppen. Einem Register sind in der
+Regel keine Terminarten zugeordnet, also gibt es keine Termine, über die gerechnet werden könnte.
+Seit 1.8.0 erklärt ein Hinweis in der Statistik genau das, statt eine stumme leere Tabelle zu
+zeigen ([`statistics.js`](../public/js/modules/statistics.js)).
+
+**Entschieden am 2026-09-16:** Die richtige Auswertung soll kommen — gerechnet über die
+**Mitglieder** der Untergruppe, ausgewertet über die Termine, zu denen diese Mitglieder über ihre
+Zugehörigkeitsgruppen erwartet werden. Das ist die eigentlich interessante Auskunft („wie
+zuverlässig ist das Register Klarinette?“) und der Grund, warum die Gliederung überhaupt gebaut
+wurde.
+
+**Warum es eine eigene Spec braucht:** Die Auswertung läuft heute konsequent über Terminarten. Ein
+zweiter Weg daneben wirft Fragen auf, die zusammenpassen müssen: Welche Termine zählen für ein
+Register — alle, zu denen seine Mitglieder erwartet werden, oder nur die der Terminarten, denen es
+selbst zugeordnet ist? Wie verhält sich die Zuverlässigkeit aus 1.5.1 dazu? Und wie zählt jemand,
+der in zwei Registern steht — einmal je Register oder anteilig? Ohne Antworten darauf entsteht
+eine Zahl, der man nicht ansieht, was sie misst.
+
+**Was heute schon geht:** Wer eine Registerstatistik braucht, ordnet das Register einer Terminart
+zu (die Registerprobe) — dann rechnet die Statistik für diese Terminart. Das deckt den
+Registerproben-Fall ab, nicht die Frage nach der Zuverlässigkeit eines Registers über alle
+Termine.
+
+**Berührt:** `private/handlers/statistics.php`, `private/helpers/punctuality.php`,
+`public/js/modules/statistics.js`. Siehe auch
+[FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht) — dort bleibt die
+Besetzungsübersicht mit Sollstärke offen, die auf derselben Gliederung aufsetzt, aber eine andere
+Frage beantwortet.
+
+---
+
+### OI-71 · Zwei Kleinigkeiten in den Dashboards
+**Priorität:** niedrig · aufgenommen am 2026-09-17
+
+Aus dem manuellen Test zum Untergruppen-Vorhaben (2026-09-16), bewusst zurückgestellt, weil ohne
+Bezug zu diesem Vorhaben:
+
+1. **Mitglieder-Dashboard: die Zahl der inaktiven Mitglieder fehlt.** Die Kennzahlenkarte zeigt
+   das Häkchen für inaktive Mitglieder, aber nicht, wie viele es sind. Wer wissen will, wie viele
+   Karteileichen im Bestand stehen, muss filtern und zählen.
+2. **Statistik-Dashboard: kein „Filter zurücksetzen“.** Andere Ansichten haben einen Knopf dafür,
+   die Statistik nicht — nach mehreren gesetzten Filtern bleibt nur, sie einzeln zurückzustellen
+   oder die Seite neu zu laden.
+
+**Nicht sicherheitsrelevant:** beides reine Anzeige und Bedienung.
