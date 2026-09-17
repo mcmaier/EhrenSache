@@ -42,10 +42,12 @@ function ugDelete(string $resource, int $id): void
 function ugWorld(string $label): array
 {
     $suffix = uniqid();
-    $world  = ['group' => null, 'type' => null, 'member' => null, 'appointment' => null, 'extraGroups' => []];
+    $world  = ['group' => null, 'type' => null, 'member' => null, 'appointment' => null,
+               'extraGroups' => [], 'typeGroups' => []];
 
     try {
-        $world['group'] = ugCreate('member_groups', ['group_name' => "UG {$label} Gruppe {$suffix}"]);
+        $world['group']      = ugCreate('member_groups', ['group_name' => "UG {$label} Gruppe {$suffix}"]);
+        $world['typeGroups'] = [$world['group']];
         $world['type']  = ugCreate('appointment_types', [
             'type_name'  => "UG {$label} {$suffix}",
             'is_default' => false,
@@ -105,6 +107,34 @@ function ugAddGroupToMember(array &$world, string $label, bool $isSubgroup, int 
         'sort_order'  => $sortOrder,
     ]);
     $world['extraGroups'][] = $groupId;
+
+    $current = ugMemberGroupIds($world['member']);
+    ugSetMemberGroups($world['member'], array_values(array_unique(array_merge($current, [$groupId]))));
+
+    return $groupId;
+}
+
+/**
+ * Haengt eine weitere Gruppe direkt der Terminart der Welt an (volles Update
+ * von group_ids, wie appointment_types.php es verlangt) und nimmt das
+ * Mitglied der Welt mit hinein -- sonst waere es fuer die neue Gruppe gar
+ * nicht erwartet. Bildet den Bugbericht nach: eine Terminart mit einer
+ * gewoehnlichen Gruppe UND einem direkt zugeordneten Register.
+ */
+function ugAddGroupToType(array &$world, string $label, bool $isSubgroup, int $sortOrder): int
+{
+    $groupId = ugCreate('member_groups', [
+        'group_name'  => "UG {$label} " . uniqid(),
+        'is_subgroup' => $isSubgroup,
+        'sort_order'  => $sortOrder,
+    ]);
+    $world['extraGroups'][] = $groupId;
+    $world['typeGroups'][]  = $groupId;
+
+    assertStatus(200, apiRequest('PUT', 'appointment_types', ['token' => apiToken('admin'),
+        'query' => ['id' => $world['type']],
+        'body'  => ['group_ids' => $world['typeGroups']],
+    ]), "Gruppe {$groupId} konnte nicht an die Terminart gehaengt werden");
 
     $current = ugMemberGroupIds($world['member']);
     ugSetMemberGroups($world['member'], array_values(array_unique(array_merge($current, [$groupId]))));
@@ -232,6 +262,86 @@ test('attendance_list: eine nicht markierte Gruppe steht nicht in subgroups', fu
     }
 });
 
+// ----------------------------------------------------------------------
+// Regression: eine Gruppe, die zugleich als Untergruppe markiert UND einer
+// Terminart direkt zugeordnet ist, darf nicht in beiden Stufen erscheinen
+// (Doppelanzeige, im manuellen Test gefunden -- Terminart "Aktive" plus
+// mehrere Register). Die beiden Faelle des Bugberichts: gemischt (Gruppe UND
+// Register an derselben Terminart) und die Registerprobe (Terminart hat NUR
+// ein Register).
+// ----------------------------------------------------------------------
+
+test('attendance_list: Gruppe und direkt zugeordnetes Register stehen nur in ihrer eigenen Stufe', function () {
+    $welt = ugWorld('Gemischt');
+    try {
+        $registerId = ugAddGroupToType($welt, 'Register', true, 10);
+
+        $zeile = ugAttendanceRow($welt['appointment'], $welt['member']);
+
+        assertSame([$welt['group']], array_map(static fn ($g) => (int) $g['group_id'], $zeile['groups']),
+            'groups darf nur die gewoehnliche Gruppe enthalten, nicht das direkt zugeordnete Register');
+        assertSame([$registerId], array_map(static fn ($g) => (int) $g['group_id'], $zeile['subgroups']),
+            'subgroups muss das direkt zugeordnete Register enthalten');
+    } finally {
+        ugDropWorld($welt);
+    }
+});
+
+/**
+ * Registerprobe: eine Terminart mit NUR einem Register zugeordnet, keine
+ * gewoehnliche Gruppe -- anders als ugWorld(), dessen Terminart-Gruppe nie
+ * als Untergruppe markiert ist.
+ */
+function ugWorldSubgroupOnly(string $label): array
+{
+    $suffix = uniqid();
+    $world  = ['group' => null, 'type' => null, 'member' => null, 'appointment' => null,
+               'extraGroups' => [], 'typeGroups' => []];
+
+    try {
+        $world['group'] = ugCreate('member_groups', [
+            'group_name'  => "UG {$label} Register {$suffix}",
+            'is_subgroup' => true,
+        ]);
+        $world['type']  = ugCreate('appointment_types', [
+            'type_name'  => "UG {$label} {$suffix}",
+            'is_default' => false,
+            'color'      => '#667eea',
+            'group_ids'  => [$world['group']],
+        ]);
+        $world['member'] = ugCreate('members', [
+            'name'      => 'Ug',
+            'surname'   => "Test {$label} {$suffix}",
+            'active'    => 1,
+            'group_ids' => [$world['group']],
+        ]);
+        $world['appointment'] = ugCreate('appointments', [
+            'title'      => 'UG-Termin',
+            'date'       => date('Y-m-d'),
+            'start_time' => '19:00:00',
+            'type_id'    => $world['type'],
+        ]);
+    } catch (Throwable $e) {
+        ugDropWorld($world);
+        throw $e;
+    }
+
+    return $world;
+}
+
+test('attendance_list: Registerprobe -- Terminart mit nur einem Register liefert das erwartete Mitglied, groups bleibt leer', function () {
+    $welt = ugWorldSubgroupOnly('Registerprobe');
+    try {
+        $zeile = ugAttendanceRow($welt['appointment'], $welt['member']);
+
+        assertSame([], $zeile['groups'], 'groups muss leer bleiben, wenn die einzige zugeordnete Gruppe ein Register ist');
+        assertSame([$welt['group']], array_map(static fn ($g) => (int) $g['group_id'], $zeile['subgroups']),
+            'subgroups muss das Register enthalten');
+    } finally {
+        ugDropWorld($welt);
+    }
+});
+
 test('appointment_responses: erwartete Mitglieder tragen Gruppen und Untergruppen', function () {
     $welt = ugWorld('Antwort');
     try {
@@ -323,6 +433,55 @@ test('appointment_responses: Mitgliedskonto mit Freigabe sieht Gruppen und Unter
             assertSame($welt['sub'], (int) $treffer[0]['subgroups'][0]['group_id']);
             assertSame($welt['group'], (int) $treffer[0]['groups'][0]['group_id']);
         });
+    } finally {
+        ugDropWorld($welt);
+    }
+});
+
+test('appointment_responses: Gruppe und direkt zugeordnetes Register stehen nur in ihrer eigenen Stufe', function () {
+    $welt = ugWorld('AntwortGemischt');
+    try {
+        $registerId = ugAddGroupToType($welt, 'AntwortRegister', true, 10);
+
+        assertStatus(200, apiRequest('PUT', 'appointment_types', ['token' => apiToken('admin'),
+            'query' => ['id' => $welt['type']],
+            'body'  => ['type_name' => 'UG-Antwort-Gemischt', 'group_ids' => $welt['typeGroups'],
+                        'responses_enabled' => 1, 'responses_names_visible' => 1]]));
+
+        $res = apiRequest('GET', 'appointment_responses', ['token' => apiToken('admin'),
+                                                          'query' => ['appointment_id' => $welt['appointment']]]);
+        assertStatus(200, $res);
+
+        $treffer = array_values(array_filter($res['body']['members'],
+            static fn ($m) => (int) $m['member_id'] === $welt['member']));
+        assertSame(1, count($treffer), 'das erwartete Mitglied steht genau einmal in der Antwort');
+        assertSame([$welt['group']], array_map(static fn ($g) => (int) $g['group_id'], $treffer[0]['groups']),
+            'groups darf nur die gewoehnliche Gruppe enthalten, nicht das direkt zugeordnete Register');
+        assertSame([$registerId], array_map(static fn ($g) => (int) $g['group_id'], $treffer[0]['subgroups']),
+            'subgroups muss das direkt zugeordnete Register enthalten');
+    } finally {
+        ugDropWorld($welt);
+    }
+});
+
+test('appointment_responses: Registerprobe -- Terminart mit nur einem Register liefert das erwartete Mitglied, groups bleibt leer', function () {
+    $welt = ugWorldSubgroupOnly('AntwortRegisterprobe');
+    try {
+        assertStatus(200, apiRequest('PUT', 'appointment_types', ['token' => apiToken('admin'),
+            'query' => ['id' => $welt['type']],
+            'body'  => ['type_name' => 'UG-Antwort-Registerprobe', 'group_ids' => [$welt['group']],
+                        'responses_enabled' => 1, 'responses_names_visible' => 1]]));
+
+        $res = apiRequest('GET', 'appointment_responses', ['token' => apiToken('admin'),
+                                                          'query' => ['appointment_id' => $welt['appointment']]]);
+        assertStatus(200, $res);
+
+        $treffer = array_values(array_filter($res['body']['members'],
+            static fn ($m) => (int) $m['member_id'] === $welt['member']));
+        assertSame(1, count($treffer), 'das erwartete Mitglied steht genau einmal in der Antwort');
+        assertSame([], $treffer[0]['groups'], 'groups muss leer bleiben, wenn die Terminart nur ein Register hat');
+        assertSame([$welt['group']], array_map(static fn ($g) => (int) $g['group_id'], $treffer[0]['subgroups']),
+            'subgroups muss das Register enthalten');
     } finally {
         ugDropWorld($welt);
     }
