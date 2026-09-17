@@ -2531,3 +2531,56 @@ diese Anwendung gebaut ist.
 **Nicht sicherheitsrelevant:** veraltete Anzeige, keine falsche Berechtigung. Der Server prüft
 jeden Check-in unabhängig von dem, was die Auswahlliste zeigt — ein fehlender Eintrag führt
 höchstens dazu, dass der automatische Terminabgleich greift oder der Check-in abgewiesen wird.
+
+---
+
+### OI-68 · „Mein Profil“: falscher Kartentitel, scheinbar gesperrtes Feld, veralteter Hinweistext
+**Priorität:** niedrig · aufgenommen am 2026-09-17
+
+Drei kleine Ungenauigkeiten auf der Profilseite, beim Umbau der Einstellungen (1.9.0) aufgefallen
+und dort nur im Abgrenzungsabschnitt der Spec notiert. Keine davon ist ein Fehlverhalten des
+Servers — alle drei führen den Nutzer in die Irre.
+
+1. **Der Kartentitel nennt die falsche Anwendung.** Die Karte heißt „API-Token für
+   Zeiterfassung“ ([`index.html:210`](../public/index.html)), der Text darunter erklärt: „Der
+   API-Token wird für die Check-In App benötigt.“ Der Token ist der Zugang zur Check-in-PWA, die
+   Zeiterfassung ist nur eine ihrer Funktionen und obendrein abschaltbar. Wer die Zeiterfassung
+   nicht nutzt, hält den Token für überflüssig.
+
+2. **Die Formatauswahl bei „Meine Daten“ sieht gesperrt aus, ist es aber nicht.** Das `<select>`
+   trägt inline `background: #f8f9fa; cursor: not-allowed`
+   ([`index.html:154`](../public/index.html)) — dieselbe Optik wie die echten Nur-Lese-Felder
+   darüber (E-Mail, Rolle, verknüpftes Mitglied). Ausgewertet wird es sehr wohl:
+   `downloadMyData()` liest den Wert ([`profile.js:279`](../public/js/modules/profile.js)). Wer
+   die CSV will, probiert es gar nicht erst.
+
+3. **Der Bestätigungsdialog zählt zu wenig auf.** Er nennt „Stammdaten, Anwesenheiten, Ausnahmen,
+   Gruppenzugehörigkeiten“ ([`profile.js:277`](../public/js/modules/profile.js)). Tatsächlich
+   enthält die Auskunft außerdem Mitgliedschaftszeiträume, Terminrückmeldungen, Arbeitszeiten samt
+   Änderungshistorie sowie Pünktlichkeit und Zuverlässigkeit — seit OI-50 in **beiden** Formaten.
+   Für eine Auskunft nach Art. 15 DSGVO ist eine zu kurze Aufzählung die unangenehmere Richtung:
+   Sie erweckt den Eindruck, es werde weniger gespeichert, als es der Fall ist.
+
+**Zu tun:** Titel auf die Check-in-App beziehen; die Inline-Optik des `<select>` entfernen (die
+gesperrte Darstellung gehört den wirklich gesperrten Feldern); den Dialogtext an den tatsächlichen
+Umfang angleichen — am besten ohne erneute Aufzählung, die beim nächsten Feature wieder veraltet.
+
+**Nicht Teil dieses Punktes: der Umbau der Seite zu Reitern.** „Mein Profil“ soll „Mein Konto“ mit
+eigenen Tabs werden — entschieden am 2026-09-15, festgehalten in Abschnitt 8 der Spec
+`docs/superpowers/specs/2026-09-16-einstellungen-untertabs-design.md`. Der Auslöser dafür ist
+[FI-17](FEATURE-IDEAS.md#fi-17--offene-punkte-unter-mein-konto): Eine Sammelkarte der offenen
+Punkte füllt einen Reiter von selbst. **Solange die Seite vier Karten hat, wäre eine Gliederung
+ein zusätzlicher Klick ohne Gewinn** — anders als bei den Systemeinstellungen, wo zwölf Karten
+untereinander standen.
+
+**Wenn es so weit ist:** Das Muster der Einstellungen wiederverwenden, nicht kopieren.
+`.settings-tabs`, `.settings-tab-btn` und `.settings-panel`
+([`css/sections/settings.css`](../public/css/sections/settings.css)) sowie `showSettingsTab()`
+und der gemerkte Reiter in `sessionStorage` ([`settings.js`](../public/js/modules/settings.js))
+sind heute an die Einstellungsseite gebunden. Für eine zweite Seite gehören die Klassen nach
+`css/components/` und die Umschaltlogik in einen gemeinsamen Helfer.
+
+**Nicht sicherheitsrelevant:** Beschriftung und Darstellung, keine Datenänderung, kein
+Rechtebezug. Punkt 3 berührt allerdings die Auskunftspflicht und ist deshalb der wichtigste der
+drei.
+
