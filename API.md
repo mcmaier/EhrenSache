@@ -1272,9 +1272,10 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
 
   Jedes Element trägt außerdem `group_name` (die Gruppe der Terminart, über die das Mitglied
   erwartet wird) sowie **seit 1.8.0** `groups` und `subgroups` — dieselbe Struktur wie bei
-  `attendance_list`: `groups` sind die Gruppen des Mitglieds, die zur Terminart gehören,
-  `subgroups` alle als Untergruppe markierten Gruppen des Mitglieds, unabhängig vom Termin.
-  Beide unterliegen denselben Sichtbarkeitsregeln wie die Namen selbst — ohne Namen keine
+  `attendance_list`: `groups` sind die Gruppen des Mitglieds, die zur Terminart gehören und
+  **seit 1.9.0** nicht als Untergruppe markiert sind, `subgroups` alle als Untergruppe
+  markierten Gruppen des Mitglieds, unabhängig vom Termin. Beide Listen sind überschneidungsfrei
+  und unterliegen denselben Sichtbarkeitsregeln wie die Namen selbst — ohne Namen keine
   Zugehörigkeiten.
 - `comparison` — nur Admin/Manager, nur nach Beginn: Anzahl je `yes_present`, `yes_absent`,
   `no_present`, `no_absent`, `maybe_present`, `maybe_absent`, `none_present`, `none_absent`.
@@ -2418,12 +2419,16 @@ für das Mitglied noch kein Anwesenheitseintrag zu diesem Termin vorliegt.
 
 **Seit 1.8.0** treten je Mitglied zwei strukturierte Listen an die Stelle der früheren
 Zeichenkette `groups`:
-- `groups`: die Gruppen des Mitglieds, **die zur Terminart gehören** — dieselbe Bedeutung wie
-  die frühere Zeichenkette, nur strukturiert statt als ein kommagetrennter Name.
+- `groups`: die Gruppen des Mitglieds, die zur Terminart gehören **und nicht als Untergruppe
+  markiert sind**. Vor 1.9.0 enthielt diese Liste auch Terminart-Gruppen, die zugleich als
+  Untergruppe markiert waren — eine Terminart mit direkt zugeordnetem Register führte so zu
+  einer doppelten Erwartung desselben Mitglieds (einmal über `groups`, einmal über `subgroups`).
 - `subgroups`: **alle** als Untergruppe markierten Gruppen des Mitglieds (z. B. das Register),
   unabhängig davon, ob die Terminart selbst nach diesen Gruppen eingeteilt ist.
 
-Beide Listen sind nach `sort_order`, bei Gleichstand nach `group_name` sortiert.
+Die beiden Listen sind seit 1.9.0 überschneidungsfrei: eine als Untergruppe markierte Gruppe
+steht nie in `groups`, auch wenn sie zur Terminart gehört. Beide Listen sind nach `sort_order`,
+bei Gleichstand nach `group_name` sortiert.
 
 > Bis 1.8.0 zeigte dieser Abschnitt eine Antwort mit einem `attendance`-Array und Feldern
 > `member_name`/`appointment_date`/`group_name`, die der Server so nie geliefert hat — geliefert
