@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.9.0] – 2026-09-17
 
 ### Neu
 - **Systemeinstellungen in sieben Untertabs**: Allgemein, Termine & Anwesenheit, Zeiterfassung,
