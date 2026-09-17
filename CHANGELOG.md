@@ -21,6 +21,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   niemanden aussperren, auch nicht den Admin, der sie reparieren will. Die Systemeinstellungen
   zeigen im Tab „System" jetzt aber an, ob der Schutz arbeitet, und nennen Zeitpunkt und
   Fehlernummer der letzten Störung (OI-28).
+- **Freitext aus der Datenbank kann in keiner CSV mehr als Formel ausgeführt werden.** Eine
+  Zelle, die mit `=`, `+`, `-` oder `@` beginnt, wertet eine Tabellenkalkulation beim Öffnen
+  einer CSV-Datei aus. Wer eine Bemerkung oder einen Terminstitel entsprechend beginnen ließ,
+  konnte damit auf dem Rechner desjenigen etwas auslösen, der den Export öffnet — typischerweise
+  ein Vorstandsmitglied. Alle Exporte und die Selbstauskunft entschärfen solche Zellen jetzt.
+  Zahlen bleiben Zahlen, damit im Stundennachweis weiter gerechnet werden kann (OI-59).
+
+### Geändert
+- Die Abschnittsüberschriften der Selbstauskunft als CSV heißen `[ STAMMDATEN ]` statt
+  `=== STAMMDATEN ===`. Ein führendes Gleichheitszeichen hätte sonst in jeder Trennzeile ein
+  Schutzapostroph nach sich gezogen, das beim Import je nach Programm sichtbar bleibt.
 
 ### Behoben
 - **Ein `PUT` löscht keine Felder mehr, die gar nicht mitgeschickt wurden.** Wer über die
