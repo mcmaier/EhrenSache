@@ -151,7 +151,7 @@
                                 <button onclick="downloadMyData()" class="btn-std btn-delete">
                                     📥 Herunterladen
                                 </button>
-                                <select id="profile_user_data_format" class="form-input" style="background: #f8f9fa; cursor: not-allowed; max-width: 100px;">
+                                <select id="profile_user_data_format" class="form-input" style="max-width: 100px;">
                                     <option value="json">JSON</option>
                                     <option value="csv">CSV</option>
                                 </select>
@@ -207,7 +207,7 @@
 
                     <!-- API-Token -->
                     <div class="profile-card">
-                        <h3>API-Token für Zeiterfassung</h3>
+                        <h3>API-Token für die Check-in-App</h3>
                         <p style="color: #7f8c8d; margin-bottom: 15px; font-size: 14px;">
                             Der API-Token wird für die Check-In App benötigt.<br>
                             Sollte der Login nicht mehr gehen, prüfen Sie ob der Token noch gültig ist.
@@ -1083,6 +1083,8 @@
                                 </select>
                             </div>
                         </div>
+                        <button id="resetStatisticsFilter" onclick="resetStatisticsFilter()"
+                                class="btn-reset-filter">Filter zurücksetzen</button>
                     </div>                
                     <!--<div class="year-card">-->
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">                        
@@ -1150,6 +1152,7 @@
                     </div>
                     <div class="stat-card">
                         <h3>Inaktive Mitglieder</h3>
+                        <div class="number" id="statInactiveMembersCount">-</div>
                         <label class="checkbox-label" style="font-weight: 600; cursor: pointer;">
                             <input type="checkbox" id="show_inactive_members">                                   
                             Anzeigen

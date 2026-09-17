@@ -48,6 +48,21 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Zeile, antwortete aber mit „gelöscht" — bei Benutzern, Terminarten, Tätigkeitsarten, Gruppen
   und Mitgliedschaftszeiträumen. Jetzt kommt `400`, und eine unbekannte Kennung ergibt `404`
   (OI-56).
+- **Die Geräteliste zeigte nie mehr als 25 Geräte — ohne Weg zu den übrigen.** Die Blätterung
+  sprach ein Element an, das es unter diesem Namen nicht gab, und blieb deshalb unsichtbar.
+  Vereine mit vielen Stationen kamen an ihre restlichen Geräte nicht heran (OI-29).
+- **Das Mitglieder-Dashboard nennt die Zahl der inaktiven Mitglieder.** Bisher stand dort nur
+  das Häkchen zum Einblenden; wer wissen wollte, wie viele Karteileichen im Bestand stehen,
+  musste filtern und zählen. Beide Zahlen beziehen sich jetzt auf den Bestand des gewählten
+  Jahres, nicht auf die gerade gefilterte Liste (OI-71).
+- **Die Statistik hat einen Knopf „Filter zurücksetzen"**, wie die übrigen Ansichten. Das Jahr
+  bleibt dabei stehen (OI-71).
+- **„Mein Profil": drei Ungenauigkeiten, die in die Irre führten.** Die Token-Karte heißt nach
+  der Check-in-App statt nach der Zeiterfassung — der Token ist der Zugang zur ganzen App, nicht
+  nur zu einer ihrer Funktionen. Die Formatauswahl bei „Meine Daten" sah gesperrt aus, obwohl
+  sie ausgewertet wird; wer die CSV wollte, probierte es gar nicht erst. Und der
+  Bestätigungsdialog zählte vier von zehn Datenarten auf und ließ die Auskunft damit kleiner
+  erscheinen, als sie ist — er nennt jetzt keine Liste mehr (OI-68).
 
 ---
 

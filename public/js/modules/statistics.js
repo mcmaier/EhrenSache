@@ -172,6 +172,24 @@ export async function applyStatisticsFilters() {
 }
 
 
+
+/**
+ * Setzt die Filter der Statistik zurück (OI-71).
+ *
+ * Das Jahr bleibt stehen -- wie bei den anderen Ansichten, deren
+ * Zurücksetzen ebenfalls nur die Filterleiste meint und nicht den
+ * Jahreswechsel rückgängig macht (vgl. resetMemberFilter).
+ */
+export async function resetStatisticsFilters() {
+    const gruppe   = document.getElementById('statGroup');
+    const mitglied = document.getElementById('statMember');
+
+    if (gruppe)   { gruppe.value   = ''; }
+    if (mitglied) { mitglied.value = ''; }
+
+    await applyStatisticsFilters();
+}
+
 // ============================================
 // RENDERING
 // ============================================
@@ -474,3 +492,4 @@ export async function initStatisticsEventHandlers() {
 
 window.updateStatisticsFilters = updateStatisticsFilters;
 window.applyStatisticsFilters = applyStatisticsFilters;
+window.resetStatisticsFilter = resetStatisticsFilters;

@@ -1502,7 +1502,7 @@ zu früh.
 ---
 
 ### OI-29 · `devices.js` Altlasten
-**Priorität:** niedrig
+**Priorität:** erledigt am 2026-09-17 — Maskierung am 2026-09-16, der Rest mit 1.9.1. Der Fund war größer als hier beschrieben, siehe unten
 
 Mehrere kleine, voneinander unabhängige Funde in `public/js/modules/devices.js`:
 
@@ -1514,9 +1514,28 @@ Mehrere kleine, voneinander unabhängige Funde in `public/js/modules/devices.js`
 - Dieselbe Lücke besteht in der Mitgliederliste: Namen werden ohne `escapeHtml()`
   interpoliert.
 
-**Zu tun:** Tote `getElementById`-Aufrufe entfernen oder das fehlende Markup ergänzen,
-`device_name` und Mitgliedsnamen konsequent über `escapeHtml()` führen, `page` in
-`showDeviceSection()` auswerten oder den Parameter streichen.
+**Erledigt in zwei Schritten.**
+
+**2026-09-16:** `device_name` und die Mitgliedsnamen laufen über `escapeHtml()` (`70d6e08`,
+`2ee35d6`), abgesichert durch einen Wächter in `tests/suites/assets.php` (`d4890b4`).
+
+**2026-09-17 (1.9.1) — und dabei war der erste Punkt kein Aufräumen, sondern ein Fehler:**
+`devicesPagination` hat sehr wohl ein Markup, es heißt nur `devicePagination` (Singular,
+[index.html](../public/index.html)). Der Code suchte den Plural, `renderDevicesPagination()`
+stieg also immer über `if (!container) return` aus. **Folge: Ab dem 26. Gerät war die Liste
+abgeschnitten, und es gab keinen Weg zu den übrigen** — `renderDevices()` schneidet auf
+`devicesPerPage = 25` zu. Ein Tippfehler, der Datensätze unerreichbar machte.
+
+Nachgestellt: Mit `devicesPerPage = 1` erscheint die Blätterung, der Sprung auf Seite 2 zeigt
+das zweite Gerät. Vorher blieb die Leiste leer.
+
+`filterDeviceRole`, `filterDeviceStatus` und `resetDeviceFilters` haben dagegen wirklich kein
+Markup — die Geräteliste hat keine Filterleiste. Die drei Handler sind entfernt; der
+Reset-Handler hätte beim Feuern sogar geworfen, weil er ohne Optional Chaining auf `.value`
+zugriff. `showDeviceSection()` wertet seinen `page`-Parameter jetzt aus, statt fest die 1 zu
+nehmen.
+
+Festgehalten in `tests/suites/profile_dashboard_frontend.php`.
 
 ---
 
@@ -2614,7 +2633,7 @@ höchstens dazu, dass der automatische Terminabgleich greift oder der Check-in a
 ---
 
 ### OI-68 · „Mein Profil“: falscher Kartentitel, scheinbar gesperrtes Feld, veralteter Hinweistext
-**Priorität:** niedrig · aufgenommen am 2026-09-17
+**Priorität:** erledigt am 2026-09-17 — mit 1.9.1, alle drei Punkte
 
 Drei kleine Ungenauigkeiten auf der Profilseite, beim Umbau der Einstellungen (1.9.0) aufgefallen
 und dort nur im Abgrenzungsabschnitt der Spec notiert. Keine davon ist ein Fehlverhalten des
@@ -2640,9 +2659,10 @@ Servers — alle drei führen den Nutzer in die Irre.
    Für eine Auskunft nach Art. 15 DSGVO ist eine zu kurze Aufzählung die unangenehmere Richtung:
    Sie erweckt den Eindruck, es werde weniger gespeichert, als es der Fall ist.
 
-**Zu tun:** Titel auf die Check-in-App beziehen; die Inline-Optik des `<select>` entfernen (die
-gesperrte Darstellung gehört den wirklich gesperrten Feldern); den Dialogtext an den tatsächlichen
-Umfang angleichen — am besten ohne erneute Aufzählung, die beim nächsten Feature wieder veraltet.
+**Behoben am 2026-09-17** (1.9.1), alle drei. Der Dialog nennt jetzt keine Datenarten mehr,
+sondern nur noch: „Die Datei enthält alles, was zu Ihnen gespeichert ist." Das ist die einzige
+Formulierung, die beim nächsten Feature nicht wieder veraltet — und für eine Auskunft nach
+Art. 15 DSGVO die richtige Richtung.
 
 **Nicht Teil dieses Punktes: der Umbau der Seite zu Reitern.** „Mein Profil“ soll „Mein Konto“ mit
 eigenen Tabs werden — entschieden am 2026-09-15, festgehalten in Abschnitt 8 der Spec
@@ -2767,7 +2787,7 @@ Frage beantwortet.
 ---
 
 ### OI-71 · Zwei Kleinigkeiten in den Dashboards
-**Priorität:** niedrig · aufgenommen am 2026-09-17
+**Priorität:** erledigt am 2026-09-17 — mit 1.9.1, beide Punkte
 
 Aus dem manuellen Test zum Untergruppen-Vorhaben (2026-09-16), bewusst zurückgestellt, weil ohne
 Bezug zu diesem Vorhaben:
@@ -2778,5 +2798,16 @@ Bezug zu diesem Vorhaben:
 2. **Statistik-Dashboard: kein „Filter zurücksetzen“.** Andere Ansichten haben einen Knopf dafür,
    die Statistik nicht — nach mehreren gesetzten Filtern bleibt nur, sie einzeln zurückzustellen
    oder die Seite neu zu laden.
+
+**Behoben am 2026-09-17** (1.9.1).
+
+**Beim Bauen zeigte sich ein zweiter Boden:** Die Kennzahlen rechneten über die **gefilterte**
+Liste. Aus ihr gerechnet, hätte die neue Zahl genau dann 0 gezeigt, wenn das Häkchen daneben aus
+ist — also immer dann, wenn jemand die Frage nach den Karteileichen überhaupt stellt. Beide
+Zahlen kommen jetzt aus dem Gesamtbestand des gewählten Jahres; die Tabelle darunter zeigt das
+Filterergebnis ohnehin.
+
+Das Zurücksetzen in der Statistik lässt das Jahr stehen — wie bei den anderen Ansichten, deren
+Knopf ebenfalls nur die Filterleiste meint.
 
 **Nicht sicherheitsrelevant:** beides reine Anzeige und Bedienung.

@@ -127,7 +127,7 @@ function renderDevices(devices, page = 1)
 
 
 function renderDevicesPagination(currentPage, totalPages, totalDevices) {
-    const container = document.getElementById('devicesPagination');
+    const container = document.getElementById('devicePagination');
     if (!container) return;
     
     if (totalPages <= 1) {
@@ -228,7 +228,7 @@ window.goToDevicesPage = function(page) {
     // ODER: Sanft zur Tabelle scrollen
     if (scrollBefore === 0) {
         // Nur scrollen wenn Device nicht gescrollt hat
-        const paginationElement = document.getElementById('devicesPagination');
+        const paginationElement = document.getElementById('devicePagination');
         if (paginationElement) {
             paginationElement.scrollIntoView({ 
                 behavior: 'smooth', 
@@ -245,7 +245,9 @@ export async function showDeviceSection(forceReload = false, page = 1)
     //applyDeviceFilters(forceReload, page);
     
     const allDevices = await loadDevices(forceReload);
-    renderDevices(allDevices, 1);
+    // Bis 1.9.1 stand hier fest die 1 -- der Parameter wurde entgegen-
+    // genommen und verworfen, ein Sprung auf Seite 2 landete wieder auf 1.
+    renderDevices(allDevices, page);
     
 }
 
@@ -298,23 +300,12 @@ export async function initDevicesEventHandlers()
     debug.log("Trying to register Device Event Handler. IsAdmin?", isAdmin);
     if (!isAdmin) return;
 
-        // Filter-Änderungen
-        document.getElementById('filterDeviceRole')?.addEventListener('change', () => {
-            applyDeviceFilters();
-        });
-        
-        document.getElementById('filterDeviceStatus')?.addEventListener('change', () => {
-            applyDeviceFilters();
-        });
-        
-        // Reset-Button (optional)
-        document.getElementById('resetDeviceFilters')?.addEventListener('click', () => {
-            document.getElementById('filterDeviceRole').value = '';
-            document.getElementById('filterDeviceStatus').value = '';
-            //document.getElementById('filterGroup').value = '';
-            applyDeviceFilters();
-        });
-    
+        // Hier standen bis 1.9.1 drei Handler fuer filterDeviceRole,
+        // filterDeviceStatus und resetDeviceFilters. Keines dieser Elemente
+        // gibt es im Markup -- die Geraeteliste hat keine Filterleiste. Der
+        // Reset-Handler haette beim Feuern sogar geworfen: Er griff ohne
+        // Optional Chaining auf .value zu (OI-29).
+
 
     // Devices laden und anzeigen
     //await applyDeviceFilters();

@@ -274,7 +274,16 @@ export async function regenerateProfileToken() {
 
 export async function downloadMyData(format = 'json') {
 
-    const confirmed = await showConfirm('Ihre persönlichen Daten herunterladen?\n\nEnthält: Stammdaten, Anwesenheiten, Ausnahmen, Gruppenzugehörigkeiten','Download bestätigen');
+    // Bewusst ohne Aufzaehlung der Datenarten (OI-68): Die alte Liste nannte
+    // vier von zehn und erweckte damit den Eindruck, es werde weniger
+    // gespeichert, als es der Fall ist -- bei einer Auskunft nach Art. 15
+    // DSGVO die unangenehmere Richtung. Jede Aufzaehlung an dieser Stelle
+    // veraltet ausserdem mit dem naechsten Feature, das Daten hinzufuegt.
+    const confirmed = await showConfirm(
+        'Ihre persönlichen Daten herunterladen?\n\n'
+        + 'Die Datei enthält alles, was zu Ihnen gespeichert ist.',
+        'Download bestätigen'
+    );
     
     format = document.getElementById("profile_user_data_format").value;
 

@@ -333,13 +333,30 @@ window.goToMembersPage = function(page) {
 
 function updateMemberStats(members)
 {
-// Statistik nur für Admin
-    if (isAdminOrManager) {
-        const activeCount = members.filter(m => m.is_active_in_period).length;
-        document.getElementById('statActiveMembersCount').textContent = activeCount;
-    } else {
-        document.getElementById('statActiveMembersCount').textContent = '-';
-    }   
+    // Beide Zahlen kommen aus dem GESAMTBESTAND des gewaehlten Jahres, nicht
+    // aus der gefilterten Liste (OI-71). Sonst zeigte die Karte "Inaktive"
+    // genau dann 0, wenn das Haekchen daneben aus ist -- also immer dann,
+    // wenn jemand die Frage stellt, wie viele Karteileichen im Bestand
+    // stehen. Die Tabelle zeigt das Filterergebnis ohnehin.
+    const aktiv   = document.getElementById('statActiveMembersCount');
+    const inaktiv = document.getElementById('statInactiveMembersCount');
+
+    if (!isAdminOrManager) {
+        if (aktiv)   { aktiv.textContent   = '-'; }
+        if (inaktiv) { inaktiv.textContent = '-'; }
+        return;
+    }
+
+    // Faellt der Cache aus (erster Aufruf, geleert), bleibt die uebergebene
+    // Liste die beste verfuegbare Grundlage.
+    const bestand = dataCache.members[currentYear]?.data ?? members ?? [];
+
+    if (aktiv) {
+        aktiv.textContent = bestand.filter(m => m.is_active_in_period).length;
+    }
+    if (inaktiv) {
+        inaktiv.textContent = bestand.filter(m => !m.is_active_in_period).length;
+    }
 }
 
 export async function showMemberSection(forceReload = false, page = 1) {
