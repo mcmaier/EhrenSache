@@ -225,10 +225,13 @@ function handleExceptions($db, $database, $method, $id) {
         case 'PUT':
             // Nur Admin darf Status ändern (genehmigen/ablehnen)
             // User dürfen ihre eigenen pending Anträge bearbeiten
-            $data = json_decode(file_get_contents("php://input"));
+            $data = (object) (json_decode(file_get_contents("php://input")) ?? []);
+            $vorhanden = get_object_vars($data);
             
-            // Hole Exception Info
-            $checkStmt = $db->prepare("SELECT member_id, status, appointment_id, exception_type
+            // Hole Exception Info. reason und requested_arrival_time gehoeren
+            // dazu, seit ein PUT nur schreibt, was er mitschickt (OI-69).
+            $checkStmt = $db->prepare("SELECT member_id, status, appointment_id, exception_type,
+                                              reason, requested_arrival_time
                                        FROM {$prefix}exceptions WHERE exception_id = ?");
             $checkStmt->execute([$id]);
             $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -239,11 +242,24 @@ function handleExceptions($db, $database, $method, $id) {
                 return;
             }
 
+            // Was der Request nicht mitschickt, bleibt stehen (OI-69). Vorher
+            // schrieben beide Zweige reason und requested_arrival_time
+            // bedingungslos: Ein PUT, das nur genehmigen oder ablehnen wollte,
+            // loeschte die Begruendung des Antragstellers und im Fall einer
+            // Zeitkorrektur auch die beantragte Uhrzeit -- also genau das, was
+            // die Entscheidung nachvollziehbar macht.
+            $wirkReason = array_key_exists('reason', $vorhanden)
+                ? $data->reason : $existing['reason'];
+            $wirkRequestedTime = array_key_exists('requested_arrival_time', $vorhanden)
+                ? $data->requested_arrival_time : $existing['requested_arrival_time'];
+            $wirkStatus = array_key_exists('status', $vorhanden)
+                ? $data->status : $existing['status'];
+
             // Dieselbe Grenze wie beim Anlegen, hier für beide Pfade: Das
             // Mitglied bessert seinen Antrag nach, der Admin korrigiert ihn vor
             // der Freigabe. Der Termin kommt aus dem Bestand, nicht aus dem
             // Anfragekörper — er lässt sich nachträglich nicht wechseln.
-            $neueWunschzeit = $data->requested_arrival_time ?? null;
+            $neueWunschzeit = $wirkRequestedTime;
 
             if ($existing['exception_type'] === 'time_correction' && $neueWunschzeit !== null
                 && !arrivalWithinAppointmentWindow($db, $database, (int) $existing['appointment_id'],
@@ -278,8 +294,8 @@ function handleExceptions($db, $database, $method, $id) {
                                       SET reason = ?, requested_arrival_time = ?
                                       WHERE exception_id = ?");
                 $stmt->execute([
-                    $data->reason,
-                    $data->requested_arrival_time ?? null,
+                    $wirkReason,
+                    $wirkRequestedTime,
                     $id
                 ]);
             } else {
@@ -295,27 +311,31 @@ function handleExceptions($db, $database, $method, $id) {
                 $approved_by = null;
                 $approved_at = null;
                 
-                if(isset($data->status) && $data->status != 'pending') {
+                if($wirkStatus != 'pending') {
                     $approved_by = getCurrentUserId();
                     $approved_at = date('Y-m-d H:i:s');
                 }
                 
                 $stmt->execute([
-                    $data->reason, 
-                    $data->requested_arrival_time ?? null,
-                    $data->status,
+                    $wirkReason, 
+                    $wirkRequestedTime,
+                    $wirkStatus,
                     $approved_by,
                     $approved_at,
                     $id
                 ]);
                 
-                // Bei Genehmigung einer Zeitkorrektur: Record erstellen/aktualisieren
-                if($data->status === 'approved')
+                // Bei Genehmigung einer Zeitkorrektur: Record erstellen/aktualisieren.
+                // Die Art kommt aus dem Bestand, nicht aus dem Anfragekoerper --
+                // sie laesst sich so wenig nachtraeglich wechseln wie der Termin,
+                // und ein PUT ohne exception_type haette sonst gar keine
+                // Nachbehandlung ausgeloest.
+                if($wirkStatus === 'approved')
                 {                    
-                    if($data->exception_type === 'time_correction') {
+                    if($existing['exception_type'] === 'time_correction') {
                         handleApprovedTimeCorrection($db, $database, $id, $data);
                     }
-                    elseif($data->exception_type === 'absence') {
+                    elseif($existing['exception_type'] === 'absence') {
                         handleApprovedAbsence($db, $database, $id, $data);
                     }
                 }

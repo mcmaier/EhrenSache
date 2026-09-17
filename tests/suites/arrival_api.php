@@ -146,7 +146,9 @@ test('Eine geleerte Ankunftszeit wird als leer gespeichert', function () {
         $recordId = (int) $create['body']['id'];
 
         // Vollstaendiger Koerper, wie ihn das Dashboard schickt. Ein Teilaufruf
-        // liefe in records.php gegen undefinierte Felder -- siehe OI-54.
+        // ist seit 1.9.1 ebenfalls erlaubt (OI-69) und in
+        // tests/suites/partial_update_api.php abgedeckt; hier bleibt bewusst
+        // der Weg der Oberflaeche stehen.
         $res = apiRequest('PUT', 'records', [
             'token' => $token,
             'query' => ['id' => $recordId],

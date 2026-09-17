@@ -230,23 +230,53 @@ function handleAppointments($db, $database, $method, $id) {
         case 'PUT':
             requireAdminOrManager();
 
-            $rawData = json_decode(file_get_contents("php://input"));
-            
-            // Nur erlaubte Felder extrahieren
-            $allowedFields = ['title', 'type_id', 'description', 'date', 'start_time','id'];
+            $rawData = (object) (json_decode(file_get_contents("php://input")) ?? []);
+
+            // Nur erlaubte Felder extrahieren. property_exists statt isset:
+            // Ein ausdrueckliches null ist eine Angabe ("Beschreibung loeschen"),
+            // ein fehlendes Feld ist keine. isset() warf beides in denselben
+            // Topf und machte das Loeschen einer Angabe unmoeglich.
+            $allowedFields = ['title', 'type_id', 'description', 'date', 'start_time'];
             $data = new stdClass();
             foreach($allowedFields as $field) {
-                if(isset($rawData->$field)) {
+                if(property_exists($rawData, $field)) {
                     $data->$field = $rawData->$field;
                 }
+            }
+
+            // Bestand lesen: Was der Request nicht mitschickt, bleibt stehen.
+            // Bis 1.9.0 war das eine Vollersetzung -- ein PUT, das nur das
+            // Datum aendern wollte, nullte Titel und Terminart (OI-69). Die
+            // schwerere Folge war die Terminart: Ein Termin ohne type_id hat
+            // keine Gruppenzuordnung mehr, verschwindet aus den Listen der
+            // Mitglieder und zaehlt in keiner Auswertung mehr mit.
+            $bestandStmt = $db->prepare("SELECT title, type_id, description, date, start_time
+                                         FROM {$prefix}appointments WHERE appointment_id = ?");
+            $bestandStmt->execute([$id]);
+            $bestand = $bestandStmt->fetch(PDO::FETCH_ASSOC);
+
+            if(!$bestand) {
+                http_response_code(404);
+                echo json_encode(["message" => "Appointment not found"]);
+                break;
             }
 
             // Prüfe ob bereits ein anderer Termin der gleichen Art in der Toleranzzeit existiert
             $tolerance = checkinToleranceHours($db, $database);
             $toleranceSeconds = $tolerance * 3600;
-            
-            $newDateTime = $data->date . ' ' . $data->start_time;
-            
+
+            // Geprüft wird gegen den Zustand NACH dem Update, nicht gegen den
+            // Anfragekörper: Fehlt ein Feld, gilt der gespeicherte Wert. Vorher
+            // verglich die Prüfung bei einem Teil-Update gegen " " und
+            // type_id = NULL -- und NULL trifft in SQL nie, die Dublettenprüfung
+            // fiel also still aus.
+            $wirkDate  = $data->date       ?? $bestand['date'];
+            $wirkTime  = $data->start_time ?? $bestand['start_time'];
+            $wirkType  = array_key_exists('type_id', get_object_vars($data))
+                ? $data->type_id : $bestand['type_id'];
+
+            $newDateTime = $wirkDate . ' ' . $wirkTime;
+
             $checkStmt = $db->prepare("
                 SELECT appointment_id, title, start_time, date,
                     ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
@@ -257,7 +287,7 @@ function handleAppointments($db, $database, $method, $id) {
                 HAVING time_diff <= ?
             ");
             
-            $checkStmt->execute([$newDateTime, $data->date, $data->type_id ?? null, $id, $toleranceSeconds]);
+            $checkStmt->execute([$newDateTime, $wirkDate, $wirkType, $id, $toleranceSeconds]);
             
             $conflict = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -276,16 +306,31 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
 
-            $description = null;
-            if(isset($data->description))
-            {
-                $description = $data->description;
+            // Nur schreiben, was mitgeschickt wurde -- dasselbe Muster wie bei
+            // members, appointment_types und activity_types (OI-54).
+            // description und type_id duerfen ausdruecklich auf NULL gesetzt
+            // werden, deshalb array_key_exists statt isset.
+            $vorhanden = get_object_vars($data);
+            $updateFields = [];
+            $updateParams = [];
+
+            foreach (['title', 'type_id', 'description', 'date', 'start_time'] as $feld) {
+                if (array_key_exists($feld, $vorhanden)) {
+                    $updateFields[] = "{$feld} = ?";
+                    $updateParams[] = $data->$feld;
+                }
             }
 
-            $stmt = $db->prepare("UPDATE {$prefix}appointments SET title=?, type_id=?, description=?, date=?, 
-                                  start_time=? WHERE appointment_id=?");
-            if($stmt->execute([$data->title, $data->type_id ?? null, $description, $data->date, 
-                              $data->start_time, $id])) {
+            if (empty($updateFields)) {
+                echo json_encode(["message" => "Appointment updated"]);
+                break;
+            }
+
+            $updateParams[] = $id;
+            $stmt = $db->prepare("UPDATE {$prefix}appointments SET " . implode(', ', $updateFields)
+                                 . " WHERE appointment_id = ?");
+
+            if($stmt->execute($updateParams)) {
                 echo json_encode(["message" => "Appointment updated"]);
             } else {
                 http_response_code(500);

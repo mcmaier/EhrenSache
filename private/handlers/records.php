@@ -225,10 +225,12 @@ function handleRecords($db, $database, $method, $id) {
             
         case 'PUT':
             requireAdminOrManager();
-            $data = json_decode(file_get_contents("php://input"));
+            $data = (object) (json_decode(file_get_contents("php://input")) ?? []);
+            $vorhanden = get_object_vars($data);
 
             // Hole ursprüngliche Daten des Records
-            $origStmt = $db->prepare("SELECT member_id, appointment_id FROM {$prefix}records WHERE record_id = ?");
+            $origStmt = $db->prepare("SELECT member_id, appointment_id, arrival_time, status
+                                      FROM {$prefix}records WHERE record_id = ?");
             $origStmt->execute([$id]);
             $originalRecord = $origStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -237,22 +239,42 @@ function handleRecords($db, $database, $method, $id) {
                 echo json_encode(["message" => "Record not found"]);
                 break;
             }
-            
+
+            // Was der Request nicht mitschickt, bleibt stehen (OI-69). Vorher
+            // las der Zweig member_id, appointment_id und status bedingungslos:
+            // Ein PUT, das nur die Ankunftszeit nachtragen wollte, nullte die
+            // Zuordnung und den Status -- und weil NULL != member_id als
+            // "geaendert" galt, lief der Datensatz zusaetzlich in die
+            // Dublettenpruefung.
+            $wirkMember      = array_key_exists('member_id', $vorhanden)
+                ? $data->member_id : $originalRecord['member_id'];
+            $wirkAppointment = array_key_exists('appointment_id', $vorhanden)
+                ? $data->appointment_id : $originalRecord['appointment_id'];
+
             // Prüfe ob Mitglied oder Termin geändert wird
-            $memberChanged = ($data->member_id != $originalRecord['member_id']);
-            $appointmentChanged = ($data->appointment_id != $originalRecord['appointment_id']);
+            $memberChanged = ($wirkMember != $originalRecord['member_id']);
+            $appointmentChanged = ($wirkAppointment != $originalRecord['appointment_id']);
             
             // Ein Leerstring ist keine Uhrzeit, sondern das Löschen einer
             // Angabe. Ohne diese Normalisierung landet er je nach SQL-Modus
             // als '0000-00-00 00:00:00' in der Spalte — ein Datum, das es
             // nicht gibt, und das jede spätere Auswertung mitschleppt.
-            $arrival_time = ($data->arrival_time ?? '') !== '' ? $data->arrival_time : null;
+            //
+            // Ein FEHLENDES Feld ist etwas anderes als ein leeres: Es heisst
+            // "nicht anfassen" und uebernimmt die gespeicherte Zeit.
+            $arrival_time = array_key_exists('arrival_time', $vorhanden)
+                ? (($data->arrival_time ?? '') !== '' ? $data->arrival_time : null)
+                : $originalRecord['arrival_time'];
 
-            // Toleranzband wie beim Anlegen. Geprüft wird gegen den Termin aus
-            // dem Anfragekörper, nicht gegen den bisherigen: Ein PUT darf den
-            // Termin wechseln, und dann gilt dessen Fenster.
+            $wirkStatus = array_key_exists('status', $vorhanden)
+                ? $data->status : $originalRecord['status'];
+
+            // Toleranzband wie beim Anlegen. Geprüft wird gegen den Termin, der
+            // nach dem Update gilt: Ein PUT darf den Termin wechseln, und dann
+            // gilt dessen Fenster -- schickt er keinen mit, bleibt es beim
+            // bisherigen.
             if ($arrival_time !== null
-                && !arrivalWithinAppointmentWindow($db, $database, (int) $data->appointment_id,
+                && !arrivalWithinAppointmentWindow($db, $database, (int) $wirkAppointment,
                                                    (string) $arrival_time,
                                                    checkinToleranceHours($db, $database))) {
                 http_response_code(400);
@@ -266,7 +288,7 @@ function handleRecords($db, $database, $method, $id) {
                 // Prüfe ob bereits ein anderer Record für neue Kombination existiert
                 $checkStmt = $db->prepare("SELECT record_id FROM {$prefix}records
                                         WHERE member_id = ? AND appointment_id = ? AND record_id != ?");
-                $checkStmt->execute([$data->member_id, $data->appointment_id, $id]);
+                $checkStmt->execute([$wirkMember, $wirkAppointment, $id]);
 
                 if ($checkStmt->fetch()) {
                     http_response_code(409);
@@ -274,17 +296,18 @@ function handleRecords($db, $database, $method, $id) {
                     break;
                 }
 
-                // Kein Konflikt - komplettes Update
+                // Kein Konflikt - Zuordnung darf mitwandern
                 $stmt = $db->prepare("UPDATE {$prefix}records
                                     SET member_id=?, appointment_id=?, arrival_time=?, status=?
                                     WHERE record_id=?");
-                $success = $stmt->execute([$data->member_id, $data->appointment_id, $arrival_time, $data->status, $id]);
+                $success = $stmt->execute([$wirkMember, $wirkAppointment, $arrival_time,
+                                           $wirkStatus, $id]);
             } else {
                 // Nur Zeit/Status ändern - kein Konfliktrisiko
                 $stmt = $db->prepare("UPDATE {$prefix}records
                                     SET arrival_time=?, status=?
                                     WHERE record_id=?");
-                $success = $stmt->execute([$arrival_time, $data->status, $id]);
+                $success = $stmt->execute([$arrival_time, $wirkStatus, $id]);
             }
             
             if ($success) {

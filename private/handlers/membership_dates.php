@@ -90,18 +90,45 @@ function handleMembershipDates($db, $database, $method, $id) {
             
         case 'PUT':
             requireAdminOrManager();
-            $data = json_decode(file_get_contents("php://input"));
-            
-            $stmt = $db->prepare("UPDATE {$prefix}membership_dates 
-                                  SET start_date = ?, end_date = ?, status = ?
-                                  WHERE membership_date_id = ?");
-            
-            if($stmt->execute([
-                $data->start_date,
-                $data->end_date ?? null,
-                $data->status ?? 'active',
-                $id
-            ])) {
+            $data = (object) (json_decode(file_get_contents("php://input")) ?? []);
+
+            $bestandStmt = $db->prepare("SELECT membership_date_id FROM {$prefix}membership_dates
+                                         WHERE membership_date_id = ?");
+            $bestandStmt->execute([$id]);
+
+            if(!$bestandStmt->fetch(PDO::FETCH_ASSOC)) {
+                http_response_code(404);
+                echo json_encode(["message" => "Membership date not found"]);
+                break;
+            }
+
+            // Nur schreiben, was mitgeschickt wurde (OI-69). Vorher war das eine
+            // Vollersetzung: start_date wurde bedingungslos gelesen, und ohne
+            // Angabe fiel status auf 'active' zurueck -- wer nur das Enddatum
+            // nachtrug, fuehrte einen beendeten Zeitraum danach wieder als
+            // laufend. end_date darf ausdruecklich null sein (offenes Ende),
+            // deshalb array_key_exists statt isset.
+            $vorhanden    = get_object_vars($data);
+            $updateFields = [];
+            $updateParams = [];
+
+            foreach (['start_date', 'end_date', 'status'] as $feld) {
+                if (array_key_exists($feld, $vorhanden)) {
+                    $updateFields[] = "{$feld} = ?";
+                    $updateParams[] = $data->$feld;
+                }
+            }
+
+            if (empty($updateFields)) {
+                echo json_encode(["message" => "Membership date updated"]);
+                break;
+            }
+
+            $updateParams[] = $id;
+            $stmt = $db->prepare("UPDATE {$prefix}membership_dates SET " . implode(', ', $updateFields)
+                                 . " WHERE membership_date_id = ?");
+
+            if($stmt->execute($updateParams)) {
                 echo json_encode(["message" => "Membership date updated"]);
             } else {
                 http_response_code(500);
