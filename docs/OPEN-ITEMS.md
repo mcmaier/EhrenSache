@@ -2853,3 +2853,31 @@ Das Zurücksetzen in der Statistik lässt das Jahr stehen — wie bei den andere
 Knopf ebenfalls nur die Filterleiste meint.
 
 **Nicht sicherheitsrelevant:** beides reine Anzeige und Bedienung.
+
+---
+
+### OI-72 · Zwei Reste aus der PWA-Überarbeitung
+**Priorität:** niedrig · aufgenommen am 2026-09-17
+
+Aus der Arbeit an der Check-in-PWA für 1.9.1 (`8f47006`, `044797d`), dort bewusst
+zurückgestellt und nicht release-blockierend. Hier festgehalten, damit sie nicht allein in
+einer Sitzungsnachricht stehen.
+
+1. **Die Trennlinie zwischen den Antwortgruppen fehlt im Dashboard.** `namesListHtml()`
+   ([responses.js](../public/js/modules/responses.js)) erzeugt dieselben
+   `.response-name-group`-Blöcke wie die PWA. Die PWA trennt sie seit 1.9.1 mit
+   `.response-name-group + .response-name-group { border-top: ... }`
+   ([checkin/css/style.css](../public/checkin/css/style.css)); die Dashboard-Styles
+   ([css/components/modals.css](../public/css/components/modals.css)) haben dafür kein
+   Gegenstück. **Geprüft am 2026-09-17:** beides bestätigt — gleiche Klassen, Regel nur in der
+   PWA.
+
+   Dieselbe Frage wie bei OI-68: Zwei Oberflächen teilen sich ein Markup, aber nicht sein CSS.
+   Beim nächsten gemeinsamen Baustein gehören die Klassen nach `css/components/`, statt sie zu
+   verdoppeln.
+
+2. **„Antrag stellen" bricht bei 320 px auf zwei Zeilen um.** Im Dialog „Nachträglicher Antrag";
+   ab 360 px einzeilig. **Übernommen aus der PWA-Sitzung, hier nicht nachgestellt** — der Knopf
+   sitzt in einem geschlossenen Modal und lässt sich ohne Anmeldung nicht messen.
+
+**Nicht sicherheitsrelevant:** beides Darstellung.
