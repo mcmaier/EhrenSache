@@ -346,7 +346,7 @@ test('Die Selbstauskunft enthaelt die eigenen Werte je Jahr, solange eingeschalt
             'Auskunft und Statistik muessen dieselben Werte nennen');
 
         $csv = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'csv']]);
-        assertTrue(str_contains($csv['raw'], '=== PÜNKTLICHKEIT UND ZUVERLÄSSIGKEIT ==='),
+        assertTrue(str_contains($csv['raw'], '[ PÜNKTLICHKEIT UND ZUVERLÄSSIGKEIT ]'),
             'Der CSV-Auskunft fehlt der Abschnitt');
     });
 });

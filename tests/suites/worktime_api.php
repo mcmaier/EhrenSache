@@ -1671,14 +1671,14 @@ test('my_data: Arbeitszeiten stehen in JSON UND in der CSV (OI-50)', function ()
             'query' => ['format' => 'csv'],
         ]);
         assertStatus(200, $csv);
-        assertTrue(str_contains($csv['raw'], '=== ARBEITSZEITEN ==='),
+        assertTrue(str_contains($csv['raw'], '[ ARBEITSZEITEN ]'),
                    'CSV-Abschnitt Arbeitszeiten fehlt');
         assertTrue(str_contains($csv['raw'], $marke),
                    'Die Sitzung selbst fehlt in der CSV');
-        assertTrue(str_contains($csv['raw'], '=== AENDERUNGSHISTORIE ARBEITSZEIT ===')
-                   || str_contains($csv['raw'], '=== ÄNDERUNGSHISTORIE ARBEITSZEIT ==='),
+        assertTrue(str_contains($csv['raw'], '[ AENDERUNGSHISTORIE ARBEITSZEIT ]')
+                   || str_contains($csv['raw'], '[ ÄNDERUNGSHISTORIE ARBEITSZEIT ]'),
                    'CSV-Abschnitt Aenderungshistorie fehlt');
-        assertTrue(str_contains($csv['raw'], '=== MITGLIEDSCHAFTSZEITRÄUME ==='),
+        assertTrue(str_contains($csv['raw'], '[ MITGLIEDSCHAFTSZEITRÄUME ]'),
                    'CSV-Abschnitt Mitgliedschaftszeitraeume fehlt');
     } finally {
         deleteSession($id);

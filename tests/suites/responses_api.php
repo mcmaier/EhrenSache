@@ -1142,7 +1142,7 @@ test('my_data: eigene Rueckmeldungen in JSON und CSV', function () {
             assertTrue(in_array('RS-Auskunft', $kommentare, true), 'Rueckmeldung fehlt in der Auskunft');
 
             $csv = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'csv']]);
-            assertTrue(str_contains($csv['raw'], '=== TERMINRÜCKMELDUNGEN ==='), 'CSV-Abschnitt fehlt');
+            assertTrue(str_contains($csv['raw'], '[ TERMINRÜCKMELDUNGEN ]'), 'CSV-Abschnitt fehlt');
             assertTrue(str_contains($csv['raw'], 'Status geändert'), 'Spalte Status geaendert fehlt');
             assertTrue(str_contains($csv['raw'], 'RS-Auskunft'));
         });

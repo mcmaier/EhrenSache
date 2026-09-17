@@ -291,4 +291,62 @@ function checkinCreatesAppointments($db, $database): bool
     return systemSetting($db, $database, 'checkin_auto_create_appointment', '1') === '1';
 }
 
+// ============================================
+// CSV-AUSGABE
+// ============================================
+
+/**
+ * Entschärft eine CSV-Zelle, die eine Tabellenkalkulation als Formel läse (OI-59).
+ *
+ * Excel, LibreOffice Calc und Google Sheets werten eine Zelle aus, die mit
+ * `=`, `+`, `-` oder `@` beginnt — auch aus einer CSV-Datei (CWE-1236). Ein
+ * Vereinsmitglied, das seine Bemerkung mit `=` beginnen lässt, könnte damit
+ * beim Vorstandsmitglied, das den Export öffnet, Code ausführen. Das Risiko
+ * trifft also den Empfänger der Datei, nicht den Schreiber der Datenbank.
+ *
+ * Ein vorangestelltes Apostroph nimmt der Zelle die Auswertung. Sichtbar
+ * bleibt es beim CSV-Import je nach Programm — das ist der Preis, und er ist
+ * kleiner als eine ausgeführte Formel.
+ *
+ * **Zahlen bleiben Zahlen.** Ohne die Ausnahme für `is_numeric()` würde jeder
+ * negative Wert (`-30` Minuten Abweichung) zu Text, und der Empfänger könnte
+ * nicht mehr damit rechnen. Ein Wert wie `-5` ist ungefährlich: Gefährlich
+ * wird das Minus erst in Verbindung mit einem Bezug oder Funktionsnamen, und
+ * dann ist die Zelle nicht mehr numerisch.
+ *
+ * Führender Tabulator und Wagenrücklauf gehören dazu, weil manche Programme
+ * sie vor der Formelerkennung abschneiden.
+ */
+function csvCell($wert)
+{
+    if ($wert === null || $wert === '') {
+        return $wert;
+    }
+
+    $text = (string) $wert;
+
+    if (is_numeric($text)) {
+        return $text;
+    }
+
+    if (preg_match('/^[=+\-@\t\r]/', $text) === 1) {
+        return "'" . $text;
+    }
+
+    return $text;
+}
+
+/**
+ * Schreibt eine CSV-Zeile und entschärft dabei jede Zelle.
+ *
+ * Alle Exporte gehen über diese Funktion statt über `fputcsv()` direkt. Der
+ * Unterschied ist nicht Bequemlichkeit, sondern Vollständigkeit: Eine neue
+ * Exportspalte erbt die Entschärfung, statt sie vergessen zu können.
+ * `tests/suites/csv_formula_unit.php` hält das fest.
+ */
+function csvRow($handle, array $felder, string $trennzeichen = ';'): void
+{
+    fputcsv($handle, array_map('csvCell', $felder), $trennzeichen);
+}
+
 ?>

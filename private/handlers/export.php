@@ -117,11 +117,11 @@ function exportMembers($db, $database) {
     $output = fopen('php://output', 'w');
     
     // Header-Zeile
-    fputcsv($output, ['name', 'surname', 'member_number', 'active', 'groups'], ';');
+    csvRow($output, ['name', 'surname', 'member_number', 'active', 'groups'], ';');
     
     // Daten
     foreach ($members as $member) {
-        fputcsv($output, [
+        csvRow($output, [
             $member['name'],
             $member['surname'],
             $member['member_number'],
@@ -164,10 +164,10 @@ function exportAppointments($db, $database) {
     // beim Reimport mit "missing required columns" abgewiesen wurde, bevor
     // eine Zeile gelesen war. Reihenfolge und Zusatzspalten sind egal — der
     // Import liest ueber array_combine() nach Namen. Siehe OI-24.
-    fputcsv($output, ['date', 'start_time', 'title', 'type_name', 'groups', 'description'], ';');
+    csvRow($output, ['date', 'start_time', 'title', 'type_name', 'groups', 'description'], ';');
     
     foreach ($appointments as $apt) {
-        fputcsv($output, [
+        csvRow($output, [
             $apt['date'],
             $apt['start_time'],
             $apt['title'],
@@ -217,12 +217,12 @@ function exportRecords($db, $database) {
     // 'arrival_date_time' statt 'arrival_time': So heisst die Pflichtspalte in
     // importRecords(), und der Name trifft es besser — die Spalte fuehrt Datum
     // UND Uhrzeit. Siehe OI-24.
-    fputcsv($output, ['member_name', 'member_surname', 'member_number', 'appointment_date',
+    csvRow($output, ['member_name', 'member_surname', 'member_number', 'appointment_date',
                       'appointment_start_time', 'appointment_type', 'appointment_title',
                       'arrival_date_time', 'status', 'checkin_source'], ';');
 
     foreach ($records as $record) {
-        fputcsv($output, [
+        csvRow($output, [
             $record['name'],
             $record['surname'],
             $record['member_number'],
@@ -452,12 +452,12 @@ function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
     echo "\xEF\xBB\xBF";
 
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['member_name', 'member_surname', 'member_number', 'activity',
+    csvRow($output, ['member_name', 'member_surname', 'member_number', 'activity',
                       'start_time', 'end_time', 'break_minutes', 'minutes', 'hours',
                       'proof', 'start_location', 'end_location', 'appointment', 'note'], ';');
 
     foreach ($rows as $r) {
-        fputcsv($output, [
+        csvRow($output, [
             $r['name'], $r['surname'], $r['member_number'],
             $r['activity_name'],
             $r['start_time'], $r['end_time'], $r['break_minutes'],
@@ -468,13 +468,13 @@ function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
         ], ';');
     }
 
-    fputcsv($output, [], ';');
-    fputcsv($output, ['SUMMEN', $period['label']], ';');
-    fputcsv($output, ['member_number', 'member_surname', 'member_name', 'minutes', 'hours'], ';');
+    csvRow($output, [], ';');
+    csvRow($output, ['SUMMEN', $period['label']], ';');
+    csvRow($output, ['member_number', 'member_surname', 'member_name', 'minutes', 'hours'], ';');
 
     foreach ($sums as $key => $minutes) {
         [$number, $surname, $name] = explode('|', $key);
-        fputcsv($output, [$number, $surname, $name, $minutes, worktimeHours($minutes)], ';');
+        csvRow($output, [$number, $surname, $name, $minutes, worktimeHours($minutes)], ';');
     }
 
     fclose($output);
@@ -536,11 +536,11 @@ function exportWorktimeActivity($db, $database) {
     echo "\xEF\xBB\xBF";
 
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['activity', 'verification', 'proof', 'sessions', 'members',
+    csvRow($output, ['activity', 'verification', 'proof', 'sessions', 'members',
                       'minutes', 'hours'], ';');
 
     foreach ($rows as $r) {
-        fputcsv($output, [
+        csvRow($output, [
             $r['activity_name'], $r['verification'],
             worktimeProofLabel($r['proof']),
             $r['sessions'], $r['members'],
@@ -548,8 +548,8 @@ function exportWorktimeActivity($db, $database) {
         ], ';');
     }
 
-    fputcsv($output, [], ';');
-    fputcsv($output, ['GESAMT', $period['label'], '', '', '', $total,
+    csvRow($output, [], ';');
+    csvRow($output, ['GESAMT', $period['label'], '', '', '', $total,
                       worktimeHours($total)], ';');
 
     fclose($output);
@@ -617,11 +617,11 @@ function exportWorktimeAppointment($db, $database) {
     echo "\xEF\xBB\xBF";
 
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['appointment_date', 'appointment', 'appointment_type', 'proof',
+    csvRow($output, ['appointment_date', 'appointment', 'appointment_type', 'proof',
                       'sessions', 'members', 'minutes', 'hours'], ';');
 
     foreach ($rows as $r) {
-        fputcsv($output, [
+        csvRow($output, [
             $r['date'],
             $r['title'] ?? '(ohne Termin)',
             $r['appointment_type'],
@@ -631,8 +631,8 @@ function exportWorktimeAppointment($db, $database) {
         ], ';');
     }
 
-    fputcsv($output, [], ';');
-    fputcsv($output, ['GESAMT', $period['label'], '', '', '', '', $total,
+    csvRow($output, [], ';');
+    csvRow($output, ['GESAMT', $period['label'], '', '', '', '', $total,
                       worktimeHours($total)], ';');
 
     fclose($output);

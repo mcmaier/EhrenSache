@@ -2275,7 +2275,7 @@ damit es nicht erneut vorgeschlagen wird, ohne dass sich an den Gründen etwas g
 ---
 
 ### OI-59 · CSV-Exporte entschärfen führende Formelzeichen nicht
-**Priorität:** niedrig–mittel
+**Priorität:** erledigt am 2026-09-17 — mit 1.9.1, alle 63 Ausgabestellen
 
 Freitextfelder, die mit `=`, `+`, `-`, `@` (oder einem führenden Tab/CR) beginnen, werden von
 Tabellenkalkulationen (Excel, LibreOffice Calc, Google Sheets) beim Öffnen einer CSV-Datei als
@@ -2296,9 +2296,22 @@ darf (`user`, `manager` oder `admin`, je nach Feld) — kein anonymer Zugriff �
 innerhalb der Anwendung selbst keine Rechteausweitung; die eigentliche Wirkung entsteht
 ausschließlich außerhalb, in der Tabellenkalkulation des Empfängers.
 
-**Zu tun:** ein gemeinsamer Helfer, der eine CSV-Zelle mit führendem `=`, `+`, `-`, `@`, Tab oder
-CR mit einem Apostroph maskiert, angewendet auf alle CSV-Exporte (`my_data.php` und
-`export.php`).
+**Behoben am 2026-09-17.** `csvCell()` und `csvRow()` in `private/helpers/utils.php`; alle 63
+Ausgabestellen laufen darüber (20 in `export.php`, 43 in `my_data.php`).
+
+**Der Wächter ist der eigentliche Schutz, nicht die Funktion.** Eine Regel, die man bei jeder
+neuen Exportspalte von Hand einhalten muss, wird irgendwann vergessen —
+`tests/suites/csv_formula_unit.php` meldet deshalb jedes direkte `fputcsv()` in den beiden
+Handlern, wie `demo_mode.php` es für die Registrierung neuer Ressourcen tut. Gegengeprüft: Mit
+einem eingebauten `fputcsv()` schlägt der Test fehl.
+
+**Zahlen sind ausgenommen.** Ohne die Prüfung auf `is_numeric()` würde jeder negative Wert zu
+Text, und der Empfänger könnte im Stundennachweis nicht mehr rechnen. Gefährlich wird ein Minus
+erst in Verbindung mit einem Bezug oder Funktionsnamen — dann ist die Zelle nicht mehr numerisch.
+
+**Mitgezogen:** Die Abschnittsüberschriften der Selbstauskunft hießen `=== STAMMDATEN ===` und
+hätten selbst ein Schutzapostroph bekommen. Sie heißen jetzt `[ STAMMDATEN ]` — programmerzeugte
+Überschriften brauchen kein Formelzeichen. Ein Test hält das fest.
 
 **Sicherheitsrelevanz:** real, aber nach der Grenze in `SECURITY.md` öffentlich dokumentierbar —
 kein Zugriff ohne vorherige Anmeldung, keine Rechteausweitung innerhalb von EhrenSache.

@@ -210,62 +210,70 @@ function exportAsCSV($data) {
     
     // UTF-8 BOM für Excel
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+
+    // Jede Zelle laeuft ueber csvCell(): Ein Freitext, der mit '=' beginnt,
+    // waere in einer Tabellenkalkulation sonst eine Formel (OI-59). Das
+    // Trennzeichen bleibt das Komma -- die Selbstauskunft hat es seit jeher,
+    // anders als die Exporte unter resource=export.
+    $csvZeile = function (array $felder) use ($output) {
+        csvRow($output, $felder, ',');
+    };
     
     // Stammdaten
-    fputcsv($output, ['=== STAMMDATEN ===']);
-    fputcsv($output, ['Feld', 'Wert']);
-    fputcsv($output, ['Name', $data['member']['name'] . ' ' . $data['member']['surname']]);
-    fputcsv($output, ['Mitgliedsnummer', $data['member']['member_number'] ?? '-']);
-    fputcsv($output, ['E-Mail', $data['user']['email']]);
-    fputcsv($output, ['Rolle', $data['user']['role']]);
-    fputcsv($output, ['Aktiv', $data['member']['active'] ? 'Ja' : 'Nein']);
-    fputcsv($output, ['Stations-PIN gesetzt', $data['member']['has_pin'] ? 'Ja' : 'Nein']);
-    fputcsv($output, ['PIN zuletzt geändert', $data['member']['pin_updated_at'] ?? '-']);
-    fputcsv($output, []);
+    $csvZeile(['[ STAMMDATEN ]']);
+    $csvZeile(['Feld', 'Wert']);
+    $csvZeile(['Name', $data['member']['name'] . ' ' . $data['member']['surname']]);
+    $csvZeile(['Mitgliedsnummer', $data['member']['member_number'] ?? '-']);
+    $csvZeile(['E-Mail', $data['user']['email']]);
+    $csvZeile(['Rolle', $data['user']['role']]);
+    $csvZeile(['Aktiv', $data['member']['active'] ? 'Ja' : 'Nein']);
+    $csvZeile(['Stations-PIN gesetzt', $data['member']['has_pin'] ? 'Ja' : 'Nein']);
+    $csvZeile(['PIN zuletzt geändert', $data['member']['pin_updated_at'] ?? '-']);
+    $csvZeile([]);
     
     // Gruppen
-    fputcsv($output, ['=== GRUPPEN ===']);
-    fputcsv($output, ['Gruppe']);
+    $csvZeile(['[ GRUPPEN ]']);
+    $csvZeile(['Gruppe']);
     foreach($data['groups'] as $group) {
-        fputcsv($output, [$group['group_name']]);
+        $csvZeile([$group['group_name']]);
     }
-    fputcsv($output, []);
+    $csvZeile([]);
 
     // Mitgliedschaftszeitraeume. Standen frueher nur in der JSON-Form —
     // beide Formate beantworten dasselbe Auskunftsersuchen (OI-50).
-    fputcsv($output, ['=== MITGLIEDSCHAFTSZEITRÄUME ===']);
-    fputcsv($output, ['Beginn', 'Ende', 'Status']);
+    $csvZeile(['[ MITGLIEDSCHAFTSZEITRÄUME ]']);
+    $csvZeile(['Beginn', 'Ende', 'Status']);
     foreach ($data['membership_dates'] as $zeitraum) {
-        fputcsv($output, [
+        $csvZeile([
             $zeitraum['start_date'] ? date('d.m.Y', strtotime($zeitraum['start_date'])) : '',
             $zeitraum['end_date']   ? date('d.m.Y', strtotime($zeitraum['end_date']))   : '',
             $zeitraum['status'] ?? '',
         ]);
     }
-    fputcsv($output, []);
+    $csvZeile([]);
     
     // Anwesenheiten
-    fputcsv($output, ['=== ANWESENHEITEN ===']);
-    fputcsv($output, ['Datum', 'Ankunft', 'Termin', 'Status']);
+    $csvZeile(['[ ANWESENHEITEN ]']);
+    $csvZeile(['Datum', 'Ankunft', 'Termin', 'Status']);
     foreach($data['records'] as $record) {
         // Das Datum steht am Termin, nicht an der Ankunft: Seit 1.5.0 darf
         // arrival_time NULL sein, und strtotime(null) ergaebe den 01.01.1970 —
         // ein Datum, das in einer Auskunft nach Art. 15 DSGVO nichts zu suchen
         // hat. Eine fehlende Uhrzeit bleibt eine leere Zelle.
-        fputcsv($output, [
+        $csvZeile([
             $record['appointment_date'] ? date('d.m.Y', strtotime($record['appointment_date'])) : '',
             $record['arrival_time'] ? date('H:i', strtotime($record['arrival_time'])) : '',
             $record['appointment_title'] ?? '-',
             $record['status'] ?? ''
         ]);
     }
-    fputcsv($output, []);
+    $csvZeile([]);
     
     // Ausnahmen
-    fputcsv($output, ['=== AUSNAHMEN/ANTRÄGE ===']);
-    fputcsv($output, ['Datum', 'Typ', 'Grund', 'Status', 'Termin']);
+    $csvZeile(['[ AUSNAHMEN/ANTRÄGE ]']);
+    $csvZeile(['Datum', 'Typ', 'Grund', 'Status', 'Termin']);
     foreach($data['exceptions'] as $exception) {
-        fputcsv($output, [
+        $csvZeile([
             date('d.m.Y', strtotime($exception['created_at'])),
             $exception['exception_type'],
             $exception['reason'],
@@ -274,12 +282,12 @@ function exportAsCSV($data) {
         ]);
     }
 
-    fputcsv($output, []);
-    fputcsv($output, ['=== TERMINRÜCKMELDUNGEN ===']);
-    fputcsv($output, ['Termindatum', 'Termin', 'Rückmeldung', 'Bemerkung', 'Status geändert', 'Zuletzt geändert']);
+    $csvZeile([]);
+    $csvZeile(['[ TERMINRÜCKMELDUNGEN ]']);
+    $csvZeile(['Termindatum', 'Termin', 'Rückmeldung', 'Bemerkung', 'Status geändert', 'Zuletzt geändert']);
     $responseLabels = ['yes' => 'Zusage', 'no' => 'Absage', 'maybe' => 'Unsicher'];
     foreach ($data['appointment_responses'] as $response) {
-        fputcsv($output, [
+        $csvZeile([
             date('d.m.Y', strtotime($response['appointment_date'])),
             $response['appointment_title'] ?? '-',
             $responseLabels[$response['status']] ?? $response['status'],
@@ -292,15 +300,15 @@ function exportAsCSV($data) {
     // Arbeitszeiten. Die Aufbereitung ist dieselbe wie im Arbeitszeitbericht
     // (private/handlers/export.php) — eine Auskunft soll nicht anders rechnen
     // als der Nachweis, den der Verein in der Hand haelt.
-    fputcsv($output, []);
-    fputcsv($output, ['=== ARBEITSZEITEN ===']);
-    fputcsv($output, ['Beginn', 'Ende', 'Pause (Min)', 'Dauer (h)', 'Tätigkeit',
+    $csvZeile([]);
+    $csvZeile(['[ ARBEITSZEITEN ]']);
+    $csvZeile(['Beginn', 'Ende', 'Pause (Min)', 'Dauer (h)', 'Tätigkeit',
                       'Termin', 'Status', 'Nachweis', 'Quelle', 'Notiz']);
     foreach ($data['work_sessions'] as $session) {
         [$beginn, $ende] = worktimeReportTimes($session['start_time'], $session['end_time']);
         $minuten = sessionDurationMinutes($session);
 
-        fputcsv($output, [
+        $csvZeile([
             $beginn,
             $ende,
             (int) ($session['break_minutes'] ?? 0),
@@ -318,11 +326,11 @@ function exportAsCSV($data) {
     // die Loeschung einer Sitzung bewusst, gehoert also in die Auskunft. Die
     // Vorher/Nachher-Werte bleiben als JSON in einer Spalte — eine Aufloesung
     // in Spalten haette fuer jede Aenderungsart ein anderes Format.
-    fputcsv($output, []);
-    fputcsv($output, ['=== ÄNDERUNGSHISTORIE ARBEITSZEIT ===']);
-    fputcsv($output, ['Zeitpunkt', 'Sitzung', 'Vorgang', 'Änderungen']);
+    $csvZeile([]);
+    $csvZeile(['[ ÄNDERUNGSHISTORIE ARBEITSZEIT ]']);
+    $csvZeile(['Zeitpunkt', 'Sitzung', 'Vorgang', 'Änderungen']);
     foreach ($data['work_session_log'] as $eintrag) {
-        fputcsv($output, [
+        $csvZeile([
             $eintrag['changed_at'] ? date('d.m.Y H:i', strtotime($eintrag['changed_at'])) : '',
             $eintrag['session_id'] ?? '',
             $eintrag['action'] ?? '',
@@ -331,26 +339,26 @@ function exportAsCSV($data) {
     }
 
     if ($data['behavior'] !== []) {
-        fputcsv($output, []);
-        fputcsv($output, ['=== PÜNKTLICHKEIT UND ZUVERLÄSSIGKEIT ===']);
-        fputcsv($output, ['Jahr', 'Kennzahl', 'Wert']);
+        $csvZeile([]);
+        $csvZeile(['[ PÜNKTLICHKEIT UND ZUVERLÄSSIGKEIT ]']);
+        $csvZeile(['Jahr', 'Kennzahl', 'Wert']);
 
         foreach ($data['behavior'] as $jahr => $blocks) {
             $p = $blocks['punctuality'];
             if (!empty($p['enabled'])) {
-                fputcsv($output, [$jahr, 'Pünktlichkeit', $p['sufficient']
+                $csvZeile([$jahr, 'Pünktlichkeit', $p['sufficient']
                     ? sprintf('Pünktlich bei %d von %d gemessenen Ankünften (%s %%)',
                               $p['on_time_count'], $p['measured_count'],
                               number_format((float) $p['rate'], 1, ',', ''))
                     : sprintf('Zu wenige Messungen (%d von mindestens %d)',
                               $p['measured_count'], $p['min_measurements'])]);
-                fputcsv($output, [$jahr, 'Messabdeckung',
+                $csvZeile([$jahr, 'Messabdeckung',
                     sprintf('Gemessen bei %d von %d Terminen', $p['measured_count'], $p['total_count'])]);
             }
 
             $r = $blocks['reliability'];
             if (!empty($r['enabled'])) {
-                fputcsv($output, [$jahr, 'Zuverlässigkeit', $r['total'] > 0
+                $csvZeile([$jahr, 'Zuverlässigkeit', $r['total'] > 0
                     ? sprintf('Erschienen oder rechtzeitig abgemeldet: %d von %d (%s %%)',
                               $r['appeared'] + $r['excused_in_time'], $r['total'],
                               number_format((float) $r['rate'], 1, ',', ''))
