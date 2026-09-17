@@ -1639,6 +1639,14 @@ den heutigen Auslöser, nicht die Klasse.
 gelesen wird; an die Stelle von `idx_expires` tritt ein Index auf `created_at` (der alte lag
 auf einer Spalte, die nur Nulldaten enthielt, und half dem Aufräumen nie).
 
+**Kein Advisory — entschieden am 2026-09-17.** Die Lage erfüllt zwar die Grenze aus
+`SECURITY.md` (ohne vorherigen Zugang ausnutzbar), aber ein GHSA warnt nur jemanden, den es
+gibt: EhrenSache läuft bislang in praktisch keiner produktiven Installation. Der Punkt steht
+im Changelog unter „Sicherheit" und hier in voller Länge — das ist die Offenlegung, die der
+Sache angemessen ist. **Bei späterer Verbreitung gilt die Abwägung neu:** Derselbe Fund wäre
+mit Vereinen im Feld advisory-würdig, gerade weil Betroffene ihn nicht selbst erkennen
+können.
+
 **Nachgestellt, nicht nur gelesen:** `tests/db/verify_rate_limiter_strict.php` fährt den
 Limiter gegen eine Verbindung mit `STRICT_TRANS_TABLES`. Gegen den Stand vor der Migration
 lässt er dort viermal durch, wo er beim vierten Mal sperren müsste — Fehler 1364. Nicht Teil
