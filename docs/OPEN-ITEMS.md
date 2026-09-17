@@ -2586,6 +2586,55 @@ drei.
 
 ---
 
+### OI-69 · `PUT` auf Termine ist eine Vollersetzung — ein Teil-Update nullt Titel und Terminart
+**Priorität:** mittel · aufgenommen am 2026-09-17
+
+Dieselbe Familie wie [OI-54](#oi-54--put-auf-terminarten-überschreibt-nicht-mitgeschickte-felder),
+nur bei `appointments` — dort geblieben, als die beiden Typ-Ressourcen in 1.9.0 umgestellt wurden.
+
+Der `PUT`-Zweig ([`appointments.php:236`](../private/handlers/appointments.php)) baut `$data`
+sauber über `isset()` aus den erlaubten Feldern. **Danach greift er unbedingt auf Felder zu, die
+darin fehlen dürfen:**
+
+| Stelle | Verhalten bei fehlendem Feld |
+|---|---|
+| `$newDateTime = $data->date . ' ' . $data->start_time` (Z. 247) | Notice, Vergleichswert wird `" "` |
+| Konfliktprüfung mit `$data->type_id ?? null` (Z. 259) | `type_id = NULL` trifft nie — die Dublettenprüfung fällt still aus |
+| `UPDATE … SET title=?, type_id=?, …` mit `$data->title` (Z. 285–287) | Notice `Undefined property: stdClass::$title`, gespeichert wird `NULL` |
+
+Auffällig ist der Bruch mitten in der Funktion: `description` wird drei Zeilen über dem `UPDATE`
+sorgfältig über `isset()` abgesichert, `title` und `type_id` nicht.
+
+**Die schwerere Folge nennt nicht der Titel, sondern die Terminart.** Ein Termin ohne `type_id`
+hat keine Gruppenzuordnung mehr — er verschwindet aus den Listen der Mitglieder, die ihn über
+Terminart → Gruppe gesehen hätten, und zählt in keiner Auswertung mehr mit. Der fehlende Titel
+fällt sofort auf, die fehlende Terminart nicht.
+
+**Wie es aufgefallen ist:** beim Test der Untergruppen-Korrektur (1.9.0) in der parallelen
+Sitzung — dort wurde ein Termin per Direkt-`PUT` verschoben und danach vollständig
+wiederhergestellt. **Im Code belegt, nicht nachgestellt:** Für eine Reproduktion müsste ein echter
+Termin verändert werden; die Zeilen oben sind eindeutig genug.
+
+**Warum es im Betrieb bisher niemanden getroffen hat:** Die eigene Oberfläche schickt bei jedem
+`PUT` alle fünf Felder mit ([`appointments.js:704`](../public/js/modules/appointments.js)). Wie
+bei OI-54 trägt also allein die Disziplin des Aufrufers, dass nichts verloren geht — und `API.md`
+weist die Vollersetzung nicht aus.
+
+**Zu tun:** Dynamisches `UPDATE` wie bei `members`, `appointment_types` und `activity_types`
+(1.9.0) — nur schreiben, was der Request enthält. Dazu die Konfliktprüfung: Fehlen `date` oder
+`start_time`, gehören die gespeicherten Werte als Grundlage genommen, statt mit `" "` zu
+vergleichen. `API.md` nachziehen, wie bei den beiden Typ-Ressourcen geschehen.
+
+**Prüfen, ob es dieselbe Stelle noch anderswo gibt:** `records`, `exceptions` und
+`membership_dates` sind bisher nicht darauf angesehen worden. Der Test dafür steht schon —
+`tests/suites/partial_update_api.php` lässt sich um je einen Fall erweitern.
+
+**Nicht sicherheitsrelevant:** setzt ein Konto mit Schreibrecht auf Termine voraus (Admin oder
+Manager) und erweitert keine Rechte. Es zerstört Daten, die derselbe Aufrufer ohnehin ändern
+dürfte.
+
+---
+
 ### OI-70 · Statistik nach Untergruppe rechnet nicht
 **Priorität:** mittel — Entscheidung getroffen, Umsetzung offen · aufgenommen am 2026-09-17
 
