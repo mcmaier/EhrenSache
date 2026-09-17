@@ -122,4 +122,10 @@ return [
         'file'     => '1.8.0.php',
         'function' => 'migrate_1_8_0',
     ],
+    [
+        'from'     => '1.9.0',
+        'to'       => '1.9.1',
+        'file'     => '1.9.0.php',
+        'function' => 'migrate_1_9_0',
+    ],
 ];

@@ -351,10 +351,9 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}rate_limits` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     identifier VARCHAR(64) NOT NULL,
     action VARCHAR(50) NOT NULL,
-    expires_at DATETIME NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_identifier_action (identifier, action),
-    INDEX idx_expires (expires_at)
+    INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Email-Verifikation für neue Registrierungen

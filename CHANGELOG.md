@@ -7,6 +7,18 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.9.1] – unveröffentlicht
+
+### Sicherheit
+- **Das Rate Limiting arbeitete auf strengen Datenbanken lautlos gar nicht.** Die Tabelle
+  `rate_limits` verlangte eine Spalte `expires_at`, die nie geschrieben wurde. Unter
+  `STRICT_TRANS_TABLES` — bei manchem Hosting die Voreinstellung — scheiterte damit jeder
+  Schreibvorgang des Limiters, und weil er einen Datenbankfehler bewusst durchlässt, blieben
+  Brute-Force-Schutz und die Sperre der Stations-PIN dauerhaft aus, ohne jeden Hinweis im
+  Betrieb. Die Spalte ist entfernt; der Limiter rechnet wie bisher über `created_at` (OI-40).
+
+---
+
 ## [1.9.0] – 2026-09-17
 
 ### Neu
