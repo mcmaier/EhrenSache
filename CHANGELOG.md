@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [1.9.1] – unveröffentlicht
+## [1.9.1] – 2026-09-17
 
 ### Sicherheit
 - **Das Rate Limiting arbeitete auf strengen Datenbanken lautlos gar nicht.** Die Tabelle
