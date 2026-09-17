@@ -16,6 +16,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Schreibvorgang des Limiters, und weil er einen Datenbankfehler bewusst durchlässt, blieben
   Brute-Force-Schutz und die Sperre der Stations-PIN dauerhaft aus, ohne jeden Hinweis im
   Betrieb. Die Spalte ist entfernt; der Limiter rechnet wie bisher über `created_at` (OI-40).
+- **Eine Störung dieses Schutzes bleibt nicht mehr unbemerkt.** Kann EhrenSache seine Zähler
+  nicht schreiben, lässt es die Anfrage weiterhin bewusst durch — eine gestörte Datenbank soll
+  niemanden aussperren, auch nicht den Admin, der sie reparieren will. Die Systemeinstellungen
+  zeigen im Tab „System" jetzt aber an, ob der Schutz arbeitet, und nennen Zeitpunkt und
+  Fehlernummer der letzten Störung (OI-28).
 
 ---
 

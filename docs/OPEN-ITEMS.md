@@ -1099,7 +1099,9 @@ das API-Token ist für Geräte und die PWA gedacht, nicht für das eigene Dashbo
 ---
 
 ### OI-28 · `RateLimiter::check()` fail-open
-**Priorität:** niedrig — vorbestehend, nicht durch 1.3.0 verursacht
+**Priorität:** erledigt am 2026-09-17 — mit 1.9.1. Der Durchlass bleibt, die Störung wird
+sichtbar. Entschieden im Zuge von [OI-40](#oi-40--rate_limitsexpires_at-wird-nie-geschrieben),
+das erst durch dieses Verhalten so lange unbemerkt blieb.
 
 Der DB-gestützte Zweig von `RateLimiter::check()` gibt bei einer `PDOException` `true`
 zurück — der Aufruf gilt dann als nicht gesperrt. Für einfaches Rate Limiting ist das
@@ -1107,9 +1109,30 @@ vertretbar (lieber durchlassen als die Anwendung lahmlegen). Für eine Sperre, d
 Brute-Force verhindern soll — Login, seit 1.3.0 auch die Kiosk-PIN — bedeutet ein
 Datenbank-Hänger dasselbe: keine Sperre, solange die Störung andauert.
 
-**Zu entscheiden:** Ob Login- und PIN-Sperren fail-open bleiben (Verfügbarkeit vor Schutz)
-oder bei einer Datenbankstörung sicherheitshalber fail-closed reagieren sollen — mit dem
-Preis, dass ein DB-Hänger dann auch reguläre Logins blockiert.
+**Entschieden am 2026-09-17:** fail-open bleibt, wird aber gemeldet. Drei Wege standen zur
+Wahl — Durchlass sichtbar machen, fail-closed, oder nur OI-40 beheben und das Verhalten
+lassen. Gewählt ist der erste:
+
+- **fail-closed** hätte einen stillen Sicherheitsausfall gegen einen lauten Betriebsausfall
+  getauscht. Für eine Anwendung, die Vereine selbst hosten und bei der niemand nachts ein
+  Datenbankproblem behebt, ist das die schlechtere Richtung: Eine hängende Datenbank sperrte
+  dann jeden aus, auch den Admin, der sie reparieren will.
+- **Nichts tun** hätte den nächsten Auslöser derselben Art wieder unbemerkt durchgehen lassen.
+  OI-40 lag jahrelang vor, ohne dass etwas darauf hinwies.
+
+`noteFailure()` hält Zeitpunkt und Fehlernummer in `system_settings` fest
+([rate_limiter.php](../private/helpers/rate_limiter.php)); die Systemeinstellungen zeigen im
+Tab „System", ob der Schutz arbeitet — grün im Normalfall, gelb mit Zeitpunkt und
+Fehlernummer, solange die letzte Störung keine 24 Stunden her ist.
+
+**Bewusst nicht gespeichert wird der Meldungstext.** Er trägt Tabellen- und Spaltennamen und
+wäre über `resource=settings` für jeden Admin lesbar; die vollständige Meldung bleibt im
+Fehlerprotokoll von PHP. Scheitert auch der Vermerk, fängt ein zweites `catch` das ab — ein
+Fehler im Melden darf den Aufrufer nie treffen.
+
+**Offen geblieben:** Die Meldung erreicht nur, wer die Einstellungen öffnet. Ein aktiver Weg
+(E-Mail an den Admin) wurde nicht gebaut — er bräuchte eine Entprellung, sonst schickt eine
+hängende Datenbank im Minutentakt Post.
 
 ---
 
@@ -1541,7 +1564,9 @@ Bis dahin genügen die Ortsfelder zur Einordnung.
 ---
 
 ### OI-40 · `rate_limits.expires_at` wird nie geschrieben
-**Priorität:** niedrig — folgenlos im Betrieb, riskant bei strengerem SQL-Modus
+**Priorität:** erledigt am 2026-09-17 — mit 1.9.1, Spalte entfernt (Migration `1.9.0.php`).
+Zusammen mit [OI-28](#oi-28--ratelimitercheck-fail-open) behoben; die Wirkung war schwerer
+als der ursprüngliche Eintrag annahm, siehe unten.
 
 `RateLimiter` schreibt beim Zählen nur `identifier`, `action` und `created_at`
 ([rate_limiter.php:104](../private/helpers/rate_limiter.php)) und rechnet seine Fenster
@@ -1550,11 +1575,27 @@ Vorgabewert. Jede Zeile trägt deshalb das ungültige Nulldatum `0000-00-00 00:0
 
 Solange MariaDB nicht im strengen Modus läuft, bleibt das folgenlos. Unter
 `STRICT_TRANS_TABLES` — auf manchem Hosting die Voreinstellung — scheitert dagegen **jeder**
-Schreibvorgang des Limiters, und damit jeder Anmeldeversuch.
+Schreibvorgang des Limiters.
 
-**Zu entscheiden:** Spalte entfernen (sie wird nirgends gelesen) oder beim Einfügen mitfüllen.
-Beides braucht eine Migration; die erste Variante ist ehrlicher, weil die Spalte keine
-Bedeutung hat.
+**Korrektur vom 2026-09-17.** Hier stand: „und damit jeder Anmeldeversuch". **Das war falsch**
+— aus der Fehlermeldung geschlossen, ohne den Aufrufer zu lesen. `checkDatabase()` fängt die
+`PDOException` und gibt `true` zurück (fail-open, [OI-28](#oi-28--ratelimitercheck-fail-open)).
+Die Anmeldung läuft also durch; **aus ist der Limiter**. Auf strengem Hosting fehlen damit seit
+jeher der Schutz gegen das Durchprobieren von Passwörtern und die Sperre der Stations-PIN,
+ohne einen anderen Hinweis als eine Zeile im Fehlerprotokoll von PHP.
+
+Das dreht die Bewertung: kein Betriebsausfall, sondern ein stiller Ausfall einer
+Sicherheitsfunktion — und die beiden Punkte gehören zusammen. Wer nur OI-40 behebt, beseitigt
+den heutigen Auslöser, nicht die Klasse.
+
+**Behoben am 2026-09-17** (1.9.1). Die Spalte ist entfernt statt gefüllt, weil sie nirgends
+gelesen wird; an die Stelle von `idx_expires` tritt ein Index auf `created_at` (der alte lag
+auf einer Spalte, die nur Nulldaten enthielt, und half dem Aufräumen nie).
+
+**Nachgestellt, nicht nur gelesen:** `tests/db/verify_rate_limiter_strict.php` fährt den
+Limiter gegen eine Verbindung mit `STRICT_TRANS_TABLES`. Gegen den Stand vor der Migration
+lässt er dort viermal durch, wo er beim vierten Mal sperren müsste — Fehler 1364. Nicht Teil
+von `tests/run.php`, weil die Datei den SQL-Modus der Verbindung umstellt.
 
 ---
 
