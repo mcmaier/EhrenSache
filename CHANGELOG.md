@@ -32,6 +32,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Die Abschnittsüberschriften der Selbstauskunft als CSV heißen `[ STAMMDATEN ]` statt
   `=== STAMMDATEN ===`. Ein führendes Gleichheitszeichen hätte sonst in jeder Trennzeile ein
   Schutzapostroph nach sich gezogen, das beim Import je nach Programm sichtbar bleibt.
+- **Jeder Bereich der Check-in-PWA trägt jetzt dieselbe Überschrift mit Symbol.** Die
+  Anwesenheitserfassung bekommt einen eigenen Kasten („📍 Anwesenheit erfassen") wie die
+  Arbeitszeit daneben, Statistik und Anwesenheitsliste erhalten überhaupt erst eine
+  Überschrift, und die Überschrift im Termine-Tab steht nicht mehr mittig, sondern links wie
+  alle anderen. Der Erfassen-Tab selbst bleibt ohne Überschrift: die beiden großen Kacheln
+  sagen bereits, worum es geht.
 
 ### Behoben
 - **Ein `PUT` löscht keine Felder mehr, die gar nicht mitgeschickt wurden.** Wer über die
@@ -63,6 +69,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   sie ausgewertet wird; wer die CSV wollte, probierte es gar nicht erst. Und der
   Bestätigungsdialog zählte vier von zehn Datenarten auf und ließ die Auskunft damit kleiner
   erscheinen, als sie ist — er nennt jetzt keine Liste mehr (OI-68).
+- **Die Tab-Leiste der Check-in-PWA ragte auf schmalen Telefonen über den Bildschirmrand.**
+  Betroffen waren Manager, die fünf Tabs sehen: Die Schaltflächen durften nicht unter die
+  Breite ihres längsten Wortes schrumpfen, weshalb „Anwesenheit" die Leiste aufspreizte.
+  Die Beschriftungen richten sich jetzt nach der Gerätebreite, der Anwesenheitstab heißt
+  kürzer „Liste", und reicht der Platz trotzdem nicht, wird gekürzt statt übergelaufen.
+- **Eine vergrößerte Systemschriftgröße zerlegt die Oberfläche der PWA nicht mehr.** Android
+  skaliert Schriften, nicht aber feste Maße in Pixeln: Die Rolle im Benutzerkästchen verlor
+  ihre Mitgliedsnummer hinter Auslassungspunkten, die Zahl im Termin-Abzeichen stand über
+  ihrem Kreis, die Beschriftung der Scanner-Knöpfe lief heraus und die Jahrespfeile der
+  Statistik sprengten ihr Kästchen. Diese Maße wachsen jetzt mit.
 
 ---
 

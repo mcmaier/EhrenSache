@@ -474,12 +474,14 @@ body {
     line-height: 1.3;
 }
 
+/* Umbruch statt Kuerzen: bei vergroesserter Systemschrift verschwand sonst
+   die Mitgliedsnummer hinter den Auslassungspunkten ('Manager • Nr. ...').
+   Die Karte darf dafuer hoeher werden, sie hat nur eine Mindesthoehe. */
 .user-role {
     font-size: 11px;
     color: var(--text-light);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;
+    line-height: 1.3;
 }
 
 /* Responsive: Bei kleinen Screens untereinander */
@@ -880,11 +882,23 @@ body {
     min-height: 36px;
 }
 
-.history-section h3 {
+/* Ueberschrift eines Abschnitts -- ein Muster fuer alle Tabs.
+   Bis 1.9.1 stand dieselbe Regel dreimal in dieser Datei, zweimal davon mit
+   text-align: center. Sichtbar wurde das nur im Termine-Tab: dort ist das h3
+   ein Block ueber die volle Breite und stand tatsaechlich mittig, waehrend es
+   im Verlauf in einem Flex-Kopf sitzt und nur so breit ist wie sein Text --
+   dieselbe Regel, zwei Erscheinungen. Jetzt linksbuendig fuer alle, und die
+   Anwesenheitsliste faellt nicht mehr auf die Browser-Vorgabe fuer h3 zurueck. */
+.history-section h3,
+.stats-section h3,
+.responses-section h3,
+.attendance-header h3,
+.capture-section h3,
+.worktime-section h3 {
     margin: 0 0 16px 0;
     font-weight: 600;
     font-size: 16px;
-    text-align: center;
+    text-align: left;
     color: var(--text);
 }
 
@@ -1155,11 +1169,15 @@ body {
 
 .tab-button {
     flex: 1;
+    /* Ohne min-width:0 erzwingt das laengste Wort ('Anwesenheit') die Breite:
+       Flex-Kinder duerfen sonst nicht unter ihre Inhaltsbreite schrumpfen, und
+       die Leiste laeuft bei fuenf Tabs ueber den Bildschirmrand hinaus. */
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 14px 10px; /* Erhöht von 10px auf 14px */
+    padding: 14px 4px; /* waagerecht knapp: fuenf Tabs muessen nebeneinander passen */
     background: transparent;
     border: none;
     border-radius: 8px;
@@ -1173,6 +1191,19 @@ body {
 
 .tab-button .icon {
     font-size: 24px;
+}
+
+/* Die Beschriftung folgt der Geraetebreite. Fuenf Tabs -- Manager mit
+   Terminrueckmeldung und Anwesenheitsliste -- passen bei festen 13px auf einem
+   360px breiten Telefon nicht in eine Zeile. Reicht der Platz trotzdem nicht,
+   etwa weil das Telefon die Schrift systemweit vergroessert, wird gekuerzt
+   statt ueberzulaufen. */
+.tab-button > span:not(.icon):not(.tab-badge) {
+    max-width: 100%;
+    font-size: clamp(9px, 2.9vw, 13px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .tab-button.active {
@@ -1483,12 +1514,6 @@ body {
     max-width: 400px;
 }
 
-.stats-section h3 {
-    margin: 0 0 16px 0;
-    font-size: 16px;
-    color: var(--text);
-    font-weight: 600;
-}
 
 /* ========================================
    YEAR SELECTOR
@@ -1505,9 +1530,12 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
+/* Mindest- statt Festmass, damit der Pfeil bei vergroesserter Systemschrift
+   nicht aus seinem Kaestchen ragt. */
 .year-nav {
-    width: 36px;
-    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0 6px;
     border: none;
     background: #f8f9fa;
     border-radius: 8px;
@@ -1855,9 +1883,11 @@ body {
    ======================================== */
 
 @media (max-width: 380px) {
+    /* Keine eigene Schriftgroesse mehr: die Beschriftung rechnet oben schon
+       mit der Geraetebreite (clamp), eine feste Groesse hier wuerde sie nur
+       wieder festnageln. */
     .tab-button {
-        font-size: 11px;
-        padding: 12px 8px;
+        padding: 12px 4px;
         min-height: 60px;
     }
     
@@ -1994,7 +2024,9 @@ body {
     padding: 10px 8px;
     gap: 8px;
     font-size: 14px;
-    white-space: nowrap;
+    /* Umbruch erlaubt: bei vergroesserter Systemschrift lief die Beschriftung
+       sonst aus dem Knopf heraus. Die Hoehe ist ohnehin nur ein Mindestmass. */
+    white-space: normal;
 }
 
 .scanner-actions .action-button .icon,
@@ -2033,6 +2065,18 @@ body {
 
 /* Die Kacheln sind der Einstieg, nicht ein Bedienelement unter vielen:
    gross genug fuer den Daumen und ohne Konkurrenz auf dem Schirm. */
+/* Anwesenheitserfassung: derselbe weisse Kasten wie .worktime-section.
+   Bewusst ohne display-Angabe -- welche Ansicht des Erfassen-Tabs sichtbar
+   ist, entscheidet das hidden-Attribut am Elternteil (showCaptureView). */
+.capture-section {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card-bg);
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
 .capture-chooser {
     display: flex;
     flex-direction: column;
@@ -2396,17 +2440,19 @@ body {
     position: relative;
 }
 
+/* Masse in em statt px: der Kreis waechst mit der Schrift mit, sonst stand
+   die Ziffer bei vergroesserter Systemschrift ueber ihrem Rand. */
 .tab-badge {
     position: absolute;
     top: 4px;
-    right: 10px;
-    min-width: 18px;
-    padding: 0 5px;
-    border-radius: 9px;
+    right: 4px;
+    min-width: 1.65em;
+    padding: 0 0.45em;
+    border-radius: 1em;
     background: var(--error);
     color: #fff;
     font-size: 11px;
-    line-height: 18px;
+    line-height: 1.65;
     text-align: center;
 }
 
@@ -2429,13 +2475,6 @@ body {
     max-width: 400px;
 }
 
-.responses-section h3 {
-    margin: 0 0 16px 0;
-    font-weight: 600;
-    font-size: 16px;
-    text-align: center;
-    color: var(--text);
-}
 
 .responses-list {
     display: flex;

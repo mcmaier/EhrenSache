@@ -125,7 +125,7 @@
                 </button>
                 <button class="tab-button" data-tab="attendance-list" id="attendanceListTab" style="display: none;">
                     <span class="icon">✅</span>
-                    <span>Anwesenheit</span>
+                    <span>Liste</span>
                 </button>
             </div>
 
@@ -179,53 +179,60 @@
                     </button>
                 </div>
 
-                <!-- Ansicht 2: Anwesenheit -->
+                <!-- Ansicht 2: Anwesenheit.
+                     Der weisse Kasten mit Ueberschrift ist dasselbe Muster wie
+                     bei der Arbeitszeit (.worktime-section) und in den uebrigen
+                     Tabs: jede Ansicht sagt zuerst, was sie ist. -->
                 <div id="captureAttendance" hidden>
-                    <div class="checkin-suggestion" id="checkinSuggestion" hidden></div>
+                    <div class="capture-section">
+                        <h3>📍 Anwesenheit erfassen</h3>
+                        <div class="checkin-suggestion" id="checkinSuggestion" hidden></div>
 
-                <div class="action-buttons">
-                    <button id="scanButton" class="action-button">
-                        <span class="icon">📷</span>
-                        <span>QR-Code scannen</span>
-                    </button>
+                        <div class="action-buttons">
+                            <button id="scanButton" class="action-button">
+                                <span class="icon">📷</span>
+                                <span>QR-Code scannen</span>
+                            </button>
 
-                    <!--  NFC-Container (nur wenn unterstützt) -->
-                    <div class="nfc-scanner-container" id="nfcScannerContainer" style="display: none;">
-                        <div class="nfc-animation">🪪</div>
-                        <div class="nfc-hint">NFC-Tag an Gerät halten</div>
+                            <!--  NFC-Container (nur wenn unterstützt) -->
+                            <div class="nfc-scanner-container" id="nfcScannerContainer" style="display: none;">
+                                <div class="nfc-animation">🪪</div>
+                                <div class="nfc-hint">NFC-Tag an Gerät halten</div>
+                            </div>
+
+                            <button id="nfcButton" class="action-button" style="display: none;">
+                                <span class="icon">📡</span>
+                                <span>NFC-Tag scannen</span>
+                            </button>
+
+                            <button id="manualCodeBtn" class="action-button secondary">
+                                <span class="icon">🔢</span>
+                                <span>Code manuell eingeben</span>
+                            </button>
+
+                            <div id="checkinDivider" class="divider"><span>oder</span></div>
+
+                            <button id="exceptionBtn" class="action-button secondary">
+                                <span class="icon">📋</span>
+                                <span>Erfassungsantrag stellen</span>
+                            </button>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="checkinAppointment">Termin (optional)</label>
+                            <select id="checkinAppointment">
+                                <option value="">Termin wählen …</option>
+                            </select>
+                            <div class="field-hint" id="checkinAppointmentHint"></div>
+                        </div>
                     </div>
-
-                    <button id="nfcButton" class="action-button" style="display: none;">
-                        <span class="icon">📡</span>
-                        <span>NFC-Tag scannen</span>
-                    </button>
-
-                    <button id="manualCodeBtn" class="action-button secondary">
-                        <span class="icon">🔢</span>
-                        <span>Code manuell eingeben</span>
-                    </button>
-
-                    <div id="checkinDivider" class="divider"><span>oder</span></div>
-
-                    <button id="exceptionBtn" class="action-button secondary">
-                        <span class="icon">📋</span>
-                        <span>Erfassungsantrag stellen</span>
-                    </button>
                 </div>
-
-                <div class="form-group">
-                    <label for="checkinAppointment">Termin (optional)</label>
-                    <select id="checkinAppointment">
-                        <option value="">Termin wählen …</option>
-                    </select>
-                    <div class="field-hint" id="checkinAppointmentHint"></div>
-                </div>
-            </div>
-            <!-- Ende Ansicht 2 -->
+                <!-- Ende Ansicht 2 -->
 
             <!-- Ansicht 3: Arbeitszeit -->
             <div id="captureWorktime" hidden>
                 <div class="worktime-section">
+                    <h3>⏱️ Arbeitszeit erfassen</h3>
                     <div id="worktimeIdle">
                         <div class="form-group">
                             <label for="worktimeActivity">Tätigkeit</label>
@@ -312,6 +319,8 @@
                 </div>
                 
                 <div class="stats-section" id="statsContent" style="display: none;">
+                    <h3>📊 Meine Statistik</h3>
+
                     <!-- Jahr-Anzeige -->
                     <div class="stats-year-selector">
                         <button class="year-nav" id="prevYear">‹</button>
@@ -337,13 +346,13 @@
                          erfassen darf; gefuellt wird sie von
                          displayWorktimeStats(). -->
                     <div class="stats-section" id="worktimeStats" style="display: none;">
-                        <h3>Arbeitszeit</h3>
+                        <h3>⏱️ Arbeitszeit</h3>
                         <div id="worktimeStatsBody"></div>
                     </div>
 
                     <!-- Gruppen-Übersicht -->
                     <div class="stats-section">
-                        <h3>Übersicht nach Gruppen</h3>
+                        <h3>👥 Übersicht nach Gruppen</h3>
                         <div class="groups-list" id="groupsList">
                             <!-- Dynamisch gefüllt -->
                         </div>
@@ -354,7 +363,7 @@
                <!-- ATTENDANCE LIST TAB (nur für Admin/Manager) -->
             <div class="tab-content" id="attendanceListPanel" data-tab="attendance-list">
                 <div class="attendance-header">
-                    <h3>Anwesenheitsliste</h3>
+                    <h3>✅ Anwesenheitsliste</h3>
                     
                     <div class="filter-section">
                         <select id="attendanceAppointmentFilter" class="select-input">
