@@ -4,8 +4,15 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-16 · **Bezugsstand:** `dev`, Terminrückmeldung gemergt ·
-**Version:** 1.7.0
+**Zuletzt geprüft:** 2026-09-17 · **Bezugsstand:** `dev`, Fehlerkorrekturen für 1.9.1 ·
+**Version:** 1.9.1
+
+> **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
+> während der Code auf 1.9.0 war — fünf Punkte waren längst behoben, ohne dass ihr Eintrag es
+> sagte. Wer aus dieser Datei heraus priorisiert, plant dann Arbeit ein, die schon getan ist.
+> **Deshalb: jeden Punkt vor der Umsetzung gegen den Code prüfen, nicht gegen diese Datei**,
+> und `git log --since=<letztes Prüfdatum>` lesen — dort stehen die Korrekturen paralleler
+> Sitzungen unter ihren eigenen `fix(...)`-Titeln.
 
 > **Diese Datei ist öffentlich.** Sie liegt seit 2026-09-02 im Repository (siehe
 > [OI-14](#oi-14--dokumentation-liegt-unversioniert)). Was hier steht, kann jeder lesen — die Grenze für sicherheitsrelevante
@@ -787,6 +794,14 @@ weiterhin `{"message":"Unauthorized"}` als Seite. Dasselbe gilt für jede von Ha
 zusammengesetzte URL. Die drei älteren Exporte sind seit 2026-09-07 nicht mehr betroffen —
 sie prüfen den Status und melden über einen Toast (OI-24).
 
+**Ergänzung vom 2026-09-17:** Betroffen ist nicht nur die Arbeitszeit. `openStatisticsReport()`
+([statistics.js](../public/js/modules/statistics.js)) öffnet den **Anwesenheitsbericht** ebenfalls
+über `window.open` auf die nackte URL — der Punkt oben nennt nur die Arbeitszeit-Berichte und
+unterschätzt damit seinen Umfang. Beide sind Druckansichten und führen deshalb in denselben
+Fallstrick: Eine `blob:`-URL würde die `<base href="../">` aushöhlen, der Bericht käme ohne
+Stylesheet und ohne Vereinslogo. Der Weg bleibt die Vorabprüfung per `fetch` und danach ein
+`window.open` auf die echte URL — bewusst zwei Anfragen, jetzt aber für zwei Berichte.
+
 **Lösungsweg:** Eine gemeinsame Funktion, die den Export per `fetch` anfordert, den Status
 prüft und erst bei `200` ausliefert. Zwei Fallstricke:
 
@@ -1152,14 +1167,16 @@ mehr doppelt vorkommt.
 ---
 
 ### OI-9 · `currentUser` ohne `member_id` im Dashboard
-**Priorität:** niedrig
+**Priorität:** erledigt — geprüft am 2026-09-17, die Lücke besteht nicht mehr
 
 Die Login-Antwort (`resource=login`) liefert `user_id`, `email`, `role` — **kein** `member_id`.
 Der Token-Login (`resource=auth`) liefert es. In `worktime.js` war das die Ursache eines Fehlers;
 umgangen, weil der Server Nicht-Managern ohnehin nur eigene Sitzungen liefert.
 
-Wer künftig im Dashboard „gehört mir?" prüfen will, läuft in dieselbe Falle. Entweder `member_id`
-in die Login-Antwort aufnehmen oder die Lücke hier dokumentiert lassen.
+**Gegengeprüft am 2026-09-17: nicht mehr aktuell.** `login()` liefert `member_id` in der
+Login-Antwort mit ([auth.php](../private/helpers/auth.php)), und das Frontend wertet es aus
+([api.js](../public/js/modules/api.js)). Wann das nachgezogen wurde, ist nirgends vermerkt —
+der Eintrag blieb stehen, obwohl die Sache erledigt war.
 
 ---
 
@@ -1630,7 +1647,7 @@ von `tests/run.php`, weil die Datei den SQL-Modus der Verbindung umstellt.
 ---
 
 ### OI-41 · `checkin_appointment` ist am selben Tag nicht wiederholbar
-**Priorität:** niedrig — betrifft nur die Testbarkeit
+**Priorität:** erledigt — geprüft am 2026-09-17, die Suite räumt ab
 
 Die Suite legt ihre Termine mit festen Uhrzeiten am aktuellen Tag an („Nachtrag-Termin" 07:00,
 „Frueher Check-in" 04:00, „Spaeter zugeordnet" 13:00 …) und räumt sie nicht wieder ab. Beim
@@ -1641,8 +1658,11 @@ obwohl nichts kaputt ist.
 Am 2026-09-09 hinterließen zwei Läufe zwölf solcher Termine. Aufgeräumt über den Titelanhang,
 den die Suite vergibt: Titel mit einem angehängten 13-stelligen Hex-Wert.
 
-**Zu tun:** Entweder räumt die Suite ihre Termine am Ende ab, oder sie legt sie zu einer
-Uhrzeit an, die aus der laufenden Sekunde abgeleitet ist.
+**Erledigt — die erste Variante.** `tests/suites/checkin_appointment.php` schließt mit einem
+Aufräumtest, der Termine, Terminarten und Gruppen in dieser Reihenfolge entfernt und den ersten
+angelegten Termin als Stichprobe gegenprüft; die `records` der Check-ins fallen per
+`ON DELETE CASCADE` mit ihren Terminen. Wie bei OI-9 stand der Eintrag hier noch, obwohl die
+Sache getan war.
 
 Dieselbe Familie wie die Stationssperre in `station_api`, dort am 2026-09-09 behoben: Der Test
 „identify mit falscher PIN" schickte eine **feste** unbekannte Mitgliedsnummer
@@ -1694,6 +1714,28 @@ Punkte, bei denen eine frühere Einschätzung revidiert wurde — als Warnung vo
   kamen von gewöhnlichem HTTP-Caching.
 - **`location_name` war immer `NULL`.** Der Bestandscode las `users.email` von Gerätekonten —
   ein Feld, das die Check-Constraint auf `NULL` zwingt.
+
+**Aus der Durchsicht für 1.9.1 (2026-09-17) — fünf Einträge, die falsch lagen:**
+
+- **OI-40 nannte die falsche Folge.** „Scheitert jeder Anmeldeversuch" war aus der Fehlermeldung
+  geschlossen, ohne den Aufrufer zu lesen. `checkDatabase()` fängt die Exception und lässt durch:
+  Nicht die Anmeldung fällt aus, sondern der Limiter — ein **stiller Ausfall einer
+  Sicherheitsfunktion** statt eines Betriebsausfalls. Die Lehre ist nicht „genauer lesen",
+  sondern: Eine Folge, die man aus einer Fehlermeldung ableitet, ist eine Vermutung, bis der
+  aufrufende Code sie bestätigt.
+- **OI-26 verlangte einen Guard für einen Fall, den es nicht gibt.** `device_type` und
+  `work_sessions.source` haben gar kein `ALTER`, das abbrechen könnte. Dafür steckte an derselben
+  Stelle ein echter Fehler, den der Eintrag nicht sah.
+- **OI-56 führte `users.php` als versorgt.** Das dortige `400` gilt dem Löschen des eigenen
+  Kontos, nicht einer fehlenden `id`. Ein `awk` über den Zweig hatte die beiden Prüfungen
+  verwechselt — aufgedeckt hat es der Test, nicht das Lesen.
+- **OI-29 hielt einen Fehler für Aufräumen.** „Tote `getElementById`-Aufrufe" — tatsächlich war
+  einer davon ein Tippfehler gegen vorhandenes Markup (`devicesPagination` statt
+  `devicePagination`), der **die Geräteliste ab dem 26. Eintrag unerreichbar machte**.
+- **OI-9 und OI-41 waren längst erledigt**, ohne dass ihr Eintrag es sagte.
+
+Das gemeinsame Muster: **Diese Datei ist ein Gedächtnis, kein Zustand.** Sie hält fest, was
+jemand einmal gesehen hat — ob es noch gilt, sagt nur der Code.
 
 ### OI-44 · Demo: gespeichertes XSS zwischen zwei Resets
 **Priorität:** niedrig · bewusst in Kauf genommen
