@@ -70,12 +70,16 @@ function groupsSortForDisplay(array $groups): array
  * Namensliste der Terminrückmeldung.
  *
  * `groups` sind die Mitgliedschaften aus $termGroupIds (z. B. die Gruppen der
- * Terminart) -- die Beschaffung dieser IDs bleibt beim Aufrufer, denn beide
- * bisherigen Aufrufer haben sie schon zur Hand (attendance_list.php aus der
- * Termin-Abfrage, responses.php aus den noch nicht entdoppelten erwarteten
- * Mitgliedern). `subgroups` sind alle als Untergruppe markierten Gruppen des
- * Mitglieds, unabhängig von $termGroupIds. Beide Listen sortiert nach
- * groupSortCompare().
+ * Terminart) OHNE die als Untergruppe markierten -- die Beschaffung der IDs
+ * bleibt beim Aufrufer, denn beide bisherigen Aufrufer haben sie schon zur
+ * Hand (attendance_list.php aus der Termin-Abfrage, responses.php aus den
+ * noch nicht entdoppelten erwarteten Mitgliedern). `subgroups` sind alle als
+ * Untergruppe markierten Gruppen des Mitglieds, unabhängig von
+ * $termGroupIds. Die beiden Stufen sind gegenseitig ausschliessend: eine als
+ * Untergruppe markierte Gruppe landet nie in `groups`, auch wenn sie zu
+ * $termGroupIds gehoert -- sonst waere ein Mitglied doppelt erwartet, wenn
+ * eine Terminart ein Register direkt zugeordnet hat. Beide Listen sortiert
+ * nach groupSortCompare().
  *
  * @param PDO $db Datenbankverbindung
  * @param Database $database Liefert den Tabellenpräfix über table()
@@ -112,11 +116,16 @@ function groupsAttachToMembers($db, $database, array $members, array $termGroupI
         ];
         $mid = (int) $row['member_id'];
 
-        if (in_array($eintrag['group_id'], $termGroups, true)) {
-            $byMember[$mid]['groups'][] = $eintrag;
-        }
+        // Gegenseitig ausschliessend: eine Terminart kann ein Register direkt
+        // zugeordnet haben (z. B. eine Terminart nur fuer ein Register). Ohne
+        // diese Weiche stuende so eine Gruppe in beiden Stufen und jedes
+        // Mitglied waere doppelt erwartet -- die Markierung is_subgroup
+        // entscheidet, in welche Stufe eine Gruppe gehoert, unabhaengig
+        // davon, ob sie auch zu $termGroupIds zaehlt.
         if ((int) $row['is_subgroup'] === 1) {
             $byMember[$mid]['subgroups'][] = $eintrag;
+        } elseif (in_array($eintrag['group_id'], $termGroups, true)) {
+            $byMember[$mid]['groups'][] = $eintrag;
         }
     }
 
