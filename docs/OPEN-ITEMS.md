@@ -1473,20 +1473,31 @@ die Anwendung ohnehin arbeitet.
 ---
 
 ### OI-26 · Schema-Guard nur für `checkin_source`
-**Priorität:** niedrig
+**Priorität:** erledigt am 2026-09-17 — anders als hier beschrieben, siehe unten
 
-In `ehrensache_db.sql` prüft nur die Spalte `checkin_source` vor dem `ALTER TABLE`, ob der
-neue Enum-Wert schon vorhanden ist (Schutz für ein frisches Einspielen des Schemas gegen
-eine bereits migrierte Datenbank). `device_type` und `work_sessions.source` — beide seit
-1.3.0 ebenfalls um neue Werte erweitert (`kiosk` bzw. `station`) — haben keinen
-entsprechenden Guard.
+Hier stand: `device_type` und `work_sessions.source` bräuchten denselben Guard wie
+`checkin_source`, sonst breche ein direktes Einspielen von `ehrensache_db.sql` auf eine
+bereits migrierte Datenbank mit einem SQL-Fehler ab.
 
-**Folge:** Ein direktes Einspielen von `ehrensache_db.sql` auf eine Datenbank, die diese
-Spalten bereits in der neuen Form hat, kann an diesen beiden Stellen mit einem SQL-Fehler
-abbrechen, während `checkin_source` das abfängt.
+**Gegengeprüft am 2026-09-17: gegenstandslos.** Für beide Spalten gibt es gar kein `ALTER
+TABLE`, das abbrechen könnte — sie stehen vollständig in ihren `CREATE TABLE`-Anweisungen
+(`device_type` Z. 129, `work_sessions.source` Z. 526), und die tragen `IF NOT EXISTS`. Der
+Eintrag hat einen Guard für einen Fall verlangt, den es nicht gibt.
 
-**Zu tun:** Denselben Guard (Abfrage gegen `INFORMATION_SCHEMA.COLUMNS`, `ALTER TABLE` nur
-bei Bedarf) für `device_type` und `work_sessions.source` ergänzen.
+**Der echte Fund an derselben Stelle.** Der vorhandene Guard prüfte auf `station_pin` (seit
+1.2.5), schrieb dann aber eine Enum-Liste **ohne** `exception_request` (seit 1.4.1). Auf einer
+Datenbank vor 1.2.5 setzte ein Einspielen des Schemas die Spalte damit auf einen
+Zwischenstand, und eine genehmigte Zeitkorrektur konnte ihre Herkunft danach nicht mehr
+ablegen.
+
+**Nachgestellt, nicht geschlossen:** In einer Wegwerf-Datenbank mit `checkin_source` im Stand
+vor 1.2.5 ergab der alte Guard `…,'timer','station_pin'` ohne `exception_request`, der
+korrigierte die volle Liste.
+
+**Behoben am 2026-09-17** (1.9.1): Der Guard fragt jetzt nach dem **jüngsten** Wert und
+schreibt den vollen Wertevorrat. Damit gilt die Regel, die vorher nur zufällig stimmte — wer
+den Guard beim nächsten neuen Enum-Wert anfasst, muss die Abfrage mitziehen, sonst greift sie
+zu früh.
 
 ---
 

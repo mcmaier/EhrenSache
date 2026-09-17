@@ -585,15 +585,20 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_responses` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
--- records.checkin_source um 'timer' und 'station_pin' erweitern
+-- records.checkin_source auf den vollen Wertevorrat ziehen
 --
-SET @has_station_pin = (SELECT COUNT(*) FROM information_schema.COLUMNS
+-- Geprueft wird der JUENGSTE Wert, nicht irgendeiner: Bis 2026-09-17 fragte
+-- der Guard nach 'station_pin' (seit 1.2.5) und schrieb dann eine Liste ohne
+-- 'exception_request' (seit 1.4.1). Auf einer Datenbank vor 1.2.5 setzte er
+-- die Spalte damit auf einen Zwischenstand zurueck, und eine genehmigte
+-- Zeitkorrektur konnte ihre Herkunft danach nicht mehr ablegen.
+SET @hat_alle_quellen = (SELECT COUNT(*) FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
       AND TABLE_NAME   = '{PREFIX}records'
       AND COLUMN_NAME  = 'checkin_source'
-      AND COLUMN_TYPE LIKE '%station_pin%');
-SET @prep_sql = IF(@has_station_pin = 0,
-    'ALTER TABLE `{PREFIX}records` MODIFY `checkin_source` ENUM(''admin'',''user_totp'',''device_auth'',''auto_checkin'',''import'',''timer'',''station_pin'') DEFAULT ''admin''',
+      AND COLUMN_TYPE LIKE '%exception_request%');
+SET @prep_sql = IF(@hat_alle_quellen = 0,
+    'ALTER TABLE `{PREFIX}records` MODIFY `checkin_source` ENUM(''admin'',''user_totp'',''device_auth'',''auto_checkin'',''import'',''timer'',''station_pin'',''exception_request'') DEFAULT ''admin''',
     'SELECT 1');
 PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
