@@ -670,6 +670,23 @@ sagt, ob dieses Mitglied für den Termin erwartet ist. Bei Terminarten ohne Rüc
 
 **Berechtigung:** Admin/Manager
 
+**Felder:** `title`, `type_id`, `description`, `date`, `start_time`
+
+**`PUT` ist eine Teiländerung, keine Vollersetzung.** Geschrieben wird nur, was im Request steht;
+alle übrigen Felder bleiben unberührt. Ein ausdrückliches `null` ist dagegen eine Angabe und
+löscht den Wert. Ein `PUT` auf eine unbekannte `id` ergibt `404 {"message": "Appointment not
+found"}`.
+
+Liegt nach der Änderung ein anderer Termin **derselben Terminart** im Toleranzfenster
+(`checkin_tolerance_hours`), antwortet der Endpunkt mit `409` und nennt den bestehenden Termin.
+Geprüft wird der Zustand nach dem Update: Fehlen `date`, `start_time` oder `type_id` im Request,
+gelten die gespeicherten Werte.
+
+**Bis einschließlich 1.9.0 war dies eine Vollersetzung.** Ein `PUT` ohne `title` und `type_id`
+nullte beide, `date` und `start_time` wurden zu `0000-00-00`; die Dublettenprüfung fiel bei einem
+Teil-Update still aus (OI-69). Wer vor 1.9.1 alle fünf Felder mitschickte, ist davon nicht
+betroffen — die mitgelieferte Oberfläche tut das.
+
 ---
 
 ### Termin löschen
@@ -679,6 +696,9 @@ sagt, ob dieses Mitglied für den Termin erwartet ist. Bei Terminarten ohne Rüc
 
 **Seit 1.8.0:** Trifft `id` keinen Datensatz (bereits gelöscht, erfundene ID), antwortet der
 Endpunkt mit `404` statt wie zuvor mit `200`.
+
+**Seit 1.9.1:** Fehlt `id` ganz, antwortet der Endpunkt mit `400 {"message": "id ist
+erforderlich"}` statt mit einer Erfolgsmeldung (OI-56).
 
 ---
 
@@ -761,8 +781,16 @@ besteht.
 **Berechtigung:** Admin/Manager
 
 Dieselben Regeln wie beim Anlegen: `arrival_time` darf leer sein (ein Leerstring löscht die
-Angabe), und das Toleranzband wird geprüft — gegen den Termin aus dem Anfragekörper, denn ein
-`PUT` darf den Termin wechseln.
+Angabe), und das Toleranzband wird geprüft — gegen den Termin, der nach der Änderung gilt, denn
+ein `PUT` darf den Termin wechseln.
+
+**`PUT` ist eine Teiländerung, keine Vollersetzung.** Geschrieben wird nur, was im Request steht;
+`member_id`, `appointment_id`, `arrival_time` und `status` bleiben unberührt, wenn sie fehlen.
+Bei `arrival_time` sind „fehlt" und „ist leer" ausdrücklich verschieden: Ein fehlendes Feld lässt
+die gespeicherte Zeit stehen, ein Leerstring löscht sie.
+
+**Bis einschließlich 1.9.0 war dies eine Vollersetzung** — ein `PUT` ohne `member_id`,
+`appointment_id` und `status` nullte alle drei (OI-69).
 
 ---
 
@@ -773,6 +801,9 @@ Angabe), und das Toleranzband wird geprüft — gegen den Termin aus dem Anfrage
 
 **Seit 1.8.0:** Trifft `id` keinen Datensatz (bereits gelöscht, erfundene ID), antwortet der
 Endpunkt mit `404` statt wie zuvor mit `200`.
+
+**Seit 1.9.1:** Fehlen `id` **und** `member_id`, antwortet der Endpunkt mit `400`. Die
+Massenlöschung über `member_id` (ohne `id`) bleibt davon unberührt.
 
 ---
 
@@ -1074,6 +1105,18 @@ abgelehnter Antrag blockiert nicht — nach einem Nein ist ein neuer Versuch mö
 }
 ```
 
+**`PUT` ist eine Teiländerung, keine Vollersetzung.** Geschrieben wird nur, was im Request steht;
+`reason` und `requested_arrival_time` bleiben unberührt, wenn sie fehlen. Die Art des Antrags
+(`exception_type`) und der Termin lassen sich nicht nachträglich wechseln — beide kommen aus dem
+Bestand.
+
+**Bis einschließlich 1.9.0 löschte genau der oben gezeigte Aufruf die Begründung** und bei einer
+Zeitkorrektur die beantragte Uhrzeit, weil beide Felder bedingungslos geschrieben wurden — also
+gerade das, was die Entscheidung nachvollziehbar macht (OI-69). Die Dokumentation war hier
+richtig, der Server nicht.
+
+**Seit 1.9.1** ergibt ein `DELETE` ohne `id` `400` statt `404`.
+
 ---
 
 ## Mitgliedergruppen (member_groups)
@@ -1163,6 +1206,9 @@ Reihenfolge (gleiches Muster wie bei Terminarten, OI-54).
 **Endpoint:** `DELETE /api.php?resource=member_groups&id=1`
 
 **Berechtigung:** Admin
+
+**Seit 1.9.1:** Fehlt `id`, antwortet der Endpunkt mit `400 {"message": "id ist erforderlich"}`;
+trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200 "Group deleted"` (OI-56).
 
 ---
 
@@ -1470,6 +1516,9 @@ Array** löscht sie.
 Hängen Sitzungen an der Art, antwortet der Server mit **409** — Löschen würde
 bestätigten Nachweisstunden ihre Zuordnung nehmen. Stattdessen `is_active = 0`
 setzen.
+
+**Seit 1.9.1:** Fehlt `id`, antwortet der Endpunkt mit `400 {"message": "id ist erforderlich"}`;
+trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200` (OI-56).
 
 ---
 
@@ -2541,10 +2590,27 @@ Mitglied am Termindatum aktiv war (siehe `membership_dates`).
 ### Zeitraum aktualisieren
 **Endpoint:** `PUT /api.php?resource=membership_dates&id=1`
 
+**Berechtigung:** Admin/Manager
+
+**Felder:** `start_date`, `end_date`, `status`
+
+**`PUT` ist eine Teiländerung, keine Vollersetzung.** Geschrieben wird nur, was im Request steht.
+Ein ausdrückliches `end_date: null` ist dagegen eine Angabe und öffnet den Zeitraum wieder. Ein
+`PUT` auf eine unbekannte `id` ergibt `404`.
+
+**Bis einschließlich 1.9.0 war dies eine Vollersetzung:** `start_date` wurde bedingungslos
+gelesen, und ohne `status` fiel der Zeitraum auf `active` zurück — wer nur das Enddatum
+nachtrug, führte einen beendeten Zeitraum danach wieder als laufend (OI-69).
+
 ---
 
 ### Zeitraum löschen
 **Endpoint:** `DELETE /api.php?resource=membership_dates&id=1`
+
+**Berechtigung:** Admin/Manager
+
+**Seit 1.9.1:** Fehlt `id`, antwortet der Endpunkt mit `400 {"message": "id ist erforderlich"}`;
+trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200` (OI-56).
 
 ---
 

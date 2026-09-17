@@ -747,6 +747,13 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
         case 'DELETE':
             // Nur Admin darf User löschen     
             requireAdmin();  
+
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(["message" => "id ist erforderlich"]);
+                exit();
+            }
+
             // Eigenen Account nicht löschen
             if($authUserId == $id) {
                 http_response_code(400);
@@ -759,6 +766,11 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
             
             $stmt = $db->prepare("DELETE FROM {$prefix}users WHERE user_id = ?");
             if($stmt->execute([$id])) {
+                if($stmt->rowCount() === 0) {
+                    http_response_code(404);
+                    echo json_encode(["message" => "User not found"]);
+                    break;
+                }
                 echo json_encode(["message" => "User deleted"]);
             } else {
                 http_response_code(500);

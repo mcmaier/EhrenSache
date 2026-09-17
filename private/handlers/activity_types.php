@@ -356,9 +356,22 @@ function handleActivityTypes($db, $database, $method, $id) {
         case 'DELETE':
             requireAdmin();
 
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(["message" => "id ist erforderlich"]);
+                break;
+            }
+
             try {
                 $stmt = $db->prepare("DELETE FROM {$prefix}activity_types WHERE activity_id = ?");
                 $stmt->execute([$id]);
+
+                if ($stmt->rowCount() === 0) {
+                    http_response_code(404);
+                    echo json_encode(["message" => "Activity type not found"]);
+                    break;
+                }
+
                 echo json_encode(["message" => "Activity type deleted"]);
             } catch (PDOException $e) {
                 // ON DELETE RESTRICT: an der Art haengen Sitzungen.

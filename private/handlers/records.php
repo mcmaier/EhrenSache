@@ -357,6 +357,14 @@ function handleRecords($db, $database, $method, $id) {
                     echo json_encode(["message" => "Failed to delete records"]);
                 }                
             } else {
+                    // Weder id noch member_id: Der Aufruf kann nichts treffen.
+                    // Die Pruefung steht bewusst HIER und nicht vor dem
+                    // Massenzweig -- der arbeitet ohne id (OI-56).
+                    if (!$id) {
+                        http_response_code(400);
+                        echo json_encode(["message" => "id oder member_id ist erforderlich"]);
+                        break;
+                    }
 
                     $stmt = $db->prepare("DELETE FROM {$prefix}records WHERE record_id = ?");
                     if($stmt->execute([$id])) {

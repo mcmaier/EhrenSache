@@ -22,6 +22,22 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   zeigen im Tab „System" jetzt aber an, ob der Schutz arbeitet, und nennen Zeitpunkt und
   Fehlernummer der letzten Störung (OI-28).
 
+### Behoben
+- **Ein `PUT` löscht keine Felder mehr, die gar nicht mitgeschickt wurden.** Wer über die
+  Schnittstelle nur ein einzelnes Feld ändern wollte, verlor bei Terminen Titel und Terminart,
+  bei Anwesenheiten Mitglied, Termin und Status, bei Anträgen die Begründung und bei
+  Mitgliedschaftszeiträumen den Beginn. Am schwersten wog die Terminart: Ein Termin ohne sie hat
+  keine Gruppenzuordnung mehr, verschwindet aus den Listen der Mitglieder und zählt in keiner
+  Auswertung mit. Die mitgelieferte Oberfläche schickt immer alle Felder mit und war deshalb nie
+  betroffen (OI-69).
+- **Die Dublettenprüfung beim Verschieben eines Termins greift wieder.** Wurde ein Termin ohne
+  Angabe seiner Terminart verschoben, fiel die Prüfung auf einen bereits bestehenden Termin
+  derselben Art still aus (OI-69).
+- **Ein Löschaufruf ohne Kennung meldet keinen Erfolg mehr.** `DELETE` ohne `id` traf keine
+  Zeile, antwortete aber mit „gelöscht" — bei Benutzern, Terminarten, Tätigkeitsarten, Gruppen
+  und Mitgliedschaftszeiträumen. Jetzt kommt `400`, und eine unbekannte Kennung ergibt `404`
+  (OI-56).
+
 ---
 
 ## [1.9.0] – 2026-09-17

@@ -347,6 +347,12 @@ function handleExceptions($db, $database, $method, $id) {
         case 'DELETE':
             // User dürfen nur ihre eigenen pending Anträge löschen
             // Admin darf alles löschen
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(["message" => "id ist erforderlich"]);
+                return;
+            }
+
             $checkStmt = $db->prepare("SELECT member_id, status FROM {$prefix}exceptions WHERE exception_id = ?");
             $checkStmt->execute([$id]);
             $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);

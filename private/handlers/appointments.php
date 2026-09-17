@@ -340,6 +340,12 @@ function handleAppointments($db, $database, $method, $id) {
             
         case 'DELETE':
             requireAdminOrManager();
+
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(["message" => "id ist erforderlich"]);
+                break;
+            }
             
             // Lösche zuerst abhängige Datensätze
             $db->prepare("DELETE FROM {$prefix}records WHERE appointment_id = ?")->execute([$id]);

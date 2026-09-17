@@ -2169,7 +2169,8 @@ eine Skala nach Wertebereich wurde die Vorgabe überhaupt erst zu einer Aussage.
 ---
 
 ### OI-56 · DELETE ohne `id` meldet Erfolg, ohne zu löschen
-**Priorität:** niedrig — folgenlos für die Daten, aber irreführend für jeden Aufrufer
+**Priorität:** erledigt am 2026-09-17 — mit 1.9.1, alle acht Ressourcen. Teilweise schon am
+2026-09-16 (`appointments`, `records`), ohne dass es hier vermerkt war.
 
 Ein `DELETE` ohne `id`-Parameter führt in den meisten Handlern
 `DELETE FROM <tabelle> WHERE <spalte> = NULL` aus. Das trifft **keine Zeile** — `= NULL` ist in
@@ -2201,7 +2202,20 @@ Datensatz getroffen wurde — das fängt auch den Fall einer gültigen, aber unb
 
 **Vorsicht bei `records.php`:** Der Zweig kennt zwei Betriebsarten — einzelner Datensatz über
 `id` und Massenlöschung über `member_id`. Eine Prüfung auf `id` allein würde die zweite
-abwürgen.
+abwürgen. Die Prüfung steht deshalb **im** Einzelzweig, nicht davor; ein eigener Testfall hält
+die Massenlöschung fest.
+
+**Korrektur der Bestandsaufnahme:** Oben stand, `users.php` gehöre zu den Handlern, die es
+richtig machen. **Das war falsch** — das dortige `400` galt dem Löschen des eigenen Kontos, nicht
+einer fehlenden `id`. Aufgefallen ist es erst durch den Test; ein Blick in den Code hatte die
+beiden Prüfungen verwechselt.
+
+**Behoben am 2026-09-17.** Einheitlich in allen acht Ressourcen: fehlende `id` → `400`,
+unbekannte `id` → `404`. `tests/suites/delete_id_api.php` prüft beides für jede Ressource,
+einschließlich der vier bereits korrigierten — 13 der 17 Fälle waren gegen den alten Stand rot.
+
+**Folge in einer anderen Suite:** `worktime_api` verlangte beim Aufräumen strikt `200`. Das ging
+nur durch, weil der Handler jeden Aufruf als Erfolg meldete; jetzt gilt dort `200` oder `404`.
 
 **Nicht sicherheitsrelevant:** keine Rechteausweitung, kein Zugriff ohne Anmeldung, kein
 zusätzlicher Datenabfluss.
@@ -2639,7 +2653,8 @@ drei.
 ---
 
 ### OI-69 · `PUT` auf Termine ist eine Vollersetzung — ein Teil-Update nullt Titel und Terminart
-**Priorität:** mittel · aufgenommen am 2026-09-17
+**Priorität:** erledigt am 2026-09-17 — mit 1.9.1, und nicht nur bei Terminen: Die drei als
+„bisher nicht angesehen" vermerkten Ressourcen waren **alle** betroffen.
 
 Dieselbe Familie wie [OI-54](#oi-54--put-auf-terminarten-überschreibt-nicht-mitgeschickte-felder),
 nur bei `appointments` — dort geblieben, als die beiden Typ-Ressourcen in 1.9.0 umgestellt wurden.
@@ -2677,9 +2692,24 @@ weist die Vollersetzung nicht aus.
 `start_time`, gehören die gespeicherten Werte als Grundlage genommen, statt mit `" "` zu
 vergleichen. `API.md` nachziehen, wie bei den beiden Typ-Ressourcen geschehen.
 
-**Prüfen, ob es dieselbe Stelle noch anderswo gibt:** `records`, `exceptions` und
-`membership_dates` sind bisher nicht darauf angesehen worden. Der Test dafür steht schon —
-`tests/suites/partial_update_api.php` lässt sich um je einen Fall erweitern.
+**Geprüft am 2026-09-17 — alle drei betroffen:**
+
+| Ressource | Was ein Teil-Update zerstörte |
+|---|---|
+| `records` | `member_id`, `appointment_id` und `status` wurden genullt. Weil `NULL != member_id` als „geändert" galt, lief der Datensatz zusätzlich in die Dublettenprüfung |
+| `exceptions` | `reason` und `requested_arrival_time` verschwanden bei jedem Genehmigen oder Ablehnen — `API.md` dokumentierte genau diesen Aufruf (`{"status": "approved"}`) als richtigen Weg |
+| `membership_dates` | `start_date` wurde genullt, `status` fiel auf `active` zurück. Wer nur das Enddatum nachtrug, führte einen beendeten Zeitraum danach wieder als laufend |
+
+**Behoben am 2026-09-17** in allen vier Ressourcen, dazu die Konfliktprüfung (sie rechnet jetzt
+mit dem Zustand **nach** dem Update) und `404` statt Erfolg bei unbekannter `id`.
+
+**Nebenbei richtiggestellt:** Der Feldaufbau nutzt `property_exists` statt `isset`. Ein
+ausdrückliches `null` ist eine Angabe („Beschreibung löschen"), ein fehlendes Feld ist keine —
+`isset()` warf beides in denselben Topf. Bei `records` bleiben „fehlt" und „ist leer" bewusst
+verschieden: Ein Leerstring löscht die Ankunftszeit weiterhin, ein fehlendes Feld lässt sie
+stehen. Beide Fälle stehen als Gegenprobe nebeneinander in der Suite.
+
+**Acht neue Fälle** in `tests/suites/partial_update_api.php`, alle gegen den alten Stand rot.
 
 **Nicht sicherheitsrelevant:** setzt ein Konto mit Schreibrecht auf Termine voraus (Admin oder
 Manager) und erweitert keine Rechte. Es zerstört Daten, die derselbe Aufrufer ohnehin ändern

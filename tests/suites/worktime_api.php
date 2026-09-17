@@ -1732,7 +1732,11 @@ test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
             'token' => apiToken('admin'),
             'query' => ['id' => $activityId],
         ]);
-        if ($res['status'] !== 200) {
+        // 404 heisst "war schon weg" und ist kein Rueckstand. Bis 1.9.0 kam
+        // hier auch dann 200, wenn der DELETE keine Zeile traf -- der strikte
+        // Vergleich ging also nur durch, weil der Handler jeden Aufruf als
+        // Erfolg meldete (OI-56).
+        if (!in_array($res['status'], [200, 404], true)) {
             $rest[] = "activity_type {$activityId} (HTTP {$res['status']})";
         }
     }

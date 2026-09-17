@@ -207,9 +207,20 @@ function handleAppointmentTypes($db, $database, $method, $id) {
             
         case 'DELETE':
             requireAdmin();
+
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(["message" => "id ist erforderlich"]);
+                break;
+            }
             
             $stmt = $db->prepare("DELETE FROM {$prefix}appointment_types WHERE type_id = ?");
             if($stmt->execute([$id])) {
+                if($stmt->rowCount() === 0) {
+                    http_response_code(404);
+                    echo json_encode(["message" => "Type not found"]);
+                    break;
+                }
                 echo json_encode(["message" => "Type deleted"]);
             } else {
                 http_response_code(500);

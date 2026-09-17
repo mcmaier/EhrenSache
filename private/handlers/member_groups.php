@@ -167,8 +167,19 @@ function handleMemberGroups($db, $database, $method, $id) {
         case 'DELETE':
             requireAdmin();
 
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(["message" => "id ist erforderlich"]);
+                break;
+            }
+
             $stmt = $db->prepare("DELETE FROM {$prefix}member_groups WHERE group_id = ?");
             if($stmt->execute([$id])) {
+                if($stmt->rowCount() === 0) {
+                    http_response_code(404);
+                    echo json_encode(["message" => "Group not found"]);
+                    break;
+                }
                 echo json_encode(["message" => "Group deleted"]);
             } else {
                 http_response_code(500);
