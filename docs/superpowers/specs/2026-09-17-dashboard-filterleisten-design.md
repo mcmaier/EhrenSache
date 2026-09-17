@@ -135,14 +135,22 @@ Die Filterung bleibt clientseitig auf dem Jahres-Cache. Der vorhandene Serverpar
 `?type_id=` in `appointments.php` bleibt ungenutzt: Die Termine eines Jahres liegen ohnehin
 vollständig im Cache, ein Serverabruf je Filterwechsel wäre ein Rückschritt.
 
-**Kalender.** `renderAppointments()` reicht die gefilterte Liste an `renderCalendar()` weiter,
-diese an `createCalendarDay()`. Beide Funktionen greifen anschließend **nicht mehr** auf
-`dataCache.appointments[currentYear].data` zu. Das ist der einzige strukturelle Eingriff des
-Vorhabens: Der Kalender hängt heute an globalem Zustand und ist dadurch von der Filterung
-abgekoppelt; danach hängt er an seiner Eingabe und ist für sich prüfbar.
+**Kalender.** `renderAppointments()` legt die gefilterte Liste in einer Modulvariablen
+`calendarAppointments` ab; `renderCalendar()` liest sie und reicht sie an `createCalendarDay()`
+weiter. Beide greifen anschließend **nicht mehr** auf `dataCache.appointments[currentYear].data`
+zu.
 
-`showAppointmentPopup()` erhält dieselbe gefilterte Tagesliste — ein Klick auf einen Tag zeigt
-denselben Ausschnitt wie Kalender und Tabelle.
+Eine Modulvariable und nicht bloß ein Parameter, weil `renderCalendar()` an drei Stellen ohne
+Argumente aufgerufen wird — neben `renderAppointments()` auch aus `previousMonth()` und
+`nextMonth()`, die beim Monatsblättern keinen Zugriff auf die gefilterte Liste haben. Ein
+Parameter allein würde dort `undefined` liefern und den Kalender beim Blättern leeren.
+
+Das ist der einzige strukturelle Eingriff des Vorhabens: Der Kalender hängt heute am globalen
+Cache und ist dadurch von der Filterung abgekoppelt; danach hängt er an einer Variablen, die
+genau eine Stelle setzt.
+
+`showAppointmentPopup()` bekommt die Tagesliste bereits als Parameter aus `createCalendarDay()`
+und filtert dadurch automatisch mit — dort ist kein Eingriff nötig.
 
 **Zurücksetzen.** Neue Funktion `resetAppointmentFilter()`: setzt beide Selects auf `''` und
 ruft `showAppointmentSection(false, 1)`. Die Rückkehr auf Seite 1 entspricht dem Verhalten von
@@ -205,7 +213,7 @@ Die Jahreskarte daneben wird nicht angefasst.
 
 ## Prüfung
 
-### Neue Suite `tests/suites/appointment_filter_frontend.php`
+### Neue Suite `tests/suites/dashboard_filter_frontend.php`
 
 Statische Gegenproben nach dem Vorbild von `settings_tabs_frontend.php`:
 
@@ -237,12 +245,25 @@ Was statische Tests nicht abdecken:
 
 ## Version und Auslieferung
 
-Das Vorhaben ändert CSS **und** JS. Die `assets`-Suite erzwingt, dass jeder `?v=`-Parameter zur
-`version.json` passt; ohne Versionssprung laden Bestandsinstallationen die alten Dateien aus
-dem Browser-Cache und sehen eine Filterleiste ohne passendes CSS.
-
 **Ziel: 1.9.2** — reine Oberflächenkorrekturen, keine Schema-, keine API-Änderung. `version.json`
-und `CHANGELOG.md` gemeinsam pflegen, `?v=` in `public/index.html` nachziehen.
+und `CHANGELOG.md` gemeinsam pflegen, `?v=` in `public/index.html` nachziehen, damit die
+`assets`-Suite grün bleibt.
+
+**Korrektur vom 2026-09-17.** Hier stand zunächst, ohne Versionssprung sähen Bestands-
+installationen eine Filterleiste ohne passendes CSS. Das trifft nicht zu, und zwar aus zwei
+unabhängigen Gründen:
+
+- `public/.htaccess` setzt für `.css`, `.js` und `.html` `Cache-Control: no-cache,
+  must-revalidate`. Der Browser revalidiert bei jedem Abruf; geänderte Dateien kommen frisch.
+- Selbst ohne diesen Header hülfe der `?v=` nicht: `index.html` bindet einzig
+  `css/main.css?v=<version>` ein, und `main.css` lädt alles Weitere per `@import url(...)`
+  **ohne** Parameter. Die beiden hier geänderten Dateien — `components/forms.css` und
+  `sections/content.css` — tragen also keinen. Die JS-Module tragen überhaupt keinen.
+
+Der Versionssprung erfolgt deshalb aus Release-Disziplin, nicht als technische Voraussetzung.
+Dass der Cache-Bust an der `@import`-Kette wirkungslos verpufft, ist ein eigener Befund und
+gehört als **OI-74** nach `docs/OPEN-ITEMS.md` — nicht in dieses Vorhaben, weil er alle
+Installationen ohne `mod_headers` betrifft und eine eigene Antwort braucht.
 
 ## Dokumentation
 
@@ -252,6 +273,7 @@ und `CHANGELOG.md` gemeinsam pflegen, `?v=` in `public/index.html` nachziehen.
 | `CHANGELOG.md` | Eintrag 1.9.2 |
 | `docs/OPEN-ITEMS.md` · OI-20 | Der Filter hat drei Zustände; „nur von Hand angelegte" ist die Richtung, die der dort angekündigten Bestandsprüfung fehlte |
 | `docs/OPEN-ITEMS.md` · OI-73 (neu) | `.filter-grid:has(#statMemberFilterGroup[style*="display: none"])` in `sections/content.css` hängt an der exakten Schreibweise eines Inline-Styles — ein Leerzeichen anders, und die Spaltenaufteilung greift nicht mehr |
+| `docs/OPEN-ITEMS.md` · OI-74 (neu) | Der `?v=`-Cache-Bust erreicht nur `main.css`; die per `@import` geladenen Dateien und sämtliche JS-Module tragen keinen Parameter. Ohne `mod_headers` fehlt damit jeder Cache-Bust |
 
 `API.md` bleibt unberührt.
 
