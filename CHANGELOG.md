@@ -21,6 +21,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   dieselbe Skala; die App färbte bisher nach eigenen Werten (OI-55).
 
 ### Behoben
+- **Doppelte Mitglieder bei Registern, die direkt einer Terminart zugeordnet sind.** War ein
+  Register (Untergruppe) einer Terminart zugeordnet, erschien jedes Mitglied sowohl bei der
+  Gruppe als auch beim Register — Anwesenheitsliste und Terminrückmeldung zeigten es doppelt,
+  inklusive einer falsch hohen Zahl an Mehrfachnennungen. Gruppe und Register schließen sich in
+  der Gliederung jetzt aus.
 - **Ein fehlgeschlagenes Speichern wird benannt.** Lehnte der Server einen Wert ab, sagte die
   Oberfläche nichts über die übrigen. Jetzt nennt der Hinweis beides („2 gespeichert,
   1 abgelehnt“), das betroffene Feld wird markiert und sein Tab angesprungen (OI-31).
