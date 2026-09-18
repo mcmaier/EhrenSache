@@ -2550,6 +2550,73 @@ body {
     margin-top: 2px;
 }
 
+/* Terminliste (seit 1.10.0): Monatsueberschriften, zugeklappte Karten. */
+.responses-month {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-light);
+    margin: 8px 4px -2px;
+}
+
+.response-card__summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.response-card__summary::-webkit-details-marker {
+    display: none;
+}
+
+.response-card__meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+/* Pfeil nur an aufklappbaren Karten; zeigt nach oben, wenn offen. */
+details.response-card > .response-card__summary .response-card__meta::after {
+    content: '▾';
+    margin-left: auto;
+    color: var(--text-light);
+}
+
+details.response-card[open] > .response-card__summary .response-card__meta::after {
+    content: '▴';
+}
+
+.response-card__body {
+    border-top: 1px solid var(--border-color, #e1e4e8);
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+.response-card__desc {
+    font-size: 13px;
+    line-height: 1.45;
+    margin-top: 4px;
+    white-space: pre-line;
+}
+
+.response-chip {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.response-chip--open  { background: #fff3cd; color: #7a5c00; }
+.response-chip--yes   { background: #e7f6ec; color: #1c6b36; }
+.response-chip--maybe { background: #fdf0dc; color: #8a5a00; }
+.response-chip--no    { background: #fdecea; color: #a12622; }
+.response-chip--muted { background: #eceff1; color: #607d8b; }
+
 .response-segment {
     display: flex;
     gap: 6px;

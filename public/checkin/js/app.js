@@ -3746,6 +3746,12 @@ function pendingStatusFor(id) {
 const responsesOpenComments = new Set();
 const responsesOpenNames = new Set();
 
+// Aufgeklappte Karten der Terminliste (seit 1.10.0). Anfangs ist alles
+// zugeklappt; ein Neuaufbau durch renderResponses() -- etwa nach einem
+// Speichern oder Netzwechsel -- darf nichts zuklappen. Geleert in
+// resetResponsesTab().
+const responsesExpanded = new Set();
+
 // Letzter Speicherversuch dieser Karte ist gescheitert -- oeffnet die
 // Bemerkung automatisch, damit die Fehlermeldung nicht hinter einer
 // zugeklappten Karte verschwindet. Wird bei Erfolg wieder geloescht, bei
@@ -3765,6 +3771,7 @@ function resetResponsesTab() {
     responsesPending.clear();
     responsesOpenComments.clear();
     responsesOpenNames.clear();
+    responsesExpanded.clear();
     responsesSaveFailed.clear();
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
     if (tab) tab.hidden = true;
@@ -3795,7 +3802,7 @@ async function initResponsesTab() {
 async function loadResponses() {
     const generation = responsesGeneration;
     const previousResponses = upcomingResponses;
-    const result = await apiCall('appointment_responses', 'GET', null, { upcoming: 1 });
+    const result = await apiCall('appointment_responses', 'GET', null, { upcoming: 1, with_info: 1 });
     if (generation !== responsesGeneration) return; // Abgemeldet/neu gestartet, waehrend die Antwort unterwegs war.
 
     if (!result.success) {
@@ -3845,7 +3852,10 @@ async function loadResponses() {
 function updateResponsesBadge() {
     const badge = document.getElementById('responsesTabBadge');
     if (!badge) return;
-    const open = upcomingResponses.filter(item => !item.own).length;
+    // Nur Rueckmeldetermine ohne eigene Antwort, die noch nicht begonnen
+    // haben: Nach Beginn nimmt der Server keine Antwort mehr an.
+    const open = upcomingResponses.filter(item =>
+        item.appointment.responses_enabled && !item.own && !item.started).length;
     badge.textContent = String(open);
     badge.hidden = open === 0;
 }
@@ -3860,10 +3870,41 @@ function formatResponseDeadline(mysql) {
 
 // Kopfzeile der Karte: Wochentag, Datum, Uhrzeit -- ebenfalls ohne "Uhr", aus
 // demselben Grund wie formatResponseDeadline().
-function formatResponseCardHead(date, startTime) {
-    const d = new Date(`${String(date).slice(0, 10)}T00:00:00`);
+function formatResponseCardHead(date, startTime, endTime) {
+    const iso = String(date).slice(0, 10);
+    const d = new Date(`${iso}T00:00:00`);
     const weekday = d.toLocaleDateString('de-DE', { weekday: 'short' });
-    return `${weekday} ${formatDateShortDe(date)} · ${String(startTime).substring(0, 5)}`;
+    // Jahr nur ausserhalb des laufenden Jahres ("08.05.27").
+    const jahr = d.getFullYear() !== new Date().getFullYear() ? iso.slice(2, 4) : '';
+    const start = String(startTime).substring(0, 5);
+    const zeit = endTime ? `${start}–${String(endTime).substring(0, 5)}` : start;
+    return `${weekday} ${formatDateShortDe(date)}${jahr} · ${zeit}`;
+}
+
+/** Monatsueberschrift; ausserhalb des laufenden Jahres mit Jahreszahl. */
+function formatResponseMonth(date) {
+    const d = new Date(`${String(date).slice(0, 10)}T00:00:00`);
+    const monat = d.toLocaleDateString('de-DE', { month: 'long' });
+    return d.getFullYear() === new Date().getFullYear() ? monat : `${monat} ${d.getFullYear()}`;
+}
+
+function responseLocationHtml(location) {
+    return location ? `<span class="response-card__location">📍 ${escapeHtml(location)}</span>` : '';
+}
+
+/**
+ * Stand einer Rueckmeldung als Chip. Es gilt der erste zutreffende:
+ * eigene Antwort -> begonnen -> Frist abgelaufen -> offen.
+ */
+function responseChipHtml(item, deadlinePassed) {
+    const status = item.own ? item.own.status : null;
+    if (status) {
+        const text = { yes: '✓ zugesagt', maybe: '? unsicher', no: '✗ abgesagt' }[status];
+        return `<span class="response-chip response-chip--${status}">${text}</span>`;
+    }
+    if (item.started)   return '<span class="response-chip response-chip--muted">hat begonnen</span>';
+    if (deadlinePassed) return '<span class="response-chip response-chip--muted">Frist abgelaufen</span>';
+    return '<span class="response-chip response-chip--open">Rückmeldung offen</span>';
 }
 
 /** Ampel-Chipreihe zu einer Zaehlung {yes, maybe, no, open} -- geteilt von der
@@ -3905,7 +3946,7 @@ function refreshResponseCardState(card) {
 
 /** Wird bei online/offline aufgerufen -- baut die Liste NICHT neu auf. */
 function refreshAllResponseCards() {
-    document.querySelectorAll('#responsesList .response-card').forEach(refreshResponseCardState);
+    document.querySelectorAll('#responsesList .response-card:not(.response-card--info)').forEach(refreshResponseCardState);
 }
 
 function renderResponses(justSavedId, drafts) {
@@ -3913,7 +3954,7 @@ function renderResponses(justSavedId, drafts) {
     if (!list) return;
 
     if (upcomingResponses.length === 0) {
-        list.innerHTML = '<p class="responses-empty">Keine kommenden Termine mit Rückmeldung.</p>';
+        list.innerHTML = '<p class="responses-empty">Keine Termine in den nächsten acht Wochen.</p>';
         return;
     }
 
@@ -3935,12 +3976,23 @@ function renderResponses(justSavedId, drafts) {
         });
     }
 
-    // Unbeantwortete zuerst, darin nach Beginn.
+    // Chronologisch (seit 1.10.0). "Unbeantwortete zuerst" entfiel: Lange
+    // vorausgeplante Veranstaltungen, fuer die noch keine Zusage moeglich
+    // ist, standen sonst dauerhaft oben und verdraengten die Proben der Woche.
     const sorted = [...upcomingResponses].sort((a, b) =>
-        (a.own ? 1 : 0) - (b.own ? 1 : 0)
-        || `${a.appointment.date} ${a.appointment.start_time}`.localeCompare(`${b.appointment.date} ${b.appointment.start_time}`));
+        `${a.appointment.date} ${a.appointment.start_time}`.localeCompare(`${b.appointment.date} ${b.appointment.start_time}`));
 
-    list.innerHTML = sorted.map(responseCardHtml).join('');
+    let html = '';
+    let monat = null;
+    for (const item of sorted) {
+        const key = String(item.appointment.date).slice(0, 7);
+        if (key !== monat) {
+            html += `<div class="responses-month">${escapeHtml(formatResponseMonth(item.appointment.date))}</div>`;
+            monat = key;
+        }
+        html += item.appointment.responses_enabled ? responseCardHtml(item) : infoCardHtml(item);
+    }
+    list.innerHTML = html;
 
     drafts.forEach((value, id) => {
         const card = list.querySelector(`.response-card[data-appointment-id="${id}"]`);
@@ -3952,6 +4004,9 @@ function renderResponses(justSavedId, drafts) {
         responsesOpenComments.add(id);
         const details = card.querySelector('.response-comment-details');
         if (details) details.open = true;
+        // Die Karte selbst ist seit 1.10.0 ebenfalls zuklappbar.
+        responsesExpanded.add(id);
+        card.open = true;
     });
 
     // Offen-Status von "Bemerkung" und "Wer hat geantwortet?" nachfuehren --
@@ -3972,6 +4027,15 @@ function renderResponses(justSavedId, drafts) {
             const cid = Number(el.dataset.appointmentId);
             if (el.open) responsesOpenNames.add(cid);
             else responsesOpenNames.delete(cid);
+        });
+    });
+    // Dasselbe fuer die Karten selbst (seit 1.10.0). "toggle" steigt nicht
+    // auf -- das Oeffnen der Bemerkung loest diesen Listener nicht aus.
+    list.querySelectorAll('.response-card[data-expandable]').forEach(el => {
+        el.addEventListener('toggle', () => {
+            const cid = Number(el.dataset.appointmentId);
+            if (el.open) responsesExpanded.add(cid);
+            else responsesExpanded.delete(cid);
         });
     });
 
@@ -4072,6 +4136,35 @@ window.setResponsesGrouping = function(stage) {
     renderResponses(null);
 };
 
+/**
+ * Karte eines Termins ohne Rueckmeldung. Aufklappbar nur, wenn es eine
+ * Beschreibung gibt -- eine Probe ohne Beschreibung bleibt eine ruhige Zeile.
+ */
+function infoCardHtml(item) {
+    const apt = item.appointment;
+    const id = Number(apt.appointment_id);
+    const color = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#1F5FBF';
+    const kopf = `
+        <div class="response-card__head">
+            <strong>${escapeHtml(apt.title)}</strong>
+            <span>${escapeHtml(formatResponseCardHead(apt.date, apt.start_time, apt.end_time))}</span>
+        </div>
+        <div class="response-card__meta">${responseLocationHtml(apt.location)}</div>`;
+
+    if (!apt.description) {
+        return `<div class="response-card response-card--info" data-appointment-id="${id}" style="border-left-color: ${color}">${kopf}</div>`;
+    }
+
+    return `
+        <details class="response-card response-card--info" data-appointment-id="${id}" data-expandable style="border-left-color: ${color}"${responsesExpanded.has(id) ? ' open' : ''}>
+            <summary class="response-card__summary">${kopf}</summary>
+            <div class="response-card__body">
+                <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
+                <div class="response-card__desc">${escapeHtml(apt.description)}</div>
+            </div>
+        </details>`;
+}
+
 function responseCardHtml(item) {
     const apt = item.appointment;
     const id = Number(apt.appointment_id);
@@ -4120,29 +4213,41 @@ function responseCardHtml(item) {
         : 'Bemerkung (optional)';
     const saveLabel = isPendingNo ? 'Absage mit Begründung speichern' : 'Bemerkung speichern';
 
+    // Nach Beginn nimmt der Server keine eigene Antwort mehr an -- Knoepfe
+    // und Bemerkung entfallen, die Karte bleibt bis Tagesende zum Nachsehen.
+    const started = !!item.started;
+    const ring = status === null && !deadlinePassed && !started;
+
     return `
-        <div class="response-card${status === null ? ' is-open' : ''}" data-appointment-id="${id}" style="border-left-color: ${color}">
-            <div class="response-card__head">
-                <strong>${escapeHtml(apt.title)}</strong>
-                <span>${escapeHtml(formatResponseCardHead(apt.date, apt.start_time))}</span>
-            </div>
-            <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
-            <div class="response-segment">${buttons}</div>
-            <div class="response-status">
-                <span class="response-status__deadline${deadlinePassed ? ' is-passed' : ''}">${escapeHtml(deadlineText)}</span>
-                <span class="response-count-row">${responseCountChipsHtml(s)}</span>${lateMarker}
-            </div>
-            <details class="response-comment-details"${commentOpen ? ' open' : ''} data-appointment-id="${id}">
-                <summary>Bemerkung${hasSavedComment ? ' 💬' : ''}</summary>
-                <div class="response-comment">
-                    <textarea rows="2" maxlength="255" placeholder="${placeholder}"${off}>${escapeHtml(item.own?.comment ?? '')}</textarea>
-                    ${item.settings.require_excuse ? '<small>Eine Absage wird als Entschuldigung eingereicht.</small>' : ''}
-                    <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>${saveLabel}</button>
+        <details class="response-card${ring ? ' is-open' : ''}" data-appointment-id="${id}" data-expandable style="border-left-color: ${color}"${responsesExpanded.has(id) ? ' open' : ''}>
+            <summary class="response-card__summary">
+                <div class="response-card__head">
+                    <strong>${escapeHtml(apt.title)}</strong>
+                    <span>${escapeHtml(formatResponseCardHead(apt.date, apt.start_time, apt.end_time))}</span>
                 </div>
-            </details>
-            ${names}
-            ${offline ? '<div class="response-card__offline">Ohne Netz ist keine Rückmeldung möglich.</div>' : ''}
-        </div>`;
+                <div class="response-card__meta">${responseLocationHtml(apt.location)}${responseChipHtml(item, deadlinePassed)}</div>
+            </summary>
+            <div class="response-card__body">
+                <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
+                ${apt.description ? `<div class="response-card__desc">${escapeHtml(apt.description)}</div>` : ''}
+                ${started ? '' : `<div class="response-segment">${buttons}</div>`}
+                <div class="response-status">
+                    <span class="response-status__deadline${deadlinePassed ? ' is-passed' : ''}">${escapeHtml(deadlineText)}</span>
+                    <span class="response-count-row">${responseCountChipsHtml(s)}</span>${lateMarker}
+                </div>
+                ${started ? '' : `
+                <details class="response-comment-details"${commentOpen ? ' open' : ''} data-appointment-id="${id}">
+                    <summary>Bemerkung${hasSavedComment ? ' 💬' : ''}</summary>
+                    <div class="response-comment">
+                        <textarea rows="2" maxlength="255" placeholder="${placeholder}"${off}>${escapeHtml(item.own?.comment ?? '')}</textarea>
+                        ${item.settings.require_excuse ? '<small>Eine Absage wird als Entschuldigung eingereicht.</small>' : ''}
+                        <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>${saveLabel}</button>
+                    </div>
+                </details>`}
+                ${names}
+                ${offline && !started ? '<div class="response-card__offline">Ohne Netz ist keine Rückmeldung möglich.</div>' : ''}
+            </div>
+        </details>`;
 }
 
 async function onResponsesClick(event) {
