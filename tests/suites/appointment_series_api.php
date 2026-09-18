@@ -245,6 +245,91 @@ test('Anlegen: ungueltige Definitionen liefern 400 und schreiben nichts', functi
     }
 });
 
+test('Anlegen: Felder falschen Typs liefern 400 mit sauberem JSON', function () {
+    $world = asWorld();
+    try {
+        foreach (['start_date' => ['2031-03-04'], 'until' => ['2031-04-01']] as $field => $value) {
+            $res = asSeriesPost(asSeriesBody($world, [$field => $value]), ['preview' => 1]);
+            assertStatus(400, $res, $field);
+            assertTrue(is_array($res['body']) && isset($res['body']['message']),
+                "{$field}: Antwort muss gueltiges JSON mit message sein, war: " . substr($res['raw'], 0, 200));
+        }
+
+        $body = asSeriesBody($world);
+        unset($body['rrule']);
+        $res = asSeriesPost($body, ['preview' => 1]);
+        assertStatus(400, $res);
+        assertSame('Die Regel fehlt', $res['body']['message'] ?? null);
+
+        $res = asSeriesPost(asSeriesBody($world, ['rrule' => ['FREQ=WEEKLY']]), ['preview' => 1]);
+        assertStatus(400, $res);
+        assertSame('Die Regel fehlt', $res['body']['message'] ?? null);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Anlegen: Terminart als Kommazahl liefert 400', function () {
+    $world = asWorld();
+    try {
+        // Der ganzzahlige Anteil ist eine vorhandene Terminart -- darf nicht still abgeschnitten werden.
+        $res = asSeriesPost(asSeriesBody($world, ['type_id' => $world['type'] + 0.7]));
+        assertStatus(400, $res);
+        assertSame('Ungültige Terminart', $res['body']['message'] ?? null);
+        assertSame([], asAppointments($world));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Vorschau ist sicher: jeder Wert ausser 0 schreibt nichts', function () {
+    $world = asWorld();
+    try {
+        foreach (['true', 'yes', '2'] as $value) {
+            $res = asSeriesPost(asSeriesBody($world), ['preview' => $value]);
+            assertStatus(200, $res, "preview={$value}");
+            assertSame(5, $res['body']['count'] ?? null, "preview={$value}");
+        }
+        assertSame([], asAppointments($world), 'Die Vorschau darf nichts anlegen');
+
+        assertStatus(201, asSeriesPost(asSeriesBody($world), ['preview' => '0']));
+        assertSame(5, count(asAppointments($world)));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Anlegen: kollidieren alle Daten, gibt es 409 und keine Serie', function () {
+    $world = asWorld();
+    try {
+        foreach (['2031-03-04', '2031-03-11', '2031-03-18', '2031-03-25', '2031-04-01'] as $date) {
+            assertStatus(201, asPostAppointment($world, ['date' => $date, 'title' => 'Belegt']));
+        }
+
+        $res = asSeriesPost(asSeriesBody($world));
+        assertStatus(409, $res);
+        assertSame(5, count($res['body']['skipped'] ?? []));
+
+        $apts = asAppointments($world);
+        assertSame(5, count($apts));
+        foreach ($apts as $apt) {
+            assertSame(null, $apt['series_id'], 'Kein Termin darf einer Serie zugeordnet sein');
+        }
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Anlegen: Ende genau an der 12-Monats-Grenze ist erlaubt, ein Tag mehr nicht', function () {
+    $world = asWorld();
+    try {
+        assertStatus(200, asSeriesPost(asSeriesBody($world, ['until' => '2032-03-04']), ['preview' => 1]));
+        assertStatus(400, asSeriesPost(asSeriesBody($world, ['until' => '2032-03-05']), ['preview' => 1]));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
 test('Serien sind Admin und Manager vorbehalten', function () {
     $world = asWorld();
     try {

@@ -24,31 +24,34 @@ function handleAppointmentSeries($db, $database, $method, $id): void
 {
     requireAdminOrManager();
 
-    $prefix  = $database->table('');
-    $tol     = checkinToleranceHours($db, $database);
-    $region  = systemSetting($db, $database, 'holiday_region', '');
-    $preview = ($_GET['preview'] ?? null) === '1';
+    // Vorschau schlaegt sicher fehl: jeder gesetzte Wert ausser '0' (preview=true,
+    // preview=yes ...) rechnet nur und schreibt nichts.
+    $preview = isset($_GET['preview']) && $_GET['preview'] !== '0';
     $action  = $_GET['action'] ?? null;
 
-    $raw = [];
-    if ($method === 'POST' || $method === 'PUT') {
-        $decoded = json_decode((string) file_get_contents('php://input'), true);
-        $raw = is_array($decoded) ? $decoded : [];
-    }
+    try {
+        $prefix = $database->table('');
+        $tol    = checkinToleranceHours($db, $database);
+        $region = systemSetting($db, $database, 'holiday_region', '');
 
-    $series = null;
-    if ($id) {
-        $series = seriesLoad($db, $prefix, (int) $id);
-        if ($series === null) {
-            seriesRespond(404, ['message' => 'Serie nicht gefunden']);
+        $raw = [];
+        if ($method === 'POST' || $method === 'PUT') {
+            $decoded = json_decode((string) file_get_contents('php://input'), true);
+            $raw = is_array($decoded) ? $decoded : [];
+        }
+
+        $series = null;
+        if ($id) {
+            $series = seriesLoad($db, $prefix, (int) $id);
+            if ($series === null) {
+                seriesRespond(404, ['message' => 'Serie nicht gefunden']);
+                return;
+            }
+        } elseif (!($method === 'POST' && $action === null)) {
+            seriesRespond(400, ['message' => 'id ist erforderlich']);
             return;
         }
-    } elseif (!($method === 'POST' && $action === null)) {
-        seriesRespond(400, ['message' => 'id ist erforderlich']);
-        return;
-    }
 
-    try {
         switch ($method) {
             case 'GET':
                 seriesRespond(200, seriesSummary($db, $prefix, $series));
@@ -86,10 +89,17 @@ function seriesResolveType(PDO $db, string $prefix, array &$raw): ?string
     if (!isset($raw['type_id']) || $raw['type_id'] === '' ) {
         $raw['type_id'] = seriesDefaultTypeId($db, $prefix);
     }
-    if ($raw['type_id'] !== null && is_numeric($raw['type_id'])
-        && !seriesTypeExists($db, $prefix, (int) $raw['type_id'])) {
+    if ($raw['type_id'] === null) {
+        return null;
+    }
+    $typeId = seriesParseTypeId($raw['type_id']);
+    if ($typeId === null) {
+        return 'Ungültige Terminart';
+    }
+    if (!seriesTypeExists($db, $prefix, $typeId)) {
         return 'Die Terminart existiert nicht';
     }
+    $raw['type_id'] = $typeId;
 
     return null;
 }

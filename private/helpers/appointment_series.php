@@ -45,10 +45,10 @@ function seriesNormalizeTemplate(array $raw): array
         $typeId = null;
     }
     if ($typeId !== null) {
-        if (!is_numeric($typeId) || (int) $typeId <= 0) {
+        $typeId = seriesParseTypeId($typeId);
+        if ($typeId === null) {
             return [null, 'Ungültige Terminart'];
         }
-        $typeId = (int) $typeId;
     }
 
     $description = $raw['description'] ?? null;
@@ -78,6 +78,22 @@ function seriesNormalizeTemplate(array $raw): array
     ], null];
 }
 
+/**
+ * Terminart als positive Ganzzahl; 3.7, true oder '5x' sind ungueltig
+ * und werden nicht still abgeschnitten.
+ *
+ * @param mixed $raw
+ */
+function seriesParseTypeId($raw): ?int
+{
+    if (is_bool($raw)) {
+        return null;
+    }
+    $id = filter_var($raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+    return $id === false ? null : $id;
+}
+
 /** @return array{0: ?string[], 1: ?string} */
 function seriesNormalizeExdates($raw): array
 {
@@ -105,14 +121,18 @@ function seriesNormalizeExdates($raw): array
  */
 function seriesDefinitionFromRequest(array $raw): array
 {
+    if (!is_string($raw['rrule'] ?? null) || trim($raw['rrule']) === '') {
+        return [null, 'Die Regel fehlt'];
+    }
     try {
-        $rule = parseRrule(is_string($raw['rrule'] ?? null) ? $raw['rrule'] : '');
+        $rule = parseRrule($raw['rrule']);
     } catch (InvalidArgumentException $e) {
         return [null, $e->getMessage()];
     }
 
-    $start = (string) ($raw['start_date'] ?? '');
-    $until = (string) ($raw['until'] ?? '');
+    // Kein (string)-Cast: ein Array erzeugte eine Warnung samt Serverpfad in der Antwort.
+    $start = is_string($raw['start_date'] ?? null) ? $raw['start_date'] : '';
+    $until = is_string($raw['until'] ?? null) ? $raw['until'] : '';
     if (!seriesIsValidDate($start)) {
         return [null, 'Ungültiges Anfangsdatum'];
     }
@@ -308,8 +328,16 @@ function seriesDeletableFollowing(PDO $db, string $prefix, int $seriesId, string
 }
 
 /**
- * Serie ab $from beenden: Termine ohne Daten loeschen, mit Daten abloesen,
- * until auf den Vortag. Ohne verbleibende Termine verschwindet die Serie.
+ * Serie ab $from beenden: nicht abgeloeste Termine ab $from ohne Daten
+ * loeschen, mit Daten abloesen.
+ *
+ * - $from nach dem Serienbeginn: until auf den Vortag; die Serie verschwindet
+ *   nur, wenn kein Termin mehr auf sie zeigt.
+ * - $from am oder vor dem Serienbeginn: die ganze Serie endet. Die Zeile wird
+ *   immer geloescht; verbliebene (abgeloeste) Termine werden zu gewoehnlichen
+ *   Einzelterminen (series_id = NULL, is_detached = 0) -- ausdruecklich gesetzt,
+ *   nicht nur ueber ON DELETE SET NULL, damit kein verwaister Abloese-Merker bleibt.
+ *
  * Laeuft in der Transaktion des Aufrufers.
  *
  * @return array{removed: int, detached: array<int, array>, series_deleted: bool}
@@ -331,6 +359,14 @@ function seriesEndFrom(PDO $db, string $prefix, array $series, string $from): ar
         }
         $delete->execute([$row['appointment_id']]);
         $removed++;
+    }
+
+    if ($from <= $series['start_date']) {
+        $db->prepare("UPDATE {$prefix}appointments SET series_id = NULL, is_detached = 0 WHERE series_id = ?")
+           ->execute([$seriesId]);
+        $db->prepare("DELETE FROM {$prefix}appointment_series WHERE series_id = ?")->execute([$seriesId]);
+
+        return ['removed' => $removed, 'detached' => $detached, 'series_deleted' => true];
     }
 
     $db->prepare("UPDATE {$prefix}appointment_series SET `until` = ? WHERE series_id = ?")
