@@ -52,6 +52,9 @@ require_once '../../private/helpers/report.php';
 require_once '../../private/helpers/attendance.php';
 require_once '../../private/helpers/responses.php';
 require_once '../../private/helpers/appointment_details.php';
+require_once '../../private/helpers/recurrence.php';
+require_once '../../private/helpers/holidays.php';
+require_once '../../private/helpers/appointment_rules.php';
 require_once '../../private/helpers/groups.php';
 require_once '../../private/helpers/demo_mode.php';
 

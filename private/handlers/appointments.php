@@ -208,41 +208,16 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
 
-            // Prüfe ob bereits ein Termin in der Toleranz existiert
+            // Dublettenpruefung: gleiche Terminart im Toleranzfenster (appointment_rules.php).
             $tolerance = checkinToleranceHours($db, $database);
-            $toleranceSeconds = $tolerance * 3600;  // Stunden in Sekunden
-
-            $newDateTime = $data->date . ' ' . $data->start_time;
-
-            $checkStmt = $db->prepare("
-                SELECT appointment_id, title, start_time, date,
-                    ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
-                FROM {$prefix}appointments 
-                WHERE date = ?
-                AND type_id = ?
-                HAVING time_diff <= ?
-            ");
-            
-            $checkStmt->execute([$newDateTime, $data->date, $typeId, $toleranceSeconds]);
-            
-            $conflict = $checkStmt->fetch(PDO::FETCH_ASSOC);
-
-            if($conflict) {
-            http_response_code(409);
-            echo json_encode([
-                "message" => "Ein Termin dieser Art existiert bereits im Toleranzbereich von ±{$tolerance}h",
-                "conflict" => [
-                    "title" => $conflict['title'],
-                    "date" => $conflict['date'],
-                    "time" => $conflict['start_time'],
-                    "time_diff_seconds" => $conflict['time_diff']
-                ],
-                "hint" => "Bestehender Termin: \"{$conflict['title']}\" am {$conflict['date']} um {$conflict['start_time']} Uhr"
-            ]);
-            break;
+            $conflict = findAppointmentConflict($db, $prefix, (string) $data->date, (string) $data->start_time,
+                                                $typeId, $tolerance);
+            if ($conflict) {
+                http_response_code(409);
+                echo json_encode(appointmentConflictBody($conflict, $tolerance));
+                break;
             }
-            
-                  
+
             $stmt = $db->prepare("INSERT INTO {$prefix}appointments (title, type_id, description, location, date,
                                   start_time, end_time, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $createdBy = getCurrentUserId();
@@ -291,8 +266,6 @@ function handleAppointments($db, $database, $method, $id) {
             }
 
             // Prüfe ob bereits ein anderer Termin der gleichen Art in der Toleranzzeit existiert
-            $tolerance = checkinToleranceHours($db, $database);
-            $toleranceSeconds = $tolerance * 3600;
 
             // Geprüft wird gegen den Zustand NACH dem Update, nicht gegen den
             // Anfragekörper: Fehlt ein Feld, gilt der gespeicherte Wert. Vorher
@@ -303,8 +276,6 @@ function handleAppointments($db, $database, $method, $id) {
             $wirkTime  = $data->start_time ?? $bestand['start_time'];
             $wirkType  = array_key_exists('type_id', get_object_vars($data))
                 ? $data->type_id : $bestand['type_id'];
-
-            $newDateTime = $wirkDate . ' ' . $wirkTime;
 
             // Ort und Ende (FI-23). Geprueft wird gegen den wirksamen Beginn;
             // aendert der Request nur den Beginn, zaehlt das gespeicherte Ende.
@@ -332,32 +303,12 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
 
-            $checkStmt = $db->prepare("
-                SELECT appointment_id, title, start_time, date,
-                    ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
-                FROM {$prefix}appointments
-                WHERE date = ?
-                AND type_id = ?
-                AND appointment_id != ?
-                HAVING time_diff <= ?
-            ");
-            
-            $checkStmt->execute([$newDateTime, $wirkDate, $wirkType, $id, $toleranceSeconds]);
-            
-            $conflict = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if($conflict) {
+            $tolerance = checkinToleranceHours($db, $database);
+            $conflict = findAppointmentConflict($db, $prefix, (string) $wirkDate, (string) $wirkTime,
+                                                $wirkType, $tolerance, [(int) $id]);
+            if ($conflict) {
                 http_response_code(409);
-                echo json_encode([
-                    "message" => "Ein Termin dieser Art existiert bereits im Toleranzbereich von ±{$tolerance}h",
-                    "conflict" => [
-                        "title" => $conflict['title'],
-                        "date" => $conflict['date'],
-                        "time" => $conflict['start_time'],
-                        "time_diff_seconds" => $conflict['time_diff']
-                    ],
-                    "hint" => "Bestehender Termin: \"{$conflict['title']}\" am {$conflict['date']} um {$conflict['start_time']} Uhr"
-                ]);
+                echo json_encode(appointmentConflictBody($conflict, $tolerance));
                 break;
             }
 
