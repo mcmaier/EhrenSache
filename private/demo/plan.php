@@ -113,6 +113,23 @@ const DEMO_PERFORMANCE_TITLES = [
     12 => 'Adventsständchen',
 ];
 
+/** Ort je Auftrittsmonat, passend zum Titel (FI-23). Keine Zufallsziehung,
+ * damit die Folge der uebrigen Ziehungen unveraendert bleibt. */
+const DEMO_PERFORMANCE_LOCATIONS = [
+    1  => 'Stadthalle Musterhausen',
+    2  => 'Marktplatz',
+    3  => 'Stadthalle Musterhausen',
+    4  => 'Kirche St. Martin',
+    5  => 'Dorfplatz',
+    6  => 'Schlosshof',
+    7  => 'Festzelt am Sportplatz',
+    8  => 'Kirche St. Martin',
+    9  => 'Stadthalle Musterhausen',
+    10 => 'Marktplatz',
+    11 => 'Kriegerdenkmal',
+    12 => 'Seniorenheim St. Anna',
+];
+
 /**
  * Gruppen. Die IDs sind fest, weil alles Weitere sie referenziert.
  *
@@ -431,6 +448,8 @@ function buildAppointments(DemoRandom $random, string $referenceDate): array
             'description'    => null,
             'date'           => $date,
             'start_time'     => '20:00:00',
+            'end_time'       => '22:00:00',
+            'location'       => 'Probelokal',
         ];
     }
 
@@ -443,6 +462,8 @@ function buildAppointments(DemoRandom $random, string $referenceDate): array
             'description'    => null,
             'date'           => $date,
             'start_time'     => '19:30:00',
+            'end_time'       => '21:00:00',
+            'location'       => 'Probelokal',
         ];
     }
 
@@ -455,6 +476,8 @@ function buildAppointments(DemoRandom $random, string $referenceDate): array
             'description'    => null,
             'date'           => $date,
             'start_time'     => '19:00:00',
+            'end_time'       => '21:00:00',
+            'location'       => 'Vereinsheim',
         ];
     }
 
@@ -463,13 +486,17 @@ function buildAppointments(DemoRandom $random, string $referenceDate): array
     $step      = max(1, intdiv(count($saturdays), 10));
     for ($n = 0; $n < 10 && $n * $step < count($saturdays); $n++) {
         $date           = $saturdays[$n * $step];
+        $monat          = (int) date('n', strtotime($date));
+        $stunde         = $random->int(10, 19);   // genau eine Ziehung, wie bisher
         $appointments[] = [
             'appointment_id' => $id++,
-            'title'          => DEMO_PERFORMANCE_TITLES[(int) date('n', strtotime($date))],
+            'title'          => DEMO_PERFORMANCE_TITLES[$monat],
             'type_id'        => 3,
             'description'    => null,
             'date'           => $date,
-            'start_time'     => sprintf('%02d:00:00', $random->int(10, 19)),
+            'start_time'     => sprintf('%02d:00:00', $stunde),
+            'end_time'       => sprintf('%02d:00:00', $stunde + 2),
+            'location'       => DEMO_PERFORMANCE_LOCATIONS[$monat],
         ];
     }
 
@@ -1088,6 +1115,8 @@ function buildFutureConcert(array $appointments, string $referenceDate): array
         'description'    => null,
         'date'           => $date->format('Y-m-d'),
         'start_time'     => '19:00:00',
+        'end_time'       => '22:00:00',
+        'location'       => DEMO_PERFORMANCE_LOCATIONS[(int) $date->format('n')],
     ];
 }
 
