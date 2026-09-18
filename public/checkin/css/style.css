@@ -2571,7 +2571,6 @@ body {
 
 .response-card__meta {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     gap: 8px;
     margin-top: 3px;
@@ -2579,11 +2578,20 @@ body {
     color: var(--text-light);
 }
 
-/* Pfeil nur an aufklappbaren Karten; zeigt nach oben, wenn offen. */
+/* Der Chip steht immer rechts, auch wenn links kein Ort steht. */
+.response-card__meta .response-chip {
+    margin-left: auto;
+}
+
+/* Pfeil nur an aufklappbaren Karten; zeigt nach oben, wenn offen. Folgt
+   dem Chip; an Infokarten ohne Chip rueckt er selbst nach rechts. */
 details.response-card > .response-card__summary .response-card__meta::after {
     content: '▾';
-    margin-left: auto;
     color: var(--text-light);
+}
+
+details.response-card--info > .response-card__summary .response-card__meta::after {
+    margin-left: auto;
 }
 
 details.response-card[open] > .response-card__summary .response-card__meta::after {
