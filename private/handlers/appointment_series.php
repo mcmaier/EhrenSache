@@ -183,6 +183,13 @@ function seriesHandleEndFrom(PDO $db, string $prefix, array $series, string $fro
  * "Dieser und alle folgenden" ohne Regelaenderung: Vorlage und die folgenden,
  * nicht abgeloesten Termine an Ort und Stelle aendern. IDs bleiben, damit
  * Rueckmeldungen und Anwesenheiten haengen bleiben.
+ *
+ * Die Vorlage ($template) gilt fuer die Serie insgesamt, nicht notwendig fuer
+ * jeden einzelnen Termin: ein frueherer Teil-PUT mit einem anderen from_date
+ * kann einzelne Termine bereits von der Vorlage abweichen lassen (z. B. eine
+ * andere Startzeit). Pro Termin gilt daher der EFFEKTIVE Wert: das gesendete
+ * (normalisierte) Feld, sonst der Bestand dieses Termins -- sowohl fuer die
+ * Ende=Beginn-Pruefung als auch fuer die Kollisionspruefung.
  */
 function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, array $raw, int $tol): void
 {
@@ -212,7 +219,9 @@ function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, arr
         return;
     }
 
-    $checkConflicts = in_array('start_time', $provided, true) || in_array('type_id', $provided, true);
+    $hasStart = in_array('start_time', $provided, true);
+    $hasEnd   = in_array('end_time', $provided, true);
+    $hasType  = in_array('type_id', $provided, true);
     $setClause = implode(', ', array_map(fn (string $f): string => "{$f} = ?", $provided));
     $setValues = array_map(fn (string $f) => $template[$f], $provided);
 
@@ -230,17 +239,43 @@ function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, arr
     $detached = [];
 
     foreach (seriesFollowing($db, $prefix, $series['series_id'], $from) as $row) {
-        if ($checkConflicts) {
-            $conflict = findAppointmentConflict($db, $prefix, $row['date'], $template['start_time'],
-                                                $template['type_id'], $tol, [$row['appointment_id']]);
+        $effectiveStart = $hasStart ? $template['start_time'] : $row['start_time'];
+        $effectiveEnd   = $hasEnd   ? $template['end_time']   : $row['end_time'];
+        $effectiveType  = $hasType  ? $template['type_id']    : $row['type_id'];
+
+        if ($effectiveEnd !== null
+            && appointmentTimeKey((string) $effectiveEnd) === appointmentTimeKey((string) $effectiveStart)) {
+            $detach->execute([$row['appointment_id']]);
+            $detached[] = ['appointment_id' => $row['appointment_id'], 'date' => $row['date'],
+                           'reason' => 'invalid_time'];
+            continue;
+        }
+
+        $riskyChange = appointmentFieldChanged('start_time', $effectiveStart, $row['start_time'])
+                       || appointmentFieldChanged('type_id', $effectiveType, $row['type_id']);
+
+        if ($riskyChange) {
+            $conflict = findAppointmentConflict($db, $prefix, $row['date'], $effectiveStart, $effectiveType, $tol,
+                                                [$row['appointment_id']]);
             if ($conflict !== null) {
                 $detach->execute([$row['appointment_id']]);
                 $detached[] = ['appointment_id' => $row['appointment_id'], 'date' => $row['date'],
-                               'reason' => 'conflict', 'conflict' => ['title' => $conflict['title'],
-                               'start_time' => $conflict['start_time']]];
+                               'reason' => 'conflict', 'conflict' => ['appointment_id' => $conflict['appointment_id'],
+                               'title' => $conflict['title'], 'start_time' => $conflict['start_time']]];
+                continue;
+            }
+            // Erfasste Daten (Anwesenheit, Rueckmeldung, Ausnahme, Arbeitszeit) haengen an
+            // der Puenktlichkeit dieses Termins -- Zeit oder Terminart aendern sich dafuer
+            // nicht mehr rueckwirkend. Andere Felder (Titel, Ort, Beschreibung, Ende) sind
+            // unkritisch und aendern sich auch bei erfassten Daten normal weiter unten.
+            if (appointmentHasData($db, $prefix, $row['appointment_id'])) {
+                $detach->execute([$row['appointment_id']]);
+                $detached[] = ['appointment_id' => $row['appointment_id'], 'date' => $row['date'],
+                               'reason' => 'has_data'];
                 continue;
             }
         }
+
         $update->execute(array_merge($setValues, [$row['appointment_id']]));
         $updated++;
     }

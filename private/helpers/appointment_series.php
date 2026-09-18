@@ -317,12 +317,17 @@ function seriesInsertOccurrences(PDO $db, string $prefix, int $seriesId, array $
  */
 function seriesFollowing(PDO $db, string $prefix, int $seriesId, string $from): array
 {
-    $stmt = $db->prepare("SELECT appointment_id, date FROM {$prefix}appointments
+    $stmt = $db->prepare("SELECT appointment_id, date, start_time, end_time, type_id FROM {$prefix}appointments
                           WHERE series_id = ? AND date >= ? AND is_detached = 0 ORDER BY date FOR UPDATE");
     $stmt->execute([$seriesId, $from]);
 
-    return array_map(fn (array $r): array => ['appointment_id' => (int) $r['appointment_id'], 'date' => $r['date']],
-                     $stmt->fetchAll(PDO::FETCH_ASSOC));
+    return array_map(fn (array $r): array => [
+        'appointment_id' => (int) $r['appointment_id'],
+        'date'           => $r['date'],
+        'start_time'     => $r['start_time'],
+        'end_time'       => $r['end_time'],
+        'type_id'        => $r['type_id'] === null ? null : (int) $r['type_id'],
+    ], $stmt->fetchAll(PDO::FETCH_ASSOC));
 }
 
 /** @return int[] Termine ab $from, die ein Beenden loeschen wuerde */

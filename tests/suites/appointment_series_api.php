@@ -704,3 +704,144 @@ test('PUT prueft Vorlage und Datum', function () {
         asDropWorld($world);
     }
 });
+
+// ---- PUT je Termin: effektive Werte, nicht nur die Vorlage --------------------
+
+test('PUT nach vorherigem Teil-PUT: Ende=Beginn nur fuer die betroffenen Termine, andere bleiben gueltig', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        assertStatus(200, asSeriesPut($sid, ['from_date' => '2031-03-25', 'start_time' => '18:00', 'end_time' => '19:30']));
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'end_time' => '19:30']);
+        assertStatus(200, $res);
+        assertSame(2, $res['body']['updated']);
+
+        $detachedDates = array_column($res['body']['detached'], 'date');
+        sort($detachedDates);
+        assertSame(['2031-03-04', '2031-03-11', '2031-03-18'], $detachedDates);
+        foreach ($res['body']['detached'] as $d) {
+            assertSame('invalid_time', $d['reason'], $d['date']);
+        }
+
+        foreach (['2031-03-04', '2031-03-11', '2031-03-18'] as $date) {
+            $apt = asAptOn($world, $date);
+            assertSame('19:30:00', $apt['start_time'], $date);
+            assertSame('22:00:00', $apt['end_time'], $date . ' unveraendert, da abgeloest');
+            assertSame(1, (int) $apt['is_detached'], $date);
+        }
+        foreach (['2031-03-25', '2031-04-01'] as $date) {
+            $apt = asAptOn($world, $date);
+            assertSame('18:00:00', $apt['start_time'], $date);
+            assertSame('19:30:00', $apt['end_time'], $date);
+            assertSame(0, (int) $apt['is_detached'], $date);
+        }
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT: Terminart-Wechsel, der kollidieren wuerde, loest nur den betroffenen Termin ab', function () {
+    $world = asWorld();
+    $otherWorld = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $fremd = apiRequest('POST', 'appointments', ['token' => apiToken('admin'), 'body' => [
+            'title' => 'Fremdtermin', 'date' => '2031-03-18', 'start_time' => '19:30', 'type_id' => $otherWorld['type'],
+        ]]);
+        assertStatus(201, $fremd);
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'type_id' => $otherWorld['type']]);
+        assertStatus(200, $res);
+        assertSame(4, $res['body']['updated']);
+        assertSame(['2031-03-18'], array_column($res['body']['detached'], 'date'));
+        assertSame('conflict', $res['body']['detached'][0]['reason']);
+        assertSame((int) $fremd['body']['id'], $res['body']['detached'][0]['conflict']['appointment_id']);
+        assertSame('Fremdtermin', $res['body']['detached'][0]['conflict']['title']);
+
+        $kept = asAptOn($world, '2031-03-18');
+        assertSame($world['type'], (int) $kept['type_id'], 'Bleibt bei der alten Terminart');
+        assertSame(1, (int) $kept['is_detached']);
+
+        // Nach dem Terminart-Wechsel zaehlen diese Termine zur Welt der neuen
+        // Terminart -- asAppointments() filtert je Welt auf ihre eigene type_id.
+        foreach (['2031-03-04', '2031-03-11', '2031-03-25', '2031-04-01'] as $date) {
+            $apt = asAptOn($otherWorld, $date);
+            assertSame($otherWorld['type'], (int) $apt['type_id'], $date);
+        }
+    } finally {
+        asDropWorld($world);
+        asDropWorld($otherWorld);
+    }
+});
+
+test('PUT: eine nicht existierende Terminart liefert 400 und aendert nichts', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $before = asAppointments($world);
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'type_id' => 999999]);
+        assertStatus(400, $res);
+        assertSame($before, asAppointments($world), 'Nichts geaendert');
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT: ein Termin mit erfassten Daten wird bei Zeit-/Artaenderung nicht geaendert, sondern abgeloest', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $withData = asAptOn($world, '2031-03-11');
+        asAddRecord((int) $withData['appointment_id']);
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'start_time' => '19:00', 'title' => 'Neu']);
+        assertStatus(200, $res);
+        assertSame(4, $res['body']['updated']);
+        assertSame(['2031-03-11'], array_column($res['body']['detached'], 'date'));
+        assertSame('has_data', $res['body']['detached'][0]['reason']);
+
+        $unchanged = asAptOn($world, '2031-03-11');
+        assertSame('19:30:00', $unchanged['start_time'], 'Nicht geaendert, da abgeloest');
+        assertSame('AS-Probe', $unchanged['title'], 'Auch der Titel bleibt, da komplett unangetastet');
+        assertSame(1, (int) $unchanged['is_detached']);
+
+        foreach (['2031-03-04', '2031-03-18', '2031-03-25', '2031-04-01'] as $date) {
+            $apt = asAptOn($world, $date);
+            assertSame('19:00:00', $apt['start_time'], $date);
+            assertSame('Neu', $apt['title'], $date);
+        }
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT: ein Titel-Wechsel allein aendert einen Termin mit Daten trotzdem', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $withData = asAptOn($world, '2031-03-11');
+        asAddRecord((int) $withData['appointment_id']);
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'title' => 'Umbenannt']);
+        assertStatus(200, $res);
+        assertSame(5, $res['body']['updated']);
+        assertSame([], $res['body']['detached']);
+        assertSame('Umbenannt', asAptOn($world, '2031-03-11')['title']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT: from_date als Array erzeugt keine PHP-Warnung und liefert 400', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $res = apiRequest('PUT', 'appointment_series', ['token' => apiToken('admin'),
+            'query' => ['id' => $sid], 'body' => ['from_date' => ['2031-03-04'], 'title' => 'X']]);
+        assertStatus(400, $res);
+    } finally {
+        asDropWorld($world);
+    }
+});
