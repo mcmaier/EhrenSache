@@ -28,3 +28,6 @@ private/config/*.bak-*
 private/config/maintenance.lock
 private/backup/
 private/.update-tmp/
+
+# Mockups des visuellen Brainstorming-Begleiters (superpowers)
+.superpowers/
