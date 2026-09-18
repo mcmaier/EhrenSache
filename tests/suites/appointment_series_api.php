@@ -54,8 +54,15 @@ function asDropWorld(array $world): void
         }
         apiRequest('DELETE', 'appointments', ['token' => $token, 'query' => ['id' => $apt['appointment_id']]]);
     }
+    // Beenden ab dem Serienbeginn: ohne verbleibende Termine verschwindet die
+    // Serie (seriesEndFrom). from muss im Zeitraum der Serie liegen.
     foreach (array_keys($seriesIds) as $sid) {
-        apiRequest('DELETE', 'appointment_series', ['token' => $token, 'query' => ['id' => $sid, 'from' => '2031-01-01']]);
+        $series = apiRequest('GET', 'appointment_series', ['token' => $token, 'query' => ['id' => $sid]]);
+        if ($series['status'] !== 200 || empty($series['body']['start_date'])) {
+            continue;
+        }
+        apiRequest('DELETE', 'appointment_series', ['token' => $token,
+            'query' => ['id' => $sid, 'from' => $series['body']['start_date']]]);
     }
     apiRequest('DELETE', 'appointment_types', ['token' => $token, 'query' => ['id' => $world['type']]]);
     apiRequest('DELETE', 'member_groups', ['token' => $token, 'query' => ['id' => $world['group']]]);
@@ -251,4 +258,6 @@ test('Serien sind Admin und Manager vorbehalten', function () {
 test('Unbekannte Serie liefert 404', function () {
     $res = apiRequest('GET', 'appointment_series', ['token' => apiToken('admin'), 'query' => ['id' => 99999999]]);
     assertStatus(404, $res);
+    assertSame('Serie nicht gefunden', $res['body']['message'] ?? null,
+        'Die Serie fehlt, nicht die Ressource');
 });
