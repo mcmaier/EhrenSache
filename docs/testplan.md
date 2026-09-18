@@ -187,6 +187,21 @@ nur im Browser sichtbar wird.
 | APT-UI-6 | „Filter zurücksetzen" | Beide Auswahlfelder leer, Seite 1, vollständige Liste |
 | APT-UI-7 | Als Rolle `user` | Herkunftsfeld unsichtbar; Terminartliste zeigt nur Arten mit mindestens einer eigenen Gruppe |
 
+### 6.4 Ort und Ende (seit 1.10.0)
+
+Automatisiert: `appointment_details_unit`, `appointment_details_api`,
+`appointment_details_frontend`, `export_import`.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| APT-DET-1 | Termin mit Ort und Ende anlegen (Dashboard) | Liste zeigt „…, 19:30–22:00" und „📍 Ort"; Kalender-Popup ebenso |
+| APT-DET-2 | Ortsfeld antippen | Vorschläge aus bisher verwendeten Orten |
+| APT-DET-3 | Ende 01:00 bei Beginn 20:00 | Gespeichert; Anzeige „20:00–01:00" |
+| APT-DET-4 | Ende gleich Beginn | Fehlermeldung, nichts gespeichert |
+| APT-DET-5 | Termin in der PWA-Terminanlage mit Ort bearbeiten | Felder vorbelegt; Speichern behält beide |
+| APT-DET-6 | CSV exportieren, Ort ändern, importieren | Ort übernommen |
+| APT-DET-7 | CSV ohne die Spalten end_time/location importieren | Ort und Ende bleiben erhalten |
+
 ---
 
 ## 7. Anwesenheitserfassung (Records)
@@ -1223,6 +1238,23 @@ Automatisiert: `php tests/run.php responses_unit`, `responses_api`, `responses_f
 | RM-21 | Entschuldigungspflicht nachträglich für eine Terminart ausschalten, die bereits offene Anträge aus Absagen hat | Die bestehenden Anträge bleiben verknüpft und offen, sichtbar unter „Anträge"; keine automatische Änderung |
 | RM-22 | Absage mit Begründung, Admin lehnt den Antrag unter „Anträge" ab, danach Zusage, danach erneut Absage mit Begründung | Zusage nach abgelehntem Antrag gelingt (kein Fehler); der abgelehnte Antrag bleibt sichtbar unverändert; die erneute Absage legt einen neuen, offenen Antrag an — zwei Anträge insgesamt, einer abgelehnt, einer offen |
 | RM-23 | Absage mit Begründung bei einer Terminart mit Entschuldigungspflicht, danach unter „Anträge" einen zweiten Abwesenheitsantrag zum selben Termin stellen | Der zweite Antrag wird abgewiesen, der Dialog bleibt offen und meldet, dass es zu diesem Termin bereits einen Antrag dieser Art gibt; unter „Anträge" steht weiterhin genau einer |
+
+### Terminliste der PWA (seit 1.10.0)
+
+Automatisiert: `responses_api` (Fenster, Sichtbarkeit bis Tagesende, Sortierung),
+`pwa_termine_frontend`.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| PWA-TL-1 | Tab „Termine" öffnen | Chronologisch, Monatsüberschriften, alles zugeklappt |
+| PWA-TL-2 | Verein ohne Terminrückmeldung | Tab sichtbar, zeigt die Termine der nächsten acht Wochen |
+| PWA-TL-3 | Rückmeldetermin in mehr als acht Wochen | erscheint, im Folgejahr mit Jahreszahl („Mai 2027") |
+| PWA-TL-4 | Karte ohne Beschreibung | kein Pfeil, nicht aufklappbar |
+| PWA-TL-5 | Rückmeldekarte aufklappen, zusagen | Chip wechselt auf „✓ zugesagt", Karte bleibt offen |
+| PWA-TL-6 | Heute begonnener Rückmeldetermin | sichtbar, Chip „hat begonnen" bzw. eigene Antwort, keine Knöpfe |
+| PWA-TL-7 | Badge | zählt nur offene, nicht begonnene Rückmeldungen |
+| PWA-TL-8 | Am 20.12. öffnen | Januartermine des Folgejahres sichtbar |
+| PWA-TL-9 | Offline | Hinweis nur an Rückmeldekarten |
 
 ---
 

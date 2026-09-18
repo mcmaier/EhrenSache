@@ -7,6 +7,34 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.10.0] – 2026-09-18
+
+### Neu
+- **Termine haben einen Ort und ein Ende.** Beide sind optional und rein informativ — sie gehen
+  in keine Auswertung ein, weder in die Anwesenheit noch in die Pünktlichkeit. Das Ortsfeld
+  schlägt bisher verwendete Orte vor. Liegt das Ende vor dem Beginn, gilt der Folgetag
+  (Nachtauftritt 20:00–01:00). Dashboard, Check-in-App und Kalender zeigen beide an; der
+  CSV-Export führt sie als letzte Spalten, der Import nimmt sie optional an. Eine ältere Datei
+  ohne die Spalten lässt Ort und Ende beim Aktualisieren stehen.
+- **Der Tab „Termine" der Check-in-App zeigt alle kommenden Termine.** Bisher erschienen dort nur
+  Termine mit Rückmeldung; ein Verein, der die Rückmeldung nicht nutzt, hatte in der App keine
+  Terminübersicht, der Tab blieb ganz verborgen. Jetzt stehen dort die Termine der eigenen
+  Gruppen der nächsten acht Wochen, Termine mit Rückmeldung auch darüber hinaus —
+  chronologisch, nach Monaten gegliedert und zugeklappt. Ein Tipp klappt eine Karte auf. Die
+  Liste reicht über den Jahreswechsel: Am 20. Dezember stehen die Januartermine schon darin.
+
+### Geändert
+- Die Terminliste der Check-in-App stellt unbeantwortete Rückmeldungen nicht mehr an den Anfang.
+  Lange vorausgeplante Veranstaltungen, für die noch keine Zusage möglich ist, standen dort
+  dauerhaft oben und verdrängten die Proben der Woche. Offene Rückmeldungen sind am Chip
+  „Rückmeldung offen" und am farbigen Rand erkennbar.
+- **Termine von heute bleiben bis Tagesende in der Liste**, auch wenn sie schon begonnen haben —
+  so lässt sich der Ort auf dem Weg noch nachsehen. Das Badge am Tab zählt begonnene Termine
+  nicht mehr mit, denn eine Rückmeldung ist dann nicht mehr möglich.
+- Die Demo-Daten tragen Ort und Ende für Proben, Sitzungen und Auftritte.
+
+---
+
 ## [1.9.3] – 2026-09-18
 
 ### Sicherheit

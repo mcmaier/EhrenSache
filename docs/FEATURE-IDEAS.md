@@ -45,7 +45,7 @@ durchschlägt.
 | [FI-5](#fi-5--pin-anmeldung-am-auth-gerät) | PIN-Anmeldung am Auth-Gerät — **umgesetzt in 1.3.0** | mittel | M | FI-4 |
 | [FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push) | Benachrichtigungskanal (E-Mail, Web-Push) | hoch | M | — |
 | [FI-7](#fi-7--terminserien-für-wiederkehrende-proben) | Terminserien für wiederkehrende Proben | hoch | M | — |
-| [FI-8](#fi-8--kalender-abo-ics-feed) | Kalender-Abo (ICS-Feed) | mittel | S | FI-23 für die Wirkung |
+| [FI-8](#fi-8--kalender-abo-ics-feed) | Kalender-Abo (ICS-Feed) | mittel | S | — |
 | [FI-9](#fi-9--dienst--und-schichtplanung-für-veranstaltungen) | Dienst- und Schichtplanung für Veranstaltungen | mittel | L | FI-1 |
 | [FI-10](#fi-10--jubiläen-und-ehrungen-automatisch-ermitteln) | Jubiläen und Ehrungen automatisch ermitteln | mittel | S | — |
 | [FI-11](#fi-11--mehrsprachigkeit-der-oberfläche) | Mehrsprachigkeit der Oberfläche | niedrig | L | — |
@@ -60,7 +60,7 @@ durchschlägt.
 | [FI-20](#fi-20--einfache-umfragen) | Einfache Umfragen | niedrig | M | FI-6 |
 | [FI-21](#fi-21--aufgaben-mit-zuweisung-und-fälligkeit) | Aufgaben mit Zuweisung und Fälligkeit | niedrig | L | FI-6 |
 | [FI-22](#fi-22--musikstücke-und-programme) | Musikstücke und Programme | niedrig | L | — |
-| [FI-23](#fi-23--ort-und-ende-am-termin) | Ort und Ende am Termin (rein informativ) | mittel | M | — |
+| [FI-23](#fi-23--ort-und-ende-am-termin) | Ort und Ende am Termin (rein informativ) — **umgesetzt in 1.10.0** | mittel | M | — |
 
 ¹ hoch in Kombination mit [FI-1](#fi-1--terminzusage-im-vorfeld), für sich allein mittel.
 
@@ -219,10 +219,11 @@ Radius befindet, kann sich in der PWA eintragen.
 **Warum interessant:** Deckt genau die Lücke, für die keine TOTP-Station aufgebaut werden kann.
 Eine feste Station im Proberaum lohnt sich, für einen einmaligen Auftritt lohnt sie sich nicht.
 
-**Wo die Koordinaten sitzen, entscheidet [FI-23](#fi-23--ort-und-ende-am-termin)** — und zwar
-vorher. Dort fällt die Wahl zwischen einem Ortsfeld am Termin und einer eigenen Ortstabelle.
-Fällt sie auf die Tabelle, hängen Koordinaten und Radius dort; fällt sie auf das Freitextfeld,
-braucht FI-3 eine eigene Ablage. Diese Frage hier nicht ein zweites Mal aufmachen.
+**Wo die Koordinaten sitzen, hat [FI-23](#fi-23--ort-und-ende-am-termin) vorentschieden:**
+Der Ort ist seit 1.10.0 ein Freitextfeld am Termin, keine Ortstabelle. FI-3 braucht deshalb eine
+eigene Ablage für Koordinaten und Radius. Naheliegend ist eine Ortstabelle, die sich aus den
+vorhandenen Werten von `appointments.location` ableiten lässt — die Vorschlagsliste
+(`appointments?locations=1`) zeigt, welche Orte tatsächlich benutzt werden.
 
 **Berührt:** Koordinaten und Radius am Termin oder an einer eigenen Check-in-Freigabe · neue
 Quelle im `checkin_source`-Enum von `records` (Migration; das Feld ist heute
@@ -410,6 +411,12 @@ Migration mit demselben `from`.
 ### FI-23 · Ort und Ende am Termin
 **Nutzen:** mittel · **Aufwand:** M — *der Ort allein wäre S*
 
+**Umgesetzt in 1.10.0** — Spec `docs/superpowers/specs/2026-09-18-pwa-terminliste-ort-ende-design.md`,
+zusammen mit der Terminliste der Check-in-App. Entschieden: Ort als Freitext mit Vorschlägen aus
+bisher verwendeten Orten (keine Ortstabelle), Ende als Uhrzeit mit Folgetag-Regel, ein Ende
+gleich dem Beginn wird abgelehnt. Kein zweites Freitextfeld „Anmerkungen". Der Text unten
+beschreibt den Stand vor der Umsetzung.
+
 Ein Termin trägt heute Titel, Beschreibung, Datum und Startzeit — mehr nicht
 (`{PREFIX}appointments`). Es fehlen **wo** und **wie lange**. Wer den Ort eines Auftritts
 mitteilen will, schreibt ihn in die Beschreibung; wer die Dauer angeben will, gar nicht.
@@ -473,15 +480,16 @@ FI-8 zusammen kommen oder warten, bis ein Verein danach fragt.
 ---
 
 ### FI-8 · Kalender-Abo (ICS-Feed)
-**Nutzen:** mittel · **Aufwand:** S — **setzt [FI-23](#fi-23--ort-und-ende-am-termin) voraus**
+**Nutzen:** mittel · **Aufwand:** S — Voraussetzung [FI-23](#fi-23--ort-und-ende-am-termin) **seit 1.10.0 erfüllt**
 
 Persönliche, mit Token geschützte Kalender-URL, die jedes Mitglied in Telefon oder
 Mail-Programm abonniert. Nur lesend, nur die Termine der eigenen Gruppen.
 
 **Der Aufwand „S" gilt nur mit FI-23.** Ohne `location` und `end_time` am Termin exportiert der
 Feed Einträge ohne Ort und mit geratener Länge — technisch ein gültiger Kalender, praktisch
-eine Liste von Titeln. Die Felder nachzuliefern ist Arbeit an `appointments`, nicht am Feed,
-und gehört deshalb dorthin.
+eine Liste von Titeln. Seit 1.10.0 sind beide Felder da: `LOCATION` und `DTEND` lassen sich
+direkt übernehmen; ein Ende vor dem Beginn ergibt `DTEND` am Folgetag, ohne Ende bleibt es beim
+reinen `DTSTART`.
 
 **Warum interessant:** Sehr viel Wirkung für sehr wenig Code — ICS ist Textausgabe, keine
 Bibliothek nötig, was zur Linie des Projekts passt (kein PDF-Export, „würde eine Bibliothek
@@ -818,9 +826,8 @@ Ein benannter Satz Vorbelegungen (Terminart, Uhrzeit, Gruppen, Ort), aus dem sic
 Termin mit einem Klick füllt. Die kleinste Idee der Liste — im Kern eine Tabelle und ein
 Auswahlfeld im Anlegen-Dialog.
 
-Das Feld „Ort" gibt es am Termin noch nicht; es kommt mit
-[FI-23](#fi-23--ort-und-ende-am-termin). Ohne dieses bleiben als Vorbelegung nur Terminart,
-Uhrzeit und Gruppen — womit die Vorlage noch weniger hergibt als ohnehin schon.
+Das Feld „Ort" gibt es am Termin seit 1.10.0 ([FI-23](#fi-23--ort-und-ende-am-termin)), dazu
+das Ende. Beide gehören in eine Vorlage.
 
 **Warum eher nicht zuerst:** [FI-7](#fi-7--terminserien-für-wiederkehrende-proben) nimmt ihr den
 Anlass. Was sich regelmäßig wiederholt, ist dann eine Serie; was einmalig ist, lohnt keine
@@ -898,7 +905,7 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
 4. **FI-6 Benachrichtigungen** — erst jetzt, und erst nachdem die Auslöserfrage beantwortet ist.
    Danach wird alles Vorherige wirksamer, FI-1 am deutlichsten. Die Einmal-Links aus der Mail
    gehören in dieselbe Runde, weil sie dieselbe Sicherheitsprüfung brauchen.
-5. **FI-23 Ort und Ende**, dann **FI-8 ICS-Abo** — in dieser Reihenfolge. FI-8 ist weiterhin
+5. ~~**FI-23 Ort und Ende**~~ (umgesetzt in 1.10.0), dann **FI-8 ICS-Abo** — in dieser Reihenfolge. FI-8 ist weiterhin
    die günstigste Idee der Liste, aber ein Feed ohne Ort und ohne Dauer ist eine Liste von
    Titeln; die zwei Felder davor gebaut, macht aus derselben Arbeit einen brauchbaren Kalender.
    FI-23 nützt außerdem für sich allein und hebt nebenbei FI-19. Nach FI-7 wird FI-8 noch

@@ -603,6 +603,13 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
   **Wirkt nur für Admin und Manager.** Für alle anderen Rollen wird der Parameter ignoriert;
   sie sehen immer die Termine der Gruppen ihres eigenen Mitglieds (bis 1.9.2 ließ sich die
   Gruppengrenze damit verschieben)
+- `locations=1`: Statt der Terminliste ein Array bisher verwendeter Orte (letzte zwei Jahre,
+  häufigste zuerst, höchstens 50) — für die Vorschlagsliste des Ortsfelds. **Nur Admin und
+  Manager**, sonst `403`. Seit 1.10.0:
+
+  ```json
+  ["Probelokal", "Stadthalle Musterhausen", "Vereinsheim"]
+  ```
 
 **Response:**
 ```json
@@ -610,22 +617,30 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
   {
     "appointment_id": 1,
     "title": "Probe",
-    "appointment_date": "2024-03-15",
+    "description": null,
+    "location": "Proberaum",
+    "date": "2024-03-15",
     "start_time": "19:00:00",
     "end_time": "21:00:00",
-    "location": "Proberaum",
+    "created_by": 1,
+    "created_at": "2024-03-01 10:12:00",
+    "is_auto_created": 0,
     "type_id": 1,
     "type_name": "Probe",
-    "type_color": "#667eea",
-    "groups": [
-      {
-        "group_id": 1,
-        "group_name": "Trompeten"
-      }
-    ]
+    "color": "#667eea",
+    "type_description": null,
+    "responses_enabled": 0
   }
 ]
 ```
+
+**Felder `location` und `end_time` (seit 1.10.0):** Ort und Ende des Termins, beide optional und
+`null`, wenn nicht gesetzt. Rein informativ — sie gehen in keine Auswertung ein. Liegt
+`end_time` vor `start_time`, meint es den Folgetag. Bis 1.9.3 stand beides in diesem Beispiel,
+ohne dass es die Felder gab.
+
+Die Gruppen eines Termins ergeben sich aus seiner Terminart (`appointment_types`), nicht aus
+dem Termin selbst.
 
 **Feld `responses` (seit 1.7.0):** Nur wenn die Anfrage `year`, `from_date` oder `to_date`
 mitschickt — ohne einen dieser Filter fehlt der Schlüssel ganz, damit die je Termin korrelierten
@@ -650,14 +665,23 @@ sagt, ob dieses Mitglied für den Termin erwartet ist. Bei Terminarten ohne Rüc
 ```json
 {
   "title": "Konzert",
-  "appointment_date": "2024-06-15",
+  "description": "Treffpunkt 18:00 am Bühneneingang",
+  "date": "2024-06-15",
   "start_time": "19:00",
   "end_time": "21:30",
   "location": "Stadthalle",
-  "type_id": 1,
-  "group_ids": [1, 2]
+  "type_id": 1
 }
 ```
+
+Pflicht sind `title`, `date` und `start_time`. Fehlt `type_id`, gilt die Standard-Terminart.
+
+**`end_time` und `location` (seit 1.10.0), beide optional:**
+
+| Feld | Regel | Fehler |
+|---|---|---|
+| `end_time` | `HH:MM` oder `HH:MM:SS`; leer oder `null` = kein Ende; vor dem Beginn = Folgetag | `400` bei ungültigem Format oder wenn es **gleich** dem Beginn ist |
+| `location` | Text, wird getrimmt; leer oder `null` = kein Ort | `400` bei mehr als 200 Zeichen |
 
 **Response:**
 ```json
@@ -667,6 +691,9 @@ sagt, ob dieses Mitglied für den Termin erwartet ist. Bei Terminarten ohne Rüc
 }
 ```
 
+Existiert im Toleranzfenster bereits ein Termin derselben Terminart, antwortet der Endpunkt mit
+`409` und nennt ihn.
+
 ---
 
 ### Termin aktualisieren
@@ -674,7 +701,12 @@ sagt, ob dieses Mitglied für den Termin erwartet ist. Bei Terminarten ohne Rüc
 
 **Berechtigung:** Admin/Manager
 
-**Felder:** `title`, `type_id`, `description`, `date`, `start_time`
+**Felder:** `title`, `type_id`, `description`, `date`, `start_time`, `end_time`, `location`
+(die beiden letzten seit 1.10.0, Regeln wie bei „Termin erstellen")
+
+Ein Ende gleich dem Beginn wird auch dann mit `400` abgelehnt, wenn nur eines der beiden Felder
+im Request steht: Ändert der Request nur `start_time` auf das gespeicherte Ende, gilt dieselbe
+Regel wie umgekehrt.
 
 **`PUT` ist eine Teiländerung, keine Vollersetzung.** Geschrieben wird nur, was im Request steht;
 alle übrigen Felder bleiben unberührt. Ein ausdrückliches `null` ist dagegen eine Angabe und
@@ -1292,6 +1324,27 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
 ```json
 { "appointments": [ { "appointment": {…}, "settings": {…}, "started": false,
                       "expected": true, "own": null, "summary": {…} } ] }
+```
+
+**Seit 1.10.0:**
+
+- **Termine von heute bleiben bis Tagesende enthalten**, auch wenn sie schon begonnen haben —
+  dann mit `"started": true`. Bis 1.9.3 verschwand ein Termin mit seinem Beginn. Eine eigene
+  Rückmeldung nimmt der Server nach Beginn weiterhin nicht an.
+- Das Objekt `appointment` trägt zusätzlich `end_time`, `location`, `description` und
+  `responses_enabled` (hier immer `true`).
+- **Schalter `with_info=1`:** hängt die Termine der eigenen Gruppen **ohne** Rückmeldung an, die
+  von heute bis acht Wochen voraus liegen. Diese Einträge sind schlank — nur `appointment` mit
+  `responses_enabled: false`, ohne `settings`, `own`, `summary` und `members`. Die Antwort ist
+  dann chronologisch nach Datum und Beginn sortiert. Ohne den Schalter bleibt sie wie bisher,
+  damit ein vor dem Update geöffneter Tab der Check-in-App keine Einträge bekommt, die sein Code
+  nicht kennt.
+
+```json
+{ "appointment": { "appointment_id": 51, "title": "Gesamtprobe", "date": "2026-09-22",
+                   "start_time": "19:30:00", "end_time": "22:00:00", "location": "Probelokal",
+                   "description": null, "type_id": 1, "type_name": "Gesamtprobe",
+                   "color": "#667eea", "responses_enabled": false } }
 ```
 
 ### Ein Termin
