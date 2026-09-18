@@ -141,6 +141,8 @@ Diese Tests systematisch mit allen Rollen durchführen:
 |----|----------|---------------------|
 | MEM-UI-1 | „Inaktive anzeigen" in der Filterleiste anhaken | Gesamtzahl der Liste steigt um die Zahl der Karte „Inaktive Mitglieder"; ohne Haken wieder zurück |
 | MEM-UI-2 | Karte „Inaktive Mitglieder" | Zeigt nur die Zahl, kein Bedienelement |
+| MEM-UI-3 | Gruppe im Filter wählen | Beide Karten zählen nur Mitglieder dieser Gruppe |
+| MEM-UI-4 | „Inaktive anzeigen" an- und abhaken | Die Karten ändern sich **nicht** — der Schalter wirkt nur auf die Tabelle (OI-71) |
 
 ---
 
@@ -1133,7 +1135,8 @@ Automatisiert: `php tests/run.php worktime_frontend` (statische Gegenproben) und
 |----|----------|---------------------|
 | MF-1 | Als Admin anmelden und **als Erstes** die Zeiterfassung öffnen, ohne vorher die Mitgliederliste zu besuchen | Der Filter „Mitglied" ist gefüllt, nicht nur „Alle Mitglieder" |
 | MF-2 | Im selben Zug „Zeit nachtragen" öffnen | Die Mitgliedsauswahl im Dialog ist gefüllt; Mitglieder ohne Mitgliedschaft im gewählten Jahr fehlen |
-| MF-3 | Ein Mitglied im Filter wählen | Tabelle und Kennzahl „bestätigte Stunden" zeigen nur dessen Einträge |
+| MF-3 | Ein Mitglied im Filter wählen | Tabelle und **alle drei** Kennzahlen — bestätigte Stunden, wartet auf Freigabe, laufende Sitzungen — zeigen nur dessen Einträge (bis 1.9.1 folgten nur die Stunden) |
+| MF-3a | Nacheinander jede Tätigkeit wählen | Die Kennzahlen der einzelnen Tätigkeiten ergeben zusammen die Werte ohne Filter |
 | MF-4 | Jahr wechseln, danach den Filter aufklappen | Auswahl passt zum neuen Jahr, ausgetretene Mitglieder tragen „(inaktiv)" |
 | MF-5 | Als Manager statt Admin | Gleiches Verhalten; als einfaches Mitglied ist der Filter gar nicht sichtbar |
 

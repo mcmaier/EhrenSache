@@ -23,6 +23,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Ausschnitt zählten.
 - In der Mitgliederverwaltung steht der Schalter „Inaktive anzeigen" in der Filterleiste; die
   Kennzahlkarte zeigt nur noch die Zahl.
+- **Die Kennzahlkarten folgen jetzt überall der Auswahl.** In der Zeiterfassung blieben „Wartet
+  auf Freigabe" und „Laufende Sitzungen" bei jedem Filter auf dem Gesamtwert stehen, nur die
+  Stunden änderten sich. In der Mitgliederverwaltung zählen die Karten jetzt die Mitglieder der
+  gewählten Gruppe — unabhängig vom Schalter „Inaktive anzeigen", damit die Zahl der Inaktiven
+  auch bei ausgeblendeten Inaktiven sichtbar bleibt.
 - In der Statistik steht „Filter zurücksetzen" bündig neben den Auswahlfeldern statt ohne
   Abstand darunter.
 
