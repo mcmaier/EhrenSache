@@ -160,6 +160,7 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | APT-GET-6 | Filter `from_date` / `to_date` | Datumsbereich korrekt |
 | APT-GET-7 | Filter `type_id=X` | Nur Termine dieses Typs |
 | APT-GET-8 | Einzeltermin per ID | Vollständig inkl. type_name, color, description |
+| APT-GET-9 | User: `member_id` eines Mitglieds einer fremden Gruppe | Parameter wird ignoriert, nur eigene Gruppen (automatisiert: `appointments_visibility_api.php`) |
 
 ### 6.2 Erstellen & Bearbeiten
 

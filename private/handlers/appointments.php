@@ -63,7 +63,12 @@ function handleAppointments($db, $database, $method, $id) {
                     $userStmt->execute([getCurrentUserId()]);
                     $userMemberId = $userStmt->fetchColumn();
 
-                    if($member_id !== null)
+                    // Eine fremde member_id duerfen nur Verwalter setzen. Fuer
+                    // alle anderen bleibt es beim eigenen Mitglied -- sonst
+                    // liest ein Mitglied mit einer fremden ID die Termine
+                    // fremder Gruppen. Die PWA schickt die eigene ID mit;
+                    // fuer sie aendert sich dadurch nichts.
+                    if($member_id !== null && isAdminOrManager())
                     {
                         $userMemberId = $member_id;
                     }

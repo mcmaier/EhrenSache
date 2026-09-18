@@ -599,6 +599,10 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
 - `month`: Filter nach Monat (Auch in Kombination mit Jahr)
 - `from_date`: Filter nach Termine ab Zeitpunkt
 - `to_date`: Filter nach Termine bis Zeitpunkt
+- `member_id`: Nur Termine, deren Terminart einer Gruppe dieses Mitglieds zugeordnet ist.
+  **Wirkt nur für Admin und Manager.** Für alle anderen Rollen wird der Parameter ignoriert;
+  sie sehen immer die Termine der Gruppen ihres eigenen Mitglieds (bis 1.9.2 ließ sich die
+  Gruppengrenze damit verschieben)
 
 **Response:**
 ```json
