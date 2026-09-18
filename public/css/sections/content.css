@@ -234,6 +234,19 @@
     border-radius: var(--radius-lg);
     padding: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    display: flex;
+    gap: var(--spacing-lg);
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+/* Das innere Grid nimmt den freien Platz, der Reset-Knopf sitzt daneben
+   statt darunter -- dasselbe Bild wie .filter-bar in allen uebrigen
+   Bereichen. min-width haelt die Felder breit genug, bevor der Knopf
+   auf schmalen Bildschirmen umbricht. */
+.filter-card .filter-grid {
+    flex: 1;
+    min-width: 200px;
 }
 
 .filter-card h3 {
