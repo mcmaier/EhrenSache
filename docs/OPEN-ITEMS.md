@@ -222,6 +222,11 @@ erscheint als unentschuldigt abwesend.
 Entschieden wurde: erst sichtbar machen, dann sehen, ob es reicht. Der Filter in der
 Terminverwaltung zeigt den Bestand.
 
+**Stand 1.9.2:** Der Filter sitzt jetzt in der Filterleiste der Terminverwaltung und kennt drei
+Zustände — alle, nur automatisch erzeugte, nur von Hand angelegte. Die dritte Richtung fehlte
+bisher und ist genau die, die der unten angekündigte Bestandsvergleich braucht: Sie zeigt, was
+ohne die automatische Erzeugung übrig bliebe. Kalender und Kennzahlen filtern mit.
+
 **Offene Variante:** Ein Auto-Termin zählt erst, wenn Admin oder Manager ihn bestätigt hat.
 Preis: Eingriffe in `statistics.php` und den Bericht, plus ein Bestätigungsschritt in der
 Oberfläche.
@@ -2890,3 +2895,64 @@ einer Sitzungsnachricht stehen.
    sitzt in einem geschlossenen Modal und lässt sich ohne Anmeldung nicht messen.
 
 **Nicht sicherheitsrelevant:** beides Darstellung.
+
+---
+
+### OI-73 · `:has()`-Selektor hängt an einer Inline-Schreibweise
+**Priorität:** niedrig · aufgenommen am 2026-09-18
+
+[sections/content.css](../public/css/sections/content.css) schaltet die Spaltenzahl der
+Statistik-Filterkarte über
+
+```css
+.filter-grid:has(#statMemberFilterGroup[style*="display: none"])
+```
+
+Der Selektor trifft auf die **Zeichenfolge** des Inline-Styles. `statistics.js` setzt ihn heute
+als `display: none` mit Leerzeichen; schriebe jemand `display:none`, griffe die Regel
+stillschweigend nicht mehr, und die Karte bliebe zweispaltig mit einer leeren Spalte.
+
+Darunter stehen bereits `.filter-grid.single-filter` und `.filter-grid.dual-filter` — zwei
+Klassen, die genau dafür gedacht waren und die niemand setzt. Der saubere Weg wäre, sie in
+`statistics.js` zu vergeben und die beiden `:has()`-Regeln zu entfernen.
+
+**Nicht dringend:** Der heutige Zustand funktioniert. Es ist eine Falle für den Nächsten, kein
+Fehler. Aufgefallen bei den Filterleisten für 1.9.2 (Spec
+`2026-09-17-dashboard-filterleisten-design.md`), dort bewusst nicht mitgenommen.
+
+---
+
+### OI-74 · Der Cache-Bust erreicht nur einen Teil der Dateien
+**Priorität:** niedrig · aufgenommen am 2026-09-18
+
+Jede HTML-Einstiegsseite hängt `?v=<version>` an ihre Assets, und `tests/suites/assets.php`
+erzwingt, dass der Wert zu `version.json` passt. Im Dashboard erreicht das aber nur einen
+Bruchteil dessen, was sich ändert:
+
+- `public/index.html` bindet ein einziges Stylesheet ein, `css/main.css?v=…`. `main.css` lädt
+  alles Weitere per `@import url('…')` **ohne** Parameter — `components/*.css` und
+  `sections/*.css` bleiben vom Versionssprung unberührt.
+- Die ES-Module unter `js/modules/` tragen gar keinen Parameter; sie werden per `import`
+  nachgeladen, nicht per `<script src>`.
+
+Die PWA und die Station sind nicht betroffen: Sie binden je ein Stylesheet und ein `app.js`
+direkt ein, beide mit Parameter.
+
+Praktisch fällt das nicht auf, weil [public/.htaccess](../public/.htaccess) für `.css`, `.js`
+und `.html` `Cache-Control: no-cache, must-revalidate` setzt — der Browser fragt ohnehin jedes
+Mal nach. Der Block steht aber in `<IfModule mod_headers.c>`. Auf einem Hosting ohne
+`mod_headers` fehlen damit der Header **und** ein wirksamer Cache-Bust; ein Mitglied sähe nach
+einem Update alte Oberfläche zu neuer Logik, bis sein Browser-Cache von selbst verfällt.
+
+**Mögliche Antworten**, keine ohne Preis:
+
+- Die `@import`-Zeilen in `main.css` mit demselben Parameter versehen — ohne Build-Kette nur von
+  Hand pflegbar; `assets.php` müsste `main.css` mitprüfen.
+- Die Teil-Stylesheets einzeln in `index.html` einbinden — achtzehn `<link>`-Zeilen statt einer.
+- Für die Module eine Import-Map mit versionierten Pfaden — sauber, aber ein neues Konzept im
+  Projekt.
+
+Entschieden ist nichts. Aufgefallen, als die Spec für 1.9.2 den Versionssprung zunächst mit
+dem Cache begründete; die Begründung hielt der Prüfung nicht stand.
+
+**Nicht sicherheitsrelevant:** betrifft nur die Aktualität der Oberfläche.

@@ -135,6 +135,13 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | MEM-PUT-3 | Nicht existierende ID | 404 `"Member not found"` |
 | MEM-DEL-1 | Mitglied löschen | 200; CASCADE: records, exceptions, membership_dates gelöscht |
 
+### 5.4 Oberfläche (seit 1.9.2)
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| MEM-UI-1 | „Inaktive anzeigen" in der Filterleiste anhaken | Gesamtzahl der Liste steigt um die Zahl der Karte „Inaktive Mitglieder"; ohne Haken wieder zurück |
+| MEM-UI-2 | Karte „Inaktive Mitglieder" | Zeigt nur die Zahl, kein Bedienelement |
+
 ---
 
 ## 6. Terminverwaltung
@@ -161,6 +168,21 @@ Diese Tests systematisch mit allen Rollen durchführen:
 | APT-POST-3 | Ungültiges Datumsformat | 400 |
 | APT-PUT-1 | `type_id` ändern | 200, Gruppenfilterung aktualisiert |
 | APT-DEL-1 | Termin löschen | 200; CASCADE: Records und Exceptions gelöscht |
+
+### 6.3 Filterleiste im Dashboard (seit 1.9.2)
+
+Die Verdrahtung prüft `tests/suites/dashboard_filter_frontend.php` statisch. Hier steht, was
+nur im Browser sichtbar wird.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| APT-UI-1 | Terminart wählen | Tabelle, Kalender und Kennzahlkarten zeigen denselben Ausschnitt |
+| APT-UI-2 | Herkunft „Nur von Hand angelegte" | Automatisch erzeugte Termine verschwinden aus Tabelle und Kalender; Summe mit „Nur automatisch erzeugte" ergibt den Gesamtbestand |
+| APT-UI-3 | Mit gesetztem Filter im Kalender vor- und zurückblättern | Filter bleibt, Kalender ist nicht leer |
+| APT-UI-4 | Mit gesetztem Filter auf einen Kalendertag klicken | Popup zeigt nur gefilterte Termine |
+| APT-UI-5 | Jahr wechseln und zurück | Terminart-Filter bleibt erhalten, Kalender springt ins gewählte Jahr |
+| APT-UI-6 | „Filter zurücksetzen" | Beide Auswahlfelder leer, Seite 1, vollständige Liste |
+| APT-UI-7 | Als Rolle `user` | Herkunftsfeld unsichtbar; Terminartliste zeigt nur Arten mit mindestens einer eigenen Gruppe |
 
 ---
 
@@ -430,6 +452,7 @@ wie eine Messung, ohne eine zu sein.
 | STAT-10 | Terminart ohne Termine im gewählten Jahr | Spalte vorhanden, Wert „–" |
 | STAT-11 | Summe der `by_type`-Werte eines Mitglieds | ergibt seine Gesamtzahlen |
 | STAT-12 | Kopfzahlen gegen die Summe der Gruppentabellen | gleich, solange sich keine Terminarten überschneiden |
+| STAT-13 | „Filter zurücksetzen" (seit 1.9.2) | Steht rechts neben den Auswahlfeldern, Unterkanten bündig; auf schmalem Bildschirm bricht er mit Abstand unter die Felder um |
 
 ### 13.1 Anwesenheitsbericht (Druckansicht)
 

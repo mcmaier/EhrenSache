@@ -7,6 +7,27 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.9.2] – 2026-09-18
+
+### Geändert
+- **Die Terminverwaltung lässt sich nach Terminart filtern.** Sie war der einzige
+  Listenbereich ohne Filterleiste. Die Leiste sitzt wie in den übrigen Bereichen direkt unter
+  den Kennzahlen; Benutzer ohne Verwaltungsrechte sehen darin nur die Terminarten ihrer
+  Gruppen.
+- **Der Schalter für automatisch erzeugte Termine ist aus der Kennzahlkarte in die
+  Filterleiste gewandert** und kennt jetzt drei Zustände: alle, nur automatisch erzeugte, nur
+  von Hand angelegte. Die letzte Richtung fehlte bisher — sie zeigt, was ohne die automatische
+  Erzeugung übrig bliebe.
+- **Der Kalender berücksichtigt die Filter.** Bisher zeigte er unabhängig von jeder Auswahl
+  alle Termine des Jahres, während Tabelle und Kennzahlen darunter nur den gefilterten
+  Ausschnitt zählten.
+- In der Mitgliederverwaltung steht der Schalter „Inaktive anzeigen" in der Filterleiste; die
+  Kennzahlkarte zeigt nur noch die Zahl.
+- In der Statistik steht „Filter zurücksetzen" bündig neben den Auswahlfeldern statt ohne
+  Abstand darunter.
+
+---
+
 ## [1.9.1] – 2026-09-17
 
 ### Sicherheit
