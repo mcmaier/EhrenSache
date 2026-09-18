@@ -264,11 +264,13 @@ function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, arr
                                'title' => $conflict['title'], 'start_time' => $conflict['start_time']]];
                 continue;
             }
-            // Erfasste Daten (Anwesenheit, Rueckmeldung, Ausnahme, Arbeitszeit) haengen an
-            // der Puenktlichkeit dieses Termins -- Zeit oder Terminart aendern sich dafuer
-            // nicht mehr rueckwirkend. Andere Felder (Titel, Ort, Beschreibung, Ende) sind
-            // unkritisch und aendern sich auch bei erfassten Daten normal weiter unten.
-            if (appointmentHasData($db, $prefix, $row['appointment_id'])) {
+            // Nur eine erfasste ANWESENHEIT haengt an der Puenktlichkeit dieses Termins --
+            // Zeit oder Terminart aendern sich dafuer nicht mehr rueckwirkend. Eine
+            // Rueckmeldung, Ausnahme oder Arbeitszeit darf sich mit der Serie weiterbewegen
+            // (Hauptfall: ein zukuenftiger Probentermin, zu dem schon zugesagt wurde). Andere
+            // Felder (Titel, Ort, Beschreibung, Ende) sind ohnehin unkritisch und aendern
+            // sich auch bei erfasster Anwesenheit normal weiter unten.
+            if (appointmentHasAttendance($db, $prefix, $row['appointment_id'])) {
                 $detach->execute([$row['appointment_id']]);
                 $detached[] = ['appointment_id' => $row['appointment_id'], 'date' => $row['date'],
                                'reason' => 'has_data'];

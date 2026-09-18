@@ -845,3 +845,91 @@ test('PUT: from_date als Array erzeugt keine PHP-Warnung und liefert 400', funct
         asDropWorld($world);
     }
 });
+
+// ---- PUT: nur erfasste Anwesenheit haelt Beginn/Terminart fest ----------------
+
+/** Wie asWorld(), aber die Terminart erlaubt Rueckmeldungen und ein Mitglied kann sie geben. */
+function asWorldWithMember(array $typeSettings = []): array
+{
+    $suffix = uniqid();
+    $group = apiRequest('POST', 'member_groups', ['token' => apiToken('admin'),
+        'body' => ['group_name' => "ASR {$suffix}"]]);
+    assertStatus(201, $group);
+    $type = apiRequest('POST', 'appointment_types', ['token' => apiToken('admin'), 'body' => array_merge([
+        'type_name' => "ASR {$suffix}", 'is_default' => 0, 'color' => '#667eea',
+        'group_ids' => [(int) $group['body']['id']],
+    ], $typeSettings)]);
+    assertStatus(201, $type);
+    $member = apiRequest('POST', 'members', ['token' => apiToken('admin'), 'body' => [
+        'name' => 'AS', 'surname' => "Ruem {$suffix}", 'active' => 1, 'group_ids' => [(int) $group['body']['id']],
+    ]]);
+    assertStatus(201, $member);
+
+    return ['group' => (int) $group['body']['id'], 'type' => (int) $type['body']['id'],
+            'member' => (int) $member['body']['id']];
+}
+
+function asDropWorldWithMember(array $world): void
+{
+    apiRequest('DELETE', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $world['member']]]);
+    asDropWorld($world);
+}
+
+test('PUT: eine Rueckmeldung allein haelt den Beginn nicht fest -- die Serie bewegt sich weiter', function () {
+    $world = asWorldWithMember(['responses_enabled' => 1]);
+    try {
+        $sid = asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-11');
+        assertStatus(200, apiRequest('PUT', 'appointment_responses', ['token' => apiToken('admin'),
+            'query' => ['appointment_id' => $apt['appointment_id'], 'member_id' => $world['member']],
+            'body' => ['status' => 'yes']]));
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'start_time' => '19:00']);
+        assertStatus(200, $res);
+        assertSame(5, $res['body']['updated']);
+        assertSame([], $res['body']['detached']);
+        assertSame('19:00:00', asAptOn($world, '2031-03-11')['start_time']);
+    } finally {
+        asDropWorldWithMember($world);
+    }
+});
+
+test('PUT: eine erfasste Anwesenheit haelt eine reine Ende-Aenderung nicht ab', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-11');
+        asAddRecord((int) $apt['appointment_id']);
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'end_time' => '21:00']);
+        assertStatus(200, $res);
+        assertSame(5, $res['body']['updated']);
+        assertSame([], $res['body']['detached']);
+        assertSame('21:00:00', asAptOn($world, '2031-03-11')['end_time']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT: eine erfasste Anwesenheit haelt die Terminart fest', function () {
+    $world = asWorld();
+    $otherWorld = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-11');
+        asAddRecord((int) $apt['appointment_id']);
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'type_id' => $otherWorld['type']]);
+        assertStatus(200, $res);
+        assertSame(4, $res['body']['updated']);
+        assertSame(['2031-03-11'], array_column($res['body']['detached'], 'date'));
+        assertSame('has_data', $res['body']['detached'][0]['reason']);
+
+        $kept = asAptOn($world, '2031-03-11');
+        assertSame($world['type'], (int) $kept['type_id'], 'Bleibt bei der alten Terminart');
+        assertSame(1, (int) $kept['is_detached']);
+    } finally {
+        asDropWorld($world);
+        asDropWorld($otherWorld);
+    }
+});

@@ -132,3 +132,21 @@ function appointmentHasData(PDO $db, string $prefix, int $appointmentId): bool
 
     return false;
 }
+
+/**
+ * Haengt an dem Termin eine erfasste ANWESENHEIT (records)? Nur diese
+ * schuetzt die Puenktlichkeit vor einer Serienaktion, die Beginn oder
+ * Terminart aendert (FI-7, seriesHandleUpdateFollowing()): eine Rueckmeldung,
+ * Ausnahme oder Arbeitszeit darf sich mit der Serie weiterbewegen -- ein
+ * zukuenftiger Probentermin, zu dem Mitglieder schon zugesagt haben, muss
+ * verschiebbar bleiben. appointmentHasData() bleibt die strengere Pruefung
+ * vor dem Loeschen (DELETE appointment_series): dort ginge ein Loeschen
+ * auch Rueckmeldungen und Ausnahmen unwiderruflich verloren.
+ */
+function appointmentHasAttendance(PDO $db, string $prefix, int $appointmentId): bool
+{
+    $stmt = $db->prepare("SELECT 1 FROM {$prefix}records WHERE appointment_id = ? LIMIT 1");
+    $stmt->execute([$appointmentId]);
+
+    return (bool) $stmt->fetchColumn();
+}
