@@ -401,6 +401,121 @@ test('appointment_responses: upcoming listet nur Termine mit Rueckmeldung, zu de
     }
 });
 
+/** @return array<int, array> Eintraege nach appointment_id */
+function rsUpcoming(bool $withInfo): array
+{
+    $query = ['upcoming' => 1];
+    if ($withInfo) {
+        $query['with_info'] = 1;
+    }
+    $res = rsGet('user', $query);
+    assertStatus(200, $res);
+
+    $nachId = [];
+    foreach ($res['body']['appointments'] as $item) {
+        $nachId[(int) $item['appointment']['appointment_id']] = $item;
+    }
+    return $nachId;
+}
+
+test('upcoming mit with_info: Infotermine im 8-Wochen-Fenster, nicht darueber hinaus', function () {
+    $info = rsWorld('UpInfo');
+    try {
+        $nah  = rsAppointment($info, rsDateInDays(21), '19:00:00');
+        $fern = rsAppointment($info, rsDateInDays(70), '19:00:00');
+
+        rsWithUserInWorld($info, function () use ($nah, $fern) {
+            $liste = rsUpcoming(true);
+            assertTrue(isset($liste[$nah]), 'Infotermin in drei Wochen fehlt');
+            assertTrue(!isset($liste[$fern]), 'Infotermin in zehn Wochen gehoert nicht hinein');
+            assertSame(false, $liste[$nah]['appointment']['responses_enabled']);
+            assertTrue(array_key_exists('location', $liste[$nah]['appointment']), 'location fehlt im Infoeintrag');
+            assertTrue(array_key_exists('end_time', $liste[$nah]['appointment']), 'end_time fehlt im Infoeintrag');
+            assertTrue(!isset($liste[$nah]['summary']), 'Infoeintraege tragen keine Zaehlung');
+        });
+    } finally {
+        rsDropWorld($info);
+    }
+});
+
+test('upcoming: Rueckmeldetermine auch jenseits von 8 Wochen, mit und ohne with_info', function () {
+    $rm = rsWorld('UpFern', ['responses_enabled' => 1]);
+    try {
+        $fern = rsAppointment($rm, rsDateInDays(70), '19:00:00');
+
+        rsWithUserInWorld($rm, function () use ($fern) {
+            assertTrue(isset(rsUpcoming(true)[$fern]), 'Rueckmeldetermin in zehn Wochen fehlt (with_info)');
+            assertTrue(isset(rsUpcoming(false)[$fern]), 'Rueckmeldetermin in zehn Wochen fehlt (ohne)');
+            assertSame(true, rsUpcoming(true)[$fern]['appointment']['responses_enabled']);
+        });
+    } finally {
+        rsDropWorld($rm);
+    }
+});
+
+test('upcoming ohne with_info liefert keine Infotermine', function () {
+    // Schutz fuer einen PWA-Tab, der vor dem Update geoeffnet wurde: Sein
+    // alter Code kennt nur Rueckmeldekarten.
+    $info = rsWorld('UpAlt');
+    try {
+        $nah = rsAppointment($info, rsDateInDays(21), '19:00:00');
+        rsWithUserInWorld($info, function () use ($nah) {
+            assertTrue(!isset(rsUpcoming(false)[$nah]), 'Ohne with_info kein Infotermin');
+        });
+    } finally {
+        rsDropWorld($info);
+    }
+});
+
+test('upcoming mit with_info: Infotermin einer fremden Gruppe nie', function () {
+    $fremd = rsWorld('UpFremd');
+    try {
+        $nah = rsAppointment($fremd, rsDateInDays(21), '19:00:00');
+        assertTrue(!isset(rsUpcoming(true)[$nah]), 'Termin einer fremden Gruppe sichtbar');
+    } finally {
+        rsDropWorld($fremd);
+    }
+});
+
+test('upcoming: ein heute schon begonnener Termin bleibt bis Tagesende sichtbar', function () {
+    // Faellt nur kurz nach Mitternacht aus: Der Termin um 00:01 hat dann
+    // noch nicht begonnen. Das ist der einzige Zeitpunkt, an dem dieser Test
+    // nichts belegt.
+    $rm = rsWorld('UpHeute', ['responses_enabled' => 1]);
+    try {
+        $heute = rsAppointment($rm, date('Y-m-d'), '00:01:00');
+        rsWithUserInWorld($rm, function () use ($heute) {
+            $liste = rsUpcoming(true);
+            assertTrue(isset($liste[$heute]), 'Heutiger, begonnener Termin fehlt');
+            assertSame(true, $liste[$heute]['started']);
+        });
+    } finally {
+        rsDropWorld($rm);
+    }
+});
+
+test('upcoming mit with_info ist chronologisch sortiert', function () {
+    $rm   = rsWorld('UpSortRm', ['responses_enabled' => 1]);
+    $info = rsWorld('UpSortInfo');
+    try {
+        $spaeter = rsAppointment($info, rsDateInDays(20), '19:00:00');
+        $frueher = rsAppointment($rm, rsDateInDays(10), '19:00:00');
+
+        rsWithUserInWorld($rm, function () use ($info, $frueher, $spaeter) {
+            rsWithUserInWorld($info, function () use ($frueher, $spaeter) {
+                $ids = array_keys(rsUpcoming(true));
+                $a = array_search($frueher, $ids, true);
+                $b = array_search($spaeter, $ids, true);
+                assertTrue($a !== false && $b !== false && $a < $b,
+                    'Der fruehere Rueckmeldetermin muss vor dem spaeteren Infotermin stehen');
+            });
+        });
+    } finally {
+        rsDropWorld($rm);
+        rsDropWorld($info);
+    }
+});
+
 // ---- appointment_responses: Schreiben --------------------------------------
 
 test('PUT: Mitglied sagt zu, aendert die Bemerkung, sagt ab', function () {

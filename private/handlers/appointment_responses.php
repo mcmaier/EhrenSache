@@ -36,7 +36,7 @@ function handleAppointmentResponses($db, $database, $method, $authUserId, $authU
     switch ($method) {
         case 'GET':
             if (isset($_GET['upcoming'])) {
-                responsesGetUpcoming($db, $database, $authMemberId, $now, $globalHours);
+                responsesGetUpcoming($db, $database, $authMemberId, $now, $globalHours, isset($_GET['with_info']));
             } else {
                 responsesGetOne($db, $database, $isManager, $authMemberId, $now, $globalHours);
             }
@@ -75,7 +75,7 @@ function responsesQueryInt(string $key): ?int
     return (ctype_digit($raw) && (int) $raw > 0) ? (int) $raw : -1;
 }
 
-function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $globalHours): void
+function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $globalHours, bool $withInfo = false): void
 {
     if ($memberId === null) {
         echo json_encode(['appointments' => []]);
@@ -90,6 +90,16 @@ function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $
             // Die Liste ist zum Antworten da, die Planung sitzt im Dashboard.
             $items[] = responsesPayload($db, $database, $apt, false, $memberId, $now, $globalHours);
         }
+    }
+
+    // Termine ohne Rueckmeldung nur auf Anforderung (seit 1.10.0). Ein
+    // PWA-Tab, der vor dem Update geoeffnet wurde, fragt ohne with_info und
+    // haelt Code, der nur Rueckmeldekarten kennt.
+    if ($withInfo) {
+        $items = array_merge($items, responsesFetchUpcomingInfo($db, $database, $memberId, $now));
+        usort($items, static fn ($a, $b) =>
+            strcmp($a['appointment']['date'] . ' ' . $a['appointment']['start_time'],
+                   $b['appointment']['date'] . ' ' . $b['appointment']['start_time']));
     }
 
     echo json_encode(['appointments' => $items], JSON_UNESCAPED_UNICODE);
@@ -162,6 +172,10 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
             'type_id'        => $apt['type_id'] === null ? null : (int) $apt['type_id'],
             'type_name'      => $apt['type_name'],
             'color'          => $apt['color'],
+            'end_time'          => $apt['end_time'] ?? null,
+            'location'          => $apt['location'] ?? null,
+            'description'       => $apt['description'] ?? null,
+            'responses_enabled' => (int) $apt['responses_enabled'] === 1,
         ],
         'settings' => [
             'names_visible'  => (int) $apt['responses_names_visible'] === 1,

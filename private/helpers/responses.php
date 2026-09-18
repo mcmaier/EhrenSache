@@ -32,6 +32,9 @@ const RESPONSE_DEADLINE_MAX_HOURS = 720;
 
 const RESPONSE_COMMENT_MAX_LENGTH = 255;
 
+/** Fenster fuer Termine ohne Rueckmeldung in der PWA-Terminliste: acht Wochen. */
+const UPCOMING_INFO_DAYS = 56;
+
 /** Vorgaben einer Terminart ohne Rueckmeldung. */
 const RESPONSE_TYPE_DEFAULTS = [
     'responses_enabled'        => 0,
@@ -322,7 +325,8 @@ function responsesFetchAppointment($db, $database, int $appointmentId): ?array
 {
     $prefix = $database->table('');
     $stmt = $db->prepare("
-        SELECT a.appointment_id, a.title, a.date, a.start_time, a.type_id,
+        SELECT a.appointment_id, a.title, a.date, a.start_time, a.end_time, a.location, a.description,
+               a.type_id,
                t.type_name, t.color,
                COALESCE(t.responses_enabled, 0)        AS responses_enabled,
                COALESCE(t.responses_names_visible, 0)  AS responses_names_visible,
@@ -410,6 +414,11 @@ function responsesFetchPresentMemberIds($db, $database, int $appointmentId): arr
  * Kommende Termine mit Rueckmeldung, zu denen das Mitglied erwartet ist.
  * Begrenzt auf 50: Die Liste ist zum Antworten da, nicht als Jahresplan.
  *
+ * Termine von heute bleiben bis Tagesende enthalten, auch wenn sie schon
+ * begonnen haben (seit 1.10.0): Auf dem Weg zum Termin will man ihn noch
+ * nachsehen. Der Payload traegt dann started = true; eine eigene
+ * Rueckmeldung nimmt der Server nach Beginn ohnehin nicht mehr an.
+ *
  * @return array<int, int>
  */
 function responsesFetchUpcomingIds($db, $database, int $memberId, string $now): array
@@ -425,13 +434,65 @@ function responsesFetchUpcomingIds($db, $database, int $memberId, string $now): 
         JOIN {$prefix}member_group_assignments mga
              ON mga.group_id = atg.group_id AND mga.member_id = ?
         JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activity}
-        WHERE a.date >= DATE(?) AND CONCAT(a.date, ' ', a.start_time) > ?
+        WHERE a.date >= DATE(?)
         ORDER BY a.date, a.start_time
         LIMIT 50
     ");
-    $stmt->execute([$memberId, $now, $now]);
+    $stmt->execute([$memberId, $now]);
 
     return array_map(static fn ($r) => (int) $r['appointment_id'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+}
+
+/**
+ * Kommende Termine OHNE Rueckmeldung fuer die PWA-Terminliste (seit 1.10.0):
+ * dieselben Gruppen- und Aktivitaetsregeln wie responsesFetchUpcomingIds(),
+ * aber nur Terminarten ohne Rueckmeldung und nur im Fenster von heute bis
+ * UPCOMING_INFO_DAYS Tage voraus.
+ *
+ * @return array<int, array> schlanke Eintraege, siehe responsesInfoItem()
+ */
+function responsesFetchUpcomingInfo($db, $database, int $memberId, string $now): array
+{
+    $prefix   = $database->table('');
+    $activity = getMemberActivityWhere('m', 'a.date');
+    $tage     = (int) UPCOMING_INFO_DAYS;
+
+    $stmt = $db->prepare("
+        SELECT DISTINCT a.appointment_id, a.title, a.date, a.start_time, a.end_time,
+               a.location, a.description, a.type_id, t.type_name, t.color
+        FROM {$prefix}appointments a
+        JOIN {$prefix}appointment_types t
+             ON t.type_id = a.type_id AND COALESCE(t.responses_enabled, 0) = 0
+        JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
+        JOIN {$prefix}member_group_assignments mga
+             ON mga.group_id = atg.group_id AND mga.member_id = ?
+        JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activity}
+        WHERE a.date BETWEEN DATE(?) AND DATE(?) + INTERVAL {$tage} DAY
+        ORDER BY a.date, a.start_time
+    ");
+    $stmt->execute([$memberId, $now, $now]);
+
+    return array_map('responsesInfoItem', $stmt->fetchAll(PDO::FETCH_ASSOC));
+}
+
+/** Schlanker Eintrag ohne Zaehlung und Namen. */
+function responsesInfoItem(array $row): array
+{
+    return [
+        'appointment' => [
+            'appointment_id'    => (int) $row['appointment_id'],
+            'title'             => $row['title'],
+            'date'              => $row['date'],
+            'start_time'        => $row['start_time'],
+            'end_time'          => $row['end_time'],
+            'location'          => $row['location'],
+            'description'       => $row['description'],
+            'type_id'           => $row['type_id'] === null ? null : (int) $row['type_id'],
+            'type_name'         => $row['type_name'],
+            'color'             => $row['color'],
+            'responses_enabled' => false,
+        ],
+    ];
 }
 
 /**
