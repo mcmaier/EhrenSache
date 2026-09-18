@@ -11,7 +11,7 @@
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
-import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml } from './utils.js';
+import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange } from './utils.js';
 import { loadTypes } from './management.js';
 import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
@@ -73,6 +73,8 @@ async function loadAppointmentData(appointmentId) {
         document.getElementById('appointment_description').value = apt.description || '';
         document.getElementById('appointment_date').value = apt.date;
         document.getElementById('appointment_time').value = apt.start_time;
+        document.getElementById('appointment_end_time').value = apt.end_time ? apt.end_time.substring(0, 5) : '';
+        document.getElementById('appointment_location').value = apt.location || '';
     }
 }
 
@@ -234,7 +236,10 @@ async function renderAppointments(appointments, page = 1) {
             if (apt.date && apt.start_time) {
                 const aptDate = new Date(apt.date + 'T00:00:00');
                 const formattedAptDate = aptDate.toLocaleDateString('de-DE');
-                appointmentInfo += `<br><small style="color: #7f8c8d;">${formattedAptDate}, ${apt.start_time.substring(0, 5)}</small>`;
+                appointmentInfo += `<br><small style="color: #7f8c8d;">${formattedAptDate}, ${formatTimeRange(apt.start_time, apt.end_time)}</small>`;
+                if (apt.location) {
+                    appointmentInfo += `<br><small style="color: #7f8c8d;">📍 ${escapeHtml(apt.location)}</small>`;
+                }
             }
             
             appointmentInfo += '</div>';
@@ -663,12 +668,13 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
 
         html += `
             <div class="calendar-event-item">
-                <div class="calendar-event-time">${apt.start_time ? apt.start_time.substring(0, 5) : ''}</div>
+                <div class="calendar-event-time">${formatTimeRange(apt.start_time, apt.end_time)}</div>
                 <div>
                     ${escapeHtml(apt.title)}
                     ${typeBadge}
                 </div>
                 ${apt.description ? `<div style="font-size: 11px; color: #7f8c8d;">${escapeHtml(apt.description)}</div>` : ''}
+                ${apt.location ? `<div style="font-size: 11px; color: #7f8c8d;">📍 ${escapeHtml(apt.location)}</div>` : ''}
                 ${apt.responses ? calendarResponseLineHtml(apt, fest) : ''}
             </div>
         `;
@@ -742,12 +748,22 @@ function nextMonth() {
 // MODAL FUNCTIONS
 // ============================================
 
+/** Vorschlaege fuer das Ortsfeld: bisher verwendete Orte, vom Server (FI-23). */
+async function fillLocationSuggestions() {
+    const list = document.getElementById('appointmentLocations');
+    if (!list) return;
+    const orte = await apiCall('appointments', 'GET', null, { locations: 1 });
+    list.innerHTML = (Array.isArray(orte) ? orte : [])
+        .map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
+}
+
 export async function openAppointmentModal(appointmentId = null) {
     const modal = document.getElementById('appointmentModal');
     const title = document.getElementById('appointmentModalTitle');
-    
+
     // Lade Terminarten
     await loadAppointmentTypes();
+    await fillLocationSuggestions();
 
     if (appointmentId) {
         title.textContent = 'Termin bearbeiten';
@@ -795,7 +811,9 @@ export async function saveAppointment() {
         type_id: parseInt(document.getElementById('appointment_type').value) || null,        
         description: document.getElementById('appointment_description').value || null,
         date: document.getElementById('appointment_date').value,
-        start_time: document.getElementById('appointment_time').value
+        start_time: document.getElementById('appointment_time').value,
+        end_time: document.getElementById('appointment_end_time').value || null,
+        location: document.getElementById('appointment_location').value.trim() || null
     };
     
     let result;

@@ -139,3 +139,14 @@ export function getCompatibleMembers(appointment, members, types) {
         m.group_ids_array.some(gid => typeGroupIds.includes(gid))
     );
 }
+
+/**
+ * "19:30–22:00", oder nur "19:30", wenn kein Ende gesetzt ist (FI-23).
+ * Ein Ende vor dem Beginn meint den Folgetag und wird ohne Zusatz gezeigt --
+ * "20:00–01:00" ist aus den Zahlen verstaendlich.
+ */
+export function formatTimeRange(startTime, endTime) {
+    const start = String(startTime || '').substring(0, 5);
+    const end = endTime ? String(endTime).substring(0, 5) : '';
+    return end ? `${start}–${end}` : start;
+}
