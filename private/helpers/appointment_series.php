@@ -240,14 +240,20 @@ function seriesInsertRow(PDO $db, string $prefix, array $def, ?int $createdBy): 
  * @param int[]   $excludeIds Termine, die fuer die Kollision nicht zaehlen (Split)
  * @param ?string $anchorDate Beginn der Serie, an dem der Wochentakt haengt (Fortsetzen);
  *                            null = $from
- * @return array<int, array{date: string, holiday: ?string, conflict: ?array, excluded: bool}>
+ * @param string[] $lockedDates Gespeicherte bzw. uebernommene Ausfaelle der Serie: immer
+ *                              abgewaehlt und mit locked: true gekennzeichnet -- der Server
+ *                              wendet sie beim Schreiben stets erneut an, die Oberflaeche
+ *                              zeigt sie deshalb nicht anwaehlbar. Vom Aufrufer im
+ *                              Anfragekoerper gesendete exdates bleiben locked: false.
+ * @return array<int, array{date: string, holiday: ?string, conflict: ?array, excluded: bool, locked: bool}>
  */
 function seriesPlan(PDO $db, string $prefix, array $rule, string $from, string $until, array $exdates,
                     array $template, int $toleranceHours, string $region, array $excludeIds = [],
-                    ?string $anchorDate = null): array
+                    ?string $anchorDate = null, array $lockedDates = []): array
 {
     $holidays = holidaysBetween($from, $until, $region === '' ? null : $region);
     $excluded = array_flip($exdates);
+    $locked   = array_flip($lockedDates);
     $out = [];
 
     foreach (expandOccurrences($rule, $from, $until, [], $anchorDate) as $date) {
@@ -261,7 +267,8 @@ function seriesPlan(PDO $db, string $prefix, array $rule, string $from, string $
                 'title'          => $conflict['title'],
                 'start_time'     => $conflict['start_time'],
             ],
-            'excluded' => isset($excluded[$date]),
+            'excluded' => isset($excluded[$date]) || isset($locked[$date]),
+            'locked'   => isset($locked[$date]),
         ];
     }
 

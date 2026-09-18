@@ -143,6 +143,8 @@ test('Vorschau liefert alle Daten und schreibt nichts', function () {
         assertSame(['2031-03-04', '2031-03-11', '2031-03-18', '2031-03-25', '2031-04-01'],
             array_column($res['body']['occurrences'], 'date'));
         assertSame(5, $res['body']['count']);
+        assertSame([false, false, false, false, false], array_column($res['body']['occurrences'], 'locked'),
+            'Beim Anlegen ist nichts gesperrt');
         assertSame([], asAppointments($world), 'Die Vorschau darf nichts anlegen');
     } finally {
         asDropWorld($world);
@@ -1124,7 +1126,18 @@ test('Split uebernimmt Ausfaelle der alten Serie ab dem Datum: ein einzeln geloe
         assertStatus(200, $preview);
         $excluded = array_column($preview['body']['occurrences'], 'excluded', 'date');
         assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => false], $excluded);
+        assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => false],
+            array_column($preview['body']['occurrences'], 'locked', 'date'), 'uebernommener Ausfall ist gesperrt');
         assertSame(2, $preview['body']['count']);
+
+        // Ein im Anfragekoerper abgewaehltes Datum ist abgewaehlt, aber nicht gesperrt.
+        $own = asSeriesPost(array_merge($body, ['exdates' => ['2031-04-01']]),
+            ['id' => $sid, 'action' => 'split', 'preview' => 1]);
+        assertStatus(200, $own);
+        assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => true],
+            array_column($own['body']['occurrences'], 'excluded', 'date'));
+        assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => false],
+            array_column($own['body']['occurrences'], 'locked', 'date'));
 
         $res = asSeriesPost($body, ['id' => $sid, 'action' => 'split']);
         assertStatus(201, $res);
@@ -1186,6 +1199,17 @@ test('Fortsetzen beachtet gespeicherte exdates im neuen Bereich', function () {
         assertStatus(200, $preview);
         assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => false],
             array_column($preview['body']['occurrences'], 'excluded', 'date'));
+        assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => false],
+            array_column($preview['body']['occurrences'], 'locked', 'date'), 'gespeicherter Ausfall ist gesperrt');
+
+        // Ein im Anfragekoerper abgewaehltes Datum ist abgewaehlt, aber nicht gesperrt.
+        $own = asSeriesPost(['until' => '2031-04-01', 'exdates' => ['2031-04-01']],
+            ['id' => $sid, 'action' => 'extend', 'preview' => 1]);
+        assertStatus(200, $own);
+        assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => true],
+            array_column($own['body']['occurrences'], 'excluded', 'date'));
+        assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => false],
+            array_column($own['body']['occurrences'], 'locked', 'date'));
 
         $res = asSeriesPost(['until' => '2031-04-01'], ['id' => $sid, 'action' => 'extend']);
         assertStatus(200, $res);

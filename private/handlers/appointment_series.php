@@ -323,14 +323,16 @@ function seriesHandleSplit(PDO $db, string $prefix, array $series, array $raw, b
         return;
     }
     // Ausfaelle der alten Serie ab from_date gehen auf die neue ueber -- sonst kaeme
-    // ein einzeln geloeschter Termin mit einer blossen Zeitaenderung zurueck. Die
-    // Vorschau zeigt sie als abgewaehlt; die Oberflaeche kann sie wieder anhaken.
+    // ein einzeln geloeschter Termin mit einer blossen Zeitaenderung zurueck. Der
+    // Server wendet sie immer an (auch nach der Sperre unten erneut); die Vorschau
+    // kennzeichnet sie als locked, die Oberflaeche zeigt sie nicht anwaehlbar.
+    $carried = seriesCarriedExdates($series, $from);
     $def['exdates'] = seriesCarryExdates($def['exdates'], $series, $from);
 
     // Termine, die das Beenden loescht, zaehlen in der Vorschau nicht als Kollision.
     $removable = seriesDeletableFollowing($db, $prefix, $series['series_id'], $from);
     $plan = seriesPlan($db, $prefix, $def['rule'], $def['start_date'], $def['until'], $def['exdates'],
-                       $def['template'], $tol, $region, $removable);
+                       $def['template'], $tol, $region, $removable, null, $carried);
     if ($plan === []) {
         seriesRespond(400, ['message' => 'Die Regel ergibt in diesem Zeitraum keinen Termin']);
         return;
@@ -410,7 +412,7 @@ function seriesHandleExtend(PDO $db, string $prefix, array $series, array $raw, 
     $template = seriesTemplateOf($series);
     // Der Wochentakt (alle n Wochen) haengt am Serienbeginn, nicht am neuen Bereich.
     $plan = seriesPlan($db, $prefix, parseRrule($series['rrule']), $from, $newUntil, $exdates, $template, $tol, $region,
-                       [], $series['start_date']);
+                       [], $series['start_date'], $series['exdates']);
 
     if ($plan === []) {
         seriesRespond(400, ['message' => 'Die Regel ergibt im neuen Zeitraum keinen Termin']);
@@ -425,8 +427,9 @@ function seriesHandleExtend(PDO $db, string $prefix, array $series, array $raw, 
     $db->beginTransaction();
     // Serienzeile sperren und neu lesen: ein zweiter Aufruf (Doppelklick) wartet
     // hier und scheitert danach am bereits verschobenen Ende, statt Termine doppelt anzulegen.
+    // Jede Aenderung von until macht $from und den Plan ungueltig -- dann lieber 409.
     $locked = seriesLoad($db, $prefix, $series['series_id'], true);
-    if ($locked === null || $newUntil <= $locked['until']) {
+    if ($locked === null || $locked['until'] !== $series['until']) {
         $db->rollBack();
         seriesRespond(409, ['message' => 'Die Serie wurde inzwischen geändert']);
         return;
@@ -454,9 +457,18 @@ function seriesHandleExtend(PDO $db, string $prefix, array $series, array $raw, 
  */
 function seriesCarryExdates(array $exdates, array $oldSeries, string $from): array
 {
-    $carried = array_filter($oldSeries['exdates'], fn ($d): bool => is_string($d) && $d >= $from);
-    $dates = array_values(array_unique(array_merge($exdates, $carried)));
+    $dates = array_values(array_unique(array_merge($exdates, seriesCarriedExdates($oldSeries, $from))));
     sort($dates);
 
     return $dates;
+}
+
+/**
+ * Ausfaelle der alten Serie ab $from -- die, die ein Split uebernimmt.
+ *
+ * @return string[]
+ */
+function seriesCarriedExdates(array $oldSeries, string $from): array
+{
+    return array_values(array_filter($oldSeries['exdates'], fn ($d): bool => is_string($d) && $d >= $from));
 }
