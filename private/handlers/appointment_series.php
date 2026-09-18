@@ -62,6 +62,14 @@ function handleAppointmentSeries($db, $database, $method, $id): void
                     seriesHandleCreate($db, $prefix, $raw, $preview, $tol, $region);
                     return;
                 }
+                if ($action === 'split') {
+                    seriesHandleSplit($db, $prefix, $series, $raw, $preview, $tol, $region);
+                    return;
+                }
+                if ($action === 'extend') {
+                    seriesHandleExtend($db, $prefix, $series, $raw, $preview, $tol, $region);
+                    return;
+                }
                 seriesRespond(400, ['message' => 'Unbekannte Aktion']);
                 return;
 
@@ -285,4 +293,124 @@ function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, arr
     $db->commit();
 
     seriesRespond(200, ['updated' => $updated, 'detached' => $detached]);
+}
+
+/**
+ * "Dieser und alle folgenden" MIT Regelaenderung: alte Serie ab from_date
+ * beenden (wie DELETE ?from), neue Serie ab from_date anlegen (wie POST) --
+ * in einer Transaktion. Ist from_date der Serienbeginn, endet die alte Serie
+ * ganz (seriesEndFrom() loescht ihre Zeile).
+ */
+function seriesHandleSplit(PDO $db, string $prefix, array $series, array $raw, bool $preview, int $tol, string $region): void
+{
+    // is_string statt (string)-Cast, wie bei PUT/DELETE.
+    $fromRaw = $raw['from_date'] ?? '';
+    $from = is_string($fromRaw) ? $fromRaw : '';
+    if (!seriesDateInRange($from, $series)) {
+        seriesRespond(400, ['message' => 'Das Datum liegt nicht innerhalb der Serie']);
+        return;
+    }
+    $raw['start_date'] = $from;
+
+    $fehler = seriesResolveType($db, $prefix, $raw);
+    if ($fehler !== null) {
+        seriesRespond(400, ['message' => $fehler]);
+        return;
+    }
+    [$def, $fehler] = seriesDefinitionFromRequest($raw);
+    if ($fehler !== null) {
+        seriesRespond(400, ['message' => $fehler]);
+        return;
+    }
+
+    // Termine, die das Beenden loescht, zaehlen in der Vorschau nicht als Kollision.
+    $removable = seriesDeletableFollowing($db, $prefix, $series['series_id'], $from);
+    $plan = seriesPlan($db, $prefix, $def['rule'], $def['start_date'], $def['until'], $def['exdates'],
+                       $def['template'], $tol, $region, $removable);
+    if ($plan === []) {
+        seriesRespond(400, ['message' => 'Die Regel ergibt in diesem Zeitraum keinen Termin']);
+        return;
+    }
+    if ($preview) {
+        seriesRespond(200, ['occurrences' => $plan, 'count' => seriesSelectableCount($plan),
+                            'removes' => count($removable)]);
+        return;
+    }
+
+    $createdBy = getCurrentUserId() === null ? null : (int) getCurrentUserId();
+    $db->beginTransaction();
+    // Erst beenden: die geloeschten Termine duerfen der neuen Serie nicht als Kollision im Weg stehen.
+    $ended = seriesEndFrom($db, $prefix, $series, $from);
+    $newId = seriesInsertRow($db, $prefix, $def, $createdBy);
+    $dates = array_column(array_filter($plan, fn (array $o): bool => !$o['excluded']), 'date');
+    $result = seriesInsertOccurrences($db, $prefix, $newId, $def['template'], $dates, $tol, $createdBy);
+
+    if ($result['created'] === 0) {
+        $db->rollBack();
+        seriesRespond(409, ['message' => 'Alle Termine der neuen Regel kollidieren oder sind abgewählt',
+                            'skipped' => $result['skipped']]);
+        return;
+    }
+
+    seriesSaveExdates($db, $prefix, $newId, array_merge($def['exdates'], $result['skipped_dates']));
+    $db->commit();
+
+    seriesRespond(201, ['series_id' => $newId, 'created' => $result['created'], 'skipped' => $result['skipped'],
+                        'removed' => $ended['removed'], 'detached' => $ended['detached'],
+                        'series_deleted' => $ended['series_deleted']]);
+}
+
+/** "Serie fortsetzen": neues Ende, Termine im Bereich (altes Ende, neues Ende]. */
+function seriesHandleExtend(PDO $db, string $prefix, array $series, array $raw, bool $preview, int $tol, string $region): void
+{
+    // is_string statt (string)-Cast, wie bei PUT/DELETE.
+    $untilRaw = $raw['until'] ?? '';
+    $newUntil = is_string($untilRaw) ? $untilRaw : '';
+    if (!seriesIsValidDate($newUntil)) {
+        seriesRespond(400, ['message' => 'Ungültiges Enddatum']);
+        return;
+    }
+    if ($newUntil <= $series['until']) {
+        seriesRespond(400, ['message' => 'Das neue Ende muss nach dem bisherigen liegen']);
+        return;
+    }
+    if ($newUntil > seriesMaxUntil($series['until'])) {
+        seriesRespond(400, ['message' => 'Eine Serie lässt sich um höchstens ' . SERIES_MAX_MONTHS . ' Monate fortsetzen']);
+        return;
+    }
+    [$extra, $fehler] = seriesNormalizeExdates($raw['exdates'] ?? null);
+    if ($fehler !== null) {
+        seriesRespond(400, ['message' => $fehler]);
+        return;
+    }
+
+    // max() haelt den Anker (start_date) sicher <= $from, auch falls until je vor
+    // start_date laege. Beenden ab dem Serienbeginn loescht die Serie zwar ganz,
+    // die Absicherung kostet aber nichts.
+    $from = max(seriesAddDays($series['until'], 1), $series['start_date']);
+    $exdates = array_merge($series['exdates'], $extra);
+    $template = seriesTemplateOf($series);
+    // Der Wochentakt (alle n Wochen) haengt am Serienbeginn, nicht am neuen Bereich.
+    $plan = seriesPlan($db, $prefix, parseRrule($series['rrule']), $from, $newUntil, $exdates, $template, $tol, $region,
+                       [], $series['start_date']);
+
+    if ($plan === []) {
+        seriesRespond(400, ['message' => 'Die Regel ergibt im neuen Zeitraum keinen Termin']);
+        return;
+    }
+    if ($preview) {
+        seriesRespond(200, ['occurrences' => $plan, 'count' => seriesSelectableCount($plan)]);
+        return;
+    }
+
+    $createdBy = getCurrentUserId() === null ? null : (int) getCurrentUserId();
+    $db->beginTransaction();
+    $dates = array_column(array_filter($plan, fn (array $o): bool => !$o['excluded']), 'date');
+    $result = seriesInsertOccurrences($db, $prefix, $series['series_id'], $template, $dates, $tol, $createdBy);
+    $db->prepare("UPDATE {$prefix}appointment_series SET `until` = ? WHERE series_id = ?")
+       ->execute([$newUntil, $series['series_id']]);
+    seriesSaveExdates($db, $prefix, $series['series_id'], array_merge($exdates, $result['skipped_dates']));
+    $db->commit();
+
+    seriesRespond(200, ['created' => $result['created'], 'skipped' => $result['skipped']]);
 }

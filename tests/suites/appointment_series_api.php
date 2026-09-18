@@ -933,3 +933,178 @@ test('PUT: eine erfasste Anwesenheit haelt die Terminart fest', function () {
         asDropWorld($otherWorld);
     }
 });
+
+// ---- Split und Fortsetzen ----------------------------------------------------
+
+test('Split: alte Serie endet am Vortag, neue Serie ab dem Datum, Termine mit Daten bleiben abgeloest', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        asAddRecord((int) asAptOn($world, '2031-03-25')['appointment_id']);
+
+        $body = asSeriesBody($world, ['rrule' => 'FREQ=WEEKLY;BYDAY=TH', 'from_date' => '2031-03-18', 'until' => '2031-04-03']);
+        unset($body['start_date']);
+
+        $preview = asSeriesPost($body, ['id' => $sid, 'action' => 'split', 'preview' => 1]);
+        assertStatus(200, $preview);
+        assertSame(['2031-03-20', '2031-03-27', '2031-04-03'], array_column($preview['body']['occurrences'], 'date'));
+        assertSame(2, $preview['body']['removes']);
+        assertSame(5, count(asAppointments($world)), 'Vorschau schreibt nichts');
+
+        $res = asSeriesPost($body, ['id' => $sid, 'action' => 'split']);
+        assertStatus(201, $res);
+        assertSame(3, $res['body']['created']);
+        assertSame(2, $res['body']['removed']);
+        assertSame(['2031-03-25'], array_column($res['body']['detached'], 'date'));
+        assertSame(false, $res['body']['series_deleted']);
+
+        assertSame(['2031-03-04', '2031-03-11', '2031-03-20', '2031-03-25', '2031-03-27', '2031-04-03'],
+            array_column(asAppointments($world), 'date'));
+        assertSame('2031-03-17', asSeriesGet($sid)['until']);
+        $new = asSeriesGet((int) $res['body']['series_id']);
+        assertSame('2031-03-18', $new['start_date']);
+        assertSame('FREQ=WEEKLY;INTERVAL=1;BYDAY=TH', $new['rrule']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Split ab dem Serienbeginn: alte Serie entfaellt ganz, Termin mit Daten wird Einzeltermin', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        asAddRecord((int) asAptOn($world, '2031-03-11')['appointment_id']);
+
+        $body = asSeriesBody($world, ['rrule' => 'FREQ=WEEKLY;BYDAY=TH', 'from_date' => '2031-03-04', 'until' => '2031-03-27']);
+        unset($body['start_date']);
+
+        $res = asSeriesPost($body, ['id' => $sid, 'action' => 'split']);
+        assertStatus(201, $res);
+        assertSame(4, $res['body']['created']);
+        assertSame(4, $res['body']['removed']);
+        assertSame(['2031-03-11'], array_column($res['body']['detached'], 'date'));
+        assertSame(true, $res['body']['series_deleted']);
+
+        assertStatus(404, apiRequest('GET', 'appointment_series', ['token' => apiToken('admin'), 'query' => ['id' => $sid]]));
+        $kept = asAptOn($world, '2031-03-11');
+        assertSame(null, $kept['series_id']);
+        assertSame(0, (int) $kept['is_detached']);
+
+        $new = asSeriesGet((int) $res['body']['series_id']);
+        assertSame('2031-03-04', $new['start_date']);
+        assertSame(4, $new['appointment_count']);
+        assertSame(['2031-03-06', '2031-03-11', '2031-03-13', '2031-03-20', '2031-03-27'],
+            array_column(asAppointments($world), 'date'));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Split: legt die neue Regel keinen Termin an, bleibt die alte Serie unveraendert (409, Rollback)', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $body = asSeriesBody($world, ['rrule' => 'FREQ=WEEKLY;BYDAY=TH', 'from_date' => '2031-03-18',
+                                      'until' => '2031-03-27', 'exdates' => ['2031-03-20', '2031-03-27']]);
+        unset($body['start_date']);
+
+        assertStatus(409, asSeriesPost($body, ['id' => $sid, 'action' => 'split']));
+        assertSame(5, count(asAppointments($world)));
+        assertSame('2031-04-01', asSeriesGet($sid)['until']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Split: Datum ausserhalb der Serie liefert 400', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $body = asSeriesBody($world, ['from_date' => '2031-05-01', 'until' => '2031-06-01']);
+        assertStatus(400, asSeriesPost($body, ['id' => $sid, 'action' => 'split']));
+        $body = asSeriesBody($world, ['from_date' => ['2031-03-18'], 'until' => '2031-04-01']);
+        assertStatus(400, asSeriesPost($body, ['id' => $sid, 'action' => 'split']));
+        assertSame(5, count(asAppointments($world)));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Fortsetzen erzeugt nur den neuen Zeitraum und beachtet exdates', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $preview = asSeriesPost(['until' => '2031-04-22'], ['id' => $sid, 'action' => 'extend', 'preview' => 1]);
+        assertStatus(200, $preview);
+        assertSame(['2031-04-08', '2031-04-15', '2031-04-22'], array_column($preview['body']['occurrences'], 'date'));
+
+        $res = asSeriesPost(['until' => '2031-04-22', 'exdates' => ['2031-04-15']], ['id' => $sid, 'action' => 'extend']);
+        assertStatus(200, $res);
+        assertSame(2, $res['body']['created']);
+
+        assertSame(['2031-03-04', '2031-03-11', '2031-03-18', '2031-03-25', '2031-04-01', '2031-04-08', '2031-04-22'],
+            array_column(asAppointments($world), 'date'));
+        $series = asSeriesGet($sid);
+        assertSame('2031-04-22', $series['until']);
+        assertTrue(in_array('2031-04-15', $series['exdates'], true));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Fortsetzen haelt den Zwei-Wochen-Takt des Serienbeginns', function () {
+    $world = asWorld();
+    try {
+        // Alle zwei Wochen dienstags: 04.03., 18.03., 01.04.; Ende 07.04. (kein Termin in der Woche)
+        $sid = asCreateSeries($world, ['rrule' => 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU', 'until' => '2031-04-07']);
+        $res = asSeriesPost(['until' => '2031-05-01'], ['id' => $sid, 'action' => 'extend', 'preview' => 1]);
+        assertStatus(200, $res);
+        assertSame(['2031-04-15', '2031-04-29'], array_column($res['body']['occurrences'], 'date'));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Fortsetzen setzt an until + 1 an', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        // Der einzeln geloeschte 01.04. liegt vor dem neuen Bereich und bleibt weg.
+        $apt = asAptOn($world, '2031-04-01');
+        assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $apt['appointment_id']]]));
+        $res = asSeriesPost(['until' => '2031-04-08'], ['id' => $sid, 'action' => 'extend']);
+        assertStatus(200, $res);
+        assertSame(1, $res['body']['created'], 'nur der 08.04.');
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Fortsetzen: Ende nicht nach dem bisherigen oder mehr als 12 Monate liefert 400', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        assertStatus(400, asSeriesPost(['until' => '2031-04-01'], ['id' => $sid, 'action' => 'extend']));
+        assertStatus(400, asSeriesPost(['until' => '2032-04-02'], ['id' => $sid, 'action' => 'extend']));
+        assertStatus(400, asSeriesPost(['until' => 'bald'], ['id' => $sid, 'action' => 'extend']));
+        assertStatus(400, asSeriesPost(['until' => ['2031-04-22']], ['id' => $sid, 'action' => 'extend']));
+        assertStatus(400, asSeriesPost(['until' => '2031-04-22', 'exdates' => 'x'], ['id' => $sid, 'action' => 'extend']));
+        assertSame('2031-04-01', asSeriesGet($sid)['until']);
+        assertSame(5, count(asAppointments($world)));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Split und Fortsetzen sind Admin und Manager vorbehalten', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        assertStatus(403, asSeriesPost(['until' => '2031-04-22'], ['id' => $sid, 'action' => 'extend', 'preview' => 1], 'user'));
+        assertStatus(200, asSeriesPost(['until' => '2031-04-22'], ['id' => $sid, 'action' => 'extend', 'preview' => 1], 'manager'));
+        $body = asSeriesBody($world, ['from_date' => '2031-03-18']);
+        assertStatus(403, asSeriesPost($body, ['id' => $sid, 'action' => 'split', 'preview' => 1], 'user'));
+    } finally {
+        asDropWorld($world);
+    }
+});
