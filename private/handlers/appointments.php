@@ -18,6 +18,18 @@ function handleAppointments($db, $database, $method, $id) {
 
     switch($method) {
         case 'GET':
+            // Vorschlagsliste fuer das Ortsfeld (FI-23). Nur fuer die Rollen,
+            // die Termine anlegen -- Orte sind Planungsdaten.
+            if (isset($_GET['locations'])) {
+                if (!isAdminOrManager()) {
+                    http_response_code(403);
+                    echo json_encode(["message" => "Nur für Admin und Manager"], JSON_UNESCAPED_UNICODE);
+                    break;
+                }
+                echo json_encode(appointmentLocationSuggestions($db, $prefix), JSON_UNESCAPED_UNICODE);
+                break;
+            }
+
             if($id) {
                 $stmt = $db->prepare("SELECT a.*, 
                                         at.type_name, 
@@ -166,7 +178,7 @@ function handleAppointments($db, $database, $method, $id) {
             $rawData = json_decode(file_get_contents("php://input"));
             
             // Nur erlaubte Felder extrahieren
-            $allowedFields = ['title', 'description','type_id', 'date', 'start_time','created_by'];
+            $allowedFields = ['title', 'description','type_id', 'date', 'start_time','created_by', 'location', 'end_time'];
             $data = new stdClass();
             foreach($allowedFields as $field) {
                 if(isset($rawData->$field)) {
@@ -182,6 +194,18 @@ function handleAppointments($db, $database, $method, $id) {
             if(isSet($data->type_id) && ($data->type_id !== null))
             {
                 $typeId = $data->type_id;
+            }
+
+            // Ort und Ende (FI-23) pruefen, bevor irgendetwas geschrieben wird.
+            [$location, $fehler] = appointmentNormalizeLocation($data->location ?? null);
+            $endTime = null;
+            if ($fehler === null) {
+                [$endTime, $fehler] = appointmentNormalizeEndTime($data->end_time ?? null, (string) ($data->start_time ?? ''));
+            }
+            if ($fehler !== null) {
+                http_response_code(400);
+                echo json_encode(["message" => $fehler], JSON_UNESCAPED_UNICODE);
+                break;
             }
 
             // Prüfe ob bereits ein Termin in der Toleranz existiert
@@ -219,11 +243,11 @@ function handleAppointments($db, $database, $method, $id) {
             }
             
                   
-            $stmt = $db->prepare("INSERT INTO {$prefix}appointments (title, type_id, description, date, 
-                                  start_time, created_by) VALUES (?, ?, ?, ?, ?, ?)");
-            $createdBy = getCurrentUserId(); 
-            if($stmt->execute([$data->title, $typeId, $data->description ?? null, $data->date, 
-                               $data->start_time, $createdBy])) {
+            $stmt = $db->prepare("INSERT INTO {$prefix}appointments (title, type_id, description, location, date,
+                                  start_time, end_time, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $createdBy = getCurrentUserId();
+            if($stmt->execute([$data->title, $typeId, $data->description ?? null, $location, $data->date,
+                               $data->start_time, $endTime, $createdBy])) {
                 http_response_code(201);
                 echo json_encode(["message" => "Appointment created", "id" => $db->lastInsertId()]);
             } else {
@@ -241,7 +265,7 @@ function handleAppointments($db, $database, $method, $id) {
             // Ein ausdrueckliches null ist eine Angabe ("Beschreibung loeschen"),
             // ein fehlendes Feld ist keine. isset() warf beides in denselben
             // Topf und machte das Loeschen einer Angabe unmoeglich.
-            $allowedFields = ['title', 'type_id', 'description', 'date', 'start_time'];
+            $allowedFields = ['title', 'type_id', 'description', 'date', 'start_time', 'location', 'end_time'];
             $data = new stdClass();
             foreach($allowedFields as $field) {
                 if(property_exists($rawData, $field)) {
@@ -255,7 +279,7 @@ function handleAppointments($db, $database, $method, $id) {
             // schwerere Folge war die Terminart: Ein Termin ohne type_id hat
             // keine Gruppenzuordnung mehr, verschwindet aus den Listen der
             // Mitglieder und zaehlt in keiner Auswertung mehr mit.
-            $bestandStmt = $db->prepare("SELECT title, type_id, description, date, start_time
+            $bestandStmt = $db->prepare("SELECT title, type_id, description, date, start_time, end_time
                                          FROM {$prefix}appointments WHERE appointment_id = ?");
             $bestandStmt->execute([$id]);
             $bestand = $bestandStmt->fetch(PDO::FETCH_ASSOC);
@@ -282,10 +306,36 @@ function handleAppointments($db, $database, $method, $id) {
 
             $newDateTime = $wirkDate . ' ' . $wirkTime;
 
+            // Ort und Ende (FI-23). Geprueft wird gegen den wirksamen Beginn;
+            // aendert der Request nur den Beginn, zaehlt das gespeicherte Ende.
+            $gesendet = get_object_vars($data);
+            if (array_key_exists('location', $gesendet)) {
+                [$data->location, $fehler] = appointmentNormalizeLocation($data->location);
+                if ($fehler !== null) {
+                    http_response_code(400);
+                    echo json_encode(["message" => $fehler], JSON_UNESCAPED_UNICODE);
+                    break;
+                }
+            }
+            if (array_key_exists('end_time', $gesendet)) {
+                [$data->end_time, $fehler] = appointmentNormalizeEndTime($data->end_time, (string) $wirkTime);
+                if ($fehler !== null) {
+                    http_response_code(400);
+                    echo json_encode(["message" => $fehler], JSON_UNESCAPED_UNICODE);
+                    break;
+                }
+            }
+            $wirkEnd = array_key_exists('end_time', $gesendet) ? $data->end_time : $bestand['end_time'];
+            if ($wirkEnd !== null && appointmentTimeKey((string) $wirkEnd) === appointmentTimeKey((string) $wirkTime)) {
+                http_response_code(400);
+                echo json_encode(["message" => "Das Ende darf nicht gleich dem Beginn sein"], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+
             $checkStmt = $db->prepare("
                 SELECT appointment_id, title, start_time, date,
                     ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
-                FROM {$prefix}appointments 
+                FROM {$prefix}appointments
                 WHERE date = ?
                 AND type_id = ?
                 AND appointment_id != ?
@@ -319,7 +369,7 @@ function handleAppointments($db, $database, $method, $id) {
             $updateFields = [];
             $updateParams = [];
 
-            foreach (['title', 'type_id', 'description', 'date', 'start_time'] as $feld) {
+            foreach (['title', 'type_id', 'description', 'date', 'start_time', 'location', 'end_time'] as $feld) {
                 if (array_key_exists($feld, $vorhanden)) {
                     $updateFields[] = "{$feld} = ?";
                     $updateParams[] = $data->$feld;
