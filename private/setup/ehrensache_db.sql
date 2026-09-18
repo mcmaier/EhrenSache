@@ -348,6 +348,100 @@ PREPARE stmt FROM @prep_sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- --------------------------------------------------------
+
+--
+-- Tabellenstruktur für Tabelle appointment_series
+-- Terminserien (FI-7): Regel, Zeitraum, exdates und Vorlage. Die Einzeltermine
+-- bleiben gewoehnliche appointments mit series_id und is_detached.
+--
+
+CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_series` (
+  `series_id` int(11) NOT NULL AUTO_INCREMENT,
+  `rrule` varchar(100) NOT NULL,
+  `start_date` date NOT NULL,
+  `until` date NOT NULL,
+  `exdates` text DEFAULT NULL,
+  `title` varchar(200) NOT NULL,
+  `type_id` int(11) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time DEFAULT NULL,
+  `location` varchar(200) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`series_id`),
+  KEY `type_id` (`type_id`),
+  KEY `created_by` (`created_by`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Appointments um die Serienzugehoerigkeit erweitern
+-- Spalten nur hinzufügen wenn nicht vorhanden (Muster wie type_id oben)
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = '{PREFIX}appointments'
+    AND COLUMN_NAME = 'series_id');
+
+SET @sql_column = IF(@column_exists = 0,
+    'ALTER TABLE `{PREFIX}appointments` ADD COLUMN `series_id` INT(11) NULL DEFAULT NULL AFTER `type_id`',
+    'SELECT 1');
+PREPARE stmt FROM @sql_column;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = '{PREFIX}appointments'
+    AND COLUMN_NAME = 'is_detached');
+
+SET @sql_column = IF(@column_exists = 0,
+    'ALTER TABLE `{PREFIX}appointments` ADD COLUMN `is_detached` TINYINT(1) NOT NULL DEFAULT 0 AFTER `series_id`',
+    'SELECT 1');
+PREPARE stmt FROM @sql_column;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Index vor dem Fremdschluessel anlegen, sonst legt InnoDB einen eigenen an
+SET @idx6 = (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{PREFIX}appointments' AND INDEX_NAME = 'idx_series');
+SET @prep_sql = IF(@idx6 = 0, 'ALTER TABLE `{PREFIX}appointments` ADD INDEX `idx_series` (`series_id`)', 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+--
+-- Constraints der Tabelle `appointment_series` und appointments.series_id
+-- (Constraint wird nur hinzugefügt wenn nicht vorhanden, sonst stillschweigend übersprungen)
+--
+SET @sql = 'ALTER TABLE `{PREFIX}appointment_series` ADD CONSTRAINT `{PREFIX}series_type_fk` FOREIGN KEY (`type_id`) REFERENCES `{PREFIX}appointment_types` (`type_id`) ON DELETE SET NULL';
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = '{PREFIX}appointment_series'
+    AND CONSTRAINT_NAME = '{PREFIX}series_type_fk');
+SET @prep_sql = IF(@constraint_exists = 0, @sql, 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = 'ALTER TABLE `{PREFIX}appointment_series` ADD CONSTRAINT `{PREFIX}series_created_by_fk` FOREIGN KEY (`created_by`) REFERENCES `{PREFIX}users` (`user_id`) ON DELETE SET NULL';
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = '{PREFIX}appointment_series'
+    AND CONSTRAINT_NAME = '{PREFIX}series_created_by_fk');
+SET @prep_sql = IF(@constraint_exists = 0, @sql, 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = 'ALTER TABLE `{PREFIX}appointments` ADD CONSTRAINT `{PREFIX}appointments_series_fk` FOREIGN KEY (`series_id`) REFERENCES `{PREFIX}appointment_series` (`series_id`) ON DELETE SET NULL';
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = '{PREFIX}appointments'
+    AND CONSTRAINT_NAME = '{PREFIX}appointments_series_fk');
+SET @prep_sql = IF(@constraint_exists = 0, @sql, 'SELECT 1');
+PREPARE stmt FROM @prep_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- Rate Limiting
 CREATE TABLE IF NOT EXISTS `{PREFIX}rate_limits` (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -615,6 +709,7 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('worktime_require_note', '0', 'boolean', 'general', 'Notiz beim Stoppen und bei manuellen Einträgen erzwingen'),
 ('checkin_auto_create_appointment', '0', 'boolean', 'general', 'Beim Check-in einen Termin anlegen, wenn keiner passt'),
 ('checkin_tolerance_hours', '2', 'number', 'general', 'Zeitfenster in Stunden, in dem ein Check-in einem Termin zugeordnet wird'),
+('holiday_region', '', 'text', 'general', 'Bundesland für die Feiertage im Kalender (leer = nur bundesweite)'),
 ('cleanup_years_records', '3', 'number', 'general', 'Löschfrist in Jahren für Anwesenheiten und Ausnahmen'),
 ('cleanup_years_worktime', '3', 'number', 'general', 'Löschfrist in Jahren für Arbeitszeiten und die zugehörige Änderungshistorie'),
 ('cleanup_years_audit', '1', 'number', 'general', 'Frist in Jahren, nach der verwaiste Einträge der Änderungshistorie anonymisiert werden'),
