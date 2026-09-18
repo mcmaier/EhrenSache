@@ -55,6 +55,10 @@ test('buildRrule schreibt kanonisch und ist verlustfrei', function () {
     assertThrows(fn () => buildRrule(['freq' => 'DAILY', 'interval' => 1, 'byday' => []]));
 });
 
+test('buildRrule lehnt eine falsche Struktur ab, statt einen TypeError zu werfen', function () {
+    assertThrows(fn () => buildRrule(['freq' => 'WEEKLY', 'byday' => 'MO']));
+});
+
 // ---- expandOccurrences: woechentlich ------------------------------------------
 
 test('Woechentlich dienstags', function () {
@@ -82,11 +86,33 @@ test('exdates fallen heraus', function () {
         expandOccurrences(parseRrule('FREQ=WEEKLY;BYDAY=TU'), '2026-10-06', '2026-10-27', ['2026-10-13']));
 });
 
+test('Serie fortsetzen: der Anker bindet den Wochentakt an den urspruenglichen Beginn', function () {
+    assertSame(['2026-11-07', '2026-11-21'],
+        expandOccurrences(parseRrule('FREQ=WEEKLY;INTERVAL=2;BYDAY=SA'), '2026-10-31', '2026-11-30', [], '2026-10-05'));
+});
+
+test('Ohne Anker bindet sich der Wochentakt an den Beginn selbst', function () {
+    assertSame(['2026-10-31', '2026-11-14', '2026-11-28'],
+        expandOccurrences(parseRrule('FREQ=WEEKLY;INTERVAL=2;BYDAY=SA'), '2026-10-31', '2026-11-30'));
+});
+
+test('Ein Anker nach dem Beginn wird abgelehnt', function () {
+    assertThrows(fn () => expandOccurrences(
+        parseRrule('FREQ=WEEKLY;INTERVAL=2;BYDAY=SA'), '2026-10-31', '2026-11-30', [], '2026-11-01'
+    ));
+});
+
 test('Zeitumstellung verschiebt keinen Tag', function () {
-    assertSame(['2026-10-18', '2026-10-25', '2026-11-01'],
-        expandOccurrences(parseRrule('FREQ=WEEKLY;BYDAY=SU'), '2026-10-18', '2026-11-01'));
-    assertSame(['2027-03-21', '2027-03-28', '2027-04-04'],
-        expandOccurrences(parseRrule('FREQ=WEEKLY;BYDAY=SU'), '2027-03-21', '2027-04-04'));
+    $previousTz = date_default_timezone_get();
+    date_default_timezone_set('Europe/Berlin');
+    try {
+        assertSame(['2026-10-18', '2026-10-25', '2026-11-01'],
+            expandOccurrences(parseRrule('FREQ=WEEKLY;BYDAY=SU'), '2026-10-18', '2026-11-01'));
+        assertSame(['2027-03-21', '2027-03-28', '2027-04-04'],
+            expandOccurrences(parseRrule('FREQ=WEEKLY;BYDAY=SU'), '2027-03-21', '2027-04-04'));
+    } finally {
+        date_default_timezone_set($previousTz);
+    }
 });
 
 // ---- expandOccurrences: monatlich ---------------------------------------------
@@ -117,6 +143,12 @@ test('Vierter Montag und letzter Dienstag im Schaltjahr', function () {
 
 test('Ende vor Beginn ergibt nichts', function () {
     assertSame([], expandOccurrences(parseRrule('FREQ=WEEKLY;BYDAY=TU'), '2026-10-06', '2026-10-05'));
+});
+
+test('expandOccurrences lehnt eine unbekannte Frequenz ab', function () {
+    assertThrows(fn () => expandOccurrences(
+        ['freq' => 'DAILY', 'interval' => 1, 'byday' => ['MO']], '2026-10-06', '2026-10-27'
+    ));
 });
 
 test('Ungueltige Daten werden abgelehnt', function () {

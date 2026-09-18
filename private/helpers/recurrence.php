@@ -101,8 +101,20 @@ function parseRrule(string $rrule): array
 /** Kanonische Schreibweise; prueft dabei ueber parseRrule(). */
 function buildRrule(array $rule): string
 {
-    $raw = sprintf('FREQ=%s;INTERVAL=%d;BYDAY=%s',
-        (string) ($rule['freq'] ?? ''), (int) ($rule['interval'] ?? 1), implode(',', $rule['byday'] ?? []));
+    $freq     = $rule['freq'] ?? '';
+    $interval = $rule['interval'] ?? 1;
+    $byday    = $rule['byday'] ?? [];
+
+    if (!is_string($freq) || !is_int($interval) || !is_array($byday)) {
+        throw new InvalidArgumentException('Ungültige Regelstruktur');
+    }
+    foreach ($byday as $day) {
+        if (!is_string($day)) {
+            throw new InvalidArgumentException('Ungültiger Wochentag in der Regel');
+        }
+    }
+
+    $raw   = sprintf('FREQ=%s;INTERVAL=%d;BYDAY=%s', $freq, $interval, implode(',', $byday));
     $canon = parseRrule($raw);
 
     return sprintf('FREQ=%s;INTERVAL=%d;BYDAY=%s', $canon['freq'], $canon['interval'], implode(',', $canon['byday']));
@@ -143,10 +155,19 @@ function seriesMaxUntil(string $from): string
 /**
  * Alle Termine der Regel in [startDate, until], aufsteigend, ohne exdates.
  *
+ * $anchorDate bindet bei woechentlichen Regeln mit INTERVAL > 1 den Wochentakt an die
+ * Woche eines fruaheren Datums, statt an $startDate selbst -- noetig, wenn eine Serie ueber
+ * "Serie fortsetzen" mit einem neuen $startDate (= altes until + 1 Tag) weiterlaeuft: ohne
+ * Anker wuerde sich der Zwei-/Drei-/Vierwochenrhythmus am neuen Beginn statt am urspruenglichen
+ * Serienbeginn ausrichten und dadurch verschieben. $anchorDate muss <= $startDate sein und wird
+ * bei monatlichen Regeln ignoriert. Ohne Angabe verhaelt sich die Funktion wie zuvor: der
+ * Wochentakt bindet sich an $startDate.
+ *
  * @param string[] $exdates
  * @return string[]
+ * @throws InvalidArgumentException bei unbekannter Frequenz oder einem Anker nach $startDate
  */
-function expandOccurrences(array $rule, string $startDate, string $until, array $exdates = []): array
+function expandOccurrences(array $rule, string $startDate, string $until, array $exdates = [], ?string $anchorDate = null): array
 {
     $start = seriesDate($startDate);
     $end   = seriesDate($until);
@@ -154,12 +175,21 @@ function expandOccurrences(array $rule, string $startDate, string $until, array 
         return [];
     }
 
+    if (!in_array($rule['freq'] ?? null, ['WEEKLY', 'MONTHLY'], true)) {
+        throw new InvalidArgumentException('Unbekannte Frequenz: ' . (string) ($rule['freq'] ?? ''));
+    }
+
+    $anchor = $anchorDate !== null ? seriesDate($anchorDate) : $start;
+    if ($anchor > $start) {
+        throw new InvalidArgumentException('Der Anker darf nicht nach dem Beginn liegen');
+    }
+
     $skip = array_flip($exdates);
     $out  = [];
 
     if ($rule['freq'] === 'WEEKLY') {
         $offsets   = array_map(fn (string $d): int => (int) array_search($d, RRULE_WEEKDAYS, true), $rule['byday']);
-        $weekStart = $start->modify('-' . ((int) $start->format('N') - 1) . ' days');
+        $weekStart = $anchor->modify('-' . ((int) $anchor->format('N') - 1) . ' days');
         $step      = '+' . (7 * (int) $rule['interval']) . ' days';
 
         for ($week = $weekStart; $week <= $end; $week = $week->modify($step)) {
