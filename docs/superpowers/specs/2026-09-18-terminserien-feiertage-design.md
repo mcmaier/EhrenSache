@@ -72,7 +72,7 @@ ALTER TABLE {PREFIX}appointments ADD COLUMN is_detached TINYINT(1) NOT NULL DEFA
 -- Index auf series_id, FK → appointment_series ON DELETE SET NULL
 ```
 
-`{PREFIX}system_settings` erhält `holiday_region` (Typ `string`, Default leer, Kategorie der
+`{PREFIX}system_settings` erhält `holiday_region` (Typ `text`, Default leer, Kategorie `general` — die ENUM kennt keine eigene; einsortiert im Untertab der
 Termineinstellungen). Zulässig: leer oder eines der 16 Länderkürzel `BW BY BE BB HB HH HE MV NI
 NW RP SL SN ST SH TH`.
 
