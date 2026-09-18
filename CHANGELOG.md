@@ -7,6 +7,19 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.9.3] – 2026-09-18
+
+### Sicherheit
+- **Ein Mitglied konnte die Termine fremder Gruppen abrufen.** Die Terminliste der Schnittstelle
+  wertete den Parameter `member_id` auch für einfache Mitglieder aus. Mit der Kennung eines
+  anderen Mitglieds ließen sich damit Titel, Datum und Beschreibung der Termine von Gruppen
+  abrufen, denen man selbst nicht angehört. Personendaten waren nicht betroffen, wohl aber die
+  Gruppengrenze, die sonst überall gilt. Der Parameter wirkt jetzt nur noch für Admin und
+  Manager. Die Check-in-App schickt die eigene Kennung mit und ist nicht betroffen. Die Stelle
+  bestand seit 1.0.0.
+
+---
+
 ## [1.9.2] – 2026-09-18
 
 ### Geändert

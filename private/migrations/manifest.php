@@ -134,4 +134,10 @@ return [
         'file'     => '1.9.1.php',
         'function' => 'migrate_1_9_1',
     ],
+    [
+        'from'     => '1.9.2',
+        'to'       => '1.9.3',
+        'file'     => '1.9.2.php',
+        'function' => 'migrate_1_9_2',
+    ],
 ];
