@@ -26,6 +26,11 @@ import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_
 
 let currentCalendarDate = new Date();
 
+// Der zuletzt gerenderte, bereits gefilterte Bestand. renderCalendar() wird
+// auch aus previousMonth()/nextMonth() ohne Argumente gerufen -- ein Parameter
+// allein wuerde den Kalender beim Blaettern leeren.
+let calendarAppointments = [];
+
 let currentAppointmentsPage = 1;
 let appointmentFiltersBound = false;
 let appointmentsPerPage = 25;
@@ -180,7 +185,8 @@ async function renderAppointments(appointments, page = 1) {
     const tbody = document.getElementById('appointmentsTableBody');
     if (!appointments){
         tbody.innerHTML = '<tr><td colspan="5" class="loading">Keine Einträge gefunden</td></tr>';
-        updateAppointmentStats(0);
+        calendarAppointments = [];
+        updateAppointmentStats([]);
         return;
     }
 
@@ -188,6 +194,7 @@ async function renderAppointments(appointments, page = 1) {
 
     // Alle Appointments speichern für Pagination
     allFilteredAppointments = appointments;
+    calendarAppointments = appointments;
     currentAppointmentsPage = page;
 
     updateAppointmentStats(appointments);
@@ -447,7 +454,7 @@ function renderCalendar() {
     
     // Vorheriger Monat (ausgegraut)
     for (let i = firstDayOfWeek; i > 0; i--) {
-        const day = createCalendarDay(prevLastDate - i + 1, year, month - 1, true);
+        const day = createCalendarDay(prevLastDate - i + 1, year, month - 1, true, false, calendarAppointments);
         container.appendChild(day);
     }
     
@@ -458,7 +465,7 @@ function renderCalendar() {
                        month === today.getMonth() && 
                        i === today.getDate();
         
-        const day = createCalendarDay(i, year, month, false, isToday);
+        const day = createCalendarDay(i, year, month, false, isToday, calendarAppointments);
         container.appendChild(day);
     }
     
@@ -466,12 +473,12 @@ function renderCalendar() {
     const totalCells = container.children.length;
     const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
     for (let i = 1; i <= remainingCells; i++) {
-        const day = createCalendarDay(i, year, month + 1, true);
+        const day = createCalendarDay(i, year, month + 1, true, false, calendarAppointments);
         container.appendChild(day);
     }
 }
 
-function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false) {
+function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, appointments = []) {
     const day = document.createElement('div');
     day.className = 'calendar-day';
     day.textContent = dayNum;
@@ -486,7 +493,7 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false) {
     
     // Prüfe ob Termine an diesem Tag
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-    const dayAppointments = dataCache.appointments[currentYear].data.filter(apt => apt.date === dateStr);
+    const dayAppointments = (appointments || []).filter(apt => apt.date === dateStr);
     
     if (dayAppointments.length > 0) {
         day.classList.add('has-event');
