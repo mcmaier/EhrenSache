@@ -322,6 +322,10 @@ function seriesHandleSplit(PDO $db, string $prefix, array $series, array $raw, b
         seriesRespond(400, ['message' => $fehler]);
         return;
     }
+    // Ausfaelle der alten Serie ab from_date gehen auf die neue ueber -- sonst kaeme
+    // ein einzeln geloeschter Termin mit einer blossen Zeitaenderung zurueck. Die
+    // Vorschau zeigt sie als abgewaehlt; die Oberflaeche kann sie wieder anhaken.
+    $def['exdates'] = seriesCarryExdates($def['exdates'], $series, $from);
 
     // Termine, die das Beenden loescht, zaehlen in der Vorschau nicht als Kollision.
     $removable = seriesDeletableFollowing($db, $prefix, $series['series_id'], $from);
@@ -332,17 +336,31 @@ function seriesHandleSplit(PDO $db, string $prefix, array $series, array $raw, b
         return;
     }
     if ($preview) {
+        // keeps: folgende Termine mit Daten, die abgeloest stehen bleiben statt ersetzt zu werden.
+        $following = count(seriesFollowing($db, $prefix, $series['series_id'], $from));
         seriesRespond(200, ['occurrences' => $plan, 'count' => seriesSelectableCount($plan),
-                            'removes' => count($removable)]);
+                            'removes' => count($removable), 'keeps' => $following - count($removable)]);
         return;
     }
 
     $createdBy = getCurrentUserId() === null ? null : (int) getCurrentUserId();
     $db->beginTransaction();
+    // Serienzeile sperren und neu lesen: ein zweiter Aufruf (Doppelklick) wartet
+    // hier und findet danach eine bereits beendete Serie vor.
+    $locked = seriesLoad($db, $prefix, $series['series_id'], true);
+    if ($locked === null || !seriesDateInRange($from, $locked)) {
+        $db->rollBack();
+        seriesRespond(409, ['message' => 'Die Serie wurde inzwischen geändert']);
+        return;
+    }
+    $def['exdates'] = seriesCarryExdates($def['exdates'], $locked, $from);
     // Erst beenden: die geloeschten Termine duerfen der neuen Serie nicht als Kollision im Weg stehen.
-    $ended = seriesEndFrom($db, $prefix, $series, $from);
+    $ended = seriesEndFrom($db, $prefix, $locked, $from);
     $newId = seriesInsertRow($db, $prefix, $def, $createdBy);
-    $dates = array_column(array_filter($plan, fn (array $o): bool => !$o['excluded']), 'date');
+    $dates = array_values(array_diff(
+        array_column(array_filter($plan, fn (array $o): bool => !$o['excluded']), 'date'),
+        $def['exdates']
+    ));
     $result = seriesInsertOccurrences($db, $prefix, $newId, $def['template'], $dates, $tol, $createdBy);
 
     if ($result['created'] === 0) {
@@ -405,7 +423,19 @@ function seriesHandleExtend(PDO $db, string $prefix, array $series, array $raw, 
 
     $createdBy = getCurrentUserId() === null ? null : (int) getCurrentUserId();
     $db->beginTransaction();
-    $dates = array_column(array_filter($plan, fn (array $o): bool => !$o['excluded']), 'date');
+    // Serienzeile sperren und neu lesen: ein zweiter Aufruf (Doppelklick) wartet
+    // hier und scheitert danach am bereits verschobenen Ende, statt Termine doppelt anzulegen.
+    $locked = seriesLoad($db, $prefix, $series['series_id'], true);
+    if ($locked === null || $newUntil <= $locked['until']) {
+        $db->rollBack();
+        seriesRespond(409, ['message' => 'Die Serie wurde inzwischen geändert']);
+        return;
+    }
+    $exdates = array_merge($locked['exdates'], $extra);
+    $dates = array_values(array_diff(
+        array_column(array_filter($plan, fn (array $o): bool => !$o['excluded']), 'date'),
+        $exdates
+    ));
     $result = seriesInsertOccurrences($db, $prefix, $series['series_id'], $template, $dates, $tol, $createdBy);
     $db->prepare("UPDATE {$prefix}appointment_series SET `until` = ? WHERE series_id = ?")
        ->execute([$newUntil, $series['series_id']]);
@@ -413,4 +443,20 @@ function seriesHandleExtend(PDO $db, string $prefix, array $series, array $raw, 
     $db->commit();
 
     seriesRespond(200, ['created' => $result['created'], 'skipped' => $result['skipped']]);
+}
+
+/**
+ * Ausfaelle (exdates) der alten Serie ab $from in die Ausfaelle der neuen
+ * Serie uebernehmen -- sortiert, ohne Dubletten.
+ *
+ * @param string[] $exdates
+ * @return string[]
+ */
+function seriesCarryExdates(array $exdates, array $oldSeries, string $from): array
+{
+    $carried = array_filter($oldSeries['exdates'], fn ($d): bool => is_string($d) && $d >= $from);
+    $dates = array_values(array_unique(array_merge($exdates, $carried)));
+    sort($dates);
+
+    return $dates;
 }

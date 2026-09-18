@@ -949,6 +949,7 @@ test('Split: alte Serie endet am Vortag, neue Serie ab dem Datum, Termine mit Da
         assertStatus(200, $preview);
         assertSame(['2031-03-20', '2031-03-27', '2031-04-03'], array_column($preview['body']['occurrences'], 'date'));
         assertSame(2, $preview['body']['removes']);
+        assertSame(1, $preview['body']['keeps'], 'der 25.03. mit Anwesenheit bleibt abgeloest stehen');
         assertSame(5, count(asAppointments($world)), 'Vorschau schreibt nichts');
 
         $res = asSeriesPost($body, ['id' => $sid, 'action' => 'split']);
@@ -1104,6 +1105,112 @@ test('Split und Fortsetzen sind Admin und Manager vorbehalten', function () {
         assertStatus(200, asSeriesPost(['until' => '2031-04-22'], ['id' => $sid, 'action' => 'extend', 'preview' => 1], 'manager'));
         $body = asSeriesBody($world, ['from_date' => '2031-03-18']);
         assertStatus(403, asSeriesPost($body, ['id' => $sid, 'action' => 'split', 'preview' => 1], 'user'));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Split uebernimmt Ausfaelle der alten Serie ab dem Datum: ein einzeln geloeschter Termin kehrt nicht zurueck', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-25');
+        assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $apt['appointment_id']]]));
+
+        $body = asSeriesBody($world, ['from_date' => '2031-03-18', 'start_time' => '20:00']);
+        unset($body['start_date']);
+
+        $preview = asSeriesPost($body, ['id' => $sid, 'action' => 'split', 'preview' => 1]);
+        assertStatus(200, $preview);
+        $excluded = array_column($preview['body']['occurrences'], 'excluded', 'date');
+        assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => false], $excluded);
+        assertSame(2, $preview['body']['count']);
+
+        $res = asSeriesPost($body, ['id' => $sid, 'action' => 'split']);
+        assertStatus(201, $res);
+        assertSame(2, $res['body']['created']);
+        assertSame(['2031-03-04', '2031-03-11', '2031-03-18', '2031-04-01'], array_column(asAppointments($world), 'date'));
+        assertSame('20:00:00', asAptOn($world, '2031-03-18')['start_time']);
+        assertTrue(in_array('2031-03-25', asSeriesGet((int) $res['body']['series_id'])['exdates'], true));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Split: trifft die neue Regel einen alten Termin mit Daten, wird das Datum ausgelassen und vermerkt', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        asAddRecord((int) asAptOn($world, '2031-03-25')['appointment_id']);
+
+        // Gleicher Wochentag, gleiche Zeit, nur ein neuer Titel: der 25.03. bleibt als abgeloester Termin stehen.
+        $body = asSeriesBody($world, ['from_date' => '2031-03-18', 'title' => 'AS-Neu']);
+        unset($body['start_date']);
+
+        $preview = asSeriesPost($body, ['id' => $sid, 'action' => 'split', 'preview' => 1]);
+        assertStatus(200, $preview);
+        $conflicts = array_column($preview['body']['occurrences'], 'conflict', 'date');
+        assertSame(null, $conflicts['2031-03-18']);
+        assertSame(null, $conflicts['2031-04-01']);
+        assertSame((int) asAptOn($world, '2031-03-25')['appointment_id'], (int) $conflicts['2031-03-25']['appointment_id']);
+        assertSame(2, $preview['body']['count']);
+        assertSame(1, $preview['body']['keeps']);
+
+        $res = asSeriesPost($body, ['id' => $sid, 'action' => 'split']);
+        assertStatus(201, $res);
+        assertSame(2, $res['body']['created']);
+        assertSame(['2031-03-25'], array_column($res['body']['skipped'], 'date'));
+        assertSame('conflict', $res['body']['skipped'][0]['reason']);
+        assertTrue(in_array('2031-03-25', asSeriesGet((int) $res['body']['series_id'])['exdates'], true));
+
+        $kept = asAptOn($world, '2031-03-25');
+        assertSame('AS-Probe', $kept['title']);
+        assertSame($sid, (int) $kept['series_id']);
+        assertSame(1, (int) $kept['is_detached']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Fortsetzen beachtet gespeicherte exdates im neuen Bereich', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-25');
+        assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $apt['appointment_id']]]));
+        assertStatus(200, apiRequest('DELETE', 'appointment_series', ['token' => apiToken('admin'),
+            'query' => ['id' => $sid, 'from' => '2031-03-18']]));
+        assertSame('2031-03-17', asSeriesGet($sid)['until']);
+
+        $preview = asSeriesPost(['until' => '2031-04-01'], ['id' => $sid, 'action' => 'extend', 'preview' => 1]);
+        assertStatus(200, $preview);
+        assertSame(['2031-03-18' => false, '2031-03-25' => true, '2031-04-01' => false],
+            array_column($preview['body']['occurrences'], 'excluded', 'date'));
+
+        $res = asSeriesPost(['until' => '2031-04-01'], ['id' => $sid, 'action' => 'extend']);
+        assertStatus(200, $res);
+        assertSame(2, $res['body']['created']);
+        assertSame(['2031-03-04', '2031-03-11', '2031-03-18', '2031-04-01'], array_column(asAppointments($world), 'date'));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Fortsetzen einer per Split entstandenen Zwei-Wochen-Serie haelt deren Takt', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $body = asSeriesBody($world, ['rrule' => 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU', 'from_date' => '2031-03-11']);
+        unset($body['start_date']);
+        $split = asSeriesPost($body, ['id' => $sid, 'action' => 'split']);
+        assertStatus(201, $split);
+        $newId = (int) $split['body']['series_id'];
+        assertSame(['2031-03-04', '2031-03-11', '2031-03-25'], array_column(asAppointments($world), 'date'));
+
+        // Takt ab 11.03.: 08.04., 22.04. -- nicht 15.04./29.04. (Takt ab dem neuen Bereich 02.04.)
+        $res = asSeriesPost(['until' => '2031-04-30'], ['id' => $newId, 'action' => 'extend', 'preview' => 1]);
+        assertStatus(200, $res);
+        assertSame(['2031-04-08', '2031-04-22'], array_column($res['body']['occurrences'], 'date'));
     } finally {
         asDropWorld($world);
     }

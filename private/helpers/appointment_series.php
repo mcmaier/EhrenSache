@@ -176,9 +176,15 @@ function seriesTypeExists(PDO $db, string $prefix, int $typeId): bool
     return (bool) $stmt->fetchColumn();
 }
 
-function seriesLoad(PDO $db, string $prefix, int $seriesId): ?array
+/**
+ * @param bool $forUpdate Serienzeile bis zum Ende der Transaktion des Aufrufers
+ *                        sperren (Split/Fortsetzen: ein Doppelklick wartet und
+ *                        sieht danach den neuen Stand)
+ */
+function seriesLoad(PDO $db, string $prefix, int $seriesId, bool $forUpdate = false): ?array
 {
-    $stmt = $db->prepare("SELECT * FROM {$prefix}appointment_series WHERE series_id = ?");
+    $lock = $forUpdate ? ' FOR UPDATE' : '';
+    $stmt = $db->prepare("SELECT * FROM {$prefix}appointment_series WHERE series_id = ?{$lock}");
     $stmt->execute([$seriesId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
