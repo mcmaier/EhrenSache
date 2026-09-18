@@ -65,6 +65,10 @@ function handleAppointmentSeries($db, $database, $method, $id): void
                 seriesRespond(400, ['message' => 'Unbekannte Aktion']);
                 return;
 
+            case 'DELETE':
+                seriesHandleEndFrom($db, $prefix, $series, (string) ($_GET['from'] ?? ''));
+                return;
+
             default:
                 seriesRespond(405, ['message' => 'Methode nicht erlaubt']);
                 return;
@@ -145,4 +149,24 @@ function seriesHandleCreate(PDO $db, string $prefix, array $raw, bool $preview, 
     $db->commit();
 
     seriesRespond(201, ['series_id' => $seriesId, 'created' => $result['created'], 'skipped' => $result['skipped']]);
+}
+
+/** Liegt $date gueltig in [start_date, until] der Serie? */
+function seriesDateInRange(string $date, array $series): bool
+{
+    return seriesIsValidDate($date) && $date >= $series['start_date'] && $date <= $series['until'];
+}
+
+function seriesHandleEndFrom(PDO $db, string $prefix, array $series, string $from): void
+{
+    if (!seriesDateInRange($from, $series)) {
+        seriesRespond(400, ['message' => 'Das Datum liegt nicht innerhalb der Serie']);
+        return;
+    }
+
+    $db->beginTransaction();
+    $result = seriesEndFrom($db, $prefix, $series, $from);
+    $db->commit();
+
+    seriesRespond(200, $result);
 }

@@ -254,7 +254,7 @@ function handleAppointments($db, $database, $method, $id) {
             // schwerere Folge war die Terminart: Ein Termin ohne type_id hat
             // keine Gruppenzuordnung mehr, verschwindet aus den Listen der
             // Mitglieder und zaehlt in keiner Auswertung mehr mit.
-            $bestandStmt = $db->prepare("SELECT title, type_id, description, date, start_time, end_time
+            $bestandStmt = $db->prepare("SELECT title, type_id, description, date, start_time, end_time, series_id
                                          FROM {$prefix}appointments WHERE appointment_id = ?");
             $bestandStmt->execute([$id]);
             $bestand = $bestandStmt->fetch(PDO::FETCH_ASSOC);
@@ -332,6 +332,11 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
 
+            // Ein einzeln geaenderter Serientermin folgt der Serie nicht mehr (FI-7).
+            if ($bestand['series_id'] !== null) {
+                $updateFields[] = 'is_detached = 1';
+            }
+
             $updateParams[] = $id;
             $stmt = $db->prepare("UPDATE {$prefix}appointments SET " . implode(', ', $updateFields)
                                  . " WHERE appointment_id = ?");
@@ -353,6 +358,15 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
             
+            // Ein geloeschter Serientermin ist ein Ausfall: Das Datum wandert in
+            // exdates, damit "Serie fortsetzen" es nicht wieder erzeugt (FI-7).
+            $serienStmt = $db->prepare("SELECT series_id, date FROM {$prefix}appointments WHERE appointment_id = ?");
+            $serienStmt->execute([$id]);
+            $serienRow = $serienStmt->fetch(PDO::FETCH_ASSOC);
+            if ($serienRow && $serienRow['series_id'] !== null) {
+                seriesAddExdates($db, $prefix, (int) $serienRow['series_id'], [$serienRow['date']]);
+            }
+
             // Lösche zuerst abhängige Datensätze
             $db->prepare("DELETE FROM {$prefix}records WHERE appointment_id = ?")->execute([$id]);
             // Explizit vor exceptions (W2): appointment_responses.exception_id zeigt

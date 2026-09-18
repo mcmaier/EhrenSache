@@ -346,3 +346,131 @@ test('Unbekannte Serie liefert 404', function () {
     assertSame('Serie nicht gefunden', $res['body']['message'] ?? null,
         'Die Serie fehlt, nicht die Ressource');
 });
+
+// ---- Einzeltermine und Beenden -----------------------------------------------
+
+/** Legt die Standardserie (5 Dienstage 04.03.–01.04.2031) an und liefert ihre ID. */
+function asCreateSeries(array $world, array $extra = []): int
+{
+    $res = asSeriesPost(asSeriesBody($world, $extra));
+    assertStatus(201, $res);
+
+    return (int) $res['body']['series_id'];
+}
+
+function asAptOn(array $world, string $date): array
+{
+    foreach (asAppointments($world) as $apt) {
+        if ($apt['date'] === $date) {
+            return $apt;
+        }
+    }
+    throw new RuntimeException("Kein Termin am {$date}");
+}
+
+/** Haengt eine Anwesenheit an den Termin -- danach gilt er als "mit Daten". */
+function asAddRecord(int $appointmentId): void
+{
+    $members = apiRequest('GET', 'members', ['token' => apiToken('admin')]);
+    assertStatus(200, $members);
+    $res = apiRequest('POST', 'records', ['token' => apiToken('admin'),
+        'body' => ['member_id' => (int) $members['body'][0]['member_id'], 'appointment_id' => $appointmentId]]);
+    assertStatus(201, $res);
+}
+
+test('Einzel-PUT auf einen Serientermin loest ihn ab', function () {
+    $world = asWorld();
+    try {
+        asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-11');
+        $res = apiRequest('PUT', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $apt['appointment_id']], 'body' => ['title' => 'Sonderprobe']]);
+        assertStatus(200, $res);
+        assertSame(1, (int) asAptOn($world, '2031-03-11')['is_detached']);
+        assertSame(0, (int) asAptOn($world, '2031-03-18')['is_detached']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Einzel-DELETE vermerkt das Datum in exdates, die Serie bleibt', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-18');
+        assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $apt['appointment_id']]]));
+        $series = asSeriesGet($sid);
+        assertSame(['2031-03-18'], $series['exdates']);
+        assertSame(4, $series['appointment_count']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Beenden ab Datum loescht folgende ohne Daten und loest die mit Daten ab', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        asAddRecord((int) asAptOn($world, '2031-03-25')['appointment_id']);
+
+        $res = apiRequest('DELETE', 'appointment_series', ['token' => apiToken('admin'),
+            'query' => ['id' => $sid, 'from' => '2031-03-18']]);
+        assertStatus(200, $res);
+        assertSame(2, $res['body']['removed'], '18.03. und 01.04. ohne Daten');
+        assertSame(['2031-03-25'], array_column($res['body']['detached'], 'date'));
+        assertSame(false, $res['body']['series_deleted']);
+
+        assertSame(['2031-03-04', '2031-03-11', '2031-03-25'], array_column(asAppointments($world), 'date'));
+        assertSame(1, (int) asAptOn($world, '2031-03-25')['is_detached']);
+        assertSame('2031-03-17', asSeriesGet($sid)['until']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Beenden ab dem ersten Termin ohne Daten entfernt auch die Serie', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $res = apiRequest('DELETE', 'appointment_series', ['token' => apiToken('admin'),
+            'query' => ['id' => $sid, 'from' => '2031-03-04']]);
+        assertStatus(200, $res);
+        assertSame(5, $res['body']['removed']);
+        assertSame(true, $res['body']['series_deleted']);
+        assertStatus(404, apiRequest('GET', 'appointment_series', ['token' => apiToken('admin'), 'query' => ['id' => $sid]]));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Beenden ab dem Serienbeginn mit Daten: Serie entfaellt, Termin mit Daten bleibt als Einzeltermin', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        asAddRecord((int) asAptOn($world, '2031-03-04')['appointment_id']);
+        $res = apiRequest('DELETE', 'appointment_series', ['token' => apiToken('admin'),
+            'query' => ['id' => $sid, 'from' => '2031-03-04']]);
+        assertStatus(200, $res);
+        assertSame(4, $res['body']['removed']);
+        assertSame(true, $res['body']['series_deleted']);
+        $apt = asAptOn($world, '2031-03-04');
+        assertSame(null, $apt['series_id']);
+        assertSame(0, (int) $apt['is_detached']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Beenden: Datum ausserhalb der Serie liefert 400', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        foreach (['2031-03-03', '2031-04-02', 'morgen'] as $from) {
+            assertStatus(400, apiRequest('DELETE', 'appointment_series', ['token' => apiToken('admin'),
+                'query' => ['id' => $sid, 'from' => $from]]), $from);
+        }
+    } finally {
+        asDropWorld($world);
+    }
+});

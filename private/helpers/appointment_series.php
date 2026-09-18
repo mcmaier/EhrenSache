@@ -303,11 +303,22 @@ function seriesInsertOccurrences(PDO $db, string $prefix, int $seriesId, array $
     return ['created' => $created, 'skipped' => $skipped, 'skipped_dates' => array_column($skipped, 'date')];
 }
 
-/** @return array<int, array{appointment_id: int, date: string}> nicht abgeloeste Termine ab $from */
+/**
+ * @return array<int, array{appointment_id: int, date: string}> nicht abgeloeste Termine ab $from
+ *
+ * FOR UPDATE sperrt die gefundenen Zeilen bis zum Ende der Transaktion des
+ * Aufrufers: Ohne die Sperre koennte zwischen appointmentHasData() und dem
+ * anschliessenden DELETE (seriesEndFrom()) ein Check-in einen records-Datensatz
+ * einfuegen, den ON DELETE CASCADE stillschweigend mitloescht. InnoDBs
+ * Fremdschluesselpruefung beim Einfuegen der Kindzeile nimmt fuer den Insert
+ * eine Shared-Lock auf die hier gesperrte appointments-Zeile und wartet damit
+ * bis zum Commit. Ausserhalb einer Transaktion (Vorschau-Pfad) ist die Klausel
+ * wirkungslos.
+ */
 function seriesFollowing(PDO $db, string $prefix, int $seriesId, string $from): array
 {
     $stmt = $db->prepare("SELECT appointment_id, date FROM {$prefix}appointments
-                          WHERE series_id = ? AND date >= ? AND is_detached = 0 ORDER BY date");
+                          WHERE series_id = ? AND date >= ? AND is_detached = 0 ORDER BY date FOR UPDATE");
     $stmt->execute([$seriesId, $from]);
 
     return array_map(fn (array $r): array => ['appointment_id' => (int) $r['appointment_id'], 'date' => $r['date']],
