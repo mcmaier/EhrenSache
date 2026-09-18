@@ -53,6 +53,7 @@ export const dataCache = {
     records: {},
     exceptions: {},
     workSessions: {},
+    holidays: {},
 
     // Systemeinstellungen (nur admin-lesbar; subgroupLabel() liest NICHT von
     // hier, siehe dort — settings.js pflegt diesen Eintrag für seine eigenen
@@ -456,6 +457,55 @@ export async function showConfirm(message, title = 'Bestätigung') {
             }
         }
         document.addEventListener('keydown', escHandler);
+    });
+}
+
+/**
+ * Auswahl zwischen mehreren Wegen, z. B. "Nur dieser" / "Dieser und alle
+ * folgenden". Liefert den value der gewaehlten Moeglichkeit oder null bei
+ * Abbrechen und ESC.
+ *
+ * @param {string} message
+ * @param {string} title
+ * @param {Array<{value: string, label: string, className?: string}>} choices
+ * @returns {Promise<string|null>}
+ */
+export function showChoice(message, title, choices) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('choiceModal');
+        const footer = document.getElementById('choiceButtons');
+        document.getElementById('choiceTitle').textContent = title;
+        document.getElementById('choiceMessage').textContent = message;
+        footer.innerHTML = '';
+
+        const finish = (value) => {
+            modal.classList.remove('active');
+            document.removeEventListener('keydown', onKey);
+            resolve(value);
+        };
+        const onKey = (e) => {
+            if (e.key === 'Escape') finish(null);
+        };
+
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'btn-cancel';
+        cancel.textContent = 'Abbrechen';
+        cancel.addEventListener('click', () => finish(null));
+        footer.appendChild(cancel);
+
+        choices.forEach(choice => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = choice.className || 'btn-save';
+            btn.textContent = choice.label;
+            btn.addEventListener('click', () => finish(choice.value));
+            footer.appendChild(btn);
+        });
+
+        document.addEventListener('keydown', onKey);
+        modal.classList.add('active');
+        cancel.focus();
     });
 }
 
