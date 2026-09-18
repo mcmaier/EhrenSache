@@ -1239,3 +1239,47 @@ test('Fortsetzen einer per Split entstandenen Zwei-Wochen-Serie haelt deren Takt
         asDropWorld($world);
     }
 });
+
+// ---- Feiertage und Bundesland ------------------------------------------------
+
+function asSetRegion(string $value): array
+{
+    return apiRequest('PUT', 'settings', ['token' => apiToken('admin'),
+        'body' => ['setting_key' => 'holiday_region', 'setting_value' => $value]]);
+}
+
+test('holidays liefert die Feiertage des eingestellten Landes', function () {
+    try {
+        assertStatus(200, asSetRegion('BW'));
+        $res = apiRequest('GET', 'holidays', ['token' => apiToken('user'),
+            'query' => ['from' => '2031-01-01', 'to' => '2031-01-31']]);
+        assertStatus(200, $res);
+        assertSame('BW', $res['body']['region']);
+        assertSame(['2031-01-01' => 'Neujahr', '2031-01-06' => 'Heilige Drei Könige'], $res['body']['holidays']);
+
+        assertStatus(200, asSetRegion(''));
+        $res = apiRequest('GET', 'holidays', ['token' => apiToken('user'),
+            'query' => ['from' => '2031-01-01', 'to' => '2031-01-31']]);
+        assertSame(null, $res['body']['region']);
+        assertSame(['2031-01-01' => 'Neujahr'], $res['body']['holidays']);
+    } finally {
+        asSetRegion('');
+    }
+});
+
+test('holidays prueft den Zeitraum', function () {
+    foreach ([['2031-01-01', '2032-03-01'], ['2031-02-01', '2031-01-01'], ['gestern', '2031-01-01']] as [$from, $to]) {
+        assertStatus(400, apiRequest('GET', 'holidays', ['token' => apiToken('user'),
+            'query' => ['from' => $from, 'to' => $to]]), "{$from}..{$to}");
+    }
+});
+
+test('holiday_region nimmt nur bekannte Laender an', function () {
+    try {
+        assertStatus(400, asSetRegion('XY'));
+        assertStatus(400, asSetRegion('bw'));
+        assertStatus(200, asSetRegion('SN'));
+    } finally {
+        asSetRegion('');
+    }
+});

@@ -88,6 +88,7 @@ require_once '../../private/helpers/update_status.php';
 require_once '../../private/handlers/update_check.php';
 require_once '../../private/handlers/appointment_responses.php';
 require_once '../../private/handlers/appointment_series.php';
+require_once '../../private/handlers/holidays.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -659,6 +660,9 @@ try {
         break;
     case 'station':
         handleStation($db, $database, $request_method, $authUserId, $authUserRole, $authDeviceType);
+        break;
+    case 'holidays':
+        handleHolidays($db, $database, $request_method);
         break;
 
     default:

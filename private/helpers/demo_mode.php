@@ -105,6 +105,7 @@ const DEMO_READ_ONLY = [
     'attendance_list',
     'import_logs',
     'export',
+    'holidays',
 ];
 
 /**

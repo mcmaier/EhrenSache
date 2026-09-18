@@ -132,7 +132,7 @@ test('Die Nur-Lesend-Liste entspricht der Spezifikation', function () {
     assertSame([
         'ping', 'appearance', 'me', 'version', 'session_info', 'my_data',
         'statistics', 'statistics_report', 'available_years', 'attendance_list',
-        'import_logs', 'export',
+        'import_logs', 'export', 'holidays',
     ], DEMO_READ_ONLY);
 });
 
