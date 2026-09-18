@@ -470,6 +470,16 @@
                     <input type="time" id="appointmentTime" required>
                 </div>
                 <div class="form-group">
+                    <label for="appointmentEndTime">Ende</label>
+                    <input type="time" id="appointmentEndTime">
+                </div>
+                <div class="form-group">
+                    <label for="appointmentLocation">Ort</label>
+                    <input type="text" id="appointmentLocation" maxlength="200"
+                           list="appointmentLocationList" autocomplete="off">
+                    <datalist id="appointmentLocationList"></datalist>
+                </div>
+                <div class="form-group">
                     <label for="appointmentType">Terminart *</label>
                     <select id="appointmentType" required>
                         <option value="">Bitte wählen...</option>

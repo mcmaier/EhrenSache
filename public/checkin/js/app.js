@@ -1130,6 +1130,8 @@ async function submitAppointmentForm(e) {
         date: document.getElementById('appointmentDate').value,
         start_time: document.getElementById('appointmentTime').value,
         type_id: document.getElementById('appointmentType').value,
+        end_time: document.getElementById('appointmentEndTime').value || null,
+        location: document.getElementById('appointmentLocation').value.trim() || null,
     };
 
     try {
@@ -2940,12 +2942,23 @@ function addExceptionToHistory(exception) {
 // APPOINTMENT MODAL
 // ========================================
 
+/** Vorschlaege fuer das Ortsfeld (FI-23). Fuer user antwortet der Server 403 --
+ * die Liste bleibt dann leer, der Dialog ist ohnehin Verwaltern vorbehalten. */
+async function fillPwaLocationSuggestions() {
+    const list = document.getElementById('appointmentLocationList');
+    if (!list) return;
+    const result = await apiCall('appointments', 'GET', null, { locations: 1 });
+    const orte = result.success && Array.isArray(result.data) ? result.data : [];
+    list.innerHTML = orte.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
+}
+
 async function showCreateAppointmentModal() {
     currentEditAppointmentId = null;
     document.getElementById('appointmentModalTitle').textContent = 'Termin anlegen';
-    
+
     // Lade Terminarten
     await loadAppointmentTypes();
+    await fillPwaLocationSuggestions();
     
     // Formular zurücksetzen
     document.getElementById('appointmentForm').reset();
@@ -2960,10 +2973,11 @@ async function showEditAppointmentModal() {
     
     currentEditAppointmentId = appointmentId;
     document.getElementById('appointmentModalTitle').textContent = 'Termin bearbeiten';
-    
+
     try {
         // Lade Terminarten
         await loadAppointmentTypes();
+        await fillPwaLocationSuggestions();
         
         // Lade Termin-Daten
         const result = await apiCall('appointments', 'GET', null, { id: appointmentId });
@@ -2977,7 +2991,9 @@ async function showEditAppointmentModal() {
             document.getElementById('appointmentTitle').value = appointment.title || '';
             document.getElementById('appointmentDate').value = appointment.date || '';
             document.getElementById('appointmentTime').value = appointment.start_time || '';
-            document.getElementById('appointmentType').value = appointment.type_id || '';            
+            document.getElementById('appointmentType').value = appointment.type_id || '';
+            document.getElementById('appointmentEndTime').value = appointment.end_time ? appointment.end_time.substring(0, 5) : '';
+            document.getElementById('appointmentLocation').value = appointment.location || '';
         }
         
         // Zeige Modal
