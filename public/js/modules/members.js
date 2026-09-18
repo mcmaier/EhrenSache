@@ -333,11 +333,13 @@ window.goToMembersPage = function(page) {
 
 function updateMemberStats(members)
 {
-    // Beide Zahlen kommen aus dem GESAMTBESTAND des gewaehlten Jahres, nicht
-    // aus der gefilterten Liste (OI-71). Sonst zeigte die Karte "Inaktive"
-    // genau dann 0, wenn das Haekchen daneben aus ist -- also immer dann,
-    // wenn jemand die Frage stellt, wie viele Karteileichen im Bestand
-    // stehen. Die Tabelle zeigt das Filterergebnis ohnehin.
+    // Beide Zahlen folgen dem Gruppenfilter, aber NICHT dem Schalter
+    // "Inaktive anzeigen" (OI-71). Der Schalter entscheidet nur, welche
+    // Zeilen die Tabelle zeigt. Zaehlte die Karte "Inaktive" die gefilterte
+    // Liste, stuende dort genau dann 0, wenn der Haken aus ist -- also immer
+    // dann, wenn jemand wissen will, wie viele Karteileichen im Bestand
+    // stehen. Der Gruppenfilter dagegen grenzt den Bestand selbst ein, und
+    // dem folgen die Karten wie in den uebrigen Bereichen.
     const aktiv   = document.getElementById('statActiveMembersCount');
     const inaktiv = document.getElementById('statInactiveMembersCount');
 
@@ -349,7 +351,14 @@ function updateMemberStats(members)
 
     // Faellt der Cache aus (erster Aufruf, geleert), bleibt die uebergebene
     // Liste die beste verfuegbare Grundlage.
-    const bestand = dataCache.members[currentYear]?.data ?? members ?? [];
+    let bestand = dataCache.members[currentYear]?.data ?? members ?? [];
+
+    const gruppe = document.getElementById('filterMemberGroup')?.value || '';
+    if (gruppe) {
+        bestand = bestand.filter(m =>
+            m.group_ids_array && m.group_ids_array.includes(parseInt(gruppe))
+        );
+    }
 
     if (aktiv) {
         aktiv.textContent = bestand.filter(m => m.is_active_in_period).length;

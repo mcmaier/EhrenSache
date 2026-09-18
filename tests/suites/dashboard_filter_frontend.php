@@ -115,3 +115,35 @@ test('Jede Filter-ID aus dem Markup kommt im Modul vor', function () use ($dfJs)
         assertTrue(str_contains($dfJs, $id), $id . ' wird im Modul nicht verwendet');
     }
 });
+
+/** Rumpf einer Funktion bis zur naechsten Funktionsdefinition auf oberster Ebene. */
+function dfFunktion(string $js, string $name): string
+{
+    $start = strpos($js, 'function ' . $name . '(');
+    assertTrue($start !== false, $name . '() nicht gefunden');
+
+    if (preg_match('/\n(?:export\s+)?(?:async\s+)?function\s/', $js, $m, PREG_OFFSET_CAPTURE, $start + 1)) {
+        return substr($js, $start, $m[0][1] - $start);
+    }
+    return substr($js, $start);
+}
+
+test('Mitglieder-Kennzahlen folgen dem Gruppenfilter', function () use ($dfRoot) {
+    $js    = (string) file_get_contents($dfRoot . '/public/js/modules/members.js');
+    $rumpf = dfFunktion($js, 'updateMemberStats');
+
+    assertTrue(str_contains($rumpf, 'filterMemberGroup'),
+               'updateMemberStats() muss den Gruppenfilter beruecksichtigen');
+    // OI-71: Der Schalter "Inaktive anzeigen" darf die Karten NICHT beeinflussen,
+    // sonst zeigt "Inaktive" genau dann 0, wenn der Haken aus ist.
+    assertSame(0, substr_count($rumpf, 'show_inactive_members'),
+               'Die Kennzahlen duerfen nicht vom Inaktiv-Schalter abhaengen (OI-71)');
+});
+
+test('Arbeitszeit-Kennzahlen zaehlen nur den gefilterten Stand', function () use ($dfRoot) {
+    $js    = (string) file_get_contents($dfRoot . '/public/js/modules/worktime.js');
+    $rumpf = dfFunktion($js, 'updateWorktimeStats');
+
+    assertSame(0, preg_match('/\ball\s*\./', $rumpf),
+               'updateWorktimeStats() darf nicht mehr auf den Gesamtbestand (all) zugreifen');
+});

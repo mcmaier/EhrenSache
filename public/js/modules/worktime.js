@@ -179,7 +179,7 @@ export function renderWorkSessions(sessions) {
     if (!tbody) return;
 
     const filtered = applyWorktimeFilters(sessions || []);
-    updateWorktimeStats(sessions || [], filtered);
+    updateWorktimeStats(filtered);
 
     if (!filtered.length) {
         tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge für diese Auswahl.</td></tr>';
@@ -241,13 +241,16 @@ function renderWorktimeActions(session) {
     return buttons.join(' ') || '—';
 }
 
-function updateWorktimeStats(all, filtered) {
+// Alle drei Karten zaehlen die gefilterte Auswahl -- wie in den uebrigen
+// Bereichen. Bis 1.9.1 zaehlten "Wartet auf Freigabe" und "Laufende
+// Sitzungen" den Gesamtbestand und blieben bei jedem Filter unveraendert.
+function updateWorktimeStats(filtered) {
     const confirmedMinutes = filtered
         .filter(s => s.status === 'confirmed' && s.end_time)
         .reduce((sum, s) => sum + (parseInt(s.duration_minutes, 10) || 0), 0);
 
-    const pending = all.filter(s => s.status === 'submitted' && s.end_time).length;
-    const open = all.filter(s => !s.end_time).length;
+    const pending = filtered.filter(s => s.status === 'submitted' && s.end_time).length;
+    const open = filtered.filter(s => !s.end_time).length;
 
     const set = (id, value) => {
         const el = document.getElementById(id);
