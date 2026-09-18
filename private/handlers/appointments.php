@@ -254,7 +254,7 @@ function handleAppointments($db, $database, $method, $id) {
             // schwerere Folge war die Terminart: Ein Termin ohne type_id hat
             // keine Gruppenzuordnung mehr, verschwindet aus den Listen der
             // Mitglieder und zaehlt in keiner Auswertung mehr mit.
-            $bestandStmt = $db->prepare("SELECT title, type_id, description, date, start_time, end_time, series_id
+            $bestandStmt = $db->prepare("SELECT title, type_id, description, date, start_time, end_time, location, series_id
                                          FROM {$prefix}appointments WHERE appointment_id = ?");
             $bestandStmt->execute([$id]);
             $bestand = $bestandStmt->fetch(PDO::FETCH_ASSOC);
@@ -319,11 +319,15 @@ function handleAppointments($db, $database, $method, $id) {
             $vorhanden = get_object_vars($data);
             $updateFields = [];
             $updateParams = [];
+            $geaendert = false;
 
             foreach (['title', 'type_id', 'description', 'date', 'start_time', 'location', 'end_time'] as $feld) {
                 if (array_key_exists($feld, $vorhanden)) {
                     $updateFields[] = "{$feld} = ?";
                     $updateParams[] = $data->$feld;
+                    if (appointmentFieldChanged($feld, $data->$feld, $bestand[$feld])) {
+                        $geaendert = true;
+                    }
                 }
             }
 
@@ -332,8 +336,11 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
 
-            // Ein einzeln geaenderter Serientermin folgt der Serie nicht mehr (FI-7).
-            if ($bestand['series_id'] !== null) {
+            // Ein einzeln geaenderter Serientermin folgt der Serie nicht mehr (FI-7) --
+            // aber nur bei einer echten Aenderung. Der Dialog schickt alle Felder
+            // mit, auch unveraendert; sonst loeste sich jeder Serientermin schon
+            // beim blossen Speichern ab.
+            if ($bestand['series_id'] !== null && $geaendert) {
                 $updateFields[] = 'is_detached = 1';
             }
 

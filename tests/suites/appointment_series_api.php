@@ -474,3 +474,141 @@ test('Beenden: Datum ausserhalb der Serie liefert 400', function () {
         asDropWorld($world);
     }
 });
+
+// ---- Abloesen nur bei echter Aenderung (Review-Nachtrag) ---------------------
+
+test('PUT ohne Felder auf einen Serientermin loest ihn nicht ab', function () {
+    $world = asWorld();
+    try {
+        asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-11');
+        $res = apiRequest('PUT', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $apt['appointment_id']], 'body' => []]);
+        assertStatus(200, $res);
+        assertSame(0, (int) asAptOn($world, '2031-03-11')['is_detached']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT mit unveraenderten Werten (Zeit nur anders geschrieben) loest nicht ab', function () {
+    $world = asWorld();
+    try {
+        asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-11');
+        $res = apiRequest('PUT', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $apt['appointment_id']], 'body' => [
+                'title' => 'AS-Probe', 'type_id' => $world['type'], 'description' => null,
+                'date' => '2031-03-11', 'start_time' => '19:30', 'end_time' => '22:00',
+                'location' => 'Probelokal',
+            ]]);
+        assertStatus(200, $res);
+        assertSame(0, (int) asAptOn($world, '2031-03-11')['is_detached'],
+            '19:30 gegen gespeichertes 19:30:00 ist keine Aenderung');
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT auf einen gewoehnlichen Termin bleibt ohne Serienbezug und is_detached', function () {
+    $world = asWorld();
+    try {
+        $post = asPostAppointment($world);
+        assertStatus(201, $post);
+        assertStatus(200, apiRequest('PUT', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => (int) $post['body']['id']], 'body' => ['title' => 'Geaendert']]));
+        $apt = asAptOn($world, '2031-03-04');
+        assertSame(null, $apt['series_id']);
+        assertSame(0, (int) $apt['is_detached']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT mit 409 (Verschieben in eine Dublette) loest nicht ab', function () {
+    $world = asWorld();
+    try {
+        asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-11');
+        $res = apiRequest('PUT', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $apt['appointment_id']], 'body' => ['date' => '2031-03-04']]);
+        assertStatus(409, $res);
+        assertSame(0, (int) asAptOn($world, '2031-03-11')['is_detached']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Werden alle Termine einzeln geloescht, bleibt die Serie fuer "fortsetzen" bestehen', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $start = asSeriesGet($sid)['start_date'];
+        foreach (asAppointments($world) as $apt) {
+            assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'),
+                'query' => ['id' => $apt['appointment_id']]]));
+        }
+        $series = asSeriesGet($sid);
+        assertSame(0, $series['appointment_count']);
+        assertSame(5, count($series['exdates']));
+
+        // Ohne verbleibenden Termin findet asDropWorld die Serie nicht mehr --
+        // dasselbe Beenden-ab-Serienbeginn wie dort selbst abraeumen.
+        apiRequest('DELETE', 'appointment_series', ['token' => apiToken('admin'),
+            'query' => ['id' => $sid, 'from' => $start]]);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Beenden ab dem 2. Termin nach Einzel-DELETE des 1. entfernt die Serie vollstaendig', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $first = asAptOn($world, '2031-03-04');
+        assertStatus(200, apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $first['appointment_id']]]));
+
+        $res = apiRequest('DELETE', 'appointment_series', ['token' => apiToken('admin'),
+            'query' => ['id' => $sid, 'from' => '2031-03-11']]);
+        assertStatus(200, $res);
+        assertSame(4, $res['body']['removed']);
+        assertSame(true, $res['body']['series_deleted']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Ein bereits abgeloester Termin nach dem Beenden-Datum bleibt unberuehrt', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $detachTarget = asAptOn($world, '2031-03-18');
+        assertStatus(200, apiRequest('PUT', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $detachTarget['appointment_id']], 'body' => ['title' => 'Sonderprobe']]));
+        assertSame(1, (int) asAptOn($world, '2031-03-18')['is_detached']);
+
+        $res = apiRequest('DELETE', 'appointment_series', ['token' => apiToken('admin'),
+            'query' => ['id' => $sid, 'from' => '2031-03-11']]);
+        assertStatus(200, $res);
+        assertSame(3, $res['body']['removed'], '11.03., 25.03. und 01.04. ohne Daten -- 18.03. ist abgeloest');
+
+        $stillThere = asAptOn($world, '2031-03-18');
+        assertSame($sid, (int) $stillThere['series_id']);
+        assertSame(1, (int) $stillThere['is_detached']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Beenden: from als Array erzeugt keine PHP-Warnung und liefert 400', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $res = apiRequest('DELETE', 'appointment_series', ['token' => apiToken('admin'),
+            'query' => ['id' => $sid, 'from[]' => '2031-03-04']]);
+        assertStatus(400, $res);
+    } finally {
+        asDropWorld($world);
+    }
+});

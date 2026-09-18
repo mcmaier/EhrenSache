@@ -79,6 +79,44 @@ function appointmentConflictBody(array $conflict, int $toleranceHours): array
 }
 
 /**
+ * Vergleicht ein von PUT appointments gesendetes Feld mit dem gespeicherten
+ * Wert, um zu entscheiden, ob sich ein Serientermin ablöst (FI-7) --
+ * unveränderte Werte in anderer Schreibweise (Zeit ohne Sekunden, leerer
+ * String statt NULL) zählen dabei nicht als Änderung.
+ *
+ * @param mixed $sent   Wert wie vom Aufrufer bereits normalisiert (location,
+ *                       end_time) bzw. roh aus dem Request (die übrigen Felder)
+ * @param mixed $stored Wert aus der Datenbank (Bestand)
+ */
+function appointmentFieldChanged(string $field, $sent, $stored): bool
+{
+    switch ($field) {
+        case 'start_time':
+        case 'end_time':
+            $sentKey   = $sent === null ? null : appointmentTimeKey((string) $sent);
+            $storedKey = $stored === null ? null : appointmentTimeKey((string) $stored);
+
+            return $sentKey !== $storedKey;
+
+        case 'type_id':
+            $sentId   = ($sent === null || $sent === '') ? null : (int) $sent;
+            $storedId = $stored === null ? null : (int) $stored;
+
+            return $sentId !== $storedId;
+
+        case 'description':
+        case 'location':
+            $sentVal   = ($sent === null || $sent === '') ? null : $sent;
+            $storedVal = ($stored === null || $stored === '') ? null : $stored;
+
+            return $sentVal !== $storedVal;
+
+        default: // title, date
+            return (string) $sent !== (string) $stored;
+    }
+}
+
+/**
  * Haengen an dem Termin erfasste Daten? Solche Termine loeschen
  * Serienaktionen nie, sie loesen sie aus der Serie.
  */

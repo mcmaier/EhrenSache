@@ -66,7 +66,11 @@ function handleAppointmentSeries($db, $database, $method, $id): void
                 return;
 
             case 'DELETE':
-                seriesHandleEndFrom($db, $prefix, $series, (string) ($_GET['from'] ?? ''));
+                // is_string statt (string)-Cast: from[]=... liefert ein Array,
+                // dessen Cast eine PHP-Warnung ausloest (samt Server-Pfad im
+                // Log) statt einfach als ungueltiges Datum durchzufallen.
+                $from = $_GET['from'] ?? '';
+                seriesHandleEndFrom($db, $prefix, $series, is_string($from) ? $from : '');
                 return;
 
             default:
