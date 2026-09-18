@@ -612,3 +612,95 @@ test('Beenden: from als Array erzeugt keine PHP-Warnung und liefert 400', functi
         asDropWorld($world);
     }
 });
+
+// ---- Dieser und alle folgenden (PUT) -----------------------------------------
+
+function asSeriesPut(int $seriesId, array $body): array
+{
+    return apiRequest('PUT', 'appointment_series', ['token' => apiToken('admin'),
+        'query' => ['id' => $seriesId], 'body' => $body]);
+}
+
+test('PUT aendert die folgenden Termine an Ort und Stelle, IDs bleiben', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $before = array_column(asAppointments($world), 'appointment_id', 'date');
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-18', 'location' => 'Aula', 'start_time' => '19:00']);
+        assertStatus(200, $res);
+        assertSame(3, $res['body']['updated']);
+        assertSame([], $res['body']['detached']);
+
+        $after = asAppointments($world);
+        assertSame($before, array_column($after, 'appointment_id', 'date'), 'IDs unveraendert');
+        foreach ($after as $apt) {
+            $changed = $apt['date'] >= '2031-03-18';
+            assertSame($changed ? 'Aula' : 'Probelokal', $apt['location'], $apt['date']);
+            assertSame($changed ? '19:00:00' : '19:30:00', $apt['start_time'], $apt['date']);
+        }
+        $series = asSeriesGet($sid);
+        assertSame('Aula', $series['location'], 'Die Vorlage folgt');
+        assertSame('19:00:00', $series['start_time']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT laesst abgeloeste Termine aus', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-25');
+        assertStatus(200, apiRequest('PUT', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $apt['appointment_id']], 'body' => ['title' => 'Sonderprobe']]));
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'title' => 'Gesamtprobe']);
+        assertStatus(200, $res);
+        assertSame(4, $res['body']['updated']);
+        assertSame('Sonderprobe', asAptOn($world, '2031-03-25')['title']);
+        assertSame('Gesamtprobe', asAptOn($world, '2031-04-01')['title']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT: ein Termin, der dadurch kollidieren wuerde, bleibt unveraendert und wird abgeloest', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        assertStatus(201, asPostAppointment($world, ['date' => '2031-03-25', 'start_time' => '08:00', 'title' => 'Konzert']));
+
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-18', 'start_time' => '08:00']);
+        assertStatus(200, $res);
+        assertSame(2, $res['body']['updated']);
+        assertSame(['2031-03-25'], array_column($res['body']['detached'], 'date'));
+
+        $kept = null;
+        foreach (asAppointments($world) as $a) {
+            if ($a['date'] === '2031-03-25' && $a['title'] === 'AS-Probe') {
+                $kept = $a;
+            }
+        }
+        assertTrue($kept !== null);
+        assertSame('19:30:00', $kept['start_time']);
+        assertSame(1, (int) $kept['is_detached']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT prueft Vorlage und Datum', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        assertStatus(400, asSeriesPut($sid, ['from_date' => '2031-02-01', 'title' => 'X']), 'Datum vor der Serie');
+        assertStatus(400, asSeriesPut($sid, ['from_date' => '2031-03-11', 'title' => '']), 'leerer Titel');
+        assertStatus(400, asSeriesPut($sid, ['from_date' => '2031-03-11', 'end_time' => '19:30']), 'Ende = Beginn');
+        $none = asSeriesPut($sid, ['from_date' => '2031-03-11']);
+        assertStatus(200, $none);
+        assertSame(0, $none['body']['updated']);
+    } finally {
+        asDropWorld($world);
+    }
+});

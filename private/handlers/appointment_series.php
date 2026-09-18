@@ -65,6 +65,10 @@ function handleAppointmentSeries($db, $database, $method, $id): void
                 seriesRespond(400, ['message' => 'Unbekannte Aktion']);
                 return;
 
+            case 'PUT':
+                seriesHandleUpdateFollowing($db, $prefix, $series, $raw, $tol);
+                return;
+
             case 'DELETE':
                 // is_string statt (string)-Cast: from[]=... liefert ein Array,
                 // dessen Cast eine PHP-Warnung ausloest (samt Server-Pfad im
@@ -173,4 +177,75 @@ function seriesHandleEndFrom(PDO $db, string $prefix, array $series, string $fro
     $db->commit();
 
     seriesRespond(200, $result);
+}
+
+/**
+ * "Dieser und alle folgenden" ohne Regelaenderung: Vorlage und die folgenden,
+ * nicht abgeloesten Termine an Ort und Stelle aendern. IDs bleiben, damit
+ * Rueckmeldungen und Anwesenheiten haengen bleiben.
+ */
+function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, array $raw, int $tol): void
+{
+    // is_string statt (string)-Cast: ein nicht-stringer from_date-Wert im
+    // JSON-Body (z. B. ein Array) soll als ungueltiges Datum durchfallen statt
+    // eine PHP-Warnung (samt Server-Pfad im Log) auszuloesen.
+    $fromRaw = $raw['from_date'] ?? '';
+    $from = is_string($fromRaw) ? $fromRaw : '';
+    if (!seriesDateInRange($from, $series)) {
+        seriesRespond(400, ['message' => 'Das Datum liegt nicht innerhalb der Serie']);
+        return;
+    }
+
+    $provided = array_values(array_intersect(SERIES_TEMPLATE_FIELDS, array_keys($raw)));
+    if ($provided === []) {
+        seriesRespond(200, ['updated' => 0, 'detached' => []]);
+        return;
+    }
+
+    $merged = array_merge(seriesTemplateOf($series), array_intersect_key($raw, array_flip($provided)));
+    [$template, $fehler] = seriesNormalizeTemplate($merged);
+    if ($fehler === null && $template['type_id'] !== null && !seriesTypeExists($db, $prefix, $template['type_id'])) {
+        $fehler = 'Die Terminart existiert nicht';
+    }
+    if ($fehler !== null) {
+        seriesRespond(400, ['message' => $fehler]);
+        return;
+    }
+
+    $checkConflicts = in_array('start_time', $provided, true) || in_array('type_id', $provided, true);
+    $setClause = implode(', ', array_map(fn (string $f): string => "{$f} = ?", $provided));
+    $setValues = array_map(fn (string $f) => $template[$f], $provided);
+
+    $db->beginTransaction();
+
+    $db->prepare("UPDATE {$prefix}appointment_series
+                  SET title = ?, type_id = ?, description = ?, start_time = ?, end_time = ?, location = ?
+                  WHERE series_id = ?")
+       ->execute([$template['title'], $template['type_id'], $template['description'], $template['start_time'],
+                  $template['end_time'], $template['location'], $series['series_id']]);
+
+    $update = $db->prepare("UPDATE {$prefix}appointments SET {$setClause} WHERE appointment_id = ?");
+    $detach = $db->prepare("UPDATE {$prefix}appointments SET is_detached = 1 WHERE appointment_id = ?");
+    $updated  = 0;
+    $detached = [];
+
+    foreach (seriesFollowing($db, $prefix, $series['series_id'], $from) as $row) {
+        if ($checkConflicts) {
+            $conflict = findAppointmentConflict($db, $prefix, $row['date'], $template['start_time'],
+                                                $template['type_id'], $tol, [$row['appointment_id']]);
+            if ($conflict !== null) {
+                $detach->execute([$row['appointment_id']]);
+                $detached[] = ['appointment_id' => $row['appointment_id'], 'date' => $row['date'],
+                               'reason' => 'conflict', 'conflict' => ['title' => $conflict['title'],
+                               'start_time' => $conflict['start_time']]];
+                continue;
+            }
+        }
+        $update->execute(array_merge($setValues, [$row['appointment_id']]));
+        $updated++;
+    }
+
+    $db->commit();
+
+    seriesRespond(200, ['updated' => $updated, 'detached' => $detached]);
 }
