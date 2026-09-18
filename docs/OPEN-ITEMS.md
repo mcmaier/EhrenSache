@@ -2546,6 +2546,18 @@ sichtbar nur für Admin und Manager, da ein einfacher Nutzer keine Termine anleg
 ist, dass Tage **mit** Terminen bereits ein Klickverhalten haben (Popup mit der Terminliste);
 beides muss sich vertragen, statt einander zu überlagern.
 
+**Vorschlag vom 2026-09-18:** Kein eigenes Kontextmenü. Es kostet beim leeren Tag einen Klick
+mehr, und ein Rechtsklick ist auf dem Telefon nicht auffindbar. Stattdessen:
+
+- **Leerer Tag** → Anlegen-Dialog direkt, Datum vorbelegt.
+- **Tag mit Terminen** → das vorhandene Popup (`showAppointmentPopup()`) bleibt und bekommt je
+  Termin „Bearbeiten" sowie unten „+ Termin an diesem Tag".
+
+Damit gibt es ein Bedienmuster statt zwei. Für einfache Nutzer bleibt alles wie heute.
+**Eingeplant** zusammen mit [FI-7](FEATURE-IDEAS.md#fi-7--terminserien-für-wiederkehrende-proben)
+für 1.11.0, nach 1.10.0 — das Popup und der Termin-Dialog werden dort gerade um Ort und Ende
+erweitert.
+
 **Nicht sicherheitsrelevant.**
 
 ---

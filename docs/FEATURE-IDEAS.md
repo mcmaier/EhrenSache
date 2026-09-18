@@ -399,6 +399,12 @@ verschoben wird?
 Wochenserie ohne die Option „Feiertage überspringen" legt den Termin zuverlässig auf
 Fronleichnam.
 
+**Eingeplant am 2026-09-18** als 1.11.0, zusammen mit dem Feiertagsteil von FI-16 und
+[OI-64](OPEN-ITEMS.md#oi-64--im-kalender-lässt-sich-kein-termin-anlegen) (Anlegen per Klick in
+den Kalender — dort beginnt eine Serie). Erst nach 1.10.0: Eine Serie muss Ort und Ende aus
+[FI-23](#fi-23--ort-und-ende-am-termin) mitführen, und beide Vorhaben bräuchten sonst eine
+Migration mit demselben `from`.
+
 ---
 
 ### FI-23 · Ort und Ende am Termin
@@ -495,6 +501,10 @@ einlesen, etwa Schulferien — ist ein anderes Feature mit anderen Problemen und
 Wiederholungsregel hier ohne Zusatzarbeit an, weil die Serie ohnehin in RFC-5545-Schreibweise
 vorliegt.
 
+**Stand 2026-09-18:** Nach 1.10.0 (FI-23) erfüllt, damit echt „S". Bewusst **nicht** Teil von
+1.11.0 (FI-7/FI-16) — unabhängig davon und als eigenes kleines Paket vor oder nach der Serie
+möglich; danach entfällt nur der Nachtrag der Regel.
+
 ---
 
 ### FI-16 · Feiertage und Ferien im Terminkalender
@@ -535,6 +545,10 @@ Widerspruch zu `requires` in `version.json`. Eine eigene kleine Klasse (Arbeitst
 - **Was heißt „überspringen"?** Den Termin gar nicht erzeugen oder ihn als abgesagt anlegen?
   Ersteres ist sauberer, Letzteres zeigt dem Mitglied, dass an dem Tag bewusst nichts ist.
   Berührt `is_cancelled` und `exdates` aus FI-7 und ist dort mitzuentscheiden.
+
+**Eingeplant am 2026-09-18:** Der **Feiertagsteil** geht mit FI-7 in 1.11.0. Ferien bleiben
+draußen — sie hängen an [FI-18](#fi-18--kalender-import-ics), und das ist nicht eingeplant.
+Einen „Feiertag-Import" gibt es in diesem Sinne nicht: berechnet, nicht eingelesen.
 
 ---
 
