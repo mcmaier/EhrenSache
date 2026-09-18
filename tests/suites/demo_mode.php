@@ -102,6 +102,7 @@ test('Die Erlaubnisliste entspricht der Spezifikation', function () {
         'auth'              => ['POST'],
         'members'           => ['POST', 'PUT', 'DELETE'],
         'appointments'      => ['POST', 'PUT', 'DELETE'],
+        'appointment_series' => ['POST', 'PUT', 'DELETE'],
         'records'           => ['POST', 'PUT', 'DELETE'],
         'exceptions'        => ['POST', 'PUT', 'DELETE'],
         'appointment_responses' => ['PUT', 'DELETE'],

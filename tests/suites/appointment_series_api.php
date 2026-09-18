@@ -103,3 +103,152 @@ test('PUT: Verschieben in eine Dublette liefert 409, der Termin selbst zaehlt ni
         asDropWorld($world);
     }
 });
+
+// ---- Serien anlegen ----------------------------------------------------------
+
+function asSeriesBody(array $world, array $extra = []): array
+{
+    return array_merge([
+        'rrule' => 'FREQ=WEEKLY;INTERVAL=1;BYDAY=TU', 'start_date' => '2031-03-04', 'until' => '2031-04-01',
+        'title' => 'AS-Probe', 'type_id' => $world['type'], 'start_time' => '19:30', 'end_time' => '22:00',
+        'location' => 'Probelokal', 'description' => null,
+    ], $extra);
+}
+
+function asSeriesPost(array $body, array $query = [], string $role = 'admin'): array
+{
+    return apiRequest('POST', 'appointment_series', ['token' => apiToken($role), 'query' => $query, 'body' => $body]);
+}
+
+function asSeriesGet(int $seriesId): array
+{
+    $res = apiRequest('GET', 'appointment_series', ['token' => apiToken('admin'), 'query' => ['id' => $seriesId]]);
+    assertStatus(200, $res);
+
+    return $res['body'];
+}
+
+test('Vorschau liefert alle Daten und schreibt nichts', function () {
+    $world = asWorld();
+    try {
+        $res = asSeriesPost(asSeriesBody($world), ['preview' => 1]);
+        assertStatus(200, $res);
+        assertSame(['2031-03-04', '2031-03-11', '2031-03-18', '2031-03-25', '2031-04-01'],
+            array_column($res['body']['occurrences'], 'date'));
+        assertSame(5, $res['body']['count']);
+        assertSame([], asAppointments($world), 'Die Vorschau darf nichts anlegen');
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Vorschau kennzeichnet Feiertage mit Namen', function () {
+    $world = asWorld();
+    try {
+        $res = asSeriesPost(asSeriesBody($world, ['rrule' => 'FREQ=WEEKLY;BYDAY=FR',
+            'start_date' => '2031-04-04', 'until' => '2031-04-25']), ['preview' => 1]);
+        assertStatus(200, $res);
+        $byDate = array_column($res['body']['occurrences'], null, 'date');
+        assertSame('Karfreitag', $byDate['2031-04-11']['holiday']);
+        assertSame(null, $byDate['2031-04-04']['holiday']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Anlegen erzeugt Einzeltermine mit Serienbezug und Vorlage', function () {
+    $world = asWorld();
+    try {
+        $res = asSeriesPost(asSeriesBody($world));
+        assertStatus(201, $res);
+        assertSame(5, $res['body']['created']);
+        assertSame([], $res['body']['skipped']);
+
+        $apts = asAppointments($world);
+        assertSame(5, count($apts));
+        foreach ($apts as $apt) {
+            assertSame((int) $res['body']['series_id'], (int) $apt['series_id']);
+            assertSame(0, (int) $apt['is_detached']);
+            assertSame('AS-Probe', $apt['title']);
+            assertSame('22:00:00', $apt['end_time']);
+            assertSame('Probelokal', $apt['location']);
+        }
+
+        $series = asSeriesGet((int) $res['body']['series_id']);
+        assertSame('FREQ=WEEKLY;INTERVAL=1;BYDAY=TU', $series['rrule']);
+        assertSame(5, $series['appointment_count']);
+        assertSame(0, $series['detached_count']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Kollision wird in der Vorschau gezeigt, beim Anlegen ausgelassen und in exdates vermerkt', function () {
+    $world = asWorld();
+    try {
+        assertStatus(201, asPostAppointment($world, ['date' => '2031-03-18', 'title' => 'Konzert']));
+
+        $preview = asSeriesPost(asSeriesBody($world), ['preview' => 1]);
+        $byDate = array_column($preview['body']['occurrences'], null, 'date');
+        assertSame('Konzert', $byDate['2031-03-18']['conflict']['title'] ?? null);
+        assertSame(4, $preview['body']['count']);
+
+        $res = asSeriesPost(asSeriesBody($world));
+        assertStatus(201, $res);
+        assertSame(4, $res['body']['created']);
+        assertSame(['2031-03-18'], array_column($res['body']['skipped'], 'date'));
+        assertSame(['2031-03-18'], asSeriesGet((int) $res['body']['series_id'])['exdates']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Abgewaehlte Daten (exdates) entstehen nicht', function () {
+    $world = asWorld();
+    try {
+        $res = asSeriesPost(asSeriesBody($world, ['exdates' => ['2031-03-11']]));
+        assertStatus(201, $res);
+        assertSame(4, $res['body']['created']);
+        assertTrue(!in_array('2031-03-11', array_column(asAppointments($world), 'date'), true));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Anlegen: ungueltige Definitionen liefern 400 und schreiben nichts', function () {
+    $world = asWorld();
+    try {
+        $cases = [
+            'Regel'          => ['rrule' => 'FREQ=DAILY'],
+            'Ende vor Beginn'=> ['until' => '2031-03-01'],
+            'ueber 12 Monate'=> ['until' => '2032-03-05'],
+            'kein Titel'     => ['title' => '  '],
+            'Startzeit'      => ['start_time' => '25:00'],
+            'Ende = Beginn'  => ['end_time' => '19:30'],
+            'exdates'        => ['exdates' => ['2031-02-30']],
+            'kein Termin'    => ['rrule' => 'FREQ=MONTHLY;BYDAY=-1WE', 'until' => '2031-03-10'],
+            'Terminart'      => ['type_id' => 999999],
+        ];
+        foreach ($cases as $name => $extra) {
+            assertStatus(400, asSeriesPost(asSeriesBody($world, $extra)), $name);
+        }
+        assertSame([], asAppointments($world));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Serien sind Admin und Manager vorbehalten', function () {
+    $world = asWorld();
+    try {
+        assertStatus(403, asSeriesPost(asSeriesBody($world), ['preview' => 1], 'user'));
+        assertStatus(200, asSeriesPost(asSeriesBody($world), ['preview' => 1], 'manager'));
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('Unbekannte Serie liefert 404', function () {
+    $res = apiRequest('GET', 'appointment_series', ['token' => apiToken('admin'), 'query' => ['id' => 99999999]]);
+    assertStatus(404, $res);
+});

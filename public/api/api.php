@@ -55,6 +55,7 @@ require_once '../../private/helpers/appointment_details.php';
 require_once '../../private/helpers/recurrence.php';
 require_once '../../private/helpers/holidays.php';
 require_once '../../private/helpers/appointment_rules.php';
+require_once '../../private/helpers/appointment_series.php';
 require_once '../../private/helpers/groups.php';
 require_once '../../private/helpers/demo_mode.php';
 
@@ -86,6 +87,7 @@ require_once '../../private/handlers/station.php';
 require_once '../../private/helpers/update_status.php';
 require_once '../../private/handlers/update_check.php';
 require_once '../../private/handlers/appointment_responses.php';
+require_once '../../private/handlers/appointment_series.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -563,7 +565,10 @@ try {
         break;
     case 'appointments':
         handleAppointments($db, $database, $request_method, $id);
-        break;       
+        break;
+    case 'appointment_series':
+        handleAppointmentSeries($db, $database, $request_method, $id);
+        break;
     case 'records':
         handleRecords($db, $database, $request_method, $id);
         break;
