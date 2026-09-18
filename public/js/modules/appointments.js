@@ -13,6 +13,7 @@ import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml } from './utils.js';
 import { loadTypes } from './management.js';
+import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS } from './responses.js';
@@ -26,6 +27,7 @@ import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_
 let currentCalendarDate = new Date();
 
 let currentAppointmentsPage = 1;
+let appointmentFiltersBound = false;
 let appointmentsPerPage = 25;
 let allFilteredAppointments = [];
 
@@ -73,6 +75,74 @@ async function loadAppointmentData(appointmentId) {
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
+/**
+ * Baut den Terminart-Filter auf. Neu aufgebaut wird nur bei forceReload oder
+ * solange ausser der Vorgabe nichts drinsteht -- showAppointmentSection() ist
+ * zugleich der Einstiegspunkt der Filter-Listener und liefe sonst bei jedem
+ * Filterwechsel erneut durch.
+ */
+async function fillAppointmentFilters(forceReload = false) {
+    const select = document.getElementById('filterAppointmentType');
+    if (!select) return;
+
+    if (!forceReload && select.options.length > 1) return;
+
+    const aptTypes      = await loadTypes(forceReload);
+    const userGroupIds  = await getUserGroupIds();
+    const vorherigeWahl = select.value;
+
+    select.innerHTML = '<option value="">Alle Terminarten</option>';
+
+    (aptTypes || []).forEach(aptt => {
+        // getUserGroupIds() liefert null fuer Admin und Manager -- die sehen alles.
+        if (userGroupIds !== null) {
+            if (!aptt.groups || aptt.groups.length === 0) return;
+            if (!aptt.groups.some(g => userGroupIds.includes(g.group_id))) return;
+        }
+
+        const option = document.createElement('option');
+        option.value = aptt.type_id;
+        option.textContent = aptt.type_name;
+        if (aptt.color) {
+            option.style.color = aptt.color;
+            option.style.fontWeight = '500';
+        }
+        select.appendChild(option);
+    });
+
+    // Auswahl nur wiederherstellen, wenn es sie noch gibt -- sonst bleibt
+    // der Browser bei der leeren Vorgabe.
+    select.value = vorherigeWahl;
+}
+
+export function initAppointmentEventHandlers() {
+    if (appointmentFiltersBound) return;
+
+    document.getElementById('filterAppointmentType')?.addEventListener('change', () => {
+        showAppointmentSection(false, 1);
+    });
+
+    document.getElementById('filterAppointmentOrigin')?.addEventListener('change', () => {
+        showAppointmentSection(false, 1);
+    });
+
+    document.getElementById('resetAppointmentFilter')?.addEventListener('click', () => {
+        resetAppointmentFilter();
+    });
+
+    appointmentFiltersBound = true;
+}
+
+export async function resetAppointmentFilter() {
+    const typ      = document.getElementById('filterAppointmentType');
+    const herkunft = document.getElementById('filterAppointmentOrigin');
+
+    if (typ) typ.value = '';
+    if (herkunft) herkunft.value = '';
+
+    await showAppointmentSection(false, 1);
+}
+
 export async function showAppointmentSection(forceReload = false, page = 1)
 {
     debug.log("== Show Appointment Section == ")
@@ -81,13 +151,25 @@ export async function showAppointmentSection(forceReload = false, page = 1)
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'termine')
     {
+        await fillAppointmentFilters(forceReload);
+
         // Der Filter arbeitet auf den bereits geladenen Daten. Ein eigener
         // Serverparameter waere hier ohne Gewinn: Die Termine eines Jahres
-        // liegen ohnehin vollstaendig im Cache.
-        const nurAuto = document.getElementById('appointmentAutoFilter')?.checked;
-        const gefiltert = nurAuto
-            ? (appointmentData || []).filter(a => Number(a.is_auto_created) === 1)
-            : appointmentData;
+        // liegen ohnehin vollstaendig im Cache. Die Werte kommen aus dem DOM,
+        // weil loadYearDependentData() (ui.js) diese Funktion ohne Parameter ruft.
+        const typ      = document.getElementById('filterAppointmentType')?.value || '';
+        const herkunft = document.getElementById('filterAppointmentOrigin')?.value || '';
+
+        let gefiltert = appointmentData || [];
+
+        if (typ) {
+            gefiltert = gefiltert.filter(a => String(a.type_id) === typ);
+        }
+        if (herkunft === 'auto') {
+            gefiltert = gefiltert.filter(a => Number(a.is_auto_created) === 1);
+        } else if (herkunft === 'manual') {
+            gefiltert = gefiltert.filter(a => Number(a.is_auto_created) !== 1);
+        }
 
         renderAppointments(gefiltert, page);
     }
@@ -812,6 +894,7 @@ window.previousMonth = previousMonth;
 window.nextMonth = nextMonth;
 window.goToToday = goToToday;
 window.showAppointmentSection = showAppointmentSection;
+window.resetAppointmentFilter = resetAppointmentFilter;
 
 // Fuer responses.js (FI-1): Terminliste auf der aktuell gezeigten Seite neu
 // laden, ohne die Seite zu wechseln. Der Cache wurde vorher per

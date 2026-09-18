@@ -14,7 +14,7 @@ import {apiCall, isAdmin, isAdminOrManager, currentUser} from './api.js';
 import {loadProfile, initProfileEventHandler} from './profile.js';
 import {loadUsers, showUserSection, initUsersEventHandlers} from'./users.js';
 import {showDeviceSection} from'./devices.js';
-import {loadAppointments, setCalendarToYear, showAppointmentSection} from'./appointments.js';
+import {loadAppointments, setCalendarToYear, showAppointmentSection, initAppointmentEventHandlers} from'./appointments.js';
 import {loadExceptions, showExceptionSection, initExceptionEventHandlers} from'./exceptions.js';
 import {loadRecords, showRecordsSection, initRecordEventHandlers, resetRecordFilter} from'./records.js';
 import {loadMembers, showMemberSection} from'./members.js';
@@ -818,6 +818,7 @@ export function initNavTabs() {
 
 export async function initEventHandlers()
 {
+    initAppointmentEventHandlers();
     initRecordEventHandlers();
     initExceptionEventHandlers();
     initStatisticsEventHandlers();
