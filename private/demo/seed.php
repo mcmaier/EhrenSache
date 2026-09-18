@@ -28,11 +28,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers/bootstrap.php';
 require_once __DIR__ . '/plan.php';
 
-// Seit 1.8.0 schreibt der Generator member_groups mit is_subgroup/sort_order
-// (Register); ältere Schemata kennen die Spalten nicht. 1.7.0 war die
-// vorherige Schwelle, weil der Generator seitdem appointment_responses
-// schreibt.
-const DEMO_MIN_SCHEMA = '1.8.0';
+// Seit 1.11.0 leert clearAll() appointment_series; ältere Schemata kennen die
+// Tabelle nicht, das DELETE bräche ab. Davor war 1.8.0 die Schwelle
+// (member_groups mit is_subgroup/sort_order), davor 1.7.0
+// (appointment_responses).
+const DEMO_MIN_SCHEMA = '1.11.0';
 
 /**
  * Reihenfolge beim Leeren: Kinder vor Eltern.
@@ -46,6 +46,7 @@ const DEMO_TABLES = [
     'records',
     'appointment_type_groups',
     'appointments',
+    'appointment_series',
     'appointment_types',
     'activity_type_appointment_types',
     'activity_type_groups',
