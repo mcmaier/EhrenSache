@@ -423,6 +423,13 @@ function importAppointments($db, $database, $filePath) {
                 }
             }
             
+            // Ort und Ende (FI-23): nur Spalten, die in der Datei stehen.
+            $details = appointmentImportDetails($row, $startTime);
+            if ($details['error'] !== null) {
+                $errors[] = "Row $rowNumber: " . $details['error'];
+                continue;
+            }
+
             // Finde Terminart
             if (!isset($typeCache[$typeName])) {
                 $errors[] = "Row $rowNumber: Appointment type '$typeName' not found";
@@ -440,21 +447,33 @@ function importAppointments($db, $database, $filePath) {
             $existing = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($existing) {
-                // Update existierenden Termin
-                $stmt = $db->prepare("
-                    UPDATE {$prefix}appointments 
-                    SET title=?, description=?
-                    WHERE appointment_id=?
-                ");
-                $stmt->execute([$title, $description, $existing['appointment_id']]);
+                // Update existierenden Termin. Ort und Ende nur, wenn die Datei
+                // die Spalte fuehrt -- sonst bleibt der gespeicherte Wert.
+                $setFields = ['title = ?', 'description = ?'];
+                $params    = [$title, $description];
+                foreach ($details['fields'] as $feld => $wert) {
+                    $setFields[] = "{$feld} = ?";
+                    $params[]    = $wert;
+                }
+                $params[] = $existing['appointment_id'];
+
+                $stmt = $db->prepare("UPDATE {$prefix}appointments SET " . implode(', ', $setFields)
+                                     . " WHERE appointment_id = ?");
+                $stmt->execute($params);
                 $updated++;
             } else {
-                // Neuen Termin erstellen
-                $stmt = $db->prepare("
-                    INSERT INTO {$prefix}appointments (type_id, date, start_time, title, description)
-                    VALUES (?, ?, ?, ?, ?)
-                ");
-                $stmt->execute([$typeId, $date, $startTime, $title, $description]);
+                // Neuen Termin erstellen. $feld stammt ausschliesslich aus
+                // appointmentImportDetails() -- location oder end_time.
+                $spalten = ['type_id', 'date', 'start_time', 'title', 'description'];
+                $werte   = [$typeId, $date, $startTime, $title, $description];
+                foreach ($details['fields'] as $feld => $wert) {
+                    $spalten[] = $feld;
+                    $werte[]   = $wert;
+                }
+
+                $stmt = $db->prepare("INSERT INTO {$prefix}appointments (" . implode(', ', $spalten) . ")
+                                      VALUES (" . implode(', ', array_fill(0, count($spalten), '?')) . ")");
+                $stmt->execute($werte);
                 $imported++;
             }
         }

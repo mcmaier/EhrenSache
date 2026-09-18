@@ -140,7 +140,7 @@ function exportAppointments($db, $database) {
     $prefix = $database->table('');
     
     $stmt = $db->prepare("
-        SELECT a.appointment_id, a.date, a.start_time, a.title, a.description,
+        SELECT a.appointment_id, a.date, a.start_time, a.end_time, a.title, a.description, a.location,
                at.type_name,
                GROUP_CONCAT(DISTINCT g.group_name SEPARATOR '|') as group_names
         FROM {$prefix}appointments a
@@ -164,8 +164,10 @@ function exportAppointments($db, $database) {
     // beim Reimport mit "missing required columns" abgewiesen wurde, bevor
     // eine Zeile gelesen war. Reihenfolge und Zusatzspalten sind egal — der
     // Import liest ueber array_combine() nach Namen. Siehe OI-24.
-    csvRow($output, ['date', 'start_time', 'title', 'type_name', 'groups', 'description'], ';');
-    
+    // end_time und location (FI-23) stehen hinten: Auswertungen, die nach
+    // Position lesen, verrutschen so nicht.
+    csvRow($output, ['date', 'start_time', 'title', 'type_name', 'groups', 'description', 'end_time', 'location'], ';');
+
     foreach ($appointments as $apt) {
         csvRow($output, [
             $apt['date'],
@@ -173,7 +175,9 @@ function exportAppointments($db, $database) {
             $apt['title'],
             $apt['type_name'],
             $apt['group_names'] ?? '',
-            $apt['description']
+            $apt['description'],
+            $apt['end_time'],
+            $apt['location'],
         ], ';');
     }
     

@@ -178,3 +178,11 @@ test('export/import: eine leere Ankunftszeit ist zulaessig, wenn der Terminschlu
         'Das Toleranzfenster laeuft auch ohne Ankunftszeit an'
     );
 });
+
+test('export/import: Termin-Export fuehrt end_time und location als letzte Spalten', function () {
+    // Hinten angehaengt, damit Auswertungen, die nach Position lesen, nicht
+    // verrutschen. Der Import liest nach Namen und nimmt beide optional an.
+    $header = exportHeader('appointments');
+    assertSame(['end_time', 'location'], array_slice($header, -2),
+        'Letzte Spalten des Termin-Exports: ' . implode(', ', $header));
+});
