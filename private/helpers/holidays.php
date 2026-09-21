@@ -19,6 +19,12 @@
  * (Mariae Himmelfahrt in Bayern, Augsburger Friedensfest, Fronleichnam in
  * Teilen Sachsens und Thueringens) sowie einmalige (Reformationstag 2017
  * bundesweit, 8.5.2025 in Berlin). Der Hinweis an der Einstellung sagt das.
+ *
+ * Ostersonntag und Pfingstsonntag sind gesetzlich nur in Brandenburg
+ * Feiertage, werden hier aber bewusst fuer alle Bundeslaender und ohne
+ * Bundesland erzeugt: es sind Sonntage, an denen im Vereinsleben ohnehin
+ * nicht geprobt wird. Fuer die Serienvorschau und den Kalender zaehlt das,
+ * der Rechtsstatus ist dafuer unerheblich.
  */
 declare(strict_types=1);
 
@@ -66,9 +72,11 @@ function holidaysForYear(int $year, ?string $region): array
 
     $add($f('01-01'), 'Neujahr');
     $add($e(-2), 'Karfreitag');
+    $add($e(0), 'Ostersonntag');
     $add($e(1), 'Ostermontag');
     $add($f('05-01'), 'Tag der Arbeit');
     $add($e(39), 'Christi Himmelfahrt');
+    $add($e(49), 'Pfingstsonntag');
     $add($e(50), 'Pfingstmontag');
     $add($f('10-03'), 'Tag der Deutschen Einheit');
     $add($f('12-25'), '1. Weihnachtstag');
@@ -82,10 +90,6 @@ function holidaysForYear(int $year, ?string $region): array
     }
     if (($r === 'BE' && $year >= 2019) || ($r === 'MV' && $year >= 2023)) {
         $add($f('03-08'), 'Internationaler Frauentag');
-    }
-    if ($r === 'BB') {
-        $add($e(0), 'Ostersonntag');
-        $add($e(49), 'Pfingstsonntag');
     }
     if ($in(['BW', 'BY', 'HE', 'NW', 'RP', 'SL'])) {
         $add($e(60), 'Fronleichnam');

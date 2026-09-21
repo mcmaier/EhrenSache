@@ -16,13 +16,15 @@ test('Ostersonntag 2024 bis 2030', function () {
     }
 });
 
-test('Ohne Bundesland genau die neun bundesweiten Feiertage', function () {
+test('Ohne Bundesland genau die elf bundesweiten Feiertage', function () {
     assertSame([
         '2026-01-01' => 'Neujahr',
         '2026-04-03' => 'Karfreitag',
+        '2026-04-05' => 'Ostersonntag',
         '2026-04-06' => 'Ostermontag',
         '2026-05-01' => 'Tag der Arbeit',
         '2026-05-14' => 'Christi Himmelfahrt',
+        '2026-05-24' => 'Pfingstsonntag',
         '2026-05-25' => 'Pfingstmontag',
         '2026-10-03' => 'Tag der Deutschen Einheit',
         '2026-12-25' => '1. Weihnachtstag',
@@ -62,11 +64,11 @@ test('Einfuehrungsjahre werden beachtet', function () {
     assertTrue(isset(holidaysBetween('2023-03-08', '2023-03-08', 'MV')['2023-03-08']));
 });
 
-test('Thueringen: Weltkindertag; Brandenburg: Oster- und Pfingstsonntag', function () {
+test('Thueringen: Weltkindertag; Oster- und Pfingstsonntag ueberall, z.B. Bayern', function () {
     assertSame('Weltkindertag', holidaysBetween('2026-09-20', '2026-09-20', 'TH')['2026-09-20'] ?? null);
-    $bb = holidaysBetween('2026-01-01', '2026-12-31', 'BB');
-    assertSame('Ostersonntag', $bb['2026-04-05'] ?? null);
-    assertSame('Pfingstsonntag', $bb['2026-05-24'] ?? null);
+    $by = holidaysBetween('2026-01-01', '2026-12-31', 'BY');
+    assertSame('Ostersonntag', $by['2026-04-05'] ?? null);
+    assertSame('Pfingstsonntag', $by['2026-05-24'] ?? null);
 });
 
 test('Saarland: Mariae Himmelfahrt; Bayern bewusst nicht', function () {

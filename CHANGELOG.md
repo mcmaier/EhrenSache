@@ -16,7 +16,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Termin ändern, ab einem Termin beenden. Termine mit erfassten Daten werden dabei nie gelöscht,
   sondern aus der Serie gelöst.
 - **Feiertage** (FI-16): berechnet je Bundesland (Einstellung unter Termine → Kalender), im
-  Kalender angezeigt und in der Serienvorschau abgewählt.
+  Kalender angezeigt und in der Serienvorschau abgewählt; Oster- und Pfingstsonntag erscheinen
+  dabei unabhängig vom Bundesland immer.
 - **Termin per Klick im Kalender anlegen** (OI-64); das Popup belegter Tage bietet „Bearbeiten"
   und „+ Termin an diesem Tag".
 
