@@ -234,6 +234,99 @@ function () use ($repoRoot) {
     );
 });
 
+test('Check-in-PWA: die Terminauswahl der Zeiterfassung ist ein begrenztes Fenster, nicht das Jahr',
+function () use ($repoRoot) {
+    $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+
+    // Ohne Fenster liefert loadWorktimeAppointments() alle Termine des
+    // laufenden Jahres -- mit Terminserien laeuft das auf Dutzende Eintraege
+    // hinaus. Die Konstanten muessen benannt sein, nicht als Magic Number im
+    // setDate() vergraben, sonst findet sie niemand wieder.
+    assertTrue(
+        preg_match('/const\s+WORKTIME_APPOINTMENT_PAST_DAYS\s*=\s*60\s*;/', $js) === 1,
+        'WORKTIME_APPOINTMENT_PAST_DAYS fehlt oder steht nicht auf 60'
+    );
+    assertTrue(
+        preg_match('/const\s+WORKTIME_APPOINTMENT_FUTURE_DAYS\s*=\s*30\s*;/', $js) === 1,
+        'WORKTIME_APPOINTMENT_FUTURE_DAYS fehlt oder steht nicht auf 30'
+    );
+
+    $body = frontendFunctionBody($js, 'loadWorktimeAppointments');
+
+    // from_date/to_date statt year: nur so traegt der Abruf den Jahreswechsel
+    // (Januar braucht Vorjahres-Termine, Dezember braucht welche aus dem
+    // naechsten Jahr).
+    assertTrue(strpos($body, 'from_date') !== false, 'loadWorktimeAppointments() ruft ohne from_date ab');
+    assertTrue(strpos($body, 'to_date') !== false, 'loadWorktimeAppointments() ruft ohne to_date ab');
+    assertTrue(
+        preg_match('/\byear\s*:/', $body) === 0,
+        'loadWorktimeAppointments() grenzt noch ueber year statt from_date/to_date ein'
+    );
+    assertTrue(
+        strpos($body, 'WORKTIME_APPOINTMENT_PAST_DAYS') !== false
+        && strpos($body, 'WORKTIME_APPOINTMENT_FUTURE_DAYS') !== false,
+        'loadWorktimeAppointments() nutzt die Fenster-Konstanten nicht'
+    );
+});
+
+test('Check-in-PWA: die Terminauswahl der Zeiterfassung gruppiert in optgroups',
+function () use ($repoRoot) {
+    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $body = frontendFunctionBody($js, 'worktimeAppointmentOptionsHtml');
+
+    // Ohne Gruppen alternieren vergangene und kommende Termine in der Liste
+    // (Sortierung nach Naehe zu heute, bis 1.11.0) -- fuer das Mitglied nicht
+    // mehr auseinanderzuhalten. Die drei Gruppen decken den Regelfall ab, eine
+    // vierte nimmt die bereits zugeordnete Sitzung ausserhalb des Fensters auf
+    // (siehe fillWorkSessionAppointments()).
+    foreach (['Heute', 'Zurückliegend', 'Kommend', 'Zugeordnet'] as $gruppe) {
+        assertTrue(
+            strpos($body, "'{$gruppe}'") !== false,
+            "worktimeAppointmentOptionsHtml() kennt die Gruppe '{$gruppe}' nicht"
+        );
+    }
+
+    assertTrue(
+        strpos($body, '<optgroup') !== false,
+        'worktimeAppointmentOptionsHtml() baut kein <optgroup>'
+    );
+
+    // "— kein Termin —" muss im finalen HTML vor den Gruppen stehen, sonst
+    // rutscht die Standardauswahl hinter die erste optgroup. Geprueft wird das
+    // an der return-Anweisung selbst, nicht an der ersten Fundstelle von
+    // "<optgroup" im Fliesstext -- die steht schon frueher, in der
+    // Hilfsfunktion, die das Markup nur BAUT.
+    $rueckgabe = strpos($body, "return '<option value=\"\">");
+    assertTrue($rueckgabe !== false, 'Kein erkennbares return der Optionen-Liste gefunden');
+    assertTrue(
+        strpos($body, '— kein Termin —', $rueckgabe) < strpos($body, 'optgroup(', $rueckgabe),
+        '"— kein Termin —" steht in der Rueckgabe nicht vor dem ersten optgroup()-Aufruf'
+    );
+});
+
+test('Check-in-PWA: die Terminauswahl der Zeiterfassung vergleicht lokale Datumsstrings',
+function () use ($repoRoot) {
+    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $body = frontendFunctionBody($js, 'worktimeAppointmentOptionsHtml');
+
+    // new Date(a.date).getTime() waere anfaellig fuer den UTC-Versatz rund um
+    // Mitternacht -- derselbe Fehler, den loadCheckinAppointments() an anderer
+    // Stelle bereits vermeidet. Die Gruppierung muss stattdessen ueber den
+    // YYYY-MM-DD-String vergleichen.
+    assertTrue(
+        strpos($js, 'function localDateString(') !== false,
+        'localDateString() fehlt'
+    );
+    assertTrue(
+        strpos($body, 'localDateString(') !== false,
+        'worktimeAppointmentOptionsHtml() nutzt localDateString() nicht'
+    );
+    assertTrue(
+        strpos($body, '.getTime()') === false,
+        'worktimeAppointmentOptionsHtml() vergleicht ueber getTime() statt ueber lokale Datumsstrings'
+    );
+});
+
 test('Check-in-PWA: der Verlauf nennt einen Antrag nicht mehr Zeitkorrektur',
 function () use ($repoRoot) {
     $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');

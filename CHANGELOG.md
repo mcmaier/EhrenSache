@@ -25,6 +25,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Die Vorschau „Termine aus Records ableiten" nutzt dieselbe Datumsliste wie die Serienvorschau.
 - Der Herkunftsfilter der Terminverwaltung kennt zusätzlich „Nur Serientermine" und „Ohne
   Serientermine"; die Auswahl wirkt wie gehabt auf Liste, Kalender und Kennzahlen gemeinsam.
+- Die Terminauswahl der Zeiterfassung (Check-in-PWA) zeigt nur noch ein Fenster von 60 Tagen
+  zurück bis 30 Tage voraus, gruppiert in „Heute", „Zurückliegend" und „Kommend" statt einer nach
+  Nähe zu heute sortierten, mit Terminserien unübersichtlich langen Liste.
 
 ### Datenbank
 - Migration 1.10.0 → 1.11.0: Tabelle `appointment_series`, Spalten `appointments.series_id` und

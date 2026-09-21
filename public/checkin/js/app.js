@@ -3139,9 +3139,16 @@ let worktimeSession = null;
 let worktimeHistorySessions = {};
 let worktimeActivities = [];
 
-// Termine des laufenden Jahres. Gehalten, damit ein Wechsel der Taetigkeitsart
-// die Auswahl neu aufbauen kann, ohne erneut zu laden.
+// Termine im Fenster um heute (siehe WORKTIME_APPOINTMENT_*_DAYS unten).
+// Gehalten, damit ein Wechsel der Taetigkeitsart die Auswahl neu aufbauen
+// kann, ohne erneut zu laden.
 let worktimeAppointments = [];
+
+// Fenster der Terminauswahl der Zeiterfassung: so weit zurueck bzw. voraus
+// laedt loadWorktimeAppointments(). Verhindert, dass Terminserien die Liste
+// auf das ganze Jahr aufblaehen.
+const WORKTIME_APPOINTMENT_PAST_DAYS = 60;
+const WORKTIME_APPOINTMENT_FUTURE_DAYS = 30;
 
 /**
  * Prueft, ob die Zeiterfassung freigeschaltet ist, und blendet den Tab ein.
@@ -3504,15 +3511,11 @@ async function worktimeStop(totpCode = null, force = false) {
     renderWorktime();
 }
 /**
- * Termine des heutigen Tages in die optionale Auswahl fuellen.
+ * Termine im Fenster um heute in die optionale Auswahl fuellen.
  *
  * Holt bewusst selbst vom Server, statt die globale Liste `appointments`
  * mitzubenutzen: die wird je nach zuletzt besuchtem Tab mit einem anderen
  * Zeitraum und einem anderen Mitgliedsfilter ueberschrieben.
- *
- * Das Tagesdatum wird lokal gebildet — `toISOString()` liefert UTC und haette
- * abends (MESZ ab 22:00) bereits den Folgetag geliefert, genau dann also,
- * wenn Vereinsarbeit stattfindet.
  */
 async function loadWorktimeAppointments() {
     const select = document.getElementById('worktimeAppointment');
@@ -3520,19 +3523,28 @@ async function loadWorktimeAppointments() {
 
     const previous = select.value;
 
-    // Alle Termine des laufenden Jahres, nicht nur die heutigen.
+    // Fenster um heute, nicht das ganze Jahr.
     //
-    // Bis 1.2.2 fragte diese Stelle from_date = to_date = heute ab. Das war
-    // die falsche Einschraenkung: Der Terminbezug dient der Aufwandsbetrachtung,
-    // und Vorbereitung findet vor der Veranstaltung statt, Nachbereitung danach.
-    // Genau diese Stunden zeigt der Bericht "nach Termin" — und genau sie
-    // liessen sich nicht zuordnen.
+    // Bis 1.2.2 fragte diese Stelle from_date = to_date = heute ab, das war zu
+    // eng: Vorbereitung findet vor der Veranstaltung statt, Nachbereitung
+    // danach, und genau diese Stunden zeigt der Bericht "nach Termin". Das
+    // ganze Jahr (bis 1.11.0) war dann wieder zu weit — mit Terminserien lief
+    // die Auswahl auf Dutzende Eintraege hinaus. from_date/to_date statt year
+    // traegt auch den Jahreswechsel: im Januar reicht das Fenster ins Vorjahr
+    // zurueck, im Dezember reicht es ins naechste voraus.
     let appointments = [];
 
     if (userData && userData.member_id) {
+        const heute = new Date();
+        const von = new Date(heute);
+        von.setDate(von.getDate() - WORKTIME_APPOINTMENT_PAST_DAYS);
+        const bis = new Date(heute);
+        bis.setDate(bis.getDate() + WORKTIME_APPOINTMENT_FUTURE_DAYS);
+
         const result = await apiCall('appointments', 'GET', null, {
             member_id: userData.member_id,
-            year: new Date().getFullYear()
+            from_date: localDateString(von),
+            to_date: localDateString(bis)
         });
 
         if (result.success && Array.isArray(result.data)) {
@@ -3546,9 +3558,16 @@ async function loadWorktimeAppointments() {
     renderWorktimeAppointmentOptions(previous);
 }
 
+/** Datum als lokales YYYY-MM-DD, ohne Zeitzonenversatz (vgl. formatDateShortDe). */
+function localDateString(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-`
+         + `${String(date.getDate()).padStart(2, '0')}`;
+}
+
 /**
- * Termine, die zu einer Taetigkeit passen — gefiltert nach ihren Terminarten,
- * naechstgelegene zuerst.
+ * Termine, die zu einer Taetigkeit passen — nach ihren Terminarten gefiltert.
+ * Die Reihenfolge legt worktimeAppointmentOptionsHtml() ueber die Gruppierung
+ * fest, nicht diese Funktion.
  *
  * Steht getrennt vom Auswahlfeld, weil zwei Stellen dieselbe Liste brauchen:
  * die Idle-Ansicht des Erfassen-Tabs und das Korrekturmodal.
@@ -3566,25 +3585,68 @@ function worktimeAppointmentsFor(activityId) {
         options = options.filter(a => allowed.includes(Number(a.type_id)));
     }
 
-    // Naechstgelegene zuerst: Arbeit wird einem Termin in ihrer Naehe
-    // zugeordnet, nicht dem ersten des Jahres.
-    const now = Date.now();
-    options.sort((a, b) =>
-        Math.abs(new Date(String(a.date)).getTime() - now)
-        - Math.abs(new Date(String(b.date)).getTime() - now));
-
     return options;
 }
 
-/** Baut die Optionen eines Terminfeldes aus einer fertigen Liste. */
+/**
+ * Baut die Optionen eines Terminfeldes aus einer fertigen Liste, gruppiert um
+ * heute statt chronologisch durchgemischt (bis 1.11.0 nach Naehe zu heute
+ * sortiert — dabei wechselten sich vergangene und kommende Termine ab).
+ *
+ * Gruppen: "Heute" (nach Uhrzeit), "Zurückliegend" (neueste zuerst), "Kommend"
+ * (naechster zuerst); leere Gruppen entfallen. Der Vergleich laeuft ueber den
+ * lokalen Datumsstring (YYYY-MM-DD), nicht ueber new Date(...).getTime() — das
+ * waere anfaellig fuer den UTC-Versatz rund um Mitternacht.
+ *
+ * Ein Termin ohne Datum — die von fillWorkSessionAppointments() ergaenzte,
+ * bereits zugeordnete Sitzung, wenn ihr appointment_date fehlt — laesst sich
+ * so nicht einsortieren und bekommt eine eigene Gruppe "Zugeordnet". Traegt er
+ * ein Datum, zaehlt das (auch ausserhalb des geladenen Fensters) fuer die
+ * normale Gruppierung — er bleibt damit unabhaengig vom Fenster waehlbar.
+ */
 function worktimeAppointmentOptionsHtml(options) {
+    const heute = localDateString(new Date());
+
+    const zugeordnet = [];
+    const vergangen   = [];
+    const heutige     = [];
+    const kommend     = [];
+
+    options.forEach(a => {
+        const datum = String(a.date || '').slice(0, 10);
+
+        if (!datum) {
+            zugeordnet.push(a);
+        } else if (datum === heute) {
+            heutige.push(a);
+        } else if (datum < heute) {
+            vergangen.push(a);
+        } else {
+            kommend.push(a);
+        }
+    });
+
+    const zeit = (a) => String(a.start_time || '');
+    heutige.sort((a, b) => zeit(a).localeCompare(zeit(b)));
+    vergangen.sort((a, b) => String(b.date).localeCompare(String(a.date)) || zeit(b).localeCompare(zeit(a)));
+    kommend.sort((a, b) => String(a.date).localeCompare(String(b.date)) || zeit(a).localeCompare(zeit(b)));
+
+    const optionHtml = (a) => {
+        const datum = a.date ? formatDateShortDe(a.date) : '';
+        const uhr   = zeit(a).substring(0, 5);
+        return `<option value="${a.appointment_id}">`
+             + `${datum}${datum ? ' ' : ''}${escapeHtml(a.title)}${uhr ? ` (${uhr})` : ''}</option>`;
+    };
+
+    const optgroup = (label, liste) => liste.length
+        ? `<optgroup label="${label}">${liste.map(optionHtml).join('')}</optgroup>`
+        : '';
+
     return '<option value="">— kein Termin —</option>'
-        + options.map(a => {
-            const datum = formatDateShortDe(a.date);
-            const zeit  = String(a.start_time || '').substring(0, 5);
-            return `<option value="${a.appointment_id}">`
-                 + `${datum} ${escapeHtml(a.title)}${zeit ? ` (${zeit})` : ''}</option>`;
-        }).join('');
+        + optgroup('Zugeordnet', zugeordnet)
+        + optgroup('Heute', heutige)
+        + optgroup('Zurückliegend', vergangen)
+        + optgroup('Kommend', kommend);
 }
 
 function renderWorktimeAppointmentOptions(previous = '') {
