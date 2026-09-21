@@ -333,16 +333,18 @@
    Die Verwalter-Tabelle oeffnet gesperrt (responses.js, managerTableHtml) --
    dieser Umschalter ist der einzige Weg, ihre Aktionsknoepfe freizugeben,
    und zwar fuer den ganzen Dialog, nicht je Zeile. */
-.response-lock-bar { margin: var(--spacing-sm) 0; }
+.response-actions-head { white-space: nowrap; }
 
+/* Kompakt im Spaltenkopf "Aktion", so gross wie die Aktionsknoepfe darunter. */
 .response-lock-toggle {
-    padding: 6px 14px;
+    margin-left: 6px;
+    padding: 2px 6px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     background: var(--bg-white);
-    color: var(--text-dark);
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.2;
+    vertical-align: middle;
     cursor: pointer;
     transition: all var(--transition-fast);
 }

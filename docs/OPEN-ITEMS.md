@@ -2507,7 +2507,7 @@ fehlten drumherum:
 
 1. ~~**Kein Schutzschritt in der Oberfläche.**~~ **Erledigt in 1.11.0:** Der
    Rückmeldungs-Dialog öffnet gesperrt; die Aktionsknöpfe fremder Zeilen sind ausgegraut
-   (`title="Zum Ändern zuerst entsperren"`), bis „🔒 Bearbeiten entsperren" geklickt wird — je
+   (`title="Zum Ändern zuerst entsperren"`), bis das Schloss 🔒 im Spaltenkopf „Aktion" geklickt wird — je
    Dialogöffnung, nicht je Zeile, und beim nächsten Öffnen wieder zu. Die eigene Zeile bleibt
    ohne Entsperren bedienbar (`isOwnMember()`, `public/js/modules/responses.js`). Bewusst nur
    in der Oberfläche: Eine serverseitige Prüfung könnte nur wiederholen, was Rolle und

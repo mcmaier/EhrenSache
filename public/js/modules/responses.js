@@ -325,12 +325,12 @@ function memberActionButtons(m) {
  * setMemberResponse(), nicht nur im disabled-Attribut der Knoepfe.
  */
 function responseLockToggleHtml() {
+    // Nur das Symbol, im Spaltenkopf "Aktion" -- direkt ueber den Knoepfen,
+    // die es sperrt. Der Text steht in title und aria-label.
+    const label = locked ? 'Bearbeiten fremder Rückmeldungen entsperren' : 'Fremde Rückmeldungen wieder sperren';
     return `<button type="button" id="responsesLockToggle" class="response-lock-toggle${locked ? '' : ' is-unlocked'}"
-                aria-pressed="${locked ? 'false' : 'true'}"
-                title="${locked ? 'Bearbeiten fremder Rückmeldungen entsperren' : 'Fremde Rückmeldungen wieder sperren'}"
-                onclick="toggleResponsesLock()">
-                ${locked ? '🔒 Bearbeiten entsperren' : '🔓 Sperren'}
-            </button>`;
+                aria-pressed="${locked ? 'false' : 'true'}" aria-label="${label}" title="${label}"
+                onclick="toggleResponsesLock()">${locked ? '🔒' : '🔓'}</button>`;
 }
 
 export function toggleResponsesLock() {
@@ -396,7 +396,6 @@ function managerTableHtml(data) {
     }).join('');
 
     return `
-        <div class="response-lock-bar">${responseLockToggleHtml()}</div>
         <div class="response-filter">
             <button type="button" class="response-filter__btn${currentFilter === 'all' ? ' is-active' : ''}"
                     aria-pressed="${currentFilter === 'all' ? 'true' : 'false'}" onclick="filterResponses('all')">Alle (${allCount})</button>
@@ -408,7 +407,7 @@ function managerTableHtml(data) {
             <table>
                 <thead><tr>
                     <th>Name</th><th>Rückmeldung</th><th>Bemerkung</th><th>Zeitpunkt</th>
-                    ${started ? '<th>Anwesenheit</th>' : ''}<th>Aktion</th>
+                    ${started ? '<th>Anwesenheit</th>' : ''}<th class="response-actions-head">Aktion ${responseLockToggleHtml()}</th>
                 </tr></thead>
                 <tbody>${rows || `<tr><td colspan="${colspan}" class="loading">Keine Einträge</td></tr>`}</tbody>
             </table>
