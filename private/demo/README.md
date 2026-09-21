@@ -27,9 +27,9 @@ den Webserver bricht es mit 403 ab.
 
 ## Voraussetzung
 
-`schema_version` ≥ **1.11.0**. Seit dieser Version leert das Rücksetzen auch
-`appointment_series` (Terminserien), eine Tabelle, die ältere Schemata nicht kennen. Serien
-selbst legt der Generator nicht an. Davor war 1.8.0 die Schwelle, weil der Generator seitdem
+`schema_version` ≥ **1.11.0**. Seit dieser Version schreibt der Generator Terminserien
+(`appointment_series`, dazu `appointments.series_id` und `is_detached`) — Tabelle und Spalten
+kennen ältere Schemata nicht. Davor war 1.8.0 die Schwelle, weil der Generator seitdem
 `member_groups` mit den Spalten `is_subgroup` und `sort_order` (Register) schreibt, und davor
 1.7.0 wegen `appointment_responses`. Der Update-Assistent stempelt bei jeder Migration deren
 `to`-Version in `schema_version`; eine aktualisierte Installation trägt daher mindestens
@@ -109,10 +109,36 @@ mit beendeter Mitgliedschaft und 15 mit Stations-PIN · fünf Register als Unter
 (Flöte, Klarinette, Trompete, Tenorhorn, Schlagzeug, in dieser `sort_order`), 38 der 40
 Mitglieder darin (Flöte 6, die übrigen vier Register je 8), vier davon zusätzlich in einem
 zweiten Register, zwei Mitglieder bewusst ohne Register — damit der Sammelabschnitt der
-Gliederung auch mit echten Daten zu sehen ist · vier Terminarten und rund 105 Termine über
-zwölf Monate rückwärts und vier Wochen vorwärts · rund 2400 Anwesenheiten mit gestreuter Quote
+Gliederung auch mit echten Daten zu sehen ist · vier Terminarten und rund 135 Termine über
+zwölf Monate rückwärts und fünf bis sechs Monate vorwärts, Proben und Vorstandssitzung als
+Terminserien (siehe unten) · Bundesland Baden-Württemberg für die Feiertage
+(`holiday_region = BW`) · rund 2200 Anwesenheiten mit gestreuter Quote
 und Ankunftszeit · 25 Anträge, davon fünf offen · sechs Tätigkeitsarten mit Gruppenbindung ·
 120 Arbeitszeiten (106 bestätigt, 10 eingereicht, 4 abgelehnt) samt Auditspur.
+
+## Terminserien
+
+Gesamtprobe (freitags, wöchentlich), Registerprobe (dienstags, alle zwei Wochen) und
+Vorstandssitzung (erster Montag im Monat) sind echte Serien, keine Einzeltermine. Je Termin
+gibt es **zwei** Serien, weil eine Serie höchstens zwölf Monate umfasst, der Bestand aber zwölf
+Monate zurück und einige Monate voraus reicht:
+
+| Serie | Beginn | Ende |
+|---|---|---|
+| 1–3, ausgelaufen | erster Termin ab Stichtag − 365 Tage | Vortag der Grenze |
+| 4–6, laufend | erster Termin ab der Grenze | Monatsletzter fünf Monate nach dem Stichtagsmonat |
+
+Die **Grenze** ist der Monatserste drei Monate vor dem Stichtagsmonat (Stichtag 21.09.2026:
+Grenze 01.06.2026, Ende 28.02.2027). Sie hängt am Monat, damit die stündlich zurückgesetzte
+Demo nicht jeden Tag eine andere Seriengrenze zeigt. So tragen auch die vergangenen Proben mit
+Anwesenheiten ihre Serie, und die laufende reicht weit genug für Kalender und PWA-Terminliste.
+
+Feiertage in Baden-Württemberg fallen aus und stehen in `exdates` — so, wie die Oberfläche sie
+in der Serienvorschau abwählt; der Server schließt sie nicht selbst aus. Der Zweiwochentakt der
+Registerprobe läuft über beide Serien durch. Kein Termin ist abgelöst (`is_detached = 0`), die
+Auftritte sind Einzeltermine. Plan und Anwendung rechnen mit denselben Funktionen
+(`private/helpers/recurrence.php`, `holidays.php`), die Tests prüfen jede Serie gegen die
+Prüfung von `POST appointment_series`.
 
 ## Regeln, die der Bestand einhält
 
@@ -129,6 +155,8 @@ Sie stehen als Tests fest, weil jede von ihnen einmal verletzt war:
 - Ein gesetzter **Terminbezug** einer Arbeitszeit zeigt nur auf einen Termin, zu dem das
   Mitglied erwartet wurde.
 - **Auftrittstitel** folgen dem Monat, nicht der Listenposition.
+- Kein **Serientermin** liegt auf einem Feiertag des eingestellten Bundeslands; jede Serie
+  umfasst höchstens zwölf Monate.
 - Genau **eine** Sitzung läuft, sie gehört Mitglied M001 und nutzt eine Tätigkeit **ohne**
   Nachweispflicht — sonst ließe sie sich ohne TOTP-Code nicht beenden, etwa von einem
   Besucher der Demo, der den Timer ausprobiert.

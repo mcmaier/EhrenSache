@@ -243,6 +243,83 @@ test('jeder Abschnitt des Gesamtplans traegt in allen Zeilen dieselben Schluesse
     }
 });
 
+// ---- writePlan gegen SQLite im Speicher -------------------------------------
+//
+// Die Tabellen entstehen aus den Schluesseln des Plans plus den Spalten, die
+// writePlan() selbst ergaenzt. SQLite kennt keine Typen und Fremdschluessel --
+// geprueft wird, was writePlan() aus dem Plan macht, nicht das MySQL-Schema.
+
+function demoSeedCliPlanDb(array $plan): PDO
+{
+    $db     = demoSeedCliMakeSqliteDb();
+    $tables = ['groups' => 'member_groups'];
+    $extra  = [
+        'members'            => ['pin_hash', 'pin_updated_at'],
+        'users'              => ['password_hash', 'api_token', 'totp_secret'],
+        'appointment_series' => ['created_by'],
+        'appointments'       => ['created_by', 'is_auto_created'],
+    ];
+
+    foreach ($plan as $section => $rows) {
+        if ($section === 'settings' || $rows === []) {
+            continue;
+        }
+        $table   = $tables[$section] ?? $section;
+        $columns = array_unique(array_merge(array_keys($rows[0]), $extra[$table] ?? []));
+        $db->exec("CREATE TABLE test_{$table} (" . implode(', ', array_map(fn ($c) => "`{$c}`", $columns)) . ')');
+    }
+
+    $db->exec('CREATE TABLE test_system_settings (setting_key TEXT, setting_value TEXT, updated_by INTEGER)');
+    $insert = $db->prepare("INSERT INTO test_system_settings (setting_key, setting_value) VALUES (?, '')");
+    foreach (array_keys($plan['settings']) as $key) {
+        $insert->execute([$key]);
+    }
+
+    return $db;
+}
+
+test('writePlan schreibt die Serien mit exdates als JSON und die Serientermine mit series_id', function () {
+    $plan    = buildDemoPlan(20260908, '2026-09-21');
+    $db      = demoSeedCliPlanDb($plan);
+    $written = writePlan($db, 'test_', $plan, 'probelauf');
+
+    assertSame(6, $written['appointment_series']);
+    $rows = $db->query('SELECT * FROM test_appointment_series ORDER BY series_id')->fetchAll(PDO::FETCH_ASSOC);
+    assertSame(count($plan['appointment_series']), count($rows));
+    foreach ($rows as $i => $row) {
+        $expected = $plan['appointment_series'][$i];
+        assertSame($expected['exdates'], json_decode($row['exdates'], true), "Serie {$row['series_id']}: exdates");
+        assertSame($expected['rrule'], $row['rrule']);
+        assertSame($expected['until'], $row['until']);
+        assertSame(1, (int) $row['created_by'], 'Serie gehoert dem Admin');
+    }
+    assertTrue(in_array('2026-12-25', json_decode($rows[3]['exdates'], true), true), 'Weihnachten fehlt in den exdates der laufenden Gesamtprobe');
+
+    $inSeries = (int) $db->query('SELECT COUNT(*) FROM test_appointments WHERE series_id IS NOT NULL')->fetchColumn();
+    $planned  = count(array_filter($plan['appointments'], fn ($a) => $a['series_id'] !== null));
+    assertSame($planned, $inSeries);
+    assertTrue($inSeries > 100, "nur {$inSeries} Serientermine");
+    $orphans = (int) $db->query('SELECT COUNT(*) FROM test_appointments a
+                                 WHERE a.series_id IS NOT NULL
+                                   AND NOT EXISTS (SELECT 1 FROM test_appointment_series s WHERE s.series_id = a.series_id)')->fetchColumn();
+    assertSame(0, $orphans, 'Termine zeigen auf eine unbekannte Serie');
+    // CAST: execute() bindet als Text, und in SQLite ist '0' <> 0.
+    assertSame(0, (int) $db->query('SELECT COUNT(*) FROM test_appointments WHERE CAST(is_detached AS INTEGER) <> 0')->fetchColumn());
+});
+
+test('writePlan setzt holiday_region auf BW', function () {
+    $plan = buildDemoPlan(20260908, '2026-09-21');
+    $db   = demoSeedCliPlanDb($plan);
+    writePlan($db, 'test_', $plan, 'probelauf');
+
+    $stmt = $db->query("SELECT setting_value FROM test_system_settings WHERE setting_key = 'holiday_region'");
+    assertSame('BW', $stmt->fetchColumn());
+});
+
+test('DEMO_TABLES leert appointments vor appointment_series (Kinder vor Eltern)', function () {
+    assertTrue(array_search('appointments', DEMO_TABLES, true) < array_search('appointment_series', DEMO_TABLES, true));
+});
+
 // ---- showTargetListing ----------------------------------------------------
 
 /**

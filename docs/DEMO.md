@@ -97,14 +97,19 @@ ein Besucher kann die veröffentlichten Zugänge also nicht unbrauchbar machen.
 
 ### Was der Reset überschreibt — und was nicht
 
-`system_settings` wird **nicht geleert**. Der Generator aktualisiert nur **acht** Schlüssel:
+`system_settings` wird **nicht geleert**. Der Generator aktualisiert nur **zehn** Schlüssel:
 
 ```
 organization_name, organization_logo, primary_color, secondary_color,
-worktime_enabled, station_pin_enabled, station_pin_min_length, pagination_limit
+worktime_enabled, station_pin_enabled, station_pin_min_length, pagination_limit,
+subgroup_label, holiday_region
 ```
 
-Die übrigen **16** überleben jeden Reset unverändert. Das ist der Grund, warum die folgende
+`holiday_region` steht auf `BW`: Die Terminserien des Bestands lassen die Feiertage dieses
+Landes aus, und der Kalender zeigt sie an. Ändern kann den Wert in der Demo niemand, der Wächter
+sperrt die Systemeinstellungen.
+
+Die übrigen (Stand 1.11: **25**) überleben jeden Reset unverändert. Das ist der Grund, warum die folgende
 Liste wichtig ist: Was hier einmal falsch steht, bleibt falsch.
 
 ### Vor dem Scharfschalten prüfen

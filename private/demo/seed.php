@@ -28,8 +28,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers/bootstrap.php';
 require_once __DIR__ . '/plan.php';
 
-// Seit 1.11.0 leert clearAll() appointment_series; ältere Schemata kennen die
-// Tabelle nicht, das DELETE bräche ab. Davor war 1.8.0 die Schwelle
+// Seit 1.11.0 leert und schreibt der Generator appointment_series samt
+// appointments.series_id/is_detached; ältere Schemata kennen beides nicht. Davor war 1.8.0 die Schwelle
 // (member_groups mit is_subgroup/sort_order), davor 1.7.0
 // (appointment_responses).
 const DEMO_MIN_SCHEMA = '1.11.0';
@@ -161,11 +161,10 @@ function registerExitGuard(): void
 /**
  * Prüft den Schemastand.
  *
- * Verlangt wird 1.7.0: Seit dieser Version schreibt der Generator
- * appointment_responses, eine Tabelle, die ältere Schemata nicht kennen. Der
+ * Verlangt wird DEMO_MIN_SCHEMA (Begründung an der Konstante). Der
  * Update-Assistent stempelt bei jeder Migration deren to-Version in
  * schema_version — eine aktualisierte Installation trägt daher mindestens
- * 1.7.0 als letzten Stempel.
+ * diesen Stand als letzten Stempel.
  */
 function assertSchema(PDO $db, string $prefix): void
 {
@@ -279,7 +278,8 @@ function insertRows(PDO $db, string $prefix, string $table, array $rows): int
     }
 
     $columns = array_keys($rows[0]);
-    $columnList  = implode(', ', $columns);
+    // Backticks: appointment_series hat eine Spalte `until`, ein Schlüsselwort.
+    $columnList  = implode(', ', array_map(fn (string $c): string => "`{$c}`", $columns));
     $placeholders = implode(', ', array_fill(0, count($columns), '?'));
 
     $stmt = $db->prepare("INSERT INTO {$prefix}{$table} ({$columnList}) VALUES ({$placeholders})");
@@ -413,7 +413,18 @@ function writePlan(PDO $db, string $prefix, array $plan, string $password): arra
     $written['activity_types']           = insertRows($db, $prefix, 'activity_types', $plan['activity_types']);
     $written['activity_type_groups']     = insertRows($db, $prefix, 'activity_type_groups', $plan['activity_type_groups']);
 
-    // 6. appointments. created_by = 1 (Admin), is_auto_created = 0.
+    // 6. appointment_series vor appointments (appointments.series_id zeigt
+    // dorthin). exdates ist im Plan eine Liste, in der Tabelle JSON — wie
+    // seriesSaveExdates() es schreibt. created_by = 1 (Admin).
+    $seriesRows = [];
+    foreach ($plan['appointment_series'] as $series) {
+        $series['exdates']    = json_encode(array_values($series['exdates']));
+        $series['created_by'] = 1;
+        $seriesRows[] = $series;
+    }
+    $written['appointment_series'] = insertRows($db, $prefix, 'appointment_series', $seriesRows);
+
+    // appointments. created_by = 1 (Admin), is_auto_created = 0.
     $appointmentRows = [];
     foreach ($plan['appointments'] as $appointment) {
         $appointment['created_by']      = 1;

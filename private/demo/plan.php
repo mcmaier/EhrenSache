@@ -27,6 +27,11 @@ declare(strict_types=1);
 // validateStationPin() prüft die PIN-Regeln. Der Generator nutzt dieselbe
 // Funktion wie die Anwendung, damit erzeugte PINs an der Station funktionieren.
 require_once __DIR__ . '/../helpers/station.php';
+// Serienregeln und Feiertage rechnen ohne Datenbank und ohne Uhr. Der Generator
+// nutzt dieselben Funktionen wie die Serienaktionen der Anwendung, damit eine
+// erzeugte Serie sich dort wie eine angelegte verhält (Fortsetzen, Split).
+require_once __DIR__ . '/../helpers/recurrence.php';
+require_once __DIR__ . '/../helpers/holidays.php';
 
 /**
  * Linearer Kongruenzgenerator.
@@ -91,6 +96,9 @@ final class DemoRandom
 
 const DEMO_ORG_NAME     = 'Musikverein Musterhausen';
 const DEMO_STATION_NAME = 'Probenraum-Station';
+
+/** Bundesland für Feiertage im Kalender und die Ausfälle der Serien (FI-16). */
+const DEMO_HOLIDAY_REGION = 'BW';
 
 /**
  * Auftrittstitel nach Monat.
@@ -422,63 +430,165 @@ function demoShiftDate(string $date, int $days): string
 }
 
 /**
- * Terminserie über zwölf Monate rückwärts und vier Wochen vorwärts.
+ * Wiederkehrende Termine des Vereins als Vorlagen für Terminserien (FI-7).
  *
- * Vier Termine liegen bewusst in der Zukunft — sonst endet die Terminliste im
- * Screenshot mit der Vergangenheit und wirkt wie ein aufgegebener Verein.
+ * Felder wie in appointment_series, die Regel in der kanonischen Schreibweise
+ * von buildRrule(). Der Zweiwochenrhythmus der Registerprobe hängt an der
+ * Woche des ersten Termins im Fenster (siehe buildAppointmentSeries()).
+ */
+const DEMO_SERIES_TEMPLATES = [
+    ['rrule' => 'FREQ=WEEKLY;INTERVAL=1;BYDAY=FR',   'title' => 'Gesamtprobe',      'type_id' => 1, 'description' => null, 'start_time' => '20:00:00', 'end_time' => '22:00:00', 'location' => 'Probelokal'],
+    ['rrule' => 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU',   'title' => 'Registerprobe',    'type_id' => 2, 'description' => null, 'start_time' => '19:30:00', 'end_time' => '21:00:00', 'location' => 'Probelokal'],
+    ['rrule' => 'FREQ=MONTHLY;INTERVAL=1;BYDAY=1MO', 'title' => 'Vorstandssitzung', 'type_id' => 4, 'description' => null, 'start_time' => '19:00:00', 'end_time' => '21:00:00', 'location' => 'Vereinsheim'],
+];
+
+/**
+ * Zeitfenster der Serien, nur aus dem Stichtag abgeleitet.
  *
- * buildDemoPlan() hängt danach über buildFutureConcert() einen fünften
- * zukünftigen Termin an — einen Auftritt, eigens für die Terminrückmeldung
- * (FI-1). Diese Funktion selbst kennt ihn nicht und bleibt bei genau vier.
+ * - start:    zwölf Monate zurück, wie der übrige Bestand (Anwesenheiten,
+ *             Anträge, Arbeitszeit)
+ * - boundary: Monatserster drei Monate vor dem Stichtagsmonat; hier beginnt
+ *             die laufende Serie, am Vortag endet die vorige
+ * - horizon:  Monatsletzter fünf Monate nach dem Stichtagsmonat
+ *
+ * Warum zwei Serien je Termin statt einer: Eine Serie umfasst höchstens zwölf
+ * Monate (SERIES_MAX_MONTHS). Zwölf Monate Vergangenheit plus einige Monate
+ * Zukunft passen in keine einzelne. Die Alternative -- eine Serie erst ab dem
+ * Stichtag, davor Einzeltermine -- ließe genau die Termine mit Anwesenheiten
+ * außerhalb jeder Serie, und das Dashboard zeigte an einer Probe mit Daten nie
+ * den Serienkasten. So sieht es aus, wie ein Verein die Software nutzt: die
+ * vorige Serie ist ausgelaufen, die laufende reicht ein halbes Jahr voraus.
+ *
+ * Die Grenzen hängen am Monat, nicht am Tag: Die öffentliche Demo setzt sich
+ * stündlich mit dem aktuellen Datum als Stichtag zurück. Eine tagesgenaue
+ * Grenze wanderte täglich mit, so bleibt sie einen Monat lang stehen. Die
+ * laufende Serie umfasst damit immer neun Monate, die vorige acht bis neun;
+ * die Zukunft reicht fünf bis sechs Monate voraus -- genug für Kalender und
+ * Terminliste der PWA.
+ *
+ * @return array{start: string, boundary: string, horizon: string}
+ */
+function demoSeriesWindow(string $referenceDate): array
+{
+    $month = new DateTimeImmutable(substr($referenceDate, 0, 7) . '-01', new DateTimeZone('UTC'));
+
+    return [
+        'start'    => demoShiftDate($referenceDate, -365),
+        'boundary' => $month->modify('-3 months')->format('Y-m-d'),
+        'horizon'  => $month->modify('+6 months')->modify('-1 day')->format('Y-m-d'),
+    ];
+}
+
+/**
+ * Terminserien samt der Daten ihrer Termine.
+ *
+ * Je Vorlage zwei Serien (siehe demoSeriesWindow()): Serien 1–3 sind die
+ * ausgelaufenen, Serien 4–6 die laufenden, jeweils in der Reihenfolge von
+ * DEMO_SERIES_TEMPLATES.
+ *
+ * Feiertage des Bundeslands fallen aus und stehen in exdates -- genau so, wie
+ * die Oberfläche sie in der Vorschau abwählt und beim Anlegen als exdates
+ * mitschickt. Der Server schließt sie nicht selbst aus.
+ *
+ * Beginn einer Serie ist ihr erster Termin, wie beim Anlegen im Kalender. Die
+ * laufende Serie der Registerprobe beginnt deshalb im Rhythmus der vorigen:
+ * Der Zweiwochentakt wird einmal über das ganze Fenster gerechnet und erst
+ * dann geteilt. expandOccurrences() aus der Anwendung ergibt ab diesem Beginn
+ * dieselben Tage -- "Serie fortsetzen" hält den Takt.
+ *
+ * Kein Zufall: Die Serien hängen nur am Stichtag und verschieben die Folge der
+ * übrigen Ziehungen nicht.
+ *
+ * @return array{series: array<int, array<string, mixed>>, dates: array<int, string[]>}
+ */
+function buildAppointmentSeries(string $referenceDate): array
+{
+    $window  = demoSeriesWindow($referenceDate);
+    $earlier = [];
+    $current = [];
+
+    foreach (DEMO_SERIES_TEMPLATES as $template) {
+        $rule   = parseRrule($template['rrule']);
+        $rhythm = expandOccurrences($rule, $window['start'], $window['horizon']);
+        $before = array_values(array_filter($rhythm, fn (string $d): bool => $d < $window['boundary']));
+        $after  = array_values(array_filter($rhythm, fn (string $d): bool => $d >= $window['boundary']));
+        if ($before === [] || $after === []) {
+            throw new LogicException("Serie '{$template['title']}' hat vor oder nach {$window['boundary']} keinen Termin.");
+        }
+
+        $earlier[] = [$template, $rule, $before[0], seriesAddDays($window['boundary'], -1)];
+        $current[] = [$template, $rule, $after[0], $window['horizon']];
+    }
+
+    $series = [];
+    $dates  = [];
+    $id     = 1;
+    foreach (array_merge($earlier, $current) as [$template, $rule, $start, $until]) {
+        // Dieselbe Grenze, die POST appointment_series prüft. Wird sie hier
+        // verletzt, ist demoSeriesWindow() falsch -- laut scheitern.
+        if ($until > seriesMaxUntil($start)) {
+            throw new LogicException("Serie '{$template['title']}' {$start}–{$until} überschreitet " . SERIES_MAX_MONTHS . ' Monate.');
+        }
+
+        $holidays = holidaysBetween($start, $until, DEMO_HOLIDAY_REGION);
+        $all      = expandOccurrences($rule, $start, $until);
+        $exdates  = array_values(array_filter($all, fn (string $d): bool => isset($holidays[$d])));
+
+        $series[] = [
+            'series_id'   => $id,
+            'rrule'       => buildRrule($rule),
+            'start_date'  => $start,
+            'until'       => $until,
+            'exdates'     => $exdates,   // Liste; seed.php schreibt sie als JSON
+            'title'       => $template['title'],
+            'type_id'     => $template['type_id'],
+            'description' => $template['description'],
+            'start_time'  => $template['start_time'],
+            'end_time'    => $template['end_time'],
+            'location'    => $template['location'],
+        ];
+        $dates[$id] = array_values(array_diff($all, $exdates));
+        $id++;
+    }
+
+    return ['series' => $series, 'dates' => $dates];
+}
+
+/**
+ * Termine: die Serientermine aus buildAppointmentSeries() und zehn Auftritte.
+ *
+ * Proben und Vorstandssitzung reichen über die laufende Serie fünf bis sechs
+ * Monate in die Zukunft -- sonst endet die Terminliste im Screenshot mit der
+ * Vergangenheit und wirkt wie ein aufgegebener Verein. Die zehn Auftritte
+ * liegen alle in der Vergangenheit.
+ *
+ * buildDemoPlan() hängt danach über buildFutureConcert() einen kommenden
+ * Auftritt an, eigens für die Terminrückmeldung (FI-1). Diese Funktion selbst
+ * kennt ihn nicht.
  */
 function buildAppointments(DemoRandom $random, string $referenceDate): array
 {
     $from = demoShiftDate($referenceDate, -365);
-    $to   = demoShiftDate($referenceDate, 28);
 
     $appointments = [];
-    $id           = 1;
 
-    // Gesamtprobe: jeden Freitag, 20:00.
-    foreach (demoWeekdaySeries($from, $to, 5, 1) as $date) {
-        $appointments[] = [
-            'appointment_id' => $id++,
-            'title'          => 'Gesamtprobe',
-            'type_id'        => 1,
-            'description'    => null,
-            'date'           => $date,
-            'start_time'     => '20:00:00',
-            'end_time'       => '22:00:00',
-            'location'       => 'Probelokal',
-        ];
-    }
-
-    // Registerprobe: jeden zweiten Dienstag, 19:30.
-    foreach (demoWeekdaySeries($from, $to, 2, 2) as $date) {
-        $appointments[] = [
-            'appointment_id' => $id++,
-            'title'          => 'Registerprobe',
-            'type_id'        => 2,
-            'description'    => null,
-            'date'           => $date,
-            'start_time'     => '19:30:00',
-            'end_time'       => '21:00:00',
-            'location'       => 'Probelokal',
-        ];
-    }
-
-    // Vorstandssitzung: erster Montag im Monat, 19:00.
-    foreach (demoFirstMondays($from, $to) as $date) {
-        $appointments[] = [
-            'appointment_id' => $id++,
-            'title'          => 'Vorstandssitzung',
-            'type_id'        => 4,
-            'description'    => null,
-            'date'           => $date,
-            'start_time'     => '19:00:00',
-            'end_time'       => '21:00:00',
-            'location'       => 'Vereinsheim',
-        ];
+    // Gesamtprobe, Registerprobe, Vorstandssitzung: die Termine der Serien.
+    $plan = buildAppointmentSeries($referenceDate);
+    foreach ($plan['series'] as $series) {
+        foreach ($plan['dates'][$series['series_id']] as $date) {
+            $appointments[] = [
+                'appointment_id' => 0, // unten nach der Sortierung vergeben
+                'title'          => $series['title'],
+                'type_id'        => $series['type_id'],
+                'description'    => $series['description'],
+                'date'           => $date,
+                'start_time'     => $series['start_time'],
+                'end_time'       => $series['end_time'],
+                'location'       => $series['location'],
+                'series_id'      => $series['series_id'],
+                'is_detached'    => 0,
+            ];
+        }
     }
 
     // Auftritte: zehn Samstage, gleichmäßig über die verfügbaren Samstage verteilt.
@@ -489,7 +599,7 @@ function buildAppointments(DemoRandom $random, string $referenceDate): array
         $monat          = (int) date('n', strtotime($date));
         $stunde         = $random->int(10, 19);   // genau eine Ziehung, wie bisher
         $appointments[] = [
-            'appointment_id' => $id++,
+            'appointment_id' => 0,
             'title'          => DEMO_PERFORMANCE_TITLES[$monat],
             'type_id'        => 3,
             'description'    => null,
@@ -497,28 +607,19 @@ function buildAppointments(DemoRandom $random, string $referenceDate): array
             'start_time'     => sprintf('%02d:00:00', $stunde),
             'end_time'       => sprintf('%02d:00:00', $stunde + 2),
             'location'       => DEMO_PERFORMANCE_LOCATIONS[$monat],
+            'series_id'      => null,
+            'is_detached'    => 0,
         ];
     }
 
-    // Genau vier Termine in der Zukunft: die nächsten Gesamt- und Registerproben
-    // stehen bereits in den Serien oben. Alles danach wird gekappt. (Der fünfte
-    // zukünftige Termin des Gesamtplans, der Auftritt aus buildFutureConcert(),
-    // entsteht getrennt und erst in buildDemoPlan() — diese Funktion liefert
-    // ihn nicht mit.)
-    $past   = array_values(array_filter($appointments, fn ($a) => $a['date'] <= $referenceDate));
-    $future = array_values(array_filter($appointments, fn ($a) => $a['date'] > $referenceDate));
-    usort($future, fn ($x, $y) => strcmp($x['date'], $y['date']));
-    $future = array_slice($future, 0, 4);
+    usort($appointments, fn ($x, $y) => strcmp($x['date'], $y['date']) ?: strcmp($x['start_time'], $y['start_time']));
 
-    $result = array_merge($past, $future);
-    usort($result, fn ($x, $y) => strcmp($x['date'], $y['date']) ?: strcmp($x['start_time'], $y['start_time']));
-
-    // IDs nach der Sortierung neu vergeben, damit sie der Chronologie folgen.
-    foreach ($result as $idx => $row) {
-        $result[$idx]['appointment_id'] = $idx + 1;
+    // IDs nach der Sortierung vergeben, damit sie der Chronologie folgen.
+    foreach ($appointments as $idx => $row) {
+        $appointments[$idx]['appointment_id'] = $idx + 1;
     }
 
-    return $result;
+    return $appointments;
 }
 
 /**
@@ -546,24 +647,6 @@ function demoWeekdaySeries(string $from, string $to, int $weekday, int $every): 
         }
         $cursor = strtotime('+1 week', $cursor);
         $n++;
-    }
-
-    return $dates;
-}
-
-/** @return array<int, string> Erster Montag jedes Monats im Zeitraum. */
-function demoFirstMondays(string $from, string $to): array
-{
-    $dates  = [];
-    $cursor = strtotime(date('Y-m-01', strtotime($from)));
-    $end    = strtotime($to);
-
-    while ($cursor <= $end) {
-        $first = strtotime('first monday of ' . date('F Y', $cursor));
-        if ($first >= strtotime($from) && $first <= $end) {
-            $dates[] = date('Y-m-d', $first);
-        }
-        $cursor = strtotime('+1 month', $cursor);
     }
 
     return $dates;
@@ -1117,6 +1200,8 @@ function buildFutureConcert(array $appointments, string $referenceDate): array
         'start_time'     => '19:00:00',
         'end_time'       => '22:00:00',
         'location'       => DEMO_PERFORMANCE_LOCATIONS[(int) $date->format('n')],
+        'series_id'      => null,
+        'is_detached'    => 0,
     ];
 }
 
@@ -1228,6 +1313,11 @@ function buildSettings(): array
         // aufgesetzte Demo ueberall die Vorgabe "Untergruppe" ueber einer
         // Liste aus Floete, Klarinette, Trompete, Tenorhorn und Schlagzeug.
         'subgroup_label'         => 'Register',
+        // Feiertage im Kalender und in der Serienvorschau. Die Serien des
+        // Generators lassen die Feiertage desselben Bundeslands aus -- ohne
+        // diesen Schlüssel zeigte der Kalender Lücken ohne Grund. Die Demo
+        // sperrt Systemeinstellungen, ändern kann ihn dort niemand.
+        'holiday_region'         => DEMO_HOLIDAY_REGION,
     ];
 }
 
@@ -1266,9 +1356,9 @@ function buildUsers(): array
  * buildWorkSessions()) hängt zusätzlich an $referenceTime, dem Zeitpunkt des
  * Laufs. Alles andere im Bestand ist von $referenceTime unabhängig.
  *
- * Nach allen Ziehungen hängt diese Funktion einen fünften zukünftigen Termin
- * an — den Auftritt aus buildFutureConcert() (FI-1). buildAppointments()
- * allein liefert weiterhin genau vier; der Gesamtplan enthält fünf.
+ * Nach allen Ziehungen hängt diese Funktion einen kommenden Auftritt an — den
+ * aus buildFutureConcert() (FI-1). Die übrigen künftigen Termine stammen aus
+ * den Serien (buildAppointmentSeries()).
  */
 function buildDemoPlan(int $seed, string $referenceDate, string $referenceTime = '12:00:00'): array
 {
@@ -1297,6 +1387,7 @@ function buildDemoPlan(int $seed, string $referenceDate, string $referenceTime =
         'users'                    => buildUsers(),
         'appointment_types'        => buildAppointmentTypes(),
         'appointment_type_groups'  => $typeGroups,
+        'appointment_series'       => buildAppointmentSeries($referenceDate)['series'],
         'activity_types'           => $activities,
         'activity_type_groups'     => $activityGroups,
         'appointments'             => $appointments,

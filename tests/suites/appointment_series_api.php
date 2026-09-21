@@ -1292,7 +1292,21 @@ function asSetRegion(string $value): array
         'body' => ['setting_key' => 'holiday_region', 'setting_value' => $value]]);
 }
 
+/**
+ * Eingestelltes Bundesland vor dem Test, zum Zuruecksetzen danach. Nicht fest
+ * auf '' zuruecksetzen: Der Demo-Bestand setzt BW, und ein Testlauf liesse die
+ * Demo sonst ohne Landesfeiertage zurueck.
+ */
+function asCurrentRegion(): string
+{
+    $res = apiRequest('GET', 'holidays', ['token' => apiToken('user'),
+        'query' => ['from' => '2031-01-01', 'to' => '2031-01-01']]);
+
+    return (string) ($res['body']['region'] ?? '');
+}
+
 test('holidays liefert die Feiertage des eingestellten Landes', function () {
+    $before = asCurrentRegion();
     try {
         assertStatus(200, asSetRegion('BW'));
         $res = apiRequest('GET', 'holidays', ['token' => apiToken('user'),
@@ -1307,7 +1321,7 @@ test('holidays liefert die Feiertage des eingestellten Landes', function () {
         assertSame(null, $res['body']['region']);
         assertSame(['2031-01-01' => 'Neujahr'], $res['body']['holidays']);
     } finally {
-        asSetRegion('');
+        asSetRegion($before);
     }
 });
 
@@ -1319,11 +1333,12 @@ test('holidays prueft den Zeitraum', function () {
 });
 
 test('holiday_region nimmt nur bekannte Laender an', function () {
+    $before = asCurrentRegion();
     try {
         assertStatus(400, asSetRegion('XY'));
         assertStatus(400, asSetRegion('bw'));
         assertStatus(200, asSetRegion('SN'));
     } finally {
-        asSetRegion('');
+        asSetRegion($before);
     }
 });

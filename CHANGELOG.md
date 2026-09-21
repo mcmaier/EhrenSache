@@ -7,6 +7,23 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Geändert
+- **Demo:** Der Beispielbestand zeigt Terminserien und Feiertage. Gesamtprobe, Registerprobe und
+  Vorstandssitzung sind echte Serien – je eine ausgelaufene und eine laufende, weil eine Serie
+  höchstens zwölf Monate umfasst – und reichen fünf bis sechs Monate in die Zukunft statt vier
+  Termine. Feiertage in Baden-Württemberg fallen als Ausfälle der Serie weg, das Bundesland ist
+  eingestellt. Der Bestand ändert sich dadurch insgesamt (weniger Proben an Feiertagen, andere
+  Anwesenheiten); vorhandene Screenshots der Demo stimmen nicht mehr.
+
+### Behoben
+- **Tests:** Die Suite `appointment_series_api` setzt das Bundesland nach ihren Tests auf den
+  vorigen Wert zurück statt auf leer – ein Testlauf ließ den Demo-Bestand sonst ohne
+  Landesfeiertage zurück.
+
+---
+
 ## [1.11.1] – 2026-09-21
 
 ### Behoben

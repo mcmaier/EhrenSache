@@ -328,23 +328,43 @@ test('demoShiftDate wirft bei ungueltigem Datum statt still auf die Systemuhr zu
 
 // ---- Termine -------------------------------------------------------------
 
-test('buildAppointments deckt zwoelf Monate rueckwaerts und vier Wochen vorwaerts ab', function () {
+test('buildAppointments deckt zwoelf Monate rueckwaerts bis zum Ende der laufenden Serie ab', function () {
     $appts = buildAppointments(new DemoRandom(20260908), '2026-09-08');
     $dates = array_map(fn ($a) => $a['date'], $appts);
     sort($dates);
     assertTrue($dates[0] >= '2025-09-08', "frühester Termin {$dates[0]} liegt vor dem Fenster");
-    assertTrue(end($dates) <= '2026-10-06', 'spätester Termin liegt hinter dem Fenster');
+    // Monatsletzter fuenf Monate nach dem Stichtagsmonat (demoSeriesWindow()).
+    assertTrue(end($dates) <= '2027-02-28', 'spätester Termin liegt hinter dem Fenster');
 });
 
-test('buildAppointments liefert zwischen 80 und 110 Termine', function () {
+test('buildAppointments liefert zwischen 120 und 150 Termine', function () {
     $count = count(buildAppointments(new DemoRandom(20260908), '2026-09-08'));
-    assertTrue($count >= 80 && $count <= 110, "unerwartete Menge: {$count}");
+    assertTrue($count >= 120 && $count <= 150, "unerwartete Menge: {$count}");
 });
 
-test('buildAppointments legt genau vier Termine in die Zukunft', function () {
+// Kalender und PWA-Terminliste brauchen Termine ueber Monate voraus -- bis
+// 1.11.1 endete der Bestand vier Termine nach dem Stichtag.
+test('buildAppointments plant Proben und Vorstandssitzung mindestens vier Monate voraus', function () {
+    foreach (['2026-09-08', '2026-09-30', '2027-01-01', '2028-02-29'] as $ref) {
+        $appts = buildAppointments(new DemoRandom(20260908), $ref);
+        // Die Serie endet fuenf bis sechs Monate nach dem Stichtag; der letzte
+        // Termin einer Regel (erster Montag, alle zwei Wochen) liegt je nach
+        // Kalender bis zu einem Monat davor.
+        $limit = demoShiftDate($ref, 120);
+        foreach ([1, 2, 4] as $typeId) {
+            $late  = array_filter($appts, fn ($a) => $a['type_id'] === $typeId && $a['date'] > $limit);
+            assertTrue(count($late) > 0, "Stichtag {$ref}: Terminart {$typeId} endet vor {$limit}");
+        }
+        $future = array_filter($appts, fn ($a) => $a['date'] > $ref);
+        assertTrue(count($future) >= 30, "Stichtag {$ref}: nur " . count($future) . ' kuenftige Termine');
+    }
+});
+
+test('buildAppointments legt keinen Auftritt in die Zukunft', function () {
+    // Der kommende Auftritt entsteht getrennt in buildFutureConcert().
     $appts  = buildAppointments(new DemoRandom(20260908), '2026-09-08');
-    $future = array_filter($appts, fn ($a) => $a['date'] > '2026-09-08');
-    assertSame(4, count($future));
+    $future = array_filter($appts, fn ($a) => $a['type_id'] === 3 && $a['date'] > '2026-09-08');
+    assertSame(0, count($future));
 });
 
 test('buildAppointments nutzt alle vier Terminarten', function () {
@@ -369,6 +389,158 @@ test('buildAppointments vergibt eindeutige, fortlaufende IDs', function () {
     $ids   = array_map(fn ($a) => $a['appointment_id'], $appts);
     assertSame(count($ids), count(array_unique($ids)));
     assertSame(1, min($ids));
+});
+
+test('buildAppointments vergibt die IDs in chronologischer Reihenfolge', function () {
+    $appts = buildAppointments(new DemoRandom(20260908), '2026-09-08');
+    assertSame(range(1, count($appts)), array_column($appts, 'appointment_id'));
+    $keys   = array_map(fn ($a) => $a['date'] . ' ' . $a['start_time'], $appts);
+    $sorted = $keys;
+    sort($sorted);
+    assertSame($sorted, $keys);
+});
+
+// ---- Terminserien (FI-7) ---------------------------------------------------
+
+/**
+ * Seriendefinition, wie die Oberflaeche sie an POST appointment_series schickt.
+ * seriesDefinitionFromRequest() ist die Pruefung der Anwendung -- was sie
+ * ablehnt, liesse sich dort so nie anlegen.
+ */
+function demoSeriesRequest(array $series): array
+{
+    return [
+        'rrule' => $series['rrule'], 'start_date' => $series['start_date'], 'until' => $series['until'],
+        'exdates' => $series['exdates'], 'title' => $series['title'], 'type_id' => $series['type_id'],
+        'description' => $series['description'], 'start_time' => $series['start_time'],
+        'end_time' => $series['end_time'], 'location' => $series['location'],
+    ];
+}
+
+test('buildAppointmentSeries liefert je Probe und Vorstandssitzung eine ausgelaufene und eine laufende Serie', function () {
+    $series = buildAppointmentSeries('2026-09-21')['series'];
+    assertSame([1, 2, 3, 4, 5, 6], array_column($series, 'series_id'));
+    assertSame(['Gesamtprobe', 'Registerprobe', 'Vorstandssitzung', 'Gesamtprobe', 'Registerprobe', 'Vorstandssitzung'],
+        array_column($series, 'title'));
+    assertSame([1, 2, 4, 1, 2, 4], array_column($series, 'type_id'));
+    assertSame('FREQ=WEEKLY;INTERVAL=1;BYDAY=FR', $series[0]['rrule']);
+    assertSame('FREQ=WEEKLY;INTERVAL=2;BYDAY=TU', $series[1]['rrule']);
+    assertSame('FREQ=MONTHLY;INTERVAL=1;BYDAY=1MO', $series[2]['rrule']);
+
+    // Stichtag 21.09.2026: Grenze 01.06.2026, Horizont 28.02.2027.
+    foreach ([0, 1, 2] as $i) {
+        assertSame('2026-05-31', $series[$i]['until'], "Serie {$series[$i]['series_id']}");
+        assertSame('2027-02-28', $series[$i + 3]['until'], "Serie {$series[$i + 3]['series_id']}");
+        assertTrue($series[$i + 3]['start_date'] >= '2026-06-01', "Serie {$series[$i + 3]['series_id']} beginnt zu frueh");
+    }
+});
+
+test('jede Serie besteht die Pruefung von POST appointment_series (hoechstens zwoelf Monate, gueltige Regel)', function () {
+    require_once __DIR__ . '/../../private/helpers/appointment_details.php';
+    require_once __DIR__ . '/../../private/helpers/appointment_series.php';
+
+    foreach (['2026-09-08', '2026-09-21', '2026-12-31', '2027-03-01', '2028-02-29', '2031-08-15'] as $ref) {
+        foreach (buildAppointmentSeries($ref)['series'] as $series) {
+            [$def, $fehler] = seriesDefinitionFromRequest(demoSeriesRequest($series));
+            assertSame(null, $fehler, "Stichtag {$ref}, Serie {$series['series_id']}: {$fehler}");
+            assertSame($series['rrule'], $def['rrule'], "Stichtag {$ref}: Regel nicht kanonisch");
+        }
+    }
+});
+
+test('Serientermine sind genau die Regel ohne exdates, und die exdates sind genau die Feiertage', function () {
+    foreach (['2026-09-08', '2026-09-21', '2027-04-10', '2028-02-29'] as $ref) {
+        $plan = buildAppointmentSeries($ref);
+        foreach ($plan['series'] as $series) {
+            $all        = expandOccurrences(parseRrule($series['rrule']), $series['start_date'], $series['until']);
+            $holidays   = holidaysBetween($series['start_date'], $series['until'], 'BW');
+            $expectedEx = array_values(array_filter($all, fn ($d) => isset($holidays[$d])));
+
+            assertSame($expectedEx, $series['exdates'], "Stichtag {$ref}, Serie {$series['series_id']}: exdates");
+            assertSame(array_values(array_diff($all, $expectedEx)), $plan['dates'][$series['series_id']],
+                "Stichtag {$ref}, Serie {$series['series_id']}: Termine");
+            assertSame($all[0], $series['start_date'], "Stichtag {$ref}, Serie {$series['series_id']}: Beginn ist nicht der erste Termin");
+        }
+    }
+});
+
+test('der Serienbestand enthaelt keinen Feiertag in Baden-Wuerttemberg, die exdates aber welche', function () {
+    $exdates = 0;
+    foreach (['2026-09-08', '2026-09-21', '2027-06-01'] as $ref) {
+        $appts    = buildAppointments(new DemoRandom(20260908), $ref);
+        $holidays = holidaysBetween(demoShiftDate($ref, -400), demoShiftDate($ref, 400), 'BW');
+        foreach ($appts as $a) {
+            if ($a['series_id'] !== null) {
+                assertTrue(!isset($holidays[$a['date']]), "Stichtag {$ref}: {$a['title']} am Feiertag {$a['date']}");
+            }
+        }
+        foreach (buildAppointmentSeries($ref)['series'] as $series) {
+            $exdates += count($series['exdates']);
+        }
+    }
+    // Karfreitag faellt immer auf einen Freitag -- ohne exdates waere der Ausschluss nicht wirksam geprueft.
+    assertTrue($exdates > 0, 'kein einziger Feiertag ausgelassen');
+});
+
+test('Proben und Vorstandssitzungen tragen ihre Serie, Auftritte keine; nichts ist abgeloest', function () {
+    $appts  = buildAppointments(new DemoRandom(20260908), '2026-09-21');
+    $series = [];
+    foreach (buildAppointmentSeries('2026-09-21')['series'] as $s) {
+        $series[$s['series_id']] = $s;
+    }
+    foreach ($appts as $a) {
+        assertSame(0, $a['is_detached']);
+        if ($a['type_id'] === 3) {
+            assertSame(null, $a['series_id'], "Auftritt {$a['date']} haengt an einer Serie");
+            continue;
+        }
+        $s = $series[$a['series_id']] ?? null;
+        assertTrue($s !== null, "{$a['title']} {$a['date']} ohne Serie");
+        assertSame($s['title'], $a['title']);
+        assertSame($s['type_id'], $a['type_id']);
+        assertSame($s['start_time'], $a['start_time']);
+        assertSame($s['end_time'], $a['end_time']);
+        assertSame($s['location'], $a['location']);
+        assertTrue($a['date'] >= $s['start_date'] && $a['date'] <= $s['until'], "{$a['date']} liegt ausserhalb von Serie {$s['series_id']}");
+    }
+});
+
+test('vergangene Serientermine tragen Anwesenheiten', function () {
+    $plan     = buildDemoPlan(20260908, '2026-09-21');
+    $inSeries = [];
+    foreach ($plan['appointments'] as $a) {
+        if ($a['series_id'] !== null && $a['date'] <= '2026-09-21') {
+            $inSeries[$a['appointment_id']] = true;
+        }
+    }
+    $withRecords = array_filter($plan['records'], fn ($r) => isset($inSeries[$r['appointment_id']]));
+    assertTrue(count($withRecords) > 1000, 'zu wenige Anwesenheiten an Serienterminen: ' . count($withRecords));
+});
+
+test('die laufende Registerprobe haelt den Zweiwochentakt der vorigen', function () {
+    foreach (['2026-09-08', '2026-09-21', '2027-01-15'] as $ref) {
+        $plan  = buildAppointmentSeries($ref);
+        $dates = array_merge(
+            expandOccurrences(parseRrule($plan['series'][1]['rrule']), $plan['series'][1]['start_date'], $plan['series'][1]['until']),
+            expandOccurrences(parseRrule($plan['series'][4]['rrule']), $plan['series'][4]['start_date'], $plan['series'][4]['until'])
+        );
+        for ($i = 1; $i < count($dates); $i++) {
+            $gap = (int) round((strtotime($dates[$i]) - strtotime($dates[$i - 1])) / 86400);
+            assertSame(14, $gap, "Stichtag {$ref}: {$dates[$i - 1]} -> {$dates[$i]}");
+        }
+    }
+});
+
+test('die Seriengrenzen haengen am Monat, nicht am Tag', function () {
+    // Die oeffentliche Demo setzt sich stuendlich mit dem aktuellen Datum zurueck.
+    $a = buildAppointmentSeries('2026-09-01')['series'];
+    $b = buildAppointmentSeries('2026-09-30')['series'];
+    assertSame(array_column($a, 'until'), array_column($b, 'until'));
+    assertSame(array_column(array_slice($a, 3), 'start_date'), array_column(array_slice($b, 3), 'start_date'));
+});
+
+test('buildAppointmentSeries ist rein: gleicher Stichtag, gleicher Bestand', function () {
+    assertSame(buildAppointmentSeries('2026-09-21'), buildAppointmentSeries('2026-09-21'));
 });
 
 test('buildAppointments ist bei gleichem Saat reproduzierbar', function () {
@@ -957,7 +1129,7 @@ test('buildDemoPlan liefert genau die erwarteten Abschnitte', function () {
     $keys = array_keys($plan);
     sort($keys);
     assertSame([
-        'activity_type_groups', 'activity_types', 'appointment_responses', 'appointment_type_groups',
+        'activity_type_groups', 'activity_types', 'appointment_responses', 'appointment_series', 'appointment_type_groups',
         'appointment_types', 'appointments', 'exceptions', 'groups', 'member_group_assignments',
         'members', 'membership_dates', 'records', 'settings', 'users', 'work_session_log', 'work_sessions',
     ], $keys);
@@ -990,6 +1162,25 @@ test('buildSettings setzt Vereinsname, leeres Logo und aktivierte Arbeitszeit/St
 test('buildSettings setzt subgroup_label auf Register', function () {
     $settings = buildDemoPlan(20260908, '2026-09-08')['settings'];
     assertSame('Register', $settings['subgroup_label']);
+});
+
+// Ohne Bundesland zeigte der Kalender der Demo keine Feiertage, obwohl die
+// Serien sie auslassen -- und die Demo sperrt die Systemeinstellungen.
+test('buildSettings setzt holiday_region auf BW, passend zu den exdates der Serien', function () {
+    $settings = buildDemoPlan(20260908, '2026-09-08')['settings'];
+    assertSame('BW', $settings['holiday_region']);
+    assertTrue(array_key_exists($settings['holiday_region'], HOLIDAY_REGIONS), 'unbekanntes Bundesland');
+});
+
+test('buildDemoPlan fuehrt die Serien, auf die die Termine zeigen', function () {
+    $plan = buildDemoPlan(20260908, '2026-09-21');
+    $ids  = array_column($plan['appointment_series'], 'series_id');
+    foreach ($plan['appointments'] as $a) {
+        if ($a['series_id'] !== null) {
+            assertTrue(in_array($a['series_id'], $ids, true), "series_id {$a['series_id']} unbekannt");
+        }
+    }
+    assertSame(buildAppointmentSeries('2026-09-21')['series'], $plan['appointment_series']);
 });
 
 test('buildUsers liefert vier Konten und zwei Geraete', function () {
