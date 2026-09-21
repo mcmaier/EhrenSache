@@ -327,6 +327,76 @@ function () use ($repoRoot) {
     );
 });
 
+test('Check-in-PWA: der zugeordnete Termin des Korrekturmodals uebersteht einen Taetigkeitswechsel',
+function () use ($repoRoot) {
+    $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+
+    // Bis 1.11.1 ergaenzte fillWorkSessionAppointments() den zugeordneten
+    // Termin nur, wenn sie mit dem session-Objekt aufgerufen wurde -- das
+    // passiert ausschliesslich beim OEFFNEN des Modals. Der
+    // Taetigkeitswechsel rief dieselbe Funktion ohne session auf, die
+    // Ergaenzung blieb dann aus: Ein Termin ausserhalb des 60/30-Tage-Fensters
+    // verschwand beim Hin- und Herschalten der Taetigkeit lautlos aus der
+    // Auswahl, und Speichern loeste die Zuordnung.
+    assertTrue(
+        strpos($js, 'let workSessionAssignedAppointment') !== false,
+        'workSessionAssignedAppointment fehlt -- ohne einen von der Sitzung getrennt '
+        . 'gehaltenen Zustand hat der Taetigkeitswechsel keine Chance, den zugeordneten '
+        . 'Termin wiederzufinden'
+    );
+
+    $oeffnen = frontendFunctionBody($js, 'openWorkSessionModal');
+    assertTrue(
+        strpos($oeffnen, 'workSessionAssignedAppointment =') !== false,
+        'openWorkSessionModal() setzt workSessionAssignedAppointment nicht'
+    );
+
+    // fillWorkSessionAppointments() darf keinen session-Parameter mehr haben:
+    // Haengt die Ergaenzung weiter an einem Parameter, hat ihn der
+    // Taetigkeitswechsel-Aufruf so oder so nicht.
+    assertTrue(
+        preg_match('/function\s+fillWorkSessionAppointments\s*\(\s*previous\s*=\s*[\'"]{2}\s*\)\s*\{/', $js) === 1,
+        'fillWorkSessionAppointments() nimmt noch einen zweiten Parameter -- '
+        . 'die Ergaenzung haengt dann wieder daran, WIE sie aufgerufen wird, statt an '
+        . 'workSessionAssignedAppointment'
+    );
+
+    $fuellen = frontendFunctionBody($js, 'fillWorkSessionAppointments');
+    assertTrue(
+        strpos($fuellen, 'workSessionAssignedAppointment') !== false,
+        'fillWorkSessionAppointments() liest workSessionAssignedAppointment nicht'
+    );
+
+    // Der Server prueft appointment_id beim Speichern nur auf Existenz, nicht
+    // auf Terminart-Passung (work_sessions.php, workSessionUpdate()) -- die
+    // Ergaenzung darf deshalb nicht an einer Terminart-Pruefung haengen.
+    assertTrue(
+        strpos($fuellen, 'allowed') === false,
+        'fillWorkSessionAppointments() prueft die Terminart, bevor sie den zugeordneten '
+        . 'Termin wieder eintraegt -- der Server tut das beim Speichern nicht, eine '
+        . 'zusaetzliche Huerde hier wuerde ihn stillschweigend wieder verlieren'
+    );
+
+    // Der Taetigkeitswechsel muss weiterhin ohne ein zweites Argument
+    // aufrufen -- die alte, session-abhaengige Form darf nicht zurueckkehren.
+    $init  = frontendFunctionBody($js, 'initWorktime');
+    $start = strpos($init, "getElementById('workSessionActivity'), 'change'");
+    assertTrue($start !== false, 'Kein change-Listener auf workSessionActivity in initWorktime() gefunden');
+
+    $ende    = strpos($init, ');', $start);
+    $snippet = substr($init, $start, ($ende === false ? 300 : $ende - $start + 2));
+
+    assertTrue(
+        strpos($snippet, 'fillWorkSessionAppointments(') !== false,
+        'Der change-Listener auf workSessionActivity ruft fillWorkSessionAppointments() nicht auf'
+    );
+    assertTrue(
+        strpos($snippet, 'session') === false,
+        'Der Taetigkeitswechsel uebergibt ein session-Objekt an fillWorkSessionAppointments() -- '
+        . 'dort steht beim Wechsel keines zur Verfuegung'
+    );
+});
+
 test('Check-in-PWA: der Verlauf nennt einen Antrag nicht mehr Zeitkorrektur',
 function () use ($repoRoot) {
     $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');

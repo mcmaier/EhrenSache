@@ -1023,6 +1023,11 @@ Unbekannte `id` → `404`. Einfacher Nutzer oder Gerät → `403`.
 externe Quelle und **ohne** `ext-calendar`. Bundesweite Feiertage immer, dazu die des in den
 Einstellungen hinterlegten Bundeslands (`holiday_region`, siehe unten).
 
+**Ostersonntag und Pfingstsonntag stehen immer in der Antwort** — unabhängig von `region`, auch
+ohne hinterlegtes Bundesland. Gesetzliche Feiertage sind beide nur in Brandenburg (`BB`); hier
+zählt nicht der Rechtsstatus, sondern dass es Sonntage sind, die Kalender und Serienvorschau ohne
+diese Sonderregel ohnehin schon als arbeitsfrei zeigen würden.
+
 ### Feiertage abrufen
 **Endpoint:** `GET /api.php?resource=holidays&from=2026-10-01&to=2027-07-31`
 

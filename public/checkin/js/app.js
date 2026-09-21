@@ -2665,30 +2665,49 @@ function fillWorkSessionActivities(session) {
     }
 }
 
+// Der Termin, der der gerade bearbeiteten Sitzung beim Oeffnen des Modals
+// zugeordnet war (null bei einem Nachtrag ohne Termin oder einem neuen
+// Eintrag). Getrennt von der Sitzung selbst gehalten, weil der
+// Taetigkeitswechsel fillWorkSessionAppointments() erneut aufruft, dabei aber
+// kein session-Objekt mehr zur Hand hat — siehe dort.
+let workSessionAssignedAppointment = null;
+
 /**
  * Fuellt die Terminauswahl des Modals passend zur gewaehlten Taetigkeit.
  *
- * Beim Oeffnen wird die Sitzung mitgegeben: Fehlt ihr Termin in der
- * gefilterten Liste, wird er ergaenzt und vorgewaehlt. Sonst stuende die
- * Auswahl still auf „kein Termin", und das Speichern loeste eine Zuordnung,
- * die niemand loesen wollte.
+ * Der urspruenglich zugeordnete Termin (workSessionAssignedAppointment) bleibt
+ * waehlbar, solange er die aktuelle bzw. vorherige Auswahl ist — auch wenn er
+ * ausserhalb des Fensters liegt ODER nicht zu den Terminarten der gewaehlten
+ * Taetigkeit passt. Bis 1.11.1 galt das nur beim OEFFNEN des Modals: Der
+ * Taetigkeitswechsel rief diese Funktion ohne session-Objekt auf, die
+ * Ergaenzung blieb dabei aus, und eine Sitzung mit einem Termin ausserhalb des
+ * Fensters verlor ihn beim Hin- und Herschalten der Taetigkeit lautlos —
+ * Speichern loeste dann eine Zuordnung, die niemand loesen wollte.
  *
- * Beim Wechsel der Taetigkeit passiert das bewusst NICHT: Dort hat das
- * Mitglied selbst gehandelt, und ein Termin, der zur neuen Taetigkeit nicht
- * passt, gehoert auch nicht mehr dazu.
+ * Die Terminart-Eingrenzung bleibt dabei bewusst ein Vorschlag, keine Regel:
+ * workSessionUpdate() (private/handlers/work_sessions.php) prueft beim
+ * Speichern nur, ob appointment_id ueberhaupt existiert, nicht ob sie zur
+ * Taetigkeit passt. Eine leere Auswahl waere der schlechtere Fehler als eine
+ * Terminart-fremde Option in der Liste.
+ *
+ * Wechselt das Mitglied die Auswahl auf einen ANDEREN Termin oder auf „kein
+ * Termin", ist das ein bewusster Schritt — genau dann weicht previous vom
+ * urspruenglich zugeordneten Termin ab, und diese Funktion draengt sich nicht
+ * mehr auf.
  */
-function fillWorkSessionAppointments(previous = '', session = null) {
+function fillWorkSessionAppointments(previous = '') {
     const select = document.getElementById('workSessionAppointment');
     if (!select) return;
 
     const options = worktimeAppointmentsFor(document.getElementById('workSessionActivity')?.value);
 
-    if (session && previous
+    if (workSessionAssignedAppointment
+        && String(workSessionAssignedAppointment.appointment_id) === String(previous)
         && !options.some(a => String(a.appointment_id) === String(previous))) {
         options.unshift({
-            appointment_id: previous,
-            title:          session.appointment_title || 'Termin',
-            date:           session.appointment_date || '',
+            appointment_id: workSessionAssignedAppointment.appointment_id,
+            title:          workSessionAssignedAppointment.title,
+            date:           workSessionAssignedAppointment.date,
             start_time:     ''
         });
     }
@@ -2732,7 +2751,15 @@ function openWorkSessionModal(sessionId = null) {
         session ? (parseInt(session.break_minutes, 10) || 0) : 0;
     document.getElementById('workSessionNote').value = session ? (session.note || '') : '';
 
-    fillWorkSessionAppointments(session ? session.appointment_id : '', session);
+    workSessionAssignedAppointment = (session && session.appointment_id)
+        ? {
+              appointment_id: session.appointment_id,
+              title:          session.appointment_title || 'Termin',
+              date:           session.appointment_date || ''
+          }
+        : null;
+
+    fillWorkSessionAppointments(session ? session.appointment_id : '');
 
     // Der Hinweis nennt die Folge vor dem Speichern, nicht danach. Der Zusatz
     // zum Ortsnachweis nur, wenn es einen zu verlieren gibt.

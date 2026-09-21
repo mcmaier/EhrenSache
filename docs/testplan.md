@@ -966,13 +966,14 @@ php tests/run.php worktime_api
 |----|----------|---------------------|
 | AK-M1 | PWA: Zeiterfassung mit Termin heute starten, danach Anwesenheitsliste des Termins | **kein** neuer Eintrag |
 | AK-M2 | Anwesenheitsquote des Mitglieds vor und nach dem Start vergleichen | unverändert |
-| AK-M3 | PWA: Terminauswahl öffnen (seit 1.11.0 auch bei aktiven Terminserien) | Fenster 60 Tage zurück / 30 Tage voraus, gruppiert in „Heute", „Zurückliegend" (neueste zuerst) und „Kommend" (nächster zuerst); leere Gruppen fehlen |
+| AK-M3 | PWA: Terminauswahl öffnen (seit 1.11.0 auch bei aktiven Terminserien) | Fenster 60 Tage zurück / 30 Tage voraus, gruppiert in „Heute", „Zurückliegend" (neueste zuerst) und „Kommend" (nächster zuerst); leere Gruppen fehlen; Termine außerhalb des Fensters erscheinen nicht neu wählbar |
 | AK-M4 | PWA: Termin wählen | Hinweis sagt, dass die Stunden zugerechnet werden und **kein** Check-in entsteht |
 | AK-M5 | Tätigkeitsart mit zwei Terminarten verknüpfen, dann in PWA und Nachtrag-Dialog wählen | Terminliste zeigt nur Termine dieser Arten |
 | AK-M6 | Tätigkeitsart ohne Verknüpfung wählen | Terminliste zeigt alle Termine |
 | AK-M7 | Bei gewähltem Termin die Tätigkeitsart wechseln, sodass der Termin nicht mehr passt | Der Termin bleibt gewählt und in der Liste |
 | AK-M8 | Update-Wizard auf einer Installation mit alten Timer-Check-ins | Protokoll nennt deren Anzahl als Warnung; die Einträge bleiben |
-| AK-M9 | Sitzung mit Termin älter als 60 Tage im Korrekturmodal öffnen | Termin bleibt vorbelegt und wählbar, auch außerhalb des Fensters |
+| AK-M9 | Sitzung mit Termin älter als 60 Tage im Korrekturmodal öffnen, dann Tätigkeitsart hin und zurück wechseln | Termin bleibt durchgehend vorbelegt und wählbar — außerhalb des Fensters und unabhängig davon, ob er zur gewählten Terminart passt |
+| AK-M10 | Termin ohne bestehende Zuordnung, älter als 60 Tage bzw. mehr als 30 Tage voraus, in der Terminauswahl suchen | Erscheint nicht — nur bereits zugeordnete Termine sind außerhalb des Fensters wählbar |
 
 ---
 
