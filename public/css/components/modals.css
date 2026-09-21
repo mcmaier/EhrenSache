@@ -664,8 +664,9 @@
     gap: 6px;
 }
 
-/* Doppelte Klasse: .form-group label:has(...) setzt sonst Abstand und Luecke. */
-.weekday-chips .weekday-chip {
+/* Drei Klassen (0,3,0) schlagen .form-group label:has(input[type="checkbox"]) (0,2,2) --
+   sonst setzt jene Regel display, gap und margin-bottom der Knoepfe. */
+.form-group .weekday-chips .weekday-chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -677,7 +678,7 @@
     cursor: pointer;
 }
 
-.weekday-chips .weekday-chip:has(input:checked) {
+.form-group .weekday-chips .weekday-chip:has(input:checked) {
     background: var(--primary-color);
     border-color: var(--primary-color);
     color: var(--bg-white);

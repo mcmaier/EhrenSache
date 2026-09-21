@@ -43,6 +43,11 @@ let currentSeries = null;        // seine Serie, falls vorhanden (GET appointmen
 let seriesRuleChange = false;    // "Regel ändern …" aktiv
 let seriesPreview = null;        // { kind: 'create'|'split'|'extend', body, checklist }
 let appointmentSeriesFormBound = false;
+let previewToken = 0;            // steigt bei jedem Verwerfen; alte Antworten werden ignoriert
+let previewPending = false;      // Vorschau-Anfrage laeuft
+
+/** Sperrzeit des Anlegen-Knopfs nach dem Anzeigen der Vorschau (Doppelklick-Schutz). */
+const PREVIEW_ARM_DELAY_MS = 400;
 
 const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];   // Index = Date.getDay()
 const WEEKDAY_SHORT = { MO: 'Mo', TU: 'Di', WE: 'Mi', TH: 'Do', FR: 'Fr', SA: 'Sa', SU: 'So' };
@@ -952,8 +957,19 @@ function setSaveButtonLabel() {
     btn.textContent = repeating ? 'Vorschau' : 'Speichern';
 }
 
-/** Eine Vorschau verfaellt, sobald sich ein Feld aendert. */
+/** "1 Termin anlegen", "3 Termine anlegen". */
+function createButtonLabel(n) {
+    return n === 1 ? '1 Termin anlegen' : `${n} Termine anlegen`;
+}
+
+/**
+ * Eine Vorschau verfaellt, sobald sich ein Feld aendert. Der Zaehler macht
+ * zugleich eine noch laufende Vorschau-Anfrage ungueltig -- ihre Antwort
+ * gehoert zu den alten Feldwerten.
+ */
 function resetSeriesPreview() {
+    previewToken++;
+    previewPending = false;
     seriesPreview = null;
     const box = document.getElementById('appointmentSeriesPreview');
     box.hidden = true;
@@ -971,6 +987,7 @@ export function toggleAppointmentRepeat() {
     if (!on && seriesRuleChange) {
         seriesRuleChange = false;
         document.getElementById('appointmentRepeatGroup').hidden = true;
+        document.getElementById('appointment_date').disabled = false;
     }
     updateAppointmentRepeatFields();
     resetSeriesPreview();
@@ -1019,6 +1036,12 @@ export function openSeriesRuleChange() {
     document.getElementById('appointmentRepeatGroup').hidden = false;
     document.getElementById('appointment_repeat').checked = true;
     document.getElementById('appointmentRepeatFields').hidden = false;
+    // Die neue Regel gilt ab diesem Termin (from_date) -- ein geaendertes Datum
+    // fiele stillschweigend unter den Tisch. Deaktivierte Felder prueft
+    // checkValidity() nicht.
+    const dateInput = document.getElementById('appointment_date');
+    dateInput.value = currentAppointment.date;
+    dateInput.disabled = true;
     presetRepeatFromRrule(currentSeries.rrule, currentAppointment.date, currentSeries.until);
     resetSeriesPreview();
 }
@@ -1032,7 +1055,27 @@ async function invalidateSeriesYears(from, until) {
     }
 }
 
-function seriesResultText(r) {
+const DETACH_REASON_TEXT = {
+    has_data: 'mit erfassten Daten',
+    conflict: 'Kollision',
+    invalid_time: 'ungültige Zeit',
+};
+
+/** "2 mit erfassten Daten, 1 Kollision" aus den reason-Feldern der Serverantwort. */
+function detachedReasonText(detached) {
+    const counts = {};
+    detached.forEach(d => { counts[d.reason] = (counts[d.reason] || 0) + 1; });
+    return Object.entries(counts)
+        .map(([reason, n]) => `${n} ${DETACH_REASON_TEXT[reason] || 'sonstiger Grund'}`)
+        .join(', ');
+}
+
+/**
+ * @param r    Serverantwort
+ * @param kind 'split' -- dort bezieht sich series_deleted auf die ALTE Serie;
+ *             die neue besteht weiter.
+ */
+function seriesResultText(r, kind = null) {
     const parts = [];
     if (r.created !== undefined) parts.push(`${r.created} angelegt`);
     if (r.updated !== undefined) parts.push(`${r.updated} geändert`);
@@ -1042,10 +1085,10 @@ function seriesResultText(r) {
         // Nach einem Ende ab Serienbeginn gibt es keine Serie mehr -- die Termine
         // sind dann gewoehnliche Einzeltermine, nicht "abgeloest".
         parts.push(r.series_deleted
-            ? `${r.detached.length} als Einzeltermin behalten (erfasste Daten)`
-            : `${r.detached.length} abgelöst (erfasste Anwesenheit, Kollision oder ungültige Zeit)`);
+            ? `${r.detached.length} als Einzeltermin behalten (${detachedReasonText(r.detached)})`
+            : `${r.detached.length} abgelöst (${detachedReasonText(r.detached)})`);
     }
-    if (r.series_deleted) parts.push('Serie aufgelöst');
+    if (r.series_deleted) parts.push(kind === 'split' ? 'alte Serie aufgelöst' : 'Serie aufgelöst');
     // Nur Zahlen und feste Texte -- showToast() setzt per innerHTML.
     return 'Serie: ' + (parts.join(', ') || 'keine Änderung');
 }
@@ -1084,13 +1127,30 @@ async function requestSeriesPreview(kind) {
         }
     }
 
+    // Eine bereits gezeigte Vorschau (z. B. erneutes "Vorschau" beim Fortsetzen)
+    // verfaellt; der neue Zaehlerstand kennzeichnet diese Anfrage.
+    resetSeriesPreview();
+    const token = previewToken;
+    const btn = document.getElementById('appointmentSaveBtn');
+    // Doppelklick-Schutz: ohne Sperre landete der zweite Klick auf "Vorschau"
+    // in commitSeriesPreview() -- geschrieben (beim Split: geloescht), ohne
+    // dass die Liste je zu sehen war.
+    btn.disabled = true;
+    previewPending = true;
+
     // Kopie: apiCall() haengt das CSRF-Token an das uebergebene Objekt.
     const result = await apiCall('appointment_series', 'POST', { ...body }, params);
-    if (!result || !result.success) return;
+    // Inzwischen geaenderte Felder oder ein neu geoeffneter Dialog: Antwort verwerfen.
+    if (token !== previewToken) return;
+    previewPending = false;
+    if (!result || !result.success) {
+        btn.disabled = false;
+        return;
+    }
 
     const box = document.getElementById('appointmentSeriesPreview');
     box.hidden = false;
-    const btn = document.getElementById('appointmentSaveBtn');
+    let armed = false;
     const items = (result.occurrences || []).map(o => ({
         date: o.date,
         note: o.conflict
@@ -1104,10 +1164,17 @@ async function requestSeriesPreview(kind) {
     }));
     const checklist = renderDateChecklist(box, items, {
         onChange: (n) => {
-            btn.textContent = `${n} Termine anlegen`;
-            btn.disabled = n === 0;
+            btn.textContent = createButtonLabel(n);
+            if (armed) btn.disabled = n === 0;
         },
     });
+    // Erst nach einer kurzen Pause freigeben -- die Liste muss sichtbar sein,
+    // bevor ein Klick sie schreiben kann.
+    setTimeout(() => {
+        if (token !== previewToken) return;
+        armed = true;
+        btn.disabled = checklist.getSelected().length === 0;
+    }, PREVIEW_ARM_DELAY_MS);
     if (kind === 'split' && (result.removes || result.keeps)) {
         const hint = document.createElement('p');
         hint.className = 'input-hint';
@@ -1145,7 +1212,7 @@ async function commitSeriesPreview() {
     closeAppointmentModal();
     await invalidateSeriesYears(from, until);
     showAppointmentSection(true, currentAppointmentsPage);
-    showToast(seriesResultText(result), 'success');
+    showToast(seriesResultText(result, kind), 'success');
 }
 
 /** Felder, die sich gegenueber dem geladenen Termin geaendert haben. */
@@ -1186,6 +1253,16 @@ export async function openAppointmentModal(appointmentId = null, preset = {}) {
     document.getElementById('appointment_repeat').checked = false;
     document.getElementById('appointmentRepeatFields').hidden = true;
     document.getElementById('appointmentSeriesBox').hidden = true;
+    document.getElementById('appointment_date').disabled = false;
+    // Versteckte Datumsfelder leeren samt Grenzen: ein alter Wert ausserhalb
+    // von min/max liesse checkValidity() sonst ohne sichtbare Meldung scheitern.
+    ['appointment_repeat_until', 'appointment_series_until'].forEach(id => {
+        const input = document.getElementById(id);
+        input.value = '';
+        input.removeAttribute('min');
+        input.removeAttribute('max');
+    });
+    resetSeriesPreview();
 
     if (appointmentId) {
         title.textContent = 'Termin bearbeiten';
@@ -1224,7 +1301,8 @@ export async function openAppointmentModal(appointmentId = null, preset = {}) {
             }
             // Haekchen in der Vorschauliste verwerfen die Vorschau nicht. Ein neues
             // Fortsetzen-Datum dagegen schon -- sonst schriebe der Knopf das alte Ende.
-            if (seriesPreview && !e.target.closest('#appointmentSeriesPreview')) {
+            // Auch eine noch laufende Anfrage wird so ungueltig.
+            if ((seriesPreview || previewPending) && !e.target.closest('#appointmentSeriesPreview')) {
                 resetSeriesPreview();
             }
         });
@@ -1337,11 +1415,8 @@ export async function deleteAppointment(appointmentId) {
         if (scope === 'following') {
             const result = await apiCall('appointment_series', 'DELETE', null, { id: cached.series_id, from: cached.date });
             if (result && result.success) {
-                // Das Serienende steht nicht im Termin-Cache: alle geladenen Jahre ab
-                // hier leeren, mindestens aber das Folgejahr.
-                const startYear = Number(cached.date.slice(0, 4));
-                const lastYear = Math.max(startYear + 1, ...Object.keys(dataCache.appointments).map(Number).filter(Number.isFinite));
-                await invalidateSeriesYears(cached.date, `${lastYear}-12-31`);
+                // Das Serienende steht nicht im Termin-Cache: alle geladenen Jahre leeren.
+                await invalidateCache('appointments');
                 showAppointmentSection(true, currentAppointmentsPage);
                 showToast(seriesResultText(result), 'success');
             }
