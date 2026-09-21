@@ -156,7 +156,7 @@ function seriesMaxUntil(string $from): string
  * Alle Termine der Regel in [startDate, until], aufsteigend, ohne exdates.
  *
  * $anchorDate bindet bei woechentlichen Regeln mit INTERVAL > 1 den Wochentakt an die
- * Woche eines fruaheren Datums, statt an $startDate selbst -- noetig, wenn eine Serie ueber
+ * Woche eines frueheren Datums, statt an $startDate selbst -- noetig, wenn eine Serie ueber
  * "Serie fortsetzen" mit einem neuen $startDate (= altes until + 1 Tag) weiterlaeuft: ohne
  * Anker wuerde sich der Zwei-/Drei-/Vierwochenrhythmus am neuen Beginn statt am urspruenglichen
  * Serienbeginn ausrichten und dadurch verschieben. $anchorDate muss <= $startDate sein und wird

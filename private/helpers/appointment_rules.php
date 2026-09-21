@@ -87,6 +87,12 @@ function appointmentConflictBody(array $conflict, int $toleranceHours): array
  * @param mixed $sent   Wert wie vom Aufrufer bereits normalisiert (location,
  *                       end_time) bzw. roh aus dem Request (die übrigen Felder)
  * @param mixed $stored Wert aus der Datenbank (Bestand)
+ *
+ * Wichtig: `location` und `end_time` normalisiert diese Funktion nicht selbst
+ * (z. B. `end_time` ohne Sekunden auf denselben Schlüssel wie mit Sekunden
+ * bringen) — Aufrufer müssen sie **vor** dem Aufruf über
+ * `appointmentNormalizeLocation()` bzw. `appointmentNormalizeEndTime()`
+ * normalisiert haben, sonst meldet der Vergleich eine Änderung, die keine ist.
  */
 function appointmentFieldChanged(string $field, $sent, $stored): bool
 {

@@ -603,7 +603,7 @@ test('Ein bereits abgeloester Termin nach dem Beenden-Datum bleibt unberuehrt', 
     }
 });
 
-test('Beenden: from als Array erzeugt keine PHP-Warnung und liefert 400', function () {
+test('Beenden: from als Array liefert 400', function () {
     $world = asWorld();
     try {
         $sid = asCreateSeries($world);
