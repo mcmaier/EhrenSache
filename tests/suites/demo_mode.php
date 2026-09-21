@@ -102,6 +102,7 @@ test('Die Erlaubnisliste entspricht der Spezifikation', function () {
         'auth'              => ['POST'],
         'members'           => ['POST', 'PUT', 'DELETE'],
         'appointments'      => ['POST', 'PUT', 'DELETE'],
+        'appointment_series' => ['POST', 'PUT', 'DELETE'],
         'records'           => ['POST', 'PUT', 'DELETE'],
         'exceptions'        => ['POST', 'PUT', 'DELETE'],
         'appointment_responses' => ['PUT', 'DELETE'],
@@ -131,7 +132,7 @@ test('Die Nur-Lesend-Liste entspricht der Spezifikation', function () {
     assertSame([
         'ping', 'appearance', 'me', 'version', 'session_info', 'my_data',
         'statistics', 'statistics_report', 'available_years', 'attendance_list',
-        'import_logs', 'export',
+        'import_logs', 'export', 'holidays',
     ], DEMO_READ_ONLY);
 });
 

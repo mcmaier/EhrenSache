@@ -618,3 +618,72 @@
    haette sie zusaetzlich ihr eigenes .data-table-Polster und einen zweiten
    Schatten. */
 #responsesModal .data-table { padding: 0; box-shadow: none; }
+
+/* Terminserien im Termin-Dialog (FI-7) */
+.appointment-series-box {
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    border-left: 3px solid var(--primary-color);
+    background: var(--bg-light);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+}
+
+.appointment-series-actions,
+.appointment-series-extend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    align-items: center;
+    margin-top: var(--spacing-sm);
+}
+
+/* [hidden] gegen das display:flex oben durchsetzen. */
+.appointment-series-actions[hidden],
+.appointment-series-extend[hidden] {
+    display: none;
+}
+
+/* Steht ausserhalb eines .form-group und bekaeme sonst nur die Browser-Vorgabe. */
+.appointment-series-extend input[type="date"] {
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font: inherit;
+}
+
+.appointment-repeat-fields {
+    margin-top: var(--spacing-sm);
+    padding-left: var(--spacing-md);
+    border-left: 2px solid var(--border-light);
+}
+
+.weekday-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Drei Klassen (0,3,0) schlagen .form-group label:has(input[type="checkbox"]) (0,2,2) --
+   sonst setzt jene Regel display, gap und margin-bottom der Knoepfe. */
+.form-group .weekday-chips .weekday-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 0;
+    padding: 2px 8px;
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.form-group .weekday-chips .weekday-chip:has(input:checked) {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--bg-white);
+}
+
+.appointment-series-preview {
+    margin-top: var(--spacing-md);
+}

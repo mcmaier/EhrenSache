@@ -625,6 +625,8 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
     "created_by": 1,
     "created_at": "2024-03-01 10:12:00",
     "is_auto_created": 0,
+    "series_id": null,
+    "is_detached": 0,
     "type_id": 1,
     "type_name": "Probe",
     "color": "#667eea",
@@ -638,6 +640,16 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
 `null`, wenn nicht gesetzt. Rein informativ — sie gehen in keine Auswertung ein. Liegt
 `end_time` vor `start_time`, meint es den Folgetag. Bis 1.9.3 stand beides in diesem Beispiel,
 ohne dass es die Felder gab.
+
+**Felder `series_id` und `is_detached` (seit 1.11.0, FI-7):** `series_id` verweist auf die Serie
+(Ressource [`appointment_series`](#terminserien-appointment_series)), `null` bei einem
+gewöhnlichen Einzeltermin. `is_detached` (0/1) heißt: sichtbar Teil der Serie, aber von
+Serienaktionen ausgenommen — gesetzt durch Bearbeiten „nur dieser" oder automatisch, wenn eine
+Serienaktion einen Termin mit erfassten Daten stehen lassen muss. **`PUT` auf einen Serientermin
+setzt `is_detached = 1`** (bei der ersten tatsächlichen Änderung; ein `PUT` ohne Felder ändert
+nichts). **`DELETE` eines Serientermins trägt sein Datum in `exdates` der Serie ein**, damit
+„Serie fortsetzen" es nicht wieder erzeugt; die Serienzeile selbst bleibt dabei stehen, auch wenn
+danach kein Termin mehr auf sie zeigt — das erledigt nur `DELETE appointment_series`.
 
 Die Gruppen eines Termins ergeben sich aus seiner Terminart (`appointment_types`), nicht aus
 dem Termin selbst.
@@ -723,6 +735,13 @@ nullte beide, `date` und `start_time` wurden zu `0000-00-00`; die Dublettenprüf
 Teil-Update still aus (OI-69). Wer vor 1.9.1 alle fünf Felder mitschickte, ist davon nicht
 betroffen — die mitgelieferte Oberfläche tut das.
 
+**Verschiebt ein `PUT` das `date` eines Serientermins tatsächlich** (seit 1.11.0, FI-7): Das
+**alte** Datum wandert zusätzlich in `exdates` der Serie — genau wie bei `DELETE appointments`.
+Ohne diesen Eintrag würde eine spätere Serienaktion mit einer Regel, die denselben Wochentag
+trifft (z. B. ein `action=split`), am alten Datum erneut einen Termin anlegen: eine doppelte
+Probe. Geprüft wird `appointmentFieldChanged('date', …)` — ein `PUT`, das `date` unverändert
+mitschickt oder gar nicht sendet, trägt nichts nach.
+
 ---
 
 ### Termin löschen
@@ -735,6 +754,307 @@ Endpunkt mit `404` statt wie zuvor mit `200`.
 
 **Seit 1.9.1:** Fehlt `id` ganz, antwortet der Endpunkt mit `400 {"message": "id ist
 erforderlich"}` statt mit einer Erfolgsmeldung (OI-56).
+
+---
+
+## Terminserien (appointment_series)
+
+**Seit 1.11.0 (FI-7).** Eine Serie ist eine Regel (Teilmenge von RFC 5545) plus Vorlage; die
+Termine selbst sind gewöhnliche `appointments` mit `series_id` (siehe oben). Termine mit
+erfassten Daten löscht keine Serienaktion — sie löst sie ab (`is_detached = 1`) und meldet sie,
+statt sie zu verwerfen.
+
+**Berechtigung:** Admin/Manager für **jeden** Aufruf dieser Ressource. Ein einfacher Nutzer oder
+ein Gerät bekommt `403`.
+
+**Vorschau statt Materialisierung:** `POST` (Anlegen), `POST …&action=split` und
+`POST …&action=extend` akzeptieren zusätzlich `?preview=…` — derselbe Code rechnet den Plan,
+schreibt aber nichts. **Jeder gesetzte Wert außer `'0'`** (`preview=1`, `preview=true`,
+`preview=yes` …) gilt als Vorschau; nur ein fehlender Parameter oder `preview=0` schreibt
+tatsächlich.
+
+**„Seriendefinition"** — gemeinsamer Anfragekörper für Anlegen und `action=split`:
+```json
+{
+  "rrule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=TU",
+  "start_date": "2026-10-06", "until": "2027-07-27",
+  "exdates": ["2026-12-29"],
+  "title": "Gesamtprobe", "type_id": 3, "description": null,
+  "start_time": "19:30", "end_time": "22:00", "location": "Probelokal"
+}
+```
+Pflicht sind `rrule`, `start_date`, `until`, `title` und `start_time`; `type_id`, `description`,
+`end_time`, `exdates` sind optional. Fehlt `type_id`, gilt die Standard-Terminart wie bei
+`POST appointments`. `end_time` und `location` folgen denselben Regeln wie bei `appointments`
+(seit 1.10.0).
+
+### Serie abrufen
+**Endpoint:** `GET /api.php?resource=appointment_series&id=1`
+
+```json
+{
+  "series_id": 1, "rrule": "FREQ=WEEKLY;INTERVAL=1;BYDAY=TU",
+  "start_date": "2026-10-06", "until": "2027-07-27", "exdates": ["2026-12-29"],
+  "title": "Gesamtprobe", "type_id": 3, "description": null,
+  "start_time": "19:30:00", "end_time": "22:00:00", "location": "Probelokal",
+  "created_by": 1, "created_at": "2026-09-18 10:00:00",
+  "appointment_count": 39, "detached_count": 2
+}
+```
+`appointment_count` und `detached_count` zählen die zugehörigen `appointments` (letztere davon
+mit `is_detached = 1`). Unbekannte `id` → `404`.
+
+### Serie anlegen (und Vorschau)
+**Endpoint:** `POST /api.php?resource=appointment_series` (Vorschau: `?preview=1`)
+
+**Request:** die Seriendefinition (siehe oben), ohne `id`.
+
+**Antwort der Vorschau (`200`)** — Beispiel für `FREQ=WEEKLY;INTERVAL=1;BYDAY=FR` über Ostern:
+```json
+{
+  "occurrences": [
+    { "date": "2031-04-04", "holiday": null, "conflict": null, "excluded": false, "locked": false },
+    { "date": "2031-04-11", "holiday": "Karfreitag", "conflict": null, "excluded": false, "locked": false },
+    { "date": "2031-04-18", "holiday": null,
+      "conflict": { "appointment_id": 88, "title": "Jugendprobe", "start_time": "19:45:00" },
+      "excluded": false, "locked": false },
+    { "date": "2031-04-25", "holiday": null, "conflict": null, "excluded": false, "locked": false }
+  ],
+  "count": 3
+}
+```
+`occurrences` enthält **alle** Daten der Regel im Zeitraum — **ohne** die gesendeten `exdates`
+angewandt, damit die Oberfläche sie als bereits abgewählt anzeigen kann (`excluded: true`).
+Ebenfalls `excluded: true`, aber zusätzlich `locked: true`: Ausfälle, die der Server unabhängig
+von der Auswahl der Oberfläche immer anwendet (in der Praxis nur bei `action=split`, siehe dort —
+die aus dem Bestand übernommenen `exdates`) — nicht abwählbar.
+
+**`holiday` schließt einen Tag NICHT automatisch aus.** Der Server meldet mit `holiday` nur den
+Namen; `excluded` bleibt bei einem Feiertag `false`, solange das Datum nicht zusätzlich in den
+gesendeten `exdates` steht oder gesperrt (`locked`) ist — ein Feiertagstermin würde also
+angelegt, wenn die Oberfläche ihn nicht selbst abwählt. Das tut sie: Sie zeigt einen Tag mit
+`holiday` von vornherein abgewählt an und schickt ihn beim Anlegen als `exdates` mit, sofern die
+Nutzerin ihn nicht bewusst wieder anhakt. Wer die Ressource direkt aufruft (nicht über die
+mitgelieferte Oberfläche), muss Feiertage also **selbst** in `exdates` aufnehmen, wenn sie nicht
+entstehen sollen.
+
+`conflict` zeigt einen kollidierenden Bestandstermin (Toleranzfenster,
+`checkin_tolerance_hours`); ein solcher Tag zählt nicht in `count`. `count` ist die Zahl der
+Termine, die ein tatsächliches Schreiben anlegen würde (`excluded: false` **und**
+`conflict: null` — ein reiner Feiertag ohne abgewähltes `exdate` zählt hier also mit). Ergibt die
+Regel im Zeitraum **keinen einzigen** Termin (auch keinen ausgeschlossenen), antwortet der
+Endpunkt mit `400 {"message": "Die Regel ergibt in diesem Zeitraum keinen Termin"}` — auch in der
+Vorschau.
+
+**Schreiben (`201`):** legt die Serienzeile und je nicht abgewähltem Datum einen Termin an, in
+einer Transaktion. Kollisionen werden dabei **erneut** geprüft (die Vorschau ist nur ein
+Vorschlag) und ausgelassen; ausgelassene Daten — abgewählte **und** neu kollidierende — landen in
+`exdates` der gespeicherten Serie.
+```json
+{
+  "series_id": 12, "created": 34,
+  "skipped": [
+    { "date": "2026-10-20", "reason": "conflict",
+      "conflict": { "appointment_id": 88, "title": "Jugendprobe", "start_time": "19:45:00" } }
+  ]
+}
+```
+Kollidieren oder entfallen **alle** Termine der Regel, wird **nichts** geschrieben (Rollback):
+`409 {"message": "Alle Termine der Serie kollidieren mit bestehenden Terminen oder sind
+abgewählt", "skipped": [...]}`.
+
+### Serie ändern: „Dieser und alle folgenden" ohne Regeländerung
+**Endpoint:** `PUT /api.php?resource=appointment_series&id=1`
+
+**Request:** `from_date` (Pflicht) plus eine beliebige Teilmenge der Vorlagenfelder (`title`,
+`type_id`, `description`, `start_time`, `end_time`, `location`) — wie bei `PUT appointments` ist
+das eine **Teiländerung**: nur gesendete Felder wirken.
+```json
+{ "from_date": "2027-01-05", "start_time": "20:00" }
+```
+
+Aktualisiert werden die Vorlage der Serie **und** alle ihre Termine mit `date >= from_date` und
+`is_detached = 0`, **an Ort und Stelle** (IDs bleiben, damit Anwesenheit, Rückmeldungen und
+Arbeitszeit hängen bleiben). Geprüft wird **je Termin mit seinen wirksamen Werten**: das
+gesendete (normalisierte) Feld, sonst der bisherige Stand dieses einzelnen Termins — ein
+früherer Teil-`PUT` mit einem anderen `from_date` kann Termine bereits von der aktuellen Vorlage
+abweichen lassen.
+
+Ein Termin bleibt unverändert, wird abgelöst (`is_detached = 1`) und im Ergebnis gemeldet, wenn:
+- die Änderung sein Ende dem Beginn gleichmachen würde (`reason: invalid_time`),
+- **nur** bei einer Änderung von `start_time` oder `type_id`: die neuen Werte mit einem
+  bestehenden Termin derselben Terminart im Toleranzfenster kollidieren würden
+  (`reason: conflict`, mit `conflict {appointment_id, title, start_time}`), oder
+- **nur** bei einer Änderung von `start_time` oder `type_id`: für den Termin bereits
+  **Anwesenheit erfasst** ist (`reason: has_data` — geprüft wird ausschließlich `records`, **nicht**
+  Rückmeldungen, Ausnahmen oder Arbeitszeit; diese ziehen mit der Serie weiter, damit sich ein
+  bereits zugesagter künftiger Termin noch verschieben lässt).
+
+Titel, Beschreibung, Ort und Ende ändern sich bei erfasster Anwesenheit normal weiter — nur
+Beginn und Terminart schützen eine erfasste Anwesenheit (Pünktlichkeit) vor dem Mitziehen.
+
+**Antwort (`200`):**
+```json
+{
+  "updated": 27,
+  "detached": [
+    { "appointment_id": 145, "date": "2027-01-12", "reason": "has_data" },
+    { "appointment_id": 146, "date": "2027-01-19", "reason": "conflict",
+      "conflict": { "appointment_id": 90, "title": "Jugendprobe", "start_time": "20:00:00" } }
+  ]
+}
+```
+`updated` zählt **jeden tatsächlich geschriebenen** Termin — auch wenn sich kein Feld dadurch
+inhaltlich ändert (der Request schickt z. B. denselben Wert erneut). Die **Vorlage der Serie
+wird geschrieben, sobald mindestens ein Feld im Request steht** — unabhängig davon, wie viele
+(oder ob überhaupt) folgende Termine tatsächlich aktualisiert werden; `updated: 0` ist also
+möglich, während die Serienvorlage bereits den neuen Wert trägt (z. B. wenn ab `from_date` alle
+Termine abgelöst sind oder es dort keine mehr gibt). **Fehlt jedes Vorlagenfeld im Request**,
+ändert sich nichts — auch die Serienvorlage nicht —, und die Antwort ist sofort
+`{"updated": 0, "detached": []}`.
+
+### Regel ab einem Termin ändern: „Dieser und alle folgenden" mit Regeländerung (Split)
+**Endpoint:** `POST /api.php?resource=appointment_series&id=1&action=split`
+(Vorschau: zusätzlich `?preview=1`)
+
+**Request:** `from_date` (Pflicht) plus eine vollständige Seriendefinition (`rrule` bis
+`location`, ohne `start_date` — `from_date` wird dafür verwendet).
+
+Beendet die **alte** Serie am Vortag von `from_date` (wie `DELETE …&from=` unten) und legt eine
+**neue** Serie ab `from_date` nach der neuen Regel an — beides in **einer** Transaktion. Die
+`exdates` der alten Serie ab `from_date` gehen automatisch in die neue Serie über (ein einzeln
+gelöschter Termin kommt so nicht zurück); in der Vorschau erscheinen sie als
+`excluded: true, locked: true` und lassen sich nicht abwählen.
+
+**Vorschau (`200`)** ergänzt `occurrences` und `count` um:
+- `removes`: Zahl der folgenden Termine ohne Daten, die das Beenden der alten Serie löschen würde,
+- `keeps`: Zahl der folgenden Termine **mit** Daten, die abgelöst stehen bleiben statt ersetzt zu
+  werden.
+
+**Schreiben (`201`):**
+```json
+{
+  "series_id": 13, "created": 20, "skipped": [],
+  "removed": 5,
+  "detached": [ { "appointment_id": 150, "date": "2027-01-12", "reason": "has_data" } ],
+  "series_deleted": false
+}
+```
+`removed`, `detached` und `series_deleted` beschreiben das Beenden der **alten** Serie (siehe
+`DELETE …&from=`) — `series_deleted: true` heißt, ihre Zeile wurde gelöscht, weil kein Termin
+mehr auf sie zeigt (oder weil `from_date` der Serienbeginn war und die alte Serie damit ganz
+endet).
+
+Kollidieren oder entfallen **alle** Termine der **neuen** Regel, wird die gesamte Aktion
+zurückgerollt — **auch das Beenden der alten Serie unterbleibt**: `409 {"message": "Alle Termine
+der neuen Regel kollidieren oder sind abgewählt", "skipped": [...]}`. Ist `from_date` inzwischen
+nicht mehr innerhalb der (zwischenzeitlich geänderten) Serie, antwortet der Endpunkt mit
+`409 {"message": "Die Serie wurde inzwischen geändert"}` (Wettlauf zweier Aufrufe, z. B. ein
+Doppelklick).
+
+### Serie fortsetzen
+**Endpoint:** `POST /api.php?resource=appointment_series&id=1&action=extend`
+(Vorschau: zusätzlich `?preview=1`)
+
+**Request:** `until` (Pflicht, neues Ende) sowie optional `exdates` (zusätzliche Ausfälle, werden
+mit den bestehenden der Serie zusammengeführt).
+```json
+{ "until": "2028-01-31", "exdates": ["2027-08-03"] }
+```
+Das neue `until` muss **nach** dem bisherigen liegen und darf höchstens 12 Monate über das
+bisherige hinausgehen, sonst `400`. Erzeugt werden nur Termine im Bereich `(altes until, neues
+until]`, nach der gespeicherten Regel und Vorlage — der Wochentakt (alle `n` Wochen) bleibt am
+ursprünglichen Serienbeginn verankert, nicht am neuen Bereich.
+
+**Antwort (`200`, kein `201` — dieselbe Serie):**
+```json
+{ "created": 22, "skipped": [] }
+```
+Hat sich `until` der Serie seit der Vorschau bereits geändert (Wettlauf), antwortet der Endpunkt
+mit `409 {"message": "Die Serie wurde inzwischen geändert"}`.
+
+### Serie ab einem Termin beenden
+**Endpoint:** `DELETE /api.php?resource=appointment_series&id=1&from=2027-01-05`
+
+Setzt `until` der Serie auf den Vortag von `from`. Ihre nicht abgelösten Termine ab `from`:
+ohne erfasste Daten werden **gelöscht** (wie ein einzelnes `DELETE appointments`), mit Daten
+werden sie **abgelöst** (`is_detached = 1`) und gemeldet — geprüft wird hier die **breite**
+Definition „Termin mit Daten" (`records`, `appointment_responses`, `exceptions`,
+`work_sessions`), nicht nur Anwesenheit.
+
+Ist `from` der Serienbeginn (oder liegt davor), endet die Serie **ganz**: Die Serienzeile wird in
+jedem Fall gelöscht, und verbleibende (abgelöste) Termine werden zu gewöhnlichen Einzelterminen
+(`series_id = NULL`, `is_detached = 0`) — sonst bliebe ein verwaister Ablöse-Merker stehen. Liegt
+`from` **nach** dem Serienbeginn, wird die Serienzeile nur gelöscht, wenn danach kein Termin mehr
+auf sie zeigt.
+
+```json
+{
+  "removed": 8,
+  "detached": [ { "appointment_id": 150, "date": "2027-01-12", "reason": "has_data" } ],
+  "series_deleted": true
+}
+```
+
+**Hinweis zu `DELETE appointments`:** Das Löschen eines **einzelnen** Serientermins löscht die
+Serienzeile dagegen **nie**, auch wenn danach kein Termin mehr auf sie zeigt — sonst würde ein
+versehentliches Löschen des letzten Termins „Serie fortsetzen" unmöglich machen. Nur
+`DELETE appointment_series` räumt die Zeile auf.
+
+### Validierung (`400`)
+- `rrule` außerhalb der Teilmenge (`WEEKLY` mit `INTERVAL` 1–4 und mindestens einem Wochentag,
+  `MONTHLY` mit `INTERVAL=1` und genau einer Position wie `2TU` oder `-1WE`) — je nach Verstoß
+  eine eigene deutsche Meldung
+- `start_date`/`until` kein gültiges Datum; `until < start_date`; `until` mehr als 12 Monate nach
+  `start_date` (bei `extend`: nach dem bisherigen `until`)
+- die Regel ergibt im Zeitraum keinen einzigen Termin
+- Vorlagenfelder wie bei `POST`/`PUT appointments` (Titel Pflicht, `start_time` Pflicht,
+  `end_time`- und `location`-Regeln aus 1.10.0)
+- `from_date` (PUT, `action=split`) außerhalb `[start_date, until]` der Serie
+- `exdates` fehlerhaft: kein Array oder ein Eintrag kein gültiges Datum
+
+Unbekannte `id` → `404`. Einfacher Nutzer oder Gerät → `403`.
+
+---
+
+## Feiertage (holidays)
+
+**Seit 1.11.0 (FI-16).** Berechnete gesetzliche Feiertage (Gauß/Meeus-Osterformel), **ohne**
+externe Quelle und **ohne** `ext-calendar`. Bundesweite Feiertage immer, dazu die des in den
+Einstellungen hinterlegten Bundeslands (`holiday_region`, siehe unten).
+
+**Ostersonntag und Pfingstsonntag stehen immer in der Antwort** — unabhängig von `region`, auch
+ohne hinterlegtes Bundesland. Gesetzliche Feiertage sind beide nur in Brandenburg (`BB`); hier
+zählt nicht der Rechtsstatus: Sie sind bewusst gesetzt, damit Serien an diesen Tagen
+standardmäßig ausfallen. In der Serienvorschau lassen sie sich wieder anhaken.
+
+### Feiertage abrufen
+**Endpoint:** `GET /api.php?resource=holidays&from=2026-10-01&to=2027-07-31`
+
+**Berechtigung:** jede angemeldete Rolle **außer Gerät** (`403`).
+
+**Query-Parameter:** `from`, `to` — beide Pflicht, gültige Datumsangaben, `to >= from`, Zeitraum
+höchstens 400 Tage, sonst `400 {"message": "Ungültiger Zeitraum (höchstens 400 Tage)"}`.
+
+**Response:**
+```json
+{
+  "region": "BY",
+  "holidays": {
+    "2026-10-03": "Tag der Deutschen Einheit",
+    "2026-11-01": "Allerheiligen",
+    "2026-12-25": "1. Weihnachtstag",
+    "2026-12-26": "2. Weihnachtstag"
+  }
+}
+```
+`region` ist das eingestellte Länderkürzel oder `null`, wenn keines oder ein unbekanntes
+hinterlegt ist — dann liefert `holidays` nur die bundesweiten Feiertage.
+
+**Nicht erzeugt** (bewusst, siehe Einstellung): Feiertage, die nur regional innerhalb eines
+Bundeslands gelten (Mariä Himmelfahrt in Bayern, Augsburger Friedensfest, Fronleichnam in Teilen
+Sachsens und Thüringens) sowie einmalige Feiertage (z. B. Reformationstag 2017 bundesweit,
+8.5.2025 in Berlin).
 
 ---
 
@@ -2357,6 +2677,13 @@ getrimmter String) von 0 bis 720, sonst `400`. Gilt als globale Frist für Termi
 getrimmt, Steuerzeichen entfernt. Ein leerer oder nur aus Leerraum bestehender Wert ergibt die
 Vorgabe `Untergruppe`. Länger als 30 Zeichen (nach dem Trimmen) wird mit `400`
 (`{"message": "Die Bezeichnung darf höchstens 30 Zeichen haben"}`) abgewiesen.
+
+**`holiday_region` (seit 1.11.0, FI-16):** Das Bundesland für die Berechnung der Feiertage
+(Ressource [`holidays`](#feiertage-holidays) und die Vorschau von
+[`appointment_series`](#terminserien-appointment_series)). Zulässig: leerer String (= nur
+bundesweite Feiertage) oder eines der 16 Länderkürzel (`BW`, `BY`, `BE`, `BB`, `HB`, `HH`, `HE`,
+`MV`, `NI`, `NW`, `RP`, `SL`, `SN`, `ST`, `SH`, `TH`). Alles andere `400 {"message": "Unbekanntes
+Bundesland"}`.
 
 ---
 

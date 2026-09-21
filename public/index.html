@@ -15,7 +15,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EhrenSache - Dashboard</title>
 
-    <link rel="stylesheet" href="css/main.css?v=1.10.0">
+    <link rel="stylesheet" href="css/main.css?v=1.11.0">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="robots" content="noindex, nofollow">
     <script type="module" src="js/theme.js"></script>
@@ -383,6 +383,41 @@
                                     Wie weit ein Check-in zeitlich von einem Termin entfernt sein darf,
                                     um ihm zugeordnet zu werden. Derselbe Wert verhindert beim Anlegen
                                     von Terminen Dubletten derselben Terminart.
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h3>📆 Kalender</h3>
+                            <div class="settings-item">
+                                <label for="setting_holiday_region">Feiertage nach Bundesland</label>
+                                <select id="setting_holiday_region" class="setting-input" data-key="holiday_region">
+                                    <option value="">nur bundesweite Feiertage</option>
+                                    <option value="BW">Baden-Württemberg</option>
+                                    <option value="BY">Bayern</option>
+                                    <option value="BE">Berlin</option>
+                                    <option value="BB">Brandenburg</option>
+                                    <option value="HB">Bremen</option>
+                                    <option value="HH">Hamburg</option>
+                                    <option value="HE">Hessen</option>
+                                    <option value="MV">Mecklenburg-Vorpommern</option>
+                                    <option value="NI">Niedersachsen</option>
+                                    <option value="NW">Nordrhein-Westfalen</option>
+                                    <option value="RP">Rheinland-Pfalz</option>
+                                    <option value="SL">Saarland</option>
+                                    <option value="SN">Sachsen</option>
+                                    <option value="ST">Sachsen-Anhalt</option>
+                                    <option value="SH">Schleswig-Holstein</option>
+                                    <option value="TH">Thüringen</option>
+                                </select>
+                                <small class="input-hint">
+                                    Die Feiertage erscheinen im Kalender und werden beim Anlegen einer Serie
+                                    abgewählt. Oster- und Pfingstsonntag werden immer angezeigt und in der
+                                    Serienvorschau abgewählt; sie lassen sich dort wieder anhaken.
+                                    <strong>Nicht berücksichtigt</strong> sind Feiertage, die nur in
+                                    Teilen eines Landes gelten — Mariä Himmelfahrt in Bayern, das Augsburger
+                                    Friedensfest, Fronleichnam in Teilen Sachsens und Thüringens — sowie
+                                    einmalige Feiertage. Solche Tage in der Serienvorschau von Hand abwählen.
                                 </small>
                             </div>
                         </div>
@@ -874,6 +909,8 @@
                             <option value="">Alle</option>
                             <option value="auto">Nur automatisch erzeugte</option>
                             <option value="manual">Nur von Hand angelegte</option>
+                            <option value="series">Nur Serientermine</option>
+                            <option value="single">Ohne Serientermine</option>
                         </select>
                     </div>
                     <button id="resetAppointmentFilter" class="btn-reset-filter">Filter zurücksetzen</button>
@@ -1633,6 +1670,18 @@
             <div class="modal-body">
                 <form id="appointmentForm">
                     <input type="hidden" id="appointment_id">
+                    <div id="appointmentSeriesBox" class="appointment-series-box" hidden>
+                        <div id="appointmentSeriesText"></div>
+                        <div id="appointmentSeriesActions" class="appointment-series-actions">
+                            <button type="button" class="btn-secondary" onclick="openSeriesExtend()">Serie fortsetzen …</button>
+                            <button type="button" class="btn-secondary" onclick="openSeriesRuleChange()">Regel ändern …</button>
+                        </div>
+                        <div id="appointmentSeriesExtend" class="appointment-series-extend" hidden>
+                            <label for="appointment_series_until">Neues Ende</label>
+                            <input type="date" id="appointment_series_until">
+                            <button type="button" class="btn-secondary" onclick="previewSeriesExtend()">Vorschau</button>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label for="appointment_title">Titel*</label>
                         <input type="text" id="appointment_title" required>
@@ -1668,11 +1717,80 @@
                                list="appointmentLocations" autocomplete="off">
                         <datalist id="appointmentLocations"></datalist>
                     </div>
+                    <div class="form-group appointment-repeat" id="appointmentRepeatGroup">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="appointment_repeat" onchange="toggleAppointmentRepeat()">
+                            Wiederholen
+                        </label>
+                        <div id="appointmentRepeatFields" class="appointment-repeat-fields" hidden>
+                            <div class="form-group">
+                                <label for="appointment_repeat_freq">Muster</label>
+                                <select id="appointment_repeat_freq" onchange="updateAppointmentRepeatFields()">
+                                    <option value="WEEKLY">Wöchentlich</option>
+                                    <option value="MONTHLY">Monatlich</option>
+                                </select>
+                            </div>
+                            <div id="appointmentRepeatWeekly">
+                                <div class="form-group">
+                                    <label for="appointment_repeat_interval">Abstand</label>
+                                    <select id="appointment_repeat_interval">
+                                        <option value="1">jede Woche</option>
+                                        <option value="2">alle 2 Wochen</option>
+                                        <option value="3">alle 3 Wochen</option>
+                                        <option value="4">alle 4 Wochen</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <span class="form-label">Wochentage</span>
+                                    <div class="weekday-chips" id="appointment_repeat_days">
+                                        <label class="weekday-chip"><input type="checkbox" value="MO"> Mo</label>
+                                        <label class="weekday-chip"><input type="checkbox" value="TU"> Di</label>
+                                        <label class="weekday-chip"><input type="checkbox" value="WE"> Mi</label>
+                                        <label class="weekday-chip"><input type="checkbox" value="TH"> Do</label>
+                                        <label class="weekday-chip"><input type="checkbox" value="FR"> Fr</label>
+                                        <label class="weekday-chip"><input type="checkbox" value="SA"> Sa</label>
+                                        <label class="weekday-chip"><input type="checkbox" value="SU"> So</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="appointmentRepeatMonthly" hidden>
+                                <div class="form-group">
+                                    <label for="appointment_repeat_pos">Am</label>
+                                    <select id="appointment_repeat_pos">
+                                        <option value="1">ersten</option>
+                                        <option value="2">zweiten</option>
+                                        <option value="3">dritten</option>
+                                        <option value="4">vierten</option>
+                                        <option value="-1">letzten</option>
+                                    </select>
+                                    <select id="appointment_repeat_weekday" aria-label="Wochentag">
+                                        <option value="MO">Montag</option>
+                                        <option value="TU">Dienstag</option>
+                                        <option value="WE">Mittwoch</option>
+                                        <option value="TH">Donnerstag</option>
+                                        <option value="FR">Freitag</option>
+                                        <option value="SA">Samstag</option>
+                                        <option value="SU">Sonntag</option>
+                                    </select>
+                                    <small class="input-hint">im Monat</small>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="appointment_repeat_until">Bis*</label>
+                                <input type="date" id="appointment_repeat_until">
+                                <small class="input-hint">
+                                    Höchstens 12 Monate ab dem ersten Termin. Verlängern lässt sich die Serie
+                                    später über „Serie fortsetzen".
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="appointmentSeriesPreview" class="appointment-series-preview" hidden></div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="closeAppointmentModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveAppointment()">Speichern</button>
+                <button class="btn-save" id="appointmentSaveBtn" onclick="saveAppointment()">Speichern</button>
             </div>
         </div>
     </div>
@@ -2232,6 +2350,19 @@
                 <button class="btn-cancel" id="confirmCancel">Abbrechen</button>
                 <button class="btn-confirm-delete" id="confirmOk">OK</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Auswahl zwischen mehreren Wegen (z. B. Serientermin: nur dieser / alle folgenden) -->
+    <div class="modal" id="choiceModal">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2 id="choiceTitle">Auswahl</h2>
+            </div>
+            <div class="modal-body">
+                <p id="choiceMessage"></p>
+            </div>
+            <div class="modal-footer" id="choiceButtons"></div>
         </div>
     </div>
 

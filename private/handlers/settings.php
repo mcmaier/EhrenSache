@@ -111,6 +111,18 @@ function handleSettings($db, $database, $method, $authUserId) {
                     break;
                 }
 
+                // Bundesland der Feiertage (FI-16): leer oder ein bekanntes Kuerzel.
+                if (($data['setting_key'] ?? null) === 'holiday_region') {
+                    $region = $data['setting_value'] ?? '';
+                    if (!is_string($region) || ($region !== '' && !array_key_exists($region, HOLIDAY_REGIONS))) {
+                        http_response_code(400);
+                        echo json_encode(['message' => 'Unbekanntes Bundesland'], JSON_UNESCAPED_UNICODE);
+                        break;
+                    }
+                    updateSetting($db, $database, 'holiday_region', $region);
+                    break;
+                }
+
                 // Die Farbschwellen der Anwesenheitsquote: ganze Zahl 1..99.
                 // Die Reihenfolge untereinander kann hier NICHT geprueft
                 // werden -- jeder Schluessel kommt einzeln, ein Zwischenstand

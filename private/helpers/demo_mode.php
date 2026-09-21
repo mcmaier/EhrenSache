@@ -41,6 +41,7 @@ const DEMO_WRITE_ALLOWED = [
     'auth'              => ['POST'],
     'members'           => ['POST', 'PUT', 'DELETE'],
     'appointments'      => ['POST', 'PUT', 'DELETE'],
+    'appointment_series' => ['POST', 'PUT', 'DELETE'],
     'records'           => ['POST', 'PUT', 'DELETE'],
     'exceptions'        => ['POST', 'PUT', 'DELETE'],
     'appointment_responses' => ['PUT', 'DELETE'],
@@ -104,6 +105,7 @@ const DEMO_READ_ONLY = [
     'attendance_list',
     'import_logs',
     'export',
+    'holidays',
 ];
 
 /**

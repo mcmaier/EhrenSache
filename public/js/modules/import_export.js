@@ -18,6 +18,9 @@ import { showRecordsSection } from './records.js';
 import { showAppointmentSection } from './appointments.js';
 import { showMemberSection } from './members.js';
 import { showConfirm } from './ui.js';
+import { renderDateChecklist, formatChecklistDate } from './date_checklist.js';
+
+let suggestionChecklist = null;
 
 // ============================================
 // EXPORT
@@ -466,26 +469,24 @@ function displaySuggestions(result) {
     
     // Vorschläge vorhanden
     count.textContent = `(${suggestions.length} gefunden)`;
-    
-    list.innerHTML = suggestions.map((s, idx) => `
-        <div class="suggestion-item">
-            <input type="checkbox" id="sugg-${idx}" data-suggestion='${JSON.stringify(s)}' checked>
-            <label for="sugg-${idx}">
-                <strong>${s.date} um ${s.start_time.substring(0,5)} Uhr</strong>
-                (${s.record_count} Records)
-                <small>Zeitspanne: ${s.time_range.earliest.substring(0,5)} - ${s.time_range.latest.substring(0,5)} Uhr</small>
-            </label>
-        </div>
-    `).join('');
-    
+
+    suggestionChecklist = renderDateChecklist(list, suggestions.map(s => ({
+        date: s.date,
+        label: `${formatChecklistDate(s.date)} um ${s.start_time.substring(0, 5)} Uhr`,
+        note: `${s.record_count} Records · ${s.time_range.earliest.substring(0, 5)}–${s.time_range.latest.substring(0, 5)} Uhr`,
+        checked: true,
+        payload: s,
+    })));
+
     container.style.display = 'block';
 }
 
 // Ausgewählte Termine anlegen
 async function createSelectedAppointments() {
-    const checkboxes = document.querySelectorAll('#suggestions-list input[type="checkbox"]:checked');
-    const appointments = Array.from(checkboxes).map(cb => JSON.parse(cb.dataset.suggestion));
-    
+    const appointments = suggestionChecklist
+        ? suggestionChecklist.getSelectedItems().map(item => item.payload)
+        : [];
+
     if (appointments.length === 0) {
         showToast('Keine Termine ausgewählt', 'error');
         return;
@@ -537,6 +538,7 @@ async function createSelectedAppointments() {
 
 // Vorschläge verwerfen
 function clearSuggestions() {
+    suggestionChecklist = null;
     document.getElementById('suggestions-container').style.display = 'none';
     document.getElementById('csv-analyze-file').value = '';
 }

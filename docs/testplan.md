@@ -966,12 +966,14 @@ php tests/run.php worktime_api
 |----|----------|---------------------|
 | AK-M1 | PWA: Zeiterfassung mit Termin heute starten, danach Anwesenheitsliste des Termins | **kein** neuer Eintrag |
 | AK-M2 | Anwesenheitsquote des Mitglieds vor und nach dem Start vergleichen | unverändert |
-| AK-M3 | PWA: Terminauswahl öffnen | Termine des ganzen Jahres, nächstgelegene zuerst, mit Datum |
+| AK-M3 | PWA: Terminauswahl öffnen (seit 1.11.0 auch bei aktiven Terminserien) | Fenster 60 Tage zurück / 30 Tage voraus, gruppiert in „Heute", „Zurückliegend" (neueste zuerst) und „Kommend" (nächster zuerst); leere Gruppen fehlen; Termine außerhalb des Fensters erscheinen nicht neu wählbar |
 | AK-M4 | PWA: Termin wählen | Hinweis sagt, dass die Stunden zugerechnet werden und **kein** Check-in entsteht |
 | AK-M5 | Tätigkeitsart mit zwei Terminarten verknüpfen, dann in PWA und Nachtrag-Dialog wählen | Terminliste zeigt nur Termine dieser Arten |
 | AK-M6 | Tätigkeitsart ohne Verknüpfung wählen | Terminliste zeigt alle Termine |
 | AK-M7 | Bei gewähltem Termin die Tätigkeitsart wechseln, sodass der Termin nicht mehr passt | Der Termin bleibt gewählt und in der Liste |
 | AK-M8 | Update-Wizard auf einer Installation mit alten Timer-Check-ins | Protokoll nennt deren Anzahl als Warnung; die Einträge bleiben |
+| AK-M9 | Sitzung mit Termin älter als 60 Tage im Korrekturmodal öffnen, dann Tätigkeitsart hin und zurück wechseln | Termin bleibt durchgehend vorbelegt und wählbar — außerhalb des Fensters und unabhängig davon, ob er zur gewählten Terminart passt |
+| AK-M10 | Termin ohne bestehende Zuordnung, älter als 60 Tage bzw. mehr als 30 Tage voraus, in der Terminauswahl suchen | Erscheint nicht — nur bereits zugeordnete Termine sind außerhalb des Fensters wählbar |
 
 ---
 
@@ -1271,3 +1273,28 @@ Automatisiert: `php tests/run.php groups_unit`, `subgroups_api`, `subgroups_fron
 | UG-4 | In den Einstellungen die Bezeichnung ändern (z. B. „Register" → „Stimme") | Die dritte Umschalterstufe, der Sammelabschnitt „Ohne <Wort>" und das Feld in der Gruppenverwaltung zeigen das neue Wort — im Dashboard **und** in der Check-in-PWA |
 | UG-5 | Umschalter auf „Untergruppe" stellen, Seite neu laden (Dashboard und PWA je einmal) | Die Wahl bleibt erhalten, kein Rücksprung auf „Alphabetisch" |
 | UG-6 | Mitglied ohne Untergruppenzuordnung in einer Liste mit aktivem Umschalter „Untergruppe" | Es erscheint im Abschnitt „Ohne <Wort>" am Ende der Liste |
+
+---
+
+## 25. Terminserien, Feiertage, Anlegen im Kalender (1.11.0)
+
+Automatisiert: `php tests/run.php recurrence_unit`, `holidays_unit`, `appointment_series_api`,
+`appointment_series_frontend`, `demo_mode`, `migrations`. Manuell (Admin, sofern nicht anders
+angegeben):
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| TS-1 | Kalender → leerer Dienstag anklicken, im Dialog „Wiederholen" einschalten | Dialog mit vorbelegtem Datum; Dienstag als Wochentag vorausgewählt; „Bis" auf Datum + 3 Monate setzen |
+| TS-2 | Im selben Dialog „Vorschau" | Datumsliste; Feiertage abgewählt mit Namen; Zähler „N von M ausgewählt"; Knopf „N Termine anlegen"; ein Tag abwählen lässt den Zähler sinken |
+| TS-3 | „N Termine anlegen" | Meldung „Serie: … angelegt"; Kalender und Terminliste zeigen die neuen Termine mit dem Serien-Symbol |
+| TS-4 | Einen Serientermin öffnen, Titel ändern, speichern, Auswahl „Dieser und alle folgenden" | Folgende Termine tragen den neuen Titel, frühere nicht; Kasten „Teil der Serie: jeden Di · 19:30 · bis …" oben im Dialog |
+| TS-5 | Einen anderen Serientermin öffnen, ein Feld ändern, „Nur dieser" | Symbol wechselt auf „abgelöst" (halbtransparent); Dialog erneut geöffnet zeigt „Von der Serie abgelöst", keine Serienaktionen mehr |
+| TS-6 | Serienkasten → „Serie fortsetzen …", neues Enddatum wählen, Vorschau, anlegen | Serie reicht bis zum neuen Datum; neue Termine im verlängerten Bereich |
+| TS-7 | Serienkasten → „Regel ändern …", anderen Wochentag wählen, Vorschau | Hinweis, dass folgende Termine ersetzt werden; nach dem Anlegen folgt die Serie ab diesem Termin der neuen Regel, frühere Termine unverändert |
+| TS-8 | Einen Serientermin löschen, Auswahl „Dieser und alle folgenden" | Serie endet an diesem Termin; folgende Termine verschwinden bzw. bleiben als abgelöste stehen, wenn sie Daten tragen |
+| TS-9 | Serie mit „Serie fortsetzen" in ein Jahr verlängern, das im Jahresfilter bereits auswählbar ist, dorthin wechseln | Die neuen Termine sind sofort sichtbar, ohne die Seite neu zu laden (der Termin-Cache des Jahres wird invalidiert) |
+| TS-9b | Dieselbe Serie in ein Jahr verlängern, das im Jahresfilter noch **nicht** auswählbar ist (z. B. erste Serie über einen Jahreswechsel hinaus) | Das Jahr erscheint im Filter erst nach dem Neuladen der Seite, obwohl die Termine schon in der Datenbank stehen (OI-79) |
+| TS-10 | Als Manager: Serie anlegen (Kurzform von TS-1–TS-3) | Gelingt wie beim Admin |
+| TS-11 | Als Nutzer ohne Verwaltungsrecht: Kalender öffnen, auf einen leeren Tag klicken | Keine Reaktion; keine Serienknöpfe im Termin-Popup |
+| TS-12 | Bundesland in den Einstellungen wechseln (Termine → Kalender), zurück zum Kalender | Feiertagsnamen und -markierung ändern sich sofort, ohne Neuladen der Seite |
+| TS-13 | Als Manager/Admin: Herkunftsfilter auf „Nur Serientermine" bzw. „Ohne Serientermine" stellen | Liste, Kalender und Kennzahlen (Vergangene/Kommende) zeigen nur die passende Teilmenge; „Filter zurücksetzen" stellt „Alle" wieder her |

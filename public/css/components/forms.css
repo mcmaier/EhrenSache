@@ -259,3 +259,49 @@
 .response-settings__dependent.is-disabled {
     opacity: 0.5;
 }
+
+/* Datumsliste (Serienvorschau, Import-Vorschau) */
+.date-checklist-counter {
+    font-size: 13px;
+    color: var(--text-light);
+    margin: var(--spacing-sm) 0;
+}
+
+.date-checklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+}
+
+.date-checklist-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 6px var(--spacing-sm);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.date-checklist-item:last-child {
+    border-bottom: none;
+}
+
+.date-checklist-item.is-disabled {
+    opacity: 0.6;
+}
+
+.date-checklist-note {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.date-checklist-note.is-holiday {
+    color: var(--calendar-holiday);
+}
+
+.date-checklist-note.is-conflict {
+    color: var(--danger-color);
+}

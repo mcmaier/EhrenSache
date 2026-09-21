@@ -27,12 +27,13 @@ den Webserver bricht es mit 403 ab.
 
 ## Voraussetzung
 
-`schema_version` ≥ **1.8.0**. Seit dieser Version schreibt der Generator `member_groups` mit
-den Spalten `is_subgroup` und `sort_order` (Register) — Spalten, die ältere Schemata nicht
-kennen. 1.7.0 war die vorherige Schwelle, weil der Generator seitdem `appointment_responses`
-schreibt, eine Tabelle, die noch ältere Schemata nicht kennen. Der Update-Assistent stempelt
-bei jeder Migration deren `to`-Version in `schema_version`; eine aktualisierte Installation
-trägt daher mindestens 1.8.0 als letzten Stempel. Auf einem älteren Stand bricht der Generator
+`schema_version` ≥ **1.11.0**. Seit dieser Version leert das Rücksetzen auch
+`appointment_series` (Terminserien), eine Tabelle, die ältere Schemata nicht kennen. Serien
+selbst legt der Generator nicht an. Davor war 1.8.0 die Schwelle, weil der Generator seitdem
+`member_groups` mit den Spalten `is_subgroup` und `sort_order` (Register) schreibt, und davor
+1.7.0 wegen `appointment_responses`. Der Update-Assistent stempelt bei jeder Migration deren
+`to`-Version in `schema_version`; eine aktualisierte Installation trägt daher mindestens
+1.11.0 als letzten Stempel. Auf einem älteren Stand bricht der Generator
 laut ab, statt in eine fehlende Tabelle oder Spalte zu schreiben.
 
 ## Reihenfolge im Alltag

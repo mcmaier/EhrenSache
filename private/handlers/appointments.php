@@ -208,41 +208,16 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
 
-            // Prüfe ob bereits ein Termin in der Toleranz existiert
+            // Dublettenpruefung: gleiche Terminart im Toleranzfenster (appointment_rules.php).
             $tolerance = checkinToleranceHours($db, $database);
-            $toleranceSeconds = $tolerance * 3600;  // Stunden in Sekunden
-
-            $newDateTime = $data->date . ' ' . $data->start_time;
-
-            $checkStmt = $db->prepare("
-                SELECT appointment_id, title, start_time, date,
-                    ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
-                FROM {$prefix}appointments 
-                WHERE date = ?
-                AND type_id = ?
-                HAVING time_diff <= ?
-            ");
-            
-            $checkStmt->execute([$newDateTime, $data->date, $typeId, $toleranceSeconds]);
-            
-            $conflict = $checkStmt->fetch(PDO::FETCH_ASSOC);
-
-            if($conflict) {
-            http_response_code(409);
-            echo json_encode([
-                "message" => "Ein Termin dieser Art existiert bereits im Toleranzbereich von ±{$tolerance}h",
-                "conflict" => [
-                    "title" => $conflict['title'],
-                    "date" => $conflict['date'],
-                    "time" => $conflict['start_time'],
-                    "time_diff_seconds" => $conflict['time_diff']
-                ],
-                "hint" => "Bestehender Termin: \"{$conflict['title']}\" am {$conflict['date']} um {$conflict['start_time']} Uhr"
-            ]);
-            break;
+            $conflict = findAppointmentConflict($db, $prefix, (string) $data->date, (string) $data->start_time,
+                                                $typeId, $tolerance);
+            if ($conflict) {
+                http_response_code(409);
+                echo json_encode(appointmentConflictBody($conflict, $tolerance));
+                break;
             }
-            
-                  
+
             $stmt = $db->prepare("INSERT INTO {$prefix}appointments (title, type_id, description, location, date,
                                   start_time, end_time, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $createdBy = getCurrentUserId();
@@ -279,7 +254,7 @@ function handleAppointments($db, $database, $method, $id) {
             // schwerere Folge war die Terminart: Ein Termin ohne type_id hat
             // keine Gruppenzuordnung mehr, verschwindet aus den Listen der
             // Mitglieder und zaehlt in keiner Auswertung mehr mit.
-            $bestandStmt = $db->prepare("SELECT title, type_id, description, date, start_time, end_time
+            $bestandStmt = $db->prepare("SELECT title, type_id, description, date, start_time, end_time, location, series_id
                                          FROM {$prefix}appointments WHERE appointment_id = ?");
             $bestandStmt->execute([$id]);
             $bestand = $bestandStmt->fetch(PDO::FETCH_ASSOC);
@@ -291,8 +266,6 @@ function handleAppointments($db, $database, $method, $id) {
             }
 
             // Prüfe ob bereits ein anderer Termin der gleichen Art in der Toleranzzeit existiert
-            $tolerance = checkinToleranceHours($db, $database);
-            $toleranceSeconds = $tolerance * 3600;
 
             // Geprüft wird gegen den Zustand NACH dem Update, nicht gegen den
             // Anfragekörper: Fehlt ein Feld, gilt der gespeicherte Wert. Vorher
@@ -303,8 +276,6 @@ function handleAppointments($db, $database, $method, $id) {
             $wirkTime  = $data->start_time ?? $bestand['start_time'];
             $wirkType  = array_key_exists('type_id', get_object_vars($data))
                 ? $data->type_id : $bestand['type_id'];
-
-            $newDateTime = $wirkDate . ' ' . $wirkTime;
 
             // Ort und Ende (FI-23). Geprueft wird gegen den wirksamen Beginn;
             // aendert der Request nur den Beginn, zaehlt das gespeicherte Ende.
@@ -332,32 +303,12 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
 
-            $checkStmt = $db->prepare("
-                SELECT appointment_id, title, start_time, date,
-                    ABS(TIMESTAMPDIFF(SECOND, CONCAT(date, ' ', start_time), ?)) as time_diff
-                FROM {$prefix}appointments
-                WHERE date = ?
-                AND type_id = ?
-                AND appointment_id != ?
-                HAVING time_diff <= ?
-            ");
-            
-            $checkStmt->execute([$newDateTime, $wirkDate, $wirkType, $id, $toleranceSeconds]);
-            
-            $conflict = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if($conflict) {
+            $tolerance = checkinToleranceHours($db, $database);
+            $conflict = findAppointmentConflict($db, $prefix, (string) $wirkDate, (string) $wirkTime,
+                                                $wirkType, $tolerance, [(int) $id]);
+            if ($conflict) {
                 http_response_code(409);
-                echo json_encode([
-                    "message" => "Ein Termin dieser Art existiert bereits im Toleranzbereich von ±{$tolerance}h",
-                    "conflict" => [
-                        "title" => $conflict['title'],
-                        "date" => $conflict['date'],
-                        "time" => $conflict['start_time'],
-                        "time_diff_seconds" => $conflict['time_diff']
-                    ],
-                    "hint" => "Bestehender Termin: \"{$conflict['title']}\" am {$conflict['date']} um {$conflict['start_time']} Uhr"
-                ]);
+                echo json_encode(appointmentConflictBody($conflict, $tolerance));
                 break;
             }
 
@@ -368,11 +319,19 @@ function handleAppointments($db, $database, $method, $id) {
             $vorhanden = get_object_vars($data);
             $updateFields = [];
             $updateParams = [];
+            $geaendert = false;
+            $datumGeaendert = false;
 
             foreach (['title', 'type_id', 'description', 'date', 'start_time', 'location', 'end_time'] as $feld) {
                 if (array_key_exists($feld, $vorhanden)) {
                     $updateFields[] = "{$feld} = ?";
                     $updateParams[] = $data->$feld;
+                    if (appointmentFieldChanged($feld, $data->$feld, $bestand[$feld])) {
+                        $geaendert = true;
+                        if ($feld === 'date') {
+                            $datumGeaendert = true;
+                        }
+                    }
                 }
             }
 
@@ -381,18 +340,34 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
 
+            // Ein einzeln geaenderter Serientermin folgt der Serie nicht mehr (FI-7) --
+            // aber nur bei einer echten Aenderung. Der Dialog schickt alle Felder
+            // mit, auch unveraendert; sonst loeste sich jeder Serientermin schon
+            // beim blossen Speichern ab.
+            if ($bestand['series_id'] !== null && $geaendert) {
+                $updateFields[] = 'is_detached = 1';
+            }
+
             $updateParams[] = $id;
             $stmt = $db->prepare("UPDATE {$prefix}appointments SET " . implode(', ', $updateFields)
                                  . " WHERE appointment_id = ?");
 
             if($stmt->execute($updateParams)) {
+                // Verschiebt sich ein Serientermin auf ein anderes Datum, gilt das
+                // ALTE Datum als Ausfall der Serie -- wie beim Einzel-DELETE (FI-7).
+                // Ohne diesen Eintrag legt eine spaetere Serienaktion (z. B. ein
+                // Split, dessen Regel denselben Wochentag trifft) am alten Datum
+                // erneut einen Termin an: eine doppelte Probe.
+                if ($bestand['series_id'] !== null && $datumGeaendert) {
+                    seriesAddExdates($db, $prefix, (int) $bestand['series_id'], [$bestand['date']]);
+                }
                 echo json_encode(["message" => "Appointment updated"]);
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to update appointment"]);
             }
             break;
-            
+
         case 'DELETE':
             requireAdminOrManager();
 
@@ -402,6 +377,15 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
             
+            // Ein geloeschter Serientermin ist ein Ausfall: Das Datum wandert in
+            // exdates, damit "Serie fortsetzen" es nicht wieder erzeugt (FI-7).
+            $serienStmt = $db->prepare("SELECT series_id, date FROM {$prefix}appointments WHERE appointment_id = ?");
+            $serienStmt->execute([$id]);
+            $serienRow = $serienStmt->fetch(PDO::FETCH_ASSOC);
+            if ($serienRow && $serienRow['series_id'] !== null) {
+                seriesAddExdates($db, $prefix, (int) $serienRow['series_id'], [$serienRow['date']]);
+            }
+
             // Lösche zuerst abhängige Datensätze
             $db->prepare("DELETE FROM {$prefix}records WHERE appointment_id = ?")->execute([$id]);
             // Explizit vor exceptions (W2): appointment_responses.exception_id zeigt

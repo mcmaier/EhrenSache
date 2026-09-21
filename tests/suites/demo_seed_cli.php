@@ -78,6 +78,13 @@ test('assertSchema wirft bei zu altem Schemastand', function () {
     assertThrows(fn () => assertSchema($db, 'test_'));
 });
 
+test('assertSchema wirft bei 1.10.0 (appointment_series fehlt)', function () {
+    // clearAll() leert seit 1.11.0 appointment_series; auf 1.10.0 fehlt die
+    // Tabelle. Zugleich Wache gegen string-alphabetischen Vergleich.
+    $db = demoSeedCliMakeSchemaDb(['1.10.0']);
+    assertThrows(fn () => assertSchema($db, 'test_'));
+});
+
 test('assertSchema laesst den Mindeststand durch', function () {
     // Grenzfall bewusst ueber die Konstante statt ueber ein Literal: der Test
     // prueft, dass DEMO_MIN_SCHEMA selbst als ausreichend gilt (inklusive
@@ -86,8 +93,8 @@ test('assertSchema laesst den Mindeststand durch', function () {
     assertSchema($db, 'test_');
 });
 
-test('assertSchema laesst 1.8.1 durch', function () {
-    $db = demoSeedCliMakeSchemaDb(['1.8.1']);
+test('assertSchema laesst 1.11.1 durch', function () {
+    $db = demoSeedCliMakeSchemaDb(['1.11.1']);
     assertSchema($db, 'test_');
 });
 
