@@ -330,3 +330,80 @@ test('namesListHtml gliedert Antworten anderer Mitglieder nach Gruppe als Chips'
     $modalsCss = (string) file_get_contents($rsRoot . '/public/css/components/modals.css');
     assertTrue(str_contains($modalsCss, 'response-names-grouped'), 'modals.css fuehrt das Layout response-names-grouped nicht');
 });
+
+test('OI-63: Das Modal oeffnet gesperrt', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+
+    $start = strpos($js, 'export async function openResponsesModal');
+    assertTrue($start !== false, 'openResponsesModal fehlt');
+    $ende = strpos($js, 'export function closeResponsesModal', $start);
+    assertTrue($ende !== false, 'Ende von openResponsesModal nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'locked = true'),
+        'openResponsesModal setzt locked nicht auf true -- der Dialog muss bei jedem Oeffnen erneut gesperrt sein');
+});
+
+test('OI-63: Es gibt einen Sperr-Umschalter fuer den ganzen Dialog', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+
+    assertTrue(str_contains($js, 'export function toggleResponsesLock'), 'toggleResponsesLock fehlt');
+    assertTrue(str_contains($js, 'window.toggleResponsesLock = toggleResponsesLock'),
+        'toggleResponsesLock ist nicht global erreichbar');
+
+    $start = strpos($js, 'function responseLockToggleHtml');
+    assertTrue($start !== false, 'responseLockToggleHtml fehlt');
+    $ende = strpos($js, 'export function toggleResponsesLock', $start);
+    assertTrue($ende !== false, 'Ende von responseLockToggleHtml nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, '<button'), 'Der Umschalter ist kein <button> -- Barrierefreiheit (aria-pressed braucht ein natives Element)');
+    assertTrue(str_contains($body, 'aria-pressed='), 'aria-pressed fehlt am Umschalter');
+    assertTrue(str_contains($body, '🔒') && str_contains($body, '🔓'), 'Beide Zustaende (gesperrt/entsperrt) fehlen als Symbol');
+
+    $css = (string) file_get_contents($rsRoot . '/public/css/components/buttons.css');
+    assertTrue(str_contains($css, '.response-lock-toggle'), 'buttons.css fuehrt .response-lock-toggle nicht');
+});
+
+test('OI-63: Zeilen anderer Mitglieder sind gesperrt bedienungsunfaehig, die eigene Zeile bleibt frei', function () use ($rsRoot) {
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+
+    assertTrue(str_contains($js, 'function isOwnMember'), 'isOwnMember fehlt -- eigene Zeile des Verwalters muss erkannt werden');
+    assertTrue(str_contains($js, 'currentUser?.member_id'), 'isOwnMember prueft nicht gegen currentUser.member_id');
+
+    $start = strpos($js, 'function memberActionButtons');
+    assertTrue($start !== false, 'memberActionButtons fehlt');
+    $ende = strpos($js, 'function responseLockToggleHtml', $start);
+    assertTrue($ende !== false, 'Ende von memberActionButtons nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'locked && !isOwnMember(m.member_id)'),
+        'memberActionButtons sperrt Zeilen nicht nach "gesperrt und nicht die eigene Zeile"');
+    assertTrue(str_contains($body, '${disabledAttr}'), 'Die Aktionsknoepfe tragen das disabled-Attribut nicht bedingt');
+    assertTrue(str_contains($body, 'Zum Ändern zuerst entsperren'), 'Der erklaerende Titel fuer gesperrte Knoepfe fehlt');
+
+    $css = (string) file_get_contents($rsRoot . '/public/css/components/buttons.css');
+    assertTrue(str_contains($css, '.response-action:disabled'), 'buttons.css stellt gesperrte Aktionsknoepfe nicht sichtbar anders dar');
+});
+
+test('OI-63: setMemberResponse verweigert fremde Aenderungen im gesperrten Zustand serverunabhaengig', function () use ($rsRoot) {
+    // Der Schutzschritt darf nicht nur im disabled-Attribut stecken -- ein
+    // direkter Aufruf von setMemberResponse() (Konsole, veraltetes DOM nach
+    // einem Re-Render) muss ebenfalls verweigert werden.
+    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+
+    $start = strpos($js, 'export async function setMemberResponse');
+    assertTrue($start !== false, 'setMemberResponse fehlt');
+    $ende = strpos($js, 'export function printResponses', $start);
+    assertTrue($ende !== false, 'Ende von setMemberResponse nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'if (locked && !isOwnMember(memberId)) return;'),
+        'setMemberResponse hat keinen fruehen Guard gegen eine gesperrte, fremde Aenderung');
+
+    // Der Guard muss vor jedem mutierenden apiCall greifen.
+    $guardPos = strpos($body, 'if (locked && !isOwnMember(memberId)) return;');
+    $firstApiCallPos = strpos($body, 'apiCall(');
+    assertTrue($guardPos !== false && $firstApiCallPos !== false && $guardPos < $firstApiCallPos,
+        'Der Sperr-Guard steht nicht vor dem ersten apiCall()');
+});

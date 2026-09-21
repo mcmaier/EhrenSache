@@ -9,7 +9,7 @@
  */
 
 import { API_BASE } from '../config.js';
-import { apiCall, isAdminOrManager } from './api.js';
+import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { showToast, showConfirm, showReasonDialog, invalidateCache, subgroupLabel } from './ui.js';
 import { escapeHtml, translateExceptionStatus } from './utils.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_RESPONSES } from './grouping.js';
@@ -31,6 +31,12 @@ const CHIP_ORDER = ['yes', 'maybe', 'no', 'open'];
 
 let current = null;          // letzte API-Antwort des offenen Modals
 let currentFilter = 'all';
+
+// OI-63: Schutzschritt gegen einen Fehlklick auf die fremde Rueckmeldung
+// eines anderen Mitglieds. Das Modal oeffnet gesperrt und sperrt sich beim
+// naechsten Oeffnen wieder zu -- pro Dialogoeffnung, nicht pro Zeile. Die
+// eigene Zeile des Verwalters (isOwnMember()) bleibt davon unberuehrt.
+let locked = true;
 
 // Race-Schutz: reloadResponses() wird mehrfach ueberlappend aufgerufen
 // (schneller Klick auf mehrere Termine, Aenderung waehrend ein Abruf laeuft).
@@ -109,6 +115,7 @@ export function responseSummaryCell(apt) {
 
 export async function openResponsesModal(appointmentId) {
     currentFilter = 'all';
+    locked = true;
     openAppointmentId = appointmentId;
     document.getElementById('responsesModalBody').innerHTML = '<p class="loading">Lade Rückmeldungen...</p>';
     document.getElementById('responsesModal').classList.add('active');
@@ -272,26 +279,63 @@ function statusBadge(status) {
         : `<span class="response-badge response-badge--${status}">${RESPONSE_LABELS[status]}</span>`;
 }
 
+/**
+ * OI-63: True, wenn memberId der eingeloggte Verwalter selbst ist -- der
+ * Dirigent kann auch in der eigenen Terminart erwartet sein und steht dann
+ * mit in data.members. Seine eigene Zeile bleibt ohne Entsperren bedienbar,
+ * genau wie ownResponseHtml() das fuer ihn ausserhalb der Tabelle waere.
+ */
+function isOwnMember(memberId) {
+    return currentUser?.member_id != null && Number(memberId) === Number(currentUser.member_id);
+}
+
 /** Vier quadratische Icon-Aktionen (Zusage/Unsicher/Absage/Zuruecknehmen) je Mitgliederzeile. */
 function memberActionButtons(m) {
     const memberLabel = `${escapeHtml(m.name)} ${escapeHtml(m.surname)}`;
+    // OI-63: gesperrt und keine eigene Zeile -- Knoepfe bleiben sichtbar,
+    // aber bedienungsunfaehig, mit erklaerendem Titel statt des normalen.
+    const disabled = locked && !isOwnMember(m.member_id);
+    const disabledAttr = disabled ? ' disabled' : '';
+    const lockedTitle = 'Zum Ändern zuerst entsperren';
+
     const buttons = ['yes', 'maybe', 'no'].map(s => {
         const active = m.status === s;
+        const title = disabled ? lockedTitle : `${RESPONSE_LABELS[s]} für ${memberLabel} setzen`;
         return `<button type="button" class="action-btn btn-icon response-action response-action--${s}${active ? ' is-active' : ''}"
                     aria-pressed="${active ? 'true' : 'false'}"
-                    title="${RESPONSE_LABELS[s]} für ${memberLabel} setzen"
+                    title="${title}"
                     aria-label="${RESPONSE_LABELS[s]} für ${memberLabel} setzen"
-                    onclick="setMemberResponse(${Number(m.member_id)}, '${s}')">${RESPONSE_ICONS[s]}</button>`;
+                    onclick="setMemberResponse(${Number(m.member_id)}, '${s}')"${disabledAttr}>${RESPONSE_ICONS[s]}</button>`;
     }).join('');
 
     const reset = m.status !== null
         ? `<button type="button" class="action-btn btn-icon response-action response-action--reset"
-                title="Rückmeldung für ${memberLabel} zurücknehmen"
+                title="${disabled ? lockedTitle : `Rückmeldung für ${memberLabel} zurücknehmen`}"
                 aria-label="Rückmeldung für ${memberLabel} zurücknehmen"
-                onclick="setMemberResponse(${Number(m.member_id)}, 'delete')">↺</button>`
+                onclick="setMemberResponse(${Number(m.member_id)}, 'delete')"${disabledAttr}>↺</button>`
         : '';
 
     return buttons + reset;
+}
+
+/**
+ * Umschalter des Schutzschritts (OI-63): oeffnet gesperrt, ein Klick
+ * entsperrt alle fremden Zeilen der Tabelle bis das Modal erneut geoeffnet
+ * wird. Reiner UI-Baustein -- die eigentliche Sperre sitzt als Guard in
+ * setMemberResponse(), nicht nur im disabled-Attribut der Knoepfe.
+ */
+function responseLockToggleHtml() {
+    return `<button type="button" id="responsesLockToggle" class="response-lock-toggle${locked ? '' : ' is-unlocked'}"
+                aria-pressed="${locked ? 'false' : 'true'}"
+                title="${locked ? 'Bearbeiten fremder Rückmeldungen entsperren' : 'Fremde Rückmeldungen wieder sperren'}"
+                onclick="toggleResponsesLock()">
+                ${locked ? '🔒 Bearbeiten entsperren' : '🔓 Sperren'}
+            </button>`;
+}
+
+export function toggleResponsesLock() {
+    locked = !locked;
+    if (current) renderResponsesModal();
 }
 
 /** Baut die volle Tabellenzeile eines Mitglieds -- steht ein Mitglied in
@@ -352,6 +396,7 @@ function managerTableHtml(data) {
     }).join('');
 
     return `
+        <div class="response-lock-bar">${responseLockToggleHtml()}</div>
         <div class="response-filter">
             <button type="button" class="response-filter__btn${currentFilter === 'all' ? ' is-active' : ''}"
                     aria-pressed="${currentFilter === 'all' ? 'true' : 'false'}" onclick="filterResponses('all')">Alle (${allCount})</button>
@@ -541,6 +586,9 @@ export async function withdrawOwnResponse() {
 
 export async function setMemberResponse(memberId, value) {
     if (value === '' || !current) return;
+    // OI-63: Guard in JS, nicht nur im disabled-Attribut -- ein direkter
+    // Aufruf (Konsole, veraltetes DOM) darf die Sperre nicht umgehen.
+    if (locked && !isOwnMember(memberId)) return;
     const appointmentId = current.appointment.appointment_id;
     const year = Number(current.appointment.date.substring(0, 4));
 
@@ -598,5 +646,6 @@ window.setOwnResponse = setOwnResponse;
 window.saveOwnComment = saveOwnComment;
 window.withdrawOwnResponse = withdrawOwnResponse;
 window.setMemberResponse = setMemberResponse;
+window.toggleResponsesLock = toggleResponsesLock;
 window.filterResponses = filterResponses;
 window.printResponses = printResponses;

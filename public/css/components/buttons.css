@@ -293,6 +293,18 @@
 .response-action--reset { color: var(--text-light); border-color: var(--border-color); }
 .response-action--reset:hover { background: var(--bg-gray); }
 
+/* OI-63: gesperrte Zeile (fremdes Mitglied, Dialog noch nicht entsperrt) --
+   Knopf bleibt sichtbar, aber ohne die Hover-Einfaerbung der aktiven Farben;
+   title traegt "Zum Ändern zuerst entsperren" (responses.js). */
+.response-action:disabled,
+.response-action:disabled:hover {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: var(--bg-white);
+    color: var(--text-light);
+    border-color: var(--border-color);
+}
+
 /* Segmentgruppe des Antwort-Filters im Modal (ersetzt die fruehere Radio-Liste).
    .list-grouping ist derselbe Baustein, wiederverwendet fuer den Gruppierungs-
    Umschalter (Anwesenheitsliste, Namensliste -- Untergruppen, FI-14/1.8.0),
@@ -316,6 +328,32 @@
 
 .response-filter__btn:hover, .list-grouping__btn:hover { opacity: 0.8; }
 .response-filter__btn.is-active, .list-grouping__btn.is-active { background: var(--primary-color); border-color: var(--primary-color); color: var(--bg-white); }
+
+/* OI-63: Schutzschritt gegen versehentliches Aendern fremder Rueckmeldungen.
+   Die Verwalter-Tabelle oeffnet gesperrt (responses.js, managerTableHtml) --
+   dieser Umschalter ist der einzige Weg, ihre Aktionsknoepfe freizugeben,
+   und zwar fuer den ganzen Dialog, nicht je Zeile. */
+.response-lock-bar { margin: var(--spacing-sm) 0; }
+
+.response-lock-toggle {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-white);
+    color: var(--text-dark);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.response-lock-toggle:hover { opacity: 0.8; }
+
+.response-lock-toggle.is-unlocked {
+    background: var(--warning-color);
+    border-color: var(--warning-color);
+    color: var(--bg-white);
+}
 
 /* Hinweiszeile bei Mehrfachnennung (Spec 6.4): wer in zwei Gruppen/Untergruppen
    steht, erscheint absichtlich in beiden Abschnitten -- das wird ausgewiesen. */

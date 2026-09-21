@@ -1240,6 +1240,7 @@ Automatisiert: `php tests/run.php responses_unit`, `responses_api`, `responses_f
 | RM-21 | Entschuldigungspflicht nachträglich für eine Terminart ausschalten, die bereits offene Anträge aus Absagen hat | Die bestehenden Anträge bleiben verknüpft und offen, sichtbar unter „Anträge"; keine automatische Änderung |
 | RM-22 | Absage mit Begründung, Admin lehnt den Antrag unter „Anträge" ab, danach Zusage, danach erneut Absage mit Begründung | Zusage nach abgelehntem Antrag gelingt (kein Fehler); der abgelehnte Antrag bleibt sichtbar unverändert; die erneute Absage legt einen neuen, offenen Antrag an — zwei Anträge insgesamt, einer abgelehnt, einer offen |
 | RM-23 | Absage mit Begründung bei einer Terminart mit Entschuldigungspflicht, danach unter „Anträge" einen zweiten Abwesenheitsantrag zum selben Termin stellen | Der zweite Antrag wird abgewiesen, der Dialog bleibt offen und meldet, dass es zu diesem Termin bereits einen Antrag dieser Art gibt; unter „Anträge" steht weiterhin genau einer |
+| RM-24 | Manager öffnet Rückmeldungen eines Termins, klickt ohne zu entsperren auf eine Aktion einer fremden Zeile; dann „🔒 Bearbeiten entsperren" klicken und erneut versuchen; danach Modal schließen und neu öffnen | Erster Klick ändert nichts, Knöpfe zeigen den Hinweis „Zum Ändern zuerst entsperren"; nach dem Entsperren funktionieren sie; ist der Manager selbst in der Liste, ist seine eigene Zeile von Anfang an bedienbar; nach erneutem Öffnen ist der Dialog wieder gesperrt (OI-63) |
 
 ### Terminliste der PWA (seit 1.10.0)
 

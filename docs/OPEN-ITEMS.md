@@ -209,6 +209,10 @@ Verwendungsnachweis ist das die Stelle, an die ein Prüfer zuerst schaut.
 Freigabe geben. Preis: In einem Verein mit nur einem Manager bleibt dessen Eintrag hängen, bis
 ein Admin ihn freigibt.
 
+**Dieselbe Lücke an einer weiteren Stelle:** Der in [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen) geplante
+Korrekturweg der PWA hat denselben Effekt — korrigiert ein Manager die eigene Sitzung, bleibt sie
+`confirmed`, ohne dass jemand anderes zustimmt.
+
 ---
 
 ### OI-20 · Auto-Termine zählen weiter in die Statistik
@@ -2494,31 +2498,35 @@ verschieden. Es geht um die Vollständigkeit künftiger Schalter, nicht um eine 
 ---
 
 ### OI-63 · Rückmeldung für andere: kein Schutzschritt, keine Spur
-**Priorität:** mittel · aufgenommen am 2026-09-16
+**Priorität:** mittel · aufgenommen am 2026-09-16 · Schutzschritt erledigt in 1.11.0
 
 `responsesResolveTarget()` (`private/handlers/appointment_responses.php`) erlaubt Admin und
 Manager, mit `?member_id=<id>` die Rückmeldung eines **anderen** Mitglieds zu setzen oder zu
 löschen. Das ist gewollt — jemand ruft an und sagt ab, der Dirigent trägt es ein. Zwei Dinge
-fehlen drumherum:
+fehlten drumherum:
 
-1. **Kein Schutzschritt in der Oberfläche.** Die fremde Antwort ist so bearbeitbar wie die
-   eigene. Ein Fehlklick in der Terminliste ändert die Zusage einer anderen Person, ohne dass
-   irgendetwas darauf hinweist.
+1. ~~**Kein Schutzschritt in der Oberfläche.**~~ **Erledigt in 1.11.0:** Der
+   Rückmeldungs-Dialog öffnet gesperrt; die Aktionsknöpfe fremder Zeilen sind ausgegraut
+   (`title="Zum Ändern zuerst entsperren"`), bis „🔒 Bearbeiten entsperren" geklickt wird — je
+   Dialogöffnung, nicht je Zeile, und beim nächsten Öffnen wieder zu. Die eigene Zeile bleibt
+   ohne Entsperren bedienbar (`isOwnMember()`, `public/js/modules/responses.js`). Bewusst nur
+   in der Oberfläche: Eine serverseitige Prüfung könnte nur wiederholen, was Rolle und
+   Mitgliedsprüfung bereits leisten (siehe „Nicht sicherheitsrelevant" unten) — sie kann nicht
+   feststellen, *ob ein Fehlklick vorlag*, nur *ob der Aufruf erlaubt ist*. Das entspricht der
+   Einordnung: kein Rechteproblem, sondern ein Bedienschutz gegen den Fehlklick.
 2. **Keine Spur.** Weder `appointment_responses` noch ein Protokoll hält fest, dass *jemand
    anderes* geschrieben hat. Nachträglich ist nicht unterscheidbar, ob ein Mitglied selbst
    abgesagt oder der Manager es für es getan hat — und auch nicht, wer. Die Arbeitszeit löst
-   dieselbe Frage seit 1.2.0 über `work_session_log`.
+   dieselbe Frage seit 1.2.0 über `work_session_log`. **Offen.**
 
 Das wiegt schwerer, seit die Rückmeldung in die Zuverlässigkeitskennzahl einfließt (1.7.0): Ein
 fremder Eintrag verschiebt eine Kennzahl, die einer Person zugerechnet wird.
 
 **Zu entscheiden:**
 
-- **Schutzschritt:** Eine Rückfrage vor dem Bearbeiten fremder Antworten („für Anna Beispiel
-  eintragen?") oder ein ausdrückliches Entsperren je Termin. Ersteres ist billiger und
-  vermutlich ausreichend; Letzteres ist die stärkere Bremse und passt zum Vier-Augen-Gedanken
-  aus [OI-3](#oi-3--vier-augen-prinzip-bei-manager-nachträgen). Die Prüfung gehört in jedem Fall
-  **serverseitig** dazu, nicht nur in die Oberfläche.
+- ~~**Schutzschritt:**~~ **Erledigt in 1.11.0** — ausdrückliches Entsperren je Dialog, die
+  stärkere der beiden erwogenen Varianten, passend zum Vier-Augen-Gedanken aus
+  [OI-3](#oi-3--vier-augen-prinzip-bei-manager-nachträgen). Nur UI-seitig (siehe oben).
 - **Spur:** Reicht ein Feld `entered_by` in `appointment_responses` (billig, beantwortet „wer
   war es") oder braucht es ein Protokoll wie `work_session_log` (beantwortet zusätzlich „was
   stand vorher da")? Der Verlauf von Antwortänderungen ist in

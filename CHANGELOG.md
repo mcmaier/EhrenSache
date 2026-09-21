@@ -33,6 +33,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Nähe zu heute sortierten, mit Terminserien unübersichtlich langen Liste. Termine außerhalb des
   Fensters lassen sich nicht neu zuordnen; ein bereits zugeordneter Termin bleibt davon
   unberührt und wählbar, auch über einen Wechsel der Tätigkeitsart hinweg.
+- Der Rückmeldungs-Dialog für Admin/Manager öffnet gesperrt; fremde Antworten lassen sich erst
+  nach einem ausdrücklichen Entsperren ändern, die eigene Zeile bleibt davon unberührt (OI-63).
 
 ### Datenbank
 - Migration 1.10.0 → 1.11.0: Tabelle `appointment_series`, Spalten `appointments.series_id` und
