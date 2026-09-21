@@ -233,8 +233,8 @@ async function renderAppointments(appointments, page = 1) {
             // Serientermin (FI-7): abgeloeste tragen ein eigenes Kennzeichen.
             const seriesBadge = apt.series_id
                 ? (Number(apt.is_detached) === 1
-                    ? ' <span class="series-badge series-badge--detached" title="Aus einer Serie, einzeln geändert">🔁</span>'
-                    : ' <span class="series-badge" title="Teil einer Serie">🔁</span>')
+                    ? ' <span class="series-badge series-badge--detached" title="Aus einer Serie, einzeln geändert" aria-label="Aus einer Serie, einzeln geändert">🔁</span>'
+                    : ' <span class="series-badge" title="Teil einer Serie" aria-label="Teil einer Serie">🔁</span>')
                 : '';
 
             appointmentInfo = `<div style="line-height: 1.4;">
@@ -590,11 +590,25 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
     } else if (!isOtherMonth && isAdminOrManager) {
         // OI-64: Ein leerer Tag legt einen Termin an. Einfache Nutzer legen
         // keine Termine an und sehen deshalb keine Aenderung.
+        const createLabel = `Neuen Termin am ${String(dayNum).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year} anlegen`;
         day.classList.add('calendar-day--can-create');
         day.title = 'Neuen Termin anlegen';
-        day.addEventListener('click', (e) => {
+        day.setAttribute('role', 'button');
+        day.setAttribute('tabindex', '0');
+        day.setAttribute('aria-label', createLabel);
+        const createHandler = (e) => {
             e.stopPropagation();
+            // Ein festgehaltenes Popup eines anderen Tages muss weichen --
+            // sonst schwebt es ueber dem neuen Dialog (Review Task 11).
+            document.querySelector('.calendar-event-popup')?.remove();
             openAppointmentModal(null, { date: dateStr });
+        };
+        day.addEventListener('click', createHandler);
+        day.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                createHandler(e);
+            }
         });
     }
 
@@ -617,11 +631,16 @@ function holidaysOfYear(year) {
     }
     if (!holidayRequests.has(year)) {
         holidayRequests.add(year);
-        apiCall('holidays', 'GET', null, { from: `${year}-01-01`, to: `${year}-12-31` })
+        apiCall('holidays', 'GET', null, { from: `${year}-01-01`, to: `${year}-12-31` },
+            { silentStatuses: [400, 403, 404, 500] })
             .then(res => {
                 if (res && res.success) {
                     dataCache.holidays[year] = { data: res.holidays || {}, timestamp: Date.now() };
                     renderCalendar();
+                } else {
+                    // Fehlschlag ebenfalls fuer die TTL merken -- sonst fragt jeder
+                    // Kalender-Rerender erneut an und haemmert mit Fehler-Toasts.
+                    dataCache.holidays[year] = { data: {}, timestamp: Date.now(), failed: true };
                 }
             })
             .finally(() => holidayRequests.delete(year));

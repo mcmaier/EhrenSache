@@ -315,3 +315,11 @@
 .series-badge--detached {
     opacity: 0.5;
 }
+
+/* Heutiger Tag: Feiertagsfarbe und Anlegen-Hinweis sind auf dem
+   Primärfarben-Hintergrund von .calendar-day.today kaum lesbar -- dort die
+   umgebende (weisse) Textfarbe erben statt der eigenen Akzentfarbe. */
+.calendar-day.today .calendar-holiday-name,
+.calendar-day.today.calendar-day--can-create:hover::after {
+    color: inherit;
+}

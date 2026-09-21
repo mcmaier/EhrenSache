@@ -90,3 +90,11 @@ test('Terminliste kennzeichnet Serientermine', function () use ($sfRoot) {
     assertTrue(str_contains($js, 'Teil einer Serie'));
     assertTrue(str_contains($js, 'Aus einer Serie, einzeln geändert'));
 });
+
+test('Leerer Kalendertag: ein offenes Popup schliesst sich vor dem Anlegen', function () use ($sfRoot) {
+    $js = sfFile($sfRoot, 'public/js/modules/appointments.js');
+    assertTrue((bool) preg_match(
+        '/document\.querySelector\(\'\.calendar-event-popup\'\)\?\.remove\(\);\s*openAppointmentModal\(null, \{ date: dateStr \}\);/',
+        $js
+    ), 'Ein festgehaltenes Popup wird vor dem Anlegen nicht entfernt');
+});
