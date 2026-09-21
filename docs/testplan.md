@@ -1295,3 +1295,4 @@ angegeben):
 | TS-10 | Als Manager: Serie anlegen (Kurzform von TS-1–TS-3) | Gelingt wie beim Admin |
 | TS-11 | Als Nutzer ohne Verwaltungsrecht: Kalender öffnen, auf einen leeren Tag klicken | Keine Reaktion; keine Serienknöpfe im Termin-Popup |
 | TS-12 | Bundesland in den Einstellungen wechseln (Termine → Kalender), zurück zum Kalender | Feiertagsnamen und -markierung ändern sich sofort, ohne Neuladen der Seite |
+| TS-13 | Als Manager/Admin: Herkunftsfilter auf „Nur Serientermine" bzw. „Ohne Serientermine" stellen | Liste, Kalender und Kennzahlen (Vergangene/Kommende) zeigen nur die passende Teilmenge; „Filter zurücksetzen" stellt „Alle" wieder her |

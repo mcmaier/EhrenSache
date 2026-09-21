@@ -23,6 +23,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ### Geändert
 - Die Vorschau „Termine aus Records ableiten" nutzt dieselbe Datumsliste wie die Serienvorschau.
+- Der Herkunftsfilter der Terminverwaltung kennt zusätzlich „Nur Serientermine" und „Ohne
+  Serientermine"; die Auswahl wirkt wie gehabt auf Liste, Kalender und Kennzahlen gemeinsam.
 
 ### Datenbank
 - Migration 1.10.0 → 1.11.0: Tabelle `appointment_series`, Spalten `appointments.series_id` und

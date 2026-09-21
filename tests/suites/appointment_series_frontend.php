@@ -149,3 +149,25 @@ test('Die Regel wird im Dialog in Klartext beschrieben', function () use ($sfRoo
     assertTrue(str_contains($js, 'Teil der Serie:'));
     assertTrue(str_contains($js, 'Von der Serie'));
 });
+
+// ---- Herkunftsfilter: Serientermine ein-/ausblenden -------------------------------
+
+test('Der Herkunftsfilter bietet "Nur Serientermine" und "Ohne Serientermine" an', function () use ($sfRoot) {
+    $html = sfFile($sfRoot, 'public/index.html');
+    assertTrue(str_contains($html, '<option value="series">Nur Serientermine</option>'),
+               'Option value="series" fehlt im Herkunftsfilter');
+    assertTrue(str_contains($html, '<option value="single">Ohne Serientermine</option>'),
+               'Option value="single" fehlt im Herkunftsfilter');
+});
+
+test('Der Herkunftsfilter filtert series/single ueber series_id', function () use ($sfRoot) {
+    $js = sfFile($sfRoot, 'public/js/modules/appointments.js');
+    assertTrue((bool) preg_match(
+        "/herkunft === 'series'\\).*?filter\\(a => a\\.series_id/s",
+        $js
+    ), '"series" muss ueber a.series_id filtern');
+    assertTrue((bool) preg_match(
+        "/herkunft === 'single'\\).*?filter\\(a => a\\.series_id/s",
+        $js
+    ), '"single" muss ueber a.series_id filtern');
+});

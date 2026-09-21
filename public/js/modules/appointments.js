@@ -203,6 +203,11 @@ export async function showAppointmentSection(forceReload = false, page = 1)
             gefiltert = gefiltert.filter(a => Number(a.is_auto_created) === 1);
         } else if (herkunft === 'manual') {
             gefiltert = gefiltert.filter(a => Number(a.is_auto_created) !== 1);
+        } else if (herkunft === 'series') {
+            // Serientermine: series_id gesetzt -- auch abgeloeste (FI-7) zaehlen dazu.
+            gefiltert = gefiltert.filter(a => a.series_id !== null && a.series_id !== undefined);
+        } else if (herkunft === 'single') {
+            gefiltert = gefiltert.filter(a => a.series_id === null || a.series_id === undefined);
         }
 
         renderAppointments(gefiltert, page);
