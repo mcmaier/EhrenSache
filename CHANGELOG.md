@@ -7,6 +7,22 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.11.1] – unveröffentlicht
+
+### Behoben
+- **Ein im Listen-Tab der PWA angelegter Termin verschwindet nicht mehr kommentarlos.** Die
+  Auswahl zeigt nur Termine im Check-in-Fenster um jetzt – diese Liste erfasst Anwesenheit.
+  Ein neuer Termin darin wird jetzt gleich ausgewählt, einer außerhalb bekommt einen
+  erklärenden Hinweis statt der Meldung „Termin erstellt" ohne sichtbares Ergebnis. Der Dialog
+  ist mit dem aktuellen Zeitpunkt vorbelegt und bleibt bei einem Fehler offen, etwa bei einer
+  Dublette; bisher schloss er sich und die Eingaben waren verloren. Die Fehlermeldung steht jetzt
+  im Dialog selbst, bei einer Dublette mit dem bestehenden Termin — als Einblendung lag sie
+  unter dem offenen Dialog und war nicht zu sehen.
+- **Kurz nach Mitternacht fehlte in derselben Auswahl ein Termin vom Vorabend**, obwohl er noch
+  im Fenster lag: Die Abfrage begann erst mit dem heutigen Datum.
+
+---
+
 ## [1.11.0] – 2026-09-21
 
 ### Neu

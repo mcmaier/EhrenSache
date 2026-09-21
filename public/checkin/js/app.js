@@ -1122,6 +1122,27 @@ async function initAttendanceList() {
  * bindOnce()-Aufruf: Der Rumpf ist laenger als die uebrige Bindung zusammen
  * und verdeckte dort, was die Funktion sonst noch tut.
  */
+/**
+ * Meldungen zu einem gescheiterten Speichern im Termin-Dialog.
+ *
+ * Bei einer Dublette (409) ersetzt apiCall() die Servermeldung durch das
+ * allgemeine "Konflikt - Eintrag existiert bereits". Der Server sagt aber
+ * genauer, was los ist, und nennt den bestehenden Termin -- beides steht in
+ * result.data und wird hier bevorzugt.
+ */
+function appointmentErrorMessages(result) {
+    const konflikt = result.status === 409 ? result.data?.conflict : null;
+    if (!konflikt) {
+        return [result.error || 'Speichern fehlgeschlagen'];
+    }
+
+    const wann = formatResponseCardHead(konflikt.date, konflikt.time, null);
+    return [
+        result.data.message || result.error,
+        `Bestehender Termin: „${konflikt.title}“ (${wann})`,
+    ];
+}
+
 async function submitAppointmentForm(e) {
     e.preventDefault();
 
@@ -1135,26 +1156,41 @@ async function submitAppointmentForm(e) {
     };
 
     try {
-        if (currentEditAppointmentId) {
-            // Update
-            const result = await apiCall('appointments', 'PUT', formData, { id: currentEditAppointmentId });
-            if(result.success) {showMessage('Termin aktualisiert', 'success');}
-            else{showMessage(result.error,'error');}
-        } else {
-            // Create
-            const result = await apiCall('appointments', 'POST', formData);
-            if(result.success) {showMessage('Termin erstellt', 'success');}
-            else{showMessage(result.error,'error');}
+        const neu = !currentEditAppointmentId;
+        const result = neu
+            ? await apiCall('appointments', 'POST', formData)
+            : await apiCall('appointments', 'PUT', formData, { id: currentEditAppointmentId });
+
+        // Bei einem Fehler bleibt der Dialog offen. Bis 1.11.0 schloss er sich
+        // auch dann -- etwa bei einer Dublette (409) -- und die Eingaben waren
+        // verloren. Die Meldung steht deshalb im Dialog selbst, nicht als
+        // Toast: Den verdeckte der offene Dialog.
+        if (!result.success) {
+            showFormErrors('appointmentErrors', appointmentErrorMessages(result));
+            return;
         }
 
-        // Modal schließen
+        showFormErrors('appointmentErrors', []);
         document.getElementById('appointmentModal').classList.remove('active');
 
-        // Liste aktualisieren
+        const id = neu ? String(result.data?.id ?? '') : String(currentEditAppointmentId);
         await loadAttendanceAppointments();
-        if(currentEditAppointmentId)
-        {
-            refreshAttendanceList();
+
+        // Die Auswahl zeigt nur Termine im Fenster um jetzt -- diese Liste
+        // erfasst Anwesenheit. Liegt der Termin darin, wird er gleich
+        // ausgewaehlt: dafuer wurde er hier angelegt. Sonst sagt die Meldung,
+        // wo er geblieben ist. Bis 1.11.0 hiess es "Termin erstellt", und der
+        // Termin tauchte nirgends auf.
+        const select = document.getElementById('attendanceAppointmentFilter');
+        const sichtbar = id !== '' && [...select.options].some(o => o.value === id);
+        select.value = sichtbar ? id : '';
+        await loadAttendanceList();
+
+        if (sichtbar) {
+            showMessage(neu ? 'Termin erstellt' : 'Termin aktualisiert', 'success');
+        } else {
+            const wann = formatResponseCardHead(formData.date, formData.start_time, null);
+            showMessage(`Termin ${neu ? 'angelegt' : 'gespeichert'} (${wann}) – außerhalb von ± ${attendanceWindowHours()} Std. um jetzt, daher nicht in dieser Liste.`, 'info');
         }
 
     } catch (error) {
@@ -1163,17 +1199,34 @@ async function submitAppointmentForm(e) {
     }
 }
 
+/**
+ * Fenster der Anwesenheitsliste in Stunden: dieselbe Toleranz wie beim
+ * Check-in (Systemeinstellung), Rueckfall 2 wie auf dem Server. Hier stand bis
+ * 1.2.4 eine 6, waehrend der Server mit 2 rechnete.
+ */
+function attendanceWindowHours() {
+    const parsed = parseInt(clientSettings.checkin_tolerance_hours, 10);
+    return Number.isNaN(parsed) ? 2 : parsed;
+}
+
+/** Liegt der Beginn dieses Termins im Fenster der Anwesenheitsliste? */
+function isInAttendanceWindow(apt, now = new Date()) {
+    const beginn = new Date(`${apt.date}T${apt.start_time}`);
+    return Math.abs(now - beginn) / 3600000 <= attendanceWindowHours();
+}
+
 async function loadAttendanceAppointments() {
     try {
-        // Hole Termine der nächsten 7 Tage (inkl. heute)
-        const today = new Date();
-        const nextWeek = new Date(today);
-        nextWeek.setDate(nextWeek.getDate() + 3);
-
+        // Abgefragt wird genau das Fenster um jetzt. Bis 1.11.0 begann die
+        // Abfrage erst mit dem heutigen Datum (und reichte drei Tage voraus,
+        // der Kommentar sprach von sieben): Kurz nach Mitternacht fehlte
+        // dadurch ein Termin vom Vorabend, obwohl er noch im Fenster lag.
+        const jetzt = new Date();
+        const fenster = attendanceWindowHours() * 3600000;
 
         const result = await apiCall('appointments', 'GET', null, {
-            from_date: formatDate(today),
-            to_date: formatDate(nextWeek)
+            from_date: formatDate(new Date(jetzt.getTime() - fenster)),
+            to_date: formatDate(new Date(jetzt.getTime() + fenster))
         });
         
         if (!result.success) {
@@ -1186,19 +1239,8 @@ async function loadAttendanceAppointments() {
             appointments = [];
         }
         
-        // Filter: Nur Termine die in Toleranz sind
-        //
-        // Fenster aus den Systemeinstellungen statt einer eigenen Zahl. Hier
-        // stand bis 1.2.4 eine 6, waehrend der Server mit 2 rechnete.
-        const parsedTolerance = parseInt(clientSettings.checkin_tolerance_hours, 10);
-        const toleranceHours = Number.isNaN(parsedTolerance) ? 2 : parsedTolerance;
-        const now = new Date();
-        
-        const relevantAppointments = appointments.filter(apt => {
-            const aptDateTime = new Date(`${apt.date}T${apt.start_time}`);
-            const diffHours = Math.abs(now - aptDateTime) / (1000 * 60 * 60);
-            return diffHours <= toleranceHours;
-        });
+        // Nur Termine im Fenster -- diese Liste erfasst Anwesenheit.
+        const relevantAppointments = appointments.filter(apt => isInAttendanceWindow(apt, jetzt));
         
         // Dropdown befüllen
         const select = document.getElementById('attendanceAppointmentFilter');
@@ -2782,7 +2824,16 @@ function closeWorkSessionModal() {
 
 /** Zeigt die Meldungen des Servers; eine leere Liste blendet den Kasten aus. */
 function showWorkSessionErrors(messages) {
-    const box = document.getElementById('workSessionErrors');
+    showFormErrors('workSessionErrors', messages);
+}
+
+/**
+ * Fehlerkasten innerhalb eines Dialogs. Ein Toast ueber showMessage() waere
+ * dort unsichtbar: Die Statuszeile liegt unter dem Overlay des offenen
+ * Dialogs. Eine leere Liste blendet den Kasten aus.
+ */
+function showFormErrors(boxId, messages) {
+    const box = document.getElementById(boxId);
     if (!box) return;
 
     if (!messages || messages.length === 0) {
@@ -2989,7 +3040,17 @@ async function showCreateAppointmentModal() {
     
     // Formular zurücksetzen
     document.getElementById('appointmentForm').reset();
-    
+    showFormErrors('appointmentErrors', []);
+
+    // Mit "jetzt" vorbelegt: Der Knopf dient dem Fall, dass gerade etwas
+    // stattfindet, das noch kein Termin ist. Bis 1.11.0 waren Datum und
+    // Uhrzeit leer -- ein vertippter Tag liess den Termin danach ausserhalb
+    // des Fensters verschwinden.
+    const jetzt = new Date();
+    document.getElementById('appointmentDate').value = formatDate(jetzt);
+    document.getElementById('appointmentTime').value =
+        `${String(jetzt.getHours()).padStart(2, '0')}:${String(jetzt.getMinutes()).padStart(2, '0')}`;
+
     // Zeige Modal
     document.getElementById('appointmentModal').classList.add('active');
 }
@@ -3000,6 +3061,7 @@ async function showEditAppointmentModal() {
     
     currentEditAppointmentId = appointmentId;
     document.getElementById('appointmentModalTitle').textContent = 'Termin bearbeiten';
+    showFormErrors('appointmentErrors', []);
 
     try {
         // Lade Terminarten
