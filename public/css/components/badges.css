@@ -66,12 +66,14 @@
     flex-shrink: 0;
 }
 
-/* Terminrueckmeldung (FI-1): Status-Badge je Mitglied */
-.response-badge { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: 0.85em; }
-.response-badge--yes   { background: var(--success-color); color: var(--bg-white); }
-.response-badge--maybe { background: var(--warning-color); color: var(--bg-white); }
-.response-badge--no    { background: var(--danger-color);  color: var(--bg-white); }
-.response-badge--none  { background: var(--bg-gray); color: var(--text-medium); }
+/* Terminrueckmeldung (FI-1): Status-Badge je Mitglied -- dieselbe Optik wie
+   die Chips im Kopf des Dialogs (.response-chip--*): blasser Grund, Text in
+   der Akzentfarbe. Vollflaechig wirkte die Tabelle bei vielen Zeilen zu laut. */
+.response-badge { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: 0.85em; font-weight: 600; }
+.response-badge--yes   { background: color-mix(in srgb, var(--success-color) 15%, transparent); color: var(--success-color); }
+.response-badge--maybe { background: color-mix(in srgb, var(--warning-color) 15%, transparent); color: var(--warning-color); }
+.response-badge--no    { background: color-mix(in srgb, var(--danger-color) 15%, transparent);  color: var(--danger-color); }
+.response-badge--none  { background: var(--bg-gray); color: var(--text-light); font-weight: normal; }
 
 .response-late {
     display: inline-block;
