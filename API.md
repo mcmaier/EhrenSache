@@ -1025,8 +1025,8 @@ Einstellungen hinterlegten Bundeslands (`holiday_region`, siehe unten).
 
 **Ostersonntag und Pfingstsonntag stehen immer in der Antwort** — unabhängig von `region`, auch
 ohne hinterlegtes Bundesland. Gesetzliche Feiertage sind beide nur in Brandenburg (`BB`); hier
-zählt nicht der Rechtsstatus, sondern dass es Sonntage sind, die Kalender und Serienvorschau ohne
-diese Sonderregel ohnehin schon als arbeitsfrei zeigen würden.
+zählt nicht der Rechtsstatus: Sie sind bewusst gesetzt, damit Serien an diesen Tagen
+standardmäßig ausfallen. In der Serienvorschau lassen sie sich wieder anhaken.
 
 ### Feiertage abrufen
 **Endpoint:** `GET /api.php?resource=holidays&from=2026-10-01&to=2027-07-31`

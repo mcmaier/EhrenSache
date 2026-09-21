@@ -2678,7 +2678,7 @@ let workSessionAssignedAppointment = null;
  * Der urspruenglich zugeordnete Termin (workSessionAssignedAppointment) bleibt
  * waehlbar, solange er die aktuelle bzw. vorherige Auswahl ist — auch wenn er
  * ausserhalb des Fensters liegt ODER nicht zu den Terminarten der gewaehlten
- * Taetigkeit passt. Bis 1.11.1 galt das nur beim OEFFNEN des Modals: Der
+ * Taetigkeit passt. Zuvor galt das nur beim OEFFNEN des Modals: Der
  * Taetigkeitswechsel rief diese Funktion ohne session-Objekt auf, die
  * Ergaenzung blieb dabei aus, und eine Sitzung mit einem Termin ausserhalb des
  * Fensters verlor ihn beim Hin- und Herschalten der Taetigkeit lautlos —

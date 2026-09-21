@@ -331,7 +331,7 @@ test('Check-in-PWA: der zugeordnete Termin des Korrekturmodals uebersteht einen 
 function () use ($repoRoot) {
     $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
 
-    // Bis 1.11.1 ergaenzte fillWorkSessionAppointments() den zugeordneten
+    // Zuvor ergaenzte fillWorkSessionAppointments() den zugeordneten
     // Termin nur, wenn sie mit dem session-Objekt aufgerufen wurde -- das
     // passiert ausschliesslich beim OEFFNEN des Modals. Der
     // Taetigkeitswechsel rief dieselbe Funktion ohne session auf, die
