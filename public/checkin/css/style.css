@@ -2598,6 +2598,28 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     content: '▴';
 }
 
+/* Rueckmeldestand schon an der zugeklappten Karte (Nutzer-Entscheidung: volle
+   Breite unter Ort und Chip). Ein zugeklapptes details zeigt nur seine
+   summary -- der Balken muss deshalb dort stehen, nicht daneben.
+   Farben wie Antwortknoepfe und Zaehlchips, "unsicher" also orange. Das Grau
+   fuer "ohne Antwort" ist bewusst heller als --text-light: Bei wenigen
+   Antworten fuellt es fast den ganzen Balken und soll dann nicht lauter
+   wirken als die farbigen Anteile. */
+.response-bar {
+    display: flex;
+    height: 5px;
+    margin-top: 8px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--border);
+}
+
+.response-bar__seg          { height: 100%; }
+.response-bar__seg--yes     { background: var(--success); }
+.response-bar__seg--maybe   { background: var(--warning); }
+.response-bar__seg--no      { background: var(--error); }
+.response-bar__seg--open    { background: #c3c9d1; }
+
 .response-card__body {
     border-top: 1px solid var(--border-color, #e1e4e8);
     margin-top: 8px;

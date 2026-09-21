@@ -3919,6 +3919,34 @@ function responseCountChipsHtml(counts) {
     ).join('');
 }
 
+/**
+ * Gestapelter Anteilsbalken zum Rueckmeldestand eines Termins -- steht in der
+ * Summary und ist damit schon an der zugeklappten Karte sichtbar: Die Liste
+ * zeigt den Stand, ohne dass jede Karte aufgeklappt werden muss.
+ *
+ * Dieselbe Zaehlung wie die Chips der Fristzeile (item.summary), also keine
+ * neue Information und kein zusaetzlicher Abruf. "Ohne Antwort" zaehlt mit:
+ * Sonst stuende ein Termin mit zwei Zusagen von vierzig als voll gruener
+ * Balken da. Gleiche Klassen wie im Dashboard (responses.js), die Regeln dazu
+ * stehen in dieser Oberflaeche eigens.
+ */
+function responseBarHtml(summary) {
+    const count = key => Number(summary?.[key]) || 0;
+    const total = RESPONSE_NAME_GROUPS.reduce((sum, g) => sum + count(g.key), 0);
+    if (total === 0) return '';
+
+    // Vorlesetext fuer Screenreader -- mit Einzahl, sonst hiesse es "1 Absagen".
+    const n = (key, eins, viele) => `${count(key)} ${count(key) === 1 ? eins : viele}`;
+    const label = `${n('yes', 'Zusage', 'Zusagen')} · ${count('maybe')} unsicher · `
+        + `${n('no', 'Absage', 'Absagen')} · ${count('open')} ohne Antwort`;
+    const segments = RESPONSE_NAME_GROUPS
+        .filter(g => count(g.key) > 0)
+        .map(g => `<span class="response-bar__seg response-bar__seg--${g.key}" style="width: ${(count(g.key) / total * 100).toFixed(2)}%"></span>`)
+        .join('');
+
+    return `<div class="response-bar" role="img" aria-label="${label}">${segments}</div>`;
+}
+
 /** Alle bedienbaren Elemente einer Rueckmeldungskarte. */
 function responseCardControls(card) {
     return card.querySelectorAll('.response-btn, .response-comment__save, .response-comment textarea');
@@ -4226,6 +4254,7 @@ function responseCardHtml(item) {
                     <span>${escapeHtml(formatResponseCardHead(apt.date, apt.start_time, apt.end_time))}</span>
                 </div>
                 <div class="response-card__meta">${responseLocationHtml(apt.location)}${responseChipHtml(item, deadlinePassed)}</div>
+                ${responseBarHtml(item.summary)}
             </summary>
             <div class="response-card__body">
                 <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
