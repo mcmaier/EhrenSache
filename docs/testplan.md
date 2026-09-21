@@ -1290,7 +1290,8 @@ angegeben):
 | TS-6 | Serienkasten → „Serie fortsetzen …", neues Enddatum wählen, Vorschau, anlegen | Serie reicht bis zum neuen Datum; neue Termine im verlängerten Bereich |
 | TS-7 | Serienkasten → „Regel ändern …", anderen Wochentag wählen, Vorschau | Hinweis, dass folgende Termine ersetzt werden; nach dem Anlegen folgt die Serie ab diesem Termin der neuen Regel, frühere Termine unverändert |
 | TS-8 | Einen Serientermin löschen, Auswahl „Dieser und alle folgenden" | Serie endet an diesem Termin; folgende Termine verschwinden bzw. bleiben als abgelöste stehen, wenn sie Daten tragen |
-| TS-9 | Auf ein Jahr wechseln, in das die verlängerte Serie neu hineinreicht | Termine dort sichtbar, ohne die Seite neu zu laden |
+| TS-9 | Serie mit „Serie fortsetzen" in ein Jahr verlängern, das im Jahresfilter bereits auswählbar ist, dorthin wechseln | Die neuen Termine sind sofort sichtbar, ohne die Seite neu zu laden (der Termin-Cache des Jahres wird invalidiert) |
+| TS-9b | Dieselbe Serie in ein Jahr verlängern, das im Jahresfilter noch **nicht** auswählbar ist (z. B. erste Serie über einen Jahreswechsel hinaus) | Das Jahr erscheint im Filter erst nach dem Neuladen der Seite, obwohl die Termine schon in der Datenbank stehen (OI-79) |
 | TS-10 | Als Manager: Serie anlegen (Kurzform von TS-1–TS-3) | Gelingt wie beim Admin |
 | TS-11 | Als Nutzer ohne Verwaltungsrecht: Kalender öffnen, auf einen leeren Tag klicken | Keine Reaktion; keine Serienknöpfe im Termin-Popup |
 | TS-12 | Bundesland in den Einstellungen wechseln (Termine → Kalender), zurück zum Kalender | Feiertagsnamen und -markierung ändern sich sofort, ohne Neuladen der Seite |

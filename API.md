@@ -735,6 +735,13 @@ nullte beide, `date` und `start_time` wurden zu `0000-00-00`; die Dublettenprüf
 Teil-Update still aus (OI-69). Wer vor 1.9.1 alle fünf Felder mitschickte, ist davon nicht
 betroffen — die mitgelieferte Oberfläche tut das.
 
+**Verschiebt ein `PUT` das `date` eines Serientermins tatsächlich** (seit 1.11.0, FI-7): Das
+**alte** Datum wandert zusätzlich in `exdates` der Serie — genau wie bei `DELETE appointments`.
+Ohne diesen Eintrag würde eine spätere Serienaktion mit einer Regel, die denselben Wochentag
+trifft (z. B. ein `action=split`), am alten Datum erneut einen Termin anlegen: eine doppelte
+Probe. Geprüft wird `appointmentFieldChanged('date', …)` — ein `PUT`, das `date` unverändert
+mitschickt oder gar nicht sendet, trägt nichts nach.
+
 ---
 
 ### Termin löschen
@@ -802,30 +809,42 @@ mit `is_detached = 1`). Unbekannte `id` → `404`.
 
 **Request:** die Seriendefinition (siehe oben), ohne `id`.
 
-**Antwort der Vorschau (`200`):**
+**Antwort der Vorschau (`200`)** — Beispiel für `FREQ=WEEKLY;INTERVAL=1;BYDAY=FR` über Ostern:
 ```json
 {
   "occurrences": [
-    { "date": "2026-10-06", "holiday": null, "conflict": null, "excluded": false, "locked": false },
-    { "date": "2026-10-13", "holiday": "Tag der Deutschen Einheit", "conflict": null, "excluded": true, "locked": false },
-    { "date": "2026-10-20", "holiday": null,
+    { "date": "2031-04-04", "holiday": null, "conflict": null, "excluded": false, "locked": false },
+    { "date": "2031-04-11", "holiday": "Karfreitag", "conflict": null, "excluded": false, "locked": false },
+    { "date": "2031-04-18", "holiday": null,
       "conflict": { "appointment_id": 88, "title": "Jugendprobe", "start_time": "19:45:00" },
-      "excluded": false, "locked": false }
+      "excluded": false, "locked": false },
+    { "date": "2031-04-25", "holiday": null, "conflict": null, "excluded": false, "locked": false }
   ],
-  "count": 35
+  "count": 3
 }
 ```
 `occurrences` enthält **alle** Daten der Regel im Zeitraum — **ohne** die gesendeten `exdates`
 angewandt, damit die Oberfläche sie als bereits abgewählt anzeigen kann (`excluded: true`).
 Ebenfalls `excluded: true`, aber zusätzlich `locked: true`: Ausfälle, die der Server unabhängig
 von der Auswahl der Oberfläche immer anwendet (in der Praxis nur bei `action=split`, siehe dort —
-die aus dem Bestand übernommenen `exdates`) — nicht abwählbar. `conflict` zeigt einen
-kollidierenden Bestandstermin (Toleranzfenster,
+die aus dem Bestand übernommenen `exdates`) — nicht abwählbar.
+
+**`holiday` schließt einen Tag NICHT automatisch aus.** Der Server meldet mit `holiday` nur den
+Namen; `excluded` bleibt bei einem Feiertag `false`, solange das Datum nicht zusätzlich in den
+gesendeten `exdates` steht oder gesperrt (`locked`) ist — ein Feiertagstermin würde also
+angelegt, wenn die Oberfläche ihn nicht selbst abwählt. Das tut sie: Sie zeigt einen Tag mit
+`holiday` von vornherein abgewählt an und schickt ihn beim Anlegen als `exdates` mit, sofern die
+Nutzerin ihn nicht bewusst wieder anhakt. Wer die Ressource direkt aufruft (nicht über die
+mitgelieferte Oberfläche), muss Feiertage also **selbst** in `exdates` aufnehmen, wenn sie nicht
+entstehen sollen.
+
+`conflict` zeigt einen kollidierenden Bestandstermin (Toleranzfenster,
 `checkin_tolerance_hours`); ein solcher Tag zählt nicht in `count`. `count` ist die Zahl der
 Termine, die ein tatsächliches Schreiben anlegen würde (`excluded: false` **und**
-`conflict: null`). Ergibt die Regel im Zeitraum **keinen einzigen** Termin (auch keinen
-ausgeschlossenen), antwortet der Endpunkt mit `400 {"message": "Die Regel ergibt in diesem
-Zeitraum keinen Termin"}` — auch in der Vorschau.
+`conflict: null` — ein reiner Feiertag ohne abgewähltes `exdate` zählt hier also mit). Ergibt die
+Regel im Zeitraum **keinen einzigen** Termin (auch keinen ausgeschlossenen), antwortet der
+Endpunkt mit `400 {"message": "Die Regel ergibt in diesem Zeitraum keinen Termin"}` — auch in der
+Vorschau.
 
 **Schreiben (`201`):** legt die Serienzeile und je nicht abgewähltem Datum einen Termin an, in
 einer Transaktion. Kollisionen werden dabei **erneut** geprüft (die Vorschau ist nur ein

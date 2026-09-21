@@ -3069,8 +3069,21 @@ alte Serienzeile bleibt bestehen, solange noch ein Termin **vor** `from_date` au
 nicht abgelösten Serientermin, unabhängig davon, ob für die Serie inzwischen bereits ein
 Nachfolger existiert. Öffnet jemand einen der frühen, noch zur alten Serie gehörenden Termine und
 wählt „Serie fortsetzen …", verlängert das die **alte** Serie ab ihrem (durch den Split
-verkürzten) `until` — genau in den Zeitraum, den die **neue** Serie bereits abdeckt. Ergebnis:
-zwei parallele Serien mit überlappenden Terminen an denselben Wochentagen.
+verkürzten) `until` — in den Zeitraum, den die **neue** Serie bereits abdeckt.
+
+**Ob daraus wirklich unbemerkte Doppeltermine entstehen, hängt davon ab, worin sich Alt- und
+Neu-Serie unterscheiden.** `seriesInsertOccurrences()` prüft jedes Datum erneut gegen
+`findAppointmentConflict()` (gleiche Terminart, Beginn innerhalb der Toleranz,
+`checkin_tolerance_hours`) — traf der Split nur Terminart oder Uhrzeit und lässt Regel und
+Wochentag unverändert, kollidiert die verlängerte alte Serie an denselben Tagen mit den bereits
+vorhandenen Terminen der neuen Serie und wird dort **ausgelassen und gemeldet** (`skipped`), wie
+bei jeder anderen Kollision auch — kein stiller Doppeltermin, nur eine überraschende Meldung.
+**Echte, unbemerkte Doppeltermine entstehen nur, wenn die Dublettenprüfung nicht greift:**
+unterscheidet sich die Terminart, oder liegt die Uhrzeit weiter als die Toleranz auseinander,
+legt die verlängerte alte Serie zusätzliche Termine an, ohne dass die neue Serie das verhindert.
+Änderte der Split zusätzlich den Wochentag, treffen beide Serien ohnehin unterschiedliche Tage —
+auch dann keine erkannte Kollision, aber zwei parallel laufende Serien, von denen nur eine
+gewollt ist.
 
 **Zu entscheiden:** Die Aktion ausblenden, sobald ein Nachfolger existiert (erfordert eine
 Erkennung „gibt es eine jüngere Serie mit `start_date` = `until` + 1 Tag, derselben Regel-Herkunft
@@ -3121,5 +3134,41 @@ Feiertagsnamen nicht, den sehende Nutzer als Text im Tagesfeld sehen.
 
 **Zu tun:** Tage mit Terminen ebenfalls `tabindex="0"` und einen `keydown`-Zuhörer (Enter/Leertaste
 öffnet das Popup) geben; den Feiertagsnamen, sofern vorhanden, vorn ins `aria-label` aufnehmen.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-81 · Serie ohne Terminart: „Serie fortsetzen" legt Termine ohne Dublettenschutz und ohne Gruppe an
+**Priorität:** niedrig · aufgenommen am 2026-09-21
+
+`{PREFIX}appointment_series.type_id` verweist mit `ON DELETE SET NULL` auf `appointment_types`
+(`series_type_fk`, `private/setup/ehrensache_db.sql`). `DELETE appointment_types`
+(`private/handlers/appointment_types.php`) prüft vor dem Löschen nicht, ob noch eine Serie (oder
+ein Einzeltermin) auf die Terminart zeigt — ein Admin kann eine Terminart löschen, die eine
+laufende Serie noch trägt. Die Serienzeile bleibt bestehen, ihr `type_id` wird `NULL`.
+
+**Wirkung:** `seriesHandleExtend()` („Serie fortsetzen") liest die Vorlage unverändert aus der
+Serie (`seriesTemplateOf()`) und legt Termine mit `type_id = NULL` an:
+
+- **Keine Dublettenprüfung.** `findAppointmentConflict()` liefert bei `typeId === null` immer
+  `null` (Kommentar dort: „Ohne Terminart gibt es keine Dublette") — zwei fortgesetzte Serien
+  ohne Terminart könnten beliebig oft auf denselben Tag treffen, ohne dass es auffällt.
+- **Keine Gruppe.** Die Gruppen eines Termins ergeben sich aus `appointment_type_groups` über
+  die Terminart (`API.md`, Abschnitt „Termine"); ohne Terminart hat der Termin keine Gruppe und
+  ist für einfache Nutzer unsichtbar (Terminliste, Kalender-Rückmeldung, Check-in) — sichtbar nur
+  für Admin und Manager, die ohne Gruppengrenze sehen.
+- `POST appointment_series` (Anlegen) und `action=split` fangen den Fall meist ab
+  (`seriesResolveType()` setzt eine fehlende oder leere `type_id` auf die Standard-Terminart) —
+  nur ohne jede Standard-Terminart könnten auch sie mit `type_id = NULL` anlegen. Der hier
+  beschriebene Weg über eine **bestehende**, nachträglich typlos gewordene Serie ist der
+  naheliegendere: „Serie fortsetzen" übernimmt die gespeicherte Vorlage unverändert und fragt
+  nicht erneut nach der Terminart.
+
+**Zu entscheiden:** `POST appointment_series?action=extend` mit `400` ablehnen, wenn die
+Vorlage der Serie `type_id = NULL` trägt (zwingt zu „Regel ändern …" / Split mit neuer
+Terminart, statt stillschweigend weiterzulaufen) — oder generell verhindern, dass eine Terminart
+gelöscht wird, solange eine Serie oder ein Termin auf sie zeigt (würde auch den analogen, schon
+länger bestehenden Fall bei gewöhnlichen Einzelterminen mit erledigen, der hier nicht neu ist).
 
 **Nicht sicherheitsrelevant.**
