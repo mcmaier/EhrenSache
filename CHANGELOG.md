@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [1.11.0] – 2026-09-18
+## [1.11.0] – 2026-09-21
 
 ### Neu
 - **Terminserien** (FI-7): wöchentlich (alle 1–4 Wochen, mehrere Tage) oder monatlich nach Position
@@ -34,7 +34,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Fensters lassen sich nicht neu zuordnen; ein bereits zugeordneter Termin bleibt davon
   unberührt und wählbar, auch über einen Wechsel der Tätigkeitsart hinweg.
 - Der Rückmeldungs-Dialog für Admin/Manager öffnet gesperrt; fremde Antworten lassen sich erst
-  nach einem ausdrücklichen Entsperren ändern, die eigene Zeile bleibt davon unberührt (OI-63).
+  nach einem ausdrücklichen Entsperren ändern (Schloss im Spaltenkopf „Aktion"), die eigene Zeile
+  bleibt davon unberührt (OI-63). Die Status-Badges der Tabelle tragen dieselbe ruhige Optik wie
+  die Summen im Kopf des Dialogs.
 
 ### Datenbank
 - Migration 1.10.0 → 1.11.0: Tabelle `appointment_series`, Spalten `appointments.series_id` und
