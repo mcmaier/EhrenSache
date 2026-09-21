@@ -320,6 +320,7 @@ function handleAppointments($db, $database, $method, $id) {
             $updateFields = [];
             $updateParams = [];
             $geaendert = false;
+            $datumGeaendert = false;
 
             foreach (['title', 'type_id', 'description', 'date', 'start_time', 'location', 'end_time'] as $feld) {
                 if (array_key_exists($feld, $vorhanden)) {
@@ -327,6 +328,9 @@ function handleAppointments($db, $database, $method, $id) {
                     $updateParams[] = $data->$feld;
                     if (appointmentFieldChanged($feld, $data->$feld, $bestand[$feld])) {
                         $geaendert = true;
+                        if ($feld === 'date') {
+                            $datumGeaendert = true;
+                        }
                     }
                 }
             }
@@ -349,13 +353,21 @@ function handleAppointments($db, $database, $method, $id) {
                                  . " WHERE appointment_id = ?");
 
             if($stmt->execute($updateParams)) {
+                // Verschiebt sich ein Serientermin auf ein anderes Datum, gilt das
+                // ALTE Datum als Ausfall der Serie -- wie beim Einzel-DELETE (FI-7).
+                // Ohne diesen Eintrag legt eine spaetere Serienaktion (z. B. ein
+                // Split, dessen Regel denselben Wochentag trifft) am alten Datum
+                // erneut einen Termin an: eine doppelte Probe.
+                if ($bestand['series_id'] !== null && $datumGeaendert) {
+                    seriesAddExdates($db, $prefix, (int) $bestand['series_id'], [$bestand['date']]);
+                }
                 echo json_encode(["message" => "Appointment updated"]);
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to update appointment"]);
             }
             break;
-            
+
         case 'DELETE':
             requireAdminOrManager();
 

@@ -410,6 +410,50 @@ test('Einzel-DELETE vermerkt das Datum in exdates, die Serie bleibt', function (
     }
 });
 
+test('Einzel-PUT mit geaendertem Datum vermerkt das ALTE Datum in exdates; Split legt es nicht erneut an', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-18');
+
+        $move = apiRequest('PUT', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $apt['appointment_id']], 'body' => ['date' => '2031-03-19']]);
+        assertStatus(200, $move);
+        assertSame(['2031-03-18'], asSeriesGet($sid)['exdates'],
+            'Sonst legt eine spaetere Serienaktion mit passendem Wochentag am alten Datum eine zweite Probe an');
+
+        $body = asSeriesBody($world, ['from_date' => '2031-03-11', 'until' => '2031-04-01']);
+        unset($body['start_date']);
+
+        $preview = asSeriesPost($body, ['id' => $sid, 'action' => 'split', 'preview' => 1]);
+        assertStatus(200, $preview);
+        $byDate = array_column($preview['body']['occurrences'], null, 'date');
+        assertSame(true, $byDate['2031-03-18']['excluded'] ?? null);
+        assertSame(true, $byDate['2031-03-18']['locked'] ?? null);
+
+        $res = asSeriesPost($body, ['id' => $sid, 'action' => 'split']);
+        assertStatus(201, $res);
+        assertTrue(!in_array('2031-03-18', array_column(asAppointments($world), 'date'), true),
+            'Der verschobene Termin darf am alten Datum nicht neu entstehen (doppelte Probe)');
+    } finally {
+        asDropWorld($world);
+    }
+});
+
+test('PUT ohne Datumsaenderung (nur Titel) traegt kein exdate ein', function () {
+    $world = asWorld();
+    try {
+        $sid = asCreateSeries($world);
+        $apt = asAptOn($world, '2031-03-18');
+        $res = apiRequest('PUT', 'appointments', ['token' => apiToken('admin'),
+            'query' => ['id' => $apt['appointment_id']], 'body' => ['title' => 'Sonderprobe']]);
+        assertStatus(200, $res);
+        assertSame([], asSeriesGet($sid)['exdates']);
+    } finally {
+        asDropWorld($world);
+    }
+});
+
 test('Beenden ab Datum loescht folgende ohne Daten und loest die mit Daten ab', function () {
     $world = asWorld();
     try {
