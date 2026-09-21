@@ -54,6 +54,9 @@
     --bg-gray: #f5f5f5;
     --border-color: #ddd;
     --border-light: #e0e0e0;
+
+    /* Feiertag im Kalender (FI-16) */
+    --calendar-holiday: #b45309;
     
     /* Sidebar */
     --sidebar-bg: #2F3A45;

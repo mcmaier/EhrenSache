@@ -258,3 +258,60 @@
     font-weight: 600;
     font-size: 14px;
 }
+
+/* Feiertag im Tagesfeld (FI-16) */
+.calendar-day--holiday {
+    color: var(--calendar-holiday);
+}
+
+.calendar-holiday-name {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    bottom: 1px;
+    font-size: 9px;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--calendar-holiday);
+    pointer-events: none;
+}
+
+/* Leerer Tag: Termin anlegen (OI-64) */
+.calendar-day--can-create:hover::after {
+    content: '+';
+    position: absolute;
+    top: 1px;
+    right: 4px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+/* Aktionen im Popup */
+.calendar-event-edit,
+.calendar-event-add {
+    margin-top: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    background: var(--bg-light);
+    cursor: pointer;
+}
+
+.calendar-event-add {
+    display: block;
+    width: 100%;
+    margin-top: var(--spacing-sm);
+}
+
+.series-badge {
+    font-size: 12px;
+    margin-left: 4px;
+}
+
+.series-badge--detached {
+    opacity: 0.5;
+}

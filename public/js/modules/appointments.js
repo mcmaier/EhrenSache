@@ -230,8 +230,15 @@ async function renderAppointments(appointments, page = 1) {
                   + 'title="Beim Check-in automatisch angelegt">🤖 automatisch</span>'
                 : '';
 
+            // Serientermin (FI-7): abgeloeste tragen ein eigenes Kennzeichen.
+            const seriesBadge = apt.series_id
+                ? (Number(apt.is_detached) === 1
+                    ? ' <span class="series-badge series-badge--detached" title="Aus einer Serie, einzeln geändert">🔁</span>'
+                    : ' <span class="series-badge" title="Teil einer Serie">🔁</span>')
+                : '';
+
             appointmentInfo = `<div style="line-height: 1.4;">
-                <strong>${escapeHtml(apt.title)}</strong>${autoBadge}`;
+                <strong>${escapeHtml(apt.title)}</strong>${autoBadge}${seriesBadge}`;
 
             if (apt.date && apt.start_time) {
                 const aptDate = new Date(apt.date + 'T00:00:00');
@@ -499,7 +506,20 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
     // Prüfe ob Termine an diesem Tag
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
     const dayAppointments = (appointments || []).filter(apt => apt.date === dateStr);
-    
+
+    // Feiertag (FI-16) -- nur im laufenden Monat; die ausgegrauten Tage der
+    // Nachbarmonate tragen ein unnormiertes Datum (Monat -1 bzw. 12).
+    if (!isOtherMonth) {
+        const holidayName = holidaysOfYear(year)[dateStr];
+        if (holidayName) {
+            day.classList.add('calendar-day--holiday');
+            const tag = document.createElement('span');
+            tag.className = 'calendar-holiday-name';
+            tag.textContent = holidayName;
+            day.appendChild(tag);
+        }
+    }
+
     if (dayAppointments.length > 0) {
         day.classList.add('has-event');
         
@@ -567,6 +587,15 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
             clearTimeout(kalenderHoverTimer);
             showAppointmentPopup(day, dayAppointments, true);
         });
+    } else if (!isOtherMonth && isAdminOrManager) {
+        // OI-64: Ein leerer Tag legt einen Termin an. Einfache Nutzer legen
+        // keine Termine an und sehen deshalb keine Aenderung.
+        day.classList.add('calendar-day--can-create');
+        day.title = 'Neuen Termin anlegen';
+        day.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openAppointmentModal(null, { date: dateStr });
+        });
     }
 
     return day;
@@ -574,6 +603,31 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
 
 /** Verzoegerung zwischen Ueberfahren und Anzeige. */
 let kalenderHoverTimer = null;
+
+/** Jahre, deren Feiertage gerade geladen werden -- verhindert Doppelanfragen. */
+const holidayRequests = new Set();
+
+/**
+ * Feiertage eines Jahres aus dem Cache. Fehlen sie, werden sie nachgeladen
+ * und der Kalender danach neu gezeichnet; bis dahin gilt: keine Feiertage.
+ */
+function holidaysOfYear(year) {
+    if (isCacheValid('holidays', year)) {
+        return dataCache.holidays[year].data;
+    }
+    if (!holidayRequests.has(year)) {
+        holidayRequests.add(year);
+        apiCall('holidays', 'GET', null, { from: `${year}-01-01`, to: `${year}-12-31` })
+            .then(res => {
+                if (res && res.success) {
+                    dataCache.holidays[year] = { data: res.holidays || {}, timestamp: Date.now() };
+                    renderCalendar();
+                }
+            })
+            .finally(() => holidayRequests.delete(year));
+    }
+    return {};
+}
 
 /**
  * Rueckmeldungs-Zeile eines Termins im Kalender-Popup: dieselbe Chip-Gruppe
@@ -676,9 +730,18 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
                 ${apt.description ? `<div style="font-size: 11px; color: #7f8c8d;">${escapeHtml(apt.description)}</div>` : ''}
                 ${apt.location ? `<div style="font-size: 11px; color: #7f8c8d;">📍 ${escapeHtml(apt.location)}</div>` : ''}
                 ${apt.responses ? calendarResponseLineHtml(apt, fest) : ''}
+                ${fest && isAdminOrManager ? `<button type="button" class="calendar-event-edit"
+                    onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openAppointmentModal(${Number(apt.appointment_id)})">Bearbeiten</button>` : ''}
             </div>
         `;
     });
+
+    // OI-64: Auch an belegten Tagen einen weiteren Termin anlegen koennen.
+    const tagDatum = appointments[0].date;
+    if (fest && isAdminOrManager && /^\d{4}-\d{2}-\d{2}$/.test(tagDatum)) {
+        html += `<button type="button" class="calendar-event-add"
+            onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openAppointmentModal(null, { date: '${tagDatum}' })">+ Termin an diesem Tag</button>`;
+    }
 
     popup.innerHTML = html;
 
@@ -757,7 +820,7 @@ async function fillLocationSuggestions() {
         .map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
 }
 
-export async function openAppointmentModal(appointmentId = null) {
+export async function openAppointmentModal(appointmentId = null, preset = {}) {
     const modal = document.getElementById('appointmentModal');
     const title = document.getElementById('appointmentModalTitle');
 
@@ -783,6 +846,10 @@ export async function openAppointmentModal(appointmentId = null) {
         const defaultType = dataCache.types.data.find(t => t.is_default);
         if (defaultType) {
             document.getElementById('appointment_type').value = defaultType.type_id;
+        }
+
+        if (preset.date && /^\d{4}-\d{2}-\d{2}$/.test(preset.date)) {
+            document.getElementById('appointment_date').value = preset.date;
         }
     }
     

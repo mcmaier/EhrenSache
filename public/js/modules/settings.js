@@ -489,6 +489,11 @@ async function saveAllSettings() {
 
             // Lokalen Cache aktualisieren
             systemSettings[update.key] = update.value;
+
+            // Feiertage haengen am Bundesland -- der Kalender laedt sie neu (FI-16).
+            if (update.key === 'holiday_region') {
+                Object.keys(dataCache.holidays).forEach(year => delete dataCache.holidays[year]);
+            }
         }
 
         applyTheme(systemSettings);
