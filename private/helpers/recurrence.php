@@ -36,20 +36,23 @@ function parseRrule(string $rrule): array
         if ($chunk === '') {
             continue;
         }
+        // Die rohe Eingabe steht bewusst NICHT in der Meldung: Sie landet
+        // unveraendert in einem Toast (innerHTML) und waere damit ein Weg fuer
+        // reflektiertes Markup/Skript im eigenen Text der Meldung.
         $kv = explode('=', $chunk, 2);
         if (count($kv) !== 2) {
-            throw new InvalidArgumentException("Ungültiger Regelteil: {$chunk}");
+            throw new InvalidArgumentException('Ungültiger Regelteil');
         }
         $key = strtoupper(trim($kv[0]));
         if (array_key_exists($key, $parts)) {
-            throw new InvalidArgumentException("Regelteil doppelt: {$key}");
+            throw new InvalidArgumentException('Regelteil doppelt');
         }
         $parts[$key] = strtoupper(trim($kv[1]));
     }
 
     $unknown = array_diff(array_keys($parts), ['FREQ', 'INTERVAL', 'BYDAY']);
     if ($unknown) {
-        throw new InvalidArgumentException('Nicht unterstützter Regelteil: ' . implode(', ', $unknown));
+        throw new InvalidArgumentException('Nicht unterstützter Regelteil');
     }
 
     $interval = 1;
@@ -72,7 +75,7 @@ function parseRrule(string $rrule): array
         }
         foreach ($byday as $day) {
             if (!in_array($day, RRULE_WEEKDAYS, true)) {
-                throw new InvalidArgumentException("Unbekannter Wochentag: {$day}");
+                throw new InvalidArgumentException('Unbekannter Wochentag');
             }
         }
         if (count(array_unique($byday)) !== count($byday)) {
