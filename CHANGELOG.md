@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [1.11.1] – unveröffentlicht
+## [1.11.1] – 2026-09-21
 
 ### Behoben
 - **Ein im Listen-Tab der PWA angelegter Termin verschwindet nicht mehr kommentarlos.** Die
