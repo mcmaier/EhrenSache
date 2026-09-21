@@ -98,3 +98,54 @@ test('Leerer Kalendertag: ein offenes Popup schliesst sich vor dem Anlegen', fun
         $js
     ), 'Ein festgehaltenes Popup wird vor dem Anlegen nicht entfernt');
 });
+
+// ---- Termin-Dialog (FI-7) ---------------------------------------------------------
+
+test('Dialog: Bereich Wiederholen mit Muster, Abstand, Wochentagen, Position und Ende', function () use ($sfRoot) {
+    $html = sfFile($sfRoot, 'public/index.html');
+    foreach (['id="appointmentRepeatGroup"', 'id="appointment_repeat"', 'id="appointment_repeat_freq"',
+              'id="appointment_repeat_interval"', 'id="appointment_repeat_days"', 'id="appointment_repeat_pos"',
+              'id="appointment_repeat_weekday"', 'id="appointment_repeat_until"', 'id="appointmentSeriesPreview"',
+              'id="appointmentSeriesBox"', 'id="appointmentSaveBtn"'] as $needle) {
+        assertTrue(str_contains($html, $needle), "{$needle} fehlt");
+    }
+    foreach (['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as $day) {
+        assertTrue(str_contains($html, "value=\"{$day}\""), "Wochentag {$day} fehlt");
+    }
+    foreach (['1', '2', '3', '4'] as $n) {
+        assertTrue(str_contains($html, "<option value=\"{$n}\">"), "Abstand/Position {$n} fehlt");
+    }
+    assertTrue(str_contains($html, '<option value="-1">letzten</option>'));
+});
+
+test('Dialog: Vorschau und Anlegen gehen an appointment_series', function () use ($sfRoot) {
+    $js = sfFile($sfRoot, 'public/js/modules/appointments.js');
+    assertTrue(str_contains($js, "from './date_checklist.js'"));
+    assertTrue(str_contains($js, "apiCall('appointment_series', 'POST'"));
+    assertTrue(str_contains($js, 'preview: 1'));
+    assertTrue(str_contains($js, "action: 'split'"));
+    assertTrue(str_contains($js, "action: 'extend'"));
+    assertTrue(str_contains($js, 'getDeselected()'));
+});
+
+test('Dialog: Serientermin fragt nach "Nur dieser" oder "Dieser und alle folgenden"', function () use ($sfRoot) {
+    $js = sfFile($sfRoot, 'public/js/modules/appointments.js');
+    assertTrue(str_contains($js, 'showChoice('));
+    assertTrue(str_contains($js, "'Nur dieser'"));
+    assertTrue(str_contains($js, "'Dieser und alle folgenden'"));
+    assertTrue(str_contains($js, "apiCall('appointment_series', 'PUT'"));
+    assertTrue(str_contains($js, "apiCall('appointment_series', 'DELETE'"));
+});
+
+test('Serienaktionen leeren den Termin-Cache aller betroffenen Jahre', function () use ($sfRoot) {
+    $js = sfFile($sfRoot, 'public/js/modules/appointments.js');
+    assertTrue(str_contains($js, 'async function invalidateSeriesYears('));
+    assertTrue((bool) preg_match("/invalidateCache\('appointments',\s*y\)/", $js));
+});
+
+test('Die Regel wird im Dialog in Klartext beschrieben', function () use ($sfRoot) {
+    $js = sfFile($sfRoot, 'public/js/modules/appointments.js');
+    assertTrue(str_contains($js, 'function describeRrule('));
+    assertTrue(str_contains($js, 'Teil der Serie:'));
+    assertTrue(str_contains($js, 'Von der Serie'));
+});

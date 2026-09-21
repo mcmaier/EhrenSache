@@ -10,7 +10,8 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
+import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
+import { renderDateChecklist } from './date_checklist.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange } from './utils.js';
 import { loadTypes } from './management.js';
 import { getUserGroupIds } from './members.js';
@@ -35,6 +36,19 @@ let currentAppointmentsPage = 1;
 let appointmentFiltersBound = false;
 let appointmentsPerPage = 25;
 let allFilteredAppointments = [];
+
+// Terminserien (FI-7) -- Zustand des geoeffneten Dialogs.
+let currentAppointment = null;   // geladener Termin (Bearbeiten)
+let currentSeries = null;        // seine Serie, falls vorhanden (GET appointment_series)
+let seriesRuleChange = false;    // "Regel ändern …" aktiv
+let seriesPreview = null;        // { kind: 'create'|'split'|'extend', body, checklist }
+let appointmentSeriesFormBound = false;
+
+const WEEKDAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];   // Index = Date.getDay()
+const WEEKDAY_SHORT = { MO: 'Mo', TU: 'Di', WE: 'Mi', TH: 'Do', FR: 'Fr', SA: 'Sa', SU: 'So' };
+const WEEKDAY_LONG = { MO: 'Montag', TU: 'Dienstag', WE: 'Mittwoch', TH: 'Donnerstag', FR: 'Freitag',
+                       SA: 'Samstag', SU: 'Sonntag' };
+const POSITION_NAMES = { '1': 'ersten', '2': 'zweiten', '3': 'dritten', '4': 'vierten', '-1': 'letzten' };
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -75,6 +89,14 @@ async function loadAppointmentData(appointmentId) {
         document.getElementById('appointment_time').value = apt.start_time;
         document.getElementById('appointment_end_time').value = apt.end_time ? apt.end_time.substring(0, 5) : '';
         document.getElementById('appointment_location').value = apt.location || '';
+
+        currentAppointment = apt;
+        currentSeries = null;
+        if (apt.series_id) {
+            const series = await apiCall('appointment_series', 'GET', null, { id: apt.series_id });
+            currentSeries = series && series.success ? series : null;
+        }
+        renderSeriesBox();
     }
 }
 
@@ -827,6 +849,316 @@ function nextMonth() {
 }
 
 // ============================================
+// TERMINSERIEN (FI-7)
+// ============================================
+
+/** Regel in Klartext: "jeden Di, Do", "alle 2 Wochen Sa", "jeden letzten Mittwoch im Monat". */
+function describeRrule(rrule) {
+    const parts = Object.fromEntries(String(rrule).split(';').map(p => p.split('=')));
+    if (parts.FREQ === 'MONTHLY') {
+        const m = /^(-1|[1-4])([A-Z]{2})$/.exec(parts.BYDAY || '');
+        return m ? `jeden ${POSITION_NAMES[m[1]]} ${WEEKDAY_LONG[m[2]]} im Monat` : rrule;
+    }
+    const days = (parts.BYDAY || '').split(',').map(d => WEEKDAY_SHORT[d] || d).join(', ');
+    const interval = Number(parts.INTERVAL || 1);
+    return interval === 1 ? `jeden ${days}` : `alle ${interval} Wochen ${days}`;
+}
+
+/** Datum + n Monate als YYYY-MM-DD, am Monatsende gekappt (wie seriesMaxUntil()). */
+function addMonths(dateStr, months) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const target = new Date(Date.UTC(y, m - 1 + months, 1));
+    const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+    target.setUTCDate(Math.min(d, lastDay));
+    return target.toISOString().slice(0, 10);
+}
+
+function addDays(dateStr, days) {
+    const d = new Date(dateStr + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+}
+
+/** Vorlagenfelder aus dem Formular -- gemeinsam fuer Einzeltermin und Serie. */
+function appointmentTemplateFromForm() {
+    return {
+        title: document.getElementById('appointment_title').value,
+        type_id: parseInt(document.getElementById('appointment_type').value) || null,
+        description: document.getElementById('appointment_description').value || null,
+        start_time: document.getElementById('appointment_time').value,
+        end_time: document.getElementById('appointment_end_time').value || null,
+        location: document.getElementById('appointment_location').value.trim() || null,
+    };
+}
+
+/** Regel aus den Feldern "Wiederholen"; null, wenn woechentlich kein Tag gewaehlt ist. */
+function readRepeatRule() {
+    if (document.getElementById('appointment_repeat_freq').value === 'MONTHLY') {
+        const pos = document.getElementById('appointment_repeat_pos').value;
+        const day = document.getElementById('appointment_repeat_weekday').value;
+        return `FREQ=MONTHLY;INTERVAL=1;BYDAY=${pos}${day}`;
+    }
+    const days = [...document.querySelectorAll('#appointment_repeat_days input:checked')].map(i => i.value);
+    if (days.length === 0) return null;
+    const interval = document.getElementById('appointment_repeat_interval').value;
+    return `FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${days.join(',')}`;
+}
+
+/** Wochentag und Position aus dem Datum vorbelegen, Grenze fuer "Bis" setzen. */
+function presetRepeatFromDate(dateStr) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return;
+    const d = new Date(dateStr + 'T00:00:00');
+    const code = WEEKDAY_CODES[d.getDay()];
+    document.querySelectorAll('#appointment_repeat_days input').forEach(box => { box.checked = box.value === code; });
+    document.getElementById('appointment_repeat_weekday').value = code;
+    // Der 29. bis 31. ist immer der letzte seines Wochentags im Monat -- einen
+    // "fuenften" bietet die Auswahl nicht an.
+    const pos = Math.ceil(d.getDate() / 7);
+    document.getElementById('appointment_repeat_pos').value = pos > 4 ? '-1' : String(pos);
+    const until = document.getElementById('appointment_repeat_until');
+    until.min = dateStr;
+    until.max = addMonths(dateStr, 12);
+    if (until.value && (until.value < until.min || until.value > until.max)) {
+        until.value = '';
+    }
+}
+
+/** Felder "Wiederholen" aus einer gespeicherten Regel vorbelegen (Regel ändern). */
+function presetRepeatFromRrule(rrule, fromDate, until) {
+    const parts = Object.fromEntries(String(rrule).split(';').map(p => p.split('=')));
+    document.getElementById('appointment_repeat_freq').value = parts.FREQ === 'MONTHLY' ? 'MONTHLY' : 'WEEKLY';
+    if (parts.FREQ === 'MONTHLY') {
+        const m = /^(-1|[1-4])([A-Z]{2})$/.exec(parts.BYDAY || '');
+        if (m) {
+            document.getElementById('appointment_repeat_pos').value = m[1];
+            document.getElementById('appointment_repeat_weekday').value = m[2];
+        }
+    } else {
+        const days = (parts.BYDAY || '').split(',');
+        document.querySelectorAll('#appointment_repeat_days input').forEach(box => { box.checked = days.includes(box.value); });
+        document.getElementById('appointment_repeat_interval').value = parts.INTERVAL || '1';
+    }
+    const untilInput = document.getElementById('appointment_repeat_until');
+    untilInput.min = fromDate;
+    untilInput.max = addMonths(fromDate, 12);
+    untilInput.value = until > untilInput.max ? untilInput.max : until;
+    updateAppointmentRepeatFields();
+}
+
+function setSaveButtonLabel() {
+    const btn = document.getElementById('appointmentSaveBtn');
+    btn.disabled = false;
+    const repeating = document.getElementById('appointment_repeat').checked;
+    btn.textContent = repeating ? 'Vorschau' : 'Speichern';
+}
+
+/** Eine Vorschau verfaellt, sobald sich ein Feld aendert. */
+function resetSeriesPreview() {
+    seriesPreview = null;
+    const box = document.getElementById('appointmentSeriesPreview');
+    box.hidden = true;
+    box.innerHTML = '';
+    setSaveButtonLabel();
+}
+
+export function toggleAppointmentRepeat() {
+    const on = document.getElementById('appointment_repeat').checked;
+    document.getElementById('appointmentRepeatFields').hidden = !on;
+    if (on && !seriesRuleChange) {
+        presetRepeatFromDate(document.getElementById('appointment_date').value);
+    }
+    // Abhaken im Bearbeiten-Dialog bricht "Regel ändern …" ab.
+    if (!on && seriesRuleChange) {
+        seriesRuleChange = false;
+        document.getElementById('appointmentRepeatGroup').hidden = true;
+    }
+    updateAppointmentRepeatFields();
+    resetSeriesPreview();
+}
+
+export function updateAppointmentRepeatFields() {
+    const monthly = document.getElementById('appointment_repeat_freq').value === 'MONTHLY';
+    document.getElementById('appointmentRepeatWeekly').hidden = monthly;
+    document.getElementById('appointmentRepeatMonthly').hidden = !monthly;
+}
+
+/** Kasten "Teil der Serie" im Bearbeiten-Dialog. */
+function renderSeriesBox() {
+    const box = document.getElementById('appointmentSeriesBox');
+    if (!currentSeries) {
+        box.hidden = true;
+        return;
+    }
+    const detached = Number(currentAppointment?.is_detached) === 1;
+    const until = new Date(currentSeries.until + 'T00:00:00').toLocaleDateString('de-DE');
+    // textContent: der Serientitel ist Nutzereingabe.
+    document.getElementById('appointmentSeriesText').textContent = detached
+        ? `Von der Serie „${currentSeries.title}" abgelöst — Änderungen an der Serie erreichen diesen Termin nicht mehr.`
+        : `Teil der Serie: ${describeRrule(currentSeries.rrule)} · ${String(currentSeries.start_time).substring(0, 5)} · bis ${until}`;
+    document.getElementById('appointmentSeriesActions').hidden = detached;
+    document.getElementById('appointmentSeriesExtend').hidden = true;
+    box.hidden = false;
+}
+
+export function openSeriesExtend() {
+    if (!currentSeries) return;
+    const input = document.getElementById('appointment_series_until');
+    input.min = addDays(currentSeries.until, 1);
+    input.max = addMonths(currentSeries.until, 12);
+    input.value = '';
+    document.getElementById('appointmentSeriesExtend').hidden = false;
+}
+
+export async function previewSeriesExtend() {
+    await requestSeriesPreview('extend');
+}
+
+export function openSeriesRuleChange() {
+    if (!currentSeries || !currentAppointment) return;
+    seriesRuleChange = true;
+    document.getElementById('appointmentRepeatGroup').hidden = false;
+    document.getElementById('appointment_repeat').checked = true;
+    document.getElementById('appointmentRepeatFields').hidden = false;
+    presetRepeatFromRrule(currentSeries.rrule, currentAppointment.date, currentSeries.until);
+    resetSeriesPreview();
+}
+
+/** Termin-Cache aller Jahre zwischen from und until leeren -- Serien reichen ueber den Jahreswechsel. */
+async function invalidateSeriesYears(from, until) {
+    const first = Number(String(from).slice(0, 4));
+    const last = Number(String(until || from).slice(0, 4));
+    for (let y = first; y <= last; y++) {
+        await invalidateCache('appointments', y);
+    }
+}
+
+function seriesResultText(r) {
+    const parts = [];
+    if (r.created !== undefined) parts.push(`${r.created} angelegt`);
+    if (r.updated !== undefined) parts.push(`${r.updated} geändert`);
+    if (r.removed) parts.push(`${r.removed} entfernt`);
+    if (r.skipped && r.skipped.length) parts.push(`${r.skipped.length} übersprungen (Kollision)`);
+    if (r.detached && r.detached.length) {
+        // Nach einem Ende ab Serienbeginn gibt es keine Serie mehr -- die Termine
+        // sind dann gewoehnliche Einzeltermine, nicht "abgeloest".
+        parts.push(r.series_deleted
+            ? `${r.detached.length} als Einzeltermin behalten (erfasste Daten)`
+            : `${r.detached.length} abgelöst (erfasste Anwesenheit, Kollision oder ungültige Zeit)`);
+    }
+    if (r.series_deleted) parts.push('Serie aufgelöst');
+    // Nur Zahlen und feste Texte -- showToast() setzt per innerHTML.
+    return 'Serie: ' + (parts.join(', ') || 'keine Änderung');
+}
+
+/** Vorschau beim Server anfordern und als Datumsliste zeigen. */
+async function requestSeriesPreview(kind) {
+    let body;
+    let params;
+
+    if (kind === 'extend') {
+        const until = document.getElementById('appointment_series_until').value;
+        if (!until) {
+            showToast('Bitte ein neues Ende wählen', 'error');
+            return;
+        }
+        body = { until };
+        params = { id: currentSeries.series_id, action: 'extend', preview: 1 };
+    } else {
+        const rrule = readRepeatRule();
+        if (!rrule) {
+            showToast('Bitte mindestens einen Wochentag wählen', 'error');
+            return;
+        }
+        const until = document.getElementById('appointment_repeat_until').value;
+        if (!until) {
+            showToast('Bitte ein Ende für die Serie wählen', 'error');
+            return;
+        }
+        body = { ...appointmentTemplateFromForm(), rrule, until };
+        if (kind === 'create') {
+            body.start_date = document.getElementById('appointment_date').value;
+            params = { preview: 1 };
+        } else {
+            body.from_date = currentAppointment.date;
+            params = { id: currentSeries.series_id, action: 'split', preview: 1 };
+        }
+    }
+
+    // Kopie: apiCall() haengt das CSRF-Token an das uebergebene Objekt.
+    const result = await apiCall('appointment_series', 'POST', { ...body }, params);
+    if (!result || !result.success) return;
+
+    const box = document.getElementById('appointmentSeriesPreview');
+    box.hidden = false;
+    const btn = document.getElementById('appointmentSaveBtn');
+    const items = (result.occurrences || []).map(o => ({
+        date: o.date,
+        note: o.conflict
+            ? `kollidiert mit „${o.conflict.title}" ${String(o.conflict.start_time).substring(0, 5)}`
+            : (o.locked ? 'entfällt (einzeln gelöscht)' : (o.holiday ? `Feiertag: ${o.holiday}` : '')),
+        noteClass: o.conflict ? 'is-conflict' : (o.holiday && !o.locked ? 'is-holiday' : ''),
+        checked: !o.conflict && !o.holiday && !o.excluded,
+        // Gespeicherte Ausfaelle der Serie (locked) setzt der Server ohnehin wieder --
+        // sie lassen sich deshalb nicht anhaken.
+        disabled: Boolean(o.conflict) || Boolean(o.locked),
+    }));
+    const checklist = renderDateChecklist(box, items, {
+        onChange: (n) => {
+            btn.textContent = `${n} Termine anlegen`;
+            btn.disabled = n === 0;
+        },
+    });
+    if (kind === 'split' && (result.removes || result.keeps)) {
+        const hint = document.createElement('p');
+        hint.className = 'input-hint';
+        const parts = [];
+        if (result.removes) parts.push(`${result.removes} folgende Termin(e) ohne erfasste Daten werden durch die neue Regel ersetzt`);
+        if (result.keeps) parts.push(`${result.keeps} Termin(e) mit erfassten Daten bleiben unverändert als Einzeltermine der alten Serie stehen`);
+        hint.textContent = parts.join('; ') + '.';
+        box.prepend(hint);
+    }
+    seriesPreview = { kind, body, checklist };
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/** Die angezeigte Vorschau schreiben. */
+async function commitSeriesPreview() {
+    const { kind, body, checklist } = seriesPreview;
+    const payload = { ...body, exdates: checklist.getDeselected() };
+    const params = kind === 'split' ? { id: currentSeries.series_id, action: 'split' }
+                 : kind === 'extend' ? { id: currentSeries.series_id, action: 'extend' }
+                 : {};
+
+    // Doppelklick abfangen: ein zweites Anlegen liefe sonst in lauter Kollisionen.
+    const btn = document.getElementById('appointmentSaveBtn');
+    btn.disabled = true;
+    const result = await apiCall('appointment_series', 'POST', payload, params);
+    if (!result || !result.success) {
+        btn.disabled = false;
+        return;
+    }
+
+    const from = kind === 'create' ? body.start_date : (kind === 'split' ? body.from_date : currentSeries.until);
+    // Ein Split beendet die alte Serie bis zu ihrem bisherigen Ende -- das kann
+    // hinter dem Ende der neuen Regel liegen.
+    const until = kind === 'split' && currentSeries.until > body.until ? currentSeries.until : body.until;
+    closeAppointmentModal();
+    await invalidateSeriesYears(from, until);
+    showAppointmentSection(true, currentAppointmentsPage);
+    showToast(seriesResultText(result), 'success');
+}
+
+/** Felder, die sich gegenueber dem geladenen Termin geaendert haben. */
+function changedTemplateFields(template, apt) {
+    const norm = (key, value) => {
+        if (value === null || value === undefined) return '';
+        if (key === 'start_time' || key === 'end_time') return String(value).substring(0, 5);
+        return String(value);
+    };
+    return Object.fromEntries(Object.entries(template).filter(([key, value]) => norm(key, value) !== norm(key, apt[key])));
+}
+
+// ============================================
 // MODAL FUNCTIONS
 // ============================================
 
@@ -846,6 +1178,14 @@ export async function openAppointmentModal(appointmentId = null, preset = {}) {
     // Lade Terminarten
     await loadAppointmentTypes();
     await fillLocationSuggestions();
+
+    // Dialogzustand der Terminserien (FI-7) zuruecksetzen.
+    currentAppointment = null;
+    currentSeries = null;
+    seriesRuleChange = false;
+    document.getElementById('appointment_repeat').checked = false;
+    document.getElementById('appointmentRepeatFields').hidden = true;
+    document.getElementById('appointmentSeriesBox').hidden = true;
 
     if (appointmentId) {
         title.textContent = 'Termin bearbeiten';
@@ -871,7 +1211,29 @@ export async function openAppointmentModal(appointmentId = null, preset = {}) {
             document.getElementById('appointment_date').value = preset.date;
         }
     }
-    
+
+    // "Wiederholen" gibt es nur beim Anlegen; beim Bearbeiten oeffnet ihn "Regel ändern …".
+    document.getElementById('appointmentRepeatGroup').hidden = Boolean(appointmentId);
+    resetSeriesPreview();
+    if (!appointmentSeriesFormBound) {
+        document.getElementById('appointmentForm').addEventListener('input', (e) => {
+            // Ein neues Datum belegt Wochentag, Position und Grenze fuer "Bis" neu.
+            if (e.target.id === 'appointment_date' && !seriesRuleChange
+                && document.getElementById('appointment_repeat').checked) {
+                presetRepeatFromDate(e.target.value);
+            }
+            // Haekchen in der Vorschauliste verwerfen die Vorschau nicht. Ein neues
+            // Fortsetzen-Datum dagegen schon -- sonst schriebe der Knopf das alte Ende.
+            if (seriesPreview && !e.target.closest('#appointmentSeriesPreview')) {
+                resetSeriesPreview();
+            }
+        });
+        appointmentSeriesFormBound = true;
+    }
+
+    // Der Kasten "Teil der Serie" steht oben -- ein vom letzten Oeffnen
+    // stehengebliebener Bildlauf verdeckte ihn.
+    modal.querySelector('.modal-body').scrollTop = 0;
     modal.classList.add('active');
 }
 
@@ -884,6 +1246,12 @@ export function closeAppointmentModal() {
 // ============================================
 
 export async function saveAppointment() {
+    // Eine angezeigte Vorschau wird geschrieben -- die Felder sind seitdem unveraendert.
+    if (seriesPreview) {
+        await commitSeriesPreview();
+        return;
+    }
+
     // Form-Validierung prüfen
     const form = document.getElementById('appointmentForm');
     if (!form.checkValidity()) {
@@ -892,24 +1260,49 @@ export async function saveAppointment() {
     }
 
     const appointmentId = document.getElementById('appointment_id').value;
-    const data = {
-        title: document.getElementById('appointment_title').value,
-        type_id: parseInt(document.getElementById('appointment_type').value) || null,        
-        description: document.getElementById('appointment_description').value || null,
-        date: document.getElementById('appointment_date').value,
-        start_time: document.getElementById('appointment_time').value,
-        end_time: document.getElementById('appointment_end_time').value || null,
-        location: document.getElementById('appointment_location').value.trim() || null
-    };
-    
+    const template = appointmentTemplateFromForm();
+    const data = { ...template, date: document.getElementById('appointment_date').value };
+
+    if (!appointmentId && document.getElementById('appointment_repeat').checked) {
+        await requestSeriesPreview('create');
+        return;
+    }
+    if (appointmentId && seriesRuleChange) {
+        await requestSeriesPreview('split');
+        return;
+    }
+
+    // Serientermin: nur dieser oder dieser und alle folgenden (FI-7). Ein
+    // verschobener Termin ist immer "nur dieser".
+    if (appointmentId && currentSeries && Number(currentAppointment?.is_detached) !== 1
+        && data.date === currentAppointment.date) {
+        const scope = await showChoice(
+            'Dieser Termin gehört zu einer Serie. Was soll geändert werden?',
+            'Serientermin ändern',
+            [{ value: 'single', label: 'Nur dieser' }, { value: 'following', label: 'Dieser und alle folgenden' }]
+        );
+        if (!scope) return;
+        if (scope === 'following') {
+            const changed = changedTemplateFields(template, currentAppointment);
+            const result = await apiCall('appointment_series', 'PUT',
+                { ...changed, from_date: currentAppointment.date }, { id: currentSeries.series_id });
+            if (!result || !result.success) return;
+            closeAppointmentModal();
+            await invalidateSeriesYears(currentAppointment.date, currentSeries.until);
+            showAppointmentSection(true, currentAppointmentsPage);
+            showToast(seriesResultText(result), 'success');
+            return;
+        }
+    }
+
     let result;
     if (appointmentId) {
         result = await apiCall('appointments', 'PUT', data, { id: appointmentId });
     } else {
         result = await apiCall('appointments', 'POST', data);
     }
-    
-    if (result.success) {
+
+    if (result && result.success) {
         closeAppointmentModal();
 
         // Cache invalidieren und neu laden
@@ -930,6 +1323,37 @@ export async function deleteAppointment(appointmentId) {
     // deleteType() in management.js (Commit ad200ba).
     const cached = dataCache.appointments[currentYear]?.data?.find(a => a.appointment_id == appointmentId);
     const title = cached ? cached.title : 'diesem Termin';
+
+    // Serientermin (FI-7): nur dieser oder ab hier die ganze Serie beenden.
+    // showChoice() setzt die Nachricht per textContent -- der Titel bleibt roh.
+    if (cached && cached.series_id && Number(cached.is_detached) !== 1) {
+        const scope = await showChoice(
+            `„${title}" gehört zu einer Serie. Was soll gelöscht werden?`,
+            'Serientermin löschen',
+            [{ value: 'single', label: 'Nur dieser', className: 'btn-confirm-delete' },
+             { value: 'following', label: 'Dieser und alle folgenden', className: 'btn-confirm-delete' }]
+        );
+        if (!scope) return;
+        if (scope === 'following') {
+            const result = await apiCall('appointment_series', 'DELETE', null, { id: cached.series_id, from: cached.date });
+            if (result && result.success) {
+                // Das Serienende steht nicht im Termin-Cache: alle geladenen Jahre ab
+                // hier leeren, mindestens aber das Folgejahr.
+                const startYear = Number(cached.date.slice(0, 4));
+                const lastYear = Math.max(startYear + 1, ...Object.keys(dataCache.appointments).map(Number).filter(Number.isFinite));
+                await invalidateSeriesYears(cached.date, `${lastYear}-12-31`);
+                showAppointmentSection(true, currentAppointmentsPage);
+                showToast(seriesResultText(result), 'success');
+            }
+            return;
+        }
+        const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
+        if (result && result.success) {
+            showAppointmentSection(true, currentAppointmentsPage);
+            showToast(`Termin "${escapeHtml(title)}" wurde gelöscht`, 'success');
+        }
+        return;
+    }
 
     const confirmed = await showConfirm(
         `Termin "${title}" wirklich löschen?`,
@@ -1006,6 +1430,11 @@ window.nextMonth = nextMonth;
 window.goToToday = goToToday;
 window.showAppointmentSection = showAppointmentSection;
 window.resetAppointmentFilter = resetAppointmentFilter;
+window.toggleAppointmentRepeat = toggleAppointmentRepeat;
+window.updateAppointmentRepeatFields = updateAppointmentRepeatFields;
+window.openSeriesExtend = openSeriesExtend;
+window.previewSeriesExtend = previewSeriesExtend;
+window.openSeriesRuleChange = openSeriesRuleChange;
 
 // Fuer responses.js (FI-1): Terminliste auf der aktuell gezeigten Seite neu
 // laden, ohne die Seite zu wechseln. Der Cache wurde vorher per
