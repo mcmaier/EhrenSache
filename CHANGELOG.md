@@ -7,6 +7,28 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.11.0] – 2026-09-18
+
+### Neu
+- **Terminserien** (FI-7): wöchentlich (alle 1–4 Wochen, mehrere Tage) oder monatlich nach Position
+  („jeden ersten Freitag", „letzten Mittwoch"), höchstens 12 Monate, mit Vorschau vor dem Anlegen.
+  Bearbeiten als „Nur dieser" oder „Dieser und alle folgenden", Serie fortsetzen, Regel ab einem
+  Termin ändern, ab einem Termin beenden. Termine mit erfassten Daten werden dabei nie gelöscht,
+  sondern aus der Serie gelöst.
+- **Feiertage** (FI-16): berechnet je Bundesland (Einstellung unter Termine → Kalender), im
+  Kalender angezeigt und in der Serienvorschau abgewählt.
+- **Termin per Klick im Kalender anlegen** (OI-64); das Popup belegter Tage bietet „Bearbeiten"
+  und „+ Termin an diesem Tag".
+
+### Geändert
+- Die Vorschau „Termine aus Records ableiten" nutzt dieselbe Datumsliste wie die Serienvorschau.
+
+### Datenbank
+- Migration 1.10.0 → 1.11.0: Tabelle `appointment_series`, Spalten `appointments.series_id` und
+  `appointments.is_detached`, Einstellung `holiday_region`.
+
+---
+
 ## [1.10.0] – 2026-09-18
 
 ### Neu

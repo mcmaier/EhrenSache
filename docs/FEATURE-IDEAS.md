@@ -44,7 +44,7 @@ durchschlägt.
 | [FI-4](#fi-4--registrierungsprozess-für-auth-geräte) | Registrierungsprozess für Auth-Geräte (Rest: NFC/Biometrie) | mittel | M | — |
 | [FI-5](#fi-5--pin-anmeldung-am-auth-gerät) | PIN-Anmeldung am Auth-Gerät — **umgesetzt in 1.3.0** | mittel | M | FI-4 |
 | [FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push) | Benachrichtigungskanal (E-Mail, Web-Push) | hoch | M | — |
-| [FI-7](#fi-7--terminserien-für-wiederkehrende-proben) | Terminserien für wiederkehrende Proben | hoch | M | — |
+| [FI-7](#fi-7--terminserien-für-wiederkehrende-proben) | Terminserien für wiederkehrende Proben — **umgesetzt in 1.11.0** | hoch | M | — |
 | [FI-8](#fi-8--kalender-abo-ics-feed) | Kalender-Abo (ICS-Feed) | mittel | S | — |
 | [FI-9](#fi-9--dienst--und-schichtplanung-für-veranstaltungen) | Dienst- und Schichtplanung für Veranstaltungen | mittel | L | FI-1 |
 | [FI-10](#fi-10--jubiläen-und-ehrungen-automatisch-ermitteln) | Jubiläen und Ehrungen automatisch ermitteln | mittel | S | — |
@@ -53,7 +53,7 @@ durchschlägt.
 | [FI-13](#fi-13--geburtstagsliste-mit-gratulationsvermerk) | Geburtstagsliste mit Gratulationsvermerk | mittel | M | — |
 | [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht — **Variante B teilweise umgesetzt in 1.8.0** | mittel¹ | M | FI-1 für die Wirkung |
 | [FI-15](#fi-15--rolle-gruppenleiter) | Rolle „Gruppenleiter" | hoch | L | — |
-| [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) | Feiertage und Ferien im Terminkalender | mittel | M | FI-7 für die Wirkung |
+| [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) | Feiertage und Ferien im Terminkalender — **Feiertagsteil umgesetzt in 1.11.0, Ferien offen bei FI-18** | mittel | M | FI-7 für die Wirkung |
 | [FI-17](#fi-17--offene-punkte-unter-mein-konto) | Offene Punkte unter „Mein Konto" | hoch | S | — |
 | [FI-18](#fi-18--kalender-import-ics) | Kalender-Import (ICS) | niedrig | M | — |
 | [FI-19](#fi-19--terminvorlagen) | Terminvorlagen | niedrig | S | — |
@@ -362,6 +362,18 @@ des Aufwands.
 ### FI-7 · Terminserien für wiederkehrende Proben
 **Nutzen:** hoch · **Aufwand:** M
 
+**Umgesetzt in 1.11.0** — Spec `docs/superpowers/specs/2026-09-18-terminserien-feiertage-design.md`,
+zusammen mit dem Feiertagsteil von [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) und
+[OI-64](OPEN-ITEMS.md#oi-64--im-kalender-lässt-sich-kein-termin-anlegen). Entschieden: Serie als
+Regel **und** echte Einzeltermine mit `series_id` (nicht berechnet); immer mit Enddatum, höchstens
+12 Monate, „Serie fortsetzen" verlängert; wöchentlich (alle 1–4 Wochen, mehrere Wochentage) oder
+monatlich nach Position, keine tägliche/jährliche Regel; Ausfälle in `exdates` statt eines
+`is_cancelled`-Felds; Bearbeiten als „nur dieser" oder „dieser und alle folgenden" — kein „alle";
+Termine mit erfassten Daten werden von Serienaktionen nie gelöscht, sondern abgelöst
+(`is_detached`) und gemeldet; Vorschau vor jedem Schreiben, vom Server berechnet. Der Text unten
+beschreibt den Entwurfsstand vor der Umsetzung, einschließlich zweier damals offener Fragen —
+beide sind in der Spec entschieden.
+
 Ein Termin mit Wiederholungsregel („jeden Dienstag 19:30 bis Ende Juli") erzeugt die
 Einzeltermine; einzelne Ausfälle lassen sich streichen.
 
@@ -517,6 +529,15 @@ möglich; danach entfällt nur der Nachtrag der Regel.
 
 ### FI-16 · Feiertage und Ferien im Terminkalender
 **Nutzen:** mittel · **Aufwand:** M — **entfaltet sich erst mit [FI-7](#fi-7--terminserien-für-wiederkehrende-proben)**
+
+**Feiertagsteil umgesetzt in 1.11.0** — Spec
+`docs/superpowers/specs/2026-09-18-terminserien-feiertage-design.md`, zusammen mit
+[FI-7](#fi-7--terminserien-für-wiederkehrende-proben). Entschieden: berechnet (Gauß/Meeus), ohne
+`ext-calendar`, bundesweite Feiertage plus ein einstellbares Bundesland (`holiday_region`, leer =
+nur bundesweit); im Kalender angezeigt und in der Serienvorschau abgewählt, nicht als eigener
+Termin angelegt. **Ferien bleiben offen und hängen weiterhin an [FI-18](#fi-18--kalender-import-ics)**
+— dafür gebraucht wird ein Import, den es nicht gibt. Der Text unten beschreibt den Entwurfsstand
+vor der Umsetzung.
 
 Der Kalender kennt gesetzliche Feiertage und, optional, Schulferien. Eine Terminserie bekommt
 dadurch die Optionen „Feiertage überspringen" und „Ferien überspringen".
@@ -891,11 +912,10 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
 > Lücke, die FI-6 füllen sollte, deckt FI-17 zum Bruchteil des Aufwands. Die alte Reihenfolge
 > steht in der Versionshistorie, falls die Begründung noch einmal gebraucht wird.
 
-1. **FI-7 Terminserien** — die lästigste wiederkehrende Arbeit im System und der häufigste
-   Grund, es gar nicht erst zu benutzen. Es hängt von nichts ab, der Entwurf steht (siehe dort),
-   und es beschafft FI-1 überhaupt erst die Termine, zu denen jemand etwas zurückmeldet.
-   Zusammen mit **FI-16 Feiertage** entwerfen, sonst legt die erste Wochenserie Proben auf
-   Karfreitag.
+1. ~~**FI-7 Terminserien**~~ (zusammen mit dem Feiertagsteil von **FI-16**, umgesetzt in 1.11.0) —
+   die lästigste wiederkehrende Arbeit im System und der häufigste Grund, es gar nicht erst zu
+   benutzen. Es hing von nichts ab, und es beschafft FI-1 überhaupt erst die Termine, zu denen
+   jemand etwas zurückmeldet.
 2. **FI-17 Offene Punkte unter „Mein Konto"** — kleinster sinnvoller Schritt gegen die
    Holschuld. Kein Cron, kein Zustellrisiko, keine Einwilligung; bündelt, was FI-6 später
    verschickt, und speist sich aus derselben Abfrage.

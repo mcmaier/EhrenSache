@@ -2535,6 +2535,8 @@ einer erlaubten Handlung, nicht ihre Begrenzung.
 ---
 
 ### OI-64 · Im Kalender lässt sich kein Termin anlegen
+**Erledigt** in 1.11.0
+
 **Priorität:** niedrig · aufgenommen am 2026-09-16
 
 `createCalendarDay()` (`public/js/modules/appointments.js`) hängt an einen Tag ohne Termine
@@ -2968,3 +2970,156 @@ Entschieden ist nichts. Aufgefallen, als die Spec für 1.9.2 den Versionssprung 
 dem Cache begründete; die Begründung hielt der Prüfung nicht stand.
 
 **Nicht sicherheitsrelevant:** betrifft nur die Aktualität der Oberfläche.
+
+---
+
+### OI-75 · CSV-Import ändert Serientermine, ohne sie abzulösen
+**Priorität:** mittel · aufgenommen am 2026-09-21
+
+`importAppointments()` (`private/handlers/import.php`) erkennt einen bestehenden Termin über
+Terminart, Datum und Startzeit (`WHERE type_id = ? AND date = ? AND start_time = ?`) und
+aktualisiert ihn dann per `UPDATE` — Titel und Beschreibung immer, Ort und Ende, wenn die Datei
+die Spalte führt. `series_id` und `is_detached` bleiben dabei unberührt: Ein Serientermin, den der
+Import verändert, sieht sich weiterhin als „folgt der Serie".
+
+**Wirkung:** Ändert eine spätere Serienaktion „Dieser und alle folgenden" (`PUT
+appointment_series`, siehe `API.md`) danach dieselben Felder,
+überschreibt sie die per Import eingespielten Werte wieder — stillschweigend, ohne Warnung. Der
+umgekehrte Fall (Import nach einer Serienänderung) betrifft dagegen nur den einen importierten
+Termin und ist unauffällig.
+
+**Zu entscheiden:** Beim Import ablösen (`is_detached = 1`, wie ein Einzel-`PUT`) oder nicht.
+Dafür spricht Konsistenz mit `PUT appointments`; dagegen, dass ein reiner CSV-Reimport (dieselben
+Werte erneut) heute keine Änderung ist und auch keine sein sollte — `appointmentFieldChanged()`
+wird hier nicht gerufen, der Import setzt also selbst bei identischen Werten ab, sobald sich das
+ändert.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-76 · Wettlauf zweier gleichzeitiger Einzel-Löschungen kann einen Ausfall verlieren
+**Priorität:** niedrig · aufgenommen am 2026-09-21
+
+`DELETE appointments` (`private/handlers/appointments.php`) trägt das Datum eines gelöschten
+Serientermins über `seriesAddExdates()` (`private/helpers/appointment_series.php`) in `exdates`
+der Serie ein: lesen (`seriesLoad()`), im PHP-Array ergänzen, komplett zurückschreiben
+(`seriesSaveExdates()`) — ohne `SELECT … FOR UPDATE` und ohne eigene Transaktion.
+
+**Wettlauf:** Löschen zwei Anfragen nahezu gleichzeitig zwei **verschiedene** Termine derselben
+Serie, können beide `seriesLoad()` vor der ersten `seriesSaveExdates()` lesen. Die zweite
+schreibt dann ihren Stand (Ausgangsliste plus ihr eigenes Datum) über den der ersten — deren
+Datum fehlt danach in `exdates`. Beide Termine sind trotzdem gelöscht (`DELETE FROM appointments`
+läuft unabhängig davon), nur der Ausfall-Eintrag der zuerst geschriebenen Anfrage geht verloren:
+„Serie fortsetzen" würde diesen Tag dann erneut anlegen, obwohl der ursprüngliche Termin bewusst
+gelöscht wurde.
+
+**Selten** — zwei Löschungen derselben Serie innerhalb von Millisekunden sind ein
+Admin-Doppelklick oder zwei gleichzeitig arbeitende Verwalter, kein Alltagsfall.
+
+**Zu tun:** `seriesAddExdates()` (bzw. der Aufruf in `appointments.php`) in eine kleine
+Transaktion mit `SELECT … FOR UPDATE` auf die Serienzeile fassen — wie `seriesFollowing()` es für
+die Serienaktionen bereits tut (siehe dessen Kommentar zur `FOR UPDATE`-Sperre).
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-77 · Offene Zeitkorrektur kann an einer verschobenen Serie scheitern
+**Priorität:** niedrig · aufgenommen am 2026-09-21
+
+Ein Mitglied beantragt für einen künftigen Serientermin ohne erfasste Anwesenheit eine
+Zeitkorrektur (`exceptions`, `exception_type = 'time_correction'`, noch `pending`). Die
+gewünschte Ankunft wird beim Anlegen **und** bei jeder weiteren Änderung (auch der Genehmigung)
+gegen den *aktuellen* Termin geprüft (`arrivalWithinAppointmentWindow()`,
+`private/handlers/exceptions.php`, Zeilen ~194 und ~264).
+
+`PUT appointment_series` „Dieser und alle folgenden“ (`seriesHandleUpdateFollowing()`,
+`private/handlers/appointment_series.php`) schützt vor dem Mitziehen von `start_time` nur, wenn
+bereits **Anwesenheit** erfasst ist (`appointmentHasAttendance()` prüft ausschließlich
+`records`) — eine offene Zeitkorrektur allein hält den Beginn nicht fest, sie zählt bewusst nicht
+als „Termin mit Daten“ im engen Sinn dieser Prüfung (siehe Kommentar dort: „ein zukünftiger
+Probentermin, zu dem schon zugesagt wurde, muss verschiebbar bleiben“).
+
+**Wirkung:** Verschiebt die Serie den Beginn, bleibt die gespeicherte `requested_arrival_time`
+unverändert stehen. Ändert das Mitglied danach nur die Bemerkung, oder genehmigt ein Verwalter
+den Antrag unverändert, prüft `arrivalWithinAppointmentWindow()` dieselbe Ankunftszeit erneut —
+jetzt gegen den **neuen** Beginn. Eine beim Beantragen gültige Ankunft kann dadurch außerhalb des
+Toleranzfensters liegen und die Genehmigung mit `400 "Die angegebene Ankunftszeit liegt zu weit
+vom Termin entfernt"` scheitern, obwohl der Antrag zum Zeitpunkt der Beantragung korrekt war.
+
+**Zu entscheiden:** Eine offene Zeitkorrektur beim Verschieben des Beginns automatisch mit
+anpassen (schwierig — welcher Bezug gilt: absolute Uhrzeit oder Abstand zum Beginn?), ablösen wie
+bei erfasster Anwesenheit, oder die Prüfung beim Genehmigen entschärfen. Betrifft nur den
+seltenen Fall einer offenen Zeitkorrektur auf einem noch nicht stattgefundenen Serientermin.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-78 · „Serie fortsetzen" bleibt auf einer durch Split abgelösten Serie verfügbar
+**Priorität:** niedrig · aufgenommen am 2026-09-21
+
+Ein Split (`POST appointment_series?action=split`, „Regel ändern ab diesem Termin") beendet die
+**alte** Serie am Vortag von `from_date` und legt eine **neue** Serie ab `from_date` an — die
+alte Serienzeile bleibt bestehen, solange noch ein Termin **vor** `from_date` auf sie zeigt
+(`seriesEndFrom()`, `private/helpers/appointment_series.php`).
+
+`renderSeriesBox()` (`public/js/modules/appointments.js`) zeigt „Serie fortsetzen …" für **jeden**
+nicht abgelösten Serientermin, unabhängig davon, ob für die Serie inzwischen bereits ein
+Nachfolger existiert. Öffnet jemand einen der frühen, noch zur alten Serie gehörenden Termine und
+wählt „Serie fortsetzen …", verlängert das die **alte** Serie ab ihrem (durch den Split
+verkürzten) `until` — genau in den Zeitraum, den die **neue** Serie bereits abdeckt. Ergebnis:
+zwei parallele Serien mit überlappenden Terminen an denselben Wochentagen.
+
+**Zu entscheiden:** Die Aktion ausblenden, sobald ein Nachfolger existiert (erfordert eine
+Erkennung „gibt es eine jüngere Serie mit `start_date` = `until` + 1 Tag, derselben Regel-Herkunft
+o. Ä." — die Datenbank hält diese Beziehung heute nicht fest), oder den Zustand hinnehmen und nur
+in der Dokumentation/Oberfläche vor doppelter Verlängerung warnen.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-79 · Jahresauswahl zeigt ein neues Serienjahr erst nach Neuladen
+**Priorität:** niedrig · aufgenommen am 2026-09-21
+
+Die verfügbaren Jahre kommen aus `dataCache.availableYears` (`public/js/modules/ui.js`), einem
+globalen (nicht jahresabhängigen) Cache-Schlüssel mit der üblichen TTL von 10 Minuten. Serien-
+und Termin-Mutationen invalidieren gezielt `appointments` für die betroffenen Jahre, nicht aber
+`availableYears`.
+
+**Wirkung:** Reicht eine neu angelegte oder verlängerte Serie erstmals in ein Jahr, für das bisher
+kein Termin existierte, fehlt dieses Jahr im Jahresfilter, bis der Cache abläuft oder die Seite
+neu geladen wird — die neuen Termine dort sind zwar in der Datenbank, aber über die Jahresauswahl
+nicht erreichbar.
+
+**Zu tun:** Serienaktionen, die `until` über ein bisher unbeteiligtes Jahr hinaus verschieben
+(Anlegen, Split, Fortsetzen), invalidieren zusätzlich `availableYears`.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-80 · Kalendertage mit Terminen: keine Tastaturbedienung, Feiertag fehlt im Vorlesetext
+**Priorität:** niedrig · aufgenommen am 2026-09-21
+
+`createCalendarDay()` (`public/js/modules/appointments.js`) behandelt zwei Tagesarten
+unterschiedlich:
+
+- **Leerer Tag** (seit 1.11.0, OI-64): `tabindex="0"`, `role="button"`, `aria-label` mit dem
+  Anlege-Hinweis — per Tastatur erreichbar und bedienbar.
+- **Tag mit Terminen** (Zeilen ~550–616): nur `mouseenter`/`mouseleave`/`click`, **kein**
+  `tabindex`, **kein** `keydown`-Zuhörer. Ein Tastaturnutzer kann das Popup dieses Tages nicht
+  öffnen — vorbestehend, nicht durch dieses Vorhaben verursacht, aber mit dem Feiertagsteil von
+  FI-16 zusätzlich relevant geworden, weil solche Tage jetzt zusätzliche Information tragen.
+
+Das `aria-label` dieser Tage (Zeile ~585) listet Uhrzeit, Terminart, Titel und
+Rückmeldungszusammenfassung je Termin, nennt aber **nicht**, wenn der Tag zusätzlich ein
+Feiertag ist (`calendar-day--holiday`, `holidaysOfYear()`) — ein Screenreader-Nutzer erfährt den
+Feiertagsnamen nicht, den sehende Nutzer als Text im Tagesfeld sehen.
+
+**Zu tun:** Tage mit Terminen ebenfalls `tabindex="0"` und einen `keydown`-Zuhörer (Enter/Leertaste
+öffnet das Popup) geben; den Feiertagsnamen, sofern vorhanden, vorn ins `aria-label` aufnehmen.
+
+**Nicht sicherheitsrelevant.**
