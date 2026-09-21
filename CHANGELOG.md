@@ -20,6 +20,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   dabei unabhängig vom Bundesland immer.
 - **Termin per Klick im Kalender anlegen** (OI-64); das Popup belegter Tage bietet „Bearbeiten"
   und „+ Termin an diesem Tag".
+- **Die Terminliste der PWA zeigt den Rückmeldestand schon an der zugeklappten Karte.** Ein
+  schmaler Balken unter Ort und eigenem Status teilt sich in Zusagen, Unsichere, Absagen und
+  Mitglieder ohne Antwort — dieselbe Zählung wie im aufgeklappten Teil, nur ohne Aufklappen lesbar.
 
 ### Geändert
 - Die Vorschau „Termine aus Records ableiten" nutzt dieselbe Datumsliste wie die Serienvorschau.
