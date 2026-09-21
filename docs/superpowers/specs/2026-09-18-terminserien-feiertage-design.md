@@ -128,9 +128,9 @@ Rein, ohne Datenbank, **ohne** `ext-calendar`.
 - `holidaysBetween(string $from, string $to, ?string $region): array` — `['YYYY-MM-DD' =>
   'Name']`, aufsteigend. Leeres oder unbekanntes `$region` → nur bundesweite.
 
-Bundesweit: Neujahr (1.1.), Karfreitag (O−2), Ostermontag (O+1), Tag der Arbeit (1.5.),
-Christi Himmelfahrt (O+39), Pfingstmontag (O+50), Tag der Deutschen Einheit (3.10.),
-1. und 2. Weihnachtstag (25./26.12.).
+Bundesweit: Neujahr (1.1.), Karfreitag (O−2), Ostersonntag (O), Ostermontag (O+1), Tag der Arbeit (1.5.),
+Christi Himmelfahrt (O+39), Pfingstsonntag (O+49), Pfingstmontag (O+50), Tag der Deutschen Einheit (3.10.),
+1. und 2. Weihnachtstag (25./26.12.). Oster- und Pfingstsonntag sind gesetzlich nur in Brandenburg Feiertage, erscheinen aber bewusst überall: Im Vereinsalltag zählt, dass an diesen Tagen niemand probt.
 
 Regional:
 
@@ -138,8 +138,6 @@ Regional:
 |---|---|---|---|
 | Heilige Drei Könige | 6.1. | BW, BY, ST | |
 | Internationaler Frauentag | 8.3. | BE (2019), MV (2023) | je Land |
-| Ostersonntag | O | BB | |
-| Pfingstsonntag | O+49 | BB | |
 | Fronleichnam | O+60 | BW, BY, HE, NW, RP, SL | |
 | Mariä Himmelfahrt | 15.8. | SL | |
 | Weltkindertag | 20.9. | TH | 2019 |
