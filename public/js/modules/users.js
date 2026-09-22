@@ -13,6 +13,7 @@ import { loadMembers } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid} from './ui.js';
 import { updateModalId, escapeHtml } from './utils.js';
 import {debug} from '../app.js'
+import { CHIPS_USERS, countChips, filterByChip, renderFilterChips, setResetVisible } from './filter_chips.js';
 
 // ============================================
 // USERS
@@ -81,8 +82,6 @@ function renderUsers(users, page = 1)
 
     const tbody = document.getElementById('usersTableBody');
     tbody.innerHTML = '';
-
-    updateUserStats(users);
 
     // Alle Users speichern für Pagination
     allFilteredUsers = users;
@@ -267,19 +266,6 @@ function renderUsersPagination(currentPage, totalPages, totalUsers) {
     container.innerHTML = html;
 }
 
-function updateUserStats(users) {
-    const totalUsers = users.length;
-    const activeUsers = users.filter(u => u.account_status === 'active').length;    
-    const pendingUsers = users.filter(u => u.account_status === 'pending').length;      
-    const suspendedUsers = users.filter(u => u.account_status === 'suspended').length;     
-        
-    document.getElementById('count-all').textContent = totalUsers || 0;           
-    document.getElementById('count-pending').textContent = pendingUsers || 0;   
-    document.getElementById('count-active').textContent = activeUsers || 0;     
-    document.getElementById('count-suspended').textContent = suspendedUsers || 0;     
-    
-}
-
 // Global für onclick
 window.goToUsersPage = function(page) {
 
@@ -314,43 +300,31 @@ export async function showUserSection(forceReload = false, page = 1)
 // FILTER FUNCTIONS
 // ============================================
 
-window.setUserStatusFilter = function(status) {
-    currentUserStatusFilter = status;
-    
-    // Button-Status aktualisieren
-    document.querySelectorAll('.status-filter-group .filter-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    document.querySelector(`[data-status="${status}"]`).classList.add('active');
-    
-    applyUserFilters();
-};
-
-
 export async function applyUserFilters(forceReload = false, page = 1) {
     debug.log('applyUserFilters called');
-    
-    // Users laden (aus Cache wenn möglich)
-    const allUsers = await loadUsers(forceReload);
-    debug.log('Loaded users:', allUsers.length);
-    
-    // Aktuelle Filter auslesen
-    const filters = {
-        role: document.getElementById('userRoleFilter')?.value || null,
-        status: currentUserStatusFilter !== 'all' ? currentUserStatusFilter : null
-    };
-    debug.log('Active filters:', filters);
-    
-    // Filtern
-    const filteredUsers = filterUsers(allUsers, filters);
-    
-    // Rendern (nur wenn auf User-Section) - Reset auf Seite 1
+
+    const allUsers = await loadUsers(forceReload) || [];
+    const role = document.getElementById('userRoleFilter')?.value || null;
+
+    // Basis: Rolle. Darauf zaehlen die Chips (bis 1.12 zaehlten sie die
+    // gefilterte Liste -- nach Klick auf einen Status standen alle anderen auf 0).
+    const base = filterUsers(allUsers, { role, status: null });
+    renderFilterChips(
+        document.getElementById('userStatusChips'),
+        CHIPS_USERS, countChips(base, CHIPS_USERS), currentUserStatusFilter,
+        key => { currentUserStatusFilter = key; applyUserFilters(false, 1); },
+        { label: 'Status der Benutzer' }
+    );
+    setResetVisible(document.getElementById('btnResetUserFilters'),
+        Boolean(role) || currentUserStatusFilter !== 'all');
+
+    const filteredUsers = filterByChip(base, CHIPS_USERS, currentUserStatusFilter);
+
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'benutzer') {
         renderUsers(filteredUsers, page);
-        debug.log('Users rendered');
     }
-    
+
     return filteredUsers;
 }
 
@@ -389,16 +363,8 @@ export async function initUsersEventHandlers()
         
         // Reset-Button
         document.getElementById('btnResetUserFilters')?.addEventListener('click', () => {
-            // Status-Filter zurücksetzen
             currentUserStatusFilter = 'all';
-            document.querySelectorAll('.status-filter-group .filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.querySelector('[data-status="all"]').classList.add('active');
-            
-            // Rolle zurücksetzen
             document.getElementById('userRoleFilter').value = '';
-            
             applyUserFilters();
         });
             

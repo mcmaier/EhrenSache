@@ -1229,41 +1229,18 @@
                     </div>  
                 </div>
 
-                <div class="controls">
-                    <div class="filter-row">
-                        <!-- Links: Status-Buttons -->
-                        <div id="userStatusFilter" class="status-filter-group">
-                            <button class="filter-btn active" data-status="all" onclick="setUserStatusFilter('all')">
-                                Alle (<span id="count-all">0</span>)
-                            </button>
-                            <button class="filter-btn pending" data-status="pending" onclick="setUserStatusFilter('pending')">
-                                ⏳ Ausstehend (<span id="count-pending">0</span>)
-                            </button>
-                            <button class="filter-btn active-status" data-status="active" onclick="setUserStatusFilter('active')">
-                                ✓ Aktiv (<span id="count-active">0</span>)
-                            </button>
-                            <button class="filter-btn suspended" data-status="suspended" onclick="setUserStatusFilter('suspended')">
-                                🚫 Gesperrt (<span id="count-suspended">0</span>)
-                            </button>
-                        </div>
-                        
-                        <!-- Rechts: Rolle + Reset -->
-                        <div class="filter-controls">
-                            <div class="filter-group">
-                                <label for="userRoleFilter">Rolle:</label>
-                                <select id="userRoleFilter" onchange="applyUserFilters()">
-                                    <option value="">Alle Rollen</option>
-                                    <option value="admin">Administrator</option>
-                                    <option value="manager">Manager</option>
-                                    <option value="user">Benutzer</option>
-                                </select>
-                            </div>
-                            
-                            <button id= "btnResetUserFilters" class="btn-reset-filter">
-                                Filter zurücksetzen
-                            </button>
-                        </div>
+                <div class="filter-chips filter-chips--standalone" id="userStatusChips"></div>
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="userRoleFilter">Rolle:</label>
+                        <select id="userRoleFilter">
+                            <option value="">Alle Rollen</option>
+                            <option value="admin">Administrator</option>
+                            <option value="manager">Manager</option>
+                            <option value="user">Benutzer</option>
+                        </select>
                     </div>
+                    <button id="btnResetUserFilters" class="btn-reset-filter" hidden>Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->

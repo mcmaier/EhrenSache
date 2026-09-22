@@ -131,6 +131,24 @@ test('Mitglieder: Chips statt Karten und Inaktiv-Schalter', function () use ($fc
         'Vorgabe des Mitglieder-Chips muss "active" sein');
 });
 
+test('Benutzer: Chips statt bunter Pillenknoepfe', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'benutzer', 'geraete');
+    assertTrue(str_contains($bereich, 'id="userStatusChips"'), 'Chip-Container fehlt');
+    foreach (['userStatusFilter', 'filter-btn', 'count-all', 'count-pending', 'setUserStatusFilter'] as $alt) {
+        assertSame(0, substr_count($fcHtml, $alt), $alt . ' muss aus index.html entfallen');
+    }
+    assertSame(0, substr_count($bereich, 'onchange="applyUserFilters()"'),
+        'userRoleFilter war doppelt verdrahtet (inline und addEventListener)');
+
+    $css = (string) file_get_contents($fcRoot . '/public/css/sections/content.css');
+    assertSame(0, preg_match('/\.filter-btn\b/', $css), '.filter-btn-Stile muessen entfallen');
+
+    $js = fcModul($fcRoot, 'users');
+    assertTrue(str_contains($js, 'CHIPS_USERS'), 'users.js nutzt den Chipsatz nicht');
+    assertSame(0, substr_count($js, 'setUserStatusFilter'), 'setUserStatusFilter muss entfallen');
+    assertTrue(str_contains($js, 'countChips(base, CHIPS_USERS)'), 'Benutzer: Chips muessen auf der Basisliste zaehlen');
+});
+
 test('Mitglieder: Chips zaehlen den Jahresbestand, nicht die Chip-Auswahl (OI-71)', function () use ($fcRoot) {
     $js = fcModul($fcRoot, 'members');
     $start = strpos($js, 'export async function showMemberSection(');
