@@ -114,3 +114,13 @@ test('PWA: der Klappzustand des Blocks wird bei Abmeldung zurueckgesetzt', funct
     assertTrue(str_contains($resetBody, 'openItemsSeq++'), 'resetSessionState() verwirft eine unterwegs befindliche Antwort nicht');
     assertTrue(str_contains($resetBody, "openItemsBlock.hidden = true"), 'resetSessionState() blendet den Block nicht aus');
 });
+
+test('PWA: Verlauf laedt auch abgelehnte Antraege', function () use ($root) {
+    $js = (string) file_get_contents($root . '/public/checkin/js/app.js');
+    $start = strpos($js, 'async function loadHistory(');
+    assertTrue($start !== false, 'loadHistory() fehlt');
+    $body = substr($js, $start, (int) strpos($js, "\nfunction ", $start) - $start);
+    assertTrue(str_contains($body, "status: 'rejected'"), 'loadHistory() laedt keine abgelehnten Antraege');
+    assertTrue(str_contains($body, 'approved_at'), 'Das Fenster wird nicht ueber approved_at bestimmt');
+    assertTrue(str_contains($body, '14'), 'Das Fenster von 14 Tagen fehlt');
+});

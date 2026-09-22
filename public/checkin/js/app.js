@@ -2713,6 +2713,18 @@ async function loadHistory() {
 
         let exceptions = result.data;
 
+        // Abgelehnte Antraege der letzten 14 Tage dazu (FI-17): Die Uebersicht
+        // „Offene Punkte" springt hierher, und ohne sie liefe der Sprung ins
+        // Leere. Dasselbe Fenster wie serverseitig OPEN_ITEMS_REJECTED_DAYS.
+        const rejected = await apiCall('exceptions', 'GET', null, {
+            member_id: userData.member_id, status: 'rejected'
+        });
+        if (rejected.success && Array.isArray(rejected.data)) {
+            const grenze = Date.now() - 14 * 24 * 60 * 60 * 1000;
+            exceptions = exceptions.concat(rejected.data.filter(e =>
+                e.approved_at && new Date(String(e.approved_at).replace(' ', 'T')).getTime() >= grenze));
+        }
+
         // Arbeitszeiten nur abrufen, wenn das Mitglied ueberhaupt welche
         // erfassen darf — sonst antwortet die Ressource mit 404 und der
         // Abruf waere verschenkt.
@@ -2744,7 +2756,13 @@ async function loadHistory() {
             ...exceptions.map(e => ({
                 type: 'exception',
                 data: e,
-                timestamp: new Date(e.created_at)
+                // Abgelehnte Antraege nach dem Entscheidungsdatum einsortieren,
+                // nicht nach der Erstellung: sonst faende eine frische Ablehnung
+                // eines laengst gestellten Antrags keinen Platz unter den
+                // letzten 20 Eintraegen. created_at bleibt wie bisher geparst.
+                timestamp: e.status === 'rejected' && e.approved_at
+                    ? new Date(String(e.approved_at).replace(' ', 'T'))
+                    : new Date(e.created_at)
             })),
             ...sessions.slice(0, 10).map(s => ({
                 type: 'session',
