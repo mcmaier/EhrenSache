@@ -3487,6 +3487,11 @@ der PWA ist das seit 1.12.0 pauschal gesperrt. Vorgeschlagene Regel für beide O
 Die Gesamtliste zeigt den neuen Eintrag „entschuldigt“ erst nach bis zu 10 Minuten oder einem
 Neuladen. Eine Zeile, im selben Zug mitnehmen.
 
+**4. Nebenbefund:** In `buildAttendanceRow()` (`records.js`) fehlt beim Status „✓ Anwesend“ das
+schließende `>`: `…✓ Anwesend</span` statt `</span>`. Der Browser repariert es stillschweigend, das
+Markup ist trotzdem kaputt. Gemeldet von der Sitzung der Filter-Chips, die die Funktion bewusst
+nicht anfasst — beim Umbau für OI-87 mitnehmen.
+
 **Abstimmung mit den parallelen Sitzungen (2026-09-22):**
 
 - **Reihenfolge:** (1) Merge der Filter-Chips (Spec `2026-09-22-filter-chips-design.md`), (2)
