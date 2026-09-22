@@ -69,6 +69,9 @@ export async function renderExceptions(exceptions, page = 1)
     if (!exceptions || (exceptions.length === 0)) {
         tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge gefunden</td></tr>';
         updateExceptionStats([]);
+        // Sonst bleiben Seitenknöpfe der vorigen Liste stehen (OI-84)
+        allFilteredExceptions = [];
+        renderExceptionsPagination(1, 0, 0);
         return;
     }
 

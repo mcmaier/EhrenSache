@@ -150,9 +150,17 @@ function renderMembers(members, page = 1) {
     tbody.innerHTML = '';
 
     if (!members || members.length === 0) {
-        
-        tbody.innerHTML = '<tr><td colspan="7" class="loading">Kein Profil verknüpft</td></tr>';
+        // Ein einfacher Nutzer sieht nur sein eigenes Mitglied — fehlt es,
+        // ist kein Profil verknüpft. Bei Verwaltern hat nur der Filter
+        // nichts gefunden.
+        const message = isAdminOrManager
+            ? 'Keine Mitglieder für diese Auswahl'
+            : 'Kein Profil verknüpft';
+        tbody.innerHTML = `<tr><td colspan="7" class="loading">${message}</td></tr>`;
         updateMemberStats(members);
+        // Sonst bleiben Seitenknöpfe der vorigen Liste stehen (OI-84)
+        allFilteredMembers = [];
+        renderMembersPagination(1, 0, 0);
         return;
     }
     

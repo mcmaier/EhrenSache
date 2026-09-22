@@ -147,3 +147,51 @@ test('Arbeitszeit-Kennzahlen zaehlen nur den gefilterten Stand', function () use
     assertSame(0, preg_match('/\ball\s*\./', $rumpf),
                'updateWorktimeStats() darf nicht mehr auf den Gesamtbestand (all) zugreifen');
 });
+
+/**
+ * Der Zweig fuer die leere Liste einer Render-Funktion: vom Test auf die leere
+ * Liste bis zum ersten return. Genau dort sprang die Funktion bis OI-84 an der
+ * Paginierung vorbei.
+ */
+function dfLeerzweig(string $body): string
+{
+    $start = strpos($body, 'length === 0');
+    assertTrue($start !== false, 'Kein Zweig fuer die leere Liste gefunden');
+
+    $ende = strpos($body, 'return;', $start);
+    assertTrue($ende !== false, 'Der Zweig fuer die leere Liste kehrt nicht zurueck');
+
+    return substr($body, $start, $ende - $start);
+}
+
+foreach ([
+    ['records.js',    'renderRecords',    'recordsPagination',    'allFilteredRecords'],
+    ['members.js',    'renderMembers',    'membersPagination',    'allFilteredMembers'],
+    ['exceptions.js', 'renderExceptions', 'exceptionsPagination', 'allFilteredExceptions'],
+] as [$datei, $funktion, $container, $liste]) {
+    test("Leeres Filterergebnis raeumt die Paginierung ab: {$funktion}() (OI-84)",
+        function () use ($dfRoot, $datei, $funktion, $container, $liste) {
+            $js = (string) file_get_contents($dfRoot . '/public/js/modules/' . $datei);
+            $leer = dfLeerzweig(dfFunktion($js, $funktion));
+
+            // Sonst bleibt „Zeige 1–25 von 196“ unter der Leermeldung stehen.
+            // stripos: der Aufruf render…Pagination() traegt die ID im Namen
+            assertTrue(stripos($leer, $container) !== false,
+                "{$funktion}() leert #{$container} bei leerer Liste nicht");
+
+            // Sonst rendert ein Klick auf die stehengebliebenen Seitenknoepfe
+            // die alte Liste unter dem neuen Filter
+            assertTrue(preg_match('/' . $liste . '\s*=\s*\[\]/', $leer) === 1,
+                "{$funktion}() setzt {$liste} bei leerer Liste nicht zurueck");
+        });
+}
+
+test('Leere Mitgliederliste meldet nur ohne Verwalterrolle ein fehlendes Profil (OI-84)',
+    function () use ($dfRoot) {
+        $js = (string) file_get_contents($dfRoot . '/public/js/modules/members.js');
+        $leer = dfLeerzweig(dfFunktion($js, 'renderMembers'));
+
+        // Ein Admin mit Filter ohne Treffer hat kein Profil zu verknuepfen
+        assertTrue(strpos($leer, 'isAdminOrManager') !== false,
+            'Die Leermeldung der Mitgliederliste unterscheidet die Rolle nicht');
+    });
