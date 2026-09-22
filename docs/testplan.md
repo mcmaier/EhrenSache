@@ -1272,6 +1272,21 @@ Automatisiert: `responses_api` (Fenster, Sichtbarkeit bis Tagesende, Sortierung)
 | PWA-TL-13 | Antrag im Dashboard ablehnen bzw. genehmigen | Chip „Entschuldigung abgelehnt“ mit erneutem „Entschuldigen“ bzw. „✗ entschuldigt“ ohne Knopf |
 | PWA-TL-14 | Heute begonnene Infokarte ohne Antrag | Chip „hat begonnen“, kein „Entschuldigen“ |
 
+### Anträge in der Anwesenheitsliste der PWA (seit 1.12.0)
+
+Automatisiert: `responses_api` (pending_exceptions), `pwa_termine_frontend`.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| PWA-AL-1 | Als Manager Tab „Liste“, Termin mit offenen Anträgen | Oben „⏳ n offene Anträge“; betroffene Zeilen tragen „⏳ Entschuldigung“ bzw. „⏳ Zeitantrag 19:55 Uhr“, zugeklappt |
+| PWA-AL-2 | Antrag aufklappen | Begründung, „Genehmigen“ und „Ablehnen“ |
+| PWA-AL-3 | Entschuldigung genehmigen | Zeile „✗ entschuldigt“, Antrag verschwindet, Zähler sinkt |
+| PWA-AL-4 | Zeitantrag genehmigen | Zeile anwesend mit der beantragten Ankunft |
+| PWA-AL-5 | Ablehnen | Rückfrage; danach Antrag weg, Zeile unverändert |
+| PWA-AL-6 | Eigener Antrag des Managers | Hinweis „Eigener Antrag …“, keine Knöpfe |
+| PWA-AL-7 | Entschuldigt-Zeile, Knopf ✗ | Rückfrage „Entschuldigt-Eintrag entfernen“; danach abwesend, der Antrag bleibt genehmigt |
+| PWA-AL-8 | Antrag zu einem Termin außerhalb des Check-in-Fensters | Termin steht nicht in der Auswahl der Liste — bewusst, die Liste ist für den laufenden Termin; entschieden wird im Dashboard oder am Tag |
+
 ---
 
 ## 24. Untergruppen (seit 1.8.0)

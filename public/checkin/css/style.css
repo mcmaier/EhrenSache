@@ -1887,6 +1887,93 @@ body {
     background: var(--success);
 }
 
+/* Entschuldigt (seit 1.12.0) -- bisher sah ein genehmigtes Fernbleiben hier
+   aus wie eine Anwesenheit. Rot wie „✗ entschuldigt“ im Tab „Termine“,
+   aber leiser als ein Fehler. Der Knopf entfernt den Eintrag, darum grau
+   statt rot: Er nimmt keine Anwesenheit weg. */
+.attendance-item.excused {
+    border-color: rgba(231, 76, 60, 0.35);
+    background: rgba(231, 76, 60, 0.04);
+}
+
+.attendance-item.excused .status-icon {
+    color: var(--error);
+}
+
+.attendance-item.excused .btn-toggle-attendance {
+    background: var(--text-light);
+}
+
+/* Offene Antraege in der Zeile (seit 1.12.0): eigene Zeile unter Name und
+   Knopf, ueber die volle Breite. */
+.attendance-item {
+    flex-wrap: wrap;
+}
+
+.attendance-requests {
+    flex-basis: 100%;
+    margin-top: 6px;
+}
+
+.attendance-request {
+    font-size: 13px;
+    background: #fff8e1;
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin-top: 4px;
+}
+
+.attendance-request summary {
+    cursor: pointer;
+    color: #7a5c00;
+    font-weight: 600;
+}
+
+.attendance-request__reason {
+    margin: 6px 0;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.attendance-request__own {
+    margin: 4px 0;
+    color: var(--text-light);
+    font-size: 12px;
+}
+
+.attendance-request__actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.btn-request-decide {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-request-decide--approve { background: var(--success); }
+.btn-request-decide--reject  { background: var(--error); }
+
+.btn-request-decide:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.attendance-requests-count {
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #fff3cd;
+    color: #7a5c00;
+    font-weight: 600;
+    font-size: 13px;
+}
+
 .btn-toggle-attendance:hover {
     transform: scale(1.05);
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);

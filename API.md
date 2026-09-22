@@ -2860,7 +2860,9 @@ Alle Schritte laufen in **einer Transaktion**.
       "checkin_source": null,
       "status": null,
       "groups":    [{ "group_id": 1, "group_name": "Aktive",     "sort_order": 0 }],
-      "subgroups": [{ "group_id": 9, "group_name": "Klarinette", "sort_order": 20 }]
+      "subgroups": [{ "group_id": 9, "group_name": "Klarinette", "sort_order": 20 }],
+      "pending_exceptions": [{ "exception_id": 2235, "exception_type": "absence",
+                               "reason": "Familienfeier", "requested_arrival_time": null }]
     }
   ]
 }
@@ -2882,6 +2884,12 @@ Zeichenkette `groups`:
 Die beiden Listen sind seit 1.9.0 überschneidungsfrei: eine als Untergruppe markierte Gruppe
 steht nie in `groups`, auch wenn sie zur Terminart gehört. Beide Listen sind nach `sort_order`,
 bei Gleichstand nach `group_name` sortiert.
+
+**Seit 1.12.0** trägt jedes Mitglied `pending_exceptions`: die **offenen** Anträge (`status = pending`)
+zu diesem Termin, sortiert nach Anlage, sonst ein leeres Array. Genehmigte zeigen sich im `status`
+des Eintrags (`excused` bzw. die beantragte Ankunft), abgelehnte fehlen. Die Check-in-App lässt Admin
+und Manager sie damit in der Liste bescheiden, über `PUT exceptions` mit `status`. Den eigenen Antrag
+entscheidet die App dort nicht, dafür bleibt das Dashboard.
 
 > Bis 1.8.0 zeigte dieser Abschnitt eine Antwort mit einem `attendance`-Array und Feldern
 > `member_name`/`appointment_date`/`group_name`, die der Server so nie geliefert hat — geliefert

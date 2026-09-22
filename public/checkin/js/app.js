@@ -1350,6 +1350,9 @@ function syncAttendanceMemberRecord(memberId, recordId, arrivalTime) {
     if (!member) return;
     member.record_id = recordId;
     member.arrival_time = arrivalTime;
+    // Die Liste legt nur Anwesenheiten an; ein entfernter Eintrag hat keinen
+    // Status mehr (seit 1.12.0 unterscheidet die Zeile entschuldigt)
+    member.status = recordId ? 'present' : null;
 }
 
 function renderAttendanceList(data) {
@@ -1388,13 +1391,19 @@ function renderAttendanceList(data) {
             <div class="attendance-list">`;
 
         section.members.forEach(member => {
+            // Ein Eintrag ist nicht immer eine Anwesenheit: Eine genehmigte
+            // Entschuldigung legt einen Record mit status = 'excused' an. Bis
+            // 1.12.0 zeigte die Liste beide als ✓ (Nebenbefund zu den Antraegen).
             const isPresent = member.record_id !== null;
-            const statusClass = isPresent ? 'present' : 'absent';
-            const statusIcon = isPresent ? '✓' : '○';
+            const isExcused = isPresent && member.status === 'excused';
+            const statusClass = isExcused ? 'excused' : (isPresent ? 'present' : 'absent');
+            const statusIcon = isExcused ? '✗' : (isPresent ? '✓' : '○');
 
             // Format Ankunftszeit
             let arrivalTimeHtml = '';
-            if (isPresent && member.arrival_time) {
+            if (isExcused) {
+                arrivalTimeHtml = '<span class="arrival-time">entschuldigt</span>';
+            } else if (isPresent && member.arrival_time) {
                 const arrivalDate = new Date(member.arrival_time);
                 const timeStr = arrivalDate.toLocaleTimeString('de-DE', {
                     hour: '2-digit',
@@ -1416,21 +1425,118 @@ function renderAttendanceList(data) {
                             data-member-id="${member.member_id}"
                             data-appointment-id="${data.appointment.appointment_id}"
                             data-record-id="${member.record_id || ''}"
-                            data-is-present="${isPresent}">
+                            data-is-present="${isPresent}"
+                            data-is-excused="${isExcused}">
                         ${isPresent ? '✗' : '✓'}
                     </button>
+                    ${attendanceRequestsHtml(member)}
                 </div>`;
         });
 
         html += `</div></div>`;
     });
 
-    content.innerHTML = html;
+    content.innerHTML = attendanceRequestsCountHtml(data.members) + html;
 
     // Event Listener für Toggle-Buttons
     content.querySelectorAll('.btn-toggle-attendance').forEach(btn => {
         btn.addEventListener('click', handleAttendanceToggle);
     });
+    content.querySelectorAll('.btn-request-decide').forEach(btn => {
+        btn.addEventListener('click', handleRequestDecision);
+    });
+}
+
+/**
+ * Zaehler ueber der Liste (seit 1.12.0): Beim Durchscrollen soll kein offener
+ * Antrag uebersehen werden. Ein Mitglied mit mehreren Untergruppen steht in
+ * mehreren Abschnitten -- gezaehlt wird es einmal.
+ */
+function attendanceRequestsCountHtml(members) {
+    const ids = new Set();
+    (members || []).forEach(m => (m.pending_exceptions || []).forEach(e => ids.add(e.exception_id)));
+    if (ids.size === 0) return '';
+
+    const text = ids.size === 1 ? '1 offener Antrag' : `${ids.size} offene Anträge`;
+    return `<div class="attendance-requests-count">⏳ ${text}</div>`;
+}
+
+/**
+ * Offene Antraege eines Mitglieds in seiner Zeile (seit 1.12.0).
+ *
+ * Zugeklappt nur die Art -- die Begruendung kann Gesundheitliches enthalten,
+ * und das Telefon liegt bei der Probe womoeglich offen herum. Den eigenen
+ * Antrag entscheidet hier niemand: live vor Publikum ist genau der Ort, an dem
+ * das Vier-Augen-Prinzip fehlen wuerde (OI-3). Das Dashboard bleibt dafuer.
+ */
+function attendanceRequestsHtml(member) {
+    const antraege = member.pending_exceptions || [];
+    if (antraege.length === 0) return '';
+
+    const eigener = userData && String(userData.member_id) === String(member.member_id);
+    const off = navigator.onLine ? '' : ' disabled';
+
+    const zeilen = antraege.map(a => {
+        const zeit = a.requested_arrival_time ? String(a.requested_arrival_time).slice(11, 16) : '';
+        const art = a.exception_type === 'absence'
+            ? 'Entschuldigung'
+            : (zeit ? `Zeitantrag ${zeit} Uhr` : 'Zeitantrag');
+
+        const aktionen = eigener
+            ? '<p class="attendance-request__own">Eigener Antrag – bitte im Dashboard von jemand anderem entscheiden lassen.</p>'
+            : `<div class="attendance-request__actions">
+                   <button type="button" class="btn-request-decide btn-request-decide--approve" data-exception-id="${Number(a.exception_id)}" data-decision="approved"${off}>Genehmigen</button>
+                   <button type="button" class="btn-request-decide btn-request-decide--reject" data-exception-id="${Number(a.exception_id)}" data-decision="rejected"${off}>Ablehnen</button>
+               </div>`;
+
+        return `
+            <details class="attendance-request">
+                <summary>⏳ ${escapeHtml(art)}</summary>
+                <div class="attendance-request__body">
+                    <p class="attendance-request__reason">${escapeHtml(a.reason || '')}</p>
+                    ${aktionen}
+                </div>
+            </details>`;
+    }).join('');
+
+    return `<div class="attendance-requests">${zeilen}</div>`;
+}
+
+/**
+ * Genehmigt oder lehnt einen Antrag aus der Liste heraus ab. Ablehnen fragt
+ * nach -- ohne Antwortfeld erfaehrt das Mitglied nur das Ergebnis, der Tipp
+ * sollte also gewollt sein. Danach wird die Liste frisch geladen: Die
+ * Genehmigung legt serverseitig den Eintrag an (entschuldigt bzw. die
+ * beantragte Ankunft), den die Zeile dann zeigt.
+ */
+async function handleRequestDecision(event) {
+    const btn = event.currentTarget;
+    const exceptionId = Number(btn.dataset.exceptionId);
+    const decision = btn.dataset.decision;
+    if (!exceptionId || (decision !== 'approved' && decision !== 'rejected')) return;
+
+    const entscheiden = async () => {
+        const buttons = document.querySelectorAll(`.btn-request-decide[data-exception-id="${exceptionId}"]`);
+        buttons.forEach(b => { b.disabled = true; });
+
+        const result = await apiCall('exceptions', 'PUT', { status: decision }, { id: exceptionId });
+        if (!result.success) {
+            showMessage(result.error || 'Antrag konnte nicht entschieden werden', 'error');
+            buttons.forEach(b => { b.disabled = !navigator.onLine; });
+            return;
+        }
+
+        showMessage(decision === 'approved' ? '✓ Antrag genehmigt' : 'Antrag abgelehnt',
+                    decision === 'approved' ? 'success' : 'warning');
+        await loadAttendanceList();
+    };
+
+    if (decision === 'rejected') {
+        showNavigationConfirm('Antrag ablehnen?',
+            'Das Mitglied sieht in der App, dass der Antrag abgelehnt wurde.', entscheiden);
+        return;
+    }
+    await entscheiden();
 }
 
 /** Umschalter Alphabetisch/Gruppe/<Wort> + Hinweiszeile bei Mehrfachnennung
@@ -1479,6 +1585,7 @@ async function handleAttendanceToggle(event) {
     const appointmentId = btn.dataset.appointmentId;
     const recordId = btn.dataset.recordId;
     const isPresent = btn.dataset.isPresent === 'true';
+    const isExcused = btn.dataset.isExcused === 'true';
 
     // Ein Mitglied mit mehreren Untergruppen steht in mehreren Abschnitten
     // der Liste (Spec 3.2) -- jede seiner Zeilen traegt denselben
@@ -1498,9 +1605,13 @@ async function handleAttendanceToggle(event) {
     try {
         if (isPresent) {
             // Bestätigung vor dem Löschen
+            // Ein entschuldigter Eintrag ist keine Anwesenheit -- die Rueckfrage
+            // sagt, was tatsaechlich verschwindet. Der genehmigte Antrag bleibt.
             showNavigationConfirm(
-                'Anwesenheit entfernen',
-                `Anwesenheit wirklich entfernen?`,
+                isExcused ? 'Entschuldigt-Eintrag entfernen' : 'Anwesenheit entfernen',
+                isExcused
+                    ? 'Der Eintrag „entschuldigt“ wird entfernt, der genehmigte Antrag bleibt bestehen. Danach lässt sich das Mitglied als anwesend eintragen.'
+                    : 'Anwesenheit wirklich entfernen?',
                 async () => {
                     memberButtons.forEach(b => b.disabled = true);
 
@@ -1514,7 +1625,7 @@ async function handleAttendanceToggle(event) {
 
                         // Optimistisches UI-Update -- in ALLEN Zeilen dieses Mitglieds
                         memberItems.forEach(listItem => {
-                            listItem.classList.remove('present');
+                            listItem.classList.remove('present', 'excused');
                             listItem.classList.add('absent');
                             const icon = listItem.querySelector('.status-icon');
                             if (icon) {
@@ -1527,6 +1638,7 @@ async function handleAttendanceToggle(event) {
                         memberButtons.forEach(b => {
                             b.textContent = '✓';
                             b.dataset.isPresent = 'false';
+                            b.dataset.isExcused = 'false';
                             b.dataset.recordId = '';
                         });
 

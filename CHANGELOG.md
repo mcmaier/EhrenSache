@@ -16,6 +16,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   aufgeklappte Karte bis Terminbeginn den Knopf „Entschuldigen“, eine Begründung ist Pflicht. Den
   Stand zeigt ein Chip am Kartenkopf. Einen offenen Antrag kann man nach Rückfrage
   zurückziehen, nach einer Ablehnung ist ein neuer möglich.
+- **Anträge live in der Anwesenheitsliste der Check-in-App entscheiden.** Admin und Manager sehen
+  im Tab „Liste“ zu jedem Mitglied dessen offene Entschuldigungen und Zeitanträge und können sie
+  direkt genehmigen oder ablehnen. Bisher ging das nur im Dashboard. Die Begründung erscheint
+  erst nach dem Antippen, und Ablehnen fragt nach. Über der Liste steht, wie viele Anträge offen
+  sind. Den eigenen Antrag entscheidet dort niemand, dafür bleibt das Dashboard.
 
 ### Geändert
 - **Der Verlauf der Check-in-App ist aufgebaut wie die Terminkarten.** Bisher standen Kopf,
@@ -25,6 +30,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Der farbige Rand zeigt die Farbe der Terminart bzw. der Tätigkeit statt des Status, wie im Tab
   „Termine“. Löschen und Korrigieren stehen in derselben Zeile rechts. Anträge nennen den Zeitpunkt des
   Termins, nicht den des Antrags.
+
+### Behoben
+- **Die Anwesenheitsliste der Check-in-App unterscheidet „entschuldigt“ von „anwesend“.** Bisher
+  zeigte sie jeden Eintrag mit ✓, auch ein genehmigtes Fernbleiben. Jetzt steht dort
+  „✗ entschuldigt“. Entfernen fragt mit eigenem Text nach, der genehmigte Antrag bleibt dabei
+  bestehen.
 
 ---
 

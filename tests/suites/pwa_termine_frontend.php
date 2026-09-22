@@ -101,3 +101,25 @@ test('Verlauf: historyCardHtml maskiert Titel, Zeitpunkt, Meta und Chip', functi
     assertTrue(str_contains(ptFunktion('historyItem'), 'safeHexColor('),
         'Die Randfarbe kommt aus der Datenbank und muss ein Hexwert sein');
 });
+
+// Antraege in der Anwesenheitsliste (seit 1.12.0)
+
+test('Liste: den eigenen Antrag entscheidet niemand in der PWA', function () {
+    $rumpf = ptFunktion('attendanceRequestsHtml');
+    assertTrue(str_contains($rumpf, 'userData.member_id') && str_contains($rumpf, 'eigener'),
+        'Ohne Abgleich mit dem eigenen Mitglied genehmigt sich ein Manager selbst (OI-3)');
+    assertTrue(str_contains($rumpf, 'escapeHtml(a.reason'), 'Die Begruendung kommt vom Mitglied und muss maskiert werden');
+    assertTrue(str_contains($rumpf, '<details'), 'Die Begruendung gehoert zugeklappt');
+});
+
+test('Liste: Ablehnen fragt nach, Genehmigen laedt die Liste neu', function () {
+    $rumpf = ptFunktion('handleRequestDecision');
+    assertTrue(str_contains($rumpf, 'showNavigationConfirm('), 'Ablehnen ohne Rueckfrage');
+    assertTrue(str_contains($rumpf, 'loadAttendanceList()'), 'Ohne Neuladen fehlt der Eintrag, den die Genehmigung anlegt');
+});
+
+test('Liste: entschuldigt ist keine Anwesenheit', function () {
+    $rumpf = ptFunktion('renderAttendanceList');
+    assertTrue(str_contains($rumpf, "member.status === 'excused'"),
+        'Bis 1.12.0 zeigte die Liste jeden Eintrag als anwesend');
+});
