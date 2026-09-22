@@ -556,6 +556,8 @@ Vorlage für die Struktur sind die drei Dateien, mit denen der Import zuletzt ge
 | RT-8 | RT-7 mit einer Terminart, die im Ziel **nicht** existiert | Fehlerzeile „Unknown appointment type …"; kein Termin, keine Terminart angelegt |
 | RT-9 | `extract_appointments` auf dieselbe Datei | Liefert nur `suggestions`; die Terminliste ist danach **unverändert** |
 | RT-10 | Verschobener Termin: Startzeit im Ziel um 3 h ändern, dann reimportieren | Weder exakter Treffer noch Toleranzfenster greifen → Fehlerzeile. Bewusst so; siehe Restrisiko in OI-24 |
+| RT-11 | Serientermin (Terminserie, 1.11.0) exportieren, Titel oder Ort in der CSV ändern, reimportieren (seit 1.12.0, OI-75) | Termin übernimmt die Werte und ist aus der Serie **abgelöst**; eine anschließende Serienänderung „Dieser und alle folgenden“ lässt ihn unverändert |
+| RT-12 | Denselben Serientermin unverändert reimportieren | Termin bleibt Teil der Serie — ein Reimport gleicher Werte löst nicht ab (automatisiert: `import_series_api`) |
 
 ---
 
@@ -1165,6 +1167,16 @@ Automatisiert: `php tests/run.php worktime_frontend` (statische Gegenproben) und
 | MF-3a | Nacheinander jede Tätigkeit wählen | Die Kennzahlen der einzelnen Tätigkeiten ergeben zusammen die Werte ohne Filter |
 | MF-4 | Jahr wechseln, danach den Filter aufklappen | Auswahl passt zum neuen Jahr, ausgetretene Mitglieder tragen „(inaktiv)" |
 | MF-5 | Als Manager statt Admin | Gleiches Verhalten; als einfaches Mitglied ist der Filter gar nicht sichtbar |
+
+### Tabelle der Zeiterfassung (Dashboard, seit 1.12.0)
+
+OI-10. Automatisiert: `worktime_frontend` (Klasse, Spaltenregeln).
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| ZT-1 | Zeiterfassung bei 1280 px Fensterbreite | Beginn, Dauer und Status je auf **einer** Zeile; die Tabelle lässt sich waagerecht rollen |
+| ZT-2 | Waagerecht bis zum Anfang rollen | Die Spalte „Aktionen“ bleibt am rechten Rand stehen, Freigeben ist ohne Zurückrollen möglich; keine Zeileninhalte scheinen neben ihr durch |
+| ZT-3 | Fenster breiter als etwa 1400 px | Kein Rollbalken, Darstellung wie bisher |
 
 ### Verlauf der Check-in-PWA
 
