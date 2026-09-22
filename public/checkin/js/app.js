@@ -2543,6 +2543,76 @@ async function loadHistory() {
 }
 
 // Rendert History-Liste
+/**
+ * Gemeinsamer Aufbau aller Verlaufseintraege (seit 1.12.0), angelehnt an die
+ * Karten im Tab „Termine“: Kopf mit Titel links und Zeitpunkt rechts, darunter
+ * Terminart oder Dauer links und ein Status-Chip rechts. Der farbige Rand
+ * traegt die Terminfarbe bzw. die Farbe der Taetigkeit -- dieselbe Bedeutung
+ * wie im Nachbartab. Der Status steht allein im Chip.
+ *
+ * Maskiert wird hier, nicht beim Aufrufer: title, when, meta und chip.text
+ * sind Klartext. Nur extraHtml und actionHtml sind fertiges Markup.
+ *
+ * @param {object} p
+ * @param {string} p.icon       Art des Eintrags (📍 📋 ⏱️ 🆕)
+ * @param {string} p.title
+ * @param {string} p.when       Zeitpunkt, bereits formatiert
+ * @param {?string} p.color     Randfarbe aus der Datenbank, wird geprueft
+ * @param {?string} p.metaDotColor Farbpunkt vor meta, wird geprueft
+ * @param {string} p.meta       Terminart oder Dauer, darf leer sein
+ * @param {?{cls: string, text: string}} p.chip Status; cls ist ein response-chip--*-Suffix
+ * @param {string} [p.extraHtml]
+ * @param {string} [p.actionHtml]
+ */
+function historyCardHtml(p) {
+    // Punkt nur mit Namen daneben -- ohne Terminart stuende er allein da
+    const dot = p.metaDotColor && p.meta ? activityDot(p.metaDotColor) : '';
+    const chip = p.chip
+        ? `<span class="response-chip response-chip--${p.chip.cls}">${escapeHtml(p.chip.text)}</span>` : '';
+
+    return `
+        <div class="history-head">
+            <span class="history-title">${p.icon} ${escapeHtml(p.title)}</span>
+            <span class="history-when">${escapeHtml(p.when)}</span>
+        </div>
+        <div class="history-meta">
+            <span class="history-meta__text">${dot}${escapeHtml(p.meta || '')}</span>${chip}
+        </div>
+        ${p.extraHtml || ''}
+        ${p.actionHtml ? `<div class="history-actions">${p.actionHtml}</div>` : ''}`;
+}
+
+/** Legt einen Verlaufseintrag an; die Randfarbe nur als Hexwert. */
+function historyItem(color) {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.style.borderLeftColor = safeHexColor(color, '#95a5a6');
+    return item;
+}
+
+/**
+ * Terminart unter dem Titel -- nur, wenn sie etwas hinzufuegt. „Gesamtprobe“
+ * unter „Gesamtprobe“ ist dieselbe Zeile zweimal.
+ */
+function historyTypeMeta(title, typeName) {
+    if (!typeName) return '';
+    return String(typeName).trim().toLowerCase() === String(title || '').trim().toLowerCase()
+        ? '' : typeName;
+}
+
+/** Zeitpunkt aus 'YYYY-MM-DD HH:MM:SS' im Format der Terminkarten. */
+function historyWhen(mysqlDateTime, fallbackDate = null) {
+    if (mysqlDateTime) {
+        const [datum, zeit] = String(mysqlDateTime).split(' ');
+        return formatResponseCardHead(datum, zeit || '', null);
+    }
+    if (fallbackDate) {
+        // Ohne Uhrzeit (seit 1.5.0 moeglich): nur Wochentag und Datum
+        return formatResponseCardHead(fallbackDate, '', null).replace(/ · $/, '');
+    }
+    return '';
+}
+
 function renderHistory(items) {
     elements.historyList.innerHTML = '';
     
@@ -2635,33 +2705,24 @@ function activityDot(color) {
 }
 
 function addWorkSessionToHistory(session) {
-    const item = document.createElement('div');
     const laeuft = !session.end_time;
-
-    item.className = session.status === 'confirmed'
-        ? 'history-item verified'
-        : 'history-item pending';
-
-    const start = new Date(String(session.start_time).replace(' ', 'T'));
-    const dateStr = start.toLocaleDateString('de-DE', {
-        day: '2-digit', month: '2-digit', year: 'numeric'
-    });
-    const timeStr = start.toLocaleTimeString('de-DE', {
-        hour: '2-digit', minute: '2-digit'
-    });
+    const item = historyItem(session.color);
 
     const dauer = laeuft
-        ? 'läuft'
-        : `${session.duration_minutes} Min.`
+        ? ''
+        : formatMinutes(session.duration_minutes)
           + ((parseInt(session.break_minutes, 10) || 0) > 0
              ? ` · ${session.break_minutes} Min. Pause` : '');
 
     // Solange die Sitzung laeuft, sagt der Freigabestatus nichts: sie ist noch
     // nicht abgeschlossen. „läuft" allein ist die ehrlichere Auskunft.
-    const status = laeuft
-        ? ''
-        : `<span class="status ${session.status === 'confirmed' ? 'verified' : 'pending'}">`
-          + `${translateWorkSessionStatus(session.status)}</span>`;
+    const chip = laeuft
+        ? { cls: 'open', text: '⏱️ läuft' }
+        : ({
+            confirmed: { cls: 'yes',   text: '✓ bestätigt' },
+            submitted: { cls: 'maybe', text: '⏳ wartet auf Freigabe' },
+            rejected:  { cls: 'no',    text: '✗ abgelehnt' }
+          }[session.status] || { cls: 'muted', text: translateWorkSessionStatus(session.status) });
 
     const note = session.note
         ? `<div class="history-note">${escapeHtml(session.note)}</div>` : '';
@@ -2676,21 +2737,15 @@ function addWorkSessionToHistory(session) {
 
     worktimeHistorySessions[session.session_id] = session;
 
-    // Der Knopf sitzt rechts oben, nicht am Datum -- derselbe Platz, den der
-    // Loeschen-Knopf eines Antrags in derselben Liste einnimmt. has-correct
-    // haelt den Text von ihm frei.
-    if (korrigieren) {
-        item.className += ' has-correct';
-    }
-
-    item.innerHTML = `
-        <div class="time">⏱️ ${dateStr} ${timeStr}</div>
-        <div class="appointment">${activityDot(session.color)}${escapeHtml(session.activity_name || 'Tätigkeit')}</div>
-        <div class="history-duration">${escapeHtml(dauer)}</div>
-        ${note}
-        ${status}
-        ${korrigieren}
-    `;
+    item.innerHTML = historyCardHtml({
+        icon: '⏱️',
+        title: session.activity_name || 'Tätigkeit',
+        when: historyWhen(session.start_time),
+        meta: dauer,
+        chip,
+        extraHtml: note,
+        actionHtml: korrigieren
+    });
 
     elements.historyList.appendChild(item);
 }
@@ -2939,46 +2994,24 @@ window.openWorkSessionModal = openWorkSessionModal;
 
 // Fügt Record zur History hinzu
 function addRecordToHistory(record) {
-    const item = document.createElement('div');
-    item.className = 'history-item verified';    
-    
+    const item = historyItem(getTypeColor(record.appointment_type_name));
+
     // Seit 1.5.0 kann eine Ankunftszeit fehlen — ein Eintrag, den jemand ohne
-    // Uhrzeit nachgetragen hat. Das Datum steht dann am Termin, die Uhrzeit
-    // entfällt. Ohne diese Unterscheidung stünde hier "Invalid Date".
-    const arrivalTime = record.arrival_time ? new Date(record.arrival_time) : null;
-    const fallbackDate = record.date ? new Date(record.date + 'T00:00:00') : null;
-    const shownDate = arrivalTime ?? fallbackDate;
+    // Uhrzeit nachgetragen hat. Dann steht nur das Datum des Termins da.
+    const chip = {
+        present: { cls: 'yes', text: '✓ anwesend' },
+        excused: { cls: 'no',  text: '✗ entschuldigt' }
+    }[record.status] || { cls: 'muted', text: translateStatus(record.status) };
 
-    const dateStr = shownDate
-        ? shownDate.toLocaleDateString('de-DE', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        })
-        : '';
-    const timeStr = arrivalTime
-        ? arrivalTime.toLocaleTimeString('de-DE', {
-            hour: '2-digit',
-            minute: '2-digit'
-        })
-        : '';
+    item.innerHTML = historyCardHtml({
+        icon: '📍',
+        title: record.title,
+        when: historyWhen(record.arrival_time, record.date),
+        meta: historyTypeMeta(record.title, record.appointment_type_name),
+        metaDotColor: record.appointment_type_name ? getTypeColor(record.appointment_type_name) : null,
+        chip
+    });
 
-    const statusText = translateStatus(record.status);
-
-    // Appointment Type Badge hinzufügen (falls vorhanden)
-    let typeBadge = '';
-    if (record.appointment_type_name) {
-        const color = getTypeColor(record.appointment_type_name);
-        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${escapeHtml(record.appointment_type_name)}</span>`;
-    }
-    
-    item.innerHTML = `
-        <div class="time">📍 ${dateStr} ${timeStr}</div>
-        <div class="appointment">${escapeHtml(record.title)}</div>
-        <span class="status verified">✓ ${statusText}</span>
-        ${typeBadge}
-    `;
-    
     elements.historyList.appendChild(item);
 }
 
@@ -3008,44 +3041,43 @@ function exceptionHistoryLabel(exception) {
 
 // Fügt Exception zur History hinzu
 function addExceptionToHistory(exception) {
-    const item = document.createElement('div');
+    const item = historyItem(getTypeColor(exception.appointment_type_name));
+    const absence = exception.exception_type === 'absence';
 
-    const canDelete = exception.status === 'pending';
-    item.className = canDelete ? 'history-item pending has-delete' : 'history-item pending';
-    
-    const createdAt = new Date(exception.created_at);
-    const dateStr = createdAt.toLocaleDateString('de-DE', { 
-        day: '2-digit', 
-        month: '2-digit',
-        year: 'numeric'
-    });
-    const timeStr = createdAt.toLocaleTimeString('de-DE', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
-    
-    const antragText = exceptionHistoryLabel(exception);
+    // Dieselben Worte und Farben wie der Chip an der Infokarte im Tab
+    // „Termine“ -- derselbe Antrag sieht in beiden Tabs gleich aus.
+    const chip = (absence ? {
+        pending:  { cls: 'maybe', text: '⏳ Entschuldigung beantragt' },
+        approved: { cls: 'no',    text: '✗ entschuldigt' },
+        rejected: { cls: 'muted', text: 'Entschuldigung abgelehnt' }
+    } : {
+        pending:  { cls: 'maybe', text: '⏳ Zeitantrag offen' },
+        approved: { cls: 'yes',   text: '✓ Zeit bestätigt' },
+        rejected: { cls: 'muted', text: 'Zeitantrag abgelehnt' }
+    })[exception.status] || { cls: 'muted', text: exceptionHistoryLabel(exception) };
 
-    // Appointment Type Badge hinzufügen (falls vorhanden)
-    let typeBadge = '';
-    if (exception.appointment_type_name) {
-        const color = getTypeColor(exception.appointment_type_name);
-        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${escapeHtml(exception.appointment_type_name)}</span>`;
-    }
+    // Zeitpunkt des Termins, nicht des Antrags: „Entschuldigung beantragt“
+    // gehoert zu „Gesamtprobe Fr 25.09.“, nicht zum Moment des Tippens.
+    const when = exception.appointment_date
+        ? formatResponseCardHead(exception.appointment_date,
+              exception.appointment_start_time || exception.appointment_start || '', null)
+        : historyWhen(exception.created_at);
 
-    // Delete-Button nur bei pending
-    const deleteBtn = canDelete 
-        ? `<button class="delete-btn" onclick="deleteException(${exception.exception_id})">🗑️ Löschen</button>`
+    // Loeschen nur, solange der Antrag offen ist
+    const deleteBtn = exception.status === 'pending'
+        ? `<button class="delete-btn" onclick="deleteException(${Number(exception.exception_id)})">🗑️ Löschen</button>`
         : '';
-    
-    item.innerHTML = `        
-        <div class="time">📋 ${dateStr} ${timeStr} ${deleteBtn}</div>
-        <div class="appointment">${escapeHtml(exception.appointment_title)}</div>
-        <span class="status pending">${antragText}</span>
-        ${typeBadge}
-        
-    `;
-    
+
+    item.innerHTML = historyCardHtml({
+        icon: '📋',
+        title: exception.appointment_title,
+        when,
+        meta: historyTypeMeta(exception.appointment_title, exception.appointment_type_name),
+        metaDotColor: exception.appointment_type_name ? getTypeColor(exception.appointment_type_name) : null,
+        chip,
+        actionHtml: deleteBtn
+    });
+
     elements.historyList.appendChild(item);
 }
 
@@ -3201,46 +3233,6 @@ async function submitConfirmDelete() {
 
     deleteExceptionId = null;
     elements.confirmDeleteModal.classList.remove('active');
-}
-
-
-// Fügt neuen Eintrag nach Check-in hinzu (prepend)
-function addNewActivityToHistory(data) {
-    // Erstelle temporären Eintrag für sofortiges Feedback
-    const item = document.createElement('div');
-    item.className = data.pending ? 'history-item pending' : 'history-item verified';
-    
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('de-DE', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
-
-    // Appointment Type Badge hinzufügen (falls vorhanden)
-    let typeBadge = '';
-    if (data.appointment_type_name) {
-        const color = getTypeColor(data.appointment_type_name);
-        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${escapeHtml(data.appointment_type_name)}</span>`;
-    }
-    
-    const statusBadge = data.pending 
-        ? '<span class="status pending">⏳ Antrag ausstehend</span>'
-        : '<span class="status verified">✓ Verifiziert</span>';
-    
-    item.innerHTML = `
-        <div class="time">🆕 Gerade eben (${timeStr})</div>
-        <div class="appointment">${escapeHtml(data.appointment?.title || 'Unbekannter Termin')}</div>
-        ${statusBadge}
-        ${typeBadge}
-    `;
-    
-    // Füge am Anfang ein
-    elements.historyList.insertBefore(item, elements.historyList.firstChild);
-    
-    // Begrenze auf 10 Einträge
-    while (elements.historyList.children.length > 10) {
-        elements.historyList.removeChild(elements.historyList.lastChild);
-    }
 }
 
 // ========================================

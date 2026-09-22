@@ -83,3 +83,21 @@ test('Klicks der Infokarte laufen nicht in die Logik der Rueckmeldekarte', funct
     assertTrue($weiche !== false && $details !== false && $weiche < $details,
         'Die Infokarte hat kein .response-comment-details -- die Weiche muss davor stehen');
 });
+
+// Verlauf im Aufbau der Terminkarten (seit 1.12.0)
+
+test('Verlauf: alle Eintragsarten laufen durch historyCardHtml', function () {
+    foreach (['addRecordToHistory', 'addExceptionToHistory', 'addWorkSessionToHistory'] as $funktion) {
+        assertTrue(str_contains(ptFunktion($funktion), 'historyCardHtml('),
+            "{$funktion}() baut sein Markup selbst -- Aufbau und Maskierung laufen dann auseinander");
+    }
+});
+
+test('Verlauf: historyCardHtml maskiert Titel, Zeitpunkt, Meta und Chip', function () {
+    $rumpf = ptFunktion('historyCardHtml');
+    foreach (['escapeHtml(p.title)', 'escapeHtml(p.when)', "escapeHtml(p.meta || '')", 'escapeHtml(p.chip.text)'] as $stelle) {
+        assertTrue(str_contains($rumpf, $stelle), "historyCardHtml() setzt ungeschuetzt ein: {$stelle}");
+    }
+    assertTrue(str_contains(ptFunktion('historyItem'), 'safeHexColor('),
+        'Die Randfarbe kommt aus der Datenbank und muss ein Hexwert sein');
+});

@@ -957,13 +957,55 @@ body {
     margin-top: 2px;
 }
 
-/* Border Farben je nach Status */
-.history-item.verified {
-    border-left-color: var(--success);
+/* Aufbau wie die Karten im Tab „Termine“ (seit 1.12.0): Der Rand traegt die
+   Terminfarbe (per style gesetzt, historyItem()), der Status steht allein im
+   Chip. Frueher hiess derselbe Rand hier „Status“ und dort „Terminart“. */
+.history-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
 }
 
-.history-item.pending {
-    border-left-color: var(--warning);
+.history-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.history-when {
+    font-size: 12px;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+.history-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+/* Der Chip steht immer rechts, auch ohne Terminart links */
+.history-meta .response-chip {
+    margin-left: auto;
+}
+
+.history-meta__text {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.history-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 6px;
 }
 
 /* Time Display */
@@ -1014,9 +1056,6 @@ body {
 
 /* Delete Button für pending Items */
 .history-item .delete-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
     background: rgba(231, 76, 60, 0.1);
     color: var(--error);
     border: 1px solid rgba(231, 76, 60, 0.3);
@@ -1036,11 +1075,6 @@ body {
 
 .history-item .delete-btn:active {
     transform: scale(0.95);
-}
-
-/* Mehr Padding rechts wenn Delete-Button da ist */
-.history-item.has-delete {
-    padding-right: 80px;
 }
 
 /* Leere History Message */
@@ -1924,10 +1958,6 @@ body {
     }
     
     
-    .history-item.has-delete {
-        padding-right: 70px;
-    }
-    
     .history-item .delete-btn {
         font-size: 10px;
         padding: 3px 6px;
@@ -2375,12 +2405,9 @@ body {
 }
 
 /* Dieselbe Form wie der Loeschen-Knopf eines Antrags, nur in Blau: Beide sind
-   Aktionen am Verlaufseintrag und gehoeren an denselben Platz. Rot bleibt dem
-   Loeschen vorbehalten -- Korrigieren zerstoert nichts. */
+   Aktionen am Verlaufseintrag und stehen in .history-actions unten rechts. Rot
+   bleibt dem Loeschen vorbehalten -- Korrigieren zerstoert nichts. */
 .history-item .history-correct-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
     background: rgba(31, 95, 191, 0.1);
     color: var(--primary-color);
     border: 1px solid rgba(31, 95, 191, 0.3);
@@ -2400,11 +2427,6 @@ body {
 
 .history-item .history-correct-btn:active {
     transform: scale(0.95);
-}
-
-/* „Korrigieren" ist breiter als „Loeschen", darum mehr Platz als has-delete. */
-.history-item.has-correct {
-    padding-right: 100px;
 }
 
 /* Sechs Felder passen auf ein kurzes Display nicht mehr ins Bild. Ohne diese
@@ -2590,7 +2612,10 @@ details.response-card > .response-card__summary .response-card__meta::after {
     color: var(--text-light);
 }
 
-details.response-card--info > .response-card__summary .response-card__meta::after {
+/* Nur ohne Chip: Der Chip traegt margin-left: auto selbst, zwei auto-Raender
+   teilten den freien Platz und setzten ihn in die Mitte (seit 1.12.0 kann
+   eine Infokarte einen Chip tragen). */
+details.response-card--info > .response-card__summary .response-card__meta:not(:has(.response-chip))::after {
     margin-left: auto;
 }
 
