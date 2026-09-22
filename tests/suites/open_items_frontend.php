@@ -25,11 +25,16 @@ test('Dashboard: Profil laedt die offenen Punkte', function () use ($root) {
     $profil = strpos($html, 'id="profil"');
     $karte  = strpos($html, 'id="openItemsCard"');
     $konto  = strpos($html, 'Account-Informationen');
+    assertTrue($profil !== false, 'id="profil" fehlt in index.html');
+    assertTrue($karte !== false, 'id="openItemsCard" fehlt in index.html');
+    assertTrue($konto !== false, 'Account-Informationen fehlt in index.html');
     assertTrue($profil < $karte && $karte < $konto, 'Die Karte steht nicht als erste Karte in #profil');
 
     assertTrue(str_contains($profile, 'loadOpenItems('), 'loadProfile() ruft loadOpenItems() nicht auf');
     assertTrue(str_contains($module, "apiCall('my_open_items'"), 'open_items.js fragt my_open_items nicht ab');
-    assertTrue(str_contains($module, 'escapeHtml('), 'open_items.js maskiert nicht');
+    assertTrue(str_contains($module, 'escapeHtml(item.title)'), 'open_items.js maskiert den Titel nicht');
+    assertTrue(str_contains($module, 'escapeHtml(item.activity_name)'), 'open_items.js maskiert die Taetigkeit nicht');
+    assertTrue(str_contains($module, 'Array.isArray(data.items)'), 'open_items.js prueft die Antwortform nicht ab');
     assertTrue(str_contains($module, 'Nichts offen'), 'Leerer Zustand fehlt');
 });
 

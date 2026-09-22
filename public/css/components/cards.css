@@ -100,7 +100,12 @@
 }
 
 .open-item:hover {
-    background: var(--bg-light);
+    border-color: var(--primary-color);
+}
+
+.open-item:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
 }
 
 .open-item__title {

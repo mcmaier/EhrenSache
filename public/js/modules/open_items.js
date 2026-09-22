@@ -24,8 +24,9 @@ const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 /** 'YYYY-MM-DD' oder 'YYYY-MM-DD HH:MM:SS' -> 'Do 25.09.' bzw. 'Do 25.09. 19:30' */
 function formatWhen(dateStr, timeStr = '') {
     const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
     const day = `${WEEKDAYS[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
-    const time = String(timeStr).slice(0, 5);
+    const time = escapeHtml(String(timeStr).slice(0, 5));
     return time ? `${day} ${time}` : day;
 }
 
@@ -79,6 +80,7 @@ function onListClick(event) {
 }
 
 let bound = false;
+let loadSeq = 0;
 
 export async function loadOpenItems() {
     const card = document.getElementById('openItemsCard');
@@ -95,14 +97,30 @@ export async function loadOpenItems() {
         bound = true;
     }
 
-    const data = await apiCall('my_open_items');
-    if (!data || data.member === false) {
-        card.hidden = true;
-        return;
-    }
+    const seq = ++loadSeq;
 
-    card.hidden = false;
-    list.innerHTML = data.items.length === 0
-        ? '<p class="open-items-empty">Nichts offen ✓</p>'
-        : data.items.map(itemHtml).join('');
+    try {
+        // apiCall() liefert bei 401 null, sonst bei Fehlern (403, 500,
+        // Netzwerk/Timeout) ein Objekt ohne `items` -- daher der explizite
+        // Array-Check statt eines Felds wie `success`, das eine erfolgreiche
+        // Antwort gar nicht traegt.
+        const data = await apiCall('my_open_items');
+
+        // Waehrenddessen wurde ein neuerer Abruf gestartet: diese Antwort
+        // ist ueberholt und darf die Karte nicht mehr anfassen.
+        if (seq !== loadSeq) return;
+
+        if (!data || data.member === false || !Array.isArray(data.items)) {
+            card.hidden = true;
+            return;
+        }
+
+        card.hidden = false;
+        list.innerHTML = data.items.length === 0
+            ? '<p class="open-items-empty">Nichts offen ✓</p>'
+            : data.items.map(itemHtml).join('');
+    } catch (error) {
+        if (seq !== loadSeq) return;
+        card.hidden = true;
+    }
 }
