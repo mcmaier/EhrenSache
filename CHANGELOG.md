@@ -28,6 +28,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   stehen. Ein Klick darauf zeigte dessen Einträge wieder an. Für Admins und Manager heißt die
   Leermeldung der Mitgliederliste außerdem „Keine Mitglieder für diese Auswahl“ statt
   „Kein Profil verknüpft“ (OI-84).
+- **Zeitanträge gibt es nur noch für Ankünfte, die schon stattgefunden haben.** Der
+  „Nachträgliche Antrag“ der PWA bot auch künftige Termine an, und der Server nahm dafür jede
+  Wunschzeit im Fenster des Termins an. Wurde so ein Antrag genehmigt, entstand eine Anwesenheit
+  für einen Termin, der noch gar nicht stattgefunden hatte. Jetzt weist der Server einen
+  Zeitantrag ab, solange das Check-in-Fenster des Termins nicht begonnen hat oder die Wunschzeit
+  nach jetzt liegt. Die PWA bietet solche Termine nicht mehr an. Entschuldigungen im Voraus
+  bleiben erlaubt. Ablehnen lässt sich ein Zeitantrag jetzt immer, auch wenn sein Termin
+  inzwischen verschoben wurde (OI-82).
 - **Tests:** Die Suite `appointment_series_api` setzt das Bundesland nach ihren Tests auf den
   vorigen Wert zurück statt auf leer – ein Testlauf ließ den Demo-Bestand sonst ohne
   Landesfeiertage zurück.

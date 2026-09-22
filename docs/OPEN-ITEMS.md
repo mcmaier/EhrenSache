@@ -21,18 +21,13 @@ oder noch nicht gebaut.
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
 *mittel* = sollte vor der Freigabe an Vereine gelöst sein · *niedrig* = Verbesserung
 
-**Nächste Umsetzung (Stand 2026-09-22, aus dem Test vom 21.09.):** zuerst die drei
-Fehlerkorrekturen, klein genug für ein gemeinsames Patch-Release —
-1. [OI-83](#oi-83--arbeitszeit-mit-ortsnachweis-ohne-kamera-nicht-startbar): Zeiterfassung mit
-   Ortsnachweis ohne Kamera. Sie blockiert eine Kernfunktion auf betroffenen Geräten, die
-   Korrektur betrifft nur die PWA.
-2. [OI-84](#oi-84--leeres-filterergebnis-lässt-die-alte-paginierung-stehen): alte Paginierung bei
-   leerem Filterergebnis. Sie zeigt Verwaltern falsche Daten, betroffen sind drei Module, jeweils
-   derselbe Zweig.
-3. [OI-82](#oi-82--nachträglicher-zeitantrag-auch-für-termine-in-der-zukunft): Zeitantrag für
-   künftige Termine. Nötig sind eine Serverprüfung mit Test und der PWA-Filter.
+**Nächste Umsetzung (Stand 2026-09-22, aus dem Test vom 21.09.):** Die drei Fehlerkorrekturen
+[OI-83](#oi-83--arbeitszeit-mit-ortsnachweis-ohne-kamera-nicht-startbar),
+[OI-84](#oi-84--leeres-filterergebnis-lässt-die-alte-paginierung-stehen) und
+[OI-82](#oi-82--nachträglicher-zeitantrag-auch-für-termine-in-der-zukunft) sind am selben Tag auf
+`dev` erledigt und warten auf ein gemeinsames Patch-Release.
 
-Danach die Verbesserungen [OI-86](#oi-86--bunte-status-filterknöpfe-nur-in-der-benutzerverwaltung)
+Als Nächstes die Verbesserungen [OI-86](#oi-86--bunte-status-filterknöpfe-nur-in-der-benutzerverwaltung)
 (Komponente, klein) und [OI-85](#oi-85--keine-ladeanzeige-und-kein-timeout-bei-langsamen-api-antworten)
 (braucht vorher die Entscheidung zur Timeout-Meldung bei Mutationen). Wie jeder Eintrag hier gilt
 auch diese Liste nur bis zur Prüfung gegen den Code.
@@ -3200,7 +3195,14 @@ länger bestehenden Fall bei gewöhnlichen Einzelterminen mit erledigen, der hie
 ---
 
 ### OI-82 · Nachträglicher Zeitantrag auch für Termine in der Zukunft
-**Priorität:** mittel · aufgenommen am 2026-09-22 (Test vom 21.09.)
+**Priorität:** erledigt am 2026-09-22 — `95141c4`. Server: `timeCorrectionTooEarly()` in
+`private/helpers/utils.php`, gilt für `POST` und `PUT`. Verglichen wird mit der Uhr der
+Datenbank, mit 5 Minuten Spielraum für die Uhr des Telefons. PWA: Terminliste und Ankunftszeit
+enden bei jetzt. Entschieden: Auch die Genehmigung eines Altbestands wird abgewiesen, die
+Ablehnung nie. Die Ausnahme fürs Ablehnen gilt auch an der vorhandenen Fensterprüfung: Ein
+Antrag zu einem verschobenen Termin ließ sich vorher gar nicht mehr bescheiden. Drei neue Tests
+in `arrival_api` scheitern ohne die Korrektur. Die PWA ist im Browser geprüft (M002: drei
+künftige Termine nicht mehr angeboten).
 
 Der Dialog „Nachträglicher Antrag“ der Check-in-PWA bietet Termine der letzten drei Tage **und
 alle künftigen** an. `loadAppointments()` in `public/checkin/js/app.js` (~Zeile 2248) filtert
@@ -3291,7 +3293,7 @@ Mitglieder: dasselbe, mit „Keine Mitglieder für diese Auswahl“. Anträge: I
 20, also keine Paginierung. Der leere Zweig läuft dort trotzdem sauber durch. Weil im Bestand
 jede Terminart und jede Gruppe Einträge hat, kam der leere Fall über eine Option zustande, die
 nur im Browser an die Auswahl angehängt wurde. Die Filterfunktion ist dieselbe. Die Frage nach
-den Dropdowns (unten) ist weiter offen.
+den Dropdowns (unten) ist geklärt.
 
 Gemeldet in der Anwesenheitsverwaltung: Wählt man eine Terminart ohne Einträge, bleibt die
 Paginierung beim alten Stand („von 196 Einträgen“). Erst die Wahl eines einzelnen Termins
@@ -3323,8 +3325,8 @@ Filter). Vorher im Browser nachstellen.
 Anträgen ist die gegenseitige Filterung seit der Spec `2026-04-15-dropdown-cross-filtering-design.md`
 gebaut (`getCompatibleAppointments()`/`getCompatibleMembers()` in `utils.js`). In der
 Filterleiste filtert die Terminart die Listen für Termin und Mitglied, und die Wahl von Termin
-oder Mitglied sperrt die beiden anderen Felder. Ein offener Fehler dazu ist nicht bekannt — was
-genau gemeint war, ist noch zu klären.
+oder Mitglied sperrt die beiden anderen Felder. **Geklärt am 2026-09-22:** Gemeint war der
+frühe Stand der Modals vor dieser Spec. Er ist behoben.
 
 **Nicht sicherheitsrelevant:** reine Anzeige, die angezeigten Einträge liegen ohnehin im Cache
 der Sitzung.
