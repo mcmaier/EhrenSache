@@ -1473,3 +1473,47 @@ test('Infokarte: ein heute begonnener Termin traegt started (1.12.0)', function 
         rsDropWorld($info);
     }
 });
+
+test('attendance_list traegt offene Antraege je Mitglied (1.12.0)', function () {
+    $welt = rsWorld('ListeAntraege');
+    try {
+        $tag = rsDateInDays(-2);
+        $apt = rsAppointment($welt, $tag, '19:00:00');
+        $admin = apiToken('admin');
+
+        $zeile = static function () use ($admin, $apt, $welt): array {
+            $res = apiRequest('GET', 'attendance_list', ['token' => $admin, 'query' => ['appointment_id' => $apt]]);
+            assertStatus(200, $res);
+            foreach ($res['body']['members'] as $m) {
+                if ((int) $m['member_id'] === (int) $welt['member']) return $m;
+            }
+            throw new RuntimeException('Mitglied der Welt fehlt in der Liste');
+        };
+
+        assertSame([], $zeile()['pending_exceptions'], 'Ohne Antrag keine offenen Antraege');
+
+        $absage = apiRequest('POST', 'exceptions', ['token' => $admin, 'body' => [
+            'member_id' => $welt['member'], 'appointment_id' => $apt,
+            'exception_type' => 'absence', 'reason' => 'AL-Test', 'status' => 'pending']]);
+        assertStatus(201, $absage);
+        $zeit = apiRequest('POST', 'exceptions', ['token' => $admin, 'body' => [
+            'member_id' => $welt['member'], 'appointment_id' => $apt,
+            'exception_type' => 'time_correction', 'reason' => 'AL-Test',
+            'requested_arrival_time' => "{$tag} 19:05:00", 'status' => 'pending']]);
+        assertStatus(201, $zeit);
+
+        $offen = $zeile()['pending_exceptions'];
+        assertSame(2, count($offen), 'Beide offenen Antraege gehoeren in die Zeile');
+        assertSame(['absence', 'time_correction'], array_column($offen, 'exception_type'));
+        assertSame('AL-Test', $offen[0]['reason']);
+
+        // Genehmigt verschwindet der Antrag aus der Liste, der Status traegt ihn
+        assertStatus(200, apiRequest('PUT', 'exceptions', ['token' => $admin,
+            'query' => ['id' => (int) $absage['body']['id']], 'body' => ['status' => 'approved']]));
+        $danach = $zeile();
+        assertSame(['time_correction'], array_column($danach['pending_exceptions'], 'exception_type'));
+        assertSame('excused', $danach['status'], 'Eine genehmigte Entschuldigung zeigt sich als entschuldigt');
+    } finally {
+        rsDropWorld($welt);
+    }
+});

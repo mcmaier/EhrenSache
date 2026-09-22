@@ -121,6 +121,33 @@ function handleAttendanceList($db, $database, $method, $id) {
         // genau daran fehlte die Gliederung nach Register bis 1.8.0.
         $members = groupsAttachToMembers($db, $database, $members, $group_ids);
 
+        // Offene Antraege je Mitglied (seit 1.12.0): Die PWA laesst Admin und
+        // Manager sie live in der Liste bescheiden. Nur offene -- genehmigte
+        // zeigen sich im Status der Anwesenheit, abgelehnte haben hier nichts
+        // mehr zu suchen. Die Liste ist Verwaltern vorbehalten (Pruefung oben).
+        $pendingStmt = $db->prepare("
+            SELECT exception_id, member_id, exception_type, reason, requested_arrival_time
+            FROM {$prefix}exceptions
+            WHERE appointment_id = ? AND status = 'pending'
+            ORDER BY exception_id
+        ");
+        $pendingStmt->execute([$appointment_id]);
+
+        $pendingByMember = [];
+        foreach ($pendingStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $pendingByMember[(int) $row['member_id']][] = [
+                'exception_id'           => (int) $row['exception_id'],
+                'exception_type'         => $row['exception_type'],
+                'reason'                 => $row['reason'],
+                'requested_arrival_time' => $row['requested_arrival_time'],
+            ];
+        }
+
+        foreach ($members as &$member) {
+            $member['pending_exceptions'] = $pendingByMember[(int) $member['member_id']] ?? [];
+        }
+        unset($member);
+
         echo json_encode([
             'appointment' => $appointment,
             'members' => $members
