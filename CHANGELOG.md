@@ -23,6 +23,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   HTTP ließ sich die Sitzung deshalb nicht starten. Jetzt steht neben Start und Stopp der Knopf
   „Code eingeben“ für den Code der Station. Scheitert die Kamera, öffnet sich die Eingabe von
   selbst (OI-83).
+- **Ein Filter ohne Treffer lässt keine alte Paginierung mehr stehen.** In Anwesenheiten,
+  Mitgliedern und Anträgen blieben die Seitenknöpfe und „von 196 Einträgen“ des vorigen Filters
+  stehen. Ein Klick darauf zeigte dessen Einträge wieder an. Für Admins und Manager heißt die
+  Leermeldung der Mitgliederliste außerdem „Keine Mitglieder für diese Auswahl“ statt
+  „Kein Profil verknüpft“ (OI-84).
 - **Tests:** Die Suite `appointment_series_api` setzt das Bundesland nach ihren Tests auf den
   vorigen Wert zurück statt auf leer – ein Testlauf ließ den Demo-Bestand sonst ohne
   Landesfeiertage zurück.

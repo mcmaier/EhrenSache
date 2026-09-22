@@ -3285,7 +3285,13 @@ eingegeben wird.
 ---
 
 ### OI-84 · Leeres Filterergebnis lässt die alte Paginierung stehen
-**Priorität:** mittel · aufgenommen am 2026-09-22 (Test vom 21.09., Live-System)
+**Priorität:** erledigt am 2026-09-22 — `500ad02`, im Browser als Admin geprüft. Anwesenheiten:
+von Seite 2 bei 942 Einträgen auf eine Terminart ohne Einträge, danach ist die Paginierung leer.
+Mitglieder: dasselbe, mit „Keine Mitglieder für diese Auswahl“. Anträge: Im Bestand gibt es nur
+20, also keine Paginierung. Der leere Zweig läuft dort trotzdem sauber durch. Weil im Bestand
+jede Terminart und jede Gruppe Einträge hat, kam der leere Fall über eine Option zustande, die
+nur im Browser an die Auswahl angehängt wurde. Die Filterfunktion ist dieselbe. Die Frage nach
+den Dropdowns (unten) ist weiter offen.
 
 Gemeldet in der Anwesenheitsverwaltung: Wählt man eine Terminart ohne Einträge, bleibt die
 Paginierung beim alten Stand („von 196 Einträgen“). Erst die Wahl eines einzelnen Termins
