@@ -87,6 +87,7 @@ function renderUsers(users, page = 1)
         tbody.innerHTML = '<tr><td colspan="5" class="loading">Keine Benutzer für diese Auswahl</td></tr>';
         // Sonst bleiben Seitenknöpfe der vorigen Liste stehen (OI-84)
         allFilteredUsers = [];
+        currentUsersPage = 1;
         renderUsersPagination(1, 0, 0);
         return;
     }
