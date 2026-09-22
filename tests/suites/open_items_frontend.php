@@ -76,6 +76,8 @@ test('PWA: Block laedt my_open_items, maskiert und blendet ohne Punkte aus', fun
     assertTrue($when !== false, 'openItemsWhen() fehlt');
     $whenBody = substr($js, $when, (int) strpos($js, "\n}", $when) - $when);
     assertTrue(str_contains($whenBody, 'escapeHtml('), 'openItemsWhen() maskiert die Zeit nicht');
+
+    assertTrue(str_contains($body, 'openItemsLastOpen'), 'loadOpenItems() merkt sich den Klappzustand nicht');
 });
 
 test('PWA: offene Punkte werden beim Zurueckkehren und beim Betreten von Erfassen nachgeladen', function () use ($root) {
@@ -83,6 +85,32 @@ test('PWA: offene Punkte werden beim Zurueckkehren und beim Betreten von Erfasse
     $enter = strpos($js, 'function enterCaptureTab(');
     $enterBody = substr($js, $enter, (int) strpos($js, "\n}", $enter) - $enter);
     assertTrue(str_contains($enterBody, 'loadOpenItems('), 'enterCaptureTab() laedt die offenen Punkte nicht');
-    assertTrue(preg_match("/visibilitychange[\\s\\S]{0,300}loadOpenItems\\(/", $js) === 1,
+    assertTrue(preg_match('/visibilitychange[\s\S]{0,600}loadOpenItems\(/', $js) === 1,
         'visibilitychange laedt die offenen Punkte nicht nach');
+    assertTrue(preg_match('/visibilitychange[\s\S]{0,600}data-tab="capture"/', $js) === 1,
+        'visibilitychange laedt auch nach, wenn ein anderer Tab aktiv ist');
+});
+
+test('PWA: offene Punkte laden nach einem Antrag und nach dem Beenden der Arbeitszeit nach', function () use ($root) {
+    $js = (string) file_get_contents($root . '/public/checkin/js/app.js');
+
+    $submit = strpos($js, 'async function submitException(');
+    assertTrue($submit !== false, 'submitException() fehlt');
+    $submitBody = substr($js, $submit, (int) strpos($js, "\n}", $submit) - $submit);
+    assertTrue(str_contains($submitBody, 'loadOpenItems('), 'submitException() laedt die offenen Punkte nicht nach');
+
+    $stop = strpos($js, "action: 'stop', note");
+    assertTrue($stop !== false, 'Die Funktion zum Beenden der Arbeitszeit fehlt');
+    $stopFnStart = strrpos(substr($js, 0, $stop), 'function ');
+    $stopBody = substr($js, $stopFnStart, (int) strpos($js, "\n}", $stop) - $stopFnStart);
+    assertTrue(str_contains($stopBody, 'loadOpenItems('), 'Das Beenden der Arbeitszeit laedt die offenen Punkte nicht nach');
+});
+
+test('PWA: der Klappzustand des Blocks wird bei Abmeldung zurueckgesetzt', function () use ($root) {
+    $js = (string) file_get_contents($root . '/public/checkin/js/app.js');
+    $reset = strpos($js, 'function resetSessionState(');
+    assertTrue($reset !== false, 'resetSessionState() fehlt');
+    $resetBody = substr($js, $reset, (int) strpos($js, "\n}", $reset) - $reset);
+    assertTrue(str_contains($resetBody, 'openItemsSeq++'), 'resetSessionState() verwirft eine unterwegs befindliche Antwort nicht');
+    assertTrue(str_contains($resetBody, "openItemsBlock.hidden = true"), 'resetSessionState() blendet den Block nicht aus');
 });

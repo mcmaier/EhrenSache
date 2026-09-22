@@ -1009,7 +1009,10 @@ function resetSessionState() {
     // Login entscheidet ueber loadOpenItems() neu, ob der Block erscheint.
     // openItemsSeq++ verwirft eine Antwort, die beim Abmelden noch unterwegs
     // war -- sonst koennten die Punkte des vorigen Mitglieds kurz aufblitzen.
+    // openItemsLastOpen = null: die naechste Anmeldung soll wieder frei
+    // entscheiden, ob sie beim ersten Erscheinen aufklappt.
     openItemsSeq++;
+    openItemsLastOpen = null;
     const openItemsBlock = document.getElementById('openItemsBlock');
     if (openItemsBlock) openItemsBlock.hidden = true;
 
@@ -1962,8 +1965,13 @@ function tick() {
 // nachhinkt.
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden && tickTimer) startTicker();
-    // Offene Punkte beim Zurueckkehren nachladen (FI-17, Regel aus OI-67).
-    if (!document.hidden) loadOpenItems();
+    // Offene Punkte beim Zurueckkehren nachladen (FI-17, Regel aus OI-67) --
+    // nur, wenn der Erfassen-Tab gerade der sichtbare ist; sonst steht der
+    // Block gar nicht im DOM-Ausschnitt, den man gerade ansieht.
+    if (!document.hidden
+        && document.querySelector('.tab-button[data-tab="capture"]')?.classList.contains('active')) {
+        loadOpenItems();
+    }
 });
 
 function updateClock() {
@@ -2639,8 +2647,11 @@ async function submitException() {
 
         if (data) {
             showMessage('✓ Antrag erfolgreich gestellt (wartet auf Genehmigung)', 'warning');
-            
+
             closeExceptionModal();
+            // Der Antrag ist selbst ein offener Punkt (FI-17); der Knopf dafuer
+            // sitzt im Erfassen-Tab, in dem der Block schon steht.
+            loadOpenItems();
         }
     } catch (error) {
         closeExceptionModal();
@@ -4108,6 +4119,12 @@ let openItemsBound = false;
 // kurz die Punkte des vorigen Mitglieds.
 let openItemsSeq = 0;
 
+// Letzte bekannte Zahl offener Rueckmeldungen. Ein Neuaufbau soll den Block
+// nicht wieder aufklappen, nur weil er neu geladen hat -- nur wenn er gerade
+// erst erscheint oder ein neuer offener Punkt dazugekommen ist. null vor dem
+// ersten Laden und nach Abmeldung (resetSessionState).
+let openItemsLastOpen = null;
+
 function openItemsWhen(dateStr, timeStr = '') {
     const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
     if (isNaN(d.getTime())) return '';
@@ -4199,10 +4216,16 @@ async function loadOpenItems() {
         }
 
         const { items, counts } = result.data;
+        const c = counts || { open: 0, pending: 0, rejected: 0 };
         list.innerHTML = items.map(openItemHtml).join('');
-        document.getElementById('openItemsSummary').textContent = openItemsSummaryText(counts);
-        // Aufgeklappt nur, wenn etwas zu tun ist -- eine offene Rueckmeldung.
-        block.open = counts.open > 0;
+        document.getElementById('openItemsSummary').textContent = openItemsSummaryText(c);
+        // Aufgeklappt nur beim ersten Erscheinen oder wenn mehr offene
+        // Rueckmeldungen dazugekommen sind -- ein blosser Neuaufbau soll ein
+        // vom Nutzer zugeklapptes Detail nicht wieder aufklappen.
+        if (block.hidden || openItemsLastOpen === null || c.open > openItemsLastOpen) {
+            block.open = c.open > 0;
+        }
+        openItemsLastOpen = c.open;
         block.hidden = false;
     } catch (error) {
         if (seq !== openItemsSeq) return;
