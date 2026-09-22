@@ -3487,5 +3487,20 @@ der PWA ist das seit 1.12.0 pauschal gesperrt. Vorgeschlagene Regel für beide O
 Die Gesamtliste zeigt den neuen Eintrag „entschuldigt“ erst nach bis zu 10 Minuten oder einem
 Neuladen. Eine Zeile, im selben Zug mitnehmen.
 
+**Abstimmung mit den parallelen Sitzungen (2026-09-22):**
+
+- **Reihenfolge:** (1) Merge der Filter-Chips (Spec `2026-09-22-filter-chips-design.md`), (2)
+  Schritt 1 von „Kalender → Anwesenheit“ (Spec `2026-09-22-kalender-anwesenheit-design.md`), (3)
+  OI-87, (4) Schritt 2 von „Kalender → Anwesenheit“ (Umbau von `attendance_list` auf einen
+  gemeinsamen Helfer — muss `pending_exceptions` unverändert liefern, das steht dort als Pflicht).
+- **Zähler offener Anträge:** kein Status-Chip — die Status-Chips einer Reihe schließen sich aus und
+  ergeben zusammen „Alle“, ein offener Antrag liegt quer dazu. Stattdessen ein eigener
+  Anzeige-Chip (`renderFilterChips(…, {static: true})`, Variante `pending`) hinter der Status-Reihe,
+  nach dem Muster `appointmentTimeChips`. **Offen:** ob er auch filtern soll („nur offene
+  Anträge“) — das wäre ein zweiter, unabhängiger Filter.
+- **Überschneidungen:** Die Filter-Chips schreiben `renderAttendanceList()` neu, lassen
+  `buildAttendanceRow()` und `saveException()` aber stehen. FI-17 (`exceptions.php` beim
+  Statuswechsel) ist noch nicht abgestimmt.
+
 **Nicht sicherheitsrelevant im Sinne von `SECURITY.md`:** Die Selbstgenehmigung ist eine bewusste,
 dokumentierte Regel (OI-3), keine Rechteausweitung.
