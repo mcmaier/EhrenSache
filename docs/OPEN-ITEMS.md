@@ -1201,7 +1201,7 @@ der Eintrag blieb stehen, obwohl die Sache erledigt war.
 ---
 
 ### OI-10 · Breite Tabelle in der Zeiterfassung
-**Priorität:** erledigt am 2026-09-22 — Branch `fix/oi-10-oi-75`, Wege 1 und 2 kombiniert.
+**Priorität:** erledigt am 2026-09-22 — mit 1.12.0 (Branch `fix/oi-10-oi-75`), Wege 1 und 2 kombiniert.
 `#worktimeTable` trägt `table-worktime` mit eigener Untergrenze `min-width: 1400px`
 (`public/css/components/tables.css`); Beginn, Dauer und Status tragen `cell-nowrap`
 (`renderWorkSessions()`). Gemessen mit 25 Zeilen aus dem Demo-Bestand und dem echten CSS: Die
@@ -3006,7 +3006,7 @@ dem Cache begründete; die Begründung hielt der Prüfung nicht stand.
 ---
 
 ### OI-75 · CSV-Import ändert Serientermine, ohne sie abzulösen
-**Priorität:** erledigt am 2026-09-22 — Branch `fix/oi-10-oi-75`. Entschieden: ablösen nur bei
+**Priorität:** erledigt am 2026-09-22 — mit 1.12.0 (Branch `fix/oi-10-oi-75`). Entschieden: ablösen nur bei
 tatsächlicher Änderung. `importAppointments()` vergleicht Titel, Beschreibung und, falls die Datei
 sie führt, Ort und Ende über `appointmentFieldsChanged()` (`private/helpers/appointment_rules.php`,
 dieselben Regeln wie `appointmentFieldChanged()` beim `PUT`) und setzt dann `is_detached = 1`. Ein

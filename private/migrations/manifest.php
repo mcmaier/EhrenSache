@@ -170,4 +170,10 @@ return [
         'file'     => '1.11.2.php',
         'function' => 'migrate_1_11_2',
     ],
+    [
+        'from'     => '1.11.3',
+        'to'       => '1.12.0',
+        'file'     => '1.11.3.php',
+        'function' => 'migrate_1_11_3',
+    ],
 ];

@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.12.0] – 2026-09-22
 
 ### Neu
 - **Entschuldigen in der Check-in-App auch bei Terminen ohne Rückmeldung.** Proben und
