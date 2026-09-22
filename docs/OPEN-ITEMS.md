@@ -1207,7 +1207,7 @@ der Eintrag blieb stehen, obwohl die Sache erledigt war.
 (`renderWorkSessions()`). Gemessen mit 25 Zeilen aus dem Demo-Bestand und dem echten CSS: Die
 Tabelle braucht ohne jeden Umbruch 1394 px, daher die 1400. Bei 1280 px Fensterbreite sinkt die
 mittlere Zeilenhöhe von 124 auf 82 px (höchste Zeile 162 → 85 px), dafür rollt die Tabelle
-waagerecht. Ab gut 1650 px Fensterbreite rollt nichts mehr. Der Status kam dazu, weil „wartet auf
+waagerecht. Ab etwa 1725 px Fensterbreite (Seitenleiste und Innenabstand kosten 325 px) rollt nichts mehr. Der Status kam dazu, weil „wartet auf
 Freigabe" ebenfalls umbrach. Test: `tests/suites/worktime_frontend.php`. **Bleibt offen:** Auf
 einem Notebook liegt die Spalte „Aktionen" jetzt außerhalb des sichtbaren Bereichs. Eine
 festgehaltene Aktionsspalte (`position: sticky`) wäre der nächste Schritt, falls das beim Freigeben
