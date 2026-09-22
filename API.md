@@ -2681,12 +2681,12 @@ bzw. `start_time` aufsteigend, dann alle `rejected` nach `decided_at` absteigend
     { "kind": "response", "state": "open", "appointment_id": 812,
       "title": "Gesamtprobe", "date": "2026-09-25", "start_time": "19:30:00",
       "deadline": "2026-09-24 19:30:00" },
-    { "kind": "exception", "state": "rejected", "id": 57, "exception_type": "absence",
-      "appointment_id": 790, "title": "Registerprobe", "date": "2026-09-18",
-      "start_time": "19:00:00", "decided_at": "2026-09-19 08:12:00" },
     { "kind": "work_session", "state": "pending", "id": 1402,
       "activity_name": "Notenarchiv", "start_time": "2026-09-20 10:00:00",
-      "duration_minutes": 135 }
+      "duration_minutes": 135 },
+    { "kind": "exception", "state": "rejected", "id": 57, "exception_type": "absence",
+      "appointment_id": 790, "title": "Registerprobe", "date": "2026-09-18",
+      "start_time": "19:00:00", "decided_at": "2026-09-19 08:12:00" }
   ],
   "counts": { "open": 1, "pending": 1, "rejected": 1 }
 }

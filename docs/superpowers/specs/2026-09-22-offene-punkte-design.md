@@ -145,6 +145,14 @@ Antrag liefe ins Leere. Der Verlauf lädt zusätzlich `status=rejected` und zeig
 Einträge, deren `approved_at` höchstens 14 Tage zurückliegt, mit dem Chip „abgelehnt".
 Abgelehnte Arbeitszeiten zeigt der Verlauf bereits.
 
+**Anheften offener Einträge (seit der Abschlussprüfung):** `loadHistory()` zeigt sonst nur die
+letzten 20 Einträge — ein wartender Antrag oder eine eingereichte Arbeitszeit könnte dabei
+herausfallen, obwohl der Block „Offene Punkte" genau dorthin verweist. Der Helfer
+`isOpenHistoryEntry()` markiert solche Einträge (wartender Antrag, eingereichte und beendete
+Arbeitszeit, oder eine erst kürzlich entschiedene Ablehnung), und `loadHistory()` rendert sie
+zusätzlich zu den letzten 20, in unveränderter zeitlicher Reihenfolge. Records zählen nie als
+offener Punkt.
+
 ### Neu laden
 
 - beim Start bzw. nach der Anmeldung;
@@ -195,14 +203,27 @@ Titel und Tätigkeitsnamen laufen durch `escapeHtml()`. Freitexte kommen in der 
 - „Gesehen"-Zustand für Ablehnungen.
 - Versand per E-Mail oder Push (FI-6).
 - Rückmeldung direkt aus der Übersicht.
-- Umstellung des Zählers am PWA-Tab „Termine" auf `my_open_items`. Die Fristregel steht damit
-  bewusst an zwei Stellen: im Server-Helfer und in `updateResponsesBadge()`.
+- Umstellung des Zählers am PWA-Tab „Termine" auf `my_open_items`. Der Zähler bleibt eine
+  eigene clientseitige Regel in `updateResponsesBadge()`; sie übernimmt seit der
+  Abschlussprüfung nur den 14-Tage-Horizont (`OPEN_ITEMS_RESPONSE_DAYS` in `app.js`), damit
+  Block und Zähler dieselbe Zahl zeigen. Die Fristregel steht damit weiterhin bewusst an zwei
+  Stellen: im Server-Helfer und in `updateResponsesBadge()`.
 
 ## Risiken
 
 - **Konflikte beim Merge** in `public/checkin/js/app.js` und `public/index.html`, falls parallel
   daran gearbeitet wird (angekündigt: Bedienkonzept für Filter). Eingriffe in `app.js` bleiben
   auf Block, Verlauf und Nachladepunkte beschränkt; vor dem Merge Abstimmung mit der
-  Release-Sitzung.
-- **Zwei Stellen für die Fristregel** (siehe oben). Laufen sie auseinander, zeigen Übersicht und
-  Zähler verschiedene Zahlen.
+  Release-Sitzung. Ebenso `CHANGELOG.md` (Abschnitt `[Unreleased]`, mehrere Vorhaben tragen dort
+  gleichzeitig ein) und `public/css/components/cards.css` (neue Regeln kommen ans Dateiende an;
+  zwei parallele Anhänge kollidieren höchstens in der Zeilennähe, nicht inhaltlich).
+- **Zwei Stellen für die Fristregel.** Beide wenden seit der Abschlussprüfung denselben
+  14-Tage-Horizont an (`OPEN_ITEMS_RESPONSE_DAYS` serverseitig und in `app.js`), die Regel selbst
+  lebt aber weiterhin an zwei Stellen. Ändert sich der Horizont künftig nur an einer, laufen
+  Übersicht und Zähler wieder auseinander.
+
+## Folgeschritt
+
+„Mein Profil" trägt inzwischen fünf Karten. Die geplante Umstellung auf „Mein Konto" mit
+Unterreitern (siehe `docs/OPEN-ITEMS.md` auf `dev`, Profil-Reiter bei FI-17) ist nicht Teil
+dieses Vorhabens.
