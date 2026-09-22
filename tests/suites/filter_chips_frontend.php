@@ -81,3 +81,18 @@ test('Ein verborgener Chip-Container bleibt verborgen', function () use ($fcCss)
     assertTrue(str_contains($fcCss, '.filter-chips[hidden]'),
         'Ohne .filter-chips[hidden] schluege display:flex das hidden');
 });
+
+test('Antraege: Chips statt Zaehlkarten und Status-Auswahl', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'antraege', 'statistik');
+    assertTrue(str_contains($bereich, 'id="exceptionStatusChips"'), 'Chip-Container fehlt');
+    assertTrue(str_contains($bereich, 'stats-grid stats-grid--chips'), 'Kopfzeile ohne stats-grid--chips');
+    foreach (['statPendingExceptions', 'statApprovedExceptions', 'filterExceptionStatus'] as $id) {
+        assertSame(0, substr_count($fcHtml, $id), $id . ' muss entfallen');
+    }
+    assertTrue(str_contains($bereich, 'id="exceptionYearFilter"'), 'Jahresfilter muss bleiben');
+
+    $js = fcModul($fcRoot, 'exceptions');
+    assertTrue(str_contains($js, 'CHIPS_EXCEPTIONS'), 'exceptions.js nutzt den Chipsatz nicht');
+    assertSame(0, substr_count($js, 'filterExceptionStatus'), 'exceptions.js liest noch das alte Auswahlfeld');
+    assertTrue(str_contains($js, 'setResetVisible'), 'Zuruecksetzen-Sichtbarkeit fehlt');
+});

@@ -17,6 +17,7 @@ import { loadTypes } from './management.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { escapeHtml } from './utils.js';
+import { CHIPS_EXCEPTIONS, countChips, filterByChip, renderFilterChips, setResetVisible } from './filter_chips.js';
 
 // ============================================
 // EXCEPTIONS
@@ -27,6 +28,9 @@ import { escapeHtml } from './utils.js';
 let currentExceptionsPage = 1;
 let exceptionsPerPage = 25;
 let allFilteredExceptions = [];
+
+// Aktiver Status-Chip (Spec 2026-09-22); ersetzt das fruehere Status-Auswahlfeld
+let exceptionStatusChip = 'all';
 
 // State für Cross-Filtering im Exception-Modal
 let _exceptionAllMembers = [];
@@ -68,7 +72,6 @@ export async function renderExceptions(exceptions, page = 1)
 
     if (!exceptions || (exceptions.length === 0)) {
         tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge gefunden</td></tr>';
-        updateExceptionStats([]);
         // Sonst bleiben Seitenknöpfe der vorigen Liste stehen (OI-84)
         allFilteredExceptions = [];
         renderExceptionsPagination(1, 0, 0);
@@ -80,8 +83,6 @@ export async function renderExceptions(exceptions, page = 1)
     // Alle Exceptions speichern für Pagination
     allFilteredExceptions = exceptions;
     currentExceptionsPage = page;
-    
-    updateExceptionStats(exceptions);
 
     // Pagination berechnen
     const totalExceptions = exceptions.length;
@@ -307,20 +308,6 @@ window.goToExceptionsPage = function(page) {
     }
 };
 
-function updateExceptionStats(exceptions){
-
-    debug.log("Update Exception Stats ()");
-    
-    if(exceptions !== null)
-    {
-        // Statistiken
-        const pending = exceptions.filter(e => e.status === 'pending').length;
-        const approved = exceptions.filter(e => e.status === 'approved').length;
-        document.getElementById('statPendingExceptions').textContent = pending;
-        document.getElementById('statApprovedExceptions').textContent = approved;
-    }
-}
-
 export function filterExceptions(exceptions, filters = {}) {
     debug.log("Filter Exceptions ()");
 
@@ -350,33 +337,39 @@ export async function applyExceptionFilters(forceReload = false, page = 1) {
 
     debug.log("Apply Exception Filters ()");
 
-    // Aktuelle Filter auslesen
-    const filters = {
-        exceptionStatus: document.getElementById('filterExceptionStatus')?.value || null,
-        exceptionType: document.getElementById('filterExceptionType')?.value || null,
-        //group: document.getElementById('filterGroup')?.value || null
-    };
+    const exceptionType = document.getElementById('filterExceptionType')?.value || null;
 
-    // Filtern
-    const filteredExceptions = filterExceptions(allExceptions, filters);
+    // Basis: alle uebrigen Filter. Darauf zaehlen die Chips (facettiert),
+    // erst danach filtert der aktive Chip die Tabelle.
+    const base = filterExceptions(allExceptions, { exceptionType });
+    renderFilterChips(
+        document.getElementById('exceptionStatusChips'),
+        CHIPS_EXCEPTIONS, countChips(base, CHIPS_EXCEPTIONS), exceptionStatusChip,
+        key => { exceptionStatusChip = key; applyExceptionFilters(false, 1); },
+        { label: 'Status der Anträge' }
+    );
+    setResetVisible(document.getElementById('resetExceptionFilter'),
+        Boolean(exceptionType) || exceptionStatusChip !== 'all');
 
-    debug.log("Filtering:", allExceptions, filteredExceptions, filters);
+    const filteredExceptions = filterByChip(base, CHIPS_EXCEPTIONS, exceptionStatusChip);
+
+    debug.log("Filtering:", allExceptions, filteredExceptions, exceptionType, exceptionStatusChip);
 
     // Rendern (nur wenn auf Exceptions-Section)
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'antraege') {
         renderExceptions(filteredExceptions, page);
-    } 
+    }
 }
 
 
 // Filter zurücksetzen
 export async function resetExceptionFilter() {
-    document.getElementById('filterExceptionType').value = '';
-    document.getElementById('filterExceptionStatus').value = '';
-
-    await showExceptionSection();
-}    
+    const typeEl = document.getElementById('filterExceptionType');
+    if (typeEl) typeEl.value = '';
+    exceptionStatusChip = 'all';
+    await applyExceptionFilters();
+}
 
 // ============================================
 // RENDER FUNCTIONS (DOM-Manipulation)
@@ -388,19 +381,13 @@ export async function initExceptionEventHandlers() {
     debug.log("Init Exception Event Handlers ()");
 
     // Filter-Änderungen
-    document.getElementById('filterExceptionStatus')?.addEventListener('change', () => {
-        applyExceptionFilters();
-    });
-    
     document.getElementById('filterExceptionType')?.addEventListener('change', () => {
         applyExceptionFilters();
     });
-    
+
     // Reset-Button (optional)
     document.getElementById('resetExceptionFilter')?.addEventListener('click', () => {
-        document.getElementById('filterExceptionStatus').value = '';
-        document.getElementById('filterExceptionType').value = '';
-        applyExceptionFilters();
+        resetExceptionFilter();
     });
 }
 
