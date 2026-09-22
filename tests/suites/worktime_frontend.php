@@ -446,3 +446,28 @@ test('Check-in-PWA: der Ortsnachweis der Arbeitszeit geht auch ohne Kamera (OI-8
         'Scheitert der Kamerastart, oeffnet toggleScanner() die Handeingabe nicht'
     );
 });
+
+test('Zeiterfassung: die Tabelle bricht Datum, Dauer und Status nicht um (OI-10)', function () use ($repoRoot) {
+    $html = (string) file_get_contents($repoRoot . '/public/index.html');
+    $css  = (string) file_get_contents($repoRoot . '/public/css/components/tables.css');
+    $js   = (string) file_get_contents($repoRoot . '/public/js/modules/worktime.js');
+
+    // Ohne eigene Untergrenze greift die allgemeine von 600px, und der Browser
+    // quetscht die acht Spalten, bis ein Datum ueber drei Zeilen laeuft.
+    assertTrue(
+        preg_match('/<table id="worktimeTable" class="table-worktime">/', $html) === 1,
+        '#worktimeTable traegt die Klasse table-worktime nicht'
+    );
+    assertTrue(
+        preg_match('/table\.table-worktime\s*\{\s*min-width:\s*\d{4}px;/', $css) === 1,
+        'tables.css setzt fuer table-worktime keine eigene Untergrenze'
+    );
+    assertTrue(
+        preg_match('/\.table-worktime \.cell-nowrap\s*\{\s*white-space:\s*nowrap;/', $css) === 1,
+        'tables.css definiert .cell-nowrap fuer die Zeiterfassung nicht'
+    );
+
+    $render = frontendFunctionBody($js, 'renderWorkSessions');
+    assertSame(3, substr_count($render, '<td class="cell-nowrap">'),
+        'renderWorkSessions() markiert nicht genau Beginn, Dauer und Status als nowrap');
+});

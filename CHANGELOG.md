@@ -64,6 +64,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   der Import einen Serientermin ab, sobald er tatsächlich etwas an ihm ändert, genau wie das
   Bearbeiten eines einzelnen Termins. Ein erneuter Import derselben Datei ändert nichts und
   lässt die Termine in der Serie.
+- **Die Tabelle der Zeiterfassung ist auf Notebook-Bildschirmen wieder lesbar.** Unter etwa
+  1900 Pixel Fensterbreite quetschte der Browser die acht Spalten so stark, dass Datum, Dauer
+  und Status über mehrere Zeilen umbrachen. Die Zeilen wurden dadurch deutlich höher. Jetzt
+  bleiben diese drei Angaben auf einer Zeile. Ist das Fenster zu schmal, lässt sich die Tabelle
+  waagerecht rollen. Bei 1280 Pixel Breite sinkt die Zeilenhöhe von durchschnittlich 124 auf
+  82 Pixel.
 
 ---
 

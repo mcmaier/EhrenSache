@@ -197,13 +197,13 @@ export function renderWorkSessions(sessions) {
             <td>${escapeHtml(s.surname || '')}, ${escapeHtml(s.name || '')}
                 ${s.member_number ? `<br><small>${escapeHtml(s.member_number)}</small>` : ''}</td>
             <td>${activityDot(s.color)}${escapeHtml(s.activity_name || '—')}</td>
-            <td>${escapeHtml(String(s.start_time || '').substring(0, 16))}</td>
-            <td>${running ? '<em>läuft</em>' : formatMinutes(s.duration_minutes)}
+            <td class="cell-nowrap">${escapeHtml(String(s.start_time || '').substring(0, 16))}</td>
+            <td class="cell-nowrap">${running ? '<em>läuft</em>' : formatMinutes(s.duration_minutes)}
                 ${s.break_minutes > 0 ? `<br><small>${s.break_minutes} Min. Pause</small>` : ''}</td>
             <td>${escapeHtml(s.appointment_title || '—')}</td>
             <td><span class="${PROOF_BADGE[proof][0]}">${PROOF_BADGE[proof][1]}</span>
                 ${locations ? `<br><small>${locations}</small>` : ''}</td>
-            <td><span class="${(STATUS_BADGE[s.status] || ['type-badge'])[0]}">${(STATUS_BADGE[s.status] || [null, s.status])[1]}</span></td>
+            <td class="cell-nowrap"><span class="${(STATUS_BADGE[s.status] || ['type-badge'])[0]}">${(STATUS_BADGE[s.status] || [null, s.status])[1]}</span></td>
             <td class="actions-cell">${renderWorktimeActions(s)}</td>
         </tr>`;
     }).join('');

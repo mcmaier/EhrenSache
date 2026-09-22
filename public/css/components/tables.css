@@ -44,6 +44,17 @@ tbody tr:hover {
     background: var(--bg-light);
 }
 
+/* Zeiterfassung (OI-10): acht Spalten brauchen gemessen rund 1400px. Darunter
+   rollt die Tabelle im .data-table waagerecht, statt Datum, Dauer und Status
+   ueber mehrere Zeilen zu brechen. */
+table.table-worktime {
+    min-width: 1400px;
+}
+
+.table-worktime .cell-nowrap {
+    white-space: nowrap;
+}
+
 .loading {
     text-align: center;
     padding: var(--spacing-xxl);
