@@ -1208,11 +1208,13 @@ der Eintrag blieb stehen, obwohl die Sache erledigt war.
 Tabelle braucht ohne jeden Umbruch 1394 px, daher die 1400. Bei 1280 px Fensterbreite sinkt die
 mittlere Zeilenhöhe von 124 auf 82 px (höchste Zeile 162 → 85 px), dafür rollt die Tabelle
 waagerecht. Ab etwa 1725 px Fensterbreite (Seitenleiste und Innenabstand kosten 325 px) rollt nichts mehr. Der Status kam dazu, weil „wartet auf
-Freigabe" ebenfalls umbrach. Test: `tests/suites/worktime_frontend.php`. **Bleibt offen:** Auf
-einem Notebook liegt die Spalte „Aktionen" jetzt außerhalb des sichtbaren Bereichs. Eine
-festgehaltene Aktionsspalte (`position: sticky`) wäre der nächste Schritt, falls das beim Freigeben
-stört. Die allgemeine Untergrenze von 600 px für alle übrigen Tabellen ist unverändert und
-weiterhin ungeprüft.
+Freigabe" ebenfalls umbrach. Test: `tests/suites/worktime_frontend.php`. Damit die Spalte
+„Aktionen" auf einem Notebook nicht außerhalb des sichtbaren Bereichs liegt, steht sie per
+`position: sticky; right: 0` am rechten Rand fest; im Browser bei 1280 px über den ganzen
+Rollweg geprüft. Den Innenabstand rechts daneben deckt ein `::after` ab — ein äußerer
+`box-shadow` hätte gereicht, Chrome zeichnet ihn an Tabellenzellen aber nicht. **Bleibt offen:**
+Die allgemeine Untergrenze von 600 px für alle übrigen Tabellen ist unverändert und weiterhin
+ungeprüft.
 
 Acht Spalten scrollen auf schmalen Fenstern horizontal. Das ist `overflow-x: auto` aus
 `.data-table` und verhält sich wie jede andere Tabelle der App — fällt hier nur stärker auf.

@@ -68,7 +68,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   1900 Pixel Fensterbreite quetschte der Browser die acht Spalten so stark, dass Datum, Dauer
   und Status über mehrere Zeilen umbrachen. Die Zeilen wurden dadurch deutlich höher. Jetzt
   bleiben diese drei Angaben auf einer Zeile. Ist das Fenster zu schmal, lässt sich die Tabelle
-  waagerecht rollen. Bei 1280 Pixel Breite sinkt die Zeilenhöhe von durchschnittlich 124 auf
+  waagerecht rollen. Die Spalte „Aktionen“ bleibt dabei am rechten Rand stehen, Freigeben geht
+  also ohne Rollen. Bei 1280 Pixel Breite sinkt die Zeilenhöhe von durchschnittlich 124 auf
   82 Pixel.
 
 ---

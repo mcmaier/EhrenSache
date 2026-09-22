@@ -471,3 +471,17 @@ test('Zeiterfassung: die Tabelle bricht Datum, Dauer und Status nicht um (OI-10)
     assertSame(3, substr_count($render, '<td class="cell-nowrap">'),
         'renderWorkSessions() markiert nicht genau Beginn, Dauer und Status als nowrap');
 });
+
+test('Zeiterfassung: die Aktionsspalte bleibt beim waagerechten Rollen sichtbar (OI-10)', function () use ($repoRoot) {
+    $css = (string) file_get_contents($repoRoot . '/public/css/components/tables.css');
+
+    // Seit der Untergrenze von 1400px liegt die Spalte auf einem Notebook
+    // ausserhalb des sichtbaren Bereichs -- Freigeben hiesse erst rollen.
+    $start = strpos($css, '.table-worktime th:last-child');
+    assertTrue($start !== false, 'tables.css haelt die Kopfzelle der Aktionsspalte nicht fest');
+    $rule = substr($css, $start, (int) strpos($css, '}', $start) - $start);
+    assertTrue(strpos($rule, '.table-worktime td.actions-cell') !== false,
+        'Kopf und Zellen der Aktionsspalte werden nicht gemeinsam festgehalten');
+    assertTrue(preg_match('/position:\s*sticky;/', $rule) === 1, 'Aktionsspalte ist nicht sticky');
+    assertTrue(preg_match('/right:\s*0;/', $rule) === 1, 'Aktionsspalte haengt nicht am rechten Rand');
+});

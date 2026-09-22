@@ -55,6 +55,37 @@ table.table-worktime {
     white-space: nowrap;
 }
 
+/* Die Aktionsspalte bleibt beim Rollen am rechten Rand stehen, damit Freigeben
+   nicht erst Rollen verlangt. Eigener Hintergrund, sonst scheint der Inhalt
+   der darunter durchlaufenden Spalten durch; die Trennlinie als Schatten,
+   weil Rahmen bei border-collapse nicht mitwandern. */
+.table-worktime th:last-child,
+.table-worktime td.actions-cell {
+    position: sticky;
+    right: 0;
+    background: var(--bg-white);
+    box-shadow: inset 1px 0 0 #dee2e6;
+}
+
+/* Deckt den Innenabstand des .data-table rechts neben der Spalte ab -- dort
+   liefe sonst der Text der weiter links liegenden Spalten durch. Ein aeusserer
+   box-shadow waere kuerzer, Chrome zeichnet ihn an Tabellenzellen aber nicht. */
+.table-worktime th:last-child::after,
+.table-worktime td.actions-cell::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 100%;
+    width: var(--spacing-lg);
+    background: var(--bg-white);
+}
+
+.table-worktime th:last-child,
+.table-worktime tbody tr:hover td.actions-cell {
+    background: var(--bg-light);
+}
+
 .loading {
     text-align: center;
     padding: var(--spacing-xxl);
