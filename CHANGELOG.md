@@ -43,21 +43,6 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   „Gruppe/Register“ stehen und zeigte beim Antippen wieder die Liste des vorigen Termins. Jetzt
   verschwindet beides. Ohne Termin im Zeitfenster steht dort ein Hinweis statt einer leeren
   Fläche.
-
----
-
-## [1.11.3] – 2026-09-22
-
-### Sicherheit
-- **Ein Termintitel konnte im Verlauf der Check-in-App Skript ausführen.** Der Verlauf setzte
-  Titel und Terminart von Anwesenheiten und Anträgen ungeschützt in die Seite ein. Ein Manager
-  konnte so einen Termin anlegen, dessen Titel im Browser jedes Mitglieds lief, das den Termin
-  im Verlauf hat. Das galt auch für den Admin, und das Skript lief mit dessen Anmeldung. Jetzt
-  werden Titel, Terminart und Gruppenname maskiert, und Terminfarben gelten nur noch als
-  Farbwert. Das Dashboard und die virtuelle Station waren nicht betroffen. Die Stelle bestand
-  seit 1.0.0.
-
-### Behoben
 - **Ein CSV-Import konnte an Serienterminen verloren gehen.** Änderte eine Termin-CSV einen
   Termin, der zu einer Serie gehört, blieb er Teil der Serie. Eine spätere Serienänderung
   „Dieser und alle folgenden“ überschrieb die importierten Werte dann ohne Warnung. Jetzt löst
@@ -71,6 +56,19 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   waagerecht rollen. Die Spalte „Aktionen“ bleibt dabei am rechten Rand stehen, Freigeben geht
   also ohne Rollen. Bei 1280 Pixel Breite sinkt die Zeilenhöhe von durchschnittlich 124 auf
   82 Pixel.
+
+---
+
+## [1.11.3] – 2026-09-22
+
+### Sicherheit
+- **Ein Termintitel konnte im Verlauf der Check-in-App Skript ausführen.** Der Verlauf setzte
+  Titel und Terminart von Anwesenheiten und Anträgen ungeschützt in die Seite ein. Ein Manager
+  konnte so einen Termin anlegen, dessen Titel im Browser jedes Mitglieds lief, das den Termin
+  im Verlauf hat. Das galt auch für den Admin, und das Skript lief mit dessen Anmeldung. Jetzt
+  werden Titel, Terminart und Gruppenname maskiert, und Terminfarben gelten nur noch als
+  Farbwert. Das Dashboard und die virtuelle Station waren nicht betroffen. Die Stelle bestand
+  seit 1.0.0.
 
 ---
 
