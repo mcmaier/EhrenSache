@@ -250,6 +250,65 @@ function arrivalWithinAppointmentWindow($db, $database, int $appointmentId,
 }
 
 /**
+ * Spielraum, um den eine beantragte Ankunft nach der Serveruhr liegen darf.
+ *
+ * Die PWA belegt das Feld mit „jetzt“ nach der Uhr des Telefons. Geht die
+ * ein paar Minuten vor, soll der Antrag daran nicht scheitern.
+ */
+const TIME_CORRECTION_CLOCK_SKEW_MINUTES = 5;
+
+/**
+ * Ist es für einen Zeitantrag zu diesem Termin noch zu früh? (OI-82)
+ *
+ * Ein Zeitantrag behauptet eine Ankunft, die schon stattgefunden hat. Zu früh
+ * ist er deshalb, wenn das Check-in-Fenster des Termins noch nicht begonnen
+ * hat — auch ohne Wunschzeit — oder wenn die Wunschzeit noch in der Zukunft
+ * liegt. arrivalWithinAppointmentWindow() allein fängt das nicht: Für einen
+ * Termin in drei Wochen liegt auch jede passende Wunschzeit in drei Wochen.
+ *
+ * Verglichen wird mit der Uhr der Datenbank, nicht mit der von PHP: Termine
+ * sind Wandzeit-Werte wie NOW() (siehe stationNow(), OI-60). Ein unbekannter
+ * Termin gilt nicht als zu früh — den weist die Fensterprüfung ab.
+ */
+function timeCorrectionTooEarly($db, $database, int $appointmentId,
+                                ?string $arrivalTime, int $toleranceHours): bool
+{
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT date, start_time, NOW() AS now FROM {$prefix}appointments
+                          WHERE appointment_id = ?");
+    $stmt->execute([$appointmentId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$row) {
+        return false;
+    }
+
+    try {
+        $now   = new DateTimeImmutable($row['now']);
+        $start = new DateTimeImmutable($row['date'] . ' ' . $row['start_time']);
+    } catch (Exception $e) {
+        return false;
+    }
+
+    if ($start->sub(new DateInterval('PT' . $toleranceHours . 'H')) > $now) {
+        return true;
+    }
+
+    if ($arrivalTime === null || trim($arrivalTime) === '') {
+        return false;
+    }
+
+    try {
+        $arrival = new DateTimeImmutable($arrivalTime);
+    } catch (Exception $e) {
+        return false;   // unlesbar -- das meldet die Fensterprüfung
+    }
+
+    return $arrival > $now->add(new DateInterval('PT' . TIME_CORRECTION_CLOCK_SKEW_MINUTES . 'M'));
+}
+
+/**
  * Prüft eine Löschfrist in Jahren.
  *
  * Liefert die Frist als ganze Zahl oder null, wenn der Wert unbrauchbar ist.

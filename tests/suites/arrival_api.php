@@ -311,7 +311,7 @@ test('Ein Record ohne Ankunftszeit wird nicht auf 1970 datiert', function () {
 test('Eine beantragte Ankunft weit vom Termin wird abgewiesen', function () {
     $token    = apiToken('admin');
     $memberId = arrAnyMemberId($token);
-    $aptId    = arrTempAppointment($token, '2031-03-08');   // 20:00 Uhr
+    $aptId    = arrTempAppointment($token, '2021-03-08');   // 20:00 Uhr, vergangen: ein Zeitantrag braucht eine stattgefundene Ankunft (OI-82)
 
     try {
         // Fuenf Stunden vor dem Termin -- ausserhalb jedes Toleranzfensters.
@@ -321,7 +321,7 @@ test('Eine beantragte Ankunft weit vom Termin wird abgewiesen', function () {
                         'appointment_id'         => $aptId,
                         'exception_type'         => 'time_correction',
                         'reason'                 => 'Ankunftszeit-Test',
-                        'requested_arrival_time' => '2031-03-08 15:00:00',
+                        'requested_arrival_time' => '2021-03-08 15:00:00',
                         'status'                 => 'pending'],
         ]);
 
@@ -335,7 +335,7 @@ test('Eine beantragte Ankunft weit vom Termin wird abgewiesen', function () {
                         'appointment_id'         => $aptId,
                         'exception_type'         => 'time_correction',
                         'reason'                 => 'Ankunftszeit-Test',
-                        'requested_arrival_time' => '2031-03-08 19:55:00',
+                        'requested_arrival_time' => '2021-03-08 19:55:00',
                         'status'                 => 'pending'],
         ]);
         assertStatus(201, $ok);
@@ -378,6 +378,142 @@ test('Eine Ankunftszeit weit vom Termin wird auch im Record abgewiesen', functio
                         'status'         => 'present'],
         ]);
         assertStatus(400, $put);
+    } finally {
+        arrDropAppointment($token, $aptId);
+    }
+});
+
+/** Das Check-in-Fenster in Stunden, wie der Server es gerade anwendet. */
+function arrToleranceHours(string $token): int
+{
+    $res = apiRequest('GET', 'settings', ['token' => $token]);
+    foreach ($res['body']['settings'] ?? [] as $setting) {
+        if ($setting['setting_key'] === 'checkin_tolerance_hours') {
+            return (int) $setting['setting_value'];
+        }
+    }
+
+    return 2;
+}
+
+/** Legt einen Zeitantrag an; $arrival null heisst: ohne Wunschzeit. */
+function arrTimeCorrection(string $token, int $memberId, int $aptId, ?string $arrival): array
+{
+    $body = ['member_id'      => $memberId,
+             'appointment_id' => $aptId,
+             'exception_type' => 'time_correction',
+             'reason'         => 'OI-82-Test',
+             'status'         => 'pending'];
+
+    if ($arrival !== null) {
+        $body['requested_arrival_time'] = $arrival;
+    }
+
+    return apiRequest('POST', 'exceptions', ['token' => $token, 'body' => $body]);
+}
+
+test('Kein Zeitantrag fuer einen Termin in der Zukunft (OI-82)', function () {
+    $token    = apiToken('admin');
+    $memberId = arrAnyMemberId($token);
+    $aptId    = arrTempAppointment($token, '2031-03-10');   // 20:00 Uhr
+
+    try {
+        // Die Wunschzeit liegt im Fenster des Termins -- die Fensterpruefung
+        // allein liess das durch, weil sie nicht gegen jetzt prueft.
+        $res = arrTimeCorrection($token, $memberId, $aptId, '2031-03-10 19:55:00');
+        assertStatus(400, $res, 'Eine Ankunft in fuenf Jahren laesst sich nicht nachtraeglich beantragen');
+        assertTrue(strpos((string) ($res['body']['message'] ?? ''), 'stattgefunden') !== false,
+            'Abgewiesen, aber nicht wegen der Zukunft: ' . $res['raw']);
+
+        $ohneZeit = arrTimeCorrection($token, $memberId, $aptId, null);
+        assertStatus(400, $ohneZeit, 'Auch ohne Wunschzeit ist ein Zeitantrag vor dem Termin sinnlos');
+
+        // Eine Entschuldigung im Voraus bleibt erlaubt
+        $absage = apiRequest('POST', 'exceptions', ['token' => $token, 'body' => [
+            'member_id' => $memberId, 'appointment_id' => $aptId,
+            'exception_type' => 'absence', 'reason' => 'OI-82-Test', 'status' => 'pending',
+        ]]);
+        assertStatus(201, $absage, 'Die Entschuldigung im Voraus darf nicht mitgesperrt werden');
+    } finally {
+        arrDropAppointment($token, $aptId);
+    }
+});
+
+test('Zeitantrag nach Beginn: nur fuer eine Ankunft, die schon war (OI-82)', function () {
+    $token    = apiToken('admin');
+    $memberId = arrAnyMemberId($token);
+    $tol      = arrToleranceHours($token);
+
+    // Termin vor zehn Minuten: Das Fenster hat begonnen, die Ankunft kann
+    // davor oder danach liegen -- aber nicht nach jetzt.
+    $start = new DateTimeImmutable('-10 minutes');
+    $aptId = arrTempAppointment($token, $start->format('Y-m-d'), $start->format('H:i:00'));
+
+    try {
+        $jetztOderFrueher = arrTimeCorrection($token, $memberId, $aptId, $start->format('Y-m-d H:i:00'));
+        assertStatus(201, $jetztOderFrueher, 'Die Ankunft zum Terminbeginn liegt in der Vergangenheit');
+
+        if ($tol >= 1) {
+            // Im Fenster, aber eine halbe Stunde nach jetzt. Weit ueber dem
+            // Spielraum fuer eine vorgehende Uhr des Telefons.
+            $spaeter = (new DateTimeImmutable('+30 minutes'))->format('Y-m-d H:i:00');
+            $res = apiRequest('PUT', 'exceptions', ['token' => $token,
+                'query' => ['id' => (int) $jetztOderFrueher['body']['id']],
+                'body'  => ['requested_arrival_time' => $spaeter]]);
+            assertStatus(400, $res, 'Auch ein PUT darf die Wunschzeit nicht in die Zukunft legen');
+        }
+    } finally {
+        arrDropAppointment($token, $aptId);
+    }
+});
+
+test('Ein Zeitantrag fuer die Zukunft laesst sich ablehnen, aber nicht genehmigen (OI-82)', function () {
+    $token    = apiToken('admin');
+    $memberId = arrAnyMemberId($token);
+    $aptId    = arrTempAppointment($token, '2021-03-11');   // 20:00 Uhr
+
+    try {
+        // Ein Antrag, der erst nachtraeglich in der Zukunft liegt: angelegt zu
+        // einem vergangenen Termin, dann wird der Termin verschoben. Ueber die
+        // API laesst sich kein Antrag herstellen, der nur an OI-82 scheitert --
+        // die Genehmigung faellt hier schon an der Fensterpruefung. Geprueft
+        // wird das Ergebnis: keine Genehmigung, aber eine Ablehnung.
+        $antrag = arrTimeCorrection($token, $memberId, $aptId, '2021-03-11 19:55:00');
+        assertStatus(201, $antrag);
+        $id = (int) $antrag['body']['id'];
+
+        assertStatus(200, apiRequest('PUT', 'appointments', ['token' => $token,
+            'query' => ['id' => $aptId],
+            'body'  => ['title' => 'Ankunftszeit-Test', 'date' => '2031-03-11', 'start_time' => '20:00:00']]));
+
+        $genehmigt = apiRequest('PUT', 'exceptions', ['token' => $token,
+            'query' => ['id' => $id], 'body' => ['status' => 'approved']]);
+        assertStatus(400, $genehmigt, 'Die Genehmigung haette einen Record fuer 2031 erzeugt');
+
+        $abgelehnt = apiRequest('PUT', 'exceptions', ['token' => $token,
+            'query' => ['id' => $id], 'body' => ['status' => 'rejected']]);
+        assertStatus(200, $abgelehnt, 'Ablehnen muss immer moeglich bleiben');
+    } finally {
+        arrDropAppointment($token, $aptId);
+    }
+});
+
+test('Neben einer Entschuldigung bleibt ein Zeitantrag zum selben Termin moeglich', function () {
+    // Die Dublettensperre gilt je Antragsart (G7). Bis OI-82 prueften das die
+    // Rueckmelde-Tests an einem kuenftigen Termin -- dort ist ein Zeitantrag
+    // jetzt zu Recht nicht mehr moeglich, deshalb steht die Probe hier.
+    $token    = apiToken('admin');
+    $memberId = arrAnyMemberId($token);
+    $aptId    = arrTempAppointment($token, '2021-03-12');
+
+    try {
+        assertStatus(201, apiRequest('POST', 'exceptions', ['token' => $token, 'body' => [
+            'member_id' => $memberId, 'appointment_id' => $aptId,
+            'exception_type' => 'absence', 'reason' => 'G7-Test', 'status' => 'pending',
+        ]]));
+
+        assertStatus(201, arrTimeCorrection($token, $memberId, $aptId, '2021-03-12 19:55:00'),
+            'Die Sperre gilt je Antragsart');
     } finally {
         arrDropAppointment($token, $aptId);
     }

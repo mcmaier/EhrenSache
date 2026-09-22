@@ -2268,14 +2268,22 @@ async function loadAppointments() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
             
-        // Letzte 3 Tage + Zukunft (für nachträgliche Anträge)
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(today.getDate() - 3);
-        
+        // Letzte 3 Tage bis jetzt. Ein Zeitantrag behauptet eine Ankunft, die
+        // schon war -- angeboten wird deshalb nur, wessen Check-in-Fenster
+        // begonnen hat (OI-82). Bis dahin standen hier auch alle kuenftigen
+        // Termine; der Server weist sie inzwischen ab.
+        const threeDaysAgo = new Date(today);
+        threeDaysAgo.setDate(today.getDate() - 3);
+
+        const parsedTolerance = parseInt(clientSettings.checkin_tolerance_hours, 10);
+        const toleranceMs = (Number.isNaN(parsedTolerance) ? 2 : parsedTolerance) * 60 * 60 * 1000;
+        const now = Date.now();
+
         const relevantAppointments = appointments.filter(a => {
             const aptDate = new Date(a.date);
             aptDate.setHours(0, 0, 0, 0);
-            return aptDate >= sevenDaysAgo;
+            const windowStart = new Date(`${a.date}T${a.start_time}`).getTime() - toleranceMs;
+            return aptDate >= threeDaysAgo && windowStart <= now;
         });
         
         elements.exceptionAppointment.innerHTML = '<option value="">Bitte wählen...</option>';
@@ -2344,14 +2352,16 @@ function updateExceptionArrivalBounds() {
     const toleranceMs     = toleranceHours * 60 * 60 * 1000;
 
     const start = new Date(`${option.dataset.date}T${option.dataset.startTime}`);
+    const now   = new Date();
     const min   = new Date(start.getTime() - toleranceMs);
-    const max   = new Date(start.getTime() + toleranceMs);
+    // Nie nach jetzt: Beantragt wird eine Ankunft, die schon war (OI-82)
+    const max   = new Date(Math.min(start.getTime() + toleranceMs, now.getTime()));
 
     input.min = toDatetimeLocalValue(min);
     input.max = toDatetimeLocalValue(max);
 
-    const now = new Date();
-    input.value = toDatetimeLocalValue(now >= min && now <= max ? now : start);
+    input.value = toDatetimeLocalValue(now >= min && now <= max ? now
+        : (start <= now ? start : now));
 
     const uhrzeit = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     hint.textContent = `Möglich zwischen ${uhrzeit(min)} und ${uhrzeit(max)} Uhr.`;

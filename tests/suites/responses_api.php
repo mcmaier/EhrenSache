@@ -1370,14 +1370,15 @@ test('POST exceptions: kein zweiter offener Antrag zum selben Termin (G7)', func
             ]]);
             assertStatus(409, $vomVerwalter, 'auch der Verwalter legt keinen zweiten an');
 
-            // Die Sperre gilt je Antragsart: eine Zeitkorrektur ist etwas anderes
-            // als eine Abmeldung und bleibt daneben moeglich.
+            // Die Sperre gilt je Antragsart -- das prueft seit OI-82 arrival_api
+            // an einem vergangenen Termin. Hier liegt der Termin in fuenf Tagen,
+            // ein Zeitantrag dazu ist deshalb gar nicht moeglich.
             $korrektur = apiRequest('POST', 'exceptions', ['token' => apiToken('user'), 'body' => [
                 'member_id' => $userMember, 'appointment_id' => $apt,
                 'exception_type' => 'time_correction', 'reason' => 'RS-G7-Korrektur',
                 'requested_arrival_time' => rsDateInDays(5) . ' 19:15:00',
             ]]);
-            assertStatus(201, $korrektur);
+            assertStatus(400, $korrektur, 'Zeitantrag fuer einen kuenftigen Termin (OI-82)');
 
             // Ein anderes Mitglied ist von der Sperre nicht betroffen.
             $anderes = apiRequest('POST', 'exceptions', ['token' => apiToken('admin'), 'body' => [

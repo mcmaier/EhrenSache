@@ -202,6 +202,20 @@ function handleExceptions($db, $database, $method, $id) {
                 return;
             }
 
+            // Eine Ankunft, die noch nicht stattgefunden hat, laesst sich nicht
+            // nachtraeglich beantragen (OI-82). Eine Entschuldigung im Voraus
+            // bleibt erlaubt -- die Terminrueckmeldung legt genau die an.
+            if (($data->exception_type ?? '') === 'time_correction'
+                && timeCorrectionTooEarly($db, $database, (int) $data->appointment_id,
+                                          $requested_time !== null ? (string) $requested_time : null,
+                                          checkinToleranceHours($db, $database))) {
+                http_response_code(400);
+                echo json_encode([
+                    "message" => "Ein Zeitantrag ist erst möglich, wenn die Ankunft schon stattgefunden hat"
+                ], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+
             if($stmt->execute([
                 $data->member_id, 
                 $data->appointment_id, 
@@ -261,13 +275,31 @@ function handleExceptions($db, $database, $method, $id) {
             // Anfragekörper — er lässt sich nachträglich nicht wechseln.
             $neueWunschzeit = $wirkRequestedTime;
 
+            //
+            // Eine Ablehnung ist ausgenommen: Sie erzeugt nichts, und ein Antrag
+            // zu einem inzwischen verschobenen Termin muss sich bescheiden lassen.
             if ($existing['exception_type'] === 'time_correction' && $neueWunschzeit !== null
+                && $wirkStatus !== 'rejected'
                 && !arrivalWithinAppointmentWindow($db, $database, (int) $existing['appointment_id'],
                                                    (string) $neueWunschzeit,
                                                    checkinToleranceHours($db, $database))) {
                 http_response_code(400);
                 echo json_encode([
                     "message" => "Die angegebene Ankunftszeit liegt zu weit vom Termin entfernt"
+                ], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+
+            // Dieselbe Grenze wie beim Anlegen (OI-82). Sie gilt auch für die
+            // Genehmigung eines Antrags, der vor dieser Prüfung angelegt wurde --
+            // nicht aber für die Ablehnung, aus demselben Grund wie oben.
+            if ($existing['exception_type'] === 'time_correction' && $wirkStatus !== 'rejected'
+                && timeCorrectionTooEarly($db, $database, (int) $existing['appointment_id'],
+                                          $neueWunschzeit !== null ? (string) $neueWunschzeit : null,
+                                          checkinToleranceHours($db, $database))) {
+                http_response_code(400);
+                echo json_encode([
+                    "message" => "Ein Zeitantrag ist erst möglich, wenn die Ankunft schon stattgefunden hat"
                 ], JSON_UNESCAPED_UNICODE);
                 return;
             }

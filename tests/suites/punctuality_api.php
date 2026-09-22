@@ -271,12 +271,21 @@ test('Zuverlaessigkeit: jeder Ausgang in der richtigen Reihenfolge', function ()
         // liegen, sonst beweist der Test nichts: Ein Antrag nach Beginn waere
         // auch ohne Typfilter "ausgefallen". Nur vor Beginn wuerde ein fehlender
         // Filter ihn zur rechtzeitigen Absage machen.
-        $f = puAppointment($welt, date('Y-m-d'), '20:59:00');
-        puCreate('exceptions', [
-            'member_id' => $welt['member'], 'appointment_id' => $f,
-            'exception_type' => 'time_correction', 'reason' => 'PU-Test',
-            'requested_arrival_time' => date('Y-m-d') . ' 20:59:00', 'status' => 'pending',
-        ]);
+        //
+        // Seit OI-82 muss die beantragte Ankunft schon stattgefunden haben: Der
+        // Termin beginnt in einer halben Stunde, angekommen ist das Mitglied vor
+        // fuenf Minuten -- frueh da, Check-in gescheitert. Das Fenster wird dafuer
+        // auf zwei Stunden festgelegt, sonst haengt der Fall an der Einstellung.
+        $fStart   = new DateTimeImmutable('+30 minutes');
+        $fArrival = new DateTimeImmutable('-5 minutes');
+        $f = puAppointment($welt, $fStart->format('Y-m-d'), $fStart->format('H:i:00'));
+        puWithSettings(['checkin_tolerance_hours' => '2'], function () use ($welt, $f, $fArrival) {
+            puCreate('exceptions', [
+                'member_id' => $welt['member'], 'appointment_id' => $f,
+                'exception_type' => 'time_correction', 'reason' => 'PU-Test',
+                'requested_arrival_time' => $fArrival->format('Y-m-d H:i:00'), 'status' => 'pending',
+            ]);
+        });
 
         puWithSettings(['reliability_enabled' => '1'], function () use ($welt) {
             $r = puStats($welt)['reliability'];
