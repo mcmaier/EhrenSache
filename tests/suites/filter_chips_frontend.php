@@ -106,8 +106,10 @@ test('Arbeitszeit: Chips, Summenkarte bleibt', function () use ($fcRoot, $fcHtml
         assertSame(0, substr_count($fcHtml, $id), $id . ' muss entfallen');
     }
     assertTrue(str_contains($bereich, 'id="resetWorktimeFilter"'), 'Zuruecksetzen braucht eine ID');
+    assertSame(0, substr_count($bereich, 'onclick="resetWorktimeFilter'), 'Zuruecksetzen ist noch inline verdrahtet');
 
     $js = fcModul($fcRoot, 'worktime');
     assertTrue(str_contains($js, 'CHIPS_WORKTIME'), 'worktime.js nutzt den Chipsatz nicht');
     assertSame(0, substr_count($js, 'filterWorktimeStatus'), 'worktime.js liest noch das alte Auswahlfeld');
+    assertTrue(str_contains($js, 'updateWorktimeStats(base)'), 'Die Summe darf dem Chip nicht folgen -- updateWorktimeStats bekommt die Basisliste');
 });

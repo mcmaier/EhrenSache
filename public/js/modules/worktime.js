@@ -259,8 +259,8 @@ function renderWorktimeActions(session) {
 
 // Nur noch "Bestaetigte Stunden" (Summe). Die Zaehler stehen seit 1.13.0 in
 // den Status-Chips. Die Summe folgt Taetigkeit und Mitglied, nicht dem Chip.
-function updateWorktimeStats(filtered) {
-    const confirmedMinutes = filtered
+function updateWorktimeStats(base) {
+    const confirmedMinutes = base
         .filter(s => s.status === 'confirmed' && s.end_time)
         .reduce((sum, s) => sum + (parseInt(s.duration_minutes, 10) || 0), 0);
 
