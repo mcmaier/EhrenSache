@@ -24,7 +24,7 @@ import { CHIPS_USERS, countChips, filterByChip, renderFilterChips, setResetVisib
 let currentUsersPage = 1;
 const usersPerPage = 25;
 let allFilteredUsers = [];
-let currentUserStatusFilter = 'all'; 
+let userStatusChip = 'all';
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -320,14 +320,14 @@ export async function applyUserFilters(forceReload = false, page = 1) {
     const base = filterUsers(allUsers, { role, status: null });
     renderFilterChips(
         document.getElementById('userStatusChips'),
-        CHIPS_USERS, countChips(base, CHIPS_USERS), currentUserStatusFilter,
-        key => { currentUserStatusFilter = key; applyUserFilters(false, 1); },
+        CHIPS_USERS, countChips(base, CHIPS_USERS), userStatusChip,
+        key => { userStatusChip = key; applyUserFilters(false, 1); },
         { label: 'Status der Benutzer' }
     );
     setResetVisible(document.getElementById('btnResetUserFilters'),
-        Boolean(role) || currentUserStatusFilter !== 'all');
+        Boolean(role) || userStatusChip !== 'all');
 
-    const filteredUsers = filterByChip(base, CHIPS_USERS, currentUserStatusFilter);
+    const filteredUsers = filterByChip(base, CHIPS_USERS, userStatusChip);
 
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'benutzer') {
@@ -372,7 +372,7 @@ export async function initUsersEventHandlers()
         
         // Reset-Button
         document.getElementById('btnResetUserFilters')?.addEventListener('click', () => {
-            currentUserStatusFilter = 'all';
+            userStatusChip = 'all';
             document.getElementById('userRoleFilter').value = '';
             applyUserFilters();
         });

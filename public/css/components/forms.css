@@ -130,19 +130,6 @@
     margin-bottom: 0; /* Verhindert extra Abstand */
 }
 
-/* Eine Checkbox hat kein Label darueber und ist viel niedriger als ein
-   Auswahlfeld. Unten buendig ausgerichtet sass sie deshalb am unteren Rand
-   der Leiste. Sie bekommt die Hoehe des Reset-Knopfs (.btn-reset-filter),
-   der ebenfalls unten buendig steht, und wird darin mittig gesetzt -- so
-   liegt sie auf Hoehe der Auswahlfelder. Breite nur so viel wie ihr Text. */
-.filter-bar .form-group:has(input[type="checkbox"]) {
-    display: flex;
-    align-items: center;
-    height: 44px;
-    flex: 0 0 auto;
-    min-width: 0;
-}
-
 .filter-bar .checkbox-label {
     width: 16px;
     height: 16px;

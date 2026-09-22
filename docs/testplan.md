@@ -139,10 +139,10 @@ Diese Tests systematisch mit allen Rollen durchführen:
 
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
-| MEM-UI-1 | „Inaktive anzeigen" in der Filterleiste anhaken | Gesamtzahl der Liste steigt um die Zahl der Karte „Inaktive Mitglieder"; ohne Haken wieder zurück |
-| MEM-UI-2 | Karte „Inaktive Mitglieder" | Zeigt nur die Zahl, kein Bedienelement |
-| MEM-UI-3 | Gruppe im Filter wählen | Beide Karten zählen nur Mitglieder dieser Gruppe |
-| MEM-UI-4 | „Inaktive anzeigen" an- und abhaken | Die Karten ändern sich **nicht** — der Schalter wirkt nur auf die Tabelle (OI-71) |
+| MEM-UI-1 | Mitglieder öffnen | Chip „Aktiv" ist vorgewählt, nur aktive Mitglieder in der Tabelle (seit 1.13.0, siehe CHIP-06) |
+| MEM-UI-2 | Chip „Inaktiv" wählen | Nur inaktive Mitglieder in der Tabelle (CHIP-07) |
+| MEM-UI-3 | Chip „Alle" wählen | Aktive und inaktive Mitglieder zusammen |
+| MEM-UI-4 | Gruppe im Filter wählen | Alle drei Chip-Zähler zählen nur Mitglieder dieser Gruppe — sie folgen der Gruppe, nicht dem gewählten Chip (OI-71) |
 
 ---
 
@@ -179,7 +179,7 @@ nur im Browser sichtbar wird.
 
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
-| APT-UI-1 | Terminart wählen | Tabelle, Kalender und Kennzahlkarten zeigen denselben Ausschnitt |
+| APT-UI-1 | Terminart wählen | Tabelle, Kalender und Anzeige-Chips „Vergangen"/„Kommend" zeigen denselben Ausschnitt |
 | APT-UI-2 | Herkunft „Nur von Hand angelegte" | Automatisch erzeugte Termine verschwinden aus Tabelle und Kalender; Summe mit „Nur automatisch erzeugte" ergibt den Gesamtbestand |
 | APT-UI-3 | Mit gesetztem Filter im Kalender vor- und zurückblättern | Filter bleibt, Kalender ist nicht leer |
 | APT-UI-4 | Mit gesetztem Filter auf einen Kalendertag klicken | Popup zeigt nur gefilterte Termine |
@@ -1163,8 +1163,8 @@ Automatisiert: `php tests/run.php worktime_frontend` (statische Gegenproben) und
 |----|----------|---------------------|
 | MF-1 | Als Admin anmelden und **als Erstes** die Zeiterfassung öffnen, ohne vorher die Mitgliederliste zu besuchen | Der Filter „Mitglied" ist gefüllt, nicht nur „Alle Mitglieder" |
 | MF-2 | Im selben Zug „Zeit nachtragen" öffnen | Die Mitgliedsauswahl im Dialog ist gefüllt; Mitglieder ohne Mitgliedschaft im gewählten Jahr fehlen |
-| MF-3 | Ein Mitglied im Filter wählen | Tabelle und **alle drei** Kennzahlen — bestätigte Stunden, wartet auf Freigabe, laufende Sitzungen — zeigen nur dessen Einträge (bis 1.9.1 folgten nur die Stunden) |
-| MF-3a | Nacheinander jede Tätigkeit wählen | Die Kennzahlen der einzelnen Tätigkeiten ergeben zusammen die Werte ohne Filter |
+| MF-3 | Ein Mitglied im Filter wählen | Tabelle, Stundenkarte und alle vier Chip-Zähler (Läuft/Wartet/Bestätigt/Abgelehnt) zeigen nur dessen Einträge (bis 1.9.1 folgten nur die Stunden) |
+| MF-3a | Nacheinander jede Tätigkeit wählen | Die Chip-Zähler der einzelnen Tätigkeiten ergeben zusammen die Werte ohne Filter; die Stundenkarte folgt Tätigkeit und Mitglied, nicht dem gewählten Chip |
 | MF-4 | Jahr wechseln, danach den Filter aufklappen | Auswahl passt zum neuen Jahr, ausgetretene Mitglieder tragen „(inaktiv)" |
 | MF-5 | Als Manager statt Admin | Gleiches Verhalten; als einfaches Mitglied ist der Filter gar nicht sichtbar |
 
@@ -1380,4 +1380,4 @@ angegeben):
 | TS-10 | Als Manager: Serie anlegen (Kurzform von TS-1–TS-3) | Gelingt wie beim Admin |
 | TS-11 | Als Nutzer ohne Verwaltungsrecht: Kalender öffnen, auf einen leeren Tag klicken | Keine Reaktion; keine Serienknöpfe im Termin-Popup |
 | TS-12 | Bundesland in den Einstellungen wechseln (Termine → Kalender), zurück zum Kalender | Feiertagsnamen und -markierung ändern sich sofort, ohne Neuladen der Seite |
-| TS-13 | Als Manager/Admin: Herkunftsfilter auf „Nur Serientermine" bzw. „Ohne Serientermine" stellen | Liste, Kalender und Kennzahlen (Vergangene/Kommende) zeigen nur die passende Teilmenge; „Filter zurücksetzen" stellt „Alle" wieder her |
+| TS-13 | Als Manager/Admin: Herkunftsfilter auf „Nur Serientermine" bzw. „Ohne Serientermine" stellen | Liste, Kalender und Anzeige-Chips „Vergangen"/„Kommend" zeigen nur die passende Teilmenge; „Filter zurücksetzen" stellt „Alle" wieder her |

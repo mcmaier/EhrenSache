@@ -11,6 +11,7 @@
  *
  * Der Versionsstempel wird vom Aufrufer gesetzt (public/update/index.php).
  */
+declare(strict_types=1);
 
 function migrate_1_12_1(PDO $pdo, string $prefix, string $configPath): array
 {

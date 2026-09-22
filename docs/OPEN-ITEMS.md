@@ -3407,6 +3407,9 @@ Fehlermeldung. Beide Wrapper brauchen das, die Station hat einen dritten.
 ### OI-86 · Bunte Status-Filterknöpfe nur in der Benutzerverwaltung
 **Priorität:** erledigt am 2026-09-22 — mit 1.13.0, Spec docs/superpowers/specs/2026-09-22-filter-chips-design.md
 
+**Umgesetzt mit 1.13.0:** Status-Chips in sieben Ansichten, Termine nur als Anzeige; die
+Entscheidungsfrage unten ist damit beantwortet.
+
 Die Benutzerverwaltung (`#userStatusFilter`, `public/index.html` ~Zeile 1264) filtert mit
 farbigen Pillenknöpfen (`.filter-btn`, `.pending`, `.active-status`, `.suspended` in
 `public/css/sections/content.css` ~Zeile 401). Alle anderen Ansichten filtern seit 1.9.2 über
@@ -3547,6 +3550,11 @@ neue Chip-Zähler macht es nur sichtbarer.
   der erzeugenden Suite steht noch aus.
 - Bei 1280 px bricht in der Arbeitszeit die fünfte Chip-Zeile um (Stundenkarte und Jahreskarte
   lassen wenig Platz).
+- Leerzeilen-Texte uneinheitlich: Anträge und Anwesenheit (alle Einträge) melden „Keine Einträge
+  gefunden“, Benutzer, Geräte und Mitglieder dagegen „… für diese Auswahl“.
+- Der Kontrast der Chips ist nur für die Standard-Primärfarbe `#1F5FBF` nachgerechnet (Tabelle in
+  `filter-chips.css`). Bei einer hellen Vereins-Primärfarbe ist WCAG AA für den aktiven neutralen
+  Chip und „Läuft“ (beide `--primary-color`) nicht gesichert.
 
 **Nicht sicherheitsrelevant.**
 
