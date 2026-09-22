@@ -57,6 +57,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Farbwert. Das Dashboard und die virtuelle Station waren nicht betroffen. Die Stelle bestand
   seit 1.0.0.
 
+### Behoben
+- **Ein CSV-Import konnte an Serienterminen verloren gehen.** Änderte eine Termin-CSV einen
+  Termin, der zu einer Serie gehört, blieb er Teil der Serie. Eine spätere Serienänderung
+  „Dieser und alle folgenden“ überschrieb die importierten Werte dann ohne Warnung. Jetzt löst
+  der Import einen Serientermin ab, sobald er tatsächlich etwas an ihm ändert, genau wie das
+  Bearbeiten eines einzelnen Termins. Ein erneuter Import derselben Datei ändert nichts und
+  lässt die Termine in der Serie.
+
 ---
 
 ## [1.11.2] – 2026-09-22

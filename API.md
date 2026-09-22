@@ -647,7 +647,7 @@ gewöhnlichen Einzeltermin. `is_detached` (0/1) heißt: sichtbar Teil der Serie,
 Serienaktionen ausgenommen — gesetzt durch Bearbeiten „nur dieser" oder automatisch, wenn eine
 Serienaktion einen Termin mit erfassten Daten stehen lassen muss. **`PUT` auf einen Serientermin
 setzt `is_detached = 1`** (bei der ersten tatsächlichen Änderung; ein `PUT` ohne Felder ändert
-nichts). **`DELETE` eines Serientermins trägt sein Datum in `exdates` der Serie ein**, damit
+nichts); dasselbe gilt für einen [CSV-Import](#import), der den Termin ändert. **`DELETE` eines Serientermins trägt sein Datum in `exdates` der Serie ein**, damit
 „Serie fortsetzen" es nicht wieder erzeugt; die Serienzeile selbst bleibt dabei stehen, auch wenn
 danach kein Termin mehr auf sie zeigt — das erledigt nur `DELETE appointment_series`.
 
@@ -2562,7 +2562,10 @@ Liest eine CSV-Datei ein. Ein Export dieser Anwendung ist ohne Umbau wieder impo
 Spaltenreihenfolge spielt keine Rolle, gelesen wird nach Namen, und unbekannte Spalten werden
 übergangen.
 
-**Endpoint:** `POST /api.php?resource=import`
+**Endpoint:** `POST /api.php?resource=import&type=<typ>`
+
+`type` steht in der **Query**, nicht im Formular: `members` (Vorgabe, wenn `type` fehlt),
+`appointments`, `records`, `extract_appointments`.
 
 **Berechtigung:** Admin
 
@@ -2573,7 +2576,6 @@ Spaltenreihenfolge spielt keine Rolle, gelesen wird nach Namen, und unbekannte S
 | Feld | Bedeutung |
 |---|---|
 | `file` | CSV-Datei, höchstens 5 MB |
-| `type` | `members`, `appointments`, `records`, `extract_appointments` |
 | `csrf_token` | CSRF-Token |
 | `create_missing_appointments` | nur bei `records`, siehe unten |
 | `min_records`, `round_minutes`, `tolerance_hours` | nur bei `extract_appointments` |
@@ -2621,6 +2623,14 @@ Karteileiche.
   "errors": []
 }
 ```
+
+**Bestehende Termine bei `appointments`.** Ein Termin gleicher Terminart, gleichen Datums und
+gleicher Startzeit wird aktualisiert statt neu angelegt: Titel und Beschreibung immer, Ort und
+Ende nur, wenn die Datei die Spalte führt. Ändert der Import dabei einen **Serientermin**
+tatsächlich, wird er wie bei `PUT` abgelöst (`is_detached = 1`), damit eine spätere
+Serienaktion die importierten Werte nicht stillschweigend überschreibt (OI-75). Ein Reimport
+derselben Werte — auch in anderer Schreibweise wie `19:30` statt `19:30:00` — lässt den Termin
+in der Serie.
 
 **`type=extract_appointments` schreibt nicht.** Es liest nur `arrival_date_time`, gruppiert
 die Zeitstempel und **schlägt** Termine vor — für den Fall, dass eine Anwesenheitsdatei aus

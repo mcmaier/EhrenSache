@@ -2993,7 +2993,13 @@ dem Cache begründete; die Begründung hielt der Prüfung nicht stand.
 ---
 
 ### OI-75 · CSV-Import ändert Serientermine, ohne sie abzulösen
-**Priorität:** mittel · aufgenommen am 2026-09-21
+**Priorität:** erledigt am 2026-09-22 — Branch `fix/oi-10-oi-75`. Entschieden: ablösen nur bei
+tatsächlicher Änderung. `importAppointments()` vergleicht Titel, Beschreibung und, falls die Datei
+sie führt, Ort und Ende über `appointmentFieldsChanged()` (`private/helpers/appointment_rules.php`,
+dieselben Regeln wie `appointmentFieldChanged()` beim `PUT`) und setzt dann `is_detached = 1`. Ein
+Reimport derselben Werte, auch als `19:30` statt `19:30:00`, löst nicht ab. Tests:
+`tests/suites/import_series_api.php`. Nebenbei in `API.md` korrigiert: `type` steht beim Import
+in der Query, nicht im Formular.
 
 `importAppointments()` (`private/handlers/import.php`) erkennt einen bestehenden Termin über
 Terminart, Datum und Startzeit (`WHERE type_id = ? AND date = ? AND start_time = ?`) und

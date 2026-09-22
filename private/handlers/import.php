@@ -439,8 +439,8 @@ function importAppointments($db, $database, $filePath) {
             
             // Prüfe ob Termin bereits existiert (gleicher Typ, Datum und Zeit)
             $stmt = $db->prepare("
-                SELECT appointment_id 
-                FROM {$prefix}appointments 
+                SELECT appointment_id, title, description, location, end_time, series_id
+                FROM {$prefix}appointments
                 WHERE type_id = ? AND date = ? AND start_time = ?
             ");
             $stmt->execute([$typeId, $date, $startTime]);
@@ -454,6 +454,14 @@ function importAppointments($db, $database, $filePath) {
                 foreach ($details['fields'] as $feld => $wert) {
                     $setFields[] = "{$feld} = ?";
                     $params[]    = $wert;
+                }
+
+                // Ein Serientermin, den der Import tatsaechlich aendert, folgt der
+                // Serie nicht mehr -- wie beim Einzel-PUT (OI-75). Ein Reimport
+                // derselben Werte loest nicht ab.
+                $gesendet = ['title' => $title, 'description' => $description] + $details['fields'];
+                if ($existing['series_id'] !== null && appointmentFieldsChanged($gesendet, $existing)) {
+                    $setFields[] = 'is_detached = 1';
                 }
                 $params[] = $existing['appointment_id'];
 

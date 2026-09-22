@@ -123,6 +123,25 @@ function appointmentFieldChanged(string $field, $sent, $stored): bool
 }
 
 /**
+ * Aendert mindestens eines der gesendeten Felder den gespeicherten Termin?
+ * Fuer Schreibwege, die mehrere Felder auf einmal setzen (CSV-Import, OI-75).
+ * Es gelten dieselben Normalisierungsregeln wie bei appointmentFieldChanged().
+ *
+ * @param array<string, mixed> $sent   Feld => neuer Wert
+ * @param array<string, mixed> $stored Zeile aus der Datenbank
+ */
+function appointmentFieldsChanged(array $sent, array $stored): bool
+{
+    foreach ($sent as $field => $value) {
+        if (appointmentFieldChanged($field, $value, $stored[$field] ?? null)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Haengen an dem Termin erfasste Daten? Solche Termine loeschen
  * Serienaktionen nie, sie loesen sie aus der Serie.
  */
