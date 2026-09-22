@@ -166,3 +166,17 @@ test('Mitglieder: Chips zaehlen den Jahresbestand, nicht die Chip-Auswahl (OI-71
     assertTrue($gruppe !== false && $gruppe < strpos($rumpf, 'countChips('),
         'Der Gruppenfilter muss vor dem Zaehlen greifen');
 });
+
+test('Geraete: Chips statt Karten', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'geraete', 'verwaltung');
+    assertTrue(str_contains($bereich, 'id="deviceStatusChips"'), 'Chip-Container fehlt');
+    foreach (['statActiveDevices', 'statInactiveDevices'] as $id) {
+        assertSame(0, substr_count($fcHtml, $id), $id . ' muss entfallen');
+    }
+    $js = fcModul($fcRoot, 'devices');
+    assertTrue(str_contains($js, 'CHIPS_DEVICES'), 'devices.js nutzt den Chipsatz nicht');
+    // Geraete haben keinen weiteren Filter -- die Basis fuer die Zaehlung ist
+    // der ganze Bestand, nicht eine bereits gefilterte Liste.
+    assertTrue(str_contains($js, 'countChips(allDevices, CHIPS_DEVICES)'), 'Geraete: Chips muessen auf dem ganzen Bestand zaehlen');
+    assertTrue(str_contains($js, 'Keine Geräte für diese Auswahl'), 'Leere Geraeteliste braucht einen Hinweis');
+});
