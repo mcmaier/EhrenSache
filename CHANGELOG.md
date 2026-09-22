@@ -18,6 +18,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Anwesenheiten); vorhandene Screenshots der Demo stimmen nicht mehr.
 
 ### Behoben
+- **Arbeitszeit mit Ortsnachweis geht in der PWA auch ohne Kamera.** Bisher führten Start und
+  Stopp nur in den Kamerasucher. Ohne Kamera, bei verweigerter Freigabe oder bei Aufruf über
+  HTTP ließ sich die Sitzung deshalb nicht starten. Jetzt steht neben Start und Stopp der Knopf
+  „Code eingeben“ für den Code der Station. Scheitert die Kamera, öffnet sich die Eingabe von
+  selbst (OI-83).
 - **Tests:** Die Suite `appointment_series_api` setzt das Bundesland nach ihren Tests auf den
   vorigen Wert zurück statt auf leer – ein Testlauf ließ den Demo-Bestand sonst ohne
   Landesfeiertage zurück.

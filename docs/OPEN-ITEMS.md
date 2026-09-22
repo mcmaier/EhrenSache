@@ -3239,7 +3239,14 @@ bescheidet.
 ---
 
 ### OI-83 · Arbeitszeit mit Ortsnachweis ohne Kamera nicht startbar
-**Priorität:** mittel · aufgenommen am 2026-09-22 (Test vom 21.09.)
+**Priorität:** erledigt am 2026-09-22 — `7e12a7b`, alle drei Punkte unter „Zu tun“ umgesetzt
+und im Browser geprüft: Start und Stopp per Handeingabe, simulierte verweigerte Kamera öffnet
+die Eingabe. Nicht nachgestellt ist der Aufruf über HTTP im Netzwerk (`localhost` gilt als
+sicherer Kontext).
+
+**Nebenbefund:** Die Fehlermeldung unterscheidet die Ursachen nicht wirklich. `html5-qrcode`
+reicht den Fehler als Text weiter, `error.name` ist nie `NotAllowedError`. Deshalb erscheint
+immer „Kamera-Zugriff nicht möglich“. Seit die Handeingabe folgt, ist das nur noch kosmetisch.
 
 Verlangt eine Tätigkeitsart einen Ortsnachweis, ruft `worktimeStart()` (`public/checkin/js/app.js`,
 ~Zeile 3520) direkt `toggleScanner()` auf. Dasselbe tut `worktimeStop()` bei `start_end`. Die
