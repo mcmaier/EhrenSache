@@ -7,6 +7,19 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Neu
+- **Ladeanzeige und Zeitgrenze bei langsamer Verbindung.** Dashboard und Check-in-App warteten
+  auf den Server ohne jede Rückmeldung und ohne Grenze. Jetzt erscheint nach einer kurzen
+  Verzögerung ein schmaler Balken am oberen Rand, der nichts blockiert. Antwortet der Server
+  nach 20 Sekunden nicht, gibt es eine Meldung. Beim Speichern lautet sie bewusst „Ob gespeichert
+  wurde, ist unklar“, denn der Server kann den Auftrag trotzdem ausgeführt haben. Wer
+  dann einfach erneut speichert, legt womöglich etwas doppelt an. Das Aufräumen alter Daten und
+  das Holen eines Updates haben keine Zeitgrenze.
+
+---
+
 ## [1.12.0] – 2026-09-22
 
 ### Neu

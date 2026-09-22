@@ -27,9 +27,9 @@ oder noch nicht gebaut.
 [OI-82](#oi-82--nachträglicher-zeitantrag-auch-für-termine-in-der-zukunft) sind am selben Tag auf
 `dev` erledigt und mit 1.11.2 veröffentlicht.
 
-Als Nächstes die Verbesserungen [OI-86](#oi-86--bunte-status-filterknöpfe-nur-in-der-benutzerverwaltung)
-(Komponente, klein) und [OI-85](#oi-85--keine-ladeanzeige-und-kein-timeout-bei-langsamen-api-antworten)
-(braucht vorher die Entscheidung zur Timeout-Meldung bei Mutationen). Wie jeder Eintrag hier gilt
+[OI-85](#oi-85--keine-ladeanzeige-und-kein-timeout-bei-langsamen-api-antworten) ist erledigt (nach 1.12.0).
+[OI-86](#oi-86--bunte-status-filterknöpfe-nur-in-der-benutzerverwaltung) ist vertagt: Er geht in einem
+Bedienkonzept für einheitliche, schlankere Filter auf, das zuerst in einem Brainstorming entsteht. Wie jeder Eintrag hier gilt
 auch diese Liste nur bis zur Prüfung gegen den Code.
 
 ---
@@ -3353,7 +3353,11 @@ der Sitzung.
 ---
 
 ### OI-85 · Keine Ladeanzeige und kein Timeout bei langsamen API-Antworten
-**Priorität:** niedrig · aufgenommen am 2026-09-22 (Test vom 21.09.)
+**Priorität:** erledigt am 2026-09-22 — `3300c26`, alle vier Punkte wie vorgeschlagen entschieden:
+schmaler Balken oben erst nach 300 ms, nicht blockierend, an einem Zähler offener Anfragen;
+Timeout 20 s, keiner für `cleanup` und `update_check` (Export und Import laufen ohnehin über
+eigene `fetch`-Aufrufe); beim Speichern „Ob gespeichert wurde, ist unklar“; Dashboard und PWA,
+nicht die Station. Im Browser geprüft (PWA, mit hängendem `fetch`).
 
 `apiCall()` (`public/js/modules/api.js`) und die gleichnamige Funktion der PWA
 (`public/checkin/js/app.js`) warten ohne Rückmeldung und ohne zeitliche Grenze. Ladeanzeigen gibt
@@ -3382,7 +3386,9 @@ Fehlermeldung. Beide Wrapper brauchen das, die Station hat einen dritten.
 ---
 
 ### OI-86 · Bunte Status-Filterknöpfe nur in der Benutzerverwaltung
-**Priorität:** niedrig · aufgenommen am 2026-09-22 (Test vom 21.09.)
+**Priorität:** niedrig · aufgenommen am 2026-09-22 (Test vom 21.09.) · **vertagt am 2026-09-22:**
+Nicht einzeln lösen. Zuerst ein Brainstorming zu einem Bedienkonzept, das die Filter aller
+Ansichten verschlankt und einheitlich gestaltet; dieser Punkt geht darin auf.
 
 Die Benutzerverwaltung (`#userStatusFilter`, `public/index.html` ~Zeile 1264) filtert mit
 farbigen Pillenknöpfen (`.filter-btn`, `.pending`, `.active-status`, `.suspended` in

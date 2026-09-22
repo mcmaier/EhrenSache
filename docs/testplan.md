@@ -1302,6 +1302,22 @@ Automatisiert: `responses_api` (pending_exceptions), `pwa_termine_frontend`.
 | PWA-AL-10 | Kein Termin im Zeitfenster | Hinweis auf „➕ Termin anlegen“ statt leerer Fläche |
 | PWA-AL-11 | Termin gewählt, Tab wechseln und zurück | Termin bleibt gewählt, Liste steht wieder da |
 
+### Ladeanzeige und Timeout (OI-85, nach 1.12.0)
+
+Automatisiert: `api_loading_frontend` (statisch). Einen langsamen Server stellt man im Browser
+nach: DevTools → Netzwerk → Drosselung, oder in der Konsole `fetch` durch eine nie
+antwortende Fassung ersetzen, die auf `signal` hört.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| LT-1 | Antwort unter 300 ms | Kein Balken, kein Flackern |
+| LT-2 | Antwort nach etwa 2 s | Schmaler Balken am oberen Rand, die Seite bleibt bedienbar; verschwindet mit der Antwort |
+| LT-3 | Zwei Anfragen, die erste schnell, die zweite langsam | Balken bleibt, bis auch die zweite fertig ist |
+| LT-4 | Server antwortet nicht, lesend (Liste öffnen) | Nach 20 s „Der Server antwortet nicht. Bitte erneut versuchen.“ |
+| LT-5 | Server antwortet nicht, speichernd (Eintrag anlegen) | Nach 20 s „… Ob gespeichert wurde, ist unklar …“ — nicht „fehlgeschlagen“ |
+| LT-6 | PWA, wie LT-4 | Meldung wie LT-4, **kein** Offline-Hinweis |
+| LT-7 | Einstellungen → Löschfristen ausführen bzw. Update holen bei langsamem Server | Kein Abbruch nach 20 s |
+
 ---
 
 ## 24. Untergruppen (seit 1.8.0)
