@@ -175,7 +175,14 @@ test('configWithDefaults fuellt fehlende Schluessel', function () {
 
     assertSame(null, $cfg['base_url']);
     assertSame(null, $cfg['demo_mode']);
+    assertSame(null, $cfg['demo_station_token']);
     assertSame('es_', $cfg['db']['prefix']);
+});
+
+test('configWithDefaults bringt demo_station_token auf String oder null', function () {
+    assertSame('abc', configWithDefaults(['demo_station_token' => '  abc '])['demo_station_token']);
+    assertSame(null, configWithDefaults(['demo_station_token' => '   '])['demo_station_token']);
+    assertSame(null, configWithDefaults(['demo_station_token' => 123])['demo_station_token']);
 });
 
 test('configWithDefaults laesst gesetzte Werte unangetastet', function () {

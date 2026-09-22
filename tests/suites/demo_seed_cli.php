@@ -316,6 +316,42 @@ test('writePlan setzt holiday_region auf BW', function () {
     assertSame('BW', $stmt->fetchColumn());
 });
 
+test('writePlan setzt den festen Stations-Token nur fuer die Kiosk-Station', function () {
+    $plan  = buildDemoPlan(20260908, '2026-09-21');
+    $db    = demoSeedCliPlanDb($plan);
+    $token = str_repeat('ab12', 12);
+    writePlan($db, 'test_', $plan, 'probelauf', $token);
+
+    $rows = $db->query("SELECT device_type, api_token FROM test_users WHERE role = 'device'")->fetchAll(PDO::FETCH_KEY_PAIR);
+    assertSame($token, $rows['kiosk']);
+    assertTrue($rows['totp_location'] !== $token, 'TOTP-Geraet darf den Stations-Token nicht bekommen');
+    assertSame(48, strlen($rows['totp_location']));
+});
+
+test('writePlan wuerfelt den Stations-Token ohne Konfiguration', function () {
+    $plan = buildDemoPlan(20260908, '2026-09-21');
+    $db   = demoSeedCliPlanDb($plan);
+    writePlan($db, 'test_', $plan, 'probelauf');
+
+    $kiosk = $db->query("SELECT api_token FROM test_users WHERE device_type = 'kiosk'")->fetchColumn();
+    assertTrue(is_string($kiosk) && preg_match('/^[0-9a-f]{48}$/', $kiosk) === 1, 'gewuerfelter Token erwartet');
+});
+
+test('demoStationToken laesst null durch und prueft gesetzte Werte', function () {
+    assertSame(null, demoStationToken(null));
+    $ok = str_repeat('a1', 16);
+    assertSame($ok, demoStationToken($ok));
+    foreach (['zu-kurz', str_repeat('a', 31), str_repeat('a', 65), str_repeat('a', 31) . '!'] as $bad) {
+        $threw = false;
+        try {
+            demoStationToken($bad);
+        } catch (InvalidArgumentException $e) {
+            $threw = true;
+        }
+        assertTrue($threw, "ungueltiger Token angenommen: {$bad}");
+    }
+});
+
 test('DEMO_TABLES leert appointments vor appointment_series (Kinder vor Eltern)', function () {
     assertTrue(array_search('appointments', DEMO_TABLES, true) < array_search('appointment_series', DEMO_TABLES, true));
 });

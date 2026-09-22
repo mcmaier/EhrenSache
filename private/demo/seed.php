@@ -106,6 +106,28 @@ function parseOptions(array $argv): array
 }
 
 /**
+ * Prüft den festen Stations-Token aus der Konfiguration ('demo_station_token').
+ *
+ * null bleibt null (dann würfelt writePlan() wie bisher). Ein gesetzter Wert
+ * muss 32 bis 64 Zeichen aus Buchstaben und Ziffern haben: Die Spalte
+ * api_token fasst 64 Zeichen, und der Token steht öffentlich in einer URL.
+ * Wirft statt zu beenden — wie parseOptions().
+ */
+function demoStationToken(?string $token): ?string
+{
+    if ($token === null) {
+        return null;
+    }
+    if (!preg_match('/^[A-Za-z0-9]{32,64}$/', $token)) {
+        throw new InvalidArgumentException(
+            "demo_station_token in config.php ist ungültig: 32 bis 64 Zeichen aus Buchstaben und Ziffern erwartet."
+        );
+    }
+
+    return $token;
+}
+
+/**
  * Ein Aufruf über den Webserver würde die Datenbank eines Besuchers leeren.
  *
  * Rückgabewert 1 statt exit('…'): Ein exit mit Text endet mit 0. Manche
@@ -352,7 +374,7 @@ function demoResolveActor(string|int|null $value): int|null
  *
  * @return array<string, int>
  */
-function writePlan(PDO $db, string $prefix, array $plan, string $password): array
+function writePlan(PDO $db, string $prefix, array $plan, string $password, ?string $stationToken = null): array
 {
     $written = [];
 
@@ -394,12 +416,17 @@ function writePlan(PDO $db, string $prefix, array $plan, string $password): arra
     $written['members'] = insertRows($db, $prefix, 'members', $memberRows);
 
     // 4. users. Konten (role !== 'device') bekommen ein Passwort-Hash, Geräte
-    // bekommen Token und TOTP-Secret.
+    // bekommen Token und TOTP-Secret. Die Kiosk-Station bekommt den festen
+    // Token aus der Konfiguration, wenn einer gesetzt ist — sonst wie jedes
+    // Gerät einen gewürfelten.
     $userRows = [];
     foreach ($plan['users'] as $user) {
         $isDevice = $user['role'] === 'device';
+        $isKiosk  = $isDevice && $user['device_type'] === 'kiosk';
         $user['password_hash'] = $isDevice ? null : password_hash($password, PASSWORD_DEFAULT);
-        $user['api_token']     = $isDevice ? bin2hex(random_bytes(24)) : null;
+        $user['api_token']     = $isKiosk && $stationToken !== null
+            ? $stationToken
+            : ($isDevice ? bin2hex(random_bytes(24)) : null);
         $user['totp_secret']   = $isDevice ? demoBase32Secret() : null;
         $userRows[] = $user;
     }
@@ -493,7 +520,8 @@ if ($isMainScript) {
     registerExitGuard();
 
     try {
-        $options = parseOptions($argv);
+        $options      = parseOptions($argv);
+        $stationToken = demoStationToken(appConfig()['demo_station_token']);
     } catch (InvalidArgumentException $e) {
         fwrite(STDERR, $e->getMessage() . "\n");
         finishRun(1);
@@ -524,7 +552,7 @@ if ($isMainScript) {
     try {
         $db->beginTransaction();
         clearAll($db, $prefix);
-        $written = writePlan($db, $prefix, $plan, $options['password']);
+        $written = writePlan($db, $prefix, $plan, $options['password'], $stationToken);
         $db->commit();
     } catch (Throwable $e) {
         if ($db->inTransaction()) {
@@ -547,7 +575,10 @@ if ($isMainScript) {
         echo "  admin@musterhausen.example    (admin)\n";
         echo "  manager@musterhausen.example  (manager)\n";
         echo "  user@musterhausen.example     (Mitglied)\n";
-        echo "\nDer Stations-Token steht im Dashboard unter Geräte.\n";
+        echo "\nÖffentliche Stations-PIN: M" . sprintf('%03d', DEMO_PUBLIC_PIN_MEMBER_ID) . ' / ' . DEMO_PUBLIC_PIN . "\n";
+        echo $stationToken !== null
+            ? "Stations-Token: fest aus config.php (demo_station_token).\n"
+            : "Der Stations-Token steht im Dashboard unter Geräte (bei jedem Lauf neu).\n";
     }
 
     finishRun(0);

@@ -58,7 +58,18 @@ aus. Details zum Generator: `private/demo/README.md`.
    `define('DEMO_MODE', true);`. Der Update-Assistent übernimmt den Wert beim Umstellen auf
    1.6.0 mitsamt seinem Rohwert.
 
-5. Einmal den Bestand herstellen:
+5. Für eine Station, die Besucher ohne Umweg erreichen, zusätzlich einen festen Token setzen
+   (32 bis 64 Zeichen aus Buchstaben und Ziffern):
+
+   ```php
+   'demo_station_token' => '<php -r "echo bin2hex(random_bytes(24));">',
+   ```
+
+   Der Generator gibt ihn bei jedem Lauf der `Probenraum-Station`, statt einen neuen zu
+   würfeln. Damit bleibt der Link `https://demo.…/station/#t=<token>` über den Reset hinweg
+   gültig; die Werbeseite liest denselben Wert aus ihrer `config/demo.php`. Ohne den Schlüssel
+   würfelt der Generator wie bisher. Ein ungültiger Wert bricht den Lauf mit Code 1 ab.
+6. Einmal den Bestand herstellen:
 
    ```
    php private/demo/seed.php
@@ -90,6 +101,10 @@ Demo nicht stillschweigend ungeschützt.
 
 Passwort für alle: `probelauf`, änderbar über `--password=`. `change_password` ist gesperrt —
 ein Besucher kann die veröffentlichten Zugänge also nicht unbrauchbar machen.
+
+**Station:** Mitglied **M001** trägt die feste PIN **4711** (`DEMO_PUBLIC_PIN` in
+`private/demo/plan.php`), unabhängig von der Saat. M001 ist das Mitglied hinter `user@` — was
+ein Besucher an der Station stempelt, sieht er in der Check-in-App wieder.
 
 ---
 
@@ -193,15 +208,14 @@ der Satz steht fest verdrahtet in `public/js/theme.js`, `public/checkin/js/app.j
 
 ### Was der Reset mit sich bringt
 
-- **Geräte-Token werden bei jedem Lauf neu gewürfelt.** Ein Kiosk oder ein TOTP-Gerät, das ein
-  Besucher eingerichtet hat, verliert seine Verbindung spätestens nach einer Stunde. Für den
-  Kiosk ist das ein Scan: als Admin anmelden, Geräte → die virtuelle Station bearbeiten → 📱,
-  den QR-Code mit dem Tablet scannen. Läuft die Station in einem Browser-Reiter statt als
-  installierte App, genügt ein Klick auf die Adresse im Modal. Für einen Dauerbetrieb taugt
-  das trotzdem nicht.
-- Die PINs der Mitglieder werden ebenfalls neu gesetzt. Wer eine PIN für die Kiosk-Vorführung
-  veröffentlicht, muss sie nach jedem Reset neu ablesen — oder `--seed` festhalten, dann
-  bleiben die Klartext-PINs gleich (`private/demo/README.md` zeigt, wie man sie ausliest).
+- **Geräte-Token werden bei jedem Lauf neu gewürfelt** — außer dem der Kiosk-Station, wenn
+  `demo_station_token` gesetzt ist (Abschnitt 1). Ohne diesen Schlüssel verliert ein Kiosk
+  seine Verbindung spätestens nach einer Stunde; dann hilft nur ein Scan: als Admin anmelden,
+  Geräte → die virtuelle Station bearbeiten → 📱, den QR-Code mit dem Tablet scannen. Das
+  TOTP-Gerät bekommt immer einen neuen Token.
+- Die PINs der Mitglieder werden ebenfalls neu gesetzt. Die öffentliche PIN von M001 (4711)
+  bleibt immer gleich; die übrigen bleiben gleich, solange `--seed` festgehalten wird
+  (`private/demo/README.md` zeigt, wie man sie ausliest).
 
 ---
 

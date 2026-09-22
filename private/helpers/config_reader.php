@@ -32,11 +32,13 @@ const CONFIG_FORMAT_UNKNOWN = 'unknown';  // Datei existiert, ist aber keine von
 
 /**
  * Liest eine Konfigurationsdatei und liefert sie normalisiert:
- *   ['db' => [host, name, user, pass, prefix], 'base_url', 'demo_mode', 'format']
+ *   ['db' => [host, name, user, pass, prefix], 'base_url', 'demo_mode',
+ *    'demo_station_token', 'format']
  *
  * base_url:  Zeichenkette oder null (= automatisch ermitteln)
  * demo_mode: der Rohwert, oder null (= nicht gesetzt). Bewusst kein Boolean,
  *            siehe demoModeActive() in private/helpers/demo_mode.php.
+ * demo_station_token: Zeichenkette oder null; nur für private/demo/seed.php.
  *
  * Wirft nie. Der Aufrufer entscheidet anhand von 'format', was ein Fehlschlag bedeutet.
  */
@@ -112,6 +114,12 @@ function configWithDefaults(array $cfg): array
         ],
         'base_url'  => is_string($baseUrl) && $baseUrl !== '' ? $baseUrl : null,
         'demo_mode' => array_key_exists('demo_mode', $cfg) ? $cfg['demo_mode'] : null,
+        // Nur für den Demo-Generator: fester Token der Demo-Station statt eines
+        // gewürfelten. Die Anwendung selbst liest ihn nicht. Geprüft wird er in
+        // private/demo/seed.php, hier nur auf "gesetzt oder nicht" gebracht.
+        'demo_station_token' => is_string($cfg['demo_station_token'] ?? null) && trim($cfg['demo_station_token']) !== ''
+            ? trim($cfg['demo_station_token'])
+            : null,
         'format'    => $cfg['format'] ?? CONFIG_FORMAT_UNKNOWN,
     ];
 }

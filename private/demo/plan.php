@@ -97,6 +97,16 @@ final class DemoRandom
 const DEMO_ORG_NAME     = 'Musikverein Musterhausen';
 const DEMO_STATION_NAME = 'Probenraum-Station';
 
+/**
+ * Öffentliche Stations-PIN. Die Werbeseite nennt sie, damit ein Besucher an der
+ * Demo-Station stempeln kann, ohne erst als Admin eine PIN nachzuschlagen.
+ * Mitglied 1 ist das Mitglied hinter user@ — was der Besucher an der Station
+ * stempelt, sieht er in der Check-in-App wieder. Fest statt gewürfelt, damit
+ * die veröffentlichte PIN nicht an der Saat hängt.
+ */
+const DEMO_PUBLIC_PIN_MEMBER_ID = 1;
+const DEMO_PUBLIC_PIN           = '4711';
+
 /** Bundesland für Feiertage im Kalender und die Ausfälle der Serien (FI-16). */
 const DEMO_HOLIDAY_REGION = 'BW';
 
@@ -355,7 +365,7 @@ function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'):
         $assignments[] = ['member_id' => $memberId, 'group_id' => 3];
     }
 
-    // PIN für 15 Mitglieder. Vierstellig, keine Einheitsziffern, keine Folge —
+    // PIN für 15 gewürfelte Mitglieder plus die öffentliche. Vierstellig, keine Einheitsziffern, keine Folge —
     // die Regeln stehen in validateStationPin().
     $pinFor = [];
     while (count($pinFor) < 15) {
@@ -364,6 +374,9 @@ function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'):
             $pinFor[$candidate] = demoPin($random);
         }
     }
+    // Nach der Ziehung gesetzt, ohne $random zu befragen: So bleibt jede
+    // folgende Ziehung und damit der übrige Bestand unverändert.
+    $pinFor[DEMO_PUBLIC_PIN_MEMBER_ID] = DEMO_PUBLIC_PIN;
     foreach ($members as $idx => $member) {
         if (isset($pinFor[$member['member_id']])) {
             $members[$idx]['pin'] = $pinFor[$member['member_id']];

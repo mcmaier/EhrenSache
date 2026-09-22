@@ -49,4 +49,14 @@ return [
     // Zeichenkette) gilt absichtlich als eingeschaltet.
     // Für eine normale Vereinsinstallation false lassen.
     'demo_mode' => false,
+
+    // Nur für eine öffentliche Demo mit stündlichem Reset (docs/DEMO.md):
+    // fester Token für die virtuelle Station, den private/demo/seed.php bei
+    // jedem Lauf setzt, statt einen neuen zu würfeln. Damit bleibt ein
+    // veröffentlichter Link /station/#t=<token> über den Reset hinweg gültig.
+    // 32 bis 64 Zeichen aus Buchstaben und Ziffern, z. B. von
+    // php -r "echo bin2hex(random_bytes(24));"
+    // Der Token kann nur stempeln und nur mit der PIN eines Mitglieds.
+    // Für eine normale Vereinsinstallation null lassen.
+    'demo_station_token' => null,
 ];

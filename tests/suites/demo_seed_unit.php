@@ -276,10 +276,22 @@ test('buildMembers haelt die Gruppenstaerken ein', function () {
     assertSame(4, $count[4], 'Ehrenmitglieder');
 });
 
-test('buildMembers vergibt genau 15 PINs im Klartext', function () {
+test('buildMembers vergibt 15 gewuerfelte PINs plus die oeffentliche', function () {
+    // Mit der Standard-Saat faellt Mitglied 1 nicht unter die 15 gewuerfelten,
+    // die oeffentliche PIN kommt also als sechzehnte hinzu.
     $m       = buildMembers(new DemoRandom(20260908));
     $withPin = array_filter($m['members'], fn ($x) => $x['pin'] !== null);
-    assertSame(15, count($withPin));
+    assertSame(16, count($withPin));
+});
+
+test('Mitglied 1 traegt bei jeder Saat die oeffentliche Stations-PIN', function () {
+    assertSame(null, validateStationPin(DEMO_PUBLIC_PIN, 4), 'oeffentliche PIN verletzt die PIN-Regeln');
+    foreach ([20260908, 1, 42, 99999] as $saat) {
+        $m = buildMembers(new DemoRandom($saat));
+        $eins = array_values(array_filter($m['members'], fn ($x) => $x['member_id'] === DEMO_PUBLIC_PIN_MEMBER_ID))[0];
+        assertSame('M001', $eins['member_number']);
+        assertSame(DEMO_PUBLIC_PIN, $eins['pin'], "Saat {$saat}");
+    }
 });
 
 test('jede erzeugte PIN besteht validateStationPin', function () {

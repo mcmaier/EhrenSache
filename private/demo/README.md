@@ -100,12 +100,16 @@ den das Bild zeigen soll — und dass die Timer-Tests an einer Sitzung scheitern
 erwarten.
 
 Geräte: `Probenraum-Station` (Kiosk) und `Proberaum` (TOTP). Die Token stehen im Dashboard
-unter Geräte und werden bei jedem Lauf neu gewürfelt.
+unter Geräte und werden bei jedem Lauf neu gewürfelt — außer dem der Station, wenn in
+`config.php` `demo_station_token` gesetzt ist (siehe `docs/DEMO.md`, Abschnitt 1).
+
+Mitglied **M001** (hinter `user@`) trägt unabhängig von der Saat die öffentliche Stations-PIN
+**4711** (`DEMO_PUBLIC_PIN` in `plan.php`).
 
 ## Was der Bestand enthält
 
 40 Mitglieder in vier Gruppen (Aktive, Jugend, Vorstandschaft, Ehrenmitglieder), davon drei
-mit beendeter Mitgliedschaft und 15 mit Stations-PIN · fünf Register als Untergruppe markiert
+mit beendeter Mitgliedschaft und 16 mit Stations-PIN (15 gewürfelt, dazu M001 mit der öffentlichen) · fünf Register als Untergruppe markiert
 (Flöte, Klarinette, Trompete, Tenorhorn, Schlagzeug, in dieser `sort_order`), 38 der 40
 Mitglieder darin (Flöte 6, die übrigen vier Register je 8), vier davon zusätzlich in einem
 zweiten Register, zwei Mitglieder bewusst ohne Register — damit der Sammelabschnitt der
