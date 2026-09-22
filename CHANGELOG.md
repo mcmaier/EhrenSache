@@ -7,6 +7,18 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Neu
+- **Entschuldigen in der Check-in-App auch bei Terminen ohne Rückmeldung.** Proben und
+  Trainings ohne Terminrückmeldung standen im Tab „Termine“ nur zur Ansicht da. Im Voraus
+  entschuldigen ließ sich dort nichts, das ging nur über das Dashboard. Jetzt trägt die
+  aufgeklappte Karte bis Terminbeginn den Knopf „Entschuldigen“, eine Begründung ist Pflicht. Den
+  Stand zeigt ein Chip am Kartenkopf. Einen offenen Antrag kann man nach Rückfrage
+  zurückziehen, nach einer Ablehnung ist ein neuer möglich.
+
+---
+
 ## [1.11.2] – 2026-09-22
 
 ### Sicherheit

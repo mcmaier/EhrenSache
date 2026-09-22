@@ -2797,7 +2797,6 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--button-bg);
-    font: inherit;
 }
 
 .response-late {

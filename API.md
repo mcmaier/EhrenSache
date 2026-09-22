@@ -1668,8 +1668,12 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
 - Das Objekt `appointment` trägt zusätzlich `end_time`, `location`, `description` und
   `responses_enabled` (hier immer `true`).
 - **Schalter `with_info=1`:** hängt die Termine der eigenen Gruppen **ohne** Rückmeldung an, die
-  von heute bis acht Wochen voraus liegen. Diese Einträge sind schlank — nur `appointment` mit
-  `responses_enabled: false`, ohne `settings`, `own`, `summary` und `members`. Die Antwort ist
+  von heute bis acht Wochen voraus liegen. Diese Einträge sind schlank — `appointment` mit
+  `responses_enabled: false`, ohne `settings`, `own`, `summary` und `members`. Seit 1.12.0 tragen
+  sie zusätzlich `started` (wie oben) und `own_absence`: den jüngsten eigenen
+  Entschuldigungsantrag zum Termin als `{"exception_id", "status"}` oder `null`. Die Check-in-App
+  bietet damit bis Terminbeginn „Entschuldigen“ an und zeigt den Stand. Eingereicht wird über
+  `POST exceptions` mit `exception_type: absence`, zurückgezogen über `DELETE exceptions`. Die Antwort ist
   dann chronologisch nach Datum und Beginn sortiert. Ohne den Schalter bleibt sie wie bisher,
   damit ein vor dem Update geöffneter Tab der Check-in-App keine Einträge bekommt, die sein Code
   nicht kennt.
@@ -1678,7 +1682,9 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
 { "appointment": { "appointment_id": 51, "title": "Gesamtprobe", "date": "2026-09-22",
                    "start_time": "19:30:00", "end_time": "22:00:00", "location": "Probelokal",
                    "description": null, "type_id": 1, "type_name": "Gesamtprobe",
-                   "color": "#667eea", "responses_enabled": false } }
+                   "color": "#667eea", "responses_enabled": false },
+  "started": false,
+  "own_absence": { "exception_id": 2123, "status": "pending" } }
 ```
 
 ### Ein Termin

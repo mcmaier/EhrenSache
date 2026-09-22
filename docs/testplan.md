@@ -1257,12 +1257,17 @@ Automatisiert: `responses_api` (Fenster, Sichtbarkeit bis Tagesende, Sortierung)
 | PWA-TL-1 | Tab „Termine" öffnen | Chronologisch, Monatsüberschriften, alles zugeklappt |
 | PWA-TL-2 | Verein ohne Terminrückmeldung | Tab sichtbar, zeigt die Termine der nächsten acht Wochen |
 | PWA-TL-3 | Rückmeldetermin in mehr als acht Wochen | erscheint, im Folgejahr mit Jahreszahl („Mai 2027") |
-| PWA-TL-4 | Karte ohne Beschreibung | kein Pfeil, nicht aufklappbar |
+| PWA-TL-4 | Infokarte ohne Beschreibung | seit 1.12.0 aufklappbar, der Körper trägt „Entschuldigen“ |
 | PWA-TL-5 | Rückmeldekarte aufklappen, zusagen | Chip wechselt auf „✓ zugesagt", Karte bleibt offen |
 | PWA-TL-6 | Heute begonnener Rückmeldetermin | sichtbar, Chip „hat begonnen" bzw. eigene Antwort, keine Knöpfe |
 | PWA-TL-7 | Badge | zählt nur offene, nicht begonnene Rückmeldungen |
 | PWA-TL-8 | Am 20.12. öffnen | Januartermine des Folgejahres sichtbar |
 | PWA-TL-9 | Offline | Hinweis nur an Rückmeldekarten |
+| PWA-TL-10 | Infokarte aufklappen, „Entschuldigen“ ohne Begründung (seit 1.12.0) | Hinweis „Bitte eine Begründung angeben“, Feld fokussiert, nichts eingereicht |
+| PWA-TL-11 | wie TL-10 mit Begründung | Chip „⏳ Entschuldigung beantragt“, Knopf „Zurückziehen“; Dashboard → Anträge zeigt den offenen Antrag |
+| PWA-TL-12 | „Zurückziehen“ | Rückfrage; danach Antrag gelöscht, Karte bietet wieder „Entschuldigen“ |
+| PWA-TL-13 | Antrag im Dashboard ablehnen bzw. genehmigen | Chip „Entschuldigung abgelehnt“ mit erneutem „Entschuldigen“ bzw. „✗ entschuldigt“ ohne Knopf |
+| PWA-TL-14 | Heute begonnene Infokarte ohne Antrag | Chip „hat begonnen“, kein „Entschuldigen“ |
 
 ---
 
