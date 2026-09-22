@@ -85,6 +85,13 @@ Terminart über `appointment_type_groups` × `member_group_assignments`, Aktivze
   eigenen Status. Eine gruppierte Abfrage für das ganze Jahr, keine Schleife je Termin.
 - `attendance_list.php` nutzt für seine Zählung denselben Helfer bzw. dieselbe WHERE-Bildung, damit
   Kalender und Liste nie verschiedene Zahlen zeigen.
+- **Pflicht beim Umbau:** `attendance_list?appointment_id` liefert je Mitglied weiter
+  `pending_exceptions` (offene Anträge, seit 1.12.0, `25150f7`) — die PWA-Liste und OI-87 im
+  Dashboard bauen darauf. Der Test „attendance_list traegt offene Antraege je Mitglied“ in
+  `tests/suites/responses_api.php` muss grün bleiben.
+- **Reihenfolge mit OI-87** (abgestimmt mit der Sitzung „Testfunde und Priorisierung“, 22.09.):
+  Schritt 1 dieser Spec, dann OI-87, dann Schritt 2 — damit der Umbau auf dem Stand mit
+  offenen Anträgen im Dashboard aufsetzt.
 
 Status aus `records.status`: `present` = anwesend, `excused` = entschuldigt (genehmigte
 Abwesenheit). `missing = expected − present − excused`, nie negativ (Records von nicht mehr
