@@ -7,6 +7,19 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.11.3] – 2026-09-22
+
+### Sicherheit
+- **Ein Termintitel konnte im Verlauf der Check-in-App Skript ausführen.** Der Verlauf setzte
+  Titel und Terminart von Anwesenheiten und Anträgen ungeschützt in die Seite ein. Ein Manager
+  konnte so einen Termin anlegen, dessen Titel im Browser jedes Mitglieds lief, das den Termin
+  im Verlauf hat. Das galt auch für den Admin, und das Skript lief mit dessen Anmeldung. Jetzt
+  werden Titel, Terminart und Gruppenname maskiert, und Terminfarben gelten nur noch als
+  Farbwert. Das Dashboard und die virtuelle Station waren nicht betroffen. Die Stelle bestand
+  seit 1.0.0.
+
+---
+
 ## [1.11.2] – 2026-09-22
 
 ### Sicherheit
