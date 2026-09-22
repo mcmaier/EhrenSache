@@ -3357,7 +3357,8 @@ der Sitzung.
 schmaler Balken oben erst nach 300 ms, nicht blockierend, an einem Zähler offener Anfragen;
 Timeout 20 s, keiner für `cleanup` und `update_check` (Export und Import laufen ohnehin über
 eigene `fetch`-Aufrufe); beim Speichern „Ob gespeichert wurde, ist unklar“; Dashboard und PWA,
-nicht die Station. Im Browser geprüft (PWA, mit hängendem `fetch`).
+nicht die Station. Im Browser geprüft, PWA und Dashboard, jeweils mit hängendem `fetch`: kein Balken nach 150 ms,
+Balken nach 550 ms, nach 20 s beide Meldungen, danach kein Balken; PWA ohne Offline-Hinweis.
 
 `apiCall()` (`public/js/modules/api.js`) und die gleichnamige Funktion der PWA
 (`public/checkin/js/app.js`) warten ohne Rückmeldung und ohne zeitliche Grenze. Ladeanzeigen gibt
