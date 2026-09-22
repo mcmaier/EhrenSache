@@ -15,6 +15,7 @@ import { updateModalId, escapeHtml } from './utils.js';
 import { loadGroups } from './management.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
+import { CHIPS_MEMBERS, countChips, filterByChip, renderFilterChips, setResetVisible } from './filter_chips.js';
 
 // ============================================
 // MEMBERS
@@ -33,6 +34,10 @@ let allFilteredMembers = [];
 let currentMembershipDates = [];
 let currentMemberGroups = [];
 let memberFilterInitialized = false;
+
+// Aktiver Status-Chip (Spec 2026-09-22). Vorgabe "active" = frueher
+// "Inaktive anzeigen" aus.
+let memberStatusChip = 'active';
 let currentMemberHasPin = false;
 let currentMemberPinUpdatedAt = null;
 
@@ -157,7 +162,6 @@ function renderMembers(members, page = 1) {
             ? 'Keine Mitglieder für diese Auswahl'
             : 'Kein Profil verknüpft';
         tbody.innerHTML = `<tr><td colspan="7" class="loading">${message}</td></tr>`;
-        updateMemberStats(members);
         // Sonst bleiben Seitenknöpfe der vorigen Liste stehen (OI-84)
         allFilteredMembers = [];
         renderMembersPagination(1, 0, 0);
@@ -169,8 +173,6 @@ function renderMembers(members, page = 1) {
     currentMembersPage = page;
 
     membersPerPage = globalPaginationValue;
-
-    updateMemberStats(members);
 
     // Pagination berechnen
     const totalMembers = members.length;
@@ -339,43 +341,6 @@ window.goToMembersPage = function(page) {
     }
 };
 
-function updateMemberStats(members)
-{
-    // Beide Zahlen folgen dem Gruppenfilter, aber NICHT dem Schalter
-    // "Inaktive anzeigen" (OI-71). Der Schalter entscheidet nur, welche
-    // Zeilen die Tabelle zeigt. Zaehlte die Karte "Inaktive" die gefilterte
-    // Liste, stuende dort genau dann 0, wenn der Haken aus ist -- also immer
-    // dann, wenn jemand wissen will, wie viele Karteileichen im Bestand
-    // stehen. Der Gruppenfilter dagegen grenzt den Bestand selbst ein, und
-    // dem folgen die Karten wie in den uebrigen Bereichen.
-    const aktiv   = document.getElementById('statActiveMembersCount');
-    const inaktiv = document.getElementById('statInactiveMembersCount');
-
-    if (!isAdminOrManager) {
-        if (aktiv)   { aktiv.textContent   = '-'; }
-        if (inaktiv) { inaktiv.textContent = '-'; }
-        return;
-    }
-
-    // Faellt der Cache aus (erster Aufruf, geleert), bleibt die uebergebene
-    // Liste die beste verfuegbare Grundlage.
-    let bestand = dataCache.members[currentYear]?.data ?? members ?? [];
-
-    const gruppe = document.getElementById('filterMemberGroup')?.value || '';
-    if (gruppe) {
-        bestand = bestand.filter(m =>
-            m.group_ids_array && m.group_ids_array.includes(parseInt(gruppe))
-        );
-    }
-
-    if (aktiv) {
-        aktiv.textContent = bestand.filter(m => m.is_active_in_period).length;
-    }
-    if (inaktiv) {
-        inaktiv.textContent = bestand.filter(m => !m.is_active_in_period).length;
-    }
-}
-
 export async function showMemberSection(forceReload = false, page = 1) {
     debug.log("Show Member Section ()");
 
@@ -383,14 +348,10 @@ export async function showMemberSection(forceReload = false, page = 1) {
 
     // Event-Listener einmalig registrieren (Admin/Manager)
     if (!memberFilterInitialized && isAdminOrManager) {
-        const checkbox = document.getElementById('show_inactive_members');
-        if (checkbox) {
-            checkbox.addEventListener('change', () => showMemberSection(false));
-        }
-        const groupFilter = document.getElementById('filterMemberGroup');
-        if (groupFilter) {
-            groupFilter.addEventListener('change', () => showMemberSection(false));
-        }
+        document.getElementById('filterMemberGroup')
+            ?.addEventListener('change', () => showMemberSection(false));
+        document.getElementById('resetMemberFilter')
+            ?.addEventListener('click', () => resetMemberFilter());
         memberFilterInitialized = true;
     }
 
@@ -404,30 +365,44 @@ export async function showMemberSection(forceReload = false, page = 1) {
     }
 
     const currentSection = sessionStorage.getItem('currentSection');
-    if (currentSection === 'mitglieder') {
-        const showInactive = isAdminOrManager &&
-            document.getElementById('show_inactive_members')?.checked;
-        const selectedGroupId = document.getElementById('filterMemberGroup')?.value;
+    if (currentSection !== 'mitglieder') return;
 
-        let displayMembers = showInactive
-            ? allMembers
-            : allMembers.filter(m => m.is_active_in_period);
+    const selectedGroupId = isAdminOrManager
+        ? (document.getElementById('filterMemberGroup')?.value || '')
+        : '';
 
-        if (selectedGroupId) {
-            displayMembers = displayMembers.filter(m =>
-                m.group_ids_array && m.group_ids_array.includes(parseInt(selectedGroupId))
-            );
-        }
-
-        renderMembers(displayMembers, page);
+    // Basis: Jahresbestand, eingegrenzt durch die Gruppe. Darauf zaehlen die
+    // Chips -- so zeigt "Inaktiv" die Karteileichen auch dann, wenn "Aktiv"
+    // gewaehlt ist (OI-71). Erst danach filtert der Chip die Tabelle.
+    let base = allMembers || [];
+    if (selectedGroupId) {
+        base = base.filter(m =>
+            m.group_ids_array && m.group_ids_array.includes(parseInt(selectedGroupId))
+        );
     }
+
+    // Einfache Nutzer: keine Chips, weiterhin nur aktive (wie bisher)
+    const chip = isAdminOrManager ? memberStatusChip : 'active';
+    const chipsEl = document.getElementById('memberStatusChips');
+    if (chipsEl) chipsEl.hidden = !isAdminOrManager;
+    if (isAdminOrManager) {
+        renderFilterChips(
+            chipsEl,
+            CHIPS_MEMBERS, countChips(base, CHIPS_MEMBERS), chip,
+            key => { memberStatusChip = key; showMemberSection(false); },
+            { label: 'Status der Mitglieder' }
+        );
+        setResetVisible(document.getElementById('resetMemberFilter'),
+            Boolean(selectedGroupId) || memberStatusChip !== 'active');
+    }
+
+    renderMembers(filterByChip(base, CHIPS_MEMBERS, chip), page);
 }
 
 export function resetMemberFilter() {
-    const showInactiveEl = document.getElementById('show_inactive_members');
-    if (showInactiveEl) showInactiveEl.checked = false;
     const groupFilterEl = document.getElementById('filterMemberGroup');
     if (groupFilterEl) groupFilterEl.value = '';
+    memberStatusChip = 'active';
     showMemberSection(false);
 }
 

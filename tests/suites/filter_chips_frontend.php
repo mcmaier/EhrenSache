@@ -113,3 +113,32 @@ test('Arbeitszeit: Chips, Summenkarte bleibt', function () use ($fcRoot, $fcHtml
     assertSame(0, substr_count($js, 'filterWorktimeStatus'), 'worktime.js liest noch das alte Auswahlfeld');
     assertTrue(str_contains($js, 'updateWorktimeStats(base)'), 'Die Summe darf dem Chip nicht folgen -- updateWorktimeStats bekommt die Basisliste');
 });
+
+test('Mitglieder: Chips statt Karten und Inaktiv-Schalter', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'mitglieder', 'benutzer');
+    assertTrue(str_contains($bereich, 'id="memberStatusChips"'), 'Chip-Container fehlt');
+    assertTrue(str_contains($bereich, 'stats-grid stats-grid--chips'), 'Kopfzeile ohne stats-grid--chips');
+    foreach (['statActiveMembersCount', 'statInactiveMembersCount', 'show_inactive_members'] as $id) {
+        assertSame(0, substr_count($fcHtml, $id), $id . ' muss entfallen');
+    }
+
+    $js = fcModul($fcRoot, 'members');
+    assertTrue(str_contains($js, 'CHIPS_MEMBERS'), 'members.js nutzt den Chipsatz nicht');
+    // Vorgabe "Aktiv" entspricht dem frueheren "Inaktive anzeigen" = aus
+    assertTrue(preg_match("/let\s+memberStatusChip\s*=\s*'active'/", $js) === 1,
+        'Vorgabe des Mitglieder-Chips muss "active" sein');
+});
+
+test('Mitglieder: Chips zaehlen den Jahresbestand, nicht die Chip-Auswahl (OI-71)', function () use ($fcRoot) {
+    $js = fcModul($fcRoot, 'members');
+    $start = strpos($js, 'export async function showMemberSection(');
+    assertTrue($start !== false, 'showMemberSection() fehlt');
+    $ende = strpos($js, "\n}", $start);
+    $rumpf = substr($js, $start, $ende - $start);
+    // countChips muss VOR filterByChip stehen, sonst zeigt "Inaktiv" 0,
+    // sobald "Aktiv" gewaehlt ist -- genau der Fehler aus OI-71.
+    $zaehlen = strpos($rumpf, 'countChips(');
+    $filtern = strpos($rumpf, 'filterByChip(');
+    assertTrue($zaehlen !== false && $filtern !== false, 'countChips/filterByChip fehlen');
+    assertTrue($zaehlen < $filtern, 'Gezaehlt werden muss vor dem Chip-Filter');
+});

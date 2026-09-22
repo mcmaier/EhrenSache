@@ -1177,15 +1177,8 @@
                     </div>
                 </div>
                 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Aktive Mitglieder</h3>
-                        <div class="number" id="statActiveMembersCount">-</div>                                             
-                    </div>
-                    <div class="stat-card">
-                        <h3>Inaktive Mitglieder</h3>
-                        <div class="number" id="statInactiveMembersCount">-</div>
-                    </div>
+                <div class="stats-grid stats-grid--chips">
+                    <div class="filter-chips" id="memberStatusChips" hidden></div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
                         <h3>Jahr filtern</h3>
                         <select id="memberYearFilter"
@@ -1195,20 +1188,14 @@
                 </div>
 
                 <!-- Filter-Leiste -->
-                <div class="filter-bar">                    
+                <div class="filter-bar">
                     <div class="form-group">
                         <label for="filterMemberGroup">Filter nach Gruppe</label>
                         <select id="filterMemberGroup" >
                             <option value="">Alle Gruppen</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="show_inactive_members">
-                            Inaktive anzeigen
-                        </label>
-                    </div>
-                    <button id="resetMemberFilter" onclick="resetMemberFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
+                    <button id="resetMemberFilter" class="btn-reset-filter" hidden>Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->
