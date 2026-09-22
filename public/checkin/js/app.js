@@ -1983,7 +1983,15 @@ async function toggleScanner() {
         setCheckinUIState(UI_STATE.IDLE);
 
     } else {
-            
+
+        // Ausserhalb eines sicheren Kontexts (HTTP) gibt es keinen
+        // Kamerazugriff — der Versuch scheitert immer. Gleich zur Handeingabe.
+        if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+            showMessage('Kamera hier nicht verfügbar – bitte Code eingeben', 'warning');
+            await openManualCodeInput();
+            return;
+        }
+
         if (!html5QrCode) {
             html5QrCode = new Html5Qrcode("qr-reader", {
                 verbose: false // Zum Debugen aktivieren
@@ -2031,8 +2039,13 @@ async function toggleScanner() {
             } else if (error.name === 'NotReadableError') {
                 errorMsg = 'Kamera wird bereits von einer anderen App verwendet';
             }
-            
+
             showMessage(errorMsg, 'error');
+
+            // Ohne Kamera bleibt der Code am Ort ablesbar (OI-83): Frueher
+            // endete der Weg hier, weil die Handeingabe nur neben dem
+            // laufenden Sucher stand.
+            await openManualCodeInput();
         }
     }
 }
@@ -2072,6 +2085,16 @@ async function stopScannerIfRunning() {
 async function openManualCodeInput() {
     // Falls Scanner läuft, erst stoppen
     await stopScannerIfRunning();
+
+    // Der Knopf sagt, was der Code bewirkt — dieselbe Ableitung aus der
+    // sichtbaren Ansicht wie in deliverTotpCode()
+    let label = 'Einchecken';
+    if (isCaptureViewVisible('worktime')) {
+        const running = document.getElementById('worktimeRunning');
+        label = running && getComputedStyle(running).display !== 'none'
+            ? 'Beenden' : 'Starten';
+    }
+    elements.submitManualCodeBtn.textContent = label;
 
     elements.manualCodeModal.classList.add('active');
     elements.manualCode.value = '';
@@ -3295,6 +3318,16 @@ async function initWorktime() {
     bindOnce(document.getElementById('worktimeStartBtn'), 'click', () => worktimeStart());
     bindOnce(document.getElementById('worktimePauseBtn'), 'click', worktimeTogglePause);
     bindOnce(document.getElementById('worktimeStopBtn'), 'click', () => worktimeStop());
+    // Handeingabe des Stationscodes (OI-83). deliverTotpCode() leitet den
+    // Code nach der sichtbaren Ansicht weiter — hier also an Start oder Stopp.
+    bindOnce(document.getElementById('worktimeStartCodeBtn'), 'click', () => {
+        if (!document.getElementById('worktimeActivity')?.value) {
+            showWorktimeStatus('Bitte eine Tätigkeit wählen', true);
+            return;
+        }
+        openManualCodeInput();
+    });
+    bindOnce(document.getElementById('worktimeStopCodeBtn'), 'click', openManualCodeInput);
     bindOnce(document.getElementById('worktimeStopForceBtn'), 'click', () => {
         // Das eigene Modal der App statt confirm(): blockierende Browserdialoge
         // werden in einer installierten PWA teils unterdrueckt — genau daran
@@ -3372,6 +3405,11 @@ function renderWorktime() {
         const forceBtn = document.getElementById('worktimeStopForceBtn');
         if (forceBtn) {
             forceBtn.style.display =
+                worktimeSession.verification === 'start_end' ? '' : 'none';
+        }
+        const stopCodeBtn = document.getElementById('worktimeStopCodeBtn');
+        if (stopCodeBtn) {
+            stopCodeBtn.style.display =
                 worktimeSession.verification === 'start_end' ? '' : 'none';
         }
 
@@ -3485,6 +3523,10 @@ function renderWorktimeActivityHint() {
 
     hint.textContent = text ? `🔒 ${text}` : '';
     hint.hidden = !text;
+
+    // Der Knopf folgt derselben Nachweispflicht wie der Hinweis darueber
+    const codeBtn = document.getElementById('worktimeStartCodeBtn');
+    if (codeBtn) codeBtn.style.display = text ? '' : 'none';
 }
 
 function renderWorktimeAppointmentHint() {

@@ -250,6 +250,12 @@
                             <button id="worktimeStartBtn" class="action-button">
                                 <span class="icon">▶️</span><span>Start</span>
                             </button>
+                            <!-- Handeingabe des Stationscodes (OI-83): ohne
+                                 Kamera, bei verweigerter Freigabe oder ueber
+                                 HTTP der einzige Weg zum Ortsnachweis. -->
+                            <button id="worktimeStartCodeBtn" class="action-button secondary" style="display: none;">
+                                <span class="icon">🔢</span><span>Code eingeben</span>
+                            </button>
                             <button id="worktimeManualBtn" class="action-button secondary">
                                 <span class="icon">📝</span><span>Zeit nachtragen</span>
                             </button>
@@ -273,6 +279,9 @@
                             </button>
                             <button id="worktimeStopBtn" class="action-button">
                                 <span class="icon">⏹️</span><span>Stopp</span>
+                            </button>
+                            <button id="worktimeStopCodeBtn" class="action-button secondary" style="display: none;">
+                                <span class="icon">🔢</span><span>Code eingeben</span>
                             </button>
                             <button id="worktimeStopForceBtn" class="action-button secondary" style="display: none;">
                                 <span class="icon">⚠️</span><span>Ohne Nachweis beenden</span>

@@ -417,3 +417,32 @@ function () use ($repoRoot) {
         'addExceptionToHistory() baut die Beschriftung nicht ueber exceptionHistoryLabel()'
     );
 });
+
+test('Check-in-PWA: der Ortsnachweis der Arbeitszeit geht auch ohne Kamera (OI-83)', function () use ($repoRoot) {
+    $html = (string) file_get_contents($repoRoot . '/public/checkin/index.html');
+    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+
+    // Die Handeingabe stand frueher nur neben dem laufenden Sucher. Startete
+    // die Kamera nicht, gab es in der Arbeitszeit-Ansicht keinen Weg zum Code.
+    foreach (['worktimeStartCodeBtn', 'worktimeStopCodeBtn'] as $id) {
+        assertTrue(strpos($html, "id=\"{$id}\"") !== false, "Knopf #{$id} fehlt im Markup");
+        assertTrue(
+            preg_match("/getElementById\('{$id}'\)\s*,\s*'click'/", $js) === 1,
+            "Knopf #{$id} ist an keinen Klick gebunden"
+        );
+    }
+
+    $toggle = frontendFunctionBody($js, 'toggleScanner');
+
+    assertTrue(
+        strpos($toggle, 'isSecureContext') !== false,
+        'toggleScanner() prueft nicht auf einen sicheren Kontext — ueber HTTP scheitert die Kamera immer'
+    );
+
+    // Der Fehlerzweig muss zur Handeingabe fuehren, nicht nur melden
+    $catch = substr($toggle, (int) strrpos($toggle, 'catch (error)'));
+    assertTrue(
+        strpos($catch, 'openManualCodeInput') !== false,
+        'Scheitert der Kamerastart, oeffnet toggleScanner() die Handeingabe nicht'
+    );
+});
