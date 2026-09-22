@@ -129,3 +129,29 @@ test('README nennt den Freischaltschritt fuer beide Assistenten', function () us
             "README erwaehnt {$path} nicht — der Freischaltschritt fehlt");
     }
 });
+
+foreach ($targets as $name => $paths) {
+    test("{$name}: Generator schreibt reine LF-Zeilenenden", function () use ($repoRoot, $paths, $name) {
+        // Unter Windows mit core.autocrlf=true steht der Generator mit CRLF im
+        // Arbeitsbaum, sein Heredoc also auch. Mit dem angehaengten "\n" entstand
+        // eine Datei mit gemischten Zeilenenden, die Git nach jedem Lauf als
+        // geaendert meldete, obwohl der Inhalt gleich war.
+        $source = (string) file_get_contents($repoRoot . $paths['generator']);
+        assertTrue(
+            str_contains($source, 'str_replace(["\r\n", "\r"], "\n", $htaccessContent)'),
+            "Der {$name} vereinheitlicht die Zeilenenden seiner Sperre nicht"
+        );
+    });
+}
+
+test('.gitattributes erwartet LF fuer beide Sperrdateien', function () use ($repoRoot) {
+    // Passend zum Generator: Ohne eol=lf erwartet Git unter autocrlf=true CRLF
+    // und meldet die frisch geschriebene LF-Datei trotzdem als geaendert.
+    $attributes = (string) file_get_contents($repoRoot . '/.gitattributes');
+    foreach (['/public/update/.htaccess', '/public/install/.htaccess'] as $path) {
+        assertTrue(
+            preg_match('#^' . preg_quote($path, '#') . '\s+text\s+eol=lf\s*$#m', $attributes) === 1,
+            "{$path} fehlt in .gitattributes mit text eol=lf"
+        );
+    }
+});

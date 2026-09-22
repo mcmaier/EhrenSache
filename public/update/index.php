@@ -326,7 +326,8 @@ if ($step == 3 && $_SERVER['REQUEST_METHOD'] !== 'POST') {
             </IfModule>
             HTACCESS;
 
-        file_put_contents(HTACCESS_PATH, $htaccessContent . "\n");
+        // Geschrieben wird die Sperre erst am Ende der Datei, nach der
+        // Ergebnisseite (OI-23).
 
         unset($_SESSION['update_prefix'], $_SESSION['update_from'], $_SESSION['update_to']);
 
@@ -764,3 +765,12 @@ $allChecksPassed = !in_array(false, $checks, true);
 </div>
 </body>
 </html>
+<?php
+// Erst jetzt sperren (OI-23): Stand die Sperre vor der Ausgabe, war bei einem
+// Fehler beim Rendern der Assistent zu und das Ergebnis nirgends mehr zu sehen.
+// Reine LF-Zeilenenden: Unter Windows mit core.autocrlf=true traegt schon das
+// Heredoc CRLF; zusammen mit dem angehaengten "\n" entstand eine gemischte
+// Datei, die Git nach jedem Update als geaendert meldete.
+if ($migrationOk) {
+    file_put_contents(HTACCESS_PATH, str_replace(["\r\n", "\r"], "\n", $htaccessContent) . "\n");
+}

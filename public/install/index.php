@@ -212,7 +212,8 @@ if ($step == 4) {
             </IfModule>
             HTACCESS;
 
-            file_put_contents(__DIR__ . '/.htaccess', $htaccessContent . "\n");
+            // Reine LF-Zeilenenden, Begruendung in public/update/index.php am Dateiende.
+            file_put_contents(__DIR__ . '/.htaccess', str_replace(["\r\n", "\r"], "\n", $htaccessContent) . "\n");
             
             $_SESSION['admin_token'] = $apiToken; 
         }  

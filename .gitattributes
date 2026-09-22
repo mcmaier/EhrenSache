@@ -18,3 +18,10 @@ private/migrations/_*       export-ignore
 # Absicht; der Weg ueber den Git-Klon steht in docs/DEMO.md, Abschnitt 1.
 private/demo/               export-ignore
 tests/                      export-ignore
+
+# Zugriffssperren, die Installer und Update-Assistent zur Laufzeit neu schreiben
+# -- immer mit LF. Ohne diese Regel erwartet Git unter Windows mit
+# core.autocrlf=true CRLF und meldet die Datei nach jedem Update als geaendert,
+# obwohl ihr Inhalt gleich ist.
+/public/update/.htaccess    text eol=lf
+/public/install/.htaccess   text eol=lf

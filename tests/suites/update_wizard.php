@@ -90,3 +90,23 @@ test('Installer und Update-Assistent lesen die Anforderungen aus version.json', 
         assertTrue(strpos($quelle, 'requirementsChecks(') !== false, "{$datei} nutzt requirementsChecks() nicht");
     }
 });
+
+test('Update-Wizard: sperrt sich erst nach der Ergebnisseite (OI-23)', function () use ($wizardSource) {
+    // Bis 1.12.0 schrieb Schritt 3 die Sperre vor der Ausgabe. Scheiterte das
+    // Rendern, war der Assistent zu und das Ergebnis nirgends mehr zu sehen --
+    // wieder oeffnen liess er sich nur durch Loeschen der .htaccess.
+    $html  = strpos($wizardSource, '<!DOCTYPE html>');
+    $ende  = strpos($wizardSource, '</html>');
+    $sperre = strpos($wizardSource, 'file_put_contents(HTACCESS_PATH');
+
+    assertTrue($html !== false && $ende !== false, 'Seitengeruest nicht gefunden');
+    assertTrue($sperre !== false, 'Der Wizard schreibt seine Sperre nicht mehr');
+    assertSame(1, substr_count($wizardSource, 'file_put_contents(HTACCESS_PATH'),
+        'Die Sperre wird an mehr als einer Stelle geschrieben');
+    assertTrue($sperre > $ende, 'Die Sperre wird vor dem Ende der Ergebnisseite geschrieben');
+
+    // Nur nach erfolgreicher Migration sperren, nie auf der Fehlerseite.
+    $nachEnde = substr($wizardSource, $ende);
+    assertTrue(preg_match('/if\s*\(\s*\$migrationOk\s*\)/', $nachEnde) === 1,
+        'Die Sperre haengt nicht an $migrationOk');
+});

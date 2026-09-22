@@ -18,6 +18,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   dann einfach erneut speichert, legt womöglich etwas doppelt an. Das Aufräumen alter Daten und
   das Holen eines Updates haben keine Zeitgrenze.
 
+### Behoben
+- **Der Update-Assistent sperrt sich erst, nachdem er sein Ergebnis angezeigt hat.** Bisher
+  schrieb er die Sperre vor der Ergebnisseite. Scheiterte die Anzeige, war der Assistent zu und
+  das Ergebnis nirgends mehr zu sehen. Nach einer fehlgeschlagenen Migration sperrt er sich
+  weiterhin nicht.
+- **Installer und Update-Assistent schreiben ihre Sperrdatei mit einheitlichen Zeilenenden.**
+  Auf Windows-Arbeitskopien entstand bisher eine Datei mit gemischten Zeilenenden, die Git nach
+  jedem Update als geändert meldete, obwohl ihr Inhalt gleich war. Installationen aus dem
+  ZIP-Paket waren nicht betroffen.
+
 ---
 
 ## [1.12.0] – 2026-09-22

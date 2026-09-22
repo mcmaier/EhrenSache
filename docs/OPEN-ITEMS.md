@@ -752,10 +752,21 @@ prüft seither die Quelle statisch — das fängt dieselbe Fehlerklasse, aber ke
 aufrufen. Preis: Der Wizard ist bewusst eine einzelne, abhängigkeitsfreie Datei, die auch dann
 läuft, wenn der Rest der Installation nicht mehr zusammenpasst.
 
-**Nebenbefund, unabhängig davon:** Der Wizard sperrt sich per `.htaccess` aus, **bevor** er
-sein Ergebnis rendert. Scheitert das Rendern, ist das Ergebnis nicht mehr erreichbar. Die
-Sperre selbst ist richtig — die Reihenfolge macht jeden Fehler in der Ausgabe unauffindbar.
-Wieder öffnen lässt sich der Assistent nur, indem man `public/update/.htaccess` löscht.
+**Nebenbefund, unabhängig davon:** ~~Der Wizard sperrt sich per `.htaccess` aus, **bevor** er
+sein Ergebnis rendert.~~ **Erledigt am 2026-09-22** (Branch `fix/update-htaccess`): Die Sperre
+steht jetzt hinter `</html>` am Dateiende, weiterhin nur bei `$migrationOk`. Scheitert das
+Rendern, bleibt der Assistent offen und das Ergebnis erreichbar. Test in
+`tests/suites/update_wizard.php`. Offen bleibt allein die Entscheidung oben.
+
+**Zweiter Nebenbefund, am selben Tag behoben:** `public/update/.htaccess` stand nach jedem
+lokalen Update als geändert in `git status`, bei identischem Inhalt. Ursache: Unter Windows mit
+`core.autocrlf=true` steht `index.php` mit CRLF im Arbeitsbaum, das Heredoc der Sperre also auch;
+das angehängte `"\n"` ergab gemischte Zeilenenden. Git hält unter `autocrlf` nur reines CRLF für
+unverändert. Behoben mit zwei Teilen, die nur zusammen wirken: Beide Generatoren (Assistent und
+Installer) schreiben reines LF, und `.gitattributes` legt `eol=lf` für beide Sperrdateien fest.
+Tests in `tests/suites/htaccess_locks.php`. Der Installer schreibt bewusst einen anderen
+Kommentartext als die ausgelieferte Datei („Installation abgeschlossen“); nach einem lokalen
+Installerlauf bleibt `public/install/.htaccess` deshalb als geändert stehen. Das ist gewollt.
 
 ---
 
