@@ -97,11 +97,13 @@ Neue Datei `public/css/components/filter-chips.css`, Vorbild `.response-chip`
   sobald einer aktiv ist. Das entspricht der Entscheidung aus OI-71 (1.9.1), dass Aktiv/Inaktiv
   aus dem Gesamtbestand des Jahres gezählt wird.
 - **Chips schließen sich gegenseitig aus.** Die Summe der Status-Chips ergibt „Alle“.
-- **Ein gemeinsamer JS-Baustein** in `public/js/modules/ui.js`, z. B.
-  `renderFilterChips(container, chips, activeKey, onChange)`, mit
-  `chips = [{ key, label, count, variant, static? }]`. Die Module liefern nur Definition und
-  Zahlen; Rendern, `aria-pressed` und Klickbehandlung liegen einmal im Baustein. Die Zählregel
-  als reine Funktion (Liste, Statusfunktion → Zähler je Schlüssel), damit sie testbar ist.
+- **Ein gemeinsamer JS-Baustein** im importfreien Modul `public/js/modules/filter_chips.js`
+  (damit Node ihn ohne Browser für die Tests laden kann):
+  `renderFilterChips(container, defs, counts, activeKey, onChange, options)`, mit
+  Chip-Definitionen `defs = [{ key, label, variant?, match? }]` und getrennt dazu berechneten
+  Zählern `counts` (aus `countChips`). Die Module liefern nur Definition und Basisliste; Rendern,
+  `aria-pressed` und Klickbehandlung liegen einmal im Baustein. Die Zählregel als reine Funktion
+  (Liste, Chip-Definitionen → Zähler je Schlüssel), damit sie testbar ist.
 
 ## Umfang je Ansicht
 

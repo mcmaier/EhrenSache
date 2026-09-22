@@ -126,6 +126,8 @@ export function resolveActiveChip(defs, activeKey, fallbackKey) {
 export function renderFilterChips(container, defs, counts, activeKey, onChange, options = {}) {
     if (!container) return;
     const isStatic = options.static === true;
+    const focusedKey = container.contains(document.activeElement)
+        ? document.activeElement.dataset.chip : null;
 
     container.replaceChildren();
     container.setAttribute('role', 'group');
@@ -157,9 +159,12 @@ export function renderFilterChips(container, defs, counts, activeKey, onChange, 
         count.className = 'filter-chip__count';
         count.textContent = String(counts?.[def.key] ?? 0);
 
-        chip.append(label, count);
+        chip.append(label, ' ', count);
         container.appendChild(chip);
     }
+
+    // Neu gezeichnet wird bei jedem Wechsel -- ohne das fiele der Tastaturfokus auf <body>.
+    if (focusedKey) container.querySelector(`[data-chip="${focusedKey}"]`)?.focus();
 }
 
 /** Zuruecksetzen-Knopf nur zeigen, wenn ein Filter von der Vorgabe abweicht. */
