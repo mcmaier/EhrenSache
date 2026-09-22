@@ -2694,8 +2694,39 @@ function showOfflineIndicator() {
     }, 3000);
 }
 
+// Wie lange eine Ablehnung als "offener Punkt" gilt -- dasselbe Fenster wie
+// serverseitig OPEN_ITEMS_REJECTED_DAYS und der Filter fuer abgelehnte
+// Antraege weiter unten.
+const OPEN_HISTORY_REJECTED_DAYS = 14;
+
+/**
+ * Ist der Verlaufseintrag ein "offener Punkt" im Sinn von FI-17 (wartender
+ * Antrag, eingereichte Sitzung mit Ende, oder eine erst kuerzlich entschiedene
+ * Ablehnung)? Solche Eintraege bleiben in der Historie immer sichtbar, auch
+ * wenn schon 20 neuere Eintraege existieren -- sonst liefe der Sprung aus dem
+ * Block "Offene Punkte" (loadOpenItems) ins Leere. records zaehlen nie als
+ * offener Punkt, die Anwesenheit selbst ist keine Entscheidung, auf die man
+ * wartet.
+ */
+function isOpenHistoryEntry(entry) {
+    const d = entry.data;
+    const decidedRecently = (approvedAt) => {
+        if (!approvedAt) return false;
+        const grenze = Date.now() - OPEN_HISTORY_REJECTED_DAYS * 24 * 60 * 60 * 1000;
+        return new Date(String(approvedAt).replace(' ', 'T')).getTime() >= grenze;
+    };
+    if (entry.type === 'exception') {
+        return d.status === 'pending' || (d.status === 'rejected' && decidedRecently(d.approved_at));
+    }
+    if (entry.type === 'session') {
+        return (d.status === 'submitted' && !!d.end_time)
+            || (d.status === 'rejected' && decidedRecently(d.approved_at));
+    }
+    return false;
+}
+
 // Lädt History beim Login
-async function loadHistory() {    
+async function loadHistory() {
         
     try {
         // Lade letzte 10 Records
@@ -2743,6 +2774,15 @@ async function loadHistory() {
             }
         }
 
+        // Die neuesten 10 plus offene Sitzungen dahinter (FI-17: eingereicht
+        // mit Ende oder frisch abgelehnt). Ohne das faende eine seit Wochen
+        // wartende Sitzung gar nicht erst den Weg in "combined" und koennte
+        // durch die Pin-Regel unten auch nicht mehr gerettet werden.
+        const topSessions = sessions.slice(0, 10);
+        const pinnedSessions = sessions.slice(10)
+            .filter(s => isOpenHistoryEntry({ type: 'session', data: s }));
+        const sessionsToShow = [...topSessions, ...pinnedSessions];
+
         // Kombiniere und sortiere nach Datum (neueste zuerst)
         const combined = [
             ...records.slice(0, 10).map(r => ({
@@ -2764,7 +2804,7 @@ async function loadHistory() {
                     ? new Date(String(e.approved_at).replace(' ', 'T'))
                     : new Date(e.created_at)
             })),
-            ...sessions.slice(0, 10).map(s => ({
+            ...sessionsToShow.map(s => ({
                 type: 'session',
                 data: s,
                 // Der Beginn, nicht das Ende: eine laufende Sitzung hat noch
@@ -2778,9 +2818,17 @@ async function loadHistory() {
         // Debug
         debug.log("Loading History", combined);
 
-        // Zeige die letzten Einträge. Mit drei Quellen statt zwei waeren zehn
-        // je Art zu knapp fuer einen brauchbaren Ueberblick.
-        renderHistory(combined.slice(0, 20));
+        // Zeige die letzten 20 Eintraege, dazu jeden offenen Eintrag (FI-17)
+        // dahinter -- sonst liefe der Sprung aus dem Block "Offene Punkte"
+        // ins Leere, nur weil der Antrag schon etwas laenger wartet. Die
+        // Gesamtreihenfolge bleibt nach Zeitstempel.
+        const top20 = combined.slice(0, 20);
+        const pinnedBeyond = combined.slice(20).filter(isOpenHistoryEntry);
+        const toRender = pinnedBeyond.length === 0
+            ? top20
+            : [...top20, ...pinnedBeyond].sort((a, b) => b.timestamp - a.timestamp);
+
+        renderHistory(toRender);
         
     } catch (error) {
         debug.error('Fehler beim Laden der History:', error);
@@ -4429,16 +4477,37 @@ async function loadResponses() {
     renderResponses(null, drafts);
 }
 
+// Wie weit ein Termin in die Zukunft reichen darf, damit seine Rueckmeldung
+// noch im Zaehler mitzaehlt. Wie serverseitig in open_items.php --
+// Uebereinstimmung mit dem Block "Offene Punkte", keine Mahnung fuer Termine,
+// die Monate entfernt liegen.
+const OPEN_ITEMS_RESPONSE_DAYS = 14;
+
+/** Horizont ('YYYY-MM-DD') aus lokalen Datumsteilen -- toISOString() wuerde bei der Uhrzeit auf UTC verschieben. */
+function openItemsResponseHorizon() {
+    const grenze = new Date();
+    grenze.setDate(grenze.getDate() + OPEN_ITEMS_RESPONSE_DAYS);
+    const jahr = grenze.getFullYear();
+    const monat = String(grenze.getMonth() + 1).padStart(2, '0');
+    const tag = String(grenze.getDate()).padStart(2, '0');
+    return `${jahr}-${monat}-${tag}`;
+}
+
 function updateResponsesBadge() {
     const badge = document.getElementById('responsesTabBadge');
     if (!badge) return;
-    // Nur Rueckmeldetermine ohne eigene Antwort, deren Frist noch laeuft. Nach
-    // Beginn nimmt der Server keine Antwort mehr an; nach Fristablauf nimmt er
-    // sie noch an (als "kurzfristig"), aber der Zaehler fordert dann zu nichts
-    // mehr auf, was jemand braucht (Nutzer-Vorgabe, seit 1.12.0).
+    // Nur Rueckmeldetermine ohne eigene Antwort, deren Frist noch laeuft und
+    // deren Termin hoechstens OPEN_ITEMS_RESPONSE_DAYS entfernt liegt (FI-17:
+    // derselbe Horizont wie im Block "Offene Punkte", sonst mahnt der Zaehler
+    // fuer Termine, die Monate entfernt liegen). Nach Beginn nimmt der Server
+    // keine Antwort mehr an; nach Fristablauf nimmt er sie noch an (als
+    // "kurzfristig"), aber der Zaehler fordert dann zu nichts mehr auf, was
+    // jemand braucht (Nutzer-Vorgabe, seit 1.12.0).
     const jetzt = new Date();
+    const horizont = openItemsResponseHorizon();
     const open = upcomingResponses.filter(item =>
         item.appointment.responses_enabled && !item.own && !item.started
+        && String(item.appointment.date).slice(0, 10) <= horizont
         && !(item.settings?.deadline
              && new Date(String(item.settings.deadline).replace(' ', 'T')) < jetzt)).length;
     badge.textContent = String(open);

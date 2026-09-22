@@ -124,3 +124,25 @@ test('PWA: Verlauf laedt auch abgelehnte Antraege', function () use ($root) {
     assertTrue(str_contains($body, 'approved_at'), 'Das Fenster wird nicht ueber approved_at bestimmt');
     assertTrue(str_contains($body, '14'), 'Das Fenster von 14 Tagen fehlt');
 });
+
+test('PWA: Zaehler am Tab Termine zaehlt nur die naechsten 14 Tage', function () use ($root) {
+    $js = (string) file_get_contents($root . '/public/checkin/js/app.js');
+    $start = strpos($js, 'function updateResponsesBadge(');
+    assertTrue($start !== false, 'updateResponsesBadge() fehlt');
+    $body = substr($js, $start, (int) strpos($js, "\n}", $start) - $start);
+    assertTrue(str_contains($body, 'OPEN_ITEMS_RESPONSE_DAYS'),
+        'updateResponsesBadge() nutzt den 14-Tage-Horizont nicht');
+});
+
+test('PWA: Verlauf behaelt offene Eintraege auch hinter den letzten 20', function () use ($root) {
+    $js = (string) file_get_contents($root . '/public/checkin/js/app.js');
+    $start = strpos($js, 'async function loadHistory(');
+    assertTrue($start !== false, 'loadHistory() fehlt');
+    $body = substr($js, $start, (int) strpos($js, "\nfunction ", $start) - $start);
+    assertTrue(str_contains($body, 'isOpenHistoryEntry'),
+        'loadHistory() nutzt isOpenHistoryEntry() nicht');
+    assertTrue(str_contains($body, 'combined.slice(20)') || str_contains($body, 'pinnedBeyond'),
+        'loadHistory() rendert weiterhin nur die ersten 20 Eintraege ohne offene Ausnahme');
+    assertTrue(!preg_match('/renderHistory\(\s*combined\.slice\(0,\s*20\)\s*\)/', $body),
+        'loadHistory() rendert unveraendert nur combined.slice(0, 20)');
+});

@@ -50,7 +50,7 @@ function itemHtml(item) {
         </button>`;
     }
     if (item.kind === 'exception') {
-        const label = item.exception_type === 'absence' ? 'Entschuldigung' : 'Zeitantrag';
+        const label = item.exception_type === 'absence' ? 'Entschuldigung' : 'Zeitkorrektur';
         return `<button type="button" class="open-item" data-kind="exception">
             <span class="open-item__title">${label} · ${escapeHtml(item.title)} ${formatWhen(item.date)}</span>
             ${chipHtml(item.state)}
