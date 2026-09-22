@@ -1405,3 +1405,71 @@ test('POST exceptions: kein zweiter offener Antrag zum selben Termin (G7)', func
         rsDropWorld($welt);
     }
 });
+
+/** Entschuldigung des Kontos user zu einem Termin. */
+function rsUserAbsence(int $memberId, int $appointmentId): array
+{
+    return apiRequest('POST', 'exceptions', ['token' => apiToken('user'), 'body' => [
+        'member_id' => $memberId, 'appointment_id' => $appointmentId,
+        'exception_type' => 'absence', 'reason' => 'RS-Infokarte',
+    ]]);
+}
+
+test('Infokarte traegt den eigenen Entschuldigungsantrag und started (1.12.0)', function () {
+    $info = rsWorld('InfoAbsage');
+    try {
+        $apt = rsAppointment($info, rsDateInDays(7), '19:00:00');
+
+        rsWithUserInWorld($info, function (int $memberId) use ($apt) {
+            $karte = rsUpcoming(true)[$apt] ?? null;
+            assertTrue($karte !== null, 'Infotermin fehlt in der Liste');
+            assertSame(false, $karte['started'], 'Termin in sieben Tagen hat nicht begonnen');
+            assertSame(null, $karte['own_absence'], 'Ohne Antrag keine Entschuldigung');
+
+            $antrag = rsUserAbsence($memberId, $apt);
+            assertStatus(201, $antrag);
+            $id = (int) $antrag['body']['id'];
+
+            $karte = rsUpcoming(true)[$apt];
+            assertSame(['exception_id' => $id, 'status' => 'pending'], $karte['own_absence']);
+
+            // Nach einer Ablehnung zaehlt der juengste Antrag
+            assertStatus(200, apiRequest('PUT', 'exceptions', ['token' => apiToken('admin'),
+                'query' => ['id' => $id], 'body' => ['status' => 'rejected']]));
+            assertSame('rejected', rsUpcoming(true)[$apt]['own_absence']['status']);
+
+            $neu = rsUserAbsence($memberId, $apt);
+            assertStatus(201, $neu, 'Nach einer Ablehnung ist ein neuer Antrag moeglich');
+            $neuId = (int) $neu['body']['id'];
+            assertSame(['exception_id' => $neuId, 'status' => 'pending'],
+                       rsUpcoming(true)[$apt]['own_absence'], 'Der neue Antrag steht an der Karte');
+
+            // Zurueckziehen: das Mitglied loescht den offenen Antrag
+            assertStatus(200, apiRequest('DELETE', 'exceptions', ['token' => apiToken('user'),
+                'query' => ['id' => $neuId]]));
+            assertSame('rejected', rsUpcoming(true)[$apt]['own_absence']['status'],
+                'Nach dem Zurueckziehen steht wieder die Ablehnung an der Karte');
+        });
+    } finally {
+        rsDropWorld($info);
+    }
+});
+
+test('Infokarte: ein heute begonnener Termin traegt started (1.12.0)', function () {
+    $info = rsWorld('InfoBegonnen');
+    try {
+        $start = new DateTimeImmutable('-1 minute');
+        if ($start->format('Y-m-d') !== date('Y-m-d')) {
+            return;   // kurz nach Mitternacht: kein heute begonnener Termin moeglich
+        }
+        $apt = rsAppointment($info, $start->format('Y-m-d'), $start->format('H:i:00'));
+
+        rsWithUserInWorld($info, function () use ($apt) {
+            $karte = rsUpcoming(true)[$apt] ?? null;
+            assertTrue($karte !== null, 'Ein heute begonnener Termin bleibt bis Tagesende in der Liste');
+            assertSame(true, $karte['started']);
+        });
+    } finally {
+        rsDropWorld($info);
+    }
+});

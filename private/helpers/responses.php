@@ -457,9 +457,18 @@ function responsesFetchUpcomingInfo($db, $database, int $memberId, string $now):
     $activity = getMemberActivityWhere('m', 'a.date');
     $tage     = (int) UPCOMING_INFO_DAYS;
 
+    // Der juengste eigene Entschuldigungsantrag je Termin (seit 1.12.0): Die
+    // Karte bietet damit „Entschuldigen“ an oder zeigt den Stand. Juengster,
+    // weil nach einer Ablehnung ein neuer Antrag moeglich ist.
+    $latestAbsence = "SELECT e.exception_id FROM {$prefix}exceptions e
+                      WHERE e.member_id = mga.member_id AND e.appointment_id = a.appointment_id
+                        AND e.exception_type = 'absence'
+                      ORDER BY e.exception_id DESC LIMIT 1";
+
     $stmt = $db->prepare("
         SELECT DISTINCT a.appointment_id, a.title, a.date, a.start_time, a.end_time,
-               a.location, a.description, a.type_id, t.type_name, t.color
+               a.location, a.description, a.type_id, t.type_name, t.color,
+               x.exception_id AS absence_id, x.status AS absence_status
         FROM {$prefix}appointments a
         JOIN {$prefix}appointment_types t
              ON t.type_id = a.type_id AND COALESCE(t.responses_enabled, 0) = 0
@@ -467,18 +476,30 @@ function responsesFetchUpcomingInfo($db, $database, int $memberId, string $now):
         JOIN {$prefix}member_group_assignments mga
              ON mga.group_id = atg.group_id AND mga.member_id = ?
         JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activity}
+        LEFT JOIN {$prefix}exceptions x ON x.exception_id = ({$latestAbsence})
         WHERE a.date BETWEEN DATE(?) AND DATE(?) + INTERVAL {$tage} DAY
         ORDER BY a.date, a.start_time
     ");
     $stmt->execute([$memberId, $now, $now]);
 
-    return array_map('responsesInfoItem', $stmt->fetchAll(PDO::FETCH_ASSOC));
+    return array_map(static fn (array $row) => responsesInfoItem($row, $now),
+                     $stmt->fetchAll(PDO::FETCH_ASSOC));
 }
 
-/** Schlanker Eintrag ohne Zaehlung und Namen. */
-function responsesInfoItem(array $row): array
+/**
+ * Schlanker Eintrag ohne Zaehlung und Namen.
+ *
+ * started und own_absence tragen die Entschuldigung an der Karte (seit
+ * 1.12.0): bis Terminbeginn beantragen, solange offen zurueckziehen.
+ */
+function responsesInfoItem(array $row, string $now): array
 {
     return [
+        'started'     => responseHasStarted($row['date'], $row['start_time'], $now),
+        'own_absence' => $row['absence_id'] === null ? null : [
+            'exception_id' => (int) $row['absence_id'],
+            'status'       => $row['absence_status'],
+        ],
         'appointment' => [
             'appointment_id'    => (int) $row['appointment_id'],
             'title'             => $row['title'],
