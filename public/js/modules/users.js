@@ -83,6 +83,14 @@ function renderUsers(users, page = 1)
     const tbody = document.getElementById('usersTableBody');
     tbody.innerHTML = '';
 
+    if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="loading">Keine Benutzer für diese Auswahl</td></tr>';
+        // Sonst bleiben Seitenknöpfe der vorigen Liste stehen (OI-84)
+        allFilteredUsers = [];
+        renderUsersPagination(1, 0, 0);
+        return;
+    }
+
     // Alle Users speichern für Pagination
     allFilteredUsers = users;
     currentUsersPage = page;

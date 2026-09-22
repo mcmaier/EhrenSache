@@ -147,6 +147,7 @@ test('Benutzer: Chips statt bunter Pillenknoepfe', function () use ($fcRoot, $fc
     assertTrue(str_contains($js, 'CHIPS_USERS'), 'users.js nutzt den Chipsatz nicht');
     assertSame(0, substr_count($js, 'setUserStatusFilter'), 'setUserStatusFilter muss entfallen');
     assertTrue(str_contains($js, 'countChips(base, CHIPS_USERS)'), 'Benutzer: Chips muessen auf der Basisliste zaehlen');
+    assertTrue(str_contains($js, 'Keine Benutzer für diese Auswahl'), 'Leere Benutzerliste braucht einen Hinweis');
 });
 
 test('Mitglieder: Chips zaehlen den Jahresbestand, nicht die Chip-Auswahl (OI-71)', function () use ($fcRoot) {
