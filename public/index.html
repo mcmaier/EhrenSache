@@ -1429,19 +1429,12 @@
                     </div>
                 </div>
 
-                <div class="stats-grid">
+                <div class="stats-grid stats-grid--chips-lead">
                     <div class="stat-card">
                         <h3>Bestätigte Stunden</h3>
                         <div class="number" id="statWorktimeTotal">-</div>
                     </div>
-                    <div class="stat-card">
-                        <h3>Wartet auf Freigabe</h3>
-                        <div class="number" id="statWorktimePending">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Laufende Sitzungen</h3>
-                        <div class="number" id="statWorktimeOpen">-</div>
-                    </div>
+                    <div class="filter-chips" id="worktimeStatusChips"></div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
                         <h3>Jahr filtern</h3>
                         <select id="worktimeYearFilter"
@@ -1451,15 +1444,6 @@
                 </div>
 
                 <div class="filter-bar">
-                    <div class="form-group">
-                        <label for="filterWorktimeStatus">Status:</label>
-                        <select id="filterWorktimeStatus">
-                            <option value="">Alle</option>
-                            <option value="submitted">Wartet auf Freigabe</option>
-                            <option value="confirmed">Bestätigt</option>
-                            <option value="rejected">Abgelehnt</option>
-                        </select>
-                    </div>
                     <div class="form-group">
                         <label for="filterWorktimeActivity">Tätigkeit:</label>
                         <select id="filterWorktimeActivity">
@@ -1472,7 +1456,7 @@
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
-                    <button onclick="resetWorktimeFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
+                    <button id="resetWorktimeFilter" class="btn-reset-filter" hidden>Filter zurücksetzen</button>
                 </div>
 
                 <div class="data-table">

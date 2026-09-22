@@ -96,3 +96,18 @@ test('Antraege: Chips statt Zaehlkarten und Status-Auswahl', function () use ($f
     assertSame(0, substr_count($js, 'filterExceptionStatus'), 'exceptions.js liest noch das alte Auswahlfeld');
     assertTrue(str_contains($js, 'setResetVisible'), 'Zuruecksetzen-Sichtbarkeit fehlt');
 });
+
+test('Arbeitszeit: Chips, Summenkarte bleibt', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'zeiterfassung', 'import-logs');
+    assertTrue(str_contains($bereich, 'id="worktimeStatusChips"'), 'Chip-Container fehlt');
+    assertTrue(str_contains($bereich, 'stats-grid stats-grid--chips-lead'), 'Kopfzeile ohne stats-grid--chips-lead');
+    assertTrue(str_contains($bereich, 'id="statWorktimeTotal"'), '"Bestaetigte Stunden" muss bleiben');
+    foreach (['statWorktimePending', 'statWorktimeOpen', 'filterWorktimeStatus'] as $id) {
+        assertSame(0, substr_count($fcHtml, $id), $id . ' muss entfallen');
+    }
+    assertTrue(str_contains($bereich, 'id="resetWorktimeFilter"'), 'Zuruecksetzen braucht eine ID');
+
+    $js = fcModul($fcRoot, 'worktime');
+    assertTrue(str_contains($js, 'CHIPS_WORKTIME'), 'worktime.js nutzt den Chipsatz nicht');
+    assertSame(0, substr_count($js, 'filterWorktimeStatus'), 'worktime.js liest noch das alte Auswahlfeld');
+});
