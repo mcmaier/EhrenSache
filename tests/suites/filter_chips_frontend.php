@@ -95,6 +95,7 @@ test('Antraege: Chips statt Zaehlkarten und Status-Auswahl', function () use ($f
     assertTrue(str_contains($js, 'CHIPS_EXCEPTIONS'), 'exceptions.js nutzt den Chipsatz nicht');
     assertSame(0, substr_count($js, 'filterExceptionStatus'), 'exceptions.js liest noch das alte Auswahlfeld');
     assertTrue(str_contains($js, 'setResetVisible'), 'Zuruecksetzen-Sichtbarkeit fehlt');
+    assertTrue(str_contains($js, 'countChips(base, CHIPS_EXCEPTIONS)'), 'Antraege: Chips muessen auf der Basisliste zaehlen');
 });
 
 test('Arbeitszeit: Chips, Summenkarte bleibt', function () use ($fcRoot, $fcHtml) {
@@ -112,6 +113,7 @@ test('Arbeitszeit: Chips, Summenkarte bleibt', function () use ($fcRoot, $fcHtml
     assertTrue(str_contains($js, 'CHIPS_WORKTIME'), 'worktime.js nutzt den Chipsatz nicht');
     assertSame(0, substr_count($js, 'filterWorktimeStatus'), 'worktime.js liest noch das alte Auswahlfeld');
     assertTrue(str_contains($js, 'updateWorktimeStats(base)'), 'Die Summe darf dem Chip nicht folgen -- updateWorktimeStats bekommt die Basisliste');
+    assertTrue(str_contains($js, 'countChips(base, CHIPS_WORKTIME)'), 'Arbeitszeit: Chips muessen auf der Basisliste zaehlen');
 });
 
 test('Mitglieder: Chips statt Karten und Inaktiv-Schalter', function () use ($fcRoot, $fcHtml) {
@@ -135,10 +137,13 @@ test('Mitglieder: Chips zaehlen den Jahresbestand, nicht die Chip-Auswahl (OI-71
     assertTrue($start !== false, 'showMemberSection() fehlt');
     $ende = strpos($js, "\n}", $start);
     $rumpf = substr($js, $start, $ende - $start);
-    // countChips muss VOR filterByChip stehen, sonst zeigt "Inaktiv" 0,
-    // sobald "Aktiv" gewaehlt ist -- genau der Fehler aus OI-71.
-    $zaehlen = strpos($rumpf, 'countChips(');
-    $filtern = strpos($rumpf, 'filterByChip(');
-    assertTrue($zaehlen !== false && $filtern !== false, 'countChips/filterByChip fehlen');
-    assertTrue($zaehlen < $filtern, 'Gezaehlt werden muss vor dem Chip-Filter');
+    // Reine Positionspruefung (countChips vor filterByChip) reicht nicht --
+    // countChips(filterByChip(base, ...), ...) stuende auch davor. Deshalb
+    // direkt den erwarteten Aufruf verlangen: Chips zaehlen auf der
+    // Basisliste, nicht auf der Chip-Auswahl.
+    assertTrue(str_contains($rumpf, 'countChips(base, CHIPS_MEMBERS)'),
+        'Chips muessen auf der Basisliste zaehlen, nicht auf der Chip-Auswahl (OI-71)');
+    $gruppe = strpos($rumpf, 'group_ids_array.includes(');
+    assertTrue($gruppe !== false && $gruppe < strpos($rumpf, 'countChips('),
+        'Der Gruppenfilter muss vor dem Zaehlen greifen');
 });
