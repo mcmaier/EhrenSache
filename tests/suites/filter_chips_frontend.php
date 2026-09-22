@@ -179,4 +179,5 @@ test('Geraete: Chips statt Karten', function () use ($fcRoot, $fcHtml) {
     // der ganze Bestand, nicht eine bereits gefilterte Liste.
     assertTrue(str_contains($js, 'countChips(allDevices, CHIPS_DEVICES)'), 'Geraete: Chips muessen auf dem ganzen Bestand zaehlen');
     assertTrue(str_contains($js, 'Keine Geräte für diese Auswahl'), 'Leere Geraeteliste braucht einen Hinweis');
+    assertTrue(str_contains($js, 'Number(device.is_active) === 1'), 'Badge und Chip muessen is_active gleich auswerten');
 });

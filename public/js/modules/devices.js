@@ -107,8 +107,8 @@ function renderDevices(devices, page = 1)
         }[device.device_type] || '❓ Unbekannt';
 
         // Status
-        const statusBadge = device.is_active 
-            ? '<span class="badge badge-success">Aktiv</span>' 
+        const statusBadge = Number(device.is_active) === 1
+            ? '<span class="badge badge-success">Aktiv</span>'
             : '<span class="badge badge-inactive">Inaktiv</span>';
 
         // Token Expiry
