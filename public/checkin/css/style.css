@@ -985,27 +985,21 @@ body {
 .history-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
     margin-top: 3px;
     font-size: 12px;
     color: var(--text-light);
 }
 
-/* Der Chip steht immer rechts, auch ohne Terminart links */
-.history-meta .response-chip {
-    margin-left: auto;
-}
-
-.history-meta__text {
-    display: inline-flex;
+/* Fusszeile: Status-Chip links, Aktion rechts in derselben Zeile */
+.history-foot {
+    display: flex;
     align-items: center;
-    min-width: 0;
+    gap: 8px;
+    margin-top: 6px;
 }
 
 .history-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 6px;
+    margin-left: auto;
 }
 
 /* Time Display */

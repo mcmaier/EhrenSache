@@ -20,10 +20,10 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ### Geändert
 - **Der Verlauf der Check-in-App ist aufgebaut wie die Terminkarten.** Bisher standen Kopf,
   Titel, Status und Terminart untereinander, und die Terminart wiederholte oft nur den Titel.
-  Jetzt steht der Titel links und der Zeitpunkt rechts. Darunter folgen links Terminart oder
-  Dauer und rechts der Status als Chip, in denselben Worten und Farben wie im Tab „Termine“.
+  Jetzt steht der Titel links und der Zeitpunkt rechts, darunter Terminart oder Dauer. Unten
+  links steht der Status als Chip, in denselben Worten und Farben wie im Tab „Termine“.
   Der farbige Rand zeigt die Farbe der Terminart bzw. der Tätigkeit statt des Status, wie im Tab
-  „Termine“. Löschen und Korrigieren stehen unten rechts. Anträge nennen den Zeitpunkt des
+  „Termine“. Löschen und Korrigieren stehen in derselben Zeile rechts. Anträge nennen den Zeitpunkt des
   Termins, nicht den des Antrags.
 
 ---

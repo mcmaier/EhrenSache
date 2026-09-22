@@ -2570,16 +2570,23 @@ function historyCardHtml(p) {
     const chip = p.chip
         ? `<span class="response-chip response-chip--${p.chip.cls}">${escapeHtml(p.chip.text)}</span>` : '';
 
+    // Status unten links, Aktion unten rechts in derselben Zeile -- rechts
+    // uebereinander gestapelt wirkten beide wie ein Knopf (Nutzer-Vorgabe).
+    // Die Zeile mit Terminart oder Dauer entfaellt, wenn sie leer waere.
+    const meta = p.meta
+        ? `<div class="history-meta">${dot}${escapeHtml(p.meta || '')}</div>` : '';
+    const foot = chip || p.actionHtml
+        ? `<div class="history-foot">${chip}${p.actionHtml ? `<span class="history-actions">${p.actionHtml}</span>` : ''}</div>`
+        : '';
+
     return `
         <div class="history-head">
             <span class="history-title">${p.icon} ${escapeHtml(p.title)}</span>
             <span class="history-when">${escapeHtml(p.when)}</span>
         </div>
-        <div class="history-meta">
-            <span class="history-meta__text">${dot}${escapeHtml(p.meta || '')}</span>${chip}
-        </div>
+        ${meta}
         ${p.extraHtml || ''}
-        ${p.actionHtml ? `<div class="history-actions">${p.actionHtml}</div>` : ''}`;
+        ${foot}`;
 }
 
 /** Legt einen Verlaufseintrag an; die Randfarbe nur als Hexwert. */
