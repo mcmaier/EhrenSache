@@ -33,6 +33,16 @@ test('Die Chip-Komponente existiert und wird geladen', function () use ($fcRoot,
     assertTrue($fcCss !== '', 'css/components/filter-chips.css fehlt');
     $main = (string) file_get_contents($fcRoot . '/public/css/main.css');
     assertTrue(str_contains($main, 'components/filter-chips.css'), 'main.css importiert filter-chips.css nicht');
+
+    // responsive.css muss NACH filter-chips.css importiert werden: Nur so
+    // gewinnt dessen .stats-grid{grid-template-columns:1fr} auf schmalen
+    // Bildschirmen gegen .stats-grid--chips aus dieser Komponente (gleiche
+    // Spezifitaet, spaetere Regel gewinnt in der Kaskade).
+    $posChips = strpos($main, 'components/filter-chips.css');
+    $posResponsive = strpos($main, 'responsive.css');
+    assertTrue($posChips !== false && $posResponsive !== false && $posChips < $posResponsive,
+        'filter-chips.css muss vor responsive.css importiert werden, sonst gewinnt auf schmalen ' .
+        'Bildschirmen nicht die einspaltige .stats-grid-Regel aus responsive.css');
 });
 
 test('Die Chip-Komponente nutzt nur Tokens, keine Hex-Farben', function () use ($fcCss) {
@@ -40,9 +50,15 @@ test('Die Chip-Komponente nutzt nur Tokens, keine Hex-Farben', function () use (
     $ohneKommentare = (string) preg_replace('#/\*.*?\*/#s', '', $fcCss);
     assertSame(0, preg_match('/#[0-9a-fA-F]{3,8}\b/', $ohneKommentare),
         'filter-chips.css enthaelt eine Hex-Farbe -- Farben nur ueber variables.css');
+    // rgb()/rgba()/hsl()/hsla() sind ebenso hart codierte Farben wie Hex --
+    // erlaubt sind nur Tokens und color-mix() darueber. "srgb" (color-mix(in
+    // srgb, ...)) schlaegt nicht an, weil kein "(" auf "rgb" folgt.
+    assertSame(0, preg_match('/\b(rgba?|hsla?)\(/i', $ohneKommentare),
+        'filter-chips.css enthaelt eine rgb()/hsl()-Farbe -- nur Tokens/color-mix() erlaubt');
     // Lookbehind: --bg-white ist ein Token und soll nicht anschlagen.
     // Lookahead: white-space (CSS-Eigenschaft) ist keine Farbe und soll ebenfalls nicht anschlagen.
-    assertSame(0, preg_match('/(?<![-\w])(white|black|gray|grey)\b(?!-)/', $ohneKommentare),
+    // transparent, currentColor, inherit sind keine festen Farben und bleiben erlaubt.
+    assertSame(0, preg_match('/(?<![-\w])(white|black|gray|grey|red|blue|green|orange|yellow|lightgray|darkgray)\b(?!-)/', $ohneKommentare),
         'filter-chips.css enthaelt eine benannte Farbe');
 });
 

@@ -48,8 +48,29 @@
     margin-bottom: var(--spacing-sm);
 }
 
+/* Kontrast (WCAG AA, >= 4.5:1): --chip-text-mix bestimmt, wie viel Chipfarbe
+   in den Text einfliesst -- weniger Chipfarbe, mehr --text-dark. Die Vorgabe
+   40% deckt den neutralen Chip (Text: --text-light, sowohl ruhend als auch
+   aktiv mit --primary-color) sowie --danger und --info mit Reserve ab; nur
+   --pending und --ok brauchen einen eigenen, niedrigeren Wert (Warnorange
+   und Gruen verlieren sonst zu schnell Kontrast). Geprueft mit einem
+   Wegwerf-Node-Skript (nicht im Repo) gegen alle vier Hintergruende, die
+   ein Chip tatsaechlich zeigt: ruhend (8% Chipfarbe auf --bg-white), aktiv
+   (22%), sowie die Zaehl-Badge (18% Chipfarbe/transparent) auf beiden.
+   Schwaechster Wert je Chip, --text-dark #2F3A45 auf --bg-white #ffffff:
+
+     Chip               Mix   ruhend  aktiv  Badge/ruhend  Badge/aktiv
+     pending (#f39c12)  35%   5.93:1  5.32:1   5.21:1        4.76:1
+     ok      (#27ae60)  35%   6.49:1  5.63:1   5.49:1        4.87:1
+     danger  (#e74c3c)  40%   7.17:1  5.97:1   5.77:1        4.93:1
+     info    (#1F5FBF)  40%   8.13:1  6.56:1   6.30:1        5.21:1
+     neutral (#7f8c8d)  40%   6.46:1  5.57:1   5.41:1        4.75:1
+     neutral aktiv (primary, s.o.) -- identisch zu info
+
+   Alle Werte >= 4.5:1, kleinster Puffer bei der Badge im aktiven Zustand. */
 .filter-chip {
     --chip-color: var(--text-light);
+    --chip-text-mix: 40%;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -57,7 +78,7 @@
     border: 1px solid color-mix(in srgb, var(--chip-color) 35%, transparent);
     border-radius: 999px;
     background: color-mix(in srgb, var(--chip-color) 8%, var(--bg-white));
-    color: color-mix(in srgb, var(--chip-color) 80%, var(--text-dark));
+    color: color-mix(in srgb, var(--chip-color) var(--chip-text-mix), var(--text-dark));
     font: inherit;
     font-size: 14px;
     font-weight: 500;
@@ -85,8 +106,8 @@
     text-align: center;
 }
 
-.filter-chip--pending { --chip-color: var(--warning-color); }
-.filter-chip--ok      { --chip-color: var(--success-color); }
+.filter-chip--pending { --chip-color: var(--warning-color); --chip-text-mix: 35%; }
+.filter-chip--ok      { --chip-color: var(--success-color); --chip-text-mix: 35%; }
 .filter-chip--danger  { --chip-color: var(--danger-color); }
 .filter-chip--info    { --chip-color: var(--primary-color); }
 
@@ -97,7 +118,7 @@
     background: color-mix(in srgb, var(--chip-color) 22%, var(--bg-white));
 }
 
-.filter-chip.is-active:not([class*="filter-chip--"]) {
+.filter-chip.is-active:not(.filter-chip--pending, .filter-chip--ok, .filter-chip--danger, .filter-chip--info) {
     --chip-color: var(--primary-color);
 }
 
