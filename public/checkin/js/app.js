@@ -2631,7 +2631,7 @@ function activityColor(activityId) {
  * damit dieselbe Tätigkeit in beiden Oberflaechen gleich aussieht.
  */
 function activityDot(color) {
-    return `<span class="activity-dot" style="background: ${escapeHtml(color || '#1F5FBF')}"></span>`;
+    return `<span class="activity-dot" style="background: ${safeHexColor(color, '#1F5FBF')}"></span>`;
 }
 
 function addWorkSessionToHistory(session) {
@@ -2969,12 +2969,12 @@ function addRecordToHistory(record) {
     let typeBadge = '';
     if (record.appointment_type_name) {
         const color = getTypeColor(record.appointment_type_name);
-        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${record.appointment_type_name}</span>`;
+        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${escapeHtml(record.appointment_type_name)}</span>`;
     }
     
     item.innerHTML = `
         <div class="time">📍 ${dateStr} ${timeStr}</div>
-        <div class="appointment">${record.title}</div>
+        <div class="appointment">${escapeHtml(record.title)}</div>
         <span class="status verified">✓ ${statusText}</span>
         ${typeBadge}
     `;
@@ -3030,7 +3030,7 @@ function addExceptionToHistory(exception) {
     let typeBadge = '';
     if (exception.appointment_type_name) {
         const color = getTypeColor(exception.appointment_type_name);
-        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${exception.appointment_type_name}</span>`;
+        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${escapeHtml(exception.appointment_type_name)}</span>`;
     }
 
     // Delete-Button nur bei pending
@@ -3040,7 +3040,7 @@ function addExceptionToHistory(exception) {
     
     item.innerHTML = `        
         <div class="time">📋 ${dateStr} ${timeStr} ${deleteBtn}</div>
-        <div class="appointment">${exception.appointment_title}</div>
+        <div class="appointment">${escapeHtml(exception.appointment_title)}</div>
         <span class="status pending">${antragText}</span>
         ${typeBadge}
         
@@ -3220,7 +3220,7 @@ function addNewActivityToHistory(data) {
     let typeBadge = '';
     if (data.appointment_type_name) {
         const color = getTypeColor(data.appointment_type_name);
-        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${data.appointment_type_name}</span>`;
+        typeBadge = `<span class="type-badge" style="background: ${color}; color: white;">${escapeHtml(data.appointment_type_name)}</span>`;
     }
     
     const statusBadge = data.pending 
@@ -3229,7 +3229,7 @@ function addNewActivityToHistory(data) {
     
     item.innerHTML = `
         <div class="time">🆕 Gerade eben (${timeStr})</div>
-        <div class="appointment">${data.appointment?.title || 'Unbekannter Termin'}</div>
+        <div class="appointment">${escapeHtml(data.appointment?.title || 'Unbekannter Termin')}</div>
         ${statusBadge}
         ${typeBadge}
     `;
@@ -5102,7 +5102,7 @@ function displayGroupStats(stats) {
         return `
             <div class="group-item">
                 <div class="group-header">
-                    <div class="group-name">${groupName}</div>
+                    <div class="group-name">${escapeHtml(groupName)}</div>
                     <div class="group-rate ${bandKlasse}">${attendanceRate.toFixed(1)}%</div>
                 </div>
                 <div class="group-details">
@@ -5185,18 +5185,28 @@ function formatDateTime(date) {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
+/**
+ * Eine Farbe aus der Datenbank, nur wenn sie ein Hexwert ist (1.11.3).
+ *
+ * Farben landen in style-Attributen. escapeHtml() haelt dort zwar das
+ * Attribut zusammen, laesst aber beliebiges CSS durch.
+ */
+function safeHexColor(color, fallback) {
+    return /^#[0-9a-f]{3,8}$/i.test(color || '') ? color : fallback;
+}
+
 function getTypeColor(typeName) {
     if (!typeName || appointmentTypes.length === 0) {
         return '#95a5a6'; // Fallback Grau
     }
-    
+
     // Finde Type in appointmentTypes Array
-    const type = appointmentTypes.find(t => 
-        t.type_name === typeName || 
+    const type = appointmentTypes.find(t =>
+        t.type_name === typeName ||
         t.type_name.toLowerCase() === typeName.toLowerCase()
     );
-    
-    return type ? type.color : '#95a5a6'; // Fallback wenn nicht gefunden
+
+    return safeHexColor(type ? type.color : null, '#95a5a6'); // Fallback wenn nicht gefunden
 }
 
 /** Hinweisband der Demo-Installation. Fester Text, keine Daten aus der Antwort. */
