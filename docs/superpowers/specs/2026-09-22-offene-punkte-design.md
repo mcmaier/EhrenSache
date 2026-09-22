@@ -31,6 +31,7 @@ Einwilligung — und liefert die Abfrage, auf der FI-6 später aufsetzt.
 | Bedienung | Antippen springt an die zuständige Stelle | Alle Aktionen laufen über vorhandene, geprüfte Wege; keine dritte Kopie der Rückmeldelogik |
 | Ort in der PWA | oben im Tab „Erfassen", einklappbar, ohne Punkte ausgeblendet | Start-Tab, den jeder sieht; das Erfassen rutscht nicht nach unten, wenn nichts offen ist |
 | Datenbeschaffung | eigene Ressource `my_open_items`, serverseitig ermittelt | Eine Regelstelle statt zwei Kopien in zwei Clients; eine Anfrage statt vier; Grundlage für FI-6 |
+| Horizont für Rückmeldungen | 14 Tage | Terminserien erzeugen sonst Dutzende offene Rückmeldungen; die Kappung auf 50 in `responsesFetchUpcomingIds()` bleibt damit folgenlos |
 
 `approved_at` wird von beiden Entscheidungswegen auch bei einer Ablehnung gesetzt
 (`exceptions.php` beim Statuswechsel weg von `pending`, `work_sessions.php` bei
@@ -48,13 +49,13 @@ Liefert die Punkte eines Mitglieds, bereits sortiert, und die Zählung. Der Hand
 Hülle darum; FI-6 ruft dieselbe Funktion später auf. `$now` wird hereingereicht, damit Tests die
 Zeit festlegen können — wie bei `responsesFetchUpcomingIds()`.
 
-Konstante `OPEN_ITEMS_REJECTED_DAYS = 14`.
+Konstanten `OPEN_ITEMS_REJECTED_DAYS = 14` und `OPEN_ITEMS_RESPONSE_DAYS = 14`.
 
 ### Welche Punkte
 
 | `kind` | `state` | Bedingung | Quelle |
 |---|---|---|---|
-| `response` | `open` | Terminart mit `responses_enabled = 1`, Mitglied über seine Gruppen erwartet und im Zeitraum aktiv, Termin nicht begonnen, **Frist noch nicht abgelaufen**, keine eigene Antwort | `responsesFetchUpcomingIds()`, Frist über `responseDeadlineHours()` und `responseDeadline()`, Beginn über `responseHasStarted()` |
+| `response` | `open` | Terminart mit `responses_enabled = 1`, Mitglied über seine Gruppen erwartet und im Zeitraum aktiv, Termin nicht begonnen, **Frist noch nicht abgelaufen**, keine eigene Antwort, Termin höchstens 14 Tage voraus (`OPEN_ITEMS_RESPONSE_DAYS`) | `responsesFetchUpcomingIds()`, Frist über `responseDeadlineHours()` und `responseDeadline()`, Beginn über `responseHasStarted()` |
 | `exception` | `pending` | eigener Antrag (`absence` oder `time_correction`), `status = 'pending'` | `exceptions` |
 | `exception` | `rejected` | `status = 'rejected'`, `approved_at >= $now - 14 Tage` | `exceptions` |
 | `work_session` | `pending` | `status = 'submitted'` **und** `end_time IS NOT NULL` | `work_sessions`, nur wenn `isWorktimeEnabled()` |
@@ -161,8 +162,9 @@ Titel und Tätigkeitsnamen laufen durch `escapeHtml()`. Freitexte kommen in der 
 - `tests/suites/open_items_api.php` — eigene Gruppe, Terminart und Termine im Jahr 2031 je
   Test, am Ende abgeräumt; Fristen relativ zu „jetzt", damit der Test zu jeder Tageszeit trägt
   (Lehre aus `5035a35`). Fälle:
-  - offene Rückmeldung erscheint; mit abgelaufener Frist, mit eigener Antwort (auch „unsicher")
-    und nach Beginn erscheint sie nicht;
+  - offene Rückmeldung erscheint; mit abgelaufener Frist, mit eigener Antwort (auch „unsicher"),
+    nach Beginn und mit einem Termin in 20 Tagen (außerhalb des 14-Tage-Horizonts) erscheint sie
+    nicht;
   - Terminart ohne Rückmeldung erscheint nicht;
   - wartender Antrag erscheint; abgelehnter erscheint, nach 15 Tagen nicht mehr;
   - wartende beendete Arbeitszeit erscheint, laufende nicht; bei ausgeschalteter Arbeitszeit

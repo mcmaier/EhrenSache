@@ -26,6 +26,15 @@ require_once __DIR__ . '/responses.php';
 const OPEN_ITEMS_REJECTED_DAYS = 14;
 
 /**
+ * Wie weit eine Rueckmeldung in die Zukunft reichen darf, um als offener
+ * Punkt zu erscheinen. Wegen Terminserien waeren sonst ohne Weiteres 50
+ * kommende woechentliche Proben ohne Antwort gleichzeitig "offen" -- eine
+ * Uebersicht, die niemand mehr liest. Die Grenze bei 14 Tagen haelt die Liste
+ * auf das, was tatsaechlich ansteht.
+ */
+const OPEN_ITEMS_RESPONSE_DAYS = 14;
+
+/**
  * Ist eine Rueckmeldung offen? Dieselbe Regel wie updateResponsesBadge() in
  * der PWA: keine eigene Antwort, Termin nicht begonnen, Frist nicht vorbei.
  * Nach Fristablauf nimmt der Server eine Antwort noch als „kurzfristig" an,
@@ -48,6 +57,14 @@ function openItemsRejectedSince(string $now): string
     return (new DateTimeImmutable($now))
         ->modify('-' . OPEN_ITEMS_REJECTED_DAYS . ' days')
         ->format('Y-m-d H:i:s');
+}
+
+/** Spaetestes Termindatum ('Y-m-d'), zu dem eine Rueckmeldung noch als offener Punkt zaehlt. */
+function openItemsResponseHorizon(string $now): string
+{
+    return (new DateTimeImmutable($now))
+        ->modify('+' . OPEN_ITEMS_RESPONSE_DAYS . ' days')
+        ->format('Y-m-d');
 }
 
 /**
@@ -117,9 +134,14 @@ function openItemsForMember($db, $database, int $memberId, string $now): array
     $items    = [];
 
     // --- Rueckmeldungen -------------------------------------------------
+    // responsesFetchUpcomingIds() begrenzt auf 50 Termine -- bei einer
+    // woechentlichen Serie koennte das schon nach knapp einem Jahr zuschlagen.
+    // Innerhalb des 14-Tage-Horizonts unten bleibt das folgenlos: eine Serie
+    // liefert in zwei Wochen nie annaehernd 50 Termine.
     $globalHours = responseDeadlineHours(null, systemSetting(
         $db, $database, 'response_deadline_hours', (string) RESPONSE_DEADLINE_DEFAULT_HOURS
     ));
+    $horizon = openItemsResponseHorizon($now);
     $ids = responsesFetchUpcomingIds($db, $database, $memberId, $now);
     if ($ids !== []) {
         $in   = implode(',', array_fill(0, count($ids), '?'));
@@ -134,6 +156,9 @@ function openItemsForMember($db, $database, int $memberId, string $now): array
         $stmt->execute(array_merge([$memberId], $ids));
 
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $a) {
+            if ($a['date'] > $horizon) {
+                continue;
+            }
             $deadline = responseDeadline($a['date'], $a['start_time'],
                 responseDeadlineHours($a['response_deadline_hours'], (string) $globalHours));
             if (!openItemsResponseIsOpen($a['date'], $a['start_time'], $deadline, (bool) $a['answered'], $now)) {

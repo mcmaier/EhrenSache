@@ -147,6 +147,14 @@ test('my_open_items: offene Rueckmeldung erscheint mit Frist', function () {
     });
 });
 
+test('my_open_items: Rueckmeldung ausserhalb des 14-Tage-Horizonts erscheint nicht', function () {
+    oiWithWorld(['responses_enabled' => 1, 'response_deadline_hours' => 24], function (array &$world) {
+        $id = oiAppointment($world, oiDate(20));
+        assertSame(null, oiFind(oiItems(), 'response', 'appointment_id', $id),
+            'Rueckmeldung in 20 Tagen liegt ausserhalb OPEN_ITEMS_RESPONSE_DAYS');
+    });
+});
+
 test('my_open_items: beantwortet (auch unsicher) ist nicht offen', function () {
     oiWithWorld(['responses_enabled' => 1], function (array &$world) {
         $id = oiAppointment($world, oiDate(10));
@@ -221,6 +229,20 @@ test('my_open_items: wartende beendete Arbeitszeit ja, laufende nein', function 
             'query' => ['id' => $sessionId], 'body' => ['action' => 'reject']]));
         $item = oiFind(oiItems(), 'work_session', 'id', $sessionId);
         assertTrue($item !== null && $item['state'] === 'rejected', 'Abgelehnte Arbeitszeit fehlt');
+
+        // "laufende nein": eine noch laufende Sitzung (end_time IS NULL) darf
+        // nicht erscheinen, weder als wartend noch als abgelehnt.
+        $start = apiRequest('POST', 'work_sessions', ['token' => apiToken('user'),
+            'body' => ['action' => 'start', 'activity_id' => $world['activity']]]);
+        assertStatus(201, $start, 'user hat bereits eine laufende Sitzung -- Testvoraussetzung verletzt');
+        $runningId = (int) $start['body']['session']['session_id'];
+        $world['sessions'][] = $runningId;
+
+        $running = oiFind(oiItems(), 'work_session', 'id', $runningId);
+        assertTrue($running === null, 'Laufende Arbeitszeit darf keinen offenen Punkt erzeugen');
+
+        assertStatus(200, apiRequest('POST', 'work_sessions', ['token' => apiToken('user'),
+            'body' => ['action' => 'stop']]));
     });
 });
 
@@ -239,11 +261,15 @@ test('my_open_items: Arbeitszeit aus -> keine Arbeitszeitpunkte', function () {
 
 test('my_open_items: Manager sieht keine Punkte des user-Mitglieds', function () {
     oiWithWorld(['responses_enabled' => 1], function (array &$world, int $memberId) {
-        $id   = oiAppointment($world, oiDate(10));
-        $body = oiItems('manager');
+        $id = oiAppointment($world, oiDate(10));
+
+        $ownItem = oiFind(oiItems('user'), 'response', 'appointment_id', $id);
+        assertTrue($ownItem !== null, 'Vorbedingung: user muesste den Punkt selbst sehen');
+
         if (apiMemberId('manager') === $memberId) {
             return; // gleiches Mitglied waere kein aussagekraeftiger Fall
         }
+        $body = oiItems('manager');
         assertSame(null, oiFind($body, 'response', 'appointment_id', $id),
             'Manager bekommt fremde Punkte -- my_open_items ist keine Arbeitsliste');
     });

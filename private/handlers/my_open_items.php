@@ -22,17 +22,17 @@ function handleMyOpenItems($db, $database, string $method, ?string $authUserRole
 {
     if ($method !== 'GET') {
         http_response_code(405);
-        echo json_encode(['message' => 'Method not allowed']);
+        echo json_encode(['message' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
         return;
     }
     if ($authUserRole === 'device') {
         http_response_code(403);
-        echo json_encode(['message' => 'Geräte haben keine offenen Punkte']);
+        echo json_encode(['message' => 'Geräte haben keine offenen Punkte'], JSON_UNESCAPED_UNICODE);
         return;
     }
     if ($authMemberId === null) {
         echo json_encode(['member' => false, 'items' => [],
-                          'counts' => ['open' => 0, 'pending' => 0, 'rejected' => 0]]);
+                          'counts' => ['open' => 0, 'pending' => 0, 'rejected' => 0]], JSON_UNESCAPED_UNICODE);
         return;
     }
 

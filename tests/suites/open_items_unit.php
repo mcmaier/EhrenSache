@@ -36,6 +36,10 @@ test('openItems: Ablehnungen bleiben 14 Tage sichtbar', function () {
     assertSame('2026-09-08 12:00:00', openItemsRejectedSince('2026-09-22 12:00:00'));
 });
 
+test('openItems: Rueckmeldungshorizont liegt 14 Tage voraus', function () {
+    assertSame('2026-10-06', openItemsResponseHorizon('2026-09-22 12:00:00'));
+});
+
 test('openItems: Sortierung Rueckmeldung vor wartend vor abgelehnt', function () {
     $items = [
         ['kind' => 'exception', 'state' => 'rejected', 'decided_at' => '2026-09-10 08:00:00'],
