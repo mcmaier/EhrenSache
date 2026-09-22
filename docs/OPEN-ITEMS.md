@@ -25,7 +25,7 @@ oder noch nicht gebaut.
 [OI-83](#oi-83--arbeitszeit-mit-ortsnachweis-ohne-kamera-nicht-startbar),
 [OI-84](#oi-84--leeres-filterergebnis-lässt-die-alte-paginierung-stehen) und
 [OI-82](#oi-82--nachträglicher-zeitantrag-auch-für-termine-in-der-zukunft) sind am selben Tag auf
-`dev` erledigt und warten auf ein gemeinsames Patch-Release.
+`dev` erledigt und mit 1.11.2 veröffentlicht.
 
 Als Nächstes die Verbesserungen [OI-86](#oi-86--bunte-status-filterknöpfe-nur-in-der-benutzerverwaltung)
 (Komponente, klein) und [OI-85](#oi-85--keine-ladeanzeige-und-kein-timeout-bei-langsamen-api-antworten)

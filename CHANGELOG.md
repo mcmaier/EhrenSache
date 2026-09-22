@@ -7,7 +7,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.11.2] – 2026-09-22
+
+### Sicherheit
+- **Ein Mitglied konnte Titel und Datum von Terminen fremder Gruppen abrufen.** Anträge und
+  Arbeitszeiten nahmen von einfachen Mitgliedern jede vorhandene Termin-Kennung an. Hängte man
+  einen Antrag oder eine Arbeitszeit über die Schnittstelle an den Termin einer Gruppe, der man
+  nicht angehört, lieferte der Abruf dieses eigenen Eintrags Titel, Datum, Uhrzeit und Terminart
+  des fremden Termins mit. Personendaten waren nicht betroffen, wohl aber die Gruppengrenze. Jetzt
+  gilt dieselbe Grenze wie beim Check-in, und ein fremder Termin wird wie ein nicht vorhandener
+  beantwortet. Admin und Manager sind nicht betroffen. Die Stelle bestand bei Anträgen seit
+  1.0.0, bei Arbeitszeiten seit 1.2.0.
 
 ### Geändert
 - **Demo:** Der Beispielbestand zeigt Terminserien und Feiertage. Gesamtprobe, Registerprobe und

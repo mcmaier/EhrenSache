@@ -158,4 +158,10 @@ return [
         'file'     => '1.11.0.php',
         'function' => 'migrate_1_11_0',
     ],
+    [
+        'from'     => '1.11.1',
+        'to'       => '1.11.2',
+        'file'     => '1.11.1.php',
+        'function' => 'migrate_1_11_1',
+    ],
 ];
