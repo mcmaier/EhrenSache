@@ -47,6 +47,65 @@ export function setInitialLoad(value) {
     //isInitialLoad = value;
 }
 
+// ============================================
+// LADEANZEIGE UND TIMEOUT (OI-85, seit 1.12.1)
+// ============================================
+//
+// Ein schmaler Balken am oberen Rand, erst nach LOADING_DELAY_MS -- schnelle
+// Antworten sollen nicht flackern. Er blockiert nichts. Er haengt an einem
+// Zaehler offener Anfragen, nicht an einem Schalter: Sonst blendete ihn die
+// erste fertige Antwort aus, waehrend die zweite noch laeuft.
+//
+// Dieselbe Regel steht in public/checkin/js/app.js; die PWA ist ein
+// eigenstaendiges Skript ohne Zugriff auf diese Module.
+
+export const API_TIMEOUT_MS   = 20000;
+export const LOADING_DELAY_MS = 300;
+
+let openRequests = 0;
+let loadingTimer = null;
+
+function setLoadingBar(visible) {
+    let bar = document.getElementById('apiLoadingBar');
+    if (!bar) {
+        if (!visible) return;
+        bar = document.createElement('div');
+        bar.id = 'apiLoadingBar';
+        bar.className = 'api-loading-bar';
+        bar.setAttribute('role', 'progressbar');
+        bar.setAttribute('aria-label', 'Lädt …');
+        document.body.appendChild(bar);
+    }
+    bar.hidden = !visible;
+}
+
+function loadingStart() {
+    openRequests++;
+    if (openRequests === 1) {
+        loadingTimer = setTimeout(() => setLoadingBar(true), LOADING_DELAY_MS);
+    }
+}
+
+function loadingEnd() {
+    openRequests = Math.max(0, openRequests - 1);
+    if (openRequests === 0) {
+        clearTimeout(loadingTimer);
+        loadingTimer = null;
+        setLoadingBar(false);
+    }
+}
+
+/**
+ * Meldung nach einem Timeout. Er bricht nur das Warten ab, nicht die Anfrage:
+ * Ein POST, der danach doch durchlaeuft, hat trotzdem angelegt. "Fehlgeschlagen"
+ * verleitete dazu, dasselbe ein zweites Mal abzuschicken.
+ */
+export function apiTimeoutMessage(method) {
+    return method === 'GET'
+        ? 'Der Server antwortet nicht. Bitte erneut versuchen.'
+        : 'Keine Antwort vom Server. Ob gespeichert wurde, ist unklar – bitte die Ansicht neu laden, bevor du es erneut versuchst.';
+}
+
 /**
  * API Helper Funktion
  *
@@ -55,6 +114,9 @@ export function setInitialLoad(value) {
  *        trotzdem zurueckgegeben. Gedacht fuer Faelle, in denen ein
  *        Fehlerstatus eine gueltige Auskunft ist: ein abgeschaltetes Feature
  *        antwortet bewusst mit 404, statt seine Existenz preiszugeben.
+ * @param callOptions.timeout Millisekunden bis zum Abbruch des Wartens,
+ *        Vorgabe API_TIMEOUT_MS; 0 heisst ohne Timeout (Loeschfristen,
+ *        Update-Paket). Ein Timeout liefert { success: false, timedOut: true }.
  */
 export async function apiCall(resource, method = 'GET', data = null, params = {}, callOptions = {}) {
     const url = new URL(API_BASE, window.location.origin);
@@ -93,6 +155,13 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
             url.searchParams.append('csrf_token', csrfToken);
         }
     }
+
+    const timeout = callOptions.timeout ?? API_TIMEOUT_MS;
+    const controller = new AbortController();
+    const abortTimer = timeout > 0 ? setTimeout(() => controller.abort(), timeout) : null;
+    options.signal = controller.signal;
+
+    loadingStart();
 
     try {
         const response = await fetch(url, options);
@@ -142,10 +211,18 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
     } catch (error) {
         debug.error('API Error:', error);
         const { showToast } = await import('./ui.js');
+
+        if (error.name === 'AbortError') {
+            showToast(apiTimeoutMessage(method), 'error', 8000);
+            return { success: false, timedOut: true, message: apiTimeoutMessage(method) };
+        }
+
         showToast('Fehler bei der Kommunikation mit dem Server', 'error', 6000);
         return result;
+    } finally {
+        clearTimeout(abortTimer);
+        loadingEnd();
     }
-    
 }
 
 /**

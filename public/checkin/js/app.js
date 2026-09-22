@@ -296,8 +296,58 @@ const SERVER_MESSAGES = {
         'Dieser Termin liegt zeitlich zu weit entfernt. Bitte den passenden Termin wählen.'
 };
 
+// ========================================
+// LADEANZEIGE UND TIMEOUT (OI-85, seit 1.12.1)
+// ========================================
+// Dieselbe Regel wie in public/js/modules/api.js (Dashboard) -- die PWA ist
+// ein eigenstaendiges Skript ohne Zugriff auf dessen Module. Weichen die
+// beiden voneinander ab, verhalten sich Dashboard und App unterschiedlich.
+
+const API_TIMEOUT_MS   = 20000;
+const LOADING_DELAY_MS = 300;
+
+let openRequests = 0;
+let loadingTimer = null;
+
+function setLoadingBar(visible) {
+    let bar = document.getElementById('apiLoadingBar');
+    if (!bar) {
+        if (!visible) return;
+        bar = document.createElement('div');
+        bar.id = 'apiLoadingBar';
+        bar.className = 'api-loading-bar';
+        bar.setAttribute('role', 'progressbar');
+        bar.setAttribute('aria-label', 'Lädt …');
+        document.body.appendChild(bar);
+    }
+    bar.hidden = !visible;
+}
+
+function loadingStart() {
+    openRequests++;
+    if (openRequests === 1) {
+        loadingTimer = setTimeout(() => setLoadingBar(true), LOADING_DELAY_MS);
+    }
+}
+
+function loadingEnd() {
+    openRequests = Math.max(0, openRequests - 1);
+    if (openRequests === 0) {
+        clearTimeout(loadingTimer);
+        loadingTimer = null;
+        setLoadingBar(false);
+    }
+}
+
+/** Meldung nach einem Timeout -- siehe apiTimeoutMessage() im Dashboard. */
+function apiTimeoutMessage(method) {
+    return method === 'GET'
+        ? 'Der Server antwortet nicht. Bitte erneut versuchen.'
+        : 'Keine Antwort vom Server. Ob gespeichert wurde, ist unklar – bitte die Ansicht neu laden, bevor du es erneut versuchst.';
+}
+
 async function apiCall(resource, method = 'GET', data = null, params = {}) {
-   
+
     const url = new URL(API_BASE);
 
     url.searchParams.append('resource', resource);   
@@ -319,6 +369,12 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
     if (data && (method === 'POST' || method === 'PUT')) {
         options.body = JSON.stringify(data);
     }
+
+    const controller = new AbortController();
+    const abortTimer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    options.signal = controller.signal;
+
+    loadingStart();
 
     try {
         debug.log('API Call:', method, url.toString());
@@ -394,6 +450,19 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
         };
     } catch (error) {
         debug.error('API Error:', error);
+
+        // Beim Timeout ist das Netz da -- nur der Server antwortet nicht.
+        // Der Offline-Hinweis gehoert allein zum Verbindungsfehler.
+        if (error.name === 'AbortError') {
+            return {
+                success: false,
+                status: 0,
+                timedOut: true,
+                error: apiTimeoutMessage(method),
+                data: null
+            };
+        }
+
         showOfflineIndicator();
 
          return {
@@ -402,6 +471,9 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
             error: 'Verbindungsfehler',
             data: null
         };
+    } finally {
+        clearTimeout(abortTimer);
+        loadingEnd();
     }
 }
 

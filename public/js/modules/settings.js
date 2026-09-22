@@ -686,11 +686,13 @@ export async function performCleanup() {
     if(confirmed)
     {
         try {
+            // Ohne Timeout (OI-85): Loeschfristen ueber einen grossen Bestand
+            // duerfen laenger als 20 s laufen.
             const result = await apiCall('cleanup', 'POST', {
                 years: years,
                 years_worktime: yearsWorktime,
                 years_audit: yearsAudit
-            });
+            }, {}, { timeout: 0 });
 
             document.getElementById('cleanup_result').innerHTML = `
                 <div class="success-message">
@@ -888,7 +890,8 @@ export async function checkForUpdates() {
     box.textContent = 'Frage GitHub an …';
 
     try {
-        const status = await apiCall('update_check', 'POST', {}, {}, { silentStatuses: [502] });
+        // Ohne Timeout (OI-85): Das Holen des Pakets von GitHub darf dauern.
+        const status = await apiCall('update_check', 'POST', {}, {}, { silentStatuses: [502], timeout: 0 });
         if (status && status.success) {
             renderUpdateStatus(status);
         } else {
