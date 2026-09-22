@@ -224,6 +224,15 @@ ein Admin ihn freigibt.
 Korrekturweg der PWA hat denselben Effekt — korrigiert ein Manager die eigene Sitzung, bleibt sie
 `confirmed`, ohne dass jemand anderes zustimmt.
 
+**Vorgeschlagene Lösung (2026-09-22, zu entscheiden):** Die Variante oben ohne ihren Preis —
+eigene Einträge gehen nur dann in die Freigabe, wenn es **ein anderes aktives Konto mit Rolle Admin
+oder Manager** gibt (`is_active = 1`, `account_status = active`). Ob dieses Konto mit einem Mitglied
+verknüpft ist, spielt keine Rolle: Freigeben braucht nur die Rolle. Ohne zweiten Verwalter bleibt
+es beim sofortigen `confirmed`. Dieselbe Regel ist für Anträge vorgesehen, siehe
+[OI-87](#oi-87--anträge-in-der-anwesenheitsliste-des-dashboards-selbstgenehmigung-nur-ohne-zweiten-verwalter).
+Für die Arbeitszeit bewusst getrennt entschieden: Sie ändert den Arbeitsablauf der Manager spürbar
+(eigene Nachträge warten dann auf Freigabe), bei Anträgen kaum.
+
 ---
 
 ### OI-20 · Auto-Termine zählen weiter in die Statistik
@@ -3429,3 +3438,54 @@ Dark Mode hat das Dashboard derzeit nicht. Mit Tokens wäre die Komponente dafü
 vorbereitet.
 
 **Nicht sicherheitsrelevant.**
+
+---
+
+### OI-87 · Anträge in der Anwesenheitsliste des Dashboards; Selbstgenehmigung nur ohne zweiten Verwalter
+**Priorität:** mittel · aufgenommen am 2026-09-22 · **Umsetzung erst nach Abstimmung mit den parallelen
+Sitzungen**, die an `records.js` und `exceptions.js` arbeiten könnten
+
+**1. Anträge in der Anwesenheitsliste.** Die PWA zeigt seit 1.12.0 in ihrer Liste je Mitglied die
+offenen Anträge und lässt sie bescheiden. Das Dashboard nicht. Geprüft am 2026-09-22, ohne Änderung:
+
+- **Daten sind da.** `loadAttendanceList()` (`public/js/modules/records.js`) ruft dieselbe Ressource
+  `attendance_list?appointment_id=…` auf, die seit 1.12.0 je Mitglied `pending_exceptions` liefert.
+  Keine Server-Änderung nötig.
+- **Entscheiden ist da.** `quickApproveException()` und `quickRejectException()` (`exceptions.js`)
+  öffnen den Antragsdialog mit vorbelegtem Status. Im Dashboard den Dialog nutzen statt eines
+  Direktknopfs wie in der PWA: Begründung und Wunschzeit sind vollständig sichtbar, die Zeit
+  lässt sich vor der Genehmigung korrigieren.
+- **„Entschuldigt“ unterscheidet das Dashboard bereits** — der Nebenbefund aus der PWA betrifft es
+  nicht.
+- **Zu bauen:** Hinweis und ✓/✗ in `buildAttendanceRow()`, Zähler offener Anträge, und nach dem
+  Speichern im Dialog auch die Anwesenheitsliste neu laden (heute lädt `saveException()` nur die
+  Antragsliste). Nur für die Ansicht je Termin; die Ansicht je Mitglied bekommt vom Server keine
+  Anträge.
+
+**2. Selbstgenehmigung.** Heute darf ein Manager im Dashboard seinen eigenen Antrag genehmigen, in
+der PWA ist das seit 1.12.0 pauschal gesperrt. Vorgeschlagene Regel für beide Oberflächen:
+
+> Seinen eigenen Antrag **genehmigt** niemand, solange es ein anderes aktives Konto mit Rolle Admin
+> oder Manager gibt. Gibt es keins, bleibt die Selbstgenehmigung erlaubt.
+
+- Maßgeblich ist das freigebende **Konto**, nicht ein verknüpftes Mitglied. Beispiel Testbestand:
+  Admin ohne Mitglied, Manager mit Mitglied — der Admin kann den Antrag des Managers bescheiden, die
+  Sperre greift also.
+- Prüfung **im Server** (`PUT exceptions`, Wechsel auf `approved`, Antragsteller = Mitglied des
+  freigebenden Kontos), die Oberflächen blenden nur passend aus. Sonst per API umgehbar.
+- **Ablehnen und Löschen** des eigenen Antrags bleiben erlaubt.
+- Die pauschale PWA-Sperre folgt dann derselben Regel und wird im Ein-Verwalter-Verein lockerer.
+- **Kennzeichnung** im Dashboard: „selbst genehmigt“, wenn Antragsteller und `approved_by`
+  zusammenfallen — auch im Ein-Verwalter-Verein nachvollziehbar. Die Spalten gibt es schon.
+- **Preis:** Ein zweites Verwalterkonto, das praktisch nie genutzt wird, lässt Anträge hängen.
+  Abhilfe: nicht mehr genutzte Konten sperren.
+- Für die Arbeitszeit dieselbe Regel als eigene Entscheidung, siehe
+  [OI-3](#oi-3--vier-augen-prinzip-bei-manager-nachträgen).
+
+**3. Nebenbefund:** Nach der Genehmigung einer **Entschuldigung** leert `saveException()`
+(`exceptions.js`, um Zeile 687) den Zwischenspeicher der Anwesenheiten nicht — nur bei Zeitanträgen.
+Die Gesamtliste zeigt den neuen Eintrag „entschuldigt“ erst nach bis zu 10 Minuten oder einem
+Neuladen. Eine Zeile, im selben Zug mitnehmen.
+
+**Nicht sicherheitsrelevant im Sinne von `SECURITY.md`:** Die Selbstgenehmigung ist eine bewusste,
+dokumentierte Regel (OI-3), keine Rechteausweitung.
