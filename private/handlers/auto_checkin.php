@@ -53,6 +53,29 @@ function memberMayAttendAppointment($db, $prefix, $memberId, $typeId) {
 }
 
 /**
+ * Darf ein Mitglied diesen Termin mit einem eigenen Eintrag verknuepfen?
+ *
+ * Dieselbe Grenze wie beim Check-in, fuer Eintraege, die ein Mitglied selbst
+ * mit einer appointment_id anlegt: Antraege und Arbeitszeiten. Bis 1.11.2
+ * pruefte dort nur, ob der Termin existiert -- der Abruf des eigenen Eintrags
+ * lieferte danach Titel und Datum eines Termins fremder Gruppen.
+ *
+ * Ein fehlender Termin liefert false wie ein fremder. Der Aufrufer soll beide
+ * gleich beantworten, sonst laesst sich ausprobieren, welche IDs es gibt.
+ */
+function memberMayLinkAppointment($db, $prefix, int $memberId, int $appointmentId): bool {
+    $stmt = $db->prepare("SELECT type_id FROM {$prefix}appointments WHERE appointment_id = ?");
+    $stmt->execute([$appointmentId]);
+    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if(!$appointment) {
+        return false;
+    }
+
+    return memberMayAttendAppointment($db, $prefix, $memberId, $appointment['type_id']);
+}
+
+/**
  * Sucht den Termin, dem ein Check-in zu diesem Zeitpunkt zugeordnet wird.
  *
  * Alle Termine im Toleranzfenster, nach zeitlicher Naehe sortiert; ein Termin

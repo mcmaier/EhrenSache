@@ -1438,6 +1438,20 @@ Genehmigt ein Admin den Antrag, entsteht daraus ein Eintrag in `records` mit
 `checkin_source = 'exception_request'`. Die Grenze gilt auch beim Bearbeiten — für das Mitglied,
 das seinen Antrag nachbessert, wie für den Admin, der ihn vor der Freigabe korrigiert.
 
+**Ein Zeitantrag braucht eine Ankunft, die schon war (ab 1.11.2).** Solange das Check-in-Fenster
+des Termins nicht begonnen hat oder `requested_arrival_time` nach jetzt liegt, antwortet der
+Server mit `400`. Das gilt auch ohne Wunschzeit. Maßgeblich ist die Uhr der Datenbank, mit
+5 Minuten Spielraum für eine vorgehende Uhr des Telefons. Die Regel gilt beim Anlegen, beim
+Bearbeiten und bei der Genehmigung. **Ablehnen** (`status: rejected`) ist immer möglich, auch wenn
+der Termin inzwischen verschoben wurde und die Wunschzeit nicht mehr in sein Fenster passt. Eine
+Abmeldung (`absence`) im Voraus ist nicht betroffen.
+
+**Nur Termine der eigenen Gruppen (ab 1.11.2).** Ohne Verwalterrolle nimmt der Server nur einen
+Termin an, zu dem das Mitglied auch einchecken dürfte: Die Terminart muss einer seiner Gruppen
+zugeordnet sein (Termine ohne Terminart oder ohne Gruppen gelten wie beim Check-in für alle).
+Ein fremder Termin ergibt `400` „Unbekannter Termin“, genau wie ein nicht vorhandener. Admin und
+Manager verknüpfen jeden Termin.
+
 **`status`** übernimmt der Server nur von Admin und Manager; jeder andere Antrag entsteht als
 `pending`, unabhängig davon, was im Körper steht.
 
@@ -1971,7 +1985,7 @@ Optional bei `POST` und `PUT`. Beim `PUT` entscheidet die Anwesenheit des Feldes
 | Payload | Wirkung |
 |---|---|
 | `appointment_id` fehlt | Der bestehende Terminbezug bleibt unverändert |
-| `appointment_id: <id>` | Zuordnung auf diesen Termin; unbekannte ID ergibt `400` |
+| `appointment_id: <id>` | Zuordnung auf diesen Termin; unbekannte ID ergibt `400`. Ohne Verwalterrolle ebenso ein Termin, dessen Terminart keiner Gruppe des Mitglieds zugeordnet ist (ab 1.11.2, gilt auch für `action: 'start'`) |
 | `appointment_id: null` (oder leer) | Die Zuordnung wird gelöst |
 
 **Ein Nachtrag erzeugt keinen Anwesenheitseintrag** — auch nicht bei der Freigabe. Arbeit für

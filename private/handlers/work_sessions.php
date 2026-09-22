@@ -313,7 +313,11 @@ function workSessionStart($db, $database, $data, $authUserId, $authMemberId, arr
         $stmt->execute([(int)$data->appointment_id]);
         $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if(!$appointment) {
+        // Ein Mitglied verknuepft nur Termine der eigenen Gruppen (1.11.2);
+        // ein fremder Termin sieht aus wie ein fehlender.
+        if(!$appointment
+           || (!isAdminOrManager()
+               && !memberMayLinkAppointment($db, $prefix, (int)$memberId, (int)$appointment['appointment_id']))) {
             http_response_code(400);
             echo json_encode(["message" => "Unknown appointment_id"]);
             return;
@@ -619,7 +623,10 @@ function workSessionCreateManual($db, $database, $data, $authUserId, $authMember
     if(!empty($data->appointment_id)) {
         $stmt = $db->prepare("SELECT appointment_id FROM {$prefix}appointments WHERE appointment_id = ?");
         $stmt->execute([(int)$data->appointment_id]);
-        if(!$stmt->fetchColumn()) {
+        // Grenze wie beim Start (1.11.2)
+        if(!$stmt->fetchColumn()
+           || (!isAdminOrManager()
+               && !memberMayLinkAppointment($db, $prefix, (int)$memberId, (int)$data->appointment_id))) {
             http_response_code(400);
             echo json_encode(["message" => "Unknown appointment_id"]);
             return;
@@ -761,7 +768,10 @@ function workSessionUpdate($db, $database, $id, $data, $authUserId, $authMemberI
                                   WHERE appointment_id = ?");
             $stmt->execute([(int)$data->appointment_id]);
 
-            if(!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            // Grenze wie beim Start (1.11.2), gemessen am Mitglied der Sitzung
+            if(!$stmt->fetch(PDO::FETCH_ASSOC)
+               || (!isAdminOrManager()
+                   && !memberMayLinkAppointment($db, $prefix, (int)$before['member_id'], (int)$data->appointment_id))) {
                 http_response_code(400);
                 echo json_encode(["message" => "Unknown appointment_id"]);
                 return;

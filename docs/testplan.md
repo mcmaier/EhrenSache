@@ -308,6 +308,9 @@ wie eine Messung, ohne eine zu sein.
 | EXC-POST-4 | Admin: Antrag für beliebiges Mitglied | 201 erlaubt |
 | EXC-POST-5 | Fehlendes `exception_type` | 400 |
 | EXC-POST-6 | Fehlendes `reason` | 400 |
+| EXC-POST-7 | User: Antrag zu einem Termin einer fremden Gruppe | 400 „Unbekannter Termin“, wie bei einer nicht vorhandenen ID; Admin: 201 (automatisiert: `appointments_visibility_api.php`) |
+| EXC-POST-8 | Zeitkorrektur zu einem künftigen Termin, mit und ohne Wunschzeit | 400; Abmeldung zum selben Termin 201 (automatisiert: `arrival_api.php`) |
+| EXC-POST-9 | PWA „Nachträglicher Antrag“ | Nur Termine, deren Check-in-Fenster begonnen hat; Ankunftszeit höchstens jetzt |
 
 ### 8.3 Bearbeiten (Genehmigen/Ablehnen)
 
@@ -318,6 +321,7 @@ wie eine Messung, ohne eine zu sein.
 | EXC-PUT-3 | Admin lehnt ab | `status=rejected` |
 | EXC-PUT-4 | Manager genehmigt | Erlaubt |
 | EXC-PUT-5 | User versucht eigene Ausnahme zu genehmigen | 403 |
+| EXC-PUT-6 | Zeitkorrektur, deren Termin inzwischen in der Zukunft liegt | Genehmigen 400, Ablehnen 200 (automatisiert: `arrival_api.php`) |
 
 ### 8.4 Löschen
 
@@ -734,6 +738,7 @@ Testhintertür.
 | WT-11 | Löschen durch Manager / durch Admin | `403` / `200` |
 | WT-12 | Tätigkeitsart löschen, an der Sitzungen hängen | `409` mit Hinweis auf `is_active = 0` |
 | WT-13 | Sitzung älter als `worktime_max_session_hours` | Gekappt auf die Obergrenze, `status = submitted`, Vermerk `auto_closed` im Log |
+| WT-14 | User: Start, Nachtrag oder Änderung mit einem Termin einer fremden Gruppe | Jeweils `400` „Unknown appointment_id“, wie bei einer nicht vorhandenen ID; mit eigenem Termin `201` (automatisiert: `appointments_visibility_api.php`) |
 | WT-14 | Auditspur nach dem Löschen einer Sitzung | Einträge bleiben, `delete` hält den letzten Stand |
 
 ### Manuell (PWA)

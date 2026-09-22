@@ -153,6 +153,15 @@ function handleExceptions($db, $database, $method, $id) {
                     echo json_encode(["message" => "You can only create requests for yourself"]);
                     return;
                 }
+
+                // Nur Termine der eigenen Gruppen (1.11.2). Sonst lieferte der
+                // Abruf des Antrags Titel und Datum eines fremden Termins.
+                // Fehlend und fremd sehen gleich aus.
+                if(!memberMayLinkAppointment($db, $prefix, (int) $userMemberId, (int) $data->appointment_id)) {
+                    http_response_code(400);
+                    echo json_encode(["message" => "Unbekannter Termin"], JSON_UNESCAPED_UNICODE);
+                    return;
+                }
             }
 
             // Zu einem Termin reicht ein Antrag je Art. Ohne diese Grenze stellt
