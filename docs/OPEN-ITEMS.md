@@ -3364,7 +3364,7 @@ der Sitzung.
 ---
 
 ### OI-85 · Keine Ladeanzeige und kein Timeout bei langsamen API-Antworten
-**Priorität:** erledigt am 2026-09-22 — `3300c26`, alle vier Punkte wie vorgeschlagen entschieden:
+**Priorität:** erledigt am 2026-09-22 — mit 1.12.1 (`3300c26`), alle vier Punkte wie vorgeschlagen entschieden:
 schmaler Balken oben erst nach 300 ms, nicht blockierend, an einem Zähler offener Anfragen;
 Timeout 20 s, keiner für `cleanup` und `update_check` (Export und Import laufen ohnehin über
 eigene `fetch`-Aufrufe); beim Speichern „Ob gespeichert wurde, ist unklar“; Dashboard und PWA,
