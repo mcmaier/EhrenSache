@@ -17,6 +17,7 @@ import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, 
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_ATTENDANCE } from './grouping.js';
+import { CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, countChips, filterByChip, resolveActiveChip, renderFilterChips, setResetVisible } from './filter_chips.js';
 
 // ============================================
 // RECORDS
@@ -38,6 +39,9 @@ let currentAppointmentId = null;
 let currentMemberId = null;
 let currentAppointmentType = null;
 let isLoadingFilters = false;
+// Aktiver Status-Chip (Spec 2026-09-22). "missing" gibt es nur in den
+// Listenmodi; beim Wechsel zu ALL_RECORDS faellt er auf "all" zurueck.
+let recordStatusChip = 'all';
 
 /**
  * Einziger Weg, currentMode zu aendern.
@@ -131,7 +135,6 @@ export async function renderRecords(records, page = 1)
     
     if (!records || (records.length === 0)) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Einträge gefunden</td></tr>';
-        updateRecordStats([]);
         // Ohne diese beiden Zeilen blieb die Paginierung des vorigen Filters
         // stehen, und ein Klick darauf zeigte dessen Einträge wieder (OI-84)
         allFilteredRecords = [];
@@ -142,8 +145,6 @@ export async function renderRecords(records, page = 1)
     // Alle Records speichern für Pagination
     allFilteredRecords = records;
     currentRecordsPage = page;
-
-    updateRecordStats(records);
 
     recordsPerPage = globalPaginationValue;
 
@@ -343,33 +344,28 @@ window.goToRecordsPage = function(page) {
     }
 };
 
-function updateRecordStats(records) {    
-    const totalRecords = records.length;
-    const present = records.filter(r => r.status === 'present').length;
-    const excused = records.filter(r => r.status === 'excused').length;;
-    const absent = totalRecords - present;
+/**
+ * Zeichnet die Status-Chips fuer den aktuellen Modus und liefert die nach
+ * Chip gefilterte Liste. base ist die Liste NACH allen uebrigen Filtern und
+ * VOR dem Chip (facettierte Zaehlung).
+ */
+function applyRecordChips(base, rerender) {
+    const defs = currentMode === RecordMode.ALL_RECORDS ? CHIPS_RECORDS_ALL : CHIPS_RECORDS_LIST;
+    recordStatusChip = resolveActiveChip(defs, recordStatusChip, 'all');
 
-    if(currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT)
-    {
-        document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesende Mitglieder zum Termin';        
-        document.getElementById('statTotalRecords').textContent = present;
-        document.getElementById('statMissingRecordsTitle').innerHTML = 'Entschuldigt';
-        document.getElementById('statMissingRecords').textContent = excused;
-    }
-    else if(currentMode === RecordMode.ATTENDANCE_BY_MEMBER)
-    {
-        document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesend bei Terminen';
-        document.getElementById('statTotalRecords').textContent = present;
-        document.getElementById('statMissingRecordsTitle').innerHTML = 'Entschuldigt';
-        document.getElementById('statMissingRecords').textContent = excused;
-    } 
-    else
-    {
-        document.getElementById('statTotalRecordsTitle').innerHTML = 'Erfasste Anwesenheitseinträge';
-        document.getElementById('statTotalRecords').textContent = present;
-        document.getElementById('statMissingRecordsTitle').innerHTML = 'Entschuldigt';
-        document.getElementById('statMissingRecords').textContent = excused;
-    }           
+    renderFilterChips(
+        document.getElementById('recordStatusChips'),
+        defs, countChips(base, defs), recordStatusChip,
+        key => { recordStatusChip = key; rerender(); },
+        { label: 'Status der Anwesenheit' }
+    );
+
+    const anyFilter = ['filterAptType', 'filterAppointment', 'filterMember']
+        .some(id => Boolean(document.getElementById(id)?.value));
+    setResetVisible(document.getElementById('resetRecordFilter'),
+        anyFilter || recordStatusChip !== 'all');
+
+    return filterByChip(base, defs, recordStatusChip);
 }
 
 export async function loadRecordFilters(forceReload = false) {
@@ -575,7 +571,8 @@ export async function applyRecordFilters(forceReload = false, currentPage = 1) {
     // Rendern (nur wenn auf Records-Section)
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'anwesenheit') {
-        renderRecords(activeFilteredRecords, currentPage);
+        const shown = applyRecordChips(activeFilteredRecords, () => applyRecordFilters(false, 1));
+        renderRecords(shown, currentPage);
         debug.log('Records rendered');
     }
 
@@ -713,6 +710,7 @@ export async function resetRecordFilter()
         memberFilter.value = '';
         //isAttendanceMode = false;
         setRecordMode(RecordMode.ALL_RECORDS);
+        recordStatusChip = 'all';
         currentAppointmentId = null;
         currentMemberId = null;
         currentAppointmentType = null;
@@ -1115,11 +1113,11 @@ async function loadAttendanceList(appointmentId) {
 }
 
 function renderAttendanceList(attendanceData) {
+    // Volle Liste merken: Gruppierung und Chip-Wechsel rendern daraus neu.
     _lastAttendanceData = attendanceData;
 
     const tbody = document.getElementById('recordsTableBody');
-
-    updateRecordStats(attendanceData);
+    const shown = applyRecordChips(attendanceData, () => renderAttendanceList(_lastAttendanceData));
 
     const container = document.getElementById('recordsPagination');
     if (!container) return;
@@ -1130,15 +1128,20 @@ function renderAttendanceList(attendanceData) {
 
     updateTableHeader('appointment');
 
-    renderAttendanceGroupingBar(attendanceData);
+    renderAttendanceGroupingBar(shown);
+
+    if (shown.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${ATTENDANCE_LIST_COLSPAN}" class="loading">Keine Mitglieder für diese Auswahl</td></tr>`;
+        return;
+    }
 
     // Umschalter-Stufen und gemerkte Wahl (Spec 6.1/6.2). Fuer den Abschnitt
     // ohne Gruppe passt "Ohne Gruppe" nur bei 'group' -- bei 'subgroup' zeigt
     // er das eingestellte Wort (z.B. "Ohne Register").
-    const stages = groupingAvailableStages(attendanceData);
+    const stages = groupingAvailableStages(shown);
     const stage  = groupingStored(GROUPING_KEY_ATTENDANCE, stages, 'alpha');
     const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
-    const sections = groupingSections(attendanceData, stage, emptyLabel);
+    const sections = groupingSections(shown, stage, emptyLabel);
 
     const fragment = document.createDocumentFragment();
 
@@ -1300,7 +1303,9 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
 
     const tbody = document.getElementById('recordsTableBody');
 
-    updateRecordStats(appointmentsData);
+    // Volle Liste bleibt in _lastMemberAttendanceData; gezeichnet wird die nach Chip gefilterte.
+    const shown = applyRecordChips(appointmentsData,
+        () => renderMemberAttendanceList(_lastMemberAttendanceData.appointments, _lastMemberAttendanceData.memberInfo));
 
     const container = document.getElementById('recordsPagination');
     if (!container) return;
@@ -1311,7 +1316,12 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
     // Neuer Header-Modus für Member-Ansicht
     updateTableHeader('member'); // 'member' = Member-Attendance-Modus
 
-    appointmentsData.forEach(appointment => {
+    if (shown.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">Keine Termine für diese Auswahl</td></tr>';
+        return;
+    }
+
+    shown.forEach(appointment => {
         const tr = document.createElement('tr');        
         
          // Termin-Info mit Terminart

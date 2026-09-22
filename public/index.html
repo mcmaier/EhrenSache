@@ -965,15 +965,8 @@
                     </div>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3 id="statTotalRecordsTitle">Erfasste Anwesenheiten</h3>
-                        <div class="number" id="statTotalRecords">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3 id="statMissingRecordsTitle">Abwesend</h3>
-                        <div class="number" id="statMissingRecords">-</div>
-                    </div>
+                <div class="stats-grid stats-grid--chips">
+                    <div class="filter-chips" id="recordStatusChips"></div>
                     <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
                         <h3>Jahr filtern</h3>
                         <select id="recordYearFilter"
@@ -1002,7 +995,7 @@
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
-                    <button id="resetRecordFilter" onclick="resetRecordFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
+                    <button id="resetRecordFilter" onclick="resetRecordFilter()" class="btn-reset-filter" hidden>Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->

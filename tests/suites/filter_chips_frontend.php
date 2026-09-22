@@ -194,3 +194,28 @@ test('Termine: statische Zeit-Chips statt Karten', function () use ($fcRoot, $fc
     assertTrue(preg_match('/static:\s*true/', $js) === 1, 'Die Termin-Chips muessen static sein');
     assertSame(0, substr_count($js, 'filterByChip'), 'Termine filtern nicht nach Chip');
 });
+
+test('Anwesenheit: Chips in allen drei Modi', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'anwesenheit', 'antraege');
+    assertTrue(str_contains($bereich, 'id="recordStatusChips"'), 'Chip-Container fehlt');
+    foreach (['statTotalRecords', 'statMissingRecords'] as $id) {
+        assertSame(0, substr_count($fcHtml, $id), $id . ' (samt Title) muss entfallen');
+    }
+    $js = fcModul($fcRoot, 'records');
+    foreach (['CHIPS_RECORDS_ALL', 'CHIPS_RECORDS_LIST', 'resolveActiveChip'] as $n) {
+        assertTrue(str_contains($js, $n), 'records.js nutzt ' . $n . ' nicht');
+    }
+    assertSame(0, substr_count($js, 'updateRecordStats'), 'updateRecordStats muss entfallen');
+    assertTrue(str_contains($js, 'countChips(base, defs)'), 'Anwesenheit: Chips muessen auf der vollen Liste des Modus zaehlen');
+});
+
+test('Anwesenheitsliste: Zwischenspeicher haelt die volle Liste', function () use ($fcRoot) {
+    // Sonst filtert ein Chip-Wechsel eine schon gefilterte Liste weiter und
+    // "Alle" zeigt nicht mehr alle.
+    $js = fcModul($fcRoot, 'records');
+    $start = strpos($js, 'function renderAttendanceList(');
+    assertTrue($start !== false, 'renderAttendanceList() fehlt');
+    $rumpf = substr($js, $start, 400);
+    assertTrue(preg_match('/_lastAttendanceData\s*=\s*attendanceData\s*;/', $rumpf) === 1,
+        '_lastAttendanceData muss die ungefilterte Liste speichern');
+});
