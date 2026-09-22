@@ -3496,8 +3496,8 @@ Neuladen. Eine Zeile, im selben Zug mitnehmen.
 - **Zähler offener Anträge:** kein Status-Chip — die Status-Chips einer Reihe schließen sich aus und
   ergeben zusammen „Alle“, ein offener Antrag liegt quer dazu. Stattdessen ein eigener
   Anzeige-Chip (`renderFilterChips(…, {static: true})`, Variante `pending`) hinter der Status-Reihe,
-  nach dem Muster `appointmentTimeChips`. **Offen:** ob er auch filtern soll („nur offene
-  Anträge“) — das wäre ein zweiter, unabhängiger Filter.
+  nach dem Muster `appointmentTimeChips`. **Entschieden (2026-09-22): nur anzeigen**, kein zweiter
+  Filter „nur offene Anträge“ — bei meist ein bis drei offenen Anträgen je Termin unnötig.
 - **Überschneidungen:** Die Filter-Chips schreiben `renderAttendanceList()` neu, lassen
   `buildAttendanceRow()` und `saveException()` aber stehen. FI-17 (`exceptions.php` beim
   Statuswechsel) ist noch nicht abgestimmt.
