@@ -36,6 +36,13 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   zeigte sie jeden Eintrag mit ✓, auch ein genehmigtes Fernbleiben. Jetzt steht dort
   „✗ entschuldigt“. Entfernen fragt mit eigenem Text nach, der genehmigte Antrag bleibt dabei
   bestehen.
+- **Der Zähler am Tab „Termine“ zählt keine Rückmeldungen mehr, deren Frist abgelaufen ist.**
+  Bisher blieb die rote Zahl bis Terminbeginn stehen, auch wenn niemand mehr zu antworten
+  brauchte.
+- **Anwesenheitsliste ohne gewählten Termin.** Wurde ein Termin abgewählt, blieb die Umschaltung
+  „Gruppe/Register“ stehen und zeigte beim Antippen wieder die Liste des vorigen Termins. Jetzt
+  verschwindet beides. Ohne Termin im Zeitfenster steht dort ein Hinweis statt einer leeren
+  Fläche.
 
 ---
 

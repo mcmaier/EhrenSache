@@ -1256,6 +1256,19 @@ async function loadAttendanceAppointments() {
         if (relevantAppointments.length === 0) {
             select.innerHTML = '<option value="">Keine aktuellen Termine</option>';
         }
+
+        // Die Auswahl ist neu aufgebaut. Der zuletzt gewaehlte Termin bleibt
+        // gewaehlt, solange er noch im Fenster liegt. Steht sie danach auf
+        // "keiner", muss die Ansicht darunter dazu passen -- sonst bleibt eine
+        // leere Flaeche oder die Liste eines Termins stehen, der nicht mehr
+        // gewaehlt ist (seit 1.12.0).
+        const vorher = currentEditAppointmentId ? String(currentEditAppointmentId) : '';
+        if (vorher && [...select.options].some(o => o.value === vorher)) {
+            select.value = vorher;
+        }
+        if (!select.value) {
+            await loadAttendanceList();
+        }
         
     } catch (error) {
         debug.log('Fehler beim Laden der Termine:', error);
@@ -1271,7 +1284,17 @@ async function loadAttendanceList() {
     const btnEdit = document.getElementById('btnEditAppointment');    
     
     if (!appointmentId) {
-        content.innerHTML = '<div class="info-box"><p>Bitte wähle einen Termin aus.</p></div>';
+        // Den zuletzt geladenen Termin vergessen: Sonst zeichnete ein Klick auf
+        // den Gliederungs-Umschalter dessen Liste wieder, ohne dass ein Termin
+        // gewaehlt ist (seit 1.12.0).
+        _lastAttendanceData = null;
+        renderAttendanceGroupingBar([]);
+
+        const select = document.getElementById('attendanceAppointmentFilter');
+        const hatTermine = !!select && [...select.options].some(o => o.value !== '');
+        content.innerHTML = hatTermine
+            ? '<div class="info-box"><p>Bitte wähle einen Termin aus.</p></div>'
+            : '<div class="info-box"><p>Kein Termin im Zeitfenster um jetzt. Über „➕ Termin anlegen“ lässt sich einer anlegen.</p></div>';
         btnRefresh.style.display = 'none';
         btnCreate.style.display = 'block';
         btnEdit.style.display = 'none';        
@@ -4166,10 +4189,15 @@ async function loadResponses() {
 function updateResponsesBadge() {
     const badge = document.getElementById('responsesTabBadge');
     if (!badge) return;
-    // Nur Rueckmeldetermine ohne eigene Antwort, die noch nicht begonnen
-    // haben: Nach Beginn nimmt der Server keine Antwort mehr an.
+    // Nur Rueckmeldetermine ohne eigene Antwort, deren Frist noch laeuft. Nach
+    // Beginn nimmt der Server keine Antwort mehr an; nach Fristablauf nimmt er
+    // sie noch an (als "kurzfristig"), aber der Zaehler fordert dann zu nichts
+    // mehr auf, was jemand braucht (Nutzer-Vorgabe, seit 1.12.0).
+    const jetzt = new Date();
     const open = upcomingResponses.filter(item =>
-        item.appointment.responses_enabled && !item.own && !item.started).length;
+        item.appointment.responses_enabled && !item.own && !item.started
+        && !(item.settings?.deadline
+             && new Date(String(item.settings.deadline).replace(' ', 'T')) < jetzt)).length;
     badge.textContent = String(open);
     badge.hidden = open === 0;
 }

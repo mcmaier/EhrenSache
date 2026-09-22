@@ -1263,7 +1263,7 @@ Automatisiert: `responses_api` (Fenster, Sichtbarkeit bis Tagesende, Sortierung)
 | PWA-TL-4 | Infokarte ohne Beschreibung | seit 1.12.0 aufklappbar, der Körper trägt „Entschuldigen“ |
 | PWA-TL-5 | Rückmeldekarte aufklappen, zusagen | Chip wechselt auf „✓ zugesagt", Karte bleibt offen |
 | PWA-TL-6 | Heute begonnener Rückmeldetermin | sichtbar, Chip „hat begonnen" bzw. eigene Antwort, keine Knöpfe |
-| PWA-TL-7 | Badge | zählt nur offene, nicht begonnene Rückmeldungen |
+| PWA-TL-7 | Badge | zählt nur offene Rückmeldungen, deren Frist noch läuft (seit 1.12.0; vorher bis Terminbeginn) |
 | PWA-TL-8 | Am 20.12. öffnen | Januartermine des Folgejahres sichtbar |
 | PWA-TL-9 | Offline | Hinweis nur an Rückmeldekarten |
 | PWA-TL-10 | Infokarte aufklappen, „Entschuldigen“ ohne Begründung (seit 1.12.0) | Hinweis „Bitte eine Begründung angeben“, Feld fokussiert, nichts eingereicht |
@@ -1286,6 +1286,9 @@ Automatisiert: `responses_api` (pending_exceptions), `pwa_termine_frontend`.
 | PWA-AL-6 | Eigener Antrag des Managers | Hinweis „Eigener Antrag …“, keine Knöpfe |
 | PWA-AL-7 | Entschuldigt-Zeile, Knopf ✗ | Rückfrage „Entschuldigt-Eintrag entfernen“; danach abwesend, der Antrag bleibt genehmigt |
 | PWA-AL-8 | Antrag zu einem Termin außerhalb des Check-in-Fensters | Termin steht nicht in der Auswahl der Liste — bewusst, die Liste ist für den laufenden Termin; entschieden wird im Dashboard oder am Tag |
+| PWA-AL-9 | Termin wählen, wieder abwählen, dann „Gruppe“/„Register“ antippen | Umschalter verschwindet mit der Abwahl; keine Liste des vorigen Termins |
+| PWA-AL-10 | Kein Termin im Zeitfenster | Hinweis auf „➕ Termin anlegen“ statt leerer Fläche |
+| PWA-AL-11 | Termin gewählt, Tab wechseln und zurück | Termin bleibt gewählt, Liste steht wieder da |
 
 ---
 
