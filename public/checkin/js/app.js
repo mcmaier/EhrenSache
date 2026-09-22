@@ -1007,6 +1007,9 @@ function resetSessionState() {
 
     // Offene Punkte des Vorgaengers nicht stehen lassen (FI-17); der naechste
     // Login entscheidet ueber loadOpenItems() neu, ob der Block erscheint.
+    // openItemsSeq++ verwirft eine Antwort, die beim Abmelden noch unterwegs
+    // war -- sonst koennten die Punkte des vorigen Mitglieds kurz aufblitzen.
+    openItemsSeq++;
     const openItemsBlock = document.getElementById('openItemsBlock');
     if (openItemsBlock) openItemsBlock.hidden = true;
 
@@ -4099,12 +4102,18 @@ function showCaptureView(view) {
 
 let openItemsBound = false;
 
+// Steigt bei jedem loadOpenItems()-Aufruf und bei Abmeldung. Eine Antwort,
+// die noch fuer eine vorige Generation unterwegs war (spaetes Zurueckkehren,
+// Abmeldung waehrend des Requests), wird verworfen -- sonst zeigt der Block
+// kurz die Punkte des vorigen Mitglieds.
+let openItemsSeq = 0;
+
 function openItemsWhen(dateStr, timeStr = '') {
     const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
     if (isNaN(d.getTime())) return '';
     const tage = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
     const tag = `${tage[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
-    const zeit = String(timeStr).slice(0, 5);
+    const zeit = escapeHtml(String(timeStr).slice(0, 5));
     return zeit ? `${tag} ${zeit}` : tag;
 }
 
@@ -4174,12 +4183,15 @@ async function loadOpenItems() {
     }
 
     if (!userData || !userData.member_id) {
+        openItemsSeq++;
         block.hidden = true;
         return;
     }
 
+    const seq = ++openItemsSeq;
     try {
         const result = await apiCall('my_open_items');
+        if (seq !== openItemsSeq) return; // Abgemeldet/neu geladen, waehrend die Antwort unterwegs war.
         if (!result.success || !result.data || result.data.member === false
             || !Array.isArray(result.data.items) || result.data.items.length === 0) {
             block.hidden = true;
@@ -4193,6 +4205,7 @@ async function loadOpenItems() {
         block.open = counts.open > 0;
         block.hidden = false;
     } catch (error) {
+        if (seq !== openItemsSeq) return;
         debug.error('Offene Punkte nicht geladen:', error);
         block.hidden = true;
     }

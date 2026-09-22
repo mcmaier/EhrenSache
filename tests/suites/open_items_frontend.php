@@ -64,12 +64,18 @@ test('PWA: Block laedt my_open_items, maskiert und blendet ohne Punkte aus', fun
     assertTrue(str_contains($body, "apiCall('my_open_items'"), 'loadOpenItems() fragt my_open_items nicht ab');
     assertTrue(str_contains($body, 'block.hidden = true'), 'Ohne Punkte wird der Block nicht ausgeblendet');
     assertTrue(str_contains($body, 'Array.isArray('), 'Fehlerantworten werden nicht abgefangen');
+    assertTrue(str_contains($body, 'openItemsSeq'), 'loadOpenItems() schuetzt sich nicht gegen verspaetete Antworten');
 
     $render = strpos($js, 'function openItemHtml(');
     assertTrue($render !== false, 'openItemHtml() fehlt');
     $renderBody = substr($js, $render, (int) strpos($js, "\n}", $render) - $render);
     assertTrue(str_contains($renderBody, 'escapeHtml(item.title)'), 'Titel wird nicht maskiert');
     assertTrue(str_contains($renderBody, 'escapeHtml(item.activity_name)'), 'Taetigkeit wird nicht maskiert');
+
+    $when = strpos($js, 'function openItemsWhen(');
+    assertTrue($when !== false, 'openItemsWhen() fehlt');
+    $whenBody = substr($js, $when, (int) strpos($js, "\n}", $when) - $when);
+    assertTrue(str_contains($whenBody, 'escapeHtml('), 'openItemsWhen() maskiert die Zeit nicht');
 });
 
 test('PWA: offene Punkte werden beim Zurueckkehren und beim Betreten von Erfassen nachgeladen', function () use ($root) {
