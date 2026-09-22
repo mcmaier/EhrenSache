@@ -1,0 +1,112 @@
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/* Status-Chips mit Zaehler (Spec 2026-09-22, OI-86). Vorbild .response-chip
+   in badges.css: blasser Grund, Text in der Akzentfarbe. Nur Tokens -- die
+   Suite filter_chips_frontend verbietet Hex-Werte in dieser Datei. */
+
+/* Kopfzeile: Chips links, Jahreskarte rechts (feste Stelle, siehe
+   Jahresfilter-Konvention). --lead: zusaetzlich eine Kennzahl links
+   (Arbeitszeit: "Bestaetigte Stunden"). Auf schmalen Bildschirmen setzt
+   responsive.css .stats-grid auf eine Spalte -- das gilt auch hier, weil
+   responsive.css spaeter geladen wird. */
+.stats-grid--chips {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+}
+
+.stats-grid--chips-lead {
+    grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) minmax(180px, 240px);
+}
+
+.filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    align-content: center;
+    gap: var(--spacing-sm);
+    padding: 12px;
+    background: var(--bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Ohne diese Regel schluege display:flex das hidden des Browsers
+   (Mitglieder blenden die Chips fuer einfache Nutzer aus). */
+.filter-chips[hidden] {
+    display: none;
+}
+
+/* Ohne stats-grid (Benutzer, Geraete): eigener Abstand nach unten */
+.filter-chips--standalone {
+    margin-bottom: var(--spacing-sm);
+}
+
+.filter-chip {
+    --chip-color: var(--text-light);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 1px solid color-mix(in srgb, var(--chip-color) 35%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--chip-color) 8%, var(--bg-white));
+    color: color-mix(in srgb, var(--chip-color) 80%, var(--text-dark));
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.filter-chip:hover {
+    background: color-mix(in srgb, var(--chip-color) 16%, var(--bg-white));
+}
+
+.filter-chip:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.filter-chip__count {
+    min-width: 1.6em;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--chip-color) 18%, transparent);
+    font-size: 12px;
+    text-align: center;
+}
+
+.filter-chip--pending { --chip-color: var(--warning-color); }
+.filter-chip--ok      { --chip-color: var(--success-color); }
+.filter-chip--danger  { --chip-color: var(--danger-color); }
+.filter-chip--info    { --chip-color: var(--primary-color); }
+
+/* Aktiv: kraeftiger Grund und Rand. Der neutrale Chip ("Alle", "Inaktiv")
+   nimmt die Primaerfarbe und folgt damit dem Branding. */
+.filter-chip.is-active {
+    border-color: var(--chip-color);
+    background: color-mix(in srgb, var(--chip-color) 22%, var(--bg-white));
+}
+
+.filter-chip.is-active:not([class*="filter-chip--"]) {
+    --chip-color: var(--primary-color);
+}
+
+/* Reine Anzeige (Termine): gleiche Form, aber erkennbar nicht klickbar */
+.filter-chip--static {
+    border-color: transparent;
+    cursor: default;
+}
+
+.filter-chip--static:hover {
+    background: color-mix(in srgb, var(--chip-color) 8%, var(--bg-white));
+}

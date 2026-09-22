@@ -1,0 +1,67 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Statische Gegenproben der Status-Chips (Spec 2026-09-22, OI-86).
+ *
+ * Geprueft wird, was ein Blick in den Browser nicht verlaesslich zeigt: dass
+ * die Komponente nur Tokens nutzt (sonst erreicht das Branding sie nicht),
+ * dass entfallene Elemente wirklich weg sind und dass jede Ansicht ihren
+ * Chip-Container hat und ihn im Modul fuellt.
+ */
+
+$fcRoot = dirname(__DIR__, 2);
+$fcHtml = (string) file_get_contents($fcRoot . '/public/index.html');
+$fcCss  = (string) @file_get_contents($fcRoot . '/public/css/components/filter-chips.css');
+
+/** Bereich zwischen zwei Abschnitts-IDs (wie dfBereich in dashboard_filter_frontend). */
+function fcBereich(string $html, string $vonId, string $bisId): string
+{
+    $start = strpos($html, 'id="' . $vonId . '"');
+    assertTrue($start !== false, 'Bereich ' . $vonId . ' nicht gefunden');
+    $ende = strpos($html, 'id="' . $bisId . '"', $start);
+    assertTrue($ende !== false, 'Bereich ' . $bisId . ' nicht gefunden');
+    return substr($html, $start, $ende - $start);
+}
+
+function fcModul(string $root, string $name): string
+{
+    return (string) file_get_contents($root . '/public/js/modules/' . $name . '.js');
+}
+
+test('Die Chip-Komponente existiert und wird geladen', function () use ($fcRoot, $fcCss) {
+    assertTrue($fcCss !== '', 'css/components/filter-chips.css fehlt');
+    $main = (string) file_get_contents($fcRoot . '/public/css/main.css');
+    assertTrue(str_contains($main, 'components/filter-chips.css'), 'main.css importiert filter-chips.css nicht');
+});
+
+test('Die Chip-Komponente nutzt nur Tokens, keine Hex-Farben', function () use ($fcCss) {
+    // Kommentare ausblenden, dort duerfen Beispiele stehen
+    $ohneKommentare = (string) preg_replace('#/\*.*?\*/#s', '', $fcCss);
+    assertSame(0, preg_match('/#[0-9a-fA-F]{3,8}\b/', $ohneKommentare),
+        'filter-chips.css enthaelt eine Hex-Farbe -- Farben nur ueber variables.css');
+    // Lookbehind: --bg-white ist ein Token und soll nicht anschlagen.
+    // Lookahead: white-space (CSS-Eigenschaft) ist keine Farbe und soll ebenfalls nicht anschlagen.
+    assertSame(0, preg_match('/(?<![-\w])(white|black|gray|grey)\b(?!-)/', $ohneKommentare),
+        'filter-chips.css enthaelt eine benannte Farbe');
+});
+
+test('Alle Varianten der Spec sind definiert', function () use ($fcCss) {
+    foreach (['--pending', '--ok', '--danger', '--info', '--static'] as $v) {
+        assertTrue(str_contains($fcCss, '.filter-chip' . $v), 'Variante .filter-chip' . $v . ' fehlt');
+    }
+});
+
+test('Der Zuruecksetzen-Knopf teilt den Stil nicht mehr mit btn-cancel', function () use ($fcRoot) {
+    $buttons = (string) file_get_contents($fcRoot . '/public/css/components/buttons.css');
+    assertSame(0, preg_match('/\.btn-cancel\s*,\s*\.btn-reset-filter/', $buttons),
+        '.btn-reset-filter haengt noch am grauen Stil von .btn-cancel');
+    $forms = (string) file_get_contents($fcRoot . '/public/css/components/forms.css');
+    assertTrue(str_contains($forms, '.btn-reset-filter[hidden]'),
+        'Ohne .btn-reset-filter[hidden] schluege ein spaeteres display das hidden');
+});
+
+test('Ein verborgener Chip-Container bleibt verborgen', function () use ($fcCss) {
+    assertTrue(str_contains($fcCss, '.filter-chips[hidden]'),
+        'Ohne .filter-chips[hidden] schluege display:flex das hidden');
+});

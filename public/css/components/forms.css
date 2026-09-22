@@ -152,6 +152,12 @@
 
 .btn-reset-filter {
     height: 44px;
+    margin-left: auto;
+}
+
+/* Ohne diese Regel schluege ein spaeteres display das hidden des Browsers. */
+.btn-reset-filter[hidden] {
+    display: none;
 }
 
 /* Token Input Styling */
