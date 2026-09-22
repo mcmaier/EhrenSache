@@ -17,6 +17,15 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Stand zeigt ein Chip am Kartenkopf. Einen offenen Antrag kann man nach Rückfrage
   zurückziehen, nach einer Ablehnung ist ein neuer möglich.
 
+### Geändert
+- **Der Verlauf der Check-in-App ist aufgebaut wie die Terminkarten.** Bisher standen Kopf,
+  Titel, Status und Terminart untereinander, und die Terminart wiederholte oft nur den Titel.
+  Jetzt steht der Titel links und der Zeitpunkt rechts. Darunter folgen links Terminart oder
+  Dauer und rechts der Status als Chip, in denselben Worten und Farben wie im Tab „Termine“.
+  Der farbige Rand zeigt die Farbe der Terminart bzw. der Tätigkeit statt des Status, wie im Tab
+  „Termine“. Löschen und Korrigieren stehen unten rechts. Anträge nennen den Zeitpunkt des
+  Termins, nicht den des Antrags.
+
 ---
 
 ## [1.11.3] – 2026-09-22

@@ -1037,9 +1037,12 @@ deckt sie ab.
 | VL-1 | Verlauf öffnen | Anwesenheiten (📍), Anträge (📋) und Arbeitszeiten (⏱️) in einer Zeitachse |
 | VL-2 | Sortierung | Neuester Eintrag oben, quellenübergreifend |
 | VL-3 | Laufende Sitzung | Erscheint als „läuft", ohne Freigabestatus |
-| VL-4 | Antrag mit Status „pending" | Liest sich als „Wartet auf Freigabe" — gleicher Wortlaut wie bei Arbeitszeiten |
+| VL-4 | Antrag mit Status „pending" (seit 1.12.0) | Chip „⏳ Entschuldigung beantragt" bzw. „⏳ Zeitantrag offen" — derselbe Wortlaut wie an der Infokarte im Tab „Termine"; Arbeitszeit: „⏳ wartet auf Freigabe" |
 | VL-5 | Mitglied ohne Zeiterfassung | Nur Anwesenheiten und Anträge, keine Fehlermeldung |
 | VL-6 | Arbeitszeit-Ansicht | Enthält KEINE eigene Liste „Erfasste Zeiten" mehr |
+| VL-7 | Aufbau (seit 1.12.0) | Titel links, Zeitpunkt rechts; darunter Terminart bzw. Dauer links, Status-Chip rechts; Löschen/Korrigieren unten rechts; Rand in Termin- bzw. Tätigkeitsfarbe |
+| VL-8 | Titel gleich Terminart („Gesamtprobe") | Terminart entfällt, kein einzelner Farbpunkt |
+| VL-9 | Antrag zu einem künftigen Termin | Zeitpunkt ist der des Termins; einsortiert wird weiter nach Antragszeit, der Eintrag steht deshalb oben |
 
 ---
 
