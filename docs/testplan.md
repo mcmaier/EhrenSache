@@ -1318,6 +1318,21 @@ antwortende Fassung ersetzen, die auf `signal` hört.
 | LT-6 | PWA, wie LT-4 | Meldung wie LT-4, **kein** Offline-Hinweis |
 | LT-7 | Einstellungen → Löschfristen ausführen bzw. Update holen bei langsamem Server | Kein Abbruch nach 20 s |
 
+### Offene Punkte (FI-17)
+
+Automatisiert: `php tests/run.php open_items_api`, `open_items_frontend`.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| OP-1 | Mitglied mit je einer offenen Rückmeldung, einem wartenden Antrag und einer wartenden Arbeitszeit öffnet Dashboard → Mein Profil | Karte „Offene Punkte“ ganz oben, je eine Zeile korrekt beschriftet mit Termin/Antrags-/Arbeitszeitangaben |
+| OP-2 | Mitglied ohne offene Punkte öffnet die Karte | „Nichts offen ✓“, Karte bleibt sichtbar |
+| OP-3 | In der Karte auf die Rückmeldungs-Zeile tippen, im Dialog antworten und schließen | Rückmeldungsdialog öffnet sich passend zum Termin; nach dem Schließen ist die Zeile aus der Karte verschwunden |
+| OP-4 | PWA öffnen: einmal ohne offene Punkte, einmal mit offener Rückmeldung | Ohne Punkte kein Block im Tab „Erfassen“; mit offener Rückmeldung ist der Block beim ersten Erscheinen aufgeklappt |
+| OP-5 | Block manuell zuklappen, App wechseln (bzw. `visibilitychange`) und zu „Erfassen“ zurückkehren, ohne dass sich die Zahl offener Rückmeldungen erhöht hat | Block bleibt zugeklappt |
+| OP-6 | Im aufgeklappten Block auf eine Rückmeldungs-Zeile tippen | Wechsel zu Tab „Termine“, passende Karte aufgeklappt und ins Bild gescrollt; Antrags- bzw. Arbeitszeit-Zeilen führen stattdessen zu Tab „Verlauf“ |
+| OP-7 | Antrag ablehnen, danach im Verlauf und in der Übersicht (Karte/Block) prüfen; nach 14 Tagen (Systemzeit vorstellen oder `decided_at` in der DB zurückdatieren) erneut prüfen | Abgelehnter Antrag erscheint mit Chip „abgelehnt“ im Verlauf und in der Übersicht; nach 14 Tagen nicht mehr in der Übersicht, im Verlauf weiterhin je nach dessen eigenem Zeitraum |
+| OP-8 | Termin in 20 Tagen mit offener Rückmeldung | Erscheint weder in der Karte noch im PWA-Block (außerhalb des 14-Tage-Horizonts) |
+
 ---
 
 ## 24. Untergruppen (seit 1.8.0)

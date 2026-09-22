@@ -7,6 +7,19 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Neu
+- **Offene Punkte auf einen Blick.** Was das System gerade von einem will, stand bisher verstreut
+  in drei Bereichen. Jetzt zeigt „Mein Profil“ im Dashboard ganz oben eine Karte „Offene Punkte“,
+  die Check-in-App einen Block oben im Tab „Erfassen“: Termine der nächsten zwei Wochen, deren
+  Rückmeldefrist läuft, Anträge und Arbeitszeiten, über die noch nicht entschieden ist, und
+  Ablehnungen der letzten 14 Tage. Antippen führt an die Stelle, an der man den Punkt erledigt.
+  Ist nichts offen, bleibt die Check-in-App unverändert. Der Verlauf der Check-in-App zeigt dafür
+  jetzt auch abgelehnte Anträge der letzten 14 Tage.
+
+---
+
 ## [1.12.1] – 2026-09-22
 
 ### Neu
