@@ -3499,8 +3499,12 @@ Neuladen. Eine Zeile, im selben Zug mitnehmen.
   nach dem Muster `appointmentTimeChips`. **Entschieden (2026-09-22): nur anzeigen**, kein zweiter
   Filter „nur offene Anträge“ — bei meist ein bis drei offenen Anträgen je Termin unnötig.
 - **Überschneidungen:** Die Filter-Chips schreiben `renderAttendanceList()` neu, lassen
-  `buildAttendanceRow()` und `saveException()` aber stehen. FI-17 (`exceptions.php` beim
-  Statuswechsel) ist noch nicht abgestimmt.
+  `buildAttendanceRow()` und `saveException()` aber stehen. FI-17 fasst `exceptions.php` nicht an
+  und in der PWA nicht `attendanceRequestsHtml()` — keine Wartezeit. **Bedingung von FI-17:** Der
+  PUT-Zweig setzt `approved_at` weiterhin auch bei `rejected` (darauf baut das 14-Tage-Fenster
+  abgelehnter Anträge unter „Mein Konto“). FI-17 zeigt eigene offene Anträge neutral als „wartet“;
+  das stimmt auch für den Antrag eines Managers, der nach dieser Regel auf den zweiten Verwalter
+  wartet.
 
 **Nicht sicherheitsrelevant im Sinne von `SECURITY.md`:** Die Selbstgenehmigung ist eine bewusste,
 dokumentierte Regel (OI-3), keine Rechteausweitung.
