@@ -1005,6 +1005,11 @@ function resetSessionState() {
         if (el) el.innerHTML = '';
     });
 
+    // Offene Punkte des Vorgaengers nicht stehen lassen (FI-17); der naechste
+    // Login entscheidet ueber loadOpenItems() neu, ob der Block erscheint.
+    const openItemsBlock = document.getElementById('openItemsBlock');
+    if (openItemsBlock) openItemsBlock.hidden = true;
+
     const statsContent = document.getElementById('statsContent');
     if (statsContent) statsContent.style.display = 'none';
 
@@ -1954,6 +1959,8 @@ function tick() {
 // nachhinkt.
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden && tickTimer) startTicker();
+    // Offene Punkte beim Zurueckkehren nachladen (FI-17, Regel aus OI-67).
+    if (!document.hidden) loadOpenItems();
 });
 
 function updateClock() {
@@ -3856,6 +3863,8 @@ async function worktimeStop(totpCode = null, force = false) {
 
     worktimeSession = null;
     renderWorktime();
+    // Eine ohne Nachweis beendete Sitzung wartet auf Freigabe (FI-17).
+    loadOpenItems();
 }
 /**
  * Termine im Fenster um heute in die optionale Auswahl fuellen.
@@ -4082,6 +4091,113 @@ function showCaptureView(view) {
     }
 }
 
+// ========================================
+// OFFENE PUNKTE (FI-17)
+// ========================================
+// Block oben im Tab „Erfassen". Reine Leseansicht; Antippen springt in den
+// Tab, in dem man den Punkt erledigt.
+
+let openItemsBound = false;
+
+function openItemsWhen(dateStr, timeStr = '') {
+    const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    const tage = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    const tag = `${tage[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
+    const zeit = String(timeStr).slice(0, 5);
+    return zeit ? `${tag} ${zeit}` : tag;
+}
+
+function openItemHtml(item) {
+    const chip = item.state === 'rejected'
+        ? '<span class="response-chip response-chip--muted">abgelehnt</span>'
+        : item.state === 'pending'
+            ? '<span class="response-chip response-chip--maybe">wartet</span>'
+            : '';
+    if (item.kind === 'response') {
+        const [dDate, dTime] = String(item.deadline).split(' ');
+        return `<button type="button" class="open-item-pwa" data-kind="response" data-appointment-id="${Number(item.appointment_id)}">
+            <span class="open-item-pwa__title">${escapeHtml(item.title)} · ${openItemsWhen(item.date, item.start_time)}</span>
+            <span class="open-item-pwa__meta">Rückmeldung bis ${openItemsWhen(dDate, dTime)}</span>
+        </button>`;
+    }
+    if (item.kind === 'exception') {
+        const label = item.exception_type === 'absence' ? 'Entschuldigung' : 'Zeitantrag';
+        return `<button type="button" class="open-item-pwa" data-kind="exception">
+            <span class="open-item-pwa__title">${label} · ${escapeHtml(item.title)} ${openItemsWhen(item.date)}</span>${chip}
+        </button>`;
+    }
+    const [sDate] = String(item.start_time).split(' ');
+    const m = Number(item.duration_minutes) || 0;
+    return `<button type="button" class="open-item-pwa" data-kind="work_session">
+        <span class="open-item-pwa__title">Arbeitszeit · ${escapeHtml(item.activity_name)} ${openItemsWhen(sDate)} · ${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} h</span>${chip}
+    </button>`;
+}
+
+function openItemsSummaryText(counts) {
+    const teile = [];
+    const offen = counts.open + counts.pending;
+    if (offen > 0) teile.push(`${offen} offene${offen === 1 ? 'r Punkt' : ' Punkte'}`);
+    if (counts.rejected > 0) teile.push(`${counts.rejected} abgelehnt`);
+    return teile.join(' · ');
+}
+
+async function onOpenItemsClick(event) {
+    const btn = event.target.closest('.open-item-pwa');
+    if (!btn) return;
+    if (btn.dataset.kind === 'response') {
+        const id = Number(btn.dataset.appointmentId);
+        responsesExpanded.add(id);
+        // Der Rueckmeldungs-Tab ist sichtbar, sobald es einen Punkt der Art
+        // "response" gibt -- der setzt einen rueckmeldefaehigen Termin voraus,
+        // und genau dieser haelt den Tab-Button ungeblendet (loadResponses()).
+        document.querySelector('.tab-button[data-tab="responses"]')?.click();
+        // loadResponses() ist idempotent; der eigene await liefert -- anders
+        // als der Klick oben -- einen Zeitpunkt, zu dem die Karte im DOM
+        // steht, ohne eine feste Wartezeit zu raten.
+        await loadResponses();
+        document.querySelector(`#responsesList .response-card[data-appointment-id="${id}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+        document.querySelector('.tab-button[data-tab="history"]')?.click();
+    }
+}
+
+async function loadOpenItems() {
+    const block = document.getElementById('openItemsBlock');
+    const list = document.getElementById('openItemsPwaList');
+    if (!block || !list) return;
+
+    if (!openItemsBound) {
+        list.addEventListener('click', onOpenItemsClick);
+        openItemsBound = true;
+    }
+
+    if (!userData || !userData.member_id) {
+        block.hidden = true;
+        return;
+    }
+
+    try {
+        const result = await apiCall('my_open_items');
+        if (!result.success || !result.data || result.data.member === false
+            || !Array.isArray(result.data.items) || result.data.items.length === 0) {
+            block.hidden = true;
+            return;
+        }
+
+        const { items, counts } = result.data;
+        list.innerHTML = items.map(openItemHtml).join('');
+        document.getElementById('openItemsSummary').textContent = openItemsSummaryText(counts);
+        // Aufgeklappt nur, wenn etwas zu tun ist -- eine offene Rueckmeldung.
+        block.open = counts.open > 0;
+        block.hidden = false;
+    } catch (error) {
+        debug.error('Offene Punkte nicht geladen:', error);
+        block.hidden = true;
+    }
+}
+
 /**
  * Einstieg in den Erfassen-Tab: fragt nur, wenn es etwas zu fragen gibt.
  *
@@ -4092,6 +4208,7 @@ function enterCaptureTab() {
     const intents = availableIntents();
 
     showCaptureView(intents.length > 1 ? 'chooser' : intents[0]);
+    loadOpenItems();
 }
 
 function initCaptureTab() {

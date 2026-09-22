@@ -44,3 +44,39 @@ test('Dashboard: Karte laedt nach, wenn der Rueckmeldungsdialog etwas geaendert 
     assertTrue(str_contains($responses, "new CustomEvent('responses:changed')"), 'responses.js meldet keine Aenderung');
     assertTrue(str_contains($module, "'responses:changed'"), 'open_items.js hoert nicht auf responses:changed');
 });
+
+test('PWA: Block steht oben im Tab Erfassen und ist anfangs ausgeblendet', function () use ($root) {
+    $html    = (string) file_get_contents($root . '/public/checkin/index.html');
+    $capture = strpos($html, 'data-tab="capture">');
+    $block   = strpos($html, 'id="openItemsBlock"');
+    $chooser = strpos($html, 'id="captureChooser"');
+    assertTrue($capture !== false && $block !== false && $chooser !== false, '#openItemsBlock, Tab oder Absichtswahl fehlt');
+    assertTrue($capture < $block && $block < $chooser, 'Block steht nicht vor der Absichtswahl');
+    assertTrue(preg_match('/<details[^>]*id="openItemsBlock"[^>]*\bhidden\b/', $html) === 1,
+        'Block ist nicht anfangs ausgeblendet');
+});
+
+test('PWA: Block laedt my_open_items, maskiert und blendet ohne Punkte aus', function () use ($root) {
+    $js = (string) file_get_contents($root . '/public/checkin/js/app.js');
+    $start = strpos($js, 'async function loadOpenItems(');
+    assertTrue($start !== false, 'loadOpenItems() fehlt in app.js');
+    $body = substr($js, $start, (int) strpos($js, "\n}", $start) - $start);
+    assertTrue(str_contains($body, "apiCall('my_open_items'"), 'loadOpenItems() fragt my_open_items nicht ab');
+    assertTrue(str_contains($body, 'block.hidden = true'), 'Ohne Punkte wird der Block nicht ausgeblendet');
+    assertTrue(str_contains($body, 'Array.isArray('), 'Fehlerantworten werden nicht abgefangen');
+
+    $render = strpos($js, 'function openItemHtml(');
+    assertTrue($render !== false, 'openItemHtml() fehlt');
+    $renderBody = substr($js, $render, (int) strpos($js, "\n}", $render) - $render);
+    assertTrue(str_contains($renderBody, 'escapeHtml(item.title)'), 'Titel wird nicht maskiert');
+    assertTrue(str_contains($renderBody, 'escapeHtml(item.activity_name)'), 'Taetigkeit wird nicht maskiert');
+});
+
+test('PWA: offene Punkte werden beim Zurueckkehren und beim Betreten von Erfassen nachgeladen', function () use ($root) {
+    $js = (string) file_get_contents($root . '/public/checkin/js/app.js');
+    $enter = strpos($js, 'function enterCaptureTab(');
+    $enterBody = substr($js, $enter, (int) strpos($js, "\n}", $enter) - $enter);
+    assertTrue(str_contains($enterBody, 'loadOpenItems('), 'enterCaptureTab() laedt die offenen Punkte nicht');
+    assertTrue(preg_match("/visibilitychange[\\s\\S]{0,300}loadOpenItems\\(/", $js) === 1,
+        'visibilitychange laedt die offenen Punkte nicht nach');
+});

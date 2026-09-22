@@ -137,6 +137,13 @@
                  sichtbaren Ansicht statt aus einer verborgenen Variablen. -->
             <div class="tab-content active" data-tab="capture">
 
+                <!-- Offene Punkte (FI-17). Ohne Punkte ausgeblendet, damit das
+                     Erfassen nicht nach unten rutscht. -->
+                <details id="openItemsBlock" class="open-items-block" hidden>
+                    <summary id="openItemsSummary"></summary>
+                    <div id="openItemsPwaList" class="open-items-pwa-list"></div>
+                </details>
+
                 <!-- Ansicht 1: Absichtswahl. Erscheint nur, wenn beide
                      Absichten offenstehen — sonst geht es direkt zum Werkzeug. -->
                 <div id="captureChooser" class="capture-chooser" hidden>
