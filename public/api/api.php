@@ -58,6 +58,7 @@ require_once '../../private/helpers/appointment_rules.php';
 require_once '../../private/helpers/appointment_series.php';
 require_once '../../private/helpers/groups.php';
 require_once '../../private/helpers/demo_mode.php';
+require_once '../../private/helpers/open_items.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';
@@ -81,6 +82,7 @@ require_once '../../private/handlers/settings.php';
 require_once '../../private/handlers/user_mailer.php';
 require_once '../../private/handlers/attendance_list.php';
 require_once '../../private/handlers/my_data.php';
+require_once '../../private/handlers/my_open_items.php';
 require_once '../../private/handlers/activity_types.php';
 require_once '../../private/handlers/work_sessions.php';
 require_once '../../private/handlers/station.php';
@@ -648,6 +650,9 @@ try {
         break;
     case 'my_data':
         handleMyData($db, $database, $request_method, $authUserId);
+        break;
+    case 'my_open_items':
+        handleMyOpenItems($db, $database, $request_method, $authUserRole, $authMemberId);
         break;
     case 'session_info':
         getSessionStatus($request_method);
