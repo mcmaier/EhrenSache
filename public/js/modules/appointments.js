@@ -18,6 +18,7 @@ import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS } from './responses.js';
+import { appointmentTimeChips, localTodayIso, countChips, renderFilterChips, setResetVisible } from './filter_chips.js';
 
 // ============================================
 // APPOINTMENTS
@@ -209,6 +210,9 @@ export async function showAppointmentSection(forceReload = false, page = 1)
         } else if (herkunft === 'single') {
             gefiltert = gefiltert.filter(a => a.series_id === null || a.series_id === undefined);
         }
+
+        setResetVisible(document.getElementById('resetAppointmentFilter'),
+            Boolean(typ) || Boolean(herkunft));
 
         renderAppointments(gefiltert, page);
     }
@@ -432,40 +436,16 @@ window.goToAppointmentsPage = function(page) {
     }
 };
 
+// Vergangen/Kommend als reine Anzeige (Spec 2026-09-22): Zaehler ueber die
+// gefilterte Liste, kein Klick -- der Kalender ist selbst die Zeitachse.
 function updateAppointmentStats(appointments)
 {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Heute 00:00 Uhr
-    
-    let pastCount = 0;
-    let upcomingCount = 0;
-    
-    appointments.forEach(appointment => {
-        // Appointment-Datum parsen
-        const appointmentDate = new Date(appointment.date);
-        
-        if (appointmentDate < today) {
-            pastCount++;
-        } else {
-            upcomingCount++;
-        }
-    });
-    
-    // Statistiken aktualisieren
-    document.getElementById('statPastAppointments').textContent = pastCount;
-    document.getElementById('statUpcomingAppointments').textContent = upcomingCount
-
-    /*
-    if(!appointments || appointments.length === 0)
-    {
-        document.getElementById('statUpcomingAppointments').textContent = '0';
-        return;
-    }
-
-    // Statistiken
-    const today = new Date().toISOString().split('T')[0];
-    const upcoming = appointments.filter(a => a.date >= today).length;
-    document.getElementById('statUpcomingAppointments').textContent = upcoming;    */    
+    const defs = appointmentTimeChips(localTodayIso());
+    renderFilterChips(
+        document.getElementById('appointmentTimeChips'),
+        defs, countChips(appointments, defs), null, null,
+        { static: true, label: 'Termine nach Zeit' }
+    );
 }
 
 

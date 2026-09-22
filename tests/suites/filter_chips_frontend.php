@@ -181,3 +181,16 @@ test('Geraete: Chips statt Karten', function () use ($fcRoot, $fcHtml) {
     assertTrue(str_contains($js, 'Keine Geräte für diese Auswahl'), 'Leere Geraeteliste braucht einen Hinweis');
     assertTrue(str_contains($js, 'Number(device.is_active) === 1'), 'Badge und Chip muessen is_active gleich auswerten');
 });
+
+test('Termine: statische Zeit-Chips statt Karten', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'termine', 'anwesenheit');
+    assertTrue(str_contains($bereich, 'id="appointmentTimeChips"'), 'Chip-Container fehlt');
+    foreach (['statPastAppointments', 'statUpcomingAppointments'] as $id) {
+        assertSame(0, substr_count($fcHtml, $id), $id . ' muss entfallen');
+    }
+    $js = fcModul($fcRoot, 'appointments');
+    assertTrue(str_contains($js, 'appointmentTimeChips('), 'appointments.js nutzt die Zeit-Chips nicht');
+    // Reine Anzeige: der Kalender darf nicht nach Vergangen/Kommend filtern
+    assertTrue(preg_match('/static:\s*true/', $js) === 1, 'Die Termin-Chips muessen static sein');
+    assertSame(0, substr_count($js, 'filterByChip'), 'Termine filtern nicht nach Chip');
+});
