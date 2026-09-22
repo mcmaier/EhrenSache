@@ -21,6 +21,22 @@ oder noch nicht gebaut.
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
 *mittel* = sollte vor der Freigabe an Vereine gelöst sein · *niedrig* = Verbesserung
 
+**Nächste Umsetzung (Stand 2026-09-22, aus dem Test vom 21.09.):** zuerst die drei
+Fehlerkorrekturen, klein genug für ein gemeinsames Patch-Release —
+1. [OI-83](#oi-83--arbeitszeit-mit-ortsnachweis-ohne-kamera-nicht-startbar): Zeiterfassung mit
+   Ortsnachweis ohne Kamera. Sie blockiert eine Kernfunktion auf betroffenen Geräten, die
+   Korrektur betrifft nur die PWA.
+2. [OI-84](#oi-84--leeres-filterergebnis-lässt-die-alte-paginierung-stehen): alte Paginierung bei
+   leerem Filterergebnis. Sie zeigt Verwaltern falsche Daten, betroffen sind drei Module, jeweils
+   derselbe Zweig.
+3. [OI-82](#oi-82--nachträglicher-zeitantrag-auch-für-termine-in-der-zukunft): Zeitantrag für
+   künftige Termine. Nötig sind eine Serverprüfung mit Test und der PWA-Filter.
+
+Danach die Verbesserungen [OI-86](#oi-86--bunte-status-filterknöpfe-nur-in-der-benutzerverwaltung)
+(Komponente, klein) und [OI-85](#oi-85--keine-ladeanzeige-und-kein-timeout-bei-langsamen-api-antworten)
+(braucht vorher die Entscheidung zur Timeout-Meldung bei Mutationen). Wie jeder Eintrag hier gilt
+auch diese Liste nur bis zur Prüfung gegen den Code.
+
 ---
 
 ## Zu klären
@@ -3178,5 +3194,186 @@ Vorlage der Serie `type_id = NULL` trägt (zwingt zu „Regel ändern …" / Spl
 Terminart, statt stillschweigend weiterzulaufen) — oder generell verhindern, dass eine Terminart
 gelöscht wird, solange eine Serie oder ein Termin auf sie zeigt (würde auch den analogen, schon
 länger bestehenden Fall bei gewöhnlichen Einzelterminen mit erledigen, der hier nicht neu ist).
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-82 · Nachträglicher Zeitantrag auch für Termine in der Zukunft
+**Priorität:** mittel · aufgenommen am 2026-09-22 (Test vom 21.09.)
+
+Der Dialog „Nachträglicher Antrag“ der Check-in-PWA bietet Termine der letzten drei Tage **und
+alle künftigen** an. `loadAppointments()` in `public/checkin/js/app.js` (~Zeile 2248) filtert
+bewusst so („Letzte 3 Tage + Zukunft (für nachträgliche Anträge)“). Ein Zeitantrag
+(`exception_type = time_correction`) behauptet aber eine Ankunft, die schon stattgefunden hat —
+für einen Termin in drei Wochen ergibt er keinen Sinn.
+
+**Der Server fängt es nicht ab.** `POST exceptions` (`private/handlers/exceptions.php`, ~Zeile
+194) prüft die Wunschzeit nur mit `arrivalWithinAppointmentWindow()` (`private/helpers/utils.php`)
+gegen das Fenster **um den Termin**, nicht gegen die aktuelle Uhrzeit. Liegt der Termin in der
+Zukunft, liegt auch jede gültige Wunschzeit in der Zukunft — und wird angenommen. Dasselbe gilt
+für den `PUT`-Pfad (~Zeile 264). Die API ist direkt aufrufbar, eine Sperre allein in der PWA
+reicht deshalb nicht.
+
+**Wirkung:** Ein Mitglied kann für einen künftigen Termin eine Ankunft beantragen. Genehmigt ein
+Verwalter den Antrag, entsteht über `handleApprovedTimeCorrection()` ein Anwesenheitseintrag für
+einen Termin, der noch nicht stattgefunden hat — er zählt in Quote und Pünktlichkeit. Eine
+Rechteausweitung ist es nicht: Der Antrag bleibt `pending`, bis jemand mit Verwalterrechten ihn
+bescheidet.
+
+**Zu tun:**
+
+- **Server:** Für `time_correction` die Wunschzeit zusätzlich gegen die aktuelle Zeit prüfen
+  (`requested_arrival_time <= jetzt`), in `POST` und `PUT`, mit `400` und verständlicher
+  Meldung. Zeitbasis wie bei [OI-60](#oi-60--zeitbasis-der-terminrückmeldung-php-uhr-statt-mysql-uhr)
+  beachten. Test in einer API-Suite.
+- **PWA:** Terminliste des Dialogs auf Termine begrenzen, deren Fenster schon begonnen hat
+  (Beginn minus `checkin_tolerance_hours` ≤ jetzt).
+- **Nicht betroffen:** `absence`. Eine Entschuldigung im Voraus ist gewollt — die
+  Terminrückmeldung legt genau so eine an (`responseExcuseAction()`).
+- **Zu entscheiden:** Soll auch die Genehmigung ablehnen, wenn die Wunschzeit noch in der Zukunft
+  liegt? Betrifft nur Anträge, die vor der Korrektur angelegt wurden.
+
+**Nicht sicherheitsrelevant im Sinne von `SECURITY.md`:** ohne Verwalterfreigabe wirkungslos.
+
+---
+
+### OI-83 · Arbeitszeit mit Ortsnachweis ohne Kamera nicht startbar
+**Priorität:** mittel · aufgenommen am 2026-09-22 (Test vom 21.09.)
+
+Verlangt eine Tätigkeitsart einen Ortsnachweis, ruft `worktimeStart()` (`public/checkin/js/app.js`,
+~Zeile 3520) direkt `toggleScanner()` auf. Dasselbe tut `worktimeStop()` bei `start_end`. Die
+Handeingabe des Codes ist in der Arbeitszeit-Ansicht nur über `scanManualBtn` erreichbar, und
+der sitzt in `#scannerActions` — sichtbar **nur, solange der Sucher läuft**
+(`setScannerActionsVisible()`). Der Knopf „Code manuell eingeben“ (`manualCodeBtn`) steht allein in
+der Ansicht „Anwesenheit erfassen“.
+
+Scheitert der Kamerastart, fängt `toggleScanner()` den Fehler, setzt den Zustand auf `IDLE` und
+zeigt eine Meldung. Der Sucher läuft dann nicht, also gibt es auch keinen Weg zur Handeingabe.
+Betroffen sind:
+
+- verweigerte Kamerafreigabe (`NotAllowedError`),
+- Geräte ohne Kamera (`NotFoundError`), Kamera belegt (`NotReadableError`),
+- Aufruf über HTTP statt HTTPS: Außerhalb eines sicheren Kontexts gibt es
+  `navigator.mediaDevices` nicht, der Start scheitert immer.
+
+**Wirkung:** Für Tätigkeiten mit Ortsnachweis lässt sich die Zeiterfassung auf solchen Geräten gar
+nicht starten, obwohl der sechsstellige Code am Ort ablesbar wäre. Als Ausweg bleibt nur „Zeit
+nachtragen“ — ohne Ortsnachweis und mit Freigabepflicht.
+
+**Zu tun:**
+
+- Knopf „Code eingeben“ in der Arbeitszeit-Ansicht neben „Start“ bzw. „Stopp“ — sichtbar, wenn
+  die gewählte Tätigkeit (bzw. die laufende Sitzung) einen Nachweis verlangt. Er öffnet das
+  vorhandene `manualCodeModal`. `deliverTotpCode()` leitet den Code nach der sichtbaren Ansicht
+  weiter und braucht keine Änderung.
+- Scheitert der Kamerastart, direkt die Handeingabe anbieten statt nur der Fehlermeldung — für
+  beide Ansichten.
+- Ohne `window.isSecureContext` den Kameraweg gar nicht erst versuchen und gleich die Handeingabe
+  öffnen.
+
+**Nicht sicherheitsrelevant:** Der Code wird serverseitig geprüft, egal auf welchem Weg er
+eingegeben wird.
+
+---
+
+### OI-84 · Leeres Filterergebnis lässt die alte Paginierung stehen
+**Priorität:** mittel · aufgenommen am 2026-09-22 (Test vom 21.09., Live-System)
+
+Gemeldet in der Anwesenheitsverwaltung: Wählt man eine Terminart ohne Einträge, bleibt die
+Paginierung beim alten Stand („von 196 Einträgen“). Erst die Wahl eines einzelnen Termins
+wechselt in die Anwesenheitsliste.
+
+**Ursache (aus dem Code, im Browser noch nicht nachgestellt):** Die Filterung selbst ist richtig.
+`filterRecords()` liefert bei leerem Ergebnis `[]`, das Backend ist nicht beteiligt (gefiltert
+wird im Client), und `applyRecordFilters()` ist bereits die zentrale Filterfunktion. Die beiden
+Vermutungen aus der Notiz treffen also nicht. Der Fehler sitzt in `renderRecords()`
+(`public/js/modules/records.js`, ~Zeile 131): Bei leerer Liste schreibt es „Keine Einträge
+gefunden“ und kehrt **vor** `renderRecordsPagination()` zurück. Dadurch
+
+1. bleibt der Inhalt von `#recordsPagination` stehen: Seitenknöpfe und „Zeige 1–25 von 196“,
+2. bleibt `allFilteredRecords` auf der alten Liste. Ein Klick auf einen Seitenknopf ruft
+   `goToRecordsPage()` auf, rendert **die alten 196 Einträge** und zeigt sie unter dem gesetzten
+   Filter an.
+
+**Dasselbe Muster** steckt in `renderMembers()` (`members.js`, ~Zeile 152) und
+`renderExceptions()` (`exceptions.js`, ~Zeile 69). In `renderMembers()` kommt dazu, dass die
+Leermeldung „Kein Profil verknüpft“ lautet — auch dann, wenn ein Admin einfach einen Filter ohne
+Treffer gesetzt hat. Termine, Benutzer und Geräte sind nicht betroffen: Dort läuft auch eine
+leere Liste durch die Paginierung, die sich bei `totalPages <= 1` selbst leert.
+
+**Zu tun:** In den drei leeren Zweigen die Paginierung leeren und die gemerkte Liste auf `[]`
+setzen. Die Leermeldung an den Fall anpassen („Keine Einträge für diese Auswahl“ bei gesetztem
+Filter). Vorher im Browser nachstellen.
+
+**Zum Hinweis auf „nicht gegenseitig gefilterte Dropdowns“:** Für die Modals von Anwesenheit und
+Anträgen ist die gegenseitige Filterung seit der Spec `2026-04-15-dropdown-cross-filtering-design.md`
+gebaut (`getCompatibleAppointments()`/`getCompatibleMembers()` in `utils.js`). In der
+Filterleiste filtert die Terminart die Listen für Termin und Mitglied, und die Wahl von Termin
+oder Mitglied sperrt die beiden anderen Felder. Ein offener Fehler dazu ist nicht bekannt — was
+genau gemeint war, ist noch zu klären.
+
+**Nicht sicherheitsrelevant:** reine Anzeige, die angezeigten Einträge liegen ohnehin im Cache
+der Sitzung.
+
+---
+
+### OI-85 · Keine Ladeanzeige und kein Timeout bei langsamen API-Antworten
+**Priorität:** niedrig · aufgenommen am 2026-09-22 (Test vom 21.09.)
+
+`apiCall()` (`public/js/modules/api.js`) und die gleichnamige Funktion der PWA
+(`public/checkin/js/app.js`) warten ohne Rückmeldung und ohne zeitliche Grenze. Ladeanzeigen gibt
+es nur vereinzelt: `.loading` als Tabellenplatzhalter, `statsLoading` im Statistik-Tab der PWA.
+Bei langsamer Verbindung sieht die Oberfläche eingefroren aus.
+
+**Vorschlag aus dem Test:** zentral im Wrapper statt je Ansicht. Die Anzeige erst nach etwa 300 ms
+einblenden, damit schnelle Antworten nicht flackern. Timeout per `AbortController` mit
+Fehlermeldung. Beide Wrapper brauchen das, die Station hat einen dritten.
+
+**Vor der Umsetzung zu klären:**
+
+- **Ein Timeout bricht nur das Warten ab, nicht die Anfrage.** Ein `POST`, der nach dem Abbruch
+  auf dem Server doch durchläuft, hat trotzdem angelegt. Die Meldung darf deshalb bei Mutationen
+  nicht „fehlgeschlagen“ heißen, sondern „Ergebnis unbekannt — bitte Ansicht neu laden“. Sonst
+  schickt das Mitglied den Check-in ein zweites Mal ab (Dubletten fangen heute die Unique-Indizes
+  und die Dublettenprüfung der Anträge ab, aber nicht jeder Weg hat eine).
+- **Länge des Timeouts:** Export, Import und Druckbericht dauern legitim länger. Sie brauchen
+  einen eigenen Wert oder gar keinen, über `callOptions`.
+- **Gleichzeitige Anfragen:** Die Anzeige hängt an einem Zähler offener Anfragen, nicht an einem
+  Schalter. Sonst blendet die erste fertige Antwort die Anzeige aus, während die zweite noch
+  läuft.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-86 · Bunte Status-Filterknöpfe nur in der Benutzerverwaltung
+**Priorität:** niedrig · aufgenommen am 2026-09-22 (Test vom 21.09.)
+
+Die Benutzerverwaltung (`#userStatusFilter`, `public/index.html` ~Zeile 1264) filtert mit
+farbigen Pillenknöpfen (`.filter-btn`, `.pending`, `.active-status`, `.suspended` in
+`public/css/sections/content.css` ~Zeile 401). Alle anderen Ansichten filtern seit 1.9.2 über
+Auswahlfelder in der Filterleiste.
+
+**Die Farben tragen Bedeutung.** Gelb steht für ausstehend, Grün für aktiv, Rot für gesperrt, und
+jeder Knopf zeigt die Anzahl. Damit ist die Frage aus der Notiz — ausweiten oder zurückbauen —
+nach deren eigenem Kriterium beantwortet: nicht zurückbauen. Das eigentliche Problem ist die
+Umsetzung. Die Farben sind hart codiert (`#ffc107`, `#28a745`, `#dc3545`, `#007bff`, `white`,
+`#ddd`) statt über `variables.css`, entgegen der Konvention in `CLAUDE.md`. Im Branding
+eingestellte Farben erreichen sie nicht, und das Blau des aktiven „Alle“ ist in keiner anderen
+Ansicht Primärfarbe.
+
+**Vorbild im Bestand:** `.response-chip--yes/--maybe/--no/--open` (`css/components/badges.css`)
+lösen dieselbe Aufgabe schon mit Tokens (`color-mix()` über `--success-color`, `--warning-color`,
+`--danger-color`).
+
+**Zu tun:** Eine gemeinsame Komponente in `css/components/` (z. B. `.filter-chip` mit
+Statusvarianten über die vorhandenen Farb-Tokens), die Benutzerverwaltung darauf umstellen.
+
+**Zu entscheiden:** Ob weitere Ansichten mit festem Statussatz Chips bekommen — Anträge
+(ausstehend/genehmigt/abgelehnt) und Arbeitszeit (eingereicht/bestätigt/abgelehnt) lägen nahe.
+Das ginge gegen die Filterleisten-Konvention aus 1.9.2 und wäre eine eigene Entscheidung.
+Dark Mode hat das Dashboard derzeit nicht. Mit Tokens wäre die Komponente dafür aber schon
+vorbereitet.
 
 **Nicht sicherheitsrelevant.**
