@@ -50,3 +50,36 @@ test('Offline-Hinweis nur an Rueckmeldekarten', function () {
     assertTrue(str_contains(ptFunktion('refreshAllResponseCards'), ':not(.response-card--info)'),
         'Sonst stuende an Infoterminen "Ohne Netz ist keine Rueckmeldung moeglich"');
 });
+
+// Entschuldigen an der Infokarte (seit 1.12.0)
+
+test('Infokarte: Entschuldigen nur bis Terminbeginn', function () {
+    $rumpf = ptFunktion('excuseSectionHtml');
+    assertTrue(str_contains($rumpf, 'item.started'),
+        'Nach Beginn darf die Karte keine neue Entschuldigung anbieten');
+    assertTrue(str_contains($rumpf, 'response-excuse__submit') && str_contains($rumpf, 'response-excuse__withdraw'),
+        'Einreichen und Zurueckziehen fehlen');
+    // Die Entwurfslogik der Liste sucht .response-comment textarea
+    assertTrue(str_contains($rumpf, 'class="response-comment"'),
+        'Ohne .response-comment ginge eine angefangene Begruendung beim Neuladen verloren');
+});
+
+test('Infokarte: die Begruendung ist Pflicht', function () {
+    $rumpf = ptFunktion('submitExcuse');
+    assertTrue(str_contains($rumpf, "reason === ''"), 'Ohne Begruendung darf nichts abgeschickt werden');
+    assertTrue(str_contains($rumpf, "exception_type: 'absence'"), 'Eingereicht wird eine Entschuldigung');
+});
+
+test('Infokarte: Zurueckziehen fragt nach und loescht', function () {
+    $rumpf = ptFunktion('withdrawExcuse');
+    assertTrue(str_contains($rumpf, 'showNavigationConfirm('), 'Zurueckziehen ohne Rueckfrage');
+    assertTrue(str_contains($rumpf, "'DELETE'"), 'Zurueckziehen loescht den offenen Antrag');
+});
+
+test('Klicks der Infokarte laufen nicht in die Logik der Rueckmeldekarte', function () {
+    $rumpf = ptFunktion('onResponsesClick');
+    $weiche = strpos($rumpf, 'response-excuse__submit');
+    $details = strpos($rumpf, ".response-comment-details'");
+    assertTrue($weiche !== false && $details !== false && $weiche < $details,
+        'Die Infokarte hat kein .response-comment-details -- die Weiche muss davor stehen');
+});

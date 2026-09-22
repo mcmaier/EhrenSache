@@ -4380,20 +4380,81 @@ function infoCardHtml(item) {
             <strong>${escapeHtml(apt.title)}</strong>
             <span>${escapeHtml(formatResponseCardHead(apt.date, apt.start_time, apt.end_time))}</span>
         </div>
-        <div class="response-card__meta">${responseLocationHtml(apt.location)}</div>`;
+        <div class="response-card__meta">${responseLocationHtml(apt.location)}${excuseChipHtml(item)}</div>`;
 
-    if (!apt.description) {
-        return `<div class="response-card response-card--info" data-appointment-id="${id}" style="border-left-color: ${color}">${kopf}</div>`;
-    }
-
+    // Seit 1.12.0 immer aufklappbar: Der Koerper traegt die Entschuldigung,
+    // auch bei einem Termin ohne Beschreibung.
     return `
         <details class="response-card response-card--info" data-appointment-id="${id}" data-expandable style="border-left-color: ${color}"${responsesExpanded.has(id) ? ' open' : ''}>
             <summary class="response-card__summary">${kopf}</summary>
             <div class="response-card__body">
                 <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
-                <div class="response-card__desc">${escapeHtml(apt.description)}</div>
+                ${apt.description ? `<div class="response-card__desc">${escapeHtml(apt.description)}</div>` : ''}
+                ${excuseSectionHtml(item)}
             </div>
         </details>`;
+}
+
+/**
+ * Stand der eigenen Entschuldigung als Chip im Kartenkopf -- sichtbar schon an
+ * der zugeklappten Karte. Ohne Antrag kein Chip: Bei einem Termin ohne
+ * Rueckmeldung ist Hingehen der Normalfall, nichts ist "offen".
+ */
+function excuseChipHtml(item) {
+    const status = item.own_absence?.status;
+    if (status === 'pending')  return '<span class="response-chip response-chip--maybe">⏳ Entschuldigung beantragt</span>';
+    if (status === 'approved') return '<span class="response-chip response-chip--no">✗ entschuldigt</span>';
+    if (status === 'rejected') return '<span class="response-chip response-chip--muted">Entschuldigung abgelehnt</span>';
+    if (item.started)          return '<span class="response-chip response-chip--muted">hat begonnen</span>';
+    return '';
+}
+
+/**
+ * Entschuldigen an der Infokarte (seit 1.12.0): bis Terminbeginn beantragen,
+ * mit Begruendung als Pflicht, solange offen zurueckziehen. Nach einer
+ * Ablehnung ist ein neuer Antrag moeglich -- dieselbe Regel wie im Server.
+ *
+ * Die Begruendung steht in .response-comment wie die Bemerkung der
+ * Rueckmeldekarte: So uebersteht ein angefangener Text das Neuladen der
+ * Liste ueber dieselbe Entwurfslogik.
+ */
+function excuseSectionHtml(item) {
+    const id = Number(item.appointment.appointment_id);
+    const absence = item.own_absence;
+    const off = navigator.onLine ? '' : ' disabled';
+
+    if (absence?.status === 'approved') {
+        return '<div class="response-excuse"><p class="response-excuse__state">Deine Entschuldigung ist genehmigt.</p></div>';
+    }
+
+    if (absence?.status === 'pending') {
+        return `
+            <div class="response-excuse">
+                <p class="response-excuse__state">Deine Entschuldigung wartet auf Freigabe.</p>
+                <button type="button" class="response-excuse__withdraw" data-appointment-id="${id}" data-exception-id="${absence.exception_id}"${off}>Zurückziehen</button>
+            </div>`;
+    }
+
+    // Kein offener Antrag: nach Beginn nichts mehr anbieten
+    if (item.started) {
+        return absence?.status === 'rejected'
+            ? '<div class="response-excuse"><p class="response-excuse__state">Deine Entschuldigung wurde abgelehnt.</p></div>'
+            : '';
+    }
+
+    const hinweis = absence?.status === 'rejected'
+        ? '<p class="response-excuse__state">Deine Entschuldigung wurde abgelehnt. Du kannst eine neue einreichen.</p>'
+        : '';
+
+    return `
+        <div class="response-excuse">
+            ${hinweis}
+            <div class="response-comment">
+                <textarea rows="2" maxlength="255" placeholder="Begründung (Pflicht)"${off}></textarea>
+                <small>Bis Terminbeginn möglich. Die Entschuldigung muss freigegeben werden.</small>
+                <button type="button" class="response-excuse__submit" data-appointment-id="${id}"${off}>Entschuldigen</button>
+            </div>
+        </div>`;
 }
 
 function responseCardHtml(item) {
@@ -4492,6 +4553,17 @@ async function onResponsesClick(event) {
     const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === appointmentId);
     if (!item) return;
 
+    // Entschuldigung an der Infokarte (seit 1.12.0) -- eigene Wege, die
+    // Infokarte hat weder Antwortknoepfe noch "Bemerkung".
+    if (btn.classList.contains('response-excuse__submit')) {
+        await submitExcuse(item, btn.closest('.response-card'));
+        return;
+    }
+    if (btn.classList.contains('response-excuse__withdraw')) {
+        withdrawExcuse(item, Number(btn.dataset.exceptionId));
+        return;
+    }
+
     const card = btn.closest('.response-card');
     const detailsEl = card.querySelector('.response-comment-details');
     const textarea = detailsEl.querySelector('textarea');
@@ -4543,6 +4615,71 @@ async function onResponsesClick(event) {
         }
         await submitResponse(item, targetStatus, comment, card);
     }
+}
+
+/**
+ * Reicht die Entschuldigung einer Infokarte ein (seit 1.12.0). Danach wird die
+ * Liste frisch geladen: Die Karte zeigt den Stand, den der Server kennt, statt
+ * einen, den die PWA sich zusammenreimt.
+ */
+async function submitExcuse(item, card) {
+    const key = Number(item.appointment.appointment_id);
+    const textarea = card?.querySelector('.response-comment textarea');
+    const reason = textarea ? textarea.value.trim() : '';
+
+    if (reason === '') {
+        showMessage('Bitte eine Begründung angeben', 'error');
+        textarea?.focus();
+        return;
+    }
+    if (!userData?.member_id) {
+        showMessage('Mit diesem Konto ist kein Mitglied verknüpft', 'error');
+        return;
+    }
+
+    responsesInFlight.add(key);
+    card?.querySelectorAll('button, textarea').forEach(el => { el.disabled = true; });
+
+    try {
+        const result = await apiCall('exceptions', 'POST', {
+            member_id: userData.member_id,
+            appointment_id: key,
+            exception_type: 'absence',
+            reason
+        });
+
+        if (!result.success) {
+            showMessage(result.error || 'Entschuldigung konnte nicht eingereicht werden', 'error');
+            card?.querySelectorAll('button, textarea').forEach(el => { el.disabled = !navigator.onLine; });
+            return;
+        }
+
+        if (textarea) textarea.value = '';   // kein Entwurf mehr -- er ist eingereicht
+        showMessage('✓ Entschuldigung eingereicht (wartet auf Freigabe)', 'success');
+    } finally {
+        responsesInFlight.delete(key);
+    }
+
+    await loadResponses();
+}
+
+/** Zieht eine offene Entschuldigung zurueck -- nach Rueckfrage, sie ist dann weg. */
+function withdrawExcuse(item, exceptionId) {
+    if (!exceptionId) return;
+
+    showNavigationConfirm(
+        'Entschuldigung zurückziehen?',
+        `Der Antrag zu „${item.appointment.title}“ wird gelöscht.`,
+        async () => {
+            const result = await apiCall('exceptions', 'DELETE', null, { id: exceptionId });
+            if (!result.success) {
+                showMessage(result.error || 'Entschuldigung konnte nicht zurückgezogen werden', 'error');
+                return;
+            }
+            showMessage('Entschuldigung zurückgezogen', 'success');
+            await loadResponses();
+        }
+    );
 }
 
 async function submitResponse(item, status, comment, card) {

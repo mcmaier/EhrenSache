@@ -2777,6 +2777,29 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     background: var(--button-bg);
 }
 
+/* Entschuldigen an der Infokarte (seit 1.12.0). Eingabe und Knopf wie die
+   Bemerkung der Rueckmeldekarte (.response-comment), damit beide Kartenarten
+   gleich bedient werden. */
+.response-excuse {
+    margin-top: 8px;
+}
+
+.response-excuse__state {
+    margin: 0 0 6px;
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.response-excuse__submit,
+.response-excuse__withdraw {
+    margin-top: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--button-bg);
+    font: inherit;
+}
+
 .response-late {
     color: var(--error);
     font-weight: 600;
