@@ -28,9 +28,7 @@ oder noch nicht gebaut.
 `dev` erledigt und mit 1.11.2 veröffentlicht.
 
 [OI-85](#oi-85--keine-ladeanzeige-und-kein-timeout-bei-langsamen-api-antworten) ist erledigt (nach 1.12.0).
-[OI-86](#oi-86--bunte-status-filterknöpfe-nur-in-der-benutzerverwaltung) ist vertagt: Er geht in einem
-Bedienkonzept für einheitliche, schlankere Filter auf, das zuerst in einem Brainstorming entsteht. Wie jeder Eintrag hier gilt
-auch diese Liste nur bis zur Prüfung gegen den Code.
+[OI-86](#oi-86--bunte-status-filterknöpfe-nur-in-der-benutzerverwaltung) ist mit 1.13.0 erledigt (Status-Chips).
 
 ---
 
@@ -3407,9 +3405,7 @@ Fehlermeldung. Beide Wrapper brauchen das, die Station hat einen dritten.
 ---
 
 ### OI-86 · Bunte Status-Filterknöpfe nur in der Benutzerverwaltung
-**Priorität:** niedrig · aufgenommen am 2026-09-22 (Test vom 21.09.) · **vertagt am 2026-09-22:**
-Nicht einzeln lösen. Zuerst ein Brainstorming zu einem Bedienkonzept, das die Filter aller
-Ansichten verschlankt und einheitlich gestaltet; dieser Punkt geht darin auf.
+**Priorität:** erledigt am 2026-09-22 — mit 1.13.0, Spec docs/superpowers/specs/2026-09-22-filter-chips-design.md
 
 Die Benutzerverwaltung (`#userStatusFilter`, `public/index.html` ~Zeile 1264) filtert mit
 farbigen Pillenknöpfen (`.filter-btn`, `.pending`, `.active-status`, `.suspended` in
@@ -3508,3 +3504,84 @@ Neuladen. Eine Zeile, im selben Zug mitnehmen.
 
 **Nicht sicherheitsrelevant im Sinne von `SECURITY.md`:** Die Selbstgenehmigung ist eine bewusste,
 dokumentierte Regel (OI-3), keine Rechteausweitung.
+
+---
+
+### OI-88 · Seitenzahl wird nach Speichern/Löschen nicht auf die letzte Seite begrenzt
+**Priorität:** niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
+
+`renderExceptions`, `renderRecords`, `renderMembers`, `renderUsers` und `renderDevices`
+übernehmen `currentXPage` ungeprüft. Mit den Status-Chips fällt das häufiger auf: z. B. unter
+„Ausstehend“ auf Seite 2 den letzten Eintrag genehmigen → leere Tabelle ohne Hinweis.
+
+**Zu tun:** `page` auf `[1, totalPages]` begrenzen.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-89 · Anwesenheit eines Mitglieds zählt kommende Termine als „Fehlend“
+**Priorität:** niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
+
+`attendance_list.php` (Modus je Mitglied, ~Z. 214–245) liefert alle Termine des Jahres
+einschließlich zukünftiger, ohne Datumsgrenze. Die Zeilen zeigten schon vorher „✗ Fehlend“, der
+neue Chip-Zähler macht es nur sichtbarer.
+
+**Zu entscheiden:** kommende Termine ausschließen oder als eigener Zustand führen.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-90 · Kleinigkeiten aus der Umsetzung von OI-86
+**Priorität:** niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
+
+- `updateUIForRole()` setzt `display: block` auch für Elemente in Flex-Zusammenhängen
+  (`.form-group[data-role]` in `.filter-bar`) — die Mitglieder-Chips umgehen das über `hidden`;
+  richtig wäre `display: ''`.
+- Antragstabelle: Kopf hat 7 Spalten, Zeilen 8 (`index.html` `#antraege`).
+- `renderRecords`-Leerzeile: `colspan` 7, obwohl die Tabelle ohne Aktionsspalte nur 6 Spalten hat.
+- Toter Code: `applyDeviceFilters`/`filterDevices` (`devices.js`), der Zweig `exceptionStatus` in
+  `filterExceptions`, `window.resetWorktimeFilter` ohne Aufrufer.
+- Testrückstände in der Testdatenbank (Tätigkeit „AV2 6ab23e39c28d5“, Termin „Tst5“) — Suche nach
+  der erzeugenden Suite steht noch aus.
+- Bei 1280 px bricht in der Arbeitszeit die fünfte Chip-Zeile um (Stundenkarte und Jahreskarte
+  lassen wenig Platz).
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-91 · Anwesenheit: Mitgliedsauswahl für einfache Nutzer leer
+**Priorität:** niedrig · aufgenommen am 2026-09-22 (Sichtprüfung OI-86 als `user`)
+
+`loadMemberFilter()` (`public/js/modules/records.js`, ~Zeile 522) filtert auf
+`m.is_active_in_period`. `loadMembers()` (`public/js/modules/members.js`) liefert für die Rolle
+`user` aber den Einzelabruf (`private/handlers/members.php`, ~Zeile 48–71), und der liefert dieses
+Feld nicht mit. Folge: Das Auswahlfeld „Mitglied“ der Anwesenheitsverwaltung hat für `user` keinen
+Eintrag, der Modus „Anwesenheit eines Mitglieds“ ist für ihn nicht erreichbar. Nicht durch OI-86
+verursacht (`loadMemberFilter` unverändert).
+
+**Zu tun:** Feld im Einzelabruf mitliefern oder im Frontend auf `member.active` zurückfallen (wie
+`loadMemberData` in `members.js`).
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-92 · Tabellen uneinheitlich: Aktionsspalte nur in der Arbeitszeit fixiert, Arbeitszeit ohne Paginierung
+**Priorität:** niedrig · aufgenommen am 2026-09-22 (Hinweis des Nutzers bei der Sichtprüfung zu
+OI-86)
+
+**1. Fixierte Aktionsspalte.** Die Aktionsspalte bleibt beim waagerechten Scrollen nur in der
+Arbeitszeit stehen: `public/css/components/tables.css` ~Zeile 62–64
+(`.table-worktime th:last-child, .table-worktime td.actions-cell { position: sticky; … }`). Die
+übrigen Listen (Termine, Anwesenheit, Anträge, Mitglieder, Benutzer, Geräte) haben das nicht.
+
+**2. Keine Paginierung.** Die Arbeitszeitliste wird nicht paginiert — `worktime.js` hat keine
+Paginierung, alle anderen Listen nutzen `globalPaginationValue` aus `settings.js`.
+
+**Zu entscheiden:** fixierte Aktionsspalte für alle Tabellen übernehmen oder bewusst nur dort
+belassen; Arbeitszeit an die gemeinsame Paginierung anschließen.
+
+**Nicht sicherheitsrelevant.**

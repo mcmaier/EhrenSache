@@ -7,6 +7,29 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.13.0] – 2026-09-22
+
+### Geändert
+- **Status als farbige Chips mit Zähler in allen Listen.** Anträge, Arbeitszeit, Mitglieder,
+  Anwesenheit, Benutzer und Geräte filtern ihren Status jetzt mit einem Klick auf einen Chip,
+  der zugleich zeigt, wie viele Einträge es sind. Die bisherigen Zählkarten und Status-
+  Auswahlfelder entfallen. Die Zähler berücksichtigen die übrigen Filter, aber nicht den
+  gewählten Status — so bleibt sichtbar, wie viele es in den anderen Status gibt. Die Farben
+  folgen dem Branding. In der Terminverwaltung zeigen die Chips „Vergangen“ und „Kommend“
+  nur an, der Kalender bleibt vollständig.
+- **In der Anwesenheitsliste eines Termins lässt sich nach „Fehlend“ filtern.**
+- **„Filter zurücksetzen“ ist ein unauffälliger Textknopf** und erscheint nur, wenn ein Filter
+  gesetzt ist.
+- **Benutzer- und Geräteliste zeigen bei leerer Auswahl einen Hinweis statt einer leeren
+  Tabelle.** Die Anwesenheitsliste eines Termins oder Mitglieds macht es ebenso.
+
+### Behoben
+- **Benutzerverwaltung: Die Zähler fielen auf 0,** sobald ein Status gewählt war.
+- **Benutzerverwaltung: Ein Rollenwechsel lud die Liste doppelt.**
+- **Geräte: Aktiv/Inaktiv wurde in Kennzahl und Tabelle unterschiedlich ermittelt.**
+
+---
+
 ## [1.12.1] – 2026-09-22
 
 ### Neu

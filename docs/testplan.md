@@ -1318,6 +1318,29 @@ antwortende Fassung ersetzen, die auf `signal` hört.
 | LT-6 | PWA, wie LT-4 | Meldung wie LT-4, **kein** Offline-Hinweis |
 | LT-7 | Einstellungen → Löschfristen ausführen bzw. Update holen bei langsamem Server | Kein Abbruch nach 20 s |
 
+### Status-Chips (OI-86, 1.13.0)
+
+Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| CHIP-01 | Anträge öffnen | Vier Chips, Summe der Status = „Alle“, „Alle“ aktiv in Primärfarbe, kein Zurücksetzen-Knopf |
+| CHIP-02 | Anträge: „Ausstehend“ klicken | Nur ausstehende; Zähler der übrigen Chips bleiben stehen (facettierte Zählung); Zurücksetzen erscheint |
+| CHIP-03 | Anträge: Typ wählen | Alle Zähler sinken passend |
+| CHIP-04 | Zurücksetzen | Chip „Alle“, Felder leer, Jahr unverändert, Knopf weg |
+| CHIP-05 | Arbeitszeit mit laufender Sitzung | Sitzung zählt nur unter „Läuft“; „Bestätigte Stunden“ ändert sich beim Chipwechsel nicht |
+| CHIP-06 | Mitglieder öffnen | „Aktiv“ vorausgewählt, keine Inaktiven in der Tabelle, kein Zurücksetzen-Knopf |
+| CHIP-07 | Mitglieder: „Inaktiv“ | Nur Inaktive, Zähler „Aktiv“ bleibt |
+| CHIP-08 | Anwesenheit: Termin wählen, „Fehlend“ | Nur fehlende Mitglieder, Gruppierung zählt mit |
+| CHIP-09 | Anwesenheit: „Fehlend“ aktiv, Termin zurück auf „Alle“ | Chip springt auf „Alle“, „Fehlend“ verschwindet |
+| CHIP-10 | Termine: Chip anklicken | Nichts passiert, kein Handcursor; Kalender vollständig |
+| CHIP-11 | Benutzer: Rolle wechseln | Liste lädt einmal; Zähler folgen der Rolle |
+| CHIP-12 | Geräte: „Inaktiv“, Seite 2 | Bleibt im Filter |
+| CHIP-13 | Branding-Primärfarbe ändern | Aktiver neutraler Chip und Zurücksetzen-Knopf folgen |
+| CHIP-14 | Anträge, Arbeitszeit, Anwesenheit als `user` | Zähler nur über eigene Einträge; Terminfeld der Anwesenheit ausgeblendet; die Mitgliederverwaltung ist für `user` nicht erreichbar (Menüpunkt nur für Verwalter); Mitgliedsauswahl leer, siehe OI-91 |
+| CHIP-15 | Schmales Fenster (375 px) | Chips umbrechen, Jahreskarte darunter, keine horizontale Scrollleiste |
+| CHIP-16 | Leere Auswahl (Chip mit 0) in Benutzer, Geräte, Anwesenheitsliste | Hinweiszeile statt leerer Tabelle, keine Seitenknöpfe |
+
 ---
 
 ## 24. Untergruppen (seit 1.8.0)
