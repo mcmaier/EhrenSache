@@ -446,8 +446,25 @@ test('Zeitantrag nach Beginn: nur fuer eine Ankunft, die schon war (OI-82)', fun
 
     // Termin vor zehn Minuten: Das Fenster hat begonnen, die Ankunft kann
     // davor oder danach liegen -- aber nicht nach jetzt.
+    //
+    // Mit eigener Terminart: Ein Termin um jetzt mit der Standardart trifft
+    // sonst auf jeden echten Termin derselben Art im Abstand von zwei Stunden
+    // und scheitert an der Dublettenpruefung (409) -- abends an den Proben
+    // des Demo-Bestands, mittags an einem beliebigen Testtermin.
+    $suffix  = uniqid();
+    $groupId = (int) (apiRequest('POST', 'member_groups', ['token' => $token,
+        'body' => ['group_name' => "ARR {$suffix}"]])['body']['id'] ?? 0);
+    $typeRes = apiRequest('POST', 'appointment_types', ['token' => $token, 'body' => [
+        'type_name' => "ARR {$suffix}", 'is_default' => 0, 'color' => '#667eea', 'group_ids' => [$groupId]]]);
+    assertStatus(201, $typeRes, 'Eigene Terminart fuer den Test');
+    $typeId = (int) $typeRes['body']['id'];
+
     $start = new DateTimeImmutable('-10 minutes');
-    $aptId = arrTempAppointment($token, $start->format('Y-m-d'), $start->format('H:i:00'));
+    $aptRes = apiRequest('POST', 'appointments', ['token' => $token, 'body' => [
+        'title' => 'Ankunftszeit-Test', 'date' => $start->format('Y-m-d'),
+        'start_time' => $start->format('H:i:00'), 'type_id' => $typeId]]);
+    assertStatus(201, $aptRes, 'Testtermin konnte nicht angelegt werden');
+    $aptId = (int) $aptRes['body']['id'];
 
     try {
         $jetztOderFrueher = arrTimeCorrection($token, $memberId, $aptId, $start->format('Y-m-d H:i:00'));
@@ -464,6 +481,8 @@ test('Zeitantrag nach Beginn: nur fuer eine Ankunft, die schon war (OI-82)', fun
         }
     } finally {
         arrDropAppointment($token, $aptId);
+        apiRequest('DELETE', 'appointment_types', ['token' => $token, 'query' => ['id' => $typeId]]);
+        apiRequest('DELETE', 'member_groups', ['token' => $token, 'query' => ['id' => $groupId]]);
     }
 });
 
