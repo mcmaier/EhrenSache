@@ -3646,3 +3646,42 @@ der neue Chip über der Gruppentabelle. Nach einem Neuladen stimmt alles.
 **Zu tun:** Beim Speichern der Einstellungen `theme-settings` in `sessionStorage` mitschreiben.
 
 **Nicht sicherheitsrelevant.**
+
+---
+
+### OI-94 · Terminfarbe als Randakzent statt Badge (Terminliste, Anwesenheit, Kalender-Popup)
+**Priorität:** niedrig · aufgenommen am 2026-09-23 (Idee des Nutzers)
+
+Die PWA zeigt die Terminart als farbigen linken Rand der Karte (`response-card`,
+`style="border-left-color: …"` in `public/checkin/js/app.js` ~Zeile 4852 und 4978). Das
+Dashboard zeigt dieselbe Information als farbiges Badge:
+
+1. **Terminliste** — eigene Spalte „Terminart“ mit `type-badge`
+   (`public/js/modules/appointments.js` ~Zeile 290–296, Kopf `public/index.html` ~Zeile 948).
+2. **Anwesenheit** — `createAppointmentTypeBadge()` (`public/js/modules/records.js`
+   ~Zeile 1528–1548), Spalte „Terminart“ (`public/index.html` ~Zeile 1016).
+3. **Kalender-Popup** (Klick/Hover) — Titel plus `calendar-type-badge` mit Inline-Stilen
+   (`appointments.js` ~Zeile 745–760). Mehrere Termine eines Tages stehen darin nur
+   untereinander, ohne sichtbare Trennung.
+
+**Idee:** Farbakzent am linken Rand der Zeile bzw. des Popup-Eintrags wie in der PWA; das
+Badge entfällt, die Zeile gewinnt Platz. Im Popup wird jeder Termin ein Listeneintrag mit eigenem
+Rand — mehrere Termine an einem Tag gruppieren sich dadurch sichtbar.
+
+**Vor der Umsetzung zu klären:**
+- **Name der Terminart geht verloren**, wenn nur die Farbe bleibt — für Farbenblinde und
+  Screenreader ist sie dann nicht mehr erkennbar. Name dezent in der Zeile behalten (z. B. als
+  graue Kleinschrift unter dem Titel) oder mindestens als `title`/`aria-label`. Wird die Spalte
+  gestrichen, fehlt sie auch beim Sortieren/Lesen der Tabelle.
+- **Tabellenzeilen:** `border-left` auf `<tr>` greift nur mit `border-collapse: collapse` und
+  kollidiert mit der Zebrastreifung/Hover. Üblicher Weg: `box-shadow: inset 4px 0 0 <farbe>` auf
+  der ersten Zelle, Farbe per CSS-Variable (`style="--type-color: …"`) statt Inline-Rahmen.
+- **Drei verschiedene Ersatzfarben** für ungültige/fehlende Terminart: `#667eea` (Dashboard),
+  `#1F5FBF` (PWA), `#95a5a6` („Allgemein“ in `records.js`). Beim Umbau auf eine festlegen,
+  am besten über `variables.css`.
+- Die Farbprüfung per Regex (ohne CSP, OI-17) steht an allen drei Stellen einzeln — beim Umbau
+  in eine gemeinsame Hilfsfunktion in `utils.js` ziehen.
+- Verwandt: [OI-92](#oi-92--tabellen-uneinheitlich-aktionsspalte-nur-in-der-arbeitszeit-fixiert-arbeitszeit-ohne-paginierung)
+  (Tabellen einheitlicher machen) — sinnvoll im selben Zug.
+
+**Nicht sicherheitsrelevant.**
