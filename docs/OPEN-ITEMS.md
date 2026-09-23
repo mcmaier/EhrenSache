@@ -3552,6 +3552,27 @@ neue Chip-Zähler macht es nur sichtbarer.
 
 **Zu entscheiden:** kommende Termine ausschließen oder als eigener Zustand führen.
 
+**Nachtrag 2026-09-23 (Hinweis des Nutzers):**
+- Mit Serienterminen wird es deutlich: Eine Serie reicht bis ein Jahr in die Zukunft, die
+  Mitgliedsansicht füllt sich mit Dutzenden „✗ Fehlend“-Zeilen, die Chip-Zähler sind verfälscht.
+- **Auch der Modus je Termin** ist betroffen: Wird ein kommender Termin gewählt, stehen alle
+  erwarteten Mitglieder als „Fehlend“ da (`attendance_list.php` ~Z. 51 ff., ebenfalls ohne
+  Datumsprüfung). Das Frontend kennt nur drei Zustände — alles, was nicht `present`/`excused` ist,
+  wird „Fehlend“ (`records.js` ~Z. 1310–1320 und ~Z. 1466–1476).
+- Die Statistik schneidet kommende Termine längst ab: `ATTENDANCE_STARTED_CUTOFF_SQL` in
+  `private/helpers/attendance.php` (genutzt in `attendance.php`, `punctuality.php`,
+  `report_statistics.php`). Die Anwesenheitsliste weicht davon ab — dieselbe Grenze übernehmen.
+
+**Vorschlag:**
+1. Server liefert je Zeile ein Kennzeichen „noch nicht begonnen“ (über dieselbe Konstante),
+   Frontend zeigt dann **„Kommend“** in neutraler Farbe statt „✗ Fehlend“. Eine vorab genehmigte
+   Entschuldigung bleibt „Entschuldigt“ — die ist für kommende Termine gerade interessant.
+2. **Mitgliedsansicht:** kommende Termine standardmäßig ausblenden, über einen Chip
+   „Kommend“ einblendbar (Muster: Vergangen/Kommend-Chips der Terminliste, `appointments.js`
+   ~Z. 439). Zählt nicht in „Fehlend“.
+3. **Terminansicht:** nicht ausblenden — wer einen kommenden Termin ausdrücklich wählt, will ihn
+   sehen. Alle Zeilen ohne Eintrag zeigen „Kommend“.
+
 **Nicht sicherheitsrelevant.**
 
 ---
