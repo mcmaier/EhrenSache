@@ -189,8 +189,9 @@ export function setCurrentYear(year, { reload = true } = {}) {
     // Alle Jahresfilter synchronisieren
     syncAllYearFilters(year);
 
-    // Jahresabhaengige Daten neu laden -- ein Sprung zwischen Bereichen
-    // (navigateToSection) laedt den Zielbereich ohnehin selbst.
+    // reload: false setzt nur das Jahr -- fuer Aufrufer, die unmittelbar
+    // danach den Bereich wechseln (navigateToSection laedt dort ohnehin
+    // neu). Ohne das liefe der Ladevorgang zweimal.
     if (reload) {
         loadYearDependentData();
     }
@@ -744,18 +745,37 @@ export function updateTableHeaders() {
     });
 }
 
+let navSeq = 0;
+
 /**
  * Bereichswechsel aus dem Code -- derselbe Weg wie ein Klick in der
- * Navigation und wartet, bis der Bereich geladen ist. Ohne die Rueckfrage
- * beim Verlassen der Einstellungen: Die bestehenden Aufrufer starten nie dort.
- * Liefert false, wenn es den Bereich nicht gibt.
+ * Navigation. Der Rueckgabewert MUSS ausgewertet werden: false bedeutet,
+ * dass der Sprung nicht stattgefunden hat -- der Bereich ist unbekannt oder
+ * fuer die aktuelle Rolle verborgen, das Laden ist fehlgeschlagen, oder ein
+ * spaeterer Aufruf hat diesen ueberholt (dann ist ein anderer Bereich laengst
+ * aktiv, und dieser Aufrufer darf nichts mehr anfassen).
+ *
+ * Ohne die Rueckfrage beim Verlassen der Einstellungen: Die bestehenden
+ * Aufrufer starten nie dort. Wer kuenftig aus den Einstellungen heraus
+ * springt, muss die Rueckfrage selbst stellen.
  */
 export async function navigateToSection(section) {
     const navItem = document.querySelector(`.nav-item[data-section="${section}"]`);
     const contentSection = document.getElementById(section);
     if (!navItem || !contentSection) {
+        debug.error('navigateToSection: unbekannter Bereich', section);
         return false;
     }
+
+    // updateUIForRole() blendet Navigationspunkte nur per Inline-Style aus,
+    // entfernt sie nicht -- ein Klick koennte das nicht ausloesen, also darf
+    // der programmatische Sprung es auch nicht.
+    if (navItem.style.display === 'none') {
+        debug.error('navigateToSection: Bereich fuer die Rolle verborgen', section);
+        return false;
+    }
+
+    const seq = ++navSeq;
 
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
     document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
@@ -765,11 +785,21 @@ export async function navigateToSection(section) {
     // Speichere aktuelle Section
     sessionStorage.setItem('currentSection', section);
 
-    debug.log("==== SECTION CHANGED ===>", section);
-    await loadAllData();
-
+    // Seitenleiste sofort schliessen, statt auf das Laden zu warten -- sonst
+    // steht sie am Handy bis zu einer Minute ueber dem Inhalt. Die
+    // Ladeanzeige aus 1.12.1 zeigt ohnehin an, dass etwas laeuft.
     closeMobileSidebar();
-    return true;
+
+    debug.log("==== SECTION CHANGED ===>", section);
+    try {
+        await loadAllData();
+    } catch (e) {
+        debug.error('navigateToSection: Laden fehlgeschlagen', section, e);
+        return false;
+    }
+
+    // Waehrenddessen wurde ein neuerer Sprung gestartet: dieser ist ueberholt.
+    return seq === navSeq;
 }
 
 export async function initNavigation() {
