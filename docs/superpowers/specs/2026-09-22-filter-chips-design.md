@@ -224,9 +224,65 @@ Diese drei Sätze sind Partitionen und werden wie die übrigen im Node-Test gepr
 ### Nicht Teil des Nachtrags
 
 - Keine Filterfunktion in Statistik, Gruppen, Terminarten und Tätigkeitsarten — die Chips dort
-  zählen nur.
-- Die Quotenkarten der Statistik bleiben unangetastet.
+  zählen nur. *(Für Gruppen, Terminarten und Tätigkeitsarten am 23.09. gekippt, siehe unten.)*
+- Die Quotenkarten der Statistik bleiben unangetastet. *(Am 23.09. gekippt, siehe unten.)*
 - Der Jahresfilter wandert nicht an eine andere Stelle.
+
+## Nachtrag 2026-09-23, zweite Sichtung: Kennzahlen als Chips, Verwaltung filtert
+
+Aus der Sichtprüfung des kompakten Kopfes. Acht Beobachtungen, davon fünf kleine und drei
+grundsätzliche; die grundsätzlichen wurden entschieden und kehren zwei Punkte der Liste oben um.
+
+### Kennzahlen werden Chips
+
+- **Statistik:** Auch Durchschnitt, Pünktlichkeit und Zuverlässigkeit werden **Anzeige-Chips** mit
+  ihrem Prozentwert. Der bisherige Erklärtext der Karte (`.stat-detail`, z. B. „Pünktlich bei 468
+  von 1221 gemessenen Ankünften · …“) wandert in den **Tooltip** des Chips. Die Kartenzeile
+  entfällt ganz, mit ihr `.stats-grid--kpi` aus dem ersten Nachtrag.
+  Abgeschaltete Kennzahlen erscheinen gar nicht erst als Chip; bei zu wenigen Messungen zeigt der
+  Chip wie bisher „–“ und die Begründung im Tooltip.
+- **Arbeitszeit:** „Bestätigte Stunden“ wird ein Anzeige-Chip in derselben Zeile („Bestätigte
+  Stunden 214:42 h“). Damit entfallen die Sonderspalte `.stats-grid--chips-lead` und die flache
+  Kennzahlkarte aus dem ersten Nachtrag; der Kopf ist dort so hoch wie überall.
+- In beiden Ansichten stehen damit **anzeigende und klickbare Chips nebeneinander**. Sie sind am
+  Rand unterscheidbar: klickbare haben einen, anzeigende nicht.
+- **`renderFilterChips` bekommt `def.title`** für den Tooltip; der Wert eines Chips darf ein Text
+  sein („214:42 h“, „65,4 %“), nicht nur eine Zahl.
+
+### Zurücksetzen bleibt sichtbar
+
+Der Knopf verschwindet nicht mehr, sondern steht dauerhaft und ist im Ruhezustand **ausgegraut und
+nicht bedienbar** (`disabled`). Grund: Beim Ein- und Ausblenden sprangen die Auswahlfelder daneben.
+Das kehrt die Entscheidung des ersten Nachtrags um; `setResetVisible` heißt künftig
+`setResetEnabled`. Betrifft alle Ansichten mit Filterleiste.
+
+### Verwaltung filtert
+
+Die Chipzeilen über Benutzergruppen, Terminarten und Tätigkeitsarten werden **klickbar** und
+filtern ihre Tabelle — dasselbe Muster wie bei den Geräten, mit „Alle“ als Vorgabe und ohne
+eigenen Zurücksetzen-Knopf. Sie verlieren damit `--static`.
+
+### Geräte bekommen eine Filterleiste
+
+Unter den Status-Chips steht künftig eine `filter-bar` mit dem Auswahlfeld **Typ**
+(Alle · Standortgerät (TOTP) · Biometrie-Gerät · Station (Kiosk), aus `device_type`) und einem
+Zurücksetzen-Knopf. Damit ist die Ansicht so aufgebaut wie die übrigen Listen.
+
+### Kleinigkeiten
+
+- **„Jahr:“** bekommt Schriftgröße und Farbe der übrigen Filterbeschriftungen (14 px,
+  `--text-medium`) statt 13 px.
+- **Termine:** Der Chip „Alle“ wird farblich hervorgehoben (`--info`), damit die Zeile nicht
+  durchgehend grau ist.
+- **Gruppen:** Der Chip für Untergruppen nutzt `--ok`, passend zum grünen Abzeichen derselben
+  Zeile in der Tabelle.
+
+### Geklärt, keine Änderung
+
+Die vielen Einträge in den Import-Protokollen sind **Testrückstände**, kein Datenfehler: 43
+Einträge `termine.csv` mit je einer Zeile, Zeitstempel exakt auf den Testläufen vom 22. und
+23.09., erzeugt von `tests/suites/import_series_api.php`, das seine Protokollzeilen nicht
+aufräumt. Vermerkt bei den Testrückständen in OI-90.
 
 ## Version
 
