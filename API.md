@@ -666,6 +666,18 @@ eigene Mitglied des Kontos, auch für Admin und Manager; die Zusage kann dadurch
 zeigen, die inzwischen gar nicht mehr zählt (Mitglied nicht mehr erwartet). `expected` (Boolean)
 sagt, ob dieses Mitglied für den Termin erwartet ist. Bei Terminarten ohne Rückmeldung `null`.
 
+**`include=attendance`** (nur zusammen mit `year`, `from_date` oder `to_date`): hängt je Termin,
+dessen Beginn vergangen ist, die Anwesenheit an.
+
+- Admin und Manager: `"attendance": {"expected": 22, "present": 18, "excused": 3, "missing": 1}` —
+  `expected` folgt derselben Regel wie die Anwesenheitsliste (Gruppen der Terminart, Aktivzeitraum
+  des Mitglieds), `missing` ist der Rest und nie negativ.
+- Mitglieder: stattdessen `"own_attendance": "present" | "excused" | "missing" | null` — `null`,
+  wenn der Termin noch nicht begonnen hat oder das Mitglied nicht erwartet wurde. Zahlen über
+  andere erhalten Mitglieder nicht.
+- Künftige Termine tragen `"attendance": null` bzw. `"own_attendance": null`.
+- Ohne den Parameter bleibt die Antwort unverändert.
+
 ---
 
 ### Termin erstellen

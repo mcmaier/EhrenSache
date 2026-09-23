@@ -7,6 +7,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unveröffentlicht]
+
+### Neu
+- **Anwesenheitszahlen je Termin über die Schnittstelle:** `GET appointments` liefert mit
+  `include=attendance` für vergangene Termine, wie viele Mitglieder anwesend, entschuldigt oder
+  abwesend waren; Mitglieder erhalten nur ihren eigenen Status. Grundlage für die Anzeige im
+  Kalender.
+
+---
+
 ## [1.12.1] – 2026-09-22
 
 ### Neu
