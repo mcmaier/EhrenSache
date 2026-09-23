@@ -331,24 +331,30 @@ test('Statistik nutzt denselben Kopf wie die uebrigen Ansichten', function () us
     assertTrue(str_contains($js, 'setResetEnabled'), 'Zuruecksetzen wird nicht mehr ueber die alte Funktion angesteuert');
 });
 
-test('Statistik: Zaehlwerte als Chips, Quoten als Karten', function () use ($fcRoot, $fcHtml) {
+test('Statistik: auch die Quoten stehen als Chips', function () use ($fcRoot, $fcHtml) {
     $bereich = fcBereich($fcHtml, 'statistik', 'mitglieder');
 
     assertTrue(str_contains($bereich, 'id="statisticsChips"'), 'Chip-Container fehlt');
     foreach (['statTotalAppointments', 'statTotalPresent', 'statTotalExcused', 'statTotalUnexcused'] as $id) {
         assertSame(0, substr_count($fcHtml, $id), $id . ' muss entfallen');
     }
-    foreach (['statOverallAverage', 'statPunctualityCard', 'statReliabilityCard'] as $id) {
-        assertTrue(str_contains($bereich, 'id="' . $id . '"'), $id . ' muss als Karte bleiben');
+    // Die drei Kennzahlkarten entfallen samt Raster und Erklaertext.
+    foreach (['statOverallAverage', 'statPunctualityCard', 'statReliabilityCard',
+              'statPunctualityDetail', 'stats-grid--kpi'] as $alt) {
+        assertSame(0, substr_count($fcHtml, $alt), $alt . ' muss entfallen');
     }
-    assertTrue(str_contains($bereich, 'stats-grid--kpi'), 'Die Quotenkarten brauchen ein eigenes Raster, sonst dehnt sich eine einzelne Karte');
 
     $js = fcModul($fcRoot, 'statistics');
     assertTrue(str_contains($js, 'CHIPS_STATISTICS'), 'statistics.js nutzt den Chipsatz nicht');
+    // Der Erklaertext der frueheren Karte steht jetzt im Tooltip des Chips
+    assertTrue(str_contains($js, 'title:'), 'statistics.js setzt keinen Tooltip');
     // An den Aufruf gebunden: sonst bliebe die Pruefung gruen, wenn die
     // Statistik-Chips klickbar wuerden und anderswo ein static: true steht.
     assertTrue(preg_match('/statisticsChips[\s\S]{0,200}static:\s*true/', $js) === 1,
         'Die Statistik-Chips muessen static sein');
+
+    $cards = (string) file_get_contents($fcRoot . '/public/css/components/cards.css');
+    assertSame(0, substr_count($cards, 'stats-grid--kpi'), '.stats-grid--kpi muss aus cards.css entfallen');
 });
 
 test('Verwaltungstabellen haben Anzeige-Chipzeilen', function () use ($fcRoot, $fcHtml) {

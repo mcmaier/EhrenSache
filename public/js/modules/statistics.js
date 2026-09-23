@@ -283,13 +283,11 @@ export async function renderStatistics(statsData) {
                 + `Die Statistik rechnet über Terminarten, und ${escapeHtml(subgroupLabel())} sind keinen `
                 + `Terminarten zugeordnet.</p>`
             : '<p class="info-message">Keine Daten für die ausgewählten Filter vorhanden.</p>';
-        updateOverallStats(statsData ? statsData.summary : null);
-        updateBehaviorStats(statsData);
+        renderStatisticsChips(statsData);
         return;
     }
 
-    updateOverallStats(statsData.summary);
-    updateBehaviorStats(statsData);
+    renderStatisticsChips(statsData);
 
     let html = '';
 
@@ -371,90 +369,102 @@ export async function renderStatistics(statsData) {
 // HELPERS
 // ============================================
 
-// Die vier Zaehlwerte stehen seit 1.13.0 als Anzeige-Chips im Kopf, nur der
-// Durchschnitt bleibt eine Karte. Ohne Daten steht ueberall "-" wie bisher.
-function updateOverallStats(summary) {
-    const leer = { appointments: '-', present: '-', excused: '-', unexcused: '-' };
-    const zahlen = summary
+/**
+ * Zeichnet die Kopfzeile der Statistik: vier Zaehlwerte und drei Quoten als
+ * Anzeige-Chips (seit 1.13.0, vorher Kennzahlkarten). Abgeschaltete Quoten
+ * erscheinen gar nicht, unzureichend gemessene zeigen "–" mit der Begruendung
+ * im Tooltip -- frueher der Erklaertext unter der Karte.
+ *
+ * Ohne Daten steht bei den Zaehlwerten und beim Durchschnitt "-" wie bisher.
+ */
+function renderStatisticsChips(statsData) {
+    const summary     = statsData?.summary ?? null;
+    const punctuality = statsData?.punctuality ?? { enabled: false };
+    const reliability = statsData?.reliability ?? { enabled: false };
+
+    const werte = summary
         ? {
             appointments: summary.total_appointments,
             present:      summary.total_present,
             excused:      summary.total_excused,
             unexcused:    summary.total_unexcused,
+            average:      `${formatGerman(summary.overall_average)} %`,
         }
-        : leer;
+        : { appointments: '-', present: '-', excused: '-', unexcused: '-', average: '-' };
+
+    // Eine abgeschaltete Kennzahl liefert der Server als {enabled: false};
+    // ihr Chip faellt dann ganz weg, statt leer dazustehen.
+    const defs = CHIPS_STATISTICS.filter(def => {
+        if (def.key === 'punctuality') return punctuality.enabled === true;
+        if (def.key === 'reliability') return reliability.enabled === true;
+        return true;
+    });
+
+    const titel = {};
+
+    if (punctuality.enabled) {
+        const p = punctualityChip(punctuality);
+        werte.punctuality = p.wert;
+        titel.punctuality = p.titel;
+    }
+    if (reliability.enabled) {
+        const z = reliabilityChip(reliability);
+        werte.reliability = z.wert;
+        titel.reliability = z.titel;
+    }
 
     renderFilterChips(
         document.getElementById('statisticsChips'),
-        CHIPS_STATISTICS, zahlen, null, null,
+        defs.map(def => (titel[def.key] ? { ...def, title: titel[def.key] } : def)),
+        werte, null, null,
         { static: true, label: 'Kennzahlen der Auswahl' }
     );
+}
 
-    const schnitt = document.getElementById('statOverallAverage');
-    if (schnitt) {
-        schnitt.textContent = summary ? `${formatGerman(summary.overall_average)} %` : '-';
+/**
+ * Wert und Erklaerung der Puenktlichkeit, Inhalt der frueheren Kennzahlkarte.
+ * Die Formulierungen folgen der Spec (Abschnitt 8) und nennen immer die
+ * Bezugsgroesse. Keine Farbskala: die gehoert zu OI-55 und wird fuer beide
+ * Quoten gemeinsam entschieden.
+ */
+function punctualityChip(punctuality) {
+    // "0 von mindestens 5 Messungen" klaenge nach einer Erfassungsluecke.
+    if (punctuality.total_count === 0) {
+        return { wert: '–', titel: 'Keine Termine im gewählten Zeitraum' };
     }
+    if (!punctuality.sufficient) {
+        return {
+            wert:  '–',
+            titel: `Zu wenige Messungen (${punctuality.measured_count} von mindestens ${punctuality.min_measurements})`,
+        };
+    }
+
+    const zeilen = [
+        `Pünktlich bei ${punctuality.on_time_count} von ${punctuality.measured_count} gemessenen Ankünften`,
+        `Gemessen bei ${punctuality.measured_count} von ${punctuality.total_count} Terminen`,
+    ];
+    if (punctuality.avg_late_minutes !== null) {
+        zeilen.push(`Wenn zu spät, dann im Schnitt ${formatGerman(punctuality.avg_late_minutes)} Minuten`);
+    }
+
+    return { wert: `${formatGerman(punctuality.rate)} %`, titel: zeilen.join(' · ') };
+}
+
+/** Wert und Erklaerung der Zuverlaessigkeit. */
+function reliabilityChip(reliability) {
+    if (reliability.total === 0) {
+        return { wert: '–', titel: 'Keine Termine im gewählten Zeitraum' };
+    }
+
+    return {
+        wert:  `${formatGerman(reliability.rate)} %`,
+        titel: `Erschienen oder rechtzeitig abgemeldet: ${reliability.appeared + reliability.excused_in_time} von ${reliability.total}`,
+    };
 }
 
 /** Zahl in deutscher Schreibweise, hoechstens eine Nachkommastelle. */
 function formatGerman(value) {
     return Number(value).toLocaleString('de-DE', { maximumFractionDigits: 1 });
-}
-
-/**
- * Kacheln fuer Puenktlichkeit und Zuverlaessigkeit.
- *
- * Eine abgeschaltete Kennzahl liefert der Server als {enabled: false}; ihre
- * Kachel verschwindet dann ganz, statt leer dazustehen. Die Formulierungen
- * folgen der Spec (Abschnitt 8) und nennen immer die Bezugsgroesse.
- */
-function updateBehaviorStats(statsData) {
-    const punctuality = statsData?.punctuality ?? { enabled: false };
-    const reliability = statsData?.reliability ?? { enabled: false };
-
-    const pCard = document.getElementById('statPunctualityCard');
-    const rCard = document.getElementById('statReliabilityCard');
-
-    pCard.hidden = !punctuality.enabled;
-    rCard.hidden = !reliability.enabled;
-
-    if (punctuality.enabled) {
-        const value  = document.getElementById('statPunctuality');
-        const detail = document.getElementById('statPunctualityDetail');
-
-        if (punctuality.total_count === 0) {
-            // "0 von mindestens 5 Messungen" klaenge nach einer Erfassungsluecke.
-            value.textContent  = '–';
-            detail.textContent = 'Keine Termine im gewählten Zeitraum';
-        } else if (!punctuality.sufficient) {
-            value.textContent  = '–';
-            detail.textContent = `Zu wenige Messungen (${punctuality.measured_count} von mindestens ${punctuality.min_measurements})`;
-        } else {
-            value.textContent = `${formatGerman(punctuality.rate)} %`;
-
-            const lines = [
-                `Pünktlich bei ${punctuality.on_time_count} von ${punctuality.measured_count} gemessenen Ankünften`,
-                `Gemessen bei ${punctuality.measured_count} von ${punctuality.total_count} Terminen`,
-            ];
-            if (punctuality.avg_late_minutes !== null) {
-                lines.push(`Wenn zu spät, dann im Schnitt ${formatGerman(punctuality.avg_late_minutes)} Minuten`);
-            }
-            detail.textContent = lines.join(' · ');
-        }
-    }
-
-    if (reliability.enabled) {
-        const value  = document.getElementById('statReliability');
-        const detail = document.getElementById('statReliabilityDetail');
-
-        if (reliability.total === 0) {
-            value.textContent  = '–';
-            detail.textContent = 'Keine Termine im gewählten Zeitraum';
-        } else {
-            value.textContent  = `${formatGerman(reliability.rate)} %`;
-            detail.textContent = `Erschienen oder rechtzeitig abgemeldet: ${reliability.appeared + reliability.excused_in_time} von ${reliability.total}`;
-        }
-    }
 }
 
 /**

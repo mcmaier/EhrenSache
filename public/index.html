@@ -1102,26 +1102,9 @@
                             class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
-                <div class="stats-grid stats-grid--kpi">
-                    <div class="stat-card">
-                        <h3>Durchschnitt</h3>
-                        <div class="number" id="statOverallAverage">-</div>
-                    </div>
-                    <!-- Nur sichtbar, wenn die Kennzahl eingeschaltet ist. Keine
-                         Farbskala: die gehoert zu OI-55 und wird fuer beide
-                         Quoten gemeinsam entschieden. -->
-                    <div class="stat-card" id="statPunctualityCard" hidden>
-                        <h3>Pünktlichkeit</h3>
-                        <div class="number" id="statPunctuality">-</div>
-                        <small class="stat-detail" id="statPunctualityDetail"></small>
-                    </div>
-                    <div class="stat-card" id="statReliabilityCard" hidden>
-                        <h3>Zuverlässigkeit</h3>
-                        <div class="number" id="statReliability">-</div>
-                        <small class="stat-detail" id="statReliabilityDetail"></small>
-                    </div>
-                </div>
-
+                <!-- Durchschnitt, Pünktlichkeit und Zuverlässigkeit stehen seit
+                     1.13.0 als Anzeige-Chips im Kopf; ihr Erklärtext liegt im
+                     Tooltip. Abgeschaltete Kennzahlen erscheinen gar nicht. -->
                 <div id="statisticsContainer"></div>
             </div>
             

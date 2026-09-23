@@ -104,10 +104,12 @@ test('localTodayIso nutzt die lokale Zeit', () => {
 });
 
 test('Statistik-Chips sind reine Anzeige und bilden keine Partition', () => {
-    assert.equal(CHIPS_STATISTICS.length, 4);
+    assert.equal(CHIPS_STATISTICS.length, 7);
     assert.ok(CHIPS_STATISTICS.every(d => !d.match), 'Statistik-Chips duerfen nicht filtern');
-    assert.deepEqual(CHIPS_STATISTICS.map(d => d.key), ['appointments', 'present', 'excused', 'unexcused']);
-    assert.deepEqual(CHIPS_STATISTICS.map(d => d.variant), [undefined, 'ok', 'pending', 'danger']);
+    assert.deepEqual(CHIPS_STATISTICS.map(d => d.key),
+        ['appointments', 'present', 'excused', 'unexcused', 'average', 'punctuality', 'reliability']);
+    assert.deepEqual(CHIPS_STATISTICS.map(d => d.variant),
+        [undefined, 'ok', 'pending', 'danger', 'info', 'info', 'info']);
 });
 
 test('Gruppen: Haupt- und Untergruppen, Wort aus den Einstellungen', () => {

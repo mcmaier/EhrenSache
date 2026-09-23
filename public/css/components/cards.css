@@ -16,14 +16,6 @@
     margin-bottom: var(--spacing-sm);
 }
 
-/* Kennzahlen, die einzeln stehen koennen: feste Kachelbreite statt voller
-   Zeilenbreite -- sonst zieht sich eine einzelne Karte ueber das ganze Raster.
-   Unter 768 px gewinnt .stats-grid { 1fr } aus responsive.css (spaeter
-   importiert), die Karte nimmt dort also wie ueberall die volle Breite. */
-.stats-grid--kpi {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 240px));
-}
-
 .stat-card {
     background: var(--bg-white);
     padding: 12px;
@@ -44,20 +36,9 @@
     color: var(--text-dark);
 }
 
-/* Unterzeile einer Kennzahl: Bezugsgroesse, Messabdeckung, Verspaetung. */
-.stat-card .stat-detail {
-    display: block;
-    margin-top: var(--spacing-sm);
-    font-size: 12px;
-    line-height: 1.4;
-    color: var(--text-light);
-}
-
-/* Ohne diese Regel schluege ein spaeteres display der Klasse das hidden des
-   Browsers, und eine abgeschaltete Kennzahl stuende als leere Kachel da. */
-.stat-card[hidden] {
-    display: none;
-}
+/* .stat-detail und .stat-card[hidden] entfielen mit den Quotenkarten: Die
+   Unterzeile steht seit 1.13.0 im Tooltip des Chips, und eine abgeschaltete
+   Kennzahl wird gar nicht erst gezeichnet. */
 
 /* Terminrueckmeldung (FI-1): Gegenueberstellung nach Beginn */
 .response-tiles {
