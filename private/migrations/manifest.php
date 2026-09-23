@@ -183,9 +183,9 @@ return [
         'function' => 'migrate_1_12_0',
     ],
     [
-        'from'     => '1.12.1',
+        'from'     => '1.12.2',
         'to'       => '1.13.0',
-        'file'     => '1.12.1.php',
-        'function' => 'migrate_1_12_1',
+        'file'     => '1.12.2.php',
+        'function' => 'migrate_1_12_2',
     ],
 ];
