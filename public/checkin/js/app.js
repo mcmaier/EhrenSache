@@ -4195,7 +4195,10 @@ function openItemsWhen(dateStr, timeStr = '') {
     const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
     if (isNaN(d.getTime())) return '';
     const tage = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-    const tag = `${tage[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
+    // Jahr nur ausserhalb des laufenden Jahres -- ein wartender Antrag kann
+    // beliebig alt sein, und „Mi 05.05." sieht sonst aus wie dieses Jahr.
+    const jahr = d.getFullYear() === new Date().getFullYear() ? '' : String(d.getFullYear());
+    const tag = `${tage[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${jahr}`;
     const zeit = escapeHtml(String(timeStr).slice(0, 5));
     return zeit ? `${tag} ${zeit}` : tag;
 }

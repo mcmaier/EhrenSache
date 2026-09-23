@@ -146,3 +146,18 @@ test('PWA: Verlauf behaelt offene Eintraege auch hinter den letzten 20', functio
     assertTrue(!preg_match('/renderHistory\(\s*combined\.slice\(0,\s*20\)\s*\)/', $body),
         'loadHistory() rendert unveraendert nur combined.slice(0, 20)');
 });
+
+test('Offene Punkte: Datum traegt das Jahr, wenn es nicht das laufende ist', function () use ($root) {
+    // Ein wartender Antrag oder eine wartende Arbeitszeit kann beliebig alt
+    // sein. Ohne Jahr sah ein Eintrag von 2021 aus wie einer von heute
+    // (Sichtpruefung am 2026-09-23).
+    foreach (['/public/js/modules/open_items.js' => 'formatWhen',
+              '/public/checkin/js/app.js'        => 'openItemsWhen'] as $datei => $funktion) {
+        $js    = (string) file_get_contents($root . $datei);
+        $start = strpos($js, "function {$funktion}(");
+        assertTrue($start !== false, "{$funktion}() fehlt in {$datei}");
+        $body  = substr($js, $start, (int) strpos($js, "\n}", $start) - $start);
+        assertTrue(str_contains($body, 'getFullYear()'),
+            "{$funktion}() vergleicht das Jahr nicht");
+    }
+});

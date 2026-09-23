@@ -21,11 +21,18 @@ import { escapeHtml } from './utils.js';
 
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-/** 'YYYY-MM-DD' oder 'YYYY-MM-DD HH:MM:SS' -> 'Do 25.09.' bzw. 'Do 25.09. 19:30' */
+/**
+ * 'YYYY-MM-DD' oder 'YYYY-MM-DD HH:MM:SS' -> 'Do 25.09.' bzw. 'Do 25.09. 19:30'.
+ *
+ * Das Jahr steht nur dabei, wenn das Datum nicht im laufenden Jahr liegt: Ein
+ * wartender Antrag oder eine wartende Arbeitszeit kann beliebig alt sein, und
+ * „Mi 05.05." sieht sonst aus wie dieses Jahr.
+ */
 function formatWhen(dateStr, timeStr = '') {
     const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
     if (isNaN(d.getTime())) return '';
-    const day = `${WEEKDAYS[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`;
+    const jahr = d.getFullYear() === new Date().getFullYear() ? '' : String(d.getFullYear());
+    const day = `${WEEKDAYS[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${jahr}`;
     const time = escapeHtml(String(timeStr).slice(0, 5));
     return time ? `${day} ${time}` : day;
 }
