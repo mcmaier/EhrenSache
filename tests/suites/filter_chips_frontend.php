@@ -261,3 +261,18 @@ test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function 
     // Task 3: statisticYearFilter kommt hier wieder in die Schleife, sobald
     // der Statistik-Kopf auf das gemeinsame Muster umgebaut ist.
 });
+
+test('Die Filterleiste stellt die Beschriftung neben das Feld', function () use ($fcRoot) {
+    $forms = (string) file_get_contents($fcRoot . '/public/css/components/forms.css');
+
+    $start = strpos($forms, '.filter-bar .form-group {');
+    assertTrue($start !== false, '.filter-bar .form-group fehlt');
+    $block = substr($forms, $start, 260);
+
+    assertTrue(str_contains($block, 'display: flex'), 'Die Filtergruppe muss eine Flex-Zeile sein');
+    assertTrue(str_contains($block, 'align-items: center'), 'Label und Feld muessen auf einer Linie stehen');
+
+    // 44px war die alte Hoehe von Feld und Knopf
+    assertSame(0, preg_match('/\.btn-reset-filter\s*\{[^}]*height:\s*44px/', $forms),
+        'Der Zuruecksetzen-Knopf ist noch 44px hoch');
+});

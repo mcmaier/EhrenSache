@@ -44,19 +44,18 @@
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .content-header h1 {
         margin-bottom: var(--spacing-sm);
     }
-    
-    .filter-bar {
-        flex-direction: column;
-    }
-    
+
     .filter-bar .form-group {
         width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
     }
-    
+
     .btn-reset-filter {
         width: 100%;
     }
