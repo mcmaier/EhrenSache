@@ -93,3 +93,17 @@ test('Anwesend-Status: das schliessende Tag ist vollstaendig', function () use (
     assertTrue(preg_match('/✓ Anwesend<\/span(?!>)/u', $rumpf) !== 1,
         'Dem schliessenden Tag von „✓ Anwesend" fehlt das >');
 });
+
+test('me liefert member_id in beiden Anmeldewegen', function () use ($arRoot) {
+    // Das Dashboard meldet sich per Sitzung an. Dort fehlte member_id, waehrend
+    // der Token-Zweig es lieferte — die Regel zum eigenen Antrag (OI-87) lief
+    // deshalb im Dashboard immer ins Leere. $authMemberId steht an der Stelle
+    // fuer beide Wege bereit.
+    $api = (string) file_get_contents($arRoot . '/public/api/api.php');
+    $start = strpos($api, "if(\$resource === 'me'");
+    assertTrue($start !== false, 'me-Endpunkt nicht gefunden');
+    $block = substr($api, $start, 900);
+
+    assertSame(2, substr_count($block, '"member_id" => $authMemberId'),
+        'member_id fehlt in einem der beiden Zweige');
+});

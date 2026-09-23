@@ -490,10 +490,15 @@ if($resource === 'me' && $request_method === 'GET') {
             "auth_type" => "token"
         ]);
     } else {
+        // member_id gehoert in beide Zweige (OI-87): Das Dashboard meldet sich
+        // per Sitzung an, und ohne dieses Feld weiss es nicht, welches Mitglied
+        // zum angemeldeten Konto gehoert -- jede Regel "eigener Eintrag" lief
+        // dort ins Leere. $authMemberId ist oben fuer beide Wege ermittelt.
         echo json_encode([
             "user_id" => $_SESSION['user_id'],
             "email" => $_SESSION['email'],
             "role" => $_SESSION['role'],
+            "member_id" => $authMemberId,
             "auth_type" => "session"
         ]);
     }
