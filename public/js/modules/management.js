@@ -13,12 +13,18 @@ import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, subgro
          updateSubgroupLabelElements } from './ui.js';
 import { loadMembers } from './members.js';
 import { formatDateTime, updateModalId, escapeHtml } from './utils.js';
-import { groupChips, CHIPS_APPOINTMENT_TYPES, countChips, renderFilterChips } from './filter_chips.js';
+import { groupChips, CHIPS_APPOINTMENT_TYPES, countChips, filterByChip,
+         renderFilterChips } from './filter_chips.js';
 import {debug} from '../app.js'
 
 // ============================================
 // MANAGEMENT (Groups & Types)
 // ============================================
+
+// Aktive Chips der Verwaltungstabellen (Sichtung 23.09.2026: die Zaehlzeilen
+// filtern jetzt, wie in den uebrigen Listen).
+let groupChip = 'all';
+let typeChip  = 'all';
 
 export async function showGroupSection(forceReload = false)
 {
@@ -63,11 +69,20 @@ const tbody = document.getElementById('groupsTableBody');
     const gruppenDefs = groupChips(subgroupLabel());
     renderFilterChips(
         document.getElementById('groupChipsRow'),
-        gruppenDefs, countChips(groupData, gruppenDefs), null, null,
-        { static: true, label: 'Gruppen nach Art' }
+        gruppenDefs, countChips(groupData, gruppenDefs), groupChip,
+        key => { groupChip = key; renderGroups(groupData); },
+        { label: 'Gruppen nach Art' }
     );
 
-    groupData.forEach(group => {
+    // "Alle" ist zugleich das Zuruecksetzen -- kein eigener Knopf.
+    const sichtbar = filterByChip(groupData, gruppenDefs, groupChip);
+
+    if (!sichtbar.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="loading">Keine Gruppen für diese Auswahl</td></tr>';
+        return;
+    }
+
+    sichtbar.forEach(group => {
         const isDefaultBadge = group.is_default
             ? '<span class="status-badge status-approved">✓ Ja</span>'
             : '<span class="type-badge">Nein</span>';
@@ -313,11 +328,20 @@ export async function renderTypeGroupOverview(typeData)
 
     renderFilterChips(
         document.getElementById('typeChipsRow'),
-        CHIPS_APPOINTMENT_TYPES, countChips(typeData, CHIPS_APPOINTMENT_TYPES), null, null,
-        { static: true, label: 'Terminarten nach Rückmeldung' }
+        CHIPS_APPOINTMENT_TYPES, countChips(typeData, CHIPS_APPOINTMENT_TYPES), typeChip,
+        key => { typeChip = key; renderTypeGroupOverview(typeData); },
+        { label: 'Terminarten nach Rückmeldung' }
     );
 
-    typeData.forEach(type => {
+    // "Alle" ist zugleich das Zuruecksetzen -- kein eigener Knopf.
+    const sichtbar = filterByChip(typeData, CHIPS_APPOINTMENT_TYPES, typeChip);
+
+    if (!sichtbar.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">Keine Terminarten für diese Auswahl</td></tr>';
+        return;
+    }
+
+    sichtbar.forEach(type => {
         const isDefaultBadge = type.is_default 
             ? '<span class="status-badge status-approved">✓ Ja</span>' 
             : '<span class="type-badge">Nein</span>';

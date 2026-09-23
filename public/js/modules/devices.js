@@ -11,7 +11,7 @@
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQRModal} from './ui.js';
 import { updateModalId, escapeHtml } from './utils.js';
-import { CHIPS_DEVICES, countChips, filterByChip, renderFilterChips } from './filter_chips.js';
+import { CHIPS_DEVICES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 import {debug} from '../app.js'
 
 // ============================================
@@ -26,6 +26,9 @@ let allFilteredDevices = [];
 
 // Aktiver Status-Chip (Spec 2026-09-22)
 let deviceStatusChip = 'all';
+
+// Handler der Filterleiste werden einmalig registriert (Sichtung 23.09.2026)
+let deviceFilterInitialized = false;
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -247,19 +250,41 @@ export async function showDeviceSection(forceReload = false, page = 1)
 
     const allDevices = await loadDevices(forceReload) || [];
 
-    // Bis 1.12 gab es hier keinen Filter; die Karten zaehlten strikt
-    // is_active === 1, das Badge dagegen truthy. CHIPS_DEVICES nutzt
-    // Number(is_active) === 1 fuer beide Faelle gleich.
+    if (!deviceFilterInitialized && isAdmin) {
+        document.getElementById('filterDeviceType')
+            ?.addEventListener('change', () => showDeviceSection(false, 1));
+        document.getElementById('resetDeviceFilter')
+            ?.addEventListener('click', () => resetDeviceFilter());
+        deviceFilterInitialized = true;
+    }
+
+    const typ = document.getElementById('filterDeviceType')?.value || '';
+
+    // Basis: Typfilter. Darauf zaehlen die Chips, erst danach filtert der Chip.
+    const base = typ ? allDevices.filter(d => d.device_type === typ) : allDevices;
+
+    // Die Karten zaehlten bis 1.12 strikt is_active === 1, das Badge dagegen
+    // truthy. CHIPS_DEVICES nutzt Number(is_active) === 1 fuer beide gleich.
     renderFilterChips(
         document.getElementById('deviceStatusChips'),
-        CHIPS_DEVICES, countChips(allDevices, CHIPS_DEVICES), deviceStatusChip,
+        CHIPS_DEVICES, countChips(base, CHIPS_DEVICES), deviceStatusChip,
         key => { deviceStatusChip = key; showDeviceSection(false, 1); },
         { label: 'Status der Geräte' }
     );
+    setResetEnabled(document.getElementById('resetDeviceFilter'),
+        Boolean(typ) || deviceStatusChip !== 'all');
 
     // Bis 1.9.1 stand hier fest die 1 -- der Parameter wurde entgegen-
     // genommen und verworfen, ein Sprung auf Seite 2 landete wieder auf 1.
-    renderDevices(filterByChip(allDevices, CHIPS_DEVICES, deviceStatusChip), page);
+    renderDevices(filterByChip(base, CHIPS_DEVICES, deviceStatusChip), page);
+}
+
+/** Setzt Typfilter und Chip auf die Vorgabe zurueck. */
+export function resetDeviceFilter() {
+    const typEl = document.getElementById('filterDeviceType');
+    if (typEl) typEl.value = '';
+    deviceStatusChip = 'all';
+    showDeviceSection(false, 1);
 }
 
 export async function applyDeviceFilters(forceReload = false, page = 1) {
@@ -312,10 +337,10 @@ export async function initDevicesEventHandlers()
     if (!isAdmin) return;
 
         // Hier standen bis 1.9.1 drei Handler fuer filterDeviceRole,
-        // filterDeviceStatus und resetDeviceFilters. Keines dieser Elemente
-        // gibt es im Markup -- die Geraeteliste hat keine Filterleiste. Der
-        // Reset-Handler haette beim Feuern sogar geworfen: Er griff ohne
-        // Optional Chaining auf .value zu (OI-29).
+        // filterDeviceStatus und resetDeviceFilters -- keines dieser Elemente
+        // gab es im Markup (OI-29). Die Filterleiste von 1.13.0 haengt ihre
+        // beiden Handler in showDeviceSection() ein, einmalig und erst dann,
+        // wenn der Bereich wirklich gezeichnet wird.
 
 
     // Devices laden und anzeigen
@@ -658,3 +683,4 @@ window.toggleDeviceTokenVisibility = toggleDeviceTokenVisibility;
 window.generateTotpSecret = generateTotpSecret;
 window.showDeviceQR = showDeviceQR;
 window.applyDeviceFilters = applyDeviceFilters;
+window.resetDeviceFilter = resetDeviceFilter;

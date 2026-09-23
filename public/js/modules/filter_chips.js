@@ -93,15 +93,18 @@ export const CHIPS_STATISTICS = Object.freeze([
     { key: 'reliability',  label: 'Zuverlässigkeit', variant: 'info' },
 ]);
 
-// Verwaltungstabellen: reine Anzeige, aber echte Partitionen -- die Summe
-// der beiden hinteren Chips ergibt "Alle".
+// Verwaltungstabellen: echte Partitionen -- die Summe der beiden hinteren
+// Chips ergibt "Alle". Seit der zweiten Sichtung (23.09.2026) filtern sie
+// ihre Tabelle, statt sie nur zu zaehlen; "Alle" ist die Vorgabe und
+// zugleich das Zuruecksetzen.
 
 /** Gruppen; das Wort fuer Untergruppen kommt aus den Einstellungen (subgroupLabel()). */
 export function groupChips(subgroupWord) {
     return [
         { key: 'all',  label: 'Alle' },
         { key: 'main', label: 'Hauptgruppen',       match: g => !isOne(g.is_subgroup) },
-        { key: 'sub',  label: String(subgroupWord || 'Untergruppe'), match: g => isOne(g.is_subgroup) },
+        // 'ok' passend zum gruenen Abzeichen derselben Zeile in der Tabelle.
+        { key: 'sub',  label: String(subgroupWord || 'Untergruppe'), variant: 'ok', match: g => isOne(g.is_subgroup) },
     ];
 }
 

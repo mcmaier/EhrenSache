@@ -27,6 +27,10 @@ let worktimeEnabled = null;   // null = noch nicht geprüft
 // Aktiver Status-Chip (Spec 2026-09-22); ersetzt das frühere Status-Auswahlfeld
 let worktimeStatusChip = 'all';
 
+// Aktiver Chip der Tätigkeitsarten-Tabelle (Sichtung 23.09.2026: die Zählzeile
+// filtert jetzt, "Alle" ist zugleich das Zurücksetzen).
+let activityChip = 'all';
+
 // Die Badge-Klassen stammen aus components/badges.css — kein eigenes CSS noetig
 const STATUS_BADGE = {
     confirmed: ['status-badge status-approved', 'bestätigt'],
@@ -792,10 +796,13 @@ export function renderActivityTypes() {
     const tbody = document.getElementById('activityTypesTableBody');
     if (!tbody) return;
 
+    // Die Chipzeile steht bewusst VOR dem Abbruch: auch ohne Bestand zeigt
+    // sie ihre Nullen statt zu verschwinden.
     renderFilterChips(
         document.getElementById('activityChipsRow'),
-        CHIPS_ACTIVITY_TYPES, countChips(activityTypes, CHIPS_ACTIVITY_TYPES), null, null,
-        { static: true, label: 'Tätigkeitsarten nach Status' }
+        CHIPS_ACTIVITY_TYPES, countChips(activityTypes, CHIPS_ACTIVITY_TYPES), activityChip,
+        key => { activityChip = key; renderActivityTypes(); },
+        { label: 'Tätigkeitsarten nach Status' }
     );
 
     if (!activityTypes.length) {
@@ -803,7 +810,15 @@ export function renderActivityTypes() {
         return;
     }
 
-    tbody.innerHTML = activityTypes.map(a => {
+    // "Alle" ist zugleich das Zuruecksetzen -- kein eigener Knopf.
+    const sichtbar = filterByChip(activityTypes, CHIPS_ACTIVITY_TYPES, activityChip);
+
+    if (!sichtbar.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Tätigkeitsarten für diese Auswahl</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = sichtbar.map(a => {
         const groupBadges = (a.groups && a.groups.length > 0)
             ? a.groups.map(g => `<span class="type-badge">${escapeHtml(g.group_name)}</span>`).join(' ')
             : '<span style="color: #7f8c8d;">Keine</span>';

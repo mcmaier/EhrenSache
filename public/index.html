@@ -1219,6 +1219,18 @@
                 </div>
 
                 <div class="filter-chips filter-chips--standalone" id="deviceStatusChips"></div>
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="filterDeviceType">Typ:</label>
+                        <select id="filterDeviceType">
+                            <option value="">Alle Typen</option>
+                            <option value="totp_location">🔢 TOTP-Station</option>
+                            <option value="auth_device">🔐 Auth-Gerät</option>
+                            <option value="kiosk">🖥️ Virtuelle Station</option>
+                        </select>
+                    </div>
+                    <button id="resetDeviceFilter" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
+                </div>
 
                  <!-- Pagination OBEN -->
                 <div id="devicePagination"></div>

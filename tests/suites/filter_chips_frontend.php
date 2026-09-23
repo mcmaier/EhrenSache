@@ -81,14 +81,14 @@ test('Der Zuruecksetzen-Knopf bleibt sichtbar und wird nur ausgegraut', function
     assertSame(0, preg_match('/class="btn-reset-filter"[^>]*\shidden/', $fcHtml),
         'Der Knopf wird nicht mehr ausgeblendet, sondern ausgegraut');
 
-    assertSame(7, preg_match_all('/class="btn-reset-filter"[^>]*\sdisabled/', $fcHtml),
-        'Alle sieben Zuruecksetzen-Knoepfe starten ausgegraut');
+    assertSame(8, preg_match_all('/class="btn-reset-filter"[^>]*\sdisabled/', $fcHtml),
+        'Alle acht Zuruecksetzen-Knoepfe starten ausgegraut');
 
     $buttons = (string) file_get_contents($fcRoot . '/public/css/components/buttons.css');
     assertTrue(str_contains($buttons, '.btn-reset-filter:disabled'),
         'Der ausgegraute Zustand braucht eine eigene Regel');
 
-    foreach (['appointments', 'exceptions', 'members', 'records', 'statistics', 'users', 'worktime'] as $modul) {
+    foreach (['appointments', 'devices', 'exceptions', 'members', 'records', 'statistics', 'users', 'worktime'] as $modul) {
         $js = fcModul($fcRoot, $modul);
         assertTrue(str_contains($js, 'setResetEnabled'), $modul . '.js nutzt setResetEnabled nicht');
         assertSame(0, substr_count($js, 'setResetVisible'), $modul . '.js kennt noch den alten Namen');
@@ -197,9 +197,9 @@ test('Geraete: Chips statt Karten', function () use ($fcRoot, $fcHtml) {
     }
     $js = fcModul($fcRoot, 'devices');
     assertTrue(str_contains($js, 'CHIPS_DEVICES'), 'devices.js nutzt den Chipsatz nicht');
-    // Geraete haben keinen weiteren Filter -- die Basis fuer die Zaehlung ist
-    // der ganze Bestand, nicht eine bereits gefilterte Liste.
-    assertTrue(str_contains($js, 'countChips(allDevices, CHIPS_DEVICES)'), 'Geraete: Chips muessen auf dem ganzen Bestand zaehlen');
+    // Seit der Typfilter da ist (Sichtung 23.09.2026) zaehlen die Chips auf
+    // der schon nach Typ gefilterten Liste -- facettiert wie ueberall sonst.
+    assertTrue(str_contains($js, 'countChips(base, CHIPS_DEVICES)'), 'Geraete: Chips muessen auf der nach Typ gefilterten Liste zaehlen');
     assertTrue(str_contains($js, 'Keine Geräte für diese Auswahl'), 'Leere Geraeteliste braucht einen Hinweis');
     assertTrue(str_contains($js, 'Number(device.is_active) === 1'), 'Badge und Chip muessen is_active gleich auswerten');
 });
@@ -445,16 +445,32 @@ test('Statistik: der Gruppenfilter raeumt leere Optgroups ohne TypeError auf', f
         'Ein <optgroup> hat keine options-Eigenschaft -- das warf fuer einfache Nutzer einen TypeError');
 });
 
-test('Verwaltungstabellen haben Anzeige-Chipzeilen', function () use ($fcRoot, $fcHtml) {
+test('Verwaltungstabellen filtern nach Chip', function () use ($fcRoot, $fcHtml) {
     foreach (['groupChipsRow', 'typeChipsRow', 'activityChipsRow'] as $id) {
         assertTrue(str_contains($fcHtml, 'id="' . $id . '"'), $id . ' fehlt im Markup');
     }
 
     $mgmt = fcModul($fcRoot, 'management');
-    assertTrue(str_contains($mgmt, 'groupChips('), 'management.js zeichnet die Gruppen-Chips nicht');
-    assertTrue(str_contains($mgmt, 'CHIPS_APPOINTMENT_TYPES'), 'management.js zeichnet die Terminart-Chips nicht');
-    assertSame(0, substr_count($mgmt, 'filterByChip'), 'Die Verwaltungstabellen filtern nicht');
+    assertTrue(str_contains($mgmt, 'filterByChip'), 'management.js filtert nicht nach Chip');
+    assertSame(0, preg_match('/groupChipsRow[\s\S]{0,300}static:\s*true/', $mgmt),
+        'Die Gruppen-Chips sind klickbar, nicht static');
 
     $wt = fcModul($fcRoot, 'worktime');
-    assertTrue(str_contains($wt, 'CHIPS_ACTIVITY_TYPES'), 'worktime.js zeichnet die Taetigkeits-Chips nicht');
+    assertSame(0, preg_match('/activityChipsRow[\s\S]{0,300}static:\s*true/', $wt),
+        'Die Taetigkeits-Chips sind klickbar, nicht static');
+});
+
+test('Geraete haben eine Filterleiste nach Typ', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'geraete', 'verwaltung');
+
+    assertTrue(str_contains($bereich, 'id="filterDeviceType"'), 'Typfilter fehlt');
+    assertTrue(str_contains($bereich, '<div class="filter-bar">'), 'Geraete ohne Filterleiste');
+    assertTrue(str_contains($bereich, 'id="resetDeviceFilter"'), 'Zuruecksetzen fehlt');
+    foreach (['totp_location', 'auth_device', 'kiosk'] as $typ) {
+        assertTrue(str_contains($bereich, 'value="' . $typ . '"'), 'Typ ' . $typ . ' fehlt');
+    }
+
+    $js = fcModul($fcRoot, 'devices');
+    assertTrue(str_contains($js, 'filterDeviceType'), 'devices.js liest den Typfilter nicht');
+    assertTrue(str_contains($js, 'setResetEnabled'), 'devices.js schaltet den Knopf nicht');
 });
