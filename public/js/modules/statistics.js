@@ -186,7 +186,9 @@ export async function resetStatisticsFilters() {
     const gruppe   = document.getElementById('statGroup');
     const mitglied = document.getElementById('statMember');
 
-    if (gruppe)   { gruppe.value   = ''; }
+    // Zuruecksetzen stellt den Ausgangszustand her -- fuer Nutzer mit genau
+    // einer Gruppe ist das deren Vorauswahl, nicht "Alle Gruppen".
+    if (gruppe)   { gruppe.value   = statGroupPreselected; }
     if (mitglied) { mitglied.value = ''; }
 
     await applyStatisticsFilters();
