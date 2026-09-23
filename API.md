@@ -447,13 +447,24 @@ behandeln, nie als HTML.
 - `id` (optional): Einzelnes Mitglied abrufen
 - `group_id` (optional): Mitglieder einer Gruppe abrufen
 - `year`, `date` (optional): Aktivitätsfilter über die Mitgliedschaftszeiträume
-- `include_inactive` (optional): `true` nimmt inaktive Mitglieder mit auf
+- `include_inactive` (optional): `true` nimmt inaktive Mitglieder mit auf. **Wirkt nur für
+  Admin/Manager** (`members.php:97`) — bei den Rollen `user` und `device` wird der Parameter
+  still ignoriert, die Antwort bleibt für sie ohnehin auf Aktive begrenzt.
 
 **Response:** ein **Array**, kein Objekt — es gibt weder einen `members`-Umschlag noch eine
 Paginierung. Die Liste kommt vollständig; die Einstellung „Datenreihen pro Seite“ wirkt allein
 im Browser (`globalPaginationValue` in `settings.js`). Serverseitig paginiert einzig
 `import_logs`.
 
+**Der Listenabruf liefert drei verschiedene Antwortformen, je nach Rolle:**
+
+| Rolle | Felder je Mitglied |
+|---|---|
+| `admin`, `manager` | vollständige Zeile (siehe Beispiel unten) |
+| `device` | nur `name`, `surname`, `member_number` (`members.php:210-223`) |
+| `user` | nur `name`, `surname` (`members.php:224-235`) |
+
+**Response (Admin/Manager):**
 ```json
 [
   {
@@ -476,6 +487,20 @@ im Browser (`globalPaginationValue` in `settings.js`). Serverseitig paginiert ei
 `is_active_in_period` bezieht sich auf den über `year` oder `date` gewählten Zeitraum.
 Mitgliedschaftszeiträume liefert die Liste nicht — dafür gibt es die eigene Ressource
 `membership_dates`.
+
+**Response (`device`):**
+```json
+[
+  { "name": "Max", "surname": "Mustermann", "member_number": "M001" }
+]
+```
+
+**Response (`user`):**
+```json
+[
+  { "name": "Max", "surname": "Mustermann" }
+]
+```
 
 **Einzelnes Mitglied:**
 ```
@@ -579,10 +604,14 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
 
 **Berechtigung:** Admin/Manager
 
+Löscht kaskadierend alle zugehörigen Daten des Mitglieds — `records`, `appointment_responses`,
+`exceptions`, `membership_dates` und `member_group_assignments` — sowie die Verknüpfung eines
+etwaigen Benutzerkontos (`users.member_id` wird auf `NULL` gesetzt, das Konto bleibt bestehen).
+
 **Response:**
 ```json
 {
-  "message": "Member deleted"
+  "message": "Member and all associated data deleted"
 }
 ```
 
@@ -599,6 +628,7 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
 - `month`: Filter nach Monat (Auch in Kombination mit Jahr)
 - `from_date`: Filter nach Termine ab Zeitpunkt
 - `to_date`: Filter nach Termine bis Zeitpunkt
+- `type_id`: Filter auf eine bestimmte Terminart
 - `member_id`: Nur Termine, deren Terminart einer Gruppe dieses Mitglieds zugeordnet ist.
   **Wirkt nur für Admin und Manager.** Für alle anderen Rollen wird der Parameter ignoriert;
   sie sehen immer die Termine der Gruppen ihres eigenen Mitglieds (bis 1.9.2 ließ sich die
@@ -1073,7 +1103,8 @@ Sachsens und Thüringens) sowie einmalige Feiertage (z. B. Reformationstag 2017 
 - `status`: Filter nach Status (Anwesend / Entschuldigt)
 - `appointment_type_id`: Filter nach Termin-Arten
 
-**Response:**
+**Response:** Es gibt weder `member_name` noch `appointment_title` — Name und Vorname stehen
+getrennt (`name`, `surname`), der Termin liefert `title`:
 ```json
 [
   {
@@ -1082,8 +1113,18 @@ Sachsens und Thüringens) sowie einmalige Feiertage (z. B. Reformationstag 2017 
     "appointment_id": 10,
     "arrival_time": "2024-03-15 19:05:00",
     "status": "present",
-    "member_name": "Max Mustermann",
-    "appointment_title": "Probe"
+    "checkin_source": "user_totp",
+    "source_device": null,
+    "location_name": null,
+    "created_at": "2024-03-15 19:05:01",
+    "name": "Max",
+    "surname": "Mustermann",
+    "member_number": "M005",
+    "title": "Probe",
+    "date": "2024-03-15",
+    "start_time": "19:00:00",
+    "appointment_type_name": "Probe",
+    "appointment_type_id": 1
   }
 ]
 ```
@@ -1095,6 +1136,42 @@ eines Eintrags steht am Termin (`appointments.date`), nicht an der Ankunft.
 
 `checkin_source` kennt zusätzlich `exception_request` für Einträge aus einem genehmigten
 Zeitkorrektur-Antrag. Die Uhrzeit stammt dort aus der Selbstauskunft des Mitglieds.
+
+---
+
+### Einzelner Eintrag
+**Endpoint:** `GET /api.php?resource=records&id=1`
+
+**Achtung — andere Feldnamen als die Liste:** Statt `title`/`date`/`start_time` liefert der
+Einzelabruf `appointment_title`, `appointment_date` und `appointment_start`:
+```json
+{
+  "record_id": 1,
+  "member_id": 5,
+  "appointment_id": 10,
+  "arrival_time": "2024-03-15 19:05:00",
+  "status": "present",
+  "checkin_source": "user_totp",
+  "source_device": null,
+  "location_name": null,
+  "created_at": "2024-03-15 19:05:01",
+  "name": "Max",
+  "surname": "Mustermann",
+  "member_number": "M005",
+  "appointment_title": "Probe",
+  "appointment_date": "2024-03-15",
+  "appointment_start": "19:00:00",
+  "appointment_type_name": "Probe",
+  "appointment_type_id": 1
+}
+```
+
+**Berechtigung:** Ohne Admin- oder Managerrolle nur der eigene Datensatz, sonst `403`:
+```json
+{
+  "message": "Access denied"
+}
+```
 
 ---
 
@@ -1161,6 +1238,18 @@ Endpunkt mit `404` statt wie zuvor mit `200`.
 **Seit 1.9.1:** Fehlen `id` **und** `member_id`, antwortet der Endpunkt mit `400`. Die
 Massenlöschung über `member_id` (ohne `id`) bleibt davon unberührt.
 
+**Massenlöschung:** `DELETE /api.php?resource=records&member_id=5` löscht **alle** Einträge
+dieses Mitglieds. Optional zusätzlich `before_date` (Format `YYYY-MM-DD`, undokumentiert bis
+jetzt) schränkt auf Einträge vor diesem Termindatum ein — geprüft wird `appointments.date`, nicht
+`arrival_time` (die seit 1.5.0 `null` sein darf). Die Antwort trägt statt `message: "Record
+deleted"` ein `deleted_count`:
+```json
+{
+  "message": "Records deleted",
+  "deleted_count": 42
+}
+```
+
 ---
 
 ## Auto Check-In
@@ -1189,24 +1278,43 @@ Sucht passenden Termin im Zeitfenster. Kann automatisch einen neuen Termin anleg
 }
 ```
 
-**Response (Erfolg):**
+**Response (Erfolg, 201 — neu angelegt):** kein `success`, kein `appointment_title`, kein
+`arrival_time` im Wurzelobjekt — die Termindaten stecken verschachtelt in `appointment`:
 ```json
 {
-  "success": true,
-  "message": "Check-in erfolgreich",
+  "message": "Check-in successful",
+  "record_action": "created",
   "record_id": 42,
-  "appointment_title": "Probe",
-  "arrival_time": "2024-03-15 19:05:32"
+  "appointment_id": 10,
+  "member_id": 5,
+  "checkin_source": "device_auth",
+  "source_device": "device_auth",
+  "location_name": null,
+  "appointment_action": "matched",
+  "appointment": {
+    "appointment_id": 10,
+    "title": "Probe",
+    "date": "2024-03-15",
+    "start_time": "19:00:00",
+    "type_id": 1
+  },
+  "warning": null
 }
 ```
+`record_action` und `message` hängen zusammen: neu angelegt → `"created"` / „Check-in
+successful" (`201`); ein vorhandener Datensatz wird übernommen → `"updated"` / „Check-in
+updated" (`200`), oder bleibt stehen (spätere Ankunft, kein Ersatz) → `"unchanged"` / „Check-in
+unchanged" (`200`). `warning` steht nur bei `201` im Objekt (auch wenn `null`).
 
-**Fehler (kein Termin):**
+**Fehler (kein Termin):** `409`
 ```json
 {
-  "success": false,
-  "message": "Kein passender Termin gefunden"
+  "message": "Kein passender Termin gefunden",
+  "reason": "no_matching_appointment",
+  "hint": "Bitte beim Vorstand melden"
 }
 ```
+Kein `success`-Feld; `message`, `reason` und `hint` sind die tatsächlichen Felder.
 
 **Zusätzliches Feld (seit 1.2.4):**
 
@@ -1261,23 +1369,27 @@ Wird automatisch für Authorisierten User durchgeführt (z.B. User über PWA).
 }
 ```
 
-**Response:**
+**Response (gültiger Code):** Ein gültiger Code ruft intern `handleAutoCheckin()` auf — die
+Antwort ist **identisch** mit der des Auto-Check-In (siehe oben), inklusive `message`,
+`record_action`, `record_id`, `appointment_id`, `member_id`, `checkin_source` (hier
+`user_totp`), `source_device`, `location_name`, `appointment_action`, `appointment`, ggf.
+`warning`. Felder `verified`/`success` gibt es **nicht**.
+
+**Fehler (ungültiger oder abgelaufener Code):** `401`
 ```json
 {
-  "success": true,
-  "message": "Check-in erfolgreich",
-  "record_id": 42,
-  "verified": true
+  "message": "Ungültiger oder abgelaufener TOTP Code",
+  "tested_locations": 3
 }
 ```
 
-**Fehler (ungültiger Code):**
-```json
-{
-  "success": false,
-  "message": "Ungültiger TOTP-Code"
-}
-```
+**Weitere Fehler:**
+
+| Status | Bedingung | `message` |
+|---|---|---|
+| `400` | `totp_code` oder `arrival_time` fehlt | „totp_code and arrival_time are required" (mit `example`) |
+| `400` | `totp_code` ist nicht genau 6 Ziffern | „Ungültiges Code-Format" |
+| `400` | keine TOTP-Station konfiguriert | „Keine TOTP-Stationen konfiguriert." |
 
 ---
 
@@ -1393,6 +1505,8 @@ Notizpflicht (`worktime_require_note`) gilt am Kiosk nicht. `created_by` ist das
 **Query-Parameter:**
 - `member_id`: Filter nach Mitglied
 - `status`: `pending`, `approved`, `rejected`
+- `year`: Filter nach Jahr des Termins (`appointments.date`)
+- `type`: Filter nach `exception_type` (`absence` oder `time_correction`)
 
 **Response:**
 ```json
@@ -1400,14 +1514,31 @@ Notizpflicht (`worktime_require_note`) gilt am Kiosk nicht. `created_by` ist das
   {
     "exception_id": 1,
     "member_id": 5,
-    "exception_date": "2024-03-20",
-    "type": "excused",
+    "appointment_id": 10,
+    "exception_type": "absence",
     "reason": "Krankheit",
+    "requested_arrival_time": null,
     "status": "pending",
-    "created_at": "2024-03-19 10:00:00"
+    "created_by": 2,
+    "approved_by": null,
+    "approved_at": null,
+    "created_at": "2024-03-19 10:00:00",
+    "name": "Max",
+    "surname": "Mustermann",
+    "appointment_title": "Probe",
+    "appointment_date": "2024-03-20",
+    "appointment_start_time": "19:00:00",
+    "appointment_type_id": 1,
+    "appointment_type_name": "Probe",
+    "created_by_email": "manager@example.com",
+    "approved_by_email": null,
+    "self_approved": 0
   }
 ]
 ```
+
+Felder gibt es weder `exception_date` noch `type` — richtig heißen sie `appointment_date` und
+`exception_type`.
 
 ---
 
@@ -1487,6 +1618,18 @@ richtig, der Server nicht.
 
 **Seit 1.9.1** ergibt ein `DELETE` ohne `id` `400` statt `404`.
 
+**Seit 1.13.0 (OI-87): Selbstgenehmigungssperre.** Den eigenen Antrag genehmigt niemand,
+solange ein weiteres aktives Verwalterkonto existiert — maßgeblich ist das Konto, nicht ein
+verknüpftes Mitglied. Ohne ein zweites aktives Verwalterkonto bleibt die Selbstgenehmigung
+erlaubt, sonst hinge im Verein mit nur einem Verwalter jeder seiner Anträge fest. Ablehnen und
+Löschen sind nie betroffen.
+```json
+{
+  "message": "Den eigenen Antrag genehmigt ein anderer Verwalter"
+}
+```
+(`403`)
+
 ---
 
 ## Mitgliedergruppen (member_groups)
@@ -1502,6 +1645,7 @@ richtig, der Server nicht.
     "group_name": "Trompeten",
     "description": "Trompetenregister",
     "is_default": 0,
+    "created_at": "2026-09-10 11:41:55",
     "is_subgroup": 1,
     "sort_order": 20,
     "member_count": 9
@@ -1603,12 +1747,20 @@ trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200 "Group delete
     "groups": [
       {
         "group_id": 1,
-        "group_name": "Trompeten"
+        "group_name": "Trompeten",
+        "description": "Trompetenregister",
+        "is_default": 0,
+        "created_at": "2026-09-10 11:41:55",
+        "is_subgroup": 1,
+        "sort_order": 20
       }
     ]
   }
 ]
 ```
+
+`groups` enthält je Eintrag die **vollständige** Gruppenzeile (wie `resource=member_groups`,
+aber ohne `member_count`), nicht nur `group_id`/`group_name`.
 
 ---
 
@@ -1934,7 +2086,45 @@ gekappt auf Start plus Obergrenze, Status `submitted`.
 
 **Parameter:** `id`, `running=1` (nur die laufende Sitzung, sonst `null`),
 `year`, `month` (nur zusammen mit `year`), `from_date`, `to_date`, `member_id`,
-`activity_id`, `appointment_id`, `status`
+`activity_id`, `appointment_id`, `status`, `open=1` (nur Sitzungen ohne `end_time`)
+
+**Response (Liste/Einzelsatz):**
+```json
+[
+  {
+    "session_id": 1,
+    "member_id": 5,
+    "activity_id": 2,
+    "appointment_id": null,
+    "start_time": "2026-09-10 18:00:00",
+    "end_time": "2026-09-10 20:30:00",
+    "break_minutes": 15,
+    "break_started_at": null,
+    "note": null,
+    "start_location_name": "Probelokal",
+    "end_location_name": "Probelokal",
+    "status": "confirmed",
+    "source": "timer",
+    "created_by": 5,
+    "approved_by": null,
+    "approved_at": null,
+    "created_at": "2026-09-10 18:00:01",
+    "updated_at": "2026-09-10 20:30:05",
+    "active_member": null,
+    "activity_name": "Bühnenaufbau",
+    "color": "#667eea",
+    "verification": "none",
+    "name": "Max",
+    "surname": "Mustermann",
+    "member_number": "M005",
+    "appointment_title": null,
+    "appointment_date": null,
+    "duration_minutes": 135,
+    "is_running": false,
+    "is_paused": false
+  }
+]
+```
 
 ---
 
@@ -1954,6 +2144,17 @@ gekappt auf Start plus Obergrenze, Status `submitted`.
 `action` kennt `start`, `pause`, `resume` und `stop`. Beim Stoppen sind `note`
 und `force` möglich; `force` beendet ohne Ortsnachweis und setzt den Eintrag auf
 `submitted`, also freigabepflichtig.
+
+**Response (`start`/`stop`, sinngemäß auch `pause`/`resume`):**
+```json
+{
+  "message": "Session started",
+  "session": { "session_id": 1, "member_id": 5, "…": "…" }
+}
+```
+`message` lautet u. a. „Session started", „Paused", „Already paused", „Resumed", „Not paused"
+oder „Stopped"; `session` trägt dieselben Felder wie die Liste oben (inkl. `duration_minutes`,
+`is_running`, `is_paused`).
 
 **Terminbezug:** `appointment_id` ordnet die Stunden einem Termin zu — für die Auswertung,
 was eine Veranstaltung an Arbeit gekostet hat.
@@ -1999,6 +2200,26 @@ einen Termin ist keine Anwesenheit bei ihm: Wer den Bühnenaufbau nachträgt, wa
 notwendig beim Konzert. Zudem ist ein Nachtrag bis zur Freigabe eine ungeprüfte Behauptung.
 Den `records`-Eintrag erzeugt allein der Timer-Start (`action: 'start'`), und auch dort nur,
 wenn der Termin am selben Tag liegt.
+
+---
+
+### Freigeben / Ablehnen
+**Endpoint:** `PUT /api.php?resource=work_sessions&id=<id>`
+
+**Berechtigung:** Admin/Manager — sonst `403 {"message": "Only managers can approve or reject"}`
+
+**Request:**
+```json
+{ "action": "approve" }
+```
+oder `{"action": "reject"}`. Setzt `status` auf `confirmed` bzw. `rejected` sowie `approved_by`
+und `approved_at`, und protokolliert die Änderung in `work_session_log`.
+
+**Response:**
+```json
+{ "message": "Session approved" }
+```
+(bzw. `"Session rejected"`)
 
 ---
 
@@ -2285,25 +2506,45 @@ nicht in der Antwort).
 
 **Berechtigung:** Admin
 
-**Query-Parameter (Geräteliste):**
-- `user_type=device`: nur Geräte-Accounts
+**Query-Parameter:**
+- `user_type`: `human` (Vorgabe, wenn der Parameter fehlt) oder `device`
 - `device_type` (seit 1.3.0, nur zusammen mit `user_type=device`): schränkt auf
   `totp_location`, `auth_device` oder `kiosk` ein
 
-**Response:**
+**Response (`user_type=human`, Vorgabe):** aus der View `v_users_extended`, 18 Felder:
 ```json
 [
   {
     "user_id": 1,
     "email": "admin@example.com",
+    "user_name": "Vereinsverwaltung",
+    "email_verified": 1,
+    "account_status": "active",
     "role": "admin",
-    "member_id": 5,
     "is_active": 1,
+    "member_id": null,
+    "pending_member_id": null,
     "created_at": "2024-01-01 12:00:00",
-    "api_token_expires_at": "2025-01-01 00:00:00"
+    "member_number": null,
+    "member_name": null,
+    "member_surname": null,
+    "pending_member_number": null,
+    "pending_member_name": null,
+    "pending_member_surname": null,
+    "status_text": "✓ Aktiv (kein Member)",
+    "role_name": "Administrator"
   }
 ]
 ```
+
+`member_*` ist gefüllt, wenn ein Mitglied verknüpft ist; `pending_member_*` bei einer noch
+unbestätigten Verknüpfung. `api_token_expires_at` gehört **nicht** zu dieser Antwort — das Feld
+gibt es nur in der Geräteliste (`user_type=device`, siehe unten).
+
+**Response (`user_type=device`):** eigene Feldmenge — `user_id`, `device_name`, `device_type`,
+`is_active`, `totp_secret` (nur bei `totp_location`, sonst durch `has_totp_secret` ersetzt),
+`api_token`, `api_token_expires_at`, `created_at`, `device_type_name`, `status_text`. Details zu
+`totp_secret`/`has_totp_secret` siehe „Gerät aktualisieren" weiter unten.
 
 ---
 
@@ -2467,7 +2708,7 @@ Doppelte Eingabeprüfung erfolgt in HTML.
 ```json
 {
   "current_password": "oldPass123",
-  "new_password": "newSecurePass456!",
+  "new_password": "newSecurePass456!"
 }
 ```
 
@@ -2887,14 +3128,14 @@ Alle Schritte laufen in **einer Transaktion**.
 **Content-Type:** `multipart/form-data`
 
 **Form-Data:**
-- `logo`: Bild-Datei (JPG, PNG, max 2MB)
+- `logo`: Bild-Datei (PNG, JPEG oder SVG, max. 500 KB)
 - `csrf_token`: CSRF-Token
 
-**Response:**
+**Response:** Feld heißt `path`, nicht `logo_url`, und trägt keinen führenden Schrägstrich:
 ```json
 {
   "success": true,
-  "logo_url": "/uploads/logo_1234567890.png"
+  "path": "uploads/logo_1a2b3c4d.png"
 }
 ```
 
@@ -2912,9 +3153,13 @@ Alle Schritte laufen in **einer Transaktion**.
     "appointment_id": 10,
     "title": "Probe",
     "type_id": 1,
+    "series_id": null,
+    "is_detached": 0,
     "description": null,
+    "location": null,
     "date": "2024-03-15",
     "start_time": "19:00:00",
+    "end_time": null,
     "created_by": 1,
     "created_at": "2024-03-01 10:00:00",
     "is_auto_created": 0,
@@ -3023,11 +3268,10 @@ Mitglied am Termindatum aktiv war (siehe `membership_dates`).
 ### Jahre mit Daten abrufen
 **Endpoint:** `GET /api.php?resource=available_years`
 
-**Response:**
+**Response:** ein **nacktes Array**, kein `{"years": …}`-Umschlag — absteigend sortiert
+(Jahre von `appointments.date`, neuestes zuerst):
 ```json
-{
-  "years": [2022, 2023, 2024, 2025]
-}
+[2026, 2025]
 ```
 
 ---
@@ -3036,6 +3280,8 @@ Mitglied am Termindatum aktiv war (siehe `membership_dates`).
 
 ### Zeiträume abrufen
 **Endpoint:** `GET /api.php?resource=membership_dates`
+
+**Berechtigung:** Admin/Manager
 
 **Query-Parameter:**
 - `member_id`: Filter nach Mitglied
@@ -3048,7 +3294,10 @@ Mitglied am Termindatum aktiv war (siehe `membership_dates`).
     "member_id": 5,
     "start_date": "2020-01-01",
     "end_date": null,
-    "status": "active"
+    "status": "active",
+    "created_at": "2024-01-01 12:00:00",
+    "name": "Max",
+    "surname": "Mustermann"
   }
 ]
 ```
@@ -3120,7 +3369,7 @@ trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200` (OI-56).
 **Fehlende Berechtigung:**
 ```json
 {
-  "message": "Admin access required"
+  "error": "Zugriff verweigert"
 }
 ```
 
@@ -3186,7 +3435,9 @@ async function getMembers() {
   return await response.json();
 }
 
-async function checkIn(memberId, appointmentId, totpCode) {
+// member_id/appointment_id werden NICHT mitgeschickt — die Zuordnung läuft
+// serverseitig über die TOTP-Auflösung (totp_checkin.php:31-44).
+async function checkIn(totpCode, arrivalTime) {
   const response = await fetch(`${API_BASE}?resource=totp_checkin`, {
     method: 'POST',
     headers: {
@@ -3194,10 +3445,9 @@ async function checkIn(memberId, appointmentId, totpCode) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      member_id: memberId,
-      appointment_id: appointmentId,
       totp_code: totpCode,
-      source: 'web'
+      arrival_time: arrivalTime,
+      source_device: 'web-scanner-1'
     })
   });
   
@@ -3227,12 +3477,13 @@ def get_members():
     response.raise_for_status()
     return response.json()
 
-def check_in(member_id, appointment_id, totp_code):
+# member_id/appointment_id werden NICHT mitgeschickt — die Zuordnung läuft
+# serverseitig über die TOTP-Auflösung (totp_checkin.php:31-44).
+def check_in(totp_code, arrival_time):
     data = {
-        'member_id': member_id,
-        'appointment_id': appointment_id,
         'totp_code': totp_code,
-        'source': 'iot'
+        'arrival_time': arrival_time,
+        'source_device': 'iot-scanner-1'
     }
     
     response = requests.post(
@@ -3255,7 +3506,9 @@ def check_in(member_id, appointment_id, totp_code):
 const char* API_BASE = "https://your-domain.com/api/api.php";
 const char* API_TOKEN = "your_api_token_here";
 
-bool checkIn(int memberId, int appointmentId, String totpCode) {
+// member_id/appointment_id werden NICHT mitgeschickt — die Zuordnung läuft
+// serverseitig über die TOTP-Auflösung (totp_checkin.php:31-44).
+bool checkIn(String totpCode, String arrivalTime) {
   HTTPClient http;
   
   String url = String(API_BASE) + "?resource=totp_checkin";
@@ -3265,22 +3518,22 @@ bool checkIn(int memberId, int appointmentId, String totpCode) {
   http.addHeader("Authorization", "Bearer " + String(API_TOKEN));
   
   StaticJsonDocument<200> doc;
-  doc["member_id"] = memberId;
-  doc["appointment_id"] = appointmentId;
   doc["totp_code"] = totpCode;
-  doc["source"] = "nfc";
+  doc["arrival_time"] = arrivalTime;
+  doc["source_device"] = "esp32-scanner-1";
   
   String jsonData;
   serializeJson(doc, jsonData);
   
   int httpCode = http.POST(jsonData);
   
-  if (httpCode == 200) {
+  if (httpCode == 200 || httpCode == 201) {
     String payload = http.getString();
     DynamicJsonDocument response(1024);
     deserializeJson(response, payload);
     
-    return response["success"];
+    http.end();
+    return response.containsKey("record_id");
   }
   
   http.end();
