@@ -194,6 +194,12 @@ export function renderFilterChips(container, defs, counts, activeKey, onChange, 
 
         if (istAnzeige) {
             chip.classList.add('filter-chip--static');
+            // Der Tooltip (title) erreicht Screenreader auf Touch-Geraeten nicht --
+            // deshalb denselben Erklaertext zusaetzlich als aria-label.
+            if (def.title) {
+                const wert = counts?.[def.key] ?? 0;
+                chip.setAttribute('aria-label', `${def.label}: ${wert} — ${def.title}`);
+            }
         } else {
             const active = def.key === activeKey;
             chip.type = 'button';

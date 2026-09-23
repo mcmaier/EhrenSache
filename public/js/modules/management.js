@@ -390,7 +390,9 @@ async function loadTypeGroup(typeId) {
 
     const type = types.find(t => t.type_id == typeId);
     const cell = document.getElementById(`type_groups_${typeId}`);
-    
+    // Zeile kann durch den Chipfilter verschwunden sein, waehrend dieser Aufruf noch lief.
+    if (!cell) return;
+
     if (type && type.groups && type.groups.length > 0) {
         cell.innerHTML = type.groups.map(g => `<span class="type-badge">${escapeHtml(g.group_name)}</span>`).join(' ');
     } else {

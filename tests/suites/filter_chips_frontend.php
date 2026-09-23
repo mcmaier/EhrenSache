@@ -68,6 +68,20 @@ test('Alle Varianten der Spec sind definiert', function () use ($fcCss) {
     }
 });
 
+test('renderFilterChips beachtet den chipweisen static-Zusatz (def.static)', function () use ($fcRoot) {
+    // Arbeitszeit stellt einen anzeigenden Chip ("Stunden") neben klickbare
+    // Status-Chips in derselben Zeile -- das geht nur, wenn die Elementwahl
+    // sowohl options.static als auch das einzelne def.static beruecksichtigt.
+    // Ein Ruecksprung auf das alte "isStatic" allein soll hier durchfallen.
+    $fc = fcModul($fcRoot, 'filter_chips');
+    assertSame(1, preg_match('/istAnzeige\s*=\s*isStatic\s*\|\|\s*def\.static\s*===\s*true/', $fc),
+        'Die Elementwahl muss isStatic UND das einzelne def.static beruecksichtigen');
+    assertSame(1, preg_match('/createElement\(\s*istAnzeige\s*\?\s*\'span\'\s*:\s*\'button\'\s*\)/', $fc),
+        'Der Elementtyp muss von der gemischten Flag (istAnzeige) abhaengen');
+    assertSame(1, preg_match('/if\s*\(\s*istAnzeige\s*\)\s*\{\s*\n\s*chip\.classList\.add\(\'filter-chip--static\'\)/', $fc),
+        'Die --static-Klasse und der Klick-/Aria-Zweig muessen an derselben istAnzeige-Verzweigung haengen');
+});
+
 test('Der Zuruecksetzen-Knopf teilt den Stil nicht mehr mit btn-cancel', function () use ($fcRoot) {
     $buttons = (string) file_get_contents($fcRoot . '/public/css/components/buttons.css');
     assertSame(0, preg_match('/\.btn-cancel\s*,\s*\.btn-reset-filter/', $buttons),
@@ -121,9 +135,14 @@ test('Arbeitszeit: Stunden stehen als Chip in der Kopfzeile', function () use ($
 
     assertTrue(str_contains($bereich, 'id="worktimeStatusChips"'), 'Chip-Container fehlt');
     assertTrue(str_contains($bereich, 'stats-grid stats-grid--chips'), 'Kopfzeile ohne stats-grid--chips');
-    foreach (['statWorktimeTotal', 'stats-grid--chips-lead'] as $alt) {
+    foreach (['statWorktimeTotal', 'statWorktimePending', 'statWorktimeOpen',
+              'filterWorktimeStatus', 'stats-grid--chips-lead'] as $alt) {
         assertSame(0, substr_count($fcHtml, $alt), $alt . ' muss entfallen');
     }
+
+    assertTrue(str_contains($bereich, 'id="resetWorktimeFilter"'), 'Zuruecksetzen-Knopf fehlt');
+    assertSame(0, substr_count($fcHtml, 'onclick="resetWorktimeFilter'),
+        'resetWorktimeFilter darf nicht mehr inline verdrahtet sein');
 
     $css = (string) file_get_contents($fcRoot . '/public/css/components/filter-chips.css');
     assertSame(0, substr_count($css, 'stats-grid--chips-lead'), 'Die Sonderspalte muss aus dem CSS entfallen');
@@ -134,7 +153,9 @@ test('Arbeitszeit: Stunden stehen als Chip in der Kopfzeile', function () use ($
 
     // Die Beschriftung ist kurz ("Stunden"), damit die Kopfzeile einzeilig bleibt
     // (Sichtprüfung 23.09.2026) -- die Erklaerung muss dafuer im Tooltip stehen.
-    assertTrue((bool) preg_match("/key:\s*'hours'.*?title:/s", $js),
+    // [^}]* statt .*? mit /s, damit ein spaeterer, unbeteiligter title: im selben
+    // Objektliteral nicht versehentlich mit ueber das Chip-Ende hinweg matcht.
+    assertTrue((bool) preg_match("/key:\s*'hours'[^}]*?title:/", $js),
         'Der Stundenchip braucht einen Tooltip, weil die Beschriftung verkuerzt ist');
 });
 
@@ -454,6 +475,8 @@ test('Verwaltungstabellen filtern nach Chip', function () use ($fcRoot, $fcHtml)
     assertTrue(str_contains($mgmt, 'filterByChip'), 'management.js filtert nicht nach Chip');
     assertSame(0, preg_match('/groupChipsRow[\s\S]{0,300}static:\s*true/', $mgmt),
         'Die Gruppen-Chips sind klickbar, nicht static');
+    assertSame(0, preg_match('/typeChipsRow[\s\S]{0,300}static:\s*true/', $mgmt),
+        'Die Terminarten-Chips sind klickbar, nicht static');
 
     $wt = fcModul($fcRoot, 'worktime');
     assertSame(0, preg_match('/activityChipsRow[\s\S]{0,300}static:\s*true/', $wt),

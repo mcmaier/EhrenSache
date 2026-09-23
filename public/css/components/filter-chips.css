@@ -173,8 +173,9 @@
 }
 
 /* Traegt ein Chip eine Erklaerung, soll der Zeiger sie ankuendigen -- sonst
-   probiert sie niemand aus. Steht nach --static, damit dessen cursor:default
-   nicht gewinnt. */
+   probiert sie niemand aus. Gewinnt gegen --static durch hoehere Spezifitaet
+   (zwei Klassen-/Attributselektoren gegen einen) -- die Reihenfolge der
+   beiden Regeln spielt dafuer keine Rolle. */
 .filter-chip[title] {
     cursor: help;
 }

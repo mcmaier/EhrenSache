@@ -23,7 +23,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Stelle: Solange kein Filter gesetzt ist, ist er ausgegraut und nicht bedienbar. So springen
   die Auswahlfelder daneben nicht mehr.
 - **Benutzer- und Geräteliste zeigen bei leerer Auswahl einen Hinweis statt einer leeren
-  Tabelle.** Die Anwesenheitsliste eines Termins oder Mitglieds macht es ebenso.
+  Tabelle.** Die Anwesenheitsliste eines Termins oder Mitglieds macht es ebenso, ebenfalls die
+  drei Verwaltungstabellen (Gruppen, Terminarten, Tätigkeitsarten), die jetzt nach Chip filtern.
 - **Der Kopfbereich aller Listen ist flacher und überall gleich gebaut.** Die Jahresauswahl steht
   als eine Zeile („Jahr: 2026“) an ihrer gewohnten Stelle oben rechts statt als zweizeilige Karte,
   die Beschriftungen der Filter stehen neben statt über den Feldern. Die Statistik nutzt jetzt

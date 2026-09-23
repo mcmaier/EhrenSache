@@ -3544,7 +3544,10 @@ neue Chip-Zähler macht es nur sichtbarer.
 - Antragstabelle: Kopf hat 7 Spalten, Zeilen 8 (`index.html` `#antraege`).
 - `renderRecords`-Leerzeile: `colspan` 7, obwohl die Tabelle ohne Aktionsspalte nur 6 Spalten hat.
 - Toter Code: `applyDeviceFilters`/`filterDevices` (`devices.js`), der Zweig `exceptionStatus` in
-  `filterExceptions`, `window.resetWorktimeFilter` ohne Aufrufer.
+  `filterExceptions`, `window.resetWorktimeFilter` ohne Aufrufer. Ebenso `window.resetDeviceFilter`
+  (`devices.js` ~Zeile 686) — die Filterleiste von 1.13.0 verdrahtet den Knopf direkt per
+  `addEventListener` in `showDeviceSection()`, nicht mehr über den globalen Namen — und die leere,
+  nie aufgerufene `initDevicesEventHandlers()` (`devices.js` ~Zeile 334).
 - Toter Code seit 1.13.0: `.stat-card` samt `h3`/`.number` (`css/components/cards.css`) und die
   zugehörige Regel in `css/responsive.css`. Mit den Kennzahlkarten fiel die letzte Verwendung im
   Dashboard weg; die Check-in-PWA hat eine eigene Kopie in `public/checkin/css/style.css` und
@@ -3556,7 +3559,11 @@ neue Chip-Zähler macht es nur sichtbarer.
   Erzeuger hier bekannt — `tests/suites/import_series_api.php` räumt seine Zeilen in
   `import_logs` nicht auf.
 - Leerzeilen-Texte uneinheitlich: Anträge und Anwesenheit (alle Einträge) melden „Keine Einträge
-  gefunden“, Benutzer, Geräte und Mitglieder dagegen „… für diese Auswahl“.
+  gefunden“, Benutzer, Geräte und Mitglieder dagegen „… für diese Auswahl“. Dasselbe bei den in
+  1.13.0 hinzugekommenen Zeilen: Verwaltung meldet zweimal ohne Punkt („Keine Gruppen für diese
+  Auswahl“, „Keine Terminarten für diese Auswahl“, beide `management.js`), Arbeitszeit dagegen mit
+  Punkt („Keine Einträge für diese Auswahl.“, `worktime.js` ~Zeile 219) — die Tätigkeitsarten
+  derselben Datei (~Zeile 817) wiederum ohne.
 - Der Kontrast der Chips ist nur für die Standard-Primärfarbe `#1F5FBF` nachgerechnet (Tabelle in
   `filter-chips.css`). Bei einer hellen Vereins-Primärfarbe ist WCAG AA für den aktiven neutralen
   Chip und „Läuft“ (beide `--primary-color`) nicht gesichert.

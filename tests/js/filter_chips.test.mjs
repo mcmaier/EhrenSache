@@ -129,6 +129,8 @@ test('Statistik-Chips sind reine Anzeige und bilden keine Partition', () => {
 test('Gruppen: Haupt- und Untergruppen, Wort aus den Einstellungen', () => {
     const defs = groupChips('Register');
     assert.deepEqual(defs.map(d => d.label), ['Alle', 'Hauptgruppen', 'Register']);
+    // 'ok' passend zum gruenen Abzeichen derselben Zeile in der Tabelle (Spec).
+    assert.equal(defs.find(d => d.key === 'sub').variant, 'ok');
     const items = [{ is_subgroup: 1 }, { is_subgroup: '1' }, { is_subgroup: 0 }, { is_subgroup: null }];
     assert.deepEqual(countChips(items, defs), { all: 4, main: 2, sub: 2 });
     assertPartition(defs, items, 'Gruppen');

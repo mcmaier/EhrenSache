@@ -241,9 +241,13 @@ grundsätzliche; die grundsätzlichen wurden entschieden und kehren zwei Punkte 
   entfällt ganz, mit ihr `.stats-grid--kpi` aus dem ersten Nachtrag.
   Abgeschaltete Kennzahlen erscheinen gar nicht erst als Chip; bei zu wenigen Messungen zeigt der
   Chip wie bisher „–“ und die Begründung im Tooltip.
-- **Arbeitszeit:** „Bestätigte Stunden“ wird ein Anzeige-Chip in derselben Zeile („Bestätigte
-  Stunden 214:42 h“). Damit entfallen die Sonderspalte `.stats-grid--chips-lead` und die flache
-  Kennzahlkarte aus dem ersten Nachtrag; der Kopf ist dort so hoch wie überall.
+- **Arbeitszeit:** „Bestätigte Stunden“ wird ein Anzeige-Chip in derselben Zeile — Beschriftung
+  „Stunden“, Wert „214:42 h“; die Erklärung („Bestätigte Stunden im gewählten Jahr; folgt
+  Tätigkeit und Mitglied, nicht dem Statusfilter“) steht im Tooltip und, damit sie auch
+  Screenreader auf Touch-Geräten erreicht, im `aria-label`. Die Kürzung auf „Stunden“ wurde erst
+  nach der Sichtprüfung im Browser entschieden: mit der langen Beschriftung „Bestätigte Stunden“
+  wurde die Kopfzeile zweizeilig. Damit entfallen die Sonderspalte `.stats-grid--chips-lead` und
+  die flache Kennzahlkarte aus dem ersten Nachtrag; der Kopf ist dort so hoch wie überall.
 - In beiden Ansichten stehen damit **anzeigende und klickbare Chips nebeneinander**. Sie sind am
   Rand unterscheidbar: klickbare haben einen, anzeigende nicht.
 - **`renderFilterChips` bekommt `def.title`** für den Tooltip; der Wert eines Chips darf ein Text

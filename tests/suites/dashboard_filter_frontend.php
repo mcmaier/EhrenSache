@@ -124,8 +124,10 @@ test('Arbeitszeit-Kennzahlen zaehlen nur den gefilterten Stand', function () use
 
     assertTrue(str_contains($rumpf, 'bestaetigteMinuten'),
                'Die Stundensumme muss weiter in renderWorkSessions berechnet werden');
-    assertSame(0, preg_match('/\ball\s*\./', $rumpf),
-               'renderWorkSessions() darf fuer die Summe nicht auf den Gesamtbestand (all) zugreifen');
+    // Die Summe folgt Taetigkeit und Mitglied (base), nicht dem Statuschip und
+    // nicht dem ungefilterten Parameter (sessions) -- genau das pinnt diese Probe.
+    assertSame(1, preg_match('/bestaetigteMinuten\s*=\s*base\s*\.filter\(/', $rumpf),
+               'Die Stundensumme muss aus der Basisliste (base), nicht aus dem ungefilterten Bestand (sessions) berechnet werden');
 });
 
 /**
