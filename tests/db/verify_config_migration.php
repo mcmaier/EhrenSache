@@ -1,5 +1,15 @@
 <?php
 /**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/**
  * EhrenSache - Prueft die Migration auf die neue Konfigurationsform (1.5.1 -> 1.6.0).
  *
  * Die echte private/config/config.php wird NICHT angefasst: Die Migration
