@@ -25,6 +25,15 @@
     grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) minmax(150px, 190px);
 }
 
+/* Ist die Chip-Leiste verborgen (Mitglieder als Rolle "user"), gibt sie ihre
+   Spalte frei und die Jahresauswahl wuerde sich sonst ueber das ganze Grid
+   dehnen. -2/-1 zeigt immer auf die letzten beiden Linien -- damit bleibt
+   sie rechts, egal ob zwei, drei oder (mobil) eine Spalte im Grid stehen. */
+.stats-grid--chips .year-filter,
+.stats-grid--chips-lead .year-filter {
+    grid-column: -2 / -1;
+}
+
 .filter-chips {
     display: flex;
     flex-wrap: wrap;

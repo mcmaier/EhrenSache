@@ -220,7 +220,7 @@ test('Anwesenheitsliste: Zwischenspeicher haelt die volle Liste', function () us
         '_lastAttendanceData muss die ungefilterte Liste speichern');
 });
 
-test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function () use ($fcRoot, $fcHtml) {
+test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function () use ($fcRoot, $fcHtml, $fcCss) {
     $jahr = (string) @file_get_contents($fcRoot . '/public/css/components/year-filter.css');
     assertTrue($jahr !== '', 'css/components/year-filter.css fehlt');
 
@@ -230,6 +230,12 @@ test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function 
     $ohneKommentare = (string) preg_replace('#/\*.*?\*/#s', '', $jahr);
     assertSame(0, preg_match('/#[0-9a-fA-F]{3,8}\b/', $ohneKommentare),
         'year-filter.css enthaelt eine Hex-Farbe');
+
+    // Bleibt die Chip-Leiste verborgen (Mitglieder als "user"), gibt sie ihre
+    // Grid-Spalte frei -- ohne eine feste Spalte wuerde sich die Jahresauswahl
+    // dann ueber das ganze Grid dehnen.
+    assertTrue(str_contains($fcCss, 'grid-column'),
+        'Die Jahresauswahl muss fest in der letzten Spalte stehen, sonst dehnt sie sich bei verborgenen Chips');
 
     // Die alte Bauform: Karte mit Ueberschrift und sechsfach wiederholtem Inline-Style.
     // Task 3: Statistik baut ihren Kopf noch nicht um, deshalb bleibt genau ein
