@@ -176,8 +176,7 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                 
                 try {
                     $userType = $_GET['user_type'] ?? 'human';
-                    $search = $_GET['search'] ?? null;
-                    
+
                     $params = [];
                     
                     // MENSCHEN
