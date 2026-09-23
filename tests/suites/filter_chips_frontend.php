@@ -131,6 +131,11 @@ test('Arbeitszeit: Stunden stehen als Chip in der Kopfzeile', function () use ($
     $js = fcModul($fcRoot, 'worktime');
     assertTrue(str_contains($js, 'countChips(base, CHIPS_WORKTIME)'), 'Arbeitszeit: Chips muessen auf der Basisliste zaehlen');
     assertTrue(str_contains($js, 'formatMinutes'), 'Die Stundensumme muss weiter formatiert werden');
+
+    // Die Beschriftung ist kurz ("Stunden"), damit die Kopfzeile einzeilig bleibt
+    // (Sichtprüfung 23.09.2026) -- die Erklaerung muss dafuer im Tooltip stehen.
+    assertTrue((bool) preg_match("/key:\s*'hours'.*?title:/s", $js),
+        'Der Stundenchip braucht einen Tooltip, weil die Beschriftung verkuerzt ist');
 });
 
 test('Mitglieder: Chips statt Karten und Inaktiv-Schalter', function () use ($fcRoot, $fcHtml) {

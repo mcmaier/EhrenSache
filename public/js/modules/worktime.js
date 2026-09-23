@@ -198,7 +198,8 @@ export function renderWorkSessions(sessions) {
 
     renderFilterChips(
         document.getElementById('worktimeStatusChips'),
-        [...CHIPS_WORKTIME, { key: 'hours', label: 'Bestätigte Stunden', static: true }],
+        [...CHIPS_WORKTIME, { key: 'hours', label: 'Stunden', static: true,
+            title: 'Bestätigte Stunden im gewählten Jahr; folgt Tätigkeit und Mitglied, nicht dem Statusfilter' }],
         zaehler, worktimeStatusChip,
         key => { worktimeStatusChip = key; renderWorkSessions(sessions); },
         { label: 'Status der Arbeitszeit' }
