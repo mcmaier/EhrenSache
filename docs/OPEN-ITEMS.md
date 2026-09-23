@@ -2656,11 +2656,14 @@ Schlüssel in der echten Antwort vorkommt; zusätzliche Felder im Server melden 
 Nebenbefund behoben: `private/handlers/users.php` las einen Parameter `search`, ohne ihn je zu
 verwenden — ein Versprechen ohne Wirkung, entfernt.
 
-**Restpunkte:** Sieben Stellen zeigen in der Dokumentation **weniger**, als der Server liefert
-(die INFO-Zeilen des Wächters), darunter `self_approval_blocked` bei `attendance_list` und die
-Blöcke `rate_bands`, `punctuality`, `reliability` bei `statistics`. Nicht bewacht sind die
-Schreibpfade sowie `appointment_responses`, `session_info`, `update_check`, die Terminserien und
-die Check-in-Endpunkte. Bei `holidays` und `my_open_items.items` vergleicht der Wächter bewusst
+Die sieben Stellen, an denen die Dokumentation **weniger** zeigte als der Server liefert, sind am
+selben Tag nachgezogen (`04b8f51`): `responses` bei den Terminen, `created_at` bei Termin- und
+Tätigkeitsarten, die Blöcke `rate_bands`, `punctuality` und `reliability` bei `statistics` und
+`self_approval_blocked` bei `attendance_list` — letzteres samt Erklärung, wann der Server die
+Genehmigung des eigenen Antrags abweist (siehe [OI-87](#oi-87--anträge-in-der-anwesenheitsliste-des-dashboards-selbstgenehmigung-nur-ohne-zweiten-verwalter)).
+
+**Restpunkte:** Nicht bewacht sind die Schreibpfade sowie `appointment_responses`,
+`session_info`, `update_check`, die Terminserien und die Check-in-Endpunkte. Bei `holidays` und `my_open_items.items` vergleicht der Wächter bewusst
 nicht die inneren Schlüssel — dort sind Kalenderdaten die Schlüssel beziehungsweise die Felder
 hängen am `kind`.
 
