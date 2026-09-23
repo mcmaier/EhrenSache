@@ -322,3 +322,58 @@ test('Ein Record eines nicht erwarteten Mitglieds veraendert die Zahlen nicht', 
         caDropWorld($world);
     }
 });
+
+// ---- Abgleich mit attendance_list ---------------------------------------------------
+
+test('Die Zahlen stimmen mit der Anwesenheitsliste desselben Termins ueberein', function () {
+    $world = caWorld('Abgleich', 4);
+    try {
+        $tag = caDateInDays(-3);
+        $apt = caAppointment($world, $tag);
+        caRecord($apt, $world['members'][0], 'present');
+        caRecord($apt, $world['members'][1], 'present');
+        caRecord($apt, $world['members'][2], 'excused');
+
+        $liste = apiRequest('GET', 'attendance_list', ['token' => apiToken('admin'),
+            'query' => ['appointment_id' => $apt]]);
+        assertStatus(200, $liste);
+        assertTrue(array_key_exists('members', $liste['body']), 'members fehlt in der Anwesenheitsliste');
+        $mitglieder = $liste['body']['members'];
+
+        $present = 0;
+        $excused = 0;
+        foreach ($mitglieder as $m) {
+            if (($m['status'] ?? null) === 'present') $present++;
+            if (($m['status'] ?? null) === 'excused') $excused++;
+        }
+
+        $row = caFetch($apt, $tag, 'admin', ['include' => 'attendance']);
+        assertTrue($row !== null, 'Termin fehlt in der Liste');
+        assertTrue(array_key_exists('attendance', $row), 'attendance fehlt in der Antwort');
+        assertSame(count($mitglieder), $row['attendance']['expected'], 'Erwartete Mitglieder');
+        assertSame($present, $row['attendance']['present']);
+        assertSame($excused, $row['attendance']['excused']);
+        assertSame(count($mitglieder) - $present - $excused, $row['attendance']['missing']);
+    } finally {
+        caDropWorld($world);
+    }
+});
+
+test('attendance_list liefert weiterhin offene Antraege je Mitglied', function () {
+    $world = caWorld('Antraege', 1);
+    try {
+        $tag = caDateInDays(-2);
+        $apt = caAppointment($world, $tag);
+
+        $res = apiRequest('GET', 'attendance_list', ['token' => apiToken('admin'),
+            'query' => ['appointment_id' => $apt]]);
+        assertStatus(200, $res);
+        assertTrue(array_key_exists('members', $res['body']), 'members fehlt in der Anwesenheitsliste');
+        assertTrue(count($res['body']['members']) > 0,
+            'Kein Mitglied in der Anwesenheitsliste -- der Test praeft sonst nichts');
+        assertTrue(array_key_exists('pending_exceptions', $res['body']['members'][0]),
+            'pending_exceptions (seit 1.12.0) muss erhalten bleiben -- OI-87 und die PWA bauen darauf');
+    } finally {
+        caDropWorld($world);
+    }
+});
