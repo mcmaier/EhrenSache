@@ -183,6 +183,16 @@ function adCheckKeys($doc, $live, string $path, array $skipDive): void
         return;
     }
 
+    // Ein Feld, das laut Doku ein Objekt traegt, darf im Bestand null sein --
+    // etwa `responses` an einem Termin, dessen Terminart keine Rueckmeldung
+    // vorsieht. Das ist ein zulaessiger Wert, keine Falschaussage; geprueft
+    // wurde schon, dass der Schluessel ueberhaupt existiert.
+    if ($live === null) {
+        echo "  INFO  {$path}: in dieser Instanz null -- Tiefenpruefung uebersprungen\n";
+
+        return;
+    }
+
     assertTrue(is_array($live), "{$path}: API.md zeigt ein Objekt, die echte Antwort liefert keins");
 
     $missing = [];

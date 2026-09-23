@@ -661,10 +661,21 @@ etwaigen Benutzerkontos (`users.member_id` wird auf `NULL` gesetzt, das Konto bl
     "type_name": "Probe",
     "color": "#667eea",
     "type_description": null,
-    "responses_enabled": 0
+    "responses_enabled": 0,
+    "responses": {
+      "yes": 6,
+      "no": 3,
+      "maybe": 4,
+      "open": 20,
+      "own": null,
+      "expected": false
+    }
   }
 ]
 ```
+
+`responses` erscheint nur in der gefilterten Abfrage und ist bei Terminarten ohne Rückmeldung
+`null` — Einzelheiten unten unter „Feld `responses`".
 
 **Felder `location` und `end_time` (seit 1.10.0):** Ort und Ende des Termins, beide optional und
 `null`, wenn nicht gesetzt. Rein informativ — sie gehen in keine Auswertung ein. Liegt
@@ -1740,6 +1751,7 @@ trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200 "Group delete
     "description": "Wöchentliche Probe",
     "color": "#667eea",
     "is_default": 1,
+    "created_at": "2026-09-10 11:41:55",
     "responses_enabled": 0,
     "responses_names_visible": 0,
     "responses_require_excuse": 0,
@@ -1983,8 +1995,17 @@ Nicht-Admins sehen zusätzlich nur Arten mit `is_active = 1`.
     "is_default": 0,
     "is_active": 1,
     "verification": "start_end",
+    "created_at": "2026-09-10 11:41:56",
     "groups": [
-      { "group_id": 1, "group_name": "Aktive" }
+      {
+        "group_id": 1,
+        "group_name": "Aktive",
+        "description": "Aktive Mitglieder",
+        "is_default": 0,
+        "created_at": "2026-09-10 11:41:54",
+        "is_subgroup": 0,
+        "sort_order": 0
+      }
     ],
     "appointment_type_ids": [2, 5]
   }
@@ -2255,6 +2276,9 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
   "warning": null,
   "year": 2026,
   "worktime": null,
+  "rate_bands": { "mid": 40, "fair": 60, "good": 80 },
+  "punctuality": { "enabled": false },
+  "reliability": { "enabled": false },
   "summary": {
     "total_appointments": 37,
     "total_members": 33,
@@ -3182,9 +3206,17 @@ Alle Schritte laufen in **einer Transaktion**.
       "pending_exceptions": [{ "exception_id": 2235, "exception_type": "absence",
                                "reason": "Familienfeier", "requested_arrival_time": null }]
     }
-  ]
+  ],
+  "self_approval_blocked": true
 }
 ```
+
+**Feld `self_approval_blocked` (seit 1.13.0, OI-87):** `true`, wenn neben dem aufrufenden Konto
+mindestens ein weiteres aktives Verwalterkonto existiert. Nur dann weist der Server die
+Genehmigung des **eigenen** Antrags mit `403` ab (siehe
+[Ausnahmen](#ausnahme-genehmigen--ablehnen)). In einem Verein mit einem einzigen Verwalter steht
+hier `false`, und er darf seinen Antrag selbst bescheiden — sonst bliebe er liegen. Die
+Check-in-App sperrt ihre Knöpfe nach diesem Flag, statt eine eigene Regel zu führen.
 
 `group_ids` am Termin sind die Gruppen-IDs seiner Terminart, kommagetrennt. `record_id`,
 `arrival_time`, `checkin_source` und `status` (`present`/`excused`) bleiben `null`, solange
