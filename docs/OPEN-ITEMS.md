@@ -3687,4 +3687,20 @@ Rand — mehrere Termine an einem Tag gruppieren sich dadurch sichtbar.
 - Verwandt: [OI-92](#oi-92--tabellen-uneinheitlich-aktionsspalte-nur-in-der-arbeitszeit-fixiert-arbeitszeit-ohne-paginierung)
   (Tabellen einheitlicher machen) — sinnvoll im selben Zug.
 
+**Nachtrag 2026-09-23 — Bedienelemente im festgehaltenen Kalender-Popup:**
+- Der Knopf „Bearbeiten“ (`.calendar-event-edit`, `appointments.js` ~Zeile 762) sitzt als
+  kleiner Textknopf direkt unter der Rückmeldezeile und liegt ihr sehr nahe — Fehlklicks
+  zwischen beiden sind leicht.
+- Die Rückmeldezeile ist ein `<button class="response-summary-btn">`
+  (`calendarResponseLineHtml()`, ~Zeile 694), sieht aber nicht so aus: `calendar.css`
+  ~Zeile 202–208 nimmt ihr Rahmen und Hintergrund **absichtlich** (FI-1-Korrektur: Hover- und
+  festgehaltenes Popup sollen gleich aussehen). Erkennbar ist sie nur an Cursor und Hover.
+  Diese Entscheidung muss beim Umbau neu abgewogen werden — z. B. Knopfoptik nur im
+  festgehaltenen Popup, im Hover-Popup weiter als reiner Text.
+- **Idee:** „Bearbeiten“ als gelber Stift wie die Aktionsknöpfe der Tabellen
+  (`action-btn btn-icon btn-edit`, `buttons.css` ~Zeile 220) an den rechten Rand des
+  Termineintrags, auf Höhe der Titelzeile. Das trennt ihn räumlich von den Rückmeldungen und
+  passt zum Eintrag mit farbigem Rand. Braucht `title`/`aria-label` „Termin bearbeiten“, da nur
+  ein Symbol. „+ Termin an diesem Tag“ bleibt als Textknopf am Ende der Liste.
+
 **Nicht sicherheitsrelevant.**
