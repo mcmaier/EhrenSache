@@ -81,6 +81,9 @@ test('Der Zuruecksetzen-Knopf bleibt sichtbar und wird nur ausgegraut', function
     assertSame(0, preg_match('/class="btn-reset-filter"[^>]*\shidden/', $fcHtml),
         'Der Knopf wird nicht mehr ausgeblendet, sondern ausgegraut');
 
+    assertSame(7, preg_match_all('/class="btn-reset-filter"[^>]*\sdisabled/', $fcHtml),
+        'Alle sieben Zuruecksetzen-Knoepfe starten ausgegraut');
+
     $buttons = (string) file_get_contents($fcRoot . '/public/css/components/buttons.css');
     assertTrue(str_contains($buttons, '.btn-reset-filter:disabled'),
         'Der ausgegraute Zustand braucht eine eigene Regel');
