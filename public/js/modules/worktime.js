@@ -119,14 +119,11 @@ export async function checkWorktimeEnabled() {
 
     const block = document.getElementById('activityTypesBlock');
     if (block) {
-        block.style.display = (worktimeEnabled && isAdmin) ? '' : 'none';
-
-        // Die Liste liegt oben schon vor; ohne dieses Zeichnen blieb die
-        // Tabelle nach dem Einschalten der Zeiterfassung (settings.js ruft
-        // diese Funktion direkt danach) bis zum Neuladen auf „Lade Daten…“.
-        if (worktimeEnabled && isAdmin) {
-            renderActivityTypes();
-        }
+        const sichtbar = worktimeEnabled && isAdmin;
+        block.style.display = sichtbar ? '' : 'none';
+        // Tabelle fuellen, sonst bleibt der Block nach dem Einschalten auf
+        // „Lade Daten…“ stehen (settings.js ruft diese Funktion direkt danach).
+        if (sichtbar) renderActivityTypes();
     }
 
     return worktimeEnabled;
