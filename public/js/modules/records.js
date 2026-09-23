@@ -40,10 +40,14 @@ let currentMemberId = null;
 let currentAppointmentType = null;
 let isLoadingFilters = false;
 // Sprung aus dem Kalender (Spec 2026-09-22-kalender-anwesenheit): Ziel des
-// Rueckwegs und Marke, damit showRecordsSection() waehrend des Sprungs den
-// Rueckweg nicht gleich wieder verwirft.
+// Rueckwegs und zwei Zaehler, damit showRecordsSection() waehrend eines
+// Sprungs den Rueckweg nicht gleich wieder verwirft. Muster wie navSeq in
+// ui.js: jumpSeq erkennt den ueberholten Sprung (zwei schnelle Klicks auf
+// verschiedene Termine), jumpActive ist eine Tiefe, kein Zustand -- der
+// langsamere Sprung darf die Marke des neueren nicht loeschen.
 let attendanceReturn = null;   // { date: 'YYYY-MM-DD' }
-let jumpInProgress = false;
+let jumpSeq = 0;
+let jumpActive = 0;
 // Aktiver Status-Chip (Spec 2026-09-22). "missing" gibt es nur in den
 // Listenmodi; beim Wechsel zu ALL_RECORDS faellt er auf "all" zurueck.
 let recordStatusChip = 'all';
@@ -590,12 +594,17 @@ export async function applyRecordFilters(forceReload = false, currentPage = 1) {
  * Auswahl im Termin-Filter und fuer den Sprung aus dem Kalender.
  */
 async function enterAppointmentAttendance(appointmentId) {
+    // Der Filter liefert einen String, der Sprung eine Zahl -- currentAppointmentId
+    // soll ueber beide Wege gleich typisiert sein.
+    appointmentId = String(appointmentId);
+
     const memberFilter = document.getElementById('filterMember');
     const aptTypeFilter = document.getElementById('filterAptType');
 
     setRecordMode(RecordMode.ATTENDANCE_BY_APPOINTMENT);
     currentAppointmentId = appointmentId;
     currentMemberId = null;
+    currentAppointmentType = null;
     memberFilter.disabled = true;
     memberFilter.value = '';
     aptTypeFilter.disabled = true;
@@ -616,45 +625,105 @@ function clearAttendanceReturn() {
  * Ansicht, wo sie ist.
  */
 export async function openAttendanceForAppointment(appointmentId, date) {
-    const year = Number(String(date).slice(0, 4));
-    const previousYear = Number(currentYear);
+    debug.log('Jump to attendance', appointmentId, date);
 
-    jumpInProgress = true;
+    const seq = ++jumpSeq;
+    jumpActive++;
+
+    // Stand vor dem Sprung. Scheitert er unterwegs, wird genau das wieder
+    // hergestellt -- sonst bliebe ein fremdes Jahr in currentYear, im
+    // sessionStorage und in allen Jahres-Auswahlfeldern stehen, waehrend der
+    // sichtbare Bereich noch das alte Jahr zeigt. Das ueberlebt einen Reload.
+    const previousYear = Number(currentYear);
+    const previousMode = currentMode;
+    const previousAppointmentId = currentAppointmentId;
+    const previousMemberId = currentMemberId;
+    const previousAppointmentType = currentAppointmentType;
+    const previousChip = recordStatusChip;
+
+    let year = previousYear;
+    let done = false;
+
     try {
+        // Ohne diese Pruefung macht ein fehlendes Datum aus dem Jahr NaN --
+        // setCurrentYear(NaN) schreibt "NaN" in den sessionStorage und die
+        // Anwendung ist bis zur naechsten Jahreswahl unbrauchbar.
+        if (!/^\d{4}-\d{2}-\d{2}/.test(String(date))) {
+            debug.error('openAttendanceForAppointment: unbrauchbares Datum', date);
+            return;
+        }
+        year = Number(String(date).slice(0, 4));
+
         if (year !== previousYear) {
             setCurrentYear(year, { reload: false });
         }
 
         const appointments = await loadAppointments(false);
-        if (!(appointments || []).some(a => String(a.appointment_id) === String(appointmentId))) {
-            if (year !== previousYear) {
-                setCurrentYear(previousYear, { reload: false });
-            }
+        if (seq !== jumpSeq) return;
+
+        // apiCall() wirft nie: bei HTTP-Fehler kommt {success:false} zurueck,
+        // bei 401 null. Beides ist keine Liste -- ohne diese Unterscheidung
+        // zerbricht .some() oder es erscheint faelschlich "Termin nicht
+        // gefunden", waehrend gerade abgemeldet wird.
+        const list = Array.isArray(appointments) ? appointments : null;
+        if (list === null) {
+            showToast('Termine konnten nicht geladen werden', 'error');
+            return;
+        }
+        if (!list.some(a => String(a.appointment_id) === String(appointmentId))) {
             showToast('Termin nicht gefunden', 'error');
             return;
         }
 
+        // Modus, Termin und Statusfilter stehen VOR dem Bereichswechsel:
+        // navigateToSection() ruft showRecordsSection(), und die laedt anhand
+        // genau dieser Werte. Stuenden sie noch auf der vorigen Auswahl,
+        // lueden wir erst eine Liste, die niemand sehen will, und danach ein
+        // zweites Mal die richtige. Der Sprung zeigt dabei immer die ganze
+        // Liste, nicht den zuletzt gewaehlten Statusfilter des Bereichs.
+        setRecordMode(RecordMode.ATTENDANCE_BY_APPOINTMENT);
+        currentAppointmentId = String(appointmentId);
+        currentMemberId = null;
+        currentAppointmentType = null;
+        recordStatusChip = 'all';
+
         if (!await navigateToSection('anwesenheit')) {
             return;
         }
+        if (seq !== jumpSeq) return;
 
         // Der Termin-Filter wird in loadRecordFilters() ohne await befuellt --
         // hier ausdruecklich abwarten, bevor gewaehlt wird.
         await loadAppointmentFilter(false);
+        if (seq !== jumpSeq) return;
+
         document.getElementById('filterAptType').value = '';
         document.getElementById('filterAppointment').value = String(appointmentId);
 
-        // Der Sprung zeigt immer die ganze Liste, nicht den zuletzt
-        // gewaehlten Statusfilter des Bereichs.
-        recordStatusChip = 'all';
-
         await enterAppointmentAttendance(appointmentId);
+        if (seq !== jumpSeq) return;
 
         attendanceReturn = { date: String(date) };
         const back = document.getElementById('recordsBackToAppointments');
         if (back) back.hidden = false;
+        done = true;
+    } catch (e) {
+        debug.error('Sprung in die Anwesenheit fehlgeschlagen', appointmentId, e);
+        showToast('Anwesenheitsliste konnte nicht geoeffnet werden', 'error');
     } finally {
-        jumpInProgress = false;
+        // Nur aufraeumen, solange dieser Sprung der juengste ist: hat ein
+        // neuerer uebernommen, gehoeren Jahr und Auswahl ihm.
+        if (!done && seq === jumpSeq) {
+            if (year !== previousYear) {
+                setCurrentYear(previousYear, { reload: false });
+            }
+            setRecordMode(previousMode);
+            currentAppointmentId = previousAppointmentId;
+            currentMemberId = previousMemberId;
+            currentAppointmentType = previousAppointmentType;
+            recordStatusChip = previousChip;
+        }
+        jumpActive--;
     }
 }
 
@@ -666,7 +735,12 @@ export async function backToAppointmentCalendar() {
 
     setCurrentYear(Number(target.date.slice(0, 4)), { reload: false });
     setCalendarMonth(target.date);
-    await navigateToSection('termine');
+
+    // Der Knopf ist schon weg -- scheitert der Wechsel, saesse der Nutzer
+    // sonst ohne Hinweis fest.
+    if (!await navigateToSection('termine')) {
+        showToast('Wechsel zu den Terminen nicht moeglich', 'error');
+    }
 }
 
 // Im Init oder beim Section-Wechsel registrieren
@@ -811,7 +885,7 @@ export async function showRecordsSection(forceReload = false) {
 
     // Ein normaler Aufruf des Bereichs (Navigation, Jahreswechsel) verwirft
     // den Rueckweg; waehrend eines Sprungs bleibt er stehen.
-    if (!jumpInProgress) {
+    if (jumpActive === 0) {
         clearAttendanceReturn();
     }
 
@@ -1212,7 +1286,8 @@ async function loadAttendanceList(appointmentId) {
             renderAttendanceList(attendance.members);
         }
     } catch (error) {
-        console.error('Fehler beim Laden der Anwesenheitsliste:', error);
+        debug.error('Fehler beim Laden der Anwesenheitsliste:', error);
+        showToast('Anwesenheitsliste konnte nicht geladen werden', 'error');
     }
 }
 
