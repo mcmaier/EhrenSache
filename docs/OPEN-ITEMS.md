@@ -3550,7 +3550,9 @@ dokumentierte Regel (OI-3), keine Rechteausweitung.
 einschließlich zukünftiger, ohne Datumsgrenze. Die Zeilen zeigten schon vorher „✗ Fehlend“, der
 neue Chip-Zähler macht es nur sichtbarer.
 
-**Zu entscheiden:** kommende Termine ausschließen oder als eigener Zustand führen.
+**Entschieden am 2026-09-23:** Umsetzung wie unten unter „Beschlossen“ (Punkte 1–3) — eigener
+Zustand „Kommend“, in der Mitgliedsansicht standardmäßig ausgeblendet, in der Terminansicht
+sichtbar.
 
 **Nachtrag 2026-09-23 (Hinweis des Nutzers):**
 - Mit Serienterminen wird es deutlich: Eine Serie reicht bis ein Jahr in die Zukunft, die
@@ -3563,7 +3565,7 @@ neue Chip-Zähler macht es nur sichtbarer.
   `private/helpers/attendance.php` (genutzt in `attendance.php`, `punctuality.php`,
   `report_statistics.php`). Die Anwesenheitsliste weicht davon ab — dieselbe Grenze übernehmen.
 
-**Vorschlag:**
+**Beschlossen:**
 1. Server liefert je Zeile ein Kennzeichen „noch nicht begonnen“ (über dieselbe Konstante),
    Frontend zeigt dann **„Kommend“** in neutraler Farbe statt „✗ Fehlend“. Eine vorab genehmigte
    Entschuldigung bleibt „Entschuldigt“ — die ist für kommende Termine gerade interessant.
