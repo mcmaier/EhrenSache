@@ -123,6 +123,28 @@ erwarteten Mitgliedern zählen nicht mit).
 - Ohne `include=attendance` bleibt die Antwort unverändert (keine Mehrkosten für andere Aufrufer).
 - `API.md` wird ergänzt.
 
+### Stand der Umsetzung — Schritt 2a ist fertig (23.09.2026)
+
+Der Server ist gebaut; was oben unter „Gemeinsamer Helfer“ und „API“ steht, war die Planung.
+Abweichungen, die für Schritt 2b gelten:
+
+- Der Helfer heißt `private/helpers/appointment_attendance.php` und bietet
+  `attendanceAttachSummaries()` (hängt die Zahlen an eine bereits geladene Terminliste),
+  dazu `attendanceExpectedMemberIds()`, `attendanceCounts()`, `attendanceStatusOf()` und
+  `attendanceHasStarted()`. Ein `attendanceCountsForAppointments(… int $year …)` gibt es nicht —
+  gezählt wird über die Termine, die der Abruf ohnehin geladen hat.
+- **`attendance_list.php` wurde bewusst nicht umgebaut.** Die Spec sah vor, dass es denselben
+  Helfer nutzt; das hätte `pending_exceptions` und (seit OI-87) `self_approval_blocked` angefasst,
+  auf denen PWA und Dashboard aufbauen. Stattdessen nutzt `responses.php` den gemeinsamen Helfer,
+  und ein Test in `calendar_attendance_api.php` vergleicht die Zahlen beider Wege über alle
+  Termine — sie dürfen nie auseinanderlaufen.
+- Der Zusatz `include=attendance` wirkt nur mit Zeitraum (`year` oder `from_date`/`to_date`);
+  ohne Zeitraum wird er stillschweigend ignoriert, der Einzelabruf (`?id=`) kennt ihn nicht.
+- Vorgemerkt: `attendanceHasStarted()` vergleicht gegen die PHP-Uhr, während `stationNow()`
+  (OI-60) die Datenbankuhr vorschreibt; der Parameter `?string $now` ist vorbereitet. Vor der
+  Anzeige im Kalender einmal das Lastverhalten mit großem Bestand messen — gezählt wird über
+  alle begonnenen Termine des Zeitraums, nicht nur über die mit Rückmeldung.
+
 ### Kalender
 
 - **Tagesfeld** vergangener Tage mit Terminen:
