@@ -120,6 +120,13 @@ export async function checkWorktimeEnabled() {
     const block = document.getElementById('activityTypesBlock');
     if (block) {
         block.style.display = (worktimeEnabled && isAdmin) ? '' : 'none';
+
+        // Die Liste liegt oben schon vor; ohne dieses Zeichnen blieb die
+        // Tabelle nach dem Einschalten der Zeiterfassung (settings.js ruft
+        // diese Funktion direkt danach) bis zum Neuladen auf „Lade Daten…“.
+        if (worktimeEnabled && isAdmin) {
+            renderActivityTypes();
+        }
     }
 
     return worktimeEnabled;

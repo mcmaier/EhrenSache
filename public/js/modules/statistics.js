@@ -72,9 +72,14 @@ export async function loadStatisticsFilters() {
                     opt.remove();
                 }
             });
-            // Leere Optgroup-Überschrift hinterlässt keine Gruppe ohne Einträge
+            // Leere Optgroup-Überschrift hinterlässt keine Gruppe ohne Einträge.
+            // Gezählt wird über die Optionen im optgroup: `.options` gibt es nur
+            // am <select>, am <optgroup> ist es undefined. Der Zugriff warf
+            // einen TypeError — und zwar nur für Nicht-Verwalter und nur bei
+            // vorhandenen Untergruppen, weshalb er von 1.8.0 bis 1.12.1
+            // unbemerkt blieb: Die Statistik lud für diese Mitglieder gar nicht.
             Array.from(groupSelect.querySelectorAll('optgroup')).forEach(optgroup => {
-                if (optgroup.options.length === 0) optgroup.remove();
+                if (optgroup.querySelectorAll('option').length === 0) optgroup.remove();
             });
             // Automatisch vorauswählen wenn nur eine Gruppe vorhanden
             if (!groupSelect.value && groupSelect.options.length === 2) {
