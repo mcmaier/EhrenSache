@@ -307,6 +307,25 @@ php tests/run.php worktime_api
 - Sprache: Deutsch (UI, Kommentare), Englisch (Code/Variablen)
 - Versionssprung: `version.json` und `CHANGELOG.md` gemeinsam pflegen
 
+## Releases bei parallelen Sitzungen
+
+Am Projekt arbeiten regelmäßig mehrere Sitzungen gleichzeitig, oft in eigenen Worktrees auf
+demselben `dev`. Damit daraus nicht zwei Releasepläne werden, gilt (Entscheidung des Nutzers
+vom 2026-09-23):
+
+- **Es gibt genau eine Release-Sitzung.** Nur sie setzt `version.json`, legt den
+  Migrationsschritt an, taggt und veröffentlicht. Wer sie gerade ist, sagt der Nutzer.
+- **Kein Versionssprung in Feature-Branches.** Sie liefern ohne `version.json`, ohne
+  Migrationsschritt und ohne `?v=`-Sprung ab; ihr Eintrag steht unter `## [Unreleased]`.
+  Andernfalls reißt die Migrationskette, sobald ein Patch dazwischenkommt — zwei Schritte mit
+  demselben `from` fallen erst beim zweiten Merge auf (`tests/suites/migrations.php`).
+- **Ein Release nimmt den Stand von `dev`,** sofern die Suite grün ist, einschließlich der
+  Doku-Commits anderer Sitzungen. Die Release-Sitzung listet vor dem Tag auf, was mitgeht.
+- **Widersprüchliche Ansagen klärt die Release-Sitzung mit dem Nutzer**, bevor sie taggt —
+  eine Sitzung kennt immer nur ihren Ausschnitt.
+- **Vor dem Übernehmen eines fremden Branches** prüfen, ob er `version.json`,
+  `private/migrations/` oder `private/setup/` anfasst; wenn ja, vorher abstimmen.
+
 ## Offene Aufgaben und geplante Features
 
 Gepflegt in **`docs/OPEN-ITEMS.md`** (offene Entscheidungen, Restarbeiten, bewusst Verworfenes)
