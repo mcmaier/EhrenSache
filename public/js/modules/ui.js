@@ -595,13 +595,15 @@ export async function showReasonDialog({ title = 'Begründung', message = '', va
 export function updateUIForRole() {
 
     // Sections für Admin und Manager sichtbar
+    // Inline "block" bricht Flex-Zeilen (Filterleiste); ein leerer Wert
+    // laesst die Stylesheet-Regel gelten.
     document.querySelectorAll('[data-role="admin"]').forEach(el => {
-        el.style.display = isAdmin ? 'block' : 'none';
+        el.style.display = isAdmin ? '' : 'none';
     });
-    
+
     document.querySelectorAll('[data-role="manager"]').forEach(el => {
-        el.style.display = isAdminOrManager ? 'block' : 'none';
-    });    
+        el.style.display = isAdminOrManager ? '' : 'none';
+    });
 
     // Zeige Tabs nur für Admins
     const navTabs = document.querySelector('.nav-tabs');

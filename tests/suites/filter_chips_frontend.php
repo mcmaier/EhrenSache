@@ -275,4 +275,10 @@ test('Die Filterleiste stellt die Beschriftung neben das Feld', function () use 
     // 44px war die alte Hoehe von Feld und Knopf
     assertSame(0, preg_match('/\.btn-reset-filter\s*\{[^}]*height:\s*44px/', $forms),
         'Der Zuruecksetzen-Knopf ist noch 44px hoch');
+
+    // updateUIForRole() darf data-role-Elemente nicht hart auf "block" schalten --
+    // das bricht die Flex-Zeile der Filterleiste (form-group mit data-role="manager").
+    $ui = fcModul($fcRoot, 'ui');
+    assertSame(0, preg_match("/style\.display\s*=\s*is(Admin|AdminOrManager)\s*\?\s*'block'/", $ui),
+        'updateUIForRole darf display nicht hart auf block setzen -- das bricht die Flex-Zeile der Filterleiste');
 });
