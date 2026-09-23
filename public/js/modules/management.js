@@ -13,6 +13,7 @@ import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, subgro
          updateSubgroupLabelElements } from './ui.js';
 import { loadMembers } from './members.js';
 import { formatDateTime, updateModalId, escapeHtml } from './utils.js';
+import { groupChips, CHIPS_APPOINTMENT_TYPES, countChips, renderFilterChips } from './filter_chips.js';
 import {debug} from '../app.js'
 
 // ============================================
@@ -58,7 +59,14 @@ function renderGroups(groupData)
 {
 const tbody = document.getElementById('groupsTableBody');
     tbody.innerHTML = '';
-    
+
+    const gruppenDefs = groupChips(subgroupLabel());
+    renderFilterChips(
+        document.getElementById('groupChipsRow'),
+        gruppenDefs, countChips(groupData, gruppenDefs), null, null,
+        { static: true, label: 'Gruppen nach Art' }
+    );
+
     groupData.forEach(group => {
         const isDefaultBadge = group.is_default
             ? '<span class="status-badge status-approved">✓ Ja</span>'
@@ -302,7 +310,13 @@ export async function renderTypeGroupOverview(typeData)
 {
     const tbody = document.getElementById('typesTableBody');
     tbody.innerHTML = '';
-    
+
+    renderFilterChips(
+        document.getElementById('typeChipsRow'),
+        CHIPS_APPOINTMENT_TYPES, countChips(typeData, CHIPS_APPOINTMENT_TYPES), null, null,
+        { static: true, label: 'Terminarten nach Rückmeldung' }
+    );
+
     typeData.forEach(type => {
         const isDefaultBadge = type.is_default 
             ? '<span class="status-badge status-approved">✓ Ja</span>' 

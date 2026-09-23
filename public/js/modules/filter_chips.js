@@ -85,6 +85,30 @@ export const CHIPS_STATISTICS = Object.freeze([
     { key: 'unexcused',    label: 'Unentschuldigt', variant: 'danger' },
 ]);
 
+// Verwaltungstabellen: reine Anzeige, aber echte Partitionen -- die Summe
+// der beiden hinteren Chips ergibt "Alle".
+
+/** Gruppen; das Wort fuer Untergruppen kommt aus den Einstellungen (subgroupLabel()). */
+export function groupChips(subgroupWord) {
+    return [
+        { key: 'all',  label: 'Alle' },
+        { key: 'main', label: 'Hauptgruppen',       match: g => !isOne(g.is_subgroup) },
+        { key: 'sub',  label: String(subgroupWord), match: g => isOne(g.is_subgroup) },
+    ];
+}
+
+export const CHIPS_APPOINTMENT_TYPES = Object.freeze([
+    { key: 'all',       label: 'Alle' },
+    { key: 'responses', label: 'mit Rückmeldung',  variant: 'ok', match: t => isOne(t.responses_enabled) },
+    { key: 'plain',     label: 'ohne Rückmeldung',                match: t => !isOne(t.responses_enabled) },
+]);
+
+export const CHIPS_ACTIVITY_TYPES = Object.freeze([
+    { key: 'all',      label: 'Alle' },
+    { key: 'active',   label: 'Aktiv',       variant: 'ok', match: a => isOne(a.is_active) },
+    { key: 'inactive', label: 'Ausgemustert',               match: a => !isOne(a.is_active) },
+]);
+
 /** Termine: reine Anzeige. Heute zaehlt als kommend. */
 export function appointmentTimeChips(todayIso) {
     const day = a => String(a.date ?? '').slice(0, 10);

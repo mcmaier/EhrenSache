@@ -15,7 +15,8 @@ import assert from 'node:assert/strict';
 import {
     countChips, filterByChip, resolveActiveChip, localTodayIso, appointmentTimeChips,
     CHIPS_EXCEPTIONS, CHIPS_WORKTIME, CHIPS_MEMBERS, CHIPS_USERS, CHIPS_DEVICES,
-    CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, CHIPS_STATISTICS
+    CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, CHIPS_STATISTICS,
+    groupChips, CHIPS_APPOINTMENT_TYPES, CHIPS_ACTIVITY_TYPES
 } from '../../public/js/modules/filter_chips.js';
 
 /** Summe aller Chips ausser "Alle" muss "Alle" ergeben (gegenseitig ausschliessend, vollstaendig). */
@@ -107,4 +108,24 @@ test('Statistik-Chips sind reine Anzeige und bilden keine Partition', () => {
     assert.ok(CHIPS_STATISTICS.every(d => !d.match), 'Statistik-Chips duerfen nicht filtern');
     assert.deepEqual(CHIPS_STATISTICS.map(d => d.key), ['appointments', 'present', 'excused', 'unexcused']);
     assert.deepEqual(CHIPS_STATISTICS.map(d => d.variant), [undefined, 'ok', 'pending', 'danger']);
+});
+
+test('Gruppen: Haupt- und Untergruppen, Wort aus den Einstellungen', () => {
+    const defs = groupChips('Register');
+    assert.deepEqual(defs.map(d => d.label), ['Alle', 'Hauptgruppen', 'Register']);
+    const items = [{ is_subgroup: 1 }, { is_subgroup: '1' }, { is_subgroup: 0 }, { is_subgroup: null }];
+    assert.deepEqual(countChips(items, defs), { all: 4, main: 2, sub: 2 });
+    assertPartition(defs, items, 'Gruppen');
+});
+
+test('Terminarten: mit und ohne Rueckmeldung', () => {
+    const items = [{ responses_enabled: 1 }, { responses_enabled: '0' }, { responses_enabled: 0 }];
+    assert.deepEqual(countChips(items, CHIPS_APPOINTMENT_TYPES), { all: 3, responses: 1, plain: 2 });
+    assertPartition(CHIPS_APPOINTMENT_TYPES, items, 'Terminarten');
+});
+
+test('Taetigkeitsarten: aktiv und ausgemustert', () => {
+    const items = [{ is_active: 1 }, { is_active: '1' }, { is_active: 0 }];
+    assert.deepEqual(countChips(items, CHIPS_ACTIVITY_TYPES), { all: 3, active: 2, inactive: 1 });
+    assertPartition(CHIPS_ACTIVITY_TYPES, items, 'Taetigkeitsarten');
 });

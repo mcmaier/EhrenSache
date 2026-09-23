@@ -322,3 +322,17 @@ test('Statistik: Zaehlwerte als Chips, Quoten als Karten', function () use ($fcR
     assertTrue(str_contains($js, 'CHIPS_STATISTICS'), 'statistics.js nutzt den Chipsatz nicht');
     assertTrue(preg_match('/static:\s*true/', $js) === 1, 'Die Statistik-Chips muessen static sein');
 });
+
+test('Verwaltungstabellen haben Anzeige-Chipzeilen', function () use ($fcRoot, $fcHtml) {
+    foreach (['groupChipsRow', 'typeChipsRow', 'activityChipsRow'] as $id) {
+        assertTrue(str_contains($fcHtml, 'id="' . $id . '"'), $id . ' fehlt im Markup');
+    }
+
+    $mgmt = fcModul($fcRoot, 'management');
+    assertTrue(str_contains($mgmt, 'groupChips('), 'management.js zeichnet die Gruppen-Chips nicht');
+    assertTrue(str_contains($mgmt, 'CHIPS_APPOINTMENT_TYPES'), 'management.js zeichnet die Terminart-Chips nicht');
+    assertSame(0, substr_count($mgmt, 'filterByChip'), 'Die Verwaltungstabellen filtern nicht');
+
+    $wt = fcModul($fcRoot, 'worktime');
+    assertTrue(str_contains($wt, 'CHIPS_ACTIVITY_TYPES'), 'worktime.js zeichnet die Taetigkeits-Chips nicht');
+});

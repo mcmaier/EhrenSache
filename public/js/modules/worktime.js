@@ -15,7 +15,7 @@ import { debug } from '../app.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { updateModalId } from './utils.js';
-import { CHIPS_WORKTIME, countChips, filterByChip, renderFilterChips, setResetVisible } from './filter_chips.js';
+import { CHIPS_WORKTIME, CHIPS_ACTIVITY_TYPES, countChips, filterByChip, renderFilterChips, setResetVisible } from './filter_chips.js';
 
 // ============================================
 // ZUSTAND
@@ -788,6 +788,12 @@ export async function loadActivityTypes(forceReload = false) {
 export function renderActivityTypes() {
     const tbody = document.getElementById('activityTypesTableBody');
     if (!tbody) return;
+
+    renderFilterChips(
+        document.getElementById('activityChipsRow'),
+        CHIPS_ACTIVITY_TYPES, countChips(activityTypes, CHIPS_ACTIVITY_TYPES), null, null,
+        { static: true, label: 'Tätigkeitsarten nach Status' }
+    );
 
     if (!activityTypes.length) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Noch keine Tätigkeitsarten angelegt.</td></tr>';
