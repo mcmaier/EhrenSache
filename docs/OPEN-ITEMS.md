@@ -3449,8 +3449,15 @@ vorbereitet.
 ---
 
 ### OI-87 · Anträge in der Anwesenheitsliste des Dashboards; Selbstgenehmigung nur ohne zweiten Verwalter
-**Priorität:** mittel · aufgenommen am 2026-09-22 · **Umsetzung erst nach Abstimmung mit den parallelen
-Sitzungen**, die an `records.js` und `exceptions.js` arbeiten könnten
+**Priorität:** erledigt am 2026-09-23 — `c1be11b` (Umsetzung) und `1e50ddc` (Nachtrag), nach dem Merge
+der Filter-Chips wie abgestimmt. Im Browser als Manager geprüft: Zähler, Hinweis je Zeile,
+Genehmigen und Ablehnen über den Dialog, Sperre beim eigenen Antrag. Beide Nebenbefunde
+(Zwischenspeicher, fehlendes `>`) sind mit erledigt.
+
+**Bei der Prüfung gefunden:** `me` lieferte `member_id` nur im Token-Zweig, nicht bei der
+Sitzungsanmeldung des Dashboards — die Regel zum eigenen Antrag lief dort ins Leere. Behoben in
+`1e50ddc`. Wer künftig „eigener Eintrag“ im Dashboard prüft, kann sich auf `currentUser.member_id`
+verlassen.
 
 **1. Anträge in der Anwesenheitsliste.** Die PWA zeigt seit 1.12.0 in ihrer Liste je Mitglied die
 offenen Anträge und lässt sie bescheiden. Das Dashboard nicht. Geprüft am 2026-09-22, ohne Änderung:

@@ -10,6 +10,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ## [1.13.0] – 2026-09-22
 
 ### Neu
+- **Anträge lassen sich in der Anwesenheitsliste des Dashboards entscheiden.** Wer die Liste
+  eines Termins öffnet, sieht bei jedem Mitglied dessen offene Entschuldigung oder Zeitkorrektur,
+  mit der Begründung im Tooltip, und entscheidet sie dort über den gewohnten Antragsdialog.
+  Über der Liste steht, wie viele Anträge zu diesem Termin offen sind. Bisher ging das nur im
+  Bereich „Anträge“; in der Check-in-App gibt es es seit 1.12.0.
+- **Den eigenen Antrag genehmigt jetzt ein anderer Verwalter.** Solange es ein weiteres aktives
+  Konto mit Rolle Admin oder Manager gibt, weist der Server die Selbstgenehmigung ab — Ablehnen
+  und Zurückziehen bleiben möglich. In einem Verein mit nur einem Verwalter bleibt die
+  Selbstgenehmigung erlaubt, sonst bliebe sein Antrag liegen; die Antragsliste kennzeichnet sie
+  dann als „selbst genehmigt“. Dieselbe Regel gilt in der Check-in-App, deren pauschale Sperre
+  damit entfällt.
 - **Offene Punkte auf einen Blick.** Was das System gerade von einem will, stand bisher verstreut
   in drei Bereichen. Jetzt zeigt „Mein Profil“ im Dashboard ganz oben eine Karte „Offene Punkte“,
   die Check-in-App einen Block oben im Tab „Erfassen“: Termine der nächsten zwei Wochen, deren
@@ -60,6 +71,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   noch Geräte dieses Typs.
 
 ### Behoben
+- **Eine genehmigte Entschuldigung erscheint sofort in der Anwesenheitsliste.** Bisher verwarf
+  das Dashboard seinen Zwischenspeicher nur bei Zeitkorrekturen, der Eintrag „entschuldigt“
+  tauchte deshalb erst nach bis zu zehn Minuten oder einem Neuladen auf.
+- **Das Dashboard kennt wieder das eigene Mitglied.** Bei der Anmeldung über die Sitzung — und so
+  meldet sich das Dashboard an — fehlte die Mitgliedskennung in der Auskunft des Servers. Regeln,
+  die zwischen eigenen und fremden Einträgen unterscheiden, liefen dort ins Leere.
 - **Benutzerverwaltung: Die Zähler fielen auf 0,** sobald ein Status gewählt war.
 - **Benutzerverwaltung: Ein Rollenwechsel lud die Liste doppelt.**
 

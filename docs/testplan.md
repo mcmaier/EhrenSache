@@ -1302,6 +1302,19 @@ Automatisiert: `responses_api` (pending_exceptions), `pwa_termine_frontend`.
 | PWA-AL-10 | Kein Termin im Zeitfenster | Hinweis auf „➕ Termin anlegen“ statt leerer Fläche |
 | PWA-AL-11 | Termin gewählt, Tab wechseln und zurück | Termin bleibt gewählt, Liste steht wieder da |
 
+### Anträge in der Anwesenheitsliste des Dashboards (OI-87)
+
+Automatisiert: `self_approval_api` (Serverregel, Flag, Kennzeichnung), `attendance_requests_frontend` (Verdrahtung).
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| DA-1 | Als Manager einen Termin mit offenen Anträgen wählen | Über der Liste „⏳ offene Anträge n“ (reine Anzeige); betroffene Zeilen tragen „⏳ Entschuldigung“ bzw. „⏳ Zeitantrag HH:MM Uhr“, Begründung im Tooltip |
+| DA-2 | „Antrag genehmigen“ an einer Zeile | Antragsdialog mit Status „genehmigt“, Mitglied/Termin/Art gesperrt; nach dem Speichern zeigt die Zeile „⚠ Entschuldigt“ bzw. die beantragte Ankunft, ohne Neuladen |
+| DA-3 | „Antrag ablehnen“ | Dialog mit Status „abgelehnt“; danach ist der Hinweis weg, die Anwesenheit unverändert |
+| DA-4 | Eigener Antrag des angemeldeten Verwalters | Keine Entscheidungsknöpfe, stattdessen „Eigener Antrag – ein anderer Verwalter entscheidet“ |
+| DA-5 | Verein mit **einem** Verwalterkonto: eigener Antrag | Knöpfe vorhanden, Genehmigung möglich; Antragsliste zeigt danach „selbst genehmigt“ |
+| DA-6 | Genehmigte Entschuldigung, danach Bereich „Anwesenheit“ ohne Termin-Filter | Der Eintrag steht sofort in der Gesamtliste (Zwischenspeicher verworfen) |
+
 ### Ladeanzeige und Timeout (OI-85, nach 1.12.0)
 
 Automatisiert: `api_loading_frontend` (statisch). Einen langsamen Server stellt man im Browser
