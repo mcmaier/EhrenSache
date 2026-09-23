@@ -67,6 +67,13 @@ test('Arbeitszeit: laufende Sitzung zaehlt nur unter "Laeuft", nicht unter "Wart
     assertPartition(CHIPS_WORKTIME, items, 'Arbeitszeit');
 });
 
+test('Einzelne Chips koennen anzeigend sein, auch wenn der Satz klickbar ist', () => {
+    const defs = [...CHIPS_WORKTIME, { key: 'hours', label: 'Bestätigte Stunden', static: true }];
+    assert.equal(defs.filter(d => d.static).length, 1);
+    // Der Anzeige-Chip hat kein match und faellt damit aus der Partition heraus
+    assert.ok(!defs.find(d => d.key === 'hours').match);
+});
+
 test('Mitglieder: Aktiv/Inaktiv, auch mit Zahl oder Text aus der API', () => {
     const items = [{ is_active_in_period: true }, { is_active_in_period: 1 }, { is_active_in_period: '0' }, { is_active_in_period: false }];
     assert.deepEqual(countChips(items, CHIPS_MEMBERS), { all: 4, active: 2, inactive: 2 });

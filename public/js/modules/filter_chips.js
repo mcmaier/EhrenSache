@@ -161,7 +161,11 @@ export function resolveActiveChip(defs, activeKey, fallbackKey) {
 
 /**
  * Rendert einen Chipsatz in container (ersetzt den Inhalt).
- * options.static: reine Anzeige (span statt button, kein Klick).
+ * options.static: reine Anzeige (span statt button, kein Klick) fuer den
+ *                 GANZEN Satz. def.static: dasselbe fuer EINEN einzelnen
+ *                 Chip -- so stehen anzeigende und klickbare Chips
+ *                 nebeneinander in derselben Zeile (Arbeitszeit: "Bestaetigte
+ *                 Stunden" neben den Status-Chips, Sichtung 23.09.2026).
  * options.label:  aria-label der Gruppe.
  * onChange(key) wird nur bei Wechsel auf einen anderen Chip gerufen.
  * def.title:      optionaler Tooltip des Chips.
@@ -179,12 +183,13 @@ export function renderFilterChips(container, defs, counts, activeKey, onChange, 
     if (options.label) container.setAttribute('aria-label', options.label);
 
     for (const def of defs) {
-        const chip = document.createElement(isStatic ? 'span' : 'button');
+        const istAnzeige = isStatic || def.static === true;
+        const chip = document.createElement(istAnzeige ? 'span' : 'button');
         chip.className = 'filter-chip';
         if (def.variant) chip.classList.add(`filter-chip--${def.variant}`);
         if (def.title) chip.title = def.title;
 
-        if (isStatic) {
+        if (istAnzeige) {
             chip.classList.add('filter-chip--static');
         } else {
             const active = def.key === activeKey;

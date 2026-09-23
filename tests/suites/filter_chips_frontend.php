@@ -116,22 +116,21 @@ test('Antraege: Chips statt Zaehlkarten und Status-Auswahl', function () use ($f
     assertTrue(str_contains($js, 'countChips(base, CHIPS_EXCEPTIONS)'), 'Antraege: Chips muessen auf der Basisliste zaehlen');
 });
 
-test('Arbeitszeit: Chips, Summenkarte bleibt', function () use ($fcRoot, $fcHtml) {
+test('Arbeitszeit: Stunden stehen als Chip in der Kopfzeile', function () use ($fcRoot, $fcHtml) {
     $bereich = fcBereich($fcHtml, 'zeiterfassung', 'import-logs');
+
     assertTrue(str_contains($bereich, 'id="worktimeStatusChips"'), 'Chip-Container fehlt');
-    assertTrue(str_contains($bereich, 'stats-grid stats-grid--chips-lead'), 'Kopfzeile ohne stats-grid--chips-lead');
-    assertTrue(str_contains($bereich, 'id="statWorktimeTotal"'), '"Bestaetigte Stunden" muss bleiben');
-    foreach (['statWorktimePending', 'statWorktimeOpen', 'filterWorktimeStatus'] as $id) {
-        assertSame(0, substr_count($fcHtml, $id), $id . ' muss entfallen');
+    assertTrue(str_contains($bereich, 'stats-grid stats-grid--chips'), 'Kopfzeile ohne stats-grid--chips');
+    foreach (['statWorktimeTotal', 'stats-grid--chips-lead'] as $alt) {
+        assertSame(0, substr_count($fcHtml, $alt), $alt . ' muss entfallen');
     }
-    assertTrue(str_contains($bereich, 'id="resetWorktimeFilter"'), 'Zuruecksetzen braucht eine ID');
-    assertSame(0, substr_count($bereich, 'onclick="resetWorktimeFilter'), 'Zuruecksetzen ist noch inline verdrahtet');
+
+    $css = (string) file_get_contents($fcRoot . '/public/css/components/filter-chips.css');
+    assertSame(0, substr_count($css, 'stats-grid--chips-lead'), 'Die Sonderspalte muss aus dem CSS entfallen');
 
     $js = fcModul($fcRoot, 'worktime');
-    assertTrue(str_contains($js, 'CHIPS_WORKTIME'), 'worktime.js nutzt den Chipsatz nicht');
-    assertSame(0, substr_count($js, 'filterWorktimeStatus'), 'worktime.js liest noch das alte Auswahlfeld');
-    assertTrue(str_contains($js, 'updateWorktimeStats(base)'), 'Die Summe darf dem Chip nicht folgen -- updateWorktimeStats bekommt die Basisliste');
     assertTrue(str_contains($js, 'countChips(base, CHIPS_WORKTIME)'), 'Arbeitszeit: Chips muessen auf der Basisliste zaehlen');
+    assertTrue(str_contains($js, 'formatMinutes'), 'Die Stundensumme muss weiter formatiert werden');
 });
 
 test('Mitglieder: Chips statt Karten und Inaktiv-Schalter', function () use ($fcRoot, $fcHtml) {

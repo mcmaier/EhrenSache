@@ -186,9 +186,20 @@ export function renderWorkSessions(sessions) {
     // Basis: Taetigkeit und Mitglied. Darauf zaehlen die Chips, erst danach
     // filtert der aktive Chip die Tabelle (Spec 2026-09-22).
     const base = applyWorktimeFilters(sessions || []);
+
+    // Die Summe folgt Taetigkeit und Mitglied, nicht dem Chip: sie beantwortet
+    // "wie viele bestaetigte Stunden", unabhaengig vom gelisteten Status.
+    const bestaetigteMinuten = base
+        .filter(s => s.status === 'confirmed' && s.end_time)
+        .reduce((summe, s) => summe + (parseInt(s.duration_minutes, 10) || 0), 0);
+
+    const zaehler = countChips(base, CHIPS_WORKTIME);
+    zaehler.hours = formatMinutes(bestaetigteMinuten);
+
     renderFilterChips(
         document.getElementById('worktimeStatusChips'),
-        CHIPS_WORKTIME, countChips(base, CHIPS_WORKTIME), worktimeStatusChip,
+        [...CHIPS_WORKTIME, { key: 'hours', label: 'Bestätigte Stunden', static: true }],
+        zaehler, worktimeStatusChip,
         key => { worktimeStatusChip = key; renderWorkSessions(sessions); },
         { label: 'Status der Arbeitszeit' }
     );
@@ -198,7 +209,6 @@ export function renderWorkSessions(sessions) {
         || Boolean(document.getElementById('filterWorktimeMember')?.value));
 
     const filtered = filterByChip(base, CHIPS_WORKTIME, worktimeStatusChip);
-    updateWorktimeStats(base);
 
     if (!filtered.length) {
         tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge für diese Auswahl.</td></tr>';
@@ -258,17 +268,6 @@ function renderWorktimeActions(session) {
     }
 
     return buttons.join(' ') || '—';
-}
-
-// Nur noch "Bestaetigte Stunden" (Summe). Die Zaehler stehen seit 1.13.0 in
-// den Status-Chips. Die Summe folgt Taetigkeit und Mitglied, nicht dem Chip.
-function updateWorktimeStats(base) {
-    const confirmedMinutes = base
-        .filter(s => s.status === 'confirmed' && s.end_time)
-        .reduce((sum, s) => sum + (parseInt(s.duration_minutes, 10) || 0), 0);
-
-    const el = document.getElementById('statWorktimeTotal');
-    if (el) el.textContent = formatMinutes(confirmedMinutes);
 }
 
 /** Füllt die Auswahlfelder der Filterleiste. */

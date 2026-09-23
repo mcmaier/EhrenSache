@@ -115,12 +115,17 @@ function dfFunktion(string $js, string $name): string
     return substr($js, $start);
 }
 
+// updateWorktimeStats() ist seit der Stunden-Anzeige-Chip-Umstellung (OI-86,
+// Task 3) aufgegangen: die Summe wird jetzt inline in renderWorkSessions()
+// berechnet. Die Gegenprobe bleibt dieselbe -- nur die Fundstelle wechselt.
 test('Arbeitszeit-Kennzahlen zaehlen nur den gefilterten Stand', function () use ($dfRoot) {
     $js    = (string) file_get_contents($dfRoot . '/public/js/modules/worktime.js');
-    $rumpf = dfFunktion($js, 'updateWorktimeStats');
+    $rumpf = dfFunktion($js, 'renderWorkSessions');
 
+    assertTrue(str_contains($rumpf, 'bestaetigteMinuten'),
+               'Die Stundensumme muss weiter in renderWorkSessions berechnet werden');
     assertSame(0, preg_match('/\ball\s*\./', $rumpf),
-               'updateWorktimeStats() darf nicht mehr auf den Gesamtbestand (all) zugreifen');
+               'renderWorkSessions() darf fuer die Summe nicht auf den Gesamtbestand (all) zugreifen');
 });
 
 /**
