@@ -22,10 +22,7 @@ import { setResetVisible } from './filter_chips.js';
 // ============================================
 
 export async function loadStatistics(filters = {}) {
-    const year = currentYear; 
-
-    const groupId = document.getElementById('statGroup').value;
-    const memberId = isAdminOrManager ? document.getElementById('statMember').value : null;
+    const year = currentYear;
 
     // API-Call mit Jahr
     debug.log(`Loading STATISTICS from API for ${year} with filters:`, filters);    
@@ -50,11 +47,19 @@ export async function loadStatistics(filters = {}) {
 // FILTERING
 // ============================================
 
+// Von der Auto-Vorwahl unten gesetzt, keine Nutzerauswahl -- applyStatisticsFilters()
+// darf sie deshalb nicht als abweichenden Filter werten.
+let statGroupPreselected = '';
+
 export async function loadStatisticsFilters() {
 
     // Gruppen laden
-    const groups = await loadGroups();    
-    
+    const groups = await loadGroups();
+
+    // Wird unten neu ermittelt, falls die Auto-Vorwahl greift -- sonst bleibt sie
+    // leer, damit ein spaeterer Re-Init keinen alten Wert stehen laesst.
+    statGroupPreselected = '';
+
     // Gruppen-Filter befüllen
     const groupSelect = document.getElementById('statGroup');
     if (groupSelect) {
@@ -80,12 +85,14 @@ export async function loadStatisticsFilters() {
             // Automatisch vorauswählen wenn nur eine Gruppe vorhanden
             if (!groupSelect.value && groupSelect.options.length === 2) {
                 groupSelect.selectedIndex = 1;
+                statGroupPreselected = groupSelect.value;
             }
         }
     }    
 
     // Der Mitgliederfilter ist Verwaltern vorbehalten. Die Spaltenlogik der
-    // frueheren filter-card entfaellt -- die filter-bar bricht von selbst um.
+    // frueheren filter-card entfaellt -- die Klasse gibt es seit Task 3 nicht
+    // mehr, die filter-bar bricht von selbst um.
     if (isAdminOrManager) {
         document.getElementById('statMemberFilterGroup').style.display = '';
         // Initial alle Mitglieder anzeigen
@@ -147,8 +154,12 @@ export async function applyStatisticsFilters() {
         group: document.getElementById('statGroup')?.value || null
     };
 
+    // Eine automatisch vorausgewaehlte Gruppe (nur eine Gruppe vorhanden, siehe
+    // loadStatisticsFilters()) zaehlt nicht als Filter -- der Knopf blieb sonst
+    // von Anfang an sichtbar, obwohl niemand etwas ausgewaehlt hat.
+    const statGroupValue = document.getElementById('statGroup')?.value ?? '';
     setResetVisible(document.getElementById('resetStatisticsFilter'),
-        Boolean(document.getElementById('statGroup')?.value)
+        (statGroupValue !== statGroupPreselected)
         || Boolean(document.getElementById('statMember')?.value));
 
     // Statistik laden
