@@ -1079,7 +1079,12 @@
                     </div>
                 </div>
                 <div class="stats-grid stats-grid--chips">
-                    <div class="filter-chips" id="statisticsChips"></div>
+                    <div class="filter-chips-block">
+                        <div class="filter-chips" id="statisticsChips"></div>
+                        <!-- Grund fuer ein "–" bei einer Quote: ein title allein ist
+                             auf Tastatur und Touch nicht erreichbar. -->
+                        <p class="filter-chips__hint" id="statisticsChipsHint" hidden></p>
+                    </div>
                     <div class="year-filter">
                         <label for="statisticYearFilter">Jahr:</label>
                         <select id="statisticYearFilter"></select>

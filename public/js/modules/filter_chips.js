@@ -77,14 +77,18 @@ export const CHIPS_RECORDS_LIST = Object.freeze([
 
 // Statistik: reine Anzeige, deshalb ohne match und ohne "Alle". Die Zahlen
 // bilden bewusst KEINE Partition -- "Termine" zaehlt Termine, die naechsten
-// drei zaehlen Anwesenheitsdatensaetze, die letzten drei sind Quoten in
-// Prozent. Ihr Erklaertext steht im Tooltip (title).
+// drei zaehlen Anwesenheitsdatensaetze, die letzten beiden sind Quoten in
+// Prozent. Ihr Erklaertext steht im Tooltip (title) und, wenn eine Quote "–"
+// zeigt, zusaetzlich als sichtbarer Hinweis unter der Zeile.
+//
+// "Durchschnitt" stand bis zur zweiten Sichtung (23.09.2026) hier mit drin.
+// Sieben Chips waren zu viel fuer eine Kopfzeile -- der Durchschnitt steht
+// jetzt je Gruppe unter deren Ueberschrift (statistics.js).
 export const CHIPS_STATISTICS = Object.freeze([
     { key: 'appointments', label: 'Termine' },
     { key: 'present',      label: 'Anwesend',        variant: 'ok' },
     { key: 'excused',      label: 'Entschuldigt',    variant: 'pending' },
     { key: 'unexcused',    label: 'Unentschuldigt',  variant: 'danger' },
-    { key: 'average',      label: 'Durchschnitt',    variant: 'info' },
     { key: 'punctuality',  label: 'Pünktlichkeit',   variant: 'info' },
     { key: 'reliability',  label: 'Zuverlässigkeit', variant: 'info' },
 ]);

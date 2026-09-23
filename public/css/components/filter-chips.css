@@ -73,6 +73,39 @@
     margin-bottom: var(--spacing-sm);
 }
 
+/* Chipzeile mit Erklaerzeile darunter (Statistik). Der Block steht an der
+   Stelle, an der sonst die Chipzeile selbst im Raster sitzt -- die Karte
+   traegt weiterhin nur die Zeile, der Hinweis steht darunter im Freien. */
+.filter-chips-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    min-width: 0;
+}
+
+.filter-chips-block > .filter-chips {
+    flex: 1;
+}
+
+/* Grund fuer ein "–" bei einer Quote, sichtbar statt nur im title: Einen
+   Tooltip erreicht weder Tastatur noch Touch (Sichtung 23.09.2026). */
+.filter-chips__hint {
+    margin: 0;
+    padding: 0 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-medium);
+}
+
+/* Im Gruppenblock der Statistik traegt der Container ebenfalls keine zweite
+   Karte -- er steht bereits auf der Karte der Gruppe. */
+.statistics-group > .filter-chips {
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: var(--spacing-md);
+}
+
 /* Innerhalb einer Datentabellen-Karte traegt der Container keine zweite Karte. */
 .data-table > .filter-chips--standalone {
     background: none;
@@ -159,6 +192,13 @@
 .filter-chip--static {
     border-color: transparent;
     cursor: default;
+}
+
+/* Traegt ein Chip eine Erklaerung, soll der Zeiger sie ankuendigen -- sonst
+   probiert sie niemand aus. Steht nach --static, damit dessen cursor:default
+   nicht gewinnt. */
+.filter-chip[title] {
+    cursor: help;
 }
 
 .filter-chip--static:hover {

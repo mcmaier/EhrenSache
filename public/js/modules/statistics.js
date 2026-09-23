@@ -17,6 +17,13 @@ import {debug} from '../app.js'
 import { escapeHtml } from './utils.js';
 import { CHIPS_STATISTICS, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
+// Anzeige-Chipzeile unter jeder Gruppenueberschrift. Ein einzelner Chip --
+// der Satz steht hier und nicht in filter_chips.js, weil er nur in dieser
+// Ansicht vorkommt und keine Filterlogik traegt.
+const CHIPS_GROUP_AVERAGE = Object.freeze([
+    { key: 'average', label: 'Durchschnitt', variant: 'info' },
+]);
+
 // ============================================
 // DATA FUNCTIONS (API-Calls)
 // ============================================
@@ -319,6 +326,7 @@ export async function renderStatistics(statsData) {
         html += `
             <div class="statistics-group">
                 <h2>${escapeHtml(group.group_name)}</h2>
+                <div class="filter-chips" data-group-chips="${escapeHtml(String(group.group_id))}"></div>
                 <div class="statistics-table-wrapper">
                     <table class="data-table">
                         <thead>
@@ -368,6 +376,20 @@ export async function renderStatistics(statsData) {
     });
 
     container.innerHTML = html;
+
+    // Erst nach dem Einhaengen: renderFilterChips() baut DOM-Knoten und kann
+    // nicht in die HTML-Zeichenkette oben hinein. Die Zeile erscheint auch
+    // dann, wenn die Gruppe nach dem Mitgliedsfilter leer ist -- der Wert
+    // steht dann auf "0 %", wie die Kopfzahl es vorher auch tat.
+    statsData.statistics.forEach(group => {
+        renderFilterChips(
+            container.querySelector(`[data-group-chips="${group.group_id}"]`),
+            CHIPS_GROUP_AVERAGE,
+            { average: `${formatGerman(groupAverage(group))} %` },
+            null, null,
+            { static: true, label: `Durchschnitt: ${group.group_name}` }
+        );
+    });
 }
 
 // ============================================
@@ -375,17 +397,57 @@ export async function renderStatistics(statsData) {
 // ============================================
 
 /**
- * Zeichnet die Kopfzeile der Statistik: vier Zaehlwerte und drei Quoten als
- * Anzeige-Chips (seit 1.13.0, vorher Kennzahlkarten). Abgeschaltete Quoten
- * erscheinen gar nicht, unzureichend gemessene zeigen "–" mit der Begruendung
- * im Tooltip -- frueher der Erklaertext unter der Karte.
+ * Anwesenheitsquote einer Gruppe in Prozent, eine Nachkommastelle.
  *
- * Ohne Daten steht bei den Zaehlwerten und beim Durchschnitt "-" wie bisher.
+ * Spiegelt attendanceRate() aus private/helpers/attendance.php und damit die
+ * Definition von summary.overall_average: anwesende geteilt durch moegliche
+ * Mitglied-Termin-Paare, NICHT der Mittelwert der Mitgliederquoten. Wer die
+ * Formel aendert, muss beide Seiten aendern -- sonst nennt der Rumpf eine
+ * andere Zahl als der Bericht.
+ *
+ * Die Mitgliederzeilen tragen total_appointments und attended bereits ueber
+ * alle Terminarten der Gruppe summiert (attendanceBuildGroup()); eine
+ * Entdopplung wie im Kopf ist hier nicht noetig, weil jedes Mitglied in der
+ * Gruppe genau eine Zeile hat.
+ */
+function groupAverage(group) {
+    const members = Array.isArray(group?.members) ? group.members : [];
+
+    let possible = 0;
+    let present  = 0;
+
+    for (const member of members) {
+        possible += Number(member.total_appointments) || 0;
+        present  += Number(member.attended) || 0;
+    }
+
+    return possible > 0 ? Math.round((present / possible) * 1000) / 10 : 0;
+}
+
+/**
+ * Zeichnet die Kopfzeile der Statistik: vier Zaehlwerte und zwei Quoten als
+ * Anzeige-Chips (seit 1.13.0, vorher Kennzahlkarten). Der Durchschnitt stand
+ * hier bis zur zweiten Sichtung mit drin und steht jetzt je Gruppe im Rumpf.
+ * Abgeschaltete Quoten erscheinen gar nicht, unzureichend gemessene zeigen
+ * "–" mit der Begruendung im Tooltip -- frueher der Erklaertext unter der Karte.
+ *
+ * Ein title ist auf Tastatur und Touch nicht erreichbar. Steht eine Quote auf
+ * "–", wiederholt deshalb eine sichtbare Zeile unter den Chips die
+ * Begruendung. Im Normalfall bleibt sie leer -- dort erklaert der Tooltip nur
+ * eine Zahl, die auch ohne ihn lesbar ist.
+ *
+ * Ohne Daten steht bei den Zaehlwerten "-" wie bisher.
  */
 function renderStatisticsChips(statsData) {
     const summary     = statsData?.summary ?? null;
     const punctuality = statsData?.punctuality ?? { enabled: false };
     const reliability = statsData?.reliability ?? { enabled: false };
+
+    // Einmal ausgewertet und ueberall gleich: Der Server liefert enabled als
+    // echten Boolean, eine lockere Pruefung an der einen und eine strenge an
+    // der anderen Stelle waere nur eine Einladung zum Auseinanderlaufen.
+    const punctualityAn = punctuality.enabled === true;
+    const reliabilityAn = reliability.enabled === true;
 
     const werte = summary
         ? {
@@ -393,29 +455,31 @@ function renderStatisticsChips(statsData) {
             present:      summary.total_present,
             excused:      summary.total_excused,
             unexcused:    summary.total_unexcused,
-            average:      `${formatGerman(summary.overall_average)} %`,
         }
-        : { appointments: '-', present: '-', excused: '-', unexcused: '-', average: '-' };
+        : { appointments: '-', present: '-', excused: '-', unexcused: '-' };
 
     // Eine abgeschaltete Kennzahl liefert der Server als {enabled: false};
     // ihr Chip faellt dann ganz weg, statt leer dazustehen.
     const defs = CHIPS_STATISTICS.filter(def => {
-        if (def.key === 'punctuality') return punctuality.enabled === true;
-        if (def.key === 'reliability') return reliability.enabled === true;
+        if (def.key === 'punctuality') return punctualityAn;
+        if (def.key === 'reliability') return reliabilityAn;
         return true;
     });
 
-    const titel = {};
+    const titel   = {};
+    const hinweis = [];
 
-    if (punctuality.enabled) {
+    if (punctualityAn) {
         const p = punctualityChip(punctuality);
         werte.punctuality = p.wert;
         titel.punctuality = p.titel;
+        if (p.wert === '–') hinweis.push(`Pünktlichkeit: ${p.titel}`);
     }
-    if (reliability.enabled) {
+    if (reliabilityAn) {
         const z = reliabilityChip(reliability);
         werte.reliability = z.wert;
         titel.reliability = z.titel;
+        if (z.wert === '–') hinweis.push(`Zuverlässigkeit: ${z.titel}`);
     }
 
     renderFilterChips(
@@ -424,6 +488,12 @@ function renderStatisticsChips(statsData) {
         werte, null, null,
         { static: true, label: 'Kennzahlen der Auswahl' }
     );
+
+    const hintEl = document.getElementById('statisticsChipsHint');
+    if (hintEl) {
+        hintEl.textContent = hinweis.join(' · ');
+        hintEl.hidden      = hinweis.length === 0;
+    }
 }
 
 /**

@@ -74,7 +74,11 @@ test('Eine abgeschaltete Kennzahl erscheint gar nicht erst als Chip', function (
 test('Die Quoten tragen keine Farbskala', function () use ($puRoot) {
     // Spec 8 / OI-55: Die Skala einer Quote wird einmal entschieden, fuer
     // Anwesenheit und Puenktlichkeit gemeinsam -- nicht hier nebenbei.
-    foreach (['function punctualityChip(', 'function reliabilityChip('] as $kopf) {
+    // renderStatisticsChips() gehoert mit in die Schleife: Dort laufen die
+    // Werte beider Quoten zusammen, und eine Farbklasse waere dort genauso
+    // leicht eingefuegt wie in den beiden Bauteilen darunter.
+    foreach (['function punctualityChip(', 'function reliabilityChip(',
+              'function renderStatisticsChips('] as $kopf) {
         assertTrue(strpos(puRumpf($puRoot, $kopf), 'rate-') === false,
             'Farbklasse in ' . $kopf . ' -- das ist OI-55');
     }
@@ -104,13 +108,15 @@ test('Der Chip nennt die Mindestzahl aus der Serverantwort', function () use ($p
 });
 
 test('Durchschnitt und Quoten nutzen dasselbe Zahlenformat', function () use ($puRoot) {
-    // "77.2%" neben "21,3 %" in derselben Chipzeile.
+    // "77.2%" neben "21,3 %". Seit der zweiten Sichtung steht der
+    // Durchschnitt je Gruppe, die Quoten in der Kopfzeile -- dasselbe
+    // Zahlenformat muessen sie trotzdem tragen.
     $js = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
 
-    assertTrue(strpos($js, "summary.overall_average + '%'") === false,
-        'statOverallAverage nutzt noch Punkt und kein Leerzeichen');
-    assertTrue(strpos($js, 'formatGerman(summary.overall_average)') !== false,
-        'statOverallAverage muss ueber formatGerman() laufen');
+    assertSame(0, preg_match("/(overall_average|groupAverage\([^)]*\))\s*\+\s*'%'/", $js),
+        'Der Durchschnitt nutzt noch Punkt und kein Leerzeichen');
+    assertSame(1, preg_match('/formatGerman\(\s*groupAverage\(/', $js),
+        'Der Durchschnitt je Gruppe muss ueber formatGerman() laufen');
 });
 
 test('Ohne Termine nennt der Puenktlichkeits-Chip keine fehlenden Messungen', function () use ($puRoot) {

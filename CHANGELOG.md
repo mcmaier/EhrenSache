@@ -30,8 +30,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Die Jahresauswahl hat jetzt eine echte Beschriftung.** Die sechs Auswahlfelder hatten zuvor
   keinen zugänglichen Namen — Screenreader kündigten nichts an; jetzt steht „Jahr:“ als Label
   davor.
-- **Die Statistik zeigt Termine, Anwesend, Entschuldigt und Unentschuldigt als Chips.**
-  Durchschnitt, Pünktlichkeit und Zuverlässigkeit bleiben Kennzahlkarten.
+- **Die Statistik zeigt ihre Kennzahlen als Chips.** Im Kopf stehen Termine, Anwesend,
+  Entschuldigt, Unentschuldigt sowie Pünktlichkeit und Zuverlässigkeit; die bisherigen
+  Kennzahlkarten entfallen. Der Erklärtext der Karten steht jetzt im Tooltip des Chips — zeigt
+  eine Quote „–“, weil zu wenig gemessen wurde, steht die Begründung zusätzlich als Text unter
+  der Zeile. **Der Durchschnitt steht je Gruppe** unter deren Überschrift und gilt damit für
+  genau diese Gruppe.
 - **Gruppen, Terminarten und Tätigkeitsarten bekommen eine Zählzeile** über der Tabelle, etwa
   „Alle 7 · Hauptgruppen 4 · Register 3“. Sie zeigt nur an und filtert nicht.
 

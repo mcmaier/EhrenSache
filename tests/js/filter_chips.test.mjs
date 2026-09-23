@@ -104,12 +104,16 @@ test('localTodayIso nutzt die lokale Zeit', () => {
 });
 
 test('Statistik-Chips sind reine Anzeige und bilden keine Partition', () => {
-    assert.equal(CHIPS_STATISTICS.length, 7);
+    // Sechs statt sieben: "Durchschnitt" steht seit der zweiten Sichtung
+    // (23.09.2026) je Gruppe im Rumpf, nicht mehr in der Kopfzeile.
+    assert.equal(CHIPS_STATISTICS.length, 6);
     assert.ok(CHIPS_STATISTICS.every(d => !d.match), 'Statistik-Chips duerfen nicht filtern');
     assert.deepEqual(CHIPS_STATISTICS.map(d => d.key),
-        ['appointments', 'present', 'excused', 'unexcused', 'average', 'punctuality', 'reliability']);
+        ['appointments', 'present', 'excused', 'unexcused', 'punctuality', 'reliability']);
     assert.deepEqual(CHIPS_STATISTICS.map(d => d.variant),
-        [undefined, 'ok', 'pending', 'danger', 'info', 'info', 'info']);
+        [undefined, 'ok', 'pending', 'danger', 'info', 'info']);
+    assert.ok(!CHIPS_STATISTICS.some(d => d.key === 'average'),
+        'Der Durchschnitt gehoert nicht mehr in die Kopfzeile');
 });
 
 test('Gruppen: Haupt- und Untergruppen, Wort aus den Einstellungen', () => {

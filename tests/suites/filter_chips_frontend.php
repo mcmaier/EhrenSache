@@ -346,8 +346,21 @@ test('Statistik: auch die Quoten stehen als Chips', function () use ($fcRoot, $f
 
     $js = fcModul($fcRoot, 'statistics');
     assertTrue(str_contains($js, 'CHIPS_STATISTICS'), 'statistics.js nutzt den Chipsatz nicht');
-    // Der Erklaertext der frueheren Karte steht jetzt im Tooltip des Chips
-    assertTrue(str_contains($js, 'title:'), 'statistics.js setzt keinen Tooltip');
+    // Der Erklaertext der frueheren Karte steht jetzt im Tooltip des Chips.
+    // "title:" allein schluege auch bei einem beliebigen anderen Objektfeld
+    // an -- gepruefft wird deshalb die Verdrahtung: ein aus den Erklaertexten
+    // angereicherter Chipsatz geht in renderFilterChips.
+    assertSame(1, preg_match('/title:\s*titel\[def\.key\]/', $js),
+        'statistics.js reicht die Erklaertexte nicht als Chip-Tooltip durch');
+    assertSame(1, preg_match('/titel\.punctuality\s*=/', $js),
+        'Der Erklaertext der Puenktlichkeit wird nicht gesetzt');
+    assertSame(1, preg_match('/titel\.reliability\s*=/', $js),
+        'Der Erklaertext der Zuverlaessigkeit wird nicht gesetzt');
+    // Gegenstueck in der Komponente: ohne diese Zeile erreicht def.title den Chip nicht.
+    $fc = fcModul($fcRoot, 'filter_chips');
+    assertSame(1, preg_match('/chip\.title\s*=\s*def\.title/', $fc),
+        'renderFilterChips setzt den Tooltip nicht auf dem Chip');
+
     // An den Aufruf gebunden: sonst bliebe die Pruefung gruen, wenn die
     // Statistik-Chips klickbar wuerden und anderswo ein static: true steht.
     assertTrue(preg_match('/statisticsChips[\s\S]{0,200}static:\s*true/', $js) === 1,
@@ -357,12 +370,74 @@ test('Statistik: auch die Quoten stehen als Chips', function () use ($fcRoot, $f
     assertSame(0, substr_count($cards, 'stats-grid--kpi'), '.stats-grid--kpi muss aus cards.css entfallen');
 });
 
+test('Statistik: die Kopfzeile fuehrt sechs Chips, der Durchschnitt steht je Gruppe', function () use ($fcRoot, $fcHtml) {
+    // Sieben Chips waren dem Nutzer zu viel (Sichtung 23.09.2026): Der
+    // Durchschnitt wandert unter die Gruppenueberschrift, wo er ohnehin
+    // aussagekraeftiger ist -- er gilt dann fuer genau diese Gruppe.
+    $fc    = fcModul($fcRoot, 'filter_chips');
+    $start = strpos($fc, 'export const CHIPS_STATISTICS');
+    assertTrue($start !== false, 'CHIPS_STATISTICS fehlt');
+    $satz = substr($fc, $start, strpos($fc, ']', $start) - $start);
+
+    assertSame(0, substr_count($satz, "'average'"),
+        'Der Durchschnitt gehoert nicht mehr in den Kopf-Chipsatz');
+    assertSame(6, substr_count($satz, 'key:'), 'Die Kopfzeile fuehrt sechs Chips');
+
+    // Der Rumpf: je Gruppe ein eigener Container, den statistics.js fuellt.
+    $js = fcModul($fcRoot, 'statistics');
+    assertTrue(str_contains($js, 'data-group-chips='),
+        'Der Gruppenblock traegt keinen Container fuer die Durchschnitts-Chipzeile');
+    assertSame(1, preg_match('/querySelector\(\s*`\[data-group-chips="\$\{[^}]+\}"\]`\s*\)/', $js),
+        'statistics.js holt den Gruppen-Container nicht ueber data-group-chips');
+    assertSame(1, preg_match('/renderFilterChips\([\s\S]{0,400}CHIPS_GROUP_AVERAGE/', $js),
+        'Die Gruppen-Chipzeile wird nicht ueber renderFilterChips gezeichnet');
+    assertSame(1, preg_match('/formatGerman\(\s*groupAverage\(/', $js),
+        'Der Gruppendurchschnitt muss ueber formatGerman() laufen');
+
+    // Der Durchschnitt je Gruppe folgt derselben Definition wie
+    // attendanceBuildSummary(): anwesend geteilt durch moegliche Paare.
+    assertSame(1, preg_match('/function groupAverage\(/', $js), 'groupAverage() fehlt');
+
+    // Innerhalb des Gruppenblocks traegt der Container keine zweite Karte.
+    $fcCss2 = (string) file_get_contents($fcRoot . '/public/css/components/filter-chips.css');
+    assertTrue(str_contains($fcCss2, '.statistics-group > .filter-chips'),
+        'Die Chipzeile im Gruppenblock braucht eine eigene, flache Darstellung');
+});
+
+test('Statistik: der Grund fuer "–" steht auch sichtbar, nicht nur im Tooltip', function () use ($fcRoot, $fcHtml) {
+    // Ein title ist auf Tastatur und Touch nicht erreichbar (Sichtung
+    // 23.09.2026). Zeigt eine Quote "–", muss der Grund als Text erscheinen.
+    assertTrue(str_contains($fcHtml, 'id="statisticsChipsHint"'),
+        'Der Hinweistext unter der Chipzeile fehlt im Markup');
+
+    $fcCss2 = (string) file_get_contents($fcRoot . '/public/css/components/filter-chips.css');
+    assertTrue(str_contains($fcCss2, '.filter-chips__hint'),
+        '.filter-chips__hint fehlt in filter-chips.css');
+    assertSame(1, preg_match('/\.filter-chip\[title\][^{]*\{[^}]*cursor:\s*help/s', $fcCss2),
+        'Ein Chip mit Tooltip muss das auch am Zeiger zeigen');
+
+    $js = fcModul($fcRoot, 'statistics');
+    assertTrue(str_contains($js, 'statisticsChipsHint'),
+        'statistics.js fuellt den Hinweistext nicht');
+    // Nur im Fall "–": im Normalfall genuegt der Tooltip.
+    assertSame(1, preg_match("/wert\s*===\s*'–'/u", $js),
+        'Der Hinweis muss an den Fall "–" gebunden sein, nicht dauerhaft stehen');
+});
+
 test('Statistik: der Gruppenfilter raeumt leere Optgroups ohne TypeError auf', function () use ($fcRoot) {
     // Der Zweig laeuft nur fuer einfache Mitglieder und nur bei eingerichteten
     // Untergruppen -- ein Laufzeitfehler dort faellt lange nicht auf.
     $js = fcModul($fcRoot, 'statistics');
 
-    assertSame(0, substr_count($js, 'optgroup.options'),
+    // Positiv gepruefft: ein <optgroup> hat keine options-Eigenschaft, gezaehlt
+    // werden muss ueber querySelectorAll. Eine reine Gegenprobe auf
+    // "optgroup.options" schluege selbst dann gruen an, wenn die Zeile ganz
+    // fehlte -- und der Kommentar darueber nennt den alten Ausdruck ohnehin.
+    assertSame(1, preg_match('/optgroup\.querySelectorAll\(\s*[\'"]option[\'"]\s*\)\.length\s*===\s*0/', $js),
+        'Leere Optgroups muessen ueber querySelectorAll(\'option\') erkannt werden');
+
+    $ohneKommentare = (string) preg_replace('#//[^\n]*#', '', $js);
+    assertSame(0, substr_count($ohneKommentare, 'optgroup.options'),
         'Ein <optgroup> hat keine options-Eigenschaft -- das warf fuer einfache Nutzer einen TypeError');
 });
 

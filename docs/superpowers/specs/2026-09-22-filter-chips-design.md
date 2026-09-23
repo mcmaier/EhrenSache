@@ -284,6 +284,24 @@ Einträge `termine.csv` mit je einer Zeile, Zeitstempel exakt auf den Testläufe
 23.09., erzeugt von `tests/suites/import_series_api.php`, das seine Protokollzeilen nicht
 aufräumt. Vermerkt bei den Testrückständen in OI-90.
 
+## Nachtrag 2026-09-23, dritte Sichtung: Durchschnitt je Gruppe
+
+Sieben Chips sind für eine Kopfzeile zu viel. **Entschieden:**
+
+- **„Durchschnitt“ verlässt den Kopf** und steht je Gruppe als eigene Anzeige-Chipzeile unter
+  der Gruppenüberschrift („Durchschnitt 63,1 %“). Dort ist er aussagekräftiger, weil er für
+  genau diese Gruppe gilt. Der Kopf führt noch **sechs** Chips: vier Zählwerte sowie
+  Pünktlichkeit und Zuverlässigkeit.
+- **Kein Serverweg dafür.** Die Zahl wird im Browser aus den Mitgliederzeilen gerechnet, die die
+  API ohnehin liefert, und folgt derselben Definition wie `summary.overall_average`: anwesende
+  geteilt durch mögliche Mitglied-Termin-Paare (`attendanceRate()`), **nicht** der Mittelwert
+  der Mitgliederquoten. Ohne Paare steht „0 %“, wie es die Kopfzahl zuvor auch tat.
+- **Der Tooltip reicht nicht allein.** Ein `title` ist auf Tastatur und Touch nicht erreichbar.
+  Zeigt eine Quote „–“, erscheint die Begründung deshalb **zusätzlich als sichtbarer Text**
+  unter der Chipzeile (`.filter-chips__hint`). Im Normalfall bleibt die Zeile leer — dort
+  erklärt der Tooltip nur eine Zahl, die auch ohne ihn lesbar ist. Chips mit Erklärung tragen
+  `cursor: help`.
+
 ## Version
 
 Minor-Sprung auf **1.13.0**: `version.json`, `CHANGELOG.md`, `?v=` in allen vier Einstiegen und
