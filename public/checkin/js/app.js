@@ -303,6 +303,9 @@ const SERVER_MESSAGES = {
 // ein eigenstaendiges Skript ohne Zugriff auf dessen Module. Weichen die
 // beiden voneinander ab, verhalten sich Dashboard und App unterschiedlich.
 
+// Serverregel zur Selbstgenehmigung aus attendance_list (OI-87)
+let attendanceSelfBlocked = true;
+
 const API_TIMEOUT_MS   = 20000;
 const LOADING_DELAY_MS = 300;
 
@@ -1402,6 +1405,8 @@ async function loadAttendanceList() {
         if (!result.data) {
             throw new Error('Keine Daten erhalten');
         }
+        // Serverregel zur Selbstgenehmigung (OI-87): Ohne Auskunft gesperrt
+        attendanceSelfBlocked = result.data.self_approval_blocked !== false;
         renderAttendanceList(result.data);
 
         // Buttons anzeigen
@@ -1579,7 +1584,12 @@ function attendanceRequestsHtml(member) {
     const antraege = member.pending_exceptions || [];
     if (antraege.length === 0) return '';
 
-    const eigener = userData && String(userData.member_id) === String(member.member_id);
+    // Bis 1.12.0 war der eigene Antrag hier pauschal gesperrt. Seit OI-87 gilt
+    // die Regel des Servers: Sie greift nur, solange ein zweites aktives
+    // Verwalterkonto da ist. Im Verein mit einem einzigen Verwalter darf er
+    // seinen Antrag also auch hier bescheiden — sonst bliebe er liegen.
+    const eigener = attendanceSelfBlocked
+        && userData && String(userData.member_id) === String(member.member_id);
     const off = navigator.onLine ? '' : ' disabled';
 
     const zeilen = antraege.map(a => {

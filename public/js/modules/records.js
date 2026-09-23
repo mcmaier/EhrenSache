@@ -8,7 +8,7 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-import { apiCall, isAdminOrManager } from './api.js';
+import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { loadAppointments } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
@@ -1099,12 +1099,26 @@ let _lastMemberAttendanceData = null;
 // Spalten der Anwesenheitsliste im Modus 'appointment' (siehe updateTableHeader()).
 const ATTENDANCE_LIST_COLSPAN = 5;
 
+// Serverregel zur Selbstgenehmigung (OI-87). Vorgabe true: Ohne Auskunft
+// lieber keinen Knopf zeigen, den der Server ohnehin abweist.
+let _attendanceSelfBlocked = true;
+
+// Ein im Antragsdialog beschiedener Antrag verschwindet aus der Liste, sobald
+// sie neu geladen ist. Ein Ereignis statt eines Imports: exceptions.js müsste
+// sonst records.js einbinden, das umgekehrt schon geschieht.
+document.addEventListener('exception-saved', () => {
+    if (currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT && currentAppointmentId) {
+        loadAttendanceList(currentAppointmentId);
+    }
+});
+
 async function loadAttendanceList(appointmentId) {
     try {
         const attendance = await apiCall('attendance_list', 'GET', null, {appointment_id:appointmentId});
-        
+
         debug.log("Attendance Data:", attendance);
         if (attendance.success) {
+            _attendanceSelfBlocked = attendance.self_approval_blocked !== false;
             renderAttendanceList(attendance.members);
         }
     } catch (error) {
@@ -1128,6 +1142,7 @@ function renderAttendanceList(attendanceData) {
 
     updateTableHeader('appointment');
 
+    renderAttendanceRequestChip(attendanceData);
     renderAttendanceGroupingBar(shown);
 
     if (shown.length === 0) {
@@ -1188,6 +1203,78 @@ function renderAttendanceGroupingBar(attendanceData) {
 }
 
 /** Baut eine Tabellenzeile der Anwesenheitsliste fuer ein Mitglied. */
+/**
+ * „⏳ n offene Anträge“ über der Liste (OI-87).
+ *
+ * Reine Anzeige, kein Filter: Ein offener Antrag liegt quer zu den
+ * Status-Chips — das Mitglied ist dabei auch anwesend oder fehlend, und die
+ * Status-Chips einer Reihe müssen sich gegenseitig ausschließen. Gezählt wird
+ * über die volle Liste, nicht über die vom Chip gefilterte, und je Antrag
+ * einmal: Ein Mitglied mit mehreren Untergruppen steht mehrfach in der Liste.
+ */
+function renderAttendanceRequestChip(members) {
+    const container = document.getElementById('recordRequestChip');
+    if (!container) return;
+
+    const ids = new Set();
+    (members || []).forEach(m => (m.pending_exceptions || []).forEach(e => ids.add(e.exception_id)));
+
+    if (ids.size === 0) {
+        container.replaceChildren();
+        return;
+    }
+
+    renderFilterChips(container,
+        [{ key: 'pending', label: 'offene Anträge', variant: 'pending',
+           title: 'Anträge zu diesem Termin, über die noch nicht entschieden ist' }],
+        { pending: ids.size }, null, null,
+        { static: true, label: 'Offene Anträge' });
+}
+
+/** Offene Anträge eines Mitglieds als Zeilenzusatz und Knöpfe (OI-87). */
+function attendanceRequestParts(member) {
+    const antraege = member.pending_exceptions || [];
+    if (antraege.length === 0) return { hinweis: '', aktionen: '' };
+
+    // Der eigene Antrag: Der Server weist die Genehmigung ab, solange ein
+    // zweiter Verwalter da ist. Ohne zweiten bleibt sie erlaubt — dann zeigt
+    // die Zeile die Knöpfe wie bei jedem anderen Antrag.
+    const eigenerAntrag = _attendanceSelfBlocked
+        && currentUser?.member_id
+        && String(currentUser.member_id) === String(member.member_id);
+
+    const hinweis = antraege.map(a => {
+        const zeit = a.requested_arrival_time ? String(a.requested_arrival_time).slice(11, 16) : '';
+        const art = a.exception_type === 'absence'
+            ? 'Entschuldigung'
+            : (zeit ? `Zeitantrag ${zeit} Uhr` : 'Zeitantrag');
+
+        return `<div class="attendance-request-hint" title="${escapeHtml(a.reason || '')}">⏳ ${escapeHtml(art)}</div>`;
+    }).join('');
+
+    if (eigenerAntrag) {
+        return {
+            hinweis: hinweis + '<div class="attendance-request-hint">Eigener Antrag – ein anderer Verwalter entscheidet</div>',
+            aktionen: ''
+        };
+    }
+
+    const aktionen = antraege.map(a => `
+            <button class="action-btn btn-icon btn-approve"
+                    onclick="quickApproveException(${Number(a.exception_id)})"
+                    title="Antrag genehmigen">
+                ⏳✓
+            </button>
+            <button class="action-btn btn-icon btn-delete"
+                    onclick="quickRejectException(${Number(a.exception_id)})"
+                    title="Antrag ablehnen">
+                ⏳✗
+            </button>
+    `).join('');
+
+    return { hinweis, aktionen };
+}
+
 function buildAttendanceRow(member) {
     const tr = document.createElement('tr');
 
@@ -1217,9 +1304,11 @@ function buildAttendanceRow(member) {
     const sourceInfo = getSourceBadge(member);
 
     // Status-Icon und Styling
+    const { hinweis, aktionen } = attendanceRequestParts(member);
+
     let statusHtml, rowClass;
     if (member.status === 'present') {
-        statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span';
+        statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span>';
         rowClass = '';
     } else if (member.status === 'excused') {
         statusHtml = '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
@@ -1228,6 +1317,10 @@ function buildAttendanceRow(member) {
         statusHtml = '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>';
         rowClass = 'table-secondary'; // Grau ausgegraut
     }
+
+    // Offene Anträge stehen unter dem Status: Sie sagen, was noch aussteht,
+    // während der Status sagt, was gilt.
+    statusHtml += hinweis;
 
     let actionsHtml;
     if (member.record_id) {
@@ -1266,7 +1359,7 @@ function buildAttendanceRow(member) {
         <td>${arrivalHtml}</td>
         <td>${statusHtml}</td>
         <td>${sourceInfo}</td>
-        <td>${actionsHtml}</td>
+        <td>${aktionen}${actionsHtml}</td>
     `;
 
     return tr;

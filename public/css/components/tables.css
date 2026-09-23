@@ -102,3 +102,10 @@ tr.row-inactive:hover td {
     opacity: 0.65;
     background-color: var(--bg-light);
 }
+/* Offene Anträge in der Anwesenheitsliste (OI-87). Leiser als der Status
+   darüber: Sie sagen, was aussteht, nicht was gilt. */
+.attendance-request-hint {
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--warning-color, #e97a13);
+}
