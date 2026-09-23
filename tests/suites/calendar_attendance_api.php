@@ -237,13 +237,17 @@ test('Ein Mitglied sieht nur den eigenen Status, keine Zahlen', function () {
         assertSame(1, $verwalter['attendance']['excused']);
         assertTrue(!array_key_exists('own_attendance', $verwalter));
     } finally {
+        // Erst aufraeumen, dann pruefen: Eine Assertion im finally wuerde
+        // sonst die echte Fehlermeldung des try-Blocks ueberschreiben und
+        // die Welt stehen lassen.
         caSetMemberGroups($memberId, $gruppenVorher);
         $gruppenNachher = caMemberGroupIds($memberId);
+        caDropWorld($world);
+
         sort($gruppenVorher);
         sort($gruppenNachher);
         assertSame($gruppenVorher, $gruppenNachher,
             "Gruppen von Mitglied {$memberId} nach der Wiederherstellung veraendert");
-        caDropWorld($world);
     }
 });
 
@@ -368,6 +372,7 @@ test('Die Zahlen stimmen mit der Anwesenheitsliste desselben Termins ueberein', 
         assertStatus(200, $liste);
         assertTrue(array_key_exists('members', $liste['body']), 'members fehlt in der Anwesenheitsliste');
         $mitglieder = $liste['body']['members'];
+        assertTrue(count($mitglieder) > 0, 'Leere Liste auf beiden Seiten wuerde jeden Vergleich blind bestehen lassen');
 
         $present = 0;
         $excused = 0;

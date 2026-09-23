@@ -672,11 +672,15 @@ dessen Beginn vergangen ist, die Anwesenheit an.
 - Admin und Manager: `"attendance": {"expected": 22, "present": 18, "excused": 3, "missing": 1}` —
   `expected` folgt derselben Regel wie die Anwesenheitsliste (Gruppen der Terminart, Aktivzeitraum
   des Mitglieds), `missing` ist der Rest und nie negativ.
-- Mitglieder: stattdessen `"own_attendance": "present" | "excused" | "missing" | null` — `null`,
+- Alle übrigen Rollen (Mitglieder): stattdessen `"own_attendance": "present" | "excused" | "missing" | null` — `null`,
   wenn der Termin noch nicht begonnen hat oder das Mitglied nicht erwartet wurde. Zahlen über
   andere erhalten Mitglieder nicht.
 - Künftige Termine tragen `"attendance": null` bzw. `"own_attendance": null`.
 - Ohne den Parameter bleibt die Antwort unverändert.
+- **Ohne Zeitraum wird der Parameter stillschweigend ignoriert** (keine Fehlermeldung): Ohne
+  `year`, `from_date` oder `to_date` liefe die Zählung über die ganze Historie — dieselbe
+  Kostengrenze wie bei den Rückmeldungssummen darüber.
+- Der Einzelabruf (`?id=`) kennt den Zusatz nicht.
 
 ---
 
