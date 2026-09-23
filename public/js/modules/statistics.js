@@ -78,9 +78,14 @@ export async function loadStatisticsFilters() {
                     opt.remove();
                 }
             });
-            // Leere Optgroup-Überschrift hinterlässt keine Gruppe ohne Einträge
+            // Leere Optgroup-Überschrift hinterlässt keine Gruppe ohne Einträge.
+            // Gezaehlt wird ueber querySelectorAll: ein <optgroup> hat KEINE
+            // options-Eigenschaft (die tragen nur <select> und <datalist>).
+            // Ueber .options gezaehlt warf die Zeile einen TypeError und liess
+            // die Statistik fuer einfache Mitglieder leer, sobald es
+            // Untergruppen gab -- Verwalter erreichen den Zweig nie.
             Array.from(groupSelect.querySelectorAll('optgroup')).forEach(optgroup => {
-                if (optgroup.options.length === 0) optgroup.remove();
+                if (optgroup.querySelectorAll('option').length === 0) optgroup.remove();
             });
             // Automatisch vorauswählen wenn nur eine Gruppe vorhanden
             if (!groupSelect.value && groupSelect.options.length === 2) {

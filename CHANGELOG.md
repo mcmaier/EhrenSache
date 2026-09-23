@@ -36,6 +36,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   „Alle 7 · Hauptgruppen 4 · Register 3“. Sie zeigt nur an und filtert nicht.
 
 ### Behoben
+- **Die Statistik blieb für einfache Mitglieder leer,** sobald Untergruppen eingerichtet waren:
+  Der Aufbau des Gruppenfilters brach mit einem JavaScript-Fehler ab.
 - **Benutzerverwaltung: Die Zähler fielen auf 0,** sobald ein Status gewählt war.
 - **Benutzerverwaltung: Ein Rollenwechsel lud die Liste doppelt.**
 - **Geräte: Aktiv/Inaktiv wurde in Kennzahl und Tabelle unterschiedlich ermittelt.**

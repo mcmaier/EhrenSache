@@ -357,6 +357,15 @@ test('Statistik: auch die Quoten stehen als Chips', function () use ($fcRoot, $f
     assertSame(0, substr_count($cards, 'stats-grid--kpi'), '.stats-grid--kpi muss aus cards.css entfallen');
 });
 
+test('Statistik: der Gruppenfilter raeumt leere Optgroups ohne TypeError auf', function () use ($fcRoot) {
+    // Der Zweig laeuft nur fuer einfache Mitglieder und nur bei eingerichteten
+    // Untergruppen -- ein Laufzeitfehler dort faellt lange nicht auf.
+    $js = fcModul($fcRoot, 'statistics');
+
+    assertSame(0, substr_count($js, 'optgroup.options'),
+        'Ein <optgroup> hat keine options-Eigenschaft -- das warf fuer einfache Nutzer einen TypeError');
+});
+
 test('Verwaltungstabellen haben Anzeige-Chipzeilen', function () use ($fcRoot, $fcHtml) {
     foreach (['groupChipsRow', 'typeChipsRow', 'activityChipsRow'] as $id) {
         assertTrue(str_contains($fcHtml, 'id="' . $id . '"'), $id . ' fehlt im Markup');
