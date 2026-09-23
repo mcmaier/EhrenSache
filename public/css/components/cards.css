@@ -17,7 +17,9 @@
 }
 
 /* Kennzahlen, die einzeln stehen koennen: feste Kachelbreite statt voller
-   Zeilenbreite -- sonst zieht sich eine einzelne Karte ueber das ganze Raster. */
+   Zeilenbreite -- sonst zieht sich eine einzelne Karte ueber das ganze Raster.
+   Unter 768 px gewinnt .stats-grid { 1fr } aus responsive.css (spaeter
+   importiert), die Karte nimmt dort also wie ueberall die volle Breite. */
 .stats-grid--kpi {
     grid-template-columns: repeat(auto-fill, minmax(180px, 240px));
 }

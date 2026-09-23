@@ -234,8 +234,15 @@ test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function 
     // Bleibt die Chip-Leiste verborgen (Mitglieder als "user"), gibt sie ihre
     // Grid-Spalte frei -- ohne eine feste Spalte wuerde sich die Jahresauswahl
     // dann ueber das ganze Grid dehnen.
-    assertTrue(str_contains($fcCss, 'grid-column'),
+    assertSame(1, preg_match('/\.stats-grid--chips[^{]*\.year-filter[^{]*\{[^}]*grid-column\s*:\s*-2\s*\/\s*-1/s', $fcCss),
         'Die Jahresauswahl muss fest in der letzten Spalte stehen, sonst dehnt sie sich bei verborgenen Chips');
+
+    // Gleiche Begruendung wie bei filter-chips.css weiter oben: responsive.css
+    // stapelt die Kopfzeile auf schmalen Bildschirmen und muss spaeter kommen.
+    $posJahr       = strpos($main, 'components/year-filter.css');
+    $posResponsive = strpos($main, 'responsive.css');
+    assertTrue($posJahr !== false && $posResponsive !== false && $posJahr < $posResponsive,
+        'year-filter.css muss vor responsive.css importiert werden');
 
     // Die alte Bauform: Karte mit Ueberschrift und sechsfach wiederholtem Inline-Style.
     assertSame(0, substr_count($fcHtml, '<h3>Jahr filtern</h3>'),
@@ -320,7 +327,10 @@ test('Statistik: Zaehlwerte als Chips, Quoten als Karten', function () use ($fcR
 
     $js = fcModul($fcRoot, 'statistics');
     assertTrue(str_contains($js, 'CHIPS_STATISTICS'), 'statistics.js nutzt den Chipsatz nicht');
-    assertTrue(preg_match('/static:\s*true/', $js) === 1, 'Die Statistik-Chips muessen static sein');
+    // An den Aufruf gebunden: sonst bliebe die Pruefung gruen, wenn die
+    // Statistik-Chips klickbar wuerden und anderswo ein static: true steht.
+    assertTrue(preg_match('/statisticsChips[\s\S]{0,200}static:\s*true/', $js) === 1,
+        'Die Statistik-Chips muessen static sein');
 });
 
 test('Verwaltungstabellen haben Anzeige-Chipzeilen', function () use ($fcRoot, $fcHtml) {

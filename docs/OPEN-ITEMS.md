@@ -2963,7 +2963,9 @@ einer Sitzungsnachricht stehen.
 ---
 
 ### OI-73 · `:has()`-Selektor hängt an einer Inline-Schreibweise
-**Priorität:** niedrig · aufgenommen am 2026-09-18
+**Erledigt am 2026-09-23** — mit 1.13.0 (Nachtrag zu OI-86): Der Sonderbau der Statistik-
+Filterkarte ist entfallen, Task 3 hat `.filter-grid` samt beider `:has()`-Regeln und der
+unbenutzten Klassen `single-filter`/`dual-filter` aus `content.css` gelöscht.
 
 [sections/content.css](../public/css/sections/content.css) schaltet die Spaltenzahl der
 Statistik-Filterkarte über
@@ -3539,22 +3541,25 @@ neue Chip-Zähler macht es nur sichtbarer.
 ### OI-90 · Kleinigkeiten aus der Umsetzung von OI-86
 **Priorität:** niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
 
-- `updateUIForRole()` setzt `display: block` auch für Elemente in Flex-Zusammenhängen
-  (`.form-group[data-role]` in `.filter-bar`) — die Mitglieder-Chips umgehen das über `hidden`;
-  richtig wäre `display: ''`.
 - Antragstabelle: Kopf hat 7 Spalten, Zeilen 8 (`index.html` `#antraege`).
 - `renderRecords`-Leerzeile: `colspan` 7, obwohl die Tabelle ohne Aktionsspalte nur 6 Spalten hat.
 - Toter Code: `applyDeviceFilters`/`filterDevices` (`devices.js`), der Zweig `exceptionStatus` in
   `filterExceptions`, `window.resetWorktimeFilter` ohne Aufrufer.
 - Testrückstände in der Testdatenbank (Tätigkeit „AV2 6ab23e39c28d5“, Termin „Tst5“) — Suche nach
   der erzeugenden Suite steht noch aus.
-- Bei 1280 px bricht in der Arbeitszeit die fünfte Chip-Zeile um (Stundenkarte und Jahreskarte
-  lassen wenig Platz).
 - Leerzeilen-Texte uneinheitlich: Anträge und Anwesenheit (alle Einträge) melden „Keine Einträge
   gefunden“, Benutzer, Geräte und Mitglieder dagegen „… für diese Auswahl“.
 - Der Kontrast der Chips ist nur für die Standard-Primärfarbe `#1F5FBF` nachgerechnet (Tabelle in
   `filter-chips.css`). Bei einer hellen Vereins-Primärfarbe ist WCAG AA für den aktiven neutralen
   Chip und „Läuft“ (beide `--primary-color`) nicht gesichert.
+- Anwesenheit: `#filterMember` und sein Label werden einzeln ausgeblendet (`updateUIForRole()` in
+  `ui.js`), die umgebende `.form-group` behält `flex: 1; min-width: 200px` und hinterlässt für
+  einfache Nutzer eine leere Lücke in der Filterleiste; sauberer wäre `data-role="manager"` am
+  Wrapper wie in Termine und Arbeitszeit.
+- `initNavTabs()` läuft zweimal (`app.js` beim Start und `ui.js` in `updateUIForRole()` für
+  Admins) und registriert die Klick-Handler der Tabs doppelt. Die Regeln
+  `.nav-tabs.system-active ~ …` in `css/sections/sidebar.css` sind toter Code — niemand vergibt
+  die Klasse `system-active`.
 
 **Nicht sicherheitsrelevant.**
 
@@ -3591,5 +3596,24 @@ Paginierung, alle anderen Listen nutzen `globalPaginationValue` aus `settings.js
 
 **Zu entscheiden:** fixierte Aktionsspalte für alle Tabellen übernehmen oder bewusst nur dort
 belassen; Arbeitszeit an die gemeinsame Paginierung anschließen.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-93 · Geänderte Untergruppen-Bezeichnung wirkt erst nach dem Neuladen
+**Priorität:** niedrig · aufgenommen am 2026-09-23 (aus dem Nachtrag zu OI-86)
+
+`subgroupLabel()` ([ui.js](../public/js/modules/ui.js)) liest das eingestellte Wort aus
+`sessionStorage['theme-settings']`. Geschrieben wird dieser Schlüssel aber nur von
+[theme.js](../public/js/theme.js) beim Aufruf der Seite; `applyTheme()` in
+[settings.js](../public/js/modules/settings.js) fasst ihn nicht an.
+
+**Wirkung:** Nach dem Speichern einer neuen Bezeichnung schreibt `updateSubgroupLabelElements()`
+das **alte** Wort zurück — entgegen dem Kommentar darüber, der ein Aktualisieren ohne Neuladen
+verspricht. Betroffen sind alle `[data-subgroup-label]`-Stellen, das Badge in `management.js` und
+der neue Chip über der Gruppentabelle. Nach einem Neuladen stimmt alles.
+
+**Zu tun:** Beim Speichern der Einstellungen `theme-settings` in `sessionStorage` mitschreiben.
 
 **Nicht sicherheitsrelevant.**

@@ -177,9 +177,26 @@ welchem Filter es gehört (die Anwesenheit hat drei ähnliche Listen).
 - **Zeile 2:** `filter-bar` mit Beschriftungen **neben** statt über den Feldern, Feldhöhe 36 px
   statt 44. Die `filter-card` der Statistik wird zur gewöhnlichen `filter-bar`; `stats-header`,
   `filter-card`, `filter-grid` und `.year-select` entfallen.
-- **Wirkung:** Kopf von etwa 150 auf etwa 95 px, bei den Mitgliedern von 120 auf 85.
+- **Wirkung:** Kopf von etwa 150 auf etwa 95 px, bei den Mitgliedern von 120 auf 85. Gemessen bei
+  1280 px nach der Umsetzung: 169 → 108 px in fünf Ansichten, Arbeitszeit 212 → 125, Statistik
+  242 → 110.
 - **Zurücksetzen:** Auch die Statistik blendet den Knopf aus, solange kein Filter abweicht. Damit
   gilt die Regel überall gleich, und der Sondersatz dazu im CHANGELOG entfällt wieder.
+  Eine für einfache Nutzer mit genau einer Gruppe **automatisch vorgewählte** Gruppe zählt dabei
+  nicht als Abweichung; das Zurücksetzen stellt sie wieder her.
+
+**Beim Bauen dazugekommen** (die Spec hielt es zuvor nicht fest):
+
+- **Beschriftungen im Kopf nutzen `--text-medium`.** Mit `--text-light` lag der Kontrast bei etwa
+  3,4:1 und damit unter WCAG AA. Das betrifft `.year-filter label`, die Beschriftungen der
+  `filter-bar` und die Überschrift der flachen Kennzahl.
+- **Die Kennzahl in der Chipzeile der Arbeitszeit ist flach** (`.stats-grid--chips-lead
+  .stat-card`: kleineres Polster, 12 px Überschrift, 20 px Zahl). Sonst wäre diese Zeile mit 95 px
+  fast doppelt so hoch wie in den übrigen Ansichten.
+- **Die Quotenkarten der Statistik haben ein eigenes Raster** `.stats-grid--kpi` mit fester
+  Kachelbreite. Ohne das zieht sich „Durchschnitt“ als einzige sichtbare Karte über die ganze
+  Zeile. Ebenso tragen die Chipzeilen der Verwaltungstabellen innerhalb `.data-table` keine
+  zweite Karte (`.data-table > .filter-chips--standalone`).
 
 ### Statistik
 

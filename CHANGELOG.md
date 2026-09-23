@@ -19,10 +19,21 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   aktive Chip nimmt die Primärfarbe des Brandings an. In der Terminverwaltung zeigen die Chips
   „Vergangen“ und „Kommend“ nur an, der Kalender bleibt vollständig.
 - **In der Anwesenheitsliste eines Termins lässt sich nach „Fehlend“ filtern.**
-- **„Filter zurücksetzen“ ist ein unauffälliger Textknopf** und erscheint in den Listen nur, wenn
-  ein Filter gesetzt ist; in der Statistik bleibt er sichtbar.
+- **„Filter zurücksetzen“ ist ein unauffälliger Textknopf** und erscheint nur, wenn ein Filter
+  gesetzt ist.
 - **Benutzer- und Geräteliste zeigen bei leerer Auswahl einen Hinweis statt einer leeren
   Tabelle.** Die Anwesenheitsliste eines Termins oder Mitglieds macht es ebenso.
+- **Der Kopfbereich aller Listen ist flacher und überall gleich gebaut.** Die Jahresauswahl steht
+  als eine Zeile („Jahr: 2026“) an ihrer gewohnten Stelle oben rechts statt als zweizeilige Karte,
+  die Beschriftungen der Filter stehen neben statt über den Feldern. Die Statistik nutzt jetzt
+  dieselbe Filterleiste wie alle anderen Ansichten.
+- **Die Jahresauswahl hat jetzt eine echte Beschriftung.** Die sechs Auswahlfelder hatten zuvor
+  keinen zugänglichen Namen — Screenreader kündigten nichts an; jetzt steht „Jahr:“ als Label
+  davor.
+- **Die Statistik zeigt Termine, Anwesend, Entschuldigt und Unentschuldigt als Chips.**
+  Durchschnitt, Pünktlichkeit und Zuverlässigkeit bleiben Kennzahlkarten.
+- **Gruppen, Terminarten und Tätigkeitsarten bekommen eine Zählzeile** über der Tabelle, etwa
+  „Alle 7 · Hauptgruppen 4 · Register 3“. Sie zeigt nur an und filtert nicht.
 
 ### Behoben
 - **Benutzerverwaltung: Die Zähler fielen auf 0,** sobald ein Status gewählt war.

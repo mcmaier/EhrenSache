@@ -1340,6 +1340,14 @@ Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).
 | CHIP-14 | Anträge, Arbeitszeit, Anwesenheit als `user` | Zähler nur über eigene Einträge; Terminfeld der Anwesenheit ausgeblendet; die Mitgliederverwaltung ist für `user` nicht erreichbar (Menüpunkt nur für Verwalter); Mitgliedsauswahl leer, siehe OI-91 |
 | CHIP-15 | Schmales Fenster (375 px) | Chips umbrechen, Jahreskarte darunter, keine horizontale Scrollleiste |
 | CHIP-16 | Leere Auswahl (Chip mit 0) in Benutzer, Geräte, Anwesenheitsliste | Hinweiszeile statt leerer Tabelle, keine Seitenknöpfe |
+| CHIP-17 | Jede Ansicht mit Jahresbezug öffnen | Jahresauswahl einzeilig oben rechts, gleiche Breite und Höhe in allen Ansichten |
+| CHIP-18 | Statistik öffnen | Vier Anzeige-Chips, darunter Durchschnitt und ggf. Pünktlichkeit/Zuverlässigkeit als Karten; Filterleiste wie in den übrigen Ansichten |
+| CHIP-19 | Statistik: Gruppe wählen, dann zurücksetzen | Zurücksetzen erscheint und verschwindet wie in den Listen; Jahr bleibt |
+| CHIP-20 | Statistik als `user` | Mitgliedsfeld ausgeblendet, Filterleiste bricht nicht um |
+| CHIP-21 | Gruppen & Terminarten öffnen | Über jeder Tabelle eine Chipzeile; Summe der hinteren Chips ergibt „Alle“; Klick bewirkt nichts |
+| CHIP-22 | Untergruppen-Bezeichnung in den Einstellungen ändern | Der dritte Gruppen-Chip trägt das neue Wort |
+| CHIP-23 | Tätigkeitsarten mit einer ausgemusterten Art | Chip „Ausgemustert“ zählt sie; Tabelle unverändert |
+| CHIP-24 | Schmales Fenster (375 px), alle Ansichten | Label über dem Feld, Jahresauswahl volle Breite, keine horizontale Scrollleiste |
 
 ---
 
