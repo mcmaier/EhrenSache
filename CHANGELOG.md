@@ -20,6 +20,19 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.12.2] – 2026-09-23
+
+### Behoben
+- **Die Statistik öffnete sich für einfache Mitglieder nicht mehr, sobald Untergruppen angelegt
+  waren.** Der Bereich blieb leer. Betroffen waren alle Vereine mit Untergruppen, und zwar seit
+  deren Einführung in 1.8.0. Admin und Manager waren nie betroffen.
+- **Die Geräteliste zeigte inaktive Geräte als „Aktiv“.** Die Kennzahl darüber zählte sie
+  richtig, die Liste widersprach ihr — je nachdem, wie die Datenbank den Wert lieferte.
+- **Nach dem Einschalten der Zeiterfassung blieb die Liste der Tätigkeitsarten auf „Lade
+  Daten…“ stehen**, bis die Seite neu geladen wurde.
+
+---
+
 ## [1.12.1] – 2026-09-22
 
 ### Neu
