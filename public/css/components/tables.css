@@ -109,3 +109,26 @@ tr.row-inactive:hover td {
     font-size: 12px;
     color: var(--warning-color, #e97a13);
 }
+
+/* Antragsknöpfe in der Anwesenheitsliste (OI-87). Dieselbe Form wie die
+   übrigen Aktionsknöpfe, aber gestrichelt und in der Antragsfarbe: Sie
+   entscheiden einen Antrag, sie setzen keine Anwesenheit. Ein Zeichen je
+   Knopf — zwei brachen im 32-px-Knopf um. */
+.action-btn.btn-request {
+    border-style: dashed;
+    border-color: var(--warning-color, #f39c12);
+    color: var(--warning-color, #f39c12);
+    white-space: nowrap;
+}
+
+.action-btn.btn-request--approve:hover {
+    background: var(--success-color, #27ae60);
+    border-color: var(--success-color, #27ae60);
+    color: white;
+}
+
+.action-btn.btn-request--reject:hover {
+    background: var(--danger-color, #e74c3c);
+    border-color: var(--danger-color, #e74c3c);
+    color: white;
+}

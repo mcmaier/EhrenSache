@@ -1256,16 +1256,20 @@ function attendanceRequestParts(member) {
         };
     }
 
+    // Ein Zeichen je Knopf: Die Aktionsknöpfe sind 32 × 32 px, zwei Zeichen
+    // brachen darin um (Sanduhr über dem Haken). Dass es um den Antrag geht und
+    // nicht um „anwesend setzen“, trägt die eigene Form (btn-request, gestrichelter
+    // Rand in der Antragsfarbe) zusammen mit dem Hinweis in derselben Zeile.
     const aktionen = antraege.map(a => `
-            <button class="action-btn btn-icon btn-approve"
+            <button class="action-btn btn-icon btn-request btn-request--approve"
                     onclick="quickApproveException(${Number(a.exception_id)})"
                     title="Antrag genehmigen">
-                ⏳✓
+                ✓
             </button>
-            <button class="action-btn btn-icon btn-delete"
+            <button class="action-btn btn-icon btn-request btn-request--reject"
                     onclick="quickRejectException(${Number(a.exception_id)})"
                     title="Antrag ablehnen">
-                ⏳✗
+                ✗
             </button>
     `).join('');
 
