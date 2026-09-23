@@ -62,11 +62,24 @@ wird die Liste neu geladen, bevor gewählt wird. Findet er sich auch dann nicht,
 Beide Knöpfe tragen nur die ID; Datum und Titel kommen aus dem Cache, nie aus dem
 `onclick`-String (Muster aus `deleteAppointment`).
 
+**Vermerk zu OI-94 (23.09.2026):** Der Nachtrag zu OI-94 hält fest, dass „Bearbeiten“ im
+festgehaltenen Popup zu nah an der Rückmeldezeile sitzt und als gelber Stift an den rechten
+Rand wandern soll. Der Knopf „Anwesenheit“ wird jetzt daneben gesetzt, weil OI-94 niemandem
+zugeteilt ist und auf „niedrig“ steht (abgestimmt mit der Release-Sitzung). Wird OI-94
+umgesetzt, ziehen **beide** Knöpfe gemeinsam um.
+
 ### Rückweg
 
 - Nach einem Sprung zeigt die Anwesenheit über der Liste „← Zurück zu Termine“.
-- Klick: Bereich `termine`, Kalender auf den Monat des Termins (`currentCalendarDate`), Jahr
-  wie gesprungen.
+- Klick: Bereich `termine`, Jahr wie gesprungen, und **zurück dorthin, wo der Sprung begann**
+  (Entscheidung des Nutzers, 23.09.2026). Im Dashboard stehen Kalender und Liste untereinander
+  im selben Bereich, es gibt keine Reiter — unterschieden wird daher:
+  - Sprung aus dem Kalender-Popup: Kalender auf den Monat des Termins (`currentCalendarDate`),
+    Ansicht am Kalender.
+  - Sprung aus der Terminliste: Kalendermonat **unverändert** lassen und zur Zeile des Termins
+    in der Liste rollen; ist sie auf der aktuellen Seite der Paginierung nicht zu finden, genügt
+    der Kopf der Liste.
+  Dafür trägt das Rücksprungziel neben dem Datum die Herkunft: `{ date, from: 'calendar' | 'list' }`.
 - Der Knopf verschwindet, sobald in der Anwesenheit ein Filter geändert oder der Bereich über
   die Navigation verlassen wird (Rücksprungziel verwerfen).
 
