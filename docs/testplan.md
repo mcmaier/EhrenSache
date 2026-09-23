@@ -203,6 +203,24 @@ Automatisiert: `appointment_details_unit`, `appointment_details_api`,
 | APT-DET-6 | CSV exportieren, Ort ändern, importieren | Ort übernommen |
 | APT-DET-7 | CSV ohne die Spalten end_time/location importieren | Ort und Ende bleiben erhalten |
 
+### 6.5 Sprung zur Anwesenheitsliste (seit 1.14.0)
+
+Automatisiert: `calendar_attendance_frontend`, `module_imports`.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| APT-ANW-1 | Als Admin im Kalender einen vergangenen Tag mit Termin anklicken | Das festgehaltene Popup zeigt neben „Bearbeiten“ den Knopf „Anwesenheit“ |
+| APT-ANW-2 | Derselbe Griff bei einem künftigen Termin | Kein Knopf „Anwesenheit“ |
+| APT-ANW-3 | „Anwesenheit“ anklicken | Bereich Anwesenheit ist aktiv, der Termin steht im Terminfilter, seine Liste ist sichtbar, der Statusfilter steht auf „Alle“, oben steht „← Zurück zu Termine“ |
+| APT-ANW-4 | „← Zurück zu Termine“ nach einem Sprung aus dem **Kalender** | Terminverwaltung, Kalender im Monat des Termins, Ansicht am Kalender |
+| APT-ANW-5 | In der Terminliste auf 📋 eines begonnenen Termins, dann zurück | Wie APT-ANW-3; der Rückweg führt an die **Zeile des Termins in der Liste**, der Kalendermonat bleibt unverändert |
+| APT-ANW-6 | Sprung auf einen Termin aus einem **anderen Jahr** | Die Jahresauswahl der Anwesenheit zeigt das Jahr des Termins; der Rückweg stellt es wieder her |
+| APT-ANW-7 | Nach dem Sprung einen anderen Filter wählen (Mitglied, Terminart, Termin, Zurücksetzen) | Der Rückweg-Knopf verschwindet; ein Wechsel des Status-Chips lässt ihn stehen |
+| APT-ANW-8 | Nach dem Sprung den Bereich über die Navigation verlassen und zurückkehren | Rückweg-Knopf ist weg |
+| APT-ANW-9 | Nach dem Sprung eine Anwesenheit korrigieren und speichern | Funktioniert wie ohne Sprung; offene Anträge (seit 1.13.0) bleiben sichtbar |
+| APT-ANW-10 | Als einfaches Mitglied Kalender und Terminliste ansehen | Weder Knopf noch Zeichen 📋 |
+| APT-ANW-11 | Zwei Termine schnell hintereinander anspringen | Es gewinnt der zuletzt geklickte; Liste, Terminfilter und Rückweg gehören zusammen |
+
 ---
 
 ## 7. Anwesenheitserfassung (Records)

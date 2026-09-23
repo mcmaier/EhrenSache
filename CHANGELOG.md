@@ -10,6 +10,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Neu
+- **Vom Termin direkt in die Anwesenheitsliste.** Im Kalender-Popup und in der Terminliste führt
+  bei bereits begonnenen Terminen ein Knopf „Anwesenheit“ (in der Liste das Zeichen 📋) sofort in
+  die Anwesenheitsliste dieses Termins — bisher musste man den Bereich wechseln und den Termin dort
+  erneut suchen. „← Zurück zu Termine“ führt wieder dorthin, wo man war: in den Kalendermonat des
+  Termins oder an seine Zeile in der Liste. Nur für Admin und Manager.
 - **Anwesenheitszahlen je Termin über die Schnittstelle:** `GET appointments` liefert mit
   `include=attendance` für vergangene Termine, wie viele Mitglieder anwesend, entschuldigt oder
   abwesend waren; Mitglieder erhalten nur ihren eigenen Status. Grundlage für die Anzeige im
