@@ -105,8 +105,8 @@ async function checkAuth() {
         }
         
         // User-Daten setzen
-        setCurrentUser(userData);
-        
+        await setCurrentUser(userData);
+
         return true;
         
     } catch (error) {
