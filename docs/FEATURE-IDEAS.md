@@ -61,6 +61,7 @@ durchschlägt.
 | [FI-21](#fi-21--aufgaben-mit-zuweisung-und-fälligkeit) | Aufgaben mit Zuweisung und Fälligkeit | niedrig | L | FI-6 |
 | [FI-22](#fi-22--musikstücke-und-programme) | Musikstücke und Programme | niedrig | L | — |
 | [FI-23](#fi-23--ort-und-ende-am-termin) | Ort und Ende am Termin (rein informativ) — **umgesetzt in 1.10.0** | mittel | M | — |
+| [FI-24](#fi-24--freigaben-in-der-check-in-app) | Freigaben in der Check-in-App (Anträge außerhalb des Zeitfensters) | mittel | M | — |
 
 ¹ hoch in Kombination mit [FI-1](#fi-1--terminzusage-im-vorfeld), für sich allein mittel.
 
@@ -71,6 +72,9 @@ Thema — deshalb steht FI-14 unter A und nicht am Ende.
 FI-23 kam am 2026-09-17 aus der Sichtung der Terminverwaltung dazu (Spec
 `2026-09-17-dashboard-filterleisten-design.md`) — nicht als eigener Wunsch, sondern weil drei
 bestehende Einträge die Felder stillschweigend voraussetzten.
+
+FI-24 kam am 2026-09-23 aus der Frage auf, ob Verwalter Anträge auch in der Check-in-App
+freigeben können — was seit 1.12.0 möglich ist, aber nur im Zeitfenster der Anwesenheitsliste.
 
 FI-16 bis FI-22 kamen am 2026-09-16 aus einem getrennt geführten Ideen-Backlog dazu, teils aus
 einem Vergleich mit `konzertmeister.app`. Aus demselben Abgleich stammen die Ergänzungen an
@@ -625,7 +629,55 @@ soll.
   Normalfall. „Nichts zu tun" ist eine Aussage, keine leere Liste.
 - **Nur eigene Daten.** Die Übersicht zeigt ausschließlich den angemeldeten Benutzer. Für
   Manager ist sie keine Arbeitsliste — deren offene Freigaben sind eine andere Frage und
-  gehören nicht hierher.
+  gehören nicht hierher. Diese Frage ist [FI-24](#fi-24--freigaben-in-der-check-in-app).
+
+---
+
+### FI-24 · Freigaben in der Check-in-App
+**Nutzen:** mittel · **Aufwand:** M
+
+Ein eigener Bereich in der Check-in-App, in dem Admin und Manager **alle** offenen Anträge
+sehen und entscheiden — unabhängig davon, ob gerade ein Termin läuft.
+
+**Warum interessant:** Entscheiden geht in der PWA seit 1.12.0 bereits, aber nur im Tab
+„Liste" und damit nur zu dem Termin, der gerade gewählt ist. Wählbar sind Termine nur im
+Check-in-Toleranzfenster (`checkin_tolerance_hours`, ab Werk zwei Stunden um den Beginn). Wer
+am Vortag wissen will, wer sich für die Probe entschuldigt hat, kommt in der PWA also gar nicht
+an die Anträge — dafür bleibt heute nur das Dashboard. Genau das ist der Anlass für diese Idee:
+Die Entscheidung ist gebaut, ihr fehlt nur der Zugang außerhalb des Zeitfensters.
+
+**Abgrenzung:** [FI-17](#fi-17--offene-punkte-unter-mein-konto) zeigt jedem Benutzer
+ausschließlich **eigene** offene Punkte, auch Verwaltern. FI-24 ist das Gegenstück für die
+Verwaltersicht und bleibt davon getrennt — sonst vermischt eine Ansicht „was will das System von
+mir" mit „was wartet auf meine Entscheidung".
+
+**Bewusst nicht enthalten: Arbeitszeiten.** Deren Freigabe bleibt im Dashboard
+(Entscheidung vom 2026-09-23). Die Prüfung einer Arbeitszeit braucht Nachweis, Notiz und
+Änderungshistorie nebeneinander; das ist keine Aufgabe für ein Telefon zwischen Tür und Angel.
+Die PWA kennt für `work_sessions` deshalb weiterhin kein `approve`/`reject`.
+
+**Vorher zu klären:**
+
+- **Welche Anträge?** Nur Entschuldigungen oder auch Zeitanträge (`exception_type =
+  'time_correction'`)? Beide sind heute im Tab „Liste" entscheidbar, aber ein Zeitantrag ohne den
+  zugehörigen Anwesenheitseintrag daneben ist schwerer zu beurteilen.
+- **Welcher Zeitraum?** Alle offenen Anträge oder nur die zu Terminen der nächsten Tage? Ein
+  Verein mit vielen Altlasten bekäme sonst eine lange Liste, die niemand abarbeitet. Naheliegend
+  ist derselbe Horizont wie bei FI-17 (14 Tage), aber rückwärts gedacht: Ein Antrag zu einem
+  Termin, der schon vorbei ist, gehört trotzdem entschieden.
+- **Gruppengrenze?** Manager sehen heute bewusst alle Datensätze ohne Gruppengrenze (siehe
+  `OPEN-ITEMS.md`). Für eine Freigabeliste ist das die Frage, ob ein Registerleiter künftig nur
+  seine Gruppe sieht — das wäre [FI-15](#fi-15--rolle-gruppenleiter) und keine Nebenentscheidung.
+- **Wo im Menü?** Eigener Tab neben „Liste" oder ein Einstieg im Tab „Erfassen"? Ein sechster Tab
+  ist auf schmalen Telefonen teuer; ein Einstieg, der nur Verwaltern erscheint, ist unauffälliger.
+- **Selbstgenehmigung.** Es gilt dieselbe Serverregel wie in der Liste (OI-87): Der eigene Antrag
+  ist gesperrt, solange ein zweites aktives Verwalterkonto existiert. Die Oberfläche übernimmt
+  das Flag, statt eine eigene Regel zu erfinden.
+
+**Berührt:** `public/checkin/` (neuer Bereich, `attendanceRequestsHtml()` und
+`decideRequest()` sind wiederverwendbar) · eine sammelnde Abfrage für offene Anträge — heute
+liefert `attendance_list` sie nur je Termin, `exceptions?status=pending` dagegen ohne
+Terminbezug und für Manager ungefiltert.
 
 ---
 
