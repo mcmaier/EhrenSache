@@ -119,13 +119,16 @@ test('Gruppen: Haupt- und Untergruppen, Wort aus den Einstellungen', () => {
 });
 
 test('Terminarten: mit und ohne Rueckmeldung', () => {
-    const items = [{ responses_enabled: 1 }, { responses_enabled: '0' }, { responses_enabled: 0 }];
-    assert.deepEqual(countChips(items, CHIPS_APPOINTMENT_TYPES), { all: 3, responses: 1, plain: 2 });
+    const items = [
+        { responses_enabled: 1 }, { responses_enabled: '1' }, { responses_enabled: '0' },
+        { responses_enabled: 0 }, { responses_enabled: null },
+    ];
+    assert.deepEqual(countChips(items, CHIPS_APPOINTMENT_TYPES), { all: 5, responses: 2, plain: 3 });
     assertPartition(CHIPS_APPOINTMENT_TYPES, items, 'Terminarten');
 });
 
 test('Taetigkeitsarten: aktiv und ausgemustert', () => {
-    const items = [{ is_active: 1 }, { is_active: '1' }, { is_active: 0 }];
-    assert.deepEqual(countChips(items, CHIPS_ACTIVITY_TYPES), { all: 3, active: 2, inactive: 1 });
+    const items = [{ is_active: 1 }, { is_active: '1' }, { is_active: 0 }, { is_active: null }];
+    assert.deepEqual(countChips(items, CHIPS_ACTIVITY_TYPES), { all: 4, active: 2, inactive: 2 });
     assertPartition(CHIPS_ACTIVITY_TYPES, items, 'Taetigkeitsarten');
 });

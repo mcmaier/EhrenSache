@@ -93,7 +93,7 @@ export function groupChips(subgroupWord) {
     return [
         { key: 'all',  label: 'Alle' },
         { key: 'main', label: 'Hauptgruppen',       match: g => !isOne(g.is_subgroup) },
-        { key: 'sub',  label: String(subgroupWord), match: g => isOne(g.is_subgroup) },
+        { key: 'sub',  label: String(subgroupWord || 'Untergruppe'), match: g => isOne(g.is_subgroup) },
     ];
 }
 

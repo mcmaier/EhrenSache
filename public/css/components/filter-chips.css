@@ -73,6 +73,14 @@
     margin-bottom: var(--spacing-sm);
 }
 
+/* Innerhalb einer Datentabellen-Karte traegt der Container keine zweite Karte. */
+.data-table > .filter-chips--standalone {
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: var(--spacing-md);
+}
+
 /* Kontrast (WCAG AA, >= 4.5:1): --chip-text-mix bestimmt, wie viel Chipfarbe
    in den Text einfliesst -- weniger Chipfarbe, mehr --text-dark. Die Vorgabe
    40% deckt den neutralen Chip (Text: --text-light, sowohl ruhend als auch

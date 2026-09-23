@@ -200,7 +200,7 @@ Ansichten haben beides nicht.
 |---|---|
 | Benutzergruppen | Alle · Hauptgruppen · Untergruppen (Wort aus `subgroupLabel()`, z. B. „Register“) |
 | Terminarten | Alle · mit Rückmeldung · ohne Rückmeldung (`responses_enabled`) |
-| Tätigkeitsarten | Alle · Aktiv · Inaktiv (`is_active`) |
+| Tätigkeitsarten | Alle · Aktiv · Ausgemustert (`is_active`) |
 
 Diese drei Sätze sind Partitionen und werden wie die übrigen im Node-Test geprüft.
 

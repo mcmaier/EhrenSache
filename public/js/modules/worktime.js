@@ -123,7 +123,10 @@ export async function checkWorktimeEnabled() {
 
     const block = document.getElementById('activityTypesBlock');
     if (block) {
-        block.style.display = (worktimeEnabled && isAdmin) ? '' : 'none';
+        const sichtbar = worktimeEnabled && isAdmin;
+        block.style.display = sichtbar ? '' : 'none';
+        // Tabelle und Chipzeile fuellen, sonst bleibt der Block nach dem Einschalten leer.
+        if (sichtbar) renderActivityTypes();
     }
 
     return worktimeEnabled;
