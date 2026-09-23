@@ -9,10 +9,10 @@
  */
 
 import { apiCall, isAdminOrManager, currentUser } from './api.js';
-import { loadAppointments } from './appointments.js';
+import { loadAppointments, setCalendarMonth } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid, currentYear, subgroupLabel } from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, currentYear, subgroupLabel, setCurrentYear, navigateToSection } from './ui.js';
 import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers } from './utils.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
@@ -39,6 +39,11 @@ let currentAppointmentId = null;
 let currentMemberId = null;
 let currentAppointmentType = null;
 let isLoadingFilters = false;
+// Sprung aus dem Kalender (Spec 2026-09-22-kalender-anwesenheit): Ziel des
+// Rueckwegs und Marke, damit showRecordsSection() waehrend des Sprungs den
+// Rueckweg nicht gleich wieder verwirft.
+let attendanceReturn = null;   // { date: 'YYYY-MM-DD' }
+let jumpInProgress = false;
 // Aktiver Status-Chip (Spec 2026-09-22). "missing" gibt es nur in den
 // Listenmodi; beim Wechsel zu ALL_RECORDS faellt er auf "all" zurueck.
 let recordStatusChip = 'all';
@@ -580,6 +585,90 @@ export async function applyRecordFilters(forceReload = false, currentPage = 1) {
 // RENDER FUNCTIONS (DOM-Manipulation)
 // ============================================
 
+/**
+ * Wechselt in die Anwesenheitsliste eines Termins -- derselbe Weg fuer die
+ * Auswahl im Termin-Filter und fuer den Sprung aus dem Kalender.
+ */
+async function enterAppointmentAttendance(appointmentId) {
+    const memberFilter = document.getElementById('filterMember');
+    const aptTypeFilter = document.getElementById('filterAptType');
+
+    setRecordMode(RecordMode.ATTENDANCE_BY_APPOINTMENT);
+    currentAppointmentId = appointmentId;
+    currentMemberId = null;
+    memberFilter.disabled = true;
+    memberFilter.value = '';
+    aptTypeFilter.disabled = true;
+    await loadAttendanceList(appointmentId);
+}
+
+/** Verwirft den gemerkten Rueckweg und verbirgt den Knopf. */
+function clearAttendanceReturn() {
+    attendanceReturn = null;
+    const back = document.getElementById('recordsBackToAppointments');
+    if (back) back.hidden = true;
+}
+
+/**
+ * Sprung aus Kalender-Popup oder Terminliste: Jahr des Termins setzen, in den
+ * Bereich Anwesenheit wechseln und dort die Anwesenheitsliste des Termins
+ * oeffnen. Steht der Termin nicht in den Terminen seines Jahres, bleibt die
+ * Ansicht, wo sie ist.
+ */
+export async function openAttendanceForAppointment(appointmentId, date) {
+    const year = Number(String(date).slice(0, 4));
+    const previousYear = Number(currentYear);
+
+    jumpInProgress = true;
+    try {
+        if (year !== previousYear) {
+            setCurrentYear(year, { reload: false });
+        }
+
+        const appointments = await loadAppointments(false);
+        if (!(appointments || []).some(a => String(a.appointment_id) === String(appointmentId))) {
+            if (year !== previousYear) {
+                setCurrentYear(previousYear, { reload: false });
+            }
+            showToast('Termin nicht gefunden', 'error');
+            return;
+        }
+
+        if (!await navigateToSection('anwesenheit')) {
+            return;
+        }
+
+        // Der Termin-Filter wird in loadRecordFilters() ohne await befuellt --
+        // hier ausdruecklich abwarten, bevor gewaehlt wird.
+        await loadAppointmentFilter(false);
+        document.getElementById('filterAptType').value = '';
+        document.getElementById('filterAppointment').value = String(appointmentId);
+
+        // Der Sprung zeigt immer die ganze Liste, nicht den zuletzt
+        // gewaehlten Statusfilter des Bereichs.
+        recordStatusChip = 'all';
+
+        await enterAppointmentAttendance(appointmentId);
+
+        attendanceReturn = { date: String(date) };
+        const back = document.getElementById('recordsBackToAppointments');
+        if (back) back.hidden = false;
+    } finally {
+        jumpInProgress = false;
+    }
+}
+
+/** "← Zurueck zu Termine": zum Kalendermonat des Termins, von dem gesprungen wurde. */
+export async function backToAppointmentCalendar() {
+    const target = attendanceReturn;
+    clearAttendanceReturn();
+    if (!target) return;
+
+    setCurrentYear(Number(target.date.slice(0, 4)), { reload: false });
+    setCalendarMonth(target.date);
+    await navigateToSection('termine');
+}
+
 // Im Init oder beim Section-Wechsel registrieren
 export async function initRecordEventHandlers() {
 
@@ -587,7 +676,8 @@ export async function initRecordEventHandlers() {
 
     // Event-Listener für Gruppen-Filter
     document.getElementById('filterAptType').addEventListener('change', async function() {
-        const appointmentTypeId = this.value;        
+        clearAttendanceReturn();
+        const appointmentTypeId = this.value;
         const appointmentFilter = document.getElementById('filterAppointment');
         const memberFilter = document.getElementById('filterMember');
 
@@ -616,19 +706,14 @@ export async function initRecordEventHandlers() {
 
     // Event-Listener für Termin-Filter
     document.getElementById('filterAppointment').addEventListener('change', async function() {
+        clearAttendanceReturn();
         const appointmentId = this.value;
         const memberFilter = document.getElementById('filterMember');
         const aptTypeFilter = document.getElementById('filterAptType');
-        
+
         if (appointmentId && appointmentId !== '') {
             // Attendance-Modus: Member-Filter deaktivieren
-            setRecordMode(RecordMode.ATTENDANCE_BY_APPOINTMENT);
-            currentAppointmentId = appointmentId;
-            currentMemberId = null;
-            memberFilter.disabled = true;
-            memberFilter.value = '';
-            aptTypeFilter.disabled = true;
-            await loadAttendanceList(appointmentId);
+            await enterAppointmentAttendance(appointmentId);
         } else {
             // Records-Modus: Member-Filter aktivieren
             setRecordMode(RecordMode.ALL_RECORDS);
@@ -642,6 +727,7 @@ export async function initRecordEventHandlers() {
 
     // Event-Listener für Member-Filter
     document.getElementById('filterMember')?.addEventListener('change', async function() {
+        clearAttendanceReturn();
         const memberId = this.value;
         const appointmentFilter = document.getElementById('filterAppointment');
         const aptTypeFilter = document.getElementById('filterAptType');
@@ -696,6 +782,7 @@ export async function initRecordEventHandlers() {
 export async function resetRecordFilter()
 {
         debug.log("Reset Filters");
+        clearAttendanceReturn();
         const aptTypeFilter = document.getElementById('filterAptType');
         const appointmentFilter = document.getElementById('filterAppointment');
         const memberFilter = document.getElementById('filterMember');
@@ -721,6 +808,12 @@ export async function resetRecordFilter()
 export async function showRecordsSection(forceReload = false) {
 
     debug.log("Show Record Section ()");
+
+    // Ein normaler Aufruf des Bereichs (Navigation, Jahreswechsel) verwirft
+    // den Rueckweg; waehrend eines Sprungs bleibt er stehen.
+    if (!jumpInProgress) {
+        clearAttendanceReturn();
+    }
 
     // Filter-Optionen laden
     await loadRecordFilters();
@@ -1690,5 +1783,6 @@ window.setArrivalTimeFromAppointment = setArrivalTimeFromAppointment;
 window.closeRecordModal = () => document.getElementById('recordModal').classList.remove('active');
 window.deleteRecord = deleteRecord;
 window.resetRecordFilter = resetRecordFilter;
+window.backToAppointmentCalendar = backToAppointmentCalendar;
 window.quickCreateRecordForMember = quickCreateRecordForMember;
 window.quickCreateRecordForAppointment = quickCreateRecordForAppointment;
