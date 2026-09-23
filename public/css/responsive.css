@@ -56,6 +56,14 @@
         gap: 4px;
     }
 
+    /* In der gestapelten Gruppe liegt flex in der Hauptachse -- flex-basis: 0
+       wuerde die Hoehe ersetzen und das Feld auf Textzeilenhoehe druecken. */
+    .filter-bar .form-group select,
+    .filter-bar .form-group input[type="text"] {
+        flex: none;
+        height: 40px;
+    }
+
     .btn-reset-filter {
         width: 100%;
     }

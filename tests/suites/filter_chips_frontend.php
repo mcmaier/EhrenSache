@@ -267,7 +267,7 @@ test('Die Filterleiste stellt die Beschriftung neben das Feld', function () use 
 
     $start = strpos($forms, '.filter-bar .form-group {');
     assertTrue($start !== false, '.filter-bar .form-group fehlt');
-    $block = substr($forms, $start, 260);
+    $block = substr($forms, $start, strpos($forms, '}', $start) - $start);
 
     assertTrue(str_contains($block, 'display: flex'), 'Die Filtergruppe muss eine Flex-Zeile sein');
     assertTrue(str_contains($block, 'align-items: center'), 'Label und Feld muessen auf einer Linie stehen');
@@ -281,4 +281,10 @@ test('Die Filterleiste stellt die Beschriftung neben das Feld', function () use 
     $ui = fcModul($fcRoot, 'ui');
     assertSame(0, preg_match("/style\.display\s*=\s*is(Admin|AdminOrManager)\s*\?\s*'block'/", $ui),
         'updateUIForRole darf display nicht hart auf block setzen -- das bricht die Flex-Zeile der Filterleiste');
+
+    // Gestapelt (Task 2) liegt flex in der Hauptachse -- ohne feste Hoehe
+    // faellt das Feld auf Textzeilenhoehe zusammen (Regression bei 375px).
+    $resp = (string) file_get_contents($fcRoot . '/public/css/responsive.css');
+    assertTrue(preg_match('/\.filter-bar \.form-group select[^}]*flex:\s*none/s', $resp) === 1,
+        'Auf schmalen Bildschirmen braucht das Feld eine feste Hoehe, sonst faellt es auf Textzeilenhoehe zusammen');
 });
