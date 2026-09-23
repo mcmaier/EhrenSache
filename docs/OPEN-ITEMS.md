@@ -3626,6 +3626,9 @@ Paginierung, alle anderen Listen nutzen `globalPaginationValue` aus `settings.js
 **Zu entscheiden:** fixierte Aktionsspalte für alle Tabellen übernehmen oder bewusst nur dort
 belassen; Arbeitszeit an die gemeinsame Paginierung anschließen.
 
+Verwandt: [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)
+(Terminfarbe als Randakzent) betrifft dieselben Tabellen — sinnvoll im selben Zug.
+
 **Nicht sicherheitsrelevant.**
 
 ---
