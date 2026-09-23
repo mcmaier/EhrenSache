@@ -18,11 +18,11 @@
    responsive.css .stats-grid auf eine Spalte -- das gilt auch hier, weil
    responsive.css spaeter geladen wird. */
 .stats-grid--chips {
-    grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
 }
 
 .stats-grid--chips-lead {
-    grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) minmax(180px, 240px);
+    grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) minmax(150px, 190px);
 }
 
 .filter-chips {

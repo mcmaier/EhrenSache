@@ -219,3 +219,39 @@ test('Anwesenheitsliste: Zwischenspeicher haelt die volle Liste', function () us
     assertTrue(preg_match('/_lastAttendanceData\s*=\s*attendanceData\s*;/', $rumpf) === 1,
         '_lastAttendanceData muss die ungefilterte Liste speichern');
 });
+
+test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function () use ($fcRoot, $fcHtml) {
+    $jahr = (string) @file_get_contents($fcRoot . '/public/css/components/year-filter.css');
+    assertTrue($jahr !== '', 'css/components/year-filter.css fehlt');
+
+    $main = (string) file_get_contents($fcRoot . '/public/css/main.css');
+    assertTrue(str_contains($main, 'components/year-filter.css'), 'main.css importiert year-filter.css nicht');
+
+    $ohneKommentare = (string) preg_replace('#/\*.*?\*/#s', '', $jahr);
+    assertSame(0, preg_match('/#[0-9a-fA-F]{3,8}\b/', $ohneKommentare),
+        'year-filter.css enthaelt eine Hex-Farbe');
+
+    // Die alte Bauform: Karte mit Ueberschrift und sechsfach wiederholtem Inline-Style.
+    // Task 3: Statistik baut ihren Kopf noch nicht um, deshalb bleibt genau ein
+    // Vorkommen (statisticYearFilter) uebrig, bis Task 3 die Schleife unten und
+    // diese Erwartung wieder auf 0 zurueckstellt.
+    assertSame(1, substr_count($fcHtml, '<h3>Jahr filtern</h3>'),
+        'Die Ueberschrift "Jahr filtern" darf nur noch bei der Statistik stehen');
+
+    foreach (['appointmentYearFilter', 'recordYearFilter', 'exceptionYearFilter',
+              'memberYearFilter', 'worktimeYearFilter'] as $id) {
+        $pos = strpos($fcHtml, 'id="' . $id . '"');
+        assertTrue($pos !== false, $id . ' fehlt im Markup');
+
+        // 320 Zeichen davor decken den umschliessenden Container samt Label ab
+        $davor = substr($fcHtml, max(0, $pos - 320), min($pos, 320));
+        assertTrue(str_contains($davor, 'class="year-filter"'),
+            $id . ' steht nicht in einer .year-filter');
+
+        $zeile = substr($fcHtml, $pos, 200);
+        assertSame(0, substr_count($zeile, 'style="'),
+            $id . ' traegt noch einen Inline-Style');
+    }
+    // Task 3: statisticYearFilter kommt hier wieder in die Schleife, sobald
+    // der Statistik-Kopf auf das gemeinsame Muster umgebaut ist.
+});

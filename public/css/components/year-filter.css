@@ -1,0 +1,50 @@
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/* Jahresauswahl im Kopf jeder Ansicht mit Jahresbezug (Spec-Nachtrag
+   2026-09-23). Einzeilig statt Karte mit Ueberschrift: "Jahr: [2026]".
+   Die Stelle oben rechts bleibt -- das ist Konvention seit 1.9.2 --,
+   nur die Bauhoehe sinkt von zwei Zeilen auf eine. */
+.year-filter {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 8px 12px;
+    background: var(--bg-light);
+    border-left: 3px solid var(--secondary-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.year-filter label {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+.year-filter select {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    padding: 0 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-white);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.year-filter select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
