@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [1.13.0] – 2026-09-22
+## [1.13.0] – 2026-09-23
 
 ### Neu
 - **Anträge lassen sich in der Anwesenheitsliste des Dashboards entscheiden.** Wer die Liste
