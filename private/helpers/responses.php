@@ -21,6 +21,11 @@ declare(strict_types=1);
 // Datenbank aus (tests/suites/responses_unit.php), holende fuehren SQL aus.
 
 require_once __DIR__ . '/member_activity.php';
+// attendanceExpectedMemberIds(): dieselbe Regel fuer "erwartet" wie die
+// Anwesenheitszahlen im Kalender (Spec 2026-09-22-kalender-anwesenheit),
+// hier direkt eingebunden statt sich auf die Ladereihenfolge des Aufrufers
+// zu verlassen.
+require_once __DIR__ . '/appointment_attendance.php';
 
 const RESPONSE_STATUSES = ['yes', 'no', 'maybe'];
 
@@ -571,19 +576,12 @@ function responsesAttachSummaries($db, $database, array $appointments, ?int $vie
     if ($ids !== []) {
         $prefix       = $database->table('');
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $activity     = getMemberActivityWhere('m', 'a.date');
 
-        $stmt = $db->prepare("
-            SELECT DISTINCT a.appointment_id, m.member_id
-            FROM {$prefix}appointments a
-            JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
-            JOIN {$prefix}member_group_assignments mga ON mga.group_id = atg.group_id
-            JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activity}
-            WHERE a.appointment_id IN ({$placeholders})
-        ");
-        $stmt->execute($ids);
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $expectedBy[(int) $row['appointment_id']][] = (int) $row['member_id'];
+        // Gemeinsame Regel mit den Anwesenheitszahlen im Kalender
+        // (attendanceExpectedMemberIds()); hier auf die Listenform gebracht,
+        // die responseSummary() und responseComparison() erwarten.
+        foreach (attendanceExpectedMemberIds($db, $prefix, $ids) as $appointmentId => $memberIds) {
+            $expectedBy[$appointmentId] = array_keys($memberIds);
         }
 
         $stmt = $db->prepare("SELECT appointment_id, member_id, status
