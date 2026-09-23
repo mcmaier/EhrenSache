@@ -182,15 +182,18 @@ export function groupSelectOptionsHtml(groups) {
 // ============================================
 export let currentYear = sessionStorage.getItem('selectedYear') || new Date().getFullYear();
 
-export function setCurrentYear(year) {
+export function setCurrentYear(year, { reload = true } = {}) {
     currentYear = parseInt(year);
     sessionStorage.setItem('selectedYear', year);
-    
+
     // Alle Jahresfilter synchronisieren
     syncAllYearFilters(year);
-    
-    // Jahresabhängige Daten neu laden
-    loadYearDependentData();
+
+    // Jahresabhaengige Daten neu laden -- ein Sprung zwischen Bereichen
+    // (navigateToSection) laedt den Zielbereich ohnehin selbst.
+    if (reload) {
+        loadYearDependentData();
+    }
 }
 
 function syncAllYearFilters(year) {
@@ -741,6 +744,34 @@ export function updateTableHeaders() {
     });
 }
 
+/**
+ * Bereichswechsel aus dem Code -- derselbe Weg wie ein Klick in der
+ * Navigation und wartet, bis der Bereich geladen ist. Ohne die Rueckfrage
+ * beim Verlassen der Einstellungen: Die bestehenden Aufrufer starten nie dort.
+ * Liefert false, wenn es den Bereich nicht gibt.
+ */
+export async function navigateToSection(section) {
+    const navItem = document.querySelector(`.nav-item[data-section="${section}"]`);
+    const contentSection = document.getElementById(section);
+    if (!navItem || !contentSection) {
+        return false;
+    }
+
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+    navItem.classList.add('active');
+    contentSection.classList.add('active');
+
+    // Speichere aktuelle Section
+    sessionStorage.setItem('currentSection', section);
+
+    debug.log("==== SECTION CHANGED ===>", section);
+    await loadAllData();
+
+    closeMobileSidebar();
+    return true;
+}
+
 export async function initNavigation() {
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', async function() {
@@ -766,21 +797,7 @@ export async function initNavigation() {
                 }
             }
 
-            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-            
-            this.classList.add('active');
-            const section = this.getAttribute('data-section');
-            document.getElementById(section).classList.add('active');            
-
-             // Speichere aktuelle Section
-            sessionStorage.setItem('currentSection', section);
-
-            debug.log("==== SECTION CHANGED ===>", section);            
-            loadAllData();
-
-            closeMobileSidebar();
-            
+            await navigateToSection(this.getAttribute('data-section'));
         });
     });
 }
