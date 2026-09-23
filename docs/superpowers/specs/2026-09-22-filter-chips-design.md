@@ -153,6 +153,64 @@ auf den Zurücksetzen-Stil unberührt — ihre Kennzahlen sind Ergebnis, kein Fi
   verschwindet, Anwesenheit beim Moduswechsel mit aktivem „Fehlend“, Branding-Farbe am aktiven
   „Alle“.
 
+## Nachtrag 2026-09-23: Kompakter Kopf, Statistik und Gruppen
+
+Aus der Sichtprüfung der ersten Runde: Der Kopfbereich trägt zu dick auf und sieht von Ansicht
+zu Ansicht verschieden aus. Drei Ursachen, alle älter als dieses Vorhaben:
+
+1. Der Jahresfilter ist eine zweizeilige `stat-card` mit Überschrift „Jahr filtern“ und
+   sechsfach wiederholten Inline-Styles am `<select>`.
+2. Die Statistik baut ihren Kopf anders: `stats-header` mit `filter-card` statt `filter-bar`,
+   dadurch ein breiterer Jahresfilter und Beschriftungen über den Feldern.
+3. Die Filterleiste stellt ihre Beschriftungen über die Felder, Feldhöhe 44 px.
+
+**Entschieden (Variante B von drei):** Zwei Zeilen, beide flacher. Alles in einer einzigen Zeile
+wurde verworfen — sobald in einem Auswahlfeld ein Wert steht, wäre nicht mehr erkennbar, zu
+welchem Filter es gehört (die Anwesenheit hat drei ähnliche Listen).
+
+### Kopfbereich
+
+- **Zeile 1:** Chipzeile links, Jahresfilter rechts. Neue Komponente `.year-filter` — „Jahr:“
+  und Auswahlfeld **in einer Zeile**, etwa 150 px breit. Sie ersetzt die sechs `stat-card`-Blöcke
+  samt Inline-Styles und den abweichenden Container der Statistik. Die Stelle oben rechts bleibt
+  (Konvention seit 1.9.2), nur die Bauform wird flach und einheitlich.
+- **Zeile 2:** `filter-bar` mit Beschriftungen **neben** statt über den Feldern, Feldhöhe 36 px
+  statt 44. Die `filter-card` der Statistik wird zur gewöhnlichen `filter-bar`; `stats-header`,
+  `filter-card`, `filter-grid` und `.year-select` entfallen.
+- **Wirkung:** Kopf von etwa 150 auf etwa 95 px, bei den Mitgliedern von 120 auf 85.
+- **Zurücksetzen:** Auch die Statistik blendet den Knopf aus, solange kein Filter abweicht. Damit
+  gilt die Regel überall gleich, und der Sondersatz dazu im CHANGELOG entfällt wieder.
+
+### Statistik
+
+Vier **Anzeige-Chips** (`--static`) in Zeile 1: Termine (neutral), Anwesend (`--ok`),
+Entschuldigt (`--pending`), Unentschuldigt (`--danger`). Sie ersetzen die gleichnamigen Karten.
+Durchschnitt, Pünktlichkeit und Zuverlässigkeit **bleiben Karten** — sie sind das Ergebnis der
+Ansicht, keine Zähler. Die beiden Quotenkarten bleiben wie bisher abschaltbar (`hidden`).
+
+Anders als sonst bilden diese Chips **keine Partition**: „Termine“ zählt Termine, die übrigen
+zählen Anwesenheitsdatensätze. Es gibt deshalb auch keinen Chip „Alle“.
+
+### Gruppen, Terminarten, Tätigkeitsarten
+
+Je eine **Anzeige-Chipzeile über der zugehörigen Tabelle**. Kein Filter, kein Jahr — diese
+Ansichten haben beides nicht.
+
+| Tabelle | Chips |
+|---|---|
+| Benutzergruppen | Alle · Hauptgruppen · Untergruppen (Wort aus `subgroupLabel()`, z. B. „Register“) |
+| Terminarten | Alle · mit Rückmeldung · ohne Rückmeldung (`responses_enabled`) |
+| Tätigkeitsarten | Alle · Aktiv · Inaktiv (`is_active`) |
+
+Diese drei Sätze sind Partitionen und werden wie die übrigen im Node-Test geprüft.
+
+### Nicht Teil des Nachtrags
+
+- Keine Filterfunktion in Statistik, Gruppen, Terminarten und Tätigkeitsarten — die Chips dort
+  zählen nur.
+- Die Quotenkarten der Statistik bleiben unangetastet.
+- Der Jahresfilter wandert nicht an eine andere Stelle.
+
 ## Version
 
 Minor-Sprung auf **1.13.0**: `version.json`, `CHANGELOG.md`, `?v=` in allen vier Einstiegen und
