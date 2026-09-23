@@ -15,6 +15,7 @@ import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, currentYear, groupSelectOptionsHtml, subgroupLabel, dataCache} from './ui.js';
 import {debug} from '../app.js'
 import { escapeHtml } from './utils.js';
+import { setResetVisible } from './filter_chips.js';
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -83,33 +84,19 @@ export async function loadStatisticsFilters() {
         }
     }    
 
-    // Grid-Klasse für Layout setzen
-    const filterGrid = document.querySelector('.filter-grid');
-
-    // Mitglieder-Filter (nur für Admins)
+    // Der Mitgliederfilter ist Verwaltern vorbehalten. Die Spaltenlogik der
+    // frueheren filter-card entfaellt -- die filter-bar bricht von selbst um.
     if (isAdminOrManager) {
-        document.getElementById('statMemberFilterGroup').style.display = 'block';              
-        // Initial alle Mitglieder anzeigen         
+        document.getElementById('statMemberFilterGroup').style.display = '';
+        // Initial alle Mitglieder anzeigen
         await loadMembers();
-        
-        // Grid für 2 Spalten
-        if (filterGrid) {
-            filterGrid.classList.remove('single-filter');
-            filterGrid.classList.add('dual-filter');
-        }
 
-        await updateStatisticsFilters(); 
-        
+        await updateStatisticsFilters();
+
     } else {
         document.getElementById('statMemberFilterGroup').style.display = 'none';
-
-        // Grid für 1 Spalte
-        if (filterGrid) {
-            filterGrid.classList.remove('dual-filter');
-            filterGrid.classList.add('single-filter');
-        }
     }
-    
+
 }
 
 export async function updateStatisticsFilters() {
@@ -155,19 +142,23 @@ export async function applyStatisticsFilters() {
     debug.log("Load Statistics with Filters ()");
 
     // Aktuelle Filter auslesen
-    const filters = {        
+    const filters = {
         member:isAdminOrManager ? (document.getElementById('statMember')?.value || null) : null,
         group: document.getElementById('statGroup')?.value || null
     };
-    
+
+    setResetVisible(document.getElementById('resetStatisticsFilter'),
+        Boolean(document.getElementById('statGroup')?.value)
+        || Boolean(document.getElementById('statMember')?.value));
+
     // Statistik laden
     const stats = await loadStatistics(filters);
-    
+
     //Rendern, wenn Sektion aktiv
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'statistik')
-    {        
-        renderStatistics(stats);  
+    {
+        renderStatistics(stats);
     }
 }
 

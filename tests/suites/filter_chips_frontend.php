@@ -238,14 +238,11 @@ test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function 
         'Die Jahresauswahl muss fest in der letzten Spalte stehen, sonst dehnt sie sich bei verborgenen Chips');
 
     // Die alte Bauform: Karte mit Ueberschrift und sechsfach wiederholtem Inline-Style.
-    // Task 3: Statistik baut ihren Kopf noch nicht um, deshalb bleibt genau ein
-    // Vorkommen (statisticYearFilter) uebrig, bis Task 3 die Schleife unten und
-    // diese Erwartung wieder auf 0 zurueckstellt.
-    assertSame(1, substr_count($fcHtml, '<h3>Jahr filtern</h3>'),
-        'Die Ueberschrift "Jahr filtern" darf nur noch bei der Statistik stehen');
+    assertSame(0, substr_count($fcHtml, '<h3>Jahr filtern</h3>'),
+        'Die Ueberschrift "Jahr filtern" gehoert nicht mehr ins Markup');
 
     foreach (['appointmentYearFilter', 'recordYearFilter', 'exceptionYearFilter',
-              'memberYearFilter', 'worktimeYearFilter'] as $id) {
+              'memberYearFilter', 'worktimeYearFilter', 'statisticYearFilter'] as $id) {
         $pos = strpos($fcHtml, 'id="' . $id . '"');
         assertTrue($pos !== false, $id . ' fehlt im Markup');
 
@@ -258,8 +255,6 @@ test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function 
         assertSame(0, substr_count($zeile, 'style="'),
             $id . ' traegt noch einen Inline-Style');
     }
-    // Task 3: statisticYearFilter kommt hier wieder in die Schleife, sobald
-    // der Statistik-Kopf auf das gemeinsame Muster umgebaut ist.
 });
 
 test('Die Filterleiste stellt die Beschriftung neben das Feld', function () use ($fcRoot) {
@@ -287,4 +282,26 @@ test('Die Filterleiste stellt die Beschriftung neben das Feld', function () use 
     $resp = (string) file_get_contents($fcRoot . '/public/css/responsive.css');
     assertTrue(preg_match('/\.filter-bar \.form-group select[^}]*flex:\s*none/s', $resp) === 1,
         'Auf schmalen Bildschirmen braucht das Feld eine feste Hoehe, sonst faellt es auf Textzeilenhoehe zusammen');
+});
+
+test('Statistik nutzt denselben Kopf wie die uebrigen Ansichten', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'statistik', 'mitglieder');
+
+    assertTrue(str_contains($bereich, 'class="year-filter"'), 'Statistik ohne einzeilige Jahresauswahl');
+    assertTrue(str_contains($bereich, '<div class="filter-bar">'), 'Statistik ohne gemeinsame Filterleiste');
+    assertTrue(str_contains($bereich, 'id="resetStatisticsFilter"'), 'Zuruecksetzen fehlt');
+
+    // Der Sonderbau entfaellt vollstaendig
+    foreach (['stats-header', 'filter-card', 'filter-grid', 'year-select', 'year-card'] as $alt) {
+        assertSame(0, substr_count($fcHtml, $alt), $alt . ' muss aus dem Markup entfallen');
+    }
+
+    $css = (string) file_get_contents($fcRoot . '/public/css/sections/content.css');
+    foreach (['.stats-header', '.filter-card', '.filter-grid', '.year-card', '.year-select'] as $regel) {
+        assertSame(0, substr_count($css, $regel), $regel . ' muss aus content.css entfallen');
+    }
+
+    $js = fcModul($fcRoot, 'statistics');
+    assertSame(0, substr_count($js, 'filter-grid'), 'statistics.js kennt die Grid-Klassen noch');
+    assertTrue(str_contains($js, 'setResetVisible'), 'Zuruecksetzen wird nicht mehr ein- und ausgeblendet');
 });
