@@ -3130,3 +3130,61 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
         width: 100%;
     }
 }
+
+/* Offene Punkte (FI-17) */
+.open-items-block {
+    margin: 0 0 12px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--warning);
+    border-radius: 10px;
+    background: var(--card-bg);
+    width: 100%;
+    max-width: 400px;
+}
+
+/* [hidden] traegt hier ohnehin keine Konkurrenz durch eine display-Regel auf
+   details/.tab-content > * -- die Zeile bleibt trotzdem als Sicherung, falls
+   spaeter eine allgemeine details-Regel dazukommt. */
+.open-items-block[hidden] {
+    display: none;
+}
+
+.open-items-block > summary {
+    padding: 10px 14px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.open-items-pwa-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 10px 10px;
+}
+
+.open-item-pwa {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 8px;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: var(--button-bg);
+    text-align: left;
+    font: inherit;
+    color: var(--text);
+}
+
+.open-item-pwa__title {
+    font-weight: 600;
+}
+
+.open-item-pwa__meta {
+    flex-basis: 100%;
+    font-size: 0.85em;
+    color: var(--text-light);
+}

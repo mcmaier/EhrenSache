@@ -139,10 +139,10 @@ Diese Tests systematisch mit allen Rollen durchführen:
 
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
-| MEM-UI-1 | „Inaktive anzeigen" in der Filterleiste anhaken | Gesamtzahl der Liste steigt um die Zahl der Karte „Inaktive Mitglieder"; ohne Haken wieder zurück |
-| MEM-UI-2 | Karte „Inaktive Mitglieder" | Zeigt nur die Zahl, kein Bedienelement |
-| MEM-UI-3 | Gruppe im Filter wählen | Beide Karten zählen nur Mitglieder dieser Gruppe |
-| MEM-UI-4 | „Inaktive anzeigen" an- und abhaken | Die Karten ändern sich **nicht** — der Schalter wirkt nur auf die Tabelle (OI-71) |
+| MEM-UI-1 | Mitglieder öffnen | Chip „Aktiv" ist vorgewählt, nur aktive Mitglieder in der Tabelle (seit 1.13.0, siehe CHIP-06) |
+| MEM-UI-2 | Chip „Inaktiv" wählen | Nur inaktive Mitglieder in der Tabelle (CHIP-07) |
+| MEM-UI-3 | Chip „Alle" wählen | Aktive und inaktive Mitglieder zusammen |
+| MEM-UI-4 | Gruppe im Filter wählen | Alle drei Chip-Zähler zählen nur Mitglieder dieser Gruppe — sie folgen der Gruppe, nicht dem gewählten Chip (OI-71) |
 
 ---
 
@@ -180,7 +180,7 @@ nur im Browser sichtbar wird.
 
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
-| APT-UI-1 | Terminart wählen | Tabelle, Kalender und Kennzahlkarten zeigen denselben Ausschnitt |
+| APT-UI-1 | Terminart wählen | Tabelle, Kalender und Anzeige-Chips „Vergangen"/„Kommend" zeigen denselben Ausschnitt |
 | APT-UI-2 | Herkunft „Nur von Hand angelegte" | Automatisch erzeugte Termine verschwinden aus Tabelle und Kalender; Summe mit „Nur automatisch erzeugte" ergibt den Gesamtbestand |
 | APT-UI-3 | Mit gesetztem Filter im Kalender vor- und zurückblättern | Filter bleibt, Kalender ist nicht leer |
 | APT-UI-4 | Mit gesetztem Filter auf einen Kalendertag klicken | Popup zeigt nur gefilterte Termine |
@@ -1164,8 +1164,8 @@ Automatisiert: `php tests/run.php worktime_frontend` (statische Gegenproben) und
 |----|----------|---------------------|
 | MF-1 | Als Admin anmelden und **als Erstes** die Zeiterfassung öffnen, ohne vorher die Mitgliederliste zu besuchen | Der Filter „Mitglied" ist gefüllt, nicht nur „Alle Mitglieder" |
 | MF-2 | Im selben Zug „Zeit nachtragen" öffnen | Die Mitgliedsauswahl im Dialog ist gefüllt; Mitglieder ohne Mitgliedschaft im gewählten Jahr fehlen |
-| MF-3 | Ein Mitglied im Filter wählen | Tabelle und **alle drei** Kennzahlen — bestätigte Stunden, wartet auf Freigabe, laufende Sitzungen — zeigen nur dessen Einträge (bis 1.9.1 folgten nur die Stunden) |
-| MF-3a | Nacheinander jede Tätigkeit wählen | Die Kennzahlen der einzelnen Tätigkeiten ergeben zusammen die Werte ohne Filter |
+| MF-3 | Ein Mitglied im Filter wählen | Tabelle, Stundenkarte und alle vier Chip-Zähler (Läuft/Wartet/Bestätigt/Abgelehnt) zeigen nur dessen Einträge (bis 1.9.1 folgten nur die Stunden) |
+| MF-3a | Nacheinander jede Tätigkeit wählen | Die Chip-Zähler der einzelnen Tätigkeiten ergeben zusammen die Werte ohne Filter; die Stundenkarte folgt Tätigkeit und Mitglied, nicht dem gewählten Chip |
 | MF-4 | Jahr wechseln, danach den Filter aufklappen | Auswahl passt zum neuen Jahr, ausgetretene Mitglieder tragen „(inaktiv)" |
 | MF-5 | Als Manager statt Admin | Gleiches Verhalten; als einfaches Mitglied ist der Filter gar nicht sichtbar |
 
@@ -1303,6 +1303,19 @@ Automatisiert: `responses_api` (pending_exceptions), `pwa_termine_frontend`.
 | PWA-AL-10 | Kein Termin im Zeitfenster | Hinweis auf „➕ Termin anlegen“ statt leerer Fläche |
 | PWA-AL-11 | Termin gewählt, Tab wechseln und zurück | Termin bleibt gewählt, Liste steht wieder da |
 
+### Anträge in der Anwesenheitsliste des Dashboards (OI-87)
+
+Automatisiert: `self_approval_api` (Serverregel, Flag, Kennzeichnung), `attendance_requests_frontend` (Verdrahtung).
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| DA-1 | Als Manager einen Termin mit offenen Anträgen wählen | Über der Liste „⏳ offene Anträge n“ (reine Anzeige); betroffene Zeilen tragen „⏳ Entschuldigung“ bzw. „⏳ Zeitantrag HH:MM Uhr“, Begründung im Tooltip |
+| DA-2 | „Antrag genehmigen“ an einer Zeile | Antragsdialog mit Status „genehmigt“, Mitglied/Termin/Art gesperrt; nach dem Speichern zeigt die Zeile „⚠ Entschuldigt“ bzw. die beantragte Ankunft, ohne Neuladen |
+| DA-3 | „Antrag ablehnen“ | Dialog mit Status „abgelehnt“; danach ist der Hinweis weg, die Anwesenheit unverändert |
+| DA-4 | Eigener Antrag des angemeldeten Verwalters | Keine Entscheidungsknöpfe, stattdessen „Eigener Antrag – ein anderer Verwalter entscheidet“ |
+| DA-5 | Verein mit **einem** Verwalterkonto: eigener Antrag | Knöpfe vorhanden, Genehmigung möglich; Antragsliste zeigt danach „selbst genehmigt“ |
+| DA-6 | Genehmigte Entschuldigung, danach Bereich „Anwesenheit“ ohne Termin-Filter | Der Eintrag steht sofort in der Gesamtliste (Zwischenspeicher verworfen) |
+
 ### Ladeanzeige und Timeout (OI-85, nach 1.12.0)
 
 Automatisiert: `api_loading_frontend` (statisch). Einen langsamen Server stellt man im Browser
@@ -1318,6 +1331,64 @@ antwortende Fassung ersetzen, die auf `signal` hört.
 | LT-5 | Server antwortet nicht, speichernd (Eintrag anlegen) | Nach 20 s „… Ob gespeichert wurde, ist unklar …“ — nicht „fehlgeschlagen“ |
 | LT-6 | PWA, wie LT-4 | Meldung wie LT-4, **kein** Offline-Hinweis |
 | LT-7 | Einstellungen → Löschfristen ausführen bzw. Update holen bei langsamem Server | Kein Abbruch nach 20 s |
+
+### Status-Chips (OI-86, 1.13.0)
+
+Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| CHIP-01 | Anträge öffnen | Vier Chips, Summe der Status = „Alle“, „Alle“ aktiv in Primärfarbe, Zurücksetzen-Knopf sichtbar und ausgegraut |
+| CHIP-02 | Anträge: „Ausstehend“ klicken | Nur ausstehende; Zähler der übrigen Chips bleiben stehen (facettierte Zählung); Zurücksetzen wird bedienbar |
+| CHIP-03 | Anträge: Typ wählen | Alle Zähler sinken passend |
+| CHIP-04 | Zurücksetzen | Chip „Alle“, Felder leer, Jahr unverändert, Knopf wieder ausgegraut |
+| CHIP-05 | Arbeitszeit mit laufender Sitzung | Sitzung zählt nur unter „Läuft“; der Chip „Stunden“ ändert sich beim Chipwechsel nicht |
+| CHIP-06 | Mitglieder öffnen | „Aktiv“ vorausgewählt, keine Inaktiven in der Tabelle, Zurücksetzen ausgegraut |
+| CHIP-07 | Mitglieder: „Inaktiv“ | Nur Inaktive, Zähler „Aktiv“ bleibt |
+| CHIP-08 | Anwesenheit: Termin wählen, „Fehlend“ | Nur fehlende Mitglieder, Gruppierung zählt mit |
+| CHIP-09 | Anwesenheit: „Fehlend“ aktiv, Termin zurück auf „Alle“ | Chip springt auf „Alle“, „Fehlend“ verschwindet |
+| CHIP-10 | Termine: Chip anklicken | Nichts passiert, kein Handcursor; Kalender vollständig |
+| CHIP-11 | Benutzer: Rolle wechseln | Liste lädt einmal; Zähler folgen der Rolle |
+| CHIP-12 | Geräte: „Inaktiv“, Seite 2 | Bleibt im Filter |
+| CHIP-13 | Branding-Primärfarbe ändern | Aktiver neutraler Chip und Zurücksetzen-Knopf folgen |
+| CHIP-14 | Anträge, Arbeitszeit, Anwesenheit als `user` | Zähler nur über eigene Einträge; Terminfeld der Anwesenheit ausgeblendet; die Mitgliederverwaltung ist für `user` nicht erreichbar (Menüpunkt nur für Verwalter); Mitgliedsauswahl leer, siehe OI-91 |
+| CHIP-15 | Schmales Fenster (375 px) | Chips umbrechen, Jahreskarte darunter, keine horizontale Scrollleiste |
+| CHIP-16 | Leere Auswahl (Chip mit 0) in Benutzer, Geräte, Anwesenheitsliste | Hinweiszeile statt leerer Tabelle, keine Seitenknöpfe |
+| CHIP-17 | Jede Ansicht mit Jahresbezug öffnen | Jahresauswahl einzeilig oben rechts, gleiche Breite und Höhe in allen Ansichten |
+| CHIP-18 | Statistik öffnen | Sechs Anzeige-Chips im Kopf (Termine, Anwesend, Entschuldigt, Unentschuldigt, Pünktlichkeit, Zuverlässigkeit), keine Kennzahlkarten mehr; Filterleiste wie in den übrigen Ansichten |
+| CHIP-19 | Statistik: Gruppe wählen, dann zurücksetzen | Zurücksetzen wird bedienbar und wieder ausgegraut wie in den Listen; Jahr bleibt |
+| CHIP-20 | Statistik als `user` | Mitgliedsfeld ausgeblendet, Filterleiste bricht nicht um |
+| CHIP-21 | Gruppen & Terminarten öffnen | Über jeder Tabelle eine Chipzeile mit „Alle“ vorgewählt; Summe der hinteren Chips ergibt „Alle“; ein Klick filtert die Tabelle |
+| CHIP-22 | Untergruppen-Bezeichnung in den Einstellungen ändern | Der dritte Gruppen-Chip trägt das neue Wort |
+| CHIP-23 | Tätigkeitsarten mit einer ausgemusterten Art | Chip „Ausgemustert“ zählt sie; ein Klick zeigt nur sie in der Tabelle |
+| CHIP-24 | Schmales Fenster (375 px), alle Ansichten | Label über dem Feld, Jahresauswahl volle Breite, keine horizontale Scrollleiste |
+| CHIP-25 | Statistik: Maus über „Pünktlichkeit“ | Tooltip nennt gemessene Ankünfte und Termine wie früher der Kartentext |
+| CHIP-26 | Statistik mit abgeschalteter Pünktlichkeit | Der Chip fehlt ganz, die übrigen rücken auf |
+| CHIP-27 | Arbeitszeit: Tätigkeit wählen | Der Chip „Stunden“ folgt der Tätigkeit, nicht dem Statuschip; sein Tooltip nennt den Bezug |
+| CHIP-28 | Gruppen: Chip „Register“ klicken | Nur Untergruppen in der Tabelle, Zähler bleiben stehen |
+| CHIP-29 | Geräte: Typ „Virtuelle Station“ wählen | Chips zählen nur noch Kiosk-Geräte, Zurücksetzen wird bedienbar |
+| CHIP-30 | Alle Ansichten ohne gesetzten Filter | „Filter zurücksetzen“ ist sichtbar, ausgegraut und nicht klickbar |
+| CHIP-31 | Statistik mit mehreren Gruppen | Unter jeder Gruppenüberschrift ein Chip „Durchschnitt“ mit der Quote dieser Gruppe (bestätigte Anwesenheiten je möglicher Mitglied-Termin-Paare, gleicher Wert wie der Server rechnet) |
+| CHIP-32 | Statistik in einem Jahr mit zu wenigen Messungen | Der betroffene Chip zeigt „–“, die Begründung steht zusätzlich als Text unter der Chipzeile (nicht nur im Tooltip) |
+
+---
+
+### Offene Punkte (FI-17)
+
+Automatisiert: `php tests/run.php open_items_api`, `open_items_frontend`.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| OP-1 | Mitglied mit je einer offenen Rückmeldung, einem wartenden Antrag und einer wartenden Arbeitszeit öffnet Dashboard → Mein Profil | Karte „Offene Punkte“ ganz oben, je eine Zeile korrekt beschriftet mit Termin/Antrags-/Arbeitszeitangaben |
+| OP-2 | Mitglied ohne offene Punkte öffnet die Karte | „Nichts offen ✓“, Karte bleibt sichtbar |
+| OP-3 | In der Karte auf die Rückmeldungs-Zeile tippen, im Dialog antworten und schließen | Rückmeldungsdialog öffnet sich passend zum Termin; nach dem Schließen ist die Zeile aus der Karte verschwunden |
+| OP-4 | PWA öffnen: einmal ohne offene Punkte, einmal mit offener Rückmeldung | Ohne Punkte kein Block im Tab „Erfassen“; mit offener Rückmeldung ist der Block beim ersten Erscheinen aufgeklappt |
+| OP-5 | Block manuell zuklappen, App wechseln (bzw. `visibilitychange`) und zu „Erfassen“ zurückkehren, ohne dass sich die Zahl offener Rückmeldungen erhöht hat | Block bleibt zugeklappt |
+| OP-6 | Im aufgeklappten Block auf eine Rückmeldungs-Zeile tippen | Wechsel zu Tab „Termine“, passende Karte aufgeklappt und ins Bild gescrollt; Antrags- bzw. Arbeitszeit-Zeilen führen stattdessen zu Tab „Verlauf“ |
+| OP-7 | Antrag ablehnen, danach im Verlauf und in der Übersicht (Karte/Block) prüfen; nach 14 Tagen (Systemzeit vorstellen oder `approved_at` in der DB zurückdatieren) erneut prüfen | Abgelehnter Antrag erscheint mit Chip „abgelehnt“ im Verlauf und in der Übersicht (DB-Spalte `approved_at`, API-Feld `decided_at`); nach 14 Tagen weder in der Übersicht noch im PWA-Verlauf, da auch dieser Ablehnungen auf 14 Tage begrenzt |
+| OP-8 | Termin in 20 Tagen mit offener Rückmeldung | Erscheint weder in der Karte noch im PWA-Block (außerhalb des 14-Tage-Horizonts) |
+| OP-9 | PWA, Tab „Termine“: mehrere offene Rückmeldungen, davon eine zu einem Termin in 20 Tagen | Zähler am Tab „Termine“ zählt nur Rückmeldungen der nächsten 14 Tage, gleiche Zahl wie im Block „Offene Punkte“ |
+| OP-10 | PWA: Antrag stellen, danach 20 neuere Verlaufseinträge (Anwesenheiten) anhäufen, ohne über den Antrag zu entscheiden | Der seit Wochen wartende Antrag erscheint weiterhin im Verlauf, auch wenn 20 neuere Einträge existieren |
 
 ---
 
@@ -1358,4 +1429,4 @@ angegeben):
 | TS-10 | Als Manager: Serie anlegen (Kurzform von TS-1–TS-3) | Gelingt wie beim Admin |
 | TS-11 | Als Nutzer ohne Verwaltungsrecht: Kalender öffnen, auf einen leeren Tag klicken | Keine Reaktion; keine Serienknöpfe im Termin-Popup |
 | TS-12 | Bundesland in den Einstellungen wechseln (Termine → Kalender), zurück zum Kalender | Feiertagsnamen und -markierung ändern sich sofort, ohne Neuladen der Seite |
-| TS-13 | Als Manager/Admin: Herkunftsfilter auf „Nur Serientermine" bzw. „Ohne Serientermine" stellen | Liste, Kalender und Kennzahlen (Vergangene/Kommende) zeigen nur die passende Teilmenge; „Filter zurücksetzen" stellt „Alle" wieder her |
+| TS-13 | Als Manager/Admin: Herkunftsfilter auf „Nur Serientermine" bzw. „Ohne Serientermine" stellen | Liste, Kalender und Anzeige-Chips „Vergangen"/„Kommend" zeigen nur die passende Teilmenge; „Filter zurücksetzen" stellt „Alle" wieder her |

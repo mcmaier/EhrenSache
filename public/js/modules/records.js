@@ -8,7 +8,7 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-import { apiCall, isAdminOrManager } from './api.js';
+import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { loadAppointments } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
@@ -17,6 +17,7 @@ import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, 
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_ATTENDANCE } from './grouping.js';
+import { CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, countChips, filterByChip, resolveActiveChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // RECORDS
@@ -38,6 +39,9 @@ let currentAppointmentId = null;
 let currentMemberId = null;
 let currentAppointmentType = null;
 let isLoadingFilters = false;
+// Aktiver Status-Chip (Spec 2026-09-22). "missing" gibt es nur in den
+// Listenmodi; beim Wechsel zu ALL_RECORDS faellt er auf "all" zurueck.
+let recordStatusChip = 'all';
 
 /**
  * Einziger Weg, currentMode zu aendern.
@@ -131,7 +135,6 @@ export async function renderRecords(records, page = 1)
     
     if (!records || (records.length === 0)) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Einträge gefunden</td></tr>';
-        updateRecordStats([]);
         // Ohne diese beiden Zeilen blieb die Paginierung des vorigen Filters
         // stehen, und ein Klick darauf zeigte dessen Einträge wieder (OI-84)
         allFilteredRecords = [];
@@ -142,8 +145,6 @@ export async function renderRecords(records, page = 1)
     // Alle Records speichern für Pagination
     allFilteredRecords = records;
     currentRecordsPage = page;
-
-    updateRecordStats(records);
 
     recordsPerPage = globalPaginationValue;
 
@@ -343,33 +344,28 @@ window.goToRecordsPage = function(page) {
     }
 };
 
-function updateRecordStats(records) {    
-    const totalRecords = records.length;
-    const present = records.filter(r => r.status === 'present').length;
-    const excused = records.filter(r => r.status === 'excused').length;;
-    const absent = totalRecords - present;
+/**
+ * Zeichnet die Status-Chips fuer den aktuellen Modus und liefert die nach
+ * Chip gefilterte Liste. base ist die Liste NACH allen uebrigen Filtern und
+ * VOR dem Chip (facettierte Zaehlung).
+ */
+function applyRecordChips(base, rerender) {
+    const defs = currentMode === RecordMode.ALL_RECORDS ? CHIPS_RECORDS_ALL : CHIPS_RECORDS_LIST;
+    recordStatusChip = resolveActiveChip(defs, recordStatusChip, 'all');
 
-    if(currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT)
-    {
-        document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesende Mitglieder zum Termin';        
-        document.getElementById('statTotalRecords').textContent = present;
-        document.getElementById('statMissingRecordsTitle').innerHTML = 'Entschuldigt';
-        document.getElementById('statMissingRecords').textContent = excused;
-    }
-    else if(currentMode === RecordMode.ATTENDANCE_BY_MEMBER)
-    {
-        document.getElementById('statTotalRecordsTitle').innerHTML = 'Anwesend bei Terminen';
-        document.getElementById('statTotalRecords').textContent = present;
-        document.getElementById('statMissingRecordsTitle').innerHTML = 'Entschuldigt';
-        document.getElementById('statMissingRecords').textContent = excused;
-    } 
-    else
-    {
-        document.getElementById('statTotalRecordsTitle').innerHTML = 'Erfasste Anwesenheitseinträge';
-        document.getElementById('statTotalRecords').textContent = present;
-        document.getElementById('statMissingRecordsTitle').innerHTML = 'Entschuldigt';
-        document.getElementById('statMissingRecords').textContent = excused;
-    }           
+    renderFilterChips(
+        document.getElementById('recordStatusChips'),
+        defs, countChips(base, defs), recordStatusChip,
+        key => { recordStatusChip = key; rerender(); },
+        { label: 'Status der Anwesenheit' }
+    );
+
+    const anyFilter = ['filterAptType', 'filterAppointment', 'filterMember']
+        .some(id => Boolean(document.getElementById(id)?.value));
+    setResetEnabled(document.getElementById('resetRecordFilter'),
+        anyFilter || recordStatusChip !== 'all');
+
+    return filterByChip(base, defs, recordStatusChip);
 }
 
 export async function loadRecordFilters(forceReload = false) {
@@ -426,12 +422,9 @@ export async function loadRecordFilters(forceReload = false) {
         });
     }
     aptTypeSelect.value = currentAptTypeValue;
-
-    // Termin-Filter für non-Admin ausblenden
-    const appointmentFilterGroup = document.getElementById('filterAppointment')?.closest('.form-group');
-    if (appointmentFilterGroup) {
-        appointmentFilterGroup.style.display = isAdminOrManager ? '' : 'none';
-    }
+    // Terminfilter und Mitgliedsfilter sind Verwaltern vorbehalten; das
+    // regelt data-role am Wrapper (updateUIForRole), nicht mehr diese
+    // Funktion -- sonst blieb die leere form-group als Luecke stehen.
 
     loadAppointmentFilter(forceReload);
 
@@ -575,7 +568,8 @@ export async function applyRecordFilters(forceReload = false, currentPage = 1) {
     // Rendern (nur wenn auf Records-Section)
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'anwesenheit') {
-        renderRecords(activeFilteredRecords, currentPage);
+        const shown = applyRecordChips(activeFilteredRecords, () => applyRecordFilters(false, 1));
+        renderRecords(shown, currentPage);
         debug.log('Records rendered');
     }
 
@@ -713,6 +707,7 @@ export async function resetRecordFilter()
         memberFilter.value = '';
         //isAttendanceMode = false;
         setRecordMode(RecordMode.ALL_RECORDS);
+        recordStatusChip = 'all';
         currentAppointmentId = null;
         currentMemberId = null;
         currentAppointmentType = null;
@@ -1101,12 +1096,26 @@ let _lastMemberAttendanceData = null;
 // Spalten der Anwesenheitsliste im Modus 'appointment' (siehe updateTableHeader()).
 const ATTENDANCE_LIST_COLSPAN = 5;
 
+// Serverregel zur Selbstgenehmigung (OI-87). Vorgabe true: Ohne Auskunft
+// lieber keinen Knopf zeigen, den der Server ohnehin abweist.
+let _attendanceSelfBlocked = true;
+
+// Ein im Antragsdialog beschiedener Antrag verschwindet aus der Liste, sobald
+// sie neu geladen ist. Ein Ereignis statt eines Imports: exceptions.js müsste
+// sonst records.js einbinden, das umgekehrt schon geschieht.
+document.addEventListener('exception-saved', () => {
+    if (currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT && currentAppointmentId) {
+        loadAttendanceList(currentAppointmentId);
+    }
+});
+
 async function loadAttendanceList(appointmentId) {
     try {
         const attendance = await apiCall('attendance_list', 'GET', null, {appointment_id:appointmentId});
-        
+
         debug.log("Attendance Data:", attendance);
         if (attendance.success) {
+            _attendanceSelfBlocked = attendance.self_approval_blocked !== false;
             renderAttendanceList(attendance.members);
         }
     } catch (error) {
@@ -1115,11 +1124,11 @@ async function loadAttendanceList(appointmentId) {
 }
 
 function renderAttendanceList(attendanceData) {
+    // Volle Liste merken: Gruppierung und Chip-Wechsel rendern daraus neu.
     _lastAttendanceData = attendanceData;
 
     const tbody = document.getElementById('recordsTableBody');
-
-    updateRecordStats(attendanceData);
+    const shown = applyRecordChips(attendanceData, () => renderAttendanceList(_lastAttendanceData));
 
     const container = document.getElementById('recordsPagination');
     if (!container) return;
@@ -1130,15 +1139,21 @@ function renderAttendanceList(attendanceData) {
 
     updateTableHeader('appointment');
 
-    renderAttendanceGroupingBar(attendanceData);
+    renderAttendanceRequestChip(attendanceData);
+    renderAttendanceGroupingBar(shown);
+
+    if (shown.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${ATTENDANCE_LIST_COLSPAN}" class="loading">Keine Mitglieder für diese Auswahl</td></tr>`;
+        return;
+    }
 
     // Umschalter-Stufen und gemerkte Wahl (Spec 6.1/6.2). Fuer den Abschnitt
     // ohne Gruppe passt "Ohne Gruppe" nur bei 'group' -- bei 'subgroup' zeigt
     // er das eingestellte Wort (z.B. "Ohne Register").
-    const stages = groupingAvailableStages(attendanceData);
+    const stages = groupingAvailableStages(shown);
     const stage  = groupingStored(GROUPING_KEY_ATTENDANCE, stages, 'alpha');
     const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
-    const sections = groupingSections(attendanceData, stage, emptyLabel);
+    const sections = groupingSections(shown, stage, emptyLabel);
 
     const fragment = document.createDocumentFragment();
 
@@ -1185,6 +1200,82 @@ function renderAttendanceGroupingBar(attendanceData) {
 }
 
 /** Baut eine Tabellenzeile der Anwesenheitsliste fuer ein Mitglied. */
+/**
+ * „⏳ n offene Anträge“ über der Liste (OI-87).
+ *
+ * Reine Anzeige, kein Filter: Ein offener Antrag liegt quer zu den
+ * Status-Chips — das Mitglied ist dabei auch anwesend oder fehlend, und die
+ * Status-Chips einer Reihe müssen sich gegenseitig ausschließen. Gezählt wird
+ * über die volle Liste, nicht über die vom Chip gefilterte, und je Antrag
+ * einmal: Ein Mitglied mit mehreren Untergruppen steht mehrfach in der Liste.
+ */
+function renderAttendanceRequestChip(members) {
+    const container = document.getElementById('recordRequestChip');
+    if (!container) return;
+
+    const ids = new Set();
+    (members || []).forEach(m => (m.pending_exceptions || []).forEach(e => ids.add(e.exception_id)));
+
+    if (ids.size === 0) {
+        container.replaceChildren();
+        return;
+    }
+
+    renderFilterChips(container,
+        [{ key: 'pending', label: 'offene Anträge', variant: 'pending',
+           title: 'Anträge zu diesem Termin, über die noch nicht entschieden ist' }],
+        { pending: ids.size }, null, null,
+        { static: true, label: 'Offene Anträge' });
+}
+
+/** Offene Anträge eines Mitglieds als Zeilenzusatz und Knöpfe (OI-87). */
+function attendanceRequestParts(member) {
+    const antraege = member.pending_exceptions || [];
+    if (antraege.length === 0) return { hinweis: '', aktionen: '' };
+
+    // Der eigene Antrag: Der Server weist die Genehmigung ab, solange ein
+    // zweiter Verwalter da ist. Ohne zweiten bleibt sie erlaubt — dann zeigt
+    // die Zeile die Knöpfe wie bei jedem anderen Antrag.
+    const eigenerAntrag = _attendanceSelfBlocked
+        && currentUser?.member_id
+        && String(currentUser.member_id) === String(member.member_id);
+
+    const hinweis = antraege.map(a => {
+        const zeit = a.requested_arrival_time ? String(a.requested_arrival_time).slice(11, 16) : '';
+        const art = a.exception_type === 'absence'
+            ? 'Entschuldigung'
+            : (zeit ? `Zeitantrag ${zeit} Uhr` : 'Zeitantrag');
+
+        return `<div class="attendance-request-hint" title="${escapeHtml(a.reason || '')}">⏳ ${escapeHtml(art)}</div>`;
+    }).join('');
+
+    if (eigenerAntrag) {
+        return {
+            hinweis: hinweis + '<div class="attendance-request-hint">Eigener Antrag – ein anderer Verwalter entscheidet</div>',
+            aktionen: ''
+        };
+    }
+
+    // Ein Zeichen je Knopf: Die Aktionsknöpfe sind 32 × 32 px, zwei Zeichen
+    // brachen darin um (Sanduhr über dem Haken). Dass es um den Antrag geht und
+    // nicht um „anwesend setzen“, trägt die eigene Form (btn-request, gestrichelter
+    // Rand in der Antragsfarbe) zusammen mit dem Hinweis in derselben Zeile.
+    const aktionen = antraege.map(a => `
+            <button class="action-btn btn-icon btn-request btn-request--approve"
+                    onclick="quickApproveException(${Number(a.exception_id)})"
+                    title="Antrag genehmigen">
+                ✓
+            </button>
+            <button class="action-btn btn-icon btn-request btn-request--reject"
+                    onclick="quickRejectException(${Number(a.exception_id)})"
+                    title="Antrag ablehnen">
+                ✗
+            </button>
+    `).join('');
+
+    return { hinweis, aktionen };
+}
+
 function buildAttendanceRow(member) {
     const tr = document.createElement('tr');
 
@@ -1214,9 +1305,11 @@ function buildAttendanceRow(member) {
     const sourceInfo = getSourceBadge(member);
 
     // Status-Icon und Styling
+    const { hinweis, aktionen } = attendanceRequestParts(member);
+
     let statusHtml, rowClass;
     if (member.status === 'present') {
-        statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span';
+        statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span>';
         rowClass = '';
     } else if (member.status === 'excused') {
         statusHtml = '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
@@ -1225,6 +1318,10 @@ function buildAttendanceRow(member) {
         statusHtml = '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>';
         rowClass = 'table-secondary'; // Grau ausgegraut
     }
+
+    // Offene Anträge stehen unter dem Status: Sie sagen, was noch aussteht,
+    // während der Status sagt, was gilt.
+    statusHtml += hinweis;
 
     let actionsHtml;
     if (member.record_id) {
@@ -1263,7 +1360,7 @@ function buildAttendanceRow(member) {
         <td>${arrivalHtml}</td>
         <td>${statusHtml}</td>
         <td>${sourceInfo}</td>
-        <td>${actionsHtml}</td>
+        <td>${aktionen}${actionsHtml}</td>
     `;
 
     return tr;
@@ -1300,7 +1397,9 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
 
     const tbody = document.getElementById('recordsTableBody');
 
-    updateRecordStats(appointmentsData);
+    // Volle Liste bleibt in _lastMemberAttendanceData; gezeichnet wird die nach Chip gefilterte.
+    const shown = applyRecordChips(appointmentsData,
+        () => renderMemberAttendanceList(_lastMemberAttendanceData.appointments, _lastMemberAttendanceData.memberInfo));
 
     const container = document.getElementById('recordsPagination');
     if (!container) return;
@@ -1311,7 +1410,12 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
     // Neuer Header-Modus für Member-Ansicht
     updateTableHeader('member'); // 'member' = Member-Attendance-Modus
 
-    appointmentsData.forEach(appointment => {
+    if (shown.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">Keine Termine für diese Auswahl</td></tr>';
+        return;
+    }
+
+    shown.forEach(appointment => {
         const tr = document.createElement('tr');        
         
          // Termin-Info mit Terminart

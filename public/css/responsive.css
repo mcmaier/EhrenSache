@@ -44,19 +44,26 @@
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .content-header h1 {
         margin-bottom: var(--spacing-sm);
     }
-    
-    .filter-bar {
-        flex-direction: column;
-    }
-    
+
     .filter-bar .form-group {
         width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
     }
-    
+
+    /* In der gestapelten Gruppe liegt flex in der Hauptachse -- flex-basis: 0
+       wuerde die Hoehe ersetzen und das Feld auf Textzeilenhoehe druecken. */
+    .filter-bar .form-group select,
+    .filter-bar .form-group input[type="text"] {
+        flex: none;
+        height: 40px;
+    }
+
     .btn-reset-filter {
         width: 100%;
     }

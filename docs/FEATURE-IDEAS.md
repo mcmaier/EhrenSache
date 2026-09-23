@@ -54,7 +54,7 @@ durchschlägt.
 | [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht — **Variante B teilweise umgesetzt in 1.8.0** | mittel¹ | M | FI-1 für die Wirkung |
 | [FI-15](#fi-15--rolle-gruppenleiter) | Rolle „Gruppenleiter" | hoch | L | — |
 | [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) | Feiertage und Ferien im Terminkalender — **Feiertagsteil umgesetzt in 1.11.0, Ferien offen bei FI-18** | mittel | M | FI-7 für die Wirkung |
-| [FI-17](#fi-17--offene-punkte-unter-mein-konto) | Offene Punkte unter „Mein Konto" | hoch | S | — |
+| [FI-17](#fi-17--offene-punkte-unter-mein-konto) | Offene Punkte unter „Mein Konto" — **umgesetzt, Version offen** | hoch | S | — |
 | [FI-18](#fi-18--kalender-import-ics) | Kalender-Import (ICS) | niedrig | M | — |
 | [FI-19](#fi-19--terminvorlagen) | Terminvorlagen | niedrig | S | — |
 | [FI-20](#fi-20--einfache-umfragen) | Einfache Umfragen | niedrig | M | FI-6 |
@@ -335,7 +335,8 @@ Die Bausteine liegen bereits: Mailer, Vorlagensystem mit `base.html`, Service Wo
 
 **Anlässe, die es heute schon gäbe:** offene Rückmeldung vor Ablauf der Frist (die Frist selbst
 ist seit 1.7.0 gebaut, `responseDeadlineHours()`), Absage eines Mitglieds an Admin und Manager,
-Entscheidung über einen Antrag, Freigabe einer Arbeitszeit.
+Entscheidung über einen Antrag, Freigabe einer Arbeitszeit. Quelle der Anlässe ist seit FI-17
+`openItemsForMember()` in `private/helpers/open_items.php`.
 
 **Rückmeldung direkt aus der Mail** — ein signierter Einmal-Link je Mitglied und Termin, der
 ohne Anmeldung auf Zusage oder Absage führt. Das ist der Unterschied zwischen einer Mail, die
@@ -583,6 +584,15 @@ Einen „Feiertag-Import" gibt es in diesem Sinne nicht: berechnet, nicht eingel
 
 ### FI-17 · Offene Punkte unter „Mein Konto"
 **Nutzen:** hoch · **Aufwand:** S
+
+**Umgesetzt** (Branch `feat/fi17-offene-punkte`, Spec
+`docs/superpowers/specs/2026-09-22-offene-punkte-design.md`): Karte „Offene Punkte" im Dashboard
+unter „Mein Profil" und einklappbarer Block oben im PWA-Tab „Erfassen", beide gespeist über die
+neue Ressource `my_open_items` bzw. den Helfer `openItemsForMember()`. Entschieden wurde: nur
+systemerzeugte Punkte, kein Hinweistext eines Admins (dafür bräuchte es einen adressierten Weg,
+siehe „Vorher zu klären" unten); Ablehnungen bleiben 14 Tage ab Entscheidung sichtbar;
+Rückmeldungen zählen nur bis 14 Tage im Voraus, damit Terminserien die Übersicht nicht fluten;
+Antippen springt an die zuständige Stelle, statt die Aktion selbst anzubieten.
 
 Eine Übersicht im eigenen Bereich, die zeigt, was das System gerade von einem will: Termine
 ohne Rückmeldung, deren Frist läuft; ein abgelehnter oder noch offener Entschuldigungsantrag;
@@ -916,9 +926,9 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
    die lästigste wiederkehrende Arbeit im System und der häufigste Grund, es gar nicht erst zu
    benutzen. Es hing von nichts ab, und es beschafft FI-1 überhaupt erst die Termine, zu denen
    jemand etwas zurückmeldet.
-2. **FI-17 Offene Punkte unter „Mein Konto"** — kleinster sinnvoller Schritt gegen die
-   Holschuld. Kein Cron, kein Zustellrisiko, keine Einwilligung; bündelt, was FI-6 später
-   verschickt, und speist sich aus derselben Abfrage.
+2. ~~**FI-17 Offene Punkte unter „Mein Konto"**~~ (umgesetzt, Version offen) — kleinster
+   sinnvoller Schritt gegen die Holschuld. Kein Cron, kein Zustellrisiko, keine Einwilligung;
+   bündelt, was FI-6 später verschickt, und speist sich aus derselben Abfrage.
 3. **FI-14 Register** in der kleinen Variante (Gruppenart statt Hierarchie) — die
    Besetzungsansicht ist der Grund, warum die Zusagen aus 1.7.0 mehr sind als eine
    Anwesenheitsprognose. Fast kostenlos, solange niemand echte Vererbung verlangt.

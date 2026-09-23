@@ -11,6 +11,7 @@
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQRModal} from './ui.js';
 import { updateModalId, escapeHtml } from './utils.js';
+import { CHIPS_DEVICES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 import {debug} from '../app.js'
 
 // ============================================
@@ -22,6 +23,12 @@ import {debug} from '../app.js'
 let currentDevicesPage = 1;
 const devicesPerPage = 25;
 let allFilteredDevices = [];
+
+// Aktiver Status-Chip (Spec 2026-09-22)
+let deviceStatusChip = 'all';
+
+// Handler der Filterleiste werden einmalig registriert (Sichtung 23.09.2026)
+let deviceFilterInitialized = false;
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -63,7 +70,14 @@ function renderDevices(devices, page = 1)
     const tbody = document.getElementById('devicesTableBody');
     tbody.innerHTML = '';
 
-    updateDeviceStats(devices);
+    if (!devices || devices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">Keine Geräte für diese Auswahl</td></tr>';
+        // Sonst bleiben Seitenknöpfe der vorigen Liste stehen (OI-84)
+        allFilteredDevices = [];
+        currentDevicesPage = 1;
+        renderDevicesPagination(1, 0, 0);
+        return;
+    }
 
     // Alle Devices speichern für Pagination
     allFilteredDevices = devices;
@@ -96,8 +110,11 @@ function renderDevices(devices, page = 1)
         }[device.device_type] || '❓ Unbekannt';
 
         // Status
-        const statusBadge = device.is_active 
-            ? '<span class="badge badge-success">Aktiv</span>' 
+        // Wie die Kennzahl darüber und der Filter: auf 1 prüfen, nicht auf
+        // truthy. Liefert PDO die Spalte als Text, ist "0" truthy — die Liste
+        // zeigte dann „Aktiv“, während die Kennzahl das Gerät als inaktiv zählte.
+        const statusBadge = Number(device.is_active) === 1
+            ? '<span class="badge badge-success">Aktiv</span>'
             : '<span class="badge badge-inactive">Inaktiv</span>';
 
         // Token Expiry
@@ -207,14 +224,6 @@ function renderDevicesPagination(currentPage, totalPages, totalDevices) {
     container.innerHTML = html;
 }
 
-function updateDeviceStats(devices) {        
-    const activeDevices = devices.filter(u => u.is_active === 1 || u.is_active === true).length;    
-    const inactiveDevices = devices.length - activeDevices;
-    
-    document.getElementById('statActiveDevices').textContent = activeDevices;
-    document.getElementById('statInactiveDevices').textContent = inactiveDevices;    
-}
-
 // Global für onclick
 window.goToDevicesPage = function(page) {
 
@@ -242,13 +251,43 @@ export async function showDeviceSection(forceReload = false, page = 1)
 {
     debug.log("Show Device Section ()");
 
-    //applyDeviceFilters(forceReload, page);
-    
-    const allDevices = await loadDevices(forceReload);
+    const allDevices = await loadDevices(forceReload) || [];
+
+    if (!deviceFilterInitialized && isAdmin) {
+        document.getElementById('filterDeviceType')
+            ?.addEventListener('change', () => showDeviceSection(false, 1));
+        document.getElementById('resetDeviceFilter')
+            ?.addEventListener('click', () => resetDeviceFilter());
+        deviceFilterInitialized = true;
+    }
+
+    const typ = document.getElementById('filterDeviceType')?.value || '';
+
+    // Basis: Typfilter. Darauf zaehlen die Chips, erst danach filtert der Chip.
+    const base = typ ? allDevices.filter(d => d.device_type === typ) : allDevices;
+
+    // Die Karten zaehlten bis 1.12 strikt is_active === 1, das Badge dagegen
+    // truthy. CHIPS_DEVICES nutzt Number(is_active) === 1 fuer beide gleich.
+    renderFilterChips(
+        document.getElementById('deviceStatusChips'),
+        CHIPS_DEVICES, countChips(base, CHIPS_DEVICES), deviceStatusChip,
+        key => { deviceStatusChip = key; showDeviceSection(false, 1); },
+        { label: 'Status der Geräte' }
+    );
+    setResetEnabled(document.getElementById('resetDeviceFilter'),
+        Boolean(typ) || deviceStatusChip !== 'all');
+
     // Bis 1.9.1 stand hier fest die 1 -- der Parameter wurde entgegen-
     // genommen und verworfen, ein Sprung auf Seite 2 landete wieder auf 1.
-    renderDevices(allDevices, page);
-    
+    renderDevices(filterByChip(base, CHIPS_DEVICES, deviceStatusChip), page);
+}
+
+/** Setzt Typfilter und Chip auf die Vorgabe zurueck. */
+export function resetDeviceFilter() {
+    const typEl = document.getElementById('filterDeviceType');
+    if (typEl) typEl.value = '';
+    deviceStatusChip = 'all';
+    showDeviceSection(false, 1);
 }
 
 export async function applyDeviceFilters(forceReload = false, page = 1) {
@@ -301,10 +340,10 @@ export async function initDevicesEventHandlers()
     if (!isAdmin) return;
 
         // Hier standen bis 1.9.1 drei Handler fuer filterDeviceRole,
-        // filterDeviceStatus und resetDeviceFilters. Keines dieser Elemente
-        // gibt es im Markup -- die Geraeteliste hat keine Filterleiste. Der
-        // Reset-Handler haette beim Feuern sogar geworfen: Er griff ohne
-        // Optional Chaining auf .value zu (OI-29).
+        // filterDeviceStatus und resetDeviceFilters -- keines dieser Elemente
+        // gab es im Markup (OI-29). Die Filterleiste von 1.13.0 haengt ihre
+        // beiden Handler in showDeviceSection() ein, einmalig und erst dann,
+        // wenn der Bereich wirklich gezeichnet wird.
 
 
     // Devices laden und anzeigen
@@ -647,3 +686,4 @@ window.toggleDeviceTokenVisibility = toggleDeviceTokenVisibility;
 window.generateTotpSecret = generateTotpSecret;
 window.showDeviceQR = showDeviceQR;
 window.applyDeviceFilters = applyDeviceFilters;
+window.resetDeviceFilter = resetDeviceFilter;

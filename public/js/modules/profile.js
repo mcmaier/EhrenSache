@@ -13,6 +13,7 @@ import { showToast, showConfirm, dataCache, invalidateCache } from './ui.js';
 import { loadUserData } from './users.js';
 import { debug } from '../app.js'
 import { API_BASE } from '../config.js';
+import { loadOpenItems } from './open_items.js';
 
 // ============================================
 // PROFLE
@@ -25,6 +26,8 @@ import { API_BASE } from '../config.js';
 // ============================================
 
 export async function loadProfile(forceReload = false) {
+
+    loadOpenItems();
 
     await loadUserData(forceReload);
 

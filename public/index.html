@@ -15,7 +15,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EhrenSache - Dashboard</title>
 
-    <link rel="stylesheet" href="css/main.css?v=1.12.1">
+    <link rel="stylesheet" href="css/main.css?v=1.13.0">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <meta name="robots" content="noindex, nofollow">
     <script type="module" src="js/theme.js"></script>
@@ -129,6 +129,12 @@
                 </div>
 
                 <div class="profile-container">
+                    <!-- Offene Punkte (FI-17) -->
+                    <div class="profile-card open-items-card" id="openItemsCard" hidden>
+                        <h3>Offene Punkte</h3>
+                        <div id="openItemsList" class="open-items-list"></div>
+                    </div>
+
                     <!-- Account-Informationen -->
                     <div class="profile-card">
                         <h3>Account-Informationen</h3>
@@ -878,20 +884,11 @@
                         <button class="btn-add" data-role="manager" onclick="openAppointmentModal()">+ Neuer Termin</button>
                      </div>
                 </div>
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Vergangene Termine</h3>
-                        <div class="number" id="statPastAppointments">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Kommende Termine</h3>
-                        <div class="number" id="statUpcomingAppointments">-</div>
-                    </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
-                        <h3>Jahr filtern</h3>
-                        <select id="appointmentYearFilter"
-                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
-                        </select>
+                <div class="stats-grid stats-grid--chips">
+                    <div class="filter-chips" id="appointmentTimeChips"></div>
+                    <div class="year-filter">
+                        <label for="appointmentYearFilter">Jahr:</label>
+                        <select id="appointmentYearFilter"></select>
                     </div>
                 </div>
 
@@ -913,7 +910,7 @@
                             <option value="single">Ohne Serientermine</option>
                         </select>
                     </div>
-                    <button id="resetAppointmentFilter" class="btn-reset-filter">Filter zurücksetzen</button>
+                    <button id="resetAppointmentFilter" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
                 <!-- Kalenderansicht -->
@@ -972,20 +969,13 @@
                     </div>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3 id="statTotalRecordsTitle">Erfasste Anwesenheiten</h3>
-                        <div class="number" id="statTotalRecords">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3 id="statMissingRecordsTitle">Abwesend</h3>
-                        <div class="number" id="statMissingRecords">-</div>
-                    </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
-                        <h3>Jahr filtern</h3>
-                        <select id="recordYearFilter"
-                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
-                        </select>
+                <div class="stats-grid stats-grid--chips">
+                    <div class="filter-chips" id="recordStatusChips"></div>
+                    <!-- Zaehler offener Antraege (OI-87): reine Anzeige, kein Filter -->
+                    <div class="filter-chips" id="recordRequestChip"></div>
+                    <div class="year-filter">
+                        <label for="recordYearFilter">Jahr:</label>
+                        <select id="recordYearFilter"></select>
                     </div>
                 </div>
 
@@ -997,19 +987,19 @@
                             <option value="">Alle Termine</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" data-role="manager">
                         <label for="filterAppointment">Filter nach Termin:</label>
                         <select id="filterAppointment"> <!-- onchange="applyRecordFilters()"> -->
                             <option value="">Alle Termine</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" data-role="manager">
                         <label for="filterMember">Filter nach Mitglied:</label>
                         <select id="filterMember" ><!--onchange="applyRecordFilters()"> -->
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
-                    <button id="resetRecordFilter" onclick="resetRecordFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
+                    <button id="resetRecordFilter" onclick="resetRecordFilter()" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->
@@ -1045,34 +1035,16 @@
                     <button class="btn-add" onclick="openExceptionModal()">+ Neuer Antrag</button>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Ausstehende Anträge</h3>
-                        <div class="number" id="statPendingExceptions">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Genehmigte Anträge</h3>
-                        <div class="number" id="statApprovedExceptions">-</div>
-                    </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
-                        <h3>Jahr filtern</h3>
-                        <select id="exceptionYearFilter"
-                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">                            
-                        </select>
+                <div class="stats-grid stats-grid--chips">
+                    <div class="filter-chips" id="exceptionStatusChips"></div>
+                    <div class="year-filter">
+                        <label for="exceptionYearFilter">Jahr:</label>
+                        <select id="exceptionYearFilter"></select>
                     </div>
                 </div>
 
                 <!-- Filter-Leiste -->
                 <div class="filter-bar">
-                    <div class="form-group">
-                        <label for="filterExceptionStatus">Status:</label>
-                        <select id="filterExceptionStatus">
-                            <option value="">Alle</option>
-                            <option value="pending">Ausstehend</option>
-                            <option value="approved">Genehmigt</option>
-                            <option value="rejected">Abgelehnt</option>
-                        </select>
-                    </div>
                     <div class="form-group">
                         <label for="filterExceptionType">Typ:</label>
                         <select id="filterExceptionType">
@@ -1081,8 +1053,8 @@
                             <option value="time_correction">Zeitkorrektur</option>
                         </select>
                     </div>
-                    <button id="resetExceptionFilter" class="btn-reset-filter">Filter zurücksetzen</button>
-                </div>                
+                    <button id="resetExceptionFilter" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
+                </div>
                  <!-- Pagination OBEN -->
                 <div id="exceptionsPagination"></div>
 
@@ -1114,71 +1086,38 @@
                         <button class="btn-secondary" id="btnStatisticsReport">📄 Bericht</button>
                     </div>
                 </div>
-                <div class="stats-header">
-                    <div class="filter-card">
-                        <div class="filter-grid">
-                            <div class="form-group">
-                                <label for="statGroup">Gruppe</label>
-                                <select id="statGroup" class="form-input">
-                                    <option value="">Alle Gruppen</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group" id="statMemberFilterGroup" style="display:none;">
-                                <label for="statMember">Mitglied</label>
-                                <select id="statMember" class="form-input">
-                                    <option value="">Alle Mitglieder</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button id="resetStatisticsFilter" onclick="resetStatisticsFilter()"
-                                class="btn-reset-filter">Filter zurücksetzen</button>
-                    </div>                
-                    <!--<div class="year-card">-->
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">                        
-                        <h3>Jahr filtern</h3>
-                        <select id="statisticYearFilter" class="form-input year-select"
-                            style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
+                <div class="stats-grid stats-grid--chips">
+                    <div class="filter-chips-block">
+                        <div class="filter-chips" id="statisticsChips"></div>
+                        <!-- Grund fuer ein "–" bei einer Quote: ein title allein ist
+                             auf Tastatur und Touch nicht erreichbar. -->
+                        <p class="filter-chips__hint" id="statisticsChipsHint" hidden></p>
+                    </div>
+                    <div class="year-filter">
+                        <label for="statisticYearFilter">Jahr:</label>
+                        <select id="statisticYearFilter"></select>
+                    </div>
+                </div>
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="statGroup">Gruppe</label>
+                        <select id="statGroup">
+                            <option value="">Alle Gruppen</option>
                         </select>
                     </div>
+                    <div class="form-group" id="statMemberFilterGroup" style="display:none;">
+                        <label for="statMember">Mitglied</label>
+                        <select id="statMember">
+                            <option value="">Alle Mitglieder</option>
+                        </select>
+                    </div>
+                    <button id="resetStatisticsFilter" onclick="resetStatisticsFilter()"
+                            class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Termine gesamt</h3>
-                        <div class="number" id="statTotalAppointments">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Anwesend</h3>
-                        <div class="number" id="statTotalPresent">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Entschuldigt</h3>
-                        <div class="number" id="statTotalExcused">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Unentschuldigt</h3>
-                        <div class="number" id="statTotalUnexcused">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Durchschnitt</h3>
-                        <div class="number" id="statOverallAverage">-</div>
-                    </div>
-                    <!-- Nur sichtbar, wenn die Kennzahl eingeschaltet ist. Keine
-                         Farbskala: die gehoert zu OI-55 und wird fuer beide
-                         Quoten gemeinsam entschieden. -->
-                    <div class="stat-card" id="statPunctualityCard" hidden>
-                        <h3>Pünktlichkeit</h3>
-                        <div class="number" id="statPunctuality">-</div>
-                        <small class="stat-detail" id="statPunctualityDetail"></small>
-                    </div>
-                    <div class="stat-card" id="statReliabilityCard" hidden>
-                        <h3>Zuverlässigkeit</h3>
-                        <div class="number" id="statReliability">-</div>
-                        <small class="stat-detail" id="statReliabilityDetail"></small>
-                    </div>
-                </div>
-
+                <!-- Durchschnitt, Pünktlichkeit und Zuverlässigkeit stehen seit
+                     1.13.0 als Anzeige-Chips im Kopf; ihr Erklärtext liegt im
+                     Tooltip. Abgeschaltete Kennzahlen erscheinen gar nicht. -->
                 <div id="statisticsContainer"></div>
             </div>
             
@@ -1193,38 +1132,23 @@
                     </div>
                 </div>
                 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Aktive Mitglieder</h3>
-                        <div class="number" id="statActiveMembersCount">-</div>                                             
-                    </div>
-                    <div class="stat-card">
-                        <h3>Inaktive Mitglieder</h3>
-                        <div class="number" id="statInactiveMembersCount">-</div>
-                    </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
-                        <h3>Jahr filtern</h3>
-                        <select id="memberYearFilter"
-                                style="width: 100%; padding: 6px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
-                        </select>
+                <div class="stats-grid stats-grid--chips">
+                    <div class="filter-chips" id="memberStatusChips" hidden></div>
+                    <div class="year-filter">
+                        <label for="memberYearFilter">Jahr:</label>
+                        <select id="memberYearFilter"></select>
                     </div>
                 </div>
 
                 <!-- Filter-Leiste -->
-                <div class="filter-bar">                    
+                <div class="filter-bar">
                     <div class="form-group">
                         <label for="filterMemberGroup">Filter nach Gruppe</label>
                         <select id="filterMemberGroup" >
                             <option value="">Alle Gruppen</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="show_inactive_members">
-                            Inaktive anzeigen
-                        </label>
-                    </div>
-                    <button id="resetMemberFilter" onclick="resetMemberFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
+                    <button id="resetMemberFilter" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->
@@ -1258,41 +1182,18 @@
                     </div>  
                 </div>
 
-                <div class="controls">
-                    <div class="filter-row">
-                        <!-- Links: Status-Buttons -->
-                        <div id="userStatusFilter" class="status-filter-group">
-                            <button class="filter-btn active" data-status="all" onclick="setUserStatusFilter('all')">
-                                Alle (<span id="count-all">0</span>)
-                            </button>
-                            <button class="filter-btn pending" data-status="pending" onclick="setUserStatusFilter('pending')">
-                                ⏳ Ausstehend (<span id="count-pending">0</span>)
-                            </button>
-                            <button class="filter-btn active-status" data-status="active" onclick="setUserStatusFilter('active')">
-                                ✓ Aktiv (<span id="count-active">0</span>)
-                            </button>
-                            <button class="filter-btn suspended" data-status="suspended" onclick="setUserStatusFilter('suspended')">
-                                🚫 Gesperrt (<span id="count-suspended">0</span>)
-                            </button>
-                        </div>
-                        
-                        <!-- Rechts: Rolle + Reset -->
-                        <div class="filter-controls">
-                            <div class="filter-group">
-                                <label for="userRoleFilter">Rolle:</label>
-                                <select id="userRoleFilter" onchange="applyUserFilters()">
-                                    <option value="">Alle Rollen</option>
-                                    <option value="admin">Administrator</option>
-                                    <option value="manager">Manager</option>
-                                    <option value="user">Benutzer</option>
-                                </select>
-                            </div>
-                            
-                            <button id= "btnResetUserFilters" class="btn-reset-filter">
-                                Filter zurücksetzen
-                            </button>
-                        </div>
+                <div class="filter-chips filter-chips--standalone" id="userStatusChips"></div>
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="userRoleFilter">Rolle:</label>
+                        <select id="userRoleFilter">
+                            <option value="">Alle Rollen</option>
+                            <option value="admin">Administrator</option>
+                            <option value="manager">Manager</option>
+                            <option value="user">Benutzer</option>
+                        </select>
                     </div>
+                    <button id="btnResetUserFilters" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->
@@ -1325,17 +1226,19 @@
                     </div>  
                 </div>
 
-                <!-- Stats Grid -->
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Aktive Geräte</h3>
-                        <div class="number" id="statActiveDevices">-</div>
+                <div class="filter-chips filter-chips--standalone" id="deviceStatusChips"></div>
+                <div class="filter-bar">
+                    <div class="form-group">
+                        <label for="filterDeviceType">Typ:</label>
+                        <select id="filterDeviceType">
+                            <option value="">Alle Typen</option>
+                            <option value="totp_location">🔢 TOTP-Station</option>
+                            <option value="auth_device">🔐 Auth-Gerät</option>
+                            <option value="kiosk">🖥️ Virtuelle Station</option>
+                        </select>
                     </div>
-                    <div class="stat-card">
-                        <h3>Inaktive Geräte</h3>
-                        <div class="number" id="statInactiveDevices">-</div>
-                    </div>
-                </div>                                               
+                    <button id="resetDeviceFilter" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
+                </div>
 
                  <!-- Pagination OBEN -->
                 <div id="devicePagination"></div>
@@ -1371,6 +1274,7 @@
                         <h2 style="margin: 0;">👥 Benutzergruppen</h2>
                         <button class="btn-add" onclick="openGroupModal()">+ Neue Gruppe</button>
                     </div>
+                    <div class="filter-chips filter-chips--standalone" id="groupChipsRow"></div>
                     <table>
                         <thead>
                             <tr>
@@ -1393,6 +1297,7 @@
                         <h2 style="margin: 0;">📅 Terminarten</h2>
                         <button class="btn-add" onclick="openTypeModal()">+ Neue Terminart</button>
                     </div>
+                    <div class="filter-chips filter-chips--standalone" id="typeChipsRow"></div>
                     <table>
                         <thead>
                             <tr>
@@ -1416,6 +1321,7 @@
                         <h2 style="margin: 0;">⏱️ Tätigkeitsarten</h2>
                         <button class="btn-add" onclick="openActivityTypeModal()">+ Neue Tätigkeitsart</button>
                     </div>
+                    <div class="filter-chips filter-chips--standalone" id="activityChipsRow"></div>
                     <table>
                         <thead>
                             <tr>
@@ -1445,37 +1351,15 @@
                     </div>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <h3>Bestätigte Stunden</h3>
-                        <div class="number" id="statWorktimeTotal">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Wartet auf Freigabe</h3>
-                        <div class="number" id="statWorktimePending">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Laufende Sitzungen</h3>
-                        <div class="number" id="statWorktimeOpen">-</div>
-                    </div>
-                    <div class="stat-card" style="background: var(--bg-light); border-left-color: var(--secondary-color);">
-                        <h3>Jahr filtern</h3>
-                        <select id="worktimeYearFilter"
-                                style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 16px; font-weight: 600; cursor: pointer;">
-                        </select>
+                <div class="stats-grid stats-grid--chips">
+                    <div class="filter-chips" id="worktimeStatusChips"></div>
+                    <div class="year-filter">
+                        <label for="worktimeYearFilter">Jahr:</label>
+                        <select id="worktimeYearFilter"></select>
                     </div>
                 </div>
 
                 <div class="filter-bar">
-                    <div class="form-group">
-                        <label for="filterWorktimeStatus">Status:</label>
-                        <select id="filterWorktimeStatus">
-                            <option value="">Alle</option>
-                            <option value="submitted">Wartet auf Freigabe</option>
-                            <option value="confirmed">Bestätigt</option>
-                            <option value="rejected">Abgelehnt</option>
-                        </select>
-                    </div>
                     <div class="form-group">
                         <label for="filterWorktimeActivity">Tätigkeit:</label>
                         <select id="filterWorktimeActivity">
@@ -1488,7 +1372,7 @@
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
-                    <button onclick="resetWorktimeFilter()" class="btn-reset-filter">Filter zurücksetzen</button>
+                    <button id="resetWorktimeFilter" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
                 <div class="data-table">
@@ -1525,7 +1409,7 @@
                                 <option value="appointments">Termine</option>
                             </select>
                         </div>
-                        <button class="btn-reset-filter" onclick="window.ImportLogs.refresh()">
+                        <button class="btn-secondary" onclick="window.ImportLogs.refresh()">
                             🔄 Aktualisieren
                         </button>
                     </div>

@@ -99,6 +99,7 @@ const DEMO_READ_ONLY = [
     'version',
     'session_info',
     'my_data',
+    'my_open_items',
     'statistics',
     'statistics_report',
     'available_years',

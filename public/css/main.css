@@ -23,6 +23,8 @@
 @import url('components/tables.css');
 @import url('components/modals.css');
 @import url('components/badges.css');
+@import url('components/filter-chips.css');
+@import url('components/year-filter.css');
 @import url('components/calendar.css');
 @import url('components/toast.css');
 @import url('components/loading.css');

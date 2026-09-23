@@ -9,11 +9,9 @@ declare(strict_types=1);
  * Bedienelemente aus den Kennzahlkarten verschwunden sind und dass der
  * Kalender seine Daten nicht mehr am Cache vorbei zieht.
  *
- * Die Pruefung auf show_inactive_members ist die wichtigste: Im Markup stand
- * ein auskommentierter Block mit derselben ID. Wird er entkommentiert statt
- * ersetzt, existiert die ID zweimal und getElementById() trifft das falsche
- * Element -- ein Fehler, den man im Browser nicht sieht, weil die Checkbox
- * trotzdem erscheint.
+ * Seit 1.13.0 (Spec 2026-09-22) ersetzen Status-Chips die Statuskarten und
+ * -Auswahlfelder mehrerer Bereiche; deren Pruefungen stehen in
+ * filter_chips_frontend.php.
  */
 
 $dfRoot = dirname(__DIR__, 2);
@@ -73,27 +71,16 @@ test('Die alte Auto-Checkbox ist verschwunden', function () use ($dfHtml) {
                'appointmentAutoFilter darf nicht mehr vorkommen');
 });
 
-test('show_inactive_members existiert genau einmal', function () use ($dfHtml) {
-    assertSame(1, substr_count($dfHtml, 'show_inactive_members'),
-               'Doppelte ID: der auskommentierte Block muss ERSETZT, nicht ergaenzt werden');
-});
-
-test('Die Inaktiv-Checkbox steht in der Filterleiste', function () use ($dfHtml) {
+// Seit 1.13.0 (Spec 2026-09-22) ersetzen Status-Chips den Inaktiv-Schalter
+// und die beiden Mitgliederkarten. Die Pruefungen dazu stehen in
+// filter_chips_frontend.php; hier bleibt nur die Gegenprobe, dass der
+// Gruppenfilter in der Filterleiste steht.
+test('Der Gruppenfilter der Mitglieder steht in der Filterleiste', function () use ($dfHtml) {
     $bereich = dfBereich($dfHtml, 'mitglieder', 'benutzer');
-
     $leiste = strpos($bereich, '<div class="filter-bar">');
-    $box    = strpos($bereich, 'show_inactive_members');
-
-    assertTrue($leiste !== false, 'Filterleiste der Mitglieder fehlt');
-    assertTrue($box !== false, 'Inaktiv-Checkbox fehlt');
-    assertTrue($box > $leiste, 'Die Checkbox muss in der Filterleiste stehen, nicht in der Karte');
-});
-
-test('Die Inaktiv-Karte behaelt ihre Zahl', function () use ($dfHtml) {
-    $bereich = dfBereich($dfHtml, 'mitglieder', 'benutzer');
-
-    assertTrue(str_contains($bereich, 'id="statInactiveMembersCount"'),
-               'Die Kennzahl der inaktiven Mitglieder darf nicht entfallen');
+    $gruppe = strpos($bereich, 'id="filterMemberGroup"');
+    assertTrue($leiste !== false && $gruppe !== false && $gruppe > $leiste,
+        'filterMemberGroup gehoert in die Filterleiste');
 });
 
 test('Der Kalender liest den Cache nicht mehr direkt', function () use ($dfJs) {
@@ -128,24 +115,19 @@ function dfFunktion(string $js, string $name): string
     return substr($js, $start);
 }
 
-test('Mitglieder-Kennzahlen folgen dem Gruppenfilter', function () use ($dfRoot) {
-    $js    = (string) file_get_contents($dfRoot . '/public/js/modules/members.js');
-    $rumpf = dfFunktion($js, 'updateMemberStats');
-
-    assertTrue(str_contains($rumpf, 'filterMemberGroup'),
-               'updateMemberStats() muss den Gruppenfilter beruecksichtigen');
-    // OI-71: Der Schalter "Inaktive anzeigen" darf die Karten NICHT beeinflussen,
-    // sonst zeigt "Inaktive" genau dann 0, wenn der Haken aus ist.
-    assertSame(0, substr_count($rumpf, 'show_inactive_members'),
-               'Die Kennzahlen duerfen nicht vom Inaktiv-Schalter abhaengen (OI-71)');
-});
-
+// updateWorktimeStats() ist seit der Stunden-Anzeige-Chip-Umstellung (OI-86,
+// Task 3) aufgegangen: die Summe wird jetzt inline in renderWorkSessions()
+// berechnet. Die Gegenprobe bleibt dieselbe -- nur die Fundstelle wechselt.
 test('Arbeitszeit-Kennzahlen zaehlen nur den gefilterten Stand', function () use ($dfRoot) {
     $js    = (string) file_get_contents($dfRoot . '/public/js/modules/worktime.js');
-    $rumpf = dfFunktion($js, 'updateWorktimeStats');
+    $rumpf = dfFunktion($js, 'renderWorkSessions');
 
-    assertSame(0, preg_match('/\ball\s*\./', $rumpf),
-               'updateWorktimeStats() darf nicht mehr auf den Gesamtbestand (all) zugreifen');
+    assertTrue(str_contains($rumpf, 'bestaetigteMinuten'),
+               'Die Stundensumme muss weiter in renderWorkSessions berechnet werden');
+    // Die Summe folgt Taetigkeit und Mitglied (base), nicht dem Statuschip und
+    // nicht dem ungefilterten Parameter (sessions) -- genau das pinnt diese Probe.
+    assertSame(1, preg_match('/bestaetigteMinuten\s*=\s*base\s*\.filter\(/', $rumpf),
+               'Die Stundensumme muss aus der Basisliste (base), nicht aus dem ungefilterten Bestand (sessions) berechnet werden');
 });
 
 /**

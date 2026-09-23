@@ -270,6 +270,45 @@ const TIME_CORRECTION_CLOCK_SKEW_MINUTES = 5;
  * sind Wandzeit-Werte wie NOW() (siehe stationNow(), OI-60). Ein unbekannter
  * Termin gilt nicht als zu früh — den weist die Fensterprüfung ab.
  */
+/**
+ * Gibt es außer diesem Konto ein weiteres, das freigeben darf? (OI-87)
+ *
+ * Maßgeblich ist das Konto, nicht ein verknüpftes Mitglied: Freigeben verlangt
+ * nur die Rolle. Im Testbestand etwa hat das Admin-Konto gar kein Mitglied und
+ * kann den Antrag des Managers trotzdem bescheiden.
+ *
+ * Ohne zweites Konto bleibt die Selbstgenehmigung erlaubt — sonst hinge im
+ * Verein mit einem einzigen Verwalter jeder seiner eigenen Anträge fest.
+ */
+function otherActiveApproverExists($db, $database, int $userId): bool
+{
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT 1 FROM {$prefix}users
+                          WHERE role IN ('admin', 'manager')
+                            AND is_active = 1
+                            AND account_status = 'active'
+                            AND user_id <> ?
+                          LIMIT 1");
+    $stmt->execute([$userId]);
+
+    return (bool) $stmt->fetchColumn();
+}
+
+/**
+ * Mitglied, das zu einem Konto gehört — oder null. (OI-87)
+ */
+function memberIdOfUser($db, $database, int $userId): ?int
+{
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $memberId = $stmt->fetchColumn();
+
+    return $memberId === false || $memberId === null ? null : (int) $memberId;
+}
+
 function timeCorrectionTooEarly($db, $database, int $appointmentId,
                                 ?string $arrivalTime, int $toleranceHours): bool
 {

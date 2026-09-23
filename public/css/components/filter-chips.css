@@ -1,0 +1,185 @@
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/* Status-Chips mit Zaehler (Spec 2026-09-22, OI-86). Vorbild .response-chip
+   in badges.css: blasser Grund, Text in der Akzentfarbe. Nur Tokens -- die
+   Suite filter_chips_frontend verbietet Hex-Werte in dieser Datei. */
+
+/* Kopfzeile: Chips links, Jahreskarte rechts (feste Stelle, siehe
+   Jahresfilter-Konvention). Auf schmalen Bildschirmen setzt responsive.css
+   .stats-grid auf eine Spalte -- das gilt auch hier, weil responsive.css
+   spaeter geladen wird. */
+.stats-grid--chips {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
+}
+
+/* Ist die Chip-Leiste verborgen (Mitglieder als Rolle "user"), gibt sie ihre
+   Spalte frei und die Jahresauswahl wuerde sich sonst ueber das ganze Grid
+   dehnen. -2/-1 zeigt immer auf die letzten beiden Linien -- damit bleibt
+   sie rechts, egal ob zwei oder (mobil) eine Spalte im Grid stehen. */
+.stats-grid--chips .year-filter {
+    grid-column: -2 / -1;
+}
+
+.filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    align-content: center;
+    gap: var(--spacing-sm);
+    padding: 12px;
+    background: var(--bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Ohne diese Regel schluege display:flex das hidden des Browsers
+   (Mitglieder blenden die Chips fuer einfache Nutzer aus). */
+.filter-chips[hidden] {
+    display: none;
+}
+
+/* Ohne stats-grid (Benutzer, Geraete): eigener Abstand nach unten */
+.filter-chips--standalone {
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Chipzeile mit Erklaerzeile darunter (Statistik). Der Block steht an der
+   Stelle, an der sonst die Chipzeile selbst im Raster sitzt -- die Karte
+   traegt weiterhin nur die Zeile, der Hinweis steht darunter im Freien. */
+.filter-chips-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    min-width: 0;
+}
+
+.filter-chips-block > .filter-chips {
+    flex: 1;
+}
+
+/* Grund fuer ein "–" bei einer Quote, sichtbar statt nur im title: Einen
+   Tooltip erreicht weder Tastatur noch Touch (Sichtung 23.09.2026). */
+.filter-chips__hint {
+    margin: 0;
+    padding: 0 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-medium);
+}
+
+/* Im Gruppenblock der Statistik traegt der Container ebenfalls keine zweite
+   Karte -- er steht bereits auf der Karte der Gruppe. */
+.statistics-group > .filter-chips {
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: var(--spacing-md);
+}
+
+/* Innerhalb einer Datentabellen-Karte traegt der Container keine zweite Karte. */
+.data-table > .filter-chips--standalone {
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: var(--spacing-md);
+}
+
+/* Kontrast (WCAG AA, >= 4.5:1): --chip-text-mix bestimmt, wie viel Chipfarbe
+   in den Text einfliesst -- weniger Chipfarbe, mehr --text-dark. Die Vorgabe
+   40% deckt den neutralen Chip (Text: --text-light, sowohl ruhend als auch
+   aktiv mit --primary-color) sowie --danger und --info mit Reserve ab; nur
+   --pending und --ok brauchen einen eigenen, niedrigeren Wert (Warnorange
+   und Gruen verlieren sonst zu schnell Kontrast). Geprueft mit einem
+   Wegwerf-Node-Skript (nicht im Repo) gegen alle vier Hintergruende, die
+   ein Chip tatsaechlich zeigt: ruhend (8% Chipfarbe auf --bg-white), aktiv
+   (22%), sowie die Zaehl-Badge (18% Chipfarbe/transparent) auf beiden.
+   Schwaechster Wert je Chip, --text-dark #2F3A45 auf --bg-white #ffffff:
+
+     Chip               Mix   ruhend  aktiv  Badge/ruhend  Badge/aktiv
+     pending (#f39c12)  35%   5.93:1  5.32:1   5.21:1        4.76:1
+     ok      (#27ae60)  35%   6.49:1  5.63:1   5.49:1        4.87:1
+     danger  (#e74c3c)  40%   7.17:1  5.97:1   5.77:1        4.93:1
+     info    (#1F5FBF)  40%   8.13:1  6.56:1   6.30:1        5.21:1
+     neutral (#7f8c8d)  40%   6.46:1  5.57:1   5.41:1        4.75:1
+     neutral aktiv (primary, s.o.) -- identisch zu info
+
+   Alle Werte >= 4.5:1, kleinster Puffer bei der Badge im aktiven Zustand. */
+.filter-chip {
+    --chip-color: var(--text-light);
+    --chip-text-mix: 40%;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 1px solid color-mix(in srgb, var(--chip-color) 35%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--chip-color) 8%, var(--bg-white));
+    color: color-mix(in srgb, var(--chip-color) var(--chip-text-mix), var(--text-dark));
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.filter-chip:hover {
+    background: color-mix(in srgb, var(--chip-color) 16%, var(--bg-white));
+}
+
+.filter-chip:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.filter-chip__count {
+    min-width: 1.6em;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--chip-color) 18%, transparent);
+    font-size: 12px;
+    text-align: center;
+}
+
+.filter-chip--pending { --chip-color: var(--warning-color); --chip-text-mix: 35%; }
+.filter-chip--ok      { --chip-color: var(--success-color); --chip-text-mix: 35%; }
+.filter-chip--danger  { --chip-color: var(--danger-color); }
+.filter-chip--info    { --chip-color: var(--primary-color); }
+
+/* Aktiv: kraeftiger Grund und Rand. Der neutrale Chip ("Alle", "Inaktiv")
+   nimmt die Primaerfarbe und folgt damit dem Branding. */
+.filter-chip.is-active {
+    border-color: var(--chip-color);
+    background: color-mix(in srgb, var(--chip-color) 22%, var(--bg-white));
+}
+
+.filter-chip.is-active:not(.filter-chip--pending, .filter-chip--ok, .filter-chip--danger, .filter-chip--info) {
+    --chip-color: var(--primary-color);
+}
+
+/* Reine Anzeige (Termine): gleiche Form, aber erkennbar nicht klickbar */
+.filter-chip--static {
+    border-color: transparent;
+    cursor: default;
+}
+
+/* Traegt ein Chip eine Erklaerung, soll der Zeiger sie ankuendigen -- sonst
+   probiert sie niemand aus. Gewinnt gegen --static durch hoehere Spezifitaet
+   (zwei Klassen-/Attributselektoren gegen einen) -- die Reihenfolge der
+   beiden Regeln spielt dafuer keine Rolle. */
+.filter-chip[title] {
+    cursor: help;
+}
+
+.filter-chip--static:hover {
+    background: color-mix(in srgb, var(--chip-color) 8%, var(--bg-white));
+}

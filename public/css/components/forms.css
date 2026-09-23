@@ -100,58 +100,54 @@
 /* ============================================
    FILTER BAR
    ============================================ */
+/* Kompakt seit dem Spec-Nachtrag 2026-09-23: Beschriftung neben dem Feld
+   statt darueber, Feldhoehe 36 statt 44 px. Das spart im Kopf jeder Ansicht
+   rund eine halbe Zeile, ohne dass der Zweck eines Feldes verloren geht. */
 .filter-bar {
     background: var(--bg-white);
-    padding: var(--spacing-lg);
+    padding: 10px var(--spacing-lg);
     border-radius: var(--radius-lg);
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-sm);
     box-shadow: var(--shadow-sm);
     display: flex;
-    gap: var(--spacing-lg);
-    align-items: flex-end;
+    gap: var(--spacing-md);
+    align-items: center;
     flex-wrap: wrap;
 }
 
 .filter-bar .form-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex: 1;
     min-width: 200px;
     margin-bottom: 0;
 }
 
-.filter-bar label {
-    font-size: 14px;
-}
-
+.filter-bar label,
 .filter-bar .form-group label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    margin-bottom: 0; /* Verhindert extra Abstand */
+    margin-bottom: 0;
+    font-size: 14px;
+    white-space: nowrap;
+    color: var(--text-medium);
 }
 
-/* Eine Checkbox hat kein Label darueber und ist viel niedriger als ein
-   Auswahlfeld. Unten buendig ausgerichtet sass sie deshalb am unteren Rand
-   der Leiste. Sie bekommt die Hoehe des Reset-Knopfs (.btn-reset-filter),
-   der ebenfalls unten buendig steht, und wird darin mittig gesetzt -- so
-   liegt sie auf Hoehe der Auswahlfelder. Breite nur so viel wie ihr Text. */
-.filter-bar .form-group:has(input[type="checkbox"]) {
-    display: flex;
-    align-items: center;
-    height: 44px;
-    flex: 0 0 auto;
+.filter-bar .form-group select,
+.filter-bar .form-group input[type="text"] {
+    flex: 1;
     min-width: 0;
-}
-
-.filter-bar .checkbox-label {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-    accent-color: var(--primary-color, #667eea);
+    height: 36px;
+    padding: 0 8px;
 }
 
 .btn-reset-filter {
-    height: 44px;
+    height: 36px;
+    margin-left: auto;
+}
+
+/* Ohne diese Regel schluege ein spaeteres display das hidden des Browsers. */
+.btn-reset-filter[hidden] {
+    display: none;
 }
 
 /* Token Input Styling */

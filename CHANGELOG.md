@@ -17,6 +17,94 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.13.0] – 2026-09-22
+
+### Neu
+- **Anträge lassen sich in der Anwesenheitsliste des Dashboards entscheiden.** Wer die Liste
+  eines Termins öffnet, sieht bei jedem Mitglied dessen offene Entschuldigung oder Zeitkorrektur,
+  mit der Begründung im Tooltip, und entscheidet sie dort über den gewohnten Antragsdialog.
+  Über der Liste steht, wie viele Anträge zu diesem Termin offen sind. Bisher ging das nur im
+  Bereich „Anträge“; in der Check-in-App gibt es es seit 1.12.0.
+- **Den eigenen Antrag genehmigt jetzt ein anderer Verwalter.** Solange es ein weiteres aktives
+  Konto mit Rolle Admin oder Manager gibt, weist der Server die Selbstgenehmigung ab — Ablehnen
+  und Zurückziehen bleiben möglich. In einem Verein mit nur einem Verwalter bleibt die
+  Selbstgenehmigung erlaubt, sonst bliebe sein Antrag liegen; die Antragsliste kennzeichnet sie
+  dann als „selbst genehmigt“. Dieselbe Regel gilt in der Check-in-App, deren pauschale Sperre
+  damit entfällt.
+- **Offene Punkte auf einen Blick.** Was das System gerade von einem will, stand bisher verstreut
+  in drei Bereichen. Jetzt zeigt „Mein Profil“ im Dashboard ganz oben eine Karte „Offene Punkte“,
+  die Check-in-App einen Block oben im Tab „Erfassen“: Termine der nächsten zwei Wochen, deren
+  Rückmeldefrist läuft, Anträge und Arbeitszeiten, über die noch nicht entschieden ist, und
+  Ablehnungen der letzten 14 Tage. Antippen führt an die Stelle, an der man den Punkt erledigt.
+  Ist nichts offen, bleibt die Check-in-App unverändert. Der Verlauf der Check-in-App zeigt dafür
+  jetzt auch abgelehnte Anträge der letzten 14 Tage.
+
+### Geändert
+- **Status als farbige Chips mit Zähler in allen Listen.** Anträge, Arbeitszeit, Mitglieder,
+  Anwesenheit, Benutzer und Geräte filtern ihren Status jetzt mit einem Klick auf einen Chip,
+  der zugleich zeigt, wie viele Einträge es sind. Die bisherigen Zählkarten und Status-
+  Auswahlfelder entfallen; bei den Mitgliedern ersetzt der vorgewählte Chip „Aktiv“ den
+  bisherigen Schalter „Inaktive anzeigen“. Die Zähler berücksichtigen die übrigen Filter, aber
+  nicht den gewählten Status — so bleibt sichtbar, wie viele es in den anderen Status gibt. Der
+  aktive Chip nimmt die Primärfarbe des Brandings an. In der Terminverwaltung zeigen die Chips
+  „Vergangen“ und „Kommend“ nur an, der Kalender bleibt vollständig.
+- **In der Anwesenheitsliste eines Termins lässt sich nach „Fehlend“ filtern.**
+- **„Filter zurücksetzen“ ist ein unauffälliger Textknopf** und steht dauerhaft an derselben
+  Stelle: Solange kein Filter gesetzt ist, ist er ausgegraut und nicht bedienbar. So springen
+  die Auswahlfelder daneben nicht mehr.
+- **Benutzer- und Geräteliste zeigen bei leerer Auswahl einen Hinweis statt einer leeren
+  Tabelle.** Die Anwesenheitsliste eines Termins oder Mitglieds macht es ebenso, ebenfalls die
+  drei Verwaltungstabellen (Gruppen, Terminarten, Tätigkeitsarten), die jetzt nach Chip filtern.
+- **Der Kopfbereich aller Listen ist flacher und überall gleich gebaut.** Die Jahresauswahl steht
+  als eine Zeile („Jahr: 2026“) an ihrer gewohnten Stelle oben rechts statt als zweizeilige Karte,
+  die Beschriftungen der Filter stehen neben statt über den Feldern. Die Statistik nutzt jetzt
+  dieselbe Filterleiste wie alle anderen Ansichten.
+- **Die Jahresauswahl hat jetzt eine echte Beschriftung.** Die sechs Auswahlfelder hatten zuvor
+  keinen zugänglichen Namen — Screenreader kündigten nichts an; jetzt steht „Jahr:“ als Label
+  davor.
+- **Die Statistik zeigt ihre Kennzahlen als Chips.** Im Kopf stehen sechs: Termine, Anwesend,
+  Entschuldigt und Unentschuldigt sowie Pünktlichkeit und Zuverlässigkeit; die bisherigen
+  Kennzahlkarten entfallen. Der Erklärtext der Karten steht jetzt im Tooltip des Chips — zeigt
+  eine Quote „–“, weil zu wenig gemessen wurde, steht die Begründung zusätzlich als Text unter
+  der Zeile. **Der Durchschnitt steht je Gruppe** als eigener Chip unter deren Überschrift und
+  gilt damit für genau diese Gruppe. Gerechnet wird er nach derselben Regel wie zuvor die
+  Kopfzahl: bestätigte Anwesenheiten geteilt durch alle möglichen Mitglied-Termin-Paare der
+  Gruppe, nicht als Mittelwert der einzelnen Mitgliederquoten.
+- **Die Arbeitszeit zeigt die bestätigten Stunden als Chip** in derselben Zeile wie die
+  Statuschips („Stunden 214:42 h“); die Kennzahlkarte entfällt. Der Tooltip nennt, worauf sich
+  die Summe bezieht. Die Summe folgt den übrigen Filtern, etwa der gewählten Tätigkeit.
+- **Gruppen, Terminarten und Tätigkeitsarten bekommen eine Chipzeile** über der Tabelle, etwa
+  „Alle 7 · Hauptgruppen 4 · Register 3“. Sie zählt nicht nur, sondern filtert die Tabelle auch
+  — mit „Alle“ als Vorgabe, wie bei den Geräten.
+- **Die Geräteverwaltung filtert nach Gerätetyp.** Unter den Status-Chips steht eine Filterleiste
+  mit dem Feld „Typ“ (TOTP-Station, Auth-Gerät, Virtuelle Station); die Chips zählen dann nur
+  noch Geräte dieses Typs.
+
+### Behoben
+- **Eine genehmigte Entschuldigung erscheint sofort in der Anwesenheitsliste.** Bisher verwarf
+  das Dashboard seinen Zwischenspeicher nur bei Zeitkorrekturen, der Eintrag „entschuldigt“
+  tauchte deshalb erst nach bis zu zehn Minuten oder einem Neuladen auf.
+- **Das Dashboard kennt wieder das eigene Mitglied.** Bei der Anmeldung über die Sitzung — und so
+  meldet sich das Dashboard an — fehlte die Mitgliedskennung in der Auskunft des Servers. Regeln,
+  die zwischen eigenen und fremden Einträgen unterscheiden, liefen dort ins Leere.
+- **Benutzerverwaltung: Die Zähler fielen auf 0,** sobald ein Status gewählt war.
+- **Benutzerverwaltung: Ein Rollenwechsel lud die Liste doppelt.**
+
+---
+
+## [1.12.2] – 2026-09-23
+
+### Behoben
+- **Die Statistik öffnete sich für einfache Mitglieder nicht mehr, sobald Untergruppen angelegt
+  waren.** Der Bereich blieb leer. Betroffen waren alle Vereine mit Untergruppen, und zwar seit
+  deren Einführung in 1.8.0. Admin und Manager waren nie betroffen.
+- **Die Geräteliste zeigte inaktive Geräte als „Aktiv“.** Die Kennzahl darüber zählte sie
+  richtig, die Liste widersprach ihr — je nachdem, wie die Datenbank den Wert lieferte.
+- **Nach dem Einschalten der Zeiterfassung blieb die Liste der Tätigkeitsarten auf „Lade
+  Daten…“ stehen**, bis die Seite neu geladen wurde.
+
+---
+
 ## [1.12.1] – 2026-09-22
 
 ### Neu

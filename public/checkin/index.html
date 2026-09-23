@@ -22,7 +22,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
-    <link rel="stylesheet" href="css/style.css?v=1.12.1">        
+    <link rel="stylesheet" href="css/style.css?v=1.13.0">        
 </head>
 <body>
     <!-- Login Screen -->
@@ -136,6 +136,13 @@
                  Absicht erreichbar; der Zweck eines Scans folgt damit aus der
                  sichtbaren Ansicht statt aus einer verborgenen Variablen. -->
             <div class="tab-content active" data-tab="capture">
+
+                <!-- Offene Punkte (FI-17). Ohne Punkte ausgeblendet, damit das
+                     Erfassen nicht nach unten rutscht. -->
+                <details id="openItemsBlock" class="open-items-block" hidden>
+                    <summary id="openItemsSummary"></summary>
+                    <div id="openItemsPwaList" class="open-items-pwa-list"></div>
+                </details>
 
                 <!-- Ansicht 1: Absichtswahl. Erscheint nur, wenn beide
                      Absichten offenstehen — sonst geht es direkt zum Werkzeug. -->
@@ -564,6 +571,6 @@
     </div>
 
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="js/app.js?v=1.12.1"></script>
+    <script src="js/app.js?v=1.13.0"></script>
 </body>
 </html>

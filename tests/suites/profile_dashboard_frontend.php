@@ -69,31 +69,12 @@ test('Die Token-Karte nennt die Check-in-App, nicht die Zeiterfassung', function
 // OI-71 · Dashboards
 // ============================================
 
-test('Das Mitglieder-Dashboard zeigt die Zahl der inaktiven Mitglieder', function () use ($pdHtml) {
-    assertTrue(
-        strpos($pdHtml, 'id="statInactiveMembersCount"') !== false,
-        'Die Kennzahl fehlt im Markup'
-    );
-});
-
-test('Beide Mitgliederzahlen kommen aus dem Bestand, nicht aus der Filterauswahl', function () use ($pdMembers) {
-    // Der entscheidende Punkt: Aus der gefilterten Liste gerechnet, zeigte die
-    // Karte "Inaktive" genau dann 0, wenn das Haekchen daneben aus ist -- also
-    // immer dann, wenn jemand die Frage ueberhaupt stellt.
-    $start = strpos($pdMembers, 'function updateMemberStats');
-    assertTrue($start !== false, 'updateMemberStats fehlt');
-
-    $ende  = strpos($pdMembers, "\n}", $start);
-    $block = substr($pdMembers, $start, $ende - $start);
-
-    assertTrue(
-        strpos($block, 'dataCache.members[currentYear]') !== false,
-        'Die Kennzahlen rechnen wieder ueber die uebergebene (gefilterte) Liste'
-    );
-    assertTrue(
-        strpos($block, 'statInactiveMembersCount') !== false,
-        'Die Zahl der inaktiven Mitglieder wird nicht gesetzt'
-    );
+test('Das Mitglieder-Dashboard zeigt die Zahl der inaktiven Mitglieder', function () use ($pdMembers) {
+    // Seit 1.13.0 steht die Zahl im Chip "Inaktiv" (CHIPS_MEMBERS, key 'inactive').
+    // Dass sie aus dem Jahresbestand und nicht aus der Chip-Auswahl kommt,
+    // prueft filter_chips_frontend.php.
+    assertTrue(strpos($pdMembers, 'CHIPS_MEMBERS') !== false,
+        'Die Mitglieder-Chips fehlen -- damit auch die Zahl der inaktiven Mitglieder');
 });
 
 test('Die Statistik hat einen Knopf zum Zuruecksetzen der Filter', function () use ($pdHtml, $pdStats) {

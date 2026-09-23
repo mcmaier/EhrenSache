@@ -97,11 +97,13 @@ Neue Datei `public/css/components/filter-chips.css`, Vorbild `.response-chip`
   sobald einer aktiv ist. Das entspricht der Entscheidung aus OI-71 (1.9.1), dass Aktiv/Inaktiv
   aus dem Gesamtbestand des Jahres gezählt wird.
 - **Chips schließen sich gegenseitig aus.** Die Summe der Status-Chips ergibt „Alle“.
-- **Ein gemeinsamer JS-Baustein** in `public/js/modules/ui.js`, z. B.
-  `renderFilterChips(container, chips, activeKey, onChange)`, mit
-  `chips = [{ key, label, count, variant, static? }]`. Die Module liefern nur Definition und
-  Zahlen; Rendern, `aria-pressed` und Klickbehandlung liegen einmal im Baustein. Die Zählregel
-  als reine Funktion (Liste, Statusfunktion → Zähler je Schlüssel), damit sie testbar ist.
+- **Ein gemeinsamer JS-Baustein** im importfreien Modul `public/js/modules/filter_chips.js`
+  (damit Node ihn ohne Browser für die Tests laden kann):
+  `renderFilterChips(container, defs, counts, activeKey, onChange, options)`, mit
+  Chip-Definitionen `defs = [{ key, label, variant?, match? }]` und getrennt dazu berechneten
+  Zählern `counts` (aus `countChips`). Die Module liefern nur Definition und Basisliste; Rendern,
+  `aria-pressed` und Klickbehandlung liegen einmal im Baustein. Die Zählregel als reine Funktion
+  (Liste, Chip-Definitionen → Zähler je Schlüssel), damit sie testbar ist.
 
 ## Umfang je Ansicht
 
@@ -150,6 +152,159 @@ auf den Zurücksetzen-Stil unberührt — ihre Kennzahlen sind Ergebnis, kein Fi
   `user`. Dabei insbesondere: Zähler bei gesetzten Auswahlfeldern, Zurücksetzen erscheint und
   verschwindet, Anwesenheit beim Moduswechsel mit aktivem „Fehlend“, Branding-Farbe am aktiven
   „Alle“.
+
+## Nachtrag 2026-09-23: Kompakter Kopf, Statistik und Gruppen
+
+Aus der Sichtprüfung der ersten Runde: Der Kopfbereich trägt zu dick auf und sieht von Ansicht
+zu Ansicht verschieden aus. Drei Ursachen, alle älter als dieses Vorhaben:
+
+1. Der Jahresfilter ist eine zweizeilige `stat-card` mit Überschrift „Jahr filtern“ und
+   sechsfach wiederholten Inline-Styles am `<select>`.
+2. Die Statistik baut ihren Kopf anders: `stats-header` mit `filter-card` statt `filter-bar`,
+   dadurch ein breiterer Jahresfilter und Beschriftungen über den Feldern.
+3. Die Filterleiste stellt ihre Beschriftungen über die Felder, Feldhöhe 44 px.
+
+**Entschieden (Variante B von drei):** Zwei Zeilen, beide flacher. Alles in einer einzigen Zeile
+wurde verworfen — sobald in einem Auswahlfeld ein Wert steht, wäre nicht mehr erkennbar, zu
+welchem Filter es gehört (die Anwesenheit hat drei ähnliche Listen).
+
+### Kopfbereich
+
+- **Zeile 1:** Chipzeile links, Jahresfilter rechts. Neue Komponente `.year-filter` — „Jahr:“
+  und Auswahlfeld **in einer Zeile**, etwa 150 px breit. Sie ersetzt die sechs `stat-card`-Blöcke
+  samt Inline-Styles und den abweichenden Container der Statistik. Die Stelle oben rechts bleibt
+  (Konvention seit 1.9.2), nur die Bauform wird flach und einheitlich.
+- **Zeile 2:** `filter-bar` mit Beschriftungen **neben** statt über den Feldern, Feldhöhe 36 px
+  statt 44. Die `filter-card` der Statistik wird zur gewöhnlichen `filter-bar`; `stats-header`,
+  `filter-card`, `filter-grid` und `.year-select` entfallen.
+- **Wirkung:** Kopf von etwa 150 auf etwa 95 px, bei den Mitgliedern von 120 auf 85. Gemessen bei
+  1280 px nach der Umsetzung: 169 → 108 px in fünf Ansichten, Arbeitszeit 212 → 125, Statistik
+  242 → 110.
+- **Zurücksetzen:** Auch die Statistik blendet den Knopf aus, solange kein Filter abweicht. Damit
+  gilt die Regel überall gleich, und der Sondersatz dazu im CHANGELOG entfällt wieder.
+  Eine für einfache Nutzer mit genau einer Gruppe **automatisch vorgewählte** Gruppe zählt dabei
+  nicht als Abweichung; das Zurücksetzen stellt sie wieder her.
+
+**Beim Bauen dazugekommen** (die Spec hielt es zuvor nicht fest):
+
+- **Beschriftungen im Kopf nutzen `--text-medium`.** Mit `--text-light` lag der Kontrast bei etwa
+  3,4:1 und damit unter WCAG AA. Das betrifft `.year-filter label`, die Beschriftungen der
+  `filter-bar` und die Überschrift der flachen Kennzahl.
+- **Die Kennzahl in der Chipzeile der Arbeitszeit ist flach** (`.stats-grid--chips-lead
+  .stat-card`: kleineres Polster, 12 px Überschrift, 20 px Zahl). Sonst wäre diese Zeile mit 95 px
+  fast doppelt so hoch wie in den übrigen Ansichten.
+- **Die Quotenkarten der Statistik haben ein eigenes Raster** `.stats-grid--kpi` mit fester
+  Kachelbreite. Ohne das zieht sich „Durchschnitt“ als einzige sichtbare Karte über die ganze
+  Zeile. Ebenso tragen die Chipzeilen der Verwaltungstabellen innerhalb `.data-table` keine
+  zweite Karte (`.data-table > .filter-chips--standalone`).
+
+### Statistik
+
+Vier **Anzeige-Chips** (`--static`) in Zeile 1: Termine (neutral), Anwesend (`--ok`),
+Entschuldigt (`--pending`), Unentschuldigt (`--danger`). Sie ersetzen die gleichnamigen Karten.
+Durchschnitt, Pünktlichkeit und Zuverlässigkeit **bleiben Karten** — sie sind das Ergebnis der
+Ansicht, keine Zähler. Die beiden Quotenkarten bleiben wie bisher abschaltbar (`hidden`).
+
+Anders als sonst bilden diese Chips **keine Partition**: „Termine“ zählt Termine, die übrigen
+zählen Anwesenheitsdatensätze. Es gibt deshalb auch keinen Chip „Alle“.
+
+### Gruppen, Terminarten, Tätigkeitsarten
+
+Je eine **Anzeige-Chipzeile über der zugehörigen Tabelle**. Kein Filter, kein Jahr — diese
+Ansichten haben beides nicht.
+
+| Tabelle | Chips |
+|---|---|
+| Benutzergruppen | Alle · Hauptgruppen · Untergruppen (Wort aus `subgroupLabel()`, z. B. „Register“) |
+| Terminarten | Alle · mit Rückmeldung · ohne Rückmeldung (`responses_enabled`) |
+| Tätigkeitsarten | Alle · Aktiv · Ausgemustert (`is_active`) |
+
+Diese drei Sätze sind Partitionen und werden wie die übrigen im Node-Test geprüft.
+
+### Nicht Teil des Nachtrags
+
+- Keine Filterfunktion in Statistik, Gruppen, Terminarten und Tätigkeitsarten — die Chips dort
+  zählen nur. *(Für Gruppen, Terminarten und Tätigkeitsarten am 23.09. gekippt, siehe unten.)*
+- Die Quotenkarten der Statistik bleiben unangetastet. *(Am 23.09. gekippt, siehe unten.)*
+- Der Jahresfilter wandert nicht an eine andere Stelle.
+
+## Nachtrag 2026-09-23, zweite Sichtung: Kennzahlen als Chips, Verwaltung filtert
+
+Aus der Sichtprüfung des kompakten Kopfes. Acht Beobachtungen, davon fünf kleine und drei
+grundsätzliche; die grundsätzlichen wurden entschieden und kehren zwei Punkte der Liste oben um.
+
+### Kennzahlen werden Chips
+
+- **Statistik:** Auch Durchschnitt, Pünktlichkeit und Zuverlässigkeit werden **Anzeige-Chips** mit
+  ihrem Prozentwert. Der bisherige Erklärtext der Karte (`.stat-detail`, z. B. „Pünktlich bei 468
+  von 1221 gemessenen Ankünften · …“) wandert in den **Tooltip** des Chips. Die Kartenzeile
+  entfällt ganz, mit ihr `.stats-grid--kpi` aus dem ersten Nachtrag.
+  Abgeschaltete Kennzahlen erscheinen gar nicht erst als Chip; bei zu wenigen Messungen zeigt der
+  Chip wie bisher „–“ und die Begründung im Tooltip.
+- **Arbeitszeit:** „Bestätigte Stunden“ wird ein Anzeige-Chip in derselben Zeile — Beschriftung
+  „Stunden“, Wert „214:42 h“; die Erklärung („Bestätigte Stunden im gewählten Jahr; folgt
+  Tätigkeit und Mitglied, nicht dem Statusfilter“) steht im Tooltip und, damit sie auch
+  Screenreader auf Touch-Geräten erreicht, im `aria-label`. Die Kürzung auf „Stunden“ wurde erst
+  nach der Sichtprüfung im Browser entschieden: mit der langen Beschriftung „Bestätigte Stunden“
+  wurde die Kopfzeile zweizeilig. Damit entfallen die Sonderspalte `.stats-grid--chips-lead` und
+  die flache Kennzahlkarte aus dem ersten Nachtrag; der Kopf ist dort so hoch wie überall.
+- In beiden Ansichten stehen damit **anzeigende und klickbare Chips nebeneinander**. Sie sind am
+  Rand unterscheidbar: klickbare haben einen, anzeigende nicht.
+- **`renderFilterChips` bekommt `def.title`** für den Tooltip; der Wert eines Chips darf ein Text
+  sein („214:42 h“, „65,4 %“), nicht nur eine Zahl.
+
+### Zurücksetzen bleibt sichtbar
+
+Der Knopf verschwindet nicht mehr, sondern steht dauerhaft und ist im Ruhezustand **ausgegraut und
+nicht bedienbar** (`disabled`). Grund: Beim Ein- und Ausblenden sprangen die Auswahlfelder daneben.
+Das kehrt die Entscheidung des ersten Nachtrags um; `setResetVisible` heißt künftig
+`setResetEnabled`. Betrifft alle Ansichten mit Filterleiste.
+
+### Verwaltung filtert
+
+Die Chipzeilen über Benutzergruppen, Terminarten und Tätigkeitsarten werden **klickbar** und
+filtern ihre Tabelle — dasselbe Muster wie bei den Geräten, mit „Alle“ als Vorgabe und ohne
+eigenen Zurücksetzen-Knopf. Sie verlieren damit `--static`.
+
+### Geräte bekommen eine Filterleiste
+
+Unter den Status-Chips steht künftig eine `filter-bar` mit dem Auswahlfeld **Typ**
+(Alle · Standortgerät (TOTP) · Biometrie-Gerät · Station (Kiosk), aus `device_type`) und einem
+Zurücksetzen-Knopf. Damit ist die Ansicht so aufgebaut wie die übrigen Listen.
+
+### Kleinigkeiten
+
+- **„Jahr:“** bekommt Schriftgröße und Farbe der übrigen Filterbeschriftungen (14 px,
+  `--text-medium`) statt 13 px.
+- **Termine:** Der Chip „Alle“ wird farblich hervorgehoben (`--info`), damit die Zeile nicht
+  durchgehend grau ist.
+- **Gruppen:** Der Chip für Untergruppen nutzt `--ok`, passend zum grünen Abzeichen derselben
+  Zeile in der Tabelle.
+
+### Geklärt, keine Änderung
+
+Die vielen Einträge in den Import-Protokollen sind **Testrückstände**, kein Datenfehler: 43
+Einträge `termine.csv` mit je einer Zeile, Zeitstempel exakt auf den Testläufen vom 22. und
+23.09., erzeugt von `tests/suites/import_series_api.php`, das seine Protokollzeilen nicht
+aufräumt. Vermerkt bei den Testrückständen in OI-90.
+
+## Nachtrag 2026-09-23, dritte Sichtung: Durchschnitt je Gruppe
+
+Sieben Chips sind für eine Kopfzeile zu viel. **Entschieden:**
+
+- **„Durchschnitt“ verlässt den Kopf** und steht je Gruppe als eigene Anzeige-Chipzeile unter
+  der Gruppenüberschrift („Durchschnitt 63,1 %“). Dort ist er aussagekräftiger, weil er für
+  genau diese Gruppe gilt. Der Kopf führt noch **sechs** Chips: vier Zählwerte sowie
+  Pünktlichkeit und Zuverlässigkeit.
+- **Kein Serverweg dafür.** Die Zahl wird im Browser aus den Mitgliederzeilen gerechnet, die die
+  API ohnehin liefert, und folgt derselben Definition wie `summary.overall_average`: anwesende
+  geteilt durch mögliche Mitglied-Termin-Paare (`attendanceRate()`), **nicht** der Mittelwert
+  der Mitgliederquoten. Ohne Paare steht „0 %“, wie es die Kopfzahl zuvor auch tat.
+- **Der Tooltip reicht nicht allein.** Ein `title` ist auf Tastatur und Touch nicht erreichbar.
+  Zeigt eine Quote „–“, erscheint die Begründung deshalb **zusätzlich als sichtbarer Text**
+  unter der Chipzeile (`.filter-chips__hint`). Im Normalfall bleibt die Zeile leer — dort
+  erklärt der Tooltip nur eine Zahl, die auch ohne ihn lesbar ist. Chips mit Erklärung tragen
+  `cursor: help`.
 
 ## Version
 

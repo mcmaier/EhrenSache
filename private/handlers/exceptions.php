@@ -26,7 +26,8 @@ function handleExceptions($db, $database, $method, $id) {
                                      at.type_name as appointment_type_name,
                                      at.type_id as appointment_type_id,
                                      u1.email as created_by_email,
-                                     u2.email as approved_by_email
+                                     u2.email as approved_by_email,
+                                     (u2.member_id IS NOT NULL AND u2.member_id = e.member_id) AS self_approved
                                      FROM {$prefix}exceptions e 
                                      JOIN {$prefix}members m ON e.member_id = m.member_id 
                                      JOIN {$prefix}appointments a ON e.appointment_id = a.appointment_id 
@@ -82,7 +83,8 @@ function handleExceptions($db, $database, $method, $id) {
                         a.title as appointment_title, a.date as appointment_date, a.start_time as appointment_start_time,
                         at.type_id as appointment_type_id, at.type_name as appointment_type_name,
                         u1.email as created_by_email,
-                        u2.email as approved_by_email
+                        u2.email as approved_by_email,
+                        (u2.member_id IS NOT NULL AND u2.member_id = e.member_id) AS self_approved
                         FROM {$prefix}exceptions e 
                         JOIN {$prefix}members m ON e.member_id = m.member_id 
                         JOIN {$prefix}appointments a ON e.appointment_id = a.appointment_id 
@@ -283,6 +285,26 @@ function handleExceptions($db, $database, $method, $id) {
             // der Freigabe. Der Termin kommt aus dem Bestand, nicht aus dem
             // Anfragekörper — er lässt sich nachträglich nicht wechseln.
             $neueWunschzeit = $wirkRequestedTime;
+
+            // Den eigenen Antrag genehmigt niemand, solange ein anderes aktives
+            // Verwalterkonto da ist (OI-87). Maßgeblich ist das Konto, nicht ein
+            // verknüpftes Mitglied — freigeben darf auch ein Admin ohne eigenes.
+            // Ohne zweites Konto bleibt es erlaubt, sonst hinge im Verein mit
+            // einem einzigen Verwalter jeder seiner Anträge fest. Ablehnen und
+            // Löschen sind nie betroffen.
+            if ($wirkStatus === 'approved' && $existing['status'] !== 'approved') {
+                $eigenesMitglied = memberIdOfUser($db, $database, (int) getCurrentUserId());
+
+                if ($eigenesMitglied !== null
+                    && (int) $existing['member_id'] === $eigenesMitglied
+                    && otherActiveApproverExists($db, $database, (int) getCurrentUserId())) {
+                    http_response_code(403);
+                    echo json_encode([
+                        "message" => "Den eigenen Antrag genehmigt ein anderer Verwalter"
+                    ], JSON_UNESCAPED_UNICODE);
+                    return;
+                }
+            }
 
             //
             // Eine Ablehnung ist ausgenommen: Sie erzeugt nichts, und ein Antrag

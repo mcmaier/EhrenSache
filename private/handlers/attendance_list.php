@@ -150,7 +150,12 @@ function handleAttendanceList($db, $database, $method, $id) {
 
         echo json_encode([
             'appointment' => $appointment,
-            'members' => $members
+            'members' => $members,
+            // Spiegelt die Regel aus PUT exceptions (OI-87), damit PWA und
+            // Dashboard beim eigenen Antrag dieselben Knöpfe zeigen wie der
+            // Server erlaubt — im Verein mit einem einzigen Verwalter also
+            // sehr wohl welche.
+            'self_approval_blocked' => otherActiveApproverExists($db, $database, (int) getCurrentUserId())
         ]);
 
         exit();

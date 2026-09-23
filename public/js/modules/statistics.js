@@ -15,16 +15,21 @@ import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, currentYear, groupSelectOptionsHtml, subgroupLabel, dataCache} from './ui.js';
 import {debug} from '../app.js'
 import { escapeHtml } from './utils.js';
+import { CHIPS_STATISTICS, renderFilterChips, setResetEnabled } from './filter_chips.js';
+
+// Anzeige-Chipzeile unter jeder Gruppenueberschrift. Ein einzelner Chip --
+// der Satz steht hier und nicht in filter_chips.js, weil er nur in dieser
+// Ansicht vorkommt und keine Filterlogik traegt.
+const CHIPS_GROUP_AVERAGE = Object.freeze([
+    { key: 'average', label: 'Durchschnitt', variant: 'info' },
+]);
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
 // ============================================
 
 export async function loadStatistics(filters = {}) {
-    const year = currentYear; 
-
-    const groupId = document.getElementById('statGroup').value;
-    const memberId = isAdminOrManager ? document.getElementById('statMember').value : null;
+    const year = currentYear;
 
     // API-Call mit Jahr
     debug.log(`Loading STATISTICS from API for ${year} with filters:`, filters);    
@@ -49,11 +54,19 @@ export async function loadStatistics(filters = {}) {
 // FILTERING
 // ============================================
 
+// Von der Auto-Vorwahl unten gesetzt, keine Nutzerauswahl -- applyStatisticsFilters()
+// darf sie deshalb nicht als abweichenden Filter werten.
+let statGroupPreselected = '';
+
 export async function loadStatisticsFilters() {
 
     // Gruppen laden
-    const groups = await loadGroups();    
-    
+    const groups = await loadGroups();
+
+    // Wird unten neu ermittelt, falls die Auto-Vorwahl greift -- sonst bleibt sie
+    // leer, damit ein spaeterer Re-Init keinen alten Wert stehen laesst.
+    statGroupPreselected = '';
+
     // Gruppen-Filter befüllen
     const groupSelect = document.getElementById('statGroup');
     if (groupSelect) {
@@ -72,44 +85,37 @@ export async function loadStatisticsFilters() {
                     opt.remove();
                 }
             });
-            // Leere Optgroup-Überschrift hinterlässt keine Gruppe ohne Einträge
+            // Leere Optgroup-Überschrift hinterlässt keine Gruppe ohne Einträge.
+            // Gezählt wird über die Optionen im optgroup: `.options` gibt es nur
+            // am <select>, am <optgroup> ist es undefined. Der Zugriff warf
+            // einen TypeError — und zwar nur für Nicht-Verwalter und nur bei
+            // vorhandenen Untergruppen, weshalb er von 1.8.0 bis 1.12.1
+            // unbemerkt blieb: Die Statistik lud für diese Mitglieder gar nicht.
             Array.from(groupSelect.querySelectorAll('optgroup')).forEach(optgroup => {
-                if (optgroup.options.length === 0) optgroup.remove();
+                if (optgroup.querySelectorAll('option').length === 0) optgroup.remove();
             });
             // Automatisch vorauswählen wenn nur eine Gruppe vorhanden
             if (!groupSelect.value && groupSelect.options.length === 2) {
                 groupSelect.selectedIndex = 1;
+                statGroupPreselected = groupSelect.value;
             }
         }
     }    
 
-    // Grid-Klasse für Layout setzen
-    const filterGrid = document.querySelector('.filter-grid');
-
-    // Mitglieder-Filter (nur für Admins)
+    // Der Mitgliederfilter ist Verwaltern vorbehalten. Die Spaltenlogik der
+    // frueheren filter-card entfaellt -- die Klasse gibt es seit Task 3 nicht
+    // mehr, die filter-bar bricht von selbst um.
     if (isAdminOrManager) {
-        document.getElementById('statMemberFilterGroup').style.display = 'block';              
-        // Initial alle Mitglieder anzeigen         
+        document.getElementById('statMemberFilterGroup').style.display = '';
+        // Initial alle Mitglieder anzeigen
         await loadMembers();
-        
-        // Grid für 2 Spalten
-        if (filterGrid) {
-            filterGrid.classList.remove('single-filter');
-            filterGrid.classList.add('dual-filter');
-        }
 
-        await updateStatisticsFilters(); 
-        
+        await updateStatisticsFilters();
+
     } else {
         document.getElementById('statMemberFilterGroup').style.display = 'none';
-
-        // Grid für 1 Spalte
-        if (filterGrid) {
-            filterGrid.classList.remove('dual-filter');
-            filterGrid.classList.add('single-filter');
-        }
     }
-    
+
 }
 
 export async function updateStatisticsFilters() {
@@ -155,19 +161,27 @@ export async function applyStatisticsFilters() {
     debug.log("Load Statistics with Filters ()");
 
     // Aktuelle Filter auslesen
-    const filters = {        
+    const filters = {
         member:isAdminOrManager ? (document.getElementById('statMember')?.value || null) : null,
         group: document.getElementById('statGroup')?.value || null
     };
-    
+
+    // Eine automatisch vorausgewaehlte Gruppe (nur eine Gruppe vorhanden, siehe
+    // loadStatisticsFilters()) zaehlt nicht als Filter -- der Knopf blieb sonst
+    // von Anfang an sichtbar, obwohl niemand etwas ausgewaehlt hat.
+    const statGroupValue = document.getElementById('statGroup')?.value ?? '';
+    setResetEnabled(document.getElementById('resetStatisticsFilter'),
+        (statGroupValue !== statGroupPreselected)
+        || Boolean(document.getElementById('statMember')?.value));
+
     // Statistik laden
     const stats = await loadStatistics(filters);
-    
+
     //Rendern, wenn Sektion aktiv
     const currentSection = sessionStorage.getItem('currentSection');
     if (currentSection === 'statistik')
-    {        
-        renderStatistics(stats);  
+    {
+        renderStatistics(stats);
     }
 }
 
@@ -184,7 +198,9 @@ export async function resetStatisticsFilters() {
     const gruppe   = document.getElementById('statGroup');
     const mitglied = document.getElementById('statMember');
 
-    if (gruppe)   { gruppe.value   = ''; }
+    // Zuruecksetzen stellt den Ausgangszustand her -- fuer Nutzer mit genau
+    // einer Gruppe ist das deren Vorauswahl, nicht "Alle Gruppen".
+    if (gruppe)   { gruppe.value   = statGroupPreselected; }
     if (mitglied) { mitglied.value = ''; }
 
     await applyStatisticsFilters();
@@ -279,13 +295,11 @@ export async function renderStatistics(statsData) {
                 + `Die Statistik rechnet über Terminarten, und ${escapeHtml(subgroupLabel())} sind keinen `
                 + `Terminarten zugeordnet.</p>`
             : '<p class="info-message">Keine Daten für die ausgewählten Filter vorhanden.</p>';
-        updateOverallStats(statsData ? statsData.summary : null);
-        updateBehaviorStats(statsData);
+        renderStatisticsChips(statsData);
         return;
     }
 
-    updateOverallStats(statsData.summary);
-    updateBehaviorStats(statsData);
+    renderStatisticsChips(statsData);
 
     let html = '';
 
@@ -312,6 +326,7 @@ export async function renderStatistics(statsData) {
         html += `
             <div class="statistics-group">
                 <h2>${escapeHtml(group.group_name)}</h2>
+                <div class="filter-chips" data-group-chips="${escapeHtml(String(group.group_id))}"></div>
                 <div class="statistics-table-wrapper">
                     <table class="data-table">
                         <thead>
@@ -361,88 +376,170 @@ export async function renderStatistics(statsData) {
     });
 
     container.innerHTML = html;
+
+    // Erst nach dem Einhaengen: renderFilterChips() baut DOM-Knoten und kann
+    // nicht in die HTML-Zeichenkette oben hinein. Die Zeile erscheint auch
+    // dann, wenn die Gruppe nach dem Mitgliedsfilter leer ist -- der Wert
+    // steht dann auf "0 %", wie die Kopfzahl es vorher auch tat.
+    statsData.statistics.forEach(group => {
+        renderFilterChips(
+            container.querySelector(`[data-group-chips="${group.group_id}"]`),
+            CHIPS_GROUP_AVERAGE,
+            { average: `${formatGerman(groupAverage(group))} %` },
+            null, null,
+            { static: true, label: `Durchschnitt: ${group.group_name}` }
+        );
+    });
 }
 
 // ============================================
 // HELPERS
 // ============================================
 
-function updateOverallStats(summary) {
-    if (!summary) {
-        document.getElementById('statTotalAppointments').textContent = '-';
-        document.getElementById('statTotalPresent').textContent = '-';
-        document.getElementById('statTotalExcused').textContent = '-';
-        document.getElementById('statTotalUnexcused').textContent = '-';
-        document.getElementById('statOverallAverage').textContent = '-';
-        return;
+/**
+ * Anwesenheitsquote einer Gruppe in Prozent, eine Nachkommastelle.
+ *
+ * Spiegelt attendanceRate() aus private/helpers/attendance.php und damit die
+ * Definition von summary.overall_average: anwesende geteilt durch moegliche
+ * Mitglied-Termin-Paare, NICHT der Mittelwert der Mitgliederquoten. Wer die
+ * Formel aendert, muss beide Seiten aendern -- sonst nennt der Rumpf eine
+ * andere Zahl als der Bericht.
+ *
+ * Die Mitgliederzeilen tragen total_appointments und attended bereits ueber
+ * alle Terminarten der Gruppe summiert (attendanceBuildGroup()); eine
+ * Entdopplung wie im Kopf ist hier nicht noetig, weil jedes Mitglied in der
+ * Gruppe genau eine Zeile hat.
+ */
+function groupAverage(group) {
+    const members = Array.isArray(group?.members) ? group.members : [];
+
+    let possible = 0;
+    let present  = 0;
+
+    for (const member of members) {
+        possible += Number(member.total_appointments) || 0;
+        present  += Number(member.attended) || 0;
     }
-    
-    document.getElementById('statTotalAppointments').textContent = summary.total_appointments;
-    document.getElementById('statTotalPresent').textContent = summary.total_present;
-    document.getElementById('statTotalExcused').textContent = summary.total_excused;
-    document.getElementById('statTotalUnexcused').textContent = summary.total_unexcused;
-    document.getElementById('statOverallAverage').textContent = `${formatGerman(summary.overall_average)} %`;
+
+    return possible > 0 ? Math.round((present / possible) * 1000) / 10 : 0;
+}
+
+/**
+ * Zeichnet die Kopfzeile der Statistik: vier Zaehlwerte und zwei Quoten als
+ * Anzeige-Chips (seit 1.13.0, vorher Kennzahlkarten). Der Durchschnitt stand
+ * hier bis zur zweiten Sichtung mit drin und steht jetzt je Gruppe im Rumpf.
+ * Abgeschaltete Quoten erscheinen gar nicht, unzureichend gemessene zeigen
+ * "–" mit der Begruendung im Tooltip -- frueher der Erklaertext unter der Karte.
+ *
+ * Ein title ist auf Tastatur und Touch nicht erreichbar. Steht eine Quote auf
+ * "–", wiederholt deshalb eine sichtbare Zeile unter den Chips die
+ * Begruendung. Im Normalfall bleibt sie leer -- dort erklaert der Tooltip nur
+ * eine Zahl, die auch ohne ihn lesbar ist.
+ *
+ * Ohne Daten steht bei den Zaehlwerten "-" wie bisher.
+ */
+function renderStatisticsChips(statsData) {
+    const summary     = statsData?.summary ?? null;
+    const punctuality = statsData?.punctuality ?? { enabled: false };
+    const reliability = statsData?.reliability ?? { enabled: false };
+
+    // Einmal ausgewertet und ueberall gleich: Der Server liefert enabled als
+    // echten Boolean, eine lockere Pruefung an der einen und eine strenge an
+    // der anderen Stelle waere nur eine Einladung zum Auseinanderlaufen.
+    const punctualityAn = punctuality.enabled === true;
+    const reliabilityAn = reliability.enabled === true;
+
+    const werte = summary
+        ? {
+            appointments: summary.total_appointments,
+            present:      summary.total_present,
+            excused:      summary.total_excused,
+            unexcused:    summary.total_unexcused,
+        }
+        : { appointments: '-', present: '-', excused: '-', unexcused: '-' };
+
+    // Eine abgeschaltete Kennzahl liefert der Server als {enabled: false};
+    // ihr Chip faellt dann ganz weg, statt leer dazustehen.
+    const defs = CHIPS_STATISTICS.filter(def => {
+        if (def.key === 'punctuality') return punctualityAn;
+        if (def.key === 'reliability') return reliabilityAn;
+        return true;
+    });
+
+    const titel   = {};
+    const hinweis = [];
+
+    if (punctualityAn) {
+        const p = punctualityChip(punctuality);
+        werte.punctuality = p.wert;
+        titel.punctuality = p.titel;
+        if (p.wert === '–') hinweis.push(`Pünktlichkeit: ${p.titel}`);
+    }
+    if (reliabilityAn) {
+        const z = reliabilityChip(reliability);
+        werte.reliability = z.wert;
+        titel.reliability = z.titel;
+        if (z.wert === '–') hinweis.push(`Zuverlässigkeit: ${z.titel}`);
+    }
+
+    renderFilterChips(
+        document.getElementById('statisticsChips'),
+        defs.map(def => (titel[def.key] ? { ...def, title: titel[def.key] } : def)),
+        werte, null, null,
+        { static: true, label: 'Kennzahlen der Auswahl' }
+    );
+
+    const hintEl = document.getElementById('statisticsChipsHint');
+    if (hintEl) {
+        hintEl.textContent = hinweis.join(' · ');
+        hintEl.hidden      = hinweis.length === 0;
+    }
+}
+
+/**
+ * Wert und Erklaerung der Puenktlichkeit, Inhalt der frueheren Kennzahlkarte.
+ * Die Formulierungen folgen der Spec (Abschnitt 8) und nennen immer die
+ * Bezugsgroesse. Keine Farbskala: die gehoert zu OI-55 und wird fuer beide
+ * Quoten gemeinsam entschieden.
+ */
+function punctualityChip(punctuality) {
+    // "0 von mindestens 5 Messungen" klaenge nach einer Erfassungsluecke.
+    if (punctuality.total_count === 0) {
+        return { wert: '–', titel: 'Keine Termine im gewählten Zeitraum' };
+    }
+    if (!punctuality.sufficient) {
+        return {
+            wert:  '–',
+            titel: `Zu wenige Messungen (${punctuality.measured_count} von mindestens ${punctuality.min_measurements})`,
+        };
+    }
+
+    const zeilen = [
+        `Pünktlich bei ${punctuality.on_time_count} von ${punctuality.measured_count} gemessenen Ankünften`,
+        `Gemessen bei ${punctuality.measured_count} von ${punctuality.total_count} Terminen`,
+    ];
+    if (punctuality.avg_late_minutes !== null) {
+        zeilen.push(`Wenn zu spät, dann im Schnitt ${formatGerman(punctuality.avg_late_minutes)} Minuten`);
+    }
+
+    return { wert: `${formatGerman(punctuality.rate)} %`, titel: zeilen.join(' · ') };
+}
+
+/** Wert und Erklaerung der Zuverlaessigkeit. */
+function reliabilityChip(reliability) {
+    if (reliability.total === 0) {
+        return { wert: '–', titel: 'Keine Termine im gewählten Zeitraum' };
+    }
+
+    return {
+        wert:  `${formatGerman(reliability.rate)} %`,
+        titel: `Erschienen oder rechtzeitig abgemeldet: ${reliability.appeared + reliability.excused_in_time} von ${reliability.total}`,
+    };
 }
 
 /** Zahl in deutscher Schreibweise, hoechstens eine Nachkommastelle. */
 function formatGerman(value) {
     return Number(value).toLocaleString('de-DE', { maximumFractionDigits: 1 });
-}
-
-/**
- * Kacheln fuer Puenktlichkeit und Zuverlaessigkeit.
- *
- * Eine abgeschaltete Kennzahl liefert der Server als {enabled: false}; ihre
- * Kachel verschwindet dann ganz, statt leer dazustehen. Die Formulierungen
- * folgen der Spec (Abschnitt 8) und nennen immer die Bezugsgroesse.
- */
-function updateBehaviorStats(statsData) {
-    const punctuality = statsData?.punctuality ?? { enabled: false };
-    const reliability = statsData?.reliability ?? { enabled: false };
-
-    const pCard = document.getElementById('statPunctualityCard');
-    const rCard = document.getElementById('statReliabilityCard');
-
-    pCard.hidden = !punctuality.enabled;
-    rCard.hidden = !reliability.enabled;
-
-    if (punctuality.enabled) {
-        const value  = document.getElementById('statPunctuality');
-        const detail = document.getElementById('statPunctualityDetail');
-
-        if (punctuality.total_count === 0) {
-            // "0 von mindestens 5 Messungen" klaenge nach einer Erfassungsluecke.
-            value.textContent  = '–';
-            detail.textContent = 'Keine Termine im gewählten Zeitraum';
-        } else if (!punctuality.sufficient) {
-            value.textContent  = '–';
-            detail.textContent = `Zu wenige Messungen (${punctuality.measured_count} von mindestens ${punctuality.min_measurements})`;
-        } else {
-            value.textContent = `${formatGerman(punctuality.rate)} %`;
-
-            const lines = [
-                `Pünktlich bei ${punctuality.on_time_count} von ${punctuality.measured_count} gemessenen Ankünften`,
-                `Gemessen bei ${punctuality.measured_count} von ${punctuality.total_count} Terminen`,
-            ];
-            if (punctuality.avg_late_minutes !== null) {
-                lines.push(`Wenn zu spät, dann im Schnitt ${formatGerman(punctuality.avg_late_minutes)} Minuten`);
-            }
-            detail.textContent = lines.join(' · ');
-        }
-    }
-
-    if (reliability.enabled) {
-        const value  = document.getElementById('statReliability');
-        const detail = document.getElementById('statReliabilityDetail');
-
-        if (reliability.total === 0) {
-            value.textContent  = '–';
-            detail.textContent = 'Keine Termine im gewählten Zeitraum';
-        } else {
-            value.textContent  = `${formatGerman(reliability.rate)} %`;
-            detail.textContent = `Erschienen oder rechtzeitig abgemeldet: ${reliability.appeared + reliability.excused_in_time} von ${reliability.total}`;
-        }
-    }
 }
 
 /**

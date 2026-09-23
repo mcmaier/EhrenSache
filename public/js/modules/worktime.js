@@ -15,6 +15,7 @@ import { debug } from '../app.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { updateModalId } from './utils.js';
+import { CHIPS_WORKTIME, CHIPS_ACTIVITY_TYPES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // ZUSTAND
@@ -22,6 +23,13 @@ import { updateModalId } from './utils.js';
 
 let activityTypes = [];
 let worktimeEnabled = null;   // null = noch nicht geprüft
+
+// Aktiver Status-Chip (Spec 2026-09-22); ersetzt das frühere Status-Auswahlfeld
+let worktimeStatusChip = 'all';
+
+// Aktiver Chip der Tätigkeitsarten-Tabelle (Sichtung 23.09.2026: die Zählzeile
+// filtert jetzt, "Alle" ist zugleich das Zurücksetzen).
+let activityChip = 'all';
 
 // Die Badge-Klassen stammen aus components/badges.css — kein eigenes CSS noetig
 const STATUS_BADGE = {
@@ -119,7 +127,12 @@ export async function checkWorktimeEnabled() {
 
     const block = document.getElementById('activityTypesBlock');
     if (block) {
-        block.style.display = (worktimeEnabled && isAdmin) ? '' : 'none';
+        const sichtbar = worktimeEnabled && isAdmin;
+        block.style.display = sichtbar ? '' : 'none';
+        // Tabelle und Chipzeile fuellen, sonst bleibt der Block nach dem
+        // Einschalten auf „Lade Daten…“ stehen (settings.js ruft diese
+        // Funktion direkt danach).
+        if (sichtbar) renderActivityTypes();
     }
 
     return worktimeEnabled;
@@ -160,14 +173,12 @@ export async function loadWorkSessions(forceReload = false) {
     return sessions;
 }
 
-/** Wendet die Filterleiste auf die geladenen Sitzungen an. */
+/** Wendet die Filterleiste (ohne Status) auf die geladenen Sitzungen an. */
 function applyWorktimeFilters(sessions) {
-    const status = document.getElementById('filterWorktimeStatus')?.value || '';
     const activity = document.getElementById('filterWorktimeActivity')?.value || '';
     const member = document.getElementById('filterWorktimeMember')?.value || '';
 
     return sessions.filter(s => {
-        if (status && s.status !== status) return false;
         if (activity && String(s.activity_id) !== String(activity)) return false;
         if (member && String(s.member_id) !== String(member)) return false;
         return true;
@@ -178,8 +189,33 @@ export function renderWorkSessions(sessions) {
     const tbody = document.getElementById('worktimeTableBody');
     if (!tbody) return;
 
-    const filtered = applyWorktimeFilters(sessions || []);
-    updateWorktimeStats(filtered);
+    // Basis: Taetigkeit und Mitglied. Darauf zaehlen die Chips, erst danach
+    // filtert der aktive Chip die Tabelle (Spec 2026-09-22).
+    const base = applyWorktimeFilters(sessions || []);
+
+    // Die Summe folgt Taetigkeit und Mitglied, nicht dem Chip: sie beantwortet
+    // "wie viele bestaetigte Stunden", unabhaengig vom gelisteten Status.
+    const bestaetigteMinuten = base
+        .filter(s => s.status === 'confirmed' && s.end_time)
+        .reduce((summe, s) => summe + (parseInt(s.duration_minutes, 10) || 0), 0);
+
+    const zaehler = countChips(base, CHIPS_WORKTIME);
+    zaehler.hours = formatMinutes(bestaetigteMinuten);
+
+    renderFilterChips(
+        document.getElementById('worktimeStatusChips'),
+        [...CHIPS_WORKTIME, { key: 'hours', label: 'Stunden', static: true,
+            title: 'Bestätigte Stunden im gewählten Jahr; folgt Tätigkeit und Mitglied, nicht dem Statusfilter' }],
+        zaehler, worktimeStatusChip,
+        key => { worktimeStatusChip = key; renderWorkSessions(sessions); },
+        { label: 'Status der Arbeitszeit' }
+    );
+    setResetEnabled(document.getElementById('resetWorktimeFilter'),
+        worktimeStatusChip !== 'all'
+        || Boolean(document.getElementById('filterWorktimeActivity')?.value)
+        || Boolean(document.getElementById('filterWorktimeMember')?.value));
+
+    const filtered = filterByChip(base, CHIPS_WORKTIME, worktimeStatusChip);
 
     if (!filtered.length) {
         tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge für diese Auswahl.</td></tr>';
@@ -241,27 +277,6 @@ function renderWorktimeActions(session) {
     return buttons.join(' ') || '—';
 }
 
-// Alle drei Karten zaehlen die gefilterte Auswahl -- wie in den uebrigen
-// Bereichen. Bis 1.9.1 zaehlten "Wartet auf Freigabe" und "Laufende
-// Sitzungen" den Gesamtbestand und blieben bei jedem Filter unveraendert.
-function updateWorktimeStats(filtered) {
-    const confirmedMinutes = filtered
-        .filter(s => s.status === 'confirmed' && s.end_time)
-        .reduce((sum, s) => sum + (parseInt(s.duration_minutes, 10) || 0), 0);
-
-    const pending = filtered.filter(s => s.status === 'submitted' && s.end_time).length;
-    const open = filtered.filter(s => !s.end_time).length;
-
-    const set = (id, value) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = value;
-    };
-
-    set('statWorktimeTotal', formatMinutes(confirmedMinutes));
-    set('statWorktimePending', pending);
-    set('statWorktimeOpen', open);
-}
-
 /** Füllt die Auswahlfelder der Filterleiste. */
 async function fillWorktimeFilters() {
     const activitySelect = document.getElementById('filterWorktimeActivity');
@@ -307,10 +322,11 @@ async function fillWorktimeFilters() {
 }
 
 export function resetWorktimeFilter() {
-    ['filterWorktimeStatus', 'filterWorktimeActivity', 'filterWorktimeMember'].forEach(id => {
+    ['filterWorktimeActivity', 'filterWorktimeMember'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
+    worktimeStatusChip = 'all';
     loadWorkSessions();
 }
 
@@ -782,12 +798,29 @@ export function renderActivityTypes() {
     const tbody = document.getElementById('activityTypesTableBody');
     if (!tbody) return;
 
+    // Die Chipzeile steht bewusst VOR dem Abbruch: auch ohne Bestand zeigt
+    // sie ihre Nullen statt zu verschwinden.
+    renderFilterChips(
+        document.getElementById('activityChipsRow'),
+        CHIPS_ACTIVITY_TYPES, countChips(activityTypes, CHIPS_ACTIVITY_TYPES), activityChip,
+        key => { activityChip = key; renderActivityTypes(); },
+        { label: 'Tätigkeitsarten nach Status' }
+    );
+
     if (!activityTypes.length) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Noch keine Tätigkeitsarten angelegt.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = activityTypes.map(a => {
+    // "Alle" ist zugleich das Zuruecksetzen -- kein eigener Knopf.
+    const sichtbar = filterByChip(activityTypes, CHIPS_ACTIVITY_TYPES, activityChip);
+
+    if (!sichtbar.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Tätigkeitsarten für diese Auswahl</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = sichtbar.map(a => {
         const groupBadges = (a.groups && a.groups.length > 0)
             ? a.groups.map(g => `<span class="type-badge">${escapeHtml(g.group_name)}</span>`).join(' ')
             : '<span style="color: #7f8c8d;">Keine</span>';
@@ -972,11 +1005,15 @@ export async function deleteActivityType(activityId) {
 // ============================================
 
 export function initWorktimeEventHandlers() {
-    ['filterWorktimeStatus', 'filterWorktimeActivity', 'filterWorktimeMember'].forEach(id => {
+    ['filterWorktimeActivity', 'filterWorktimeMember'].forEach(id => {
         document.getElementById(id)?.addEventListener('change', () => {
             const sessions = dataCache.workSessions?.[currentYear]?.data || [];
             renderWorkSessions(sessions);
         });
+    });
+
+    document.getElementById('resetWorktimeFilter')?.addEventListener('click', () => {
+        resetWorktimeFilter();
     });
 
     // Der Berichtsdialog haengt bewusst an addEventListener statt an

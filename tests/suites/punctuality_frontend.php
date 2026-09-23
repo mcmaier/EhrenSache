@@ -44,31 +44,47 @@ test('Jeder Schluessel der Karte ist fuer Neuinstallationen angelegt', function 
     }
 });
 
-test('Beide Kacheln sind vorhanden und zunaechst verborgen', function () use ($puRoot) {
+/** Rumpf einer Funktion aus statistics.js bis zur schliessenden Klammer in Spalte 1. */
+function puRumpf(string $puRoot, string $kopf): string
+{
+    $js    = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+    $start = strpos($js, $kopf);
+    assertTrue($start !== false, $kopf . ' fehlt');
+
+    return substr($js, $start, strpos($js, "\n}", $start) - $start);
+}
+
+test('Eine abgeschaltete Kennzahl erscheint gar nicht erst als Chip', function () use ($puRoot) {
+    // Seit 1.13.0 sind beide Quoten Anzeige-Chips statt Kachel mit hidden:
+    // Sie werden schon aus dem Chipsatz genommen, wenn enabled false ist.
     $html = (string) file_get_contents($puRoot . '/public/index.html');
+    foreach (['statPunctualityCard', 'statReliabilityCard'] as $alt) {
+        assertSame(0, substr_count($html, $alt), $alt . ' muss mit den Kennzahlkarten entfallen');
+    }
 
-    foreach (['statPunctualityCard', 'statReliabilityCard'] as $id) {
-        $pos = strpos($html, "id=\"{$id}\"");
-        assertTrue($pos !== false, "Kachel {$id} fehlt");
+    $body = puRumpf($puRoot, 'function renderStatisticsChips(');
+    foreach (['punctuality', 'reliability'] as $key) {
+        assertTrue(strpos($body, "def.key === '{$key}'") !== false,
+            "{$key} wird nicht auf enabled geprueft");
+    }
+    assertTrue(substr_count($body, '.enabled === true') === 2,
+        'Beide Quoten muessen ohne enabled aus dem Chipsatz fallen');
+});
 
-        $tagEnde = strpos($html, '>', $pos);
-        assertTrue(strpos(substr($html, $pos, $tagEnde - $pos), 'hidden') !== false,
-            "{$id} muss ohne Serverantwort verborgen sein");
+test('Die Quoten tragen keine Farbskala', function () use ($puRoot) {
+    // Spec 8 / OI-55: Die Skala einer Quote wird einmal entschieden, fuer
+    // Anwesenheit und Puenktlichkeit gemeinsam -- nicht hier nebenbei.
+    // renderStatisticsChips() gehoert mit in die Schleife: Dort laufen die
+    // Werte beider Quoten zusammen, und eine Farbklasse waere dort genauso
+    // leicht eingefuegt wie in den beiden Bauteilen darunter.
+    foreach (['function punctualityChip(', 'function reliabilityChip(',
+              'function renderStatisticsChips('] as $kopf) {
+        assertTrue(strpos(puRumpf($puRoot, $kopf), 'rate-') === false,
+            'Farbklasse in ' . $kopf . ' -- das ist OI-55');
     }
 });
 
-test('Die Kacheln tragen keine Farbskala', function () use ($puRoot) {
-    // Spec 8 / OI-55: Die Skala einer Quote wird einmal entschieden, fuer
-    // Anwesenheit und Puenktlichkeit gemeinsam -- nicht hier nebenbei.
-    $js    = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
-    $start = strpos($js, 'function updateBehaviorStats(');
-    assertTrue($start !== false, 'updateBehaviorStats() fehlt');
-    $body  = substr($js, $start, strpos($js, "\n}", $start) - $start);
-
-    assertTrue(strpos($body, 'rate-') === false, 'Farbklasse in den Kacheln -- das ist OI-55');
-});
-
-test('Beide Pfade von renderStatistics befuellen die Kacheln', function () use ($puRoot) {
+test('Beide Pfade von renderStatistics zeichnen die Chips', function () use ($puRoot) {
     // Der Leerpfad kehrt frueh zurueck. Fehlte der Aufruf dort, blieben nach
     // einem Filterwechsel die Werte der vorherigen Auswahl stehen.
     $js    = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
@@ -79,11 +95,11 @@ test('Beide Pfade von renderStatistics befuellen die Kacheln', function () use (
     assertTrue($start !== false && $ende !== false, 'renderStatistics() nicht auffindbar');
     $body  = substr($js, $start, $ende - $start);
 
-    assertSame(2, substr_count($body, 'updateBehaviorStats('),
-        'updateBehaviorStats() muss im Leerpfad und im Normalpfad stehen');
+    assertSame(2, substr_count($body, 'renderStatisticsChips('),
+        'renderStatisticsChips() muss im Leerpfad und im Normalpfad stehen');
 });
 
-test('Die Kachel nennt die Mindestzahl aus der Serverantwort', function () use ($puRoot) {
+test('Der Chip nennt die Mindestzahl aus der Serverantwort', function () use ($puRoot) {
     $js = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
 
     assertTrue(strpos($js, 'min_measurements') !== false,
@@ -91,22 +107,24 @@ test('Die Kachel nennt die Mindestzahl aus der Serverantwort', function () use (
     assertSame(5, PUNCTUALITY_MIN_MEASUREMENTS);
 });
 
-test('Durchschnitt und neue Kacheln nutzen dasselbe Zahlenformat', function () use ($puRoot) {
-    // "77.2%" neben "21,3 %" in derselben Kachelreihe.
+test('Durchschnitt und Quoten nutzen dasselbe Zahlenformat', function () use ($puRoot) {
+    // "77.2%" neben "21,3 %". Seit der zweiten Sichtung steht der
+    // Durchschnitt je Gruppe, die Quoten in der Kopfzeile -- dasselbe
+    // Zahlenformat muessen sie trotzdem tragen.
     $js = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
 
-    assertTrue(strpos($js, "summary.overall_average + '%'") === false,
-        'statOverallAverage nutzt noch Punkt und kein Leerzeichen');
-    assertTrue(strpos($js, 'formatGerman(summary.overall_average)') !== false,
-        'statOverallAverage muss ueber formatGerman() laufen');
+    assertSame(0, preg_match("/(overall_average|groupAverage\([^)]*\))\s*\+\s*'%'/", $js),
+        'Der Durchschnitt nutzt noch Punkt und kein Leerzeichen');
+    assertSame(1, preg_match('/formatGerman\(\s*groupAverage\(/', $js),
+        'Der Durchschnitt je Gruppe muss ueber formatGerman() laufen');
 });
 
-test('Ohne Termine nennt die Puenktlichkeitskachel keine fehlenden Messungen', function () use ($puRoot) {
-    $js    = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
-    $start = strpos($js, 'function updateBehaviorStats(');
-    assertTrue($start !== false, 'updateBehaviorStats() fehlt');
-    $body  = substr($js, $start, strpos($js, "\n}", $start) - $start);
+test('Ohne Termine nennt der Puenktlichkeits-Chip keine fehlenden Messungen', function () use ($puRoot) {
+    $body = puRumpf($puRoot, 'function punctualityChip(');
 
-    assertTrue(strpos($body, 'punctuality.total_count === 0') !== false,
+    $ohneTermine = strpos($body, 'punctuality.total_count === 0');
+    $zuWenige    = strpos($body, 'punctuality.sufficient');
+    assertTrue($ohneTermine !== false, 'Der Fall ohne Termine fehlt');
+    assertTrue($zuWenige !== false && $ohneTermine < $zuWenige,
         'Der Fall ohne Termine muss vor "Zu wenige Messungen" stehen');
 });
