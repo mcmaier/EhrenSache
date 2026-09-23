@@ -22,7 +22,22 @@
 }
 
 .stats-grid--chips-lead {
-    grid-template-columns: minmax(140px, 200px) minmax(0, 1fr) minmax(150px, 190px);
+    grid-template-columns: minmax(120px, 170px) minmax(0, 1fr) minmax(150px, 190px);
+}
+
+/* Die Kennzahl in der Chip-Zeile bleibt flach, damit die Zeile nicht doppelt
+   so hoch wird wie in den uebrigen Ansichten. */
+.stats-grid--chips-lead .stat-card {
+    padding: 8px 12px;
+}
+
+.stats-grid--chips-lead .stat-card h3 {
+    margin-bottom: 2px;
+    font-size: 12px;
+}
+
+.stats-grid--chips-lead .stat-card .number {
+    font-size: 20px;
 }
 
 /* Ist die Chip-Leiste verborgen (Mitglieder als Rolle "user"), gibt sie ihre
