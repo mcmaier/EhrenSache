@@ -1,5 +1,15 @@
 <?php
 /**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/**
  * Ankunftszeit darf fehlen (ab 1.5.0).
  *
  * Frueher setzte records.php die Startzeit des Termins ein, wenn beim Anlegen

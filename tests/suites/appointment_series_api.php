@@ -1,5 +1,15 @@
 <?php
 /**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/**
  * Terminserien ueber die API (FI-7) und die gemeinsamen Terminregeln.
  *
  * Jeder Test baut sich eine eigene Terminart, damit die Dublettenpruefung
