@@ -18,7 +18,7 @@ import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS } from './responses.js';
-import { appointmentTimeChips, localTodayIso, countChips, renderFilterChips, setResetVisible } from './filter_chips.js';
+import { appointmentTimeChips, localTodayIso, countChips, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // APPOINTMENTS
@@ -211,7 +211,7 @@ export async function showAppointmentSection(forceReload = false, page = 1)
             gefiltert = gefiltert.filter(a => a.series_id === null || a.series_id === undefined);
         }
 
-        setResetVisible(document.getElementById('resetAppointmentFilter'),
+        setResetEnabled(document.getElementById('resetAppointmentFilter'),
             Boolean(typ) || Boolean(herkunft));
 
         renderAppointments(gefiltert, page);

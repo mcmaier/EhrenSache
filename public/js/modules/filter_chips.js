@@ -156,6 +156,9 @@ export function resolveActiveChip(defs, activeKey, fallbackKey) {
  * options.static: reine Anzeige (span statt button, kein Klick).
  * options.label:  aria-label der Gruppe.
  * onChange(key) wird nur bei Wechsel auf einen anderen Chip gerufen.
+ * def.title:      optionaler Tooltip des Chips.
+ * Der Zaehler nimmt jeden Wert aus counts entgegen, nicht nur Zahlen --
+ * Textwerte wie '214:42 h' oder '65,4 %' werden unveraendert angezeigt.
  */
 export function renderFilterChips(container, defs, counts, activeKey, onChange, options = {}) {
     if (!container) return;
@@ -171,6 +174,7 @@ export function renderFilterChips(container, defs, counts, activeKey, onChange, 
         const chip = document.createElement(isStatic ? 'span' : 'button');
         chip.className = 'filter-chip';
         if (def.variant) chip.classList.add(`filter-chip--${def.variant}`);
+        if (def.title) chip.title = def.title;
 
         if (isStatic) {
             chip.classList.add('filter-chip--static');
@@ -201,7 +205,11 @@ export function renderFilterChips(container, defs, counts, activeKey, onChange, 
     if (focusedKey) container.querySelector(`[data-chip="${focusedKey}"]`)?.focus();
 }
 
-/** Zuruecksetzen-Knopf nur zeigen, wenn ein Filter von der Vorgabe abweicht. */
-export function setResetVisible(button, visible) {
-    if (button) button.hidden = !visible;
+/**
+ * Zuruecksetzen-Knopf: dauerhaft sichtbar, im Ruhezustand ausgegraut.
+ * Frueher wurde er ein- und ausgeblendet -- dabei sprangen die Auswahlfelder
+ * daneben bei jeder Aenderung (Sichtung 23.09.2026).
+ */
+export function setResetEnabled(button, enabled) {
+    if (button) button.disabled = !enabled;
 }

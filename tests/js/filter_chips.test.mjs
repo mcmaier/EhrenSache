@@ -16,7 +16,7 @@ import {
     countChips, filterByChip, resolveActiveChip, localTodayIso, appointmentTimeChips,
     CHIPS_EXCEPTIONS, CHIPS_WORKTIME, CHIPS_MEMBERS, CHIPS_USERS, CHIPS_DEVICES,
     CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, CHIPS_STATISTICS,
-    groupChips, CHIPS_APPOINTMENT_TYPES, CHIPS_ACTIVITY_TYPES
+    groupChips, CHIPS_APPOINTMENT_TYPES, CHIPS_ACTIVITY_TYPES, setResetEnabled
 } from '../../public/js/modules/filter_chips.js';
 
 /** Summe aller Chips ausser "Alle" muss "Alle" ergeben (gegenseitig ausschliessend, vollstaendig). */
@@ -131,4 +131,17 @@ test('Taetigkeitsarten: aktiv und ausgemustert', () => {
     const items = [{ is_active: 1 }, { is_active: '1' }, { is_active: 0 }, { is_active: null }];
     assert.deepEqual(countChips(items, CHIPS_ACTIVITY_TYPES), { all: 4, active: 2, inactive: 2 });
     assertPartition(CHIPS_ACTIVITY_TYPES, items, 'Taetigkeitsarten');
+});
+
+test('setResetEnabled graut den Knopf aus, statt ihn zu verstecken', () => {
+    const knopf = { disabled: false, hidden: false };
+    setResetEnabled(knopf, false);
+    assert.equal(knopf.disabled, true, 'Ruhezustand: ausgegraut');
+    assert.equal(knopf.hidden, false, 'Der Knopf darf nicht verschwinden');
+    setResetEnabled(knopf, true);
+    assert.equal(knopf.disabled, false);
+});
+
+test('setResetEnabled vertraegt ein fehlendes Element', () => {
+    setResetEnabled(null, true);
 });

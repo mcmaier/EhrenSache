@@ -77,6 +77,21 @@ test('Der Zuruecksetzen-Knopf teilt den Stil nicht mehr mit btn-cancel', functio
         'Ohne .btn-reset-filter[hidden] schluege ein spaeteres display das hidden');
 });
 
+test('Der Zuruecksetzen-Knopf bleibt sichtbar und wird nur ausgegraut', function () use ($fcRoot, $fcHtml) {
+    assertSame(0, preg_match('/class="btn-reset-filter"[^>]*\shidden/', $fcHtml),
+        'Der Knopf wird nicht mehr ausgeblendet, sondern ausgegraut');
+
+    $buttons = (string) file_get_contents($fcRoot . '/public/css/components/buttons.css');
+    assertTrue(str_contains($buttons, '.btn-reset-filter:disabled'),
+        'Der ausgegraute Zustand braucht eine eigene Regel');
+
+    foreach (['appointments', 'exceptions', 'members', 'records', 'statistics', 'users', 'worktime'] as $modul) {
+        $js = fcModul($fcRoot, $modul);
+        assertTrue(str_contains($js, 'setResetEnabled'), $modul . '.js nutzt setResetEnabled nicht');
+        assertSame(0, substr_count($js, 'setResetVisible'), $modul . '.js kennt noch den alten Namen');
+    }
+});
+
 test('Ein verborgener Chip-Container bleibt verborgen', function () use ($fcCss) {
     assertTrue(str_contains($fcCss, '.filter-chips[hidden]'),
         'Ohne .filter-chips[hidden] schluege display:flex das hidden');
@@ -94,7 +109,7 @@ test('Antraege: Chips statt Zaehlkarten und Status-Auswahl', function () use ($f
     $js = fcModul($fcRoot, 'exceptions');
     assertTrue(str_contains($js, 'CHIPS_EXCEPTIONS'), 'exceptions.js nutzt den Chipsatz nicht');
     assertSame(0, substr_count($js, 'filterExceptionStatus'), 'exceptions.js liest noch das alte Auswahlfeld');
-    assertTrue(str_contains($js, 'setResetVisible'), 'Zuruecksetzen-Sichtbarkeit fehlt');
+    assertTrue(str_contains($js, 'setResetEnabled'), 'Zuruecksetzen-Ansteuerung fehlt');
     assertTrue(str_contains($js, 'countChips(base, CHIPS_EXCEPTIONS)'), 'Antraege: Chips muessen auf der Basisliste zaehlen');
 });
 
@@ -310,7 +325,7 @@ test('Statistik nutzt denselben Kopf wie die uebrigen Ansichten', function () us
 
     $js = fcModul($fcRoot, 'statistics');
     assertSame(0, substr_count($js, 'filter-grid'), 'statistics.js kennt die Grid-Klassen noch');
-    assertTrue(str_contains($js, 'setResetVisible'), 'Zuruecksetzen wird nicht mehr ein- und ausgeblendet');
+    assertTrue(str_contains($js, 'setResetEnabled'), 'Zuruecksetzen wird nicht mehr ueber die alte Funktion angesteuert');
 });
 
 test('Statistik: Zaehlwerte als Chips, Quoten als Karten', function () use ($fcRoot, $fcHtml) {

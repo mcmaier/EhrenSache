@@ -13,7 +13,7 @@ import { loadMembers } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid} from './ui.js';
 import { updateModalId, escapeHtml } from './utils.js';
 import {debug} from '../app.js'
-import { CHIPS_USERS, countChips, filterByChip, renderFilterChips, setResetVisible } from './filter_chips.js';
+import { CHIPS_USERS, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // USERS
@@ -324,7 +324,7 @@ export async function applyUserFilters(forceReload = false, page = 1) {
         key => { userStatusChip = key; applyUserFilters(false, 1); },
         { label: 'Status der Benutzer' }
     );
-    setResetVisible(document.getElementById('btnResetUserFilters'),
+    setResetEnabled(document.getElementById('btnResetUserFilters'),
         Boolean(role) || userStatusChip !== 'all');
 
     const filteredUsers = filterByChip(base, CHIPS_USERS, userStatusChip);

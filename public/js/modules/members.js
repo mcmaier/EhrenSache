@@ -15,7 +15,7 @@ import { updateModalId, escapeHtml } from './utils.js';
 import { loadGroups } from './management.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
-import { CHIPS_MEMBERS, countChips, filterByChip, renderFilterChips, setResetVisible } from './filter_chips.js';
+import { CHIPS_MEMBERS, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // MEMBERS
@@ -392,7 +392,7 @@ export async function showMemberSection(forceReload = false, page = 1) {
             key => { memberStatusChip = key; showMemberSection(false); },
             { label: 'Status der Mitglieder' }
         );
-        setResetVisible(document.getElementById('resetMemberFilter'),
+        setResetEnabled(document.getElementById('resetMemberFilter'),
             Boolean(selectedGroupId) || memberStatusChip !== 'active');
     }
 

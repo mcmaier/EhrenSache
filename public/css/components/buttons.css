@@ -71,8 +71,9 @@
     opacity: 0.8;
 }
 
-/* Filter zuruecksetzen: ruhiger Ghost-Knopf (Spec 2026-09-22). Er erscheint
-   in den Listen nur, wenn ein Filter von der Vorgabe abweicht (hidden). */
+/* Filter zuruecksetzen: ruhiger Ghost-Knopf (Spec 2026-09-22). Er steht
+   dauerhaft in den Listen und ist ausgegraut (disabled), solange kein Filter
+   von der Vorgabe abweicht -- Sichtung 23.09.2026, siehe .btn-reset-filter:disabled. */
 .btn-reset-filter {
     padding: var(--spacing-sm) var(--spacing-md);
     background: transparent;
@@ -87,6 +88,16 @@
 
 .btn-reset-filter:hover {
     background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+}
+
+/* Ruhezustand: sichtbar, aber erkennbar nicht bedienbar. */
+.btn-reset-filter:disabled {
+    color: var(--text-light);
+    cursor: default;
+}
+
+.btn-reset-filter:disabled:hover {
+    background: transparent;
 }
 
 .btn-confirm-delete {

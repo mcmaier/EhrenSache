@@ -17,7 +17,7 @@ import { loadTypes } from './management.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { escapeHtml } from './utils.js';
-import { CHIPS_EXCEPTIONS, countChips, filterByChip, renderFilterChips, setResetVisible } from './filter_chips.js';
+import { CHIPS_EXCEPTIONS, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // EXCEPTIONS
@@ -348,7 +348,7 @@ export async function applyExceptionFilters(forceReload = false, page = 1) {
         key => { exceptionStatusChip = key; applyExceptionFilters(false, 1); },
         { label: 'Status der Anträge' }
     );
-    setResetVisible(document.getElementById('resetExceptionFilter'),
+    setResetEnabled(document.getElementById('resetExceptionFilter'),
         Boolean(exceptionType) || exceptionStatusChip !== 'all');
 
     const filteredExceptions = filterByChip(base, CHIPS_EXCEPTIONS, exceptionStatusChip);

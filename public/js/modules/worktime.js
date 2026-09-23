@@ -15,7 +15,7 @@ import { debug } from '../app.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { updateModalId } from './utils.js';
-import { CHIPS_WORKTIME, CHIPS_ACTIVITY_TYPES, countChips, filterByChip, renderFilterChips, setResetVisible } from './filter_chips.js';
+import { CHIPS_WORKTIME, CHIPS_ACTIVITY_TYPES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // ZUSTAND
@@ -192,7 +192,7 @@ export function renderWorkSessions(sessions) {
         key => { worktimeStatusChip = key; renderWorkSessions(sessions); },
         { label: 'Status der Arbeitszeit' }
     );
-    setResetVisible(document.getElementById('resetWorktimeFilter'),
+    setResetEnabled(document.getElementById('resetWorktimeFilter'),
         worktimeStatusChip !== 'all'
         || Boolean(document.getElementById('filterWorktimeActivity')?.value)
         || Boolean(document.getElementById('filterWorktimeMember')?.value));

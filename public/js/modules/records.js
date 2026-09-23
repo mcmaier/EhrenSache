@@ -17,7 +17,7 @@ import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, 
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_ATTENDANCE } from './grouping.js';
-import { CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, countChips, filterByChip, resolveActiveChip, renderFilterChips, setResetVisible } from './filter_chips.js';
+import { CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, countChips, filterByChip, resolveActiveChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // RECORDS
@@ -362,7 +362,7 @@ function applyRecordChips(base, rerender) {
 
     const anyFilter = ['filterAptType', 'filterAppointment', 'filterMember']
         .some(id => Boolean(document.getElementById(id)?.value));
-    setResetVisible(document.getElementById('resetRecordFilter'),
+    setResetEnabled(document.getElementById('resetRecordFilter'),
         anyFilter || recordStatusChip !== 'all');
 
     return filterByChip(base, defs, recordStatusChip);

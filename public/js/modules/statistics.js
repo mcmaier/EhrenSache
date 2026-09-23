@@ -15,7 +15,7 @@ import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, currentYear, groupSelectOptionsHtml, subgroupLabel, dataCache} from './ui.js';
 import {debug} from '../app.js'
 import { escapeHtml } from './utils.js';
-import { CHIPS_STATISTICS, renderFilterChips, setResetVisible } from './filter_chips.js';
+import { CHIPS_STATISTICS, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -158,7 +158,7 @@ export async function applyStatisticsFilters() {
     // loadStatisticsFilters()) zaehlt nicht als Filter -- der Knopf blieb sonst
     // von Anfang an sichtbar, obwohl niemand etwas ausgewaehlt hat.
     const statGroupValue = document.getElementById('statGroup')?.value ?? '';
-    setResetVisible(document.getElementById('resetStatisticsFilter'),
+    setResetEnabled(document.getElementById('resetStatisticsFilter'),
         (statGroupValue !== statGroupPreselected)
         || Boolean(document.getElementById('statMember')?.value));
 
