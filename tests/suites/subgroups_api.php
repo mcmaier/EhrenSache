@@ -1,5 +1,15 @@
 <?php
 /**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/**
  * Untergruppen-Gliederung ueber die API (1.8.0).
  *
  * Spec: docs/superpowers/specs/2026-09-16-untergruppen-gliederung-design.md,
