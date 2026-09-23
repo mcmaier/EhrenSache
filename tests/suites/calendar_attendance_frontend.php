@@ -317,3 +317,43 @@ test('loadAttendanceList meldet den Fehler, statt ihn zu verschlucken', function
     assertTrue(str_contains($body, "'Anwesenheitsliste konnte nicht geladen werden'"),
         'Ohne Meldung gilt der Sprung als geglueckt, waehrend die Tabelle alten Inhalt zeigt');
 });
+
+// ---- appointments.js ----------------------------------------------------------------
+
+test('Kalendermonat laesst sich von aussen setzen', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    assertTrue(str_contains($js, 'export function setCalendarMonth('),
+        'Muss eine gehobene Funktionsdeklaration sein -- records.js und appointments.js importieren sich gegenseitig');
+    $body = caFeFunctionBody($js, 'export function setCalendarMonth(');
+    assertTrue(str_contains($body, 'currentCalendarDate = new Date('), 'Zielmonat wird nicht gesetzt');
+});
+
+test('Anwesenheit nur fuer begonnene Termine und nur fuer Verwalter', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $started = caFeFunctionBody($js, 'function appointmentHasStarted(');
+    assertTrue(str_contains($started, '<= new Date()'), 'Vergangenheitspruefung fehlt');
+
+    $popup = caFeFunctionBody($js, 'function showAppointmentPopup(');
+    assertTrue((bool) preg_match('/fest && isAdminOrManager && appointmentHasStarted\(apt\)/', $popup),
+        'Popup-Knopf ohne vollstaendige Bedingung');
+
+    $list = caFeFunctionBody($js, 'async function renderAppointments(');
+    assertTrue(str_contains($list, 'appointmentHasStarted(apt)'), 'Listenknopf ohne Bedingung');
+    assertTrue(str_contains($list, 'aria-label="Anwesenheit anzeigen"'), 'Symbolknopf braucht einen Namen');
+});
+
+test('Die Terminzeile traegt ihre Id fuer den Rueckweg', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $list = caFeFunctionBody($js, 'async function renderAppointments(');
+    assertTrue((bool) preg_match('/dataset\.appointmentId\s*=|setAttribute\(.data-appointment-id./', $list),
+        'Ohne Kennung an der Zeile rollt der Rueckweg aus der Liste nur zum Tabellenkopf');
+});
+
+test('jumpToAttendance liest das Datum aus dem Cache und nennt die Herkunft', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'export async function jumpToAttendance(');
+    assertTrue(str_contains($body, "import('./records.js')"), 'records.js muss dynamisch geladen werden');
+    assertTrue(str_contains($body, 'openAttendanceForAppointment('), 'Sprungfunktion wird nicht gerufen');
+    assertTrue(str_contains($body, "'list'"), 'Die Herkunft muss durchgereicht werden');
+    assertTrue(str_contains($js, 'window.jumpToAttendance = jumpToAttendance'), 'Der onclick braucht die globale Zuweisung');
+});

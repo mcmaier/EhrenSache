@@ -255,7 +255,10 @@ async function renderAppointments(appointments, page = 1) {
     pageAppointments.forEach(apt => {
         
         const tr = document.createElement('tr');
-    
+        // Kennung fuer den Rueckweg aus der Anwesenheitsliste: records.js sucht
+        // die Zeile ueber #appointmentsTableBody tr[data-appointment-id="<id>"].
+        tr.dataset.appointmentId = apt.appointment_id;
+
         // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (apt.appointment_id && apt.title) {
@@ -297,7 +300,10 @@ async function renderAppointments(appointments, page = 1) {
 
         const actionsHtml = isAdminOrManager ? `
             <td class="actions-cell">
-                    <button class="action-btn btn-icon btn-edit" 
+                    ${appointmentHasStarted(apt) ? `<button class="action-btn btn-icon"
+                            onclick="jumpToAttendance(${Number(apt.appointment_id)}, 'list')"
+                            title="Anwesenheit anzeigen" aria-label="Anwesenheit anzeigen">📋</button>` : ''}
+                    <button class="action-btn btn-icon btn-edit"
                             onclick="openAppointmentModal(${apt.appointment_id})"
                             title="Bearbeiten">
                         ✎
@@ -763,6 +769,8 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
                 ${apt.responses ? calendarResponseLineHtml(apt, fest) : ''}
                 ${fest && isAdminOrManager ? `<button type="button" class="calendar-event-edit"
                     onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openAppointmentModal(${Number(apt.appointment_id)})">Bearbeiten</button>` : ''}
+                ${fest && isAdminOrManager && appointmentHasStarted(apt) ? `<button type="button" class="calendar-event-edit"
+                    onclick="document.querySelector('.calendar-event-popup')?.remove(); window.jumpToAttendance(${Number(apt.appointment_id)})">Anwesenheit</button>` : ''}
             </div>
         `;
     });
@@ -1476,6 +1484,41 @@ export async function setCalendarToYear() {
     }
 
 }
+
+/** Kalender auf den Monat eines Datums stellen (Rueckweg aus der Anwesenheit). */
+export function setCalendarMonth(date) {
+    const d = new Date(String(date) + 'T00:00:00');
+    if (!isNaN(d.getTime())) {
+        currentCalendarDate = new Date(d.getFullYear(), d.getMonth(), 1);
+    }
+}
+
+/** Hat der Termin begonnen? Nur dann gibt es eine Anwesenheit. */
+function appointmentHasStarted(apt) {
+    const start = new Date(`${apt.date}T${apt.start_time || '00:00:00'}`);
+    return !isNaN(start.getTime()) && start <= new Date();
+}
+
+/**
+ * Sprung in die Anwesenheitsliste. Datum aus dem Cache statt aus dem
+ * onclick-String (Muster aus deleteAppointment). records.js wird dynamisch
+ * geladen -- es importiert selbst aus diesem Modul.
+ */
+export async function jumpToAttendance(appointmentId, from = 'calendar') {
+    const apt = calendarAppointments.find(a => a.appointment_id == appointmentId)
+        || dataCache.appointments[currentYear]?.data?.find(a => a.appointment_id == appointmentId);
+    if (!apt) {
+        showToast('Termin nicht gefunden', 'error');
+        return;
+    }
+    // Die Herkunft kommt aus einem onclick-Attribut, also aus dem DOM. Nur
+    // 'calendar' und 'list' sind gueltig, alles andere faellt auf den Kalender
+    // zurueck -- sonst entschiede ein Tippfehler stillschweigend den Rueckweg.
+    const origin = from === 'list' ? 'list' : 'calendar';
+    const { openAttendanceForAppointment } = await import('./records.js');
+    await openAttendanceForAppointment(apt.appointment_id, apt.date, origin);
+}
+
 // ============================================
 // GLOBAL EXPORTS (für onclick in HTML)
 // ============================================
@@ -1495,6 +1538,7 @@ window.updateAppointmentRepeatFields = updateAppointmentRepeatFields;
 window.openSeriesExtend = openSeriesExtend;
 window.previewSeriesExtend = previewSeriesExtend;
 window.openSeriesRuleChange = openSeriesRuleChange;
+window.jumpToAttendance = jumpToAttendance;
 
 // Fuer responses.js (FI-1): Terminliste auf der aktuell gezeigten Seite neu
 // laden, ohne die Seite zu wechseln. Der Cache wurde vorher per
