@@ -75,6 +75,16 @@ export const CHIPS_RECORDS_LIST = Object.freeze([
       match: r => r.status !== 'present' && r.status !== 'excused' },
 ]);
 
+// Statistik: reine Anzeige, deshalb ohne match und ohne "Alle". Die vier
+// Zahlen bilden bewusst KEINE Partition -- "Termine" zaehlt Termine, die
+// uebrigen zaehlen Anwesenheitsdatensaetze.
+export const CHIPS_STATISTICS = Object.freeze([
+    { key: 'appointments', label: 'Termine' },
+    { key: 'present',      label: 'Anwesend',       variant: 'ok' },
+    { key: 'excused',      label: 'Entschuldigt',   variant: 'pending' },
+    { key: 'unexcused',    label: 'Unentschuldigt', variant: 'danger' },
+]);
+
 /** Termine: reine Anzeige. Heute zaehlt als kommend. */
 export function appointmentTimeChips(todayIso) {
     const day = a => String(a.date ?? '').slice(0, 10);

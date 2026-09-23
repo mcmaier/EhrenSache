@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import {
     countChips, filterByChip, resolveActiveChip, localTodayIso, appointmentTimeChips,
     CHIPS_EXCEPTIONS, CHIPS_WORKTIME, CHIPS_MEMBERS, CHIPS_USERS, CHIPS_DEVICES,
-    CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST
+    CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, CHIPS_STATISTICS
 } from '../../public/js/modules/filter_chips.js';
 
 /** Summe aller Chips ausser "Alle" muss "Alle" ergeben (gegenseitig ausschliessend, vollstaendig). */
@@ -100,4 +100,11 @@ test('Termine: heute zaehlt als kommend, gestern als vergangen', () => {
 
 test('localTodayIso nutzt die lokale Zeit', () => {
     assert.equal(localTodayIso(new Date(2026, 0, 5, 23, 30)), '2026-01-05');
+});
+
+test('Statistik-Chips sind reine Anzeige und bilden keine Partition', () => {
+    assert.equal(CHIPS_STATISTICS.length, 4);
+    assert.ok(CHIPS_STATISTICS.every(d => !d.match), 'Statistik-Chips duerfen nicht filtern');
+    assert.deepEqual(CHIPS_STATISTICS.map(d => d.key), ['appointments', 'present', 'excused', 'unexcused']);
+    assert.deepEqual(CHIPS_STATISTICS.map(d => d.variant), [undefined, 'ok', 'pending', 'danger']);
 });

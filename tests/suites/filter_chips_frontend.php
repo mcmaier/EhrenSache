@@ -305,3 +305,19 @@ test('Statistik nutzt denselben Kopf wie die uebrigen Ansichten', function () us
     assertSame(0, substr_count($js, 'filter-grid'), 'statistics.js kennt die Grid-Klassen noch');
     assertTrue(str_contains($js, 'setResetVisible'), 'Zuruecksetzen wird nicht mehr ein- und ausgeblendet');
 });
+
+test('Statistik: Zaehlwerte als Chips, Quoten als Karten', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'statistik', 'mitglieder');
+
+    assertTrue(str_contains($bereich, 'id="statisticsChips"'), 'Chip-Container fehlt');
+    foreach (['statTotalAppointments', 'statTotalPresent', 'statTotalExcused', 'statTotalUnexcused'] as $id) {
+        assertSame(0, substr_count($fcHtml, $id), $id . ' muss entfallen');
+    }
+    foreach (['statOverallAverage', 'statPunctualityCard', 'statReliabilityCard'] as $id) {
+        assertTrue(str_contains($bereich, 'id="' . $id . '"'), $id . ' muss als Karte bleiben');
+    }
+
+    $js = fcModul($fcRoot, 'statistics');
+    assertTrue(str_contains($js, 'CHIPS_STATISTICS'), 'statistics.js nutzt den Chipsatz nicht');
+    assertTrue(preg_match('/static:\s*true/', $js) === 1, 'Die Statistik-Chips muessen static sein');
+});

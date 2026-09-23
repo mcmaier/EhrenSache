@@ -15,7 +15,7 @@ import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, currentYear, groupSelectOptionsHtml, subgroupLabel, dataCache} from './ui.js';
 import {debug} from '../app.js'
 import { escapeHtml } from './utils.js';
-import { setResetVisible } from './filter_chips.js';
+import { CHIPS_STATISTICS, renderFilterChips, setResetVisible } from './filter_chips.js';
 
 // ============================================
 // DATA FUNCTIONS (API-Calls)
@@ -371,21 +371,29 @@ export async function renderStatistics(statsData) {
 // HELPERS
 // ============================================
 
+// Die vier Zaehlwerte stehen seit 1.13.0 als Anzeige-Chips im Kopf, nur der
+// Durchschnitt bleibt eine Karte. Ohne Daten steht ueberall "-" wie bisher.
 function updateOverallStats(summary) {
-    if (!summary) {
-        document.getElementById('statTotalAppointments').textContent = '-';
-        document.getElementById('statTotalPresent').textContent = '-';
-        document.getElementById('statTotalExcused').textContent = '-';
-        document.getElementById('statTotalUnexcused').textContent = '-';
-        document.getElementById('statOverallAverage').textContent = '-';
-        return;
+    const leer = { appointments: '-', present: '-', excused: '-', unexcused: '-' };
+    const zahlen = summary
+        ? {
+            appointments: summary.total_appointments,
+            present:      summary.total_present,
+            excused:      summary.total_excused,
+            unexcused:    summary.total_unexcused,
+        }
+        : leer;
+
+    renderFilterChips(
+        document.getElementById('statisticsChips'),
+        CHIPS_STATISTICS, zahlen, null, null,
+        { static: true, label: 'Kennzahlen der Auswahl' }
+    );
+
+    const schnitt = document.getElementById('statOverallAverage');
+    if (schnitt) {
+        schnitt.textContent = summary ? `${formatGerman(summary.overall_average)} %` : '-';
     }
-    
-    document.getElementById('statTotalAppointments').textContent = summary.total_appointments;
-    document.getElementById('statTotalPresent').textContent = summary.total_present;
-    document.getElementById('statTotalExcused').textContent = summary.total_excused;
-    document.getElementById('statTotalUnexcused').textContent = summary.total_unexcused;
-    document.getElementById('statOverallAverage').textContent = `${formatGerman(summary.overall_average)} %`;
 }
 
 /** Zahl in deutscher Schreibweise, hoechstens eine Nachkommastelle. */
