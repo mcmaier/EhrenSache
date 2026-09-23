@@ -25,7 +25,31 @@ function caCreate(string $resource, array $body): int
 
 function caDelete(string $resource, int $id): void
 {
-    apiRequest('DELETE', $resource, ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    $res = apiRequest('DELETE', $resource, ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    if (in_array($resource, ['members', 'member_groups'], true)) {
+        assertStatus(200, $res, "{$resource} {$id} konnte nicht geloescht werden");
+    }
+}
+
+/** Wie rsMemberGroupIds() in responses_api.php. */
+function caMemberGroupIds(int $memberId): array
+{
+    $res = apiRequest('GET', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
+    assertStatus(200, $res);
+    assertTrue(isset($res['body']['groups']) && is_array($res['body']['groups']),
+        "members lieferte kein groups-Array fuer Mitglied {$memberId}: " . $res['raw']);
+
+    return array_map(static fn ($g) => (int) $g['group_id'], $res['body']['groups']);
+}
+
+/** Wie rsSetMemberGroups() in responses_api.php. */
+function caSetMemberGroups(int $memberId, array $groupIds): void
+{
+    assertStatus(200, apiRequest('PUT', 'members', [
+        'token' => apiToken('admin'),
+        'query' => ['id' => $memberId],
+        'body'  => ['group_ids' => $groupIds],
+    ]), "Gruppen von Mitglied {$memberId} konnten nicht gesetzt werden");
 }
 
 /** @return array{group:int,type:int,members:int[],appointments:int[]} */
@@ -185,15 +209,16 @@ test('Ein Mitglied sieht nur den eigenen Status, keine Zahlen', function () {
     assertTrue($memberId !== null, 'Testkonto user hat kein verknuepftes Mitglied');
 
     // Das Mitglied des Testkontos zusaetzlich in die Gruppe der Welt nehmen und
-    // am Ende wieder herausnehmen -- sonst waere es gar nicht erwartet.
-    $vorher = apiRequest('GET', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
-    assertStatus(200, $vorher);
-    $gruppenVorher = array_map(static fn ($g) => (int) $g['group_id'], $vorher['body']['groups'] ?? []);
+    // am Ende wieder herausnehmen -- sonst waere es gar nicht erwartet. Wie
+    // rsWithUserInWorld() in responses_api.php: die urspruengliche Zuordnung
+    // wird gelesen, geprueft (eine leere Liste waere ein Fehler -- das Konto
+    // muss Gruppen haben) und am Ende exakt wiederhergestellt und gegengeprueft,
+    // statt eine fehlgeschlagene Wiederherstellung stillschweigend durchzulassen.
+    $gruppenVorher = caMemberGroupIds($memberId);
+    assertTrue($gruppenVorher !== [], "Testkonto user (Mitglied {$memberId}) hat keine Gruppe");
 
     try {
-        $res = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId],
-            'body' => ['group_ids' => array_merge($gruppenVorher, [$world['group']])]]);
-        assertStatus(200, $res);
+        caSetMemberGroups($memberId, array_values(array_unique(array_merge($gruppenVorher, [$world['group']]))));
 
         $tag = caDateInDays(-2);
         $apt = caAppointment($world, $tag);
@@ -212,8 +237,12 @@ test('Ein Mitglied sieht nur den eigenen Status, keine Zahlen', function () {
         assertSame(1, $verwalter['attendance']['excused']);
         assertTrue(!array_key_exists('own_attendance', $verwalter));
     } finally {
-        apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId],
-            'body' => ['group_ids' => $gruppenVorher]]);
+        caSetMemberGroups($memberId, $gruppenVorher);
+        $gruppenNachher = caMemberGroupIds($memberId);
+        sort($gruppenVorher);
+        sort($gruppenNachher);
+        assertSame($gruppenVorher, $gruppenNachher,
+            "Gruppen von Mitglied {$memberId} nach der Wiederherstellung veraendert");
         caDropWorld($world);
     }
 });

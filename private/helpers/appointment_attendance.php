@@ -16,13 +16,15 @@
  * Gruppen der Terminart (appointment_type_groups) mal Gruppenzuordnung des
  * Mitglieds, eingeschraenkt auf den Aktivzeitraum zum Termindatum
  * (getMemberActivityWhere). Gezaehlt wird in zwei Abfragen fuer die ganze
- * Liste -- Vorbild ist responsesAttachSummaries() in responses.php.
+ * Liste, im selben Stil wie responsesAttachSummaries() in responses.php --
+ * die beiden Helfer stehen nebeneinander, responses.php bindet diesen hier
+ * zusaetzlich ein (fuer attendanceExpectedMemberIds()).
  */
 declare(strict_types=1);
 
-// getMemberActivityWhere() wird hier gebraucht. responses.php bindet
-// member_activity.php bereits vor diesem Helfer ein, aber require_once ist
-// unschaedlich und macht die Datei von der Einbindereihenfolge unabhaengig.
+// getMemberActivityWhere() wird hier gebraucht -- dieser Helfer bindet
+// member_activity.php selbst ein, unabhaengig davon, ob der Aufrufer (etwa
+// responses.php, das umgekehrt diesen Helfer einbindet) das schon getan hat.
 require_once __DIR__ . '/member_activity.php';
 
 const ATTENDANCE_PRESENT = 'present';
