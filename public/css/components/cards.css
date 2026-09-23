@@ -16,6 +16,12 @@
     margin-bottom: var(--spacing-sm);
 }
 
+/* Kennzahlen, die einzeln stehen koennen: feste Kachelbreite statt voller
+   Zeilenbreite -- sonst zieht sich eine einzelne Karte ueber das ganze Raster. */
+.stats-grid--kpi {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 240px));
+}
+
 .stat-card {
     background: var(--bg-white);
     padding: 12px;

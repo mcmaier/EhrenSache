@@ -316,6 +316,7 @@ test('Statistik: Zaehlwerte als Chips, Quoten als Karten', function () use ($fcR
     foreach (['statOverallAverage', 'statPunctualityCard', 'statReliabilityCard'] as $id) {
         assertTrue(str_contains($bereich, 'id="' . $id . '"'), $id . ' muss als Karte bleiben');
     }
+    assertTrue(str_contains($bereich, 'stats-grid--kpi'), 'Die Quotenkarten brauchen ein eigenes Raster, sonst dehnt sich eine einzelne Karte');
 
     $js = fcModul($fcRoot, 'statistics');
     assertTrue(str_contains($js, 'CHIPS_STATISTICS'), 'statistics.js nutzt den Chipsatz nicht');
