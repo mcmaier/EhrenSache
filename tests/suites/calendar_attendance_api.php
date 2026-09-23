@@ -118,6 +118,7 @@ test('include=attendance zaehlt anwesend, entschuldigt und fehlend', function ()
 
         $row = caFetch($apt, $tag, 'admin', ['include' => 'attendance']);
         assertTrue($row !== null, 'Termin fehlt in der Liste');
+        assertTrue(array_key_exists('attendance', $row), 'attendance fehlt in der Antwort');
         assertSame(['expected' => 3, 'present' => 1, 'excused' => 1, 'missing' => 1], $row['attendance']);
     } finally {
         caDropWorld($world);
@@ -131,6 +132,8 @@ test('Kuenftige Termine tragen keine Zahlen', function () {
         $apt = caAppointment($world, $tag);
 
         $row = caFetch($apt, $tag, 'admin', ['include' => 'attendance']);
+        assertTrue($row !== null, 'Termin fehlt in der Liste');
+        assertTrue(array_key_exists('attendance', $row), 'attendance fehlt in der Antwort');
         assertSame(null, $row['attendance']);
     } finally {
         caDropWorld($world);
@@ -160,13 +163,162 @@ test('Ohne Zeitraum keine Zahlen (Kostengrenze wie bei den Rueckmeldungen)', fun
         $res = apiRequest('GET', 'appointments', ['token' => apiToken('admin'),
             'query' => ['include' => 'attendance']]);
         assertStatus(200, $res);
+        $gefunden = false;
         foreach ($res['body'] as $row) {
             if ((int) $row['appointment_id'] === $apt) {
+                $gefunden = true;
                 assertTrue(!array_key_exists('attendance', $row),
                     'Ohne Jahres- oder Datumsfilter werden keine Zahlen angehaengt');
             }
         }
+        assertTrue($gefunden, 'Termin fehlt in der ungefilterten Liste -- der Test praeft sonst nichts');
     } finally {
+        caDropWorld($world);
+    }
+});
+
+// ---- Rollen -------------------------------------------------------------------------
+
+test('Ein Mitglied sieht nur den eigenen Status, keine Zahlen', function () {
+    $world = caWorld('Rolle');
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Testkonto user hat kein verknuepftes Mitglied');
+
+    // Das Mitglied des Testkontos zusaetzlich in die Gruppe der Welt nehmen und
+    // am Ende wieder herausnehmen -- sonst waere es gar nicht erwartet.
+    $vorher = apiRequest('GET', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
+    assertStatus(200, $vorher);
+    $gruppenVorher = array_map(static fn ($g) => (int) $g['group_id'], $vorher['body']['groups'] ?? []);
+
+    try {
+        $res = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId],
+            'body' => ['group_ids' => array_merge($gruppenVorher, [$world['group']])]]);
+        assertStatus(200, $res);
+
+        $tag = caDateInDays(-2);
+        $apt = caAppointment($world, $tag);
+        caRecord($apt, $memberId, 'excused');
+
+        $row = caFetch($apt, $tag, 'user', ['include' => 'attendance']);
+        assertTrue($row !== null, 'Termin fehlt in der Mitgliedersicht');
+        assertTrue(array_key_exists('own_attendance', $row), 'own_attendance fehlt in der Antwort');
+        assertSame('excused', $row['own_attendance']);
+        assertTrue(!array_key_exists('attendance', $row), 'Ein Mitglied darf keine Zahlen ueber andere sehen');
+
+        $verwalter = caFetch($apt, $tag, 'manager', ['include' => 'attendance']);
+        assertTrue($verwalter !== null, 'Termin fehlt in der Verwaltersicht');
+        assertTrue(array_key_exists('attendance', $verwalter), 'attendance fehlt in der Antwort');
+        assertSame(4, $verwalter['attendance']['expected'], 'Manager zaehlt alle erwarteten Mitglieder');
+        assertSame(1, $verwalter['attendance']['excused']);
+        assertTrue(!array_key_exists('own_attendance', $verwalter));
+    } finally {
+        apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId],
+            'body' => ['group_ids' => $gruppenVorher]]);
+        caDropWorld($world);
+    }
+});
+
+test('Ohne Anwesenheit gilt das Mitglied als fehlend, ohne Erwartung als null', function () {
+    $world = caWorld('Fehlend');
+    try {
+        $tag = caDateInDays(-2);
+        $apt = caAppointment($world, $tag);
+
+        // Das Testkonto user ist nicht in der Gruppe der Welt -- also nicht erwartet.
+        $fremd = caFetch($apt, $tag, 'user', ['include' => 'attendance']);
+        assertTrue($fremd === null || $fremd['own_attendance'] === null,
+            'Nicht erwartete Mitglieder bekommen keinen Status');
+
+        $row = caFetch($apt, $tag, 'admin', ['include' => 'attendance']);
+        assertTrue($row !== null, 'Termin fehlt in der Liste');
+        assertTrue(array_key_exists('attendance', $row), 'attendance fehlt in der Antwort');
+        assertSame(3, $row['attendance']['missing'], 'Ohne Records fehlen alle Erwarteten');
+    } finally {
+        caDropWorld($world);
+    }
+});
+
+test('Ein erst spaeter aktives Mitglied zaehlt beim frueheren Termin nicht', function () {
+    $world = caWorld('Aktiv');
+    try {
+        $tag = caDateInDays(-10);
+        $apt = caAppointment($world, $tag);
+
+        // Eintritt nach dem Termin: membership_dates ab morgen.
+        $res = apiRequest('POST', 'membership_dates', ['token' => apiToken('admin'), 'body' => [
+            'member_id' => $world['members'][2], 'start_date' => caDateInDays(1), 'end_date' => null]]);
+        assertStatus(201, $res);
+
+        $row = caFetch($apt, $tag, 'admin', ['include' => 'attendance']);
+        assertTrue($row !== null, 'Termin fehlt in der Liste');
+        assertTrue(array_key_exists('attendance', $row), 'attendance fehlt in der Antwort');
+        assertSame(2, $row['attendance']['expected'], 'Das spaeter eingetretene Mitglied zaehlt nicht mit');
+    } finally {
+        caDropWorld($world);
+    }
+});
+
+// ---- Spec-Regeln fuer "erwartet" -----------------------------------------------------
+
+test('Ein Mitglied in zwei Gruppen derselben Terminart zaehlt nur einmal', function () {
+    $world = caWorld('Doppelgruppe', 2);
+    $zweiteGruppe = null;
+    try {
+        $zweiteGruppe = caCreate('member_groups', ['group_name' => 'CA Doppelgruppe zweite ' . uniqid()]);
+
+        // Terminart um die zweite Gruppe erweitern (Voll-Update, beide Gruppen mitschicken).
+        $resType = apiRequest('PUT', 'appointment_types', ['token' => apiToken('admin'),
+            'query' => ['id' => $world['type']],
+            'body' => ['group_ids' => [$world['group'], $zweiteGruppe]]]);
+        assertStatus(200, $resType);
+
+        // Erstes Mitglied zusaetzlich in die zweite Gruppe nehmen -- es ist jetzt
+        // ueber beide Gruppen der Terminart erwartet.
+        $resMember = apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $world['members'][0]],
+            'body' => ['group_ids' => [$world['group'], $zweiteGruppe]]]);
+        assertStatus(200, $resMember);
+
+        $tag = caDateInDays(-2);
+        $apt = caAppointment($world, $tag);
+
+        $row = caFetch($apt, $tag, 'admin', ['include' => 'attendance']);
+        assertTrue($row !== null, 'Termin fehlt in der Liste');
+        assertTrue(array_key_exists('attendance', $row), 'attendance fehlt in der Antwort');
+        assertSame(2, $row['attendance']['expected'],
+            'Das Mitglied in beiden Gruppen der Terminart zaehlt trotzdem nur einmal');
+    } finally {
+        if ($zweiteGruppe !== null) {
+            caDelete('member_groups', $zweiteGruppe);
+        }
+        caDropWorld($world);
+    }
+});
+
+test('Ein Record eines nicht erwarteten Mitglieds veraendert die Zahlen nicht', function () {
+    $world  = caWorld('Fremdrecord', 3);
+    $fremde = caWorld('FremdrecordFremd', 1);
+    try {
+        $tag = caDateInDays(-2);
+        $apt = caAppointment($world, $tag);
+        caRecord($apt, $world['members'][0], 'present');
+
+        $vorher = caFetch($apt, $tag, 'admin', ['include' => 'attendance']);
+        assertTrue($vorher !== null, 'Termin fehlt in der Liste');
+        assertTrue(array_key_exists('attendance', $vorher), 'attendance fehlt in der Antwort');
+
+        // Record eines Mitglieds aus einer fremden Gruppe/Terminart auf denselben Termin --
+        // das Mitglied ist an diesem Termin nicht erwartet.
+        caRecord($apt, $fremde['members'][0], 'present');
+
+        $nachher = caFetch($apt, $tag, 'admin', ['include' => 'attendance']);
+        assertTrue($nachher !== null, 'Termin fehlt in der Liste');
+        assertTrue(array_key_exists('attendance', $nachher), 'attendance fehlt in der Antwort');
+        assertSame($vorher['attendance'], $nachher['attendance'],
+            'Ein Record eines nicht erwarteten Mitglieds darf expected/present/excused/missing nicht aendern');
+        assertTrue($nachher['attendance']['missing'] >= 0, 'missing darf nie negativ werden');
+    } finally {
+        caDropWorld($fremde);
         caDropWorld($world);
     }
 });
