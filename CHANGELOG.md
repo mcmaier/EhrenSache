@@ -9,6 +9,15 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [1.13.0] – 2026-09-22
 
+### Neu
+- **Offene Punkte auf einen Blick.** Was das System gerade von einem will, stand bisher verstreut
+  in drei Bereichen. Jetzt zeigt „Mein Profil“ im Dashboard ganz oben eine Karte „Offene Punkte“,
+  die Check-in-App einen Block oben im Tab „Erfassen“: Termine der nächsten zwei Wochen, deren
+  Rückmeldefrist läuft, Anträge und Arbeitszeiten, über die noch nicht entschieden ist, und
+  Ablehnungen der letzten 14 Tage. Antippen führt an die Stelle, an der man den Punkt erledigt.
+  Ist nichts offen, bleibt die Check-in-App unverändert. Der Verlauf der Check-in-App zeigt dafür
+  jetzt auch abgelehnte Anträge der letzten 14 Tage.
+
 ### Geändert
 - **Status als farbige Chips mit Zähler in allen Listen.** Anträge, Arbeitszeit, Mitglieder,
   Anwesenheit, Benutzer und Geräte filtern ihren Status jetzt mit einem Klick auf einen Chip,
@@ -51,11 +60,21 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   noch Geräte dieses Typs.
 
 ### Behoben
-- **Die Statistik blieb für einfache Mitglieder leer,** sobald Untergruppen eingerichtet waren:
-  Der Aufbau des Gruppenfilters brach mit einem JavaScript-Fehler ab.
 - **Benutzerverwaltung: Die Zähler fielen auf 0,** sobald ein Status gewählt war.
 - **Benutzerverwaltung: Ein Rollenwechsel lud die Liste doppelt.**
-- **Geräte: Aktiv/Inaktiv wurde in Kennzahl und Tabelle unterschiedlich ermittelt.**
+
+---
+
+## [1.12.2] – 2026-09-23
+
+### Behoben
+- **Die Statistik öffnete sich für einfache Mitglieder nicht mehr, sobald Untergruppen angelegt
+  waren.** Der Bereich blieb leer. Betroffen waren alle Vereine mit Untergruppen, und zwar seit
+  deren Einführung in 1.8.0. Admin und Manager waren nie betroffen.
+- **Die Geräteliste zeigte inaktive Geräte als „Aktiv“.** Die Kennzahl darüber zählte sie
+  richtig, die Liste widersprach ihr — je nachdem, wie die Datenbank den Wert lieferte.
+- **Nach dem Einschalten der Zeiterfassung blieb die Liste der Tätigkeitsarten auf „Lade
+  Daten…“ stehen**, bis die Seite neu geladen wurde.
 
 ---
 

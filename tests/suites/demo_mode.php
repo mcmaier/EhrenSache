@@ -130,7 +130,7 @@ test('Die Sperrliste entspricht der Spezifikation', function () {
 
 test('Die Nur-Lesend-Liste entspricht der Spezifikation', function () {
     assertSame([
-        'ping', 'appearance', 'me', 'version', 'session_info', 'my_data',
+        'ping', 'appearance', 'me', 'version', 'session_info', 'my_data', 'my_open_items',
         'statistics', 'statistics_report', 'available_years', 'attendance_list',
         'import_logs', 'export', 'holidays',
     ], DEMO_READ_ONLY);

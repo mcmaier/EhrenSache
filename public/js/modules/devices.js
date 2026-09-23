@@ -110,6 +110,9 @@ function renderDevices(devices, page = 1)
         }[device.device_type] || '❓ Unbekannt';
 
         // Status
+        // Wie die Kennzahl darüber und der Filter: auf 1 prüfen, nicht auf
+        // truthy. Liefert PDO die Spalte als Text, ist "0" truthy — die Liste
+        // zeigte dann „Aktiv“, während die Kennzahl das Gerät als inaktiv zählte.
         const statusBadge = Number(device.is_active) === 1
             ? '<span class="badge badge-success">Aktiv</span>'
             : '<span class="badge badge-inactive">Inaktiv</span>';

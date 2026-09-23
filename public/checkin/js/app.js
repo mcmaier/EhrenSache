@@ -1005,6 +1005,17 @@ function resetSessionState() {
         if (el) el.innerHTML = '';
     });
 
+    // Offene Punkte des Vorgaengers nicht stehen lassen (FI-17); der naechste
+    // Login entscheidet ueber loadOpenItems() neu, ob der Block erscheint.
+    // openItemsSeq++ verwirft eine Antwort, die beim Abmelden noch unterwegs
+    // war -- sonst koennten die Punkte des vorigen Mitglieds kurz aufblitzen.
+    // openItemsLastOpen = null: die naechste Anmeldung soll wieder frei
+    // entscheiden, ob sie beim ersten Erscheinen aufklappt.
+    openItemsSeq++;
+    openItemsLastOpen = null;
+    const openItemsBlock = document.getElementById('openItemsBlock');
+    if (openItemsBlock) openItemsBlock.hidden = true;
+
     const statsContent = document.getElementById('statsContent');
     if (statsContent) statsContent.style.display = 'none';
 
@@ -1954,6 +1965,13 @@ function tick() {
 // nachhinkt.
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden && tickTimer) startTicker();
+    // Offene Punkte beim Zurueckkehren nachladen (FI-17, Regel aus OI-67) --
+    // nur, wenn der Erfassen-Tab gerade der sichtbare ist; sonst steht der
+    // Block gar nicht im DOM-Ausschnitt, den man gerade ansieht.
+    if (!document.hidden
+        && document.querySelector('.tab-button[data-tab="capture"]')?.classList.contains('active')) {
+        loadOpenItems();
+    }
 });
 
 function updateClock() {
@@ -2629,8 +2647,11 @@ async function submitException() {
 
         if (data) {
             showMessage('✓ Antrag erfolgreich gestellt (wartet auf Genehmigung)', 'warning');
-            
+
             closeExceptionModal();
+            // Der Antrag ist selbst ein offener Punkt (FI-17); der Knopf dafuer
+            // sitzt im Erfassen-Tab, in dem der Block schon steht.
+            loadOpenItems();
         }
     } catch (error) {
         closeExceptionModal();
@@ -2673,8 +2694,39 @@ function showOfflineIndicator() {
     }, 3000);
 }
 
+// Wie lange eine Ablehnung als "offener Punkt" gilt -- dasselbe Fenster wie
+// serverseitig OPEN_ITEMS_REJECTED_DAYS und der Filter fuer abgelehnte
+// Antraege weiter unten.
+const OPEN_HISTORY_REJECTED_DAYS = 14;
+
+/**
+ * Ist der Verlaufseintrag ein "offener Punkt" im Sinn von FI-17 (wartender
+ * Antrag, eingereichte Sitzung mit Ende, oder eine erst kuerzlich entschiedene
+ * Ablehnung)? Solche Eintraege bleiben in der Historie immer sichtbar, auch
+ * wenn schon 20 neuere Eintraege existieren -- sonst liefe der Sprung aus dem
+ * Block "Offene Punkte" (loadOpenItems) ins Leere. records zaehlen nie als
+ * offener Punkt, die Anwesenheit selbst ist keine Entscheidung, auf die man
+ * wartet.
+ */
+function isOpenHistoryEntry(entry) {
+    const d = entry.data;
+    const decidedRecently = (approvedAt) => {
+        if (!approvedAt) return false;
+        const grenze = Date.now() - OPEN_HISTORY_REJECTED_DAYS * 24 * 60 * 60 * 1000;
+        return new Date(String(approvedAt).replace(' ', 'T')).getTime() >= grenze;
+    };
+    if (entry.type === 'exception') {
+        return d.status === 'pending' || (d.status === 'rejected' && decidedRecently(d.approved_at));
+    }
+    if (entry.type === 'session') {
+        return (d.status === 'submitted' && !!d.end_time)
+            || (d.status === 'rejected' && decidedRecently(d.approved_at));
+    }
+    return false;
+}
+
 // Lädt History beim Login
-async function loadHistory() {    
+async function loadHistory() {
         
     try {
         // Lade letzte 10 Records
@@ -2691,6 +2743,18 @@ async function loadHistory() {
         }
 
         let exceptions = result.data;
+
+        // Abgelehnte Antraege der letzten 14 Tage dazu (FI-17): Die Uebersicht
+        // „Offene Punkte" springt hierher, und ohne sie liefe der Sprung ins
+        // Leere. Dasselbe Fenster wie serverseitig OPEN_ITEMS_REJECTED_DAYS.
+        const rejected = await apiCall('exceptions', 'GET', null, {
+            member_id: userData.member_id, status: 'rejected'
+        });
+        if (rejected.success && Array.isArray(rejected.data)) {
+            const grenze = Date.now() - 14 * 24 * 60 * 60 * 1000;
+            exceptions = exceptions.concat(rejected.data.filter(e =>
+                e.approved_at && new Date(String(e.approved_at).replace(' ', 'T')).getTime() >= grenze));
+        }
 
         // Arbeitszeiten nur abrufen, wenn das Mitglied ueberhaupt welche
         // erfassen darf — sonst antwortet die Ressource mit 404 und der
@@ -2710,6 +2774,15 @@ async function loadHistory() {
             }
         }
 
+        // Die neuesten 10 plus offene Sitzungen dahinter (FI-17: eingereicht
+        // mit Ende oder frisch abgelehnt). Ohne das faende eine seit Wochen
+        // wartende Sitzung gar nicht erst den Weg in "combined" und koennte
+        // durch die Pin-Regel unten auch nicht mehr gerettet werden.
+        const topSessions = sessions.slice(0, 10);
+        const pinnedSessions = sessions.slice(10)
+            .filter(s => isOpenHistoryEntry({ type: 'session', data: s }));
+        const sessionsToShow = [...topSessions, ...pinnedSessions];
+
         // Kombiniere und sortiere nach Datum (neueste zuerst)
         const combined = [
             ...records.slice(0, 10).map(r => ({
@@ -2723,9 +2796,15 @@ async function loadHistory() {
             ...exceptions.map(e => ({
                 type: 'exception',
                 data: e,
-                timestamp: new Date(e.created_at)
+                // Abgelehnte Antraege nach dem Entscheidungsdatum einsortieren,
+                // nicht nach der Erstellung: sonst faende eine frische Ablehnung
+                // eines laengst gestellten Antrags keinen Platz unter den
+                // letzten 20 Eintraegen. created_at bleibt wie bisher geparst.
+                timestamp: e.status === 'rejected' && e.approved_at
+                    ? new Date(String(e.approved_at).replace(' ', 'T'))
+                    : new Date(e.created_at)
             })),
-            ...sessions.slice(0, 10).map(s => ({
+            ...sessionsToShow.map(s => ({
                 type: 'session',
                 data: s,
                 // Der Beginn, nicht das Ende: eine laufende Sitzung hat noch
@@ -2739,9 +2818,17 @@ async function loadHistory() {
         // Debug
         debug.log("Loading History", combined);
 
-        // Zeige die letzten Einträge. Mit drei Quellen statt zwei waeren zehn
-        // je Art zu knapp fuer einen brauchbaren Ueberblick.
-        renderHistory(combined.slice(0, 20));
+        // Zeige die letzten 20 Eintraege, dazu jeden offenen Eintrag (FI-17)
+        // dahinter -- sonst liefe der Sprung aus dem Block "Offene Punkte"
+        // ins Leere, nur weil der Antrag schon etwas laenger wartet. Die
+        // Gesamtreihenfolge bleibt nach Zeitstempel.
+        const top20 = combined.slice(0, 20);
+        const pinnedBeyond = combined.slice(20).filter(isOpenHistoryEntry);
+        const toRender = pinnedBeyond.length === 0
+            ? top20
+            : [...top20, ...pinnedBeyond].sort((a, b) => b.timestamp - a.timestamp);
+
+        renderHistory(toRender);
         
     } catch (error) {
         debug.error('Fehler beim Laden der History:', error);
@@ -3856,6 +3943,8 @@ async function worktimeStop(totpCode = null, force = false) {
 
     worktimeSession = null;
     renderWorktime();
+    // Eine ohne Nachweis beendete Sitzung wartet auf Freigabe (FI-17).
+    loadOpenItems();
 }
 /**
  * Termine im Fenster um heute in die optionale Auswahl fuellen.
@@ -4082,6 +4171,138 @@ function showCaptureView(view) {
     }
 }
 
+// ========================================
+// OFFENE PUNKTE (FI-17)
+// ========================================
+// Block oben im Tab „Erfassen". Reine Leseansicht; Antippen springt in den
+// Tab, in dem man den Punkt erledigt.
+
+let openItemsBound = false;
+
+// Steigt bei jedem loadOpenItems()-Aufruf und bei Abmeldung. Eine Antwort,
+// die noch fuer eine vorige Generation unterwegs war (spaetes Zurueckkehren,
+// Abmeldung waehrend des Requests), wird verworfen -- sonst zeigt der Block
+// kurz die Punkte des vorigen Mitglieds.
+let openItemsSeq = 0;
+
+// Letzte bekannte Zahl offener Rueckmeldungen. Ein Neuaufbau soll den Block
+// nicht wieder aufklappen, nur weil er neu geladen hat -- nur wenn er gerade
+// erst erscheint oder ein neuer offener Punkt dazugekommen ist. null vor dem
+// ersten Laden und nach Abmeldung (resetSessionState).
+let openItemsLastOpen = null;
+
+function openItemsWhen(dateStr, timeStr = '') {
+    const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
+    if (isNaN(d.getTime())) return '';
+    const tage = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+    // Jahr nur ausserhalb des laufenden Jahres -- ein wartender Antrag kann
+    // beliebig alt sein, und „Mi 05.05." sieht sonst aus wie dieses Jahr.
+    const jahr = d.getFullYear() === new Date().getFullYear() ? '' : String(d.getFullYear());
+    const tag = `${tage[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${jahr}`;
+    const zeit = escapeHtml(String(timeStr).slice(0, 5));
+    return zeit ? `${tag} ${zeit}` : tag;
+}
+
+function openItemHtml(item) {
+    const chip = item.state === 'rejected'
+        ? '<span class="response-chip response-chip--muted">abgelehnt</span>'
+        : item.state === 'pending'
+            ? '<span class="response-chip response-chip--maybe">wartet</span>'
+            : '';
+    if (item.kind === 'response') {
+        const [dDate, dTime] = String(item.deadline).split(' ');
+        return `<button type="button" class="open-item-pwa" data-kind="response" data-appointment-id="${Number(item.appointment_id)}">
+            <span class="open-item-pwa__title">${escapeHtml(item.title)} · ${openItemsWhen(item.date, item.start_time)}</span>
+            <span class="open-item-pwa__meta">Rückmeldung bis ${openItemsWhen(dDate, dTime)}</span>
+        </button>`;
+    }
+    if (item.kind === 'exception') {
+        const label = item.exception_type === 'absence' ? 'Entschuldigung' : 'Zeitantrag';
+        return `<button type="button" class="open-item-pwa" data-kind="exception">
+            <span class="open-item-pwa__title">${label} · ${escapeHtml(item.title)} ${openItemsWhen(item.date)}</span>${chip}
+        </button>`;
+    }
+    const [sDate] = String(item.start_time).split(' ');
+    const m = Number(item.duration_minutes) || 0;
+    return `<button type="button" class="open-item-pwa" data-kind="work_session">
+        <span class="open-item-pwa__title">Arbeitszeit · ${escapeHtml(item.activity_name)} ${openItemsWhen(sDate)} · ${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')} h</span>${chip}
+    </button>`;
+}
+
+function openItemsSummaryText(counts) {
+    const teile = [];
+    const offen = counts.open + counts.pending;
+    if (offen > 0) teile.push(`${offen} offene${offen === 1 ? 'r Punkt' : ' Punkte'}`);
+    if (counts.rejected > 0) teile.push(`${counts.rejected} abgelehnt`);
+    return teile.join(' · ');
+}
+
+async function onOpenItemsClick(event) {
+    const btn = event.target.closest('.open-item-pwa');
+    if (!btn) return;
+    if (btn.dataset.kind === 'response') {
+        const id = Number(btn.dataset.appointmentId);
+        responsesExpanded.add(id);
+        // Der Rueckmeldungs-Tab ist sichtbar, sobald es einen Punkt der Art
+        // "response" gibt -- der setzt einen rueckmeldefaehigen Termin voraus,
+        // und genau dieser haelt den Tab-Button ungeblendet (loadResponses()).
+        document.querySelector('.tab-button[data-tab="responses"]')?.click();
+        // loadResponses() ist idempotent; der eigene await liefert -- anders
+        // als der Klick oben -- einen Zeitpunkt, zu dem die Karte im DOM
+        // steht, ohne eine feste Wartezeit zu raten.
+        await loadResponses();
+        document.querySelector(`#responsesList .response-card[data-appointment-id="${id}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+        document.querySelector('.tab-button[data-tab="history"]')?.click();
+    }
+}
+
+async function loadOpenItems() {
+    const block = document.getElementById('openItemsBlock');
+    const list = document.getElementById('openItemsPwaList');
+    if (!block || !list) return;
+
+    if (!openItemsBound) {
+        list.addEventListener('click', onOpenItemsClick);
+        openItemsBound = true;
+    }
+
+    if (!userData || !userData.member_id) {
+        openItemsSeq++;
+        block.hidden = true;
+        return;
+    }
+
+    const seq = ++openItemsSeq;
+    try {
+        const result = await apiCall('my_open_items');
+        if (seq !== openItemsSeq) return; // Abgemeldet/neu geladen, waehrend die Antwort unterwegs war.
+        if (!result.success || !result.data || result.data.member === false
+            || !Array.isArray(result.data.items) || result.data.items.length === 0) {
+            block.hidden = true;
+            return;
+        }
+
+        const { items, counts } = result.data;
+        const c = counts || { open: 0, pending: 0, rejected: 0 };
+        list.innerHTML = items.map(openItemHtml).join('');
+        document.getElementById('openItemsSummary').textContent = openItemsSummaryText(c);
+        // Aufgeklappt nur beim ersten Erscheinen oder wenn mehr offene
+        // Rueckmeldungen dazugekommen sind -- ein blosser Neuaufbau soll ein
+        // vom Nutzer zugeklapptes Detail nicht wieder aufklappen.
+        if (block.hidden || openItemsLastOpen === null || c.open > openItemsLastOpen) {
+            block.open = c.open > 0;
+        }
+        openItemsLastOpen = c.open;
+        block.hidden = false;
+    } catch (error) {
+        if (seq !== openItemsSeq) return;
+        debug.error('Offene Punkte nicht geladen:', error);
+        block.hidden = true;
+    }
+}
+
 /**
  * Einstieg in den Erfassen-Tab: fragt nur, wenn es etwas zu fragen gibt.
  *
@@ -4092,6 +4313,7 @@ function enterCaptureTab() {
     const intents = availableIntents();
 
     showCaptureView(intents.length > 1 ? 'chooser' : intents[0]);
+    loadOpenItems();
 }
 
 function initCaptureTab() {
@@ -4258,16 +4480,37 @@ async function loadResponses() {
     renderResponses(null, drafts);
 }
 
+// Wie weit ein Termin in die Zukunft reichen darf, damit seine Rueckmeldung
+// noch im Zaehler mitzaehlt. Wie serverseitig in open_items.php --
+// Uebereinstimmung mit dem Block "Offene Punkte", keine Mahnung fuer Termine,
+// die Monate entfernt liegen.
+const OPEN_ITEMS_RESPONSE_DAYS = 14;
+
+/** Horizont ('YYYY-MM-DD') aus lokalen Datumsteilen -- toISOString() wuerde bei der Uhrzeit auf UTC verschieben. */
+function openItemsResponseHorizon() {
+    const grenze = new Date();
+    grenze.setDate(grenze.getDate() + OPEN_ITEMS_RESPONSE_DAYS);
+    const jahr = grenze.getFullYear();
+    const monat = String(grenze.getMonth() + 1).padStart(2, '0');
+    const tag = String(grenze.getDate()).padStart(2, '0');
+    return `${jahr}-${monat}-${tag}`;
+}
+
 function updateResponsesBadge() {
     const badge = document.getElementById('responsesTabBadge');
     if (!badge) return;
-    // Nur Rueckmeldetermine ohne eigene Antwort, deren Frist noch laeuft. Nach
-    // Beginn nimmt der Server keine Antwort mehr an; nach Fristablauf nimmt er
-    // sie noch an (als "kurzfristig"), aber der Zaehler fordert dann zu nichts
-    // mehr auf, was jemand braucht (Nutzer-Vorgabe, seit 1.12.0).
+    // Nur Rueckmeldetermine ohne eigene Antwort, deren Frist noch laeuft und
+    // deren Termin hoechstens OPEN_ITEMS_RESPONSE_DAYS entfernt liegt (FI-17:
+    // derselbe Horizont wie im Block "Offene Punkte", sonst mahnt der Zaehler
+    // fuer Termine, die Monate entfernt liegen). Nach Beginn nimmt der Server
+    // keine Antwort mehr an; nach Fristablauf nimmt er sie noch an (als
+    // "kurzfristig"), aber der Zaehler fordert dann zu nichts mehr auf, was
+    // jemand braucht (Nutzer-Vorgabe, seit 1.12.0).
     const jetzt = new Date();
+    const horizont = openItemsResponseHorizon();
     const open = upcomingResponses.filter(item =>
         item.appointment.responses_enabled && !item.own && !item.started
+        && String(item.appointment.date).slice(0, 10) <= horizont
         && !(item.settings?.deadline
              && new Date(String(item.settings.deadline).replace(' ', 'T')) < jetzt)).length;
     badge.textContent = String(open);

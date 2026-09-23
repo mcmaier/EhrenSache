@@ -132,6 +132,8 @@ export function closeResponsesModal() {
     // wenn im Modal gar nichts geaendert wurde.
     if (listDirty) {
         listDirty = false;
+        // Offene Punkte im Profil (FI-17) hoeren darauf.
+        document.dispatchEvent(new CustomEvent('responses:changed'));
         window.refreshAppointmentsKeepPage?.();
     }
 }

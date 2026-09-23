@@ -86,11 +86,11 @@ export async function loadStatisticsFilters() {
                 }
             });
             // Leere Optgroup-Überschrift hinterlässt keine Gruppe ohne Einträge.
-            // Gezaehlt wird ueber querySelectorAll: ein <optgroup> hat KEINE
-            // options-Eigenschaft (die tragen nur <select> und <datalist>).
-            // Ueber .options gezaehlt warf die Zeile einen TypeError und liess
-            // die Statistik fuer einfache Mitglieder leer, sobald es
-            // Untergruppen gab -- Verwalter erreichen den Zweig nie.
+            // Gezählt wird über die Optionen im optgroup: `.options` gibt es nur
+            // am <select>, am <optgroup> ist es undefined. Der Zugriff warf
+            // einen TypeError — und zwar nur für Nicht-Verwalter und nur bei
+            // vorhandenen Untergruppen, weshalb er von 1.8.0 bis 1.12.1
+            // unbemerkt blieb: Die Statistik lud für diese Mitglieder gar nicht.
             Array.from(groupSelect.querySelectorAll('optgroup')).forEach(optgroup => {
                 if (optgroup.querySelectorAll('option').length === 0) optgroup.remove();
             });

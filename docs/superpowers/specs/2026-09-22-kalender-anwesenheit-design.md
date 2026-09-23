@@ -90,8 +90,9 @@ Terminart über `appointment_type_groups` × `member_group_assignments`, Aktivze
   Dashboard bauen darauf. Der Test „attendance_list traegt offene Antraege je Mitglied“ in
   `tests/suites/responses_api.php` muss grün bleiben.
 - **Reihenfolge mit OI-87** (abgestimmt mit der Sitzung „Testfunde und Priorisierung“, 22.09.):
-  Schritt 1 dieser Spec, dann OI-87, dann Schritt 2 — damit der Umbau auf dem Stand mit
-  offenen Anträgen im Dashboard aufsetzt.
+  Filter-Chips, dann OI-87, dann Schritt 1, dann Schritt 2 — damit der Umbau auf dem Stand mit
+  offenen Anträgen im Dashboard aufsetzt. Schritt 1 setzt auf OI-87 auf (getrennte Funktionen in
+  `records.js`, gemeinsam nur die Imports).
 
 Status aus `records.status`: `present` = anwesend, `excused` = entschuldigt (genehmigte
 Abwesenheit). `missing = expected − present − excused`, nie negativ (Records von nicht mehr

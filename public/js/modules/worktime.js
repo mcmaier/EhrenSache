@@ -129,7 +129,9 @@ export async function checkWorktimeEnabled() {
     if (block) {
         const sichtbar = worktimeEnabled && isAdmin;
         block.style.display = sichtbar ? '' : 'none';
-        // Tabelle und Chipzeile fuellen, sonst bleibt der Block nach dem Einschalten leer.
+        // Tabelle und Chipzeile fuellen, sonst bleibt der Block nach dem
+        // Einschalten auf „Lade Daten…“ stehen (settings.js ruft diese
+        // Funktion direkt danach).
         if (sichtbar) renderActivityTypes();
     }
 

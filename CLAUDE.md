@@ -87,7 +87,7 @@ EhrenSache/
 │   │   ├── appointment_types.php, appointment_responses.php, activity_types.php
 │   │   ├── work_sessions.php   # Arbeitszeiterfassung
 │   │   ├── statistics.php, export.php, import.php, settings.php
-│   │   ├── attendance_list.php, my_data.php
+│   │   ├── attendance_list.php, my_data.php, my_open_items.php
 │   │   ├── auto_checkin.php, totp_checkin.php, station.php
 │   │   ├── regenerate_token.php, change_password.php, change_pin.php, user_mailer.php
 │   │   └── update_check.php    # Update-Prüfung auf Knopfdruck
@@ -105,6 +105,7 @@ EhrenSache/
 │   │   ├── member_activity.php # Aktiv/Inaktiv-Zeiträume
 │   │   ├── groups.php          # Fachlogik Untergruppen: Bezeichnung, Sortierung (FI-14, 1.8.0)
 │   │   ├── station.php         # Fachlogik virtuelle Station (Kiosk): Code, PIN-Prüfung, Sperre
+│   │   ├── open_items.php      # Offene Punkte je Mitglied, FI-17
 │   │   ├── migrations.php      # Ausführung der Migrationskette
 │   │   ├── version.php         # Liest version.json
 │   │   ├── branding.php, mail_template.php, mailer.php
@@ -131,7 +132,7 @@ EhrenSache/
     │   └── modules/            # api, auth, ui, members, appointments, records,
     │                           # exceptions, users, devices, profile, management,
     │                           # settings, statistics, worktime, responses, grouping,
-    │                           # import_export, utils
+    │                           # import_export, open_items, utils
     ├── css/
     │   ├── variables.css, reset.css, main.css, responsive.css, utilities.css, login.css
     │   ├── components/         # buttons, cards, forms, modals, tables, badges,
@@ -170,7 +171,7 @@ member_groups, appointment_types, appointment_responses, activity_types, work_se
 statistics, available_years,
 auto_checkin, totp_checkin, station, regenerate_token, change_password, change_pin, export,
 import, import_logs, settings, upload-logo, attendance_list, activate_user, user_status,
-cleanup, my_data, session_info, version, update_check, ping — Details in `API.md`.
+cleanup, my_data, my_open_items, session_info, version, update_check, ping — Details in `API.md`.
 
 **Authentifizierungsmethoden:**
 - `Authorization: Bearer <token>` Header
@@ -271,7 +272,8 @@ php tests/run.php worktime_api
 
 - Harness: `tests/lib/harness.php` (Assertions, Summary), `tests/lib/api.php` (HTTP-Aufrufe)
 - Suites in `tests/suites/`: api_selftest, assets, harness_selftest, migrations,
-  worktime_api, worktime_unit, station_api, station_unit
+  worktime_api, worktime_unit, station_api, station_unit, open_items_unit, open_items_api,
+  open_items_frontend
 - Einzelprüfungen gegen die Datenbank: `tests/db/verify_*.php`
 - Konfiguration: `tests/config.php` aus `tests/config.example.php` kopieren (ignoriert)
 - Manueller Testplan: `docs/testplan.md`

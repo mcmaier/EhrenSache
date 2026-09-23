@@ -2639,6 +2639,69 @@ gerundeter Startzeit und Anzahl der Einträge; angelegt wird nichts.
 
 ---
 
+## Offene Punkte (my_open_items)
+
+### Eigene offene Punkte abrufen
+**Endpoint:** `GET /api.php?resource=my_open_items`
+
+**Berechtigung:** angemeldet (Session oder Token). Rolle `device` → `403`. Admin, Manager und
+User erhalten ausschließlich die Punkte des **eigenen verknüpften Mitglieds** — auch für Admin
+und Manager, das ist keine Arbeitsliste. Ohne verknüpftes Mitglied `200` mit `"member": false`,
+leerer `items`-Liste und Zählung `0`. Andere Methoden als `GET` → `405`.
+
+**Welche Punkte erscheinen:**
+
+| `kind` | `state` | Bedingung |
+|---|---|---|
+| `response` | `open` | Terminart mit Rückmeldung, Mitglied über seine Gruppen erwartet und im Zeitraum aktiv, Termin noch nicht begonnen, Frist noch nicht abgelaufen, keine eigene Antwort (**„unsicher" zählt als Antwort**), Termin höchstens 14 Tage voraus |
+| `exception` | `pending` | eigener Antrag, `status = pending` |
+| `exception` | `rejected` | `status = rejected`, Entscheidung höchstens 14 Tage her |
+| `work_session` | `pending` | eingereicht (`status = submitted`) und beendet; nur bei eingeschalteter Arbeitszeiterfassung |
+| `work_session` | `rejected` | `status = rejected`, Entscheidung höchstens 14 Tage her; nur bei eingeschalteter Arbeitszeiterfassung |
+
+**Felder je Art:**
+
+- `response`: `appointment_id`, `title`, `date`, `start_time`, `deadline`
+- `exception`: `id`, `exception_type` (`absence` oder `time_correction`), `appointment_id`,
+  `title`, `date`, `start_time`, bei `rejected` zusätzlich `decided_at`
+- `work_session`: `id`, `activity_name`, `start_time`, `duration_minutes`, bei `rejected`
+  zusätzlich `decided_at`
+
+**Keine Freitexte:** Begründung, Ablehnungsgrund und Notiz sind nicht enthalten — die Übersicht
+verweist nur, gelesen wird an der Zielstelle (`exceptions`, `work_sessions`).
+
+**Sortierung:** zuerst alle `open` nach `deadline` aufsteigend, dann alle `pending` nach Datum
+bzw. `start_time` aufsteigend, dann alle `rejected` nach `decided_at` absteigend.
+
+**Response:**
+```json
+{
+  "member": true,
+  "items": [
+    { "kind": "response", "state": "open", "appointment_id": 812,
+      "title": "Gesamtprobe", "date": "2026-09-25", "start_time": "19:30:00",
+      "deadline": "2026-09-24 19:30:00" },
+    { "kind": "work_session", "state": "pending", "id": 1402,
+      "activity_name": "Notenarchiv", "start_time": "2026-09-20 10:00:00",
+      "duration_minutes": 135 },
+    { "kind": "exception", "state": "rejected", "id": 57, "exception_type": "absence",
+      "appointment_id": 790, "title": "Registerprobe", "date": "2026-09-18",
+      "start_time": "19:00:00", "decided_at": "2026-09-19 08:12:00" }
+  ],
+  "counts": { "open": 1, "pending": 1, "rejected": 1 }
+}
+```
+
+Ohne verknüpftes Mitglied:
+```json
+{ "member": false, "items": [], "counts": { "open": 0, "pending": 0, "rejected": 0 } }
+```
+
+Genutzt von der Karte „Offene Punkte" im Dashboard (Bereich „Mein Profil") und vom Block oben
+im Tab „Erfassen" der Check-in-App (FI-17).
+
+---
+
 ## Systemeinstellungen (settings)
 
 ### Einstellungen abrufen

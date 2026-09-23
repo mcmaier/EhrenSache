@@ -2783,20 +2783,26 @@ sondern nur noch: „Die Datei enthält alles, was zu Ihnen gespeichert ist." Da
 Formulierung, die beim nächsten Feature nicht wieder veraltet — und für eine Auskunft nach
 Art. 15 DSGVO die richtige Richtung.
 
-**Nicht Teil dieses Punktes: der Umbau der Seite zu Reitern.** „Mein Profil“ soll „Mein Konto“ mit
-eigenen Tabs werden — entschieden am 2026-09-15, festgehalten in Abschnitt 8 der Spec
-`docs/superpowers/specs/2026-09-16-einstellungen-untertabs-design.md`. Der Auslöser dafür ist
-[FI-17](FEATURE-IDEAS.md#fi-17--offene-punkte-unter-mein-konto): Eine Sammelkarte der offenen
-Punkte füllt einen Reiter von selbst. **Solange die Seite vier Karten hat, wäre eine Gliederung
-ein zusätzlicher Klick ohne Gewinn** — anders als bei den Systemeinstellungen, wo zwölf Karten
-untereinander standen.
+**Nicht Teil dieses Punktes: der Umbau der Seite.** Bis 2026-09-22 war vorgesehen, „Mein Profil“
+zu „Mein Konto“ mit eigenen Reitern zu machen (entschieden am 2026-09-15, Abschnitt 8 der Spec
+`docs/superpowers/specs/2026-09-16-einstellungen-untertabs-design.md`), ausgelöst durch die
+Sammelkarte aus [FI-17](FEATURE-IDEAS.md#fi-17--offene-punkte-unter-mein-konto).
 
-**Wenn es so weit ist:** Das Muster der Einstellungen wiederverwenden, nicht kopieren.
-`.settings-tabs`, `.settings-tab-btn` und `.settings-panel`
-([`css/sections/settings.css`](../public/css/sections/settings.css)) sowie `showSettingsTab()`
-und der gemerkte Reiter in `sessionStorage` ([`settings.js`](../public/js/modules/settings.js))
-sind heute an die Einstellungsseite gebunden. Für eine zweite Seite gehören die Klassen nach
-`css/components/` und die Umschaltlogik in einen gemeinsamen Helfer.
+**Am 2026-09-23 verworfen — keine Reiter auf der Profilseite.** „Offene Punkte“ ist eine tägliche
+Arbeitsfläche, der Rest der Seite (Passwort, Token, PIN, Datenexport) ist Einmal-Kram. Ein Reiter
+neben „Konto“ würde zementieren, dass man erst ins Profil muss, um zu sehen, was ansteht.
+**Zielzustand stattdessen:** ein eigener Bereich **„Übersicht“** in der Seitenleiste, der die
+offenen Punkte trägt und nach dem Anmelden Landeseite wird, während „Mein Profil“ reines Konto
+bleibt. Das erspart zugleich das Herauslösen von `.settings-tabs`/`showSettingsTab()` aus der
+Einstellungsseite.
+
+**Auslöser ist [FI-6](FEATURE-IDEAS.md#fi-6--benachrichtigungskanal-e-mail-web-push), nicht die
+Kartenzahl:** Sobald Benachrichtigungseinstellungen je Mitglied dazukommen, hat die Kontoseite
+genug Inhalt und die Übersicht genug Eigengewicht. Das frühere Kriterium „solange die Seite vier
+Karten hat“ ist damit überholt.
+
+**Offen dabei:** Wo landen Konten **ohne** verknüpftes Mitglied? Für sie wäre der Bereich leer —
+`my_open_items` antwortet in dem Fall mit `member: false` (seit FI-17).
 
 **Nicht sicherheitsrelevant:** Beschriftung und Darstellung, keine Datenänderung, kein
 Rechtebezug. Punkt 3 berührt allerdings die Auskunftspflicht und ist deshalb der wichtigste der
@@ -3487,6 +3493,11 @@ der PWA ist das seit 1.12.0 pauschal gesperrt. Vorgeschlagene Regel für beide O
 (`exceptions.js`, um Zeile 687) den Zwischenspeicher der Anwesenheiten nicht — nur bei Zeitanträgen.
 Die Gesamtliste zeigt den neuen Eintrag „entschuldigt“ erst nach bis zu 10 Minuten oder einem
 Neuladen. Eine Zeile, im selben Zug mitnehmen.
+
+**4. Nebenbefund:** In `buildAttendanceRow()` (`records.js`) fehlt beim Status „✓ Anwesend“ das
+schließende `>`: `…✓ Anwesend</span` statt `</span>`. Der Browser repariert es stillschweigend, das
+Markup ist trotzdem kaputt. Gemeldet von der Sitzung der Filter-Chips, die die Funktion bewusst
+nicht anfasst — beim Umbau für OI-87 mitnehmen.
 
 **Abstimmung mit den parallelen Sitzungen (2026-09-22):**
 

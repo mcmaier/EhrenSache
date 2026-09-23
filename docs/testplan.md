@@ -1359,6 +1359,25 @@ Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).
 
 ---
 
+### Offene Punkte (FI-17)
+
+Automatisiert: `php tests/run.php open_items_api`, `open_items_frontend`.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| OP-1 | Mitglied mit je einer offenen Rückmeldung, einem wartenden Antrag und einer wartenden Arbeitszeit öffnet Dashboard → Mein Profil | Karte „Offene Punkte“ ganz oben, je eine Zeile korrekt beschriftet mit Termin/Antrags-/Arbeitszeitangaben |
+| OP-2 | Mitglied ohne offene Punkte öffnet die Karte | „Nichts offen ✓“, Karte bleibt sichtbar |
+| OP-3 | In der Karte auf die Rückmeldungs-Zeile tippen, im Dialog antworten und schließen | Rückmeldungsdialog öffnet sich passend zum Termin; nach dem Schließen ist die Zeile aus der Karte verschwunden |
+| OP-4 | PWA öffnen: einmal ohne offene Punkte, einmal mit offener Rückmeldung | Ohne Punkte kein Block im Tab „Erfassen“; mit offener Rückmeldung ist der Block beim ersten Erscheinen aufgeklappt |
+| OP-5 | Block manuell zuklappen, App wechseln (bzw. `visibilitychange`) und zu „Erfassen“ zurückkehren, ohne dass sich die Zahl offener Rückmeldungen erhöht hat | Block bleibt zugeklappt |
+| OP-6 | Im aufgeklappten Block auf eine Rückmeldungs-Zeile tippen | Wechsel zu Tab „Termine“, passende Karte aufgeklappt und ins Bild gescrollt; Antrags- bzw. Arbeitszeit-Zeilen führen stattdessen zu Tab „Verlauf“ |
+| OP-7 | Antrag ablehnen, danach im Verlauf und in der Übersicht (Karte/Block) prüfen; nach 14 Tagen (Systemzeit vorstellen oder `approved_at` in der DB zurückdatieren) erneut prüfen | Abgelehnter Antrag erscheint mit Chip „abgelehnt“ im Verlauf und in der Übersicht (DB-Spalte `approved_at`, API-Feld `decided_at`); nach 14 Tagen weder in der Übersicht noch im PWA-Verlauf, da auch dieser Ablehnungen auf 14 Tage begrenzt |
+| OP-8 | Termin in 20 Tagen mit offener Rückmeldung | Erscheint weder in der Karte noch im PWA-Block (außerhalb des 14-Tage-Horizonts) |
+| OP-9 | PWA, Tab „Termine“: mehrere offene Rückmeldungen, davon eine zu einem Termin in 20 Tagen | Zähler am Tab „Termine“ zählt nur Rückmeldungen der nächsten 14 Tage, gleiche Zahl wie im Block „Offene Punkte“ |
+| OP-10 | PWA: Antrag stellen, danach 20 neuere Verlaufseinträge (Anwesenheiten) anhäufen, ohne über den Antrag zu entscheiden | Der seit Wochen wartende Antrag erscheint weiterhin im Verlauf, auch wenn 20 neuere Einträge existieren |
+
+---
+
 ## 24. Untergruppen (seit 1.8.0)
 
 Automatisiert: `php tests/run.php groups_unit`, `subgroups_api`, `subgroups_frontend`,
