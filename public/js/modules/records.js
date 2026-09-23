@@ -422,12 +422,9 @@ export async function loadRecordFilters(forceReload = false) {
         });
     }
     aptTypeSelect.value = currentAptTypeValue;
-
-    // Termin-Filter für non-Admin ausblenden
-    const appointmentFilterGroup = document.getElementById('filterAppointment')?.closest('.form-group');
-    if (appointmentFilterGroup) {
-        appointmentFilterGroup.style.display = isAdminOrManager ? '' : 'none';
-    }
+    // Terminfilter und Mitgliedsfilter sind Verwaltern vorbehalten; das
+    // regelt data-role am Wrapper (updateUIForRole), nicht mehr diese
+    // Funktion -- sonst blieb die leere form-group als Luecke stehen.
 
     loadAppointmentFilter(forceReload);
 

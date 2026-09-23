@@ -497,3 +497,30 @@ test('Geraete haben eine Filterleiste nach Typ', function () use ($fcRoot, $fcHt
     assertTrue(str_contains($js, 'filterDeviceType'), 'devices.js liest den Typfilter nicht');
     assertTrue(str_contains($js, 'setResetEnabled'), 'devices.js schaltet den Knopf nicht');
 });
+
+test('Anwesenheit: Verwalterfilter werden ueber data-role ausgeblendet', function () use ($fcRoot, $fcHtml) {
+    $bereich = fcBereich($fcHtml, 'anwesenheit', 'antraege');
+
+    // Ohne data-role am Wrapper blieb die leere form-group mit min-width: 200px
+    // stehen -- als Luecke in der Filterleiste (Sichtung 23.09.2026).
+    foreach (['filterAppointment', 'filterMember'] as $feld) {
+        $pos = strpos($bereich, 'id="' . $feld . '"');
+        assertTrue($pos !== false, $feld . ' fehlt');
+
+        $davor = substr($bereich, max(0, $pos - 260), min($pos, 260));
+        assertTrue(str_contains($davor, 'data-role="manager"'),
+            $feld . ' braucht data-role am umgebenden form-group');
+    }
+
+    $ui = fcModul($fcRoot, 'ui');
+    assertSame(0, substr_count($ui, "label[for=\"filterMember\"]"),
+        'ui.js darf Feld und Beschriftung nicht mehr einzeln ausblenden');
+
+    $rec = fcModul($fcRoot, 'records');
+    assertSame(0, substr_count($rec, 'appointmentFilterGroup'),
+        'records.js darf den Terminfilter nicht mehr selbst ausblenden');
+
+    $jahr = (string) file_get_contents($fcRoot . '/public/css/components/year-filter.css');
+    assertTrue(str_contains($jahr, 'font-weight: 500'),
+        'Die Jahresbeschriftung muss so fett sein wie die uebrigen Filterbeschriftungen');
+});

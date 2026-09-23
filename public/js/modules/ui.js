@@ -615,16 +615,6 @@ export function updateUIForRole() {
     if (isAdmin) {
         initNavTabs();
     }
-    
-    // Filter-Leiste anpassen
-    if (!isAdminOrManager) {
-        const filterMember = document.getElementById('filterMember');
-        if (filterMember) {
-            filterMember.style.display = 'none';
-            const label = document.querySelector('label[for="filterMember"]');
-            if (label) label.style.display = 'none';
-        }
-    }
 }
 
 /**

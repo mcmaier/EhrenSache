@@ -3578,10 +3578,6 @@ neue Chip-Zähler macht es nur sichtbarer.
 - Der Kontrast der Chips ist nur für die Standard-Primärfarbe `#1F5FBF` nachgerechnet (Tabelle in
   `filter-chips.css`). Bei einer hellen Vereins-Primärfarbe ist WCAG AA für den aktiven neutralen
   Chip und „Läuft“ (beide `--primary-color`) nicht gesichert.
-- Anwesenheit: `#filterMember` und sein Label werden einzeln ausgeblendet (`updateUIForRole()` in
-  `ui.js`), die umgebende `.form-group` behält `flex: 1; min-width: 200px` und hinterlässt für
-  einfache Nutzer eine leere Lücke in der Filterleiste; sauberer wäre `data-role="manager"` am
-  Wrapper wie in Termine und Arbeitszeit.
 - `initNavTabs()` läuft zweimal (`app.js` beim Start und `ui.js` in `updateUIForRole()` für
   Admins) und registriert die Klick-Handler der Tabs doppelt. Die Regeln
   `.nav-tabs.system-active ~ …` in `css/sections/sidebar.css` sind toter Code — niemand vergibt
