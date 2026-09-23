@@ -104,6 +104,9 @@ test('Termine: heute zaehlt als kommend, gestern als vergangen', () => {
     const items = [{ date: '2026-09-21' }, { date: '2026-09-22' }, { date: '2026-12-01' }];
     assert.deepEqual(countChips(items, defs), { all: 3, past: 1, upcoming: 2 });
     assertPartition(defs, items, 'Termine');
+    // "Alle" ist hervorgehoben, damit die Zeile nicht durchgehend grau wirkt
+    // (Spec-Nachtrag 23.09.2026, zweite Sichtung).
+    assert.deepEqual(defs.map(d => d.variant), ['info', undefined, undefined]);
 });
 
 test('localTodayIso nutzt die lokale Zeit', () => {

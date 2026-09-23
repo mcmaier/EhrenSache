@@ -3545,8 +3545,16 @@ neue Chip-Zähler macht es nur sichtbarer.
 - `renderRecords`-Leerzeile: `colspan` 7, obwohl die Tabelle ohne Aktionsspalte nur 6 Spalten hat.
 - Toter Code: `applyDeviceFilters`/`filterDevices` (`devices.js`), der Zweig `exceptionStatus` in
   `filterExceptions`, `window.resetWorktimeFilter` ohne Aufrufer.
+- Toter Code seit 1.13.0: `.stat-card` samt `h3`/`.number` (`css/components/cards.css`) und die
+  zugehörige Regel in `css/responsive.css`. Mit den Kennzahlkarten fiel die letzte Verwendung im
+  Dashboard weg; die Check-in-PWA hat eine eigene Kopie in `public/checkin/css/style.css` und
+  bleibt davon unberührt. Beim nächsten Aufräumen entfernen — nicht in dieser Runde, um den
+  Sichtprüfungsstand nicht zu verändern.
 - Testrückstände in der Testdatenbank (Tätigkeit „AV2 6ab23e39c28d5“, Termin „Tst5“) — Suche nach
-  der erzeugenden Suite steht noch aus.
+  der erzeugenden Suite steht noch aus. Gleiches Muster in den Import-Protokollen: 43 Einträge
+  `termine.csv` mit je einer Zeile, Zeitstempel genau auf den Testläufen vom 22./23.09.2026.
+  Erzeuger hier bekannt — `tests/suites/import_series_api.php` räumt seine Zeilen in
+  `import_logs` nicht auf.
 - Leerzeilen-Texte uneinheitlich: Anträge und Anwesenheit (alle Einträge) melden „Keine Einträge
   gefunden“, Benutzer, Geräte und Mitglieder dagegen „… für diese Auswahl“.
 - Der Kontrast der Chips ist nur für die Standard-Primärfarbe `#1F5FBF` nachgerechnet (Tabelle in

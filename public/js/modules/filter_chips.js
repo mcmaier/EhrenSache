@@ -124,7 +124,7 @@ export const CHIPS_ACTIVITY_TYPES = Object.freeze([
 export function appointmentTimeChips(todayIso) {
     const day = a => String(a.date ?? '').slice(0, 10);
     return [
-        { key: 'all',      label: 'Alle' },
+        { key: 'all',      label: 'Alle', variant: 'info' },
         { key: 'past',     label: 'Vergangen', match: a => day(a) < todayIso },
         { key: 'upcoming', label: 'Kommend',   match: a => day(a) >= todayIso },
     ];

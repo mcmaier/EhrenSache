@@ -19,8 +19,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   aktive Chip nimmt die Primärfarbe des Brandings an. In der Terminverwaltung zeigen die Chips
   „Vergangen“ und „Kommend“ nur an, der Kalender bleibt vollständig.
 - **In der Anwesenheitsliste eines Termins lässt sich nach „Fehlend“ filtern.**
-- **„Filter zurücksetzen“ ist ein unauffälliger Textknopf** und erscheint nur, wenn ein Filter
-  gesetzt ist.
+- **„Filter zurücksetzen“ ist ein unauffälliger Textknopf** und steht dauerhaft an derselben
+  Stelle: Solange kein Filter gesetzt ist, ist er ausgegraut und nicht bedienbar. So springen
+  die Auswahlfelder daneben nicht mehr.
 - **Benutzer- und Geräteliste zeigen bei leerer Auswahl einen Hinweis statt einer leeren
   Tabelle.** Die Anwesenheitsliste eines Termins oder Mitglieds macht es ebenso.
 - **Der Kopfbereich aller Listen ist flacher und überall gleich gebaut.** Die Jahresauswahl steht
@@ -30,14 +31,23 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Die Jahresauswahl hat jetzt eine echte Beschriftung.** Die sechs Auswahlfelder hatten zuvor
   keinen zugänglichen Namen — Screenreader kündigten nichts an; jetzt steht „Jahr:“ als Label
   davor.
-- **Die Statistik zeigt ihre Kennzahlen als Chips.** Im Kopf stehen Termine, Anwesend,
-  Entschuldigt, Unentschuldigt sowie Pünktlichkeit und Zuverlässigkeit; die bisherigen
+- **Die Statistik zeigt ihre Kennzahlen als Chips.** Im Kopf stehen sechs: Termine, Anwesend,
+  Entschuldigt und Unentschuldigt sowie Pünktlichkeit und Zuverlässigkeit; die bisherigen
   Kennzahlkarten entfallen. Der Erklärtext der Karten steht jetzt im Tooltip des Chips — zeigt
   eine Quote „–“, weil zu wenig gemessen wurde, steht die Begründung zusätzlich als Text unter
-  der Zeile. **Der Durchschnitt steht je Gruppe** unter deren Überschrift und gilt damit für
-  genau diese Gruppe.
-- **Gruppen, Terminarten und Tätigkeitsarten bekommen eine Zählzeile** über der Tabelle, etwa
-  „Alle 7 · Hauptgruppen 4 · Register 3“. Sie zeigt nur an und filtert nicht.
+  der Zeile. **Der Durchschnitt steht je Gruppe** als eigener Chip unter deren Überschrift und
+  gilt damit für genau diese Gruppe. Gerechnet wird er nach derselben Regel wie zuvor die
+  Kopfzahl: bestätigte Anwesenheiten geteilt durch alle möglichen Mitglied-Termin-Paare der
+  Gruppe, nicht als Mittelwert der einzelnen Mitgliederquoten.
+- **Die Arbeitszeit zeigt die bestätigten Stunden als Chip** in derselben Zeile wie die
+  Statuschips („Stunden 214:42 h“); die Kennzahlkarte entfällt. Der Tooltip nennt, worauf sich
+  die Summe bezieht. Die Summe folgt den übrigen Filtern, etwa der gewählten Tätigkeit.
+- **Gruppen, Terminarten und Tätigkeitsarten bekommen eine Chipzeile** über der Tabelle, etwa
+  „Alle 7 · Hauptgruppen 4 · Register 3“. Sie zählt nicht nur, sondern filtert die Tabelle auch
+  — mit „Alle“ als Vorgabe, wie bei den Geräten.
+- **Die Geräteverwaltung filtert nach Gerätetyp.** Unter den Status-Chips steht eine Filterleiste
+  mit dem Feld „Typ“ (TOTP-Station, Auth-Gerät, Virtuelle Station); die Chips zählen dann nur
+  noch Geräte dieses Typs.
 
 ### Behoben
 - **Die Statistik blieb für einfache Mitglieder leer,** sobald Untergruppen eingerichtet waren:

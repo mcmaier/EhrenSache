@@ -1324,12 +1324,12 @@ Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).
 
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
-| CHIP-01 | Anträge öffnen | Vier Chips, Summe der Status = „Alle“, „Alle“ aktiv in Primärfarbe, kein Zurücksetzen-Knopf |
-| CHIP-02 | Anträge: „Ausstehend“ klicken | Nur ausstehende; Zähler der übrigen Chips bleiben stehen (facettierte Zählung); Zurücksetzen erscheint |
+| CHIP-01 | Anträge öffnen | Vier Chips, Summe der Status = „Alle“, „Alle“ aktiv in Primärfarbe, Zurücksetzen-Knopf sichtbar und ausgegraut |
+| CHIP-02 | Anträge: „Ausstehend“ klicken | Nur ausstehende; Zähler der übrigen Chips bleiben stehen (facettierte Zählung); Zurücksetzen wird bedienbar |
 | CHIP-03 | Anträge: Typ wählen | Alle Zähler sinken passend |
-| CHIP-04 | Zurücksetzen | Chip „Alle“, Felder leer, Jahr unverändert, Knopf weg |
-| CHIP-05 | Arbeitszeit mit laufender Sitzung | Sitzung zählt nur unter „Läuft“; „Bestätigte Stunden“ ändert sich beim Chipwechsel nicht |
-| CHIP-06 | Mitglieder öffnen | „Aktiv“ vorausgewählt, keine Inaktiven in der Tabelle, kein Zurücksetzen-Knopf |
+| CHIP-04 | Zurücksetzen | Chip „Alle“, Felder leer, Jahr unverändert, Knopf wieder ausgegraut |
+| CHIP-05 | Arbeitszeit mit laufender Sitzung | Sitzung zählt nur unter „Läuft“; der Chip „Stunden“ ändert sich beim Chipwechsel nicht |
+| CHIP-06 | Mitglieder öffnen | „Aktiv“ vorausgewählt, keine Inaktiven in der Tabelle, Zurücksetzen ausgegraut |
 | CHIP-07 | Mitglieder: „Inaktiv“ | Nur Inaktive, Zähler „Aktiv“ bleibt |
 | CHIP-08 | Anwesenheit: Termin wählen, „Fehlend“ | Nur fehlende Mitglieder, Gruppierung zählt mit |
 | CHIP-09 | Anwesenheit: „Fehlend“ aktiv, Termin zurück auf „Alle“ | Chip springt auf „Alle“, „Fehlend“ verschwindet |
@@ -1341,13 +1341,21 @@ Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).
 | CHIP-15 | Schmales Fenster (375 px) | Chips umbrechen, Jahreskarte darunter, keine horizontale Scrollleiste |
 | CHIP-16 | Leere Auswahl (Chip mit 0) in Benutzer, Geräte, Anwesenheitsliste | Hinweiszeile statt leerer Tabelle, keine Seitenknöpfe |
 | CHIP-17 | Jede Ansicht mit Jahresbezug öffnen | Jahresauswahl einzeilig oben rechts, gleiche Breite und Höhe in allen Ansichten |
-| CHIP-18 | Statistik öffnen | Vier Anzeige-Chips, darunter Durchschnitt und ggf. Pünktlichkeit/Zuverlässigkeit als Karten; Filterleiste wie in den übrigen Ansichten |
-| CHIP-19 | Statistik: Gruppe wählen, dann zurücksetzen | Zurücksetzen erscheint und verschwindet wie in den Listen; Jahr bleibt |
+| CHIP-18 | Statistik öffnen | Sechs Anzeige-Chips im Kopf (Termine, Anwesend, Entschuldigt, Unentschuldigt, Pünktlichkeit, Zuverlässigkeit), keine Kennzahlkarten mehr; Filterleiste wie in den übrigen Ansichten |
+| CHIP-19 | Statistik: Gruppe wählen, dann zurücksetzen | Zurücksetzen wird bedienbar und wieder ausgegraut wie in den Listen; Jahr bleibt |
 | CHIP-20 | Statistik als `user` | Mitgliedsfeld ausgeblendet, Filterleiste bricht nicht um |
-| CHIP-21 | Gruppen & Terminarten öffnen | Über jeder Tabelle eine Chipzeile; Summe der hinteren Chips ergibt „Alle“; Klick bewirkt nichts |
+| CHIP-21 | Gruppen & Terminarten öffnen | Über jeder Tabelle eine Chipzeile mit „Alle“ vorgewählt; Summe der hinteren Chips ergibt „Alle“; ein Klick filtert die Tabelle |
 | CHIP-22 | Untergruppen-Bezeichnung in den Einstellungen ändern | Der dritte Gruppen-Chip trägt das neue Wort |
-| CHIP-23 | Tätigkeitsarten mit einer ausgemusterten Art | Chip „Ausgemustert“ zählt sie; Tabelle unverändert |
+| CHIP-23 | Tätigkeitsarten mit einer ausgemusterten Art | Chip „Ausgemustert“ zählt sie; ein Klick zeigt nur sie in der Tabelle |
 | CHIP-24 | Schmales Fenster (375 px), alle Ansichten | Label über dem Feld, Jahresauswahl volle Breite, keine horizontale Scrollleiste |
+| CHIP-25 | Statistik: Maus über „Pünktlichkeit“ | Tooltip nennt gemessene Ankünfte und Termine wie früher der Kartentext |
+| CHIP-26 | Statistik mit abgeschalteter Pünktlichkeit | Der Chip fehlt ganz, die übrigen rücken auf |
+| CHIP-27 | Arbeitszeit: Tätigkeit wählen | Der Chip „Stunden“ folgt der Tätigkeit, nicht dem Statuschip; sein Tooltip nennt den Bezug |
+| CHIP-28 | Gruppen: Chip „Register“ klicken | Nur Untergruppen in der Tabelle, Zähler bleiben stehen |
+| CHIP-29 | Geräte: Typ „Virtuelle Station“ wählen | Chips zählen nur noch Kiosk-Geräte, Zurücksetzen wird bedienbar |
+| CHIP-30 | Alle Ansichten ohne gesetzten Filter | „Filter zurücksetzen“ ist sichtbar, ausgegraut und nicht klickbar |
+| CHIP-31 | Statistik mit mehreren Gruppen | Unter jeder Gruppenüberschrift ein Chip „Durchschnitt“ mit der Quote dieser Gruppe (bestätigte Anwesenheiten je möglicher Mitglied-Termin-Paare, gleicher Wert wie der Server rechnet) |
+| CHIP-32 | Statistik in einem Jahr mit zu wenigen Messungen | Der betroffene Chip zeigt „–“, die Begründung steht zusätzlich als Text unter der Chipzeile (nicht nur im Tooltip) |
 
 ---
 
