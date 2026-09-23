@@ -524,3 +524,66 @@ test('Anwesenheit: Verwalterfilter werden ueber data-role ausgeblendet', functio
     assertTrue(str_contains($jahr, 'font-weight: 500'),
         'Die Jahresbeschriftung muss so fett sein wie die uebrigen Filterbeschriftungen');
 });
+
+test('Jede Kopfzeile hat so viele Spalten wie Elemente', function () use ($fcHtml, $fcCss) {
+    // Der Fall aus 1.13.0: OI-87 stellte einen zweiten Chip-Container neben den
+    // Statusfilter, das Raster hatte aber nur zwei Spalten -- die Jahresauswahl
+    // rutschte in eine zweite Zeile, an ihrer Stelle stand eine leere Karte.
+    $spalten = [];
+    foreach (['--chips', '--chips-extra', '--chips-lead'] as $klasse) {
+        if (preg_match('/\.stats-grid' . preg_quote($klasse, '/') . '\s*\{[^}]*grid-template-columns:([^;]+);/s', $fcCss, $m)) {
+            $ohneKlammern = (string) preg_replace('/\([^)]*\)/', 'X', $m[1]);
+            $spalten[$klasse] = count(preg_split('/\s+/', trim($ohneKlammern)));
+        }
+    }
+    assertTrue(isset($spalten['--chips']), 'Regel fuer stats-grid--chips fehlt');
+
+    $offset = 0;
+    $geprueft = 0;
+    while (($start = strpos($fcHtml, '<div class="stats-grid', $offset)) !== false) {
+        $offset = $start + 20;
+
+        $kopfEnde = strpos($fcHtml, '"', $start + 12);
+        $klassen  = substr($fcHtml, $start + 12, $kopfEnde - $start - 12);
+
+        // Der Kopf reicht bis zur Filterleiste oder zur Tabelle darunter.
+        $ende = strpos($fcHtml, 'class="filter-bar"', $start);
+        $tab  = strpos($fcHtml, 'class="data-table"', $start);
+        if ($ende === false || ($tab !== false && $tab < $ende)) { $ende = $tab; }
+        if ($ende === false) { continue; }
+
+        $block  = substr($fcHtml, $start, $ende - $start);
+
+        // Nur die unmittelbaren Kinder zaehlen: Sie stehen eine Stufe tiefer
+        // eingerueckt als das Raster. Ein Wrapper wie .filter-chips-block in
+        // der Statistik ist ein Kind, die Chipleiste darin nicht.
+        $zeilen = preg_split('/\r?\n/', $block);
+        $tiefe  = null;
+        $kinder = 0;
+        foreach ($zeilen as $i => $zeile) {
+            if ($i === 0) { continue; }
+            if (!preg_match('/^(\s*)<div class="(filter-chips|year-filter|stat-card)/', $zeile, $m)) { continue; }
+            if ($tiefe === null) { $tiefe = strlen($m[1]); }
+            if (strlen($m[1]) === $tiefe) { $kinder++; }
+        }
+
+        $erlaubt = $spalten['--chips'];
+        foreach ($spalten as $klasse => $anzahl) {
+            if ($klasse !== '--chips' && str_contains($klassen, 'stats-grid' . $klasse)) {
+                $erlaubt = $anzahl;
+            }
+        }
+
+        assertTrue($kinder <= $erlaubt,
+            'Kopfzeile "' . trim($klassen) . '" hat ' . $kinder . ' Elemente, das Raster aber nur '
+            . $erlaubt . ' Spalten -- die Jahresauswahl rutscht in die zweite Zeile');
+        $geprueft++;
+    }
+
+    assertTrue($geprueft >= 5, 'Es wurden nur ' . $geprueft . ' Kopfzeilen geprueft');
+});
+
+test('Ein leerer Chip-Container erscheint nicht als Karte', function () use ($fcCss) {
+    assertTrue(str_contains($fcCss, '.filter-chips:empty'),
+        'Ohne .filter-chips:empty steht ein noch leerer Container als weisse Karte da');
+});

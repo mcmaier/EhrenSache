@@ -20,10 +20,17 @@
     grid-template-columns: minmax(0, 1fr) minmax(150px, 190px);
 }
 
+/* Zwei Chipleisten nebeneinander (Anwesenheit seit OI-87: Status links, Zaehler
+   offener Antraege daneben). Ohne eigene Spalte fuer die zweite Leiste rutscht
+   die Jahresauswahl in eine zweite Zeile, weil sie fest rechts steht. */
+.stats-grid--chips-extra {
+    grid-template-columns: minmax(0, 1fr) auto minmax(150px, 190px);
+}
+
 /* Ist die Chip-Leiste verborgen (Mitglieder als Rolle "user"), gibt sie ihre
    Spalte frei und die Jahresauswahl wuerde sich sonst ueber das ganze Grid
    dehnen. -2/-1 zeigt immer auf die letzten beiden Linien -- damit bleibt
-   sie rechts, egal ob zwei oder (mobil) eine Spalte im Grid stehen. */
+   sie rechts, egal ob zwei, drei oder (mobil) eine Spalte im Grid stehen. */
 .stats-grid--chips .year-filter {
     grid-column: -2 / -1;
 }
@@ -43,6 +50,13 @@
 /* Ohne diese Regel schluege display:flex das hidden des Browsers
    (Mitglieder blenden die Chips fuer einfache Nutzer aus). */
 .filter-chips[hidden] {
+    display: none;
+}
+
+/* Ein Container ohne Chips traegt sonst Grund, Polsterung und Schatten und
+   steht als leere weisse Karte da -- etwa der Antragszaehler, solange kein
+   Termin gewaehlt ist, oder jede Leiste vor dem ersten Zeichnen. */
+.filter-chips:empty {
     display: none;
 }
 
