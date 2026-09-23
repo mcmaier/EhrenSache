@@ -13,8 +13,9 @@
 // APPOINTMENTS Controller
 // ============================================
 function handleAppointments($db, $database, $method, $id) {
- 
+
     $prefix = $database->table('');
+    require_once __DIR__ . '/../helpers/appointment_attendance.php';
 
     switch($method) {
         case 'GET':
@@ -166,6 +167,19 @@ function handleAppointments($db, $database, $method, $id) {
                         $db, $database, $rows,
                         $viewerMemberId ? (int) $viewerMemberId : null
                     );
+
+                    // Anwesenheitszahlen nur auf Anforderung (Kalender, Spec
+                    // 2026-09-22-kalender-anwesenheit). Ohne include bleibt die
+                    // Antwort unveraendert; ohne Zeitraum waere die Zaehlung
+                    // ueber die ganze Historie zu teuer -- dieselbe Grenze wie
+                    // bei den Rueckmeldungen oben.
+                    if (($_GET['include'] ?? '') === 'attendance') {
+                        $rows = attendanceAttachSummaries(
+                            $db, $database, $rows,
+                            $viewerMemberId ? (int) $viewerMemberId : null,
+                            isAdminOrManager()
+                        );
+                    }
                 }
 
                 echo json_encode($rows);
