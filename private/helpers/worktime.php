@@ -289,6 +289,98 @@ function requireWorktimeEnabled($db, $database): void
 }
 
 /**
+ * Ermittelt das Mitglied, nach dessen Gruppen Taetigkeitsarten gefiltert werden.
+ *
+ * Rolle user: immer das eigene Mitglied — der Parameter member_id aendert
+ * daran nichts. Admin/Manager: nur wenn member_id ausdruecklich mitgegeben
+ * wird; sonst sehen sie alles, weil sie Nachtraege zugunsten anderer erfassen.
+ *
+ * Stand bis zur Korrektur des Einzelabrufs in handlers/activity_types.php und
+ * liegt seither neben activityTypeVisibility(), die sie aufruft — ein Helfer
+ * darf nicht von einem Handler abhaengen.
+ *
+ * Setzt auth.php voraus (isAdminOrManager(), getCurrentUserId()); api.php
+ * laedt sie vor dieser Datei. Kein require_once, weil auth.php mehr mitbringt
+ * als diese beiden Funktionen und worktime_unit.php diese Datei allein laedt,
+ * ohne eine der hiesigen Datenbankfunktionen aufzurufen.
+ *
+ * @return int|null null bedeutet: nicht filtern
+ */
+function activityFilterMemberId($db, $database): ?int
+{
+    $prefix = $database->table('');
+
+    if (isAdminOrManager()) {
+        return isset($_GET['member_id']) ? (int) $_GET['member_id'] : null;
+    }
+
+    $stmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
+    $stmt->execute([getCurrentUserId()]);
+    $memberId = $stmt->fetchColumn();
+
+    // Kein verknuepftes Mitglied: es gibt keine Gruppen, also nichts zu sehen.
+    return $memberId ? (int) $memberId : 0;
+}
+
+/**
+ * Sichtbarkeit von Taetigkeitsarten beim Lesen — die eine Stelle, an der die
+ * Regel steht. Liste und Einzelabruf in handleActivityTypes() benutzen sie
+ * beide.
+ *
+ * Zwei Bedingungen mit ABSICHTLICH verschiedenen Schwellen:
+ *
+ *  1. Gruppengrenze (activityFilterMemberId() oben): Die Rolle user sieht nur
+ *     Arten, die mindestens einer Gruppe ihres eigenen Mitglieds zugeordnet
+ *     sind. Admin und Manager sehen ohne member_id alles, mit member_id=<id>
+ *     die Arten dieses Mitglieds — die Schwelle ist hier isAdminOrManager().
+ *     Aus dem EXISTS folgt zweierlei, das hier ausdruecklich festgehalten
+ *     wird, weil es sich nicht von selbst versteht:
+ *       - Art OHNE Gruppenzuordnung          -> fuer die Rolle user unsichtbar
+ *       - Konto ohne verknuepftes Mitglied   -> sieht keine einzige Art
+ *     (member_id 0 trifft keine Zuordnung; 0 statt null ist deshalb wichtig.)
+ *  2. Ausgemusterte Arten (is_active = 0) sieht NUR der Admin. Der Manager
+ *     faellt hier — anders als bei 1. — unter die Grenze: isAdmin(), nicht
+ *     isAdminOrManager(). Ausmustern ist Systemkonfiguration und damit
+ *     Adminsache; wer sie nicht vornehmen darf, sieht das Ergebnis auch nicht.
+ *
+ * Bis dahin stand beides nur im Listenzweig. Der Einzelabruf (?id=) las ohne
+ * beides und gab Name, Beschreibung, Nachweisart, die vollstaendige
+ * Gruppenliste und die verknuepften Terminarten einer fremden oder
+ * ausgemusterten Art heraus. Zwei Kopien derselben Sichtbarkeitsregel laufen
+ * erfahrungsgemaess auseinander — deshalb steht sie jetzt nur noch hier.
+ *
+ * @param string $alias Tabellenalias der activity_types in der Abfrage
+ * @return array{0: string, 1: array<int, mixed>} SQL-Zusatz (beginnt mit
+ *         " AND " oder ist leer) und die zugehoerigen Parameter, in dieser
+ *         Reihenfolge an das Ende der bestehenden WHERE-Klausel zu haengen
+ */
+function activityTypeVisibility($db, $database, string $alias = 'a'): array
+{
+    $prefix = $database->table('');
+    $sql    = '';
+    $params = [];
+
+    $filterMemberId = activityFilterMemberId($db, $database);
+
+    if ($filterMemberId !== null) {
+        $sql .= " AND EXISTS (
+                    SELECT 1 FROM {$prefix}activity_type_groups atg
+                    INNER JOIN {$prefix}member_group_assignments mga
+                            ON mga.group_id = atg.group_id
+                    WHERE atg.activity_id = {$alias}.activity_id
+                      AND mga.member_id = ?
+                  )";
+        $params[] = $filterMemberId;
+    }
+
+    if (!isAdmin()) {
+        $sql .= " AND {$alias}.is_active = 1";
+    }
+
+    return [$sql, $params];
+}
+
+/**
  * Die laufende Sitzung eines Mitglieds, oder null.
  *
  * @return array<string, mixed>|null

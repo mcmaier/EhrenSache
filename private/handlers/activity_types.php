@@ -10,31 +10,6 @@
  */
 
 /**
- * Ermittelt das Mitglied, nach dessen Gruppen gefiltert wird.
- *
- * Rolle user: immer das eigene Mitglied — der Parameter aendert daran nichts.
- * Admin/Manager: nur wenn member_id ausdruecklich mitgegeben wird; sonst
- * sehen sie alles, weil sie Nachtraege zugunsten anderer erfassen.
- *
- * @return int|null null bedeutet: nicht filtern
- */
-function activityFilterMemberId($db, $database): ?int
-{
-    $prefix = $database->table('');
-
-    if(isAdminOrManager()) {
-        return isset($_GET['member_id']) ? (int)$_GET['member_id'] : null;
-    }
-
-    $stmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
-    $stmt->execute([getCurrentUserId()]);
-    $memberId = $stmt->fetchColumn();
-
-    // Kein verknuepftes Mitglied: es gibt keine Gruppen, also nichts zu sehen.
-    return $memberId ? (int)$memberId : 0;
-}
-
-/**
  * Terminarten, auf die eine Taetigkeitsart eingegrenzt ist.
  *
  * Ein leeres Array bedeutet KEINE Einschraenkung — die Taetigkeitsart bietet
@@ -106,8 +81,20 @@ function handleActivityTypes($db, $database, $method, $id) {
     switch($method) {
         case 'GET':
             if($id) {
-                $stmt = $db->prepare("SELECT * FROM {$prefix}activity_types WHERE activity_id = ?");
-                $stmt->execute([$id]);
+                // Dieselbe Sichtbarkeitsregel wie im Listenzweig unten:
+                // activityTypeVisibility() in helpers/worktime.php liefert
+                // Gruppengrenze und is_active-Filter als einen SQL-Zusatz.
+                // Bis dahin las dieser Zweig ohne beides — jedes angemeldete
+                // Konto konnte Name, Beschreibung, Nachweisart, Gruppenliste
+                // und Terminarten einer fremden oder ausgemusterten Art lesen.
+                // Eine nicht sichtbare Art verhaelt sich wie eine nicht
+                // vorhandene (404, gleiche Meldung), sonst verriete die
+                // Antwort, dass es sie gibt.
+                [$visibilitySql, $visibilityParams] = activityTypeVisibility($db, $database, 'a');
+
+                $stmt = $db->prepare("SELECT a.* FROM {$prefix}activity_types a
+                                      WHERE a.activity_id = ?" . $visibilitySql);
+                $stmt->execute(array_merge([$id], $visibilityParams));
                 $type = $stmt->fetch(PDO::FETCH_ASSOC);
 
                 if($type) {
@@ -127,30 +114,14 @@ function handleActivityTypes($db, $database, $method, $id) {
                     echo json_encode(["message" => "Activity type not found"]);
                 }
             } else {
-                $filterMemberId = activityFilterMemberId($db, $database);
-                $params         = [];
+                // Gruppengrenze und is_active-Filter stehen an einer Stelle
+                // (helpers/worktime.php) und gelten damit auch fuer den
+                // Einzelabruf oben.
+                [$visibilitySql, $params] = activityTypeVisibility($db, $database, 'a');
 
-                $sql = "SELECT a.* FROM {$prefix}activity_types a";
-
-                if($filterMemberId !== null) {
-                    // 0 = Nutzer ohne verknuepftes Mitglied → leere Liste
-                    $sql .= " WHERE EXISTS (
-                                SELECT 1 FROM {$prefix}activity_type_groups atg
-                                INNER JOIN {$prefix}member_group_assignments mga
-                                        ON mga.group_id = atg.group_id
-                                WHERE atg.activity_id = a.activity_id
-                                  AND mga.member_id = ?
-                              )";
-                    $params[] = $filterMemberId;
-                } else {
-                    $sql .= " WHERE 1=1";
-                }
-
-                if(!isAdmin()) {
-                    $sql .= " AND a.is_active = 1";
-                }
-
-                $sql .= " ORDER BY a.activity_name";
+                $sql = "SELECT a.* FROM {$prefix}activity_types a WHERE 1=1"
+                     . $visibilitySql
+                     . " ORDER BY a.activity_name";
 
                 $stmt = $db->prepare($sql);
                 $stmt->execute($params);

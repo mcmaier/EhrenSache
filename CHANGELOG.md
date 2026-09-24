@@ -24,6 +24,10 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Der Einzelabruf eines Termins prüft jetzt dieselbe Gruppengrenze wie die Terminliste.**
   Bisher wandte nur die Liste sie an. Für Admin und Manager ändert sich nichts — sie sehen
   weiterhin alle Termine ohne Gruppengrenze.
+- **Der Einzelabruf einer Tätigkeitsart wendet jetzt dieselben Grenzen an wie deren Liste.**
+  Bisher galten die Gruppenzuordnung und das Ausblenden ausgemusterter Einträge nur für die
+  Liste. Beide Regeln stehen nun an einer Stelle; eine nicht sichtbare Tätigkeitsart wird wie
+  eine nicht vorhandene beantwortet. Für Admin ändert sich nichts.
 
 ---
 

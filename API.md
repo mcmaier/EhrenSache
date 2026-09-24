@@ -2004,7 +2004,19 @@ Ein Mitglied ohne passende Gruppe erhält ein **leeres Array mit Status 200**,
 nicht 404. Die beiden Fälle sind so unterscheidbar: leere Auswahl gegen
 abgeschaltetes Feature.
 
-Nicht-Admins sehen zusätzlich nur Arten mit `is_active = 1`.
+Nicht-Admins sehen zusätzlich nur Arten mit `is_active = 1` — der **Manager
+eingeschlossen**, für den die Gruppengrenze oben nicht gilt. Ausmustern ist
+Systemkonfiguration und damit Adminsache.
+
+**Query-Parameter:**
+- `id`: Einzelne Tätigkeitsart. **Beide Grenzen gelten hier genauso wie für die Liste:** die
+  Gruppenzuordnung nach der Tabelle oben und das Ausblenden ausgemusterter Arten für
+  Nicht-Admins. Jede Art, die der Aufrufer in der Liste nicht zu sehen bekäme, wird wie eine
+  nicht vorhandene beantwortet (`404 "Activity type not found"`), damit die Antwort ihre
+  Existenz nicht verrät — ebenso für ein Konto ohne verknüpftes Mitglied oder ohne Gruppe.
+  Eine Tätigkeitsart **ohne** Gruppenzuordnung ist damit, wie in der Liste, für die Rolle
+  `user` unsichtbar. `member_id` wirkt im Einzelabruf wie in der Liste
+- `member_id`: siehe Tabelle oben
 
 **Response:**
 ```json

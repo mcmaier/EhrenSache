@@ -1695,6 +1695,254 @@ test('my_data: Arbeitszeiten stehen in JSON UND in der CSV (OI-50)', function ()
     }
 });
 
+/*
+ * Sichtbarkeitsgrenze beim Einzelabruf einer Taetigkeitsart
+ * (GET activity_types&id=).
+ *
+ * Der Einzelabruf holte die Art ohne die beiden Einschraenkungen, die der
+ * Listenzweig anwendet: Gruppenfilterung fuer Nicht-Verwalter und Ausblenden
+ * ausgemusterter Eintraege fuer Nicht-Admins. Jedes angemeldete Konto konnte
+ * damit Name, Beschreibung, Nachweisart, die vollstaendige Gruppenliste und
+ * die verknuepften Terminarten einer fremden oder ausgemusterten Art lesen.
+ * Seither wenden beide Zweige dieselbe Regel an — activityTypeVisibility()
+ * in private/helpers/worktime.php.
+ *
+ * Die Welt hier legt nur neue Gruppen und Taetigkeitsarten an; die
+ * Gruppenzuordnung der Testkonten wird nicht angefasst. atvWithWorld() liest
+ * sie vor und nach dem Lauf zurueck und vergleicht.
+ */
+
+/** Legt eine Taetigkeitsart mit genau diesen Gruppen an. */
+function atvCreateActivity(string $name, array $groupIds, array $extra = []): int
+{
+    $res = apiRequest('POST', 'activity_types', [
+        'token' => apiToken('admin'),
+        'body'  => ['activity_name' => $name, 'group_ids' => $groupIds] + $extra,
+    ]);
+    assertStatus(201, $res, "Taetigkeitsart '{$name}' konnte nicht angelegt werden");
+
+    return trackCreated('activity', (int) $res['body']['id']);
+}
+
+function atvCreateGroup(string $name): int
+{
+    $res = apiRequest('POST', 'member_groups', [
+        'token' => apiToken('admin'),
+        'body'  => ['group_name' => $name],
+    ]);
+    assertStatus(201, $res, "Gruppe '{$name}' konnte nicht angelegt werden");
+
+    return trackCreated('group', (int) $res['body']['id']);
+}
+
+function atvDelete(string $resource, ?int $id): void
+{
+    if ($id !== null) {
+        apiRequest('DELETE', $resource, ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    }
+}
+
+/** Einzelabruf einer Taetigkeitsart als $role. */
+function atvGet(string $role, int $activityId): array
+{
+    return apiRequest('GET', 'activity_types', [
+        'token' => apiToken($role),
+        'query' => ['id' => $activityId],
+    ]);
+}
+
+/** @return int[] activity_ids der Liste */
+function atvListIds(string $role): array
+{
+    $res = apiRequest('GET', 'activity_types', ['token' => apiToken($role)]);
+    assertStatus(200, $res, "Liste der Taetigkeitsarten fuer {$role} nicht abrufbar");
+    assertTrue(is_array($res['body']), 'Liste ist kein Array: ' . $res['raw']);
+
+    return array_map(static fn ($a) => (int) $a['activity_id'], $res['body']);
+}
+
+/**
+ * Welt fuer den Einzelabruf. $fn bekommt die IDs und den Namensstempel:
+ *   own       -- Gruppen des Kontos "user", is_active = 1
+ *   foreign   -- eine eigens angelegte Gruppe, der kein Testkonto angehoert
+ *   inactive  -- Gruppen des Kontos "user", aber is_active = 0
+ *   groupless -- ganz ohne Gruppenzuordnung
+ *
+ * Eine Art ohne Gruppe laesst sich ueber die API nicht anlegen (POST und PUT
+ * weisen eine leere group_ids ab). Sie entsteht so, wie sie im Betrieb
+ * entsteht: Die einzige zugeordnete Gruppe wird geloescht, und der
+ * Fremdschluessel raeumt die Zuordnung per ON DELETE CASCADE mit weg.
+ */
+function atvWithWorld(callable $fn): void
+{
+    enableWorktime();
+
+    $suffix = uniqid();
+    $ids = ['foreignGroup' => null, 'tempGroup' => null,
+            'own' => null, 'foreign' => null, 'inactive' => null, 'groupless' => null];
+
+    $userMember = apiMemberId('user');
+    assertTrue($userMember !== null, 'Das Konto "user" braucht ein verknuepftes Mitglied');
+
+    // In diesem Projekt sind schon Testdaten durch unaufgeraeumte
+    // Gruppenzuordnungen kaputtgegangen — deshalb der Vergleich am Ende.
+    $groupsBefore = memberGroupIds($userMember);
+    sort($groupsBefore);
+    assertTrue($groupsBefore !== [], 'Das Mitglied des Kontos "user" braucht eine Gruppe');
+
+    try {
+        $ids['foreignGroup'] = atvCreateGroup("ATV Fremdgruppe {$suffix}");
+        $ids['tempGroup']    = atvCreateGroup("ATV Wegwerfgruppe {$suffix}");
+
+        $ids['own'] = atvCreateActivity("ATV eigen {$suffix}", $groupsBefore,
+            ['description' => "ATV eigen Beschreibung {$suffix}"]);
+        $ids['foreign'] = atvCreateActivity("ATV fremd {$suffix}", [$ids['foreignGroup']],
+            ['description' => "ATV geheime Beschreibung {$suffix}", 'verification' => 'start_end']);
+        $ids['inactive'] = atvCreateActivity("ATV ausgemustert {$suffix}", $groupsBefore,
+            ['description' => "ATV ausgemusterte Beschreibung {$suffix}", 'is_active' => 0]);
+        $ids['groupless'] = atvCreateActivity("ATV ohne Gruppe {$suffix}", [$ids['tempGroup']],
+            ['description' => "ATV gruppenlose Beschreibung {$suffix}"]);
+
+        // Macht groupless gruppenlos.
+        atvDelete('member_groups', $ids['tempGroup']);
+        $ids['tempGroup'] = null;
+
+        $kontrolle = atvGet('admin', $ids['groupless']);
+        assertStatus(200, $kontrolle, 'Die gruppenlose Art ist dem Admin nicht abrufbar');
+        assertSame([], $kontrolle['body']['groups'] ?? null,
+            'Der Aufbau hat keine gruppenlose Taetigkeitsart erzeugt: ' . $kontrolle['raw']);
+
+        $fn($ids, $suffix);
+    } finally {
+        atvDelete('activity_types', $ids['own']);
+        atvDelete('activity_types', $ids['foreign']);
+        atvDelete('activity_types', $ids['inactive']);
+        atvDelete('activity_types', $ids['groupless']);
+        atvDelete('member_groups', $ids['foreignGroup']);
+        atvDelete('member_groups', $ids['tempGroup']);
+
+        // Kontrolle: die Gruppen des Testkontos sind unveraendert
+        $groupsAfter = memberGroupIds($userMember);
+        sort($groupsAfter);
+        assertSame($groupsBefore, $groupsAfter,
+            'Die Gruppenzuordnung des Testkontos "user" hat sich durch den Lauf geaendert');
+    }
+}
+
+test('activity_types Einzelabruf: user sieht eine Art seiner Gruppe', function () {
+    atvWithWorld(function (array $ids, string $suffix) {
+        $res = atvGet('user', $ids['own']);
+        assertStatus(200, $res, 'Einzelabruf einer Art der eigenen Gruppe');
+        assertSame("ATV eigen {$suffix}", $res['body']['activity_name'] ?? null, 'Name fehlt');
+        assertTrue(($res['body']['groups'] ?? []) !== [], 'Gruppenliste fehlt: ' . $res['raw']);
+        assertTrue(array_key_exists('appointment_type_ids', $res['body']),
+            'appointment_type_ids fehlt: ' . $res['raw']);
+    });
+});
+
+test('activity_types Einzelabruf: user sieht die Art einer fremden Gruppe nicht', function () {
+    atvWithWorld(function (array $ids, string $suffix) {
+        $fremd = atvGet('user', $ids['foreign']);
+        assertStatus(404, $fremd, 'Einzelabruf einer Art einer fremden Gruppe');
+
+        foreach (["ATV fremd {$suffix}", "ATV geheime Beschreibung {$suffix}",
+                  "ATV Fremdgruppe {$suffix}", 'start_end'] as $verraten) {
+            assertTrue(strpos($fremd['raw'], $verraten) === false,
+                "Die Antwort verraet Inhalte der fremden Art ({$verraten}): " . $fremd['raw']);
+        }
+
+        // Fremd und nicht vorhanden muessen gleich aussehen -- sonst laesst
+        // sich ausprobieren, welche IDs es gibt.
+        $weg = atvGet('user', 999999999);
+        assertSame($weg['status'], $fremd['status'],
+            'Fremde und fehlende Taetigkeitsart unterscheiden sich im Status');
+        assertSame($weg['body']['message'] ?? null, $fremd['body']['message'] ?? null,
+            'Fremde und fehlende Taetigkeitsart unterscheiden sich in der Meldung');
+    });
+});
+
+test('activity_types Einzelabruf: ausgemusterte Art je Rolle wie in der Liste', function () {
+    // Nachgewiesenes Verhalten, keine Annahme: Der Listenzweig blendet
+    // is_active = 0 fuer alle ausser dem Admin aus — isAdmin(), NICHT
+    // isAdminOrManager(). Der Manager faellt hier also unter die Grenze,
+    // obwohl die Gruppengrenze fuer ihn nicht gilt. Die Liste steht als
+    // Zeuge daneben, damit der Test mitzieht, falls die Listenregel sich
+    // aendert.
+    atvWithWorld(function (array $ids, string $suffix) {
+        foreach (['user' => false, 'manager' => false, 'admin' => true] as $role => $erwartet) {
+            assertSame($erwartet, in_array($ids['inactive'], atvListIds($role), true),
+                "Liste fuer {$role}: ausgemusterte Art " . ($erwartet ? 'fehlt' : 'ist sichtbar'));
+            assertStatus($erwartet ? 200 : 404, atvGet($role, $ids['inactive']),
+                "Einzelabruf der ausgemusterten Art als {$role}");
+        }
+
+        $fremd = atvGet('manager', $ids['inactive']);
+        assertTrue(strpos($fremd['raw'], "ATV ausgemusterte Beschreibung {$suffix}") === false,
+            'Die Antwort an den Manager verraet die ausgemusterte Art');
+
+        // Gegenprobe zur Gruppengrenze: Die aktive Art derselben Gruppen
+        // sehen alle drei — die 404 oben kommt wirklich von is_active.
+        foreach (['user', 'manager', 'admin'] as $role) {
+            assertStatus(200, atvGet($role, $ids['own']),
+                "Die aktive Art derselben Gruppen muss {$role} sichtbar sein");
+        }
+    });
+});
+
+test('activity_types Einzelabruf: Art ohne Gruppenzuordnung verhaelt sich wie in der Liste', function () {
+    // Nachgewiesenes Verhalten: Der Listenzweig filtert ueber
+    // EXISTS(activity_type_groups) — eine Art ohne Gruppenzuordnung trifft
+    // die Bedingung nie und ist fuer die Rolle user unsichtbar. Verwalter
+    // fragen ohne member_id gar nicht erst nach Gruppen und sehen sie.
+    atvWithWorld(function (array $ids, string $suffix) {
+        assertSame(false, in_array($ids['groupless'], atvListIds('user'), true),
+            'Erwartet: Eine Art ohne Gruppenzuordnung ist fuer user nicht in der Liste');
+        $res = atvGet('user', $ids['groupless']);
+        assertStatus(404, $res, 'Einzelabruf einer Art ohne Gruppenzuordnung als user');
+        assertTrue(strpos($res['raw'], "ATV gruppenlose Beschreibung {$suffix}") === false,
+            'Die Antwort verraet die gruppenlose Art');
+
+        foreach (['manager', 'admin'] as $role) {
+            assertTrue(in_array($ids['groupless'], atvListIds($role), true),
+                "{$role} muss die Art ohne Gruppenzuordnung in der Liste sehen");
+            assertStatus(200, atvGet($role, $ids['groupless']),
+                "{$role} muss die Art ohne Gruppenzuordnung einzeln abrufen koennen");
+        }
+
+        // Und mit member_id greift die Gruppengrenze auch fuer den Verwalter —
+        // in Liste und Einzelabruf gleichermassen.
+        $mit = ['token' => apiToken('admin'), 'query' => ['member_id' => apiMemberId('user')]];
+        $liste = apiRequest('GET', 'activity_types', $mit);
+        assertStatus(200, $liste);
+        $listIds = array_map(static fn ($a) => (int) $a['activity_id'], $liste['body']);
+        assertSame(false, in_array($ids['groupless'], $listIds, true),
+            'member_id muss die gruppenlose Art auch fuer den Admin aus der Liste nehmen');
+        assertStatus(404, apiRequest('GET', 'activity_types', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $ids['groupless'], 'member_id' => apiMemberId('user')],
+        ]), 'member_id muss im Einzelabruf genauso wirken wie in der Liste');
+    });
+});
+
+test('activity_types: Einzelabruf liefert genau das, was auch die Liste liefert', function () {
+    // Die eigentliche Zusicherung: keine zweite Wahrheit. Was die Liste
+    // zeigt, muss der Einzelabruf mit 200 beantworten; was sie verschweigt,
+    // mit 404 — ueber alle vier Welten und alle drei Rollen.
+    atvWithWorld(function (array $ids) {
+        foreach (['user', 'manager', 'admin'] as $role) {
+            $liste = atvListIds($role);
+            foreach (['own', 'foreign', 'inactive', 'groupless'] as $welt) {
+                $inListe  = in_array($ids[$welt], $liste, true);
+                $status   = atvGet($role, $ids[$welt])['status'];
+                $erwartet = $inListe ? 200 : 404;
+                assertSame($erwartet, $status,
+                    "{$role}/{$welt}: Liste sagt " . ($inListe ? 'sichtbar' : 'unsichtbar')
+                    . ", Einzelabruf antwortet {$status}");
+            }
+        }
+    });
+});
+
 test('Aufraeumen steht am Ende der Datei', function () {
     // Ein Test hinter dem Aufraeumen legt Daten an, die niemand mehr
     // entfernt -- und faellt nicht auf, weil das Aufraeumen davor gruen war.
