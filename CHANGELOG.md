@@ -9,6 +9,15 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unveröffentlicht]
 
+### Geändert
+- **Die virtuelle Station achtet jetzt auf die Mitgliedschaftszeiträume.** Wer laut seinen
+  Zeiträumen gerade nicht aktiv ist — etwa nach einem Austritt oder vor dem Eintritt —, kann am
+  Kiosk nicht mehr stempeln. Bisher genügte das Häkchen „aktiv" am Mitglied, und der Stempel
+  erzeugte Anwesenheiten, die in keiner Auswertung auftauchten, weil Statistik und Berichte
+  schon immer die Zeiträume zugrunde legen. Der Kiosk meldet wie bei einer falschen PIN
+  „Mitgliedsnummer oder PIN ungültig", nennt den Grund also nicht. Wer keine Zeiträume gepflegt
+  hat — der Normalfall —, merkt nichts: Dann zählt weiterhin allein das Häkchen.
+
 ### Behoben
 - **In der Anwesenheit stand die Jahresauswahl nicht mehr oben rechts.** Sobald ein Termin
   gewählt war, rutschte sie unter die Statuschips, und an ihrer gewohnten Stelle blieb ein

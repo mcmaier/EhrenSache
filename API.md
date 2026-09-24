@@ -1473,9 +1473,17 @@ den vorhandenen Status (`present`, `excused`) oder `null`. `identify`, `checkin`
 `server_time` (Status-Endpunkt) rechnen mit der Datenbankuhr des Servers; `server_unix` und der
 Stations-Code (TOTP) laufen dagegen auf Unix-Zeit, unabhängig von der Zeitzone der Datenbank.
 
+**Wer als aktiv gilt (OI-27):** `members.active = 1` **und** der heutige Tag liegt in einem
+Zeitraum aus `membership_dates` — dieselbe Regel, nach der Statistik und Anwesenheitsbericht
+rechnen (`getMemberActivityWhere()`). Ein Mitglied ohne Einträge in `membership_dates` gilt wie
+bisher allein über `active` als aktiv; das ist der Normalfall. Bis 1.13.0 prüfte der Kiosk nur
+`active` — ein Mitglied mit abgelaufenem oder erst künftigem Zeitraum konnte also stempeln,
+obwohl es in keiner Auswertung vorkam.
+
 **Fehler:** `400` Nummer oder PIN fehlt · `401 "Invalid member number or PIN"` — dieselbe
-Meldung bei unbekannter Nummer, falscher PIN, fehlender PIN, inaktivem Mitglied und
-mehrdeutiger Nummer · `423 "Too many attempts"` mit `retry_after` (Sekunden): 5 Fehlversuche
+Meldung bei unbekannter Nummer, falscher PIN, fehlender PIN, inaktivem Mitglied (auch außerhalb
+seiner Mitgliedschaftszeiträume) und mehrdeutiger Nummer · `423 "Too many attempts"` mit
+`retry_after` (Sekunden): 5 Fehlversuche
 je Mitgliedsnummer (auch unbekannte) innerhalb von 15 Minuten · `423 "Station temporarily
 locked"`: 30 Fehlversuche je Kiosk innerhalb von 15 Minuten. `retry_after` nennt in beiden
 Fällen die volle Fensterlänge (900 Sekunden), nicht die verbleibende Sperrzeit. Eine neu

@@ -1038,6 +1038,91 @@ test('users: auth_device lehnt totp_action generate ab, clear und GET liefern ke
     assertSame(true, $kioskCheck['body']['has_totp_secret']);
 });
 
+// ---- OI-27: Mitgliedschaftszeitraeume am Kiosk -----------------------------
+//
+// Der Stempel prueft dieselbe Aktivitaet wie Statistik und Anwesenheitslogik:
+// members.active UND der heutige Tag im Zeitraum aus membership_dates. Vorher
+// genuegte active = 1 -- ein Mitglied mit abgelaufenem Zeitraum konnte also
+// weiter stempeln, zaehlte aber in keiner Auswertung.
+//
+// Diese Tests bringen ihr eigenes Mitglied mit, statt stationMember() zu
+// benutzen: Sie legen Mitgliedschaftszeitraeume an, und das gemeinsame
+// Testmitglied traegt sie sonst in die uebrigen Tests weiter.
+
+/**
+ * Legt ein Mitglied mit PIN und optionalem Zeitraum an, fuehrt $fn damit aus
+ * und raeumt danach beides wieder ab.
+ *
+ * @param ?array{0: string, 1: ?string} $zeitraum start_date und end_date
+ */
+function oi27WithMember(?array $zeitraum, callable $fn): void
+{
+    $nummer = 'OI27' . substr(uniqid(), -6);
+    $res    = apiRequest('POST', 'members', ['token' => apiToken('admin'), 'body' => [
+        'name' => 'Kiosk', 'surname' => 'Zeitraum ' . $nummer,
+        'member_number' => $nummer, 'active' => 1,
+    ]]);
+    assertStatus(201, $res, 'Testmitglied konnte nicht angelegt werden: ' . $res['raw']);
+    $memberId = (int) $res['body']['id'];
+
+    try {
+        // Die PIN nimmt erst PUT entgegen, das Anlegen kennt das Feld nicht.
+        assertStatus(200, apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['pin' => '2580']]),
+            'PIN konnte nicht gesetzt werden');
+
+        if ($zeitraum !== null) {
+            $zr = apiRequest('POST', 'membership_dates', ['token' => apiToken('admin'), 'body' => [
+                'member_id' => $memberId, 'start_date' => $zeitraum[0], 'end_date' => $zeitraum[1],
+            ]]);
+            assertStatus(201, $zr, 'Zeitraum konnte nicht angelegt werden: ' . $zr['raw']);
+        }
+
+        $fn($nummer, $memberId);
+    } finally {
+        apiRequest('DELETE', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
+    }
+}
+
+test('station: Mitglied ausserhalb seines Zeitraums kann nicht stempeln (OI-27)', function () {
+    enableStationPin();
+    oi27WithMember([date('Y-m-d', strtotime('-2 years')), date('Y-m-d', strtotime('-1 day'))],
+        function (string $nummer) {
+            $res = stationPost('identify', ['member_number' => $nummer, 'pin' => '2580']);
+            assertStatus(401, $res, 'Abgelaufener Zeitraum muss den Stempel verhindern');
+            assertSame('Invalid member number or PIN', $res['body']['message'],
+                'Die Meldung bleibt einheitlich -- sie verraet nicht, woran es lag');
+        });
+});
+
+test('station: Zeitraum, der erst spaeter beginnt, gilt noch nicht (OI-27)', function () {
+    enableStationPin();
+    oi27WithMember([date('Y-m-d', strtotime('+7 days')), null], function (string $nummer) {
+        assertStatus(401, stationPost('identify', ['member_number' => $nummer, 'pin' => '2580']),
+            'Ein erst kuenftig beginnender Zeitraum darf noch nicht stempeln lassen');
+    });
+});
+
+test('station: Mitglied im laufenden Zeitraum stempelt weiterhin (OI-27)', function () {
+    enableStationPin();
+    oi27WithMember([date('Y-m-d', strtotime('-1 day')), null], function (string $nummer) {
+        $res = stationPost('identify', ['member_number' => $nummer, 'pin' => '2580']);
+        assertStatus(200, $res, 'Offener Zeitraum ab gestern muss gelten: ' . $res['raw']);
+        // identify liefert bewusst nur Vor- und Nachnamen, keine member_id.
+        assertSame('Zeitraum ' . $nummer, $res['body']['member']['surname']);
+    });
+});
+
+test('station: ohne Zeitraeume bleibt es bei members.active (OI-27)', function () {
+    enableStationPin();
+    // Kein membership_dates-Eintrag: Das Mitglied gilt wie in der Statistik als
+    // immer aktiv -- der haeufigste Fall in einem Verein.
+    oi27WithMember(null, function (string $nummer) {
+        assertStatus(200, stationPost('identify', ['member_number' => $nummer, 'pin' => '2580']),
+            'Ohne Zeitraeume muss der Stempel unveraendert gehen');
+    });
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 
