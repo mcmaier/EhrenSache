@@ -20,6 +20,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   abwesend waren; Mitglieder erhalten nur ihren eigenen Status. Grundlage für die Anzeige im
   Kalender.
 
+### Sicherheit
+- **Der Einzelabruf eines Termins prüft jetzt dieselbe Gruppengrenze wie die Terminliste.**
+  Bisher wandte nur die Liste sie an. Für Admin und Manager ändert sich nichts — sie sehen
+  weiterhin alle Termine ohne Gruppengrenze.
+
 ---
 
 ## [1.13.0] – 2026-09-23

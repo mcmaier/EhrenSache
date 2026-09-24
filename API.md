@@ -623,7 +623,13 @@ etwaigen Benutzerkontos (`users.member_id` wird auf `NULL` gesetzt, das Konto bl
 **Endpoint:** `GET /api.php?resource=appointments`
 
 **Query-Parameter:**
-- `id`: Einzelner Termin
+- `id`: Einzelner Termin. **Die Gruppengrenze gilt hier genauso wie für die Liste:** Für alle
+  Rollen außer Admin und Manager wird nur ein Termin geliefert, dessen Terminart einer Gruppe
+  des eigenen Mitglieds zugeordnet ist. Jeder andere Termin wird wie ein nicht vorhandener
+  beantwortet (`404 "Appointment not found"`), damit die Antwort seine Existenz nicht verrät —
+  ebenso ein Konto ohne verknüpftes Mitglied oder ohne Gruppe. Eine Terminart **ohne**
+  Gruppenzuordnung ist damit, wie in der Liste, für Mitglieder unsichtbar. Der Einzelabruf
+  liefert kein `responses_enabled` und keine `responses`-Summen (siehe unten)
 - `year`: Filter nach Jahr
 - `month`: Filter nach Monat (Auch in Kombination mit Jahr)
 - `from_date`: Filter nach Termine ab Zeitpunkt

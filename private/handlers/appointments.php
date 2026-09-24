@@ -32,14 +32,40 @@ function handleAppointments($db, $database, $method, $id) {
             }
 
             if($id) {
-                $stmt = $db->prepare("SELECT a.*, 
-                                        at.type_name, 
+                $sql = "SELECT a.*,
+                                        at.type_name,
                                         at.color,
                                         at.description as type_description
                                         FROM {$prefix}appointments a
                                         LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
-                                        WHERE a.appointment_id = ?");
-                $stmt->execute([$id]);
+                                        WHERE a.appointment_id = ?";
+                $params = [$id];
+
+                // Dieselbe Gruppengrenze wie im Listenzweig unten
+                // (appointmentGroupVisibility() in helpers/appointment_rules.php).
+                // Bis dahin las der Einzelabruf ungefiltert: jedes angemeldete
+                // Mitglied konnte damit Titel, Beschreibung, Ort und Zeiten eines
+                // Termins einer fremden Gruppe lesen. Ein nicht sichtbarer Termin
+                // verhaelt sich wie ein nicht vorhandener -- 404 mit derselben
+                // Meldung, sonst verraet die Antwort, dass es ihn gibt.
+                if(!isAdminOrManager()) {
+                    $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
+                    $userStmt->execute([getCurrentUserId()]);
+                    $userMemberId = $userStmt->fetchColumn();
+
+                    $visibility = appointmentGroupVisibility($db, $prefix, $userMemberId);
+                    if($visibility === null) {
+                        http_response_code(404);
+                        echo json_encode(["message" => "Appointment not found"]);
+                        break;
+                    }
+
+                    $sql .= $visibility[0];
+                    $params = array_merge($params, $visibility[1]);
+                }
+
+                $stmt = $db->prepare($sql);
+                $stmt->execute($params);
                 $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
                 if($appointment) {
                     echo json_encode($appointment);
@@ -86,32 +112,18 @@ function handleAppointments($db, $database, $method, $id) {
                         $userMemberId = $member_id;
                     }
                     
-                    if($userMemberId) {
-                        // Hole Gruppen des Mitglieds
-                        $groupStmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?");
-                        $groupStmt->execute([$userMemberId]);
-                        $userGroupIds = $groupStmt->fetchAll(PDO::FETCH_COLUMN);
-                        
-                        
-                        if(empty($userGroupIds)) {
-                            // Kein Gruppe zugeordnet → keine Termine sichtbar
-                            echo json_encode([]);
-                            return;
-                        }
-                        
-                        // Filterung: Nur Termine deren Terminart zu den User-Gruppen passt
-                        $placeholders = str_repeat('?,', count($userGroupIds) - 1) . '?';
-                        $sql .= " AND EXISTS (
-                            SELECT 1 FROM {$prefix}appointment_type_groups atg
-                            WHERE atg.type_id = a.type_id
-                            AND atg.group_id IN ($placeholders)
-                        )";
-                        $params = array_merge($params, $userGroupIds);
-                    } else {
-                        // User hat kein verknüpftes Mitglied → keine Termine
+                    // Filterung: Nur Termine, deren Terminart zu den Gruppen des
+                    // Mitglieds passt. Kein verknuepftes Mitglied oder keine
+                    // Gruppe → keine Termine. Dieselbe Regel wendet der
+                    // Einzelabruf oben an (helpers/appointment_rules.php).
+                    $visibility = appointmentGroupVisibility($db, $prefix, $userMemberId);
+                    if($visibility === null) {
                         echo json_encode([]);
                         return;
                     }
+
+                    $sql .= $visibility[0];
+                    $params = array_merge($params, $visibility[1]);
                 }
                 
                 if($year) {

@@ -275,3 +275,180 @@ test('Arbeitszeit: user kann keinen Termin einer fremden Gruppe verknuepfen', fu
         assertStatus(400, $start, 'Start mit dem Termin einer fremden Gruppe');
     });
 });
+
+/*
+ * Gruppengrenze beim Einzelabruf eines Termins (GET appointments&id=).
+ *
+ * Der Einzelabruf holte den Termin ohne jede Gruppenfilterung: jedes
+ * angemeldete Mitglied konnte damit Titel, Beschreibung, Ort, Zeiten und
+ * Terminart eines Termins einer fremden Gruppe lesen, den es in der
+ * Terminliste nie zu sehen bekaeme. Seither wenden Liste und Einzelabruf
+ * dieselbe Regel an (appointmentGroupVisibility() in
+ * private/helpers/appointment_rules.php).
+ *
+ * Die Welt hier legt nur neue Gruppen, Terminarten und Termine an; die
+ * Gruppenzuordnung der Testkonten wird nicht angefasst. avSingleGroupsOf()
+ * liest sie vor und nach dem Lauf zur Kontrolle zurueck.
+ */
+
+/** Einzelabruf eines Termins als $role. */
+function avGet(string $role, int $appointmentId): array
+{
+    return apiRequest('GET', 'appointments', [
+        'token' => apiToken($role),
+        'query' => ['id' => $appointmentId],
+    ]);
+}
+
+/**
+ * Welt fuer den Einzelabruf: drei Termine am selben Tag, damit ein einziger
+ * Listenabruf die Gegenprobe zu allen dreien liefert.
+ *   foreign   -- Terminart einer fremden Gruppe
+ *   own       -- Terminart der Gruppen des Kontos "user"
+ *   groupless -- Terminart ganz ohne Gruppenzuordnung
+ * $fn bekommt die IDs und den Datumsfilter fuer die Liste.
+ */
+function avWithSingleWorld(callable $fn): void
+{
+    $suffix = uniqid();
+    $date   = '2021-05-07';
+    $ids = ['group' => null, 'foreignType' => null, 'ownType' => null, 'grouplessType' => null,
+            'foreign' => null, 'own' => null, 'groupless' => null];
+
+    // Die Gruppen des Testkontos werden hier nicht geaendert -- der Stand vor
+    // dem Lauf wird gemerkt und am Ende zurueckgelesen. In diesem Projekt sind
+    // schon Testdaten durch unaufgeraeumte Gruppenzuordnungen kaputtgegangen.
+    $groupsBefore = avGroupsOf('user');
+    sort($groupsBefore);
+
+    try {
+        $ids['group']       = avCreate('member_groups', ['group_name' => "AV3 {$suffix}"]);
+        $ids['foreignType'] = avCreate('appointment_types', [
+            'type_name' => "AV3 fremd {$suffix}", 'is_default' => 0, 'color' => '#667eea',
+            'group_ids' => [$ids['group']],
+        ]);
+        $ids['ownType'] = avCreate('appointment_types', [
+            'type_name' => "AV3 eigen {$suffix}", 'is_default' => 0, 'color' => '#667eea',
+            'group_ids' => $groupsBefore,
+        ]);
+        $ids['grouplessType'] = avCreate('appointment_types', [
+            'type_name' => "AV3 ohne Gruppe {$suffix}", 'is_default' => 0, 'color' => '#667eea',
+            'group_ids' => [],
+        ]);
+
+        $ids['foreign'] = avCreate('appointments', [
+            'title' => 'AV3-Termin fremde Gruppe', 'description' => 'AV3 geheim',
+            'location' => 'AV3 Geheimort', 'date' => $date,
+            'start_time' => '19:00', 'type_id' => $ids['foreignType'],
+        ]);
+        $ids['own'] = avCreate('appointments', [
+            'title' => 'AV3-Termin eigene Gruppe', 'description' => 'AV3 eigen',
+            'location' => 'AV3 Eigenort', 'date' => $date,
+            'start_time' => '19:00', 'type_id' => $ids['ownType'],
+        ]);
+        $ids['groupless'] = avCreate('appointments', [
+            'title' => 'AV3-Termin ohne Gruppenzuordnung', 'date' => $date,
+            'start_time' => '19:00', 'type_id' => $ids['grouplessType'],
+        ]);
+
+        $fn($ids, ['from_date' => $date, 'to_date' => $date]);
+    } finally {
+        avDelete('appointments', $ids['foreign']);
+        avDelete('appointments', $ids['own']);
+        avDelete('appointments', $ids['groupless']);
+        avDelete('appointment_types', $ids['foreignType']);
+        avDelete('appointment_types', $ids['ownType']);
+        avDelete('appointment_types', $ids['grouplessType']);
+        avDelete('member_groups', $ids['group']);
+
+        // Kontrolle: die Gruppen des Testkontos sind unveraendert
+        $groupsAfter = avGroupsOf('user');
+        sort($groupsAfter);
+        assertSame($groupsBefore, $groupsAfter,
+            'Die Gruppenzuordnung des Testkontos "user" hat sich durch den Lauf geaendert');
+    }
+}
+
+test('Einzelabruf: user sieht den Termin der eigenen Gruppe', function () {
+    avWithSingleWorld(function (array $ids) {
+        $res = avGet('user', $ids['own']);
+        assertStatus(200, $res, 'Einzelabruf eines Termins der eigenen Gruppe');
+        assertSame('AV3-Termin eigene Gruppe', $res['body']['title'] ?? null, 'Titel fehlt');
+        assertSame('2021-05-07', $res['body']['date'] ?? null, 'Datum fehlt');
+        assertSame('AV3 Eigenort', $res['body']['location'] ?? null, 'Ort fehlt');
+        assertTrue(isset($res['body']['type_name']), 'Terminart fehlt: ' . $res['raw']);
+    });
+});
+
+test('Einzelabruf: user sieht den Termin einer fremden Gruppe nicht', function () {
+    avWithSingleWorld(function (array $ids) {
+        $fremd = avGet('user', $ids['foreign']);
+        assertStatus(404, $fremd, 'Einzelabruf eines Termins einer fremden Gruppe');
+
+        foreach (['AV3-Termin fremde Gruppe', 'AV3 geheim', 'AV3 Geheimort'] as $verraten) {
+            assertTrue(strpos($fremd['raw'], $verraten) === false,
+                "Die Antwort verraet Inhalte des fremden Termins ({$verraten})");
+        }
+
+        // Fremd und nicht vorhanden muessen gleich aussehen -- sonst laesst
+        // sich ausprobieren, welche Termin-IDs es gibt.
+        $weg = avGet('user', 999999999);
+        assertSame($weg['status'], $fremd['status'],
+            'Fremder und fehlender Termin unterscheiden sich im Status');
+        assertSame($weg['body']['message'] ?? null, $fremd['body']['message'] ?? null,
+            'Fremder und fehlender Termin unterscheiden sich in der Meldung');
+    });
+});
+
+test('Einzelabruf: Admin und Manager kennen die Gruppengrenze nicht', function () {
+    // Bewusste Entscheidung (CLAUDE.md, Rollen): Verwalter sehen alle
+    // Datensaetze ohne Gruppengrenze.
+    avWithSingleWorld(function (array $ids) {
+        foreach (['admin', 'manager'] as $role) {
+            $res = avGet($role, $ids['foreign']);
+            assertStatus(200, $res, "{$role} muss den Termin einer fremden Gruppe einzeln abrufen koennen");
+            assertSame('AV3-Termin fremde Gruppe', $res['body']['title'] ?? null,
+                "{$role} bekommt den Termin nicht vollstaendig");
+        }
+    });
+});
+
+test('Einzelabruf: Terminart ohne Gruppenzuordnung verhaelt sich wie in der Liste', function () {
+    // Nachgewiesenes Verhalten, keine Annahme: Der Listenzweig filtert ueber
+    // EXISTS(appointment_type_groups) -- eine Terminart ohne Gruppenzuordnung
+    // trifft die Bedingung nie und ist damit fuer die Rolle user unsichtbar.
+    // Der Einzelabruf muss dasselbe tun. Die Liste steht hier als Zeuge
+    // daneben, damit der Test mitzieht, falls die Listenregel sich aendert.
+    avWithSingleWorld(function (array $ids, array $filter) {
+        $inListe = in_array($ids['groupless'], avListIds('user', $filter), true);
+        assertSame(false, $inListe,
+            'Erwartet: Eine Terminart ohne Gruppenzuordnung ist fuer user nicht in der Liste');
+
+        $res = avGet('user', $ids['groupless']);
+        assertStatus(404, $res, 'Einzelabruf eines Termins mit Terminart ohne Gruppenzuordnung');
+
+        // Verwalter sehen ihn dagegen -- auch das genau wie in der Liste.
+        assertTrue(in_array($ids['groupless'], avListIds('admin', $filter), true),
+            'Admin muss den Termin ohne Gruppenzuordnung in der Liste sehen');
+        assertStatus(200, avGet('admin', $ids['groupless']),
+            'Admin muss den Termin ohne Gruppenzuordnung einzeln abrufen koennen');
+    });
+});
+
+test('Einzelabruf liefert genau das, was auch die Liste liefert', function () {
+    // Die eigentliche Zusicherung: keine zweite Wahrheit. Was die Liste zeigt,
+    // muss der Einzelabruf mit 200 beantworten; was sie verschweigt, mit 404.
+    avWithSingleWorld(function (array $ids, array $filter) {
+        foreach (['user', 'manager', 'admin'] as $role) {
+            $liste = avListIds($role, $filter);
+            foreach (['foreign', 'own', 'groupless'] as $welt) {
+                $inListe  = in_array($ids[$welt], $liste, true);
+                $status   = avGet($role, $ids[$welt])['status'];
+                $erwartet = $inListe ? 200 : 404;
+                assertSame($erwartet, $status,
+                    "{$role}/{$welt}: Liste sagt " . ($inListe ? 'sichtbar' : 'unsichtbar')
+                    . ", Einzelabruf antwortet {$status}");
+            }
+        }
+    });
+});

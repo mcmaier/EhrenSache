@@ -175,3 +175,54 @@ function appointmentHasAttendance(PDO $db, string $prefix, int $appointmentId): 
 
     return (bool) $stmt->fetchColumn();
 }
+
+/**
+ * Gruppengrenze beim Lesen von Terminen -- die eine Stelle, an der sie steht.
+ *
+ * Regel, unveraendert aus dem Listenzweig von handleAppointments()
+ * uebernommen: Ein Mitglied sieht einen Termin nur, wenn die Terminart des
+ * Termins mindestens einer Gruppe zugeordnet ist, der auch das Mitglied
+ * angehoert. Daraus folgt dreierlei, hier ausdruecklich festgehalten, weil es
+ * sich vom Check-in unterscheidet (memberMayAttendAppointment() in
+ * auto_checkin.php laesst eine Terminart ohne Gruppenbindung fuer alle zu):
+ *   - Terminart ohne Gruppenzuordnung      -> fuer kein Mitglied sichtbar
+ *   - Termin ohne Terminart (type_id NULL) -> fuer kein Mitglied sichtbar
+ *   - Mitglied ohne Gruppe, Konto ohne Mitglied -> sieht keinen Termin
+ * Admin und Manager fragen hier bewusst gar nicht erst an; fuer sie gilt die
+ * Grenze nicht (siehe CLAUDE.md, Rollen).
+ *
+ * Bis dahin stand die Bedingung nur im Listenzweig; der Einzelabruf (?id=)
+ * las ohne sie und gab Titel, Ort und Zeiten eines Termins fremder Gruppen
+ * heraus. Seither benutzen beide diesen Helfer -- zwei Kopien derselben
+ * Sichtbarkeitsregel laufen erfahrungsgemaess auseinander.
+ *
+ * @param mixed  $memberId Mitglied des anfragenden Kontos (null/0 = keines)
+ * @param string $alias    Tabellenalias der appointments in der Abfrage
+ * @return array{0: string, 1: array<int, mixed>}|null SQL-Zusatz und Parameter,
+ *         oder null, wenn dieses Konto ueberhaupt keinen Termin sehen darf
+ */
+function appointmentGroupVisibility(PDO $db, string $prefix, $memberId, string $alias = 'a'): ?array
+{
+    if (!$memberId) {
+        return null;
+    }
+
+    $stmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?");
+    $stmt->execute([$memberId]);
+    $groupIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($groupIds)) {
+        return null;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+
+    return [
+        " AND EXISTS (
+                            SELECT 1 FROM {$prefix}appointment_type_groups atg
+                            WHERE atg.type_id = {$alias}.type_id
+                            AND atg.group_id IN ({$placeholders})
+                        )",
+        $groupIds,
+    ];
+}
