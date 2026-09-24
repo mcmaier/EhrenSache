@@ -227,14 +227,17 @@ test('Puenktlichkeit: Quote, Verspaetung, Selbstauskunft und Messabdeckung', fun
 
 test('Zuverlaessigkeit: jeder Ausgang in der richtigen Reihenfolge', function () {
     // Eine Meldung "vor Beginn" braucht einen Termin, der beim Anlegen noch
-    // bevorsteht, aber schon zur Statistik zaehlt -- also heute spaeter. Zwei
-    // davon (20:59 und 23:59), drei Stunden auseinander wegen der
-    // Dublettenpruefung. Die uebrigen liegen am 1. Januar.
+    // bevorsteht, aber schon zur Statistik zaehlt -- seit OI-89 heisst das: im
+    // Check-in-Fenster. Zwei davon, in 30 und 90 Minuten; die Statistik rechnet
+    // unten mit zwei Stunden Fenster. Angelegt werden sie mit Fenster 0, sonst
+    // lehnt die Dublettenpruefung (dasselbe Fenster) den zweiten ab. Die
+    // uebrigen liegen am 1. Januar.
     //
-    // Laeuft der Test am 1. Januar vor 03:01 oder ab 20:57, stimmt die Zeitlage
-    // nicht; dann bricht er ab, statt falsch zu pruefen.
+    // Laeuft der Test am 1. Januar vor 09:01 oder in den letzten zwei Stunden
+    // des Jahres, stimmt die Zeitlage nicht; dann bricht er ab, statt falsch zu
+    // pruefen.
     $jetzt = date('H:i');
-    if ((date('m-d') === '01-01' && $jetzt < '03:01') || $jetzt >= '20:57') {
+    if ((date('m-d') === '01-01' && $jetzt < '09:01') || date('Y', time() + 7200) !== date('Y')) {
         assertTrue(true, 'Zeitlage ungeeignet -- Test uebersprungen');
         return;
     }
@@ -270,8 +273,16 @@ test('Zuverlaessigkeit: jeder Ausgang in der richtigen Reihenfolge', function ()
         // (e) nichts
         puAppointment($welt, $tag, '09:00:00');
 
-        // (b) rechtzeitig abgemeldet, noch offen
-        $b = puAppointment($welt, date('Y-m-d'), '23:59:00');
+        // (b) rechtzeitig abgemeldet, noch offen. (f) weiter unten liegt eine
+        // Stunde davor -- beide mit Fenster 0 anlegen.
+        $bStart = new DateTimeImmutable('+90 minutes');
+        $fStart = new DateTimeImmutable('+30 minutes');
+        $b = 0;
+        $f = 0;
+        puWithSettings(['checkin_tolerance_hours' => '0'], function () use (&$welt, $bStart, $fStart, &$b, &$f) {
+            $b = puAppointment($welt, $bStart->format('Y-m-d'), $bStart->format('H:i:00'));
+            $f = puAppointment($welt, $fStart->format('Y-m-d'), $fStart->format('H:i:00'));
+        });
         puCreate('exceptions', [
             'member_id' => $welt['member'], 'appointment_id' => $b,
             'exception_type' => 'absence', 'reason' => 'PU-Test', 'status' => 'pending',
@@ -286,9 +297,7 @@ test('Zuverlaessigkeit: jeder Ausgang in der richtigen Reihenfolge', function ()
         // Termin beginnt in einer halben Stunde, angekommen ist das Mitglied vor
         // fuenf Minuten -- frueh da, Check-in gescheitert. Das Fenster wird dafuer
         // auf zwei Stunden festgelegt, sonst haengt der Fall an der Einstellung.
-        $fStart   = new DateTimeImmutable('+30 minutes');
         $fArrival = new DateTimeImmutable('-5 minutes');
-        $f = puAppointment($welt, $fStart->format('Y-m-d'), $fStart->format('H:i:00'));
         puWithSettings(['checkin_tolerance_hours' => '2'], function () use ($welt, $f, $fArrival) {
             puCreate('exceptions', [
                 'member_id' => $welt['member'], 'appointment_id' => $f,
@@ -297,7 +306,7 @@ test('Zuverlaessigkeit: jeder Ausgang in der richtigen Reihenfolge', function ()
             ]);
         });
 
-        puWithSettings(['reliability_enabled' => '1'], function () use ($welt) {
+        puWithSettings(['reliability_enabled' => '1', 'checkin_tolerance_hours' => '2'], function () use ($welt) {
             $r = puStats($welt)['reliability'];
 
             assertSame(6,    $r['total']);

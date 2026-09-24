@@ -217,6 +217,33 @@ function rsWithSettings(array $settings, callable $fn): void
     }
 }
 
+/**
+ * Termin in $minutes Minuten: noch nicht begonnen, aber im Check-in-Fenster und
+ * damit schon in der Statistik (OI-89) -- sofern die Statistik mit
+ * RS_SOON_LEAD Stunden Vorlauf rechnet (rsWithSettings in den Tests).
+ *
+ * Angelegt wird mit Fenster 0: Die Dublettenpruefung nutzt dasselbe Fenster,
+ * und zwei Termine einer Art liegen hier weniger als zwei Stunden auseinander.
+ */
+const RS_SOON_LEAD = '2';
+
+function rsSoonAppointment(array &$world, int $minutes): int
+{
+    $start = new DateTimeImmutable("+{$minutes} minutes");
+    $id = 0;
+    rsWithSettings(['checkin_tolerance_hours' => '0'], function () use (&$world, $start, &$id) {
+        $id = rsAppointment($world, $start->format('Y-m-d'), $start->format('H:i:00'));
+    });
+
+    return $id;
+}
+
+/** Liegt "in zwei Stunden" noch im laufenden Jahr? Sonst zaehlt die Jahresstatistik ihn nicht. */
+function rsSoonFitsYear(): bool
+{
+    return date('Y', time() + 7200) === date('Y');
+}
+
 test('appointment_types: neue Terminart traegt die Rueckmeldungs-Einstellungen', function () {
     $welt = rsWorld('Typ', [
         'responses_enabled' => 1, 'responses_names_visible' => 1,
@@ -780,31 +807,30 @@ test('Namen fuer Mitglieder: nur mit Freigabe, Bemerkungen nie', function () {
 });
 
 test('Zuverlaessigkeit: rechtzeitige Absage zaehlt, kurzfristige und Antrag nach der Frist nicht', function () {
-    // Termine heute spaeter: noch nicht begonnen, zaehlen aber schon zur
-    // Statistik (vgl. punctuality_api.php). Ab 20:57 stimmt die Zeitlage nicht.
-    if (date('H:i') >= '20:57') {
+    // Termine gleich: noch nicht begonnen, aber im Check-in-Fenster und damit
+    // schon in der Statistik (OI-89, rsSoonAppointment()).
+    if (!rsSoonFitsYear()) {
         assertTrue(true, 'Zeitlage ungeeignet -- Test uebersprungen');
         return;
     }
 
     $frist0   = rsWorld('Frist0', ['responses_enabled' => 1, 'response_deadline_hours' => 0]);
     $frist720 = rsWorld('Frist720', ['responses_enabled' => 1, 'response_deadline_hours' => 720]);
-    $heute    = date('Y-m-d');
 
     try {
-        $a = rsAppointment($frist0, $heute, '23:59:00');
+        $a = rsSoonAppointment($frist0, 90);
         assertStatus(200, rsPut('manager', $a, ['status' => 'no'], $frist0['member']));
 
-        $b = rsAppointment($frist720, $heute, '23:59:00');
+        $b = rsSoonAppointment($frist720, 90);
         assertStatus(200, rsPut('manager', $b, ['status' => 'no'], $frist720['member']));
 
-        $c = rsAppointment($frist720, $heute, '20:59:00');
+        $c = rsSoonAppointment($frist720, 30);
         rsCreate('exceptions', [
             'member_id' => $frist720['member'], 'appointment_id' => $c,
             'exception_type' => 'absence', 'reason' => 'RS-Test', 'status' => 'pending',
         ]);
 
-        rsWithSettings(['reliability_enabled' => '1'], function () use ($frist0, $frist720) {
+        rsWithSettings(['reliability_enabled' => '1', 'checkin_tolerance_hours' => RS_SOON_LEAD], function () use ($frist0, $frist720) {
             $stats = static function (array $welt): array {
                 $res = apiRequest('GET', 'statistics', ['token' => apiToken('admin'),
                     'query' => ['year' => date('Y'), 'group_id' => $welt['group'], 'member_id' => $welt['member']]]);
@@ -829,21 +855,20 @@ test('Zuverlaessigkeit: rechtzeitige Absage zaehlt, kurzfristige und Antrag nach
 });
 
 test('Zuverlaessigkeit: globale Frist greift, wenn die Terminart keine eigene hat; Antrag vor der Frist zaehlt', function () {
-    // Gleiche Zeitlage-Absicherung wie beim Test oben -- Termine heute spaeter.
-    if (date('H:i') >= '20:57') {
+    // Gleiche Zeitlage-Absicherung wie beim Test oben -- Termine gleich.
+    if (!rsSoonFitsYear()) {
         assertTrue(true, 'Zeitlage ungeeignet -- Test uebersprungen');
         return;
     }
 
     $weltG = rsWorld('Global', ['responses_enabled' => 1]);   // keine eigene Frist -> global
     $weltA = rsWorld('Antrag', ['responses_enabled' => 1, 'response_deadline_hours' => 0]);
-    $heute = date('Y-m-d');
 
     try {
-        $g = rsAppointment($weltG, $heute, '23:59:00');
+        $g = rsSoonAppointment($weltG, 90);
         assertStatus(200, rsPut('manager', $g, ['status' => 'no'], $weltG['member']));
 
-        $a = rsAppointment($weltA, $heute, '22:59:00');
+        $a = rsSoonAppointment($weltA, 60);
         rsCreate('exceptions', [
             'member_id' => $weltA['member'], 'appointment_id' => $a,
             'exception_type' => 'absence', 'reason' => 'RS-Test', 'status' => 'pending',
@@ -857,7 +882,8 @@ test('Zuverlaessigkeit: globale Frist greift, wenn die Terminart keine eigene ha
             return $res['body']['reliability'];
         };
 
-        rsWithSettings(['reliability_enabled' => '1', 'response_deadline_hours' => '0'], function () use ($weltG, $weltA, $stats) {
+        rsWithSettings(['reliability_enabled' => '1', 'response_deadline_hours' => '0',
+                        'checkin_tolerance_hours' => RS_SOON_LEAD], function () use ($weltG, $weltA, $stats) {
             $rG = $stats($weltG);
             assertSame(1, $rG['excused_in_time'], 'Globale Frist 0 -- Absage vor Terminbeginn zaehlt rechtzeitig');
 
@@ -865,7 +891,8 @@ test('Zuverlaessigkeit: globale Frist greift, wenn die Terminart keine eigene ha
             assertSame(1, $rA['excused_in_time'], 'Antrag vor der globalen Frist 0 zaehlt rechtzeitig');
         });
 
-        rsWithSettings(['reliability_enabled' => '1', 'response_deadline_hours' => '720'], function () use ($weltG, $weltA, $stats) {
+        rsWithSettings(['reliability_enabled' => '1', 'response_deadline_hours' => '720',
+                        'checkin_tolerance_hours' => RS_SOON_LEAD], function () use ($weltG, $weltA, $stats) {
             $rG = $stats($weltG);
             assertSame(1, $rG['missed'], 'Globale Frist 720 ist nun verstrichen');
             assertSame(0, $rG['excused_in_time']);
@@ -883,8 +910,8 @@ test('Zuverlaessigkeit: globale Frist greift, wenn die Terminart keine eigene ha
 });
 
 test('Zuverlaessigkeit: bei Entschuldigungspflicht zaehlt die rechtzeitige Absage nur mit gueltigem Antrag (W3)', function () {
-    // Gleiche Zeitlage-Absicherung wie bei den Tests oben -- Termine heute spaeter.
-    if (date('H:i') >= '20:57') {
+    // Gleiche Zeitlage-Absicherung wie bei den Tests oben -- Termine gleich.
+    if (!rsSoonFitsYear()) {
         assertTrue(true, 'Zeitlage ungeeignet -- Test uebersprungen');
         return;
     }
@@ -892,10 +919,9 @@ test('Zuverlaessigkeit: bei Entschuldigungspflicht zaehlt die rechtzeitige Absag
     $welt  = rsWorld('Pflicht720', [
         'responses_enabled' => 1, 'responses_require_excuse' => 1, 'response_deadline_hours' => 0,
     ]);
-    $heute = date('Y-m-d');
 
     try {
-        $apt = rsAppointment($welt, $heute, '23:59:00');
+        $apt = rsSoonAppointment($welt, 90);
         $res = rsPut('manager', $apt, ['status' => 'no', 'comment' => 'RS-W3'], $welt['member']);
         assertStatus(200, $res);
 
@@ -914,7 +940,7 @@ test('Zuverlaessigkeit: bei Entschuldigungspflicht zaehlt die rechtzeitige Absag
             return $res['body']['reliability'];
         };
 
-        rsWithSettings(['reliability_enabled' => '1'], function () use ($stats, $antrag) {
+        rsWithSettings(['reliability_enabled' => '1', 'checkin_tolerance_hours' => RS_SOON_LEAD], function () use ($stats, $antrag) {
             $r = $stats();
             assertSame(1, $r['excused_in_time'], 'gueltiger, verknuepfter Antrag vor der Frist');
             assertSame(0, $r['missed']);
