@@ -142,6 +142,63 @@
     background: var(--warning-color);
 }
 
+/* Anwesenheit im Tagesfeld (Schritt 2b): Dreifarbbalken fuer Verwalter am
+   unteren Rand, anteilig nach Anwesend/Entschuldigt/Fehlend. Absolut
+   positioniert -- die Zellengroesse bleibt unveraendert. */
+.calendar-attendance-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    display: flex;
+    overflow: hidden;
+}
+
+.calendar-attendance-bar__seg {
+    height: 100%;
+    flex-basis: 0;
+}
+
+.calendar-attendance-bar__seg.is-present {
+    background: var(--success-color);
+}
+
+.calendar-attendance-bar__seg.is-excused {
+    background: var(--warning-color);
+}
+
+.calendar-attendance-bar__seg.is-missing {
+    background: var(--danger-color);
+}
+
+/* Mitglieder sehen statt der Zahlen anderer nur ihren eigenen Status. */
+.calendar-own-dot {
+    position: absolute;
+    left: 4px;
+    bottom: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.calendar-own-dot.is-present {
+    background: var(--success-color);
+}
+
+.calendar-own-dot.is-excused {
+    background: var(--warning-color);
+}
+
+.calendar-own-dot.is-missing {
+    background: var(--danger-color);
+}
+
+/* Der Feiertagsname sitzt sonst auf dem Balken. */
+.calendar-day--holiday .calendar-holiday-name {
+    margin-bottom: 4px;
+}
+
 /* Terminart-Badge im Popup */
 .calendar-type-badge {
     display: inline-block;

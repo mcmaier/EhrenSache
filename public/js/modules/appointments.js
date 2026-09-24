@@ -513,6 +513,45 @@ function renderCalendar() {
     }
 }
 
+/**
+ * Summiert die Anwesenheit aller Termine eines Tages. Termine ohne Zahlen
+ * zaehlen nicht mit: attendance ist null, solange der Termin serverseitig
+ * nicht begonnen hat -- die Oberflaeche zeigt ihn wegen des Check-in-Fensters
+ * schon zwei Stunden frueher als begonnen an.
+ */
+function attendanceTotals(dayAppointments) {
+    return (dayAppointments || []).reduce((sum, apt) => {
+        const a = apt.attendance;
+        if (!a) {
+            return sum;
+        }
+        sum.expected += Number(a.expected) || 0;
+        sum.present  += Number(a.present) || 0;
+        sum.excused  += Number(a.excused) || 0;
+        sum.missing  += Number(a.missing) || 0;
+        return sum;
+    }, { expected: 0, present: 0, excused: 0, missing: 0 });
+}
+
+/**
+ * Der schlechteste eigene Status des Tages. Bei mehreren Terminen zaehlt der
+ * ungueltigste: fehlend vor entschuldigt vor anwesend. Liefert null, wenn kein
+ * Termin des Tages einen eigenen Status traegt -- das heisst "noch nicht
+ * begonnen" oder "hier nicht erwartet", beides ohne Punkt.
+ */
+function worstOwnStatus(dayAppointments) {
+    const rang = { missing: 3, excused: 2, present: 1 };
+    let schlechtester = null;
+    (dayAppointments || []).forEach(apt => {
+        const s = apt.own_attendance;
+        if (s && rang[s] && (!schlechtester || rang[s] > rang[schlechtester])) {
+            schlechtester = s;
+        }
+    });
+
+    return schlechtester;
+}
+
 function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, appointments = []) {
     const day = document.createElement('div');
     day.className = 'calendar-day';
@@ -573,6 +612,36 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
             day.appendChild(dot);
         }
 
+        // Anwesenheit (Schritt 2b): Verwalter sehen einen Dreifarbbalken ueber
+        // alle Termine des Tages, Mitglieder einen Punkt in der Farbe ihres
+        // eigenen Status. Die Zahlen kommen aus dem Terminabruf des Jahres.
+        const totals = attendanceTotals(dayAppointments);
+        const eigenerStatus = worstOwnStatus(dayAppointments);
+
+        if (isAdminOrManager && totals.expected > 0) {
+            const bar = document.createElement('div');
+            bar.className = 'calendar-attendance-bar';
+            bar.setAttribute('aria-hidden', 'true');
+
+            [['present', totals.present], ['excused', totals.excused], ['missing', totals.missing]]
+                .forEach(([art, wert]) => {
+                    if (wert <= 0) {
+                        return;
+                    }
+                    const seg = document.createElement('span');
+                    seg.className = `calendar-attendance-bar__seg is-${art}`;
+                    seg.style.flexGrow = String(wert);
+                    bar.appendChild(seg);
+                });
+
+            day.appendChild(bar);
+        } else if (!isAdminOrManager && eigenerStatus) {
+            const eigenerPunkt = document.createElement('span');
+            eigenerPunkt.className = `calendar-own-dot is-${eigenerStatus}`;
+            eigenerPunkt.setAttribute('aria-hidden', 'true');
+            day.appendChild(eigenerPunkt);
+        }
+
         // Termine des Tages als Vorlesetext.
         //
         // Ersetzt das frueher gesetzte title-Attribut: Der native Tooltip kam
@@ -583,7 +652,13 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
             return `${a.start_time} ${typeName}${a.title}`;
         }).join('; ')
             + withResponses.map(a => `; ${responseSummaryTitle(a.responses)}`).join('')
-            + (responseOpen ? '; Rückmeldung offen' : ''));
+            + (responseOpen ? '; Rückmeldung offen' : '')
+            + (isAdminOrManager && totals.expected > 0
+                ? `; Anwesend ${totals.present}, Entschuldigt ${totals.excused}, Fehlend ${totals.missing} von ${totals.expected}`
+                : '')
+            + (!isAdminOrManager && eigenerStatus
+                ? `; ${ { present: 'Du warst anwesend', excused: 'Du warst entschuldigt', missing: 'Du warst nicht da' }[eigenerStatus] }`
+                : ''));
 
         // Ueberfahren zeigt dasselbe Popup wie der Klick, nur fluechtig. Die
         // kleine Verzoegerung verhindert, dass beim Wandern ueber den Kalender

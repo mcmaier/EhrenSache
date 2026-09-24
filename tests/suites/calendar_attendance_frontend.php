@@ -453,11 +453,56 @@ test('Eine genehmigte Entschuldigung verwirft die Termine ebenfalls', function (
 test('Der Import von Anwesenheiten verwirft die Termine aller Jahre', function () use ($caFeRoot) {
     $js = caFeFile($caFeRoot, 'public/js/modules/import_export.js');
     assertTrue(str_contains($js, 'invalidateCache'), 'invalidateCache wird nicht verwendet');
-    assertTrue(str_contains($js, "import { showToast, showConfirm, invalidateCache } from './ui.js';")
-        || (bool) preg_match("/import \{[^}]*invalidateCache[^}]*\} from '\.\/ui\.js'/", $js),
+    assertTrue((bool) preg_match("/import \{[^}]*invalidateCache[^}]*\} from '\.\/ui\.js'/", $js),
         'invalidateCache muss aus ui.js importiert sein');
 
     $body = caFeFunctionBody($js, 'export async function executeRecordsImport(');
     assertTrue(str_contains($body, "invalidateCache('appointments')"),
         'Eine CSV kann Termine mehrerer Jahre treffen -- deshalb ohne Jahresangabe');
+});
+
+// ---- Schritt 2b: Tagesfeld ----------------------------------------------------------
+
+test('attendanceTotals summiert die Termine eines Tages', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'function attendanceTotals(');
+    assertTrue(str_contains($body, 'expected'), 'Ohne expected laesst sich kein Anteil rechnen');
+    assertTrue(str_contains($body, 'present'), 'Anwesend fehlt');
+    assertTrue(str_contains($body, 'excused'), 'Entschuldigt fehlt');
+    assertTrue(str_contains($body, 'missing'), 'Fehlend fehlt');
+    assertTrue((bool) preg_match('/if\s*\(\s*!\s*a\s*\)|if\s*\(\s*!\s*apt\.attendance\s*\)/', $body),
+        'Ein Termin ohne Zahlen (noch nicht begonnen) darf nicht als drei Nullen mitzaehlen');
+});
+
+test('worstOwnStatus nimmt den schlechtesten eigenen Status des Tages', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'function worstOwnStatus(');
+    assertTrue((bool) preg_match('/missing[\s\S]*excused[\s\S]*present/', $body),
+        'Die Reihenfolge entscheidet: fehlend schlaegt entschuldigt schlaegt anwesend');
+});
+
+test('Das Tagesfeld zeichnet Balken fuer Verwalter und Punkt fuer Mitglieder', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'function createCalendarDay(');
+    assertTrue(str_contains($body, 'calendar-attendance-bar'), 'Balken fehlt');
+    assertTrue(str_contains($body, 'calendar-own-dot'), 'Punkt fuer Mitglieder fehlt');
+    assertTrue(str_contains($body, 'isAdminOrManager'), 'Balken und Punkt duerfen sich nicht vermischen');
+    assertTrue(str_contains($body, 'attendanceTotals('), 'Summierung wird nicht benutzt');
+    assertTrue(str_contains($body, 'worstOwnStatus('), 'Eigener Status wird nicht benutzt');
+    assertTrue(str_contains($body, 'totals.expected > 0'), 'Ohne erwartete Mitglieder gibt es keinen Balken');
+});
+
+test('Der Vorlesetext nennt die Zahlen bzw. den eigenen Status', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'function createCalendarDay(');
+    assertTrue(str_contains($body, 'aria-label'), 'Vorlesetext fehlt');
+    assertTrue(str_contains($body, 'Anwesend'), 'Der Balken ist rein grafisch -- ohne Text bleibt er fuer Screenreader stumm');
+});
+
+test('Die Segmente des Balkens nehmen die Farben aus den Variablen', function () use ($caFeRoot) {
+    $css = caFeFile($caFeRoot, 'public/css/components/calendar.css');
+    assertTrue(str_contains($css, '.calendar-attendance-bar'), 'CSS fuer den Balken fehlt');
+    assertTrue(str_contains($css, 'var(--success-color)'), 'Anwesend muss die Erfolgsfarbe nehmen');
+    assertTrue(str_contains($css, 'var(--warning-color)'), 'Entschuldigt muss die Warnfarbe nehmen');
+    assertTrue(str_contains($css, 'var(--danger-color)'), 'Fehlend muss die Gefahrenfarbe nehmen');
 });
