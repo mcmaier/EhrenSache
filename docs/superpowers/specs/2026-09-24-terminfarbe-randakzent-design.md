@@ -32,8 +32,12 @@ Kalender-Popup sichtbar.
 
 ### 2. Anwesenheitsliste (`records.js`, `createAppointmentTypeBadge()`, ~Z. 1528–1548)
 
-- Dieselbe Behandlung. Die Funktion liefert künftig nicht mehr ein Schildchen, sondern setzt die
-  Farbvariable und gibt den Namen für die Unterzeile zurück; der Name ändert sich entsprechend.
+- Dieselbe Behandlung — aber die Funktion wird **aufgeteilt, nicht umgebaut**. Beim Planen kam
+  heraus, dass sie **vier** Aufrufer hat, nicht drei: `records.js:1393` setzt das Schildchen in ein
+  **Formularfeld** (Terminart des gewählten Termins beim Erfassen). Dort wäre ein Randstreifen
+  sinnlos. Neu entsteht `appointmentTypeAccent()` für die beiden Listen;
+  `createAppointmentTypeBadge()` bleibt für das Formularfeld erhalten und nutzt künftig
+  ebenfalls `safeTypeColor()`.
 - **Nicht anfassen:** die Statuszelle aus OI-89 (`attendanceStatusCell()`, `.attendance-upcoming`).
   Grauer Text und Farbstreifen müssen nebeneinander lesbar bleiben — das ist beim Browsertest zu
   prüfen, nicht durch Änderung an OI-89 zu lösen.
