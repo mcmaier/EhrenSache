@@ -2643,7 +2643,31 @@ widersprüchlich, den Bildschirm per Wake Lock wachzuhalten und zugleich Strom s
 ---
 
 ### OI-66 · `API.md` gegen die echten Antworten prüfen
-**Priorität:** mittel · aufgenommen am 2026-09-16
+**Priorität:** erledigt am 2026-09-23 — Branch `docs/oi-66-api-abgleich` (`9d6a50a`). Alle 31
+dokumentierten Lesepfade gegen eine laufende Instanz abgerufen und `API.md` dagegen geprüft: 30
+Abweichungen, davon 14 Felder oder Antwortformen, die der Server **nie** geliefert hat — unter
+anderem `member_name`/`appointment_title` bei den Anwesenheiten, `{"years": …}` bei
+`available_years`, `logo_url` beim Logo-Upload, `{"message": "Admin access required"}` in der
+Fehlerbehandlung und alle drei Beispiel-Implementierungen für eigene Geräte (JavaScript, Python,
+Arduino schickten Felder, die `totp_checkin` nie gelesen hat; wer den ESP32-Code kopierte, bekam
+einen 400er). Alle korrigiert. Die unten offene Frage nach einem Test ist entschieden und
+umgesetzt: `tests/suites/api_doc_keys.php` prüft für 20 Lesepfade, dass jeder dokumentierte
+Schlüssel in der echten Antwort vorkommt; zusätzliche Felder im Server melden nur INFO.
+Nebenbefund behoben: `private/handlers/users.php` las einen Parameter `search`, ohne ihn je zu
+verwenden — ein Versprechen ohne Wirkung, entfernt.
+
+Die sieben Stellen, an denen die Dokumentation **weniger** zeigte als der Server liefert, sind am
+selben Tag nachgezogen (`04b8f51`): `responses` bei den Terminen, `created_at` bei Termin- und
+Tätigkeitsarten, die Blöcke `rate_bands`, `punctuality` und `reliability` bei `statistics` und
+`self_approval_blocked` bei `attendance_list` — letzteres samt Erklärung, wann der Server die
+Genehmigung des eigenen Antrags abweist (siehe [OI-87](#oi-87--anträge-in-der-anwesenheitsliste-des-dashboards-selbstgenehmigung-nur-ohne-zweiten-verwalter)).
+
+**Restpunkte:** Nicht bewacht sind die Schreibpfade sowie `appointment_responses`,
+`session_info`, `update_check`, die Terminserien und die Check-in-Endpunkte. Bei `holidays` und `my_open_items.items` vergleicht der Wächter bewusst
+nicht die inneren Schlüssel — dort sind Kalenderdaten die Schlüssel beziehungsweise die Felder
+hängen am `kind`.
+
+_Aufgenommen am 2026-09-16._
 
 Beim Durchsehen der Dokumentation fiel auf, dass der Abschnitt „Alle Mitglieder abrufen" einen
 Endpunkt beschrieb, den es so **nie gab**: eine Antwort `{"members": [...], "pagination": {…}}`
