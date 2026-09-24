@@ -220,27 +220,27 @@ Automatisiert: `calendar_attendance_frontend`, `module_imports`.
 | APT-ANW-9 | Nach dem Sprung eine Anwesenheit korrigieren und speichern | Funktioniert wie ohne Sprung; offene Anträge (seit 1.13.0) bleiben sichtbar |
 | APT-ANW-10 | Als einfaches Mitglied Kalender und Terminliste ansehen | Weder Knopf noch Zeichen 📋 |
 | APT-ANW-11 | Zwei Termine schnell hintereinander anspringen | Es gewinnt der zuletzt geklickte; Liste, Terminfilter und Rückweg gehören zusammen |
+| APT-ANW-12 | Termin anlegen, der **in zwei Stunden** beginnt, dann Kalender-Popup und Terminliste ansehen | Knopf „Anwesenheit“ bzw. 📋 ist bereits da — das Check-in-Fenster läuft, es kann schon Erfassungen geben |
+| APT-ANW-13 | Popup eines vergangenen Termins festhalten, oben rechts das **Jahr wechseln**, dann „Anwesenheit“ klicken | Der Sprung gelingt; der Termin wird einzeln nachgeladen, keine Meldung „Termin nicht gefunden“ |
 
 **Anwesenheit im Kalender (Schritt 2, seit 1.14.0).** Automatisiert: `calendar_attendance_api`,
 `calendar_attendance_frontend`.
 
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
-| APT-ANW-12 | Als Admin einen vergangenen Tag mit Termin ansehen | Am unteren Rand ein dreifarbiger Balken; die Anteile entsprechen den Zahlen im Popup |
-| APT-ANW-13 | Tag mit **mehreren** Terminen | Der Balken zählt alle Termine des Tages zusammen; im Popup steht je Termin eine eigene Zeile |
-| APT-ANW-14 | Popup eines begonnenen Termins (überfahren **und** angeklickt) | Zeile „Anwesend … Entschuldigt … Fehlend … von …“, in beiden Fällen |
-| APT-ANW-15 | Termin, der **noch nicht begonnen** hat | Kein Balken, keine Zeile — auch nicht in den zwei Stunden davor, in denen der Knopf „Anwesenheit“ bereits erscheint |
-| APT-ANW-16 | Termin einer Terminart **ohne Gruppenzuordnung** (niemand erwartet) | Kein Balken, keine Zeile (statt dreimal der Null) |
-| APT-ANW-17 | Termin, der **gerade läuft**, noch ohne Erfassung | Balken vollständig rot — **so gewollt** (Entscheidung 24.09.2026): Er zeigt, dass noch niemand erfasst wurde |
-| APT-ANW-18 | Tag mit sehr wenigen Fehlenden bei vielen Erwarteten (etwa 1 von 200) | Der rote Streifen ist noch sichtbar; die Anteile sind dabei bewusst zugunsten der Sichtbarkeit verzerrt |
-| APT-ANW-19 | Feiertag **mit** Termin / Feiertag **ohne** Termin | Mit Termin rückt der Feiertagsname über den Balken; ohne Termin bleibt er an seiner gewohnten Stelle |
-| APT-ANW-20 | Als einfaches Mitglied | Kein Balken, keine Zahlen über andere; stattdessen ein Punkt oben links in der Farbe des eigenen Status, im Popup „Du warst anwesend/entschuldigt/nicht da“ |
-| APT-ANW-21 | Mitglied mit mehreren Terminen an einem Tag, davon einer gefehlt | Der Punkt zeigt den schlechtesten Status des Tages (fehlend vor entschuldigt vor anwesend) |
-| APT-ANW-22 | Eine Anwesenheit korrigieren, zurück zum Kalender | Der Balken zeigt die neuen Zahlen ohne Neuladen der Seite |
-| APT-ANW-23 | Ein Mitglied einer Gruppe zuordnen oder entfernen, dann in den Kalender | Die Zahl der Erwarteten ändert sich entsprechend |
-| APT-ANW-24 | Screenreader auf einem Tagesfeld | Der Vorlesetext nennt die Zahlen bzw. den eigenen Status; Balken und Punkt selbst sind stumm |
-| APT-ANW-12 | Termin anlegen, der **in zwei Stunden** beginnt, dann Kalender-Popup und Terminliste ansehen | Knopf „Anwesenheit“ bzw. 📋 ist bereits da — das Check-in-Fenster läuft, es kann schon Erfassungen geben |
-| APT-ANW-13 | Popup eines vergangenen Termins festhalten, oben rechts das **Jahr wechseln**, dann „Anwesenheit“ klicken | Der Sprung gelingt; der Termin wird einzeln nachgeladen, keine Meldung „Termin nicht gefunden“ |
+| APT-ANW-14 | Als Admin einen vergangenen Tag mit Termin ansehen | Am unteren Rand ein dreifarbiger Balken; die Anteile entsprechen den Zahlen im Popup |
+| APT-ANW-15 | Tag mit **mehreren** Terminen | Der Balken zählt alle Termine des Tages zusammen; im Popup steht je Termin eine eigene Zeile |
+| APT-ANW-16 | Popup eines begonnenen Termins (überfahren **und** angeklickt) | Zeile „Anwesend … Entschuldigt … Fehlend … von …“, in beiden Fällen |
+| APT-ANW-17 | Termin, der **noch nicht begonnen** hat | Kein Balken, keine Zeile — auch nicht in den zwei Stunden davor, in denen der Knopf „Anwesenheit“ bereits erscheint |
+| APT-ANW-18 | Termin einer Terminart **ohne Gruppenzuordnung** (niemand erwartet) | Kein Balken, keine Zeile (statt dreimal der Null) |
+| APT-ANW-19 | Termin, der **gerade läuft**, noch ohne Erfassung | Balken vollständig rot — **so gewollt** (Entscheidung 24.09.2026): Er zeigt, dass noch niemand erfasst wurde |
+| APT-ANW-20 | Tag mit sehr wenigen Fehlenden bei vielen Erwarteten (etwa 1 von 200) | Der rote Streifen ist noch sichtbar; die Anteile sind dabei bewusst zugunsten der Sichtbarkeit verzerrt |
+| APT-ANW-21 | Feiertag **mit** Termin / Feiertag **ohne** Termin | Mit Termin rückt der Feiertagsname über den Balken; ohne Termin bleibt er an seiner gewohnten Stelle |
+| APT-ANW-22 | Als einfaches Mitglied | Kein Balken, keine Zahlen über andere; stattdessen ein Punkt oben links in der Farbe des eigenen Status, im Popup „Du warst anwesend/entschuldigt/nicht da“ |
+| APT-ANW-23 | Mitglied mit mehreren Terminen an einem Tag, davon einer gefehlt | Der Punkt zeigt den schlechtesten Status des Tages (fehlend vor entschuldigt vor anwesend) |
+| APT-ANW-24 | Eine Anwesenheit korrigieren, zurück zum Kalender | Der Balken zeigt die neuen Zahlen ohne Neuladen der Seite |
+| APT-ANW-25 | Ein Mitglied einer Gruppe zuordnen oder entfernen, dann in den Kalender | Die Zahl der Erwarteten ändert sich entsprechend |
+| APT-ANW-26 | Screenreader auf einem Tagesfeld | Der Vorlesetext nennt die Zahlen bzw. den eigenen Status; Balken und Punkt selbst sind stumm |
 
 ---
 
