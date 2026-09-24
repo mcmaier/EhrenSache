@@ -1187,6 +1187,9 @@ Manuell im Dashboard:
 | ST-12 | Kiosk: Taste „ABC" im Ziffernblock, dann „123" | Buchstabentastatur mit Bindestrich, Umschalter zurück ist doppelt breit; Navigationszeile zeigt nur Abbrechen/Weiter |
 | ST-13 | Kiosk: PIN-Bild nach Eingabe von „B77" | Unter „PIN" steht „Mitgliedsnummer: B77"; nach Abbruch oder Ruhezeit ist der Text weg |
 | ST-14 | Kiosk: Seite mitten in einer TOTP-Periode neu laden, dann drei Codewechsel abwarten | Balken beginnt sofort bei der tatsächlichen Restlaufzeit (nicht voll) und läuft bei jedem neuen Code von 100 % auf 0 %; bleibt nie grau |
+| ST-15 | Mitglied mit Zeitraum, der gestern endete, am Kiosk anmelden (OI-27) | „Mitgliedsnummer oder PIN ungültig" — derselbe Text wie bei falscher PIN, der Grund wird nicht genannt |
+| ST-16 | Demselben Mitglied einen offenen Zeitraum ab gestern geben, erneut anmelden | Anmeldung gelingt, der Stempel wird geschrieben |
+| ST-17 | Mitglied ganz ohne Mitgliedschaftszeiträume am Kiosk anmelden | Anmeldung gelingt wie bisher; Zeiträume sind kein Pflichtfeld |
 
 ---
 

@@ -26,6 +26,27 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   abwesend waren; Mitglieder erhalten nur ihren eigenen Status. Grundlage für die Anzeige im
   Kalender.
 
+### Geändert
+- **Die virtuelle Station achtet jetzt auf die Mitgliedschaftszeiträume.** Wer laut seinen
+  Zeiträumen gerade nicht aktiv ist — etwa nach einem Austritt oder vor dem Eintritt —, kann am
+  Kiosk nicht mehr stempeln. Bisher genügte das Häkchen „aktiv" am Mitglied, und der Stempel
+  erzeugte Anwesenheiten, die in keiner Auswertung auftauchten, weil Statistik und Berichte
+  schon immer die Zeiträume zugrunde legen. Der Kiosk meldet wie bei einer falschen PIN
+  „Mitgliedsnummer oder PIN ungültig", nennt den Grund also nicht. Wer keine Zeiträume gepflegt
+  hat — der Normalfall —, merkt nichts: Dann zählt weiterhin allein das Häkchen.
+
+### Behoben
+- **Ein Abruf mit API-Token meldete im selben Browser vom Dashboard ab.** Wer angemeldet war und
+  nebenher etwas mit Token abrief, flog beim nächsten Klick ohne erkennbaren Grund aus dem
+  Dashboard und musste sich neu anmelden. Ein Token-Aufruf legt jetzt gar keine Sitzung mehr an
+  und lässt die Anmeldung im Browser unberührt. Unverändert bleibt, dass ein Token nie die Rechte
+  einer angemeldeten Sitzung erbt: Wer mit dem Token eines Mitglieds abruft, wird als dieses
+  Mitglied bedient, auch wenn im selben Browser ein Administrator angemeldet ist.
+- **In der Anwesenheit stand die Jahresauswahl nicht mehr oben rechts.** Sobald ein Termin
+  gewählt war, rutschte sie unter die Statuschips, und an ihrer gewohnten Stelle blieb ein
+  leerer weißer Kasten stehen. Ursache war der mit 1.13.0 hinzugekommene Zähler der offenen
+  Anträge, für den in der Kopfzeile kein Platz vorgesehen war.
+
 ### Sicherheit
 - **Der Einzelabruf eines Termins prüft jetzt dieselbe Gruppengrenze wie die Terminliste.**
   Bisher wandte nur die Liste sie an. Für Admin und Manager ändert sich nichts — sie sehen

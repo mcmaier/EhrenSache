@@ -13,26 +13,31 @@
  * Generiert WHERE-Clause für Mitglieder-Aktivität basierend auf membership_dates
  * 
  * @param string $memberAlias Tabellen-Alias für members (z.B. 'm')
- * @param string $dateColumn Spalte mit Vergleichsdatum (z.B. 'a.date')
+ * @param string $dateColumn Spalte mit Vergleichsdatum (z.B. 'a.date') oder ein
+ *                           SQL-Datumsliteral (z.B. "'2026-09-24'")
  * @param bool $includeInactive Auch inaktive Mitglieder einschließen (für Admin/Manager)
+ * @param object|null $databaseOverride Statt des globalen $database — für Aufrufer,
+ *                    die ihre Datenbank hereinreichen statt sie global zu halten
+ *                    (seit OI-27 die Station; ohne Angabe bleibt alles wie bisher)
  * @return string SQL WHERE-Clause Teil
  */
 
-function getMemberActivityWhere($memberAlias = 'm', $dateColumn = null, $includeInactive = false) {
+function getMemberActivityWhere($memberAlias = 'm', $dateColumn = null, $includeInactive = false,
+                                $databaseOverride = null) {
     if ($includeInactive) {
         // Admin/Manager-Ansicht: Alle Mitglieder
         return "{$memberAlias}.active = 1";
     }
-    
+
     if ($dateColumn === null) {
         // Kein Datum → nur generell aktive Mitglieder
         return "{$memberAlias}.active = 1";
     }
-    
+
     // Prüfe Aktivität zum Termin-Datum
     global $database;
-    $prefix = $database->table('');
-    
+    $prefix = ($databaseOverride ?? $database)->table('');
+
     return "
         {$memberAlias}.active = 1
         AND (

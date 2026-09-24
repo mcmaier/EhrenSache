@@ -12,6 +12,10 @@
 
 declare(strict_types=1);
 
+// Aktivitaetsregel der Statistik (OI-27) -- selbst eingebunden, statt sich auf
+// die Reihenfolge in api.php zu verlassen, wie responses.php es auch tut.
+require_once __DIR__ . '/member_activity.php';
+
 /**
  * Fachlogik der Stations-Anmeldung (Kiosk): Einstellungen, PIN-Regeln,
  * Prüfung von Mitgliedsnummer + PIN mit Sperre.
@@ -177,7 +181,8 @@ function stationAuthenticate($db, $database, RateLimiter $limiter, int $deviceId
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $member = count($rows) === 1 ? $rows[0] : null;
-    $usable = $member !== null && !empty($member['pin_hash']) && (int) $member['active'] === 1;
+    $usable = $member !== null && !empty($member['pin_hash'])
+        && stationMemberIsActiveToday($db, $database, (int) $member['member_id']);
 
     if ($member !== null) {
         $memberKey = 'station_member_' . (int) $member['member_id'];
@@ -223,6 +228,35 @@ function stationAuthenticate($db, $database, RateLimiter $limiter, int $deviceId
         'surname'       => (string) $member['surname'],
         'member_number' => (string) $member['member_number'],
     ];
+}
+
+/**
+ * Ist das Mitglied heute aktiv — dieselbe Regel wie Statistik und
+ * Anwesenheitslogik (OI-27)?
+ *
+ * Bis 1.13.0 genügte dem Kiosk `members.active = 1`. Ein Mitglied mit
+ * abgelaufenem oder erst künftigem Zeitraum in `membership_dates` konnte
+ * dadurch weiter stempeln, obwohl es in keiner Auswertung als aktiv zählte —
+ * der Stempel erzeugte also Anwesenheiten, die später niemand sah. Geprüft
+ * wird jetzt über `getMemberActivityWhere()`, damit die Regel nur an einer
+ * Stelle steht; als Vergleichsdatum steht dort das heutige — ein Stempel gilt
+ * immer für heute. Als Literal statt `CURDATE()`, damit derselbe Weg auch
+ * gegen SQLite läuft (`tests/suites/station_unit.php`) und die Uhr des
+ * Anwendungsservers gilt, wie überall sonst im Projekt.
+ *
+ * Ohne Einträge in `membership_dates` bleibt es bei `active` — das ist der
+ * Normalfall in einem Verein und die bisherige Wirkung.
+ */
+function stationMemberIsActiveToday($db, $database, int $memberId): bool
+{
+    $prefix   = $database->table('');
+    $activity = getMemberActivityWhere('m', "'" . date('Y-m-d') . "'", false, $database);
+
+    $stmt = $db->prepare("SELECT 1 FROM {$prefix}members m
+                          WHERE m.member_id = ? AND ({$activity})");
+    $stmt->execute([$memberId]);
+
+    return (bool) $stmt->fetchColumn();
 }
 
 /**

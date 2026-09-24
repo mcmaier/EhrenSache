@@ -229,6 +229,22 @@ if (!extension_loaded('pdo_sqlite')) {
         $ins->execute(['Olga', 'Ohne',    '300', null, 1]);
         $ins->execute(['Dora', 'Doppelt', '400', $pinHash2580, 1]);
         $ins->execute(['Dirk', 'Doppelt', '400', $pinHash2580, 1]);
+        $ins->execute(['Elke', 'Ende',    '500', $pinHash2580, 1]);   // Zeitraum abgelaufen
+        $ins->execute(['Konrad', 'Kommt', '600', $pinHash2580, 1]);   // Zeitraum beginnt erst
+        $ins->execute(['Lena', 'Laeuft',  '700', $pinHash2580, 1]);   // Zeitraum offen
+
+        // Mitgliedschaftszeitraeume (OI-27): Der Stempel prueft sie ueber
+        // dieselbe Regel wie die Statistik. Wer hier keinen Eintrag hat, gilt
+        // wie bisher allein ueber members.active als aktiv -- deshalb bleiben
+        // die Mitglieder 1 bis 5 ohne Zeitraum.
+        $pdo->exec("CREATE TABLE ut_membership_dates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        member_id INTEGER, start_date TEXT, end_date TEXT)");
+        $zeit = $pdo->prepare("INSERT INTO ut_membership_dates (member_id, start_date, end_date)
+                               VALUES (?, ?, ?)");
+        $zeit->execute([6, date('Y-m-d', strtotime('-2 years')), date('Y-m-d', strtotime('-1 day'))]);
+        $zeit->execute([7, date('Y-m-d', strtotime('+7 days')), null]);
+        $zeit->execute([8, date('Y-m-d', strtotime('-1 day')), null]);
 
         $_SESSION = [];
 
@@ -399,3 +415,48 @@ if (!extension_loaded('pdo_sqlite')) {
         assertSame('locked', $failure, 'nx1 und NX1 muessen denselben Zaehler treffen');
     });
 }
+
+    test('stationAuthenticate lehnt ein Mitglied ausserhalb seines Zeitraums ab (OI-27)', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '500', '2580', $failure),
+            'Abgelaufener Zeitraum muss den Stempel verhindern');
+        assertSame('invalid', $failure, 'Die Begruendung bleibt dieselbe wie bei falscher PIN');
+    });
+
+    test('stationAuthenticate lehnt einen erst kuenftigen Zeitraum ab (OI-27)', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertSame(null, stationAuthenticate($db, $database, $limiter, 1, '600', '2580', $failure));
+        assertSame('invalid', $failure);
+    });
+
+    test('stationAuthenticate akzeptiert einen laufenden Zeitraum (OI-27)', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        $member = stationAuthenticate($db, $database, $limiter, 1, '700', '2580', $failure);
+        assertTrue($member !== null, 'Offener Zeitraum ab gestern muss gelten');
+        assertSame('Lena', $member['name']);
+    });
+
+    test('stationAuthenticate: ohne Zeitraeume bleibt es bei members.active (OI-27)', function () {
+        [$db, $database, $limiter] = stationTestDb();
+        assertTrue(stationAuthenticate($db, $database, $limiter, 1, '100', '2580') !== null,
+            'Ein Mitglied ohne Zeitraeume stempelt wie bisher');
+    });
+
+test('Station: die Aktivitaetsregel steht nur an einer Stelle (OI-27)', function () {
+    // Der Kiosk darf die Regel nicht nachbauen. Bis 1.13.0 prueften Statistik
+    // und Anwesenheitslogik membership_dates, der Stempel dagegen nur
+    // members.active -- ein Mitglied ausserhalb seines Zeitraums konnte
+    // stempeln und tauchte in keiner Auswertung auf.
+    $quelle = (string) file_get_contents(dirname(__DIR__, 2) . '/private/helpers/station.php');
+
+    assertTrue(str_contains($quelle, 'getMemberActivityWhere('),
+        'station.php nutzt die gemeinsame Aktivitaetsregel nicht');
+    assertTrue(str_contains($quelle, "require_once __DIR__ . '/member_activity.php';"),
+        'station.php bindet member_activity.php nicht selbst ein');
+
+    $start = strpos($quelle, 'function stationAuthenticate(');
+    assertTrue($start !== false, 'stationAuthenticate() nicht gefunden');
+    $rumpf = substr($quelle, $start, (int) strpos($quelle, "\n}", $start) - $start);
+    assertTrue(!str_contains($rumpf, "active'] === 1"),
+        'stationAuthenticate() prueft members.active wieder selbst statt ueber die gemeinsame Regel');
+});

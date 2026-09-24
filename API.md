@@ -55,6 +55,15 @@ dem Browser heraus mit Session arbeitet, sendet stattdessen `credentials: 'same-
 Diese Falle hat die CSV-Exporte des Dashboards vier Monate lang unbrauchbar gemacht, siehe
 OI-24 in `docs/OPEN-ITEMS.md`.
 
+**Ein Token-Aufruf legt keine Session an und setzt kein Cookie** (seit OI-25). Die Rolle des
+Tokens gilt nur für diese eine Anfrage. Wer im selben Browser angemeldet ist und nebenbei
+etwas mit Token abruft — etwa über `?api_token=` in der Adressleiste —, bleibt angemeldet:
+Die beiden Wege stören einander nicht mehr. Bis 1.13.0 überschrieb der Token-Aufruf die
+Sitzung, und der nächste Aufruf ohne Token endete in `401 "Token-created session cannot be
+used without the token"`. Unverändert gilt: Ein Token erbt **nie** Rechte aus einer
+vorhandenen Sitzung — wer mit Mitgliedstoken aufruft, wird als Mitglied bedient, auch wenn im
+selben Browser ein Admin angemeldet ist.
+
 ### CSRF-Schutz
 
 Bei Session-basierter Authentifizierung ist ein CSRF-Token erforderlich:
@@ -1495,9 +1504,17 @@ den vorhandenen Status (`present`, `excused`) oder `null`. `identify`, `checkin`
 `server_time` (Status-Endpunkt) rechnen mit der Datenbankuhr des Servers; `server_unix` und der
 Stations-Code (TOTP) laufen dagegen auf Unix-Zeit, unabhängig von der Zeitzone der Datenbank.
 
+**Wer als aktiv gilt (OI-27):** `members.active = 1` **und** der heutige Tag liegt in einem
+Zeitraum aus `membership_dates` — dieselbe Regel, nach der Statistik und Anwesenheitsbericht
+rechnen (`getMemberActivityWhere()`). Ein Mitglied ohne Einträge in `membership_dates` gilt wie
+bisher allein über `active` als aktiv; das ist der Normalfall. Bis 1.13.0 prüfte der Kiosk nur
+`active` — ein Mitglied mit abgelaufenem oder erst künftigem Zeitraum konnte also stempeln,
+obwohl es in keiner Auswertung vorkam.
+
 **Fehler:** `400` Nummer oder PIN fehlt · `401 "Invalid member number or PIN"` — dieselbe
-Meldung bei unbekannter Nummer, falscher PIN, fehlender PIN, inaktivem Mitglied und
-mehrdeutiger Nummer · `423 "Too many attempts"` mit `retry_after` (Sekunden): 5 Fehlversuche
+Meldung bei unbekannter Nummer, falscher PIN, fehlender PIN, inaktivem Mitglied (auch außerhalb
+seiner Mitgliedschaftszeiträume) und mehrdeutiger Nummer · `423 "Too many attempts"` mit
+`retry_after` (Sekunden): 5 Fehlversuche
 je Mitgliedsnummer (auch unbekannte) innerhalb von 15 Minuten · `423 "Station temporarily
 locked"`: 30 Fehlversuche je Kiosk innerhalb von 15 Minuten. `retry_after` nennt in beiden
 Fällen die volle Fensterlänge (900 Sekunden), nicht die verbleibende Sperrzeit. Eine neu
