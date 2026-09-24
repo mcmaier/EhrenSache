@@ -7,6 +7,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unveröffentlicht]
+
+### Behoben
+- **In der Anwesenheit stand die Jahresauswahl nicht mehr oben rechts.** Sobald ein Termin
+  gewählt war, rutschte sie unter die Statuschips, und an ihrer gewohnten Stelle blieb ein
+  leerer weißer Kasten stehen. Ursache war der mit 1.13.0 hinzugekommene Zähler der offenen
+  Anträge, für den in der Kopfzeile kein Platz vorgesehen war.
+
+---
+
 ## [1.13.0] – 2026-09-23
 
 ### Neu
