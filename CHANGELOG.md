@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unveröffentlicht]
+## [1.15.0] – 2026-09-24
 
 ### Neu
 - **„Kommend“ statt „Fehlend“.** Die Anwesenheitsliste zeigt bei Terminen, die noch nicht

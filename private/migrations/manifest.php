@@ -216,4 +216,10 @@ return [
         'file'     => '1.14.0.php',
         'function' => 'migrate_1_14_0',
     ],
+    [
+        'from'     => '1.14.1',
+        'to'       => '1.15.0',
+        'file'     => '1.14.1.php',
+        'function' => 'migrate_1_14_1',
+    ],
 ];
