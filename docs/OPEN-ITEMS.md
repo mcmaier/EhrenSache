@@ -3598,7 +3598,12 @@ einschließlich zukünftiger, ohne Datumsgrenze. Die Zeilen zeigten schon vorher
 neue Chip-Zähler macht es nur sichtbarer.
 
 **Entschieden am 2026-09-23/24:** Umsetzung wie unten unter „Beschlossen“ — eigener Zustand
-„Kommend“, Grenze = Beginn des Check-in-Fensters, Umsetzung **nach 1.14.0 als 1.14.1**.
+„Kommend“, **eine** Grenze „begonnen“ = Beginn des Check-in-Fensters für Anwesenheitsliste,
+Kalender **und Statistik**.
+
+**Stand 2026-09-24:** Nicht gebaut. Voraussetzung erfüllt — der Kalender-Zweig ist mit 1.14.0
+auf `dev`/`main`, `attendanceHasStarted()` liegt vor. 1.14.1 (Sicherheitskorrekturen) ist ohne
+OI-89 erschienen; Ziel ist der **nächste Release**, dessen Nummer die Release-Sitzung festlegt.
 
 **Nachtrag 2026-09-23 (Hinweis des Nutzers):**
 - Mit Serienterminen wird es deutlich: Eine Serie reicht bis ein Jahr in die Zukunft, die
@@ -3620,12 +3625,13 @@ neue Chip-Zähler macht es nur sichtbarer.
    Startzeit erfasst (`auto_checkin.php`), in der Aufbauphase liegen schon Erfassungen vor — die
    Liste darf dann nicht „Kommend“ zeigen, während der Kalender „hat begonnen“ sagt.
    - **Eine Regel, keine zweite daneben:** `attendanceHasStarted()` in
-     `private/helpers/appointment_attendance.php` (kommt mit 1.14.0) um den Vorlauf ergänzen und
+     `private/helpers/appointment_attendance.php` (seit 1.14.0, ~Z. 35; vergleicht derzeit gegen
+     die reine Startzeit, `?string $now` wird von niemandem gesetzt) um den Vorlauf ergänzen und
      mitbenutzen. Für SQL die Bedingung gegen die **Datenbankuhr** (OI-60), PHP-Fassung beim
      selben Cutoff halten.
    - **Einstellung überall:** Der Vorlauf kommt aus der Vereinseinstellung
-     `checkin_tolerance_hours`, nicht fest verdrahtet. Der Kalender rechnet in 1.14.0 noch mit
-     festen 2 h (`ATTENDANCE_LEAD_MS` in `appointments.js`, weil das Dashboard die Einstellung
+     `checkin_tolerance_hours`, nicht fest verdrahtet. Der Kalender rechnet seit 1.14.0 mit
+     festen 2 h (`ATTENDANCE_LEAD_MS`, `appointments.js` ~Z. 1640, weil das Dashboard die Einstellung
      nicht kennt — `settings` ist `requireAdmin()`). Mit OI-89 gibt der Server den Wert ans
      Dashboard weiter und der Kalender übernimmt ihn statt der Konstante. **Achtung:**
      `appointmentHasStarted()` läuft synchron mitten im Aufbau von Terminliste und Popup — der
@@ -3644,10 +3650,20 @@ neue Chip-Zähler macht es nur sichtbarer.
      braucht eine Rasterspalte, sonst meldet `tests/suites/filter_chips_frontend.php` rot.
 4. **Terminansicht:** nicht ausblenden — wer einen kommenden Termin ausdrücklich wählt, will ihn
    sehen. Alle Zeilen ohne Eintrag zeigen „Kommend“.
-5. **Nebenbefund Statistik:** `ATTENDANCE_STARTED_CUTOFF_SQL` schneidet nur nach Datum (ein
-   Termin von heute Abend zählt ab Mitternacht als begonnen) und weicht damit von der Regel oben
-   ab. Ob die Statistik die Regel übernimmt, ändert Zahlen — eigene Entscheidung, nicht Teil
-   von OI-89.
+5. **Statistik zieht mit (Nutzer, 2026-09-24):** `ATTENDANCE_STARTED_CUTOFF_SQL`
+   (`private/helpers/attendance.php` Z. 39, `DATE_ADD(CURDATE(), INTERVAL 2 HOUR)`) wird gegen
+   die DATE-Spalte `a.date` verglichen, also gegen Mitternacht: Jeder Termin von heute zählt ab
+   0 Uhr als begonnen, die Erwarteten stehen tagsüber schon als fehlend. Die Konstante heißt
+   „begonnen“, verhält sich aber anders als die beiden anderen Stellen.
+   - Auf dieselbe Regel umstellen: Startzeitpunkt aus `a.date` und `a.start_time` bilden
+     (z. B. `TIMESTAMP(a.date, a.start_time)`), Vorlauf `checkin_tolerance_hours` abziehen,
+     gegen `NOW()` der Datenbank vergleichen (OI-60).
+   - Betroffen sind fünf Abfragen: `attendance.php` ~Z. 336, 395, 435, `punctuality.php`
+     ~Z. 232, `report_statistics.php` ~Z. 284. Tests dieser Suiten mitziehen.
+   - Wirkung: Zahlen ändern sich nur am laufenden Tag, vor Öffnung des Check-in-Fensters.
+     Im Changelog als Korrektur unter „Behoben“ nennen.
+   - Ziel: danach genau **eine** Definition — SQL-Fassung und `attendanceHasStarted()` beim
+     selben Cutoff, Frontend mit demselben Vorlaufwert.
 
 **Nicht sicherheitsrelevant.**
 
@@ -3761,7 +3777,7 @@ Dashboard zeigt dieselbe Information als farbiges Badge:
 2. **Anwesenheit** — `createAppointmentTypeBadge()` (`public/js/modules/records.js`
    ~Zeile 1528–1548), Spalte „Terminart“ (`public/index.html` ~Zeile 1016).
 3. **Kalender-Popup** (Klick/Hover) — Titel plus `calendar-type-badge` mit Inline-Stilen
-   (`appointments.js` ~Zeile 745–760). Mehrere Termine eines Tages stehen darin nur
+   (`showAppointmentPopup()`, `appointments.js` ~Zeile 843–905). Mehrere Termine eines Tages stehen darin nur
    untereinander, ohne sichtbare Trennung.
 
 **Idee:** Farbakzent am linken Rand der Zeile bzw. des Popup-Eintrags wie in der PWA; das
@@ -3785,11 +3801,11 @@ Rand — mehrere Termine an einem Tag gruppieren sich dadurch sichtbar.
   (Tabellen einheitlicher machen) — sinnvoll im selben Zug.
 
 **Nachtrag 2026-09-23 — Bedienelemente im festgehaltenen Kalender-Popup:**
-- Der Knopf „Bearbeiten“ (`.calendar-event-edit`, `appointments.js` ~Zeile 762) sitzt als
+- Der Knopf „Bearbeiten“ (`.calendar-event-edit`, `appointments.js` ~Zeile 900) sitzt als
   kleiner Textknopf direkt unter der Rückmeldezeile und liegt ihr sehr nahe — Fehlklicks
   zwischen beiden sind leicht.
 - Die Rückmeldezeile ist ein `<button class="response-summary-btn">`
-  (`calendarResponseLineHtml()`, ~Zeile 694), sieht aber nicht so aus: `calendar.css`
+  (`calendarResponseLineHtml()`, ~Zeile 778), sieht aber nicht so aus: `calendar.css`
   ~Zeile 202–208 nimmt ihr Rahmen und Hintergrund **absichtlich** (FI-1-Korrektur: Hover- und
   festgehaltenes Popup sollen gleich aussehen). Erkennbar ist sie nur an Cursor und Hover.
   Diese Entscheidung muss beim Umbau neu abgewogen werden — z. B. Knopfoptik nur im
@@ -3799,6 +3815,11 @@ Rand — mehrere Termine an einem Tag gruppieren sich dadurch sichtbar.
   Termineintrags, auf Höhe der Titelzeile. Das trennt ihn räumlich von den Rückmeldungen und
   passt zum Eintrag mit farbigem Rand. Braucht `title`/`aria-label` „Termin bearbeiten“, da nur
   ein Symbol. „+ Termin an diesem Tag“ bleibt als Textknopf am Ende der Liste.
+- **Seit 1.14.0** steht neben „Bearbeiten“ ein zweiter Knopf „Anwesenheit“ (gleiche Klasse
+  `.calendar-event-edit`, ~Zeile 902, nur bei begonnenen Terminen), dazu die Zahlenzeile der
+  Anwesenheit. Laut Spec Kalender → Anwesenheit ziehen beide Knöpfe **gemeinsam** um — etwa als
+  Symbolgruppe rechts (Stift, Liste). Die Popup-Umbauten des Kalender-Zweigs sind damit
+  abgeschlossen, OI-94 kann auf dem heutigen `dev` aufsetzen.
 
 **Nicht sicherheitsrelevant.**
 
