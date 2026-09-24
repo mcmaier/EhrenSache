@@ -388,15 +388,23 @@ if($apiToken) {
     $authMemberId = $tokenUser['member_id'] ? intval($tokenUser['member_id']) : null;
     $authDeviceType = $tokenUser['device_type'] ?? null;
 
-    // Für Kompatibilität mit auth-Hilfsfunktionen (isAdmin(), isAdminOrManager() etc.)
-    // die $_SESSION['role'] lesen: Session starten und mit Token-Daten befüllen.
-    // Vorhandene Session dabei IMMER überschreiben, damit keine alte Admin-Session
-    // die Rechte des Token-Users ausweitet.
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    // Nur sicherheitsrelevante Felder überschreiben – verhindert Privilege-Escalation
-    // durch ältere Session-Daten, ohne die gesamte Session (inkl. csrf_token) zu leeren.
+    // Für Kompatibilität mit auth-Hilfsfunktionen (isAdmin(), isAdminOrManager()
+    // etc.), die $_SESSION['role'] lesen: Die Token-Daten stehen im
+    // $_SESSION-Array — aber OHNE session_start(), also nur im Arbeitsspeicher
+    // dieser einen Anfrage. Nichts wird gespeichert, kein Cookie gesetzt.
+    //
+    // Bis 1.13.0 wurde hier eine echte Session gestartet und überschrieben. Das
+    // schützte zwar davor, dass ein Token die Rechte einer fremden Anmeldung
+    // erbt — erledigte aber zugleich die Anmeldung im selben Browser: Der
+    // nächste Aufruf nur mit Cookie lief in 401 "Token-created session cannot
+    // be used without the token", für den Nutzer ein grundloser Rauswurf
+    // (OI-25). Im Arbeitsspeicher gilt beides: Der Token bestimmt allein, wer
+    // bedient wird, und die Sitzung des Browsers bleibt unberührt.
+    //
+    // $_SESSION ist ohne aktive Session ein gewöhnliches Array. Alle Helfer
+    // lesen es unverändert; ein späterer session_start() in derselben Anfrage
+    // würde es allerdings aus dem Speicher der Sitzung neu füllen — im
+    // Token-Zweig ruft ihn niemand auf (Gegenprobe: tests/suites/token_session_api.php).
     $_SESSION['user_id']   = $authUserId;
     $_SESSION['role']      = $authUserRole;
     $_SESSION['email']     = $tokenUser['email'];

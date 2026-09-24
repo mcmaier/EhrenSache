@@ -69,9 +69,14 @@ function apiRequest(string $method, string $resource, array $opts = []): array
         curl_setopt($ch, CURLOPT_COOKIE, $opts['cookie']);
     }
 
+    // Das LETZTE Set-Cookie zaehlt, nicht das erste: Die Anmeldung erneuert die
+    // Sitzungskennung (session_regenerate_id in auth.php), schickt also zwei
+    // Kopfzeilen. Wer die erste behielt, arbeitete danach mit einer bereits
+    // verworfenen Sitzung weiter -- ein Test konnte dadurch bestehen, obwohl er
+    // gegen eine tote Sitzung prueft (gefunden bei OI-25).
     $setCookie = null;
     curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $header) use (&$setCookie): int {
-        if ($setCookie === null && stripos($header, 'Set-Cookie:') === 0) {
+        if (stripos($header, 'Set-Cookie:') === 0) {
             $setCookie = trim(substr($header, strlen('Set-Cookie:')));
         }
 

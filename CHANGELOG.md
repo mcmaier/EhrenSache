@@ -9,6 +9,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unveröffentlicht]
 
+### Behoben
+- **Ein Abruf mit API-Token meldete im selben Browser vom Dashboard ab.** Wer angemeldet war und
+  nebenher etwas mit Token abrief, flog beim nächsten Klick ohne erkennbaren Grund aus dem
+  Dashboard und musste sich neu anmelden. Ein Token-Aufruf legt jetzt gar keine Sitzung mehr an
+  und lässt die Anmeldung im Browser unberührt. Unverändert bleibt, dass ein Token nie die Rechte
+  einer angemeldeten Sitzung erbt: Wer mit dem Token eines Mitglieds abruft, wird als dieses
+  Mitglied bedient, auch wenn im selben Browser ein Administrator angemeldet ist.
+
 ### Geändert
 - **Die virtuelle Station achtet jetzt auf die Mitgliedschaftszeiträume.** Wer laut seinen
   Zeiträumen gerade nicht aktiv ist — etwa nach einem Austritt oder vor dem Eintritt —, kann am

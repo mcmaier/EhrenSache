@@ -55,6 +55,15 @@ dem Browser heraus mit Session arbeitet, sendet stattdessen `credentials: 'same-
 Diese Falle hat die CSV-Exporte des Dashboards vier Monate lang unbrauchbar gemacht, siehe
 OI-24 in `docs/OPEN-ITEMS.md`.
 
+**Ein Token-Aufruf legt keine Session an und setzt kein Cookie** (seit OI-25). Die Rolle des
+Tokens gilt nur für diese eine Anfrage. Wer im selben Browser angemeldet ist und nebenbei
+etwas mit Token abruft — etwa über `?api_token=` in der Adressleiste —, bleibt angemeldet:
+Die beiden Wege stören einander nicht mehr. Bis 1.13.0 überschrieb der Token-Aufruf die
+Sitzung, und der nächste Aufruf ohne Token endete in `401 "Token-created session cannot be
+used without the token"`. Unverändert gilt: Ein Token erbt **nie** Rechte aus einer
+vorhandenen Sitzung — wer mit Mitgliedstoken aufruft, wird als Mitglied bedient, auch wenn im
+selben Browser ein Admin angemeldet ist.
+
 ### CSRF-Schutz
 
 Bei Session-basierter Authentifizierung ist ein CSRF-Token erforderlich:
