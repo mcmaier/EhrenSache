@@ -17,7 +17,7 @@ import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, 
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_ATTENDANCE } from './grouping.js';
-import { CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, countChips, filterByChip, resolveActiveChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
+import { CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, CHIPS_RECORDS_MEMBER, attendanceState, countChips, filterByChip, resolveActiveChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
 // RECORDS
@@ -359,8 +359,32 @@ window.goToRecordsPage = function(page) {
  * Chip gefilterte Liste. base ist die Liste NACH allen uebrigen Filtern und
  * VOR dem Chip (facettierte Zaehlung).
  */
+/** Chipsatz je Ansicht; die Mitgliedsansicht trennt kommende Termine ab (OI-89). */
+function recordChipDefs() {
+    if (currentMode === RecordMode.ALL_RECORDS) return CHIPS_RECORDS_ALL;
+    if (currentMode === RecordMode.ATTENDANCE_BY_MEMBER) return CHIPS_RECORDS_MEMBER;
+    return CHIPS_RECORDS_LIST;
+}
+
+/**
+ * Statuszelle der Anwesenheitsliste. "Kommend" (OI-89) in neutraler Farbe:
+ * Der Termin hat noch nicht begonnen, fehlen kann noch niemand.
+ */
+function attendanceStatusCell(row) {
+    switch (attendanceState(row)) {
+        case 'present':
+            return { statusHtml: '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span>', rowClass: '' };
+        case 'excused':
+            return { statusHtml: '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>', rowClass: '' };
+        case 'upcoming':
+            return { statusHtml: '<span class="attendance-upcoming">◷ Kommend</span>', rowClass: '' };
+        default:
+            return { statusHtml: '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>', rowClass: 'table-secondary' };
+    }
+}
+
 function applyRecordChips(base, rerender) {
-    const defs = currentMode === RecordMode.ALL_RECORDS ? CHIPS_RECORDS_ALL : CHIPS_RECORDS_LIST;
+    const defs = recordChipDefs();
     recordStatusChip = resolveActiveChip(defs, recordStatusChip, 'all');
 
     renderFilterChips(
@@ -1598,17 +1622,7 @@ function buildAttendanceRow(member) {
     // Status-Icon und Styling
     const { hinweis, aktionen } = attendanceRequestParts(member);
 
-    let statusHtml, rowClass;
-    if (member.status === 'present') {
-        statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span>';
-        rowClass = '';
-    } else if (member.status === 'excused') {
-        statusHtml = '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
-        rowClass = '';
-    } else {
-        statusHtml = '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>';
-        rowClass = 'table-secondary'; // Grau ausgegraut
-    }
+    let { statusHtml, rowClass } = attendanceStatusCell(member);
 
     // Offene Anträge stehen unter dem Status: Sie sagen, was noch aussteht,
     // während der Status sagt, was gilt.
@@ -1753,17 +1767,7 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
         const sourceInfo = getSourceBadge(appointment);
         
         // Status-Icon und Styling
-        let statusHtml, rowClass;
-        if (appointment.status === 'present') {
-            statusHtml = '<span style="color: #258b3d; font-weight: 500;">✓ Anwesend</span>';
-            rowClass = '';
-        } else if (appointment.status === 'excused') {
-            statusHtml = '<span style="color: #e97a13; font-weight: 500;">⚠ Entschuldigt</span>';
-            rowClass = '';
-        } else {
-            statusHtml = '<span style="color: #dc3545; font-weight: 500;">✗ Fehlend</span>';
-            rowClass = 'table-secondary';
-        }
+        const { statusHtml, rowClass } = attendanceStatusCell(appointment);
 
 
         // Terminart Badge

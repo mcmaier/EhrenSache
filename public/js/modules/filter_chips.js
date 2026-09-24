@@ -68,11 +68,42 @@ export const CHIPS_RECORDS_ALL = Object.freeze([
     { key: 'excused', label: 'Entschuldigt', variant: 'pending', match: r => r.status === 'excused' },
 ]);
 
-// Anwesenheitsliste (Termin oder Mitglied gewaehlt): status null = kein Datensatz = fehlend.
+// Hat der Termin der Zeile begonnen (OI-89)? Der Server liefert
+// appointment_started (Beginn des Check-in-Fensters). Fehlt das Kennzeichen,
+// gilt die Zeile wie bisher als begonnen.
+const hasStarted = r => Number(r.appointment_started) !== 0;
+
+/**
+ * Zustand einer Zeile der Anwesenheitsliste. Ohne Datensatz heisst sie vor
+ * Beginn "Kommend", danach "Fehlend". Eine vorab genehmigte Entschuldigung
+ * bleibt "Entschuldigt" -- gerade die ist bei kommenden Terminen interessant.
+ */
+export function attendanceState(r) {
+    if (r.status === 'present') return 'present';
+    if (r.status === 'excused') return 'excused';
+    return hasStarted(r) ? 'missing' : 'upcoming';
+}
+
+const CHIP_UPCOMING_LABEL = 'Kommend';
+
+// Terminansicht: status null = kein Datensatz = fehlend, vor Beginn kommend.
+// Nichts wird ausgeblendet -- wer einen kommenden Termin waehlt, will ihn sehen.
 export const CHIPS_RECORDS_LIST = Object.freeze([
     ...CHIPS_RECORDS_ALL,
-    { key: 'missing', label: 'Fehlend', variant: 'danger',
-      match: r => r.status !== 'present' && r.status !== 'excused' },
+    { key: 'missing',  label: 'Fehlend', variant: 'danger', match: r => attendanceState(r) === 'missing' },
+    { key: 'upcoming', label: CHIP_UPCOMING_LABEL,          match: r => attendanceState(r) === 'upcoming' },
+]);
+
+// Mitgliedsansicht (OI-89, Variante A): Eine Serie reicht bis ein Jahr voraus.
+// "Alle" und die Status-Chips zeigen deshalb nur begonnene Termine, "Kommend"
+// alle kommenden, auch vorab entschuldigte. Hier ausnahmsweise "Alle" MIT
+// match -- die Partition gilt fuer die begonnenen, "Kommend" steht daneben.
+export const CHIPS_RECORDS_MEMBER = Object.freeze([
+    { key: 'all',      label: 'Alle',                                          match: hasStarted },
+    { key: 'present',  label: 'Anwesend',     variant: 'ok',      match: r => hasStarted(r) && r.status === 'present' },
+    { key: 'excused',  label: 'Entschuldigt', variant: 'pending', match: r => hasStarted(r) && r.status === 'excused' },
+    { key: 'missing',  label: 'Fehlend',      variant: 'danger',  match: r => attendanceState(r) === 'missing' },
+    { key: 'upcoming', label: CHIP_UPCOMING_LABEL,                match: r => !hasStarted(r) },
 ]);
 
 // Statistik: reine Anzeige, deshalb ohne match und ohne "Alle". Die Zahlen

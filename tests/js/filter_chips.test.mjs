@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import {
     countChips, filterByChip, resolveActiveChip, localTodayIso, appointmentTimeChips,
     CHIPS_EXCEPTIONS, CHIPS_WORKTIME, CHIPS_MEMBERS, CHIPS_USERS, CHIPS_DEVICES,
-    CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, CHIPS_STATISTICS,
+    CHIPS_RECORDS_ALL, CHIPS_RECORDS_LIST, CHIPS_RECORDS_MEMBER, CHIPS_STATISTICS, attendanceState,
     groupChips, CHIPS_APPOINTMENT_TYPES, CHIPS_ACTIVITY_TYPES, setResetEnabled
 } from '../../public/js/modules/filter_chips.js';
 
@@ -94,7 +94,7 @@ test('Geraete: "1" als Text zaehlt als aktiv', () => {
 test('Anwesenheit: "Fehlend" nur im Listensatz, null zaehlt als fehlend', () => {
     assert.ok(!CHIPS_RECORDS_ALL.some(d => d.key === 'missing'));
     const items = [{ status: 'present' }, { status: 'excused' }, { status: null }];
-    assert.deepEqual(countChips(items, CHIPS_RECORDS_LIST), { all: 3, present: 1, excused: 1, missing: 1 });
+    assert.deepEqual(countChips(items, CHIPS_RECORDS_LIST), { all: 3, present: 1, excused: 1, missing: 1, upcoming: 0 });
     assertPartition(CHIPS_RECORDS_LIST, items, 'Anwesenheitsliste');
     assertPartition(CHIPS_RECORDS_ALL, [{ status: 'present' }, { status: 'excused' }], 'Anwesenheit');
 });
@@ -162,4 +162,67 @@ test('setResetEnabled graut den Knopf aus, statt ihn zu verstecken', () => {
 
 test('setResetEnabled vertraegt ein fehlendes Element', () => {
     setResetEnabled(null, true);
+});
+
+// ---- OI-89: "Kommend" statt "Fehlend" ---------------------------------------
+
+test('attendanceState: ohne Eintrag vor Beginn "Kommend", danach "Fehlend"', () => {
+    assert.equal(attendanceState({ status: null, appointment_started: 0 }), 'upcoming');
+    assert.equal(attendanceState({ status: null, appointment_started: 1 }), 'missing');
+    assert.equal(attendanceState({ status: null, appointment_started: '0' }), 'upcoming', 'Zahl als Text aus der API');
+    // Eine vorab genehmigte Entschuldigung bleibt "Entschuldigt".
+    assert.equal(attendanceState({ status: 'excused', appointment_started: 0 }), 'excused');
+    assert.equal(attendanceState({ status: 'present', appointment_started: 1 }), 'present');
+    // Ohne Kennzeichen (aeltere Antwort) wie bisher: fehlend.
+    assert.equal(attendanceState({ status: null }), 'missing');
+});
+
+test('Terminansicht: "Kommend" ist ein Chip der Partition, "Alle" blendet nichts aus', () => {
+    const items = [
+        { status: 'excused', appointment_started: 0 },
+        { status: null, appointment_started: 0 },
+        { status: null, appointment_started: 0 },
+    ];
+    assert.deepEqual(countChips(items, CHIPS_RECORDS_LIST),
+        { all: 3, present: 0, excused: 1, missing: 0, upcoming: 2 });
+    assertPartition(CHIPS_RECORDS_LIST, items, 'Terminansicht kommend');
+    assertPartition(CHIPS_RECORDS_LIST, [
+        { status: 'present', appointment_started: 1 }, { status: null, appointment_started: 1 },
+    ], 'Terminansicht begonnen');
+});
+
+test('Mitgliedsansicht: "Alle" und Status nur begonnene, "Kommend" alle kommenden', () => {
+    const items = [
+        { status: 'present', appointment_started: 1 },
+        { status: null,      appointment_started: 1 },
+        { status: 'excused', appointment_started: 1 },
+        { status: 'excused', appointment_started: 0 },
+        { status: null,      appointment_started: 0 },
+        { status: null,      appointment_started: 0 },
+    ];
+    assert.deepEqual(countChips(items, CHIPS_RECORDS_MEMBER),
+        { all: 3, present: 1, excused: 1, missing: 1, upcoming: 3 });
+    assert.equal(filterByChip(items, CHIPS_RECORDS_MEMBER, 'all').length, 3);
+    assert.equal(filterByChip(items, CHIPS_RECORDS_MEMBER, 'upcoming').length, 3,
+        'Auch die vorab entschuldigten kommenden Termine stehen unter "Kommend"');
+
+    // Die Status-Chips teilen die begonnenen restlos auf.
+    const begonnen = items.filter(r => Number(r.appointment_started) !== 0);
+    const status = CHIPS_RECORDS_MEMBER.filter(d => ['present', 'excused', 'missing'].includes(d.key));
+    for (const r of begonnen) {
+        assert.equal(status.filter(d => d.match(r)).length, 1, JSON.stringify(r));
+    }
+    for (const r of items.filter(r => Number(r.appointment_started) === 0)) {
+        assert.equal(status.filter(d => d.match(r)).length, 0, 'Kommende zaehlen unter keinem Status: ' + JSON.stringify(r));
+    }
+});
+
+test('"Kommend" ist neutral gefaerbt und in beiden Listensaetzen gleich beschriftet', () => {
+    for (const defs of [CHIPS_RECORDS_LIST, CHIPS_RECORDS_MEMBER]) {
+        const chip = defs.find(d => d.key === 'upcoming');
+        assert.ok(chip, 'Chip "Kommend" fehlt');
+        assert.equal(chip.label, 'Kommend');
+        assert.equal(chip.variant, undefined);
+    }
+    assert.ok(!CHIPS_RECORDS_ALL.some(d => d.key === 'upcoming'));
 });

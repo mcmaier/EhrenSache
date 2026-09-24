@@ -515,6 +515,13 @@ async function saveAllSettings() {
             resetStationPinSettings();
         }
 
+        // Das Check-in-Fenster ist zugleich der Vorlauf, ab dem ein Termin als
+        // begonnen gilt (OI-89) -- appointments.js haelt ihn zwischengespeichert.
+        if (updates.some(u => u.key === 'checkin_tolerance_hours')) {
+            const { resetAttendanceLead } = await import('./appointments.js');
+            resetAttendanceLead();
+        }
+
         // Gruppendialog und Gruppenliste zeigen das Wort ohne Neuladen der Seite
         if (updates.some(u => u.key === 'subgroup_label')) {
             updateSubgroupLabelElements();

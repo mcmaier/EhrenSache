@@ -63,6 +63,10 @@ const POSITION_NAMES = { '1': 'ersten', '2': 'zweiten', '3': 'dritten', '4': 'vi
 export async function loadAppointments(forceReload = false) {
     const year = currentYear;
 
+    // Vor jedem Aufbau von Liste und Kalender: appointmentHasStarted() braucht
+    // den Vorlauf synchron (OI-89).
+    await ensureAttendanceLead();
+
     // Cache verwenden wenn vorhanden und nicht forceReload
     if (!forceReload && isCacheValid('appointments', year)) {
         debug.log(`Loading APPOINTMENTS from CACHE for ${year}`);
@@ -1634,10 +1638,37 @@ export function setCalendarMonth(date) {
     }
 }
 
-// Der Vorlauf entspricht dem Check-in-Fenster (Einstellung checkin_tolerance_hours,
-// Vorgabe zwei Stunden): So frueh koennen bereits Erfassungen zum Termin liegen.
-// Die Oberflaeche kennt die Einstellung nicht, daher der feste Wert.
-const ATTENDANCE_LEAD_MS = 2 * 60 * 60 * 1000;
+// Der Vorlauf entspricht dem Check-in-Fenster (Einstellung checkin_tolerance_hours):
+// So frueh koennen bereits Erfassungen zum Termin liegen. Derselbe Wert wie auf
+// dem Server (attendanceHasStarted(), OI-89). settings?scope=client liefert ihn
+// auch ohne Adminrecht; bis zur Antwort gilt die Vorgabe von zwei Stunden.
+const DEFAULT_ATTENDANCE_LEAD_HOURS = 2;
+let attendanceLeadMs = DEFAULT_ATTENDANCE_LEAD_HOURS * 60 * 60 * 1000;
+let attendanceLeadLoaded = false;
+
+/**
+ * Laedt den Vorlauf einmal. appointmentHasStarted() laeuft synchron mitten im
+ * Aufbau von Terminliste und Popup -- der Wert muss vorher bereitliegen.
+ * Nur ein erfolgreicher Abruf wird gemerkt, wie bei loadStationPinSettings().
+ */
+async function ensureAttendanceLead() {
+    if (attendanceLeadLoaded) return;
+    try {
+        const res   = await apiCall('settings', 'GET', null, { scope: 'client' });
+        const hours = parseInt(res?.settings?.checkin_tolerance_hours, 10);
+        if (res?.success && Number.isInteger(hours) && hours >= 0 && hours <= 8) {
+            attendanceLeadMs     = hours * 60 * 60 * 1000;
+            attendanceLeadLoaded = true;
+        }
+    } catch (error) {
+        debug.warn('Check-in-Fenster nicht geladen, Vorgabe bleibt:', error);
+    }
+}
+
+/** Verwirft den Vorlauf, nachdem die Einstellung geaendert wurde. */
+export function resetAttendanceLead() {
+    attendanceLeadLoaded = false;
+}
 
 /**
  * Laeuft das Anwesenheitsfenster des Termins schon? Nur dann gibt es etwas zu
@@ -1647,7 +1678,7 @@ const ATTENDANCE_LEAD_MS = 2 * 60 * 60 * 1000;
  */
 function appointmentHasStarted(apt) {
     const start = new Date(`${apt.date}T${apt.start_time || '00:00:00'}`);
-    return !isNaN(start.getTime()) && start.getTime() - ATTENDANCE_LEAD_MS <= Date.now();
+    return !isNaN(start.getTime()) && start.getTime() - attendanceLeadMs <= Date.now();
 }
 
 /**

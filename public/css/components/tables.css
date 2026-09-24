@@ -132,3 +132,9 @@ tr.row-inactive:hover td {
     border-color: var(--danger-color, #e74c3c);
     color: white;
 }
+
+/* Anwesenheitsliste: Termin hat noch nicht begonnen (OI-89) -- neutral, kein Fehler */
+.attendance-upcoming {
+    color: var(--text-muted);
+    font-weight: 500;
+}

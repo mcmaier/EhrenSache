@@ -335,12 +335,21 @@ test('Anwesenheit ab dem Check-in-Fenster und nur fuer Verwalter', function () u
     // (ABS(TIMESTAMPDIFF(...)) <= toleranceSeconds, Vorgabe zwei Stunden).
     // Ohne Vorlauf fehlte der Knopf genau in der Aufbauphase, in der schon
     // Erfassungen vorliegen.
-    assertTrue(str_contains($js, 'const ATTENDANCE_LEAD_MS = 2 * 60 * 60 * 1000;'),
-        'Vorlauf-Konstante fehlt');
-
     $started = caFeFunctionBody($js, 'function appointmentHasStarted(');
-    assertTrue(str_contains($started, 'start.getTime() - ATTENDANCE_LEAD_MS <= Date.now()'),
+    assertTrue(str_contains($started, 'start.getTime() - attendanceLeadMs <= Date.now()'),
         'Zeitpruefung ohne Vorlauf -- der Knopf erschiene erst ab Beginn');
+
+    // OI-89: Der Vorlauf kommt aus checkin_tolerance_hours, nicht fest verdrahtet.
+    assertSame(0, substr_count($js, 'ATTENDANCE_LEAD_MS'), 'Fester Vorlauf muss entfallen');
+    $ensure = caFeFunctionBody($js, 'async function ensureAttendanceLead(');
+    assertTrue(str_contains($ensure, "scope: 'client'") && str_contains($ensure, 'checkin_tolerance_hours'),
+        'Vorlauf muss aus settings?scope=client kommen');
+    $load = caFeFunctionBody($js, 'export async function loadAppointments(');
+    assertTrue(str_contains($load, 'await ensureAttendanceLead()'),
+        'Der Vorlauf muss vor dem Aufbau geladen sein -- appointmentHasStarted() laeuft synchron');
+    $settings = caFeFile($caFeRoot, 'public/js/modules/settings.js');
+    assertTrue(str_contains($settings, 'resetAttendanceLead()'),
+        'Nach Aenderung des Check-in-Fensters muss der Vorlauf neu geladen werden');
 
     $popup = caFeFunctionBody($js, 'function showAppointmentPopup(');
     assertTrue((bool) preg_match('/fest && isAdminOrManager && appointmentHasStarted\(apt\)/', $popup),

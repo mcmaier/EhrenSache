@@ -597,3 +597,23 @@ test('Ein leerer Chip-Container erscheint nicht als Karte', function () use ($fc
     assertTrue(str_contains($fcCss, '.filter-chips:empty'),
         'Ohne .filter-chips:empty steht ein noch leerer Container als weisse Karte da');
 });
+
+test('Anwesenheit: "Kommend" statt "Fehlend" fuer kommende Termine (OI-89)', function () use ($fcRoot) {
+    $js = fcModul($fcRoot, 'records');
+
+    // Mitgliedsansicht mit eigenem Satz (Variante A), Terminansicht mit dem Listensatz.
+    $start = strpos($js, 'function recordChipDefs(');
+    assertTrue($start !== false, 'recordChipDefs() fehlt');
+    $rumpf = substr($js, $start, 400);
+    assertTrue(str_contains($rumpf, 'RecordMode.ATTENDANCE_BY_MEMBER) return CHIPS_RECORDS_MEMBER'),
+        'Mitgliedsansicht muss CHIPS_RECORDS_MEMBER nutzen');
+
+    // Beide Zeilenbauer lesen den Zustand aus derselben Stelle.
+    assertSame(2, substr_count($js, '= attendanceStatusCell('), 'Beide Listen muessen attendanceStatusCell() nutzen');
+    assertSame(1, substr_count($js, '✗ Fehlend'), '"Fehlend" darf nur noch in attendanceStatusCell() stehen');
+    assertTrue(str_contains($js, 'Kommend'), 'Anzeige "Kommend" fehlt');
+
+    $css = (string) file_get_contents($fcRoot . '/public/css/components/tables.css');
+    assertTrue((bool) preg_match('/\.attendance-upcoming\s*\{[^}]*var\(--text-muted\)/s', $css),
+        '"Kommend" braucht eine neutrale Farbe aus variables.css');
+});
