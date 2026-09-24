@@ -506,3 +506,48 @@ test('Die Segmente des Balkens nehmen die Farben aus den Variablen', function ()
     assertTrue(str_contains($css, 'var(--warning-color)'), 'Entschuldigt muss die Warnfarbe nehmen');
     assertTrue(str_contains($css, 'var(--danger-color)'), 'Fehlend muss die Gefahrenfarbe nehmen');
 });
+
+// ---- Review: Rueckgabewert der Schnellerfassung ---------------------------------------
+
+test('Die Schnellerfassung meldet erst Erfolg, wenn der Server einen meldet', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/records.js');
+
+    // apiCall() wirft nicht: 401 liefert null, jeder andere Fehler {success:false}.
+    // Ohne Pruefung lief der Code bis zum Erfolgs-Toast weiter, obwohl nichts
+    // gespeichert wurde -- und verwarf obendrein den Cache fuer nichts.
+    foreach (['async function quickCreateRecordForMember(',
+              'async function quickCreateRecordForAppointment('] as $signature) {
+        $body = caFeFunctionBody($js, $signature);
+
+        assertTrue(str_contains($body, "const result = await apiCall('records', 'POST'"),
+            "{$signature}: Der Rueckgabewert von apiCall() wird nicht festgehalten");
+        assertTrue(str_contains($body, 'if (!result || !result.success)'),
+            "{$signature}: null (401) und {success:false} muessen beide abgefangen werden");
+        assertTrue(str_contains($body, "showToast('Anwesenheit konnte nicht erfasst werden', 'error')"),
+            "{$signature}: Fehlermeldung fehlt");
+
+        $guard   = strpos($body, 'if (!result || !result.success)');
+        $success = strpos($body, "showToast(message, 'success')");
+        assertTrue($guard !== false && $success !== false && $guard < $success,
+            "{$signature}: Die Pruefung muss vor dem Erfolgs-Toast stehen");
+
+        $invalidate = strpos($body, "invalidateCache('appointments'");
+        assertTrue($invalidate !== false && $guard < $invalidate,
+            "{$signature}: Ohne gespeicherten Datensatz gibt es nichts zu verwerfen");
+    }
+});
+
+test('records.js protokolliert ueber debug, nicht ueber console', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/records.js');
+
+    // Projektregel: console.* umgeht den Debug-Schalter und schreibt auch im
+    // Normalbetrieb in die Konsole.
+    assertTrue(!str_contains($js, 'console.'), 'records.js darf console.* nicht verwenden');
+
+    foreach (['async function loadMemberAttendanceList(',
+              'async function quickCreateRecordForMember(',
+              'async function quickCreateRecordForAppointment('] as $signature) {
+        $body = caFeFunctionBody($js, $signature);
+        assertTrue(str_contains($body, 'debug.error('), "{$signature}: catch ohne debug.error");
+    }
+});

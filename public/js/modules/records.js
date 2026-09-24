@@ -1679,7 +1679,7 @@ async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
             renderMemberAttendanceList(attendance.appointments, attendance.member);
         }
     } catch (error) {
-        console.error('Fehler beim Laden der Mitglieder-Anwesenheit:', error);
+        debug.error('Fehler beim Laden der Mitglieder-Anwesenheit:', error);
     }
 }
 
@@ -1847,13 +1847,21 @@ async function quickCreateRecordForMember(memberId, status = 'present') {
     }
     
     try {
-        await apiCall('records', 'POST', {
+        const result = await apiCall('records', 'POST', {
             member_id: parseInt(memberId),
             appointment_id: parseInt(appointmentId),
             status: status
             // status wird automatisch 'present'
         });
-        
+
+        // apiCall wirft nicht: bei einem Serverfehler kommt null oder success=false
+        // zurueck. Ohne diese Pruefung meldete die Oberflaeche Erfolg, obwohl nichts
+        // gespeichert wurde.
+        if (!result || !result.success) {
+            showToast('Anwesenheit konnte nicht erfasst werden', 'error');
+            return;
+        }
+
         const message = status === 'excused' ? 'Entschuldigung erfasst' : 'Anwesenheit erfasst';
         showToast(message, 'success');
 
@@ -1865,7 +1873,7 @@ async function quickCreateRecordForMember(memberId, status = 'present') {
         await loadAttendanceList(appointmentId);
         
     } catch (error) {
-        console.error('Fehler beim Erstellen:', error);
+        debug.error('Fehler beim Erstellen:', error);
         showToast('Fehler beim Erstellen der Anwesenheit', 'error');
     }
 }
@@ -1881,12 +1889,20 @@ async function quickCreateRecordForAppointment(appointmentId, status = 'present'
     }
     
     try {
-        await apiCall('records', 'POST', {
+        const result = await apiCall('records', 'POST', {
             member_id: parseInt(memberId),
             appointment_id: parseInt(appointmentId),
             status: status
         });
-        
+
+        // apiCall wirft nicht: bei einem Serverfehler kommt null oder success=false
+        // zurueck. Ohne diese Pruefung meldete die Oberflaeche Erfolg, obwohl nichts
+        // gespeichert wurde.
+        if (!result || !result.success) {
+            showToast('Anwesenheit konnte nicht erfasst werden', 'error');
+            return;
+        }
+
         const message = status === 'excused' ? 'Entschuldigung erfasst' : 'Anwesenheit erfasst';
         showToast(message, 'success');
 
@@ -1898,7 +1914,7 @@ async function quickCreateRecordForAppointment(appointmentId, status = 'present'
         await loadMemberAttendanceList(memberId, currentAppointmentType);
         
     } catch (error) {
-        console.error('Fehler beim Erstellen:', error);
+        debug.error('Fehler beim Erstellen:', error);
         showToast('Fehler beim Erstellen der Anwesenheit', 'error');
     }
 }
