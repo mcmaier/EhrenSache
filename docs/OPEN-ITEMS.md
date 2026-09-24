@@ -4,8 +4,8 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-17 · **Bezugsstand:** `dev`, Fehlerkorrekturen für 1.9.1 ·
-**Version:** 1.9.1
+**Zuletzt geprüft:** 2026-09-24 · **Bezugsstand:** `dev` = `main` = `v1.15.0` (`fbfc73b`) ·
+**Version:** 1.15.0
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
 > während der Code auf 1.9.0 war — fünf Punkte waren längst behoben, ohne dass ihr Eintrag es
@@ -21,14 +21,16 @@ oder noch nicht gebaut.
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
 *mittel* = sollte vor der Freigabe an Vereine gelöst sein · *niedrig* = Verbesserung
 
-**Nächste Umsetzung (Stand 2026-09-22, aus dem Test vom 21.09.):** Die drei Fehlerkorrekturen
-[OI-83](#oi-83--arbeitszeit-mit-ortsnachweis-ohne-kamera-nicht-startbar),
-[OI-84](#oi-84--leeres-filterergebnis-lässt-die-alte-paginierung-stehen) und
-[OI-82](#oi-82--nachträglicher-zeitantrag-auch-für-termine-in-der-zukunft) sind am selben Tag auf
-`dev` erledigt und mit 1.11.2 veröffentlicht.
+**Nächste Umsetzung (Stand 2026-09-24, nach 1.15.0):**
+[OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)
+(Terminfarbe als Randakzent) liegt bei der Sitzung „Kalender-Termine und Serien“ und wartet auf
+vier Gestaltungsentscheidungen des Nutzers. Entschieden, aber nicht gebaut ist
+[OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe). Offen mit
+Priorität *mittel*: OI-67, OI-96, OI-98, OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23.
 
-[OI-85](#oi-85--keine-ladeanzeige-und-kein-timeout-bei-langsamen-api-antworten) ist erledigt (nach 1.12.0).
-[OI-86](#oi-86--bunte-status-filterknöpfe-nur-in-der-benutzerverwaltung) ist mit 1.13.0 erledigt (Status-Chips).
+Seit der letzten Prüfung (17.09.) veröffentlicht: OI-82 bis OI-84 (1.11.2), OI-85 (1.12.1),
+OI-86 und OI-87 (1.13.0), OI-25, OI-27, OI-66 und OI-95 (1.14.x),
+[OI-89](#oi-89--anwesenheit-eines-mitglieds-zählt-kommende-termine-als-fehlend) (1.15.0).
 
 ---
 
@@ -2685,7 +2687,8 @@ Tätigkeitsarten, die Blöcke `rate_bands`, `punctuality` und `reliability` bei 
 `self_approval_blocked` bei `attendance_list` — letzteres samt Erklärung, wann der Server die
 Genehmigung des eigenen Antrags abweist (siehe [OI-87](#oi-87--anträge-in-der-anwesenheitsliste-des-dashboards-selbstgenehmigung-nur-ohne-zweiten-verwalter)).
 
-**Restpunkte:** Nicht bewacht sind die Schreibpfade sowie `appointment_responses`,
+**Restpunkte** (seit 2026-09-24 als eigener Eintrag
+[OI-100](#oi-100--api-abgleich-schreibpfade-und-fünf-lesepfade-nicht-bewacht)): Nicht bewacht sind die Schreibpfade sowie `appointment_responses`,
 `session_info`, `update_check`, die Terminserien und die Check-in-Endpunkte. Bei `holidays` und `my_open_items.items` vergleicht der Wächter bewusst
 nicht die inneren Schlüssel — dort sind Kalenderdaten die Schlüssel beziehungsweise die Felder
 hängen am `kind`.
@@ -3226,7 +3229,12 @@ nicht erreichbar.
 ---
 
 ### OI-80 · Kalendertage mit Terminen: keine Tastaturbedienung, Feiertag fehlt im Vorlesetext
-**Priorität:** niedrig · aufgenommen am 2026-09-21
+**Priorität:** zusammengelegt am 2026-09-24 mit
+[OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar) — derselbe Fund,
+dort mit Priorität *mittel* und beiden Teilen (Tastatur **und** Feiertag im Vorlesetext). Hier
+nichts mehr umsetzen. Der Eintrag bleibt für die Vorgeschichte stehen.
+
+_Ursprünglich:_ niedrig · aufgenommen am 2026-09-21
 
 `createCalendarDay()` (`public/js/modules/appointments.js`) behandelt zwei Tagesarten
 unterschiedlich:
@@ -3591,8 +3599,8 @@ dokumentierte Regel (OI-3), keine Rechteausweitung.
 ---
 
 ### OI-89 · Anwesenheit eines Mitglieds zählt kommende Termine als „Fehlend“
-**Priorität:** erledigt am 2026-09-24 — Branch `fix/oi-89-kommend`, unveröffentlicht (Version legt
-die Release-Sitzung fest). Alle fünf Punkte unter „Beschlossen“ umgesetzt: `attendanceHasStarted()`
+**Priorität:** erledigt am 2026-09-24 — mit **1.15.0** veröffentlicht (`fbfc73b`, Branch
+`fix/oi-89-kommend`). Alle fünf Punkte unter „Beschlossen“ umgesetzt: `attendanceHasStarted()`
 mit Vorlauf und Datenbankuhr, `attendanceStartedSql()` ersetzt `ATTENDANCE_STARTED_CUTOFF_SQL` in
 allen fünf Abfragen, `attendance_list` liefert `appointment_started`, Chipsatz
 `CHIPS_RECORDS_MEMBER` für die Mitgliedsansicht, Kalender liest `checkin_tolerance_hours` statt
@@ -3892,6 +3900,15 @@ Zahlen haben keinen zweiten Weg.
 Enter/Space). Dabei klären, wie das Popup per Tastatur wieder geschlossen wird — `mouseleave`
 greift dort nicht, es braucht Escape und vermutlich einen Fokusrahmen.
 
+**Aus OI-80 übernommen (zusammengelegt am 2026-09-24):** Das `aria-label` eines Tages mit
+Terminen nennt Uhrzeit, Terminart, Titel und Rückmeldungen, aber **nicht** den Feiertag
+(`calendar-day--holiday`, `holidaysOfYear()`), den sehende Nutzer als Text im Tagesfeld lesen.
+Den Feiertagsnamen, sofern vorhanden, vorn ins `aria-label` aufnehmen. Am 24.09. gegen den Code
+geprüft: Beide Teile sind weiterhin offen, `tabindex`/`keydown` gibt es nur im Leer-Zweig.
+
+**Achtung Reihenfolge:** OI-94 baut dieselbe Datei um (`showAppointmentPopup()`). Nach OI-94
+umsetzen oder mit der Kalender-Sitzung abstimmen.
+
 **Nicht sicherheitsrelevant.**
 
 ---
@@ -3973,5 +3990,29 @@ Zwischenspeicher liegen.
 mehrere Jahre auf einmal. Muster und Begründung stehen an den entsprechenden Stellen in
 [records.js](../public/js/modules/records.js) und
 [import_export.js](../public/js/modules/import_export.js).
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-100 · API-Abgleich: Schreibpfade und fünf Lesepfade nicht bewacht
+**Priorität:** niedrig · aufgenommen am 2026-09-24 (Rest aus
+[OI-66](#oi-66--apimd-gegen-die-echten-antworten-prüfen), bis dahin ohne eigene Nummer)
+
+`tests/suites/api_doc_keys.php` hält seit 1.14.0 für die Lesepfade fest, dass jeder in `API.md`
+dokumentierte Antwortschlüssel in der echten Antwort vorkommt. **Nicht** bewacht sind:
+
+- alle **Schreibpfade** (POST/PUT/DELETE) — sie brauchen eine Welt zum Anlegen und Aufräumen;
+- die Lesepfade `appointment_responses`, `session_info`, `update_check`, die Terminserien und
+  die Check-in-Endpunkte (`auto_checkin`, `totp_checkin`, `station`);
+- bei `holidays` und `my_open_items.items` die inneren Schlüssel — bewusst, weil dort
+  Kalenderdaten die Schlüssel sind bzw. die Felder am `kind` hängen.
+
+Ohne Wächter kann die Dokumentation dieser Pfade wieder auseinanderlaufen, wie vor OI-66 an 30
+Stellen geschehen.
+
+**Zu tun:** Die fehlenden Lesepfade in `adEndpoints()` aufnehmen (günstig, dieselbe Mechanik).
+Für Schreibpfade entscheiden, ob sich der Aufwand lohnt — Kandidaten zuerst dort, wo Fremdgeräte
+anbinden (`totp_checkin`, `station`), weil ein falsches Format dort erst beim Anwender auffällt.
 
 **Nicht sicherheitsrelevant.**
