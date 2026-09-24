@@ -472,13 +472,23 @@ test('attendanceTotals summiert die Termine eines Tages', function () use ($caFe
     assertTrue(str_contains($body, 'missing'), 'Fehlend fehlt');
     assertTrue((bool) preg_match('/if\s*\(\s*!\s*a\s*\)|if\s*\(\s*!\s*apt\.attendance\s*\)/', $body),
         'Ein Termin ohne Zahlen (noch nicht begonnen) darf nicht als drei Nullen mitzaehlen');
+
+    // Ein "=" statt "+=" bestuende alle Zusicherungen oben: der Tag zeigte dann
+    // die Zahlen des letzten Termins statt der Summe.
+    foreach (['expected', 'present', 'excused', 'missing'] as $feld) {
+        assertTrue((bool) preg_match('/sum\.' . $feld . '\s*\+=/', $body),
+            "sum.{$feld} muss addieren, nicht zuweisen -- sonst zaehlt nur der letzte Termin");
+    }
 });
 
 test('worstOwnStatus nimmt den schlechtesten eigenen Status des Tages', function () use ($caFeRoot) {
     $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
     $body = caFeFunctionBody($js, 'function worstOwnStatus(');
-    assertTrue((bool) preg_match('/missing[\s\S]*excused[\s\S]*present/', $body),
-        'Die Reihenfolge entscheidet: fehlend schlaegt entschuldigt schlaegt anwesend');
+
+    // Nicht die Reihenfolge der Woerter pruefen: { missing: 1, excused: 2,
+    // present: 3 } -- also genau die verkehrte Rangfolge -- bestuende das.
+    assertTrue((bool) preg_match('/missing:\s*3[\s\S]*excused:\s*2[\s\S]*present:\s*1/', $body),
+        'Die Rangzahlen entscheiden: fehlend schlaegt entschuldigt schlaegt anwesend');
 });
 
 test('Das Tagesfeld zeichnet Balken fuer Verwalter und Punkt fuer Mitglieder', function () use ($caFeRoot) {
@@ -490,6 +500,13 @@ test('Das Tagesfeld zeichnet Balken fuer Verwalter und Punkt fuer Mitglieder', f
     assertTrue(str_contains($body, 'attendanceTotals('), 'Summierung wird nicht benutzt');
     assertTrue(str_contains($body, 'worstOwnStatus('), 'Eigener Status wird nicht benutzt');
     assertTrue(str_contains($body, 'totals.expected > 0'), 'Ohne erwartete Mitglieder gibt es keinen Balken');
+
+    // Ein Segment der Breite 0 waere ueber min-width trotzdem 2 px breit --
+    // der Tag zeigte eine Farbe, die es an ihm nicht gibt.
+    assertTrue((bool) preg_match('/if\s*\(\s*(value|wert)\s*<=\s*0\s*\)/', $body),
+        'Ein Wert von 0 darf kein Segment erzeugen');
+    assertTrue(str_contains($body, 'flexGrow'),
+        'Die Segmente teilen sich die Breite anteilig ueber flex-grow');
 });
 
 test('Der Vorlesetext nennt die Zahlen bzw. den eigenen Status', function () use ($caFeRoot) {
@@ -502,9 +519,23 @@ test('Der Vorlesetext nennt die Zahlen bzw. den eigenen Status', function () use
 test('Die Segmente des Balkens nehmen die Farben aus den Variablen', function () use ($caFeRoot) {
     $css = caFeFile($caFeRoot, 'public/css/components/calendar.css');
     assertTrue(str_contains($css, '.calendar-attendance-bar'), 'CSS fuer den Balken fehlt');
-    assertTrue(str_contains($css, 'var(--success-color)'), 'Anwesend muss die Erfolgsfarbe nehmen');
-    assertTrue(str_contains($css, 'var(--warning-color)'), 'Entschuldigt muss die Warnfarbe nehmen');
-    assertTrue(str_contains($css, 'var(--danger-color)'), 'Fehlend muss die Gefahrenfarbe nehmen');
+
+    // Auf die Regel zielen, nicht auf die Datei: Erfolgs- und Warnfarbe stehen
+    // hier ohnehin schon (has-event, response-dot). Ein str_contains ueber die
+    // ganze Datei bliebe gruen, auch wenn die Segmente harte Farben truegen.
+    $farben = [
+        'present' => '--success-color',
+        'excused' => '--warning-color',
+        'missing' => '--danger-color',
+    ];
+
+    foreach (['.calendar-attendance-bar__seg', '.calendar-own-dot'] as $basis) {
+        foreach ($farben as $status => $variable) {
+            $muster = '/' . preg_quote($basis, '/') . '\.is-' . $status . '\s*\{[^}]*var\(' . $variable . '\)/';
+            assertTrue((bool) preg_match($muster, $css),
+                "{$basis}.is-{$status} muss var({$variable}) nehmen");
+        }
+    }
 });
 
 // ---- Review: Rueckgabewert der Schnellerfassung ---------------------------------------

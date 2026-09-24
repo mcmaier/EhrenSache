@@ -153,11 +153,18 @@
     height: 3px;
     display: flex;
     overflow: hidden;
+    /* Sonst lugen die eckigen Enden aus der gerundeten Zellenkante heraus --
+       .calendar-day rundet, hat aber kein overflow: hidden. */
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 
 .calendar-attendance-bar__seg {
     height: 100%;
     flex-basis: 0;
+    /* Ein Fehlender unter 200 Erwarteten ergaebe weniger als einen Pixel und
+       verschwaende -- der Tag saehe durchgehend gruen aus. Bei drei Segmenten
+       sind das hoechstens 6 px, auch in der schmalsten Handyzelle unkritisch. */
+    min-width: 2px;
 }
 
 .calendar-attendance-bar__seg.is-present {
@@ -172,11 +179,13 @@
     background: var(--danger-color);
 }
 
-/* Mitglieder sehen statt der Zahlen anderer nur ihren eigenen Status. */
+/* Mitglieder sehen statt der Zahlen anderer nur ihren eigenen Status.
+   Oben links, spiegelbildlich zum Rueckmeldungspunkt oben rechts: unten
+   liegt auf dem Handy der Feiertagsname, der die Zellenbreite fuellt. */
 .calendar-own-dot {
     position: absolute;
+    top: 4px;
     left: 4px;
-    bottom: 4px;
     width: 6px;
     height: 6px;
     border-radius: 50%;
@@ -194,8 +203,10 @@
     background: var(--danger-color);
 }
 
-/* Der Feiertagsname sitzt sonst auf dem Balken. */
-.calendar-day--holiday .calendar-holiday-name {
+/* Der Feiertagsname sitzt sonst auf dem Balken -- nur dort, wo einer
+   gezeichnet ist. An den Feiertag gebunden rueckte der Name auch ohne
+   Termin hoch, etwa in der Mitgliedersicht. */
+.calendar-day:has(.calendar-attendance-bar) .calendar-holiday-name {
     margin-bottom: 4px;
 }
 

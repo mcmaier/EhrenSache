@@ -513,6 +513,9 @@ function renderCalendar() {
     }
 }
 
+/** Text des eigenen Status -- Tagesfeld (Vorlesetext) und Popup nutzen denselben. */
+const OWN_STATUS_TEXT = { present: 'Du warst anwesend', excused: 'Du warst entschuldigt', missing: 'Du warst nicht da' };
+
 /**
  * Summiert die Anwesenheit aller Termine eines Tages. Termine ohne Zahlen
  * zaehlen nicht mit: attendance ist null, solange der Termin serverseitig
@@ -535,21 +538,21 @@ function attendanceTotals(dayAppointments) {
 
 /**
  * Der schlechteste eigene Status des Tages. Bei mehreren Terminen zaehlt der
- * ungueltigste: fehlend vor entschuldigt vor anwesend. Liefert null, wenn kein
+ * schlechteste: fehlend vor entschuldigt vor anwesend. Liefert null, wenn kein
  * Termin des Tages einen eigenen Status traegt -- das heisst "noch nicht
  * begonnen" oder "hier nicht erwartet", beides ohne Punkt.
  */
 function worstOwnStatus(dayAppointments) {
-    const rang = { missing: 3, excused: 2, present: 1 };
-    let schlechtester = null;
+    const rank = { missing: 3, excused: 2, present: 1 };
+    let worst = null;
     (dayAppointments || []).forEach(apt => {
         const s = apt.own_attendance;
-        if (s && rang[s] && (!schlechtester || rang[s] > rang[schlechtester])) {
-            schlechtester = s;
+        if (s && rank[s] && (!worst || rank[s] > rank[worst])) {
+            worst = s;
         }
     });
 
-    return schlechtester;
+    return worst;
 }
 
 function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, appointments = []) {
@@ -615,8 +618,13 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
         // Anwesenheit (Schritt 2b): Verwalter sehen einen Dreifarbbalken ueber
         // alle Termine des Tages, Mitglieder einen Punkt in der Farbe ihres
         // eigenen Status. Die Zahlen kommen aus dem Terminabruf des Jahres.
+        //
+        // Der laufende Termin faerbt das Tagesfeld von heute zunaechst vollrot:
+        // ab dem Start gilt jeder Erwartete als fehlend, solange niemand erfasst
+        // ist. Das ist eine Entscheidung des Nutzers und kein Fehler -- es zeigt
+        // ungeschminkt, dass noch nicht erfasst wurde. Nicht "reparieren".
         const totals = attendanceTotals(dayAppointments);
-        const eigenerStatus = worstOwnStatus(dayAppointments);
+        const ownStatus = worstOwnStatus(dayAppointments);
 
         if (isAdminOrManager && totals.expected > 0) {
             const bar = document.createElement('div');
@@ -624,22 +632,22 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
             bar.setAttribute('aria-hidden', 'true');
 
             [['present', totals.present], ['excused', totals.excused], ['missing', totals.missing]]
-                .forEach(([art, wert]) => {
-                    if (wert <= 0) {
+                .forEach(([kind, value]) => {
+                    if (value <= 0) {
                         return;
                     }
                     const seg = document.createElement('span');
-                    seg.className = `calendar-attendance-bar__seg is-${art}`;
-                    seg.style.flexGrow = String(wert);
+                    seg.className = `calendar-attendance-bar__seg is-${kind}`;
+                    seg.style.flexGrow = String(value);
                     bar.appendChild(seg);
                 });
 
             day.appendChild(bar);
-        } else if (!isAdminOrManager && eigenerStatus) {
-            const eigenerPunkt = document.createElement('span');
-            eigenerPunkt.className = `calendar-own-dot is-${eigenerStatus}`;
-            eigenerPunkt.setAttribute('aria-hidden', 'true');
-            day.appendChild(eigenerPunkt);
+        } else if (!isAdminOrManager && ownStatus) {
+            const ownDot = document.createElement('span');
+            ownDot.className = `calendar-own-dot is-${ownStatus}`;
+            ownDot.setAttribute('aria-hidden', 'true');
+            day.appendChild(ownDot);
         }
 
         // Termine des Tages als Vorlesetext.
@@ -653,12 +661,13 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
         }).join('; ')
             + withResponses.map(a => `; ${responseSummaryTitle(a.responses)}`).join('')
             + (responseOpen ? '; Rückmeldung offen' : '')
+            // Ohne "von X": bei mehreren Terminen zaehlt expected die Plaetze,
+            // nicht die Personen -- zweimal dieselbe Gruppe ergaebe 50 statt 25.
+            // Fuer die Anteile des Balkens ist das richtig, fuer den Satz nicht.
             + (isAdminOrManager && totals.expected > 0
-                ? `; Anwesend ${totals.present}, Entschuldigt ${totals.excused}, Fehlend ${totals.missing} von ${totals.expected}`
+                ? `; Anwesend ${totals.present}, Entschuldigt ${totals.excused}, Fehlend ${totals.missing}`
                 : '')
-            + (!isAdminOrManager && eigenerStatus
-                ? `; ${ { present: 'Du warst anwesend', excused: 'Du warst entschuldigt', missing: 'Du warst nicht da' }[eigenerStatus] }`
-                : ''));
+            + (!isAdminOrManager && ownStatus ? `; ${OWN_STATUS_TEXT[ownStatus]}` : ''));
 
         // Ueberfahren zeigt dasselbe Popup wie der Klick, nur fluechtig. Die
         // kleine Verzoegerung verhindert, dass beim Wandern ueber den Kalender
