@@ -81,8 +81,15 @@ Bei Session-basierter Authentifizierung ist ein CSRF-Token erforderlich:
 
 ## Rate Limiting
 
-- **100 Requests pro Minute** pro IP/User-Kombination
-- Bei Überschreitung: HTTP 429 mit `retry_after` in Sekunden
+- **150 Requests pro Minute je IP-Adresse für unangemeldete Aufrufe.** Bei Überschreitung:
+  HTTP 429 mit `retry_after` in Sekunden. Ein ungültiger Token zählt als unangemeldet — sonst
+  ließe sich die Grenze mit Zufallstoken umgehen und Token wären ungebremst durchprobierbar.
+- **Angemeldete Aufrufe** (gültiger Token oder Sitzung) zählen hier nicht mit. Missbrauch ist
+  dort einem Konto zurechenbar und lässt sich abschalten; die heiklen Einzelwege haben eigene,
+  engere Grenzen.
+- **Eigene Grenzen, jeweils in der Datenbank gezählt:** Anmeldung (5 Fehlversuche je Konto und
+  IP in 15 Minuten), Stations-PIN (5 je Mitglied, 30 je Kiosk in 15 Minuten), Mailversand.
+- `ping` zählt nicht mit: Die Statusabfrage kommt ohne Datenbank aus.
 
 ## HTTP Status Codes
 

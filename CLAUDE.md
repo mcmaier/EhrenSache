@@ -242,7 +242,9 @@ exceptions, statistics und work_sessions (siehe `docs/OPEN-ITEMS.md`).
 
 - Prepared Statements für alle DB-Queries (kein SQL-Injection-Risiko)
 - CSRF-Token für alle mutierende Requests via Session
-- Rate Limiting: 100 Requests/Minute pro IP+User (`private/helpers/rate_limiter.php`)
+- Rate Limiting: 150 Requests/Minute je IP fuer **unangemeldete** Aufrufe, in der Datenbank
+  gezaehlt (`private/helpers/rate_limiter.php`, Abschnitt 6.2 in `api.php`). Angemeldete zaehlen
+  nicht mit; Anmeldung, Stations-PIN und Mailversand haben eigene, engere Grenzen
 - Session-Timeout: 1800 Sekunden, gesetzt in `public/api/api.php`
 - TOTP für standortgebundene Geräte-Check-ins
 - HttpOnly + SameSite Cookies, `Secure` nur über HTTPS (`public/api/api.php`)

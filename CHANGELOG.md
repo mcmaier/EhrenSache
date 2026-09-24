@@ -7,6 +7,18 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unveröffentlicht]
+
+### Behoben
+- **Die Begrenzung der Anfragen pro Minute wirkt jetzt.** Sie zählte bisher in der Sitzung des
+  Browsers; ein Programm, das keine Cookies annimmt, bekam bei jeder Anfrage einen frischen
+  Zähler und wurde nie gebremst. Gezählt wird jetzt in der Datenbank, und zwar für Aufrufe ohne
+  Anmeldung, 150 pro Minute je Adresse. Für angemeldete Nutzer und für Geräte ändert sich
+  nichts. Die Anmeldung selbst, die Stations-PIN und der Mailversand hatten immer schon eigene
+  Grenzen; die waren nie betroffen.
+
+---
+
 ## [1.14.0] – 2026-09-24
 
 ### Neu

@@ -178,26 +178,14 @@ if (!$apiToken) {
 }
 
 // ============================================
-// 5. RATE LIMITING
+// 5. RATE LIMITING — steht weiter unten, hinter der Datenbankverbindung
 // ============================================
-
-$rateLimiter = new RateLimiter();
-
-// Identifier: IP + User/Token
-$identifier = $_SERVER['REMOTE_ADDR'];
-if(isset($_SESSION['user_id'])) {
-    $identifier .= '_user_' . $_SESSION['user_id'];
-}
-
-// API Rate Limit: 150 Requests pro Minute
-if (!$rateLimiter->check($identifier, 'api_request', 150, 60)) {
-    http_response_code(429);
-    echo json_encode([
-        "message" => "Rate limit exceeded",
-        "retry_after" => 60
-    ]);
-    exit();
-}
+//
+// Die Grenze zaehlt in der Datenbank und braucht dafuer $db. Sie stand bis
+// 1.13.0 hier oben und wurde ohne Datenbank gebaut -- also im Sitzungsmodus.
+// Wer keine Cookies annimmt, bekam bei jeder Anfrage eine frische, leere
+// Sitzung: Der Zaehler stand immer bei null, die Grenze bremste niemanden.
+// Siehe Abschnitt 6.2.
 
 // ============================================
 // 5.1 DEMO-MODUS
@@ -291,6 +279,53 @@ $database = new Database(appConfig()['db']);
 $db = $database->getConnection();
 $prefix = $database->table('');
 
+// ============================================
+// 6.2 RATE LIMITING
+// ============================================
+//
+// Gezaehlt wird in der Datenbank, wie bei Anmeldung, Stations-PIN und
+// Mailversand -- der Sitzungsmodus zaehlte nur, wer Cookies annimmt, und war
+// damit wirkungslos: Ein Aufrufer ohne Cookie bekam bei jeder Anfrage einen
+// leeren Zaehler.
+//
+// Die Grenze gilt fuer **unangemeldete** Aufrufe, je Adresse. Das ist genau
+// die Luecke, die offen stand. Angemeldete Konten und Geraete zaehlen nicht
+// mit: Ihr Missbrauch ist zurechenbar und laesst sich abschalten, und die
+// heiklen Einzelwege haben ohnehin eigene, engere Grenzen (Anmeldung 5/15 min,
+// Stations-PIN, Mailversand). Ein UNGUELTIGER Token gilt als unangemeldet und
+// zaehlt mit -- sonst liesse sich die Grenze mit Zufallstoken umgehen, und das
+// Durchprobieren von Token waere ungebremst.
+//
+// `ping` liegt bewusst davor: Die Statusabfrage soll ohne Datenbank
+// funktionieren und keinen Schreibvorgang ausloesen.
+
+// Den Token-Inhaber schon hier bestimmen; die Authentifizierung weiter unten
+// nutzt dasselbe Ergebnis, es wird also nur einmal nachgeschlagen.
+$tokenUser = null;
+if ($apiToken) {
+    $stmt = $db->prepare("SELECT user_id, member_id, role, is_active, email, api_token_expires_at, device_type
+                          FROM {$prefix}users
+                          WHERE api_token = ?");
+    $stmt->execute([$apiToken]);
+    $tokenUser = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+$istAngemeldet = $tokenUser !== null || isset($_SESSION['user_id']);
+
+if (!$istAngemeldet) {
+    $rateLimiter = new RateLimiter($db, $database);
+
+    // API Rate Limit: 150 Requests pro Minute je Adresse
+    if (!$rateLimiter->check($_SERVER['REMOTE_ADDR'] ?? 'unknown', 'api_request', 150, 60)) {
+        http_response_code(429);
+        echo json_encode([
+            "message" => "Rate limit exceeded",
+            "retry_after" => 60
+        ]);
+        exit();
+    }
+}
+
 // APPEARANCE
 if($resource === 'appearance' && $request_method === 'GET') {
     getAppearance($db, $database);
@@ -353,12 +388,8 @@ $authDeviceType = null;   // nur bei Geraete-Token gesetzt: totp_location | auth
 if($apiToken) {
     //error_log("Token Auth: Token received, length=" . strlen($apiToken));
     
-    $stmt = $db->prepare("SELECT user_id, member_id, role, is_active, email, api_token_expires_at, device_type
-                         FROM {$prefix}users
-                         WHERE api_token = ?");
-    $stmt->execute([$apiToken]);
-    $tokenUser = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+    // $tokenUser steht schon aus Abschnitt 6.2 bereit (die Rate-Grenze zaehlt
+    // je Konto und musste den Inhaber dafuer kennen) -- kein zweiter Nachschlag.
     if(!$tokenUser || !$tokenUser['is_active']) {
         //error_log("Token Auth: Invalid token");
         http_response_code(401);
