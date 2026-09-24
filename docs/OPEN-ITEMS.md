@@ -3604,7 +3604,11 @@ neue Chip-Zähler macht es nur sichtbarer.
      `checkin_tolerance_hours`, nicht fest verdrahtet. Der Kalender rechnet in 1.14.0 noch mit
      festen 2 h (`ATTENDANCE_LEAD_MS` in `appointments.js`, weil das Dashboard die Einstellung
      nicht kennt — `settings` ist `requireAdmin()`). Mit OI-89 gibt der Server den Wert ans
-     Dashboard weiter und der Kalender übernimmt ihn statt der Konstante.
+     Dashboard weiter und der Kalender übernimmt ihn statt der Konstante. **Achtung:**
+     `appointmentHasStarted()` läuft synchron mitten im Aufbau von Terminliste und Popup — der
+     Wert muss vorher geladen und zwischengespeichert sein (z. B. mit den Session-Daten), ein
+     `await` an dieser Stelle wäre ein größerer Umbau. `settings?scope=client` liefert den
+     Schlüssel bereits, wird im Dashboard bisher nur für die Stations-PIN gelesen.
 3. **Mitgliedsansicht — Chip „Kommend“ als gewöhnlicher Chip (Variante A):** „Alle“ und die
    Status-Chips zeigen nur begonnene Termine; der Chip „Kommend“ zeigt ausschließlich die
    kommenden. Kein zweiter, zuschaltbarer Mechanismus in der Chip-Leiste. Umsetzungshinweise
