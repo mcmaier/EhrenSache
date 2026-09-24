@@ -3591,6 +3591,17 @@ dokumentierte Regel (OI-3), keine Rechteausweitung.
 ---
 
 ### OI-89 · Anwesenheit eines Mitglieds zählt kommende Termine als „Fehlend“
+**Priorität:** erledigt am 2026-09-24 — Branch `fix/oi-89-kommend`, unveröffentlicht (Version legt
+die Release-Sitzung fest). Alle fünf Punkte unter „Beschlossen“ umgesetzt: `attendanceHasStarted()`
+mit Vorlauf und Datenbankuhr, `attendanceStartedSql()` ersetzt `ATTENDANCE_STARTED_CUTOFF_SQL` in
+allen fünf Abfragen, `attendance_list` liefert `appointment_started`, Chipsatz
+`CHIPS_RECORDS_MEMBER` für die Mitgliedsansicht, Kalender liest `checkin_tolerance_hours` statt
+`ATTENDANCE_LEAD_MS`. Danach gibt es nur noch **eine** Regel „begonnen“ — ein eigener Eintrag zu
+den früheren drei Definitionen entfällt. Tests: `attendance_started_unit`,
+`attendance_upcoming_api`, `tests/js/filter_chips.test.mjs`.
+
+<details><summary>Ursprünglicher Eintrag</summary>
+
 **Priorität:** niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
 
 `attendance_list.php` (Modus je Mitglied, ~Z. 214–245) liefert alle Termine des Jahres
@@ -3666,6 +3677,8 @@ OI-89 erschienen; Ziel ist der **nächste Release**, dessen Nummer die Release-S
      selben Cutoff, Frontend mit demselben Vorlaufwert.
 
 **Nicht sicherheitsrelevant.**
+
+</details>
 
 ---
 

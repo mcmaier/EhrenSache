@@ -225,3 +225,38 @@ test('GET appointments include=attendance: Zahlen ab dem Check-in-Fenster', func
         upDropWorld($world);
     }
 });
+
+// ---- Statistik: dieselbe Grenze ---------------------------------------------
+
+test('Statistik zaehlt vergangene und laufende Termine, nicht die vor dem Check-in-Fenster', function () {
+    // Bis OI-89 zaehlte die Statistik jeden Termin von heute ab Mitternacht.
+    // Vergangene Termine muessen unveraendert zaehlen, nur der Rand verschiebt sich.
+    $lead  = upLeadHours();
+    $world = upWorld('Statistik', 1);
+    try {
+        $jetzt = time();
+        $ts = [
+            'vorbei' => $jetzt - 86400 * 3,
+            'offen'  => $jetzt + max(0, $lead * 3600 - 1800),
+            'zu'     => $jetzt + $lead * 3600 + 7200,
+        ];
+        $jahre = array_unique(array_map(static fn ($t) => date('Y', $t), $ts));
+        if (count($jahre) !== 1) {
+            return; // Jahreswechsel in Reichweite -- nicht aussagekraeftig
+        }
+        foreach ($ts as $t) {
+            upAppointmentAt($world, $t);
+        }
+
+        $res = apiRequest('GET', 'statistics', ['token' => apiToken('admin'), 'query' => [
+            'year' => (int) date('Y', $jetzt), 'group_id' => $world['group'], 'member_id' => $world['members'][0],
+        ]]);
+        assertStatus(200, $res);
+        assertSame(2, (int) $res['body']['summary']['total_appointments'],
+            'Vergangener und laufender Termin zaehlen, der vor dem Check-in-Fenster nicht: ' . json_encode($res['body']['summary']));
+        assertSame(2, (int) $res['body']['summary']['total_unexcused'],
+            'Beide begonnenen Termine ohne Eintrag sind unentschuldigt');
+    } finally {
+        upDropWorld($world);
+    }
+});

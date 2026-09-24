@@ -730,7 +730,8 @@ zeigen, die inzwischen gar nicht mehr zählt (Mitglied nicht mehr erwartet). `ex
 sagt, ob dieses Mitglied für den Termin erwartet ist. Bei Terminarten ohne Rückmeldung `null`.
 
 **`include=attendance`** (nur zusammen mit `year`, `from_date` oder `to_date`): hängt je Termin,
-dessen Beginn vergangen ist, die Anwesenheit an.
+dessen Check-in-Fenster offen ist (Startzeit minus `checkin_tolerance_hours`, Uhr der Datenbank),
+die Anwesenheit an.
 
 - Admin und Manager: `"attendance": {"expected": 22, "present": 18, "excused": 3, "missing": 1}` —
   `expected` folgt derselben Regel wie die Anwesenheitsliste (Gruppen der Terminart, Aktivzeitraum
@@ -2403,8 +2404,10 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
 mitgeliefert: Jeder Verbraucher, der es selbst ausrechnet, ist eine Stelle mehr, an der die
 Formel auseinanderlaufen kann.
 
-**Ein Termin zählt nur, wenn er bereits begonnen hat** (`date <= CURDATE() + 2h`), und nur
-innerhalb der Mitgliedschaftszeiträume des Mitglieds.
+**Ein Termin zählt nur, wenn er bereits begonnen hat**, und nur innerhalb der
+Mitgliedschaftszeiträume des Mitglieds. Begonnen heißt: Das Check-in-Fenster ist offen —
+Startzeit minus `checkin_tolerance_hours`, gemessen an der Uhr der Datenbank. Bis OI-89 zählte
+hier `date <= CURDATE() + 2h` gegen die Datumsspalte, also jeder Termin von heute ab Mitternacht.
 
 `appointment_types` listet **alle** Terminarten, an denen die Gruppe hängt. `by_type` führt sie
 je Mitglied in **derselben Länge und derselben Reihenfolge** — Eintrag *n* von `by_type` gehört
@@ -3255,7 +3258,8 @@ Alle Schritte laufen in **einer Transaktion**.
     "is_auto_created": 0,
     "type_name": "Probe",
     "color": "#1F5FBF",
-    "group_ids": "1,2"
+    "group_ids": "1,2",
+    "appointment_started": 1
   },
   "members": [
     {
@@ -3270,7 +3274,8 @@ Alle Schritte laufen in **einer Transaktion**.
       "groups":    [{ "group_id": 1, "group_name": "Aktive",     "sort_order": 0 }],
       "subgroups": [{ "group_id": 9, "group_name": "Klarinette", "sort_order": 20 }],
       "pending_exceptions": [{ "exception_id": 2235, "exception_type": "absence",
-                               "reason": "Familienfeier", "requested_arrival_time": null }]
+                               "reason": "Familienfeier", "requested_arrival_time": null }],
+      "appointment_started": 1
     }
   ],
   "self_approval_blocked": true
@@ -3306,6 +3311,12 @@ zu diesem Termin, sortiert nach Anlage, sonst ein leeres Array. Genehmigte zeige
 des Eintrags (`excused` bzw. die beantragte Ankunft), abgelehnte fehlen. Die Check-in-App lässt Admin
 und Manager sie damit in der Liste bescheiden, über `PUT exceptions` mit `status`. Den eigenen Antrag
 entscheidet die App dort nicht, dafür bleibt das Dashboard.
+
+**Feld `appointment_started` (OI-89, unveröffentlicht):** `1`, sobald das Check-in-Fenster des
+Termins offen ist — Startzeit minus `checkin_tolerance_hours`, gemessen an der Uhr der Datenbank —,
+sonst `0`. Es steht am Termin und, gleichlautend, an jedem Mitglied. Ein Mitglied ohne Eintrag
+ist vor diesem Zeitpunkt „kommend“, nicht „fehlend“. Dieselbe Grenze gilt für die Zahlen an
+`GET appointments` mit `include=attendance` und für Statistik, Pünktlichkeit und Anwesenheitsbericht.
 
 > Bis 1.8.0 zeigte dieser Abschnitt eine Antwort mit einem `attendance`-Array und Feldern
 > `member_name`/`appointment_date`/`group_name`, die der Server so nie geliefert hat — geliefert
@@ -3343,7 +3354,8 @@ entscheidet die App dort nicht, dafür bleibt das Dashboard.
       "arrival_time": "2024-03-15 19:05:00",
       "checkin_source": "admin",
       "status": "present",
-      "member_was_active": 1
+      "member_was_active": 1,
+      "appointment_started": 1
     },
     ...
   ]
@@ -3353,7 +3365,9 @@ entscheidet die App dort nicht, dafür bleibt das Dashboard.
 `member.groups` bleibt hier die kommagetrennte Zeichenkette aller Gruppen des Mitglieds — diese
 Ansicht wurde von der Untergruppen-Gliederung (1.8.0) nicht angefasst, da sie zum Ausfüllen
 einer Mitgliedskarte dient, nicht zum Gliedern einer Liste. `member_was_active` zeigt, ob das
-Mitglied am Termindatum aktiv war (siehe `membership_dates`).
+Mitglied am Termindatum aktiv war (siehe `membership_dates`). `appointment_started` folgt derselben
+Regel wie in der Anwesenheitsliste für einen Termin: Die Liste enthält alle Termine des Jahres,
+auch kommende, und das Dashboard trennt sie über dieses Feld ab.
 
 > Bis 1.8.0 zeigte dieser Abschnitt eine Antwort mit dem Schlüssel `member_id` statt `member`
 > und einem `attendance`-Array statt `appointments`, mit Feldern (`member_name`,

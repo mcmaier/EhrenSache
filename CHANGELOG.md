@@ -7,6 +7,29 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unveröffentlicht]
+
+### Neu
+- **„Kommend“ statt „Fehlend“.** Die Anwesenheitsliste zeigt bei Terminen, die noch nicht
+  begonnen haben, „Kommend“ statt „✗ Fehlend“ — mit Serienterminen stand die Mitgliedsansicht
+  bis zu ein Jahr voraus voller Fehlzeiten. In der Mitgliedsansicht zeigen „Alle“ und die
+  Statusfilter nur begonnene Termine, der neue Filter „Kommend“ die kommenden. In der
+  Terminansicht bleibt alles sichtbar, Mitglieder ohne Eintrag stehen dort als „Kommend“. Eine
+  vorab genehmigte Entschuldigung bleibt „Entschuldigt“.
+
+### Behoben
+- **Statistik, Pünktlichkeit und Anwesenheitsbericht zählen einen Termin erst ab dem
+  Check-in-Fenster.** Bisher galt jeder Termin von heute ab Mitternacht als begonnen: Eine Probe
+  um 20 Uhr stand schon morgens in der Statistik, und alle Erwarteten waren bis zu den ersten
+  Check-ins unentschuldigt abwesend. Jetzt zählt er ab Startzeit minus Check-in-Fenster
+  (Einstellung „Zeitfenster für die Zuordnung“, Vorgabe zwei Stunden). Vergangene Termine zählen unverändert; die
+  Zahlen ändern sich nur am laufenden Tag.
+- **Eine Regel für „hat begonnen“.** Anwesenheitsliste, Kalender und Statistik rechneten mit drei
+  verschiedenen Grenzen; der Kalender nahm fest zwei Stunden Vorlauf, auch wenn der Verein ein
+  anderes Check-in-Fenster eingestellt hat. Alle folgen jetzt der Einstellung.
+
+---
+
 ## [1.14.1] – 2026-09-24
 
 ### Sicherheit
