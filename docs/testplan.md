@@ -241,6 +241,8 @@ Automatisiert: `calendar_attendance_frontend`, `module_imports`.
 | APT-ANW-24 | Eine Anwesenheit korrigieren, zurück zum Kalender | Der Balken zeigt die neuen Zahlen ohne Neuladen der Seite |
 | APT-ANW-25 | Ein Mitglied einer Gruppe zuordnen oder entfernen, dann in den Kalender | Die Zahl der Erwarteten ändert sich entsprechend |
 | APT-ANW-26 | Screenreader auf einem Tagesfeld | Der Vorlesetext nennt die Zahlen bzw. den eigenen Status; Balken und Punkt selbst sind stumm |
+| APT-ANW-27 | Als einfaches Mitglied ein Termin, der **gerade läuft**, noch ohne Erfassung | Punkt rot, im Popup „Du warst nicht da“ — **so gewollt** (Entscheidung 24.09.2026), dieselbe Regel wie beim vollroten Balken in APT-ANW-19 |
+| APT-ANW-28 | Festgehaltenes Popup an einem Tag mit **sehr vielen** Terminen | Das Popup wird höchstens fensterhoch und lässt sich darin scrollen, statt unten aus dem Bild zu laufen (beim bloßen Überfahren nicht prüfbar: es verschwindet, sobald der Zeiger das Tagesfeld verlässt) |
 
 ---
 

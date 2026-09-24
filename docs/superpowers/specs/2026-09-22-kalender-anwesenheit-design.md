@@ -163,11 +163,19 @@ Abweichungen, die für Schritt 2b gelten:
   - Admin/Manager: Balken 3 px am unteren Rand, volle Breite, Segmente anteilig
     Anwesend (`--success-color`), Entschuldigt (`--warning-color`), Fehlend (`--danger-color`);
     mehrere Termine am Tag werden summiert. Der Feiertagsname rückt darüber.
-  - Nutzer: ein Punkt unten links in der Farbe des eigenen Status (bei mehreren Terminen am Tag:
+  - Nutzer: ein Punkt oben links in der Farbe des eigenen Status (bei mehreren Terminen am Tag:
     der schlechteste Status).
   - Kein Balken, wenn `expected = 0`.
-- **Popup** je Termin eine Zeile: Admin/Manager „Anwesend 18 · Entschuldigt 4 · Fehlend 3“
+- **Popup** je Termin eine Zeile: Admin/Manager „Anwesend 18 Entschuldigt 4 Fehlend 3 von 25“
   plus Knopf „Anwesenheit“ (Schritt 1); Nutzer „Du warst anwesend / entschuldigt / nicht da“.
+  - **Abweichung von dieser Spec, bewusst (Schritt 2b):** Die Werte trennt Abstand statt der
+    hier vorgesehenen Mittelpunkte „·“. Ein Screenreader liest das Zeichen mit
+    („Anwesend 18 Mittelpunkt Entschuldigt 4“); der Flex-Abstand trennt fürs Auge
+    genauso und bleibt stumm.
+  - **Ergänzung, bewusst:** Dazu die Bezugsgröße „von 25“. Im Popup steht je Termin eine
+    eigene Zeile, dort ist `expected` die Zahl der erwarteten Personen. Im Tagesfeld fehlt sie
+    aus genau diesem Grund: über mehrere Termine summiert zählt `expected` Plätze, nicht
+    Personen — zweimal dieselbe Gruppe ergäbe „von 50“ statt „von 25“.
 - Aria-Label des Tagesfelds nennt die Zahlen bzw. den eigenen Status.
 - Die Zahlen kommen mit dem Terminabruf des Jahres (`dataCache.appointments[year]`); kein eigener
   Cache. Nach einer Änderung in der Anwesenheit wird der Terminabruf des Jahres invalidiert.

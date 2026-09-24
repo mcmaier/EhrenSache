@@ -344,10 +344,20 @@
     border-radius: var(--radius-md);
     padding: var(--spacing-md);
     box-shadow: var(--shadow-md);
-    z-index: 1000;
     min-width: 250px;
     max-width: 400px;
+    /* Stand hier zweimal (1000 und 100); gewirkt hat immer die zweite. 100
+       liegt ueber den Tagesfeldern (--z-base: 1) und unter den Modalen (1000)
+       -- genau dort gehoert das Popup hin. Gegen die Seitenleiste (ebenfalls
+       100) gewinnt es, weil es an body angehaengt wird und damit spaeter im
+       Baum steht. */
     z-index: 100;
+    /* Ein Tag mit vielen Terminen lief unten aus dem Bild, ohne dass man
+       scrollen konnte -- seit die Anwesenheitszeile dazukommt, umso frueher.
+       Nuetzt nur dem festgehaltenen Popup: das fluechtige verschwindet, sobald
+       der Zeiger das Tagesfeld verlaesst, dorthin kommt man nie. */
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
 }
 .calendar-event-popup h4 {
     margin: 0 0 var(--spacing-sm) 0;

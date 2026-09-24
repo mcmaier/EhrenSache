@@ -633,11 +633,48 @@ test('Das Popup zeigt je Termin eine Anwesenheitszeile', function () use ($caFeR
     assertTrue(str_contains($body, 'Entschuldigt'), 'Beschriftung Entschuldigt fehlt');
     assertTrue(str_contains($body, 'Fehlend'), 'Beschriftung Fehlend fehlt');
     assertTrue(str_contains($body, 'OWN_STATUS_TEXT'), 'Mitglieder bekommen denselben Text wie im Vorlesetext');
+
+    // OWN_STATUS_TEXT[status] allein ist kein Test: das Objektliteral erbt von
+    // Object.prototype, 'toString' waere ein wahrer Wert und landete als Klasse
+    // und als Text in der Seite.
+    assertTrue(str_contains($body, 'hasOwnStatusText('), 'Der Status muss gegen die drei bekannten Werte geprueft werden');
+    assertTrue(str_contains($js, 'Object.prototype.hasOwnProperty.call(OWN_STATUS_TEXT'),
+        'hasOwnStatusText() muss ueber hasOwnProperty gehen, nicht ueber den Indexzugriff');
     assertTrue(str_contains($body, 'Number('), 'Zahlen aus der Antwort gehoeren durch Number() gefiltert');
     assertTrue(str_contains($body, 'isAdminOrManager'), 'Die Rollenweiche fehlt');
+    assertTrue(str_contains($body, 'calendar-attendance-line__total'), 'Die Bezugsgroesse fehlt');
+    assertTrue(str_contains($body, 'von ${Number(a.expected)}'), 'Im Popup steht je Termin eine Zeile -- dort ist "von 25" richtig und gehoert dazu');
 
     $popup = caFeFunctionBody($js, 'function showAppointmentPopup(');
     assertTrue(str_contains($popup, 'attendanceLineHtml('), 'Das Popup benutzt die Zeile nicht');
+});
+
+test('Die Anwesenheitszeile steht zwischen Rueckmeldung und Knopfreihe -- auch beim Ueberfahren', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'function showAppointmentPopup(');
+
+    $rueckmeldung = strpos($body, 'calendarResponseLineHtml(apt, fest)');
+    $zeile        = strpos($body, 'attendanceLineHtml(');
+    $knopfreihe   = strpos($body, 'window.openAppointmentModal(${Number(apt.appointment_id)})');
+
+    // Erst positiv festnageln, dass alle drei Marken im Rumpf stehen.
+    // caFeFunctionBody() schneidet an der ersten Klammer in Spalte 0 -- schnitte
+    // es kuenftig zu frueh, faellt das hier auf, statt die Reihenfolgepruefungen
+    // darunter still gruen werden zu lassen.
+    assertTrue($rueckmeldung !== false, 'Die Rueckmeldezeile fehlt im Popup');
+    assertTrue($zeile !== false, 'Die Anwesenheitszeile fehlt im Popup');
+    assertTrue($knopfreihe !== false, 'Die Knopfreihe fehlt im Popup');
+
+    assertTrue($rueckmeldung < $zeile, 'Die Anwesenheitszeile gehoert unter die Rueckmeldezeile');
+    assertTrue($zeile < $knopfreihe, 'Die Anwesenheitszeile gehoert ueber "Bearbeiten" und "Anwesenheit"');
+
+    // Die Zahlen sind auch beim Ueberfahren nuetzlich und enthalten nichts, was
+    // nur im festgehaltenen Popup stehen duerfte. Haengte die Zeile wie die
+    // Knoepfe an fest, saehe ein Mitglied seinen Status erst nach einem Klick.
+    $umbruch = strrpos(substr($body, 0, $zeile), "\n");
+    $zeilenanfang = $umbruch === false ? '' : substr($body, $umbruch + 1, $zeile - $umbruch - 1);
+    assertTrue(!str_contains($zeilenanfang, 'fest'),
+        'Vor attendanceLineHtml( steht eine Bedingung auf fest -- damit faellt die Zeile im Hover-Popup weg: ' . trim($zeilenanfang));
 });
 
 test('Ohne Zahlen bleibt das Popup unveraendert', function () use ($caFeRoot) {
@@ -651,8 +688,17 @@ test('Ohne Zahlen bleibt das Popup unveraendert', function () use ($caFeRoot) {
 
 test('Die Popup-Zeile nimmt die Farben aus den Variablen', function () use ($caFeRoot) {
     $css = caFeFile($caFeRoot, 'public/css/components/calendar.css');
-    foreach ([['is-present', '--success-color'], ['is-excused', '--warning-color'], ['is-missing', '--danger-color']] as [$mod, $var]) {
-        assertTrue((bool) preg_match('/\.calendar-attendance-line[^{]*\.' . $mod . '\s*\{[^}]*var\(' . preg_quote($var, '/') . '\)/', $css),
-            "Die Popup-Zeile muss fuer {$mod} auf {$var} zurueckgreifen");
+
+    // Ueber beide Klassenstaemme einzeln, wie beim Balken: ein Muster, das nur
+    // ".calendar-attendance-line...is-present" verlangt, waere schon erfuellt,
+    // wenn eine der beiden Darstellungen die Farbe traegt -- die Zahlenzeile
+    // der Verwalter und die Statuszeile der Mitglieder sind aber zwei Regeln.
+    foreach (['.calendar-attendance-line__part', '.calendar-attendance-line--own'] as $basis) {
+        foreach (['is-present' => '--success-color', 'is-excused' => '--warning-color', 'is-missing' => '--danger-color'] as $mod => $var) {
+            assertTrue((bool) preg_match('/' . preg_quote($basis, '/') . '\.' . $mod . '\s*\{[^}]*var\(' . preg_quote($var, '/') . '\)/', $css),
+                "{$basis}.{$mod} muss auf {$var} zurueckgreifen");
+        }
     }
+
+    assertTrue(str_contains($css, '.calendar-attendance-line__total'), 'Die Bezugsgroesse braucht eine eigene, gedeckte Farbe');
 });

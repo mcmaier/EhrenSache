@@ -517,6 +517,17 @@ function renderCalendar() {
 const OWN_STATUS_TEXT = { present: 'Du warst anwesend', excused: 'Du warst entschuldigt', missing: 'Du warst nicht da' };
 
 /**
+ * Ist der Status einer der drei bekannten? Bewusst ueber hasOwnProperty und
+ * nicht ueber OWN_STATUS_TEXT[status]: das Objektliteral erbt von
+ * Object.prototype, 'toString' lieferte also eine Funktion und damit einen
+ * wahren Wert. Der Server schickt nur die drei Werte -- der Status steuert
+ * aber eine CSS-Klasse und einen Text, da kostet das Zumachen nichts.
+ */
+function hasOwnStatusText(status) {
+    return Object.prototype.hasOwnProperty.call(OWN_STATUS_TEXT, status);
+}
+
+/**
  * Summiert die Anwesenheit aller Termine eines Tages. Termine ohne Zahlen
  * zaehlen nicht mit: attendance ist null, solange der Termin serverseitig
  * nicht begonnen hat -- die Oberflaeche zeigt ihn wegen des Check-in-Fensters
@@ -643,7 +654,7 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
                 });
 
             day.appendChild(bar);
-        } else if (!isAdminOrManager && ownStatus) {
+        } else if (!isAdminOrManager && hasOwnStatusText(ownStatus)) {
             const ownDot = document.createElement('span');
             ownDot.className = `calendar-own-dot is-${ownStatus}`;
             ownDot.setAttribute('aria-hidden', 'true');
@@ -667,7 +678,7 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
             + (isAdminOrManager && totals.expected > 0
                 ? `; Anwesend ${totals.present}, Entschuldigt ${totals.excused}, Fehlend ${totals.missing}`
                 : '')
-            + (!isAdminOrManager && ownStatus ? `; ${OWN_STATUS_TEXT[ownStatus]}` : ''));
+            + (!isAdminOrManager && hasOwnStatusText(ownStatus) ? `; ${OWN_STATUS_TEXT[ownStatus]}` : ''));
 
         // Ueberfahren zeigt dasselbe Popup wie der Klick, nur fluechtig. Die
         // kleine Verzoegerung verhindert, dass beim Wandern ueber den Kalender
@@ -812,7 +823,7 @@ function attendanceLineHtml(apt) {
     }
 
     const ownStatus = apt.own_attendance;
-    if (!isAdminOrManager && ownStatus && OWN_STATUS_TEXT[ownStatus]) {
+    if (!isAdminOrManager && hasOwnStatusText(ownStatus)) {
         return `<div class="calendar-attendance-line calendar-attendance-line--own is-${ownStatus}">${OWN_STATUS_TEXT[ownStatus]}</div>`;
     }
 
