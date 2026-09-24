@@ -210,7 +210,7 @@ Automatisiert: `calendar_attendance_frontend`, `module_imports`.
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
 | APT-ANW-1 | Als Admin im Kalender einen vergangenen Tag mit Termin anklicken | Das festgehaltene Popup zeigt neben „Bearbeiten“ den Knopf „Anwesenheit“ |
-| APT-ANW-2 | Derselbe Griff bei einem künftigen Termin **außerhalb des Vorlaufs** (Beginn in mehr als zwei Stunden) | Kein Knopf „Anwesenheit“ |
+| APT-ANW-2 | Derselbe Griff bei einem künftigen Termin **außerhalb des Check-in-Fensters** (Beginn später als das eingestellte „Zeitfenster für die Zuordnung“) | Kein Knopf „Anwesenheit“ |
 | APT-ANW-3 | „Anwesenheit“ anklicken | Bereich Anwesenheit ist aktiv, der Termin steht im Terminfilter, seine Liste ist sichtbar, der Statusfilter steht auf „Alle“, oben steht „← Zurück zu Termine“ |
 | APT-ANW-4 | „← Zurück zu Termine“ nach einem Sprung aus dem **Kalender** | Terminverwaltung, Kalender im Monat des Termins, Ansicht am Kalender |
 | APT-ANW-5 | In der Terminliste auf 📋 eines begonnenen Termins, dann zurück | Wie APT-ANW-3; der Rückweg führt an die **Zeile des Termins in der Liste**, der Kalendermonat bleibt unverändert |
@@ -231,7 +231,7 @@ Automatisiert: `calendar_attendance_frontend`, `module_imports`.
 | APT-ANW-14 | Als Admin einen vergangenen Tag mit Termin ansehen | Am unteren Rand ein dreifarbiger Balken; die Anteile entsprechen den Zahlen im Popup |
 | APT-ANW-15 | Tag mit **mehreren** Terminen | Der Balken zählt alle Termine des Tages zusammen; im Popup steht je Termin eine eigene Zeile |
 | APT-ANW-16 | Popup eines begonnenen Termins (überfahren **und** angeklickt) | Zeile „Anwesend … Entschuldigt … Fehlend … von …“, in beiden Fällen |
-| APT-ANW-17 | Termin, der **noch nicht begonnen** hat | Kein Balken, keine Zeile — auch nicht in den zwei Stunden davor, in denen der Knopf „Anwesenheit“ bereits erscheint |
+| APT-ANW-17 | Termin, dessen **Check-in-Fenster noch nicht offen** ist | Kein Balken, keine Zeile. Seit 1.15.0 (OI-89) erscheinen Zahlen und Knopf gemeinsam mit Beginn des Fensters — bis 1.14.1 kamen die Zahlen erst zur Startzeit |
 | APT-ANW-18 | Termin einer Terminart **ohne Gruppenzuordnung** (niemand erwartet) | Kein Balken, keine Zeile (statt dreimal der Null) |
 | APT-ANW-19 | Termin, der **gerade läuft**, noch ohne Erfassung | Balken vollständig rot — **so gewollt** (Entscheidung 24.09.2026): Er zeigt, dass noch niemand erfasst wurde |
 | APT-ANW-20 | Tag mit sehr wenigen Fehlenden bei vielen Erwarteten (etwa 1 von 200) | Der rote Streifen ist noch sichtbar; die Anteile sind dabei bewusst zugunsten der Sichtbarkeit verzerrt |
@@ -244,9 +244,26 @@ Automatisiert: `calendar_attendance_frontend`, `module_imports`.
 | APT-ANW-27 | Als einfaches Mitglied ein Termin, der **gerade läuft**, noch ohne Erfassung | Punkt rot, im Popup „Du warst nicht da“ — **so gewollt** (Entscheidung 24.09.2026), dieselbe Regel wie beim vollroten Balken in APT-ANW-19 |
 | APT-ANW-28 | Festgehaltenes Popup an einem Tag mit **sehr vielen** Terminen | Das Popup wird höchstens fensterhoch und lässt sich darin scrollen, statt unten aus dem Bild zu laufen (beim bloßen Überfahren nicht prüfbar: es verschwindet, sobald der Zeiger das Tagesfeld verlässt) |
 
+| APT-ANW-29 | Seit 1.15.0: „Zeitfenster für die Zuordnung“ auf 1 Stunde stellen, speichern, ohne Neuladen in den Kalender; Termin, der in 90 Minuten beginnt | Kein Knopf „Anwesenheit“ — der Kalender übernimmt die geänderte Einstellung sofort, nicht mehr fest zwei Stunden |
+
 ---
 
 ## 7. Anwesenheitserfassung (Records)
+
+### 7.0 „Kommend“ statt „Fehlend“ (seit 1.15.0, OI-89)
+
+Automatisiert: `attendance_started_unit`, `attendance_upcoming_api`, `filter_chips_unit`,
+`filter_chips_frontend`, `calendar_attendance_frontend`.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| KOM-1 | Anwesenheit, Mitglied wählen, dessen Gruppe eine Terminserie bis ins nächste Jahr hat | „Alle“ zeigt nur begonnene Termine; die Zähler von Anwesend/Entschuldigt/Fehlend enthalten keine kommenden |
+| KOM-2 | Derselbe Bildschirm, Chip „Kommend“ | Nur Termine, deren Check-in-Fenster noch nicht offen ist; Status grau „◷ Kommend“, Zeile nicht ausgegraut |
+| KOM-3 | Für einen kommenden Termin eine Entschuldigung genehmigen, dann KOM-2 | Der Termin steht unter „Kommend“ mit dem Status „Entschuldigt“ |
+| KOM-4 | Anwesenheit, einen kommenden **Termin** wählen | Alle Erwarteten sichtbar, ohne Eintrag „Kommend“; Chip „Kommend“ zählt sie, „Fehlend“ steht auf 0 |
+| KOM-5 | Termin, der in weniger als dem Check-in-Fenster beginnt | In beiden Ansichten schon „Fehlend“, nicht „Kommend“ — es können bereits Erfassungen vorliegen |
+| KOM-6 | Statistik am Vormittag, Probe heute Abend | Die Probe zählt noch nicht (bis 1.14.1 zählte sie ab Mitternacht, alle Erwarteten standen als unentschuldigt) |
+| KOM-7 | Statistik und Anwesenheitsbericht für ein **abgeschlossenes** Jahr, vor und nach dem Update | Zahlen unverändert |
 
 ### 7.1 Abrufen
 
