@@ -10,6 +10,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 ## [Unveröffentlicht]
 
 ### Neu
+- **Die Anwesenheit steht im Kalender.** Vergangene Tage tragen am unteren Rand einen
+  dreifarbigen Balken: anwesend, entschuldigt, fehlend — bei mehreren Terminen am Tag
+  zusammengezählt. Das Popup nennt die Zahlen je Termin, schon beim Überfahren.
+  Mitglieder sehen statt der Zahlen anderer einen Punkt in der Farbe ihres eigenen Status
+  und im Popup „Du warst anwesend“. Solange ein Termin noch nicht begonnen hat, bleibt das
+  Feld leer.
 - **Vom Termin direkt in die Anwesenheitsliste.** Im Kalender-Popup und in der Terminliste führt
   bei bereits begonnenen Terminen ein Knopf „Anwesenheit“ (in der Liste das Zeichen 📋) sofort in
   die Anwesenheitsliste dieses Termins — bisher musste man den Bereich wechseln und den Termin dort
