@@ -940,8 +940,17 @@ test('work_sessions: user darf fremde Sitzung nicht lesen', function () {
     assertStatus(201, $res);
     $id = (int) $res['body']['session']['session_id'];
 
-    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
-    assertStatus(403, $get);
+    // Nicht nur "nicht lesen", sondern "nicht einmal erfahren, dass es sie
+    // gibt" (1.14.1): Die Antwort auf eine fremde Sitzung muss der auf eine
+    // erfundene Kennung gleichen. Stuende hier nur assertStatus(404), bestuende
+    // der Test auch mit einer verraeterischen Meldung.
+    $fremd = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+    $nichts = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => 999000111]]);
+
+    assertStatus(404, $fremd, 'Die fremde Sitzung wird noch durch den Status verraten');
+    assertSame($nichts['status'], $fremd['status'], 'Fremd und nicht vorhanden liefern verschiedene Status');
+    assertSame(json_encode($nichts['body']), json_encode($fremd['body']),
+        'Fremd und nicht vorhanden liefern verschiedene Antworten');
 
     deleteSession($id);
 });

@@ -34,7 +34,11 @@ function handleRecords($db, $database, $method, $id) {
                 $stmt->execute([$id]);
                 $record = $stmt->fetch(PDO::FETCH_ASSOC);
                 
-                // User dürfen nur ihre eigenen Records sehen
+                // User dürfen nur ihre eigenen Records sehen. Ein fremder Satz
+                // antwortet dabei wie ein nicht vorhandener (1.14.1): Bis dahin
+                // stand hier 403, während eine erfundene Kennung 404 ergab --
+                // allein am Rückgabewert war so abzulesen, welche Kennungen
+                // belegt sind. Der Inhalt war nie sichtbar, die Existenz schon.
                 if(!isAdminOrManager()) {
                     // Hole member_id des Users
                     $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
@@ -42,9 +46,7 @@ function handleRecords($db, $database, $method, $id) {
                     $userMemberId = $userStmt->fetchColumn();
                     
                     if($record && $record['member_id'] != $userMemberId) {
-                        http_response_code(403);
-                        echo json_encode(["message" => "Access denied"]);
-                        return;
+                        $record = false;
                     }
                 }
                 

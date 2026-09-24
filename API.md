@@ -1215,12 +1215,9 @@ Einzelabruf `appointment_title`, `appointment_date` und `appointment_start`:
 }
 ```
 
-**Berechtigung:** Ohne Admin- oder Managerrolle nur der eigene Datensatz, sonst `403`:
-```json
-{
-  "message": "Access denied"
-}
-```
+**Berechtigung:** Ohne Admin- oder Managerrolle nur der eigene Datensatz. Ein fremder
+Datensatz wird wie ein nicht vorhandener beantwortet (`404 "Record not found"`), damit die
+Antwort seine Existenz nicht verrät — seit 1.14.1; davor `403 "Access denied"`.
 
 ---
 
@@ -1596,6 +1593,12 @@ Notizpflicht (`worktime_require_note`) gilt am Kiosk nicht. `created_by` ist das
 
 Felder gibt es weder `exception_date` noch `type` — richtig heißen sie `appointment_date` und
 `exception_type`.
+
+**Berechtigung:** Ohne Admin- oder Managerrolle nur die eigenen Anträge — in der Liste wie im
+Einzelabruf (`id`). Ein fremder Antrag wird wie ein nicht vorhandener beantwortet
+(`404 "Exception not found"`), damit die Antwort seine Existenz nicht verrät — seit 1.14.1;
+davor `403 "Access denied"`. Für `PUT` und `DELETE` bleibt es bei `403`: dort entscheidet die
+Rolle, nicht die Existenz.
 
 ---
 
@@ -2166,6 +2169,11 @@ gekappt auf Start plus Obergrenze, Status `submitted`.
 **Parameter:** `id`, `running=1` (nur die laufende Sitzung, sonst `null`),
 `year`, `month` (nur zusammen mit `year`), `from_date`, `to_date`, `member_id`,
 `activity_id`, `appointment_id`, `status`, `open=1` (nur Sitzungen ohne `end_time`)
+
+**Berechtigung:** Ohne Admin- oder Managerrolle nur die eigenen Sitzungen. Eine fremde Sitzung
+wird im Einzelabruf (`id`) wie eine nicht vorhandene beantwortet
+(`404 "Session not found"`), damit die Antwort ihre Existenz nicht verrät — seit 1.14.1;
+davor `403 "Access denied"`.
 
 **Response (Liste/Einzelsatz):**
 ```json

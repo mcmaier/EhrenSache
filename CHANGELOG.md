@@ -9,6 +9,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unveröffentlicht]
 
+### Sicherheit
+- **Ein Datensatz, den man nicht sehen darf, gibt sich nicht mehr zu erkennen.** Der Abruf eines
+  einzelnen Anwesenheitssatzes, Antrags oder einer einzelnen Arbeitszeitsitzung antwortete bei
+  einem fremden Satz anders als bei einem nicht vorhandenen. Der Inhalt war nie sichtbar, die
+  bloße Existenz schon. Beides sieht jetzt gleich aus. Wer die Sätze ohnehin sehen darf — Admin
+  und Manager — merkt nichts; für das Ändern und Löschen fremder Sätze bleibt es bei der
+  bisherigen Abweisung.
+
 ### Behoben
 - **Die Begrenzung der Anfragen pro Minute wirkt jetzt.** Sie zählte bisher in der Sitzung des
   Browsers; ein Programm, das keine Cookies annimmt, bekam bei jeder Anfrage einen frischen

@@ -39,16 +39,17 @@ function handleExceptions($db, $database, $method, $id) {
                 $stmt->execute([$id]);
                 $exception = $stmt->fetch(PDO::FETCH_ASSOC);
                 
-                // User dürfen nur ihre eigenen Exceptions sehen
+                // User dürfen nur ihre eigenen Exceptions sehen. Ein fremder
+                // Antrag antwortet wie ein nicht vorhandener (1.14.1) -- dieselbe
+                // Regel wie beim Anlegen weiter unten: fehlend und fremd sehen
+                // gleich aus. Vorher unterschied der Rückgabewert beides.
                 if(!isAdminOrManager()) {
                     $userStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
                     $userStmt->execute([getCurrentUserId()]);
                     $userMemberId = $userStmt->fetchColumn();
                     
                     if($exception && $exception['member_id'] != $userMemberId) {
-                        http_response_code(403);
-                        echo json_encode(["message" => "Access denied"]);
-                        return;
+                        $exception = false;
                     }
                 }
                 

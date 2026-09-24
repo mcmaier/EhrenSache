@@ -103,15 +103,13 @@ function workSessionsGet($db, $database, $id, $authMemberId) {
         $stmt->execute([$id]);
         $session = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if(!$session) {
+        // Eine fremde Sitzung antwortet wie eine nicht vorhandene (1.14.1).
+        // Bis dahin trennte der Rückgabewert beides -- 403 gegen 404 -- und gab
+        // damit preis, welche Kennungen belegt sind. Schreibende Zugriffe
+        // bleiben bei 403: dort entscheidet die Rolle, nicht die Existenz.
+        if(!$session || (!isAdminOrManager() && (int)$session['member_id'] !== (int)$authMemberId)) {
             http_response_code(404);
             echo json_encode(["message" => "Session not found"]);
-            return;
-        }
-
-        if(!isAdminOrManager() && (int)$session['member_id'] !== (int)$authMemberId) {
-            http_response_code(403);
-            echo json_encode(["message" => "Access denied"]);
             return;
         }
 
