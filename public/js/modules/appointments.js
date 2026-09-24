@@ -1641,7 +1641,10 @@ export function setCalendarMonth(date) {
 // Der Vorlauf entspricht dem Check-in-Fenster (Einstellung checkin_tolerance_hours):
 // So frueh koennen bereits Erfassungen zum Termin liegen. Derselbe Wert wie auf
 // dem Server (attendanceHasStarted(), OI-89). settings?scope=client liefert ihn
-// auch ohne Adminrecht; bis zur Antwort gilt die Vorgabe von zwei Stunden.
+// auch ohne Adminrecht. Bis zur Antwort (oder wenn sie scheitert) gilt bewusst
+// die Vorgabe der Einstellung, zwei Stunden -- sie trifft die meisten Vereine,
+// und 0 liesse den Knopf in der Aufbauphase fehlen, in der schon Erfassungen
+// vorliegen. Regulaer rendert nichts vor loadAppointments().
 const DEFAULT_ATTENDANCE_LEAD_HOURS = 2;
 let attendanceLeadMs = DEFAULT_ATTENDANCE_LEAD_HOURS * 60 * 60 * 1000;
 let attendanceLeadLoaded = false;
