@@ -42,6 +42,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   und lässt die Anmeldung im Browser unberührt. Unverändert bleibt, dass ein Token nie die Rechte
   einer angemeldeten Sitzung erbt: Wer mit dem Token eines Mitglieds abruft, wird als dieses
   Mitglied bedient, auch wenn im selben Browser ein Administrator angemeldet ist.
+- **Das schnelle Erfassen einer Anwesenheit meldete Erfolg, auch wenn nichts gespeichert wurde.**
+  Wer in der Anwesenheitsliste eines Termins auf „Anwesend“ oder „Entschuldigt“ tippte, bekam die
+  Bestätigung „Anwesenheit erfasst“ — selbst wenn der Server die Eintragung abgelehnt hatte oder
+  die Sitzung abgelaufen war. Die Zeile sprang dann beim nächsten Laden wieder auf „Fehlend“
+  zurück. Jetzt erscheint in diesem Fall eine Fehlermeldung.
 - **In der Anwesenheit stand die Jahresauswahl nicht mehr oben rechts.** Sobald ein Termin
   gewählt war, rutschte sie unter die Statuschips, und an ihrer gewohnten Stelle blieb ein
   leerer weißer Kasten stehen. Ursache war der mit 1.13.0 hinzugekommene Zähler der offenen
@@ -54,7 +59,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Der Einzelabruf einer Tätigkeitsart wendet jetzt dieselben Grenzen an wie deren Liste.**
   Bisher galten die Gruppenzuordnung und das Ausblenden ausgemusterter Einträge nur für die
   Liste. Beide Regeln stehen nun an einer Stelle; eine nicht sichtbare Tätigkeitsart wird wie
-  eine nicht vorhandene beantwortet. Für Admin ändert sich nichts.
+  eine nicht vorhandene beantwortet. Für Admins ändert sich nichts. Ein **Manager** sieht eine
+  ausgemusterte Tätigkeitsart jetzt auch dann nicht mehr, wenn er sie direkt aufruft — die Liste
+  blendet sie für ihn schon immer aus, jetzt tun es beide Wege gleich.
 
 ---
 
