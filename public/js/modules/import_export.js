@@ -192,6 +192,13 @@ export async function executeImport() {
         const result = await response.json();
 
         debug.log('Import result:',result);
+
+        // Der Import schreibt die Gruppenzuordnungen der Mitglieder neu
+        // (import.php loescht und legt sie an). Damit verschiebt sich, wer zu
+        // einem Termin erwartet wird -- und das sind die Zahlen im Kalender
+        // (Schritt 2b). Ohne Jahresangabe, weil die Zuordnung fuer alle Jahre
+        // gilt. showMemberSection() laedt nur die Mitglieder, nicht die Termine.
+        await invalidateCache('appointments');
         
         // Progress auf 100%
         document.getElementById('importProgressFill').style.width = '100%';

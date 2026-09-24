@@ -174,7 +174,7 @@ test('Unter public/js/ liegen Module zum Pruefen', function () use ($miJsDir) {
     assertTrue(count(miJsFiles($miJsDir)) > 10, 'Zu wenige Moduldateien gefunden -- der Test liefe ins Leere');
 });
 
-test('Dynamische Importe mit Literalpfad werden erfasst', function () use ($miRoot, $miJsDir) {
+test('Dynamische Importe mit Literalpfad werden erfasst', function () use ($miJsDir) {
     // Ohne diese Gegenprobe koennte das Muster still ins Leere laufen und der
     // Hauptttest waere weiterhin gruen, ohne einen einzigen dynamischen Import
     // gesehen zu haben.

@@ -461,6 +461,17 @@ test('Der Import von Anwesenheiten verwirft die Termine aller Jahre', function (
         'Eine CSV kann Termine mehrerer Jahre treffen -- deshalb ohne Jahresangabe');
 });
 
+test('Der Import von Mitgliedern verwirft die Termine aller Jahre', function () use ($caFeRoot) {
+    // import.php loescht die Gruppenzuordnungen des Mitglieds und legt sie neu an.
+    // Damit verschiebt sich, wer zu einem Termin erwartet wird -- und das ist die
+    // Grundlage der Zahlen im Kalender. showMemberSection() laedt nur die
+    // Mitglieder, holt die Termine also nicht nach.
+    $js = caFeFile($caFeRoot, 'public/js/modules/import_export.js');
+    $body = caFeFunctionBody($js, 'export async function executeImport(');
+    assertTrue(str_contains($body, "invalidateCache('appointments')"),
+        'Ohne Verwerfen zeigt der Balken bis zu zehn Minuten die alte Zahl der Erwarteten');
+});
+
 // ---- Schritt 2b: Tagesfeld ----------------------------------------------------------
 
 test('attendanceTotals summiert die Termine eines Tages', function () use ($caFeRoot) {

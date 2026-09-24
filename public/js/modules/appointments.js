@@ -558,7 +558,9 @@ function worstOwnStatus(dayAppointments) {
     let worst = null;
     (dayAppointments || []).forEach(apt => {
         const s = apt.own_attendance;
-        if (s && rank[s] && (!worst || rank[s] > rank[worst])) {
+        // hasOwnProperty statt rank[s]: Ein Wert wie 'toString' truege sonst
+        // ueber Object.prototype eine Funktion und damit einen wahren Wert bei.
+        if (s && Object.prototype.hasOwnProperty.call(rank, s) && (!worst || rank[s] > rank[worst])) {
             worst = s;
         }
     });
