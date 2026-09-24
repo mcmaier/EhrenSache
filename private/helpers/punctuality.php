@@ -212,7 +212,7 @@ function reliabilityBuild(array $pairs): array
  * @return array{0: string, 1: array<int, mixed>}
  */
 function punctualityScope($database, array $groupIds, int $year, ?int $memberId,
-                          ?int $appointmentTypeId): array
+                          ?int $appointmentTypeId, int $leadHours): array
 {
     require_once __DIR__ . '/member_activity.php';
 
@@ -229,7 +229,7 @@ function punctualityScope($database, array $groupIds, int $year, ?int $memberId,
         LEFT JOIN {$prefix}records r
              ON r.appointment_id = a.appointment_id AND r.member_id = m.member_id
         WHERE YEAR(a.date) = ?
-          AND a.date <= " . ATTENDANCE_STARTED_CUTOFF_SQL . "
+          AND " . attendanceStartedSql($leadHours) . "
     ";
 
     $params   = array_values(array_map('intval', $groupIds));
@@ -266,7 +266,8 @@ function punctualityFetchMeasurements($db, $database, array $groupIds, int $year
         return [];
     }
 
-    [$scope, $params] = punctualityScope($database, $groupIds, $year, $memberId, $appointmentTypeId);
+    [$scope, $params] = punctualityScope($database, $groupIds, $year, $memberId, $appointmentTypeId,
+                                          checkinToleranceHours($db, $database));
 
     $stmt = $db->prepare("
         SELECT DISTINCT r.record_id,
@@ -305,7 +306,8 @@ function reliabilityFetchPairs($db, $database, array $groupIds, int $year,
     require_once __DIR__ . '/utils.php';
 
     $prefix = $database->table('');
-    [$scope, $params] = punctualityScope($database, $groupIds, $year, $memberId, $appointmentTypeId);
+    [$scope, $params] = punctualityScope($database, $groupIds, $year, $memberId, $appointmentTypeId,
+                                          checkinToleranceHours($db, $database));
 
     $absence = "
         FROM {$prefix}exceptions e

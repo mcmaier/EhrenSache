@@ -281,7 +281,7 @@ function statisticsReportAppointments($db, $database, int $memberId, int $year, 
             AND r.member_id     = m.member_id
         WHERE a.type_id IN ({$placeholders})
           AND YEAR(a.date) = ?
-          AND a.date <= " . ATTENDANCE_STARTED_CUTOFF_SQL . "
+          AND " . attendanceStartedSql(checkinToleranceHours($db, $database)) . "
         ORDER BY a.date, a.start_time
     ";
 

@@ -31,16 +31,54 @@ const ATTENDANCE_PRESENT = 'present';
 const ATTENDANCE_EXCUSED = 'excused';
 const ATTENDANCE_MISSING = 'missing';
 
-/** Hat der Termin begonnen? Erst dann gibt es eine Anwesenheit. */
-function attendanceHasStarted(array $appointment, ?string $now = null): bool
+/**
+ * Hat der Termin begonnen? Erst dann gibt es eine Anwesenheit (OI-89).
+ *
+ * "Begonnen" heisst: Das Check-in-Fenster ist offen, also Startzeit minus
+ * $leadHours (Einstellung checkin_tolerance_hours, checkinToleranceHours()).
+ * auto_checkin.php erfasst symmetrisch um den Start -- in der Aufbauphase
+ * liegen schon Erfassungen vor, der Termin darf dann nicht "kommend" heissen.
+ *
+ * Dieselbe Regel steht als SQL in attendanceStartedSql(). $now kommt
+ * bevorzugt von der Datenbankuhr (attendanceDbNow(), OI-60), damit beide
+ * gleich umschlagen.
+ */
+function attendanceHasStarted(array $appointment, int $leadHours = 0, ?string $now = null): bool
 {
     $date = (string) ($appointment['date'] ?? '');
     if ($date === '') {
         return false;
     }
-    $start = $date . ' ' . (string) ($appointment['start_time'] ?? '00:00:00');
+    $start = strtotime($date . ' ' . (string) ($appointment['start_time'] ?? '00:00:00'));
+    if ($start === false) {
+        return false;
+    }
+    $opens = date('Y-m-d H:i:s', $start - $leadHours * 3600);
 
-    return $start <= ($now ?? date('Y-m-d H:i:s'));
+    return $opens <= ($now ?? date('Y-m-d H:i:s'));
+}
+
+/**
+ * SQL-Fassung von attendanceHasStarted(): Startzeitpunkt gegen NOW() der
+ * Datenbank. Ersetzt ATTENDANCE_STARTED_CUTOFF_SQL, das nur nach Datum
+ * schnitt.
+ *
+ * $leadHours ist ein int, $alias wird geprueft -- die Verkettung ist deshalb
+ * unbedenklich.
+ */
+function attendanceStartedSql(int $leadHours, string $alias = 'a'): string
+{
+    if (preg_match('/^[a-z_][a-z0-9_]*$/i', $alias) !== 1) {
+        throw new InvalidArgumentException('Ungueltiger Tabellenalias: ' . $alias);
+    }
+
+    return "TIMESTAMP({$alias}.date, {$alias}.start_time) <= NOW() + INTERVAL {$leadHours} HOUR";
+}
+
+/** Uhrzeit der Datenbank, damit PHP- und SQL-Fassung gleich umschlagen (OI-60). */
+function attendanceDbNow($db): string
+{
+    return (string) $db->query('SELECT NOW()')->fetchColumn();
 }
 
 /** Rohstatus eines Records auf die drei Werte der Anzeige abbilden. */
@@ -137,8 +175,12 @@ function attendanceAttachSummaries($db, $database, array $appointments, ?int $vi
                                    bool $forManager): array
 {
     $ids = [];
+    if ($appointments !== []) {
+        $leadHours = checkinToleranceHours($db, $database);
+        $now       = attendanceDbNow($db);
+    }
     foreach ($appointments as $appointment) {
-        if (attendanceHasStarted($appointment)) {
+        if (attendanceHasStarted($appointment, $leadHours, $now)) {
             $ids[] = (int) $appointment['appointment_id'];
         }
     }

@@ -15,6 +15,7 @@
 function handleAttendanceList($db, $database, $method, $id) {
 
     require_once __DIR__ . '/../helpers/member_activity.php';
+    require_once __DIR__ . '/../helpers/appointment_attendance.php';
     $prefix = $database->table('');
 
     // Nur GET erlaubt
@@ -70,6 +71,12 @@ function handleAttendanceList($db, $database, $method, $id) {
             echo json_encode(["message" => "Appointment not found"]);
             exit();
         }
+
+        // Hat der Termin begonnen (OI-89)? Sonst ist niemand "fehlend", sondern
+        // der Termin "kommend". Dieselbe Regel wie im Kalender: Beginn des
+        // Check-in-Fensters, gegen die Datenbankuhr.
+        $appointment['appointment_started'] = attendanceHasStarted(
+            $appointment, checkinToleranceHours($db, $database), attendanceDbNow($db)) ? 1 : 0;
 
         // Aktivitäts-WHERE-Clause generieren
         $activityWhere = getMemberActivityWhere('m', 'a.date', $includeInactive);        
@@ -145,6 +152,8 @@ function handleAttendanceList($db, $database, $method, $id) {
 
         foreach ($members as &$member) {
             $member['pending_exceptions'] = $pendingByMember[(int) $member['member_id']] ?? [];
+            // Je Zeile wie im Modus je Mitglied -- die Status-Chips lesen es dort.
+            $member['appointment_started'] = $appointment['appointment_started'];
         }
         unset($member);
 
@@ -212,6 +221,9 @@ function handleAttendanceList($db, $database, $method, $id) {
         // Aktivitäts-WHERE-Clause generieren
         $activityWhere = getMemberActivityWhere('m', 'a.date', $includeInactive);    
 
+        // Kommende Termine (OI-89) -- dieselbe Regel wie im Modus je Termin.
+        $startedSql = attendanceStartedSql(checkinToleranceHours($db, $database));
+
         // Hole alle Termine des Jahres, die für die Member-Gruppen relevant sind
         $placeholders = str_repeat('?,', count($member_group_ids) - 1) . '?';
         $params = array_merge($params, $member_group_ids);
@@ -233,7 +245,11 @@ function handleAttendanceList($db, $database, $method, $id) {
                 CASE 
                     WHEN ($activityWhere) THEN 1
                     ELSE 0
-                END as member_was_active
+                END as member_was_active,
+                CASE
+                    WHEN ($startedSql) THEN 1
+                    ELSE 0
+                END as appointment_started
             FROM {$prefix}appointments a
             LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
             LEFT JOIN {$prefix}appointment_type_groups atg ON at.type_id = atg.type_id
@@ -251,6 +267,10 @@ function handleAttendanceList($db, $database, $method, $id) {
         
         $stmt->execute($params);
         $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($appointments as &$row) {
+            $row['appointment_started'] = (int) $row['appointment_started'];
+        }
+        unset($row);
         
         echo json_encode([
             'member' => $member,
