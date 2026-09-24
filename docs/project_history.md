@@ -149,6 +149,16 @@ Repositories.)*
 - **Nur vergangene Termine zählen**, sonst verdirbt das Restjahr die Quote. *(im Code
   `a.date <= DATE_ADD(CURDATE(), INTERVAL 2 HOUR)` in `statistics.php` — wirkungsgleich zu
   `date <= CURDATE()`, die zwei Stunden sind dort hart codiert.)*
+
+  > *Abgelöst am 2026-09-24 (OI-89, Entscheidung des Nutzers):* **Anzeige und Auswertung nutzen
+  > dieselbe Grenze „begonnen“**, und die kommt aus dem **Check-in-Fenster**
+  > (`checkin_tolerance_hours`): Startzeit minus Fenster, gegen die Uhr der Datenbank. Eine
+  > Regel für Anwesenheitsliste, Kalender, Statistik, Pünktlichkeit und Bericht —
+  > `attendanceHasStarted()` und `attendanceStartedSql()` in `appointment_attendance.php`.
+  > Grund: Ab Beginn des Fensters liegen Check-ins vor, davor kann niemand fehlen. Die alte
+  > Datumsgrenze führte alle Erwarteten einer Abendprobe schon morgens als abwesend. Dass die
+  > Statistik damit von einer Einstellung abhängt, die nach Check-in klingt, ist gewollt, kein
+  > Versehen; für vergangene Tage ändert sich nichts.
 - **Kein Record = unentschuldigtes Fehlen**; genehmigte Entschuldigungen erzeugen einen Record
   mit Status `excused`, sonst tauchen sie in der Auswertung gar nicht auf.
 - **Verworfen:** Berechnung im Frontend aus mehreren parallelen Abfragen („zu umständlich"),
