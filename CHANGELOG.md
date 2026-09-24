@@ -26,7 +26,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Zahlen ändern sich nur am laufenden Tag.
 - **Eine Regel für „hat begonnen“.** Anwesenheitsliste, Kalender und Statistik rechneten mit drei
   verschiedenen Grenzen; der Kalender nahm fest zwei Stunden Vorlauf, auch wenn der Verein ein
-  anderes Check-in-Fenster eingestellt hat. Alle folgen jetzt der Einstellung.
+  anderes Check-in-Fenster eingestellt hat. Alle folgen jetzt der Einstellung. Im Kalender
+  erscheinen die Anwesenheitszahlen dadurch zusammen mit dem Knopf „Anwesenheit“ schon ab Beginn
+  des Fensters, nicht erst zur Startzeit.
 
 ---
 
