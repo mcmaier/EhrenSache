@@ -265,7 +265,14 @@ export async function saveGroup() {
     
     if (result.success) {
         closeGroupModal();
-        //invalidateCache('groups'); 
+
+        // Kein invalidateCache('appointments') noetig: Anlegen, Umbenennen und die
+        // Schalter is_default/is_subgroup/sort_order fassen weder
+        // member_group_assignments noch appointment_type_groups an -- "erwartet"
+        // bleibt unveraendert. Beim Loeschen einer Gruppe ist das anders, siehe
+        // deleteGroup().
+
+        //invalidateCache('groups');
         //await loadGroups(true);
         await showGroupSection(true);
         showToast(
@@ -290,7 +297,13 @@ export async function deleteGroup(groupId) {
     if (confirmed) {
         const result = await apiCall('member_groups', 'DELETE', null, { id: groupId });
         if (result.success) {
-            //invalidateCache('groups'); 
+            // Mit der Gruppe fallen per ON DELETE CASCADE auch ihre
+            // member_group_assignments und appointment_type_groups weg -- "erwartet"
+            // im Kalender aendert sich dadurch. Bewusst ohne Jahr, die Zuordnung
+            // gilt fuer alle Jahre.
+            await invalidateCache('appointments');
+
+            //invalidateCache('groups');
             //await loadGroups(true);
             await showGroupSection(true);
             // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Gruppenname
@@ -568,6 +581,12 @@ export async function saveType() {
     
     if (result.success) {
         closeTypeModal();
+
+        // group_ids schreibt appointment_type_groups fort -- damit verschiebt sich,
+        // wer zu einem Termin dieser Art erwartet wird. Die Zahlen im Kalender
+        // kommen mit dem Terminabruf des Jahres; bewusst ohne Jahr verwerfen.
+        await invalidateCache('appointments');
+
         //invalidateCache('types');
         //await loadTypes(true);
 
@@ -591,6 +610,11 @@ export async function deleteType(typeId) {
     if (confirmed) {
         const result = await apiCall('appointment_types', 'DELETE', null, { id: typeId });
         if (result.success) {
+            // Mit der Terminart fallen ihre appointment_type_groups weg -- die
+            // Termine dieser Art haben danach niemanden mehr, der erwartet wird.
+            // Bewusst ohne Jahr verwerfen.
+            await invalidateCache('appointments');
+
             //invalidateCache('types');
             //await loadTypes(true);
             await showGroupSection(true);

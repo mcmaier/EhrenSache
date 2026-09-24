@@ -9,7 +9,7 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, currentYear, groupSelectOptionsHtml} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, groupSelectOptionsHtml} from './ui.js';
 import { loadUserData } from './users.js';
 import { updateModalId, escapeHtml } from './utils.js';
 import { loadGroups } from './management.js';
@@ -625,6 +625,11 @@ export async function saveMember() {
         // wurde) — das PIN-Feld soll beim Wiederoeffnen dem aktuellen Stand
         // folgen statt dem gecachten.
         resetStationPinSettings();
+
+        // Das Mitglied steht trotz abgelehnter PIN in der Datenbank und zaehlt
+        // damit zu den Erwarteten: Terminabruf verwerfen wie im Erfolgsfall.
+        await invalidateCache('appointments');
+
         // Modal bleibt offen, wechselt aber in den Bearbeiten-Modus für das neu angelegte Mitglied
         await openMemberModal(result.id);
         showMemberSection(true, currentMembersPage);
@@ -633,6 +638,12 @@ export async function saveMember() {
 
     if (result.success) {
         closeMemberModal();
+
+        // Die Anwesenheitszahlen im Kalender kommen mit dem Terminabruf des Jahres.
+        // "Erwartet" bildet der Server aus Gruppenzuordnung und Aktivzeitraum --
+        // ein neues oder geaendertes Mitglied verschiebt die Zahlen, ohne dass eine
+        // Anwesenheit angefasst wurde. Bewusst ohne Jahr: die Zuordnung gilt fuer alle.
+        await invalidateCache('appointments');
 
         // Cache invalidieren und neu laden
         //invalidateCache('members');
@@ -663,7 +674,11 @@ export async function deleteMember(memberId) {
         const result = await apiCall('members', 'DELETE', null, { id: memberId });
         if (result.success) {
 
-            // Cache invalidieren und neu laden         
+            // Ein geloeschtes Mitglied faellt aus "erwartet" heraus -- der
+            // Terminabruf des Jahres traegt die alten Zahlen (bewusst ohne Jahr).
+            await invalidateCache('appointments');
+
+            // Cache invalidieren und neu laden
             showMemberSection(true, currentMembersPage);
 
             showToast('Mitglied erfolgreich gelöscht', 'success');
@@ -782,6 +797,11 @@ async function saveMembershipDates(memberId) {
     for (const deletedId of existingIds) {
         await apiCall('membership_dates', 'DELETE', null, { id: deletedId });
     }
+
+    // Aktiv/Inaktiv-Zeitraeume gehen in "erwartet" ein (getMemberActivityWhere).
+    // Hier statt nur in saveMember(), weil diese Funktion auch dann laeuft, wenn
+    // die Mitgliederantwort selbst keinen Erfolg meldet. Bewusst ohne Jahr.
+    await invalidateCache('appointments');
 }
 
 // ============================================

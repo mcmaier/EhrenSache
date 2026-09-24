@@ -551,3 +551,44 @@ test('records.js protokolliert ueber debug, nicht ueber console', function () us
         assertTrue(str_contains($body, 'debug.error('), "{$signature}: catch ohne debug.error");
     }
 });
+
+// ---- Review: Gruppen- und Mitgliederaenderungen ---------------------------------------
+
+test('Mitgliederaenderungen verwerfen den Terminabruf aller Jahre', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/members.js');
+
+    // "Erwartet" bildet der Server aus appointment_type_groups x
+    // member_group_assignments x getMemberActivityWhere
+    // (private/helpers/appointment_attendance.php). Ein neues, geaendertes oder
+    // geloeschtes Mitglied verschiebt die Zahlen, ohne dass eine Anwesenheit
+    // angefasst wurde.
+    assertTrue((bool) preg_match("/import \{[^}]*invalidateCache[^}]*\} from '\.\/ui\.js'/", $js),
+        'invalidateCache muss aus ui.js importiert sein');
+
+    foreach (['export async function saveMember(' => 'Anlegen, Aendern und die Gruppenzuordnung',
+              'export async function deleteMember(' => 'Loeschen',
+              'async function saveMembershipDates(' => 'Aktiv/Inaktiv-Zeitraeume'] as $signature => $what) {
+        $body = caFeFunctionBody($js, $signature);
+
+        // Bewusst ohne Jahresangabe: eine Gruppenzuordnung gilt fuer alle Jahre,
+        // nicht nur fuer das gerade angezeigte.
+        assertTrue(str_contains($body, "invalidateCache('appointments')"),
+            "{$signature}: {$what} aendert die erwarteten Mitglieder -- ohne Jahr verwerfen");
+        assertTrue(!str_contains($body, "invalidateCache('appointments', currentYear)"),
+            "{$signature}: Mit Jahr blieben die uebrigen Jahre zehn Minuten falsch");
+    }
+});
+
+test('Terminarten und geloeschte Gruppen verwerfen den Terminabruf aller Jahre', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/management.js');
+
+    // saveType schreibt appointment_type_groups fort; deleteGroup und deleteType
+    // raeumen sie per ON DELETE CASCADE ab. Beides verschiebt "erwartet".
+    foreach (['export async function saveType(' => 'Die Gruppen der Terminart',
+              'export async function deleteType(' => 'Die geloeschte Terminart',
+              'export async function deleteGroup(' => 'Die geloeschte Gruppe'] as $signature => $what) {
+        $body = caFeFunctionBody($js, $signature);
+        assertTrue(str_contains($body, "invalidateCache('appointments')"),
+            "{$signature}: {$what} aendert die erwarteten Mitglieder -- ohne Jahr verwerfen");
+    }
+});
