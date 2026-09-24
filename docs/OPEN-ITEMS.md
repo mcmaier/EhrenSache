@@ -3804,7 +3804,7 @@ Rand — mehrere Termine an einem Tag gruppieren sich dadurch sichtbar.
 
 ---
 
-### OI-95 · Kalendertage mit Terminen sind per Tastatur nicht erreichbar
+### OI-96 · Kalendertage mit Terminen sind per Tastatur nicht erreichbar
 **Priorität:** mittel · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
 
 `createCalendarDay()` ([appointments.js](../public/js/modules/appointments.js)) gibt einem Tag
@@ -3827,7 +3827,7 @@ greift dort nicht, es braucht Escape und vermutlich einen Fokusrahmen.
 
 ---
 
-### OI-96 · Terminarten kennen keine Gruppengrenze
+### OI-97 · Terminarten kennen keine Gruppengrenze
 **Priorität:** niedrig · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
 
 `GET appointment_types` steht jedem angemeldeten Konto offen (`requireAdmin()` greift erst ab
@@ -3850,7 +3850,7 @@ Rechteausweitung, keine personenbezogenen Daten.
 
 ---
 
-### OI-97 · Lastverhalten von `include=attendance` bei großem Bestand ungemessen
+### OI-98 · Lastverhalten von `include=attendance` bei großem Bestand ungemessen
 **Priorität:** mittel · aufgenommen am 2026-09-24 (Vorbehalt aus der Spec zu 1.14.0)
 
 Seit 1.14.0 hängt `loadAppointments()` ([appointments.js](../public/js/modules/appointments.js))
@@ -3876,7 +3876,7 @@ Kopie die Zahlen?“. Genau daraus entsteht später ein veralteter Balken.
 
 ---
 
-### OI-98 · Aufräumen der Altdaten verwirft den Zwischenspeicher nicht
+### OI-99 · Aufräumen der Altdaten verwirft den Zwischenspeicher nicht
 **Priorität:** niedrig · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
 
 Die Aufräumfunktion in den Einstellungen (`apiCall('cleanup', 'POST', …)` in
@@ -3884,9 +3884,20 @@ Die Aufräumfunktion in den Einstellungen (`apiCall('cleanup', 'POST', …)` in
 eingestellten Frist (`cleanup_years_records`, Vorgabe drei Jahre). Die Oberfläche verwirft danach
 **nichts** — weder `records` noch, seit 1.14.0, `appointments` mit den Anwesenheitszahlen.
 
-**Wirkung:** Wer nach dem Aufräumen ohne Neuladen in ein betroffenes Jahr wechselt, sieht bis zu
-zehn Minuten Daten, die es nicht mehr gibt. In der Praxis selten, weil betroffen nur Jahre jenseits
-der Löschfrist sind und die kaum im Zwischenspeicher liegen.
+**Wirkung:** Wer nach dem Aufräumen ohne Neuladen in ein betroffenes Jahr wechselt, sieht Daten,
+die es nicht mehr gibt. Der falsche Stand hält höchstens `CACHE_TTL` an — **zehn Minuten**
+([ui.js](../public/js/modules/ui.js)) — und verschwindet mit jedem Neuladen der Seite, weil der
+Zwischenspeicher nur im Arbeitsspeicher liegt.
+
+**Es ist ein reiner Anzeigefehler, keine falsche Auswertung.** Statistik, Pünktlichkeit und
+Druckberichte holen ihre Zahlen über eigene Ressourcen direkt vom Server und rühren
+`dataCache.appointments` nicht an (geprüft: nur `appointments.js`, `records.js`, `exceptions.js`
+und `worktime.js` greifen darauf zu, alle vier nur für Anzeige und Auswahlfelder). Betroffen sind
+also die Terminliste, der Kalender samt der Anwesenheitszahlen aus 1.14.0 und die Terminauswahl in
+Anträgen und Zeiterfassung — nicht die Auswertung.
+
+In der Praxis selten, weil betroffen nur Jahre jenseits der Löschfrist sind und die kaum im
+Zwischenspeicher liegen.
 
 **Zu tun:** Nach erfolgreichem Aufräumen `invalidateCache('records')` und
 `invalidateCache('appointments')` aufrufen, beide **ohne** Jahresangabe — das Aufräumen trifft
