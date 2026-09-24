@@ -45,7 +45,7 @@ test('Rate-Grenze: sie steht hinter dem Datenbankaufbau', function () use ($rlSo
 test('Rate-Grenze: sie zaehlt unangemeldete Aufrufe je Adresse', function () use ($rlSource) {
     $start = strpos($rlSource, '// 6.2 RATE LIMITING');
     assertTrue($start !== false, 'Abschnitt 6.2 nicht gefunden');
-    $block = substr($rlSource, $start, 2400);
+    $block = substr($rlSource, $start, 3600);
 
     assertTrue(str_contains($block, '$istAngemeldet'),
         'Die Unterscheidung angemeldet/unangemeldet fehlt');
@@ -54,15 +54,17 @@ test('Rate-Grenze: sie zaehlt unangemeldete Aufrufe je Adresse', function () use
     assertTrue(str_contains($block, 'REMOTE_ADDR'), 'Gezaehlt wird nicht je Adresse');
 });
 
-test('Rate-Grenze: ein ungueltiger Token gilt als unangemeldet', function () use ($rlSource) {
+test('Rate-Grenze: ein unbekannter Token gilt als unangemeldet', function () use ($rlSource) {
     // Sonst liesse sich die Grenze mit immer neuen Zufallstoken umgehen, und
     // das Durchprobieren von Token waere ungebremst.
-    $start = strpos($rlSource, '$istAngemeldet =');
-    assertTrue($start !== false, 'Zuweisung nicht gefunden');
-    $zeile = substr($rlSource, $start, (int) strpos($rlSource, ';', $start) - $start);
+    $start = strpos($rlSource, '$tokenTraegt =');
+    assertTrue($start !== false, 'Zuweisung $tokenTraegt nicht gefunden');
+    $block = substr($rlSource, $start, (int) strpos($rlSource, ';', $start) - $start);
+    assertTrue(str_contains($block, '$tokenUser !== null'),
+        'Ein unbekannter Token faellt nicht auf "unangemeldet" zurueck');
 
-    assertTrue(str_contains($zeile, '$tokenUser !== null'),
-        'Als angemeldet gilt nicht der gefundene Token-Inhaber, sondern etwas anderes');
+    $start = strpos($rlSource, '$istAngemeldet =');
+    $zeile = substr($rlSource, $start, (int) strpos($rlSource, ';', $start) - $start);
     assertTrue(str_contains($zeile, "isset(\$_SESSION['user_id'])"),
         'Die angemeldete Browser-Sitzung fehlt in der Unterscheidung');
 });
@@ -70,4 +72,20 @@ test('Rate-Grenze: ein ungueltiger Token gilt als unangemeldet', function () use
 test('Rate-Grenze: der Token wird nur einmal nachgeschlagen', function () use ($rlSource) {
     assertSame(1, substr_count($rlSource, 'WHERE api_token = ?'),
         'Der Token wird mehrfach aus der Datenbank geholt -- einmal reicht, das Ergebnis wird weitergereicht');
+});
+
+test('Rate-Grenze: ein inaktiver oder abgelaufener Token gilt nicht als angemeldet', function () use ($rlSource) {
+    // Dass eine Zeile zum Token existiert, genuegt nicht: is_active und das
+    // Ablaufdatum entscheiden mit. Sonst koennte ein ausgetretenes Mitglied
+    // oder ein ausgemustertes Geraet die API ungebremst anfragen -- der Aufruf
+    // laeuft zwar in 401, aber eben beliebig oft (belegt am 2026-09-24 mit
+    // 160 Aufrufen ohne einen einzigen 429).
+    $start = strpos($rlSource, '$tokenTraegt =');
+    assertTrue($start !== false, 'Die Pruefung $tokenTraegt fehlt');
+    $block = substr($rlSource, $start, (int) strpos($rlSource, ';', $start) - $start);
+
+    assertTrue(str_contains($block, "is_active"), 'is_active wird nicht geprueft');
+    assertTrue(str_contains($block, 'api_token_expires_at'), 'Das Ablaufdatum wird nicht geprueft');
+    assertTrue(str_contains($rlSource, '$istAngemeldet = $tokenTraegt'),
+        'Die Grenze haengt nicht an der vollstaendigen Pruefung');
 });

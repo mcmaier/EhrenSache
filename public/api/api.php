@@ -310,7 +310,24 @@ if ($apiToken) {
     $tokenUser = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
-$istAngemeldet = $tokenUser !== null || isset($_SESSION['user_id']);
+// Als angemeldet gilt nur ein Token, der auch WIRKLICH traegt: Dass eine Zeile
+// dazu existiert, genuegt nicht. Ein deaktiviertes Konto und ein abgelaufener
+// Token laufen weiter unten in den 401 -- wuerden sie hier schon als angemeldet
+// gelten, koennte ein ausgetretenes Mitglied oder ein ausgemustertes Geraet die
+// API ungebremst anfragen (belegt: 160 Aufrufe mit dem Token eines
+// deaktivierten Kontos, kein einziger 429). Dieselben zwei Bedingungen prueft
+// der Auth-Block danach noch einmal; sie stehen hier bewusst doppelt, damit die
+// Grenze nicht von der Reihenfolge weiter unten abhaengt.
+$tokenTraegt = $tokenUser !== null
+    && $tokenUser['is_active']
+    && (empty($tokenUser['api_token_expires_at'])
+        || new DateTime($tokenUser['api_token_expires_at']) >= new DateTime());
+
+// Eine ABGELAUFENE Browser-Sitzung gilt hier dagegen weiter als angemeldet: Die
+// Zeitueberschreitung greift erst im Auth-Block. Das ist bewusst so -- dafuer
+// braucht es eine echte Anmeldung vorher, und ein Cookie laeuft nur mit dem
+// Browser mit, der es bekommen hat.
+$istAngemeldet = $tokenTraegt || isset($_SESSION['user_id']);
 
 if (!$istAngemeldet) {
     $rateLimiter = new RateLimiter($db, $database);
