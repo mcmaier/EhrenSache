@@ -420,11 +420,13 @@ if($apiToken) {
     }
 
     // Eine Session, die ein Token angelegt hat, darf ohne dieses Token nicht
-    // weiterverwendet werden. Der Token-Zweig oben startet eine Session und
-    // schickt ein PHPSESSID-Cookie mit; wer nur dieses Cookie weiterreicht,
+    // weiterverwendet werden: Wer nur das PHPSESSID-Cookie weiterreicht,
     // umginge sonst alle Einschraenkungen, die am Token haengen (z. B. die
     // Kiosk-Sperre weiter unten). Dieser Zweig laeuft nur ohne Token, das
     // Cookie allein reicht hier also nicht.
+    // Seit OI-25 legt der Token-Zweig selbst keine Session mehr an; die
+    // Pruefung bleibt fuer Sessions, die eine aeltere Fassung gestartet hat
+    // und die im Browser noch liegen.
     // login() in helpers/auth.php entfernt auth_type seit 1.3.0 aktiv per
     // unset() (Regeneration einer zuvor per Token gestarteten Session),
     // Dashboard-Sessions sind davon also nicht betroffen.

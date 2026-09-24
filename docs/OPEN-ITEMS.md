@@ -1139,7 +1139,18 @@ Kommt sie nicht, ist der Endpoint ersatzlos entfernbar.
 ---
 
 ### OI-25 · Token-erzeugte Sessions
-**Priorität:** mittel
+**Priorität:** erledigt am 2026-09-24 — Branch `fix/oi-25-token-session` (`797d332`). Der
+Token-Zweig in `public/api/api.php` startet keine Session mehr; die Token-Daten stehen nur im
+`$_SESSION`-Array des Arbeitsspeichers, ohne gespeicherten Zustand und ohne Cookie. Damit
+überlebt eine angemeldete Browser-Sitzung einen Token-Aufruf im selben Browser, und der 401
+„Token-created session cannot be used without the token“ kann nicht mehr grundlos auftreten.
+Die Schutzrichtung von 1.3.0 bleibt und ist jetzt geprüft: Ein Token erbt keine Rechte einer
+fremden Sitzung (`tests/suites/token_session_api.php`). Die in diesem Punkt beschriebene
+Fußangel `Bearer null` war bereits mit OI-24 behoben. Nebenbefund behoben: `tests/lib/api.php`
+merkte sich das erste statt des letzten `Set-Cookie` und arbeitete nach einer Anmeldung mit
+einer verworfenen Sitzungskennung weiter — daran wäre der neue Test fast fälschlich grün
+geworden. Der Sperrzweig für `auth_type = token` bleibt für Sitzungen stehen, die eine
+ältere Fassung im Browser angelegt hat; der Kommentar dort ist entsprechend richtiggestellt.
 
 `api.php` befüllt bei einem Bearer-Token-Request eine vollwertige PHP-Session. Seit 1.3.0 ist
 eine so entstandene Session ohne den Token nicht mehr nutzbar — ein Zugriff allein über das
