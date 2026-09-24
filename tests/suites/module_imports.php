@@ -19,9 +19,14 @@
  * setCalendarMonth aus appointments.js, bevor es dort stand) -- kein Test hat
  * es bemerkt, weil die Suiten nur einzelne Funktionsrumpfe lesen.
  *
+ * Mitgeprueft werden auch dynamische Importe der Form
+ * const { a } = await import('./x.js'). Sie brechen zwar nur den Aufrufweg und
+ * nicht den Modulstart, aber genau daran haengt der Sprung vom Kalender in die
+ * Anwesenheit (appointments.js -> records.js) -- er bliebe sonst ungeprueft.
+ *
  * Bewusst ausgeklammert:
- *   - dynamische Importe (await import('./x.js')): der Zielpfad kann berechnet
- *     sein, und ein Fehler trifft nur den Aufrufweg, nicht den Modulstart
+ *   - dynamische Importe mit berechnetem Pfad: sie fallen automatisch heraus,
+ *     weil das Muster ein mit '.' beginnendes String-Literal verlangt
  *   - Standard-Importe (import x from) und Namensraum-Importe (import * as x):
  *     sie haengen nicht an einem Namen im Ziel
  *   - Pfade ausserhalb von public/js/ (Fremdcode, vendor/)
@@ -51,12 +56,15 @@ function miJsFiles(string $jsDir): array
 /**
  * Benannte Importe einer Datei: [['ziel' => absoluter Pfad, 'name' => Export], ...]
  *
- * Erfasst nur statische Importe mit geschweiften Klammern. Umbenennungen
- * (import { a as b }) zaehlen mit ihrem Namen im Ziel, also a.
+ * Erfasst statische Importe mit geschweiften Klammern und dynamische Importe
+ * mit Literalpfad. Umbenennungen (import { a as b }) zaehlen mit ihrem Namen
+ * im Ziel, also a.
  */
 function miNamedImports(string $src, string $datei, string $jsDir): array
 {
-    $treffer = [];
+    // Rohtreffer: je Eintrag [Namensliste aus den Klammern, Pfad-Literal].
+    $rohe = [];
+
     // import { ... } from '...';  -- auch ueber mehrere Zeilen, auch gemischt
     // mit einem Standard-Import (import x, { y } from '...').
     //
@@ -64,25 +72,44 @@ function miNamedImports(string $src, string $datei, string $jsDir): array
     // so eine Zeile). Statische Importe stehen ohnehin nur auf oberster Ebene,
     // also immer am Zeilenanfang. Grenze: ein in /* ... */ eingepackter Import
     // wuerde noch mitgezaehlt -- im Projekt gibt es keinen.
-    preg_match_all('/^[ \t]*import\s+(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}\s*from\s*[\'"]([^\'"]+)[\'"]/sm', $src, $m, PREG_SET_ORDER);
+    preg_match_all('/^[ \t]*import\s+(?:[A-Za-z_$][\w$]*\s*,\s*)?\{([^}]*)\}\s*from\s*[\'"]([^\'"]+)[\'"]/sm', $src, $statisch, PREG_SET_ORDER);
+    foreach ($statisch as $treffer) {
+        $rohe[] = [$treffer[1], $treffer[2]];
+    }
 
-    foreach ($m as $treffer_) {
-        $pfad = $treffer_[2];
+    // const { ... } = await import('...') bzw. ({ ... } = await import('...')).
+    // Das verlangte String-Literal mit fuehrendem Punkt laesst berechnete Pfade
+    // automatisch draussen.
+    //
+    // [^{}] statt [^}]: ohne das Verbot der oeffnenden Klammer begaenne der
+    // Treffer beim naechstgelegenen vorangehenden Block ("try {" eine Zeile
+    // darueber), und die Namensliste truege dessen Rumpf mit sich.
+    preg_match_all('/\{([^{}]*)\}\s*=\s*await\s+import\(\s*[\'"](\.[^\'"]+)[\'"]\s*\)/s', $src, $dynamisch, PREG_SET_ORDER);
+    foreach ($dynamisch as $treffer) {
+        $rohe[] = [$treffer[1], $treffer[2]];
+    }
+
+    // Der Praefixvergleich braucht den Schraegstrich: ohne ihn gaelte ein
+    // Nachbarverzeichnis public/jsx als "innerhalb von public/js".
+    $jsPraefix = rtrim(str_replace('\\', '/', $jsDir), '/') . '/';
+
+    $importe = [];
+    foreach ($rohe as [$namensliste, $pfad]) {
         if ($pfad === '' || $pfad[0] !== '.') {
             continue; // Paketnamen o. ae. -- gibt es hier nicht, waere aber Fremdcode
         }
 
         $ziel = realpath(dirname($datei) . '/' . $pfad);
         if ($ziel === false) {
-            $treffer[] = ['ziel' => null, 'name' => null, 'pfad' => $pfad];
+            $importe[] = ['ziel' => null, 'name' => null, 'pfad' => $pfad];
             continue;
         }
         $ziel = str_replace('\\', '/', $ziel);
-        if (strpos($ziel, str_replace('\\', '/', $jsDir)) !== 0) {
+        if (strpos($ziel, $jsPraefix) !== 0) {
             continue; // ausserhalb von public/js/
         }
 
-        foreach (explode(',', $treffer_[1]) as $teil) {
+        foreach (explode(',', $namensliste) as $teil) {
             $teil = trim($teil);
             if ($teil === '') {
                 continue;
@@ -94,11 +121,11 @@ function miNamedImports(string $src, string $datei, string $jsDir): array
             if (!preg_match('/^[A-Za-z_$][\w$]*$/', $teil)) {
                 continue; // z. B. "default as x" -- kein benannter Export
             }
-            $treffer[] = ['ziel' => $ziel, 'name' => $teil, 'pfad' => $pfad];
+            $importe[] = ['ziel' => $ziel, 'name' => $teil, 'pfad' => $pfad];
         }
     }
 
-    return $treffer;
+    return $importe;
 }
 
 /** Alle benannten Exporte einer Moduldatei. */
@@ -145,6 +172,18 @@ function miExports(string $src): array
 test('Unter public/js/ liegen Module zum Pruefen', function () use ($miJsDir) {
     assertTrue(is_dir($miJsDir), 'public/js/ fehlt');
     assertTrue(count(miJsFiles($miJsDir)) > 10, 'Zu wenige Moduldateien gefunden -- der Test liefe ins Leere');
+});
+
+test('Dynamische Importe mit Literalpfad werden erfasst', function () use ($miRoot, $miJsDir) {
+    // Ohne diese Gegenprobe koennte das Muster still ins Leere laufen und der
+    // Hauptttest waere weiterhin gruen, ohne einen einzigen dynamischen Import
+    // gesehen zu haben.
+    $datei = str_replace('\\', '/', $miJsDir) . '/modules/appointments.js';
+    assertTrue(is_file($datei), 'appointments.js fehlt');
+
+    $namen = array_column(miNamedImports((string) file_get_contents($datei), $datei, $miJsDir), 'name');
+    assertTrue(in_array('openAttendanceForAppointment', $namen, true),
+        'Der dynamische Import aus records.js wird nicht erfasst -- die Kopplung Kalender/Anwesenheit bliebe ungeprueft');
 });
 
 test('Jeder benannte Import existiert im Zielmodul', function () use ($miRoot, $miJsDir) {

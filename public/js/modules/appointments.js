@@ -1485,7 +1485,18 @@ export async function setCalendarToYear() {
 
 }
 
-/** Kalender auf den Monat eines Datums stellen (Rueckweg aus der Anwesenheit). */
+/**
+ * Kalender auf den Monat eines Datums stellen (Rueckweg aus der Anwesenheit).
+ *
+ * Setzt nur currentCalendarDate, zeichnet aber NICHT neu. Gezeichnet wird
+ * erst, wenn der Aufrufer anschliessend den Bereich wechselt -- am Ende von
+ * renderAppointments() steht renderCalendar().
+ *
+ * Die Reihenfolge in backToAppointments() (records.js) ist deshalb zwingend:
+ * erst setCurrentYear(..., { reload: false }), dann setCalendarMonth(), dann
+ * navigateToSection(). Mit reload: true liefe setCalendarToYear() dazwischen
+ * und setzte den Monat wieder auf Januar.
+ */
 export function setCalendarMonth(date) {
     const d = new Date(String(date) + 'T00:00:00');
     if (!isNaN(d.getTime())) {
@@ -1493,10 +1504,20 @@ export function setCalendarMonth(date) {
     }
 }
 
-/** Hat der Termin begonnen? Nur dann gibt es eine Anwesenheit. */
+// Der Vorlauf entspricht dem Check-in-Fenster (Einstellung checkin_tolerance_hours,
+// Vorgabe zwei Stunden): So frueh koennen bereits Erfassungen zum Termin liegen.
+// Die Oberflaeche kennt die Einstellung nicht, daher der feste Wert.
+const ATTENDANCE_LEAD_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Laeuft das Anwesenheitsfenster des Termins schon? Nur dann gibt es etwas zu
+ * sehen. Der Knopf erscheint bereits im Vorlauf, weil auto_checkin.php
+ * symmetrisch um den Start erfasst (ABS(TIMESTAMPDIFF(...)) <= toleranceSeconds)
+ * -- in der Aufbauphase liegen also schon Erfassungen vor.
+ */
 function appointmentHasStarted(apt) {
     const start = new Date(`${apt.date}T${apt.start_time || '00:00:00'}`);
-    return !isNaN(start.getTime()) && start <= new Date();
+    return !isNaN(start.getTime()) && start.getTime() - ATTENDANCE_LEAD_MS <= Date.now();
 }
 
 /**
@@ -1505,17 +1526,42 @@ function appointmentHasStarted(apt) {
  * geladen -- es importiert selbst aus diesem Modul.
  */
 export async function jumpToAttendance(appointmentId, from = 'calendar') {
-    const apt = calendarAppointments.find(a => a.appointment_id == appointmentId)
+    let apt = calendarAppointments.find(a => a.appointment_id == appointmentId)
         || dataCache.appointments[currentYear]?.data?.find(a => a.appointment_id == appointmentId);
+
     if (!apt) {
+        // Ein festgehaltenes Popup ueberlebt den Jahreswechsel: Dann steht der Termin
+        // in keinem geladenen Jahr, der Server kennt ihn aber.
+        // silentStatuses haelt den zweiten Toast des 404 heraus -- die Meldung
+        // unten ist die genauere.
+        apt = await apiCall('appointments', 'GET', null, { id: Number(appointmentId) }, { silentStatuses: [404] });
+    }
+
+    // apiCall() wirft nicht: bei 401 kommt null, sonst {success:false} ohne
+    // date. Beides muss hier enden und nicht als TypeError weiterlaufen.
+    if (!apt || !apt.date) {
         showToast('Termin nicht gefunden', 'error');
         return;
     }
+
     // Die Herkunft kommt aus einem onclick-Attribut, also aus dem DOM. Nur
     // 'calendar' und 'list' sind gueltig, alles andere faellt auf den Kalender
     // zurueck -- sonst entschiede ein Tippfehler stillschweigend den Rueckweg.
     const origin = from === 'list' ? 'list' : 'calendar';
-    const { openAttendanceForAppointment } = await import('./records.js');
+
+    // Scheitert der dynamische Import (Netzaussetzer, Cache-Miss nach einem
+    // Update), lehnt das Promise ab. Der Aufrufer ist ein onclick -- ohne
+    // catch landet die Ablehnung unbehandelt in der Konsole und der Knopf
+    // wirkt tot.
+    let openAttendanceForAppointment;
+    try {
+        ({ openAttendanceForAppointment } = await import('./records.js'));
+    } catch (error) {
+        debug.error('records.js konnte nicht geladen werden:', error);
+        showToast('Anwesenheitsliste konnte nicht geoeffnet werden', 'error');
+        return;
+    }
+
     await openAttendanceForAppointment(apt.appointment_id, apt.date, origin);
 }
 

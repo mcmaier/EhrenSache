@@ -54,13 +54,25 @@ wird die Liste neu geladen, bevor gewählt wird. Findet er sich auch dann nicht,
 ### Einstiege in `appointments.js`
 
 - **Kalender-Popup** (`showAppointmentPopup`, nur festgehaltenes Popup, nur `isAdminOrManager`):
-  je Termin, dessen Beginn (`date` + `start_time`) in der Vergangenheit liegt, ein Knopf
-  „Anwesenheit“ neben „Bearbeiten“. Er schließt das Popup und ruft die Einstiegsfunktion.
+  je Termin, dessen Anwesenheitsfenster bereits läuft, ein Knopf „Anwesenheit“ neben
+  „Bearbeiten“. Er schließt das Popup und ruft die Einstiegsfunktion.
 - **Terminliste** (`renderAppointments`, Aktionsspalte): dieselbe Bedingung, ein Symbolknopf
   (📋, `title`/`aria-label` „Anwesenheit anzeigen“) neben Bearbeiten/Löschen.
 
+**Wann der Knopf erscheint** (`appointmentHasStarted`, Nachbesserung 24.09.2026): nicht erst ab
+Beginn (`date` + `start_time`), sondern bereits **zwei Stunden davor**. `auto_checkin.php` erfasst
+symmetrisch um den Start (`ABS(TIMESTAMPDIFF(...)) <= toleranceSeconds`, Einstellung
+`checkin_tolerance_hours`, Vorgabe zwei Stunden). So früh können also schon Erfassungen zum
+Termin vorliegen — genau in der Aufbauphase, in der ein Verwalter wissen will, wer bereits da
+ist. Ohne den Vorlauf gäbe es Daten, aber keinen Weg dorthin. Der Wert steht als Konstante
+`ATTENDANCE_LEAD_MS` in `appointments.js`, weil die Oberfläche die Einstellung nicht kennt:
+`settings` ist admin-only, `settings?scope=client` liest im Hauptmodul niemand, und
+`appointmentHasStarted()` läuft synchron im Rendern.
+
 Beide Knöpfe tragen nur die ID; Datum und Titel kommen aus dem Cache, nie aus dem
-`onclick`-String (Muster aus `deleteAppointment`).
+`onclick`-String (Muster aus `deleteAppointment`). Steht der Termin in keinem geladenen Jahr —
+ein festgehaltenes Popup überlebt den Jahreswechsel —, holt `jumpToAttendance()` ihn einzeln
+vom Server, bevor „Termin nicht gefunden“ gemeldet wird.
 
 **Vermerk zu OI-94 (23.09.2026):** Der Nachtrag zu OI-94 hält fest, dass „Bearbeiten“ im
 festgehaltenen Popup zu nah an der Rückmeldezeile sitzt und als gelber Stift an den rechten

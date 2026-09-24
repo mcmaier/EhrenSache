@@ -210,7 +210,7 @@ Automatisiert: `calendar_attendance_frontend`, `module_imports`.
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
 | APT-ANW-1 | Als Admin im Kalender einen vergangenen Tag mit Termin anklicken | Das festgehaltene Popup zeigt neben „Bearbeiten“ den Knopf „Anwesenheit“ |
-| APT-ANW-2 | Derselbe Griff bei einem künftigen Termin | Kein Knopf „Anwesenheit“ |
+| APT-ANW-2 | Derselbe Griff bei einem künftigen Termin **außerhalb des Vorlaufs** (Beginn in mehr als zwei Stunden) | Kein Knopf „Anwesenheit“ |
 | APT-ANW-3 | „Anwesenheit“ anklicken | Bereich Anwesenheit ist aktiv, der Termin steht im Terminfilter, seine Liste ist sichtbar, der Statusfilter steht auf „Alle“, oben steht „← Zurück zu Termine“ |
 | APT-ANW-4 | „← Zurück zu Termine“ nach einem Sprung aus dem **Kalender** | Terminverwaltung, Kalender im Monat des Termins, Ansicht am Kalender |
 | APT-ANW-5 | In der Terminliste auf 📋 eines begonnenen Termins, dann zurück | Wie APT-ANW-3; der Rückweg führt an die **Zeile des Termins in der Liste**, der Kalendermonat bleibt unverändert |
@@ -220,6 +220,8 @@ Automatisiert: `calendar_attendance_frontend`, `module_imports`.
 | APT-ANW-9 | Nach dem Sprung eine Anwesenheit korrigieren und speichern | Funktioniert wie ohne Sprung; offene Anträge (seit 1.13.0) bleiben sichtbar |
 | APT-ANW-10 | Als einfaches Mitglied Kalender und Terminliste ansehen | Weder Knopf noch Zeichen 📋 |
 | APT-ANW-11 | Zwei Termine schnell hintereinander anspringen | Es gewinnt der zuletzt geklickte; Liste, Terminfilter und Rückweg gehören zusammen |
+| APT-ANW-12 | Termin anlegen, der **in zwei Stunden** beginnt, dann Kalender-Popup und Terminliste ansehen | Knopf „Anwesenheit“ bzw. 📋 ist bereits da — das Check-in-Fenster läuft, es kann schon Erfassungen geben |
+| APT-ANW-13 | Popup eines vergangenen Termins festhalten, oben rechts das **Jahr wechseln**, dann „Anwesenheit“ klicken | Der Sprung gelingt; der Termin wird einzeln nachgeladen, keine Meldung „Termin nicht gefunden“ |
 
 ---
 

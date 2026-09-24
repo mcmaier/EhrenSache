@@ -328,10 +328,19 @@ test('Kalendermonat laesst sich von aussen setzen', function () use ($caFeRoot) 
     assertTrue(str_contains($body, 'currentCalendarDate = new Date('), 'Zielmonat wird nicht gesetzt');
 });
 
-test('Anwesenheit nur fuer begonnene Termine und nur fuer Verwalter', function () use ($caFeRoot) {
+test('Anwesenheit ab dem Check-in-Fenster und nur fuer Verwalter', function () use ($caFeRoot) {
     $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+
+    // auto_checkin.php erfasst symmetrisch um den Start
+    // (ABS(TIMESTAMPDIFF(...)) <= toleranceSeconds, Vorgabe zwei Stunden).
+    // Ohne Vorlauf fehlte der Knopf genau in der Aufbauphase, in der schon
+    // Erfassungen vorliegen.
+    assertTrue(str_contains($js, 'const ATTENDANCE_LEAD_MS = 2 * 60 * 60 * 1000;'),
+        'Vorlauf-Konstante fehlt');
+
     $started = caFeFunctionBody($js, 'function appointmentHasStarted(');
-    assertTrue(str_contains($started, '<= new Date()'), 'Vergangenheitspruefung fehlt');
+    assertTrue(str_contains($started, 'start.getTime() - ATTENDANCE_LEAD_MS <= Date.now()'),
+        'Zeitpruefung ohne Vorlauf -- der Knopf erschiene erst ab Beginn');
 
     $popup = caFeFunctionBody($js, 'function showAppointmentPopup(');
     assertTrue((bool) preg_match('/fest && isAdminOrManager && appointmentHasStarted\(apt\)/', $popup),
@@ -356,4 +365,38 @@ test('jumpToAttendance liest das Datum aus dem Cache und nennt die Herkunft', fu
     assertTrue(str_contains($body, 'openAttendanceForAppointment('), 'Sprungfunktion wird nicht gerufen');
     assertTrue(str_contains($body, "'list'"), 'Die Herkunft muss durchgereicht werden');
     assertTrue(str_contains($js, 'window.jumpToAttendance = jumpToAttendance'), 'Der onclick braucht die globale Zuweisung');
+});
+
+test('jumpToAttendance faengt einen gescheiterten dynamischen Import ab', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'export async function jumpToAttendance(');
+
+    // Der Aufrufer ist ein onclick: eine unbehandelte Ablehnung landet nur in
+    // der Konsole, der Knopf wirkt tot.
+    assertTrue((bool) preg_match("/try\s*\{\s*\n\s*\(\{ openAttendanceForAppointment \} = await import\('\.\/records\.js'\)\);/", $body),
+        'Der dynamische Import steht nicht in einem try');
+    assertTrue(str_contains($body, '} catch ('), 'catch fehlt');
+    assertTrue(str_contains($body, 'debug.error('), 'Fehler gehoeren in debug.error, nicht in console.error');
+    assertTrue(str_contains($body, "showToast('Anwesenheitsliste konnte nicht geoeffnet werden', 'error')"),
+        'Ohne Meldung sieht der Nutzer nichts');
+});
+
+test('jumpToAttendance faellt nach einem Jahreswechsel auf den Einzelabruf zurueck', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'export async function jumpToAttendance(');
+
+    // Ein festgehaltenes Popup ueberlebt renderCalendar() und den Jahreswechsel:
+    // dann steht der Termin in keinem geladenen Jahr mehr.
+    assertTrue(str_contains($body, "apt = await apiCall('appointments', 'GET', null, { id: Number(appointmentId) }"),
+        'Rueckfall auf den Einzelabruf fehlt');
+    assertTrue(str_contains($body, 'silentStatuses'), 'Der 404 wuerde sonst zwei Meldungen zeigen');
+
+    // apiCall() wirft nicht: bei 401 kommt null, sonst {success:false} ohne date.
+    assertTrue(str_contains($body, '!apt || !apt.date'),
+        'Ohne beide Pruefungen laeuft der Fehlerfall in einen TypeError statt in die Meldung');
+
+    $abruf = strpos($body, "apiCall('appointments'");
+    $meldung = strpos($body, "showToast('Termin nicht gefunden'");
+    assertTrue($abruf !== false && $meldung !== false && $abruf < $meldung,
+        'Der Einzelabruf muss vor der Fehlermeldung stehen');
 });
