@@ -296,7 +296,19 @@ Minuten-Modell in einer eigenen Spec umsetzen.
 ---
 
 ### OI-27 · `members.active` vs. `membership_dates` am Kiosk
-**Priorität:** mittel
+**Priorität:** erledigt am 2026-09-24 — Branch `fix/oi-27-station-aktivzeitraum` (`4b10791`).
+Entschieden: umstellen. `stationAuthenticate()` prüft die Aktivität über
+`getMemberActivityWhere()` mit dem heutigen Tag, also dieselbe Regel wie Statistik und
+Anwesenheitsbericht; ohne Einträge in `membership_dates` bleibt es bei `members.active`, dem
+Normalfall im Verein. Ein Mitglied mit abgelaufenem oder erst künftigem Zeitraum kann nicht
+mehr stempeln. Die Antwort an den Kiosk bleibt für jeden Ablehnungsgrund wortgleich
+(„Invalid member number or PIN“), der Grund wird also nicht verraten, und der Dummy-Hash hält
+die Laufzeit konstant. `getMemberActivityWhere()` nimmt die Datenbank seither optional als
+vierten Parameter, damit die Station sie hereinreichen kann statt sie global zu halten; als
+Vergleichsdatum steht ein Literal aus `date('Y-m-d')` statt `CURDATE()`, weil die Unit-Suite
+gegen SQLite läuft. Tests: `station_unit` (vier Fälle plus statische Gegenprobe, dass die
+gemeinsame Regel genutzt wird), `station_api` (vier Fälle über HTTP), Handprüfungen ST-15 bis
+ST-17 in `docs/testplan.md`.
 
 `stationAuthenticate()` prüft für den Stempel nur `active = 1` auf `members`. Die Statistik
 und die übrige Anwesenheitslogik werten dagegen `getMemberActivityWhere()` gegen
