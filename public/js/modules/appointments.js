@@ -70,7 +70,12 @@ export async function loadAppointments(forceReload = false) {
     }
     
     debug.log(`Loading APPOINTMENTS from API for ${year}`);
-    const appointments = await apiCall('appointments', 'GET', null, {year: year});
+    // include=attendance liefert je begonnenem Termin {expected, present,
+    // excused, missing} fuer Verwalter und own_attendance fuer alle anderen
+    // (Schritt 2a). Die Zahlen liegen damit im ohnehin vorhandenen Cache des
+    // Jahres -- der Kalender braucht keinen zweiten Abruf und keinen eigenen
+    // Cache. Ohne Zeitraum wuerde der Server den Zusatz ignorieren.
+    const appointments = await apiCall('appointments', 'GET', null, { year: year, include: 'attendance' });
 
     // Cache für dieses Jahr speichern
     if (!dataCache.appointments[year]) {

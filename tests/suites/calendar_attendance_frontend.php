@@ -400,3 +400,64 @@ test('jumpToAttendance faellt nach einem Jahreswechsel auf den Einzelabruf zurue
     assertTrue($abruf !== false && $meldung !== false && $abruf < $meldung,
         'Der Einzelabruf muss vor der Fehlermeldung stehen');
 });
+
+// ---- Schritt 2b: Zahlen im Terminabruf ----------------------------------------------
+
+test('Der Jahresabruf der Termine holt die Anwesenheitszahlen mit', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'export async function loadAppointments(');
+    assertTrue(str_contains($body, "include: 'attendance'"),
+        'Ohne den Zusatz stehen im Cache keine Zahlen, und der Kalender haette nichts zu zeichnen');
+    assertTrue(str_contains($body, 'year: year'), 'Der Zeitraum muss erhalten bleiben -- ohne ihn ignoriert der Server den Zusatz');
+});
+
+test('Eine geaenderte Anwesenheit verwirft die Termine des Jahres', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/records.js');
+
+    $quick = caFeFunctionBody($js, 'async function quickCreateRecordForMember(');
+    assertTrue(str_contains($quick, "invalidateCache('appointments'"),
+        'Sonst zeigt der Kalender die alten Zahlen weiter, bis der Cache von selbst ablaeuft');
+
+    $del = caFeFunctionBody($js, 'export async function deleteRecord(');
+    assertTrue(str_contains($del, "invalidateCache('appointments'"),
+        'Loeschen aendert die Zahlen genauso wie Erfassen');
+});
+
+test('Auch die uebrigen Anwesenheitsaenderungen in records.js verwerfen die Termine', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/records.js');
+
+    // Die Mitgliedsansicht erfasst ueber einen zweiten Weg -- dieselbe Wirkung
+    // auf die Zahlen, also dasselbe Verwerfen.
+    $quickApt = caFeFunctionBody($js, 'async function quickCreateRecordForAppointment(');
+    assertTrue(str_contains($quickApt, "invalidateCache('appointments'"),
+        'Die Erfassung aus der Mitgliedsansicht aendert die Zahlen ebenso');
+
+    // Das Modal legt an und aendert: eine Aenderung von anwesend auf
+    // entschuldigt verschiebt den Balken, ohne die Summe zu aendern.
+    $save = caFeFunctionBody($js, 'export async function saveRecord(');
+    assertTrue(str_contains($save, "invalidateCache('appointments'"),
+        'Anlegen und Bearbeiten im Modal aendern die Zahlen');
+});
+
+test('Eine genehmigte Entschuldigung verwirft die Termine ebenfalls', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/exceptions.js');
+    $body = caFeFunctionBody($js, 'export async function saveException(');
+
+    // Die Genehmigung legt serverseitig einen Anwesenheitseintrag an
+    // (handleApprovedAbsence/handleApprovedTimeCorrection) -- aus "fehlend"
+    // wird "entschuldigt".
+    assertTrue(str_contains($body, "invalidateCache('appointments')"),
+        'Ohne Verwerfen zeigte der Kalender das Mitglied weiter als fehlend');
+});
+
+test('Der Import von Anwesenheiten verwirft die Termine aller Jahre', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/import_export.js');
+    assertTrue(str_contains($js, 'invalidateCache'), 'invalidateCache wird nicht verwendet');
+    assertTrue(str_contains($js, "import { showToast, showConfirm, invalidateCache } from './ui.js';")
+        || (bool) preg_match("/import \{[^}]*invalidateCache[^}]*\} from '\.\/ui\.js'/", $js),
+        'invalidateCache muss aus ui.js importiert sein');
+
+    $body = caFeFunctionBody($js, 'export async function executeRecordsImport(');
+    assertTrue(str_contains($body, "invalidateCache('appointments')"),
+        'Eine CSV kann Termine mehrerer Jahre treffen -- deshalb ohne Jahresangabe');
+});

@@ -683,6 +683,12 @@ export async function saveException() {
         // zu zehn Minuten lang nicht.
         if (isAdminOrManager && data.status === 'approved') {
             invalidateCache('records');
+
+            // Dieselbe Genehmigung verschiebt die Zahlen im Kalender von
+            // "fehlend" auf "entschuldigt" (Schritt 2b). Ohne Jahresangabe,
+            // weil der Antrag zu einem Termin ausserhalb des gewaehlten
+            // Jahres gehoeren kann.
+            invalidateCache('appointments');
         }
 
         // Die Anwesenheitsliste zeigt offene Anträge in der Zeile (OI-87).

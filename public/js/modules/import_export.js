@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall } from './api.js';
 import { debug } from '../app.js'
 import { getAuthHeaders } from './api.js';
-import { showToast } from './ui.js';
+import { showToast, invalidateCache } from './ui.js';
 import { loadAppointments } from './appointments.js';
 import { showRecordsSection } from './records.js';
 import { showAppointmentSection } from './appointments.js';
@@ -321,7 +321,12 @@ export async function executeRecordsImport() {
         }
         
         const result = await response.json();
-        
+
+        // Der Import legt Anwesenheiten an, an denen die Zahlen im Kalender
+        // haengen (Schritt 2b). Ohne Jahresangabe, weil eine CSV Termine
+        // mehrerer Jahre treffen kann -- auch ein teilweiser Import zaehlt.
+        await invalidateCache('appointments');
+
         // Progress auf 100%
         document.getElementById('recordsImportProgressFill').style.width = '100%';
         document.getElementById('recordsImportStatus').textContent = 'Abgeschlossen!';
