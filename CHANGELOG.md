@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unveröffentlicht]
+## [1.14.1] – 2026-09-24
 
 ### Sicherheit
 - **Ein Datensatz, den man nicht sehen darf, gibt sich nicht mehr zu erkennen.** Der Abruf eines

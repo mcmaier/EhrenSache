@@ -3804,6 +3804,41 @@ Rand — mehrere Termine an einem Tag gruppieren sich dadurch sichtbar.
 
 ---
 
+### OI-95 · Die globale Rate-Grenze zählt nur unangemeldete Aufrufe
+**Priorität:** entschieden am 2026-09-24, umgesetzt mit 1.14.1 — nicht erneut aufmachen.
+
+Die Grenze von 150 Anfragen je Minute gilt **je IP-Adresse und nur für Aufrufe ohne
+Anmeldung**. Angemeldete Konten und Geräte zählen nicht mit. Ein **ungültiger** Token — unbekannt,
+deaktiviert oder abgelaufen — gilt dabei als unangemeldet und zählt mit; sonst ließe sich die
+Grenze mit Zufallstoken umgehen und das Durchprobieren von Token wäre ungebremst
+(`public/api/api.php`, Abschnitt 6.2; Gegenproben in `tests/suites/rate_limit_frontend.php`, der
+Flutfall in `tests/db/verify_rate_limit_token.php`).
+
+**Warum nicht für alle.** Die erste Fassung zählte jeden Aufruf je Konto. Damit lief der eigene
+Testlauf in 327 Fehlschläge: Eine Maschine erzeugt in 90 Sekunden ein Vielfaches dessen, was ein
+Mensch an einem Tag auslöst. Dasselbe träfe im Betrieb die Check-in-App an einem Probenabend, wenn
+dreißig Mitglieder gleichzeitig einchecken, oder einen Import. Eine Grenze, die den Normalbetrieb
+abwürgt, wird beim ersten Vorfall hochgesetzt und schützt dann gar nicht mehr.
+
+**Was angemeldeten Missbrauch begrenzt.** Er ist einem Konto zurechenbar und lässt sich
+abschalten. Die heiklen Einzelwege haben eigene, engere Grenzen, jeweils in der Datenbank gezählt:
+Anmeldung (5 Fehlversuche je Konto und IP in 15 Minuten), Stations-PIN (5 je Mitglied, 30 je
+Kiosk), Mailversand.
+
+**Messung zur Schreiblast:** Ein vollständiger Testlauf mit rund 1300 Fällen erzeugte **fünf**
+Zeilen in `rate_limits` — angemeldete Aufrufe schreiben nichts. Die Last hängt also allein an
+dem, was unangemeldet hereinkommt; auf Billighosting unkritisch.
+
+**Folge, bewusst in Kauf genommen:** Angemeldete Aufrufe haben keine Obergrenze mehr. Vorher zählte
+der Sitzungsmodus wenigstens Browser-Sitzungen mit Cookie mit — allerdings nur die, und genau
+deshalb war die Grenze insgesamt wirkungslos.
+
+**Nicht erneut vorschlagen:** „Endlich auch angemeldete Aufrufe begrenzen." Wer es doch will,
+braucht zuerst eine Antwort darauf, wie Testlauf, Check-in-Abend und Import unter der Grenze
+bleiben — und misst vorher, wie viele Aufrufe diese Fälle wirklich erzeugen.
+
+---
+
 ### OI-96 · Kalendertage mit Terminen sind per Tastatur nicht erreichbar
 **Priorität:** mittel · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
 
