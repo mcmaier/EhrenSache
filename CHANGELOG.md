@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unveröffentlicht]
+## [1.14.0] – 2026-09-24
 
 ### Neu
 - **Die Anwesenheit steht im Kalender.** Vergangene Tage tragen am unteren Rand einen
