@@ -793,6 +793,33 @@ function calendarResponseLineHtml(apt, fest) {
 }
 
 /**
+ * Anwesenheitszeile eines Termins im Popup. Verwalter sehen die Zahlen,
+ * Mitglieder ihren eigenen Status im Klartext. Keine Zeile gibt es, solange
+ * der Server keine Zahlen liefert: vor dem Start (die Oberflaeche zeigt den
+ * Termin wegen des Check-in-Fensters schon zwei Stunden frueher als begonnen),
+ * bei einer Terminart ohne Gruppenzuordnung (expected = 0), und beim
+ * Einzelabruf eines Termins, der das Feld gar nicht kennt.
+ */
+function attendanceLineHtml(apt) {
+    const a = apt.attendance;
+    if (isAdminOrManager && a && Number(a.expected) > 0) {
+        return `<div class="calendar-attendance-line">`
+            + `<span class="calendar-attendance-line__part is-present">Anwesend ${Number(a.present) || 0}</span>`
+            + `<span class="calendar-attendance-line__part is-excused">Entschuldigt ${Number(a.excused) || 0}</span>`
+            + `<span class="calendar-attendance-line__part is-missing">Fehlend ${Number(a.missing) || 0}</span>`
+            + `<span class="calendar-attendance-line__total">von ${Number(a.expected)}</span>`
+            + `</div>`;
+    }
+
+    const ownStatus = apt.own_attendance;
+    if (!isAdminOrManager && ownStatus && OWN_STATUS_TEXT[ownStatus]) {
+        return `<div class="calendar-attendance-line calendar-attendance-line--own is-${ownStatus}">${OWN_STATUS_TEXT[ownStatus]}</div>`;
+    }
+
+    return '';
+}
+
+/**
  * Zeigt die Termine eines Tages neben dem Kalenderfeld.
  *
  * @param {HTMLElement} ziel         Das Kalenderfeld, an dem das Popup haengt
@@ -856,6 +883,7 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
                 ${apt.description ? `<div style="font-size: 11px; color: #7f8c8d;">${escapeHtml(apt.description)}</div>` : ''}
                 ${apt.location ? `<div style="font-size: 11px; color: #7f8c8d;">📍 ${escapeHtml(apt.location)}</div>` : ''}
                 ${apt.responses ? calendarResponseLineHtml(apt, fest) : ''}
+                ${attendanceLineHtml(apt)}
                 ${fest && isAdminOrManager ? `<button type="button" class="calendar-event-edit"
                     onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openAppointmentModal(${Number(apt.appointment_id)})">Bearbeiten</button>` : ''}
                 ${fest && isAdminOrManager && appointmentHasStarted(apt) ? `<button type="button" class="calendar-event-edit"

@@ -210,6 +210,44 @@
     margin-bottom: 4px;
 }
 
+/* Anwesenheitszeile im Popup: drei Werte nebeneinander, in denselben Farben
+   wie der Balken im Tagesfeld. */
+.calendar-attendance-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0;
+    font-size: 0.85em;
+}
+
+.calendar-attendance-line__part.is-present {
+    color: var(--success-color);
+}
+
+.calendar-attendance-line__part.is-excused {
+    color: var(--warning-color);
+}
+
+.calendar-attendance-line__part.is-missing {
+    color: var(--danger-color);
+}
+
+.calendar-attendance-line__total {
+    color: var(--text-light);
+}
+
+.calendar-attendance-line--own.is-present {
+    color: var(--success-color);
+}
+
+.calendar-attendance-line--own.is-excused {
+    color: var(--warning-color);
+}
+
+.calendar-attendance-line--own.is-missing {
+    color: var(--danger-color);
+}
+
 /* Terminart-Badge im Popup */
 .calendar-type-badge {
     display: inline-block;

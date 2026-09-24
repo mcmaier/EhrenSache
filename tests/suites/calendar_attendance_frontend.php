@@ -623,3 +623,36 @@ test('Terminarten und geloeschte Gruppen verwerfen den Terminabruf aller Jahre',
             "{$signature}: {$what} aendert die erwarteten Mitglieder -- ohne Jahr verwerfen");
     }
 });
+
+// ---- Schritt 2b: Popup --------------------------------------------------------------
+
+test('Das Popup zeigt je Termin eine Anwesenheitszeile', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'function attendanceLineHtml(');
+    assertTrue(str_contains($body, 'Anwesend'), 'Beschriftung Anwesend fehlt');
+    assertTrue(str_contains($body, 'Entschuldigt'), 'Beschriftung Entschuldigt fehlt');
+    assertTrue(str_contains($body, 'Fehlend'), 'Beschriftung Fehlend fehlt');
+    assertTrue(str_contains($body, 'OWN_STATUS_TEXT'), 'Mitglieder bekommen denselben Text wie im Vorlesetext');
+    assertTrue(str_contains($body, 'Number('), 'Zahlen aus der Antwort gehoeren durch Number() gefiltert');
+    assertTrue(str_contains($body, 'isAdminOrManager'), 'Die Rollenweiche fehlt');
+
+    $popup = caFeFunctionBody($js, 'function showAppointmentPopup(');
+    assertTrue(str_contains($popup, 'attendanceLineHtml('), 'Das Popup benutzt die Zeile nicht');
+});
+
+test('Ohne Zahlen bleibt das Popup unveraendert', function () use ($caFeRoot) {
+    $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
+    $body = caFeFunctionBody($js, 'function attendanceLineHtml(');
+    assertTrue((bool) preg_match("/return\s*''/", $body),
+        'Kuenftige Termine und Terminarten ohne Gruppe tragen keine Zahlen -- dann darf auch keine leere Zeile erscheinen');
+    assertTrue((bool) preg_match('/expected\s*\)?\s*>\s*0|expected\s*<=\s*0/', $body),
+        'expected = 0 muss eigens abgefangen werden, sonst steht dort dreimal die Null');
+});
+
+test('Die Popup-Zeile nimmt die Farben aus den Variablen', function () use ($caFeRoot) {
+    $css = caFeFile($caFeRoot, 'public/css/components/calendar.css');
+    foreach ([['is-present', '--success-color'], ['is-excused', '--warning-color'], ['is-missing', '--danger-color']] as [$mod, $var]) {
+        assertTrue((bool) preg_match('/\.calendar-attendance-line[^{]*\.' . $mod . '\s*\{[^}]*var\(' . preg_quote($var, '/') . '\)/', $css),
+            "Die Popup-Zeile muss fuer {$mod} auf {$var} zurueckgreifen");
+    }
+});
