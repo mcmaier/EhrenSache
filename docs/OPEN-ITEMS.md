@@ -3801,3 +3801,97 @@ Rand — mehrere Termine an einem Tag gruppieren sich dadurch sichtbar.
   ein Symbol. „+ Termin an diesem Tag“ bleibt als Textknopf am Ende der Liste.
 
 **Nicht sicherheitsrelevant.**
+
+---
+
+### OI-95 · Kalendertage mit Terminen sind per Tastatur nicht erreichbar
+**Priorität:** mittel · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
+
+`createCalendarDay()` ([appointments.js](../public/js/modules/appointments.js)) gibt einem Tag
+**mit** Terminen nur `mouseenter`, `mouseleave` und `click` — kein `tabindex`, kein `role`, keinen
+Tastatur-Handler. Das festgehaltene Popup entsteht damit ausschließlich mit der Maus. Leere Tage
+machen es seit OI-64 richtig vor: Sie bekommen `role="button"`, `tabindex="0"`, `aria-label` und
+einen Enter/Space-Handler.
+
+**Wirkung:** Ohne Maus sind die Bedienelemente im Popup unerreichbar — seit 1.14.0 sind das der
+Knopf „Anwesenheit“ (Sprung in die Anwesenheitsliste) und die Anwesenheitszahlen je Termin, davor
+schon „Bearbeiten“ und die Rückmeldezeile. Das Tagesfeld selbst ist über `aria-label` lesbar, seine
+Inhalte sind es nicht. Der Sprung bleibt über das Zeichen 📋 in der Terminliste erreichbar, die
+Zahlen haben keinen zweiten Weg.
+
+**Zu tun:** Den Belegt-Zweig genauso behandeln wie den Leer-Zweig darunter (`role`, `tabindex`,
+Enter/Space). Dabei klären, wie das Popup per Tastatur wieder geschlossen wird — `mouseleave`
+greift dort nicht, es braucht Escape und vermutlich einen Fokusrahmen.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-96 · Terminarten kennen keine Gruppengrenze
+**Priorität:** niedrig · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
+
+`GET appointment_types` steht jedem angemeldeten Konto offen (`requireAdmin()` greift erst ab
+POST), und **weder die Liste noch der Einzelabruf** wenden eine Gruppengrenze an. Jedes Mitglied
+kann damit sämtliche Terminarten samt ihrer vollständigen Gruppenzuordnung lesen — auch die von
+Gruppen, denen es nicht angehört.
+
+Anders als bei den beiden Fällen, die mit 1.14.0 korrigiert wurden, gibt es hier **keine zwei
+Wahrheiten**: Liste und Einzelabruf sind gleich offen. Es ist also kein Divergenzfehler, sondern
+eine Frage an das Produkt.
+
+**Zu klären:** Ist die Offenheit gewollt? Dafür spricht, dass die Oberfläche die Terminarten
+überall zum Übersetzen von `type_id` braucht (Filter, Listen, PWA) und eine Einschränkung dort
+Lücken risse. Dagegen spricht, dass Name und Gruppenzuordnung einer Terminart verraten, welche
+Gruppen es gibt und was sie tun. Wenn eingeschränkt werden soll, ist der Weg vermutlich, die
+**Gruppenliste** je Terminart für Nicht-Verwalter wegzulassen, nicht die Terminart selbst.
+
+**Nicht sicherheitsrelevant** im Sinne von SECURITY.md: kein Zugriff ohne Konto, keine
+Rechteausweitung, keine personenbezogenen Daten.
+
+---
+
+### OI-97 · Lastverhalten von `include=attendance` bei großem Bestand ungemessen
+**Priorität:** mittel · aufgenommen am 2026-09-24 (Vorbehalt aus der Spec zu 1.14.0)
+
+Seit 1.14.0 hängt `loadAppointments()` ([appointments.js](../public/js/modules/appointments.js))
+den Zusatz `include=attendance` an **jeden** Jahresabruf der Termine — nicht nur, wenn der Kalender
+sichtbar ist. Jeder Bereich, der den Abruf auslöst (Anwesenheit, Anträge, Arbeitszeit, Statistik),
+zahlt die Zählung also mit, für jede Rolle.
+
+Serverseitig fährt `attendanceExpectedMemberIds()`
+([appointment_attendance.php](../private/helpers/appointment_attendance.php)) dafür eine Abfrage
+über alle begonnenen Termine des Zeitraums mal alle Mitglieder der zugehörigen Gruppen, mit zwei
+korrelierten `EXISTS` auf `membership_dates` je Zeile.
+
+**Gemessen** wurde am Demo-Bestand (91 Termine, 33 Mitglieder): mittlerer Aufschlag −5 ms über drei
+Läufe, also im Rauschen, Antwort rund 6 KB größer. **Nicht gemessen** wurde ein großer Verein, etwa
+200 Mitglieder und 300 Termine im Jahr.
+
+**Zu tun:** Einmal mit großem Bestand messen. Falls es klemmt, ist der richtige Hebel ein
+**monatsweiser** Abruf für den Kalender — nicht eine zweite Variante des Jahresabrufs ohne Zahlen:
+Beide füllten denselben Cache-Schlüssel, und dann bräuchte jeder Treffer eine Prüfung „enthält diese
+Kopie die Zahlen?“. Genau daraus entsteht später ein veralteter Balken.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-98 · Aufräumen der Altdaten verwirft den Zwischenspeicher nicht
+**Priorität:** niedrig · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
+
+Die Aufräumfunktion in den Einstellungen (`apiCall('cleanup', 'POST', …)` in
+[settings.js](../public/js/modules/settings.js)) löscht serverseitig Anwesenheitsdaten jenseits der
+eingestellten Frist (`cleanup_years_records`, Vorgabe drei Jahre). Die Oberfläche verwirft danach
+**nichts** — weder `records` noch, seit 1.14.0, `appointments` mit den Anwesenheitszahlen.
+
+**Wirkung:** Wer nach dem Aufräumen ohne Neuladen in ein betroffenes Jahr wechselt, sieht bis zu
+zehn Minuten Daten, die es nicht mehr gibt. In der Praxis selten, weil betroffen nur Jahre jenseits
+der Löschfrist sind und die kaum im Zwischenspeicher liegen.
+
+**Zu tun:** Nach erfolgreichem Aufräumen `invalidateCache('records')` und
+`invalidateCache('appointments')` aufrufen, beide **ohne** Jahresangabe — das Aufräumen trifft
+mehrere Jahre auf einmal. Muster und Begründung stehen an den entsprechenden Stellen in
+[records.js](../public/js/modules/records.js) und
+[import_export.js](../public/js/modules/import_export.js).
+
+**Nicht sicherheitsrelevant.**
