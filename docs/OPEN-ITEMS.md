@@ -3574,9 +3574,8 @@ dokumentierte Regel (OI-3), keine Rechteausweitung.
 einschließlich zukünftiger, ohne Datumsgrenze. Die Zeilen zeigten schon vorher „✗ Fehlend“, der
 neue Chip-Zähler macht es nur sichtbarer.
 
-**Entschieden am 2026-09-23:** Umsetzung wie unten unter „Beschlossen“ (Punkte 1–3) — eigener
-Zustand „Kommend“, in der Mitgliedsansicht standardmäßig ausgeblendet, in der Terminansicht
-sichtbar.
+**Entschieden am 2026-09-23/24:** Umsetzung wie unten unter „Beschlossen“ — eigener Zustand
+„Kommend“, Grenze = Beginn des Check-in-Fensters, Umsetzung **nach 1.14.0 als 1.14.1**.
 
 **Nachtrag 2026-09-23 (Hinweis des Nutzers):**
 - Mit Serienterminen wird es deutlich: Eine Serie reicht bis ein Jahr in die Zukunft, die
@@ -3587,17 +3586,41 @@ sichtbar.
   wird „Fehlend“ (`records.js` ~Z. 1310–1320 und ~Z. 1466–1476).
 - Die Statistik schneidet kommende Termine längst ab: `ATTENDANCE_STARTED_CUTOFF_SQL` in
   `private/helpers/attendance.php` (genutzt in `attendance.php`, `punctuality.php`,
-  `report_statistics.php`). Die Anwesenheitsliste weicht davon ab — dieselbe Grenze übernehmen.
+  `report_statistics.php`). Diese Grenze ist nur das Datum — nicht übernehmen, siehe Punkt 2 unten.
 
-**Beschlossen:**
-1. Server liefert je Zeile ein Kennzeichen „noch nicht begonnen“ (über dieselbe Konstante),
+**Beschlossen (Nutzer, 2026-09-23/24):**
+1. **Zustand „Kommend“:** Server liefert je Zeile ein Kennzeichen „noch nicht begonnen“,
    Frontend zeigt dann **„Kommend“** in neutraler Farbe statt „✗ Fehlend“. Eine vorab genehmigte
    Entschuldigung bleibt „Entschuldigt“ — die ist für kommende Termine gerade interessant.
-2. **Mitgliedsansicht:** kommende Termine standardmäßig ausblenden, über einen Chip
-   „Kommend“ einblendbar (Muster: Vergangen/Kommend-Chips der Terminliste, `appointments.js`
-   ~Z. 439). Zählt nicht in „Fehlend“.
-3. **Terminansicht:** nicht ausblenden — wer einen kommenden Termin ausdrücklich wählt, will ihn
+2. **Grenze „begonnen“ = Beginn des Check-in-Fensters**, nicht die Startzeit: Termin gilt als
+   begonnen ab `Startzeit − checkin_tolerance_hours`. Grund: Check-ins werden symmetrisch um die
+   Startzeit erfasst (`auto_checkin.php`), in der Aufbauphase liegen schon Erfassungen vor — die
+   Liste darf dann nicht „Kommend“ zeigen, während der Kalender „hat begonnen“ sagt.
+   - **Eine Regel, keine zweite daneben:** `attendanceHasStarted()` in
+     `private/helpers/appointment_attendance.php` (kommt mit 1.14.0) um den Vorlauf ergänzen und
+     mitbenutzen. Für SQL die Bedingung gegen die **Datenbankuhr** (OI-60), PHP-Fassung beim
+     selben Cutoff halten.
+   - **Einstellung überall:** Der Vorlauf kommt aus der Vereinseinstellung
+     `checkin_tolerance_hours`, nicht fest verdrahtet. Der Kalender rechnet in 1.14.0 noch mit
+     festen 2 h (`ATTENDANCE_LEAD_MS` in `appointments.js`, weil das Dashboard die Einstellung
+     nicht kennt — `settings` ist `requireAdmin()`). Mit OI-89 gibt der Server den Wert ans
+     Dashboard weiter und der Kalender übernimmt ihn statt der Konstante.
+3. **Mitgliedsansicht — Chip „Kommend“ als gewöhnlicher Chip (Variante A):** „Alle“ und die
+   Status-Chips zeigen nur begonnene Termine; der Chip „Kommend“ zeigt ausschließlich die
+   kommenden. Kein zweiter, zuschaltbarer Mechanismus in der Chip-Leiste. Umsetzungshinweise
+   der Chip-Sitzung:
+   - Chip-Definitionen stehen in `public/js/modules/filter_chips.js` (`CHIPS_RECORDS_ALL`,
+     `CHIPS_RECORDS_LIST`), nicht in `records.js`.
+   - Zähler sind facettiert (OI-71): „Kommend“ muss in der **Klassifizierung** aus „Fehlend“
+     herausfallen, nicht erst im Filter, sonst kippen die Zahlen der anderen Chips.
+   - Kopfzeile der Anwesenheit ist voll (`.stats-grid--chips-extra`); ein weiteres Element
+     braucht eine Rasterspalte, sonst meldet `tests/suites/filter_chips_frontend.php` rot.
+4. **Terminansicht:** nicht ausblenden — wer einen kommenden Termin ausdrücklich wählt, will ihn
    sehen. Alle Zeilen ohne Eintrag zeigen „Kommend“.
+5. **Nebenbefund Statistik:** `ATTENDANCE_STARTED_CUTOFF_SQL` schneidet nur nach Datum (ein
+   Termin von heute Abend zählt ab Mitternacht als begonnen) und weicht damit von der Regel oben
+   ab. Ob die Statistik die Regel übernimmt, ändert Zahlen — eigene Entscheidung, nicht Teil
+   von OI-89.
 
 **Nicht sicherheitsrelevant.**
 
