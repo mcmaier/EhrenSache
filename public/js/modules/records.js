@@ -1995,8 +1995,8 @@ function updateTableHeader(mode) {
             thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
         }
         else
-        {
-            // Keine Aktionen für User
+        {   
+            // Keine Aktionen für User            
             thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th>';
         }
     }
