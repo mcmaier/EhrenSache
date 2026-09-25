@@ -138,3 +138,16 @@ tr.row-inactive:hover td {
     color: var(--text-muted);
     font-weight: 500;
 }
+
+/* Terminart als Randakzent (OI-94). Der Streifen sitzt als inset-Schatten auf
+   der ersten Zelle: border-left auf der Zeile griffe nur mit
+   border-collapse: collapse und kollidierte mit Zebrastreifung und Hover.
+   Die Farbe kommt ueber --type-color am Element, gesetzt aus der Terminart. */
+.type-accent {
+    box-shadow: inset 4px 0 0 var(--type-color, var(--type-color-none));
+}
+
+/* Name der Terminart in der Unterzeile, wo frueher die Spalte stand. */
+.type-accent-name {
+    color: var(--text-light);
+}

@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
 import { renderDateChecklist } from './date_checklist.js';
-import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange } from './utils.js';
+import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor } from './utils.js';
 import { loadTypes } from './management.js';
 import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
@@ -231,7 +231,7 @@ async function renderAppointments(appointments, page = 1) {
     
     const tbody = document.getElementById('appointmentsTableBody');
     if (!appointments){
-        tbody.innerHTML = '<tr><td colspan="5" class="loading">Keine Einträge gefunden</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="loading">Keine Einträge gefunden</td></tr>';
         calendarAppointments = [];
         updateAppointmentStats([]);
         return;
@@ -268,6 +268,15 @@ async function renderAppointments(appointments, page = 1) {
         // die Zeile ueber #appointmentsTableBody tr[data-appointment-id="<id>"].
         tr.dataset.appointmentId = apt.appointment_id;
 
+        // apt.color/apt.type_name kommen aus der Terminart (DB) -- ohne CSP
+        // (OI-17) muss hier selbst maskiert werden: Farbe ueber safeTypeColor(),
+        // Text per escapeHtml(). Die Farbe geht als CSS-Variable ins Markup,
+        // das Aussehen steht im Stylesheet (.type-accent).
+        const typeColor = safeTypeColor(apt.color);
+        const typeName = apt.type_name
+            ? `<span class="type-accent-name">${escapeHtml(apt.type_name)} · </span>`
+            : '';
+
         // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (apt.appointment_id && apt.title) {
@@ -291,7 +300,7 @@ async function renderAppointments(appointments, page = 1) {
             if (apt.date && apt.start_time) {
                 const aptDate = new Date(apt.date + 'T00:00:00');
                 const formattedAptDate = aptDate.toLocaleDateString('de-DE');
-                appointmentInfo += `<br><small style="color: #7f8c8d;">${formattedAptDate}, ${formatTimeRange(apt.start_time, apt.end_time)}</small>`;
+                appointmentInfo += `<br><small style="color: #7f8c8d;">${typeName}${formattedAptDate}, ${formatTimeRange(apt.start_time, apt.end_time)}</small>`;
                 if (apt.location) {
                     appointmentInfo += `<br><small style="color: #7f8c8d;">📍 ${escapeHtml(apt.location)}</small>`;
                 }
@@ -299,13 +308,6 @@ async function renderAppointments(appointments, page = 1) {
             
             appointmentInfo += '</div>';
         }
-
-        // apt.color/apt.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
-        // muss hier selbst maskiert werden: Farbe per Whitelist, Text per escapeHtml().
-        const safeAptColor = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#667eea';
-        const typeBadge = apt.type_name
-            ? `<span class="type-badge" style="background: ${safeAptColor}; color: white;">${escapeHtml(apt.type_name)}</span>`
-            : '<span class="type-badge">-</span>';
 
         const actionsHtml = isAdminOrManager ? `
             <td class="actions-cell">
@@ -326,8 +328,7 @@ async function renderAppointments(appointments, page = 1) {
         ` : '';
         
         tr.innerHTML = `
-                <td>${appointmentInfo}</td>
-                <td>${typeBadge}</td>
+                <td class="type-accent" style="--type-color: ${typeColor};">${appointmentInfo}</td>
                 <td>${apt.description ? escapeHtml(apt.description) : '-'}</td>
                 <td class="response-cell">${responseSummaryCell(apt)}</td>
                 ${actionsHtml}

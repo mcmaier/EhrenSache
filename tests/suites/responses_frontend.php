@@ -108,8 +108,13 @@ test('Terminliste hat die Spalte Rueckmeldung und passende colspan', function ()
     $html = (string) file_get_contents($rsRoot . '/public/index.html');
     assertTrue(str_contains($html, '<th>Rückmeldung</th>'), 'Spaltenkopf fehlt');
 
+    // Seit OI-94 entfaellt die Spalte "Terminart" -- die Terminliste hat wieder
+    // vier Spalten (Termin, Beschreibung, Rueckmeldung, Aktionen). Geprueft wird
+    // deshalb nicht mehr die Abwesenheit von colspan="4", sondern dass die
+    // Leerzeile genau vier Spalten ueberspannt statt weiterhin fuenf.
     $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
-    assertTrue(!str_contains($js, 'colspan="4"'), 'appointments.js rendert noch vier Spalten');
+    assertTrue(str_contains($js, 'colspan="4"'), 'appointments.js ueberspannt nicht vier Spalten');
+    assertTrue(!str_contains($js, 'colspan="5"'), 'appointments.js rendert noch fuenf Spalten');
 });
 
 test('updateTableHeaders() in ui.js fuehrt Rueckmeldung fuer die Terminliste', function () use ($rsRoot) {

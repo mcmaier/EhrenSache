@@ -721,7 +721,9 @@ export function showDashboard() {
 export function updateTableHeaders() {
     const tables = [
         { id: 'membersTableBody', headers: ['Name', 'Vorname', 'Mitgliedsnummer', 'Gruppen','Status'] },
-        { id: 'appointmentsTableBody', headers: ['Termin', 'Terminart', 'Beschreibung', 'Rückmeldung'] },
+        // Terminliste ohne Spalte "Terminart" (OI-94): Die Terminart steht als
+        // Randakzent an der ersten Zelle und mit Namen in deren Unterzeile.
+        { id: 'appointmentsTableBody', headers: ['Termin', 'Beschreibung', 'Rückmeldung'] },
         { id: 'recordsTableBody', headers: ['Termin', 'Terminart', 'Mitglied', 'Ankunftszeit', 'Status','Quelle'] },
         { id: 'exceptionsTableBody', headers: ['Typ', 'Mitglied', 'Termin', 'Begründung', 'Gewünschte Zeit', 'Status', 'Erstellt am'] }
     ];
