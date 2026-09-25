@@ -227,6 +227,18 @@ test('Die Terminliste traegt den Streifen und den Namen in der Unterzeile', func
     assertTrue((bool) preg_match('/innerHTML\s*=\s*`\s*<td[^>]*type-accent/', $body),
         'Die Klasse type-accent muss auf der ersten Zelle der Zeile sitzen');
 
+    // Genau eine Deklaration im style-Attribut, also genau ein Doppelpunkt
+    // (eingesetzte Werte vorher heraus). Beim Mutationstest zu Task 4 fiel auf,
+    // dass ein angehaengtes "background: ${apt.color};" hier gruen blieb: Der
+    // Datenbankwert stuende dann ein zweites Mal im Markup, diesmal ungeprueft,
+    // und ohne CSP (OI-17) ist safeTypeColor() die einzige Schranke. Die
+    // Anwesenheitsliste hatte diese Zaehlung schon, die Terminliste nicht.
+    assertTrue((bool) preg_match('/innerHTML\s*=\s*`\s*<td[^>]*style="([^"]*)"/', $body, $styleAttr),
+        'Die erste Zelle der Zeile traegt kein style-Attribut mit der Farbvariablen');
+    $ohneWerte = preg_replace('/\$\{[^}]*\}/', 'X', $styleAttr[1]);
+    assertSame(1, substr_count($ohneWerte, ':'),
+        'In das style-Attribut der ersten Zelle gehoert genau eine Deklaration');
+
     // Der Name der Terminart steht in der Unterzeile, unmittelbar vor dem Datum
     // -- ohne diese Gegenprobe waere auch eine Umsetzung ganz ohne Namen gruen.
     assertTrue(str_contains($body, 'type-accent-name'),
