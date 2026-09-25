@@ -310,32 +310,35 @@
     font-size: 11px;
 }
 
-/* FI-1 Fehlerbehebung: Hover- (span, .response-summary-text) und Pin-
-   Variante (button, .response-summary-btn) sollen im Popup optisch nahe
-   beieinander bleiben -- der Unterschied war seinerzeit als Fehler gemeldet
-   worden. Die allgemeine Button-Optik aus buttons.css (.response-summary-btn:
-   Rahmen, Hintergrund) wird deshalb weiterhin zurueckgesetzt: Die Zeile bleibt
-   Text, kein dritter Knopf neben "Bearbeiten" und "Anwesenheit".
-   Seit OI-94 gilt das nicht mehr absolut -- die Regel darunter gibt der
-   angeklickten Fassung einen leisen Hinweis mit. */
+/* FI-1 Fehlerbehebung: Hover- (span, .response-summary-text) und Pin-Variante
+   (button, .response-summary-btn) sollen im Popup optisch IDENTISCH wirken --
+   so wurde es seinerzeit entschieden, nachdem der sichtbare Unterschied als
+   Fehler gemeldet worden war. Die allgemeine Button-Optik aus buttons.css
+   (.response-summary-btn: Rahmen, Hintergrund) wird dafuer zurueckgesetzt.
+   Dieser Teil gilt unveraendert: Die Zeile bleibt Text, kein dritter Knopf
+   neben "Bearbeiten" und "Anwesenheit".
+
+   OI-94 loest den Anspruch auf Gleichheit ab -- aber nur fuer das
+   festgehaltene Popup und nur so weit wie noetig: gepunktete Linie und
+   Linkfarbe, sonst nichts. Aus "identisch" wird also "beinahe identisch",
+   nicht "darf sich unterscheiden". Grund: Den Knopf gibt es ueberhaupt nur
+   im festgehaltenen Popup (calendarResponseLineHtml, clickable haengt an
+   fest), und ohne Maus war nicht zu erkennen, dass die Zeile etwas tut --
+   auf dem Handy gibt es weder Mauszeiger noch Hover-Zustand. Siehe
+   docs/project_history.md. Die Hover-Fassung (.response-summary-text) bleibt
+   unveraendert schlichter Text.
+
+   Beides steht bewusst in DERSELBEN Regel und in dieser Reihenfolge:
+   "border: none" nimmt auch die Unterkante, "border-bottom" muss danach
+   kommen. Als zwei Regelbloecke uebereinander liess ein Vertauschen der
+   Bloecke die Linie wortlos verschwinden, ohne dass ein Test anschlug. */
 .calendar-event-responses .response-summary-btn {
     border: none;
+    border-bottom: 1px dotted var(--text-light);
     background: none;
+    color: var(--primary-color);
     font-family: inherit;
     cursor: pointer;
-}
-
-/* Im festgehaltenen Popup ist die Rueckmeldezeile anklickbar (den Knopf gibt
-   es nur dort, siehe calendarResponseLineHtml: clickable = fest && ...). Sie
-   bekommt dafuer eine gepunktete Linie und Linkfarbe statt Knopfoptik:
-   erkennbar auch ohne Maus -- auf dem Handy gibt es weder Mauszeiger noch
-   Hover-Zustand, und ohne Maus war gar nicht zu sehen, dass die Zeile etwas
-   tut. Loest die FI-1-Entscheidung ab, dass beide Popup-Fassungen gleich
-   aussehen -- siehe docs/project_history.md. Die Hover-Fassung
-   (.response-summary-text) bleibt unveraendert schlichter Text. */
-.calendar-event-responses .response-summary-btn {
-    border-bottom: 1px dotted var(--text-light);
-    color: var(--primary-color);
 }
 
 .calendar-event-responses .response-summary-btn:hover {

@@ -583,16 +583,28 @@ test('Jeder Termin im Popup ist ein eigener Block mit Streifen', function () use
     // Ergaenzung nicht "Block fehlt" meldet und den Naechsten falsch leitet.
     assertTrue((bool) preg_match('/<div[^>]*class="[^"]*calendar-event-block[^"]*"[^>]*style="([^"]*)"/', $body, $styleAttr),
         'Der Block traegt die Farbvariable nicht im eigenen style-Attribut');
-    assertTrue((bool) preg_match('/^--type-color:\s*\$\{(safeTypeColor\(|typeColor\})/', trim($styleAttr[1])),
-        'Die Variable --type-color muss ihren Wert aus safeTypeColor() beziehen');
+
     // Genau eine Deklaration, also genau ein Doppelpunkt (eingesetzte Werte
-    // vorher heraus, ein Ternaer darin braechte einen eigenen mit). Ohne diese
-    // Zaehlung bliebe ein angehaengtes "background: ${apt.color};" gruen -- der
+    // vorher heraus, ein Ternaer darin braechte einen eigenen mit). Die
+    // Zaehlung steht VOR der Herkunftspruefung, damit ein angehaengtes
+    // "background: ${apt.color};" die Meldung bekommt, die es verdient: Der
     // Datenbankwert stuende dann ein zweites Mal im style-Attribut, diesmal
     // ungeprueft, und ohne CSP (OI-17) ist die Pruefung die einzige Schranke.
     $ohneWerte = preg_replace('/\$\{[^}]*\}/', 'X', $styleAttr[1]);
     assertSame(1, substr_count($ohneWerte, ':'),
         'In das style-Attribut des Blocks gehoert genau eine Deklaration');
+
+    // Die Farbe kommt aus safeTypeColor() -- entweder direkt oder ueber eine
+    // lokale Variable, die den Aufruf haelt. Wie die heisst, ist gleichgueltig:
+    // Ein Muster, das auf "typeColor" besteht, meldete bei einer Umbenennung
+    // "kommt nicht aus safeTypeColor()", obwohl sie genau das tut -- und
+    // schickte den Naechsten an die falsche Stelle.
+    assertTrue((bool) preg_match('/^--type-color:\s*\$\{([^}]+)\};?$/', trim($styleAttr[1]), $wert),
+        'Der Wert von --type-color muss vollstaendig aus einem eingesetzten Ausdruck bestehen');
+    $ausdruck = trim($wert[1]);
+    assertTrue(str_starts_with($ausdruck, 'safeTypeColor(')
+        || (bool) preg_match('/(?:const|let|var)\s+' . preg_quote($ausdruck, '/') . '\s*=\s*safeTypeColor\(/', $body),
+        "Die Variable --type-color muss ihren Wert aus safeTypeColor() beziehen -- \"{$ausdruck}\" kommt nicht von dort");
 
     // Das Schildchen muss verschwinden -- im Rumpf, in der ganzen Datei und im
     // Stylesheet. Bliebe die Regel stehen, faende der Naechste eine Klasse ohne
@@ -654,24 +666,74 @@ test('Der Name der Terminart steht im Popup in der Unterzeile beim Ort', functio
     }
 });
 
+test('Der Fokusrahmen am Popup-Block ist fuer OI-96 schon angelegt', function () use ($taRoot) {
+    // Eigener Test, nicht angehaengt: Er darf nicht hinter einer fremden roten
+    // Zusicherung verschwinden.
+    //
+    // Die Spec verlangt ihn ausdruecklich ("der Fokusrahmen wird im Stylesheet
+    // schon angelegt"). Heute ist er wirkungslos -- es gibt noch kein
+    // fokussierbares Element, tabindex und Tastenbedienung kommen mit OI-96 --
+    // und genau deshalb braucht er eine Zusicherung: Beim naechsten Aufraeumen
+    // saehe er wie eine Regel ohne Benutzer aus, und OI-96 begaenne mit einer
+    // Ueberraschung statt mit der halben Vorleistung.
+    $css = (string) preg_replace('~/\*.*?\*/~s', '',
+        taFile($taRoot, 'public/css/components/calendar.css'));
+
+    assertTrue((bool) preg_match('/\.calendar-event-block:focus-visible\s*\{([^}]*)\}/', $css, $fokus),
+        'Der Fokusrahmen am Termin-Block fehlt -- er gehoert zur Vorleistung fuer OI-96');
+    assertTrue((bool) preg_match('/outline:\s*[^;]*\bvar\(--/', $fokus[1]),
+        'Der Fokusrahmen braucht eine sichtbare outline aus einer Farbvariablen');
+
+    // Die Bedienung selbst bleibt OI-96 -- kein tabindex, kein keydown am
+    // Block. Ohne diese Gegenprobe waere auch ein halbfertiger Vorgriff gruen,
+    // der fokussierbar macht, aber weder Enter noch Escape beantwortet.
+    $js = taFile($taRoot, 'public/js/modules/appointments.js');
+    $body = taFunctionBody($js, 'function showAppointmentPopup(');
+    assertTrue(!str_contains($body, 'tabindex') && !str_contains($body, "'keydown'"),
+        'Tastaturbedienung des Popups ist OI-96, nicht dieser Vorgang -- hier wird nur die Struktur angelegt');
+});
+
 test('Die Rueckmeldezeile ist nur im festgehaltenen Popup als bedienbar erkennbar', function () use ($taRoot) {
     $css = taFile($taRoot, 'public/css/components/calendar.css');
 
-    assertTrue((bool) preg_match('/\.calendar-event-block\s*\{[^}]*var\(--type-color/', $css),
+    // Kommentare vorher heraus: Sie stehen ueber den Regeln, nennen Klassen im
+    // Fliesstext und wuerden sonst als Selektor oder als Regelinhalt gelesen.
+    $cssPur = (string) preg_replace('~/\*.*?\*/~s', '', $css);
+
+    assertTrue((bool) preg_match('/\.calendar-event-block\s*\{[^}]*var\(--type-color/', $cssPur),
         'Der Block traegt den Streifen nicht');
-    assertTrue((bool) preg_match('/\.calendar-event-responses \.response-summary-btn\s*\{[^}]*border-bottom:[^;]*dotted/', $css),
+
+    // Die Rueckmeldezeile im Popup braucht GENAU EINE Regel. Als zwei Bloecke
+    // untereinander (Ruecknahme oben, Linie unten) haengt das Ergebnis an der
+    // Quelltextreihenfolge: Vertauscht man sie, nimmt "border: none" die
+    // Unterkante wieder weg, die Linie verschwindet vollstaendig -- und beide
+    // Regeln fuer sich gelesen sind weiter in Ordnung, die Suite bliebe gruen.
+    assertSame(1, preg_match_all('/\.calendar-event-responses \.response-summary-btn\s*\{([^}]*)\}/', $cssPur, $btnRegeln),
+        'Die Rueckmeldezeile im Popup gehoert in genau eine Regel -- zwei uebereinander lassen sich vertauschen, und die Linie verschwindet wortlos');
+    $btnRegel = $btnRegeln[1][0];
+
+    assertTrue((bool) preg_match('/border-bottom:[^;]*dotted/', $btnRegel),
         'Die gepunktete Linie fehlt -- ohne Maus war die Zeile nicht als bedienbar erkennbar');
     // Sie bleibt ein leiser Hinweis: kein dritter Knopf neben "Bearbeiten" und
     // "Anwesenheit". Die Ruecknahme der Knopfoptik aus buttons.css gilt weiter.
-    assertTrue((bool) preg_match('/\.calendar-event-responses \.response-summary-btn\s*\{[^}]*background:\s*none/', $css),
+    assertTrue((bool) preg_match('/background:\s*none/', $btnRegel),
         'Die Knopfoptik muss weiterhin zurueckgesetzt sein');
+
+    // Und auch innerhalb der Regel zaehlt die Reihenfolge: Die Kurzform
+    // "border: none" nimmt die Unterkante mit, sie muss VOR der Linie stehen.
+    $reset = strpos($btnRegel, 'border:');
+    $linie = strpos($btnRegel, 'border-bottom:');
+    assertTrue($reset !== false,
+        'Die Ruecknahme des Rahmens aus buttons.css fehlt -- die Zeile saehe wieder wie ein Knopf aus');
+    assertTrue($reset < $linie,
+        '"border: none" steht hinter "border-bottom" und nimmt die gepunktete Linie wieder weg');
 
     // Die Ueberfahr-Fassung bleibt schlichter Text. Geprueft ueber ALLE Regeln,
     // die ihren Selektor nennen: Die gemeinsame Regel weiter oben fasst beide
     // Fassungen zusammen, und eine Deklaration DORT traefe auch den Hover-Fall
     // -- genau der Unterschied, den FI-1 seinerzeit als Fehler gemeldet bekam.
     $textRegeln = 0;
-    foreach (taCssRules($css) as [$selektor, $regel]) {
+    foreach (taCssRules($cssPur) as [$selektor, $regel]) {
         if (!str_contains($selektor, 'response-summary-text')) {
             continue;
         }
@@ -685,8 +747,16 @@ test('Die Rueckmeldezeile ist nur im festgehaltenen Popup als bedienbar erkennba
     // traefe die neue Regel auch das Hover-Popup, gleich was das Stylesheet sagt.
     $js = taFile($taRoot, 'public/js/modules/appointments.js');
     $zeile = taFunctionBody($js, 'function calendarResponseLineHtml(');
-    assertTrue(str_contains($zeile, 'const clickable = fest &&'),
-        'Die Klickbarkeit haengt nicht mehr an fest -- die gepunktete Linie erschiene dann auch beim Ueberfahren');
+    // Geprueft wird die Absicht, nicht der Wortlaut: Die Bedingung muss fest
+    // UND-verknuepfen. "(r.expected || isAdminOrManager) && fest" ist dieselbe
+    // Aussage wie "fest && (...)"; ein Muster, das auf der Operandenreihenfolge
+    // besteht, meldete dort "haengt nicht mehr an fest" und waere schlicht
+    // falsch. Den genauen Wortlaut sichert responses_frontend ohnehin.
+    assertTrue((bool) preg_match('/\bclickable\s*=\s*([^;]+);/', $zeile, $bedingung),
+        'calendarResponseLineHtml() bildet keine Bedingung clickable');
+    assertTrue((bool) preg_match('/\bfest\b/', $bedingung[1]) && str_contains($bedingung[1], '&&'),
+        'Die Klickbarkeit haengt nicht mehr (UND-verknuepft) an fest -- die gepunktete Linie'
+        . ' erschiene dann auch beim Ueberfahren: ' . trim($bedingung[1]));
     $text = strpos($zeile, 'response-summary-text');
     $knopf = strpos($zeile, 'response-summary-btn');
     assertTrue($text !== false && $knopf !== false, 'Beide Fassungen der Rueckmeldezeile muessen vorkommen');
