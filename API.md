@@ -129,14 +129,20 @@ Prüft ob das System installiert und betriebsbereit ist.
   "version": "1.0"
 }
 ```
+`version` ist ein fester Wert (`"1.0"`) und sagt **nichts** über den Stand der Installation.
+Für Versionsprüfungen gilt die Ressource [`version`](#version); `ping` meldet nur, ob das
+System antwortet und installiert ist.
 
-**Fehler-Status:**
+**Fehler-Status:** `503`
 ```json
 {
   "status": "not_installed",
   "message": "Installation required"
 }
 ```
+`message` ist je nach Ursache `"Installation required"` (keine `config.php`),
+`"Installation not completed"` (kein `install.lock`), `"Database schema missing"` (Tabelle
+`users` fehlt) oder `"Database connection failed"`.
 
 ---
 
@@ -1356,6 +1362,11 @@ Sucht passenden Termin im Zeitfenster. Kann automatisch einen neuen Termin anleg
   "warning": null
 }
 ```
+`appointment_action` nennt, woher der Termin stammt: `"matched"` — ein bestehender Termin,
+gefunden im Toleranzfenster oder über `appointment_id` gewählt; `"created"` — ohne Treffer neu
+angelegt, weil `checkin_auto_create_appointment` eingeschaltet ist (dann trägt `appointment`
+zusätzlich `is_auto_created: 1`). Andere Werte gibt es nicht.
+
 `record_action` und `message` hängen zusammen: neu angelegt → `"created"` / „Check-in
 successful" (`201`); ein vorhandener Datensatz wird übernommen → `"updated"` / „Check-in
 updated" (`200`), oder bleibt stehen (spätere Ankunft, kein Ersatz) → `"unchanged"` / „Check-in
