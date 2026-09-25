@@ -550,8 +550,10 @@ export async function saveType() {
         const allMembersGroup = dataCache.groups.data.find(g => g.is_default);
         
         if (allMembersGroup && !groupIds.includes(allMembersGroup.group_id)) {
+            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Gruppenname
+            // ist Freitext.
             showToast(
-                `Standard-Terminart muss die Gruppe "${allMembersGroup.group_name}" enthalten`,
+                `Standard-Terminart muss die Gruppe "${escapeHtml(allMembersGroup.group_name)}" enthalten`,
                 'warning'
             );
             return;

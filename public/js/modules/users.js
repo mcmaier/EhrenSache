@@ -142,15 +142,15 @@ function renderUsers(users, page = 1)
             
         // Member-Number kann null sein
         const memberNumber = user.pending_member_number 
-            ? ` (${user.pending_member_number})` 
+            ? ` (${escapeHtml(user.pending_member_number)})`
             : '';
         memberInfo = `<div class="linked-member">→ wird verknüpft: ${escapeHtml(user.pending_member_surname)}, ${escapeHtml(user.pending_member_name)} ${memberNumber}</div>`;
         
     } else if (user.account_status === 'active') {
         statusBadge = '<span class="status-badge active">✓ Aktiv</span>';
         if (user.member_id) {
-            const memberNumber = user.member_number 
-                ? ` (${user.member_number})` 
+            const memberNumber = user.member_number
+                ? ` (${escapeHtml(user.member_number)})`
                 : '';
 
             memberInfo = `<div class="linked-member">→ ${escapeHtml(user.member_surname)}, ${escapeHtml(user.member_name)} ${memberNumber}</div>`;
@@ -158,8 +158,8 @@ function renderUsers(users, page = 1)
     } else if (user.account_status === 'suspended') {
         statusBadge = '<span class="status-badge suspended">🚫 Gesperrt</span>';
         if (user.member_id) {
-            const memberNumber = user.member_number 
-                ? ` (${user.member_number})` 
+            const memberNumber = user.member_number
+                ? ` (${escapeHtml(user.member_number)})`
                 : '';
             memberInfo = `<div class="linked-member">→ ${escapeHtml(user.member_surname)}, ${escapeHtml(user.member_name)}${memberNumber}</div>`;
         }
@@ -625,7 +625,7 @@ function displayMemberLink(user) {
     
     if (user.member_id) {
             const memberNumber = user.member_number 
-                ? ` Mitgliedsnummer: ${user.member_number}` 
+                ? ` Mitgliedsnummer: ${escapeHtml(user.member_number)}`
                 : '';
 
         linkedMemberInfo.className = 'linked-member-info';

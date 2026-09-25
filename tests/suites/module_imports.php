@@ -211,3 +211,121 @@ test('Jeder benannte Import existiert im Zielmodul', function () use ($miRoot, $
 
     assertTrue($fehler === [], "Fehlende Exporte -- die Anwendung startet im Browser nicht:\n  " . implode("\n  ", $fehler));
 });
+
+/**
+ * Nur der ausfuehrbare Teil eines Moduls: Zeichenketten und der woertliche
+ * Text von Template-Literalen werden zu Leerzeichen, die Ausdruecke in ${…}
+ * bleiben stehen. Sonst gaelte onclick="openX(1)" in einem Markup-String als
+ * Aufruf von openX.
+ */
+function miCodeOnly(string $js): string
+{
+    $out = '';
+    $n   = strlen($js);
+    $tpl = [];      // Klammertiefe beim Betreten eines ${…} je offenem Template
+    $depth = 0;
+    $inTemplateText = false;
+    for ($i = 0; $i < $n; $i++) {
+        $c = $js[$i];
+        if ($inTemplateText) {
+            if ($c === '\\') {
+                $out .= '  ';
+                $i++;
+            } elseif ($c === '`') {
+                $inTemplateText = false;
+                $out .= ' ';
+            } elseif ($c === '$' && ($js[$i + 1] ?? '') === '{') {
+                $inTemplateText = false;
+                $tpl[] = $depth;
+                $depth++;
+                $out .= '  ';
+                $i++;
+            } else {
+                $out .= $c === "\n" ? "\n" : ' ';
+            }
+            continue;
+        }
+        if ($c === '"' || $c === "'") {
+            $out .= ' ';
+            for ($i++; $i < $n && $js[$i] !== $c && $js[$i] !== "\n"; $i++) {
+                $out .= ' ';
+                if ($js[$i] === '\\') {
+                    $out .= ' ';
+                    $i++;
+                }
+            }
+            $out .= ' ';
+            continue;
+        }
+        if ($c === '`') {
+            $inTemplateText = true;
+            $out .= ' ';
+            continue;
+        }
+        if ($c === '{') {
+            $depth++;
+        } elseif ($c === '}') {
+            $depth--;
+            if ($tpl !== [] && end($tpl) === $depth) {
+                array_pop($tpl);
+                $inTemplateText = true;
+                $out .= ' ';
+                continue;
+            }
+        }
+        $out .= $c;
+    }
+
+    return $out;
+}
+
+test('Wer eine exportierte Funktion aufruft, importiert oder definiert sie', function () use ($miRoot, $miJsDir) {
+    // Gegenrichtung zum Test darueber. Am 2026-09-25 rief import_export.js
+    // escapeHtml() auf, ohne es zu importieren -- die Liste der Importprotokolle
+    // waere mit einem ReferenceError abgebrochen, und keine Suite merkte es.
+    $dateien = miJsFiles($miJsDir);
+
+    $exportiert = [];
+    foreach ($dateien as $datei) {
+        foreach (array_keys(miExports((string) sourceCode($datei))) as $name) {
+            $exportiert[$name] = true;
+        }
+    }
+
+    $fehler = [];
+    foreach ($dateien as $datei) {
+        $src = (string) sourceCode($datei);
+        if (preg_match('/^[ \t]*(?:import|export)\b/m', $src) !== 1) {
+            continue; // klassisches Skript, kein Modul
+        }
+        $kurz = ltrim(str_replace(str_replace('\\', '/', $miRoot), '', $datei), '/');
+
+        $bekannt = [];
+        foreach (miNamedImports($src, $datei, $miJsDir) as $imp) {
+            $bekannt[$imp['name']] = true;
+        }
+        // import { a as b }: lokal heisst es b
+        if (preg_match_all('/\bas\s+([A-Za-z_$][\w$]*)/', $src, $m)) {
+            foreach ($m[1] as $alias) {
+                $bekannt[$alias] = true;
+            }
+        }
+        if (preg_match_all('/\b(?:function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/', $src, $m)) {
+            foreach ($m[1] as $lokal) {
+                $bekannt[$lokal] = true;
+            }
+        }
+
+        $code = miCodeOnly($src);
+        if (preg_match_all('/(?<![\w$.])([A-Za-z_$][\w$]*)\s*\(/', $code, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[1] as [$name, $off]) {
+                if (isset($exportiert[$name]) && !isset($bekannt[$name])) {
+                    $zeile    = substr_count($code, "\n", 0, $off) + 1;
+                    $fehler[] = "{$kurz}:{$zeile}: {$name}() ohne Import";
+                }
+            }
+        }
+    }
+
+    assertTrue($fehler === [], "Aufruf ohne Import -- ReferenceError im Browser:\n  " . implode("\n  ", array_unique($fehler)));
+});
