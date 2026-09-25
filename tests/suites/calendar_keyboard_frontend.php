@@ -203,7 +203,7 @@ test('Die Liste der bedienbaren Elemente wird bei jedem Tab neu gelesen', functi
 });
 
 test('Die Umlenkung springt in der richtigen Richtung', function () use ($ckRoot) {
-    [$body] = ckTrapFocus($ckRoot);
+    [$body, $el] = ckTrapFocus($ckRoot);
     $liste = preg_quote(ckListenFunktion($body), '/');
     [, $hoerer] = ckAmHoerer($body);
 
@@ -223,17 +223,50 @@ test('Die Umlenkung springt in der richtigen Richtung', function () use ($ckRoot
     // ANFANG. Vertauscht liefe der Fang rueckwaerts -- Tab sprang ans Ende,
     // Shift+Tab an den Anfang -- und das blieb gruen, weil beide Namen im Rumpf
     // ohnehin vorkommen. Bedingung UND Sprungziel werden deshalb gemeinsam
-    // gelesen: Der Zweig wird ueber die Grenze gefunden, gegen die er prueft,
-    // und nur sein eigener Rumpf zaehlt.
-    assertTrue((bool) preg_match('/\(\s*e\.shiftKey\b[^)]*===\s*' . preg_quote($anfang, '/')
-        . '\b[^{]*\{([^}]*)\}/s', $hoerer, $rueckwaerts),
-        'Kein Zweig "Shift+Tab und der Fokus steht auf dem ersten Element"');
-    assertTrue((bool) preg_match('/\b' . preg_quote($ende, '/') . '\.focus\(\)/', $rueckwaerts[1]),
-        'Shift+Tab auf dem ersten Element muss ans Ende springen, nicht nach: ' . trim($rueckwaerts[1]));
+    // gelesen.
+    //
+    // Der Zweig wird an e.shiftKey aufgespannt: alles bis zur oeffnenden
+    // Klammer ist seine Bedingung, das Folgende sein Rumpf. Damit haengt die
+    // Zusicherung nicht an der Schreibweise -- ob die beiden Faelle mit ||,
+    // mit includes([...]) oder mit some() verbunden sind, ist gleichgueltig;
+    // geprueft wird, dass beide Vergleiche in DERSELBEN Bedingung stehen.
+    $bedingungRumpf = '/\(\s*%se\.shiftKey\b([^{]*)\{([^}]*)\}/s';
 
-    assertTrue((bool) preg_match('/\(\s*!\s*e\.shiftKey\b[^)]*===\s*' . preg_quote($ende, '/')
-        . '\b[^{]*\{([^}]*)\}/s', $hoerer, $vorwaerts),
-        'Kein Zweig "Tab und der Fokus steht auf dem letzten Element"');
-    assertTrue((bool) preg_match('/\b' . preg_quote($anfang, '/') . '\.focus\(\)/', $vorwaerts[1]),
-        'Tab auf dem letzten Element muss an den Anfang springen, nicht nach: ' . trim($vorwaerts[1]));
+    assertTrue((bool) preg_match(sprintf($bedingungRumpf, ''), $hoerer, $rueckwaerts),
+        'Kein Zweig fuer Shift+Tab');
+    [, $bedingungRw, $rumpfRw] = $rueckwaerts;
+
+    assertTrue((bool) preg_match('/\b' . preg_quote($anfang, '/') . '\b/', $bedingungRw),
+        'Der Shift+Tab-Zweig prueft nicht auf das erste bedienbare Element: ' . trim($bedingungRw));
+
+    // Der Dialog selbst gehoert rueckwaerts in denselben Zweig. Ohne diesen
+    // Fall ist der Fang nach einem Klick auf freie Flaeche darin nur halb
+    // geheilt: Escape und Tab gehen wieder (siehe den Test zu tabindex="-1"),
+    // Shift+Tab aber laeuft nativ auf das Element VOR dem Dialog in der
+    // Dokumentreihenfolge -- beim Kalender-Popup, das am Ende von body haengt,
+    // also in den Rest der Seite. Ein Fang, der in einer Richtung haelt und in
+    // der anderen nicht, ist schlimmer als keiner, weil man sich auf ihn
+    // verlaesst.
+    //
+    // Vorwaerts braucht es die Entsprechung NICHT: Nativ fuehrt Tab von einem
+    // Container in dessen ersten bedienbaren Nachfahren -- Nachfahren folgen in
+    // der Dokumentreihenfolge unmittelbar --, also genau dorthin, wohin der
+    // Fang ihn setzen wuerde. Und gibt es keinen, hat die Pruefung auf eine
+    // leere Liste vorher schon gehalten. Deshalb steht hier bewusst keine
+    // spiegelbildliche Zusicherung fuer den Vorwaertszweig.
+    assertTrue((bool) preg_match('/\b' . preg_quote($el, '/') . '\b/', $bedingungRw),
+        'Der Shift+Tab-Zweig muss AUCH den Dialog selbst als "am Anfang" behandeln -- sonst'
+        . ' verlaesst Shift+Tab nach einem Klick auf freie Flaeche den Fang: ' . trim($bedingungRw));
+
+    assertTrue((bool) preg_match('/\b' . preg_quote($ende, '/') . '\.focus\(\)/', $rumpfRw),
+        'Shift+Tab am Anfang muss ans Ende springen, nicht nach: ' . trim($rumpfRw));
+
+    assertTrue((bool) preg_match(sprintf($bedingungRumpf, '!\s*'), $hoerer, $vorwaerts),
+        'Kein Zweig fuer Tab vorwaerts');
+    [, $bedingungVw, $rumpfVw] = $vorwaerts;
+
+    assertTrue((bool) preg_match('/\b' . preg_quote($ende, '/') . '\b/', $bedingungVw),
+        'Der Tab-Zweig prueft nicht auf das letzte bedienbare Element: ' . trim($bedingungVw));
+    assertTrue((bool) preg_match('/\b' . preg_quote($anfang, '/') . '\.focus\(\)/', $rumpfVw),
+        'Tab am Ende muss an den Anfang springen, nicht nach: ' . trim($rumpfVw));
 });

@@ -255,7 +255,17 @@ export function trapFocus(element, onEscape) {
         const start = list[0];
         const end = list[list.length - 1];
 
-        if (e.shiftKey && document.activeElement === start) {
+        // Der Dialog selbst gilt rueckwaerts als "am Anfang": Nach einem Klick
+        // auf freie Flaeche steht der Fokus auf ihm, und ohne diesen Fall geht
+        // Shift+Tab nativ auf das Element VOR ihm in der Dokumentreihenfolge --
+        // beim Kalender-Popup also aus dem Fang heraus in den Rest der Seite.
+        //
+        // Vorwaerts braucht es keine Entsprechung: Nativ fuehrt Tab von einem
+        // Container in dessen ersten bedienbaren Nachfahren, weil Nachfahren in
+        // der Dokumentreihenfolge unmittelbar folgen -- genau dorthin, wohin der
+        // Fang ihn setzen wuerde. Und ist gar keiner da, hat die Pruefung auf
+        // list.length === 0 weiter oben schon gehalten.
+        if (e.shiftKey && (document.activeElement === start || document.activeElement === element)) {
             e.preventDefault();
             end.focus();
         } else if (!e.shiftKey && document.activeElement === end) {
