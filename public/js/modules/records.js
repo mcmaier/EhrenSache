@@ -13,7 +13,7 @@ import { loadAppointments, setCalendarMonth } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, subgroupLabel, setCurrentYear, navigateToSection } from './ui.js';
-import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers } from './utils.js';
+import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers, safeTypeColor } from './utils.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_ATTENDANCE } from './grouping.js';
@@ -144,7 +144,11 @@ export async function renderRecords(records, page = 1)
     updateTableHeader(false); // false = Record-Modus
     
     if (!records || (records.length === 0)) {
-        tbody.innerHTML = '<tr><td colspan="7" class="loading">Keine Einträge gefunden</td></tr>';
+        // Sechs Spalten seit OI-94 (Terminart entfaellt): Termin, Mitglied,
+        // Ankunft, Status, Quelle, Aktionen. Ein einfaches Mitglied sieht die
+        // Aktionsspalte nicht -- die Meldung spannt bewusst ueber die breitere
+        // Fassung, sonst endet sie dort vor dem rechten Rand.
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">Keine Einträge gefunden</td></tr>';
         // Ohne diese beiden Zeilen blieb die Paginierung des vorigen Filters
         // stehen, und ein Klick darauf zeigte dessen Einträge wieder (OI-84)
         allFilteredRecords = [];
@@ -173,26 +177,33 @@ export async function renderRecords(records, page = 1)
     
      pageRecords.forEach(record => {
         const tr = document.createElement('tr');
-        
+
+        // Terminart als Randakzent (OI-94): Streifen an der ersten Zelle, Name
+        // in deren Unterzeile. Der Trenner steht ausserhalb des Spans -- er ist
+        // Satzzeichen, nicht Teil des Namens, und die Klasse gestaltet nur den
+        // Namen. Das geschuetzte Leerzeichen bindet ihn ans Datum: bricht die
+        // Unterzeile in schmalen Spalten um, wandert er mit nach unten, statt
+        // am Namen haengen zu bleiben. Vor dem Trenner steht bewusst ein
+        // normales Leerzeichen, denn genau dort soll der Umbruch stattfinden.
+        const accent = appointmentTypeAccent(record.appointment_type_id);
+        const typeName = accent.name
+            ? `<span class="type-accent-name">${accent.name}</span> ·&nbsp;`
+            : '';
+
          // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (record.appointment_id && record.title) {
             appointmentInfo = `<div style="line-height: 1.4;">
                 <strong>${escapeHtml(record.title)}</strong>`;
-            
+
             if (record.date && record.start_time) {
                 const aptDate = new Date(record.date + 'T00:00:00');
                 const formattedAptDate = aptDate.toLocaleDateString('de-DE');
-                appointmentInfo += `<br><small style="color: #7f8c8d;">${formattedAptDate}, ${record.start_time.substring(0, 5)}</small>`;
+                appointmentInfo += `<br><small style="color: #7f8c8d;">${typeName}${formattedAptDate}, ${record.start_time.substring(0, 5)}</small>`;
             }
-            
+
             appointmentInfo += '</div>';
         }
-
-        const typeId = record.appointment_type_id;
-
-        // Terminart Badge
-        const appointmentTypeBadge = createAppointmentTypeBadge(typeId);                
 
         // Member-Info mit Mitgliedsnr. wenn vorhanden       
         let memberInfo = `<div style="line-height: 1.4;">${escapeHtml(record.surname)}, ${escapeHtml(record.name)}`;
@@ -239,8 +250,7 @@ export async function renderRecords(records, page = 1)
                         </td>` : '';
 
         tr.innerHTML = `
-                <td>${appointmentInfo}</td>
-                <td>${appointmentTypeBadge}</td>
+                <td class="type-accent" style="${accent.style}">${appointmentInfo}</td>
                 <td>${memberInfo}</td>
                 <td>${arrivalHtml}</td>
                 <td>${statusHtml}</td>
@@ -1681,7 +1691,13 @@ window.setAttendanceGrouping = function(stage) {
 };
 
 async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
-    try {        
+    try {
+        // Der Randakzent holt Farbe und Namen der Terminart aus dataCache.types
+        // (OI-94). Diese Liste laedt die Terminarten bisher nirgends selbst --
+        // fehlten sie, blieben Streifen grau und Name leer. renderRecords()
+        // macht es genauso; aus dem Cache kostet es nichts.
+        await loadTypes();
+
         const attendance = await apiCall('attendance_list', 'GET', null, {
             member_id: memberId,
             year: currentYear,
@@ -1716,25 +1732,36 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
     updateTableHeader('member'); // 'member' = Member-Attendance-Modus
 
     if (shown.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="loading">Keine Termine für diese Auswahl</td></tr>';
+        // Fuenf Spalten seit OI-94 (Terminart entfaellt): Termin, Ankunft,
+        // Status, Quelle, Aktionen.
+        tbody.innerHTML = '<tr><td colspan="5" class="loading">Keine Termine für diese Auswahl</td></tr>';
         return;
     }
 
     shown.forEach(appointment => {
-        const tr = document.createElement('tr');        
-        
+        const tr = document.createElement('tr');
+
+        // Terminart als Randakzent (OI-94) -- dieselbe Form wie in
+        // renderRecords(): Streifen an der ersten Zelle, Name in deren
+        // Unterzeile, Trenner ausserhalb des Spans und per geschuetztem
+        // Leerzeichen ans Datum gebunden, damit er beim Umbruch mitwandert.
+        const accent = appointmentTypeAccent(appointment.type_id);
+        const typeName = accent.name
+            ? `<span class="type-accent-name">${accent.name}</span> ·&nbsp;`
+            : '';
+
          // Termin-Info mit Terminart
         let appointmentInfo = '-';
         if (appointment.appointment_id && appointment.title) {
             appointmentInfo = `<div style="line-height: 1.4;">
                 <strong>${escapeHtml(appointment.title)}</strong>`;
-            
+
             if (appointment.date && appointment.start_time) {
                 const aptDate = new Date(appointment.date + 'T00:00:00');
                 const formattedAptDate = aptDate.toLocaleDateString('de-DE');
-                appointmentInfo += `<br><small style="color: #7f8c8d;">${formattedAptDate}, ${appointment.start_time.substring(0, 5)}</small>`;
+                appointmentInfo += `<br><small style="color: #7f8c8d;">${typeName}${formattedAptDate}, ${appointment.start_time.substring(0, 5)}</small>`;
             }
-            
+
             appointmentInfo += '</div>';
         }
 
@@ -1770,9 +1797,6 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
         const { statusHtml, rowClass } = attendanceStatusCell(appointment);
 
 
-        // Terminart Badge
-        let appointmentTypeBadge = createAppointmentTypeBadge(appointment.type_id);
-
         let actionsHtml;
         if (appointment.record_id) {
             // Eintrag vorhanden → Edit & Delete
@@ -1806,8 +1830,7 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
         
         tr.className = rowClass;
         tr.innerHTML = `
-            <td>${appointmentInfo}</td>
-            <td>${appointmentTypeBadge}</td>
+            <td class="type-accent" style="${accent.style}">${appointmentInfo}</td>
             <td>${arrivalHtml}</td>
             <td>${statusHtml}</td>
             <td>${sourceInfo}</td>
@@ -1818,26 +1841,54 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
     });
 }
 
+/**
+ * Terminart als Randakzent (OI-94): liefert die CSS-Variable fuer die erste
+ * Zelle der Zeile und den Namen fuer deren Unterzeile.
+ *
+ * Das Schildchen gibt es weiterhin in createAppointmentTypeBadge() -- im
+ * Formular beim Erfassen sitzt es in einem einzelnen <span> ohne Zeile
+ * daneben, ein Randstreifen waere dort sinnlos.
+ *
+ * type.color/type.type_name kommen aus der Terminart (DB) und sind von
+ * Verwaltern frei befuellbar. Ohne CSP (OI-17) ist die Maskierung hier die
+ * einzige Schranke: Farbe ueber safeTypeColor(), Text per escapeHtml().
+ *
+ * Fehlt die Terminart -- oder sind die Terminarten noch nicht geladen --,
+ * bleibt der Name leer. Die Zeile zeigt dann nur den grauen Streifen; ein
+ * Ersatzwort wie "Allgemein" behauptete eine Terminart, die es nicht gibt.
+ */
+function appointmentTypeAccent(appointment_type_id = null)
+{
+    const types = dataCache.types.data;
+    const type = (appointment_type_id && Array.isArray(types))
+        ? types.find(t => t.type_id == appointment_type_id)
+        : null;
+
+    return {
+        style: `--type-color: ${safeTypeColor(type ? type.color : null)};`,
+        name: type ? escapeHtml(type.type_name) : ''
+    };
+}
+
 function createAppointmentTypeBadge(appointment_type_id = null)
 {
     const types = dataCache.types.data;
-        
+
     // Type-ID vorhanden UND types ist Array
     if (appointment_type_id && Array.isArray(types)) {
         const type = types.find(t => t.type_id == appointment_type_id);
-        
+
         if (type) {
             // type.color/type.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
-            // muss hier selbst maskiert werden: Farbe per Whitelist, Text per escapeHtml().
-            const safeTypeColor = /^#[0-9a-f]{3,8}$/i.test(type.color || '') ? type.color : '#667eea';
-            return `<span class="type-badge" style="background: ${safeTypeColor}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+            // muss hier selbst maskiert werden: Farbe per safeTypeColor(), Text per escapeHtml().
+            return `<span class="type-badge" style="background: ${safeTypeColor(type.color)}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
                         ${escapeHtml(type.type_name)}
                     </span>`;
         }
     }
-    
+
     // Fallback: Termin ohne Type ODER nicht gefunden
-    return `<span class="type-badge" style="background: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+    return `<span class="type-badge" style="background: var(--type-color-none); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
                 Allgemein
             </span>`;
 }
@@ -1928,7 +1979,12 @@ function updateTableHeader(mode) {
     
     if (mode === 'member') {
         // Member-Attendance: Termine auflisten
-        thead.innerHTML = '<th>Termin</th><th>Typ</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+        // Ohne Spalte "Typ" seit OI-94 -- die Terminart steht als Randakzent an
+        // der ersten Zelle und mit Namen in deren Unterzeile. Diese Funktion
+        // schreibt den Kopf bei jedem Moduswechsel neu und ueberschreibt damit
+        // sowohl index.html als auch updateTableHeaders() in ui.js; wer nur
+        // dort loescht, bekommt die Spalte im Betrieb zurueck.
+        thead.innerHTML = '<th>Termin</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
     } else if (mode === 'appointment') {
         // Appointment-Attendance: Mitglieder auflisten
         thead.innerHTML = '<th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
@@ -1936,12 +1992,12 @@ function updateTableHeader(mode) {
         // ALL_RECORDS: Alle Felder
         if(isAdminOrManager)
         {
-            thead.innerHTML = '<th>Termin</th><th>Typ</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
         }
         else
-        {   
-            // Keine Aktionen für User            
-            thead.innerHTML = '<th>Termin</th><th>Typ</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th>';
+        {
+            // Keine Aktionen für User
+            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th>';
         }
     }
 }

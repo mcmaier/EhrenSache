@@ -724,7 +724,10 @@ export function updateTableHeaders() {
         // Terminliste ohne Spalte "Terminart" (OI-94): Die Terminart steht als
         // Randakzent an der ersten Zelle und mit Namen in deren Unterzeile.
         { id: 'appointmentsTableBody', headers: ['Termin', 'Beschreibung', 'Rückmeldung'] },
-        { id: 'recordsTableBody', headers: ['Termin', 'Terminart', 'Mitglied', 'Ankunftszeit', 'Status','Quelle'] },
+        // Anwesenheitsliste ebenso (OI-94). Achtung: updateTableHeader() in
+        // records.js schreibt denselben Kopf bei jedem Moduswechsel erneut --
+        // beide Stellen muessen dieselbe Spaltenzahl fuehren.
+        { id: 'recordsTableBody', headers: ['Termin', 'Mitglied', 'Ankunftszeit', 'Status','Quelle'] },
         { id: 'exceptionsTableBody', headers: ['Typ', 'Mitglied', 'Termin', 'Begründung', 'Gewünschte Zeit', 'Status', 'Erstellt am'] }
     ];
     
