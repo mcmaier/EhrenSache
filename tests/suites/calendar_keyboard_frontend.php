@@ -49,10 +49,30 @@ test('trapFocus steht in utils.js und haelt Tab, Escape und die Rueckgabe', func
     assertTrue(str_contains($body, "'Escape'"), 'Escape wird nicht behandelt');
     assertTrue(str_contains($body, "'Tab'"), 'Tab wird nicht behandelt');
     assertTrue(str_contains($body, 'shiftKey'), 'Shift+Tab fehlt -- rueckwaerts bliebe der Fang offen');
-    assertTrue((bool) preg_match('/return\s+function|return\s*\(\s*\)\s*=>/', $body),
-        'trapFocus muss eine Freigabe-Funktion liefern, sonst bleibt der Hoerer haengen');
-    assertTrue(str_contains($body, 'activeElement'),
+
+    // Das zuvor fokussierte Element muss gemerkt UND in der Freigabe wieder
+    // angefahren werden -- geprueft auf die Herkunft des Wertes, nicht auf das
+    // Vorkommen eines Namens (OI-107). Ein blosses
+    // str_contains($body, 'activeElement') genuegt dafuer NICHT: Der Name steht
+    // auch in den Tab-Vergleichen. Nachgestellt am 2026-09-25 -- die
+    // Fokusrueckgabe ersatzlos entfernt (Merker und Wiederanfahren, fuenf
+    // Zeilen), und die Suite blieb gruen. Genau dann faellt der Fang auf, wenn
+    // es darauf ankommt: nach Escape stuende der Fokus auf body statt am Tag.
+    assertTrue((bool) preg_match('/(?:const|let|var)\s+(\w+)\s*=\s*document\.activeElement/', $body, $merker),
         'Das zuvor fokussierte Element muss gemerkt werden, sonst gibt es keine Rueckgabe');
+
+    // Am return aufgeteilt: Was danach steht, ist die Freigabe. Nur dort darf
+    // das Wiederanfahren zaehlen -- im Rumpf davor waere es das Setzen des
+    // Anfangsfokus und sagte nichts ueber die Rueckgabe.
+    $teile = preg_split('/return\s+function|return\s*\(\s*\)\s*=>/', $body);
+    assertSame(2, count($teile),
+        'trapFocus muss eine Freigabe-Funktion liefern, sonst bleibt der Hoerer haengen');
+    $freigabe = $teile[1];
+
+    assertTrue((bool) preg_match('/\b' . preg_quote($merker[1], '/') . '\s*\.focus\(\)/', $freigabe),
+        "Die Freigabe muss den Fokus auf das gemerkte Element zurueckgeben -- \"{$merker[1]}\" wird dort nicht angefahren");
+    assertTrue(str_contains($freigabe, 'removeEventListener'),
+        'Die Freigabe muss den Hoerer entfernen, sonst haelt der Fang nach dem Schliessen weiter Tab');
 });
 
 test('Die Liste der bedienbaren Elemente wird bei jedem Tab neu gelesen', function () use ($ckRoot) {
