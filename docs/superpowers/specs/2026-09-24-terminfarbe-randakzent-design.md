@@ -52,9 +52,14 @@ Kalender-Popup sichtbar.
 
 ## Technische Festlegungen
 
-**Streifen als `box-shadow`, nicht als `border-left`.** Auf `<tr>` greift `border-left` nur mit
-`border-collapse: collapse` und kollidiert mit Zebrastreifung und Überfahr-Zustand. Stattdessen
+**Streifen als `box-shadow`, nicht als `border-left`.** Ein `border-left` auf der Zeile kollidiert
+mit Zebrastreifung und Überfahr-Zustand — beide setzen den Zellhintergrund. Stattdessen
 `box-shadow: inset 4px 0 0 var(--type-color)` auf der ersten Zelle.
+
+*Nachtrag 2026-09-25:* Der ursprüngliche Wortlaut nannte zusätzlich, `border-left` greife auf `<tr>`
+nur mit `border-collapse: collapse`. Das trifft hier nicht zu — das Projekt setzt
+`border-collapse: collapse` global (`tables.css:21`). Der Satz stand als Ausschlussgrund da, der
+keiner ist; tragend ist allein die Kollision mit der Zebrastreifung.
 
 **Farbe als CSS-Variable, nicht als Inline-Stil.** Das Element trägt `style="--type-color: …"`,
 das Aussehen liegt vollständig im Stylesheet. Damit steht der Wert aus der Datenbank an genau
