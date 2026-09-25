@@ -150,3 +150,17 @@ export function formatTimeRange(startTime, endTime) {
     const end = endTime ? String(endTime).substring(0, 5) : '';
     return end ? `${start}–${end}` : start;
 }
+
+/**
+ * Farbe einer Terminart aus der Datenbank, gegen eine Whitelist geprueft.
+ *
+ * Ohne Inhaltssicherheitsrichtlinie (OI-17) ist diese Pruefung die einzige
+ * Schranke: Der Wert landet als CSS-Variable im style-Attribut, ein Wert wie
+ * "red; background: url(...)" wuerde sonst durchschlagen. Frueher stand
+ * dieselbe Pruefung dreimal einzeln im Code.
+ *
+ * Liefert bei fehlender oder ungueltiger Farbe die gemeinsame Ersatzfarbe.
+ */
+export function safeTypeColor(color) {
+    return /^#[0-9a-f]{3,8}$/i.test(color || '') ? color : 'var(--type-color-none)';
+}

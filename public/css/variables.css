@@ -55,6 +55,10 @@
     --border-color: #ddd;
     --border-light: #e0e0e0;
 
+    /* Termin ohne Terminart: erkennbar "keine Zuordnung", keine eigene Art.
+       Ersetzt drei frueher verstreute Werte (#667eea, #95a5a6). */
+    --type-color-none: #7f8c8d;
+
     /* Feiertag im Kalender (FI-16) */
     --calendar-holiday: #b45309;
     
