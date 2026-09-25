@@ -1121,6 +1121,162 @@ test('station: ohne Zeitraeume bleibt es bei members.active (OI-27)', function (
     });
 });
 
+// ---- OI-101: station fuer auth_device (PIN am Hardware-Terminal) -----------
+//
+// Das Terminal bedient beide Vertrauensmodelle: Finger und Karte ueber
+// auto_checkin (das Geraet buergt), Nummer + PIN ueber station (der Server
+// prueft). An station darf es nur status, identify und checkin.
+
+/**
+ * Legt einmal je Lauf ein auth_device an; der Aufraeum-Test loescht es.
+ *
+ * @return array{user_id: int, api_token: string, device_name: string}
+ */
+function authDevice(): array
+{
+    static $device = null;
+    if ($device !== null) {
+        return $device;
+    }
+
+    $name = 'Test-Terminal ' . uniqid();
+    $res  = apiRequest('POST', 'users', [
+        'token' => apiToken('admin'),
+        'body'  => [
+            'action'      => 'create_device',
+            'device_name' => $name,
+            'device_type' => 'auth_device',
+        ],
+    ]);
+    assertStatus(200, $res, 'Auth-Geraet konnte nicht angelegt werden');
+
+    authDeviceBuilt(true);
+
+    return $device = [
+        'user_id'     => (int) $res['body']['device']['user_id'],
+        'api_token'   => (string) $res['body']['device']['api_token'],
+        'device_name' => $name,
+    ];
+}
+
+/** Haelt fest, ob authDevice() in diesem Lauf etwas angelegt hat (Muster T4). */
+function authDeviceBuilt(?bool $set = null): bool
+{
+    static $built = false;
+    if ($set !== null) {
+        $built = $set;
+    }
+    return $built;
+}
+
+function authDeviceToken(): string
+{
+    return authDevice()['api_token'];
+}
+
+test('station: status mit auth_device-Token (OI-101)', function () {
+    enableStationPin();
+    $res = stationGet('status', authDeviceToken());
+    assertStatus(200, $res);
+    assertSame(authDevice()['device_name'], $res['body']['device_name']);
+    assertSame(false, $res['body']['totp_enabled'], 'ein auth_device hat kein Secret');
+    assertSame(true, $res['body']['pin_enabled']);
+    assertSame(false, $res['body']['worktime_enabled'],
+        'Arbeitszeit ist am Terminal nicht freigegeben, status darf sie nicht anbieten');
+});
+
+test('station: auth_device bekommt keinen Stations-Code (OI-101)', function () {
+    $res = stationGet('totp', authDeviceToken());
+    assertStatus(403, $res);
+    assertSame('Action not available for this device type', $res['body']['message']);
+});
+
+test('station: auth_device darf identify, ohne Taetigkeitsarten (OI-101)', function () {
+    stationWorkFixture();   // Zeiterfassung an, Testmitglied mit Taetigkeitsart
+    $res = stationPost('identify', stationCreds(), authDeviceToken());
+    assertStatus(200, $res);
+    assertSame('Kiosk', $res['body']['member']['name']);
+    assertSame(false, $res['body']['worktime_enabled']);
+    assertSame([], $res['body']['activities']);
+    assertSame(null, $res['body']['running_session']);
+});
+
+test('station: checkin am auth_device traegt station_pin und den Geraetenamen (OI-101)', function () {
+    enableStationPin();
+    $appointmentId = stationAppointment()['appointment_id'];
+    oi27WithMember(null, function (string $nummer) use ($appointmentId) {
+        $res = stationPost('checkin', ['member_number' => $nummer, 'pin' => '2580'], authDeviceToken());
+        assertStatus(201, $res, 'Check-in am Terminal: ' . $res['raw']);
+        assertSame('station_pin', $res['body']['checkin_source']);
+        assertSame(authDevice()['device_name'], $res['body']['source_device']);
+        assertSame(authDevice()['device_name'], $res['body']['location_name']);
+        assertSame($appointmentId, (int) $res['body']['appointment_id']);
+    });
+});
+
+test('station: work_* am auth_device → 403 (OI-101)', function () {
+    $fx = stationWorkFixture();
+    foreach (['work_start', 'work_pause', 'work_resume', 'work_stop'] as $action) {
+        $res = stationPost($action, stationCreds() + ['activity_id' => $fx['activity_id']], authDeviceToken());
+        // Greift die Sperre nicht, entsteht eine echte Sitzung -- dem
+        // Aufraeum-Test melden, sonst bleibt sie samt Mitglied liegen.
+        if ($res['status'] === 201 && isset($res['body']['session']['session_id'])) {
+            stationSessionId((int) $res['body']['session']['session_id']);
+        }
+        assertStatus(403, $res, "{$action} muss am Terminal gesperrt sein");
+        assertSame('Action not available for this device type', $res['body']['message']);
+    }
+});
+
+test('station: gesperrte Action verbraucht keinen PIN-Versuch (OI-101)', function () {
+    enableStationPin();
+    oi27WithMember(null, function (string $nummer) {
+        // Sechs Versuche mit falscher PIN -- laege die Typpruefung hinter der
+        // PIN-Pruefung, waere die Nummer danach gesperrt (5 in 15 Minuten).
+        for ($i = 0; $i < 6; $i++) {
+            assertStatus(403, stationPost('work_start',
+                ['member_number' => $nummer, 'pin' => '0001', 'activity_id' => 1], authDeviceToken()));
+        }
+        assertStatus(200, stationPost('identify', ['member_number' => $nummer, 'pin' => '2580'], authDeviceToken()),
+            'Die gesperrten Aufrufe duerfen keinen Fehlversuch gezaehlt haben');
+    });
+});
+
+test('station: auth_device behaelt auto_checkin (OI-101)', function () {
+    // Unbekannte Nummer: die Kiosk-Sperre in api.php wuerde 403 liefern, der
+    // Handler selbst antwortet mit 404.
+    $res = apiRequest('POST', 'auto_checkin', [
+        'token' => authDeviceToken(),
+        'body'  => ['member_number' => 'NX' . uniqid(), 'arrival_time' => date('Y-m-d H:i:s')],
+    ]);
+    assertStatus(404, $res, 'auth_device muss auto_checkin weiter erreichen: ' . $res['raw']);
+});
+
+test('station: totp_location bleibt an station abgewiesen (OI-101)', function () {
+    $res = apiRequest('POST', 'users', [
+        'token' => apiToken('admin'),
+        'body'  => [
+            'action'      => 'create_device',
+            'device_name' => 'Test-Standort ' . uniqid(),
+            'device_type' => 'totp_location',
+            'totp_secret' => 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+        ],
+    ]);
+    assertStatus(200, $res, 'totp_location konnte nicht angelegt werden');
+    $deviceId = (int) $res['body']['device']['user_id'];
+
+    try {
+        $token = (string) $res['body']['device']['api_token'];
+        assertStatus(403, stationGet('status', $token));
+        assertStatus(403, stationPost('identify', stationCreds(), $token));
+    } finally {
+        assertStatus(200, apiRequest('DELETE', 'users', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $deviceId],
+        ]), 'Test-Standort konnte nicht geloescht werden');
+    }
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 
@@ -1155,6 +1311,13 @@ test('station: Aufraeumen — Kiosk loeschen', function () {
         'query' => ['id' => stationMember()['member_id']],
     ]);
     assertStatus(200, $m, 'Testmitglied konnte nicht geloescht werden');
+
+    if (authDeviceBuilt()) {
+        assertStatus(200, apiRequest('DELETE', 'users', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => authDevice()['user_id']],
+        ]), 'Test-Terminal konnte nicht geloescht werden');
+    }
 
     $res = apiRequest('DELETE', 'users', [
         'token' => apiToken('admin'),

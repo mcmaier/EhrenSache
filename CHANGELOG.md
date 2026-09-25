@@ -7,6 +7,19 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Hinzugefügt
+- **Das Hardware-Terminal kann Mitglieder per Mitgliedsnummer und PIN stempeln lassen.** Die
+  Ressource `station` nimmt neben dem Kiosk jetzt auch Geräte vom Typ `auth_device` an, damit
+  Mitglieder ohne Fingerabdruck oder Karte am Keypad des Terminals einchecken können. Der Server
+  prüft die PIN wie am Kiosk; der Eintrag trägt die Quelle „Stations-PIN“ und den Gerätenamen.
+  Erlaubt sind dort nur Status, Anmeldung und Check-in — Stations-Code und Arbeitszeit bleiben
+  dem Kiosk vorbehalten und werden abgewiesen, ohne einen PIN-Versuch zu verbrauchen. Finger und
+  Karte laufen unverändert über `auto_checkin` (OI-101).
+
+---
+
 ## [1.16.0] – 2026-09-25
 
 ### Geändert

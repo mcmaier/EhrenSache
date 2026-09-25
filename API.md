@@ -1453,6 +1453,23 @@ Eine vom Token erzeugte Session ist ohne den Token nicht nutzbar (`401`).
 Im Unterschied zu `auto_checkin` (das Gerät bürgt für die Identität) prüft hier der Server
 die Identität des Mitglieds; das Gerät ist nur Tastatur und Bildschirm.
 
+**Hardware-Terminal (`auth_device`, OI-101):** Auch das Token eines `auth_device` wird
+angenommen, damit ein Terminal mit Keypad Mitglieder ohne Fingerabdruck oder Karte per
+Mitgliedsnummer + PIN stempeln lassen kann. Es darf hier nur `GET status`, `POST identify`
+und `POST checkin`; `GET totp` und `POST work_*` antworten
+`403 "Action not available for this device type"` — geprüft vor der PIN, ein solcher Aufruf
+zählt also keinen Fehlversuch. Unbekannte Actions bleiben `400`. Im Status steht
+`totp_enabled` mangels Secret auf `false`, `worktime_enabled` am Terminal immer auf `false`,
+ebenso in der `identify`-Antwort (dort zusätzlich `activities: []`, `running_session: null`).
+Der Record trägt wie am Kiosk `checkin_source = station_pin` und den Gerätenamen. Gerätename
+Pflicht, Sperren und der Schalter `station_pin_enabled` gelten gleich. Anders als ein Kiosk
+behält ein `auth_device` alle übrigen Ressourcen, insbesondere `auto_checkin`. Ein Gerät
+erkennt die Unterstützung an `GET status` (`200` statt `403`). Andere Gerätetypen und
+Nicht-Geräte bekommen `403 "Kiosk device token required"`.
+
+**Hinweis für Clients:** `401` bedeutet an diesem Endpunkt entweder ein ungültiges Token oder
+`"Invalid member number or PIN"` — unterscheidbar nur an `message`.
+
 Steuerung über `?action=`. Andere Methoden als GET und POST antworten `405`.
 
 ### Status

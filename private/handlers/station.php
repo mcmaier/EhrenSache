@@ -21,10 +21,18 @@ declare(strict_types=1);
 //                                das Geraet ist nur Tastatur und Bildschirm.
 // Ein gestohlenes Kiosk-Token darf deshalb ohne PIN eines Mitglieds nichts
 // bewirken; api.php laesst Kiosk-Token nur an diese Ressource.
+//
+// Seit OI-101 nimmt station auch ein auth_device (Hardware-Terminal) an: Es
+// bedient beide Modelle, Finger und Karte ueber auto_checkin, Nummer + PIN
+// hier. Dafuer genuegen status, identify und checkin — Stations-Code und
+// Arbeitszeit bleiben dem Kiosk vorbehalten.
+
+/** Actions, die ein auth_device an station aufrufen darf (OI-101). */
+const STATION_AUTH_DEVICE_ACTIONS = ['status', 'identify', 'checkin'];
 
 function handleStation($db, $database, $method, $authUserId, $authUserRole, $authDeviceType)
 {
-    if ($authUserRole !== 'device' || $authDeviceType !== 'kiosk') {
+    if ($authUserRole !== 'device' || !in_array($authDeviceType, ['kiosk', 'auth_device'], true)) {
         http_response_code(403);
         echo json_encode(["message" => "Kiosk device token required"]);
         return;
@@ -32,7 +40,7 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
 
     $prefix = $database->table('');
 
-    $stmt = $db->prepare("SELECT user_id, device_name, totp_secret, is_active
+    $stmt = $db->prepare("SELECT user_id, device_name, device_type, totp_secret, is_active
                           FROM {$prefix}users WHERE user_id = ?");
     $stmt->execute([$authUserId]);
     $device = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -55,6 +63,18 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
     }
 
     $action = $_GET['action'] ?? '';
+
+    // Nur bekannte Actions werden hier gesperrt — eine unbekannte bekommt
+    // weiter ihr 400. Die Sperre liegt VOR stationRequireMember(): ein
+    // gesperrter Aufruf darf keinen PIN-Versuch verbrauchen.
+    $knownActions = ['status', 'totp', 'identify', 'checkin', 'work_start', 'work_pause', 'work_resume', 'work_stop'];
+    if ($device['device_type'] === 'auth_device'
+        && in_array($action, $knownActions, true)
+        && !in_array($action, STATION_AUTH_DEVICE_ACTIONS, true)) {
+        http_response_code(403);
+        echo json_encode(["message" => "Action not available for this device type"]);
+        return;
+    }
 
     if ($method === 'GET') {
         switch ($action) {
@@ -125,6 +145,16 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
     ]);
 }
 
+/**
+ * Zeiterfassung an diesem Geraet? Nur am Kiosk — am auth_device sind die
+ * work_*-Actions gesperrt (OI-101), status und identify duerfen sie dann
+ * auch nicht anbieten.
+ */
+function stationWorktimeAvailable($db, $database, array $device): bool
+{
+    return $device['device_type'] === 'kiosk' && isWorktimeEnabled($db, $database);
+}
+
 /** Konfiguration und Uhrzeit — beim Start des Kiosks und alle fuenf Minuten. */
 function stationStatus($db, $database, array $device)
 {
@@ -133,7 +163,7 @@ function stationStatus($db, $database, array $device)
         'totp_enabled'     => !empty($device['totp_secret']),
         'pin_enabled'      => isStationPinEnabled($db, $database),
         'pin_min_length'   => stationPinMinLength($db, $database),
-        'worktime_enabled' => isWorktimeEnabled($db, $database),
+        'worktime_enabled' => stationWorktimeAvailable($db, $database, $device),
         'server_time'      => stationNow($db),
         // server_unix bleibt PHP-Zeit (nicht die DB-Uhr): er treibt den
         // TOTP-Zaehler mit an, und RFC 6238 rechnet mit Unix-Zeit — davon
@@ -241,7 +271,7 @@ function stationIdentify($db, $database, array $device, array $member)
         ];
     }
 
-    $worktime   = isWorktimeEnabled($db, $database);
+    $worktime   = stationWorktimeAvailable($db, $database, $device);
     $running    = null;
     $activities = [];
 

@@ -721,7 +721,7 @@ erst starten? Gefunden im Codequalitäts-Review zur Schnellinbetriebnahme.
 ---
 
 ### OI-101 · `station` für `auth_device` öffnen (PIN-Anmeldung am Hardware-Terminal)
-**Priorität:** mittel · aufgenommen am 2026-09-25 · **Bezug:** [FI-4](FEATURE-IDEAS.md),
+**Priorität:** erledigt am 2026-09-25 auf Branch `feat/oi-101-auth-device`, noch nicht in `dev` · aufgenommen am 2026-09-25 · **Bezug:** [FI-4](FEATURE-IDEAS.md),
 Kiosk-Spec `docs/superpowers/specs/2026-09-04-station-pin-kiosk-design.md` Abschnitt 5
 („später `auth_method: device` für `auth_device`")
 
@@ -781,6 +781,12 @@ Abschnitt `station` ausdrücklich vermerkt.
 
 **Nicht sicherheitsrelevant** — die Prüfung bleibt auf dem Server, das Gerät bekommt keine
 zusätzlichen Rechte außerhalb der Ressource `station`.
+
+**Umgesetzt wie skizziert,** mit einer Ergänzung: `worktime_enabled` steht für ein `auth_device`
+in `status` und `identify` immer auf `false` (dort auch `activities: []`) — sonst böte das
+Terminal eine Zeiterfassung an, deren Actions es mit `403` beantwortet bekommt. Tests in
+`tests/suites/station_api.php` (Abschnitt OI-101), gegengeprüft durch Abschalten der Sperre
+und der Zeiterfassungsregel.
 
 ---
 
