@@ -99,15 +99,28 @@ test('Die Terminliste traegt den Streifen und den Namen in der Unterzeile', func
     assertTrue(str_contains($body, 'safeTypeColor('), 'Die gemeinsame Farbpruefung wird nicht benutzt');
     assertTrue(str_contains($body, '--type-color:'), 'Die Farbe muss als CSS-Variable gesetzt werden, nicht als fertiger Stil');
     assertTrue(str_contains($body, 'type-accent'), 'Die Zelle traegt die Klasse fuer den Streifen nicht');
-    // Das Schildchen der Terminart muss weg -- die Klasse type-badge selbst
-    // bleibt im Rumpf: sie ist projektweit das allgemeine Schildchen und
-    // traegt hier noch "automatisch angelegt", ein anderes Ding. Geprueft
-    // wird deshalb, dass kein Schildchen mehr die Terminart traegt und die
-    // eigene Farbpruefung der gemeinsamen gewichen ist.
-    assertTrue(!preg_match('/type-badge[^\n]*type_name/', $body),
-        'Das Schildchen muss aus der Terminliste verschwinden');
-    assertTrue(!str_contains($body, 'safeAptColor'),
-        'Die eigene Farbpruefung muss safeTypeColor() weichen');
+
+    // Der Streifen gehoert an die ERSTE Zelle der Zeile -- nur dort liegt er am
+    // linken Rand. Geprueft am Anfang des Zeilen-Templates, nicht irgendwo darin.
+    assertTrue((bool) preg_match('/innerHTML\s*=\s*`\s*<td[^>]*type-accent/', $body),
+        'Die Klasse type-accent muss auf der ersten Zelle der Zeile sitzen');
+
+    // Der Name der Terminart steht in der Unterzeile, unmittelbar vor dem Datum
+    // -- ohne diese Gegenprobe waere auch eine Umsetzung ganz ohne Namen gruen.
+    assertTrue(str_contains($body, 'type-accent-name'),
+        'Der Name der Terminart fehlt in der Unterzeile');
+    assertTrue((bool) preg_match('/\$\{typeName\}\$\{[A-Za-z]*[Dd]ate[A-Za-z]*\}/', $body),
+        'Der Name der Terminart muss der Datumsausgabe unmittelbar vorangehen');
+
+    // Das Schildchen der Terminart muss weg. Gezaehlt statt gesucht: type-badge
+    // ist projektweit das allgemeine Schildchen, und genau EINES bleibt hier
+    // zulaessig -- "automatisch angelegt" am Titel, ein anderes Ding als die
+    // Terminart. Jedes zweite ist der Rueckfall, gleich wie geschrieben
+    // (mehrzeilig, ueber eine Zwischenvariable oder ueber ${typeName}).
+    assertSame(1, substr_count($body, 'type-badge'),
+        'Im Rumpf darf genau ein Schildchen stehen: "automatisch angelegt". '
+        . 'Ein zweites bedeutet, dass die Terminart wieder als Schildchen gerendert wird');
+
     assertTrue((bool) preg_match('/import \{[^}]*safeTypeColor[^}]*\} from .\.\/utils\.js./', $js),
         'safeTypeColor muss aus utils.js importiert sein');
 });

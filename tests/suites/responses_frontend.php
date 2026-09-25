@@ -108,10 +108,13 @@ test('Terminliste hat die Spalte Rueckmeldung und passende colspan', function ()
     $html = (string) file_get_contents($rsRoot . '/public/index.html');
     assertTrue(str_contains($html, '<th>Rückmeldung</th>'), 'Spaltenkopf fehlt');
 
-    // Seit OI-94 entfaellt die Spalte "Terminart" -- die Terminliste hat wieder
-    // vier Spalten (Termin, Beschreibung, Rueckmeldung, Aktionen). Geprueft wird
-    // deshalb nicht mehr die Abwesenheit von colspan="4", sondern dass die
-    // Leerzeile genau vier Spalten ueberspannt statt weiterhin fuenf.
+    // Die urspruengliche Form verbot colspan="4", weil FI-1 die Liste mit der
+    // Spalte "Rueckmeldung" von vier auf fuenf Spalten wachsen liess -- ein
+    // stehengebliebenes colspan="4" war damals der Rueckstand.
+    // Seit OI-94 entfaellt dafuer die Spalte "Terminart": Die Terminliste hat
+    // wieder vier Spalten (Termin, Beschreibung, Rueckmeldung, Aktionen), und
+    // der Rueckstand waere jetzt ein colspan="5". Dieselbe Zusicherung dreht
+    // sich deshalb ein zweites Mal um.
     $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
     assertTrue(str_contains($js, 'colspan="4"'), 'appointments.js ueberspannt nicht vier Spalten');
     assertTrue(!str_contains($js, 'colspan="5"'), 'appointments.js rendert noch fuenf Spalten');
