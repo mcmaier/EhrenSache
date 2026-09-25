@@ -144,11 +144,7 @@ export async function renderRecords(records, page = 1)
     updateTableHeader(false); // false = Record-Modus
     
     if (!records || (records.length === 0)) {
-        // Sechs Spalten seit OI-94 (Terminart entfaellt): Termin, Mitglied,
-        // Ankunft, Status, Quelle, Aktionen. Ein einfaches Mitglied sieht die
-        // Aktionsspalte nicht -- die Meldung spannt bewusst ueber die breitere
-        // Fassung, sonst endet sie dort vor dem rechten Rand.
-        tbody.innerHTML = '<tr><td colspan="6" class="loading">Keine Einträge gefunden</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${RECORDS_LIST_COLSPAN}" class="loading">Keine Einträge gefunden</td></tr>`;
         // Ohne diese beiden Zeilen blieb die Paginierung des vorigen Filters
         // stehen, und ein Klick darauf zeigte dessen Einträge wieder (OI-84)
         allFilteredRecords = [];
@@ -1420,6 +1416,17 @@ let _lastMemberAttendanceData = null;
 // Spalten der Anwesenheitsliste im Modus 'appointment' (siehe updateTableHeader()).
 const ATTENDANCE_LIST_COLSPAN = 5;
 
+// Spalten im Modus 'all' (siehe updateTableHeader()): Termin, Mitglied, Ankunft,
+// Status, Quelle, Aktionen. Ein einfaches Mitglied sieht die Aktionsspalte nicht;
+// die Leermeldung wird aber nur einmal geschrieben und spannt bewusst ueber die
+// breitere Fassung -- zu schmal endete sie sichtbar vor dem rechten Rand, zu
+// breit dehnt kein Browser die Tabelle.
+const RECORDS_LIST_COLSPAN = 6;
+
+// Spalten im Modus 'member' (siehe updateTableHeader()): Termin, Ankunft, Status,
+// Quelle, Aktionen.
+const MEMBER_ATTENDANCE_COLSPAN = 5;
+
 // Serverregel zur Selbstgenehmigung (OI-87). Vorgabe true: Ohne Auskunft
 // lieber keinen Knopf zeigen, den der Server ohnehin abweist.
 let _attendanceSelfBlocked = true;
@@ -1735,9 +1742,7 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
     updateTableHeader('member'); // 'member' = Member-Attendance-Modus
 
     if (shown.length === 0) {
-        // Fuenf Spalten seit OI-94 (Terminart entfaellt): Termin, Ankunft,
-        // Status, Quelle, Aktionen.
-        tbody.innerHTML = '<tr><td colspan="5" class="loading">Keine Termine für diese Auswahl</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${MEMBER_ATTENDANCE_COLSPAN}" class="loading">Keine Termine für diese Auswahl</td></tr>`;
         return;
     }
 
@@ -1845,6 +1850,23 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
 }
 
 /**
+ * Terminart aus dem Cache holen -- gemeinsamer Nachschlag der beiden
+ * Darstellungen (Randakzent und Schildchen). Liefert null, wenn keine ID
+ * vorliegt, die Terminarten noch nicht geladen sind oder die ID ins Leere
+ * zeigt (geloeschte Terminart).
+ */
+function findAppointmentType(appointment_type_id = null)
+{
+    const types = dataCache.types.data;
+
+    if (!appointment_type_id || !Array.isArray(types)) {
+        return null;
+    }
+
+    return types.find(t => t.type_id == appointment_type_id) || null;
+}
+
+/**
  * Terminart als Randakzent (OI-94): liefert die CSS-Variable fuer die erste
  * Zelle der Zeile und den Namen fuer deren Unterzeile.
  *
@@ -1856,16 +1878,19 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
  * Verwaltern frei befuellbar. Ohne CSP (OI-17) ist die Maskierung hier die
  * einzige Schranke: Farbe ueber safeTypeColor(), Text per escapeHtml().
  *
+ * ACHTUNG beim Weiterverwenden von `name`: Der Wert ist BEREITS HTML-maskiert
+ * und gehoert nur als Elementtext ins Markup. escapeHtml() maskiert < > &,
+ * aber weder " noch ' -- in einem Attribut (title="${name}") waere er
+ * ausbrechbar. Und ueber textContent gesetzt erschiene eine Terminart
+ * "Probe & Auftritt" dem Nutzer als "Probe &amp; Auftritt".
+ *
  * Fehlt die Terminart -- oder sind die Terminarten noch nicht geladen --,
  * bleibt der Name leer. Die Zeile zeigt dann nur den grauen Streifen; ein
  * Ersatzwort wie "Allgemein" behauptete eine Terminart, die es nicht gibt.
  */
 function appointmentTypeAccent(appointment_type_id = null)
 {
-    const types = dataCache.types.data;
-    const type = (appointment_type_id && Array.isArray(types))
-        ? types.find(t => t.type_id == appointment_type_id)
-        : null;
+    const type = findAppointmentType(appointment_type_id);
 
     return {
         style: `--type-color: ${safeTypeColor(type ? type.color : null)};`,
@@ -1873,21 +1898,26 @@ function appointmentTypeAccent(appointment_type_id = null)
     };
 }
 
+/**
+ * Terminart als Schildchen. Das ist KEIN Rest des Umbaus auf den Randakzent
+ * (OI-94), sondern dessen bewusst erhaltene zweite Haelfte: Es bedient nur
+ * noch das Formularfeld beim Erfassen (updateAppointmentTypeDisplay()), wo das
+ * Schildchen allein in einem <span> steht. Ein Randstreifen braucht eine Zeile
+ * neben sich, an deren linkem Rand er liegen kann -- dort gibt es keine.
+ *
+ * Die beiden Listen nutzen appointmentTypeAccent(). Wer hier aufraeumen will,
+ * muss zuerst das Formularfeld umbauen.
+ */
 function createAppointmentTypeBadge(appointment_type_id = null)
 {
-    const types = dataCache.types.data;
-        
-    // Type-ID vorhanden UND types ist Array
-    if (appointment_type_id && Array.isArray(types)) {
-        const type = types.find(t => t.type_id == appointment_type_id);
-        
-        if (type) {
-            // type.color/type.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
-            // muss hier selbst maskiert werden: Farbe per safeTypeColor(), Text per escapeHtml().
-            return `<span class="type-badge" style="background: ${safeTypeColor(type.color)}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                        ${escapeHtml(type.type_name)}
-                    </span>`;
-        }
+    const type = findAppointmentType(appointment_type_id);
+
+    if (type) {
+        // type.color/type.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
+        // muss hier selbst maskiert werden: Farbe per safeTypeColor(), Text per escapeHtml().
+        return `<span class="type-badge" style="background: ${safeTypeColor(type.color)}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+                    ${escapeHtml(type.type_name)}
+                </span>`;
     }
     
     // Fallback: Termin ohne Type ODER nicht gefunden

@@ -37,6 +37,65 @@ function taFunctionBody(string $js, string $signature): string
     return substr($js, $start, $next - $start);
 }
 
+/**
+ * Eine Tabelle aus index.html, aufgespannt an festen Markern statt an
+ * Zeichenabstaenden: vom <table> um das genannte tbody bis zu dessen
+ * </table>. So liegen Kopf- und Ladezeile sicher drin, und keine Zelle einer
+ * anderen Tabelle kann hineinrutschen.
+ */
+function taTableBlock(string $html, string $bodyId): string
+{
+    $pos = strpos($html, 'id="' . $bodyId . '"');
+    assertTrue($pos !== false, "{$bodyId} fehlt in index.html");
+    $start = strrpos(substr($html, 0, $pos), '<table');
+    assertTrue($start !== false, "Anfang der Tabelle um {$bodyId} nicht gefunden");
+    $end = strpos($html, '</table>', $pos);
+    assertTrue($end !== false, "Ende der Tabelle um {$bodyId} nicht gefunden");
+
+    return substr($html, $start, $end - $start);
+}
+
+/** Kopfzellen einer Tabelle zaehlen -- auch solche mit Attributen (<th class="...">). */
+function taCountTh(string $markup): int
+{
+    return preg_match_all('/<th[\s>]/', $markup);
+}
+
+/**
+ * Die vier Kopfzeilen aus updateTableHeader() in Quelltext-Reihenfolge, je mit
+ * erwarteter Spaltenzahl und Klartext. Die Reihenfolge wird ueber einen Marker
+ * mitgeprueft, damit ein Umsortieren der Zweige nicht stillschweigend die
+ * Zuordnung verschiebt.
+ */
+function taRecordHeads(string $records): array
+{
+    $header = taFunctionBody($records, 'function updateTableHeader(');
+    assertSame(4, preg_match_all("/thead\.innerHTML = '([^']*)'/", $header, $m),
+        'updateTableHeader() fuehrt vier Kopfzeilen: member, appointment, all/Verwalter, all/Mitglied');
+
+    $erwartet = [
+        ['<th>Termin</th><th>Ankunft</th>', 5,
+            'Modus member: Termin, Ankunft, Status, Quelle, Aktionen'],
+        ['<th>Mitglied</th><th>Ankunft</th>', 5,
+            'Modus appointment: Mitglied, Ankunft, Status, Quelle, Aktionen (hatte nie eine Terminart)'],
+        ['<th>Termin</th><th>Mitglied</th>', 6,
+            'Modus all, Verwalter: Termin, Mitglied, Ankunft, Status, Quelle, Aktionen'],
+        ['<th>Termin</th><th>Mitglied</th>', 5,
+            'Modus all, einfaches Mitglied: dieselben Spalten ohne Aktionen'],
+    ];
+
+    $heads = [];
+    foreach ($erwartet as $i => [$marker, $spalten, $klartext]) {
+        assertTrue(str_starts_with($m[1][$i], $marker),
+            "updateTableHeader(), {$klartext}: Kopfzeile {$i} passt nicht zum erwarteten Zweig");
+        assertSame($spalten, taCountTh($m[1][$i]),
+            "updateTableHeader(), {$klartext}: erwartet {$spalten} Spalten");
+        $heads[] = [$m[1][$i], $klartext];
+    }
+
+    return $heads;
+}
+
 test('safeTypeColor prueft Farben mit einer auf ^# verankerten Hex-Whitelist gueltiger Laenge', function () use ($taRoot) {
     $js = taFile($taRoot, 'public/js/modules/utils.js');
     $body = taFunctionBody($js, 'export function safeTypeColor(');
@@ -83,6 +142,36 @@ test('Keine hart codierte Ersatzfarbe mehr bei der Terminart', function () use (
         assertTrue(!str_contains($js, '#667eea'), "{$rel}: #667eea muss der Variablen weichen");
     }
 
+    // management.js ist die VIERTE Kopie, die die Spec nicht kannte (sie nennt
+    // nur drei Stellen). Dateiweit darf #667eea hier NICHT verschwinden: Es ist
+    // an zwei weiteren Stellen die Vorgabefarbe des Farbwaehlers fuer eine neue
+    // Terminart -- eine Produktentscheidung, keine Ersatzfarbe, und ein
+    // <input type="color"> nimmt ohnehin nur einen echten Hexwert, keine
+    // CSS-Variable. Geprueft wird deshalb allein die Anzeige.
+    $management = taFile($taRoot, 'public/js/modules/management.js');
+    $uebersicht = taFunctionBody($management, 'export async function renderTypeGroupOverview(');
+    assertTrue(!str_contains($uebersicht, '#667eea'),
+        'renderTypeGroupOverview(): Die Farbkachel muss die gemeinsame Ersatzfarbe nutzen');
+
+    // Zweite Haelfte desselben Gedankens: Der Sinn der Zentralisierung ist,
+    // dass es KEINE eigene Kopie der Pruefung mehr gibt, die man beim
+    // Nachschaerfen vergisst -- management.js war genau so eine. Geprueft wird
+    // deshalb das ganze Modulverzeichnis, damit eine fuenfte Kopie beim Anlegen
+    // auffaellt und nicht erst beim naechsten Sicherheitsbefund. Die
+    // Check-in-PWA (public/checkin/) hat bewusst eigene Farben und bleibt
+    // aussen vor, siehe "Nicht in diesem Vorhaben" in der Spec.
+    $kopien = [];
+    foreach (glob($taRoot . '/public/js/modules/*.js') as $pfad) {
+        if (basename($pfad) === 'utils.js') {
+            continue;
+        }
+        if (preg_match('/\/\^#\[0-9a-f\]/i', (string) file_get_contents($pfad))) {
+            $kopien[] = 'public/js/modules/' . basename($pfad);
+        }
+    }
+    assertSame([], $kopien,
+        'Eigene Hex-Whitelist statt safeTypeColor() aus utils.js in: ' . implode(', ', $kopien));
+
     // #95a5a6 traegt dagegen zwei fremde Dinge: das Schildchen "automatisch
     // angelegt" (appointments.js:277) und die Erfassungsmethode "Auto"
     // (records.js:1054). Beide bleiben -- geprueft wird nur die Terminart.
@@ -90,6 +179,23 @@ test('Keine hart codierte Ersatzfarbe mehr bei der Terminart', function () use (
     $badge = taFunctionBody($records, 'function createAppointmentTypeBadge(');
     assertTrue(!str_contains($badge, '#95a5a6'),
         'Das Schildchen der Terminart muss die gemeinsame Ersatzfarbe nutzen');
+});
+
+test('Die Farbkachel der Terminartenverwaltung nutzt die gemeinsame Pruefung', function () use ($taRoot) {
+    // Vierte Kopie der Farbpruefung, die die Spec nicht kannte -- sie nennt nur
+    // appointments.js (zweimal) und records.js. Sie war zudem loseer als
+    // safeTypeColor(): Sie nahm auch #abcde an, was der Browser wortlos
+    // verwirft; die Kachel blieb dann farblos statt grau.
+    $management = taFile($taRoot, 'public/js/modules/management.js');
+    assertTrue((bool) preg_match('/import \{[^}]*safeTypeColor[^}]*\} from .\.\/utils\.js./', $management),
+        'management.js muss safeTypeColor aus utils.js importieren');
+
+    $uebersicht = taFunctionBody($management, 'export async function renderTypeGroupOverview(');
+    assertTrue(str_contains($uebersicht, 'safeTypeColor('),
+        'Die Farbkachel der Terminartenverwaltung muss die gemeinsame Pruefung nutzen');
+    // Sie bleibt eine Kachel -- umgestellt wird die Pruefung, nicht die Anzeige.
+    assertTrue(str_contains($uebersicht, 'background: ${safeColor}'),
+        'Die Farbkachel behaelt ihre Darstellung -- nur die Pruefung wandert');
 });
 
 test('Die Terminliste traegt den Streifen und den Namen in der Unterzeile', function () use ($taRoot) {
@@ -138,17 +244,7 @@ test('Die Terminliste traegt den Streifen und den Namen in der Unterzeile', func
 test('Die Kopfzelle Terminart ist aus der Terminliste entfernt', function () use ($taRoot) {
     $html = taFile($taRoot, 'public/index.html');
 
-    // Ausschnitt an festen Markern aufspannen statt an Zeichenabstaenden:
-    // vom <table> der Terminliste bis zu ihrem </table>. So liegen Kopfzeile
-    // und Ladezeile sicher drin, und kein <th>Terminart</th> einer anderen
-    // Tabelle kann hineinrutschen.
-    $pos = strpos($html, 'id="appointmentsTableBody"');
-    assertTrue($pos !== false, 'Die Terminliste fehlt in index.html');
-    $start = strrpos(substr($html, 0, $pos), '<table');
-    assertTrue($start !== false, 'Anfang der Terminlisten-Tabelle nicht gefunden');
-    $end = strpos($html, '</table>', $pos);
-    assertTrue($end !== false, 'Ende der Terminlisten-Tabelle nicht gefunden');
-    $block = substr($html, $start, $end - $start);
+    $block = taTableBlock($html, 'appointmentsTableBody');
 
     assertTrue(!str_contains($block, '<th>Terminart</th>'),
         'Die Spalte entfaellt -- der Name steht jetzt in der Unterzeile');
@@ -194,22 +290,19 @@ test('Der Streifen liegt im Stylesheet, nicht im Markup', function () use ($taRo
 function taRecordLists(): array
 {
     return [
-        // Signatur => [Klartext, colspan der Leermeldung]
+        // Signatur => [Klartext, Konstante mit der Spaltenzahl der Leermeldung]
         //
-        // Der colspan ist die Spaltenzahl der BREITESTEN Rolle: In der
-        // Erfassungsliste sieht ein einfaches Mitglied keine Aktionsspalte, die
-        // Leermeldung wird aber nur einmal geschrieben. Zu klein waere sie
-        // sichtbar falsch (die Meldung endet vor dem rechten Rand), zu gross
-        // dehnt kein Browser die Tabelle.
+        // Die Zahl steht als Konstante im Code, nicht als Literal in der Zeile:
+        // Ein Kommentar daneben veraltet, eine Konstante nicht. Welchen Wert sie
+        // tragen muss, prueft der Test "Kopf und Zellen ... uebereinander" gegen
+        // die tatsaechlichen Kopfzeilen.
         'export async function renderRecords(' => [
             'Erfassungsliste (alle Anwesenheiten)',
-            // Termin, Mitglied, Ankunft, Status, Quelle, Aktionen
-            6,
+            'RECORDS_LIST_COLSPAN',
         ],
         'function renderMemberAttendanceList(' => [
             'Mitgliedsansicht (Termine eines Mitglieds)',
-            // Termin, Ankunft, Status, Quelle, Aktionen
-            5,
+            'MEMBER_ATTENDANCE_COLSPAN',
         ],
     ];
 }
@@ -278,7 +371,7 @@ test('Beide Listen in records.js rendern die Terminart als Randakzent', function
     assertTrue((bool) preg_match('/import \{[^}]*safeTypeColor[^}]*\} from .\.\/utils\.js./', $js),
         'safeTypeColor muss aus utils.js importiert sein');
 
-    foreach (taRecordLists() as $signature => [$klartext, $colspan]) {
+    foreach (taRecordLists() as $signature => [$klartext, $konstante]) {
         $body = taFunctionBody($js, $signature);
 
         assertTrue(str_contains($body, 'appointmentTypeAccent('),
@@ -288,9 +381,14 @@ test('Beide Listen in records.js rendern die Terminart als Randakzent', function
 
         // Der Streifen gehoert an die ERSTE Zelle der Zeile -- nur dort liegt er
         // am linken Rand. Geprueft am Anfang des Zeilen-Templates, nicht
-        // irgendwo darin.
-        assertTrue((bool) preg_match('/innerHTML\s*=\s*`\s*<td class="type-accent" style="\$\{\w+\.style\}"/', $body),
-            "{$klartext}: Die erste Zelle traegt Klasse und Farbvariable nicht -- der Streifen liegt nur am linken Rand, wenn er an der ERSTEN Zelle haengt");
+        // irgendwo darin. Klasse und Stil werden getrennt zugesichert und
+        // tolerieren weitere Attribute: Eine zweite, harmlose Klasse darf nicht
+        // "Klasse fehlt" melden und den Naechsten an die falsche Stelle
+        // schicken.
+        assertTrue((bool) preg_match('/innerHTML\s*=\s*`\s*<td[^>]*type-accent/', $body),
+            "{$klartext}: Die erste Zelle der Zeile traegt die Klasse type-accent nicht -- der Streifen liegt nur am linken Rand, wenn er an der ERSTEN Zelle haengt");
+        assertTrue((bool) preg_match('/innerHTML\s*=\s*`\s*<td[^>]*style="\$\{\w+\.style\}"/', $body),
+            "{$klartext}: Die erste Zelle der Zeile bekommt die Farbvariable nicht aus dem Randakzent");
 
         // Dass in diese Deklaration nichts ausser der Variablen geraet, prueft
         // der Test der Hilfsfunktion -- dort wird sie gebaut.
@@ -315,8 +413,8 @@ test('Beide Listen in records.js rendern die Terminart als Randakzent', function
         assertTrue((bool) preg_match('/<span class="type-accent-name">\$\{[^}]+\}<\/span> ·&nbsp;/', $body),
             "{$klartext}: Der Span darf nur den Namen umschliessen, der Trenner gehoert mit geschuetztem Leerzeichen nach aussen");
 
-        assertTrue(str_contains($body, "colspan=\"{$colspan}\""),
-            "{$klartext}: Die Leermeldung muss auf {$colspan} Spalten schrumpfen -- mit der Terminart entfaellt eine");
+        assertTrue(str_contains($body, "colspan=\"\${{$konstante}}\""),
+            "{$klartext}: Die Leermeldung muss ihre Spaltenzahl aus {$konstante} nehmen, nicht als Zahl in der Zeile tragen");
     }
 });
 
@@ -326,23 +424,15 @@ test('Die Spalte Terminart ist aus der Anwesenheitsliste entfernt -- an allen dr
     // die Koepfe stehen dann gegen die Zellen versetzt, und zwar erst nach dem
     // naechsten Login oder Moduswechsel, also lange nach dem Umbau.
     $html = taFile($taRoot, 'public/index.html');
-
-    // Ausschnitt an festen Markern aufspannen statt an Zeichenabstaenden.
-    $pos = strpos($html, 'id="recordsTableBody"');
-    assertTrue($pos !== false, 'Die Anwesenheitsliste fehlt in index.html');
-    $start = strrpos(substr($html, 0, $pos), '<table');
-    assertTrue($start !== false, 'Anfang der Anwesenheitstabelle nicht gefunden');
-    $end = strpos($html, '</table>', $pos);
-    assertTrue($end !== false, 'Ende der Anwesenheitstabelle nicht gefunden');
-    $block = substr($html, $start, $end - $start);
+    $block = taTableBlock($html, 'recordsTableBody');
 
     // Gezaehlt, nicht nach einem Wort gesucht: Die Spalte kann auch unter
     // anderem Namen zurueckkommen ("Art", "Kategorie"). Die Zahl der Koepfe
     // ist das, was gegen die Zellen stehen muss.
-    assertTrue(!preg_match('/<th>(Terminart|Typ|Art)<\/th>/', $block),
+    assertTrue(!preg_match('/<th[^>]*>(Terminart|Typ|Art)<\/th>/', $block),
         'index.html: Die Spalte entfaellt -- der Name steht jetzt in der Unterzeile');
     // Termin, Mitglied, Ankunftszeit, Status, Quelle, Aktionen
-    assertSame(6, substr_count($block, '<th>'),
+    assertSame(6, taCountTh($block),
         'index.html: Die Anwesenheitsliste hat sechs Spalten, nicht sieben');
     assertTrue(str_contains($block, 'colspan="6"'),
         'index.html: Die Ladezeile muss auf sechs Spalten schrumpfen');
@@ -369,45 +459,10 @@ test('Die Spalte Terminart ist aus der Anwesenheitsliste entfernt -- an allen dr
     // "Terminart" ginge hier ins Leere, eine nach "Typ" an 'Art' vorbei.
     $records = taFile($taRoot, 'public/js/modules/records.js');
     foreach (taRecordHeads($records) as [$kopf, $klartext]) {
-        assertTrue(!preg_match('/<th>(Terminart|Typ|Art)<\/th>/', $kopf),
+        assertTrue(!preg_match('/<th[^>]*>(Terminart|Typ|Art)<\/th>/', $kopf),
             "updateTableHeader(), {$klartext}: Die Terminart darf nicht als Spalte zurueckkommen -- sie stuende versetzt gegen die Zellen");
     }
 });
-
-/**
- * Die vier Kopfzeilen aus updateTableHeader() in Quelltext-Reihenfolge, je mit
- * erwarteter Spaltenzahl und Klartext. Die Reihenfolge wird ueber einen Marker
- * mitgeprueft, damit ein Umsortieren der Zweige nicht stillschweigend die
- * Zuordnung verschiebt.
- */
-function taRecordHeads(string $records): array
-{
-    $header = taFunctionBody($records, 'function updateTableHeader(');
-    assertSame(4, preg_match_all("/thead\.innerHTML = '([^']*)'/", $header, $m),
-        'updateTableHeader() fuehrt vier Kopfzeilen: member, appointment, all/Verwalter, all/Mitglied');
-
-    $erwartet = [
-        ['<th>Termin</th><th>Ankunft</th>', 5,
-            'Modus member: Termin, Ankunft, Status, Quelle, Aktionen'],
-        ['<th>Mitglied</th><th>Ankunft</th>', 5,
-            'Modus appointment: Mitglied, Ankunft, Status, Quelle, Aktionen (hatte nie eine Terminart)'],
-        ['<th>Termin</th><th>Mitglied</th>', 6,
-            'Modus all, Verwalter: Termin, Mitglied, Ankunft, Status, Quelle, Aktionen'],
-        ['<th>Termin</th><th>Mitglied</th>', 5,
-            'Modus all, einfaches Mitglied: dieselben Spalten ohne Aktionen'],
-    ];
-
-    $heads = [];
-    foreach ($erwartet as $i => [$marker, $spalten, $klartext]) {
-        assertTrue(str_starts_with($m[1][$i], $marker),
-            "updateTableHeader(), {$klartext}: Kopfzeile {$i} passt nicht zum erwarteten Zweig");
-        assertSame($spalten, substr_count($m[1][$i], '<th>'),
-            "updateTableHeader(), {$klartext}: erwartet {$spalten} Spalten");
-        $heads[] = [$m[1][$i], $klartext];
-    }
-
-    return $heads;
-}
 
 test('Kopf und Zellen der Anwesenheitsliste stehen Spalte fuer Spalte uebereinander', function () use ($taRoot) {
     // Der colspan der Leermeldung allein sagt nichts darueber, ob die gezeichnete
@@ -417,7 +472,23 @@ test('Kopf und Zellen der Anwesenheitsliste stehen Spalte fuer Spalte uebereinan
     // beides aus dem Quelltext gezaehlt.
     $js = taFile($taRoot, 'public/js/modules/records.js');
     $heads = taRecordHeads($js);
-    $spalten = fn (int $i) => substr_count($heads[$i][0], '<th>');
+    $spalten = fn (int $i) => taCountTh($heads[$i][0]);
+
+    // Die drei colspan-Konstanten sind genau dann richtig, wenn sie die
+    // Spaltenzahl ihres Modus tragen. Ohne diese Bindung koennte eine Kopfzeile
+    // wachsen und die Leermeldung zurueckbleiben -- sie endete dann sichtbar
+    // vor dem rechten Rand, und keine andere Zusicherung merkte es.
+    $konstanten = [
+        ['RECORDS_LIST_COLSPAN', 2, 'Modus all (breiteste Rolle: Verwalter)'],
+        ['MEMBER_ATTENDANCE_COLSPAN', 0, 'Modus member'],
+        ['ATTENDANCE_LIST_COLSPAN', 1, 'Modus appointment'],
+    ];
+    foreach ($konstanten as [$name, $kopf, $klartext]) {
+        assertTrue((bool) preg_match('/const ' . $name . ' = (\d+);/', $js, $wert),
+            "{$name} fehlt -- die Spaltenzahl gehoert als Konstante in den Code, nicht als Zahl in die Zeile");
+        assertSame($spalten($kopf), (int) $wert[1],
+            "{$name} passt nicht zu den Kopfzeilen fuer {$klartext}");
+    }
 
     // Erfassungsliste: fuenf Zellen im Template, die Aktionszelle kommt aus
     // einer eigenen Variablen und nur fuer Verwalter dazu.

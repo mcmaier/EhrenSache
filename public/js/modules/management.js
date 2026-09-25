@@ -12,7 +12,7 @@ import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, subgroupLabel,
          updateSubgroupLabelElements } from './ui.js';
 import { loadMembers } from './members.js';
-import { formatDateTime, updateModalId, escapeHtml } from './utils.js';
+import { formatDateTime, updateModalId, escapeHtml, safeTypeColor } from './utils.js';
 import { groupChips, CHIPS_APPOINTMENT_TYPES, countChips, filterByChip,
          renderFilterChips } from './filter_chips.js';
 import {debug} from '../app.js'
@@ -361,9 +361,12 @@ export async function renderTypeGroupOverview(typeData)
         
         // Farbwert kommt frei aus der DB (kein Server-seitiger Format-Zwang) und landet
         // in einem style-Attribut -- escapeHtml() maskiert dort keine Anführungszeichen
-        // und würde das Attribut nicht schützen. Stattdessen wie in appointments.js:
-        // nur ein gültiger Hexcode wird übernommen, sonst der Default.
-        const safeColor = /^#[0-9a-f]{3,8}$/i.test(type.color || '') ? type.color : '#667eea';
+        // und würde das Attribut nicht schützen. Die Prüfung steht seit OI-94 nur noch
+        // einmal im Projekt, als safeTypeColor() in utils.js, und ist dort zugleich
+        // enger als die frühere Kopie an dieser Stelle: nur 3, 4, 6 oder 8 Hexstellen.
+        // Eine Länge wie 5 galt hier als sicher, ergab aber ungültiges CSS, das der
+        // Browser wortlos verwirft -- die Kachel blieb dann farblos statt grau.
+        const safeColor = safeTypeColor(type.color);
         const colorBadge = `<span style="display: inline-block; width: 20px; height: 20px; background: ${safeColor}; border-radius: 3px; border: 1px solid #ddd;"></span>`;
 
         // Lade Gruppen für diese Terminart
