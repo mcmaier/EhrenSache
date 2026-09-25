@@ -140,16 +140,24 @@ tr.row-inactive:hover td {
 }
 
 /* Terminart als Randakzent (OI-94). Der Streifen sitzt als inset-Schatten auf
-   der ersten Zelle und nicht als border-left an der Zeile: ein Rahmen an der
-   Zeile kollidiert mit Zebrastreifung und Ueberfahr-Zustand, die beide den
-   Zellhintergrund setzen. (border-collapse: collapse steht oben ohnehin global
-   -- daran scheitert es also nicht, wohl aber am Zusammenspiel.)
+   der ersten Zelle, nicht als border-left an der Zeile: Der Schatten zeichnet
+   INNERHALB der Zellflaeche und kostet keine Layoutbreite -- ein Rahmen an der
+   Zeile schoebe die Spalte gegen den Tabellenkopf. Er liegt ausserdem ueber
+   jedem Hintergrund, den die Zeilenzustaende setzen (tbody tr:hover,
+   tr.row-inactive td). Dieselbe Technik traegt oben schon die klebende
+   Aktionsspalte der Zeiterfassung, siehe .table-worktime td.actions-cell.
    Die Farbe kommt ueber --type-color am Element, gesetzt aus der Terminart. */
 .type-accent {
     box-shadow: inset 4px 0 0 var(--type-color, var(--type-color-none));
 }
 
-/* Name der Terminart in der Unterzeile, wo frueher die Spalte stand. */
+/* Name der Terminart in der Unterzeile, wo frueher die Spalte stand. Die Regel
+   darf nicht leer bleiben und nicht auf --text-light lauten: Das umschliessende
+   <small> vererbt genau diese Farbe, der Name stuende dann in Farbe UND Gewicht
+   wie das Datum daneben -- ununterscheidbar, zumal er unter 480px auf rund
+   9,6px schrumpft. Fuer Farbenblinde ist er der Textersatz des Streifens und
+   muss sich abheben, ohne wie ein Knopf auszusehen. */
 .type-accent-name {
-    color: var(--text-light);
+    color: var(--text-medium);
+    font-weight: 500;
 }

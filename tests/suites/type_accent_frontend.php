@@ -112,6 +112,16 @@ test('Die Terminliste traegt den Streifen und den Namen in der Unterzeile', func
     assertTrue((bool) preg_match('/\$\{typeName\}\$\{[A-Za-z]*[Dd]ate[A-Za-z]*\}/', $body),
         'Der Name der Terminart muss der Datumsausgabe unmittelbar vorangehen');
 
+    // Der Span umschliesst NUR den Namen. Der Trenner ist Satzzeichen und steht
+    // mit geschuetztem Leerzeichen davor am Datum, damit er beim Umbruch
+    // schmaler Spalten mit dem Datum wandert statt am Namen haengen zu bleiben.
+    // Tasks 3 und 4 erben die Klasse ("Terminart · Ort", Name am Zeilenende) --
+    // mit dem Trenner im Span waere sie dort unbrauchbar.
+    assertTrue((bool) preg_match('/<span class="type-accent-name">\$\{escapeHtml\(apt\.type_name\)\}<\/span>/', $body),
+        'Der Span darf nur den Namen umschliessen -- der Trenner gehoert nach aussen');
+    assertTrue(str_contains($body, '·&nbsp;'),
+        'Der Trenner muss per geschuetztem Leerzeichen am Datum kleben');
+
     // Das Schildchen der Terminart muss weg. Gezaehlt statt gesucht: type-badge
     // ist projektweit das allgemeine Schildchen, und genau EINES bleibt hier
     // zulaessig -- "automatisch angelegt" am Titel, ein anderes Ding als die
@@ -160,7 +170,18 @@ test('Die Kopfzelle Terminart ist aus der Terminliste entfernt', function () use
 test('Der Streifen liegt im Stylesheet, nicht im Markup', function () use ($taRoot) {
     $css = taFile($taRoot, 'public/css/components/tables.css');
     assertTrue((bool) preg_match('/\.type-accent\s*\{[^}]*box-shadow:\s*inset/', $css),
-        'Der Streifen gehoert als inset-Schatten auf die erste Zelle -- border-left auf tr vertraegt sich nicht mit Zebrastreifung');
+        'Der Streifen gehoert als inset-Schatten auf die erste Zelle -- ein Rahmen an der Zeile kostet Layoutbreite und schoebe die Spalte gegen den Tabellenkopf');
     assertTrue((bool) preg_match('/\.type-accent\s*\{[^}]*var\(--type-color/', $css),
         'Die Farbe muss aus der Variablen kommen');
+
+    // Die Regel fuer den Namen darf nicht wirkungslos werden: Das umschliessende
+    // <small> vererbt --text-light. Steht dieselbe Farbe in der Klasse und kein
+    // eigenes Gewicht, ist der Name von der Datumsangabe daneben nicht zu
+    // unterscheiden -- und er ist der Textersatz des Streifens.
+    assertTrue((bool) preg_match('/\.type-accent-name\s*\{([^}]*)\}/', $css, $nameRule),
+        'Die Klasse fuer den Namen fehlt im Stylesheet');
+    assertTrue(!str_contains($nameRule[1], '--text-light'),
+        'var(--text-light) erbt der Name ohnehin -- die Regel waere wirkungslos');
+    assertTrue((bool) preg_match('/font-weight:/', $nameRule[1]),
+        'Ohne eigenes Gewicht hebt sich der Name nicht vom Datum ab');
 });

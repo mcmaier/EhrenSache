@@ -272,9 +272,15 @@ async function renderAppointments(appointments, page = 1) {
         // (OI-17) muss hier selbst maskiert werden: Farbe ueber safeTypeColor(),
         // Text per escapeHtml(). Die Farbe geht als CSS-Variable ins Markup,
         // das Aussehen steht im Stylesheet (.type-accent).
+        // Der Trenner steht ausserhalb des Spans: Er ist Satzzeichen, nicht Teil
+        // des Namens, und die Klasse gestaltet nur den Namen. Das geschuetzte
+        // Leerzeichen bindet ihn ans Datum -- bricht die Unterzeile in schmalen
+        // Spalten um, wandert er mit nach unten, statt am Namen haengen zu
+        // bleiben. Vor dem Trenner steht bewusst ein normales Leerzeichen, denn
+        // genau dort soll der Umbruch stattfinden.
         const typeColor = safeTypeColor(apt.color);
         const typeName = apt.type_name
-            ? `<span class="type-accent-name">${escapeHtml(apt.type_name)} · </span>`
+            ? `<span class="type-accent-name">${escapeHtml(apt.type_name)}</span> ·&nbsp;`
             : '';
 
         // Termin-Info mit Terminart
