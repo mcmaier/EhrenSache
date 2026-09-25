@@ -365,8 +365,9 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     // (OI-27), Stichtag ist der Tag der Ankunft, damit nachgereichte Eintraege
     // aus der Offline-Warteschlange nach ihrem eigenen Datum beurteilt werden.
     // Eigene reason statt "Member not found": das Terminal markiert daran die
-    // Zuordnung als verwaist. Admin und Manager bleiben aussen vor — ob sie
-    // hier fuer inaktive Mitglieder nachtragen duerfen, ist nicht entschieden.
+    // Zuordnung als verwaist. Nur Geraete werden geprueft (entschieden am
+    // 2026-09-25): Admin und Manager duerfen hier bewusst auch fuer inaktive
+    // Mitglieder nachtragen.
     if(isDevice() && !memberIsActiveOn($db, $database, (int)$memberId, $arrivalDate)) {
         http_response_code(404);
         echo json_encode([

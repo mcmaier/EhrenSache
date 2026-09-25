@@ -29,7 +29,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   einem Mitgliedschaftszeitraum. Bisher reichte, dass es die Nummer gab — ein noch angelernter
   Finger oder eine Karte erzeugte Anwesenheiten, die in keiner Auswertung auftauchten. Die
   Antwort trägt `reason: "member_inactive"`, das Terminal markiert daran die Zuordnung als
-  verwaist. Für Admin und Manager bleibt der Endpunkt unverändert (OI-103).
+  verwaist. Admin und Manager dürfen über den Endpunkt weiterhin auch für inaktive Mitglieder
+  nachtragen (OI-103).
 - **Die Mitgliederliste für Geräte enthält nur noch heute aktive Mitglieder.** Ohne Jahr oder
   Datum lieferte `GET members` einem Gerät bisher alle Mitglieder, auch ausgetretene. Damit
   kann das Terminal verwaiste Zuordnungen erkennen und im Admin-Menü zum Löschen anbieten.

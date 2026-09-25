@@ -37,7 +37,7 @@ Offen mit Priorität *mittel*, am 2026-09-25 einzeln gegen den Code geprüft: OI
 OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23,
 [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt). Die am 25.09. aus dem
 Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103 sind am selben Tag in `dev`
-erledigt; offen bleibt dort nur die Frage aus OI-103 zu Admin und Manager. **OI-3 und OI-20 tragen ebenfalls
+erledigt. **OI-3 und OI-20 tragen ebenfalls
 *mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
 Restarbeit, und gehören deshalb nicht in eine Umsetzungsreihe. OI-62 steht auf
 *niedrig–mittel*, OI-104 bis OI-106 und OI-108 auf *niedrig*.
@@ -1162,8 +1162,9 @@ Mitglieder nachtragen dürfen sollen. Wenn ja, greift die Prüfung nur für `isD
 
 **Umgesetzt für Gerätekonten** (`isDevice()`), Stichtag das Datum der `arrival_time`, Antwort
 `404 {"message": "Member not active", "reason": "member_inactive"}` — so, wie die Firmware
-sie auswertet. Die Frage nach Admin und Manager bleibt **offen**; bis sie entschieden ist, gilt
-für sie das alte Verhalten. Mit erledigt: `GET members` liefert Geräten ohne `date`/`year`
+sie auswertet. **Entschieden am 2026-09-25:** Es bleibt bei der Prüfung nur für Geräte. Admin
+und Manager dürfen über `auto_checkin` weiterhin auch für inaktive Mitglieder nachtragen; auch
+für `user` wird nicht geprüft. Mit erledigt: `GET members` liefert Geräten ohne `date`/`year`
 jetzt nur heute aktive Mitglieder (vorher alle), damit das Terminal verwaiste Zuordnungen
 erkennt. Die Regel steht in `memberIsActiveOn()` (`private/helpers/member_activity.php`), die
 der Kiosk mitbenutzt.

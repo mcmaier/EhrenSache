@@ -1385,8 +1385,9 @@ Ort immer `null`. Bestandsdaten bleiben so.
 mit `404`. Maßgeblich ist `reason`; eine unbekannte Nummer bleibt `404 "Member not found"`
 **ohne** `reason` (mit `searched_for`). Ein Terminal markiert an `member_inactive` die
 Zuordnung als verwaist. Weil der Stichtag das Ankunftsdatum ist, wird ein nachgereichter
-Eintrag nach seinem eigenen Tag beurteilt. Für Admin, Manager und `user` gilt die Prüfung
-(noch) nicht.
+Eintrag nach seinem eigenen Tag beurteilt. Die Prüfung gilt **nur für Gerätekonten**: Admin und
+Manager dürfen über diesen Endpunkt bewusst auch für inaktive Mitglieder nachtragen, und auch für
+`user` wird nicht geprüft.
 
 **Fehler (kein Termin):** `409`
 ```json
