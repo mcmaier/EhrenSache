@@ -698,6 +698,70 @@ erst starten? Gefunden im Codequalitäts-Review zur Schnellinbetriebnahme.
 
 ---
 
+### OI-101 · `station` für `auth_device` öffnen (PIN-Anmeldung am Hardware-Terminal)
+**Priorität:** mittel · aufgenommen am 2026-09-25 · **Bezug:** [FI-4](FEATURE-IDEAS.md),
+Kiosk-Spec `docs/superpowers/specs/2026-09-04-station-pin-kiosk-design.md` Abschnitt 5
+(„später `auth_method: device` für `auth_device`")
+
+**Anlass.** Für das Hardware-Terminal (ESP32-S3, eigenes Repository `mcmaier/EhrenSache_IoT`,
+Gerätetyp `auth_device`) ist entschieden, dass es beide Vertrauensmodelle bedient: Finger und
+Karte über `auto_checkin` (das Gerät bürgt), Mitgliedsnummer + PIN über `station` (der Server
+prüft). Das Terminal hat ein Keypad und soll damit auch Mitgliedern ohne Fingerabdruck oder
+Karte die Anmeldung erlauben. Heute nimmt `handleStation()` nur Kiosk-Token an
+([station.php:27](../private/handlers/station.php), `403 "Kiosk device token required"`).
+
+**Warum nicht lokal am Gerät.** Eine PIN-Prüfung auf dem Gerät hieße, die PIN-Hashes aller
+Mitglieder dorthin zu kopieren und das Ergebnis über `auto_checkin` als `device_auth` zu melden
+— also als Beleg, für den das Gerät bürgt, obwohl nur eine weitergebbare PIN dahintersteht. Das
+vermischt die beiden Vertrauensmodelle, die die Kiosk-Spec (2.1) bewusst trennt. Entschieden:
+Der Server prüft die PIN, das Terminal ist dort nur Tastatur und Bildschirm — wie der Kiosk.
+
+**Soll-Verhalten**
+
+| Action | `kiosk` | `auth_device` (neu) |
+|---|---|---|
+| `GET status` | ja | ja (`totp_enabled` mangels Secret `false`) |
+| `GET totp` | ja | `403` |
+| `POST identify` | ja | ja |
+| `POST checkin` | ja | ja |
+| `POST work_*` | ja | `403` (Arbeitszeit am Terminal nicht entschieden) |
+| andere Ressourcen | nur `version` | unverändert, insbesondere `auto_checkin` |
+
+- Record wie beim Kiosk: `checkin_source = 'station_pin'`, `source_device` und `location_name`
+  = `device_name` ([station.php:292](../private/handlers/station.php)). Die Auswertung braucht
+  so keinen Sonderfall.
+- Gerätename bleibt Pflicht (`409 "Device has no name"`), Sperren je Mitglied und je
+  Gerätekonto wie beim Kiosk, der Schalter `station_pin_enabled` gilt für beide Typen.
+- **Keine Schemaänderung:** `station_pin` (`records.checkin_source`) und `auth_device`
+  (`users.device_type`) stehen in den ENUMs bereits.
+
+**Umsetzungsskizze**
+
+- [station.php](../private/handlers/station.php), `handleStation()`: Typprüfung auf
+  `['kiosk', 'auth_device']` erweitern; für `auth_device` Positivliste `status`, `identify`,
+  `checkin`, sonst `403 "Action not available for this device type"`. Die Prüfung muss **vor**
+  `stationRequireMember()` liegen — eine gesperrte Action darf keinen PIN-Versuch verbrauchen
+  (dieselbe Überlegung wie bei `$knownPostActions`, station.php:78).
+- [api.php](../public/api/api.php) Abschnitt 7.1 (Kiosk-Sperre, Zeile 529) bleibt unverändert:
+  Sie greift nur bei `device_type = 'kiosk'`, ein `auth_device` behält `auto_checkin`.
+- `API.md`, Abschnitt „Station": Gerätetyp `auth_device` und Positivliste ergänzen.
+- `tests/suites/station_api.php`: `auth_device` darf `status`/`identify`/`checkin`; `403` auf
+  `totp` und `work_*`; Record trägt `station_pin` und den Gerätenamen; `totp_location` bekommt
+  weiterhin `403`; ein `403` auf eine gesperrte Action zählt keinen Fehlversuch.
+
+**Abwärtskompatibilität.** Die Firmware erkennt die Unterstützung an
+`GET station&action=status` (`200` gegen `403`) und schaltet die PIN-Eingabe sonst ab. Ein
+Server ohne diese Änderung bricht das Terminal also nicht.
+
+**Hinweis für Clients.** `401` bedeutet an diesem Endpunkt entweder ein ungültiges Token oder
+„Invalid member number or PIN" — unterscheidbar nur an `message`. Das gehört in `API.md` beim
+Abschnitt `station` ausdrücklich vermerkt.
+
+**Nicht sicherheitsrelevant** — die Prüfung bleibt auf dem Server, das Gerät bekommt keine
+zusätzlichen Rechte außerhalb der Ressource `station`.
+
+---
+
 ## Restarbeiten
 
 ### OI-4 · Terminbezug: Oberfläche unvollständig
@@ -1012,6 +1076,54 @@ Zwei Teilsignale gibt es bereits: Der Nachweisgrad fällt bei einer Zeitkorrektu
 
 **Berührt:** `private/handlers/work_sessions.php`, `public/js/modules/worktime.js`,
 `API.md`, `docs/testplan.md`. Kein Schemabedarf.
+
+---
+
+### OI-102 · `auto_checkin` von Geräten: `location_name` bleibt leer
+**Priorität:** mittel · aufgenommen am 2026-09-25
+
+`handleAutoCheckin()` liest für Gerätekonten die Spalte `email` und schreibt sie als
+`location_name` in den Record ([auto_checkin.php:535](../private/handlers/auto_checkin.php),
+Block „Bei Device: Hole Device-Info aus users Tabelle"). Gerätekonten werden aber ohne E-Mail
+angelegt — `createDevice()` fügt nur `device_name`, `role`, `device_type`, Token und Secret ein
+([users.php](../private/handlers/users.php), INSERT „Gerät anlegen (OHNE Email, OHNE
+Passwort)"). Jeder Check-in über ein `auth_device` trägt damit `location_name = NULL`. Der
+Kiosk schreibt an derselben Stelle `device_name`
+([station.php:292](../private/handlers/station.php)).
+
+**Vorschlag:** `device_name` lesen statt `email`; Test in `tests/suites/arrival_api.php` oder
+`station_api.php`, dass der Record eines `auth_device` den Gerätenamen trägt. Bestandsdaten
+bleiben `NULL` — nachträglich befüllen ließe sich höchstens über `source_device`, und auch das
+nur, wo es gesetzt wurde.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-103 · `auto_checkin` prüft den Aktivstatus des Mitglieds nicht
+**Priorität:** mittel · aufgenommen am 2026-09-25 · **Bezug:**
+[OI-27](#oi-27--membersactive-vs-membership_dates-am-kiosk)
+
+`resolveMemberIdByNumber()` ([utils.php:106](../private/helpers/utils.php)) und der
+`member_id`-Zweig in `handleAutoCheckin()`
+([auto_checkin.php:291](../private/handlers/auto_checkin.php)) prüfen nur, ob das Mitglied
+existiert — weder `members.active` noch `membership_dates`. Der Kiosk prüft seit OI-27 beides
+über `getMemberActivityWhere()` ([station.php:253](../private/helpers/station.php)).
+
+**Folge:** Ein ausgetretenes Mitglied, dessen Fingerabdruck oder Karte am Terminal noch
+angelernt ist, checkt weiter ein. Der Eintrag taucht in keiner Auswertung auf, liegt aber in
+`records`. Dasselbe gilt für Admin und Manager über diesen Endpunkt.
+
+**Vorschlag:** Aktivprüfung wie am Kiosk, Stichtag ist das Datum der `arrival_time`. Die
+Antwort sollte für Geräte von „unbekannt" unterscheidbar sein, damit das Terminal die
+Zuordnung als verwaist markieren kann — etwa `404` mit `reason: "member_inactive"` neben
+`"Member not found"`.
+
+**Vorher zu klären:** Ob Admin und Manager über diesen Endpunkt bewusst auch für inaktive
+Mitglieder nachtragen dürfen sollen. Wenn ja, greift die Prüfung nur für `isDevice()`.
+
+**Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: kein Rechtezuwachs, es braucht ein
+gültiges Gerätetoken und eine am Gerät angelernte Biometrie. Es geht um Datenqualität.
 
 ---
 
