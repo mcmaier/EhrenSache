@@ -249,7 +249,12 @@ exceptions, statistics und work_sessions (siehe `docs/OPEN-ITEMS.md`).
 - TOTP für standortgebundene Geräte-Check-ins
 - HttpOnly + SameSite Cookies, `Secure` nur über HTTPS (`public/api/api.php`)
 - `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` in `public/.htaccess`
-- **Keine CSP** — die Oberfläche nutzt Inline-Handler, siehe OI-17 in `docs/OPEN-ITEMS.md`
+- **CSP nur für Anmeldung, Check-in-PWA und Station** (`script-src 'self'`, gesetzt in
+  `public/.htaccess` im Abschnitt `<Files "login.html">`, `public/checkin/.htaccess`,
+  `public/station/.htaccess`). Dort **keine Inline-Handler** — Knöpfe aus Templates über
+  `data-action` und einen delegierten Zuhörer; `tests/suites/csp.php` wacht darüber. Das
+  Dashboard hat noch keine CSP (Inline-Handler, OI-17 Etappe 2), Maskierung bleibt dort die
+  einzige Schranke
 - `private/` nie öffentlich erreichbar
 
 ## Lokale Entwicklung

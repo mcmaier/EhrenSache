@@ -652,8 +652,9 @@ eigenen Kamera-Scanner?
 
 - *Dafür:* Eine installierte iPadOS-Station ließe sich ohne Tippen neu koppeln — der Fall
   tritt bei jedem neuen Token auf, in der öffentlichen Demo stündlich.
-- *Dagegen:* Eine zweite Fremdbibliothek (`html5-qrcode`, ~350 kB, in der Check-in-PWA heute
-  über unpkg statt vendored), Kamerarechte auf einem Kiosk-Tablet, mehr Testfläche. Der Weg
+- *Dagegen:* Eine zweite Fremdbibliothek (`html5-qrcode`, ~370 kB; liegt seit OI-17 Etappe 1
+  unter `public/js/vendor/`, wäre also schon im Paket), Kamerarechte auf einem Kiosk-Tablet,
+  mehr Testfläche. Der Weg
   über die Kamera-App kostet nichts davon.
 
 **Heutiger Ausweg:** 5 Sekunden auf die Uhr drücken und den Token eingeben. Die Reihenfolge
@@ -1203,11 +1204,14 @@ Bewusst unverändert. Nur dokumentieren, nicht als stärker beschreiben, als es 
 ---
 
 ### OI-17 · Keine Content-Security-Policy
-**Priorität:** mittel
+**Priorität:** mittel · Etappe 1 (Anmeldung, Check-in-PWA, Station) erledigt am 2026-09-25,
+offen bleibt Etappe 2 (Dashboard)
 
-Die Anwendung liefert **keine** CSP — weder als Header noch als `<meta http-equiv>`. Am
-2026-09-03 nachgeprüft: keine der neun `.htaccess`-Dateien und kein `header()`-Aufruf setzt
-sie. `CLAUDE.md` behauptete das Gegenteil; die Zeile war schlicht falsch und ist korrigiert.
+Bis 2026-09-25 lieferte die Anwendung **keine** CSP — weder als Header noch als
+`<meta http-equiv>`. Am 2026-09-03 nachgeprüft: keine der neun `.htaccess`-Dateien und kein
+`header()`-Aufruf setzte sie. `CLAUDE.md` behauptete das Gegenteil; die Zeile war schlicht falsch
+und ist korrigiert. Seit Etappe 1 tragen Anmeldung, Check-in-PWA und Station eine; das Dashboard
+weiterhin nicht.
 
 **Warum sie nicht einfach nachgereicht wird.** Die Oberfläche steckt voller Inline-Code, und
 jedes Stück davon blockiert eine CSP:
@@ -1226,11 +1230,11 @@ Hälfte:
 |---|---|
 | Inline-Handler in `index.html` | 109 (`onclick`, `onchange`, `onmouseover`/`-out`) |
 | Inline-Handler in HTML aus JS-Templates | 126 in 14 Modulen unter `public/js/modules/` (records 21, members 16, exceptions 15, appointments 15, responses 11, users 10, devices 10 …) |
-| Check-in-PWA | 4 Handler in `public/checkin/js/app.js` — sie ist **nicht** frei davon, wie hier früher stand |
-| Login | 1 Handler in `public/login.html` |
+| Check-in-PWA | 4 Handler in `public/checkin/js/app.js` — sie war **nicht** frei davon, wie hier früher stand (Etappe 1: umgestellt) |
+| Login | 1 Handler in `public/login.html` (Etappe 1: umgestellt) |
 | Station-PWA | 0 Handler, nur externe Scripts |
 | Inline-`<script>` | 1 Block in `index.html` (Installationsprüfung am Dateiende) |
-| Fremdquelle | `public/checkin/index.html` lädt `html5-qrcode` von unpkg.com |
+| Fremdquelle | `public/checkin/index.html` lud `html5-qrcode` von unpkg.com (Etappe 1: liegt unter `public/js/vendor/`) |
 | `window.*`-Exporte, die nur den Handlern dienen | 137 |
 | `style=`-Attribute | 245, davon 15 mit interpolierten Werten; dazu `<style>`-Blöcke in install, update, `reset_password.php`, `verify_email.php` |
 
@@ -1244,12 +1248,31 @@ Summe: **235 Inline-Handler in 16 Dateien.** Nicht betroffen sind Zuweisungen ü
 
 **Weg zu einer echten CSP** — in zwei Etappen, sonst bricht der Header die Oberfläche:
 
-*Etappe 1 — die kleinen Oberflächen, je mit eigenem Header in ihrem Verzeichnis:*
+*Etappe 1 — die kleinen Oberflächen. **Erledigt am 2026-09-25.***
 
-1. **Station-PWA:** sofort möglich, es gibt nichts umzubauen.
-2. **Login:** einen Handler umstellen.
-3. **Check-in-PWA:** vier Handler umstellen, `html5-qrcode` nach `public/js/vendor/` holen
-   wie `qrcode.js` (beseitigt nebenbei die Abhängigkeit von einem fremden CDN).
+1. **Station-PWA:** eigene `public/station/.htaccess` mit der Richtlinie, sonst nichts umzubauen.
+   Der QR-Code entsteht als Inline-SVG im DOM und braucht kein `img-src data:`.
+2. **Login:** den Schließen-Knopf des Passwort-vergessen-Dialogs per `addEventListener`
+   gebunden. Die Richtlinie steht in `public/.htaccess` im Abschnitt `<Files "login.html">` —
+   auf Verzeichnisebene träfe sie das Dashboard mit.
+3. **Check-in-PWA:** die vier Handler auf `data-action` plus `data-*`-Argumente und einen
+   delegierten Zuhörer am `document` umgestellt (Vorlage für Etappe 2). `html5-qrcode` 2.3.8 liegt
+   unter `public/js/vendor/`. Die Richtlinie in `public/checkin/.htaccess` erlaubt zusätzlich
+   `img-src data:` für den Pfeil der Auswahlfelder in `css/style.css`.
+
+Die Richtlinie lautet an allen drei Stellen `default-src 'self'; script-src 'self';
+style-src 'self' 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'self';
+form-action 'self'; frame-ancestors 'none'` (PWA mit `img-src 'self' data:`).
+`tests/suites/csp.php` hält fest: kein Inline-Handler, kein Inline-Skript, keine
+`javascript:`-URL in den drei Oberflächen, genau eine scharfe Richtlinie je Oberfläche ohne
+Aufweichung in `script-src`, keine Richtlinie außerhalb von `<Files "login.html">` in
+`public/.htaccess`, und der Server liefert sie tatsächlich aus. Beide Wächter sind mit einer
+Mutation gegengeprüft.
+
+Eine Report-Only-Phase gab es nicht: Ein Puppeteer-Durchgang hat jeden umgebauten Knopf
+ausgelöst und Verstöße über `securitypolicyviolation` gesammelt — null Funde, und eine
+Gegenprobe mit eingeschleustem `onclick` wurde blockiert und gemeldet. Report-Only auf
+Vereinsinstallationen hätte ohnehin niemanden erreicht, es gibt keinen Meldeendpunkt.
 
 *Etappe 2 — das Dashboard, Modul für Modul:*
 
@@ -1266,17 +1289,17 @@ Summe: **235 Inline-Handler in 16 Dateien.** Nicht betroffen sind Zuweisungen ü
 
 *Für beide Etappen:*
 
-7. Header zunächst als `Content-Security-Policy-Report-Only` ausliefern und die Konsole aller
-   Sektionen durchsehen, dann scharf schalten:
-   `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none';
-   base-uri 'self'; frame-ancestors 'none'`. Zu prüfen: ob die QR-Codes `img-src data:`
-   brauchen.
-8. Einen Wächter anlegen, der `on…=` unter `public/` verbietet — und dabei Kommentare
-   ausnimmt, sonst entsteht genau die Zusicherung, vor der OI-107 warnt. 13 bestehende
-   Zusicherungen in fünf Frontend-Suiten (`arrival`, `calendar_attendance`, `filter_chips`,
-   `profile_dashboard`, `subgroups`) prüfen heute `onclick`-Strings und sind anzupassen.
+7. Vor dem Scharfschalten jede Sektion im Browser mit gesammelten Verstößen durchgehen, wie in
+   Etappe 1 (ein Puppeteer-Durchgang statt Report-Only im Feld). Richtlinie wie in Etappe 1;
+   ob das Dashboard `img-src data:` braucht, ist für seine CSS-Dateien zu prüfen.
+8. Den Wächter `tests/suites/csp.php` auf `index.html` und `public/js/modules/` ausweiten
+   (Liste `$cspSurfaces`); er nimmt reine Kommentarzeilen aus, wertet aber Code-Zeilen mit
+   angehängtem Kommentar als Fund (OI-107). Dessen Gegenprobe „Dashboard ohne CSP“ entfällt
+   dann. 13 bestehende Zusicherungen in fünf Frontend-Suiten (`arrival`,
+   `calendar_attendance`, `filter_chips`, `profile_dashboard`, `subgroups`) prüfen heute
+   `onclick`-Strings und sind anzupassen.
 
-**Aufwand, geschätzt am 2026-09-25:** Etappe 1 etwa ein Tag. Etappe 2 etwa zwei bis drei Tage,
+**Aufwand, geschätzt am 2026-09-25:** Etappe 1 ist erledigt. Etappe 2 etwa zwei bis drei Tage,
 davon den größten Teil für die 126 Template-Handler; dazu ein vollständiger Durchgang durch
 `docs/testplan.md`, denn ein vergessener Handler fällt erst beim Klicken auf, nicht in der
 Suite. Etappe 2 gehört in eine eigene Spec. OI-107 geht voraus.
@@ -2026,8 +2049,9 @@ jemand einmal gesehen hat — ob es noch gilt, sagt nur der Code.
 
 Der Demo-Modus lässt Schreibzugriffe auf Mitglieder, Termine, Anwesenheiten, Anträge und
 Arbeitszeiten zu — das ist sein Zweck. Was ein Besucher dabei in ein Freitextfeld schreibt,
-bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Die Oberfläche nutzt
-Inline-Handler und führt bewusst keine CSP (siehe [OI-17](#oi-17--keine-content-security-policy)).
+bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Das Dashboard nutzt
+Inline-Handler und führt noch keine CSP (siehe [OI-17](#oi-17--keine-content-security-policy));
+Anmeldung, Check-in-PWA und Station tragen seit Etappe 1 eine.
 
 Beim Entwurf am 2026-09-09 erwogen und für die Ausbaustufe „Sandkasten mit Grenzen"
 hingenommen. Die Alternative wäre eine reine Schaufenster-Demo gewesen, die weder Check-in

@@ -7,6 +7,24 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Sicherheit
+- **Anmeldeseite, Check-in-App und virtuelle Station tragen eine Content-Security-Policy.** Der
+  Browser führt dort nur noch Skripte aus, die aus der Installation selbst kommen. Eingeschleuster
+  Code in Knöpfen, Links oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der
+  Maskierung vorbei ins Markup schaffen sollte. Das Dashboard folgt in einem eigenen Schritt;
+  es arbeitet noch mit Inline-Handlern (OI-17).
+
+### Geändert
+- **Die Check-in-App lädt den QR-Scanner nicht mehr aus dem Internet.** Die Bibliothek
+  `html5-qrcode` (2.3.8) liegt jetzt im Installationspaket unter `public/js/vendor/`, statt bei
+  jedem Aufruf von unpkg.com geholt zu werden. Der Scanner funktioniert damit auch in einem
+  Vereinsnetz ohne Internetzugang, und kein fremder Server erfährt mehr, wann die App geöffnet
+  wird.
+
+---
+
 ## [1.16.0] – 2026-09-25
 
 ### Geändert
