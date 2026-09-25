@@ -26,7 +26,7 @@ statt sie hier zu duplizieren:
 | `docs/DEMO.md` | **Öffentliche Demo betreiben: Installation, Einstellungen, Cronjob, Prüfliste** | ja |
 | `docs/OPEN-ITEMS.md` | **Offene Entscheidungen, Restarbeiten, bewusst Verworfenes** | ja |
 | `docs/FEATURE-IDEAS.md` | **Ideen für künftige Funktionen — unverbindlich, nicht geplant** | ja |
-| `docs/project_history.md` | **Warum das System so gebaut ist: Grundsatzentscheidungen und verworfene Wege (11/2025–04/2026)** | ja |
+| `docs/project_history.md` | **Warum das System so gebaut ist: Grundsatzentscheidungen und verworfene Wege (seit 11/2025)** | ja |
 | `docs/testplan.md` | Manueller Testplan nach Feature-Bereichen | ja |
 | `docs/superpowers/specs/` | Design-Spezifikationen je Feature | ja |
 | `docs/superpowers/plans/` | Umsetzungspläne je Feature (Prozessprotokolle) | nein (ignoriert) |
