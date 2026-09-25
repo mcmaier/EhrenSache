@@ -114,7 +114,7 @@ test('export/import: fehlende Termine werden nur auf Anforderung angelegt', func
     // aus einem Tippfehler im Datum eine Karteileiche. Wer Termine aus bloßen
     // Ankunftszeiten rekonstruieren will, nutzt extract_appointments — das
     // schlägt vor, ohne zu schreiben.
-    $src = (string) file_get_contents(__DIR__ . '/../../private/handlers/import.php');
+    $src = (string) sourceCode(__DIR__ . '/../../private/handlers/import.php');
 
     assertTrue(strpos($src, 'function importRecords($db, $database, $filePath, $createMissingAppointments = false)') !== false,
         'importRecords legt Termine nicht mehr nur auf Anforderung an');
@@ -126,7 +126,7 @@ test('export/import: extract_appointments schreibt nicht', function () {
     // Die Arbeitsteilung: extract_appointments SCHLÄGT Termine VOR (aus
     // geclusterten Ankunftszeiten), der Record-Import ÜBERNIMMT sie (aus dem
     // mitgelieferten Schlüssel). Nur einer der beiden Wege schreibt.
-    $src = (string) file_get_contents(__DIR__ . '/../../private/handlers/import.php');
+    $src = (string) sourceCode(__DIR__ . '/../../private/handlers/import.php');
 
     $start = strpos($src, 'function extractAppointments');
     $end   = strpos($src, 'function saveImportLog');
@@ -144,8 +144,8 @@ test('export/import: Mitglieder-Gruppen nutzen dasselbe Trennzeichen', function 
     // Der Export verkettet mit GROUP_CONCAT(... SEPARATOR '|'), der Import
     // zerlegt mit explode('|', ...). Ein anderes Zeichen auf einer Seite
     // brächte alle Gruppen als einen einzigen Namen zurück.
-    $exportSrc = (string) file_get_contents(__DIR__ . '/../../private/handlers/export.php');
-    $importSrc = (string) file_get_contents(__DIR__ . '/../../private/handlers/import.php');
+    $exportSrc = (string) sourceCode(__DIR__ . '/../../private/handlers/export.php');
+    $importSrc = (string) sourceCode(__DIR__ . '/../../private/handlers/import.php');
 
     assertTrue(strpos($exportSrc, "SEPARATOR '|'") !== false,
         'Der Mitglieder-Export verkettet Gruppen nicht mehr mit |');
@@ -156,7 +156,7 @@ test('export/import: Mitglieder-Gruppen nutzen dasselbe Trennzeichen', function 
 test('export/import: der Import akzeptiert die alten Spaltennamen weiter', function () {
     // Dateien aus Exporten bis 1.3.1 tragen 'type' bzw. 'arrival_time'. Sie
     // sollen einlesbar bleiben, sonst wird jede archivierte Datei wertlos.
-    $src = (string) file_get_contents(__DIR__ . '/../../private/handlers/import.php');
+    $src = (string) sourceCode(__DIR__ . '/../../private/handlers/import.php');
 
     assertTrue(strpos($src, "in_array('type', \$header)") !== false,
         "importAppointments akzeptiert den Zweitnamen 'type' nicht mehr");
@@ -173,7 +173,7 @@ test('export/import: eine leere Ankunftszeit ist zulaessig, wenn der Terminschlu
     // Die Zelle darf aber nur fehlen, wenn der Terminschluessel den Termin
     // trifft: Ohne ihn ist die Ankunftszeit die einzige Zuordnung, ueber das
     // Toleranzfenster.
-    $src = (string) file_get_contents(__DIR__ . '/../../private/handlers/import.php');
+    $src = (string) sourceCode(__DIR__ . '/../../private/handlers/import.php');
 
     assertTrue(
         strpos($src, 'member_number and arrival_date_time required') === false,

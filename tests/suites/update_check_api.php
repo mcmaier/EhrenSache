@@ -33,7 +33,7 @@ test('update_check liefert dem Admin den gespeicherten Stand', function () {
     foreach (['installed', 'last_checked', 'latest', 'update_available'] as $schluessel) {
         assertTrue(array_key_exists($schluessel, $res['body'] ?? []), "Schluessel {$schluessel} fehlt");
     }
-    $erwartet = json_decode((string) file_get_contents(__DIR__ . '/../../version.json'), true)['version'];
+    $erwartet = json_decode((string) sourceCode(__DIR__ . '/../../version.json'), true)['version'];
     assertSame($erwartet, $res['body']['installed']);
 });
 

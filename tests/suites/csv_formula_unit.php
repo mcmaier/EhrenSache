@@ -62,7 +62,7 @@ test('csvRow schreibt jede Zelle entschaerft', function () {
     csvRow($h, ['=1+1', 'Probe', '-5'], ';');
     fclose($h);
 
-    $zeile = trim((string) file_get_contents($datei));
+    $zeile = trim((string) sourceCode($datei));
     unlink($datei);
 
     $felder = str_getcsv($zeile, ';');
@@ -82,7 +82,7 @@ test('Kein Exporthandler schreibt am Entschaerfen vorbei', function () {
     $treffer = [];
     foreach ($dateien as $relativ) {
         $pfad  = __DIR__ . '/../../' . $relativ;
-        $zeilen = preg_split('/\r\n|\n|\r/', (string) file_get_contents($pfad)) ?: [];
+        $zeilen = preg_split('/\r\n|\n|\r/', (string) sourceCode($pfad)) ?: [];
 
         foreach ($zeilen as $nr => $zeile) {
             if (strpos($zeile, 'fputcsv') !== false) {
@@ -101,7 +101,7 @@ test('Die Selbstauskunft beginnt keine Zeile mit einem Formelzeichen', function 
     // Entschaerfung haette jedem davon ein Apostroph verpasst, das der
     // Empfaenger beim CSV-Import je nach Programm zu sehen bekommt. Programm-
     // erzeugte Ueberschriften brauchen kein Formelzeichen.
-    $quelle = (string) file_get_contents(__DIR__ . '/../../private/handlers/my_data.php');
+    $quelle = (string) sourceCode(__DIR__ . '/../../private/handlers/my_data.php');
 
     assertSame(0, preg_match_all("/\\['===/", $quelle),
         'Eine Abschnittsueberschrift beginnt wieder mit ===');

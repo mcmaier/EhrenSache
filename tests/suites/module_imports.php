@@ -181,7 +181,7 @@ test('Dynamische Importe mit Literalpfad werden erfasst', function () use ($miJs
     $datei = str_replace('\\', '/', $miJsDir) . '/modules/appointments.js';
     assertTrue(is_file($datei), 'appointments.js fehlt');
 
-    $namen = array_column(miNamedImports((string) file_get_contents($datei), $datei, $miJsDir), 'name');
+    $namen = array_column(miNamedImports((string) sourceCode($datei), $datei, $miJsDir), 'name');
     assertTrue(in_array('openAttendanceForAppointment', $namen, true),
         'Der dynamische Import aus records.js wird nicht erfasst -- die Kopplung Kalender/Anwesenheit bliebe ungeprueft');
 });
@@ -191,7 +191,7 @@ test('Jeder benannte Import existiert im Zielmodul', function () use ($miRoot, $
     $fehler = [];
 
     foreach (miJsFiles($miJsDir) as $datei) {
-        $src = (string) file_get_contents($datei);
+        $src = (string) sourceCode($datei);
         $kurz = ltrim(str_replace(str_replace('\\', '/', $miRoot), '', $datei), '/');
 
         foreach (miNamedImports($src, $datei, $miJsDir) as $imp) {
@@ -200,7 +200,7 @@ test('Jeder benannte Import existiert im Zielmodul', function () use ($miRoot, $
                 continue;
             }
             if (!isset($exportCache[$imp['ziel']])) {
-                $exportCache[$imp['ziel']] = miExports((string) file_get_contents($imp['ziel']));
+                $exportCache[$imp['ziel']] = miExports((string) sourceCode($imp['ziel']));
             }
             if (!isset($exportCache[$imp['ziel']][$imp['name']])) {
                 $zielKurz = ltrim(str_replace(str_replace('\\', '/', $miRoot), '', $imp['ziel']), '/');

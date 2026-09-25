@@ -23,8 +23,8 @@ declare(strict_types=1);
  */
 
 $stRoot = dirname(__DIR__, 2);
-$stHtml = (string) file_get_contents($stRoot . '/public/index.html');
-$stJs   = (string) file_get_contents($stRoot . '/public/js/modules/settings.js');
+$stHtml = (string) sourceCode($stRoot . '/public/index.html');
+$stJs   = (string) sourceCode($stRoot . '/public/js/modules/settings.js');
 
 /** Der Ausschnitt zwischen Tab-Leiste und Ende des Einstellungsbereichs. */
 function stSettingsBereich(string $html): string
@@ -85,7 +85,7 @@ test('Jede Einstellung hat eine Vorgabe im Schema', function () use ($stHtml, $s
     $bereich = stSettingsBereich($stHtml);
     preg_match_all('/data-key="([a-z_]+)"/', $bereich, $keys);
 
-    $sql = (string) file_get_contents($stRoot . '/private/setup/ehrensache_db.sql');
+    $sql = (string) sourceCode($stRoot . '/private/setup/ehrensache_db.sql');
 
     // organization_logo wird beim Installieren gesetzt, nicht als Zeile gepflegt
     $ohneVorgabe = [];
@@ -125,7 +125,7 @@ test('settings.js verdrahtet Tabs, Fehlermarken und die Reihenfolgepruefung', fu
 });
 
 test('ui.js fragt vor dem Verlassen mit offenen Aenderungen', function () use ($stRoot) {
-    $ui = (string) file_get_contents($stRoot . '/public/js/modules/ui.js');
+    $ui = (string) sourceCode($stRoot . '/public/js/modules/ui.js');
 
     assertTrue(str_contains($ui, 'hasUnsavedSettings'),
                'Der Bereichswechsel prueft offene Einstellungen nicht');

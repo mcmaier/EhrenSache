@@ -447,7 +447,7 @@ test('Station: die Aktivitaetsregel steht nur an einer Stelle (OI-27)', function
     // und Anwesenheitslogik membership_dates, der Stempel dagegen nur
     // members.active -- ein Mitglied ausserhalb seines Zeitraums konnte
     // stempeln und tauchte in keiner Auswertung auf.
-    $quelle = (string) file_get_contents(dirname(__DIR__, 2) . '/private/helpers/station.php');
+    $quelle = (string) sourceCode(dirname(__DIR__, 2) . '/private/helpers/station.php');
 
     assertTrue(str_contains($quelle, 'getMemberActivityWhere('),
         'station.php nutzt die gemeinsame Aktivitaetsregel nicht');

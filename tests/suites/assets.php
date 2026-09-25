@@ -22,12 +22,12 @@ declare(strict_types=1);
 $repoRoot = dirname(__DIR__, 2);
 
 test('version.json ist lesbar und enthaelt eine Version', function () use ($repoRoot) {
-    $data = json_decode((string) file_get_contents($repoRoot . '/version.json'), true);
+    $data = json_decode((string) sourceCode($repoRoot . '/version.json'), true);
     assertTrue(is_array($data) && !empty($data['version']), 'version.json ohne Version');
 });
 
 test('Alle Asset-Links mit ?v= tragen die aktuelle Version', function () use ($repoRoot) {
-    $version = json_decode((string) file_get_contents($repoRoot . '/version.json'), true)['version'];
+    $version = json_decode((string) sourceCode($repoRoot . '/version.json'), true)['version'];
 
     $files = [
         '/public/index.html',
@@ -38,7 +38,7 @@ test('Alle Asset-Links mit ?v= tragen die aktuelle Version', function () use ($r
 
     $found = 0;
     foreach ($files as $rel) {
-        $html = (string) file_get_contents($repoRoot . $rel);
+        $html = (string) sourceCode($repoRoot . $rel);
 
         if (!preg_match_all('/(?:href|src)="[^"]*\?v=([^"&]*)"/', $html, $m)) {
             continue;
@@ -58,7 +58,7 @@ test('ES-Module tragen KEINEN Versions-Query', function () use ($repoRoot) {
     // laedt dieselbe Datei ein zweites Mal als eigenstaendiges Modul — mit
     // doppeltem Zustand. Deshalb ist das hier ein Fehler, kein Versaeumnis.
     foreach (['/public/index.html', '/public/login.html', '/public/checkin/index.html'] as $rel) {
-        $html = (string) file_get_contents($repoRoot . $rel);
+        $html = (string) sourceCode($repoRoot . $rel);
 
         preg_match_all('/<script[^>]*type="module"[^>]*>/', $html, $m);
         foreach ($m[0] as $tag) {
@@ -72,7 +72,7 @@ test('ES-Module tragen KEINEN Versions-Query', function () use ($repoRoot) {
 
 test('Die .htaccess laesst CSS und JS revalidieren', function () use ($repoRoot) {
     // Faengt ab, was der Query nicht abdeckt: relativ importierte Module.
-    $htaccess = (string) file_get_contents($repoRoot . '/public/.htaccess');
+    $htaccess = (string) sourceCode($repoRoot . '/public/.htaccess');
 
     assertTrue(
         strpos($htaccess, 'Cache-Control "no-cache, must-revalidate"') !== false,
@@ -94,7 +94,7 @@ test('getAuthHeaders baut keinen Authorization-Header ohne Token', function () u
     // 3d1a30e ihn für die Token-Auth durchreichte und die CSV-Exporte lahmlegte.
     // Ein serverseitiger Test kann das nicht fangen — er sieht nur, was der
     // Client schickt. Deshalb hier, an der Quelle.
-    $js = (string) file_get_contents($repoRoot . '/public/js/modules/api.js');
+    $js = (string) sourceCode($repoRoot . '/public/js/modules/api.js');
 
     assertTrue(
         preg_match('/Bearer \$\{\s*sessionStorage\.getItem/', $js) === 0,
@@ -120,7 +120,7 @@ test('DEBUG wird aus der Umgebung abgeleitet, nicht hart gesetzt', function () u
     ];
 
     foreach ($files as $rel) {
-        $js = (string) file_get_contents($repoRoot . $rel);
+        $js = (string) sourceCode($repoRoot . $rel);
 
         assertTrue(
             preg_match('/const\s+DEBUG\s*=\s*(?:true|false)\s*;/', $js) === 0,
@@ -179,7 +179,7 @@ test('Die Station schaltet im Vereins-LAN nicht auf DEBUG', function () use ($re
     // sie haengt als Kiosk dauerhaft im Vereins-LAN und wird genau so
     // aufgerufen. Waeren die privaten Netze dort eingeschlossen, liefe jedes
     // Stationsgeraet im Publikumsbetrieb mit offener Konsole.
-    $js = (string) file_get_contents($repoRoot . '/public/station/js/app.js');
+    $js = (string) sourceCode($repoRoot . '/public/station/js/app.js');
 
     assertTrue(
         preg_match('/const\s+DEBUG\s*=(.*?)const\s+debug\s*=/s', $js, $m) === 1,
@@ -207,7 +207,7 @@ test('Keine Oberflaeche laedt externe Skripte', function () use ($repoRoot) {
     // Bis OI-17 lud die Check-in-PWA html5-qrcode von unpkg und war hier
     // ausgenommen; seither liegt es unter public/js/vendor/.
     foreach (['/public/index.html', '/public/login.html', '/public/checkin/index.html', '/public/station/index.html'] as $rel) {
-        $html = (string) file_get_contents($repoRoot . $rel);
+        $html = (string) sourceCode($repoRoot . $rel);
 
         preg_match_all('/<script[^>]*\ssrc="((?:https?:)?\/\/[^"]+)"/', $html, $m);
 
@@ -231,7 +231,7 @@ test('Jedes Script-Tag zeigt auf eine vorhandene Datei', function () use ($repoR
 
     $fehlend = [];
     foreach ($files as $rel) {
-        $html = (string) file_get_contents($repoRoot . $rel);
+        $html = (string) sourceCode($repoRoot . $rel);
         $dir  = dirname($repoRoot . $rel);
 
         preg_match_all('/<script[^>]*\ssrc="([^"]+)"/', $html, $m);
@@ -256,7 +256,7 @@ test('Die Station raeumt das Fragment mit replaceState ab', function () use ($re
     // wird der Hash erneut abgeraeumt — die Station laedt sich im Kreis.
     // replaceState loest kein hashchange aus und haengt zudem keinen
     // Verlaufseintrag mit dem Token an.
-    $js = (string) file_get_contents($repoRoot . '/public/station/js/app.js');
+    $js = (string) sourceCode($repoRoot . '/public/station/js/app.js');
 
     assertTrue(
         preg_match('/function clearHash\(\)\s*\{(.*?)\n\}/s', $js, $m) === 1,

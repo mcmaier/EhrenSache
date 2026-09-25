@@ -38,7 +38,7 @@ function frontendFunctionBody(string $js, string $name): string
 }
 
 test('Zeiterfassung: die Mitgliederauswahl laedt ihre Liste selbst', function () use ($repoRoot) {
-    $js = (string) file_get_contents($repoRoot . '/public/js/modules/worktime.js');
+    $js = (string) sourceCode($repoRoot . '/public/js/modules/worktime.js');
 
     // showSection() fuellt den Mitglieder-Cache erst 500 ms nach dem Wechsel im
     // Hintergrund. Wer ihn direkt liest, baut die Auswahl beim ERSTEN Oeffnen
@@ -56,7 +56,7 @@ test('Zeiterfassung: die Mitgliederauswahl laedt ihre Liste selbst', function ()
 });
 
 test('Check-in-PWA: der Verlauf holt nur die eigenen Arbeitszeiten', function () use ($repoRoot) {
-    $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
 
     // Ohne member_id liefert die Ressource einem Admin oder Manager die
     // Sitzungen ALLER Mitglieder (so gewollt fuers Dashboard, siehe
@@ -86,7 +86,7 @@ test('Check-in-PWA: der Verlauf holt nur die eigenen Arbeitszeiten', function ()
 });
 
 test('Check-in-PWA: die Abmeldung raeumt die Ansichten des Mitglieds ab', function () use ($repoRoot) {
-    $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
 
     // Auf einem geteilten Geraet meldet sich nach dem Admin ein Mitglied an.
     // Bleiben Verlauf, Statistik und Anwesenheitsliste gerendert stehen, sieht
@@ -109,7 +109,7 @@ test('Check-in-PWA: die Abmeldung raeumt die Ansichten des Mitglieds ab', functi
 });
 
 test('Check-in-PWA: die Anmeldung haengt keine Ereignisse doppelt an', function () use ($repoRoot) {
-    $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
 
     // Diese fuenf laufen bei JEDER Anmeldung erneut (handleLogin und
     // checkAutoLogin, initWorktime und initAttendanceList ueber loadUserData),
@@ -139,8 +139,8 @@ test('Check-in-PWA: die Stundenform stimmt mit dem Dashboard ueberein', function
     // aus public/js/modules/worktime.js importieren. Die Regel steht deshalb
     // zweimal da — und muss zweimal dieselbe sein, sonst zeigen Dashboard und
     // PWA fuer denselben Bestand verschiedene Stunden.
-    $pwa       = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
-    $dashboard = (string) file_get_contents($repoRoot . '/public/js/modules/worktime.js');
+    $pwa       = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
+    $dashboard = (string) sourceCode($repoRoot . '/public/js/modules/worktime.js');
 
     $inPwa       = frontendFunctionBody($pwa, 'formatMinutes');
     $inDashboard = frontendFunctionBody($dashboard, 'formatMinutes');
@@ -164,7 +164,7 @@ test('Check-in-PWA: die Stundenform stimmt mit dem Dashboard ueberein', function
 });
 
 test('Check-in-PWA: die Statistik fragt den Arbeitszeitblock an', function () use ($repoRoot) {
-    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js   = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
     $body = frontendFunctionBody($js, 'loadStatistics');
 
     // Ohne include=worktime antwortet die Ressource mit worktime: null — der
@@ -177,7 +177,7 @@ test('Check-in-PWA: die Statistik fragt den Arbeitszeitblock an', function () us
 
 test('Check-in-PWA: der Arbeitszeitabruf der Statistik grenzt auf Mitglied und Jahr ein',
 function () use ($repoRoot) {
-    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js   = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
     $body = frontendFunctionBody($js, 'loadStatistics');
 
     $start = strpos($body, "apiCall('work_sessions'");
@@ -200,7 +200,7 @@ function () use ($repoRoot) {
 
 test('Check-in-PWA: die Arbeitszeit-Zusaetze der Statistik haengen am Gate',
 function () use ($repoRoot) {
-    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js   = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
     $body = frontendFunctionBody($js, 'loadStatistics');
 
     // Ein Mitglied ohne Taetigkeitsarten soll dieselbe Statistik bekommen wie
@@ -220,7 +220,7 @@ function () use ($repoRoot) {
 
 test('Check-in-PWA: das Korrekturmodal schickt PUT mit id und POST ohne action',
 function () use ($repoRoot) {
-    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js   = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
     $body = frontendFunctionBody($js, 'saveWorkSession');
 
     // Die Zuordnung muss stimmen, nicht nur das Vorkommen: Waeren die Zweige
@@ -246,7 +246,7 @@ function () use ($repoRoot) {
 
 test('Check-in-PWA: die Terminauswahl der Zeiterfassung ist ein begrenztes Fenster, nicht das Jahr',
 function () use ($repoRoot) {
-    $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
 
     // Ohne Fenster liefert loadWorktimeAppointments() alle Termine des
     // laufenden Jahres -- mit Terminserien laeuft das auf Dutzende Eintraege
@@ -281,7 +281,7 @@ function () use ($repoRoot) {
 
 test('Check-in-PWA: die Terminauswahl der Zeiterfassung gruppiert in optgroups',
 function () use ($repoRoot) {
-    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js   = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
     $body = frontendFunctionBody($js, 'worktimeAppointmentOptionsHtml');
 
     // Ohne Gruppen alternieren vergangene und kommende Termine in der Liste
@@ -316,7 +316,7 @@ function () use ($repoRoot) {
 
 test('Check-in-PWA: die Terminauswahl der Zeiterfassung vergleicht lokale Datumsstrings',
 function () use ($repoRoot) {
-    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js   = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
     $body = frontendFunctionBody($js, 'worktimeAppointmentOptionsHtml');
 
     // new Date(a.date).getTime() waere anfaellig fuer den UTC-Versatz rund um
@@ -339,7 +339,7 @@ function () use ($repoRoot) {
 
 test('Check-in-PWA: der zugeordnete Termin des Korrekturmodals uebersteht einen Taetigkeitswechsel',
 function () use ($repoRoot) {
-    $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
 
     // Zuvor ergaenzte fillWorkSessionAppointments() den zugeordneten
     // Termin nur, wenn sie mit dem session-Objekt aufgerufen wurde -- das
@@ -409,7 +409,7 @@ function () use ($repoRoot) {
 
 test('Check-in-PWA: der Verlauf nennt einen Antrag nicht mehr Zeitkorrektur',
 function () use ($repoRoot) {
-    $js = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
 
     // „Zeitkorrektur" meinte hier die Ankunftszeit. Seit Arbeitszeit-Eintraege
     // in derselben Liste stehen, ist das Wort mit einer Korrektur der
@@ -429,8 +429,8 @@ function () use ($repoRoot) {
 });
 
 test('Check-in-PWA: der Ortsnachweis der Arbeitszeit geht auch ohne Kamera (OI-83)', function () use ($repoRoot) {
-    $html = (string) file_get_contents($repoRoot . '/public/checkin/index.html');
-    $js   = (string) file_get_contents($repoRoot . '/public/checkin/js/app.js');
+    $html = (string) sourceCode($repoRoot . '/public/checkin/index.html');
+    $js   = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
 
     // Die Handeingabe stand frueher nur neben dem laufenden Sucher. Startete
     // die Kamera nicht, gab es in der Arbeitszeit-Ansicht keinen Weg zum Code.
@@ -458,9 +458,9 @@ test('Check-in-PWA: der Ortsnachweis der Arbeitszeit geht auch ohne Kamera (OI-8
 });
 
 test('Zeiterfassung: die Tabelle bricht Datum, Dauer und Status nicht um (OI-10)', function () use ($repoRoot) {
-    $html = (string) file_get_contents($repoRoot . '/public/index.html');
-    $css  = (string) file_get_contents($repoRoot . '/public/css/components/tables.css');
-    $js   = (string) file_get_contents($repoRoot . '/public/js/modules/worktime.js');
+    $html = (string) sourceCode($repoRoot . '/public/index.html');
+    $css  = (string) sourceCode($repoRoot . '/public/css/components/tables.css');
+    $js   = (string) sourceCode($repoRoot . '/public/js/modules/worktime.js');
 
     // Ohne eigene Untergrenze greift die allgemeine von 600px, und der Browser
     // quetscht die acht Spalten, bis ein Datum ueber drei Zeilen laeuft.
@@ -483,7 +483,7 @@ test('Zeiterfassung: die Tabelle bricht Datum, Dauer und Status nicht um (OI-10)
 });
 
 test('Zeiterfassung: die Aktionsspalte bleibt beim waagerechten Rollen sichtbar (OI-10)', function () use ($repoRoot) {
-    $css = (string) file_get_contents($repoRoot . '/public/css/components/tables.css');
+    $css = (string) sourceCode($repoRoot . '/public/css/components/tables.css');
 
     // Seit der Untergrenze von 1400px liegt die Spalte auf einem Notebook
     // ausserhalb des sichtbaren Bereichs -- Freigeben hiesse erst rollen.

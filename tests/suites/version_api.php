@@ -57,6 +57,6 @@ test('version liefert weiterhin die Versionsnummer', function () {
     $res = apiRequest('GET', 'version', ['token' => apiToken('user')]);
     assertStatus(200, $res);
 
-    $erwartet = json_decode((string) file_get_contents(__DIR__ . '/../../version.json'), true)['version'];
+    $erwartet = json_decode((string) sourceCode(__DIR__ . '/../../version.json'), true)['version'];
     assertSame($erwartet, $res['body']['version'] ?? null);
 });

@@ -134,7 +134,7 @@ test('Preflight meldet ein Hindernis, bevor etwas getauscht wird', function () {
     $fehler = updatePreflight($plan, $install, $install . '/private/backup/probe');
 
     assertTrue($fehler !== [] && strpos(implode(' ', $fehler), 'private/neu') !== false, implode(' | ', $fehler));
-    assertSame('ich bin eine Datei', file_get_contents("{$install}/private/neu"));
+    assertSame('ich bin eine Datei', sourceCode("{$install}/private/neu"));
 
     updateRemoveTree($paket);
     updateRemoveTree($install);
@@ -159,14 +159,14 @@ test('Sicherung, Tausch und Rueckweg stellen den Ausgangszustand wieder her', fu
     updateBackup($plan, $install, $backup, ['from' => '1.0.0', 'to' => '1.0.1', 'db_version' => '1.0.0', 'package_root' => $paket]);
     updateApply($plan, $paket, $install);
 
-    assertSame('neu', file_get_contents("{$install}/private/handlers/a.php"));
+    assertSame('neu', sourceCode("{$install}/private/handlers/a.php"));
     assertSame(true, is_file("{$install}/private/handlers/neu.php"));
     assertSame(false, is_file("{$install}/private/handlers/weg.php"));
 
     assertSame([], updateRollback($backup, $install));
 
-    assertSame('alt', file_get_contents("{$install}/private/handlers/a.php"));
-    assertSame('weg', file_get_contents("{$install}/private/handlers/weg.php"));
+    assertSame('alt', sourceCode("{$install}/private/handlers/a.php"));
+    assertSame('weg', sourceCode("{$install}/private/handlers/weg.php"));
     assertSame(false, is_file("{$install}/private/handlers/neu.php"));
 
     updateRemoveTree($paket);

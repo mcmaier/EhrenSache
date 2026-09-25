@@ -304,7 +304,7 @@ test('my_open_items: Antwortform und Zaehlung', function () {
 });
 
 test('my_open_items: ohne Mitglied 200 mit member:false (statisch)', function () {
-    $src = (string) file_get_contents(dirname(__DIR__, 2) . '/private/handlers/my_open_items.php');
+    $src = (string) sourceCode(dirname(__DIR__, 2) . '/private/handlers/my_open_items.php');
     $start = strpos($src, '$authMemberId === null');
     assertTrue($start !== false, 'Handler prueft das fehlende Mitglied nicht');
     $branch = substr($src, $start, (int) strpos($src, 'return;', $start) - $start);

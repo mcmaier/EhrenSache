@@ -25,7 +25,7 @@
  */
 declare(strict_types=1);
 
-$rlSource = (string) file_get_contents(dirname(__DIR__, 2) . '/public/api/api.php');
+$rlSource = (string) sourceCode(dirname(__DIR__, 2) . '/public/api/api.php');
 
 test('Rate-Grenze: der Limiter der API bekommt die Datenbank', function () use ($rlSource) {
     assertTrue(preg_match('/\$rateLimiter\s*=\s*new RateLimiter\(\s*\$db\s*,\s*\$database\s*\)/', $rlSource) === 1,
@@ -43,15 +43,19 @@ test('Rate-Grenze: sie steht hinter dem Datenbankaufbau', function () use ($rlSo
 });
 
 test('Rate-Grenze: sie zaehlt unangemeldete Aufrufe je Adresse', function () use ($rlSource) {
-    $start = strpos($rlSource, '// 6.2 RATE LIMITING');
-    assertTrue($start !== false, 'Abschnitt 6.2 nicht gefunden');
-    $block = substr($rlSource, $start, 3600);
-
-    assertTrue(str_contains($block, '$istAngemeldet'),
-        'Die Unterscheidung angemeldet/unangemeldet fehlt');
-    assertTrue(preg_match('/if\s*\(\s*!\$istAngemeldet\s*\)/', $block) === 1,
+    // Verankert am Code, nicht an der Ueberschrift "// 6.2 RATE LIMITING":
+    // Bis OI-107 las der Test 3600 Zeichen ab diesem Kommentar -- ueberwiegend
+    // Erklaerungstext, in dem $istAngemeldet und REMOTE_ADDR ebenfalls stehen.
+    // Jetzt muss der Zaehlaufruf im Rumpf von if (!$istAngemeldet) liegen.
+    assertTrue(preg_match('/^([ \t]*)if\s*\(\s*!\$istAngemeldet\s*\)\s*\{/m', $rlSource, $m, PREG_OFFSET_CAPTURE) === 1,
         'Die Grenze greift nicht ausdruecklich nur fuer Unangemeldete');
-    assertTrue(str_contains($block, 'REMOTE_ADDR'), 'Gezaehlt wird nicht je Adresse');
+    $start = $m[0][1];
+    $end   = strpos($rlSource, "\n" . $m[1][0] . '}', $start + 1);
+    assertTrue($end !== false, 'Ende des Blocks if (!$istAngemeldet) nicht gefunden');
+    $block = substr($rlSource, $start, $end - $start);
+
+    assertTrue(preg_match('/\$rateLimiter->check\(\s*\$_SERVER\[\'REMOTE_ADDR\'\]/', $block) === 1,
+        'Gezaehlt wird nicht je Adresse, oder nicht innerhalb von if (!$istAngemeldet)');
 });
 
 test('Rate-Grenze: ein unbekannter Token gilt als unangemeldet', function () use ($rlSource) {

@@ -70,7 +70,7 @@ test('Jede Mailer-Instanziierung uebergibt Konfiguration, PDO und Database', fun
             continue;
         }
 
-        $code   = (string) file_get_contents($file->getPathname());
+        $code   = (string) sourceCode($file->getPathname());
         $offset = 0;
 
         while (($pos = strpos($code, 'new Mailer(', $offset)) !== false) {
@@ -166,7 +166,7 @@ test('config_example.php enthaelt keinen Programmcode mehr', function () use ($r
     // Datei nie ueberschrieben wird. Die Mailkonfiguration laedt allein
     // loadMailConfig() in private/helpers/mailer.php, geprueft in den Tests
     // darueber; getMailConfig() gibt es nicht mehr.
-    $php = (string) file_get_contents($repoRoot . '/private/config/config_example.php');
+    $php = (string) sourceCode($repoRoot . '/private/config/config_example.php');
 
     assertTrue(
         strpos($php, 'function getMailConfig(') === false,
@@ -191,7 +191,7 @@ test('Versandte Mails tragen einen To-Header', function () use ($repoRoot) {
     // fehlender To-Header ist ein klassisches Spam-Merkmal — ausgerechnet bei
     // Registrierungs- und Reset-Mails, die ankommen muessen. RFC 5322 verlangt
     // ihn ebenfalls.
-    $code = (string) file_get_contents($repoRoot . '/private/helpers/mailer.php');
+    $code = (string) sourceCode($repoRoot . '/private/helpers/mailer.php');
 
     assertTrue(
         preg_match('/public function send\(.*?fputs\(\$socket, \$body/s', $code, $m) === 1,

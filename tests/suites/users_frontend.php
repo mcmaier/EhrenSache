@@ -40,14 +40,14 @@ function ufFunctionBody(string $quelle, string $signatur): string
 }
 
 test('Benutzerdialog: das Modal hat die Auswahl fuers Anlegen', function () use ($ufRoot) {
-    $html = (string) file_get_contents($ufRoot . '/public/index.html');
+    $html = (string) sourceCode($ufRoot . '/public/index.html');
 
     assertTrue(str_contains($html, 'id="userMemberGroup"'), 'Gruppe des Auswahlfelds fehlt');
     assertTrue(str_contains($html, 'id="user_member"'), 'Auswahlfeld fehlt');
 });
 
 test('saveUser liest beim Anlegen das sichtbare Auswahlfeld', function () use ($ufRoot) {
-    $js   = (string) file_get_contents($ufRoot . '/public/js/modules/users.js');
+    $js   = (string) sourceCode($ufRoot . '/public/js/modules/users.js');
     $body = ufFunctionBody($js, 'export async function saveUser()');
 
     assertTrue(
@@ -58,13 +58,13 @@ test('saveUser liest beim Anlegen das sichtbare Auswahlfeld', function () use ($
 });
 
 test('Passwortfeld: Pflichtkennzeichen und Hinweis je Modus', function () use ($ufRoot) {
-    $html = (string) file_get_contents($ufRoot . '/public/index.html');
+    $html = (string) sourceCode($ufRoot . '/public/index.html');
     assertTrue(str_contains($html, 'id="user_password_label"'), 'Label ohne id — nicht umschaltbar');
     assertTrue(str_contains($html, 'id="user_password_hint"'), 'Hinweis ohne id — nicht umschaltbar');
     assertTrue(str_contains($html, 'id="user_password" minlength="6"'),
                'Die Mindestlaenge des Servers fehlt am Feld');
 
-    $js = (string) file_get_contents($ufRoot . '/public/js/modules/users.js');
+    $js = (string) sourceCode($ufRoot . '/public/js/modules/users.js');
     assertTrue(str_contains($js, "'Passwort *'"), 'Beim Anlegen fehlt das Pflichtkennzeichen');
     assertTrue(str_contains($js, "'Mindestens 6 Zeichen'"), 'Beim Anlegen fehlt der passende Hinweis');
 
@@ -74,7 +74,7 @@ test('Passwortfeld: Pflichtkennzeichen und Hinweis je Modus', function () use ($
 });
 
 test('openUserModal zeigt das Auswahlfeld beim Anlegen', function () use ($ufRoot) {
-    $js   = (string) file_get_contents($ufRoot . '/public/js/modules/users.js');
+    $js   = (string) sourceCode($ufRoot . '/public/js/modules/users.js');
     $body = ufFunctionBody($js, 'export async function openUserModal(userId = null)');
 
     assertTrue(

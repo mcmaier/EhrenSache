@@ -19,6 +19,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/lib/harness.php';
+require_once __DIR__ . '/lib/source.php';
 
 /**
  * Absicherung gegen stille Abbrüche: Ruft eine Suite exit() (z. B. über eine

@@ -1957,7 +1957,7 @@ test('Aufraeumen steht am Ende der Datei', function () {
     // entfernt -- und faellt nicht auf, weil das Aufraeumen davor gruen war.
     // strrpos, nicht strpos: Der gesuchte Text steht auch in diesem Test hier,
     // und das erste Vorkommen waere er selbst.
-    $quelle = (string) file_get_contents(__FILE__);
+    $quelle = (string) sourceCode(__FILE__);
     $marke  = strrpos($quelle, "test('Aufraeumen: die Suite entfernt alles");
     assertTrue($marke !== false, 'Aufraeumtest nicht gefunden');
 

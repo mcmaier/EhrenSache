@@ -32,7 +32,7 @@ function rsfTag(string $html, string $needle): string
 }
 
 test('Einstellungskarte: Frist mit demselben Bereich wie der Server', function () use ($rsRoot) {
-    $html = (string) file_get_contents($rsRoot . '/public/index.html');
+    $html = (string) sourceCode($rsRoot . '/public/index.html');
     $tag  = rsfTag($html, 'data-key="response_deadline_hours"');
 
     assertTrue(str_contains($tag, 'type="number"'), 'Zahlenfeld erwartet');
@@ -43,12 +43,12 @@ test('Einstellungskarte: Frist mit demselben Bereich wie der Server', function (
 test('Die Frist ist fuer Neuinstallationen angelegt', function () use ($rsRoot) {
     // Ein fehlender Schluessel laesst das Zahlenfeld leer, und settings.js
     // blockiert dann das Speichern ALLER Einstellungen.
-    $sql = (string) file_get_contents($rsRoot . '/private/setup/ehrensache_db.sql');
+    $sql = (string) sourceCode($rsRoot . '/private/setup/ehrensache_db.sql');
     assertTrue(str_contains($sql, "('response_deadline_hours',"), 'Schluessel fehlt im Insert-Block');
 });
 
 test('saveAllSettings meldet eine serverseitige Ablehnung nicht als gespeichert', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/settings.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/settings.js');
 
     // Die Funktion wird schon vorher als Event-Listener referenziert
     // ("saveBtn.addEventListener('click', saveAllSettings)") -- die Definition
@@ -64,7 +64,7 @@ test('saveAllSettings meldet eine serverseitige Ablehnung nicht als gespeichert'
 });
 
 test('Terminart-Modal fuehrt die vier Rueckmeldungs-Felder', function () use ($rsRoot) {
-    $html = (string) file_get_contents($rsRoot . '/public/index.html');
+    $html = (string) sourceCode($rsRoot . '/public/index.html');
     foreach (['type_responses_enabled', 'type_responses_names_visible',
               'type_responses_require_excuse', 'type_response_deadline_hours'] as $id) {
         assertTrue(str_contains($html, "id=\"{$id}\""), "Feld {$id} fehlt im Terminart-Modal");
@@ -75,7 +75,7 @@ test('Terminart-Modal fuehrt die vier Rueckmeldungs-Felder', function () use ($r
 });
 
 test('management.js schickt die vier Felder beim Speichern', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/management.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/management.js');
     foreach (['responses_enabled:', 'responses_names_visible:', 'responses_require_excuse:', 'response_deadline_hours:'] as $key) {
         assertTrue(str_contains($js, $key), "{$key} fehlt in saveType()");
     }
@@ -84,7 +84,7 @@ test('management.js schickt die vier Felder beim Speichern', function () use ($r
 test('renderTypeGroupOverview maskiert Terminart-Werte und die Gruppennamen aus loadTypeGroup', function () use ($rsRoot) {
     // Keine CSP (OI-17): type_name/description kommen frei aus der DB, ebenso
     // die Gruppennamen, die loadTypeGroup() nachtraeglich in die Zelle rendert.
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/management.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/management.js');
 
     $start = strpos($js, 'export async function renderTypeGroupOverview');
     assertTrue($start !== false, 'renderTypeGroupOverview fehlt');
@@ -105,7 +105,7 @@ test('renderTypeGroupOverview maskiert Terminart-Werte und die Gruppennamen aus 
 });
 
 test('Terminliste hat die Spalte Rueckmeldung und passende colspan', function () use ($rsRoot) {
-    $html = (string) file_get_contents($rsRoot . '/public/index.html');
+    $html = (string) sourceCode($rsRoot . '/public/index.html');
     assertTrue(str_contains($html, '<th>Rückmeldung</th>'), 'Spaltenkopf fehlt');
 
     // Die urspruengliche Form verbot colspan="4", weil FI-1 die Liste mit der
@@ -115,7 +115,7 @@ test('Terminliste hat die Spalte Rueckmeldung und passende colspan', function ()
     // wieder vier Spalten (Termin, Beschreibung, Rueckmeldung, Aktionen), und
     // der Rueckstand waere jetzt ein colspan="5". Dieselbe Zusicherung dreht
     // sich deshalb ein zweites Mal um.
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/appointments.js');
     assertTrue(str_contains($js, 'colspan="4"'), 'appointments.js ueberspannt nicht vier Spalten');
     assertTrue(!str_contains($js, 'colspan="5"'), 'appointments.js rendert noch fuenf Spalten');
 });
@@ -125,7 +125,7 @@ test('updateTableHeaders() in ui.js fuehrt Rueckmeldung fuer die Terminliste', f
     // ueberschrieb dabei den korrekten Header aus index.html -- ohne
     // 'Rückmeldung' in diesem Array verschieben sich die Spalten gegen die
     // Zeilen aus appointments.js.
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/ui.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/ui.js');
     $start = strpos($js, "id: 'appointmentsTableBody'");
     assertTrue($start !== false, 'appointmentsTableBody fehlt in updateTableHeaders()');
     $end = strpos($js, ']', $start);
@@ -135,11 +135,11 @@ test('updateTableHeaders() in ui.js fuehrt Rueckmeldung fuer die Terminliste', f
 });
 
 test('Rueckmeldungs-Modal ist eingebunden', function () use ($rsRoot) {
-    $html = (string) file_get_contents($rsRoot . '/public/index.html');
+    $html = (string) sourceCode($rsRoot . '/public/index.html');
     assertTrue(str_contains($html, 'id="responsesModal"'), 'Modal fehlt');
     assertTrue(str_contains($html, 'src="./js/modules/responses.js"'), 'Modul nicht geladen');
 
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
     foreach (['openResponsesModal', 'closeResponsesModal', 'setOwnResponse', 'setMemberResponse'] as $fn) {
         assertTrue(str_contains($js, "window.{$fn} = {$fn}"), "{$fn} ist nicht global erreichbar");
     }
@@ -147,7 +147,7 @@ test('Rueckmeldungs-Modal ist eingebunden', function () use ($rsRoot) {
 
 test('responses.js maskiert Namen und Bemerkungen', function () use ($rsRoot) {
     // Keine CSP (OI-17): Bemerkungen sind freie Eingaben von Mitgliedern.
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
     assertTrue(str_contains($js, 'escapeHtml(m.comment'), 'Bemerkung wird nicht maskiert');
     assertTrue(str_contains($js, 'escapeHtml(m.surname'), 'Name wird nicht maskiert');
 });
@@ -157,7 +157,7 @@ test('setMemberResponse sendet die bestehende Bemerkung des Mitglieds mit (W1)',
     // nicht loeschen. Statischer Beleg statt eines echten JS-Testlaufs: die
     // Funktion muss current.members nach der bestehenden Bemerkung durchsuchen
     // und sie in existingComment/comment weiterreichen, statt fest null zu senden.
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
     $start = strpos($js, 'export async function setMemberResponse');
     assertTrue($start !== false, 'setMemberResponse fehlt');
@@ -171,10 +171,10 @@ test('setMemberResponse sendet die bestehende Bemerkung des Mitglieds mit (W1)',
 });
 
 test('responses.js sichert sich gegen ueberholte Antworten ab und laedt die Liste nur einmal neu', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
     assertTrue(str_contains($js, 'loadToken'), 'Kein Zaehler gegen ueberholte reloadResponses()-Antworten');
 
-    $appointmentsJs = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+    $appointmentsJs = (string) sourceCode($rsRoot . '/public/js/modules/appointments.js');
     assertTrue(str_contains($appointmentsJs, 'window.refreshAppointmentsKeepPage'),
         'appointments.js stellt refreshAppointmentsKeepPage nicht global bereit');
     assertTrue(str_contains($js, 'refreshAppointmentsKeepPage'),
@@ -182,12 +182,12 @@ test('responses.js sichert sich gegen ueberholte Antworten ab und laedt die List
 });
 
 test('Terminliste und Modal zeigen die Ampel als Chips', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
     assertTrue(str_contains($js, 'response-chip'), "'response-chip' fehlt -- die Ampel wird nicht mehr als Chip-Gruppe gerendert");
 });
 
 test('Modal setzt Mitglieder-Rueckmeldungen ueber die bestehenden Icon-Aktionen statt eines Auswahlfelds', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
     assertTrue(str_contains($js, 'action-btn btn-icon'),
         "Mitglieder-Aktionen im Modal nutzen nicht die bestehenden Klassen 'action-btn btn-icon'");
     assertTrue(!str_contains($js, '<select class="response-set"'), 'Das fruehere Auswahlfeld response-set ist noch vorhanden');
@@ -195,7 +195,7 @@ test('Modal setzt Mitglieder-Rueckmeldungen ueber die bestehenden Icon-Aktionen 
 });
 
 test('Kalender-Popup zeigt die Rueckmeldung ueber responseChipsHtml und maskiert Termindaten', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/appointments.js');
 
     assertTrue(str_contains($js, "import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS } from './responses.js';"),
         'appointments.js importiert die Ampel-Bausteine nicht aus responses.js');
@@ -211,13 +211,13 @@ test('Kalender-Popup zeigt die Rueckmeldung ueber responseChipsHtml und maskiert
     assertTrue(str_contains($body, 'escapeHtml(apt.description)'), 'apt.description wird im Popup nicht maskiert');
     assertTrue(str_contains($body, 'calendarResponseLineHtml'), 'Popup ruft calendarResponseLineHtml() nicht auf');
 
-    $responses = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $responses = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
     assertTrue(str_contains($responses, 'export function responseChipsHtml'), 'responseChipsHtml ist nicht exportiert');
     assertTrue(str_contains($responses, 'export function responseSummaryTitle'), 'responseSummaryTitle ist nicht exportiert');
 });
 
 test('calendarResponseLineHtml() macht die Ampel nur im festgehaltenen Popup anklickbar', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/appointments.js');
 
     $start = strpos($js, 'function calendarResponseLineHtml');
     assertTrue($start !== false, 'calendarResponseLineHtml fehlt');
@@ -233,7 +233,7 @@ test('calendarResponseLineHtml() macht die Ampel nur im festgehaltenen Popup ank
 });
 
 test('Kalendertag zeigt einen Rueckmeldungs-Punkt und die Hervorhebung fuer offene Rueckmeldungen', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/appointments.js');
 
     assertTrue(str_contains($js, "'calendar-response-dot'"), 'createCalendarDay() setzt keine calendar-response-dot-Klasse');
     assertTrue(str_contains($js, 'calendar-response-dot--open'), 'Hervorhebungs-Variante fuer offene Rueckmeldungen fehlt');
@@ -242,7 +242,7 @@ test('Kalendertag zeigt einen Rueckmeldungs-Punkt und die Hervorhebung fuer offe
     assertTrue(str_contains($js, 'Rückmeldung offen'), 'aria-label-Zusatz fuer offene Rueckmeldung fehlt');
     assertTrue(str_contains($js, 'responseSummaryTitle(a.responses)'), 'aria-label fuehrt responseSummaryTitle je Termin nicht mit');
 
-    $css = (string) file_get_contents($rsRoot . '/public/css/components/calendar.css');
+    $css = (string) sourceCode($rsRoot . '/public/css/components/calendar.css');
     assertTrue(str_contains($css, '.calendar-response-dot'), 'calendar.css enthaelt keine Regel fuer calendar-response-dot');
     assertTrue(str_contains($css, '.calendar-response-dot--open'), 'calendar.css enthaelt keine Regel fuer calendar-response-dot--open');
 });
@@ -251,18 +251,18 @@ test('responses.js nutzt keinen window.prompt mehr fuer die Begruendung', functi
     // Ersetzt durch den eigenen Begruendungsdialog (showReasonDialog) --
     // window.prompt() wird in einer installierten PWA teils unterdrueckt und
     // passt sich nicht der Optik der Oberflaeche an.
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
     assertTrue(!str_contains($js, 'window.prompt'), 'responses.js ruft noch window.prompt() auf');
     assertTrue(!preg_match('/(?<!window\\.)\\bprompt\\(/', $js), 'responses.js ruft noch prompt() auf');
     assertTrue(str_contains($js, 'showReasonDialog'), 'setMemberResponse nutzt showReasonDialog nicht');
 });
 
 test('ui.js stellt showReasonDialog bereit und index.html fuehrt das zugehoerige Modal', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/ui.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/ui.js');
     assertTrue(str_contains($js, 'export async function showReasonDialog') || str_contains($js, 'export function showReasonDialog'),
         'ui.js exportiert showReasonDialog nicht');
 
-    $html = (string) file_get_contents($rsRoot . '/public/index.html');
+    $html = (string) sourceCode($rsRoot . '/public/index.html');
     assertTrue(str_contains($html, 'id="reasonModal"'), 'reasonModal fehlt in index.html');
 });
 
@@ -270,7 +270,7 @@ test('showAppointmentPopup klammert gegen documentElement.clientWidth/clientHeig
     // window.innerWidth/innerHeight schliessen die Breite eines sichtbaren
     // Scrollbalkens mit ein -- das Popup lief dort unter dem Scrollbalken
     // hinaus statt daneben umzuklappen.
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/appointments.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/appointments.js');
 
     $start = strpos($js, 'function showAppointmentPopup');
     assertTrue($start !== false, 'showAppointmentPopup fehlt');
@@ -285,7 +285,7 @@ test('showAppointmentPopup klammert gegen documentElement.clientWidth/clientHeig
 });
 
 test('deadlineText() erklaert vergangene Termine als abgeschlossen', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
     $start = strpos($js, 'function deadlineText');
     assertTrue($start !== false, 'deadlineText fehlt');
@@ -298,7 +298,7 @@ test('deadlineText() erklaert vergangene Termine als abgeschlossen', function ()
 });
 
 test('ownResponseHtml zeigt bei begonnenen Terminen die kompakte, nur lesende Zeile', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
     $start = strpos($js, 'function ownResponseHtml');
     assertTrue($start !== false, 'ownResponseHtml fehlt');
@@ -325,7 +325,7 @@ test('ownResponseHtml zeigt bei begonnenen Terminen die kompakte, nur lesende Ze
 });
 
 test('namesListHtml gliedert Antworten anderer Mitglieder nach Gruppe als Chips', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
     $start = strpos($js, 'function namesListHtml');
     assertTrue($start !== false, 'namesListHtml fehlt');
@@ -340,17 +340,17 @@ test('namesListHtml gliedert Antworten anderer Mitglieder nach Gruppe als Chips'
     assertTrue(str_contains($body, 'Ohne Gruppe'), "Mitglieder ohne Gruppe fehlt 'Ohne Gruppe'");
     assertTrue(str_contains($body, 'responseChipsHtml('), 'Gruppenkopf nutzt responseChipsHtml() nicht fuer die Ampel-Zeile');
 
-    $css = (string) file_get_contents($rsRoot . '/public/css/components/badges.css');
+    $css = (string) sourceCode($rsRoot . '/public/css/components/badges.css');
     foreach (['--yes', '--maybe', '--no', '--open'] as $suffix) {
         assertTrue(str_contains($css, "response-name-chip{$suffix}"), "badges.css fuehrt response-name-chip{$suffix} nicht");
     }
 
-    $modalsCss = (string) file_get_contents($rsRoot . '/public/css/components/modals.css');
+    $modalsCss = (string) sourceCode($rsRoot . '/public/css/components/modals.css');
     assertTrue(str_contains($modalsCss, 'response-names-grouped'), 'modals.css fuehrt das Layout response-names-grouped nicht');
 });
 
 test('OI-63: Das Modal oeffnet gesperrt', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
     $start = strpos($js, 'export async function openResponsesModal');
     assertTrue($start !== false, 'openResponsesModal fehlt');
@@ -363,7 +363,7 @@ test('OI-63: Das Modal oeffnet gesperrt', function () use ($rsRoot) {
 });
 
 test('OI-63: Es gibt einen Sperr-Umschalter fuer den ganzen Dialog', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
     assertTrue(str_contains($js, 'export function toggleResponsesLock'), 'toggleResponsesLock fehlt');
     assertTrue(str_contains($js, 'window.toggleResponsesLock = toggleResponsesLock'),
@@ -379,12 +379,12 @@ test('OI-63: Es gibt einen Sperr-Umschalter fuer den ganzen Dialog', function ()
     assertTrue(str_contains($body, 'aria-pressed='), 'aria-pressed fehlt am Umschalter');
     assertTrue(str_contains($body, '🔒') && str_contains($body, '🔓'), 'Beide Zustaende (gesperrt/entsperrt) fehlen als Symbol');
 
-    $css = (string) file_get_contents($rsRoot . '/public/css/components/buttons.css');
+    $css = (string) sourceCode($rsRoot . '/public/css/components/buttons.css');
     assertTrue(str_contains($css, '.response-lock-toggle'), 'buttons.css fuehrt .response-lock-toggle nicht');
 });
 
 test('OI-63: Zeilen anderer Mitglieder sind gesperrt bedienungsunfaehig, die eigene Zeile bleibt frei', function () use ($rsRoot) {
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
     assertTrue(str_contains($js, 'function isOwnMember'), 'isOwnMember fehlt -- eigene Zeile des Verwalters muss erkannt werden');
     assertTrue(str_contains($js, 'currentUser?.member_id'), 'isOwnMember prueft nicht gegen currentUser.member_id');
@@ -400,7 +400,7 @@ test('OI-63: Zeilen anderer Mitglieder sind gesperrt bedienungsunfaehig, die eig
     assertTrue(str_contains($body, '${disabledAttr}'), 'Die Aktionsknoepfe tragen das disabled-Attribut nicht bedingt');
     assertTrue(str_contains($body, 'Zum Ändern zuerst entsperren'), 'Der erklaerende Titel fuer gesperrte Knoepfe fehlt');
 
-    $css = (string) file_get_contents($rsRoot . '/public/css/components/buttons.css');
+    $css = (string) sourceCode($rsRoot . '/public/css/components/buttons.css');
     assertTrue(str_contains($css, '.response-action:disabled'), 'buttons.css stellt gesperrte Aktionsknoepfe nicht sichtbar anders dar');
 });
 
@@ -408,7 +408,7 @@ test('OI-63: setMemberResponse verweigert fremde Aenderungen im gesperrten Zusta
     // Der Schutzschritt darf nicht nur im disabled-Attribut stecken -- ein
     // direkter Aufruf von setMemberResponse() (Konsole, veraltetes DOM nach
     // einem Re-Render) muss ebenfalls verweigert werden.
-    $js = (string) file_get_contents($rsRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
     $start = strpos($js, 'export async function setMemberResponse');
     assertTrue($start !== false, 'setMemberResponse fehlt');

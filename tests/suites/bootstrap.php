@@ -65,7 +65,7 @@ test('Database liefert den Tabellennamen mit Praefix, ohne zu verbinden', functi
 });
 
 test('Bootstrap mit der Vorlage von 1.5.1: BASE_URL wird ermittelt, nicht aus dem Ausdruck gelesen', function () {
-    $werte = bootstrapProbe((string) file_get_contents(__DIR__ . '/../fixtures/config_legacy_1_5_1.php'));
+    $werte = bootstrapProbe((string) sourceCode(__DIR__ . '/../fixtures/config_legacy_1_5_1.php'));
 
     assertTrue(strpos($werte['base_url'], 'getBaseUrl') === false, 'BASE_URL: ' . $werte['base_url']);
     assertTrue(strpos($werte['base_url'], 'http') === 0, 'BASE_URL: ' . $werte['base_url']);
@@ -106,7 +106,7 @@ test('Bootstrap: ein unsauberer demo_mode faellt zur sicheren Seite', function (
 test('Bootstrap: ein aktives DEMO_MODE in der alten Form bleibt an', function () {
     // Die Zeile steht hinter der Klasse. Die Datei wird nie ausgefuehrt, nur
     // gelesen -- die Position spielt fuer den Leser keine Rolle.
-    $werte = bootstrapProbe((string) file_get_contents(__DIR__ . '/../fixtures/config_legacy_1_5_1.php')
+    $werte = bootstrapProbe((string) sourceCode(__DIR__ . '/../fixtures/config_legacy_1_5_1.php')
         . "\ndefine('DEMO_MODE', true);\n");
 
     assertSame(true, $werte['demo_active']);

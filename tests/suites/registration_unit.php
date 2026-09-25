@@ -58,7 +58,7 @@ test('Der Mailversand der Registrierung haengt in einem eigenen try', function (
     // Zwischen commit() und der Antwort darf nichts mehr liegen, das den
     // Vorgang scheitern laesst. Geprueft wird die Klammer: nach dem commit
     // folgt ein try, und es faengt Throwable — Error ist keine Exception.
-    $code = (string) file_get_contents($repoRoot . '/private/handlers/user_mailer.php');
+    $code = (string) sourceCode($repoRoot . '/private/handlers/user_mailer.php');
 
     assertTrue(
         preg_match('/\$db->commit\(\);\s*(?:\/\/[^\n]*\n\s*)*.*?try\s*\{/s', $code) === 1,

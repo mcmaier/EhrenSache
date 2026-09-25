@@ -164,7 +164,7 @@ function cspPolicyFor(string $root, array $loc, string $label): array
     assertTrue(is_file($path), "{$label}: {$loc['htaccess']} fehlt");
 
     $headers = array_values(array_filter(
-        cspHeadersIn((string) file_get_contents($path)),
+        cspHeadersIn((string) sourceCode($path)),
         static fn (array $h): bool => $h['files'] === $loc['files']
     ));
     assertSame(1, count($headers), "{$label}: erwartet genau eine CSP-Kopfzeile in {$loc['htaccess']}"
@@ -186,7 +186,7 @@ test('CSP Etappe 1: keine Inline-Handler in HTML und JS-Templates', function () 
     $fehler = [];
     foreach ($cspSurfaces as $label => $files) {
         foreach (array_merge($files['html'], $files['js']) as $rel) {
-            $src = (string) file_get_contents($cspRoot . $rel);
+            $src = (string) sourceCode($cspRoot . $rel);
             if (str_ends_with($rel, '.html')) {
                 $src = cspStripHtmlComments($src);
             }
@@ -206,7 +206,7 @@ test('CSP Etappe 1: kein setAttribute mit on…-Handler', function () use ($cspR
     $fehler = [];
     foreach ($cspSurfaces as $files) {
         foreach ($files['js'] as $rel) {
-            $hits = cspCodeLinesMatching((string) file_get_contents($cspRoot . $rel), $pattern);
+            $hits = cspCodeLinesMatching((string) sourceCode($cspRoot . $rel), $pattern);
             if ($hits !== []) {
                 $fehler[] = cspFormatHits($rel, $hits);
             }
@@ -220,7 +220,7 @@ test('CSP Etappe 1: keine Inline-Skripte', function () use ($cspRoot, $cspSurfac
     $fehler = [];
     foreach ($cspSurfaces as $files) {
         foreach ($files['html'] as $rel) {
-            $html = cspStripHtmlComments((string) file_get_contents($cspRoot . $rel));
+            $html = cspStripHtmlComments((string) sourceCode($cspRoot . $rel));
             preg_match_all('/<script\b[^>]*>/i', $html, $m);
             foreach ($m[0] as $tag) {
                 // JSON-Daten waeren erlaubt, ausfuehrbarer Code nur mit src.
@@ -240,7 +240,7 @@ test('CSP Etappe 1: keine javascript:-URLs', function () use ($cspRoot, $cspSurf
     $fehler = [];
     foreach ($cspSurfaces as $files) {
         foreach (array_merge($files['html'], $files['js']) as $rel) {
-            $src = (string) file_get_contents($cspRoot . $rel);
+            $src = (string) sourceCode($cspRoot . $rel);
             if (str_ends_with($rel, '.html')) {
                 $src = cspStripHtmlComments($src);
             }
@@ -293,7 +293,7 @@ test('CSP Etappe 1: jede Oberflaeche hat genau eine scharfe Richtlinie', functio
 test('CSP Etappe 1: die Richtlinie der Anmeldung gilt nicht fuer das Dashboard', function () use ($cspRoot) {
     // index.html traegt noch ueber hundert Inline-Handler (Etappe 2). Eine CSP
     // auf Verzeichnisebene in public/.htaccess wuerde sie still lahmlegen.
-    $headers = cspHeadersIn((string) file_get_contents($cspRoot . '/public/.htaccess'));
+    $headers = cspHeadersIn((string) sourceCode($cspRoot . '/public/.htaccess'));
     foreach ($headers as $h) {
         assertSame('login.html', $h['files'],
             'public/.htaccess setzt eine CSP ausserhalb von <Files "login.html"> — das trifft auch das Dashboard');

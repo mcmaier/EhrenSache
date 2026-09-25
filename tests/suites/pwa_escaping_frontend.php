@@ -74,7 +74,7 @@ foreach ($peDateien as $datei) {
 }
 
 test('Terminfarben gehen nur als Hexwert in ein style-Attribut', function () use ($peRoot) {
-    $js = (string) file_get_contents($peRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($peRoot . '/public/checkin/js/app.js');
 
     foreach (['getTypeColor', 'activityDot'] as $funktion) {
         $start = strpos($js, "function {$funktion}(");

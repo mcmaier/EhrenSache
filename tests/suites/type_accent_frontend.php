@@ -24,7 +24,7 @@ function taFile(string $root, string $rel): string
     $path = $root . '/' . $rel;
     assertTrue(is_file($path), "{$rel} fehlt");
 
-    return (string) file_get_contents($path);
+    return (string) sourceCode($path);
 }
 
 /** Rumpf einer JS-Funktion ab ihrer Signatur bis zur schliessenden Klammer in Spalte 0. */
@@ -206,7 +206,7 @@ test('Die Hex-Whitelist steht nur noch an den bekannten Stellen', function () us
         if (basename($pfad) === 'utils.js') {
             continue;
         }
-        if (preg_match('/\/\^#\[0-9a-f\]/i', (string) file_get_contents($pfad))) {
+        if (preg_match('/\/\^#\[0-9a-f\]/i', (string) sourceCode($pfad))) {
             $kopien[] = 'public/js/modules/' . basename($pfad);
         }
     }
