@@ -570,7 +570,9 @@
         ⚠️ Verbindung prüfen!
     </div>
 
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- html5-qrcode 2.3.8 liegt im Paket statt auf einem CDN: script-src 'self' (OI-17)
+         und Vereinsnetze ohne Internetzugang -->
+    <script src="../js/vendor/html5-qrcode.min.js"></script>
     <script src="js/app.js?v=1.16.0"></script>
 </body>
 </html>

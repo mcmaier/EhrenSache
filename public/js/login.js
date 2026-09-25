@@ -195,9 +195,11 @@ document.getElementById('forgotPasswordLink').addEventListener('click', (e) => {
     document.getElementById('forgotPasswordModal').classList.add('active');
 });
 
-window.closeForgotPasswordModal = function() {
+// Per addEventListener statt onclick im Markup: login.html steht unter einer
+// CSP ohne 'unsafe-inline' (OI-17), ein Inline-Handler fiele dort still aus.
+document.getElementById('forgotPasswordClose').addEventListener('click', () => {
     document.getElementById('forgotPasswordModal').classList.remove('active');
-};
+});
 
 document.getElementById('forgotPasswordForm').addEventListener('submit', async (e) => {
     e.preventDefault();
