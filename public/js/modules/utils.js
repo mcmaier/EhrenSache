@@ -191,9 +191,11 @@ const FOCUSABLE_SELECTOR = [
  * was man sieht. Das Kalender-Popup haengt an document.body und steht damit
  * hinter allem anderen; ohne Fang fuehrt Tab vom Kalendertag nicht hinein.
  *
- * Die Liste der bedienbaren Elemente wird bei jedem Tab neu gelesen: Was im
- * Dialog steht, haengt an Rolle und Zustand und kann sich waehrenddessen
- * aendern.
+ * Die Liste der bedienbaren Elemente wird bei jedem Tab neu gelesen, nicht
+ * einmal beim Oeffnen. Fuer das Kalender-Popup aendert sich zur Laufzeit nichts
+ * -- sein Inhalt steht beim Bauen des Markups fest --, aber das Neulesen kostet
+ * nichts und macht den Helfer fuer Aufrufer belastbar, deren Inhalt sich
+ * aendert.
  *
  * Das Element bekommt tabindex="-1" und behaelt es: Die Freigabe nimmt das
  * Attribut nicht zurueck. Fuer das Kalender-Popup belanglos, weil es bei jedem

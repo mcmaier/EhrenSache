@@ -181,9 +181,13 @@ test('Der Fokus wandert beim Oeffnen in den Dialog', function () use ($ckRoot) {
 test('Die Liste der bedienbaren Elemente wird bei jedem Tab neu gelesen', function () use ($ckRoot) {
     [$body] = ckTrapFocus($ckRoot);
 
-    // Die Rueckmeldezeile erscheint je nach Rolle, die Knopfreihe je nach
-    // appointmentHasStarted() -- eine einmal beim Oeffnen gelesene Liste waere
-    // nach dem ersten Neuzeichnen falsch.
+    // Neu gelesen, nicht einmal beim Oeffnen. Die urspruengliche Begruendung
+    // der Spec -- die Rueckmeldezeile haenge an der Rolle, die Knopfreihe an
+    // appointmentHasStarted() -- traegt zur Laufzeit NICHT: Beides steht beim
+    // Bauen des Markups fest, und jedes Bedienelement ruft .remove() statt neu
+    // zu zeichnen (Nachtrag vom 2026-09-25 in der Spec). Die Zusicherung bleibt
+    // trotzdem richtig -- das Neulesen kostet nichts und macht den Helfer fuer
+    // Aufrufer belastbar, deren Inhalt sich aendert.
     $liste = ckListenFunktion($body);
 
     // Eine Pfeilfunktion allein genuegt dafuer NICHT: Man kann sie einmal rufen
