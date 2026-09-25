@@ -62,8 +62,14 @@ einmal benutzt.
 
 Die Liste der bedienbaren Elemente ist der übliche Selektor (`button`, `a[href]`, `input`,
 `select`, `textarea`, `[tabindex]:not([tabindex="-1"])`), gefiltert auf sichtbare. **Sie wird bei
-jedem Tab neu gelesen**, nicht einmal beim Öffnen: Die Rückmeldezeile erscheint je nach Rolle und
-Termin, und die Knopfreihe hängt an `appointmentHasStarted()`.
+jedem Tab neu gelesen**, nicht einmal beim Öffnen.
+
+*Nachtrag 2026-09-25 (Review zu Task 1):* Die ursprüngliche Begründung — die Rückmeldezeile
+erscheine je nach Rolle, die Knopfreihe hänge an `appointmentHasStarted()` — **trägt zur Laufzeit
+nicht.** Beides wird einmal beim Bauen des Markups entschieden, und jedes Bedienelement im
+festgehaltenen Popup ruft `.remove()` darauf, statt es neu zu zeichnen. Das Neulesen bleibt
+trotzdem richtig: Es kostet nichts und macht den Helfer für künftige Aufrufer belastbar, deren
+Inhalt sich ändert. Nur die Begründung sollte man nicht weitertragen.
 
 ### 2. Der Kalendertag mit Terminen (`createCalendarDay()`, Belegt-Zweig)
 
