@@ -7,6 +7,25 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unveröffentlicht]
+
+### Geändert
+- **Die Spalte „Terminart“ entfällt — die Terminart steht jetzt als farbiger Streifen am linken
+  Rand.** In der Terminliste und in der Anwesenheitsliste fällt damit eine ganze Tabellenspalte
+  weg; ihr Inhalt geht nicht verloren, sondern rückt in die Zeile unter den Termin
+  („Auftritt · 26.9.2026, 19:00“), die Farbe sitzt als Streifen an der ersten Zelle. So macht es
+  die Check-in-App seit jeher. Im Kalender-Popup wird dadurch jeder Termin ein eigener Block —
+  bei mehreren Terminen an einem Tag ist damit erkennbar, welche Knöpfe zu welchem gehören.
+  Termine ohne Terminart bekommen einheitlich einen grauen Streifen statt bisher drei
+  verschiedener Farben. Sortieren nach Terminart entfällt mit der Spalte; der Filter „Terminart“
+  über der Liste bleibt und deckt den Bedarf ab.
+- **Die Rückmeldezeile im festgehaltenen Kalender-Popup ist als anklickbar erkennbar.** Sie trägt
+  dort eine gepunktete Unterlinie und Linkfarbe — bisher verriet nur der Mauszeiger, dass sie zu
+  den Rückmeldungen führt, und auf dem Telefon gibt es keinen. Im Popup beim Überfahren bleibt
+  sie unverändert schlichter Text.
+
+---
+
 ## [1.15.0] – 2026-09-24
 
 ### Neu

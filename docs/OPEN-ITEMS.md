@@ -21,10 +21,10 @@ oder noch nicht gebaut.
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
 *mittel* = sollte vor der Freigabe an Vereine gelöst sein · *niedrig* = Verbesserung
 
-**Nächste Umsetzung (Stand 2026-09-24, nach 1.15.0):**
+**Nächste Umsetzung (Stand 2026-09-25, nach 1.15.0):**
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)
-(Terminfarbe als Randakzent) liegt bei der Sitzung „Kalender-Termine und Serien“ und wartet auf
-vier Gestaltungsentscheidungen des Nutzers. Entschieden, aber nicht gebaut ist
+(Terminfarbe als Randakzent) ist am 2026-09-25 umgesetzt und wartet nur noch auf eine Version;
+aus dem Umbau kamen OI-104 bis OI-107 als eigene Punkte. Entschieden, aber nicht gebaut ist
 [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe). Offen mit
 Priorität *mittel*: OI-67, OI-96, OI-98, OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23.
 
@@ -3899,6 +3899,27 @@ der neue Chip über der Gruppentabelle. Nach einem Neuladen stimmt alles.
 ---
 
 ### OI-94 · Terminfarbe als Randakzent statt Badge (Terminliste, Anwesenheit, Kalender-Popup)
+**Erledigt am 2026-09-25** — Branch `feat/oi-94-randakzent`, Spec
+`docs/superpowers/specs/2026-09-24-terminfarbe-randakzent-design.md`. Alle drei Ansichten
+umgebaut: Terminliste, beide Anwesenheitslisten (Erfassungsliste und Mitgliedsansicht) und das
+Kalender-Popup, in dem jeder Termin ein eigener Block mit Farbstreifen wurde. Die Spalte
+„Terminart“ ist in der Terminliste und in der Anwesenheitsliste entfallen, der Name steht in der
+Unterzeile; die Liste **eines** Termins hatte nie eine solche Spalte und blieb unverändert. Die
+Farbprüfung liegt als `safeTypeColor()` in `utils.js` — zusammengezogen aus **vier** Kopien, nicht
+drei, und dabei enger gefasst: Nur die CSS-gültigen Hexlängen 3, 4, 6 und 8 passieren, das alte
+`{3,8}` ließ auch 5 und 7 durch, die der Browser wortlos verwirft. Termine ohne Terminart tragen
+einheitlich `--type-color-none`. Die Entscheidung zur Rückmeldezeile löst eine frühere aus FI-1 ab
+und steht deshalb in `docs/project_history.md`, Kapitel 12 — nicht nur in der Spec. Tests:
+`type_accent_frontend` (neu), Gesamtlauf 1409 grün.
+
+**Nicht dazugehörig, beim Umbau aufgefallen:**
+[OI-104](#oi-104--die-spaltenzahl-der-anwesenheitsliste-steht-an-sechs-stellen),
+[OI-105](#oi-105--dieselbe-spalte-heißt-im-betrieb-zweimal-anders),
+[OI-106](#oi-106--das-formularfeld-für-die-terminart-beim-erfassen-ist-toter-code),
+[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt).
+
+<details><summary>Ursprünglicher Eintrag</summary>
+
 **Priorität:** niedrig · aufgenommen am 2026-09-23 (Idee des Nutzers)
 
 Die PWA zeigt die Terminart als farbigen linken Rand der Karte (`response-card`,
@@ -3955,6 +3976,8 @@ Rand — mehrere Termine an einem Tag gruppieren sich dadurch sichtbar.
   abgeschlossen, OI-94 kann auf dem heutigen `dev` aufsetzen.
 
 **Nicht sicherheitsrelevant.**
+
+</details>
 
 ---
 
@@ -4128,3 +4151,134 @@ Für Schreibpfade entscheiden, ob sich der Aufwand lohnt — Kandidaten zuerst d
 anbinden (`totp_checkin`, `station`), weil ein falsches Format dort erst beim Anwender auffällt.
 
 **Nicht sicherheitsrelevant.**
+
+---
+
+### OI-104 · Die Spaltenzahl der Anwesenheitsliste steht an sechs Stellen
+**Priorität:** niedrig · aufgenommen am 2026-09-25 (beim Umbau für
+[OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
+
+Wie viele Spalten die Anwesenheitsliste hat, ist an sechs Stellen festgehalten:
+
+| Wo | Was |
+|---|---|
+| [index.html](../public/index.html) ~Zeile 1016 | der Kopf im Markup |
+| [ui.js](../public/js/modules/ui.js), `updateTableHeaders()` | schreibt denselben Kopf beim Sprachaufbau neu |
+| [records.js](../public/js/modules/records.js), `updateTableHeader()` | **vier** Zweige: `member`, `appointment`, `all` für Verwalter, `all` für einfache Nutzer |
+| `records.js`, `ATTENDANCE_LIST_COLSPAN`, `RECORDS_LIST_COLSPAN`, `MEMBER_ATTENDANCE_COLSPAN` | die Breite der Leerzeile je Modus |
+
+`updateTableHeader()` überschreibt bei jedem Moduswechsel, was `index.html` und `ui.js` gesetzt
+haben — wer nur dort eine Spalte streicht, bekommt sie im Betrieb zurück. Genau das ist bei OI-94
+passiert und nur durch einen Test aufgefallen.
+
+**Was OI-94 getan hat:** die drei `colspan`-Zahlen zu benannten Konstanten mit Kommentar gemacht
+und an beiden Kopfstellen einen Warnhinweis hinterlassen. Das mildert den Fund, löst ihn nicht:
+Es sind weiterhin sechs Stellen, die von Hand übereinstimmen müssen.
+
+**Die saubere Fassung** wäre eine Titel-Tabelle je Modus — ein Array von Überschriften, aus dem
+sich der Kopf rendert und `colspan` als dessen `.length` ergibt. Dann gäbe es **eine** Stelle
+statt sechs, und die spröde Regex-Zerlegung `taRecordHeads()` in
+`tests/suites/type_accent_frontend.php`, die heute die `thead.innerHTML`-Zeichenketten der vier
+Zweige auseinandernimmt, könnte ersatzlos entfallen.
+
+**Warum nicht in OI-94:** ein eigener Umbau mit Regressionsrisiko über vier Modi und zwei Rollen.
+OI-94 war ein Gestaltungsvorhaben; es hätte die Prüfung seiner eigenen Änderung mit der Prüfung
+eines fremden Umbaus vermischt.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-105 · Dieselbe Spalte heißt im Betrieb zweimal anders
+**Priorität:** niedrig · aufgenommen am 2026-09-25 (beim Umbau für
+[OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
+
+Die Ankunftsspalte der Anwesenheitsliste trägt zwei verschiedene Überschriften:
+
+- [index.html](../public/index.html) ~Zeile 1018 und `updateTableHeaders()` in
+  [ui.js](../public/js/modules/ui.js) schreiben **„Ankunftszeit“**;
+- alle vier Zweige von `updateTableHeader()` in [records.js](../public/js/modules/records.js)
+  (~Zeile 2010) schreiben **„Ankunft“**.
+
+**Folge:** Die Liste startet mit „Ankunftszeit“ und wechselt beim ersten Moduswechsel — etwa beim
+Sprung in die Liste eines Termins — stillschweigend auf „Ankunft“. Vorbestehend, nicht durch
+OI-94 entstanden; dort nur sichtbar geworden, weil beide Kopfstellen nebeneinander zu ändern
+waren.
+
+**Zu tun:** Eine Schreibweise festlegen und an beiden Stellen führen. Hängt sachlich an
+[OI-104](#oi-104--die-spaltenzahl-der-anwesenheitsliste-steht-an-sechs-stellen) — mit einer
+Titel-Tabelle je Modus kann der Fall gar nicht mehr auftreten.
+
+**Warum nicht in OI-94:** Der Wortlaut der Ankunftsspalte hat mit der Terminart nichts zu tun.
+Eine Umbenennung im selben Commit hätte eine Textänderung in ein Gestaltungsvorhaben geschmuggelt.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-106 · Das Formularfeld für die Terminart beim Erfassen ist toter Code
+**Priorität:** niedrig · aufgenommen am 2026-09-25 (beim Umbau für
+[OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)) ·
+**Entscheidung des Nutzers vom 2026-09-25:** bewusst nicht in OI-94 geklärt
+
+`updateAppointmentTypeDisplay()` ([records.js](../public/js/modules/records.js) ~Zeile 1386) setzt
+das Schildchen der Terminart in ein Feld des Erfassungsdialogs. Die Funktion hat **keinen lebenden
+Aufrufer**: Der einzige steht seit `1468a8a` (2025-12-17) auskommentiert (`records.js` ~Zeile 1196).
+Der zugehörige Container `#recordAppointmentTypeGroup` ([index.html](../public/index.html)
+~Zeile 1705) steht auf `display: none` und wird nur noch einmal ausgeblendet (`records.js`
+~Zeile 1157), nie eingeschaltet. Im Browser ist an dieser Stelle nichts zu sehen — geprüft am
+2026-09-25.
+
+**Vermutlicher Grund:** Das Auswahlfeld darüber nennt die Terminart bereits selbst
+(„Probe (18.12.2026 - 20:00) [Gesamtprobe]“). Das Feld war damit doppelt.
+
+**Folge für OI-94:** Die Spec entschied, `createAppointmentTypeBadge()` **aufzuteilen statt zu
+ersetzen** — die Listen bekommen `appointmentTypeAccent()`, das Schildchen bleibt für das
+Formularfeld erhalten. Diese Entscheidung beruht auf einem Aufrufer, der nicht läuft: Nach OI-94
+hat `createAppointmentTypeBadge()` faktisch **null** lebende Aufrufer.
+
+**Zu klären:** Entweder entfallen Funktion, auskommentierter Aufruf und Markup zusammen — dann
+verschwindet das letzte Schildchen der Terminart aus dem Dashboard —, oder das Feld wird
+wiederbelebt, dann braucht es einen Grund, warum die Angabe neben dem Auswahlfeld nochmals
+erscheinen soll.
+
+**Warum nicht in OI-94:** ausdrücklich so entschieden. OI-94 sollte die Gestaltung ändern, nicht
+nebenbei einen Dialog entkernen; und ob ein seit neun Monaten stillgelegtes Feld weg soll oder
+zurückkommt, ist eine Produktfrage, keine Aufräumarbeit.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-107 · Zusicherungen, die ein Kommentar erfüllt
+**Priorität:** mittel · aufgenommen am 2026-09-25 (beim Umbau für
+[OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
+
+Beim Umbau fiel auf: Eine Zusicherung der Form `str_contains($body, 'safeTypeColor(')` findet den
+Funktionsnamen **auch im Kommentar darüber**. Dadurch blieb die gesamte Suite grün, obwohl die
+Farbprüfung der Terminliste ersatzlos entfernt war — der erklärende Kommentar allein hielt den
+Test am Leben.
+
+**Warum das mehr ist als ein Testfehler:** Ohne Inhaltssicherheitsrichtlinie
+([OI-17](#oi-17--keine-content-security-policy)) ist `safeTypeColor()` die einzige Schranke
+zwischen dem Farbfeld einer Terminart und dem `style`-Attribut im Markup. Ein Wächter, der einen
+Namen statt einer Wirkung prüft, sichert genau dann nichts, wenn es darauf ankommt.
+
+**In OI-94 behoben** für die betroffenen Stellen: Geprüft wird jetzt die **Herkunft des Wertes**
+(dass die gesetzte Variable aus dem Rückgabewert der Prüffunktion stammt), nicht das Vorkommen
+eines Namens im Dateitext.
+
+**Derselbe Mechanismus steckt vermutlich in weiteren Suiten.** `str_contains` über einen
+Dateiinhalt ist das übliche Werkzeug der statischen Gegenproben unter `tests/suites/`, und jede
+dieser Stellen ist blind gegenüber dem Unterschied zwischen Code und Kommentar.
+
+**Zu tun:** Ein eigener Durchgang durch `tests/suites/` mit der Frage: Welche Zusicherungen prüfen
+ein Vorkommen, das ein Kommentar erfüllen kann? Vorrang haben die, die eine Sicherheitseigenschaft
+festhalten sollen. Wo es sich lohnt, statt des Namens die Wirkung festnageln oder wenigstens
+Kommentare vor dem Prüfen entfernen.
+
+**Warum nicht in OI-94:** Der Vorgang hat seine eigenen Wächter geradegezogen; eine Durchsicht
+aller Suiten ist Arbeit an der Testbasis und gehört nicht in ein Gestaltungsvorhaben.
+
+**Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: Es geht um die Verlässlichkeit der
+Wächter, nicht um eine ausnutzbare Lücke. Die geprüfte Schranke selbst ist vorhanden.

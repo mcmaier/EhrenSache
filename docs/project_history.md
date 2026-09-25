@@ -13,8 +13,9 @@ eine Grundsatzentscheidung fällt oder eine alte gekippt wird.
 **Wenn Historie und heutiger Stand auseinandergehen, gilt der Code.** Wo eine Entscheidung
 später korrigiert wurde, steht das unter „heute" direkt dabei.
 
-**Stand:** 2026-09-09 · **Quelle:** verdichtete Projektchats bis 2026-04-15; ab da liegt die
-Historie in `git log`, `CHANGELOG.md` und `docs/`
+**Stand:** 2026-09-25 · **Quelle:** verdichtete Projektchats bis 2026-04-15; ab da liegt die
+Historie in `git log`, `CHANGELOG.md` und `docs/` — nur Grundsatzentscheidungen dieser Zeit
+stehen hier, in Kapitel 12
 
 ---
 
@@ -32,6 +33,7 @@ Historie in `git log`, `CHANGELOG.md` und `docs/`
 | Betrieb | 01–02/2026 | SemVer + `version.json`, Tabellenpräfix, Installer |
 | Produkt | 02/2026 | Umbenennung in EhrenSache, Dual-Lizenz AGPL + kommerziell |
 | Werkzeugwechsel | 04/2026 | Entwicklung wandert nach Claude Code, `CLAUDE.md` entsteht |
+| Im Versionstakt | 04–09/2026 | Rückmeldezeile im Kalender: aus „identisch“ wird „beinahe identisch“ |
 
 ---
 
@@ -283,6 +285,41 @@ dokumentiert und wird hier nicht wiederholt:
 Grobe Linie dieser Phase, nur zur Einordnung: Sicherheits- und Bugfix-Runde nach Code-Review
 (1.1.3, 04/2026), Update-Wizard und Migrationskette, Arbeitszeiterfassung (1.2.x), virtuelle
 Station mit PIN (1.3.0), eigene Testsuiten unter `tests/` und ein Demo-Datengenerator.
+
+*(Eine Ausnahme seit 2026-09-25: Wenn eine Entscheidung dieser Zeit eine frühere **ablöst**,
+steht sie in Kapitel 12 — sonst bliebe die alte Regel hier als geltend stehen.)*
+
+## 12 · Im Versionstakt: Entscheidungen seit dem Werkzeugwechsel (04–09/2026)
+
+Seit dem Werkzeugwechsel sind vierzehn Nebenversionen erschienen — 1.2.0 bis 1.15.0. Was sie
+gebracht haben, steht in `CHANGELOG.md`, warum im Einzelnen, in den Specs unter
+`docs/superpowers/specs/`. Ihre **Grundsatzentscheidungen** standen bisher nirgends hier; dieses
+Kapitel ist die Stelle, an der Einträge aus dieser Zeit landen.
+
+**Es wird nicht rückwirkend gefüllt.** Aufgenommen wird nur, was eine frühere
+Grundsatzentscheidung ablöst oder eine neue setzt — alles andere bleibt in Changelog, Spec und
+`docs/OPEN-ITEMS.md`.
+
+- **Die beiden Fassungen des Kalender-Popups sehen gleich aus.** Es gibt das Popup beim Überfahren
+  eines Kalendertags und das festgehaltene nach dem Klick; beide zeigen denselben Inhalt. Mit der
+  Terminrückmeldung (FI-1, 1.7.0) kam eine Zeile hinzu, die den Stand der Zu- und Absagen nennt
+  und **nur** im festgehaltenen Popup ein Knopf ist. Dass sie dort anders aussah als beim
+  Überfahren, **wurde als Fehler gemeldet**. Die Antwort darauf war eine Regel: Die beiden
+  Fassungen sollen optisch **identisch** wirken, die Zeile bleibt Text — kein dritter Knopf neben
+  „Bearbeiten“ und „Anwesenheit“. `calendar.css` nimmt der Zeile dafür Rahmen und Hintergrund aus
+  `buttons.css` wieder ab.
+
+  > *Abgelöst am 2026-09-25 (OI-94, Entscheidung des Nutzers):* **Das festgehaltene Popup darf
+  > zeigen, dass die Zeile bedienbar ist** — gepunktete Unterlinie und Linkfarbe, sonst nichts.
+  > Grund: Erkennbar war das nur an Mauszeiger und Überfahr-Zustand. Auf dem Telefon gibt es
+  > weder das eine noch das andere; dort stand eine Angabe, die zufällig auch ein Bedienelement
+  > war, und niemand konnte es wissen. **Die alte Regel war kein Irrtum.** Sie verlangte
+  > Gleichheit, weil der sichtbare Unterschied damals ein gemeldeter Fehler war, und sie gilt der
+  > Sache nach weiter: Aus *identisch* wird *beinahe identisch*, nicht *darf sich unterscheiden*.
+  > Der Unterschied bleibt bewusst klein — gepunktete Linie statt Knopfoptik, kein dritter Knopf
+  > neben „Bearbeiten“ und „Anwesenheit“, und die Überfahr-Fassung bleibt unverändert schlichter
+  > Text. Wer die beiden Fassungen später weiter auseinanderzieht, kippt nicht diesen Vermerk,
+  > sondern den Fehlerbericht aus FI-1.
 
 ---
 
