@@ -355,8 +355,26 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     }
     
     $arrivalDate = $arrivalTime->format('Y-m-d');
-    $arrivalTimeStr = $arrivalTime->format('H:i:s'); 
+    $arrivalTimeStr = $arrivalTime->format('H:i:s');
     $timestamp = $arrivalTime->format('Y-m-d H:i:s');
+
+    // Ein Geraet buergt fuer die Identitaet, nicht fuer die Mitgliedschaft
+    // (OI-103): Ein ausgetretenes Mitglied, dessen Finger oder Karte noch
+    // angelernt ist, darf nicht weiter einchecken — sonst laege ein Eintrag in
+    // records, den keine Auswertung zeigt. Dieselbe Regel wie am Kiosk
+    // (OI-27), Stichtag ist der Tag der Ankunft, damit nachgereichte Eintraege
+    // aus der Offline-Warteschlange nach ihrem eigenen Datum beurteilt werden.
+    // Eigene reason statt "Member not found": das Terminal markiert daran die
+    // Zuordnung als verwaist. Admin und Manager bleiben aussen vor — ob sie
+    // hier fuer inaktive Mitglieder nachtragen duerfen, ist nicht entschieden.
+    if(isDevice() && !memberIsActiveOn($db, $database, (int)$memberId, $arrivalDate)) {
+        http_response_code(404);
+        echo json_encode([
+            "message" => "Member not active",
+            "reason"  => "member_inactive"
+        ]);
+        return;
+    }
         
     // Zeittoleranz: Einstellung schlaegt Konstante, ein mitgeschickter Wert
     // schlaegt beides. Der Request-Parameter bleibt fuer Geraete bestehen.
@@ -530,13 +548,15 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     }
     $locationName = $sourceInfo['location_name'] ?? null;
 
-    // Bei Device: Hole Device-Info aus users Tabelle (unveraendert uebernommen)
+    // Bei Device: Der Geraetename ist der Ort, wie am Kiosk (OI-102). Bis
+    // dahin stand hier users.email — Geraetekonten haben keine E-Mail, jeder
+    // Record trug deshalb location_name = NULL.
     if(isDevice()) {
-        $deviceStmt = $db->prepare("SELECT email, device_type FROM {$prefix}users WHERE user_id = ?");
+        $deviceStmt = $db->prepare("SELECT device_name FROM {$prefix}users WHERE user_id = ?");
         $deviceStmt->execute([$authUserId]);
-        $deviceInfo = $deviceStmt->fetch(PDO::FETCH_ASSOC);
-        if($deviceInfo) {
-            $locationName = $deviceInfo['email'];
+        $deviceName = $deviceStmt->fetchColumn();
+        if($deviceName !== false && trim((string)$deviceName) !== '') {
+            $locationName = $deviceName;
         }
     }
 

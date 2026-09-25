@@ -465,7 +465,15 @@ behandeln, nie als HTML.
 - `year`, `date` (optional): Aktivitätsfilter über die Mitgliedschaftszeiträume
 - `include_inactive` (optional): `true` nimmt inaktive Mitglieder mit auf. **Wirkt nur für
   Admin/Manager** (`members.php:97`) — bei den Rollen `user` und `device` wird der Parameter
-  still ignoriert, die Antwort bleibt für sie ohnehin auf Aktive begrenzt.
+  still ignoriert.
+
+**Welche Mitglieder die Liste enthält:** Mit `date` gilt die Aktivregel für diesen Tag
+(`members.active = 1` und der Tag in einem Zeitraum aus `membership_dates`), mit `year` „im
+Jahr irgendwann aktiv". **Ohne beide** unterscheidet sich das nach Rolle: Die Rolle `device`
+bekommt die Regel von heute — dieselbe wie am Kiosk, damit ein Terminal Zuordnungen zu
+ausgetretenen Mitgliedern als verwaist erkennen kann (bis dahin kamen alle Mitglieder). Admin,
+Manager und `user` bekommen ohne `date`/`year` **alle** Mitglieder, auch inaktive; Admin und
+Manager sehen die Aktivität dann an `active`.
 
 **Response:** ein **Array**, kein Objekt — es gibt weder einen `members`-Umschlag noch eine
 Paginierung. Die Liste kommt vollständig; die Einstellung „Datenreihen pro Seite“ wirkt allein
@@ -1336,7 +1344,7 @@ Sucht passenden Termin im Zeitfenster. Kann automatisch einen neuen Termin anleg
   "member_id": 5,
   "checkin_source": "device_auth",
   "source_device": "device_auth",
-  "location_name": null,
+  "location_name": "Terminal Eingang",
   "appointment_action": "matched",
   "appointment": {
     "appointment_id": 10,
@@ -1352,6 +1360,22 @@ Sucht passenden Termin im Zeitfenster. Kann automatisch einen neuen Termin anleg
 successful" (`201`); ein vorhandener Datensatz wird übernommen → `"updated"` / „Check-in
 updated" (`200`), oder bleibt stehen (spätere Ankunft, kein Ersatz) → `"unchanged"` / „Check-in
 unchanged" (`200`). `warning` steht nur bei `201` im Objekt (auch wenn `null`).
+
+**Ort bei Geräten (OI-102):** Ruft ein Gerätekonto auf, ist `location_name` der Gerätename —
+wie am Kiosk. Bis dahin stand dort `users.email`, und weil Geräte keine E-Mail haben, war der
+Ort immer `null`. Bestandsdaten bleiben so.
+
+**Aktivprüfung bei Geräten (OI-103):** Für ein Gerätekonto muss das Mitglied am **Tag der
+`arrival_time`** aktiv sein — `members.active = 1` und der Tag in einem Zeitraum aus
+`membership_dates` (ohne Zeiträume genügt `active`), dieselbe Regel wie am Kiosk. Sonst:
+```json
+{ "message": "Member not active", "reason": "member_inactive" }
+```
+mit `404`. Maßgeblich ist `reason`; eine unbekannte Nummer bleibt `404 "Member not found"`
+**ohne** `reason` (mit `searched_for`). Ein Terminal markiert an `member_inactive` die
+Zuordnung als verwaist. Weil der Stichtag das Ankunftsdatum ist, wird ein nachgereichter
+Eintrag nach seinem eigenen Tag beurteilt. Für Admin, Manager und `user` gilt die Prüfung
+(noch) nicht.
 
 **Fehler (kein Termin):** `409`
 ```json
@@ -1375,6 +1399,8 @@ Kein `success`-Feld; `message`, `reason` und `hint` sind die tatsächlichen Feld
 |---|---|---|
 | `201` / `200` | – | Check-in angelegt oder aktualisiert |
 | `403` | `appointment_not_permitted` | Termin gehört zu einer anderen Gruppe |
+| `404` | – | `"Member not found"`: Nummer bzw. `member_id` unbekannt |
+| `404` | `member_inactive` | Nur Gerätekonten: Mitglied am Tag der Ankunft nicht aktiv (OI-103) |
 | `404` | `appointment_not_found` | `appointment_id` existiert nicht |
 | `409` | `appointment_wrong_day` | Termin liegt an einem anderen Tag |
 | `409` | `appointment_outside_tolerance` | Termin liegt zeitlich außerhalb von `checkin_tolerance_hours` |

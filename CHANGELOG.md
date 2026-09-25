@@ -18,6 +18,22 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   dem Kiosk vorbehalten und werden abgewiesen, ohne einen PIN-Versuch zu verbrauchen. Finger und
   Karte laufen unverändert über `auto_checkin` (OI-101).
 
+### Geändert
+- **Ein Gerät checkt ein ausgetretenes Mitglied nicht mehr ein.** `auto_checkin` prüft für
+  Gerätekonten jetzt dieselbe Regel wie der Kiosk: Mitglied aktiv und der Tag der Ankunft in
+  einem Mitgliedschaftszeitraum. Bisher reichte, dass es die Nummer gab — ein noch angelernter
+  Finger oder eine Karte erzeugte Anwesenheiten, die in keiner Auswertung auftauchten. Die
+  Antwort trägt `reason: "member_inactive"`, das Terminal markiert daran die Zuordnung als
+  verwaist. Für Admin und Manager bleibt der Endpunkt unverändert (OI-103).
+- **Die Mitgliederliste für Geräte enthält nur noch heute aktive Mitglieder.** Ohne Jahr oder
+  Datum lieferte `GET members` einem Gerät bisher alle Mitglieder, auch ausgetretene. Damit
+  kann das Terminal verwaiste Zuordnungen erkennen und im Admin-Menü zum Löschen anbieten.
+
+### Behoben
+- **Check-ins von Geräten tragen den Gerätenamen als Ort.** Bisher las `auto_checkin` dafür die
+  E-Mail des Gerätekontos, die es nicht gibt — der Ort blieb immer leer. Bestehende Einträge
+  bleiben ohne Ort (OI-102).
+
 ---
 
 ## [1.16.0] – 2026-09-25

@@ -1277,6 +1277,127 @@ test('station: totp_location bleibt an station abgewiesen (OI-101)', function ()
     }
 });
 
+// ---- OI-102/OI-103: auto_checkin vom Terminal -------------------------------
+//
+// Finger und Karte laufen ueber auto_checkin: das Geraet buergt fuer die
+// Identitaet. Der Record soll den Geraetenamen als Ort tragen (OI-102), und
+// ein nicht aktives Mitglied darf nicht mehr einchecken (OI-103) -- mit einer
+// Antwort, an der das Terminal die Zuordnung als verwaist erkennt.
+
+/** POST auto_checkin mit dem Terminal-Token. */
+function terminalCheckin(string $nummer, ?string $arrival = null): array
+{
+    return apiRequest('POST', 'auto_checkin', [
+        'token' => authDeviceToken(),
+        'body'  => ['member_number' => $nummer, 'arrival_time' => $arrival ?? date('Y-m-d H:i:s'),
+                    'source_device' => 'device_auth'],
+    ]);
+}
+
+test('auto_checkin: Terminal schreibt seinen Geraetenamen als Ort (OI-102)', function () {
+    stationAppointment();
+    oi27WithMember(null, function (string $nummer) {
+        $res = terminalCheckin($nummer);
+        assertStatus(201, $res, 'Check-in per Finger/Karte: ' . $res['raw']);
+        assertSame('device_auth', $res['body']['checkin_source']);
+        assertSame(authDevice()['device_name'], $res['body']['location_name']);
+    });
+});
+
+test('auto_checkin: Mitglied ausserhalb seines Zeitraums → 404 member_inactive (OI-103)', function () {
+    stationAppointment();
+    oi27WithMember([date('Y-m-d', strtotime('-2 years')), date('Y-m-d', strtotime('-1 day'))],
+        function (string $nummer) {
+            $res = terminalCheckin($nummer);
+            assertStatus(404, $res, 'Abgelaufener Zeitraum muss abgewiesen werden: ' . $res['raw']);
+            assertSame('member_inactive', $res['body']['reason'] ?? null);
+        });
+});
+
+test('auto_checkin: kuenftiger Zeitraum gilt noch nicht (OI-103)', function () {
+    stationAppointment();
+    oi27WithMember([date('Y-m-d', strtotime('+7 days')), null], function (string $nummer) {
+        $res = terminalCheckin($nummer);
+        assertStatus(404, $res, $res['raw']);
+        assertSame('member_inactive', $res['body']['reason'] ?? null);
+    });
+});
+
+test('auto_checkin: members.active = 0 → 404 member_inactive (OI-103)', function () {
+    stationAppointment();
+    oi27WithMember(null, function (string $nummer, int $memberId) {
+        assertStatus(200, apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['active' => 0]]), 'Mitglied liess sich nicht deaktivieren');
+        $res = terminalCheckin($nummer);
+        assertStatus(404, $res, $res['raw']);
+        assertSame('member_inactive', $res['body']['reason'] ?? null);
+    });
+});
+
+test('auto_checkin: unbekannte Nummer bleibt "Member not found" ohne reason (OI-103)', function () {
+    $res = terminalCheckin('NX' . uniqid());
+    assertStatus(404, $res);
+    assertSame('Member not found', $res['body']['message']);
+    assertTrue(!array_key_exists('reason', $res['body']), 'unbekannt und inaktiv muessen unterscheidbar bleiben');
+});
+
+test('auto_checkin: Stichtag ist das Datum der arrival_time, nicht heute (OI-103)', function () {
+    // Zeitraum endete gestern, der nachgereichte Check-in ist von gestern: Das
+    // Mitglied war an dem Tag aktiv. Ohne passenden Termin und ohne
+    // Auto-Anlage antwortet der Server dann 409 -- die Aktivpruefung ist also
+    // bestanden, ohne dass der Test einen Termin anlegen muss.
+    $before = apiRequest('GET', 'settings', ['token' => apiToken('admin')]);
+    $prev   = (string) ($before['body']['settings']['checkin_auto_create_appointment'] ?? '1');
+    stationSetSetting('checkin_auto_create_appointment', '0');
+    try {
+        oi27WithMember([date('Y-m-d', strtotime('-2 years')), date('Y-m-d', strtotime('-1 day'))],
+            function (string $nummer) {
+                $res = terminalCheckin($nummer, date('Y-m-d', strtotime('-1 day')) . ' 03:17:00');
+                assertStatus(409, $res, 'Am Tag der Ankunft war das Mitglied aktiv: ' . $res['raw']);
+                assertSame('no_matching_appointment', $res['body']['reason'] ?? null);
+            });
+    } finally {
+        stationSetSetting('checkin_auto_create_appointment', $prev);
+    }
+});
+
+// ---- Terminal-Spec 13.1 Punkt 3: Mitgliederliste fuer Geraete ---------------
+//
+// Das Terminal gleicht nach jedem Abruf seine Zuordnungen gegen die Liste ab
+// und markiert fehlende Nummern als verwaist. Die Liste muss deshalb dieselbe
+// Regel wie Kiosk und Statistik anwenden (OI-27), nicht nur members.active.
+
+/** Mitgliedsnummern aus GET members mit dem Terminal-Token. */
+function terminalMemberNumbers(): array
+{
+    $res = apiRequest('GET', 'members', ['token' => authDeviceToken()]);
+    assertStatus(200, $res);
+    return array_column($res['body'], 'member_number');
+}
+
+test('members: Geraet sieht Mitglied im laufenden Zeitraum', function () {
+    oi27WithMember([date('Y-m-d', strtotime('-1 day')), null], function (string $nummer) {
+        assertTrue(in_array($nummer, terminalMemberNumbers(), true), 'aktives Mitglied fehlt in der Geraeteliste');
+    });
+});
+
+test('members: Geraet sieht kein Mitglied mit abgelaufenem Zeitraum', function () {
+    oi27WithMember([date('Y-m-d', strtotime('-2 years')), date('Y-m-d', strtotime('-1 day'))],
+        function (string $nummer) {
+            assertTrue(!in_array($nummer, terminalMemberNumbers(), true),
+                'ausgetretenes Mitglied darf nicht in der Geraeteliste stehen');
+        });
+});
+
+test('members: Geraet sieht kein Mitglied mit active = 0', function () {
+    oi27WithMember(null, function (string $nummer, int $memberId) {
+        assertStatus(200, apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['active' => 0]]));
+        assertTrue(!in_array($nummer, terminalMemberNumbers(), true),
+            'inaktives Mitglied darf nicht in der Geraeteliste stehen');
+    });
+});
+
 // ---- Aufraeumen: bleibt der LETZTE Test der Datei ---------------------------
 // Spaetere Tasks fuegen ihre Tests VOR diesem Block ein.
 

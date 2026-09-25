@@ -209,11 +209,20 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 }
                 else if(isDevice())
                 {
-                    // Liste aller Mitglieder mit Member_Number für Auto-Checkin
-                    $sql = "SELECT name, surname, member_number 
+                    // Liste der Mitglieder mit Member_Number für Auto-Checkin.
+                    // Ohne year/date gilt die Regel von heute wie am Kiosk
+                    // (OI-27): Das Terminal markiert Zuordnungen zu Nummern,
+                    // die hier fehlen, als verwaist — ausgetretene Mitglieder
+                    // duerfen also nicht in der Liste stehen. Bis dahin lieferte
+                    // der Aufruf ohne Parameter alle Mitglieder.
+                    $deviceFilter = $activityFilter !== ''
+                        ? $activityFilter
+                        : "AND (" . getMemberActivityWhere('m', "'" . date('Y-m-d') . "'", false, $database) . ")";
+
+                    $sql = "SELECT name, surname, member_number
                             FROM {$prefix}members m
                             WHERE 1=1
-                                $activityFilter
+                                $deviceFilter
                             ORDER BY surname, name";
 
                     //$stmt = $db->query("SELECT name, surname, member_number FROM {$prefix}members ORDER BY surname, name");

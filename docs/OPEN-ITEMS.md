@@ -1116,7 +1116,7 @@ Zwei Teilsignale gibt es bereits: Der Nachweisgrad fällt bei einer Zeitkorrektu
 ---
 
 ### OI-102 · `auto_checkin` von Geräten: `location_name` bleibt leer
-**Priorität:** mittel · aufgenommen am 2026-09-25
+**Priorität:** erledigt am 2026-09-25 auf Branch `feat/oi-101-auth-device`, noch nicht in `dev` · aufgenommen am 2026-09-25
 
 `handleAutoCheckin()` liest für Gerätekonten die Spalte `email` und schreibt sie als
 `location_name` in den Record ([auto_checkin.php:535](../private/handlers/auto_checkin.php),
@@ -1137,7 +1137,7 @@ nur, wo es gesetzt wurde.
 ---
 
 ### OI-103 · `auto_checkin` prüft den Aktivstatus des Mitglieds nicht
-**Priorität:** mittel · aufgenommen am 2026-09-25 · **Bezug:**
+**Priorität:** erledigt am 2026-09-25 auf Branch `feat/oi-101-auth-device`, noch nicht in `dev` · aufgenommen am 2026-09-25 · **Bezug:**
 [OI-27](#oi-27--membersactive-vs-membership_dates-am-kiosk)
 
 `resolveMemberIdByNumber()` ([utils.php:106](../private/helpers/utils.php)) und der
@@ -1157,6 +1157,14 @@ Zuordnung als verwaist markieren kann — etwa `404` mit `reason: "member_inacti
 
 **Vorher zu klären:** Ob Admin und Manager über diesen Endpunkt bewusst auch für inaktive
 Mitglieder nachtragen dürfen sollen. Wenn ja, greift die Prüfung nur für `isDevice()`.
+
+**Umgesetzt für Gerätekonten** (`isDevice()`), Stichtag das Datum der `arrival_time`, Antwort
+`404 {"message": "Member not active", "reason": "member_inactive"}` — so, wie die Firmware
+sie auswertet. Die Frage nach Admin und Manager bleibt **offen**; bis sie entschieden ist, gilt
+für sie das alte Verhalten. Mit erledigt: `GET members` liefert Geräten ohne `date`/`year`
+jetzt nur heute aktive Mitglieder (vorher alle), damit das Terminal verwaiste Zuordnungen
+erkennt. Die Regel steht in `memberIsActiveOn()` (`private/helpers/member_activity.php`), die
+der Kiosk mitbenutzt.
 
 **Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: kein Rechtezuwachs, es braucht ein
 gültiges Gerätetoken und eine am Gerät angelernte Biometrie. Es geht um Datenqualität.
