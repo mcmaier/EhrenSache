@@ -704,7 +704,7 @@ Kiosk-Spec `docs/superpowers/specs/2026-09-04-station-pin-kiosk-design.md` Absch
 („später `auth_method: device` für `auth_device`")
 
 **Anlass.** Für das Hardware-Terminal (ESP32-S3, eigenes Repository `mcmaier/EhrenSache_IoT`,
-Gerätetyp `auth_device`) ist entschieden, dass es beide Vertrauensmodelle bedient: Finger und
+Spezifikation dort in `docs/spezifikation-auth-geraet.md`, Gerätetyp `auth_device`) ist entschieden, dass es beide Vertrauensmodelle bedient: Finger und
 Karte über `auto_checkin` (das Gerät bürgt), Mitgliedsnummer + PIN über `station` (der Server
 prüft). Das Terminal hat ein Keypad und soll damit auch Mitgliedern ohne Fingerabdruck oder
 Karte die Anmeldung erlauben. Heute nimmt `handleStation()` nur Kiosk-Token an
