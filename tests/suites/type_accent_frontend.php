@@ -239,6 +239,19 @@ test('Die Terminliste traegt den Streifen und den Namen in der Unterzeile', func
     assertSame(1, substr_count($ohneWerte, ':'),
         'In das style-Attribut der ersten Zelle gehoert genau eine Deklaration');
 
+    // Und die Farbe muss wirklich aus safeTypeColor() kommen. Die Zusicherung
+    // oben (str_contains) genuegt dafuer NICHT: Sie findet auch den
+    // Funktionsnamen im Kommentar darueber. Nachgestellt -- "const typeColor =
+    // apt.color;" liess die ganze Suite gruen, weil der Kommentar drei Zeilen
+    // hoeher "Farbe ueber safeTypeColor()" sagt. Der Variablenname ist dabei
+    // gleichgueltig, die gepruefte Herkunft nicht.
+    assertTrue((bool) preg_match('/^--type-color:\s*\$\{([^}]+)\};?$/', trim($styleAttr[1]), $wert),
+        'Der Wert von --type-color muss vollstaendig aus einem eingesetzten Ausdruck bestehen');
+    $ausdruck = trim($wert[1]);
+    assertTrue(str_starts_with($ausdruck, 'safeTypeColor(')
+        || (bool) preg_match('/(?:const|let|var)\s+' . preg_quote($ausdruck, '/') . '\s*=\s*safeTypeColor\(/', $body),
+        "Die Farbe der ersten Zelle muss aus safeTypeColor() stammen -- \"{$ausdruck}\" kommt nicht von dort");
+
     // Der Name der Terminart steht in der Unterzeile, unmittelbar vor dem Datum
     // -- ohne diese Gegenprobe waere auch eine Umsetzung ganz ohne Namen gruen.
     assertTrue(str_contains($body, 'type-accent-name'),
