@@ -4,8 +4,8 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-24 · **Bezugsstand:** `dev` = `main` = `v1.15.0` (`fbfc73b`) ·
-**Version:** 1.15.0
+**Zuletzt geprüft:** 2026-09-25 · **Bezugsstand:** `dev` = `main` = `v1.16.0` (`82d38b2`) ·
+**Version:** 1.16.0
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
 > während der Code auf 1.9.0 war — fünf Punkte waren längst behoben, ohne dass ihr Eintrag es
@@ -21,17 +21,31 @@ oder noch nicht gebaut.
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
 *mittel* = sollte vor der Freigabe an Vereine gelöst sein · *niedrig* = Verbesserung
 
-**Nächste Umsetzung (Stand 2026-09-25, nach 1.15.0):**
-[OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)
-(Terminfarbe als Randakzent) ist am 2026-09-25 umgesetzt und wartet nur noch auf eine Version;
-aus dem Umbau kamen OI-104 bis OI-107 als eigene Punkte. Entschieden, aber nicht gebaut ist
-[OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe). Offen mit
-Priorität *mittel*: OI-67, OI-96, OI-98, OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23,
-[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (OI-104 bis OI-106 sind *niedrig*).
+**Nächste Umsetzung (Stand 2026-09-25, nach 1.16.0):**
+[OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar) (Tastaturbedienung
+im Kalender). Der Vorbehalt „erst nach OI-94“ ist mit 1.16.0 gefallen, und derselbe Umbau hat die
+Struktur gleich mitgeliefert: Jeder Termin im festgehaltenen Popup ist ein eigener Block, ein
+Fokusrahmen dafür liegt in `calendar.css`. Es fehlt die Bedienung, nicht der Aufbau. Daneben
+steht [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (Wächter, die ein Kommentar
+erfüllt) aus demselben Vorgang — ein Durchgang durch `tests/suites/`, der Vorrang hat, solange
+[OI-17](#oi-17--keine-content-security-policy) offen ist: Ohne CSP hängt an solchen Wächtern die
+einzige Schranke gegen eingeschleustes Markup. Entschieden, aber nicht gebaut bleibt
+[OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) — es
+braucht eine eigene Spec, nicht nur eine Umsetzung.
 
-Seit der letzten Prüfung (17.09.) veröffentlicht: OI-82 bis OI-84 (1.11.2), OI-85 (1.12.1),
+Offen mit Priorität *mittel*, am 2026-09-25 einzeln gegen den Code geprüft: OI-67, OI-96, OI-98,
+OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23,
+[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) sowie die am 25.09. aus dem
+Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103. **OI-3 und OI-20 tragen ebenfalls
+*mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
+Restarbeit, und gehören deshalb nicht in eine Umsetzungsreihe. OI-62 steht auf
+*niedrig–mittel*, OI-104 bis OI-106 und OI-108 auf *niedrig*.
+
+Seit der Durchsicht vom 17.09. veröffentlicht: OI-82 bis OI-84 (1.11.2), OI-85 (1.12.1),
 OI-86 und OI-87 (1.13.0), OI-25, OI-27, OI-66 und OI-95 (1.14.x),
-[OI-89](#oi-89--anwesenheit-eines-mitglieds-zählt-kommende-termine-als-fehlend) (1.15.0).
+[OI-89](#oi-89--anwesenheit-eines-mitglieds-zählt-kommende-termine-als-fehlend) (1.15.0),
+[OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)
+(1.16.0).
 
 ---
 
@@ -233,6 +247,13 @@ es beim sofortigen `confirmed`. Dieselbe Regel ist für Anträge vorgesehen, sie
 [OI-87](#oi-87--anträge-in-der-anwesenheitsliste-des-dashboards-selbstgenehmigung-nur-ohne-zweiten-verwalter).
 Für die Arbeitszeit bewusst getrennt entschieden: Sie ändert den Arbeitsablauf der Manager spürbar
 (eigene Nachträge warten dann auf Freigabe), bei Anträgen kaum.
+
+**Stand 2026-09-25, gegen den Code geprüft.** Unverändert: `private/handlers/work_sessions.php`
+entscheidet den Status weiter allein an der Rolle (`$status = $isApprover ? 'confirmed' :
+'submitted'`). Der Baustein der vorgeschlagenen Lösung liegt inzwischen aber bereit —
+`otherActiveApproverExists()` in `private/helpers/utils.php` beantwortet genau die Frage „gibt es
+ein zweites freigabeberechtigtes Konto?“ und wird von den Anträgen (OI-87) seit 1.13.0 benutzt.
+Offen ist damit die Entscheidung und ihr Aufruf an dieser Stelle, nicht mehr die Regel selbst.
 
 ---
 
@@ -854,6 +875,10 @@ Tests in `tests/suites/htaccess_locks.php`. Der Installer schreibt bewusst einen
 Kommentartext als die ausgelieferte Datei („Installation abgeschlossen“); nach einem lokalen
 Installerlauf bleibt `public/install/.htaccess` deshalb als geändert stehen. Das ist gewollt.
 
+**Am 2026-09-25 gegen den Code geprüft: unverändert.** `runWizardStep3()` steht weiter in
+`tests/db/verify_migration_chain.php` (Zeile 141) und wird dort neunmal aufgerufen; der Wizard
+hat seinen Schritt 3 nicht ausgelagert.
+
 ---
 
 ### OI-22 · Selbstauskunft findet verwaiste Logzeilen nicht
@@ -877,6 +902,10 @@ den meisten Installationen gar nicht gibt.
 
 **Alternative:** Die Auditfrist in der Vorgabe kurz halten (steht auf 1 Jahr) und den Punkt
 in `DATENSCHUTZ.md` benennen, statt ihn technisch zu lösen. Das ist der aktuelle Stand.
+
+**Am 2026-09-25 gegen den Code geprüft: unverändert.** `my_data.php` liest die Historie
+weiterhin über ein `JOIN {$prefix}work_sessions` — ein innerer Join, verwaiste Zeilen fallen
+heraus. Kein `JSON_EXTRACT` im Handler.
 
 ---
 
@@ -1141,7 +1170,8 @@ gültiges Gerätetoken und eine am Gerät angelernte Biometrie. Es geht um Daten
 **Priorität:** hoch für den Nachweiszweck, mittel für den Betrieb
 
 Risiko R5 aus der Spec. Das Secret der Stationen liegt unverschlüsselt in `users.totp_secret` und
-wird in der Geräte-Verwaltung angezeigt ([devices.js:347](../public/js/modules/devices.js)). Wer
+wird in der Geräte-Verwaltung angezeigt ([devices.js:377](../public/js/modules/devices.js) —
+Zeilennummer am 2026-09-25 nachgezogen). Wer
 Administrator- oder Manager-Zugang hat, kann Codes offline erzeugen und Ortsnachweise fälschen.
 
 Für die Anwesenheitserfassung war das vertretbar. Für einen Förder-Verwendungsnachweis begrenzt
@@ -1180,7 +1210,8 @@ Die Anwendung liefert **keine** CSP — weder als Header noch als `<meta http-eq
 sie. `CLAUDE.md` behauptete das Gegenteil; die Zeile war schlicht falsch und ist korrigiert.
 
 **Warum sie nicht einfach nachgereicht wird.** `public/index.html` enthält 95
-`onclick`-Attribute und 124 Inline-`style`-Attribute. Jedes davon ist aus Sicht einer CSP
+`onclick`-Attribute und 124 Inline-`style`-Attribute — am 2026-09-25 nachgezählt sind es 98 und
+137. Der Bestand wächst mit jeder Ansicht, der Befund bleibt. Jedes davon ist aus Sicht einer CSP
 Inline-Code:
 
 - CSP ohne `'unsafe-inline'` → die Oberfläche funktioniert nicht mehr
@@ -1210,6 +1241,15 @@ maskiert ihre Werte selbst. Das betrifft insbesondere die geplante Druckansicht 
 Arbeitszeitauswertung, in die freie Nutzereingaben aus der PWA fließen — siehe
 `docs/superpowers/specs/2026-09-03-zeitraumfilter-druckansicht-design.md`, Abschnitt
 „Sicherheit".
+
+**Was dieses Fehlen konkret kostet — Beispiel seit 1.16.0.** Die Farbe einer Terminart ist ein
+freies Textfeld und fließt im Dashboard in ein `style`-Attribut (Randakzent der Termin- und
+Anwesenheitslisten, OI-94). Ohne CSP ist `safeTypeColor()`
+([utils.js](../public/js/modules/utils.js)) die **einzige** Schranke zwischen diesem Feld und dem
+Markup — eine einzelne Funktion, die vier vorher verstreute Kopien ersetzt. Wie viel Last darauf
+liegt, zeigte [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt): Der Wächter, der ihren
+Einsatz sichern sollte, suchte nur den Funktionsnamen im Dateitext und blieb grün, nachdem die
+Prüfung ersatzlos entfernt war. Das ist der Grund, warum OI-107 trotz *mittel* Vorrang hat.
 
 ---
 
@@ -2721,6 +2761,10 @@ fremder Eintrag verschiebt eine Kennzahl, die einer Person zugerechnet wird.
 kann, darf es bereits, und Rolle wie Mitgliedsprüfung greifen. Es fehlt die Nachvollziehbarkeit
 einer erlaubten Handlung, nicht ihre Begrenzung.
 
+**Am 2026-09-25 gegen den Code geprüft: die Spur fehlt weiterhin.** Weder das Schema in
+`private/setup/ehrensache_db.sql` noch ein Handler kennt ein `entered_by` oder ein Protokoll zu
+`appointment_responses`.
+
 ---
 
 ### OI-64 · Im Kalender lässt sich kein Termin anlegen
@@ -2867,9 +2911,17 @@ zwischen — jede Anfrage geht ans Netz (Zwischenspeicherung stillgelegt 2025-12
 [OI-43](#oi-43--offline-betrieb-der-check-in-pwa)). Der veraltete Stand steckt im
 JavaScript-Zustand der laufenden Seite: `loadCheckinAppointments()`
 (`public/checkin/js/app.js`) läuft genau zweimal — beim Anmelden bzw. beim Start mit
-gespeichertem Token und nach einem erfolgreichen Check-in. Danach nie wieder. Der einzige
-`visibilitychange`-Hörer der Datei richtet den Sekundentakt der Uhr neu aus und holt keine
-Daten. Eine PWA ist als Dauergast gebaut — sie bleibt auf dem Telefon tagelang offen —, und
+gespeichertem Token und nach einem erfolgreichen Check-in. Danach nie wieder.
+
+**Korrektur vom 2026-09-25.** Hier stand: „Der einzige `visibilitychange`-Hörer der Datei
+richtet den Sekundentakt der Uhr neu aus und holt keine Daten.“ Das gilt nicht mehr. Mit FI-17
+(1.13.0) lädt derselbe Hörer beim Zurückkehren die **offenen Punkte** nach und nennt im
+Kommentar ausdrücklich die „Regel aus OI-67“ als Begründung. Weg 1 unten ist damit nicht mehr
+hypothetisch, sondern für eine Liste gebaut und im Betrieb — die Terminauswahl, also der
+beobachtete Fall, hat ihn nicht. Das senkt den Aufwand und macht es zugleich schwerer zu
+begründen, warum es bei einer Liste bleibt.
+
+Eine PWA ist als Dauergast gebaut — sie bleibt auf dem Telefon tagelang offen —, und
 genau dort fällt das auf.
 
 **Gegenprobe im selben Modul:** Der Entschuldigungsdialog macht es richtig, `openExceptionModal()`
@@ -3072,6 +3124,11 @@ Termine.
 [FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht) — dort bleibt die
 Besetzungsübersicht mit Sollstärke offen, die auf derselben Gliederung aufsetzt, aber eine andere
 Frage beantwortet.
+
+**Am 2026-09-25 gegen den Code geprüft: unverändert.** `statistics.php` und
+`punctuality.php` kennen `is_subgroup` nicht; die Auswertung läuft weiter allein über
+Terminarten, und `statistics.js` zeigt bei einer Untergruppe nach wie vor nur den erklärenden
+Hinweis.
 
 ---
 
@@ -3901,7 +3958,8 @@ der neue Chip über der Gruppentabelle. Nach einem Neuladen stimmt alles.
 ---
 
 ### OI-94 · Terminfarbe als Randakzent statt Badge (Terminliste, Anwesenheit, Kalender-Popup)
-**Erledigt am 2026-09-25** — Branch `feat/oi-94-randakzent`, Spec
+**Erledigt am 2026-09-25** — mit **1.16.0** veröffentlicht (Tag `v1.16.0` auf `82d38b2`,
+`main` = `dev`), Branch `feat/oi-94-randakzent`, Spec
 `docs/superpowers/specs/2026-09-24-terminfarbe-randakzent-design.md`. Alle drei Ansichten
 umgebaut: Terminliste, beide Anwesenheitslisten (Erfassungsliste und Mitgliedsansicht) und das
 Kalender-Popup, in dem jeder Termin ein eigener Block mit Farbstreifen wurde. Die Spalte
@@ -4046,8 +4104,16 @@ Terminen nennt Uhrzeit, Terminart, Titel und Rückmeldungen, aber **nicht** den 
 Den Feiertagsnamen, sofern vorhanden, vorn ins `aria-label` aufnehmen. Am 24.09. gegen den Code
 geprüft: Beide Teile sind weiterhin offen, `tabindex`/`keydown` gibt es nur im Leer-Zweig.
 
-**Achtung Reihenfolge:** OI-94 baut dieselbe Datei um (`showAppointmentPopup()`). Nach OI-94
-umsetzen oder mit der Kalender-Sitzung abstimmen.
+**Reihenfolge geklärt, Zuschnitt verschoben (2026-09-25):** OI-94 ist mit 1.16.0 veröffentlicht,
+der Vorbehalt entfällt. Derselbe Umbau hat zugleich vorgearbeitet: Im festgehaltenen Popup ist
+jeder Termin jetzt ein eigener Block (`.calendar-event-block`), und ein Fokusrahmen dafür steht
+schon in `public/css/components/calendar.css` (`.calendar-event-block:focus-visible`). Damit
+endet die Arbeit **nicht** mehr am Tagesfeld: Erreichbar werden müssen die Bedienelemente je
+Block, und der vorhandene Fokusrahmen ist der Hinweis, dass das der gedachte Weg ist. Am
+2026-09-25 erneut gegen den Code geprüft: Der Belegt-Zweig von `createCalendarDay()` hat
+weiterhin nur `mouseenter`, `mouseleave` und `click`; `tabindex`, `role` und `keydown` stehen
+allein im Leer-Zweig darunter, und auch der Block selbst trägt kein `tabindex`. Beide Teile des
+Punktes bleiben offen.
 
 **Nicht sicherheitsrelevant.**
 
@@ -4097,6 +4163,10 @@ Läufe, also im Rauschen, Antwort rund 6 KB größer. **Nicht gemessen** wurde e
 **monatsweiser** Abruf für den Kalender — nicht eine zweite Variante des Jahresabrufs ohne Zahlen:
 Beide füllten denselben Cache-Schlüssel, und dann bräuchte jeder Treffer eine Prüfung „enthält diese
 Kopie die Zahlen?“. Genau daraus entsteht später ein veralteter Balken.
+
+**Am 2026-09-25 gegen den Code geprüft: unverändert.** `loadAppointments()` hängt
+`include: 'attendance'` weiterhin an **jeden** Jahresabruf, unabhängig davon, ob der Kalender
+sichtbar ist. Die Messung mit großem Bestand steht weiter aus.
 
 **Nicht sicherheitsrelevant.**
 
