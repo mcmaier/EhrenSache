@@ -26,7 +26,8 @@ oder noch nicht gebaut.
 (Terminfarbe als Randakzent) ist am 2026-09-25 umgesetzt und wartet nur noch auf eine Version;
 aus dem Umbau kamen OI-104 bis OI-107 als eigene Punkte. Entschieden, aber nicht gebaut ist
 [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe). Offen mit
-Priorität *mittel*: OI-67, OI-96, OI-98, OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23.
+Priorität *mittel*: OI-67, OI-96, OI-98, OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23,
+[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (OI-104 bis OI-106 sind *niedrig*).
 
 Seit der letzten Prüfung (17.09.) veröffentlicht: OI-82 bis OI-84 (1.11.2), OI-85 (1.12.1),
 OI-86 und OI-87 (1.13.0), OI-25, OI-27, OI-66 und OI-95 (1.14.x),
@@ -1883,6 +1884,7 @@ sind seither grün.
 | Kein PDF-Export | So belassen | Würde eine Bibliothek einschleppen, die das Projekt bewusst nicht hat. Der Bedarf ist seit 1.2.2 über die Druckansicht (`&format=html`) gedeckt: Das PDF entsteht im Druckdialog des Browsers |
 | Installer und Update-Assistent werden gesperrt ausgeliefert | So belassen | Ein hochgeladener, aber noch nicht eingerichteter Webspace soll `/install` nicht offen zeigen. Der Freischaltschritt steht für beide in der README; nach dem Lauf sperrt sich jeder Assistent selbst wieder. Die Alternative — ungesperrt ausliefern — nähme dem Ersteinrichter eine Hürde, öffnete aber ein Zeitfenster zwischen Upload und Installation |
 | Statistik getrennt von Anwesenheit | Eigener `worktime`-Block | Anwesenheitsquote und geleistete Stunden sind verschiedene Fragen |
+| Keine Sortierung nach Terminart | So belassen (2026-09-25) | Die Frage kam mit OI-94 auf, weil dort die Spalte „Terminart“ entfiel. Sie beruhte auf einem Missverständnis: Sortieren nach Terminart war **nie** möglich — das Dashboard kennt überhaupt keine Sortierung über Tabellenköpfe (kein `sortTable`, keine klickbaren `<th>`, kein `.sort(` in `appointments.js`), und `grouping.js` gruppiert nur Mitglieder (`alpha`, `group`, `subgroup`). Der Filter „Terminart“ über der Liste deckt den Bedarf ab; bei nach Datum sortierten Terminen wäre eine Sortierung nach Terminart ohnehin von zweifelhaftem Nutzen. Festgehalten, damit es nicht als vermeintlicher Verlust wiederkehrt |
 | Kiosk-Sperre als Gruppen-DoS | So belassen (E12) | 30 Fehlversuche je Station sperren die ganze Station 15 Minuten — trifft damit alle, die an ihr stempeln wollen, nicht nur den Angreifer. Die Fehlermeldung unterscheidet Gerät und Konto, damit ein gesperrtes Mitglied von einer gesperrten Station unterscheidbar bleibt. Akzeptiert, weil die Alternative — keine Stationssperre — Nummern-Durchprobieren ohne Bremse erlaubt |
 | Kiosk: Terminwahl serverseitig, keine Auto-Anlage (E9) | So belassen | Der Kiosk wählt den passenden Termin wie `auto_checkin` serverseitig aus, zeigt keine Terminliste zur Auswahl und legt keinen Termin an. Ein Stempel ohne passenden Termin bekommt nur eine Meldung, keinen Datensatz. Ziel ist ein Stempelvorgang in drei Tipps; die Terminauswahl bleibt der Handy-PWA vorbehalten |
 | Kiosk: Notizpflicht entfällt (P1) | So belassen | Der Kiosk hat keine Tastatur für Fließtext. Ist `worktime_require_note` aktiv, verlangt ein Stopp über `station` trotzdem keine Notiz; die Tätigkeitsart bleibt die Beschreibung |
@@ -3916,7 +3918,10 @@ und steht deshalb in `docs/project_history.md`, Kapitel 12 — nicht nur in der 
 [OI-104](#oi-104--die-spaltenzahl-der-anwesenheitsliste-steht-an-sechs-stellen),
 [OI-105](#oi-105--dieselbe-spalte-heißt-im-betrieb-zweimal-anders),
 [OI-106](#oi-106--das-formularfeld-für-die-terminart-beim-erfassen-ist-toter-code),
-[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt).
+[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt),
+[OI-108](#oi-108--die-check-in-app-führt-ihre-eigene-lockerere-farbprüfung). Dass es nach
+Terminart **nie** eine Sortierung gab, steht unter
+[Bewusst entschieden](#bewusst-entschieden--nicht-erneut-aufmachen).
 
 <details><summary>Ursprünglicher Eintrag</summary>
 
@@ -4266,7 +4271,10 @@ Namen statt einer Wirkung prüft, sichert genau dann nichts, wenn es darauf anko
 
 **In OI-94 behoben** für die betroffenen Stellen: Geprüft wird jetzt die **Herkunft des Wertes**
 (dass die gesetzte Variable aus dem Rückgabewert der Prüffunktion stammt), nicht das Vorkommen
-eines Namens im Dateitext.
+eines Namens im Dateitext. Zwei dieser Stellen fielen erst im Abschlussreview auf — das Schildchen
+in `records.js` und, schwerer wiegend, die Farbkachel der Terminartenverwaltung in
+`management.js`, die anders als das Schildchen einen lebenden Aufrufer hat. Beide Wächter sind mit
+einer Mutation gegengeprüft: Wird der rohe Datenbankwert eingesetzt, schlagen sie an.
 
 **Derselbe Mechanismus steckt vermutlich in weiteren Suiten.** `str_contains` über einen
 Dateiinhalt ist das übliche Werkzeug der statischen Gegenproben unter `tests/suites/`, und jede
@@ -4282,3 +4290,38 @@ aller Suiten ist Arbeit an der Testbasis und gehört nicht in ein Gestaltungsvor
 
 **Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: Es geht um die Verlässlichkeit der
 Wächter, nicht um eine ausnutzbare Lücke. Die geprüfte Schranke selbst ist vorhanden.
+
+---
+
+### OI-108 · Die Check-in-App führt ihre eigene, lockerere Farbprüfung
+**Priorität:** niedrig · aufgenommen am 2026-09-25 (aus dem Abschlussreview zu
+[OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
+
+`/^#[0-9a-f]{3,8}$/i` steht in [public/checkin/js/app.js](../public/checkin/js/app.js)
+**dreimal** — Zeile 4841 und 4933 (je einmal für die Rückmeldekarte, das Ergebnis landet in
+`style="border-left-color: …"` in Zeile 4852 bzw. 4978) sowie in `safeHexColor()` (Zeile 5658),
+das seinerseits von `historyItem()`, dem Tätigkeitspunkt und `getTypeColor()` benutzt wird. Das
+ist die Fassung, die OI-94 im Dashboard abgelöst hat: Sie lässt auch die Hexlängen 5 und 7 durch,
+die es in CSS nicht gibt. Ein solcher Wert passiert die Prüfung als „sicher“, ergibt aber eine
+ungültige Deklaration, die der Browser wortlos verwirft.
+
+**Warum es hier besonders zählt:** `historyItem()`
+([app.js:2897](../public/checkin/js/app.js)) setzt in Zeile 2900 damit einen `borderLeftColor` —
+genau den Randakzent, dessen Versagensfall OI-94 beschreibt. Bei einer Farbe der Länge 5 oder 7
+fehlt der Streifen dann **ganz**, statt grau zu erscheinen. Die Funktion hat drei lebende Aufrufer
+(Arbeitszeitverlauf, Anwesenheitsverlauf, Anträge). Die PWA war das Vorbild für den ganzen Umbau
+und hat den Fehler noch.
+
+**Warum es nicht in OI-94 gehörte:** Die Spec nimmt die Check-in-App ausdrücklich aus. Sie bezieht
+ihre Farben **nicht** aus `variables.css`, hat eigene Ersatzfarben und einen eigenen Service
+Worker; `utils.js` mit `safeTypeColor()` ist ein ES6-Modul des Dashboards, das die PWA nicht lädt.
+Eine gemeinsame Prüfung über beide Anwendungen hinweg ist ein eigener Schritt.
+
+**Zu klären:** Ob die PWA `safeTypeColor()` mitbenutzen kann — und auf welchem Weg, ohne die
+Trennung der beiden Auslieferungen aufzuweichen — oder ob sie ihre eigene Fassung behält und nur
+enger gefasst wird (3, 4, 6, 8). Mitzuentscheiden ist die **Ersatzfarbe**: Die PWA führt derzeit
+zwei (`#1F5FBF` für Rückmeldekarte und Tätigkeitspunkt, `#95a5a6` für Verlauf und
+`getTypeColor()`), das Dashboard seit OI-94 nur noch `--type-color-none`.
+
+**Nicht sicherheitsrelevant:** Die Prüfung ist vorhanden und schließt eingeschleustes CSS aus;
+die zu weite Fassung kostet die Ersatzfarbe, nicht die Schranke.

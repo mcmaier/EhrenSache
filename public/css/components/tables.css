@@ -156,7 +156,13 @@ tr.row-inactive:hover td {
    <small> vererbt genau diese Farbe, der Name stuende dann in Farbe UND Gewicht
    wie das Datum daneben -- ununterscheidbar, zumal er unter 480px auf rund
    9,6px schrumpft. Fuer Farbenblinde ist er der Textersatz des Streifens und
-   muss sich abheben, ohne wie ein Knopf auszusehen. */
+   muss sich abheben, ohne wie ein Knopf auszusehen.
+
+   ACHTUNG, trotz tables.css nicht nur Tabellensache: Das Kalender-Popup nutzt
+   dieselbe Klasse fuer seine Unterzeile "Terminart - Ort"
+   (showAppointmentPopup() in appointments.js), und das ist keine Tabelle. Wer
+   hier aufraeumt, weil die Regel in Tabellen entbehrlich scheint, entstellt
+   stillschweigend das Popup mit. */
 .type-accent-name {
     color: var(--text-medium);
     font-weight: 500;

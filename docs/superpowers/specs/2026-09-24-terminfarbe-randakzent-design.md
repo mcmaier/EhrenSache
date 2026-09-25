@@ -117,6 +117,13 @@ springen.
 - **Sortierung nach Terminart.** Sie entfällt mit der Spalte. Der Filter „Terminart“ über der
   Liste bleibt und deckt den Bedarf ab.
 
+  *Nachtrag 2026-09-25:* Es gab sie nie. Das Dashboard kennt überhaupt keine Sortierung über
+  Tabellenköpfe — kein `sortTable`, keine klickbaren `<th>`, und `renderAppointments()` sortiert
+  nicht; `grouping.js` gruppiert Mitglieder (`alpha`, `group`, `subgroup`), sortiert aber keine
+  Termine. Der Satz stand hier als Abgrenzung und war als solche harmlos; im Changelog wäre er
+  als weggefallene Funktion gelesen worden und ist dort deshalb gestrichen. (Beim
+  Abschlussreview aufgefallen.)
+
 ## Offene Entscheidung, die beim Umbau anfällt
 
 Die Entscheidung zur Rückmeldezeile **kippt eine frühere**: Der Kommentar in `calendar.css`

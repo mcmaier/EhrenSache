@@ -173,8 +173,13 @@ test('Die Farbkachel der Terminartenverwaltung nutzt die gemeinsame Pruefung', f
         'management.js muss safeTypeColor aus utils.js importieren');
 
     $uebersicht = taFunctionBody($management, 'export async function renderTypeGroupOverview(');
-    assertTrue(str_contains($uebersicht, 'safeTypeColor('),
-        'Die Farbkachel der Terminartenverwaltung muss die gemeinsame Pruefung nutzen');
+    // Auch hier die Herkunft statt des Namens (OI-107): Der Kommentar ueber der
+    // Zeile nennt safeTypeColor() ebenfalls, ein str_contains() blieb also auch
+    // dann gruen, wenn die Zuweisung wieder den rohen Wert naehme. Diese Stelle
+    // wiegt schwerer als das Schildchen in records.js -- sie hat einen lebenden
+    // Aufrufer, die Terminartenverwaltung rendert sie bei jedem Aufruf.
+    assertTrue((bool) preg_match('/const\s+safeColor\s*=\s*safeTypeColor\(/', $uebersicht),
+        'Die Farbkachel muss ihren Wert aus safeTypeColor() beziehen, nicht roh aus der Terminart');
     // Sie bleibt eine Kachel -- umgestellt wird die Pruefung, nicht die Anzeige.
     assertTrue(str_contains($uebersicht, 'background: ${safeColor}'),
         'Die Farbkachel behaelt ihre Darstellung -- nur die Pruefung wandert');
@@ -395,8 +400,15 @@ test('Die Anwesenheitsliste nutzt den Randakzent, das Formularfeld das Schildche
 test('Die Badge-Funktion nutzt ebenfalls die gemeinsame Farbpruefung', function () use ($taRoot) {
     $js = taFile($taRoot, 'public/js/modules/records.js');
     $body = taFunctionBody($js, 'function createAppointmentTypeBadge(');
-    assertTrue(str_contains($body, 'safeTypeColor('),
-        'Auch das verbliebene Schildchen darf die Pruefung nicht selbst mitbringen');
+    // Geprueft wird die HERKUNFT des Wertes, nicht das Vorkommen eines Namens.
+    // Hier stand bis 2026-09-25 ein str_contains($body, 'safeTypeColor(') -- und
+    // das fand den Namen auch im Kommentar zwei Zeilen ueber dem Code.
+    // Nachgestellt: "background: ${type.color}", also der rohe Datenbankwert im
+    // style-Attribut, liess die ganze Suite gruen. Ohne CSP (OI-17) ist diese
+    // Pruefung die einzige Schranke; ein Waechter, der einen Namen statt einer
+    // Wirkung sichert, greift genau dann nicht, wenn es darauf ankommt (OI-107).
+    assertTrue((bool) preg_match('/background:\s*\$\{safeTypeColor\(/', $body),
+        'Die Farbe des Schildchens muss aus safeTypeColor() stammen, nicht roh aus der Terminart');
 
     // Frueher hiess eine LOKALE Variable im Rumpf ebenfalls safeTypeColor und
     // ueberschattete damit die importierte Funktion. Bliebe sie stehen, waere

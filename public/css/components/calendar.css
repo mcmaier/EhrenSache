@@ -325,8 +325,8 @@
    im festgehaltenen Popup (calendarResponseLineHtml, clickable haengt an
    fest), und ohne Maus war nicht zu erkennen, dass die Zeile etwas tut --
    auf dem Handy gibt es weder Mauszeiger noch Hover-Zustand. Siehe
-   docs/project_history.md. Die Hover-Fassung (.response-summary-text) bleibt
-   unveraendert schlichter Text.
+   docs/project_history.md, Kapitel 12. Die Hover-Fassung
+   (.response-summary-text) bleibt unveraendert schlichter Text.
 
    Beides steht bewusst in DERSELBEN Regel und in dieser Reihenfolge:
    "border: none" nimmt auch die Unterkante, "border-bottom" muss danach

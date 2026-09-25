@@ -361,10 +361,12 @@ export async function renderTypeGroupOverview(typeData)
         
         // Farbwert kommt frei aus der DB (kein Server-seitiger Format-Zwang) und landet
         // in einem style-Attribut -- escapeHtml() maskiert dort keine Anführungszeichen
-        // und würde das Attribut nicht schützen. Die Prüfung steht seit OI-94 nur noch
-        // einmal im Projekt, als safeTypeColor() in utils.js, und ist dort zugleich
-        // enger als die frühere Kopie an dieser Stelle: nur 3, 4, 6 oder 8 Hexstellen.
-        // Eine Länge wie 5 galt hier als sicher, ergab aber ungültiges CSS, das der
+        // und wuerde das Attribut nicht schuetzen. Die Pruefung steht seit OI-94 nur
+        // noch einmal im Dashboard, als safeTypeColor() in utils.js; die Check-in-App
+        // fuehrt weiter ihre eigene Fassung (public/checkin/js/app.js) -- sie war von
+        // OI-94 ausdruecklich ausgenommen. Die gemeinsame Fassung ist zugleich enger
+        // als die fruehere Kopie an dieser Stelle: nur 3, 4, 6 oder 8 Hexstellen. Eine
+        // Laenge wie 5 galt hier als sicher, ergab aber ungueltiges CSS, das der
         // Browser wortlos verwirft -- die Kachel blieb dann farblos statt grau.
         const safeColor = safeTypeColor(type.color);
         const colorBadge = `<span style="display: inline-block; width: 20px; height: 20px; background: ${safeColor}; border-radius: 3px; border: 1px solid #ddd;"></span>`;
