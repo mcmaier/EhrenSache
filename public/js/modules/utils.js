@@ -172,3 +172,90 @@ export function formatTimeRange(startTime, endTime) {
 export function safeTypeColor(color) {
     return /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color || '') ? color : 'var(--type-color-none)';
 }
+
+/** Was in einem Dialog angefahren werden kann. */
+const FOCUSABLE_SELECTOR = [
+    'button:not([disabled])',
+    'a[href]',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+].join(', ');
+
+/**
+ * Haelt den Tastaturfokus in einem Element, bis die Freigabe gerufen wird.
+ *
+ * Gedacht fuer Elemente, die optisch ueber der Seite liegen, im DOM aber
+ * woanders haengen -- dort stimmt die Tab-Reihenfolge nicht mit dem ueberein,
+ * was man sieht. Das Kalender-Popup haengt an document.body und steht damit
+ * hinter allem anderen; ohne Fang fuehrt Tab vom Kalendertag nicht hinein.
+ *
+ * Die Liste der bedienbaren Elemente wird bei jedem Tab neu gelesen: Was im
+ * Dialog steht, haengt an Rolle und Zustand und kann sich waehrenddessen
+ * aendern.
+ *
+ * Liefert eine Funktion, die den Hoerer entfernt und den Fokus dorthin
+ * zurueckgibt, wo er vorher stand.
+ */
+export function trapFocus(element, onEscape) {
+    const previouslyFocused = document.activeElement;
+
+    // offsetParent ist null, wenn ein Vorfahr display:none traegt -- und
+    // ausserdem bei position:fixed. Beides stoert hier nicht: Gefiltert werden
+    // nur Nachfahren, und die liegen im Dialog, nicht selbst fest am Fenster.
+    // Ein kuenftiger Aufrufer mit einem festgestellten Bedienelement DARIN
+    // muesste den Filter erweitern.
+    const focusables = () => Array.from(element.querySelectorAll(FOCUSABLE_SELECTOR))
+        .filter(el => el.offsetParent !== null);
+
+    const first = focusables()[0];
+    if (first) {
+        first.focus();
+    } else {
+        // Ein Dialog ohne Bedienelement muss den Fokus trotzdem nehmen,
+        // sonst laeuft Escape ins Leere.
+        element.setAttribute('tabindex', '-1');
+        element.focus();
+    }
+
+    function onKeydown(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            onEscape();
+            return;
+        }
+
+        if (e.key !== 'Tab') {
+            return;
+        }
+
+        const list = focusables();
+        if (list.length === 0) {
+            e.preventDefault();
+            return;
+        }
+
+        const start = list[0];
+        const end = list[list.length - 1];
+
+        if (e.shiftKey && document.activeElement === start) {
+            e.preventDefault();
+            end.focus();
+        } else if (!e.shiftKey && document.activeElement === end) {
+            e.preventDefault();
+            start.focus();
+        }
+    }
+
+    element.addEventListener('keydown', onKeydown);
+
+    return function releaseFocus() {
+        element.removeEventListener('keydown', onKeydown);
+        // Das Element kann inzwischen aus dem DOM sein -- dann waere focus()
+        // wirkungslos und der Fokus fiele auf body zurueck.
+        if (previouslyFocused && document.body.contains(previouslyFocused)) {
+            previouslyFocused.focus();
+        }
+    };
+}
