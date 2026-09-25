@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unveröffentlicht]
+## [1.16.0] – 2026-09-25
 
 ### Geändert
 - **Die Spalte „Terminart“ entfällt — die Terminart steht jetzt als farbiger Streifen am linken
