@@ -63,7 +63,14 @@ einer Stelle im Markup.
 **Farbprüfung an eine Stelle.** Heute steht `/^#[0-9a-f]{3,8}$/i` dreimal einzeln:
 `appointments.js:305`, `appointments.js:888`, `records.js:1832`. Sie wandert als
 `safeTypeColor(color)` nach `public/js/modules/utils.js` und liefert bei ungültiger oder fehlender
-Farbe die neue Ersatzfarbe. **Das ist keine Kosmetik:** Ohne Inhaltssicherheitsrichtlinie (OI-17)
+Farbe die neue Ersatzfarbe.
+
+Dabei wird die Prüfung zugleich **enger**, als die drei Kopien sie hatten: `{3,8}` erlaubt auch
+Länge 5 und 7, die es in CSS nicht gibt (gültig sind 3, 4, 6, 8). Ein solcher Wert passierte die
+Prüfung als „sicher", ergab dann aber eine ungültige CSS-Deklaration, die der Browser wortlos
+verwirft — der Termin stand danach ganz ohne Streifen da, also schlechter als mit der grauen
+Ersatzfarbe. Die Prüfung lautet deshalb `/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i`.
+(Beim Qualitätsreview zu Task 1 aufgefallen, 2026-09-25.) **Das ist keine Kosmetik:** Ohne Inhaltssicherheitsrichtlinie (OI-17)
 ist diese Prüfung die einzige Schranke gegen eingeschleustes Markup aus dem Farbfeld der
 Terminart — drei Kopien sind drei Gelegenheiten, eine zu vergessen.
 
