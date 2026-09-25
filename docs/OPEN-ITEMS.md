@@ -39,7 +39,7 @@ OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23,
 Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103. **OI-3 und OI-20 tragen ebenfalls
 *mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
 Restarbeit, und gehören deshalb nicht in eine Umsetzungsreihe. OI-62 steht auf
-*niedrig–mittel*, OI-104 bis OI-106 und OI-108 auf *niedrig*.
+*niedrig–mittel*, OI-104 bis OI-106, OI-108 und OI-109 auf *niedrig*.
 
 Seit der Durchsicht vom 17.09. veröffentlicht: OI-82 bis OI-84 (1.11.2), OI-85 (1.12.1),
 OI-86 und OI-87 (1.13.0), OI-25, OI-27, OI-66 und OI-95 (1.14.x),
@@ -1977,6 +1977,55 @@ damit sich Nummern nicht durchprobieren lassen —, also sammelte diese eine Zei
 Läufe hinweg an und der sechste Lauf binnen 15 Minuten bekam `423` statt `401`. Die Nummer
 trägt jetzt ein `uniqid()`, wie alles andere in der Suite auch. Sieben Läufe hintereinander
 sind seither grün.
+
+---
+
+### OI-109 · „Keine Antwort“ unterscheidet nicht, wer gar nicht antworten kann
+**Priorität:** niedrig · aufgenommen am 2026-09-25 (Beobachtung aus dem manuellen Test)
+
+Selbst zurückmelden kann nur ein Mitglied mit Benutzerkonto — also ein `users`-Satz mit dieser
+`member_id`, `account_status = 'active'` und `is_active = 1`. Für alle anderen trägt die
+Verwaltung ein: Admin und Manager setzen die Rückmeldung jedes Mitglieds über
+`?member_id=<id>` (`responsesResolveTarget()`,
+[appointment_responses.php](../private/handlers/appointment_responses.php)), in der Oberfläche
+über das Schloss im Rückmeldungs-Dialog ([OI-63](#oi-63--rückmeldung-für-andere-kein-schutzschritt-keine-spur)).
+Die Funktion fehlt also nicht.
+
+**Was fehlt, ist die Unterscheidung in der Anzeige.** „Keine Antwort“ bzw. „ohne Antwort“ zählt
+zwei verschiedene Fälle zusammen:
+
+- das Mitglied *könnte* antworten und hat es nicht getan — Nachhaken lohnt;
+- das Mitglied *kann* nicht antworten, weil es keinen Zugang hat — hier hilft nur, dass die
+  Verwaltung selbst einträgt.
+
+In einem Verein mit vielen Mitgliedern ohne Konto wird die Zahl damit zum Rauschen: Zwölf offene
+Rückmeldungen, von denen acht niemand abgeben kann, sehen aus wie zwölf säumige Mitglieder.
+
+**Betroffene Stellen:** Ampel-Chips und Zusammenfassung in der Terminliste und im Dialog sowie
+der Filter „Keine Antwort (n)“ ([responses.js](../public/js/modules/responses.js)), die
+Rückmeldeübersicht der Check-in-App für Verwalter ([app.js](../public/checkin/js/app.js)) und
+der Druckbericht (`keine Antwort {$s['open']}` in `appointment_responses.php`).
+
+**Nicht betroffen:** die Zuverlässigkeit. `reliabilityOutcome()`
+([punctuality.php](../private/helpers/punctuality.php)) wertet eine fehlende Rückmeldung nicht
+als Versäumnis, nur Absage, Antrag und Anwesenheit. Ein Mitglied ohne Konto verliert dort nichts.
+
+**Vorschlag:**
+
+- Die Antwort von `appointment_responses` liefert je Mitglied ein `has_account` (EXISTS auf
+  `users` mit den Bedingungen oben), nur für Admin und Manager.
+- Offene Zeilen ohne Zugang tragen ein dezentes Kennzeichen mit Tooltip, etwa „Kein Zugang –
+  Rückmeldung nur durch die Verwaltung“.
+- Optional die Zusammenfassung aufteilen: „keine Antwort 12 (davon 8 ohne Zugang)“.
+
+**Bewusst nicht:** keine eigene Kategorie in der Zuverlässigkeit, keine eigene Filterleiste.
+Beim Umsetzen `API.md` nachziehen; der Lesepfad ist nach
+[OI-100](#oi-100--api-abgleich-schreibpfade-und-fünf-lesepfade-nicht-bewacht) nicht bewacht.
+
+**Zu klären:** Zählt ein Konto im Zustand `pending` (eingeladen, noch nicht aktiviert) als
+Zugang? Für die Frage „lohnt Nachhaken?“ eher ja, streng genommen kann es noch nicht antworten.
+
+**Nicht sicherheitsrelevant.**
 
 ---
 
