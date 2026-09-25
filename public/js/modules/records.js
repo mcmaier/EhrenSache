@@ -177,7 +177,7 @@ export async function renderRecords(records, page = 1)
     
      pageRecords.forEach(record => {
         const tr = document.createElement('tr');
-
+        
         // Terminart als Randakzent (OI-94): Streifen an der ersten Zelle, Name
         // in deren Unterzeile. Der Trenner steht ausserhalb des Spans -- er ist
         // Satzzeichen, nicht Teil des Namens, und die Klasse gestaltet nur den
@@ -195,13 +195,13 @@ export async function renderRecords(records, page = 1)
         if (record.appointment_id && record.title) {
             appointmentInfo = `<div style="line-height: 1.4;">
                 <strong>${escapeHtml(record.title)}</strong>`;
-
+            
             if (record.date && record.start_time) {
                 const aptDate = new Date(record.date + 'T00:00:00');
                 const formattedAptDate = aptDate.toLocaleDateString('de-DE');
                 appointmentInfo += `<br><small style="color: #7f8c8d;">${typeName}${formattedAptDate}, ${record.start_time.substring(0, 5)}</small>`;
             }
-
+            
             appointmentInfo += '</div>';
         }
 
@@ -1691,11 +1691,14 @@ window.setAttendanceGrouping = function(stage) {
 };
 
 async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
-    try {
+    try {        
         // Der Randakzent holt Farbe und Namen der Terminart aus dataCache.types
-        // (OI-94). Diese Liste laedt die Terminarten bisher nirgends selbst --
-        // fehlten sie, blieben Streifen grau und Name leer. renderRecords()
-        // macht es genauso; aus dem Cache kostet es nichts.
+        // (OI-94). Das ist heute immer gefuellt: Jeder Weg in den
+        // Anwesenheitsbereich laeuft ueber showRecordsSection(), und die ruft
+        // als Erstes loadRecordFilters(), die ihrerseits loadTypes() holt.
+        // Dieser Aufruf schliesst also KEINE Luecke -- er ist Vorsorge fuer
+        // einen kuenftigen Direkteinstieg in diese Liste. renderRecords()
+        // haelt es genauso, und aus dem Cache kostet er nichts.
         await loadTypes();
 
         const attendance = await apiCall('attendance_list', 'GET', null, {
@@ -1739,8 +1742,8 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
     }
 
     shown.forEach(appointment => {
-        const tr = document.createElement('tr');
-
+        const tr = document.createElement('tr');        
+        
         // Terminart als Randakzent (OI-94) -- dieselbe Form wie in
         // renderRecords(): Streifen an der ersten Zelle, Name in deren
         // Unterzeile, Trenner ausserhalb des Spans und per geschuetztem
@@ -1755,13 +1758,13 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
         if (appointment.appointment_id && appointment.title) {
             appointmentInfo = `<div style="line-height: 1.4;">
                 <strong>${escapeHtml(appointment.title)}</strong>`;
-
+            
             if (appointment.date && appointment.start_time) {
                 const aptDate = new Date(appointment.date + 'T00:00:00');
                 const formattedAptDate = aptDate.toLocaleDateString('de-DE');
                 appointmentInfo += `<br><small style="color: #7f8c8d;">${typeName}${formattedAptDate}, ${appointment.start_time.substring(0, 5)}</small>`;
             }
-
+            
             appointmentInfo += '</div>';
         }
 
@@ -1873,11 +1876,11 @@ function appointmentTypeAccent(appointment_type_id = null)
 function createAppointmentTypeBadge(appointment_type_id = null)
 {
     const types = dataCache.types.data;
-
+        
     // Type-ID vorhanden UND types ist Array
     if (appointment_type_id && Array.isArray(types)) {
         const type = types.find(t => t.type_id == appointment_type_id);
-
+        
         if (type) {
             // type.color/type.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
             // muss hier selbst maskiert werden: Farbe per safeTypeColor(), Text per escapeHtml().
@@ -1886,7 +1889,7 @@ function createAppointmentTypeBadge(appointment_type_id = null)
                     </span>`;
         }
     }
-
+    
     // Fallback: Termin ohne Type ODER nicht gefunden
     return `<span class="type-badge" style="background: var(--type-color-none); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
                 Allgemein

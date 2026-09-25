@@ -219,18 +219,42 @@ test('Die Anwesenheitsliste nutzt den Randakzent, das Formularfeld das Schildche
 
     $accent = taFunctionBody($js, 'function appointmentTypeAccent(');
     assertTrue(str_contains($accent, 'safeTypeColor('), 'Die gemeinsame Farbpruefung wird nicht benutzt');
-    assertTrue(str_contains($accent, '--type-color'), 'Die Farbe muss als CSS-Variable herauskommen');
 
-    // Ohne diese Gegenprobe waere auch eine Fassung gruen, die den Namen gar
-    // nicht mitliefert -- der Name ist der Textersatz des Streifens fuer
-    // Farbenblinde und ersetzt die entfallene Spalte.
-    assertTrue(str_contains($accent, 'escapeHtml('),
-        'Der Name der Terminart kommt aus der Datenbank und muss maskiert werden (keine CSP, OI-17)');
+    // Die Deklaration fuer die erste Zelle wird HIER gebaut, nicht mehr im
+    // Zeilen-Template -- also gehoert die Pruefung hierher. Sie im Rumpf der
+    // Liste zu suchen war wirkungslos: Dort steht seit der Aufteilung gar
+    // kein CSS mehr, ein zusaetzliches "background: ..." waere dort nie
+    // aufgefallen.
+    assertTrue((bool) preg_match('/style:\s*`([^`]*)`/', $accent, $styleTpl),
+        'Die Hilfsfunktion liefert die Deklaration fuer die erste Zelle nicht als Vorlage');
+    assertTrue((bool) preg_match('/^--type-color:\s*\$\{safeTypeColor\(/', trim($styleTpl[1])),
+        'Die Variable --type-color muss ihren Wert unmittelbar aus safeTypeColor() beziehen');
+    // Genau eine Deklaration, also genau ein Doppelpunkt. Ohne diese Zaehlung
+    // bliebe ein angehaengtes "background: ${type.color};" gruen -- der
+    // Datenbankwert stuende dann ein zweites Mal im style-Attribut, diesmal
+    // ungeprueft, und ohne CSP (OI-17) ist die Pruefung die einzige Schranke.
+    // Die eingesetzten Werte fallen vorher heraus: Ein Ternaer darin bringt
+    // einen eigenen Doppelpunkt mit, der nichts mit CSS zu tun hat.
+    $ohneWerte = preg_replace('/\$\{[^}]*\}/', 'X', $styleTpl[1]);
+    assertSame(1, substr_count($ohneWerte, ':'),
+        'In das style-Attribut gehoert genau eine Deklaration -- jede weitere waere eine zweite Stelle, an der ein Datenbankwert ins Markup laeuft');
+
+    // Der Name ist der Textersatz des Streifens fuer Farbenblinde und ersetzt
+    // die entfallene Spalte. Geprueft wird nicht, DASS escapeHtml irgendwo im
+    // Rumpf steht, sondern dass der Name durch den Aufruf laeuft -- sonst
+    // bliebe eine Fassung gruen, die an anderer Stelle maskiert und den Namen
+    // selbst roh durchreicht.
+    assertTrue((bool) preg_match('/name:\s*[^,]*escapeHtml\(type\.type_name\)/', $accent),
+        'Der Name der Terminart kommt aus der Datenbank und muss durch escapeHtml() laufen (keine CSP, OI-17)');
 
     // Das Formularfeld beim Erfassen behaelt bewusst ein Schildchen.
     assertTrue(str_contains($js, 'createAppointmentTypeBadge('),
         'Die Badge-Funktion bleibt fuer das Formularfeld erhalten');
-    assertTrue((bool) preg_match('/typeBadge\.innerHTML = await createAppointmentTypeBadge\(/', $js),
+    // Das await davor ist wirkungslos -- die Funktion ist nicht async -- und
+    // Altlast aus der Zeit vor OI-94. Es steht hier bewusst als OPTION: Diese
+    // Zusicherung soll den Aufrufer am Randakzent hindern, nicht eine Warze
+    // zementieren, die niemand verlangt hat.
+    assertTrue((bool) preg_match('/typeBadge\.innerHTML = (?:await )?createAppointmentTypeBadge\(/', $js),
         'Der Aufrufer im Formular darf nicht auf den Randakzent umgestellt werden');
 });
 
@@ -268,11 +292,8 @@ test('Beide Listen in records.js rendern die Terminart als Randakzent', function
         assertTrue((bool) preg_match('/innerHTML\s*=\s*`\s*<td class="type-accent" style="\$\{\w+\.style\}"/', $body),
             "{$klartext}: Die erste Zelle traegt Klasse und Farbvariable nicht -- der Streifen liegt nur am linken Rand, wenn er an der ERSTEN Zelle haengt");
 
-        // Die Farbe geht als Variable ins Markup, das Aussehen steht im
-        // Stylesheet. Ein fertiger Stil im Markup hiesse, den Datenbankwert an
-        // mehreren Stellen einzusetzen -- jede davon eine eigene Luecke.
-        assertTrue(!preg_match('/background:\s*\$\{[A-Za-z]*[Tt]ype[A-Za-z]*\}/', $body),
-            "{$klartext}: Die Terminfarbe darf nicht als fertiger Stil ins Markup");
+        // Dass in diese Deklaration nichts ausser der Variablen geraet, prueft
+        // der Test der Hilfsfunktion -- dort wird sie gebaut.
 
         // Das Schildchen der Terminart muss weg. Gezaehlt statt gesucht: In
         // diesen beiden Ruempfen ist type-badge projektweit nur die Terminart
@@ -315,7 +336,10 @@ test('Die Spalte Terminart ist aus der Anwesenheitsliste entfernt -- an allen dr
     assertTrue($end !== false, 'Ende der Anwesenheitstabelle nicht gefunden');
     $block = substr($html, $start, $end - $start);
 
-    assertTrue(!str_contains($block, '<th>Terminart</th>'),
+    // Gezaehlt, nicht nach einem Wort gesucht: Die Spalte kann auch unter
+    // anderem Namen zurueckkommen ("Art", "Kategorie"). Die Zahl der Koepfe
+    // ist das, was gegen die Zellen stehen muss.
+    assertTrue(!preg_match('/<th>(Terminart|Typ|Art)<\/th>/', $block),
         'index.html: Die Spalte entfaellt -- der Name steht jetzt in der Unterzeile');
     // Termin, Mitglied, Ankunftszeit, Status, Quelle, Aktionen
     assertSame(6, substr_count($block, '<th>'),
@@ -327,16 +351,100 @@ test('Die Spalte Terminart ist aus der Anwesenheitsliste entfernt -- an allen dr
     $ui = taFile($taRoot, 'public/js/modules/ui.js');
     $uiStart = strpos($ui, "id: 'recordsTableBody'");
     assertTrue($uiStart !== false, 'recordsTableBody fehlt in updateTableHeaders()');
-    $uiEntry = substr($ui, $uiStart, strpos($ui, ']', $uiStart) - $uiStart);
-    assertTrue(!str_contains($uiEntry, 'Terminart'),
+    // Die schliessende Klammer gehoert in den Ausschnitt -- die Titelliste wird
+    // gleich als vollstaendiges [...] gelesen.
+    $uiEntry = substr($ui, $uiStart, strpos($ui, ']', $uiStart) - $uiStart + 1);
+    assertTrue((bool) preg_match('/headers:\s*\[([^\]]*)\]/', $uiEntry, $uiHeaders),
+        'Der Eintrag fuer recordsTableBody fuehrt keine Titelliste');
+    assertTrue(!preg_match("/'(Terminart|Typ|Art)'/", $uiHeaders[1]),
         'updateTableHeaders() setzt die Spalte Terminart wieder ins thead der Anwesenheitsliste');
+    // Fuenf Titel; "Aktionen" haengt updateTableHeaders() nur fuer Verwalter an.
+    // Ohne diese Zahl bliebe ein umbenannter Rueckfall wie 'Art' unbemerkt.
+    assertSame(5, preg_match_all("/'[^']*'/", $uiHeaders[1]),
+        'updateTableHeaders() fuehrt fuenf feste Titel fuer die Anwesenheitsliste');
 
     // updateTableHeader() in records.js baut denselben Kopf bei JEDEM
     // Moduswechsel neu -- es ist die Stelle, die im Betrieb zuletzt schreibt.
     // Die Spalte heisst dort "Typ", nicht "Terminart"; eine Suche nach
-    // "Terminart" ginge hier ins Leere.
+    // "Terminart" ginge hier ins Leere, eine nach "Typ" an 'Art' vorbei.
     $records = taFile($taRoot, 'public/js/modules/records.js');
+    foreach (taRecordHeads($records) as [$kopf, $klartext]) {
+        assertTrue(!preg_match('/<th>(Terminart|Typ|Art)<\/th>/', $kopf),
+            "updateTableHeader(), {$klartext}: Die Terminart darf nicht als Spalte zurueckkommen -- sie stuende versetzt gegen die Zellen");
+    }
+});
+
+/**
+ * Die vier Kopfzeilen aus updateTableHeader() in Quelltext-Reihenfolge, je mit
+ * erwarteter Spaltenzahl und Klartext. Die Reihenfolge wird ueber einen Marker
+ * mitgeprueft, damit ein Umsortieren der Zweige nicht stillschweigend die
+ * Zuordnung verschiebt.
+ */
+function taRecordHeads(string $records): array
+{
     $header = taFunctionBody($records, 'function updateTableHeader(');
-    assertTrue(!str_contains($header, '<th>Typ</th>'),
-        'updateTableHeader() setzt die Spalte Typ wieder ins thead -- versetzt gegen die Zellen aus renderRecords()');
+    assertSame(4, preg_match_all("/thead\.innerHTML = '([^']*)'/", $header, $m),
+        'updateTableHeader() fuehrt vier Kopfzeilen: member, appointment, all/Verwalter, all/Mitglied');
+
+    $erwartet = [
+        ['<th>Termin</th><th>Ankunft</th>', 5,
+            'Modus member: Termin, Ankunft, Status, Quelle, Aktionen'],
+        ['<th>Mitglied</th><th>Ankunft</th>', 5,
+            'Modus appointment: Mitglied, Ankunft, Status, Quelle, Aktionen (hatte nie eine Terminart)'],
+        ['<th>Termin</th><th>Mitglied</th>', 6,
+            'Modus all, Verwalter: Termin, Mitglied, Ankunft, Status, Quelle, Aktionen'],
+        ['<th>Termin</th><th>Mitglied</th>', 5,
+            'Modus all, einfaches Mitglied: dieselben Spalten ohne Aktionen'],
+    ];
+
+    $heads = [];
+    foreach ($erwartet as $i => [$marker, $spalten, $klartext]) {
+        assertTrue(str_starts_with($m[1][$i], $marker),
+            "updateTableHeader(), {$klartext}: Kopfzeile {$i} passt nicht zum erwarteten Zweig");
+        assertSame($spalten, substr_count($m[1][$i], '<th>'),
+            "updateTableHeader(), {$klartext}: erwartet {$spalten} Spalten");
+        $heads[] = [$m[1][$i], $klartext];
+    }
+
+    return $heads;
+}
+
+test('Kopf und Zellen der Anwesenheitsliste stehen Spalte fuer Spalte uebereinander', function () use ($taRoot) {
+    // Der colspan der Leermeldung allein sagt nichts darueber, ob die gezeichnete
+    // Zeile zum Kopf passt: Ein zusaetzliches oder fehlendes <td> im
+    // Zeilen-Template verschiebt jede Spalte dahinter, ohne dass eine der
+    // bisherigen Zusicherungen anschlaegt. Deshalb hier Zellen GEGEN Koepfe,
+    // beides aus dem Quelltext gezaehlt.
+    $js = taFile($taRoot, 'public/js/modules/records.js');
+    $heads = taRecordHeads($js);
+    $spalten = fn (int $i) => substr_count($heads[$i][0], '<th>');
+
+    // Erfassungsliste: fuenf Zellen im Template, die Aktionszelle kommt aus
+    // einer eigenen Variablen und nur fuer Verwalter dazu.
+    $alle = taFunctionBody($js, 'export async function renderRecords(');
+    assertTrue((bool) preg_match('/tr\.innerHTML = `([^`]*)`/', $alle, $zeile),
+        'Erfassungsliste: Zeilen-Template nicht gefunden');
+    assertTrue((bool) preg_match('/const actionsHtml = isAdminOrManager \? `([^`]*)`/', $alle, $aktionen),
+        'Erfassungsliste: Aktionszelle nicht gefunden');
+    assertSame(1, substr_count($aktionen[1], '<td'),
+        'Erfassungsliste: Die Aktionsspalte ist genau eine Zelle');
+
+    assertSame($spalten(2), substr_count($zeile[1], '<td') + 1,
+        'Erfassungsliste, Verwalter: Zellen der Zeile (mit Aktionszelle) und Koepfe stehen versetzt');
+    assertSame($spalten(3), substr_count($zeile[1], '<td'),
+        'Erfassungsliste, einfaches Mitglied: Zellen der Zeile und Koepfe stehen versetzt');
+
+    // Mitgliedsansicht: Hier liegt die Aktionszelle IM Template, die
+    // Knopfvarianten liefern nur deren Inhalt -- sonst zaehlte die Zeile falsch.
+    $mitglied = taFunctionBody($js, 'function renderMemberAttendanceList(');
+    assertTrue((bool) preg_match('/tr\.innerHTML = `([^`]*)`/', $mitglied, $mZeile),
+        'Mitgliedsansicht: Zeilen-Template nicht gefunden');
+    assertTrue(preg_match_all('/actionsHtml = `([^`]*)`/', $mitglied, $mAkt) > 0,
+        'Mitgliedsansicht: Knopfreihe nicht gefunden');
+    foreach ($mAkt[1] as $fragment) {
+        assertTrue(!str_contains($fragment, '<td'),
+            'Mitgliedsansicht: Die Knopfreihe darf keine eigene Zelle mitbringen -- sonst zaehlt die Zeile eine Spalte zu viel');
+    }
+    assertSame($spalten(0), substr_count($mZeile[1], '<td'),
+        'Mitgliedsansicht: Zellen der Zeile und Koepfe stehen versetzt');
 });
