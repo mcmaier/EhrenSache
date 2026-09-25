@@ -1209,10 +1209,8 @@ Die Anwendung liefert **keine** CSP — weder als Header noch als `<meta http-eq
 2026-09-03 nachgeprüft: keine der neun `.htaccess`-Dateien und kein `header()`-Aufruf setzt
 sie. `CLAUDE.md` behauptete das Gegenteil; die Zeile war schlicht falsch und ist korrigiert.
 
-**Warum sie nicht einfach nachgereicht wird.** `public/index.html` enthält 95
-`onclick`-Attribute und 124 Inline-`style`-Attribute — am 2026-09-25 nachgezählt sind es 98 und
-137. Der Bestand wächst mit jeder Ansicht, der Befund bleibt. Jedes davon ist aus Sicht einer CSP
-Inline-Code:
+**Warum sie nicht einfach nachgereicht wird.** Die Oberfläche steckt voller Inline-Code, und
+jedes Stück davon blockiert eine CSP:
 
 - CSP ohne `'unsafe-inline'` → die Oberfläche funktioniert nicht mehr
 - CSP mit `'unsafe-inline'` für `script-src` → gegen XSS praktisch wirkungslos
@@ -1220,20 +1218,68 @@ Inline-Code:
 Die zweite Variante wäre eine Zeile, die in einem Audit gut aussieht und nichts verhindert.
 Deshalb bewusst keine CSP, statt einer, die nur so heißt.
 
+**Bestand, am 2026-09-25 über ganz `public/` gezählt.** Frühere Zählungen (95, dann 98
+`onclick`) erfassten nur `public/index.html` und unterschätzten den Umfang um mehr als die
+Hälfte:
+
+| Befund | Umfang |
+|---|---|
+| Inline-Handler in `index.html` | 109 (`onclick`, `onchange`, `onmouseover`/`-out`) |
+| Inline-Handler in HTML aus JS-Templates | 126 in 14 Modulen unter `public/js/modules/` (records 21, members 16, exceptions 15, appointments 15, responses 11, users 10, devices 10 …) |
+| Check-in-PWA | 4 Handler in `public/checkin/js/app.js` — sie ist **nicht** frei davon, wie hier früher stand |
+| Login | 1 Handler in `public/login.html` |
+| Station-PWA | 0 Handler, nur externe Scripts |
+| Inline-`<script>` | 1 Block in `index.html` (Installationsprüfung am Dateiende) |
+| Fremdquelle | `public/checkin/index.html` lädt `html5-qrcode` von unpkg.com |
+| `window.*`-Exporte, die nur den Handlern dienen | 137 |
+| `style=`-Attribute | 245, davon 15 mit interpolierten Werten; dazu `<style>`-Blöcke in install, update, `reset_password.php`, `verify_email.php` |
+
+Summe: **235 Inline-Handler in 16 Dateien.** Nicht betroffen sind Zuweisungen über
+`element.style.…` (CSSOM, von einer CSP nicht erfasst) und die Druckberichte
+(`private/helpers/report.php`, bewusst ohne JavaScript).
+
 **Was stattdessen gesetzt wurde** (`public/.htaccess`, seit 2026-09-03):
 `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
 `Referrer-Policy: strict-origin-when-cross-origin`.
 
-**Weg zu einer echten CSP** — in dieser Reihenfolge, sonst bricht Schritt 3:
+**Weg zu einer echten CSP** — in zwei Etappen, sonst bricht der Header die Oberfläche:
 
-1. Die 95 `onclick`-Attribute auf `addEventListener` umstellen. Die PWA unter
-   `public/checkin/` ist bereits frei von Inline-Handlern und taugt als Vorlage.
-2. Inline-`style` auf Klassen aus `public/css/` umstellen, oder `style-src 'unsafe-inline'`
-   als bewusste Ausnahme behalten — Inline-Styles sind das deutlich kleinere Risiko.
-3. `Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none';
-   base-uri 'self'; frame-ancestors 'none'` setzen und gegen alle Sektionen prüfen.
+*Etappe 1 — die kleinen Oberflächen, je mit eigenem Header in ihrem Verzeichnis:*
 
-Schritt 1 ist der gesamte Aufwand und gehört in eine eigene Spec.
+1. **Station-PWA:** sofort möglich, es gibt nichts umzubauen.
+2. **Login:** einen Handler umstellen.
+3. **Check-in-PWA:** vier Handler umstellen, `html5-qrcode` nach `public/js/vendor/` holen
+   wie `qrcode.js` (beseitigt nebenbei die Abhängigkeit von einem fremden CDN).
+
+*Etappe 2 — das Dashboard, Modul für Modul:*
+
+4. Handler auf Event-Delegation umstellen: `data-action` plus Argumente als `data-*`-Attribute,
+   eine zentrale Zuordnung Aktionsname → Funktion. Die Paginierung ist in jedem Modul kopiert —
+   ein gemeinsamer Helfer erledigt einen guten Teil der Template-Handler auf einmal.
+   Sonderfälle: `this.parentElement` im Toast (`ui.js`), die mehrteiligen Handler im
+   Kalender-Popup (`appointments.js`), die Hover-Handler, ein `onsubmit`.
+5. Inline-Script aus `index.html` in eine eigene Datei ziehen. Die `window.*`-Exporte können
+   danach schrittweise entfallen.
+6. Inline-`style` als bewusste Ausnahme behalten (`style-src 'self' 'unsafe-inline'`) —
+   Inline-Styles sind das deutlich kleinere Risiko. Die Folge: `safeTypeColor()` bleibt die
+   einzige Schranke für das Farbfeld der Terminart (siehe unten und OI-107).
+
+*Für beide Etappen:*
+
+7. Header zunächst als `Content-Security-Policy-Report-Only` ausliefern und die Konsole aller
+   Sektionen durchsehen, dann scharf schalten:
+   `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none';
+   base-uri 'self'; frame-ancestors 'none'`. Zu prüfen: ob die QR-Codes `img-src data:`
+   brauchen.
+8. Einen Wächter anlegen, der `on…=` unter `public/` verbietet — und dabei Kommentare
+   ausnimmt, sonst entsteht genau die Zusicherung, vor der OI-107 warnt. 13 bestehende
+   Zusicherungen in fünf Frontend-Suiten (`arrival`, `calendar_attendance`, `filter_chips`,
+   `profile_dashboard`, `subgroups`) prüfen heute `onclick`-Strings und sind anzupassen.
+
+**Aufwand, geschätzt am 2026-09-25:** Etappe 1 etwa ein Tag. Etappe 2 etwa zwei bis drei Tage,
+davon den größten Teil für die 126 Template-Handler; dazu ein vollständiger Durchgang durch
+`docs/testplan.md`, denn ein vergessener Handler fällt erst beim Klicken auf, nicht in der
+Suite. Etappe 2 gehört in eine eigene Spec. OI-107 geht voraus.
 
 **Keine Entwarnung.** Eine CSP ist die zweite Verteidigungslinie, nicht die erste. Ihr Fehlen
 ist kein Freibrief für ungeprüfte Ausgabe: Jede neue serverseitig gerenderte HTML-Ansicht
