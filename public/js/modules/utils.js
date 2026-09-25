@@ -195,6 +195,11 @@ const FOCUSABLE_SELECTOR = [
  * Dialog steht, haengt an Rolle und Zustand und kann sich waehrenddessen
  * aendern.
  *
+ * Das Element bekommt tabindex="-1" und behaelt es: Die Freigabe nimmt das
+ * Attribut nicht zurueck. Fuer das Kalender-Popup belanglos, weil es bei jedem
+ * Oeffnen neu entsteht -- ein wiederverwendeter Container bleibt danach
+ * programmatisch anfahrbar.
+ *
  * Liefert eine Funktion, die den Hoerer entfernt und den Fokus dorthin
  * zurueckgibt, wo er vorher stand.
  */
@@ -209,13 +214,22 @@ export function trapFocus(element, onEscape) {
     const focusables = () => Array.from(element.querySelectorAll(FOCUSABLE_SELECTOR))
         .filter(el => el.offsetParent !== null);
 
+    // Der Dialog selbst wird anfahrbar -- unbedingt, nicht bloss im Rueckfall
+    // ohne Bedienelemente. Ein Klick auf freie Flaeche darin setzt sonst
+    // document.activeElement auf BODY, und damit ist der Fang tot: Der Hoerer
+    // haengt am Element, bekommt die Taste nicht mehr zu sehen, Escape verpufft
+    // und Tab wird nicht gehalten. Genau dieser Klick ist im Kalender-Popup
+    // erlaubt -- es soll dabei offen bleiben (OI-96). Ohne Nebenwirkung: Der
+    // Selektor schliesst [tabindex="-1"] aus, und querySelectorAll sieht das
+    // Element selbst ohnehin nicht.
+    element.setAttribute('tabindex', '-1');
+
     const first = focusables()[0];
     if (first) {
         first.focus();
     } else {
         // Ein Dialog ohne Bedienelement muss den Fokus trotzdem nehmen,
         // sonst laeuft Escape ins Leere.
-        element.setAttribute('tabindex', '-1');
         element.focus();
     }
 

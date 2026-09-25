@@ -36,15 +36,75 @@ function ckFunctionBody(string $js, string $signature): string
     return substr($js, $start, $next - $start);
 }
 
-/** Entfernt Zeilenkommentare, damit eine Zusicherung nicht vom Kommentar erfuellt wird (OI-107). */
+/**
+ * Entfernt Kommentare, damit eine Zusicherung nicht vom Kommentar erfuellt wird
+ * (OI-107).
+ *
+ * Beide Formen, und in dieser Reihenfolge: erst Bloecke, dann Zeilenreste. Ein
+ * Muster, das den Kommentar am Zeilenanfang verankert, erwischt nur
+ * GANZZEILIGE Kommentare -- ein nachgestellter ("const x = 1; // shiftKey") und
+ * ein Blockkommentar bleiben stehen und erfuellen die Zusicherung weiter. Genau
+ * so stand es hier bis zum Review und war damit halb wirkungslos. Dieselben
+ * Muster wie in tests/suites/filter_chips_frontend.php (Zeilen 60 und 474).
+ *
+ * Gedacht fuer Funktionsruempfe. Auf eine ganze Datei angewandt trifft
+ * '#//[^\n]*#' auch die Schraegstriche in einer URL ("https://...") -- in den
+ * hier gelesenen Ruempfen kommt keine vor.
+ */
 function ckOhneKommentare(string $js): string
 {
-    return preg_replace('~^\s*//.*$~m', '', $js);
+    $js = (string) preg_replace('#/\*.*?\*/#s', '', $js);
+
+    return (string) preg_replace('#//[^\n]*#', '', $js);
+}
+
+/**
+ * Der Rumpf von trapFocus ohne Kommentare, dazu der Name seines ersten
+ * Parameters (des Dialogs). Der Name wird ausgelesen statt angenommen: Eine
+ * Umbenennung ist keine Verschlechterung und soll nicht "Zusicherung verletzt"
+ * melden.
+ */
+function ckTrapFocus(string $root): array
+{
+    $roh = ckFunctionBody(ckFile($root, 'public/js/modules/utils.js'), 'export function trapFocus(');
+    assertTrue((bool) preg_match('/^export function trapFocus\(\s*(\w+)\s*,/', $roh, $sig),
+        'trapFocus muss den Dialog als ersten Parameter nehmen');
+
+    return [ckOhneKommentare($roh), $sig[1]];
+}
+
+/**
+ * Teilt den Rumpf am keydown-Hoerer: [was beim Oeffnen laeuft, der Hoerer].
+ *
+ * Ohne diese Trennung laesst sich nicht unterscheiden, was EINMAL beim Oeffnen
+ * geschieht und was BEI JEDEM Tastendruck -- und genau daran haengt der Fang.
+ * Der Hoerer wird ueber den Namen gefunden, den addEventListener uebergibt,
+ * nicht ueber eine angenommene Schreibweise.
+ */
+function ckAmHoerer(string $body): array
+{
+    assertTrue((bool) preg_match('/addEventListener\(\s*\'keydown\'\s*,\s*(\w+)\s*\)/', $body, $m),
+        'Der Fang haengt keinen keydown-Hoerer an');
+    $name = preg_quote($m[1], '/');
+    assertTrue((bool) preg_match('/function\s+' . $name . '\s*\(|(?:const|let|var)\s+' . $name . '\s*=/',
+        $body, $d, PREG_OFFSET_CAPTURE),
+        "Der Hoerer {$m[1]} wird nicht innerhalb von trapFocus erklaert");
+
+    return [substr($body, 0, $d[0][1]), substr($body, $d[0][1])];
+}
+
+/** Name der Funktion, die die bedienbaren Elemente liefert. */
+function ckListenFunktion(string $body): string
+{
+    assertTrue(substr_count($body, 'querySelectorAll') >= 1, 'Kein Selektor fuer bedienbare Elemente');
+    assertTrue((bool) preg_match('/(?:const|let)\s+(\w+)\s*=\s*\(\s*\)\s*=>[^;]*querySelectorAll/s', $body, $m),
+        'Die Liste muss aus einer Funktion kommen, nicht aus einer einmal gesetzten Konstanten');
+
+    return $m[1];
 }
 
 test('trapFocus steht in utils.js und haelt Tab, Escape und die Rueckgabe', function () use ($ckRoot) {
-    $js = ckFile($ckRoot, 'public/js/modules/utils.js');
-    $body = ckOhneKommentare(ckFunctionBody($js, 'export function trapFocus('));
+    [$body] = ckTrapFocus($ckRoot);
 
     assertTrue(str_contains($body, "'Escape'"), 'Escape wird nicht behandelt');
     assertTrue(str_contains($body, "'Tab'"), 'Tab wird nicht behandelt');
@@ -75,14 +135,101 @@ test('trapFocus steht in utils.js und haelt Tab, Escape und die Rueckgabe', func
         'Die Freigabe muss den Hoerer entfernen, sonst haelt der Fang nach dem Schliessen weiter Tab');
 });
 
+test('Der Dialog selbst wird anfahrbar -- unbedingt, nicht nur im Rueckfall', function () use ($ckRoot) {
+    [$body, $el] = ckTrapFocus($ckRoot);
+    [$beimOeffnen] = ckAmHoerer($body);
+
+    // Im Browser nachgestellt: Ein Klick auf nicht bedienbare Flaeche IM Dialog
+    // setzt document.activeElement auf BODY. Der Hoerer haengt am Dialog,
+    // bekommt die Taste danach nicht mehr zu sehen -- Escape verpufft, Tab wird
+    // nicht gehalten, und der Dialog ist per Tastatur nicht mehr erreichbar.
+    // Das trifft OI-96 unmittelbar: Ein Klick auf freie Flaeche im Popup soll es
+    // ausdruecklich NICHT schliessen, wer danach Escape druecken will, saesse
+    // fest. tabindex="-1" am Dialog faengt den Klick auf.
+    //
+    // Geprueft wird die EINRUECKUNG: vier Leerzeichen heisst Rumpfebene von
+    // trapFocus, acht hiessen innerhalb eines Zweiges. Genau das ist der
+    // Unterschied -- im Rueckfallzweig allein (kein Bedienelement vorhanden)
+    // stand es schon, und dort greift es fuer den Klickfall nicht.
+    assertTrue((bool) preg_match('/(?:^|\n)    ' . preg_quote($el, '/')
+        . '\.setAttribute\(\s*\'tabindex\'\s*,\s*\'-1\'\s*\)/', $beimOeffnen),
+        'Der Dialog braucht tabindex="-1" auf Rumpfebene, nicht in einem Zweig -- sonst ist der Fang'
+        . ' nach einem Klick auf freie Flaeche darin tot');
+});
+
+test('Der Fokus wandert beim Oeffnen in den Dialog', function () use ($ckRoot) {
+    [$body, $el] = ckTrapFocus($ckRoot);
+    $liste = preg_quote(ckListenFunktion($body), '/');
+    [$beimOeffnen] = ckAmHoerer($body);
+
+    // Ohne diese Zusicherung liess sich der Anfangsfokus ersatzlos entfernen
+    // (zehn Zeilen) und die Suite blieb gruen -- der Fang haette dann nichts
+    // gefangen: Der Fokus stuende weiter auf dem Kalendertag, Tab liefe an der
+    // Knopfreihe vorbei in den Rest der Seite.
+    assertTrue((bool) preg_match('/(?:const|let)\s+(\w+)\s*=\s*' . $liste . '\(\)\s*\[\s*0\s*\]/', $beimOeffnen, $m),
+        'Der Anfangsfokus muss das erste bedienbare Element aus der Liste holen');
+    assertTrue((bool) preg_match('/\b' . preg_quote($m[1], '/') . '\.focus\(\)/', $beimOeffnen),
+        "Das erste bedienbare Element wird nicht angefahren -- \"{$m[1]}\" bekommt kein focus()");
+
+    // Der Rueckfall: Ein Dialog ohne Bedienelement muss den Fokus selbst nehmen,
+    // sonst laeuft Escape ins Leere. Liess sich ebenfalls entfernen, ohne rot zu
+    // werden.
+    assertTrue((bool) preg_match('/\b' . preg_quote($el, '/') . '\.focus\(\)/', $beimOeffnen),
+        'Ohne Bedienelement muss der Dialog selbst den Fokus nehmen, sonst laeuft Escape ins Leere');
+});
+
 test('Die Liste der bedienbaren Elemente wird bei jedem Tab neu gelesen', function () use ($ckRoot) {
-    $js = ckFile($ckRoot, 'public/js/modules/utils.js');
-    $body = ckOhneKommentare(ckFunctionBody($js, 'export function trapFocus('));
+    [$body] = ckTrapFocus($ckRoot);
 
     // Die Rueckmeldezeile erscheint je nach Rolle, die Knopfreihe je nach
-    // appointmentHasStarted() -- eine einmal beim Oeffnen gelesene Liste
-    // waere nach dem ersten Neuzeichnen falsch.
-    assertTrue(substr_count($body, 'querySelectorAll') >= 1, 'Kein Selektor fuer bedienbare Elemente');
-    assertTrue((bool) preg_match('/(const|let)\s+\w+\s*=\s*\(\)\s*=>[^;]*querySelectorAll/s', $body),
-        'Die Liste muss aus einer Funktion kommen, nicht aus einer einmal gesetzten Konstanten');
+    // appointmentHasStarted() -- eine einmal beim Oeffnen gelesene Liste waere
+    // nach dem ersten Neuzeichnen falsch.
+    $liste = ckListenFunktion($body);
+
+    // Eine Pfeilfunktion allein genuegt dafuer NICHT: Man kann sie einmal rufen
+    // und das Ergebnis einfrieren -- die Zusicherung blieb gruen, obwohl genau
+    // die gepruefte Eigenschaft fehlte. Verlangt wird deshalb der Aufruf IM
+    // Hoerer und hinter der Tab-Pruefung: Dort wird die Liste gebraucht, und nur
+    // dort ist sie zum Zeitpunkt des Tastendrucks gelesen.
+    [, $hoerer] = ckAmHoerer($body);
+    $tab = strpos($hoerer, "'Tab'");
+    assertTrue($tab !== false, "Der Hoerer prueft nicht auf 'Tab'");
+    assertTrue((bool) preg_match('/\b' . preg_quote($liste, '/') . '\s*\(\s*\)/', substr($hoerer, $tab)),
+        "Die Liste muss bei jedem Tab neu gelesen werden -- \"{$liste}()\" wird hinter der Tab-Pruefung nicht gerufen");
+});
+
+test('Die Umlenkung springt in der richtigen Richtung', function () use ($ckRoot) {
+    [$body] = ckTrapFocus($ckRoot);
+    $liste = preg_quote(ckListenFunktion($body), '/');
+    [, $hoerer] = ckAmHoerer($body);
+
+    assertTrue((bool) preg_match('/(?:const|let)\s+(\w+)\s*=\s*' . $liste . '\(\)/', $hoerer, $m),
+        'Der Hoerer liest die bedienbaren Elemente nicht in eine eigene Liste');
+    $l = preg_quote($m[1], '/');
+
+    assertTrue((bool) preg_match('/(?:const|let)\s+(\w+)\s*=\s*' . $l . '\s*\[\s*0\s*\]/', $hoerer, $mAnfang),
+        'Der Hoerer bestimmt das erste bedienbare Element nicht aus der Liste');
+    $anfang = $mAnfang[1];
+    assertTrue((bool) preg_match('/(?:const|let)\s+(\w+)\s*=\s*' . $l . '\s*\[\s*' . $l . '\.length\s*-\s*1\s*\]/',
+        $hoerer, $mEnde),
+        'Der Hoerer bestimmt das letzte bedienbare Element nicht aus der Liste');
+    $ende = $mEnde[1];
+
+    // Rueckwaerts am Anfang muss ans ENDE springen, vorwaerts am Ende an den
+    // ANFANG. Vertauscht liefe der Fang rueckwaerts -- Tab sprang ans Ende,
+    // Shift+Tab an den Anfang -- und das blieb gruen, weil beide Namen im Rumpf
+    // ohnehin vorkommen. Bedingung UND Sprungziel werden deshalb gemeinsam
+    // gelesen: Der Zweig wird ueber die Grenze gefunden, gegen die er prueft,
+    // und nur sein eigener Rumpf zaehlt.
+    assertTrue((bool) preg_match('/\(\s*e\.shiftKey\b[^)]*===\s*' . preg_quote($anfang, '/')
+        . '\b[^{]*\{([^}]*)\}/s', $hoerer, $rueckwaerts),
+        'Kein Zweig "Shift+Tab und der Fokus steht auf dem ersten Element"');
+    assertTrue((bool) preg_match('/\b' . preg_quote($ende, '/') . '\.focus\(\)/', $rueckwaerts[1]),
+        'Shift+Tab auf dem ersten Element muss ans Ende springen, nicht nach: ' . trim($rueckwaerts[1]));
+
+    assertTrue((bool) preg_match('/\(\s*!\s*e\.shiftKey\b[^)]*===\s*' . preg_quote($ende, '/')
+        . '\b[^{]*\{([^}]*)\}/s', $hoerer, $vorwaerts),
+        'Kein Zweig "Tab und der Fokus steht auf dem letzten Element"');
+    assertTrue((bool) preg_match('/\b' . preg_quote($anfang, '/') . '\.focus\(\)/', $vorwaerts[1]),
+        'Tab auf dem letzten Element muss an den Anfang springen, nicht nach: ' . trim($vorwaerts[1]));
 });
