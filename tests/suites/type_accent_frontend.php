@@ -153,24 +153,6 @@ test('Keine hart codierte Ersatzfarbe mehr bei der Terminart', function () use (
     assertTrue(!str_contains($uebersicht, '#667eea'),
         'renderTypeGroupOverview(): Die Farbkachel muss die gemeinsame Ersatzfarbe nutzen');
 
-    // Zweite Haelfte desselben Gedankens: Der Sinn der Zentralisierung ist,
-    // dass es KEINE eigene Kopie der Pruefung mehr gibt, die man beim
-    // Nachschaerfen vergisst -- management.js war genau so eine. Geprueft wird
-    // deshalb das ganze Modulverzeichnis, damit eine fuenfte Kopie beim Anlegen
-    // auffaellt und nicht erst beim naechsten Sicherheitsbefund. Die
-    // Check-in-PWA (public/checkin/) hat bewusst eigene Farben und bleibt
-    // aussen vor, siehe "Nicht in diesem Vorhaben" in der Spec.
-    $kopien = [];
-    foreach (glob($taRoot . '/public/js/modules/*.js') as $pfad) {
-        if (basename($pfad) === 'utils.js') {
-            continue;
-        }
-        if (preg_match('/\/\^#\[0-9a-f\]/i', (string) file_get_contents($pfad))) {
-            $kopien[] = 'public/js/modules/' . basename($pfad);
-        }
-    }
-    assertSame([], $kopien,
-        'Eigene Hex-Whitelist statt safeTypeColor() aus utils.js in: ' . implode(', ', $kopien));
 
     // #95a5a6 traegt dagegen zwei fremde Dinge: das Schildchen "automatisch
     // angelegt" (appointments.js:277) und die Erfassungsmethode "Auto"
@@ -196,6 +178,42 @@ test('Die Farbkachel der Terminartenverwaltung nutzt die gemeinsame Pruefung', f
     // Sie bleibt eine Kachel -- umgestellt wird die Pruefung, nicht die Anzeige.
     assertTrue(str_contains($uebersicht, 'background: ${safeColor}'),
         'Die Farbkachel behaelt ihre Darstellung -- nur die Pruefung wandert');
+});
+
+test('Die Hex-Whitelist steht nur noch an den bekannten Stellen', function () use ($taRoot) {
+    // Der Sinn der Zentralisierung (OI-94) ist, dass es keine eigene Kopie der
+    // Pruefung mehr gibt, die man beim Nachschaerfen vergisst -- management.js
+    // war genau so eine, und die Spec kannte sie nicht. Gegen eine fuenfte hilft
+    // nur, das ganze Modulverzeichnis zu lesen.
+    //
+    // Geprueft wird die Liste GENAU, nicht auf leer: Zum Stand von Task 3 bleibt
+    // eine bekannte Kopie in showAppointmentPopup() (appointments.js), die Task 4
+    // aufloest. Eine Zusicherung auf leer waere heute rot und damit wirkungslos --
+    // sie wuerde beim ersten Blick als "bekannt rot" abgetan und faenge eine neue
+    // Kopie nicht. So faellt jede zusaetzliche Kopie sofort auf, und wenn Task 4
+    // die letzte entfernt, wird dieser Test rot und verlangt die leere Liste.
+    //
+    // Die Check-in-PWA (public/checkin/) hat bewusst eigene Farben und bleibt
+    // aussen vor, siehe "Nicht in diesem Vorhaben" in der Spec.
+    $bekannt = ['public/js/modules/appointments.js'];
+
+    $kopien = [];
+    foreach (glob($taRoot . '/public/js/modules/*.js') as $pfad) {
+        if (basename($pfad) === 'utils.js') {
+            continue;
+        }
+        if (preg_match('/\/\^#\[0-9a-f\]/i', (string) file_get_contents($pfad))) {
+            $kopien[] = 'public/js/modules/' . basename($pfad);
+        }
+    }
+    sort($kopien);
+
+    assertSame($bekannt, $kopien,
+        "Eigene Hex-Whitelist statt safeTypeColor() aus utils.js.\n"
+        . '  erwartet: ' . (implode(', ', $bekannt) ?: '(keine)') . "\n"
+        . '  gefunden: ' . (implode(', ', $kopien) ?: '(keine)') . "\n"
+        . '  Ist eine Datei dazugekommen: safeTypeColor() aus utils.js benutzen. '
+        . 'Ist eine weggefallen (Task 4): hier aus $bekannt streichen.');
 });
 
 test('Die Terminliste traegt den Streifen und den Namen in der Unterzeile', function () use ($taRoot) {
