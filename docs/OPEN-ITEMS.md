@@ -35,8 +35,9 @@ braucht eine eigene Spec, nicht nur eine Umsetzung.
 
 Offen mit Priorität *mittel*, am 2026-09-25 einzeln gegen den Code geprüft: OI-67, OI-96, OI-98,
 OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23,
-[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) sowie die am 25.09. aus dem
-Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103. **OI-3 und OI-20 tragen ebenfalls
+[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt). Die am 25.09. aus dem
+Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103 sind am selben Tag in `dev`
+erledigt; offen bleibt dort nur die Frage aus OI-103 zu Admin und Manager. **OI-3 und OI-20 tragen ebenfalls
 *mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
 Restarbeit, und gehören deshalb nicht in eine Umsetzungsreihe. OI-62 steht auf
 *niedrig–mittel*, OI-104 bis OI-106 und OI-108 auf *niedrig*.
@@ -722,7 +723,7 @@ erst starten? Gefunden im Codequalitäts-Review zur Schnellinbetriebnahme.
 ---
 
 ### OI-101 · `station` für `auth_device` öffnen (PIN-Anmeldung am Hardware-Terminal)
-**Priorität:** erledigt am 2026-09-25 auf Branch `feat/oi-101-auth-device`, noch nicht in `dev` · aufgenommen am 2026-09-25 · **Bezug:** [FI-4](FEATURE-IDEAS.md),
+**Priorität:** erledigt am 2026-09-25 (Branch `feat/oi-101-auth-device`, in `dev`) · aufgenommen am 2026-09-25 · **Bezug:** [FI-4](FEATURE-IDEAS.md),
 Kiosk-Spec `docs/superpowers/specs/2026-09-04-station-pin-kiosk-design.md` Abschnitt 5
 („später `auth_method: device` für `auth_device`")
 
@@ -1117,7 +1118,7 @@ Zwei Teilsignale gibt es bereits: Der Nachweisgrad fällt bei einer Zeitkorrektu
 ---
 
 ### OI-102 · `auto_checkin` von Geräten: `location_name` bleibt leer
-**Priorität:** erledigt am 2026-09-25 auf Branch `feat/oi-101-auth-device`, noch nicht in `dev` · aufgenommen am 2026-09-25
+**Priorität:** erledigt am 2026-09-25 (Branch `feat/oi-101-auth-device`, in `dev`) · aufgenommen am 2026-09-25
 
 `handleAutoCheckin()` liest für Gerätekonten die Spalte `email` und schreibt sie als
 `location_name` in den Record ([auto_checkin.php:535](../private/handlers/auto_checkin.php),
@@ -1138,7 +1139,7 @@ nur, wo es gesetzt wurde.
 ---
 
 ### OI-103 · `auto_checkin` prüft den Aktivstatus des Mitglieds nicht
-**Priorität:** erledigt am 2026-09-25 auf Branch `feat/oi-101-auth-device`, noch nicht in `dev` · aufgenommen am 2026-09-25 · **Bezug:**
+**Priorität:** erledigt am 2026-09-25 (Branch `feat/oi-101-auth-device`, in `dev`) · aufgenommen am 2026-09-25 · **Bezug:**
 [OI-27](#oi-27--membersactive-vs-membership_dates-am-kiosk)
 
 `resolveMemberIdByNumber()` ([utils.php:106](../private/helpers/utils.php)) und der

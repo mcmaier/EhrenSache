@@ -607,23 +607,43 @@ nicht.
 
 In allen drei Fällen speichert der Server nur die **Anwesenheit** (Termin, Zeit, Quelle, Name
 des Geräts), wie bei jedem anderen Check-in. Die PIN liegt auf dem Server nur als Hash, wie bei
-der virtuellen Station.
+der virtuellen Station. Am Gerät steht sie nur im Arbeitsspeicher, wird nach der Anfrage
+überschrieben und weder gespeichert noch protokolliert.
 
 ### 13.2 Was auf dem Gerät liegt
 
-| Daten | Ort | Schutz |
+| Daten | Ort | Schutz und Zweck |
 |---|---|---|
-| Fingerabdruck-Merkmale (Templates) | im Sensor selbst | verlassen den Sensor nie — weder zum Gerät noch zum Server |
-| Kartennummer (UID) → Mitgliedsnummer | Speicher des Geräts | verschlüsselt |
-| Namensliste (Vorname, Nachname, Mitgliedsnummer) | Speicher des Geräts | verschlüsselt; dient nur der Bestätigung beim Anlernen und der Anzeige des Vornamens, eine Liste zeigt das Gerät nie an |
-| Warteschlange bei fehlender Verbindung (Nummer, Zeit) | Speicher des Geräts | verschlüsselt |
+| Fingerabdruck-Merkmale (Templates) | im Sensor selbst | verlassen den Sensor nie — weder zum ESP32 noch in dessen Speicher noch zum Server |
+| Zuordnung: Sensor-ID (Finger) bzw. Karten-UID → Mitgliedsnummer, dazu Zeitpunkt des Anlernens und ein Merker „verwaist“ | Speicher des Geräts (NVS) | verschlüsselt |
+| Namensliste (Vorname, Nachname, Mitgliedsnummer) | Speicher des Geräts (NVS) | verschlüsselt; dient nur der Bestätigung beim Anlernen und der Anzeige des Vornamens |
+| Warteschlange bei fehlender Verbindung (Mitgliedsnummer, Ankunftszeit, Art Finger/Karte, Anzahl Versuche) | Speicher des Geräts (NVS) | verschlüsselt; höchstens 200 Einträge |
+| Konfiguration (Geräte-Token, WLAN-Zugang, Admin-PIN des Geräts) | Speicher des Geräts | verschlüsselt |
 
 Die Verschlüsselung setzt die Release-Fassung der Firmware voraus (Flash- und
 NVS-Verschlüsselung des ESP32). Ein Gerät mit Entwicklungsfirmware ist für den Echtbetrieb
 nicht gedacht.
 
-Die Namensliste bezieht das Gerät vom Server. Sie enthält nur Mitglieder, die am Tag des
-Abrufs aktiv sind; wer ausgetreten ist, fällt beim nächsten Abruf heraus.
+**Namensliste.** Das Gerät bezieht sie vom Server und ersetzt sie täglich und nach jedem
+Neustart vollständig. Der Server liefert nur Mitglieder, die am Tag des Abrufs aktiv sind;
+wer ausgetreten ist, verschwindet also spätestens mit der nächsten Aktualisierung aus der
+Liste. Seine Zuordnung wird dann als verwaist markiert und im Admin-Menü zum Löschen
+angeboten — **nicht** automatisch gelöscht (13.4).
+
+**Warteschlange.** Ein Eintrag wird gelöscht, sobald der Server ihn angenommen hat, sobald
+der Server ihn fachlich ablehnt (etwa weil das Mitglied nicht aktiv ist oder kein Termin im
+Zeitfenster liegt) oder sobald er älter ist als das Zeitfenster für Check-ins
+(`checkin_tolerance_hours`). Ein so verworfener Eintrag wird auch nicht mehr als Anwesenheit
+erfasst.
+
+**Anzeige.** Nach einer Erfassung zeigt das Gerät einige Sekunden lang nur den Vornamen und den
+Termin. Eine Mitgliederliste zeigt es nie, eine PIN nie im Klartext.
+
+**Diagnose-Ausgabe.** Über die serielle Schnittstelle (UART0) gibt das Gerät bei
+Bildschirmwechseln Mitgliedsnummern und Vornamen aus, nie Token oder PIN. Die Ausgabe wird nicht
+gespeichert, erscheint nur bei angeschlossenem Kabel, und im Gehäuse ist die Schnittstelle nicht
+zugänglich. Wer das Gerät öffnet und ein Kabel anschließt, kann sie also mitlesen — das gehört
+zum Schutz des Geräts selbst (13.5).
 
 ### 13.3 Fingerabdruck ist ein biometrisches Datum
 
@@ -649,11 +669,16 @@ Für **Karte und PIN** genügt dieselbe Rechtsgrundlage wie für die übrige Anw
 
 ### 13.4 Löschung
 
-- **Austritt oder Widerruf:** Am Gerät löscht ein Admin über das Admin-Menü die Merkmale des
-  Mitglieds („Merkmale löschen“). Zuordnungen zu Mitgliedern, die nicht mehr in der Namensliste
-  stehen, bietet das Gerät unter „Verwaiste Einträge“ zum Löschen an.
-- **Gerät außer Betrieb, Weitergabe, Reparatur:** Werksreset am Gerät; er löscht alle
-  Merkmale, Zuordnungen, die Namensliste und die Warteschlange.
+- **Austritt oder Widerruf:** Am Gerät löscht ein Admin über das Admin-Menü „Merkmale löschen“
+  die Merkmale des Mitglieds: Finger aus dem Sensor und aus der Zuordnung, Karten aus der
+  Zuordnung. Zuordnungen zu Mitgliedern, die nicht mehr in der Namensliste stehen, bietet das
+  Gerät unter „Verwaiste Einträge“ zum Löschen an; gelöscht wird dort erst auf Bestätigung.
+  Prüfen Sie diesen Menüpunkt deshalb regelmäßig, etwa nach Austritten.
+- **Gerät außer Betrieb, Weitergabe, Reparatur:** Werksreset am Gerät. Er löscht die Merkmale
+  im Sensor, die Zuordnung, die Namensliste und die Konfiguration (Token, WLAN-Zugang,
+  Admin-PIN). Die **Warteschlange** löscht er nur nach eigener Rückfrage, die die Zahl der
+  offenen Einträge nennt („löschen“ oder „behalten“) — so gehen noch nicht übertragene
+  Anwesenheiten nicht verloren. Verlässt das Gerät den Verein, wählen Sie „löschen“.
 - **Server:** Die Anwesenheiten unterliegen denselben Fristen wie jede andere Anwesenheit
   (*Einstellungen → DSGVO Datenverwaltung*).
 
@@ -662,9 +687,11 @@ weist den Check-in ab, auch wenn Finger oder Karte am Gerät noch angelernt sind
 
 ### 13.5 Wer was tun kann
 
-Angelernt und gelöscht wird **nur am Gerät**, durch einen Admin mit Admin-PIN des Geräts. Im
-Dashboard gibt es dafür keine Verwaltung, und der Server kennt weder Merkmale noch
-Kartennummern. Die Admin-PIN des Geräts ist entsprechend zu schützen.
+Angelernt und gelöscht wird **nur am Gerät**, durch einen Admin mit Admin-PIN des Geräts.
+Anlernen braucht zusätzlich die Verbindung zum Server und die geladene Namensliste. Im
+Dashboard gibt es dafür keine Verwaltung, und der Server kennt weder Merkmale noch Sensor-IDs
+oder Kartennummern. Schützen Sie die Admin-PIN des Geräts und das Gerät selbst: Es sollte so
+angebracht sein, dass es sich nicht unbemerkt öffnen lässt.
 
 ### 13.6 Was Sie den Mitgliedern sagen müssen
 
