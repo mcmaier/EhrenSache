@@ -1,0 +1,13 @@
+# ============================================
+# HTACCESS - Virtuelle Station (Kiosk)
+# ============================================
+
+# Content-Security-Policy (OI-17, Etappe 1). Die Station enthielt nie
+# Inline-Code; tests/suites/csp.php haelt fest, dass es so bleibt. Der QR-Code
+# entsteht als Inline-SVG im DOM und braucht deshalb kein img-src data:.
+#
+# style-src 'unsafe-inline' ist eine bewusste Ausnahme: Inline-Styles sind das
+# deutlich kleinere Risiko.
+<IfModule mod_headers.c>
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+</IfModule>

@@ -5,6 +5,18 @@
 # Service Worker muss über HTTPS laufen
 # Lokal: über localhost funktioniert auch HTTP
 
+# Content-Security-Policy (OI-17, Etappe 1). Die PWA enthaelt keinen
+# Inline-Code mehr; tests/suites/csp.php haelt das fest. Gilt fuer das ganze
+# Verzeichnis, also auch fuer den Service Worker -- dessen fetch() faellt damit
+# unter connect-src 'self', was reicht, weil die PWA nur die eigene API ruft.
+#
+# img-src data: braucht der Pfeil der Auswahlfelder in css/style.css.
+# style-src 'unsafe-inline' ist eine bewusste Ausnahme: Inline-Styles sind das
+# deutlich kleinere Risiko, und Markup wie html5-qrcode setzen style-Attribute.
+<IfModule mod_headers.c>
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+</IfModule>
+
 # Manifest richtig ausliefern
 <Files "manifest.json">
     Header set Content-Type "application/manifest+json"

@@ -140,7 +140,7 @@ test('Kein ungeschuetztes console.log/warn/debug in Auslieferungsskripten', func
     // Der debug-Wrapper nuetzt nichts, solange direkt daneben ungeschuetzt
     // geloggt wird. console.error bleibt erlaubt: eine Fehlermeldung soll auch
     // produktiv sichtbar sein, sie traegt keine Sitzungsdaten.
-    $fremdcode = ['qrcode.js'];
+    $fremdcode = ['qrcode.js', 'html5-qrcode.min.js'];
 
     $dir = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($repoRoot . '/public', FilesystemIterator::SKIP_DOTS)
@@ -197,15 +197,16 @@ test('Die Station schaltet im Vereins-LAN nicht auf DEBUG', function () use ($re
     );
 });
 
-test('Dashboard und Station laden keine externen Skripte', function () use ($repoRoot) {
+test('Keine Oberflaeche laedt externe Skripte', function () use ($repoRoot) {
     // Eine Vereinsinstallation steht oft in einem Netz ohne Internetzugang. Ein
     // Skript von einem CDN faellt dort still aus — kein Fehler, der QR-Code
-    // fehlt einfach. Deshalb liegt die Bibliothek im Paket.
+    // fehlt einfach. Deshalb liegen die Bibliotheken im Paket. Zudem blockiert
+    // die CSP von Check-in-PWA und Station (script-src 'self', OI-17) jede
+    // fremde Quelle.
     //
-    // public/checkin/index.html ist bewusst ausgenommen: dort kommt
-    // html5-qrcode weiterhin von unpkg. Das ist eine eigene Baustelle und
-    // wuerde diesen Test sofort rot faerben.
-    foreach (['/public/index.html', '/public/station/index.html'] as $rel) {
+    // Bis OI-17 lud die Check-in-PWA html5-qrcode von unpkg und war hier
+    // ausgenommen; seither liegt es unter public/js/vendor/.
+    foreach (['/public/index.html', '/public/login.html', '/public/checkin/index.html', '/public/station/index.html'] as $rel) {
         $html = (string) file_get_contents($repoRoot . $rel);
 
         preg_match_all('/<script[^>]*\ssrc="((?:https?:)?\/\/[^"]+)"/', $html, $m);

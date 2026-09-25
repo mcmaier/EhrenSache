@@ -9,7 +9,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
-### Hinzugefügt
+### Neu
 - **Das Hardware-Terminal kann Mitglieder per Mitgliedsnummer und PIN stempeln lassen.** Die
   Ressource `station` nimmt neben dem Kiosk jetzt auch Geräte vom Typ `auth_device` an, damit
   Mitglieder ohne Fingerabdruck oder Karte am Keypad des Terminals einchecken können. Der Server
@@ -19,6 +19,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Karte laufen unverändert über `auto_checkin` (OI-101).
 
 ### Geändert
+- **Die Check-in-App lädt den QR-Scanner nicht mehr aus dem Internet.** Die Bibliothek
+  `html5-qrcode` (2.3.8) liegt jetzt im Installationspaket unter `public/js/vendor/`, statt bei
+  jedem Aufruf von unpkg.com geholt zu werden. Der Scanner funktioniert damit auch in einem
+  Vereinsnetz ohne Internetzugang, und kein fremder Server erfährt mehr, wann die App geöffnet
+  wird.
 - **Ein Gerät checkt ein ausgetretenes Mitglied nicht mehr ein.** `auto_checkin` prüft für
   Gerätekonten jetzt dieselbe Regel wie der Kiosk: Mitglied aktiv und der Tag der Ankunft in
   einem Mitgliedschaftszeitraum. Bisher reichte, dass es die Nummer gab — ein noch angelernter
@@ -33,6 +38,13 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Check-ins von Geräten tragen den Gerätenamen als Ort.** Bisher las `auto_checkin` dafür die
   E-Mail des Gerätekontos, die es nicht gibt — der Ort blieb immer leer. Bestehende Einträge
   bleiben ohne Ort (OI-102).
+
+### Sicherheit
+- **Anmeldeseite, Check-in-App und virtuelle Station tragen eine Content-Security-Policy.** Der
+  Browser führt dort nur noch Skripte aus, die aus der Installation selbst kommen. Eingeschleuster
+  Code in Knöpfen, Links oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der
+  Maskierung vorbei ins Markup schaffen sollte. Das Dashboard folgt in einem eigenen Schritt;
+  es arbeitet noch mit Inline-Handlern (OI-17).
 
 ---
 
