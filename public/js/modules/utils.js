@@ -159,8 +159,16 @@ export function formatTimeRange(startTime, endTime) {
  * "red; background: url(...)" wuerde sonst durchschlagen. Frueher stand
  * dieselbe Pruefung dreimal einzeln im Code.
  *
+ * Nur gueltige CSS-Hex-Notation (3, 4, 6 oder 8 Stellen) besteht die Pruefung --
+ * Laengen wie 5 oder 7 sind kein Injection-Risiko, ergeben aber ungueltiges
+ * CSS, das der Browser wortlos verwirft: der Termin stuende dann ganz ohne
+ * Streifen da statt mit der grauen Ersatzfarbe.
+ *
  * Liefert bei fehlender oder ungueltiger Farbe die gemeinsame Ersatzfarbe.
+ * Der Rueckgabewert gehoert in ein CSS-Attribut (z.B. --type-color): er ist
+ * nicht immer ein Hexwert und taugt nicht als Eingabe fuer Farbrechnungen wie
+ * Hexwert zerlegen, Kontrastfarbe berechnen oder rgba() fuer eine Toenung bauen.
  */
 export function safeTypeColor(color) {
-    return /^#[0-9a-f]{3,8}$/i.test(color || '') ? color : 'var(--type-color-none)';
+    return /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color || '') ? color : 'var(--type-color-none)';
 }

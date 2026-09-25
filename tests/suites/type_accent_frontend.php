@@ -1,5 +1,4 @@
 <?php
-
 /**
  * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
  *
@@ -10,12 +9,13 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+declare(strict_types=1);
+
 /**
  * Statische Gegenproben: Terminfarbe als Randakzent statt Badge (OI-94).
  *
  * Spec: docs/superpowers/specs/2026-09-24-terminfarbe-randakzent-design.md
  */
-declare(strict_types=1);
 
 $taRoot = dirname(__DIR__, 2);
 
@@ -37,11 +37,32 @@ function taFunctionBody(string $js, string $signature): string
     return substr($js, $start, $next - $start);
 }
 
-test('safeTypeColor steht in utils.js und prueft per Whitelist', function () use ($taRoot) {
+test('safeTypeColor prueft Farben mit einer auf ^# verankerten Hex-Whitelist gueltiger Laenge', function () use ($taRoot) {
     $js = taFile($taRoot, 'public/js/modules/utils.js');
     $body = taFunctionBody($js, 'export function safeTypeColor(');
-    assertTrue((bool) preg_match('/\^#\[0-9a-f\]\{3,8\}\$/i', $body),
-        'Ohne Whitelist koennte aus dem Farbfeld einer Terminart Markup in die Seite gelangen (OI-17: keine CSP)');
+
+    // Nicht auf den genauen Wortlaut pruefen (bricht bei jeder harmlosen
+    // Umformatierung), sondern das Regex-Literal aus dem Rumpf herausloesen
+    // und mit echten Werten befeuern -- das prueft die Absicht: eine auf ^#
+    // verankerte, nur mit $ abgeschlossene Hex-Whitelist.
+    assertTrue((bool) preg_match('/\/\^#[^\/]+\/i/', $body, $m),
+        'Whitelist-Regex nicht gefunden (erwartet: auf ^# verankert, mit $ abgeschlossen, Hexstellen)');
+    // JS-Regex-Literal (/.../i) als PCRE-Pattern weiterverwenden -- Zeichen-
+    // klassen und Quantoren sind zwischen JS und PCRE hier identisch.
+    $phpPattern = '~' . substr($m[0], 1, -2) . '~i';
+
+    // Gueltige CSS-Hex-Notation: 3, 4, 6 oder 8 Stellen.
+    foreach (['#abc', '#abcd', '#aabbcc', '#aabbccdd'] as $valid) {
+        assertTrue((bool) preg_match($phpPattern, $valid), "{$valid} muss die Whitelist bestehen");
+    }
+    // Ungueltige CSS-Hex-Laengen (5, 7) und Nicht-Hex-Werte muessen durchfallen --
+    // sonst haelt der Browser den Wert fuer sicher, verwirft ihn aber wortlos als
+    // ungueltiges CSS und der Termin steht ganz ohne Streifen da (schlechter als
+    // die graue Ersatzfarbe).
+    foreach (['#abcde', '#abcdefa', '', 'abc', '#gggggg', 'red; background:url(x)'] as $invalid) {
+        assertTrue(!preg_match($phpPattern, $invalid), "{$invalid} darf die Whitelist nicht bestehen");
+    }
+
     assertTrue(str_contains($body, 'var(--type-color-none)') || str_contains($body, "'--type-color-none'")
         || str_contains($body, 'type-color-none'),
         'Ungueltige oder fehlende Farbe muss auf die gemeinsame Ersatzfarbe fallen');
