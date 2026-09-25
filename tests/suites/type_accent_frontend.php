@@ -186,16 +186,15 @@ test('Die Hex-Whitelist steht nur noch an den bekannten Stellen', function () us
     // war genau so eine, und die Spec kannte sie nicht. Gegen eine fuenfte hilft
     // nur, das ganze Modulverzeichnis zu lesen.
     //
-    // Geprueft wird die Liste GENAU, nicht auf leer: Zum Stand von Task 3 bleibt
-    // eine bekannte Kopie in showAppointmentPopup() (appointments.js), die Task 4
-    // aufloest. Eine Zusicherung auf leer waere heute rot und damit wirkungslos --
-    // sie wuerde beim ersten Blick als "bekannt rot" abgetan und faenge eine neue
-    // Kopie nicht. So faellt jede zusaetzliche Kopie sofort auf, und wenn Task 4
-    // die letzte entfernt, wird dieser Test rot und verlangt die leere Liste.
+    // Geprueft wird die Liste GENAU, nicht bloss auf "nicht mehr geworden":
+    // Bis Task 3 stand hier appointments.js, weil showAppointmentPopup() die
+    // letzte Kopie trug -- eine Zusicherung auf leer waere damals rot und damit
+    // wirkungslos gewesen. Task 4 hat sie aufgeloest, seither ist die Liste leer
+    // und jede neue Kopie faellt beim naechsten Lauf auf.
     //
     // Die Check-in-PWA (public/checkin/) hat bewusst eigene Farben und bleibt
     // aussen vor, siehe "Nicht in diesem Vorhaben" in der Spec.
-    $bekannt = ['public/js/modules/appointments.js'];
+    $bekannt = [];
 
     $kopien = [];
     foreach (glob($taRoot . '/public/js/modules/*.js') as $pfad) {
@@ -212,8 +211,7 @@ test('Die Hex-Whitelist steht nur noch an den bekannten Stellen', function () us
         "Eigene Hex-Whitelist statt safeTypeColor() aus utils.js.\n"
         . '  erwartet: ' . (implode(', ', $bekannt) ?: '(keine)') . "\n"
         . '  gefunden: ' . (implode(', ', $kopien) ?: '(keine)') . "\n"
-        . '  Ist eine Datei dazugekommen: safeTypeColor() aus utils.js benutzen. '
-        . 'Ist eine weggefallen (Task 4): hier aus $bekannt streichen.');
+        . '  Ist eine Datei dazugekommen: safeTypeColor() aus utils.js benutzen.');
 });
 
 test('Die Terminliste traegt den Streifen und den Namen in der Unterzeile', function () use ($taRoot) {
@@ -536,4 +534,150 @@ test('Kopf und Zellen der Anwesenheitsliste stehen Spalte fuer Spalte uebereinan
     }
     assertSame($spalten(0), substr_count($mZeile[1], '<td'),
         'Mitgliedsansicht: Zellen der Zeile und Koepfe stehen versetzt');
+});
+
+// ============================================================
+// Kalender-Popup (appointments.js) -- Task 4
+// ============================================================
+
+/**
+ * Alle Regeln eines Stylesheets als [Selektor, Rumpf]. Verschachtelte Bloecke
+ * (@media) fallen dabei heraus, ihre inneren Regeln bleiben erhalten -- fuer
+ * die Frage "welcher Selektor traegt welche Deklaration" genuegt das.
+ *
+ * Kommentare fallen vorher heraus: Sie stehen ueber der Regel und landeten
+ * sonst in deren Selektor. Ein Kommentar, der eine Klasse bloss ERWAEHNT,
+ * haette die Regel dann so aussehen lassen, als betreffe sie diese Klasse.
+ */
+function taCssRules(string $css): array
+{
+    $css = (string) preg_replace('~/\*.*?\*/~s', '', $css);
+    preg_match_all('/([^{}]+)\{([^{}]*)\}/', $css, $m, PREG_SET_ORDER);
+
+    return array_map(fn ($r) => [trim($r[1]), $r[2]], $m);
+}
+
+test('Jeder Termin im Popup ist ein eigener Block mit Streifen', function () use ($taRoot) {
+    $js = taFile($taRoot, 'public/js/modules/appointments.js');
+    $body = taFunctionBody($js, 'function showAppointmentPopup(');
+
+    assertTrue(str_contains($body, 'safeTypeColor('), 'Die gemeinsame Farbpruefung wird nicht benutzt');
+    assertTrue(str_contains($body, '--type-color:'), 'Die Farbe muss als CSS-Variable gesetzt werden, nicht als fertiger Stil');
+    assertTrue(str_contains($body, 'calendar-event-block'), 'Der Block je Termin fehlt');
+
+    // Klasse und Farbvariable gehoeren an DASSELBE Element -- ein Streifen an
+    // einem anderen Knoten als dem Block traegt die Farbe nicht. Tolerant
+    // formuliert (weitere Attribute, weitere Klassen), damit eine harmlose
+    // Ergaenzung nicht "Block fehlt" meldet und den Naechsten falsch leitet.
+    assertTrue((bool) preg_match('/<div[^>]*class="[^"]*calendar-event-block[^"]*"[^>]*style="([^"]*)"/', $body, $styleAttr),
+        'Der Block traegt die Farbvariable nicht im eigenen style-Attribut');
+    assertTrue((bool) preg_match('/^--type-color:\s*\$\{(safeTypeColor\(|typeColor\})/', trim($styleAttr[1])),
+        'Die Variable --type-color muss ihren Wert aus safeTypeColor() beziehen');
+    // Genau eine Deklaration, also genau ein Doppelpunkt (eingesetzte Werte
+    // vorher heraus, ein Ternaer darin braechte einen eigenen mit). Ohne diese
+    // Zaehlung bliebe ein angehaengtes "background: ${apt.color};" gruen -- der
+    // Datenbankwert stuende dann ein zweites Mal im style-Attribut, diesmal
+    // ungeprueft, und ohne CSP (OI-17) ist die Pruefung die einzige Schranke.
+    $ohneWerte = preg_replace('/\$\{[^}]*\}/', 'X', $styleAttr[1]);
+    assertSame(1, substr_count($ohneWerte, ':'),
+        'In das style-Attribut des Blocks gehoert genau eine Deklaration');
+
+    // Das Schildchen muss verschwinden -- im Rumpf, in der ganzen Datei und im
+    // Stylesheet. Bliebe die Regel stehen, faende der Naechste eine Klasse ohne
+    // Benutzer und baute sie gutglaeubig wieder ein.
+    assertTrue(!str_contains($js, 'calendar-type-badge'),
+        'Das Schildchen muss aus dem Popup verschwinden');
+    assertTrue(!str_contains(taFile($taRoot, 'public/css/components/calendar.css'), 'calendar-type-badge'),
+        'Die Regel des Schildchens hat keinen Benutzer mehr und gehoert entfernt');
+
+    // Keine Farbe mehr im Markup: Das Popup trug seine Nebenzeilen mit
+    // "color: #7f8c8d" inline. Farben stehen im Projekt nur in variables.css --
+    // und ein Hexwert im Rumpf ist genau das Muster, aus dem die vierte Kopie
+    // der Farbpruefung entstanden ist.
+    assertTrue(!preg_match('/#[0-9a-f]{3,8}\b/i', $body),
+        'Im Popup darf kein Hexwert mehr stehen -- Farben kommen aus variables.css');
+
+    assertTrue((bool) preg_match('/import \{[^}]*safeTypeColor[^}]*\} from .\.\/utils\.js./', $js),
+        'safeTypeColor muss aus utils.js importiert sein');
+});
+
+test('Der Name der Terminart steht im Popup in der Unterzeile beim Ort', function () use ($taRoot) {
+    $js = taFile($taRoot, 'public/js/modules/appointments.js');
+    $body = taFunctionBody($js, 'function showAppointmentPopup(');
+
+    // Der Name ist der Textersatz des Streifens -- ohne diese Gegenprobe waere
+    // auch eine Umsetzung gruen, die das Schildchen ersatzlos streicht.
+    assertTrue(str_contains($body, 'type-accent-name'),
+        'Der Name der Terminart fehlt in der Unterzeile');
+    assertTrue((bool) preg_match('/<span class="type-accent-name">\$\{escapeHtml\(apt\.type_name\)\}<\/span>/', $body),
+        'Der Span darf nur den Namen umschliessen -- der Trenner gehoert nach aussen');
+    assertTrue(str_contains($body, "\u{b7}&nbsp;"),
+        'Der Trenner muss per geschuetztem Leerzeichen am folgenden Text kleben');
+    // Name und Ort stehen in DERSELBEN Zeile, unmittelbar hintereinander --
+    // sonst stuende der Name zwar irgendwo, aber nicht in der Unterzeile.
+    assertTrue((bool) preg_match('/\$\{typeName\}\$\{[A-Za-z]*[Ll]ocation[A-Za-z]*\}/', $body),
+        'Der Name der Terminart muss dem Ort in der Unterzeile unmittelbar vorangehen');
+
+    // Reihenfolge im Block: Zeit, Titel, Unterzeile, Rueckmeldung, Anwesenheit,
+    // Knopfreihe. Die letzten drei sichert auch calendar_attendance_frontend --
+    // hier steht der ganze Block, damit die Unterzeile nicht unbemerkt unter
+    // die Knoepfe rutscht.
+    $marken = [
+        'calendar-event-time'   => 'Die Zeit fehlt im Block',
+        'escapeHtml(apt.title)' => 'Der Titel fehlt im Block',
+        'calendar-event-sub'    => 'Die Unterzeile fehlt im Block',
+        'calendarResponseLineHtml(apt, fest)' => 'Die Rueckmeldezeile fehlt im Block',
+        'attendanceLineHtml('   => 'Die Anwesenheitszeile fehlt im Block',
+        'window.openAppointmentModal(${Number(apt.appointment_id)})' => 'Die Knopfreihe fehlt im Block',
+    ];
+    $vorher = -1;
+    $vorname = '';
+    foreach ($marken as $marke => $fehlt) {
+        $pos = strpos($body, $marke);
+        assertTrue($pos !== false, $fehlt);
+        assertTrue($pos > $vorher,
+            "Im Block steht \"{$marke}\" vor \"{$vorname}\" -- die Reihenfolge ist Zeit, Titel, Unterzeile, Rueckmeldung, Anwesenheit, Knopfreihe");
+        $vorher = $pos;
+        $vorname = $marke;
+    }
+});
+
+test('Die Rueckmeldezeile ist nur im festgehaltenen Popup als bedienbar erkennbar', function () use ($taRoot) {
+    $css = taFile($taRoot, 'public/css/components/calendar.css');
+
+    assertTrue((bool) preg_match('/\.calendar-event-block\s*\{[^}]*var\(--type-color/', $css),
+        'Der Block traegt den Streifen nicht');
+    assertTrue((bool) preg_match('/\.calendar-event-responses \.response-summary-btn\s*\{[^}]*border-bottom:[^;]*dotted/', $css),
+        'Die gepunktete Linie fehlt -- ohne Maus war die Zeile nicht als bedienbar erkennbar');
+    // Sie bleibt ein leiser Hinweis: kein dritter Knopf neben "Bearbeiten" und
+    // "Anwesenheit". Die Ruecknahme der Knopfoptik aus buttons.css gilt weiter.
+    assertTrue((bool) preg_match('/\.calendar-event-responses \.response-summary-btn\s*\{[^}]*background:\s*none/', $css),
+        'Die Knopfoptik muss weiterhin zurueckgesetzt sein');
+
+    // Die Ueberfahr-Fassung bleibt schlichter Text. Geprueft ueber ALLE Regeln,
+    // die ihren Selektor nennen: Die gemeinsame Regel weiter oben fasst beide
+    // Fassungen zusammen, und eine Deklaration DORT traefe auch den Hover-Fall
+    // -- genau der Unterschied, den FI-1 seinerzeit als Fehler gemeldet bekam.
+    $textRegeln = 0;
+    foreach (taCssRules($css) as [$selektor, $regel]) {
+        if (!str_contains($selektor, 'response-summary-text')) {
+            continue;
+        }
+        $textRegeln++;
+        assertTrue(!str_contains($regel, 'border-bottom') && !str_contains($regel, 'dotted'),
+            "Die Regel \"{$selektor}\" gaebe auch der Hover-Fassung eine Linie -- dort bleibt es schlichter Text");
+    }
+    assertTrue($textRegeln > 0, 'Die nicht bedienbare Fassung im Hover-Popup muss unveraendert bleiben');
+
+    // Und im Code darf der Knopf nur im festgehaltenen Popup entstehen -- sonst
+    // traefe die neue Regel auch das Hover-Popup, gleich was das Stylesheet sagt.
+    $js = taFile($taRoot, 'public/js/modules/appointments.js');
+    $zeile = taFunctionBody($js, 'function calendarResponseLineHtml(');
+    assertTrue(str_contains($zeile, 'const clickable = fest &&'),
+        'Die Klickbarkeit haengt nicht mehr an fest -- die gepunktete Linie erschiene dann auch beim Ueberfahren');
+    $text = strpos($zeile, 'response-summary-text');
+    $knopf = strpos($zeile, 'response-summary-btn');
+    assertTrue($text !== false && $knopf !== false, 'Beide Fassungen der Rueckmeldezeile muessen vorkommen');
+    assertTrue($text < $knopf,
+        'Die Text-Fassung gehoert in den Zweig !clickable, der Knopf dahinter');
 });

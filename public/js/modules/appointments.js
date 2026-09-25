@@ -889,23 +889,32 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
 
     let html = `<h4>${kopf}</h4>`;
     appointments.forEach(apt => {
-        // Terminart-Badge mit Farbe. apt.color kommt aus der Terminart und
-        // landet ungeprueft in einem style-Attribut -- ohne CSP (OI-17) muss
-        // das selbst geschehen. Bei ungueltigem Wert bleibt es beim Default.
-        const color = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#667eea';
-        const typeBadge = apt.type_name
-            ? `<span class="calendar-type-badge" style="background: ${color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin-left: 5px;">${escapeHtml(apt.type_name)}</span>`
+        // apt.color und apt.type_name kommen aus der Terminart (DB) und landen
+        // in style-Attribut und Markup -- ohne CSP (OI-17) muss hier selbst
+        // geprueft werden: Farbe ueber safeTypeColor(), Text per escapeHtml().
+        // Die Farbe geht als CSS-Variable ins Markup, das Aussehen steht im
+        // Stylesheet (.calendar-event-block).
+        const typeColor = safeTypeColor(apt.color);
+
+        // Unterzeile: "Gesamtprobe · 📍 Probelokal". Der Name der Terminart
+        // ersetzt das fruehere Schildchen und ist der Textersatz des Streifens.
+        // Der Trenner steht ausserhalb des Spans -- er ist Satzzeichen, nicht
+        // Teil des Namens -- und klebt per geschuetztem Leerzeichen am Ort,
+        // damit er beim Umbruch des schmalen Popups mit nach unten wandert
+        // statt am Namen haengen zu bleiben. Fehlt eines von beidem, entfaellt
+        // der Trenner; fehlen beide, entfaellt die Zeile ganz.
+        const locationText = apt.location ? `📍 ${escapeHtml(apt.location)}` : '';
+        const typeName = apt.type_name
+            ? `<span class="type-accent-name">${escapeHtml(apt.type_name)}</span>${locationText ? ' ·&nbsp;' : ''}`
             : '';
+        const subLine = `${typeName}${locationText}`;
 
         html += `
-            <div class="calendar-event-item">
+            <div class="calendar-event-block" style="--type-color: ${typeColor};">
                 <div class="calendar-event-time">${formatTimeRange(apt.start_time, apt.end_time)}</div>
-                <div>
-                    ${escapeHtml(apt.title)}
-                    ${typeBadge}
-                </div>
-                ${apt.description ? `<div style="font-size: 11px; color: #7f8c8d;">${escapeHtml(apt.description)}</div>` : ''}
-                ${apt.location ? `<div style="font-size: 11px; color: #7f8c8d;">📍 ${escapeHtml(apt.location)}</div>` : ''}
+                <div class="calendar-event-title">${escapeHtml(apt.title)}</div>
+                ${apt.description ? `<div class="calendar-event-desc">${escapeHtml(apt.description)}</div>` : ''}
+                ${subLine ? `<div class="calendar-event-sub">${subLine}</div>` : ''}
                 ${apt.responses ? calendarResponseLineHtml(apt, fest) : ''}
                 ${attendanceLineHtml(apt)}
                 ${fest && isAdminOrManager ? `<button type="button" class="calendar-event-edit"

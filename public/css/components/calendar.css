@@ -248,28 +248,32 @@
     color: var(--danger-color);
 }
 
-/* Terminart-Badge im Popup */
-.calendar-type-badge {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 3px;
-    margin-left: 5px;
-    vertical-align: middle;
-}
-
-
-/* Event-Item im Popup */
-.calendar-event-item {
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
+/* Ein Block je Termin (OI-94): Streifen in der Farbe der Terminart, leicht
+   abgesetzter Hintergrund. Bei mehreren Terminen an einem Tag war vorher nicht
+   erkennbar, welche Knoepfe zu welchem Termin gehoeren -- getrennt hat nur eine
+   duenne Linie, und die Knoepfe klebten optisch am naechsten Termin.
+   Die eigene Grenze je Termin ist zugleich die Struktur, an der OI-96 spaeter
+   Fokus und Tastaturbedienung ergaenzt.
+   Hier ist border-left richtig, anders als in den Tabellen (dort box-shadow:
+   inset): Das Popup ist keine Tabelle, es gibt keinen Zellhintergrund und keine
+   Zebrastreifung, die mit dem Rahmen kollidieren koennten. */
+.calendar-event-block {
+    border-left: 3px solid var(--type-color, var(--type-color-none));
+    background: var(--bg-gray);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 6px 8px;
+    margin-bottom: 7px;
     font-size: 13px;
 }
 
+.calendar-event-block:last-child {
+    margin-bottom: 0;
+}
 
-.calendar-event-item:last-child {
-    border-bottom: none;
+/* Fuer OI-96 vorbereitet -- tabindex und Tastenbedienung kommen dort. */
+.calendar-event-block:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 1px;
 }
 
 .calendar-event-time {
@@ -279,16 +283,17 @@
     margin-bottom: 3px;
 }
 
-.calendar-event-item > div:nth-child(2) {
+.calendar-event-title {
     color: var(--text-dark);
     font-weight: 500;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 5px;
 }
 
-.calendar-event-item > div:nth-child(3) {
+/* Beschreibung und Unterzeile (Terminart, Ort). Die Farbe stand frueher als
+   Hexwert im style-Attribut je Zeile, die Zuordnung ueber :nth-child() am
+   Block -- beides hing an der Reihenfolge der Kinder und brach, sobald eine
+   Zeile dazukam. */
+.calendar-event-desc,
+.calendar-event-sub {
     margin-top: 3px;
     font-size: 11px;
     color: var(--text-light);
@@ -306,15 +311,31 @@
 }
 
 /* FI-1 Fehlerbehebung: Hover- (span, .response-summary-text) und Pin-
-   Variante (button, .response-summary-btn) sollen im Popup optisch
-   identisch wirken. Die allgemeine Button-Optik aus buttons.css
-   (.response-summary-btn: Rahmen, Hintergrund) wird hier zurueckgesetzt;
-   erkennbar bleibt die anklickbare Variante nur an Cursor und Hover. */
+   Variante (button, .response-summary-btn) sollen im Popup optisch nahe
+   beieinander bleiben -- der Unterschied war seinerzeit als Fehler gemeldet
+   worden. Die allgemeine Button-Optik aus buttons.css (.response-summary-btn:
+   Rahmen, Hintergrund) wird deshalb weiterhin zurueckgesetzt: Die Zeile bleibt
+   Text, kein dritter Knopf neben "Bearbeiten" und "Anwesenheit".
+   Seit OI-94 gilt das nicht mehr absolut -- die Regel darunter gibt der
+   angeklickten Fassung einen leisen Hinweis mit. */
 .calendar-event-responses .response-summary-btn {
     border: none;
     background: none;
     font-family: inherit;
     cursor: pointer;
+}
+
+/* Im festgehaltenen Popup ist die Rueckmeldezeile anklickbar (den Knopf gibt
+   es nur dort, siehe calendarResponseLineHtml: clickable = fest && ...). Sie
+   bekommt dafuer eine gepunktete Linie und Linkfarbe statt Knopfoptik:
+   erkennbar auch ohne Maus -- auf dem Handy gibt es weder Mauszeiger noch
+   Hover-Zustand, und ohne Maus war gar nicht zu sehen, dass die Zeile etwas
+   tut. Loest die FI-1-Entscheidung ab, dass beide Popup-Fassungen gleich
+   aussehen -- siehe docs/project_history.md. Die Hover-Fassung
+   (.response-summary-text) bleibt unveraendert schlichter Text. */
+.calendar-event-responses .response-summary-btn {
+    border-bottom: 1px dotted var(--text-light);
+    color: var(--primary-color);
 }
 
 .calendar-event-responses .response-summary-btn:hover {
