@@ -293,70 +293,6 @@ function ckStringEnde(string $js, int $auf): int
     return $n;
 }
 
-/**
- * Darf an dieser Stelle ein Regex-Literal beginnen, oder ist das / eine
- * Division?
- *
- * Dieselbe Entscheidungsregel wie stripJsComments() in tests/lib/source.php:
- * das letzte bedeutungstragende Zeichen entscheidet ('a' steht fuer Wert oder
- * Bezeichner), dazu die Woerter, hinter denen ein Wert erwartet wird. Die Regel
- * ist bewusst identisch und NICHT neu erfunden -- der zentrale Entferner ist
- * gegen einen echten Parser abgeglichen.
- *
- * Sauber wiederverwenden liesse sie sich nur, wenn source.php sie als eigene
- * Funktion anbietet; dort steckt sie heute im Rumpf von stripJsComments(). Ob
- * der Helfer dorthin gehoert, ist eine offene Frage an die Sitzung, die
- * source.php verantwortet.
- */
-function ckRegexErlaubt(string $prev, string $word): bool
-{
-    static $regexAfterWord = [
-        'return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete',
-        'void', 'throw', 'instanceof', 'yield', 'await',
-    ];
-
-    return $prev === '' || strpos('(,=:[!&|?{};+-*%<>~^', $prev) !== false
-        || ($prev === 'a' && in_array($word, $regexAfterWord, true));
-}
-
-/**
- * Letztes Zeichen eines Regex-Literals ab seinem oeffnenden / -- Flags
- * eingeschlossen, eine Zeichenklasse [/] nicht als Ende missverstanden.
- *
- * Ohne diese Kenntnis verliest sich der Leser an genau den Stellen, um die es
- * im Haus gerade geht: escapeHtml() besteht aus fuenf .replace(/…/g, …). Ein
- * Literal wie /['"]/g liess ihn in die Anfuehrungszeichen laufen, ein
- * /\(/g kippte die Klammerbilanz -- am 2026-09-28 beide nachgestellt.
- */
-function ckRegexEnde(string $js, int $auf): int
-{
-    $n = strlen($js);
-    $j = $auf + 1;
-    $inClass = false;
-    while ($j < $n && $js[$j] !== "\n") {
-        $ch = $js[$j];
-        if ($ch === '\\') {
-            $j += 2;
-            continue;
-        }
-        if ($ch === '[') {
-            $inClass = true;
-        } elseif ($ch === ']') {
-            $inClass = false;
-        } elseif ($ch === '/' && !$inClass) {
-            break;
-        }
-        $j++;
-    }
-    assertTrue($j < $n && $js[$j] === '/', "Nicht geschlossenes Regex-Literal ab Position {$auf}");
-
-    $j++;
-    while ($j < $n && ctype_alpha($js[$j])) {
-        $j++;
-    }
-
-    return $j - 1;
-}
 
 /**
  * Ein Stueck Quelltext ab $von, gelesen bis dorthin, wo es endet: bis zu einer
@@ -374,37 +310,33 @@ function ckRegexEnde(string $js, int $auf): int
  * zu pruefen behauptet, ohne rot zu werden.
  *
  * Zeichenketten, Template-Literale und Regex-Literale werden uebersprungen --
- * nur dort duerfen Klammern und Semikola die Bilanz nicht beruehren. $prev und
- * $word werden dafuer mitgefuehrt wie in stripJsComments().
+ * nur dort duerfen Klammern und Semikola die Bilanz nicht beruehren. Ob ein /
+ * ein Literal beginnt, entscheidet jsRegexStart() rueckwaerts im Text -- der
+ * ist kommentarfrei, weil ckFile() ueber sourceCode() liest.
  */
 function ckLiesBis(string $js, int $von, bool $semikolonEndet): string
 {
     $tiefe = 0;
     $n = strlen($js);
-    $prev = '';
-    $word = '';
 
     for ($i = $von; $i < $n; $i++) {
         $c = $js[$i];
 
         if ($c === '\'' || $c === '"' || $c === '`') {
             $i = ckStringEnde($js, $i);
-            $prev = 'a';
-            $word = '';
             continue;
         }
 
-        if ($c === '/' && ckRegexErlaubt($prev, $word)) {
-            $i = ckRegexEnde($js, $i);
-            $prev = 'a';
-            $word = '';
+        if ($c === '/' && jsRegexStart($js, $i)) {
+            // jsRegexEnd() zeigt auf das schliessende / OHNE Flags. Die Flags
+            // liest die Schleife danach als Bezeichner weiter -- sie aendern
+            // die Klammerbilanz nicht.
+            $i = jsRegexEnd($js, $i);
             continue;
         }
 
         if (preg_match('/[A-Za-z0-9_$]+/A', $js, $m, 0, $i) === 1) {
             $i += strlen($m[0]) - 1;
-            $prev = 'a';
-            $word = $m[0];
             continue;
         }
 
@@ -419,10 +351,6 @@ function ckLiesBis(string $js, int $von, bool $semikolonEndet): string
             return substr($js, $von, $i - $von);
         }
 
-        if (!ctype_space($c)) {
-            $prev = $c;
-            $word = '';
-        }
     }
     assertTrue(false, "Gelesenes Stueck ab Position {$von} endet nicht");
 
