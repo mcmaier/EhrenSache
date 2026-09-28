@@ -258,3 +258,207 @@ test('Die Umlenkung springt in der richtigen Richtung', function () use ($ckRoot
     assertTrue((bool) preg_match('/\b' . preg_quote($anfang, '/') . '\.focus\(\)/', $rumpfVw),
         'Tab am Ende muss an den Anfang springen, nicht nach: ' . trim($rumpfVw));
 });
+
+/**
+ * Ende einer Zeichenkette ab der Position ihres oeffnenden Anfuehrungszeichens.
+ *
+ * Genuegt fuer createCalendarDay(): Dort steckt kein Template-Literal im
+ * eingebetteten Ausdruck eines anderen. Ein Template wird als Ganzes
+ * uebersprungen -- die Klammern in seinen Ausdruecken sind ohnehin paarig, und
+ * die Anfuehrungszeichen darin (etwa padStart(2, '0')) duerfen die Bilanz
+ * nicht verwirren.
+ */
+function ckStringEnde(string $js, int $auf): int
+{
+    $quote = $js[$auf];
+    $n = strlen($js);
+    for ($i = $auf + 1; $i < $n; $i++) {
+        if ($js[$i] === '\\') {
+            $i++;
+            continue;
+        }
+        if ($js[$i] === $quote) {
+            return $i;
+        }
+    }
+    assertTrue(false, "Nicht geschlossene Zeichenkette ab Position {$auf}");
+
+    return $n;
+}
+
+/**
+ * Ein Ausdruck ab $von, gelesen bis dorthin, wo er endet: bis zum Semikolon
+ * auf Klammerbilanz 0 oder bis zu einer schliessenden Klammer, fuer die es
+ * keine offene gibt -- der des umgebenden Aufrufs.
+ *
+ * Ein Muster wie /setAttribute\(\s*.aria-label.\s*,([^;]+);/ traegt hier
+ * NICHT, am 2026-09-25 bestaetigt: Die Zuweisung im Belegt-Zweig ist eine
+ * Verkettung ueber acht Zeilen, deren eingebettete Rueckruffunktion ein
+ * eigenes Semikolon enthaelt. [^;]+ bricht dort ab, und die Zusicherung prueft
+ * dann nur noch die kuerzere zweite Zuweisung -- die Haelfte dessen, was sie
+ * zu pruefen behauptet, ohne rot zu werden.
+ */
+function ckAusdruck(string $js, int $von): string
+{
+    $tiefe = 0;
+    $n = strlen($js);
+    for ($i = $von; $i < $n; $i++) {
+        $c = $js[$i];
+        if ($c === '\'' || $c === '"' || $c === '`') {
+            $i = ckStringEnde($js, $i);
+            continue;
+        }
+        if ($c === '(' || $c === '[' || $c === '{') {
+            $tiefe++;
+            continue;
+        }
+        if ($c === ')' || $c === ']' || $c === '}') {
+            if ($tiefe === 0) {
+                return substr($js, $von, $i - $von);
+            }
+            $tiefe--;
+            continue;
+        }
+        if ($c === ';' && $tiefe === 0) {
+            return substr($js, $von, $i - $von);
+        }
+    }
+    assertTrue(false, "Ausdruck ab Position {$von} endet nicht");
+
+    return '';
+}
+
+/**
+ * Die Vorlesetexte aller aria-label-Zuweisungen eines Rumpfes, aufgeloest.
+ *
+ * Steht hinter dem Komma nur ein Name, wird dessen Deklaration eingesetzt: Der
+ * Leer-Zweig legt seinen Text erst in eine Konstante und uebergibt dann diese.
+ * Ohne das Aufloesen suchte die Zusicherung "holidayName" im Wort
+ * "createLabel" -- und waere fuer diesen Zweig blind.
+ */
+function ckAriaLabelTexte(string $body): array
+{
+    $texte = [];
+    $ab = 0;
+    while (preg_match('/setAttribute\(\s*([\'"])aria-label\1\s*,\s*/', $body, $m, PREG_OFFSET_CAPTURE, $ab)) {
+        $hinterKomma = $m[0][1] + strlen($m[0][0]);
+        $text = ckAusdruck($body, $hinterKomma);
+        $ab = $hinterKomma + max(1, strlen($text));
+
+        if (preg_match('/^\s*(\w+)\s*$/', $text, $name)) {
+            $n = preg_quote($name[1], '/');
+            assertTrue((bool) preg_match('/(?:const|let|var)\s+' . $n . '\s*=\s*/', $body, $d, PREG_OFFSET_CAPTURE),
+                "Der Vorlesetext steht in \"{$name[1]}\", aber dafuer gibt es im Rumpf keine Deklaration");
+            $text = ckAusdruck($body, $d[0][1] + strlen($d[0][0]));
+        }
+
+        $texte[] = $text;
+    }
+
+    return $texte;
+}
+
+/**
+ * Der Belegt-Zweig von createCalendarDay(), von has-event bis zum else-if.
+ *
+ * Abgegrenzt wird am "} else if" auf VIER Leerzeichen -- der Einrueckung des
+ * Zweiges selbst. Ein blosses strpos($body, '} else if') schneidet an der
+ * falschen Stelle: Im Zweig steckt bei der Anwesenheitsanzeige ein zweites
+ * "} else if" auf acht Leerzeichen, und alles danach -- Vorlesetext und
+ * Hoerer -- fiele aus der Pruefung heraus. Die Zusicherungen meldeten dann
+ * rot, obwohl der Code stimmt.
+ */
+function ckBelegtZweig(string $body): string
+{
+    $von = strpos($body, "classList.add('has-event')");
+    assertTrue($von !== false, 'Der Belegt-Zweig ist nicht am has-event zu finden');
+    $zweig = substr($body, (int) $von);
+
+    $bis = strpos($zweig, "\n    } else if");
+    assertTrue($bis !== false, 'Das Ende des Belegt-Zweiges ist nicht zu finden');
+
+    return substr($zweig, 0, (int) $bis);
+}
+
+test('Ein Tag mit Terminen ist anfahrbar und oeffnet per Enter und Leertaste', function () use ($ckRoot) {
+    $js = ckFile($ckRoot, 'public/js/modules/appointments.js');
+    $body = ckFunctionBody($js, 'function createCalendarDay(');
+    $belegt = ckBelegtZweig($body);
+
+    assertTrue((bool) preg_match('/setAttribute\(\s*.role.\s*,\s*.button.\s*\)/', $belegt),
+        'Der belegte Tag traegt keine Rolle -- ein Vorlesegeraet kuendigt ihn nicht als bedienbar an');
+    assertTrue((bool) preg_match('/setAttribute\(\s*.tabindex.\s*,\s*.0.\s*\)/', $belegt),
+        'Ohne tabindex ist der Tag mit Tab nicht erreichbar');
+    assertTrue(str_contains($belegt, 'aria-haspopup'),
+        'aria-haspopup sagt vorab, dass sich ein Dialog oeffnet');
+
+    // Enter, Leertaste und preventDefault muessen IM keydown-Hoerer stehen,
+    // nicht irgendwo im Zweig. Ohne diese Eingrenzung erfuellte der
+    // Klick-Hoerer darueber die Zusicherung mit -- er ruft ebenfalls
+    // showAppointmentPopup, und stopPropagation steht dort auch.
+    assertTrue((bool) preg_match('/addEventListener\(\s*\'keydown\'\s*,\s*\(?\s*(\w+)\s*\)?\s*=>\s*\{/',
+        $belegt, $m, PREG_OFFSET_CAPTURE),
+        'Kein keydown-Hoerer im Belegt-Zweig -- das Popup bleibt ohne Maus unerreichbar');
+    $e = preg_quote($m[1][0], '/');
+    $hoerer = ckAusdruck($belegt, $m[0][1] + strlen($m[0][0]));
+
+    assertTrue((bool) preg_match('/' . $e . '\.key === \'Enter\'[^)]*\|\|[^)]*' . $e . '\.key === \' \'/', $hoerer),
+        'Enter und Leertaste muessen beide oeffnen -- der Leer-Zweig macht es seit OI-64 so vor');
+    assertTrue(str_contains($hoerer, 'preventDefault'),
+        'Ohne preventDefault rollt die Leertaste die Seite, waehrend sich das Popup oeffnet');
+    assertTrue(str_contains($hoerer, 'showAppointmentPopup'),
+        'Der keydown-Hoerer oeffnet das Popup nicht');
+});
+
+test('Der Feiertagsname steht vorn im Vorlesetext, in beiden Zweigen', function () use ($ckRoot) {
+    $js = ckFile($ckRoot, 'public/js/modules/appointments.js');
+    $body = ckFunctionBody($js, 'function createCalendarDay(');
+
+    // Auf VIER Leerzeichen, also auf Rumpfebene: Im Feiertags-Block stuende
+    // die Deklaration auf acht. Und weil dieser Block VOR dem classList.add
+    // liegt, bliebe eine Suche nach dem blossen Namen im Textstueck davor auch
+    // dann gruen, wenn holidayName wieder im Block gefangen waere -- also
+    // genau bei der Verschlechterung, die sie verhindern soll. Nur die
+    // Einrueckung unterscheidet die beiden Faelle.
+    $vorFeiertag = substr($body, 0, (int) strpos($body, "classList.add('calendar-day--holiday')"));
+    assertTrue((bool) preg_match('/(?:^|\n)    let\s+holidayName\b/', $vorFeiertag),
+        'holidayName muss vor dem Feiertags-Block auf Rumpfebene mit let deklariert sein, damit beide'
+        . ' Zweige ihn lesen');
+
+    // Ein aria-label ueberschreibt den sichtbaren Text vollstaendig -- ohne den
+    // Namen darin ist der Feiertag fuer Vorlesegeraete verschwunden, obwohl er
+    // als span im Tagesfeld steht. Genau zwei Stellen setzen eines: der
+    // Belegt-Zweig und der Leer-Zweig fuer Verwalter. Ein leerer Feiertag ohne
+    // Verwalterrolle bekommt keines und liest den span -- dort ist nichts zu
+    // tun.
+    $texte = ckAriaLabelTexte($body);
+    assertSame(2, count($texte),
+        'Es muessen genau zwei aria-label-Zuweisungen sein (Belegt- und Leer-Zweig); gefunden: '
+        . count($texte));
+
+    foreach ($texte as $i => $text) {
+        assertTrue(str_contains($text, 'holidayName'),
+            'Der ' . ($i + 1) . '. Vorlesetext nennt den Feiertag nicht -- das aria-label ueberschreibt'
+            . ' den sichtbaren Namen, er ist damit unhoerbar: '
+            . trim((string) preg_replace('/\s+/', ' ', $text)));
+    }
+
+    // Vorn heisst: vor dem, was den Zweig ausmacht. Die Zuweisungen werden
+    // dafuer an ihrem Inhalt unterschieden, nicht an ihrer Reihenfolge.
+    $belegtText = '';
+    $leerText = '';
+    foreach ($texte as $text) {
+        if (str_contains($text, 'dayAppointments')) {
+            $belegtText = $text;
+        } elseif (str_contains($text, 'Neuen Termin')) {
+            $leerText = $text;
+        }
+    }
+    assertTrue($belegtText !== '', 'Kein Vorlesetext, der die Termine des Tages auflistet');
+    assertTrue($leerText !== '', 'Kein Vorlesetext fuer den leeren Tag');
+
+    assertTrue(strpos($belegtText, 'holidayName') < strpos($belegtText, 'dayAppointments'),
+        'Der Feiertagsname muss VOR der Terminliste stehen, sonst kommt er erst nach allen Terminen');
+    assertTrue(strpos($leerText, 'holidayName') < strpos($leerText, 'Neuen Termin'),
+        'Der Feiertagsname muss VOR der Aufforderung stehen');
+});

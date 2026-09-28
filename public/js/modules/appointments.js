@@ -598,8 +598,11 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
 
     // Feiertag (FI-16) -- nur im laufenden Monat; die ausgegrauten Tage der
     // Nachbarmonate tragen ein unnormiertes Datum (Monat -1 bzw. 12).
+    // Der Name wird weiter unten auch im Vorlesetext gebraucht (OI-80), in
+    // beiden Zweigen -- deshalb ausserhalb des Blocks deklariert.
+    let holidayName = '';
     if (!isOtherMonth) {
-        const holidayName = holidaysOfYear(year)[dateStr];
+        holidayName = holidaysOfYear(year)[dateStr] || '';
         if (holidayName) {
             day.classList.add('calendar-day--holiday');
             const tag = document.createElement('span');
@@ -679,10 +682,11 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
         // Ersetzt das frueher gesetzte title-Attribut: Der native Tooltip kam
         // erst nach rund einer Sekunde, war unformatiert -- und liefe jetzt
         // zusaetzlich zum eigenen Popup auf, das dieselben Termine zeigt.
-        day.setAttribute('aria-label', `${dayNum}., ` + dayAppointments.map(a => {
-            const typeName = a.type_name ? `${a.type_name}, ` : '';
-            return `${a.start_time} ${typeName}${a.title}`;
-        }).join('; ')
+        day.setAttribute('aria-label', `${dayNum}., ` + (holidayName ? `${holidayName}, ` : '')
+            + dayAppointments.map(a => {
+                const typeName = a.type_name ? `${a.type_name}, ` : '';
+                return `${a.start_time} ${typeName}${a.title}`;
+            }).join('; ')
             + withResponses.map(a => `; ${responseSummaryTitle(a.responses)}`).join('')
             + (responseOpen ? '; Rückmeldung offen' : '')
             // Ohne "von X": bei mehreren Terminen zaehlt expected die Plaetze,
@@ -692,6 +696,12 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
                 ? `; Anwesend ${totals.present}, Entschuldigt ${totals.excused}, Fehlend ${totals.missing}`
                 : '')
             + (!isAdminOrManager && hasOwnStatusText(ownStatus) ? `; ${OWN_STATUS_TEXT[ownStatus]}` : ''));
+
+        // Der Leer-Zweig unten macht es seit OI-64 so vor. Ohne diese drei
+        // Zeilen ist das Popup und alles darin nur mit der Maus erreichbar.
+        day.setAttribute('role', 'button');
+        day.setAttribute('tabindex', '0');
+        day.setAttribute('aria-haspopup', 'dialog');
 
         // Ueberfahren zeigt dasselbe Popup wie der Klick, nur fluechtig. Die
         // kleine Verzoegerung verhindert, dass beim Wandern ueber den Kalender
@@ -718,10 +728,22 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
             clearTimeout(kalenderHoverTimer);
             showAppointmentPopup(day, dayAppointments, true);
         });
+
+        day.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                // Ohne preventDefault rollt die Leertaste die Seite, waehrend
+                // sich das Popup oeffnet.
+                e.preventDefault();
+                e.stopPropagation();
+                clearTimeout(kalenderHoverTimer);
+                showAppointmentPopup(day, dayAppointments, true);
+            }
+        });
     } else if (!isOtherMonth && isAdminOrManager) {
         // OI-64: Ein leerer Tag legt einen Termin an. Einfache Nutzer legen
         // keine Termine an und sehen deshalb keine Aenderung.
-        const createLabel = `Neuen Termin am ${String(dayNum).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year} anlegen`;
+        const createLabel = (holidayName ? `${holidayName}. ` : '')
+            + `Neuen Termin am ${String(dayNum).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year} anlegen`;
         day.classList.add('calendar-day--can-create');
         day.title = 'Neuen Termin anlegen';
         day.setAttribute('role', 'button');
