@@ -267,6 +267,10 @@ test('Die Umlenkung springt in der richtigen Richtung', function () use ($ckRoot
  * uebersprungen -- die Klammern in seinen Ausdruecken sind ohnehin paarig, und
  * die Anfuehrungszeichen darin (etwa padStart(2, '0')) duerfen die Bilanz
  * nicht verwirren.
+ *
+ * ' und " enden wie in JavaScript am Zeilenende: Verliest sich der Leser doch
+ * einmal, bricht er dann laut ab, statt stillschweigend halbe Dateien zu
+ * ueberspringen.
  */
 function ckStringEnde(string $js, int $auf): int
 {
@@ -280,10 +284,78 @@ function ckStringEnde(string $js, int $auf): int
         if ($js[$i] === $quote) {
             return $i;
         }
+        if ($quote !== '`' && ($js[$i] === "\n" || $js[$i] === "\r")) {
+            break;
+        }
     }
     assertTrue(false, "Nicht geschlossene Zeichenkette ab Position {$auf}");
 
     return $n;
+}
+
+/**
+ * Darf an dieser Stelle ein Regex-Literal beginnen, oder ist das / eine
+ * Division?
+ *
+ * Dieselbe Entscheidungsregel wie stripJsComments() in tests/lib/source.php:
+ * das letzte bedeutungstragende Zeichen entscheidet ('a' steht fuer Wert oder
+ * Bezeichner), dazu die Woerter, hinter denen ein Wert erwartet wird. Die Regel
+ * ist bewusst identisch und NICHT neu erfunden -- der zentrale Entferner ist
+ * gegen einen echten Parser abgeglichen.
+ *
+ * Sauber wiederverwenden liesse sie sich nur, wenn source.php sie als eigene
+ * Funktion anbietet; dort steckt sie heute im Rumpf von stripJsComments(). Ob
+ * der Helfer dorthin gehoert, ist eine offene Frage an die Sitzung, die
+ * source.php verantwortet.
+ */
+function ckRegexErlaubt(string $prev, string $word): bool
+{
+    static $regexAfterWord = [
+        'return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete',
+        'void', 'throw', 'instanceof', 'yield', 'await',
+    ];
+
+    return $prev === '' || strpos('(,=:[!&|?{};+-*%<>~^', $prev) !== false
+        || ($prev === 'a' && in_array($word, $regexAfterWord, true));
+}
+
+/**
+ * Letztes Zeichen eines Regex-Literals ab seinem oeffnenden / -- Flags
+ * eingeschlossen, eine Zeichenklasse [/] nicht als Ende missverstanden.
+ *
+ * Ohne diese Kenntnis verliest sich der Leser an genau den Stellen, um die es
+ * im Haus gerade geht: escapeHtml() besteht aus fuenf .replace(/…/g, …). Ein
+ * Literal wie /['"]/g liess ihn in die Anfuehrungszeichen laufen, ein
+ * /\(/g kippte die Klammerbilanz -- am 2026-09-28 beide nachgestellt.
+ */
+function ckRegexEnde(string $js, int $auf): int
+{
+    $n = strlen($js);
+    $j = $auf + 1;
+    $inClass = false;
+    while ($j < $n && $js[$j] !== "\n") {
+        $ch = $js[$j];
+        if ($ch === '\\') {
+            $j += 2;
+            continue;
+        }
+        if ($ch === '[') {
+            $inClass = true;
+        } elseif ($ch === ']') {
+            $inClass = false;
+        } elseif ($ch === '/' && !$inClass) {
+            break;
+        }
+        $j++;
+    }
+    assertTrue($j < $n && $js[$j] === '/', "Nicht geschlossenes Regex-Literal ab Position {$auf}");
+
+    $j++;
+    while ($j < $n && ctype_alpha($js[$j])) {
+        $j++;
+    }
+
+    return $j - 1;
 }
 
 /**
@@ -297,30 +369,56 @@ function ckStringEnde(string $js, int $auf): int
  * eigenes Semikolon enthaelt. [^;]+ bricht dort ab, und die Zusicherung prueft
  * dann nur noch die kuerzere zweite Zuweisung -- die Haelfte dessen, was sie
  * zu pruefen behauptet, ohne rot zu werden.
+ *
+ * Zeichenketten, Template-Literale und Regex-Literale werden uebersprungen --
+ * nur dort duerfen Klammern und Semikola die Bilanz nicht beruehren. $prev und
+ * $word werden dafuer mitgefuehrt wie in stripJsComments().
  */
 function ckAusdruck(string $js, int $von): string
 {
     $tiefe = 0;
     $n = strlen($js);
+    $prev = '';
+    $word = '';
+
     for ($i = $von; $i < $n; $i++) {
         $c = $js[$i];
+
         if ($c === '\'' || $c === '"' || $c === '`') {
             $i = ckStringEnde($js, $i);
+            $prev = 'a';
+            $word = '';
             continue;
         }
+
+        if ($c === '/' && ckRegexErlaubt($prev, $word)) {
+            $i = ckRegexEnde($js, $i);
+            $prev = 'a';
+            $word = '';
+            continue;
+        }
+
+        if (preg_match('/[A-Za-z0-9_$]+/A', $js, $m, 0, $i) === 1) {
+            $i += strlen($m[0]) - 1;
+            $prev = 'a';
+            $word = $m[0];
+            continue;
+        }
+
         if ($c === '(' || $c === '[' || $c === '{') {
             $tiefe++;
-            continue;
-        }
-        if ($c === ')' || $c === ']' || $c === '}') {
+        } elseif ($c === ')' || $c === ']' || $c === '}') {
             if ($tiefe === 0) {
                 return substr($js, $von, $i - $von);
             }
             $tiefe--;
-            continue;
-        }
-        if ($c === ';' && $tiefe === 0) {
+        } elseif ($c === ';' && $tiefe === 0) {
             return substr($js, $von, $i - $von);
+        }
+
+        if (!ctype_space($c)) {
+            $prev = $c;
+            $word = '';
         }
     }
     assertTrue(false, "Ausdruck ab Position {$von} endet nicht");
@@ -345,11 +443,30 @@ function ckAriaLabelTexte(string $body): array
         $text = ckAusdruck($body, $hinterKomma);
         $ab = $hinterKomma + max(1, strlen($text));
 
+        // Laeuft der Leser ueber das schliessende ) seines eigenen Aufrufs
+        // hinaus, verschluckt er den folgenden Code -- und eine Zusicherung,
+        // die darin irgendwo ihren Namen findet, bleibt gruen. Ein zweites
+        // setAttribute( im gelesenen Text kann nur so hineingeraten sein.
+        assertTrue(!str_contains($text, 'setAttribute('),
+            'Der Leser ist ueber das Ende der aria-label-Zuweisung hinausgelaufen'
+            . ' -- gelesen bis: ' . trim((string) preg_replace('/\s+/', ' ', substr($text, -120))));
+
         if (preg_match('/^\s*(\w+)\s*$/', $text, $name)) {
             $n = preg_quote($name[1], '/');
-            assertTrue((bool) preg_match('/(?:const|let|var)\s+' . $n . '\s*=\s*/', $body, $d, PREG_OFFSET_CAPTURE),
-                "Der Vorlesetext steht in \"{$name[1]}\", aber dafuer gibt es im Rumpf keine Deklaration");
-            $text = ckAusdruck($body, $d[0][1] + strlen($d[0][0]));
+
+            // GENAU eine Deklaration, nicht mindestens eine: Bei zwei
+            // gleichnamigen nimmt der Leser die erste, auch wenn die zweite
+            // den Geltungsbereich beherrscht. Eine tote Deklaration mit
+            // Feiertag oben und eine abgeschattete ohne darunter liessen die
+            // Zusicherung gruen, obwohl der Fehler da ist. Heute nicht
+            // ausloesbar -- aber der Leser darf nicht raten muessen.
+            $treffer = preg_match_all('/(?:const|let|var)\s+' . $n . '\s*=\s*/', $body, $alle,
+                PREG_OFFSET_CAPTURE);
+            assertSame(1, $treffer,
+                "Der Vorlesetext steht in \"{$name[1]}\"; dafuer muss es im Rumpf genau eine"
+                . " Deklaration geben, gefunden: {$treffer}");
+
+            $text = ckAusdruck($body, $alle[0][0][1] + strlen($alle[0][0][0]));
         }
 
         $texte[] = $text;
