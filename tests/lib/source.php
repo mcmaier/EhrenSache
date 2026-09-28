@@ -73,6 +73,17 @@ function sourceCode(string $path): string
 }
 
 /**
+ * sourceCode() zeilenweise, Index 0 = Zeile 1. Ersatz fuer file(): Die
+ * Entferner erhalten die Zeilenstruktur, die Zeilennummern stimmen also.
+ *
+ * @return string[]
+ */
+function sourceLines(string $path): array
+{
+    return preg_split('/\R/', sourceCode($path)) ?: [];
+}
+
+/**
  * Wie sourceCode(), aber eine fehlende Datei ergibt '' statt einer Ausnahme —
  * fuer Suiten, die das Fehlen selbst als Befund melden.
  */

@@ -25,17 +25,13 @@ oder noch nicht gebaut.
 [OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar) (Tastaturbedienung
 im Kalender). Der Vorbehalt „erst nach OI-94“ ist mit 1.16.0 gefallen, und derselbe Umbau hat die
 Struktur gleich mitgeliefert: Jeder Termin im festgehaltenen Popup ist ein eigener Block, ein
-Fokusrahmen dafür liegt in `calendar.css`. Es fehlt die Bedienung, nicht der Aufbau. Daneben
-steht [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (Wächter, die ein Kommentar
-erfüllt) aus demselben Vorgang — ein Durchgang durch `tests/suites/`, der Vorrang hat, solange
-[OI-17](#oi-17--keine-content-security-policy) offen ist: Ohne CSP hängt an solchen Wächtern die
-einzige Schranke gegen eingeschleustes Markup. Entschieden, aber nicht gebaut bleibt
+Fokusrahmen dafür liegt in `calendar.css`. Es fehlt die Bedienung, nicht der Aufbau. [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (Wächter, die ein Kommentar
+erfüllt) aus demselben Vorgang ist mit 1.17.0 erledigt. Entschieden, aber nicht gebaut bleibt
 [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) — es
 braucht eine eigene Spec, nicht nur eine Umsetzung.
 
 Offen mit Priorität *mittel*, am 2026-09-25 einzeln gegen den Code geprüft: OI-67, OI-96, OI-98,
-OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23,
-[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt). Die am 25.09. aus dem
+OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23. Die am 25.09. aus dem
 Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103 sind am selben Tag in `dev`
 erledigt. **OI-3 und OI-20 tragen ebenfalls
 *mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
@@ -46,7 +42,7 @@ Seit der Durchsicht vom 17.09. veröffentlicht: OI-82 bis OI-84 (1.11.2), OI-85 
 OI-86 und OI-87 (1.13.0), OI-25, OI-27, OI-66 und OI-95 (1.14.x),
 [OI-89](#oi-89--anwesenheit-eines-mitglieds-zählt-kommende-termine-als-fehlend) (1.15.0),
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)
-(1.16.0).
+(1.16.0), [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (1.17.0).
 
 ---
 
@@ -1318,7 +1314,8 @@ Vereinsinstallationen hätte ohnehin niemanden erreicht, es gibt keinen Meldeend
 **Aufwand, geschätzt am 2026-09-25:** Etappe 1 ist erledigt. Etappe 2 etwa zwei bis drei Tage,
 davon den größten Teil für die 126 Template-Handler; dazu ein vollständiger Durchgang durch
 `docs/testplan.md`, denn ein vergessener Handler fällt erst beim Klicken auf, nicht in der
-Suite. Etappe 2 gehört in eine eigene Spec. OI-107 geht voraus.
+Suite. Etappe 2 gehört in eine eigene Spec. OI-107, das vorausgehen sollte, ist mit 1.17.0
+erledigt.
 
 **Keine Entwarnung.** Eine CSP ist die zweite Verteidigungslinie, nicht die erste. Ihr Fehlen
 ist kein Freibrief für ungeprüfte Ausgabe: Jede neue serverseitig gerenderte HTML-Ansicht
@@ -1334,7 +1331,7 @@ Anwesenheitslisten, OI-94). Ohne CSP ist `safeTypeColor()`
 Markup — eine einzelne Funktion, die vier vorher verstreute Kopien ersetzt. Wie viel Last darauf
 liegt, zeigte [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt): Der Wächter, der ihren
 Einsatz sichern sollte, suchte nur den Funktionsnamen im Dateitext und blieb grün, nachdem die
-Prüfung ersatzlos entfernt war. Das ist der Grund, warum OI-107 trotz *mittel* Vorrang hat.
+Prüfung ersatzlos entfernt war. Deshalb hatte OI-107 trotz *mittel* Vorrang; erledigt mit 1.17.0.
 
 ---
 
@@ -4468,7 +4465,7 @@ zurückkommt, ist eine Produktfrage, keine Aufräumarbeit.
 ---
 
 ### OI-107 · Zusicherungen, die ein Kommentar erfüllt
-**Priorität:** mittel · aufgenommen am 2026-09-25 (beim Umbau für
+**Priorität:** erledigt am 2026-09-28, veröffentlicht mit 1.17.0 · aufgenommen am 2026-09-25 (beim Umbau für
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
 
 Beim Umbau fiel auf: Eine Zusicherung der Form `str_contains($body, 'safeTypeColor(')` findet den
@@ -4492,34 +4489,69 @@ einer Mutation gegengeprüft: Wird der rohe Datenbankwert eingesetzt, schlagen s
 Dateiinhalt ist das übliche Werkzeug der statischen Gegenproben unter `tests/suites/`, und jede
 dieser Stellen ist blind gegenüber dem Unterschied zwischen Code und Kommentar.
 
-**Zu tun:** Ein eigener Durchgang durch `tests/suites/` mit der Frage: Welche Zusicherungen prüfen
-ein Vorkommen, das ein Kommentar erfüllen kann? Vorrang haben die, die eine Sicherheitseigenschaft
-festhalten sollen. Wo es sich lohnt, statt des Namens die Wirkung festnageln oder wenigstens
-Kommentare vor dem Prüfen entfernen.
+**Der Auftrag war:** ein eigener Durchgang durch `tests/suites/` mit der Frage, welche
+Zusicherungen ein Vorkommen prüfen, das ein Kommentar erfüllen kann — Vorrang für die, die eine
+Sicherheitseigenschaft festhalten; wo es sich lohnt, die Wirkung statt des Namens festnageln,
+sonst wenigstens Kommentare vor dem Prüfen entfernen.
 
-**Warum nicht in OI-94:** Der Vorgang hat seine eigenen Wächter geradegezogen; eine Durchsicht
-aller Suiten ist Arbeit an der Testbasis und gehört nicht in ein Gestaltungsvorhaben.
+**Umgesetzt (1.17.0):**
+- `tests/lib/source.php`: `sourceCode()` liest Quelltext ohne Kommentare, je Sprache — JS über
+  einen Tokenizer, der Zeichenketten, Template-Literale und Regex-Literale kennt; PHP über
+  `token_get_all`; dazu CSS, HTML samt Inline-Skripten, SQL und `.htaccess`. Die Zeilenstruktur
+  bleibt erhalten. Der JS-Entferner ist gegen esprima abgeglichen: gleiche Token-Folge in allen
+  31 JS-Dateien unter `public/`. `rawSource()` liest bewusst roh (Copyright-Kopf, Doku-Wächter).
+- Alle Suiten lesen darüber; `tests/suites/source_lib.php` verbietet `file_get_contents` in den
+  Suiten.
+- Die Umstellung deckte **sechs** Zusicherungen auf, die am Kommentar hingen — darunter der
+  14-Tage-Horizont der PWA (die Konstante stand nur im Kommentar, der Code nutzt eine
+  Hilfsfunktion) und die Rate-Grenze (der Test las 3600 Zeichen ab einer Kommentarüberschrift).
+  Nach dem Merge von OI-103 kam eine **siebte** hinzu: Die Aktivitätsregel der Station stand in
+  `station.php` nur noch im Kommentar, auf `origin/dev` blieb der Test deshalb grün. Er prüft
+  jetzt die Kette `stationAuthenticate()` → `memberIsActiveOn()` → `getMemberActivityWhere()`.
+- Wirkung statt Name: `tests/suites/html_sinks_frontend.php` verfolgt jede HTML-Senke
+  (`innerHTML`, `insertAdjacentHTML`, `showToast`, Markup-Templates) über Zwischenvariablen bis
+  zum Freitextfeld; Ausnahmen tragen eine Prüfung ihrer Herkunft. `module_imports.php` prüft
+  zusätzlich die Gegenrichtung — ein Aufruf ohne Import war in `import_export.js` unbemerkt.
+- Mutationsprobe: Von 67 einzeln entfernten Maskierungen, die eine Suite ausdrücklich verlangt,
+  blieben vorher **44** unbemerkt, danach **keine**.
 
-**Weitgehend erledigt am 2026-09-25 und 2026-09-28.** Der Durchgang ist gelaufen:
-`tests/lib/source.php` liefert Quelltext **ohne Kommentare**, je Sprache eigens behandelt (der
-JavaScript-Teil gegen einen echten Parser abgeglichen), alle Suiten wurden umgestellt, und
-`tests/suites/source_lib.php` verbietet `file_get_contents` in Suiten. Dabei kamen **sechs weitere**
-Zusicherungen ans Licht, die am Kommentar hingen — darunter `station_unit`, das einen Funktionsnamen
-suchte, der längst nur noch im Kommentar stand.
-
-**Zwei Werkzeugfehler kamen erst beim Anwenden ans Licht**, beide nur durch Mutationsproben:
+**Der Wächter selbst musste geprüft werden**, nicht nur die Suiten, die er bewacht. Zwei
+Werkzeugfehler kamen erst beim Anwenden ans Licht, beide nur durch Mutationsproben:
 `html_sinks_frontend.php` kannte **keine Regex-Literale** — ein `"` in `/"/` brachte seine Scanner
 aus dem Takt, wodurch ganze Markup-Vorlagen unsichtbar wurden — und es stieg **nicht in
 verschachtelte Vorlagen** ab, sodass fünf von sechzehn `style`-Einsetzungen still herausfielen.
 Beides behoben und mit Selbstproben festgenagelt.
 
-**Was offen bleibt:** `tests/suites/pwa_escaping_frontend.php` liest weiterhin mit `file()` statt
-über `tests/lib/source.php` und prüft damit Kommentare mit. Der Wächter `source_lib` sieht das
-nicht, weil er nur `file_get_contents` verbietet — dieselbe Falle durch eine andere Tür. Solange
-das so ist, ist der Punkt nicht abgeschlossen.
+**Was dahinter lag:** Der Durchgang führte zu einer Sicherheitslücke, veröffentlicht mit 1.17.0
+als GHSA-fj3f-3q3v-w274: Freitext gelangte an mehreren Stellen unmaskiert oder mit einer
+Maskierung ohne Anführungszeichen in HTML-Attribute. Die erste Fassung des neuen Wächters hielt
+`escapeHtml()` für ausreichend, ohne zu prüfen, **wohin** der Wert geht — dieselbe Bauart
+„Name statt Wirkung“, eine Ebene tiefer. Gefunden hat das erst die Durchsicht einer zweiten
+Sitzung. Seit 1.17.0 erkennt der Wächter Attributkontexte
+([OI-112](#oi-112--strenge-attributregel-gilt-nur-für-style-nicht-für-on)).
 
-**Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: Es geht um die Verlässlichkeit der
-Wächter, nicht um eine ausnutzbare Lücke. Die geprüfte Schranke selbst ist vorhanden.
+**Offen, bewusst ausgelagert:** [OI-110](#oi-110--testsuiten-durchsuchen-fremde-arbeitsbäume-im-projektverzeichnis)
+(Suiten sehen fremde Arbeitsbäume), [OI-111](#oi-111--showtoast-maskiert-nicht-die-aufrufer-tun-es-einzeln)
+(`showToast()`), OI-112 (`on…`-Attribute).
+
+**Letzter Rest, am 2026-09-28 nach dem Release behoben:** `file()` las in **vier** Suiten weiter am
+Entferner vorbei (`assets.php` 3×, `mailer_unit.php`, `pwa_escaping_frontend.php`,
+`registration_unit.php`) — dieselbe Falle durch eine andere Tür. `registration_unit` hätte ein
+Kommentar mit `inTransaction()` in der Zeile vor `rollBack()` genügt; `mailer_unit` hatte einen
+eigenen Filter, der nur ganzzeilige Kommentare kannte. Alle lesen jetzt über `sourceLines()`, und
+der Wächter in `source_lib.php` verbietet jeden lesenden Zugriff an der Bibliothek vorbei
+(`file_get_contents`, `file`, `readfile`, `SplFileObject`, `fopen` mit Lesemodus). Vor der
+Umstellung schlug er an genau diesen sechs Stellen an.
+
+**Nicht wiederholt:** Eine breite Mutationsprobe über **jede** `escapeHtml`-Stelle wurde bei 116 von
+192 Stellen abgebrochen (79 erkannt, 37 unbemerkt) — gemessen vor den Erweiterungen des Wächters in
+1.17.0.
+
+**Warum nicht in OI-94:** Der Vorgang hat seine eigenen Wächter geradegezogen; eine Durchsicht
+aller Suiten ist Arbeit an der Testbasis und gehört nicht in ein Gestaltungsvorhaben.
+
+**Einordnung bei Aufnahme:** „nicht sicherheitsrelevant“ — es ging um die Verlässlichkeit der
+Wächter. Für die Wächter selbst stimmte das; hinter ihnen lag die oben genannte Lücke.
 
 ---
 

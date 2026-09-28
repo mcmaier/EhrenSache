@@ -34,7 +34,7 @@ test('Kein rollBack ohne Pruefung auf eine offene Transaktion', function () use 
 
     $verstoesse = [];
     foreach ($dateien as $rel) {
-        $zeilen = file($repoRoot . $rel, FILE_IGNORE_NEW_LINES);
+        $zeilen = sourceLines($repoRoot . $rel);
         foreach ($zeilen as $i => $zeile) {
             if (strpos($zeile, '->rollBack()') === false) {
                 continue;

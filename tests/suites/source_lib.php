@@ -129,18 +129,29 @@ test('sourceCode waehlt die Sprache nach der Endung', function () use ($slRoot) 
 // ---------------------------------------------------------------------------
 
 test('Suiten lesen Dateien nur ueber sourceCode() oder rawSource()', function () use ($slRoot) {
-    // Ein direktes file_get_contents liest Kommentare mit — genau der Weg, auf
-    // dem ein Kommentar eine Zusicherung erfuellte (OI-107). Wer den rohen Text
-    // wirklich braucht, sagt es mit rawSource().
+    // Ein direktes Lesen liest Kommentare mit — genau der Weg, auf dem ein
+    // Kommentar eine Zusicherung erfuellte (OI-107). Wer den rohen Text
+    // wirklich braucht, sagt es mit rawSource(); zeilenweise gibt es
+    // sourceLines().
+    //
+    // Bis 2026-09-28 stand hier nur file_get_contents. file() las in vier
+    // Suiten weiter am Entferner vorbei, eine davon mit einem selbstgebauten
+    // Filter, der nur ganzzeilige Kommentare kannte — dieselbe Falle durch
+    // eine andere Tuer. Deshalb jetzt jeder lesende Zugriff: file(),
+    // readfile(), SplFileObject und fopen() mit Lesemodus.
+    $lesend = '/(?<![\w$>:])(?:file_get_contents|file|readfile)\s*\('
+        . '|\bnew\s+\\\\?SplFileObject\b'
+        . '|(?<![\w$>:])fopen\s*\([^,]+,\s*[\'"][r]/';
+
     $verstoesse = [];
     foreach (glob($slRoot . '/tests/suites/*.php') ?: [] as $datei) {
         $code = stripPhpComments(rawSource($datei));
         foreach (preg_split('/\R/', $code) ?: [] as $i => $zeile) {
-            if (preg_match('/\bfile_get_contents\s*\(/', $zeile) === 1) {
+            if (preg_match($lesend, $zeile) === 1) {
                 $verstoesse[] = basename($datei) . ':' . ($i + 1) . ': ' . trim($zeile);
             }
         }
     }
 
-    assertTrue($verstoesse === [], "file_get_contents in Suiten:\n  " . implode("\n  ", $verstoesse));
+    assertTrue($verstoesse === [], "Lesender Dateizugriff an sourceCode()/rawSource() vorbei:\n  " . implode("\n  ", $verstoesse));
 });

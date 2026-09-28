@@ -153,7 +153,7 @@ test('Kein ungeschuetztes console.log/warn/debug in Auslieferungsskripten', func
         }
 
         $rel   = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot)));
-        $lines = file($file->getPathname(), FILE_IGNORE_NEW_LINES);
+        $lines = sourceLines($file->getPathname());
 
         foreach ($lines as $i => $line) {
             if (preg_match('/console\.(log|warn|debug)\s*\(/', $line) !== 1) {
@@ -299,7 +299,7 @@ test('Farbwerte aus der DB landen nur ueber eine Hex-Whitelist im style-Attribut
             continue;
         }
         $rel   = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot) + 1));
-        $lines = file($file->getPathname(), FILE_IGNORE_NEW_LINES);
+        $lines = sourceLines($file->getPathname());
 
         foreach ($lines as $i => $line) {
             if (preg_match('/style="[^"]*\$\{[a-zA-Z_][a-zA-Z0-9_]*\.color\b/', $line) !== 1) {
@@ -340,7 +340,7 @@ test('Mitgliedsname landet in <option>-Listen nur maskiert', function () use ($r
             continue;
         }
         $rel   = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot) + 1));
-        $lines = file($file->getPathname(), FILE_IGNORE_NEW_LINES);
+        $lines = sourceLines($file->getPathname());
 
         foreach ($lines as $i => $line) {
             if (preg_match('/<option[^>]*>\$\{/', $line) !== 1) {

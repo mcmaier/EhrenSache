@@ -117,13 +117,10 @@ test('Keine Mailer-Aufrufstelle laedt die Mailkonfiguration ungeprueft', functio
             continue;
         }
 
-        foreach (file($file->getPathname(), FILE_IGNORE_NEW_LINES) as $i => $line) {
-            $trimmed = ltrim($line);
-            // Kommentare erwaehnen die Funktion, sie rufen sie nicht auf
-            if ($trimmed === '' || $trimmed[0] === '*' || strpos($trimmed, '//') === 0
-                || strpos($trimmed, '/*') === 0) {
-                continue;
-            }
+        // Ohne Kommentare gelesen: Sie erwaehnen die Funktion, rufen sie aber
+        // nicht auf. Der fruehere eigene Filter kannte nur ganzzeilige
+        // Kommentare; ein angehaengter meldete einen Aufruf, den es nicht gab.
+        foreach (sourceLines($file->getPathname()) as $i => $line) {
             if (strpos($line, 'getMailConfig()') !== false) {
                 $verstoesse[] = $rel . ':' . ($i + 1) . ' — ' . trim($line);
             }
