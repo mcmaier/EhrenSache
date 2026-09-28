@@ -4,7 +4,7 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-25 gegen `v1.16.0` (`82d38b2`); seither nur einzeln nachgetragen ·
+**Zuletzt geprüft:** 2026-09-28 gegen `v1.17.1` (`8d77479`), Eintrag für Eintrag gegen Code und git ·
 **Version:** 1.17.1
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
@@ -23,8 +23,7 @@ oder noch nicht gebaut.
 
 **Nächste Umsetzung (Stand 2026-09-28):** noch nicht festgelegt.
 [OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar)
-(Tastaturbedienung im Kalender) ist **erledigt** — umgesetzt auf `feat/oi-96-tastatur`, bewusst
-ohne Versionssprung; die Nummer vergibt die Release-Sitzung. Die Annahme dieses Absatzes, der Fokusrahmen aus OI-94
+(Tastaturbedienung im Kalender) ist **erledigt** und mit **1.17.1** veröffentlicht. Die Annahme dieses Absatzes, der Fokusrahmen aus OI-94
 (`.calendar-event-block:focus-visible`) sei der Wegweiser, hat sich beim Entwerfen **nicht**
 gehalten: Die Termin-Blöcke wurden `role="group"` mit einem Namen **ohne** Tab-Stopp, und der
 Fokusrahmen ist samt seiner Zusicherung entfallen. [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (Wächter, die ein Kommentar
@@ -235,7 +234,7 @@ Verwendungsnachweis ist das die Stelle, an die ein Prüfer zuerst schaut.
 Freigabe geben. Preis: In einem Verein mit nur einem Manager bleibt dessen Eintrag hängen, bis
 ein Admin ihn freigibt.
 
-**Dieselbe Lücke an einer weiteren Stelle:** Der in [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen) geplante
+**Dieselbe Lücke an einer weiteren Stelle:** Der mit [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen) gebaute
 Korrekturweg der PWA hat denselben Effekt — korrigiert ein Manager die eigene Sitzung, bleibt sie
 `confirmed`, ohne dass jemand anderes zustimmt.
 
@@ -288,10 +287,10 @@ wie viele davon nachbearbeitet wurden.
 Das Zuordnungsfenster ist durchgehend ganzzahlig. Das Eingabefeld ist
 `<input type="number" min="0" max="8" step="1">` ([public/index.html](../public/index.html)),
 und jeder Leser schneidet Nachkommastellen ab: `parseInt(…, 10)` in der PWA
-([app.js](../public/checkin/js/app.js), zwei Stellen — seit `7f4d445` mit derselben
-NaN-geprüften Regel, vorher fiel die Anwesenheitsliste bei `'0'` still auf 2 h zurück),
-`(int)` in `checkinToleranceHours()` ([utils.php:145](../private/helpers/utils.php),
-Rückgabetyp `int`), `intval()` in [auto_checkin.php:123](../private/handlers/auto_checkin.php).
+([app.js](../public/checkin/js/app.js), vier Stellen (`app.js:750, 1311, 2530, 2602`) — seit
+`7f4d445` mit derselben NaN-geprüften Regel, vorher fiel die Anwesenheitsliste bei `'0'` still
+auf 2 h zurück), `(int)` in `checkinToleranceHours()` ([utils.php:195](../private/helpers/utils.php),
+Rückgabetyp `int`), `intval()` in [auto_checkin.php:383](../private/handlers/auto_checkin.php).
 `saveAllSettings()` ([settings.js](../public/js/modules/settings.js)) prüfte mit `parseInt`,
 speicherte danach aber den Rohstring — wer `0,5` eintrug, bekam in der Datenbank `"0,5"`
 und überall sonst `0`. **Dieser Teilbefund ist seit 1.9.0 behoben:** Zahlenfelder senden den
@@ -307,12 +306,12 @@ keine Option. 30 Minuten sind nicht darstellbar.
 vermeidet Fließkomma und ist verständlicher — oder Bruchstunden mit `parseFloat`/`floatval`
 durch die ganze Kette ziehen.
 
-**Preis:** ~5 Codestellen (2× `app.js`, `settings.js`, `utils.php`, `auto_checkin.php`),
-Migration (Bestandswert steht in Stunden), `tests/suites/checkin_appointment.php`, und Doku
-(`API.md`, `docs/testplan.md`, Spec). Die Dublettenprüfung beim Terminanlegen
-([appointments.php](../private/handlers/appointments.php)) rechnet noch mit der Konstante
-`AUTO_CHECKIN_TOLERANCE_HOURS` statt der Einstellung — beim Umbau mitnehmen oder bewusst
-trennen.
+**Preis:** `checkinToleranceHours()` und ihre rund 15 Aufrufer (records, exceptions, import,
+station, attendance_list, report_statistics, appointment_attendance, appointments,
+appointment_series, auto_checkin), dazu 4× `app.js` und `settings.js`, Migration (Bestandswert
+steht in Stunden), `tests/suites/checkin_appointment.php`, und Doku (`API.md`,
+`docs/testplan.md`, Spec). Die Konstante `AUTO_CHECKIN_TOLERANCE_HOURS` wird seit 1.6.0
+nirgends mehr definiert; der Fallback in `checkinToleranceHours()` ist toter Code.
 
 **Nächster Schritt:** Bedarf abwarten. Meldet ein Verein, dass `1` h zu grob ist, das
 Minuten-Modell in einer eigenen Spec umsetzen.
@@ -320,7 +319,8 @@ Minuten-Modell in einer eigenen Spec umsetzen.
 ---
 
 ### OI-27 · `members.active` vs. `membership_dates` am Kiosk
-**Priorität:** erledigt am 2026-09-24 — Branch `fix/oi-27-station-aktivzeitraum` (`4b10791`).
+**Priorität:** erledigt am 2026-09-24 — mit **1.14.0** (`4b10791`); seit 1.17.0 über
+`memberIsActiveOn()`.
 Entschieden: umstellen. `stationAuthenticate()` prüft die Aktivität über
 `getMemberActivityWhere()` mit dem heutigen Tag, also dieselbe Regel wie Statistik und
 Anwesenheitsbericht; ohne Einträge in `membership_dates` bleibt es bei `members.active`, dem
@@ -334,33 +334,38 @@ gegen SQLite läuft. Tests: `station_unit` (vier Fälle plus statische Gegenprob
 gemeinsame Regel genutzt wird), `station_api` (vier Fälle über HTTP), Handprüfungen ST-15 bis
 ST-17 in `docs/testplan.md`.
 
-`stationAuthenticate()` prüft für den Stempel nur `active = 1` auf `members`. Die Statistik
+**Ausgangslage:** `stationAuthenticate()` prüft für den Stempel nur `active = 1` auf `members`. Die Statistik
 und die übrige Anwesenheitslogik werten dagegen `getMemberActivityWhere()` gegen
 `membership_dates` aus — ein Mitglied kann `active = 1` sein, aber außerhalb seines aktiven
 Zeitraums liegen (Austritt zu einem künftigen Datum, Karenzzeit, Datenpflegefehler). Ein
 solches Mitglied kann am Kiosk weiterhin stempeln, obwohl es für den fraglichen Zeitraum in
 keiner Auswertung als aktiv zählt.
 
-**Zu entscheiden:** `stationAuthenticate()` auf dieselbe Aktivitätsprüfung wie die Statistik
+**Zu entscheiden (Ausgangslage):** `stationAuthenticate()` auf dieselbe Aktivitätsprüfung wie die Statistik
 umstellen, oder bewusst bei `active` belassen, weil ein Kiosk-Stempel ohnehin nur eine
 Anwesenheit erzeugt und die nachgelagerte Auswertung über `membership_dates` filtert.
 
 ---
 
 ### OI-32 · Wake Lock / Kiosk-Modus
-**Priorität:** niedrig
+**Priorität:** erledigt — Wake Lock seit **1.3.0** (`fc47332`, `requestWakeLock()` in
+`public/station/js/app.js`), mit einmaligem Hinweis, wenn der Browser ihn nicht unterstützt, und
+Neuanforderung bei `visibilitychange`. Das Verriegeln der Navigation bleibt bewusst Sache des
+Vereins (`public/station/README.md`, Abschnitt Kiosk-Modus).
 
 Die Station kann den Browser nicht gegen Bildschirmsperre oder Verlassen der Seite
 verriegeln — dokumentiert in `public/station/README.md`. Ohne Wake Lock oder echten
 Kiosk-Modus des Tablets kann der Bildschirm während des Betriebs einschlafen oder jemand
 navigiert versehentlich weg.
 
-**Zu entscheiden:** Ob die Web-App eine Wake-Lock-API anfordert (nicht auf allen Browsern
+**Zu entscheiden (entschieden, siehe oben):** Ob die Web-App eine Wake-Lock-API anfordert (nicht auf allen Browsern
 verfügbar) oder ob das Vereinssache bleibt (Tablet-eigene Kiosk-App, Geräteverwaltung durch
 MDM). Eine native Kiosk-App ist ausdrücklich außerhalb des Projektumfangs.
 
+---
+
 ### OI-37 · Ortsnachweis überlebt jede Zeitkorrektur
-**Priorität:** erledigt am 2026-09-08 — `workSessionUpdate()` nullt den Ortsnachweis der geänderten Zeit, Regel in `worktimeProofDrop()` (`private/helpers/worktime.php`), Tests in `tests/suites/worktime_unit.php` und `tests/db/verify_proof_drop.php`
+**Priorität:** erledigt am 2026-09-08 — mit **1.4.0** (`96cd645`); `workSessionUpdate()` nullt den Ortsnachweis der geänderten Zeit, Regel in `worktimeProofDrop()` (`private/helpers/worktime.php`), Tests in `tests/suites/worktime_unit.php` und `tests/db/verify_proof_drop.php`
 
 **Nachtrag vom 2026-09-08.** Beim Nachmessen fiel eine Asymmetrie in der Leiter des
 Nachweisgrades auf: Es gab eine Stufe für „nur der Start ist belegt", aber keine für „nur das
@@ -374,9 +379,9 @@ belegt", gleich welche. Der Wert heißt weiterhin `start`, weil er über `by_pro
 
 `workSessionUpdate()` schreibt `start_time` und `end_time` neu, lässt `start_location_name`
 und `end_location_name` dabei aber unberührt
-([work_sessions.php:770](../private/handlers/work_sessions.php)). Der Nachweisgrad wird aus
+([work_sessions.php:793](../private/handlers/work_sessions.php)). Der Nachweisgrad wird aus
 genau diesen beiden Feldern abgeleitet — im Dashboard clientseitig (`proofOf()` in
-[worktime.js:73](../public/js/modules/worktime.js)), in Statistik und Export serverseitig über
+[worktime.js:99](../public/js/modules/worktime.js)), in Statistik und Export serverseitig über
 `worktimeProofExpression()`. Er hängt damit daran, dass **irgendwann** ein Ortsnachweis vorlag,
 nicht an dem Zeitraum, für den er gelten soll.
 
@@ -417,6 +422,8 @@ hält.
 `tests/suites/worktime_api.php`. Frontend unberührt: Der Nachweisgrad wird überall aus den
 Ortsfeldern abgeleitet, hier wie dort.
 
+---
+
 ### OI-39 · Freigaben liegen an zwei Orten
 **Priorität:** niedrig — offen, aufgekommen bei den PWA-Korrekturen am 2026-09-08
 
@@ -424,12 +431,11 @@ Ein Manager, der wissen will, was seine Entscheidung braucht, muss zwei Bereiche
 
 | Bereich | Inhalt | Zähler |
 |---|---|---|
-| „📋 Anträge" | Entschuldigungen und Zeitkorrekturen aus `exceptions` | „Ausstehende Anträge" |
-| „Zeiterfassung" | Arbeitszeitsitzungen in `submitted`, Freigabe über ✓/✗ in der Tabellenzeile | keiner |
+| „📋 Anträge" | Entschuldigungen und Zeitkorrekturen aus `exceptions` | Status-Chip „Ausstehend“ (seit 1.13.0, OI-86) |
+| „Zeiterfassung" | Arbeitszeitsitzungen in `submitted`, Freigabe über ✓/✗ in der Tabellenzeile | Status-Chip „Wartet“ (seit 1.13.0, OI-86) |
 
 Beide sind Freigaben desselben Zuschnitts — jemand behauptet etwas, ein Manager entscheidet
-darüber. Sie heißen nur verschieden, liegen an verschiedenen Stellen, und nur eine der beiden
-hat einen Zähler. Wer ausschließlich in die Anträge schaut, übersieht wartende Stunden
+darüber. Sie heißen nur verschieden und liegen an verschiedenen Stellen. Wer ausschließlich in die Anträge schaut, übersieht wartende Stunden
 vollständig.
 
 **Der Aufwand ist geringer, als er wirkt.** Für eine gemeinsame Ansicht braucht es **keine**
@@ -468,6 +474,8 @@ für eine Freigabeliste tun.
 `public/js/modules/worktime.js`, gegebenenfalls `private/handlers/` für einen
 zusammenfassenden Lesezugriff. Kein Schemabedarf für die erste Stufe.
 
+---
+
 ### OI-42 · Neun Versionen haben den Release-Branch nie erreicht
 **Priorität:** erledigt am 2026-09-09 — `main` steht auf **1.4.0** (`fcf0d2e`), die neun Tags liegen auf `origin`, das Release ist angelegt. Der Rückstand von neun Versionen ist damit aufgeholt; `SECURITY.md` nennt wieder eine Version, die es wirklich gibt.
 
@@ -494,8 +502,6 @@ Tags gibt es nur bis `v1.1.3`.
 **Die gute Nachricht:** `main` ist ein reiner Vorfahr von `dev` — 230 Commits voraus, **null**
 zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 
-**Vor dem Nachholen zu entscheiden:**
-
 **Entschieden am 2026-09-09:**
 
 - **Die Zwischenstände werden nachträglich getaggt.** `v1.2.0` bis `v1.3.1` liegen als
@@ -505,11 +511,6 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 - **`SECURITY.md` ist richtiggestellt** (2026-09-09). Die Zusage gilt jetzt der jeweils
   neuesten veröffentlichten Version statt einer Versionsnummer, die es auf `main` nie gab;
   der Abstand zu `dev` ist dort benannt.
-
-**Offen:**
-
-- **Wann?** Der nächste Versionssprung ist der natürliche Moment. Bis dahin gilt: Wer die
-  Anwendung heute installiert, bekommt eine ein halbes Jahr alte Fassung.
 - **Vorbereitung des Releases** — Stand 2026-09-09:
 
   **Erledigt auf `dev`:**
@@ -561,7 +562,7 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
      GitHub-Release angelegt: Sie waren nie beziehbar, und leere Einträge verwässerten die
      Release-Seite. Als Tags bleiben sie auffindbar.
 
-  9. Das Release zu `v1.4.0` ist angelegt und als *Latest* markiert. Die Notizen sind der
+  8. Das Release zu `v1.4.0` ist angelegt und als *Latest* markiert. Die Notizen sind der
      `[1.4.0]`-Block aus dem `CHANGELOG.md`, davor die Update-Anleitung und ein Hinweis auf
      die beiden Änderungen, die ohne Zutun wirken: die HTTPS-Umleitung und der veränderte
      Nachweisgrad bestehender Arbeitszeiten. Das ZIP stammt von GitHub selbst — nur das
@@ -584,7 +585,7 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
      Vermutlich wurde das Datum beim Schreiben des Eintrags gesetzt. Nicht korrigiert — die
      Angabe ist harmlos, und eine nachträgliche Änderung veröffentlichter Daten wäre die
      schlechtere Wahl.
-  8. ~~In `SECURITY.md` die Zeile „Aktuell veröffentlicht" ziehen~~ — **erledigt auf `dev`**
+  9. ~~In `SECURITY.md` die Zeile „Aktuell veröffentlicht" ziehen~~ — **erledigt auf `dev`**
      (2026-09-09). Sie nennt bereits 1.4.0, und der Absatz zum Abstand von `dev` ist auf eine
      dauerhafte Formulierung umgestellt, die nach jedem Release stimmt. Das musste **vor** dem
      Fast-Forward geschehen: Er überträgt genau den Stand von `dev`, eine spätere Korrektur
@@ -653,7 +654,7 @@ eigenen Kamera-Scanner?
 - *Dafür:* Eine installierte iPadOS-Station ließe sich ohne Tippen neu koppeln — der Fall
   tritt bei jedem neuen Token auf, in der öffentlichen Demo stündlich.
 - *Dagegen:* Eine zweite Fremdbibliothek (`html5-qrcode`, ~370 kB; liegt seit OI-17 Etappe 1
-  unter `public/js/vendor/`, wäre also schon im Paket), Kamerarechte auf einem Kiosk-Tablet,
+  unter `public/js/vendor/` (seit 1.17.0, bislang nur von der Check-in-PWA geladen), wäre also schon im Paket), Kamerarechte auf einem Kiosk-Tablet,
   mehr Testfläche. Der Weg
   über die Kamera-App kostet nichts davon.
 
@@ -679,8 +680,8 @@ Der QR-Code zur Inbetriebnahme enthält den API-Token der Station im Klartext. W
 abfotografiert, hat ihn.
 
 **Warum das heute vertretbar ist:** Der Token darf nur die Ressource `station` aufrufen
-(`public/api/api.php`), `handleStation()` prüft zusätzlich `device_type = kiosk`, und ohne die
-PIN eines Mitglieds bewirkt er nichts. Er ist nur für Admins lesbar
+(`public/api/api.php`), `handleStation()` lässt nur `kiosk` und (seit 1.17.0, OI-101)
+`auth_device` zu, und ohne die PIN eines Mitglieds bewirkt er nichts. Er ist nur für Admins lesbar
 (`private/handlers/users.php`) und steht im Gerätedialog ohnehin im Klartextfeld — der QR-Code
 macht ihn nicht exponierter, als er dort schon ist. Das Modal warnt ausdrücklich.
 
@@ -722,7 +723,7 @@ erst starten? Gefunden im Codequalitäts-Review zur Schnellinbetriebnahme.
 ---
 
 ### OI-101 · `station` für `auth_device` öffnen (PIN-Anmeldung am Hardware-Terminal)
-**Priorität:** erledigt am 2026-09-25 (Branch `feat/oi-101-auth-device`, in `dev`) · aufgenommen am 2026-09-25 · **Bezug:** [FI-4](FEATURE-IDEAS.md),
+**Priorität:** erledigt am 2026-09-25 — mit **1.17.0** (`c953f55`) · aufgenommen am 2026-09-25 · **Bezug:** [FI-4](FEATURE-IDEAS.md),
 Kiosk-Spec `docs/superpowers/specs/2026-09-04-station-pin-kiosk-design.md` Abschnitt 5
 („später `auth_method: device` für `auth_device`")
 
@@ -730,7 +731,7 @@ Kiosk-Spec `docs/superpowers/specs/2026-09-04-station-pin-kiosk-design.md` Absch
 Spezifikation dort in `docs/spezifikation-auth-geraet.md`, Gerätetyp `auth_device`) ist entschieden, dass es beide Vertrauensmodelle bedient: Finger und
 Karte über `auto_checkin` (das Gerät bürgt), Mitgliedsnummer + PIN über `station` (der Server
 prüft). Das Terminal hat ein Keypad und soll damit auch Mitgliedern ohne Fingerabdruck oder
-Karte die Anmeldung erlauben. Heute nimmt `handleStation()` nur Kiosk-Token an
+Karte die Anmeldung erlauben. Bis 1.16.0 nahm `handleStation()` nur Kiosk-Token an
 ([station.php:27](../private/handlers/station.php), `403 "Kiosk device token required"`).
 
 **Warum nicht lokal am Gerät.** Eine PIN-Prüfung auf dem Gerät hieße, die PIN-Hashes aller
@@ -867,7 +868,7 @@ aufrufen. Preis: Der Wizard ist bewusst eine einzelne, abhängigkeitsfreie Datei
 läuft, wenn der Rest der Installation nicht mehr zusammenpasst.
 
 **Nebenbefund, unabhängig davon:** ~~Der Wizard sperrt sich per `.htaccess` aus, **bevor** er
-sein Ergebnis rendert.~~ **Erledigt am 2026-09-22** (Branch `fix/update-htaccess`): Die Sperre
+sein Ergebnis rendert.~~ **Erledigt am 2026-09-22**, veröffentlicht mit **1.12.1** (`6d07750`): Die Sperre
 steht jetzt hinter `</html>` am Dateiende, weiterhin nur bei `$migrationOk`. Scheitert das
 Rendern, bleibt der Assistent offen und das Ergebnis erreichbar. Test in
 `tests/suites/update_wizard.php`. Offen bleibt allein die Entscheidung oben.
@@ -883,7 +884,7 @@ Kommentartext als die ausgelieferte Datei („Installation abgeschlossen“); na
 Installerlauf bleibt `public/install/.htaccess` deshalb als geändert stehen. Das ist gewollt.
 
 **Am 2026-09-25 gegen den Code geprüft: unverändert.** `runWizardStep3()` steht weiter in
-`tests/db/verify_migration_chain.php` (Zeile 141) und wird dort neunmal aufgerufen; der Wizard
+`tests/db/verify_migration_chain.php` (Zeile 141) und wird dort achtmal aufgerufen; der Wizard
 hat seinen Schritt 3 nicht ausgelagert.
 
 ---
@@ -964,8 +965,10 @@ prüft und erst bei `200` ausliefert. Zwei Fallstricke:
   nicht, der Bericht käme ohne Stylesheet und ohne Logo. Hier bliebe nur eine Vorabprüfung
   per `fetch` und danach ein `window.open` auf die echte URL — also bewusst zwei Anfragen.
 
+---
+
 ### OI-34 · Kiosk: Bedienbarkeit der Nummern- und PIN-Eingabe
-**Priorität:** erledigt am 2026-09-07 — Rückmeldung aus dem ersten Tablet-Test, umgesetzt in `public/station/` (Umschalter „ABC“/„123“ als Taste im Ziffernblock, Hinweis „Nummer darf nicht leer sein“, Mitgliedsnummer im PIN-Bild)
+**Priorität:** erledigt am 2026-09-07 — mit **1.4.0** (`04a8f92`); Rückmeldung aus dem ersten Tablet-Test, umgesetzt in `public/station/` (Umschalter „ABC“/„123“ als Taste im Ziffernblock, Hinweis „Nummer darf nicht leer sein“, Mitgliedsnummer im PIN-Bild)
 
 Drei Beobachtungen aus dem Probebetrieb der virtuellen Station (`public/station/`):
 
@@ -985,8 +988,10 @@ Drei Beobachtungen aus dem Probebetrieb der virtuellen Station (`public/station/
 `public/station/js/app.js` (`renderNumberPad()`, `numberNext`, `showScreen('pin')`).
 Kein Server-Anteil.
 
+---
+
 ### OI-35 · PWA: Arbeitszeit korrigieren und nachtragen
-**Priorität:** erledigt am 2026-09-08 — umgesetzt in `public/checkin/` (Modal mit zwei Einstiegen: „Korrigieren“ am Verlaufseintrag, „Zeit nachtragen“ im Arbeitszeit-Tab)
+**Priorität:** erledigt am 2026-09-08 — mit **1.4.0** (`35e97ba`, `6413f7d`); umgesetzt in `public/checkin/` (Modal mit zwei Einstiegen: „Korrigieren“ am Verlaufseintrag, „Zeit nachtragen“ im Arbeitszeit-Tab)
 
 Der Verlauf-Tab der Check-in-PWA führt Arbeitszeitsitzungen in der Zeitachse mit, aber ohne
 jede Aktion: `addWorkSessionToHistory()` rendert Datum, Tätigkeit, Dauer, Notiz und Status —
@@ -1038,8 +1043,10 @@ nachtragen“ im Arbeitszeit-Tab (`POST`) — ein Formular, zwei Einstiege.
 (`addWorkSessionToHistory()`, `loadHistory()`, Arbeitszeit-Tab), `public/checkin/css/style.css`.
 Server voraussichtlich unberührt.
 
+---
+
 ### OI-36 · PWA-Statistik ohne geleistete Stunden
-**Priorität:** erledigt am 2026-09-07 — umgesetzt in `public/checkin/` (Block „Arbeitszeit“ im Statistik-Tab: bestätigte Jahressumme, Fußnote über Eingereichtes und Abgelehntes, Aufschlüsselung nach Tätigkeit)
+**Priorität:** erledigt am 2026-09-07 — mit **1.4.0** (`3167fa9`, `719940b`); umgesetzt in `public/checkin/` (Block „Arbeitszeit“ im Statistik-Tab: bestätigte Jahressumme, Fußnote über Eingereichtes und Abgelehntes, Aufschlüsselung nach Tätigkeit)
 
 Der Statistik-Tab der PWA zeigt zwei Karten — Anwesenheitsquote und Terminzahl — und die
 Übersicht nach Gruppen. Die seit 1.2.0 erfassten Stunden kommen darin nicht vor. Ein Mitglied,
@@ -1053,8 +1060,8 @@ und hängt dann einen eigenen `worktime`-Block an
 nach Nachweisart und nach Tätigkeit, für einen `user` auf das eigene Mitglied begrenzt.
 `loadStatistics()` in der PWA fragt den Parameter schlicht nicht an
 ([app.js:3080](../public/checkin/js/app.js)) — und auch das Dashboard nutzt den Block nirgends;
-es rechnet seine Summen in `updateWorktimeStats()` selbst aus der Sitzungsliste. Der Block hat
-damit heute **keinen** Abnehmer im Frontend.
+es rechnet seine Summen in `updateWorktimeStats()` selbst aus der Sitzungsliste. Bis 1.4.0
+hatte der Block keinen Abnehmer im Frontend; seither nutzt ihn die PWA-Statistik.
 
 **Vor der Umsetzung zu klären:**
 
@@ -1078,23 +1085,25 @@ ist seit 2026-09-07 in `API.md` dokumentiert (Abschnitt *Statistiken → Arbeits
 (`loadStatistics()`, `displayStatistics()`), `public/checkin/css/style.css`.
 Server voraussichtlich unberührt.
 
+---
+
 ### OI-38 · Die Auditspur ist nirgends zu sehen
 **Priorität:** niedrig — vorgemerkt, entstanden bei der Planung von [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen)
 
 Jede Änderung an einer Arbeitszeitsitzung wird protokolliert: `logSessionChange()` schreibt
 Vorher/Nachher-Werte als JSON in `work_session_log.changes`
-([worktime.php:317](../private/helpers/worktime.php)). Angezeigt wird das nirgends. Der einzige
+([worktime.php:409](../private/helpers/worktime.php)). Angezeigt wird das nirgends. Der einzige
 Weg heraus ist die Selbstauskunft — `my_data` gibt die eigenen Logzeilen aus
-([my_data.php:150](../private/handlers/my_data.php)) —, und die liest niemand zur Freigabe.
+([my_data.php:159](../private/handlers/my_data.php)) —, und die liest niemand zur Freigabe.
 
 **Folge für die Freigabe.** In der Freigabeliste des Dashboards steht ein Eintrag mit Status
 „wartet auf Freigabe". Ob das eine frisch nachgetragene Sitzung ist oder eine bestätigte, deren
 Zeiten das Mitglied nachträglich verschoben hat, ist daran nicht zu erkennen. Der Manager gibt
-also frei, ohne zu wissen, worüber er entscheidet. Mit [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen) — Korrigieren und
-Nachtragen aus der PWA — wird dieser Fall vom Sonderfall zum Regelfall.
+also frei, ohne zu wissen, worüber er entscheidet. Seit [OI-35](#oi-35--pwa-arbeitszeit-korrigieren-und-nachtragen) (1.4.0) — Korrigieren und
+Nachtragen aus der PWA — ist dieser Fall der Regelfall.
 
 Zwei Teilsignale gibt es bereits: Der Nachweisgrad fällt bei einer Zeitkorrektur auf
-„teilbelegt" oder „unbelegt" (sobald [OI-37](#oi-37--ortsnachweis-überlebt-jede-zeitkorrektur) umgesetzt ist), und `source` unterscheidet
+„teilbelegt" oder „unbelegt" (seit [OI-37](#oi-37--ortsnachweis-überlebt-jede-zeitkorrektur), 2026-09-08), und `source` unterscheidet
 `timer` von `manual`. Beides sagt aber nur, *dass* etwas anders ist, nicht *was*.
 
 **Zu klären:**
@@ -1117,7 +1126,7 @@ Zwei Teilsignale gibt es bereits: Der Nachweisgrad fällt bei einer Zeitkorrektu
 ---
 
 ### OI-102 · `auto_checkin` von Geräten: `location_name` bleibt leer
-**Priorität:** erledigt am 2026-09-25 (Branch `feat/oi-101-auth-device`, in `dev`) · aufgenommen am 2026-09-25
+**Priorität:** erledigt am 2026-09-25 — mit **1.17.0** (`10546c4`) · aufgenommen am 2026-09-25
 
 `handleAutoCheckin()` liest für Gerätekonten die Spalte `email` und schreibt sie als
 `location_name` in den Record ([auto_checkin.php:535](../private/handlers/auto_checkin.php),
@@ -1138,7 +1147,7 @@ nur, wo es gesetzt wurde.
 ---
 
 ### OI-103 · `auto_checkin` prüft den Aktivstatus des Mitglieds nicht
-**Priorität:** erledigt am 2026-09-25 (Branch `feat/oi-101-auth-device`, in `dev`) · aufgenommen am 2026-09-25 · **Bezug:**
+**Priorität:** erledigt am 2026-09-25 — mit **1.17.0** (`10546c4`, `43b049a`) · aufgenommen am 2026-09-25 · **Bezug:**
 [OI-27](#oi-27--membersactive-vs-membership_dates-am-kiosk)
 
 `resolveMemberIdByNumber()` ([utils.php:106](../private/helpers/utils.php)) und der
@@ -1220,7 +1229,7 @@ Bewusst unverändert. Nur dokumentieren, nicht als stärker beschreiben, als es 
 
 ### OI-17 · Keine Content-Security-Policy
 **Priorität:** mittel · Etappe 1 (Anmeldung, Check-in-PWA, Station) erledigt am 2026-09-25,
-offen bleibt Etappe 2 (Dashboard)
+veröffentlicht mit **1.17.0** (`c163cd2`); offen bleibt Etappe 2 (Dashboard)
 
 Bis 2026-09-25 lieferte die Anwendung **keine** CSP — weder als Header noch als
 `<meta http-equiv>`. Am 2026-09-03 nachgeprüft: keine der neun `.htaccess`-Dateien und kein
@@ -1244,16 +1253,16 @@ Hälfte:
 | Befund | Umfang |
 |---|---|
 | Inline-Handler in `index.html` | 109 (`onclick`, `onchange`, `onmouseover`/`-out`) |
-| Inline-Handler in HTML aus JS-Templates | 126 in 14 Modulen unter `public/js/modules/` (records 21, members 16, exceptions 15, appointments 15, responses 11, users 10, devices 10 …) |
+| Inline-Handler in HTML aus JS-Templates | 114 in 12 Modulen unter `public/js/modules/` (records 21, members 16, exceptions 15, appointments 15, responses 11, users 10, devices 10, worktime 6, management 6, import_export 2, ui 1, auth 1; gezählt mit dem Muster `on[a-z]+="`) |
 | Check-in-PWA | 4 Handler in `public/checkin/js/app.js` — sie war **nicht** frei davon, wie hier früher stand (Etappe 1: umgestellt) |
 | Login | 1 Handler in `public/login.html` (Etappe 1: umgestellt) |
 | Station-PWA | 0 Handler, nur externe Scripts |
 | Inline-`<script>` | 1 Block in `index.html` (Installationsprüfung am Dateiende) |
 | Fremdquelle | `public/checkin/index.html` lud `html5-qrcode` von unpkg.com (Etappe 1: liegt unter `public/js/vendor/`) |
-| `window.*`-Exporte, die nur den Handlern dienen | 137 |
+| `window.*`-Exporte, die nur den Handlern dienen | 135 (nach Entfernen von `saveMemberLink` in 1.17.1) |
 | `style=`-Attribute | 245, davon 15 mit interpolierten Werten; dazu `<style>`-Blöcke in install, update, `reset_password.php`, `verify_email.php` |
 
-Summe: **235 Inline-Handler in 16 Dateien.** Nicht betroffen sind Zuweisungen über
+Summe: **223 Inline-Handler in 13 Dateien** (109 in `index.html` + 114 in Modulen). Nicht betroffen sind Zuweisungen über
 `element.style.…` (CSSOM, von einer CSP nicht erfasst) und die Druckberichte
 (`private/helpers/report.php`, bewusst ohne JavaScript).
 
@@ -1315,10 +1324,10 @@ Vereinsinstallationen hätte ohnehin niemanden erreicht, es gibt keinen Meldeend
    `onclick`-Strings und sind anzupassen.
 
 **Aufwand, geschätzt am 2026-09-25:** Etappe 1 ist erledigt. Etappe 2 etwa zwei bis drei Tage,
-davon den größten Teil für die 126 Template-Handler; dazu ein vollständiger Durchgang durch
+davon den größten Teil für die 114 Template-Handler; dazu ein vollständiger Durchgang durch
 `docs/testplan.md`, denn ein vergessener Handler fällt erst beim Klicken auf, nicht in der
 Suite. Etappe 2 gehört in eine eigene Spec. OI-107, das vorausgehen sollte, ist mit 1.17.0
-erledigt.
+erledigt, der abschließende Testcommit kam mit 1.17.1.
 
 **Keine Entwarnung.** Eine CSP ist die zweite Verteidigungslinie, nicht die erste. Ihr Fehlen
 ist kein Freibrief für ungeprüfte Ausgabe: Jede neue serverseitig gerenderte HTML-Ansicht
@@ -1334,12 +1343,13 @@ Anwesenheitslisten, OI-94). Ohne CSP ist `safeTypeColor()`
 Markup — eine einzelne Funktion, die vier vorher verstreute Kopien ersetzt. Wie viel Last darauf
 liegt, zeigte [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt): Der Wächter, der ihren
 Einsatz sichern sollte, suchte nur den Funktionsnamen im Dateitext und blieb grün, nachdem die
-Prüfung ersatzlos entfernt war. Deshalb hatte OI-107 trotz *mittel* Vorrang; erledigt mit 1.17.0.
+Prüfung ersatzlos entfernt war. Deshalb hatte OI-107 trotz *mittel* Vorrang; mit 1.17.0 erledigt, der abschließende Testcommit
+kam mit 1.17.1.
 
 ---
 
 ### OI-18 · `session_info` gab Session-ID und CSRF-Token heraus
-**Priorität:** erledigt am 2026-09-03
+**Priorität:** erledigt am 2026-09-03 — mit **1.2.1** (`3dc2a5d`)
 
 `GET ?resource=session_info` lieferte jeder angemeldeten Rolle — auch `user` — die
 Session-ID im Klartext und das vollständige `$_SESSION`-Array, darin den CSRF-Token,
@@ -1379,7 +1389,7 @@ Kommt sie nicht, ist der Endpoint ersatzlos entfernbar.
 ---
 
 ### OI-25 · Token-erzeugte Sessions
-**Priorität:** erledigt am 2026-09-24 — Branch `fix/oi-25-token-session` (`797d332`). Der
+**Priorität:** erledigt am 2026-09-24 — mit **1.14.0** (`797d332`). Der
 Token-Zweig in `public/api/api.php` startet keine Session mehr; die Token-Daten stehen nur im
 `$_SESSION`-Array des Arbeitsspeichers, ohne gespeicherten Zustand und ohne Cookie. Damit
 überlebt eine angemeldete Browser-Sitzung einen Token-Aufruf im selben Browser, und der 401
@@ -1396,6 +1406,8 @@ geworden. Der Sperrzweig für `auth_type = token` bleibt für Sitzungen stehen, 
 eine so entstandene Session ohne den Token nicht mehr nutzbar — ein Zugriff allein über das
 Session-Cookie liefert `401`. Das schließt die Lücke, dass ein einmal ausgestelltes
 Session-Cookie eines Geräte-Tokens den Token selbst überflüssig machte.
+
+*Ursprünglicher Stand, erledigt durch OI-24 und den Fix oben:*
 
 **Fußangel dabei gefunden:** `public/js/modules/api.js::getAuthHeaders()` sendet
 `Bearer ${sessionStorage.api_token}` — dieser Schlüssel wird im Dashboard nirgends gesetzt,
@@ -1455,7 +1467,7 @@ hängende Datenbank im Minutentakt Post.
 ## Kleinere Funde
 
 ### OI-8 · Doppelte `id="scannerContainer"` in der PWA
-**Priorität:** erledigt am 2026-09-02
+**Priorität:** erledigt am 2026-09-02 — mit **1.2.1** (`a0bafb2`)
 
 `public/checkin/index.html` enthielt das Element zweimal mit derselben Id. `getElementById`
 lieferte nur das erste; das zweite war toter Markup.
@@ -1476,13 +1488,13 @@ umgangen, weil der Server Nicht-Managern ohnehin nur eigene Sitzungen liefert.
 
 **Gegengeprüft am 2026-09-17: nicht mehr aktuell.** `login()` liefert `member_id` in der
 Login-Antwort mit ([auth.php](../private/helpers/auth.php)), und das Frontend wertet es aus
-([api.js](../public/js/modules/api.js)). Wann das nachgezogen wurde, ist nirgends vermerkt —
-der Eintrag blieb stehen, obwohl die Sache erledigt war.
+([api.js](../public/js/modules/api.js)). Nachgezogen bereits vor 1.0.0 (Commit `1468a8a`,
+2025-12-17) — der Eintrag blieb stehen, obwohl die Sache erledigt war.
 
 ---
 
 ### OI-10 · Breite Tabelle in der Zeiterfassung
-**Priorität:** erledigt am 2026-09-22 — mit 1.12.0 (Branch `fix/oi-10-oi-75`), Wege 1 und 2 kombiniert.
+**Priorität:** erledigt am 2026-09-22 — mit **1.12.0** (`fa13bbb`), Wege 1 und 2 kombiniert.
 `#worktimeTable` trägt `table-worktime` mit eigener Untergrenze `min-width: 1400px`
 (`public/css/components/tables.css`); Beginn, Dauer und Status tragen `cell-nowrap`
 (`renderWorkSessions()`). Gemessen mit 25 Zeilen aus dem Demo-Bestand und dem echten CSS: Die
@@ -1530,7 +1542,7 @@ Browsers quetscht die Spalten und bricht den Zellinhalt um. Sichtbare Folgen:
 - Zeilen wachsen von 83 px auf 108 px. Bei 25 Einträgen je Seite sind das gut 600 px
   zusätzliche Scrollstrecke ohne jeden Informationsgewinn.
 
-Denkbare Wege, noch nicht entschieden:
+Denkbare Wege (Stand 2026-09-09; mit 1.12.0 für 1 + 2 entschieden):
 
 1. Eine eigene Untergrenze für diese Tabelle (Modifikator-Klasse mit `min-width` um 1550px),
    damit sie unterhalb davon rollt statt umzubrechen. Kleinster Eingriff, löst aber nur das
@@ -1580,7 +1592,8 @@ Umsetzungspläne, Testplan **und diese Datei** existierten nur lokal und wären 
 Arbeitsverzeichnis verloren gegangen.
 
 **Entscheidung:** Als Open-Source-Projekt gehört die Doku ins Repository. Versioniert sind
-seither `CLAUDE.md`, `docs/OPEN-ITEMS.md`, `docs/testplan.md` und `docs/superpowers/specs/`.
+seither `CLAUDE.md`, `docs/OPEN-ITEMS.md`, `docs/testplan.md` und `docs/superpowers/specs/`
+— inzwischen außerdem `docs/project_history.md`, `docs/DEMO.md` und `docs/FEATURE-IDEAS.md`.
 
 Weiterhin ignoriert bleiben:
 
@@ -1603,7 +1616,8 @@ die Grenze im Abschnitt [Sicherheit](#sicherheit) und der Ablauf in `SECURITY.md
 ---
 
 ### OI-15 · `mainScreen` wird nie geschlossen
-**Priorität:** erledigt am 2026-09-02
+**Priorität:** erledigt am 2026-09-02 — mit **1.2.1** (`1028565`); der Teilbefund zu
+`public/index.html` war falsch, siehe Korrektur
 
 `public/checkin/index.html` öffnet in Zeile 70 `<div id="mainScreen">`, schließt es aber nie —
 über die ganze Datei bleibt genau ein `<div>` offen. Browser ergänzen das fehlende Tag
@@ -1621,6 +1635,12 @@ die ganze Zeit korrekt, es fehlte ein einzelnes Zeichen.
 `<div class="dashboard">` tatsächlich — ebenfalls unbemerkt, weil der Browser es am `</body>`
 ergänzte. Auch dort lagen sämtliche 16 Modals im Dashboard-Container.
 
+**Korrektur (Durchsicht 2026-09-28):** `public/index.html` war vor `1028565` ausgeglichen (409
+öffnende, 409 schließende `div`, Kommentare nicht mitgezählt); das Dashboard wurde nach
+`</main>` geschlossen. Der Fix hat ein überzähliges `</div>` eingefügt, das bis heute steht
+(1.17.1: 484 zu 485). Der Browser ignoriert es. **Entfernt am 2026-09-28** auf `dev`, samt dem
+Kommentar, der die falsche Vorgeschichte festhielt.
+
 **Folge des Fixes:** Die Modals liegen jetzt außerhalb ihrer Bildschirm-Container und sind damit
 von deren `display` unabhängig. Das ist richtig so — sie tragen `position: fixed` und werden
 ohnehin nur über `.active` sichtbar. Es hatte aber eine Konsequenz, die zuvor der Container
@@ -1628,22 +1648,24 @@ verdeckte: Ein offener Dialog überlebte in der PWA das Abmelden und stünde üb
 Anmeldebildschirm. `handleLogout()` schließt offene Dialoge deshalb jetzt ausdrücklich. Im
 Dashboard entfällt das, weil der Abmeldevorgang zu `login.html` navigiert.
 
-Geprüft: alle drei ausgelieferten HTML-Dateien sind ausgeglichen, alle 16 Dashboard-Modals und
+Geprüft: Check-in und Station sind ausgeglichen (`index.html` erst seit der Korrektur oben),
+alle 16 Dashboard-Modals und
 alle 4 PWA-Modals öffnen weiterhin, und das offene Modal verschwindet beim Abmelden.
 
-**Absicherung wäre möglich:** Ein Test in `tests/suites/assets.php`, der die `div`-Bilanz jeder
-ausgelieferten HTML-Datei prüft, würde solche Fälle künftig beim Entstehen melden — beide hier
-gefundenen wären damit sofort aufgefallen.
+**Absicherung seit 2026-09-28:** Der Test „Oeffnende und schliessende Container-Tags sind
+ausgeglichen“ in `tests/suites/assets.php` prüft `div`, `main`, `section`, `form` und `table` in
+den vier ausgelieferten HTML-Dateien. Gegenprobe: Auf dem Stand vor der Korrektur meldet er
+„484 geöffnet, 485 geschlossen“.
 
 ---
 
 ### OI-16 · Zeiterfassung zeigt inaktive Mitglieder zur Auswahl
-**Priorität:** erledigt am 2026-09-02
+**Priorität:** erledigt am 2026-09-02 — mit **1.2.1** (`2bd7e0c`)
 
 Die Mitgliederauswahl der Zeiterfassung nahm den Jahres-Cache ungefiltert:
 
-- **Filterleiste** — `fillWorktimeFilters()`, [worktime.js:274](../public/js/modules/worktime.js)
-- **Nachtrag-Modal** — `openWorkSessionModal()`, [worktime.js:375](../public/js/modules/worktime.js)
+- **Filterleiste** — `fillWorktimeFilters()`, [worktime.js:298](../public/js/modules/worktime.js)
+- **Nachtrag-Modal** — `openWorkSessionModal()`, [worktime.js:480](../public/js/modules/worktime.js)
 
 Beide bauen ihre Optionen aus `dataCache.members[currentYear].data`, ohne den
 Mitgliedschaftszeitraum zu berücksichtigen. Wer im gewählten Jahr nicht aktiv war, steht
@@ -1651,7 +1673,7 @@ trotzdem zur Wahl — und ein Nachtrag für ein ausgetretenes Mitglied lässt si
 
 **Woran es sich messen lassen muss:** Die Statistik löst das bereits. Sie filtert mit
 `allMembers.filter(m => m.is_active_in_period)`
-([statistics.js:130](../public/js/modules/statistics.js)). Das Feld liefert der Server
+([statistics.js:138](../public/js/modules/statistics.js)). Das Feld liefert der Server
 jahresabhängig aus `membership_dates` — es steht im selben Cache, wird in der Zeiterfassung
 nur nicht ausgewertet.
 
@@ -1664,7 +1686,7 @@ nur nicht ausgewertet.
   Mitglied ausgetreten ist. Wären sie nicht auffindbar, fehlten sie in der Auswertung.
 
 Die Anwesenheitsverwaltung blendet Einträge inaktiver Mitglieder sogar ganz aus
-([records.js:545](../public/js/modules/records.js)). Für Arbeitszeiten wurde das **bewusst
+([records.js:559](../public/js/modules/records.js)). Für Arbeitszeiten wurde das **bewusst
 nicht** übernommen: Stunden dürfen nicht verschwinden, weil jemand den Verein verlässt.
 
 **Fallstrick beim Bearbeiten:** Das Modal setzt `memberSelect.value = session.member_id`.
@@ -1677,7 +1699,8 @@ korrekter Vorauswahl.
 ---
 
 ### OI-24 · CSV-Export war durch einen leeren Auth-Header blockiert
-**Priorität:** erledigt am 2026-09-07 — Import weiterhin ungetestet
+**Priorität:** erledigt am 2026-09-07 — mit **1.4.0** (`13c52fe`, `a069900`); Import manuell
+geprüft, Round-Trip durch die Suite `export_import` bewacht
 
 Der CSV-Export von Terminen, Mitgliedern und Anwesenheiten funktionierte nicht:
 
@@ -1833,7 +1856,7 @@ zu früh.
 ---
 
 ### OI-29 · `devices.js` Altlasten
-**Priorität:** erledigt am 2026-09-17 — Maskierung am 2026-09-16, der Rest mit 1.9.1. Der Fund war größer als hier beschrieben, siehe unten
+**Priorität:** erledigt am 2026-09-17 — Maskierung am 2026-09-16 mit **1.8.0**, der Rest mit **1.9.1**. Der Fund war größer als hier beschrieben, siehe unten
 
 Mehrere kleine, voneinander unabhängige Funde in `public/js/modules/devices.js`:
 
@@ -1864,7 +1887,7 @@ das zweite Gerät. Vorher blieb die Leiste leer.
 Markup — die Geräteliste hat keine Filterleiste. Die drei Handler sind entfernt; der
 Reset-Handler hätte beim Feuern sogar geworfen, weil er ohne Optional Chaining auf `.value`
 zugriff. `showDeviceSection()` wertet seinen `page`-Parameter jetzt aus, statt fest die 1 zu
-nehmen.
+nehmen. `filterGroup` ist ebenfalls nicht mehr in `devices.js`.
 
 Festgehalten in `tests/suites/profile_dashboard_frontend.php`.
 
@@ -1879,12 +1902,13 @@ darauf hinweist — für den Betrieb unauffällig, aber schwer zu erklären, wen
 plötzlich keine Codes mehr annimmt.
 
 **Zu tun (optional):** Warnhinweis in der Geräteliste für ein `totp_location`-Gerät ohne
-gesetztes Secret.
+gesetztes Secret. Der Server liefert bereits `has_totp_secret` (`users.php`); es fehlt nur die
+Anzeige.
 
 ---
 
 ### OI-31 · `settings.js` prüft PUT-Ergebnisse nicht
-**Priorität:** erledigt am 2026-09-16 — Teilerfolg wird benannt, Feld und Reiter markiert
+**Priorität:** erledigt am 2026-09-16 — mit **1.9.0** (`a0b421f`); Teilerfolg wird benannt, Feld und Reiter markiert
 
 **Umgesetzt** mit den Untertabs (1.9.0): Die Speicherschleife bricht bei einer Ablehnung nicht
 mehr ab, sondern arbeitet die übrigen Schlüssel ab und sammelt die gescheiterten. Der Hinweis
@@ -1969,7 +1993,7 @@ von `tests/run.php`, weil die Datei den SQL-Modus der Verbindung umstellt.
 ---
 
 ### OI-41 · `checkin_appointment` ist am selben Tag nicht wiederholbar
-**Priorität:** erledigt — geprüft am 2026-09-17, die Suite räumt ab
+**Priorität:** erledigt mit **1.2.4** (`e695f08`) — geprüft am 2026-09-17, die Suite räumt ab
 
 Die Suite legt ihre Termine mit festen Uhrzeiten am aktuellen Tag an („Nachtrag-Termin" 07:00,
 „Frueher Check-in" 04:00, „Spaeter zugeordnet" 13:00 …) und räumt sie nicht wieder ab. Beim
@@ -1998,7 +2022,7 @@ sind seither grün.
 
 ### OI-109 · „Keine Antwort“ unterscheidet nicht, wer gar nicht antworten kann
 **Priorität:** erledigt am 2026-09-28 · aufgenommen am 2026-09-25 (Beobachtung aus dem manuellen Test) ·
-umgesetzt auf `feat/oi-109-ohne-zugang`, Spec `docs/superpowers/specs/2026-09-28-rueckmeldung-ohne-zugang-design.md`
+mit **1.17.0**, Spec `docs/superpowers/specs/2026-09-28-rueckmeldung-ohne-zugang-design.md`
 
 Selbst zurückmelden kann nur ein Mitglied mit Benutzerkonto — also ein `users`-Satz mit dieser
 `member_id`, `account_status = 'active'` und `is_active = 1`. Für alle anderen trägt die
@@ -2042,8 +2066,8 @@ Umfang: Rückmeldungs-Dialog (Kennzeichen „kein Zugang“, Filterknopf „Kein
 ohne Zugang)“) und Druckbericht. Die Ampel-Chips der Terminliste bleiben ohne.
 
 **Bewusst nicht:** keine eigene Kategorie in der Zuverlässigkeit, keine eigene Filterleiste.
-Beim Umsetzen `API.md` nachziehen; der Lesepfad ist nach
-[OI-100](#oi-100--api-abgleich-schreibpfade-und-fünf-lesepfade-nicht-bewacht) nicht bewacht.
+`API.md` ist nachgezogen; der Lesepfad bleibt nach
+[OI-100](#oi-100--api-abgleich-schreibpfade-und-fünf-lesepfade-nicht-bewacht) unbewacht.
 
 **Geklärt:** Ein Konto im Zustand `pending` trägt das Mitglied nur in `pending_member_id`
 (`member_id` wird erst bei der Aktivierung gesetzt) und zählt damit als ohne Zugang.
@@ -2123,7 +2147,7 @@ Der Demo-Modus lässt Schreibzugriffe auf Mitglieder, Termine, Anwesenheiten, An
 Arbeitszeiten zu — das ist sein Zweck. Was ein Besucher dabei in ein Freitextfeld schreibt,
 bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Das Dashboard nutzt
 Inline-Handler und führt noch keine CSP (siehe [OI-17](#oi-17--keine-content-security-policy));
-Anmeldung, Check-in-PWA und Station tragen seit Etappe 1 eine.
+Anmeldung, Check-in-PWA und Station tragen seit Etappe 1 (1.17.0) eine.
 
 Beim Entwurf am 2026-09-09 erwogen und für die Ausbaustufe „Sandkasten mit Grenzen"
 hingenommen. Die Alternative wäre eine reine Schaufenster-Demo gewesen, die weder Check-in
@@ -2139,7 +2163,7 @@ Fällt OI-17, fällt dieser Punkt mit.
 ---
 
 ### OI-48 · Statistik zählt je Gruppe nur **eine** Terminart
-**Priorität:** erledigt am 2026-09-11 — alle Terminarten einer Gruppe werden jetzt ausgewertet,
+**Priorität:** erledigt am 2026-09-11 — mit **1.5.0**; alle Terminarten einer Gruppe werden jetzt ausgewertet,
 Kopfzahlen sind entdoppelt; Fundstellen: `private/helpers/attendance.php` (neu, trennt holende
 von formenden Funktionen), `private/handlers/statistics.php`,
 `private/handlers/report_statistics.php`, `public/js/modules/statistics.js`, Tests in
@@ -2226,7 +2250,9 @@ Demo erzählen will.
 
 Der Produktivpfad ist in Ordnung: `handleApprovedAbsence()` in `private/helpers/utils.php` legt
 den Eintrag beim Genehmigen korrekt an. Der Demo-Generator schreibt die Ausnahmen jedoch direkt
-in die Tabelle und geht an dieser Funktion vorbei.
+in die Tabelle und geht an dieser Funktion vorbei: `buildExceptions()` in
+`private/demo/plan.php` erzeugt `absence` nur für Paare ohne Record, `private/demo/seed.php`
+schreibt sie direkt.
 
 **Zu tun:** Der Generator legt für jede genehmigte `absence` zusätzlich den `records`-Eintrag
 mit `status = 'excused'` an — oder er ruft beim Erzeugen denselben Weg wie die Oberfläche.
@@ -2234,18 +2260,21 @@ mit `status = 'excused'` an — oder er ruft beim Erzeugen denselben Weg wie die
 **Am Rande aufgefallen:** `handleApprovedAbsence()` arbeitet mit `INSERT IGNORE`. Existiert
 bereits ein Eintrag — etwa weil das Mitglied vorher als anwesend erfasst wurde —, verpufft die
 Genehmigung wirkungslos, und das Mitglied bleibt „anwesend". `handleApprovedTimeCorrection()`
-aktualisiert in derselben Lage einen vorhandenen Eintrag. Ob dieser Unterschied Absicht ist,
-ist ungeklärt; er ist von diesem Punkt getrennt zu bewerten.
+aktualisiert in derselben Lage einen vorhandenen Eintrag. Seit 1.5.0 ist das als Absicht im
+Code festgehalten (Kommentar in `handleApprovedAbsence()`, `private/helpers/utils.php`: eine
+nachträgliche Entschuldigung überschreibt keine Anwesenheit).
 
 ---
 
 ### OI-50 · `my_data` als CSV enthält keine Arbeitszeiten
-**Priorität:** erledigt am 2026-09-16 — die CSV führt jetzt dieselben Daten wie die JSON-Form
+**Priorität:** erledigt am 2026-09-16 — mit **1.8.0** (`d8e32df`); die CSV führt jetzt dieselben
+Daten wie die JSON-Form
 
-**Umgesetzt** in `private/handlers/my_data.php` (Branch `fix/my-data-csv`): drei neue Abschnitte
-— `=== MITGLIEDSCHAFTSZEITRÄUME ===`, `=== ARBEITSZEITEN ===` (Beginn, Ende, Pause, Dauer,
+**Umgesetzt** in `private/handlers/my_data.php`: drei neue Abschnitte
+— `[ MITGLIEDSCHAFTSZEITRÄUME ]`, `[ ARBEITSZEITEN ]` (Beginn, Ende, Pause, Dauer,
 Tätigkeit, Termin, Status, Nachweis, Quelle, Notiz) und
-`=== ÄNDERUNGSHISTORIE ARBEITSZEIT ===` (Zeitpunkt, Sitzung, Vorgang, Änderungen als JSON).
+`[ ÄNDERUNGSHISTORIE ARBEITSZEIT ]` (Zeitpunkt, Sitzung, Vorgang, Änderungen als JSON; umbenannt
+mit OI-59, 1.9.1).
 Die Aufbereitung kommt aus `export.php` und `worktime.php` (`worktimeReportTimes()`,
 `sessionDurationMinutes()`, `worktimeHours()`, `worktimeProofLabel()`), der Nachweisgrad über
 `worktimeProofExpression()` aus der Abfrage — der Nachweis rechnet damit nicht anders als der
@@ -2392,21 +2421,23 @@ kennt er nicht.
 
 Das ist keine Nachlässigkeit, sondern eine Entscheidung beim Entwurf am 2026-09-10: Die Statistik
 rechnet durchgehend über `YEAR(a.date) = ?`, und die Mitgliedschaftszeiträume kommen über
-`getMemberActivityWhereYear()` dazu. Ein freier Zeitraum würde `calculateGroupStatistics()`, die
-Terminzählung und die Aktivitätsprüfung umbauen — ein Eingriff in Zahlen, die Vereine seit Jahren
-kennen, für einen Bedarf, den niemand geäußert hat.
+`getMemberActivityWhereYear()` dazu. Ein freier Zeitraum würde die Gruppenrechnung in
+`private/helpers/attendance.php`, die Terminzählung und die Aktivitätsprüfung umbauen — ein
+Eingriff in Zahlen, die Vereine seit Jahren kennen, für einen Bedarf, den niemand geäußert hat.
 
 Solange der Bericht dieselben Filter benutzt wie der Bildschirm, können beide sich nicht
 widersprechen. Das ist der eigentliche Gewinn der Beschränkung.
 
 **Zu tun, falls der Bedarf entsteht:** Monat, Quartal oder Vereinsjahr auswerten zu können, hieße
-die Jahresbasis der gesamten Statistik aufzugeben — nicht nur die des Berichts. Dann besser
-gemeinsam mit [OI-48](#oi-48--statistik-zählt-je-gruppe-nur-eine-terminart) entscheiden, das ohnehin an derselben Funktion ansetzt.
+die Jahresbasis der gesamten Statistik aufzugeben — nicht nur die des Berichts.
+[OI-48](#oi-48--statistik-zählt-je-gruppe-nur-eine-terminart) ist seit 1.5.0 erledigt; ein freier
+Zeitraum setzt an denselben Funktionen in `attendance.php` an.
 
 ---
 
 ### OI-53 · Navigation im Querformat auf dem Telefon kaum bedienbar
-**Priorität:** erledigt am 2026-09-11 — Ursache war eine andere als hier vermutet, siehe unten
+**Priorität:** erledigt am 2026-09-11 — mit **1.5.0** (`4ad5b5c`); Ursache war eine andere als
+hier vermutet, siehe unten
 
 **Gemeldet am 2026-09-10** vom Betreiber: In der mobilen Ansicht im **Querformat** ist das
 Navigationsmenü zu klein und lässt sich nicht bedienen.
@@ -2466,10 +2497,11 @@ sind **nicht** betroffen — beide laden ein eigenes `css/style.css` und erben d
 ---
 
 ### OI-54 · PUT auf Terminarten überschreibt nicht mitgeschickte Felder
-**Priorität:** erledigt am 2026-09-16 — beide Handler schreiben nur noch mitgeschickte Felder
+**Priorität:** erledigt am 2026-09-16 — mit **1.8.0** (`f583ce5`); beide Handler schreiben nur
+noch mitgeschickte Felder
 
 **Umgesetzt** in `private/handlers/appointment_types.php` und
-`private/handlers/activity_types.php` (Branch `fix/api-korrekturen`): dynamisches `UPDATE` wie
+`private/handlers/activity_types.php`: dynamisches `UPDATE` wie
 bei `members`, `API.md` weist die Teiländerung bei beiden Ressourcen ausdrücklich aus.
 `activity_name` ist beim `PUT` damit nicht mehr Pflicht — mitgeschickt darf es aber nicht leer
 sein.
@@ -2664,7 +2696,10 @@ zusätzlicher Datenabfluss.
 ---
 
 ### OI-57 · ID-Badge fehlt in den Modals der Zeiterfassung
-**Erledigt am 2026-09-14** — beide Dialoge rufen `updateModalId()`.
+**Erledigt am 2026-09-14** — mit **1.5.1** (`f1355d9`); beide Dialoge rufen `updateModalId()`.
+
+<details>
+<summary>Ursprünglicher Befund</summary>
 
 Die Bearbeitungsdialoge zeigen oben rechts im Kopf die Datenbank-ID des bearbeiteten
 Datensatzes (`updateModalId()` in `public/js/modules/utils.js`, Stil `.modal-id-badge` in
@@ -2692,6 +2727,7 @@ devices, groups und Terminarten rufen `updateModalId` bereits.
 
 **Nicht sicherheitsrelevant:** keine Datenänderung, kein Rechtebezug; die IDs sind für den
 Bearbeitenden ohnehin über die API sichtbar.
+</details>
 
 ---
 
@@ -2704,7 +2740,7 @@ damit es nicht erneut vorgeschlagen wird, ohne dass sich an den Gründen etwas g
 | Punkt | Grund | Wo es weitergeht |
 |---|---|---|
 | Erinnerung an offene Rückmeldungen | braucht einen Versandweg | FI-6 |
-| Besetzungsansicht nach Registern | braucht Untergruppen | FI-14 |
+| Besetzungsansicht mit Sollstärke | Untergruppen gibt es seit 1.8.0, die Sollstärke fehlt | FI-14 |
 | Rolle „Gruppenleiter" | der Dirigent erhält ein Manager-Konto | FI-15 |
 | Kennzahl „Zusagetreue" je Person | Personenbewertung; die Zuverlässigkeit deckt die Frage ab | — |
 | Verlauf der Antwortänderungen | mehr Datenbestand, eigene Löschfrist, wäre wieder eine Personenauswertung | — |
@@ -2788,9 +2824,10 @@ schlechtesten Fall eine falsch eingeordnete Frist, kein Zugriff auf fremde Daten
 ### OI-61 · Terminrückmeldung: Einstellungen der Terminart wirken rückwirkend auf die Zuverlässigkeit
 **Priorität:** niedrig — bewusst so entschieden am 2026-09-15
 
-`responseDeadlineHours()` und `responses_enabled` (`private/helpers/responses.php`,
-`reliabilityFetchPairs()`) lesen die Einstellungen der Terminart zum Zeitpunkt der Auswertung, nicht
-als Schnappschuss je Termin. Ändert der Admin sie später — etwa schaltet er Rückmeldungen für eine
+`responseDeadlineHours()` (`private/helpers/responses.php`) und `responses_enabled`, ausgewertet in
+`reliabilityFetchPairs()` (`private/helpers/punctuality.php`),
+lesen die Einstellungen der Terminart zum Zeitpunkt der Auswertung, nicht als Schnappschuss je
+Termin. Ändert der Admin sie später — etwa schaltet er Rückmeldungen für eine
 Terminart erst nachträglich ein oder verschiebt die Frist —, wertet das auch **vergangene** Termine
 neu aus. Die Zuverlässigkeit eines Mitglieds für einen bereits gelaufenen Termin kann sich dadurch
 nachträglich verschieben, ohne dass sich am tatsächlichen Verhalten des Mitglieds etwas geändert
@@ -2968,7 +3005,7 @@ widersprüchlich, den Bildschirm per Wake Lock wachzuhalten und zugleich Strom s
 ---
 
 ### OI-66 · `API.md` gegen die echten Antworten prüfen
-**Priorität:** erledigt am 2026-09-23 — Branch `docs/oi-66-api-abgleich` (`9d6a50a`). Alle 31
+**Priorität:** erledigt am 2026-09-23 — mit **1.14.0** (`9d6a50a`, `04b8f51`). Alle 31
 dokumentierten Lesepfade gegen eine laufende Instanz abgerufen und `API.md` dagegen geprüft: 30
 Abweichungen, davon 14 Felder oder Antwortformen, die der Server **nie** geliefert hat — unter
 anderem `member_name`/`appointment_title` bei den Anwesenheiten, `{"years": …}` bei
@@ -3173,7 +3210,7 @@ drei.
 „bisher nicht angesehen" vermerkten Ressourcen waren **alle** betroffen.
 
 Dieselbe Familie wie [OI-54](#oi-54--put-auf-terminarten-überschreibt-nicht-mitgeschickte-felder),
-nur bei `appointments` — dort geblieben, als die beiden Typ-Ressourcen in 1.9.0 umgestellt wurden.
+nur bei `appointments` — dort geblieben, als die beiden Typ-Ressourcen in 1.8.0 umgestellt wurden.
 
 Der `PUT`-Zweig ([`appointments.php:236`](../private/handlers/appointments.php)) baut `$data`
 sauber über `isset()` aus den erlaubten Feldern. **Danach greift er unbedingt auf Felder zu, die
@@ -3204,7 +3241,7 @@ bei OI-54 trägt also allein die Disziplin des Aufrufers, dass nichts verloren g
 weist die Vollersetzung nicht aus.
 
 **Zu tun:** Dynamisches `UPDATE` wie bei `members`, `appointment_types` und `activity_types`
-(1.9.0) — nur schreiben, was der Request enthält. Dazu die Konfliktprüfung: Fehlen `date` oder
+(1.8.0) — nur schreiben, was der Request enthält. Dazu die Konfliktprüfung: Fehlen `date` oder
 `start_time`, gehören die gespeicherten Werte als Grundlage genommen, statt mit `" "` zu
 vergleichen. `API.md` nachziehen, wie bei den beiden Typ-Ressourcen geschehen.
 
@@ -3262,7 +3299,7 @@ Registerproben-Fall ab, nicht die Frage nach der Zuverlässigkeit eines Register
 Termine.
 
 **Berührt:** `private/handlers/statistics.php`, `private/helpers/punctuality.php`,
-`public/js/modules/statistics.js`. Siehe auch
+`private/helpers/attendance.php`, `public/js/modules/statistics.js`. Siehe auch
 [FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht) — dort bleibt die
 Besetzungsübersicht mit Sollstärke offen, die auf derselben Gliederung aufsetzt, aber eine andere
 Frage beantwortet.
@@ -3368,7 +3405,8 @@ Bruchteil dessen, was sich ändert:
   alles Weitere per `@import url('…')` **ohne** Parameter — `components/*.css` und
   `sections/*.css` bleiben vom Versionssprung unberührt.
 - Die ES-Module unter `js/modules/` tragen gar keinen Parameter; sie werden per `import`
-  nachgeladen, nicht per `<script src>`.
+  nachgeladen, nicht per `<script src>`. `public/.htaccess` begründet, warum ein Query an den
+  Modulen doppelte Modulinstanzen erzeugen würde.
 
 Die PWA und die Station sind nicht betroffen: Sie binden je ein Stylesheet und ein `app.js`
 direkt ein, beide mit Parameter.
@@ -3383,7 +3421,7 @@ einem Update alte Oberfläche zu neuer Logik, bis sein Browser-Cache von selbst 
 
 - Die `@import`-Zeilen in `main.css` mit demselben Parameter versehen — ohne Build-Kette nur von
   Hand pflegbar; `assets.php` müsste `main.css` mitprüfen.
-- Die Teil-Stylesheets einzeln in `index.html` einbinden — achtzehn `<link>`-Zeilen statt einer.
+- Die Teil-Stylesheets einzeln in `index.html` einbinden — 21 (Stand 1.17.1) `<link>`-Zeilen statt einer.
 - Für die Module eine Import-Map mit versionierten Pfaden — sauber, aber ein neues Konzept im
   Projekt.
 
@@ -3395,7 +3433,7 @@ dem Cache begründete; die Begründung hielt der Prüfung nicht stand.
 ---
 
 ### OI-75 · CSV-Import ändert Serientermine, ohne sie abzulösen
-**Priorität:** erledigt am 2026-09-22 — mit 1.12.0 (Branch `fix/oi-10-oi-75`). Entschieden: ablösen nur bei
+**Priorität:** erledigt am 2026-09-22 — mit **1.12.0** (`100e054`). Entschieden: ablösen nur bei
 tatsächlicher Änderung. `importAppointments()` vergleicht Titel, Beschreibung und, falls die Datei
 sie führt, Ort und Ende über `appointmentFieldsChanged()` (`private/helpers/appointment_rules.php`,
 dieselben Regeln wie `appointmentFieldChanged()` beim `PUT`) und setzt dann `is_detached = 1`. Ein
@@ -3431,7 +3469,9 @@ wird hier nicht gerufen, der Import setzt also selbst bei identischen Werten ab,
 `DELETE appointments` (`private/handlers/appointments.php`) trägt das Datum eines gelöschten
 Serientermins über `seriesAddExdates()` (`private/helpers/appointment_series.php`) in `exdates`
 der Serie ein: lesen (`seriesLoad()`), im PHP-Array ergänzen, komplett zurückschreiben
-(`seriesSaveExdates()`) — ohne `SELECT … FOR UPDATE` und ohne eigene Transaktion.
+(`seriesSaveExdates()`) — ohne `SELECT … FOR UPDATE` und ohne eigene Transaktion. Dasselbe gilt
+seit 1.11.0 für `PUT appointments` mit Datumsänderung (`appointments.php`, Aufruf von
+`seriesAddExdates()` nach dem UPDATE).
 
 **Wettlauf:** Löschen zwei Anfragen nahezu gleichzeitig zwei **verschiedene** Termine derselben
 Serie, können beide `seriesLoad()` vor der ersten `seriesSaveExdates()` lesen. Die zweite
@@ -3444,7 +3484,8 @@ gelöscht wurde.
 **Selten** — zwei Löschungen derselben Serie innerhalb von Millisekunden sind ein
 Admin-Doppelklick oder zwei gleichzeitig arbeitende Verwalter, kein Alltagsfall.
 
-**Zu tun:** `seriesAddExdates()` (bzw. der Aufruf in `appointments.php`) in eine kleine
+**Zu tun:** `seriesAddExdates()` (bzw. beide Aufrufe in `appointments.php`: im `DELETE`-Zweig und
+im `PUT`-Zweig nach dem UPDATE) in eine kleine
 Transaktion mit `SELECT … FOR UPDATE` auf die Serienzeile fassen — wie `seriesFollowing()` es für
 die Serienaktionen bereits tut (siehe dessen Kommentar zur `FOR UPDATE`-Sperre).
 
@@ -3459,7 +3500,7 @@ Ein Mitglied beantragt für einen künftigen Serientermin ohne erfasste Anwesenh
 Zeitkorrektur (`exceptions`, `exception_type = 'time_correction'`, noch `pending`). Die
 gewünschte Ankunft wird beim Anlegen **und** bei jeder weiteren Änderung (auch der Genehmigung)
 gegen den *aktuellen* Termin geprüft (`arrivalWithinAppointmentWindow()`,
-`private/handlers/exceptions.php`, Zeilen ~194 und ~264).
+`private/handlers/exceptions.php`, im `POST`- und im `PUT`-Zweig).
 
 `PUT appointment_series` „Dieser und alle folgenden“ (`seriesHandleUpdateFollowing()`,
 `private/handlers/appointment_series.php`) schützt vor dem Mitziehen von `start_time` nur, wenn
@@ -3542,10 +3583,10 @@ nicht erreichbar.
 ---
 
 ### OI-80 · Kalendertage mit Terminen: keine Tastaturbedienung, Feiertag fehlt im Vorlesetext
-**Priorität:** zusammengelegt am 2026-09-24 mit
-[OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar) — derselbe Fund,
-dort mit Priorität *mittel* und beiden Teilen (Tastatur **und** Feiertag im Vorlesetext). Hier
-nichts mehr umsetzen. Der Eintrag bleibt für die Vorgeschichte stehen.
+**Erledigt mit 1.17.1** — am 2026-09-24 mit
+[OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar) zusammengelegt und
+dort umgesetzt (Tastatur und Feiertag im Vorlesetext). Der Eintrag bleibt für die Vorgeschichte
+stehen.
 
 _Ursprünglich:_ niedrig · aufgenommen am 2026-09-21
 
@@ -3608,7 +3649,7 @@ länger bestehenden Fall bei gewöhnlichen Einzelterminen mit erledigen, der hie
 ---
 
 ### OI-82 · Nachträglicher Zeitantrag auch für Termine in der Zukunft
-**Priorität:** erledigt am 2026-09-22 — `95141c4`. Server: `timeCorrectionTooEarly()` in
+**Priorität:** erledigt am 2026-09-22 — mit **1.11.2** (`95141c4`). Server: `timeCorrectionTooEarly()` in
 `private/helpers/utils.php`, gilt für `POST` und `PUT`. Verglichen wird mit der Uhr der
 Datenbank, mit 5 Minuten Spielraum für die Uhr des Telefons. PWA: Terminliste und Ankunftszeit
 enden bei jetzt. Entschieden: Auch die Genehmigung eines Altbestands wird abgewiesen, die
@@ -3654,7 +3695,7 @@ bescheidet.
 ---
 
 ### OI-83 · Arbeitszeit mit Ortsnachweis ohne Kamera nicht startbar
-**Priorität:** erledigt am 2026-09-22 — `7e12a7b`, alle drei Punkte unter „Zu tun“ umgesetzt
+**Priorität:** erledigt am 2026-09-22 — mit **1.11.2** (`7e12a7b`), alle drei Punkte unter „Zu tun“ umgesetzt
 und im Browser geprüft: Start und Stopp per Handeingabe, simulierte verweigerte Kamera öffnet
 die Eingabe. Nicht nachgestellt ist der Aufruf über HTTP im Netzwerk (`localhost` gilt als
 sicherer Kontext).
@@ -3700,7 +3741,7 @@ eingegeben wird.
 ---
 
 ### OI-84 · Leeres Filterergebnis lässt die alte Paginierung stehen
-**Priorität:** erledigt am 2026-09-22 — `500ad02`, im Browser als Admin geprüft. Anwesenheiten:
+**Priorität:** erledigt am 2026-09-22 — mit **1.11.2** (`500ad02`), im Browser als Admin geprüft. Anwesenheiten:
 von Seite 2 bei 942 Einträgen auf eine Terminart ohne Einträge, danach ist die Paginierung leer.
 Mitglieder: dasselbe, mit „Keine Mitglieder für diese Auswahl“. Anträge: Im Bestand gibt es nur
 20, also keine Paginierung. Der leere Zweig läuft dort trotzdem sauber durch. Weil im Bestand
@@ -3817,7 +3858,7 @@ vorbereitet.
 ---
 
 ### OI-87 · Anträge in der Anwesenheitsliste des Dashboards; Selbstgenehmigung nur ohne zweiten Verwalter
-**Priorität:** erledigt am 2026-09-23 — `c1be11b` (Umsetzung) und `1e50ddc` (Nachtrag), nach dem Merge
+**Priorität:** erledigt am 2026-09-23 — mit **1.13.0** (`c1be11b` Umsetzung, `1e50ddc` Nachtrag), nach dem Merge
 der Filter-Chips wie abgestimmt. Im Browser als Manager geprüft: Zähler, Hinweis je Zeile,
 Genehmigen und Ablehnen über den Dialog, Sperre beim eigenen Antrag. Beide Nebenbefunde
 (Zwischenspeicher, fehlendes `>`) sind mit erledigt.
@@ -4008,11 +4049,13 @@ OI-89 erschienen; Ziel ist der **nächste Release**, dessen Nummer die Release-S
 
 - Antragstabelle: Kopf hat 7 Spalten, Zeilen 8 (`index.html` `#antraege`).
 - `renderRecords`-Leerzeile: `colspan` 7, obwohl die Tabelle ohne Aktionsspalte nur 6 Spalten hat.
+  — erledigt seit 1.16.0: `RECORDS_LIST_COLSPAN = 6`, bewusst die breitere Fassung, siehe
+  Kommentar in `records.js`.
 - Toter Code: `applyDeviceFilters`/`filterDevices` (`devices.js`), der Zweig `exceptionStatus` in
   `filterExceptions`, `window.resetWorktimeFilter` ohne Aufrufer. Ebenso `window.resetDeviceFilter`
-  (`devices.js` ~Zeile 686) — die Filterleiste von 1.13.0 verdrahtet den Knopf direkt per
+  (`devices.js` ~Zeile 689) — die Filterleiste von 1.13.0 verdrahtet den Knopf direkt per
   `addEventListener` in `showDeviceSection()`, nicht mehr über den globalen Namen — und die leere,
-  nie aufgerufene `initDevicesEventHandlers()` (`devices.js` ~Zeile 334).
+  nie aufgerufene `initDevicesEventHandlers()` (`devices.js` ~Zeile 337).
 - Toter Code seit 1.13.0: `.stat-card` samt `h3`/`.number` (`css/components/cards.css`) und die
   zugehörige Regel in `css/responsive.css`. Mit den Kennzahlkarten fiel die letzte Verwendung im
   Dashboard weg; die Check-in-PWA hat eine eigene Kopie in `public/checkin/css/style.css` und
@@ -4027,8 +4070,8 @@ OI-89 erschienen; Ziel ist der **nächste Release**, dessen Nummer die Release-S
   gefunden“, Benutzer, Geräte und Mitglieder dagegen „… für diese Auswahl“. Dasselbe bei den in
   1.13.0 hinzugekommenen Zeilen: Verwaltung meldet zweimal ohne Punkt („Keine Gruppen für diese
   Auswahl“, „Keine Terminarten für diese Auswahl“, beide `management.js`), Arbeitszeit dagegen mit
-  Punkt („Keine Einträge für diese Auswahl.“, `worktime.js` ~Zeile 219) — die Tätigkeitsarten
-  derselben Datei (~Zeile 817) wiederum ohne.
+  Punkt („Keine Einträge für diese Auswahl.“, `worktime.js` ~Zeile 238) — die Tätigkeitsarten
+  derselben Datei (~Zeile 836) wiederum ohne.
 - Der Kontrast der Chips ist nur für die Standard-Primärfarbe `#1F5FBF` nachgerechnet (Tabelle in
   `filter-chips.css`). Bei einer hellen Vereins-Primärfarbe ist WCAG AA für den aktiven neutralen
   Chip und „Läuft“ (beide `--primary-color`) nicht gesichert.
@@ -4044,7 +4087,7 @@ OI-89 erschienen; Ziel ist der **nächste Release**, dessen Nummer die Release-S
 ### OI-91 · Anwesenheit: Mitgliedsauswahl für einfache Nutzer leer
 **Priorität:** niedrig · aufgenommen am 2026-09-22 (Sichtprüfung OI-86 als `user`)
 
-`loadMemberFilter()` (`public/js/modules/records.js`, ~Zeile 522) filtert auf
+`loadMemberFilter()` (`public/js/modules/records.js`, ~Zeile 528) filtert auf
 `m.is_active_in_period`. `loadMembers()` (`public/js/modules/members.js`) liefert für die Rolle
 `user` aber den Einzelabruf (`private/handlers/members.php`, ~Zeile 48–71), und der liefert dieses
 Feld nicht mit. Folge: Das Auswahlfeld „Mitglied“ der Anwesenheitsverwaltung hat für `user` keinen
@@ -4074,7 +4117,8 @@ Paginierung, alle anderen Listen nutzen `globalPaginationValue` aus `settings.js
 belassen; Arbeitszeit an die gemeinsame Paginierung anschließen.
 
 Verwandt: [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)
-(Terminfarbe als Randakzent) betrifft dieselben Tabellen — sinnvoll im selben Zug.
+(Terminfarbe als Randakzent) ist mit 1.16.0 ohne diesen Punkt umgesetzt; die Tabellenfragen hier
+bleiben offen.
 
 **Nicht sicherheitsrelevant.**
 
@@ -4222,12 +4266,11 @@ bleiben — und misst vorher, wie viele Aufrufe diese Fälle wirklich erzeugen.
 ---
 
 ### OI-96 · Kalendertage mit Terminen sind per Tastatur nicht erreichbar
-**Erledigt am 2026-09-28** — **beide Teile**: die Tastaturbedienung *und* der aus
+**Erledigt am 2026-09-28** — mit **1.17.1** (Merge `730f5fc`); **beide Teile**: die
+Tastaturbedienung *und* der aus
 [OI-80](#oi-80--kalendertage-mit-terminen-keine-tastaturbedienung-feiertag-fehlt-im-vorlesetext)
-übernommene Feiertagsname im Vorlesetext. Umgesetzt auf Branch `feat/oi-96-tastatur`, Spec
-`docs/superpowers/specs/2026-09-25-kalender-tastaturbedienung-design.md`. **Ohne Versionssprung
-und ohne Migrationsschritt** abgeliefert, Eintrag steht unter `## [Unreleased]`; die Nummer vergibt
-die Release-Sitzung.
+übernommene Feiertagsname im Vorlesetext. Spec
+`docs/superpowers/specs/2026-09-25-kalender-tastaturbedienung-design.md`.
 
 Ein Tag mit Terminen trägt jetzt `role="button"`, `tabindex="0"`, `aria-haspopup="dialog"` und
 einen `keydown`-Hörer für Enter und Leertaste. Das festgehaltene Popup ist ein Dialog
@@ -4518,7 +4561,8 @@ zurückkommt, ist eine Produktfrage, keine Aufräumarbeit.
 ---
 
 ### OI-107 · Zusicherungen, die ein Kommentar erfüllt
-**Priorität:** erledigt am 2026-09-28, veröffentlicht mit 1.17.0 · aufgenommen am 2026-09-25 (beim Umbau für
+**Priorität:** erledigt am 2026-09-28, veröffentlicht mit 1.17.0, abschließender Testcommit
+(`4414986`) mit 1.17.1 · aufgenommen am 2026-09-25 (beim Umbau für
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
 
 Beim Umbau fiel auf: Eine Zusicherung der Form `str_contains($body, 'safeTypeColor(')` findet den
@@ -4584,10 +4628,10 @@ Sitzung. Seit 1.17.0 erkennt der Wächter Attributkontexte
 ([OI-112](#oi-112--strenge-attributregel-gilt-nur-für-style-nicht-für-on)).
 
 **Offen, bewusst ausgelagert:** [OI-110](#oi-110--testsuiten-durchsuchen-fremde-arbeitsbäume-im-projektverzeichnis)
-(Suiten sehen fremde Arbeitsbäume), [OI-111](#oi-111--showtoast-maskiert-nicht-die-aufrufer-tun-es-einzeln)
+(Suiten sehen fremde Arbeitsbäume; erledigt auf `dev`, `e5adab3`), [OI-111](#oi-111--showtoast-maskiert-nicht-die-aufrufer-tun-es-einzeln)
 (`showToast()`), OI-112 (`on…`-Attribute).
 
-**Letzter Rest, am 2026-09-28 nach dem Release behoben:** `file()` las in **vier** Suiten weiter am
+**Letzter Rest, am 2026-09-28 nach 1.17.0 behoben, veröffentlicht mit 1.17.1 (`4414986`):** `file()` las in **vier** Suiten weiter am
 Entferner vorbei (`assets.php` 3×, `mailer_unit.php`, `pwa_escaping_frontend.php`,
 `registration_unit.php`) — dieselbe Falle durch eine andere Tür. `registration_unit` hätte ein
 Kommentar mit `inTransaction()` in der Zeile vor `rollBack()` genügt; `mailer_unit` hatte einen
@@ -4612,16 +4656,14 @@ Wächter. Für die Wächter selbst stimmte das; hinter ihnen lag die oben genann
 **Priorität:** niedrig · aufgenommen am 2026-09-25 (aus dem Abschlussreview zu
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
 
-`/^#[0-9a-f]{3,8}$/i` steht in [public/checkin/js/app.js](../public/checkin/js/app.js)
-**dreimal** — Zeile 4841 und 4933 (je einmal für die Rückmeldekarte, das Ergebnis landet in
-`style="border-left-color: …"` in Zeile 4852 bzw. 4978) sowie in `safeHexColor()` (Zeile 5658),
-das seinerseits von `historyItem()`, dem Tätigkeitspunkt und `getTypeColor()` benutzt wird. Das
-ist die Fassung, die OI-94 im Dashboard abgelöst hat: Sie lässt auch die Hexlängen 5 und 7 durch,
+`/^#[0-9a-f]{3,8}$/i` steht in [public/checkin/js/app.js](../public/checkin/js/app.js) nur
+noch **einmal**, in `safeHexColor()`; seit 1.17.0 (`eb77fae`) laufen auch die Rückmeldekarten,
+`historyItem()`, der Tätigkeitspunkt und `getTypeColor()` darüber. Das ist die Fassung, die OI-94 im Dashboard abgelöst hat: Sie lässt auch die Hexlängen 5 und 7 durch,
 die es in CSS nicht gibt. Ein solcher Wert passiert die Prüfung als „sicher“, ergibt aber eine
 ungültige Deklaration, die der Browser wortlos verwirft.
 
 **Warum es hier besonders zählt:** `historyItem()`
-([app.js:2897](../public/checkin/js/app.js)) setzt in Zeile 2900 damit einen `borderLeftColor` —
+([app.js:2914](../public/checkin/js/app.js)) setzt in Zeile 2917 damit einen `borderLeftColor` —
 genau den Randakzent, dessen Versagensfall OI-94 beschreibt. Bei einer Farbe der Länge 5 oder 7
 fehlt der Streifen dann **ganz**, statt grau zu erscheinen. Die Funktion hat drei lebende Aufrufer
 (Arbeitszeitverlauf, Anwesenheitsverlauf, Anträge). Die PWA war das Vorbild für den ganzen Umbau
@@ -4631,6 +4673,9 @@ und hat den Fehler noch.
 ihre Farben **nicht** aus `variables.css`, hat eigene Ersatzfarben und einen eigenen Service
 Worker; `utils.js` mit `safeTypeColor()` ist ein ES6-Modul des Dashboards, das die PWA nicht lädt.
 Eine gemeinsame Prüfung über beide Anwendungen hinweg ist ein eigener Schritt.
+
+**Offen bleibt nur:** die Prüfung auf die Längen 3/4/6/8 beschränken und die Ersatzfarbe
+festlegen.
 
 **Zu klären:** Ob die PWA `safeTypeColor()` mitbenutzen kann — und auf welchem Weg, ohne die
 Trennung der beiden Auslieferungen aufzuweichen — oder ob sie ihre eigene Fassung behält und nur
