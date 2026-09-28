@@ -252,8 +252,9 @@
    abgesetzter Hintergrund. Bei mehreren Terminen an einem Tag war vorher nicht
    erkennbar, welche Knoepfe zu welchem Termin gehoeren -- getrennt hat nur eine
    duenne Linie, und die Knoepfe klebten optisch am naechsten Termin.
-   Die eigene Grenze je Termin ist zugleich die Struktur, an der OI-96 spaeter
-   Fokus und Tastaturbedienung ergaenzt.
+   Die eigene Grenze je Termin ist zugleich die Struktur, die OI-96 benannt hat:
+   Der Block ist dort eine Gruppe mit aria-label geworden, kein Tab-Stopp -- der
+   hier zunaechst vorbereitete Fokusrahmen ist damit entfallen.
    Hier ist border-left richtig, anders als in den Tabellen (dort box-shadow:
    inset): Das Popup ist keine Tabelle, es gibt keinen Zellhintergrund und keine
    Zebrastreifung, die mit dem Rahmen kollidieren koennten. */
@@ -268,12 +269,6 @@
 
 .calendar-event-block:last-child {
     margin-bottom: 0;
-}
-
-/* Fuer OI-96 vorbereitet -- tabindex und Tastenbedienung kommen dort. */
-.calendar-event-block:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 1px;
 }
 
 .calendar-event-time {

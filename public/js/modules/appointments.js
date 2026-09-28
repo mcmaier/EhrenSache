@@ -945,8 +945,28 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
             : '';
         const subLine = `${typeName}${locationText}`;
 
+        // Der Block bekommt einen Namen, aber keinen Tab-Stopp (OI-96): Wer
+        // durch die Knoepfe tabbt, hoerte sonst "Bearbeiten, Anwesenheit,
+        // Bearbeiten, Anwesenheit", ohne zu wissen, zu welchem Termin sie
+        // gehoeren. Eine Gruppe nennt ihren Namen beim Betreten -- ohne
+        // zusaetzlichen Tastendruck; bei drei Terminen an einem Tag spart das
+        // drei Tab-Stopps gegenueber fokussierbaren Bloecken.
+        //
+        // Reihenfolge: Terminart, Uhrzeit, Titel. Fehlt die Terminart, entfaellt
+        // sie ersatzlos -- deshalb filter(Boolean) statt einer festen Vorlage.
+        // Die Uhrzeit kommt aus derselben Funktion wie die sichtbare Zeile, sonst
+        // koennten beide auseinanderlaufen.
+        //
+        // Maskiert wird mit escapeHtml() wie ueberall sonst. Das genuegt auch im
+        // Attribut: Seit 1.17.0 erfasst escapeHtml() " und '. Ein zweiter,
+        // eigener Weg fuer Attributwerte war im Haus die Ursache einer Luecke --
+        // hier entsteht keiner.
+        const blockLabel = [apt.type_name, formatTimeRange(apt.start_time, apt.end_time), apt.title]
+            .filter(Boolean)
+            .join(', ');
+
         html += `
-            <div class="calendar-event-block" style="--type-color: ${typeColor};">
+            <div class="calendar-event-block" role="group" aria-label="${escapeHtml(blockLabel)}" style="--type-color: ${typeColor};">
                 <div class="calendar-event-time">${formatTimeRange(apt.start_time, apt.end_time)}</div>
                 <div class="calendar-event-title">${escapeHtml(apt.title)}</div>
                 ${apt.description ? `<div class="calendar-event-desc">${escapeHtml(apt.description)}</div>` : ''}

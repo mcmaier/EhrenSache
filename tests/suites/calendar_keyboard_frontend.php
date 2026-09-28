@@ -850,3 +850,161 @@ test('Eine gemeinsame Schliessfunktion, ueber die alle Wege hinaus laufen', func
         "Escape muss {$schliessen}(true) rufen -- ohne die Fokusrueckgabe stuende der Fokus danach"
         . ' auf body statt am Kalendertag');
 });
+
+
+// ============================================================
+// Task 5 der Spec: Die Termin-Bloecke bekommen einen Namen, keinen Tab-Stopp
+// ============================================================
+
+/**
+ * Das oeffnende Tag des Termin-Blocks im Markup von showAppointmentPopup().
+ *
+ * Gesucht wird von der Klasse aus RUECKWAERTS bis zum "<", nicht ab
+ * '<div class="calendar-event-block"': Damit haengt keine Zusicherung an der
+ * Reihenfolge der Attribute -- role, aria-label und style duerfen in jeder
+ * Folge stehen.
+ *
+ * Ein eingesetzter Ausdruck ${…} wird uebersprungen. Ohne das waere ein ">"
+ * darin (ein Vergleich, eine Pfeilfunktion) das vermeintliche Ende des Tags:
+ * Der abgeschnittene Rest fiele aus der Pruefung, und eine Zusicherung auf ein
+ * fehlendes Attribut meldete rot, obwohl es dasteht -- oder eine Gegenprobe auf
+ * tabindex bliebe gruen, obwohl es dahinter steht.
+ */
+function ckBlockTag(string $body): string
+{
+    $marke = strpos($body, 'calendar-event-block');
+    assertTrue($marke !== false, 'Der Block je Termin fehlt im Markup des Popups');
+    $von = strrpos(substr($body, 0, $marke), '<');
+    assertTrue($von !== false, 'Vor der Klasse calendar-event-block steht kein oeffnendes Tag');
+
+    $n = strlen($body);
+    for ($i = (int) $von; $i < $n; $i++) {
+        if ($body[$i] === '$' && ($body[$i + 1] ?? '') === '{') {
+            $tiefe = 1;
+            for ($i += 2; $i < $n && $tiefe > 0; $i++) {
+                if ($body[$i] === '{') {
+                    $tiefe++;
+                } elseif ($body[$i] === '}') {
+                    $tiefe--;
+                }
+            }
+            $i--;
+            continue;
+        }
+        if ($body[$i] === '>') {
+            return substr($body, (int) $von, $i - (int) $von + 1);
+        }
+    }
+    assertTrue(false, 'Das oeffnende Tag des Termin-Blocks endet nicht');
+
+    return '';
+}
+
+/** Der eingesetzte Ausdruck im aria-label des Termin-Blocks. */
+function ckBlockLabelAusdruck(string $tag): string
+{
+    assertTrue((bool) preg_match('/\saria-label="\$\{([^}]*)\}"/', $tag, $m),
+        'Der Termin-Block traegt keinen eingesetzten Vorlesetext -- eine Gruppe ohne Namen nennt beim'
+        . ' Betreten nichts und ist damit nutzlos: ' . trim((string) preg_replace('/\s+/', ' ', $tag)));
+
+    return $m[1];
+}
+
+test('Der Termin-Block ist eine Gruppe, deren Name aus dem Termin kommt', function () use ($ckRoot) {
+    $body = ckPopupRumpf($ckRoot);
+    $tag = ckBlockTag($body);
+
+    assertTrue((bool) preg_match('/\srole="group"/', $tag),
+        'Der Termin-Block traegt kein role="group" -- wer durch die Knoepfe tabbt, hoert dann'
+        . ' "Bearbeiten, Anwesenheit, Bearbeiten, Anwesenheit", ohne zu wissen, zu welchem Termin sie'
+        . ' gehoeren: ' . trim((string) preg_replace('/\s+/', ' ', $tag)));
+
+    // Maskierung ist Pflicht, der Wert landet in einem Attribut. Verlangt wird
+    // ausdruecklich escapeHtml() -- dieselbe Funktion wie ueberall sonst. Sie
+    // erfasst seit 1.17.0 auch " und '. Ein zweiter, eigener Weg fuer
+    // Attributwerte war im Haus die Ursache einer Luecke; genau das soll hier
+    // nicht wieder entstehen.
+    $ausdruck = ckBlockLabelAusdruck($tag);
+    assertTrue((bool) preg_match('/^\s*escapeHtml\(\s*([\w$]+)\s*\)\s*$/', $ausdruck, $m),
+        'Der Name des Blocks muss durch escapeHtml() laufen -- er steht in einem Attributwert: '
+        . trim($ausdruck));
+
+    // Aufgeloest bis zur Deklaration: Sonst prueft die Zusicherung nur, DASS
+    // etwas maskiert wird, nicht WAS. Ein aria-label="${escapeHtml('Termin')}"
+    // waere sonst gruen und sagte nichts ueber den Termin.
+    $n = preg_quote($m[1], '/');
+    $treffer = preg_match_all('/(?:const|let|var)\s+' . $n . '\s*=\s*/', $body, $alle, PREG_OFFSET_CAPTURE);
+    assertSame(1, $treffer,
+        "Der Name des Blocks steht in \"{$m[1]}\"; dafuer muss es in showAppointmentPopup() genau eine"
+        . " Deklaration geben, gefunden: {$treffer}");
+    $text = ckAusdruck($body, $alle[0][0][1] + strlen($alle[0][0][0]));
+
+    // Terminart, Uhrzeit, Titel -- und in dieser Reihenfolge. Die Uhrzeit muss
+    // aus derselben Funktion kommen wie die sichtbare Zeile darunter: Zwei
+    // Formatierungen desselben Wertes koennen auseinanderlaufen, und gehoert
+    // haette man dann etwas anderes als gesehen.
+    $marken = [
+        'apt.type_name' => 'die Terminart',
+        'formatTimeRange(apt.start_time' => 'die Uhrzeit aus derselben Funktion wie die sichtbare Zeile',
+        'apt.title' => 'der Titel',
+    ];
+    $kurz = trim((string) preg_replace('/\s+/', ' ', $text));
+    $vorher = -1;
+    $vorname = '';
+    foreach ($marken as $marke => $was) {
+        $pos = strpos($text, $marke);
+        assertTrue($pos !== false,
+            "Im Namen des Blocks fehlt {$was} (\"{$marke}\"): {$kurz}");
+        assertTrue($pos > $vorher,
+            "Im Namen des Blocks steht \"{$marke}\" vor \"{$vorname}\" -- die Reihenfolge ist"
+            . " Terminart, Uhrzeit, Titel: {$kurz}");
+        $vorher = (int) $pos;
+        $vorname = $marke;
+    }
+
+    // Fehlt die Terminart, entfaellt sie ersatzlos. Ohne diese Zusicherung
+    // stuende bei einem Termin ohne Art ein "null, 20:00-22:00, Probe" oder ein
+    // fuehrendes Komma im Vorlesetext.
+    assertTrue((bool) preg_match('/\bfilter\(\s*Boolean\s*\)|\bfilter\([^)]*=>/', $text),
+        'Die Teile des Namens muessen gefiltert werden -- ohne das liest ein Termin ohne Terminart'
+        . " ein \"null\" oder ein fuehrendes Komma vor: {$kurz}");
+});
+
+test('Der Termin-Block bekommt keinen Tab-Stopp', function () use ($ckRoot) {
+    // Eigener Test, nicht angehaengt: Das ist die Entscheidung des Tasks, und
+    // sie darf nicht hinter einer fremden roten Zusicherung verschwinden.
+    //
+    // Eine Gruppe nennt ihren Namen beim Betreten, ohne eigenen Tastendruck.
+    // Ein fokussierbarer Block kostete bei drei Terminen an einem Tag drei
+    // zusaetzliche Tab-Stopps und brachte nichts dazu -- der Name steht im
+    // aria-label, das Vorlesegeraet liest ihn ohnehin.
+    $tag = ckBlockTag(ckPopupRumpf($ckRoot));
+
+    assertTrue(!preg_match('/\btabindex\b/', $tag),
+        'Der Termin-Block darf kein tabindex tragen -- eine Gruppe nennt ihren Namen ohne eigenen'
+        . ' Tab-Stopp: ' . trim((string) preg_replace('/\s+/', ' ', $tag)));
+});
+
+test('Der Fokusrahmen am Termin-Block ist fort, samt seiner Zusicherung', function () use ($ckRoot) {
+    // Die Regel entstand am Vormittag des 2026-09-25 in OI-94 als Vorleistung
+    // fuer genau dieses Vorhaben -- und wurde eigens abgesichert, damit sie
+    // niemand versehentlich entfernt. Der hier gewaehlte Weg kommt ohne sie aus:
+    // Ohne tabindex kann :focus-visible am Block nie greifen. Sie stehen zu
+    // lassen waere schlechter -- eine Regel ohne Wirkung und ein Test, der sie
+    // bewacht.
+    assertTrue(!str_contains(ckFile($ckRoot, 'public/css/components/calendar.css'),
+        '.calendar-event-block:focus-visible'),
+        'Die Regel .calendar-event-block:focus-visible ist wieder da -- der Block hat kein tabindex,'
+        . ' sie kann nie greifen');
+
+    // Und die Zusicherung, die sie bewachte. Ohne diese Haelfte holte der
+    // naechste Lauf die Regel zurueck: Der alte Test verlangte sie, und wer ihn
+    // rot sieht, setzt eher die Regel wieder ein als ihn zu loeschen.
+    //
+    // Gelesen wird ueber ckFile(), also OHNE Kommentare: Der Vermerk, der dort
+    // an der Stelle des entfallenen Tests steht, darf diese Zusicherung nicht
+    // erfuellen -- genau die Verwechslung von Kommentar und Code ist OI-107.
+    assertTrue(!str_contains(ckFile($ckRoot, 'tests/suites/type_accent_frontend.php'), 'focus-visible'),
+        'type_accent_frontend.php bewacht den Fokusrahmen weiter -- die Zusicherung aus OI-94 gehoert'
+        . ' mit der Regel weg');
+});
