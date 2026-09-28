@@ -54,23 +54,16 @@ function mailerArgCount(string $code, int $start): int
 }
 
 test('Jede Mailer-Instanziierung uebergibt Konfiguration, PDO und Database', function () use ($repoRoot) {
-    $dir = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($repoRoot, FilesystemIterator::SKIP_DOTS)
-    );
-
     $stellen    = 0;
     $verstoesse = [];
 
-    foreach ($dir as $file) {
-        if ($file->getExtension() !== 'php') {
-            continue;
-        }
-        $rel = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot)));
+    foreach (projectFiles($repoRoot, 'php') as $pfad) {
+        $rel = substr($pfad, strlen($repoRoot));
         if (strpos($rel, '/tests/') === 0 || strpos($rel, '/.git/') === 0) {
             continue;
         }
 
-        $code   = (string) sourceCode($file->getPathname());
+        $code   = (string) sourceCode($pfad);
         $offset = 0;
 
         while (($pos = strpos($code, 'new Mailer(', $offset)) !== false) {
@@ -101,16 +94,10 @@ test('Keine Mailer-Aufrufstelle laedt die Mailkonfiguration ungeprueft', functio
     // ungeprueft per `require`. Jede Stelle, die den Mailer davor baut, stirbt
     // dann mit einem Fatal error, noch bevor checkMailStatus() gefragt werden
     // kann. Zwei dieser Stellen stehen direkt hinter einem commit().
-    $dir = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($repoRoot, FilesystemIterator::SKIP_DOTS)
-    );
 
     $verstoesse = [];
-    foreach ($dir as $file) {
-        if ($file->getExtension() !== 'php') {
-            continue;
-        }
-        $rel = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot)));
+    foreach (projectFiles($repoRoot, 'php') as $pfad) {
+        $rel = substr($pfad, strlen($repoRoot));
         // config.php und ihr Muster duerfen die Funktion definieren
         if (strpos($rel, '/tests/') === 0 || strpos($rel, '/.git/') === 0
             || strpos($rel, '/private/config/') === 0) {
@@ -120,7 +107,7 @@ test('Keine Mailer-Aufrufstelle laedt die Mailkonfiguration ungeprueft', functio
         // Ohne Kommentare gelesen: Sie erwaehnen die Funktion, rufen sie aber
         // nicht auf. Der fruehere eigene Filter kannte nur ganzzeilige
         // Kommentare; ein angehaengter meldete einen Aufruf, den es nicht gab.
-        foreach (sourceLines($file->getPathname()) as $i => $line) {
+        foreach (sourceLines($pfad) as $i => $line) {
             if (strpos($line, 'getMailConfig()') !== false) {
                 $verstoesse[] = $rel . ':' . ($i + 1) . ' — ' . trim($line);
             }

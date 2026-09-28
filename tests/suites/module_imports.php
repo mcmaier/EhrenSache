@@ -39,18 +39,10 @@ $miJsDir = $miRoot . '/public/js';
 /** Alle .js-Dateien unter public/js/ (Module und Einstiegspunkte). */
 function miJsFiles(string $jsDir): array
 {
-    $found = [];
-    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($jsDir, FilesystemIterator::SKIP_DOTS));
-    foreach ($it as $file) {
-        /** @var SplFileInfo $file */
-        $pfad = str_replace('\\', '/', $file->getPathname());
-        if ($file->isFile() && substr($pfad, -3) === '.js' && strpos($pfad, '/vendor/') === false) {
-            $found[] = $pfad;
-        }
-    }
-    sort($found);
-
-    return $found;
+    return array_values(array_filter(
+        projectFiles($jsDir, 'js'),
+        static fn(string $pfad): bool => strpos($pfad, '/vendor/') === false
+    ));
 }
 
 /**

@@ -4644,7 +4644,7 @@ die zu weite Fassung kostet die Ersatzfarbe, nicht die Schranke.
 ---
 
 ### OI-110 · Testsuiten durchsuchen fremde Arbeitsbäume im Projektverzeichnis
-**Priorität:** mittel · aufgenommen am 2026-09-28
+**Priorität:** erledigt am 2026-09-28 (auf `dev`, nach 1.17.1) · aufgenommen am 2026-09-28
 
 Die Desktop-App legt Arbeitsbäume unter `.claude/worktrees/<name>/` **innerhalb** des
 Projektverzeichnisses an. Dort liegt eine vollständige Kopie des Repositorys, einschließlich
@@ -4670,6 +4670,19 @@ Verzeichnisse an einer Stelle kennt. `.gitignore` schließt `.claude` bereits au
 lesen aber das Dateisystem, nicht git.
 
 **Nicht sicherheitsrelevant.**
+
+**Umgesetzt:** `projectFiles()` in `tests/lib/source.php` liefert die Dateien einer Endung und
+betritt `.git`, `.claude` und `node_modules` auf keiner Tiefe (`PROJECT_FILES_SKIP_DIRS`, eine
+Stelle). `mailer_unit`, `assets`, `escape_html_frontend` und `module_imports` laufen darüber;
+`source_lib` verbietet eigene `RecursiveDirectoryIterator` in den Suiten (Ausnahme:
+`update_package_unit` räumt damit eigene Temp-Verzeichnisse ab). Gegenprobe: Ein Verstoß unter
+`.claude/worktrees/` bleibt grün, derselbe unter `private/` wird rot.
+
+**Richtigstellung zur Reichweite:** Tatsächlich durchlief nur `mailer_unit` das
+Projektwurzelverzeichnis. `assets`, `escape_html_frontend` und `module_imports` laufen über
+`public/` bzw. `public/js/` und waren nie betroffen, `update_package_unit` nur über eigene
+Temp-Verzeichnisse. Umgestellt sind sie trotzdem, damit kein Durchlauf die Ausnahmen selbst
+kennen muss.
 
 ---
 

@@ -142,18 +142,14 @@ test('Kein ungeschuetztes console.log/warn/debug in Auslieferungsskripten', func
     // produktiv sichtbar sein, sie traegt keine Sitzungsdaten.
     $fremdcode = ['qrcode.js', 'html5-qrcode.min.js'];
 
-    $dir = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($repoRoot . '/public', FilesystemIterator::SKIP_DOTS)
-    );
-
     $verstoesse = [];
-    foreach ($dir as $file) {
-        if ($file->getExtension() !== 'js' || in_array($file->getFilename(), $fremdcode, true)) {
+    foreach (projectFiles($repoRoot . '/public', 'js') as $pfad) {
+        if (in_array(basename($pfad), $fremdcode, true)) {
             continue;
         }
 
-        $rel   = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot)));
-        $lines = sourceLines($file->getPathname());
+        $rel   = substr($pfad, strlen($repoRoot));
+        $lines = sourceLines($pfad);
 
         foreach ($lines as $i => $line) {
             if (preg_match('/console\.(log|warn|debug)\s*\(/', $line) !== 1) {
@@ -289,17 +285,10 @@ test('Farbwerte aus der DB landen nur ueber eine Hex-Whitelist im style-Attribut
         'public/js/modules/records.js' => ['${source.color}'],
     ];
 
-    $dir = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($repoRoot . '/public/js', FilesystemIterator::SKIP_DOTS)
-    );
-
     $verstoesse = [];
-    foreach ($dir as $file) {
-        if ($file->getExtension() !== 'js') {
-            continue;
-        }
-        $rel   = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot) + 1));
-        $lines = sourceLines($file->getPathname());
+    foreach (projectFiles($repoRoot . '/public/js', 'js') as $pfad) {
+        $rel   = substr($pfad, strlen($repoRoot) + 1);
+        $lines = sourceLines($pfad);
 
         foreach ($lines as $i => $line) {
             if (preg_match('/style="[^"]*\$\{[a-zA-Z_][a-zA-Z0-9_]*\.color\b/', $line) !== 1) {
@@ -330,17 +319,10 @@ test('Mitgliedsname landet in <option>-Listen nur maskiert', function () use ($r
     // statistics.js und users.js — member.surname/member.name kommen aus der
     // DB, innerHTML maskiert nicht von selbst. Haelt fest, dass der Name dabei
     // immer durch escapeHtml() (utils.js) läuft.
-    $dir = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($repoRoot . '/public/js', FilesystemIterator::SKIP_DOTS)
-    );
-
     $verstoesse = [];
-    foreach ($dir as $file) {
-        if ($file->getExtension() !== 'js') {
-            continue;
-        }
-        $rel   = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($repoRoot) + 1));
-        $lines = sourceLines($file->getPathname());
+    foreach (projectFiles($repoRoot . '/public/js', 'js') as $pfad) {
+        $rel   = substr($pfad, strlen($repoRoot) + 1);
+        $lines = sourceLines($pfad);
 
         foreach ($lines as $i => $line) {
             if (preg_match('/<option[^>]*>\$\{/', $line) !== 1) {

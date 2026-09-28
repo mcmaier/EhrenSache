@@ -49,20 +49,10 @@ const EH_NODE_PATTERN = '/\.textContent\s*=.{0,400}?\breturn\s+[\w$]+(?:\.\w+)*\
 /** Alle .js-Dateien unter public/, ohne vendor/. */
 function ehJsFiles(string $root): array
 {
-    $found = [];
-    $it = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($root . '/public', FilesystemIterator::SKIP_DOTS)
-    );
-    foreach ($it as $file) {
-        /** @var SplFileInfo $file */
-        $pfad = str_replace('\\', '/', $file->getPathname());
-        if ($file->isFile() && substr($pfad, -3) === '.js' && strpos($pfad, '/vendor/') === false) {
-            $found[] = $pfad;
-        }
-    }
-    sort($found);
-
-    return $found;
+    return array_values(array_filter(
+        projectFiles($root . '/public', 'js'),
+        static fn(string $pfad): bool => strpos($pfad, '/vendor/') === false
+    ));
 }
 
 /**

@@ -179,3 +179,69 @@ test('Suiten lesen Dateien nur ueber sourceCode() oder rawSource()', function ()
 
     assertTrue($verstoesse === [], "Lesender Dateizugriff an sourceCode()/rawSource() vorbei:\n  " . implode("\n  ", $verstoesse));
 });
+
+// ---------------------------------------------------------------------------
+// Dateien finden (OI-110)
+// ---------------------------------------------------------------------------
+
+test('projectFiles betritt .claude, .git und node_modules nicht', function () {
+    // Die Desktop-App legt Arbeitsbaeume unter .claude/worktrees/<name>/ an,
+    // also innerhalb des Projekts und mit vollstaendiger Kopie von private/
+    // und tests/. Eine Suite, die das Projekt durchlaeuft, fand dort fremde
+    // Dateien und meldete sie als Verstoss (2026-09-28, mailer_unit).
+    $root = sys_get_temp_dir() . '/es_pf_' . uniqid();
+    $dateien = [
+        'a.php', 'sub/b.php', 'sub/c.js',
+        '.claude/worktrees/x/private/d.php',
+        '.git/hooks/e.php',
+        'node_modules/pkg/f.php',
+        'sub/.claude/g.php',
+    ];
+    foreach ($dateien as $rel) {
+        @mkdir(dirname($root . '/' . $rel), 0777, true);
+        touch($root . '/' . $rel);
+    }
+
+    try {
+        $gefunden = array_map(
+            static fn(string $p): string => substr($p, strlen($root) + 1),
+            projectFiles($root, 'php')
+        );
+        assertSame(['a.php', 'sub/b.php'], $gefunden, 'Falsche Auswahl');
+        assertSame(['sub/c.js'], array_map(
+            static fn(string $p): string => substr($p, strlen($root) + 1),
+            projectFiles($root, 'js')
+        ), 'Endungsfilter greift nicht');
+    } finally {
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($it as $e) {
+            $e->isDir() ? rmdir($e->getPathname()) : unlink($e->getPathname());
+        }
+        rmdir($root);
+    }
+});
+
+test('Suiten durchlaufen Verzeichnisse nur ueber projectFiles()', function () use ($slRoot) {
+    // Jeder eigene RecursiveDirectoryIterator muesste die Ausnahmen selbst
+    // kennen; bis 2026-09-28 kannte mailer_unit .git, aber nicht .claude.
+    // Ausnahme: update_package_unit raeumt damit eigene Temp-Verzeichnisse
+    // ab, und diese Suite tut es oben fuer ihren Pruefbaum.
+    $erlaubt = ['update_package_unit.php', 'source_lib.php'];
+
+    $verstoesse = [];
+    foreach (glob($slRoot . '/tests/suites/*.php') ?: [] as $datei) {
+        if (in_array(basename($datei), $erlaubt, true)) {
+            continue;
+        }
+        foreach (preg_split('/\R/', sourceCode($datei)) ?: [] as $i => $zeile) {
+            if (str_contains($zeile, 'RecursiveDirectoryIterator')) {
+                $verstoesse[] = basename($datei) . ':' . ($i + 1) . ': ' . trim($zeile);
+            }
+        }
+    }
+
+    assertTrue($verstoesse === [], "Eigener Verzeichnisdurchlauf statt projectFiles():\n  " . implode("\n  ", $verstoesse));
+});

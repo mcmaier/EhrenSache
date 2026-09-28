@@ -30,6 +30,42 @@ declare(strict_types=1);
  * orientieren, finden dieselben Grenzen.
  */
 
+/**
+ * Verzeichnisse, die ein Durchlauf nie betritt (OI-110). Die Desktop-App legt
+ * Arbeitsbaeume unter .claude/worktrees/<name>/ an, also im Projekt und mit
+ * vollstaendiger Kopie von private/ und tests/; die Suiten lesen das
+ * Dateisystem, nicht git, und .gitignore hilft ihnen deshalb nicht.
+ */
+const PROJECT_FILES_SKIP_DIRS = ['.git', '.claude', 'node_modules'];
+
+/**
+ * Alle Dateien mit der Endung unter $dir, sortiert, als absolute Pfade mit
+ * Schraegstrichen. Verzeichnisse aus PROJECT_FILES_SKIP_DIRS werden auf jeder
+ * Tiefe uebersprungen, ohne sie zu betreten.
+ *
+ * @return string[]
+ */
+function projectFiles(string $dir, string $extension): array
+{
+    $filter = new RecursiveCallbackFilterIterator(
+        new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+        static function (SplFileInfo $file): bool {
+            return !($file->isDir() && in_array($file->getFilename(), PROJECT_FILES_SKIP_DIRS, true));
+        }
+    );
+
+    $found = [];
+    foreach (new RecursiveIteratorIterator($filter) as $file) {
+        /** @var SplFileInfo $file */
+        if ($file->isFile() && $file->getExtension() === $extension) {
+            $found[] = str_replace("\\", "/", $file->getPathname());
+        }
+    }
+    sort($found);
+
+    return $found;
+}
+
 /** Rohtext einer Datei, bewusst mit Kommentaren. */
 function rawSource(string $path): string
 {
