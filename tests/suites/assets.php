@@ -245,6 +245,33 @@ test('Jedes Script-Tag zeigt auf eine vorhandene Datei', function () use ($repoR
 
     assertTrue($fehlend === [], "Script-Tag ohne Datei:\n  " . implode("\n  ", $fehlend));
 });
+
+test('Oeffnende und schliessende Container-Tags sind ausgeglichen', function () use ($repoRoot) {
+    // Der Browser verzeiht beides stillschweigend: ein fehlendes </div> ergaenzt
+    // er am </body>, ein ueberzaehliges ignoriert er. Deshalb fiel keins davon
+    // auf. 1.2.1 schloss in der PWA einen offenen Container und fuegte dabei im
+    // Dashboard ein ueberzaehliges </div> ein, das bis 1.17.1 stand (OI-15).
+    $files = [
+        '/public/index.html',
+        '/public/login.html',
+        '/public/checkin/index.html',
+        '/public/station/index.html',
+    ];
+
+    $schief = [];
+    foreach ($files as $rel) {
+        $html = (string) sourceCode($repoRoot . $rel);
+        foreach (['div', 'main', 'section', 'form', 'table'] as $tag) {
+            $auf = preg_match_all('/<' . $tag . '\b/i', $html);
+            $zu  = preg_match_all('/<\/' . $tag . '\s*>/i', $html);
+            if ($auf !== $zu) {
+                $schief[] = "{$rel}: <{$tag}> {$auf} geoeffnet, {$zu} geschlossen";
+            }
+        }
+    }
+
+    assertTrue($schief === [], "Unausgeglichene Tags:\n  " . implode("\n  ", $schief));
+});
 test('Die Station raeumt das Fragment mit replaceState ab', function () use ($repoRoot) {
     // Waechter gegen eine Neulade-Schleife. `location.hash = ''` waere die
     // naheliegende Vereinfachung von clearHash() und genau falsch: Sie loest
