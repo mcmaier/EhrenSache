@@ -4,8 +4,8 @@ Sammelstelle für Funde, offene Entscheidungen und Restarbeiten. Ergänzt die Sp
 unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nicht entschieden
 oder noch nicht gebaut.
 
-**Zuletzt geprüft:** 2026-09-25 · **Bezugsstand:** `dev` = `main` = `v1.16.0` (`82d38b2`) ·
-**Version:** 1.16.0
+**Zuletzt geprüft:** 2026-09-25 gegen `v1.16.0` (`82d38b2`); seither nur einzeln nachgetragen ·
+**Version:** 1.17.1
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
 > während der Code auf 1.9.0 war — fünf Punkte waren längst behoben, ohne dass ihr Eintrag es

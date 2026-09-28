@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.17.1] – 2026-09-28
 
 ### Behoben
 - **Ein Teil-Update eines Benutzers trennt ihn nicht mehr von seinem Mitglied.** `PUT users`
