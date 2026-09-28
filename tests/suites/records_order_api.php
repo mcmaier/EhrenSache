@@ -106,3 +106,35 @@ test('GET records: gleicher Tag -- erst Termin, dann Ankunft, dann Name', functi
         }
     }
 });
+
+test('GET my_data: gleicher Tag -- neuester Termin zuerst, auch ohne Ankunft', function () {
+    // Ein Mitglied hat je Termin hoechstens einen Record; entscheidend ist hier,
+    // dass eine fehlende Ankunft den spaeteren Termin nicht nach hinten schiebt.
+    $admin    = apiToken('admin');
+    $memberId = (int) apiMemberId('user');
+
+    $early = $late = 0;
+    try {
+        $early = ordTempAppointment($admin, 'Sortierung frueh', '14:00:00');
+        $late  = ordTempAppointment($admin, 'Sortierung spaet', '20:00:00');
+        ordRecord($admin, $early, $memberId, '13:55:00');
+        ordRecord($admin, $late, $memberId, null);
+
+        $res = apiRequest('GET', 'my_data', ['token' => apiToken('user')]);
+        assertStatus(200, $res);
+
+        $titles = array_values(array_filter(
+            array_column(
+                array_filter($res['body']['records'], fn($r) => $r['appointment_date'] === ORD_DATE),
+                'appointment_title'
+            ),
+            fn($t) => str_starts_with((string) $t, 'Sortierung')
+        ));
+        assertSame(['Sortierung spaet', 'Sortierung frueh'], $titles,
+            'Der spaetere Termin gehoert nach oben, auch wenn seine Ankunft fehlt');
+    } finally {
+        foreach (array_filter([$early, $late]) as $id) {
+            apiRequest('DELETE', 'appointments', ['token' => $admin, 'query' => ['id' => $id]]);
+        }
+    }
+});

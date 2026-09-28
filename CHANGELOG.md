@@ -21,7 +21,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   sortierte nur nach Datum und Ankunftszeit; bei zwei Terminen an einem Tag mischten sich deren
   Einträge, und alle ohne Ankunftszeit standen gesammelt alphabetisch am Tagesende. Jetzt gilt:
   Termin (neuester zuerst), darin Ankunft (neueste zuerst, fehlende zuletzt), erst bei gleicher
-  Zeit alphabetisch.
+  Zeit alphabetisch. Die eigenen Anwesenheiten im Datenexport (`my_data`) folgen derselben
+  Terminreihenfolge.
 
 ---
 

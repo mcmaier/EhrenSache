@@ -90,7 +90,8 @@ function handleMyData($db, $database, $request_method, $authUserId)
         FROM {$prefix}records r
         LEFT JOIN {$prefix}appointments a ON r.appointment_id = a.appointment_id
         WHERE r.member_id = ?
-        ORDER BY a.date DESC, r.arrival_time IS NULL, r.arrival_time DESC
+        ORDER BY a.date DESC, a.start_time DESC, a.appointment_id DESC,
+                 r.arrival_time IS NULL, r.arrival_time DESC
     ");
     $stmt->execute([$member_id]);
     $data['records'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
