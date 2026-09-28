@@ -543,14 +543,14 @@ function handleUsers($db, $database, $method, $id, $authUserId) {
                         $updateParams[] = $data->role;
                     }
 
-                    if(isset($data->member_id)) {
+                    // Verknuepfung nur anfassen, wenn member_id mitgeschickt
+                    // wurde -- ein ausdrueckliches null trennt sie. Frueher
+                    // setzte jedes PUT ohne den Schluessel NULL und trennte so
+                    // still das Mitglied. isset() in der Feldliste oben laesst
+                    // null fallen, deshalb property_exists auf dem Rohkoerper.
+                    if(is_object($rawData) && property_exists($rawData, 'member_id')) {
                         $updateFields[] = "member_id = ?";
-                        $updateParams[] = $data->member_id ?: NULL;
-                    }
-                    else
-                    {
-                        $updateFields[] = "member_id = ?";
-                        $updateParams[] =  NULL;
+                        $updateParams[] = ($data->member_id ?? NULL) ?: NULL;
                     }
                     
                     if(isset($data->account_status) && in_array($data->account_status, ['pending', 'active', 'suspended'])) {
