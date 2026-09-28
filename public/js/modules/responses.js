@@ -340,19 +340,19 @@ export function toggleResponsesLock() {
     if (current) renderResponsesModal();
 }
 
-/** Baut die volle Tabellenzeile eines Mitglieds -- steht ein Mitglied in
- * mehreren Abschnitten (Gruppe/Untergruppe), bekommt es je Abschnitt eine
- * eigene, vollstaendige Zeile mit Aktionsknoepfen statt nur einen Namen. */
 // OI-109: Tooltip des Kennzeichens "kein Zugang" in der Verwalter-Tabelle.
 const NO_ACCESS_TITLE = 'Kein aktives Benutzerkonto – Rückmeldung nur durch die Verwaltung';
 
+/** Baut die volle Tabellenzeile eines Mitglieds -- steht ein Mitglied in
+ * mehreren Abschnitten (Gruppe/Untergruppe), bekommt es je Abschnitt eine
+ * eigene, vollstaendige Zeile mit Aktionsknoepfen statt nur einen Namen. */
 function managerMemberRowHtml(m, started) {
     const excuse = m.excuse_state
         ? `<br><small>Entschuldigung: ${escapeHtml(translateExceptionStatus(m.excuse_state))}</small>` : '';
     // OI-109: offen und ohne Zugang. Strikt auf false -- ein aelterer Server
     // ohne das Feld zeigt nichts an.
     const noAccess = m.status === null && m.has_access === false
-        ? ` <span class="response-no-access" title="${NO_ACCESS_TITLE}">kein Zugang</span>` : '';
+        ? ` <span class="response-no-access" title="${escapeHtml(NO_ACCESS_TITLE)}">kein Zugang</span>` : '';
 
     // G6: "kurzfristig" nur bei einer Absage.
     return `<tr>

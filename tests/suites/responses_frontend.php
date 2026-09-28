@@ -435,7 +435,7 @@ test('OI-109: Offene Zeilen ohne Zugang tragen ein Kennzeichen', function () use
     assertTrue($ende !== false, 'Ende von managerMemberRowHtml nicht gefunden');
     $body = substr($js, $start, $ende - $start);
 
-    assertTrue(str_contains($body, 'm.has_access === false'),
+    assertTrue(str_contains($body, 'm.status === null && m.has_access === false'),
         'Kennzeichen muss auf has_access === false pruefen, damit ein aelterer Server nichts anzeigt');
     assertTrue(str_contains($body, 'response-no-access'), 'Klasse response-no-access fehlt');
 
@@ -453,6 +453,7 @@ test('OI-109: Filterknopf nennt die Zahl ohne Zugang', function () use ($rsRoot)
     $body = substr($js, $start, $ende - $start);
 
     assertTrue(str_contains($body, 'ohne Zugang'), 'Filterknopf nennt "ohne Zugang" nicht');
+    assertTrue(str_contains($body, '${openLabel}</button>'), 'Die Beschriftung landet nicht im Filterknopf');
     assertTrue(str_contains($body, 'has_access === false'),
         'Zaehlung ohne Zugang muss aus data.members kommen, wie openCount');
 });

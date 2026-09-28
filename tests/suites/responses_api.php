@@ -1701,6 +1701,15 @@ test('OI-109: Druckbericht nennt offene Rueckmeldungen ohne Zugang', function ()
             'Zeile des Mitglieds ohne Zugang ist nicht gekennzeichnet');
         assertTrue(str_contains($res['raw'], 'davon 1 ohne Zugang'),
             'Hinweiszeile nennt die Zahl ohne Zugang nicht');
+
+        // Gegenprobe: mit Antwort ist niemand mehr offen ohne Zugang, der Zusatz entfaellt.
+        assertStatus(200, rsPut('manager', $apt, ['status' => 'yes'], $welt['member']));
+        $danach = rsGet('manager', ['appointment_id' => $apt, 'format' => 'html']);
+        assertStatus(200, $danach);
+        assertTrue(!str_contains($danach['raw'], 'ohne Zugang'),
+            'Ohne offene Rueckmeldung ohne Zugang darf der Druckbericht keinen Zusatz nennen');
+        assertTrue(!str_contains($danach['raw'], 'kein Zugang'),
+            'Eine beantwortete Zeile darf nicht als "kein Zugang" gekennzeichnet sein');
     } finally {
         rsDropWorld($welt);
     }
