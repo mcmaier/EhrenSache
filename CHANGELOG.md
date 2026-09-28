@@ -7,22 +7,27 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.17.0] – 2026-09-28
 
 ### Sicherheit
-- **Freitext aus der Datenbank wird jetzt auch in HTML-Attributen vollständig maskiert.** Die
-  Maskierungsfunktion der Oberfläche behandelte bisher nur `<`, `>` und `&`, nicht aber
-  Anführungszeichen. Wo ein Wert in einem Attribut landete — etwa die Begründung eines
-  Antrags, ein Terminort oder ein Mitgliedsname —, konnte er das Attribut verlassen. Betroffen waren alle
-  Versionen seit 1.0.0. Die Funktion lag an drei Stellen im Projekt vor und wurde überall
-  angeglichen; ein Test hält das Verhalten künftig fest.
-- **Die Seite zum Zurücksetzen des Passworts prüft den Token jetzt vor jeder Ausgabe.** Bisher
-  konnte ein abgeschicktes Formular den Token erreichen, bevor er auf Form und Länge geprüft
-  wurde. Zusätzlich nennen alle Maskierungsaufrufe der öffentlich erreichbaren Seiten die
-  Optionen ausdrücklich, statt sich auf eine Vorgabe zu verlassen, die sich zwischen PHP 8.0 und
-  8.1 geändert hat.
-- **Farbwerte des Erscheinungsbilds werden auf ihr Format geprüft, bevor sie in eine Seite
-  gelangen.** Sie standen zuvor ungeprüft in einem Stilblock der öffentlich erreichbaren Seiten.
+- **Eingaben aus der Datenbank werden jetzt auch in HTML-Attributen vollständig maskiert.** Die
+  Maskierung der Oberfläche ließ Anführungszeichen stehen, ein gespeicherter Wert konnte dadurch
+  aus einem Attribut ausbrechen; einige Stellen waren gar nicht maskiert. Betroffen waren unter
+  anderem die Begründung von Anträgen, der Ort von Terminen, Mitgliedsnamen und die
+  Mitgliedsnummer in der Benutzerverwaltung. Über diese Felder konnte ein angemeldetes Konto —
+  bis hinunter zum einfachen Mitglied — Code in der Sitzung von Verwaltern oder Administratoren
+  ausführen. Betroffen waren alle Versionen seit 1.0.0. Siehe Advisory GHSA-fj3f-3q3v-w274.
+- **Die Seite „Passwort zurücksetzen“ maskiert unabhängig von der PHP-Version** und prüft den
+  Token vor jeder Verarbeitung. Unter PHP 8.0 war dort eine Einschleusung ohne Anmeldung möglich;
+  ab PHP 8.1 nicht.
+- **Farben des Erscheinungsbilds werden auf ihr Format geprüft**, bevor sie in öffentliche Seiten
+  und E-Mails gelangen.
+- **Meldungen aus Serverantworten gelangen maskiert in die Seite.**
+- **Anmeldeseite, Check-in-App und virtuelle Station tragen eine Content-Security-Policy.** Der
+  Browser führt dort nur noch Skripte aus, die aus der Installation selbst kommen. Eingeschleuster
+  Code in Knöpfen, Links oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der
+  Maskierung vorbei ins Markup schaffen sollte. Das Dashboard folgt in einem eigenen Schritt;
+  es arbeitet noch mit Inline-Handlern (OI-17).
 
 ### Neu
 - **Das Hardware-Terminal kann Mitglieder per Mitgliedsnummer und PIN stempeln lassen.** Die
@@ -59,13 +64,6 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Check-ins von Geräten tragen den Gerätenamen als Ort.** Bisher las `auto_checkin` dafür die
   E-Mail des Gerätekontos, die es nicht gibt — der Ort blieb immer leer. Bestehende Einträge
   bleiben ohne Ort (OI-102).
-
-### Sicherheit
-- **Anmeldeseite, Check-in-App und virtuelle Station tragen eine Content-Security-Policy.** Der
-  Browser führt dort nur noch Skripte aus, die aus der Installation selbst kommen. Eingeschleuster
-  Code in Knöpfen, Links oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der
-  Maskierung vorbei ins Markup schaffen sollte. Das Dashboard folgt in einem eigenen Schritt;
-  es arbeitet noch mit Inline-Handlern (OI-17).
 
 ---
 
