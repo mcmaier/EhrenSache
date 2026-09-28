@@ -34,7 +34,10 @@ declare(strict_types=1);
  *
  * Grenzen, bewusst:
  * - Nur Template-Interpolationen ${…} werden als roh erkannt, nicht
- *   String-Verkettung mit +.
+ *   String-Verkettung mit + und nicht Array.join(). Eine Variable wird nur
+ *   verfolgt, wenn ihre eigene Definition ein ${…} enthaelt; bei
+ *   [a, b].join(', ') bleibt sie unsichtbar, und eine fehlende Maskierung
+ *   faellt nicht auf. Belegt am 2026-09-28 (OI-113).
  * - Variablen werden innerhalb derselben Datei aufgeloest, nicht ueber
  *   Funktionsparameter hinweg.
  * - hsDefinitions() kennt const/let/var und Zuweisung, nicht

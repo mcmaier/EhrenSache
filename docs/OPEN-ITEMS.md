@@ -4667,3 +4667,39 @@ Attributnamen bereits — eine künftige Regel wäre nur ein Zweig, falls die CS
 warten lässt.
 
 **Nicht sicherheitsrelevant.**
+
+---
+
+### OI-113 · Der Senken-Wächter folgt `join()` nicht — fehlende Maskierung bleibt unbemerkt
+**Priorität:** mittel · aufgenommen am 2026-09-28 (bei der Umsetzung von
+[OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar))
+
+`tests/suites/html_sinks_frontend.php` verfolgt eine Variable nur, wenn **ihre eigene Definition**
+eine Template-Einsetzung `${…}` enthält. Entsteht ihr Wert anders, sieht der Wächter nichts:
+
+```js
+const name = [apt.type_name, zeit, apt.title].filter(Boolean).join(', ');
+… aria-label="${name}"     // kein escapeHtml — Wächter bleibt grün
+```
+
+**Belegt, nicht vermutet:** Bei der Umsetzung von OI-96 wurde `escapeHtml()` an genau dieser Stelle
+probeweise entfernt. Der Wächter meldete **nichts**, obwohl Terminart und Titel damit roh in einem
+Attribut landen. Eine Diagnose gegen `hsSinks()`/`hsRawFieldsReaching()` zeigt: `${a},${b}` wird
+gesehen, `[a, b].join(', ')` und `a + ', ' + b` nicht.
+
+**Warum das zählt:** Das Dashboard hat keine Content-Security-Policy
+([OI-17](#oi-17--keine-content-security-policy), Etappe 2). Dort ist die Maskierung die einzige
+Schranke — und dieser Wächter ist das einzige, was sie ehrlich hält. Er ist im September 2026 aus
+einem Sicherheitsvorgang entstanden, dessen Ursache genau war, dass niemand bemerkte, wo Maskierung
+fehlt.
+
+**Die `+`-Verkettung stand schon als bewusste Grenze im Kopf der Suite, `join()` nicht.** Der
+Unterschied ist willkürlich: Beide bauen einen String aus Feldern zusammen. Die Grenze ist dort
+inzwischen ergänzt — damit ist sie wenigstens benannt.
+
+**Zu tun:** `hsRawFieldsReaching()` auch `join()` und `+`-Verkettung folgen lassen. Dabei prüfen,
+wie viele bisher unsichtbare Stellen dadurch auftauchen — die Zahl ist der eigentliche Befund.
+
+**Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: Die geprüften Stellen sind heute korrekt
+maskiert (in OI-96 eigens gegengeprüft). Es geht um die Verlässlichkeit des Wächters, nicht um
+eine offene Lücke.
