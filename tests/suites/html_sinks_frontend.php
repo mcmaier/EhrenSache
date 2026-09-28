@@ -26,17 +26,49 @@ declare(strict_types=1);
  * (setzt per innerHTML, ui.js) und das return einer Funktion, deren Name auf
  * Html endet (Konvention fuer Markup-Bausteine).
  *
- * Grenzen, bewusst: Nur Template-Interpolationen ${…} werden als roh erkannt,
- * nicht String-Verkettung mit +; Variablen werden innerhalb derselben Datei
- * aufgeloest, nicht ueber Funktionsparameter hinweg. Das Werkzeug ersetzt
- * keine Durchsicht, es haelt den erreichten Stand fest.
+ * Seit 2026-09-28 fragt der Waechter zusaetzlich, WOHIN ein Wert geht: ob er in
+ * einem Attributwert oder im Elementinhalt landet (hsAttributeAt()). Fuer ein
+ * style-Attribut gilt damit eine strengere Regel als fuer Elementinhalt --
+ * dort genuegt Maskierung nicht, der Wert braucht eine Formatpruefung, weil
+ * dort CSS steht und nicht HTML.
+ *
+ * Grenzen, bewusst:
+ * - Nur Template-Interpolationen ${…} werden als roh erkannt, nicht
+ *   String-Verkettung mit +.
+ * - Variablen werden innerhalb derselben Datei aufgeloest, nicht ueber
+ *   Funktionsparameter hinweg.
+ * - hsDefinitions() kennt const/let/var und Zuweisung, nicht
+ *   Objekteigenschaften, Destrukturierung oder den Parameter einer Pfeilfunktion
+ *   in map(m => …).
+ * - hsIsRawField() erkennt einen Rueckfall auf ein Literal (feld || 'x'), nicht
+ *   eine Kette ueber ein zweites Feld (feld || anderesFeld || 'x').
+ * - Die strengere Attributregel gilt bisher nur fuer style. Ein on…-Attribut
+ *   ist derselbe Fall -- dort steht JavaScript, und Maskierung ist auch da die
+ *   falsche Schranke --, braucht aber einen Begriff von "das kann nur eine Zahl
+ *   oder ein Schluesselwort sein"; rund siebzig Einsetzungen im Dashboard
+ *   haengen daran. Die eigentliche Abhilfe ist dort die Inhaltssicherheits-
+ *   richtlinie fuer das Dashboard (OI-17, Etappe 2).
+ * - Geltungsbereich sind die JS-Dateien aus hsScannedFiles(). Serverseitig
+ *   gerendertes HTML (reset_password.php, verify_email.php, branding.php,
+ *   email_templates/) sieht dieser Waechter nicht.
+ *
+ * Das Werkzeug ersetzt keine Durchsicht, es haelt den erreichten Stand fest.
  */
 
 $hsRoot = dirname(__DIR__, 2);
 
-/** Freitextfelder aus der Datenbank, die ein Nutzer mit Schreibrecht frei befuellt. */
+/**
+ * Felder, deren Inhalt der Waechter nicht als fest im Code stehend ansieht.
+ *
+ * Der Grossteil sind Freitextfelder aus der Datenbank, die ein Nutzer mit
+ * Schreibrecht frei befuellt. message, hint und error kommen aus Serverantworten
+ * und standen bis 2026-09-28 nicht in dieser Liste: Sie sind zwar meist fester
+ * Text aus einem Handler, tragen aber auch weitergegebene Ausnahmetexte, und
+ * deren Inhalt bestimmt nicht der Code.
+ */
 const HS_FIELDS = 'name|surname|title|description|comment|reason|type_name|group_name'
-    . '|activity_name|note|location|member_number|email|organization_name|subgroup_name|device_name|filename|label';
+    . '|activity_name|note|location|member_number|email|organization_name|subgroup_name|device_name|filename|label'
+    . '|message|hint|error';
 
 /**
  * Beginnt an $i ein Regex-Literal? Wie ueblich entscheidet das vorige
@@ -156,6 +188,98 @@ function hsInterpolations(string $expr): array
     return $out;
 }
 
+/**
+ * Nur die aeussersten ${…} eines Templates, als [Inhalt, Position des $].
+ *
+ * Fuer die Attributfrage zaehlt allein diese Ebene: Eine verschachtelte
+ * Einsetzung steht nicht im Markup, sondern im Ausdruck darueber.
+ */
+function hsTopLevelInterpolations(string $expr): array
+{
+    $out = [];
+    $pos = 0;
+    while (($p = strpos($expr, '${', $pos)) !== false) {
+        $end   = hsExpressionEnd($expr, $p + 2);
+        $out[] = [substr($expr, $p + 2, $end - $p - 2), $p];
+        $pos   = $end + 1;
+    }
+
+    return $out;
+}
+
+/**
+ * Attributname, in dessen Wert die Stelle $pos eines Markup-Templates liegt --
+ * oder null, wenn dort Elementinhalt steht.
+ *
+ * Diese Unterscheidung fehlte dem Waechter bis 2026-09-28: Er fragte nur, OB
+ * maskiert wird, nie WOHIN der Wert geht. Solange jeder Wert durch
+ * escapeHtml() laeuft, traegt das -- seit die Maskierung auch Anfuehrungszeichen
+ * erfasst, ist ein Attribut so sicher wie Elementinhalt. Der Unterschied
+ * zaehlt bei jedem Wert, der gar nicht maskiert wird: In einem style-Attribut
+ * ist Maskierung die falsche Schranke, weil dort CSS steht und nicht HTML.
+ *
+ * Grenzen: Ein Attributwert ohne Anfuehrungen (style=${x}) wird erkannt, ein
+ * Attribut, dessen Name selbst aus einer Einsetzung kommt (${attr}="x"), nicht.
+ * Ueber Templategrenzen hinweg (`<i style="` + naechstes Template) ebenfalls
+ * nicht -- im Projekt kommt das nicht vor.
+ */
+function hsAttributeAt(string $template, int $pos): ?string
+{
+    // Einsetzungen im Vorlauf sind undurchsichtig: Ein " in ${x ? "a" : "b"}
+    // gehoert nicht zum Markup und darf die Anfuehrungen nicht mitzaehlen.
+    $prefix = '';
+    for ($i = 0; $i < $pos;) {
+        if ($template[$i] === '$' && ($template[$i + 1] ?? '') === '{') {
+            $prefix .= 'X';
+            $i       = hsExpressionEnd($template, $i + 2) + 1;
+            continue;
+        }
+        $prefix .= $template[$i];
+        $i++;
+    }
+
+    $inTag     = false;
+    $quote     = '';
+    $attr      = null;
+    $wantValue = false;   // direkt hinter einem = , Wert noch nicht begonnen
+    $unquoted  = false;   // Wert ohne Anfuehrungen, endet am Leerzeichen
+    $n         = strlen($prefix);
+    for ($i = 0; $i < $n; $i++) {
+        $c = $prefix[$i];
+        if ($quote !== '') {
+            if ($c === $quote) {
+                $quote = '';
+                $attr  = null;
+            }
+            continue;
+        }
+        if (!$inTag) {
+            $inTag = $c === '<';
+            continue;
+        }
+        if ($c === '>') {
+            $inTag = false;
+            $attr  = null;
+            $wantValue = $unquoted = false;
+        } elseif ($c === '=' && !$unquoted) {
+            $attr      = preg_match('/([A-Za-z_:][-\w:.]*)\s*$/', substr($prefix, 0, $i), $m) === 1
+                ? strtolower($m[1]) : null;
+            $wantValue = true;
+        } elseif ($wantValue && ($c === '"' || $c === "'")) {
+            $quote     = $c;
+            $wantValue = false;
+        } elseif ($wantValue && !ctype_space($c)) {
+            $wantValue = false;
+            $unquoted  = true;
+        } elseif ($unquoted && ctype_space($c)) {
+            $unquoted = false;
+            $attr     = null;
+        }
+    }
+
+    return $inTag && ($quote !== '' || $wantValue || $unquoted) ? $attr : null;
+}
+
 /** Ist der Inhalt einer Interpolation ein Freitextfeld ohne Maskierung? */
 function hsIsRawField(string $content): bool
 {
@@ -229,6 +353,52 @@ function hsMarkupTemplates(string $js, int $base = 0, string $whole = ''): array
                 $out   = array_merge($out, hsMarkupTemplates($inner, $base + $i + $p + 2, $whole));
                 $pos   = $close + 1;
             }
+        }
+        $i = $end;
+    }
+
+    return $out;
+}
+
+/**
+ * Jedes Template-Literal einer Datei als [Text, Position] -- auch die
+ * verschachtelten.
+ *
+ * hsMarkupTemplates() haelt bei einem Markup-Template an und steigt nicht
+ * hinein. Fuer die Feldfrage genuegt das, weil hsInterpolations() auch
+ * verschachtelte ${…} einsammelt. Die Attributfrage braucht dagegen jede Ebene
+ * fuer sich: Ein Wert in `<div style="${x}">` innerhalb eines .map() steht auf
+ * der aeusseren Ebene nur als ganzer map()-Aufruf da.
+ */
+function hsAllTemplates(string $js, int $base = 0): array
+{
+    $out = [];
+    $n   = strlen($js);
+    for ($i = 0; $i < $n; $i++) {
+        $c = $js[$i];
+        if (hsRegexStart($js, $i)) {
+            $i = hsRegexEnd($js, $i);
+            continue;
+        }
+        if ($c === '"' || $c === "'") {
+            $i++;
+            while ($i < $n && $js[$i] !== $c && $js[$i] !== "\n") {
+                $i += $js[$i] === '\\' ? 2 : 1;
+            }
+            continue;
+        }
+        if ($c !== '`') {
+            continue;
+        }
+        $end      = hsTemplateEnd($js, $i);
+        $template = substr($js, $i, $end - $i + 1);
+        $out[]    = [$template, $base + $i];
+        $pos      = 0;
+        while (($p = strpos($template, '${', $pos)) !== false) {
+            $close = hsExpressionEnd($template, $p + 2);
+            $inner = substr($template, $p + 2, $close - $p - 2);
+            $out   = array_merge($out, hsAllTemplates($inner, $base + $i + $p + 2));
+            $pos   = $close + 1;
         }
         $i = $end;
     }
@@ -347,15 +517,94 @@ function hsSinks(string $js): array
     return $sinks;
 }
 
-/** @return string[] Funde "datei:zeile: feld" */
-function hsFindings(string $root): array
+/**
+ * Ist der Ausdruck als Wert in einem style-Attribut unbedenklich?
+ *
+ * Unbedenklich heisst hier: sein Format ist geprueft oder er kann gar nichts
+ * anderes sein als eine Zahl. Maskierung genuegt ausdruecklich NICHT -- ein
+ * maskiertes "red; background:url(x)" steht weiterhin im Attribut, nur
+ * unschaedlich verstuemmelt, und die eigentliche Aussage (das ist keine Farbe)
+ * bliebe ungeprueft.
+ */
+function hsIsSafeStyleValue(string $expr): bool
 {
-    $funde = [];
-    $files = array_merge(
+    $e = trim($expr);
+
+    // Die gemeinsamen Farbhelfer: utils.js (Dashboard) und die Fassung der
+    // Check-in-App, die ohne Modulimport auskommen muss.
+    if (preg_match('/^(?:safeTypeColor|safeHexColor)\s*\(/', $e) === 1) {
+        return true;
+    }
+
+    // Eine Zahl bleibt eine Zahl -- Rechnung oder ausdrueckliche Wandlung.
+    if (preg_match('/^(?:Number|parseInt|parseFloat)\s*\(|\.toFixed\s*\(/', $e) === 1) {
+        return true;
+    }
+
+    // Reines Literal.
+    return preg_match('/^(?:\'[^\']*\'|"[^"]*"|-?[\d.]+)$/', $e) === 1;
+}
+
+/**
+ * Einsetzungen in einem style-Attribut, deren Wert nicht geprueft ist, als
+ * [Zeile, Ausdruck].
+ *
+ * Ein einzelner Bezeichner wird ueber seine Definitionen aufgeloest, damit
+ * "const typeColor = safeTypeColor(apt.color)" traegt. Nicht aufgeloest werden
+ * Objekteigenschaften (accent.style) -- dafuer gibt es $hsStyleAllowed.
+ */
+function hsUncheckedStyleValues(string $js, string $template, int $at): array
+{
+    $out = [];
+    foreach (hsTopLevelInterpolations($template) as [$content, $pos]) {
+        if (hsAttributeAt($template, $pos) !== 'style' || hsIsSafeStyleValue($content)) {
+            continue;
+        }
+        if (preg_match('/^\s*([A-Za-z_$][\w$]*)\s*$/', $content, $m) === 1) {
+            $defs = hsDefinitions($js, $m[1], $at);
+            $ungeprueft = array_filter($defs, static fn (string $d): bool => !hsIsSafeStyleValue($d));
+            if ($defs !== [] && $ungeprueft === []) {
+                continue;
+            }
+        }
+        $out[] = [substr_count($js, "\n", 0, $at + $pos) + 1, trim($content)];
+    }
+
+    return $out;
+}
+
+/** Die Dateien, die beide Waechter durchsehen. */
+function hsScannedFiles(string $root): array
+{
+    return array_merge(
         glob($root . '/public/js/modules/*.js') ?: [],
         [$root . '/public/js/app.js', $root . '/public/js/login.js', $root . '/public/js/theme.js',
          $root . '/public/checkin/js/app.js', $root . '/public/station/js/app.js']
     );
+}
+
+/** @return string[] Funde "datei:zeile: ausdruck" */
+function hsStyleFindings(string $root): array
+{
+    $funde = [];
+    foreach (hsScannedFiles($root) as $file) {
+        $js  = sourceCode($file);
+        $rel = substr(str_replace('\\', '/', $file), strlen(str_replace('\\', '/', $root)) + 1);
+        foreach (hsAllTemplates($js) as [$template, $at]) {
+            foreach (hsUncheckedStyleValues($js, $template, $at) as [$line, $expr]) {
+                $funde[] = "{$rel}:{$line}: {$expr}";
+            }
+        }
+    }
+
+    return array_values(array_unique($funde));
+}
+
+/** @return string[] Funde "datei:zeile: feld" */
+function hsFindings(string $root): array
+{
+    $funde = [];
+    $files = hsScannedFiles($root);
     foreach ($files as $file) {
         $js  = sourceCode($file);
         $rel = substr(str_replace('\\', '/', $file), strlen(str_replace('\\', '/', $root)) + 1);
@@ -460,6 +709,105 @@ test('Ausnahmen: vorab maskierte Felder sind an ihrer Quelle wirklich maskiert',
         assertTrue(preg_match($muster, sourceCode($hsRoot . '/' . $datei)) === 1,
             "{$feld}: {$grund} — gilt nicht mehr, die Ausnahme ist zu streichen");
     }
+});
+
+test('Werkzeug: unterscheidet Attributwert von Elementinhalt', function () {
+    $t = '`<i style="background: ${a}" title="${b}">${c}</i><b data-x=${d} class="k">${e}</b>`';
+    $orte = [];
+    foreach (hsTopLevelInterpolations($t) as [$inhalt, $pos]) {
+        $orte[trim($inhalt)] = hsAttributeAt($t, $pos) ?? '(inhalt)';
+    }
+
+    assertSame([
+        'a' => 'style',
+        'b' => 'title',
+        'c' => '(inhalt)',
+        'd' => 'data-x',     // Wert ohne Anfuehrungen zaehlt auch als Attribut
+        'e' => '(inhalt)',   // nach dem schliessenden > wieder Inhalt
+    ], $orte);
+});
+
+test('Werkzeug: ein Anfuehrungszeichen in einer Einsetzung verschiebt den Attributort nicht', function () {
+    // Der Vorlauf wird um jede Einsetzung gekuerzt. Ohne das gaelte das " in
+    // ${x ? "a" : "b"} als Ende des style-Attributs, und ${c} stuende
+    // scheinbar im Elementinhalt.
+    $t = '`<i style="${x ? "a" : "b"}; color: ${c}">t</i>`';
+    $orte = [];
+    foreach (hsTopLevelInterpolations($t) as [$inhalt, $pos]) {
+        $orte[] = hsAttributeAt($t, $pos);
+    }
+
+    assertSame(['style', 'style'], $orte);
+});
+
+test('Werkzeug: im style-Attribut genuegt Maskierung nicht, im Inhalt schon', function () {
+    $js = <<<'JS'
+function render(a, t) {
+    const geprueft = safeTypeColor(a.color);
+    const roh = a.color;
+    box.innerHTML = `<i style="background: ${escapeHtml(a.color)}">${escapeHtml(a.activity_name)}</i>`;
+    ok.innerHTML = `<i style="background: ${geprueft}"></i>`;
+    ok2.innerHTML = `<i style="width: ${(t.rate * 100).toFixed(1)}%"></i>`;
+    ok3.innerHTML = `<i title="${escapeHtml(a.color)}"></i>`;
+    bad.innerHTML = `<i style="background: ${roh}"></i>`;
+    list.innerHTML = `<ul>${t.rows.map(r => `<li style="background: ${r.color}"></li>`).join('')}</ul>`;
+}
+JS;
+    $funde = [];
+    foreach (hsAllTemplates($js) as [$template, $at]) {
+        foreach (hsUncheckedStyleValues($js, $template, $at) as [$line, $expr]) {
+            $funde[] = "{$line}: {$expr}";
+        }
+    }
+    sort($funde);
+
+    // Zeile 4: maskiert, aber nicht auf Farbe geprueft -- genau die Bauart, die
+    // der Waechter vorher nicht sah. Zeile 8 ueber die Variable roh. Zeile 9
+    // steckt in einem Template innerhalb eines .map(); ohne den Abstieg in jede
+    // Ebene faellt sie still heraus. Die geprueften Zeilen 5 und 6 und das
+    // title-Attribut in Zeile 7 fehlen zu Recht.
+    assertSame(['4: escapeHtml(a.color)', '8: roh', '9: r.color'], $funde);
+});
+
+/**
+ * Einsetzungen in style-Attributen, die ohne Farbhelfer auskommen. Wie bei
+ * $hsPreEscaped nennt jede Ausnahme ihre Quelle, und der Test prueft sie mit.
+ *
+ * Der Schluessel ist der Ausdruck, nicht Datei und Zeile: Eine Ausnahme gilt
+ * damit projektweit. Das ist vertretbar, solange die Namen so besonders sind
+ * wie hier -- bei einem Alltagsnamen waere eine Datei mitzunennen.
+ */
+$hsStyleAllowed = [
+    'accent.style' => ['public/js/modules/records.js',
+        '/style:\s*`--type-color: \$\{safeTypeColor\(/',
+        'appointmentTypeAccent() baut style bereits mit safeTypeColor()'],
+    'source.color' => ['public/js/modules/records.js',
+        '/const source = sources\[record\.checkin_source\] \|\| sources\[\'none\'\];/',
+        'source kommt aus der festen Tabelle sources in getSourceBadge(), kein Freitext'],
+    'member.attendance_rate' => ['private/helpers/attendance.php',
+        '/function attendanceRate\(int \$attended, int \$total\): float/',
+        'attendanceRate() liefert float, der Server rechnet die Quote'],
+    't.attendance_rate' => ['private/helpers/attendance.php',
+        '/function attendanceRate\(int \$attended, int \$total\): float/',
+        'attendanceRate() liefert float, der Server rechnet die Quote'],
+];
+
+test('Ausnahmen: erlaubte style-Werte sind an ihrer Quelle wirklich geprueft', function () use ($hsRoot, $hsStyleAllowed) {
+    foreach ($hsStyleAllowed as $ausdruck => [$datei, $muster, $grund]) {
+        assertTrue(preg_match($muster, sourceCode($hsRoot . '/' . $datei)) === 1,
+            "{$ausdruck}: {$grund} — gilt nicht mehr, die Ausnahme ist zu streichen");
+    }
+});
+
+test('Kein style-Attribut erhaelt einen ungepruefeten Wert', function () use ($hsRoot, $hsStyleAllowed) {
+    $funde = array_values(array_filter(
+        hsStyleFindings($hsRoot),
+        static fn (string $f): bool => !isset($hsStyleAllowed[substr($f, strrpos($f, ': ') + 2)])
+    ));
+
+    assertTrue($funde === [],
+        "Wert ohne Formatpruefung in einem style-Attribut (safeTypeColor()/safeHexColor() statt escapeHtml()):\n  "
+        . implode("\n  ", $funde));
 });
 
 test('Keine HTML-Senke erreicht ein Freitextfeld unmaskiert', function () use ($hsRoot, $hsPreEscaped) {
