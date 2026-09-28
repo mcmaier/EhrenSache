@@ -218,6 +218,15 @@ const FOCUSABLE_SELECTOR = [
  *
  * Liefert eine Funktion, die den Hoerer entfernt und den Fokus dorthin
  * zurueckgibt, wo er vorher stand.
+ *
+ * Die Rueckgabe des Fokus ist abschaltbar (Parameter der Freigabe). Nachgetragen
+ * am 2026-09-28 beim Anschliessen des ersten Aufrufers (OI-96, Task 3): Sie ist
+ * richtig, wenn der Nutzer den Dialog mit Escape verlaesst -- dann will er
+ * zurueck. Auf jedem anderen Weg hinaus hat etwas anderes die Fuehrung
+ * uebernommen: Ein Klick daneben hat sein Ziel schon selbst gewaehlt (bei einem
+ * Eingabefeld ist der Fokus dort, bevor der click-Hoerer laeuft), ein Knopf im
+ * Dialog hat einen weiteren Dialog geoeffnet. Den Fokus dann auf das Element
+ * hinter dem Geschehen zu ziehen, waere schlechter als ihn zu lassen.
  */
 export function trapFocus(element, onEscape) {
     const previouslyFocused = document.activeElement;
@@ -290,11 +299,11 @@ export function trapFocus(element, onEscape) {
 
     element.addEventListener('keydown', onKeydown);
 
-    return function releaseFocus() {
+    return function releaseFocus(returnFocus = true) {
         element.removeEventListener('keydown', onKeydown);
         // Das Element kann inzwischen aus dem DOM sein -- dann waere focus()
         // wirkungslos und der Fokus fiele auf body zurueck.
-        if (previouslyFocused && document.body.contains(previouslyFocused)) {
+        if (returnFocus && previouslyFocused && document.body.contains(previouslyFocused)) {
             previouslyFocused.focus();
         }
     };

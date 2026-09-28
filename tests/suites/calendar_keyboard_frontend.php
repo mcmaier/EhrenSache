@@ -359,9 +359,12 @@ function ckRegexEnde(string $js, int $auf): int
 }
 
 /**
- * Ein Ausdruck ab $von, gelesen bis dorthin, wo er endet: bis zum Semikolon
- * auf Klammerbilanz 0 oder bis zu einer schliessenden Klammer, fuer die es
- * keine offene gibt -- der des umgebenden Aufrufs.
+ * Ein Stueck Quelltext ab $von, gelesen bis dorthin, wo es endet: bis zu einer
+ * schliessenden Klammer, fuer die es keine offene gibt -- und, wenn
+ * $semikolonEndet gilt, auch bis zum Semikolon auf Klammerbilanz 0.
+ *
+ * Gemeinsamer Kern von ckAusdruck() und ckBlockRumpf(). Ein Block endet NICHT
+ * am Semikolon: Seine Anweisungen tragen selbst welche.
  *
  * Ein Muster wie /setAttribute\(\s*.aria-label.\s*,([^;]+);/ traegt hier
  * NICHT, am 2026-09-25 bestaetigt: Die Zuweisung im Belegt-Zweig ist eine
@@ -374,7 +377,7 @@ function ckRegexEnde(string $js, int $auf): int
  * nur dort duerfen Klammern und Semikola die Bilanz nicht beruehren. $prev und
  * $word werden dafuer mitgefuehrt wie in stripJsComments().
  */
-function ckAusdruck(string $js, int $von): string
+function ckLiesBis(string $js, int $von, bool $semikolonEndet): string
 {
     $tiefe = 0;
     $n = strlen($js);
@@ -412,7 +415,7 @@ function ckAusdruck(string $js, int $von): string
                 return substr($js, $von, $i - $von);
             }
             $tiefe--;
-        } elseif ($c === ';' && $tiefe === 0) {
+        } elseif ($semikolonEndet && $c === ';' && $tiefe === 0) {
             return substr($js, $von, $i - $von);
         }
 
@@ -421,9 +424,21 @@ function ckAusdruck(string $js, int $von): string
             $word = '';
         }
     }
-    assertTrue(false, "Ausdruck ab Position {$von} endet nicht");
+    assertTrue(false, "Gelesenes Stueck ab Position {$von} endet nicht");
 
     return '';
+}
+
+/** Ein Ausdruck ab $von -- bis zum Semikolon oder zur fremden Klammer. */
+function ckAusdruck(string $js, int $von): string
+{
+    return ckLiesBis($js, $von, true);
+}
+
+/** Der Rumpf eines Blocks ab der Position HINTER seiner oeffnenden Klammer. */
+function ckBlockRumpf(string $js, int $von): string
+{
+    return ckLiesBis($js, $von, false);
 }
 
 /**
@@ -578,4 +593,260 @@ test('Der Feiertagsname steht vorn im Vorlesetext, in beiden Zweigen', function 
         'Der Feiertagsname muss VOR der Terminliste stehen, sonst kommt er erst nach allen Terminen');
     assertTrue(strpos($leerText, 'holidayName') < strpos($leerText, 'Neuen Termin'),
         'Der Feiertagsname muss VOR der Aufforderung stehen');
+});
+
+
+// ============================================================
+// Task 4 der Spec: Das festgehaltene Popup wird ein Dialog
+// ============================================================
+
+/** Der Rumpf von showAppointmentPopup(). */
+function ckPopupRumpf(string $root): string
+{
+    return ckFunctionBody(ckFile($root, 'public/js/modules/appointments.js'),
+        'function showAppointmentPopup(');
+}
+
+/** Name des angelegten Popup-Elements -- ausgelesen, nicht angenommen. */
+function ckPopupVar(string $body): string
+{
+    assertTrue((bool) preg_match('/(?:const|let)\s+(\w+)\s*=\s*document\.createElement\(/', $body, $m),
+        'showAppointmentPopup() legt kein Element an');
+
+    return $m[1];
+}
+
+/** Rumpf einer im Popup-Rumpf erklaerten Funktion, ueber ihren Namen gefunden. */
+function ckInnereFunktion(string $body, string $name): string
+{
+    $n = preg_quote($name, '/');
+    assertTrue((bool) preg_match('/function\s+' . $n . '\s*\([^)]*\)\s*\{/', $body, $m, PREG_OFFSET_CAPTURE),
+        "Die Funktion {$name}() ist in showAppointmentPopup() nicht erklaert");
+
+    return ckBlockRumpf($body, $m[0][1] + strlen($m[0][0]));
+}
+
+/** Text hinter der fruehen Rueckkehr "if (!fest) { return; }". */
+function ckNachFestRueckkehr(string $body): string
+{
+    assertTrue((bool) preg_match('/if\s*\(\s*!\s*fest\s*\)\s*\{\s*return\s*;\s*\}/', $body, $m,
+        PREG_OFFSET_CAPTURE),
+        'Ohne die fruehe Rueckkehr "if (!fest) { return; }" laesst sich nicht unterscheiden, was nur'
+        . ' fuer das festgehaltene Popup laeuft -- die Gegenprobe fuer das Ueberfahr-Popup haette dann'
+        . ' keinen Sinn');
+
+    return substr($body, $m[0][1] + strlen($m[0][0]));
+}
+
+/**
+ * Eine Maske ueber den Rumpf: true an jeder Stelle, die NUR fuer das
+ * festgehaltene Popup laeuft.
+ *
+ * Das sind die Rumpfe aller "if (fest)"-Bloecke und alles hinter der fruehen
+ * Rueckkehr. Eine Maske statt zweier Textstuecke, weil sich Bereiche sonst
+ * ueberlappen koennten -- gezaehlte Vorkommen waeren dann doppelt gezaehlt und
+ * die Gegenprobe meldete gruen oder rot, je nach Anordnung.
+ */
+function ckFestMaske(string $body): array
+{
+    $laenge = strlen($body);
+    $maske = array_fill(0, $laenge + 1, false);
+
+    $nach = ckNachFestRueckkehr($body);
+    for ($i = $laenge - strlen($nach); $i < $laenge; $i++) {
+        $maske[$i] = true;
+    }
+
+    // Ein Ternaer im Template-Literal ("${fest && isAdminOrManager ? ...}") ist
+    // damit nicht gemeint und wird nicht getroffen: Verlangt ist die oeffnende
+    // Klammer eines Blocks.
+    $bloecke = 0;
+    $ab = 0;
+    while (preg_match('/if\s*\(\s*fest\s*\)\s*\{/', $body, $m, PREG_OFFSET_CAPTURE, $ab)) {
+        $auf = $m[0][1] + strlen($m[0][0]);
+        $rumpf = ckBlockRumpf($body, $auf);
+        for ($i = $auf; $i < $auf + strlen($rumpf); $i++) {
+            $maske[$i] = true;
+        }
+        $bloecke++;
+        $ab = $auf;
+    }
+    assertTrue($bloecke > 0, 'Kein "if (fest)"-Block in showAppointmentPopup()');
+
+    return $maske;
+}
+
+/**
+ * Jedes Vorkommen von $muster liegt im Bereich, der nur fuer das festgehaltene
+ * Popup laeuft -- und es gibt mindestens eines.
+ *
+ * Beides gehoert zusammen: Ohne die untere Grenze waere die Zusicherung von
+ * einer geloeschten Zeile erfuellt, ohne die Maske von einer Zeile, die das
+ * fluechtige Ueberfahr-Popup mitnimmt.
+ */
+function ckNurBeiFest(string $body, array $maske, string $muster, string $was): void
+{
+    $treffer = preg_match_all($muster, $body, $alle, PREG_OFFSET_CAPTURE);
+    assertTrue($treffer > 0, "{$was}: kein Vorkommen in showAppointmentPopup()");
+
+    foreach ($alle[0] as $t) {
+        assertTrue($maske[$t[1]],
+            "{$was} steht ausserhalb des Zweiges fuer das festgehaltene Popup -- das fluechtige"
+            . ' Ueberfahr-Popup bekaeme es mit: ' . trim((string) preg_replace('/\s+/', ' ', $t[0])));
+    }
+}
+
+/**
+ * Der Aufruf des Fokusfangs: [Name der Freigabe, Name der Schliessfunktion].
+ *
+ * Beide Namen werden ausgelesen statt angenommen -- eine Umbenennung ist keine
+ * Verschlechterung.
+ */
+function ckFangAufruf(string $body, string $popupVar): array
+{
+    assertTrue((bool) preg_match('/(?:const|let)\s+(\w+)\s*=\s*trapFocus\(\s*'
+        . preg_quote($popupVar, '/') . '\s*,\s*(?:\(\s*\)\s*=>\s*)?(\w+)\s*\(/', $body, $m),
+        'Der Fokusfang muss auf das Popup gelegt und seine Freigabe behalten werden -- ohne die'
+        . ' Rueckgabe in einer Variablen kann sie niemand rufen, und der Fang haelt Tab weiter');
+
+    return [$m[1], $m[2]];
+}
+
+test('Nur das festgehaltene Popup ist ein Dialog', function () use ($ckRoot) {
+    $body = ckPopupRumpf($ckRoot);
+    $maske = ckFestMaske($body);
+
+    // Ein aria-modal am fluechtigen Ueberfahr-Popup waere schaedlich, nicht
+    // bloss unnoetig: Ein Vorlesegeraet blendet dann alles ausserhalb aus,
+    // waehrend der Nutzer nur mit der Maus ueber den Kalender wandert.
+    ckNurBeiFest($body, $maske, '/setAttribute\(\s*([\'"])role\1\s*,\s*([\'"])dialog\2\s*\)/',
+        'role="dialog"');
+    ckNurBeiFest($body, $maske, '/setAttribute\(\s*([\'"])aria-modal\1\s*,/', 'aria-modal');
+    ckNurBeiFest($body, $maske, '/setAttribute\(\s*([\'"])aria-label\1\s*,/',
+        'Der Vorlesetext des Dialogs');
+});
+
+test('Der Vorlesetext des Dialogs nennt das Datum in deutscher Schreibweise', function () use ($ckRoot) {
+    $body = ckPopupRumpf($ckRoot);
+
+    // Geprueft auf die HERKUNFT des Wertes: Verlangt wird der Name, der aus
+    // toLocaleDateString('de-DE', ...) kommt. Eine Zusicherung auf die
+    // Zeichenkette "de-DE" allein waere von der Kopfzeile darueber schon
+    // erfuellt, ohne dass der Vorlesetext davon etwas hat.
+    $namen = [];
+    $ab = 0;
+    while (preg_match('/(?:const|let)\s+(\w+)\s*=\s*/', $body, $m, PREG_OFFSET_CAPTURE, $ab)) {
+        $von = $m[0][1] + strlen($m[0][0]);
+        $wert = ckAusdruck($body, $von);
+        if (str_contains($wert, "toLocaleDateString('de-DE'")) {
+            $namen[] = $m[1][0];
+        }
+        $ab = $von + max(1, strlen($wert));
+    }
+    assertSame(1, count($namen),
+        'In showAppointmentPopup() muss genau ein Wert aus toLocaleDateString(\'de-DE\', ...) kommen,'
+        . ' damit klar ist, welcher gemeint ist; gefunden: ' . count($namen));
+
+    $texte = ckAriaLabelTexte($body);
+    assertSame(1, count($texte),
+        'Genau eine aria-label-Zuweisung erwartet (die des Dialogs); gefunden: ' . count($texte));
+
+    assertTrue(str_contains($texte[0], $namen[0]),
+        "Der Vorlesetext des Dialogs muss das deutsch geschriebene Datum aus \"{$namen[0]}\" nennen: "
+        . trim((string) preg_replace('/\s+/', ' ', $texte[0])));
+
+    // appointments[0].date und tagDatum sind ISO. "2026-09-21" liest ein
+    // Vorlesegeraet als Zahlenfolge vor -- genau das soll der Dialog nicht tun.
+    assertTrue(!preg_match('/appointments\s*\[\s*0\s*\]\s*\.date|\btagDatum\b/', $texte[0]),
+        'Der Vorlesetext des Dialogs darf das ISO-Datum nicht nennen: '
+        . trim((string) preg_replace('/\s+/', ' ', $texte[0])));
+});
+
+test('trapFocus kommt aus utils.js und greift nur beim festgehaltenen Popup', function () use ($ckRoot) {
+    $js = ckFile($ckRoot, 'public/js/modules/appointments.js');
+    assertTrue((bool) preg_match('/import\s*\{[^}]*\btrapFocus\b[^}]*\}\s*from\s*[\'"][^\'"]*utils\.js[\'"]/',
+        $js),
+        'trapFocus muss aus utils.js importiert werden -- ein eigener Fang im Kalender waere der zweite');
+
+    $body = ckFunctionBody($js, 'function showAppointmentPopup(');
+    $maske = ckFestMaske($body);
+
+    // Der Fang am fluechtigen Popup waere kein Schoenheitsfehler: Er zoege den
+    // Fokus beim blossen Ueberfahren aus dem Feld, in dem der Nutzer gerade
+    // tippt, und hielte Tab in einem Popup, das beim mouseleave verschwindet.
+    ckNurBeiFest($body, $maske, '/\btrapFocus\s*\(/', 'Der Fokusfang');
+
+    ckFangAufruf($body, ckPopupVar($body));
+});
+
+test('Der Klick-Hoerer prueft die Herkunft des Klicks', function () use ($ckRoot) {
+    $body = ckPopupRumpf($ckRoot);
+    $popupVar = ckPopupVar($body);
+    [, $schliessen] = ckFangAufruf($body, $popupVar);
+
+    assertTrue((bool) preg_match('/document\.addEventListener\(\s*([\'"])click\1\s*,\s*(\w+)\s*\)/',
+        $body, $m),
+        'Kein Dokument-Klick-Hoerer -- ein Klick daneben liesse das Popup stehen');
+    $hoerer = ckInnereFunktion($body, $m[2]);
+
+    // Der Zweig wird aufgespannt: Bedingung und Rumpf gemeinsam gelesen. Ein
+    // blosses str_contains($hoerer, 'contains') liesse sich mit einer
+    // umgedrehten Pruefung erfuellen, die genau das Gegenteil tut.
+    assertTrue((bool) preg_match('/if\s*\(\s*' . preg_quote($popupVar, '/')
+        . '\.contains\(\s*(\w+)\.target\s*\)\s*\)\s*\{([^}]*)\}/', $hoerer, $z),
+        'Der Klick-Hoerer prueft nicht, ob der Klick IM Popup lag -- mit Fokusfang ist das ein'
+        . ' Widerspruch: Tab bleibt drin, ein Klick auf freie Flaeche wuerfe hinaus');
+    assertTrue(str_contains($z[2], 'return'),
+        'Ein Klick im Popup muss den Hoerer verlassen, ohne zu schliessen: ' . trim($z[2]));
+    assertTrue(!str_contains($z[2], $schliessen),
+        "Ein Klick im Popup darf nicht schliessen -- {$schliessen}() steht im falschen Zweig: "
+        . trim($z[2]));
+
+    assertTrue((bool) preg_match('/\b' . preg_quote($schliessen, '/') . '\s*\(/', $hoerer),
+        "Der Klick-Hoerer schliesst auf keinem Weg -- {$schliessen}() wird nicht gerufen");
+});
+
+test('Eine gemeinsame Schliessfunktion, ueber die alle Wege hinaus laufen', function () use ($ckRoot) {
+    $body = ckPopupRumpf($ckRoot);
+    $popupVar = ckPopupVar($body);
+    [$freigabe, $schliessen] = ckFangAufruf($body, $popupVar);
+    $rumpf = ckInnereFunktion($body, $schliessen);
+
+    // Was die Schliessfunktion tun muss: den Fang loesen, das Popup wegnehmen
+    // und den Dokument-Hoerer abmelden. Fehlt das Loesen, haelt der Fang nach
+    // dem Schliessen weiter Tab; fehlt das Abmelden, bleibt ein Hoerer auf
+    // document zurueck.
+    assertTrue((bool) preg_match('/\b' . preg_quote($freigabe, '/') . '\s*\(/', $rumpf),
+        "{$schliessen}() gibt den Fokusfang nicht frei -- {$freigabe}() wird dort nicht gerufen");
+    assertTrue((bool) preg_match('/\b' . preg_quote($popupVar, '/') . '\.remove\(\s*\)/', $rumpf),
+        "{$schliessen}() nimmt das Popup nicht weg");
+    assertTrue((bool) preg_match('/removeEventListener\(\s*([\'"])click\1/', $rumpf),
+        "{$schliessen}() meldet den Dokument-Klick-Hoerer nicht ab");
+
+    // Und: NUR sie. Ein zweiter Weg, der das Popup wegnimmt oder den Fang
+    // loest, ist genau der Fehler, den eine gemeinsame Funktion verhindern
+    // soll -- er laesst den Fang irgendwann haengen oder gibt ihn doppelt frei.
+    // Gezaehlt wird im Zweig fuer das festgehaltene Popup; oldPopup.remove()
+    // weiter oben traegt einen anderen Namen und liegt ausserhalb.
+    $nachFest = ckNachFestRueckkehr($body);
+    foreach ([
+        preg_quote($popupVar, '/') . '\.remove\(\s*\)' => 'Das Popup wird weggenommen',
+        preg_quote($freigabe, '/') . '\s*\(' => 'Der Fokusfang wird freigegeben',
+    ] as $muster => $was) {
+        $imZweig = preg_match_all('/' . $muster . '/', $nachFest);
+        $inFunktion = preg_match_all('/' . $muster . '/', $rumpf);
+        assertSame($inFunktion, $imZweig,
+            "{$was} auch ausserhalb von {$schliessen}(): {$imZweig} Vorkommen im Zweig fuer das"
+            . " festgehaltene Popup, davon {$inFunktion} in der gemeinsamen Schliessfunktion");
+    }
+
+    // Escape laeuft ueber denselben Weg -- und ist der einzige, der den Fokus
+    // an den Kalendertag zurueckgibt. Auf jedem anderen Weg hat etwas anderes
+    // die Fuehrung: Ein Klick hat sein Ziel selbst gewaehlt, ein Knopf im Popup
+    // hat ein Modal geoeffnet. Deshalb wird hier der WAHRE Wert verlangt, nicht
+    // bloss ein Aufruf.
+    assertTrue((bool) preg_match('/trapFocus\([^;]*?\b' . preg_quote($schliessen, '/')
+        . '\(\s*true\s*\)/s', $body),
+        "Escape muss {$schliessen}(true) rufen -- ohne die Fokusrueckgabe stuende der Fokus danach"
+        . ' auf body statt am Kalendertag');
 });

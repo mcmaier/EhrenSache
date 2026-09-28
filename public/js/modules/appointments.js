@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
 import { renderDateChecklist } from './date_checklist.js';
-import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor } from './utils.js';
+import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus } from './utils.js';
 import { loadTypes } from './management.js';
 import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
@@ -828,10 +828,11 @@ function calendarResponseLineHtml(apt, fest) {
         return `<div class="calendar-event-responses"><span class="response-summary-text" title="${escapeHtml(title)}">${chips}</span>${own}${hinweis}</div>`;
     }
 
-    // Der Dokument-Klick-Handler in showAppointmentPopup() entfernt das Popup
-    // ohnehin beim Bubbling -- aber erst danach, und nur, wenn er ueberhaupt
-    // registriert ist (10ms Verzoegerung). Hier explizit vorher entfernen,
-    // damit ein schneller Klick nicht ins Leere modaliert.
+    // Das Popup hier selbst entfernen. Der Dokument-Klick-Hoerer in
+    // showAppointmentPopup() nimmt es seit OI-96 NICHT mehr mit: Er prueft die
+    // Herkunft des Klicks, und dieser kommt aus dem Popup. Auch vorher war er
+    // kein Verlass -- er raeumte erst nach dem onclick auf und nur, wenn er
+    // ueberhaupt schon registriert war (10 ms Verzoegerung).
     return `<div class="calendar-event-responses">
         <button type="button" class="response-summary-btn" title="${escapeHtml(title)}"
             onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openResponsesModal(${Number(apt.appointment_id)})">${chips}</button>${own}
@@ -893,13 +894,6 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
         oldPopup.remove();
     }
 
-    // Erstelle neues Popup
-    const popup = document.createElement('div');
-    popup.className = 'calendar-event-popup active';
-    if (fest) {
-        popup.dataset.fest = '1';
-    }
-
     // Datum und Uhrzeit wie ueberall sonst in der Oberflaeche: deutsches
     // Format, Uhrzeit ohne Sekunden. Roh gezeigt las sich der Kopf als
     // "2026-09-04" und die Zeile als "20:00:00" -- seit das Popup schon beim
@@ -908,6 +902,26 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
     const kopf = isNaN(tag.getTime())
         ? appointments[0].date
         : tag.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Erstelle neues Popup
+    const popup = document.createElement('div');
+    popup.className = 'calendar-event-popup active';
+    if (fest) {
+        popup.dataset.fest = '1';
+
+        // Das festgehaltene Popup ist ein Dialog: Es nimmt den Fokus, haelt Tab
+        // und gibt ihn bei Escape zurueck (OI-96). Das fluechtige
+        // Ueberfahr-Popup bekommt davon nichts -- es gehoert der Maus, dieselbe
+        // Trennung wie bei der Rueckmeldezeile (OI-94).
+        //
+        // Der Vorlesetext nennt dasselbe Datum wie die Kopfzeile, also die
+        // deutsche Schreibweise. appointments[0].date ist ISO; "2026-09-21"
+        // liest ein Vorlesegeraet als Zahlenfolge. Bewusst derselbe Wert und
+        // keine zweite Formatierung -- zwei koennten auseinanderlaufen.
+        popup.setAttribute('role', 'dialog');
+        popup.setAttribute('aria-modal', 'true');
+        popup.setAttribute('aria-label', `Termine am ${kopf}`);
+    }
 
     let html = `<h4>${kopf}</h4>`;
     appointments.forEach(apt => {
@@ -995,16 +1009,82 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
     popup.style.visibility = '';
 
     // Nur ein festgehaltenes Popup wartet auf einen Klick daneben. Ein
-    // fluechtiges verschwindet ohnehin, sobald der Zeiger das Feld verlaesst.
+    // fluechtiges verschwindet ohnehin, sobald der Zeiger das Feld verlaesst --
+    // und bekommt deshalb auch keinen Fokusfang.
     if (!fest) {
         return;
     }
 
+    /**
+     * Der eine Weg hinaus, ueber den alle laufen. Nur so wird der Fokusfang auf
+     * jedem Weg wieder freigegeben:
+     *
+     * - Escape: aus dem Fang heraus gerufen, mit Fokusrueckgabe
+     * - Klick daneben: aus dem Hoerer unten
+     * - Knopf im Popup ("Bearbeiten", "Anwesenheit", "+ Termin", die
+     *   Rueckmeldezeile): Der entfernt das Popup per Inline-onclick selbst,
+     *   OHNE hier durchzukommen. Erst der naechste Klick irgendwohin fuehrt
+     *   vorbei -- dann ist nur noch aufzuraeumen, siehe isConnected unten.
+     *
+     * Ein zweiter Aufruf laeuft an derselben Pruefung ins Leere; ein eigenes
+     * Merkmal fuer "schon geschlossen" braucht es dafuer nicht.
+     *
+     * @param {boolean} fokusZurueck Fokus auf den Kalendertag zurueckgeben?
+     *   Nur bei Escape -- dort will der Nutzer zurueck. Auf jedem anderen Weg
+     *   hat etwas anderes die Fuehrung: Ein Klick hat sein Ziel schon selbst
+     *   gewaehlt, ein Knopf hat ein Modal geoeffnet (weder
+     *   openAppointmentModal() noch openAttendanceForAppointment() setzen den
+     *   Fokus selbst). Den Fokus dann auf den Tag im Hintergrund zu ziehen,
+     *   waere schlechter als ihn zu lassen.
+     */
+    function schliessePopup(fokusZurueck = false) {
+        document.removeEventListener('click', aufKlickDaneben);
+
+        // Schon weg -- ein Knopf im Popup hat es selbst entfernt. Der Fang
+        // haengt am Popup und ist mit ihm aus dem Dokument, Tab und Escape
+        // erreichen ihn nicht mehr; es bleibt nichts zu loesen. Und nichts zu
+        // fokussieren: Der Tag liegt hinter dem Modal, das der Knopf geoeffnet
+        // hat.
+        if (!popup.isConnected) {
+            return;
+        }
+        popup.remove();
+        freigabe(fokusZurueck);
+    }
+
+    /**
+     * Ein Klick daneben schliesst, ein Klick hinein nicht.
+     *
+     * Bis 1.16.0 nahm JEDER Klick das Popup weg, auch einer hinein. Das fiel
+     * nicht auf, weil jeder Knopf darin ohnehin schliesst -- mit Fokusfang
+     * waere es ein Widerspruch: Tab bliebe drin, ein Klick auf freie Flaeche
+     * wuerfe hinaus.
+     */
+    function aufKlickDaneben(e) {
+        if (popup.contains(e.target)) {
+            return;
+        }
+        schliessePopup();
+    }
+
+    const freigabe = trapFocus(popup, () => schliessePopup(true));
+
+    // Die 10 ms bleiben. Die Herkunftspruefung macht sie NICHT entbehrlich: Ein
+    // neu an document gehaengter Hoerer sieht das gerade laufende
+    // Klick-Ereignis noch, sobald es ihn erreicht -- und der oeffnende Klick
+    // liegt auf dem Kalendertag, also AUSSERHALB des Popups. Die Pruefung liesse
+    // ihn durch, das Popup ginge im selben Zug wieder zu. Dass ihn heute schon
+    // das stopPropagation() im Klick-Hoerer des Tages von document fernhaelt,
+    // ist eine Zusicherung an anderer Stelle; von hier aus darauf zu bauen,
+    // hiesse sie unsichtbar mitzuverlangen. Beim Oeffnen per Tastatur gibt es
+    // keinen oeffnenden Klick -- dort ist die Verzoegerung wirkungslos, nicht
+    // schaedlich.
     setTimeout(() => {
-        document.addEventListener('click', function closePopup() {
-            popup.remove();
-            document.removeEventListener('click', closePopup);
-        });
+        // In den 10 ms kann das Popup schon weg sein (Escape, Knopf) -- sonst
+        // blieb hier ein Hoerer auf document zurueck, den niemand mehr loest.
+        if (popup.isConnected) {
+            document.addEventListener('click', aufKlickDaneben);
+        }
     }, 10);
 }
 
