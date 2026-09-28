@@ -717,7 +717,7 @@ export async function performCleanup() {
 
         } catch(error) {
             document.getElementById('cleanup_result').innerHTML = `
-                <div class="error-message">❌ Fehler: ${error.message}</div>
+                <div class="error-message">❌ Fehler: ${escapeHtml(error.message)}</div>
             `;
         }
     }
