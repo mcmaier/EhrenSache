@@ -142,7 +142,7 @@ try {
 function showForm($token, $error = '', $branding) {
     $brandingCSS = getBrandingCSS($branding);
     $brandingLogo = getBrandingLogo($branding);
-    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES, 'UTF-8')
+    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
 
     ?>
     <!DOCTYPE html>
@@ -219,7 +219,7 @@ function showForm($token, $error = '', $branding) {
             <h1>Neues Passwort setzen</h1>
             
             <?php if ($error): ?>
-                <div class='error'><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
+                <div class='error'><?= htmlspecialchars($error, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></div>
             <?php endif; ?>
             
             <!-- Ohne action sendet das Formular an dieselbe Adresse zurueck, der
@@ -251,7 +251,7 @@ function showForm($token, $error = '', $branding) {
 function showSuccess($branding) {
     $brandingCSS = getBrandingCSS($branding);
     $brandingLogo = getBrandingLogo($branding);
-    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES, 'UTF-8');
+    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
     ?>
     <!DOCTYPE html>
@@ -352,7 +352,7 @@ function showSuccess($branding) {
 function showError($title, $message = '', $branding) {
     $brandingCSS = getBrandingCSS($branding);
     $brandingLogo = getBrandingLogo($branding);
-    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES, 'UTF-8');
+    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     
     ?>
     <!DOCTYPE html>
@@ -435,9 +435,9 @@ function showError($title, $message = '', $branding) {
         <div class='container'>
              <?= $brandingLogo ?>
             <div class='error-icon'></div>
-            <h1><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></h1>
+            <h1><?= htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></h1>
             <?php if ($message): ?>
-                <p><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></p>
+                <p><?= htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></p>
             <?php endif; ?>
             <a href='login.html' class='button'>Zur Login-Seite</a>
         </div>

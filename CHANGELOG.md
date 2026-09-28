@@ -9,6 +9,21 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Sicherheit
+- **Freitext aus der Datenbank wird jetzt auch in HTML-Attributen vollständig maskiert.** Die
+  Maskierungsfunktion der Oberfläche behandelte bisher nur `<`, `>` und `&`, nicht aber
+  Anführungszeichen. Wo ein Wert in einem Attribut landete — etwa die Begründung eines
+  Antrags, ein Terminort oder ein Mitgliedsname —, konnte er das Attribut verlassen. Betroffen waren alle
+  Versionen seit 1.0.0. Die Funktion lag an drei Stellen im Projekt vor und wurde überall
+  angeglichen; ein Test hält das Verhalten künftig fest.
+- **Die Seite zum Zurücksetzen des Passworts prüft den Token jetzt vor jeder Ausgabe.** Bisher
+  konnte ein abgeschicktes Formular den Token erreichen, bevor er auf Form und Länge geprüft
+  wurde. Zusätzlich nennen alle Maskierungsaufrufe der öffentlich erreichbaren Seiten die
+  Optionen ausdrücklich, statt sich auf eine Vorgabe zu verlassen, die sich zwischen PHP 8.0 und
+  8.1 geändert hat.
+- **Farbwerte des Erscheinungsbilds werden auf ihr Format geprüft, bevor sie in eine Seite
+  gelangen.** Sie standen zuvor ungeprüft in einem Stilblock der öffentlich erreichbaren Seiten.
+
 ### Neu
 - **Das Hardware-Terminal kann Mitglieder per Mitgliedsnummer und PIN stempeln lassen.** Die
   Ressource `station` nimmt neben dem Kiosk jetzt auch Geräte vom Typ `auth_device` an, damit

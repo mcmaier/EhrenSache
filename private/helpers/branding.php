@@ -49,7 +49,7 @@ function brandingEscape($value): string
 {
     // ENT_QUOTES ausdruecklich: Bis PHP 8.0 ist ENT_COMPAT die Vorgabe, dort
     // bleibt ' stehen. Die Ausgaben hier stecken in einfachen Anfuehrungen.
-    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 /**
