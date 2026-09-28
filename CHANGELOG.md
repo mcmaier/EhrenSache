@@ -23,6 +23,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Termin (neuester zuerst), darin Ankunft (neueste zuerst, fehlende zuletzt), erst bei gleicher
   Zeit alphabetisch. Die eigenen Anwesenheiten im Datenexport (`my_data`) folgen derselben
   Terminreihenfolge.
+- **Der Kalender lässt sich ohne Maus bedienen.** Ein Tag mit Terminen ist jetzt mit Tab
+  anzufahren und öffnet sich mit Enter oder der Leertaste. Im Popup führt Tab durch alle
+  Schaltflächen und hinter der letzten wieder zur ersten, Shift+Tab rückwärts; Escape schließt es
+  und setzt den Fokus zurück auf den Tag. Bisher waren „Bearbeiten“, „Anwesenheit“, die
+  Rückmeldezeile und die Anwesenheitszahlen **nur mit der Maus** erreichbar — leere Tage ließen
+  sich schon vorher per Tastatur öffnen. Ein Klick auf freie Fläche **im** Popup schließt es nicht
+  mehr; ein Klick daneben weiterhin.
+- **Die Vorlesehilfe nennt jetzt den Feiertag, den sehende Nutzer im Tagesfeld lesen.** Bisher
+  hörte man nur die Termine des Tages — ein Feiertag ohne Termine war überhaupt nur als Zahl
+  hörbar. Bei mehreren Terminen an einem Tag sagt sie beim Durchgehen des Popups außerdem, zu
+  welchem Termin die Schaltflächen gehören.
 
 ---
 

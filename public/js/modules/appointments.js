@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
 import { renderDateChecklist } from './date_checklist.js';
-import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor } from './utils.js';
+import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus } from './utils.js';
 import { loadTypes } from './management.js';
 import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
@@ -598,8 +598,11 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
 
     // Feiertag (FI-16) -- nur im laufenden Monat; die ausgegrauten Tage der
     // Nachbarmonate tragen ein unnormiertes Datum (Monat -1 bzw. 12).
+    // Der Name wird weiter unten auch im Vorlesetext gebraucht (OI-80), in
+    // beiden Zweigen -- deshalb ausserhalb des Blocks deklariert.
+    let holidayName = '';
     if (!isOtherMonth) {
-        const holidayName = holidaysOfYear(year)[dateStr];
+        holidayName = holidaysOfYear(year)[dateStr] || '';
         if (holidayName) {
             day.classList.add('calendar-day--holiday');
             const tag = document.createElement('span');
@@ -679,10 +682,11 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
         // Ersetzt das frueher gesetzte title-Attribut: Der native Tooltip kam
         // erst nach rund einer Sekunde, war unformatiert -- und liefe jetzt
         // zusaetzlich zum eigenen Popup auf, das dieselben Termine zeigt.
-        day.setAttribute('aria-label', `${dayNum}., ` + dayAppointments.map(a => {
-            const typeName = a.type_name ? `${a.type_name}, ` : '';
-            return `${a.start_time} ${typeName}${a.title}`;
-        }).join('; ')
+        day.setAttribute('aria-label', `${dayNum}., ` + (holidayName ? `${holidayName}, ` : '')
+            + dayAppointments.map(a => {
+                const typeName = a.type_name ? `${a.type_name}, ` : '';
+                return `${a.start_time} ${typeName}${a.title}`;
+            }).join('; ')
             + withResponses.map(a => `; ${responseSummaryTitle(a.responses)}`).join('')
             + (responseOpen ? '; Rückmeldung offen' : '')
             // Ohne "von X": bei mehreren Terminen zaehlt expected die Plaetze,
@@ -692,6 +696,12 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
                 ? `; Anwesend ${totals.present}, Entschuldigt ${totals.excused}, Fehlend ${totals.missing}`
                 : '')
             + (!isAdminOrManager && hasOwnStatusText(ownStatus) ? `; ${OWN_STATUS_TEXT[ownStatus]}` : ''));
+
+        // Der Leer-Zweig unten macht es seit OI-64 so vor. Ohne diese drei
+        // Zeilen ist das Popup und alles darin nur mit der Maus erreichbar.
+        day.setAttribute('role', 'button');
+        day.setAttribute('tabindex', '0');
+        day.setAttribute('aria-haspopup', 'dialog');
 
         // Ueberfahren zeigt dasselbe Popup wie der Klick, nur fluechtig. Die
         // kleine Verzoegerung verhindert, dass beim Wandern ueber den Kalender
@@ -718,10 +728,22 @@ function createCalendarDay(dayNum, year, month, isOtherMonth, isToday = false, a
             clearTimeout(kalenderHoverTimer);
             showAppointmentPopup(day, dayAppointments, true);
         });
+
+        day.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                // Ohne preventDefault rollt die Leertaste die Seite, waehrend
+                // sich das Popup oeffnet.
+                e.preventDefault();
+                e.stopPropagation();
+                clearTimeout(kalenderHoverTimer);
+                showAppointmentPopup(day, dayAppointments, true);
+            }
+        });
     } else if (!isOtherMonth && isAdminOrManager) {
         // OI-64: Ein leerer Tag legt einen Termin an. Einfache Nutzer legen
         // keine Termine an und sehen deshalb keine Aenderung.
-        const createLabel = `Neuen Termin am ${String(dayNum).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year} anlegen`;
+        const createLabel = (holidayName ? `${holidayName}. ` : '')
+            + `Neuen Termin am ${String(dayNum).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year} anlegen`;
         day.classList.add('calendar-day--can-create');
         day.title = 'Neuen Termin anlegen';
         day.setAttribute('role', 'button');
@@ -806,10 +828,11 @@ function calendarResponseLineHtml(apt, fest) {
         return `<div class="calendar-event-responses"><span class="response-summary-text" title="${escapeHtml(title)}">${chips}</span>${own}${hinweis}</div>`;
     }
 
-    // Der Dokument-Klick-Handler in showAppointmentPopup() entfernt das Popup
-    // ohnehin beim Bubbling -- aber erst danach, und nur, wenn er ueberhaupt
-    // registriert ist (10ms Verzoegerung). Hier explizit vorher entfernen,
-    // damit ein schneller Klick nicht ins Leere modaliert.
+    // Das Popup hier selbst entfernen. Der Dokument-Klick-Hoerer in
+    // showAppointmentPopup() nimmt es seit OI-96 NICHT mehr mit: Er prueft die
+    // Herkunft des Klicks, und dieser kommt aus dem Popup. Auch vorher war er
+    // kein Verlass -- er raeumte erst nach dem onclick auf und nur, wenn er
+    // ueberhaupt schon registriert war (10 ms Verzoegerung).
     return `<div class="calendar-event-responses">
         <button type="button" class="response-summary-btn" title="${escapeHtml(title)}"
             onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openResponsesModal(${Number(apt.appointment_id)})">${chips}</button>${own}
@@ -871,13 +894,6 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
         oldPopup.remove();
     }
 
-    // Erstelle neues Popup
-    const popup = document.createElement('div');
-    popup.className = 'calendar-event-popup active';
-    if (fest) {
-        popup.dataset.fest = '1';
-    }
-
     // Datum und Uhrzeit wie ueberall sonst in der Oberflaeche: deutsches
     // Format, Uhrzeit ohne Sekunden. Roh gezeigt las sich der Kopf als
     // "2026-09-04" und die Zeile als "20:00:00" -- seit das Popup schon beim
@@ -886,6 +902,26 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
     const kopf = isNaN(tag.getTime())
         ? appointments[0].date
         : tag.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Erstelle neues Popup
+    const popup = document.createElement('div');
+    popup.className = 'calendar-event-popup active';
+    if (fest) {
+        popup.dataset.fest = '1';
+
+        // Das festgehaltene Popup ist ein Dialog: Es nimmt den Fokus, haelt Tab
+        // und gibt ihn bei Escape zurueck (OI-96). Das fluechtige
+        // Ueberfahr-Popup bekommt davon nichts -- es gehoert der Maus, dieselbe
+        // Trennung wie bei der Rueckmeldezeile (OI-94).
+        //
+        // Der Vorlesetext nennt dasselbe Datum wie die Kopfzeile, also die
+        // deutsche Schreibweise. appointments[0].date ist ISO; "2026-09-21"
+        // liest ein Vorlesegeraet als Zahlenfolge. Bewusst derselbe Wert und
+        // keine zweite Formatierung -- zwei koennten auseinanderlaufen.
+        popup.setAttribute('role', 'dialog');
+        popup.setAttribute('aria-modal', 'true');
+        popup.setAttribute('aria-label', `Termine am ${kopf}`);
+    }
 
     let html = `<h4>${kopf}</h4>`;
     appointments.forEach(apt => {
@@ -909,8 +945,28 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
             : '';
         const subLine = `${typeName}${locationText}`;
 
+        // Der Block bekommt einen Namen, aber keinen Tab-Stopp (OI-96): Wer
+        // durch die Knoepfe tabbt, hoerte sonst "Bearbeiten, Anwesenheit,
+        // Bearbeiten, Anwesenheit", ohne zu wissen, zu welchem Termin sie
+        // gehoeren. Eine Gruppe nennt ihren Namen beim Betreten -- ohne
+        // zusaetzlichen Tastendruck; bei drei Terminen an einem Tag spart das
+        // drei Tab-Stopps gegenueber fokussierbaren Bloecken.
+        //
+        // Reihenfolge: Terminart, Uhrzeit, Titel. Fehlt die Terminart, entfaellt
+        // sie ersatzlos -- deshalb filter(Boolean) statt einer festen Vorlage.
+        // Die Uhrzeit kommt aus derselben Funktion wie die sichtbare Zeile, sonst
+        // koennten beide auseinanderlaufen.
+        //
+        // Maskiert wird mit escapeHtml() wie ueberall sonst. Das genuegt auch im
+        // Attribut: Seit 1.17.0 erfasst escapeHtml() " und '. Ein zweiter,
+        // eigener Weg fuer Attributwerte war im Haus die Ursache einer Luecke --
+        // hier entsteht keiner.
+        const blockLabel = [apt.type_name, formatTimeRange(apt.start_time, apt.end_time), apt.title]
+            .filter(Boolean)
+            .join(', ');
+
         html += `
-            <div class="calendar-event-block" style="--type-color: ${typeColor};">
+            <div class="calendar-event-block" role="group" aria-label="${escapeHtml(blockLabel)}" style="--type-color: ${typeColor};">
                 <div class="calendar-event-time">${formatTimeRange(apt.start_time, apt.end_time)}</div>
                 <div class="calendar-event-title">${escapeHtml(apt.title)}</div>
                 ${apt.description ? `<div class="calendar-event-desc">${escapeHtml(apt.description)}</div>` : ''}
@@ -973,16 +1029,82 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
     popup.style.visibility = '';
 
     // Nur ein festgehaltenes Popup wartet auf einen Klick daneben. Ein
-    // fluechtiges verschwindet ohnehin, sobald der Zeiger das Feld verlaesst.
+    // fluechtiges verschwindet ohnehin, sobald der Zeiger das Feld verlaesst --
+    // und bekommt deshalb auch keinen Fokusfang.
     if (!fest) {
         return;
     }
 
+    /**
+     * Der eine Weg hinaus, ueber den alle laufen. Nur so wird der Fokusfang auf
+     * jedem Weg wieder freigegeben:
+     *
+     * - Escape: aus dem Fang heraus gerufen, mit Fokusrueckgabe
+     * - Klick daneben: aus dem Hoerer unten
+     * - Knopf im Popup ("Bearbeiten", "Anwesenheit", "+ Termin", die
+     *   Rueckmeldezeile): Der entfernt das Popup per Inline-onclick selbst,
+     *   OHNE hier durchzukommen. Erst der naechste Klick irgendwohin fuehrt
+     *   vorbei -- dann ist nur noch aufzuraeumen, siehe isConnected unten.
+     *
+     * Ein zweiter Aufruf laeuft an derselben Pruefung ins Leere; ein eigenes
+     * Merkmal fuer "schon geschlossen" braucht es dafuer nicht.
+     *
+     * @param {boolean} fokusZurueck Fokus auf den Kalendertag zurueckgeben?
+     *   Nur bei Escape -- dort will der Nutzer zurueck. Auf jedem anderen Weg
+     *   hat etwas anderes die Fuehrung: Ein Klick hat sein Ziel schon selbst
+     *   gewaehlt, ein Knopf hat ein Modal geoeffnet (weder
+     *   openAppointmentModal() noch openAttendanceForAppointment() setzen den
+     *   Fokus selbst). Den Fokus dann auf den Tag im Hintergrund zu ziehen,
+     *   waere schlechter als ihn zu lassen.
+     */
+    function schliessePopup(fokusZurueck = false) {
+        document.removeEventListener('click', aufKlickDaneben);
+
+        // Schon weg -- ein Knopf im Popup hat es selbst entfernt. Der Fang
+        // haengt am Popup und ist mit ihm aus dem Dokument, Tab und Escape
+        // erreichen ihn nicht mehr; es bleibt nichts zu loesen. Und nichts zu
+        // fokussieren: Der Tag liegt hinter dem Modal, das der Knopf geoeffnet
+        // hat.
+        if (!popup.isConnected) {
+            return;
+        }
+        popup.remove();
+        freigabe(fokusZurueck);
+    }
+
+    /**
+     * Ein Klick daneben schliesst, ein Klick hinein nicht.
+     *
+     * Bis 1.16.0 nahm JEDER Klick das Popup weg, auch einer hinein. Das fiel
+     * nicht auf, weil jeder Knopf darin ohnehin schliesst -- mit Fokusfang
+     * waere es ein Widerspruch: Tab bliebe drin, ein Klick auf freie Flaeche
+     * wuerfe hinaus.
+     */
+    function aufKlickDaneben(e) {
+        if (popup.contains(e.target)) {
+            return;
+        }
+        schliessePopup();
+    }
+
+    const freigabe = trapFocus(popup, () => schliessePopup(true));
+
+    // Die 10 ms bleiben. Die Herkunftspruefung macht sie NICHT entbehrlich: Ein
+    // neu an document gehaengter Hoerer sieht das gerade laufende
+    // Klick-Ereignis noch, sobald es ihn erreicht -- und der oeffnende Klick
+    // liegt auf dem Kalendertag, also AUSSERHALB des Popups. Die Pruefung liesse
+    // ihn durch, das Popup ginge im selben Zug wieder zu. Dass ihn heute schon
+    // das stopPropagation() im Klick-Hoerer des Tages von document fernhaelt,
+    // ist eine Zusicherung an anderer Stelle; von hier aus darauf zu bauen,
+    // hiesse sie unsichtbar mitzuverlangen. Beim Oeffnen per Tastatur gibt es
+    // keinen oeffnenden Klick -- dort ist die Verzoegerung wirkungslos, nicht
+    // schaedlich.
     setTimeout(() => {
-        document.addEventListener('click', function closePopup() {
-            popup.remove();
-            document.removeEventListener('click', closePopup);
-        });
+        // In den 10 ms kann das Popup schon weg sein (Escape, Knopf) -- sonst
+        // blieb hier ein Hoerer auf document zurueck, den niemand mehr loest.
+        if (popup.isConnected) {
+            document.addEventListener('click', aufKlickDaneben);
+        }
     }, 10);
 }
 

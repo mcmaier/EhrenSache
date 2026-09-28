@@ -21,17 +21,20 @@ oder noch nicht gebaut.
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
 *mittel* = sollte vor der Freigabe an Vereine gelöst sein · *niedrig* = Verbesserung
 
-**Nächste Umsetzung (Stand 2026-09-25, nach 1.16.0):**
-[OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar) (Tastaturbedienung
-im Kalender). Der Vorbehalt „erst nach OI-94“ ist mit 1.16.0 gefallen, und derselbe Umbau hat die
-Struktur gleich mitgeliefert: Jeder Termin im festgehaltenen Popup ist ein eigener Block, ein
-Fokusrahmen dafür liegt in `calendar.css`. Es fehlt die Bedienung, nicht der Aufbau. [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (Wächter, die ein Kommentar
+**Nächste Umsetzung (Stand 2026-09-28):** noch nicht festgelegt.
+[OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar)
+(Tastaturbedienung im Kalender) ist **erledigt** — umgesetzt auf `feat/oi-96-tastatur`, bewusst
+ohne Versionssprung; die Nummer vergibt die Release-Sitzung. Die Annahme dieses Absatzes, der Fokusrahmen aus OI-94
+(`.calendar-event-block:focus-visible`) sei der Wegweiser, hat sich beim Entwerfen **nicht**
+gehalten: Die Termin-Blöcke wurden `role="group"` mit einem Namen **ohne** Tab-Stopp, und der
+Fokusrahmen ist samt seiner Zusicherung entfallen. [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (Wächter, die ein Kommentar
 erfüllt) aus demselben Vorgang ist mit 1.17.0 erledigt. Entschieden, aber nicht gebaut bleibt
 [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) — es
 braucht eine eigene Spec, nicht nur eine Umsetzung.
 
-Offen mit Priorität *mittel*, am 2026-09-25 einzeln gegen den Code geprüft: OI-67, OI-96, OI-98,
-OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23. Die am 25.09. aus dem
+Offen mit Priorität *mittel*, am 2026-09-25 einzeln gegen den Code geprüft: OI-67, OI-98,
+OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23. OI-96 stand am 25.09. noch in dieser Reihe
+und ist seit dem 28.09. erledigt. Die am 25.09. aus dem
 Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103 sind am selben Tag in `dev`
 erledigt. **OI-3 und OI-20 tragen ebenfalls
 *mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
@@ -4219,6 +4222,49 @@ bleiben — und misst vorher, wie viele Aufrufe diese Fälle wirklich erzeugen.
 ---
 
 ### OI-96 · Kalendertage mit Terminen sind per Tastatur nicht erreichbar
+**Erledigt am 2026-09-28** — **beide Teile**: die Tastaturbedienung *und* der aus
+[OI-80](#oi-80--kalendertage-mit-terminen-keine-tastaturbedienung-feiertag-fehlt-im-vorlesetext)
+übernommene Feiertagsname im Vorlesetext. Umgesetzt auf Branch `feat/oi-96-tastatur`, Spec
+`docs/superpowers/specs/2026-09-25-kalender-tastaturbedienung-design.md`. **Ohne Versionssprung
+und ohne Migrationsschritt** abgeliefert, Eintrag steht unter `## [Unreleased]`; die Nummer vergibt
+die Release-Sitzung.
+
+Ein Tag mit Terminen trägt jetzt `role="button"`, `tabindex="0"`, `aria-haspopup="dialog"` und
+einen `keydown`-Hörer für Enter und Leertaste. Das festgehaltene Popup ist ein Dialog
+(`role="dialog"`, `aria-modal="true"`, `aria-label` mit dem Datum in deutscher Schreibweise) mit
+Fokusfang und einer gemeinsamen Schließfunktion für alle Wege — Escape, Klick daneben, Knopf im
+Popup. Der Fokusfang liegt als `trapFocus()` in `public/js/modules/utils.js`; es ist der erste im
+Projekt, und OI-96 ist bis auf Weiteres sein einziger Aufrufer. Ein Klick auf freie Fläche **im**
+Popup nimmt es nicht mehr weg. Das Überfahr-Popup (`fest === false`) blieb unangetastet: kein
+`role`, kein `aria-modal`, kein Fokus. Der Feiertagsname steht nun vorn im `aria-label` **beider**
+Zweige, auch im leeren — ein Feiertag ohne Termine war zuvor nur als Zahl hörbar.
+
+**Der Fokusrahmen aus OI-94 ist wieder entfallen, nicht genutzt.** Dieser Eintrag nahm am
+2026-09-25 an, `.calendar-event-block:focus-visible` in `calendar.css` sei „der Hinweis, dass das
+der gedachte Weg ist“ — fokussierbare Termin-Blöcke. Beim Entwerfen zeigte sich der bessere Weg:
+Jeder Block wurde `role="group"` mit einem Namen aus Terminart, Uhrzeit und Titel, **ohne**
+Tab-Stopp. Wer durch die Knöpfe tabbt, hört beim Betreten der Gruppe, zu welchem Termin sie
+gehört; bei drei Terminen an einem Tag spart das drei Tab-Stopps. Die CSS-Regel und ihre
+Zusicherung aus `tests/suites/type_accent_frontend.php` sind damit gestrichen — eine Regel ohne
+Wirkung und ein Test, der sie bewacht, wären schlechter als ihr Fehlen. Wer Blöcke später doch
+fokussierbar machen will (Pfeiltasten, siehe „Nicht in diesem Vorhaben“ in der Spec), legt beides
+neu an.
+
+**Die offene Frage der Spec ist beantwortet:** Die 10-ms-Verzögerung vor dem Registrieren des
+Klick-Hörers **bleibt**. Die neue Herkunftsprüfung macht sie nicht entbehrlich, denn der öffnende
+Klick liegt auf dem Kalendertag, also *außerhalb* des Popups — die Prüfung ließe ihn durch. Die
+Begründung steht als Kommentar an der Stelle.
+
+**Prüfung:** neue Suite `tests/suites/calendar_keyboard_frontend.php`, jede Zusicherung mit einer
+Mutation gegengeprüft (Lehre aus [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt)),
+Gesamtlauf 1485 grün. Im Browser als Admin **und** als einfaches Mitglied durchgegangen: Enter
+öffnet, der Fokus wandert ins erste Bedienelement, Tab läuft um, Shift+Tab rückwärts, Escape
+schließt und der Fokus steht wieder auf dem Tag. Als Mitglied gibt es nur **ein** Bedienelement —
+Tab bleibt darauf, der Randfall des Fangs. Leere Tage tragen für Mitglieder bewusst keine Rolle,
+der Anlegen-Weg gehört Verwaltern. Keine neuen Konsolenfehler.
+
+<details><summary>Ursprünglicher Eintrag</summary>
+
 **Priorität:** mittel · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
 
 `createCalendarDay()` ([appointments.js](../public/js/modules/appointments.js)) gibt einem Tag
@@ -4237,6 +4283,8 @@ Zahlen haben keinen zweiten Weg.
 Enter/Space). Dabei klären, wie das Popup per Tastatur wieder geschlossen wird — `mouseleave`
 greift dort nicht, es braucht Escape und vermutlich einen Fokusrahmen.
 
+*Überholt:* Es wurde Escape **und** ein Fokusfang, aber kein Fokusrahmen — siehe oben.
+
 **Aus OI-80 übernommen (zusammengelegt am 2026-09-24):** Das `aria-label` eines Tages mit
 Terminen nennt Uhrzeit, Terminart, Titel und Rückmeldungen, aber **nicht** den Feiertag
 (`calendar-day--holiday`, `holidaysOfYear()`), den sehende Nutzer als Text im Tagesfeld lesen.
@@ -4254,7 +4302,12 @@ weiterhin nur `mouseenter`, `mouseleave` und `click`; `tabindex`, `role` und `ke
 allein im Leer-Zweig darunter, und auch der Block selbst trägt kein `tabindex`. Beide Teile des
 Punktes bleiben offen.
 
+*Überholt:* Der Fokusrahmen war **nicht** der gedachte Weg. Er ist mit der Umsetzung entfallen,
+die Blöcke wurden Gruppen mit Namen statt Tab-Stopps — siehe oben.
+
 **Nicht sicherheitsrelevant.**
+
+</details>
 
 ---
 

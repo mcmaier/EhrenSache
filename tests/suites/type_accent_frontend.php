@@ -691,32 +691,14 @@ test('Der Name der Terminart steht im Popup in der Unterzeile beim Ort', functio
     }
 });
 
-test('Der Fokusrahmen am Popup-Block ist fuer OI-96 schon angelegt', function () use ($taRoot) {
-    // Eigener Test, nicht angehaengt: Er darf nicht hinter einer fremden roten
-    // Zusicherung verschwinden.
-    //
-    // Die Spec verlangt ihn ausdruecklich ("der Fokusrahmen wird im Stylesheet
-    // schon angelegt"). Heute ist er wirkungslos -- es gibt noch kein
-    // fokussierbares Element, tabindex und Tastenbedienung kommen mit OI-96 --
-    // und genau deshalb braucht er eine Zusicherung: Beim naechsten Aufraeumen
-    // saehe er wie eine Regel ohne Benutzer aus, und OI-96 begaenne mit einer
-    // Ueberraschung statt mit der halben Vorleistung.
-    $css = (string) preg_replace('~/\*.*?\*/~s', '',
-        taFile($taRoot, 'public/css/components/calendar.css'));
-
-    assertTrue((bool) preg_match('/\.calendar-event-block:focus-visible\s*\{([^}]*)\}/', $css, $fokus),
-        'Der Fokusrahmen am Termin-Block fehlt -- er gehoert zur Vorleistung fuer OI-96');
-    assertTrue((bool) preg_match('/outline:\s*[^;]*\bvar\(--/', $fokus[1]),
-        'Der Fokusrahmen braucht eine sichtbare outline aus einer Farbvariablen');
-
-    // Die Bedienung selbst bleibt OI-96 -- kein tabindex, kein keydown am
-    // Block. Ohne diese Gegenprobe waere auch ein halbfertiger Vorgriff gruen,
-    // der fokussierbar macht, aber weder Enter noch Escape beantwortet.
-    $js = taFile($taRoot, 'public/js/modules/appointments.js');
-    $body = taFunctionBody($js, 'function showAppointmentPopup(');
-    assertTrue(!str_contains($body, 'tabindex') && !str_contains($body, "'keydown'"),
-        'Tastaturbedienung des Popups ist OI-96, nicht dieser Vorgang -- hier wird nur die Struktur angelegt');
-});
+// Hier stand bis OI-96 ein Test auf .calendar-event-block:focus-visible -- die
+// Vorleistung dieses Vorgangs, eigens abgesichert, damit sie niemand
+// versehentlich entfernt. OI-96 hat den Block zur Gruppe mit aria-label gemacht
+// statt zum Tab-Stopp; damit kann die Regel nie greifen, und beide sind
+// entfallen. Das ist kein Fehler der Vorleistung, sondern ihr Zweck: Eine
+// Vorbereitung wird erst dann auf die Probe gestellt, wenn jemand darauf
+// aufbaut. Die Gegenprobe "kein tabindex am Block" steht jetzt in
+// tests/suites/calendar_keyboard_frontend.php, wo die Entscheidung hingehoert.
 
 test('Die Rueckmeldezeile ist nur im festgehaltenen Popup als bedienbar erkennbar', function () use ($taRoot) {
     $css = taFile($taRoot, 'public/css/components/calendar.css');

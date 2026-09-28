@@ -186,3 +186,125 @@ export function formatTimeRange(startTime, endTime) {
 export function safeTypeColor(color) {
     return /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color || '') ? color : 'var(--type-color-none)';
 }
+
+/** Was in einem Dialog angefahren werden kann. */
+const FOCUSABLE_SELECTOR = [
+    'button:not([disabled])',
+    'a[href]',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+].join(', ');
+
+/**
+ * Haelt den Tastaturfokus in einem Element, bis die Freigabe gerufen wird.
+ *
+ * Gedacht fuer Elemente, die optisch ueber der Seite liegen, im DOM aber
+ * woanders haengen -- dort stimmt die Tab-Reihenfolge nicht mit dem ueberein,
+ * was man sieht. Das Kalender-Popup haengt an document.body und steht damit
+ * hinter allem anderen; ohne Fang fuehrt Tab vom Kalendertag nicht hinein.
+ *
+ * Die Liste der bedienbaren Elemente wird bei jedem Tab neu gelesen, nicht
+ * einmal beim Oeffnen. Fuer das Kalender-Popup aendert sich zur Laufzeit nichts
+ * -- sein Inhalt steht beim Bauen des Markups fest --, aber das Neulesen kostet
+ * nichts und macht den Helfer fuer Aufrufer belastbar, deren Inhalt sich
+ * aendert.
+ *
+ * Das Element bekommt tabindex="-1" und behaelt es: Die Freigabe nimmt das
+ * Attribut nicht zurueck. Fuer das Kalender-Popup belanglos, weil es bei jedem
+ * Oeffnen neu entsteht -- ein wiederverwendeter Container bleibt danach
+ * programmatisch anfahrbar.
+ *
+ * Liefert eine Funktion, die den Hoerer entfernt und den Fokus dorthin
+ * zurueckgibt, wo er vorher stand.
+ *
+ * Die Rueckgabe des Fokus ist abschaltbar (Parameter der Freigabe). Nachgetragen
+ * am 2026-09-28 beim Anschliessen des ersten Aufrufers (OI-96, Task 3): Sie ist
+ * richtig, wenn der Nutzer den Dialog mit Escape verlaesst -- dann will er
+ * zurueck. Auf jedem anderen Weg hinaus hat etwas anderes die Fuehrung
+ * uebernommen: Ein Klick daneben hat sein Ziel schon selbst gewaehlt (bei einem
+ * Eingabefeld ist der Fokus dort, bevor der click-Hoerer laeuft), ein Knopf im
+ * Dialog hat einen weiteren Dialog geoeffnet. Den Fokus dann auf das Element
+ * hinter dem Geschehen zu ziehen, waere schlechter als ihn zu lassen.
+ */
+export function trapFocus(element, onEscape) {
+    const previouslyFocused = document.activeElement;
+
+    // offsetParent ist null, wenn ein Vorfahr display:none traegt -- und
+    // ausserdem bei position:fixed. Beides stoert hier nicht: Gefiltert werden
+    // nur Nachfahren, und die liegen im Dialog, nicht selbst fest am Fenster.
+    // Ein kuenftiger Aufrufer mit einem festgestellten Bedienelement DARIN
+    // muesste den Filter erweitern.
+    const focusables = () => Array.from(element.querySelectorAll(FOCUSABLE_SELECTOR))
+        .filter(el => el.offsetParent !== null);
+
+    // Der Dialog selbst wird anfahrbar -- unbedingt, nicht bloss im Rueckfall
+    // ohne Bedienelemente. Ein Klick auf freie Flaeche darin setzt sonst
+    // document.activeElement auf BODY, und damit ist der Fang tot: Der Hoerer
+    // haengt am Element, bekommt die Taste nicht mehr zu sehen, Escape verpufft
+    // und Tab wird nicht gehalten. Genau dieser Klick ist im Kalender-Popup
+    // erlaubt -- es soll dabei offen bleiben (OI-96). Ohne Nebenwirkung: Der
+    // Selektor schliesst [tabindex="-1"] aus, und querySelectorAll sieht das
+    // Element selbst ohnehin nicht.
+    element.setAttribute('tabindex', '-1');
+
+    const first = focusables()[0];
+    if (first) {
+        first.focus();
+    } else {
+        // Ein Dialog ohne Bedienelement muss den Fokus trotzdem nehmen,
+        // sonst laeuft Escape ins Leere.
+        element.focus();
+    }
+
+    function onKeydown(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            onEscape();
+            return;
+        }
+
+        if (e.key !== 'Tab') {
+            return;
+        }
+
+        const list = focusables();
+        if (list.length === 0) {
+            e.preventDefault();
+            return;
+        }
+
+        const start = list[0];
+        const end = list[list.length - 1];
+
+        // Der Dialog selbst gilt rueckwaerts als "am Anfang": Nach einem Klick
+        // auf freie Flaeche steht der Fokus auf ihm, und ohne diesen Fall geht
+        // Shift+Tab nativ auf das Element VOR ihm in der Dokumentreihenfolge --
+        // beim Kalender-Popup also aus dem Fang heraus in den Rest der Seite.
+        //
+        // Vorwaerts braucht es keine Entsprechung: Nativ fuehrt Tab von einem
+        // Container in dessen ersten bedienbaren Nachfahren, weil Nachfahren in
+        // der Dokumentreihenfolge unmittelbar folgen -- genau dorthin, wohin der
+        // Fang ihn setzen wuerde. Und ist gar keiner da, hat die Pruefung auf
+        // list.length === 0 weiter oben schon gehalten.
+        if (e.shiftKey && (document.activeElement === start || document.activeElement === element)) {
+            e.preventDefault();
+            end.focus();
+        } else if (!e.shiftKey && document.activeElement === end) {
+            e.preventDefault();
+            start.focus();
+        }
+    }
+
+    element.addEventListener('keydown', onKeydown);
+
+    return function releaseFocus(returnFocus = true) {
+        element.removeEventListener('keydown', onKeydown);
+        // Das Element kann inzwischen aus dem DOM sein -- dann waere focus()
+        // wirkungslos und der Fokus fiele auf body zurueck.
+        if (returnFocus && previouslyFocused && document.body.contains(previouslyFocused)) {
+            previouslyFocused.focus();
+        }
+    };
+}
