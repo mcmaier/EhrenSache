@@ -68,6 +68,30 @@ JS;
     assertTrue(!str_contains($out, 'weg'), 'Kommentar hinter einem Regex blieb stehen');
 });
 
+test('jsRegexStart/jsRegexEnd: die eine Regel fuer Regex-Literale', function () {
+    // Eine Fassung fuer alle Scanner (stripJsComments, html_sinks_frontend,
+    // weitere Suiten). Bis 2026-09-28 gab es eine zweite ohne die
+    // Schluesselwoerter -- nach "return" galt ein / dort als Division.
+    $faelle = [
+        ['x = /a/g;',            4, true,  'nach ='],
+        ['f(/a/)',               2, true,  'nach ('],
+        ['return /a/.test(s)',   7, true,  'nach return'],
+        ['typeof /a/',           7, true,  'nach typeof'],
+        ['a / b',                2, false, 'nach Bezeichner: Division'],
+        ['(x) / 2',              4, false, 'nach ): Division'],
+        ['n / 2',                2, false, 'nach Wort, das kein Schluesselwort ist'],
+        ['x = a // c',           6, false, 'Zeilenkommentar'],
+        ['x = /* c */',          4, false, 'Blockkommentar'],
+        ['/a/',                  0, true,  'am Anfang'],
+    ];
+    foreach ($faelle as [$js, $i, $erwartet, $grund]) {
+        assertSame($erwartet, jsRegexStart($js, $i), "jsRegexStart('{$js}', {$i}): {$grund}");
+    }
+
+    $js = 'x = /[/"]+\\//g;';
+    assertSame(strlen($js) - 3, jsRegexEnd($js, 4), 'Ende: / in der Zeichenklasse und maskiertes \\/ schliessen nicht');
+});
+
 test('JS: Division bleibt Division', function () {
     $src = "const q = a / b / c; // weg\nconst h = (x) / 2 /* weg */;";
     assertSame("const q = a / b / c; \nconst h = (x) / 2  ;", stripJsComments($src));

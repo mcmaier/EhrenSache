@@ -100,6 +100,76 @@ function sourceBlank(string $comment): string
     return $breaks === '' ? ' ' : $breaks;
 }
 
+/** Schluesselwoerter, nach denen ein / ein Regex-Literal beginnt (return /re/ …). */
+const JS_REGEX_AFTER_WORD = [
+    'return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete',
+    'void', 'throw', 'instanceof', 'yield', 'await',
+];
+
+/**
+ * Beginnt an $i ein Regex-Literal — oder ist das / eine Division bzw. ein
+ * Kommentaranfang?
+ *
+ * Wie ueblich entscheidet das vorige bedeutungstragende Zeichen: nach
+ * ( , = : [ ! & | ? { } ; und Operatoren steht ein Regex, nach einem Wert eine
+ * Division; nach einem Wort nur, wenn es eines aus JS_REGEX_AFTER_WORD ist.
+ * Gesucht wird rueckwaerts in $js — Kommentare sollten dort also schon
+ * entfernt sein (sourceCode() tut das).
+ *
+ * Die eine Stelle fuer diese Regel. Bis 2026-09-28 stand sie zweifach im
+ * Projekt, und die zweite Fassung kannte die Schluesselwoerter nicht.
+ */
+function jsRegexStart(string $js, int $i): bool
+{
+    if (($js[$i] ?? '') !== '/' || ($js[$i + 1] ?? '') === '/' || ($js[$i + 1] ?? '') === '*') {
+        return false;
+    }
+    $p = $i - 1;
+    while ($p >= 0 && ctype_space($js[$p])) {
+        $p--;
+    }
+    if ($p < 0) {
+        return true;
+    }
+    if (strpos('(,=:[!&|?{};+-*%<>~^', $js[$p]) !== false) {
+        return true;
+    }
+    if (preg_match('/[A-Za-z0-9_$]/', $js[$p]) !== 1) {
+        return false;
+    }
+    $ende = $p;
+    while ($p >= 0 && preg_match('/[A-Za-z0-9_$]/', $js[$p]) === 1) {
+        $p--;
+    }
+
+    return in_array(substr($js, $p + 1, $ende - $p), JS_REGEX_AFTER_WORD, true);
+}
+
+/**
+ * Position des schliessenden / eines Regex-Literals, das an $i beginnt
+ * (ohne Flags). Ein / in einer Zeichenklasse [...] schliesst nicht. Endet die
+ * Zeile vorher, zeigt das Ergebnis auf den Zeilenumbruch.
+ */
+function jsRegexEnd(string $js, int $i): int
+{
+    $n       = strlen($js);
+    $inClass = false;
+    for ($i++; $i < $n && $js[$i] !== "\n"; $i++) {
+        $c = $js[$i];
+        if ($c === '\\') {
+            $i++;
+        } elseif ($c === '[') {
+            $inClass = true;
+        } elseif ($c === ']') {
+            $inClass = false;
+        } elseif ($c === '/' && !$inClass) {
+            return $i;
+        }
+    }
+
+    return $i;
+}
+
 /**
  * JavaScript ohne // und /* *\/-Kommentare.
  *
@@ -114,15 +184,8 @@ function stripJsComments(string $src): string
     $n     = strlen($src);
     $i     = 0;
     $out   = '';
-    $prev  = '';      // letztes bedeutungstragendes Zeichen, 'a' fuer Wert/Bezeichner
-    $word  = '';      // letztes Wort, fuer "return /re/" und Verwandte
     $depth = 0;       // Tiefe geschweifter Klammern
     $tpl   = [];      // Tiefe beim Betreten eines ${…} je offenem Template
-
-    static $regexAfterWord = [
-        'return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete',
-        'void', 'throw', 'instanceof', 'yield', 'await',
-    ];
 
     // Liest ein Template-Literal ab $i (hinter dem oeffnenden Backtick oder
     // der schliessenden } eines Ausdrucks) bis zum Ende oder bis ${.
@@ -182,8 +245,6 @@ function stripJsComments(string $src): string
             $j = min($j + 1, $n);
             $out .= substr($src, $i, $j - $i);
             $i = $j;
-            $prev = 'a';
-            $word = '';
             continue;
         }
 
@@ -191,40 +252,19 @@ function stripJsComments(string $src): string
             $out .= '`';
             $i++;
             $scanTemplate();
-            $prev = 'a';
-            $word = '';
             continue;
         }
 
+        // Entschieden wird rueckwaerts in der bisherigen Ausgabe: Dort sind
+        // Kommentare schon entfernt, und das / steht an ihrem Ende.
         if ($c === '/') {
-            $regexAllowed = $prev === '' || strpos('(,=:[!&|?{};+-*%<>~^', $prev) !== false
-                || ($prev === 'a' && in_array($word, $regexAfterWord, true));
-            if ($regexAllowed) {
-                $j = $i + 1;
-                $inClass = false;
-                while ($j < $n && $src[$j] !== "\n") {
-                    $ch = $src[$j];
-                    if ($ch === '\\') {
-                        $j += 2;
-                        continue;
-                    }
-                    if ($ch === '[') {
-                        $inClass = true;
-                    } elseif ($ch === ']') {
-                        $inClass = false;
-                    } elseif ($ch === '/' && !$inClass) {
-                        break;
-                    }
-                    $j++;
-                }
-                $j = min($j + 1, $n);
+            if (jsRegexStart($out . '/', strlen($out))) {
+                $j = min(jsRegexEnd($src, $i) + 1, $n);
                 while ($j < $n && ctype_alpha($src[$j])) {
                     $j++;
                 }
                 $out .= substr($src, $i, $j - $i);
                 $i = $j;
-                $prev = 'a';
-                $word = '';
                 continue;
             }
         }
@@ -233,8 +273,6 @@ function stripJsComments(string $src): string
             preg_match('/[A-Za-z0-9_$]+/A', $src, $m, 0, $i);
             $out .= $m[0];
             $i += strlen($m[0]);
-            $prev = 'a';
-            $word = $m[0];
             continue;
         }
 
@@ -247,18 +285,12 @@ function stripJsComments(string $src): string
                 $out .= '}';
                 $i++;
                 $scanTemplate();
-                $prev = 'a';
-                $word = '';
                 continue;
             }
         }
 
         $out .= $c;
         $i++;
-        if (!ctype_space($c)) {
-            $prev = $c;
-            $word = '';
-        }
     }
 
     return $out;
