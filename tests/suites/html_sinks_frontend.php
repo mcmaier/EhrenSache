@@ -411,12 +411,21 @@ test('Werkzeug: ein Regex mit Anfuehrungszeichen bringt den Scanner nicht aus de
     // Die Maskierung ersetzt " und ' per Regex-Literal. Galten die Zeichen
     // darin als Beginn einer Zeichenkette, verschob sich alles danach: Die
     // Senke in Zeile 5 wurde der Zeile 2 zugeschlagen und doppelt gemeldet.
+    //
+    // Zeile 8 prueft die andere Haelfte: Dort steht das Regex-Literal vor
+    // einem Markup-Template. Ohne Regex-Erkennung verschluckt die vermeintliche
+    // Zeichenkette den Backtick, das Template wird nicht mehr gesehen, und das
+    // rohe Feld darin faellt still heraus — gruen, obwohl nichts geprueft wurde.
     $js = <<<'JS'
 function escapeHtml(value) {
     return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 function render(apt) {
     box.innerHTML = `<b>${apt.title}</b>`;
+}
+function label(apt, raw) {
+    const s = raw.replace(/'/g, '&#039;') + `<i>${apt.description}</i>`;
+    return s;
 }
 JS;
     $funde = [];
@@ -428,7 +437,7 @@ JS;
     $funde = array_values(array_unique($funde));
     sort($funde);
 
-    assertSame(['5: apt.title'], $funde);
+    assertSame(['5: apt.title', '8: apt.description'], $funde);
 });
 
 /**
