@@ -39,9 +39,54 @@ const HS_FIELDS = 'name|surname|title|description|comment|reason|type_name|group
     . '|activity_name|note|location|member_number|email|organization_name|subgroup_name|device_name|filename|label';
 
 /**
+ * Beginnt an $i ein Regex-Literal? Wie ueblich entscheidet das vorige
+ * bedeutungstragende Zeichen: nach ( , = : [ ! & | ? { } ; und Verwandten
+ * steht ein Regex, nach einem Wert eine Division.
+ *
+ * Ohne diese Unterscheidung gilt das " in .replace(/"/g, '&quot;') als Beginn
+ * einer Zeichenkette. Die Scanner laufen dann aus dem Takt: Sinnabschnitte
+ * reichen ueber hunderte Zeilen (falsche Funde), und ein Markup-Template im
+ * verschluckten Bereich wird gar nicht mehr gesehen (stille Luecke).
+ */
+function hsRegexStart(string $js, int $i): bool
+{
+    if (($js[$i] ?? '') !== '/' || ($js[$i + 1] ?? '') === '/' || ($js[$i + 1] ?? '') === '*') {
+        return false;
+    }
+    for ($p = $i - 1; $p >= 0; $p--) {
+        if (!ctype_space($js[$p])) {
+            return strpos('(,=:[!&|?{};+-*%<>~^', $js[$p]) !== false;
+        }
+    }
+
+    return true;
+}
+
+/** Position des schliessenden / eines Regex-Literals, das an $i beginnt. */
+function hsRegexEnd(string $js, int $i): int
+{
+    $n       = strlen($js);
+    $inClass = false;
+    for ($i++; $i < $n && $js[$i] !== "\n"; $i++) {
+        $c = $js[$i];
+        if ($c === '\\') {
+            $i++;
+        } elseif ($c === '[') {
+            $inClass = true;
+        } elseif ($c === ']') {
+            $inClass = false;
+        } elseif ($c === '/' && !$inClass) {
+            return $i;
+        }
+    }
+
+    return $i;
+}
+
+/**
  * Ende eines Ausdrucks ab $i: das erste ; , ) ] } auf Tiefe 0 (bzw. das
- * schliessende Gegenstueck einer offenen Klammer). Zeichenketten und
- * Template-Literale mit ${…} werden uebersprungen.
+ * schliessende Gegenstueck einer offenen Klammer). Zeichenketten,
+ * Regex-Literale und Template-Literale mit ${…} werden uebersprungen.
  */
 function hsExpressionEnd(string $js, int $i, bool $stopAtComma = false, bool $block = false): int
 {
@@ -49,7 +94,9 @@ function hsExpressionEnd(string $js, int $i, bool $stopAtComma = false, bool $bl
     $depth = 0;
     while ($i < $n) {
         $c = $js[$i];
-        if ($c === '"' || $c === "'") {
+        if (hsRegexStart($js, $i)) {
+            $i = hsRegexEnd($js, $i);
+        } elseif ($c === '"' || $c === "'") {
             $i++;
             while ($i < $n && $js[$i] !== $c) {
                 $i += $js[$i] === '\\' ? 2 : 1;
@@ -155,6 +202,10 @@ function hsMarkupTemplates(string $js, int $base = 0, string $whole = ''): array
     $n     = strlen($js);
     for ($i = 0; $i < $n; $i++) {
         $c = $js[$i];
+        if (hsRegexStart($js, $i)) {
+            $i = hsRegexEnd($js, $i);
+            continue;
+        }
         if ($c === '"' || $c === "'") {
             $i++;
             while ($i < $n && $js[$i] !== $c && $js[$i] !== "\n") {
@@ -354,6 +405,30 @@ JS;
         '5: apt.title',
         '6: g.group_name',
     ], $funde);
+});
+
+test('Werkzeug: ein Regex mit Anfuehrungszeichen bringt den Scanner nicht aus dem Takt', function () {
+    // Die Maskierung ersetzt " und ' per Regex-Literal. Galten die Zeichen
+    // darin als Beginn einer Zeichenkette, verschob sich alles danach: Die
+    // Senke in Zeile 5 wurde der Zeile 2 zugeschlagen und doppelt gemeldet.
+    $js = <<<'JS'
+function escapeHtml(value) {
+    return String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+function render(apt) {
+    box.innerHTML = `<b>${apt.title}</b>`;
+}
+JS;
+    $funde = [];
+    foreach (hsSinks($js) as [$line, $expr, $at]) {
+        foreach (hsRawFieldsReaching($js, $expr, $at) as $f) {
+            $funde[] = "{$line}: {$f}";
+        }
+    }
+    $funde = array_values(array_unique($funde));
+    sort($funde);
+
+    assertSame(['5: apt.title'], $funde);
 });
 
 /**

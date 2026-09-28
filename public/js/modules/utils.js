@@ -107,11 +107,25 @@ export function round(value, decimals) {
     return Number(Math.round(value + 'e' + decimals) + 'e-' + decimals);
 }
 
+/**
+ * Maskiert Freitext fuer HTML — auch fuer Attributwerte.
+ *
+ * Anfuehrungszeichen gehoeren dazu: Der Weg ueber einen Textknoten
+ * (div.textContent, dann div.innerHTML) kodiert & < > , aber nicht " und '.
+ * In title="${escapeHtml(feld)}" liesse sich der Attributwert damit
+ * verlassen, und das Dashboard hat keine CSP (OI-17 Etappe 2).
+ *
+ * Das & muss zuerst ersetzt werden, sonst werden die eigenen Entities
+ * doppelt maskiert. tests/suites/escape_html_frontend.php wacht darueber.
+ */
 export function escapeHtml(text) {
     if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 /**

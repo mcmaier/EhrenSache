@@ -54,10 +54,21 @@ const VERIFICATION_LABEL = {
 // HILFSFUNKTIONEN
 // ============================================
 
+/**
+ * Maskiert Freitext fuer HTML — auch fuer Attributwerte. Anfuehrungszeichen
+ * gehoeren dazu, weil ein Wert in style="…${escapeHtml(feld)}" oder
+ * title="${escapeHtml(feld)}" sonst ausbrechen kann; der Weg ueber einen
+ * Textknoten kodiert sie nicht. Das & muss zuerst ersetzt werden, sonst
+ * werden die eigenen Entities doppelt maskiert.
+ * Gegenprobe: tests/suites/escape_html_frontend.php.
+ */
 function escapeHtml(value) {
-    const div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return (value == null ? '' : String(value))
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 /** Minuten als "3:45 h" — die Form, in der Vereine über Stunden sprechen. */
