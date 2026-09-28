@@ -208,10 +208,17 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
     if ($isManager) {
         $present = $started ? responsesFetchPresentMemberIds($db, $database, $appointmentId) : [];
         $presentLookup = array_flip($present);
+        // OI-109: nur fuer Verwalter -- Mitglieder sollen nicht sehen, wer ein Konto hat.
+        $withAccess = responsesFetchMemberIdsWithAccess($db, $database, $expectedIds);
+        $openWithoutAccess = 0;
 
         $members = [];
         foreach ($expected as $memberId => $m) {
             $r = $responses[$memberId] ?? null;
+            $hasAccess = isset($withAccess[$memberId]);
+            if ($r === null && !$hasAccess) {
+                $openWithoutAccess++;
+            }
             $members[] = [
                 'member_id'         => $memberId,
                 'name'              => $m['name'],
@@ -225,9 +232,11 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
                 // G3: wie bei 'own' -- angelegt UND noch verknuepft.
                 'excuse_created'    => $r !== null && $r['excuse_state'] !== null && (int) $r['exception_created'] === 1,
                 'present'           => $started ? isset($presentLookup[$memberId]) : null,
+                'has_access'        => $hasAccess,
             ];
         }
         $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds);
+        $payload['summary']['open_without_access'] = $openWithoutAccess;
 
         if ($started) {
             $payload['comparison'] = array_map('count', responseComparison($expectedIds, $statusByMember, $present));

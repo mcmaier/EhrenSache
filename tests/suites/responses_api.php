@@ -396,7 +396,10 @@ test('appointment_responses: Verwalter sieht alle Erwarteten, Mitglied ohne Frei
         rsWithUserInWorld($welt, function (int $userMember) use ($apt, $welt, $tag) {
             $admin = rsGet('manager', ['appointment_id' => $apt]);
             assertStatus(200, $admin);
-            assertSame(['yes' => 0, 'no' => 0, 'maybe' => 0, 'open' => 2], $admin['body']['summary']);
+            // OI-109: von den 2 offenen Mitgliedern hat nur $welt['member'] keinen
+            // Zugang -- $userMember ist das verknuepfte Mitglied des Testkontos
+            // "user" und damit aktiv und verknuepft.
+            assertSame(['yes' => 0, 'no' => 0, 'maybe' => 0, 'open' => 2, 'open_without_access' => 1], $admin['body']['summary']);
             assertSame(2, count($admin['body']['members']));
             assertSame(false, $admin['body']['started']);
             assertTrue(!array_key_exists('comparison', $admin['body']), 'Vor Beginn keine Gegenueberstellung');
@@ -1549,6 +1552,115 @@ test('attendance_list traegt offene Antraege je Mitglied (1.12.0)', function () 
         $danach = $zeile();
         assertSame(['time_correction'], array_column($danach['pending_exceptions'], 'exception_type'));
         assertSame('excused', $danach['status'], 'Eine genehmigte Entschuldigung zeigt sich als entschuldigt');
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+// ---- OI-109: Zugang ---------------------------------------------------------
+
+/** Legt einen Benutzer fuer $memberId an und liefert seine ID. */
+function rsCreateUserFor(int $memberId): int
+{
+    return rsCreate('users', [
+        'email'     => 'rs-zugang-' . uniqid() . '@example.com',
+        'password'  => 'rs-test-' . uniqid(),
+        'role'      => 'user',
+        'member_id' => $memberId,
+    ]);
+}
+
+function rsUpdateUser(int $userId, array $body): void
+{
+    assertStatus(200, apiRequest('PUT', 'users', [
+        'token' => apiToken('admin'), 'query' => ['id' => $userId], 'body' => $body,
+    ]), "Benutzer {$userId} konnte nicht geaendert werden");
+}
+
+/** Zeile des Mitglieds $memberId aus der Verwaltersicht. */
+function rsManagerRow(array $body, int $memberId): array
+{
+    $rows = array_values(array_filter($body['members'] ?? [],
+        static fn ($m) => (int) $m['member_id'] === $memberId));
+    assertSame(1, count($rows), "Mitglied {$memberId} fehlt in members");
+
+    return $rows[0];
+}
+
+test('OI-109: Verwalter sieht, ob ein offenes Mitglied Zugang hat', function () {
+    $welt = rsWorld('Zugang', ['responses_enabled' => 1]);
+    $userId = null;
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(4), '19:00:00');
+
+        $ohne = rsGet('manager', ['appointment_id' => $apt]);
+        assertStatus(200, $ohne);
+        assertSame(false, rsManagerRow($ohne['body'], $welt['member'])['has_access'],
+            'Mitglied ohne Benutzer hat keinen Zugang');
+        assertSame(1, $ohne['body']['summary']['open_without_access']);
+
+        $userId = rsCreateUserFor($welt['member']);
+        $mit = rsGet('manager', ['appointment_id' => $apt]);
+        assertSame(true, rsManagerRow($mit['body'], $welt['member'])['has_access'],
+            'Aktiver, verknuepfter Benutzer ist Zugang');
+        assertSame(0, $mit['body']['summary']['open_without_access']);
+
+        rsUpdateUser($userId, ['account_status' => 'suspended']);
+        $gesperrt = rsGet('manager', ['appointment_id' => $apt]);
+        assertSame(false, rsManagerRow($gesperrt['body'], $welt['member'])['has_access'],
+            'Gesperrtes Konto ist kein Zugang');
+
+        rsUpdateUser($userId, ['account_status' => 'active', 'is_active' => 0]);
+        $inaktiv = rsGet('manager', ['appointment_id' => $apt]);
+        assertSame(false, rsManagerRow($inaktiv['body'], $welt['member'])['has_access'],
+            'Deaktiviertes Konto ist kein Zugang');
+    } finally {
+        if ($userId !== null) {
+            rsDelete('users', $userId);
+        }
+        rsDropWorld($welt);
+    }
+});
+
+test('OI-109: Mit Rueckmeldung zaehlt ein Mitglied nicht mehr als offen ohne Zugang', function () {
+    $welt = rsWorld('ZugangAntwort', ['responses_enabled' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(5), '19:00:00');
+        assertStatus(200, rsPut('manager', $apt, ['status' => 'yes'], $welt['member']));
+
+        $res = rsGet('manager', ['appointment_id' => $apt]);
+        assertStatus(200, $res);
+        assertSame(false, rsManagerRow($res['body'], $welt['member'])['has_access'],
+            'has_access haengt nicht an der Antwort');
+        assertSame(0, $res['body']['summary']['open_without_access']);
+    } finally {
+        rsDropWorld($welt);
+    }
+});
+
+test('OI-109: Mitglieder sehen nie, wer Zugang hat', function () {
+    $welt = rsWorld('ZugangSicht', ['responses_enabled' => 1, 'responses_names_visible' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(6), '19:00:00');
+
+        rsWithUserInWorld($welt, function () use ($apt) {
+            $res = rsGet('user', ['appointment_id' => $apt]);
+            assertStatus(200, $res);
+            assertTrue(!array_key_exists('open_without_access', $res['body']['summary']),
+                'summary.open_without_access darf in der Mitgliedssicht nicht erscheinen');
+            foreach ($res['body']['members'] as $m) {
+                assertTrue(!array_key_exists('has_access', $m),
+                    'has_access darf in der Mitgliedssicht nicht erscheinen');
+            }
+
+            $liste = apiRequest('GET', 'appointment_responses',
+                ['token' => apiToken('user'), 'query' => ['upcoming' => 1]]);
+            assertStatus(200, $liste);
+            foreach ($liste['body']['appointments'] as $item) {
+                assertTrue(!array_key_exists('open_without_access', $item['summary'] ?? []),
+                    'upcoming=1 liefert die Mitgliedssicht, ohne Zugangszahl');
+            }
+        });
     } finally {
         rsDropWorld($welt);
     }
