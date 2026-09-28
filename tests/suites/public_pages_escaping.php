@@ -38,6 +38,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../private/helpers/branding.php';
+require_once __DIR__ . '/../../private/helpers/mail_template.php';
 
 $ppRoot = dirname(__DIR__, 2);
 
@@ -169,6 +170,39 @@ test('getBrandingCSS() prueft beide Farben', function () {
     // Gueltige Farben muessen weiterhin ankommen, sonst waere die Pruefung
     // gruen und das Branding kaputt.
     $echt = getBrandingCSS(['primary_color' => '#123456', 'secondary_color' => '#654321']);
+    assertTrue(strpos($echt, '#123456') !== false, 'Gueltige Farbe kommt nicht an');
+    assertTrue(strpos($echt, '#654321') !== false, 'Gueltige zweite Farbe kommt nicht an');
+});
+
+test('EmailTemplate::render() prueft die Farben und maskiert doppelte Anfuehrungszeichen', function () {
+    // Dieselbe Bauart wie die beiden Seiten: Die Farben landen im <style>-Block
+    // von base.html, der Logopfad im Attribut src="…" in doppelten
+    // Anfuehrungen. Das Ziel ist eine HTML-Mail, also gelten dort dieselben
+    // Regeln -- nur ohne CSP, die es in einem Mailprogramm ohnehin nicht gibt.
+    $html = EmailTemplate::render('password_reset', [
+        'PRIMARY_COLOR'     => 'red</style><script>alert(1)</script>',
+        'SECONDARY_COLOR'   => '#abc; background: url(http://boese.test/x)',
+        'ORGANIZATION_LOGO' => 'x.png" onerror="alert(1)',
+        'ORGANIZATION_NAME' => 'Verein" onmouseover="alert(2)',
+        'USER_NAME'         => '<script>alert(3)</script>',
+        'RESET_LINK'        => 'https://example.test/r" onclick="alert(4)',
+    ]);
+
+    // base.html hat selbst genau einen Stilblock -- ein zweites </style> waere
+    // eingeschleust.
+    assertSame(1, substr_count($html, '</style>'), 'Der Stilblock kann verlassen werden');
+    assertTrue(strpos($html, '<script') === false, 'Markup steht in der Mail');
+    assertTrue(strpos($html, 'boese.test') === false, 'Fremde Deklaration steht im Stilblock');
+    assertTrue(strpos($html, 'onerror="') === false, 'Der Logopfad bricht aus src="…" aus');
+    assertTrue(strpos($html, 'onmouseover="') === false, 'Der Name bricht aus einem Attribut aus');
+    assertTrue(strpos($html, 'onclick="') === false, 'Der Link bricht aus href="…" aus');
+    assertTrue(strpos($html, BRANDING_PRIMARY_DEFAULT) !== false, 'Die Vorgabefarbe greift nicht');
+
+    // Gueltige Werte muessen weiterhin ankommen, sonst waere der Test gruen und
+    // die Mail farblos.
+    $echt = EmailTemplate::render('password_reset', [
+        'PRIMARY_COLOR' => '#123456', 'SECONDARY_COLOR' => '#654321',
+    ]);
     assertTrue(strpos($echt, '#123456') !== false, 'Gueltige Farbe kommt nicht an');
     assertTrue(strpos($echt, '#654321') !== false, 'Gueltige zweite Farbe kommt nicht an');
 });
