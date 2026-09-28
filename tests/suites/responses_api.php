@@ -401,6 +401,10 @@ test('appointment_responses: Verwalter sieht alle Erwarteten, Mitglied ohne Frei
             // "user" und damit aktiv und verknuepft.
             assertSame(['yes' => 0, 'no' => 0, 'maybe' => 0, 'open' => 2, 'open_without_access' => 1], $admin['body']['summary']);
             assertSame(2, count($admin['body']['members']));
+            assertSame(true, rsManagerRow($admin['body'], $userMember)['has_access'],
+                'Verknuepftes Mitglied des Testkontos user hat Zugang');
+            assertSame(false, rsManagerRow($admin['body'], $welt['member'])['has_access'],
+                'Frisch angelegtes Mitglied ohne Konto hat keinen Zugang');
             assertSame(false, $admin['body']['started']);
             assertTrue(!array_key_exists('comparison', $admin['body']), 'Vor Beginn keine Gegenueberstellung');
             assertSame(date('Y-m-d', strtotime("{$tag} -1 day")) . ' 19:00:00', $admin['body']['settings']['deadline']);
@@ -1605,12 +1609,21 @@ test('OI-109: Verwalter sieht, ob ein offenes Mitglied Zugang hat', function () 
             'Aktiver, verknuepfter Benutzer ist Zugang');
         assertSame(0, $mit['body']['summary']['open_without_access']);
 
-        rsUpdateUser($userId, ['account_status' => 'suspended']);
+        // member_id muss bei jedem PUT mitgeschickt werden: ohne das Feld setzt
+        // die Verwaltung es auf NULL und haengt den Benutzer aus (users.php),
+        // sonst wuerde die folgende Pruefung aus dem falschen Grund bestehen.
+        rsUpdateUser($userId, ['account_status' => 'suspended', 'member_id' => $welt['member']]);
         $gesperrt = rsGet('manager', ['appointment_id' => $apt]);
         assertSame(false, rsManagerRow($gesperrt['body'], $welt['member'])['has_access'],
             'Gesperrtes Konto ist kein Zugang');
 
-        rsUpdateUser($userId, ['account_status' => 'active', 'is_active' => 0]);
+        // Gegenprobe: wieder aktiv und verknuepft heisst wieder Zugang.
+        rsUpdateUser($userId, ['account_status' => 'active', 'is_active' => 1, 'member_id' => $welt['member']]);
+        $reaktiviert = rsGet('manager', ['appointment_id' => $apt]);
+        assertSame(true, rsManagerRow($reaktiviert['body'], $welt['member'])['has_access'],
+            'Wieder aktives, verknuepftes Konto ist wieder Zugang');
+
+        rsUpdateUser($userId, ['account_status' => 'active', 'is_active' => 0, 'member_id' => $welt['member']]);
         $inaktiv = rsGet('manager', ['appointment_id' => $apt]);
         assertSame(false, rsManagerRow($inaktiv['body'], $welt['member'])['has_access'],
             'Deaktiviertes Konto ist kein Zugang');
@@ -1656,9 +1669,20 @@ test('OI-109: Mitglieder sehen nie, wer Zugang hat', function () {
             $liste = apiRequest('GET', 'appointment_responses',
                 ['token' => apiToken('user'), 'query' => ['upcoming' => 1]]);
             assertStatus(200, $liste);
-            foreach ($liste['body']['appointments'] as $item) {
-                assertTrue(!array_key_exists('open_without_access', $item['summary'] ?? []),
-                    'upcoming=1 liefert die Mitgliedssicht, ohne Zugangszahl');
+            // Nicht blind ueber die Liste laufen (waere bei leerer Liste ein
+            // wirkungsloser Durchlauf) -- den eigenen Termin gezielt suchen.
+            $eigener = array_values(array_filter($liste['body']['appointments'],
+                static fn ($i) => (int) $i['appointment']['appointment_id'] === $apt));
+            assertSame(1, count($eigener), 'Eigener Termin fehlt in upcoming=1');
+            assertTrue(isset($eigener[0]['summary']) && is_array($eigener[0]['summary']),
+                'upcoming=1 liefert kein summary-Array fuer den eigenen Termin');
+            assertTrue(!array_key_exists('open_without_access', $eigener[0]['summary']),
+                'upcoming=1 liefert die Mitgliedssicht, ohne Zugangszahl');
+            if (isset($eigener[0]['members'])) {
+                foreach ($eigener[0]['members'] as $m) {
+                    assertTrue(!array_key_exists('has_access', $m),
+                        'has_access darf auch in upcoming=1 nicht erscheinen');
+                }
             }
         });
     } finally {
