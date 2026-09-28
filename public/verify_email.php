@@ -128,12 +128,18 @@ try {
 // ============================================
 // HTML OUTPUT FUNCTIONS
 // ============================================
+//
+// Jeder htmlspecialchars()-Aufruf hier nennt ENT_QUOTES und das Encoding
+// ausdruecklich. Bis PHP 8.0 -- der Version, die version.json verlangt -- ist
+// ENT_COMPAT die Vorgabe: ' bleibt dann stehen, und die Attribute dieser Seiten
+// stehen in einfachen Anfuehrungen. Erst ab 8.1 ist ENT_QUOTES die Vorgabe. Auf
+// eine Vorgabe, die zwischen Versionen wechselt, darf sich hier nichts stuetzen.
 
 function showSuccess($name, $branding) {
     
     $brandingCSS = getBrandingCSS($branding);
     $brandingLogo = getBrandingLogo($branding);
-    $orgName = htmlspecialchars($branding['organization_name']) 
+    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES, 'UTF-8') 
     ?>
     <!DOCTYPE html>
     <html lang='de'>
@@ -221,7 +227,7 @@ function showSuccess($name, $branding) {
             <?= $brandingLogo ?>
             <div class='success-icon'></div>
             <h1>Email erfolgreich bestätigt!</h1>
-            <p>Vielen Dank <strong><?= htmlspecialchars($name) ?></strong>.</p>
+            <p>Vielen Dank <strong><?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?></strong>.</p>
             <p>Ihre Email-Adresse wurde erfolgreich verifiziert.</p>
             
             <div class='info-box'>
@@ -241,7 +247,7 @@ function showSuccess($name, $branding) {
 function showError($title, $message, $branding) {
     $brandingCSS = getBrandingCSS($branding);
     $brandingLogo = getBrandingLogo($branding);
-    $orgName = htmlspecialchars($branding['organization_name'])
+    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES, 'UTF-8')
     ?>
     <!DOCTYPE html>
     <html lang='de'>
@@ -321,9 +327,9 @@ function showError($title, $message, $branding) {
         <div class='container'>
             <?= $brandingLogo ?>
             <div class='error-icon'></div>
-            <h1><?= htmlspecialchars($title) ?></h1>
+            <h1><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></h1>
             <?php if ($message): ?>
-                <p><?= htmlspecialchars($message) ?></p>
+                <p><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></p>
             <?php endif; ?>
             <a href='login.html' class='button'>Zur Login-Seite</a>
         </div>

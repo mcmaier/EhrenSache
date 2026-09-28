@@ -27,6 +27,17 @@ $prefix = $database->table('');
 
 $token = $_GET['token'] ?? '';
 
+// Formpruefung des Tokens vor jedem Zweig, also auch vor POST: Fuer eine Seite
+// mit ungueltigem Token gibt es auch keine Formularverarbeitung. Kein Zweig
+// unterhalb arbeitet damit mit einem ungeprueften Token.
+//
+// Beide Zweige lesen den Token aus $_GET. Das Formular sendet ohne action an
+// dieselbe Adresse zurueck, die Abfrage bleibt dabei erhalten.
+if (empty($token) || !ctype_xdigit($token) || strlen($token) !== 64) {
+    showError('Token ungültig', 'Der Reset-Link ist ungültig.', $branding);
+    exit();
+}
+
 // Wenn POST: Passwort setzen
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $newPassword = $_POST['password'] ?? '';
@@ -95,11 +106,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // GET: Formular anzeigen
-if (empty($token) || !ctype_xdigit($token) || strlen($token) !== 64) {
-    showError('Token ungültig', 'Der Reset-Link ist ungültig.',$branding);
-    exit();
-}
-
 try {
     // Token validieren
     $tokenHash = hash('sha256', $token);
@@ -126,11 +132,17 @@ try {
 // ============================================
 // HTML OUTPUT FUNCTIONS
 // ============================================
+//
+// Jeder htmlspecialchars()-Aufruf hier nennt ENT_QUOTES und das Encoding
+// ausdruecklich. Bis PHP 8.0 -- der Version, die version.json verlangt -- ist
+// ENT_COMPAT die Vorgabe: ' bleibt dann stehen, und die Attribute dieser Seiten
+// stehen in einfachen Anfuehrungen. Erst ab 8.1 ist ENT_QUOTES die Vorgabe. Auf
+// eine Vorgabe, die zwischen Versionen wechselt, darf sich hier nichts stuetzen.
 
 function showForm($token, $error = '', $branding) {
     $brandingCSS = getBrandingCSS($branding);
     $brandingLogo = getBrandingLogo($branding);
-    $orgName = htmlspecialchars($branding['organization_name'])
+    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES, 'UTF-8')
 
     ?>
     <!DOCTYPE html>
@@ -207,12 +219,14 @@ function showForm($token, $error = '', $branding) {
             <h1>Neues Passwort setzen</h1>
             
             <?php if ($error): ?>
-                <div class='error'><?= htmlspecialchars($error) ?></div>
+                <div class='error'><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
             <?php endif; ?>
             
+            <!-- Ohne action sendet das Formular an dieselbe Adresse zurueck, der
+                 Token steht dort in der Abfrage. Ein verstecktes Feld dafuer gab
+                 es hier, es wurde serverseitig aber nie gelesen -- beide Zweige
+                 nehmen $_GET. Damit ist es entfallen. -->
             <form method='POST'>
-                <input type='hidden' name='token' value='<?= htmlspecialchars($token) ?>'>
-                
                 <div class='form-group'>
                     <label for='password'>Neues Passwort</label>
                     <input type='password' id='password' name='password' 
@@ -237,7 +251,7 @@ function showForm($token, $error = '', $branding) {
 function showSuccess($branding) {
     $brandingCSS = getBrandingCSS($branding);
     $brandingLogo = getBrandingLogo($branding);
-    $orgName = htmlspecialchars($branding['organization_name']);
+    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES, 'UTF-8');
 
     ?>
     <!DOCTYPE html>
@@ -338,7 +352,7 @@ function showSuccess($branding) {
 function showError($title, $message = '', $branding) {
     $brandingCSS = getBrandingCSS($branding);
     $brandingLogo = getBrandingLogo($branding);
-    $orgName = htmlspecialchars($branding['organization_name']);
+    $orgName = htmlspecialchars($branding['organization_name'], ENT_QUOTES, 'UTF-8');
     
     ?>
     <!DOCTYPE html>
@@ -421,9 +435,9 @@ function showError($title, $message = '', $branding) {
         <div class='container'>
              <?= $brandingLogo ?>
             <div class='error-icon'></div>
-            <h1><?= htmlspecialchars($title) ?></h1>
+            <h1><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></h1>
             <?php if ($message): ?>
-                <p><?= htmlspecialchars($message) ?></p>
+                <p><?= htmlspecialchars($message, ENT_QUOTES, 'UTF-8') ?></p>
             <?php endif; ?>
             <a href='login.html' class='button'>Zur Login-Seite</a>
         </div>
