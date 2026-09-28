@@ -4567,3 +4567,53 @@ Verzeichnisse an einer Stelle kennt. `.gitignore` schließt `.claude` bereits au
 lesen aber das Dateisystem, nicht git.
 
 **Nicht sicherheitsrelevant.**
+
+---
+
+### OI-111 · `showToast()` maskiert nicht, die Aufrufer tun es einzeln
+**Priorität:** niedrig · aufgenommen am 2026-09-28
+
+`showToast()` (`public/js/modules/ui.js`) setzt seine Meldung per `innerHTML`, maskiert sie aber
+nicht. Statt dessen maskieren **fünf** Aufrufstellen selbst (`appointments.js` 2×,
+`management.js` 2×, `users.js` 1×) — und die übrigen nicht. Genau diese Aufteilung „die Senke
+verlässt sich auf ihre Aufrufer“ hat schon einmal dazu geführt, dass eine Stelle vergessen wurde.
+
+`api.js` schiebt bei jeder Fehlerantwort `result.message || result.hint` dorthin. **Ein Weg von
+einem Nutzer zu einem anderen wurde gesucht und nicht gefunden** (2026-09-28): Die Meldungstexte
+der Handler sind fest formuliert; die einzigen fremdbestimmten sind `$e->getMessage()`-Pfade, und
+die sieht nur der Absender selbst. Es ist also kein Angriffsweg, sondern eine Bauart, die
+irgendwann einer wird.
+
+**Zu tun:** In `showToast()` zentral maskieren. Dabei müssen die fünf Aufrufstellen ihr eigenes
+`escapeHtml()` verlieren, sonst steht dort künftig `&amp;amp;`. Der Wächter
+`html_sinks_frontend.php` führt `showToast` dann wieder als Senke.
+
+**Nebenbefund:** `hsIsRawField()` im Wächter erkennt nur einen Rückfall auf ein Literal, nicht die
+verkettete Form `feld || anderesFeld || 'x'`. Deshalb fällt diese Stelle heute nicht auf. Beides
+gehört zusammen behoben.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-112 · Strenge Attributregel gilt nur für `style`, nicht für `on…`
+**Priorität:** niedrig · aufgenommen am 2026-09-28
+
+Seit 2026-09-28 erkennt `tests/suites/html_sinks_frontend.php` Attributkontexte und verlangt für
+`style`-Attribute mehr als Maskierung: Der Wert muss durch `safeTypeColor()`/`safeHexColor()`
+laufen, eine Zahl sein oder ein Literal. Für `on…`-Attribute gilt diese Strenge **nicht**, obwohl
+dort derselbe Grund vorliegt — im Attribut steht JavaScript, Maskierung trägt dort ebenso wenig.
+
+**Warum nicht gleich mitgemacht:** Gemessen **86** Einsetzungen in `on…` gegen 16 in `style`. Fast
+alle sind numerische IDs oder kurze Schlüsselwörter (`'present'`, `'excused'`). Eine Regel dafür
+braucht einen Begriff von „dieser Wert kann nur eine Zahl oder ein Schlüsselwort sein“, den es im
+Wächter nicht gibt — ohne ihn wüchse die Ausnahmeliste auf Dutzende und der Wächter wäre nicht
+mehr zu pflegen.
+
+**Die eigentliche Abhilfe ist die Content-Security-Policy fürs Dashboard**
+([OI-17](#oi-17--keine-content-security-policy), Etappe 2). Mit ihr sind Inline-Handler
+grundsätzlich unwirksam, und die Frage stellt sich nicht mehr. `hsAttributeAt()` liefert den
+Attributnamen bereits — eine künftige Regel wäre nur ein Zweig, falls die CSP länger auf sich
+warten lässt.
+
+**Nicht sicherheitsrelevant.**
