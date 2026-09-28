@@ -19,6 +19,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Karte laufen unverändert über `auto_checkin` (OI-101).
 
 ### Geändert
+- **Der Rückmeldungs-Dialog zeigt, wer gar nicht selbst antworten kann.** Offene Rückmeldungen von
+  Mitgliedern ohne aktives Benutzerkonto tragen in der Verwaltungstabelle den Hinweis „kein
+  Zugang“, der Filterknopf nennt ihre Zahl („Keine Antwort (12, davon 8 ohne Zugang)“), der
+  Druckbericht ebenso. Nachhaken hilft bei ihnen nicht, eintragen muss die Verwaltung. Mitglieder
+  sehen davon nichts (OI-109).
 - **Die Check-in-App lädt den QR-Scanner nicht mehr aus dem Internet.** Die Bibliothek
   `html5-qrcode` (2.3.8) liegt jetzt im Installationspaket unter `public/js/vendor/`, statt bei
   jedem Aufruf von unpkg.com geholt zu werden. Der Scanner funktioniert damit auch in einem
