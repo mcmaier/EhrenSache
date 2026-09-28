@@ -4537,3 +4537,33 @@ zwei (`#1F5FBF` für Rückmeldekarte und Tätigkeitspunkt, `#95a5a6` für Verlau
 
 **Nicht sicherheitsrelevant:** Die Prüfung ist vorhanden und schließt eingeschleustes CSS aus;
 die zu weite Fassung kostet die Ersatzfarbe, nicht die Schranke.
+
+---
+
+### OI-110 · Testsuiten durchsuchen fremde Arbeitsbäume im Projektverzeichnis
+**Priorität:** mittel · aufgenommen am 2026-09-28
+
+Die Desktop-App legt Arbeitsbäume unter `.claude/worktrees/<name>/` **innerhalb** des
+Projektverzeichnisses an. Dort liegt eine vollständige Kopie des Repositorys, einschließlich
+`tests/` und `private/`.
+
+`tests/suites/mailer_unit.php` durchläuft `$repoRoot` rekursiv und überspringt dabei `/tests/`
+und `/.git/`, aber **nicht** `/.claude/`. Es findet deshalb die Dateien des fremden Arbeitsbaums
+und meldet sie als Verstoß — zwei rote Tests, ohne dass etwas kaputt ist. Am 2026-09-28
+beobachtet mit `.claude/worktrees/unruffled-feynman-3b7d94`.
+
+**Das betrifft nicht nur diese eine Suite.** Rekursiv durchsuchen den Baum ebenfalls:
+`assets.php`, `escape_html_frontend.php`, `module_imports.php`, `update_package_unit.php`.
+Dass bisher nur `mailer_unit` auffiel, heißt nur, dass die anderen nach Mustern suchen, die im
+fremden Baum zufällig nicht vorkamen — nicht, dass sie gefeit sind.
+
+**Wirkung:** Wer einen Arbeitsbaum über die Desktop-App anlegt, färbt den Gesamtlauf aller
+anderen Sitzungen rot. Das trifft besonders die Release-Sitzung, die vor einem Tag einen grünen
+Lauf braucht — sie sieht dann einen Fehler, der keiner ist, und muss ihn wegerklären.
+
+**Zu tun:** `.claude/` in allen fünf Suiten überspringen. Sinnvoller als fünf Einzelfilter wäre
+ein gemeinsamer Helfer in `tests/lib/` — etwa ein Iterator, der die auszuschließenden
+Verzeichnisse an einer Stelle kennt. `.gitignore` schließt `.claude` bereits aus; die Suiten
+lesen aber das Dateisystem, nicht git.
+
+**Nicht sicherheitsrelevant.**
