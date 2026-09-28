@@ -21,9 +21,9 @@ declare(strict_types=1);
  */
 
 $arRoot = dirname(__DIR__, 2);
-$arJs   = (string) file_get_contents($arRoot . '/public/js/modules/records.js');
-$arExc  = (string) file_get_contents($arRoot . '/public/js/modules/exceptions.js');
-$arHtml = (string) file_get_contents($arRoot . '/public/index.html');
+$arJs   = (string) sourceCode($arRoot . '/public/js/modules/records.js');
+$arExc  = (string) sourceCode($arRoot . '/public/js/modules/exceptions.js');
+$arHtml = (string) sourceCode($arRoot . '/public/index.html');
 
 /** Rumpf einer Funktion bis zur naechsten Funktionsdefinition auf oberster Ebene. */
 function arFunktion(string $js, string $name): string
@@ -99,7 +99,7 @@ test('me liefert member_id in beiden Anmeldewegen', function () use ($arRoot) {
     // der Token-Zweig es lieferte — die Regel zum eigenen Antrag (OI-87) lief
     // deshalb im Dashboard immer ins Leere. $authMemberId steht an der Stelle
     // fuer beide Wege bereit.
-    $api = (string) file_get_contents($arRoot . '/public/api/api.php');
+    $api = (string) sourceCode($arRoot . '/public/api/api.php');
     $start = strpos($api, "if(\$resource === 'me'");
     assertTrue($start !== false, 'me-Endpunkt nicht gefunden');
     $block = substr($api, $start, 900);

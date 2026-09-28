@@ -59,6 +59,34 @@ function getMemberActivityWhere($memberAlias = 'm', $dateColumn = null, $include
 }
 
 /**
+ * Ist das Mitglied am Stichtag aktiv — `members.active = 1` und der Tag in
+ * einem Zeitraum aus `membership_dates` (bzw. keine Zeiträume)?
+ *
+ * Eine Stelle für Einzelprüfungen: Kiosk (OI-27) und `auto_checkin` von
+ * Geräten (OI-103). Das Datum geht als Literal in die Abfrage, damit
+ * derselbe Weg auch gegen SQLite läuft (`tests/suites/station_unit.php`);
+ * deshalb wird es hier auf YYYY-MM-DD geprüft.
+ *
+ * @param string $date Stichtag als YYYY-MM-DD
+ */
+function memberIsActiveOn($db, $database, int $memberId, string $date): bool
+{
+    $parsed = DateTime::createFromFormat('!Y-m-d', $date);
+    if (!$parsed || $parsed->format('Y-m-d') !== $date) {
+        throw new InvalidArgumentException("memberIsActiveOn: invalid date '{$date}'");
+    }
+
+    $prefix   = $database->table('');
+    $activity = getMemberActivityWhere('m', "'" . $date . "'", false, $database);
+
+    $stmt = $db->prepare("SELECT 1 FROM {$prefix}members m
+                          WHERE m.member_id = ? AND ({$activity})");
+    $stmt->execute([$memberId]);
+
+    return (bool) $stmt->fetchColumn();
+}
+
+/**
  * Generiert WHERE-Clause für Mitglieder-Aktivität für ein ganzes Jahr.
  * Prüft ob Mitglied irgendwann im angegebenen Jahr aktiv war (Periodenüberschneidung).
  *

@@ -289,7 +289,7 @@ test('DEMO_MODE als Boolean false zeigt den Waechter untaetig', function () {
  * Liefert seit der vierten Pruefung (Abschnitt "Vollstaendigkeit gegen
  * api.php" -> "Die Stellung des Waechters") auch den ungeschnittenen
  * Dateitext mit ('src') - dort wird geprueft, ob demoGuard() vor dem ersten
- * fruehen Ausstieg aufgerufen wird. Ein zweites file_get_contents() dafuer
+ * fruehen Ausstieg aufgerufen wird. Ein zweites sourceCode() dafuer
  * waere nur eine unnoetige zweite Wahrheit ueber denselben Dateiinhalt.
  *
  * @return array{cases: string[], early: string[], src: string}
@@ -302,7 +302,7 @@ function demoTestResourcesFromApi(): array
         return $cache;
     }
 
-    $src = (string) file_get_contents(dirname(__DIR__, 2) . '/public/api/api.php');
+    $src = (string) sourceCode(dirname(__DIR__, 2) . '/public/api/api.php');
 
     $marker = 'switch($resource) {';
     $cut = strpos($src, $marker);

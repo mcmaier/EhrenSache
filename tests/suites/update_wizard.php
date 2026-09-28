@@ -31,7 +31,7 @@ declare(strict_types=1);
  * Form, aber sie fängt die Wiederkehr dieser Klasse von Fehler.
  */
 
-$wizardSource = (string) file_get_contents(dirname(__DIR__, 2) . '/public/update/index.php');
+$wizardSource = (string) sourceCode(dirname(__DIR__, 2) . '/public/update/index.php');
 
 test('Update-Wizard: keine Schleife bindet an $step', function () use ($wizardSource) {
     // Deckt beide Formen ab: `as $step` und `as $key => $step`.
@@ -94,7 +94,7 @@ test('Update-Wizard: Werte aus der GitHub-Antwort werden maskiert ausgegeben', f
 });
 
 test('Installer und Update-Assistent lesen die Anforderungen aus version.json', function () use ($wizardSource) {
-    $installer = (string) file_get_contents(dirname(__DIR__, 2) . '/public/install/index.php');
+    $installer = (string) sourceCode(dirname(__DIR__, 2) . '/public/install/index.php');
     foreach (['public/update/index.php' => $wizardSource, 'public/install/index.php' => $installer] as $datei => $quelle) {
         assertSame(false, strpos($quelle, 'version_compare(PHP_VERSION'), "{$datei} prueft die PHP-Version noch selbst");
         assertTrue(strpos($quelle, 'requirementsChecks(') !== false, "{$datei} nutzt requirementsChecks() nicht");

@@ -21,11 +21,11 @@ declare(strict_types=1);
  */
 
 $pdRoot = dirname(__DIR__, 2);
-$pdHtml = (string) file_get_contents($pdRoot . '/public/index.html');
-$pdProfile = (string) file_get_contents($pdRoot . '/public/js/modules/profile.js');
-$pdMembers = (string) file_get_contents($pdRoot . '/public/js/modules/members.js');
-$pdStats   = (string) file_get_contents($pdRoot . '/public/js/modules/statistics.js');
-$pdDevices = (string) file_get_contents($pdRoot . '/public/js/modules/devices.js');
+$pdHtml = (string) sourceCode($pdRoot . '/public/index.html');
+$pdProfile = (string) sourceCode($pdRoot . '/public/js/modules/profile.js');
+$pdMembers = (string) sourceCode($pdRoot . '/public/js/modules/members.js');
+$pdStats   = (string) sourceCode($pdRoot . '/public/js/modules/statistics.js');
+$pdDevices = (string) sourceCode($pdRoot . '/public/js/modules/devices.js');
 
 // ============================================
 // OI-68 · Mein Profil

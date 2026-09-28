@@ -416,6 +416,40 @@ function responsesFetchPresentMemberIds($db, $database, int $appointmentId): arr
 }
 
 /**
+ * Mitglieder aus $memberIds, die sich selbst anmelden und antworten koennen
+ * (OI-109): aktiver, verknuepfter Benutzer, kein Geraet. Eingeladene Konten
+ * tragen das Mitglied erst nach der Aktivierung in member_id und fallen damit
+ * von selbst heraus.
+ *
+ * @param array<int, int> $memberIds
+ * @return array<int, true> member_id => true
+ */
+function responsesFetchMemberIdsWithAccess($db, $database, array $memberIds): array
+{
+    $memberIds = array_values(array_unique(array_map('intval', $memberIds)));
+    if ($memberIds === []) {
+        return [];
+    }
+
+    $prefix       = $database->table('');
+    $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
+    $stmt = $db->prepare("SELECT DISTINCT member_id
+                          FROM {$prefix}users
+                          WHERE member_id IN ({$placeholders})
+                            AND is_active = 1
+                            AND account_status = 'active'
+                            AND role <> 'device'");
+    $stmt->execute($memberIds);
+
+    $out = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $memberId) {
+        $out[(int) $memberId] = true;
+    }
+
+    return $out;
+}
+
+/**
  * Kommende Termine mit Rueckmeldung, zu denen das Mitglied erwartet ist.
  * Begrenzt auf 50: Die Liste ist zum Antworten da, nicht als Jahresplan.
  *

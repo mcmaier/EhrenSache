@@ -208,10 +208,17 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
     if ($isManager) {
         $present = $started ? responsesFetchPresentMemberIds($db, $database, $appointmentId) : [];
         $presentLookup = array_flip($present);
+        // OI-109: nur fuer Verwalter -- Mitglieder sollen nicht sehen, wer ein Konto hat.
+        $withAccess = responsesFetchMemberIdsWithAccess($db, $database, $expectedIds);
+        $openWithoutAccess = 0;
 
         $members = [];
         foreach ($expected as $memberId => $m) {
             $r = $responses[$memberId] ?? null;
+            $hasAccess = isset($withAccess[$memberId]);
+            if ($r === null && !$hasAccess) {
+                $openWithoutAccess++;
+            }
             $members[] = [
                 'member_id'         => $memberId,
                 'name'              => $m['name'],
@@ -225,9 +232,11 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
                 // G3: wie bei 'own' -- angelegt UND noch verknuepft.
                 'excuse_created'    => $r !== null && $r['excuse_state'] !== null && (int) $r['exception_created'] === 1,
                 'present'           => $started ? isset($presentLookup[$memberId]) : null,
+                'has_access'        => $hasAccess,
             ];
         }
         $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds);
+        $payload['summary']['open_without_access'] = $openWithoutAccess;
 
         if ($started) {
             $payload['comparison'] = array_map('count', responseComparison($expectedIds, $statusByMember, $present));
@@ -260,6 +269,10 @@ function responsesRenderPrint($db, $database, array $payload): void
         if ($m['status'] === 'no' && $m['is_late']) {
             $status .= ' (kurzfristig)';
         }
+        // OI-109: offen und ohne Zugang -- Nachhaken hilft hier nicht.
+        if ($m['status'] === null && ($m['has_access'] ?? true) === false) {
+            $status .= ' (kein Zugang)';
+        }
         $byGroup[$m['group_name']][] = [
             $m['surname'] . ', ' . $m['name'],
             $status,
@@ -278,12 +291,15 @@ function responsesRenderPrint($db, $database, array $payload): void
     }
 
     $s = $payload['summary'];
+    $withoutAccess = (int) ($s['open_without_access'] ?? 0);
+    $openNote = "keine Antwort {$s['open']}"
+        . ($withoutAccess > 0 ? " (davon {$withoutAccess} ohne Zugang)" : '');
     renderReport($db, $database, [
         'title'    => 'Rückmeldungen: ' . $apt['title'],
         'period'   => date('d.m.Y', strtotime($apt['date'])) . ', ' . substr($apt['start_time'], 0, 5) . ' Uhr',
         'sections' => $sections,
         'notes'    => [
-            "Zusage {$s['yes']} · Unsicher {$s['maybe']} · Absage {$s['no']} · keine Antwort {$s['open']}",
+            "Zusage {$s['yes']} · Unsicher {$s['maybe']} · Absage {$s['no']} · {$openNote}",
             'Frist: ' . date('d.m.Y H:i', strtotime($payload['settings']['deadline'])) . ' Uhr',
         ],
     ]);

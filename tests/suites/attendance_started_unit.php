@@ -80,7 +80,7 @@ test('Der alte Datums-Cutoff ist entfernt', function () {
     $root = dirname(__DIR__, 2);
     foreach (['private/helpers/attendance.php', 'private/helpers/punctuality.php',
               'private/handlers/report_statistics.php'] as $file) {
-        $src = (string) file_get_contents($root . '/' . $file);
+        $src = (string) sourceCode($root . '/' . $file);
         assertSame(0, substr_count($src, 'ATTENDANCE_STARTED_CUTOFF_SQL'), $file . ' nutzt noch den alten Cutoff');
         assertTrue(str_contains($src, 'attendanceStartedSql('), $file . ' nutzt die gemeinsame Regel nicht');
     }

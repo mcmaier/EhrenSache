@@ -23,11 +23,11 @@ declare(strict_types=1);
  */
 
 $alRoot   = dirname(__DIR__, 2);
-$alApi    = (string) file_get_contents($alRoot . '/public/js/modules/api.js');
-$alPwa    = (string) file_get_contents($alRoot . '/public/checkin/js/app.js');
-$alSet    = (string) file_get_contents($alRoot . '/public/js/modules/settings.js');
-$alMain   = (string) file_get_contents($alRoot . '/public/css/main.css');
-$alPwaCss = (string) file_get_contents($alRoot . '/public/checkin/css/style.css');
+$alApi    = (string) sourceCode($alRoot . '/public/js/modules/api.js');
+$alPwa    = (string) sourceCode($alRoot . '/public/checkin/js/app.js');
+$alSet    = (string) sourceCode($alRoot . '/public/js/modules/settings.js');
+$alMain   = (string) sourceCode($alRoot . '/public/css/main.css');
+$alPwaCss = (string) sourceCode($alRoot . '/public/checkin/css/style.css');
 
 const AL_UNCLEAR = 'Ob gespeichert wurde, ist unklar';
 

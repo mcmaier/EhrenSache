@@ -76,7 +76,7 @@ test('Der Menueknopf erscheint auch im flachen Querformat', function () use ($re
     // Ein Telefon ist quer breiter als 768 px. Haengt die mobile Bedienung
     // allein an der Breite, faellt sie genau in der Lage aus, in der die
     // Leiste am wenigsten Platz hat.
-    $css = (string) file_get_contents($repoRoot . '/public/css/responsive.css');
+    $css = (string) sourceCode($repoRoot . '/public/css/responsive.css');
 
     $treffer = array_filter(mediaBloecke($css), static fn (array $b): bool =>
         strpos($b['bedingung'], 'max-height') !== false
@@ -91,7 +91,7 @@ test('Der Menueknopf erscheint auch im flachen Querformat', function () use ($re
 test('Die Leiste faehrt im flachen Querformat aus dem Layout', function () use ($repoRoot) {
     // Der Knopf allein genuegt nicht: Solange die Leiste fest im Layout steht,
     // frisst sie 250 der 844 px Breite und der Knopf haette nichts zu oeffnen.
-    $css = (string) file_get_contents($repoRoot . '/public/css/responsive.css');
+    $css = (string) sourceCode($repoRoot . '/public/css/responsive.css');
 
     $treffer = array_filter(mediaBloecke($css), static fn (array $b): bool =>
         strpos($b['bedingung'], 'max-height') !== false
@@ -104,7 +104,7 @@ test('Kein Breitenblock versteckt den Menueknopf im flachen Querformat', functio
     // Die eigentliche Falle. `min-width: 1200px` steht in der Datei NACH der
     // Mobilregel und gewinnt bei gleicher Spezifitaet. Ohne Hoehenbedingung
     // nimmt er dem flach gezogenen Fenster den Knopf wieder weg.
-    $css = (string) file_get_contents($repoRoot . '/public/css/responsive.css');
+    $css = (string) sourceCode($repoRoot . '/public/css/responsive.css');
 
     foreach (mediaBloecke($css) as $block) {
         if (!regelSetzt($block['rumpf'], '.mobile-menu-btn', 'display:none')) {
@@ -122,7 +122,7 @@ test('Kein Breitenblock versteckt den Menueknopf im flachen Querformat', functio
 test('Kein Breitenblock raeumt dem Inhalt Platz fuer eine ausgefahrene Leiste ein', function () use ($repoRoot) {
     // Gegenstueck zur vorigen Pruefung: Ein margin-left von der Breite der
     // Leiste ist falsch, sobald die Leiste ausgefahren ist.
-    $css = (string) file_get_contents($repoRoot . '/public/css/responsive.css');
+    $css = (string) sourceCode($repoRoot . '/public/css/responsive.css');
 
     foreach (mediaBloecke($css) as $block) {
         if (!regelSetzt($block['rumpf'], '.main-content', 'margin-left:250px')) {
@@ -140,8 +140,8 @@ test('Die Navigationsliste wird im flachen Querformat nicht mehr zerdrueckt', fu
     // Der Kern des Befunds: `.nav-menu { flex: 1 }` bekommt den Rest, und der
     // ist bei 375 px Fensterhoehe null. Im flachen Querformat muss die Liste
     // ihre Eintragshoehe behalten und stattdessen die ganze Leiste scrollen.
-    $css = (string) file_get_contents($repoRoot . '/public/css/sections/sidebar.css')
-         . (string) file_get_contents($repoRoot . '/public/css/responsive.css');
+    $css = (string) sourceCode($repoRoot . '/public/css/sections/sidebar.css')
+         . (string) sourceCode($repoRoot . '/public/css/responsive.css');
 
     $flach = array_filter(mediaBloecke($css), static fn (array $b): bool =>
         strpos($b['bedingung'], 'max-height') !== false);
@@ -168,7 +168,7 @@ test('Die Seitenleiste rechnet mit der tatsaechlich sichtbaren Hoehe', function 
     // ragt die Leiste unten aus dem Bild — im Querformat um ein Vielfaches
     // ihres verbliebenen Platzes. 100dvh misst, was wirklich zu sehen ist;
     // aeltere Browser ueberlesen die Deklaration und behalten 100vh.
-    $css = (string) file_get_contents($repoRoot . '/public/css/sections/sidebar.css');
+    $css = (string) sourceCode($repoRoot . '/public/css/sections/sidebar.css');
 
     assertTrue(
         preg_match('/\.sidebar\s*\{[^}]*height:\s*100vh;[^}]*height:\s*100dvh;/s', $css) === 1,
@@ -183,8 +183,8 @@ test('Der Menueknopf richtet sich nach derselben Bedingung wie das Stylesheet', 
     // Zeichenkette im JavaScript. Laufen die beiden auseinander, blendet das
     // eine ein, was das andere ausgeblendet laesst — hier tritt genau das
     // Querformat wieder durch. Diese Pruefung haelt sie deckungsgleich.
-    $js  = (string) file_get_contents($repoRoot . '/public/js/modules/ui.js');
-    $css = (string) file_get_contents($repoRoot . '/public/css/responsive.css');
+    $js  = (string) sourceCode($repoRoot . '/public/js/modules/ui.js');
+    $css = (string) sourceCode($repoRoot . '/public/css/responsive.css');
 
     assertTrue(
         preg_match('/innerWidth\s*<=?\s*\d+/', $js) !== 1,

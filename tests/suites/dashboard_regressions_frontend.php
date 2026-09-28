@@ -34,7 +34,7 @@ function drFunktion(string $js, string $name): string
 }
 
 test('Statistik: leere Optgroup wird ueber ihre Optionen geprueft, nicht ueber .options', function () use ($drRoot) {
-    $js = (string) file_get_contents($drRoot . '/public/js/modules/statistics.js');
+    $js = (string) sourceCode($drRoot . '/public/js/modules/statistics.js');
     $rumpf = drFunktion($js, 'loadStatisticsFilters');
 
     // <optgroup> hat keine options-Eigenschaft (die gibt es nur am <select>).
@@ -47,7 +47,7 @@ test('Statistik: leere Optgroup wird ueber ihre Optionen geprueft, nicht ueber .
 });
 
 test('Geraeteliste: Badge und Kennzahl lesen is_active gleich', function () use ($drRoot) {
-    $js = (string) file_get_contents($drRoot . '/public/js/modules/devices.js');
+    $js = (string) sourceCode($drRoot . '/public/js/modules/devices.js');
 
     // Der Badge pruefte auf truthy. Liefert PDO die Spalte als Text, ist "0"
     // truthy — die Liste zeigte „Aktiv“, die Kennzahl daneben zaehlte das
@@ -59,7 +59,7 @@ test('Geraeteliste: Badge und Kennzahl lesen is_active gleich', function () use 
 });
 
 test('Zeiterfassung: nach dem Einschalten stehen die Taetigkeitsarten sofort da', function () use ($drRoot) {
-    $js = (string) file_get_contents($drRoot . '/public/js/modules/worktime.js');
+    $js = (string) sourceCode($drRoot . '/public/js/modules/worktime.js');
     $rumpf = drFunktion($js, 'checkWorktimeEnabled');
 
     // settings.js ruft checkWorktimeEnabled() direkt nach dem Einschalten.

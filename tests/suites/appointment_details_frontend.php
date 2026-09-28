@@ -22,7 +22,7 @@ $adRoot = dirname(__DIR__, 2);
 
 function adfDatei(string $rel): string
 {
-    return (string) file_get_contents(dirname(__DIR__, 2) . $rel);
+    return (string) sourceCode(dirname(__DIR__, 2) . $rel);
 }
 
 test('Dashboard-Dialog hat Ende und Ort mit Vorschlagsliste', function () {

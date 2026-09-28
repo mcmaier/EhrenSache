@@ -29,7 +29,7 @@ function caFeFile(string $root, string $rel): string
     $path = $root . '/' . $rel;
     assertTrue(is_file($path), "{$rel} fehlt");
 
-    $src = file_get_contents($path);
+    $src = sourceCode($path);
     assertTrue($src !== false, "{$rel} konnte nicht gelesen werden");
 
     return (string) $src;

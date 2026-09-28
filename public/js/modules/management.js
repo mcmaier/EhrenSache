@@ -360,8 +360,8 @@ export async function renderTypeGroupOverview(typeData)
             : '<span class="type-badge">Nein</span>';
         
         // Farbwert kommt frei aus der DB (kein Server-seitiger Format-Zwang) und landet
-        // in einem style-Attribut -- escapeHtml() maskiert dort keine Anführungszeichen
-        // und wuerde das Attribut nicht schuetzen. Die Pruefung steht seit OI-94 nur
+        // in einem style-Attribut -- escapeHtml() haelt dort zwar das Attribut zusammen,
+        // laesst aber beliebiges CSS durch. Die Pruefung steht seit OI-94 nur
         // noch einmal im Dashboard, als safeTypeColor() in utils.js; die Check-in-App
         // fuehrt weiter ihre eigene Fassung (public/checkin/js/app.js) -- sie war von
         // OI-94 ausdruecklich ausgenommen. Die gemeinsame Fassung ist zugleich enger
@@ -550,8 +550,10 @@ export async function saveType() {
         const allMembersGroup = dataCache.groups.data.find(g => g.is_default);
         
         if (allMembersGroup && !groupIds.includes(allMembersGroup.group_id)) {
+            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Gruppenname
+            // ist Freitext.
             showToast(
-                `Standard-Terminart muss die Gruppe "${allMembersGroup.group_name}" enthalten`,
+                `Standard-Terminart muss die Gruppe "${escapeHtml(allMembersGroup.group_name)}" enthalten`,
                 'warning'
             );
             return;

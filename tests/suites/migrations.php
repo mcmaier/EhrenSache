@@ -154,7 +154,7 @@ test('Das echte Manifest ist lueckenlos verkettet', function () {
 
 test('Das Manifest endet bei der Version aus version.json', function () {
     $manifest = loadMigrationManifest(__DIR__ . '/../../private/migrations/manifest.php');
-    $version  = json_decode(file_get_contents(__DIR__ . '/../../version.json'), true);
+    $version  = json_decode(sourceCode(__DIR__ . '/../../version.json'), true);
 
     assertSame(
         $version['version'],
@@ -188,7 +188,7 @@ test('Zu jedem Manifest-Eintrag existiert die Migrationsfunktion', function () {
 test('Migration 1.2.3 liest die Toleranz aus dem Text der config.php', function () {
     require_once __DIR__ . '/../../private/migrations/1.2.3.php';
 
-    $vorlage = (string) file_get_contents(__DIR__ . '/../fixtures/config_legacy_1_5_1.php');
+    $vorlage = (string) sourceCode(__DIR__ . '/../fixtures/config_legacy_1_5_1.php');
     $pfad    = sys_get_temp_dir() . '/es_tol_' . uniqid() . '.php';
     $faelle  = [
         "define('AUTO_CHECKIN_TOLERANCE_HOURS', 2);"         => [2, false],
@@ -216,7 +216,7 @@ test('Keine Migration bindet die config.php ein', function () {
     // database.php laedt (Spec 2026-09-14-direktsprung-requires-design.md, 3.4).
     $verstoesse = [];
     foreach (glob(__DIR__ . '/../../private/migrations/*.php') ?: [] as $datei) {
-        $quelle = (string) file_get_contents($datei);
+        $quelle = (string) sourceCode($datei);
         if (preg_match('/\b(require|require_once|include|include_once)\b[^;]*\$configPath/', $quelle)) {
             $verstoesse[] = basename($datei);
         }

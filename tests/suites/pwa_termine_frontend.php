@@ -21,7 +21,7 @@ declare(strict_types=1);
 
 function ptFunktion(string $name): string
 {
-    $js    = (string) file_get_contents(dirname(__DIR__, 2) . '/public/checkin/js/app.js');
+    $js    = (string) sourceCode(dirname(__DIR__, 2) . '/public/checkin/js/app.js');
     $start = strpos($js, 'function ' . $name . '(');
     assertTrue($start !== false, $name . '() nicht gefunden');
 

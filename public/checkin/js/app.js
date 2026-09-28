@@ -186,6 +186,23 @@ document.addEventListener('DOMContentLoaded', function() {
     elements.nfcButton.addEventListener('click', toggleNFCReader);        
     toDashboardBtn.addEventListener('click', handleDashboardNavigation);
 
+    // Knoepfe aus per innerHTML erzeugtem Markup: ein Zuhoerer fuer alle, die
+    // Aktion steht in data-action, die Argumente in data-*. Inline-onclick
+    // blockiert die CSP der PWA (OI-17, checkin/.htaccess).
+    const dataActions = {
+        'attendance-grouping':  (el) => window.setAttendanceGrouping(el.dataset.stage),
+        'responses-grouping':   (el) => window.setResponsesGrouping(el.dataset.stage),
+        'correct-work-session': (el) => openWorkSessionModal(Number(el.dataset.sessionId)),
+        'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId))
+    };
+    document.addEventListener('click', (event) => {
+        const el = event.target.closest('[data-action]');
+        const action = el ? dataActions[el.dataset.action] : null;
+        if (action) {
+            action(el);
+        }
+    });
+
 
     // Enter-Taste im Code-Input
     elements.manualCode.addEventListener('keypress', (e) => {
@@ -1675,7 +1692,7 @@ function renderAttendanceGroupingBar(members) {
     const buttons = stages.map(s => `
         <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
                 aria-pressed="${stage === s ? 'true' : 'false'}"
-                onclick="setAttendanceGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+                data-action="attendance-grouping" data-stage="${s}">${stageLabels[s]}</button>`).join('');
 
     let hint = '';
     if (duplicates > 0) {
@@ -3044,7 +3061,7 @@ function addWorkSessionToHistory(session) {
     const korrigieren = laeuft
         ? ''
         : `<button class="history-correct-btn"
-                   onclick="openWorkSessionModal(${session.session_id})">✎ Korrigieren</button>`;
+                   data-action="correct-work-session" data-session-id="${Number(session.session_id)}">✎ Korrigieren</button>`;
 
     worktimeHistorySessions[session.session_id] = session;
 
@@ -3376,7 +3393,7 @@ function addExceptionToHistory(exception) {
 
     // Loeschen nur, solange der Antrag offen ist
     const deleteBtn = exception.status === 'pending'
-        ? `<button class="delete-btn" onclick="deleteException(${Number(exception.exception_id)})">🗑️ Löschen</button>`
+        ? `<button class="delete-btn" data-action="delete-exception" data-exception-id="${Number(exception.exception_id)}">🗑️ Löschen</button>`
         : '';
 
     item.innerHTML = historyCardHtml({
@@ -3550,11 +3567,21 @@ async function submitConfirmDelete() {
 // ZEITERFASSUNG
 // ========================================
 
-/** Minimales HTML-Escaping fuer Werte aus der Datenbank. */
+/**
+ * Minimales HTML-Escaping fuer Werte aus der Datenbank — auch fuer
+ * Attributwerte. Anfuehrungszeichen gehoeren dazu, weil ein Wert in
+ * title="${escapeHtml(feld)}" sonst ausbrechen kann; der Weg ueber einen
+ * Textknoten kodiert sie nicht. Das & muss zuerst ersetzt werden, sonst
+ * werden die eigenen Entities doppelt maskiert.
+ * Gegenprobe: tests/suites/escape_html_frontend.php.
+ */
 function escapeHtml(value) {
-    const div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return (value == null ? '' : String(value))
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 let worktimeSession = null;
@@ -4755,7 +4782,7 @@ function responsesGroupingSwitcher(stages, stage) {
     const buttons = stages.map(s => `
         <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
                 aria-pressed="${stage === s ? 'true' : 'false'}"
-                onclick="setResponsesGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+                data-action="responses-grouping" data-stage="${s}">${stageLabels[s]}</button>`).join('');
     return `<div class="list-grouping">${buttons}</div>`;
 }
 
@@ -4838,7 +4865,7 @@ window.setResponsesGrouping = function(stage) {
 function infoCardHtml(item) {
     const apt = item.appointment;
     const id = Number(apt.appointment_id);
-    const color = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#1F5FBF';
+    const color = safeHexColor(apt.color, '#1F5FBF');
     const kopf = `
         <div class="response-card__head">
             <strong>${escapeHtml(apt.title)}</strong>
@@ -4930,7 +4957,7 @@ function responseCardHtml(item) {
     const off = offline ? ' disabled' : '';
     // apt.color kommt vom Server frei waehlbar (Terminart-Einstellung) --
     // nur ein gueltiger Hexwert darf ungemaskiert in ein style-Attribut.
-    const color = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#1F5FBF';
+    const color = safeHexColor(apt.color, '#1F5FBF');
 
     const deadlinePassed = new Date(item.settings.deadline.replace(' ', 'T')) < new Date();
     const deadlineText = deadlinePassed

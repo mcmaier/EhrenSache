@@ -35,8 +35,9 @@ braucht eine eigene Spec, nicht nur eine Umsetzung.
 
 Offen mit Priorität *mittel*, am 2026-09-25 einzeln gegen den Code geprüft: OI-67, OI-96, OI-98,
 OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23,
-[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) sowie die am 25.09. aus dem
-Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103. **OI-3 und OI-20 tragen ebenfalls
+[OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt). Die am 25.09. aus dem
+Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103 sind am selben Tag in `dev`
+erledigt. **OI-3 und OI-20 tragen ebenfalls
 *mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
 Restarbeit, und gehören deshalb nicht in eine Umsetzungsreihe. OI-62 steht auf
 *niedrig–mittel*, OI-104 bis OI-106 und OI-108 auf *niedrig*.
@@ -652,8 +653,9 @@ eigenen Kamera-Scanner?
 
 - *Dafür:* Eine installierte iPadOS-Station ließe sich ohne Tippen neu koppeln — der Fall
   tritt bei jedem neuen Token auf, in der öffentlichen Demo stündlich.
-- *Dagegen:* Eine zweite Fremdbibliothek (`html5-qrcode`, ~350 kB, in der Check-in-PWA heute
-  über unpkg statt vendored), Kamerarechte auf einem Kiosk-Tablet, mehr Testfläche. Der Weg
+- *Dagegen:* Eine zweite Fremdbibliothek (`html5-qrcode`, ~370 kB; liegt seit OI-17 Etappe 1
+  unter `public/js/vendor/`, wäre also schon im Paket), Kamerarechte auf einem Kiosk-Tablet,
+  mehr Testfläche. Der Weg
   über die Kamera-App kostet nichts davon.
 
 **Heutiger Ausweg:** 5 Sekunden auf die Uhr drücken und den Token eingeben. Die Reihenfolge
@@ -721,7 +723,7 @@ erst starten? Gefunden im Codequalitäts-Review zur Schnellinbetriebnahme.
 ---
 
 ### OI-101 · `station` für `auth_device` öffnen (PIN-Anmeldung am Hardware-Terminal)
-**Priorität:** mittel · aufgenommen am 2026-09-25 · **Bezug:** [FI-4](FEATURE-IDEAS.md),
+**Priorität:** erledigt am 2026-09-25 (Branch `feat/oi-101-auth-device`, in `dev`) · aufgenommen am 2026-09-25 · **Bezug:** [FI-4](FEATURE-IDEAS.md),
 Kiosk-Spec `docs/superpowers/specs/2026-09-04-station-pin-kiosk-design.md` Abschnitt 5
 („später `auth_method: device` für `auth_device`")
 
@@ -781,6 +783,12 @@ Abschnitt `station` ausdrücklich vermerkt.
 
 **Nicht sicherheitsrelevant** — die Prüfung bleibt auf dem Server, das Gerät bekommt keine
 zusätzlichen Rechte außerhalb der Ressource `station`.
+
+**Umgesetzt wie skizziert,** mit einer Ergänzung: `worktime_enabled` steht für ein `auth_device`
+in `status` und `identify` immer auf `false` (dort auch `activities: []`) — sonst böte das
+Terminal eine Zeiterfassung an, deren Actions es mit `403` beantwortet bekommt. Tests in
+`tests/suites/station_api.php` (Abschnitt OI-101), gegengeprüft durch Abschalten der Sperre
+und der Zeiterfassungsregel.
 
 ---
 
@@ -1110,7 +1118,7 @@ Zwei Teilsignale gibt es bereits: Der Nachweisgrad fällt bei einer Zeitkorrektu
 ---
 
 ### OI-102 · `auto_checkin` von Geräten: `location_name` bleibt leer
-**Priorität:** mittel · aufgenommen am 2026-09-25
+**Priorität:** erledigt am 2026-09-25 (Branch `feat/oi-101-auth-device`, in `dev`) · aufgenommen am 2026-09-25
 
 `handleAutoCheckin()` liest für Gerätekonten die Spalte `email` und schreibt sie als
 `location_name` in den Record ([auto_checkin.php:535](../private/handlers/auto_checkin.php),
@@ -1131,7 +1139,7 @@ nur, wo es gesetzt wurde.
 ---
 
 ### OI-103 · `auto_checkin` prüft den Aktivstatus des Mitglieds nicht
-**Priorität:** mittel · aufgenommen am 2026-09-25 · **Bezug:**
+**Priorität:** erledigt am 2026-09-25 (Branch `feat/oi-101-auth-device`, in `dev`) · aufgenommen am 2026-09-25 · **Bezug:**
 [OI-27](#oi-27--membersactive-vs-membership_dates-am-kiosk)
 
 `resolveMemberIdByNumber()` ([utils.php:106](../private/helpers/utils.php)) und der
@@ -1151,6 +1159,15 @@ Zuordnung als verwaist markieren kann — etwa `404` mit `reason: "member_inacti
 
 **Vorher zu klären:** Ob Admin und Manager über diesen Endpunkt bewusst auch für inaktive
 Mitglieder nachtragen dürfen sollen. Wenn ja, greift die Prüfung nur für `isDevice()`.
+
+**Umgesetzt für Gerätekonten** (`isDevice()`), Stichtag das Datum der `arrival_time`, Antwort
+`404 {"message": "Member not active", "reason": "member_inactive"}` — so, wie die Firmware
+sie auswertet. **Entschieden am 2026-09-25:** Es bleibt bei der Prüfung nur für Geräte. Admin
+und Manager dürfen über `auto_checkin` weiterhin auch für inaktive Mitglieder nachtragen; auch
+für `user` wird nicht geprüft. Mit erledigt: `GET members` liefert Geräten ohne `date`/`year`
+jetzt nur heute aktive Mitglieder (vorher alle), damit das Terminal verwaiste Zuordnungen
+erkennt. Die Regel steht in `memberIsActiveOn()` (`private/helpers/member_activity.php`), die
+der Kiosk mitbenutzt.
 
 **Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: kein Rechtezuwachs, es braucht ein
 gültiges Gerätetoken und eine am Gerät angelernte Biometrie. Es geht um Datenqualität.
@@ -1203,11 +1220,14 @@ Bewusst unverändert. Nur dokumentieren, nicht als stärker beschreiben, als es 
 ---
 
 ### OI-17 · Keine Content-Security-Policy
-**Priorität:** mittel
+**Priorität:** mittel · Etappe 1 (Anmeldung, Check-in-PWA, Station) erledigt am 2026-09-25,
+offen bleibt Etappe 2 (Dashboard)
 
-Die Anwendung liefert **keine** CSP — weder als Header noch als `<meta http-equiv>`. Am
-2026-09-03 nachgeprüft: keine der neun `.htaccess`-Dateien und kein `header()`-Aufruf setzt
-sie. `CLAUDE.md` behauptete das Gegenteil; die Zeile war schlicht falsch und ist korrigiert.
+Bis 2026-09-25 lieferte die Anwendung **keine** CSP — weder als Header noch als
+`<meta http-equiv>`. Am 2026-09-03 nachgeprüft: keine der neun `.htaccess`-Dateien und kein
+`header()`-Aufruf setzte sie. `CLAUDE.md` behauptete das Gegenteil; die Zeile war schlicht falsch
+und ist korrigiert. Seit Etappe 1 tragen Anmeldung, Check-in-PWA und Station eine; das Dashboard
+weiterhin nicht.
 
 **Warum sie nicht einfach nachgereicht wird.** Die Oberfläche steckt voller Inline-Code, und
 jedes Stück davon blockiert eine CSP:
@@ -1226,11 +1246,11 @@ Hälfte:
 |---|---|
 | Inline-Handler in `index.html` | 109 (`onclick`, `onchange`, `onmouseover`/`-out`) |
 | Inline-Handler in HTML aus JS-Templates | 126 in 14 Modulen unter `public/js/modules/` (records 21, members 16, exceptions 15, appointments 15, responses 11, users 10, devices 10 …) |
-| Check-in-PWA | 4 Handler in `public/checkin/js/app.js` — sie ist **nicht** frei davon, wie hier früher stand |
-| Login | 1 Handler in `public/login.html` |
+| Check-in-PWA | 4 Handler in `public/checkin/js/app.js` — sie war **nicht** frei davon, wie hier früher stand (Etappe 1: umgestellt) |
+| Login | 1 Handler in `public/login.html` (Etappe 1: umgestellt) |
 | Station-PWA | 0 Handler, nur externe Scripts |
 | Inline-`<script>` | 1 Block in `index.html` (Installationsprüfung am Dateiende) |
-| Fremdquelle | `public/checkin/index.html` lädt `html5-qrcode` von unpkg.com |
+| Fremdquelle | `public/checkin/index.html` lud `html5-qrcode` von unpkg.com (Etappe 1: liegt unter `public/js/vendor/`) |
 | `window.*`-Exporte, die nur den Handlern dienen | 137 |
 | `style=`-Attribute | 245, davon 15 mit interpolierten Werten; dazu `<style>`-Blöcke in install, update, `reset_password.php`, `verify_email.php` |
 
@@ -1244,12 +1264,31 @@ Summe: **235 Inline-Handler in 16 Dateien.** Nicht betroffen sind Zuweisungen ü
 
 **Weg zu einer echten CSP** — in zwei Etappen, sonst bricht der Header die Oberfläche:
 
-*Etappe 1 — die kleinen Oberflächen, je mit eigenem Header in ihrem Verzeichnis:*
+*Etappe 1 — die kleinen Oberflächen. **Erledigt am 2026-09-25.***
 
-1. **Station-PWA:** sofort möglich, es gibt nichts umzubauen.
-2. **Login:** einen Handler umstellen.
-3. **Check-in-PWA:** vier Handler umstellen, `html5-qrcode` nach `public/js/vendor/` holen
-   wie `qrcode.js` (beseitigt nebenbei die Abhängigkeit von einem fremden CDN).
+1. **Station-PWA:** eigene `public/station/.htaccess` mit der Richtlinie, sonst nichts umzubauen.
+   Der QR-Code entsteht als Inline-SVG im DOM und braucht kein `img-src data:`.
+2. **Login:** den Schließen-Knopf des Passwort-vergessen-Dialogs per `addEventListener`
+   gebunden. Die Richtlinie steht in `public/.htaccess` im Abschnitt `<Files "login.html">` —
+   auf Verzeichnisebene träfe sie das Dashboard mit.
+3. **Check-in-PWA:** die vier Handler auf `data-action` plus `data-*`-Argumente und einen
+   delegierten Zuhörer am `document` umgestellt (Vorlage für Etappe 2). `html5-qrcode` 2.3.8 liegt
+   unter `public/js/vendor/`. Die Richtlinie in `public/checkin/.htaccess` erlaubt zusätzlich
+   `img-src data:` für den Pfeil der Auswahlfelder in `css/style.css`.
+
+Die Richtlinie lautet an allen drei Stellen `default-src 'self'; script-src 'self';
+style-src 'self' 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'self';
+form-action 'self'; frame-ancestors 'none'` (PWA mit `img-src 'self' data:`).
+`tests/suites/csp.php` hält fest: kein Inline-Handler, kein Inline-Skript, keine
+`javascript:`-URL in den drei Oberflächen, genau eine scharfe Richtlinie je Oberfläche ohne
+Aufweichung in `script-src`, keine Richtlinie außerhalb von `<Files "login.html">` in
+`public/.htaccess`, und der Server liefert sie tatsächlich aus. Beide Wächter sind mit einer
+Mutation gegengeprüft.
+
+Eine Report-Only-Phase gab es nicht: Ein Puppeteer-Durchgang hat jeden umgebauten Knopf
+ausgelöst und Verstöße über `securitypolicyviolation` gesammelt — null Funde, und eine
+Gegenprobe mit eingeschleustem `onclick` wurde blockiert und gemeldet. Report-Only auf
+Vereinsinstallationen hätte ohnehin niemanden erreicht, es gibt keinen Meldeendpunkt.
 
 *Etappe 2 — das Dashboard, Modul für Modul:*
 
@@ -1266,17 +1305,17 @@ Summe: **235 Inline-Handler in 16 Dateien.** Nicht betroffen sind Zuweisungen ü
 
 *Für beide Etappen:*
 
-7. Header zunächst als `Content-Security-Policy-Report-Only` ausliefern und die Konsole aller
-   Sektionen durchsehen, dann scharf schalten:
-   `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none';
-   base-uri 'self'; frame-ancestors 'none'`. Zu prüfen: ob die QR-Codes `img-src data:`
-   brauchen.
-8. Einen Wächter anlegen, der `on…=` unter `public/` verbietet — und dabei Kommentare
-   ausnimmt, sonst entsteht genau die Zusicherung, vor der OI-107 warnt. 13 bestehende
-   Zusicherungen in fünf Frontend-Suiten (`arrival`, `calendar_attendance`, `filter_chips`,
-   `profile_dashboard`, `subgroups`) prüfen heute `onclick`-Strings und sind anzupassen.
+7. Vor dem Scharfschalten jede Sektion im Browser mit gesammelten Verstößen durchgehen, wie in
+   Etappe 1 (ein Puppeteer-Durchgang statt Report-Only im Feld). Richtlinie wie in Etappe 1;
+   ob das Dashboard `img-src data:` braucht, ist für seine CSS-Dateien zu prüfen.
+8. Den Wächter `tests/suites/csp.php` auf `index.html` und `public/js/modules/` ausweiten
+   (Liste `$cspSurfaces`); er nimmt reine Kommentarzeilen aus, wertet aber Code-Zeilen mit
+   angehängtem Kommentar als Fund (OI-107). Dessen Gegenprobe „Dashboard ohne CSP“ entfällt
+   dann. 13 bestehende Zusicherungen in fünf Frontend-Suiten (`arrival`,
+   `calendar_attendance`, `filter_chips`, `profile_dashboard`, `subgroups`) prüfen heute
+   `onclick`-Strings und sind anzupassen.
 
-**Aufwand, geschätzt am 2026-09-25:** Etappe 1 etwa ein Tag. Etappe 2 etwa zwei bis drei Tage,
+**Aufwand, geschätzt am 2026-09-25:** Etappe 1 ist erledigt. Etappe 2 etwa zwei bis drei Tage,
 davon den größten Teil für die 126 Template-Handler; dazu ein vollständiger Durchgang durch
 `docs/testplan.md`, denn ein vergessener Handler fällt erst beim Klicken auf, nicht in der
 Suite. Etappe 2 gehört in eine eigene Spec. OI-107 geht voraus.
@@ -1957,6 +1996,62 @@ sind seither grün.
 
 ---
 
+### OI-109 · „Keine Antwort“ unterscheidet nicht, wer gar nicht antworten kann
+**Priorität:** erledigt am 2026-09-28 · aufgenommen am 2026-09-25 (Beobachtung aus dem manuellen Test) ·
+umgesetzt auf `feat/oi-109-ohne-zugang`, Spec `docs/superpowers/specs/2026-09-28-rueckmeldung-ohne-zugang-design.md`
+
+Selbst zurückmelden kann nur ein Mitglied mit Benutzerkonto — also ein `users`-Satz mit dieser
+`member_id`, `account_status = 'active'` und `is_active = 1`. Für alle anderen trägt die
+Verwaltung ein: Admin und Manager setzen die Rückmeldung jedes Mitglieds über
+`?member_id=<id>` (`responsesResolveTarget()`,
+[appointment_responses.php](../private/handlers/appointment_responses.php)), in der Oberfläche
+über das Schloss im Rückmeldungs-Dialog ([OI-63](#oi-63--rückmeldung-für-andere-kein-schutzschritt-keine-spur)).
+Die Funktion fehlt also nicht.
+
+**Was fehlt, ist die Unterscheidung in der Anzeige.** „Keine Antwort“ bzw. „ohne Antwort“ zählt
+zwei verschiedene Fälle zusammen:
+
+- das Mitglied *könnte* antworten und hat es nicht getan — Nachhaken lohnt;
+- das Mitglied *kann* nicht antworten, weil es keinen Zugang hat — hier hilft nur, dass die
+  Verwaltung selbst einträgt.
+
+In einem Verein mit vielen Mitgliedern ohne Konto wird die Zahl damit zum Rauschen: Zwölf offene
+Rückmeldungen, von denen acht niemand abgeben kann, sehen aus wie zwölf säumige Mitglieder.
+
+**Betroffene Stellen:** Ampel-Chips und Zusammenfassung in der Terminliste und im Dialog sowie
+der Filter „Keine Antwort (n)“ ([responses.js](../public/js/modules/responses.js)) und der
+Druckbericht (`keine Antwort {$s['open']}` in `appointment_responses.php`). Die Check-in-App ist
+**nicht** betroffen: Sie holt Rückmeldungen auch für Verwalter nur in der Mitgliedssicht
+(`upcoming=1`).
+
+**Nicht betroffen:** die Zuverlässigkeit. `reliabilityOutcome()`
+([punctuality.php](../private/helpers/punctuality.php)) wertet eine fehlende Rückmeldung nicht
+als Versäumnis, nur Absage, Antrag und Anwesenheit. Ein Mitglied ohne Konto verliert dort nichts.
+
+**Vorschlag:**
+
+- Die Antwort von `appointment_responses` liefert je Mitglied ein `has_account` (EXISTS auf
+  `users` mit den Bedingungen oben), nur für Admin und Manager.
+- Offene Zeilen ohne Zugang tragen ein dezentes Kennzeichen mit Tooltip, etwa „Kein Zugang –
+  Rückmeldung nur durch die Verwaltung“.
+- Optional die Zusammenfassung aufteilen: „keine Antwort 12 (davon 8 ohne Zugang)“.
+
+**Umgesetzt** als `has_access` (nicht `has_account`: ein eingeladenes oder gesperrtes Konto ist ein
+Konto, aber kein Zugang) und `summary.open_without_access`, beide nur in der Verwaltersicht.
+Umfang: Rückmeldungs-Dialog (Kennzeichen „kein Zugang“, Filterknopf „Keine Antwort (12, davon 8
+ohne Zugang)“) und Druckbericht. Die Ampel-Chips der Terminliste bleiben ohne.
+
+**Bewusst nicht:** keine eigene Kategorie in der Zuverlässigkeit, keine eigene Filterleiste.
+Beim Umsetzen `API.md` nachziehen; der Lesepfad ist nach
+[OI-100](#oi-100--api-abgleich-schreibpfade-und-fünf-lesepfade-nicht-bewacht) nicht bewacht.
+
+**Geklärt:** Ein Konto im Zustand `pending` trägt das Mitglied nur in `pending_member_id`
+(`member_id` wird erst bei der Aktivierung gesetzt) und zählt damit als ohne Zugang.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
@@ -2026,8 +2121,9 @@ jemand einmal gesehen hat — ob es noch gilt, sagt nur der Code.
 
 Der Demo-Modus lässt Schreibzugriffe auf Mitglieder, Termine, Anwesenheiten, Anträge und
 Arbeitszeiten zu — das ist sein Zweck. Was ein Besucher dabei in ein Freitextfeld schreibt,
-bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Die Oberfläche nutzt
-Inline-Handler und führt bewusst keine CSP (siehe [OI-17](#oi-17--keine-content-security-policy)).
+bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Das Dashboard nutzt
+Inline-Handler und führt noch keine CSP (siehe [OI-17](#oi-17--keine-content-security-policy));
+Anmeldung, Check-in-PWA und Station tragen seit Etappe 1 eine.
 
 Beim Entwurf am 2026-09-09 erwogen und für die Ausbaustufe „Sandkasten mit Grenzen"
 hingenommen. Die Alternative wäre eine reine Schaufenster-Demo gewesen, die weder Check-in
@@ -4404,6 +4500,24 @@ Kommentare vor dem Prüfen entfernen.
 **Warum nicht in OI-94:** Der Vorgang hat seine eigenen Wächter geradegezogen; eine Durchsicht
 aller Suiten ist Arbeit an der Testbasis und gehört nicht in ein Gestaltungsvorhaben.
 
+**Weitgehend erledigt am 2026-09-25 und 2026-09-28.** Der Durchgang ist gelaufen:
+`tests/lib/source.php` liefert Quelltext **ohne Kommentare**, je Sprache eigens behandelt (der
+JavaScript-Teil gegen einen echten Parser abgeglichen), alle Suiten wurden umgestellt, und
+`tests/suites/source_lib.php` verbietet `file_get_contents` in Suiten. Dabei kamen **sechs weitere**
+Zusicherungen ans Licht, die am Kommentar hingen — darunter `station_unit`, das einen Funktionsnamen
+suchte, der längst nur noch im Kommentar stand.
+
+**Zwei Werkzeugfehler kamen erst beim Anwenden ans Licht**, beide nur durch Mutationsproben:
+`html_sinks_frontend.php` kannte **keine Regex-Literale** — ein `"` in `/"/` brachte seine Scanner
+aus dem Takt, wodurch ganze Markup-Vorlagen unsichtbar wurden — und es stieg **nicht in
+verschachtelte Vorlagen** ab, sodass fünf von sechzehn `style`-Einsetzungen still herausfielen.
+Beides behoben und mit Selbstproben festgenagelt.
+
+**Was offen bleibt:** `tests/suites/pwa_escaping_frontend.php` liest weiterhin mit `file()` statt
+über `tests/lib/source.php` und prüft damit Kommentare mit. Der Wächter `source_lib` sieht das
+nicht, weil er nur `file_get_contents` verbietet — dieselbe Falle durch eine andere Tür. Solange
+das so ist, ist der Punkt nicht abgeschlossen.
+
 **Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: Es geht um die Verlässlichkeit der
 Wächter, nicht um eine ausnutzbare Lücke. Die geprüfte Schranke selbst ist vorhanden.
 
@@ -4441,3 +4555,83 @@ zwei (`#1F5FBF` für Rückmeldekarte und Tätigkeitspunkt, `#95a5a6` für Verlau
 
 **Nicht sicherheitsrelevant:** Die Prüfung ist vorhanden und schließt eingeschleustes CSS aus;
 die zu weite Fassung kostet die Ersatzfarbe, nicht die Schranke.
+
+---
+
+### OI-110 · Testsuiten durchsuchen fremde Arbeitsbäume im Projektverzeichnis
+**Priorität:** mittel · aufgenommen am 2026-09-28
+
+Die Desktop-App legt Arbeitsbäume unter `.claude/worktrees/<name>/` **innerhalb** des
+Projektverzeichnisses an. Dort liegt eine vollständige Kopie des Repositorys, einschließlich
+`tests/` und `private/`.
+
+`tests/suites/mailer_unit.php` durchläuft `$repoRoot` rekursiv und überspringt dabei `/tests/`
+und `/.git/`, aber **nicht** `/.claude/`. Es findet deshalb die Dateien des fremden Arbeitsbaums
+und meldet sie als Verstoß — zwei rote Tests, ohne dass etwas kaputt ist. Am 2026-09-28
+beobachtet mit `.claude/worktrees/unruffled-feynman-3b7d94`.
+
+**Das betrifft nicht nur diese eine Suite.** Rekursiv durchsuchen den Baum ebenfalls:
+`assets.php`, `escape_html_frontend.php`, `module_imports.php`, `update_package_unit.php`.
+Dass bisher nur `mailer_unit` auffiel, heißt nur, dass die anderen nach Mustern suchen, die im
+fremden Baum zufällig nicht vorkamen — nicht, dass sie gefeit sind.
+
+**Wirkung:** Wer einen Arbeitsbaum über die Desktop-App anlegt, färbt den Gesamtlauf aller
+anderen Sitzungen rot. Das trifft besonders die Release-Sitzung, die vor einem Tag einen grünen
+Lauf braucht — sie sieht dann einen Fehler, der keiner ist, und muss ihn wegerklären.
+
+**Zu tun:** `.claude/` in allen fünf Suiten überspringen. Sinnvoller als fünf Einzelfilter wäre
+ein gemeinsamer Helfer in `tests/lib/` — etwa ein Iterator, der die auszuschließenden
+Verzeichnisse an einer Stelle kennt. `.gitignore` schließt `.claude` bereits aus; die Suiten
+lesen aber das Dateisystem, nicht git.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-111 · `showToast()` maskiert nicht, die Aufrufer tun es einzeln
+**Priorität:** niedrig · aufgenommen am 2026-09-28
+
+`showToast()` (`public/js/modules/ui.js`) setzt seine Meldung per `innerHTML`, maskiert sie aber
+nicht. Statt dessen maskieren **fünf** Aufrufstellen selbst (`appointments.js` 2×,
+`management.js` 2×, `users.js` 1×) — und die übrigen nicht. Genau diese Aufteilung „die Senke
+verlässt sich auf ihre Aufrufer“ hat schon einmal dazu geführt, dass eine Stelle vergessen wurde.
+
+`api.js` schiebt bei jeder Fehlerantwort `result.message || result.hint` dorthin. **Ein Weg von
+einem Nutzer zu einem anderen wurde gesucht und nicht gefunden** (2026-09-28): Die Meldungstexte
+der Handler sind fest formuliert; die einzigen fremdbestimmten sind `$e->getMessage()`-Pfade, und
+die sieht nur der Absender selbst. Es ist also kein Angriffsweg, sondern eine Bauart, die
+irgendwann einer wird.
+
+**Zu tun:** In `showToast()` zentral maskieren. Dabei müssen die fünf Aufrufstellen ihr eigenes
+`escapeHtml()` verlieren, sonst steht dort künftig `&amp;amp;`. Der Wächter
+`html_sinks_frontend.php` führt `showToast` dann wieder als Senke.
+
+**Nebenbefund:** `hsIsRawField()` im Wächter erkennt nur einen Rückfall auf ein Literal, nicht die
+verkettete Form `feld || anderesFeld || 'x'`. Deshalb fällt diese Stelle heute nicht auf. Beides
+gehört zusammen behoben.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-112 · Strenge Attributregel gilt nur für `style`, nicht für `on…`
+**Priorität:** niedrig · aufgenommen am 2026-09-28
+
+Seit 2026-09-28 erkennt `tests/suites/html_sinks_frontend.php` Attributkontexte und verlangt für
+`style`-Attribute mehr als Maskierung: Der Wert muss durch `safeTypeColor()`/`safeHexColor()`
+laufen, eine Zahl sein oder ein Literal. Für `on…`-Attribute gilt diese Strenge **nicht**, obwohl
+dort derselbe Grund vorliegt — im Attribut steht JavaScript, Maskierung trägt dort ebenso wenig.
+
+**Warum nicht gleich mitgemacht:** Gemessen **86** Einsetzungen in `on…` gegen 16 in `style`. Fast
+alle sind numerische IDs oder kurze Schlüsselwörter (`'present'`, `'excused'`). Eine Regel dafür
+braucht einen Begriff von „dieser Wert kann nur eine Zahl oder ein Schlüsselwort sein“, den es im
+Wächter nicht gibt — ohne ihn wüchse die Ausnahmeliste auf Dutzende und der Wächter wäre nicht
+mehr zu pflegen.
+
+**Die eigentliche Abhilfe ist die Content-Security-Policy fürs Dashboard**
+([OI-17](#oi-17--keine-content-security-policy), Etappe 2). Mit ihr sind Inline-Handler
+grundsätzlich unwirksam, und die Frage stellt sich nicht mehr. `hsAttributeAt()` liefert den
+Attributnamen bereits — eine künftige Regel wäre nur ein Zweig, falls die CSP länger auf sich
+warten lässt.
+
+**Nicht sicherheitsrelevant.**

@@ -19,6 +19,7 @@ import { showAppointmentSection } from './appointments.js';
 import { showMemberSection } from './members.js';
 import { showConfirm } from './ui.js';
 import { renderDateChecklist, formatChecklistDate } from './date_checklist.js';
+import { escapeHtml } from './utils.js';
 
 let suggestionChecklist = null;
 
@@ -250,7 +251,7 @@ function displayImportResult(result) {
         html += '<div class="import-error">';
         html += '<strong>Warnungen:</strong><ul>';
         result.errors.forEach(error => {
-            html += `<li>${error}</li>`;
+            html += `<li>${escapeHtml(error)}</li>`;
         });
         html += '</ul></div>';
     }
@@ -384,7 +385,7 @@ function displayRecordsImportResult(result) {
         html += '<div class="import-error">';
         html += '<strong>Warnungen:</strong><ul>';
         result.errors.forEach(error => {
-            html += `<li>${error}</li>`;
+            html += `<li>${escapeHtml(error)}</li>`;
         });
         html += '</ul></div>';
     }
@@ -675,7 +676,7 @@ function displayAppointmentsImportResult(result) {
         html += '<div class="import-error">';
         html += '<strong>Warnungen:</strong><ul>';
         result.errors.forEach(error => {
-            html += `<li>${error}</li>`;
+            html += `<li>${escapeHtml(error)}</li>`;
         });
         html += '</ul></div>';
     }
@@ -752,8 +753,8 @@ function renderLogsList(logs) {
                     <tr>
                         <td>${log.created_at}</td>
                         <td><span class="badge badge-${log.import_type}">${getTypeLabel(log.import_type)}</span></td>
-                        <td>${log.filename || 'N/A'}</td>
-                        <td>${log.user_name}</td>
+                        <td>${escapeHtml(log.filename || 'N/A')}</td>
+                        <td>${escapeHtml(log.user_name)}</td>
                         <td>${log.total_rows}</td>
                         <td class="text-success"><strong>${log.successful_rows}</strong></td>
                         <td class="text-danger"><strong>${log.failed_rows}</strong></td>
@@ -805,7 +806,7 @@ async function showDetails(logId) {
             errorsList.innerHTML = log.errors.map((error, index) => `
                 <div class="error-item">
                     <span class="error-number">#${index + 1}</span>
-                    <span class="error-text">${error}</span>
+                    <span class="error-text">${escapeHtml(error)}</span>
                 </div>
             `).join('');
         }

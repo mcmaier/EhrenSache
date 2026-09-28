@@ -86,7 +86,7 @@ $targets = [
 
 foreach ($targets as $name => $paths) {
     test("{$name}: Sperre wirkt auf Apache 2.2 und 2.4", function () use ($repoRoot, $paths) {
-        $content = (string) file_get_contents($repoRoot . $paths['file']);
+        $content = (string) sourceCode($repoRoot . $paths['file']);
 
         assertTrue(str_contains($content, 'Require all denied'),
             '2.4-Syntax fehlt — auf einem Apache ohne mod_access_compat gibt es einen 500er');
@@ -105,7 +105,9 @@ foreach ($targets as $name => $paths) {
             // abgeschlossen" — der Text des Generators, versehentlich
             // eingecheckt. Wer klonte, stand vor einem 403 und einer Datei,
             // die ihm sagte, er sei fertig.
-            $content = (string) file_get_contents($repoRoot . $paths['file']);
+            // Roh gelesen: Der Auslieferungszustand steht in den Kommentaren
+            // der Datei, genau die sind hier der Gegenstand.
+            $content = rawSource($repoRoot . $paths['file']);
 
             assertTrue(!str_contains($content, 'abgeschlossen'),
                 "Die ausgelieferte Sperre des {$name} meldet einen Abschluss, der nicht stattgefunden hat");
@@ -117,9 +119,9 @@ foreach ($targets as $name => $paths) {
 
     test("{$name}: Generator schreibt dieselben Direktiven wie die Datei",
         function () use ($repoRoot, $paths) {
-            $file      = (string) file_get_contents($repoRoot . $paths['file']);
+            $file      = (string) sourceCode($repoRoot . $paths['file']);
             $generator = hlHeredoc(
-                (string) file_get_contents($repoRoot . $paths['generator']),
+                (string) sourceCode($repoRoot . $paths['generator']),
                 $paths['generator']
             );
 
@@ -132,7 +134,7 @@ test('README nennt den Freischaltschritt fuer beide Assistenten', function () us
     // Beide Verzeichnisse werden gesperrt ausgeliefert. Steht der Schritt
     // nicht in der Anleitung, endet die dokumentierte Installation an einem
     // Forbidden — genau so war es bis 2026-09-04 fuer den Installer.
-    $readme = (string) file_get_contents($repoRoot . '/README.md');
+    $readme = (string) sourceCode($repoRoot . '/README.md');
 
     foreach (['public/install/.htaccess', 'public/update/.htaccess'] as $path) {
         assertTrue(str_contains($readme, $path),
@@ -146,7 +148,7 @@ foreach ($targets as $name => $paths) {
         // Arbeitsbaum, sein Heredoc also auch. Mit dem angehaengten "\n" entstand
         // eine Datei mit gemischten Zeilenenden, die Git nach jedem Lauf als
         // geaendert meldete, obwohl der Inhalt gleich war.
-        $source = (string) file_get_contents($repoRoot . $paths['generator']);
+        $source = (string) sourceCode($repoRoot . $paths['generator']);
         assertTrue(
             str_contains($source, 'str_replace(["\r\n", "\r"], "\n", $htaccessContent)'),
             "Der {$name} vereinheitlicht die Zeilenenden seiner Sperre nicht"
@@ -157,7 +159,7 @@ foreach ($targets as $name => $paths) {
 test('.gitattributes erwartet LF fuer beide Sperrdateien', function () use ($repoRoot) {
     // Passend zum Generator: Ohne eol=lf erwartet Git unter autocrlf=true CRLF
     // und meldet die frisch geschriebene LF-Datei trotzdem als geaendert.
-    $attributes = (string) file_get_contents($repoRoot . '/.gitattributes');
+    $attributes = (string) sourceCode($repoRoot . '/.gitattributes');
     foreach (['/public/update/.htaccess', '/public/install/.htaccess'] as $path) {
         assertTrue(
             preg_match('#^' . preg_quote($path, '#') . '\s+text\s+eol=lf\s*$#m', $attributes) === 1,

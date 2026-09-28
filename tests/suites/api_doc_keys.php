@@ -128,7 +128,7 @@ function adDoc(string $heading, int $blockIndex): array
 {
     static $markdown = null;
     if ($markdown === null) {
-        $markdown = (string) file_get_contents(adApiMdPath());
+        $markdown = (string) sourceCode(adApiMdPath());
         assertTrue($markdown !== '', 'API.md konnte nicht gelesen werden: ' . adApiMdPath());
     }
 

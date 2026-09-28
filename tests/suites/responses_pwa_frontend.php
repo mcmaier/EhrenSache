@@ -33,7 +33,7 @@ function rspTag(string $html, string $needle): string
 }
 
 test('PWA: Tab Termine ist vorhanden und zunaechst verborgen', function () use ($rspRoot) {
-    $html = (string) file_get_contents($rspRoot . '/public/checkin/index.html');
+    $html = (string) sourceCode($rspRoot . '/public/checkin/index.html');
     $tag  = rspTag($html, 'data-tab="responses"');
 
     assertTrue(str_contains($tag, 'hidden'), 'Der Tab erscheint erst, wenn es etwas zu beantworten gibt');
@@ -42,7 +42,7 @@ test('PWA: Tab Termine ist vorhanden und zunaechst verborgen', function () use (
 });
 
 test('PWA: Tab wird beim Start und beim Wechsel geladen, maskiert Freitext', function () use ($rspRoot) {
-    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
 
     // Substring-Zaehlung statt einmaligem str_contains: die Definition allein
     // beweist noch keinen Aufruf. initResponsesTab() muss also mindestens
@@ -63,7 +63,7 @@ test('PWA: Tab wird beim Start und beim Wechsel geladen, maskiert Freitext', fun
 test('PWA: hidden schlaegt display:flex der Tab-Knoepfe', function () use ($rspRoot) {
     // .tab-button setzt display:flex und ueberstimmt damit das hidden-Attribut
     // des Browsers -- ohne eigene Regel waere der Tab immer sichtbar.
-    $css = (string) file_get_contents($rspRoot . '/public/checkin/css/style.css');
+    $css = (string) sourceCode($rspRoot . '/public/checkin/css/style.css');
     assertTrue(str_contains($css, '.tab-button[hidden]'), 'Regel .tab-button[hidden] fehlt');
 });
 
@@ -80,7 +80,7 @@ test('PWA: vorgemerkte Absage hat Vorrang vor gespeicherter Antwort, gespeichert
     // sperrte genau dieser Aufruf die frisch gebaute Karte dauerhaft.
     // responsesInFlight.delete(key) muss deshalb VOR renderResponses(key)
     // erfolgen, nicht erst danach im finally.
-    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
 
     assertTrue((bool) preg_match('/pendingStatusFor\(appointmentId\)\s*\|\|\s*item\.own/', $js),
         'Die gespeicherte Antwort (item.own) schlaegt weiterhin die vorgemerkte Absage');
@@ -93,7 +93,7 @@ test('PWA: "Wer hat geantwortet?" zeigt Namen als Chips statt Bullet-Liste, mask
     // Nutzer-Feedback: die fruehere <ul><li>-Liste wirkte bei vielen
     // Mitgliedern unuebersichtlich und die Punkte sassen zu weit links am
     // Kartenrand. Ersetzt durch nach Status gruppierte, umbrechende Chips.
-    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
 
     assertTrue(str_contains($js, 'response-name-chip'), 'Namen tragen keine Chip-Klasse mehr');
     assertTrue(str_contains($js, 'escapeHtml(m.name)') && str_contains($js, 'escapeHtml(m.surname)'),
@@ -111,7 +111,7 @@ test('PWA: "Wer hat geantwortet?" gliedert ueber groupingSections() (Vorgabe Gru
     // tests/suites/subgroups_frontend.php ab; hier bleibt nur, was dort NICHT
     // geprueft wird: der Ohne-Gruppe-Sammelabschnitt und die Maskierung der
     // Abschnittsueberschrift selbst.
-    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
 
     assertTrue(!str_contains($js, 'responseGroupKey'), 'responseGroupKey() ist wieder da -- sollte durch groupingSections() ersetzt bleiben');
 
@@ -129,12 +129,12 @@ test('PWA: "Wer hat geantwortet?" gliedert ueber groupingSections() (Vorgabe Gru
 test('PWA: Namens-Chips tragen Status-Icon und eigene Farbklasse, nicht nur Farbe', function () use ($rspRoot) {
     // Kontrast/Nicht-nur-Farbe: jeder Chip traegt zusaetzlich zur getoenten
     // Klasse ein Icon-Praefix (✓/?/✗/—) im Text.
-    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
 
     assertTrue((bool) preg_match('/response-name-chip response-name-chip--\$\{meta\.key\}"[^`]*\$\{meta\.icon\}/', $js),
         'Chip traegt weder eine statusabhaengige Klasse noch ein vorangestelltes Icon');
 
-    $css = (string) file_get_contents($rspRoot . '/public/checkin/css/style.css');
+    $css = (string) sourceCode($rspRoot . '/public/checkin/css/style.css');
     foreach (['yes', 'maybe', 'no', 'open'] as $key) {
         assertTrue(str_contains($css, ".response-name-chip--{$key}"), "Farbklasse fuer '{$key}' fehlt in der CSS");
     }
@@ -146,7 +146,7 @@ test('PWA: Offen-Status von "Bemerkung" und "Wer hat geantwortet?" ueberlebt ein
     // Fehlschlag) sie automatisch oeffnet -- ein Neuaufbau (renderResponses)
     // ersetzt das <details>-Element, ein modulweites Set haelt den Zustand
     // deshalb ausserhalb des DOM fest.
-    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
 
     assertTrue((bool) preg_match('/const\s+responsesOpenComments\s*=\s*new Set\(\)/', $js),
         'responsesOpenComments fehlt als Set');
@@ -160,7 +160,7 @@ test('PWA: Offen-Status von "Bemerkung" und "Wer hat geantwortet?" ueberlebt ein
 });
 
 test('PWA: "Bemerkung" oeffnet automatisch bei Pflichtbegruendung und bei Speicherfehler', function () use ($rspRoot) {
-    $js = (string) file_get_contents($rspRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
 
     assertTrue((bool) preg_match('/isPendingNo\s*\|\|\s*responsesSaveFailed\.has\(id\)\)\s*\{\s*\n\s*responsesOpenComments\.add\(id\)/', $js),
         'Vorgemerkte Absage mit Pflichtbegruendung oder ein fehlgeschlagener Speicherversuch oeffnen die Bemerkung nicht automatisch');
@@ -172,7 +172,7 @@ test('PWA: Termine-Tab bekommt denselben weissen Rahmen wie der Verlauf-Tab, Kar
     // Nutzer-Feedback: die Ueberschrift sass zu nah am Kartenrand -- Fix ist
     // derselbe weisse Container wie .history-section, die Karten darin
     // werden hellgrau wie .history-item statt weiss.
-    $css = (string) file_get_contents($rspRoot . '/public/checkin/css/style.css');
+    $css = (string) sourceCode($rspRoot . '/public/checkin/css/style.css');
 
     assertTrue((bool) preg_match('/\.responses-section\s*\{[^}]*background:\s*var\(--card-bg\)/', $css),
         '.responses-section ist kein weisser Container wie .history-section');

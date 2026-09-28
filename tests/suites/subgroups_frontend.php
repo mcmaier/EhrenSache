@@ -35,9 +35,13 @@ test('grouping.js existiert mit Copyright-Kopf und den erwarteten Exporten', fun
     $path = $ugfRoot . '/public/js/modules/grouping.js';
     assertTrue(is_file($path), 'public/js/modules/grouping.js fehlt');
 
-    $js = (string) file_get_contents($path);
-    assertTrue(str_contains($js, 'Copyright (c) 2026 Martin Maier'), 'Copyright-Kopf fehlt');
-    assertTrue(str_contains($js, 'AGPL-3.0'), 'Lizenzhinweis fehlt');
+    // Der Kopf ist ein Kommentar und deshalb roh zu lesen; die Exporte
+    // darunter prueft der bereinigte Quelltext.
+    $kopf = rawSource($path);
+    assertTrue(str_contains($kopf, 'Copyright (c) 2026 Martin Maier'), 'Copyright-Kopf fehlt');
+    assertTrue(str_contains($kopf, 'AGPL-3.0'), 'Lizenzhinweis fehlt');
+
+    $js = (string) sourceCode($path);
 
     foreach ([
         'export function groupingSections',
@@ -58,7 +62,7 @@ test('grouping.js existiert mit Copyright-Kopf und den erwarteten Exporten', fun
 test('grouping.js kapselt jeden localStorage-Zugriff in try/catch', function () use ($ugfRoot) {
     // 6.2: ein unlesbarer oder gesperrter Speicher (privates Fenster) darf
     // die Listen nicht zum Absturz bringen.
-    $js = (string) file_get_contents($ugfRoot . '/public/js/modules/grouping.js');
+    $js = (string) sourceCode($ugfRoot . '/public/js/modules/grouping.js');
 
     $stored = ugfBody($js, 'export function groupingStored', 'export function groupingStore');
     assertTrue(str_contains($stored, 'try {') && str_contains($stored, 'catch'), 'groupingStored() sichert localStorage.getItem nicht ab');
@@ -68,7 +72,7 @@ test('grouping.js kapselt jeden localStorage-Zugriff in try/catch', function () 
 });
 
 test('records.js bindet grouping.js ein und traegt den Anwesenheits-Umschalter', function () use ($ugfRoot) {
-    $js = (string) file_get_contents($ugfRoot . '/public/js/modules/records.js');
+    $js = (string) sourceCode($ugfRoot . '/public/js/modules/records.js');
 
     assertTrue(str_contains($js, "from './grouping.js'"), 'records.js importiert nicht aus grouping.js');
     foreach (['groupingAvailableStages', 'groupingSections', 'groupingDuplicateCount', 'groupingStored', 'groupingStore', 'GROUPING_KEY_ATTENDANCE'] as $needle) {
@@ -88,7 +92,7 @@ test('records.js bindet grouping.js ein und traegt den Anwesenheits-Umschalter',
 });
 
 test('responses.js bindet grouping.js ein, gliedert die Namensliste und fuehrt responseGroupKey nicht mehr', function () use ($ugfRoot) {
-    $js = (string) file_get_contents($ugfRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($ugfRoot . '/public/js/modules/responses.js');
 
     assertTrue(str_contains($js, "from './grouping.js'"), 'responses.js importiert nicht aus grouping.js');
     foreach (['groupingAvailableStages', 'groupingSections', 'groupingDuplicateCount', 'groupingStored', 'groupingStore', 'GROUPING_KEY_RESPONSES'] as $needle) {
@@ -106,7 +110,7 @@ test('responses.js bindet grouping.js ein, gliedert die Namensliste und fuehrt r
 });
 
 test('responses.js: die Verwalter-Tabelle gliedert ebenfalls ueber groupingSections() und fuehrt group_name nirgends mehr (a291efd)', function () use ($ugfRoot) {
-    $js = (string) file_get_contents($ugfRoot . '/public/js/modules/responses.js');
+    $js = (string) sourceCode($ugfRoot . '/public/js/modules/responses.js');
 
     assertTrue(!str_contains($js, 'group_name'), 'group_name kommt in responses.js noch vor -- die Gliederung soll vollstaendig ueber groups/subgroups laufen');
 
@@ -118,20 +122,20 @@ test('responses.js: die Verwalter-Tabelle gliedert ebenfalls ueber groupingSecti
 });
 
 test('Der Umschalter nutzt die gemeinsame Gestaltung .list-grouping', function () use ($ugfRoot) {
-    $css = (string) file_get_contents($ugfRoot . '/public/css/components/buttons.css');
+    $css = (string) sourceCode($ugfRoot . '/public/css/components/buttons.css');
 
     assertTrue(str_contains($css, '.response-filter, .list-grouping'), 'buttons.css erweitert .response-filter nicht um .list-grouping');
     assertTrue(str_contains($css, '.response-filter__btn, .list-grouping__btn'), 'buttons.css erweitert .response-filter__btn nicht um .list-grouping__btn');
 
-    $recordsJs = (string) file_get_contents($ugfRoot . '/public/js/modules/records.js');
+    $recordsJs = (string) sourceCode($ugfRoot . '/public/js/modules/records.js');
     assertTrue(str_contains($recordsJs, 'list-grouping'), 'records.js verwendet die Klasse list-grouping nicht im Markup');
 
-    $responsesJs = (string) file_get_contents($ugfRoot . '/public/js/modules/responses.js');
+    $responsesJs = (string) sourceCode($ugfRoot . '/public/js/modules/responses.js');
     assertTrue(str_contains($responsesJs, 'list-grouping'), 'responses.js verwendet die Klasse list-grouping nicht im Markup');
 });
 
 test('index.html traegt einen Container fuer den Gruppierungs-Umschalter der Anwesenheitsliste', function () use ($ugfRoot) {
-    $html = (string) file_get_contents($ugfRoot . '/public/index.html');
+    $html = (string) sourceCode($ugfRoot . '/public/index.html');
     assertTrue(str_contains($html, 'id="recordsGroupingBar"'), 'recordsGroupingBar fehlt in index.html');
     assertTrue(str_contains($html, 'src="./js/modules/records.js"') || str_contains($html, "type=\"module\""),
         'index.html laedt die Module nicht wie erwartet');
@@ -147,7 +151,7 @@ test('checkin/js/app.js enthaelt eine eigene Gruppierungsfassung ohne export, mi
     $path = $ugfRoot . '/public/checkin/js/app.js';
     assertTrue(is_file($path), 'public/checkin/js/app.js fehlt');
 
-    $js = (string) file_get_contents($path);
+    $js = (string) sourceCode($path);
 
     foreach ([
         'function groupingSections',
@@ -166,7 +170,7 @@ test('checkin/js/app.js enthaelt eine eigene Gruppierungsfassung ohne export, mi
 });
 
 test('app.js kapselt jeden localStorage-Zugriff der Gruppierung in try/catch', function () use ($ugfRoot) {
-    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($ugfRoot . '/public/checkin/js/app.js');
 
     $stored = ugfBody($js, 'function groupingStored', 'function groupingStore');
     assertTrue(str_contains($stored, 'try {') && str_contains($stored, 'catch'), 'groupingStored() sichert localStorage.getItem nicht ab');
@@ -177,7 +181,7 @@ test('app.js kapselt jeden localStorage-Zugriff der Gruppierung in try/catch', f
 });
 
 test('app.js: renderAttendanceList() gliedert ueber groupingSections(), escaped Namen/Gruppen und fuehrt die alte Zeichenketten-Gruppierung nicht mehr', function () use ($ugfRoot) {
-    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($ugfRoot . '/public/checkin/js/app.js');
 
     assertTrue(!str_contains($js, "member.groups || "), 'member.groups || (Zeichenketten-Gruppierung) kommt noch vor -- das Feld ist jetzt eine Liste');
     assertTrue(!str_contains($js, "member.groups ||'"), 'member.groups || (Zeichenketten-Gruppierung) kommt noch vor -- das Feld ist jetzt eine Liste');
@@ -193,7 +197,7 @@ test('app.js: renderAttendanceList() gliedert ueber groupingSections(), escaped 
 });
 
 test('app.js: die Namensliste "Wer hat geantwortet?" gliedert ueber groupingSections() und fuehrt responseGroupKey/sortByNameSurname nicht mehr', function () use ($ugfRoot) {
-    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($ugfRoot . '/public/checkin/js/app.js');
 
     assertTrue(!str_contains($js, 'function responseGroupKey'), 'responseGroupKey() ist noch vorhanden -- sollte durch groupingSections() ersetzt sein');
     assertTrue(!str_contains($js, 'function sortByNameSurname'), 'sortByNameSurname() ist noch vorhanden -- groupingSections() sortiert bereits');
@@ -207,11 +211,11 @@ test('app.js: die Namensliste "Wer hat geantwortet?" gliedert ueber groupingSect
 });
 
 test('checkin/css/style.css und index.html tragen die Gruppierungsleiste der PWA', function () use ($ugfRoot) {
-    $css = (string) file_get_contents($ugfRoot . '/public/checkin/css/style.css');
+    $css = (string) sourceCode($ugfRoot . '/public/checkin/css/style.css');
     assertTrue(str_contains($css, '.list-grouping'), 'style.css definiert .list-grouping nicht');
     assertTrue(str_contains($css, '.list-grouping__btn'), 'style.css definiert .list-grouping__btn nicht');
 
-    $html = (string) file_get_contents($ugfRoot . '/public/checkin/index.html');
+    $html = (string) sourceCode($ugfRoot . '/public/checkin/index.html');
     assertTrue(str_contains($html, 'id="attendanceGroupingBar"'), 'attendanceGroupingBar fehlt in index.html');
 });
 
@@ -227,7 +231,7 @@ test('app.js: handleAttendanceToggle() spricht ALLE Zeilen eines Mitglieds ueber
     // optimistische UI-Update nur "const listItem = btn.closest('.attendance-item')"
     // -- also genau eine Zeile. Die zweite blieb stehen, ein Klick dort
     // schickte einen zweiten, widerspruechlichen Request (409 vom Server).
-    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($ugfRoot . '/public/checkin/js/app.js');
 
     $body = ugfBody($js, 'async function handleAttendanceToggle', 'function handleDashboardNavigation');
 
@@ -258,7 +262,7 @@ test('records.js: currentMode wird ausschliesslich ueber setRecordMode() geaende
     // bisher ausschliesslich in renderAttendanceList() befuellt, nirgends
     // aber geleert. Beim Wechsel in eine andere Ansicht (Terminart,
     // Mitglied, Filter zuruecksetzen) blieb er stehen.
-    $js = (string) file_get_contents($ugfRoot . '/public/js/modules/records.js');
+    $js = (string) sourceCode($ugfRoot . '/public/js/modules/records.js');
 
     assertTrue(str_contains($js, 'function setRecordMode(mode)'), 'setRecordMode() fehlt -- der einzige Weg, currentMode zu aendern');
 
@@ -272,11 +276,12 @@ test('records.js: currentMode wird ausschliesslich ueber setRecordMode() geaende
 
     // Jede aktive Stelle, die den Modus wechselt, muss durch den Setter
     // gehen -- sonst reicht eine vergessene Stelle, damit der Fehler
-    // zurueckkommt. Nur die Deklaration (let currentMode = ...) und die
-    // auskommentierte Altlast (Reset-Button, seit 1.8.0 durch
-    // resetRecordFilter() ersetzt) duerfen currentMode noch direkt setzen.
+    // zurueckkommt. Nur die Deklaration (let currentMode = ...) darf
+    // currentMode noch direkt setzen. Bis OI-107 zaehlte hier die
+    // auskommentierte Altlast mit (erwartet: 2) -- eine aktive Zuweisung
+    // anstelle der geloeschten Altlast waere so unbemerkt geblieben.
     $direct = substr_count($js, 'currentMode = RecordMode.');
-    assertTrue($direct === 2, "Erwartet genau 2 direkte currentMode-Zuweisungen (Deklaration + auskommentierter Altcode), gefunden: {$direct}. Jede aktive Zuweisung muss ueber setRecordMode() laufen.");
+    assertTrue($direct === 1, "Erwartet genau 1 direkte currentMode-Zuweisung (die Deklaration), gefunden: {$direct}. Jede aktive Zuweisung muss ueber setRecordMode() laufen.");
 
     $setterCalls = substr_count($js, 'setRecordMode(RecordMode.');
     assertTrue($setterCalls >= 6, "Erwartet mindestens 6 Aufrufe von setRecordMode() (Terminart-, Termin-, Mitglied-Filter je zwei Zweige, resetRecordFilter()), gefunden: {$setterCalls}");
@@ -309,7 +314,7 @@ test('checkin/js/app.js: apiCall()-Ergebnisse (Konvention: Variable "result") we
     // wird dort direkt mit einem zusaetzlichen .success-Feld zurueckgegeben,
     // nicht unter .data verschachtelt. Ein result.members o. ae. ist dort
     // richtig und keine Instanz dieses Fehlers.
-    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($ugfRoot . '/public/checkin/js/app.js');
 
     preg_match_all('/\bresult\.([a-zA-Z_][a-zA-Z0-9_]*)/', $js, $matches);
     $erlaubt = ['success', 'status', 'data', 'error'];
@@ -322,7 +327,7 @@ test('checkin/js/app.js: apiCall()-Ergebnisse (Konvention: Variable "result") we
 });
 
 test('checkin/js/app.js: handleAttendanceToggle() liest die neue Datensatz-ID aus result.data.id, nicht aus result.id', function () use ($ugfRoot) {
-    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($ugfRoot . '/public/checkin/js/app.js');
     $body = ugfBody($js, 'async function handleAttendanceToggle', 'function handleDashboardNavigation');
 
     assertTrue(
@@ -350,7 +355,7 @@ test('checkin/js/app.js: handleAttendanceToggle() fuehrt _lastAttendanceData nac
     // (Register -> Alphabetisch) rief renderAttendanceList() erneut mit dem
     // dabei unveraenderten, veralteten Stand auf: jede eben eingetragene
     // oder entfernte Anwesenheit fiel auf den Ladezustand zurueck.
-    $js = (string) file_get_contents($ugfRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($ugfRoot . '/public/checkin/js/app.js');
 
     assertTrue(
         str_contains($js, 'function syncAttendanceMemberRecord('),

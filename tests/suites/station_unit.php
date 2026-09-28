@@ -447,16 +447,36 @@ test('Station: die Aktivitaetsregel steht nur an einer Stelle (OI-27)', function
     // und Anwesenheitslogik membership_dates, der Stempel dagegen nur
     // members.active -- ein Mitglied ausserhalb seines Zeitraums konnte
     // stempeln und tauchte in keiner Auswertung auf.
-    $quelle = (string) file_get_contents(dirname(__DIR__, 2) . '/private/helpers/station.php');
+    //
+    // Geprueft wird die Kette bis zur Regel, Glied fuer Glied im jeweiligen
+    // Rumpf: stationAuthenticate() -> stationMemberIsActiveToday() ->
+    // memberIsActiveOn() -> getMemberActivityWhere(). Bis 2026-09-28 suchte der
+    // Test nur getMemberActivityWhere( irgendwo in station.php; seit OI-103
+    // (10546c4) stand der Name dort nur noch im Kommentar, und der Test blieb
+    // gruen, weil er Kommentare mitlas (OI-107).
+    $wurzel = dirname(__DIR__, 2) . '/private/helpers/';
+    $quelle = (string) sourceCode($wurzel . 'station.php');
+    $regel  = (string) sourceCode($wurzel . 'member_activity.php');
 
-    assertTrue(str_contains($quelle, 'getMemberActivityWhere('),
-        'station.php nutzt die gemeinsame Aktivitaetsregel nicht');
+    $rumpfVon = static function (string $code, string $funktion): string {
+        $start = strpos($code, 'function ' . $funktion . '(');
+        assertTrue($start !== false, "{$funktion}() nicht gefunden");
+
+        return substr($code, $start, (int) strpos($code, "\n}", $start) - $start);
+    };
+
     assertTrue(str_contains($quelle, "require_once __DIR__ . '/member_activity.php';"),
         'station.php bindet member_activity.php nicht selbst ein');
 
-    $start = strpos($quelle, 'function stationAuthenticate(');
-    assertTrue($start !== false, 'stationAuthenticate() nicht gefunden');
-    $rumpf = substr($quelle, $start, (int) strpos($quelle, "\n}", $start) - $start);
+    $rumpf = $rumpfVon($quelle, 'stationAuthenticate');
+    assertTrue(preg_match('/&&\s*stationMemberIsActiveToday\(/', $rumpf) === 1,
+        'stationAuthenticate() macht die Aktivitaet nicht zur Bedingung fuer ein verwendbares Mitglied');
     assertTrue(!str_contains($rumpf, "active'] === 1"),
         'stationAuthenticate() prueft members.active wieder selbst statt ueber die gemeinsame Regel');
+
+    assertTrue(preg_match('/return\s+memberIsActiveOn\(/', $rumpfVon($quelle, 'stationMemberIsActiveToday')) === 1,
+        'stationMemberIsActiveToday() fragt nicht die gemeinsame Funktion memberIsActiveOn()');
+
+    assertTrue(preg_match('/\$activity\s*=\s*getMemberActivityWhere\(/', $rumpfVon($regel, 'memberIsActiveOn')) === 1,
+        'memberIsActiveOn() nutzt die gemeinsame Aktivitaetsregel getMemberActivityWhere() nicht');
 });

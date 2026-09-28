@@ -249,14 +249,7 @@ function stationAuthenticate($db, $database, RateLimiter $limiter, int $deviceId
  */
 function stationMemberIsActiveToday($db, $database, int $memberId): bool
 {
-    $prefix   = $database->table('');
-    $activity = getMemberActivityWhere('m', "'" . date('Y-m-d') . "'", false, $database);
-
-    $stmt = $db->prepare("SELECT 1 FROM {$prefix}members m
-                          WHERE m.member_id = ? AND ({$activity})");
-    $stmt->execute([$memberId]);
-
-    return (bool) $stmt->fetchColumn();
+    return memberIsActiveOn($db, $database, $memberId, date('Y-m-d'));
 }
 
 /**

@@ -188,6 +188,6 @@ test('Der Update-Pfad enthaelt keine Syntax nach PHP 8.0', function () {
     foreach (UPDATE_PATH_FILES as $rel) {
         $pfad = "{$wurzel}/{$rel}";
         assertTrue(is_file($pfad), "Datei des Update-Pfads fehlt: {$rel} -- Liste in dieser Suite pflegen");
-        assertSame([], syntaxAfterPhp80((string) file_get_contents($pfad)), $rel);
+        assertSame([], syntaxAfterPhp80((string) sourceCode($pfad)), $rel);
     }
 });

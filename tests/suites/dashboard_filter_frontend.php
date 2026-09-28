@@ -25,8 +25,8 @@ declare(strict_types=1);
  */
 
 $dfRoot = dirname(__DIR__, 2);
-$dfHtml = (string) file_get_contents($dfRoot . '/public/index.html');
-$dfJs   = (string) file_get_contents($dfRoot . '/public/js/modules/appointments.js');
+$dfHtml = (string) sourceCode($dfRoot . '/public/index.html');
+$dfJs   = (string) sourceCode($dfRoot . '/public/js/modules/appointments.js');
 
 /** Schneidet einen Bereich zwischen zwei Abschnitts-IDs aus. */
 function dfBereich(string $html, string $vonId, string $bisId): string
@@ -129,7 +129,7 @@ function dfFunktion(string $js, string $name): string
 // Task 3) aufgegangen: die Summe wird jetzt inline in renderWorkSessions()
 // berechnet. Die Gegenprobe bleibt dieselbe -- nur die Fundstelle wechselt.
 test('Arbeitszeit-Kennzahlen zaehlen nur den gefilterten Stand', function () use ($dfRoot) {
-    $js    = (string) file_get_contents($dfRoot . '/public/js/modules/worktime.js');
+    $js    = (string) sourceCode($dfRoot . '/public/js/modules/worktime.js');
     $rumpf = dfFunktion($js, 'renderWorkSessions');
 
     assertTrue(str_contains($rumpf, 'bestaetigteMinuten'),
@@ -163,7 +163,7 @@ foreach ([
 ] as [$datei, $funktion, $container, $liste]) {
     test("Leeres Filterergebnis raeumt die Paginierung ab: {$funktion}() (OI-84)",
         function () use ($dfRoot, $datei, $funktion, $container, $liste) {
-            $js = (string) file_get_contents($dfRoot . '/public/js/modules/' . $datei);
+            $js = (string) sourceCode($dfRoot . '/public/js/modules/' . $datei);
             $leer = dfLeerzweig(dfFunktion($js, $funktion));
 
             // Sonst bleibt „Zeige 1–25 von 196“ unter der Leermeldung stehen.
@@ -180,7 +180,7 @@ foreach ([
 
 test('Leere Mitgliederliste meldet nur ohne Verwalterrolle ein fehlendes Profil (OI-84)',
     function () use ($dfRoot) {
-        $js = (string) file_get_contents($dfRoot . '/public/js/modules/members.js');
+        $js = (string) sourceCode($dfRoot . '/public/js/modules/members.js');
         $leer = dfLeerzweig(dfFunktion($js, 'renderMembers'));
 
         // Ein Admin mit Filter ohne Treffer hat kein Profil zu verknuepfen

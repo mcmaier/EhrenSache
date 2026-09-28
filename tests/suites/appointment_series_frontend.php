@@ -23,7 +23,7 @@ $sfRoot = dirname(__DIR__, 2);
 
 function sfFile(string $root, string $rel): string
 {
-    $src = file_get_contents($root . '/' . $rel);
+    $src = sourceCode($root . '/' . $rel);
     assertTrue($src !== false, "{$rel} fehlt");
 
     return (string) $src;

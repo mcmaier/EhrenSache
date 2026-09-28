@@ -29,7 +29,7 @@ declare(strict_types=1);
 $arrivalRoot = dirname(__DIR__, 2);
 
 test('Ankunftszeit im Record-Dialog ist kein Pflichtfeld mehr', function () use ($arrivalRoot) {
-    $html = (string) file_get_contents($arrivalRoot . '/public/index.html');
+    $html = (string) sourceCode($arrivalRoot . '/public/index.html');
 
     $start = strpos($html, 'id="record_arrival_time"');
     assertTrue($start !== false, 'Eingabefeld nicht gefunden');
@@ -47,7 +47,7 @@ test('Ankunftszeit im Record-Dialog ist kein Pflichtfeld mehr', function () use 
 test('Der Status steht im Dialog vor der Ankunftszeit', function () use ($arrivalRoot) {
     // Die Reihenfolge traegt Bedeutung: Der Status entscheidet, ob das
     // Ankunftsfeld ueberhaupt sichtbar ist.
-    $html = (string) file_get_contents($arrivalRoot . '/public/index.html');
+    $html = (string) sourceCode($arrivalRoot . '/public/index.html');
 
     $status  = strpos($html, 'id="record_status"');
     $arrival = strpos($html, 'id="recordArrivalTimeGroup"');
@@ -60,7 +60,7 @@ test('Der Terminwechsel schreibt keine Ankunftszeit mehr', function () use ($arr
     // Bis 1.5.0 setzte onRecordAppointmentChange() die Startzeit des Termins
     // ins Feld. Wer danach speicherte, erzeugte einen konstruiert puenktlichen
     // Datensatz, ohne es zu merken.
-    $js = (string) file_get_contents($arrivalRoot . '/public/js/modules/records.js');
+    $js = (string) sourceCode($arrivalRoot . '/public/js/modules/records.js');
 
     $start = strpos($js, 'function onRecordAppointmentChange(');
     assertTrue($start !== false, 'onRecordAppointmentChange() nicht gefunden');
@@ -74,8 +74,8 @@ test('Der Terminwechsel schreibt keine Ankunftszeit mehr', function () use ($arr
 });
 
 test('Die Terminstartzeit gibt es nur auf Knopfdruck', function () use ($arrivalRoot) {
-    $html = (string) file_get_contents($arrivalRoot . '/public/index.html');
-    $js   = (string) file_get_contents($arrivalRoot . '/public/js/modules/records.js');
+    $html = (string) sourceCode($arrivalRoot . '/public/index.html');
+    $js   = (string) sourceCode($arrivalRoot . '/public/js/modules/records.js');
 
     assertTrue(
         strpos($html, 'onclick="setArrivalTimeFromAppointment()"') !== false,
@@ -92,7 +92,7 @@ test('Die Terminstartzeit gibt es nur auf Knopfdruck', function () use ($arrival
 });
 
 test('Bei Status entschuldigt wird die Ankunftszeit ausgeblendet und geleert', function () use ($arrivalRoot) {
-    $js = (string) file_get_contents($arrivalRoot . '/public/js/modules/records.js');
+    $js = (string) sourceCode($arrivalRoot . '/public/js/modules/records.js');
 
     $start = strpos($js, 'function toggleArrivalTimeField(');
     assertTrue($start !== false, 'toggleArrivalTimeField() nicht gefunden');
@@ -109,7 +109,7 @@ test('Die Zeitkonvertierung vertraegt leere und fehlende Werte', function () use
     // datetimeLocalToMysql('') lieferte ':00' -- einen Wert, den niemand
     // eingegeben hat. mysqlToDatetimeLocal(null) warf, und der Dialog blieb
     // beim Bearbeiten eines Eintrags ohne Ankunftszeit unbefuellt stehen.
-    $js = (string) file_get_contents($arrivalRoot . '/public/js/modules/utils.js');
+    $js = (string) sourceCode($arrivalRoot . '/public/js/modules/utils.js');
 
     assertTrue(
         strpos($js, 'if (!datetimeLocalValue) return null;') !== false,
@@ -134,7 +134,7 @@ test('Keine ungeschuetzte Datumskonvertierung der Ankunftszeit', function () use
     // im Bestand) oder als Ternaer davor. Beide sind in Ordnung, nur das
     // ungeschuetzte new Date(x.arrival_time) ist es nicht.
     foreach ($dateien as $datei) {
-        $js = (string) file_get_contents($arrivalRoot . $datei);
+        $js = (string) sourceCode($arrivalRoot . $datei);
 
         preg_match_all('/new Date\(([^)]*arrival_time[^)]*)\)/', $js, $treffer, PREG_OFFSET_CAPTURE);
 
@@ -160,8 +160,8 @@ test('Jeder Wert von checkin_source hat ein Abzeichen im Dashboard', function ()
     // getSourceBadge() faellt bei unbekannten Werten auf 'none' zurueck und
     // zeigt einen grauen Strich. Ein neuer ENUM-Wert ohne Eintrag sieht damit
     // aus wie "keine Quelle" -- genau das ist bei exception_request passiert.
-    $sql = (string) file_get_contents($arrivalRoot . '/private/setup/ehrensache_db.sql');
-    $js  = (string) file_get_contents($arrivalRoot . '/public/js/modules/records.js');
+    $sql = (string) sourceCode($arrivalRoot . '/private/setup/ehrensache_db.sql');
+    $js  = (string) sourceCode($arrivalRoot . '/public/js/modules/records.js');
 
     assertTrue(
         preg_match("/`checkin_source` enum\(([^)]*)\)/", $sql, $treffer) === 1,
@@ -184,8 +184,8 @@ test('Der PWA-Antrag fragt nach der Ankunftszeit, statt sie zu setzen', function
     // nach dem gescheiterten Stempeln daran dachte, beantragte damit eine
     // halbe Stunde Verspaetung. Mit der Puenktlichkeitskennzahl wuerde genau
     // das bestraft, was der Antrag heilen soll.
-    $html = (string) file_get_contents($arrivalRoot . '/public/checkin/index.html');
-    $js   = (string) file_get_contents($arrivalRoot . '/public/checkin/js/app.js');
+    $html = (string) sourceCode($arrivalRoot . '/public/checkin/index.html');
+    $js   = (string) sourceCode($arrivalRoot . '/public/checkin/js/app.js');
 
     assertTrue(
         strpos($html, 'id="exceptionArrivalTime"') !== false,
@@ -208,7 +208,7 @@ test('Der PWA-Antrag fragt nach der Ankunftszeit, statt sie zu setzen', function
 });
 
 test('Das Fenster der beantragten Ankunftszeit haengt am Termin', function () use ($arrivalRoot) {
-    $js = (string) file_get_contents($arrivalRoot . '/public/checkin/js/app.js');
+    $js = (string) sourceCode($arrivalRoot . '/public/checkin/js/app.js');
 
     $start = strpos($js, 'function updateExceptionArrivalBounds(');
     assertTrue($start !== false, 'updateExceptionArrivalBounds() nicht gefunden');
@@ -228,7 +228,7 @@ test('Das Fenster der beantragten Ankunftszeit haengt am Termin', function () us
 test('Der Server prueft das Fenster selbst', function () use ($arrivalRoot) {
     // Die PWA ist ein Client; die Grenze muss im Handler stehen, nicht nur im
     // Formular.
-    $php = (string) file_get_contents($arrivalRoot . '/private/handlers/exceptions.php');
+    $php = (string) sourceCode($arrivalRoot . '/private/handlers/exceptions.php');
 
     assertTrue(
         substr_count($php, 'arrivalWithinAppointmentWindow') === 2,

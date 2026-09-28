@@ -21,8 +21,8 @@ declare(strict_types=1);
  */
 
 $fcRoot = dirname(__DIR__, 2);
-$fcHtml = (string) file_get_contents($fcRoot . '/public/index.html');
-$fcCss  = (string) @file_get_contents($fcRoot . '/public/css/components/filter-chips.css');
+$fcHtml = (string) sourceCode($fcRoot . '/public/index.html');
+$fcCss  = (string) sourceCodeIfExists($fcRoot . '/public/css/components/filter-chips.css');
 
 /** Bereich zwischen zwei Abschnitts-IDs (wie dfBereich in dashboard_filter_frontend). */
 function fcBereich(string $html, string $vonId, string $bisId): string
@@ -36,12 +36,12 @@ function fcBereich(string $html, string $vonId, string $bisId): string
 
 function fcModul(string $root, string $name): string
 {
-    return (string) file_get_contents($root . '/public/js/modules/' . $name . '.js');
+    return (string) sourceCode($root . '/public/js/modules/' . $name . '.js');
 }
 
 test('Die Chip-Komponente existiert und wird geladen', function () use ($fcRoot, $fcCss) {
     assertTrue($fcCss !== '', 'css/components/filter-chips.css fehlt');
-    $main = (string) file_get_contents($fcRoot . '/public/css/main.css');
+    $main = (string) sourceCode($fcRoot . '/public/css/main.css');
     assertTrue(str_contains($main, 'components/filter-chips.css'), 'main.css importiert filter-chips.css nicht');
 
     // responsive.css muss NACH filter-chips.css importiert werden: Nur so
@@ -93,10 +93,10 @@ test('renderFilterChips beachtet den chipweisen static-Zusatz (def.static)', fun
 });
 
 test('Der Zuruecksetzen-Knopf teilt den Stil nicht mehr mit btn-cancel', function () use ($fcRoot) {
-    $buttons = (string) file_get_contents($fcRoot . '/public/css/components/buttons.css');
+    $buttons = (string) sourceCode($fcRoot . '/public/css/components/buttons.css');
     assertSame(0, preg_match('/\.btn-cancel\s*,\s*\.btn-reset-filter/', $buttons),
         '.btn-reset-filter haengt noch am grauen Stil von .btn-cancel');
-    $forms = (string) file_get_contents($fcRoot . '/public/css/components/forms.css');
+    $forms = (string) sourceCode($fcRoot . '/public/css/components/forms.css');
     assertTrue(str_contains($forms, '.btn-reset-filter[hidden]'),
         'Ohne .btn-reset-filter[hidden] schluege ein spaeteres display das hidden');
 });
@@ -108,7 +108,7 @@ test('Der Zuruecksetzen-Knopf bleibt sichtbar und wird nur ausgegraut', function
     assertSame(8, preg_match_all('/class="btn-reset-filter"[^>]*\sdisabled/', $fcHtml),
         'Alle acht Zuruecksetzen-Knoepfe starten ausgegraut');
 
-    $buttons = (string) file_get_contents($fcRoot . '/public/css/components/buttons.css');
+    $buttons = (string) sourceCode($fcRoot . '/public/css/components/buttons.css');
     assertTrue(str_contains($buttons, '.btn-reset-filter:disabled'),
         'Der ausgegraute Zustand braucht eine eigene Regel');
 
@@ -154,7 +154,7 @@ test('Arbeitszeit: Stunden stehen als Chip in der Kopfzeile', function () use ($
     assertSame(0, substr_count($fcHtml, 'onclick="resetWorktimeFilter'),
         'resetWorktimeFilter darf nicht mehr inline verdrahtet sein');
 
-    $css = (string) file_get_contents($fcRoot . '/public/css/components/filter-chips.css');
+    $css = (string) sourceCode($fcRoot . '/public/css/components/filter-chips.css');
     assertSame(0, substr_count($css, 'stats-grid--chips-lead'), 'Die Sonderspalte muss aus dem CSS entfallen');
 
     $js = fcModul($fcRoot, 'worktime');
@@ -193,7 +193,7 @@ test('Benutzer: Chips statt bunter Pillenknoepfe', function () use ($fcRoot, $fc
     assertSame(0, substr_count($bereich, 'onchange="applyUserFilters()"'),
         'userRoleFilter war doppelt verdrahtet (inline und addEventListener)');
 
-    $css = (string) file_get_contents($fcRoot . '/public/css/sections/content.css');
+    $css = (string) sourceCode($fcRoot . '/public/css/sections/content.css');
     assertSame(0, preg_match('/\.filter-btn\b/', $css), '.filter-btn-Stile muessen entfallen');
 
     $js = fcModul($fcRoot, 'users');
@@ -274,10 +274,10 @@ test('Anwesenheitsliste: Zwischenspeicher haelt die volle Liste', function () us
 });
 
 test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function () use ($fcRoot, $fcHtml, $fcCss) {
-    $jahr = (string) @file_get_contents($fcRoot . '/public/css/components/year-filter.css');
+    $jahr = (string) sourceCodeIfExists($fcRoot . '/public/css/components/year-filter.css');
     assertTrue($jahr !== '', 'css/components/year-filter.css fehlt');
 
-    $main = (string) file_get_contents($fcRoot . '/public/css/main.css');
+    $main = (string) sourceCode($fcRoot . '/public/css/main.css');
     assertTrue(str_contains($main, 'components/year-filter.css'), 'main.css importiert year-filter.css nicht');
 
     $ohneKommentare = (string) preg_replace('#/\*.*?\*/#s', '', $jahr);
@@ -318,7 +318,7 @@ test('Der Jahresfilter ist ueberall einzeilig und ohne Inline-Styles', function 
 });
 
 test('Die Filterleiste stellt die Beschriftung neben das Feld', function () use ($fcRoot) {
-    $forms = (string) file_get_contents($fcRoot . '/public/css/components/forms.css');
+    $forms = (string) sourceCode($fcRoot . '/public/css/components/forms.css');
 
     $start = strpos($forms, '.filter-bar .form-group {');
     assertTrue($start !== false, '.filter-bar .form-group fehlt');
@@ -339,7 +339,7 @@ test('Die Filterleiste stellt die Beschriftung neben das Feld', function () use 
 
     // Gestapelt (Task 2) liegt flex in der Hauptachse -- ohne feste Hoehe
     // faellt das Feld auf Textzeilenhoehe zusammen (Regression bei 375px).
-    $resp = (string) file_get_contents($fcRoot . '/public/css/responsive.css');
+    $resp = (string) sourceCode($fcRoot . '/public/css/responsive.css');
     assertTrue(preg_match('/\.filter-bar \.form-group select[^}]*flex:\s*none/s', $resp) === 1,
         'Auf schmalen Bildschirmen braucht das Feld eine feste Hoehe, sonst faellt es auf Textzeilenhoehe zusammen');
 });
@@ -356,7 +356,7 @@ test('Statistik nutzt denselben Kopf wie die uebrigen Ansichten', function () us
         assertSame(0, substr_count($fcHtml, $alt), $alt . ' muss aus dem Markup entfallen');
     }
 
-    $css = (string) file_get_contents($fcRoot . '/public/css/sections/content.css');
+    $css = (string) sourceCode($fcRoot . '/public/css/sections/content.css');
     foreach (['.stats-header', '.filter-card', '.filter-grid', '.year-card', '.year-select'] as $regel) {
         assertSame(0, substr_count($css, $regel), $regel . ' muss aus content.css entfallen');
     }
@@ -401,7 +401,7 @@ test('Statistik: auch die Quoten stehen als Chips', function () use ($fcRoot, $f
     assertTrue(preg_match('/statisticsChips[\s\S]{0,200}static:\s*true/', $js) === 1,
         'Die Statistik-Chips muessen static sein');
 
-    $cards = (string) file_get_contents($fcRoot . '/public/css/components/cards.css');
+    $cards = (string) sourceCode($fcRoot . '/public/css/components/cards.css');
     assertSame(0, substr_count($cards, 'stats-grid--kpi'), '.stats-grid--kpi muss aus cards.css entfallen');
 });
 
@@ -434,7 +434,7 @@ test('Statistik: die Kopfzeile fuehrt sechs Chips, der Durchschnitt steht je Gru
     assertSame(1, preg_match('/function groupAverage\(/', $js), 'groupAverage() fehlt');
 
     // Innerhalb des Gruppenblocks traegt der Container keine zweite Karte.
-    $fcCss2 = (string) file_get_contents($fcRoot . '/public/css/components/filter-chips.css');
+    $fcCss2 = (string) sourceCode($fcRoot . '/public/css/components/filter-chips.css');
     assertTrue(str_contains($fcCss2, '.statistics-group > .filter-chips'),
         'Die Chipzeile im Gruppenblock braucht eine eigene, flache Darstellung');
 });
@@ -445,7 +445,7 @@ test('Statistik: der Grund fuer "–" steht auch sichtbar, nicht nur im Tooltip'
     assertTrue(str_contains($fcHtml, 'id="statisticsChipsHint"'),
         'Der Hinweistext unter der Chipzeile fehlt im Markup');
 
-    $fcCss2 = (string) file_get_contents($fcRoot . '/public/css/components/filter-chips.css');
+    $fcCss2 = (string) sourceCode($fcRoot . '/public/css/components/filter-chips.css');
     assertTrue(str_contains($fcCss2, '.filter-chips__hint'),
         '.filter-chips__hint fehlt in filter-chips.css');
     assertSame(1, preg_match('/\.filter-chip\[title\][^{]*\{[^}]*cursor:\s*help/s', $fcCss2),
@@ -530,7 +530,7 @@ test('Anwesenheit: Verwalterfilter werden ueber data-role ausgeblendet', functio
     assertSame(0, substr_count($rec, 'appointmentFilterGroup'),
         'records.js darf den Terminfilter nicht mehr selbst ausblenden');
 
-    $jahr = (string) file_get_contents($fcRoot . '/public/css/components/year-filter.css');
+    $jahr = (string) sourceCode($fcRoot . '/public/css/components/year-filter.css');
     assertTrue(str_contains($jahr, 'font-weight: 500'),
         'Die Jahresbeschriftung muss so fett sein wie die uebrigen Filterbeschriftungen');
 });
@@ -613,7 +613,7 @@ test('Anwesenheit: "Kommend" statt "Fehlend" fuer kommende Termine (OI-89)', fun
     assertSame(1, substr_count($js, '✗ Fehlend'), '"Fehlend" darf nur noch in attendanceStatusCell() stehen');
     assertTrue(str_contains($js, 'Kommend'), 'Anzeige "Kommend" fehlt');
 
-    $css = (string) file_get_contents($fcRoot . '/public/css/components/tables.css');
+    $css = (string) sourceCode($fcRoot . '/public/css/components/tables.css');
     assertTrue((bool) preg_match('/\.attendance-upcoming\s*\{[^}]*var\(--text-muted\)/s', $css),
         '"Kommend" braucht eine neutrale Farbe aus variables.css');
 });

@@ -49,9 +49,10 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 - Datei-Uploads werden über den tatsächlichen MIME-Typ geprüft, nicht über die Endung
 
 > [!NOTE]
-> EhrenSache liefert **bewusst keine Content-Security-Policy** aus: die Oberfläche arbeitet mit
-> Inline-Handlern, eine strikte CSP würde sie lahmlegen. Begründung und geplanter Weg dorthin
-> stehen als OI-17 in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
+> Eine **Content-Security-Policy** (`script-src 'self'`) tragen bisher die Anmeldeseite, die
+> Check-in-App und die virtuelle Station. Das Dashboard liefert **bewusst noch keine** aus: Es
+> arbeitet mit Inline-Handlern, eine strikte CSP würde es lahmlegen, eine weiche wäre nur
+> Fassade. Begründung und Weg dorthin stehen als OI-17 in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
 ---
 

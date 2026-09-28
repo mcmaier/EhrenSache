@@ -46,10 +46,23 @@ Options -Indexes
 # ============================================
 # SICHERHEITS-HEADER
 # ============================================
-# Bewusst OHNE Content-Security-Policy: Die Oberflaeche traegt 95 onclick-
-# Attribute in index.html. Eine CSP ohne 'unsafe-inline' legt sie still, eine
-# CSP mit 'unsafe-inline' waere gegen XSS wirkungslos und damit nur Fassade.
-# Der Weg dorthin steht als OI-17 in docs/OPEN-ITEMS.md.
+# Content-Security-Policy nur fuer login.html (OI-17, Etappe 1). Das Dashboard
+# (index.html) traegt noch ueber hundert Inline-Handler; eine CSP ohne
+# 'unsafe-inline' legte sie still, eine mit 'unsafe-inline' waere gegen XSS
+# wirkungslos und damit nur Fassade. Deshalb hier kein Header auf
+# Verzeichnisebene -- er gaelte fuer index.html mit. Check-in-PWA und Station
+# setzen ihre Richtlinie in der eigenen .htaccess. Der Weg fuer das Dashboard
+# steht als OI-17 in docs/OPEN-ITEMS.md; tests/suites/csp.php haelt fest, dass
+# keine Richtlinie ausserhalb dieses Abschnitts auftaucht.
+#
+# style-src 'unsafe-inline' ist eine bewusste Ausnahme: Inline-Styles sind
+# das deutlich kleinere Risiko, und die Seite traegt noch style-Attribute.
+<IfModule mod_headers.c>
+    <Files "login.html">
+        Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    </Files>
+</IfModule>
+
 <IfModule mod_headers.c>
     # Kein MIME-Sniffing -- ein hochgeladenes Logo bleibt ein Bild
     Header always set X-Content-Type-Options "nosniff"

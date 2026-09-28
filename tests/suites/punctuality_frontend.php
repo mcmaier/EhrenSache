@@ -23,7 +23,7 @@ require_once __DIR__ . '/../../private/helpers/punctuality.php';
 $puRoot = dirname(__DIR__, 2);
 
 test('Die Einstellungskarte fuehrt alle drei Schluessel', function () use ($puRoot) {
-    $html = (string) file_get_contents($puRoot . '/public/index.html');
+    $html = (string) sourceCode($puRoot . '/public/index.html');
 
     foreach (['punctuality_enabled', 'reliability_enabled', 'punctuality_grace_minutes'] as $key) {
         assertTrue(strpos($html, "data-key=\"{$key}\"") !== false, "Feld fuer {$key} fehlt");
@@ -31,7 +31,7 @@ test('Die Einstellungskarte fuehrt alle drei Schluessel', function () use ($puRo
 });
 
 test('Die Karenz erlaubt negative Werte und denselben Bereich wie der Server', function () use ($puRoot) {
-    $html  = (string) file_get_contents($puRoot . '/public/index.html');
+    $html  = (string) sourceCode($puRoot . '/public/index.html');
     $start = strpos($html, 'data-key="punctuality_grace_minutes"');
     assertTrue($start !== false, 'Karenzfeld fehlt');
 
@@ -47,7 +47,7 @@ test('Jeder Schluessel der Karte ist fuer Neuinstallationen angelegt', function 
     // Ein leeres Zahlenfeld blockiert in settings.js das Speichern ALLER
     // Einstellungen. Fehlt ein Schluessel im Schema, ist die Einstellungsseite
     // einer frischen Installation unbenutzbar.
-    $sql = (string) file_get_contents($puRoot . '/private/setup/ehrensache_db.sql');
+    $sql = (string) sourceCode($puRoot . '/private/setup/ehrensache_db.sql');
 
     foreach (['punctuality_enabled', 'reliability_enabled', 'punctuality_grace_minutes'] as $key) {
         assertTrue(strpos($sql, "('{$key}',") !== false, "{$key} fehlt im Insert-Block des Schemas");
@@ -57,7 +57,7 @@ test('Jeder Schluessel der Karte ist fuer Neuinstallationen angelegt', function 
 /** Rumpf einer Funktion aus statistics.js bis zur schliessenden Klammer in Spalte 1. */
 function puRumpf(string $puRoot, string $kopf): string
 {
-    $js    = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+    $js    = (string) sourceCode($puRoot . '/public/js/modules/statistics.js');
     $start = strpos($js, $kopf);
     assertTrue($start !== false, $kopf . ' fehlt');
 
@@ -67,7 +67,7 @@ function puRumpf(string $puRoot, string $kopf): string
 test('Eine abgeschaltete Kennzahl erscheint gar nicht erst als Chip', function () use ($puRoot) {
     // Seit 1.13.0 sind beide Quoten Anzeige-Chips statt Kachel mit hidden:
     // Sie werden schon aus dem Chipsatz genommen, wenn enabled false ist.
-    $html = (string) file_get_contents($puRoot . '/public/index.html');
+    $html = (string) sourceCode($puRoot . '/public/index.html');
     foreach (['statPunctualityCard', 'statReliabilityCard'] as $alt) {
         assertSame(0, substr_count($html, $alt), $alt . ' muss mit den Kennzahlkarten entfallen');
     }
@@ -97,7 +97,7 @@ test('Die Quoten tragen keine Farbskala', function () use ($puRoot) {
 test('Beide Pfade von renderStatistics zeichnen die Chips', function () use ($puRoot) {
     // Der Leerpfad kehrt frueh zurueck. Fehlte der Aufruf dort, blieben nach
     // einem Filterwechsel die Werte der vorherigen Auswahl stehen.
-    $js    = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+    $js    = (string) sourceCode($puRoot . '/public/js/modules/statistics.js');
     $start = strpos($js, 'export async function renderStatistics(');
     // Bis zur Schleife ueber die Gruppen -- dort beginnt der Tabellenaufbau,
     // und beide Aufrufe muessen davor stehen.
@@ -110,7 +110,7 @@ test('Beide Pfade von renderStatistics zeichnen die Chips', function () use ($pu
 });
 
 test('Der Chip nennt die Mindestzahl aus der Serverantwort', function () use ($puRoot) {
-    $js = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+    $js = (string) sourceCode($puRoot . '/public/js/modules/statistics.js');
 
     assertTrue(strpos($js, 'min_measurements') !== false,
         'Die Mindestzahl muss aus der Antwort kommen, nicht als 5 im Skript stehen');
@@ -121,7 +121,7 @@ test('Durchschnitt und Quoten nutzen dasselbe Zahlenformat', function () use ($p
     // "77.2%" neben "21,3 %". Seit der zweiten Sichtung steht der
     // Durchschnitt je Gruppe, die Quoten in der Kopfzeile -- dasselbe
     // Zahlenformat muessen sie trotzdem tragen.
-    $js = (string) file_get_contents($puRoot . '/public/js/modules/statistics.js');
+    $js = (string) sourceCode($puRoot . '/public/js/modules/statistics.js');
 
     assertSame(0, preg_match("/(overall_average|groupAverage\([^)]*\))\s*\+\s*'%'/", $js),
         'Der Durchschnitt nutzt noch Punkt und kein Leerzeichen');

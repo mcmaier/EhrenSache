@@ -129,14 +129,20 @@ Prüft ob das System installiert und betriebsbereit ist.
   "version": "1.0"
 }
 ```
+`version` ist ein fester Wert (`"1.0"`) und sagt **nichts** über den Stand der Installation.
+Für Versionsprüfungen gilt die Ressource [`version`](#version); `ping` meldet nur, ob das
+System antwortet und installiert ist.
 
-**Fehler-Status:**
+**Fehler-Status:** `503`
 ```json
 {
   "status": "not_installed",
   "message": "Installation required"
 }
 ```
+`message` ist je nach Ursache `"Installation required"` (keine `config.php`),
+`"Installation not completed"` (kein `install.lock`), `"Database schema missing"` (Tabelle
+`users` fehlt) oder `"Database connection failed"`.
 
 ---
 
@@ -465,7 +471,15 @@ behandeln, nie als HTML.
 - `year`, `date` (optional): Aktivitätsfilter über die Mitgliedschaftszeiträume
 - `include_inactive` (optional): `true` nimmt inaktive Mitglieder mit auf. **Wirkt nur für
   Admin/Manager** (`members.php:97`) — bei den Rollen `user` und `device` wird der Parameter
-  still ignoriert, die Antwort bleibt für sie ohnehin auf Aktive begrenzt.
+  still ignoriert.
+
+**Welche Mitglieder die Liste enthält:** Mit `date` gilt die Aktivregel für diesen Tag
+(`members.active = 1` und der Tag in einem Zeitraum aus `membership_dates`), mit `year` „im
+Jahr irgendwann aktiv". **Ohne beide** unterscheidet sich das nach Rolle: Die Rolle `device`
+bekommt die Regel von heute — dieselbe wie am Kiosk, damit ein Terminal Zuordnungen zu
+ausgetretenen Mitgliedern als verwaist erkennen kann (bis dahin kamen alle Mitglieder). Admin,
+Manager und `user` bekommen ohne `date`/`year` **alle** Mitglieder, auch inaktive; Admin und
+Manager sehen die Aktivität dann an `active`.
 
 **Response:** ein **Array**, kein Objekt — es gibt weder einen `members`-Umschlag noch eine
 Paginierung. Die Liste kommt vollständig; die Einstellung „Datenreihen pro Seite“ wirkt allein
@@ -1336,7 +1350,7 @@ Sucht passenden Termin im Zeitfenster. Kann automatisch einen neuen Termin anleg
   "member_id": 5,
   "checkin_source": "device_auth",
   "source_device": "device_auth",
-  "location_name": null,
+  "location_name": "Terminal Eingang",
   "appointment_action": "matched",
   "appointment": {
     "appointment_id": 10,
@@ -1348,10 +1362,32 @@ Sucht passenden Termin im Zeitfenster. Kann automatisch einen neuen Termin anleg
   "warning": null
 }
 ```
+`appointment_action` nennt, woher der Termin stammt: `"matched"` — ein bestehender Termin,
+gefunden im Toleranzfenster oder über `appointment_id` gewählt; `"created"` — ohne Treffer neu
+angelegt, weil `checkin_auto_create_appointment` eingeschaltet ist (dann trägt `appointment`
+zusätzlich `is_auto_created: 1`). Andere Werte gibt es nicht.
+
 `record_action` und `message` hängen zusammen: neu angelegt → `"created"` / „Check-in
 successful" (`201`); ein vorhandener Datensatz wird übernommen → `"updated"` / „Check-in
 updated" (`200`), oder bleibt stehen (spätere Ankunft, kein Ersatz) → `"unchanged"` / „Check-in
 unchanged" (`200`). `warning` steht nur bei `201` im Objekt (auch wenn `null`).
+
+**Ort bei Geräten (OI-102):** Ruft ein Gerätekonto auf, ist `location_name` der Gerätename —
+wie am Kiosk. Bis dahin stand dort `users.email`, und weil Geräte keine E-Mail haben, war der
+Ort immer `null`. Bestandsdaten bleiben so.
+
+**Aktivprüfung bei Geräten (OI-103):** Für ein Gerätekonto muss das Mitglied am **Tag der
+`arrival_time`** aktiv sein — `members.active = 1` und der Tag in einem Zeitraum aus
+`membership_dates` (ohne Zeiträume genügt `active`), dieselbe Regel wie am Kiosk. Sonst:
+```json
+{ "message": "Member not active", "reason": "member_inactive" }
+```
+mit `404`. Maßgeblich ist `reason`; eine unbekannte Nummer bleibt `404 "Member not found"`
+**ohne** `reason` (mit `searched_for`). Ein Terminal markiert an `member_inactive` die
+Zuordnung als verwaist. Weil der Stichtag das Ankunftsdatum ist, wird ein nachgereichter
+Eintrag nach seinem eigenen Tag beurteilt. Die Prüfung gilt **nur für Gerätekonten**: Admin und
+Manager dürfen über diesen Endpunkt bewusst auch für inaktive Mitglieder nachtragen, und auch für
+`user` wird nicht geprüft.
 
 **Fehler (kein Termin):** `409`
 ```json
@@ -1375,6 +1411,8 @@ Kein `success`-Feld; `message`, `reason` und `hint` sind die tatsächlichen Feld
 |---|---|---|
 | `201` / `200` | – | Check-in angelegt oder aktualisiert |
 | `403` | `appointment_not_permitted` | Termin gehört zu einer anderen Gruppe |
+| `404` | – | `"Member not found"`: Nummer bzw. `member_id` unbekannt |
+| `404` | `member_inactive` | Nur Gerätekonten: Mitglied am Tag der Ankunft nicht aktiv (OI-103) |
 | `404` | `appointment_not_found` | `appointment_id` existiert nicht |
 | `409` | `appointment_wrong_day` | Termin liegt an einem anderen Tag |
 | `409` | `appointment_outside_tolerance` | Termin liegt zeitlich außerhalb von `checkin_tolerance_hours` |
@@ -1452,6 +1490,23 @@ noch vor der Authentifizierung laufen) antwortet jede andere Ressource `403`.
 Eine vom Token erzeugte Session ist ohne den Token nicht nutzbar (`401`).
 Im Unterschied zu `auto_checkin` (das Gerät bürgt für die Identität) prüft hier der Server
 die Identität des Mitglieds; das Gerät ist nur Tastatur und Bildschirm.
+
+**Hardware-Terminal (`auth_device`, OI-101):** Auch das Token eines `auth_device` wird
+angenommen, damit ein Terminal mit Keypad Mitglieder ohne Fingerabdruck oder Karte per
+Mitgliedsnummer + PIN stempeln lassen kann. Es darf hier nur `GET status`, `POST identify`
+und `POST checkin`; `GET totp` und `POST work_*` antworten
+`403 "Action not available for this device type"` — geprüft vor der PIN, ein solcher Aufruf
+zählt also keinen Fehlversuch. Unbekannte Actions bleiben `400`. Im Status steht
+`totp_enabled` mangels Secret auf `false`, `worktime_enabled` am Terminal immer auf `false`,
+ebenso in der `identify`-Antwort (dort zusätzlich `activities: []`, `running_session: null`).
+Der Record trägt wie am Kiosk `checkin_source = station_pin` und den Gerätenamen. Gerätename
+Pflicht, Sperren und der Schalter `station_pin_enabled` gelten gleich. Anders als ein Kiosk
+behält ein `auth_device` alle übrigen Ressourcen, insbesondere `auto_checkin`. Ein Gerät
+erkennt die Unterstützung an `GET status` (`200` statt `403`). Andere Gerätetypen und
+Nicht-Geräte bekommen `403 "Kiosk device token required"`.
+
+**Hinweis für Clients:** `401` bedeutet an diesem Endpunkt entweder ein ungültiges Token oder
+`"Invalid member number or PIN"` — unterscheidbar nur an `message`.
 
 Steuerung über `?action=`. Andere Methoden als GET und POST antworten `405`.
 
@@ -1915,7 +1970,7 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
   "expected": true,
   "own": { "status": "no", "comment": "Urlaub", "status_changed_at": "2026-09-15 08:12:00",
            "is_late": false, "excuse_state": "pending", "excuse_created": true },
-  "summary": { "yes": 21, "no": 4, "maybe": 3, "open": 9 },
+  "summary": { "yes": 21, "no": 4, "maybe": 3, "open": 9, "open_without_access": 5 },
   "members": [ … ],
   "comparison": { … }
 }
@@ -1923,7 +1978,8 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
 
 - `members` — **Admin/Manager:** alle erwarteten Mitglieder nach Gruppen mit `status` (`null` =
   keine Antwort), `comment`, `status_changed_at`, `is_late`, `excuse_state`, `excuse_created` und
-  nach Beginn `present`. **Mitglied:** nur bei `names_visible`, dann ausschließlich `member_id`,
+  nach Beginn `present`, **seit OI-109** außerdem `has_access`. **Mitglied:** nur bei
+  `names_visible`, dann ausschließlich `member_id`,
   Name, Gruppe und Status. Ohne `names_visible` und ohne Admin/Manager-Rechte fehlt `members`
   ganz — keine Namen, keine Zugehörigkeiten.
 
@@ -1934,6 +1990,13 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
   markierten Gruppen des Mitglieds, unabhängig vom Termin. Beide Listen sind überschneidungsfrei
   und unterliegen denselben Sichtbarkeitsregeln wie die Namen selbst — ohne Namen keine
   Zugehörigkeiten.
+- `has_access` (in `members`) und `summary.open_without_access` — **nur Admin/Manager** (OI-109).
+  `has_access` ist wahr, wenn ein aktiver Benutzer (`is_active = 1`, `account_status = 'active'`,
+  kein Gerät) mit dem Mitglied verknüpft ist. Eingeladene, noch nicht aktivierte Konten zählen
+  nicht: Sie tragen das Mitglied erst nach der Aktivierung. `open_without_access` zählt die
+  erwarteten Mitglieder ohne Rückmeldung und ohne Zugang, eine Teilmenge von `open`. Beide Felder
+  fehlen in der Mitgliedssicht und bei `upcoming=1`. Die Druckansicht (`format=html`) nennt dieselbe
+  Zahl und kennzeichnet die Zeilen mit „keine Antwort (kein Zugang)“.
 - `comparison` — nur Admin/Manager, nur nach Beginn: Anzahl je `yes_present`, `yes_absent`,
   `no_present`, `no_absent`, `maybe_present`, `maybe_absent`, `none_present`, `none_absent`.
 - `is_late` — die letzte **Statusänderung** liegt nach der Frist (Frist = Beginn minus
