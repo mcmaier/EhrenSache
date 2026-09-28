@@ -17,6 +17,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   mitkommt; `"member_id": null` trennt sie weiterhin. Die Oberfläche schickt das Feld immer mit
   und war nicht betroffen. Ein `PUT` ohne verwertbares Feld antwortet jetzt auch bei Admins mit
   `400` statt `200`.
+- **Anwesenheitsliste: Termine am selben Tag laufen nicht mehr ineinander.** Die Liste
+  sortierte nur nach Datum und Ankunftszeit; bei zwei Terminen an einem Tag mischten sich deren
+  Einträge, und alle ohne Ankunftszeit standen gesammelt alphabetisch am Tagesende. Jetzt gilt:
+  Termin (neuester zuerst), darin Ankunft (neueste zuerst, fehlende zuletzt), erst bei gleicher
+  Zeit alphabetisch.
 
 ---
 
