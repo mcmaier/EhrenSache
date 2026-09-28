@@ -3567,11 +3567,21 @@ async function submitConfirmDelete() {
 // ZEITERFASSUNG
 // ========================================
 
-/** Minimales HTML-Escaping fuer Werte aus der Datenbank. */
+/**
+ * Minimales HTML-Escaping fuer Werte aus der Datenbank — auch fuer
+ * Attributwerte. Anfuehrungszeichen gehoeren dazu, weil ein Wert in
+ * title="${escapeHtml(feld)}" sonst ausbrechen kann; der Weg ueber einen
+ * Textknoten kodiert sie nicht. Das & muss zuerst ersetzt werden, sonst
+ * werden die eigenen Entities doppelt maskiert.
+ * Gegenprobe: tests/suites/escape_html_frontend.php.
+ */
 function escapeHtml(value) {
-    const div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return (value == null ? '' : String(value))
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 let worktimeSession = null;
@@ -4855,7 +4865,7 @@ window.setResponsesGrouping = function(stage) {
 function infoCardHtml(item) {
     const apt = item.appointment;
     const id = Number(apt.appointment_id);
-    const color = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#1F5FBF';
+    const color = safeHexColor(apt.color, '#1F5FBF');
     const kopf = `
         <div class="response-card__head">
             <strong>${escapeHtml(apt.title)}</strong>
@@ -4947,7 +4957,7 @@ function responseCardHtml(item) {
     const off = offline ? ' disabled' : '';
     // apt.color kommt vom Server frei waehlbar (Terminart-Einstellung) --
     // nur ein gueltiger Hexwert darf ungemaskiert in ein style-Attribut.
-    const color = /^#[0-9a-f]{3,8}$/i.test(apt.color || '') ? apt.color : '#1F5FBF';
+    const color = safeHexColor(apt.color, '#1F5FBF');
 
     const deadlinePassed = new Date(item.settings.deadline.replace(' ', 'T')) < new Date();
     const deadlineText = deadlinePassed

@@ -1970,7 +1970,7 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
   "expected": true,
   "own": { "status": "no", "comment": "Urlaub", "status_changed_at": "2026-09-15 08:12:00",
            "is_late": false, "excuse_state": "pending", "excuse_created": true },
-  "summary": { "yes": 21, "no": 4, "maybe": 3, "open": 9 },
+  "summary": { "yes": 21, "no": 4, "maybe": 3, "open": 9, "open_without_access": 5 },
   "members": [ … ],
   "comparison": { … }
 }
@@ -1978,7 +1978,8 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
 
 - `members` — **Admin/Manager:** alle erwarteten Mitglieder nach Gruppen mit `status` (`null` =
   keine Antwort), `comment`, `status_changed_at`, `is_late`, `excuse_state`, `excuse_created` und
-  nach Beginn `present`. **Mitglied:** nur bei `names_visible`, dann ausschließlich `member_id`,
+  nach Beginn `present`, **seit OI-109** außerdem `has_access`. **Mitglied:** nur bei
+  `names_visible`, dann ausschließlich `member_id`,
   Name, Gruppe und Status. Ohne `names_visible` und ohne Admin/Manager-Rechte fehlt `members`
   ganz — keine Namen, keine Zugehörigkeiten.
 
@@ -1989,6 +1990,13 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
   markierten Gruppen des Mitglieds, unabhängig vom Termin. Beide Listen sind überschneidungsfrei
   und unterliegen denselben Sichtbarkeitsregeln wie die Namen selbst — ohne Namen keine
   Zugehörigkeiten.
+- `has_access` (in `members`) und `summary.open_without_access` — **nur Admin/Manager** (OI-109).
+  `has_access` ist wahr, wenn ein aktiver Benutzer (`is_active = 1`, `account_status = 'active'`,
+  kein Gerät) mit dem Mitglied verknüpft ist. Eingeladene, noch nicht aktivierte Konten zählen
+  nicht: Sie tragen das Mitglied erst nach der Aktivierung. `open_without_access` zählt die
+  erwarteten Mitglieder ohne Rückmeldung und ohne Zugang, eine Teilmenge von `open`. Beide Felder
+  fehlen in der Mitgliedssicht und bei `upcoming=1`. Die Druckansicht (`format=html`) nennt dieselbe
+  Zahl und kennzeichnet die Zeilen mit „keine Antwort (kein Zugang)“.
 - `comparison` — nur Admin/Manager, nur nach Beginn: Anzahl je `yes_present`, `yes_absent`,
   `no_present`, `no_absent`, `maybe_present`, `maybe_absent`, `none_present`, `none_absent`.
 - `is_late` — die letzte **Statusänderung** liegt nach der Frist (Frist = Beginn minus

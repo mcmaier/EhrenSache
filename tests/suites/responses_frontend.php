@@ -425,3 +425,35 @@ test('OI-63: setMemberResponse verweigert fremde Aenderungen im gesperrten Zusta
     assertTrue($guardPos !== false && $firstApiCallPos !== false && $guardPos < $firstApiCallPos,
         'Der Sperr-Guard steht nicht vor dem ersten apiCall()');
 });
+
+test('OI-109: Offene Zeilen ohne Zugang tragen ein Kennzeichen', function () use ($rsRoot) {
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
+
+    $start = strpos($js, 'function managerMemberRowHtml');
+    assertTrue($start !== false, 'managerMemberRowHtml fehlt');
+    $ende = strpos($js, 'function managerTableHtml', $start);
+    assertTrue($ende !== false, 'Ende von managerMemberRowHtml nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'm.status === null && m.has_access === false'),
+        'Kennzeichen muss auf has_access === false pruefen, damit ein aelterer Server nichts anzeigt');
+    assertTrue(str_contains($body, 'response-no-access'), 'Klasse response-no-access fehlt');
+
+    $css = (string) sourceCode($rsRoot . '/public/css/components/badges.css');
+    assertTrue(str_contains($css, '.response-no-access'), 'badges.css gestaltet .response-no-access nicht');
+});
+
+test('OI-109: Filterknopf nennt die Zahl ohne Zugang', function () use ($rsRoot) {
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
+
+    $start = strpos($js, 'function managerTableHtml');
+    assertTrue($start !== false, 'managerTableHtml fehlt');
+    $ende = strpos($js, 'function responseNameChip', $start);
+    assertTrue($ende !== false, 'Ende von managerTableHtml nicht gefunden');
+    $body = substr($js, $start, $ende - $start);
+
+    assertTrue(str_contains($body, 'ohne Zugang'), 'Filterknopf nennt "ohne Zugang" nicht');
+    assertTrue(str_contains($body, '${openLabel}</button>'), 'Die Beschriftung landet nicht im Filterknopf');
+    assertTrue(str_contains($body, 'has_access === false'),
+        'Zaehlung ohne Zugang muss aus data.members kommen, wie openCount');
+});

@@ -149,10 +149,13 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             // Erfolg oder teilweiser Erfolg
             if (data.partial) {
                 // Warnung: Registrierung OK, aber Mail-Problem
-                successDiv.innerHTML = `
-                    <strong>⚠️ Registrierung erfolgreich mit Einschränkung</strong><br>
-                    ${data.message}
-                `;
+                //
+                // Der Text kommt aus der Antwort und geht als Textknoten in die
+                // Seite, nicht per innerHTML: Die uebrigen Zweige hier nutzen
+                // textContent, und login.js hat bewusst keine eigene
+                // Maskierungsfunktion -- die Datei steht ohne Modulimporte da.
+                successDiv.innerHTML = '<strong>⚠️ Registrierung erfolgreich mit Einschränkung</strong><br>';
+                successDiv.appendChild(document.createTextNode(data.message ?? ''));
                 successDiv.style.background = '#fff3cd';
                 successDiv.style.borderColor = '#ffc107';
                 successDiv.style.color = '#856404';

@@ -14,7 +14,7 @@ import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, curre
 import { debug } from '../app.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
-import { updateModalId } from './utils.js';
+import { updateModalId, safeTypeColor } from './utils.js';
 import { CHIPS_WORKTIME, CHIPS_ACTIVITY_TYPES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
@@ -54,10 +54,21 @@ const VERIFICATION_LABEL = {
 // HILFSFUNKTIONEN
 // ============================================
 
+/**
+ * Maskiert Freitext fuer HTML — auch fuer Attributwerte. Anfuehrungszeichen
+ * gehoeren dazu, weil ein Wert in style="…${escapeHtml(feld)}" oder
+ * title="${escapeHtml(feld)}" sonst ausbrechen kann; der Weg ueber einen
+ * Textknoten kodiert sie nicht. Das & muss zuerst ersetzt werden, sonst
+ * werden die eigenen Entities doppelt maskiert.
+ * Gegenprobe: tests/suites/escape_html_frontend.php.
+ */
 function escapeHtml(value) {
-    const div = document.createElement('div');
-    div.textContent = value == null ? '' : String(value);
-    return div.innerHTML;
+    return (value == null ? '' : String(value))
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 /** Minuten als "3:45 h" — die Form, in der Vereine über Stunden sprechen. */
@@ -73,9 +84,15 @@ export function formatMinutes(minutes) {
  * Die Farbe war bislang nur dort zu sehen, wo man sie einstellt — im
  * Stammdatenblock. Wiedererkennung stiftet sie erst in den Listen, in denen
  * viele Eintraege untereinander stehen.
+ *
+ * safeTypeColor() statt escapeHtml(): Maskierung ist fuer einen Farbwert die
+ * falsche Schranke. Eine Farbe hat ein Format, und wer "red; background:url(x)"
+ * hinterlegt, hat keine Farbe hinterlegt -- maskiert waere der Unsinn weiterhin
+ * im Attribut, nur unschaedlich. Alle uebrigen Farbstellen des Projekts pruefen
+ * das Format; dies war die letzte Ausnahme.
  */
 function activityDot(color) {
-    return `<span class="activity-dot" style="background: ${escapeHtml(color || '#1F5FBF')}"></span>`;
+    return `<span class="activity-dot" style="background: ${safeTypeColor(color || '#1F5FBF')}"></span>`;
 }
 
 /** Nachweisgrad einer Sitzung aus den beiden Ortsfeldern. */
@@ -829,7 +846,7 @@ export function renderActivityTypes() {
         <td>${activityDot(a.color)}${escapeHtml(a.activity_name)}</td>
         <td>${escapeHtml(a.description || '—')}</td>
         <td><span style="display: inline-block; width: 20px; height: 20px;
-            background: ${escapeHtml(a.color || '#1F5FBF')}; border-radius: 3px;
+            background: ${safeTypeColor(a.color || '#1F5FBF')}; border-radius: 3px;
             border: 1px solid #ddd;"></span></td>
         <td>${VERIFICATION_LABEL[a.verification] || escapeHtml(a.verification)}</td>
         <td>${groupBadges}</td>

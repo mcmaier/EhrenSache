@@ -40,7 +40,7 @@ Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103 sind am selben Tag in 
 erledigt. **OI-3 und OI-20 tragen ebenfalls
 *mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
 Restarbeit, und gehören deshalb nicht in eine Umsetzungsreihe. OI-62 steht auf
-*niedrig–mittel*, OI-104 bis OI-106, OI-108 und OI-109 auf *niedrig*.
+*niedrig–mittel*, OI-104 bis OI-106 und OI-108 auf *niedrig*.
 
 Seit der Durchsicht vom 17.09. veröffentlicht: OI-82 bis OI-84 (1.11.2), OI-85 (1.12.1),
 OI-86 und OI-87 (1.13.0), OI-25, OI-27, OI-66 und OI-95 (1.14.x),
@@ -1997,7 +1997,8 @@ sind seither grün.
 ---
 
 ### OI-109 · „Keine Antwort“ unterscheidet nicht, wer gar nicht antworten kann
-**Priorität:** niedrig · aufgenommen am 2026-09-25 (Beobachtung aus dem manuellen Test)
+**Priorität:** erledigt am 2026-09-28 · aufgenommen am 2026-09-25 (Beobachtung aus dem manuellen Test) ·
+umgesetzt auf `feat/oi-109-ohne-zugang`, Spec `docs/superpowers/specs/2026-09-28-rueckmeldung-ohne-zugang-design.md`
 
 Selbst zurückmelden kann nur ein Mitglied mit Benutzerkonto — also ein `users`-Satz mit dieser
 `member_id`, `account_status = 'active'` und `is_active = 1`. Für alle anderen trägt die
@@ -2018,9 +2019,10 @@ In einem Verein mit vielen Mitgliedern ohne Konto wird die Zahl damit zum Rausch
 Rückmeldungen, von denen acht niemand abgeben kann, sehen aus wie zwölf säumige Mitglieder.
 
 **Betroffene Stellen:** Ampel-Chips und Zusammenfassung in der Terminliste und im Dialog sowie
-der Filter „Keine Antwort (n)“ ([responses.js](../public/js/modules/responses.js)), die
-Rückmeldeübersicht der Check-in-App für Verwalter ([app.js](../public/checkin/js/app.js)) und
-der Druckbericht (`keine Antwort {$s['open']}` in `appointment_responses.php`).
+der Filter „Keine Antwort (n)“ ([responses.js](../public/js/modules/responses.js)) und der
+Druckbericht (`keine Antwort {$s['open']}` in `appointment_responses.php`). Die Check-in-App ist
+**nicht** betroffen: Sie holt Rückmeldungen auch für Verwalter nur in der Mitgliedssicht
+(`upcoming=1`).
 
 **Nicht betroffen:** die Zuverlässigkeit. `reliabilityOutcome()`
 ([punctuality.php](../private/helpers/punctuality.php)) wertet eine fehlende Rückmeldung nicht
@@ -2034,12 +2036,17 @@ als Versäumnis, nur Absage, Antrag und Anwesenheit. Ein Mitglied ohne Konto ver
   Rückmeldung nur durch die Verwaltung“.
 - Optional die Zusammenfassung aufteilen: „keine Antwort 12 (davon 8 ohne Zugang)“.
 
+**Umgesetzt** als `has_access` (nicht `has_account`: ein eingeladenes oder gesperrtes Konto ist ein
+Konto, aber kein Zugang) und `summary.open_without_access`, beide nur in der Verwaltersicht.
+Umfang: Rückmeldungs-Dialog (Kennzeichen „kein Zugang“, Filterknopf „Keine Antwort (12, davon 8
+ohne Zugang)“) und Druckbericht. Die Ampel-Chips der Terminliste bleiben ohne.
+
 **Bewusst nicht:** keine eigene Kategorie in der Zuverlässigkeit, keine eigene Filterleiste.
 Beim Umsetzen `API.md` nachziehen; der Lesepfad ist nach
 [OI-100](#oi-100--api-abgleich-schreibpfade-und-fünf-lesepfade-nicht-bewacht) nicht bewacht.
 
-**Zu klären:** Zählt ein Konto im Zustand `pending` (eingeladen, noch nicht aktiviert) als
-Zugang? Für die Frage „lohnt Nachhaken?“ eher ja, streng genommen kann es noch nicht antworten.
+**Geklärt:** Ein Konto im Zustand `pending` trägt das Mitglied nur in `pending_member_id`
+(`member_id` wird erst bei der Aktivierung gesetzt) und zählt damit als ohne Zugang.
 
 **Nicht sicherheitsrelevant.**
 
@@ -4493,6 +4500,24 @@ Kommentare vor dem Prüfen entfernen.
 **Warum nicht in OI-94:** Der Vorgang hat seine eigenen Wächter geradegezogen; eine Durchsicht
 aller Suiten ist Arbeit an der Testbasis und gehört nicht in ein Gestaltungsvorhaben.
 
+**Weitgehend erledigt am 2026-09-25 und 2026-09-28.** Der Durchgang ist gelaufen:
+`tests/lib/source.php` liefert Quelltext **ohne Kommentare**, je Sprache eigens behandelt (der
+JavaScript-Teil gegen einen echten Parser abgeglichen), alle Suiten wurden umgestellt, und
+`tests/suites/source_lib.php` verbietet `file_get_contents` in Suiten. Dabei kamen **sechs weitere**
+Zusicherungen ans Licht, die am Kommentar hingen — darunter `station_unit`, das einen Funktionsnamen
+suchte, der längst nur noch im Kommentar stand.
+
+**Zwei Werkzeugfehler kamen erst beim Anwenden ans Licht**, beide nur durch Mutationsproben:
+`html_sinks_frontend.php` kannte **keine Regex-Literale** — ein `"` in `/"/` brachte seine Scanner
+aus dem Takt, wodurch ganze Markup-Vorlagen unsichtbar wurden — und es stieg **nicht in
+verschachtelte Vorlagen** ab, sodass fünf von sechzehn `style`-Einsetzungen still herausfielen.
+Beides behoben und mit Selbstproben festgenagelt.
+
+**Was offen bleibt:** `tests/suites/pwa_escaping_frontend.php` liest weiterhin mit `file()` statt
+über `tests/lib/source.php` und prüft damit Kommentare mit. Der Wächter `source_lib` sieht das
+nicht, weil er nur `file_get_contents` verbietet — dieselbe Falle durch eine andere Tür. Solange
+das so ist, ist der Punkt nicht abgeschlossen.
+
 **Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: Es geht um die Verlässlichkeit der
 Wächter, nicht um eine ausnutzbare Lücke. Die geprüfte Schranke selbst ist vorhanden.
 
@@ -4530,3 +4555,83 @@ zwei (`#1F5FBF` für Rückmeldekarte und Tätigkeitspunkt, `#95a5a6` für Verlau
 
 **Nicht sicherheitsrelevant:** Die Prüfung ist vorhanden und schließt eingeschleustes CSS aus;
 die zu weite Fassung kostet die Ersatzfarbe, nicht die Schranke.
+
+---
+
+### OI-110 · Testsuiten durchsuchen fremde Arbeitsbäume im Projektverzeichnis
+**Priorität:** mittel · aufgenommen am 2026-09-28
+
+Die Desktop-App legt Arbeitsbäume unter `.claude/worktrees/<name>/` **innerhalb** des
+Projektverzeichnisses an. Dort liegt eine vollständige Kopie des Repositorys, einschließlich
+`tests/` und `private/`.
+
+`tests/suites/mailer_unit.php` durchläuft `$repoRoot` rekursiv und überspringt dabei `/tests/`
+und `/.git/`, aber **nicht** `/.claude/`. Es findet deshalb die Dateien des fremden Arbeitsbaums
+und meldet sie als Verstoß — zwei rote Tests, ohne dass etwas kaputt ist. Am 2026-09-28
+beobachtet mit `.claude/worktrees/unruffled-feynman-3b7d94`.
+
+**Das betrifft nicht nur diese eine Suite.** Rekursiv durchsuchen den Baum ebenfalls:
+`assets.php`, `escape_html_frontend.php`, `module_imports.php`, `update_package_unit.php`.
+Dass bisher nur `mailer_unit` auffiel, heißt nur, dass die anderen nach Mustern suchen, die im
+fremden Baum zufällig nicht vorkamen — nicht, dass sie gefeit sind.
+
+**Wirkung:** Wer einen Arbeitsbaum über die Desktop-App anlegt, färbt den Gesamtlauf aller
+anderen Sitzungen rot. Das trifft besonders die Release-Sitzung, die vor einem Tag einen grünen
+Lauf braucht — sie sieht dann einen Fehler, der keiner ist, und muss ihn wegerklären.
+
+**Zu tun:** `.claude/` in allen fünf Suiten überspringen. Sinnvoller als fünf Einzelfilter wäre
+ein gemeinsamer Helfer in `tests/lib/` — etwa ein Iterator, der die auszuschließenden
+Verzeichnisse an einer Stelle kennt. `.gitignore` schließt `.claude` bereits aus; die Suiten
+lesen aber das Dateisystem, nicht git.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-111 · `showToast()` maskiert nicht, die Aufrufer tun es einzeln
+**Priorität:** niedrig · aufgenommen am 2026-09-28
+
+`showToast()` (`public/js/modules/ui.js`) setzt seine Meldung per `innerHTML`, maskiert sie aber
+nicht. Statt dessen maskieren **fünf** Aufrufstellen selbst (`appointments.js` 2×,
+`management.js` 2×, `users.js` 1×) — und die übrigen nicht. Genau diese Aufteilung „die Senke
+verlässt sich auf ihre Aufrufer“ hat schon einmal dazu geführt, dass eine Stelle vergessen wurde.
+
+`api.js` schiebt bei jeder Fehlerantwort `result.message || result.hint` dorthin. **Ein Weg von
+einem Nutzer zu einem anderen wurde gesucht und nicht gefunden** (2026-09-28): Die Meldungstexte
+der Handler sind fest formuliert; die einzigen fremdbestimmten sind `$e->getMessage()`-Pfade, und
+die sieht nur der Absender selbst. Es ist also kein Angriffsweg, sondern eine Bauart, die
+irgendwann einer wird.
+
+**Zu tun:** In `showToast()` zentral maskieren. Dabei müssen die fünf Aufrufstellen ihr eigenes
+`escapeHtml()` verlieren, sonst steht dort künftig `&amp;amp;`. Der Wächter
+`html_sinks_frontend.php` führt `showToast` dann wieder als Senke.
+
+**Nebenbefund:** `hsIsRawField()` im Wächter erkennt nur einen Rückfall auf ein Literal, nicht die
+verkettete Form `feld || anderesFeld || 'x'`. Deshalb fällt diese Stelle heute nicht auf. Beides
+gehört zusammen behoben.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-112 · Strenge Attributregel gilt nur für `style`, nicht für `on…`
+**Priorität:** niedrig · aufgenommen am 2026-09-28
+
+Seit 2026-09-28 erkennt `tests/suites/html_sinks_frontend.php` Attributkontexte und verlangt für
+`style`-Attribute mehr als Maskierung: Der Wert muss durch `safeTypeColor()`/`safeHexColor()`
+laufen, eine Zahl sein oder ein Literal. Für `on…`-Attribute gilt diese Strenge **nicht**, obwohl
+dort derselbe Grund vorliegt — im Attribut steht JavaScript, Maskierung trägt dort ebenso wenig.
+
+**Warum nicht gleich mitgemacht:** Gemessen **86** Einsetzungen in `on…` gegen 16 in `style`. Fast
+alle sind numerische IDs oder kurze Schlüsselwörter (`'present'`, `'excused'`). Eine Regel dafür
+braucht einen Begriff von „dieser Wert kann nur eine Zahl oder ein Schlüsselwort sein“, den es im
+Wächter nicht gibt — ohne ihn wüchse die Ausnahmeliste auf Dutzende und der Wächter wäre nicht
+mehr zu pflegen.
+
+**Die eigentliche Abhilfe ist die Content-Security-Policy fürs Dashboard**
+([OI-17](#oi-17--keine-content-security-policy), Etappe 2). Mit ihr sind Inline-Handler
+grundsätzlich unwirksam, und die Frage stellt sich nicht mehr. `hsAttributeAt()` liefert den
+Attributnamen bereits — eine künftige Regel wäre nur ein Zweig, falls die CSP länger auf sich
+warten lässt.
+
+**Nicht sicherheitsrelevant.**

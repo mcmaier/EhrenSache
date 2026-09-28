@@ -7,7 +7,27 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.17.0] – 2026-09-28
+
+### Sicherheit
+- **Eingaben aus der Datenbank werden jetzt auch in HTML-Attributen vollständig maskiert.** Die
+  Maskierung der Oberfläche ließ Anführungszeichen stehen, ein gespeicherter Wert konnte dadurch
+  aus einem Attribut ausbrechen; einige Stellen waren gar nicht maskiert. Betroffen waren unter
+  anderem die Begründung von Anträgen, der Ort von Terminen, Mitgliedsnamen und die
+  Mitgliedsnummer in der Benutzerverwaltung. Über diese Felder konnte ein angemeldetes Konto —
+  bis hinunter zum einfachen Mitglied — Code in der Sitzung von Verwaltern oder Administratoren
+  ausführen. Betroffen waren alle Versionen seit 1.0.0. Siehe Advisory GHSA-fj3f-3q3v-w274.
+- **Die Seite „Passwort zurücksetzen“ maskiert unabhängig von der PHP-Version** und prüft den
+  Token vor jeder Verarbeitung. Unter PHP 8.0 war dort eine Einschleusung ohne Anmeldung möglich;
+  ab PHP 8.1 nicht.
+- **Farben des Erscheinungsbilds werden auf ihr Format geprüft**, bevor sie in öffentliche Seiten
+  und E-Mails gelangen.
+- **Meldungen aus Serverantworten gelangen maskiert in die Seite.**
+- **Anmeldeseite, Check-in-App und virtuelle Station tragen eine Content-Security-Policy.** Der
+  Browser führt dort nur noch Skripte aus, die aus der Installation selbst kommen. Eingeschleuster
+  Code in Knöpfen, Links oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der
+  Maskierung vorbei ins Markup schaffen sollte. Das Dashboard folgt in einem eigenen Schritt;
+  es arbeitet noch mit Inline-Handlern (OI-17).
 
 ### Neu
 - **Das Hardware-Terminal kann Mitglieder per Mitgliedsnummer und PIN stempeln lassen.** Die
@@ -19,6 +39,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Karte laufen unverändert über `auto_checkin` (OI-101).
 
 ### Geändert
+- **Der Rückmeldungs-Dialog zeigt, wer gar nicht selbst antworten kann.** Offene Rückmeldungen von
+  Mitgliedern ohne aktives Benutzerkonto tragen in der Verwaltungstabelle den Hinweis „kein
+  Zugang“, der Filterknopf nennt ihre Zahl („Keine Antwort (12, davon 8 ohne Zugang)“), der
+  Druckbericht ebenso. Nachhaken hilft bei ihnen nicht, eintragen muss die Verwaltung. Mitglieder
+  sehen davon nichts (OI-109).
 - **Die Check-in-App lädt den QR-Scanner nicht mehr aus dem Internet.** Die Bibliothek
   `html5-qrcode` (2.3.8) liegt jetzt im Installationspaket unter `public/js/vendor/`, statt bei
   jedem Aufruf von unpkg.com geholt zu werden. Der Scanner funktioniert damit auch in einem
@@ -46,13 +71,6 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   mitkommt; `"member_id": null` trennt sie weiterhin. Die Oberfläche schickt das Feld immer mit
   und war nicht betroffen. Ein `PUT` ohne verwertbares Feld antwortet jetzt auch bei Admins mit
   `400` statt `200`.
-
-### Sicherheit
-- **Anmeldeseite, Check-in-App und virtuelle Station tragen eine Content-Security-Policy.** Der
-  Browser führt dort nur noch Skripte aus, die aus der Installation selbst kommen. Eingeschleuster
-  Code in Knöpfen, Links oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der
-  Maskierung vorbei ins Markup schaffen sollte. Das Dashboard folgt in einem eigenen Schritt;
-  es arbeitet noch mit Inline-Handlern (OI-17).
 
 ---
 
