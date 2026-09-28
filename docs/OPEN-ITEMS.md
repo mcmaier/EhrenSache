@@ -4500,6 +4500,24 @@ Kommentare vor dem Prüfen entfernen.
 **Warum nicht in OI-94:** Der Vorgang hat seine eigenen Wächter geradegezogen; eine Durchsicht
 aller Suiten ist Arbeit an der Testbasis und gehört nicht in ein Gestaltungsvorhaben.
 
+**Weitgehend erledigt am 2026-09-25 und 2026-09-28.** Der Durchgang ist gelaufen:
+`tests/lib/source.php` liefert Quelltext **ohne Kommentare**, je Sprache eigens behandelt (der
+JavaScript-Teil gegen einen echten Parser abgeglichen), alle Suiten wurden umgestellt, und
+`tests/suites/source_lib.php` verbietet `file_get_contents` in Suiten. Dabei kamen **sechs weitere**
+Zusicherungen ans Licht, die am Kommentar hingen — darunter `station_unit`, das einen Funktionsnamen
+suchte, der längst nur noch im Kommentar stand.
+
+**Zwei Werkzeugfehler kamen erst beim Anwenden ans Licht**, beide nur durch Mutationsproben:
+`html_sinks_frontend.php` kannte **keine Regex-Literale** — ein `"` in `/"/` brachte seine Scanner
+aus dem Takt, wodurch ganze Markup-Vorlagen unsichtbar wurden — und es stieg **nicht in
+verschachtelte Vorlagen** ab, sodass fünf von sechzehn `style`-Einsetzungen still herausfielen.
+Beides behoben und mit Selbstproben festgenagelt.
+
+**Was offen bleibt:** `tests/suites/pwa_escaping_frontend.php` liest weiterhin mit `file()` statt
+über `tests/lib/source.php` und prüft damit Kommentare mit. Der Wächter `source_lib` sieht das
+nicht, weil er nur `file_get_contents` verbietet — dieselbe Falle durch eine andere Tür. Solange
+das so ist, ist der Punkt nicht abgeschlossen.
+
 **Nicht sicherheitsrelevant** im Sinne von `SECURITY.md`: Es geht um die Verlässlichkeit der
 Wächter, nicht um eine ausnutzbare Lücke. Die geprüfte Schranke selbst ist vorhanden.
 
