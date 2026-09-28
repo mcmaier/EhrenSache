@@ -18,12 +18,21 @@ declare(strict_types=1);
 
 $ckRoot = dirname(__DIR__, 2);
 
+/**
+ * Quelltext einer Projektdatei, bereits ohne Kommentare.
+ *
+ * Liest ueber sourceCode() aus tests/lib/source.php (OI-107): Wer die Datei
+ * roh einliest, bekommt die Kommentare mit -- und eine Zusicherung, die einen
+ * Namen sucht, ist dann schon vom erklaerenden Kommentar darueber erfuellt.
+ * Genau das ist im Projekt mehrfach passiert. tests/suites/source_lib.php
+ * wacht darueber.
+ */
 function ckFile(string $root, string $rel): string
 {
     $path = $root . '/' . $rel;
     assertTrue(is_file($path), "{$rel} fehlt");
 
-    return (string) file_get_contents($path);
+    return sourceCode($path);
 }
 
 /** Rumpf einer JS-Funktion ab ihrer Signatur bis zur schliessenden Klammer in Spalte 0. */
@@ -36,27 +45,6 @@ function ckFunctionBody(string $js, string $signature): string
     return substr($js, $start, $next - $start);
 }
 
-/**
- * Entfernt Kommentare, damit eine Zusicherung nicht vom Kommentar erfuellt wird
- * (OI-107).
- *
- * Beide Formen, und in dieser Reihenfolge: erst Bloecke, dann Zeilenreste. Ein
- * Muster, das den Kommentar am Zeilenanfang verankert, erwischt nur
- * GANZZEILIGE Kommentare -- ein nachgestellter ("const x = 1; // shiftKey") und
- * ein Blockkommentar bleiben stehen und erfuellen die Zusicherung weiter. Genau
- * so stand es hier bis zum Review und war damit halb wirkungslos. Dieselben
- * Muster wie in tests/suites/filter_chips_frontend.php (Zeilen 60 und 474).
- *
- * Gedacht fuer Funktionsruempfe. Auf eine ganze Datei angewandt trifft
- * '#//[^\n]*#' auch die Schraegstriche in einer URL ("https://...") -- in den
- * hier gelesenen Ruempfen kommt keine vor.
- */
-function ckOhneKommentare(string $js): string
-{
-    $js = (string) preg_replace('#/\*.*?\*/#s', '', $js);
-
-    return (string) preg_replace('#//[^\n]*#', '', $js);
-}
 
 /**
  * Der Rumpf von trapFocus ohne Kommentare, dazu der Name seines ersten
@@ -70,7 +58,7 @@ function ckTrapFocus(string $root): array
     assertTrue((bool) preg_match('/^export function trapFocus\(\s*(\w+)\s*,/', $roh, $sig),
         'trapFocus muss den Dialog als ersten Parameter nehmen');
 
-    return [ckOhneKommentare($roh), $sig[1]];
+    return [$roh, $sig[1]];
 }
 
 /**
