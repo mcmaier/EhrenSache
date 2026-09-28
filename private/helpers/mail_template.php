@@ -17,15 +17,24 @@ class EmailTemplate {
     /**
      * Setzt eine Vorlage zusammen.
      *
-     * Maskiert wird ueber brandingEscape(), also mit ausdruecklichem
-     * ENT_QUOTES: Mehrere Platzhalter landen in einem Attributwert in doppelten
-     * Anfuehrungen -- src="{{BASE_URL}}/{{ORGANIZATION_LOGO}}" in base.html
-     * sowie href="{{LOGIN_LINK}}", href="{{RESET_LINK}}" und
-     * href="{{VERIFICATION_LINK}}" in den Inhaltsvorlagen. Die Vorgabe von
-     * htmlspecialchars() ist bis PHP 8.0 ENT_COMPAT und laesst " stehen; das
-     * Projekt laesst PHP 8.0 zu (version.json). Der Logopfad ist dabei die
-     * Stelle mit Freitext dahinter: Er steht als organization_logo in
-     * system_settings.
+     * Maskiert wird ueber brandingEscape() statt htmlspecialchars() ohne
+     * Optionen. Das ist Sorgfalt, keine Behebung: Mehrere Platzhalter landen in
+     * einem Attributwert -- src="{{BASE_URL}}/{{ORGANIZATION_LOGO}}" in
+     * base.html sowie href="{{LOGIN_LINK}}", href="{{RESET_LINK}}" und
+     * href="{{VERIFICATION_LINK}}" in den Inhaltsvorlagen --, doch alle
+     * Attribute der Vorlagen stehen in DOPPELTEN Anfuehrungen, und die " maskiert
+     * schon ENT_COMPAT, die Vorgabe bis PHP 8.0. Ausbrechen konnte hier also
+     * nichts. Drei Gruende gibt es trotzdem:
+     *
+     * 1. Eine Vorgabe, die zwischen PHP 8.0 und 8.1 wechselt, taugt nicht als
+     *    Verlass -- version.json laesst 8.0 zu.
+     * 2. Traegt eine Vorlage spaeter ein Attribut in einfachen Anfuehrungen,
+     *    greift die Maskierung ohne ENT_QUOTES dort nicht.
+     * 3. htmlspecialchars(null) ist seit PHP 8.1 verworfen; brandingEscape()
+     *    wandelt vorher.
+     *
+     * Die Stelle mit Freitext dahinter ist der Logopfad: Er steht als
+     * organization_logo in system_settings.
      */
     public static function render($templateName, $variables = [], $pdo = null, $database = null) {
         // Branding laden (falls PDO übergeben)

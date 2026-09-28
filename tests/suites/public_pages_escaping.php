@@ -183,7 +183,7 @@ test('EmailTemplate::render() prueft die Farben und maskiert doppelte Anfuehrung
         'PRIMARY_COLOR'     => 'red</style><script>alert(1)</script>',
         'SECONDARY_COLOR'   => '#abc; background: url(http://boese.test/x)',
         'ORGANIZATION_LOGO' => 'x.png" onerror="alert(1)',
-        'ORGANIZATION_NAME' => 'Verein" onmouseover="alert(2)',
+        'ORGANIZATION_NAME' => "Verein' onmouseover='alert(2)",
         'USER_NAME'         => '<script>alert(3)</script>',
         'RESET_LINK'        => 'https://example.test/r" onclick="alert(4)',
     ]);
@@ -194,8 +194,14 @@ test('EmailTemplate::render() prueft die Farben und maskiert doppelte Anfuehrung
     assertTrue(strpos($html, '<script') === false, 'Markup steht in der Mail');
     assertTrue(strpos($html, 'boese.test') === false, 'Fremde Deklaration steht im Stilblock');
     assertTrue(strpos($html, 'onerror="') === false, 'Der Logopfad bricht aus src="…" aus');
-    assertTrue(strpos($html, 'onmouseover="') === false, 'Der Name bricht aus einem Attribut aus');
     assertTrue(strpos($html, 'onclick="') === false, 'Der Link bricht aus href="…" aus');
+
+    // ENT_QUOTES festnageln. Die Attribute der Vorlagen stehen in doppelten
+    // Anfuehrungen, und die " maskiert schon ENT_COMPAT -- diese Zusicherung ist
+    // die einzige, die den Unterschied bemerkt. Sie haelt die Maskierung
+    // vollstaendig, falls eine Vorlage spaeter einfache Anfuehrungen traegt.
+    assertTrue(strpos($html, "onmouseover='") === false, 'Der Name bricht aus einem Attribut aus');
+    assertTrue(strpos($html, '&#039;') !== false, 'Das einfache Anfuehrungszeichen wurde nicht maskiert');
     assertTrue(strpos($html, BRANDING_PRIMARY_DEFAULT) !== false, 'Die Vorgabefarbe greift nicht');
 
     // Gueltige Werte muessen weiterhin ankommen, sonst waere der Test gruen und
