@@ -269,6 +269,10 @@ function responsesRenderPrint($db, $database, array $payload): void
         if ($m['status'] === 'no' && $m['is_late']) {
             $status .= ' (kurzfristig)';
         }
+        // OI-109: offen und ohne Zugang -- Nachhaken hilft hier nicht.
+        if ($m['status'] === null && ($m['has_access'] ?? true) === false) {
+            $status .= ' (kein Zugang)';
+        }
         $byGroup[$m['group_name']][] = [
             $m['surname'] . ', ' . $m['name'],
             $status,
@@ -287,12 +291,15 @@ function responsesRenderPrint($db, $database, array $payload): void
     }
 
     $s = $payload['summary'];
+    $withoutAccess = (int) ($s['open_without_access'] ?? 0);
+    $openNote = "keine Antwort {$s['open']}"
+        . ($withoutAccess > 0 ? " (davon {$withoutAccess} ohne Zugang)" : '');
     renderReport($db, $database, [
         'title'    => 'Rückmeldungen: ' . $apt['title'],
         'period'   => date('d.m.Y', strtotime($apt['date'])) . ', ' . substr($apt['start_time'], 0, 5) . ' Uhr',
         'sections' => $sections,
         'notes'    => [
-            "Zusage {$s['yes']} · Unsicher {$s['maybe']} · Absage {$s['no']} · keine Antwort {$s['open']}",
+            "Zusage {$s['yes']} · Unsicher {$s['maybe']} · Absage {$s['no']} · {$openNote}",
             'Frist: ' . date('d.m.Y H:i', strtotime($payload['settings']['deadline'])) . ' Uhr',
         ],
     ]);

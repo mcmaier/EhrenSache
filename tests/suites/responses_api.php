@@ -1689,3 +1689,19 @@ test('OI-109: Mitglieder sehen nie, wer Zugang hat', function () {
         rsDropWorld($welt);
     }
 });
+
+test('OI-109: Druckbericht nennt offene Rueckmeldungen ohne Zugang', function () {
+    $welt = rsWorld('ZugangDruck', ['responses_enabled' => 1]);
+    try {
+        $apt = rsAppointment($welt, rsDateInDays(7), '19:00:00');
+
+        $res = rsGet('manager', ['appointment_id' => $apt, 'format' => 'html']);
+        assertStatus(200, $res);
+        assertTrue(str_contains($res['raw'], 'keine Antwort (kein Zugang)'),
+            'Zeile des Mitglieds ohne Zugang ist nicht gekennzeichnet');
+        assertTrue(str_contains($res['raw'], 'davon 1 ohne Zugang'),
+            'Hinweiszeile nennt die Zahl ohne Zugang nicht');
+    } finally {
+        rsDropWorld($welt);
+    }
+});
