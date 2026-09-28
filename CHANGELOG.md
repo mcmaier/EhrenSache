@@ -9,12 +9,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
-### Sicherheit
-- **Anmeldeseite, Check-in-App und virtuelle Station tragen eine Content-Security-Policy.** Der
-  Browser führt dort nur noch Skripte aus, die aus der Installation selbst kommen. Eingeschleuster
-  Code in Knöpfen, Links oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der
-  Maskierung vorbei ins Markup schaffen sollte. Das Dashboard folgt in einem eigenen Schritt;
-  es arbeitet noch mit Inline-Handlern (OI-17).
+### Neu
+- **Das Hardware-Terminal kann Mitglieder per Mitgliedsnummer und PIN stempeln lassen.** Die
+  Ressource `station` nimmt neben dem Kiosk jetzt auch Geräte vom Typ `auth_device` an, damit
+  Mitglieder ohne Fingerabdruck oder Karte am Keypad des Terminals einchecken können. Der Server
+  prüft die PIN wie am Kiosk; der Eintrag trägt die Quelle „Stations-PIN“ und den Gerätenamen.
+  Erlaubt sind dort nur Status, Anmeldung und Check-in — Stations-Code und Arbeitszeit bleiben
+  dem Kiosk vorbehalten und werden abgewiesen, ohne einen PIN-Versuch zu verbrauchen. Finger und
+  Karte laufen unverändert über `auto_checkin` (OI-101).
 
 ### Geändert
 - **Die Check-in-App lädt den QR-Scanner nicht mehr aus dem Internet.** Die Bibliothek
@@ -22,6 +24,28 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   jedem Aufruf von unpkg.com geholt zu werden. Der Scanner funktioniert damit auch in einem
   Vereinsnetz ohne Internetzugang, und kein fremder Server erfährt mehr, wann die App geöffnet
   wird.
+- **Ein Gerät checkt ein ausgetretenes Mitglied nicht mehr ein.** `auto_checkin` prüft für
+  Gerätekonten jetzt dieselbe Regel wie der Kiosk: Mitglied aktiv und der Tag der Ankunft in
+  einem Mitgliedschaftszeitraum. Bisher reichte, dass es die Nummer gab — ein noch angelernter
+  Finger oder eine Karte erzeugte Anwesenheiten, die in keiner Auswertung auftauchten. Die
+  Antwort trägt `reason: "member_inactive"`, das Terminal markiert daran die Zuordnung als
+  verwaist. Admin und Manager dürfen über den Endpunkt weiterhin auch für inaktive Mitglieder
+  nachtragen (OI-103).
+- **Die Mitgliederliste für Geräte enthält nur noch heute aktive Mitglieder.** Ohne Jahr oder
+  Datum lieferte `GET members` einem Gerät bisher alle Mitglieder, auch ausgetretene. Damit
+  kann das Terminal verwaiste Zuordnungen erkennen und im Admin-Menü zum Löschen anbieten.
+
+### Behoben
+- **Check-ins von Geräten tragen den Gerätenamen als Ort.** Bisher las `auto_checkin` dafür die
+  E-Mail des Gerätekontos, die es nicht gibt — der Ort blieb immer leer. Bestehende Einträge
+  bleiben ohne Ort (OI-102).
+
+### Sicherheit
+- **Anmeldeseite, Check-in-App und virtuelle Station tragen eine Content-Security-Policy.** Der
+  Browser führt dort nur noch Skripte aus, die aus der Installation selbst kommen. Eingeschleuster
+  Code in Knöpfen, Links oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der
+  Maskierung vorbei ins Markup schaffen sollte. Das Dashboard folgt in einem eigenen Schritt;
+  es arbeitet noch mit Inline-Handlern (OI-17).
 
 ---
 

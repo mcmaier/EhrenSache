@@ -40,6 +40,8 @@ verpflichtet, die datenschutzrechtlichen Vorgaben eigenständig umzusetzen.
 - [ ] **Auftragsverarbeitungsvertrag (AVV)** mit Hosting-Provider abschließen
 - [ ] Nur falls **Pünktlichkeit oder Zuverlässigkeit** eingeschaltet werden sollen: Abschnitt 11
       lesen und den Zweck festlegen, **bevor** der Schalter umgelegt wird
+- [ ] Nur falls ein **Hardware-Terminal mit Fingerabdruck** betrieben werden soll: Abschnitt 13
+      lesen und die Einwilligungen einholen, **bevor** der erste Finger angelernt wird
 
 ### Phase 2: Technische Maßnahmen
 
@@ -114,6 +116,9 @@ Sie benötigen eine **Rechtsgrundlage** für die Datenverarbeitung (Art. 6 DSGVO
 - **Änderungshistorie der Arbeitszeiten**: wer wann welchen Wert geändert,
   freigegeben, abgelehnt oder gelöscht hat
 - **Stations-PIN** (nur als Hash; Zeitpunkt der letzten Änderung): wird mit dem Mitglied gelöscht
+- **Herkunft eines Check-ins**: Quelle (z. B. App, Station per PIN, Gerät) und Name des Geräts
+  bzw. der Station. Ein Hardware-Terminal hält zusätzlich Daten **auf dem Gerät** — siehe
+  Abschnitt 13; biometrische Daten liegen nie auf dem Server
 - **Pünktlichkeit und Zuverlässigkeit** (nur wenn eingeschaltet, siehe Abschnitt 11): keine
   gespeicherten Daten, sondern Kennzahlen, die bei jedem Aufruf aus Anwesenheiten und Abmeldungen
   berechnet werden
@@ -585,7 +590,120 @@ eigenen Rückmeldungen stehen in der Selbstauskunft (Profil → „Meine Daten",
 
 ---
 
-## 13. Hilfreiche Links & Ressourcen
+## 13. Hardware-Terminal (Fingerabdruck, Karte, PIN)
+
+Das Hardware-Terminal ist ein eigenes Gerät (ESP32 mit Fingerabdrucksensor, Kartenleser und
+Tastatur), das im Server als Gerät vom Typ „Authentifiziert Benutzer“ (`auth_device`)
+eingerichtet wird. Es ist **optional**; ohne ein solches Gerät betrifft Sie dieser Abschnitt
+nicht.
+
+### 13.1 Drei Wege, zwei Vertrauensmodelle
+
+| Weg | Wer prüft die Identität? | Was der Server erhält |
+|---|---|---|
+| Fingerabdruck | das Gerät (Sensor) | Mitgliedsnummer, Zeit — Quelle „Gerät“ (`device_auth`) |
+| Karte | das Gerät (Kartennummer) | Mitgliedsnummer, Zeit — Quelle „Gerät“ (`device_auth`) |
+| Mitgliedsnummer + PIN | der Server | Nummer und PIN zur Prüfung — Quelle „Station (PIN)“ (`station_pin`) |
+
+In allen drei Fällen speichert der Server nur die **Anwesenheit** (Termin, Zeit, Quelle, Name
+des Geräts), wie bei jedem anderen Check-in. Die PIN liegt auf dem Server nur als Hash, wie bei
+der virtuellen Station. Am Gerät steht sie nur im Arbeitsspeicher, wird nach der Anfrage
+überschrieben und weder gespeichert noch protokolliert.
+
+### 13.2 Was auf dem Gerät liegt
+
+| Daten | Ort | Schutz und Zweck |
+|---|---|---|
+| Fingerabdruck-Merkmale (Templates) | im Sensor selbst | verlassen den Sensor nie — weder zum ESP32 noch in dessen Speicher noch zum Server |
+| Zuordnung: Sensor-ID (Finger) bzw. Karten-UID → Mitgliedsnummer, dazu Zeitpunkt des Anlernens und ein Merker „verwaist“ | Speicher des Geräts (NVS) | verschlüsselt |
+| Namensliste (Vorname, Nachname, Mitgliedsnummer) | Speicher des Geräts (NVS) | verschlüsselt; dient nur der Bestätigung beim Anlernen und der Anzeige des Vornamens |
+| Warteschlange bei fehlender Verbindung (Mitgliedsnummer, Ankunftszeit, Art Finger/Karte, Anzahl Versuche) | Speicher des Geräts (NVS) | verschlüsselt; höchstens 200 Einträge |
+| Konfiguration (Geräte-Token, WLAN-Zugang, Admin-PIN des Geräts) | Speicher des Geräts | verschlüsselt |
+
+Die Verschlüsselung setzt die Release-Fassung der Firmware voraus (Flash- und
+NVS-Verschlüsselung des ESP32). Ein Gerät mit Entwicklungsfirmware ist für den Echtbetrieb
+nicht gedacht.
+
+**Namensliste.** Das Gerät bezieht sie vom Server und ersetzt sie täglich und nach jedem
+Neustart vollständig. Der Server liefert nur Mitglieder, die am Tag des Abrufs aktiv sind;
+wer ausgetreten ist, verschwindet also spätestens mit der nächsten Aktualisierung aus der
+Liste. Seine Zuordnung wird dann als verwaist markiert und im Admin-Menü zum Löschen
+angeboten — **nicht** automatisch gelöscht (13.4).
+
+**Warteschlange.** Ein Eintrag wird gelöscht, sobald der Server ihn angenommen hat, sobald
+der Server ihn fachlich ablehnt (etwa weil das Mitglied nicht aktiv ist oder kein Termin im
+Zeitfenster liegt) oder sobald er älter ist als das Zeitfenster für Check-ins
+(`checkin_tolerance_hours`). Ein so verworfener Eintrag wird auch nicht mehr als Anwesenheit
+erfasst.
+
+**Anzeige.** Nach einer Erfassung zeigt das Gerät einige Sekunden lang nur den Vornamen und den
+Termin. Eine Mitgliederliste zeigt es nie, eine PIN nie im Klartext.
+
+**Diagnose-Ausgabe.** Über die serielle Schnittstelle (UART0) gibt das Gerät bei
+Bildschirmwechseln Mitgliedsnummern und Vornamen aus, nie Token oder PIN. Die Ausgabe wird nicht
+gespeichert, erscheint nur bei angeschlossenem Kabel, und im Gehäuse ist die Schnittstelle nicht
+zugänglich. Wer das Gerät öffnet und ein Kabel anschließt, kann sie also mitlesen — das gehört
+zum Schutz des Geräts selbst (13.5).
+
+### 13.3 Fingerabdruck ist ein biometrisches Datum
+
+Fingerabdruck-Merkmale zur eindeutigen Identifizierung gehören zu den **besonderen Kategorien
+personenbezogener Daten** (Art. 9 Abs. 1 DSGVO). Dass sie das Gerät nie verlassen, verringert
+das Risiko erheblich — es ändert aber nichts daran, dass **Sie** sie verarbeiten: Der Verein
+betreibt das Gerät und lernt die Finger an.
+
+- **Rechtsgrundlage:** Für einen Verein kommt praktisch nur die **ausdrückliche Einwilligung**
+  in Betracht (Art. 9 Abs. 2 lit. a DSGVO). Holen Sie sie **schriftlich und je Person** ein,
+  bevor der Finger angelernt wird, und bewahren Sie sie auf.
+- **Freiwilligkeit:** Die Einwilligung ist nur wirksam, wenn es eine gleichwertige Alternative
+  gibt. Das Terminal bietet sie: Karte oder Mitgliedsnummer + PIN, außerdem die App. Niemand
+  darf zum Fingerabdruck gedrängt werden.
+- **Widerruf:** Ein Widerruf muss jederzeit möglich sein und die Merkmale am Gerät löschen
+  (13.4). Die bis dahin erfassten Anwesenheiten bleiben davon unberührt — sie enthalten keine
+  biometrischen Daten.
+- **Datenschutz-Folgenabschätzung:** Ob sie nötig ist (Art. 35 DSGVO), hängt vom Umfang ab.
+  Prüfen Sie es anhand der Liste Ihrer Aufsichtsbehörde und halten Sie das Ergebnis fest.
+
+Für **Karte und PIN** genügt dieselbe Rechtsgrundlage wie für die übrige Anwesenheit
+(Abschnitt 3). Sie sind keine biometrischen Daten.
+
+### 13.4 Löschung
+
+- **Austritt oder Widerruf:** Am Gerät löscht ein Admin über das Admin-Menü „Merkmale löschen“
+  die Merkmale des Mitglieds: Finger aus dem Sensor und aus der Zuordnung, Karten aus der
+  Zuordnung. Zuordnungen zu Mitgliedern, die nicht mehr in der Namensliste stehen, bietet das
+  Gerät unter „Verwaiste Einträge“ zum Löschen an; gelöscht wird dort erst auf Bestätigung.
+  Prüfen Sie diesen Menüpunkt deshalb regelmäßig, etwa nach Austritten.
+- **Gerät außer Betrieb, Weitergabe, Reparatur:** Werksreset am Gerät. Er löscht die Merkmale
+  im Sensor, die Zuordnung, die Namensliste und die Konfiguration (Token, WLAN-Zugang,
+  Admin-PIN). Die **Warteschlange** löscht er nur nach eigener Rückfrage, die die Zahl der
+  offenen Einträge nennt („löschen“ oder „behalten“) — so gehen noch nicht übertragene
+  Anwesenheiten nicht verloren. Verlässt das Gerät den Verein, wählen Sie „löschen“.
+- **Server:** Die Anwesenheiten unterliegen denselben Fristen wie jede andere Anwesenheit
+  (*Einstellungen → DSGVO Datenverwaltung*).
+
+Ein inaktives oder ausgetretenes Mitglied kann am Terminal nicht mehr einchecken; der Server
+weist den Check-in ab, auch wenn Finger oder Karte am Gerät noch angelernt sind.
+
+### 13.5 Wer was tun kann
+
+Angelernt und gelöscht wird **nur am Gerät**, durch einen Admin mit Admin-PIN des Geräts.
+Anlernen braucht zusätzlich die Verbindung zum Server und die geladene Namensliste. Im
+Dashboard gibt es dafür keine Verwaltung, und der Server kennt weder Merkmale noch Sensor-IDs
+oder Kartennummern. Schützen Sie die Admin-PIN des Geräts und das Gerät selbst: Es sollte so
+angebracht sein, dass es sich nicht unbemerkt öffnen lässt.
+
+### 13.6 Was Sie den Mitgliedern sagen müssen
+
+- dass es das Terminal gibt, wo es steht und welche Wege es anbietet
+- dass der Fingerabdruck **freiwillig** ist und Karte, PIN oder App gleichwertig bleiben
+- dass die Fingerabdruck-Merkmale nur im Sensor des Geräts liegen und nie an den Server gehen
+- welche Daten auf dem Gerät liegen (13.2) und wie sie gelöscht werden (13.4)
+- wie die Einwilligung widerrufen werden kann
+
+---
+
+## 14. Hilfreiche Links & Ressourcen
 
 ### Gesetzestexte
 - **DSGVO**: https://dsgvo-gesetz.de
@@ -605,7 +723,7 @@ eigenen Rückmeldungen stehen in der Selbstauskunft (Profil → „Meine Daten",
 
 ---
 
-## 14. Häufige Fragen (FAQ)
+## 15. Häufige Fragen (FAQ)
 
 **Q: Müssen wir einen Datenschutzbeauftragten bestellen?**  
 A: Nur falls mind. 20 Personen ständig mit automatisierter Datenverarbeitung 
@@ -624,7 +742,7 @@ aber Abmahnungen möglich).
 
 ---
 
-## 15. Disclaimer
+## 16. Disclaimer
 
 **Keine Rechtsberatung**: Diese Hinweise dienen der Orientierung und 
 ersetzen keine individuelle Rechtsberatung. Im Zweifel konsultieren Sie 
