@@ -169,10 +169,11 @@ export function groupSelectOptionsHtml(groups) {
     }
 
     const main = list.filter(g => g.is_subgroup != 1);
-    // subgroupLabel() ist Freitext aus den Einstellungen -- für den
-    // Attribut-Kontext reicht das Escaping von escapeHtml() (utils.js) nicht,
-    // da es Anführungszeichen im Textknoten nicht kodiert.
-    const attrLabel = subgroupLabel().replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    // subgroupLabel() ist Freitext aus den Einstellungen und landet hier in
+    // einem Attribut. escapeHtml() maskiert auch " und ', deckt den
+    // Attribut-Kontext also mit ab -- eine eigene Maskierung daneben waere
+    // eine zweite Fassung, die auseinanderlaufen kann.
+    const attrLabel = escapeHtml(subgroupLabel());
     return `<optgroup label="Gruppen">${main.map(option).join('')}</optgroup>`
         + `<optgroup label="${attrLabel}">${subgroups.map(option).join('')}</optgroup>`;
 }

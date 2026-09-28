@@ -1879,10 +1879,8 @@ function findAppointmentType(appointment_type_id = null)
  * einzige Schranke: Farbe ueber safeTypeColor(), Text per escapeHtml().
  *
  * ACHTUNG beim Weiterverwenden von `name`: Der Wert ist BEREITS HTML-maskiert
- * und gehoert nur als Elementtext ins Markup. escapeHtml() maskiert < > &,
- * aber weder " noch ' -- in einem Attribut (title="${name}") waere er
- * ausbrechbar. Und ueber textContent gesetzt erschiene eine Terminart
- * "Probe & Auftritt" dem Nutzer als "Probe &amp; Auftritt".
+ * und gehoert nur ins Markup, nicht in textContent -- dort erschiene eine
+ * Terminart "Probe & Auftritt" dem Nutzer als "Probe &amp; Auftritt".
  *
  * Fehlt die Terminart -- oder sind die Terminarten noch nicht geladen --,
  * bleibt der Name leer. Die Zeile zeigt dann nur den grauen Streifen; ein
