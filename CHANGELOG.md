@@ -7,6 +7,24 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Behoben
+- **Ein Teil-Update eines Benutzers trennt ihn nicht mehr von seinem Mitglied.** `PUT users`
+  setzte bei Admins `member_id` auf leer, sobald der Schlüssel im Request fehlte — wer per API
+  nur `account_status`, `is_active` oder den Namen änderte, nahm dem Konto still Check-in,
+  eigene Statistik und Rückmeldungen. Die Verknüpfung ändert sich jetzt nur, wenn `member_id`
+  mitkommt; `"member_id": null` trennt sie weiterhin. Die Oberfläche schickt das Feld immer mit
+  und war nicht betroffen. Ein `PUT` ohne verwertbares Feld antwortet jetzt auch bei Admins mit
+  `400` statt `200`.
+- **Anwesenheitsliste: Termine am selben Tag laufen nicht mehr ineinander.** Die Liste
+  sortierte nur nach Datum und Ankunftszeit; bei zwei Terminen an einem Tag mischten sich deren
+  Einträge, und alle ohne Ankunftszeit standen gesammelt alphabetisch am Tagesende. Jetzt gilt:
+  Termin (neuester zuerst), darin Ankunft (neueste zuerst, fehlende zuletzt), erst bei gleicher
+  Zeit alphabetisch.
+
+---
+
 ## [1.17.0] – 2026-09-28
 
 ### Sicherheit

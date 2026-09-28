@@ -32,7 +32,7 @@ const PE_TEXT_FIELDS = 'title|appointment_title|appointment_type_name|type_name|
 function peUnescaped(string $file): array
 {
     $funde = [];
-    $zeilen = file($file, FILE_IGNORE_NEW_LINES) ?: [];
+    $zeilen = sourceLines($file);
 
     foreach ($zeilen as $nr => $zeile) {
         // Nur Zeilen mit Markup: Text fuer textContent oder showMessage()

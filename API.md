@@ -2779,6 +2779,13 @@ erscheint nur in dieser Antwort; danach ist er nur noch über das Bearbeiten-For
 
 **Berechtigung:** Admin
 
+Geschrieben wird nur, was im Request steht. Das gilt auch für die Mitgliedsverknüpfung eines
+Benutzers: Ohne `member_id` bleibt sie unverändert, `"member_id": null` trennt sie, eine andere
+ID hängt sie um (dieselbe Prüfung wie beim Anlegen: `409`, wenn das Mitglied schon mit einem
+anderen Benutzer verknüpft ist, `404`, wenn es nicht existiert). Früher trennte jedes
+Admin-`PUT` ohne `member_id` die Verknüpfung. Enthält der Request kein verwertbares Feld,
+antwortet der Endpunkt mit `400 "Keine Daten zum Aktualisieren"`.
+
 Um das TOTP-Secret eines Geräts zu ändern, ohne den Wert selbst zu übertragen:
 ```json
 {

@@ -707,39 +707,6 @@ async function loadMembersForEdit(currentMemberId = null) {
     }
 }
 
-window.saveMemberLink = async function() {
-    const userId = document.getElementById('user_id').value;
-    const memberId = document.getElementById('editMemberId').value;
-
-    const confirmed = await showConfirm(
-        `Mitgliedsverknüpfung ändern?`,
-        'Änderung bestätigen'
-    );
-
-    if(!confirmed)
-    {
-        return;
-    }
-    
-    try {
-        const response = await apiCall('users', 'PUT', {
-            member_id: memberId ? parseInt(memberId) : null
-        }, { id: userId });
-        
-        if (response.success || response.message === 'User updated') {
-            showToast('Verknüpfung aktualisiert', 'success');
-            
-            // Modal neu laden
-            await loadUserFormData(userId);
-            cancelMemberEdit();
-        } else {
-            showToast('Fehler: ' + response.message, 'error');
-        }
-    } catch (error) {
-        showToast('Fehler beim Speichern: ' + error.message, 'error');
-    }
-};
-
 // ============================================
 // CRUD FUNCTIONS
 // ============================================
