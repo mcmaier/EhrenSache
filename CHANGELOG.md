@@ -7,6 +7,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Sicherheit
+- **Das Dashboard trägt jetzt eine Content-Security-Policy.** Der Browser führt dort nur noch
+  Skripte aus, die aus der Installation selbst kommen; eingeschleuster Code in Knöpfen, Links
+  oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der Maskierung vorbei ins Markup
+  schafft. Dafür bedient sich das Dashboard nicht mehr über Inline-Handler, sondern über eine
+  zentrale Aktionstabelle. Die öffentlichen Seiten „Passwort zurücksetzen“ und „E-Mail
+  bestätigen“ führen gar kein Skript mehr aus. Damit gilt die CSP für alle Oberflächen außer
+  den Assistenten für Installation und Update (OI-17).
+
 ## [1.17.1] – 2026-09-28
 
 ### Behoben

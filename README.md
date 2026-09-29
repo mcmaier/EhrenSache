@@ -49,10 +49,11 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 - Datei-Uploads werden über den tatsächlichen MIME-Typ geprüft, nicht über die Endung
 
 > [!NOTE]
-> Eine **Content-Security-Policy** (`script-src 'self'`) tragen bisher die Anmeldeseite, die
-> Check-in-App und die virtuelle Station. Das Dashboard liefert **bewusst noch keine** aus: Es
-> arbeitet mit Inline-Handlern, eine strikte CSP würde es lahmlegen, eine weiche wäre nur
-> Fassade. Begründung und Weg dorthin stehen als OI-17 in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
+> Alle Oberflächen außer den Assistenten für Installation und Update liefern eine
+> **Content-Security-Policy** aus (`script-src 'self'`, die öffentlichen Seiten ohne jedes
+> Skript). Eingeschleustes Skript wird dadurch auch dann nicht ausgeführt, wenn es an der
+> Maskierung vorbei ins Markup gelangt. Hintergrund: OI-17 in
+> [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
 ---
 

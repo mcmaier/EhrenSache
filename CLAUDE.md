@@ -249,12 +249,17 @@ exceptions, statistics und work_sessions (siehe `docs/OPEN-ITEMS.md`).
 - TOTP für standortgebundene Geräte-Check-ins
 - HttpOnly + SameSite Cookies, `Secure` nur über HTTPS (`public/api/api.php`)
 - `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` in `public/.htaccess`
-- **CSP nur für Anmeldung, Check-in-PWA und Station** (`script-src 'self'`, gesetzt in
-  `public/.htaccess` im Abschnitt `<Files "login.html">`, `public/checkin/.htaccess`,
-  `public/station/.htaccess`). Dort **keine Inline-Handler** — Knöpfe aus Templates über
-  `data-action` und einen delegierten Zuhörer; `tests/suites/csp.php` wacht darüber. Das
-  Dashboard hat noch keine CSP (Inline-Handler, OI-17 Etappe 2), Maskierung bleibt dort die
-  einzige Schranke
+- **CSP für alle Oberflächen außer `install/` und `update/`** (`script-src 'self'`; die
+  öffentlichen PHP-Seiten `script-src 'none'`), gesetzt in `public/.htaccess` in
+  `<Files>`-Abschnitten sowie in `public/checkin/.htaccess` und `public/station/.htaccess`.
+  Der Abschnitt `<Files "index.html">` trifft auch `checkin/` und `station/index.html`, deshalb
+  dort `Header always setifempty`, nicht `set`. **Keine Inline-Handler:** Knöpfe tragen
+  `data-action` (bzw. `data-action-change`, `data-action-submit`), das Modul registriert die
+  Aktion mit `registerActions()` aus `public/js/modules/actions.js`. `tests/suites/csp.php`
+  (keine Inline-Handler, kein Inline-Skript) und `actions_frontend.php` (Abgleich Markup ↔
+  Aktionstabelle, dazu Wächter gegen neue `window.*`-Exporte) wachen darüber;
+  `tests/browser/click-through.mjs` prüft im Browser, dass jeder Knopf noch etwas tut.
+  Maskierung bleibt Pflicht (zweite Verteidigungslinie, Markup wird nicht von der CSP gefangen)
 - `private/` nie öffentlich erreichbar
 
 ## Lokale Entwicklung
@@ -282,6 +287,9 @@ php tests/run.php worktime_api
   worktime_api, worktime_unit, station_api, station_unit, open_items_unit, open_items_api,
   open_items_frontend
 - Einzelprüfungen gegen die Datenbank: `tests/db/verify_*.php`
+- Klickdurchgang durch das Dashboard unter der CSP (nur lokal, nicht Teil von `tests/run.php`):
+  `cd tests/browser && npm install`, dann `node tests/browser/click-through.mjs`; Details in
+  `tests/browser/README.md`
 - Konfiguration: `tests/config.php` aus `tests/config.example.php` kopieren (ignoriert)
 - Manueller Testplan: `docs/testplan.md`
 - Verifizierung wenn möglich selbst durchführen
@@ -299,6 +307,11 @@ php tests/run.php worktime_api
   `tests/suites/demo_mode.php` gleicht jede geroutete Ressource gegen diese Listen ab und meldet
   eine unbekannte als vergessen
 - Neues Frontend-Feature: Modul in `public/js/modules/<name>.js`
+- Knöpfe und Formularfelder im Dashboard: nie `onclick`/`onchange`, sondern
+  `data-action="bereich-verb"` plus `registerActions({ 'name': (el) => fn(...) })` am Ende des
+  Moduls, das die Funktion definiert — immer als Pfeilfunktion, Argumente als `data-*`, der
+  Aktionsname als Literal. Nichts auf `window` ablegen. Details: Spec
+  `docs/superpowers/specs/2026-09-29-csp-dashboard-design.md`
 - Neues CSS: in `components/` oder `sections/` einsortieren, Farben nur über `variables.css`
 - Schemaänderung: Migration anlegen **und** `private/setup/ehrensache_db.sql` nachziehen
 - Neuer Konfigurationsschalter: Schlüssel mit Default in `configWithDefaults()`
