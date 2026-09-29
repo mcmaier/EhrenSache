@@ -12,6 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { showToast, showConfirm, showReasonDialog, invalidateCache, subgroupLabel } from './ui.js';
 import { escapeHtml, translateExceptionStatus } from './utils.js';
+import { registerActions } from './actions.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_RESPONSES } from './grouping.js';
 
 // ============================================
@@ -110,7 +111,7 @@ export function responseSummaryCell(apt) {
         return `<span class="response-summary-text" title="${title}">${chips}</span>${own}`;
     }
 
-    return `<button type="button" class="response-summary-btn" onclick="openResponsesModal(${Number(apt.appointment_id)})" title="${title}">${chips}</button>${own}`;
+    return `<button type="button" class="response-summary-btn" data-action="open-responses-modal" data-id="${Number(apt.appointment_id)}" title="${title}">${chips}</button>${own}`;
 }
 
 export async function openResponsesModal(appointmentId) {
@@ -206,7 +207,7 @@ function ownResponseHtml(data) {
     const buttons = ['yes', 'maybe', 'no'].map(s => `
         <button type="button" class="response-segment__btn response-segment__btn--${s}${own?.status === s ? ' is-active' : ''}"
                 aria-pressed="${own?.status === s ? 'true' : 'false'}"
-                onclick="setOwnResponse('${s}')">${RESPONSE_ICONS[s]} ${RESPONSE_LABELS[s]}</button>`).join('');
+                data-action="set-own-response" data-value="${escapeHtml(s)}">${RESPONSE_ICONS[s]} ${RESPONSE_LABELS[s]}</button>`).join('');
 
     // G6: "kurzfristig" nur bei einer Absage zeigen -- Spec 3.4 spricht von
     // Absagen, is_late bleibt in der API fuer jeden Status unveraendert.
@@ -222,8 +223,8 @@ function ownResponseHtml(data) {
             </div>
             ${own ? `
                 <div class="response-own-actions">
-                    <button type="button" class="btn-secondary" onclick="saveOwnComment()">Bemerkung speichern</button>
-                    <button type="button" class="btn-cancel" onclick="withdrawOwnResponse()">Zurücknehmen</button>
+                    <button type="button" class="btn-secondary" data-action="save-own-comment">Bemerkung speichern</button>
+                    <button type="button" class="btn-cancel" data-action="withdraw-own-response">Zurücknehmen</button>
                 </div>` : ''}
         </div>`;
 }
@@ -259,7 +260,7 @@ function comparisonHtml(c) {
 
     return `<div class="response-tiles">${tiles.map(([filter, label, count]) => `
         <button type="button" class="response-tile${currentFilter === filter ? ' is-active' : ''}"
-                aria-pressed="${currentFilter === filter ? 'true' : 'false'}" onclick="filterResponses('${filter}')">
+                aria-pressed="${currentFilter === filter ? 'true' : 'false'}" data-action="filter-responses" data-value="${escapeHtml(filter)}">
             <span class="response-tile__count">${Number(count)}</span>
             <span class="response-tile__label">${label}</span>
         </button>`).join('')}</div>`;
@@ -307,14 +308,14 @@ function memberActionButtons(m) {
                     aria-pressed="${active ? 'true' : 'false'}"
                     title="${title}"
                     aria-label="${RESPONSE_LABELS[s]} für ${memberLabel} setzen"
-                    onclick="setMemberResponse(${Number(m.member_id)}, '${s}')"${disabledAttr}>${RESPONSE_ICONS[s]}</button>`;
+                    data-action="set-member-response" data-id="${Number(m.member_id)}" data-value="${escapeHtml(s)}"${disabledAttr}>${RESPONSE_ICONS[s]}</button>`;
     }).join('');
 
     const reset = m.status !== null
         ? `<button type="button" class="action-btn btn-icon response-action response-action--reset"
                 title="${disabled ? lockedTitle : `Rückmeldung für ${memberLabel} zurücknehmen`}"
                 aria-label="Rückmeldung für ${memberLabel} zurücknehmen"
-                onclick="setMemberResponse(${Number(m.member_id)}, 'delete')"${disabledAttr}>↺</button>`
+                data-action="set-member-response" data-id="${Number(m.member_id)}" data-value="delete"${disabledAttr}>↺</button>`
         : '';
 
     return buttons + reset;
@@ -332,7 +333,7 @@ function responseLockToggleHtml() {
     const label = locked ? 'Bearbeiten fremder Rückmeldungen entsperren' : 'Fremde Rückmeldungen wieder sperren';
     return `<button type="button" id="responsesLockToggle" class="response-lock-toggle${locked ? '' : ' is-unlocked'}"
                 aria-pressed="${locked ? 'false' : 'true'}" aria-label="${label}" title="${label}"
-                onclick="toggleResponsesLock()">${locked ? '🔒' : '🔓'}</button>`;
+                data-action="toggle-responses-lock">${locked ? '🔒' : '🔓'}</button>`;
 }
 
 export function toggleResponsesLock() {
@@ -412,9 +413,9 @@ function managerTableHtml(data) {
     return `
         <div class="response-filter">
             <button type="button" class="response-filter__btn${currentFilter === 'all' ? ' is-active' : ''}"
-                    aria-pressed="${currentFilter === 'all' ? 'true' : 'false'}" onclick="filterResponses('all')">Alle (${allCount})</button>
+                    aria-pressed="${currentFilter === 'all' ? 'true' : 'false'}" data-action="filter-responses" data-value="all">Alle (${allCount})</button>
             <button type="button" class="response-filter__btn${currentFilter === 'open' ? ' is-active' : ''}"
-                    aria-pressed="${currentFilter === 'open' ? 'true' : 'false'}" onclick="filterResponses('open')">${openLabel}</button>
+                    aria-pressed="${currentFilter === 'open' ? 'true' : 'false'}" data-action="filter-responses" data-value="open">${openLabel}</button>
         </div>
         ${responsesGroupingSwitcher(stages, stage)}${hint}
         <div class="data-table">
@@ -443,7 +444,7 @@ function responsesGroupingSwitcher(stages, stage) {
     const buttons = stages.map(s => `
         <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
                 aria-pressed="${stage === s ? 'true' : 'false'}"
-                onclick="setResponsesGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+                data-action="set-responses-grouping" data-value="${escapeHtml(s)}">${stageLabels[s]}</button>`).join('');
     return `<div class="list-grouping">${buttons}</div>`;
 }
 
@@ -495,10 +496,12 @@ function namesListHtml(members) {
 
 /** Umschalter-Klick: merkt die Wahl und rendert das offene Modal aus den
  * vorliegenden Daten neu -- kein erneuter API-Aufruf. */
-window.setResponsesGrouping = function(stage) {
+function setResponsesGrouping(stage) {
     groupingStore(GROUPING_KEY_RESPONSES, stage);
     if (current) renderResponsesModal();
-};
+}
+// Global bis Task 19 (OI-17)
+window.setResponsesGrouping = setResponsesGrouping;
 
 export function filterResponses(filter) {
     currentFilter = filter;
@@ -662,3 +665,16 @@ window.setMemberResponse = setMemberResponse;
 window.toggleResponsesLock = toggleResponsesLock;
 window.filterResponses = filterResponses;
 window.printResponses = printResponses;
+
+registerActions({
+    'close-responses-modal': () => closeResponsesModal(),
+    'filter-responses': (el) => filterResponses(el.dataset.value),
+    'open-responses-modal': (el) => openResponsesModal(Number(el.dataset.id)),
+    'print-responses': () => printResponses(),
+    'save-own-comment': () => saveOwnComment(),
+    'set-member-response': (el) => setMemberResponse(Number(el.dataset.id), el.dataset.value),
+    'set-own-response': (el) => setOwnResponse(el.dataset.value),
+    'set-responses-grouping': (el) => setResponsesGrouping(el.dataset.value),
+    'toggle-responses-lock': () => toggleResponsesLock(),
+    'withdraw-own-response': () => withdrawOwnResponse(),
+});

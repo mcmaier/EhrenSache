@@ -140,8 +140,16 @@ test('Rueckmeldungs-Modal ist eingebunden', function () use ($rsRoot) {
     assertTrue(str_contains($html, 'src="./js/modules/responses.js"'), 'Modul nicht geladen');
 
     $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
-    foreach (['openResponsesModal', 'closeResponsesModal', 'setOwnResponse', 'setMemberResponse'] as $fn) {
-        assertTrue(str_contains($js, "window.{$fn} = {$fn}"), "{$fn} ist nicht global erreichbar");
+    // Seit OI-17 Etappe 2 laufen die Knoepfe ueber die Aktionstabelle, nicht
+    // ueber window.x. Geprueft wird, dass die Aktion auf die Funktion zeigt.
+    foreach ([
+        'open-responses-modal'  => 'openResponsesModal(',
+        'close-responses-modal' => 'closeResponsesModal(',
+        'set-own-response'      => 'setOwnResponse(',
+        'set-member-response'   => 'setMemberResponse(',
+    ] as $action => $call) {
+        assertTrue(preg_match("/'" . preg_quote($action, '/') . "':[^\n]*" . preg_quote($call, '/') . '/', $js) === 1,
+            "Aktion {$action} ruft {$call}) nicht auf");
     }
 });
 
@@ -366,8 +374,8 @@ test('OI-63: Es gibt einen Sperr-Umschalter fuer den ganzen Dialog', function ()
     $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
     assertTrue(str_contains($js, 'export function toggleResponsesLock'), 'toggleResponsesLock fehlt');
-    assertTrue(str_contains($js, 'window.toggleResponsesLock = toggleResponsesLock'),
-        'toggleResponsesLock ist nicht global erreichbar');
+    assertTrue(preg_match("/'toggle-responses-lock':\s*\(\)\s*=>\s*toggleResponsesLock\(\)/", $js) === 1,
+        'Die Aktion toggle-responses-lock ruft toggleResponsesLock() nicht auf');
 
     $start = strpos($js, 'function responseLockToggleHtml');
     assertTrue($start !== false, 'responseLockToggleHtml fehlt');

@@ -2206,14 +2206,14 @@
         <div class="modal-content modal-content--wide">
             <div class="modal-header">
                 <h2 id="responsesModalTitle">Rückmeldungen</h2>
-                <button class="close-modal" onclick="closeResponsesModal()">×</button>
+                <button class="close-modal" data-action="close-responses-modal">×</button>
             </div>
             <div class="modal-body" id="responsesModalBody">
                 <p class="loading">Lade Rückmeldungen...</p>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" id="responsesPrintButton" onclick="printResponses()" hidden>🖨 Druckansicht</button>
-                <button class="btn-cancel" onclick="closeResponsesModal()">Schließen</button>
+                <button class="btn-secondary" id="responsesPrintButton" data-action="print-responses" hidden>🖨 Druckansicht</button>
+                <button class="btn-cancel" data-action="close-responses-modal">Schließen</button>
             </div>
         </div>
     </div>
