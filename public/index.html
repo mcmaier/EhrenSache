@@ -1128,7 +1128,7 @@
                     <div class="header-actions">                        
                         <button class="btn-secondary" data-role="admin" onclick="openImportModal()">📤 Import CSV</button>
                         <button class="btn-secondary" data-role="manager" onclick="exportMembers()">💾 Export CSV</button>            
-                        <button class="btn-add" data-role="manager" onclick="openMemberModal()">+ Neues Mitglied</button>                    
+                        <button class="btn-add" data-role="manager" data-action="open-member-modal">+ Neues Mitglied</button>                    
                     </div>
                 </div>
                 
@@ -1486,7 +1486,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="memberModalTitle">Neues Mitglied</h2>
-                <button class="close-modal" onclick="closeMemberModal()">×</button>
+                <button class="close-modal" data-action="close-member-modal">×</button>
             </div>
             <div class="modal-body">                
                 <form id="memberForm">
@@ -1528,15 +1528,15 @@
                     <div class="form-group" id="membershipDatesGroup" style="display: none;">
                         <label>Mitgliedschaftszeiträume</label>
                         <div id="membershipDatesList"></div>
-                        <button type="button" class="btn-add" onclick="addMembershipDate()" style="margin-top: 10px;">
+                        <button type="button" class="btn-add" data-action="add-membership-date" style="margin-top: 10px;">
                             + Zeitraum hinzufügen
                         </button>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeMemberModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveMember()">Speichern</button>
+                <button class="btn-cancel" data-action="close-member-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-member">Speichern</button>
             </div>
         </div>
     </div>

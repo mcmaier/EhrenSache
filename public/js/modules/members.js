@@ -12,6 +12,7 @@ import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, groupSelectOptionsHtml} from './ui.js';
 import { loadUserData } from './users.js';
 import { updateModalId, escapeHtml } from './utils.js';
+import { registerActions } from './actions.js';
 import { loadGroups } from './management.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
@@ -204,10 +205,10 @@ function renderMembers(members, page = 1) {
 
         const actionsHtml = isAdminOrManager ? `
             <td class="actions-cell">
-                      <button class="action-btn btn-icon btn-edit" onclick="openMemberModal(${member.member_id})" title="Bearbeiten">
+                      <button class="action-btn btn-icon btn-edit" data-action="open-member-modal" data-id="${Number(member.member_id)}" title="Bearbeiten">
                     ✎
                 </button>
-                <button class="action-btn btn-icon btn-delete" onclick="deleteMember(${member.member_id})" title="Löschen">
+                <button class="action-btn btn-icon btn-delete" data-action="delete-member" data-id="${Number(member.member_id)}" title="Löschen">
                     🗑
                 </button>
             </td>
@@ -258,17 +259,17 @@ function renderMembersPagination(currentPage, totalPages, totalMembers) {
         // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
         for (let i = 1; i <= totalPages; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToMembersPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-members-page" data-page="${Number(i)}">${i}</button>`;
         }
     } 
     else
     {
         // Erste Seite Button
         if (currentPage > 1) {
-            //html += `<button onclick="goToMembersPage(1)" title="Erste Seite">
+            //html += `<button data-action="go-to-members-page" data-page="1" title="Erste Seite">
             //            «
             //        </button>`;
-            html += `<button onclick="goToMembersPage(${currentPage - 1})" title="Vorherige Seite">
+            html += `<button data-action="go-to-members-page" data-page="${Number(currentPage - 1)}" title="Vorherige Seite">
                         ‹
                     </button>`;
         }
@@ -278,7 +279,7 @@ function renderMembersPagination(currentPage, totalPages, totalMembers) {
         const endPage = Math.min(totalPages, currentPage + 2);
         
         if (startPage > 1) {
-            html += `<button onclick="goToMembersPage(1)">1</button>`;
+            html += `<button data-action="go-to-members-page" data-page="1">1</button>`;
             if (startPage > 2) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
@@ -286,22 +287,22 @@ function renderMembersPagination(currentPage, totalPages, totalMembers) {
         
         for (let i = startPage; i <= endPage; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToMembersPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-members-page" data-page="${Number(i)}">${i}</button>`;
         }
         
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
-            html += `<button onclick="goToMembersPage(${totalPages})">${totalPages}</button>`;
+            html += `<button data-action="go-to-members-page" data-page="${Number(totalPages)}">${totalPages}</button>`;
         }
         
         // Letzte Seite Button
         if (currentPage < totalPages) {
-            html += `<button onclick="goToMembersPage(${currentPage + 1})" title="Nächste Seite">
+            html += `<button data-action="go-to-members-page" data-page="${Number(currentPage + 1)}" title="Nächste Seite">
                         ›
                     </button>`;
-            //html += `<button onclick="goToMembersPage(${totalPages})" title="Letzte Seite">
+            //html += `<button data-action="go-to-members-page" data-page="${Number(totalPages)}" title="Letzte Seite">
             //            »
             //        </button>`;
         }
@@ -315,8 +316,7 @@ function renderMembersPagination(currentPage, totalPages, totalMembers) {
     container.innerHTML = html;
 }
 
-// Global für onclick
-window.goToMembersPage = function(page) {
+function goToMembersPage(page) {
 
     // Aktuelle Scroll-Position der Tabelle speichern
     const tableContainer = document.querySelector('.data-table')?.parentElement;
@@ -339,7 +339,9 @@ window.goToMembersPage = function(page) {
             });
         }
     }
-};
+}
+// Global bis Task 19 (OI-17)
+window.goToMembersPage = goToMembersPage;
 
 export async function showMemberSection(forceReload = false, page = 1) {
     debug.log("Show Member Section ()");
@@ -712,19 +714,19 @@ function renderMembershipDates() {
         div.innerHTML = `
             <div style="display: flex; gap: 10px; align-items: center;">
                 <input type="date" value="${period.start_date}" 
-                       onchange="updateMembershipDate(${index}, 'start_date', this.value)" 
+                       data-action-change="update-membership-date" data-index="${Number(index)}" data-field="start_date" 
                        style="flex: 1;">
                 <span>bis</span>
                 <input type="date" value="${period.end_date || ''}" 
-                       onchange="updateMembershipDate(${index}, 'end_date', this.value)" 
+                       data-action-change="update-membership-date" data-index="${Number(index)}" data-field="end_date" 
                        style="flex: 1;" placeholder="laufend">
-                <select onchange="updateMembershipDate(${index}, 'status', this.value)" 
+                <select data-action-change="update-membership-date" data-index="${Number(index)}" data-field="status" 
                         style="flex: 1;">
                     <option value="active" ${period.status === 'active' ? 'selected' : ''}>Aktiv</option>
                     <option value="inactive" ${period.status === 'inactive' ? 'selected' : ''}>Inaktiv</option>
                 </select>
                 <button type="button" class="action-btn btn-delete" 
-                        onclick="removeMembershipDate(${index})">×</button>
+                        data-action="remove-membership-date" data-index="${Number(index)}">×</button>
             </div>
         `;
         container.appendChild(div);
@@ -808,9 +810,20 @@ async function saveMembershipDates(memberId) {
 
 window.openMemberModal = openMemberModal;
 window.saveMember = saveMember;
-window.closeMemberModal = () => document.getElementById('memberModal').classList.remove('active');
+window.closeMemberModal = closeMemberModal;
 window.deleteMember = deleteMember;
 window.addMembershipDate = addMembershipDate;
 window.removeMembershipDate = removeMembershipDate;
 window.updateMembershipDate = updateMembershipDate;
 window.resetMemberFilter = resetMemberFilter;
+
+registerActions({
+    'add-membership-date': () => addMembershipDate(),
+    'close-member-modal': () => closeMemberModal(),
+    'delete-member': (el) => deleteMember(Number(el.dataset.id)),
+    'go-to-members-page': (el) => goToMembersPage(Number(el.dataset.page)),
+    'open-member-modal': (el) => openMemberModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'remove-membership-date': (el) => removeMembershipDate(Number(el.dataset.index)),
+    'save-member': () => saveMember(),
+    'update-membership-date': (el) => updateMembershipDate(Number(el.dataset.index), el.dataset.field, el.value),
+});
