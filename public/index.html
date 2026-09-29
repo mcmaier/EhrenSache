@@ -1032,7 +1032,7 @@
             <div class="content-section" id="antraege">
                 <div class="content-header">
                     <h1>Anträge & Entschuldigungen</h1>
-                    <button class="btn-add" onclick="openExceptionModal()">+ Neuer Antrag</button>
+                    <button class="btn-add" data-action="open-exception-modal">+ Neuer Antrag</button>
                 </div>
 
                 <div class="stats-grid stats-grid--chips">
@@ -1741,7 +1741,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="exceptionModalTitle">Neuer Antrag</h2>
-                <button class="close-modal" onclick="closeExceptionModal()">×</button>
+                <button class="close-modal" data-action="close-exception-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="exceptionForm">
@@ -1763,7 +1763,7 @@
                     
                     <div class="form-group">
                         <label for="exception_type">Art des Antrags*</label>
-                        <select id="exception_type" required onchange="toggleExceptionFields()">
+                        <select id="exception_type" required data-action-change="toggle-exception-fields">
                             <option value="absence">Entschuldigung</option>
                             <option value="time_correction">Zeitkorrektur</option>
                         </select>
@@ -1791,8 +1791,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeExceptionModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveException()">Speichern</button>
+                <button class="btn-cancel" data-action="close-exception-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-exception">Speichern</button>
             </div>
         </div>
     </div>

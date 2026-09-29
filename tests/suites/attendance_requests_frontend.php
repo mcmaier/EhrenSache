@@ -46,7 +46,7 @@ test('Zeile zeigt offene Antraege und entscheidet ueber den Antragsdialog', func
 
     assertTrue(str_contains($rumpf, 'pending_exceptions'),
         'Die Zeile liest die offenen Antraege nicht');
-    assertTrue(str_contains($rumpf, 'quickApproveException(') && str_contains($rumpf, 'quickRejectException('),
+    assertTrue(str_contains($rumpf, 'data-action="quick-approve-exception"') && str_contains($rumpf, 'data-action="quick-reject-exception"'),
         'Entschieden wird ueber denselben Dialog wie in der Antragsliste');
 });
 

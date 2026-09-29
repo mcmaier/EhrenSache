@@ -17,6 +17,7 @@ import { loadTypes } from './management.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { escapeHtml } from './utils.js';
+import { registerActions } from './actions.js';
 import { CHIPS_EXCEPTIONS, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
@@ -130,22 +131,22 @@ export async function renderExceptions(exceptions, page = 1)
             actionsHtml = `
                 <td class="actions-cell">
                     <button class="action-btn btn-icon btn-approve" 
-                            onclick="quickApproveException(${exception.exception_id})"
+                            data-action="quick-approve-exception" data-id="${Number(exception.exception_id)}"
                             title="Genehmigen">
                         ✓
                     </button>
                     <button class="action-btn btn-icon btn-reject" 
-                            onclick="quickRejectException(${exception.exception_id})"
+                            data-action="quick-reject-exception" data-id="${Number(exception.exception_id)}"
                             title="Ablehnen">
                         ✗
                     </button>
                     <button class="action-btn btn-icon btn-edit" 
-                            onclick="openExceptionModal(${exception.exception_id})"
+                            data-action="open-exception-modal" data-id="${Number(exception.exception_id)}"
                             title="Bearbeiten">
                         ✎
                     </button>
                     <button class="action-btn btn-icon btn-delete" 
-                            onclick="deleteException(${exception.exception_id})"
+                            data-action="delete-exception" data-id="${Number(exception.exception_id)}"
                             title="Löschen">
                         🗑
                     </button>
@@ -155,7 +156,7 @@ export async function renderExceptions(exceptions, page = 1)
                 actionsHtml = `
                     <td class="actions-cell">
                         <button class="action-btn btn-icon btn-view" 
-                                onclick="openExceptionModal(${exception.exception_id})"
+                                data-action="open-exception-modal" data-id="${Number(exception.exception_id)}"
                                 title="Ansehen">
                             👁
                         </button>
@@ -168,12 +169,12 @@ export async function renderExceptions(exceptions, page = 1)
                 actionsHtml = `
                     <td class="actions-cell">
                         <button class="action-btn btn-icon btn-edit" 
-                                onclick="openExceptionModal(${exception.exception_id})"
+                                data-action="open-exception-modal" data-id="${Number(exception.exception_id)}"
                                 title="Bearbeiten">
                             ✎
                         </button>
                         <button class="action-btn btn-icon btn-delete" 
-                                onclick="deleteException(${exception.exception_id})"
+                                data-action="delete-exception" data-id="${Number(exception.exception_id)}"
                                 title="Löschen">
                             🗑
                         </button>
@@ -232,16 +233,16 @@ function renderExceptionsPagination(currentPage, totalPages, totalExceptions) {
         // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
         for (let i = 1; i <= totalPages; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToExceptionsPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-exceptions-page" data-page="${Number(i)}">${i}</button>`;
         }
     } 
     else {
         // Erste Seite Button
         if (currentPage > 1) {
-            //html += `<button onclick="goToExceptionsPage(1)" title="Erste Seite">
+            //html += `<button data-action="go-to-exceptions-page" data-page="1" title="Erste Seite">
             //           «
             //        </button>`;
-            html += `<button onclick="goToExceptionsPage(${currentPage - 1})" title="Vorherige Seite">
+            html += `<button data-action="go-to-exceptions-page" data-page="${Number(currentPage - 1)}" title="Vorherige Seite">
                         ‹
                     </button>`;
         }
@@ -251,7 +252,7 @@ function renderExceptionsPagination(currentPage, totalPages, totalExceptions) {
         const endPage = Math.min(totalPages, currentPage + 2);
         
         if (startPage > 1) {
-            html += `<button onclick="goToExceptionsPage(1)">1</button>`;
+            html += `<button data-action="go-to-exceptions-page" data-page="1">1</button>`;
             if (startPage > 2) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
@@ -259,22 +260,22 @@ function renderExceptionsPagination(currentPage, totalPages, totalExceptions) {
         
         for (let i = startPage; i <= endPage; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToExceptionsPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-exceptions-page" data-page="${Number(i)}">${i}</button>`;
         }
         
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
-            html += `<button onclick="goToExceptionsPage(${totalPages})">${totalPages}</button>`;
+            html += `<button data-action="go-to-exceptions-page" data-page="${Number(totalPages)}">${totalPages}</button>`;
         }
         
         // Letzte Seite Button
         if (currentPage < totalPages) {
-            html += `<button onclick="goToExceptionsPage(${currentPage + 1})" title="Nächste Seite">
+            html += `<button data-action="go-to-exceptions-page" data-page="${Number(currentPage + 1)}" title="Nächste Seite">
                         ›
                     </button>`;
-            //html += `<button onclick="goToExceptionsPage(${totalPages})" title="Letzte Seite">
+            //html += `<button data-action="go-to-exceptions-page" data-page="${Number(totalPages)}" title="Letzte Seite">
             //            »
             //        </button>`;
         }
@@ -288,8 +289,7 @@ function renderExceptionsPagination(currentPage, totalPages, totalExceptions) {
     container.innerHTML = html;
 }
 
-// Global für onclick
-window.goToExceptionsPage = function(page) {
+function goToExceptionsPage(page) {
 
     // Aktuelle Scroll-Position der Tabelle speichern
     const tableContainer = document.querySelector('.data-table')?.parentElement;
@@ -312,7 +312,10 @@ window.goToExceptionsPage = function(page) {
             });
         }
     }
-};
+}
+
+// Global bis Task 19 (OI-17)
+window.goToExceptionsPage = goToExceptionsPage;
 
 export function filterExceptions(exceptions, filters = {}) {
     debug.log("Filter Exceptions ()");
@@ -556,7 +559,7 @@ export function toggleExceptionFields() {
 }
 
 // Schnelles Genehmigen
-window.quickApproveException = async function(exceptionId) {
+async function quickApproveException(exceptionId) {
     // Modal öffnen mit Status = approved vorausgewählt
     await openExceptionModal(exceptionId);
     
@@ -568,10 +571,13 @@ window.quickApproveException = async function(exceptionId) {
     
     // Fokus auf Admin-Notizen
     document.getElementById('exception_reason')?.focus();
-};
+}
+
+// Global bis Task 19 (OI-17)
+window.quickApproveException = quickApproveException;
 
 // Schnelles Ablehnen
-window.quickRejectException = async function(exceptionId) {
+async function quickRejectException(exceptionId) {
     // Modal öffnen mit Status = rejected vorausgewählt
     await openExceptionModal(exceptionId);
     
@@ -583,7 +589,10 @@ window.quickRejectException = async function(exceptionId) {
     
     // Fokus auf Admin-Notizen (Grund für Ablehnung)
     document.getElementById('exception_reason')?.focus();
-};
+}
+
+// Global bis Task 19 (OI-17)
+window.quickRejectException = quickRejectException;
 
 // ============================================
 // CRUD FUNCTIONS
@@ -731,7 +740,18 @@ export async function deleteException(exceptionId) {
 window.openExceptionModal = openExceptionModal;
 window.saveException = saveException;
 window.toggleExceptionFields = toggleExceptionFields;
-window.closeExceptionModal = () => document.getElementById('exceptionModal').classList.remove('active');
+window.closeExceptionModal = closeExceptionModal;
 window.deleteException = deleteException;
 window.resetExceptionFilter = resetExceptionFilter;
 window.applyExceptionFilter = applyExceptionFilters;
+
+registerActions({
+    'close-exception-modal': () => closeExceptionModal(),
+    'delete-exception': (el) => deleteException(Number(el.dataset.id)),
+    'go-to-exceptions-page': (el) => goToExceptionsPage(Number(el.dataset.page)),
+    'open-exception-modal': (el) => openExceptionModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'quick-approve-exception': (el) => quickApproveException(Number(el.dataset.id)),
+    'quick-reject-exception': (el) => quickRejectException(Number(el.dataset.id)),
+    'save-exception': () => saveException(),
+    'toggle-exception-fields': () => toggleExceptionFields(),
+});

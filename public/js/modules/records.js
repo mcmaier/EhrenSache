@@ -1594,12 +1594,12 @@ function attendanceRequestParts(member) {
     // Rand in der Antragsfarbe) zusammen mit dem Hinweis in derselben Zeile.
     const aktionen = antraege.map(a => `
             <button class="action-btn btn-icon btn-request btn-request--approve"
-                    onclick="quickApproveException(${Number(a.exception_id)})"
+                    data-action="quick-approve-exception" data-id="${Number(a.exception_id)}"
                     title="Antrag genehmigen">
                 ✓
             </button>
             <button class="action-btn btn-icon btn-request btn-request--reject"
-                    onclick="quickRejectException(${Number(a.exception_id)})"
+                    data-action="quick-reject-exception" data-id="${Number(a.exception_id)}"
                     title="Antrag ablehnen">
                 ✗
             </button>
