@@ -225,8 +225,8 @@ function renderDevicesPagination(currentPage, totalPages, totalDevices) {
     container.innerHTML = html;
 }
 
-// Global für onclick
-window.goToDevicesPage = function(page) {
+// Global bis Task 19 (OI-17)
+function goToDevicesPage(page) {
 
     // Aktuelle Scroll-Position der Tabelle speichern
     const tableContainer = document.querySelector('.data-table')?.parentElement;
@@ -247,6 +247,7 @@ window.goToDevicesPage = function(page) {
         }
     }
 }
+window.goToDevicesPage = goToDevicesPage;
 
 export async function showDeviceSection(forceReload = false, page = 1)
 {
