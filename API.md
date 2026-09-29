@@ -780,7 +780,21 @@ die Anwesenheit an.
 }
 ```
 
-Pflicht sind `title`, `date` und `start_time`. Fehlt `type_id`, gilt die Standard-Terminart.
+Pflicht sind `title`, `date` und `start_time`. Fehlt `type_id` (oder ist es `null` bzw. leer),
+gilt die Standard-Terminart.
+
+**Pflichtfelder und Terminart** werden geprüft, bevor etwas geschrieben wird; ein Verstoß ergibt
+`400 {"message": "…"}`:
+
+| Feld | Regel |
+|---|---|
+| `title` | Text, wird getrimmt; nicht leer, höchstens 200 Zeichen |
+| `date` | `JJJJ-MM-TT` und ein echtes Kalenderdatum (`2026-02-30` wird abgelehnt) |
+| `start_time` | `HH:MM` oder `HH:MM:SS`, 00:00 bis 23:59; gespeichert als `HH:MM:SS` |
+| `type_id` | positive Ganzzahl einer **vorhandenen** Terminart |
+
+Bis einschließlich 1.17.1 fehlte diese Prüfung: Ein Datum `"kaputt"` wurde mit `201` angelegt,
+und eine unbekannte `type_id` endete in HTTP `200` mit einer HTML-Fehlerseite statt JSON.
 
 **`end_time` und `location` (seit 1.10.0), beide optional:**
 
@@ -809,6 +823,10 @@ Existiert im Toleranzfenster bereits ein Termin derselben Terminart, antwortet d
 
 **Felder:** `title`, `type_id`, `description`, `date`, `start_time`, `end_time`, `location`
 (die beiden letzten seit 1.10.0, Regeln wie bei „Termin erstellen")
+
+Für mitgeschickte `title`, `date`, `start_time` und `type_id` gelten dieselben Regeln wie bei
+„Termin erstellen“ (`400` bei Verstoß, der Termin bleibt dann unverändert). `title`, `date` und
+`start_time` lassen sich nicht per `null` löschen; `"type_id": null` entfernt die Terminart.
 
 Ein Ende gleich dem Beginn wird auch dann mit `400` abgelehnt, wenn nur eines der beiden Felder
 im Request steht: Ändert der Request nur `start_time` auf das gespeicherte Ende, gilt dieselbe

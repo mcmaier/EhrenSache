@@ -618,6 +618,28 @@ function createTodayAppointment(string $title): int
     return (int) ($res['body']['id'] ?? $res['body']['appointment_id']);
 }
 
+/**
+ * Legt einen Testtermin fuer heute an, reicht seine id an den Callback weiter
+ * und loescht ihn IMMER wieder — auch wenn eine Assertion wirft.
+ *
+ * Ein liegengebliebener Testtermin ist nicht harmlos: Er traegt die Terminart
+ * aus testAppointmentTypeId(), die der Abschlusstest loescht; danach steht er
+ * ohne Art und damit fuer jedes Mitglied im Kalender. Am 2026-09-29 hat so ein
+ * Rest ("Frueher Check-in", 04:00) einen Check-in in station_api am Folgetag
+ * eingefangen. Records haengen per ON DELETE CASCADE am Termin, Arbeitszeiten
+ * per SET NULL — der Termin laesst sich deshalb vor ihnen loeschen.
+ */
+function withTodayAppointment(string $title, callable $fn): void
+{
+    $appointmentId = createTodayAppointment($title);
+
+    try {
+        $fn($appointmentId);
+    } finally {
+        apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+    }
+}
+
 /** Liest den records-Eintrag eines Mitglieds zu einem Termin, oder null. */
 function findRecord(int $appointmentId, int $memberId): ?array
 {
@@ -644,22 +666,24 @@ test('work_sessions: Start mit Termin erzeugt KEINEN Check-in', function () {
     enableWorktime();
     stopRunningIfAny();
 
-    $memberId      = apiMemberId('user');
-    $activityId    = createActivityType('Terminbezug ' . uniqid());
-    $appointmentId = createTodayAppointment('Zeiterfassungstest ' . uniqid());
+    $memberId   = apiMemberId('user');
+    $activityId = createActivityType('Terminbezug ' . uniqid());
 
-    assertSame(null, findRecord($appointmentId, $memberId), 'Vorher darf kein Check-in existieren');
+    withTodayAppointment('Zeiterfassungstest ' . uniqid(), function (int $appointmentId) use ($memberId, $activityId) {
+        assertSame(null, findRecord($appointmentId, $memberId), 'Vorher darf kein Check-in existieren');
 
-    assertStatus(201, apiRequest('POST', 'work_sessions', [
-        'token' => apiToken('user'),
-        'body'  => ['action' => 'start', 'activity_id' => $activityId, 'appointment_id' => $appointmentId],
-    ]));
+        try {
+            assertStatus(201, apiRequest('POST', 'work_sessions', [
+                'token' => apiToken('user'),
+                'body'  => ['action' => 'start', 'activity_id' => $activityId, 'appointment_id' => $appointmentId],
+            ]));
 
-    assertSame(null, findRecord($appointmentId, $memberId),
-        'Der Timer-Start hat einen Anwesenheitseintrag erzeugt');
-
-    stopRunningIfAny();
-    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+            assertSame(null, findRecord($appointmentId, $memberId),
+                'Der Timer-Start hat einen Anwesenheitseintrag erzeugt');
+        } finally {
+            stopRunningIfAny();
+        }
+    });
 });
 
 test('work_sessions: Start mit Termin laesst einen bestehenden Check-in unberuehrt', function () {
@@ -669,53 +693,55 @@ test('work_sessions: Start mit Termin laesst einen bestehenden Check-in unberueh
     enableWorktime();
     stopRunningIfAny();
 
-    $memberId      = apiMemberId('user');
-    $activityId    = createActivityType('Kein-Ueberschreiben ' . uniqid());
-    $appointmentId = createTodayAppointment('Frueher Check-in ' . uniqid());
+    $memberId   = apiMemberId('user');
+    $activityId = createActivityType('Kein-Ueberschreiben ' . uniqid());
 
-    // Check-in kurz vor Terminbeginn, ueber den bestehenden Weg.
-    //
-    // Die Zeit haengt am Termin und nicht am Zeitpunkt des Testlaufs: Seit
-    // 1.5.0 prueft records.php, ob eine Ankunftszeit im Toleranzband um den
-    // Termin liegt. Die Testtermine liegen gestreut ueber den Tag (01:00,
-    // 04:00, ...), damit sich ihre Fenster nicht ueberlappen -- "vor jetzt"
-    // traf dieses Fenster nur zufaellig.
-    $apt = apiRequest('GET', 'appointments', [
-        'token' => apiToken('admin'),
-        'query' => ['id' => $appointmentId],
-    ]);
-    assertStatus(200, $apt, 'Testtermin nicht lesbar');
+    withTodayAppointment('Frueher Check-in ' . uniqid(), function (int $appointmentId) use ($memberId, $activityId) {
+        // Check-in kurz vor Terminbeginn, ueber den bestehenden Weg.
+        //
+        // Die Zeit haengt am Termin und nicht am Zeitpunkt des Testlaufs: Seit
+        // 1.5.0 prueft records.php, ob eine Ankunftszeit im Toleranzband um den
+        // Termin liegt. Die Testtermine liegen gestreut ueber den Tag (01:00,
+        // 04:00, ...), damit sich ihre Fenster nicht ueberlappen -- "vor jetzt"
+        // traf dieses Fenster nur zufaellig.
+        $apt = apiRequest('GET', 'appointments', [
+            'token' => apiToken('admin'),
+            'query' => ['id' => $appointmentId],
+        ]);
+        assertStatus(200, $apt, 'Testtermin nicht lesbar');
 
-    $early = date(
-        'Y-m-d H:i:s',
-        strtotime($apt['body']['date'] . ' ' . $apt['body']['start_time'] . ' -5 minutes')
-    );
-    assertStatus(201, apiRequest('POST', 'records', [
-        'token' => apiToken('admin'),
-        'body'  => [
-            'member_id'      => $memberId,
-            'appointment_id' => $appointmentId,
-            'arrival_time'   => $early,
-            'status'         => 'present',
-        ],
-    ]), 'Vorbereitender Check-in fehlgeschlagen');
+        $early = date(
+            'Y-m-d H:i:s',
+            strtotime($apt['body']['date'] . ' ' . $apt['body']['start_time'] . ' -5 minutes')
+        );
+        assertStatus(201, apiRequest('POST', 'records', [
+            'token' => apiToken('admin'),
+            'body'  => [
+                'member_id'      => $memberId,
+                'appointment_id' => $appointmentId,
+                'arrival_time'   => $early,
+                'status'         => 'present',
+            ],
+        ]), 'Vorbereitender Check-in fehlgeschlagen');
 
-    $before = findRecord($appointmentId, $memberId);
-    assertTrue($before !== null, 'Vorbereitender Check-in fehlt');
+        $before = findRecord($appointmentId, $memberId);
+        assertTrue($before !== null, 'Vorbereitender Check-in fehlt');
 
-    assertStatus(201, apiRequest('POST', 'work_sessions', [
-        'token' => apiToken('user'),
-        'body'  => ['action' => 'start', 'activity_id' => $activityId, 'appointment_id' => $appointmentId],
-    ]));
+        try {
+            assertStatus(201, apiRequest('POST', 'work_sessions', [
+                'token' => apiToken('user'),
+                'body'  => ['action' => 'start', 'activity_id' => $activityId, 'appointment_id' => $appointmentId],
+            ]));
 
-    $after = findRecord($appointmentId, $memberId);
-    assertSame($before['arrival_time'], $after['arrival_time'],
-        'Ein Timer-Start darf eine frueher erfasste Ankunftszeit nicht ueberschreiben');
-    assertSame($before['checkin_source'], $after['checkin_source'],
-        'Die urspruengliche Check-in-Quelle muss erhalten bleiben');
-
-    stopRunningIfAny();
-    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+            $after = findRecord($appointmentId, $memberId);
+            assertSame($before['arrival_time'], $after['arrival_time'],
+                'Ein Timer-Start darf eine frueher erfasste Ankunftszeit nicht ueberschreiben');
+            assertSame($before['checkin_source'], $after['checkin_source'],
+                'Die urspruengliche Check-in-Quelle muss erhalten bleiben');
+        } finally {
+            stopRunningIfAny();
+        }
+    });
 });
 
 test('work_sessions: Start mit unbekanntem Termin wird abgewiesen', function () {
@@ -1376,18 +1402,20 @@ test('export: eine Notiz mit Markup wird im Bericht maskiert', function () {
 
 test('work_sessions: Nachtrag mit Termin traegt den Terminbezug', function () {
     enableWorktime();
-    $activityId    = createActivityType('Terminbezug ' . uniqid());
-    $appointmentId = createTodayAppointment('Nachtrag-Termin ' . uniqid());
+    $activityId = createActivityType('Terminbezug ' . uniqid());
 
-    $res = createManualSession('user', $activityId, ['appointment_id' => $appointmentId]);
-    assertStatus(201, $res);
-    $id = (int) $res['body']['session']['session_id'];
+    withTodayAppointment('Nachtrag-Termin ' . uniqid(), function (int $appointmentId) use ($activityId) {
+        $res = createManualSession('user', $activityId, ['appointment_id' => $appointmentId]);
+        assertStatus(201, $res);
+        $id = (int) $res['body']['session']['session_id'];
 
-    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
-    assertSame($appointmentId, (int) $get['body']['appointment_id']);
-
-    deleteSession($id);
-    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+        try {
+            $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('user'), 'query' => ['id' => $id]]);
+            assertSame($appointmentId, (int) $get['body']['appointment_id']);
+        } finally {
+            deleteSession($id);
+        }
+    });
 });
 
 test('work_sessions: Nachtrag mit Termin erzeugt KEINEN Anwesenheitseintrag', function () {
@@ -1397,94 +1425,102 @@ test('work_sessions: Nachtrag mit Termin erzeugt KEINEN Anwesenheitseintrag', fu
     // Timer-Start. Schlaegt dieser Test fehl, wurde die Entscheidung
     // zurueckgenommen -- siehe OI-4 in docs/OPEN-ITEMS.md.
     enableWorktime();
-    $activityId    = createActivityType('Kein Checkin ' . uniqid());
-    $appointmentId = createTodayAppointment('Ohne Checkin ' . uniqid());
-    $memberId      = apiMemberId('user');
+    $activityId = createActivityType('Kein Checkin ' . uniqid());
+    $memberId   = apiMemberId('user');
 
-    assertSame(null, findRecord($appointmentId, $memberId), 'Vorbedingung: noch kein Eintrag');
+    withTodayAppointment('Ohne Checkin ' . uniqid(), function (int $appointmentId) use ($activityId, $memberId) {
+        assertSame(null, findRecord($appointmentId, $memberId), 'Vorbedingung: noch kein Eintrag');
 
-    $id = (int) createManualSession('user', $activityId,
-        ['appointment_id' => $appointmentId])['body']['session']['session_id'];
+        $id = (int) createManualSession('user', $activityId,
+            ['appointment_id' => $appointmentId])['body']['session']['session_id'];
 
-    assertSame(null, findRecord($appointmentId, $memberId),
-        'Der Nachtrag hat einen Anwesenheitseintrag erzeugt');
+        try {
+            assertSame(null, findRecord($appointmentId, $memberId),
+                'Der Nachtrag hat einen Anwesenheitseintrag erzeugt');
 
-    // Auch die Freigabe darf keinen erzeugen.
-    apiRequest('PUT', 'work_sessions', [
-        'token' => apiToken('manager'),
-        'query' => ['id' => $id],
-        'body'  => ['action' => 'approve'],
-    ]);
-    assertSame(null, findRecord($appointmentId, $memberId),
-        'Die Freigabe hat einen Anwesenheitseintrag erzeugt');
-
-    deleteSession($id);
-    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+            // Auch die Freigabe darf keinen erzeugen.
+            apiRequest('PUT', 'work_sessions', [
+                'token' => apiToken('manager'),
+                'query' => ['id' => $id],
+                'body'  => ['action' => 'approve'],
+            ]);
+            assertSame(null, findRecord($appointmentId, $memberId),
+                'Die Freigabe hat einen Anwesenheitseintrag erzeugt');
+        } finally {
+            deleteSession($id);
+        }
+    });
 });
 
 test('work_sessions: Korrektur traegt einen Termin nach', function () {
     enableWorktime();
-    $activityId    = createActivityType('Nachtragen ' . uniqid());
-    $appointmentId = createTodayAppointment('Spaeter zugeordnet ' . uniqid());
+    $activityId = createActivityType('Nachtragen ' . uniqid());
 
-    $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
+    withTodayAppointment('Spaeter zugeordnet ' . uniqid(), function (int $appointmentId) use ($activityId) {
+        $id = (int) createManualSession('user', $activityId)['body']['session']['session_id'];
 
-    $res = apiRequest('PUT', 'work_sessions', [
-        'token' => apiToken('manager'),
-        'query' => ['id' => $id],
-        'body'  => ['appointment_id' => $appointmentId],
-    ]);
-    assertStatus(200, $res);
+        try {
+            $res = apiRequest('PUT', 'work_sessions', [
+                'token' => apiToken('manager'),
+                'query' => ['id' => $id],
+                'body'  => ['appointment_id' => $appointmentId],
+            ]);
+            assertStatus(200, $res);
 
-    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
-    assertSame($appointmentId, (int) $get['body']['appointment_id']);
-
-    deleteSession($id);
-    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+            $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+            assertSame($appointmentId, (int) $get['body']['appointment_id']);
+        } finally {
+            deleteSession($id);
+        }
+    });
 });
 
 test('work_sessions: Korrektur mit leerem Termin loest die Zuordnung', function () {
     enableWorktime();
-    $activityId    = createActivityType('Loesen ' . uniqid());
-    $appointmentId = createTodayAppointment('Wieder geloest ' . uniqid());
+    $activityId = createActivityType('Loesen ' . uniqid());
 
-    $id = (int) createManualSession('user', $activityId,
-        ['appointment_id' => $appointmentId])['body']['session']['session_id'];
+    withTodayAppointment('Wieder geloest ' . uniqid(), function (int $appointmentId) use ($activityId) {
+        $id = (int) createManualSession('user', $activityId,
+            ['appointment_id' => $appointmentId])['body']['session']['session_id'];
 
-    apiRequest('PUT', 'work_sessions', [
-        'token' => apiToken('manager'),
-        'query' => ['id' => $id],
-        'body'  => ['appointment_id' => null],
-    ]);
+        try {
+            apiRequest('PUT', 'work_sessions', [
+                'token' => apiToken('manager'),
+                'query' => ['id' => $id],
+                'body'  => ['appointment_id' => null],
+            ]);
 
-    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
-    assertSame(null, $get['body']['appointment_id']);
-
-    deleteSession($id);
-    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+            $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+            assertSame(null, $get['body']['appointment_id']);
+        } finally {
+            deleteSession($id);
+        }
+    });
 });
 
 test('work_sessions: Korrektur ohne Terminfeld laesst den Termin unangetastet', function () {
     enableWorktime();
-    $activityId    = createActivityType('Unangetastet ' . uniqid());
-    $appointmentId = createTodayAppointment('Bleibt ' . uniqid());
+    $activityId = createActivityType('Unangetastet ' . uniqid());
 
-    $id = (int) createManualSession('user', $activityId,
-        ['appointment_id' => $appointmentId])['body']['session']['session_id'];
+    withTodayAppointment('Bleibt ' . uniqid(), function (int $appointmentId) use ($activityId) {
+        $id = (int) createManualSession('user', $activityId,
+            ['appointment_id' => $appointmentId])['body']['session']['session_id'];
 
-    // Nur die Pause aendern -- appointment_id kommt gar nicht mit.
-    apiRequest('PUT', 'work_sessions', [
-        'token' => apiToken('manager'),
-        'query' => ['id' => $id],
-        'body'  => ['break_minutes' => 20],
-    ]);
+        try {
+            // Nur die Pause aendern -- appointment_id kommt gar nicht mit.
+            apiRequest('PUT', 'work_sessions', [
+                'token' => apiToken('manager'),
+                'query' => ['id' => $id],
+                'body'  => ['break_minutes' => 20],
+            ]);
 
-    $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
-    assertSame($appointmentId, (int) $get['body']['appointment_id']);
-    assertSame(20, (int) $get['body']['break_minutes']);
-
-    deleteSession($id);
-    apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $appointmentId]]);
+            $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+            assertSame($appointmentId, (int) $get['body']['appointment_id']);
+            assertSame(20, (int) $get['body']['break_minutes']);
+        } finally {
+            deleteSession($id);
+        }
+    });
 });
 
 test('work_sessions: Korrektur mit unbekanntem Termin wird abgewiesen', function () {

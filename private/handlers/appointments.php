@@ -212,21 +212,32 @@ function handleAppointments($db, $database, $method, $id) {
                 }
             }
 
-            // Hole Standard-Terminart
-            $typeStmt = $db->query("SELECT type_id FROM {$prefix}appointment_types WHERE is_default = 1 LIMIT 1");
-            $defaultType = $typeStmt->fetch(PDO::FETCH_ASSOC);
-            $typeId = $defaultType ? $defaultType['type_id'] : null;
+            // Titel, Datum, Beginn und Terminart pruefen, bevor irgendetwas
+            // geschrieben wird. Fehlende Pflichtfelder kommen als null an.
+            [$core, $fehler] = appointmentNormalizeCore([
+                'title'      => $data->title ?? null,
+                'date'       => $data->date ?? null,
+                'start_time' => $data->start_time ?? null,
+                'type_id'    => $data->type_id ?? null,
+            ]);
 
-            if(isSet($data->type_id) && ($data->type_id !== null))
-            {
-                $typeId = $data->type_id;
+            // Ohne Angabe gilt die Standard-Terminart.
+            $typeId = null;
+            if ($fehler === null) {
+                $typeId = $core['type_id'] ?? seriesDefaultTypeId($db, $prefix);
+                if ($core['type_id'] !== null && !seriesTypeExists($db, $prefix, $core['type_id'])) {
+                    $fehler = 'Die Terminart existiert nicht';
+                }
             }
 
-            // Ort und Ende (FI-23) pruefen, bevor irgendetwas geschrieben wird.
-            [$location, $fehler] = appointmentNormalizeLocation($data->location ?? null);
+            // Ort und Ende (FI-23).
+            $location = null;
             $endTime = null;
             if ($fehler === null) {
-                [$endTime, $fehler] = appointmentNormalizeEndTime($data->end_time ?? null, (string) ($data->start_time ?? ''));
+                [$location, $fehler] = appointmentNormalizeLocation($data->location ?? null);
+            }
+            if ($fehler === null) {
+                [$endTime, $fehler] = appointmentNormalizeEndTime($data->end_time ?? null, $core['start_time']);
             }
             if ($fehler !== null) {
                 http_response_code(400);
@@ -236,7 +247,7 @@ function handleAppointments($db, $database, $method, $id) {
 
             // Dublettenpruefung: gleiche Terminart im Toleranzfenster (appointment_rules.php).
             $tolerance = checkinToleranceHours($db, $database);
-            $conflict = findAppointmentConflict($db, $prefix, (string) $data->date, (string) $data->start_time,
+            $conflict = findAppointmentConflict($db, $prefix, $core['date'], $core['start_time'],
                                                 $typeId, $tolerance);
             if ($conflict) {
                 http_response_code(409);
@@ -247,8 +258,8 @@ function handleAppointments($db, $database, $method, $id) {
             $stmt = $db->prepare("INSERT INTO {$prefix}appointments (title, type_id, description, location, date,
                                   start_time, end_time, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $createdBy = getCurrentUserId();
-            if($stmt->execute([$data->title, $typeId, $data->description ?? null, $location, $data->date,
-                               $data->start_time, $endTime, $createdBy])) {
+            if($stmt->execute([$core['title'], $typeId, $data->description ?? null, $location, $core['date'],
+                               $core['start_time'], $endTime, $createdBy])) {
                 http_response_code(201);
                 echo json_encode(["message" => "Appointment created", "id" => $db->lastInsertId()]);
             } else {
@@ -289,6 +300,24 @@ function handleAppointments($db, $database, $method, $id) {
                 http_response_code(404);
                 echo json_encode(["message" => "Appointment not found"]);
                 break;
+            }
+
+            // Mitgeschickte Kernfelder pruefen; was fehlt, bleibt wie gespeichert.
+            // title, date und start_time sind Pflicht und lassen sich nicht per
+            // null loeschen. type_id darf null werden (keine Terminart).
+            $kern = array_intersect_key(get_object_vars($data), array_flip(['title', 'date', 'start_time', 'type_id']));
+            [$kern, $fehler] = appointmentNormalizeCore($kern);
+            if ($fehler === null && ($kern['type_id'] ?? null) !== null
+                && !seriesTypeExists($db, $prefix, $kern['type_id'])) {
+                $fehler = 'Die Terminart existiert nicht';
+            }
+            if ($fehler !== null) {
+                http_response_code(400);
+                echo json_encode(["message" => $fehler], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+            foreach ($kern as $feld => $wert) {
+                $data->$feld = $wert;
             }
 
             // Prüfe ob bereits ein anderer Termin der gleichen Art in der Toleranzzeit existiert

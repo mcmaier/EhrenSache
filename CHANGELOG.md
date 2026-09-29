@@ -18,6 +18,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   bestätigen“ führen gar kein Skript mehr aus. Damit gilt die CSP für alle Oberflächen außer
   den Assistenten für Installation und Update (OI-17).
 
+### Behoben
+- **`POST appointments` prüft Titel, Datum, Beginn und Terminart.** Ein Datum wie `"kaputt"`
+  oder `2026-02-30` wurde mit `201` angelegt; eine nicht vorhandene `type_id` endete in HTTP
+  `200` mit einer PHP-Fehlerseite statt einer JSON-Antwort; fehlten `title`, `date` oder
+  `start_time`, gab es PHP-Warnungen. Jetzt antwortet der Endpunkt mit `400` und einer Meldung,
+  bevor etwas geschrieben wird. `PUT appointments` prüft dieselben Felder, sofern sie
+  mitgeschickt werden; ein leerer Titel oder `"date": null` wird dort nicht mehr gespeichert.
+  Der Titel wird getrimmt, der Beginn als `HH:MM:SS` gespeichert. Die Oberfläche und die
+  Check-in-App schicken nur gültige Werte und waren nicht betroffen.
+
 ## [1.17.1] – 2026-09-28
 
 ### Behoben

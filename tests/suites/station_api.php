@@ -1284,13 +1284,13 @@ test('station: totp_location bleibt an station abgewiesen (OI-101)', function ()
 // ein nicht aktives Mitglied darf nicht mehr einchecken (OI-103) -- mit einer
 // Antwort, an der das Terminal die Zuordnung als verwaist erkennt.
 
-/** POST auto_checkin mit dem Terminal-Token. */
-function terminalCheckin(string $nummer, ?string $arrival = null): array
+/** POST auto_checkin mit dem Terminal-Token; $extra geht zusaetzlich in den Body. */
+function terminalCheckin(string $nummer, ?string $arrival = null, array $extra = []): array
 {
     return apiRequest('POST', 'auto_checkin', [
         'token' => authDeviceToken(),
         'body'  => ['member_number' => $nummer, 'arrival_time' => $arrival ?? date('Y-m-d H:i:s'),
-                    'source_device' => 'device_auth'],
+                    'source_device' => 'device_auth'] + $extra,
     ]);
 }
 
@@ -1346,13 +1346,20 @@ test('auto_checkin: Stichtag ist das Datum der arrival_time, nicht heute (OI-103
     // Mitglied war an dem Tag aktiv. Ohne passenden Termin und ohne
     // Auto-Anlage antwortet der Server dann 409 -- die Aktivpruefung ist also
     // bestanden, ohne dass der Test einen Termin anlegen muss.
+    //
+    // "Ohne passenden Termin" darf nicht vom Datenbestand abhaengen: Am
+    // 2026-09-29 fing ein liegengebliebener Testtermin von gestern 04:00 den
+    // Check-in um 03:17 ein, und der Test wurde rot, obwohl die Aktivpruefung
+    // stimmte. Deshalb Toleranz 0 und eine Ankunft mit krummen Sekunden --
+    // treffen koennte nur ein Termin, der auf die Sekunde genau dann beginnt.
     $before = apiRequest('GET', 'settings', ['token' => apiToken('admin')]);
     $prev   = (string) ($before['body']['settings']['checkin_auto_create_appointment'] ?? '1');
     stationSetSetting('checkin_auto_create_appointment', '0');
     try {
         oi27WithMember([date('Y-m-d', strtotime('-2 years')), date('Y-m-d', strtotime('-1 day'))],
             function (string $nummer) {
-                $res = terminalCheckin($nummer, date('Y-m-d', strtotime('-1 day')) . ' 03:17:00');
+                $res = terminalCheckin($nummer, date('Y-m-d', strtotime('-1 day')) . ' 03:17:43',
+                    ['tolerance_hours' => 0]);
                 assertStatus(409, $res, 'Am Tag der Ankunft war das Mitglied aktiv: ' . $res['raw']);
                 assertSame('no_matching_appointment', $res['body']['reason'] ?? null);
             });
