@@ -13,11 +13,22 @@
 // Meldet sich als Admin an, oeffnet jede Sektion und loest jeden sichtbaren
 // Knopf mit data-action / data-action-change aus. Aktionen, die Daten
 // veraendern, etwas herunterladen, drucken, nach aussen greifen oder die
-// Zwischenablage brauchen, werden uebersprungen (SKIP). Ein geoeffneter
-// Dialog wird danach mit Escape geschlossen.
+// Zwischenablage brauchen, werden uebersprungen (SKIP). Nach jeder Sektion
+// werden offene Dialoge geschlossen (Escape, notfalls der Abbrechen-Knopf).
+//
+// Je Aktionsname wird einmal mit und einmal ohne data-id ausgeloest: Die
+// Bearbeiten-Variante eines Dialogs zeigt oft Knoepfe, die der Neu-Dialog nicht hat.
+//
+// Untertabs, die abgedeckt sind: .settings-tab-btn, .tab-btn und [role="tab"]
+// (siehe TABS), dazu das Kalender-Popup eines belegten Tages. NICHT abgedeckt:
+// Umschalter anderer Bauart (etwa Ansichts-Schalter ohne diese Klassen, Filter-Chips).
 //
 // Fehler (Exit-Code 1): CSP-Verstoss, Laufzeitfehler, "Unbekannte Aktion".
-// Nur Auskunft: welche Aktionen ausgeloest, uebersprungen, nie gesehen wurden.
+// Nur Auskunft (kein Fehler): welche Aktionen ausgeloest, uebersprungen und
+// "registriert, aber nie gesehen" wurden. Nie gesehen heisst: im ganzen Lauf in
+// keinem DOM aufgetaucht (Ausgeloest und Uebersprungen zaehlen als gesehen);
+// manche brauchen bestimmte Daten. data-action-submit-Formulare werden nur
+// als gesehen gezaehlt, nicht abgeschickt.
 //
 // Aufruf:  node tests/browser/click-through.mjs [--section=mitglieder]
 // Konfiguration aus tests/config.php (base_url, admin). PHP_BIN und CHROME_BIN
@@ -25,7 +36,7 @@
 
 import puppeteer from 'puppeteer-core';
 import { execFileSync } from 'node:child_process';
-import { readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,6 +47,30 @@ const onlySection = (process.argv.find(a => a.startsWith('--section=')) || '').s
 // Veraendert Daten, laedt herunter, druckt, greift nach aussen oder in die
 // Zwischenablage -- hier nie ausloesen.
 const SKIP = /^(delete-|save-|execute-|perform-|regenerate-|generate-|quick-|approve-|reject-|send-|set-member-|set-own-|withdraw-|create-|analyze-|export-|download-|print-|check-for-|copy-|remove-membership|add-membership|toggle-responses-lock|import-logs-delete|app-reset-reload|auth-reload|calendar-new-appointment)/;
+
+// Aktionen, die beim Durchgang ans Ende gehoeren, sonst schliessen sie den
+// Dialog vor dessen uebrigen Knoepfen.
+const CLOSING = /^(close|cancel|hide|dismiss)-/;
+
+// Alle registerActions({ ... })-Namen aus public/js (gleiche Form wie
+// tests/suites/actions_frontend.php: Block ab Spalte 0, ein 'name': je Zeile).
+function registeredActions() {
+    const names = new Set();
+    const walk = dir => {
+        for (const f of readdirSync(dir)) {
+            const full = join(dir, f);
+            if (statSync(full).isDirectory()) walk(full);
+            else if (f.endsWith('.js')) {
+                const src = readFileSync(full, 'utf8');
+                for (const b of src.matchAll(/^registerActions\(\{\r?\n([\s\S]*?)^\}\);/gm)) {
+                    for (const k of b[1].matchAll(/^\s+'([^']+)':/gm)) names.add(k[1]);
+                }
+            }
+        }
+    };
+    walk(join(ROOT, 'public', 'js'));
+    return names;
+}
 
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
@@ -61,6 +96,8 @@ const BASE = cfg.base_url.replace(/\/$/, '');
 const problems = [];
 const triggered = new Set();
 const skipped = new Set();
+const done = new Set();      // Schluessel kind|name|id bzw. -, schon behandelt
+const seen = new Set();      // Aktionsnamen, die irgendwann im DOM standen
 
 const browser = await puppeteer.launch({ executablePath: chromePath(), headless: 'new' });
 try {
@@ -75,6 +112,22 @@ try {
     });
     await page.evaluateOnNewDocument(() => {
         window.__csp = [];
+        // Jeden Aktionsnamen merken, der irgendwann im DOM steht (auch kurzlebig).
+        window.__seenActions = new Set();
+        const ATTRS = ['data-action', 'data-action-change', 'data-action-submit'];
+        const SEL = ATTRS.map(a => `[${a}]`).join(',');
+        const scan = root => {
+            if (root.nodeType !== 1) return;
+            for (const e of [root, ...root.querySelectorAll(SEL)])
+                for (const a of ATTRS) if (e.hasAttribute(a)) window.__seenActions.add(e.getAttribute(a));
+        };
+        window.__scanActions = () => scan(document.documentElement);
+        new MutationObserver(ms => {
+            for (const m of ms) {
+                m.addedNodes.forEach(scan);
+                if (m.type === 'attributes') scan(m.target);
+            }
+        }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ATTRS });
         document.addEventListener('securitypolicyviolation', e =>
             window.__csp.push(`${e.effectiveDirective} ${e.blockedURI || '(inline)'} @${e.sourceFile}:${e.lineNumber}`));
     });
@@ -97,43 +150,68 @@ try {
 
     const sections = await page.$$eval('.nav-item[data-section]', els => els.map(e => e.dataset.section));
 
+    // Offene Dialoge schliessen: Escape, bis keiner mehr aktiv ist; sonst den
+    // Abbrechen-Knopf des noch offenen Dialogs (Bestaetigung, Begruendung ...).
+    async function closeDialogs() {
+        const open = () => page.evaluate(() => !!document.querySelector('.modal.active'));
+        for (let i = 0; i < 5 && await open(); i++) {
+            await page.keyboard.press('Escape');
+            await wait(300);
+        }
+        if (!await open()) return;
+        await page.evaluate(() => {
+            const m = document.querySelector('.modal.active');
+            const btn = m.querySelector('#confirmCancel, #reasonCancel, [id$="Cancel"], [data-action^="close-"], [data-action^="cancel-"]');
+            if (btn) btn.click();
+        });
+        await wait(300);
+        if (await open()) problems.push('Dialog liess sich nicht schliessen (Escape und Abbrechen wirkungslos)');
+    }
+
     // Alle sichtbaren, noch nicht versuchten Aktionen ausloesen.
     async function sweep(label) {
         // Geoeffnete Dialoge bleiben zwischen den Runden offen, damit ihre Knoepfe
         // in der naechsten Runde gefunden werden; erst am Ende wird geschlossen.
-        for (let round = 0; round < 5; round++) {
+        for (let round = 0; round < 200; round++) {
             const candidates = await page.$$eval('[data-action], [data-action-change]', els => els
                 .filter(e => e.offsetParent !== null || e.getClientRects().length > 0)
-                .map((e, i) => ({
-                    i,
+                .map(e => ({
                     name: e.getAttribute('data-action') || e.getAttribute('data-action-change'),
                     kind: e.hasAttribute('data-action') ? 'click' : 'change',
+                    withId: e.hasAttribute('data-id'),
                 })));
-            // close-* zuletzt, sonst schliesst es den Dialog vor dessen uebrigen Knoepfen
-            const fresh = candidates.filter(c => !triggered.has(c.name) && !skipped.has(c.name))
-                .sort((a, b) => Number(a.name.startsWith('close-')) - Number(b.name.startsWith('close-')));
+            const keyOf = c => `${c.kind}|${c.name}|${c.withId ? 'id' : '-'}`;
+            // Schliessende Aktionen zuletzt, sonst schliessen sie den Dialog vor dessen uebrigen Knoepfen
+            const fresh = candidates.filter(c => !done.has(keyOf(c)))
+                .sort((a, b) => Number(CLOSING.test(a.name)) - Number(CLOSING.test(b.name)));
             if (fresh.length === 0) break;
+            let clicked = false;
             for (const c of fresh) {
-                if (triggered.has(c.name) || skipped.has(c.name)) continue;
-                if (SKIP.test(c.name)) { skipped.add(c.name); continue; }
-                const ok = await page.evaluate(({ name, kind }) => {
-                    const sel = kind === 'click' ? `[data-action="${name}"]` : `[data-action-change="${name}"]`;
-                    const el = [...document.querySelectorAll(sel)].find(e => e.offsetParent !== null || e.getClientRects().length > 0);
+                const key = keyOf(c);
+                if (done.has(key)) continue;
+                if (SKIP.test(c.name)) { done.add(key); skipped.add(c.name); continue; }
+                const ok = await page.evaluate(({ name, kind, withId }) => {
+                    const attr = kind === 'click' ? 'data-action' : 'data-action-change';
+                    const el = [...document.querySelectorAll(`[${attr}="${name}"]`)]
+                        .find(e => e.hasAttribute('data-id') === withId && (e.offsetParent !== null || e.getClientRects().length > 0));
                     if (!el) return false;
                     if (kind === 'click') el.click();
                     else el.dispatchEvent(new Event('change', { bubbles: true }));
                     return true;
                 }, c);
                 if (!ok) continue;
+                done.add(key);
                 triggered.add(c.name);
-                await wait(400);
-                // Neu sichtbar gewordene Knoepfe (etwa im Dialog) in der naechsten Runde
+                clicked = true;
+                // Nachgeladene Inhalte (etwa Zeitraeume im Mitglieder-Dialog) abwarten
+                await wait(300);
+                await page.waitForNetworkIdle({ idleTime: 300, timeout: 4000 }).catch(() => {});
+                // Neu sichtbar gewordene Knoepfe (etwa im Dialog) erst ansehen, bevor es weitergeht
+                break;
             }
+            if (!clicked) break;
         }
-        for (let i = 0; i < 2; i++) {
-            await page.keyboard.press('Escape');
-            await wait(300);
-        }
+        await closeDialogs();
         void label;
     }
 
@@ -170,9 +248,11 @@ try {
             });
             if (opened) { await wait(500); await sweep('kalender-popup'); }
         }
-        await page.keyboard.press('Escape');
-        await wait(300);
+        await closeDialogs();
     }
+
+    await page.evaluate(() => window.__scanActions());
+    for (const n of await page.evaluate(() => [...window.__seenActions])) seen.add(n);
 
     const cspViolations = await page.evaluate(() => window.__csp);
     for (const v of cspViolations) problems.push(`CSP-Verstoss: ${v}`);
@@ -195,9 +275,13 @@ try {
     if (cspHeader && (probe.ran || !probe.reported)) problems.push('Gegenprobe: eingeschleuster onclick lief trotz CSP');
     if (!cspHeader && !probe.ran) problems.push('Gegenprobe: ohne CSP muss der eingeschleuste onclick laufen');
 
-    console.log(`Ausgeloest: ${triggered.size}  Uebersprungen: ${skipped.size}`);
+    // Ausgeloeste und uebersprungene Aktionen standen im DOM und zaehlen als gesehen.
+    const neverSeen = [...registeredActions()].filter(n => !seen.has(n) && !triggered.has(n) && !skipped.has(n)).sort();
+    console.log(`Ausgeloest: ${triggered.size}  Uebersprungen: ${skipped.size}  Registriert, aber nie gesehen: ${neverSeen.length}`);
     console.log(`  ausgeloest: ${[...triggered].sort().join(', ')}`);
     console.log(`  uebersprungen: ${[...skipped].sort().join(', ')}`);
+    console.log(`  registriert, aber nie gesehen (${neverSeen.length}): ${neverSeen.join(', ') || '-'}`);
+    if (onlySection) console.log('  (mit --section ist diese Liste erwartungsgemaess laenger)');
 } finally {
     await browser.close();
 }
