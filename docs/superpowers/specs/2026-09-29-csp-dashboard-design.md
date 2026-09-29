@@ -127,6 +127,14 @@ PHP-Seiten), **nicht** auf Verzeichnisebene — sonst griffe die Richtlinie auch
 `csp.php`. Greift er nicht, wird die Kopfzeile auf den Aufruf über `DirectoryIndex` ausgeweitet und
 die gewählte Form hier nachgetragen.
 
+**Belegt (Task 18):** `<Files "index.html">` greift auch beim Aufruf über `DirectoryIndex` (`/`
+liefert die Kopfzeile; `/index.html` leitet ohnehin per 301 auf `/` um). Dafür trifft der Abschnitt
+aber auch `checkin/index.html` und `station/index.html`, und Apache wertet `<Files>` nach den
+`.htaccess` der Unterverzeichnisse aus: Mit `Header always set` überschrieb die Dashboard-Richtlinie
+die eigene der Check-in-PWA (dort `img-src 'self' data:`). Deshalb steht beim Dashboard
+`Header always setifempty` — die Richtlinie gilt nur, wo noch keine gesetzt ist. Der HTTP-Test in
+`csp.php` fängt einen Rückfall auf `set` über die Check-in-PWA ab.
+
 ## Tests
 
 1. **`tests/suites/csp.php`, erweitert.** Geprüfte Oberflächen zusätzlich `index.html`, alle Module

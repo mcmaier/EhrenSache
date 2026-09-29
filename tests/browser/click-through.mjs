@@ -102,6 +102,8 @@ const skipped = new Set();
 const done = new Set();      // Schluessel kind|name|id bzw. -, schon behandelt
 const seen = new Set();      // Aktionsnamen, die irgendwann im DOM standen
 const notes = [];            // Hinweise auf nicht erreichte Schritte (Auskunft, kein Fehler)
+let probing = false;         // Gegenprobe laeuft: CSP-Meldungen der Konsole gehoeren zu ihr
+const probeConsole = [];     // die dabei gesammelten Meldungen
 
 const browser = await puppeteer.launch({ executablePath: chromePath(), headless: 'new' });
 try {
@@ -112,7 +114,8 @@ try {
     page.on('console', m => {
         const t = m.text();
         if (/Unbekannte Aktion/.test(t)) problems.push(t);
-        else if (/Content Security Policy|Refused to/.test(t)) problems.push(`CSP: ${t}`);
+        // Waehrend der Gegenprobe ist die Konsolenmeldung der CSP erwuenscht.
+        else if (/Content Security Policy|Refused to/.test(t)) (probing ? probeConsole : problems).push(`CSP: ${t}`);
     });
     await page.evaluateOnNewDocument(() => {
         window.__csp = [];
@@ -329,6 +332,8 @@ try {
     for (const v of cspViolations) problems.push(`CSP-Verstoss: ${v}`);
 
     // Gegenprobe: Ein eingeschleuster onclick muss unter CSP blockiert werden.
+    // Die dabei erwartete Konsolenmeldung zaehlt nicht als Problem.
+    probing = true;
     const probe = await page.evaluate(async () => {
         window.__probeRan = false;
         const before = window.__csp.length;
@@ -340,9 +345,11 @@ try {
         holder.remove();
         return { ran: window.__probeRan, reported: window.__csp.length > before };
     });
+    await wait(300);
+    probing = false;
 
     console.log(`CSP-Kopfzeile auf /: ${cspHeader ? 'ja' : 'NEIN'}`);
-    console.log(`Gegenprobe onclick: ${probe.ran ? 'AUSGEFUEHRT' : 'blockiert'}${probe.reported ? ', gemeldet' : ''}`);
+    console.log(`Gegenprobe onclick: ${probe.ran ? 'AUSGEFUEHRT' : 'blockiert'}${probe.reported ? ', gemeldet' : ''}${probeConsole.length ? `, Konsole: ${probeConsole.length}` : ''}`);
     if (cspHeader && (probe.ran || !probe.reported)) problems.push('Gegenprobe: eingeschleuster onclick lief trotz CSP');
     if (!cspHeader && !probe.ran) problems.push('Gegenprobe: ohne CSP muss der eingeschleuste onclick laufen');
 
