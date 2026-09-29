@@ -1319,7 +1319,7 @@
                 <div class="data-table" style="margin-top: 30px; display: none;" id="activityTypesBlock">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0;">⏱️ Tätigkeitsarten</h2>
-                        <button class="btn-add" onclick="openActivityTypeModal()">+ Neue Tätigkeitsart</button>
+                        <button class="btn-add" data-action="open-activity-type-modal">+ Neue Tätigkeitsart</button>
                     </div>
                     <div class="filter-chips filter-chips--standalone" id="activityChipsRow"></div>
                     <table>
@@ -1347,7 +1347,7 @@
                     <h1>Zeiterfassung</h1>
                     <div class="header-actions">
                         <button class="btn-secondary" id="btnWorktimeReport">📄 Bericht</button>
-                        <button class="btn-add" onclick="openWorkSessionModal()">+ Zeit nachtragen</button>
+                        <button class="btn-add" data-action="open-work-session-modal">+ Zeit nachtragen</button>
                     </div>
                 </div>
 
@@ -2546,7 +2546,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="workSessionModalTitle">Zeit nachtragen</h2>
-                <button class="close-modal" onclick="closeWorkSessionModal()">×</button>
+                <button class="close-modal" data-action="close-work-session-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="workSessionForm">
@@ -2599,8 +2599,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeWorkSessionModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveWorkSession()">Speichern</button>
+                <button class="btn-cancel" data-action="close-work-session-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-work-session">Speichern</button>
             </div>
         </div>
     </div>
@@ -2666,7 +2666,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="activityTypeModalTitle">Neue Tätigkeitsart</h2>
-                <button class="close-modal" onclick="closeActivityTypeModal()">×</button>
+                <button class="close-modal" data-action="close-activity-type-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="activityTypeForm">
@@ -2731,8 +2731,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeActivityTypeModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveActivityType()">Speichern</button>
+                <button class="btn-cancel" data-action="close-activity-type-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-activity-type">Speichern</button>
             </div>
         </div>
     </div>

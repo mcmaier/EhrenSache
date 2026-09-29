@@ -12,6 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdmin, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear } from './ui.js';
 import { debug } from '../app.js';
+import { registerActions } from './actions.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { updateModalId, safeTypeColor } from './utils.js';
@@ -267,9 +268,9 @@ function renderWorktimeActions(session) {
 
     if (isAdminOrManager && session.status === 'submitted' && session.end_time) {
         buttons.push(`<button class="action-btn btn-icon btn-approve" title="Freigeben"
-            onclick="approveWorkSession(${session.session_id})">✓</button>`);
+            data-action="approve-work-session" data-id="${Number(session.session_id)}">✓</button>`);
         buttons.push(`<button class="action-btn btn-icon btn-reject" title="Ablehnen"
-            onclick="rejectWorkSession(${session.session_id})">✗</button>`);
+            data-action="reject-work-session" data-id="${Number(session.session_id)}">✗</button>`);
     }
 
     // Mitglieder duerfen eigene Eintraege korrigieren; jede Aenderung entzieht
@@ -283,12 +284,12 @@ function renderWorktimeActions(session) {
 
     if ((isAdminOrManager || isOwn) && session.end_time) {
         buttons.push(`<button class="action-btn btn-icon btn-edit" title="Bearbeiten"
-            onclick="openWorkSessionModal(${session.session_id})">✎</button>`);
+            data-action="open-work-session-modal" data-id="${Number(session.session_id)}">✎</button>`);
     }
 
     if (isAdmin) {
         buttons.push(`<button class="action-btn btn-icon btn-delete" title="Löschen"
-            onclick="deleteWorkSession(${session.session_id})">🗑</button>`);
+            data-action="delete-work-session" data-id="${Number(session.session_id)}">🗑</button>`);
     }
 
     return buttons.join(' ') || '—';
@@ -855,9 +856,9 @@ export function renderActivityTypes() {
                 : '<span class="type-badge">ausgemustert</span>'}</td>
         <td class="actions-cell">
             <button class="action-btn btn-icon btn-edit" title="Bearbeiten"
-                onclick="openActivityTypeModal(${a.activity_id})">✎</button>
+                data-action="open-activity-type-modal" data-id="${Number(a.activity_id)}">✎</button>
             <button class="action-btn btn-icon btn-delete" title="Löschen"
-                onclick="deleteActivityType(${a.activity_id})">🗑</button>
+                data-action="delete-activity-type" data-id="${Number(a.activity_id)}">🗑</button>
         </td>
     </tr>`;
     }).join('');
@@ -1089,3 +1090,16 @@ window.openActivityTypeModal = openActivityTypeModal;
 window.closeActivityTypeModal = closeActivityTypeModal;
 window.saveActivityType = saveActivityType;
 window.deleteActivityType = deleteActivityType;
+
+registerActions({
+    'approve-work-session': (el) => approveWorkSession(Number(el.dataset.id)),
+    'close-activity-type-modal': () => closeActivityTypeModal(),
+    'close-work-session-modal': () => closeWorkSessionModal(),
+    'delete-activity-type': (el) => deleteActivityType(Number(el.dataset.id)),
+    'delete-work-session': (el) => deleteWorkSession(Number(el.dataset.id)),
+    'open-activity-type-modal': (el) => openActivityTypeModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'open-work-session-modal': (el) => openWorkSessionModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'reject-work-session': (el) => rejectWorkSession(Number(el.dataset.id)),
+    'save-activity-type': () => saveActivityType(),
+    'save-work-session': () => saveWorkSession(),
+});
