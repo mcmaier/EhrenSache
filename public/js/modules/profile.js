@@ -14,6 +14,7 @@ import { loadUserData } from './users.js';
 import { debug } from '../app.js'
 import { API_BASE } from '../config.js';
 import { loadOpenItems } from './open_items.js';
+import { registerActions } from './actions.js';
 
 // ============================================
 // PROFLE
@@ -339,3 +340,10 @@ window.regenerateProfileToken = regenerateProfileToken;
 window.copyProfileToken = copyProfileToken;
 window.toggleProfileTokenVisibility = toggleProfileTokenVisibility;
 window.downloadMyData = downloadMyData;
+
+registerActions({
+    'copy-profile-token': () => copyProfileToken(),
+    'download-my-data': () => downloadMyData(),
+    'regenerate-profile-token': () => regenerateProfileToken(),
+    'toggle-profile-token-visibility': () => toggleProfileTokenVisibility(),
+});

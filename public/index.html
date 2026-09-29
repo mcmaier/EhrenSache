@@ -154,7 +154,7 @@
                         <div class="profile-item" id="profile_user_data">
                             <label>Meine Daten</label>
                             <div style="display: flex; flex-direction: row; gap: 20px;">                                                                
-                                <button onclick="downloadMyData()" class="btn-std btn-delete">
+                                <button data-action="download-my-data" class="btn-std btn-delete">
                                     📥 Herunterladen
                                 </button>
                                 <select id="profile_user_data_format" class="form-input" style="max-width: 100px;">
@@ -224,18 +224,18 @@
                                 <div style="flex: 1; position: relative;">
                                     <input type="password" id="profile_token" readonly class="token-hidden"
                                            style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace;">
-                                    <button onclick="toggleProfileTokenVisibility()" id="toggleProfileTokenBtn" type="button"
+                                    <button data-action="toggle-profile-token-visibility" id="toggleProfileTokenBtn" type="button"
                                             style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
                                         👁️
                                     </button>
                                 </div>
-                                <button onclick="copyProfileToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋 Kopieren</button>
+                                <button data-action="copy-profile-token" type="button" class="btn-add" style="margin: 0; width: auto;">📋 Kopieren</button>
                             </div>
                         </div>
                         
                         <div style="display: flex; flex-direction: row; align-items: baseline; gap: 16px;">
                             <div id="profileTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 14px;"></div>
-                            <button onclick="regenerateProfileToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
+                            <button data-action="regenerate-profile-token" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
                                 🔄 Neuen Token generieren
                             </button>                             
                         </div>
