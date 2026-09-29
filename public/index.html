@@ -1272,7 +1272,7 @@
                 <div class="data-table">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0;">👥 Benutzergruppen</h2>
-                        <button class="btn-add" onclick="openGroupModal()">+ Neue Gruppe</button>
+                        <button class="btn-add" data-action="open-group-modal">+ Neue Gruppe</button>
                     </div>
                     <div class="filter-chips filter-chips--standalone" id="groupChipsRow"></div>
                     <table>
@@ -1295,7 +1295,7 @@
                 <div class="data-table" style="margin-top: 30px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0;">📅 Terminarten</h2>
-                        <button class="btn-add" onclick="openTypeModal()">+ Neue Terminart</button>
+                        <button class="btn-add" data-action="open-type-modal">+ Neue Terminart</button>
                     </div>
                     <div class="filter-chips filter-chips--standalone" id="typeChipsRow"></div>
                     <table>
@@ -2055,7 +2055,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="groupModalTitle">Neue Gruppe</h2>
-                <button class="close-modal" onclick="closeGroupModal()">×</button>
+                <button class="close-modal" data-action="close-group-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="groupForm">
@@ -2070,7 +2070,7 @@
                     </div>
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="group_is_default" onchange="toggleGroupExclusivity()">
+                            <input type="checkbox" id="group_is_default" data-action-change="toggle-group-exclusivity">
                             <span>Standard-Gruppe (gilt für alle neuen Mitglieder)</span>
                         </label>
                         <small style="color: #e67e22; display: block; margin-top: 5px;">
@@ -2083,7 +2083,7 @@
                     </div>
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="group_is_subgroup" onchange="toggleGroupExclusivity()">
+                            <input type="checkbox" id="group_is_subgroup" data-action-change="toggle-group-exclusivity">
                             Gliedert Listen als <span data-subgroup-label>Untergruppe</span>
                         </label>
                         <small class="input-hint">Anwesenheitslisten und Rückmeldungen lassen sich
@@ -2108,8 +2108,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeGroupModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveGroup()">Speichern</button>
+                <button class="btn-cancel" data-action="close-group-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-group">Speichern</button>
             </div>
         </div>
     </div>
@@ -2119,7 +2119,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="typeModalTitle">Neue Terminart</h2>
-                <button class="close-modal" onclick="closeTypeModal()">×</button>
+                <button class="close-modal" data-action="close-type-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="typeForm">
@@ -2157,7 +2157,7 @@
                     <fieldset class="form-group response-settings">
                         <legend>Rückmeldung</legend>
                         <label class="checkbox-label">
-                            <input type="checkbox" id="type_responses_enabled" onchange="toggleTypeResponseFields()">
+                            <input type="checkbox" id="type_responses_enabled" data-action-change="toggle-type-response-fields">
                             Rückmeldung erbeten
                         </label>
                         <small class="input-hint">
@@ -2195,8 +2195,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeTypeModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveType()">Speichern</button>
+                <button class="btn-cancel" data-action="close-type-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-type">Speichern</button>
             </div>
         </div>
     </div>
