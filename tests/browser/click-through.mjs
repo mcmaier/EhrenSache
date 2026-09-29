@@ -46,7 +46,10 @@ const onlySection = (process.argv.find(a => a.startsWith('--section=')) || '').s
 
 // Veraendert Daten, laedt herunter, druckt, greift nach aussen oder in die
 // Zwischenablage -- hier nie ausloesen.
-const SKIP = /^(delete-|save-|execute-|perform-|regenerate-|generate-|quick-|approve-|reject-|send-|set-member-|set-own-|withdraw-|create-|analyze-|export-|download-|print-|check-for-|copy-|remove-membership|add-membership|toggle-responses-lock|import-logs-delete|app-reset-reload|auth-reload|calendar-new-appointment)/;
+const SKIP = /^(delete-|save-|execute-|perform-|regenerate-|generate-|quick-|approve-|reject-|send-|set-member-|set-own-|withdraw-|create-|analyze-|export-|download-|print-|check-for-|copy-|remove-membership|add-membership|toggle-responses-lock|import-logs-delete|app-reset-reload|auth-reload)/;
+// Bewusst NICHT in SKIP: calendar-new-appointment (oeffnet nur den Neu-Dialog, gespeichert
+// wird erst ueber save-appointment) und set-attendance-grouping (nur Ansichtsgruppierung).
+// quick-create-* legt Anwesenheitssaetze an und faellt unter "quick-".
 
 // Aktionen, die beim Durchgang ans Ende gehoeren, sonst schliessen sie den
 // Dialog vor dessen uebrigen Knoepfen.
@@ -98,6 +101,7 @@ const triggered = new Set();
 const skipped = new Set();
 const done = new Set();      // Schluessel kind|name|id bzw. -, schon behandelt
 const seen = new Set();      // Aktionsnamen, die irgendwann im DOM standen
+const notes = [];            // Hinweise auf nicht erreichte Schritte (Auskunft, kein Fehler)
 
 const browser = await puppeteer.launch({ executablePath: chromePath(), headless: 'new' });
 try {
@@ -215,6 +219,35 @@ try {
         void label;
     }
 
+    // Kalender-Popup mit der gesuchten Aktion oeffnen: alle belegten Tage des angezeigten
+    // Monats, dann Vormonat, dann Folgemonat (gedeckelt). Am Ende steht der Kalender wieder
+    // im Ausgangsmonat, sofern nichts gefunden wurde; bei Erfolg bleibt der Fundmonat.
+    async function openPopupWith(name) {
+        const nav = dir => page.evaluate(d => document.querySelector(`[data-action="${d}"]`)?.click(), dir)
+            .then(() => wait(700));
+        const tryMonth = async () => {
+            const count = await page.evaluate(() => document.querySelectorAll('.calendar-day.has-event').length);
+            for (let i = 0; i < Math.min(count, 40); i++) {
+                const found = await page.evaluate((idx, n) => {
+                    document.querySelector('.calendar-event-popup')?.remove();
+                    const day = document.querySelectorAll('.calendar-day.has-event')[idx];
+                    if (!day) return false;
+                    day.click();
+                    return !!document.querySelector(`.calendar-event-popup [data-action="${n}"]`);
+                }, i, name);
+                if (found) return true;
+            }
+            return false;
+        };
+        if (await tryMonth()) return true;
+        await nav('previous-month');
+        if (await tryMonth()) return true;
+        await nav('next-month'); await nav('next-month');
+        if (await tryMonth()) return true;
+        await nav('previous-month');
+        return false;
+    }
+
     for (const section of sections) {
         if (onlySection && section !== onlySection) continue;
         await page.evaluate(s => document.querySelector(`.nav-item[data-section="${s}"]`).click(), section);
@@ -238,15 +271,53 @@ try {
             await sweep(`${section}-tab${t}`);
         }
 
-        // Kalender: das festgehaltene Popup eines belegten Tages oeffnen
+        // Anwesenheitsmodi: Termin- bzw. Mitglieds-Filter setzen (change-Listener per
+        // addEventListener, daher kein data-action), dort erneut ausloesen, zuruecksetzen.
+        if (section === 'anwesenheit') {
+            for (const id of ['filterAppointment', 'filterMember']) {
+                const set = await page.evaluate(sel => {
+                    const s = document.getElementById(sel);
+                    if (!s || s.disabled) return false;
+                    const opt = [...s.options].find(o => o.value !== '');
+                    if (!opt) return false;
+                    s.value = opt.value;
+                    s.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                }, id);
+                if (!set) { notes.push(`Filter #${id} nicht setzbar (keine Option oder gesperrt)`); continue; }
+                await wait(500);
+                await page.waitForNetworkIdle({ idleTime: 300, timeout: 4000 }).catch(() => {});
+                await sweep(`anwesenheit-${id}`);
+                // Zuruecksetzen, sonst ist der andere Filter gesperrt
+                await page.evaluate(sel => {
+                    const s = document.getElementById(sel);
+                    s.value = '';
+                    s.dispatchEvent(new Event('change', { bubbles: true }));
+                }, id);
+                await wait(500);
+                await page.waitForNetworkIdle({ idleTime: 300, timeout: 4000 }).catch(() => {});
+            }
+        }
+
+        // Kalender-Popup: jede Popup-Aktion einzeln, das Popup wird je Aktion neu geoeffnet
+        // (die Aktion schliesst es). Sprung zur Anwesenheit zuletzt, er verlaesst die Sektion.
         if (section === 'termine') {
-            const opened = await page.evaluate(() => {
-                const day = document.querySelector('.calendar-day.has-event');
-                if (!day) return false;
-                day.click();
-                return true;
-            });
-            if (opened) { await wait(500); await sweep('kalender-popup'); }
+            for (const name of ['calendar-open-responses', 'calendar-open-appointment', 'calendar-new-appointment', 'calendar-jump-to-attendance']) {
+                if (!await openPopupWith(name)) { notes.push(`Kalender-Popup mit ${name} nicht gefunden (Monat -1..+1)`); continue; }
+                await page.evaluate(n => document.querySelector(`.calendar-event-popup [data-action="${n}"]`).click(), name);
+                triggered.add(name);
+                done.add(`click|${name}|id`); done.add(`click|${name}|-`);
+                await wait(500);
+                await page.waitForNetworkIdle({ idleTime: 300, timeout: 4000 }).catch(() => {});
+                // Folgeansicht (Dialog bzw. Anwesenheit mit Zurueck-Knopf) durchgehen
+                await sweep(`popup-${name}`);
+                if (name === 'calendar-jump-to-attendance') {
+                    // Zurueck in den Kalender, falls der Zurueck-Knopf ihn nicht schon zeigte
+                    await page.evaluate(() => document.querySelector('.nav-item[data-section="termine"]').click());
+                    await wait(1000);
+                }
+            }
+            await page.evaluate(() => document.querySelector('[data-action="go-to-today"]')?.click());
         }
         await closeDialogs();
     }
@@ -277,9 +348,14 @@ try {
 
     // Ausgeloeste und uebersprungene Aktionen standen im DOM und zaehlen als gesehen.
     const neverSeen = [...registeredActions()].filter(n => !seen.has(n) && !triggered.has(n) && !skipped.has(n)).sort();
-    console.log(`Ausgeloest: ${triggered.size}  Uebersprungen: ${skipped.size}  Registriert, aber nie gesehen: ${neverSeen.length}`);
+    // Im DOM gesehen, aber weder ausgeloest noch bewusst uebersprungen (etwa versteckt bis zu einem Sprung).
+    const reg = registeredActions();
+    const seenNotTriggered = [...seen].filter(n => reg.has(n) && !triggered.has(n) && !skipped.has(n)).sort();
+    console.log(`Ausgeloest: ${triggered.size}  Uebersprungen: ${skipped.size}  Gesehen, aber nie ausgeloest: ${seenNotTriggered.length}  Registriert, aber nie gesehen: ${neverSeen.length}`);
+    for (const n of notes) console.log(`  Hinweis: ${n}`);
     console.log(`  ausgeloest: ${[...triggered].sort().join(', ')}`);
     console.log(`  uebersprungen: ${[...skipped].sort().join(', ')}`);
+    console.log(`  gesehen, aber nie ausgeloest (${seenNotTriggered.length}): ${seenNotTriggered.join(', ') || '-'}`);
     console.log(`  registriert, aber nie gesehen (${neverSeen.length}): ${neverSeen.join(', ') || '-'}`);
     if (onlySection) console.log('  (mit --section ist diese Liste erwartungsgemaess laenger)');
 } finally {
