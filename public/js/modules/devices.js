@@ -13,6 +13,7 @@ import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQR
 import { updateModalId, escapeHtml } from './utils.js';
 import { CHIPS_DEVICES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 import {debug} from '../app.js'
+import { registerActions } from './actions.js';
 
 // ============================================
 // DEVICES
@@ -129,8 +130,8 @@ function renderDevices(devices, page = 1)
                 <td>${tokenExpiry}</td>
                 <td>${formattedCreated}</td>
                 <td class="actions-cell">
-                    <button class="action-btn btn-icon btn-edit" onclick="openDeviceModal(${device.user_id})">✎</button>
-                    <button class="action-btn btn-icon btn-delete" onclick="deleteDevice(${device.user_id})">🗑</button>
+                    <button class="action-btn btn-icon btn-edit" data-action="open-device-modal" data-id="${Number(device.user_id)}">✎</button>
+                    <button class="action-btn btn-icon btn-delete" data-action="delete-device" data-id="${Number(device.user_id)}">🗑</button>
                 </td> `;                     
                 fragment.appendChild(tr);
         });
@@ -168,17 +169,17 @@ function renderDevicesPagination(currentPage, totalPages, totalDevices) {
         // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
         for (let i = 1; i <= totalPages; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToDevicesPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-devices-page" data-page="${Number(i)}">${i}</button>`;
         }
     } 
     else {
 
         // Erste Seite Button
         if (currentPage > 1) {
-            //html += `<button onclick="goToDevicesPage(1)" title="Erste Seite">
+            //html += `<button data-action="go-to-devices-page" data-page="1" title="Erste Seite">
             //            «
             //        </button>`;
-            html += `<button onclick="goToDevicesPage(${currentPage - 1})" title="Vorherige Seite">
+            html += `<button data-action="go-to-devices-page" data-page="${Number(currentPage - 1)}" title="Vorherige Seite">
                         ‹
                     </button>`;
         }
@@ -188,7 +189,7 @@ function renderDevicesPagination(currentPage, totalPages, totalDevices) {
         const endPage = Math.min(totalPages, currentPage + 2);
         
         if (startPage > 1) {
-            html += `<button onclick="goToDevicesPage(1)">1</button>`;
+            html += `<button data-action="go-to-devices-page" data-page="1">1</button>`;
             if (startPage > 2) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
@@ -196,22 +197,22 @@ function renderDevicesPagination(currentPage, totalPages, totalDevices) {
         
         for (let i = startPage; i <= endPage; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToDevicesPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-devices-page" data-page="${Number(i)}">${i}</button>`;
         }
         
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
-            html += `<button onclick="goToDevicesPage(${totalPages})">${totalPages}</button>`;
+            html += `<button data-action="go-to-devices-page" data-page="${Number(totalPages)}">${totalPages}</button>`;
         }
         
         // Letzte Seite Button
         if (currentPage < totalPages) {
-            html += `<button onclick="goToDevicesPage(${currentPage + 1})" title="Nächste Seite">
+            html += `<button data-action="go-to-devices-page" data-page="${Number(currentPage + 1)}" title="Nächste Seite">
                         ›
                     </button>`;
-            //html += `<button onclick="goToDevicesPage(${totalPages})" title="Letzte Seite">
+            //html += `<button data-action="go-to-devices-page" data-page="${Number(totalPages)}" title="Letzte Seite">
             //            »
             //        </button>`;
         }
@@ -687,3 +688,16 @@ window.generateTotpSecret = generateTotpSecret;
 window.showDeviceQR = showDeviceQR;
 window.applyDeviceFilters = applyDeviceFilters;
 window.resetDeviceFilter = resetDeviceFilter;
+
+registerActions({
+    'close-device-modal': () => closeDeviceModal(),
+    'copy-device-token': () => copyDeviceToken(),
+    'delete-device': (el) => deleteDevice(Number(el.dataset.id)),
+    'generate-totp-secret': () => generateTotpSecret(),
+    'go-to-devices-page': (el) => goToDevicesPage(Number(el.dataset.page)),
+    'open-device-modal': (el) => openDeviceModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'regenerate-device-token': () => regenerateDeviceToken(),
+    'save-device': () => saveDevice(),
+    'show-device-qr': () => showDeviceQR(),
+    'toggle-device-token-visibility': () => toggleDeviceTokenVisibility(),
+});

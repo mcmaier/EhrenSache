@@ -1222,7 +1222,7 @@
                 <div class="content-header">
                     <h1>Geräteverwaltung</h1>
                     <div class="header-actions">                                             
-                        <button class="btn-add" onclick="openDeviceModal()">🔧 Neues Gerät</button>
+                        <button class="btn-add" data-action="open-device-modal">🔧 Neues Gerät</button>
                     </div>  
                 </div>
 
@@ -1960,7 +1960,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="deviceModalTitle">Neues Gerät</h2>
-                <button class="close-modal" onclick="closeDeviceModal()">×</button>
+                <button class="close-modal" data-action="close-device-modal">×</button>
             </div>
             <div class="modal-body">                
                 <form id="deviceForm">
@@ -1994,7 +1994,7 @@
                         <div class="form-group">
                             <label for="device_totp_secret">TOTP Secret</label>
                             <input type="text" id="device_totp_secret" style="font-family: monospace;">
-                            <button type="button" id="toggleDeviceTotpBtn" onclick="generateTotpSecret()" 
+                            <button type="button" id="toggleDeviceTotpBtn" data-action="generate-totp-secret" 
                                     class="btn-secondary" style="margin-top: 5px;">
                                 🔄 Secret neu generieren
                             </button>
@@ -2024,28 +2024,28 @@
                             <div style="flex: 1; position: relative;">
                                 <input type="password" id="device_token" readonly class="token-hidden" 
                                     style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace; background: #f8f9fa;">
-                                <button onclick="toggleDeviceTokenVisibility()" id="toggleDeviceTokenBtn" type="button"
+                                <button data-action="toggle-device-token-visibility" id="toggleDeviceTokenBtn" type="button"
                                         style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
                                     👁️
                                 </button>
                             </div>
-                            <button onclick="copyDeviceToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
-                            <button onclick="showDeviceQR()" type="button" id="deviceQRBtn" class="btn-add"
+                            <button data-action="copy-device-token" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
+                            <button data-action="show-device-qr" type="button" id="deviceQRBtn" class="btn-add"
                                     style="margin: 0; width: auto; display: none;"
                                     title="QR-Code zur Inbetriebnahme der Station"
                                     aria-label="QR-Code zur Inbetriebnahme der Station">📱</button>
                         </div>
                         <!-- Im userTokenGroup nach dem Token-Input -->
                         <div id="deviceTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
-                        <button onclick="regenerateDeviceToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
+                        <button data-action="regenerate-device-token" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
                             🔄 Neuen Token generieren
                         </button>
                     </div>
                 </form>               
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeDeviceModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveDevice()">Speichern</button>
+                <button class="btn-cancel" data-action="close-device-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-device">Speichern</button>
             </div>
         </div>
     </div>
