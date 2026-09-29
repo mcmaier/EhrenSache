@@ -20,6 +20,7 @@ import { showMemberSection } from './members.js';
 import { showConfirm } from './ui.js';
 import { renderDateChecklist, formatChecklistDate } from './date_checklist.js';
 import { escapeHtml } from './utils.js';
+import { registerActions } from './actions.js';
 
 let suggestionChecklist = null;
 
@@ -394,13 +395,15 @@ function displayRecordsImportResult(result) {
     resultDiv.style.display = 'block';
 }
 
-// Tab-Wechsel
-export function switchImportTab(tab) {
+/** Wechselt den Reiter im Import-Dialog. button ist der ausloesende Reiter
+ *  (Aktion switch-import-tab); frueher kam er aus dem globalen event, das es
+ *  ohne Inline-Handler nicht gibt. */
+export function switchImportTab(tab, button) {
     // Tabs umschalten
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.import-tab-content').forEach(content => content.style.display = 'none');
     
-    event.target.classList.add('active');
+    button.classList.add('active');
     document.getElementById(`import-tab-${tab}`).style.display = 'block';
 }
 
@@ -759,10 +762,10 @@ function renderLogsList(logs) {
                         <td class="text-success"><strong>${log.successful_rows}</strong></td>
                         <td class="text-danger"><strong>${log.failed_rows}</strong></td>
                         <td class="actions-cell">
-                            <button class="action-btn btn-icon btn-view" onclick="window.ImportLogs.showDetails(${log.log_id})" title="Details anzeigen">
+                            <button class="action-btn btn-icon btn-view" data-action="import-logs-show-details" data-id="${Number(log.log_id)}" title="Details anzeigen">
                                 👁
                             </button>
-                            <button class="action-btn btn-icon btn-delete" onclick="window.ImportLogs.deleteLog(${log.log_id})" title="Log löschen">
+                            <button class="action-btn btn-icon btn-delete" data-action="import-logs-delete-log" data-id="${Number(log.log_id)}" title="Log löschen">
                                 🗑
                             </button>
                         </td>
@@ -863,11 +866,14 @@ function refresh() {
 }
 
 // Globaler Zugriff für onclick-Handler
-window.ImportLogs = {
+const ImportLogs = {
     showDetails,
     deleteLog,
     refresh
 };
+
+// Global bis Task 19 (OI-17)
+window.ImportLogs = ImportLogs;
 
 
 // Globale Funktionen
@@ -892,3 +898,26 @@ window.switchImportTab = switchImportTab;
 window.analyzeCsvForAppointments = analyzeCsvForAppointments;
 window.createSelectedAppointments = createSelectedAppointments;
 window.clearSuggestions = clearSuggestions;
+
+registerActions({
+    'analyze-csv-for-appointments': () => analyzeCsvForAppointments(),
+    'clear-suggestions': () => clearSuggestions(),
+    'close-appointments-import-modal': () => closeAppointmentsImportModal(),
+    'close-import-modal': () => closeImportModal(),
+    'close-log-modal': () => closeLogModal(),
+    'close-records-import-modal': () => closeRecordsImportModal(),
+    'create-selected-appointments': () => createSelectedAppointments(),
+    'execute-appointments-import': () => executeAppointmentsImport(),
+    'execute-import': () => executeImport(),
+    'execute-records-import': () => executeRecordsImport(),
+    'export-appointments': () => exportAppointments(),
+    'export-members': () => exportMembers(),
+    'export-records': () => exportRecords(),
+    'import-logs-delete-log': (el) => ImportLogs.deleteLog(Number(el.dataset.id)),
+    'import-logs-refresh': () => ImportLogs.refresh(),
+    'import-logs-show-details': (el) => ImportLogs.showDetails(Number(el.dataset.id)),
+    'open-appointments-import-modal': () => openAppointmentsImportModal(),
+    'open-import-modal': () => openImportModal(),
+    'open-records-import-modal': () => openRecordsImportModal(),
+    'switch-import-tab': (el) => switchImportTab(el.dataset.value, el),
+});

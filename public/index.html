@@ -879,8 +879,8 @@
                 <div class="content-header">
                     <h1>Terminverwaltung</h1>                    
                      <div class="header-actions">
-                        <button class="btn-secondary" data-role="admin" onclick="openAppointmentsImportModal()">📤 Import CSV</button>
-                        <button class="btn-secondary" data-role="manager" onclick="exportAppointments()">💾 Export CSV</button>                                    
+                        <button class="btn-secondary" data-role="admin" data-action="open-appointments-import-modal">📤 Import CSV</button>
+                        <button class="btn-secondary" data-role="manager" data-action="export-appointments">💾 Export CSV</button>                                    
                         <button class="btn-add" data-role="manager" onclick="openAppointmentModal()">+ Neuer Termin</button>
                      </div>
                 </div>
@@ -964,8 +964,8 @@
                     <div class="header-actions">                        
                         <button type="button" id="recordsBackToAppointments" class="btn-secondary" hidden
                                 onclick="backToAppointments()">← Zurück zu Termine</button>
-                        <button class="btn-secondary" data-role="admin" onclick="openRecordsImportModal()">📤 Import CSV</button>
-                        <button class="btn-secondary" data-role="manager" onclick="exportRecords()">💾 Export CSV</button>  
+                        <button class="btn-secondary" data-role="admin" data-action="open-records-import-modal">📤 Import CSV</button>
+                        <button class="btn-secondary" data-role="manager" data-action="export-records">💾 Export CSV</button>  
                         <button class="btn-add" data-role="manager" onclick="openRecordModal()">+ Anwesenheit erfassen</button>
                     </div>
                 </div>
@@ -1126,8 +1126,8 @@
                 <div class="content-header">
                     <h1>Mitgliederverwaltung</h1> 
                     <div class="header-actions">                        
-                        <button class="btn-secondary" data-role="admin" onclick="openImportModal()">📤 Import CSV</button>
-                        <button class="btn-secondary" data-role="manager" onclick="exportMembers()">💾 Export CSV</button>            
+                        <button class="btn-secondary" data-role="admin" data-action="open-import-modal">📤 Import CSV</button>
+                        <button class="btn-secondary" data-role="manager" data-action="export-members">💾 Export CSV</button>            
                         <button class="btn-add" data-role="manager" data-action="open-member-modal">+ Neues Mitglied</button>                    
                     </div>
                 </div>
@@ -1409,7 +1409,7 @@
                                 <option value="appointments">Termine</option>
                             </select>
                         </div>
-                        <button class="btn-secondary" onclick="window.ImportLogs.refresh()">
+                        <button class="btn-secondary" data-action="import-logs-refresh">
                             🔄 Aktualisieren
                         </button>
                     </div>
@@ -1430,7 +1430,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Import-Details</h2>
-                <button class="close-modal" onclick="closeLogModal()">×</button>
+                <button class="close-modal" data-action="close-log-modal">×</button>
             </div>
             <div class="modal-body">
             <!-- Zusammenfassung -->
@@ -1476,7 +1476,7 @@
                 </div>
             </div>           
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeLogModal()">Schließen</button>
+                <button class="btn-cancel" data-action="close-log-modal">Schließen</button>
             </div>
         </div>
     </div>
@@ -2272,7 +2272,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Mitglieder importieren (CSV)</h2>
-                <span class="modal-close" onclick="closeImportModal()">&times;</span>
+                <span class="modal-close" data-action="close-import-modal">&times;</span>
             </div>
             <div class="modal-body">
                 <div class="import-info">
@@ -2307,8 +2307,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeImportModal()">Abbrechen</button>
-                <button class="btn-save" id="importBtn" onclick="executeImport()">Importieren</button>
+                <button class="btn-cancel" data-action="close-import-modal">Abbrechen</button>
+                <button class="btn-save" id="importBtn" data-action="execute-import">Importieren</button>
             </div>
         </div>
     </div>
@@ -2318,7 +2318,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Termine importieren (CSV)</h2>
-                <span class="modal-close" onclick="closeAppointmentsImportModal()">&times;</span>
+                <span class="modal-close" data-action="close-appointments-import-modal">&times;</span>
             </div>
             <div class="modal-body">
                 <div class="import-info">
@@ -2354,8 +2354,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeAppointmentsImportModal()">Abbrechen</button>
-                <button class="btn-save" id="appointmentsImportBtn" onclick="executeAppointmentsImport()">Importieren</button>
+                <button class="btn-cancel" data-action="close-appointments-import-modal">Abbrechen</button>
+                <button class="btn-save" id="appointmentsImportBtn" data-action="execute-appointments-import">Importieren</button>
             </div>
         </div>
     </div>
@@ -2365,13 +2365,13 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Anwesenheiten importieren (CSV)</h2>
-                <span class="modal-close" onclick="closeRecordsImportModal()">&times;</span>
+                <span class="modal-close" data-action="close-records-import-modal">&times;</span>
             </div>
             <div class="modal-body">
                 <!-- Tab-Navigation -->
                 <div class="import-tabs">
-                    <button class="tab-btn active" onclick="switchImportTab('records')">Records Importieren</button>
-                    <button class="tab-btn" onclick="switchImportTab('analyze')">Termine Vorschlagen</button>
+                    <button class="tab-btn active" data-action="switch-import-tab" data-value="records">Records Importieren</button>
+                    <button class="tab-btn" data-action="switch-import-tab" data-value="analyze">Termine Vorschlagen</button>
                 </div>
 
                 <!-- Tab 1: Bestehender Records-Import -->
@@ -2445,7 +2445,7 @@
                             </div>
                         </div>
                         
-                        <button type="button" class="btn-save" onclick="analyzeCsvForAppointments()">Analysieren</button>
+                        <button type="button" class="btn-save" data-action="analyze-csv-for-appointments">Analysieren</button>
                     </form>
                     
                     <div id="suggestions-container" style="display:none; margin-top: 20px;">
@@ -2453,10 +2453,10 @@
                         <div id="suggestions-list" class="suggestions-list"></div>
                         
                         <div class="form-actions" style="margin-top: 20px;">
-                            <button onclick="createSelectedAppointments()" class="btn-save">
+                            <button data-action="create-selected-appointments" class="btn-save">
                                 Ausgewählte Termine anlegen
                             </button>
-                            <button onclick="clearSuggestions()" class="btn-secondary">
+                            <button data-action="clear-suggestions" class="btn-secondary">
                                 Verwerfen
                             </button>
                         </div>
@@ -2464,8 +2464,8 @@
                 </div>               
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeRecordsImportModal()">Abbrechen</button>
-                <button class="btn-save" id="recordsImportBtn" onclick="executeRecordsImport()">Importieren</button>
+                <button class="btn-cancel" data-action="close-records-import-modal">Abbrechen</button>
+                <button class="btn-save" id="recordsImportBtn" data-action="execute-records-import">Importieren</button>
             </div>
         </div>
     </div>
