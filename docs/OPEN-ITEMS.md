@@ -2150,9 +2150,9 @@ jemand einmal gesehen hat — ob es noch gilt, sagt nur der Code.
 
 Der Demo-Modus lässt Schreibzugriffe auf Mitglieder, Termine, Anwesenheiten, Anträge und
 Arbeitszeiten zu — das ist sein Zweck. Was ein Besucher dabei in ein Freitextfeld schreibt,
-bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Das Dashboard nutzt
-Inline-Handler und führt noch keine CSP (siehe [OI-17](#oi-17--keine-content-security-policy));
-Anmeldung, Check-in-PWA und Station tragen seit Etappe 1 (1.17.0) eine. Seit OI-17 Etappe 2
+bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Anmeldung, Check-in-PWA und
+Station tragen seit Etappe 1 (1.17.0) von [OI-17](#oi-17--keine-content-security-policy) eine
+CSP. Seit OI-17 Etappe 2
 trägt auch das Dashboard eine CSP; eingeschleustes Skript läuft zwischen zwei Resets nicht mehr,
 eingeschleustes Markup bleibt sichtbar.
 
@@ -4809,7 +4809,10 @@ gesehen, `[a, b].join(', ')` und `a + ', ' + b` nicht.
 **Warum das zählt:** Das Dashboard trägt seit [OI-17](#oi-17--keine-content-security-policy)
 Etappe 2 eine Content-Security-Policy, die eingeschleustes Skript blockiert. Eingeschleustes
 Markup und Attributwerte (etwa `style`) fängt sie nicht; dagegen ist die Maskierung die
-Schranke — und dieser Wächter ist das einzige, was sie ehrlich hält. Er ist im September 2026 aus
+Schranke — und dieser Wächter ist das einzige, was sie ehrlich hält. Mit der Aktionstabelle
+erlaubte eine fehlende Maskierung zudem, `data-action`-Attribute einzuschleusen, die eine
+registrierte Aktion ohne Rückfrage auslösen (etwa `approve-work-session` oder `set-*-response`);
+der Wächter schützt damit auch gegen Aktions-Injektion. Er ist im September 2026 aus
 einem Sicherheitsvorgang entstanden, dessen Ursache genau war, dass niemand bemerkte, wo Maskierung
 fehlt.
 

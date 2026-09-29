@@ -15,7 +15,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der Maskierung vorbei ins Markup
   schafft. Dafür bedient sich das Dashboard nicht mehr über Inline-Handler, sondern über eine
   zentrale Aktionstabelle. Die öffentlichen Seiten „Passwort zurücksetzen“ und „E-Mail
-  bestätigen“ führen gar kein Skript mehr aus. Damit gilt die CSP für alle Oberflächen außer
+  bestätigen“ dürfen gar kein Skript ausführen. Damit gilt die CSP für alle Oberflächen außer
   den Assistenten für Installation und Update (OI-17).
 
 ### Behoben

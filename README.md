@@ -112,6 +112,9 @@ Fachanwalt für IT-Recht, um die DSGVO-Konformität sicherzustellen.
 - Webserver mit PHP 8+ und MySQL 5.7+ oder MariaDB 10.4+ — die genaue PHP-Version und die
   nötigen PHP-Erweiterungen stehen unter `requires` in `version.json`; Installer und
   Update-Assistent prüfen sie
+- Apache ab 2.4.7 (`Header … setifempty`) mit `mod_headers`; `AllowOverride` muss
+  die `Header`-Direktiven zulassen (`FileInfo`). Ohne `mod_headers` fehlen die Sicherheits-Header samt
+  Content-Security-Policy aus den `.htaccess`-Dateien still
 - SSL-Zertifikat (für PWA und sichere Authentifizierung)
 - Schreibrechte für Upload-Verzeichnisse
 
