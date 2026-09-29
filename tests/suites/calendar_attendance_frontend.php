@@ -121,13 +121,14 @@ test('Change-Handler und Sprung gehen denselben Weg in die Anwesenheitsliste', f
 test('Rueckweg: Knopf, Ziel und Verwerfen', function () use ($caFeRoot) {
     $html = caFeFile($caFeRoot, 'public/index.html');
     assertTrue((bool) preg_match('/id="recordsBackToAppointments"[^>]*hidden/', $html), 'Knopf fehlt oder ist nicht verborgen');
-    assertTrue(str_contains($html, 'onclick="backToAppointments()"'), 'Knopf ohne Handler');
+    assertTrue(str_contains($html, 'data-action="back-to-appointments"'), 'Knopf ohne Handler');
 
     $js = caFeFile($caFeRoot, 'public/js/modules/records.js');
     $back = caFeFunctionBody($js, 'export async function backToAppointments(');
     assertTrue(str_contains($back, 'setCalendarMonth('), 'Zielmonat wird nicht gesetzt');
     assertTrue(str_contains($back, "navigateToSection('termine')"), 'Rueckweg wechselt den Bereich nicht');
-    assertTrue(str_contains($js, 'window.backToAppointments = backToAppointments'), 'Knopf im HTML braucht die globale Zuweisung');
+    assertTrue(preg_match("/'back-to-appointments':\s*\(\)\s*=>\s*backToAppointments\(\)/", $js) === 1,
+        'Der Knopf ist nicht als Aktion verdrahtet');
 
     $show = caFeFunctionBody($js, 'export async function showRecordsSection(');
     assertTrue(str_contains($show, 'clearAttendanceReturn()'), 'Normaler Aufruf des Bereichs muss den Rueckweg verwerfen');

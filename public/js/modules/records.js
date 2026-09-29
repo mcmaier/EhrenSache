@@ -8,6 +8,7 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+import { registerActions } from './actions.js';
 import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { loadAppointments, setCalendarMonth } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
@@ -234,12 +235,12 @@ export async function renderRecords(records, page = 1)
         const actionsHtml = isAdminOrManager ? `
                         <td class="actions-cell">
                             <button class="action-btn btn-icon btn-edit" 
-                                    onclick="openRecordModal(${record.record_id})"
+                                    data-action="open-record-modal" data-id="${Number(record.record_id)}"
                                     title="Bearbeiten">
                                 ✎
                             </button>
                             <button class="action-btn btn-icon btn-delete" 
-                                    onclick="deleteRecord(${record.record_id})"
+                                    data-action="delete-record" data-id="${Number(record.record_id)}"
                                     title="Löschen">
                                 🗑
                             </button>
@@ -289,15 +290,15 @@ function renderRecordsPagination(currentPage, totalPages, totalRecords) {
         // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
         for (let i = 1; i <= totalPages; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToRecordsPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-records-page" data-page="${Number(i)}">${i}</button>`;
         }
     } 
     else
     {
         // Erste Seite Button
         if (currentPage > 1) {
-            //html += `<button onclick="goToRecordsPage(1)" title="Erste Seite">«</button>`;
-            html += `<button onclick="goToRecordsPage(${currentPage - 1})" title="Vorherige Seite">‹</button>`;
+            //html += `<button data-action="go-to-records-page" data-page="1" title="Erste Seite">«</button>`;
+            html += `<button data-action="go-to-records-page" data-page="${Number(currentPage - 1)}" title="Vorherige Seite">‹</button>`;
         }
         
         // Seitenzahlen (max 3 anzeigen)
@@ -305,7 +306,7 @@ function renderRecordsPagination(currentPage, totalPages, totalRecords) {
         const endPage = Math.min(totalPages, currentPage + 1);
         
         if (startPage > 1) {
-            html += `<button onclick="goToRecordsPage(1)">1</button>`;
+            html += `<button data-action="go-to-records-page" data-page="1">1</button>`;
             if (startPage > 2) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
@@ -313,20 +314,20 @@ function renderRecordsPagination(currentPage, totalPages, totalRecords) {
         
         for (let i = startPage; i <= endPage; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToRecordsPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-records-page" data-page="${Number(i)}">${i}</button>`;
         }
         
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
-            html += `<button onclick="goToRecordsPage(${totalPages})">${totalPages}</button>`;
+            html += `<button data-action="go-to-records-page" data-page="${Number(totalPages)}">${totalPages}</button>`;
         }
         
         // Letzte Seite Button
         if (currentPage < totalPages) {
-            html += `<button onclick="goToRecordsPage(${currentPage + 1})" title="Nächste Seite">›</button>`;
-            //html += `<button onclick="goToRecordsPage(${totalPages})" title="Letzte Seite">»</button>`;
+            html += `<button data-action="go-to-records-page" data-page="${Number(currentPage + 1)}" title="Nächste Seite">›</button>`;
+            //html += `<button data-action="go-to-records-page" data-page="${Number(totalPages)}" title="Letzte Seite">»</button>`;
         }
     }
     
@@ -338,8 +339,7 @@ function renderRecordsPagination(currentPage, totalPages, totalRecords) {
     container.innerHTML = html;
 }
 
-// Global für onclick
-window.goToRecordsPage = function(page) {
+function goToRecordsPage(page) {
 
     // Aktuelle Scroll-Position der Tabelle speichern
     const tableContainer = document.querySelector('.data-table')?.parentElement;
@@ -358,7 +358,9 @@ window.goToRecordsPage = function(page) {
             });
         }
     }
-};
+}
+// Global bis Task 19 (OI-17)
+window.goToRecordsPage = goToRecordsPage;
 
 /**
  * Zeichnet die Status-Chips fuer den aktuellen Modus und liefert die nach
@@ -1520,7 +1522,7 @@ function renderAttendanceGroupingBar(attendanceData) {
     const buttons = stages.map(s => `
         <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
                 aria-pressed="${stage === s ? 'true' : 'false'}"
-                onclick="setAttendanceGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+                data-action="set-attendance-grouping" data-value="${escapeHtml(s)}">${stageLabels[s]}</button>`).join('');
 
     let hint = '';
     if (duplicates > 0) {
@@ -1650,12 +1652,12 @@ function buildAttendanceRow(member) {
         // Eintrag vorhanden → Edit & Delete
         actionsHtml = `
             <button class="action-btn btn-icon btn-edit"
-                    onclick="openRecordModal(${member.record_id})"
+                    data-action="open-record-modal" data-id="${Number(member.record_id)}"
                     title="Bearbeiten">
                 ✎
             </button>
             <button class="action-btn btn-icon btn-delete"
-                    onclick="deleteRecord(${member.record_id})"
+                    data-action="delete-record" data-id="${Number(member.record_id)}"
                     title="Löschen">
                 🗑
             </button>
@@ -1664,12 +1666,12 @@ function buildAttendanceRow(member) {
         // Kein Eintrag → Anwesend & Entschuldigt
         actionsHtml = `
             <button class="action-btn btn-icon btn-approve"
-                    onclick="quickCreateRecordForMember(${member.member_id}, 'present')"
+                    data-action="quick-create-record-for-member" data-id="${Number(member.member_id)}" data-value="present"
                     title="Anwesend">
                 ✓
             </button>
             <button class="action-btn btn-icon btn-edit"
-                    onclick="quickCreateRecordForMember(${member.member_id}, 'excused')"
+                    data-action="quick-create-record-for-member" data-id="${Number(member.member_id)}" data-value="excused"
                     title="Entschuldigt">
                 ⚠
             </button>
@@ -1690,12 +1692,14 @@ function buildAttendanceRow(member) {
 
 /** Umschalter-Klick (Spec 6.2): merkt die Wahl und rendert aus den vorliegenden
  * Daten neu -- kein erneuter API-Aufruf. */
-window.setAttendanceGrouping = function(stage) {
+function setAttendanceGrouping(stage) {
     groupingStore(GROUPING_KEY_ATTENDANCE, stage);
     if (_lastAttendanceData) {
         renderAttendanceList(_lastAttendanceData);
     }
-};
+}
+// Global bis Task 19 (OI-17)
+window.setAttendanceGrouping = setAttendanceGrouping;
 
 async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
     try {        
@@ -1810,12 +1814,12 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
             // Eintrag vorhanden → Edit & Delete
             actionsHtml = `
                 <button class="action-btn btn-icon btn-edit" 
-                        onclick="openRecordModal(${appointment.record_id})"
+                        data-action="open-record-modal" data-id="${Number(appointment.record_id)}"
                         title="Bearbeiten">
                     ✎
                 </button>
                 <button class="action-btn btn-icon btn-delete" 
-                        onclick="deleteRecord(${appointment.record_id})"
+                        data-action="delete-record" data-id="${Number(appointment.record_id)}"
                         title="Löschen">
                     🗑
                 </button>
@@ -1824,12 +1828,12 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
             // Kein Eintrag → Anwesend & Entschuldigt
             actionsHtml = `
                 <button class="action-btn btn-icon btn-approve" 
-                        onclick="quickCreateRecordForAppointment(${appointment.appointment_id}, 'present')"
+                        data-action="quick-create-record-for-appointment" data-id="${Number(appointment.appointment_id)}" data-value="present"
                         title="Anwesend">
                     ✓
                 </button>
                 <button class="action-btn btn-icon btn-edit" 
-                        onclick="quickCreateRecordForAppointment(${appointment.appointment_id}, 'excused')"
+                        data-action="quick-create-record-for-appointment" data-id="${Number(appointment.appointment_id)}" data-value="excused"
                         title="Entschuldigt">
                     ⚠
                 </button>
@@ -2093,9 +2097,24 @@ window.openRecordModal = openRecordModal;
 window.saveRecord = saveRecord;
 window.toggleArrivalTimeField = toggleArrivalTimeField;
 window.setArrivalTimeFromAppointment = setArrivalTimeFromAppointment;
-window.closeRecordModal = () => document.getElementById('recordModal').classList.remove('active');
+window.closeRecordModal = closeRecordModal;
 window.deleteRecord = deleteRecord;
 window.resetRecordFilter = resetRecordFilter;
 window.backToAppointments = backToAppointments;
 window.quickCreateRecordForMember = quickCreateRecordForMember;
 window.quickCreateRecordForAppointment = quickCreateRecordForAppointment;
+
+registerActions({
+    'back-to-appointments': () => backToAppointments(),
+    'close-record-modal': () => closeRecordModal(),
+    'delete-record': (el) => deleteRecord(Number(el.dataset.id)),
+    'go-to-records-page': (el) => goToRecordsPage(Number(el.dataset.page)),
+    'open-record-modal': (el) => openRecordModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'quick-create-record-for-appointment': (el) => quickCreateRecordForAppointment(Number(el.dataset.id), el.dataset.value),
+    'quick-create-record-for-member': (el) => quickCreateRecordForMember(Number(el.dataset.id), el.dataset.value),
+    'reset-record-filter': () => resetRecordFilter(),
+    'save-record': () => saveRecord(),
+    'set-arrival-time-from-appointment': () => setArrivalTimeFromAppointment(),
+    'set-attendance-grouping': (el) => setAttendanceGrouping(el.dataset.value),
+    'toggle-arrival-time-field': () => toggleArrivalTimeField(),
+});

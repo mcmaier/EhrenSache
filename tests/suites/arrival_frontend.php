@@ -78,16 +78,17 @@ test('Die Terminstartzeit gibt es nur auf Knopfdruck', function () use ($arrival
     $js   = (string) sourceCode($arrivalRoot . '/public/js/modules/records.js');
 
     assertTrue(
-        strpos($html, 'onclick="setArrivalTimeFromAppointment()"') !== false,
+        strpos($html, 'data-action="set-arrival-time-from-appointment"') !== false,
         'Kein Knopf fuer die Terminstartzeit im Dialog'
     );
     assertTrue(
-        strpos($js, 'window.setArrivalTimeFromAppointment = setArrivalTimeFromAppointment;') !== false,
-        'setArrivalTimeFromAppointment() ist nicht global verfuegbar -- der onclick liefe ins Leere'
+        preg_match("/'set-arrival-time-from-appointment':\s*\(\)\s*=>\s*setArrivalTimeFromAppointment\(\)/", $js) === 1,
+        'Die Aktion fuer die Terminstartzeit ruft setArrivalTimeFromAppointment() nicht auf'
     );
     assertTrue(
-        strpos($js, 'window.toggleArrivalTimeField = toggleArrivalTimeField;') !== false,
-        'toggleArrivalTimeField() ist nicht global verfuegbar -- der onchange liefe ins Leere'
+        strpos($html, 'data-action-change="toggle-arrival-time-field"') !== false
+            && preg_match("/'toggle-arrival-time-field':\s*\(\)\s*=>\s*toggleArrivalTimeField\(\)/", $js) === 1,
+        'Das Umschalten des Ankunftsfelds ist nicht als Aktion verdrahtet'
     );
 });
 

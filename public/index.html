@@ -963,10 +963,10 @@
                     <h1>Anwesenheitsverwaltung</h1>
                     <div class="header-actions">                        
                         <button type="button" id="recordsBackToAppointments" class="btn-secondary" hidden
-                                onclick="backToAppointments()">← Zurück zu Termine</button>
+                                data-action="back-to-appointments">← Zurück zu Termine</button>
                         <button class="btn-secondary" data-role="admin" data-action="open-records-import-modal">📤 Import CSV</button>
                         <button class="btn-secondary" data-role="manager" data-action="export-records">💾 Export CSV</button>  
-                        <button class="btn-add" data-role="manager" onclick="openRecordModal()">+ Anwesenheit erfassen</button>
+                        <button class="btn-add" data-role="manager" data-action="open-record-modal">+ Anwesenheit erfassen</button>
                     </div>
                 </div>
 
@@ -984,23 +984,23 @@
                 <div class="filter-bar">
                     <div class="form-group">
                         <label for="filterAptType">Terminart:</label>
-                        <select id="filterAptType"> <!-- onchange="applyRecordFilters()"> -->
+                        <select id="filterAptType">
                             <option value="">Alle Termine</option>
                         </select>
                     </div>
                     <div class="form-group" data-role="manager">
                         <label for="filterAppointment">Filter nach Termin:</label>
-                        <select id="filterAppointment"> <!-- onchange="applyRecordFilters()"> -->
+                        <select id="filterAppointment">
                             <option value="">Alle Termine</option>
                         </select>
                     </div>
                     <div class="form-group" data-role="manager">
                         <label for="filterMember">Filter nach Mitglied:</label>
-                        <select id="filterMember" ><!--onchange="applyRecordFilters()"> -->
+                        <select id="filterMember">
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
-                    <button id="resetRecordFilter" onclick="resetRecordFilter()" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
+                    <button id="resetRecordFilter" data-action="reset-record-filter" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->
@@ -1681,7 +1681,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="recordModalTitle">Anwesenheit erfassen</h2>
-                <button class="close-modal" onclick="closeRecordModal()">×</button>
+                <button class="close-modal" data-action="close-record-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="recordForm">
@@ -1706,7 +1706,7 @@
                     </div>
                     <div class="form-group">
                         <label for="record_status">Status*</label>
-                        <select id="record_status" required onchange="toggleArrivalTimeField()">
+                        <select id="record_status" required data-action-change="toggle-arrival-time-field">
                             <option value="present">Anwesend</option>
                             <option value="excused">Entschuldigt</option>
                         </select>
@@ -1722,7 +1722,7 @@
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <input type="datetime-local" id="record_arrival_time" style="flex: 1;">
                             <button type="button" class="btn-secondary" id="recordArrivalFromAppointment"
-                                    onclick="setArrivalTimeFromAppointment()"
+                                    data-action="set-arrival-time-from-appointment"
                                     title="Startzeit des gewählten Termins übernehmen">Terminbeginn</button>
                         </div>
                         <small class="input-hint">Leer lassen, wenn die Ankunft nicht bekannt ist.</small>
@@ -1730,8 +1730,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeRecordModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveRecord()">Speichern</button>
+                <button class="btn-cancel" data-action="close-record-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-record">Speichern</button>
             </div>
         </div>
     </div>

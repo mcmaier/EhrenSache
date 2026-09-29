@@ -88,7 +88,8 @@ test('records.js bindet grouping.js ein und traegt den Anwesenheits-Umschalter',
     assertTrue(str_contains($body, 'escapeHtml('), 'renderAttendanceList() maskiert die Abschnittsueberschrift nicht');
     assertTrue(str_contains($body, 'groupingSections('), 'renderAttendanceList() bildet die Abschnitte nicht ueber groupingSections()');
 
-    assertTrue(str_contains($js, 'window.setAttendanceGrouping'), 'Der Umschalter-Klick ist nicht global erreichbar (onclick)');
+    assertTrue(preg_match("/'set-attendance-grouping':\s*\(el\)\s*=>\s*setAttendanceGrouping\(el\.dataset\.value\)/", $js) === 1,
+        'Der Umschalter-Klick ist nicht als Aktion registriert');
 });
 
 test('responses.js bindet grouping.js ein, gliedert die Namensliste und fuehrt responseGroupKey nicht mehr', function () use ($ugfRoot) {
