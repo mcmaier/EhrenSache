@@ -146,6 +146,14 @@ test('registerActions steht ueberall in der auswertbaren Form', function () use 
  */
 const AC_WINDOW_ALLOWED = ['addEventListener', 'localStorage', 'location', 'matchMedia', 'open', 'URL'];
 
+/**
+ * Andere Namen fuer das globale Objekt. Ueber sie liesse sich genauso eine
+ * Funktion global ablegen; im Dashboard sind sie gar nicht in Gebrauch und
+ * deshalb ohne Ausnahme verboten. Der Lookbehind laesst obj.self oder
+ * rect.top in Ruhe.
+ */
+const AC_GLOBAL_ALIASES = '(?<![.\w$])(?:self|top|parent|frames)';
+
 test('Dashboard-Module legen nichts auf window ab und rufen nichts ueber window', function () use ($acRoot) {
     $bad = [];
     foreach (acFiles($acRoot) as $file) {
@@ -155,6 +163,13 @@ test('Dashboard-Module legen nichts auf window ab und rufen nichts ueber window'
         $src = sourceCode($file);
         $name = basename($file);
         $line = static fn (int $off): int => substr_count($src, "\n", 0, $off) + 1;
+
+        // Jeder Zugriff auf self, top, parent, frames als globales Objekt.
+        if (preg_match_all('/' . AC_GLOBAL_ALIASES . '\s*(?:\?\.|\.|\[)/', $src, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[0] as [$hit, $off]) {
+                $bad[] = "{$name}:{$line($off)} globales Objekt {$hit}";
+            }
+        }
 
         // Zuweisung an ein window-Mitglied, auch an ein erlaubtes (window.open = ...).
         if (preg_match_all('/\b(?:window|globalThis)\s*(?:\.\s*[A-Za-z_$][\w$]*|\[[^\]]*\])\s*=(?!=)/', $src, $m, PREG_OFFSET_CAPTURE)) {
@@ -179,4 +194,84 @@ test('Dashboard-Module legen nichts auf window ab und rufen nichts ueber window'
         }
     }
     assertTrue($bad === [], "Anwendungsfunktion ueber window statt Import/Aktion:\n  " . implode("\n  ", $bad));
+});
+
+test('Dashboard setzt keine on…-Handler per Zuweisung', function () use ($acRoot) {
+    // Bis Etappe 2 ersetzte importBtn.onclick = fn den Inline-Handler im
+    // selben Platz. Neben data-action laeuft er dagegen zusaetzlich: Der
+    // CSV-Import ging zweimal hinaus, "Schliessen" startete einen dritten.
+    // Zustand gehoert in die registrierte Aktion, nicht in einen zweiten Handler.
+    $bad = [];
+    foreach (acFiles($acRoot) as $file) {
+        if (str_ends_with($file, '.html')) {
+            continue;
+        }
+        $src = sourceCode($file);
+        $name = basename($file);
+        if (preg_match_all('/(?:\.\s*on[a-z]+|\[\s*[\'"`]on[a-z]+[\'"`]\s*\])\s*=(?!=)/', $src, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[0] as [$hit, $off]) {
+                $bad[] = "{$name}:" . (substr_count($src, "\n", 0, $off) + 1) . " {$hit}";
+            }
+        }
+    }
+    assertTrue($bad === [], "Handler per Zuweisung laeuft neben data-action doppelt -- Aktion registrieren:\n  " . implode("\n  ", $bad));
+});
+
+test('Aktionen stehen nur in der pruefbaren Form im Markup', function () use ($acRoot) {
+    // Der Abgleich oben liest nur data-action="…" in doppelten
+    // Anfuehrungszeichen. Jede andere Schreibweise setzte eine Aktion an ihm
+    // vorbei: einfache oder keine Anfuehrungszeichen, das Attribut per
+    // setAttribute oder ueber dataset.
+    $patterns = [
+        'Attribut ohne doppelte Anfuehrungszeichen' => '/\bdata-action(?:-change|-submit)?\s*=\s*(?!")/',
+        'setAttribute/toggleAttribute'              => '/\b(?:set|toggle)Attribute(?:NS)?\s*\([^,)]*[\'"`]data-action/',
+        'dataset.action*'                           => '/\bdataset\s*(?:\?\.|\.)\s*action/',
+        'dataset[…]'                                => '/\bdataset\s*\[/',
+    ];
+    $bad = [];
+    foreach (acFiles($acRoot) as $file) {
+        $src = sourceCode($file);
+        $name = basename($file);
+        foreach ($patterns as $label => $pattern) {
+            if (preg_match_all($pattern, $src, $m, PREG_OFFSET_CAPTURE)) {
+                foreach ($m[0] as [$hit, $off]) {
+                    $bad[] = "{$name}:" . (substr_count($src, "\n", 0, $off) + 1) . " {$label}: {$hit}";
+                }
+            }
+        }
+    }
+    assertTrue($bad === [], "Aktion am Abgleich vorbei gesetzt:\n  " . implode("\n  ", $bad));
+});
+
+test('registerActions-Schluessel sind Literale in einfachen Anfuehrungszeichen', function () use ($acRoot) {
+    // acRegisteredActions() liest nur Zeilen der Form "    'name': …". Ein
+    // Schluessel in doppelten Anfuehrungszeichen, berechnet ([x]:), als
+    // Kurzform (name,) oder per Spread (...tabelle) waere registriert, ohne
+    // dass der Abgleich ihn saehe. Jede Zeile auf Einrueckungstiefe 4 muss
+    // deshalb ein Schluessel oder das Ende eines mehrzeiligen Eintrags sein.
+    $bad = [];
+    foreach (acFiles($acRoot) as $file) {
+        if (str_ends_with($file, '.html')) {
+            continue;
+        }
+        $src = sourceCode($file);
+        if (!preg_match_all('/^registerActions\(\{\R(.*?)^\}\);/ms', $src, $blocks, PREG_OFFSET_CAPTURE)) {
+            continue;
+        }
+        foreach ($blocks[1] as [$block, $blockOff]) {
+            $first = substr_count($src, "\n", 0, $blockOff) + 1;
+            foreach (preg_split('/\R/', $block) ?: [] as $i => $line) {
+                if (trim($line) === '') {
+                    continue;
+                }
+                $ok = preg_match("/^ {4}(?:'[a-z0-9]+(?:-[a-z0-9]+)*':\s|\}\)?,\s*$)/", $line) === 1
+                    || (preg_match('/^ {5,}\S/', $line) === 1
+                        && preg_match('/^\s*(?:"[^"]*"|`[^`]*`|\[[^\]]*\])\s*:|^\s*\.\.\./', $line) !== 1);
+                if (!$ok) {
+                    $bad[] = basename($file) . ':' . ($first + $i) . ' ' . trim($line);
+                }
+            }
+        }
+    }
+    assertTrue($bad === [], "registerActions-Eintrag in nicht pruefbarer Form:\n  " . implode("\n  ", $bad));
 });

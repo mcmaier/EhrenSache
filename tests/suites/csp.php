@@ -171,7 +171,7 @@ $cspLocations = [
     'Station'      => ['htaccess' => '/public/station/.htaccess', 'files' => null,         'url' => '/station/',   'script' => ["'self'"]],
     'Dashboard'    => ['htaccess' => '/public/.htaccess',         'files' => 'index.html', 'url' => '/',           'script' => ["'self'"]],
     'Oeffentliche Seiten' => ['htaccess' => '/public/.htaccess', 'files' => '^(reset_password|verify_email)\.php$',
-                              'url' => '/verify_email.php', 'script' => ["'none'"]],
+                              'url' => '/verify_email.php', 'more_urls' => ['/reset_password.php'], 'script' => ["'none'"]],
 ];
 
 /** Die eine CSP-Kopfzeile einer Oberflaeche, oder ein Testfehler. */
@@ -196,8 +196,10 @@ function cspPolicyFor(string $root, array $loc, string $label): array
 
 test('CSP: keine Inline-Handler in HTML und JS-Templates', function () use ($cspRoot, $cspSurfaces) {
     // Das Muster verlangt ein Anfuehrungszeichen hinter dem "=": Es trifft
-    // onclick="…" im Markup und in Template-Strings, nicht aber die erlaubte
-    // Zuweisung el.onclick = fn.
+    // onclick="…" im Markup und in Template-Strings, nicht aber die Zuweisung
+    // el.onclick = fn. Die bleibt in PWA und Station erlaubt; im Dashboard
+    // verbietet sie actions_frontend.php, weil sie neben data-action doppelt
+    // ausloest.
     $pattern = '/(?<![\w.-])on' . CSP_EVENT_PATTERN . '\s*=\s*["\'`]/i';
 
     $fehler = [];
@@ -342,23 +344,30 @@ test('CSP: der Server liefert die Richtlinie aus', function () use ($cspRoot, $c
     foreach ($cspLocations as $label => $loc) {
         $expected = cspPolicyFor($cspRoot, $loc, $label)['policy'];
 
-        $got = null;
-        $ch  = curl_init($base . $loc['url']);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $header) use (&$got): int {
-            if (stripos($header, 'Content-Security-Policy:') === 0) {
-                $got = trim(substr($header, strlen('Content-Security-Policy:')));
-            }
+        foreach (array_merge([$loc['url']], $loc['more_urls'] ?? []) as $url) {
+            // Alle CSP-Kopfzeilen sammeln statt die letzte zu behalten: Zwei
+            // Richtlinien gelten im Browser gemeinsam, und eine zweite, etwa
+            // aus einer uebergeordneten Konfiguration, soll auffallen statt
+            // von der erwarteten ueberschrieben zu werden.
+            $got = [];
+            $ch  = curl_init($base . $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $header) use (&$got): int {
+                if (stripos($header, 'Content-Security-Policy:') === 0) {
+                    $got[] = trim(substr($header, strlen('Content-Security-Policy:')));
+                }
 
-            return strlen($header);
-        });
-        $ok     = curl_exec($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+                return strlen($header);
+            });
+            $ok     = curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
 
-        assertTrue($ok !== false, "{$label}: {$loc['url']} nicht erreichbar");
-        assertTrue($status > 0 && $status < 500, "{$label}: {$loc['url']} liefert HTTP {$status}");
-        assertSame($expected, $got, "{$label}: {$loc['url']} liefert nicht die CSP aus {$loc['htaccess']}");
+            assertTrue($ok !== false, "{$label}: {$url} nicht erreichbar");
+            assertTrue($status > 0 && $status < 500, "{$label}: {$url} liefert HTTP {$status}");
+            assertSame(1, count($got), "{$label}: {$url} liefert " . count($got) . ' CSP-Kopfzeilen statt genau einer');
+            assertSame($expected, $got[0] ?? null, "{$label}: {$url} liefert nicht die CSP aus {$loc['htaccess']}");
+        }
     }
 });
