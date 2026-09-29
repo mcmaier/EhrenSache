@@ -12,6 +12,7 @@ import { apiCall, currentUser, isAdmin } from './api.js';
 import { loadMembers } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid} from './ui.js';
 import { updateModalId, escapeHtml } from './utils.js';
+import { registerActions } from './actions.js';
 import {debug} from '../app.js'
 import { CHIPS_USERS, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
@@ -167,7 +168,7 @@ function renderUsers(users, page = 1)
     
     // Lösch-Button nicht für den eigenen Account anzeigen
     const deleteBtn = (currentUser && user.user_id !== currentUser.user_id) ? `
-        <button class="action-btn btn-icon btn-delete" onclick="deleteUser(${user.user_id})">
+        <button class="action-btn btn-icon btn-delete" data-action="delete-user" data-id="${Number(user.user_id)}">
             🗑
         </button>
     ` : '';
@@ -178,7 +179,7 @@ function renderUsers(users, page = 1)
             <td> ${statusBadge} ${memberInfo}</td>
             <td>${formattedCreated}</td>
             <td class="actions-cell">
-                <button class="action-btn btn-icon btn-edit" onclick="openUserModal(${user.user_id})">
+                <button class="action-btn btn-icon btn-edit" data-action="open-user-modal" data-id="${Number(user.user_id)}">
                     ✎
                 </button>
                 ${deleteBtn}
@@ -219,17 +220,17 @@ function renderUsersPagination(currentPage, totalPages, totalUsers) {
         // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
         for (let i = 1; i <= totalPages; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToUsersPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-users-page" data-page="${Number(i)}">${i}</button>`;
         }
     } 
     else {
 
         // Erste Seite Button
         if (currentPage > 1) {
-            //html += `<button onclick="goToUsersPage(1)" title="Erste Seite">
+            //html += `<button data-action="go-to-users-page" data-page="1" title="Erste Seite">
             //            «
             //        </button>`;
-            html += `<button onclick="goToUsersPage(${currentPage - 1})" title="Vorherige Seite">
+            html += `<button data-action="go-to-users-page" data-page="${Number(currentPage - 1)}" title="Vorherige Seite">
                         ‹
                     </button>`;
         }
@@ -239,7 +240,7 @@ function renderUsersPagination(currentPage, totalPages, totalUsers) {
         const endPage = Math.min(totalPages, currentPage + 2);
         
         if (startPage > 1) {
-            html += `<button onclick="goToUsersPage(1)">1</button>`;
+            html += `<button data-action="go-to-users-page" data-page="1">1</button>`;
             if (startPage > 2) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
@@ -247,22 +248,22 @@ function renderUsersPagination(currentPage, totalPages, totalUsers) {
         
         for (let i = startPage; i <= endPage; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToUsersPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-users-page" data-page="${Number(i)}">${i}</button>`;
         }
         
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
-            html += `<button onclick="goToUsersPage(${totalPages})">${totalPages}</button>`;
+            html += `<button data-action="go-to-users-page" data-page="${Number(totalPages)}">${totalPages}</button>`;
         }
         
         // Letzte Seite Button
         if (currentPage < totalPages) {
-            html += `<button onclick="goToUsersPage(${currentPage + 1})" title="Nächste Seite">
+            html += `<button data-action="go-to-users-page" data-page="${Number(currentPage + 1)}" title="Nächste Seite">
                         ›
                     </button>`;
-            //html += `<button onclick="goToUsersPage(${totalPages})" title="Letzte Seite">
+            //html += `<button data-action="go-to-users-page" data-page="${Number(totalPages)}" title="Letzte Seite">
             //            »
             //        </button>`;
         }
@@ -275,8 +276,8 @@ function renderUsersPagination(currentPage, totalPages, totalUsers) {
     container.innerHTML = html;
 }
 
-// Global für onclick
-window.goToUsersPage = function(page) {
+// Global bis Task 19 (OI-17)
+function goToUsersPage(page) {
 
     // Aktuelle Scroll-Position der Tabelle speichern
     const tableContainer = document.querySelector('.data-table')?.parentElement;
@@ -652,7 +653,7 @@ function displayMemberLink(user) {
 // MEMBER-VERKNÜPFUNG EDITIEREN
 // ============================================
 
-window.toggleMemberEdit = async function() {
+async function toggleMemberEdit() {
     const displayMode = document.getElementById('memberDisplayMode');
     const editMode = document.getElementById('memberEditMode');
     //const editBtn = document.getElementById('editMemberBtn');    
@@ -1030,7 +1031,8 @@ async function activateUser(userId) {
     } catch (error) {
         showToast('Fehler beim Aktivieren: ' + error.message, 'error');
     }
-};
+}
+window.goToUsersPage = goToUsersPage;
 
 async function suspendUser(userId)  {
     const confirmed = await showConfirm(
@@ -1059,7 +1061,8 @@ async function suspendUser(userId)  {
     } catch (error) {
         showToast('Fehler beim Sperren: ' + error.message, 'error');
     }
-};
+}
+window.toggleMemberEdit = toggleMemberEdit;
 
 async function reactivateUser(userId) {    
     const confirmed = await showConfirm(
@@ -1103,3 +1106,14 @@ window.copyUserToken = copyUserToken;
 window.toggleUserTokenVisibility = toggleUserTokenVisibility;
 window.applyUserFilters = applyUserFilters;
 
+registerActions({
+    'close-user-modal': () => closeUserModal(),
+    'copy-user-token': () => copyUserToken(),
+    'delete-user': (el) => deleteUser(Number(el.dataset.id)),
+    'go-to-users-page': (el) => goToUsersPage(Number(el.dataset.page)),
+    'open-user-modal': (el) => openUserModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'regenerate-user-token': () => regenerateUserToken(),
+    'save-user': () => saveUser(),
+    'toggle-member-edit': () => toggleMemberEdit(),
+    'toggle-user-token-visibility': () => toggleUserTokenVisibility(),
+});

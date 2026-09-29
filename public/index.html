@@ -1178,7 +1178,7 @@
                 <div class="content-header">
                     <h1>Benutzerverwaltung</h1>
                     <div class="header-actions">                                                 
-                        <button class="btn-add" onclick="openUserModal()">+ Neuer Benutzer</button>
+                        <button class="btn-add" data-action="open-user-modal">+ Neuer Benutzer</button>
                     </div>  
                 </div>
 
@@ -1802,7 +1802,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="userModalTitle">Neuer Benutzer</h2>
-                <button class="close-modal" onclick="closeUserModal()">×</button>
+                <button class="close-modal" data-action="close-user-modal">×</button>
             </div>
             <div class="modal-body">                
                 <form id="userForm">
@@ -1903,7 +1903,7 @@
                                     <div id="linkedMemberInfo" style="flex: 1; padding: 10px; background: #f8f9fa; border-radius: 4px;">
                                         -
                                     </div>
-                                    <button id="editMemberBtn" type="button" class="action-btn btn-edit" onclick="toggleMemberEdit()" title="Bearbeiten">
+                                    <button id="editMemberBtn" type="button" class="action-btn btn-edit" data-action="toggle-member-edit" title="Bearbeiten">
                                         ✏️
                                     </button>
                                 </div>
@@ -1932,16 +1932,16 @@
                                 <div style="flex: 1; position: relative;">
                                     <input type="password" id="user_token" readonly class="token-hidden" 
                                         style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace; background: #f8f9fa;">
-                                    <button onclick="toggleUserTokenVisibility()" id="toggleUserTokenBtn" type="button"
+                                    <button data-action="toggle-user-token-visibility" id="toggleUserTokenBtn" type="button"
                                             style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
                                         👁️
                                     </button>
                                 </div>
-                                <button onclick="copyUserToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
+                                <button data-action="copy-user-token" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
                             </div>
                             <!-- Im userTokenGroup nach dem Token-Input -->
                             <div id="tokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
-                            <button onclick="regenerateUserToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
+                            <button data-action="regenerate-user-token" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
                                 🔄 Neuen Token generieren
                             </button>                       
                         </div>
@@ -1949,8 +1949,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeUserModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveUser()">Speichern</button>
+                <button class="btn-cancel" data-action="close-user-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-user">Speichern</button>
             </div>
         </div>
     </div>
