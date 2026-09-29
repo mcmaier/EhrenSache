@@ -2765,38 +2765,7 @@
     <!-- Hauptdatei -->
     <script type="module" src="./js/app.js"></script>
 
-    <script>
-        (async function checkInstallation() {
-            try {
-                // Prüfe ob API erreichbar und DB konfiguriert ist
-                const response = await fetch('./api/api.php?resource=ping', {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const result = await response.json();
-                
-                // Wenn "not_installed" Status → Weiterleitung
-                if (result.status === 'not_installed') {
-                    console.log('Installation erforderlich - Weiterleitung...');
-                    window.location.href = './install/';
-                }
-            } catch (error) {
-                // Bei Fehler auch zur Installation
-                console.warn('API nicht erreichbar - prüfe Installation');
-                
-                // Versuche Installation zu erreichen
-                try {
-                    const installCheck = await fetch('./install/index.php');
-                    if (installCheck.ok) {
-                        window.location.href = './install/';
-                    }
-                } catch (e) {
-                    console.error('Weder API noch Installation erreichbar');
-                }
-            }
-        })();
-        </script>
+    <script src="./js/install-check.js"></script>
 
 </body>
 </html>

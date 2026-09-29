@@ -23,6 +23,7 @@ import {initStatisticsEventHandlers, showStatisticsSection} from './statistics.j
 import {showWorktimeSection, loadWorkSessions, loadActivityTypes, renderActivityTypes,
         checkWorktimeEnabled, initWorktimeEventHandlers} from './worktime.js';
 import {debug} from '../app.js'
+import { registerActions } from './actions.js';
 import {renderSystemSettings} from './settings.js';
 import {loadImportLogs} from './import_export.js';
 
@@ -395,7 +396,7 @@ export function showToast(message, type = 'info', duration = TOAST_DURATION) {
         <div class="toast-content">
             <div class="toast-message">${message}</div>
         </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+        <button class="toast-close" data-action="toast-close">×</button>
         ${duration > 0 ? '<div class="toast-progress"></div>' : ''}
     `;
     
@@ -1220,3 +1221,7 @@ export function showQRModal({ title, url, hint, warning }) {
             'QR-Code konnte nicht erzeugt werden — bitte die Adresse unten verwenden.';
     }
 }
+
+registerActions({
+    'toast-close': (el) => el.parentElement.remove(),
+});

@@ -127,9 +127,9 @@ test('registerActions steht ueberall in der auswertbaren Form', function () use 
         }
         $src = sourceCode($file);
         $calls = preg_match_all('/\bregisterActions\s*\(/', $src);
-        $imports = preg_match_all('/^import\s*\{[^}]*\bregisterActions\b/m', $src);
+        // Der Import enthaelt keine Klammer und zaehlt daher nicht als Aufruf.
         $blocks = preg_match_all('/^registerActions\(\{\R.*?^\}\);/ms', $src);
-        if ($calls - $imports !== $blocks || $blocks > 1) {
+        if ($calls !== $blocks || $blocks > 1) {
             $bad[] = basename($file) . ": {$calls} Aufrufe, {$blocks} auswertbare Bloecke";
         }
     }

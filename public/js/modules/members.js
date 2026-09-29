@@ -527,9 +527,7 @@ function renderMemberGroups() {
     }
     
     container.innerHTML = dataCache.groups.data.map(group => `
-        <label style="display: flex; align-items: flex-start; padding: 8px; cursor: pointer; border-radius: 4px;" 
-               onmouseover="this.style.background='#f5f5f5'" 
-               onmouseout="this.style.background='transparent'">
+        <label class="group-choice" style="display: flex; align-items: flex-start; padding: 8px; cursor: pointer; border-radius: 4px;">
             <input type="checkbox" 
                    class="member-group-checkbox" 
                    value="${group.group_id}" 

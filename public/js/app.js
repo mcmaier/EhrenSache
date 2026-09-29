@@ -8,6 +8,8 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+import { registerActions } from './modules/actions.js';
+
 const redirectKey = 'auth_redirect_count';
 const redirectTime = 'auth_last_redirect';
 
@@ -29,7 +31,7 @@ function checkRedirectLoop() {
                         height: 100vh; flex-direction: column; font-family: system-ui;">
                 <h1>⚠️ Redirect-Loop erkannt</h1>
                 <p>Es gab ein Problem mit der Authentifizierung.</p>
-                <button onclick="sessionStorage.clear(); location.reload()" 
+                <button data-action="app-reset-reload"
                         style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">
                     Session zurücksetzen und neu laden
                 </button>
@@ -171,3 +173,10 @@ async function init() {
 
 // Start
 window.addEventListener('load', init);
+
+registerActions({
+    'app-reset-reload': () => {
+        sessionStorage.clear();
+        location.reload();
+    },
+});

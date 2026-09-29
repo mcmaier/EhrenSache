@@ -11,6 +11,7 @@
 import { apiCall, setCsrfToken} from './api.js';
 import { showToast } from './ui.js';
 import { debug } from '../app.js';
+import { registerActions } from './actions.js';
 
 // ============================================
 // AUTH
@@ -43,7 +44,7 @@ export async function checkAuth() {
                                 height: 100vh; flex-direction: column; font-family: system-ui;">
                         <h1>? Verbindungsfehler</h1>
                         <p>Die API ist nicht erreichbar. Bitte sp�ter erneut versuchen.</p>
-                        <button onclick="location.reload()" 
+                        <button data-action="auth-reload"
                                 style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">
                             Neu laden
                         </button>
@@ -203,3 +204,6 @@ export function stopSessionTimeout() {
         document.removeEventListener(event, handleUserActivity);
     });
 }
+registerActions({
+    'auth-reload': () => location.reload(),
+});

@@ -509,9 +509,7 @@ function renderTypeGroups(selectedGroups) {
     const selectedIds = selectedGroups.map(g => g.group_id);
     
     container.innerHTML = dataCache.groups.data.map(group => `
-        <label style="display: block; padding: 8px; cursor: pointer; border-radius: 4px;" 
-               onmouseover="this.style.background='#f5f5f5'" 
-               onmouseout="this.style.background='transparent'">
+        <label class="group-choice" style="display: block; padding: 8px; cursor: pointer; border-radius: 4px;">
             <input type="checkbox" 
                    class="type-group-checkbox" 
                    value="${group.group_id}" 
