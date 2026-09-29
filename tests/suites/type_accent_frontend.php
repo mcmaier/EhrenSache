@@ -677,7 +677,7 @@ test('Der Name der Terminart steht im Popup in der Unterzeile beim Ort', functio
         'calendar-event-sub'    => 'Die Unterzeile fehlt im Block',
         'calendarResponseLineHtml(apt, fest)' => 'Die Rueckmeldezeile fehlt im Block',
         'attendanceLineHtml('   => 'Die Anwesenheitszeile fehlt im Block',
-        'window.openAppointmentModal(${Number(apt.appointment_id)})' => 'Die Knopfreihe fehlt im Block',
+        'data-action="calendar-open-appointment"' => 'Die Knopfreihe fehlt im Block',
     ];
     $vorher = -1;
     $vorname = '';

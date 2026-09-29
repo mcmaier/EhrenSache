@@ -881,7 +881,7 @@
                      <div class="header-actions">
                         <button class="btn-secondary" data-role="admin" data-action="open-appointments-import-modal">📤 Import CSV</button>
                         <button class="btn-secondary" data-role="manager" data-action="export-appointments">💾 Export CSV</button>                                    
-                        <button class="btn-add" data-role="manager" onclick="openAppointmentModal()">+ Neuer Termin</button>
+                        <button class="btn-add" data-role="manager" data-action="open-appointment-modal">+ Neuer Termin</button>
                      </div>
                 </div>
                 <div class="stats-grid stats-grid--chips">
@@ -916,14 +916,14 @@
                 <!-- Kalenderansicht -->
                 <div class="calendar-container">
                     <div class="calendar-header">
-                        <button class="calendar-nav" onclick="previousMonth()">‹</button>
+                        <button class="calendar-nav" data-action="previous-month">‹</button>
                         <h2 id="calendarMonthYear">November 2025</h2>                        
-                        <button class="calendar-nav" onclick="goToToday()" 
+                        <button class="calendar-nav" data-action="go-to-today" 
                                 style="margin-left: 10px; padding: 8px 16px; font-size: 14px;"
                                 title="Zum aktuellen Monat springen">
                             Heute
                         </button>
-                        <button class="calendar-nav" onclick="nextMonth()">›</button>
+                        <button class="calendar-nav" data-action="next-month">›</button>
                     </div>
                     <div class="calendar-grid">
                         <div class="calendar-day-header">Mo</div>
@@ -1546,7 +1546,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="appointmentModalTitle">Neuer Termin</h2>
-                <button class="close-modal" onclick="closeAppointmentModal()">×</button>
+                <button class="close-modal" data-action="close-appointment-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="appointmentForm">
@@ -1554,13 +1554,13 @@
                     <div id="appointmentSeriesBox" class="appointment-series-box" hidden>
                         <div id="appointmentSeriesText"></div>
                         <div id="appointmentSeriesActions" class="appointment-series-actions">
-                            <button type="button" class="btn-secondary" onclick="openSeriesExtend()">Serie fortsetzen …</button>
-                            <button type="button" class="btn-secondary" onclick="openSeriesRuleChange()">Regel ändern …</button>
+                            <button type="button" class="btn-secondary" data-action="open-series-extend">Serie fortsetzen …</button>
+                            <button type="button" class="btn-secondary" data-action="open-series-rule-change">Regel ändern …</button>
                         </div>
                         <div id="appointmentSeriesExtend" class="appointment-series-extend" hidden>
                             <label for="appointment_series_until">Neues Ende</label>
                             <input type="date" id="appointment_series_until">
-                            <button type="button" class="btn-secondary" onclick="previewSeriesExtend()">Vorschau</button>
+                            <button type="button" class="btn-secondary" data-action="preview-series-extend">Vorschau</button>
                         </div>
                     </div>
                     <div class="form-group">
@@ -1600,13 +1600,13 @@
                     </div>
                     <div class="form-group appointment-repeat" id="appointmentRepeatGroup">
                         <label class="checkbox-label">
-                            <input type="checkbox" id="appointment_repeat" onchange="toggleAppointmentRepeat()">
+                            <input type="checkbox" id="appointment_repeat" data-action-change="toggle-appointment-repeat">
                             Wiederholen
                         </label>
                         <div id="appointmentRepeatFields" class="appointment-repeat-fields" hidden>
                             <div class="form-group">
                                 <label for="appointment_repeat_freq">Muster</label>
-                                <select id="appointment_repeat_freq" onchange="updateAppointmentRepeatFields()">
+                                <select id="appointment_repeat_freq" data-action-change="update-appointment-repeat-fields">
                                     <option value="WEEKLY">Wöchentlich</option>
                                     <option value="MONTHLY">Monatlich</option>
                                 </select>
@@ -1670,8 +1670,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeAppointmentModal()">Abbrechen</button>
-                <button class="btn-save" id="appointmentSaveBtn" onclick="saveAppointment()">Speichern</button>
+                <button class="btn-cancel" data-action="close-appointment-modal">Abbrechen</button>
+                <button class="btn-save" id="appointmentSaveBtn" data-action="save-appointment">Speichern</button>
             </div>
         </div>
     </div>

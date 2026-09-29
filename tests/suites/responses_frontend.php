@@ -235,9 +235,13 @@ test('calendarResponseLineHtml() macht die Ampel nur im festgehaltenen Popup ank
 
     assertTrue(str_contains($body, 'fest && (r.expected || isAdminOrManager)'),
         'Klickbarkeit folgt nicht derselben Regel wie responseSummaryCell() (erwartet oder Verwaltung, nur im festen Popup)');
-    assertTrue(str_contains($body, "document.querySelector('.calendar-event-popup')?.remove()"),
+    assertTrue(str_contains($body, 'data-action="calendar-open-responses"'),
+        'Die Ampel im Popup loest keine Aktion aus');
+    $aktion = preg_match("/'calendar-open-responses':\s*\(el\)\s*=>\s*\{(.*?)\n    \},/s", $js, $m) === 1 ? $m[1] : '';
+    assertTrue(str_contains($aktion, 'closeCalendarPopup()'),
         'Der Klick auf die Ampel im Popup entfernt das Popup nicht explizit, bevor das Modal oeffnet');
-    assertTrue(str_contains($body, 'window.openResponsesModal('), 'Klick oeffnet das Rueckmeldungs-Modal nicht');
+    assertTrue(str_contains($aktion, 'openResponsesModal(Number(el.dataset.id))'),
+        'Klick oeffnet das Rueckmeldungs-Modal nicht');
 });
 
 test('Kalendertag zeigt einen Rueckmeldungs-Punkt und die Hervorhebung fuer offene Rueckmeldungen', function () use ($rsRoot) {
