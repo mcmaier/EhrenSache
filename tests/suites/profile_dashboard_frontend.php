@@ -93,8 +93,12 @@ test('Die Statistik hat einen Knopf zum Zuruecksetzen der Filter', function () u
         'Der Knopf fehlt im Markup'
     );
     assertTrue(
-        strpos($pdStats, 'window.resetStatisticsFilter') !== false,
-        'Der Handler ist nicht global verdrahtet — der onclick liefe ins Leere'
+        strpos($pdHtml, 'data-action="reset-statistics-filter"') !== false,
+        'Der Knopf loest keine Aktion aus'
+    );
+    assertTrue(
+        preg_match("/'reset-statistics-filter':\s*\(\)\s*=>\s*resetStatisticsFilters\(\)/", $pdStats) === 1,
+        'Die Aktion reset-statistics-filter ist nicht auf resetStatisticsFilters() registriert'
     );
 });
 

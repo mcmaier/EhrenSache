@@ -15,6 +15,7 @@ import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, currentYear, groupSelectOptionsHtml, subgroupLabel, dataCache} from './ui.js';
 import {debug} from '../app.js'
 import { escapeHtml } from './utils.js';
+import { registerActions } from './actions.js';
 import { CHIPS_STATISTICS, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // Anzeige-Chipzeile unter jeder Gruppenueberschrift. Ein einzelner Chip --
@@ -590,3 +591,7 @@ export async function initStatisticsEventHandlers() {
 window.updateStatisticsFilters = updateStatisticsFilters;
 window.applyStatisticsFilters = applyStatisticsFilters;
 window.resetStatisticsFilter = resetStatisticsFilters;
+
+registerActions({
+    'reset-statistics-filter': () => resetStatisticsFilters(),
+});
