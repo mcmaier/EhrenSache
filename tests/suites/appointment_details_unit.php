@@ -141,3 +141,14 @@ test('Kernfelder: Terminart als positive Ganzzahl, null und Leerwert bleiben nul
         assertTrue(is_string($fehler), 'Terminart ' . var_export($typ, true) . ' muss abgelehnt werden');
     }
 });
+
+test('Kernfelder: Beschreibung ist Text oder null, getrimmt, Leerwert wird null', function () {
+    assertSame([['description' => null], null], appointmentNormalizeCore(['description' => null]));
+    assertSame([['description' => null], null], appointmentNormalizeCore(['description' => '  ']));
+    assertSame([['description' => 'Noten'], null], appointmentNormalizeCore(['description' => ' Noten ']));
+    foreach ([['x'], 42, true] as $text) {
+        [$wert, $fehler] = appointmentNormalizeCore(['description' => $text]);
+        assertSame(null, $wert);
+        assertTrue(is_string($fehler), 'Beschreibung ' . var_export($text, true) . ' muss abgelehnt werden');
+    }
+});

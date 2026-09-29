@@ -87,10 +87,10 @@ function appointmentNormalizeEndTime($raw, string $startTime): array
 }
 
 /**
- * Kernfelder eines Termins pruefen: title, date, start_time, type_id.
+ * Kernfelder eines Termins pruefen: title, date, start_time, description, type_id.
  *
  * Geprueft wird nur, was in $fields steht -- PUT reicht nur die mitgeschickten
- * Felder herein, POST alle vier (fehlende als null). Bis dahin nahm POST ein
+ * Felder herein, POST alle fuenf (fehlende als null). Bis dahin nahm POST ein
  * Datum "kaputt" an, und eine unbekannte Terminart endete in einer
  * PDOException mit HTML-Fehlerseite statt einer JSON-Antwort.
  *
@@ -134,6 +134,17 @@ function appointmentNormalizeCore(array $fields): array
             return [null, 'Der Beginn muss als Uhrzeit HH:MM angegeben werden'];
         }
         $out['start_time'] = appointmentTimeKey($start);
+    }
+
+    // Wie bei den Serien: Text oder null, getrimmt, leer wird null. Eine Liste
+    // landete vorher als "Array" in der Datenbank, samt PHP-Warnung mit
+    // Serverpfad in der Antwort.
+    if (array_key_exists('description', $fields)) {
+        $description = $fields['description'];
+        if ($description !== null && !is_string($description)) {
+            return [null, 'Die Beschreibung muss Text sein'];
+        }
+        $out['description'] = ($description === null || trim($description) === '') ? null : trim($description);
     }
 
     if (array_key_exists('type_id', $fields)) {

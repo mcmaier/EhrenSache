@@ -212,13 +212,14 @@ function handleAppointments($db, $database, $method, $id) {
                 }
             }
 
-            // Titel, Datum, Beginn und Terminart pruefen, bevor irgendetwas
-            // geschrieben wird. Fehlende Pflichtfelder kommen als null an.
+            // Titel, Datum, Beginn, Beschreibung und Terminart pruefen, bevor
+            // irgendetwas geschrieben wird. Fehlende Felder kommen als null an.
             [$core, $fehler] = appointmentNormalizeCore([
-                'title'      => $data->title ?? null,
-                'date'       => $data->date ?? null,
-                'start_time' => $data->start_time ?? null,
-                'type_id'    => $data->type_id ?? null,
+                'title'       => $data->title ?? null,
+                'date'        => $data->date ?? null,
+                'start_time'  => $data->start_time ?? null,
+                'description' => $data->description ?? null,
+                'type_id'     => $data->type_id ?? null,
             ]);
 
             // Ohne Angabe gilt die Standard-Terminart.
@@ -258,7 +259,7 @@ function handleAppointments($db, $database, $method, $id) {
             $stmt = $db->prepare("INSERT INTO {$prefix}appointments (title, type_id, description, location, date,
                                   start_time, end_time, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
             $createdBy = getCurrentUserId();
-            if($stmt->execute([$core['title'], $typeId, $data->description ?? null, $location, $core['date'],
+            if($stmt->execute([$core['title'], $typeId, $core['description'], $location, $core['date'],
                                $core['start_time'], $endTime, $createdBy])) {
                 http_response_code(201);
                 echo json_encode(["message" => "Appointment created", "id" => $db->lastInsertId()]);
@@ -304,8 +305,9 @@ function handleAppointments($db, $database, $method, $id) {
 
             // Mitgeschickte Kernfelder pruefen; was fehlt, bleibt wie gespeichert.
             // title, date und start_time sind Pflicht und lassen sich nicht per
-            // null loeschen. type_id darf null werden (keine Terminart).
-            $kern = array_intersect_key(get_object_vars($data), array_flip(['title', 'date', 'start_time', 'type_id']));
+            // null loeschen. type_id darf null werden (keine Terminart),
+            // description ebenso (leer wird null).
+            $kern = array_intersect_key(get_object_vars($data), array_flip(['title', 'date', 'start_time', 'description', 'type_id']));
             [$kern, $fehler] = appointmentNormalizeCore($kern);
             if ($fehler === null && ($kern['type_id'] ?? null) !== null
                 && !seriesTypeExists($db, $prefix, $kern['type_id'])) {

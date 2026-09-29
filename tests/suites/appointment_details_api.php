@@ -258,3 +258,27 @@ test('PUT prueft mitgeschickte Kernfelder und laesst den Bestand bei 400 stehen'
         adDropWorld($world, $ids);
     }
 });
+
+test('Beschreibung muss Text sein, Leerwert wird null', function () {
+    $world = adWorld();
+    $ids = [];
+    try {
+        adExpect400Json(adPost($world, ['description' => ['x']]), $ids, 'POST: Beschreibung als Liste');
+        adExpect400Json(adPost($world, ['description' => 42]), $ids, 'POST: Beschreibung als Zahl');
+
+        $res = adPost($world, ['description' => '  Noten mitbringen  ']);
+        assertStatus(201, $res);
+        $ids[] = $id = (int) $res['body']['id'];
+        assertSame('Noten mitbringen', adGet($id)['description'], 'Beschreibung muss getrimmt gespeichert sein');
+
+        $put = adPut($id, ['description' => ['x']]);
+        assertStatus(400, $put, 'PUT: Beschreibung als Liste');
+        assertTrue(is_string($put['body']['message'] ?? null), 'PUT: Beschreibung als Liste ohne JSON-Meldung');
+        assertSame('Noten mitbringen', adGet($id)['description'], 'Abgelehntes PUT darf die Beschreibung nicht aendern');
+
+        assertStatus(200, adPut($id, ['description' => '   ']));
+        assertSame(null, adGet($id)['description'], 'Leere Beschreibung wird zu null');
+    } finally {
+        adDropWorld($world, $ids);
+    }
+});
