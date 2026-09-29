@@ -13,6 +13,10 @@ import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { showToast, showConfirm, showReasonDialog, invalidateCache, subgroupLabel } from './ui.js';
 import { escapeHtml, translateExceptionStatus } from './utils.js';
 import { registerActions } from './actions.js';
+// Kreisimport (appointments.js importiert von hier): unbedenklich, weil
+// refreshAppointmentsKeepPage erst beim Schliessen des Modals gerufen wird,
+// nie beim Laden des Moduls.
+import { refreshAppointmentsKeepPage } from './appointments.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_RESPONSES } from './grouping.js';
 
 // ============================================
@@ -135,7 +139,7 @@ export function closeResponsesModal() {
         listDirty = false;
         // Offene Punkte im Profil (FI-17) hoeren darauf.
         document.dispatchEvent(new CustomEvent('responses:changed'));
-        window.refreshAppointmentsKeepPage?.();
+        refreshAppointmentsKeepPage();
     }
 }
 
@@ -500,8 +504,6 @@ function setResponsesGrouping(stage) {
     groupingStore(GROUPING_KEY_RESPONSES, stage);
     if (current) renderResponsesModal();
 }
-// Global bis Task 19 (OI-17)
-window.setResponsesGrouping = setResponsesGrouping;
 
 export function filterResponses(filter) {
     currentFilter = filter;
@@ -655,16 +657,6 @@ export function printResponses() {
     const params = new URLSearchParams({ resource: 'appointment_responses', appointment_id: id, format: 'html' });
     window.open(`${API_BASE}?${params.toString()}`, '_blank', 'noopener');
 }
-
-window.openResponsesModal = openResponsesModal;
-window.closeResponsesModal = closeResponsesModal;
-window.setOwnResponse = setOwnResponse;
-window.saveOwnComment = saveOwnComment;
-window.withdrawOwnResponse = withdrawOwnResponse;
-window.setMemberResponse = setMemberResponse;
-window.toggleResponsesLock = toggleResponsesLock;
-window.filterResponses = filterResponses;
-window.printResponses = printResponses;
 
 registerActions({
     'close-responses-modal': () => closeResponsesModal(),

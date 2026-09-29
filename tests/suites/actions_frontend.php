@@ -135,3 +135,48 @@ test('registerActions steht ueberall in der auswertbaren Form', function () use 
     }
     assertTrue($bad === [], "registerActions() nicht in der festen Form (ein Block, Spalte 0):\n  " . implode("\n  ", $bad));
 });
+
+/**
+ * Browser-Schnittstellen, die das Dashboard ueber window anspricht. Alles
+ * andere hinter window. waere eine Anwendungsfunktion auf dem Umweg ueber den
+ * globalen Namensraum -- genau der Weg, den Etappe 2 abgeraeumt hat (Task 19).
+ * Ein Aufruf wie window.openResponsesModal?.(id) liefe nach dem Abraeumen
+ * still ins Leere; deshalb Import statt window. Erweitern nur um echte
+ * Browser-APIs, nie um eigene Funktionen.
+ */
+const AC_WINDOW_ALLOWED = ['addEventListener', 'localStorage', 'location', 'matchMedia', 'open', 'URL'];
+
+test('Dashboard-Module legen nichts auf window ab und rufen nichts ueber window', function () use ($acRoot) {
+    $bad = [];
+    foreach (acFiles($acRoot) as $file) {
+        if (str_ends_with($file, '.html')) {
+            continue;
+        }
+        $src = sourceCode($file);
+        $name = basename($file);
+        $line = static fn (int $off): int => substr_count($src, "\n", 0, $off) + 1;
+
+        // Zuweisung an ein window-Mitglied, auch an ein erlaubtes (window.open = ...).
+        if (preg_match_all('/\b(?:window|globalThis)\s*(?:\.\s*[A-Za-z_$][\w$]*|\[[^\]]*\])\s*=(?!=)/', $src, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[0] as [$hit, $off]) {
+                $bad[] = "{$name}:{$line($off)} Zuweisung {$hit}";
+            }
+        }
+        // Zugriff per Index: window['x'], window[name] -- nicht pruefbar, also verboten.
+        if (preg_match_all('/\b(?:window|globalThis)\s*\??\.?\s*\[/', $src, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[0] as [$hit, $off]) {
+                $bad[] = "{$name}:{$line($off)} Indexzugriff {$hit}";
+            }
+        }
+        // Jedes andere Mitglied als die erlaubten Browser-APIs, ob Aufruf
+        // (window.x(), window.x?.()) oder Lesen (window.x.y).
+        if (preg_match_all('/\b(?:window|globalThis)\s*\??\.\s*([A-Za-z_$][\w$]*)/', $src, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[1] as [$member, $off]) {
+                if (!in_array($member, AC_WINDOW_ALLOWED, true)) {
+                    $bad[] = "{$name}:{$line($off)} window.{$member}";
+                }
+            }
+        }
+    }
+    assertTrue($bad === [], "Anwendungsfunktion ueber window statt Import/Aktion:\n  " . implode("\n  ", $bad));
+});

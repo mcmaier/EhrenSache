@@ -359,8 +359,6 @@ function goToRecordsPage(page) {
         }
     }
 }
-// Global bis Task 19 (OI-17)
-window.goToRecordsPage = goToRecordsPage;
 
 /**
  * Zeichnet die Status-Chips fuer den aktuellen Modus und liefert die nach
@@ -1698,8 +1696,6 @@ function setAttendanceGrouping(stage) {
         renderAttendanceList(_lastAttendanceData);
     }
 }
-// Global bis Task 19 (OI-17)
-window.setAttendanceGrouping = setAttendanceGrouping;
 
 async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
     try {        
@@ -2087,22 +2083,6 @@ function toggleArrivalTimeField() {
         group.style.display = '';
     }
 }
-
-// ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
-// ============================================
-
-// Globale Funktionen für HTML onclick
-window.openRecordModal = openRecordModal;
-window.saveRecord = saveRecord;
-window.toggleArrivalTimeField = toggleArrivalTimeField;
-window.setArrivalTimeFromAppointment = setArrivalTimeFromAppointment;
-window.closeRecordModal = closeRecordModal;
-window.deleteRecord = deleteRecord;
-window.resetRecordFilter = resetRecordFilter;
-window.backToAppointments = backToAppointments;
-window.quickCreateRecordForMember = quickCreateRecordForMember;
-window.quickCreateRecordForAppointment = quickCreateRecordForAppointment;
 
 registerActions({
     'back-to-appointments': () => backToAppointments(),

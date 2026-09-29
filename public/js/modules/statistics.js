@@ -588,10 +588,6 @@ export async function initStatisticsEventHandlers() {
         ?.addEventListener('click', openStatisticsReport);
 }
 
-window.updateStatisticsFilters = updateStatisticsFilters;
-window.applyStatisticsFilters = applyStatisticsFilters;
-window.resetStatisticsFilter = resetStatisticsFilters;
-
 registerActions({
     'reset-statistics-filter': () => resetStatisticsFilters(),
 });

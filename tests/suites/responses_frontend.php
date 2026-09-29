@@ -182,11 +182,15 @@ test('responses.js sichert sich gegen ueberholte Antworten ab und laedt die List
     $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
     assertTrue(str_contains($js, 'loadToken'), 'Kein Zaehler gegen ueberholte reloadResponses()-Antworten');
 
+    // Seit OI-17 Etappe 2 per Import statt ueber window: ein window.x?.()
+    // liefe nach dem Abraeumen der Exporte still ins Leere.
     $appointmentsJs = (string) sourceCode($rsRoot . '/public/js/modules/appointments.js');
-    assertTrue(str_contains($appointmentsJs, 'window.refreshAppointmentsKeepPage'),
-        'appointments.js stellt refreshAppointmentsKeepPage nicht global bereit');
-    assertTrue(str_contains($js, 'refreshAppointmentsKeepPage'),
-        'responses.js ruft refreshAppointmentsKeepPage nicht auf');
+    assertTrue(str_contains($appointmentsJs, 'export function refreshAppointmentsKeepPage'),
+        'appointments.js exportiert refreshAppointmentsKeepPage nicht');
+    assertTrue(preg_match("/^import \{[^}]*\brefreshAppointmentsKeepPage\b[^}]*\} from '\.\/appointments\.js';/m", $js) === 1,
+        'responses.js importiert refreshAppointmentsKeepPage nicht aus appointments.js');
+    assertTrue(preg_match('/(?<![.\w])refreshAppointmentsKeepPage\(\);/', $js) === 1,
+        'responses.js ruft refreshAppointmentsKeepPage nicht (direkt) auf');
 });
 
 test('Terminliste und Modal zeigen die Ampel als Chips', function () use ($rsRoot) {
@@ -205,8 +209,11 @@ test('Modal setzt Mitglieder-Rueckmeldungen ueber die bestehenden Icon-Aktionen 
 test('Kalender-Popup zeigt die Rueckmeldung ueber responseChipsHtml und maskiert Termindaten', function () use ($rsRoot) {
     $js = (string) sourceCode($rsRoot . '/public/js/modules/appointments.js');
 
-    assertTrue(str_contains($js, "import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS } from './responses.js';"),
-        'appointments.js importiert die Ampel-Bausteine nicht aus responses.js');
+    $import = preg_match("/^import \{([^}]*)\} from '\.\/responses\.js';/m", $js, $im) === 1 ? $im[1] : '';
+    foreach (['responseSummaryCell', 'responseChipsHtml', 'responseSummaryTitle', 'RESPONSE_ICONS', 'RESPONSE_LABELS', 'openResponsesModal'] as $baustein) {
+        assertTrue(preg_match('/\b' . $baustein . '\b/', $import) === 1,
+            "appointments.js importiert {$baustein} nicht aus responses.js");
+    }
 
     $start = strpos($js, 'function showAppointmentPopup');
     assertTrue($start !== false, 'showAppointmentPopup fehlt');
@@ -240,8 +247,13 @@ test('calendarResponseLineHtml() macht die Ampel nur im festgehaltenen Popup ank
     $aktion = preg_match("/'calendar-open-responses':\s*\(el\)\s*=>\s*\{(.*?)\n    \},/s", $js, $m) === 1 ? $m[1] : '';
     assertTrue(str_contains($aktion, 'closeCalendarPopup()'),
         'Der Klick auf die Ampel im Popup entfernt das Popup nicht explizit, bevor das Modal oeffnet');
-    assertTrue(str_contains($aktion, 'openResponsesModal(Number(el.dataset.id))'),
-        'Klick oeffnet das Rueckmeldungs-Modal nicht');
+    // closeCalendarPopup() muss das Popup auch wirklich entfernen -- ein
+    // leerer Rumpf liesse die Zusicherung darueber gruen.
+    $schliessen = preg_match('/function closeCalendarPopup\(\)\s*\{(.*?)\n\}/s', $js, $cm) === 1 ? $cm[1] : '';
+    assertTrue(str_contains($schliessen, "document.querySelector('.calendar-event-popup')?.remove()"),
+        'closeCalendarPopup() entfernt das Kalender-Popup nicht');
+    assertTrue(preg_match('/(?<![.\w])openResponsesModal\(Number\(el\.dataset\.id\)\)/', $aktion) === 1,
+        'Klick oeffnet das Rueckmeldungs-Modal nicht (direkter Aufruf, nicht ueber window)');
 });
 
 test('Kalendertag zeigt einen Rueckmeldungs-Punkt und die Hervorhebung fuer offene Rueckmeldungen', function () use ($rsRoot) {

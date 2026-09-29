@@ -314,9 +314,6 @@ function goToExceptionsPage(page) {
     }
 }
 
-// Global bis Task 19 (OI-17)
-window.goToExceptionsPage = goToExceptionsPage;
-
 export function filterExceptions(exceptions, filters = {}) {
     debug.log("Filter Exceptions ()");
 
@@ -573,9 +570,6 @@ async function quickApproveException(exceptionId) {
     document.getElementById('exception_reason')?.focus();
 }
 
-// Global bis Task 19 (OI-17)
-window.quickApproveException = quickApproveException;
-
 // Schnelles Ablehnen
 async function quickRejectException(exceptionId) {
     // Modal öffnen mit Status = rejected vorausgewählt
@@ -590,9 +584,6 @@ async function quickRejectException(exceptionId) {
     // Fokus auf Admin-Notizen (Grund für Ablehnung)
     document.getElementById('exception_reason')?.focus();
 }
-
-// Global bis Task 19 (OI-17)
-window.quickRejectException = quickRejectException;
 
 // ============================================
 // CRUD FUNCTIONS
@@ -732,18 +723,6 @@ export async function deleteException(exceptionId) {
         }
     }
 }
-
-// ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
-// ============================================
-
-window.openExceptionModal = openExceptionModal;
-window.saveException = saveException;
-window.toggleExceptionFields = toggleExceptionFields;
-window.closeExceptionModal = closeExceptionModal;
-window.deleteException = deleteException;
-window.resetExceptionFilter = resetExceptionFilter;
-window.applyExceptionFilter = applyExceptionFilters;
 
 registerActions({
     'close-exception-modal': () => closeExceptionModal(),

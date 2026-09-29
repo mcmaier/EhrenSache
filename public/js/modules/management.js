@@ -631,22 +631,6 @@ export async function deleteType(typeId) {
     }
 }
 
-// ============================================
-// GLOBAL EXPORTS
-// ============================================
-
-window.openGroupModal = openGroupModal;
-window.closeGroupModal = closeGroupModal;
-window.toggleGroupExclusivity = toggleGroupExclusivity;
-window.saveGroup = saveGroup;
-window.deleteGroup = deleteGroup;
-
-window.openTypeModal = openTypeModal;
-window.closeTypeModal = closeTypeModal;
-window.saveType = saveType;
-window.deleteType = deleteType;
-window.toggleTypeResponseFields = toggleTypeResponseFields;
-
 registerActions({
     'close-group-modal': () => closeGroupModal(),
     'close-type-modal': () => closeTypeModal(),

@@ -225,7 +225,6 @@ function renderDevicesPagination(currentPage, totalPages, totalDevices) {
     container.innerHTML = html;
 }
 
-// Global bis Task 19 (OI-17)
 function goToDevicesPage(page) {
 
     // Aktuelle Scroll-Position der Tabelle speichern
@@ -247,7 +246,6 @@ function goToDevicesPage(page) {
         }
     }
 }
-window.goToDevicesPage = goToDevicesPage;
 
 export async function showDeviceSection(forceReload = false, page = 1)
 {
@@ -673,22 +671,6 @@ export function showDeviceQR() {
         warning: 'Dieser Code enthält den Zugang der Station. Nicht abfotografieren lassen.'
     });
 }
-
-// ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
-// ============================================
-
-window.openDeviceModal = openDeviceModal;
-window.saveDevice = saveDevice;
-window.closeDeviceModal = closeDeviceModal;
-window.deleteDevice = deleteDevice;
-window.regenerateDeviceToken = regenerateDeviceToken;
-window.copyDeviceToken = copyDeviceToken;
-window.toggleDeviceTokenVisibility = toggleDeviceTokenVisibility;
-window.generateTotpSecret = generateTotpSecret;
-window.showDeviceQR = showDeviceQR;
-window.applyDeviceFilters = applyDeviceFilters;
-window.resetDeviceFilter = resetDeviceFilter;
 
 registerActions({
     'close-device-modal': () => closeDeviceModal(),

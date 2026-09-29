@@ -276,7 +276,6 @@ function renderUsersPagination(currentPage, totalPages, totalUsers) {
     container.innerHTML = html;
 }
 
-// Global bis Task 19 (OI-17)
 function goToUsersPage(page) {
 
     // Aktuelle Scroll-Position der Tabelle speichern
@@ -1032,7 +1031,6 @@ async function activateUser(userId) {
         showToast('Fehler beim Aktivieren: ' + error.message, 'error');
     }
 }
-window.goToUsersPage = goToUsersPage;
 
 async function suspendUser(userId)  {
     const confirmed = await showConfirm(
@@ -1062,7 +1060,6 @@ async function suspendUser(userId)  {
         showToast('Fehler beim Sperren: ' + error.message, 'error');
     }
 }
-window.toggleMemberEdit = toggleMemberEdit;
 
 async function reactivateUser(userId) {    
     const confirmed = await showConfirm(
@@ -1092,19 +1089,6 @@ async function reactivateUser(userId) {
         showToast('Fehler beim Reaktivieren: ' + error.message, 'error');
     }
 };
-
-// ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
-// ============================================
-
-window.openUserModal = openUserModal;
-window.saveUser = saveUser;
-window.closeUserModal = closeUserModal;
-window.deleteUser = deleteUser;
-window.regenerateUserToken = regenerateUserToken;
-window.copyUserToken = copyUserToken;
-window.toggleUserTokenVisibility = toggleUserTokenVisibility;
-window.applyUserFilters = applyUserFilters;
 
 registerActions({
     'close-user-modal': () => closeUserModal(),

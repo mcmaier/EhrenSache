@@ -17,7 +17,7 @@ import { loadTypes } from './management.js';
 import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
-import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS } from './responses.js';
+import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS, openResponsesModal } from './responses.js';
 import { appointmentTimeChips, localTodayIso, countChips, renderFilterChips, setResetEnabled } from './filter_chips.js';
 import { registerActions } from './actions.js';
 
@@ -457,8 +457,6 @@ function goToAppointmentsPage(page) {
         }
     }
 }
-// Global bis Task 19 (OI-17)
-window.goToAppointmentsPage = goToAppointmentsPage;
 
 // Vergangen/Kommend als reine Anzeige (Spec 2026-09-22): Zaehler ueber die
 // gefilterte Liste, kein Klick -- der Kalender ist selbst die Zeitachse.
@@ -1877,36 +1875,16 @@ export async function jumpToAttendance(appointmentId, from = 'calendar') {
     await openAttendanceForAppointment(apt.appointment_id, apt.date, origin);
 }
 
-// ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
-// ============================================
-
-// Globale Funktionen für HTML onclick
-window.openAppointmentModal = openAppointmentModal;
-window.saveAppointment = saveAppointment;
-window.closeAppointmentModal = closeAppointmentModal;
-window.deleteAppointment = deleteAppointment;
-window.previousMonth = previousMonth;
-window.nextMonth = nextMonth;
-window.goToToday = goToToday;
-window.showAppointmentSection = showAppointmentSection;
-window.resetAppointmentFilter = resetAppointmentFilter;
-window.toggleAppointmentRepeat = toggleAppointmentRepeat;
-window.updateAppointmentRepeatFields = updateAppointmentRepeatFields;
-window.openSeriesExtend = openSeriesExtend;
-window.previewSeriesExtend = previewSeriesExtend;
-window.openSeriesRuleChange = openSeriesRuleChange;
-window.jumpToAttendance = jumpToAttendance;
-
 // Fuer responses.js (FI-1): Terminliste auf der aktuell gezeigten Seite neu
 // laden, ohne die Seite zu wechseln. Der Cache wurde vorher per
 // invalidateCache('appointments', jahr) geleert, forceReload=false reicht
 // deshalb -- loadAppointments() faellt automatisch auf den API-Abruf zurueck.
-function refreshAppointmentsKeepPage() {
+// responses.js importiert die Funktion; der Kreis appointments <-> responses
+// ist unbedenklich, weil keines der beiden Module beim Laden (oberste Ebene)
+// etwas vom anderen aufruft -- nur spaeter, aus Klicks und Antworten heraus.
+export function refreshAppointmentsKeepPage() {
     return showAppointmentSection(false, currentAppointmentsPage);
 }
-// Global bis Task 19 (OI-17)
-window.refreshAppointmentsKeepPage = refreshAppointmentsKeepPage;
 
 registerActions({
     'calendar-jump-to-attendance': (el) => {
@@ -1923,7 +1901,7 @@ registerActions({
     },
     'calendar-open-responses': (el) => {
         closeCalendarPopup();
-        window.openResponsesModal(Number(el.dataset.id));
+        openResponsesModal(Number(el.dataset.id));
     },
     'close-appointment-modal': () => closeAppointmentModal(),
     'delete-appointment': (el) => deleteAppointment(Number(el.dataset.id)),

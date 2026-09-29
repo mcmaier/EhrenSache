@@ -1075,22 +1075,6 @@ export function initWorktimeEventHandlers() {
     });
 }
 
-// Global verfügbar machen, weil die Oberfläche onclick-Attribute nutzt
-window.openWorkSessionModal = openWorkSessionModal;
-window.closeWorkSessionModal = closeWorkSessionModal;
-window.saveWorkSession = saveWorkSession;
-window.approveWorkSession = approveWorkSession;
-window.rejectWorkSession = rejectWorkSession;
-window.deleteWorkSession = deleteWorkSession;
-window.resetWorktimeFilter = resetWorktimeFilter;
-window.openWorktimeReportModal = openWorktimeReportModal;
-window.closeWorktimeReportModal = closeWorktimeReportModal;
-
-window.openActivityTypeModal = openActivityTypeModal;
-window.closeActivityTypeModal = closeActivityTypeModal;
-window.saveActivityType = saveActivityType;
-window.deleteActivityType = deleteActivityType;
-
 registerActions({
     'approve-work-session': (el) => approveWorkSession(Number(el.dataset.id)),
     'close-activity-type-modal': () => closeActivityTypeModal(),

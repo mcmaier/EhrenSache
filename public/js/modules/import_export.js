@@ -865,39 +865,12 @@ function refresh() {
     loadImportLogs();
 }
 
-// Globaler Zugriff für onclick-Handler
+// Aktionen des Importprotokolls (import-logs-*), gebuendelt wie die Aktionsnamen
 const ImportLogs = {
     showDetails,
     deleteLog,
     refresh
 };
-
-// Global bis Task 19 (OI-17)
-window.ImportLogs = ImportLogs;
-
-
-// Globale Funktionen
-window.openAppointmentsImportModal = openAppointmentsImportModal;
-window.closeAppointmentsImportModal = closeAppointmentsImportModal;
-window.executeAppointmentsImport = executeAppointmentsImport;
-window.exportAppointments = exportAppointments;
-window.closeLogModal = closeLogModal;
-
-// Globale Funktionen für Members
-window.exportMembers = exportMembers;
-window.openImportModal = openImportModal;
-window.closeImportModal = closeImportModal;
-window.executeImport = executeImport;
-
-// Globale Funktionen für Records
-window.openRecordsImportModal = openRecordsImportModal;
-window.closeRecordsImportModal = closeRecordsImportModal;
-window.executeRecordsImport = executeRecordsImport;
-window.exportRecords = exportRecords;
-window.switchImportTab = switchImportTab;
-window.analyzeCsvForAppointments = analyzeCsvForAppointments;
-window.createSelectedAppointments = createSelectedAppointments;
-window.clearSuggestions = clearSuggestions;
 
 registerActions({
     'analyze-csv-for-appointments': () => analyzeCsvForAppointments(),

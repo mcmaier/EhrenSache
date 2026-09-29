@@ -754,13 +754,11 @@ async function openSmtpConfigModal() {
         debug.error('Error loading SMTP config:', error);
     }    
 }
-window.openSmtpConfigModal = openSmtpConfigModal;
 
 function closeSmtpConfigModal() {
     document.getElementById('smtpConfigModal').classList.remove('active');
     document.getElementById('smtpConfigForm').reset();
 }
-window.closeSmtpConfigModal = closeSmtpConfigModal;
 
 async function saveSmtpConfig() {
     const smtpData = {
@@ -804,7 +802,6 @@ async function saveSmtpConfig() {
         showToast('Fehler beim Speichern: ' + error.message, 'error');
     }
 }
-window.saveSmtpConfig = saveSmtpConfig;
 
 // ============================================
 // TEST MAIL
@@ -859,7 +856,6 @@ async function sendTestMail() {
         testBtn.textContent = originalText;
     }
 }
-window.sendTestMail = sendTestMail;
 
 // ============================================
 // PASSWORD VISIBILITY TOGGLE
@@ -879,7 +875,6 @@ function togglePasswordVisibility(inputId, button) {
         button.textContent = '👁️';
     }
 }
-window.togglePasswordVisibility = togglePasswordVisibility;
 
 // ============================================
 // UPDATES
@@ -971,9 +966,6 @@ function renderUpdateStatus(status) {
         box.append(link);
     }
 }
-
-window.checkForUpdates = checkForUpdates;
-window.performCleanup = performCleanup;
 
 
 // ============================================

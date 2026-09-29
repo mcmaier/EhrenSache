@@ -332,15 +332,6 @@ export async function downloadMyData(format = 'json') {
     }
 }
 
-// ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
-// ============================================
-
-window.regenerateProfileToken = regenerateProfileToken;
-window.copyProfileToken = copyProfileToken;
-window.toggleProfileTokenVisibility = toggleProfileTokenVisibility;
-window.downloadMyData = downloadMyData;
-
 registerActions({
     'copy-profile-token': () => copyProfileToken(),
     'download-my-data': () => downloadMyData(),

@@ -340,8 +340,6 @@ function goToMembersPage(page) {
         }
     }
 }
-// Global bis Task 19 (OI-17)
-window.goToMembersPage = goToMembersPage;
 
 export async function showMemberSection(forceReload = false, page = 1) {
     debug.log("Show Member Section ()");
@@ -803,19 +801,6 @@ async function saveMembershipDates(memberId) {
     // die Mitgliederantwort selbst keinen Erfolg meldet. Bewusst ohne Jahr.
     await invalidateCache('appointments');
 }
-
-// ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
-// ============================================
-
-window.openMemberModal = openMemberModal;
-window.saveMember = saveMember;
-window.closeMemberModal = closeMemberModal;
-window.deleteMember = deleteMember;
-window.addMembershipDate = addMembershipDate;
-window.removeMembershipDate = removeMembershipDate;
-window.updateMembershipDate = updateMembershipDate;
-window.resetMemberFilter = resetMemberFilter;
 
 registerActions({
     'add-membership-date': () => addMembershipDate(),
