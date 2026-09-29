@@ -99,7 +99,9 @@ try {
 
     // Alle sichtbaren, noch nicht versuchten Aktionen ausloesen.
     async function sweep(label) {
-        for (let round = 0; round < 3; round++) {
+        // Geoeffnete Dialoge bleiben zwischen den Runden offen, damit ihre Knoepfe
+        // in der naechsten Runde gefunden werden; erst am Ende wird geschlossen.
+        for (let round = 0; round < 5; round++) {
             const candidates = await page.$$eval('[data-action], [data-action-change]', els => els
                 .filter(e => e.offsetParent !== null || e.getClientRects().length > 0)
                 .map((e, i) => ({
@@ -107,8 +109,10 @@ try {
                     name: e.getAttribute('data-action') || e.getAttribute('data-action-change'),
                     kind: e.hasAttribute('data-action') ? 'click' : 'change',
                 })));
-            const fresh = candidates.filter(c => !triggered.has(c.name) && !skipped.has(c.name));
-            if (fresh.length === 0) return;
+            // close-* zuletzt, sonst schliesst es den Dialog vor dessen uebrigen Knoepfen
+            const fresh = candidates.filter(c => !triggered.has(c.name) && !skipped.has(c.name))
+                .sort((a, b) => Number(a.name.startsWith('close-')) - Number(b.name.startsWith('close-')));
+            if (fresh.length === 0) break;
             for (const c of fresh) {
                 if (triggered.has(c.name) || skipped.has(c.name)) continue;
                 if (SKIP.test(c.name)) { skipped.add(c.name); continue; }
@@ -125,6 +129,8 @@ try {
                 await wait(400);
                 // Neu sichtbar gewordene Knoepfe (etwa im Dialog) in der naechsten Runde
             }
+        }
+        for (let i = 0; i < 2; i++) {
             await page.keyboard.press('Escape');
             await wait(300);
         }
@@ -136,6 +142,23 @@ try {
         await page.evaluate(s => document.querySelector(`.nav-item[data-section="${s}"]`).click(), section);
         await wait(1500);
         await sweep(section);
+
+        // Untertabs (Einstellungen, Import/Export ...): jeden oeffnen und dort erneut ausloesen
+        const TABS = '.settings-tab-btn, .tab-btn, [role="tab"]';
+        const tabCount = await page.evaluate(sel => [...document.querySelectorAll(sel)]
+            .filter(e => e.offsetParent !== null || e.getClientRects().length > 0).length, TABS);
+        for (let t = 0; t < tabCount; t++) {
+            const clicked = await page.evaluate((sel, n) => {
+                const el = [...document.querySelectorAll(sel)]
+                    .filter(e => e.offsetParent !== null || e.getClientRects().length > 0)[n];
+                if (!el) return false;
+                el.click();
+                return true;
+            }, TABS, t);
+            if (!clicked) break;
+            await wait(500);
+            await sweep(`${section}-tab${t}`);
+        }
 
         // Kalender: das festgehaltene Popup eines belegten Tages oeffnen
         if (section === 'termine') {
