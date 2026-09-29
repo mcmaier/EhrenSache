@@ -17,7 +17,8 @@
  * Beginn, meint es den Folgetag (Nachtauftritt 20:00-01:00).
  *
  * Genutzt von private/handlers/appointments.php (POST, PUT) und
- * private/handlers/import.php (CSV).
+ * private/handlers/import.php (CSV). Dazu kommt die Pruefung der Kernfelder
+ * (appointmentNormalizeCore), die nur appointments.php nutzt.
  */
 declare(strict_types=1);
 
@@ -83,6 +84,72 @@ function appointmentNormalizeEndTime($raw, string $startTime): array
     }
 
     return [$norm, null];
+}
+
+/**
+ * Kernfelder eines Termins pruefen: title, date, start_time, type_id.
+ *
+ * Geprueft wird nur, was in $fields steht -- PUT reicht nur die mitgeschickten
+ * Felder herein, POST alle vier (fehlende als null). Bis dahin nahm POST ein
+ * Datum "kaputt" an, und eine unbekannte Terminart endete in einer
+ * PDOException mit HTML-Fehlerseite statt einer JSON-Antwort.
+ *
+ * type_id: null oder '' bleibt null -- was das bedeutet (Standard-Terminart
+ * bei POST, keine Terminart bei PUT), entscheidet der Aufrufer. Ob die
+ * Terminart existiert, prueft er ebenfalls (seriesTypeExists), weil das die
+ * Datenbank braucht.
+ *
+ * Nutzt seriesIsValidDate() (recurrence.php) und seriesParseTypeId()
+ * (appointment_series.php), dieselben Regeln wie die Terminserien.
+ *
+ * @param array<string, mixed> $fields
+ * @return array{0: ?array<string, mixed>, 1: ?string} [normalisierte Felder, Fehlermeldung]
+ */
+function appointmentNormalizeCore(array $fields): array
+{
+    $out = [];
+
+    if (array_key_exists('title', $fields)) {
+        $title = is_string($fields['title']) ? trim($fields['title']) : '';
+        if ($title === '') {
+            return [null, 'Der Titel ist erforderlich'];
+        }
+        if (mb_strlen($title) > 200) {
+            return [null, 'Der Titel darf höchstens 200 Zeichen lang sein'];
+        }
+        $out['title'] = $title;
+    }
+
+    if (array_key_exists('date', $fields)) {
+        $date = $fields['date'];
+        if (!is_string($date) || !seriesIsValidDate(trim($date))) {
+            return [null, 'Das Datum muss als JJJJ-MM-TT angegeben werden und gültig sein'];
+        }
+        $out['date'] = trim($date);
+    }
+
+    if (array_key_exists('start_time', $fields)) {
+        $start = $fields['start_time'];
+        if (!is_string($start) || !preg_match('/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', trim($start))) {
+            return [null, 'Der Beginn muss als Uhrzeit HH:MM angegeben werden'];
+        }
+        $out['start_time'] = appointmentTimeKey($start);
+    }
+
+    if (array_key_exists('type_id', $fields)) {
+        $typeId = $fields['type_id'];
+        if ($typeId === null || $typeId === '') {
+            $out['type_id'] = null;
+        } else {
+            $typeId = seriesParseTypeId($typeId);
+            if ($typeId === null) {
+                return [null, 'Ungültige Terminart'];
+            }
+            $out['type_id'] = $typeId;
+        }
+    }
+
+    return [$out, null];
 }
 
 /**

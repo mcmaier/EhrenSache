@@ -165,3 +165,96 @@ test('locations=1 liefert Orte fuer Verwalter, 403 fuer user', function () {
         adDropWorld($world, $ids);
     }
 });
+
+/**
+ * Wie adExpect400, prueft zusaetzlich, dass die Antwort JSON mit einer
+ * Meldung ist. Eine Terminart, die es nicht gibt, lieferte bis dahin HTTP 200
+ * mit der HTML-Fehlerseite der PDOException.
+ */
+function adExpect400Json(array $res, array &$ids, string $msg): void
+{
+    adExpect400($res, $ids, $msg);
+    assertTrue(is_string($res['body']['message'] ?? null) && $res['body']['message'] !== '',
+               "{$msg}: 400 ohne JSON-Meldung: " . substr($res['raw'], 0, 200));
+}
+
+/** POST mit den Standardfeldern, aus denen $drop entfernt wird. */
+function adPostWithout(array $world, array $drop): array
+{
+    $body = ['title' => 'AD-Termin', 'date' => '2026-11-20', 'start_time' => '19:30', 'type_id' => $world['type']];
+    foreach ($drop as $feld) {
+        unset($body[$feld]);
+    }
+
+    return apiRequest('POST', 'appointments', ['token' => apiToken('admin'), 'body' => $body]);
+}
+
+test('POST prueft Titel, Datum, Beginn und Terminart vor dem Anlegen', function () {
+    $world = adWorld();
+    $ids = [];
+    try {
+        foreach (['title', 'date', 'start_time'] as $feld) {
+            adExpect400Json(adPostWithout($world, [$feld]), $ids, "Fehlendes {$feld}");
+        }
+        adExpect400Json(adPost($world, ['title' => '   ']), $ids, 'Leerer Titel');
+        adExpect400Json(adPost($world, ['title' => str_repeat('x', 201)]), $ids, 'Titel ueber 200 Zeichen');
+        adExpect400Json(adPost($world, ['title' => ['x']]), $ids, 'Titel als Liste');
+        adExpect400Json(adPost($world, ['date' => 'kaputt']), $ids, 'Datum kaputt');
+        adExpect400Json(adPost($world, ['date' => '2026-02-30']), $ids, 'Datum, das es nicht gibt');
+        adExpect400Json(adPost($world, ['date' => '20.11.2026']), $ids, 'Datum im deutschen Format');
+        adExpect400Json(adPost($world, ['start_time' => '25:00']), $ids, 'Beginn 25:00');
+        adExpect400Json(adPost($world, ['start_time' => 'abends']), $ids, 'Beginn als Wort');
+        adExpect400Json(adPost($world, ['type_id' => 999999999]), $ids, 'Terminart, die es nicht gibt');
+        adExpect400Json(adPost($world, ['type_id' => 'abc']), $ids, 'Terminart als Wort');
+
+        $res = adPost($world, ['title' => '  Probe  ', 'start_time' => '19:30:00']);
+        assertStatus(201, $res, 'Gueltiger Termin mit HH:MM:SS');
+        $ids[] = $id = (int) $res['body']['id'];
+        $apt = adGet($id);
+        assertSame('Probe', $apt['title'], 'Titel muss getrimmt gespeichert sein');
+        assertSame('2026-11-20', $apt['date']);
+        assertSame('19:30:00', $apt['start_time']);
+    } finally {
+        adDropWorld($world, $ids);
+    }
+});
+
+test('PUT prueft mitgeschickte Kernfelder und laesst den Bestand bei 400 stehen', function () {
+    $world = adWorld();
+    $ids = [];
+    try {
+        $res = adPost($world, []);
+        assertStatus(201, $res);
+        $ids[] = $id = (int) $res['body']['id'];
+
+        $faelle = [
+            'Leerer Titel'        => ['title' => ''],
+            'Titel null'          => ['title' => null],
+            'Datum kaputt'        => ['date' => 'kaputt'],
+            'Datum null'          => ['date' => null],
+            'Datum 2026-02-30'    => ['date' => '2026-02-30'],
+            'Beginn kaputt'       => ['start_time' => '7 Uhr'],
+            'Beginn null'         => ['start_time' => null],
+            'Terminart unbekannt' => ['type_id' => 999999999],
+            'Terminart als Wort'  => ['type_id' => 'abc'],
+        ];
+        foreach ($faelle as $name => $body) {
+            $put = adPut($id, $body);
+            assertStatus(400, $put, "PUT: {$name}");
+            assertTrue(is_string($put['body']['message'] ?? null), "PUT: {$name} ohne JSON-Meldung");
+        }
+
+        $apt = adGet($id);
+        assertSame('AD-Termin', $apt['title'], 'Abgelehntes PUT darf den Titel nicht aendern');
+        assertSame('2026-11-20', $apt['date']);
+        assertSame('19:30:00', $apt['start_time']);
+        assertSame($world['type'], (int) $apt['type_id']);
+
+        assertStatus(200, adPut($id, ['date' => '2026-11-27', 'start_time' => '20:00']), 'Gueltiges Teil-Update');
+        $apt = adGet($id);
+        assertSame('2026-11-27', $apt['date']);
+        assertSame('20:00:00', $apt['start_time']);
+    } finally {
+        adDropWorld($world, $ids);
+    }
+});

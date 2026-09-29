@@ -20,6 +20,9 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../private/helpers/appointment_details.php';
+// appointmentNormalizeCore() nutzt die Datums- und Terminartregeln der Serien.
+require_once __DIR__ . '/../../private/helpers/recurrence.php';
+require_once __DIR__ . '/../../private/helpers/appointment_series.php';
 
 test('Ort: null und Leerstring werden zu null', function () {
     assertSame([null, null], appointmentNormalizeLocation(null));
@@ -93,4 +96,48 @@ test('Import: ungueltiges Ende ist ein Zeilenfehler', function () {
     $erg = appointmentImportDetails(['end_time' => '19:00'], '19:00:00');
     assertSame([], $erg['fields']);
     assertTrue(is_string($erg['error']));
+});
+
+test('Kernfelder: nur mitgeschickte Felder werden geprueft', function () {
+    assertSame([[], null], appointmentNormalizeCore([]));
+    assertSame([['title' => 'Probe'], null], appointmentNormalizeCore(['title' => '  Probe ']));
+});
+
+test('Kernfelder: Titel fehlt, ist leer, zu lang oder kein Text', function () {
+    foreach ([null, '', '   ', ['x'], 42, str_repeat('ä', 201)] as $titel) {
+        [$wert, $fehler] = appointmentNormalizeCore(['title' => $titel]);
+        assertSame(null, $wert);
+        assertTrue(is_string($fehler), 'Titel ' . var_export($titel, true) . ' muss abgelehnt werden');
+    }
+    assertSame([['title' => str_repeat('ä', 200)], null], appointmentNormalizeCore(['title' => str_repeat('ä', 200)]));
+});
+
+test('Kernfelder: Datum nur als echtes JJJJ-MM-TT', function () {
+    assertSame([['date' => '2028-02-29'], null], appointmentNormalizeCore(['date' => '2028-02-29']));
+    foreach ([null, 'kaputt', '2026-02-30', '2026-2-3', '20.11.2026', '2026-11-20 19:30', 20261120] as $datum) {
+        [$wert, $fehler] = appointmentNormalizeCore(['date' => $datum]);
+        assertSame(null, $wert);
+        assertTrue(is_string($fehler), 'Datum ' . var_export($datum, true) . ' muss abgelehnt werden');
+    }
+});
+
+test('Kernfelder: Beginn als HH:MM oder HH:MM:SS, normalisiert auf HH:MM:SS', function () {
+    assertSame([['start_time' => '19:30:00'], null], appointmentNormalizeCore(['start_time' => '19:30']));
+    assertSame([['start_time' => '07:05:30'], null], appointmentNormalizeCore(['start_time' => '07:05:30']));
+    foreach ([null, '', '24:00', '7:30', '19:60', 'abends', 1930] as $zeit) {
+        [$wert, $fehler] = appointmentNormalizeCore(['start_time' => $zeit]);
+        assertSame(null, $wert);
+        assertTrue(is_string($fehler), 'Beginn ' . var_export($zeit, true) . ' muss abgelehnt werden');
+    }
+});
+
+test('Kernfelder: Terminart als positive Ganzzahl, null und Leerwert bleiben null', function () {
+    assertSame([['type_id' => null], null], appointmentNormalizeCore(['type_id' => null]));
+    assertSame([['type_id' => null], null], appointmentNormalizeCore(['type_id' => '']));
+    assertSame([['type_id' => 7], null], appointmentNormalizeCore(['type_id' => '7']));
+    foreach (['abc', 0, -1, 3.7, true, '5x'] as $typ) {
+        [$wert, $fehler] = appointmentNormalizeCore(['type_id' => $typ]);
+        assertSame(null, $wert);
+        assertTrue(is_string($fehler), 'Terminart ' . var_export($typ, true) . ' muss abgelehnt werden');
+    }
 });
