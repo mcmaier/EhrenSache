@@ -701,7 +701,7 @@
                                 </small>
 
                                 <div style="margin-top: 12px;">
-                                    <button onclick="performCleanup()" class="btn-std btn-delete">
+                                    <button data-action="perform-cleanup" class="btn-std btn-delete">
                                         🗑️ Alte Daten löschen
                                     </button>
                                     <span class="acts-now-hint">wirkt sofort, ohne Speichern</span>
@@ -798,7 +798,7 @@
                             
                                 <button type="button" 
                                         class="btn btn-secondary" 
-                                        onclick="openSmtpConfigModal()"
+                                        data-action="open-smtp-config-modal"
                                         style="width: 100%;">
                                     ⚙️ SMTP-Server konfigurieren
                                 </button>
@@ -818,7 +818,7 @@
                                         style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
                                     <button type="button" 
                                             class="btn btn-secondary" 
-                                            onclick="sendTestMail()"
+                                            data-action="send-test-mail"
                                             id="testMailBtn">
                                         📤 Test senden
                                     </button>
@@ -846,7 +846,7 @@
                                     Projekts auf GitHub abonnierst.
                                 </small>
                                 <div style="margin-top: 12px;">
-                                    <button type="button" id="update_check_btn" class="btn btn-secondary" onclick="checkForUpdates()">
+                                    <button type="button" id="update_check_btn" class="btn btn-secondary" data-action="check-for-updates">
                                         🔍 Auf Updates prüfen
                                     </button>
                                     <span class="acts-now-hint">wirkt sofort</span>
@@ -2474,12 +2474,12 @@
     <div class="modal" id="smtpConfigModal">
         <div class="modal-content">
             <div class="modal-header">            
-                <span class="close" onclick="closeSmtpConfigModal()">&times;</span>
+                <span class="close" data-action="close-smtp-config-modal">&times;</span>
                 <h2>SMTP-Server Konfiguration</h2>
             </div>
             
             <div class="modal-body">
-                <form id="smtpConfigForm" onsubmit="return false;">
+                <form id="smtpConfigForm" data-action-submit="prevent-submit">
                     <div class="form-group">
                         <label for="smtp_host">SMTP Server</label>
                         <input type="text" id="smtp_host" class="form-control" placeholder="mail.example.com" required>
@@ -2518,7 +2518,7 @@
                                 placeholder="Leer lassen um bestehendes zu behalten">
                             <button type="button" 
                                     class="btn-icon" 
-                                    onclick="togglePasswordVisibility('smtp_password')"
+                                    data-action="toggle-password-visibility" data-value="smtp_password"
                                     style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);"
                                     title="Passwort anzeigen/verbergen">
                                 👁️
@@ -2530,10 +2530,10 @@
             </div>
                     
                 <div class="modal-footer">
-                    <button type="button" class="btn-std btn-modal-cancel" onclick="closeSmtpConfigModal()">
+                    <button type="button" class="btn-std btn-modal-cancel" data-action="close-smtp-config-modal">
                         Abbrechen
                     </button>
-                    <button type="button" class="btn-std btn-modal-success" onclick="saveSmtpConfig()">
+                    <button type="button" class="btn-std btn-modal-success" data-action="save-smtp-config">
                         💾 Speichern
                     </button>
                 </div>                

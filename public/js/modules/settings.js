@@ -12,6 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdmin } from './api.js';
 import { showConfirm, showToast, dataCache, updateSubgroupLabelElements } from './ui.js';
 import { escapeHtml } from './utils.js';
+import { registerActions } from './actions.js';
 import { debug } from '../app.js';
 import { applyTheme } from '../theme.js';
 
@@ -727,7 +728,7 @@ export async function performCleanup() {
 // SMTP CONFIGURATION MODAL
 // ============================================
 
-window.openSmtpConfigModal = async function() {
+async function openSmtpConfigModal() {
     const modal = document.getElementById('smtpConfigModal');
     modal.classList.add('active');
     //modal.style.display = 'block';
@@ -752,14 +753,16 @@ window.openSmtpConfigModal = async function() {
     } catch (error) {
         debug.error('Error loading SMTP config:', error);
     }    
-};
+}
+window.openSmtpConfigModal = openSmtpConfigModal;
 
-window.closeSmtpConfigModal = function() {
+function closeSmtpConfigModal() {
     document.getElementById('smtpConfigModal').classList.remove('active');
     document.getElementById('smtpConfigForm').reset();
-};
+}
+window.closeSmtpConfigModal = closeSmtpConfigModal;
 
-window.saveSmtpConfig = async function() {
+async function saveSmtpConfig() {
     const smtpData = {
         smtp_host: document.getElementById('smtp_host').value.trim(),
         smtp_port: parseInt(document.getElementById('smtp_port').value),
@@ -800,13 +803,14 @@ window.saveSmtpConfig = async function() {
     } catch (error) {
         showToast('Fehler beim Speichern: ' + error.message, 'error');
     }
-};
+}
+window.saveSmtpConfig = saveSmtpConfig;
 
 // ============================================
 // TEST MAIL
 // ============================================
 
-window.sendTestMail = async function() {
+async function sendTestMail() {
     const recipientInput = document.getElementById('test_mail_recipient');
     const recipient = recipientInput.value.trim();
     const testBtn = document.getElementById('testMailBtn');
@@ -854,15 +858,18 @@ window.sendTestMail = async function() {
         testBtn.disabled = false;
         testBtn.textContent = originalText;
     }
-};
+}
+window.sendTestMail = sendTestMail;
 
 // ============================================
 // PASSWORD VISIBILITY TOGGLE
 // ============================================
 
-window.togglePasswordVisibility = function(inputId) {
+/** Blendet ein Passwortfeld ein/aus. button ist der ausloesende Knopf (Aktion
+ *  toggle-password-visibility); frueher kam er aus dem globalen event, das es
+ *  ohne Inline-Handler nicht gibt. */
+function togglePasswordVisibility(inputId, button) {
     const input = document.getElementById(inputId);
-    const button = event.target.closest('button');
     
     if (input.type === 'password') {
         input.type = 'text';
@@ -871,7 +878,8 @@ window.togglePasswordVisibility = function(inputId) {
         input.type = 'password';
         button.textContent = '👁️';
     }
-};
+}
+window.togglePasswordVisibility = togglePasswordVisibility;
 
 // ============================================
 // UPDATES
@@ -1020,3 +1028,14 @@ function updateRateLimiterStatus(settings) {
     ziel.innerHTML = 'Arbeitet normal. Letzte Störung: ' + escapeHtml(wann)
         + (code ? ' (Fehler ' + escapeHtml(String(code)) + ')' : '') + '.';
 }
+
+registerActions({
+    'check-for-updates': () => checkForUpdates(),
+    'close-smtp-config-modal': () => closeSmtpConfigModal(),
+    'open-smtp-config-modal': () => openSmtpConfigModal(),
+    'perform-cleanup': () => performCleanup(),
+    'save-smtp-config': () => saveSmtpConfig(),
+    'send-test-mail': () => sendTestMail(),
+    'prevent-submit': () => {},
+    'toggle-password-visibility': (el) => togglePasswordVisibility(el.dataset.value, el),
+});
