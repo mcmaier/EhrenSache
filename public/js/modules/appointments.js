@@ -269,8 +269,8 @@ async function renderAppointments(appointments, page = 1) {
         // die Zeile ueber #appointmentsTableBody tr[data-appointment-id="<id>"].
         tr.dataset.appointmentId = apt.appointment_id;
 
-        // apt.color/apt.type_name kommen aus der Terminart (DB) -- ohne CSP
-        // (OI-17) muss hier selbst maskiert werden: Farbe ueber safeTypeColor(),
+        // apt.color/apt.type_name kommen aus der Terminart (DB) -- die CSP
+        // (OI-17) faengt kein eingeschleustes Markup, hier wird selbst maskiert: Farbe ueber safeTypeColor(),
         // Text per escapeHtml(). Die Farbe geht als CSS-Variable ins Markup,
         // das Aussehen steht im Stylesheet (.type-accent).
         // Der Trenner steht ausserhalb des Spans: Er ist Satzzeichen, nicht Teil
@@ -934,8 +934,8 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
     let html = `<h4>${kopf}</h4>`;
     appointments.forEach(apt => {
         // apt.color und apt.type_name kommen aus der Terminart (DB) und landen
-        // in style-Attribut und Markup -- ohne CSP (OI-17) muss hier selbst
-        // geprueft werden: Farbe ueber safeTypeColor(), Text per escapeHtml().
+        // in style-Attribut und Markup -- die CSP (OI-17) faengt kein
+        // Markup und keine Attribute, hier wird selbst geprueft: Farbe ueber safeTypeColor(), Text per escapeHtml().
         // Die Farbe geht als CSS-Variable ins Markup, das Aussehen steht im
         // Stylesheet (.calendar-event-block).
         const typeColor = safeTypeColor(apt.color);
@@ -1670,8 +1670,8 @@ export async function saveAppointment() {
 export async function deleteAppointment(appointmentId) {
     // Titel aus dem Cache holen statt aus dem onclick-Attribut: ein Termin-Titel
     // mit Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als
-    // Code einschleusen (kein CSP im Projekt) -- Muster aus deleteGroup()/
-    // deleteType() in management.js (Commit ad200ba).
+    // Code einschleusen (Defense in Depth, die CSP blockt Inline-Code ohnehin) --
+    // Muster aus deleteGroup()/deleteType() in management.js (Commit ad200ba).
     const cached = dataCache.appointments[currentYear]?.data?.find(a => a.appointment_id == appointmentId);
     const title = cached ? cached.title : 'diesem Termin';
 

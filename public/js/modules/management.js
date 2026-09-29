@@ -286,7 +286,7 @@ export async function saveGroup() {
 export async function deleteGroup(groupId) {
     // Name aus dem Cache holen statt aus dem onclick-Attribut: ein Gruppenname mit
     // Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als Code
-    // einschleusen (kein CSP im Projekt).
+    // einschleusen (Defense in Depth, die CSP blockt Inline-Code ohnehin).
     const group = dataCache.groups.data.find(g => g.group_id == groupId);
     const groupName = group ? group.group_name : '';
 

@@ -195,8 +195,8 @@ function renderMembers(members, page = 1) {
         }
 
         // Gruppen-Badges erstellen
-        // member.group_names kommt aus der Gruppenverwaltung (DB) -- ohne CSP
-        // (OI-17) muss hier selbst maskiert werden.
+        // member.group_names kommt aus der Gruppenverwaltung (DB) -- die CSP
+        // (OI-17) faengt kein eingeschleustes Markup, hier wird selbst maskiert.
         const groupBadges = member.group_names
             ? member.group_names.split(', ').map(name =>
                 `<span class="type-badge" style="margin: 2px;">${escapeHtml(name)}</span>`
@@ -658,8 +658,8 @@ export async function saveMember() {
 export async function deleteMember(memberId) {
     // Name aus dem Cache holen statt aus dem onclick-Attribut: ein Mitgliedsname
     // mit Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als
-    // Code einschleusen (kein CSP im Projekt) -- Muster aus deleteGroup()/
-    // deleteType() in management.js (Commit ad200ba).
+    // Code einschleusen (Defense in Depth, die CSP blockt Inline-Code ohnehin) --
+    // Muster aus deleteGroup()/deleteType() in management.js (Commit ad200ba).
     const member = dataCache.members[currentYear]?.data?.find(m => m.member_id == memberId);
     const name = member ? `${member.name} ${member.surname}` : 'diesem Mitglied';
 

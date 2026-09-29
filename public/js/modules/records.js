@@ -1081,8 +1081,8 @@ function getSourceBadge(record) {
     // location_name/source_device kommen bei auto_checkin/totp_checkin direkt aus dem
     // Client-Request (private/handlers/auto_checkin.php, totp_checkin.php) -- jedes
     // angemeldete Konto (auch Rolle "user") kann sie beim eigenen Check-in setzen, hier
-    // sieht sie aber Admin/Manager in der Anwesenheitsliste. Ohne CSP (OI-17) daher
-    // zwingend escapeHtml().
+    // sieht sie aber Admin/Manager in der Anwesenheitsliste. Die CSP (OI-17) faengt
+    // kein eingeschleustes Markup, daher zwingend escapeHtml().
     const details = [];
     if (record.location_name) {
         details.push(`📍 ${escapeHtml(record.location_name)}`);
@@ -1331,9 +1331,9 @@ export async function saveRecord() {
 export async function deleteRecord(recordId, memberName, appointmentTitle) {
     // Alle Aufrufstellen uebergeben nur noch die ID (Spec-Pruefung 16.09.2026):
     // ein Mitglieds- oder Terminname mit Apostroph oder HTML sprengte dort sonst
-    // den onclick-Aufruf bzw. liesse sich als Code einschleusen (kein CSP im
-    // Projekt) -- Muster aus deleteGroup()/deleteType() in management.js
-    // (Commit ad200ba). Name und Termin kommen stattdessen aus den bereits
+    // den Aufruf bzw. liesse sich als Code einschleusen (Defense in Depth, die CSP
+    // blockt Inline-Code ohnehin) -- Muster aus deleteGroup()/deleteType() in
+    // management.js (Commit ad200ba). Name und Termin kommen stattdessen aus den bereits
     // geladenen Daten der jeweils aktuell angezeigten Liste.
     if (memberName === undefined) {
         if (currentMode === RecordMode.ATTENDANCE_BY_MEMBER) {
@@ -1875,8 +1875,8 @@ function findAppointmentType(appointment_type_id = null)
  * daneben, ein Randstreifen waere dort sinnlos.
  *
  * type.color/type.type_name kommen aus der Terminart (DB) und sind von
- * Verwaltern frei befuellbar. Ohne CSP (OI-17) ist die Maskierung hier die
- * einzige Schranke: Farbe ueber safeTypeColor(), Text per escapeHtml().
+ * Verwaltern frei befuellbar. Die CSP (OI-17) faengt kein Markup und keine
+ * Attribute, die Maskierung ist hier die Schranke: Farbe ueber safeTypeColor(), Text per escapeHtml().
  *
  * ACHTUNG beim Weiterverwenden von `name`: Der Wert ist BEREITS HTML-maskiert
  * und gehoert nur ins Markup, nicht in textContent -- dort erschiene eine
@@ -1911,8 +1911,8 @@ function createAppointmentTypeBadge(appointment_type_id = null)
     const type = findAppointmentType(appointment_type_id);
 
     if (type) {
-        // type.color/type.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
-        // muss hier selbst maskiert werden: Farbe per safeTypeColor(), Text per escapeHtml().
+        // type.color/type.type_name kommen aus der Terminart (DB) -- die CSP (OI-17)
+        // faengt kein Markup, hier wird selbst maskiert: Farbe per safeTypeColor(), Text per escapeHtml().
         return `<span class="type-badge" style="background: ${safeTypeColor(type.color)}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
                     ${escapeHtml(type.type_name)}
                 </span>`;

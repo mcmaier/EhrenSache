@@ -518,8 +518,8 @@ export async function saveDevice() {
 export async function deleteDevice(deviceId) {
     // Name aus dem Cache holen statt aus dem onclick-Attribut: ein Geraetename mit
     // Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als Code
-    // einschleusen (kein CSP im Projekt) -- Muster aus deleteGroup()/deleteType()
-    // in management.js (Commit ad200ba).
+    // einschleusen (Defense in Depth, die CSP blockt Inline-Code ohnehin) -- Muster
+    // aus deleteGroup()/deleteType() in management.js (Commit ad200ba).
     const device = dataCache.devices.data.find(d => d.user_id == deviceId);
     const name = device ? device.device_name : 'diesem Gerät';
 

@@ -160,8 +160,8 @@ export function updateSubgroupLabelElements() {
  */
 export function groupSelectOptionsHtml(groups) {
     const list = Array.isArray(groups) ? groups : [];
-    // g.group_name kommt aus der Gruppenverwaltung (DB) -- ohne CSP (OI-17)
-    // muss hier selbst maskiert werden.
+    // g.group_name kommt aus der Gruppenverwaltung (DB) -- die CSP (OI-17)
+    // faengt kein eingeschleustes Markup, hier wird selbst maskiert.
     const option = g => `<option value="${g.group_id}">${escapeHtml(g.group_name)}</option>`;
     const subgroups = list.filter(g => g.is_subgroup == 1);
 

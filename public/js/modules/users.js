@@ -846,9 +846,9 @@ export async function deleteUser(userId) {
     // vom eigenen Account her selbst waehlbar (users.php PUT erlaubt "Admin
     // oder eigener Account"), FILTER_VALIDATE_EMAIL laesst dabei Anfuehrungs-
     // zeichen im local-part einer quoted-string-Adresse zu -- ein Mitglied
-    // koennte damit sonst Code in die Verwalteransicht einschleusen (kein CSP
-    // im Projekt). Muster aus deleteGroup()/deleteType() in management.js
-    // (Commit ad200ba).
+    // koennte damit sonst Code in die Verwalteransicht einschleusen (Defense in
+    // Depth, die CSP blockt Inline-Code ohnehin). Muster aus deleteGroup()/
+    // deleteType() in management.js (Commit ad200ba).
     const user = dataCache.users.data.find(u => u.user_id == userId);
     const email = user ? user.email : 'diesem Benutzer';
 

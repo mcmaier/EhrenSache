@@ -995,8 +995,8 @@ export async function saveActivityType() {
 export async function deleteActivityType(activityId) {
     // Name aus dem geladenen Bestand holen statt aus dem onclick-Attribut: ein
     // Name mit Apostroph oder Anfuehrungszeichen sprengte dort sonst den Aufruf
-    // bzw. das Attribut (kein CSP im Projekt) -- Muster aus deleteGroup()/
-    // deleteType() in management.js (Commit ad200ba). Das bisherige manuelle
+    // bzw. das Attribut (Defense in Depth, die CSP blockt Inline-Code ohnehin) --
+    // Muster aus deleteGroup()/deleteType() in management.js (Commit ad200ba). Das bisherige manuelle
     // Escaping des Apostrophs (replace(/'/g, "\\'")) liess Anfuehrungszeichen im
     // Namen unberuehrt und haette das Attribut trotzdem gesprengt.
     const activity = activityTypes.find(a => String(a.activity_id) === String(activityId));
@@ -1035,8 +1035,8 @@ export function initWorktimeEventHandlers() {
     });
 
     // Der Berichtsdialog haengt bewusst an addEventListener statt an
-    // onclick-Attributen: Jedes weitere Inline-Attribut verlaengert den Weg zu
-    // einer wirksamen CSP (OI-17 in docs/OPEN-ITEMS.md).
+    // onclick-Attributen: Inline-Handler blockt die CSP (OI-17), hier ist es
+    // eine feste Bindung statt einer Aktion.
     document.getElementById('btnWorktimeReport')
         ?.addEventListener('click', openWorktimeReportModal);
     document.getElementById('btnWorktimeReportClose')
