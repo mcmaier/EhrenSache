@@ -8,6 +8,7 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+import { registerActions } from './actions.js';
 import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { loadAppointments, setCalendarMonth } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
@@ -234,12 +235,12 @@ export async function renderRecords(records, page = 1)
         const actionsHtml = isAdminOrManager ? `
                         <td class="actions-cell">
                             <button class="action-btn btn-icon btn-edit" 
-                                    onclick="openRecordModal(${record.record_id})"
+                                    data-action="open-record-modal" data-id="${Number(record.record_id)}"
                                     title="Bearbeiten">
                                 ✎
                             </button>
                             <button class="action-btn btn-icon btn-delete" 
-                                    onclick="deleteRecord(${record.record_id})"
+                                    data-action="delete-record" data-id="${Number(record.record_id)}"
                                     title="Löschen">
                                 🗑
                             </button>
@@ -289,15 +290,15 @@ function renderRecordsPagination(currentPage, totalPages, totalRecords) {
         // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
         for (let i = 1; i <= totalPages; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToRecordsPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-records-page" data-page="${Number(i)}">${i}</button>`;
         }
     } 
     else
     {
         // Erste Seite Button
         if (currentPage > 1) {
-            //html += `<button onclick="goToRecordsPage(1)" title="Erste Seite">«</button>`;
-            html += `<button onclick="goToRecordsPage(${currentPage - 1})" title="Vorherige Seite">‹</button>`;
+            //html += `<button data-action="go-to-records-page" data-page="1" title="Erste Seite">«</button>`;
+            html += `<button data-action="go-to-records-page" data-page="${Number(currentPage - 1)}" title="Vorherige Seite">‹</button>`;
         }
         
         // Seitenzahlen (max 3 anzeigen)
@@ -305,7 +306,7 @@ function renderRecordsPagination(currentPage, totalPages, totalRecords) {
         const endPage = Math.min(totalPages, currentPage + 1);
         
         if (startPage > 1) {
-            html += `<button onclick="goToRecordsPage(1)">1</button>`;
+            html += `<button data-action="go-to-records-page" data-page="1">1</button>`;
             if (startPage > 2) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
@@ -313,20 +314,20 @@ function renderRecordsPagination(currentPage, totalPages, totalRecords) {
         
         for (let i = startPage; i <= endPage; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToRecordsPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-records-page" data-page="${Number(i)}">${i}</button>`;
         }
         
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
-            html += `<button onclick="goToRecordsPage(${totalPages})">${totalPages}</button>`;
+            html += `<button data-action="go-to-records-page" data-page="${Number(totalPages)}">${totalPages}</button>`;
         }
         
         // Letzte Seite Button
         if (currentPage < totalPages) {
-            html += `<button onclick="goToRecordsPage(${currentPage + 1})" title="Nächste Seite">›</button>`;
-            //html += `<button onclick="goToRecordsPage(${totalPages})" title="Letzte Seite">»</button>`;
+            html += `<button data-action="go-to-records-page" data-page="${Number(currentPage + 1)}" title="Nächste Seite">›</button>`;
+            //html += `<button data-action="go-to-records-page" data-page="${Number(totalPages)}" title="Letzte Seite">»</button>`;
         }
     }
     
@@ -338,8 +339,7 @@ function renderRecordsPagination(currentPage, totalPages, totalRecords) {
     container.innerHTML = html;
 }
 
-// Global für onclick
-window.goToRecordsPage = function(page) {
+function goToRecordsPage(page) {
 
     // Aktuelle Scroll-Position der Tabelle speichern
     const tableContainer = document.querySelector('.data-table')?.parentElement;
@@ -358,7 +358,7 @@ window.goToRecordsPage = function(page) {
             });
         }
     }
-};
+}
 
 /**
  * Zeichnet die Status-Chips fuer den aktuellen Modus und liefert die nach
@@ -1081,8 +1081,8 @@ function getSourceBadge(record) {
     // location_name/source_device kommen bei auto_checkin/totp_checkin direkt aus dem
     // Client-Request (private/handlers/auto_checkin.php, totp_checkin.php) -- jedes
     // angemeldete Konto (auch Rolle "user") kann sie beim eigenen Check-in setzen, hier
-    // sieht sie aber Admin/Manager in der Anwesenheitsliste. Ohne CSP (OI-17) daher
-    // zwingend escapeHtml().
+    // sieht sie aber Admin/Manager in der Anwesenheitsliste. Die CSP (OI-17) faengt
+    // kein eingeschleustes Markup, daher zwingend escapeHtml().
     const details = [];
     if (record.location_name) {
         details.push(`📍 ${escapeHtml(record.location_name)}`);
@@ -1331,9 +1331,9 @@ export async function saveRecord() {
 export async function deleteRecord(recordId, memberName, appointmentTitle) {
     // Alle Aufrufstellen uebergeben nur noch die ID (Spec-Pruefung 16.09.2026):
     // ein Mitglieds- oder Terminname mit Apostroph oder HTML sprengte dort sonst
-    // den onclick-Aufruf bzw. liesse sich als Code einschleusen (kein CSP im
-    // Projekt) -- Muster aus deleteGroup()/deleteType() in management.js
-    // (Commit ad200ba). Name und Termin kommen stattdessen aus den bereits
+    // den Aufruf bzw. liesse sich als Code einschleusen (Defense in Depth, die CSP
+    // blockt Inline-Code ohnehin) -- Muster aus deleteGroup()/deleteType() in
+    // management.js (Commit ad200ba). Name und Termin kommen stattdessen aus den bereits
     // geladenen Daten der jeweils aktuell angezeigten Liste.
     if (memberName === undefined) {
         if (currentMode === RecordMode.ATTENDANCE_BY_MEMBER) {
@@ -1520,7 +1520,7 @@ function renderAttendanceGroupingBar(attendanceData) {
     const buttons = stages.map(s => `
         <button type="button" class="list-grouping__btn${stage === s ? ' is-active' : ''}"
                 aria-pressed="${stage === s ? 'true' : 'false'}"
-                onclick="setAttendanceGrouping('${s}')">${stageLabels[s]}</button>`).join('');
+                data-action="set-attendance-grouping" data-value="${escapeHtml(s)}">${stageLabels[s]}</button>`).join('');
 
     let hint = '';
     if (duplicates > 0) {
@@ -1594,12 +1594,12 @@ function attendanceRequestParts(member) {
     // Rand in der Antragsfarbe) zusammen mit dem Hinweis in derselben Zeile.
     const aktionen = antraege.map(a => `
             <button class="action-btn btn-icon btn-request btn-request--approve"
-                    onclick="quickApproveException(${Number(a.exception_id)})"
+                    data-action="quick-approve-exception" data-id="${Number(a.exception_id)}"
                     title="Antrag genehmigen">
                 ✓
             </button>
             <button class="action-btn btn-icon btn-request btn-request--reject"
-                    onclick="quickRejectException(${Number(a.exception_id)})"
+                    data-action="quick-reject-exception" data-id="${Number(a.exception_id)}"
                     title="Antrag ablehnen">
                 ✗
             </button>
@@ -1650,12 +1650,12 @@ function buildAttendanceRow(member) {
         // Eintrag vorhanden → Edit & Delete
         actionsHtml = `
             <button class="action-btn btn-icon btn-edit"
-                    onclick="openRecordModal(${member.record_id})"
+                    data-action="open-record-modal" data-id="${Number(member.record_id)}"
                     title="Bearbeiten">
                 ✎
             </button>
             <button class="action-btn btn-icon btn-delete"
-                    onclick="deleteRecord(${member.record_id})"
+                    data-action="delete-record" data-id="${Number(member.record_id)}"
                     title="Löschen">
                 🗑
             </button>
@@ -1664,12 +1664,12 @@ function buildAttendanceRow(member) {
         // Kein Eintrag → Anwesend & Entschuldigt
         actionsHtml = `
             <button class="action-btn btn-icon btn-approve"
-                    onclick="quickCreateRecordForMember(${member.member_id}, 'present')"
+                    data-action="quick-create-record-for-member" data-id="${Number(member.member_id)}" data-value="present"
                     title="Anwesend">
                 ✓
             </button>
             <button class="action-btn btn-icon btn-edit"
-                    onclick="quickCreateRecordForMember(${member.member_id}, 'excused')"
+                    data-action="quick-create-record-for-member" data-id="${Number(member.member_id)}" data-value="excused"
                     title="Entschuldigt">
                 ⚠
             </button>
@@ -1690,12 +1690,12 @@ function buildAttendanceRow(member) {
 
 /** Umschalter-Klick (Spec 6.2): merkt die Wahl und rendert aus den vorliegenden
  * Daten neu -- kein erneuter API-Aufruf. */
-window.setAttendanceGrouping = function(stage) {
+function setAttendanceGrouping(stage) {
     groupingStore(GROUPING_KEY_ATTENDANCE, stage);
     if (_lastAttendanceData) {
         renderAttendanceList(_lastAttendanceData);
     }
-};
+}
 
 async function loadMemberAttendanceList(memberId, appointmentTypeId = null) {
     try {        
@@ -1810,12 +1810,12 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
             // Eintrag vorhanden → Edit & Delete
             actionsHtml = `
                 <button class="action-btn btn-icon btn-edit" 
-                        onclick="openRecordModal(${appointment.record_id})"
+                        data-action="open-record-modal" data-id="${Number(appointment.record_id)}"
                         title="Bearbeiten">
                     ✎
                 </button>
                 <button class="action-btn btn-icon btn-delete" 
-                        onclick="deleteRecord(${appointment.record_id})"
+                        data-action="delete-record" data-id="${Number(appointment.record_id)}"
                         title="Löschen">
                     🗑
                 </button>
@@ -1824,12 +1824,12 @@ function renderMemberAttendanceList(appointmentsData, memberInfo) {
             // Kein Eintrag → Anwesend & Entschuldigt
             actionsHtml = `
                 <button class="action-btn btn-icon btn-approve" 
-                        onclick="quickCreateRecordForAppointment(${appointment.appointment_id}, 'present')"
+                        data-action="quick-create-record-for-appointment" data-id="${Number(appointment.appointment_id)}" data-value="present"
                         title="Anwesend">
                     ✓
                 </button>
                 <button class="action-btn btn-icon btn-edit" 
-                        onclick="quickCreateRecordForAppointment(${appointment.appointment_id}, 'excused')"
+                        data-action="quick-create-record-for-appointment" data-id="${Number(appointment.appointment_id)}" data-value="excused"
                         title="Entschuldigt">
                     ⚠
                 </button>
@@ -1875,8 +1875,8 @@ function findAppointmentType(appointment_type_id = null)
  * daneben, ein Randstreifen waere dort sinnlos.
  *
  * type.color/type.type_name kommen aus der Terminart (DB) und sind von
- * Verwaltern frei befuellbar. Ohne CSP (OI-17) ist die Maskierung hier die
- * einzige Schranke: Farbe ueber safeTypeColor(), Text per escapeHtml().
+ * Verwaltern frei befuellbar. Die CSP (OI-17) faengt kein Markup und keine
+ * Attribute, die Maskierung ist hier die Schranke: Farbe ueber safeTypeColor(), Text per escapeHtml().
  *
  * ACHTUNG beim Weiterverwenden von `name`: Der Wert ist BEREITS HTML-maskiert
  * und gehoert nur ins Markup, nicht in textContent -- dort erschiene eine
@@ -1911,8 +1911,8 @@ function createAppointmentTypeBadge(appointment_type_id = null)
     const type = findAppointmentType(appointment_type_id);
 
     if (type) {
-        // type.color/type.type_name kommen aus der Terminart (DB) -- ohne CSP (OI-17)
-        // muss hier selbst maskiert werden: Farbe per safeTypeColor(), Text per escapeHtml().
+        // type.color/type.type_name kommen aus der Terminart (DB) -- die CSP (OI-17)
+        // faengt kein Markup, hier wird selbst maskiert: Farbe per safeTypeColor(), Text per escapeHtml().
         return `<span class="type-badge" style="background: ${safeTypeColor(type.color)}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
                     ${escapeHtml(type.type_name)}
                 </span>`;
@@ -2084,18 +2084,17 @@ function toggleArrivalTimeField() {
     }
 }
 
-// ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
-// ============================================
-
-// Globale Funktionen für HTML onclick
-window.openRecordModal = openRecordModal;
-window.saveRecord = saveRecord;
-window.toggleArrivalTimeField = toggleArrivalTimeField;
-window.setArrivalTimeFromAppointment = setArrivalTimeFromAppointment;
-window.closeRecordModal = () => document.getElementById('recordModal').classList.remove('active');
-window.deleteRecord = deleteRecord;
-window.resetRecordFilter = resetRecordFilter;
-window.backToAppointments = backToAppointments;
-window.quickCreateRecordForMember = quickCreateRecordForMember;
-window.quickCreateRecordForAppointment = quickCreateRecordForAppointment;
+registerActions({
+    'back-to-appointments': () => backToAppointments(),
+    'close-record-modal': () => closeRecordModal(),
+    'delete-record': (el) => deleteRecord(Number(el.dataset.id)),
+    'go-to-records-page': (el) => goToRecordsPage(Number(el.dataset.page)),
+    'open-record-modal': (el) => openRecordModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'quick-create-record-for-appointment': (el) => quickCreateRecordForAppointment(Number(el.dataset.id), el.dataset.value),
+    'quick-create-record-for-member': (el) => quickCreateRecordForMember(Number(el.dataset.id), el.dataset.value),
+    'reset-record-filter': () => resetRecordFilter(),
+    'save-record': () => saveRecord(),
+    'set-arrival-time-from-appointment': () => setArrivalTimeFromAppointment(),
+    'set-attendance-grouping': (el) => setAttendanceGrouping(el.dataset.value),
+    'toggle-arrival-time-field': () => toggleArrivalTimeField(),
+});

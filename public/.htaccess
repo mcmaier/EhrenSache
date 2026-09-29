@@ -46,21 +46,30 @@ Options -Indexes
 # ============================================
 # SICHERHEITS-HEADER
 # ============================================
-# Content-Security-Policy nur fuer login.html (OI-17, Etappe 1). Das Dashboard
-# (index.html) traegt noch ueber hundert Inline-Handler; eine CSP ohne
-# 'unsafe-inline' legte sie still, eine mit 'unsafe-inline' waere gegen XSS
-# wirkungslos und damit nur Fassade. Deshalb hier kein Header auf
-# Verzeichnisebene -- er gaelte fuer index.html mit. Check-in-PWA und Station
-# setzen ihre Richtlinie in der eigenen .htaccess. Der Weg fuer das Dashboard
-# steht als OI-17 in docs/OPEN-ITEMS.md; tests/suites/csp.php haelt fest, dass
-# keine Richtlinie ausserhalb dieses Abschnitts auftaucht.
+# Content-Security-Policy (OI-17): Anmeldung und Dashboard mit script-src 'self',
+# die oeffentlichen PHP-Seiten ohne jedes Skript (script-src 'none'). Bewusst in
+# Files-Abschnitten, nicht auf Verzeichnisebene -- sonst griffe sie auch in
+# install/ und update/, die dafuer nicht vorbereitet sind. Check-in-PWA und
+# Station setzen ihre Richtlinie in der eigenen .htaccess.
+# tests/suites/csp.php haelt das fest; Knoepfe laufen ueber data-action
+# (public/js/modules/actions.js), nie ueber on…-Attribute.
 #
 # style-src 'unsafe-inline' ist eine bewusste Ausnahme: Inline-Styles sind
-# das deutlich kleinere Risiko, und die Seite traegt noch style-Attribute.
+# das deutlich kleinere Risiko, und die Seiten tragen noch style-Attribute.
 <IfModule mod_headers.c>
     <Files "login.html">
         Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     </Files>
+    # setifempty, nicht set: <Files "index.html"> trifft auch checkin/index.html
+    # und station/index.html und wird nach deren .htaccess ausgewertet. Mit set
+    # ueberschriebe die Dashboard-Richtlinie die eigene der PWA (dort z. B.
+    # img-src data:). So gilt sie nur, wo noch keine Richtlinie gesetzt ist.
+    <Files "index.html">
+        Header always setifempty Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    </Files>
+    <FilesMatch "^(reset_password|verify_email)\.php$">
+        Header always set Content-Security-Policy "default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    </FilesMatch>
 </IfModule>
 
 <IfModule mod_headers.c>

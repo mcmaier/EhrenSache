@@ -121,13 +121,14 @@ test('Change-Handler und Sprung gehen denselben Weg in die Anwesenheitsliste', f
 test('Rueckweg: Knopf, Ziel und Verwerfen', function () use ($caFeRoot) {
     $html = caFeFile($caFeRoot, 'public/index.html');
     assertTrue((bool) preg_match('/id="recordsBackToAppointments"[^>]*hidden/', $html), 'Knopf fehlt oder ist nicht verborgen');
-    assertTrue(str_contains($html, 'onclick="backToAppointments()"'), 'Knopf ohne Handler');
+    assertTrue(str_contains($html, 'data-action="back-to-appointments"'), 'Knopf ohne Handler');
 
     $js = caFeFile($caFeRoot, 'public/js/modules/records.js');
     $back = caFeFunctionBody($js, 'export async function backToAppointments(');
     assertTrue(str_contains($back, 'setCalendarMonth('), 'Zielmonat wird nicht gesetzt');
     assertTrue(str_contains($back, "navigateToSection('termine')"), 'Rueckweg wechselt den Bereich nicht');
-    assertTrue(str_contains($js, 'window.backToAppointments = backToAppointments'), 'Knopf im HTML braucht die globale Zuweisung');
+    assertTrue(preg_match("/'back-to-appointments':\s*\(\)\s*=>\s*backToAppointments\(\)/", $js) === 1,
+        'Der Knopf ist nicht als Aktion verdrahtet');
 
     $show = caFeFunctionBody($js, 'export async function showRecordsSection(');
     assertTrue(str_contains($show, 'clearAttendanceReturn()'), 'Normaler Aufruf des Bereichs muss den Rueckweg verwerfen');
@@ -373,14 +374,15 @@ test('jumpToAttendance liest das Datum aus dem Cache und nennt die Herkunft', fu
     assertTrue(str_contains($body, "import('./records.js')"), 'records.js muss dynamisch geladen werden');
     assertTrue(str_contains($body, 'openAttendanceForAppointment('), 'Sprungfunktion wird nicht gerufen');
     assertTrue(str_contains($body, "'list'"), 'Die Herkunft muss durchgereicht werden');
-    assertTrue(str_contains($js, 'window.jumpToAttendance = jumpToAttendance'), 'Der onclick braucht die globale Zuweisung');
+    assertTrue(preg_match("/'jump-to-attendance':\s*\(el\)\s*=>\s*jumpToAttendance\(Number\(el\.dataset\.id\), el\.dataset\.value\)/", $js) === 1,
+        'Der Sprung aus der Terminliste ist nicht als Aktion verdrahtet');
 });
 
 test('jumpToAttendance faengt einen gescheiterten dynamischen Import ab', function () use ($caFeRoot) {
     $js = caFeFile($caFeRoot, 'public/js/modules/appointments.js');
     $body = caFeFunctionBody($js, 'export async function jumpToAttendance(');
 
-    // Der Aufrufer ist ein onclick: eine unbehandelte Ablehnung landet nur in
+    // Der Aufrufer ist eine Aktion (data-action): eine unbehandelte Ablehnung landet nur in
     // der Konsole, der Knopf wirkt tot.
     assertTrue((bool) preg_match("/try\s*\{\s*\n\s*\(\{ openAttendanceForAppointment \} = await import\('\.\/records\.js'\)\);/", $body),
         'Der dynamische Import steht nicht in einem try');
@@ -675,7 +677,7 @@ test('Die Anwesenheitszeile steht zwischen Rueckmeldung und Knopfreihe -- auch b
 
     $rueckmeldung = strpos($body, 'calendarResponseLineHtml(apt, fest)');
     $zeile        = strpos($body, 'attendanceLineHtml(');
-    $knopfreihe   = strpos($body, 'window.openAppointmentModal(${Number(apt.appointment_id)})');
+    $knopfreihe   = strpos($body, 'data-action="calendar-open-appointment"');
 
     // Erst positiv festnageln, dass alle drei Marken im Rumpf stehen.
     // caFeFunctionBody() schneidet an der ersten Klammer in Spalte 0 -- schnitte

@@ -32,8 +32,8 @@ erfüllt) aus demselben Vorgang ist mit 1.17.0 erledigt. Entschieden, aber nicht
 braucht eine eigene Spec, nicht nur eine Umsetzung.
 
 Offen mit Priorität *mittel*, am 2026-09-25 einzeln gegen den Code geprüft: OI-67, OI-98,
-OI-63 (nur noch die Spur), OI-17, OI-6, OI-22, OI-23. OI-96 stand am 25.09. noch in dieser Reihe
-und ist seit dem 28.09. erledigt. Die am 25.09. aus dem
+OI-63 (nur noch die Spur), OI-6, OI-22, OI-23. OI-96 stand am 25.09. noch in dieser Reihe
+und ist seit dem 28.09. erledigt, OI-17 seit dem 29.09. (Etappe 2 auf `dev`). Die am 25.09. aus dem
 Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103 sind am selben Tag in `dev`
 erledigt. **OI-3 und OI-20 tragen ebenfalls
 *mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
@@ -1228,8 +1228,9 @@ Bewusst unverändert. Nur dokumentieren, nicht als stärker beschreiben, als es 
 ---
 
 ### OI-17 · Keine Content-Security-Policy
-**Priorität:** mittel · Etappe 1 (Anmeldung, Check-in-PWA, Station) erledigt am 2026-09-25,
-veröffentlicht mit **1.17.0** (`c163cd2`); offen bleibt Etappe 2 (Dashboard)
+**Priorität:** erledigt am 2026-09-29 — Etappe 1 (Anmeldung, Check-in-PWA, Station) mit
+**1.17.0** (`c163cd2`), Etappe 2 (Dashboard, öffentliche PHP-Seiten) auf `dev`; Spec
+`docs/superpowers/specs/2026-09-29-csp-dashboard-design.md`
 
 Bis 2026-09-25 lieferte die Anwendung **keine** CSP — weder als Header noch als
 `<meta http-equiv>`. Am 2026-09-03 nachgeprüft: keine der neun `.htaccess`-Dateien und kein
@@ -1298,7 +1299,11 @@ ausgelöst und Verstöße über `securitypolicyviolation` gesammelt — null Fun
 Gegenprobe mit eingeschleustem `onclick` wurde blockiert und gemeldet. Report-Only auf
 Vereinsinstallationen hätte ohnehin niemanden erreicht, es gibt keinen Meldeendpunkt.
 
-*Etappe 2 — das Dashboard, Modul für Modul:*
+*Etappe 2 — das Dashboard, Modul für Modul. **Erledigt am 2026-09-29.** Umsetzung und
+Abweichungen von diesem Plan stehen in der Spec
+`docs/superpowers/specs/2026-09-29-csp-dashboard-design.md`; die Knöpfe laufen über
+`registerActions()` in `public/js/modules/actions.js`, ein Puppeteer-Klickdurchgang unter
+`tests/browser/` hat jede Sektion ohne Verstoß durchlaufen.*
 
 4. Handler auf Event-Delegation umstellen: `data-action` plus Argumente als `data-*`-Attribute,
    eine zentrale Zuordnung Aktionsname → Funktion. Die Paginierung ist in jedem Modul kopiert —
@@ -2145,9 +2150,11 @@ jemand einmal gesehen hat — ob es noch gilt, sagt nur der Code.
 
 Der Demo-Modus lässt Schreibzugriffe auf Mitglieder, Termine, Anwesenheiten, Anträge und
 Arbeitszeiten zu — das ist sein Zweck. Was ein Besucher dabei in ein Freitextfeld schreibt,
-bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Das Dashboard nutzt
-Inline-Handler und führt noch keine CSP (siehe [OI-17](#oi-17--keine-content-security-policy));
-Anmeldung, Check-in-PWA und Station tragen seit Etappe 1 (1.17.0) eine.
+bekommt bis zum nächsten Reset jeder weitere Besucher zu sehen. Anmeldung, Check-in-PWA und
+Station tragen seit Etappe 1 (1.17.0) von [OI-17](#oi-17--keine-content-security-policy) eine
+CSP. Seit OI-17 Etappe 2
+trägt auch das Dashboard eine CSP; eingeschleustes Skript läuft zwischen zwei Resets nicht mehr,
+eingeschleustes Markup bleibt sichtbar.
 
 Beim Entwurf am 2026-09-09 erwogen und für die Ausbaustufe „Sandkasten mit Grenzen"
 hingenommen. Die Alternative wäre eine reine Schaufenster-Demo gewesen, die weder Check-in
@@ -4758,7 +4765,8 @@ gehört zusammen behoben.
 ---
 
 ### OI-112 · Strenge Attributregel gilt nur für `style`, nicht für `on…`
-**Priorität:** niedrig · aufgenommen am 2026-09-28
+**Priorität:** erledigt am 2026-09-29 — gegenstandslos: seit OI-17 Etappe 2 gibt es im Dashboard
+keine `on…`-Attribute mehr; `csp.php` verbietet sie · aufgenommen am 2026-09-28
 
 Seit 2026-09-28 erkennt `tests/suites/html_sinks_frontend.php` Attributkontexte und verlangt für
 `style`-Attribute mehr als Maskierung: Der Wert muss durch `safeTypeColor()`/`safeHexColor()`
@@ -4798,9 +4806,13 @@ probeweise entfernt. Der Wächter meldete **nichts**, obwohl Terminart und Titel
 Attribut landen. Eine Diagnose gegen `hsSinks()`/`hsRawFieldsReaching()` zeigt: `${a},${b}` wird
 gesehen, `[a, b].join(', ')` und `a + ', ' + b` nicht.
 
-**Warum das zählt:** Das Dashboard hat keine Content-Security-Policy
-([OI-17](#oi-17--keine-content-security-policy), Etappe 2). Dort ist die Maskierung die einzige
-Schranke — und dieser Wächter ist das einzige, was sie ehrlich hält. Er ist im September 2026 aus
+**Warum das zählt:** Das Dashboard trägt seit [OI-17](#oi-17--keine-content-security-policy)
+Etappe 2 eine Content-Security-Policy, die eingeschleustes Skript blockiert. Eingeschleustes
+Markup und Attributwerte (etwa `style`) fängt sie nicht; dagegen ist die Maskierung die
+Schranke — und dieser Wächter ist das einzige, was sie ehrlich hält. Mit der Aktionstabelle
+erlaubte eine fehlende Maskierung zudem, `data-action`-Attribute einzuschleusen, die eine
+registrierte Aktion ohne Rückfrage auslösen (etwa `approve-work-session` oder `set-*-response`);
+der Wächter schützt damit auch gegen Aktions-Injektion. Er ist im September 2026 aus
 einem Sicherheitsvorgang entstanden, dessen Ursache genau war, dass niemand bemerkte, wo Maskierung
 fehlt.
 

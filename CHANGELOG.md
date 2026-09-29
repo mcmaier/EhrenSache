@@ -9,6 +9,15 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Sicherheit
+- **Das Dashboard trägt jetzt eine Content-Security-Policy.** Der Browser führt dort nur noch
+  Skripte aus, die aus der Installation selbst kommen; eingeschleuster Code in Knöpfen, Links
+  oder Skript-Blöcken läuft nicht mehr, selbst wenn er es an der Maskierung vorbei ins Markup
+  schafft. Dafür bedient sich das Dashboard nicht mehr über Inline-Handler, sondern über eine
+  zentrale Aktionstabelle. Die öffentlichen Seiten „Passwort zurücksetzen“ und „E-Mail
+  bestätigen“ dürfen gar kein Skript ausführen. Damit gilt die CSP für alle Oberflächen außer
+  den Assistenten für Installation und Update (OI-17).
+
 ### Behoben
 - **`POST appointments` prüft Titel, Datum, Beginn, Beschreibung und Terminart.** Ein Datum
   wie `"kaputt"` oder `2026-02-30` wurde mit `201` angelegt; eine nicht vorhandene `type_id`

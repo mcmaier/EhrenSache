@@ -23,6 +23,7 @@ import {initStatisticsEventHandlers, showStatisticsSection} from './statistics.j
 import {showWorktimeSection, loadWorkSessions, loadActivityTypes, renderActivityTypes,
         checkWorktimeEnabled, initWorktimeEventHandlers} from './worktime.js';
 import {debug} from '../app.js'
+import { registerActions } from './actions.js';
 import {renderSystemSettings} from './settings.js';
 import {loadImportLogs} from './import_export.js';
 
@@ -159,8 +160,8 @@ export function updateSubgroupLabelElements() {
  */
 export function groupSelectOptionsHtml(groups) {
     const list = Array.isArray(groups) ? groups : [];
-    // g.group_name kommt aus der Gruppenverwaltung (DB) -- ohne CSP (OI-17)
-    // muss hier selbst maskiert werden.
+    // g.group_name kommt aus der Gruppenverwaltung (DB) -- die CSP (OI-17)
+    // faengt kein eingeschleustes Markup, hier wird selbst maskiert.
     const option = g => `<option value="${g.group_id}">${escapeHtml(g.group_name)}</option>`;
     const subgroups = list.filter(g => g.is_subgroup == 1);
 
@@ -395,7 +396,7 @@ export function showToast(message, type = 'info', duration = TOAST_DURATION) {
         <div class="toast-content">
             <div class="toast-message">${message}</div>
         </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+        <button class="toast-close" data-action="toast-close">×</button>
         ${duration > 0 ? '<div class="toast-progress"></div>' : ''}
     `;
     
@@ -1220,3 +1221,7 @@ export function showQRModal({ title, url, hint, warning }) {
             'QR-Code konnte nicht erzeugt werden — bitte die Adresse unten verwenden.';
     }
 }
+
+registerActions({
+    'toast-close': (el) => el.parentElement.remove(),
+});

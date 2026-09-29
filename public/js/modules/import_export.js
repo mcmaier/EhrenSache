@@ -20,8 +20,20 @@ import { showMemberSection } from './members.js';
 import { showConfirm } from './ui.js';
 import { renderDateChecklist, formatChecklistDate } from './date_checklist.js';
 import { escapeHtml } from './utils.js';
+import { registerActions } from './actions.js';
 
 let suggestionChecklist = null;
+
+// Phase der drei Import-Knoepfe. Bis OI-17 tauschte der Code nach dem Import
+// den onclick-Handler gegen "Schliessen" aus. Mit der Aktionstabelle haengt
+// der Knopf fest an seiner Aktion (data-action) -- ein zusaetzlicher
+// Property-Handler liefe daneben und schickte die CSV zweimal. Darum
+// entscheidet diese Phase, was ein Klick tut:
+//   'idle'    -> importieren
+//   'running' -> nichts, ein zweiter Klick sendet nicht noch einmal
+//   'done'    -> Dialog schliessen und Bereich neu laden
+// Oeffnen und Schliessen des Dialogs setzen sie auf 'idle' zurueck.
+const importPhase = { members: 'idle', records: 'idle', appointments: 'idle' };
 
 // ============================================
 // EXPORT
@@ -138,17 +150,31 @@ export function openImportModal() {
     // Button zurücksetzen
     importBtn.textContent = 'Importieren';
     importBtn.disabled = false;
-    importBtn.onclick = executeImport;
-    
+    importPhase.members = 'idle';
+
     // Abbrechen-Button wieder anzeigen
     cancelBtn.style.display = 'inline-block';
 }
 
 export function closeImportModal() {
+    importPhase.members = 'idle';
     document.getElementById('importModal').classList.remove('active');
 }
 
+/** Klick auf den Import-Knopf der Mitglieder (Aktion execute-import). */
+function onMemberImportButton() {
+    if (importPhase.members === 'done') {
+        closeImportModal();
+        showMemberSection(true);
+        return;
+    }
+    executeImport();
+}
+
 export async function executeImport() {
+    if (importPhase.members !== 'idle') {
+        return;
+    }
     const fileInput = document.getElementById('importFile');
     const file = fileInput.files[0];
     
@@ -167,6 +193,7 @@ export async function executeImport() {
     const cancelBtn = document.querySelector('#importModal .btn-cancel');
     
     // UI aktualisieren
+    importPhase.members = 'running';
     importBtn.disabled = true;
     document.getElementById('importProgress').style.display = 'block';
     document.getElementById('importProgressFill').style.width = '50%';
@@ -212,19 +239,17 @@ export async function executeImport() {
         // Button umwandeln zu "Schließen"
         importBtn.disabled = false;
         importBtn.textContent = 'Schließen';
-        importBtn.onclick = function() {
-            closeImportModal();
-            showMemberSection(true);
-        };       
+        importPhase.members = 'done';
 
         // Abbrechen-Button ausblenden
         cancelBtn.style.display = 'none';
-        
+
     } catch (error) {
         debug.error('Import error:', error);
         document.getElementById('importProgress').style.display = 'none';
         showToast('Import fehlgeschlagen', 'error');
         importBtn.disabled = false;
+        importPhase.members = 'idle';
     }
 }
 
@@ -277,17 +302,32 @@ export function openRecordsImportModal() {
     // Button zurücksetzen
     importBtn.textContent = 'Importieren';
     importBtn.disabled = false;
-    importBtn.onclick = executeRecordsImport;
-    
+    importPhase.records = 'idle';
+
     // Abbrechen-Button wieder anzeigen
     cancelBtn.style.display = 'inline-block';
 }
 
 export function closeRecordsImportModal() {
+    importPhase.records = 'idle';
     document.getElementById('recordsImportModal').classList.remove('active');
 }
 
+/** Klick auf den Import-Knopf der Anwesenheiten (Aktion execute-records-import). */
+function onRecordsImportButton() {
+    if (importPhase.records === 'done') {
+        closeRecordsImportModal();
+        // Records neu laden
+        showRecordsSection(true);
+        return;
+    }
+    executeRecordsImport();
+}
+
 export async function executeRecordsImport() {
+    if (importPhase.records !== 'idle') {
+        return;
+    }
     const fileInput = document.getElementById('recordsImportFile');
     const file = fileInput.files[0];
     
@@ -305,6 +345,7 @@ export async function executeRecordsImport() {
     const importBtn = document.getElementById('recordsImportBtn');
     const cancelBtn = document.querySelector('#recordsImportModal .btn-cancel');
     
+    importPhase.records = 'running';
     importBtn.disabled = true;
     document.getElementById('recordsImportProgress').style.display = 'block';
     document.getElementById('recordsImportProgressFill').style.width = '50%';
@@ -345,20 +386,17 @@ export async function executeRecordsImport() {
         // Button umwandeln zu "Schließen"
         importBtn.disabled = false;
         importBtn.textContent = 'Schließen';
-        importBtn.onclick = function() {
-            closeRecordsImportModal();
-            // Records neu laden
-            showRecordsSection(true);            
-        };
-        
+        importPhase.records = 'done';
+
         // Abbrechen-Button ausblenden
         cancelBtn.style.display = 'none';
-        
+
     } catch (error) {
         debug.error('Import error:', error);
         document.getElementById('recordsImportProgress').style.display = 'none';
         showToast('Import fehlgeschlagen', 'error');
         importBtn.disabled = false;
+        importPhase.records = 'idle';
     }
 }
 
@@ -394,13 +432,15 @@ function displayRecordsImportResult(result) {
     resultDiv.style.display = 'block';
 }
 
-// Tab-Wechsel
-export function switchImportTab(tab) {
+/** Wechselt den Reiter im Import-Dialog. button ist der ausloesende Reiter
+ *  (Aktion switch-import-tab); frueher kam er aus dem globalen event, das es
+ *  ohne Inline-Handler nicht gibt. */
+export function switchImportTab(tab, button) {
     // Tabs umschalten
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.import-tab-content').forEach(content => content.style.display = 'none');
     
-    event.target.classList.add('active');
+    button.classList.add('active');
     document.getElementById(`import-tab-${tab}`).style.display = 'block';
 }
 
@@ -573,17 +613,32 @@ export function openAppointmentsImportModal() {
     // Button zurücksetzen
     importBtn.textContent = 'Importieren';
     importBtn.disabled = false;
-    importBtn.onclick = executeAppointmentsImport;
-    
+    importPhase.appointments = 'idle';
+
     // Abbrechen-Button wieder anzeigen
     cancelBtn.style.display = 'inline-block';
 }
 
 export function closeAppointmentsImportModal() {
+    importPhase.appointments = 'idle';
     document.getElementById('appointmentsImportModal').classList.remove('active');
 }
 
+/** Klick auf den Import-Knopf der Termine (Aktion execute-appointments-import). */
+function onAppointmentsImportButton() {
+    if (importPhase.appointments === 'done') {
+        closeAppointmentsImportModal();
+        // Termine neu laden
+        showAppointmentSection(true);
+        return;
+    }
+    executeAppointmentsImport();
+}
+
 export async function executeAppointmentsImport() {
+    if (importPhase.appointments !== 'idle') {
+        return;
+    }
     const fileInput = document.getElementById('appointmentsImportFile');
     const file = fileInput.files[0];
     
@@ -601,6 +656,7 @@ export async function executeAppointmentsImport() {
     const importBtn = document.getElementById('appointmentsImportBtn');
     const cancelBtn = document.querySelector('#appointmentsImportModal .btn-cancel');
     
+    importPhase.appointments = 'running';
     importBtn.disabled = true;
     document.getElementById('appointmentsImportProgress').style.display = 'block';
     document.getElementById('appointmentsImportProgressFill').style.width = '50%';
@@ -636,20 +692,17 @@ export async function executeAppointmentsImport() {
         // Button umwandeln zu "Schließen"
         importBtn.disabled = false;
         importBtn.textContent = 'Schließen';
-        importBtn.onclick = function() {
-            closeAppointmentsImportModal();
-            // Termine neu laden
-            showAppointmentSection(true);            
-        };
-        
+        importPhase.appointments = 'done';
+
         // Abbrechen-Button ausblenden
         cancelBtn.style.display = 'none';
-        
+
     } catch (error) {
         debug.error('Import error:', error);
         document.getElementById('appointmentsImportProgress').style.display = 'none';
         showToast('Import fehlgeschlagen', 'error');
         importBtn.disabled = false;
+        importPhase.appointments = 'idle';
     }
 }
 
@@ -759,10 +812,10 @@ function renderLogsList(logs) {
                         <td class="text-success"><strong>${log.successful_rows}</strong></td>
                         <td class="text-danger"><strong>${log.failed_rows}</strong></td>
                         <td class="actions-cell">
-                            <button class="action-btn btn-icon btn-view" onclick="window.ImportLogs.showDetails(${log.log_id})" title="Details anzeigen">
+                            <button class="action-btn btn-icon btn-view" data-action="import-logs-show-details" data-id="${Number(log.log_id)}" title="Details anzeigen">
                                 👁
                             </button>
-                            <button class="action-btn btn-icon btn-delete" onclick="window.ImportLogs.deleteLog(${log.log_id})" title="Log löschen">
+                            <button class="action-btn btn-icon btn-delete" data-action="import-logs-delete-log" data-id="${Number(log.log_id)}" title="Log löschen">
                                 🗑
                             </button>
                         </td>
@@ -862,33 +915,32 @@ function refresh() {
     loadImportLogs();
 }
 
-// Globaler Zugriff für onclick-Handler
-window.ImportLogs = {
+// Aktionen des Importprotokolls (import-logs-*), gebuendelt wie die Aktionsnamen
+const ImportLogs = {
     showDetails,
     deleteLog,
     refresh
 };
 
-
-// Globale Funktionen
-window.openAppointmentsImportModal = openAppointmentsImportModal;
-window.closeAppointmentsImportModal = closeAppointmentsImportModal;
-window.executeAppointmentsImport = executeAppointmentsImport;
-window.exportAppointments = exportAppointments;
-window.closeLogModal = closeLogModal;
-
-// Globale Funktionen für Members
-window.exportMembers = exportMembers;
-window.openImportModal = openImportModal;
-window.closeImportModal = closeImportModal;
-window.executeImport = executeImport;
-
-// Globale Funktionen für Records
-window.openRecordsImportModal = openRecordsImportModal;
-window.closeRecordsImportModal = closeRecordsImportModal;
-window.executeRecordsImport = executeRecordsImport;
-window.exportRecords = exportRecords;
-window.switchImportTab = switchImportTab;
-window.analyzeCsvForAppointments = analyzeCsvForAppointments;
-window.createSelectedAppointments = createSelectedAppointments;
-window.clearSuggestions = clearSuggestions;
+registerActions({
+    'analyze-csv-for-appointments': () => analyzeCsvForAppointments(),
+    'clear-suggestions': () => clearSuggestions(),
+    'close-appointments-import-modal': () => closeAppointmentsImportModal(),
+    'close-import-modal': () => closeImportModal(),
+    'close-log-modal': () => closeLogModal(),
+    'close-records-import-modal': () => closeRecordsImportModal(),
+    'create-selected-appointments': () => createSelectedAppointments(),
+    'execute-appointments-import': () => onAppointmentsImportButton(),
+    'execute-import': () => onMemberImportButton(),
+    'execute-records-import': () => onRecordsImportButton(),
+    'export-appointments': () => exportAppointments(),
+    'export-members': () => exportMembers(),
+    'export-records': () => exportRecords(),
+    'import-logs-delete-log': (el) => ImportLogs.deleteLog(Number(el.dataset.id)),
+    'import-logs-refresh': () => ImportLogs.refresh(),
+    'import-logs-show-details': (el) => ImportLogs.showDetails(Number(el.dataset.id)),
+    'open-appointments-import-modal': () => openAppointmentsImportModal(),
+    'open-import-modal': () => openImportModal(),
+    'open-records-import-modal': () => openRecordsImportModal(),
+    'switch-import-tab': (el) => switchImportTab(el.dataset.value, el),
+});

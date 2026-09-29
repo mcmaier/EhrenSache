@@ -88,7 +88,8 @@ test('records.js bindet grouping.js ein und traegt den Anwesenheits-Umschalter',
     assertTrue(str_contains($body, 'escapeHtml('), 'renderAttendanceList() maskiert die Abschnittsueberschrift nicht');
     assertTrue(str_contains($body, 'groupingSections('), 'renderAttendanceList() bildet die Abschnitte nicht ueber groupingSections()');
 
-    assertTrue(str_contains($js, 'window.setAttendanceGrouping'), 'Der Umschalter-Klick ist nicht global erreichbar (onclick)');
+    assertTrue(preg_match("/'set-attendance-grouping':\s*\(el\)\s*=>\s*setAttendanceGrouping\(el\.dataset\.value\)/", $js) === 1,
+        'Der Umschalter-Klick ist nicht als Aktion registriert');
 });
 
 test('responses.js bindet grouping.js ein, gliedert die Namensliste und fuehrt responseGroupKey nicht mehr', function () use ($ugfRoot) {
@@ -101,12 +102,13 @@ test('responses.js bindet grouping.js ein, gliedert die Namensliste und fuehrt r
 
     assertTrue(!str_contains($js, 'responseGroupKey'), 'responseGroupKey() ist noch vorhanden -- sollte durch grouping.js ersetzt sein');
 
-    $body = ugfBody($js, 'function namesListHtml', 'window.setResponsesGrouping');
+    $body = ugfBody($js, 'function namesListHtml', 'function setResponsesGrouping');
     assertTrue(str_contains($body, 'escapeHtml(label)'), 'namesListHtml() maskiert die Abschnittsueberschrift nicht');
     assertTrue(str_contains($body, 'response-names-grouped'), 'Aeusserer Rahmen response-names-grouped fehlt weiterhin');
     assertTrue(str_contains($body, 'groupingSections('), 'namesListHtml() bildet die Abschnitte nicht ueber groupingSections()');
 
-    assertTrue(str_contains($js, 'window.setResponsesGrouping'), 'Der Umschalter-Klick ist nicht global erreichbar (onclick)');
+    assertTrue(preg_match("/'set-responses-grouping':\s*\(el\)\s*=>\s*setResponsesGrouping\(el\.dataset\.value\)/", $js) === 1,
+        'Der Umschalter-Klick ist nicht als Aktion registriert');
 });
 
 test('responses.js: die Verwalter-Tabelle gliedert ebenfalls ueber groupingSections() und fuehrt group_name nirgends mehr (a291efd)', function () use ($ugfRoot) {

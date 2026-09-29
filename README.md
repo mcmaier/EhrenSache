@@ -49,10 +49,11 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 - Datei-Uploads werden über den tatsächlichen MIME-Typ geprüft, nicht über die Endung
 
 > [!NOTE]
-> Eine **Content-Security-Policy** (`script-src 'self'`) tragen bisher die Anmeldeseite, die
-> Check-in-App und die virtuelle Station. Das Dashboard liefert **bewusst noch keine** aus: Es
-> arbeitet mit Inline-Handlern, eine strikte CSP würde es lahmlegen, eine weiche wäre nur
-> Fassade. Begründung und Weg dorthin stehen als OI-17 in [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
+> Alle Oberflächen außer den Assistenten für Installation und Update liefern eine
+> **Content-Security-Policy** aus (`script-src 'self'`, die öffentlichen Seiten ohne jedes
+> Skript). Eingeschleustes Skript wird dadurch auch dann nicht ausgeführt, wenn es an der
+> Maskierung vorbei ins Markup gelangt. Hintergrund: OI-17 in
+> [docs/OPEN-ITEMS.md](docs/OPEN-ITEMS.md).
 
 ---
 
@@ -111,6 +112,9 @@ Fachanwalt für IT-Recht, um die DSGVO-Konformität sicherzustellen.
 - Webserver mit PHP 8+ und MySQL 5.7+ oder MariaDB 10.4+ — die genaue PHP-Version und die
   nötigen PHP-Erweiterungen stehen unter `requires` in `version.json`; Installer und
   Update-Assistent prüfen sie
+- Apache ab 2.4.7 (`Header … setifempty`) mit `mod_headers`; `AllowOverride` muss
+  die `Header`-Direktiven zulassen (`FileInfo`). Ohne `mod_headers` fehlen die Sicherheits-Header samt
+  Content-Security-Policy aus den `.htaccess`-Dateien still
 - SSL-Zertifikat (für PWA und sichere Authentifizierung)
 - Schreibrechte für Upload-Verzeichnisse
 

@@ -16,6 +16,7 @@ import { formatDateTime, updateModalId, escapeHtml, safeTypeColor } from './util
 import { groupChips, CHIPS_APPOINTMENT_TYPES, countChips, filterByChip,
          renderFilterChips } from './filter_chips.js';
 import {debug} from '../app.js'
+import { registerActions } from './actions.js';
 
 // ============================================
 // MANAGEMENT (Groups & Types)
@@ -101,10 +102,10 @@ const tbody = document.getElementById('groupsTableBody');
                 <td>${memberCount}</td>
                 <td>${isDefaultBadge}</td>
                 <td class="actions-cell">
-                    <button class="action-btn btn-icon btn-edit" onclick="openGroupModal(${group.group_id})" title="Bearbeiten">
+                    <button class="action-btn btn-icon btn-edit" data-action="open-group-modal" data-id="${Number(group.group_id)}" title="Bearbeiten">
                         ✎
                     </button>
-                    <button class="action-btn btn-icon btn-delete" onclick="deleteGroup(${group.group_id})" title="Löschen">
+                    <button class="action-btn btn-icon btn-delete" data-action="delete-group" data-id="${Number(group.group_id)}" title="Löschen">
                         🗑
                     </button>
                 </td>                
@@ -285,7 +286,7 @@ export async function saveGroup() {
 export async function deleteGroup(groupId) {
     // Name aus dem Cache holen statt aus dem onclick-Attribut: ein Gruppenname mit
     // Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als Code
-    // einschleusen (kein CSP im Projekt).
+    // einschleusen (Defense in Depth, die CSP blockt Inline-Code ohnehin).
     const group = dataCache.groups.data.find(g => g.group_id == groupId);
     const groupName = group ? group.group_name : '';
 
@@ -386,10 +387,10 @@ export async function renderTypeGroupOverview(typeData)
                 <td id="type_groups_${type.type_id}">Lädt...</td>
                 <td>${isDefaultBadge}</td>
                 <td class="actions-cell">
-                    <button class="action-btn btn-icon btn-edit" onclick="openTypeModal(${type.type_id})" title="Bearbeiten">
+                    <button class="action-btn btn-icon btn-edit" data-action="open-type-modal" data-id="${Number(type.type_id)}" title="Bearbeiten">
                         ✎
                     </button>
-                    <button class="action-btn btn-icon btn-delete" onclick="deleteType(${type.type_id})" title="Löschen">
+                    <button class="action-btn btn-icon btn-delete" data-action="delete-type" data-id="${Number(type.type_id)}" title="Löschen">
                         🗑
                     </button>
                 </td>
@@ -509,9 +510,7 @@ function renderTypeGroups(selectedGroups) {
     const selectedIds = selectedGroups.map(g => g.group_id);
     
     container.innerHTML = dataCache.groups.data.map(group => `
-        <label style="display: block; padding: 8px; cursor: pointer; border-radius: 4px;" 
-               onmouseover="this.style.background='#f5f5f5'" 
-               onmouseout="this.style.background='transparent'">
+        <label class="group-choice" style="display: block; padding: 8px; cursor: pointer; border-radius: 4px;">
             <input type="checkbox" 
                    class="type-group-checkbox" 
                    value="${group.group_id}" 
@@ -632,18 +631,15 @@ export async function deleteType(typeId) {
     }
 }
 
-// ============================================
-// GLOBAL EXPORTS
-// ============================================
-
-window.openGroupModal = openGroupModal;
-window.closeGroupModal = closeGroupModal;
-window.toggleGroupExclusivity = toggleGroupExclusivity;
-window.saveGroup = saveGroup;
-window.deleteGroup = deleteGroup;
-
-window.openTypeModal = openTypeModal;
-window.closeTypeModal = closeTypeModal;
-window.saveType = saveType;
-window.deleteType = deleteType;
-window.toggleTypeResponseFields = toggleTypeResponseFields;
+registerActions({
+    'close-group-modal': () => closeGroupModal(),
+    'close-type-modal': () => closeTypeModal(),
+    'delete-group': (el) => deleteGroup(Number(el.dataset.id)),
+    'delete-type': (el) => deleteType(Number(el.dataset.id)),
+    'open-group-modal': (el) => openGroupModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'open-type-modal': (el) => openTypeModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'save-group': () => saveGroup(),
+    'save-type': () => saveType(),
+    'toggle-group-exclusivity': () => toggleGroupExclusivity(),
+    'toggle-type-response-fields': () => toggleTypeResponseFields(),
+});

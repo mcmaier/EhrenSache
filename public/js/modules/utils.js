@@ -113,7 +113,8 @@ export function round(value, decimals) {
  * Anfuehrungszeichen gehoeren dazu: Der Weg ueber einen Textknoten
  * (div.textContent, dann div.innerHTML) kodiert & < > , aber nicht " und '.
  * In title="${escapeHtml(feld)}" liesse sich der Attributwert damit
- * verlassen, und das Dashboard hat keine CSP (OI-17 Etappe 2).
+ * verlassen. Die CSP des Dashboards (OI-17) blockt zwar Inline-Skript, aber
+ * kein eingeschleustes Markup oder Attribut -- die Maskierung bleibt Pflicht.
  *
  * Das & muss zuerst ersetzt werden, sonst werden die eigenen Entities
  * doppelt maskiert. tests/suites/escape_html_frontend.php wacht darueber.

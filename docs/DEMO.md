@@ -240,8 +240,9 @@ Bewusst hingenommen, damit die Demo zeigen kann, wofür sie da ist:
 
 - **Gespeichertes XSS zwischen zwei Resets.** Ein Besucher darf schreiben, also kann er in ein
   Freitextfeld schreiben, was bis zum nächsten Reset jeder weitere Besucher zu sehen bekommt.
-  Das Dashboard nutzt Inline-Handler und führt noch keine CSP; Anmeldung, Check-in-PWA und
-  Station tragen seit OI-17 Etappe 1 eine. Siehe OI-17 und OI-44 in `docs/OPEN-ITEMS.md`.
+  Seit OI-17 Etappe 2 tragen alle Oberflächen eine CSP: Eingeschleustes Skript läuft nicht,
+  eingeschleustes Markup bleibt bis zum Reset sichtbar. Siehe OI-17 und OI-44 in
+  `docs/OPEN-ITEMS.md`.
 - **Die Kiosk-PIN.** `change_pin` ist gesperrt, aber dieselbe Wirkung ist über `members` `PUT`
   erreichbar — und Mitglieder darf ein Besucher bearbeiten. Der stündliche Reset ist die
   Gegenmaßnahme.

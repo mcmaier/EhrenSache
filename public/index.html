@@ -154,7 +154,7 @@
                         <div class="profile-item" id="profile_user_data">
                             <label>Meine Daten</label>
                             <div style="display: flex; flex-direction: row; gap: 20px;">                                                                
-                                <button onclick="downloadMyData()" class="btn-std btn-delete">
+                                <button data-action="download-my-data" class="btn-std btn-delete">
                                     📥 Herunterladen
                                 </button>
                                 <select id="profile_user_data_format" class="form-input" style="max-width: 100px;">
@@ -224,18 +224,18 @@
                                 <div style="flex: 1; position: relative;">
                                     <input type="password" id="profile_token" readonly class="token-hidden"
                                            style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace;">
-                                    <button onclick="toggleProfileTokenVisibility()" id="toggleProfileTokenBtn" type="button"
+                                    <button data-action="toggle-profile-token-visibility" id="toggleProfileTokenBtn" type="button"
                                             style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
                                         👁️
                                     </button>
                                 </div>
-                                <button onclick="copyProfileToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋 Kopieren</button>
+                                <button data-action="copy-profile-token" type="button" class="btn-add" style="margin: 0; width: auto;">📋 Kopieren</button>
                             </div>
                         </div>
                         
                         <div style="display: flex; flex-direction: row; align-items: baseline; gap: 16px;">
                             <div id="profileTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 14px;"></div>
-                            <button onclick="regenerateProfileToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
+                            <button data-action="regenerate-profile-token" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
                                 🔄 Neuen Token generieren
                             </button>                             
                         </div>
@@ -701,7 +701,7 @@
                                 </small>
 
                                 <div style="margin-top: 12px;">
-                                    <button onclick="performCleanup()" class="btn-std btn-delete">
+                                    <button data-action="perform-cleanup" class="btn-std btn-delete">
                                         🗑️ Alte Daten löschen
                                     </button>
                                     <span class="acts-now-hint">wirkt sofort, ohne Speichern</span>
@@ -798,7 +798,7 @@
                             
                                 <button type="button" 
                                         class="btn btn-secondary" 
-                                        onclick="openSmtpConfigModal()"
+                                        data-action="open-smtp-config-modal"
                                         style="width: 100%;">
                                     ⚙️ SMTP-Server konfigurieren
                                 </button>
@@ -818,7 +818,7 @@
                                         style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
                                     <button type="button" 
                                             class="btn btn-secondary" 
-                                            onclick="sendTestMail()"
+                                            data-action="send-test-mail"
                                             id="testMailBtn">
                                         📤 Test senden
                                     </button>
@@ -846,7 +846,7 @@
                                     Projekts auf GitHub abonnierst.
                                 </small>
                                 <div style="margin-top: 12px;">
-                                    <button type="button" id="update_check_btn" class="btn btn-secondary" onclick="checkForUpdates()">
+                                    <button type="button" id="update_check_btn" class="btn btn-secondary" data-action="check-for-updates">
                                         🔍 Auf Updates prüfen
                                     </button>
                                     <span class="acts-now-hint">wirkt sofort</span>
@@ -879,9 +879,9 @@
                 <div class="content-header">
                     <h1>Terminverwaltung</h1>                    
                      <div class="header-actions">
-                        <button class="btn-secondary" data-role="admin" onclick="openAppointmentsImportModal()">📤 Import CSV</button>
-                        <button class="btn-secondary" data-role="manager" onclick="exportAppointments()">💾 Export CSV</button>                                    
-                        <button class="btn-add" data-role="manager" onclick="openAppointmentModal()">+ Neuer Termin</button>
+                        <button class="btn-secondary" data-role="admin" data-action="open-appointments-import-modal">📤 Import CSV</button>
+                        <button class="btn-secondary" data-role="manager" data-action="export-appointments">💾 Export CSV</button>                                    
+                        <button class="btn-add" data-role="manager" data-action="open-appointment-modal">+ Neuer Termin</button>
                      </div>
                 </div>
                 <div class="stats-grid stats-grid--chips">
@@ -916,14 +916,14 @@
                 <!-- Kalenderansicht -->
                 <div class="calendar-container">
                     <div class="calendar-header">
-                        <button class="calendar-nav" onclick="previousMonth()">‹</button>
+                        <button class="calendar-nav" data-action="previous-month">‹</button>
                         <h2 id="calendarMonthYear">November 2025</h2>                        
-                        <button class="calendar-nav" onclick="goToToday()" 
+                        <button class="calendar-nav" data-action="go-to-today" 
                                 style="margin-left: 10px; padding: 8px 16px; font-size: 14px;"
                                 title="Zum aktuellen Monat springen">
                             Heute
                         </button>
-                        <button class="calendar-nav" onclick="nextMonth()">›</button>
+                        <button class="calendar-nav" data-action="next-month">›</button>
                     </div>
                     <div class="calendar-grid">
                         <div class="calendar-day-header">Mo</div>
@@ -963,10 +963,10 @@
                     <h1>Anwesenheitsverwaltung</h1>
                     <div class="header-actions">                        
                         <button type="button" id="recordsBackToAppointments" class="btn-secondary" hidden
-                                onclick="backToAppointments()">← Zurück zu Termine</button>
-                        <button class="btn-secondary" data-role="admin" onclick="openRecordsImportModal()">📤 Import CSV</button>
-                        <button class="btn-secondary" data-role="manager" onclick="exportRecords()">💾 Export CSV</button>  
-                        <button class="btn-add" data-role="manager" onclick="openRecordModal()">+ Anwesenheit erfassen</button>
+                                data-action="back-to-appointments">← Zurück zu Termine</button>
+                        <button class="btn-secondary" data-role="admin" data-action="open-records-import-modal">📤 Import CSV</button>
+                        <button class="btn-secondary" data-role="manager" data-action="export-records">💾 Export CSV</button>  
+                        <button class="btn-add" data-role="manager" data-action="open-record-modal">+ Anwesenheit erfassen</button>
                     </div>
                 </div>
 
@@ -984,23 +984,23 @@
                 <div class="filter-bar">
                     <div class="form-group">
                         <label for="filterAptType">Terminart:</label>
-                        <select id="filterAptType"> <!-- onchange="applyRecordFilters()"> -->
+                        <select id="filterAptType">
                             <option value="">Alle Termine</option>
                         </select>
                     </div>
                     <div class="form-group" data-role="manager">
                         <label for="filterAppointment">Filter nach Termin:</label>
-                        <select id="filterAppointment"> <!-- onchange="applyRecordFilters()"> -->
+                        <select id="filterAppointment">
                             <option value="">Alle Termine</option>
                         </select>
                     </div>
                     <div class="form-group" data-role="manager">
                         <label for="filterMember">Filter nach Mitglied:</label>
-                        <select id="filterMember" ><!--onchange="applyRecordFilters()"> -->
+                        <select id="filterMember">
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
-                    <button id="resetRecordFilter" onclick="resetRecordFilter()" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
+                    <button id="resetRecordFilter" data-action="reset-record-filter" class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
                  <!-- Pagination OBEN -->
@@ -1032,7 +1032,7 @@
             <div class="content-section" id="antraege">
                 <div class="content-header">
                     <h1>Anträge & Entschuldigungen</h1>
-                    <button class="btn-add" onclick="openExceptionModal()">+ Neuer Antrag</button>
+                    <button class="btn-add" data-action="open-exception-modal">+ Neuer Antrag</button>
                 </div>
 
                 <div class="stats-grid stats-grid--chips">
@@ -1111,7 +1111,7 @@
                             <option value="">Alle Mitglieder</option>
                         </select>
                     </div>
-                    <button id="resetStatisticsFilter" onclick="resetStatisticsFilter()"
+                    <button id="resetStatisticsFilter" data-action="reset-statistics-filter"
                             class="btn-reset-filter" disabled>Filter zurücksetzen</button>
                 </div>
 
@@ -1126,9 +1126,9 @@
                 <div class="content-header">
                     <h1>Mitgliederverwaltung</h1> 
                     <div class="header-actions">                        
-                        <button class="btn-secondary" data-role="admin" onclick="openImportModal()">📤 Import CSV</button>
-                        <button class="btn-secondary" data-role="manager" onclick="exportMembers()">💾 Export CSV</button>            
-                        <button class="btn-add" data-role="manager" onclick="openMemberModal()">+ Neues Mitglied</button>                    
+                        <button class="btn-secondary" data-role="admin" data-action="open-import-modal">📤 Import CSV</button>
+                        <button class="btn-secondary" data-role="manager" data-action="export-members">💾 Export CSV</button>            
+                        <button class="btn-add" data-role="manager" data-action="open-member-modal">+ Neues Mitglied</button>                    
                     </div>
                 </div>
                 
@@ -1178,7 +1178,7 @@
                 <div class="content-header">
                     <h1>Benutzerverwaltung</h1>
                     <div class="header-actions">                                                 
-                        <button class="btn-add" onclick="openUserModal()">+ Neuer Benutzer</button>
+                        <button class="btn-add" data-action="open-user-modal">+ Neuer Benutzer</button>
                     </div>  
                 </div>
 
@@ -1222,7 +1222,7 @@
                 <div class="content-header">
                     <h1>Geräteverwaltung</h1>
                     <div class="header-actions">                                             
-                        <button class="btn-add" onclick="openDeviceModal()">🔧 Neues Gerät</button>
+                        <button class="btn-add" data-action="open-device-modal">🔧 Neues Gerät</button>
                     </div>  
                 </div>
 
@@ -1272,7 +1272,7 @@
                 <div class="data-table">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0;">👥 Benutzergruppen</h2>
-                        <button class="btn-add" onclick="openGroupModal()">+ Neue Gruppe</button>
+                        <button class="btn-add" data-action="open-group-modal">+ Neue Gruppe</button>
                     </div>
                     <div class="filter-chips filter-chips--standalone" id="groupChipsRow"></div>
                     <table>
@@ -1295,7 +1295,7 @@
                 <div class="data-table" style="margin-top: 30px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0;">📅 Terminarten</h2>
-                        <button class="btn-add" onclick="openTypeModal()">+ Neue Terminart</button>
+                        <button class="btn-add" data-action="open-type-modal">+ Neue Terminart</button>
                     </div>
                     <div class="filter-chips filter-chips--standalone" id="typeChipsRow"></div>
                     <table>
@@ -1319,7 +1319,7 @@
                 <div class="data-table" style="margin-top: 30px; display: none;" id="activityTypesBlock">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0;">⏱️ Tätigkeitsarten</h2>
-                        <button class="btn-add" onclick="openActivityTypeModal()">+ Neue Tätigkeitsart</button>
+                        <button class="btn-add" data-action="open-activity-type-modal">+ Neue Tätigkeitsart</button>
                     </div>
                     <div class="filter-chips filter-chips--standalone" id="activityChipsRow"></div>
                     <table>
@@ -1347,7 +1347,7 @@
                     <h1>Zeiterfassung</h1>
                     <div class="header-actions">
                         <button class="btn-secondary" id="btnWorktimeReport">📄 Bericht</button>
-                        <button class="btn-add" onclick="openWorkSessionModal()">+ Zeit nachtragen</button>
+                        <button class="btn-add" data-action="open-work-session-modal">+ Zeit nachtragen</button>
                     </div>
                 </div>
 
@@ -1409,7 +1409,7 @@
                                 <option value="appointments">Termine</option>
                             </select>
                         </div>
-                        <button class="btn-secondary" onclick="window.ImportLogs.refresh()">
+                        <button class="btn-secondary" data-action="import-logs-refresh">
                             🔄 Aktualisieren
                         </button>
                     </div>
@@ -1430,7 +1430,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Import-Details</h2>
-                <button class="close-modal" onclick="closeLogModal()">×</button>
+                <button class="close-modal" data-action="close-log-modal">×</button>
             </div>
             <div class="modal-body">
             <!-- Zusammenfassung -->
@@ -1476,7 +1476,7 @@
                 </div>
             </div>           
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeLogModal()">Schließen</button>
+                <button class="btn-cancel" data-action="close-log-modal">Schließen</button>
             </div>
         </div>
     </div>
@@ -1486,7 +1486,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="memberModalTitle">Neues Mitglied</h2>
-                <button class="close-modal" onclick="closeMemberModal()">×</button>
+                <button class="close-modal" data-action="close-member-modal">×</button>
             </div>
             <div class="modal-body">                
                 <form id="memberForm">
@@ -1528,15 +1528,15 @@
                     <div class="form-group" id="membershipDatesGroup" style="display: none;">
                         <label>Mitgliedschaftszeiträume</label>
                         <div id="membershipDatesList"></div>
-                        <button type="button" class="btn-add" onclick="addMembershipDate()" style="margin-top: 10px;">
+                        <button type="button" class="btn-add" data-action="add-membership-date" style="margin-top: 10px;">
                             + Zeitraum hinzufügen
                         </button>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeMemberModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveMember()">Speichern</button>
+                <button class="btn-cancel" data-action="close-member-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-member">Speichern</button>
             </div>
         </div>
     </div>
@@ -1546,7 +1546,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="appointmentModalTitle">Neuer Termin</h2>
-                <button class="close-modal" onclick="closeAppointmentModal()">×</button>
+                <button class="close-modal" data-action="close-appointment-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="appointmentForm">
@@ -1554,13 +1554,13 @@
                     <div id="appointmentSeriesBox" class="appointment-series-box" hidden>
                         <div id="appointmentSeriesText"></div>
                         <div id="appointmentSeriesActions" class="appointment-series-actions">
-                            <button type="button" class="btn-secondary" onclick="openSeriesExtend()">Serie fortsetzen …</button>
-                            <button type="button" class="btn-secondary" onclick="openSeriesRuleChange()">Regel ändern …</button>
+                            <button type="button" class="btn-secondary" data-action="open-series-extend">Serie fortsetzen …</button>
+                            <button type="button" class="btn-secondary" data-action="open-series-rule-change">Regel ändern …</button>
                         </div>
                         <div id="appointmentSeriesExtend" class="appointment-series-extend" hidden>
                             <label for="appointment_series_until">Neues Ende</label>
                             <input type="date" id="appointment_series_until">
-                            <button type="button" class="btn-secondary" onclick="previewSeriesExtend()">Vorschau</button>
+                            <button type="button" class="btn-secondary" data-action="preview-series-extend">Vorschau</button>
                         </div>
                     </div>
                     <div class="form-group">
@@ -1600,13 +1600,13 @@
                     </div>
                     <div class="form-group appointment-repeat" id="appointmentRepeatGroup">
                         <label class="checkbox-label">
-                            <input type="checkbox" id="appointment_repeat" onchange="toggleAppointmentRepeat()">
+                            <input type="checkbox" id="appointment_repeat" data-action-change="toggle-appointment-repeat">
                             Wiederholen
                         </label>
                         <div id="appointmentRepeatFields" class="appointment-repeat-fields" hidden>
                             <div class="form-group">
                                 <label for="appointment_repeat_freq">Muster</label>
-                                <select id="appointment_repeat_freq" onchange="updateAppointmentRepeatFields()">
+                                <select id="appointment_repeat_freq" data-action-change="update-appointment-repeat-fields">
                                     <option value="WEEKLY">Wöchentlich</option>
                                     <option value="MONTHLY">Monatlich</option>
                                 </select>
@@ -1670,8 +1670,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeAppointmentModal()">Abbrechen</button>
-                <button class="btn-save" id="appointmentSaveBtn" onclick="saveAppointment()">Speichern</button>
+                <button class="btn-cancel" data-action="close-appointment-modal">Abbrechen</button>
+                <button class="btn-save" id="appointmentSaveBtn" data-action="save-appointment">Speichern</button>
             </div>
         </div>
     </div>
@@ -1681,7 +1681,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="recordModalTitle">Anwesenheit erfassen</h2>
-                <button class="close-modal" onclick="closeRecordModal()">×</button>
+                <button class="close-modal" data-action="close-record-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="recordForm">
@@ -1706,7 +1706,7 @@
                     </div>
                     <div class="form-group">
                         <label for="record_status">Status*</label>
-                        <select id="record_status" required onchange="toggleArrivalTimeField()">
+                        <select id="record_status" required data-action-change="toggle-arrival-time-field">
                             <option value="present">Anwesend</option>
                             <option value="excused">Entschuldigt</option>
                         </select>
@@ -1722,7 +1722,7 @@
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <input type="datetime-local" id="record_arrival_time" style="flex: 1;">
                             <button type="button" class="btn-secondary" id="recordArrivalFromAppointment"
-                                    onclick="setArrivalTimeFromAppointment()"
+                                    data-action="set-arrival-time-from-appointment"
                                     title="Startzeit des gewählten Termins übernehmen">Terminbeginn</button>
                         </div>
                         <small class="input-hint">Leer lassen, wenn die Ankunft nicht bekannt ist.</small>
@@ -1730,8 +1730,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeRecordModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveRecord()">Speichern</button>
+                <button class="btn-cancel" data-action="close-record-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-record">Speichern</button>
             </div>
         </div>
     </div>
@@ -1741,7 +1741,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="exceptionModalTitle">Neuer Antrag</h2>
-                <button class="close-modal" onclick="closeExceptionModal()">×</button>
+                <button class="close-modal" data-action="close-exception-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="exceptionForm">
@@ -1763,7 +1763,7 @@
                     
                     <div class="form-group">
                         <label for="exception_type">Art des Antrags*</label>
-                        <select id="exception_type" required onchange="toggleExceptionFields()">
+                        <select id="exception_type" required data-action-change="toggle-exception-fields">
                             <option value="absence">Entschuldigung</option>
                             <option value="time_correction">Zeitkorrektur</option>
                         </select>
@@ -1791,8 +1791,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeExceptionModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveException()">Speichern</button>
+                <button class="btn-cancel" data-action="close-exception-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-exception">Speichern</button>
             </div>
         </div>
     </div>
@@ -1802,7 +1802,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="userModalTitle">Neuer Benutzer</h2>
-                <button class="close-modal" onclick="closeUserModal()">×</button>
+                <button class="close-modal" data-action="close-user-modal">×</button>
             </div>
             <div class="modal-body">                
                 <form id="userForm">
@@ -1903,7 +1903,7 @@
                                     <div id="linkedMemberInfo" style="flex: 1; padding: 10px; background: #f8f9fa; border-radius: 4px;">
                                         -
                                     </div>
-                                    <button id="editMemberBtn" type="button" class="action-btn btn-edit" onclick="toggleMemberEdit()" title="Bearbeiten">
+                                    <button id="editMemberBtn" type="button" class="action-btn btn-edit" data-action="toggle-member-edit" title="Bearbeiten">
                                         ✏️
                                     </button>
                                 </div>
@@ -1932,16 +1932,16 @@
                                 <div style="flex: 1; position: relative;">
                                     <input type="password" id="user_token" readonly class="token-hidden" 
                                         style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace; background: #f8f9fa;">
-                                    <button onclick="toggleUserTokenVisibility()" id="toggleUserTokenBtn" type="button"
+                                    <button data-action="toggle-user-token-visibility" id="toggleUserTokenBtn" type="button"
                                             style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
                                         👁️
                                     </button>
                                 </div>
-                                <button onclick="copyUserToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
+                                <button data-action="copy-user-token" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
                             </div>
                             <!-- Im userTokenGroup nach dem Token-Input -->
                             <div id="tokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
-                            <button onclick="regenerateUserToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
+                            <button data-action="regenerate-user-token" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
                                 🔄 Neuen Token generieren
                             </button>                       
                         </div>
@@ -1949,8 +1949,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeUserModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveUser()">Speichern</button>
+                <button class="btn-cancel" data-action="close-user-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-user">Speichern</button>
             </div>
         </div>
     </div>
@@ -1960,7 +1960,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="deviceModalTitle">Neues Gerät</h2>
-                <button class="close-modal" onclick="closeDeviceModal()">×</button>
+                <button class="close-modal" data-action="close-device-modal">×</button>
             </div>
             <div class="modal-body">                
                 <form id="deviceForm">
@@ -1994,7 +1994,7 @@
                         <div class="form-group">
                             <label for="device_totp_secret">TOTP Secret</label>
                             <input type="text" id="device_totp_secret" style="font-family: monospace;">
-                            <button type="button" id="toggleDeviceTotpBtn" onclick="generateTotpSecret()" 
+                            <button type="button" id="toggleDeviceTotpBtn" data-action="generate-totp-secret" 
                                     class="btn-secondary" style="margin-top: 5px;">
                                 🔄 Secret neu generieren
                             </button>
@@ -2024,28 +2024,28 @@
                             <div style="flex: 1; position: relative;">
                                 <input type="password" id="device_token" readonly class="token-hidden" 
                                     style="width: 100%; padding: 10px 40px 10px 10px; font-family: monospace; background: #f8f9fa;">
-                                <button onclick="toggleDeviceTokenVisibility()" id="toggleDeviceTokenBtn" type="button"
+                                <button data-action="toggle-device-token-visibility" id="toggleDeviceTokenBtn" type="button"
                                         style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 20px; padding: 5px 10px; color: #7f8c8d;">
                                     👁️
                                 </button>
                             </div>
-                            <button onclick="copyDeviceToken()" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
-                            <button onclick="showDeviceQR()" type="button" id="deviceQRBtn" class="btn-add"
+                            <button data-action="copy-device-token" type="button" class="btn-add" style="margin: 0; width: auto;">📋</button>
+                            <button data-action="show-device-qr" type="button" id="deviceQRBtn" class="btn-add"
                                     style="margin: 0; width: auto; display: none;"
                                     title="QR-Code zur Inbetriebnahme der Station"
                                     aria-label="QR-Code zur Inbetriebnahme der Station">📱</button>
                         </div>
                         <!-- Im userTokenGroup nach dem Token-Input -->
                         <div id="deviceTokenExpiryInfo" style="display: block; margin-top: 5px; font-size: 12px;"></div>
-                        <button onclick="regenerateDeviceToken()" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
+                        <button data-action="regenerate-device-token" type="button" class="btn-std btn-delete" style="margin-top: 10px;">
                             🔄 Neuen Token generieren
                         </button>
                     </div>
                 </form>               
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeDeviceModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveDevice()">Speichern</button>
+                <button class="btn-cancel" data-action="close-device-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-device">Speichern</button>
             </div>
         </div>
     </div>
@@ -2055,7 +2055,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="groupModalTitle">Neue Gruppe</h2>
-                <button class="close-modal" onclick="closeGroupModal()">×</button>
+                <button class="close-modal" data-action="close-group-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="groupForm">
@@ -2070,7 +2070,7 @@
                     </div>
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="group_is_default" onchange="toggleGroupExclusivity()">
+                            <input type="checkbox" id="group_is_default" data-action-change="toggle-group-exclusivity">
                             <span>Standard-Gruppe (gilt für alle neuen Mitglieder)</span>
                         </label>
                         <small style="color: #e67e22; display: block; margin-top: 5px;">
@@ -2083,7 +2083,7 @@
                     </div>
                     <div class="form-group">
                         <label>
-                            <input type="checkbox" id="group_is_subgroup" onchange="toggleGroupExclusivity()">
+                            <input type="checkbox" id="group_is_subgroup" data-action-change="toggle-group-exclusivity">
                             Gliedert Listen als <span data-subgroup-label>Untergruppe</span>
                         </label>
                         <small class="input-hint">Anwesenheitslisten und Rückmeldungen lassen sich
@@ -2108,8 +2108,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeGroupModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveGroup()">Speichern</button>
+                <button class="btn-cancel" data-action="close-group-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-group">Speichern</button>
             </div>
         </div>
     </div>
@@ -2119,7 +2119,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="typeModalTitle">Neue Terminart</h2>
-                <button class="close-modal" onclick="closeTypeModal()">×</button>
+                <button class="close-modal" data-action="close-type-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="typeForm">
@@ -2157,7 +2157,7 @@
                     <fieldset class="form-group response-settings">
                         <legend>Rückmeldung</legend>
                         <label class="checkbox-label">
-                            <input type="checkbox" id="type_responses_enabled" onchange="toggleTypeResponseFields()">
+                            <input type="checkbox" id="type_responses_enabled" data-action-change="toggle-type-response-fields">
                             Rückmeldung erbeten
                         </label>
                         <small class="input-hint">
@@ -2195,8 +2195,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeTypeModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveType()">Speichern</button>
+                <button class="btn-cancel" data-action="close-type-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-type">Speichern</button>
             </div>
         </div>
     </div>
@@ -2206,14 +2206,14 @@
         <div class="modal-content modal-content--wide">
             <div class="modal-header">
                 <h2 id="responsesModalTitle">Rückmeldungen</h2>
-                <button class="close-modal" onclick="closeResponsesModal()">×</button>
+                <button class="close-modal" data-action="close-responses-modal">×</button>
             </div>
             <div class="modal-body" id="responsesModalBody">
                 <p class="loading">Lade Rückmeldungen...</p>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" id="responsesPrintButton" onclick="printResponses()" hidden>🖨 Druckansicht</button>
-                <button class="btn-cancel" onclick="closeResponsesModal()">Schließen</button>
+                <button class="btn-secondary" id="responsesPrintButton" data-action="print-responses" hidden>🖨 Druckansicht</button>
+                <button class="btn-cancel" data-action="close-responses-modal">Schließen</button>
             </div>
         </div>
     </div>
@@ -2272,7 +2272,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Mitglieder importieren (CSV)</h2>
-                <span class="modal-close" onclick="closeImportModal()">&times;</span>
+                <span class="modal-close" data-action="close-import-modal">&times;</span>
             </div>
             <div class="modal-body">
                 <div class="import-info">
@@ -2307,8 +2307,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeImportModal()">Abbrechen</button>
-                <button class="btn-save" id="importBtn" onclick="executeImport()">Importieren</button>
+                <button class="btn-cancel" data-action="close-import-modal">Abbrechen</button>
+                <button class="btn-save" id="importBtn" data-action="execute-import">Importieren</button>
             </div>
         </div>
     </div>
@@ -2318,7 +2318,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Termine importieren (CSV)</h2>
-                <span class="modal-close" onclick="closeAppointmentsImportModal()">&times;</span>
+                <span class="modal-close" data-action="close-appointments-import-modal">&times;</span>
             </div>
             <div class="modal-body">
                 <div class="import-info">
@@ -2354,8 +2354,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeAppointmentsImportModal()">Abbrechen</button>
-                <button class="btn-save" id="appointmentsImportBtn" onclick="executeAppointmentsImport()">Importieren</button>
+                <button class="btn-cancel" data-action="close-appointments-import-modal">Abbrechen</button>
+                <button class="btn-save" id="appointmentsImportBtn" data-action="execute-appointments-import">Importieren</button>
             </div>
         </div>
     </div>
@@ -2365,13 +2365,13 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Anwesenheiten importieren (CSV)</h2>
-                <span class="modal-close" onclick="closeRecordsImportModal()">&times;</span>
+                <span class="modal-close" data-action="close-records-import-modal">&times;</span>
             </div>
             <div class="modal-body">
                 <!-- Tab-Navigation -->
                 <div class="import-tabs">
-                    <button class="tab-btn active" onclick="switchImportTab('records')">Records Importieren</button>
-                    <button class="tab-btn" onclick="switchImportTab('analyze')">Termine Vorschlagen</button>
+                    <button class="tab-btn active" data-action="switch-import-tab" data-value="records">Records Importieren</button>
+                    <button class="tab-btn" data-action="switch-import-tab" data-value="analyze">Termine Vorschlagen</button>
                 </div>
 
                 <!-- Tab 1: Bestehender Records-Import -->
@@ -2445,7 +2445,7 @@
                             </div>
                         </div>
                         
-                        <button type="button" class="btn-save" onclick="analyzeCsvForAppointments()">Analysieren</button>
+                        <button type="button" class="btn-save" data-action="analyze-csv-for-appointments">Analysieren</button>
                     </form>
                     
                     <div id="suggestions-container" style="display:none; margin-top: 20px;">
@@ -2453,10 +2453,10 @@
                         <div id="suggestions-list" class="suggestions-list"></div>
                         
                         <div class="form-actions" style="margin-top: 20px;">
-                            <button onclick="createSelectedAppointments()" class="btn-save">
+                            <button data-action="create-selected-appointments" class="btn-save">
                                 Ausgewählte Termine anlegen
                             </button>
-                            <button onclick="clearSuggestions()" class="btn-secondary">
+                            <button data-action="clear-suggestions" class="btn-secondary">
                                 Verwerfen
                             </button>
                         </div>
@@ -2464,8 +2464,8 @@
                 </div>               
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeRecordsImportModal()">Abbrechen</button>
-                <button class="btn-save" id="recordsImportBtn" onclick="executeRecordsImport()">Importieren</button>
+                <button class="btn-cancel" data-action="close-records-import-modal">Abbrechen</button>
+                <button class="btn-save" id="recordsImportBtn" data-action="execute-records-import">Importieren</button>
             </div>
         </div>
     </div>
@@ -2474,12 +2474,12 @@
     <div class="modal" id="smtpConfigModal">
         <div class="modal-content">
             <div class="modal-header">            
-                <span class="close" onclick="closeSmtpConfigModal()">&times;</span>
+                <span class="close" data-action="close-smtp-config-modal">&times;</span>
                 <h2>SMTP-Server Konfiguration</h2>
             </div>
             
             <div class="modal-body">
-                <form id="smtpConfigForm" onsubmit="return false;">
+                <form id="smtpConfigForm" data-action-submit="prevent-submit">
                     <div class="form-group">
                         <label for="smtp_host">SMTP Server</label>
                         <input type="text" id="smtp_host" class="form-control" placeholder="mail.example.com" required>
@@ -2518,7 +2518,7 @@
                                 placeholder="Leer lassen um bestehendes zu behalten">
                             <button type="button" 
                                     class="btn-icon" 
-                                    onclick="togglePasswordVisibility('smtp_password')"
+                                    data-action="toggle-password-visibility" data-value="smtp_password"
                                     style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%);"
                                     title="Passwort anzeigen/verbergen">
                                 👁️
@@ -2530,10 +2530,10 @@
             </div>
                     
                 <div class="modal-footer">
-                    <button type="button" class="btn-std btn-modal-cancel" onclick="closeSmtpConfigModal()">
+                    <button type="button" class="btn-std btn-modal-cancel" data-action="close-smtp-config-modal">
                         Abbrechen
                     </button>
-                    <button type="button" class="btn-std btn-modal-success" onclick="saveSmtpConfig()">
+                    <button type="button" class="btn-std btn-modal-success" data-action="save-smtp-config">
                         💾 Speichern
                     </button>
                 </div>                
@@ -2546,7 +2546,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="workSessionModalTitle">Zeit nachtragen</h2>
-                <button class="close-modal" onclick="closeWorkSessionModal()">×</button>
+                <button class="close-modal" data-action="close-work-session-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="workSessionForm">
@@ -2599,8 +2599,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeWorkSessionModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveWorkSession()">Speichern</button>
+                <button class="btn-cancel" data-action="close-work-session-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-work-session">Speichern</button>
             </div>
         </div>
     </div>
@@ -2666,7 +2666,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="activityTypeModalTitle">Neue Tätigkeitsart</h2>
-                <button class="close-modal" onclick="closeActivityTypeModal()">×</button>
+                <button class="close-modal" data-action="close-activity-type-modal">×</button>
             </div>
             <div class="modal-body">
                 <form id="activityTypeForm">
@@ -2731,8 +2731,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeActivityTypeModal()">Abbrechen</button>
-                <button class="btn-save" onclick="saveActivityType()">Speichern</button>
+                <button class="btn-cancel" data-action="close-activity-type-modal">Abbrechen</button>
+                <button class="btn-save" data-action="save-activity-type">Speichern</button>
             </div>
         </div>
     </div>
@@ -2765,38 +2765,7 @@
     <!-- Hauptdatei -->
     <script type="module" src="./js/app.js"></script>
 
-    <script>
-        (async function checkInstallation() {
-            try {
-                // Prüfe ob API erreichbar und DB konfiguriert ist
-                const response = await fetch('./api/api.php?resource=ping', {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const result = await response.json();
-                
-                // Wenn "not_installed" Status → Weiterleitung
-                if (result.status === 'not_installed') {
-                    console.log('Installation erforderlich - Weiterleitung...');
-                    window.location.href = './install/';
-                }
-            } catch (error) {
-                // Bei Fehler auch zur Installation
-                console.warn('API nicht erreichbar - prüfe Installation');
-                
-                // Versuche Installation zu erreichen
-                try {
-                    const installCheck = await fetch('./install/index.php');
-                    if (installCheck.ok) {
-                        window.location.href = './install/';
-                    }
-                } catch (e) {
-                    console.error('Weder API noch Installation erreichbar');
-                }
-            }
-        })();
-        </script>
+    <script src="./js/install-check.js"></script>
 
 </body>
 </html>

@@ -17,8 +17,9 @@ import { loadTypes } from './management.js';
 import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
 import { globalPaginationValue } from './settings.js';
-import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS } from './responses.js';
+import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS, openResponsesModal } from './responses.js';
 import { appointmentTimeChips, localTodayIso, countChips, renderFilterChips, setResetEnabled } from './filter_chips.js';
+import { registerActions } from './actions.js';
 
 // ============================================
 // APPOINTMENTS
@@ -268,8 +269,8 @@ async function renderAppointments(appointments, page = 1) {
         // die Zeile ueber #appointmentsTableBody tr[data-appointment-id="<id>"].
         tr.dataset.appointmentId = apt.appointment_id;
 
-        // apt.color/apt.type_name kommen aus der Terminart (DB) -- ohne CSP
-        // (OI-17) muss hier selbst maskiert werden: Farbe ueber safeTypeColor(),
+        // apt.color/apt.type_name kommen aus der Terminart (DB) -- die CSP
+        // (OI-17) faengt kein eingeschleustes Markup, hier wird selbst maskiert: Farbe ueber safeTypeColor(),
         // Text per escapeHtml(). Die Farbe geht als CSS-Variable ins Markup,
         // das Aussehen steht im Stylesheet (.type-accent).
         // Der Trenner steht ausserhalb des Spans: Er ist Satzzeichen, nicht Teil
@@ -318,15 +319,15 @@ async function renderAppointments(appointments, page = 1) {
         const actionsHtml = isAdminOrManager ? `
             <td class="actions-cell">
                     ${appointmentHasStarted(apt) ? `<button class="action-btn btn-icon"
-                            onclick="jumpToAttendance(${Number(apt.appointment_id)}, 'list')"
+                            data-action="jump-to-attendance" data-id="${Number(apt.appointment_id)}" data-value="list"
                             title="Anwesenheit anzeigen" aria-label="Anwesenheit anzeigen">📋</button>` : ''}
                     <button class="action-btn btn-icon btn-edit"
-                            onclick="openAppointmentModal(${apt.appointment_id})"
+                            data-action="open-appointment-modal" data-id="${Number(apt.appointment_id)}"
                             title="Bearbeiten">
                         ✎
                     </button>
                     <button class="action-btn btn-icon btn-delete"
-                            onclick="deleteAppointment(${apt.appointment_id})"
+                            data-action="delete-appointment" data-id="${Number(apt.appointment_id)}"
                             title="Löschen">
                         🗑
                     </button>
@@ -376,16 +377,16 @@ function renderAppointmentsPagination(currentPage, totalPages, totalAppointments
         // Wenige Seiten (≤5): Alle Seitenzahlen ohne Pfeile
         for (let i = 1; i <= totalPages; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToAppointmentsPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-appointments-page" data-page="${Number(i)}">${i}</button>`;
         }
     } 
     else {
         // Erste Seite Button
         if (currentPage > 1) {
-            //html += `<button onclick="goToAppointmentsPage(1)" title="Erste Seite">
+            //html += `<button data-action="go-to-appointments-page" data-page="1" title="Erste Seite">
             //            «
             //        </button>`;
-            html += `<button onclick="goToAppointmentsPage(${currentPage - 1})" title="Vorherige Seite">
+            html += `<button data-action="go-to-appointments-page" data-page="${Number(currentPage - 1)}" title="Vorherige Seite">
                         ‹
                     </button>`;
         }
@@ -395,7 +396,7 @@ function renderAppointmentsPagination(currentPage, totalPages, totalAppointments
         const endPage = Math.min(totalPages, currentPage + 2);
         
         if (startPage > 1) {
-            html += `<button onclick="goToAppointmentsPage(1)">1</button>`;
+            html += `<button data-action="go-to-appointments-page" data-page="1">1</button>`;
             if (startPage > 2) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
@@ -403,22 +404,22 @@ function renderAppointmentsPagination(currentPage, totalPages, totalAppointments
         
         for (let i = startPage; i <= endPage; i++) {
             const activeClass = i === currentPage ? 'active' : '';
-            html += `<button class="${activeClass}" onclick="goToAppointmentsPage(${i})">${i}</button>`;
+            html += `<button class="${activeClass}" data-action="go-to-appointments-page" data-page="${Number(i)}">${i}</button>`;
         }
         
         if (endPage < totalPages) {
             if (endPage < totalPages - 1) {
                 html += `<span class="pagination-ellipsis">...</span>`;
             }
-            html += `<button onclick="goToAppointmentsPage(${totalPages})">${totalPages}</button>`;
+            html += `<button data-action="go-to-appointments-page" data-page="${Number(totalPages)}">${totalPages}</button>`;
         }
         
         // Letzte Seite Button
         if (currentPage < totalPages) {
-            html += `<button onclick="goToAppointmentsPage(${currentPage + 1})" title="Nächste Seite">
+            html += `<button data-action="go-to-appointments-page" data-page="${Number(currentPage + 1)}" title="Nächste Seite">
                         ›
                     </button>`;
-            //html += `<button onclick="goToAppointmentsPage(${totalPages})" title="Letzte Seite">
+            //html += `<button data-action="go-to-appointments-page" data-page="${Number(totalPages)}" title="Letzte Seite">
             //            »
             //        </button>`;
         }
@@ -432,8 +433,7 @@ function renderAppointmentsPagination(currentPage, totalPages, totalAppointments
     container.innerHTML = html;
 }
 
-// Global für onclick
-window.goToAppointmentsPage = function(page) {
+function goToAppointmentsPage(page) {
 
     // Aktuelle Scroll-Position der Tabelle speichern
     const tableContainer = document.querySelector('.data-table')?.parentElement;
@@ -452,11 +452,11 @@ window.goToAppointmentsPage = function(page) {
         if (paginationElement) {
             paginationElement.scrollIntoView({ 
                 behavior: 'smooth', 
-                block: 'nearest' 
+                block: 'nearest'
             });
         }
     }
-};
+}
 
 // Vergangen/Kommend als reine Anzeige (Spec 2026-09-22): Zaehler ueber die
 // gefilterte Liste, kein Klick -- der Kalender ist selbst die Zeitachse.
@@ -831,11 +831,11 @@ function calendarResponseLineHtml(apt, fest) {
     // Das Popup hier selbst entfernen. Der Dokument-Klick-Hoerer in
     // showAppointmentPopup() nimmt es seit OI-96 NICHT mehr mit: Er prueft die
     // Herkunft des Klicks, und dieser kommt aus dem Popup. Auch vorher war er
-    // kein Verlass -- er raeumte erst nach dem onclick auf und nur, wenn er
+    // kein Verlass -- er raeumte erst nach der Aktion auf und nur, wenn er
     // ueberhaupt schon registriert war (10 ms Verzoegerung).
     return `<div class="calendar-event-responses">
         <button type="button" class="response-summary-btn" title="${escapeHtml(title)}"
-            onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openResponsesModal(${Number(apt.appointment_id)})">${chips}</button>${own}
+            data-action="calendar-open-responses" data-id="${Number(apt.appointment_id)}">${chips}</button>${own}
     </div>`;
 }
 
@@ -864,6 +864,14 @@ function attendanceLineHtml(apt) {
     }
 
     return '';
+}
+
+/** Entfernt ein offenes Kalender-Popup. Die Popup-Knoepfe rufen das selbst,
+ *  bevor sie ein Modal oeffnen: Der Dokument-Klick-Hoerer des Popups prueft
+ *  seit OI-96 die Herkunft des Klicks und nimmt es bei einem Klick aus dem
+ *  Popup bewusst NICHT weg. */
+function closeCalendarPopup() {
+    document.querySelector('.calendar-event-popup')?.remove();
 }
 
 /**
@@ -926,8 +934,8 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
     let html = `<h4>${kopf}</h4>`;
     appointments.forEach(apt => {
         // apt.color und apt.type_name kommen aus der Terminart (DB) und landen
-        // in style-Attribut und Markup -- ohne CSP (OI-17) muss hier selbst
-        // geprueft werden: Farbe ueber safeTypeColor(), Text per escapeHtml().
+        // in style-Attribut und Markup -- die CSP (OI-17) faengt kein
+        // Markup und keine Attribute, hier wird selbst geprueft: Farbe ueber safeTypeColor(), Text per escapeHtml().
         // Die Farbe geht als CSS-Variable ins Markup, das Aussehen steht im
         // Stylesheet (.calendar-event-block).
         const typeColor = safeTypeColor(apt.color);
@@ -974,9 +982,9 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
                 ${apt.responses ? calendarResponseLineHtml(apt, fest) : ''}
                 ${attendanceLineHtml(apt)}
                 ${fest && isAdminOrManager ? `<button type="button" class="calendar-event-edit"
-                    onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openAppointmentModal(${Number(apt.appointment_id)})">Bearbeiten</button>` : ''}
+                    data-action="calendar-open-appointment" data-id="${Number(apt.appointment_id)}">Bearbeiten</button>` : ''}
                 ${fest && isAdminOrManager && appointmentHasStarted(apt) ? `<button type="button" class="calendar-event-edit"
-                    onclick="document.querySelector('.calendar-event-popup')?.remove(); window.jumpToAttendance(${Number(apt.appointment_id)})">Anwesenheit</button>` : ''}
+                    data-action="calendar-jump-to-attendance" data-id="${Number(apt.appointment_id)}">Anwesenheit</button>` : ''}
             </div>
         `;
     });
@@ -985,7 +993,7 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
     const tagDatum = appointments[0].date;
     if (fest && isAdminOrManager && /^\d{4}-\d{2}-\d{2}$/.test(tagDatum)) {
         html += `<button type="button" class="calendar-event-add"
-            onclick="document.querySelector('.calendar-event-popup')?.remove(); window.openAppointmentModal(null, { date: '${tagDatum}' })">+ Termin an diesem Tag</button>`;
+            data-action="calendar-new-appointment" data-date="${escapeHtml(tagDatum)}">+ Termin an diesem Tag</button>`;
     }
 
     popup.innerHTML = html;
@@ -1042,7 +1050,7 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
      * - Escape: aus dem Fang heraus gerufen, mit Fokusrueckgabe
      * - Klick daneben: aus dem Hoerer unten
      * - Knopf im Popup ("Bearbeiten", "Anwesenheit", "+ Termin", die
-     *   Rueckmeldezeile): Der entfernt das Popup per Inline-onclick selbst,
+     *   Rueckmeldezeile): Der entfernt das Popup in seiner Aktion selbst,
      *   OHNE hier durchzukommen. Erst der naechste Klick irgendwohin fuehrt
      *   vorbei -- dann ist nur noch aufzuraeumen, siehe isConnected unten.
      *
@@ -1662,8 +1670,8 @@ export async function saveAppointment() {
 export async function deleteAppointment(appointmentId) {
     // Titel aus dem Cache holen statt aus dem onclick-Attribut: ein Termin-Titel
     // mit Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als
-    // Code einschleusen (kein CSP im Projekt) -- Muster aus deleteGroup()/
-    // deleteType() in management.js (Commit ad200ba).
+    // Code einschleusen (Defense in Depth, die CSP blockt Inline-Code ohnehin) --
+    // Muster aus deleteGroup()/deleteType() in management.js (Commit ad200ba).
     const cached = dataCache.appointments[currentYear]?.data?.find(a => a.appointment_id == appointmentId);
     const title = cached ? cached.title : 'diesem Termin';
 
@@ -1846,13 +1854,13 @@ export async function jumpToAttendance(appointmentId, from = 'calendar') {
         return;
     }
 
-    // Die Herkunft kommt aus einem onclick-Attribut, also aus dem DOM. Nur
+    // Die Herkunft kommt aus einem data-value-Attribut, also aus dem DOM. Nur
     // 'calendar' und 'list' sind gueltig, alles andere faellt auf den Kalender
     // zurueck -- sonst entschiede ein Tippfehler stillschweigend den Rueckweg.
     const origin = from === 'list' ? 'list' : 'calendar';
 
     // Scheitert der dynamische Import (Netzaussetzer, Cache-Miss nach einem
-    // Update), lehnt das Promise ab. Der Aufrufer ist ein onclick -- ohne
+    // Update), lehnt das Promise ab. Der Aufrufer ist eine Aktion -- ohne
     // catch landet die Ablehnung unbehandelt in der Konsole und der Knopf
     // wirkt tot.
     let openAttendanceForAppointment;
@@ -1867,29 +1875,46 @@ export async function jumpToAttendance(appointmentId, from = 'calendar') {
     await openAttendanceForAppointment(apt.appointment_id, apt.date, origin);
 }
 
-// ============================================
-// GLOBAL EXPORTS (für onclick in HTML)
-// ============================================
-
-// Globale Funktionen für HTML onclick
-window.openAppointmentModal = openAppointmentModal;
-window.saveAppointment = saveAppointment;
-window.closeAppointmentModal = () => document.getElementById('appointmentModal').classList.remove('active');
-window.deleteAppointment = deleteAppointment;
-window.previousMonth = previousMonth;
-window.nextMonth = nextMonth;
-window.goToToday = goToToday;
-window.showAppointmentSection = showAppointmentSection;
-window.resetAppointmentFilter = resetAppointmentFilter;
-window.toggleAppointmentRepeat = toggleAppointmentRepeat;
-window.updateAppointmentRepeatFields = updateAppointmentRepeatFields;
-window.openSeriesExtend = openSeriesExtend;
-window.previewSeriesExtend = previewSeriesExtend;
-window.openSeriesRuleChange = openSeriesRuleChange;
-window.jumpToAttendance = jumpToAttendance;
-
 // Fuer responses.js (FI-1): Terminliste auf der aktuell gezeigten Seite neu
 // laden, ohne die Seite zu wechseln. Der Cache wurde vorher per
 // invalidateCache('appointments', jahr) geleert, forceReload=false reicht
 // deshalb -- loadAppointments() faellt automatisch auf den API-Abruf zurueck.
-window.refreshAppointmentsKeepPage = () => showAppointmentSection(false, currentAppointmentsPage);
+// responses.js importiert die Funktion; der Kreis appointments <-> responses
+// ist unbedenklich, weil keines der beiden Module beim Laden (oberste Ebene)
+// etwas vom anderen aufruft -- nur spaeter, aus Klicks und Antworten heraus.
+export function refreshAppointmentsKeepPage() {
+    return showAppointmentSection(false, currentAppointmentsPage);
+}
+
+registerActions({
+    'calendar-jump-to-attendance': (el) => {
+        closeCalendarPopup();
+        jumpToAttendance(Number(el.dataset.id));
+    },
+    'calendar-new-appointment': (el) => {
+        closeCalendarPopup();
+        openAppointmentModal(null, { date: el.dataset.date });
+    },
+    'calendar-open-appointment': (el) => {
+        closeCalendarPopup();
+        openAppointmentModal(Number(el.dataset.id));
+    },
+    'calendar-open-responses': (el) => {
+        closeCalendarPopup();
+        openResponsesModal(Number(el.dataset.id));
+    },
+    'close-appointment-modal': () => closeAppointmentModal(),
+    'delete-appointment': (el) => deleteAppointment(Number(el.dataset.id)),
+    'go-to-appointments-page': (el) => goToAppointmentsPage(Number(el.dataset.page)),
+    'go-to-today': () => goToToday(),
+    'jump-to-attendance': (el) => jumpToAttendance(Number(el.dataset.id), el.dataset.value),
+    'next-month': () => nextMonth(),
+    'open-appointment-modal': (el) => openAppointmentModal(el.dataset.id ? Number(el.dataset.id) : null),
+    'open-series-extend': () => openSeriesExtend(),
+    'open-series-rule-change': () => openSeriesRuleChange(),
+    'preview-series-extend': () => previewSeriesExtend(),
+    'previous-month': () => previousMonth(),
+    'save-appointment': () => saveAppointment(),
+    'toggle-appointment-repeat': () => toggleAppointmentRepeat(),
+    'update-appointment-repeat-fields': () => updateAppointmentRepeatFields(),
+});

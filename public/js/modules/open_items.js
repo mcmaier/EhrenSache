@@ -18,6 +18,7 @@
 
 import { apiCall } from './api.js';
 import { escapeHtml } from './utils.js';
+import { openResponsesModal } from './responses.js';
 
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
@@ -78,7 +79,7 @@ function onListClick(event) {
     const btn = event.target.closest('.open-item');
     if (!btn) return;
     if (btn.dataset.kind === 'response') {
-        window.openResponsesModal?.(Number(btn.dataset.appointmentId));
+        openResponsesModal(Number(btn.dataset.appointmentId));
     } else if (btn.dataset.kind === 'exception') {
         goToSection('antraege');
     } else {

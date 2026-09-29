@@ -87,7 +87,7 @@ Funktion wirklich aufruft (etwa `window.ImportLogs`), bleibt der Export oder wir
 
 | Stelle | Heute | Danach |
 |---|---|---|
-| Kalender-Popup (`appointments.js`, 5×) | zwei Anweisungen: Popup entfernen, dann Modal öffnen | eine Aktion, die beides tut |
+| Kalender-Popup (`appointments.js`, 4×) | zwei Anweisungen: Popup entfernen, dann Modal öffnen | eine Aktion, die beides tut |
 | Mitgliedszeiträume (`updateMembershipDate`, 3×) | `this.value` | `element.value`, Feld und ID als `data-*` |
 | Toast schließen (`ui.js`) | `this.parentElement.remove()` | Aktion `toast-close` |
 | Hover in zwei Listen (`management.js`, `members.js`, je ein Paar `onmouseover`/`onmouseout`) | setzt `style.background` | CSS-Regel mit `:hover`, kein Skript |
@@ -126,6 +126,22 @@ PHP-Seiten), **nicht** auf Verzeichnisebene — sonst griffe die Richtlinie auch
 `<Files "index.html">`-Abschnitt auch über `DirectoryIndex` anwendet, zeigt der HTTP-Test in
 `csp.php`. Greift er nicht, wird die Kopfzeile auf den Aufruf über `DirectoryIndex` ausgeweitet und
 die gewählte Form hier nachgetragen.
+
+**Belegt (Task 18):** `<Files "index.html">` greift auch beim Aufruf über `DirectoryIndex` (`/`
+liefert die Kopfzeile; `/index.html` leitet ohnehin per 301 auf `/` um). Dafür trifft der Abschnitt
+aber auch `checkin/index.html` und `station/index.html`, und Apache wertet `<Files>` nach den
+`.htaccess` der Unterverzeichnisse aus: Mit `Header always set` überschrieb die Dashboard-Richtlinie
+die eigene der Check-in-PWA (dort `img-src 'self' data:`). Deshalb steht beim Dashboard
+`Header always setifempty` — die Richtlinie gilt nur, wo noch keine gesetzt ist. Der HTTP-Test in
+`csp.php` fängt einen Rückfall auf `set` über die Check-in-PWA ab.
+
+Der im Plan vorgesehene Ausweichweg über `<If "%{REQUEST_URI} …">` blieb ungenutzt: Er hätte
+ebenso `/install/`, `/update/`, `/checkin/` und `/station/` getroffen, `<Files>` mit `setifempty`
+reicht.
+
+**Abweichung beim Zählen:** Die Aktion `apply-record-filters` entfiel. Die drei
+`onchange="applyRecordFilters()"` in `index.html` standen nur in HTML-Kommentaren; die Filter der
+Anwesenheit sind per `addEventListener` verdrahtet.
 
 ## Tests
 

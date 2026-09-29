@@ -31,3 +31,6 @@ private/.update-tmp/
 
 # Mockups des visuellen Brainstorming-Begleiters (superpowers)
 .superpowers/
+
+# Klickdurchgang (tests/browser): Abhaengigkeiten nur lokal
+tests/browser/node_modules/

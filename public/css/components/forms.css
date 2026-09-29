@@ -301,3 +301,9 @@
 .date-checklist-note.is-conflict {
     color: var(--danger-color);
 }
+
+/* Gruppenauswahl in Mitglieds- und Terminart-Dialog (OI-17: vorher
+   onmouseover/onmouseout im Markup, das die CSP nicht ausfuehrt) */
+.group-choice:hover {
+    background: var(--bg-gray);
+}

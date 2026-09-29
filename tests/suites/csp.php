@@ -21,7 +21,7 @@ require_once __DIR__ . '/../lib/api.php';
  * einem Fehler, sondern mit einem Knopf, der nichts tut. Diese Suite haelt
  * deshalb zweierlei fest:
  *
- * 1. Die drei Oberflaechen enthalten keinen Inline-Code, der unter der
+ * 1. Die Oberflaechen enthalten keinen Inline-Code, der unter der
  *    Richtlinie ausfiele (Handler-Attribute, Inline-Skripte, javascript:-URLs).
  * 2. Die Richtlinie ist gesetzt, wirkt nur dort, wo sie hingehoert, und
  *    verzichtet in script-src auf jede Aufweichung.
@@ -30,12 +30,12 @@ require_once __DIR__ . '/../lib/api.php';
  * Kommentar dagegen schon: Lieber ein Fehlalarm als ein Waechter, den ein
  * erklaerender Kommentar gruen haelt (OI-107).
  *
- * Das Dashboard (index.html) ist Etappe 2 und hier bewusst nicht erfasst.
+ * Seit Etappe 2 (Spec 2026-09-29) gehoeren das Dashboard und die oeffentlichen PHP-Seiten dazu.
  */
 
 $cspRoot = dirname(__DIR__, 2);
 
-/** Die Dateien der Etappe 1, deren Markup oder Code unter die CSP faellt. */
+/** Die Dateien, deren Markup oder Code unter die CSP faellt. */
 $cspSurfaces = [
     'Anmeldung' => [
         'html' => ['/public/login.html'],
@@ -48,6 +48,20 @@ $cspSurfaces = [
     'Station' => [
         'html' => ['/public/station/index.html'],
         'js'   => ['/public/station/js/app.js', '/public/station/service-worker.js'],
+    ],
+    'Dashboard' => [
+        'html' => ['/public/index.html'],
+        'js'   => array_merge(
+            ['/public/js/app.js', '/public/js/install-check.js'],
+            array_map(
+                static fn (string $f): string => substr(str_replace('\\', '/', $f), strlen(str_replace('\\', '/', dirname(__DIR__, 2)))),
+                glob(dirname(__DIR__, 2) . '/public/js/modules/*.js') ?: []
+            )
+        ),
+    ],
+    'Oeffentliche Seiten' => [
+        'html' => ['/public/reset_password.php', '/public/verify_email.php'],
+        'js'   => [],
     ],
 ];
 
@@ -127,7 +141,7 @@ function cspHeadersIn(string $htaccess): array
             $files = null;
             continue;
         }
-        if (preg_match('/^Header\s+(?:always\s+)?set\s+(Content-Security-Policy(?:-Report-Only)?)\s+"([^"]+)"$/i', $line, $m) === 1) {
+        if (preg_match('/^Header\s+(?:always\s+)?(?:set|setifempty)\s+(Content-Security-Policy(?:-Report-Only)?)\s+"([^"]+)"$/i', $line, $m) === 1) {
             $found[] = ['files' => $files, 'directive' => $m[1], 'policy' => $m[2]];
         }
     }
@@ -152,9 +166,12 @@ function cspParse(string $policy): array
 
 /** Wo die Richtlinie der jeweiligen Oberflaeche steht. */
 $cspLocations = [
-    'Anmeldung'    => ['htaccess' => '/public/.htaccess',         'files' => 'login.html', 'url' => '/login.html'],
-    'Check-in-PWA' => ['htaccess' => '/public/checkin/.htaccess', 'files' => null,         'url' => '/checkin/'],
-    'Station'      => ['htaccess' => '/public/station/.htaccess', 'files' => null,         'url' => '/station/'],
+    'Anmeldung'    => ['htaccess' => '/public/.htaccess',         'files' => 'login.html', 'url' => '/login.html', 'script' => ["'self'"]],
+    'Check-in-PWA' => ['htaccess' => '/public/checkin/.htaccess', 'files' => null,         'url' => '/checkin/',   'script' => ["'self'"]],
+    'Station'      => ['htaccess' => '/public/station/.htaccess', 'files' => null,         'url' => '/station/',   'script' => ["'self'"]],
+    'Dashboard'    => ['htaccess' => '/public/.htaccess',         'files' => 'index.html', 'url' => '/',           'script' => ["'self'"]],
+    'Oeffentliche Seiten' => ['htaccess' => '/public/.htaccess', 'files' => '^(reset_password|verify_email)\.php$',
+                              'url' => '/verify_email.php', 'more_urls' => ['/reset_password.php'], 'script' => ["'none'"]],
 ];
 
 /** Die eine CSP-Kopfzeile einer Oberflaeche, oder ein Testfehler. */
@@ -177,17 +194,19 @@ function cspPolicyFor(string $root, array $loc, string $label): array
 // 1. Kein Inline-Code
 // ---------------------------------------------------------------------------
 
-test('CSP Etappe 1: keine Inline-Handler in HTML und JS-Templates', function () use ($cspRoot, $cspSurfaces) {
+test('CSP: keine Inline-Handler in HTML und JS-Templates', function () use ($cspRoot, $cspSurfaces) {
     // Das Muster verlangt ein Anfuehrungszeichen hinter dem "=": Es trifft
-    // onclick="…" im Markup und in Template-Strings, nicht aber die erlaubte
-    // Zuweisung el.onclick = fn.
+    // onclick="…" im Markup und in Template-Strings, nicht aber die Zuweisung
+    // el.onclick = fn. Die bleibt in PWA und Station erlaubt; im Dashboard
+    // verbietet sie actions_frontend.php, weil sie neben data-action doppelt
+    // ausloest.
     $pattern = '/(?<![\w.-])on' . CSP_EVENT_PATTERN . '\s*=\s*["\'`]/i';
 
     $fehler = [];
     foreach ($cspSurfaces as $label => $files) {
         foreach (array_merge($files['html'], $files['js']) as $rel) {
             $src = (string) sourceCode($cspRoot . $rel);
-            if (str_ends_with($rel, '.html')) {
+            if (str_ends_with($rel, '.html') || str_ends_with($rel, '.php')) {
                 $src = cspStripHtmlComments($src);
             }
             $hits = cspCodeLinesMatching($src, $pattern);
@@ -200,7 +219,7 @@ test('CSP Etappe 1: keine Inline-Handler in HTML und JS-Templates', function () 
     assertTrue($fehler === [], "Inline-Handler fallen unter der CSP still aus:\n  " . implode("\n  ", $fehler));
 });
 
-test('CSP Etappe 1: kein setAttribute mit on…-Handler', function () use ($cspRoot, $cspSurfaces) {
+test('CSP: kein setAttribute mit on…-Handler', function () use ($cspRoot, $cspSurfaces) {
     $pattern = '/setAttribute\(\s*["\']on/i';
 
     $fehler = [];
@@ -216,7 +235,7 @@ test('CSP Etappe 1: kein setAttribute mit on…-Handler', function () use ($cspR
     assertTrue($fehler === [], "Handler per setAttribute sind Inline-Code:\n  " . implode("\n  ", $fehler));
 });
 
-test('CSP Etappe 1: keine Inline-Skripte', function () use ($cspRoot, $cspSurfaces) {
+test('CSP: keine Inline-Skripte', function () use ($cspRoot, $cspSurfaces) {
     $fehler = [];
     foreach ($cspSurfaces as $files) {
         foreach ($files['html'] as $rel) {
@@ -234,14 +253,29 @@ test('CSP Etappe 1: keine Inline-Skripte', function () use ($cspRoot, $cspSurfac
     assertTrue($fehler === [], "Inline-Skripte blockiert die CSP:\n  " . implode("\n  ", $fehler));
 });
 
-test('CSP Etappe 1: keine javascript:-URLs', function () use ($cspRoot, $cspSurfaces) {
+test('CSP Etappe 2: die oeffentlichen PHP-Seiten enthalten gar kein Skript', function () use ($cspRoot) {
+    // script-src 'none' (Spec 2026-09-29): Jedes <script>, auch mit src,
+    // wuerde blockiert. Wer dort eines einfuehrt, muss die Richtlinie aendern.
+    $fehler = [];
+    foreach (['/public/reset_password.php', '/public/verify_email.php'] as $rel) {
+        $src = cspStripHtmlComments((string) sourceCode($cspRoot . $rel));
+        if (preg_match_all('/<script\b[^>]*>/i', $src, $m)) {
+            foreach ($m[0] as $tag) {
+                $fehler[] = "{$rel}: {$tag}";
+            }
+        }
+    }
+    assertTrue($fehler === [], "Skript auf einer Seite mit script-src 'none':\n  " . implode("\n  ", $fehler));
+});
+
+test('CSP: keine javascript:-URLs', function () use ($cspRoot, $cspSurfaces) {
     $pattern = '/(?:href|src|action)\s*=\s*["\'`]?\s*javascript:/i';
 
     $fehler = [];
     foreach ($cspSurfaces as $files) {
         foreach (array_merge($files['html'], $files['js']) as $rel) {
             $src = (string) sourceCode($cspRoot . $rel);
-            if (str_ends_with($rel, '.html')) {
+            if (str_ends_with($rel, '.html') || str_ends_with($rel, '.php')) {
                 $src = cspStripHtmlComments($src);
             }
             $hits = cspCodeLinesMatching($src, $pattern);
@@ -258,7 +292,7 @@ test('CSP Etappe 1: keine javascript:-URLs', function () use ($cspRoot, $cspSurf
 // 2. Die Richtlinie
 // ---------------------------------------------------------------------------
 
-test('CSP Etappe 1: jede Oberflaeche hat genau eine scharfe Richtlinie', function () use ($cspRoot, $cspLocations) {
+test('CSP: jede Oberflaeche hat genau eine scharfe Richtlinie', function () use ($cspRoot, $cspLocations) {
     foreach ($cspLocations as $label => $loc) {
         $header = cspPolicyFor($cspRoot, $loc, $label);
 
@@ -269,7 +303,7 @@ test('CSP Etappe 1: jede Oberflaeche hat genau eine scharfe Richtlinie', functio
         $csp = cspParse($header['policy']);
 
         assertSame(["'self'"], $csp['default-src'] ?? null, "{$label}: default-src muss 'self' sein");
-        assertSame(["'self'"], $csp['script-src'] ?? null,
+        assertSame($loc['script'], $csp['script-src'] ?? null,
             "{$label}: script-src muss genau 'self' sein — jede weitere Quelle weicht den XSS-Schutz auf");
         assertSame(["'none'"], $csp['object-src'] ?? null, "{$label}: object-src muss 'none' sein");
         assertSame(["'self'"], $csp['base-uri'] ?? null, "{$label}: base-uri muss 'self' sein");
@@ -290,19 +324,19 @@ test('CSP Etappe 1: jede Oberflaeche hat genau eine scharfe Richtlinie', functio
     }
 });
 
-test('CSP Etappe 1: die Richtlinie der Anmeldung gilt nicht fuer das Dashboard', function () use ($cspRoot) {
-    // index.html traegt noch ueber hundert Inline-Handler (Etappe 2). Eine CSP
-    // auf Verzeichnisebene in public/.htaccess wuerde sie still lahmlegen.
-    $headers = cspHeadersIn((string) sourceCode($cspRoot . '/public/.htaccess'));
-    foreach ($headers as $h) {
-        assertSame('login.html', $h['files'],
-            'public/.htaccess setzt eine CSP ausserhalb von <Files "login.html"> — das trifft auch das Dashboard');
+test('CSP: public/.htaccess setzt Richtlinien nur in Files-Abschnitten', function () use ($cspRoot) {
+    // Auf Verzeichnisebene griffe eine Richtlinie auch in install/ und update/,
+    // die nicht dafuer vorbereitet sind (Spec 2026-09-29).
+    $erlaubt = ['login.html', 'index.html', '^(reset_password|verify_email)\.php$'];
+    foreach (cspHeadersIn((string) sourceCode($cspRoot . '/public/.htaccess')) as $h) {
+        assertTrue(in_array($h['files'], $erlaubt, true),
+            'public/.htaccess setzt eine CSP ausserhalb der erlaubten Files-Abschnitte: ' . var_export($h['files'], true));
     }
 });
 
 // Dass keine Oberflaeche Skripte von aussen laedt, prueft tests/suites/assets.php.
 
-test('CSP Etappe 1: der Server liefert die Richtlinie aus', function () use ($cspRoot, $cspLocations) {
+test('CSP: der Server liefert die Richtlinie aus', function () use ($cspRoot, $cspLocations) {
     // Die Kopfzeile in der .htaccess nuetzt nichts, wenn mod_headers fehlt
     // oder der <Files>-Abschnitt den Aufruf nicht trifft.
     $base = rtrim(testConfig()['base_url'], '/');
@@ -310,40 +344,30 @@ test('CSP Etappe 1: der Server liefert die Richtlinie aus', function () use ($cs
     foreach ($cspLocations as $label => $loc) {
         $expected = cspPolicyFor($cspRoot, $loc, $label)['policy'];
 
-        $got = null;
-        $ch  = curl_init($base . $loc['url']);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $header) use (&$got): int {
-            if (stripos($header, 'Content-Security-Policy:') === 0) {
-                $got = trim(substr($header, strlen('Content-Security-Policy:')));
-            }
+        foreach (array_merge([$loc['url']], $loc['more_urls'] ?? []) as $url) {
+            // Alle CSP-Kopfzeilen sammeln statt die letzte zu behalten: Zwei
+            // Richtlinien gelten im Browser gemeinsam, und eine zweite, etwa
+            // aus einer uebergeordneten Konfiguration, soll auffallen statt
+            // von der erwarteten ueberschrieben zu werden.
+            $got = [];
+            $ch  = curl_init($base . $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $header) use (&$got): int {
+                if (stripos($header, 'Content-Security-Policy:') === 0) {
+                    $got[] = trim(substr($header, strlen('Content-Security-Policy:')));
+                }
 
-            return strlen($header);
-        });
-        $ok     = curl_exec($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+                return strlen($header);
+            });
+            $ok     = curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
 
-        assertTrue($ok !== false, "{$label}: {$loc['url']} nicht erreichbar");
-        assertSame(200, $status, "{$label}: {$loc['url']} liefert HTTP {$status}");
-        assertSame($expected, $got, "{$label}: {$loc['url']} liefert nicht die CSP aus {$loc['htaccess']}");
-    }
-
-    // Gegenprobe: das Dashboard bleibt bis Etappe 2 ohne Richtlinie.
-    $got = null;
-    $ch  = curl_init($base . '/');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-    curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $header) use (&$got): int {
-        if (stripos($header, 'Content-Security-Policy') === 0) {
-            $got = trim($header);
+            assertTrue($ok !== false, "{$label}: {$url} nicht erreichbar");
+            assertTrue($status > 0 && $status < 500, "{$label}: {$url} liefert HTTP {$status}");
+            assertSame(1, count($got), "{$label}: {$url} liefert " . count($got) . ' CSP-Kopfzeilen statt genau einer');
+            assertSame($expected, $got[0] ?? null, "{$label}: {$url} liefert nicht die CSP aus {$loc['htaccess']}");
         }
-
-        return strlen($header);
-    });
-    curl_exec($ch);
-    curl_close($ch);
-
-    assertSame(null, $got, 'Das Dashboard erhaelt eine CSP, obwohl es noch Inline-Handler traegt (Etappe 2)');
+    }
 });
