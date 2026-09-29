@@ -73,8 +73,11 @@ Navigationen, der QR-Code ist Inline-SVG), keine Fremdquellen und nutzt kein `ev
 `assets.php`). Der Knopf tut sichtbar nichts — der Fehler steht in der Konsole statt still verloren
 zu gehen.
 
-**Namen:** `bereich-verb`, z. B. `member-save`, `records-page`, `calendar-open-appointment`.
-Nur als Literal im Markup, **nie** zusammengesetzt (`data-action="${x}"` ist verboten), sonst ist
+**Namen:** die Kebab-Form des aufgerufenen Funktionsnamens — `saveMember` → `save-member`,
+`goToMembersPage` → `go-to-members-page`, `ImportLogs.showDetails` → `import-logs-show-details`.
+Mechanisch ableitbar, damit bei rund 120 Aktionen kein Name erfunden werden muss. Eigene Namen
+nur für Aktionen ohne gleichnamige Funktion (`toast-close`, `app-reset-reload`, `prevent-submit`,
+die vier `calendar-…` des Popups). Nur als Literal im Markup, **nie** zusammengesetzt (`data-action="${x}"` ist verboten), sonst ist
 der statische Abgleich blind.
 
 **`window.*`-Exporte:** Die nur für Inline-Handler bestehenden entfallen. Wo ein anderes Modul eine
