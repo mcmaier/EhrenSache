@@ -2984,6 +2984,9 @@ Ein Monat ist damit kein eigener Parameter, sondern ein Zeitraum:
 - `format=csv`: CSV-Datei (`;` als Trennzeichen, UTF-8 mit BOM). Der Dateiname trägt den
   Zeitraum: `stundennachweis_2026-01.csv`, `taetigkeiten_2026.csv`,
   `termine_2026-02-01_2026-03-31.csv`.
+  Der Stundennachweis (`worktime_member`) führt je Sitzung hinter `proof` die Spalte `source`:
+  wie die Sitzung entstanden ist (`Timer`, `Nachgetragen`, `Admin`, `Import`,
+  `Station (PIN)`), in der Druckansicht als Spalte „Quelle“ (seit OI-33).
 - `format=html`: HTML-Seite mit Vereinslogo, Zeitraum, Tabelle, Summen und Fußnote, gestaltet
   über `public/css/print.css`. Enthält kein JavaScript; gedruckt wird über den Browserdialog.
 

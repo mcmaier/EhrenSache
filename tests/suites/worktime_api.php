@@ -2014,6 +2014,49 @@ test(") === false,
  * er wusste von ihnen nichts. Der Waechter darueber haelt die Reihenfolge
  * fest.
  */
+test('export: der Stundennachweis nennt die Quelle jeder Sitzung (OI-33)', function () {
+    enableWorktime();
+    $activityId = createActivityType('Quelle ' . uniqid());
+    $marker = 'Quelle-' . uniqid();
+
+    // Nachgetragen von user -> source "manual"
+    $id = (int) createManualSession('user', $activityId, ['note' => $marker])['body']['session']['session_id'];
+    apiRequest('PUT', 'work_sessions', [
+        'token' => apiToken('manager'), 'query' => ['id' => $id], 'body' => ['action' => 'approve'],
+    ]);
+
+    try {
+        $csv = apiRequest('GET', 'export', [
+            'token' => apiToken('admin'),
+            'query' => ['type' => 'worktime_member', 'format' => 'csv', 'year' => date('Y')],
+        ]);
+        assertStatus(200, $csv);
+        $lines = preg_split('/\r?\n/', ltrim($csv['raw'], "\xEF\xBB\xBF"));
+        $head = str_getcsv($lines[0], ';');
+        $proof = array_search('proof', $head, true);
+        $source = array_search('source', $head, true);
+        assertTrue($source !== false, 'Spalte source fehlt im CSV: ' . $lines[0]);
+        assertSame($proof + 1, $source, 'source steht nicht direkt hinter proof');
+
+        $row = null;
+        foreach ($lines as $line) {
+            if (str_contains($line, $marker)) {
+                $row = str_getcsv($line, ';');
+            }
+        }
+        assertTrue($row !== null, 'Sitzung fehlt im Nachweis');
+        assertSame('Nachgetragen', $row[$source], 'Quelle der nachgetragenen Sitzung falsch');
+
+        $html = apiRequest('GET', 'export', [
+            'token' => apiToken('admin'),
+            'query' => ['type' => 'worktime_member', 'format' => 'html', 'year' => date('Y')],
+        ]);
+        assertTrue(str_contains($html['raw'], '<th>Quelle</th>'), 'Druckansicht ohne Spalte Quelle');
+    } finally {
+        deleteSession($id);
+    }
+});
+
 test('Aufraeumen: die Suite entfernt alles, was sie angelegt hat', function () {
     enableWorktime();
     stopRunningIfAny();

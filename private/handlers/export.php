@@ -254,6 +254,23 @@ function worktimeProofLabel(string $proof): string
     }
 }
 
+/**
+ * Wie eine Sitzung entstanden ist (work_sessions.source), in Worten wie in
+ * der Dashboard-Liste -- ohne deren Zeichen, die im CSV stoeren (OI-33).
+ * Eine Kiosk-Sitzung war im Nachweis bisher nur am Ortsnamen erkennbar.
+ */
+function worktimeSourceLabel(?string $source): string
+{
+    switch ($source) {
+        case 'timer':   return 'Timer';
+        case 'manual':  return 'Nachgetragen';
+        case 'admin':   return 'Admin';
+        case 'import':  return 'Import';
+        case 'station': return 'Station (PIN)';
+        default:        return '';
+    }
+}
+
 // ============================================
 // ZEITRAUM UND AUSGABEFORMAT
 // ============================================
@@ -385,7 +402,7 @@ function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
                ws.start_time, ws.end_time, ws.break_minutes,
                {$duration} AS minutes,
                {$proof}    AS proof,
-               ws.start_location_name, ws.end_location_name,
+               ws.start_location_name, ws.end_location_name, ws.source,
                ws.note, a.title AS appointment_title
         FROM {$prefix}work_sessions ws
         LEFT JOIN {$prefix}members m         ON ws.member_id     = m.member_id
@@ -417,6 +434,7 @@ function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
                 $r['break_minutes'],
                 worktimeHours((int) $r['minutes']),
                 worktimeProofLabel($r['proof']),
+                worktimeSourceLabel($r['source']),
                 $r['appointment_title'] ?? '',
                 $r['note'] ?? '',
             ];
@@ -435,7 +453,7 @@ function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
                 [
                     'heading' => null,
                     'columns' => ['Mitglied', 'Mitgliedsnr.', 'Tätigkeit', 'Beginn', 'Ende',
-                                  'Pause (min)', 'Stunden', 'Nachweis', 'Termin', 'Notiz'],
+                                  'Pause (min)', 'Stunden', 'Nachweis', 'Quelle', 'Termin', 'Notiz'],
                     'rows'    => $reportRows,
                     'empty'   => 'Für diesen Zeitraum sind keine bestätigten Sitzungen erfasst.',
                 ],
@@ -458,7 +476,7 @@ function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
     $output = fopen('php://output', 'w');
     csvRow($output, ['member_name', 'member_surname', 'member_number', 'activity',
                       'start_time', 'end_time', 'break_minutes', 'minutes', 'hours',
-                      'proof', 'start_location', 'end_location', 'appointment', 'note'], ';');
+                      'proof', 'source', 'start_location', 'end_location', 'appointment', 'note'], ';');
 
     foreach ($rows as $r) {
         csvRow($output, [
@@ -467,6 +485,7 @@ function exportWorktimeMember($db, $database, ?int $forceMemberId = null) {
             $r['start_time'], $r['end_time'], $r['break_minutes'],
             $r['minutes'], worktimeHours((int) $r['minutes']),
             worktimeProofLabel($r['proof']),
+            worktimeSourceLabel($r['source']),
             $r['start_location_name'], $r['end_location_name'],
             $r['appointment_title'], $r['note'],
         ], ';');
