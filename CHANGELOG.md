@@ -17,6 +17,13 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   auch keine andere Spalte. In inaktiven Mitgliederzeilen scheint die festgehaltene Spalte nicht
   durch (OI-92).
 
+### Behoben
+- **Das Dashboard leert Gruppen, Terminarten und Profildaten im Zwischenspeicher sauber.**
+  `invalidateCache()` hielt diese Einträge für jahresabhängig und schrieb in `data` und
+  `timestamp` je ein Objekt statt einer leeren Liste. Neu geladen wurde trotzdem, aber nur, weil
+  die Gültigkeitsprüfung daraus zufällig „ungültig“ errechnete. Jahresabhängige Daten sind nicht
+  betroffen.
+
 ## [1.18.0] – 2026-09-30
 
 ### Sicherheit
