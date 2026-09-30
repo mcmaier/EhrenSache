@@ -16,6 +16,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Ende des waagerechten Rollwegs. Ohne Aktionsspalte, etwa in der Ansicht der Rolle `user`, klebt
   auch keine andere Spalte. In inaktiven Mitgliederzeilen scheint die festgehaltene Spalte nicht
   durch (OI-92).
+- **Die Zeiterfassung zeigt, wie ein Eintrag entstanden ist:** Timer, nachgetragen, Admin,
+  Import oder Station (PIN), mit denselben Zeichen wie die Quellen der Anwesenheit (OI-33).
 - **Die Zeiterfassung wird paginiert wie alle anderen Listen.** Bisher zeigte sie alle Einträge
   des Jahres auf einer Seite; jetzt gilt die Einstellung „Datenreihen pro Seite“ (OI-92).
 - **Leere Listen melden einheitlich „Keine … für diese Auswahl“.** Bisher stand dort je nach
@@ -53,6 +55,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   oder Daten importiert, sah in Mitgliederliste, Anwesenheit, Anträgen oder Benutzern teils bis zu
   zehn Minuten den alten Stand. Bei Mitgliedern, Terminen und Anträgen verdeckte das bisher das
   Neuladen beim Bereichswechsel; die Anwesenheitsliste war schon immer betroffen.
+- **Gleichzeitig gelöschte Termine einer Serie verlieren keinen Ausfall mehr.** Löschten zwei
+  Anfragen fast zeitgleich Termine derselben Serie, ging ein Teil der Ausfalldaten verloren, und
+  „Serie fortsetzen“ hätte die gelöschten Tage wieder angelegt. Im Test gingen bei vier
+  gleichzeitigen Löschungen regelmäßig Daten verloren (OI-76).
+- **Die Geräteliste zeigt eine TOTP-Station ohne Secret an.** Ein solches Gerät (Rest aus der
+  Zeit vor 1.3.0) nimmt keine Codes an; bisher war das nirgends zu sehen (OI-30).
+- **Check-in-App: Terminfarben werden wie im Dashboard geprüft,** mit derselben grauen
+  Ersatzfarbe. Eine Farbe mit 5 oder 7 Hexstellen ließ den Farbstreifen im Verlauf bisher ganz
+  verschwinden; Rückmeldekarten ohne gültige Farbe erschienen blau statt grau (OI-108).
+- **Check-in-App: Die Knöpfe im Dialog „Nachträglicher Antrag“ bleiben bei 320 px Breite
+  einzeilig** (OI-72).
 
 ### Intern
 - Hinweismeldungen (`showToast()`) setzen ihren Text als Text, nicht als HTML; die aufrufenden
@@ -60,6 +73,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Die Reiter „Verwaltung“ und „System“ registrierten ihre Klick-Handler für Admins doppelt
   (OI-90).
 - Toter Code aus Geräteverwaltung, Anträgen und Stylesheets entfernt (OI-90).
+- Der Abgleich von API.md gegen die echten Antworten prüft fünf weitere Lesepfade:
+  `session_info`, `update_check`, `appointment_series` und beide Lesepfade von
+  `appointment_responses` (OI-100).
 - Das seit Dezember 2025 stillgelegte, nie sichtbare Terminart-Feld im Dialog „Anwesenheit
   erfassen“ ist entfernt; die Terminart steht weiter im Optionstext der Terminauswahl (OI-106).
 

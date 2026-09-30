@@ -1901,6 +1901,8 @@ Festgehalten in `tests/suites/profile_dashboard_frontend.php`.
 ### OI-30 · `totp_location` ohne Secret aus der Zeit vor 1.3.0
 **Priorität:** niedrig
 
+**Erledigt am 2026-09-30** (`84c546a`, unveröffentlicht): Die Typspalte der Geräteliste zeigt „⚠ Kein Secret – nimmt keine Codes an“. Die Angabe `has_totp_secret` gibt es nur für `kiosk` und `auth_device`; für `totp_location` liefert die Liste `totp_secret` selbst (API.md), daran hängt der Hinweis. Keine Serveränderung.
+
 Vor 1.3.0 konnte `clear` ein TOTP-Stationsgerät ohne Secret zurücklassen. Ein solches Gerät
 fällt in `resolveTotpLocation()` heute stillschweigend heraus, ohne dass die Geräteliste
 darauf hinweist — für den Betrieb unauffällig, aber schwer zu erklären, wenn eine Station
@@ -1941,6 +1943,8 @@ Speicherungen unterscheiden.
 
 ### OI-33 · Keine Quellen-Kennzeichnung bei Arbeitszeit-Sitzungen
 **Priorität:** niedrig
+
+**Teilweise erledigt am 2026-09-30** (`b1e4c53`, unveröffentlicht): Die Dashboard-Ansicht zeigt die Quelle in der Spalte „Nachweis“ (Timer, Nachgetragen, Admin, Import, Station (PIN)); ein Wächter verlangt für jeden ENUM-Wert eine Beschriftung. **Offen:** die Quelle im Export.
 
 Anwesenheits-Datensätze zeigen ihre Quelle als Badge (u. a. „Station (PIN)"), Arbeitszeit-
 Sitzungen dagegen nicht: Weder die Dashboard-Ansicht der Zeiterfassung noch der Export
@@ -3355,6 +3359,8 @@ Knopf ebenfalls nur die Filterleiste meint.
 ### OI-72 · Zwei Reste aus der PWA-Überarbeitung
 **Priorität:** niedrig · aufgenommen am 2026-09-17
 
+**Punkt 2 erledigt am 2026-09-30** (`0aa83e6`, unveröffentlicht), im Browser gemessen: bei 320 px vorher 109 px je Knopf und zweizeilig, nachher 125 px und einzeilig (`@media (max-width: 359px)`: Dialog 94 % breit, Rand 20 px). Punkt 1 war verworfen — **OI-72 ist damit abgeschlossen.**
+
 Aus der Arbeit an der Check-in-PWA für 1.9.1 (`8f47006`, `044797d`), dort bewusst
 zurückgestellt und nicht release-blockierend. Hier festgehalten, damit sie nicht allein in
 einer Sitzungsnachricht stehen.
@@ -3478,6 +3484,8 @@ wird hier nicht gerufen, der Import setzt also selbst bei identischen Werten ab,
 
 ### OI-76 · Wettlauf zweier gleichzeitiger Einzel-Löschungen kann einen Ausfall verlieren
 **Priorität:** niedrig · aufgenommen am 2026-09-21
+
+**Erledigt am 2026-09-30** (`de56e79`, unveröffentlicht): `seriesAddExdates()` sperrt die Serienzeile (`SELECT … FOR UPDATE`) in einer eigenen kleinen Transaktion bzw. in der des Aufrufers. **Die Einschätzung „selten“ war zu mild:** Ein neuer Test löscht 16 Termine in Viererblöcken per `curl_multi` — mit dem alten Stand gingen in 3 von 3 Läufen 3 bis 7 Ausfälle verloren, mit Sperre 3 von 3 grün.
 
 `DELETE appointments` (`private/handlers/appointments.php`) trägt das Datum eines gelöschten
 Serientermins über `seriesAddExdates()` (`private/helpers/appointment_series.php`) in `exdates`
@@ -4485,6 +4493,8 @@ mehrere Jahre auf einmal. Muster und Begründung stehen an den entsprechenden St
 **Priorität:** niedrig · aufgenommen am 2026-09-24 (Rest aus
 [OI-66](#oi-66--apimd-gegen-die-echten-antworten-prüfen), bis dahin ohne eigene Nummer)
 
+**Teilweise erledigt am 2026-09-30** (`4ba591a`, unveröffentlicht): `session_info` (per Sitzungs-Cookie), `update_check`, `appointment_series` und beide Lesepfade von `appointment_responses` stehen in `adEndpoints()`. Gekürzte Beispiele (`{…}`, `[ … ]`) gelten dem Parser als leerer Container. **Offen:** die Check-in-Endpunkte (`station`, `totp_checkin`, `auto_checkin`) — sie brauchen ein Geräte-Token, das die Benutzerliste nicht herausgibt, oder sind Schreibpfade — und alle Schreibpfade.
+
 `tests/suites/api_doc_keys.php` hält seit 1.14.0 für die Lesepfade fest, dass jeder in `API.md`
 dokumentierte Antwortschlüssel in der echten Antwort vorkommt. **Nicht** bewacht sind:
 
@@ -4700,6 +4710,8 @@ Wächter. Für die Wächter selbst stimmte das; hinter ihnen lag die oben genann
 ### OI-108 · Die Check-in-App führt ihre eigene, lockerere Farbprüfung
 **Priorität:** niedrig · aufgenommen am 2026-09-25 (aus dem Abschlussreview zu
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
+
+**Erledigt am 2026-09-30** (`dee5c66`, unveröffentlicht) — Entscheidung des Nutzers: Ersatzfarbe vereinheitlichen. `safeHexColor()` der PWA prüft wie `safeTypeColor()` (3, 4, 6, 8 Stellen) und fällt auf `var(--type-color-none)` zurück, in `checkin/css/style.css` mit demselben Wert wie im Dashboard (`#7f8c8d`); ein Test hält beide Werte gleich. Die PWA behält ihre eigene Funktion, weil sie `utils.js` nicht lädt. Wie im Dashboard bleibt der Farbpunkt einer Tätigkeit **ohne** Farbe `#1F5FBF`.
 
 `/^#[0-9a-f]{3,8}$/i` steht in [public/checkin/js/app.js](../public/checkin/js/app.js) nur
 noch **einmal**, in `safeHexColor()`; seit 1.17.0 (`eb77fae`) laufen auch die Rückmeldekarten,
