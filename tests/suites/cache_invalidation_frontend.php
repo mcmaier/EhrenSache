@@ -147,3 +147,29 @@ test('Gleichzeitige Abrufe: die Loader gehen ueber sharedLoad()', function () us
             $funktion . '() ruft die API ausserhalb von sharedLoad()');
     }
 });
+
+test('Eigene Aenderungen verwerfen, was andere Bereiche aus dem Cache zeigen', function () use ($ciRoot) {
+    // Bis zur Umstellung verdeckte das erzwungene Neuladen beim Bereichswechsel,
+    // dass diese Stellen nur ihren eigenen Bestand erneuerten: Nach dem
+    // Umbenennen einer Gruppe zeigte die Mitgliederliste sonst bis zum Ablauf
+    // der TTL die alten Gruppennamen.
+    $faelle = [
+        ['management.js',   'saveGroup',                      "invalidateCache('members')"],
+        ['management.js',   'deleteGroup',                    "invalidateCache('members')"],
+        ['members.js',      'saveMember',                     'invalidateMemberDependents()'],
+        ['members.js',      'deleteMember',                   'invalidateMemberDependents()'],
+        ['members.js',      'invalidateMemberDependents',     "'groups', 'users', 'records', 'exceptions'"],
+        ['appointments.js', 'saveAppointment',                'invalidateAppointmentDependents()'],
+        ['appointments.js', 'deleteAppointment',              'invalidateAppointmentDependents()'],
+        ['appointments.js', 'invalidateAppointmentDependents', "invalidateCache('exceptions')"],
+        ['records.js',      'saveRecord',                     "invalidateCache('records', currentYear)"],
+        ['records.js',      'deleteRecord',                   "invalidateCache('records', currentYear)"],
+        ['responses.js',    'afterChange',                    "invalidateCache('exceptions', year)"],
+    ];
+
+    foreach ($faelle as [$datei, $funktion, $nadel]) {
+        $js = (string) sourceCode($ciRoot . '/public/js/modules/' . $datei);
+        assertTrue(str_contains(ciFunktion($js, $funktion), $nadel),
+            $funktion . '() in ' . $datei . ' enthaelt ' . $nadel . ' nicht mehr');
+    }
+});

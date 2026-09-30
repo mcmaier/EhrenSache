@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall } from './api.js';
 import { debug } from '../app.js'
 import { getAuthHeaders } from './api.js';
-import { showToast, invalidateCache } from './ui.js';
+import { showToast, invalidateCache, refreshYearFilters } from './ui.js';
 import { loadAppointments } from './appointments.js';
 import { showRecordsSection } from './records.js';
 import { showAppointmentSection } from './appointments.js';
@@ -227,6 +227,12 @@ export async function executeImport() {
         // (Schritt 2b). Ohne Jahresangabe, weil die Zuordnung fuer alle Jahre
         // gilt. showMemberSection() laedt nur die Mitglieder, nicht die Termine.
         await invalidateCache('appointments');
+
+        // Mitglieder aller Jahre, Gruppenzaehler und die Namen in der
+        // Benutzerliste stammen aus dem Bestand, den der Import gerade aendert.
+        await invalidateCache('members');
+        await invalidateCache('groups');
+        await invalidateCache('users');
         
         // Progress auf 100%
         document.getElementById('importProgressFill').style.width = '100%';
@@ -375,6 +381,8 @@ export async function executeRecordsImport() {
         // haengen (Schritt 2b). Ohne Jahresangabe, weil eine CSV Termine
         // mehrerer Jahre treffen kann -- auch ein teilweiser Import zaehlt.
         await invalidateCache('appointments');
+        await invalidateCache('records');
+        await refreshYearFilters();
 
         // Progress auf 100%
         document.getElementById('recordsImportProgressFill').style.width = '100%';
@@ -579,6 +587,9 @@ async function createSelectedAppointments() {
     if (created > 0) {
         showToast(`${created} Termine erfolgreich angelegt`, 'success');
         clearSuggestions();
+        // Vorschlaege koennen in andere Jahre fallen als das angezeigte.
+        await invalidateCache('appointments');
+        await refreshYearFilters();
         await loadAppointments(true); // Refresh Terminliste
     }
     
@@ -681,6 +692,12 @@ export async function executeAppointmentsImport() {
         }
         
         const result = await response.json();
+
+        // Der Import legt Termine beliebiger Jahre an oder aendert sie; Titel
+        // und Zeiten stehen auch in den Anwesenheiten (per JOIN).
+        await invalidateCache('appointments');
+        await invalidateCache('records');
+        await refreshYearFilters();
         
         // Progress auf 100%
         document.getElementById('appointmentsImportProgressFill').style.width = '100%';

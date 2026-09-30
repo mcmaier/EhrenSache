@@ -575,7 +575,9 @@ export async function regenerateDeviceToken() {
         });
         
         if (result && result.api_token) {
-            updateTokenDisplay(result.api_token, result.expires_at);            
+            updateTokenDisplay(result.api_token, result.expires_at);
+            // Die Geraeteliste zeigt das Ablaufdatum des Tokens.
+            await invalidateCache('devices');
             showToast('Neuer Token generiert!', 'success');
         }
     }

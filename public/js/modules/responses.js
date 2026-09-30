@@ -520,6 +520,9 @@ export function filterResponses(filter) {
  */
 async function afterChange(appointmentId, year) {
     invalidateCache('appointments', year);
+    // Eine Absage legt serverseitig einen Abwesenheitsantrag an, eine
+    // Ruecknahme aendert oder loescht ihn.
+    invalidateCache('exceptions', year);
     listDirty = true;
     if (openAppointmentId === appointmentId) {
         await reloadResponses(appointmentId);

@@ -276,8 +276,8 @@ export async function saveGroup() {
         // bleibt unveraendert. Beim Loeschen einer Gruppe ist das anders, siehe
         // deleteGroup().
 
-        //invalidateCache('groups');
-        //await loadGroups(true);
+        // Die Mitgliederliste zeigt die Gruppennamen je Mitglied (alle Jahre).
+        await invalidateCache('members');
         await showGroupSection(true);
         showToast(
             groupId ? 'Gruppe erfolgreich aktualisiert' : 'Gruppe erfolgreich erstellt',
@@ -307,8 +307,8 @@ export async function deleteGroup(groupId) {
             // gilt fuer alle Jahre.
             await invalidateCache('appointments');
 
-            //invalidateCache('groups');
-            //await loadGroups(true);
+            // Die Mitgliederliste zeigt die Gruppen je Mitglied (alle Jahre).
+            await invalidateCache('members');
             await showGroupSection(true);
             // showToast() setzt die Nachricht als Text (OI-111) -- nicht selbst maskieren.
             showToast(`Gruppe "${groupName}" wurde gelöscht`, 'success');

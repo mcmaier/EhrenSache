@@ -1052,7 +1052,7 @@ export async function showRecordsSection(forceReload = false) {
     }
     else
     {
-        await applyRecordFilters();
+        await applyRecordFilters(forceReload);
     }
 }
 
@@ -1305,6 +1305,7 @@ export async function saveRecord() {
         // Die Zahlen im Kalender haengen am Terminabruf des Jahres (Schritt 2b).
         // Ohne Verwerfen zeigte er bis zu zehn Minuten die alten Werte.
         await invalidateCache('appointments', currentYear);
+        await invalidateCache('records', currentYear);
 
         if(currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT)
         {
@@ -1362,6 +1363,7 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
             // Die Zahlen im Kalender haengen am Terminabruf des Jahres (Schritt 2b).
             // Ohne Verwerfen zeigte er bis zu zehn Minuten die alten Werte.
             await invalidateCache('appointments', currentYear);
+            await invalidateCache('records', currentYear);
 
             if(currentMode === RecordMode.ATTENDANCE_BY_APPOINTMENT)
             {
@@ -1373,7 +1375,6 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
             }
             else
             {
-                //await invalidateCache('records', currentYear);
                 applyRecordFilters(true, currentRecordsPage);
             }
             //await loadRecords(true, currentYear);
@@ -1908,6 +1909,7 @@ async function quickCreateRecordForMember(memberId, status = 'present') {
         // Die Zahlen im Kalender haengen am Terminabruf des Jahres (Schritt 2b).
         // Ohne Verwerfen zeigte er bis zu zehn Minuten die alten Werte.
         await invalidateCache('appointments', currentYear);
+        await invalidateCache('records', currentYear);
 
         // Anwesenheitsliste neu laden
         await loadAttendanceList(appointmentId);
@@ -1949,6 +1951,7 @@ async function quickCreateRecordForAppointment(appointmentId, status = 'present'
         // Die Zahlen im Kalender haengen am Terminabruf des Jahres (Schritt 2b).
         // Ohne Verwerfen zeigte er bis zu zehn Minuten die alten Werte.
         await invalidateCache('appointments', currentYear);
+        await invalidateCache('records', currentYear);
 
         // Member-Anwesenheitsliste neu laden
         await loadMemberAttendanceList(memberId, currentAppointmentType);

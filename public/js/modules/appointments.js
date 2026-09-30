@@ -1325,6 +1325,18 @@ export function openSeriesRuleChange() {
 }
 
 /** Termin-Cache aller Jahre zwischen from und until leeren -- Serien reichen ueber den Jahreswechsel. */
+/**
+ * Was ausser der Terminliste am Termin haengt: Anwesenheiten, Antraege und
+ * Arbeitszeiten tragen Titel, Datum und Terminart per JOIN, und beim Loeschen
+ * raeumt der Server Anwesenheiten und Antraege mit ab. Ohne Jahr, weil ein
+ * Termin beim Bearbeiten das Jahr wechseln kann.
+ */
+async function invalidateAppointmentDependents() {
+    await invalidateCache('records');
+    await invalidateCache('exceptions');
+    await invalidateCache('workSessions');
+}
+
 async function invalidateSeriesYears(from, until) {
     const first = Number(String(from).slice(0, 4));
     const last = Number(String(until || from).slice(0, 4));
@@ -1647,6 +1659,7 @@ export async function saveAppointment() {
             if (!result || !result.success) return;
             closeAppointmentModal();
             await invalidateSeriesYears(currentAppointment.date, currentSeries.until);
+            await invalidateAppointmentDependents();
             showAppointmentSection(true, currentAppointmentsPage);
             showToast(seriesResultText(result), 'success');
             return;
@@ -1666,7 +1679,10 @@ export async function saveAppointment() {
         // Ein einzelner Termin kann ebenso ein neues Jahr eroeffnen (OI-79)
         await refreshYearFilters();
 
-        // Cache invalidieren und neu laden
+        // Cache invalidieren und neu laden. Alle Jahre: Ein geaendertes Datum
+        // kann den Termin in ein anderes Jahr verschieben.
+        await invalidateCache('appointments');
+        await invalidateAppointmentDependents();
         showAppointmentSection(true, currentAppointmentsPage);
 
         // Erfolgs-Toast
@@ -1700,6 +1716,7 @@ export async function deleteAppointment(appointmentId) {
             if (result && result.success) {
                 // Das Serienende steht nicht im Termin-Cache: alle geladenen Jahre leeren.
                 await invalidateCache('appointments');
+                await invalidateAppointmentDependents();
                 showAppointmentSection(true, currentAppointmentsPage);
                 showToast(seriesResultText(result), 'success');
             }
@@ -1707,6 +1724,7 @@ export async function deleteAppointment(appointmentId) {
         }
         const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
         if (result && result.success) {
+            await invalidateAppointmentDependents();
             showAppointmentSection(true, currentAppointmentsPage);
             showToast(`Termin "${title}" wurde gelöscht`, 'success');
         }
@@ -1721,7 +1739,8 @@ export async function deleteAppointment(appointmentId) {
     if (confirmed) {
         const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
         if (result.success) {
-            // Cache invalidieren und neu laden            
+            // Cache invalidieren und neu laden
+            await invalidateAppointmentDependents();
             showAppointmentSection(true, currentAppointmentsPage);
 
             // showToast() setzt die Nachricht als Text (OI-111) -- nicht selbst maskieren.

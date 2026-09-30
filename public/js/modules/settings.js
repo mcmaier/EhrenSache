@@ -549,6 +549,8 @@ async function saveAllSettings() {
         if (updates.some(u => u.key === 'checkin_tolerance_hours')) {
             const { resetAttendanceLead } = await import('./appointments.js');
             resetAttendanceLead();
+            // Die Anwesenheitszahlen je Termin gelten erst ab Beginn des Fensters.
+            await invalidateCache('appointments');
         }
 
         // Gruppendialog und Gruppenliste zeigen das Wort ohne Neuladen der Seite

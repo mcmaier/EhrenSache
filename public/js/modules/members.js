@@ -635,6 +635,7 @@ export async function saveMember() {
         // Das Mitglied steht trotz abgelehnter PIN in der Datenbank und zaehlt
         // damit zu den Erwarteten: Terminabruf verwerfen wie im Erfolgsfall.
         await invalidateCache('appointments');
+        await invalidateMemberDependents();
 
         // Modal bleibt offen, wechselt aber in den Bearbeiten-Modus für das neu angelegte Mitglied
         await openMemberModal(result.id);
@@ -652,7 +653,7 @@ export async function saveMember() {
         await invalidateCache('appointments');
 
         // Cache invalidieren und neu laden
-        //invalidateCache('members');
+        await invalidateMemberDependents();
         showMemberSection(true, currentMembersPage);
 
         // Erfolgs-Toast
@@ -661,6 +662,18 @@ export async function saveMember() {
             'success'
         );
     }    
+}
+
+/**
+ * Was ausser der Mitgliederliste des Jahres am Mitglied haengt: Das Mitglied
+ * steht in jedem geladenen Jahr, Gruppen zaehlen ihre Mitglieder, Benutzer,
+ * Anwesenheiten, Antraege und Arbeitszeiten zeigen den Namen. Beim Loeschen
+ * raeumt der Server Anwesenheiten und Antraege mit ab.
+ */
+async function invalidateMemberDependents() {
+    for (const key of ['members', 'groups', 'users', 'records', 'exceptions', 'workSessions']) {
+        await invalidateCache(key);
+    }
 }
 
 export async function deleteMember(memberId) {
@@ -685,6 +698,7 @@ export async function deleteMember(memberId) {
             await invalidateCache('appointments');
 
             // Cache invalidieren und neu laden
+            await invalidateMemberDependents();
             showMemberSection(true, currentMembersPage);
 
             showToast('Mitglied erfolgreich gelöscht', 'success');

@@ -989,6 +989,8 @@ export async function saveActivityType() {
 
     closeActivityTypeModal();
     showToast(activityId ? 'Tätigkeitsart geändert' : 'Tätigkeitsart angelegt', 'success');
+    // Die Sitzungen zeigen den Namen der Taetigkeit (per JOIN).
+    await invalidateCache('workSessions');
     await loadActivityTypes(true);
 }
 

@@ -203,6 +203,8 @@ export async function handlePinChange() {
     }
 
     document.getElementById('changePinForm').reset();
+    // Die Mitgliederliste zeigt, ob eine PIN gesetzt ist.
+    await invalidateCache('members');
     showToast('PIN gespeichert', 'success');
 }
 
