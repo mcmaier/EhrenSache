@@ -212,11 +212,35 @@ function seriesSaveExdates(PDO $db, string $prefix, int $seriesId, array $dates)
        ->execute([json_encode($dates), $seriesId]);
 }
 
+/**
+ * Traegt Ausfalldaten in exdates der Serie ein: lesen, ergaenzen, schreiben.
+ *
+ * Unter Sperre der Serienzeile (OI-76): Loeschen zwei Anfragen fast gleich-
+ * zeitig zwei Termine derselben Serie, lasen sonst beide denselben Stand, und
+ * die zweite ueberschrieb das Datum der ersten -- "Serie fortsetzen" legte den
+ * bewusst geloeschten Tag dann wieder an. Laeuft der Aufrufer schon in einer
+ * Transaktion, gilt deren Sperre bis zu deren Ende; sonst eine eigene kleine.
+ */
 function seriesAddExdates(PDO $db, string $prefix, int $seriesId, array $dates): void
 {
-    $series = seriesLoad($db, $prefix, $seriesId);
-    if ($series !== null) {
-        seriesSaveExdates($db, $prefix, $seriesId, array_merge($series['exdates'], $dates));
+    $own = !$db->inTransaction();
+    if ($own) {
+        $db->beginTransaction();
+    }
+
+    try {
+        $series = seriesLoad($db, $prefix, $seriesId, true);
+        if ($series !== null) {
+            seriesSaveExdates($db, $prefix, $seriesId, array_merge($series['exdates'], $dates));
+        }
+        if ($own) {
+            $db->commit();
+        }
+    } catch (Throwable $e) {
+        if ($own && $db->inTransaction()) {
+            $db->rollBack();
+        }
+        throw $e;
     }
 }
 

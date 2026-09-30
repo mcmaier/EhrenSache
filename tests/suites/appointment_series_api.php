@@ -1352,3 +1352,73 @@ test('holiday_region nimmt nur bekannte Laender an', function () {
         asSetRegion($before);
     }
 });
+
+/**
+ * Loescht Termine gleichzeitig -- alle Anfragen gehen per curl_multi auf
+ * einmal hinaus, damit sich die Server-Prozesse ueberlappen.
+ *
+ * @param int[] $ids
+ * @return int[] HTTP-Status je Anfrage
+ */
+function asParallelDelete(array $ids): array
+{
+    $cfg = testConfig();
+    $multi = curl_multi_init();
+    $handles = [];
+    foreach ($ids as $id) {
+        $ch = curl_init(rtrim($cfg['base_url'], '/') . '/api/api.php?resource=appointments&id=' . (int) $id);
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST  => 'DELETE',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_HTTPHEADER     => ['Accept: application/json', 'Authorization: Bearer ' . apiToken('admin')],
+        ]);
+        curl_multi_add_handle($multi, $ch);
+        $handles[] = $ch;
+    }
+    do {
+        $status = curl_multi_exec($multi, $running);
+        if ($running) {
+            curl_multi_select($multi);
+        }
+    } while ($running && $status === CURLM_OK);
+
+    $codes = [];
+    foreach ($handles as $ch) {
+        $codes[] = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_multi_remove_handle($multi, $ch);
+        curl_close($ch);
+    }
+    curl_multi_close($multi);
+
+    return $codes;
+}
+
+test('Gleichzeitig geloeschte Serientermine verlieren keinen Ausfall (OI-76)', function () {
+    // Ohne Sperre lasen parallele Loeschungen denselben exdates-Stand, und
+    // die letzte schrieb die Daten der anderen weg -- "Serie fortsetzen"
+    // haette die bewusst geloeschten Tage wieder angelegt.
+    $world = asWorld();
+    try {
+        $res = asSeriesPost(asSeriesBody($world, ['until' => '2031-06-24']));
+        assertStatus(201, $res);
+        $seriesId = (int) $res['body']['series_id'];
+
+        $apts = asAppointments($world);
+        assertTrue(count($apts) >= 16, 'Serie hat zu wenige Termine: ' . count($apts));
+
+        $deleted = [];
+        foreach (array_chunk(array_slice($apts, 0, 16), 4) as $batch) {
+            $codes = asParallelDelete(array_column($batch, 'appointment_id'));
+            assertSame([200, 200, 200, 200], $codes, 'Parallele Loeschung scheiterte');
+            $deleted = array_merge($deleted, array_column($batch, 'date'));
+        }
+
+        $exdates = asSeriesGet($seriesId)['exdates'];
+        sort($deleted);
+        assertSame($deleted, array_values(array_intersect($exdates, $deleted)),
+            'Ausfaelle fehlen in exdates: ' . implode(', ', array_diff($deleted, $exdates)));
+    } finally {
+        asDropWorld($world);
+    }
+});
