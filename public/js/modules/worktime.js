@@ -45,6 +45,17 @@ const STATUS_BADGE = {
     rejected:  ['status-badge status-rejected', 'abgelehnt']
 };
 
+// Wie eine Sitzung entstanden ist (work_sessions.source). Dieselben Zeichen
+// wie die Quellen der Anwesenheit (getSourceBadge() in records.js), damit eine
+// Kiosk-Sitzung nicht nur an ihrem Ortsnamen erkennbar ist (OI-33).
+const SOURCE_LABEL = {
+    timer:   '⏱️ Timer',
+    manual:  '✍️ Nachgetragen',
+    admin:   '👤 Admin',
+    import:  '📤 Import',
+    station: '🖥️ Station (PIN)',
+};
+
 const PROOF_BADGE = {
     hours: ['status-badge status-approved', 'stundenbelegt'],
     start: ['status-badge status-pending',  'teilbelegt'],
@@ -278,7 +289,8 @@ export function renderWorkSessions(sessions, page = 1) {
                 ${s.break_minutes > 0 ? `<br><small>${s.break_minutes} Min. Pause</small>` : ''}</td>
             <td>${escapeHtml(s.appointment_title || '—')}</td>
             <td><span class="${PROOF_BADGE[proof][0]}">${PROOF_BADGE[proof][1]}</span>
-                ${locations ? `<br><small>${locations}</small>` : ''}</td>
+                ${locations ? `<br><small>${locations}</small>` : ''}
+                ${SOURCE_LABEL[s.source] ? `<br><small>${SOURCE_LABEL[s.source]}</small>` : ''}</td>
             <td class="cell-nowrap"><span class="${(STATUS_BADGE[s.status] || ['type-badge'])[0]}">${(STATUS_BADGE[s.status] || [null, s.status])[1]}</span></td>
             <td class="actions-cell">${renderWorktimeActions(s)}</td>
         </tr>`;

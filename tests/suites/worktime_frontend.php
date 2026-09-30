@@ -515,3 +515,23 @@ test('Zeiterfassung: die Liste wird paginiert wie alle anderen (OI-92)', functio
     assertTrue(preg_match("/'go-to-worktime-page':\s*\(el\)\s*=>\s*goToWorktimePage\(Number\(el\.dataset\.page\)\)/", $js) === 1,
         'Die Aktion go-to-worktime-page ist nicht registriert');
 });
+
+test('Zeiterfassung: die Liste zeigt, wie eine Sitzung entstanden ist (OI-33)', function () use ($repoRoot) {
+    $js = (string) sourceCode($repoRoot . '/public/js/modules/worktime.js');
+    $sql = (string) sourceCode($repoRoot . '/private/setup/ehrensache_db.sql');
+
+    // Jeder Wert der Spalte source braucht eine Beschriftung -- sonst faellt
+    // eine neue Quelle still aus der Anzeige.
+    // Am Zeilenanfang verankert: checkin_source der records ist ebenfalls ein ENUM
+    assertTrue(preg_match("/^\s*source\s+ENUM\(([^)]*)\)/m", $sql, $m) === 1, 'ENUM der Spalte source nicht gefunden');
+    preg_match_all("/'([a-z_]+)'/", $m[1], $werte);
+    $start = strpos($js, 'const SOURCE_LABEL = {');
+    assertTrue($start !== false, 'SOURCE_LABEL fehlt');
+    $map = substr($js, $start, (int) strpos($js, '};', $start) - $start);
+    foreach ($werte[1] as $wert) {
+        assertTrue(preg_match('/\b' . $wert . ':\s*\'/', $map) === 1, "Quelle {$wert} hat keine Beschriftung");
+    }
+
+    assertTrue(str_contains(frontendFunctionBody($js, 'renderWorkSessions'), 'SOURCE_LABEL[s.source]'),
+        'renderWorkSessions() zeigt die Quelle nicht an');
+});
