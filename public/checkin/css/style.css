@@ -51,6 +51,9 @@
        Bewusst nicht --badge-bg: das folgt der Vereinsfarbe und wird damit
        gruenlich -- neben gruen/gelb/rot als Ampel wuerde das mitsprechen. */
     --chip-neutral-bg: #EEF1F4;
+    /* Termin ohne (gueltige) Terminart -- derselbe Wert wie --type-color-none
+       in css/variables.css, die die PWA nicht laedt (OI-108). */
+    --type-color-none: #7f8c8d;
 }
 
 * {

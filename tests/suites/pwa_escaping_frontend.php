@@ -85,3 +85,35 @@ test('Terminfarben gehen nur als Hexwert in ein style-Attribut', function () use
             "{$funktion}() gibt eine Farbe aus der Datenbank ungeprueft weiter");
     }
 });
+
+test('PWA prueft Farben wie das Dashboard und nutzt dieselbe Ersatzfarbe (OI-108)', function () use ($peRoot) {
+    $js = (string) sourceCode($peRoot . '/public/checkin/js/app.js');
+    $start = strpos($js, 'function safeHexColor(');
+    assertTrue($start !== false, 'safeHexColor() nicht gefunden');
+    $rumpf = substr($js, $start, (int) strpos($js, "\n}", $start) - $start);
+
+    // Nur gueltige CSS-Hexlaengen 3, 4, 6, 8 -- 5 und 7 verwirft der Browser
+    // wortlos, der Randakzent fehlte dann ganz statt grau zu erscheinen.
+    assertTrue(preg_match('/\/(\^#[^\/]+)\/i/', $rumpf, $m) === 1, 'Hex-Pruefung nicht gefunden');
+    $re = '/' . $m[1] . '/i';
+    foreach (['#abc', '#abcd', '#1F5FBF', '#1f5fbfcc'] as $gut) {
+        assertTrue(preg_match($re, $gut) === 1, "{$gut} wird abgelehnt");
+    }
+    foreach (['#abcde', '#1F5FBF0', 'red', '#12', '#1F5FBF; x:y'] as $schlecht) {
+        assertTrue(preg_match($re, $schlecht) !== 1, "{$schlecht} wird angenommen");
+    }
+    assertTrue(str_contains($rumpf, "'var(--type-color-none)'"),
+        'safeHexColor() faellt nicht auf die gemeinsame Ersatzfarbe zurueck');
+
+    // Keine eigenen Ersatzfarben mehr neben der gemeinsamen
+    assertTrue(!str_contains($js, "'#95a5a6'"), 'app.js fuehrt noch die Ersatzfarbe #95a5a6');
+    assertTrue(preg_match("/safeHexColor\([^)]*,/", $js) !== 1,
+        'safeHexColor() wird noch mit eigener Ersatzfarbe aufgerufen');
+
+    // Derselbe Wert wie im Dashboard -- die PWA laedt variables.css nicht
+    $pwaCss = (string) sourceCode($peRoot . '/public/checkin/css/style.css');
+    $dashCss = (string) sourceCode($peRoot . '/public/css/variables.css');
+    assertTrue(preg_match('/--type-color-none:\s*([^;]+);/', $dashCss, $d) === 1, 'variables.css ohne --type-color-none');
+    assertTrue(preg_match('/--type-color-none:\s*([^;]+);/', $pwaCss, $p) === 1, 'checkin/css/style.css ohne --type-color-none');
+    assertSame(strtolower(trim($d[1])), strtolower(trim($p[1])), 'Ersatzfarbe der PWA weicht vom Dashboard ab');
+});

@@ -2914,7 +2914,7 @@ function historyCardHtml(p) {
 function historyItem(color) {
     const item = document.createElement('div');
     item.className = 'history-item';
-    item.style.borderLeftColor = safeHexColor(color, '#95a5a6');
+    item.style.borderLeftColor = safeHexColor(color);
     return item;
 }
 
@@ -3029,7 +3029,7 @@ function activityColor(activityId) {
  * damit dieselbe Tätigkeit in beiden Oberflaechen gleich aussieht.
  */
 function activityDot(color) {
-    return `<span class="activity-dot" style="background: ${safeHexColor(color, '#1F5FBF')}"></span>`;
+    return `<span class="activity-dot" style="background: ${safeHexColor(color || '#1F5FBF')}"></span>`;
 }
 
 function addWorkSessionToHistory(session) {
@@ -4865,7 +4865,7 @@ window.setResponsesGrouping = function(stage) {
 function infoCardHtml(item) {
     const apt = item.appointment;
     const id = Number(apt.appointment_id);
-    const color = safeHexColor(apt.color, '#1F5FBF');
+    const color = safeHexColor(apt.color);
     const kopf = `
         <div class="response-card__head">
             <strong>${escapeHtml(apt.title)}</strong>
@@ -4957,7 +4957,7 @@ function responseCardHtml(item) {
     const off = offline ? ' disabled' : '';
     // apt.color kommt vom Server frei waehlbar (Terminart-Einstellung) --
     // nur ein gueltiger Hexwert darf ungemaskiert in ein style-Attribut.
-    const color = safeHexColor(apt.color, '#1F5FBF');
+    const color = safeHexColor(apt.color);
 
     const deadlinePassed = new Date(item.settings.deadline.replace(' ', 'T')) < new Date();
     const deadlineText = deadlinePassed
@@ -5681,14 +5681,20 @@ function formatDateTime(date) {
  *
  * Farben landen in style-Attributen. escapeHtml() haelt dort zwar das
  * Attribut zusammen, laesst aber beliebiges CSS durch.
+ *
+ * Dieselbe Regel wie safeTypeColor() im Dashboard (OI-108): nur gueltige
+ * CSS-Hexlaengen 3, 4, 6, 8 -- 5 und 7 verwirft der Browser wortlos, der
+ * Randakzent fehlte dann ganz. Sonst die gemeinsame Ersatzfarbe
+ * --type-color-none (Wert wie in css/variables.css). Der Rueckgabewert ist
+ * nicht immer ein Hexwert und taugt nicht fuer Farbrechnungen.
  */
-function safeHexColor(color, fallback) {
-    return /^#[0-9a-f]{3,8}$/i.test(color || '') ? color : fallback;
+function safeHexColor(color) {
+    return /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color || '') ? color : 'var(--type-color-none)';
 }
 
 function getTypeColor(typeName) {
     if (!typeName || appointmentTypes.length === 0) {
-        return '#95a5a6'; // Fallback Grau
+        return safeHexColor(null);
     }
 
     // Finde Type in appointmentTypes Array
@@ -5697,7 +5703,7 @@ function getTypeColor(typeName) {
         t.type_name.toLowerCase() === typeName.toLowerCase()
     );
 
-    return safeHexColor(type ? type.color : null, '#95a5a6'); // Fallback wenn nicht gefunden
+    return safeHexColor(type ? type.color : null);
 }
 
 /** Hinweisband der Demo-Installation. Fester Text, keine Daten aus der Antwort. */
