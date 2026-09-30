@@ -81,31 +81,41 @@ export function isCacheValid(cacheKey, year = null) {
     return (Date.now() - cached.timestamp) < CACHE_TTL;
 }
 
+/**
+ * Globaler Eintrag ({ data, timestamp }) oder jahresabhaengiger ({ <jahr>: {...} })?
+ * Beide sind Objekte; unterscheiden laesst sie nur der Schluessel. Ein leerer
+ * jahresabhaengiger Eintrag ist {}, ein geleerter globaler traegt data = [].
+ */
+function isGlobalCacheEntry(entry) {
+    return 'data' in entry || 'timestamp' in entry;
+}
+
 export async function invalidateCache(cacheKey = null, year = null) {
     if (cacheKey) {
+        const entry = dataCache[cacheKey];
         if (year !== null) {
             // Spezifisches Jahr invalidieren
-            if (dataCache[cacheKey][year]) {
-                dataCache[cacheKey][year] = { data: [], timestamp: null };
+            if (entry[year]) {
+                entry[year] = { data: [], timestamp: null };
             }
-        } else if (typeof dataCache[cacheKey] === 'object' && !Array.isArray(dataCache[cacheKey])) {
-            // Alle Jahre invalidieren
-            Object.keys(dataCache[cacheKey]).forEach(y => {
-                dataCache[cacheKey][y] = { data: [], timestamp: null };
-            });
-        } else {
+        } else if (isGlobalCacheEntry(entry)) {
             // Normale Cache-Einträge
-            dataCache[cacheKey].data = [];
-            dataCache[cacheKey].timestamp = null;
+            entry.data = [];
+            entry.timestamp = null;
+        } else {
+            // Alle Jahre invalidieren
+            Object.keys(entry).forEach(y => {
+                entry[y] = { data: [], timestamp: null };
+            });
         }
     } else {
         // Alles invalidieren
         Object.keys(dataCache).forEach(key => {
-            if (typeof dataCache[key] === 'object' && !Array.isArray(dataCache[key]) && !dataCache[key].data) {
-                dataCache[key] = {};
-            } else {
+            if (isGlobalCacheEntry(dataCache[key])) {
                 dataCache[key].data = [];
                 dataCache[key].timestamp = null;
+            } else {
+                dataCache[key] = {};
             }
         });
     }
