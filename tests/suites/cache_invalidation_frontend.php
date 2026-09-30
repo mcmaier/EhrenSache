@@ -173,3 +173,47 @@ test('Eigene Aenderungen verwerfen, was andere Bereiche aus dem Cache zeigen', f
             $funktion . '() in ' . $datei . ' enthaelt ' . $nadel . ' nicht mehr');
     }
 });
+
+// ============================================
+// Doppelte Abrufe beim Seitenstart
+// ============================================
+
+test('Seitenstart: Taetigkeitsarten kommen einmal, mit der Freischaltpruefung', function () use ($ciRoot) {
+    $js = (string) sourceCode($ciRoot . '/public/js/modules/ui.js');
+    $rumpf = ciFunktion($js, 'initEventHandlers');
+
+    // checkWorktimeEnabled() holt die Liste, merkt sie sich und zeichnet den
+    // Block. Ein loadActivityTypes(true) danach holte sie ein zweites Mal.
+    assertTrue(str_contains($rumpf, 'await checkWorktimeEnabled()'),
+        'initEventHandlers() prueft die Freischaltung der Zeiterfassung nicht mehr');
+    assertTrue(!str_contains($rumpf, 'loadActivityTypes('),
+        'initEventHandlers() holt die Taetigkeitsarten ein zweites Mal');
+});
+
+test('Seitenstart: loadUserData() nimmt me aus der Anmeldepruefung', function () use ($ciRoot) {
+    $js = (string) sourceCode($ciRoot . '/public/js/modules/users.js');
+    $rumpf = ciFunktion($js, 'loadUserData');
+
+    // app.js holt me in checkAuth() und legt es als currentUser ab.
+    assertTrue(preg_match('/const\s+userData\s*=\s*currentUser\s*\?\?\s*await\s+apiCall\(\s*\'me\'\s*\)/', $rumpf) === 1,
+        'loadUserData() fragt me erneut ab, obwohl currentUser es schon traegt');
+});
+
+test('Seitenstart: settings?scope=client laeuft ueber einen gemeinsamen Abruf', function () use ($ciRoot) {
+    // Profil, Mitgliederdialog und Terminliste holten die Ressource je fuer
+    // sich -- beim Start auf „Mein Profil“ zweimal.
+    foreach (['members.js', 'profile.js', 'appointments.js', 'settings.js', 'users.js'] as $datei) {
+        $js = (string) sourceCode($ciRoot . '/public/js/modules/' . $datei);
+        assertTrue(preg_match('/apiCall\(\s*\'settings\'\s*,\s*\'GET\'\s*,\s*null\s*,\s*\{\s*scope:\s*\'client\'/', $js) !== 1,
+            $datei . ' fragt settings?scope=client an loadClientSettings() vorbei ab');
+    }
+
+    $ui = (string) sourceCode($ciRoot . '/public/js/modules/ui.js');
+    assertTrue(str_contains(ciFunktion($ui, 'loadClientSettings'), "return sharedLoad('clientSettings', false,"),
+        'loadClientSettings() legt gleichzeitige Abrufe nicht zusammen');
+
+    // Nach dem Speichern der Einstellungen muss der naechste Abruf den Server fragen.
+    $settings = (string) sourceCode($ciRoot . '/public/js/modules/settings.js');
+    assertTrue(str_contains($settings, 'resetClientSettings();'),
+        'settings.js verwirft den gemeinsamen Abruf nach dem Speichern nicht');
+});

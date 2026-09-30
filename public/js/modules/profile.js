@@ -9,7 +9,7 @@
  */
 
 import { apiCall } from './api.js';
-import { showToast, showConfirm, dataCache, invalidateCache } from './ui.js';
+import { showToast, showConfirm, dataCache, invalidateCache, loadClientSettings } from './ui.js';
 import { loadUserData } from './users.js';
 import { debug } from '../app.js'
 import { API_BASE } from '../config.js';
@@ -105,7 +105,7 @@ export async function loadProfile(forceReload = false) {
     // Stations-PIN nur zeigen, wenn freigeschaltet und ein Mitglied verknuepft ist
     const card = document.getElementById('profilePinCard');
     try {
-        const res = await apiCall('settings', 'GET', null, { scope: 'client' });
+        const res = await loadClientSettings();
         const s   = res?.settings || {};
         const enabled = s.station_pin_enabled === '1' && !!userDetails.member_id;
         card.style.display = enabled ? 'block' : 'none';

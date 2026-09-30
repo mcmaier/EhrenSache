@@ -9,7 +9,7 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, groupSelectOptionsHtml} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, groupSelectOptionsHtml, loadClientSettings} from './ui.js';
 import { sharedLoad } from './pending_loads.js';
 import { loadUserData } from './users.js';
 import { updateModalId, escapeHtml, clampPage } from './utils.js';
@@ -48,7 +48,7 @@ let stationPinSettings = null;
 
 async function loadStationPinSettings() {
     if (stationPinSettings) return stationPinSettings;
-    const res = await apiCall('settings', 'GET', null, { scope: 'client' });
+    const res = await loadClientSettings();
     const s   = res?.settings || {};   // apiCall liefert den JSON-Body direkt
     const settings = {
         enabled:   s.station_pin_enabled === '1',

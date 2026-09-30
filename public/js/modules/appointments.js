@@ -10,7 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear, refreshYearFilters} from './ui.js';
+import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear, refreshYearFilters, loadClientSettings} from './ui.js';
 import { sharedLoad } from './pending_loads.js';
 import { renderDateChecklist } from './date_checklist.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus, clampPage } from './utils.js';
@@ -1831,7 +1831,7 @@ let attendanceLeadLoaded = false;
 async function ensureAttendanceLead() {
     if (attendanceLeadLoaded) return;
     try {
-        const res   = await apiCall('settings', 'GET', null, { scope: 'client' });
+        const res   = await loadClientSettings();
         const hours = parseInt(res?.settings?.checkin_tolerance_hours, 10);
         if (res?.success && Number.isInteger(hours) && hours >= 0 && hours <= 8) {
             attendanceLeadMs     = hours * 60 * 60 * 1000;

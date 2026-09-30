@@ -20,11 +20,11 @@ import {loadRecords, showRecordsSection, initRecordEventHandlers, resetRecordFil
 import {loadMembers, showMemberSection} from'./members.js';
 import {loadGroups, loadTypes, showGroupSection} from './management.js';
 import {initStatisticsEventHandlers, showStatisticsSection} from './statistics.js';
-import {showWorktimeSection, loadWorkSessions, loadActivityTypes, renderActivityTypes,
+import {showWorktimeSection, loadWorkSessions, renderActivityTypes,
         checkWorktimeEnabled, initWorktimeEventHandlers} from './worktime.js';
 import {debug} from '../app.js'
 import { registerActions } from './actions.js';
-import { forgetPendingLoads } from './pending_loads.js';
+import { forgetPendingLoads, sharedLoad } from './pending_loads.js';
 import {renderSystemSettings} from './settings.js';
 import {loadImportLogs} from './import_export.js';
 
@@ -82,6 +82,31 @@ export function isCacheValid(cacheKey, year = null) {
     // Normale Daten
     if (!cached.data || !cached.timestamp) return false;
     return (Date.now() - cached.timestamp) < CACHE_TTL;
+}
+
+// settings?scope=client (Check-in-Fenster, Stations-PIN). Profil, Mitglieder-
+// dialog und Terminliste lasen die Ressource je fuer sich und holten sie beim
+// Start doppelt. Gemerkt wird nur ein erfolgreicher Abruf.
+let clientSettings = { data: null, timestamp: null };
+
+export async function loadClientSettings() {
+    if (clientSettings.data && (Date.now() - clientSettings.timestamp) < CACHE_TTL) {
+        return clientSettings.data;
+    }
+
+    return sharedLoad('clientSettings', false, async () => {
+        const res = await apiCall('settings', 'GET', null, { scope: 'client' });
+        if (res?.success) {
+            clientSettings = { data: res, timestamp: Date.now() };
+        }
+        return res;
+    });
+}
+
+/** Nach dem Speichern der Einstellungen: der naechste Abruf fragt den Server. */
+export function resetClientSettings() {
+    clientSettings = { data: null, timestamp: null };
+    forgetPendingLoads('clientSettings');
 }
 
 /**
@@ -971,14 +996,10 @@ export async function initEventHandlers()
 
     // Blendet Navigationspunkt und Stammdatenblock ein, sofern die
     // Zeiterfassung freigeschaltet ist. Ist sie es nicht, antwortet
-    // activity_types mit 404 und beides bleibt verborgen.
-    if (await checkWorktimeEnabled()) {
-        const block = document.getElementById('activityTypesBlock');
-        if (block && isAdmin) {
-            block.style.display = '';
-            await loadActivityTypes(true);
-        }
-    }
+    // activity_types mit 404 und beides bleibt verborgen. Die Liste der
+    // Taetigkeitsarten kommt mit derselben Antwort und wird dort gezeichnet --
+    // ein zweiter Abruf ueber loadActivityTypes(true) holte sie doppelt.
+    await checkWorktimeEnabled();
 }
 
 

@@ -66,7 +66,9 @@ export async function loadUserData(forceReload = false) {
 
     return sharedLoad('userData', forceReload, async () => {
         debug.log("Loading USER DETAILS (ME) from API");
-        const userData = await apiCall('me');
+        // Die Anmeldepruefung in app.js hat me gerade geholt (currentUser).
+        // Gelesen wird davon nur user_id, und die aendert sich nicht.
+        const userData = currentUser ?? await apiCall('me');
         const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
         
         // userData Cache separat speichern

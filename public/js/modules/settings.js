@@ -10,7 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdmin } from './api.js';
-import { showConfirm, showToast, dataCache, updateSubgroupLabelElements, invalidateCache } from './ui.js';
+import { showConfirm, showToast, dataCache, updateSubgroupLabelElements, invalidateCache, resetClientSettings } from './ui.js';
 import { escapeHtml } from './utils.js';
 import { registerActions } from './actions.js';
 import { debug } from '../app.js';
@@ -524,6 +524,10 @@ async function saveAllSettings() {
         }
 
         syncThemeSettingsCache(updates.filter(u => !abgelehnt.includes(u.key)));
+
+        // Check-in-Fenster und Stations-PIN stehen im gemeinsamen Abruf
+        // settings?scope=client (ui.js) -- die Merker unten bauen darauf auf.
+        resetClientSettings();
 
         applyTheme(systemSettings);
 

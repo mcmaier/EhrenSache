@@ -343,8 +343,12 @@ test('Anwesenheit ab dem Check-in-Fenster und nur fuer Verwalter', function () u
     // OI-89: Der Vorlauf kommt aus checkin_tolerance_hours, nicht fest verdrahtet.
     assertSame(0, substr_count($js, 'ATTENDANCE_LEAD_MS'), 'Fester Vorlauf muss entfallen');
     $ensure = caFeFunctionBody($js, 'async function ensureAttendanceLead(');
-    assertTrue(str_contains($ensure, "scope: 'client'") && str_contains($ensure, 'checkin_tolerance_hours'),
+    assertTrue(str_contains($ensure, 'await loadClientSettings()') && str_contains($ensure, 'checkin_tolerance_hours'),
         'Vorlauf muss aus settings?scope=client kommen');
+    // Der gemeinsame Abruf (ui.js) fragt genau diese Ressource ab.
+    $client = caFeFunctionBody(caFeFile($caFeRoot, 'public/js/modules/ui.js'), 'export async function loadClientSettings(');
+    assertTrue(str_contains($client, "apiCall('settings', 'GET', null, { scope: 'client' })"),
+        'loadClientSettings() fragt nicht settings?scope=client ab');
     $load = caFeFunctionBody($js, 'export async function loadAppointments(');
     assertTrue(str_contains($load, 'await ensureAttendanceLead()'),
         'Der Vorlauf muss vor dem Aufbau geladen sein -- appointmentHasStarted() laeuft synchron');
