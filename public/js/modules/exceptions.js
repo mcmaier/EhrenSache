@@ -9,7 +9,8 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad,invalidateCache,currentYear} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache,currentYear} from './ui.js';
+import { sharedLoad } from './pending_loads.js';
 import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, getCompatibleAppointments, getCompatibleMembers, clampPage} from './utils.js';
 import { loadAppointments } from './appointments.js';
 import { loadMembers } from './members.js';

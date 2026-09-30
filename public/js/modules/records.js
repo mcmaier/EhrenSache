@@ -13,7 +13,8 @@ import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { loadAppointments, setCalendarMonth } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad, invalidateCache, currentYear, subgroupLabel, setCurrentYear, navigateToSection } from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, subgroupLabel, setCurrentYear, navigateToSection } from './ui.js';
+import { sharedLoad } from './pending_loads.js';
 import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers, safeTypeColor, clampPage } from './utils.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';

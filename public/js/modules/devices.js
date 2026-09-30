@@ -9,7 +9,8 @@
  */
 
 import { apiCall, currentUser, isAdmin } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad,invalidateCache, showQRModal} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQRModal} from './ui.js';
+import { sharedLoad } from './pending_loads.js';
 import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { CHIPS_DEVICES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 import {debug} from '../app.js'

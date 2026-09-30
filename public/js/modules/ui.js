@@ -24,6 +24,7 @@ import {showWorktimeSection, loadWorkSessions, loadActivityTypes, renderActivity
         checkWorktimeEnabled, initWorktimeEventHandlers} from './worktime.js';
 import {debug} from '../app.js'
 import { registerActions } from './actions.js';
+import { forgetPendingLoads } from './pending_loads.js';
 import {renderSystemSettings} from './settings.js';
 import {loadImportLogs} from './import_export.js';
 
@@ -65,42 +66,6 @@ export const dataCache = {
 // Kurz genug, dass Aenderungen anderer Benutzer ohne Neuladen der Seite
 // ankommen: Der Bereichswechsel laedt nicht mehr erzwungen nach (OI-67).
 const CACHE_TTL = 2 * 60 * 1000; // 2 Minuten
-
-// Laufende Abrufe je Schluessel ('members:2026', 'types' ...). Fragen zwei
-// Stellen gleichzeitig denselben Bestand an -- etwa beim Jahreswechsel
-// Filter-Reset und Bereichsaufbau --, teilen sie sich eine Anfrage.
-const pendingLoads = new Map();
-
-/**
- * Fuehrt fetcher() aus oder haengt sich an einen laufenden Abruf desselben
- * Schluessels. forceReload startet immer eine eigene Anfrage (nach einer
- * Aenderung darf keine aeltere Antwort zurueckkommen); spaetere Aufrufer ohne
- * forceReload haengen sich an diese.
- */
-export function sharedLoad(key, forceReload, fetcher) {
-    if (!forceReload && pendingLoads.has(key)) {
-        return pendingLoads.get(key);
-    }
-
-    const promise = fetcher().finally(() => {
-        if (pendingLoads.get(key) === promise) {
-            pendingLoads.delete(key);
-        }
-    });
-    pendingLoads.set(key, promise);
-    return promise;
-}
-
-/** Laufende Abrufe verwerfen: Nach invalidateCache() darf sich keiner mehr an eine alte Anfrage haengen. */
-function forgetPendingLoads(cacheKey, year) {
-    for (const key of [...pendingLoads.keys()]) {
-        if (cacheKey === null
-            || key === (year !== null ? `${cacheKey}:${year}` : cacheKey)
-            || (year === null && key.startsWith(`${cacheKey}:`))) {
-            pendingLoads.delete(key);
-        }
-    }
-}
 
 export function isCacheValid(cacheKey, year = null) {
 

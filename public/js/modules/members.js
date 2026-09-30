@@ -9,7 +9,8 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad, invalidateCache, currentYear, groupSelectOptionsHtml} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, groupSelectOptionsHtml} from './ui.js';
+import { sharedLoad } from './pending_loads.js';
 import { loadUserData } from './users.js';
 import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { registerActions } from './actions.js';

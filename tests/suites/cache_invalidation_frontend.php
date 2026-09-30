@@ -80,3 +80,70 @@ test('Cache: invalidateCache() ohne Schluessel waehlt den Zweig ueber dieselbe P
     assertTrue(preg_match('/!\s*dataCache\[key\]\.data\b/', $rumpf) !== 1,
         'invalidateCache() prueft data wieder auf Truthiness statt auf den Schluessel');
 });
+
+// ============================================
+// Bereichswechsel und gleichzeitige Abrufe
+// ============================================
+//
+// loadAllData() rief jeden Bereich mit forceReload = true auf: Mitglieder,
+// Termine, Antraege und Terminarten kamen bei jedem Klick von der API, der
+// Cache wirkte nur fuer Bereiche, die das Flag zufaellig nicht weiterreichten.
+// Beim Jahreswechsel luden Filter-Reset und Bereichsaufbau dasselbe Jahr doppelt.
+
+test('Bereichswechsel: loadAllData() erzwingt kein Neuladen', function () use ($ciRoot) {
+    $js = (string) sourceCode($ciRoot . '/public/js/modules/ui.js');
+    $rumpf = ciFunktion($js, 'loadAllData');
+
+    assertTrue(preg_match_all('/\bawait\s+(?:show\w+Section|loadProfile)\(\s*\)/', $rumpf) >= 10,
+        'loadAllData() ruft die Bereiche nicht mehr wie erwartet auf');
+    assertTrue(preg_match('/\b(?:show\w+Section|loadProfile)\(\s*true\b/', $rumpf) !== 1,
+        'loadAllData() erzwingt wieder ein Neuladen — der Cache wirkt beim Bereichswechsel nicht');
+});
+
+test('Bereichswechsel: CACHE_TTL ist hoechstens zwei Minuten', function () use ($ciRoot) {
+    $js = (string) sourceCode($ciRoot . '/public/js/modules/ui.js');
+
+    // Ohne erzwungenes Neuladen ist die TTL das Einzige, was fremde Aenderungen
+    // ins Dashboard bringt (OI-67).
+    assertTrue(preg_match('/const\s+CACHE_TTL\s*=\s*(\d+)\s*\*\s*60\s*\*\s*1000\s*;/', $js, $m) === 1,
+        'CACHE_TTL nicht in der Form <Minuten> * 60 * 1000 gefunden');
+    assertTrue((int) $m[1] >= 1 && (int) $m[1] <= 2,
+        'CACHE_TTL ist ' . $m[1] . ' Minuten — fremde Aenderungen kaemen zu spaet an');
+});
+
+test('Gleichzeitige Abrufe: invalidateCache() vergisst laufende Abrufe', function () use ($ciRoot) {
+    $js = (string) sourceCode($ciRoot . '/public/js/modules/ui.js');
+    $rumpf = ciFunktion($js, 'invalidateCache');
+
+    // Sonst haengt sich ein Aufruf nach einer eigenen Aenderung an eine Anfrage
+    // von davor und bekommt den alten Stand.
+    assertTrue(preg_match('/\{\s*forgetPendingLoads\(\s*cacheKey\s*,\s*year\s*\)\s*;/', $rumpf) === 1,
+        'invalidateCache() ruft forgetPendingLoads(cacheKey, year) nicht als Erstes');
+});
+
+test('Gleichzeitige Abrufe: die Loader gehen ueber sharedLoad()', function () use ($ciRoot) {
+    $loader = [
+        ['members.js',      'loadMembers',      '`members:${year}`'],
+        ['appointments.js', 'loadAppointments', '`appointments:${year}`'],
+        ['records.js',      'loadRecords',      '`records:${year}`'],
+        ['exceptions.js',   'loadExceptions',   '`exceptions:${year}`'],
+        ['management.js',   'loadGroups',       "'groups'"],
+        ['management.js',   'loadTypes',        "'types'"],
+        ['users.js',        'loadUsers',        "'users'"],
+        ['users.js',        'loadUserData',     "'userData'"],
+        ['devices.js',      'loadDevices',      "'devices'"],
+    ];
+
+    foreach ($loader as [$datei, $funktion, $schluessel]) {
+        $js = (string) sourceCode($ciRoot . '/public/js/modules/' . $datei);
+        $rumpf = ciFunktion($js, $funktion);
+
+        // Der Schluessel muss dem Cache-Schluessel entsprechen, sonst trifft
+        // forgetPendingLoads() aus invalidateCache() ihn nicht.
+        assertTrue(str_contains($rumpf, 'return sharedLoad(' . $schluessel . ', forceReload, async () => {'),
+            $funktion . '() laedt nicht ueber sharedLoad(' . $schluessel . ', forceReload, ...)');
+        assertTrue(substr_count($rumpf, 'apiCall(') === substr_count(
+                substr($rumpf, (int) strpos($rumpf, 'return sharedLoad(')), 'apiCall('),
+            $funktion . '() ruft die API ausserhalb von sharedLoad()');
+    }
+});

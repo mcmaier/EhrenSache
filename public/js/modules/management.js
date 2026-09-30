@@ -9,8 +9,9 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad, invalidateCache, subgroupLabel,
+import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, subgroupLabel,
          updateSubgroupLabelElements } from './ui.js';
+import { sharedLoad } from './pending_loads.js';
 import { loadMembers } from './members.js';
 import { formatDateTime, updateModalId, escapeHtml, safeTypeColor } from './utils.js';
 import { groupChips, CHIPS_APPOINTMENT_TYPES, countChips, filterByChip,

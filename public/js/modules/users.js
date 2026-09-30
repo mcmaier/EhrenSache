@@ -10,7 +10,8 @@
 
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { loadMembers } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid} from './ui.js';
+import { sharedLoad } from './pending_loads.js';
 import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { registerActions } from './actions.js';
 import {debug} from '../app.js'

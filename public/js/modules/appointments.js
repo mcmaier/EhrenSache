@@ -10,7 +10,8 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, showChoice, dataCache, isCacheValid, sharedLoad, invalidateCache,currentYear, setCurrentYear, refreshYearFilters} from './ui.js';
+import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear, refreshYearFilters} from './ui.js';
+import { sharedLoad } from './pending_loads.js';
 import { renderDateChecklist } from './date_checklist.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus, clampPage } from './utils.js';
 import { loadTypes } from './management.js';
