@@ -9,7 +9,7 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, groupSelectOptionsHtml} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad, invalidateCache, currentYear, groupSelectOptionsHtml} from './ui.js';
 import { loadUserData } from './users.js';
 import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { registerActions } from './actions.js';
@@ -78,61 +78,63 @@ export async function loadMembers(forceReload = false) {
         return dataCache.members[year].data;
     }
 
-    // Userprofil abfragen (falls nicht gecacht)
-    await loadUserData();
+    return sharedLoad(`members:${year}`, forceReload, async () => {
+        // Userprofil abfragen (falls nicht gecacht)
+        await loadUserData();
 
-    // Mitglieder laden basierend auf gecachten userDetails
-    const { userDetails } = dataCache.userData.data;
+        // Mitglieder laden basierend auf gecachten userDetails
+        const { userDetails } = dataCache.userData.data;
 
-    let members = [];
+        let members = [];
 
-    debug.log(`Loading MEMBERS from API for ${year}`);
+        debug.log(`Loading MEMBERS from API for ${year}`);
             
-    if(isAdminOrManager){
-        // Admin sieht alle Mitglieder
-       members = await apiCall('members','GET',null, {year: year, include_inactive: true});    
+        if(isAdminOrManager){
+            // Admin sieht alle Mitglieder
+           members = await apiCall('members','GET',null, {year: year, include_inactive: true});    
         
-        // GROUP_CONCAT Strings zu Arrays konvertieren
-        members.forEach(member => {
-            if (member.group_ids && typeof member.group_ids === 'string') {
-                member.group_ids_array = member.group_ids
-                    .split(',')
-                    .map(id => parseInt(id.trim()));
-            } else {
-                member.group_ids_array = [];
-            }
-        });
-    }
-    else {
-        if (userDetails && userDetails.member_id) {
-            // year liefert is_active_in_period fuer das gewaehlte Jahr -- ohne
-            // das Feld fiel das eigene Mitglied aus jeder Auswahl, die auf
-            // aktive Mitglieder filtert (OI-91)
-            const member = await apiCall('members', 'GET', null, { id: userDetails.member_id, year: year });
-            members = member ? [member] : [];
+            // GROUP_CONCAT Strings zu Arrays konvertieren
+            members.forEach(member => {
+                if (member.group_ids && typeof member.group_ids === 'string') {
+                    member.group_ids_array = member.group_ids
+                        .split(',')
+                        .map(id => parseInt(id.trim()));
+                } else {
+                    member.group_ids_array = [];
+                }
+            });
         }
-        // group_ids_array aus group_ids-String berechnen (analog zum Admin-Zweig)
-        members.forEach(member => {
-            if (member.group_ids && typeof member.group_ids === 'string') {
-                member.group_ids_array = member.group_ids
-                    .split(',')
-                    .map(id => parseInt(id.trim()));
-            } else {
-                member.group_ids_array = [];
+        else {
+            if (userDetails && userDetails.member_id) {
+                // year liefert is_active_in_period fuer das gewaehlte Jahr -- ohne
+                // das Feld fiel das eigene Mitglied aus jeder Auswahl, die auf
+                // aktive Mitglieder filtert (OI-91)
+                const member = await apiCall('members', 'GET', null, { id: userDetails.member_id, year: year });
+                members = member ? [member] : [];
             }
-        });
-    }     
+            // group_ids_array aus group_ids-String berechnen (analog zum Admin-Zweig)
+            members.forEach(member => {
+                if (member.group_ids && typeof member.group_ids === 'string') {
+                    member.group_ids_array = member.group_ids
+                        .split(',')
+                        .map(id => parseInt(id.trim()));
+                } else {
+                    member.group_ids_array = [];
+                }
+            });
+        }     
 
-    // Cache für dieses Jahr speichern
-    if (!dataCache.members[year]) {
-        dataCache.members[year] = {};
-    }
+        // Cache für dieses Jahr speichern
+        if (!dataCache.members[year]) {
+            dataCache.members[year] = {};
+        }
 
-    // Cache speichern
-    dataCache.members[year].data = members;
-    dataCache.members[year].timestamp = Date.now();
+        // Cache speichern
+        dataCache.members[year].data = members;
+        dataCache.members[year].timestamp = Date.now();
 
-    return members;
+        return members;
+    });
 }
 
 /**

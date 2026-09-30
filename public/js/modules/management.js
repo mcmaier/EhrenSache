@@ -9,7 +9,7 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, subgroupLabel,
+import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad, invalidateCache, subgroupLabel,
          updateSubgroupLabelElements } from './ui.js';
 import { loadMembers } from './members.js';
 import { formatDateTime, updateModalId, escapeHtml, safeTypeColor } from './utils.js';
@@ -53,13 +53,15 @@ export async function loadGroups(forceReload = false) {
         return dataCache.groups.data;
     }
 
-    debug.log('Loading groups from API');
-    const groups = await apiCall('member_groups');
+    return sharedLoad('groups', forceReload, async () => {
+        debug.log('Loading groups from API');
+        const groups = await apiCall('member_groups');
 
-    dataCache.groups.data = groups;
-    dataCache.groups.timestamp = Date.now();
+        dataCache.groups.data = groups;
+        dataCache.groups.timestamp = Date.now();
 
-    return groups;        
+        return groups;        
+    });
 }
 
 function renderGroups(groupData)
@@ -324,14 +326,16 @@ export async function loadTypes(forceReload = false) {
         debug.log('Loading Appointment Types from CACHE');
         return dataCache.types.data;
     }
-    
-    debug.log('Loading Appointment Types from API');
-    const types = await apiCall('appointment_types');        
 
-    dataCache.types.data = types;
-    dataCache.types.timestamp = Date.now();
+    return sharedLoad('types', forceReload, async () => {
+        debug.log('Loading Appointment Types from API');
+        const types = await apiCall('appointment_types');        
+
+        dataCache.types.data = types;
+        dataCache.types.timestamp = Date.now();
     
-    return types;       
+        return types;       
+    });
 }
 
 export async function renderTypeGroupOverview(typeData)

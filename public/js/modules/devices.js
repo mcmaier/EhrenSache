@@ -9,7 +9,7 @@
  */
 
 import { apiCall, currentUser, isAdmin } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQRModal} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad,invalidateCache, showQRModal} from './ui.js';
 import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { CHIPS_DEVICES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 import {debug} from '../app.js'
@@ -47,14 +47,16 @@ export async function loadDevices(forceReload = false) {
         return dataCache.devices.data;
     }
 
-    debug.log("Loading DEVICES from API");
-    const devices = await apiCall('users','GET',null, { user_type: 'device' });
+    return sharedLoad('devices', forceReload, async () => {
+        debug.log("Loading DEVICES from API");
+        const devices = await apiCall('users','GET',null, { user_type: 'device' });
     
-    // Cache speichern
-    dataCache.devices.data = devices;
-    dataCache.devices.timestamp = Date.now();
+        // Cache speichern
+        dataCache.devices.data = devices;
+        dataCache.devices.timestamp = Date.now();
     
-    return devices;    
+        return devices;    
+    });
 }
 
 // ============================================

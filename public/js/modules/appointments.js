@@ -10,7 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear, refreshYearFilters} from './ui.js';
+import { showToast, showConfirm, showChoice, dataCache, isCacheValid, sharedLoad, invalidateCache,currentYear, setCurrentYear, refreshYearFilters} from './ui.js';
 import { renderDateChecklist } from './date_checklist.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus, clampPage } from './utils.js';
 import { loadTypes } from './management.js';
@@ -73,24 +73,26 @@ export async function loadAppointments(forceReload = false) {
         debug.log(`Loading APPOINTMENTS from CACHE for ${year}`);
         return dataCache.appointments[year].data;
     }
-    
-    debug.log(`Loading APPOINTMENTS from API for ${year}`);
-    // include=attendance liefert je begonnenem Termin {expected, present,
-    // excused, missing} fuer Verwalter und own_attendance fuer alle anderen
-    // (Schritt 2a). Die Zahlen liegen damit im ohnehin vorhandenen Cache des
-    // Jahres -- der Kalender braucht keinen zweiten Abruf und keinen eigenen
-    // Cache. Ohne Zeitraum wuerde der Server den Zusatz ignorieren.
-    const appointments = await apiCall('appointments', 'GET', null, { year: year, include: 'attendance' });
 
-    // Cache für dieses Jahr speichern
-    if (!dataCache.appointments[year]) {
-        dataCache.appointments[year] = {};
-    }
+    return sharedLoad(`appointments:${year}`, forceReload, async () => {
+        debug.log(`Loading APPOINTMENTS from API for ${year}`);
+        // include=attendance liefert je begonnenem Termin {expected, present,
+        // excused, missing} fuer Verwalter und own_attendance fuer alle anderen
+        // (Schritt 2a). Die Zahlen liegen damit im ohnehin vorhandenen Cache des
+        // Jahres -- der Kalender braucht keinen zweiten Abruf und keinen eigenen
+        // Cache. Ohne Zeitraum wuerde der Server den Zusatz ignorieren.
+        const appointments = await apiCall('appointments', 'GET', null, { year: year, include: 'attendance' });
 
-    dataCache.appointments[year].data = appointments;
-    dataCache.appointments[year].timestamp = Date.now();
+        // Cache für dieses Jahr speichern
+        if (!dataCache.appointments[year]) {
+            dataCache.appointments[year] = {};
+        }
 
-    return appointments;    
+        dataCache.appointments[year].data = appointments;
+        dataCache.appointments[year].timestamp = Date.now();
+
+        return appointments;    
+    });
 }
 
 async function loadAppointmentData(appointmentId) {

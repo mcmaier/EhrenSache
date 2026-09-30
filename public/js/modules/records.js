@@ -13,7 +13,7 @@ import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { loadAppointments, setCalendarMonth } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, subgroupLabel, setCurrentYear, navigateToSection } from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad, invalidateCache, currentYear, subgroupLabel, setCurrentYear, navigateToSection } from './ui.js';
 import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers, safeTypeColor, clampPage } from './utils.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
@@ -92,16 +92,18 @@ export async function loadRecords(forceReload = false) {
         return dataCache.records[year].data;
     }
 
-    debug.log(`Loading RECORDS from API for ${year}`);
-    const records = await apiCall('records', 'GET', null, {year:year});
+    return sharedLoad(`records:${year}`, forceReload, async () => {
+        debug.log(`Loading RECORDS from API for ${year}`);
+        const records = await apiCall('records', 'GET', null, {year:year});
 
-    if(!dataCache.records[year]){
-        dataCache.records[year] = {};
-    }
-    dataCache.records[year].data = records;
-    dataCache.records[year].timestamp = Date.now();    
+        if(!dataCache.records[year]){
+            dataCache.records[year] = {};
+        }
+        dataCache.records[year].data = records;
+        dataCache.records[year].timestamp = Date.now();    
     
-    return records;
+        return records;
+    });
 }
 
 export function filterRecords(records, filters = {}) {

@@ -10,7 +10,7 @@
 
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { loadMembers } from './members.js';
-import { showToast, showConfirm, dataCache, isCacheValid} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad} from './ui.js';
 import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { registerActions } from './actions.js';
 import {debug} from '../app.js'
@@ -43,14 +43,16 @@ export async function loadUsers(forceReload = false) {
         return dataCache.users.data;
     }
 
-    debug.log("Loading USERS from API");
-    const users = await apiCall('users','GET',null,{user_type:'human'});
+    return sharedLoad('users', forceReload, async () => {
+        debug.log("Loading USERS from API");
+        const users = await apiCall('users','GET',null,{user_type:'human'});
     
-    // Cache speichern
-    dataCache.users.data = users;
-    dataCache.users.timestamp = Date.now();
+        // Cache speichern
+        dataCache.users.data = users;
+        dataCache.users.timestamp = Date.now();
     
-    return users;    
+        return users;    
+    });
 }
 
 export async function loadUserData(forceReload = false) {
@@ -61,13 +63,15 @@ export async function loadUserData(forceReload = false) {
         return;
     }
 
-    debug.log("Loading USER DETAILS (ME) from API");
-    const userData = await apiCall('me');
-    const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
+    return sharedLoad('userData', forceReload, async () => {
+        debug.log("Loading USER DETAILS (ME) from API");
+        const userData = await apiCall('me');
+        const userDetails = await apiCall('users', 'GET', null, { id: userData.user_id });
         
-    // userData Cache separat speichern
-    dataCache.userData.data = { userData, userDetails };
-    dataCache.userData.timestamp = Date.now();
+        // userData Cache separat speichern
+        dataCache.userData.data = { userData, userDetails };
+        dataCache.userData.timestamp = Date.now();
+    });
 }
 
 // ============================================

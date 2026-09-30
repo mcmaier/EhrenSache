@@ -9,7 +9,7 @@
  */
 
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache,currentYear} from './ui.js';
+import { showToast, showConfirm, dataCache, isCacheValid, sharedLoad,invalidateCache,currentYear} from './ui.js';
 import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, getCompatibleAppointments, getCompatibleMembers, clampPage} from './utils.js';
 import { loadAppointments } from './appointments.js';
 import { loadMembers } from './members.js';
@@ -51,18 +51,20 @@ export async function loadExceptions(forceReload = false) {
         return dataCache.exceptions[year].data;
     }
 
-    debug.log(`Loading EXCEPTIONS from API for ${year}`);
-    const exceptions = await apiCall('exceptions', 'GET', null, {year: year});
+    return sharedLoad(`exceptions:${year}`, forceReload, async () => {
+        debug.log(`Loading EXCEPTIONS from API for ${year}`);
+        const exceptions = await apiCall('exceptions', 'GET', null, {year: year});
 
-    if(!dataCache.exceptions[year])
-    {
-        dataCache.exceptions[year] = {};
-    }
+        if(!dataCache.exceptions[year])
+        {
+            dataCache.exceptions[year] = {};
+        }
 
-    dataCache.exceptions[year].data = exceptions;
-    dataCache.exceptions[year].timestamp = Date.now();
+        dataCache.exceptions[year].data = exceptions;
+        dataCache.exceptions[year].timestamp = Date.now();
 
-    return exceptions;
+        return exceptions;
+    });
 }
 
 export async function renderExceptions(exceptions, page = 1)
