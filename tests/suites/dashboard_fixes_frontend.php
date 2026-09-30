@@ -82,3 +82,12 @@ test('OI-88: jede paginierte Liste begrenzt die Seite, bevor sie schneidet', fun
             "{$function}() merkt sich die Seite vor der Begrenzung");
     }
 });
+
+test('OI-91: loadMembers() fragt das eigene Mitglied mit Jahr ab', function () use ($dfRoot) {
+    $body = dfFunction(dfModule($dfRoot, 'members'), 'loadMembers');
+
+    // Ohne year liefert der Einzelabruf is_active_in_period nur als
+    // Stammdatum; der Zeitraum des gewaehlten Jahres fehlte dann.
+    assertTrue(preg_match("/apiCall\('members',\s*'GET',\s*null,\s*\{\s*id:\s*userDetails\.member_id,\s*year\b/", $body) === 1,
+        'loadMembers() ruft den Einzelabruf fuer user ohne year auf');
+});

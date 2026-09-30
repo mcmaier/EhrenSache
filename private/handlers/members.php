@@ -47,9 +47,20 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 }               
                 else{
                     $memberId = $authMemberId;
+
+                    // Aktiv im Zeitraum wie im Listenabruf der Verwalter: mit
+                    // year "irgendwann im Jahr aktiv", sonst das Stammdatum.
+                    // Ohne das Feld blieb die Mitgliedsauswahl der
+                    // Anwesenheit fuer user leer (OI-91).
+                    $ownYear = isset($_GET['year']) ? intval($_GET['year']) : null;
+                    $ownActivityFlag = $ownYear
+                        ? 'CASE WHEN (' . getMemberActivityWhereYear($ownYear, 'm') . ') THEN 1 ELSE 0 END'
+                        : 'm.active';
+
                     $stmt = $db->prepare("
-                        SELECT m.name, m.surname, m.member_number,
-                               GROUP_CONCAT(mga.group_id SEPARATOR ', ') as group_ids
+                        SELECT m.member_id, m.name, m.surname, m.member_number, m.active,
+                               GROUP_CONCAT(mga.group_id SEPARATOR ', ') as group_ids,
+                               $ownActivityFlag as is_active_in_period
                         FROM {$prefix}members m
                         LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
                         WHERE m.member_id = ?
@@ -65,11 +76,14 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
 
                     if ($member) {
                         echo json_encode([
-                            "name"          => $member['name'],
-                            "surname"       => $member['surname'],
-                            "member_number" => $member['member_number'],
-                            "group_ids"     => $member['group_ids'],
-                            "warning"       => $warning
+                            "member_id"           => (int) $member['member_id'],
+                            "name"                => $member['name'],
+                            "surname"             => $member['surname'],
+                            "member_number"       => $member['member_number'],
+                            "active"              => (int) $member['active'],
+                            "group_ids"           => $member['group_ids'],
+                            "is_active_in_period" => (int) $member['is_active_in_period'],
+                            "warning"             => $warning
                         ]);
                     } else {
                         http_response_code(404);

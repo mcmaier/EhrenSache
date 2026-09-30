@@ -105,7 +105,10 @@ export async function loadMembers(forceReload = false) {
     }
     else {
         if (userDetails && userDetails.member_id) {
-            const member = await apiCall('members', 'GET', null, { id: userDetails.member_id });
+            // year liefert is_active_in_period fuer das gewaehlte Jahr -- ohne
+            // das Feld fiel das eigene Mitglied aus jeder Auswahl, die auf
+            // aktive Mitglieder filtert (OI-91)
+            const member = await apiCall('members', 'GET', null, { id: userDetails.member_id, year: year });
             members = member ? [member] : [];
         }
         // group_ids_array aus group_ids-String berechnen (analog zum Admin-Zweig)

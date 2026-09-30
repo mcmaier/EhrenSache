@@ -557,8 +557,23 @@ Die Einzelantwort ist ein Objekt und trägt statt der beiden Zeichenketten ein `
 ```
 
 Ein `user` ohne Admin- oder Managerrolle bekommt auf denselben Endpunkt nur die eigenen
-Stammdaten (`name`, `surname`, `member_number`, `group_ids`) und bei fremder `id` zusätzlich ein
-`warning`; die fremde `id` wird ignoriert, nicht abgewiesen.
+Stammdaten (`member_id`, `name`, `surname`, `member_number`, `active`, `group_ids`,
+`is_active_in_period`) und bei fremder `id` zusätzlich ein `warning`; die fremde `id` wird
+ignoriert, nicht abgewiesen. `is_active_in_period` folgt derselben Regel wie im Listenabruf: mit
+`year` „im Jahr irgendwann aktiv“, ohne `year` gleich `active` (seit OI-91).
+
+```json
+{
+  "member_id": 2,
+  "name": "Anna",
+  "surname": "Beispiel",
+  "member_number": "M002",
+  "active": 1,
+  "group_ids": "2, 5720",
+  "is_active_in_period": 1,
+  "warning": null
+}
+```
 
 **Stations-PIN (seit 1.3.0):** Jede Admin/Manager-Antwort (einzeln und Liste) trägt `has_pin`
 (Boolean) und `pin_updated_at`; der Hash selbst (`pin_hash`) verlässt den Server nie.
