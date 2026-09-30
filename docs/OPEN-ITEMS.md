@@ -4110,12 +4110,21 @@ verursacht (`loadMemberFilter` unverändert).
 
 ### OI-92 · Tabellen uneinheitlich: Aktionsspalte nur in der Arbeitszeit fixiert, Arbeitszeit ohne Paginierung
 **Priorität:** niedrig · aufgenommen am 2026-09-22 (Hinweis des Nutzers bei der Sichtprüfung zu
-OI-86)
+OI-86) · Punkt 1 erledigt am 2026-09-30 auf `fix/oi-92-sticky-aktionen`, Punkt 2 offen
 
-**1. Fixierte Aktionsspalte.** Die Aktionsspalte bleibt beim waagerechten Scrollen nur in der
-Arbeitszeit stehen: `public/css/components/tables.css` ~Zeile 62–64
-(`.table-worktime th:last-child, .table-worktime td.actions-cell { position: sticky; … }`). Die
-übrigen Listen (Termine, Anwesenheit, Anträge, Mitglieder, Benutzer, Geräte) haben das nicht.
+**1. Fixierte Aktionsspalte — erledigt.** Die Regel aus OI-10 hing an `.table-worktime`; sie gilt
+jetzt für jede `td.actions-cell` (`public/css/components/tables.css`). Der Kopf klebt über
+`table:has(td.actions-cell) > thead th:last-child`, also nur, wo es Aktionszellen gibt: Für die
+Rolle `user` lassen `updateTableHeaders()` (`ui.js`) und `records.js` die Spalte „Aktionen“ weg,
+ein bloßes `th:last-child` hätte dann die letzte Datenspalte festgehalten. Zwei Sonderfälle
+mussten mit: `tr.row-inactive td` setzt `opacity` auf die ganze Zelle samt Hintergrund — die
+festgehaltene Zelle bekommt deshalb einen deckenden Mischton, blass sind nur die Knöpfe. Und die
+Abdeckung rechts neben der Spalte war fest `--spacing-lg` breit, unter 480 px ist das Polster
+aber schmaler; das Polster von `.data-table` steht dafür jetzt in `--table-pad`, die Abdeckung
+folgt ihm (auch im Rückmeldungs-Dialog, dort 0). Wächter: `tests/suites/tables_frontend.php`
+(ersetzt den OI-10-Test in `worktime_frontend.php`), sechs Mutanten geprüft. Im Browser als
+admin und user bei 1280, 800 und 375 px über alle Bereiche gemessen: Zelle bündig am rechten
+Rand über den ganzen Rollweg, nicht überdeckt, Rollfläche nicht verbreitert.
 
 **2. Keine Paginierung.** Die Arbeitszeitliste wird nicht paginiert — `worktime.js` hat keine
 Paginierung, alle anderen Listen nutzen `globalPaginationValue` aus `settings.js`.

@@ -7,6 +7,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Geändert
+- **Die Spalte „Aktionen“ bleibt in allen Tabellen am rechten Rand stehen.** Bisher tat sie das
+  nur in der Zeiterfassung; auf Tablet und Handy lagen Bearbeiten und Löschen in Mitgliedern,
+  Terminen, Anwesenheit, Anträgen, Benutzern, Geräten, der Verwaltung und den Import-Logs am
+  Ende des waagerechten Rollwegs. Ohne Aktionsspalte, etwa in der Ansicht der Rolle `user`, klebt
+  auch keine andere Spalte. In inaktiven Mitgliederzeilen scheint die festgehaltene Spalte nicht
+  durch (OI-92).
+
 ## [1.18.0] – 2026-09-30
 
 ### Sicherheit
