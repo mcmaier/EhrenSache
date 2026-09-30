@@ -617,7 +617,7 @@
 /* Die Tabelle sitzt schon im gepolsterten modal-body -- ohne diese Regel
    haette sie zusaetzlich ihr eigenes .data-table-Polster und einen zweiten
    Schatten. */
-#responsesModal .data-table { padding: 0; box-shadow: none; }
+#responsesModal .data-table { --table-pad: 0px; box-shadow: none; }
 
 /* Terminserien im Termin-Dialog (FI-7) */
 .appointment-series-box {

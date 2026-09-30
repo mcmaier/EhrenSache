@@ -100,7 +100,7 @@
     }
     
     .data-table {
-        padding: var(--spacing-sm);
+        --table-pad: var(--spacing-sm);
     }
     
     table {

@@ -9,9 +9,11 @@
  */
  
 .data-table {
+    /* Polster als Variable: Die klebende Aktionsspalte deckt es mit ab. */
+    --table-pad: var(--spacing-lg);
     background: var(--bg-white);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
+    padding: var(--table-pad);
     box-shadow: var(--shadow-sm);
     overflow-x: auto;
 }
@@ -55,12 +57,18 @@ table.table-worktime {
     white-space: nowrap;
 }
 
-/* Die Aktionsspalte bleibt beim Rollen am rechten Rand stehen, damit Freigeben
-   nicht erst Rollen verlangt. Eigener Hintergrund, sonst scheint der Inhalt
-   der darunter durchlaufenden Spalten durch; die Trennlinie als Schatten,
-   weil Rahmen bei border-collapse nicht mitwandern. */
-.table-worktime th:last-child,
-.table-worktime td.actions-cell {
+/* Die Aktionsspalte bleibt beim Rollen am rechten Rand stehen, damit
+   Bearbeiten oder Freigeben nicht erst Rollen verlangt -- in jeder Tabelle,
+   deren Zeilen eine .actions-cell tragen (OI-10 fuer die Zeiterfassung, OI-92
+   fuer alle uebrigen). Der Kopf wird ueber :has() nur dann festgehalten, wenn
+   die Tabelle ueberhaupt Aktionszellen hat: Fuer die Rolle user lassen
+   updateTableHeaders() (ui.js) und records.js die Spalte "Aktionen" weg, ein
+   blosses th:last-child hielte dann die letzte Datenspalte fest, die Zellen
+   darunter aber nicht. Eigener Hintergrund, sonst scheint der Inhalt der
+   darunter durchlaufenden Spalten durch; die Trennlinie als Schatten, weil
+   Rahmen bei border-collapse nicht mitwandern. */
+table:has(td.actions-cell) > thead th:last-child,
+td.actions-cell {
     position: sticky;
     right: 0;
     background: var(--bg-white);
@@ -69,20 +77,23 @@ table.table-worktime {
 
 /* Deckt den Innenabstand des .data-table rechts neben der Spalte ab -- dort
    liefe sonst der Text der weiter links liegenden Spalten durch. Ein aeusserer
-   box-shadow waere kuerzer, Chrome zeichnet ihn an Tabellenzellen aber nicht. */
-.table-worktime th:last-child::after,
-.table-worktime td.actions-cell::after {
+   box-shadow waere kuerzer, Chrome zeichnet ihn an Tabellenzellen aber nicht.
+   Die Breite folgt --table-pad, damit die Abdeckung dort, wo das Polster
+   schmaler ist (responsive.css, Rueckmeldungs-Dialog), nicht ueber den Rand
+   hinausragt und die Rollflaeche verbreitert. */
+table:has(td.actions-cell) > thead th:last-child::after,
+td.actions-cell::after {
     content: "";
     position: absolute;
     top: 0;
     bottom: 0;
     left: 100%;
-    width: var(--spacing-lg);
+    width: var(--table-pad, 0px);
     background: var(--bg-white);
 }
 
-.table-worktime th:last-child,
-.table-worktime tbody tr:hover td.actions-cell {
+table:has(td.actions-cell) > thead th:last-child,
+tbody tr:hover td.actions-cell {
     background: var(--bg-light);
 }
 
@@ -101,6 +112,27 @@ tr.row-inactive td {
 tr.row-inactive:hover td {
     opacity: 0.65;
     background-color: var(--bg-light);
+}
+
+/* Die klebende Aktionsspalte darf nicht mit durchscheinen, sonst laufen beim
+   Rollen die Nachbarspalten sichtbar unter ihr durch. Deshalb deckender
+   Hintergrund im selben Mischton, den die halbtransparenten Nachbarzellen auf
+   Weiss ergeben, und die Blaesse nur auf den Knoepfen. */
+tr.row-inactive td.actions-cell {
+    opacity: 1;
+    background-color: color-mix(in srgb, var(--bg-gray) 45%, var(--bg-white));
+}
+
+tr.row-inactive td.actions-cell > * {
+    opacity: 0.45;
+}
+
+tr.row-inactive:hover td.actions-cell {
+    background-color: var(--bg-light);
+}
+
+tr.row-inactive:hover td.actions-cell > * {
+    opacity: 0.65;
 }
 /* Offene Anträge in der Anwesenheitsliste (OI-87). Leiser als der Status
    darüber: Sie sagen, was aussteht, nicht was gilt. */
@@ -145,7 +177,7 @@ tr.row-inactive:hover td {
    Zeile schoebe die Spalte gegen den Tabellenkopf. Er liegt ausserdem ueber
    jedem Hintergrund, den die Zeilenzustaende setzen (tbody tr:hover,
    tr.row-inactive td). Dieselbe Technik traegt oben schon die klebende
-   Aktionsspalte der Zeiterfassung, siehe .table-worktime td.actions-cell.
+   Aktionsspalte, siehe td.actions-cell.
    Die Farbe kommt ueber --type-color am Element, gesetzt aus der Terminart. */
 .type-accent {
     box-shadow: inset 4px 0 0 var(--type-color, var(--type-color-none));
