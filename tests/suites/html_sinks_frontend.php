@@ -22,9 +22,11 @@ declare(strict_types=1);
  * Variablen bis zu ihrer Definition, auch ueber mehrere Stufen
  * (feld -> memberNumber -> memberInfo -> tr.innerHTML).
  *
- * Senken: Zuweisung an innerHTML/outerHTML, insertAdjacentHTML(), showToast()
- * (setzt per innerHTML, ui.js) und das return einer Funktion, deren Name auf
- * Html endet (Konvention fuer Markup-Bausteine).
+ * Senken: Zuweisung an innerHTML/outerHTML, insertAdjacentHTML() und das
+ * return einer Funktion, deren Name auf Html endet (Konvention fuer
+ * Markup-Bausteine). showToast() ist seit OI-111 keine Senke mehr: Es setzt
+ * die Meldung per textContent. Ein eigener Test haelt das fest -- und dass
+ * kein Aufrufer mehr selbst maskiert, sonst erschiene "&amp;".
  *
  * Seit 2026-09-28 fragt der Waechter zusaetzlich, WOHIN ein Wert geht: ob er in
  * einem Attributwert oder im Elementinhalt landet (hsAttributeAt()). Fuer ein
@@ -43,8 +45,8 @@ declare(strict_types=1);
  * - hsDefinitions() kennt const/let/var und Zuweisung, nicht
  *   Objekteigenschaften, Destrukturierung oder den Parameter einer Pfeilfunktion
  *   in map(m => …).
- * - hsIsRawField() erkennt einen Rueckfall auf ein Literal (feld || 'x'), nicht
- *   eine Kette ueber ein zweites Feld (feld || anderesFeld || 'x').
+ * - hsIsRawField() erkennt Rueckfallketten aus Feldern und Literalen
+ *   (feld || anderesFeld || 'x') erst seit OI-111; davor nur ein Literal.
  * - Die strengere Attributregel gilt bisher nur fuer style. Ein on…-Attribut
  *   ist derselbe Fall -- dort steht JavaScript, und Maskierung ist auch da die
  *   falsche Schranke --, braucht aber einen Begriff von "das kann nur eine Zahl
@@ -250,8 +252,10 @@ function hsIsRawField(string $content): bool
     // Ein Feld, wahlweise mit Methodenaufruf (.trim()), Rueckfallwert (|| '')
     // und in String(…) gehuellt — innen oder aussen vom Rueckfallwert.
     $lit      = '(?:\'[^\']*\'|"[^"]*"|`[^`$]*`|-?\d+)';
-    $fallback = '(?:\s*(?:\|\||\?\?)\s*' . $lit . ')?';
     $field    = '[\w$]+(?:\??\.[\w$]+)*\??\.(?:\w+_)?(?:' . HS_FIELDS . ')\b(?:\??\.\w+\(\))*';
+    // Rueckfallkette: feld || 'x', aber auch feld || anderesFeld || 'x' --
+    // jedes Glied kann ein weiteres Feld oder ein Literal sein (OI-111).
+    $fallback = '(?:\s*(?:\|\||\?\?)\s*(?:' . $lit . '|' . $field . '))*';
     $raw      = '(?:String\(\s*)?' . $field . $fallback . '\s*\)?' . $fallback;
     // Oder als Zweig eines Ternaers: cond ? feld : 'x' bzw. cond ? 'x' : feld
     $cond     = '[^?`]+?';
@@ -445,13 +449,12 @@ function hsSinks(string $js): array
     $patterns = [
         '/\.(?:inner|outer)HTML\s*\+?=(?!=)/',
         '/\binsertAdjacentHTML\s*\(\s*[^,]+,/',
-        '/\bshowToast\s*\(/',
     ];
     foreach ($patterns as $re) {
         if (preg_match_all($re, $js, $m, PREG_OFFSET_CAPTURE)) {
             foreach ($m[0] as [$match, $off]) {
                 $start   = $off + strlen($match);
-                $end     = hsExpressionEnd($js, $start, str_contains($match, 'showToast'));
+                $end     = hsExpressionEnd($js, $start);
                 $sinks[] = [substr_count($js, "\n", 0, $off) + 1, substr($js, $start, $end - $start), $off];
             }
         }
@@ -591,7 +594,7 @@ function renderUsers(user) {
     const info = `<div>${escapeHtml(user.name)} ${nr}</div>`;
     tr.innerHTML = `<td>${info}</td>`;
     box.innerHTML = `<b>${apt.title}</b>`;
-    showToast(`Gruppe "${g.group_name}" fehlt`, 'warning');
+    msg.innerHTML = `<i>${res.message || res.hint || 'Fehler'}</i>`;
     ok.innerHTML = `<b>${escapeHtml(apt.title)}</b>`;
     el.textContent = `${apt.title}`;
 }
@@ -599,6 +602,8 @@ function cardHtml(item) {
     return `<p>${item.description}</p>`;
 }
 JS;
+    // Zeile 6: eine Rueckfallkette ueber ein zweites Feld (OI-111) -- bis dahin
+    // nur mit einem Literal als Rueckfall erkannt.
     $funde = [];
     foreach (hsSinks($js) as [$line, $expr, $at]) {
         foreach (hsRawFieldsReaching($js, $expr, $at) as $f) {
@@ -616,7 +621,7 @@ JS;
         '3: user.member_number (ueber nr)',
         '4: user.member_number (ueber nr) (ueber info)',
         '5: apt.title',
-        '6: g.group_name',
+        "6: res.message || res.hint || 'Fehler'",
     ], $funde);
 });
 
@@ -784,4 +789,34 @@ test('Keine HTML-Senke erreicht ein Freitextfeld unmaskiert', function () use ($
     assertTrue($funde === [],
         "Freitext ohne escapeHtml() in einer HTML-Senke (innerHTML, showToast, …Html()):\n  "
         . implode("\n  ", $funde));
+});
+
+test('showToast() setzt die Meldung als Text, kein Aufrufer maskiert selbst (OI-111)', function () use ($hsRoot) {
+    $ui = (string) sourceCode($hsRoot . '/public/js/modules/ui.js');
+    $start = strpos($ui, 'export function showToast(');
+    assertTrue($start !== false, 'showToast() nicht gefunden');
+    $body = substr($ui, $start, hsExpressionEnd($ui, (int) strpos($ui, '{', $start) + 1, false, true) - $start);
+
+    // Die Meldung darf in keinem Template stehen, das per innerHTML gesetzt
+    // wird -- Serverantworten landen hier ungeprueft (api.js).
+    assertTrue(!str_contains($body, '${message'),
+        'showToast() setzt die Meldung wieder als Markup');
+    assertTrue(preg_match("/querySelector\('\.toast-message'\)\.textContent\s*=/", $body) === 1,
+        'showToast() setzt die Meldung nicht per textContent');
+
+    // Maskiert ein Aufrufer weiterhin selbst, zeigt der Toast "&amp;" statt "&".
+    $funde = [];
+    foreach (hsScannedFiles($hsRoot) as $file) {
+        $js = (string) sourceCode($file);
+        if (preg_match_all('/\bshowToast\s*\(/', $js, $m, PREG_OFFSET_CAPTURE)) {
+            foreach ($m[0] as [$match, $off]) {
+                $start = $off + strlen($match);
+                $args  = substr($js, $start, hsExpressionEnd($js, $start, true) - $start);
+                if (str_contains($args, 'escapeHtml(')) {
+                    $funde[] = basename($file) . ':' . (substr_count($js, "\n", 0, $off) + 1);
+                }
+            }
+        }
+    }
+    assertTrue($funde === [], "Doppelt maskierte Toast-Meldung:\n  " . implode("\n  ", $funde));
 });

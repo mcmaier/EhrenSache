@@ -10,9 +10,9 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
+import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear, refreshYearFilters} from './ui.js';
 import { renderDateChecklist } from './date_checklist.js';
-import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus } from './utils.js';
+import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus, clampPage } from './utils.js';
 import { loadTypes } from './management.js';
 import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
@@ -232,7 +232,7 @@ async function renderAppointments(appointments, page = 1) {
     
     const tbody = document.getElementById('appointmentsTableBody');
     if (!appointments){
-        tbody.innerHTML = '<tr><td colspan="4" class="loading">Keine Einträge gefunden</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="loading">Keine Termine für diese Auswahl</td></tr>';
         calendarAppointments = [];
         updateAppointmentStats([]);
         return;
@@ -243,13 +243,15 @@ async function renderAppointments(appointments, page = 1) {
     // Alle Appointments speichern für Pagination
     allFilteredAppointments = appointments;
     calendarAppointments = appointments;
-    currentAppointmentsPage = page;
 
     updateAppointmentStats(appointments);
 
     // Pagination berechnen
     const totalAppointments = appointments.length;
     const totalPages = Math.ceil(totalAppointments / appointmentsPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentAppointmentsPage = page;
     const startIndex = (page - 1) * appointmentsPerPage;
     const endIndex = startIndex + appointmentsPerPage;
     const pageAppointments = appointments.slice(startIndex, endIndex);
@@ -1326,6 +1328,8 @@ async function invalidateSeriesYears(from, until) {
     for (let y = first; y <= last; y++) {
         await invalidateCache('appointments', y);
     }
+    // Reicht die Serie in ein bisher leeres Jahr, fehlt es sonst im Jahresfilter (OI-79)
+    await refreshYearFilters();
 }
 
 const DETACH_REASON_TEXT = {
@@ -1362,7 +1366,7 @@ function seriesResultText(r, kind = null) {
             : `${r.detached.length} abgelöst (${detachedReasonText(r.detached)})`);
     }
     if (r.series_deleted) parts.push(kind === 'split' ? 'alte Serie aufgelöst' : 'Serie aufgelöst');
-    // Nur Zahlen und feste Texte -- showToast() setzt per innerHTML.
+    // Nur Zahlen und feste Texte; showToast() setzt ohnehin als Text (OI-111).
     return 'Serie: ' + (parts.join(', ') || 'keine Änderung');
 }
 
@@ -1656,6 +1660,9 @@ export async function saveAppointment() {
     if (result && result.success) {
         closeAppointmentModal();
 
+        // Ein einzelner Termin kann ebenso ein neues Jahr eroeffnen (OI-79)
+        await refreshYearFilters();
+
         // Cache invalidieren und neu laden
         showAppointmentSection(true, currentAppointmentsPage);
 
@@ -1698,7 +1705,7 @@ export async function deleteAppointment(appointmentId) {
         const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
         if (result && result.success) {
             showAppointmentSection(true, currentAppointmentsPage);
-            showToast(`Termin "${escapeHtml(title)}" wurde gelöscht`, 'success');
+            showToast(`Termin "${title}" wurde gelöscht`, 'success');
         }
         return;
     }
@@ -1714,9 +1721,8 @@ export async function deleteAppointment(appointmentId) {
             // Cache invalidieren und neu laden            
             showAppointmentSection(true, currentAppointmentsPage);
 
-            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Titel
-            // kommt aus der Terminverwaltung (Admin/Manager) und muss daher escaped werden.
-            showToast(`Termin "${escapeHtml(title)}" wurde gelöscht`, 'success');
+            // showToast() setzt die Nachricht als Text (OI-111) -- nicht selbst maskieren.
+            showToast(`Termin "${title}" wurde gelöscht`, 'success');
         }
     }
 }

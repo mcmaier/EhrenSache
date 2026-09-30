@@ -117,14 +117,6 @@
         margin-bottom: var(--spacing-xs);
     }
     
-    .stat-card {
-        padding: var(--spacing-md);
-    }
-    
-    .stat-card .number {
-        font-size: 24px;
-    }
-    
     .calendar-grid {
         gap: 2px;
     }

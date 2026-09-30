@@ -235,6 +235,33 @@ export async function populateYearFilter(selectElement) {
     });
 }
 
+const YEAR_FILTER_IDS = [
+    'memberYearFilter',
+    'appointmentYearFilter',
+    'recordYearFilter',
+    'exceptionYearFilter',
+    'statisticYearFilter',
+    'worktimeYearFilter'
+];
+
+/**
+ * Laedt die verfuegbaren Jahre neu und befuellt alle Jahresfilter erneut,
+ * ohne die gewaehlte Auswahl zu verlieren. Nach Terminaenderungen, die in ein
+ * bisher leeres Jahr reichen -- sonst fehlte dieses Jahr bis zum Ablauf des
+ * Zwischenspeichers oder bis zum Neuladen in der Auswahl (OI-79).
+ * Die Listener aus initAllYearFilters() haengen am Element und bleiben.
+ */
+export async function refreshYearFilters() {
+    await loadAvailableYears(true);
+    for (const filterId of YEAR_FILTER_IDS) {
+        const element = document.getElementById(filterId);
+        if (element) {
+            await populateYearFilter(element);
+            element.value = currentYear;
+        }
+    }
+}
+
 export async function initAllYearFilters() {
 
     // Verhindere Mehrfach-Initialisierung
@@ -244,14 +271,7 @@ export async function initAllYearFilters() {
     }
 
     // Alle Jahresfilter identifizieren und befüllen
-    const yearFilters = [
-        'memberYearFilter',
-        'appointmentYearFilter',
-        'recordYearFilter', 
-        'exceptionYearFilter',
-        'statisticYearFilter',
-        'worktimeYearFilter'
-    ];
+    const yearFilters = YEAR_FILTER_IDS;
 
     debug.log("Initializing Year Filters");
 
@@ -404,11 +424,16 @@ export function showToast(message, type = 'info', duration = TOAST_DURATION) {
     toast.innerHTML = `
         <div class="toast-icon">${icons[type] || icons.info}</div>
         <div class="toast-content">
-            <div class="toast-message">${message}</div>
+            <div class="toast-message"></div>
         </div>
         <button class="toast-close" data-action="toast-close">×</button>
         ${duration > 0 ? '<div class="toast-progress"></div>' : ''}
     `;
+    // Die Meldung ist Text, nie Markup (OI-111): Serverantworten landen hier
+    // ungeprueft (api.js), und die Aufrufer mussten bisher einzeln maskieren.
+    // Deshalb maskiert auch kein Aufrufer mehr selbst -- sonst stuende dort
+    // "&amp;".
+    toast.querySelector('.toast-message').textContent = String(message ?? '');
     
     container.appendChild(toast);
     
@@ -850,6 +875,10 @@ export async function initNavigation() {
 }
 
 
+// app.js ruft initNavTabs() beim Start, updateUIForRole() fuer Admins erneut --
+// der Zustand darf neu gesetzt werden, die Klick-Handler nur einmal (OI-90).
+let navTabsBound = false;
+
 export function initNavTabs() {
     const tabs = document.querySelectorAll('.nav-tab-btn');
     const mainNav = document.querySelector('.nav-menu[data-nav-group="main"]');
@@ -872,6 +901,9 @@ export function initNavTabs() {
         systemNav.style.display = 'block';
         tabs[1].classList.add('active');
     }
+
+    if (navTabsBound) return;
+    navTabsBound = true;
 
     tabs.forEach(tab => {
         tab.addEventListener('click', (e) => {

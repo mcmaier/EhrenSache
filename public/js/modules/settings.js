@@ -10,7 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdmin } from './api.js';
-import { showConfirm, showToast, dataCache, updateSubgroupLabelElements } from './ui.js';
+import { showConfirm, showToast, dataCache, updateSubgroupLabelElements, invalidateCache } from './ui.js';
 import { escapeHtml } from './utils.js';
 import { registerActions } from './actions.js';
 import { debug } from '../app.js';
@@ -381,6 +381,32 @@ function rateThresholdsOrdered() {
     return inOrdnung;
 }
 
+/**
+ * Zieht gespeicherte Werte in den Theme-Zwischenspeicher nach, den theme.js
+ * beim Seitenaufruf in sessionStorage['theme-settings'] ablegt. Daraus lesen
+ * subgroupLabel() und der Cache-Zweig von theme.js -- ohne Nachziehen schrieb
+ * updateSubgroupLabelElements() nach dem Speichern das ALTE Wort zurueck
+ * (OI-93). Nur Schluessel, die der Zwischenspeicher schon kennt: Er haelt die
+ * oeffentlichen Einstellungen, nicht alles aus systemSettings. Fehlt er ganz,
+ * bleibt er weg -- ein Teilobjekt verdraengte beim naechsten Aufruf das volle.
+ */
+function syncThemeSettingsCache(saved) {
+    try {
+        const raw = sessionStorage.getItem('theme-settings');
+        if (!raw) return;
+        const cached = JSON.parse(raw);
+        if (!cached || typeof cached !== 'object') return;
+        saved.forEach(({ key, value }) => {
+            if (Object.prototype.hasOwnProperty.call(cached, key)) {
+                cached[key] = value;
+            }
+        });
+        sessionStorage.setItem('theme-settings', JSON.stringify(cached));
+    } catch (error) {
+        debug.warn('theme-settings nicht aktualisiert:', error);
+    }
+}
+
 async function saveAllSettings() {
     const inputs = document.querySelectorAll('.setting-input');
     const updates = [];
@@ -496,6 +522,8 @@ async function saveAllSettings() {
                 Object.keys(dataCache.holidays).forEach(year => delete dataCache.holidays[year]);
             }
         }
+
+        syncThemeSettingsCache(updates.filter(u => !abgelehnt.includes(u.key)));
 
         applyTheme(systemSettings);
 
@@ -713,6 +741,13 @@ export async function performCleanup() {
                     (älter als ${result.cutoff_date_audit})
                 </div>
             `;
+
+            // Die Loeschung trifft mehrere Jahre auf einmal -- deshalb ohne
+            // Jahresangabe verwerfen. Sonst zeigten Terminliste, Kalender und
+            // Listen bis zum Ablauf des Zwischenspeichers geloeschte Daten (OI-99).
+            for (const key of ['records', 'appointments', 'exceptions', 'workSessions']) {
+                await invalidateCache(key);
+            }
 
             showToast('Datenlöschung erfolgreich','success');
 

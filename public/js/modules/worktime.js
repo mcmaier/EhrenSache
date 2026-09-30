@@ -236,7 +236,7 @@ export function renderWorkSessions(sessions) {
     const filtered = filterByChip(base, CHIPS_WORKTIME, worktimeStatusChip);
 
     if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge für diese Auswahl.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge für diese Auswahl</td></tr>';
         return;
     }
 

@@ -428,7 +428,7 @@ function managerTableHtml(data) {
                     <th>Name</th><th>Rückmeldung</th><th>Bemerkung</th><th>Zeitpunkt</th>
                     ${started ? '<th>Anwesenheit</th>' : ''}<th class="response-actions-head">Aktion ${responseLockToggleHtml()}</th>
                 </tr></thead>
-                <tbody>${rows || `<tr><td colspan="${colspan}" class="loading">Keine Einträge</td></tr>`}</tbody>
+                <tbody>${rows || `<tr><td colspan="${colspan}" class="loading">Keine Einträge für diese Auswahl</td></tr>`}</tbody>
             </table>
         </div>`;
 }

@@ -10,7 +10,7 @@
 
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQRModal} from './ui.js';
-import { updateModalId, escapeHtml } from './utils.js';
+import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { CHIPS_DEVICES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 import {debug} from '../app.js'
 import { registerActions } from './actions.js';
@@ -82,11 +82,13 @@ function renderDevices(devices, page = 1)
 
     // Alle Devices speichern für Pagination
     allFilteredDevices = devices;
-    currentDevicesPage = page;
 
     // Pagination berechnen
     const totalDevices = devices.length;
     const totalPages = Math.ceil(totalDevices / devicesPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentDevicesPage = page;
     const startIndex = (page - 1) * devicesPerPage;
     const endIndex = startIndex + devicesPerPage;
     const pageDevices = devices.slice(startIndex, endIndex);
@@ -288,66 +290,6 @@ export function resetDeviceFilter() {
     if (typEl) typEl.value = '';
     deviceStatusChip = 'all';
     showDeviceSection(false, 1);
-}
-
-export async function applyDeviceFilters(forceReload = false, page = 1) {
-    debug.log('applyDeviceFilters called');
-    
-    // Devices laden (aus Cache wenn möglich)
-    const allDevices = await loadDevices(forceReload);
-    debug.log('Loaded devices:', allDevices.length);
-
-    // Rendern (nur wenn auf Device-Section) - Reset auf Seite 1
-    const currentSection = sessionStorage.getItem('currentSection');
-    if (currentSection === 'benutzer') {
-        renderDevices(allDevices, page);
-        debug.log('Devices rendered');
-    }
-    
-    return allDevices;
-}
-
-export function filterDevices(devices, filters = {}) {
-    debug.log("filterDevices() called with filters:", filters);
-    
-    if (!devices || devices.length === 0) return [];
-    
-    let filtered = [...devices];
-    
-    // Filter: Rolle
-    if (filters.role && filters.role !== '') {
-        filtered = filtered.filter(u => u.role === filters.role);
-        debug.log(`After role filter (${filters.role}):`, filtered.length);
-    }
-    
-    // Filter: Status (aktiv/inaktiv)
-    if (filters.status && filters.status !== '') {
-        if (filters.status === 'active') {
-            filtered = filtered.filter(u => u.is_active === 1 || u.is_active === true);
-        } else if (filters.status === 'inactive') {
-            filtered = filtered.filter(u => u.is_active === 0 || u.is_active === false);
-        }
-        debug.log(`After status filter (${filters.status}):`, filtered.length);
-    }
-    
-    debug.log(`Final filtered devices:`, filtered.length);
-    return filtered;
-}
-
-export async function initDevicesEventHandlers()
-{
-    debug.log("Trying to register Device Event Handler. IsAdmin?", isAdmin);
-    if (!isAdmin) return;
-
-        // Hier standen bis 1.9.1 drei Handler fuer filterDeviceRole,
-        // filterDeviceStatus und resetDeviceFilters -- keines dieser Elemente
-        // gab es im Markup (OI-29). Die Filterleiste von 1.13.0 haengt ihre
-        // beiden Handler in showDeviceSection() ein, einmalig und erst dann,
-        // wenn der Bereich wirklich gezeichnet wird.
-
-
-    // Devices laden und anzeigen
-    //await applyDeviceFilters();
 }
 
 

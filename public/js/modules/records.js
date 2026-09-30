@@ -14,7 +14,7 @@ import { loadAppointments, setCalendarMonth } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, subgroupLabel, setCurrentYear, navigateToSection } from './ui.js';
-import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers, safeTypeColor } from './utils.js';
+import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers, safeTypeColor, clampPage } from './utils.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_ATTENDANCE } from './grouping.js';
@@ -145,7 +145,7 @@ export async function renderRecords(records, page = 1)
     updateTableHeader(false); // false = Record-Modus
     
     if (!records || (records.length === 0)) {
-        tbody.innerHTML = `<tr><td colspan="${RECORDS_LIST_COLSPAN}" class="loading">Keine Einträge gefunden</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${RECORDS_LIST_COLSPAN}" class="loading">Keine Einträge für diese Auswahl</td></tr>`;
         // Ohne diese beiden Zeilen blieb die Paginierung des vorigen Filters
         // stehen, und ein Klick darauf zeigte dessen Einträge wieder (OI-84)
         allFilteredRecords = [];
@@ -155,13 +155,15 @@ export async function renderRecords(records, page = 1)
 
     // Alle Records speichern für Pagination
     allFilteredRecords = records;
-    currentRecordsPage = page;
 
     recordsPerPage = globalPaginationValue;
 
     // Pagination berechnen
     const totalRecords = records.length;
     const totalPages = Math.ceil(totalRecords / recordsPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentRecordsPage = page;
     const startIndex = (page - 1) * recordsPerPage;
     const endIndex = startIndex + recordsPerPage;
     const pageRecords = records.slice(startIndex, endIndex);
@@ -1152,9 +1154,6 @@ export async function openRecordModal(recordId = null) {
         // Wer vom Terminbeginn ausgehen will, benutzt den Knopf daneben.
         document.getElementById('record_arrival_time').value = '';
         toggleArrivalTimeField();
-
-        // Verstecke Terminart-Anzeige
-        document.getElementById('recordAppointmentTypeGroup').style.display = 'none';            
     }    
 
     memberSelect.removeEventListener('change', onRecordMemberChange);
@@ -1191,9 +1190,6 @@ export async function loadRecordData(recordId) {
 
         document.getElementById('record_member').disabled = true;
         document.getElementById('record_appointment').disabled = true;
-
-        // Terminart anzeigen
-        //updateAppointmentTypeDisplay();
     }
 }
 
@@ -1381,23 +1377,6 @@ export async function deleteRecord(recordId, memberName, appointmentTitle) {
             showToast(`Eintrag wurde gelöscht`, 'success');
         }
     }
-}
-
-async function updateAppointmentTypeDisplay() {
-    const appointmentSelect = document.getElementById('record_appointment');
-    const selectedOption = appointmentSelect.options[appointmentSelect.selectedIndex];
-    const typeGroup = document.getElementById('recordAppointmentTypeGroup');
-    const typeBadge = document.getElementById('recordAppointmentTypeBadge');
-        
-    // Kein Termin gewählt
-    if (!selectedOption.value) {
-        typeGroup.style.display = 'none';
-        return;
-    }
-
-    typeGroup.style.display = 'block';
-    typeBadge.innerHTML = await createAppointmentTypeBadge(selectedOption.dataset.typeId);
-
 }
 
 // ============================================
@@ -1870,9 +1849,9 @@ function findAppointmentType(appointment_type_id = null)
  * Terminart als Randakzent (OI-94): liefert die CSS-Variable fuer die erste
  * Zelle der Zeile und den Namen fuer deren Unterzeile.
  *
- * Das Schildchen gibt es weiterhin in createAppointmentTypeBadge() -- im
- * Formular beim Erfassen sitzt es in einem einzelnen <span> ohne Zeile
- * daneben, ein Randstreifen waere dort sinnlos.
+ * Das Schildchen createAppointmentTypeBadge() fuer den Erfassungsdialog ist
+ * mit OI-106 entfallen: Das Feld war seit 12/2025 stillgelegt, die Terminart
+ * steht bereits im Optionstext der Terminauswahl.
  *
  * type.color/type.type_name kommen aus der Terminart (DB) und sind von
  * Verwaltern frei befuellbar. Die CSP (OI-17) faengt kein Markup und keine
@@ -1894,34 +1873,6 @@ function appointmentTypeAccent(appointment_type_id = null)
         style: `--type-color: ${safeTypeColor(type ? type.color : null)};`,
         name: type ? escapeHtml(type.type_name) : ''
     };
-}
-
-/**
- * Terminart als Schildchen. Das ist KEIN Rest des Umbaus auf den Randakzent
- * (OI-94), sondern dessen bewusst erhaltene zweite Haelfte: Es bedient nur
- * noch das Formularfeld beim Erfassen (updateAppointmentTypeDisplay()), wo das
- * Schildchen allein in einem <span> steht. Ein Randstreifen braucht eine Zeile
- * neben sich, an deren linkem Rand er liegen kann -- dort gibt es keine.
- *
- * Die beiden Listen nutzen appointmentTypeAccent(). Wer hier aufraeumen will,
- * muss zuerst das Formularfeld umbauen.
- */
-function createAppointmentTypeBadge(appointment_type_id = null)
-{
-    const type = findAppointmentType(appointment_type_id);
-
-    if (type) {
-        // type.color/type.type_name kommen aus der Terminart (DB) -- die CSP (OI-17)
-        // faengt kein Markup, hier wird selbst maskiert: Farbe per safeTypeColor(), Text per escapeHtml().
-        return `<span class="type-badge" style="background: ${safeTypeColor(type.color)}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                    ${escapeHtml(type.type_name)}
-                </span>`;
-    }
-    
-    // Fallback: Termin ohne Type ODER nicht gefunden
-    return `<span class="type-badge" style="background: var(--type-color-none); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
-                Allgemein
-            </span>`;
 }
 
 async function quickCreateRecordForMember(memberId, status = 'present') {
@@ -2015,20 +1966,20 @@ function updateTableHeader(mode) {
         // schreibt den Kopf bei jedem Moduswechsel neu und ueberschreibt damit
         // sowohl index.html als auch updateTableHeaders() in ui.js; wer nur
         // dort loescht, bekommt die Spalte im Betrieb zurueck.
-        thead.innerHTML = '<th>Termin</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+        thead.innerHTML = '<th>Termin</th><th>Ankunftszeit</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
     } else if (mode === 'appointment') {
         // Appointment-Attendance: Mitglieder auflisten
-        thead.innerHTML = '<th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+        thead.innerHTML = '<th>Mitglied</th><th>Ankunftszeit</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
     } else {
         // ALL_RECORDS: Alle Felder
         if(isAdminOrManager)
         {
-            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunftszeit</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
         }
         else
         {   
             // Keine Aktionen für User            
-            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th>';
+            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunftszeit</th><th>Status</th><th>Quelle</th>';
         }
     }
 }

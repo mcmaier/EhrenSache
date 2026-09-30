@@ -3572,6 +3572,8 @@ in der Dokumentation/Oberfläche vor doppelter Verlängerung warnen.
 ### OI-79 · Jahresauswahl zeigt ein neues Serienjahr erst nach Neuladen
 **Priorität:** niedrig · aufgenommen am 2026-09-21
 
+**Erledigt am 2026-09-30** (`59061a5`, unveröffentlicht): `refreshYearFilters()` in `ui.js` lädt die Jahre erzwungen und befüllt alle Jahresfilter neu. Aufgerufen in `invalidateSeriesYears()` (Anlegen, Split, Fortsetzen einer Serie) und nach dem Speichern eines einzelnen Termins, der ebenso ein neues Jahr eröffnen kann. Wächter: `tests/suites/dashboard_fixes_frontend.php`.
+
 Die verfügbaren Jahre kommen aus `dataCache.availableYears` (`public/js/modules/ui.js`), einem
 globalen (nicht jahresabhängigen) Cache-Schlüssel mit der üblichen TTL von 10 Minuten. Serien-
 und Termin-Mutationen invalidieren gezielt `appointments` für die betroffenen Jahre, nicht aber
@@ -3949,6 +3951,8 @@ dokumentierte Regel (OI-3), keine Rechteausweitung.
 ### OI-88 · Seitenzahl wird nach Speichern/Löschen nicht auf die letzte Seite begrenzt
 **Priorität:** niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
 
+**Erledigt am 2026-09-30** (`2f5d38b`, unveröffentlicht): `clampPage()` in `utils.js`, eingesetzt in allen sechs paginierten Listen — die fünf genannten und zusätzlich `renderAppointments`, das dasselbe Muster hatte. Die gemerkte Seite ist die begrenzte. Wächter: `tests/suites/dashboard_fixes_frontend.php`.
+
 `renderExceptions`, `renderRecords`, `renderMembers`, `renderUsers` und `renderDevices`
 übernehmen `currentXPage` ungeprüft. Mit den Status-Chips fällt das häufiger auf: z. B. unter
 „Ausstehend“ auf Seite 2 den letzten Eintrag genehmigen → leere Tabelle ohne Hinweis.
@@ -4054,6 +4058,8 @@ OI-89 erschienen; Ziel ist der **nächste Release**, dessen Nummer die Release-S
 ### OI-90 · Kleinigkeiten aus der Umsetzung von OI-86
 **Priorität:** niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
 
+**Weitgehend erledigt am 2026-09-30** (`7b75b37`, unveröffentlicht): Leertexte einheitlich „Keine … für diese Auswahl“ (ohne Punkt), Antragskopf im Markup mit Aktionsspalte, `initNavTabs()` registriert die Handler nur einmal (im Browser belegt: vorher zwei Aufrufe je Klick), toter Code entfernt (`applyDeviceFilters`, `filterDevices`, `initDevicesEventHandlers`, Statuszweig in `filterExceptions`, `.stat-card`, `.system-active`). `resetWorktimeFilter` und `resetDeviceFilter` sind **kein** toter Code mehr — seit 1.13.0 per `addEventListener` verdrahtet. **Offen bleiben:** Kontrast der Chips bei heller Vereinsfarbe und die Testrückstände in der Datenbank (`import_series_api.php` räumt `import_logs` nicht auf).
+
 - Antragstabelle: Kopf hat 7 Spalten, Zeilen 8 (`index.html` `#antraege`).
 - `renderRecords`-Leerzeile: `colspan` 7, obwohl die Tabelle ohne Aktionsspalte nur 6 Spalten hat.
   — erledigt seit 1.16.0: `RECORDS_LIST_COLSPAN = 6`, bewusst die breitere Fassung, siehe
@@ -4093,6 +4099,8 @@ OI-89 erschienen; Ziel ist der **nächste Release**, dessen Nummer die Release-S
 
 ### OI-91 · Anwesenheit: Mitgliedsauswahl für einfache Nutzer leer
 **Priorität:** niedrig · aufgenommen am 2026-09-22 (Sichtprüfung OI-86 als `user`)
+
+**Erledigt am 2026-09-30** (`504a56b`, unveröffentlicht) — anders als vorgeschlagen serverseitig: Der Einzelabruf für `user` lieferte auch `member_id` nicht, ein Rückfall auf `member.active` im Frontend hätte die Auswahl also nur mit Einträgen ohne Wert gefüllt. Er liefert jetzt `member_id`, `active` und `is_active_in_period` (mit `year` nach derselben Regel wie der Listenabruf); `loadMembers()` schickt das Jahr mit. Davon profitieren alle Stellen, die für `user` auf `is_active_in_period` filtern (Anträge, Statistik, Zeiterfassung). Test: `tests/suites/members_own_api.php` (nur lesend), API.md ergänzt.
 
 `loadMemberFilter()` (`public/js/modules/records.js`, ~Zeile 528) filtert auf
 `m.is_active_in_period`. `loadMembers()` (`public/js/modules/members.js`) liefert für die Rolle
@@ -4142,6 +4150,8 @@ bleiben offen.
 
 ### OI-93 · Geänderte Untergruppen-Bezeichnung wirkt erst nach dem Neuladen
 **Priorität:** niedrig · aufgenommen am 2026-09-23 (aus dem Nachtrag zu OI-86)
+
+**Erledigt am 2026-09-30** (`656b461`, unveröffentlicht): `saveAllSettings()` zieht gespeicherte Werte über `syncThemeSettingsCache()` in `sessionStorage['theme-settings']` nach — nur Schlüssel, die der Zwischenspeicher schon kennt, und nur wenn er existiert.
 
 `subgroupLabel()` ([ui.js](../public/js/modules/ui.js)) liest das eingestellte Wort aus
 `sessionStorage['theme-settings']`. Geschrieben wird dieser Schlüssel aber nur von
@@ -4426,6 +4436,8 @@ sichtbar ist. Die Messung mit großem Bestand steht weiter aus.
 ### OI-99 · Aufräumen der Altdaten verwirft den Zwischenspeicher nicht
 **Priorität:** niedrig · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
 
+**Erledigt am 2026-09-30** (`92bd36e`, unveröffentlicht): Nach erfolgreichem Aufräumen werden `records`, `appointments`, `exceptions` und `workSessions` ohne Jahresangabe verworfen.
+
 Die Aufräumfunktion in den Einstellungen (`apiCall('cleanup', 'POST', …)` in
 [settings.js](../public/js/modules/settings.js)) löscht serverseitig Anwesenheitsdaten jenseits der
 eingestellten Frist (`cleanup_years_records`, Vorgabe drei Jahre). Die Oberfläche verwirft danach
@@ -4519,6 +4531,8 @@ eines fremden Umbaus vermischt.
 **Priorität:** niedrig · aufgenommen am 2026-09-25 (beim Umbau für
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
 
+**Erledigt am 2026-09-30** (`35b69a8`, unveröffentlicht): Entscheidung des Nutzers „Ankunftszeit“; die vier Zweige in `records.js` folgen. OI-104 (eine Titel-Tabelle statt sechs Stellen) bleibt offen.
+
 Die Ankunftsspalte der Anwesenheitsliste trägt zwei verschiedene Überschriften:
 
 - [index.html](../public/index.html) ~Zeile 1018 und `updateTableHeaders()` in
@@ -4546,6 +4560,8 @@ Eine Umbenennung im selben Commit hätte eine Textänderung in ein Gestaltungsvo
 **Priorität:** niedrig · aufgenommen am 2026-09-25 (beim Umbau für
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)) ·
 **Entscheidung des Nutzers vom 2026-09-25:** bewusst nicht in OI-94 geklärt
+
+**Erledigt am 2026-09-30** (unveröffentlicht) — Entscheidung des Nutzers: entfernen. Markup `#recordAppointmentTypeGroup`, `updateAppointmentTypeDisplay()`, der auskommentierte Aufruf und `createAppointmentTypeBadge()` sind weg; damit gibt es im Dashboard kein Schildchen der Terminart mehr. Die Zusicherungen in `tests/suites/type_accent_frontend.php`, die das Schildchen erhalten sollten, sind durch einen Test ersetzt, der die Rückkehr meldet.
 
 `updateAppointmentTypeDisplay()` ([records.js](../public/js/modules/records.js) ~Zeile 1386) setzt
 das Schildchen der Terminart in ein Feld des Erfassungsdialogs. Die Funktion hat **keinen lebenden
@@ -4749,6 +4765,8 @@ kennen muss.
 
 ### OI-111 · `showToast()` maskiert nicht, die Aufrufer tun es einzeln
 **Priorität:** niedrig · aufgenommen am 2026-09-28
+
+**Erledigt am 2026-09-30** (`33e4d28`, unveröffentlicht): `showToast()` setzt die Meldung per `textContent`, die Aufrufer maskieren nicht mehr selbst. Es waren **sechs** Aufrufer, nicht fünf — der neue Wächter fand den sechsten in `management.js` (Standard-Terminart). `html_sinks_frontend.php` führt `showToast` nicht mehr als HTML-Senke, sondern prüft `textContent` und verbietet doppelte Maskierung; `hsIsRawField()` erkennt jetzt Rückfallketten über ein zweites Feld.
 
 `showToast()` (`public/js/modules/ui.js`) setzt seine Meldung per `innerHTML`, maskiert sie aber
 nicht. Statt dessen maskieren **fünf** Aufrufstellen selbst (`appointments.js` 2×,

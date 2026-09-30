@@ -11,7 +11,7 @@
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { loadMembers } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid} from './ui.js';
-import { updateModalId, escapeHtml } from './utils.js';
+import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { registerActions } from './actions.js';
 import {debug} from '../app.js'
 import { CHIPS_USERS, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
@@ -95,11 +95,13 @@ function renderUsers(users, page = 1)
 
     // Alle Users speichern für Pagination
     allFilteredUsers = users;
-    currentUsersPage = page;
 
     // Pagination berechnen
     const totalUsers = users.length;
     const totalPages = Math.ceil(totalUsers / usersPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentUsersPage = page;
     const startIndex = (page - 1) * usersPerPage;
     const endIndex = startIndex + usersPerPage;
     const pageUsers = users.slice(startIndex, endIndex);
@@ -861,7 +863,7 @@ export async function deleteUser(userId) {
         const result = await apiCall('users', 'DELETE', null, { id: userId });
         if (result) {
             showUserSection(true, currentUsersPage);
-            showToast(`User "${escapeHtml(email)}" wurde gelöscht`, 'success');
+            showToast(`User "${email}" wurde gelöscht`, 'success');
         }
     }
 }

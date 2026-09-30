@@ -10,7 +10,7 @@
 
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache,currentYear} from './ui.js';
-import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, getCompatibleAppointments, getCompatibleMembers} from './utils.js';
+import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, getCompatibleAppointments, getCompatibleMembers, clampPage} from './utils.js';
 import { loadAppointments } from './appointments.js';
 import { loadMembers } from './members.js';
 import { loadTypes } from './management.js';
@@ -72,7 +72,7 @@ export async function renderExceptions(exceptions, page = 1)
     const tbody = document.getElementById('exceptionsTableBody');    
 
     if (!exceptions || (exceptions.length === 0)) {
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge gefunden</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Anträge für diese Auswahl</td></tr>';
         // Sonst bleiben Seitenknöpfe der vorigen Liste stehen (OI-84)
         allFilteredExceptions = [];
         renderExceptionsPagination(1, 0, 0);
@@ -83,11 +83,13 @@ export async function renderExceptions(exceptions, page = 1)
 
     // Alle Exceptions speichern für Pagination
     allFilteredExceptions = exceptions;
-    currentExceptionsPage = page;
 
     // Pagination berechnen
     const totalExceptions = exceptions.length;
     const totalPages = Math.ceil(totalExceptions / exceptionsPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentExceptionsPage = page;
     const startIndex = (page - 1) * exceptionsPerPage;
     const endIndex = startIndex + exceptionsPerPage;
     const pageExceptions = exceptions.slice(startIndex, endIndex);
@@ -324,11 +326,6 @@ export function filterExceptions(exceptions, filters = {}) {
     // Filter: ExceptionType
     if (filters.exceptionType && filters.exceptionType !== '') {
         filtered = filtered.filter(e => e.exception_type === filters.exceptionType);
-    }
-    
-    // Filter: ExceptionStatus
-    if (filters.exceptionStatus && filters.exceptionStatus !== '') {
-        filtered = filtered.filter(e => e.status === filters.exceptionStatus);
     }
     
     return filtered;

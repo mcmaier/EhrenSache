@@ -16,29 +16,9 @@
     margin-bottom: var(--spacing-sm);
 }
 
-.stat-card {
-    background: var(--bg-white);
-    padding: 12px;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    border-left: 4px solid var(--primary-color);
-}
-
-.stat-card h3 {
-    color: var(--text-light);
-    font-size: 14px;
-    margin-bottom: var(--spacing-sm);
-}
-
-.stat-card .number {
-    font-size: 24px;
-    font-weight: bold;
-    color: var(--text-dark);
-}
-
-/* .stat-detail und .stat-card[hidden] entfielen mit den Quotenkarten: Die
-   Unterzeile steht seit 1.13.0 im Tooltip des Chips, und eine abgeschaltete
-   Kennzahl wird gar nicht erst gezeichnet. */
+/* .stat-card samt .stat-detail entfiel mit den Quotenkarten (1.13.0, OI-90):
+   Die Unterzeile steht im Tooltip des Chips. Die Check-in-PWA fuehrt eine
+   eigene Fassung in checkin/css/style.css. */
 
 /* Terminrueckmeldung (FI-1): Gegenueberstellung nach Beginn */
 .response-tiles {

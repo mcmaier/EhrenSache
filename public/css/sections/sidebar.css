@@ -60,14 +60,6 @@
 .nav-menu[data-nav-group="system"] {
     display: none; /* Standard versteckt */
 }
-/* Wenn System-Tab aktiv */
-.nav-tabs.system-active ~ .nav-menu[data-nav-group="main"] {
-    display: none;
-}
-
-.nav-tabs.system-active ~ .nav-menu[data-nav-group="system"] {
-    display: block;
-}
 
 /* Nav Tabs für Admin */
 .nav-tabs {

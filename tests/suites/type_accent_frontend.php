@@ -74,12 +74,12 @@ function taRecordHeads(string $records): array
         'updateTableHeader() fuehrt vier Kopfzeilen: member, appointment, all/Verwalter, all/Mitglied');
 
     $erwartet = [
-        ['<th>Termin</th><th>Ankunft</th>', 5,
-            'Modus member: Termin, Ankunft, Status, Quelle, Aktionen'],
-        ['<th>Mitglied</th><th>Ankunft</th>', 5,
-            'Modus appointment: Mitglied, Ankunft, Status, Quelle, Aktionen (hatte nie eine Terminart)'],
+        ['<th>Termin</th><th>Ankunftszeit</th>', 5,
+            'Modus member: Termin, Ankunftszeit, Status, Quelle, Aktionen'],
+        ['<th>Mitglied</th><th>Ankunftszeit</th>', 5,
+            'Modus appointment: Mitglied, Ankunftszeit, Status, Quelle, Aktionen (hatte nie eine Terminart)'],
         ['<th>Termin</th><th>Mitglied</th>', 6,
-            'Modus all, Verwalter: Termin, Mitglied, Ankunft, Status, Quelle, Aktionen'],
+            'Modus all, Verwalter: Termin, Mitglied, Ankunftszeit, Status, Quelle, Aktionen'],
         ['<th>Termin</th><th>Mitglied</th>', 5,
             'Modus all, einfaches Mitglied: dieselben Spalten ohne Aktionen'],
     ];
@@ -153,14 +153,8 @@ test('Keine hart codierte Ersatzfarbe mehr bei der Terminart', function () use (
     assertTrue(!str_contains($uebersicht, '#667eea'),
         'renderTypeGroupOverview(): Die Farbkachel muss die gemeinsame Ersatzfarbe nutzen');
 
-
-    // #95a5a6 traegt dagegen zwei fremde Dinge: das Schildchen "automatisch
-    // angelegt" (appointments.js:277) und die Erfassungsmethode "Auto"
-    // (records.js:1054). Beide bleiben -- geprueft wird nur die Terminart.
-    $records = taFile($taRoot, 'public/js/modules/records.js');
-    $badge = taFunctionBody($records, 'function createAppointmentTypeBadge(');
-    assertTrue(!str_contains($badge, '#95a5a6'),
-        'Das Schildchen der Terminart muss die gemeinsame Ersatzfarbe nutzen');
+    // Das Schildchen der Terminart im Erfassungsdialog (createAppointmentTypeBadge)
+    // ist mit OI-106 entfallen; #95a5a6 tragen nur noch fremde Dinge.
 });
 
 test('Die Farbkachel der Terminartenverwaltung nutzt die gemeinsame Pruefung', function () use ($taRoot) {
@@ -386,29 +380,20 @@ test('Die Anwesenheitsliste nutzt den Randakzent, das Formularfeld das Schildche
     assertTrue((bool) preg_match('/name:\s*[^,]*escapeHtml\(type\.type_name\)/', $accent),
         'Der Name der Terminart kommt aus der Datenbank und muss durch escapeHtml() laufen (keine CSP, OI-17)');
 
-    // Das Formularfeld beim Erfassen behaelt bewusst ein Schildchen.
-    assertTrue(str_contains($js, 'createAppointmentTypeBadge('),
-        'Die Badge-Funktion bleibt fuer das Formularfeld erhalten');
-    // Das await davor ist wirkungslos -- die Funktion ist nicht async -- und
-    // Altlast aus der Zeit vor OI-94. Es steht hier bewusst als OPTION: Diese
-    // Zusicherung soll den Aufrufer am Randakzent hindern, nicht eine Warze
-    // zementieren, die niemand verlangt hat.
-    assertTrue((bool) preg_match('/typeBadge\.innerHTML = (?:await )?createAppointmentTypeBadge\(/', $js),
-        'Der Aufrufer im Formular darf nicht auf den Randakzent umgestellt werden');
 });
 
-test('Die Badge-Funktion nutzt ebenfalls die gemeinsame Farbpruefung', function () use ($taRoot) {
+test('Das stillgelegte Terminart-Feld im Erfassungsdialog bleibt entfernt (OI-106)', function () use ($taRoot) {
     $js = taFile($taRoot, 'public/js/modules/records.js');
-    $body = taFunctionBody($js, 'function createAppointmentTypeBadge(');
-    // Geprueft wird die HERKUNFT des Wertes, nicht das Vorkommen eines Namens.
-    // Hier stand bis 2026-09-25 ein str_contains($body, 'safeTypeColor(') -- und
-    // das fand den Namen auch im Kommentar zwei Zeilen ueber dem Code.
-    // Nachgestellt: "background: ${type.color}", also der rohe Datenbankwert im
-    // style-Attribut, liess die ganze Suite gruen. Ohne CSP (OI-17) ist diese
-    // Pruefung die einzige Schranke; ein Waechter, der einen Namen statt einer
-    // Wirkung sichert, greift genau dann nicht, wenn es darauf ankommt (OI-107).
-    assertTrue((bool) preg_match('/background:\s*\$\{safeTypeColor\(/', $body),
-        'Die Farbe des Schildchens muss aus safeTypeColor() stammen, nicht roh aus der Terminart');
+    // Seit 12/2025 nie sichtbar (Aufruf auskommentiert, Container auf
+    // display: none); die Terminart steht im Optionstext der Terminauswahl.
+    // Kehrt die Funktion zurueck, braucht sie wieder eine Farbpruefung per
+    // safeTypeColor() -- dieser Test erinnert daran.
+    foreach (['function createAppointmentTypeBadge(', 'function updateAppointmentTypeDisplay(', 'recordAppointmentTypeGroup'] as $spur) {
+        assertTrue(!str_contains($js, $spur), "records.js fuehrt wieder {$spur}");
+    }
+    $html = taFile($taRoot, 'public/index.html');
+    assertTrue(!str_contains($html, 'recordAppointmentTypeGroup'),
+        'index.html fuehrt wieder den Container #recordAppointmentTypeGroup');
 
     // Frueher hiess eine LOKALE Variable im Rumpf ebenfalls safeTypeColor und
     // ueberschattete damit die importierte Funktion. Bliebe sie stehen, waere
