@@ -16,6 +16,31 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Ende des waagerechten Rollwegs. Ohne Aktionsspalte, etwa in der Ansicht der Rolle `user`, klebt
   auch keine andere Spalte. In inaktiven Mitgliederzeilen scheint die festgehaltene Spalte nicht
   durch (OI-92).
+- **Leere Listen melden einheitlich „Keine … für diese Auswahl“.** Bisher stand dort je nach
+  Liste „Keine Einträge gefunden“, „Keine Einträge“ oder derselbe Text mit Punkt (OI-90).
+- **Die Ankunftsspalte der Anwesenheit heißt durchgehend „Ankunftszeit“.** Beim ersten
+  Moduswechsel wechselte die Überschrift bisher auf „Ankunft“ (OI-105).
+
+### Behoben
+- **Nach Genehmigen oder Löschen des letzten Eintrags einer Seite erscheint die letzte
+  vorhandene Seite** statt einer leeren Tabelle ohne Hinweis. Betraf Termine, Anwesenheit,
+  Anträge, Mitglieder, Benutzer und Geräte (OI-88).
+- **Die Mitgliedsauswahl der Anwesenheit ist für einfache Nutzer nicht mehr leer.** Der Abruf
+  des eigenen Mitglieds lieferte weder dessen ID noch den Aktivstatus im gewählten Jahr; beides
+  ist jetzt dabei (`GET members&id` für die Rolle `user`, siehe API.md) (OI-91).
+- **Eine geänderte Bezeichnung für Untergruppen wirkt sofort,** nicht erst nach dem Neuladen der
+  Seite (OI-93).
+- **Ein neues Terminjahr erscheint sofort im Jahresfilter,** wenn eine Serie oder ein einzelner
+  Termin erstmals in dieses Jahr reicht (OI-79).
+- **Nach dem Aufräumen der Altdaten zeigt die Oberfläche keine gelöschten Daten mehr** aus dem
+  Zwischenspeicher (OI-99).
+
+### Intern
+- Hinweismeldungen (`showToast()`) setzen ihren Text als Text, nicht als HTML; die aufrufenden
+  Stellen maskieren nicht mehr einzeln. Bauart-Härtung, kein bekannter Angriffsweg (OI-111).
+- Die Reiter „Verwaltung“ und „System“ registrierten ihre Klick-Handler für Admins doppelt
+  (OI-90).
+- Toter Code aus Geräteverwaltung, Anträgen und Stylesheets entfernt (OI-90).
 
 ## [1.18.0] – 2026-09-30
 
