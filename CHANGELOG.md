@@ -34,6 +34,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Termin erstmals in dieses Jahr reicht (OI-79).
 - **Nach dem Aufräumen der Altdaten zeigt die Oberfläche keine gelöschten Daten mehr** aus dem
   Zwischenspeicher (OI-99).
+- **Das Dashboard leert Gruppen, Terminarten und Profildaten im Zwischenspeicher sauber.**
+  `invalidateCache()` hielt diese Einträge für jahresabhängig und schrieb in `data` und
+  `timestamp` je ein Objekt statt einer leeren Liste. Neu geladen wurde trotzdem, aber nur, weil
+  die Gültigkeitsprüfung daraus zufällig „ungültig“ errechnete. Jahresabhängige Daten sind nicht
+  betroffen.
 
 ### Intern
 - Hinweismeldungen (`showToast()`) setzen ihren Text als Text, nicht als HTML; die aufrufenden
@@ -43,13 +48,6 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Toter Code aus Geräteverwaltung, Anträgen und Stylesheets entfernt (OI-90).
 - Das seit Dezember 2025 stillgelegte, nie sichtbare Terminart-Feld im Dialog „Anwesenheit
   erfassen“ ist entfernt; die Terminart steht weiter im Optionstext der Terminauswahl (OI-106).
-
-### Behoben
-- **Das Dashboard leert Gruppen, Terminarten und Profildaten im Zwischenspeicher sauber.**
-  `invalidateCache()` hielt diese Einträge für jahresabhängig und schrieb in `data` und
-  `timestamp` je ein Objekt statt einer leeren Liste. Neu geladen wurde trotzdem, aber nur, weil
-  die Gültigkeitsprüfung daraus zufällig „ungültig“ errechnete. Jahresabhängige Daten sind nicht
-  betroffen.
 
 ## [1.18.0] – 2026-09-30
 
