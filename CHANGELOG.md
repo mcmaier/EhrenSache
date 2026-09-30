@@ -20,6 +20,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Liste „Keine Einträge gefunden“, „Keine Einträge“ oder derselbe Text mit Punkt (OI-90).
 - **Die Ankunftsspalte der Anwesenheit heißt durchgehend „Ankunftszeit“.** Beim ersten
   Moduswechsel wechselte die Überschrift bisher auf „Ankunft“ (OI-105).
+- **Das Dashboard lädt beim Wechsel zwischen den Bereichen nicht mehr jedes Mal neu.** Bisher
+  holten Mitglieder, Termine, Anträge, Benutzer, Geräte und Verwaltung ihre Daten bei jedem Klick
+  von vorn, der Zwischenspeicher wirkte dort nie. Jetzt bleibt er zwei Minuten gültig statt zehn,
+  damit Änderungen anderer Benutzer ohne Neuladen der Seite ankommen (OI-67). Beim Jahreswechsel
+  werden Mitglieder, Termine und Anwesenheiten nur noch einmal statt doppelt abgerufen.
 
 ### Behoben
 - **Nach Genehmigen oder Löschen des letzten Eintrags einer Seite erscheint die letzte
@@ -39,6 +44,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   `timestamp` je ein Objekt statt einer leeren Liste. Neu geladen wurde trotzdem, aber nur, weil
   die Gültigkeitsprüfung daraus zufällig „ungültig“ errechnete. Jahresabhängige Daten sind nicht
   betroffen.
+- **Eigene Änderungen erscheinen sofort auch in den anderen Bereichen.** Wer eine Gruppe
+  umbenennt, ein Mitglied oder einen Termin löscht, eine Anwesenheit erfasst, einen Termin absagt
+  oder Daten importiert, sah in Mitgliederliste, Anwesenheit, Anträgen oder Benutzern teils bis zu
+  zehn Minuten den alten Stand. Bei Mitgliedern, Terminen und Anträgen verdeckte das bisher das
+  Neuladen beim Bereichswechsel; die Anwesenheitsliste war schon immer betroffen.
 
 ### Intern
 - Hinweismeldungen (`showToast()`) setzen ihren Text als Text, nicht als HTML; die aufrufenden

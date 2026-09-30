@@ -374,7 +374,7 @@ EhrenSache/
 Das System verwendet ein jahresbasiertes Caching:
 - Termine, Anwesenheiten, Ausnahmen und Arbeitszeiten: pro Jahr zwischengespeichert
 - Benutzer, Geräte, Gruppen und Terminarten: global zwischengespeichert
-- Gültigkeit: 10 Minuten; nach einer Änderung wird der betroffene Schlüssel verworfen
+- Gültigkeit: 2 Minuten; nach einer Änderung werden die betroffenen Schlüssel verworfen
 - Der Speicher liegt **im Arbeitsspeicher** (`dataCache` in `public/js/modules/ui.js`) und ist
   nach jedem Neuladen leer — kein `localStorage`
 

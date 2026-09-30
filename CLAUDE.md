@@ -233,8 +233,14 @@ exceptions, statistics und work_sessions (siehe `docs/OPEN-ITEMS.md`).
 - Globale Schlüssel: `users`, `devices`, `groups`, `types`, `availableYears`, `userData`
 - Jahresabhängig (`dataCache.<key>[year]`): `members`, `appointments`, `records`, `exceptions`,
   `workSessions`
-- TTL: 10 Minuten (`CACHE_TTL` in `ui.js`), geprüft über `isCacheValid(key, year)`
-- Invalidierung nach Mutationen über `invalidateCache(key, year)`
+- TTL: 2 Minuten (`CACHE_TTL` in `ui.js`), geprüft über `isCacheValid(key, year)`. Der
+  Bereichswechsel (`loadAllData()`) lädt **nicht** erzwungen neu, die TTL ist der einzige Weg,
+  auf dem Änderungen anderer Benutzer ankommen (OI-67)
+- Invalidierung nach Mutationen über `invalidateCache(key, year)` — an der Änderungsstelle
+  **alle** Schlüssel verwerfen, deren Anzeige die Änderung betrifft (Namen per JOIN, Zähler,
+  andere Jahre), nicht nur den eigenen; Wächter `tests/suites/cache_invalidation_frontend.php`
+- Loader laufen über `sharedLoad()` aus `pending_loads.js`: gleichzeitige Abrufe desselben
+  Schlüssels und Jahres teilen sich eine Anfrage
 - `sessionStorage` wird nur für den Redirect-Loop-Schutz in `app.js` verwendet
 - Ziel: Reduktion der API-Anfragen
 

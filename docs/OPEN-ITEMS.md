@@ -3114,6 +3114,12 @@ genau dort fällt das auf.
 ruft `loadAppointments()` bei jedem Öffnen. Es fehlt also keine Technik, sondern eine Regel,
 wann nachgeladen wird.
 
+**Stand Dashboard seit 2026-09-30:** Der Bereichswechsel lud bis dahin jeden Bereich erzwungen
+neu und war damit unbeabsichtigt der Weg, auf dem fremde Änderungen ankamen. Er nimmt jetzt den
+Cache; `CACHE_TTL` ist dafür von zehn auf zwei Minuten gesenkt. Fremde Änderungen sind im
+Dashboard damit höchstens zwei Minuten alt — entschärft, nicht gelöst. Der Absatz unten
+beschreibt den Stand davor.
+
 **Dasselbe Thema im Dashboard, andere Wurzel:** `dataCache` in `public/js/modules/ui.js` hält
 Mitglieder, Termine, Aufzeichnungen, Ausnahmen und Arbeitszeiten zehn Minuten (`CACHE_TTL`).
 `invalidateCache()` greift nach **eigenen** Mutationen; ändert ein *anderer* Benutzer etwas,
