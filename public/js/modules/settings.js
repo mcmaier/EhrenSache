@@ -10,7 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdmin } from './api.js';
-import { showConfirm, showToast, dataCache, updateSubgroupLabelElements } from './ui.js';
+import { showConfirm, showToast, dataCache, updateSubgroupLabelElements, invalidateCache } from './ui.js';
 import { escapeHtml } from './utils.js';
 import { registerActions } from './actions.js';
 import { debug } from '../app.js';
@@ -741,6 +741,13 @@ export async function performCleanup() {
                     (älter als ${result.cutoff_date_audit})
                 </div>
             `;
+
+            // Die Loeschung trifft mehrere Jahre auf einmal -- deshalb ohne
+            // Jahresangabe verwerfen. Sonst zeigten Terminliste, Kalender und
+            // Listen bis zum Ablauf des Zwischenspeichers geloeschte Daten (OI-99).
+            for (const key of ['records', 'appointments', 'exceptions', 'workSessions']) {
+                await invalidateCache(key);
+            }
 
             showToast('Datenlöschung erfolgreich','success');
 
