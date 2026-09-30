@@ -1172,6 +1172,17 @@ body {
     font-size: 15px;
 }
 
+/* Unter 360px reichte selbst das nicht: 90 % Breite und 30px Rand liessen bei
+   320px nur 228px fuer beide Knoepfe, "Antrag stellen" und "Abbrechen" brachen
+   auf zwei Zeilen um (OI-72). Schmalerer Rand und etwas mehr Breite geben
+   jedem Knopf gut 125px -- so viel wie bei 360px, wo beide einzeilig sind. */
+@media (max-width: 359px) {
+    .modal-content {
+        width: 94%;
+        padding: 20px;
+    }
+}
+
 
 /* Offline Indicator */
 .offline-indicator {

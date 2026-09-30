@@ -133,3 +133,13 @@ test('Liste: entschuldigt ist keine Anwesenheit', function () {
     assertTrue(str_contains($rumpf, "member.status === 'excused'"),
         'Bis 1.12.0 zeigte die Liste jeden Eintrag als anwesend');
 });
+
+test('PWA: Dialoge geben ihren Knoepfen unter 360px mehr Platz (OI-72)', function () {
+    $css = (string) sourceCode(dirname(__DIR__, 2) . '/public/checkin/css/style.css');
+
+    // Bei 320px brachen "Antrag stellen" und "Abbrechen" auf zwei Zeilen um;
+    // im Browser gemessen: 109px je Knopf vorher, 125px nachher (einzeilig).
+    assertTrue(preg_match('/@media \(max-width: 359px\) \{\s*\.modal-content \{([^}]*)\}/', $css, $m) === 1,
+        'Keine schmale Fassung von .modal-content unter 360px');
+    assertTrue(preg_match('/padding:\s*20px;/', $m[1]) === 1, 'Der Dialogrand bleibt unter 360px bei 30px');
+});
