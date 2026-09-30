@@ -203,12 +203,12 @@ Session-basierte Anmeldung für das Web-Dashboard.
 ```json
 {
   "success": true,
-  "user_id": 1,
-  "role": "admin",
-  "email": "user@example.com",
+  "user": { "user_id": 1, "email": "user@example.com", "role": "admin" },
   "csrf_token": "abc123..."
 }
 ```
+`user_id`, `email` und `role` stehen im Objekt `user`, nicht auf oberster Ebene (bis OI-100 falsch
+dokumentiert).
 
 **Fehler:**
 ```json
@@ -239,12 +239,12 @@ Token-basierte Anmeldung für PWA/IoT-Geräte.
 ```json
 {
   "success": true,
+  "message": "Login erfolgreich",
   "token": "abc123...",
-  "user_id": 1,
-  "role": "user",
-  "member_id": 5
+  "user": { "user_id": 1, "email": "user@example.com", "role": "user", "member_id": 5 }
 }
 ```
+Die Kontodaten stehen im Objekt `user` (bis OI-100 falsch auf oberster Ebene dokumentiert).
 
 ---
 
@@ -2885,16 +2885,26 @@ erzeugen.
 ### API-Token neu generieren
 **Endpoint:** `POST /api.php?resource=regenerate_token`
 
-**Berechtigung:** Admin/Manager
+**Berechtigung:** jedes Konto außer Geräten für den **eigenen** Token; nur Admin für ein anderes
+Konto über `user_id` im Body. Ohne `user_id` wird der Token des Aufrufers ersetzt — der bisherige
+gilt danach nicht mehr.
+
+**Request (optional):**
+```json
+{ "user_id": 12 }
+```
 
 **Response:**
 ```json
 {
-  "success": true,
-  "token": "new_generated_token_here",
-  "expires_at": "2025-12-31 23:59:59"
+  "message": "Token regenerated",
+  "api_token": "new_generated_token_here",
+  "expires_at": "2027-09-30 15:46:18",
+  "user_id": 12
 }
 ```
+Laufzeit: ein Jahr, für Geräte zehn Jahre. Bis OI-100 standen hier `success` und `token` — diese
+Schlüssel gibt es nicht.
 
 ---
 
