@@ -24,7 +24,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   holten Mitglieder, Termine, Anträge, Benutzer, Geräte und Verwaltung ihre Daten bei jedem Klick
   von vorn, der Zwischenspeicher wirkte dort nie. Jetzt bleibt er zwei Minuten gültig statt zehn,
   damit Änderungen anderer Benutzer ohne Neuladen der Seite ankommen (OI-67). Beim Jahreswechsel
-  werden Mitglieder, Termine und Anwesenheiten nur noch einmal statt doppelt abgerufen.
+  werden Mitglieder, Termine und Anwesenheiten nur noch einmal statt doppelt abgerufen, beim
+  Seitenstart ebenso die Anmeldedaten, die Tätigkeitsarten und die Einstellungen für Check-in und
+  Stations-PIN.
 
 ### Behoben
 - **Nach Genehmigen oder Löschen des letzten Eintrags einer Seite erscheint die letzte
