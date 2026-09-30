@@ -225,6 +225,33 @@ export async function populateYearFilter(selectElement) {
     });
 }
 
+const YEAR_FILTER_IDS = [
+    'memberYearFilter',
+    'appointmentYearFilter',
+    'recordYearFilter',
+    'exceptionYearFilter',
+    'statisticYearFilter',
+    'worktimeYearFilter'
+];
+
+/**
+ * Laedt die verfuegbaren Jahre neu und befuellt alle Jahresfilter erneut,
+ * ohne die gewaehlte Auswahl zu verlieren. Nach Terminaenderungen, die in ein
+ * bisher leeres Jahr reichen -- sonst fehlte dieses Jahr bis zum Ablauf des
+ * Zwischenspeichers oder bis zum Neuladen in der Auswahl (OI-79).
+ * Die Listener aus initAllYearFilters() haengen am Element und bleiben.
+ */
+export async function refreshYearFilters() {
+    await loadAvailableYears(true);
+    for (const filterId of YEAR_FILTER_IDS) {
+        const element = document.getElementById(filterId);
+        if (element) {
+            await populateYearFilter(element);
+            element.value = currentYear;
+        }
+    }
+}
+
 export async function initAllYearFilters() {
 
     // Verhindere Mehrfach-Initialisierung
@@ -234,14 +261,7 @@ export async function initAllYearFilters() {
     }
 
     // Alle Jahresfilter identifizieren und befüllen
-    const yearFilters = [
-        'memberYearFilter',
-        'appointmentYearFilter',
-        'recordYearFilter', 
-        'exceptionYearFilter',
-        'statisticYearFilter',
-        'worktimeYearFilter'
-    ];
+    const yearFilters = YEAR_FILTER_IDS;
 
     debug.log("Initializing Year Filters");
 

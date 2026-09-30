@@ -10,7 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
-import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
+import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear, refreshYearFilters} from './ui.js';
 import { renderDateChecklist } from './date_checklist.js';
 import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus, clampPage } from './utils.js';
 import { loadTypes } from './management.js';
@@ -1328,6 +1328,8 @@ async function invalidateSeriesYears(from, until) {
     for (let y = first; y <= last; y++) {
         await invalidateCache('appointments', y);
     }
+    // Reicht die Serie in ein bisher leeres Jahr, fehlt es sonst im Jahresfilter (OI-79)
+    await refreshYearFilters();
 }
 
 const DETACH_REASON_TEXT = {
@@ -1657,6 +1659,9 @@ export async function saveAppointment() {
 
     if (result && result.success) {
         closeAppointmentModal();
+
+        // Ein einzelner Termin kann ebenso ein neues Jahr eroeffnen (OI-79)
+        await refreshYearFilters();
 
         // Cache invalidieren und neu laden
         showAppointmentSection(true, currentAppointmentsPage);

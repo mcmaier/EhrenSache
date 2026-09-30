@@ -115,3 +115,40 @@ test('OI-93: Speichern zieht den Theme-Zwischenspeicher nach', function () use (
     assertTrue(preg_match('/syncThemeSettingsCache\(updates\.filter\([^)]*abgelehnt\.includes/', $save) === 1,
         'Abgelehnte Werte landen im Zwischenspeicher');
 });
+
+test('OI-79: Termin- und Serienaenderungen befuellen die Jahresfilter neu', function () use ($dfRoot) {
+    $ui = dfModule($dfRoot, 'ui');
+    $refresh = dfFunction($ui, 'refreshYearFilters');
+
+    // Nur der erzwungene Abruf holt ein neues Jahr; der Zwischenspeicher der
+    // Jahre ist global und haelt zehn Minuten.
+    assertTrue(str_contains($refresh, 'loadAvailableYears(true)'),
+        'refreshYearFilters() liest die Jahre aus dem Zwischenspeicher');
+    assertTrue(str_contains($refresh, 'populateYearFilter(') && str_contains($refresh, 'YEAR_FILTER_IDS'),
+        'refreshYearFilters() befuellt nicht alle Jahresfilter');
+    assertTrue(preg_match('/const yearFilters = YEAR_FILTER_IDS;/', dfFunction($ui, 'initAllYearFilters')) === 1,
+        'initAllYearFilters() fuehrt eine eigene Liste der Jahresfilter');
+
+    $apt = dfModule($dfRoot, 'appointments');
+    // Anlegen, Split und Fortsetzen einer Serie laufen alle ueber diese Stelle
+    assertTrue(str_contains(dfFunction($apt, 'invalidateSeriesYears'), 'await refreshYearFilters()'),
+        'Serienaktionen aktualisieren die Jahresfilter nicht');
+    assertTrue(str_contains(dfFunction($apt, 'saveAppointment'), 'await refreshYearFilters()'),
+        'Ein einzelner Termin in einem neuen Jahr aktualisiert die Jahresfilter nicht');
+});
+
+test('OI-99: nach dem Aufraeumen der Altdaten wird der Zwischenspeicher verworfen', function () use ($dfRoot) {
+    $js = dfModule($dfRoot, 'settings');
+    $start = strpos($js, "apiCall('cleanup', 'POST'");
+    assertTrue($start !== false, 'Aufruf von cleanup nicht gefunden');
+    $end = strpos($js, 'catch', $start);
+    $after = substr($js, $start, $end - $start);
+
+    // Ohne Jahr: Die Loeschfrist trifft mehrere Jahre auf einmal.
+    foreach (['records', 'appointments', 'exceptions', 'workSessions'] as $key) {
+        assertTrue(preg_match("/\[[^\]]*'{$key}'[^\]]*\]/", $after) === 1,
+            "Nach dem Aufraeumen wird {$key} nicht verworfen");
+    }
+    assertTrue(preg_match('/await invalidateCache\(key\)/', $after) === 1,
+        'Der Zwischenspeicher wird nicht ohne Jahresangabe verworfen');
+});
