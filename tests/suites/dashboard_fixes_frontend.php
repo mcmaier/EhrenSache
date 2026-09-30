@@ -152,3 +152,20 @@ test('OI-99: nach dem Aufraeumen der Altdaten wird der Zwischenspeicher verworfe
     assertTrue(preg_match('/await invalidateCache\(key\)/', $after) === 1,
         'Der Zwischenspeicher wird nicht ohne Jahresangabe verworfen');
 });
+
+test('OI-105: die Ankunftsspalte heisst in allen Koepfen "Ankunftszeit"', function () use ($dfRoot) {
+    // index.html und updateTableHeaders() schrieben "Ankunftszeit", die vier
+    // Zweige von updateTableHeader() in records.js "Ankunft" -- die Liste
+    // wechselte beim ersten Moduswechsel stillschweigend die Ueberschrift.
+    $sources = [
+        'index.html' => (string) sourceCode($dfRoot . '/public/index.html'),
+        'ui.js'      => dfModule($dfRoot, 'ui'),
+        'records.js' => dfModule($dfRoot, 'records'),
+    ];
+    foreach ($sources as $name => $src) {
+        assertTrue(preg_match('/<th>Ankunft<\/th>|[\'"]Ankunft[\'"]/', $src) !== 1,
+            "{$name} fuehrt noch die Kurzform \"Ankunft\" als Spaltenkopf");
+    }
+    assertSame(4, substr_count(dfFunction($sources['records.js'], 'updateTableHeader'), '<th>Ankunftszeit</th>'),
+        'updateTableHeader() fuehrt nicht in allen vier Zweigen "Ankunftszeit"');
+});

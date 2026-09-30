@@ -2017,20 +2017,20 @@ function updateTableHeader(mode) {
         // schreibt den Kopf bei jedem Moduswechsel neu und ueberschreibt damit
         // sowohl index.html als auch updateTableHeaders() in ui.js; wer nur
         // dort loescht, bekommt die Spalte im Betrieb zurueck.
-        thead.innerHTML = '<th>Termin</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+        thead.innerHTML = '<th>Termin</th><th>Ankunftszeit</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
     } else if (mode === 'appointment') {
         // Appointment-Attendance: Mitglieder auflisten
-        thead.innerHTML = '<th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+        thead.innerHTML = '<th>Mitglied</th><th>Ankunftszeit</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
     } else {
         // ALL_RECORDS: Alle Felder
         if(isAdminOrManager)
         {
-            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
+            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunftszeit</th><th>Status</th><th>Quelle</th><th>Aktionen</th>';
         }
         else
         {   
             // Keine Aktionen für User            
-            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunft</th><th>Status</th><th>Quelle</th>';
+            thead.innerHTML = '<th>Termin</th><th>Mitglied</th><th>Ankunftszeit</th><th>Status</th><th>Quelle</th>';
         }
     }
 }

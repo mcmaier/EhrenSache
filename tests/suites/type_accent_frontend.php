@@ -74,12 +74,12 @@ function taRecordHeads(string $records): array
         'updateTableHeader() fuehrt vier Kopfzeilen: member, appointment, all/Verwalter, all/Mitglied');
 
     $erwartet = [
-        ['<th>Termin</th><th>Ankunft</th>', 5,
-            'Modus member: Termin, Ankunft, Status, Quelle, Aktionen'],
-        ['<th>Mitglied</th><th>Ankunft</th>', 5,
-            'Modus appointment: Mitglied, Ankunft, Status, Quelle, Aktionen (hatte nie eine Terminart)'],
+        ['<th>Termin</th><th>Ankunftszeit</th>', 5,
+            'Modus member: Termin, Ankunftszeit, Status, Quelle, Aktionen'],
+        ['<th>Mitglied</th><th>Ankunftszeit</th>', 5,
+            'Modus appointment: Mitglied, Ankunftszeit, Status, Quelle, Aktionen (hatte nie eine Terminart)'],
         ['<th>Termin</th><th>Mitglied</th>', 6,
-            'Modus all, Verwalter: Termin, Mitglied, Ankunft, Status, Quelle, Aktionen'],
+            'Modus all, Verwalter: Termin, Mitglied, Ankunftszeit, Status, Quelle, Aktionen'],
         ['<th>Termin</th><th>Mitglied</th>', 5,
             'Modus all, einfaches Mitglied: dieselben Spalten ohne Aktionen'],
     ];
