@@ -10,7 +10,7 @@
 
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache,currentYear} from './ui.js';
-import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, getCompatibleAppointments, getCompatibleMembers} from './utils.js';
+import {translateExceptionStatus, translateExceptionType, datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, getCompatibleAppointments, getCompatibleMembers, clampPage} from './utils.js';
 import { loadAppointments } from './appointments.js';
 import { loadMembers } from './members.js';
 import { loadTypes } from './management.js';
@@ -83,11 +83,13 @@ export async function renderExceptions(exceptions, page = 1)
 
     // Alle Exceptions speichern für Pagination
     allFilteredExceptions = exceptions;
-    currentExceptionsPage = page;
 
     // Pagination berechnen
     const totalExceptions = exceptions.length;
     const totalPages = Math.ceil(totalExceptions / exceptionsPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentExceptionsPage = page;
     const startIndex = (page - 1) * exceptionsPerPage;
     const endIndex = startIndex + exceptionsPerPage;
     const pageExceptions = exceptions.slice(startIndex, endIndex);

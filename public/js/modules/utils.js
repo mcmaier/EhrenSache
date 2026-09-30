@@ -119,6 +119,15 @@ export function round(value, decimals) {
  * Das & muss zuerst ersetzt werden, sonst werden die eigenen Entities
  * doppelt maskiert. tests/suites/escape_html_frontend.php wacht darueber.
  */
+/**
+ * Haelt eine Seitenzahl in [1, totalPages]. Nach Speichern oder Loeschen kann
+ * die zuletzt angezeigte Seite wegfallen -- ohne Begrenzung zeigte die Liste
+ * dann eine leere Tabelle ohne Hinweis (OI-88).
+ */
+export function clampPage(page, totalPages) {
+    return Math.min(Math.max(1, Number(page) || 1), Math.max(1, totalPages));
+}
+
 export function escapeHtml(text) {
     if (!text) return '';
     return String(text)

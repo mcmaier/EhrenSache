@@ -11,7 +11,7 @@
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, groupSelectOptionsHtml} from './ui.js';
 import { loadUserData } from './users.js';
-import { updateModalId, escapeHtml } from './utils.js';
+import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { registerActions } from './actions.js';
 import { loadGroups } from './management.js';
 import { debug } from '../app.js'
@@ -171,13 +171,15 @@ function renderMembers(members, page = 1) {
     
     // Alle Members speichern für Pagination
     allFilteredMembers = members;
-    currentMembersPage = page;
 
     membersPerPage = globalPaginationValue;
 
     // Pagination berechnen
     const totalMembers = members.length;
     const totalPages = Math.ceil(totalMembers / membersPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentMembersPage = page;
     const startIndex = (page - 1) * membersPerPage;
     const endIndex = startIndex + membersPerPage;
     const pageMembers = members.slice(startIndex, endIndex);

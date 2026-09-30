@@ -14,7 +14,7 @@ import { loadAppointments, setCalendarMonth } from './appointments.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers, getUserGroupIds } from './members.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, subgroupLabel, setCurrentYear, navigateToSection } from './ui.js';
-import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers, safeTypeColor } from './utils.js';
+import { datetimeLocalToMysql, mysqlToDatetimeLocal, updateModalId, escapeHtml, getCompatibleAppointments, getCompatibleMembers, safeTypeColor, clampPage } from './utils.js';
 import { debug } from '../app.js'
 import { globalPaginationValue } from './settings.js';
 import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_ATTENDANCE } from './grouping.js';
@@ -155,13 +155,15 @@ export async function renderRecords(records, page = 1)
 
     // Alle Records speichern für Pagination
     allFilteredRecords = records;
-    currentRecordsPage = page;
 
     recordsPerPage = globalPaginationValue;
 
     // Pagination berechnen
     const totalRecords = records.length;
     const totalPages = Math.ceil(totalRecords / recordsPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentRecordsPage = page;
     const startIndex = (page - 1) * recordsPerPage;
     const endIndex = startIndex + recordsPerPage;
     const pageRecords = records.slice(startIndex, endIndex);

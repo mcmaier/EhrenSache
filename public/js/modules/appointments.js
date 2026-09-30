@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, showChoice, dataCache, isCacheValid, invalidateCache,currentYear, setCurrentYear} from './ui.js';
 import { renderDateChecklist } from './date_checklist.js';
-import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus } from './utils.js';
+import {datetimeLocalToMysql, mysqlToDatetimeLocal, formatDateTime, updateModalId, escapeHtml, formatTimeRange, safeTypeColor, trapFocus, clampPage } from './utils.js';
 import { loadTypes } from './management.js';
 import { getUserGroupIds } from './members.js';
 import {debug} from '../app.js'
@@ -243,13 +243,15 @@ async function renderAppointments(appointments, page = 1) {
     // Alle Appointments speichern für Pagination
     allFilteredAppointments = appointments;
     calendarAppointments = appointments;
-    currentAppointmentsPage = page;
 
     updateAppointmentStats(appointments);
 
     // Pagination berechnen
     const totalAppointments = appointments.length;
     const totalPages = Math.ceil(totalAppointments / appointmentsPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentAppointmentsPage = page;
     const startIndex = (page - 1) * appointmentsPerPage;
     const endIndex = startIndex + appointmentsPerPage;
     const pageAppointments = appointments.slice(startIndex, endIndex);

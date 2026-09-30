@@ -10,7 +10,7 @@
 
 import { apiCall, currentUser, isAdmin } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid,invalidateCache, showQRModal} from './ui.js';
-import { updateModalId, escapeHtml } from './utils.js';
+import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { CHIPS_DEVICES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 import {debug} from '../app.js'
 import { registerActions } from './actions.js';
@@ -82,11 +82,13 @@ function renderDevices(devices, page = 1)
 
     // Alle Devices speichern für Pagination
     allFilteredDevices = devices;
-    currentDevicesPage = page;
 
     // Pagination berechnen
     const totalDevices = devices.length;
     const totalPages = Math.ceil(totalDevices / devicesPerPage);
+    // Nach Speichern/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentDevicesPage = page;
     const startIndex = (page - 1) * devicesPerPage;
     const endIndex = startIndex + devicesPerPage;
     const pageDevices = devices.slice(startIndex, endIndex);
