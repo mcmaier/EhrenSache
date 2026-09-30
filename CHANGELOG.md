@@ -17,7 +17,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   auch keine andere Spalte. In inaktiven Mitgliederzeilen scheint die festgehaltene Spalte nicht
   durch (OI-92).
 - **Die Zeiterfassung zeigt, wie ein Eintrag entstanden ist:** Timer, nachgetragen, Admin,
-  Import oder Station (PIN), mit denselben Zeichen wie die Quellen der Anwesenheit (OI-33).
+  Import oder Station (PIN), mit denselben Zeichen wie die Quellen der Anwesenheit. Der
+  Stundennachweis führt die Quelle als Spalte `source` im CSV und als „Quelle“ in der
+  Druckansicht (OI-33).
 - **Die Zeiterfassung wird paginiert wie alle anderen Listen.** Bisher zeigte sie alle Einträge
   des Jahres auf einer Seite; jetzt gilt die Einstellung „Datenreihen pro Seite“ (OI-92).
 - **Leere Listen melden einheitlich „Keine … für diese Auswahl“.** Bisher stand dort je nach
@@ -73,9 +75,10 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Die Reiter „Verwaltung“ und „System“ registrierten ihre Klick-Handler für Admins doppelt
   (OI-90).
 - Toter Code aus Geräteverwaltung, Anträgen und Stylesheets entfernt (OI-90).
-- Der Abgleich von API.md gegen die echten Antworten prüft fünf weitere Lesepfade:
-  `session_info`, `update_check`, `appointment_series` und beide Lesepfade von
-  `appointment_responses` (OI-100).
+- Der Abgleich von API.md gegen die echten Antworten prüft fünf weitere Lesepfade und neu
+  25 Schreib- und Check-in-Pfade in einer eigenen Testwelt (OI-100). Dabei fielen drei falsch
+  dokumentierte Antworten auf: Login (Web), Login (Token) und „API-Token neu generieren“ —
+  API.md ist korrigiert.
 - Das seit Dezember 2025 stillgelegte, nie sichtbare Terminart-Feld im Dialog „Anwesenheit
   erfassen“ ist entfernt; die Terminart steht weiter im Optionstext der Terminauswahl (OI-106).
 

@@ -1944,7 +1944,7 @@ Speicherungen unterscheiden.
 ### OI-33 · Keine Quellen-Kennzeichnung bei Arbeitszeit-Sitzungen
 **Priorität:** niedrig
 
-**Teilweise erledigt am 2026-09-30** (`b1e4c53`, unveröffentlicht): Die Dashboard-Ansicht zeigt die Quelle in der Spalte „Nachweis“ (Timer, Nachgetragen, Admin, Import, Station (PIN)); ein Wächter verlangt für jeden ENUM-Wert eine Beschriftung. **Offen:** die Quelle im Export.
+**Erledigt am 2026-09-30** (unveröffentlicht): Die Dashboard-Ansicht zeigt die Quelle in der Spalte „Nachweis“ (`b1e4c53`); ein Wächter verlangt für jeden ENUM-Wert eine Beschriftung. Der Stundennachweis (`export&type=worktime_member`) führt sie als CSV-Spalte `source` hinter `proof` und in der Druckansicht als „Quelle“ (`94e797b`, Test in `worktime_api.php`). Die Summenberichte je Tätigkeit und Termin haben keine Einzelsitzungen und bleiben ohne Quelle.
 
 Anwesenheits-Datensätze zeigen ihre Quelle als Badge (u. a. „Station (PIN)"), Arbeitszeit-
 Sitzungen dagegen nicht: Weder die Dashboard-Ansicht der Zeiterfassung noch der Export
@@ -4493,7 +4493,15 @@ mehrere Jahre auf einmal. Muster und Begründung stehen an den entsprechenden St
 **Priorität:** niedrig · aufgenommen am 2026-09-24 (Rest aus
 [OI-66](#oi-66--apimd-gegen-die-echten-antworten-prüfen), bis dahin ohne eigene Nummer)
 
-**Teilweise erledigt am 2026-09-30** (`4ba591a`, unveröffentlicht): `session_info` (per Sitzungs-Cookie), `update_check`, `appointment_series` und beide Lesepfade von `appointment_responses` stehen in `adEndpoints()`. Gekürzte Beispiele (`{…}`, `[ … ]`) gelten dem Parser als leerer Container. **Offen:** die Check-in-Endpunkte (`station`, `totp_checkin`, `auto_checkin`) — sie brauchen ein Geräte-Token, das die Benutzerliste nicht herausgibt, oder sind Schreibpfade — und alle Schreibpfade.
+**Weitgehend erledigt am 2026-09-30** (unveröffentlicht):
+- **Lesepfade** (`4ba591a`): `session_info`, `update_check`, `appointment_series`, beide Lesepfade von `appointment_responses`.
+- **Schreibpfade und Check-in** (`6834dc7`, neue Suite `tests/suites/api_doc_keys_write.php`): alle 25 Pfade, zu denen API.md eine Erfolgsantwort als JSON zeigt, in einer eigenen Testwelt — Anmeldung, Mitglieder, Termine, alle Serienaktionen, Geräte, `regenerate_token` (an einem Wegwerf-Gerät), Station `status`/`totp`/`identify`, `auto_checkin` (Hardware-Terminal), `totp_checkin` (Code vom Kiosk), Rückmeldung, Arbeitszeit, Import, `cleanup` mit Fristen, die nichts treffen. Schalter werden zurückgestellt; belegt, dass zwei Läufe keine Zeilenzahl ändern.
+- **Dabei gefunden und korrigiert** (`694725a`): API.md dokumentierte die Antworten von Login (Web), Login (Token) und `regenerate_token` falsch (Kontodaten stehen im Objekt `user`; `regenerate_token` liefert `api_token` statt `token`, kein `success`), dazu die Berechtigung von `regenerate_token`.
+- Werkzeuge liegen jetzt gemeinsam in `tests/lib/api_doc.php`.
+
+**Bewusst nicht aufgerufen**, weil der Aufruf über die Testwelt hinaus wirkt (die Suite läuft auch gegen die gemeinsame Entwicklungsinstanz): `register` und `password_reset_request` (Mails, Rate-Grenzen), `update_check` POST (GitHub), `upload-logo` (löscht die Logodatei), `regenerate_token` ohne `user_id` und `change_password` (Zugänge der Testkonten), `settings` POST (SMTP-Datei, Testmail).
+
+**Offen — nicht prüfbar, weil API.md keine Erfolgsantwort als JSON zeigt:** POST/PUT/DELETE `records` (einzeln), PUT/DELETE `appointments`, `exceptions` (POST, Erfolg von PUT, DELETE), `member_groups`, `appointment_types`, `activity_types`, `membership_dates`, DELETE `appointment_responses`, `work_sessions` ohne `action` (Nachtrag, Korrektur, Löschung), Station `checkin` und `work_*`, `users` (POST, PUT, DELETE), `activate_user`, `user_status`, `change_pin`, PUT `settings`. Bei `activate_user` und `user_status` weicht zudem das dokumentierte **Request**-Format vom Code ab. Wer die Liste schließen will, ergänzt in API.md je ein Antwortbeispiel und einen Eintrag in der Schreibsuite.
 
 `tests/suites/api_doc_keys.php` hält seit 1.14.0 für die Lesepfade fest, dass jeder in `API.md`
 dokumentierte Antwortschlüssel in der echten Antwort vorkommt. **Nicht** bewacht sind:
