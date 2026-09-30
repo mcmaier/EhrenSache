@@ -4118,7 +4118,7 @@ verursacht (`loadMemberFilter` unverändert).
 
 ### OI-92 · Tabellen uneinheitlich: Aktionsspalte nur in der Arbeitszeit fixiert, Arbeitszeit ohne Paginierung
 **Priorität:** niedrig · aufgenommen am 2026-09-22 (Hinweis des Nutzers bei der Sichtprüfung zu
-OI-86) · Punkt 1 erledigt am 2026-09-30 auf `fix/oi-92-sticky-aktionen`, Punkt 2 offen
+OI-86) · **erledigt am 2026-09-30** (Punkt 1 `13d4c5c`, Punkt 2 `af9551f`), unveröffentlicht
 
 **1. Fixierte Aktionsspalte — erledigt.** Die Regel aus OI-10 hing an `.table-worktime`; sie gilt
 jetzt für jede `td.actions-cell` (`public/css/components/tables.css`). Der Kopf klebt über
@@ -4134,11 +4134,18 @@ folgt ihm (auch im Rückmeldungs-Dialog, dort 0). Wächter: `tests/suites/tables
 admin und user bei 1280, 800 und 375 px über alle Bereiche gemessen: Zelle bündig am rechten
 Rand über den ganzen Rollweg, nicht überdeckt, Rollfläche nicht verbreitert.
 
-**2. Keine Paginierung.** Die Arbeitszeitliste wird nicht paginiert — `worktime.js` hat keine
-Paginierung, alle anderen Listen nutzen `globalPaginationValue` aus `settings.js`.
+**2. Keine Paginierung — erledigt.** Die Arbeitszeitliste nutzt jetzt `globalPaginationValue`
+mit Seitenknöpfen oberhalb der Tabelle (`#worktimePagination`, Aktion `go-to-worktime-page`).
+Chip- und Filterwechsel springen auf Seite 1; Freigeben, Ablehnen, Löschen und Speichern bleiben
+auf der Seite, begrenzt über `clampPage()` (OI-88). Der Schalter „Stunden“ zählt weiter über
+alle Seiten. Die Seitenknöpfe sind die **siebte** Kopie desselben Bausteins
+(`render…Pagination()` je Modul): Ein gemeinsamer Baustein scheitert daran, dass Aktionsnamen
+im Markup Literale sein müssen (`tests/suites/actions_frontend.php`). Wer das zusammenführen
+will, braucht eine Aktion mit Ziel als `data-*`-Attribut statt sieben Aktionsnamen — eigener
+Umbau, nicht Teil dieses Punkts. Test: `tests/suites/worktime_frontend.php`.
 
-**Zu entscheiden:** fixierte Aktionsspalte für alle Tabellen übernehmen oder bewusst nur dort
-belassen; Arbeitszeit an die gemeinsame Paginierung anschließen.
+**Entschieden (2026-09-30):** fixierte Aktionsspalte für alle Tabellen, Arbeitszeit an die
+gemeinsame Paginierung angeschlossen.
 
 Verwandt: [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)
 (Terminfarbe als Randakzent) ist mit 1.16.0 ohne diesen Punkt umgesetzt; die Tabellenfragen hier
