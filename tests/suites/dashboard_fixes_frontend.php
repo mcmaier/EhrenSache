@@ -220,3 +220,12 @@ test('OI-90: toter Code aus der Filterleiste und den Quotenkarten bleibt weg', f
         assertTrue(!str_contains($src, 'system-active'), "{$css} fuehrt wieder .system-active");
     }
 });
+
+test('OI-30: eine TOTP-Station ohne Secret wird in der Geraeteliste markiert', function () use ($dfRoot) {
+    $body = dfFunction(dfModule($dfRoot, 'devices'), 'renderDevices');
+
+    assertTrue(preg_match("/device\.device_type === 'totp_location' && !device\.totp_secret/", $body) === 1,
+        'renderDevices() erkennt eine TOTP-Station ohne Secret nicht');
+    assertTrue(str_contains($body, '<td>${typeText}${missingSecret}</td>'),
+        'Der Hinweis erscheint nicht in der Typspalte');
+});

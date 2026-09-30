@@ -115,6 +115,14 @@ function renderDevices(devices, page = 1)
             'kiosk':         '🖥️ Virtuelle Station'
         }[device.device_type] || '❓ Unbekannt';
 
+        // Eine TOTP-Station ohne Secret (Rest aus der Zeit vor 1.3.0) faellt
+        // in resolveTotpLocation() stillschweigend heraus und nimmt keine Codes
+        // mehr an -- ohne Hinweis kaum zu erklaeren (OI-30). Die Liste liefert
+        // totp_secret nur fuer diesen Typ (API.md, Geraete).
+        const missingSecret = device.device_type === 'totp_location' && !device.totp_secret
+            ? '<br><small class="text-danger" title="Im Gerätedialog ein Secret erzeugen">⚠ Kein Secret – nimmt keine Codes an</small>'
+            : '';
+
         // Status
         // Wie die Kennzahl darüber und der Filter: auf 1 prüfen, nicht auf
         // truthy. Liefert PDO die Spalte als Text, ist "0" truthy — die Liste
@@ -130,7 +138,7 @@ function renderDevices(devices, page = 1)
                             
             tr.innerHTML = `
                 <td>${escapeHtml(device.device_name)}</td>
-                <td>${typeText}</td>
+                <td>${typeText}${missingSecret}</td>
                 <td>${statusBadge}</td>
                 <td>${tokenExpiry}</td>
                 <td>${formattedCreated}</td>
