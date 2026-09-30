@@ -91,3 +91,27 @@ test('OI-91: loadMembers() fragt das eigene Mitglied mit Jahr ab', function () u
     assertTrue(preg_match("/apiCall\('members',\s*'GET',\s*null,\s*\{\s*id:\s*userDetails\.member_id,\s*year\b/", $body) === 1,
         'loadMembers() ruft den Einzelabruf fuer user ohne year auf');
 });
+
+test('OI-93: Speichern zieht den Theme-Zwischenspeicher nach', function () use ($dfRoot) {
+    $js = dfModule($dfRoot, 'settings');
+    $sync = dfFunction($js, 'syncThemeSettingsCache');
+    $save = dfFunction($js, 'saveAllSettings');
+
+    // subgroupLabel() liest aus sessionStorage['theme-settings'], das nur
+    // theme.js beim Seitenaufruf schrieb -- nach dem Speichern kam das alte
+    // Wort zurueck.
+    assertTrue(str_contains($sync, "sessionStorage.setItem('theme-settings'"),
+        'syncThemeSettingsCache() schreibt theme-settings nicht zurueck');
+    assertTrue(preg_match('/hasOwnProperty\.call\(cached,\s*key\)/', $sync) === 1,
+        'syncThemeSettingsCache() uebernimmt auch Schluessel, die nicht oeffentlich sind');
+    assertTrue(preg_match('/if\s*\(!raw\)\s*return/', $sync) === 1,
+        'Ohne vorhandenen Zwischenspeicher legte die Funktion ein Teilobjekt an');
+
+    $call = strpos($save, 'syncThemeSettingsCache(');
+    $label = strpos($save, 'updateSubgroupLabelElements()');
+    assertTrue($call !== false, 'saveAllSettings() zieht den Zwischenspeicher nicht nach');
+    assertTrue($label !== false && $call < $label,
+        'Der Zwischenspeicher wird erst nach dem Beschriften nachgezogen -- das alte Wort bleibt');
+    assertTrue(preg_match('/syncThemeSettingsCache\(updates\.filter\([^)]*abgelehnt\.includes/', $save) === 1,
+        'Abgelehnte Werte landen im Zwischenspeicher');
+});
