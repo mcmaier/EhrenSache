@@ -481,3 +481,37 @@ test('Zeiterfassung: die Tabelle bricht Datum, Dauer und Status nicht um (OI-10)
     assertSame(3, substr_count($render, '<td class="cell-nowrap">'),
         'renderWorkSessions() markiert nicht genau Beginn, Dauer und Status als nowrap');
 });
+
+test('Zeiterfassung: die Liste wird paginiert wie alle anderen (OI-92)', function () use ($repoRoot) {
+    $js = (string) sourceCode($repoRoot . '/public/js/modules/worktime.js');
+    $html = (string) sourceCode($repoRoot . '/public/index.html');
+
+    // Dieselbe Einstellung "Datenreihen pro Seite" wie die uebrigen Listen
+    assertTrue(preg_match("/import\s*\{[^}]*\bglobalPaginationValue\b[^}]*\}\s*from\s*'\.\/settings\.js'/", $js) === 1,
+        'worktime.js liest globalPaginationValue nicht');
+    assertTrue(str_contains($html, '<div id="worktimePagination"></div>'),
+        'index.html hat keinen Platz fuer die Seitenknoepfe der Zeiterfassung');
+
+    $render = frontendFunctionBody($js, 'renderWorkSessions');
+    assertTrue(str_contains($render, 'page = clampPage(page, totalPages)'),
+        'renderWorkSessions() begrenzt die Seite nicht (OI-88)');
+    assertTrue(preg_match('/filtered\.slice\(\s*startIndex\s*,\s*endIndex\s*\)/', $render) === 1,
+        'renderWorkSessions() zeichnet alle Eintraege statt einer Seite');
+    assertTrue(str_contains($render, 'renderWorktimePagination('),
+        'renderWorkSessions() zeichnet keine Seitenknoepfe');
+
+    // Auch die Leerzeile raeumt die Knoepfe der vorigen Auswahl ab (OI-84)
+    $leer = substr($render, (int) strpos($render, 'if (!filtered.length)'), 400);
+    assertTrue(str_contains($leer, 'renderWorktimePagination('),
+        'Die Leerzeile laesst die Seitenknoepfe der vorigen Auswahl stehen');
+
+    // Chip-Wechsel springt auf Seite 1, eine Freigabe bleibt auf der Seite
+    assertTrue(preg_match('/key => \{ worktimeStatusChip = key; renderWorkSessions\(sessions, 1\); \}/', $render) === 1,
+        'Ein Chip-Wechsel springt nicht auf Seite 1');
+    $status = frontendFunctionBody($js, 'setSessionStatus');
+    assertTrue(str_contains($status, 'loadWorkSessions(true, currentWorktimePage)'),
+        'Nach Freigeben/Ablehnen springt die Liste auf Seite 1');
+
+    assertTrue(preg_match("/'go-to-worktime-page':\s*\(el\)\s*=>\s*goToWorktimePage\(Number\(el\.dataset\.page\)\)/", $js) === 1,
+        'Die Aktion go-to-worktime-page ist nicht registriert');
+});
