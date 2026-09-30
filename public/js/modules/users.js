@@ -863,7 +863,7 @@ export async function deleteUser(userId) {
         const result = await apiCall('users', 'DELETE', null, { id: userId });
         if (result) {
             showUserSection(true, currentUsersPage);
-            showToast(`User "${escapeHtml(email)}" wurde gelöscht`, 'success');
+            showToast(`User "${email}" wurde gelöscht`, 'success');
         }
     }
 }

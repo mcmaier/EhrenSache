@@ -414,11 +414,16 @@ export function showToast(message, type = 'info', duration = TOAST_DURATION) {
     toast.innerHTML = `
         <div class="toast-icon">${icons[type] || icons.info}</div>
         <div class="toast-content">
-            <div class="toast-message">${message}</div>
+            <div class="toast-message"></div>
         </div>
         <button class="toast-close" data-action="toast-close">×</button>
         ${duration > 0 ? '<div class="toast-progress"></div>' : ''}
     `;
+    // Die Meldung ist Text, nie Markup (OI-111): Serverantworten landen hier
+    // ungeprueft (api.js), und die Aufrufer mussten bisher einzeln maskieren.
+    // Deshalb maskiert auch kein Aufrufer mehr selbst -- sonst stuende dort
+    // "&amp;".
+    toast.querySelector('.toast-message').textContent = String(message ?? '');
     
     container.appendChild(toast);
     

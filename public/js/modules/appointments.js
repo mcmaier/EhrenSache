@@ -1366,7 +1366,7 @@ function seriesResultText(r, kind = null) {
             : `${r.detached.length} abgelöst (${detachedReasonText(r.detached)})`);
     }
     if (r.series_deleted) parts.push(kind === 'split' ? 'alte Serie aufgelöst' : 'Serie aufgelöst');
-    // Nur Zahlen und feste Texte -- showToast() setzt per innerHTML.
+    // Nur Zahlen und feste Texte; showToast() setzt ohnehin als Text (OI-111).
     return 'Serie: ' + (parts.join(', ') || 'keine Änderung');
 }
 
@@ -1705,7 +1705,7 @@ export async function deleteAppointment(appointmentId) {
         const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
         if (result && result.success) {
             showAppointmentSection(true, currentAppointmentsPage);
-            showToast(`Termin "${escapeHtml(title)}" wurde gelöscht`, 'success');
+            showToast(`Termin "${title}" wurde gelöscht`, 'success');
         }
         return;
     }
@@ -1721,9 +1721,8 @@ export async function deleteAppointment(appointmentId) {
             // Cache invalidieren und neu laden            
             showAppointmentSection(true, currentAppointmentsPage);
 
-            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Titel
-            // kommt aus der Terminverwaltung (Admin/Manager) und muss daher escaped werden.
-            showToast(`Termin "${escapeHtml(title)}" wurde gelöscht`, 'success');
+            // showToast() setzt die Nachricht als Text (OI-111) -- nicht selbst maskieren.
+            showToast(`Termin "${title}" wurde gelöscht`, 'success');
         }
     }
 }

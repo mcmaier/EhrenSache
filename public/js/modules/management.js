@@ -307,9 +307,8 @@ export async function deleteGroup(groupId) {
             //invalidateCache('groups');
             //await loadGroups(true);
             await showGroupSection(true);
-            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Gruppenname
-            // muss deshalb wie jeder andere HTML-Textinhalt maskiert werden.
-            showToast(`Gruppe "${escapeHtml(groupName)}" wurde gelöscht`, 'success');
+            // showToast() setzt die Nachricht als Text (OI-111) -- nicht selbst maskieren.
+            showToast(`Gruppe "${groupName}" wurde gelöscht`, 'success');
         }
     }
 }
@@ -549,10 +548,9 @@ export async function saveType() {
         const allMembersGroup = dataCache.groups.data.find(g => g.is_default);
         
         if (allMembersGroup && !groupIds.includes(allMembersGroup.group_id)) {
-            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Gruppenname
-            // ist Freitext.
+            // showToast() setzt die Nachricht als Text (OI-111) -- nicht selbst maskieren.
             showToast(
-                `Standard-Terminart muss die Gruppe "${escapeHtml(allMembersGroup.group_name)}" enthalten`,
+                `Standard-Terminart muss die Gruppe "${allMembersGroup.group_name}" enthalten`,
                 'warning'
             );
             return;
@@ -624,9 +622,8 @@ export async function deleteType(typeId) {
             //invalidateCache('types');
             //await loadTypes(true);
             await showGroupSection(true);
-            // showToast() setzt die Nachricht per innerHTML (ui.js) -- der Terminartname
-            // muss deshalb wie jeder andere HTML-Textinhalt maskiert werden.
-            showToast(`Terminart "${escapeHtml(typeName)}" wurde gelöscht`, 'success');
+            // showToast() setzt die Nachricht als Text (OI-111) -- nicht selbst maskieren.
+            showToast(`Terminart "${typeName}" wurde gelöscht`, 'success');
         }
     }
 }
