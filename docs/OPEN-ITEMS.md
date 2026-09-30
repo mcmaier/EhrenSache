@@ -4561,6 +4561,8 @@ Eine Umbenennung im selben Commit hätte eine Textänderung in ein Gestaltungsvo
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)) ·
 **Entscheidung des Nutzers vom 2026-09-25:** bewusst nicht in OI-94 geklärt
 
+**Erledigt am 2026-09-30** (unveröffentlicht) — Entscheidung des Nutzers: entfernen. Markup `#recordAppointmentTypeGroup`, `updateAppointmentTypeDisplay()`, der auskommentierte Aufruf und `createAppointmentTypeBadge()` sind weg; damit gibt es im Dashboard kein Schildchen der Terminart mehr. Die Zusicherungen in `tests/suites/type_accent_frontend.php`, die das Schildchen erhalten sollten, sind durch einen Test ersetzt, der die Rückkehr meldet.
+
 `updateAppointmentTypeDisplay()` ([records.js](../public/js/modules/records.js) ~Zeile 1386) setzt
 das Schildchen der Terminart in ein Feld des Erfassungsdialogs. Die Funktion hat **keinen lebenden
 Aufrufer**: Der einzige steht seit `1468a8a` (2025-12-17) auskommentiert (`records.js` ~Zeile 1196).

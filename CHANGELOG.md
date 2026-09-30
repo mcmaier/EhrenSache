@@ -41,6 +41,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - Die Reiter „Verwaltung“ und „System“ registrierten ihre Klick-Handler für Admins doppelt
   (OI-90).
 - Toter Code aus Geräteverwaltung, Anträgen und Stylesheets entfernt (OI-90).
+- Das seit Dezember 2025 stillgelegte, nie sichtbare Terminart-Feld im Dialog „Anwesenheit
+  erfassen“ ist entfernt; die Terminart steht weiter im Optionstext der Terminauswahl (OI-106).
 
 ## [1.18.0] – 2026-09-30
 
