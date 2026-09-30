@@ -16,6 +16,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Ende des waagerechten Rollwegs. Ohne Aktionsspalte, etwa in der Ansicht der Rolle `user`, klebt
   auch keine andere Spalte. In inaktiven Mitgliederzeilen scheint die festgehaltene Spalte nicht
   durch (OI-92).
+- **Die Zeiterfassung wird paginiert wie alle anderen Listen.** Bisher zeigte sie alle Einträge
+  des Jahres auf einer Seite; jetzt gilt die Einstellung „Datenreihen pro Seite“ (OI-92).
 - **Leere Listen melden einheitlich „Keine … für diese Auswahl“.** Bisher stand dort je nach
   Liste „Keine Einträge gefunden“, „Keine Einträge“ oder derselbe Text mit Punkt (OI-90).
 - **Die Ankunftsspalte der Anwesenheit heißt durchgehend „Ankunftszeit“.** Beim ersten

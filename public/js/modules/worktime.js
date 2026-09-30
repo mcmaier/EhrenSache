@@ -15,7 +15,8 @@ import { debug } from '../app.js';
 import { registerActions } from './actions.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
-import { updateModalId, safeTypeColor } from './utils.js';
+import { updateModalId, safeTypeColor, clampPage } from './utils.js';
+import { globalPaginationValue } from './settings.js';
 import { CHIPS_WORKTIME, CHIPS_ACTIVITY_TYPES, countChips, filterByChip, renderFilterChips, setResetEnabled } from './filter_chips.js';
 
 // ============================================
@@ -27,6 +28,11 @@ let worktimeEnabled = null;   // null = noch nicht geprüft
 
 // Aktiver Status-Chip (Spec 2026-09-22); ersetzt das frühere Status-Auswahlfeld
 let worktimeStatusChip = 'all';
+
+// Paginierung wie in den uebrigen Listen (OI-92): dieselbe Einstellung
+// "Datenreihen pro Seite", die zuletzt gezeichneten Sitzungen fuer das Blaettern.
+let currentWorktimePage = 1;
+let worktimeSessions = [];
 
 // Aktiver Chip der Tätigkeitsarten-Tabelle (Sichtung 23.09.2026: die Zählzeile
 // filtert jetzt, "Alle" ist zugleich das Zurücksetzen).
@@ -170,11 +176,11 @@ export async function showWorktimeSection(forceReload = false) {
     await loadWorkSessions(forceReload);
 }
 
-export async function loadWorkSessions(forceReload = false) {
+export async function loadWorkSessions(forceReload = false, page = 1) {
     const year = currentYear;
 
     if (!forceReload && isCacheValid('workSessions', year)) {
-        renderWorkSessions(dataCache.workSessions[year].data);
+        renderWorkSessions(dataCache.workSessions[year].data, page);
         return dataCache.workSessions[year].data;
     }
 
@@ -187,7 +193,7 @@ export async function loadWorkSessions(forceReload = false) {
     dataCache.workSessions[year].data = sessions;
     dataCache.workSessions[year].timestamp = Date.now();
 
-    renderWorkSessions(sessions);
+    renderWorkSessions(sessions, page);
     return sessions;
 }
 
@@ -203,9 +209,11 @@ function applyWorktimeFilters(sessions) {
     });
 }
 
-export function renderWorkSessions(sessions) {
+export function renderWorkSessions(sessions, page = 1) {
     const tbody = document.getElementById('worktimeTableBody');
     if (!tbody) return;
+
+    worktimeSessions = sessions || [];
 
     // Basis: Taetigkeit und Mitglied. Darauf zaehlen die Chips, erst danach
     // filtert der aktive Chip die Tabelle (Spec 2026-09-22).
@@ -225,7 +233,7 @@ export function renderWorkSessions(sessions) {
         [...CHIPS_WORKTIME, { key: 'hours', label: 'Stunden', static: true,
             title: 'Bestätigte Stunden im gewählten Jahr; folgt Tätigkeit und Mitglied, nicht dem Statusfilter' }],
         zaehler, worktimeStatusChip,
-        key => { worktimeStatusChip = key; renderWorkSessions(sessions); },
+        key => { worktimeStatusChip = key; renderWorkSessions(sessions, 1); },
         { label: 'Status der Arbeitszeit' }
     );
     setResetEnabled(document.getElementById('resetWorktimeFilter'),
@@ -237,10 +245,24 @@ export function renderWorkSessions(sessions) {
 
     if (!filtered.length) {
         tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge für diese Auswahl</td></tr>';
+        // Sonst bleiben Seitenknöpfe der vorigen Auswahl stehen (OI-84)
+        currentWorktimePage = 1;
+        renderWorktimePagination(1, 0, 0);
         return;
     }
 
-    tbody.innerHTML = filtered.map(s => {
+    const perPage = globalPaginationValue;
+    const totalPages = Math.ceil(filtered.length / perPage);
+    // Nach Freigeben/Loeschen kann die letzte Seite wegfallen (OI-88)
+    page = clampPage(page, totalPages);
+    currentWorktimePage = page;
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const pageSessions = filtered.slice(startIndex, endIndex);
+
+    renderWorktimePagination(page, totalPages, filtered.length);
+
+    tbody.innerHTML = pageSessions.map(s => {
         const proof = proofOf(s);
         const running = !s.end_time;
 
@@ -261,6 +283,76 @@ export function renderWorkSessions(sessions) {
             <td class="actions-cell">${renderWorktimeActions(s)}</td>
         </tr>`;
     }).join('');
+}
+
+function renderWorktimePagination(currentPage, totalPages, totalSessions) {
+    const container = document.getElementById('worktimePagination');
+    if (!container) return;
+
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const perPage = globalPaginationValue;
+    const first = (currentPage - 1) * perPage + 1;
+    const last = Math.min(currentPage * perPage, totalSessions);
+
+    let html = `
+        <div class="pagination-container">
+            <div class="pagination-info">
+                Zeige ${first} - ${last} von ${totalSessions} Einträgen
+            </div>
+            <div class="pagination-buttons">
+    `;
+
+    if (totalPages <= 5) {
+        for (let i = 1; i <= totalPages; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" data-action="go-to-worktime-page" data-page="${Number(i)}">${i}</button>`;
+        }
+    } else {
+        if (currentPage > 1) {
+            html += `<button data-action="go-to-worktime-page" data-page="${Number(currentPage - 1)}" title="Vorherige Seite">‹</button>`;
+        }
+
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+
+        if (startPage > 1) {
+            html += `<button data-action="go-to-worktime-page" data-page="1">1</button>`;
+            if (startPage > 2) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            const activeClass = i === currentPage ? 'active' : '';
+            html += `<button class="${activeClass}" data-action="go-to-worktime-page" data-page="${Number(i)}">${i}</button>`;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span class="pagination-ellipsis">...</span>`;
+            }
+            html += `<button data-action="go-to-worktime-page" data-page="${Number(totalPages)}">${totalPages}</button>`;
+        }
+
+        if (currentPage < totalPages) {
+            html += `<button data-action="go-to-worktime-page" data-page="${Number(currentPage + 1)}" title="Nächste Seite">›</button>`;
+        }
+    }
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function goToWorktimePage(page) {
+    renderWorkSessions(worktimeSessions, page);
 }
 
 function renderWorktimeActions(session) {
@@ -361,7 +453,7 @@ async function setSessionStatus(sessionId, action, successText) {
 
     showToast(successText, 'success');
     await invalidateCache('workSessions', currentYear);
-    await loadWorkSessions(true);
+    await loadWorkSessions(true, currentWorktimePage);
 }
 
 export async function approveWorkSession(sessionId) {
@@ -392,7 +484,7 @@ export async function deleteWorkSession(sessionId) {
 
     showToast('Eintrag gelöscht', 'success');
     await invalidateCache('workSessions', currentYear);
-    await loadWorkSessions(true);
+    await loadWorkSessions(true, currentWorktimePage);
 }
 
 // ============================================
@@ -616,7 +708,7 @@ export async function saveWorkSession() {
     showToast(sessionId ? 'Eintrag geändert' : 'Zeit nachgetragen', 'success');
 
     await invalidateCache('workSessions', currentYear);
-    await loadWorkSessions(true);
+    await loadWorkSessions(true, currentWorktimePage);
 }
 
 // ============================================
@@ -1079,6 +1171,7 @@ export function initWorktimeEventHandlers() {
 
 registerActions({
     'approve-work-session': (el) => approveWorkSession(Number(el.dataset.id)),
+    'go-to-worktime-page': (el) => goToWorktimePage(Number(el.dataset.page)),
     'close-activity-type-modal': () => closeActivityTypeModal(),
     'close-work-session-modal': () => closeWorkSessionModal(),
     'delete-activity-type': (el) => deleteActivityType(Number(el.dataset.id)),
