@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.18.0] – 2026-09-30
 
 ### Sicherheit
 - **Das Dashboard trägt jetzt eine Content-Security-Policy.** Der Browser führt dort nur noch

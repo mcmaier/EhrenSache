@@ -240,4 +240,10 @@ return [
         'file'     => '1.17.0.php',
         'function' => 'migrate_1_17_0',
     ],
+    [
+        'from'     => '1.17.1',
+        'to'       => '1.18.0',
+        'file'     => '1.17.1.php',
+        'function' => 'migrate_1_17_1',
+    ],
 ];
