@@ -865,6 +865,10 @@ export async function initNavigation() {
 }
 
 
+// app.js ruft initNavTabs() beim Start, updateUIForRole() fuer Admins erneut --
+// der Zustand darf neu gesetzt werden, die Klick-Handler nur einmal (OI-90).
+let navTabsBound = false;
+
 export function initNavTabs() {
     const tabs = document.querySelectorAll('.nav-tab-btn');
     const mainNav = document.querySelector('.nav-menu[data-nav-group="main"]');
@@ -887,6 +891,9 @@ export function initNavTabs() {
         systemNav.style.display = 'block';
         tabs[1].classList.add('active');
     }
+
+    if (navTabsBound) return;
+    navTabsBound = true;
 
     tabs.forEach(tab => {
         tab.addEventListener('click', (e) => {

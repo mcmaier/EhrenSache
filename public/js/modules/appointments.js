@@ -232,7 +232,7 @@ async function renderAppointments(appointments, page = 1) {
     
     const tbody = document.getElementById('appointmentsTableBody');
     if (!appointments){
-        tbody.innerHTML = '<tr><td colspan="4" class="loading">Keine Einträge gefunden</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="loading">Keine Termine für diese Auswahl</td></tr>';
         calendarAppointments = [];
         updateAppointmentStats([]);
         return;

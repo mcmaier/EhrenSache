@@ -292,66 +292,6 @@ export function resetDeviceFilter() {
     showDeviceSection(false, 1);
 }
 
-export async function applyDeviceFilters(forceReload = false, page = 1) {
-    debug.log('applyDeviceFilters called');
-    
-    // Devices laden (aus Cache wenn möglich)
-    const allDevices = await loadDevices(forceReload);
-    debug.log('Loaded devices:', allDevices.length);
-
-    // Rendern (nur wenn auf Device-Section) - Reset auf Seite 1
-    const currentSection = sessionStorage.getItem('currentSection');
-    if (currentSection === 'benutzer') {
-        renderDevices(allDevices, page);
-        debug.log('Devices rendered');
-    }
-    
-    return allDevices;
-}
-
-export function filterDevices(devices, filters = {}) {
-    debug.log("filterDevices() called with filters:", filters);
-    
-    if (!devices || devices.length === 0) return [];
-    
-    let filtered = [...devices];
-    
-    // Filter: Rolle
-    if (filters.role && filters.role !== '') {
-        filtered = filtered.filter(u => u.role === filters.role);
-        debug.log(`After role filter (${filters.role}):`, filtered.length);
-    }
-    
-    // Filter: Status (aktiv/inaktiv)
-    if (filters.status && filters.status !== '') {
-        if (filters.status === 'active') {
-            filtered = filtered.filter(u => u.is_active === 1 || u.is_active === true);
-        } else if (filters.status === 'inactive') {
-            filtered = filtered.filter(u => u.is_active === 0 || u.is_active === false);
-        }
-        debug.log(`After status filter (${filters.status}):`, filtered.length);
-    }
-    
-    debug.log(`Final filtered devices:`, filtered.length);
-    return filtered;
-}
-
-export async function initDevicesEventHandlers()
-{
-    debug.log("Trying to register Device Event Handler. IsAdmin?", isAdmin);
-    if (!isAdmin) return;
-
-        // Hier standen bis 1.9.1 drei Handler fuer filterDeviceRole,
-        // filterDeviceStatus und resetDeviceFilters -- keines dieser Elemente
-        // gab es im Markup (OI-29). Die Filterleiste von 1.13.0 haengt ihre
-        // beiden Handler in showDeviceSection() ein, einmalig und erst dann,
-        // wenn der Bereich wirklich gezeichnet wird.
-
-
-    // Devices laden und anzeigen
-    //await applyDeviceFilters();
-}
-
 
 // ============================================
 // DEVICE MODAL FUNCTIONS

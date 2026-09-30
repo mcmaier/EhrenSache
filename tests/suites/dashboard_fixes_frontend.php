@@ -169,3 +169,54 @@ test('OI-105: die Ankunftsspalte heisst in allen Koepfen "Ankunftszeit"', functi
     assertSame(4, substr_count(dfFunction($sources['records.js'], 'updateTableHeader'), '<th>Ankunftszeit</th>'),
         'updateTableHeader() fuehrt nicht in allen vier Zweigen "Ankunftszeit"');
 });
+
+test('OI-90: die Klick-Handler der Navigations-Tabs werden nur einmal registriert', function () use ($dfRoot) {
+    $body = dfFunction(dfModule($dfRoot, 'ui'), 'initNavTabs');
+
+    // app.js ruft initNavTabs() beim Start, updateUIForRole() fuer Admins
+    // erneut. Ohne Sperre hing jeder Tab doppelt am Klick.
+    $guard = strpos($body, 'if (navTabsBound) return;');
+    $listen = strpos($body, "addEventListener('click'");
+    assertTrue($guard !== false && $listen !== false && $guard < $listen,
+        'initNavTabs() registriert die Klick-Handler ohne Sperre');
+});
+
+test('OI-90: leere Dashboard-Listen melden einheitlich "… für diese Auswahl"', function () use ($dfRoot) {
+    $funde = [];
+    foreach (projectFiles($dfRoot . '/public/js/modules', 'js') as $file) {
+        $js = (string) sourceCode($file);
+        if (preg_match_all('/class="loading">(Keine[^<$]*)</u', $js, $m)) {
+            foreach ($m[1] as $text) {
+                if (preg_match('/^Keine \S+ für diese Auswahl$/u', $text) !== 1) {
+                    $funde[] = basename($file) . ': "' . $text . '"';
+                }
+            }
+        }
+    }
+    assertTrue($funde === [], "Abweichender Leertext:\n  " . implode("\n  ", $funde));
+});
+
+test('OI-90: Antragstabelle hat im Markup so viele Kopfspalten wie Zellen', function () use ($dfRoot) {
+    $html = (string) sourceCode($dfRoot . '/public/index.html');
+    $start = strpos($html, '<tbody id="exceptionsTableBody">');
+    assertTrue($start !== false, 'Antragstabelle nicht gefunden');
+    $thead = substr($html, (int) strrpos(substr($html, 0, $start), '<thead>'), $start - (int) strrpos(substr($html, 0, $start), '<thead>'));
+
+    // Zeilen und Leerzeile (exceptions.js) fuehren acht Spalten, samt Aktionen.
+    assertSame(8, substr_count($thead, '<th>'), 'Kopf der Antragstabelle hat nicht acht Spalten');
+});
+
+test('OI-90: toter Code aus der Filterleiste und den Quotenkarten bleibt weg', function () use ($dfRoot) {
+    $devices = dfModule($dfRoot, 'devices');
+    foreach (['applyDeviceFilters', 'filterDevices', 'initDevicesEventHandlers'] as $fn) {
+        assertTrue(!str_contains($devices, "function {$fn}("), "devices.js fuehrt wieder {$fn}()");
+    }
+    assertTrue(!str_contains(dfModule($dfRoot, 'exceptions'), 'filters.exceptionStatus'),
+        'filterExceptions() fuehrt wieder den Statuszweig -- den Status filtern die Chips');
+
+    foreach (['components/cards.css', 'responsive.css', 'sections/sidebar.css'] as $css) {
+        $src = (string) sourceCode($dfRoot . '/public/css/' . $css);
+        assertTrue(!str_contains($src, '.stat-card'), "{$css} fuehrt wieder .stat-card");
+        assertTrue(!str_contains($src, 'system-active'), "{$css} fuehrt wieder .system-active");
+    }
+});

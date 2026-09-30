@@ -72,7 +72,7 @@ export async function renderExceptions(exceptions, page = 1)
     const tbody = document.getElementById('exceptionsTableBody');    
 
     if (!exceptions || (exceptions.length === 0)) {
-        tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Einträge gefunden</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">Keine Anträge für diese Auswahl</td></tr>';
         // Sonst bleiben Seitenknöpfe der vorigen Liste stehen (OI-84)
         allFilteredExceptions = [];
         renderExceptionsPagination(1, 0, 0);
@@ -326,11 +326,6 @@ export function filterExceptions(exceptions, filters = {}) {
     // Filter: ExceptionType
     if (filters.exceptionType && filters.exceptionType !== '') {
         filtered = filtered.filter(e => e.exception_type === filters.exceptionType);
-    }
-    
-    // Filter: ExceptionStatus
-    if (filters.exceptionStatus && filters.exceptionStatus !== '') {
-        filtered = filtered.filter(e => e.status === filters.exceptionStatus);
     }
     
     return filtered;

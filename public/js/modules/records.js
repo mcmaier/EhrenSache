@@ -145,7 +145,7 @@ export async function renderRecords(records, page = 1)
     updateTableHeader(false); // false = Record-Modus
     
     if (!records || (records.length === 0)) {
-        tbody.innerHTML = `<tr><td colspan="${RECORDS_LIST_COLSPAN}" class="loading">Keine Einträge gefunden</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="${RECORDS_LIST_COLSPAN}" class="loading">Keine Einträge für diese Auswahl</td></tr>`;
         // Ohne diese beiden Zeilen blieb die Paginierung des vorigen Filters
         // stehen, und ein Klick darauf zeigte dessen Einträge wieder (OI-84)
         allFilteredRecords = [];
