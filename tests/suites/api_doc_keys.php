@@ -49,9 +49,10 @@
  * - export (CSV) und Logo-Upload: keine JSON-Antworten.
  * - Fehlerbehandlung, Best Practices, Beispiel-Implementierungen: keine
  *   Endpunkt-Antworten, sondern Referenzmaterial.
- * - appointment_responses, session_info, update_check, Terminserien,
- *   Auto-/TOTP-/Stations-Check-In: nicht in der Vorgabenliste dieses
- *   Vorhabens (OI-66) -- eigene Suite wäre ein Folgeschritt.
+ * - Auto-/TOTP-/Stations-Check-In: brauchen ein Geräte-Token, das die
+ *   Benutzerliste nicht herausgibt, oder sind Schreibpfade (OI-100, offen).
+ *   appointment_responses, session_info, update_check und Terminserien sind
+ *   seit OI-100 dabei.
  *
  * Bewusst nur eingeschränkt geprüft:
  * - members (Liste): nur die Admin/Manager-Form. Die Antwort hat laut Doku
@@ -110,6 +111,10 @@ function adJsonBlock(string $section, int $blockIndex, string $heading): array
         "Ueberschrift '{$heading}': nur " . count($blocks) . " json-Block(e) gefunden, Block {$blockIndex} erwartet");
 
     $raw = trim($blocks[$blockIndex - 1]);
+    // Gekuerzte Beispiele ("members": [ … ], "settings": {…}) sind in API.md
+    // lesbarer als volle, aber kein JSON. Sie gelten als leerer Container:
+    // Geprueft wird dann nur, dass der Schluessel existiert (OI-100).
+    $raw = (string) preg_replace(['/\{\s*…\s*\}/u', '/\[\s*…\s*\]/u'], ['{}', '[]'], $raw);
     $decoded = json_decode($raw, true);
     if ($decoded === null && $raw !== 'null') {
         // Zeilenkommentare sind kein gueltiges JSON -- ein Versuch, bevor
@@ -235,11 +240,42 @@ function adContext(): array
     assertTrue($appointments['body'] !== [],
         "Instanz hat keine Termine im Jahr {$year} -- Kontext kann nicht gebaut werden");
 
+    // Ein Serientermin und ein Termin mit Rueckmeldung (OI-100); fehlt einer,
+    // bleibt der Wert null und der Eintrag meldet das, statt still zu bestehen.
+    $seriesId = null;
+    $responsesAppointmentId = null;
+    foreach ($appointments['body'] as $apt) {
+        if ($seriesId === null && !empty($apt['series_id'])) {
+            $seriesId = (int) $apt['series_id'];
+        }
+        if ($responsesAppointmentId === null && !empty($apt['responses'])) {
+            $responsesAppointmentId = (int) $apt['appointment_id'];
+        }
+    }
+
     return $ctx = [
-        'memberId'      => (int) $members['body'][0]['member_id'],
-        'appointmentId' => (int) $appointments['body'][0]['appointment_id'],
-        'year'          => $year,
+        'memberId'               => (int) $members['body'][0]['member_id'],
+        'appointmentId'          => (int) $appointments['body'][0]['appointment_id'],
+        'seriesId'               => $seriesId,
+        'responsesAppointmentId' => $responsesAppointmentId,
+        'year'                   => $year,
     ];
+}
+
+/** Sitzungs-Cookie eines Web-Logins (session_info kennt keine Tokens). */
+function adSessionCookie(string $role): string
+{
+    static $cookies = [];
+    if (isset($cookies[$role])) {
+        return $cookies[$role];
+    }
+    $cfg = testConfig();
+    $res = apiRequest('POST', 'login', ['body' => [
+        'email' => $cfg[$role]['email'], 'password' => $cfg[$role]['password']]]);
+    assertStatus(200, $res, "Web-Login als {$role}");
+    assertTrue(!empty($res['set_cookie']), "Web-Login als {$role} setzt kein Cookie");
+
+    return $cookies[$role] = explode(';', (string) $res['set_cookie'])[0];
 }
 
 /**
@@ -252,6 +288,9 @@ function adContext(): array
  * - query:     Query-Parameter, entweder Array oder Closure(array $ctx): array
  * - skipDive:  Pfade (Punktnotation, ausgehend von $resource), an denen die
  *              Tiefenprüfung in einem Array bewusst ausgelassen wird
+ * - session:   true = mit Sitzungs-Cookie statt Token der Rolle (session_info)
+ * - needs:     Kontextschluessel, der nicht null sein darf (sonst Testfehler
+ *              mit Hinweis auf fehlende Testdaten)
  */
 function adEndpoints(): array
 {
@@ -329,16 +368,44 @@ function adEndpoints(): array
 
         ['name' => 'membership_dates', 'heading' => 'Zeiträume abrufen', 'block' => 1,
             'resource' => 'membership_dates', 'role' => 'admin', 'query' => []],
+
+        // Seit OI-100
+        ['name' => 'session_info', 'heading' => 'Session-Status', 'block' => 1,
+            'resource' => 'session_info', 'role' => 'admin', 'query' => [], 'session' => true],
+
+        ['name' => 'update_check (GET)', 'heading' => 'Update-Prüfung', 'block' => 1,
+            'resource' => 'update_check', 'role' => 'admin', 'query' => []],
+
+        ['name' => 'appointment_series (einzeln)', 'heading' => 'Serie abrufen', 'block' => 1,
+            'resource' => 'appointment_series', 'role' => 'admin', 'needs' => 'seriesId',
+            'query' => static fn (array $ctx) => ['id' => $ctx['seriesId']]],
+
+        ['name' => 'appointment_responses (kommende)', 'heading' => 'Kommende Termine', 'block' => 1,
+            'resource' => 'appointment_responses', 'role' => 'user', 'query' => ['upcoming' => 1]],
+
+        ['name' => 'appointment_responses (ein Termin)', 'heading' => 'Ein Termin', 'block' => 1,
+            'resource' => 'appointment_responses', 'role' => 'admin', 'needs' => 'responsesAppointmentId',
+            'query' => static fn (array $ctx) => ['appointment_id' => $ctx['responsesAppointmentId']]],
     ];
 }
 
 foreach (adEndpoints() as $entry) {
     test("API.md-Schluessel: {$entry['name']}", function () use ($entry) {
         $ctx   = adContext();
+        if (isset($entry['needs'])) {
+            assertTrue($ctx[$entry['needs']] !== null,
+                "Testinstanz hat keine Daten fuer {$entry['needs']} im Jahr {$ctx['year']} -- Eintrag nicht pruefbar");
+        }
         $query = is_callable($entry['query']) ? $entry['query']($ctx) : $entry['query'];
-        $token = $entry['role'] !== null ? apiToken($entry['role']) : null;
 
-        $res = apiRequest('GET', $entry['resource'], ['token' => $token, 'query' => $query]);
+        $opts = ['query' => $query];
+        if (!empty($entry['session'])) {
+            $opts['cookie'] = adSessionCookie($entry['role']);
+        } elseif ($entry['role'] !== null) {
+            $opts['token'] = apiToken($entry['role']);
+        }
+
+        $res = apiRequest('GET', $entry['resource'], $opts);
         assertStatus(200, $res, "GET {$entry['resource']} fuer den Schluessel-Abgleich");
 
         $doc = adDoc($entry['heading'], $entry['block']);
