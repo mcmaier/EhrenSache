@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.19.0] – 2026-10-01
 
 ### Geändert
 - **Die Spalte „Aktionen“ bleibt in allen Tabellen am rechten Rand stehen.** Bisher tat sie das

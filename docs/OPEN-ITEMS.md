@@ -5,7 +5,7 @@ unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nic
 oder noch nicht gebaut.
 
 **Zuletzt geprüft:** 2026-09-28 gegen `v1.17.1` (`8d77479`), Eintrag für Eintrag gegen Code und git ·
-**Version:** 1.18.0
+**Version:** 1.19.0
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
 > während der Code auf 1.9.0 war — fünf Punkte waren längst behoben, ohne dass ihr Eintrag es
