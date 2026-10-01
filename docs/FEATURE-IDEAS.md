@@ -62,8 +62,11 @@ durchschlägt.
 | [FI-22](#fi-22--musikstücke-und-programme) | Musikstücke und Programme | niedrig | L | — |
 | [FI-23](#fi-23--ort-und-ende-am-termin) | Ort und Ende am Termin (rein informativ) — **umgesetzt in 1.10.0** | mittel | M | — |
 | [FI-24](#fi-24--freigaben-in-der-check-in-app) | Freigaben in der Check-in-App (Anträge außerhalb des Zeitfensters) | mittel | M | — |
+| [FI-25](#fi-25--docker-als-zweiter-auslieferungsweg) | Docker als zweiter Auslieferungsweg | niedrig² | S/M | — |
 
 ¹ hoch in Kombination mit [FI-1](#fi-1--terminzusage-im-vorfeld), für sich allein mittel.
+² für Vereine; als Entwicklungs- und Testumgebung mittel. Aufwand S für die Compose-Variante,
+M für ein offizielles Image — die Folgekosten stecken nicht im Bau, sondern im Betrieb.
 
 FI-1 bis FI-5 und FI-13 bis FI-15 stammen aus der Ideensammlung, FI-6 bis FI-12 sind
 Ergänzungen aus der Sichtung des Bestands. Die Nummern folgen dem Eingang, die Abschnitte dem
@@ -75,6 +78,10 @@ bestehende Einträge die Felder stillschweigend voraussetzten.
 
 FI-24 kam am 2026-09-23 aus der Frage auf, ob Verwalter Anträge auch in der Check-in-App
 freigeben können — was seit 1.12.0 möglich ist, aber nur im Zeitfenster der Anwesenheitsliste.
+
+FI-25 kam am 2026-10-01 aus der Frage auf, ob EhrenSache zusätzlich als Docker-Container
+ausgeliefert werden kann. Es ist keine Funktion, sondern ein Auslieferungsweg, und steht deshalb
+in einem eigenen Abschnitt F.
 
 FI-16 bis FI-22 kamen am 2026-09-16 aus einem getrennt geführten Ideen-Backlog dazu, teils aus
 einem Vergleich mit `konzertmeister.app`. Aus demselben Abgleich stammen die Ergänzungen an
@@ -962,6 +969,69 @@ zurückgestellt.
 
 ---
 
+## F · Betrieb und Auslieferung
+
+### FI-25 · Docker als zweiter Auslieferungsweg
+**Nutzen:** niedrig (Vereine) / mittel (Entwicklung) · **Aufwand:** S (Variante A) / M (Variante B)
+
+EhrenSache zusätzlich zum ZIP-Paket als Container anbieten: ein Image auf Basis von
+`php:8.x-apache` mit `pdo_mysql` und `mod_headers`, dazu MariaDB in einer
+`docker-compose.yml`. Das Dokumentenverzeichnis zeigt auf `public/`, `private/` liegt damit
+von selbst außerhalb.
+
+**Warum interessant:** Ausprobieren in fünf Minuten ohne eigene LAMP-Umgebung — für den
+technikaffinen Vereinsadmin mit NAS (Synology, Unraid) oder VPS. Intern wäre es eine
+reproduzierbare Entwicklungs- und Testumgebung: Die Testdatenbank unter XAMPP ist am 16.09.
+und 01.10.2026 korrupt geworden, eine Container-Datenbank ist in Sekunden neu aufgesetzt, auch
+je Worktree.
+
+**Was schon passt** (Stand 1.19.0 geprüft):
+- Kein Build-Step, kein Composer — das Image ist im Kern „Code hineinkopieren".
+- Der Mailversand läuft ausschließlich über SMTP (`private/helpers/mailer.php`), ein MTA im
+  Container ist nicht nötig.
+- `api.php` wertet `X-Forwarded-Proto` für das `Secure`-Cookie bereits aus; ein vorgeschalteter
+  Reverse Proxy für HTTPS (Traefik, Caddy, NAS-Proxy) funktioniert damit grundsätzlich.
+
+**Was zu bauen wäre:**
+1. **Updater abschalten.** Der Update-Wizard holt ein Paket und tauscht Programmdateien
+   (`update_package.php`, `update_swap.php`). Im Container kommt neuer Code mit einem neuen
+   Image, ein Tausch im laufenden Container ginge beim nächsten Neustart verloren. Nötig ist ein
+   Konfigurationsschalter, der Schritt 0 sperrt, während die Migrationskette weiter über den
+   Wizard oder beim Start läuft. Das ist der einzige Punkt mit echter Designarbeit — es entstehen
+   zwei Update-Wege, die beide getestet werden müssen.
+2. **Zustand auf Volumes.** `private/config/config.php`, `install.lock`, `private/uploads/` und
+   `public/uploads/` liegen im Code-Baum und müssen persistent eingehängt werden. Sauberer
+   (Variante B): `config_reader.php` liest die Werte zusätzlich aus Umgebungsvariablen, dann
+   schreibt der Installer im Container nichts in den Code-Baum.
+3. **Zeitzone** im Container explizit setzen — sonst verschieben sich Check-in-Zeiten und der
+   Terminbezug.
+4. **Apache-Konfiguration:** `AllowOverride All`, `mod_headers`, sonst greifen CSP und Sperren
+   aus den `.htaccess`-Dateien nicht.
+
+**Zwei Varianten:**
+
+| | A · Compose-Datei mit Doku | B · Offizielles Image |
+|---|---|---|
+| Umfang | Dockerfile, Compose, Volumes, Updater-Schalter, README-Abschnitt; das Image baut der Nutzer | A plus Umgebungsvariablen, Migration beim Start, Health-Check, Bauen per GitHub Actions nach GHCR, amd64 + arm64, Tests im Container |
+| Aufwand | ca. 1–2 Tage | ca. 1 Woche, danach laufend |
+| Zusage | Community-Variante, ohne Support | Release-Pfad mit Pflege |
+
+**Warum B vermutlich nicht jetzt:** Zielgruppe ist der Webspace eines Vereins
+(`project_history.md`, „Shared Hosting ist die Messlatte"). Die Nachfrage nach Docker ist
+unbelegt. Ein offizielles Image ist ein Versprechen mit Dauerlast: Neubau bei Lücken im
+Basis-Image auch ohne eigenes Release, Mitprüfen bei jedem Release — bei der derzeitigen
+Taktung samt Sicherheitshinweisen spürbar. Dazu Support-Fragen zu Umgebungen, die niemand im
+Projekt kennt.
+
+**Vorher zu klären:**
+- Gibt es überhaupt Anfragen? Ohne die bleibt es bei A, und A vorrangig als Entwicklungshilfe.
+- Leitplanke bleibt: Docker ist *zusätzlich*. Nichts im Code darf davon abhängen — keine
+  Hintergrunddienste, keine Worker, kein Composer, nur weil der Container es könnte.
+- Fällt die Entscheidung gegen Docker, gehört sie mit Begründung in die Liste der verworfenen
+  Wege in `project_history.md`, nicht nur hierher.
+
+---
+
 ## Wenn etwas davon kommt: sinnvolle Reihenfolge
 
 Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
@@ -1006,6 +1076,9 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
    etwas anderem zu laufen. Sinnvoll erst nach [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht),
    damit feststeht, worauf sich „seine Gruppe" bezieht.
 9. Alles Übrige — Abschnitt E, FI-9, FI-11, FI-12 — nur, wenn ein Verein danach fragt.
+
+**FI-25 Docker** steht außerhalb dieser Reihenfolge: Es berührt keine Funktion und hängt an
+keiner. Variante A kann jederzeit als Entwicklungshilfe dazwischen, Variante B erst auf Nachfrage.
 
 ---
 
