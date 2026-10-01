@@ -5,6 +5,8 @@ unter `docs/superpowers/specs/`, ersetzt sie nicht: Was hier steht, ist noch nic
 oder noch nicht gebaut.
 
 **Zuletzt geprüft:** 2026-09-28 gegen `v1.17.1` (`8d77479`), Eintrag für Eintrag gegen Code und git ·
+**Status nachgezogen:** 2026-10-01 gegen `v1.19.0` (`d672b8d`) — nur Veröffentlichungsvermerke und
+Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
 **Version:** 1.19.0
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
@@ -21,30 +23,42 @@ oder noch nicht gebaut.
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
 *mittel* = sollte vor der Freigabe an Vereine gelöst sein · *niedrig* = Verbesserung
 
-**Nächste Umsetzung (Stand 2026-09-28):** noch nicht festgelegt.
-[OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar)
-(Tastaturbedienung im Kalender) ist **erledigt** und mit **1.17.1** veröffentlicht. Die Annahme dieses Absatzes, der Fokusrahmen aus OI-94
-(`.calendar-event-block:focus-visible`) sei der Wegweiser, hat sich beim Entwerfen **nicht**
-gehalten: Die Termin-Blöcke wurden `role="group"` mit einem Namen **ohne** Tab-Stopp, und der
-Fokusrahmen ist samt seiner Zusicherung entfallen. [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (Wächter, die ein Kommentar
-erfüllt) aus demselben Vorgang ist mit 1.17.0 erledigt. Entschieden, aber nicht gebaut bleibt
-[OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) — es
-braucht eine eigene Spec, nicht nur eine Umsetzung.
+**Nächste Umsetzung (Stand 2026-10-01):** noch nicht festgelegt. Entschieden, aber nicht gebaut
+bleibt [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) — es
+braucht eine eigene Spec, nicht nur eine Umsetzung. Diese Spec sollte die Besetzungsübersicht mit
+Sollstärke aus [FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht)
+gleich mitentwerfen: Beide fragen, wie über ein Register gerechnet wird, dem keine Terminart
+zugeordnet ist.
 
-Offen mit Priorität *mittel*, am 2026-09-25 einzeln gegen den Code geprüft: OI-67, OI-98,
-OI-63 (nur noch die Spur), OI-6, OI-22, OI-23. OI-96 stand am 25.09. noch in dieser Reihe
-und ist seit dem 28.09. erledigt, OI-17 seit dem 29.09. (Etappe 2 auf `dev`). Die am 25.09. aus dem
-Hardware-Terminal aufgenommenen OI-101, OI-102 und OI-103 sind am selben Tag in `dev`
-erledigt. **OI-3 und OI-20 tragen ebenfalls
-*mittel*, stehen aber bewusst so** — sie halten eine in Kauf genommene Folge fest, keine
-Restarbeit, und gehören deshalb nicht in eine Umsetzungsreihe. OI-62 steht auf
-*niedrig–mittel*, OI-104 bis OI-106 und OI-108 auf *niedrig*.
+**Berührungspunkte mit Feature-Ideen** (Vorschlag vom 2026-10-01, nicht entschieden) — Einträge
+dieser Datei, die beim Bau einer Idee ohnehin auf dem Tisch liegen:
+
+| Idee | Eintrag | Warum zusammen |
+|---|---|---|
+| FI-14 Besetzungsübersicht | OI-70 | dieselbe Rechengrundlage für Untergruppen |
+| FI-24 Freigaben in der App | [OI-39](#oi-39--freigaben-liegen-an-zwei-orten) | beide brauchen eine sammelnde Abfrage offener Freigaben — eine für beide, nicht zwei (FI-24 lässt Arbeitszeiten bewusst weg) |
+| FI-4 / FI-3 Check-in-Wege | [OI-6](#oi-6--totp-secret-im-klartext), [OI-46](#oi-46--einmal-kopplungscode-statt-token-im-qr-bild), [OI-7](#oi-7--gültigkeitsfenster-der-totp-codes), [OI-45](#oi-45--kamera-scanner-in-der-station) | Gerätekopplung, Beweiswert und Quellen einmal festlegen |
+| FI-8 ICS-Abo | [OI-97](#oi-97--terminarten-kennen-keine-gruppengrenze) | der Feed braucht die Gruppengrenze, die bei Terminarten fehlt |
+| FI-18 ICS-Import | [OI-20](#oi-20--auto-termine-zählen-weiter-in-die-statistik) | Termine mit Herkunft, die nicht in die Statistik zählen — dieselbe Regel; OI-20 müsste dafür neu aufgemacht werden |
+| FI-2 Rest (je Person) | [OI-61](#oi-61--terminrückmeldung-einstellungen-der-terminart-wirken-rückwirkend-auf-die-zuverlässigkeit) | dieselbe Kennzahl, dieselbe Frage nach rückwirkenden Einstellungen |
+
+Offen mit Priorität *mittel*: OI-67, OI-98, OI-63 (nur noch die Spur), OI-6, OI-22, OI-23 (am
+2026-09-25 einzeln gegen den Code geprüft), dazu OI-70 und
+[OI-113](#oi-113--der-senken-wächter-folgt-join-nicht--fehlende-maskierung-bleibt-unbemerkt)
+(aufgenommen am 2026-09-28). OI-67 ist im Dashboard seit 1.19.0 entschärft (Cache-TTL zwei
+Minuten), in der Check-in-App unverändert. **OI-3 und OI-20 tragen ebenfalls *mittel*, stehen aber
+bewusst so** — sie halten eine in Kauf genommene Folge fest, keine Restarbeit, und gehören deshalb
+nicht in eine Umsetzungsreihe. OI-62 steht auf *niedrig–mittel*, OI-104 auf *niedrig*.
 
 Seit der Durchsicht vom 17.09. veröffentlicht: OI-82 bis OI-84 (1.11.2), OI-85 (1.12.1),
 OI-86 und OI-87 (1.13.0), OI-25, OI-27, OI-66 und OI-95 (1.14.x),
 [OI-89](#oi-89--anwesenheit-eines-mitglieds-zählt-kommende-termine-als-fehlend) (1.15.0),
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)
-(1.16.0), [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt) (1.17.0).
+(1.16.0), [OI-107](#oi-107--zusicherungen-die-ein-kommentar-erfüllt), OI-101 bis OI-103 und
+OI-109 (1.17.0), [OI-96](#oi-96--kalendertage-mit-terminen-sind-per-tastatur-nicht-erreichbar)
+(1.17.1), [OI-17](#oi-17--keine-content-security-policy) Etappe 2, OI-110 und OI-112 (1.18.0),
+OI-30, OI-33, OI-72, OI-76, OI-79, OI-88, OI-91 bis OI-93, OI-99, OI-105, OI-106, OI-108 und
+OI-111 (1.19.0); OI-90 und OI-100 mit 1.19.0 weitgehend, ihr Rest steht im Eintrag.
 
 ---
 
@@ -1229,7 +1243,8 @@ Bewusst unverändert. Nur dokumentieren, nicht als stärker beschreiben, als es 
 
 ### OI-17 · Keine Content-Security-Policy
 **Priorität:** erledigt am 2026-09-29 — Etappe 1 (Anmeldung, Check-in-PWA, Station) mit
-**1.17.0** (`c163cd2`), Etappe 2 (Dashboard, öffentliche PHP-Seiten) auf `dev`; Spec
+**1.17.0** (`c163cd2`), Etappe 2 (Dashboard, öffentliche PHP-Seiten) mit
+**1.18.0** (`383a111`); Spec
 `docs/superpowers/specs/2026-09-29-csp-dashboard-design.md`
 
 Bis 2026-09-25 lieferte die Anwendung **keine** CSP — weder als Header noch als
@@ -1643,7 +1658,7 @@ ergänzte. Auch dort lagen sämtliche 16 Modals im Dashboard-Container.
 **Korrektur (Durchsicht 2026-09-28):** `public/index.html` war vor `1028565` ausgeglichen (409
 öffnende, 409 schließende `div`, Kommentare nicht mitgezählt); das Dashboard wurde nach
 `</main>` geschlossen. Der Fix hat ein überzähliges `</div>` eingefügt, das bis heute steht
-(1.17.1: 484 zu 485). Der Browser ignoriert es. **Entfernt am 2026-09-28** auf `dev`, samt dem
+(1.17.1: 484 zu 485). Der Browser ignoriert es. **Entfernt am 2026-09-28**, veröffentlicht mit **1.18.0** (`5ab992a`), samt dem
 Kommentar, der die falsche Vorgeschichte festhielt.
 
 **Folge des Fixes:** Die Modals liegen jetzt außerhalb ihrer Bildschirm-Container und sind damit
@@ -1899,9 +1914,9 @@ Festgehalten in `tests/suites/profile_dashboard_frontend.php`.
 ---
 
 ### OI-30 · `totp_location` ohne Secret aus der Zeit vor 1.3.0
-**Priorität:** niedrig
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0**
 
-**Erledigt am 2026-09-30** (`84c546a`, unveröffentlicht): Die Typspalte der Geräteliste zeigt „⚠ Kein Secret – nimmt keine Codes an“. Die Angabe `has_totp_secret` gibt es nur für `kiosk` und `auth_device`; für `totp_location` liefert die Liste `totp_secret` selbst (API.md), daran hängt der Hinweis. Keine Serveränderung.
+**Erledigt am 2026-09-30** (`84c546a`, veröffentlicht mit **1.19.0**): Die Typspalte der Geräteliste zeigt „⚠ Kein Secret – nimmt keine Codes an“. Die Angabe `has_totp_secret` gibt es nur für `kiosk` und `auth_device`; für `totp_location` liefert die Liste `totp_secret` selbst (API.md), daran hängt der Hinweis. Keine Serveränderung.
 
 Vor 1.3.0 konnte `clear` ein TOTP-Stationsgerät ohne Secret zurücklassen. Ein solches Gerät
 fällt in `resolveTotpLocation()` heute stillschweigend heraus, ohne dass die Geräteliste
@@ -1942,9 +1957,9 @@ Speicherungen unterscheiden.
 ---
 
 ### OI-33 · Keine Quellen-Kennzeichnung bei Arbeitszeit-Sitzungen
-**Priorität:** niedrig
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0**
 
-**Erledigt am 2026-09-30** (unveröffentlicht): Die Dashboard-Ansicht zeigt die Quelle in der Spalte „Nachweis“ (`b1e4c53`); ein Wächter verlangt für jeden ENUM-Wert eine Beschriftung. Der Stundennachweis (`export&type=worktime_member`) führt sie als CSV-Spalte `source` hinter `proof` und in der Druckansicht als „Quelle“ (`94e797b`, Test in `worktime_api.php`). Die Summenberichte je Tätigkeit und Termin haben keine Einzelsitzungen und bleiben ohne Quelle.
+**Erledigt am 2026-09-30** (veröffentlicht mit **1.19.0**): Die Dashboard-Ansicht zeigt die Quelle in der Spalte „Nachweis“ (`b1e4c53`); ein Wächter verlangt für jeden ENUM-Wert eine Beschriftung. Der Stundennachweis (`export&type=worktime_member`) führt sie als CSV-Spalte `source` hinter `proof` und in der Druckansicht als „Quelle“ (`94e797b`, Test in `worktime_api.php`). Die Summenberichte je Tätigkeit und Termin haben keine Einzelsitzungen und bleiben ohne Quelle.
 
 Anwesenheits-Datensätze zeigen ihre Quelle als Badge (u. a. „Station (PIN)"), Arbeitszeit-
 Sitzungen dagegen nicht: Weder die Dashboard-Ansicht der Zeiterfassung noch der Export
@@ -3357,9 +3372,9 @@ Knopf ebenfalls nur die Filterleiste meint.
 ---
 
 ### OI-72 · Zwei Reste aus der PWA-Überarbeitung
-**Priorität:** niedrig · aufgenommen am 2026-09-17
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-17
 
-**Punkt 2 erledigt am 2026-09-30** (`0aa83e6`, unveröffentlicht), im Browser gemessen: bei 320 px vorher 109 px je Knopf und zweizeilig, nachher 125 px und einzeilig (`@media (max-width: 359px)`: Dialog 94 % breit, Rand 20 px). Punkt 1 war verworfen — **OI-72 ist damit abgeschlossen.**
+**Punkt 2 erledigt am 2026-09-30** (`0aa83e6`, veröffentlicht mit **1.19.0**), im Browser gemessen: bei 320 px vorher 109 px je Knopf und zweizeilig, nachher 125 px und einzeilig (`@media (max-width: 359px)`: Dialog 94 % breit, Rand 20 px). Punkt 1 war verworfen — **OI-72 ist damit abgeschlossen.**
 
 Aus der Arbeit an der Check-in-PWA für 1.9.1 (`8f47006`, `044797d`), dort bewusst
 zurückgestellt und nicht release-blockierend. Hier festgehalten, damit sie nicht allein in
@@ -3483,9 +3498,9 @@ wird hier nicht gerufen, der Import setzt also selbst bei identischen Werten ab,
 ---
 
 ### OI-76 · Wettlauf zweier gleichzeitiger Einzel-Löschungen kann einen Ausfall verlieren
-**Priorität:** niedrig · aufgenommen am 2026-09-21
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-21
 
-**Erledigt am 2026-09-30** (`de56e79`, unveröffentlicht): `seriesAddExdates()` sperrt die Serienzeile (`SELECT … FOR UPDATE`) in einer eigenen kleinen Transaktion bzw. in der des Aufrufers. **Die Einschätzung „selten“ war zu mild:** Ein neuer Test löscht 16 Termine in Viererblöcken per `curl_multi` — mit dem alten Stand gingen in 3 von 3 Läufen 3 bis 7 Ausfälle verloren, mit Sperre 3 von 3 grün.
+**Erledigt am 2026-09-30** (`de56e79`, veröffentlicht mit **1.19.0**): `seriesAddExdates()` sperrt die Serienzeile (`SELECT … FOR UPDATE`) in einer eigenen kleinen Transaktion bzw. in der des Aufrufers. **Die Einschätzung „selten“ war zu mild:** Ein neuer Test löscht 16 Termine in Viererblöcken per `curl_multi` — mit dem alten Stand gingen in 3 von 3 Läufen 3 bis 7 Ausfälle verloren, mit Sperre 3 von 3 grün.
 
 `DELETE appointments` (`private/handlers/appointments.php`) trägt das Datum eines gelöschten
 Serientermins über `seriesAddExdates()` (`private/helpers/appointment_series.php`) in `exdates`
@@ -3584,9 +3599,9 @@ in der Dokumentation/Oberfläche vor doppelter Verlängerung warnen.
 ---
 
 ### OI-79 · Jahresauswahl zeigt ein neues Serienjahr erst nach Neuladen
-**Priorität:** niedrig · aufgenommen am 2026-09-21
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-21
 
-**Erledigt am 2026-09-30** (`59061a5`, unveröffentlicht): `refreshYearFilters()` in `ui.js` lädt die Jahre erzwungen und befüllt alle Jahresfilter neu. Aufgerufen in `invalidateSeriesYears()` (Anlegen, Split, Fortsetzen einer Serie) und nach dem Speichern eines einzelnen Termins, der ebenso ein neues Jahr eröffnen kann. Wächter: `tests/suites/dashboard_fixes_frontend.php`.
+**Erledigt am 2026-09-30** (`59061a5`, veröffentlicht mit **1.19.0**): `refreshYearFilters()` in `ui.js` lädt die Jahre erzwungen und befüllt alle Jahresfilter neu. Aufgerufen in `invalidateSeriesYears()` (Anlegen, Split, Fortsetzen einer Serie) und nach dem Speichern eines einzelnen Termins, der ebenso ein neues Jahr eröffnen kann. Wächter: `tests/suites/dashboard_fixes_frontend.php`.
 
 Die verfügbaren Jahre kommen aus `dataCache.availableYears` (`public/js/modules/ui.js`), einem
 globalen (nicht jahresabhängigen) Cache-Schlüssel mit der üblichen TTL von 10 Minuten. Serien-
@@ -3963,9 +3978,9 @@ dokumentierte Regel (OI-3), keine Rechteausweitung.
 ---
 
 ### OI-88 · Seitenzahl wird nach Speichern/Löschen nicht auf die letzte Seite begrenzt
-**Priorität:** niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
 
-**Erledigt am 2026-09-30** (`2f5d38b`, unveröffentlicht): `clampPage()` in `utils.js`, eingesetzt in allen sechs paginierten Listen — die fünf genannten und zusätzlich `renderAppointments`, das dasselbe Muster hatte. Die gemerkte Seite ist die begrenzte. Wächter: `tests/suites/dashboard_fixes_frontend.php`.
+**Erledigt am 2026-09-30** (`2f5d38b`, veröffentlicht mit **1.19.0**): `clampPage()` in `utils.js`, eingesetzt in allen sechs paginierten Listen — die fünf genannten und zusätzlich `renderAppointments`, das dasselbe Muster hatte. Die gemerkte Seite ist die begrenzte. Wächter: `tests/suites/dashboard_fixes_frontend.php`.
 
 `renderExceptions`, `renderRecords`, `renderMembers`, `renderUsers` und `renderDevices`
 übernehmen `currentXPage` ungeprüft. Mit den Status-Chips fällt das häufiger auf: z. B. unter
@@ -4070,9 +4085,9 @@ OI-89 erschienen; Ziel ist der **nächste Release**, dessen Nummer die Release-S
 ---
 
 ### OI-90 · Kleinigkeiten aus der Umsetzung von OI-86
-**Priorität:** niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
+**Priorität:** weitgehend erledigt am 2026-09-30 — mit **1.19.0**, Rest niedrig · aufgenommen am 2026-09-22 (aus der Umsetzung der Filter-Chips, 1.13.0)
 
-**Weitgehend erledigt am 2026-09-30** (`7b75b37`, unveröffentlicht): Leertexte einheitlich „Keine … für diese Auswahl“ (ohne Punkt), Antragskopf im Markup mit Aktionsspalte, `initNavTabs()` registriert die Handler nur einmal (im Browser belegt: vorher zwei Aufrufe je Klick), toter Code entfernt (`applyDeviceFilters`, `filterDevices`, `initDevicesEventHandlers`, Statuszweig in `filterExceptions`, `.stat-card`, `.system-active`). `resetWorktimeFilter` und `resetDeviceFilter` sind **kein** toter Code mehr — seit 1.13.0 per `addEventListener` verdrahtet. **Offen bleiben:** Kontrast der Chips bei heller Vereinsfarbe und die Testrückstände in der Datenbank (`import_series_api.php` räumt `import_logs` nicht auf).
+**Weitgehend erledigt am 2026-09-30** (`7b75b37`, veröffentlicht mit **1.19.0**): Leertexte einheitlich „Keine … für diese Auswahl“ (ohne Punkt), Antragskopf im Markup mit Aktionsspalte, `initNavTabs()` registriert die Handler nur einmal (im Browser belegt: vorher zwei Aufrufe je Klick), toter Code entfernt (`applyDeviceFilters`, `filterDevices`, `initDevicesEventHandlers`, Statuszweig in `filterExceptions`, `.stat-card`, `.system-active`). `resetWorktimeFilter` und `resetDeviceFilter` sind **kein** toter Code mehr — seit 1.13.0 per `addEventListener` verdrahtet. **Offen bleiben:** Kontrast der Chips bei heller Vereinsfarbe und die Testrückstände in der Datenbank (`import_series_api.php` räumt `import_logs` nicht auf).
 
 - Antragstabelle: Kopf hat 7 Spalten, Zeilen 8 (`index.html` `#antraege`).
 - `renderRecords`-Leerzeile: `colspan` 7, obwohl die Tabelle ohne Aktionsspalte nur 6 Spalten hat.
@@ -4112,9 +4127,9 @@ OI-89 erschienen; Ziel ist der **nächste Release**, dessen Nummer die Release-S
 ---
 
 ### OI-91 · Anwesenheit: Mitgliedsauswahl für einfache Nutzer leer
-**Priorität:** niedrig · aufgenommen am 2026-09-22 (Sichtprüfung OI-86 als `user`)
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-22 (Sichtprüfung OI-86 als `user`)
 
-**Erledigt am 2026-09-30** (`504a56b`, unveröffentlicht) — anders als vorgeschlagen serverseitig: Der Einzelabruf für `user` lieferte auch `member_id` nicht, ein Rückfall auf `member.active` im Frontend hätte die Auswahl also nur mit Einträgen ohne Wert gefüllt. Er liefert jetzt `member_id`, `active` und `is_active_in_period` (mit `year` nach derselben Regel wie der Listenabruf); `loadMembers()` schickt das Jahr mit. Davon profitieren alle Stellen, die für `user` auf `is_active_in_period` filtern (Anträge, Statistik, Zeiterfassung). Test: `tests/suites/members_own_api.php` (nur lesend), API.md ergänzt.
+**Erledigt am 2026-09-30** (`504a56b`, veröffentlicht mit **1.19.0**) — anders als vorgeschlagen serverseitig: Der Einzelabruf für `user` lieferte auch `member_id` nicht, ein Rückfall auf `member.active` im Frontend hätte die Auswahl also nur mit Einträgen ohne Wert gefüllt. Er liefert jetzt `member_id`, `active` und `is_active_in_period` (mit `year` nach derselben Regel wie der Listenabruf); `loadMembers()` schickt das Jahr mit. Davon profitieren alle Stellen, die für `user` auf `is_active_in_period` filtern (Anträge, Statistik, Zeiterfassung). Test: `tests/suites/members_own_api.php` (nur lesend), API.md ergänzt.
 
 `loadMemberFilter()` (`public/js/modules/records.js`, ~Zeile 528) filtert auf
 `m.is_active_in_period`. `loadMembers()` (`public/js/modules/members.js`) liefert für die Rolle
@@ -4131,8 +4146,8 @@ verursacht (`loadMemberFilter` unverändert).
 ---
 
 ### OI-92 · Tabellen uneinheitlich: Aktionsspalte nur in der Arbeitszeit fixiert, Arbeitszeit ohne Paginierung
-**Priorität:** niedrig · aufgenommen am 2026-09-22 (Hinweis des Nutzers bei der Sichtprüfung zu
-OI-86) · **erledigt am 2026-09-30** (Punkt 1 `13d4c5c`, Punkt 2 `af9551f`), unveröffentlicht
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-22 (Hinweis des Nutzers bei der Sichtprüfung zu
+OI-86) · **erledigt am 2026-09-30** (Punkt 1 `13d4c5c`, Punkt 2 `af9551f`), veröffentlicht mit **1.19.0**
 
 **1. Fixierte Aktionsspalte — erledigt.** Die Regel aus OI-10 hing an `.table-worktime`; sie gilt
 jetzt für jede `td.actions-cell` (`public/css/components/tables.css`). Der Kopf klebt über
@@ -4170,9 +4185,9 @@ bleiben offen.
 ---
 
 ### OI-93 · Geänderte Untergruppen-Bezeichnung wirkt erst nach dem Neuladen
-**Priorität:** niedrig · aufgenommen am 2026-09-23 (aus dem Nachtrag zu OI-86)
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-23 (aus dem Nachtrag zu OI-86)
 
-**Erledigt am 2026-09-30** (`656b461`, unveröffentlicht): `saveAllSettings()` zieht gespeicherte Werte über `syncThemeSettingsCache()` in `sessionStorage['theme-settings']` nach — nur Schlüssel, die der Zwischenspeicher schon kennt, und nur wenn er existiert.
+**Erledigt am 2026-09-30** (`656b461`, veröffentlicht mit **1.19.0**): `saveAllSettings()` zieht gespeicherte Werte über `syncThemeSettingsCache()` in `sessionStorage['theme-settings']` nach — nur Schlüssel, die der Zwischenspeicher schon kennt, und nur wenn er existiert.
 
 `subgroupLabel()` ([ui.js](../public/js/modules/ui.js)) liest das eingestellte Wort aus
 `sessionStorage['theme-settings']`. Geschrieben wird dieser Schlüssel aber nur von
@@ -4455,9 +4470,9 @@ sichtbar ist. Die Messung mit großem Bestand steht weiter aus.
 ---
 
 ### OI-99 · Aufräumen der Altdaten verwirft den Zwischenspeicher nicht
-**Priorität:** niedrig · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-24 (aus dem Abschlussreview zu 1.14.0)
 
-**Erledigt am 2026-09-30** (`92bd36e`, unveröffentlicht): Nach erfolgreichem Aufräumen werden `records`, `appointments`, `exceptions` und `workSessions` ohne Jahresangabe verworfen.
+**Erledigt am 2026-09-30** (`92bd36e`, veröffentlicht mit **1.19.0**): Nach erfolgreichem Aufräumen werden `records`, `appointments`, `exceptions` und `workSessions` ohne Jahresangabe verworfen.
 
 Die Aufräumfunktion in den Einstellungen (`apiCall('cleanup', 'POST', …)` in
 [settings.js](../public/js/modules/settings.js)) löscht serverseitig Anwesenheitsdaten jenseits der
@@ -4490,10 +4505,10 @@ mehrere Jahre auf einmal. Muster und Begründung stehen an den entsprechenden St
 ---
 
 ### OI-100 · API-Abgleich: Schreibpfade und fünf Lesepfade nicht bewacht
-**Priorität:** niedrig · aufgenommen am 2026-09-24 (Rest aus
+**Priorität:** weitgehend erledigt am 2026-09-30 — mit **1.19.0**, Rest niedrig · aufgenommen am 2026-09-24 (Rest aus
 [OI-66](#oi-66--apimd-gegen-die-echten-antworten-prüfen), bis dahin ohne eigene Nummer)
 
-**Weitgehend erledigt am 2026-09-30** (unveröffentlicht):
+**Weitgehend erledigt am 2026-09-30** (veröffentlicht mit **1.19.0**):
 - **Lesepfade** (`4ba591a`): `session_info`, `update_check`, `appointment_series`, beide Lesepfade von `appointment_responses`.
 - **Schreibpfade und Check-in** (`6834dc7`, neue Suite `tests/suites/api_doc_keys_write.php`): alle 25 Pfade, zu denen API.md eine Erfolgsantwort als JSON zeigt, in einer eigenen Testwelt — Anmeldung, Mitglieder, Termine, alle Serienaktionen, Geräte, `regenerate_token` (an einem Wegwerf-Gerät), Station `status`/`totp`/`identify`, `auto_checkin` (Hardware-Terminal), `totp_checkin` (Code vom Kiosk), Rückmeldung, Arbeitszeit, Import, `cleanup` mit Fristen, die nichts treffen. Schalter werden zurückgestellt; belegt, dass zwei Läufe keine Zeilenzahl ändern.
 - **Dabei gefunden und korrigiert** (`694725a`): API.md dokumentierte die Antworten von Login (Web), Login (Token) und `regenerate_token` falsch (Kontodaten stehen im Objekt `user`; `regenerate_token` liefert `api_token` statt `token`, kein `success`), dazu die Berechtigung von `regenerate_token`.
@@ -4559,10 +4574,10 @@ eines fremden Umbaus vermischt.
 ---
 
 ### OI-105 · Dieselbe Spalte heißt im Betrieb zweimal anders
-**Priorität:** niedrig · aufgenommen am 2026-09-25 (beim Umbau für
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-25 (beim Umbau für
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
 
-**Erledigt am 2026-09-30** (`35b69a8`, unveröffentlicht): Entscheidung des Nutzers „Ankunftszeit“; die vier Zweige in `records.js` folgen. OI-104 (eine Titel-Tabelle statt sechs Stellen) bleibt offen.
+**Erledigt am 2026-09-30** (`35b69a8`, veröffentlicht mit **1.19.0**): Entscheidung des Nutzers „Ankunftszeit“; die vier Zweige in `records.js` folgen. OI-104 (eine Titel-Tabelle statt sechs Stellen) bleibt offen.
 
 Die Ankunftsspalte der Anwesenheitsliste trägt zwei verschiedene Überschriften:
 
@@ -4588,11 +4603,11 @@ Eine Umbenennung im selben Commit hätte eine Textänderung in ein Gestaltungsvo
 ---
 
 ### OI-106 · Das Formularfeld für die Terminart beim Erfassen ist toter Code
-**Priorität:** niedrig · aufgenommen am 2026-09-25 (beim Umbau für
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-25 (beim Umbau für
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup)) ·
 **Entscheidung des Nutzers vom 2026-09-25:** bewusst nicht in OI-94 geklärt
 
-**Erledigt am 2026-09-30** (unveröffentlicht) — Entscheidung des Nutzers: entfernen. Markup `#recordAppointmentTypeGroup`, `updateAppointmentTypeDisplay()`, der auskommentierte Aufruf und `createAppointmentTypeBadge()` sind weg; damit gibt es im Dashboard kein Schildchen der Terminart mehr. Die Zusicherungen in `tests/suites/type_accent_frontend.php`, die das Schildchen erhalten sollten, sind durch einen Test ersetzt, der die Rückkehr meldet.
+**Erledigt am 2026-09-30** (veröffentlicht mit **1.19.0**) — Entscheidung des Nutzers: entfernen. Markup `#recordAppointmentTypeGroup`, `updateAppointmentTypeDisplay()`, der auskommentierte Aufruf und `createAppointmentTypeBadge()` sind weg; damit gibt es im Dashboard kein Schildchen der Terminart mehr. Die Zusicherungen in `tests/suites/type_accent_frontend.php`, die das Schildchen erhalten sollten, sind durch einen Test ersetzt, der die Rückkehr meldet.
 
 `updateAppointmentTypeDisplay()` ([records.js](../public/js/modules/records.js) ~Zeile 1386) setzt
 das Schildchen der Terminart in ein Feld des Erfassungsdialogs. Die Funktion hat **keinen lebenden
@@ -4690,9 +4705,9 @@ Maskierung ohne Anführungszeichen in HTML-Attribute. Die erste Fassung des neue
 Sitzung. Seit 1.17.0 erkennt der Wächter Attributkontexte
 ([OI-112](#oi-112--strenge-attributregel-gilt-nur-für-style-nicht-für-on)).
 
-**Offen, bewusst ausgelagert:** [OI-110](#oi-110--testsuiten-durchsuchen-fremde-arbeitsbäume-im-projektverzeichnis)
-(Suiten sehen fremde Arbeitsbäume; erledigt auf `dev`, `e5adab3`), [OI-111](#oi-111--showtoast-maskiert-nicht-die-aufrufer-tun-es-einzeln)
-(`showToast()`), OI-112 (`on…`-Attribute).
+**Ausgelagert, inzwischen erledigt:** [OI-110](#oi-110--testsuiten-durchsuchen-fremde-arbeitsbäume-im-projektverzeichnis)
+(Suiten sehen fremde Arbeitsbäume; mit 1.18.0, `e5adab3`), [OI-111](#oi-111--showtoast-maskiert-nicht-die-aufrufer-tun-es-einzeln)
+(`showToast()`; mit 1.19.0), OI-112 (`on…`-Attribute; mit 1.18.0 gegenstandslos).
 
 **Letzter Rest, am 2026-09-28 nach 1.17.0 behoben, veröffentlicht mit 1.17.1 (`4414986`):** `file()` las in **vier** Suiten weiter am
 Entferner vorbei (`assets.php` 3×, `mailer_unit.php`, `pwa_escaping_frontend.php`,
@@ -4716,10 +4731,10 @@ Wächter. Für die Wächter selbst stimmte das; hinter ihnen lag die oben genann
 ---
 
 ### OI-108 · Die Check-in-App führt ihre eigene, lockerere Farbprüfung
-**Priorität:** niedrig · aufgenommen am 2026-09-25 (aus dem Abschlussreview zu
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-25 (aus dem Abschlussreview zu
 [OI-94](#oi-94--terminfarbe-als-randakzent-statt-badge-terminliste-anwesenheit-kalender-popup))
 
-**Erledigt am 2026-09-30** (`dee5c66`, unveröffentlicht) — Entscheidung des Nutzers: Ersatzfarbe vereinheitlichen. `safeHexColor()` der PWA prüft wie `safeTypeColor()` (3, 4, 6, 8 Stellen) und fällt auf `var(--type-color-none)` zurück, in `checkin/css/style.css` mit demselben Wert wie im Dashboard (`#7f8c8d`); ein Test hält beide Werte gleich. Die PWA behält ihre eigene Funktion, weil sie `utils.js` nicht lädt. Wie im Dashboard bleibt der Farbpunkt einer Tätigkeit **ohne** Farbe `#1F5FBF`.
+**Erledigt am 2026-09-30** (`dee5c66`, veröffentlicht mit **1.19.0**) — Entscheidung des Nutzers: Ersatzfarbe vereinheitlichen. `safeHexColor()` der PWA prüft wie `safeTypeColor()` (3, 4, 6, 8 Stellen) und fällt auf `var(--type-color-none)` zurück, in `checkin/css/style.css` mit demselben Wert wie im Dashboard (`#7f8c8d`); ein Test hält beide Werte gleich. Die PWA behält ihre eigene Funktion, weil sie `utils.js` nicht lädt. Wie im Dashboard bleibt der Farbpunkt einer Tätigkeit **ohne** Farbe `#1F5FBF`.
 
 `/^#[0-9a-f]{3,8}$/i` steht in [public/checkin/js/app.js](../public/checkin/js/app.js) nur
 noch **einmal**, in `safeHexColor()`; seit 1.17.0 (`eb77fae`) laufen auch die Rückmeldekarten,
@@ -4754,7 +4769,7 @@ die zu weite Fassung kostet die Ersatzfarbe, nicht die Schranke.
 ---
 
 ### OI-110 · Testsuiten durchsuchen fremde Arbeitsbäume im Projektverzeichnis
-**Priorität:** erledigt am 2026-09-28 (auf `dev`, nach 1.17.1) · aufgenommen am 2026-09-28
+**Priorität:** erledigt am 2026-09-28 — mit **1.18.0** (`e5adab3`) · aufgenommen am 2026-09-28
 
 Die Desktop-App legt Arbeitsbäume unter `.claude/worktrees/<name>/` **innerhalb** des
 Projektverzeichnisses an. Dort liegt eine vollständige Kopie des Repositorys, einschließlich
@@ -4797,9 +4812,9 @@ kennen muss.
 ---
 
 ### OI-111 · `showToast()` maskiert nicht, die Aufrufer tun es einzeln
-**Priorität:** niedrig · aufgenommen am 2026-09-28
+**Priorität:** erledigt am 2026-09-30 — mit **1.19.0** · aufgenommen am 2026-09-28
 
-**Erledigt am 2026-09-30** (`33e4d28`, unveröffentlicht): `showToast()` setzt die Meldung per `textContent`, die Aufrufer maskieren nicht mehr selbst. Es waren **sechs** Aufrufer, nicht fünf — der neue Wächter fand den sechsten in `management.js` (Standard-Terminart). `html_sinks_frontend.php` führt `showToast` nicht mehr als HTML-Senke, sondern prüft `textContent` und verbietet doppelte Maskierung; `hsIsRawField()` erkennt jetzt Rückfallketten über ein zweites Feld.
+**Erledigt am 2026-09-30** (`33e4d28`, veröffentlicht mit **1.19.0**): `showToast()` setzt die Meldung per `textContent`, die Aufrufer maskieren nicht mehr selbst. Es waren **sechs** Aufrufer, nicht fünf — der neue Wächter fand den sechsten in `management.js` (Standard-Terminart). `html_sinks_frontend.php` führt `showToast` nicht mehr als HTML-Senke, sondern prüft `textContent` und verbietet doppelte Maskierung; `hsIsRawField()` erkennt jetzt Rückfallketten über ein zweites Feld.
 
 `showToast()` (`public/js/modules/ui.js`) setzt seine Meldung per `innerHTML`, maskiert sie aber
 nicht. Statt dessen maskieren **fünf** Aufrufstellen selbst (`appointments.js` 2×,
@@ -4825,7 +4840,7 @@ gehört zusammen behoben.
 ---
 
 ### OI-112 · Strenge Attributregel gilt nur für `style`, nicht für `on…`
-**Priorität:** erledigt am 2026-09-29 — gegenstandslos: seit OI-17 Etappe 2 gibt es im Dashboard
+**Priorität:** erledigt am 2026-09-29 — mit **1.18.0** gegenstandslos: seit OI-17 Etappe 2 gibt es im Dashboard
 keine `on…`-Attribute mehr; `csp.php` verbietet sie · aufgenommen am 2026-09-28
 
 Seit 2026-09-28 erkennt `tests/suites/html_sinks_frontend.php` Attributkontexte und verlangt für

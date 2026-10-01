@@ -4,8 +4,8 @@ Ideensammlung für mögliche künftige Funktionen. **Nichts hier ist beschlossen
 terminiert.** Der Zweck ist, Einfälle festzuhalten, bevor sie verloren gehen, und ihre Kosten
 grob abzuschätzen — nicht, sie zu versprechen.
 
-**Angelegt:** 2026-09-02 · **Zuletzt abgeglichen:** 2026-09-16 · **Bezugsstand:** `dev`,
-Version 1.7.0
+**Angelegt:** 2026-09-02 · **Zuletzt abgeglichen:** 2026-10-01 (Status gegen git und `OPEN-ITEMS.md`) ·
+**Bezugsstand:** `dev`, Version 1.19.0
 
 ## Abgrenzung zu `docs/OPEN-ITEMS.md`
 
@@ -54,7 +54,7 @@ durchschlägt.
 | [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht — **Variante B teilweise umgesetzt in 1.8.0** | mittel¹ | M | FI-1 für die Wirkung |
 | [FI-15](#fi-15--rolle-gruppenleiter) | Rolle „Gruppenleiter" | hoch | L | — |
 | [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) | Feiertage und Ferien im Terminkalender — **Feiertagsteil umgesetzt in 1.11.0, Ferien offen bei FI-18** | mittel | M | FI-7 für die Wirkung |
-| [FI-17](#fi-17--offene-punkte-unter-mein-konto) | Offene Punkte unter „Mein Konto" — **umgesetzt, Version offen** | hoch | S | — |
+| [FI-17](#fi-17--offene-punkte-unter-mein-konto) | Offene Punkte unter „Mein Konto" — **umgesetzt in 1.13.0** | hoch | S | — |
 | [FI-18](#fi-18--kalender-import-ics) | Kalender-Import (ICS) | niedrig | M | — |
 | [FI-19](#fi-19--terminvorlagen) | Terminvorlagen | niedrig | S | — |
 | [FI-20](#fi-20--einfache-umfragen) | Einfache Umfragen | niedrig | M | FI-6 |
@@ -269,7 +269,10 @@ ein festgelegter Registrierungs- und Zuordnungsweg existiert nicht. Diese Idee h
 Wie kommt ein Gerät in den Verein, wie lernt es ein Mitglied, wie wird es wieder entzogen?
 
 Das Verfahren *PIN, serverseitig geprüft* und der Registrierungsweg der virtuellen Station
-sind seit 1.3.0 gebaut. Offen bleiben NFC und Biometrie.
+sind seit 1.3.0 gebaut. Seit 1.17.0 meldet sich auch ein Hardware-Terminal vom Typ
+`auth_device` mit der Mitglieds-PIN über die Ressource `station` an
+([OI-101](OPEN-ITEMS.md#oi-101--station-für-auth_device-öffnen-pin-anmeldung-am-hardware-terminal)).
+Offen bleiben NFC und Biometrie.
 
 **Warum interessant:** Ohne definierten Ablauf ist der Gerätetyp eine Zusage, die die Software
 nicht einlöst. Und der Weg entscheidet mit, ob OI-6 — TOTP-Secret im Klartext — sich bei dieser
@@ -596,7 +599,7 @@ Einen „Feiertag-Import" gibt es in diesem Sinne nicht: berechnet, nicht eingel
 ### FI-17 · Offene Punkte unter „Mein Konto"
 **Nutzen:** hoch · **Aufwand:** S
 
-**Umgesetzt** (Branch `feat/fi17-offene-punkte`, Spec
+**Umgesetzt in 1.13.0** (Branch `feat/fi17-offene-punkte`, Spec
 `docs/superpowers/specs/2026-09-22-offene-punkte-design.md`): Karte „Offene Punkte" im Dashboard
 unter „Mein Profil" und einklappbarer Block oben im PWA-Tab „Erfassen", beide gespeist über die
 neue Ressource `my_open_items` bzw. den Helfer `openItemsForMember()`. Entschieden wurde: nur
@@ -680,6 +683,10 @@ Die PWA kennt für `work_sessions` deshalb weiterhin kein `approve`/`reject`.
 - **Selbstgenehmigung.** Es gilt dieselbe Serverregel wie in der Liste (OI-87): Der eigene Antrag
   ist gesperrt, solange ein zweites aktives Verwalterkonto existiert. Die Oberfläche übernimmt
   das Flag, statt eine eigene Regel zu erfinden.
+- **Eine Abfrage mit OI-39.** [OI-39](OPEN-ITEMS.md#oi-39--freigaben-liegen-an-zwei-orten)
+  schlägt für das Dashboard einen zusammenfassenden Lesezugriff auf offene Freigaben vor; FI-24
+  braucht ebenfalls eine sammelnde Abfrage (siehe „Berührt"). Dann eine für beide, nicht
+  zwei — auch wenn FI-24 Arbeitszeiten bewusst weglässt.
 
 **Berührt:** `public/checkin/` (neuer Bereich, `attendanceRequestsHtml()` und
 `decideRequest()` sind wiederverwendbar) · eine sammelnde Abfrage für offene Anträge — heute
@@ -884,7 +891,7 @@ und `isAdminOrManager` bleiben unangetastet) · alle zwölf genannten Handler ·
   über `activity_type_groups` (seit 1.2.0). Also entweder so lesen — „die Gruppe hat mindestens
   eine Tätigkeitsart" — oder einen echten Schalter je Gruppe einführen. Ersteres ist geschenkt
   und vermutlich schon die gemeinte Semantik, Letzteres ausdrücklicher.
-- **Freigabe der eigenen Stunden.** [OI-3](OPEN-ITEMS.md#oi-3) ist bereits offen: Ein Manager
+- **Freigabe der eigenen Stunden.** [OI-3](OPEN-ITEMS.md#oi-3--vier-augen-prinzip-bei-manager-nachträgen) ist bereits offen: Ein Manager
   bestätigt seinen eigenen Nachtrag ohne Kontrolle. Mit einer dritten freigebenden Rolle
   vervielfacht sich die Frage — und beim Gruppenleiter wiegt sie schwerer, weil er in seiner
   kleinen Gruppe oft die einzige freigebende Instanz ist. Diese Entscheidung gehört zu OI-3 und
@@ -1048,12 +1055,15 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
    die lästigste wiederkehrende Arbeit im System und der häufigste Grund, es gar nicht erst zu
    benutzen. Es hing von nichts ab, und es beschafft FI-1 überhaupt erst die Termine, zu denen
    jemand etwas zurückmeldet.
-2. ~~**FI-17 Offene Punkte unter „Mein Konto"**~~ (umgesetzt, Version offen) — kleinster
+2. ~~**FI-17 Offene Punkte unter „Mein Konto"**~~ (umgesetzt in 1.13.0) — kleinster
    sinnvoller Schritt gegen die Holschuld. Kein Cron, kein Zustellrisiko, keine Einwilligung;
    bündelt, was FI-6 später verschickt, und speist sich aus derselben Abfrage.
-3. **FI-14 Register** in der kleinen Variante (Gruppenart statt Hierarchie) — die
-   Besetzungsansicht ist der Grund, warum die Zusagen aus 1.7.0 mehr sind als eine
-   Anwesenheitsprognose. Fast kostenlos, solange niemand echte Vererbung verlangt.
+3. ~~**FI-14 Register** in der kleinen Variante~~ (Gruppenart umgesetzt in 1.8.0) — offen ist
+   die Besetzungsansicht mit Sollstärke, und sie ist der Grund, warum die Zusagen aus 1.7.0
+   mehr sind als eine Anwesenheitsprognose. Zusammen mit
+   [OI-70](OPEN-ITEMS.md#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach
+   Untergruppe) entwerfen: Beide brauchen dieselbe Rechengrundlage für ein Register ohne
+   eigene Terminart.
 4. **FI-6 Benachrichtigungen** — erst jetzt, und erst nachdem die Auslöserfrage beantwortet ist.
    Danach wird alles Vorherige wirksamer, FI-1 am deutlichsten. Die Einmal-Links aus der Mail
    gehören in dieselbe Runde, weil sie dieselbe Sicherheitsprüfung brauchen.
@@ -1079,6 +1089,11 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
 
 **FI-25 Docker** steht außerhalb dieser Reihenfolge: Es berührt keine Funktion und hängt an
 keiner. Variante A kann jederzeit als Entwicklungshilfe dazwischen, Variante B erst auf Nachfrage.
+
+**Berührungspunkte mit `OPEN-ITEMS.md`** — welche offenen Einträge beim Bau einer Idee ohnehin
+auf dem Tisch liegen (etwa OI-6 bei FI-4, OI-97 bei FI-8, OI-20 bei FI-18), steht seit
+2026-10-01 als Tabelle im Kopf von `OPEN-ITEMS.md` unter „Nächste Umsetzung". Hier bewusst
+nicht doppelt geführt.
 
 ---
 
