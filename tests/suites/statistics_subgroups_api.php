@@ -280,6 +280,20 @@ test('Mitglied sieht in seiner Registertabelle nur sich, fremdes Register ist ge
     }
 });
 
+test('Anwesenheitsbericht listet nur Termine im Aktivzeitraum', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w   = $sgWorld;
+    $res = apiRequest('GET', 'statistics_report', ['token' => apiToken('admin'), 'query' => [
+        'year' => $w['year'], 'member_id' => $w['members']['D']]]);
+    assertStatus(200, $res);
+
+    $html = $res['raw'];
+    assertTrue(str_contains($html, 'SG G2'), 'G2 liegt im Aktivzeitraum von D');
+    assertTrue(str_contains($html, 'SG G3'), 'G3 liegt im Aktivzeitraum von D');
+    assertTrue(!str_contains($html, 'SG G1'), 'G1 liegt vor dem Eintritt von D');
+    assertTrue(!str_contains($html, 'SG R1'), 'R1 liegt vor dem Eintritt von D');
+});
+
 test('Statistik-Welt wird aufgeraeumt', function () use (&$sgWorld) {
     if (!empty($sgWorld)) {
         sgDropWorld($sgWorld);
