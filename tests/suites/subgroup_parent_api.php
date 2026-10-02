@@ -209,6 +209,13 @@ test('Gruppen eines Registers: Selbstbezug, Duplikate, Ziffern-Strings, Rechte, 
         assertStatus(400, $bad, 'Selbstbezug muss abgewiesen werden');
         assertSame([], spGroup($r)['parent_group_ids'] ?? null);
 
+        // Selbstbezug beim Umwandeln: die Gruppe ist in der Datenbank noch gewoehnlich,
+        // nur der eigene Pruefschritt faengt das ab
+        $x = $ids[] = (int) spCreate('member_groups', ['group_name' => "SP X {$s}"])['id'];
+        $bad = spPutGroup($x, "SP X {$s}", ['is_subgroup' => true, 'parent_group_ids' => [$x]]);
+        assertStatus(400, $bad, 'Selbstbezug beim Umwandeln muss abgewiesen werden');
+        assertSame(0, (int) spGroup($x)['is_subgroup'], 'Gruppe bleibt gewoehnlich');
+
         // Duplikate werden zusammengefasst
         $res = spPutGroup($r, "SP R {$s}", ['is_subgroup' => true, 'parent_group_ids' => [$g, $g]]);
         assertStatus(200, $res);
