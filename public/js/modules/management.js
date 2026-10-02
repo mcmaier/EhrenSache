@@ -86,21 +86,51 @@ const tbody = document.getElementById('groupsTableBody');
         return;
     }
 
-    sichtbar.forEach(group => {
+    // Register stehen unter JEDER ihrer Gruppen (eingerückt); Register ohne
+    // Gruppe am Ende mit Hinweis. Ein Register, dessen Gruppen alle ausgeblendet
+    // sind (Chip-Filter), steht ohne Einrückung am Ende, damit es nicht verschwindet.
+    const isRegister = g => g.is_subgroup == 1;
+    const parentsOf = g => Array.isArray(g.parent_group_ids) ? g.parent_group_ids.map(Number) : [];
+    const plain = sichtbar.filter(g => !isRegister(g));
+    const plainIds = new Set(plain.map(g => Number(g.group_id)));
+    const registers = sichtbar.filter(isRegister);
+    const rows = [];
+    plain.forEach(group => {
+        rows.push({ group, kind: 'plain' });
+        registers
+            .filter(r => parentsOf(r).includes(Number(group.group_id)))
+            .forEach(r => rows.push({ group: r, kind: 'sub' }));
+    });
+    registers
+        .filter(r => parentsOf(r).length > 0 && !parentsOf(r).some(p => plainIds.has(p)))
+        .forEach(r => rows.push({ group: r, kind: 'orphan' }));
+    registers
+        .filter(r => parentsOf(r).length === 0)
+        .forEach(r => rows.push({ group: r, kind: 'unassigned' }));
+
+    rows.forEach(({ group, kind }) => {
         const isDefaultBadge = group.is_default
             ? '<span class="status-badge status-approved">✓ Ja</span>'
             : '<span class="type-badge">Nein</span>';
 
         const subgroupBadge = group.is_subgroup == 1
-            ? ` <span class="status-badge status-approved" style="font-size: 10px; padding: 2px 6px;">${escapeHtml(subgroupLabel())}</span>`
+            ? ` <span class="status-badge status-approved group-sub-badge">${escapeHtml(subgroupLabel())}</span>`
+            : '';
+
+        const unassignedHint = kind === 'unassigned'
+            ? '<small class="group-unassigned-hint">ohne Gruppe — bitte zuordnen; bis dahin keine Registerstatistik</small>'
+            : '';
+
+        const rowClass = kind === 'sub' ? 'group-row--sub'
+            : kind === 'unassigned' ? 'group-row--unassigned'
             : '';
 
         // Mitgliederanzahl anzeigen
         const memberCount = group.member_count || 0;
 
         const row = `
-            <tr>
-                <td><strong>${escapeHtml(group.group_name)}</strong>${subgroupBadge}</td>
+            <tr class="${rowClass}">
+                <td><strong>${escapeHtml(group.group_name)}</strong>${subgroupBadge}${unassignedHint}</td>
                 <td>${group.description ? escapeHtml(group.description) : '-'}</td>
                 <td>${memberCount}</td>
                 <td>${isDefaultBadge}</td>
@@ -111,7 +141,7 @@ const tbody = document.getElementById('groupsTableBody');
                     <button class="action-btn btn-icon btn-delete" data-action="delete-group" data-id="${Number(group.group_id)}" title="Löschen">
                         🗑
                     </button>
-                </td>                
+                </td>
             </tr>
         `;
         tbody.innerHTML += row;
@@ -127,8 +157,9 @@ export async function openGroupModal(groupId = null) {
     const title = document.getElementById('groupModalTitle');
     const membersGroup = document.getElementById('groupMembersGroup');
 
-    await loadMembers();       
-    
+    await loadMembers();
+    await loadGroups();
+
     if (groupId) {
         title.textContent = 'Gruppe bearbeiten';
         await loadGroupData(groupId);
@@ -142,6 +173,7 @@ export async function openGroupModal(groupId = null) {
         document.getElementById('group_is_default').checked = false;
         document.getElementById('group_is_subgroup').checked = false;
         document.getElementById('group_sort_order').value = 0;
+        fillGroupParentList(null, []);
         toggleGroupExclusivity();
         membersGroup.style.display = 'none';
         updateModalId('groupModal', null)
@@ -172,6 +204,33 @@ export function toggleGroupExclusivity() {
 
     isDefault.disabled = isSubgroup.checked;
     defaultHint.style.display = isSubgroup.checked ? 'block' : 'none';
+
+    // Die Gruppen eines Registers sind nur bei einer Untergruppe wählbar.
+    document.getElementById('group_parent_row').hidden = !isSubgroup.checked;
+}
+
+/**
+ * Checkbox-Liste "Gehört zu": alle gewöhnlichen Gruppen außer der eigenen.
+ * Quelle ist der Gruppen-Cache (openGroupModal lädt ihn vorher).
+ */
+function fillGroupParentList(currentGroupId, selectedIds) {
+    const container = document.getElementById('group_parent_list');
+    const selected = new Set((selectedIds || []).map(Number));
+    const candidates = (dataCache.groups.data || [])
+        .filter(g => g.is_subgroup != 1 && Number(g.group_id) !== Number(currentGroupId));
+
+    if (candidates.length === 0) {
+        container.innerHTML = '<small class="input-hint">Keine Gruppen verfügbar</small>';
+        return;
+    }
+
+    container.innerHTML = candidates.map(g => `
+        <label class="group-choice group-parent-choice">
+            <input type="checkbox" class="group-parent-checkbox" value="${Number(g.group_id)}"
+                   ${selected.has(Number(g.group_id)) ? 'checked' : ''}>
+            <span>${escapeHtml(g.group_name)}</span>
+        </label>
+    `).join('');
 }
 
 async function loadGroupData(groupId) {
@@ -184,6 +243,7 @@ async function loadGroupData(groupId) {
         document.getElementById('group_is_default').checked = group.is_default == 1;
         document.getElementById('group_is_subgroup').checked = group.is_subgroup == 1;
         document.getElementById('group_sort_order').value = group.sort_order ?? 0;
+        fillGroupParentList(group.group_id, group.parent_group_ids || []);
         toggleGroupExclusivity();
 
         // Zeige Mitglieder in dieser Gruppe
@@ -251,13 +311,17 @@ export async function saveGroup() {
     }
 
     const sortOrderRaw = parseInt(document.getElementById('group_sort_order').value, 10);
+    const isSubgroup = document.getElementById('group_is_subgroup').checked;
+    const parentGroupIds = Array.from(document.querySelectorAll('.group-parent-checkbox:checked'))
+        .map(cb => parseInt(cb.value, 10));
 
     const data = {
         group_name: document.getElementById('group_name').value,
         description: document.getElementById('group_description').value || null,
         is_default: isDefault,
-        is_subgroup: document.getElementById('group_is_subgroup').checked ? 1 : 0,
-        sort_order: Number.isFinite(sortOrderRaw) ? sortOrderRaw : 0
+        is_subgroup: isSubgroup ? 1 : 0,
+        sort_order: Number.isFinite(sortOrderRaw) ? sortOrderRaw : 0,
+        parent_group_ids: isSubgroup ? parentGroupIds : []
     };
     
     let result;
@@ -270,19 +334,29 @@ export async function saveGroup() {
     if (result.success) {
         closeGroupModal();
 
-        // Kein invalidateCache('appointments') noetig: Anlegen, Umbenennen und die
-        // Schalter is_default/is_subgroup/sort_order fassen weder
-        // member_group_assignments noch appointment_type_groups an -- "erwartet"
-        // bleibt unveraendert. Beim Loeschen einer Gruppe ist das anders, siehe
-        // deleteGroup().
-
-        // Die Mitgliederliste zeigt die Gruppennamen je Mitglied (alle Jahre).
+        // Die Gruppen eines Registers verschieben, wer in der Gliederung und in
+        // "erwartet" steht, und der Server ergaenzt Mitglieder in der Gruppe eines
+        // Registers (added_groups). Betroffen sind Mitgliederliste (Gruppennamen,
+        // alle Jahre), Termine ("erwartet", Zaehler) und Anwesenheiten (Gliederung).
+        // Bewusst ohne Jahr: die Zuordnung gilt fuer alle.
         await invalidateCache('members');
+        await invalidateCache('appointments');
+        await invalidateCache('records');
         await showGroupSection(true);
         showToast(
             groupId ? 'Gruppe erfolgreich aktualisiert' : 'Gruppe erfolgreich erstellt',
             'success'
         );
+
+        // Folgen der Mitgliedschaftsregel als Hinweis (Spec 2026-10-02, 4.2)
+        const added = Array.isArray(result.added_groups) ? result.added_groups.length : 0;
+        const warned = Array.isArray(result.group_warnings) ? result.group_warnings.length : 0;
+        if (added > 0) {
+            showToast(`${added} Mitglied(er) zusätzlich der Gruppe des Registers zugeordnet`, 'info');
+        }
+        if (warned > 0) {
+            showToast(`${warned} Mitglied(er) stehen in keiner der Gruppen des Registers — bitte prüfen`, 'warning');
+        }
     }
 }
 
@@ -512,17 +586,46 @@ async function loadTypeData(typeId) {
 function renderTypeGroups(selectedGroups) {
     const container = document.getElementById('typeGroupsList');
     const selectedIds = selectedGroups.map(g => g.group_id);
-    
-    container.innerHTML = dataCache.groups.data.map(group => `
-        <label class="group-choice" style="display: block; padding: 8px; cursor: pointer; border-radius: 4px;">
-            <input type="checkbox" 
-                   class="type-group-checkbox" 
-                   value="${group.group_id}" 
+    const all = dataCache.groups.data;
+    const nameOf = id => all.find(g => Number(g.group_id) === Number(id))?.group_name || '';
+    const parentNames = g => (Array.isArray(g.parent_group_ids) ? g.parent_group_ids : [])
+        .map(nameOf).filter(Boolean).sort((a, b) => a.localeCompare(b, 'de'));
+
+    // Register stehen unter ihrer ersten Gruppe (nach Name); weitere Gruppen
+    // als Unterzeile. Register ohne Gruppe am Ende.
+    const plain = all.filter(g => g.is_subgroup != 1);
+    const registers = all.filter(g => g.is_subgroup == 1);
+    const firstParentId = r => {
+        const ids = (Array.isArray(r.parent_group_ids) ? r.parent_group_ids : []).map(Number)
+            .filter(id => nameOf(id));
+        ids.sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'de'));
+        return ids[0];
+    };
+
+    const choice = (group, sub, extraLine) => `
+        <label class="group-choice${sub ? ' group-choice--sub' : ''}">
+            <input type="checkbox"
+                   class="type-group-checkbox"
+                   value="${Number(group.group_id)}"
                    ${selectedIds.includes(group.group_id) ? 'checked' : ''}>
-            <span style="margin-left: 8px;">${escapeHtml(group.group_name)}</span>
-            ${group.description ? `<small style="color: #7f8c8d; display: block; margin-left: 28px;">${escapeHtml(group.description)}</small>` : ''}
+            <span class="group-choice-name">${escapeHtml(group.group_name)}</span>
+            ${group.description ? `<small class="group-choice-note">${escapeHtml(group.description)}</small>` : ''}
+            ${extraLine ? `<small class="group-choice-note">${escapeHtml(extraLine)}</small>` : ''}
         </label>
-    `).join('');
+    `;
+
+    const html = [];
+    plain.forEach(group => {
+        html.push(choice(group, false, ''));
+        registers.filter(r => firstParentId(r) === Number(group.group_id)).forEach(r => {
+            const others = parentNames(r).filter(n => n !== group.group_name);
+            html.push(choice(r, true, others.length ? 'auch in: ' + others.join(', ') : ''));
+        });
+    });
+    registers.filter(r => firstParentId(r) === undefined)
+        .forEach(r => html.push(choice(r, true, 'ohne Gruppe — bitte zuordnen')));
+
+    container.innerHTML = html.join('');
 }
 
 // ============================================

@@ -307,3 +307,58 @@
 .group-choice:hover {
     background: var(--bg-gray);
 }
+
+/* Gruppenauswahl: Dialoge von Terminart und Mitglied, Gruppenliste "Gehört zu" */
+.group-choice {
+    display: block;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.group-choice--member {
+    display: flex;
+    align-items: flex-start;
+}
+
+.group-choice--sub {
+    margin-left: var(--spacing-lg);
+}
+
+.group-choice-name,
+.group-choice-text {
+    margin-left: 8px;
+}
+
+.group-choice-text {
+    flex: 1;
+}
+
+.group-choice-note {
+    display: block;
+    margin-left: 28px;
+    color: var(--text-light);
+}
+
+.group-choice-text .group-choice-note {
+    margin-left: 0;
+}
+
+.member-group-hint {
+    display: block;
+    color: var(--text-muted);
+}
+
+.group-parent-list {
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-sm);
+    border-radius: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.group-parent-choice {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
