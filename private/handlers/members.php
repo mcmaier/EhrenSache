@@ -282,6 +282,13 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 break;
             }
 
+            // group_ids: nur Liste ganzer Zahlen (vor jeder Aenderung pruefen)
+            if (isset($cleanData->group_ids) && ($groupIdsError = groupsCheckMemberGroupIds($cleanData->group_ids)) !== null) {
+                http_response_code(400);
+                echo json_encode(["message" => $groupIdsError, "field" => "group_ids"]);
+                break;
+            }
+
             // Umgebende Leerzeichen entfernen, bevor auf Duplikate geprueft
             // und gespeichert wird — sonst waeren "AB1" und "AB1 " zwei
             // "unterschiedliche" Nummern. Leer nach dem Trim faellt wie
@@ -346,6 +353,13 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 if (isset($data->$field)) {
                     $cleanData->$field = $data->$field;
                 }
+            }
+
+            // group_ids: nur Liste ganzer Zahlen (vor jeder Aenderung pruefen)
+            if (isset($cleanData->group_ids) && ($groupIdsError = groupsCheckMemberGroupIds($cleanData->group_ids)) !== null) {
+                http_response_code(400);
+                echo json_encode(["message" => $groupIdsError, "field" => "group_ids"]);
+                break;
             }
 
             // Umgebende Leerzeichen entfernen — siehe POST weiter oben.

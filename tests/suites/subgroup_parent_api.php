@@ -375,3 +375,35 @@ test('Gruppen eines Registers: Selbstbezug, Duplikate, Ziffern-Strings, Rechte, 
         foreach (array_reverse($ids) as $id) { spDelete('member_groups', $id); }
     }
 });
+
+test('members: group_ids muss eine Liste ganzer Zahlen sein (400, nichts gespeichert)', function () {
+    $s       = uniqid();
+    $groups  = [];
+    $members = [];
+    try {
+        $g = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP G {$s}"])['id'];
+
+        foreach ([[[1]], ['abc'], [1.5], [null]] as $bad) {
+            $res = apiRequest('POST', 'members', ['token' => apiToken('admin'),
+                'body' => ['name' => 'Sp', 'surname' => "bad {$s}", 'active' => 1, 'group_ids' => $bad]]);
+            assertStatus(400, $res, 'POST group_ids ' . json_encode($bad) . ': ' . $res['raw']);
+        }
+        $res = apiRequest('POST', 'members', ['token' => apiToken('admin'),
+            'body' => ['name' => 'Sp', 'surname' => "bad {$s}", 'active' => 1, 'group_ids' => 'x']]);
+        assertStatus(400, $res, 'POST group_ids muss eine Liste sein');
+
+        $m = $members[] = (int) spCreate('members', ['name' => 'Sp', 'surname' => "ok {$s}", 'active' => 1,
+                                                    'group_ids' => [(string) $g]])['id'];
+        assertSame([$g], spGroupIdsOf($m), 'Ziffern-String ist erlaubt');
+
+        foreach ([[[1]], ['abc']] as $bad) {
+            $res = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $m],
+                'body' => ['group_ids' => $bad]]);
+            assertStatus(400, $res, 'PUT group_ids ' . json_encode($bad));
+        }
+        assertSame([$g], spGroupIdsOf($m), 'abgewiesenes PUT laesst die Zuordnung unberuehrt');
+    } finally {
+        foreach ($members as $id) { spDelete('members', $id); }
+        foreach (array_reverse($groups) as $id) { spDelete('member_groups', $id); }
+    }
+});

@@ -208,6 +208,27 @@ function groupsApplySubgroupRule($db, $database, int $subgroupId): array
 }
 
 /**
+ * Prueft group_ids eines Mitglieds: Liste ganzer Zahlen (int oder Ziffern-String).
+ * Alles andere wuerde in groupsWithParents() still zu 0 oder 1 gecastet.
+ *
+ * @param mixed $raw
+ * @return ?string Fehlermeldung oder null, wenn gueltig
+ */
+function groupsCheckMemberGroupIds($raw): ?string
+{
+    if (!is_array($raw)) {
+        return 'group_ids muss eine Liste sein';
+    }
+    foreach ($raw as $value) {
+        if (!is_int($value) && !(is_string($value) && ctype_digit($value))) {
+            return 'group_ids darf nur Gruppen-IDs enthalten';
+        }
+    }
+
+    return null;
+}
+
+/**
  * Mitgliedschaftsregel fuer die Gruppenliste eines Mitglieds (Spec 2026-10-02, 4.1):
  * Fuer jedes Register S in der Liste, dessen Gruppen P(S) alle fehlen -- bei genau
  * einer Gruppe ergaenzen, bei mehreren in warnings melden, ohne Gruppe nichts.
