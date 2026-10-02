@@ -365,10 +365,11 @@ function attendanceGroupMeta($db, $database, array $groupIds): array
  * Je Mitglied und Terminart eine Zeile innerhalb einer Gruppe.
  *
  * Der Bereich kommt aus expectedPairsScopeSql(): bei einer gewoehnlichen
- * Gruppe die Paare, die ueber sie kommen, bei einer Untergruppe die Paare
- * ihrer Mitglieder (Spec 4.1). DISTINCT auf (Mitglied, Termin) vor dem Join
- * auf records: Ein Termin, der ein Registermitglied ueber zwei Gruppen
- * erreicht, zaehlt einmal. Die Gruppierung nach member_id und type_id ist die
+ * Gruppe die Paare, die ueber sie kommen, bei einem Register S die Paare, deren
+ * Mitglied in S steht und deren Termin ueber S selbst oder eine Gruppe aus
+ * P(S) kommt (Spec 2026-10-02, 5.1). DISTINCT auf (Mitglied, Termin) vor dem
+ * Join auf records: Ein Termin, der ein Registermitglied ueber S und eine
+ * Gruppe aus P(S) zugleich erreicht, zaehlt einmal. Die Gruppierung nach member_id und type_id ist die
  * Voraussetzung, die attendanceBuildGroup() prueft.
  *
  * @return array<int, array<string, mixed>>

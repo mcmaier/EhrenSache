@@ -309,6 +309,34 @@ test('Registertabelle rechnet ueber die Termine ihrer Gruppen und eigene', funct
         'parent_group_names: Gruppen von R nach Name');
 });
 
+test('Register ohne Gruppe rechnet auch in den Kopfzahlen nicht', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']['K']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w = $sgWorld;
+    // Eigene Terminart an R2 mit einem Termin, zu dem C anwesend ist: ohne die
+    // Regel aus Spec 5.1 zaehlten Kopfzahlen und Kennzahlen ihn ueber R2 selbst.
+    $typeId = sgCreate('appointment_types', ['type_name' => 'SG Reg2probe ' . uniqid(), 'is_default' => 0,
+        'color' => '#667eea', 'group_ids' => [$w['groups']['R2']]]);
+    $apptId = sgCreate('appointments', ['title' => 'SG REG2', 'date' => "{$w['year']}-10-04",
+        'start_time' => '19:00:00', 'type_id' => $typeId]);
+    try {
+        assertStatus(201, apiRequest('POST', 'records', ['token' => apiToken('admin'), 'body' => [
+            'member_id' => $w['members']['C'], 'appointment_id' => $apptId, 'status' => 'present']]));
+
+        sgWithSettings(['punctuality_enabled' => '1', 'reliability_enabled' => '1'], function () use ($w) {
+            $stats = sgStats($w, ['group_id' => $w['groups']['R2']]);
+            assertSame([], $stats['statistics'], 'R2 ohne Gruppe: keine Tabelle');
+            assertSame(null, $stats['warning'] ?? null, 'Kein Zugriffsproblem, also keine Warnung');
+            assertSame(0, (int) $stats['summary']['total_appointments'], 'Kopfzahlen leer');
+            assertSame(0, (int) $stats['summary']['total_present'], 'Kopfzahlen leer');
+            assertSame(0, (int) $stats['punctuality']['total_count'], 'Puenktlichkeit leer');
+            assertSame(0, (int) $stats['reliability']['total'], 'Zuverlaessigkeit leer');
+        });
+    } finally {
+        sgDelete('appointments', $apptId);
+        sgDelete('appointment_types', $typeId);
+    }
+});
+
 test('Register mit einer Gruppe: Termine der Gruppe und eigene', function () use (&$sgWorld) {
     assertTrue(!empty($sgWorld['members']['K']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
     $w  = $sgWorld;

@@ -95,17 +95,27 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
         // aufrufbar sein -- der Anwesenheitsbericht ruft sie so. Das kostet fuer
         // Nicht-Manager mit Gruppenfilter eine zusaetzliche, indizierte
         // COUNT-Abfrage. Wer hier "bereinigt", macht den Bericht angreifbar.
+        // Leerer Bereich: Auch hier beide Kennzahl-Bloecke -- eine eingeschaltete
+        // Kennzahl ueber einen leeren Bereich ist leer, nicht abgeschaltet.
+        $emptyResult = static fn (?string $warning): array => [
+            'warning'    => $warning,
+            'year'       => $year,
+            'worktime'   => null,
+            'summary'    => attendanceBuildSummary([], 0, 0),
+            'statistics' => [],
+            'rate_bands' => rateBands($db, $database),
+        ] + punctualityBlocks($db, $database, [], $year, $memberId, $appointmentTypeId, 0);
+
         if (!hasStatisticsGroupAccess($db, $database, $authMemberId, $role, $groupId)) {
-            // Auch hier beide Bloecke: eine eingeschaltete Kennzahl ueber einen
-            // leeren Bereich ist leer, nicht abgeschaltet.
-            return [
-                'warning'    => 'group not accessible',
-                'year'       => $year,
-                'worktime'   => null,
-                'summary'    => attendanceBuildSummary([], 0, 0),
-                'statistics' => [],
-                'rate_bands' => rateBands($db, $database),
-            ] + punctualityBlocks($db, $database, [], $year, $memberId, $appointmentTypeId, 0);
+            return $emptyResult('group not accessible');
+        }
+
+        // Register ohne Gruppe rechnet nicht (Spec 2026-10-02, 5.1): keine
+        // Tabelle und ebenso keine Kopfzahlen, Puenktlichkeit, Zuverlaessigkeit.
+        // Kein Zugriffsproblem, daher ohne Warnung.
+        $filterMeta = attendanceGroupMeta($db, $database, [$groupId])[$groupId] ?? null;
+        if ($filterMeta !== null && $filterMeta['is_subgroup'] && $filterMeta['parent_group_names'] === []) {
+            return $emptyResult(null);
         }
         $groups = [$groupId];
     } else {
