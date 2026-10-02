@@ -74,8 +74,9 @@ function handleStatisticsReport($db, $database, $request_method, $authUserRole, 
         $result['summary'], $result['punctuality'], $result['reliability']
     )];
 
+    $subgroupWord = groupSubgroupLabel(systemSetting($db, $database, 'subgroup_label', ''));
     foreach ($result['statistics'] as $group) {
-        $sections[] = statisticsReportGroupSection($group);
+        $sections[] = statisticsReportGroupSection($group, $subgroupWord);
     }
 
     if ($memberId !== null) {
@@ -171,7 +172,7 @@ function statisticsReportSummarySection(array $summary,
 }
 
 /** Ein Abschnitt je Gruppe: eine Zeile je Mitglied, Spalten je Terminart. */
-function statisticsReportGroupSection(array $group): array
+function statisticsReportGroupSection(array $group, string $subgroupWord = 'Untergruppe'): array
 {
     $columns = ['Mitglied', 'Termine', 'Anwesend', 'Entschuldigt', 'Unentschuldigt', 'Quote'];
 
@@ -203,7 +204,12 @@ function statisticsReportGroupSection(array $group): array
     }
 
     $section = [
-        'heading' => $group['group_name'],
+        // Untergruppen rechnen ueber ihre Mitglieder (Spec 4.4) -- die
+        // Ueberschrift sagt das, damit die Tabelle nicht wie eine
+        // Gruppentabelle gelesen wird.
+        'heading' => !empty($group['is_subgroup'])
+            ? $group['group_name'] . " ({$subgroupWord}: alle Termine der Mitglieder)"
+            : $group['group_name'],
         'class'   => 'report-attendance',
         'columns' => $columns,
         'rows'    => $rows,
