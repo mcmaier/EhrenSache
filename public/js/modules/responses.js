@@ -516,9 +516,13 @@ function renderKeepingFocus(key) {
  * dort als eigene, absichtlich gleich gehaltene Fassung der grouping.js-
  * Funktionen, weil die PWA kein Modulsystem hat. Vorgabe 'group', ausser es
  * gibt Untergruppen (groupingStored()). Je
- * Abschnitt eine Ampel-Zeile aus responseChipsHtml() und darunter Namens-Chips
- * Zusage -> Unsicher -> Absage -> ohne Antwort (CHIP_ORDER), darin nach
- * Nachname/Vorname (schon durch groupingSections() sortiert). Wer in
+ * Abschnitt eine Kopfzeile mit Balken (groupingSectionHeaderHtml(), Zahlen aus
+ * allen Mitgliedern des Abschnitts); die Abschnitte sind einklappbar
+ * (isSectionExpanded(), Alle-Knopf toggleAllSectionsHtml()), im aufgeklappten
+ * Abschnitt stehen Namens-Chips Zusage -> Unsicher -> Absage -> ohne Antwort
+ * (CHIP_ORDER), darin nach Nachname/Vorname (schon durch groupingSections()
+ * sortiert). Alphabetisch gibt es nur eine flache Liste ohne Kopfzeile.
+ * Nur fuer die Rolle user: Admin/Manager bekommen managerTableHtml(). Wer in
  * mehreren Abschnitten steht (Gruppe/Untergruppe), erscheint mehrfach --
  * groupingDuplicateCount() macht das ueber der Liste sichtbar (Spec 6.4).
  */

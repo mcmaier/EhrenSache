@@ -4838,13 +4838,15 @@ function responsesGroupingSwitcher(stages, stage) {
  * Umschalter gegliedert statt fest nach Terminart-Gruppe -- analog zu
  * namesListHtml() im Dashboard (public/js/modules/responses.js). Vorgabe
  * 'group', außer es gibt Untergruppen (groupingStored() fällt dann auf
- * 'subgroup' zurück). Die Summary traegt bewusst KEINE eigene Ampel-Zeile
- * mehr (Nutzer-Feedback: doppelt mit .response-status in der Fristzeile,
- * die direkt darueber steht und immer sichtbar ist) -- je Abschnitt bleibt
- * eine eigene Ampel-Zeile in der Ueberschrift, das ist eine Aufschluesselung,
- * keine Wiederholung derselben Gesamtzahl. Chips darunter Zusage -> Unsicher
- * -> Absage -> ohne Antwort, darin nach Nachname/Vorname (schon durch
- * groupingSections() sortiert). Wer in mehreren Abschnitten steht
+ * 'subgroup' zurück). Die Summary trägt bewusst keine eigene Ampel-Zeile
+ * (doppelt mit .response-status in der Fristzeile darüber). Je Abschnitt
+ * eine einklappbare Kopfzeile mit Balken (groupingSectionHeaderHtml(), Zahlen
+ * aus allen Mitgliedern des Abschnitts, auch zugeklappt); im aufgeklappten
+ * Abschnitt Chips Zusage -> Unsicher -> Absage -> ohne Antwort, darin nach
+ * Nachname/Vorname (schon durch groupingSections() sortiert). Alphabetisch
+ * gibt es nur einen Abschnitt ohne Kopfzeile. Die Namen liefert der Server
+ * nur bei names_visible bzw. für Manager -- hier wird alles gezeigt, was
+ * in item.members ankommt. Wer in mehreren Abschnitten steht
  * (Gruppe/Untergruppe), erscheint mehrfach -- groupingDuplicateCount() macht
  * das sichtbar (Spec 6.4).
  */
