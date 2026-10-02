@@ -309,8 +309,8 @@ export async function renderStatistics(statsData) {
         html += `
             <div class="statistics-group">
                 <h2>${escapeHtml(group.group_name)}</h2>
-                ${group.is_subgroup
-                    ? `<p class="statistics-group__note">${escapeHtml(subgroupLabel())}: alle Termine der Mitglieder</p>`
+                ${group.is_subgroup && group.parent_group_names?.length
+                    ? `<p class="statistics-group__note">${escapeHtml(subgroupLabel())} von ${escapeHtml(group.parent_group_names.join(', '))}: Termine von ${escapeHtml(group.parent_group_names.join(', '))} und eigene Termine</p>`
                     : ''}
                 <div class="filter-chips" data-group-chips="${escapeHtml(String(group.group_id))}"></div>
                 <div class="statistics-table-wrapper">

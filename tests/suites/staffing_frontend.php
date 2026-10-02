@@ -27,8 +27,10 @@ test('Statistik: der Hinweis "keine Auswertung fuer Untergruppen" ist entfallen'
 test('Statistik: Untergruppen-Tabelle traegt die Unterzeile aus is_subgroup', function () use ($stRoot) {
     $js = (string) sourceCode($stRoot . '/public/js/modules/statistics.js');
     assertTrue(str_contains($js, 'group.is_subgroup'), 'Die Unterzeile muss an is_subgroup der Antwort haengen');
+    assertTrue(preg_match('/group\.parent_group_names\?\.length\s*\?[^;]*statistics-group__note/s', $js) === 1,
+        'Die Unterzeile muss im Ternaer an group.parent_group_names haengen');
     assertTrue(str_contains($js, 'statistics-group__note'), 'Klasse der Unterzeile fehlt');
-    assertTrue(str_contains($js, 'alle Termine der Mitglieder'), 'Text der Unterzeile fehlt');
+    assertTrue(str_contains($js, 'eigene Termine'), 'Text der Unterzeile fehlt');
 });
 
 /** Rumpf einer JS-Funktion: von "function <name>(" bis vor die naechste Top-Level-Funktion. */

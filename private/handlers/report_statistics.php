@@ -204,11 +204,11 @@ function statisticsReportGroupSection(array $group, string $subgroupWord = 'Unte
     }
 
     $section = [
-        // Untergruppen rechnen ueber ihre Mitglieder (Spec 4.4) -- die
-        // Ueberschrift sagt das, damit die Tabelle nicht wie eine
-        // Gruppentabelle gelesen wird.
-        'heading' => !empty($group['is_subgroup'])
-            ? $group['group_name'] . " ({$subgroupWord}: alle Termine der Mitglieder)"
+        // Register zaehlen Termine ihrer Gruppen und eigene -- die Ueberschrift
+        // nennt die Gruppen, damit die Tabelle nicht wie eine Gruppentabelle
+        // gelesen wird. Ohne Gruppe gibt es keine Tabelle, hier nur der Name.
+        'heading' => !empty($group['is_subgroup']) && !empty($group['parent_group_names'])
+            ? $group['group_name'] . " ({$subgroupWord} von " . ($names = implode(', ', $group['parent_group_names'])) . ": Termine von {$names} und eigene Termine)"
             : $group['group_name'],
         'class'   => 'report-attendance',
         'columns' => $columns,
