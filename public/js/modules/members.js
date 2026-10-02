@@ -620,6 +620,12 @@ export async function saveMember() {
 
     const memberId = document.getElementById('member_id').value;
 
+    // Gruppennamen jetzt sichern: invalidateMemberDependents() leert den
+    // Gruppen-Cache, bevor die Hinweise zu den Gruppen angezeigt werden.
+    const groupNameById = new Map(
+        (dataCache.groups?.data || []).map(g => [Number(g.group_id), g.group_name])
+    );
+
     // Sammle ausgewählte Gruppen
     const groupCheckboxes = document.querySelectorAll('.member-group-checkbox:checked');
     const groupIds = Array.from(groupCheckboxes).map(cb => parseInt(cb.value));    
@@ -693,6 +699,7 @@ export async function saveMember() {
         // damit zu den Erwarteten: Terminabruf verwerfen wie im Erfolgsfall.
         await invalidateCache('appointments');
         await invalidateMemberDependents();
+        showGroupConsequences(result, groupNameById);
 
         // Modal bleibt offen, wechselt aber in den Bearbeiten-Modus für das neu angelegte Mitglied
         await openMemberModal(result.id);
@@ -719,17 +726,25 @@ export async function saveMember() {
             'success'
         );
 
-        // Folgen der Mitgliedschaftsregel (Spec 2026-10-02, 4.1)
-        const groupName = id => dataCache.groups.data.find(g => Number(g.group_id) === Number(id))?.group_name;
-        const addedNames = [...new Set((result.added_groups || []).map(a => groupName(a.group_id)).filter(Boolean))];
-        if (addedNames.length > 0) {
-            showToast('Zusätzlich den Gruppen zugeordnet: ' + addedNames.join(', '), 'info');
-        }
-        const warnedNames = [...new Set((result.group_warnings || []).map(w => groupName(w.subgroup_id)).filter(Boolean))];
-        if (warnedNames.length > 0) {
-            showToast('Steht in keiner der Gruppen des Registers: ' + warnedNames.join(', '), 'warning');
-        }
+        showGroupConsequences(result, groupNameById);
     }    
+}
+
+/**
+ * Hinweise zu den Folgen der Mitgliedschaftsregel (Spec 2026-10-02, 4.1):
+ * zusätzlich zugeordnete Gruppen und Register ohne Gruppe des Registers.
+ * Die Namen kommen aus der vor der Cache-Invalidierung gesicherten Map.
+ */
+function showGroupConsequences(result, groupNameById) {
+    const names = ids => [...new Set(ids.map(id => groupNameById.get(Number(id))).filter(Boolean))];
+    const addedNames = names((result.added_groups || []).map(a => a.group_id));
+    if (addedNames.length > 0) {
+        showToast('Zusätzlich den Gruppen zugeordnet: ' + addedNames.join(', '), 'info');
+    }
+    const warnedNames = names((result.group_warnings || []).map(w => w.subgroup_id));
+    if (warnedNames.length > 0) {
+        showToast('Steht in keiner der Gruppen des Registers: ' + warnedNames.join(', '), 'warning');
+    }
 }
 
 /**

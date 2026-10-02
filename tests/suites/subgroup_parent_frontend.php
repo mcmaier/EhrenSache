@@ -90,7 +90,17 @@ test('Mitgliederdialog: data-parent-ids, Abgleich der Checkboxen, Hinweise', fun
     assertTrue(!str_contains($hints, 'innerHTML'), 'updateMemberGroupHints() nutzt innerHTML');
 
     $save = spfBody($js, 'export async function saveMember', "\n}");
-    assertTrue(str_contains($save, 'added_groups') && str_contains($save, 'group_warnings'),
-        'saveMember() wertet added_groups/group_warnings nicht aus');
-    assertTrue(str_contains($save, 'showToast'), 'saveMember() zeigt keinen Hinweis');
+    $conseq = spfBody($js, 'function showGroupConsequences', "
+}");
+    assertTrue(str_contains($conseq, 'added_groups') && str_contains($conseq, 'group_warnings'),
+        'showGroupConsequences() wertet added_groups/group_warnings nicht aus');
+    assertTrue(str_contains($conseq, 'showToast'), 'showGroupConsequences() zeigt keinen Hinweis');
+
+    // invalidateMemberDependents() leert den Gruppen-Cache; Namen muessen vorher gesichert sein
+    $snap = strpos($save, 'groupNameById');
+    $inval = strpos($save, 'invalidateMemberDependents(');
+    assertTrue($snap !== false && $inval !== false && $snap < $inval,
+        'saveMember() sichert die Gruppennamen nicht vor invalidateMemberDependents()');
+    assertTrue(substr_count($save, 'showGroupConsequences(') >= 2,
+        'saveMember() zeigt die Hinweise nicht in beiden Zweigen (pinFailed und Erfolg)');
 });
