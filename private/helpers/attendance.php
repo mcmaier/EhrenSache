@@ -262,17 +262,57 @@ function attendanceGroupTypes($db, $database, int $groupId): array
 }
 
 /**
- * Namen mehrerer Gruppen auf einmal, als Zuordnung group_id => group_name.
+ * Spalten einer Untergruppe: alle Terminarten aller Gruppen, in denen
+ * mindestens ein Mitglied der Untergruppe steht, die Untergruppe selbst
+ * eingeschlossen (Spec 4.2). Haengt nicht vom Jahr ab -- die Spalten sollen
+ * beim Jahreswechsel nicht springen, wie bei attendanceGroupTypes().
  *
- * Eine Abfrage statt einer je Gruppe: Der Name haengt weder an Terminart noch
- * an Jahr, er muss nicht in der Gruppenschleife geholt werden. Fehlt eine
- * group_id im Ergebnis, gibt es die Gruppe nicht mehr -- der Aufrufer
- * ueberspringt sie dann.
+ * Jede Zeile aus attendanceFetchGroupRows() traegt eine Terminart einer
+ * Gruppe ihres Mitglieds und liegt damit in dieser Liste; die
+ * Vertragspruefung in attendanceBuildGroup() bleibt gueltig.
+ *
+ * @return array<int, array{type_id: int, type_name: ?string}>
+ */
+function attendanceSubgroupTypes($db, $database, int $subgroupId): array
+{
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("
+        SELECT DISTINCT atg.type_id, at.type_name
+        FROM {$prefix}appointment_type_groups atg
+        LEFT JOIN {$prefix}appointment_types at ON at.type_id = atg.type_id
+        WHERE atg.group_id IN (
+            SELECT mga.group_id
+            FROM {$prefix}member_group_assignments mga
+            WHERE mga.member_id IN (
+                SELECT sga.member_id FROM {$prefix}member_group_assignments sga WHERE sga.group_id = ?
+            )
+        )
+        ORDER BY at.type_name, atg.type_id
+    ");
+    $stmt->execute([$subgroupId]);
+
+    $types = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $types[] = [
+            'type_id'   => (int) $row['type_id'],
+            'type_name' => $row['type_name'],
+        ];
+    }
+
+    return $types;
+}
+
+/**
+ * Name, Gruppenart und Sortierung mehrerer Gruppen auf einmal.
+ *
+ * Eine Abfrage statt einer je Gruppe. Fehlt eine group_id im Ergebnis, gibt
+ * es die Gruppe nicht mehr -- der Aufrufer ueberspringt sie dann.
  *
  * @param array<int, int> $groupIds
- * @return array<int, string>
+ * @return array<int, array{group_name: string, is_subgroup: bool, sort_order: int}>
  */
-function attendanceGroupNames($db, $database, array $groupIds): array
+function attendanceGroupMeta($db, $database, array $groupIds): array
 {
     if ($groupIds === []) {
         return [];
@@ -282,18 +322,22 @@ function attendanceGroupNames($db, $database, array $groupIds): array
     $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
 
     $stmt = $db->prepare("
-        SELECT group_id, group_name
+        SELECT group_id, group_name, is_subgroup, sort_order
         FROM {$prefix}member_groups
         WHERE group_id IN ({$placeholders})
     ");
-    $stmt->execute($groupIds);
+    $stmt->execute(array_values(array_map('intval', $groupIds)));
 
-    $names = [];
+    $meta = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $names[(int) $row['group_id']] = (string) $row['group_name'];
+        $meta[(int) $row['group_id']] = [
+            'group_name'  => (string) $row['group_name'],
+            'is_subgroup' => (int) $row['is_subgroup'] === 1,
+            'sort_order'  => (int) $row['sort_order'],
+        ];
     }
 
-    return $names;
+    return $meta;
 }
 
 /**

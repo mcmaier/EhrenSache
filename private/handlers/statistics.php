@@ -114,14 +114,27 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
 
     $groups = array_map('intval', $groups);
 
-    $statistics = [];
-    $groupNames = attendanceGroupNames($db, $database, $groups);
+    $meta = attendanceGroupMeta($db, $database, $groups);
 
-    foreach ($groups as $gid) {
-        // Gruppe ohne Terminart -- oder ohne die angefragte -- hat keine
-        // Anwesenheit, ueber die sich reden liesse. Sie entfaellt, wie bisher.
+    // Reihenfolge (Spec 4.3): gewoehnliche Gruppen wie bisher, danach die
+    // Untergruppen nach sort_order und Name. Nur die Tabellen werden
+    // umsortiert; $groups bleibt fuer die Kopfzahlen unveraendert.
+    $ordinary  = array_values(array_filter($groups, static fn (int $g) => isset($meta[$g]) && !$meta[$g]['is_subgroup']));
+    $subgroups = array_values(array_filter($groups, static fn (int $g) => isset($meta[$g]) && $meta[$g]['is_subgroup']));
+    usort($subgroups, static fn (int $a, int $b) => groupSortCompare($meta[$a], $meta[$b]));
+
+    $statistics = [];
+
+    foreach (array_merge($ordinary, $subgroups) as $gid) {
+        $isSubgroup = $meta[$gid]['is_subgroup'];
+
+        // Gewoehnliche Gruppe: ihre Terminarten. Untergruppe: die Terminarten
+        // der Gruppen ihrer Mitglieder (Spec 4.2). Ohne Spalte -- oder ohne
+        // die angefragte Terminart -- entfaellt die Tabelle, wie bisher.
         $types = attendanceFilterTypes(
-            attendanceGroupTypes($db, $database, $gid),
+            $isSubgroup
+                ? attendanceSubgroupTypes($db, $database, $gid)
+                : attendanceGroupTypes($db, $database, $gid),
             $appointmentTypeId
         );
 
@@ -137,12 +150,9 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
             continue;
         }
 
-        $groupName = $groupNames[$gid] ?? null;
-        if ($groupName === null) {
-            continue;
-        }
-
-        $statistics[] = attendanceBuildGroup($gid, $groupName, $types, $rows);
+        $block = attendanceBuildGroup($gid, $meta[$gid]['group_name'], $types, $rows);
+        $block['is_subgroup'] = $isSubgroup;
+        $statistics[] = $block;
     }
 
     $memberTotals = attendanceFetchMemberTotals($db, $database, $groups, $year,
