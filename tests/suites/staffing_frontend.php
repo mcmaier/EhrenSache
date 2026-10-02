@@ -125,14 +125,37 @@ test('Dashboard: Aufklappzustand wird beim Oeffnen und beim Stufenwechsel geleer
         'setResponsesGrouping() leert expandedSections nicht');
 });
 
-test('App: Besetzungsblock liest staffing und rechnet nicht selbst', function () use ($stRoot) {
-    $js   = (string) sourceCode($stRoot . '/public/checkin/js/app.js');
-    $body = stFunctionBody($js, 'staffingHtml');
+test('App: kein eigener Besetzungsblock mehr', function () use ($stRoot) {
+    $js = (string) sourceCode($stRoot . '/public/checkin/js/app.js');
+    assertTrue(!str_contains($js, 'staffingHtml'), 'staffingHtml() steht noch in app.js');
+    assertTrue(!str_contains($js, '.staffing'), '.staffing steht noch in app.js');
+    assertTrue(!str_contains($js, 'item.staffing'), 'Die Karte liest noch item.staffing');
+    $css = (string) file_get_contents($stRoot . '/public/checkin/css/style.css');
+    assertTrue(!str_contains($css, '.staffing'), '.staffing-Regeln stehen noch in style.css');
+});
 
-    assertTrue(str_contains($body, '.expected'), 'staffingHtml() muss expected aus staffing lesen');
-    assertTrue(!str_contains($body, 'members'), 'staffingHtml() darf nicht aus der Mitgliederliste zaehlen');
-    assertTrue(!str_contains($body, '++'), 'staffingHtml() darf nicht zaehlen');
+test('App: Abschnitte mit Kopfzeile, Zustand im Set, "Alle aufklappen" je Karte', function () use ($stRoot) {
+    $js = (string) sourceCode($stRoot . '/public/checkin/js/app.js');
 
-    $card = stFunctionBody($js, 'responseCardHtml');
-    assertTrue(str_contains($card, 'staffingHtml(item.staffing)'), 'Die Karte muss den Block aus item.staffing zeigen');
+    $head = stFunctionBody($js, 'groupingSectionHeaderHtml');
+    assertTrue(str_contains($head, '<button'), 'Kopfzeile muss ein <button sein');
+    assertTrue(str_contains($head, 'aria-expanded'), 'aria-expanded fehlt');
+    assertTrue(str_contains($head, 'data-action="toggle-response-section"'), 'Aktion als Literal im Markup fehlt');
+    assertTrue(str_contains($head, 'section-head') && str_contains($head, 'section-bar'), 'Klassen section-head/section-bar fehlen');
+    assertTrue(str_contains($head, 'escapeHtml(label)'), 'Bezeichnung wird nicht maskiert');
+    assertTrue(preg_match('/section-bar"[^>]*aria-hidden="true"/', $head) === 1, 'Balken muss aria-hidden sein');
+    assertTrue(!str_contains($head, 'role='), 'Balken traegt keine role');
+    assertTrue(str_contains(stFunctionBody($js, 'groupingStatusCounts'), "'maybe'"), 'groupingStatusCounts fehlt');
+
+    $names = stFunctionBody($js, 'responseNamesHtml');
+    assertTrue(str_contains($names, 'groupingSectionHeaderHtml('), 'responseNamesHtml() muss die Kopfzeile nutzen');
+    assertTrue(str_contains($names, 'groupingStatusCounts('), 'responseNamesHtml() muss die Zahlen zaehlen');
+    assertTrue(str_contains($names, '${appointmentId}:${stage}:${section.key}'), 'Schluessel je Termin/Stufe/Abschnitt fehlt');
+    assertTrue(str_contains($names, 'responsesOpenSections.has('), 'Aufklappzustand wird nicht aus dem Set gelesen');
+    assertTrue(str_contains($names, 'data-action="toggle-all-response-sections"'), 'Knopf "Alle aufklappen" fehlt');
+
+    assertTrue(preg_match('/const responsesOpenSections\s*=\s*new Set\(\)/', $js) === 1, 'responsesOpenSections ist kein Set');
+    assertTrue(str_contains($js, "'toggle-response-section':"), 'Aktion toggle-response-section nicht in der Aktionstabelle');
+    assertTrue(str_contains($js, "'toggle-all-response-sections':"), 'Aktion toggle-all-response-sections nicht in der Aktionstabelle');
+    assertTrue(str_contains($js, 'CSS.escape(') && str_contains($js, '.focus()'), 'Fokus wird nach dem Neuzeichnen nicht wiederhergestellt');
 });

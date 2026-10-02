@@ -192,6 +192,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const dataActions = {
         'attendance-grouping':  (el) => window.setAttendanceGrouping(el.dataset.stage),
         'responses-grouping':   (el) => window.setResponsesGrouping(el.dataset.stage),
+        'toggle-response-section':      (el) => toggleResponseSection(el.dataset.key),
+        'toggle-all-response-sections': (el) => toggleAllResponseSections(Number(el.dataset.cardId)),
         'correct-work-session': (el) => openWorkSessionModal(Number(el.dataset.sessionId)),
         'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId))
     };
@@ -602,6 +604,48 @@ function groupingSections(members, stage, emptyLabel) {
 function groupingDuplicateCount(members, stage) {
     if (stage !== 'group' && stage !== 'subgroup') return 0;
     return members.filter(m => listFor(m, stage).length > 1).length;
+}
+
+/**
+ * Zählt Rückmeldungen eines Abschnitts; alles außer yes/maybe/no ist offen.
+ * Absichtlich gleich gehalten mit groupingStatusCounts() in
+ * public/js/modules/grouping.js -- die App hat kein Modulsystem.
+ */
+function groupingStatusCounts(members) {
+    const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
+    members.forEach(m => {
+        const key = ['yes', 'maybe', 'no'].includes(m.status) ? m.status : 'open';
+        counts[key]++;
+    });
+    return counts;
+}
+
+/**
+ * Kopfzeile eines zuklappbaren Abschnitts (Spec 2026-10-02, Abschnitt 6):
+ * Knopf mit Name, Balken und "2 von 5 · 1 unsicher · 2 offen". Absichtlich
+ * gleich gehalten mit groupingSectionHeaderHtml() in grouping.js. Die Aktion
+ * steht als Literal im Markup, der Schlüssel in data-key; die Breiten der
+ * Balkenteile sind Zahlen und gehen über toFixed() ins style-Attribut.
+ */
+function groupingSectionHeaderHtml({ key, label, counts, expanded, disabled = false }) {
+    const total = counts.yes + counts.maybe + counts.no + counts.open;
+    const details = [];
+    if (counts.maybe > 0) details.push(`${counts.maybe} unsicher`);
+    if (counts.no > 0) details.push(`${counts.no} ${counts.no === 1 ? 'Absage' : 'Absagen'}`);
+    if (counts.open > 0) details.push(`${counts.open} offen`);
+    const summary = [`${counts.yes} von ${total}`, ...details].join(' · ');
+    const segments = total === 0 ? '' : ['yes', 'maybe', 'no', 'open']
+        .filter(k => counts[k] > 0)
+        .map(k => `<span class="section-bar__seg section-bar__seg--${k}" style="width:${(counts[k] / total * 100).toFixed(2)}%"></span>`)
+        .join('');
+
+    return `<button type="button" class="section-head" aria-expanded="${expanded ? 'true' : 'false'}"${disabled ? ' disabled' : ''}
+                data-action="toggle-response-section" data-key="${escapeHtml(key)}">
+            <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
+            <span class="section-head__label">${escapeHtml(label)}</span>
+            <span class="section-bar" aria-hidden="true">${segments}</span>
+            <span class="section-head__summary">${escapeHtml(summary)}</span>
+        </button>`;
 }
 
 /**
@@ -4413,6 +4457,8 @@ function pendingStatusFor(id) {
 // renderResponses()). Geleert in resetResponsesTab().
 const responsesOpenComments = new Set();
 const responsesOpenNames = new Set();
+// Aufgeklappte Abschnitte in "Wer hat geantwortet?": `${appointmentId}:${stage}:${section.key}`.
+const responsesOpenSections = new Set();
 
 // Aufgeklappte Karten der Terminliste (seit 1.10.0). Anfangs ist alles
 // zugeklappt; ein Neuaufbau durch renderResponses() -- etwa nach einem
@@ -4439,6 +4485,7 @@ function resetResponsesTab() {
     responsesPending.clear();
     responsesOpenComments.clear();
     responsesOpenNames.clear();
+    responsesOpenSections.clear();
     responsesExpanded.clear();
     responsesSaveFailed.clear();
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
@@ -4816,12 +4863,19 @@ function responseNamesHtml(members, appointmentId) {
         hint = `<p class="list-grouping-hint">${text} in mehreren Abschnitten.</p>`;
     }
 
+    const sectionKey = section => `${appointmentId}:${stage}:${section.key}`;
+    const grouped = stage === 'group' || stage === 'subgroup';
+    const allOpen = grouped && sections.every(section => responsesOpenSections.has(sectionKey(section)));
+    const toggleAll = grouped && sections.length > 0
+        ? `<button type="button" class="list-grouping__toggle-all" data-action="toggle-all-response-sections" data-card-id="${appointmentId}">${allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}</button>`
+        : '';
+
     const groups = sections.map(section => {
         const label = section.label === null ? 'Alle Mitglieder' : section.label;
-        const groupCounts = { yes: 0, maybe: 0, no: 0, open: 0 };
-        section.members.forEach(m => groupCounts[m.status || 'open']++);
+        // Alphabetisch gibt es nur einen Abschnitt ohne Kopfzeile -- immer offen.
+        const expanded = !grouped || responsesOpenSections.has(sectionKey(section));
 
-        const chips = RESPONSE_NAME_GROUPS.map(g => {
+        const chips = !expanded ? '' : RESPONSE_NAME_GROUPS.map(g => {
             const inStatus = section.members.filter(m => (m.status || null) === g.status);
             if (inStatus.length === 0) return '';
 
@@ -4838,17 +4892,49 @@ function responseNamesHtml(members, appointmentId) {
             return shown.map(m => responseNameChip(m, g.status)).join('') + moreChip;
         }).join('');
 
+        // Die Zahlen der Kopfzeile kommen aus allen Mitgliedern des Abschnitts,
+        // auch zugeklappt (der Balken ist die Zusammenfassung).
+        const heading = grouped
+            ? groupingSectionHeaderHtml({ key: sectionKey(section), label, counts: groupingStatusCounts(section.members), expanded })
+            : '';
+
         return `<div class="response-name-group">
-            <div class="response-name-group__heading"><span class="response-name-group__label">${escapeHtml(label)}</span> · <span class="response-count-row">${responseCountChipsHtml(groupCounts)}</span></div>
-            <div class="response-name-chips">${chips}</div>
+            ${heading}
+            ${chips ? `<div class="response-name-chips">${chips}</div>` : ''}
         </div>`;
     }).join('');
 
     return `<details class="response-names"${responsesOpenNames.has(appointmentId) ? ' open' : ''} data-appointment-id="${appointmentId}">
         <summary><span class="response-summary-label">Wer hat geantwortet?</span></summary>
-        ${responsesGroupingSwitcher(stages, stage)}${hint}
+        ${responsesGroupingSwitcher(stages, stage)}${toggleAll}${hint}
         <div class="response-names__body">${groups}</div>
     </details>`;
+}
+
+/** Fokus nach dem Neuzeichnen zurück auf den gedrückten Knopf (Tastaturbedienung). */
+function renderResponsesKeepingFocus(selector) {
+    renderResponses(null);
+    document.getElementById('responsesList')?.querySelector(selector)?.focus();
+}
+
+/** Klick auf eine Kopfzeile: Abschnitt auf- bzw. zuklappen. */
+function toggleResponseSection(key) {
+    responsesOpenSections.has(key) ? responsesOpenSections.delete(key) : responsesOpenSections.add(key);
+    renderResponsesKeepingFocus(`.section-head[data-key="${CSS.escape(key)}"]`);
+}
+
+/** Klick auf "Alle aufklappen/zuklappen" einer Karte: gleiche Stufe wie die Anzeige. */
+function toggleAllResponseSections(appointmentId) {
+    const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === appointmentId);
+    if (!item || !item.members) return;
+    const stages = groupingAvailableStages(item.members);
+    const stage  = groupingStored(GROUPING_KEY_RESPONSES, stages, 'group');
+    if (stage !== 'group' && stage !== 'subgroup') return;
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const keys = groupingSections(item.members, stage, emptyLabel).map(section => `${appointmentId}:${stage}:${section.key}`);
+    const allOpen = keys.every(key => responsesOpenSections.has(key));
+    keys.forEach(key => allOpen ? responsesOpenSections.delete(key) : responsesOpenSections.add(key));
+    renderResponsesKeepingFocus(`.list-grouping__toggle-all[data-card-id="${appointmentId}"]`);
 }
 
 /** Umschalter-Klick (Spec 6.2): merkt die Wahl und baut die Termine-Liste neu
@@ -4948,38 +5034,6 @@ function excuseSectionHtml(item) {
         </div>`;
 }
 
-/**
- * Besetzung je Register fuer Verwalter (Spec 2026-10-01, 5.2). Der Server
- * schickt `staffing` nur an Verwalter; ohne das Feld bleibt der Block weg.
- * Gleiche Darstellung wie staffingHtml() in public/js/modules/responses.js --
- * die Zahlen kommen aus responsesStaffing(), hier wird nichts gezaehlt.
- */
-function staffingHtml(staffing) {
-    if (!Array.isArray(staffing) || staffing.length === 0) return '';
-
-    const word = subgroupLabel();
-    const num = value => escapeHtml(String(Number(value)));
-    const rows = staffing.map(s => {
-        const name = s.group_id === null ? `Ohne ${word}` : s.name;
-        const details = [];
-        if (Number(s.maybe) > 0) details.push(`${Number(s.maybe)} unsicher`);
-        if (Number(s.no) > 0) details.push(`${Number(s.no)} ${Number(s.no) === 1 ? 'Absage' : 'Absagen'}`);
-        if (Number(s.open) > 0) details.push(`${Number(s.open)} offen`);
-        const shared = Number(s.shared) > 0 ? ` (davon ${Number(s.shared)} mehrfach eingeteilt)` : '';
-
-        return `<tr>
-            <th scope="row">${escapeHtml(name)}</th>
-            <td class="staffing-count">${num(s.yes)} von ${num(s.expected)}</td>
-            <td class="staffing-details">${escapeHtml(details.join(' · '))}${escapeHtml(shared)}</td>
-        </tr>`;
-    }).join('');
-
-    return `<section class="staffing" aria-label="Besetzung">
-        <h4 class="staffing__title">Besetzung</h4>
-        <table class="staffing-table"><tbody>${rows}</tbody></table>
-    </section>`;
-}
-
 function responseCardHtml(item) {
     const apt = item.appointment;
     const id = Number(apt.appointment_id);
@@ -5060,7 +5114,6 @@ function responseCardHtml(item) {
                         <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>${saveLabel}</button>
                     </div>
                 </details>`}
-                ${staffingHtml(item.staffing)}
                 ${names}
                 ${offline && !started ? '<div class="response-card__offline">Ohne Netz ist keine Rückmeldung möglich.</div>' : ''}
             </div>

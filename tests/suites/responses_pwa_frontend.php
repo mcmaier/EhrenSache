@@ -123,7 +123,10 @@ test('PWA: "Wer hat geantwortet?" gliedert ueber groupingSections() (Vorgabe Gru
 
     assertTrue(str_contains($body, 'groupingSections('), 'responseNamesHtml() bildet die Abschnitte nicht ueber groupingSections()');
     assertTrue(str_contains($body, "'Ohne Gruppe'"), 'Mitglieder ohne Gruppe landen nicht in "Ohne Gruppe"');
-    assertTrue(str_contains($body, 'escapeHtml(label)'), 'Gruppenname wird nicht maskiert');
+    // Der Name geht seit der Kopfzeile ueber groupingSectionHeaderHtml(), die ihn maskiert.
+    assertTrue(str_contains($body, 'groupingSectionHeaderHtml({ key: sectionKey(section), label,'), 'Gruppenname geht nicht an die Kopfzeile');
+    $hs = strpos($js, 'function groupingSectionHeaderHtml');
+    assertTrue($hs !== false && str_contains(substr($js, $hs, 1500), 'escapeHtml(label)'), 'Gruppenname wird nicht maskiert');
 });
 
 test('PWA: Namens-Chips tragen Status-Icon und eigene Farbklasse, nicht nur Farbe', function () use ($rspRoot) {

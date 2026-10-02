@@ -3002,15 +3002,61 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     margin-bottom: 4px;
 }
 
-/* Besetzung je Register (nur Verwalter), steht ueber den Namenslisten. */
-.staffing { margin: 8px 0 12px; }
-.staffing__title { margin: 0 0 4px; font-size: 13px; }
-.staffing-table { border-collapse: collapse; width: 100%; font-size: 12px; }
-.staffing-table th,
-.staffing-table td { padding: 2px 8px 2px 0; text-align: left; vertical-align: baseline; }
-.staffing-table th { font-weight: 600; color: var(--text); }
-.staffing-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.staffing-details { color: var(--text-light); }
+/* Kopfzeile eines zuklappbaren Abschnitts mit Balken (wie .section-head im
+   Dashboard, components/modals.css). Darf unter ~480px umbrechen. */
+.section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    width: 100%;
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+.section-head:disabled { cursor: default; }
+.section-head:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+.section-head__chevron { flex: 0 0 1em; }
+.section-head__label { color: var(--text); }
+.section-head__summary {
+    margin-left: auto;
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+}
+.section-bar {
+    display: flex;
+    flex: 1 1 80px;
+    min-width: 60px;
+    max-width: 200px;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--border);
+}
+.section-bar__seg { height: 100%; }
+.section-bar__seg--yes   { background: var(--success); }
+.section-bar__seg--maybe { background: var(--warning); }
+.section-bar__seg--no    { background: var(--error); }
+.section-bar__seg--open  { background: var(--text-light); }
+.list-grouping__toggle-all {
+    border: 0;
+    background: none;
+    color: var(--primary-color);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 0;
+    text-decoration: underline;
+}
+.list-grouping__toggle-all:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 
 /* Chips statt Bullet-Liste (Nutzer-Feedback: Punkte sassen zu weit links am
    Kartenrand) -- keine ul/li mehr, daher auch kein list-style noetig. */
