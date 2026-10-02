@@ -549,8 +549,8 @@ function renderMemberGroups() {
                    ${currentMemberGroups.includes(group.group_id) ? 'checked' : ''}>
             <span class="group-choice-text">
                 <strong>${escapeHtml(group.group_name)}</strong>
-                ${group.is_default ? ' <span class="status-badge status-approved group-sub-badge">Standard</span>' : ''}
-                ${group.description ? `<br><small class="group-choice-note">${escapeHtml(group.description)}</small>` : ''}
+                ${group.is_default ? ' <span class="status-badge status-approved badge-small">Standard</span>' : ''}
+                ${group.description ? `<small class="group-choice-note">${escapeHtml(group.description)}</small>` : ''}
             </span>
         </label>`;
     }).join('');

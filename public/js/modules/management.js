@@ -114,7 +114,7 @@ const tbody = document.getElementById('groupsTableBody');
             : '<span class="type-badge">Nein</span>';
 
         const subgroupBadge = group.is_subgroup == 1
-            ? ` <span class="status-badge status-approved group-sub-badge">${escapeHtml(subgroupLabel())}</span>`
+            ? ` <span class="status-badge status-approved badge-small">${escapeHtml(subgroupLabel())}</span>`
             : '';
 
         const unassignedHint = kind === 'unassigned'
@@ -158,7 +158,7 @@ export async function openGroupModal(groupId = null) {
     const membersGroup = document.getElementById('groupMembersGroup');
 
     await loadMembers();
-    await loadGroups();
+    await loadGroups(true);
 
     if (groupId) {
         title.textContent = 'Gruppe bearbeiten';
@@ -381,6 +381,11 @@ export async function deleteGroup(groupId) {
             // gilt fuer alle Jahre.
             await invalidateCache('appointments');
 
+            // Auch subgroup_parents und appointment_type_groups fallen per CASCADE
+            // weg: Anwesenheiten (Gliederung) und Terminarten (Gruppenanzeige).
+            await invalidateCache('records');
+            await invalidateCache('types');
+
             // Die Mitgliederliste zeigt die Gruppen je Mitglied (alle Jahre).
             await invalidateCache('members');
             await showGroupSection(true);
@@ -602,6 +607,7 @@ function renderTypeGroups(selectedGroups) {
         return ids[0];
     };
 
+    const registerNote = 'nur für eigene Termine, z. B. Registerprobe';
     const choice = (group, sub, extraLine) => `
         <label class="group-choice${sub ? ' group-choice--sub' : ''}">
             <input type="checkbox"
@@ -610,6 +616,7 @@ function renderTypeGroups(selectedGroups) {
                    ${selectedIds.includes(group.group_id) ? 'checked' : ''}>
             <span class="group-choice-name">${escapeHtml(group.group_name)}</span>
             ${group.description ? `<small class="group-choice-note">${escapeHtml(group.description)}</small>` : ''}
+            ${sub ? `<small class="group-choice-note">${escapeHtml(registerNote)}</small>` : ''}
             ${extraLine ? `<small class="group-choice-note">${escapeHtml(extraLine)}</small>` : ''}
         </label>
     `;

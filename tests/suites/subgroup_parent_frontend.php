@@ -69,6 +69,10 @@ test('Terminart-Auswahl ordnet Register unter ihrer ersten Gruppe ein', function
     $render = spfBody($js, 'function renderTypeGroups', "\n}");
     assertTrue(str_contains($render, 'group-choice--sub'), 'renderTypeGroups() setzt group-choice--sub nicht');
     assertTrue(str_contains($render, 'parent_group_ids'), 'renderTypeGroups() liest parent_group_ids nicht');
+    assertTrue(str_contains($render, 'nur für eigene Termine, z. B. Registerprobe'),
+        'renderTypeGroups() zeigt die Unterzeile fuer Register nicht');
+    assertTrue(str_contains($js, "invalidateCache('types')") && str_contains($js, 'loadGroups(true)'),
+        'deleteGroup()/openGroupModal(): types verwerfen bzw. Gruppen neu laden fehlt');
     $css = (string) sourceCode($spfRoot . '/public/css/components/forms.css');
     assertTrue(str_contains($css, '.group-choice--sub'), 'forms.css: .group-choice--sub fehlt');
 });
