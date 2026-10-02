@@ -1252,8 +1252,8 @@ nicht in der Liste, also überlebt eine Zuordnung, die ein Besucher angelegt hat
 weil der Plan die Gruppen mit festen IDs neu anlegt, gilt sie danach wieder.
 
 **Erledigt:** `subgroup_parents` steht in `DEMO_TABLES` (vor `member_groups`), der Plan liefert
-über `buildSubgroupParents()` je Register seine Gruppen (alle: Aktive und Jugend, Klarinette
-zusätzlich Ehrenmitglieder, weil die Mitglieder 9–12 dort sitzen), `writePlan()` schreibt sie. Die
+über `buildSubgroupParents()` je Register seine Gruppen (alle: Aktive und Jugend; die Ehrenmitglieder 9–12
+spielen in keinem Register mit, damit ihre Termine nicht in die Registerstatistik zählen), `writePlan()` schreibt sie. Die
 Suiten `demo_seed_unit` und `demo_seed_cli` prüfen Zuordnung, Mitgliedschaftsregel, Leerungsliste
 und Schreiben. **Für die Release-Sitzung:** `DEMO_MIN_SCHEMA` (`private/demo/seed.php`) steht noch
 auf 1.11.0; der Generator braucht jetzt die Tabelle und muss auf den Schemastand der Migration

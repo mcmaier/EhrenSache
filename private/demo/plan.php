@@ -181,16 +181,16 @@ const DEMO_SUBGROUP_IDS = [5, 6, 7, 8, 9];
  * Spec 2026-10-02-register-gruppe-besetzung). Ohne diese Zuordnung gäbe es in der
  * Demo weder Registerstatistik noch Besetzung (OI-118).
  *
- * Aktive und Jugend spielen gemeinsam; Klarinette hat zusätzlich Ehrenmitglieder
- * (Mitglieder 9–12 sind dort eingeordnet). Jedes Registermitglied muss in
- * mindestens einer dieser Gruppen stehen — das prüft die Suite demo_seed_unit.
- * Flöte: Jugend (Mitglieder 3–8) und Aktive (Mitglied 16 als Zweitregister).
+ * Aktive und Jugend spielen gemeinsam. Ehrenmitglieder (ohne Dienstpflicht) sind
+ * bewusst kein Register-Elternteil und spielen in keinem Register mit — sonst
+ * zählten ihre Termine in der Registerstatistik. Jedes Registermitglied muss in
+ * mindestens einer Gruppe seines Registers stehen — das prüft die Suite demo_seed_unit.
  */
 function buildSubgroupParents(): array
 {
     $parentsOf = [
         5 => [1, 2],       // Flöte: Aktive, Jugend
-        6 => [1, 2, 4],    // Klarinette: Aktive, Jugend, Ehrenmitglieder
+        6 => [1, 2],       // Klarinette
         7 => [1, 2],       // Trompete
         8 => [1, 2],       // Tenorhorn
         9 => [1, 2],       // Schlagzeug
@@ -425,9 +425,21 @@ function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'):
     // ("Ohne " . subgroup_label) im Demo-Bestand leer und ließe sich nie mit
     // echten Daten zeigen -- genau der Fall, den Abschnitt 3.2 der
     // Spezifikation als eigenen Abschnitt vorsieht.
+    //
+    // Ebenfalls ohne Register: die Ehrenmitglieder (Mitglieder 9–12, Gruppe 4,
+    // "ohne Dienstpflicht"). Sie gehören keiner Gruppe eines Registers an; ein
+    // Register verlangt aber Mitgliedschaft in einer seiner Gruppen. Die Zuordnung
+    // der Reihe nach würde sie sonst in die Klarinette setzen.
     $noSubgroupMemberIds = [1, 2];
+    $honoraryIds = [];
+    foreach ($assignments as $a) {
+        if ($a['group_id'] === 4) {
+            $honoraryIds[] = $a['member_id'];
+        }
+    }
     foreach ($members as $member) {
-        if (in_array($member['member_id'], $noSubgroupMemberIds, true)) {
+        if (in_array($member['member_id'], $noSubgroupMemberIds, true)
+            || in_array($member['member_id'], $honoraryIds, true)) {
             continue;
         }
         $registerIndex = intdiv($member['member_id'] - 1, 8);

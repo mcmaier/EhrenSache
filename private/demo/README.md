@@ -110,10 +110,10 @@ Mitglied **M001** (hinter `user@`) trägt unabhängig von der Saat die öffentli
 
 40 Mitglieder in vier Gruppen (Aktive, Jugend, Vorstandschaft, Ehrenmitglieder), davon drei
 mit beendeter Mitgliedschaft und 16 mit Stations-PIN (15 gewürfelt, dazu M001 mit der öffentlichen) · fünf Register als Untergruppe markiert
-(Flöte, Klarinette, Trompete, Tenorhorn, Schlagzeug, in dieser `sort_order`), 38 der 40
-Mitglieder darin (Flöte 6, die übrigen vier Register je 8), vier davon zusätzlich in einem
-zweiten Register, zwei Mitglieder bewusst ohne Register — damit der Sammelabschnitt der
-Gliederung auch mit echten Daten zu sehen ist · jedes Register gehört zu Gruppen (Aktive und Jugend, Klarinette zusätzlich Ehrenmitglieder; Tabelle `subgroup_parents`), damit Registerstatistik und Besetzung Daten zeigen · vier Terminarten und rund 135 Termine über
+(Flöte, Klarinette, Trompete, Tenorhorn, Schlagzeug, in dieser `sort_order`), 34 der 40
+Mitglieder darin (Flöte 6, Klarinette 5, Trompete, Tenorhorn und Schlagzeug je 8), vier davon zusätzlich in einem
+zweiten Register, sechs Mitglieder bewusst ohne Register (zwei Jugendliche, die vier Ehrenmitglieder) — damit der Sammelabschnitt der
+Gliederung auch mit echten Daten zu sehen ist · jedes Register gehört zu Gruppen (Aktive und Jugend; Tabelle `subgroup_parents`), damit Registerstatistik und Besetzung Daten zeigen · vier Terminarten und rund 135 Termine über
 zwölf Monate rückwärts und fünf bis sechs Monate vorwärts, Proben und Vorstandssitzung als
 Terminserien (siehe unten) · Bundesland Baden-Württemberg für die Feiertage
 (`holiday_region = BW`) · rund 2200 Anwesenheiten mit gestreuter Quote
