@@ -74,8 +74,14 @@ test('Dashboard: Kopfzeile ist ein Knopf mit aria-expanded, darueber "Alle aufkl
     assertTrue(str_contains($head, 'aria-expanded'), 'aria-expanded fehlt');
     assertTrue(str_contains($head, 'toggle-response-section'), 'Aktion toggle-response-section fehlt');
     assertTrue(str_contains($head, 'escapeHtml(label)'), 'Bezeichnung wird nicht maskiert');
+    // Zusammenfassung: nur "n von m" als Text, Rest als Icon-Chips; Vorlesetext im aria-label
+    assertTrue(str_contains($head, 'chipsHtml'), 'Kopfzeile nimmt die Chips nicht entgegen');
+    assertTrue(str_contains($head, 'aria-label=') && str_contains($head, 'zugesagt') && str_contains($head, 'ohne Antwort'), 'aria-label mit vollem Satz fehlt');
+    assertTrue(!str_contains($head, ' offen`'), 'Alter Fliesstext "n offen" steht noch in der Kopfzeile');
 
     $js = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
+    assertTrue(substr_count($js, 'chipsHtml: responseChipsHtml(') >= 2, 'Beide Aufrufer muessen responseChipsHtml() uebergeben');
+    assertTrue(preg_match('/list-grouping__toggle-all" data-action="toggle-all-response-sections"/', $js) === 1 && str_contains($js, 'list-grouping__btn list-grouping__toggle-all'), 'Alle-aufklappen ist kein Knopf im Stil von list-grouping__btn');
     assertTrue(str_contains($js, 'data-action="toggle-all-response-sections"'), 'Knopf "Alle aufklappen" fehlt');
     assertTrue(str_contains($js, "'toggle-response-section':"), 'Aktion toggle-response-section nicht registriert');
     assertTrue(str_contains($js, "'toggle-all-response-sections':"), 'Aktion toggle-all-response-sections nicht registriert');
@@ -144,6 +150,9 @@ test('App: Abschnitte mit Kopfzeile, Zustand im Set, "Alle aufklappen" je Karte'
     assertTrue(str_contains($head, 'section-head') && str_contains($head, 'section-bar'), 'Klassen section-head/section-bar fehlen');
     assertTrue(str_contains($head, 'escapeHtml(label)'), 'Bezeichnung wird nicht maskiert');
     assertTrue(preg_match('/section-bar"[^>]*aria-hidden="true"/', $head) === 1, 'Balken muss aria-hidden sein');
+    assertTrue(str_contains($head, 'responseCountChipsHtml('), 'PWA-Kopfzeile nutzt responseCountChipsHtml() nicht');
+    assertTrue(str_contains($head, 'aria-label=') && str_contains($head, 'zugesagt') && str_contains($head, 'ohne Antwort'), 'aria-label mit vollem Satz fehlt');
+    assertTrue(!str_contains($head, ' offen`'), 'Alter Fliesstext "n offen" steht noch in der Kopfzeile');
     assertTrue(!str_contains($head, 'role='), 'Balken traegt keine role');
     assertTrue(str_contains(stFunctionBody($js, 'groupingStatusCounts'), "'maybe'"), 'groupingStatusCounts fehlt');
 

@@ -622,29 +622,28 @@ function groupingStatusCounts(members) {
 
 /**
  * Kopfzeile eines zuklappbaren Abschnitts (Spec 2026-10-02, Abschnitt 6):
- * Knopf mit Name, Balken und "2 von 5 · 1 unsicher · 2 offen". Absichtlich
+ * Knopf mit Name, Balken, "2 von 5" und Icon-Chips (Vollsatz im aria-label). Absichtlich
  * gleich gehalten mit groupingSectionHeaderHtml() in grouping.js. Die Aktion
  * steht als Literal im Markup, der Schlüssel in data-key; die Breiten der
  * Balkenteile sind Zahlen und gehen über toFixed() ins style-Attribut.
  */
 function groupingSectionHeaderHtml({ key, label, counts, expanded, disabled = false }) {
     const total = counts.yes + counts.maybe + counts.no + counts.open;
-    const details = [];
-    if (counts.maybe > 0) details.push(`${counts.maybe} unsicher`);
-    if (counts.no > 0) details.push(`${counts.no} ${counts.no === 1 ? 'Absage' : 'Absagen'}`);
-    if (counts.open > 0) details.push(`${counts.open} offen`);
-    const summary = [`${counts.yes} von ${total}`, ...details].join(' · ');
+    // Vorlesetext: Die Icon-Chips sind aria-hidden bzw. nur Symbole, der Knopf
+    // bekommt deshalb den vollen Satz als aria-label.
+    const spoken = `${label}: ${counts.yes} von ${total} zugesagt, ${counts.maybe} unsicher, `
+        + `${counts.no} ${counts.no === 1 ? 'Absage' : 'Absagen'}, ${counts.open} ohne Antwort`;
     const segments = total === 0 ? '' : ['yes', 'maybe', 'no', 'open']
         .filter(k => counts[k] > 0)
         .map(k => `<span class="section-bar__seg section-bar__seg--${k}" style="width:${(counts[k] / total * 100).toFixed(2)}%"></span>`)
         .join('');
 
-    return `<button type="button" class="section-head" aria-expanded="${expanded ? 'true' : 'false'}"${disabled ? ' disabled' : ''}
+    return `<button type="button" class="section-head" aria-label="${escapeHtml(spoken)}" aria-expanded="${expanded ? 'true' : 'false'}"${disabled ? ' disabled' : ''}
                 data-action="toggle-response-section" data-key="${escapeHtml(key)}">
             <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
             <span class="section-head__label">${escapeHtml(label)}</span>
             <span class="section-bar" aria-hidden="true">${segments}</span>
-            <span class="section-head__summary">${escapeHtml(summary)}</span>
+            <span class="section-head__summary" aria-hidden="true">${counts.yes} von ${total} <span class="response-count-row">${responseCountChipsHtml(counts, ['yes'])}</span></span>
         </button>`;
 }
 
@@ -4654,8 +4653,8 @@ function responseChipHtml(item, deadlinePassed) {
  * optisch gleich bleiben. Die Summary von "Wer hat geantwortet?" traegt
  * bewusst keine eigene Zaehlung mehr -- das waere dieselbe Gesamtzahl ein
  * zweites Mal auf derselben Karte (Nutzer-Feedback). */
-function responseCountChipsHtml(counts) {
-    return RESPONSE_NAME_GROUPS.map(g =>
+function responseCountChipsHtml(counts, skip = []) {
+    return RESPONSE_NAME_GROUPS.filter(g => !skip.includes(g.key)).map(g =>
         `<span class="response-count-chip response-count-chip--${g.key}${counts[g.key] === 0 ? ' is-zero' : ''}">${g.icon} ${counts[g.key]}</span>`
     ).join('');
 }
@@ -4869,7 +4868,7 @@ function responseNamesHtml(members, appointmentId) {
     const grouped = stage === 'group' || stage === 'subgroup';
     const allOpen = grouped && sections.every(section => responsesOpenSections.has(sectionKey(section)));
     const toggleAll = grouped && sections.length > 0
-        ? `<button type="button" class="list-grouping__toggle-all" data-action="toggle-all-response-sections" data-card-id="${appointmentId}">${allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}</button>`
+        ? `<button type="button" class="list-grouping__btn list-grouping__toggle-all" data-action="toggle-all-response-sections" data-card-id="${appointmentId}">${allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}</button>`
         : '';
 
     const groups = sections.map(section => {

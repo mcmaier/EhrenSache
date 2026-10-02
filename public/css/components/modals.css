@@ -605,7 +605,7 @@
 .section-head:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 .section-head__chevron { flex: 0 0 1em; }
 .section-head__label { color: var(--text-dark); }
-.section-head__summary { color: var(--text-medium); font-weight: 400; font-size: 0.9em; white-space: nowrap; margin-left: auto; }
+.section-head__summary { display: inline-flex; align-items: center; gap: var(--spacing-sm); color: var(--text-medium); font-weight: 400; font-size: 0.9em; white-space: nowrap; margin-left: auto; }
 .section-bar {
     display: flex; flex: 1 1 80px; min-width: 60px; max-width: 200px; height: 8px;
     border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-gray);
@@ -616,8 +616,8 @@
 .section-bar__seg--no    { background: var(--danger-color); }
 .section-bar__seg--open  { background: var(--text-light); }
 .list-grouping__toggle-all {
-    border: 0; background: none; color: var(--primary-color); font: inherit;
-    cursor: pointer; padding: var(--spacing-xs) 0; text-decoration: underline;
+    /* Kleiner Zweitknopf im Stil von .list-grouping__btn (components/buttons.css) */
+    padding: 3px 10px; font-size: 12px; margin: var(--spacing-xs) 0;
 }
 .list-grouping__toggle-all:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 /* Segmentgruppe .response-filter: siehe components/buttons.css */

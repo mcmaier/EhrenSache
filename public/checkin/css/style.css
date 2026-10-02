@@ -3010,6 +3010,9 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
 .section-head__chevron { flex: 0 0 1em; }
 .section-head__label { color: var(--text); }
 .section-head__summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     margin-left: auto;
     color: var(--text-light);
     font-size: 12px;
@@ -3031,16 +3034,6 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
 .section-bar__seg--maybe { background: var(--warning); }
 .section-bar__seg--no    { background: var(--error); }
 .section-bar__seg--open  { background: var(--text-light); }
-.list-grouping__toggle-all {
-    border: 0;
-    background: none;
-    color: var(--primary-color);
-    font: inherit;
-    font-size: 13px;
-    cursor: pointer;
-    padding: 4px 0;
-    text-decoration: underline;
-}
 .list-grouping__toggle-all:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 
 /* Chips statt Bullet-Liste (Nutzer-Feedback: Punkte sassen zu weit links am
@@ -3121,6 +3114,15 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
 
 .list-grouping__btn:hover {
     opacity: 0.8;
+}
+
+/* "Alle aufklappen": kleiner Zweitknopf im Stil von .list-grouping__btn, aber
+   nur so breit wie sein Text (steht allein, nicht in der Segmentleiste). */
+.list-grouping__toggle-all {
+    flex: none;
+    padding: 4px 10px;
+    font-size: 12px;
+    margin: 4px 0;
 }
 
 .list-grouping__btn.is-active {

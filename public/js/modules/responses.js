@@ -83,8 +83,8 @@ export function responseSummaryTitle(summary) {
  * Chip-Gruppe der Ampel (Zusage/Unsicher/Absage/Ohne Antwort). `large` schaltet
  * die beschriftete Modal-Variante ein (Terminliste bleibt bei Icon + Zahl).
  */
-export function responseChipsHtml(summary, { large = false } = {}) {
-    const chips = CHIP_ORDER.map(key => {
+export function responseChipsHtml(summary, { large = false, skip = [] } = {}) {
+    const chips = CHIP_ORDER.filter(key => !skip.includes(key)).map(key => {
         const count = Number(summary[key] ?? 0);
         const zero = count === 0 ? ' is-zero' : '';
         const label = large ? `<span class="response-chip__label">${RESPONSE_LABELS[key]}</span>` : '';
@@ -433,7 +433,8 @@ function managerTableHtml(data) {
         const counts = sectionCounts.get(section.key) ?? groupingStatusCounts(section.members);
         const expanded = isSectionExpanded(section.key);
         const groupRow = `<tr class="response-group-row"><td colspan="${colspan}">${groupingSectionHeaderHtml({
-            key: section.key, label: section.label, counts, expanded, disabled: currentFilter !== 'all' })}</td></tr>`;
+            key: section.key, label: section.label, counts, expanded, disabled: currentFilter !== 'all',
+            chipsHtml: responseChipsHtml(counts, { skip: ['yes'] }) })}</td></tr>`;
         return groupRow + (expanded ? section.members.map(m => managerMemberRowHtml(m, started)).join('') : '');
     }).join('');
 
@@ -484,7 +485,7 @@ function sectionKeys(members, stage, emptyLabel) {
 function toggleAllSectionsHtml(stage, keys) {
     if (stage === 'alpha' || keys.length === 0 || currentFilter !== 'all') return '';
     const allOpen = keys.every(isSectionExpanded);
-    return `<button type="button" class="list-grouping__toggle-all" data-action="toggle-all-response-sections">${allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}</button>`;
+    return `<button type="button" class="list-grouping__btn list-grouping__toggle-all" data-action="toggle-all-response-sections">${allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}</button>`;
 }
 
 /** Klick auf "Alle aufklappen/zuklappen": gleiche Stufe wie die Anzeige. */
@@ -556,7 +557,8 @@ function namesListHtml(members) {
         const expanded = isSectionExpanded(section.key);
         return `<div class="response-name-group">
             ${groupingSectionHeaderHtml({ key: section.key, label: section.label,
-                counts: groupingStatusCounts(section.members), expanded, disabled: currentFilter !== 'all' })}
+                counts: groupingStatusCounts(section.members), expanded, disabled: currentFilter !== 'all',
+                chipsHtml: responseChipsHtml(groupingStatusCounts(section.members), { skip: ['yes'] }) })}
             ${expanded ? `<div class="response-name-chips">${chipsHtml()}</div>` : ''}
         </div>`;
     }).join('');

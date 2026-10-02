@@ -125,27 +125,28 @@ export function groupingStatusCounts(members) {
 
 /**
  * Kopfzeile eines zuklappbaren Abschnitts (Spec 2026-10-02, Abschnitt 6):
- * Knopf mit Name, Balken und "2 von 5 · 1 unsicher · 2 offen". Die Breiten
+ * Knopf mit Name, Balken, "2 von 5" und Icon-Chips (chipsHtml, vom Aufrufer
+ * mit responseChipsHtml() gebaut -- grouping.js darf responses.js nicht
+ * importieren, das waere ein Zyklus; der Vollsatz steht im aria-label). Die Breiten
  * der Balkenteile sind Zahlen -- sie gehen über toFixed() ins style-Attribut.
  * Der Aufrufer maskiert nichts vorher; hier wird alles maskiert.
  */
-export function groupingSectionHeaderHtml({ key, label, counts, expanded, disabled = false }) {
+export function groupingSectionHeaderHtml({ key, label, counts, expanded, disabled = false, chipsHtml = '' }) {
     const total = counts.yes + counts.maybe + counts.no + counts.open;
-    const details = [];
-    if (counts.maybe > 0) details.push(`${counts.maybe} unsicher`);
-    if (counts.no > 0) details.push(`${counts.no} ${counts.no === 1 ? 'Absage' : 'Absagen'}`);
-    if (counts.open > 0) details.push(`${counts.open} offen`);
-    const summary = [`${counts.yes} von ${total}`, ...details].join(' · ');
+    // Vorlesetext: Die Icon-Chips sind aria-hidden bzw. nur Symbole, der Knopf
+    // bekommt deshalb den vollen Satz als aria-label.
+    const spoken = `${label}: ${counts.yes} von ${total} zugesagt, ${counts.maybe} unsicher, `
+        + `${counts.no} ${counts.no === 1 ? 'Absage' : 'Absagen'}, ${counts.open} ohne Antwort`;
     const segments = total === 0 ? '' : ['yes', 'maybe', 'no', 'open']
         .filter(k => counts[k] > 0)
         .map(k => `<span class="section-bar__seg section-bar__seg--${k}" style="width:${(counts[k] / total * 100).toFixed(2)}%"></span>`)
         .join('');
 
-    return `<button type="button" class="section-head" aria-expanded="${expanded ? 'true' : 'false'}"${disabled ? ' disabled' : ''}
+    return `<button type="button" class="section-head" aria-label="${escapeHtml(spoken)}" aria-expanded="${expanded ? 'true' : 'false'}"${disabled ? ' disabled' : ''}
                 data-action="toggle-response-section" data-key="${escapeHtml(key)}">
             <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
             <span class="section-head__label">${escapeHtml(label)}</span>
             <span class="section-bar" aria-hidden="true">${segments}</span>
-            <span class="section-head__summary">${escapeHtml(summary)}</span>
+            <span class="section-head__summary" aria-hidden="true">${counts.yes} von ${total}${chipsHtml}</span>
         </button>`;
 }
