@@ -74,6 +74,7 @@ test('Dashboard: Kopfzeile ist ein Knopf mit aria-expanded, darueber "Alle aufkl
     assertTrue(str_contains($head, 'aria-expanded'), 'aria-expanded fehlt');
     assertTrue(str_contains($head, 'toggle-response-section'), 'Aktion toggle-response-section fehlt');
     assertTrue(str_contains($head, 'escapeHtml(label)'), 'Bezeichnung wird nicht maskiert');
+    assertTrue(str_contains($head, 'title="${escapeHtml(label)}"'), 'title mit vollem Namen fehlt');
     // Zusammenfassung: nur "n von m" als Text, Rest als Icon-Chips; Vorlesetext im aria-label
     assertTrue(str_contains($head, 'chipsHtml'), 'Kopfzeile nimmt die Chips nicht entgegen');
     assertTrue(str_contains($head, 'aria-label=') && str_contains($head, 'zugesagt') && str_contains($head, 'ohne Antwort'), 'aria-label mit vollem Satz fehlt');
@@ -149,6 +150,7 @@ test('App: Abschnitte mit Kopfzeile, Zustand im Set, "Alle aufklappen" je Karte'
     assertTrue(str_contains($head, 'data-action="toggle-response-section"'), 'Aktion als Literal im Markup fehlt');
     assertTrue(str_contains($head, 'section-head') && str_contains($head, 'section-bar'), 'Klassen section-head/section-bar fehlen');
     assertTrue(str_contains($head, 'escapeHtml(label)'), 'Bezeichnung wird nicht maskiert');
+    assertTrue(str_contains($head, 'title="${escapeHtml(label)}"'), 'title mit vollem Namen fehlt');
     assertTrue(preg_match('/section-bar"[^>]*aria-hidden="true"/', $head) === 1, 'Balken muss aria-hidden sein');
     assertTrue(str_contains($head, 'responseCountChipsHtml('), 'PWA-Kopfzeile nutzt responseCountChipsHtml() nicht');
     assertTrue(str_contains($head, 'aria-label=') && str_contains($head, 'zugesagt') && str_contains($head, 'ohne Antwort'), 'aria-label mit vollem Satz fehlt');

@@ -3008,7 +3008,17 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
 .section-head:disabled { cursor: default; }
 .section-head:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 .section-head__chevron { flex: 0 0 1em; }
-.section-head__label { color: var(--text); }
+.section-head__label {
+    /* Feste Spalte, damit der Balken in allen Kopfzeilen links gleich beginnt;
+       max-width verhindert Ueberlauf in sehr schmalen Fenstern (320px). */
+    flex: 0 0 7.5rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+}
 .section-head__summary {
     display: inline-flex;
     align-items: center;

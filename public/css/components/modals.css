@@ -604,7 +604,12 @@
 .section-head:disabled { cursor: default; color: inherit; }
 .section-head:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 .section-head__chevron { flex: 0 0 1em; }
-.section-head__label { color: var(--text-dark); }
+.section-head__label {
+    /* Feste Spalte, damit der Balken in allen Kopfzeilen links gleich beginnt */
+    flex: 0 0 10rem; max-width: 100%; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text-dark);
+}
 .section-head__summary { display: inline-flex; align-items: center; gap: var(--spacing-sm); color: var(--text-medium); font-weight: 400; font-size: 0.9em; white-space: nowrap; margin-left: auto; }
 .section-bar {
     display: flex; flex: 1 1 80px; min-width: 60px; max-width: 200px; height: 8px;

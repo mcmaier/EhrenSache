@@ -641,7 +641,7 @@ function groupingSectionHeaderHtml({ key, label, counts, expanded, disabled = fa
     return `<button type="button" class="section-head" aria-label="${escapeHtml(spoken)}" aria-expanded="${expanded ? 'true' : 'false'}"${disabled ? ' disabled' : ''}
                 data-action="toggle-response-section" data-key="${escapeHtml(key)}">
             <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
-            <span class="section-head__label">${escapeHtml(label)}</span>
+            <span class="section-head__label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
             <span class="section-bar" aria-hidden="true">${segments}</span>
             <span class="section-head__summary" aria-hidden="true">${counts.yes} von ${total} <span class="response-count-row">${responseCountChipsHtml(counts, ['yes'])}</span></span>
         </button>`;
