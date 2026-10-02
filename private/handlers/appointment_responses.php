@@ -36,7 +36,7 @@ function handleAppointmentResponses($db, $database, $method, $authUserId, $authU
     switch ($method) {
         case 'GET':
             if (isset($_GET['upcoming'])) {
-                responsesGetUpcoming($db, $database, $authMemberId, $now, $globalHours, isset($_GET['with_info']));
+                responsesGetUpcoming($db, $database, $authMemberId, $now, $globalHours, isset($_GET['with_info']), $isManager);
             } else {
                 responsesGetOne($db, $database, $isManager, $authMemberId, $now, $globalHours);
             }
@@ -75,7 +75,7 @@ function responsesQueryInt(string $key): ?int
     return (ctype_digit($raw) && (int) $raw > 0) ? (int) $raw : -1;
 }
 
-function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $globalHours, bool $withInfo = false): void
+function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $globalHours, bool $withInfo = false, bool $isManager = false): void
 {
     if ($memberId === null) {
         echo json_encode(['appointments' => []]);
@@ -88,7 +88,7 @@ function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $
         if ($apt !== null) {
             // Auch Admin und Manager bekommen hier die Sicht des Mitglieds:
             // Die Liste ist zum Antworten da, die Planung sitzt im Dashboard.
-            $items[] = responsesPayload($db, $database, $apt, false, $memberId, $now, $globalHours);
+            $items[] = responsesPayload($db, $database, $apt, false, $memberId, $now, $globalHours, $isManager);
         }
     }
 
@@ -128,7 +128,7 @@ function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string
         return;
     }
 
-    $payload = responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours);
+    $payload = responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours, $isManager);
 
     if (!$isManager && !$payload['expected']) {
         responsesFail(403, 'Für dieses Mitglied ist zu diesem Termin keine Rückmeldung vorgesehen');
@@ -149,7 +149,8 @@ function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string
  * @param ?int $viewerMemberId Mitglied, dessen Antwort als "own" erscheint
  * @param int $globalHours Globale Frist-Einstellung, einmal je Anfrage gelesen
  */
-function responsesPayload($db, $database, array $apt, bool $isManager, ?int $viewerMemberId, string $now, int $globalHours): array
+function responsesPayload($db, $database, array $apt, bool $isManager, ?int $viewerMemberId, string $now, int $globalHours,
+                          bool $withStaffing = false): array
 {
     $appointmentId = (int) $apt['appointment_id'];
     $hours = responseDeadlineHours($apt['response_deadline_hours'], (string) $globalHours);
@@ -251,6 +252,17 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
             'status'     => $responses[$id]['status'] ?? null,
         ], $expected, array_keys($expected)));
         $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds);
+    }
+
+    // Besetzung je Register (Spec 2026-10-01, 5.1) -- nur für Verwalter.
+    // Aus den erwarteten Mitgliedern mit ihren Untergruppen; die Namensliste
+    // muss dafür nicht in der Antwort stehen (Listenantwort der App).
+    if ($withStaffing) {
+        $staffMembers = array_map(static fn (int $id) => ['member_id' => $id], $expectedIds);
+        $payload['staffing'] = responsesStaffing(
+            groupsAttachToMembers($db, $database, $staffMembers, []),
+            $statusByMember
+        );
     }
 
     return $payload;
@@ -515,7 +527,7 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
     }
 
     // "own" traegt die Antwort des betroffenen Mitglieds, auch wenn ein Verwalter schrieb.
-    echo json_encode(responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours), JSON_UNESCAPED_UNICODE);
+    echo json_encode(responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours, $isManager), JSON_UNESCAPED_UNICODE);
 }
 
 function responsesDelete($db, $database, bool $isManager, ?int $authMemberId, string $now): void
