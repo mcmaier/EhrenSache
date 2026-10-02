@@ -26,14 +26,13 @@ Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
 **Nächste Umsetzung (Stand 2026-10-02):** noch nicht festgelegt.
 [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) ist am
 2026-10-02 zusammen mit der Besetzung je Register aus
-[FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht) gebaut, noch
-unveröffentlicht (Specs `2026-10-01-register-statistik-besetzung-design.md` und
+[FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht) gebaut, veröffentlicht
+mit 1.20.0 (Specs `2026-10-01-register-statistik-besetzung-design.md` und
 `2026-10-02-register-gruppe-besetzung-design.md`; Register gehören seither zu Gruppen). Dabei
 fiel [OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt) an und wurde
 behoben, [OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse) bleibt als bekannte Grenze offen.
-**Vor dem Release:**
-[OI-116](#oi-116--migrationsschritt-für-subgroup_parents-fehlt) (Priorität *hoch* — ohne
-Migrationsschritt fehlt bestehenden Installationen die Tabelle `subgroup_parents`) und
+Mit demselben Release erledigt:
+[OI-116](#oi-116--migrationsschritt-für-subgroup_parents-fehlt) (Migrationsschritt) und
 [OI-118](#oi-118--demo-generator-kennt-subgroup_parents-nicht) (Demo).
 
 **Berührungspunkte mit Feature-Ideen** (Vorschlag vom 2026-10-01, nicht entschieden) — Einträge
@@ -1202,8 +1201,14 @@ gültiges Gerätetoken und eine am Gerät angelernte Biometrie. Es geht um Daten
 ---
 
 ### OI-116 · Migrationsschritt für `subgroup_parents` fehlt
-**Priorität:** hoch — blockiert das Release · aufgenommen am 2026-10-02 (Zweig
+**Priorität:** — · **erledigt mit 1.20.0 (2026-10-02)** · aufgenommen am 2026-10-02 (Zweig
 `feat/register-statistik`, Spec `2026-10-02-register-gruppe-besetzung-design.md`, Abschnitt 8)
+
+**Umsetzung:** `private/migrations/1.19.0.php` ruft `subgroupParentMigrate()` auf, Manifest
+1.19.0 → 1.20.0. `tests/db/verify_schema_convergence.php` ist damit grün (52/52); gegen die
+Hauptdatenbank meldete die Migration die vier Register ohne Gruppe und änderte nichts. Der
+Release-Text beginnt mit „Nach dem Update: Register einmal ihren Gruppen zuordnen“.
+`DEMO_MIN_SCHEMA` steht auf 1.20.0. Der Text darunter ist der Stand vor der Umsetzung.
 
 Register gehören seit diesem Zweig zu Gruppen; die Zuordnung steht in der neuen Tabelle
 `subgroup_parents`. `private/setup/ehrensache_db.sql` legt sie für neue Installationen an, einen
@@ -1238,7 +1243,7 @@ Schritt grün.
 ---
 
 ### OI-118 · Demo-Generator kennt `subgroup_parents` nicht
-**Priorität:** — · **erledigt am 2026-10-02 — unveröffentlicht (Zweig `feat/register-statistik`)** ·
+**Priorität:** — · **erledigt am 2026-10-02 — veröffentlicht mit 1.20.0** ·
 aufgenommen am 2026-10-02
 
 `private/demo/plan.php` legt fünf Register an (Flöte, Klarinette, Trompete, Tenorhorn,
@@ -1255,9 +1260,8 @@ weil der Plan die Gruppen mit festen IDs neu anlegt, gilt sie danach wieder.
 über `buildSubgroupParents()` je Register seine Gruppen (alle: Aktive und Jugend; die Ehrenmitglieder 9–12
 spielen in keinem Register mit, damit ihre Termine nicht in die Registerstatistik zählen), `writePlan()` schreibt sie. Die
 Suiten `demo_seed_unit` und `demo_seed_cli` prüfen Zuordnung, Mitgliedschaftsregel, Leerungsliste
-und Schreiben. **Für die Release-Sitzung:** `DEMO_MIN_SCHEMA` (`private/demo/seed.php`) steht noch
-auf 1.11.0; der Generator braucht jetzt die Tabelle und muss auf den Schemastand der Migration
-angehoben werden, die `subgroup_parents` anlegt.
+und Schreiben. `DEMO_MIN_SCHEMA` (`private/demo/seed.php`) steht seit 1.20.0 auf 1.20.0, dem Schemastand,
+der `subgroup_parents` anlegt.
 
 **Nicht sicherheitsrelevant:** Es überleben nur Zuordnungen zwischen Gruppen-IDs, keine Texte.
 
@@ -2168,7 +2172,7 @@ ohne Zugang)“) und Druckbericht. Die Ampel-Chips der Terminliste bleiben ohne.
 ---
 
 ### OI-114 · Statistik zählte Termine vor Eintritt und nach Austritt
-**Priorität:** erledigt am 2026-10-02 — unveröffentlicht (Zweig `feat/register-statistik`) ·
+**Priorität:** erledigt am 2026-10-02 — veröffentlicht mit 1.20.0 ·
 gefunden am 2026-10-01 (beim Entwurf zu [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht))
 
 Die Statistik prüfte die Aktivität eines Mitglieds mit `getMemberActivityWhereYear()`:
@@ -2240,7 +2244,7 @@ Vorher die Praxis abwarten.
 ---
 
 ### OI-119 · CSV-Import zeigt die Folgen der Mitgliedschaftsregel nicht an
-**Priorität:** erledigt am 2026-10-02 (unveröffentlicht, Zweig `feat/register-statistik`) · aufgenommen am 2026-10-02
+**Priorität:** erledigt am 2026-10-02 — veröffentlicht mit 1.20.0 · aufgenommen am 2026-10-02
 
 Der Mitgliederimport wendet die Mitgliedschaftsregel für Register an und liefert `added_groups`
 und `group_warnings` in der Antwort (siehe `API.md`, „Import“). Die Oberfläche
@@ -2925,7 +2929,7 @@ damit es nicht erneut vorgeschlagen wird, ohne dass sich an den Gründen etwas g
 | Punkt | Grund | Wo es weitergeht |
 |---|---|---|
 | Erinnerung an offene Rückmeldungen | braucht einen Versandweg | FI-6 |
-| Besetzungsansicht mit Sollstärke | Untergruppen gibt es seit 1.8.0, die Sollstärke fehlt | FI-14 — Besetzung je Register seit 2026-10-02 gebaut (unveröffentlicht): zugeklappte Abschnitte mit Balken und „x von n“, n = Zahl der Erwarteten statt einer gepflegten Mindestbesetzung |
+| Besetzungsansicht mit Sollstärke | Untergruppen gibt es seit 1.8.0, die Sollstärke fehlt | FI-14 — Besetzung je Register seit 1.20.0: zugeklappte Abschnitte mit Balken und „x von n“, n = Zahl der Erwarteten statt einer gepflegten Mindestbesetzung |
 | Rolle „Gruppenleiter" | der Dirigent erhält ein Manager-Konto | FI-15 |
 | Kennzahl „Zusagetreue" je Person | Personenbewertung; die Zuverlässigkeit deckt die Frage ab | — |
 | Verlauf der Antwortänderungen | mehr Datenbestand, eigene Löschfrist, wäre wieder eine Personenauswertung | — |
@@ -3462,7 +3466,7 @@ dürfte.
 ---
 
 ### OI-70 · Statistik nach Untergruppe rechnet nicht
-**Priorität:** erledigt am 2026-10-02 — unveröffentlicht (Zweig `feat/register-statistik`) ·
+**Priorität:** erledigt am 2026-10-02 — veröffentlicht mit 1.20.0 ·
 aufgenommen am 2026-09-17
 
 **Erledigt am 2026-10-02** nach Spec
@@ -3496,8 +3500,8 @@ mit Filter auf ein Register über denselben Bereich. Nebenbei fiel die Jahresreg
 `statistics_subgroups_api` (Welt mit drei Gruppen und Registern mit zwei, keiner und einer
 Gruppe), `subgroup_parent_api` und die Gleichheitsprüfung `tests/db/verify_statistics_parity.php`
 — die meldet für gewöhnliche Gruppen nur die Abweichungen aus OI-114, für die Demo-Register nach
-der Umstellung **keine** Tabellen mehr (sie stehen ohne Gruppe, gewollt). Vor dem Release fehlt
-noch der Migrationsschritt ([OI-116](#oi-116--migrationsschritt-für-subgroup_parents-fehlt)).
+der Umstellung **keine** Tabellen mehr (sie stehen ohne Gruppe, gewollt). Veröffentlicht mit
+1.20.0 samt Migrationsschritt ([OI-116](#oi-116--migrationsschritt-für-subgroup_parents-fehlt)).
 
 Der Text darunter ist der Stand vor der Umsetzung.
 
@@ -4631,7 +4635,7 @@ Gruppen es gibt und was sie tun. Wenn eingeschränkt werden soll, ist der Weg ve
 **Gruppenliste** je Terminart für Nicht-Verwalter wegzulassen, nicht die Terminart selbst.
 
 **Statistik nach Register ([OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht),
-unveröffentlicht):** Ein am 2026-10-02 notierter indirekter Weg — die Spalten einer
+seit 1.20.0):** Ein am 2026-10-02 notierter indirekter Weg — die Spalten einer
 Registertabelle verrieten die Gruppen von Registerkollegen — ist mit der Korrektur am selben Tag
 entfallen. Die Spalten sind jetzt nur noch die Terminarten des Registers und seiner eigenen
 Gruppen, nicht mehr die der Gruppen seiner Mitglieder.
