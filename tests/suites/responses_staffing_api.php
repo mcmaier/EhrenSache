@@ -77,8 +77,11 @@ test('staffing: Verwalter bekommt Besetzung je Register, Mitglied nicht', functi
         $apt  = $ids['appointments'][] = rstCreate('appointments', ['title' => "RST {$s}", 'date' => $date,
             'start_time' => '19:00:00', 'type_id' => $t]);
 
-        assertStatus(200, apiRequest('PUT', 'appointment_responses', ['token' => apiToken('admin'),
-            'query' => ['appointment_id' => $apt, 'member_id' => $m1], 'body' => ['status' => 'yes']]));
+        $put1 = apiRequest('PUT', 'appointment_responses', ['token' => apiToken('admin'),
+            'query' => ['appointment_id' => $apt, 'member_id' => $m1], 'body' => ['status' => 'yes']]);
+        assertStatus(200, $put1);
+        assertTrue(is_array($put1['body']['staffing'] ?? null) && $put1['body']['staffing'] !== [],
+            'staffing fehlt in der PUT-Antwort des Verwalters');
         assertStatus(200, apiRequest('PUT', 'appointment_responses', ['token' => apiToken('admin'),
             'query' => ['appointment_id' => $apt, 'member_id' => $m2], 'body' => ['status' => 'maybe']]));
 
@@ -121,12 +124,31 @@ test('staffing: Verwalter bekommt Besetzung je Register, Mitglied nicht', functi
         foreach ($u2['body']['appointments'] as $a) {
             assertTrue(!array_key_exists('staffing', $a), 'Mitglied darf staffing nicht sehen (Liste)');
         }
+
+        // PUT-Antwort: Mitglied traegt sich selbst ein -- kein staffing
+        $own = apiRequest('PUT', 'appointment_responses', ['token' => apiToken('user'),
+            'query' => ['appointment_id' => $apt], 'body' => ['status' => 'yes']]);
+        assertStatus(200, $own);
+        assertTrue(!array_key_exists('staffing', $own['body']), 'Mitglied darf staffing nicht sehen (PUT-Antwort)');
+    } catch (Throwable $failure) {
+        throw $failure;
     } finally {
-        rstSetMemberGroups($mgrId, $mgrVorher);
-        rstSetMemberGroups($usrId, $usrVorher);
+        // Wiederherstellung darf das Aufraeumen nicht verhindern; ein Fehler
+        // wird erst danach geworfen (eine vorhandene Ausnahme hat Vorrang).
+        $restoreErrors = [];
+        foreach ([[$mgrId, $mgrVorher], [$usrId, $usrVorher]] as [$mid, $groups]) {
+            try {
+                rstSetMemberGroups($mid, $groups);
+            } catch (Throwable $e) {
+                $restoreErrors[] = "Gruppen von Mitglied {$mid} nicht wiederhergestellt: " . $e->getMessage();
+            }
+        }
         foreach ($ids['appointments'] as $id) { apiRequest('DELETE', 'appointments', ['token' => apiToken('admin'), 'query' => ['id' => $id]]); }
         foreach ($ids['members'] as $id)      { apiRequest('DELETE', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $id]]); }
         foreach ($ids['types'] as $id)        { apiRequest('DELETE', 'appointment_types', ['token' => apiToken('admin'), 'query' => ['id' => $id]]); }
         foreach ($ids['groups'] as $id)       { apiRequest('DELETE', 'member_groups', ['token' => apiToken('admin'), 'query' => ['id' => $id]]); }
+        if ($restoreErrors !== [] && !isset($failure)) {
+            throw new RuntimeException(implode('; ', $restoreErrors));
+        }
     }
 });
