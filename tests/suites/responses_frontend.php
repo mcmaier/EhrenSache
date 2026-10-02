@@ -360,9 +360,11 @@ test('namesListHtml gliedert Antworten anderer Mitglieder nach Gruppe als Chips'
     assertTrue(!str_contains($body, '<ul'), 'namesListHtml rendert noch eine <ul>-Liste mit Aufzaehlungspunkten');
     assertTrue(str_contains($body, 'response-name-chip'), "namesListHtml nutzt die Klasse 'response-name-chip' nicht");
     assertTrue(str_contains($body, 'response-names-grouped'), "Aeusserer Rahmen 'response-names-grouped' fehlt");
-    assertTrue(str_contains($body, 'escapeHtml(label)'), 'Gruppenname wird nicht maskiert');
+    // Gruppenname und Ampel-Zeile stecken seit der zugeklappten Gliederung in der gemeinsamen Kopfzeile.
+    assertTrue(str_contains($body, 'groupingSectionHeaderHtml('), 'Gruppenkopf nutzt groupingSectionHeaderHtml() nicht');
+    $grouping = (string) sourceCode($rsRoot . '/public/js/modules/grouping.js');
+    assertTrue(str_contains($grouping, 'escapeHtml(label)'), 'Gruppenname wird in der Kopfzeile nicht maskiert');
     assertTrue(str_contains($body, 'Ohne Gruppe'), "Mitglieder ohne Gruppe fehlt 'Ohne Gruppe'");
-    assertTrue(str_contains($body, 'responseChipsHtml('), 'Gruppenkopf nutzt responseChipsHtml() nicht fuer die Ampel-Zeile');
 
     $css = (string) sourceCode($rsRoot . '/public/css/components/badges.css');
     foreach (['--yes', '--maybe', '--no', '--open'] as $suffix) {

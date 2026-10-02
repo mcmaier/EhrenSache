@@ -17,6 +17,8 @@
  * Mehrfachnennungen, damit die Oberfläche sie ausweisen kann.
  */
 
+import { escapeHtml } from './utils.js';
+
 export const GROUPING_STAGES = ['alpha', 'group', 'subgroup'];
 
 function sortMembers(members) {
@@ -110,3 +112,40 @@ export function groupingStore(key, stage) {
 
 export const GROUPING_KEY_ATTENDANCE = 'es_grouping_attendance';
 export const GROUPING_KEY_RESPONSES  = 'es_grouping_responses';
+
+/** Zählt Rückmeldungen eines Abschnitts; alles außer yes/maybe/no ist offen. */
+export function groupingStatusCounts(members) {
+    const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
+    members.forEach(m => {
+        const key = ['yes', 'maybe', 'no'].includes(m.status) ? m.status : 'open';
+        counts[key]++;
+    });
+    return counts;
+}
+
+/**
+ * Kopfzeile eines zuklappbaren Abschnitts (Spec 2026-10-02, Abschnitt 6):
+ * Knopf mit Name, Balken und "2 von 5 · 1 unsicher · 2 offen". Die Breiten
+ * der Balkenteile sind Zahlen -- sie gehen über toFixed() ins style-Attribut.
+ * Der Aufrufer maskiert nichts vorher; hier wird alles maskiert.
+ */
+export function groupingSectionHeaderHtml({ key, label, counts, expanded }) {
+    const total = counts.yes + counts.maybe + counts.no + counts.open;
+    const details = [];
+    if (counts.maybe > 0) details.push(`${counts.maybe} unsicher`);
+    if (counts.no > 0) details.push(`${counts.no} ${counts.no === 1 ? 'Absage' : 'Absagen'}`);
+    if (counts.open > 0) details.push(`${counts.open} offen`);
+    const summary = [`${counts.yes} von ${total}`, ...details].join(' · ');
+    const segments = total === 0 ? '' : ['yes', 'maybe', 'no', 'open']
+        .filter(k => counts[k] > 0)
+        .map(k => `<span class="section-bar__seg section-bar__seg--${k}" style="width:${(counts[k] / total * 100).toFixed(2)}%"></span>`)
+        .join('');
+
+    return `<button type="button" class="section-head" aria-expanded="${expanded ? 'true' : 'false'}"
+                data-action="toggle-response-section" data-key="${escapeHtml(key)}">
+            <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
+            <span class="section-head__label">${escapeHtml(label)}</span>
+            <span class="section-bar" role="img" aria-label="${escapeHtml(summary)}">${segments}</span>
+            <span class="section-head__summary">${escapeHtml(summary)}</span>
+        </button>`;
+}

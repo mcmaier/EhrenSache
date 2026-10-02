@@ -17,7 +17,7 @@ import { registerActions } from './actions.js';
 // refreshAppointmentsKeepPage erst beim Schliessen des Modals gerufen wird,
 // nie beim Laden des Moduls.
 import { refreshAppointmentsKeepPage } from './appointments.js';
-import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_RESPONSES } from './grouping.js';
+import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStatusCounts, groupingSectionHeaderHtml, groupingStored, groupingStore, GROUPING_KEY_RESPONSES } from './grouping.js';
 
 // ============================================
 // TERMINRUECKMELDUNG (FI-1)
@@ -36,6 +36,16 @@ const CHIP_ORDER = ['yes', 'maybe', 'no', 'open'];
 
 let current = null;          // letzte API-Antwort des offenen Modals
 let currentFilter = 'all';
+
+// Aufgeklappte Abschnitte der Rückmeldeliste (Spec 2026-10-02, Abschnitt 6),
+// Schlüssel = section.key. Wird beim Öffnen eines anderen Termins und beim
+// Wechsel der Gliederungsstufe geleert -- Schlüssel gelten nur je Stufe.
+const expandedSections = new Set();
+
+/** Bei Filter "Keine Antwort" zählt alles als aufgeklappt, sonst der gemerkte Zustand. */
+function isSectionExpanded(key) {
+    return currentFilter === 'open' || expandedSections.has(key);
+}
 
 // OI-63: Schutzschritt gegen einen Fehlklick auf die fremde Rueckmeldung
 // eines anderen Mitglieds. Das Modal oeffnet gesperrt und sperrt sich beim
@@ -97,38 +107,6 @@ function responseSummaryBlock(summary) {
     return `<div class="response-summary">${responseChipsHtml(summary, { large: true })}</div>${bar}`;
 }
 
-/**
- * Besetzung je Register (Spec 2026-10-01-register-statistik-besetzung, 5.2).
- * Zeigt nur an, was der Server in `staffing` liefert -- die Zahlen stammen aus
- * responsesStaffing() und werden hier nicht nachgerechnet, damit Dashboard,
- * App und Druck dieselben Werte zeigen. Ohne Untergruppen bleibt der Block weg.
- */
-function staffingHtml(staffing) {
-    if (!Array.isArray(staffing) || staffing.length === 0) return '';
-
-    const word = subgroupLabel();
-    const num = value => escapeHtml(String(Number(value)));
-    const rows = staffing.map(s => {
-        const name = s.group_id === null ? `Ohne ${word}` : s.name;
-        const details = [];
-        if (Number(s.maybe) > 0) details.push(`${Number(s.maybe)} unsicher`);
-        if (Number(s.no) > 0) details.push(`${Number(s.no)} ${Number(s.no) === 1 ? 'Absage' : 'Absagen'}`);
-        if (Number(s.open) > 0) details.push(`${Number(s.open)} offen`);
-        const shared = Number(s.shared) > 0 ? ` (davon ${Number(s.shared)} mehrfach eingeteilt)` : '';
-
-        return `<tr>
-            <th scope="row">${escapeHtml(name)}</th>
-            <td class="staffing-count">${num(s.yes)} von ${num(s.expected)}</td>
-            <td class="staffing-details">${escapeHtml(details.join(' · '))}${escapeHtml(shared)}</td>
-        </tr>`;
-    }).join('');
-
-    return `<section class="staffing" aria-label="Besetzung">
-        <h4 class="staffing__title">Besetzung</h4>
-        <table class="staffing-table"><tbody>${rows}</tbody></table>
-    </section>`;
-}
-
 /** Zelle der Terminliste. */
 export function responseSummaryCell(apt) {
     if (!apt.responses) {
@@ -152,6 +130,7 @@ export function responseSummaryCell(apt) {
 
 export async function openResponsesModal(appointmentId) {
     currentFilter = 'all';
+    if (openAppointmentId !== appointmentId) expandedSections.clear();
     locked = true;
     openAppointmentId = appointmentId;
     document.getElementById('responsesModalBody').innerHTML = '<p class="loading">Lade Rückmeldungen...</p>';
@@ -223,7 +202,6 @@ function renderResponsesModal() {
 
     let html = `<p class="response-deadline">${escapeHtml(deadlineText(data))}</p>`;
     html += responseSummaryBlock(data.summary);
-    html += staffingHtml(data.staffing);
 
     if (data.expected) html += ownResponseHtml(data);
     if (data.comparison) html += comparisonHtml(data.comparison);
@@ -432,12 +410,12 @@ function managerTableHtml(data) {
     // Sammelabschnitt das eingestellte Wort (z.B. "Ohne Register").
     const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
     const sections = groupingSections(filtered, stage, emptyLabel);
-    // "x von n zugesagt" je Abschnitt aus ALLEN Mitgliedern des Abschnitts
+    // Zahlen der Kopfzeile je Abschnitt aus ALLEN Mitgliedern des Abschnitts
     // (Spec 5.2): Bei aktivem Filter "Keine Antwort" stuende sonst "0 von 2"
     // ueber einem Register, in dem vier von sechs zugesagt haben.
     const sectionCounts = new Map(groupingSections(data.members, stage, emptyLabel).map(s => [
         s.key,
-        { yes: s.members.filter(m => m.status === 'yes').length, total: s.members.length },
+        groupingStatusCounts(s.members),
     ]));
     const duplicates = groupingDuplicateCount(filtered, stage);
 
@@ -448,11 +426,15 @@ function managerTableHtml(data) {
     }
 
     const rows = sections.map(section => {
-        const c = sectionCounts.get(section.key) ?? { yes: 0, total: section.members.length };
-        const groupRow = section.label !== null
-            ? `<tr class="response-group-row"><td colspan="${colspan}">${escapeHtml(section.label)} · ${escapeHtml(String(c.yes))} von ${escapeHtml(String(c.total))} zugesagt</td></tr>`
-            : '';
-        return groupRow + section.members.map(m => managerMemberRowHtml(m, started)).join('');
+        // Alphabetisch: flache Liste ohne Kopfzeile
+        if (section.label === null) {
+            return section.members.map(m => managerMemberRowHtml(m, started)).join('');
+        }
+        const counts = sectionCounts.get(section.key) ?? groupingStatusCounts(section.members);
+        const expanded = isSectionExpanded(section.key);
+        const groupRow = `<tr class="response-group-row"><td colspan="${colspan}">${groupingSectionHeaderHtml({
+            key: section.key, label: section.label, counts, expanded })}</td></tr>`;
+        return groupRow + (expanded ? section.members.map(m => managerMemberRowHtml(m, started)).join('') : '');
     }).join('');
 
     return `
@@ -462,7 +444,7 @@ function managerTableHtml(data) {
             <button type="button" class="response-filter__btn${currentFilter === 'open' ? ' is-active' : ''}"
                     aria-pressed="${currentFilter === 'open' ? 'true' : 'false'}" data-action="filter-responses" data-value="open">${openLabel}</button>
         </div>
-        ${responsesGroupingSwitcher(stages, stage)}${hint}
+        ${responsesGroupingSwitcher(stages, stage)}${toggleAllSectionsHtml(stage, sectionKeys(data.members, stage, emptyLabel))}${hint}
         <div class="data-table">
             <table>
                 <thead><tr>
@@ -491,6 +473,31 @@ function responsesGroupingSwitcher(stages, stage) {
                 aria-pressed="${stage === s ? 'true' : 'false'}"
                 data-action="set-responses-grouping" data-value="${escapeHtml(s)}">${stageLabels[s]}</button>`).join('');
     return `<div class="list-grouping">${buttons}</div>`;
+}
+
+/** Schlüssel der Abschnitte, wie sie die Anzeige bildet (ungefiltert). */
+function sectionKeys(members, stage, emptyLabel) {
+    return groupingSections(members, stage, emptyLabel).map(s => s.key);
+}
+
+/** Knopf "Alle aufklappen/zuklappen" über der Liste; bei alphabetischer Stufe gibt es keine Abschnitte. */
+function toggleAllSectionsHtml(stage, keys) {
+    if (stage === 'alpha' || keys.length === 0) return '';
+    const allOpen = keys.every(isSectionExpanded);
+    return `<button type="button" class="list-grouping__toggle-all" data-action="toggle-all-response-sections">${allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}</button>`;
+}
+
+/** Klick auf "Alle aufklappen/zuklappen": gleiche Stufe wie die Anzeige. */
+function toggleAllResponseSections() {
+    if (!current || !current.members) return;
+    const members = current.members;
+    const stage = groupingStored(GROUPING_KEY_RESPONSES, groupingAvailableStages(members), 'group');
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const keys = sectionKeys(members, stage, emptyLabel);
+    const allOpen = keys.every(key => expandedSections.has(key));
+    if (allOpen) keys.forEach(key => expandedSections.delete(key));
+    else keys.forEach(key => expandedSections.add(key));
+    renderResponsesModal();
 }
 
 /**
@@ -522,26 +529,32 @@ function namesListHtml(members) {
     }
 
     const groups = sections.map(section => {
-        const label = section.label === null ? 'Alle Mitglieder' : section.label;
-        const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
-        section.members.forEach(m => counts[m.status ?? 'open']++);
-
-        const chips = CHIP_ORDER.map(key =>
+        const chipsHtml = () => CHIP_ORDER.map(key =>
             section.members.filter(m => (m.status ?? 'open') === key).map(responseNameChip).join('')
         ).join('');
 
+        // Alphabetisch: eine flache Liste ohne Kopfzeile
+        if (section.label === null) {
+            return `<div class="response-name-group">
+            <div class="response-name-chips">${chipsHtml()}</div>
+        </div>`;
+        }
+
+        const expanded = isSectionExpanded(section.key);
         return `<div class="response-name-group">
-            <div class="response-name-group__heading"><span class="response-name-group__label">${escapeHtml(label)}</span> ${responseChipsHtml(counts)}</div>
-            <div class="response-name-chips">${chips}</div>
+            ${groupingSectionHeaderHtml({ key: section.key, label: section.label,
+                counts: groupingStatusCounts(section.members), expanded })}
+            ${expanded ? `<div class="response-name-chips">${chipsHtml()}</div>` : ''}
         </div>`;
     }).join('');
 
-    return `${responsesGroupingSwitcher(stages, stage)}${hint}<div class="response-names-grouped">${groups}</div>`;
+    return `${responsesGroupingSwitcher(stages, stage)}${toggleAllSectionsHtml(stage, sections.map(s => s.key))}${hint}<div class="response-names-grouped">${groups}</div>`;
 }
 
 /** Umschalter-Klick: merkt die Wahl und rendert das offene Modal aus den
  * vorliegenden Daten neu -- kein erneuter API-Aufruf. */
 function setResponsesGrouping(stage) {
+    expandedSections.clear();
     groupingStore(GROUPING_KEY_RESPONSES, stage);
     if (current) renderResponsesModal();
 }
@@ -711,6 +724,12 @@ registerActions({
     'set-member-response': (el) => setMemberResponse(Number(el.dataset.id), el.dataset.value),
     'set-own-response': (el) => setOwnResponse(el.dataset.value),
     'set-responses-grouping': (el) => setResponsesGrouping(el.dataset.value),
+    'toggle-all-response-sections': () => toggleAllResponseSections(),
+    'toggle-response-section': (el) => {
+        const key = el.dataset.key;
+        expandedSections.has(key) ? expandedSections.delete(key) : expandedSections.add(key);
+        renderResponsesModal();
+    },
     'toggle-responses-lock': () => toggleResponsesLock(),
     'withdraw-own-response': () => withdrawOwnResponse(),
 });

@@ -44,30 +44,68 @@ function stFunctionBody(string $js, string $name): string
     return substr($js, $start, $next - $start);
 }
 
-test('Dashboard: Besetzungsblock liest staffing und rechnet nicht selbst', function () use ($stRoot) {
-    $js   = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
-    $body = stFunctionBody($js, 'staffingHtml');
-
-    assertTrue(str_contains($body, '.expected'), 'staffingHtml() muss expected aus staffing lesen');
-    assertTrue(!str_contains($body, 'members'), 'staffingHtml() darf nicht aus der Mitgliederliste zaehlen');
-    assertTrue(!str_contains($body, '++'), 'staffingHtml() darf nicht zaehlen');
-
-    $render = stFunctionBody($js, 'renderResponsesModal');
-    assertTrue(str_contains($render, 'staffingHtml(data.staffing)'), 'Der Dialog muss den Block aus data.staffing zeigen');
+test('Dashboard: kein eigener Besetzungsblock mehr', function () use ($stRoot) {
+    $js = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
+    assertTrue(!str_contains($js, 'staffingHtml'), 'staffingHtml() steht noch in responses.js');
+    assertTrue(!str_contains($js, '.staffing'), '.staffing steht noch in responses.js');
+    assertTrue(!str_contains($js, 'data.staffing'), 'Der Dialog liest noch data.staffing');
+    $css = (string) file_get_contents($stRoot . '/public/css/components/modals.css');
+    assertTrue(!str_contains($css, '.staffing'), '.staffing-Regeln stehen noch in modals.css');
 });
 
-test('Dashboard: Abschnittszeilen sagen "x von n zugesagt", unabhaengig vom Filter', function () use ($stRoot) {
+test('Dashboard: grouping.js liefert Zaehlung und Kopfzeile, beide Listen nutzen sie', function () use ($stRoot) {
+    $g = (string) sourceCode($stRoot . '/public/js/modules/grouping.js');
+    assertTrue(str_contains($g, 'export function groupingStatusCounts('), 'groupingStatusCounts fehlt');
+    assertTrue(str_contains($g, 'export function groupingSectionHeaderHtml('), 'groupingSectionHeaderHtml fehlt');
+    assertTrue(preg_match('/import\s*\{[^}]*escapeHtml[^}]*\}\s*from\s*\'\.\/utils\.js\'/', $g) === 1,
+        'grouping.js muss escapeHtml aus utils.js importieren');
+
+    $js = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
+    assertTrue(str_contains(stFunctionBody($js, 'managerTableHtml'), 'groupingSectionHeaderHtml('),
+        'managerTableHtml() muss die gemeinsame Kopfzeile nutzen');
+    assertTrue(str_contains(stFunctionBody($js, 'namesListHtml'), 'groupingSectionHeaderHtml('),
+        'namesListHtml() muss die gemeinsame Kopfzeile nutzen');
+});
+
+test('Dashboard: Kopfzeile ist ein Knopf mit aria-expanded, darueber "Alle aufklappen"', function () use ($stRoot) {
+    $g    = (string) sourceCode($stRoot . '/public/js/modules/grouping.js');
+    $head = stFunctionBody($g, 'groupingSectionHeaderHtml');
+    assertTrue(str_contains($head, '<button'), 'Kopfzeile muss ein <button sein');
+    assertTrue(str_contains($head, 'aria-expanded'), 'aria-expanded fehlt');
+    assertTrue(str_contains($head, 'toggle-response-section'), 'Aktion toggle-response-section fehlt');
+    assertTrue(str_contains($head, 'escapeHtml(label)'), 'Bezeichnung wird nicht maskiert');
+
+    $js = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
+    assertTrue(str_contains($js, 'data-action="toggle-all-response-sections"'), 'Knopf "Alle aufklappen" fehlt');
+    assertTrue(str_contains($js, "'toggle-response-section':"), 'Aktion toggle-response-section nicht registriert');
+    assertTrue(str_contains($js, "'toggle-all-response-sections':"), 'Aktion toggle-all-response-sections nicht registriert');
+});
+
+test('Dashboard: Zahlen der Kopfzeile aus ungefilterten Abschnitten, ueber section.key', function () use ($stRoot) {
     $js   = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
     $body = stFunctionBody($js, 'managerTableHtml');
 
-    assertTrue(str_contains($body, 'zugesagt'), 'Abschnittszeile ohne Zusagen');
     assertTrue(str_contains($body, 'groupingSections(data.members'),
         'Die Zahl muss aus allen Mitgliedern des Abschnitts kommen, nicht aus der gefilterten Liste');
+    assertTrue(str_contains($body, 'groupingStatusCounts('), 'Zaehlung muss groupingStatusCounts nutzen');
     assertTrue(str_contains($body, 'sectionCounts.get(section.key)'),
         'Die Zahlen muessen ueber den Abschnittsschluessel gesucht werden, Bezeichnungen sind nicht eindeutig');
     assertTrue(str_contains($body, 's.key,'), 'Die Zahlen muessen nach s.key abgelegt werden');
-    assertTrue(preg_match('/c\.yes.*?von.*?c\.total.*?zugesagt/s', $body) === 1,
-        'Die Abschnittszeile muss c.yes und c.total der Zaehlung zeigen');
+});
+
+test('Dashboard: bei Filter "Keine Antwort" sind alle Abschnitte aufgeklappt', function () use ($stRoot) {
+    $js   = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
+    $body = stFunctionBody($js, 'isSectionExpanded');
+    assertTrue(str_contains($body, "currentFilter === 'open'"), "Aufklapp-Entscheidung kennt den Filter 'open' nicht");
+    assertTrue(str_contains($body, 'expandedSections.has('), 'Aufklapp-Entscheidung liest expandedSections nicht');
+});
+
+test('Dashboard: Aufklappzustand wird beim Oeffnen und beim Stufenwechsel geleert', function () use ($stRoot) {
+    $js = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
+    assertTrue(str_contains(stFunctionBody($js, 'openResponsesModal'), 'expandedSections.clear()'),
+        'openResponsesModal() leert expandedSections nicht');
+    assertTrue(str_contains(stFunctionBody($js, 'setResponsesGrouping'), 'expandedSections.clear()'),
+        'setResponsesGrouping() leert expandedSections nicht');
 });
 
 test('App: Besetzungsblock liest staffing und rechnet nicht selbst', function () use ($stRoot) {
