@@ -179,6 +179,105 @@ test('Kopfzahlen der Gruppe folgen der Jahresregel', function () use (&$sgWorld)
     assertSame(70.0, (float) $s['overall_average']);
 });
 
+test('Registertabelle rechnet ueber alle Termine ihrer Mitglieder', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w = $sgWorld;
+    $r = sgTable(sgStats($w, ['group_id' => $w['groups']['R']]), $w['groups']['R']);
+    assertTrue($r !== null, 'Tabelle des Registers R fehlt');
+
+    $typeIds = array_map(static fn ($t) => (int) $t['type_id'], $r['appointment_types']);
+    assertSame([$w['types']['TG'], $w['types']['TR']], $typeIds,
+        'Spalten: Gesamtprobe (ueber G) und Registerprobe (eigene), nach Name sortiert');
+
+    assertSame([5, 5, 0, 0], sgRow($r, $w['members']['A']), 'A');
+    assertSame([2, 1, 0, 1], sgRow($r, $w['members']['B']), 'B nur Registerprobe');
+    assertSame([5, 3, 1, 1], sgRow($r, $w['members']['C']), 'C');
+    assertSame([3, 1, 0, 2], sgRow($r, $w['members']['D']), 'D erst ab Eintritt');
+    assertSame(null, sgRow($r, $w['members']['E']), 'E steht nicht in R');
+    assertSame(true, $r['is_subgroup'] ?? null, 'is_subgroup fehlt oder ist falsch');
+});
+
+test('Untergruppe ohne eigene Terminart bekommt die Spalten ihrer Mitglieder', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w  = $sgWorld;
+    $r2 = sgTable(sgStats($w, ['group_id' => $w['groups']['R2']]), $w['groups']['R2']);
+    assertTrue($r2 !== null, 'Tabelle von R2 fehlt -- vor dem Umbau blieb sie leer');
+
+    $typeIds = array_map(static fn ($t) => (int) $t['type_id'], $r2['appointment_types']);
+    assertSame([$w['types']['TG'], $w['types']['TR']], $typeIds);
+    assertSame(1, count($r2['members']), 'Nur C steht in R2');
+    assertSame([5, 3, 1, 1], sgRow($r2, $w['members']['C']));
+});
+
+test('Kopfzahlen mit Untergruppen-Filter: entdoppelt ueber die Mitglieder', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w = $sgWorld;
+    $s = sgStats($w, ['group_id' => $w['groups']['R']])['summary'];
+
+    assertSame(5,    (int) $s['total_appointments']);
+    assertSame(4,    (int) $s['total_members']);
+    assertSame(10,   (int) $s['total_present']);
+    assertSame(1,    (int) $s['total_excused']);
+    assertSame(4,    (int) $s['total_unexcused']);
+    assertSame(66.7, (float) $s['overall_average']);
+});
+
+test('Ohne Gruppenfilter aendern Untergruppen die Kopfzahlen nicht', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w = $sgWorld;
+    // C steht in G, R und R2. Ohne Filter: jeder seiner Termine einmal.
+    $s = sgStats($w, ['member_id' => $w['members']['C']])['summary'];
+    assertSame(5, (int) $s['total_appointments']);
+    assertSame(3, (int) $s['total_present']);
+    assertSame(1, (int) $s['total_excused']);
+    assertSame(1, (int) $s['total_unexcused']);
+});
+
+test('Gewoehnliche Gruppen zuerst, Untergruppen danach nach sort_order', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w   = $sgWorld;
+    $stats = sgStats($w, ['member_id' => $w['members']['C']]);
+    $ids = array_map(static fn ($g) => (int) $g['group_id'], $stats['statistics']);
+
+    $posG  = array_search($w['groups']['G'], $ids, true);
+    $posR  = array_search($w['groups']['R'], $ids, true);
+    $posR2 = array_search($w['groups']['R2'], $ids, true);
+    assertTrue($posG !== false && $posR !== false && $posR2 !== false, 'Tabellen fehlen: ' . json_encode($ids));
+    assertTrue($posG < $posR2 && $posR2 < $posR, 'Reihenfolge G, R2 (sort 0), R (sort 1) erwartet: ' . json_encode($ids));
+
+    foreach ($stats['statistics'] as $g) {
+        assertTrue(array_key_exists('is_subgroup', $g), 'is_subgroup fehlt bei Gruppe ' . $g['group_id']);
+    }
+});
+
+test('Mitglied sieht in seiner Registertabelle nur sich, fremdes Register ist gesperrt', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w        = $sgWorld;
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Testkonto user ohne Mitglied');
+
+    $res    = apiRequest('GET', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
+    assertStatus(200, $res);
+    $vorher = array_map(static fn ($g) => (int) $g['group_id'], $res['body']['groups']);
+
+    try {
+        assertStatus(200, apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => array_merge($vorher, [$w['groups']['R']])]]));
+
+        $r = sgTable(sgStats($w, ['group_id' => $w['groups']['R']], 'user'), $w['groups']['R']);
+        assertTrue($r !== null, 'Registertabelle fehlt fuer das Mitglied');
+        assertSame(1, count($r['members']), 'Nur die eigene Zeile');
+        assertSame($memberId, (int) $r['members'][0]['member_id']);
+
+        $fremd = apiRequest('GET', 'statistics', ['token' => apiToken('user'),
+            'query' => ['year' => $w['year'], 'group_id' => $w['groups']['R2']]]);
+        assertStatus(403, $fremd, 'Fremdes Register muss gesperrt sein');
+    } finally {
+        apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => $vorher]]);
+    }
+});
+
 test('Statistik-Welt wird aufgeraeumt', function () use (&$sgWorld) {
     if (!empty($sgWorld)) {
         sgDropWorld($sgWorld);
