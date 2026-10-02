@@ -2222,7 +2222,8 @@ Mitgliederverwaltung? Bewusst nicht Teil von OI-70.
 ---
 
 ### OI-117 · Check-in-App: Registerzeilen erst hinter „Wer hat geantwortet?“
-**Priorität:** niedrig · aufgenommen am 2026-10-02 (Zweig `feat/register-statistik`)
+**Priorität:** niedrig · aufgenommen am 2026-10-02 (Zweig `feat/register-statistik`) ·
+**Entscheidung des Nutzers vom 2026-10-02: so belassen** — die Registerzeilen bleiben im Bereich „Wer hat geantwortet?“.
 
 In der Check-in-App stehen die zugeklappten Registerabschnitte mit Balken innerhalb des
 bestehenden Aufklappbereichs „Wer hat geantwortet?“ der Terminkarte. Ein Verwalter, der vor
