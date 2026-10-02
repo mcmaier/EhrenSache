@@ -615,7 +615,7 @@ function responsesAttachSummaries($db, $database, array $appointments, ?int $vie
         // Gemeinsame Regel mit den Anwesenheitszahlen im Kalender
         // (attendanceExpectedMemberIds()); hier auf die Listenform gebracht,
         // die responseSummary() und responseComparison() erwarten.
-        foreach (attendanceExpectedMemberIds($db, $prefix, $ids) as $appointmentId => $memberIds) {
+        foreach (attendanceExpectedMemberIds($db, $database, $ids) as $appointmentId => $memberIds) {
             $expectedBy[$appointmentId] = array_keys($memberIds);
         }
 
