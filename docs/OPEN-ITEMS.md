@@ -2252,7 +2252,7 @@ Abschnitt 4.3, verlangt das für alle Wege).
 **Zu tun:** im Ergebnis des Mitgliederimports zwei Zeilen „n Mitglied(er) zusätzlich einer Gruppe
 zugeordnet“ und „n Mitglied(er) in keiner Gruppe ihres Registers“, Namen über den Gruppen-Cache.
 
-**Umgesetzt:** `displayImportResult()` hängt `importGroupSummaryHtml()` an; die Namen stammen aus den Caches und werden in `importNameLookup()` vor der Invalidierung gesichert. Neu angelegte Mitglieder und nicht geladene Gruppen erscheinen mit ihrer ID. Wächter in `tests/suites/subgroup_parent_frontend.php`.
+**Umgesetzt:** `displayImportResult()` hängt `importGroupSummaryHtml()` an. Den Mitgliedsnamen liefert der Server je Eintrag als `member_name` (nur beim Import); die Gruppennamen kommen aus dem Cache, gesichert in `importNameLookup()` vor der Invalidierung. Ist der Gruppen-Cache nicht geladen, erscheint „Gruppe #ID“. Wächter in `tests/suites/subgroup_parent_frontend.php`.
 
 **Nicht sicherheitsrelevant.**
 
