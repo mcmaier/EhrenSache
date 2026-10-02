@@ -235,6 +235,24 @@ test('Ohne Gruppenfilter aendern Untergruppen die Kopfzahlen nicht', function ()
     assertSame(1, (int) $s['total_unexcused']);
 });
 
+test('Kopfzahlen ohne Filter: Termin, den zwei Gruppen erwarten, zaehlt einmal', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w    = $sgWorld;
+    $base = (int) sgStats($w, ['member_id' => $w['members']['C']])['summary']['total_appointments'];
+    // Terminart an zwei Gruppen, in denen C steht: die Soll-Menge enthaelt (C, Termin) doppelt.
+    $typeId = sgCreate('appointment_types', ['type_name' => 'SG Summenprobe ' . uniqid(), 'is_default' => 0,
+        'color' => '#667eea', 'group_ids' => [$w['groups']['G'], $w['groups']['R2']]]);
+    $apptId = sgCreate('appointments', ['title' => 'SG SUMME', 'date' => "{$w['year']}-10-02",
+        'start_time' => '19:00:00', 'type_id' => $typeId]);
+    try {
+        $after = (int) sgStats($w, ['member_id' => $w['members']['C']])['summary']['total_appointments'];
+        assertSame($base + 1, $after, 'Der Doppeltermin zaehlt in den Kopfzahlen genau einmal');
+    } finally {
+        sgDelete('appointments', $apptId);
+        sgDelete('appointment_types', $typeId);
+    }
+});
+
 test('Gewoehnliche Gruppen zuerst, Untergruppen danach nach sort_order', function () use (&$sgWorld) {
     assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
     $w   = $sgWorld;
