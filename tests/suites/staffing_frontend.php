@@ -49,7 +49,7 @@ test('Dashboard: kein eigener Besetzungsblock mehr', function () use ($stRoot) {
     assertTrue(!str_contains($js, 'staffingHtml'), 'staffingHtml() steht noch in responses.js');
     assertTrue(!str_contains($js, '.staffing'), '.staffing steht noch in responses.js');
     assertTrue(!str_contains($js, 'data.staffing'), 'Der Dialog liest noch data.staffing');
-    $css = (string) file_get_contents($stRoot . '/public/css/components/modals.css');
+    $css = (string) sourceCode($stRoot . '/public/css/components/modals.css');
     assertTrue(!str_contains($css, '.staffing'), '.staffing-Regeln stehen noch in modals.css');
 });
 
@@ -130,7 +130,7 @@ test('App: kein eigener Besetzungsblock mehr', function () use ($stRoot) {
     assertTrue(!str_contains($js, 'staffingHtml'), 'staffingHtml() steht noch in app.js');
     assertTrue(!str_contains($js, '.staffing'), '.staffing steht noch in app.js');
     assertTrue(!str_contains($js, 'item.staffing'), 'Die Karte liest noch item.staffing');
-    $css = (string) file_get_contents($stRoot . '/public/checkin/css/style.css');
+    $css = (string) sourceCode($stRoot . '/public/checkin/css/style.css');
     assertTrue(!str_contains($css, '.staffing'), '.staffing-Regeln stehen noch in style.css');
 });
 
