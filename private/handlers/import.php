@@ -193,6 +193,8 @@ function importMembers($db, $database, $filePath) {
     $imported = 0;
     $updated = 0;
     $errors = [];
+    $groupsAdded = [];
+    $groupWarnings = [];
     $rowNumber = 1;
     
     // Cache für Gruppen-Lookup
@@ -290,19 +292,28 @@ function importMembers($db, $database, $filePath) {
                 $stmt = $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id=?");
                 $stmt->execute([$memberId]);
                 
-                // Neue Zuordnungen erstellen
-                $stmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
+                // Gruppen-IDs erst sammeln, dann die Mitgliedschaftsregel anwenden
+                // (Spec 2026-10-02, 4.1) und danach schreiben.
+                $resolved = [];
                 foreach ($groups as $groupName) {
                     $groupName = trim($groupName);
                     if (isset($groupCache[$groupName])) {
-                        $stmt->execute([$memberId, $groupCache[$groupName]]);
+                        $resolved[] = $groupCache[$groupName];
                     } else {
                         $errors[] = "Row $rowNumber: Group '$groupName' not found";
                     }
                 }
+                $normalized = groupsWithParents($db, $database, $resolved);
+                $stmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
+                foreach ($normalized['group_ids'] as $groupId) {
+                    $stmt->execute([$memberId, $groupId]);
+                }
+                [$addedRows, $warningRows] = groupsRuleReport((int) $memberId, $normalized);
+                $groupsAdded = array_merge($groupsAdded, $addedRows);
+                $groupWarnings = array_merge($groupWarnings, $warningRows);
             }
         }
-        
+
         $db->commit();
         fclose($handle);
         
@@ -310,7 +321,9 @@ function importMembers($db, $database, $filePath) {
             "success" => true,
             "imported" => $imported,
             "updated" => $updated,
-            "errors" => $errors
+            "errors" => $errors,
+            "groups_added" => $groupsAdded,
+            "group_warnings" => $groupWarnings
         ];
         
     } catch (Exception $e) {

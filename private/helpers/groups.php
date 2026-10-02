@@ -180,3 +180,65 @@ function groupsApplySubgroupRule($db, $database, int $subgroupId): array
 
     return $result;
 }
+
+/**
+ * Mitgliedschaftsregel fuer die Gruppenliste eines Mitglieds (Spec 2026-10-02, 4.1):
+ * Fuer jedes Register S in der Liste, dessen Gruppen P(S) alle fehlen -- bei genau
+ * einer Gruppe ergaenzen, bei mehreren in warnings melden, ohne Gruppe nichts.
+ *
+ * @param array<int, int|string> $groupIds
+ * @return array{group_ids: array<int, int>, added: array<int, int>, warnings: array<int, int>}
+ *         added = ergaenzte group_ids, warnings = subgroup_ids ohne passende Gruppe
+ */
+function groupsWithParents($db, $database, array $groupIds): array
+{
+    $prefix = $database->table('');
+
+    $ids = [];
+    foreach ($groupIds as $id) {
+        $ids[(int) $id] = (int) $id;
+    }
+    $ids    = array_values($ids);
+    $result = ['group_ids' => $ids, 'added' => [], 'warnings' => []];
+    if ($ids === []) {
+        return $result;
+    }
+
+    $in   = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $db->prepare("SELECT sp.subgroup_id, sp.group_id FROM {$prefix}subgroup_parents sp
+                           WHERE sp.subgroup_id IN ({$in}) ORDER BY sp.subgroup_id, sp.group_id");
+    $stmt->execute($ids);
+    $parentsOf = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $parentsOf[(int) $row['subgroup_id']][] = (int) $row['group_id'];
+    }
+
+    foreach ($parentsOf as $subgroupId => $parents) {
+        if (array_intersect($parents, $ids) !== []) {
+            continue;
+        }
+        if (count($parents) === 1) {
+            $result['group_ids'][] = $parents[0];
+            $result['added'][]     = $parents[0];
+            $ids[]                 = $parents[0];
+        } else {
+            $result['warnings'][] = $subgroupId;
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Antwortform der Mitgliedschaftsregel fuer ein Mitglied.
+ *
+ * @param array{group_ids: array<int, int>, added: array<int, int>, warnings: array<int, int>} $normalized
+ * @return array{0: array<int, array{member_id: int, group_id: int}>, 1: array<int, array{member_id: int, subgroup_id: int}>}
+ */
+function groupsRuleReport(int $memberId, array $normalized): array
+{
+    $added = array_map(static fn (int $g) => ['member_id' => $memberId, 'group_id' => $g], $normalized['added']);
+    $warnings = array_map(static fn (int $s) => ['member_id' => $memberId, 'subgroup_id' => $s], $normalized['warnings']);
+
+    return [$added, $warnings];
+}

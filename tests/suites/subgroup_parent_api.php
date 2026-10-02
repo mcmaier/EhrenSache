@@ -169,7 +169,6 @@ test('Mitgliedschaftsregel: nachtraegliche Zuordnung (eine Gruppe ergaenzt, mehr
     }
 });
 
-// Haengt an Task 3 (POST/PUT members normalisieren die Gruppenliste); bis dahin rot.
 test('Mitgliedschaftsregel: POST und PUT members ziehen die Gruppe nach', function () {
     $s       = uniqid();
     $groups  = [];
@@ -193,6 +192,118 @@ test('Mitgliedschaftsregel: POST und PUT members ziehen die Gruppe nach', functi
         assertSame($exp, spGroupIdsOf($m1), 'Register gewinnt bei einer Gruppe');
     } finally {
         foreach ($members as $id) { spDelete('members', $id); }
+        foreach (array_reverse($groups) as $id) { spDelete('member_groups', $id); }
+    }
+});
+
+test('Mitgliedschaftsregel: Register mit zwei Gruppen warnt bei POST und PUT members', function () {
+    $s       = uniqid();
+    $groups  = [];
+    $members = [];
+    try {
+        $g = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP G {$s}"])['id'];
+        $h = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP H {$s}"])['id'];
+        $r = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP R {$s}", 'is_subgroup' => true,
+                                                         'parent_group_ids' => [$g, $h]])['id'];
+
+        // In keiner der beiden Gruppen: unveraendert, Warnung
+        $body = spCreate('members', ['name' => 'Sp', 'surname' => "1 {$s}", 'active' => 1, 'group_ids' => [$r]]);
+        $m1 = $members[] = (int) $body['id'];
+        assertSame([$r], spGroupIdsOf($m1), 'bei mehreren Gruppen wird nichts ergaenzt');
+        assertSame([], $body['added_groups'] ?? null);
+        assertSame([['member_id' => $m1, 'subgroup_id' => $r]], $body['group_warnings'] ?? null, 'Warnung bei POST');
+
+        // In einer der beiden: keine Warnung
+        $body = spCreate('members', ['name' => 'Sp', 'surname' => "2 {$s}", 'active' => 1, 'group_ids' => [$r, $h]]);
+        $m2 = $members[] = (int) $body['id'];
+        $exp = [$h, $r]; sort($exp);
+        assertSame($exp, spGroupIdsOf($m2));
+        assertSame([], $body['added_groups'] ?? null);
+        assertSame([], $body['group_warnings'] ?? null, 'Mitglied in einer der Gruppen: keine Warnung');
+
+        // PUT: Warnung, dann mit Gruppe keine mehr
+        $res = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $m2],
+            'body' => ['group_ids' => [$r]]]);
+        assertStatus(200, $res);
+        assertSame([['member_id' => $m2, 'subgroup_id' => $r]], $res['body']['group_warnings'] ?? null, 'Warnung bei PUT');
+        assertSame([$r], spGroupIdsOf($m2));
+        $res = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $m2],
+            'body' => ['group_ids' => [$r, $g]]]);
+        assertSame([], $res['body']['group_warnings'] ?? null);
+        assertSame([], $res['body']['added_groups'] ?? null);
+    } finally {
+        foreach ($members as $id) { spDelete('members', $id); }
+        foreach (array_reverse($groups) as $id) { spDelete('member_groups', $id); }
+    }
+});
+
+/** Laedt eine Mitglieder-CSV ueber POST import hoch. */
+function spImportMembers(string $csv): array
+{
+    $tmp = tempnam(sys_get_temp_dir(), 'spimp');
+    file_put_contents($tmp, $csv);
+    try {
+        $cfg = testConfig();
+        $ch = curl_init(rtrim($cfg['base_url'], '/') . '/api/api.php?resource=import&type=members');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json',
+                                              'Authorization: Bearer ' . apiToken('admin')]);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, ['file' => new CURLFile($tmp, 'text/csv', 'sp_import.csv')]);
+        $raw = curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+    } finally {
+        unlink($tmp);
+    }
+
+    return ['status' => $status, 'body' => json_decode((string) $raw, true), 'raw' => (string) $raw];
+}
+
+test('Mitgliedschaftsregel: CSV-Import zieht die Gruppe nach und meldet Warnungen', function () {
+    $s       = uniqid();
+    $groups  = [];
+    $numbers = ["SPI1{$s}", "SPI2{$s}"];
+    try {
+        $g  = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP G {$s}"])['id'];
+        $h  = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP H {$s}"])['id'];
+        $r  = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP R {$s}", 'is_subgroup' => true,
+                                                          'parent_group_ids' => [$g]])['id'];
+        $r2 = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP R2 {$s}", 'is_subgroup' => true,
+                                                          'parent_group_ids' => [$g, $h]])['id'];
+
+        $csv = "name;surname;member_number;active;groups\n"
+             . "Sp;Eins {$s};{$numbers[0]};1;SP R {$s}\n"
+             . "Sp;Zwei {$s};{$numbers[1]};1;SP R2 {$s}\n";
+        $res = spImportMembers($csv);
+        assertStatus(200, $res, $res['raw']);
+        assertSame(2, (int) ($res['body']['imported'] ?? 0), $res['raw']);
+
+        $ids = [];
+        foreach (apiRequest('GET', 'members', ['token' => apiToken('admin')])['body'] as $m) {
+            if (in_array($m['member_number'] ?? '', $numbers, true)) {
+                $ids[$m['member_number']] = (int) $m['member_id'];
+            }
+        }
+        assertSame(2, count($ids), 'importierte Mitglieder nicht gefunden');
+        $exp = [$g, $r]; sort($exp);
+        assertSame($exp, spGroupIdsOf($ids[$numbers[0]]), 'Import ergaenzt die einzige Gruppe');
+        assertSame([$r2], spGroupIdsOf($ids[$numbers[1]]), 'Import ergaenzt bei mehreren Gruppen nichts');
+        assertSame([['member_id' => $ids[$numbers[0]], 'group_id' => $g]], $res['body']['groups_added'] ?? null);
+        assertSame([['member_id' => $ids[$numbers[1]], 'subgroup_id' => $r2]], $res['body']['group_warnings'] ?? null);
+    } finally {
+        foreach (apiRequest('GET', 'members', ['token' => apiToken('admin')])['body'] ?? [] as $m) {
+            if (in_array($m['member_number'] ?? '', $numbers, true)) {
+                spDelete('members', (int) $m['member_id']);
+            }
+        }
+        $logs = apiRequest('GET', 'import_logs', ['token' => apiToken('admin')])['body'] ?? [];
+        foreach ($logs['logs'] ?? $logs as $log) {
+            if (($log['filename'] ?? '') === 'sp_import.csv') {
+                spDelete('import_logs', (int) $log['log_id']);
+            }
+        }
         foreach (array_reverse($groups) as $id) { spDelete('member_groups', $id); }
     }
 });
