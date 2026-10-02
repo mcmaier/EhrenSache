@@ -302,6 +302,28 @@ function responsesRenderPrint($db, $database, array $payload): void
         ];
     }
 
+    // Besetzung je Register am Kopf des Blatts (Spec 2026-10-01, 5.2); die
+    // Gliederung darunter bleibt nach Terminart-Gruppe (Entscheidung 1.8.0).
+    if (!empty($payload['staffing'])) {
+        $word = groupSubgroupLabel(systemSetting($db, $database, 'subgroup_label', ''));
+        $rows = [];
+        foreach ($payload['staffing'] as $st) {
+            $rows[] = [
+                $st['group_id'] === null ? "Ohne {$word}" : (string) $st['name'],
+                "{$st['yes']} von {$st['expected']}",
+                (string) $st['maybe'],
+                (string) $st['no'],
+                (string) $st['open'],
+                $st['shared'] > 0 ? (string) $st['shared'] : '',
+            ];
+        }
+        array_unshift($sections, [
+            'heading' => 'Besetzung',
+            'columns' => [$word, 'Zusagen', 'Unsicher', 'Absagen', 'Offen', 'Mehrfach eingeteilt'],
+            'rows'    => $rows,
+        ]);
+    }
+
     $s = $payload['summary'];
     $withoutAccess = (int) ($s['open_without_access'] ?? 0);
     $openNote = "keine Antwort {$s['open']}"

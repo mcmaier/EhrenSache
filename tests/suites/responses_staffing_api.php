@@ -130,6 +130,17 @@ test('staffing: Verwalter bekommt Besetzung je Register, Mitglied nicht', functi
             'query' => ['appointment_id' => $apt], 'body' => ['status' => 'yes']]);
         assertStatus(200, $own);
         assertTrue(!array_key_exists('staffing', $own['body']), 'Mitglied darf staffing nicht sehen (PUT-Antwort)');
+
+        // Druck: Besetzung als eigener Abschnitt am Kopf
+        $print = apiRequest('GET', 'appointment_responses', ['token' => apiToken('manager'),
+            'query' => ['appointment_id' => $apt, 'format' => 'html']]);
+        assertStatus(200, $print);
+        $html = $print['raw'];
+        $posBesetzung = strpos($html, '>Besetzung<');
+        $posKla       = strpos($html, "RST Kla {$s}");
+        assertTrue($posBesetzung !== false, 'Abschnitt Besetzung fehlt im Druck');
+        assertTrue($posKla !== false && $posKla > $posBesetzung, 'Register steht im Besetzungsabschnitt');
+        assertTrue(str_contains($html, '1 von 2'), 'Zahl "1 von 2" fuer das erste Register fehlt');
     } catch (Throwable $failure) {
         throw $failure;
     } finally {
