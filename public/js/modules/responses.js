@@ -97,6 +97,38 @@ function responseSummaryBlock(summary) {
     return `<div class="response-summary">${responseChipsHtml(summary, { large: true })}</div>${bar}`;
 }
 
+/**
+ * Besetzung je Register (Spec 2026-10-01-register-statistik-besetzung, 5.2).
+ * Zeigt nur an, was der Server in `staffing` liefert -- die Zahlen stammen aus
+ * responsesStaffing() und werden hier nicht nachgerechnet, damit Dashboard,
+ * App und Druck dieselben Werte zeigen. Ohne Untergruppen bleibt der Block weg.
+ */
+function staffingHtml(staffing) {
+    if (!Array.isArray(staffing) || staffing.length === 0) return '';
+
+    const word = subgroupLabel();
+    const num = value => escapeHtml(String(Number(value)));
+    const rows = staffing.map(s => {
+        const name = s.group_id === null ? `Ohne ${word}` : s.name;
+        const details = [];
+        if (Number(s.maybe) > 0) details.push(`${Number(s.maybe)} unsicher`);
+        if (Number(s.no) > 0) details.push(`${Number(s.no)} ${Number(s.no) === 1 ? 'Absage' : 'Absagen'}`);
+        if (Number(s.open) > 0) details.push(`${Number(s.open)} offen`);
+        const shared = Number(s.shared) > 0 ? ` (davon ${Number(s.shared)} mehrfach eingeteilt)` : '';
+
+        return `<tr>
+            <th scope="row">${escapeHtml(name)}</th>
+            <td class="staffing-count">${num(s.yes)} von ${num(s.expected)}</td>
+            <td class="staffing-details">${escapeHtml(details.join(' · '))}${escapeHtml(shared)}</td>
+        </tr>`;
+    }).join('');
+
+    return `<section class="staffing" aria-label="Besetzung">
+        <h4 class="staffing__title">Besetzung</h4>
+        <table class="staffing-table"><tbody>${rows}</tbody></table>
+    </section>`;
+}
+
 /** Zelle der Terminliste. */
 export function responseSummaryCell(apt) {
     if (!apt.responses) {
@@ -191,6 +223,7 @@ function renderResponsesModal() {
 
     let html = `<p class="response-deadline">${escapeHtml(deadlineText(data))}</p>`;
     html += responseSummaryBlock(data.summary);
+    html += staffingHtml(data.staffing);
 
     if (data.expected) html += ownResponseHtml(data);
     if (data.comparison) html += comparisonHtml(data.comparison);
@@ -399,6 +432,13 @@ function managerTableHtml(data) {
     // Sammelabschnitt das eingestellte Wort (z.B. "Ohne Register").
     const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
     const sections = groupingSections(filtered, stage, emptyLabel);
+    // "x von n zugesagt" je Abschnitt aus ALLEN Mitgliedern des Abschnitts
+    // (Spec 5.2): Bei aktivem Filter "Keine Antwort" stuende sonst "0 von 2"
+    // ueber einem Register, in dem vier von sechs zugesagt haben.
+    const sectionCounts = new Map(groupingSections(data.members, stage, emptyLabel).map(s => [
+        s.label,
+        { yes: s.members.filter(m => m.status === 'yes').length, total: s.members.length },
+    ]));
     const duplicates = groupingDuplicateCount(filtered, stage);
 
     let hint = '';
@@ -408,8 +448,9 @@ function managerTableHtml(data) {
     }
 
     const rows = sections.map(section => {
+        const c = sectionCounts.get(section.label) ?? { yes: 0, total: section.members.length };
         const groupRow = section.label !== null
-            ? `<tr class="response-group-row"><td colspan="${colspan}">${escapeHtml(section.label)} · ${section.members.length}</td></tr>`
+            ? `<tr class="response-group-row"><td colspan="${colspan}">${escapeHtml(section.label)} · ${escapeHtml(String(c.yes))} von ${escapeHtml(String(c.total))} zugesagt</td></tr>`
             : '';
         return groupRow + section.members.map(m => managerMemberRowHtml(m, started)).join('');
     }).join('');

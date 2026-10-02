@@ -596,6 +596,14 @@
 .response-summary { font-weight: 600; margin-bottom: var(--spacing-sm); }
 .response-deadline { color: var(--text-medium); }
 .response-group-row td { background: var(--bg-gray); font-weight: 600; }
+.staffing { margin: var(--spacing-sm) 0 var(--spacing-md); }
+.staffing__title { margin: 0 0 var(--spacing-xs); font-size: 1em; }
+.staffing-table { border-collapse: collapse; width: 100%; }
+.staffing-table th,
+.staffing-table td { padding: 2px var(--spacing-sm) 2px 0; text-align: left; vertical-align: baseline; }
+.staffing-table th { font-weight: 600; white-space: nowrap; }
+.staffing-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.staffing-details { color: var(--text-medium); }
 /* Segmentgruppe .response-filter: siehe components/buttons.css */
 
 /* Gestapelter Anteilsbalken der Rueckmeldungen (nur im Modal gebraucht). */
