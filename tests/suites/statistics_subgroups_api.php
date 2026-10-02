@@ -52,10 +52,12 @@ function sgWorld(array &$w): void
     $w['groups']['R']  = sgCreate('member_groups', ['group_name' => "SG Reg {$s}",  'is_subgroup' => true, 'sort_order' => 1]);
     $w['groups']['R2'] = sgCreate('member_groups', ['group_name' => "SG Reg2 {$s}", 'is_subgroup' => true, 'sort_order' => 0]);
 
-    $w['types']['TG'] = sgCreate('appointment_types', ['type_name' => "SG Gesamtprobe {$s}", 'is_default' => 0,
-        'color' => '#667eea', 'group_ids' => [$w['groups']['G']]]);
+    // Registerprobe zuerst anlegen: Ihre ID ist kleiner, die Namensfolge (TG, TR)
+    // unterscheidet sich damit von der ID-Folge.
     $w['types']['TR'] = sgCreate('appointment_types', ['type_name' => "SG Registerprobe {$s}", 'is_default' => 0,
         'color' => '#667eea', 'group_ids' => [$w['groups']['R']]]);
+    $w['types']['TG'] = sgCreate('appointment_types', ['type_name' => "SG Gesamtprobe {$s}", 'is_default' => 0,
+        'color' => '#667eea', 'group_ids' => [$w['groups']['G']]]);
 
     $members = [
         'A' => ['G', 'R'],
