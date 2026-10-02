@@ -42,7 +42,7 @@ function sgDelete(string $resource, int $id): void
     apiRequest('DELETE', $resource, ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
 }
 
-function sgWorld(): array
+function sgWorld(array &$w): void
 {
     $y = (int) date('Y') - 1;
     $s = uniqid();
@@ -103,16 +103,15 @@ function sgWorld(): array
         ]]), "Eintrag {$m}/{$a}");
     }
 
-    return $w;
 }
 
 /** Termine zuerst -- der Handler raeumt ihre Records mit weg. */
 function sgDropWorld(array $w): void
 {
-    foreach ($w['appointments'] as $id) { sgDelete('appointments', $id); }
-    foreach ($w['members'] as $id)      { sgDelete('members', $id); }
-    foreach ($w['types'] as $id)        { sgDelete('appointment_types', $id); }
-    foreach ($w['groups'] as $id)       { sgDelete('member_groups', $id); }
+    foreach ($w['appointments'] ?? [] as $id) { sgDelete('appointments', $id); }
+    foreach ($w['members'] ?? [] as $id)      { sgDelete('members', $id); }
+    foreach ($w['types'] ?? [] as $id)        { sgDelete('appointment_types', $id); }
+    foreach ($w['groups'] ?? [] as $id)       { sgDelete('member_groups', $id); }
 }
 
 function sgStats(array $w, array $query, string $role = 'admin'): array
@@ -149,13 +148,14 @@ function sgRow(array $table, int $memberId): ?array
 }
 
 /** Eine Welt fuer alle Tests -- der Aufbau kostet rund 30 Anfragen. */
-$sgWorld = null;
+$sgWorld = [];
 
 test('Statistik-Welt laesst sich anlegen', function () use (&$sgWorld) {
-    $sgWorld = sgWorld();
+    sgWorld($sgWorld);
 });
 
 test('Gruppentabelle zaehlt nur Termine im Aktivzeitraum (Jahresregel)', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
     $w = $sgWorld;
     $g = sgTable(sgStats($w, ['group_id' => $w['groups']['G']]), $w['groups']['G']);
     assertTrue($g !== null, 'Tabelle der Gruppe G fehlt');
@@ -168,6 +168,7 @@ test('Gruppentabelle zaehlt nur Termine im Aktivzeitraum (Jahresregel)', functio
 });
 
 test('Kopfzahlen der Gruppe folgen der Jahresregel', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
     $w = $sgWorld;
     $s = sgStats($w, ['group_id' => $w['groups']['G']])['summary'];
 
@@ -179,7 +180,7 @@ test('Kopfzahlen der Gruppe folgen der Jahresregel', function () use (&$sgWorld)
 });
 
 test('Statistik-Welt wird aufgeraeumt', function () use (&$sgWorld) {
-    if ($sgWorld !== null) {
+    if (!empty($sgWorld)) {
         sgDropWorld($sgWorld);
     }
 });
