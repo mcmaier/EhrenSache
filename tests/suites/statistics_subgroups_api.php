@@ -354,6 +354,24 @@ test('Register ohne Gruppe bekommt keine Tabelle', function () use (&$sgWorld) {
     $w     = $sgWorld;
     $stats = sgStats($w, ['group_id' => $w['groups']['R2']]);
     assertSame([], $stats['statistics'], 'R2 hat keine Gruppe: keine Registerstatistik (Spec 5.1)');
+
+    // Auch ohne Gruppenfilter und mit eigener Terminart samt Termin an R2 bleibt die
+    // Tabelle weg -- sonst haelt nur das Fehlen einer Terminart sie zurueck.
+    $typeId = sgCreate('appointment_types', ['type_name' => 'SG Reg2tabelle ' . uniqid(), 'is_default' => 0,
+        'color' => '#667eea', 'group_ids' => [$w['groups']['R2']]]);
+    $apptId = sgCreate('appointments', ['title' => 'SG REG2T', 'date' => "{$w['year']}-10-05",
+        'start_time' => '19:00:00', 'type_id' => $typeId]);
+    try {
+        assertStatus(201, apiRequest('POST', 'records', ['token' => apiToken('admin'), 'body' => [
+            'member_id' => $w['members']['C'], 'appointment_id' => $apptId, 'status' => 'present']]));
+        $all = sgStats($w, ['member_id' => $w['members']['C']]);
+        $ids = array_map(static fn ($g) => (int) $g['group_id'], $all['statistics']);
+        assertSame(false, array_search($w['groups']['R2'], $ids, true),
+            'R2 ohne Gruppe: keine Tabelle ohne Filter, auch mit eigener Terminart');
+    } finally {
+        sgDelete('appointments', $apptId);
+        sgDelete('appointment_types', $typeId);
+    }
 });
 
 test('Kopfzahlen mit Registerfilter: entdoppelt ueber die Mitglieder', function () use (&$sgWorld) {
