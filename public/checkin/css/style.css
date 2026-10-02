@@ -2987,21 +2987,6 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     padding-top: 10px;
 }
 
-/* Je Mitgliedsgruppe ein Block (Nutzer-Entscheidung) -- die Ueberschrift
-   traegt keine eigene Statusfarbe mehr, sie steht ja fuer eine Gruppe, nicht
-   fuer einen Antwortstatus. Die Faerbung nach Status sitzt jetzt an den
-   einzelnen Namens-Chips darunter. */
-.response-name-group__heading {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 4px;
-}
-
 /* Kopfzeile eines zuklappbaren Abschnitts mit Balken (wie .section-head im
    Dashboard, components/modals.css). Darf unter ~480px umbrechen. */
 .section-head {

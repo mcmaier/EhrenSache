@@ -4940,6 +4940,7 @@ function toggleAllResponseSections(appointmentId) {
 /** Umschalter-Klick (Spec 6.2): merkt die Wahl und baut die Termine-Liste neu
  * auf -- kein erneuter API-Aufruf. */
 window.setResponsesGrouping = function(stage) {
+    responsesOpenSections.clear();
     groupingStore(GROUPING_KEY_RESPONSES, stage);
     renderResponses(null);
 };
@@ -5124,6 +5125,7 @@ async function onResponsesClick(event) {
     const btn = event.target.closest('button');
     if (!btn || btn.disabled) return;
 
+    if (!btn.dataset.appointmentId) return; // z. B. Abschnittsknöpfe: eigener Klickweg über dataActions
     const appointmentId = Number(btn.dataset.appointmentId);
     if (responsesInFlight.has(appointmentId)) return; // Speichert schon -- Doppeltipp ignorieren.
 
