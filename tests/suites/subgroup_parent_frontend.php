@@ -104,3 +104,21 @@ test('Mitgliederdialog: data-parent-ids, Abgleich der Checkboxen, Hinweise', fun
     assertTrue(substr_count($save, 'showGroupConsequences(') >= 2,
         'saveMember() zeigt die Hinweise nicht in beiden Zweigen (pinFailed und Erfolg)');
 });
+
+test('Mitgliederimport: Ergebnis zeigt added_groups und group_warnings, Namen vor der Invalidierung gesichert', function () use ($spfRoot) {
+    $js = (string) sourceCode($spfRoot . '/public/js/modules/import_export.js');
+    $summary = spfBody($js, 'function importGroupSummaryHtml', "\n}");
+    assertTrue(str_contains($summary, 'added_groups') && str_contains($summary, 'group_warnings'),
+        'importGroupSummaryHtml() wertet added_groups/group_warnings nicht aus');
+    assertTrue(str_contains($summary, 'escapeHtml('), 'importGroupSummaryHtml() maskiert nicht');
+    assertTrue(!str_contains($summary, 'style='), 'importGroupSummaryHtml() setzt Inline-Styles');
+
+    $display = spfBody($js, 'function displayImportResult', "\n}");
+    assertTrue(str_contains($display, 'importGroupSummaryHtml('), 'displayImportResult() zeigt die Gruppenhinweise nicht an');
+
+    $run = spfBody($js, 'async function executeImport', "\n}");
+    $snap = strpos($run, 'importNameLookup(');
+    $inval = strpos($run, "invalidateCache('members')");
+    assertTrue($snap !== false && $inval !== false && $snap < $inval,
+        'Namen werden nicht vor invalidateCache() gesichert');
+});

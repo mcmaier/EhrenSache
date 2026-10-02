@@ -2239,7 +2239,7 @@ Vorher die Praxis abwarten.
 ---
 
 ### OI-119 · CSV-Import zeigt die Folgen der Mitgliedschaftsregel nicht an
-**Priorität:** niedrig · aufgenommen am 2026-10-02 (Zweig `feat/register-statistik`)
+**Priorität:** erledigt am 2026-10-02 (unveröffentlicht, Zweig `feat/register-statistik`) · aufgenommen am 2026-10-02
 
 Der Mitgliederimport wendet die Mitgliedschaftsregel für Register an und liefert `added_groups`
 und `group_warnings` in der Antwort (siehe `API.md`, „Import“). Die Oberfläche
@@ -2251,6 +2251,8 @@ Abschnitt 4.3, verlangt das für alle Wege).
 
 **Zu tun:** im Ergebnis des Mitgliederimports zwei Zeilen „n Mitglied(er) zusätzlich einer Gruppe
 zugeordnet“ und „n Mitglied(er) in keiner Gruppe ihres Registers“, Namen über den Gruppen-Cache.
+
+**Umgesetzt:** `displayImportResult()` hängt `importGroupSummaryHtml()` an; die Namen stammen aus den Caches und werden in `importNameLookup()` vor der Invalidierung gesichert. Neu angelegte Mitglieder und nicht geladene Gruppen erscheinen mit ihrer ID. Wächter in `tests/suites/subgroup_parent_frontend.php`.
 
 **Nicht sicherheitsrelevant.**
 

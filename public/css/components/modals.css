@@ -314,6 +314,16 @@
     margin-top: var(--spacing-xs);
 }
 
+.import-groups {
+    margin-top: var(--spacing-sm);
+    font-size: 14px;
+}
+
+.import-groups ul {
+    margin: var(--spacing-xs) 0 0;
+    padding-left: var(--spacing-lg);
+}
+
 /* USER MODAL */
 
 .modal-section {

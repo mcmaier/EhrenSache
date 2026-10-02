@@ -12,7 +12,7 @@ import { API_BASE } from '../config.js';
 import { apiCall } from './api.js';
 import { debug } from '../app.js'
 import { getAuthHeaders } from './api.js';
-import { showToast, invalidateCache, refreshYearFilters } from './ui.js';
+import { showToast, invalidateCache, refreshYearFilters, dataCache } from './ui.js';
 import { loadAppointments } from './appointments.js';
 import { showRecordsSection } from './records.js';
 import { showAppointmentSection } from './appointments.js';
@@ -226,6 +226,10 @@ export async function executeImport() {
         // einem Termin erwartet wird -- und das sind die Zahlen im Kalender
         // (Schritt 2b). Ohne Jahresangabe, weil die Zuordnung fuer alle Jahre
         // gilt. showMemberSection() laedt nur die Mitglieder, nicht die Termine.
+        // Namen vorher sichern: die Invalidierung leert Mitglieder- und
+        // Gruppen-Cache, bevor das Ergebnis angezeigt wird.
+        const nameLookup = importNameLookup();
+
         await invalidateCache('appointments');
 
         // Mitglieder aller Jahre, Gruppenzaehler und die Namen in der
@@ -239,9 +243,9 @@ export async function executeImport() {
         document.getElementById('importStatus').textContent = 'Abgeschlossen!';
         
         // Ergebnis anzeigen
-        displayImportResult(result);
-        
-        
+        displayImportResult(result, nameLookup);
+
+
         // Button umwandeln zu "Schließen"
         importBtn.disabled = false;
         importBtn.textContent = 'Schließen';
@@ -259,7 +263,7 @@ export async function executeImport() {
     }
 }
 
-function displayImportResult(result) {
+function displayImportResult(result, nameLookup) {
     const resultDiv = document.getElementById('importResult');
     const contentDiv = document.getElementById('importResultContent');
 
@@ -287,8 +291,59 @@ function displayImportResult(result) {
         html += '</ul></div>';
     }
     
+    html += importGroupSummaryHtml(result, nameLookup);
+
     contentDiv.innerHTML = html;
     resultDiv.style.display = 'block';
+}
+
+/**
+ * Sichert Mitglieds- und Gruppennamen aus den Caches (vor der Invalidierung).
+ * Die Importantwort liefert nur IDs; neu angelegte Mitglieder stehen nicht im
+ * Cache und werden mit ihrer ID angezeigt.
+ */
+function importNameLookup() {
+    const groups = new Map((dataCache.groups?.data || []).map(g => [Number(g.group_id), g.group_name]));
+    const members = new Map();
+    Object.values(dataCache.members || {}).forEach(entry => {
+        (entry?.data || []).forEach(m => {
+            members.set(Number(m.member_id), [m.surname, m.name].filter(Boolean).join(', '));
+        });
+    });
+    return { groups, members };
+}
+
+/**
+ * Folgen der Mitgliedschaftsregel für Register (Spec 2026-10-02, 4.3):
+ * zusätzlich zugeordnete Gruppen und Mitglieder ohne Gruppe ihres Registers.
+ */
+function importGroupSummaryHtml(result, nameLookup) {
+    const lookup = nameLookup || { groups: new Map(), members: new Map() };
+    const memberLabel = id => lookup.members.get(Number(id)) || `Mitglied #${id}`;
+    const groupLabel = id => lookup.groups.get(Number(id)) || `Gruppe #${id}`;
+    const section = (title, rows) => {
+        const items = [...new Set(rows)].map(r => `<li>${escapeHtml(r)}</li>`).join('');
+        return `<div class="import-groups"><strong>${escapeHtml(title)}</strong><ul>${items}</ul></div>`;
+    };
+
+    const added = Array.isArray(result.added_groups) ? result.added_groups : [];
+    const warned = Array.isArray(result.group_warnings) ? result.group_warnings : [];
+    let html = '';
+    if (added.length > 0) {
+        const count = new Set(added.map(a => Number(a.member_id))).size;
+        html += section(
+            `${count} Mitglied(er) zusätzlich einer Gruppe zugeordnet`,
+            added.map(a => `${memberLabel(a.member_id)}: ${groupLabel(a.group_id)}`)
+        );
+    }
+    if (warned.length > 0) {
+        const count = new Set(warned.map(w => Number(w.member_id))).size;
+        html += section(
+            `${count} Mitglied(er) in keiner Gruppe ihres Registers`,
+            warned.map(w => `${memberLabel(w.member_id)}: ${groupLabel(w.subgroup_id)}`)
+        );
+    }
+    return html;
 }
 
 // ============================================
