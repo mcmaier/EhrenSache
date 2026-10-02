@@ -95,8 +95,38 @@ export function responseChipsHtml(summary, { large = false, skip = [] } = {}) {
     return `<span class="response-chip-group${large ? ' response-chip-group--lg' : ''}">${chips}</span>`;
 }
 
-/** Summenblock des Modals: beschriftete Chips plus gestapelter Balken. */
-function responseSummaryBlock(summary) {
+/**
+ * Filter-Chips der Verwalter-Tabelle: dieselben beschrifteten Chips wie der
+ * Summenblock, aber als Knöpfe mit "Alle" davor -- Anzeige und Filter in einem
+ * (wie die Status-Chips des Dashboards, OI-86). Ein zweiter Klick auf den
+ * aktiven Chip hebt den Filter wieder auf. Die Zahl ohne Zugang (OI-109)
+ * steht im Chip "Ohne Antwort", dort, wo sie vorher im Filterknopf stand.
+ */
+function responseFilterChipsHtml(summary, noAccessCount) {
+    const total = CHIP_ORDER.reduce((sum, key) => sum + Number(summary[key] ?? 0), 0);
+    const chip = (key, cls, inner) => {
+        const active = currentFilter === key;
+        const target = active && key !== 'all' ? 'all' : key;
+        return `<button type="button" class="response-chip response-chip--btn ${cls}${active ? ' is-active' : ''}"
+                aria-pressed="${active ? 'true' : 'false'}" data-action="filter-responses" data-value="${escapeHtml(target)}" data-chip="${escapeHtml(key)}">${inner}</button>`;
+    };
+    const all = chip('all', 'response-chip--all',
+        `<span class="response-chip__label">Alle</span><span class="response-chip__count">${total}</span>`);
+    const status = CHIP_ORDER.map(key => {
+        const count = Number(summary[key] ?? 0);
+        const note = key === 'open' && noAccessCount > 0
+            ? `<span class="response-chip__note">davon ${Number(noAccessCount)} ohne Zugang</span>` : '';
+        return chip(key, `response-chip--${key}${count === 0 ? ' is-zero' : ''}`,
+            `<span class="response-chip__label">${RESPONSE_LABELS[key]}</span>`
+            + `<span class="response-chip__icon" aria-hidden="true">${RESPONSE_ICONS[key]}</span>`
+            + `<span class="response-chip__count">${count}</span>${note}`);
+    }).join('');
+    return `<span class="response-chip-group response-chip-group--lg" role="group" aria-label="Nach Rückmeldung filtern">${all}${status}</span>`;
+}
+
+/** Summenblock des Modals: beschriftete Chips plus gestapelter Balken. Für
+ * Verwalter sind die Chips zugleich der Filter (responseFilterChipsHtml()). */
+function responseSummaryBlock(summary, { filterable = false, noAccessCount = 0 } = {}) {
     const total = CHIP_ORDER.reduce((sum, key) => sum + Number(summary[key] ?? 0), 0);
     const bar = total > 0 ? `
         <div class="response-bar" role="img" aria-label="${responseSummaryTitle(summary)}">
@@ -104,7 +134,10 @@ function responseSummaryBlock(summary) {
                 `<span class="response-bar__seg response-bar__seg--${key}" style="width:${(Number(summary[key]) / total * 100).toFixed(2)}%"></span>`
             ).join('')}
         </div>` : '';
-    return `<div class="response-summary">${responseChipsHtml(summary, { large: true })}</div>${bar}`;
+    const chips = filterable
+        ? responseFilterChipsHtml(summary, noAccessCount)
+        : responseChipsHtml(summary, { large: true });
+    return `<div class="response-summary">${chips}</div>${bar}`;
 }
 
 /** Zelle der Terminliste. */
@@ -201,7 +234,11 @@ function renderResponsesModal() {
         `Rückmeldungen: ${apt.title} (${date}, ${apt.start_time.substring(0, 5)})`;
 
     let html = `<p class="response-deadline">${escapeHtml(deadlineText(data))}</p>`;
-    html += responseSummaryBlock(data.summary);
+    const filterable = isAdminOrManager && Boolean(data.members);
+    // OI-109: aus derselben Quelle wie die Tabelle, damit Chip und Zeilen passen.
+    const noAccessCount = filterable
+        ? data.members.filter(m => m.status === null && m.has_access === false).length : 0;
+    html += responseSummaryBlock(data.summary, { filterable, noAccessCount });
 
     if (data.expected) html += ownResponseHtml(data);
     if (data.comparison) html += comparisonHtml(data.comparison);
@@ -283,6 +320,9 @@ function comparisonHtml(c) {
 
 function matchesFilter(m, filter) {
     switch (filter) {
+        case 'yes':
+        case 'maybe':
+        case 'no':          return m.status === filter;
         case 'open':        return m.status === null;
         case 'yes_present': return m.status === 'yes' && m.present === true;
         case 'yes_absent':  return m.status === 'yes' && m.present === false;
@@ -394,14 +434,6 @@ function managerMemberRowHtml(m, started) {
 function managerTableHtml(data) {
     const started = data.started;
     const colspan = started ? 6 : 5;
-    const allCount = data.members.length;
-    const openCount = data.members.filter(m => m.status === null).length;
-    // OI-109: aus derselben Quelle wie openCount, damit Knopf und Tabelle passen.
-    const noAccessCount = data.members.filter(m => m.status === null && m.has_access === false).length;
-    const openLabel = noAccessCount > 0
-        ? `Keine Antwort (${openCount}, davon ${noAccessCount} ohne Zugang)`
-        : `Keine Antwort (${openCount})`;
-
     const filtered = data.members.filter(m => matchesFilter(m, currentFilter));
 
     const stages = groupingAvailableStages(data.members);
@@ -434,18 +466,12 @@ function managerTableHtml(data) {
         const expanded = isSectionExpanded(section.key);
         const groupRow = `<tr class="response-group-row"><td colspan="${colspan}">${groupingSectionHeaderHtml({
             key: section.key, label: section.label, counts, expanded, disabled: currentFilter !== 'all',
-            chipsHtml: responseChipsHtml(counts, { skip: ['yes'] }) })}</td></tr>`;
+            chipsHtml: responseChipsHtml(counts) })}</td></tr>`;
         return groupRow + (expanded ? section.members.map(m => managerMemberRowHtml(m, started)).join('') : '');
     }).join('');
 
     return `
-        <div class="response-filter">
-            <button type="button" class="response-filter__btn${currentFilter === 'all' ? ' is-active' : ''}"
-                    aria-pressed="${currentFilter === 'all' ? 'true' : 'false'}" data-action="filter-responses" data-value="all">Alle (${allCount})</button>
-            <button type="button" class="response-filter__btn${currentFilter === 'open' ? ' is-active' : ''}"
-                    aria-pressed="${currentFilter === 'open' ? 'true' : 'false'}" data-action="filter-responses" data-value="open">${openLabel}</button>
-        </div>
-        ${responsesGroupingSwitcher(stages, stage)}${toggleAllSectionsHtml(stage, sectionKeys(data.members, stage, emptyLabel))}${hint}
+        ${responsesToolbarHtml(responsesGroupingSwitcher(stages, stage), toggleAllSectionsHtml(stage, sectionKeys(data.members, stage, emptyLabel)))}${hint}
         <div class="data-table">
             <table>
                 <thead><tr>
@@ -474,6 +500,12 @@ function responsesGroupingSwitcher(stages, stage) {
                 aria-pressed="${stage === s ? 'true' : 'false'}"
                 data-action="set-responses-grouping" data-value="${escapeHtml(s)}">${stageLabels[s]}</button>`).join('');
     return `<div class="list-grouping">${buttons}</div>`;
+}
+
+/** Eine Zeile unter den Chips: Gliederung links, "Alle aufklappen" rechts. */
+function responsesToolbarHtml(switcher, toggleAll) {
+    if (!switcher && !toggleAll) return '';
+    return `<div class="response-toolbar">${switcher}${toggleAll}</div>`;
 }
 
 /** Schlüssel der Abschnitte, wie sie die Anzeige bildet (ungefiltert). */
@@ -558,12 +590,12 @@ function namesListHtml(members) {
         return `<div class="response-name-group">
             ${groupingSectionHeaderHtml({ key: section.key, label: section.label,
                 counts: groupingStatusCounts(section.members), expanded, disabled: currentFilter !== 'all',
-                chipsHtml: responseChipsHtml(groupingStatusCounts(section.members), { skip: ['yes'] }) })}
+                chipsHtml: responseChipsHtml(groupingStatusCounts(section.members)) })}
             ${expanded ? `<div class="response-name-chips">${chipsHtml()}</div>` : ''}
         </div>`;
     }).join('');
 
-    return `${responsesGroupingSwitcher(stages, stage)}${toggleAllSectionsHtml(stage, sections.map(s => s.key))}${hint}<div class="response-names-grouped">${groups}</div>`;
+    return `${responsesToolbarHtml(responsesGroupingSwitcher(stages, stage), toggleAllSectionsHtml(stage, sections.map(s => s.key)))}${hint}<div class="response-names-grouped">${groups}</div>`;
 }
 
 /** Umschalter-Klick: merkt die Wahl und rendert das offene Modal aus den
@@ -574,9 +606,15 @@ function setResponsesGrouping(stage) {
     if (current) renderResponsesModal();
 }
 
-export function filterResponses(filter) {
+/** chip: Schlüssel des geklickten Filter-Chips -- der Fokus bleibt nach dem
+ * Neuzeichnen auf ihm (Tastaturbedienung), auch wenn er den Filter aufhebt. */
+export function filterResponses(filter, chip) {
     currentFilter = filter;
     renderResponsesModal();
+    if (chip) {
+        document.getElementById('responsesModalBody')
+            .querySelector(`.response-chip--btn[data-chip="${CSS.escape(chip)}"]`)?.focus();
+    }
 }
 
 /**
@@ -732,7 +770,7 @@ export function printResponses() {
 
 registerActions({
     'close-responses-modal': () => closeResponsesModal(),
-    'filter-responses': (el) => filterResponses(el.dataset.value),
+    'filter-responses': (el) => filterResponses(el.dataset.value, el.dataset.chip),
     'open-responses-modal': (el) => openResponsesModal(Number(el.dataset.id)),
     'print-responses': () => printResponses(),
     'save-own-comment': () => saveOwnComment(),

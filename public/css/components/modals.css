@@ -621,6 +621,8 @@
     color: var(--text-dark);
 }
 .section-head__summary { display: inline-flex; align-items: center; gap: var(--spacing-sm); color: var(--text-medium); font-weight: 400; font-size: 0.9em; white-space: nowrap; margin-left: auto; }
+/* Gesamtzahl "von 5" am Ende hinter den vier Chips, in normaler Textfarbe */
+.section-head__total { color: var(--text-dark); }
 .section-bar {
     display: flex; flex: 1 1 80px; min-width: 60px; max-width: 200px; height: 8px;
     border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-gray);
@@ -635,7 +637,13 @@
     padding: 3px 10px; font-size: 12px; margin: var(--spacing-xs) 0;
 }
 .list-grouping__toggle-all:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
-/* Segmentgruppe .response-filter: siehe components/buttons.css */
+/* Zeile unter den Filter-Chips: Gliederung links, "Alle aufklappen" rechts */
+.response-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: var(--spacing-xs) var(--spacing-sm); margin: var(--spacing-sm) 0;
+}
+.response-toolbar .list-grouping { margin: 0; }
+.response-toolbar .list-grouping__toggle-all { margin: 0 0 0 auto; }
 
 /* Gestapelter Anteilsbalken der Rueckmeldungen (nur im Modal gebraucht). */
 .response-bar {

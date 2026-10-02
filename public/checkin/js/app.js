@@ -193,7 +193,6 @@ document.addEventListener('DOMContentLoaded', function() {
         'attendance-grouping':  (el) => window.setAttendanceGrouping(el.dataset.stage),
         'responses-grouping':   (el) => window.setResponsesGrouping(el.dataset.stage),
         'toggle-response-section':      (el) => toggleResponseSection(el.dataset.key),
-        'toggle-all-response-sections': (el) => toggleAllResponseSections(Number(el.dataset.cardId)),
         'correct-work-session': (el) => openWorkSessionModal(Number(el.dataset.sessionId)),
         'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId))
     };
@@ -622,7 +621,7 @@ function groupingStatusCounts(members) {
 
 /**
  * Kopfzeile eines zuklappbaren Abschnitts (Spec 2026-10-02, Abschnitt 6):
- * Knopf mit Name, Balken, "2 von 5" und Icon-Chips (Vollsatz im aria-label). Absichtlich
+ * Knopf mit Name, Balken, vier Icon-Chips und am Ende "von 5" (Vollsatz im aria-label). Absichtlich
  * gleich gehalten mit groupingSectionHeaderHtml() in grouping.js. Die Aktion
  * steht als Literal im Markup, der Schlüssel in data-key; die Breiten der
  * Balkenteile sind Zahlen und gehen über toFixed() ins style-Attribut.
@@ -643,7 +642,7 @@ function groupingSectionHeaderHtml({ key, label, counts, expanded, disabled = fa
             <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
             <span class="section-head__label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
             <span class="section-bar" aria-hidden="true">${segments}</span>
-            <span class="section-head__summary" aria-hidden="true">${counts.yes} von ${total} <span class="response-count-row">${responseCountChipsHtml(counts, ['yes'])}</span></span>
+            <span class="section-head__summary" aria-hidden="true"><span class="response-count-row">${responseCountChipsHtml(counts)}</span><span class="section-head__total">von ${total}</span></span>
         </button>`;
 }
 
@@ -4866,10 +4865,6 @@ function responseNamesHtml(members, appointmentId) {
 
     const sectionKey = section => `${appointmentId}:${stage}:${section.key}`;
     const grouped = stage === 'group' || stage === 'subgroup';
-    const allOpen = grouped && sections.every(section => responsesOpenSections.has(sectionKey(section)));
-    const toggleAll = grouped && sections.length > 0
-        ? `<button type="button" class="list-grouping__btn list-grouping__toggle-all" data-action="toggle-all-response-sections" data-card-id="${appointmentId}">${allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}</button>`
-        : '';
 
     const groups = sections.map(section => {
         const label = section.label === null ? 'Alle Mitglieder' : section.label;
@@ -4907,7 +4902,7 @@ function responseNamesHtml(members, appointmentId) {
 
     return `<details class="response-names"${responsesOpenNames.has(appointmentId) ? ' open' : ''} data-appointment-id="${appointmentId}">
         <summary><span class="response-summary-label">Wer hat geantwortet?</span></summary>
-        ${responsesGroupingSwitcher(stages, stage)}${toggleAll}${hint}
+        ${responsesGroupingSwitcher(stages, stage)}${hint}
         <div class="response-names__body">${groups}</div>
     </details>`;
 }
@@ -4922,20 +4917,6 @@ function renderResponsesKeepingFocus(selector) {
 function toggleResponseSection(key) {
     responsesOpenSections.has(key) ? responsesOpenSections.delete(key) : responsesOpenSections.add(key);
     renderResponsesKeepingFocus(`.section-head[data-key="${CSS.escape(key)}"]`);
-}
-
-/** Klick auf "Alle aufklappen/zuklappen" einer Karte: gleiche Stufe wie die Anzeige. */
-function toggleAllResponseSections(appointmentId) {
-    const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === appointmentId);
-    if (!item || !item.members) return;
-    const stages = groupingAvailableStages(item.members);
-    const stage  = groupingStored(GROUPING_KEY_RESPONSES, stages, 'group');
-    if (stage !== 'group' && stage !== 'subgroup') return;
-    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
-    const keys = groupingSections(item.members, stage, emptyLabel).map(section => `${appointmentId}:${stage}:${section.key}`);
-    const allOpen = keys.every(key => responsesOpenSections.has(key));
-    keys.forEach(key => allOpen ? responsesOpenSections.delete(key) : responsesOpenSections.add(key));
-    renderResponsesKeepingFocus(`.list-grouping__toggle-all[data-card-id="${appointmentId}"]`);
 }
 
 /** Umschalter-Klick (Spec 6.2): merkt die Wahl und baut die Termine-Liste neu

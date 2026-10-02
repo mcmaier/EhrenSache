@@ -129,6 +129,23 @@
 .response-chip-group--lg .response-chip { font-size: 0.95em; padding: 4px 10px; gap: 5px; }
 .response-chip__label { font-weight: 600; }
 
+/* Verwalter-Dialog: Die Chips sind zugleich der Filter der Tabelle
+   (responseFilterChipsHtml() in responses.js). Rand statt Flaeche zeigt den
+   aktiven Chip, damit die Ampelfarbe erhalten bleibt. Kein font-Kurzschreiber:
+   Groesse und Gewicht kommen aus .response-chip-group--lg. */
+.response-chip--btn {
+    border: 1px solid transparent;
+    font-family: inherit;
+    line-height: inherit;
+    cursor: pointer;
+}
+.response-chip--btn:hover { filter: brightness(0.95); }
+.response-chip--btn:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+.response-chip--btn.is-active { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; }
+.response-chip--all { background: var(--bg-gray); color: var(--text-dark); }
+.response-chip--all.is-active { color: var(--primary-color); }
+.response-chip__note { font-weight: 400; font-size: 0.85em; opacity: 0.85; }
+
 /* Terminrueckmeldung (FI-1): Namens-Chips "Wer hat geantwortet?" (Mitgliedsansicht,
    namesListHtml() in responses.js). Getoenter Hintergrund plus farbiger linker
    Rand, Icon-Praefix im Chiptext sorgt dafuer, dass der Status nicht allein an

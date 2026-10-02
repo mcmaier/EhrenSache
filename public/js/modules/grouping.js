@@ -125,8 +125,8 @@ export function groupingStatusCounts(members) {
 
 /**
  * Kopfzeile eines zuklappbaren Abschnitts (Spec 2026-10-02, Abschnitt 6):
- * Knopf mit Name, Balken, "2 von 5" und Icon-Chips (chipsHtml, vom Aufrufer
- * mit responseChipsHtml() gebaut -- grouping.js darf responses.js nicht
+ * Knopf mit Name, Balken, vier Icon-Chips (chipsHtml, vom Aufrufer
+ * mit responseChipsHtml() gebaut, Zusagen eingeschlossen) und am Ende "von 5" -- grouping.js darf responses.js nicht
  * importieren, das waere ein Zyklus; der Vollsatz steht im aria-label). Die Breiten
  * der Balkenteile sind Zahlen -- sie gehen über toFixed() ins style-Attribut.
  * Der Aufrufer maskiert nichts vorher; hier wird alles maskiert.
@@ -147,6 +147,6 @@ export function groupingSectionHeaderHtml({ key, label, counts, expanded, disabl
             <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
             <span class="section-head__label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
             <span class="section-bar" aria-hidden="true">${segments}</span>
-            <span class="section-head__summary" aria-hidden="true">${counts.yes} von ${total}${chipsHtml}</span>
+            <span class="section-head__summary" aria-hidden="true">${chipsHtml}<span class="section-head__total">von ${total}</span></span>
         </button>`;
 }

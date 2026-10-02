@@ -469,17 +469,51 @@ test('OI-109: Offene Zeilen ohne Zugang tragen ein Kennzeichen', function () use
     assertTrue(str_contains($css, '.response-no-access'), 'badges.css gestaltet .response-no-access nicht');
 });
 
-test('OI-109: Filterknopf nennt die Zahl ohne Zugang', function () use ($rsRoot) {
+test('OI-109: Filter-Chip "Ohne Antwort" nennt die Zahl ohne Zugang', function () use ($rsRoot) {
     $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
 
-    $start = strpos($js, 'function managerTableHtml');
-    assertTrue($start !== false, 'managerTableHtml fehlt');
-    $ende = strpos($js, 'function responseNameChip', $start);
-    assertTrue($ende !== false, 'Ende von managerTableHtml nicht gefunden');
+    $start = strpos($js, 'function responseFilterChipsHtml');
+    assertTrue($start !== false, 'responseFilterChipsHtml fehlt');
+    $ende = strpos($js, 'function responseSummaryBlock', $start);
+    assertTrue($ende !== false, 'Ende von responseFilterChipsHtml nicht gefunden');
     $body = substr($js, $start, $ende - $start);
 
-    assertTrue(str_contains($body, 'ohne Zugang'), 'Filterknopf nennt "ohne Zugang" nicht');
-    assertTrue(str_contains($body, '${openLabel}</button>'), 'Die Beschriftung landet nicht im Filterknopf');
-    assertTrue(str_contains($body, 'has_access === false'),
-        'Zaehlung ohne Zugang muss aus data.members kommen, wie openCount');
+    assertTrue(str_contains($body, 'ohne Zugang'), 'Filter-Chip nennt "ohne Zugang" nicht');
+    assertTrue(str_contains($body, "key === 'open' && noAccessCount > 0"), 'Der Zusatz gehoert nur an den Chip "Ohne Antwort"');
+
+    $start = strpos($js, 'function renderResponsesModal');
+    $ende  = strpos($js, 'function ownResponseHtml', $start);
+    $render = substr($js, $start, $ende - $start);
+    assertTrue(str_contains($render, 'has_access === false') && str_contains($render, 'data.members.filter('),
+        'Zaehlung ohne Zugang muss aus data.members kommen, wie die Tabelle');
+});
+
+test('Verwalter-Dialog: Anzeige-Chips sind zugleich der Filter, keine eigene Filterleiste', function () use ($rsRoot) {
+    $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
+
+    $start = strpos($js, 'function responseFilterChipsHtml');
+    $ende  = strpos($js, 'function responseSummaryBlock', $start);
+    $chips = substr($js, $start, $ende - $start);
+    assertTrue(str_contains($chips, '<button type="button" class="response-chip response-chip--btn'), 'Filter-Chips sind keine Knoepfe');
+    assertTrue(str_contains($chips, 'data-action="filter-responses"'), 'Filter-Chips loesen filter-responses nicht aus');
+    assertTrue(str_contains($chips, "active && key !== 'all' ? 'all' : key"), 'Zweiter Klick auf den aktiven Chip hebt den Filter nicht auf');
+    assertTrue(str_contains($chips, 'aria-pressed='), 'aria-pressed fehlt');
+    assertTrue(str_contains($chips, "chip('all'"), 'Chip "Alle" fehlt');
+
+    $start = strpos($js, 'function managerTableHtml');
+    $ende  = strpos($js, 'function responseNameChip', $start);
+    $table = substr($js, $start, $ende - $start);
+    assertTrue(!str_contains($table, 'response-filter'), 'Die alte Filterleiste steht noch in managerTableHtml');
+    assertTrue(str_contains($table, 'responsesToolbarHtml('), 'Gliederung und "Alle aufklappen" stehen nicht in einer Zeile');
+
+    foreach (["case 'yes':", "case 'maybe':", "case 'no':", 'return m.status === filter;'] as $needle) {
+        assertTrue(str_contains($js, $needle), "matchesFilter() kennt den Statusfilter nicht: {$needle}");
+    }
+    assertTrue(str_contains($js, "'filter-responses': (el) => filterResponses(el.dataset.value, el.dataset.chip)"),
+        'Der Fokus wird nach dem Filtern nicht auf den Chip zurueckgesetzt');
+
+    $css = (string) sourceCode($rsRoot . '/public/css/components/badges.css');
+    assertTrue(str_contains($css, '.response-chip--btn.is-active'), 'Aktiver Filter-Chip ist nicht gestaltet');
+    $modals = (string) sourceCode($rsRoot . '/public/css/components/modals.css');
+    assertTrue(str_contains($modals, '.response-toolbar'), '.response-toolbar ist nicht gestaltet');
 });

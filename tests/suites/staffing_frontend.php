@@ -75,13 +75,17 @@ test('Dashboard: Kopfzeile ist ein Knopf mit aria-expanded, darueber "Alle aufkl
     assertTrue(str_contains($head, 'toggle-response-section'), 'Aktion toggle-response-section fehlt');
     assertTrue(str_contains($head, 'escapeHtml(label)'), 'Bezeichnung wird nicht maskiert');
     assertTrue(str_contains($head, 'title="${escapeHtml(label)}"'), 'title mit vollem Namen fehlt');
-    // Zusammenfassung: nur "n von m" als Text, Rest als Icon-Chips; Vorlesetext im aria-label
+    // Zusammenfassung: vier Icon-Chips, danach "von m" als Text; Vorlesetext im aria-label
     assertTrue(str_contains($head, 'chipsHtml'), 'Kopfzeile nimmt die Chips nicht entgegen');
+    assertTrue(str_contains($head, '${chipsHtml}<span class="section-head__total">von ${total}</span>'),
+        'Gesamtzahl "von n" muss am Ende hinter den Chips stehen');
+    assertTrue(!str_contains($head, 'aria-hidden="true">${counts.yes} von'), 'Zusagen stehen noch als Text vor den Chips');
     assertTrue(str_contains($head, 'aria-label=') && str_contains($head, 'zugesagt') && str_contains($head, 'ohne Antwort'), 'aria-label mit vollem Satz fehlt');
     assertTrue(!str_contains($head, ' offen`'), 'Alter Fliesstext "n offen" steht noch in der Kopfzeile');
 
     $js = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
     assertTrue(substr_count($js, 'chipsHtml: responseChipsHtml(') >= 2, 'Beide Aufrufer muessen responseChipsHtml() uebergeben');
+    assertTrue(!str_contains($js, "skip: ['yes']"), 'Der Zusage-Chip wird in der Kopfzeile noch ausgelassen');
     assertTrue(preg_match('/list-grouping__toggle-all" data-action="toggle-all-response-sections"/', $js) === 1 && str_contains($js, 'list-grouping__btn list-grouping__toggle-all'), 'Alle-aufklappen ist kein Knopf im Stil von list-grouping__btn');
     assertTrue(str_contains($js, 'data-action="toggle-all-response-sections"'), 'Knopf "Alle aufklappen" fehlt');
     assertTrue(str_contains($js, "'toggle-response-section':"), 'Aktion toggle-response-section nicht registriert');
@@ -141,7 +145,7 @@ test('App: kein eigener Besetzungsblock mehr', function () use ($stRoot) {
     assertTrue(!str_contains($css, '.staffing'), '.staffing-Regeln stehen noch in style.css');
 });
 
-test('App: Abschnitte mit Kopfzeile, Zustand im Set, "Alle aufklappen" je Karte', function () use ($stRoot) {
+test('App: Abschnitte mit Kopfzeile, Zustand im Set, kein "Alle aufklappen"', function () use ($stRoot) {
     $js = (string) sourceCode($stRoot . '/public/checkin/js/app.js');
 
     $head = stFunctionBody($js, 'groupingSectionHeaderHtml');
@@ -152,7 +156,9 @@ test('App: Abschnitte mit Kopfzeile, Zustand im Set, "Alle aufklappen" je Karte'
     assertTrue(str_contains($head, 'escapeHtml(label)'), 'Bezeichnung wird nicht maskiert');
     assertTrue(str_contains($head, 'title="${escapeHtml(label)}"'), 'title mit vollem Namen fehlt');
     assertTrue(preg_match('/section-bar"[^>]*aria-hidden="true"/', $head) === 1, 'Balken muss aria-hidden sein');
-    assertTrue(str_contains($head, 'responseCountChipsHtml('), 'PWA-Kopfzeile nutzt responseCountChipsHtml() nicht');
+    assertTrue(str_contains($head, 'responseCountChipsHtml(counts)'), 'PWA-Kopfzeile zeigt nicht alle vier Chips (responseCountChipsHtml(counts))');
+    assertTrue(str_contains($head, '<span class="section-head__total">von ${total}</span>'), 'Gesamtzahl "von n" fehlt am Ende der PWA-Kopfzeile');
+    assertTrue(!str_contains($head, 'aria-hidden="true">${counts.yes} von'), 'Zusagen stehen in der PWA noch als Text vor den Chips');
     assertTrue(str_contains($head, 'aria-label=') && str_contains($head, 'zugesagt') && str_contains($head, 'ohne Antwort'), 'aria-label mit vollem Satz fehlt');
     assertTrue(!str_contains($head, ' offen`'), 'Alter Fliesstext "n offen" steht noch in der Kopfzeile');
     assertTrue(!str_contains($head, 'role='), 'Balken traegt keine role');
@@ -163,10 +169,12 @@ test('App: Abschnitte mit Kopfzeile, Zustand im Set, "Alle aufklappen" je Karte'
     assertTrue(str_contains($names, 'groupingStatusCounts('), 'responseNamesHtml() muss die Zahlen zaehlen');
     assertTrue(str_contains($names, '${appointmentId}:${stage}:${section.key}'), 'Schluessel je Termin/Stufe/Abschnitt fehlt');
     assertTrue(str_contains($names, 'responsesOpenSections.has('), 'Aufklappzustand wird nicht aus dem Set gelesen');
-    assertTrue(str_contains($names, 'data-action="toggle-all-response-sections"'), 'Knopf "Alle aufklappen" fehlt');
+    // Nutzerentscheidung 02.10.2026: In der App reicht der Klick auf die Zeile.
+    assertTrue(!str_contains($names, 'toggle-all-response-sections'), 'Knopf "Alle aufklappen" steht noch in der App');
 
     assertTrue(preg_match('/const responsesOpenSections\s*=\s*new Set\(\)/', $js) === 1, 'responsesOpenSections ist kein Set');
     assertTrue(str_contains($js, "'toggle-response-section':"), 'Aktion toggle-response-section nicht in der Aktionstabelle');
-    assertTrue(str_contains($js, "'toggle-all-response-sections':"), 'Aktion toggle-all-response-sections nicht in der Aktionstabelle');
+    assertTrue(!str_contains($js, 'toggle-all-response-sections') && !str_contains($js, 'toggleAllResponseSections'), 'Reste von "Alle aufklappen" in app.js');
+    assertTrue(!str_contains((string) sourceCode($stRoot . '/public/checkin/css/style.css'), 'list-grouping__toggle-all'), 'Regeln fuer "Alle aufklappen" stehen noch in style.css');
     assertTrue(str_contains($js, 'CSS.escape(') && str_contains($js, '.focus()'), 'Fokus wird nach dem Neuzeichnen nicht wiederhergestellt');
 });

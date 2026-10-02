@@ -3029,6 +3029,10 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     font-weight: 400;
     white-space: nowrap;
 }
+/* Gesamtzahl "von 5" am Ende hinter den vier Chips, in normaler Textfarbe */
+.section-head__total {
+    color: var(--text);
+}
 .section-bar {
     display: flex;
     flex: 1 1 80px;
@@ -3044,7 +3048,6 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
 .section-bar__seg--maybe { background: var(--warning); }
 .section-bar__seg--no    { background: var(--error); }
 .section-bar__seg--open  { background: var(--text-light); }
-.list-grouping__toggle-all:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 
 /* Chips statt Bullet-Liste (Nutzer-Feedback: Punkte sassen zu weit links am
    Kartenrand) -- keine ul/li mehr, daher auch kein list-style noetig. */
@@ -3124,15 +3127,6 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
 
 .list-grouping__btn:hover {
     opacity: 0.8;
-}
-
-/* "Alle aufklappen": kleiner Zweitknopf im Stil von .list-grouping__btn, aber
-   nur so breit wie sein Text (steht allein, nicht in der Segmentleiste). */
-.list-grouping__toggle-all {
-    flex: none;
-    padding: 4px 10px;
-    font-size: 12px;
-    margin: 4px 0;
 }
 
 .list-grouping__btn.is-active {
