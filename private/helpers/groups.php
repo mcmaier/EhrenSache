@@ -74,8 +74,9 @@ function groupsSortForDisplay(array $groups): array
  * bleibt beim Aufrufer, denn beide bisherigen Aufrufer haben sie schon zur
  * Hand (attendance_list.php aus der Termin-Abfrage, responses.php aus den
  * noch nicht entdoppelten erwarteten Mitgliedern). `subgroups` sind alle als
- * Untergruppe markierten Gruppen des Mitglieds, unabhängig von
- * $termGroupIds. Die beiden Stufen sind gegenseitig ausschliessend: eine als
+ * Untergruppe markierten Gruppen des Mitglieds, aber nur solche, die selbst in
+ * $termGroupIds liegen oder von denen mindestens eine ihrer Gruppen
+ * (subgroup_parents) darin liegt (Spec 2026-10-02, 5.2). Die beiden Stufen sind gegenseitig ausschliessend: eine als
  * Untergruppe markierte Gruppe landet nie in `groups`, auch wenn sie zu
  * $termGroupIds gehoert -- sonst waere ein Mitglied doppelt erwartet, wenn
  * eine Terminart ein Register direkt zugeordnet hat. Beide Listen sortiert
@@ -107,8 +108,24 @@ function groupsAttachToMembers($db, $database, array $members, array $termGroupI
 
     $termGroups = array_map('intval', $termGroupIds);
     $byMember   = [];
+    $rows       = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    // Gruppen der gelesenen Register einmal laden
+    $parentsOf = [];
+    $subIds    = array_values(array_unique(array_map(
+        static fn ($r) => (int) $r['group_id'],
+        array_filter($rows, static fn ($r) => (int) $r['is_subgroup'] === 1)
+    )));
+    if ($subIds !== []) {
+        $inSubs = str_repeat('?,', count($subIds) - 1) . '?';
+        $pStmt  = $db->prepare("SELECT subgroup_id, group_id FROM {$prefix}subgroup_parents WHERE subgroup_id IN ($inSubs)");
+        $pStmt->execute($subIds);
+        while ($p = $pStmt->fetch(PDO::FETCH_ASSOC)) {
+            $parentsOf[(int) $p['subgroup_id']][] = (int) $p['group_id'];
+        }
+    }
+
+    foreach ($rows as $row) {
         $eintrag = [
             'group_id'   => (int) $row['group_id'],
             'group_name' => $row['group_name'],
@@ -122,8 +139,17 @@ function groupsAttachToMembers($db, $database, array $members, array $termGroupI
         // Mitglied waere doppelt erwartet -- die Markierung is_subgroup
         // entscheidet, in welche Stufe eine Gruppe gehoert, unabhaengig
         // davon, ob sie auch zu $termGroupIds zaehlt.
+        //
+        // Register nur, wenn sie selbst dem Termin zugeordnet sind oder zu einer
+        // Gruppe des Termins gehoeren -- ein Vorstandsmitglied, das Trompete
+        // spielt, erzeugt auf der Liste einer Vorstandssitzung keinen Abschnitt
+        // "Trompete".
         if ((int) $row['is_subgroup'] === 1) {
-            $byMember[$mid]['subgroups'][] = $eintrag;
+            $gid = $eintrag['group_id'];
+            if (in_array($gid, $termGroups, true)
+                || array_intersect($parentsOf[$gid] ?? [], $termGroups) !== []) {
+                $byMember[$mid]['subgroups'][] = $eintrag;
+            }
         } elseif (in_array($eintrag['group_id'], $termGroups, true)) {
             $byMember[$mid]['groups'][] = $eintrag;
         }
