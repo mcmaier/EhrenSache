@@ -590,19 +590,18 @@
 /* Antworten anderer Mitglieder nach Gruppe (namesListHtml() in responses.js,
    Rolle user + names_visible) -- Layout, Faerbung der Chips in badges.css. */
 .response-names-grouped { display: flex; flex-direction: column; gap: var(--spacing-md); margin-top: var(--spacing-sm); }
-.response-name-group__heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 600; margin-bottom: 6px; }
-.response-name-group__label { color: var(--text-dark); }
 .response-name-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .response-summary { font-weight: 600; margin-bottom: var(--spacing-sm); }
 .response-deadline { color: var(--text-medium); }
 .response-group-row td { background: var(--bg-gray); font-weight: 600; }
 /* Zuklappbare Abschnittskopfzeile (groupingSectionHeaderHtml() in grouping.js) */
 .section-head {
-    display: flex; align-items: center; gap: var(--spacing-sm);
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-xs) var(--spacing-sm);
     width: 100%; padding: var(--spacing-xs) 0;
     border: 0; background: none; color: inherit; font: inherit; font-weight: 600;
     text-align: left; cursor: pointer;
 }
+.section-head:disabled { cursor: default; color: inherit; }
 .section-head:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
 .section-head__chevron { flex: 0 0 1em; }
 .section-head__label { color: var(--text-dark); }

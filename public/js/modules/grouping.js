@@ -129,7 +129,7 @@ export function groupingStatusCounts(members) {
  * der Balkenteile sind Zahlen -- sie gehen über toFixed() ins style-Attribut.
  * Der Aufrufer maskiert nichts vorher; hier wird alles maskiert.
  */
-export function groupingSectionHeaderHtml({ key, label, counts, expanded }) {
+export function groupingSectionHeaderHtml({ key, label, counts, expanded, disabled = false }) {
     const total = counts.yes + counts.maybe + counts.no + counts.open;
     const details = [];
     if (counts.maybe > 0) details.push(`${counts.maybe} unsicher`);
@@ -141,11 +141,11 @@ export function groupingSectionHeaderHtml({ key, label, counts, expanded }) {
         .map(k => `<span class="section-bar__seg section-bar__seg--${k}" style="width:${(counts[k] / total * 100).toFixed(2)}%"></span>`)
         .join('');
 
-    return `<button type="button" class="section-head" aria-expanded="${expanded ? 'true' : 'false'}"
+    return `<button type="button" class="section-head" aria-expanded="${expanded ? 'true' : 'false'}"${disabled ? ' disabled' : ''}
                 data-action="toggle-response-section" data-key="${escapeHtml(key)}">
             <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
             <span class="section-head__label">${escapeHtml(label)}</span>
-            <span class="section-bar" role="img" aria-label="${escapeHtml(summary)}">${segments}</span>
+            <span class="section-bar" aria-hidden="true">${segments}</span>
             <span class="section-head__summary">${escapeHtml(summary)}</span>
         </button>`;
 }

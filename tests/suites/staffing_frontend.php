@@ -93,11 +93,28 @@ test('Dashboard: Zahlen der Kopfzeile aus ungefilterten Abschnitten, ueber secti
     assertTrue(str_contains($body, 's.key,'), 'Die Zahlen muessen nach s.key abgelegt werden');
 });
 
-test('Dashboard: bei Filter "Keine Antwort" sind alle Abschnitte aufgeklappt', function () use ($stRoot) {
+test('Dashboard: bei jedem aktiven Filter sind Abschnitte aufgeklappt und nicht bedienbar', function () use ($stRoot) {
     $js   = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
     $body = stFunctionBody($js, 'isSectionExpanded');
-    assertTrue(str_contains($body, "currentFilter === 'open'"), "Aufklapp-Entscheidung kennt den Filter 'open' nicht");
+    assertTrue(str_contains($body, "currentFilter !== 'all'"), "Aufklapp-Entscheidung kennt aktive Filter nicht (!== 'all')");
     assertTrue(str_contains($body, 'expandedSections.has('), 'Aufklapp-Entscheidung liest expandedSections nicht');
+
+    assertTrue(str_contains(stFunctionBody($js, 'toggleAllSectionsHtml'), "currentFilter !== 'all'"),
+        'Der Alle-Knopf muss unter einem Filter entfallen');
+    assertTrue(str_contains(stFunctionBody($js, 'toggleAllResponseSections'), "currentFilter !== 'all'"),
+        'toggleAllResponseSections() muss unter einem Filter zurueckkehren');
+    assertTrue(preg_match("/'toggle-response-section':.*?currentFilter !== 'all'.*?return/s", $js) === 1,
+        'toggle-response-section muss unter einem Filter zurueckkehren');
+    assertTrue(substr_count($js, 'disabled: currentFilter') >= 2, 'Beide Listen muessen die Kopfzeilen unter Filter sperren');
+
+    $g = (string) sourceCode($stRoot . '/public/js/modules/grouping.js');
+    assertTrue(str_contains(stFunctionBody($g, 'groupingSectionHeaderHtml'), 'disabled'), 'Kopfzeile kennt disabled nicht');
+});
+
+test('Dashboard: Fokus bleibt nach dem Umschalten auf dem Knopf', function () use ($stRoot) {
+    $js = (string) sourceCode($stRoot . '/public/js/modules/responses.js');
+    assertTrue(str_contains($js, 'CSS.escape('), 'Fokus wird nicht ueber CSS.escape wiedergefunden');
+    assertTrue(str_contains($js, '.focus()'), 'Fokus wird nicht wiederhergestellt');
 });
 
 test('Dashboard: Aufklappzustand wird beim Oeffnen und beim Stufenwechsel geleert', function () use ($stRoot) {

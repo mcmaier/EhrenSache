@@ -42,9 +42,9 @@ let currentFilter = 'all';
 // Wechsel der Gliederungsstufe geleert -- Schlüssel gelten nur je Stufe.
 const expandedSections = new Set();
 
-/** Bei Filter "Keine Antwort" zählt alles als aufgeklappt, sonst der gemerkte Zustand. */
+/** Unter jedem aktiven Filter zählt alles als aufgeklappt (und ist nicht umschaltbar), sonst der gemerkte Zustand. */
 function isSectionExpanded(key) {
-    return currentFilter === 'open' || expandedSections.has(key);
+    return currentFilter !== 'all' || expandedSections.has(key);
 }
 
 // OI-63: Schutzschritt gegen einen Fehlklick auf die fremde Rueckmeldung
@@ -433,7 +433,7 @@ function managerTableHtml(data) {
         const counts = sectionCounts.get(section.key) ?? groupingStatusCounts(section.members);
         const expanded = isSectionExpanded(section.key);
         const groupRow = `<tr class="response-group-row"><td colspan="${colspan}">${groupingSectionHeaderHtml({
-            key: section.key, label: section.label, counts, expanded })}</td></tr>`;
+            key: section.key, label: section.label, counts, expanded, disabled: currentFilter !== 'all' })}</td></tr>`;
         return groupRow + (expanded ? section.members.map(m => managerMemberRowHtml(m, started)).join('') : '');
     }).join('');
 
@@ -482,14 +482,14 @@ function sectionKeys(members, stage, emptyLabel) {
 
 /** Knopf "Alle aufklappen/zuklappen" über der Liste; bei alphabetischer Stufe gibt es keine Abschnitte. */
 function toggleAllSectionsHtml(stage, keys) {
-    if (stage === 'alpha' || keys.length === 0) return '';
+    if (stage === 'alpha' || keys.length === 0 || currentFilter !== 'all') return '';
     const allOpen = keys.every(isSectionExpanded);
     return `<button type="button" class="list-grouping__toggle-all" data-action="toggle-all-response-sections">${allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}</button>`;
 }
 
 /** Klick auf "Alle aufklappen/zuklappen": gleiche Stufe wie die Anzeige. */
 function toggleAllResponseSections() {
-    if (!current || !current.members) return;
+    if (!current || !current.members || currentFilter !== 'all') return;
     const members = current.members;
     const stage = groupingStored(GROUPING_KEY_RESPONSES, groupingAvailableStages(members), 'group');
     const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
@@ -497,7 +497,16 @@ function toggleAllResponseSections() {
     const allOpen = keys.every(key => expandedSections.has(key));
     if (allOpen) keys.forEach(key => expandedSections.delete(key));
     else keys.forEach(key => expandedSections.add(key));
+    renderKeepingFocus();
+}
+
+/** Rendert das Modal neu und setzt den Fokus auf den gleichen Knopf zurück (Kopfzeile je Schlüssel, sonst der Alle-Knopf). */
+function renderKeepingFocus(key) {
     renderResponsesModal();
+    const selector = key === undefined
+        ? '.list-grouping__toggle-all'
+        : `.section-head[data-key="${CSS.escape(key)}"]`;
+    document.getElementById('responsesModalBody').querySelector(selector)?.focus();
 }
 
 /**
@@ -543,7 +552,7 @@ function namesListHtml(members) {
         const expanded = isSectionExpanded(section.key);
         return `<div class="response-name-group">
             ${groupingSectionHeaderHtml({ key: section.key, label: section.label,
-                counts: groupingStatusCounts(section.members), expanded })}
+                counts: groupingStatusCounts(section.members), expanded, disabled: currentFilter !== 'all' })}
             ${expanded ? `<div class="response-name-chips">${chipsHtml()}</div>` : ''}
         </div>`;
     }).join('');
@@ -726,9 +735,10 @@ registerActions({
     'set-responses-grouping': (el) => setResponsesGrouping(el.dataset.value),
     'toggle-all-response-sections': () => toggleAllResponseSections(),
     'toggle-response-section': (el) => {
+        if (currentFilter !== 'all') return;
         const key = el.dataset.key;
         expandedSections.has(key) ? expandedSections.delete(key) : expandedSections.add(key);
-        renderResponsesModal();
+        renderKeepingFocus(key);
     },
     'toggle-responses-lock': () => toggleResponsesLock(),
     'withdraw-own-response': () => withdrawOwnResponse(),
