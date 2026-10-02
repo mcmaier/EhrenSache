@@ -48,6 +48,9 @@ function spFetch(array $query): array
 function spYears(): array
 {
     $res = apiRequest('GET', 'available_years', ['token' => apiToken('admin')]);
+    if ($res['status'] !== 200) {
+        throw new RuntimeException("available_years -> HTTP {$res['status']}");
+    }
     $out = [];
     foreach ((array) $res['body'] as $y) {
         $out[] = (int) (is_array($y) ? ($y['year'] ?? 0) : $y);
@@ -59,6 +62,9 @@ function spYears(): array
 function spGroups(): array
 {
     $res = apiRequest('GET', 'member_groups', ['token' => apiToken('admin')]);
+    if ($res['status'] !== 200) {
+        throw new RuntimeException("member_groups -> HTTP {$res['status']}");
+    }
 
     return array_map(static fn ($g) => (int) $g['group_id'], (array) $res['body']);
 }
@@ -80,7 +86,13 @@ function spCollect(): array
 function spBoundaryMembers(int $year): array
 {
     static $rows = null; // einmal laden, nicht je Schluessel
-    $rows ??= (array) apiRequest('GET', 'membership_dates', ['token' => apiToken('admin')])['body'];
+    if ($rows === null) {
+        $res = apiRequest('GET', 'membership_dates', ['token' => apiToken('admin')]);
+        if ($res['status'] !== 200) {
+            throw new RuntimeException("membership_dates -> HTTP {$res['status']}");
+        }
+        $rows = (array) $res['body'];
+    }
     $ids = [];
     foreach ($rows as $row) {
         $start = (string) ($row['start_date'] ?? '');
@@ -105,6 +117,7 @@ function spTables(array $stats): array
         $out[(int) $group['group_id']] = [
             'types' => array_map(static fn ($t) => (int) $t['type_id'], $group['appointment_types']),
             'rows'  => $rows,
+            'count' => count($group['members']), // faengt doppelte Zeilen ab
         ];
     }
 
@@ -113,6 +126,7 @@ function spTables(array $stats): array
 
 if ($mode === 'snapshot') {
     if ($file === '') { fwrite(STDERR, "Zieldatei fehlt\n"); exit(2); }
+    if (spYears() === []) { fwrite(STDERR, "Keine Jahre gefunden -- Abbruch\n"); exit(2); }
     file_put_contents($file, json_encode(spCollect(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     echo "Momentaufnahme geschrieben: {$file}\n";
     exit(0);
@@ -120,17 +134,19 @@ if ($mode === 'snapshot') {
 
 if ($mode === 'compare') {
     $before = json_decode((string) file_get_contents($file), true);
-    if (!is_array($before)) { fwrite(STDERR, "Momentaufnahme unlesbar: {$file}\n"); exit(2); }
+    if (!is_array($before) || $before === []) { fwrite(STDERR, "Momentaufnahme unlesbar oder leer: {$file}\n"); exit(2); }
+    $hasAll = false;
+    foreach (array_keys($before) as $k) {
+        if (str_ends_with((string) $k, '|all')) { $hasAll = true; break; }
+    }
+    if (!$hasAll) { fwrite(STDERR, "Momentaufnahme ohne Bereich '|all' -- unbrauchbar\n"); exit(2); }
 
     $unexpected = 0;
     foreach ($before as $key => $old) {
-        [$year, $scope] = explode('|', $key);
+        [$year, $scope] = explode('|', (string) $key);
         $new      = spFetch($scope === 'all' ? ['year' => $year] : ['year' => $year, 'group_id' => $scope]);
         $boundary = spBoundaryMembers((int) $year);
-
-        if ($old['summary'] != $new['summary']) {
-            echo "[{$key}] Kopfzahlen: " . json_encode($old['summary']) . ' -> ' . json_encode($new['summary']) . "\n";
-        }
+        $allowed  = 0; // erlaubte Zeilenabweichungen dieses Bereichs
 
         $oldTables = spTables($old);
         $newTables = spTables($new);
@@ -153,14 +169,18 @@ if ($mode === 'compare') {
                 $unexpected++;
             }
             $ids = array_unique(array_merge(array_keys($table['rows']), array_keys($newTables[$gid]['rows'])));
+            $rowDiffs = 0;
             foreach ($ids as $mid) {
                 $a = $table['rows'][$mid] ?? null;
                 $b = $newTables[$gid]['rows'][$mid] ?? null;
                 if ($a == $b) {
                     continue;
                 }
+                $rowDiffs++;
                 $label = isset($boundary[$mid]) ? 'erlaubt (Ein-/Austritt)' : 'UNERWARTET';
-                if (!isset($boundary[$mid])) {
+                if (isset($boundary[$mid])) {
+                    $allowed++;
+                } else {
                     $unexpected++;
                 }
                 echo "[{$key}] {$label}: Gruppe {$gid}, Mitglied {$mid}: "
@@ -168,6 +188,38 @@ if ($mode === 'compare') {
                     . ' -> '
                     . json_encode($b === null ? null : [$b['total_appointments'], $b['attended'], $b['excused'], $b['unexcused_absences']])
                     . "\n";
+            }
+            // Zeilenzahl: eine doppelte Zeile faellt im Schluessel-Vergleich nicht auf
+            if ($table['count'] !== $newTables[$gid]['count'] && $rowDiffs === 0) {
+                echo "[{$key}] UNERWARTET: Zeilenzahl Gruppe {$gid}: {$table['count']} -> {$newTables[$gid]['count']}\n";
+                $unexpected++;
+            }
+        }
+
+        // Kopfzahlen und Bloecke: bewertet, nicht nur ausgegeben
+        foreach (['summary' => 'Kopfzahlen', 'punctuality' => 'Pünktlichkeit', 'reliability' => 'Zuverlässigkeit', 'warning' => 'Warnung'] as $block => $name) {
+            $a = $old[$block] ?? null;
+            $b = $new[$block] ?? null;
+            if ($a == $b) {
+                continue;
+            }
+            $text = "[{$key}] {$name}: " . json_encode($a, JSON_UNESCAPED_UNICODE) . ' -> ' . json_encode($b, JSON_UNESCAPED_UNICODE);
+            if ($allowed > 0) {
+                echo $text . " -- erlaubt (folgt aus Ein-/Austritt)\n";
+            } else {
+                echo $text . " -- UNERWARTET (keine erlaubte Zeilenabweichung)\n";
+                $unexpected++;
+            }
+        }
+    }
+
+    // Bereiche, die es jetzt gibt, in der Momentaufnahme aber nicht
+    foreach (spYears() as $year) {
+        $scopes = ['all'];
+        foreach (spGroups() as $gid) { $scopes[] = (string) $gid; }
+        foreach ($scopes as $scope) {
+            if (!array_key_exists("{$year}|{$scope}", $before)) {
+                echo "[{$year}|{$scope}] neuer Bereich (nicht in der Momentaufnahme)\n";
             }
         }
     }
