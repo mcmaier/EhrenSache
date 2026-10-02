@@ -100,9 +100,11 @@ function sgWorld(array &$w): void
         ['E', 'G1', 'present'],
     ];
     foreach ($records as [$m, $a, $status]) {
-        assertStatus(201, apiRequest('POST', 'records', ['token' => apiToken('admin'), 'body' => [
+        $res = apiRequest('POST', 'records', ['token' => apiToken('admin'), 'body' => [
             'member_id' => $w['members'][$m], 'appointment_id' => $w['appointments'][$a], 'status' => $status,
-        ]]), "Eintrag {$m}/{$a}");
+        ]]);
+        assertStatus(201, $res, "Eintrag {$m}/{$a}");
+        $w['records']["{$m}/{$a}"] = (int) $res['body']['id'];
     }
 
 }
@@ -114,6 +116,44 @@ function sgDropWorld(array $w): void
     foreach ($w['members'] ?? [] as $id)      { sgDelete('members', $id); }
     foreach ($w['types'] ?? [] as $id)        { sgDelete('appointment_types', $id); }
     foreach ($w['groups'] ?? [] as $id)       { sgDelete('member_groups', $id); }
+}
+
+function sgSettingValue(string $key): ?string
+{
+    $res = apiRequest('GET', 'settings', ['token' => apiToken('admin')]);
+    foreach ($res['body']['settings'] ?? [] as $setting) {
+        if ($setting['setting_key'] === $key) {
+            return (string) $setting['setting_value'];
+        }
+    }
+
+    return null;
+}
+
+function sgSetSetting(string $key, string $value): void
+{
+    assertStatus(200, apiRequest('PUT', 'settings', [
+        'token' => apiToken('admin'),
+        'body'  => ['setting_key' => $key, 'setting_value' => $value],
+    ]), "Einstellung {$key} konnte nicht gesetzt werden");
+}
+
+/** Fuehrt $fn mit den Einstellungen aus und stellt danach den Vorzustand her. */
+function sgWithSettings(array $settings, callable $fn): void
+{
+    $vorher = [];
+    foreach ($settings as $key => $value) {
+        $vorher[$key] = sgSettingValue($key) ?? '0';
+        sgSetSetting($key, $value);
+    }
+
+    try {
+        $fn();
+    } finally {
+        foreach ($vorher as $key => $value) {
+            sgSetSetting($key, $value);
+        }
+    }
 }
 
 function sgStats(array $w, array $query, string $role = 'admin'): array
@@ -347,6 +387,31 @@ test('Anwesenheitsbericht mit Gruppenfilter listet nur Termine dieser Spalten', 
     $html = $res['raw'];
     assertTrue(preg_match('#<td>SG G2</td>#', $html) === 1, 'G2 (Gesamtprobe) muss als Tabellenzelle im Bericht stehen');
     assertTrue(preg_match('#<td>SG R2</td>#', $html) !== 1, 'R2 gehoert zu einer Terminart ausserhalb der Spalten');
+});
+
+test('Puenktlichkeit und Zuverlaessigkeit mit Filter R ueber denselben Bereich', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w = $sgWorld;
+
+    // Vier gemessene Ankuenfte im Bereich von R: drei Registerproben, eine Gesamtprobe.
+    $ankuenfte = ['A/R1', 'B/R1', 'C/R1', 'D/G2'];
+    foreach ($ankuenfte as $key) {
+        [$m, $a] = explode('/', $key);
+        $tag  = $w['year'] . ($a === 'R1' ? '-04-01 19:00:00' : '-06-01 10:00:00');
+        assertStatus(200, apiRequest('PUT', 'records', [
+            'token' => apiToken('admin'), 'query' => ['id' => $w['records'][$key]],
+            'body'  => ['arrival_time' => $tag],
+        ]), "Ankunft {$key}");
+    }
+
+    sgWithSettings(['punctuality_enabled' => '1', 'reliability_enabled' => '1'], function () use ($w) {
+        $stats = sgStats($w, ['group_id' => $w['groups']['R']]);
+
+        // 15 = A 5 + B 2 + C 5 + D 3, jedes Paar einmal (siehe Kopfzahlen-Probe)
+        assertSame(15, (int) $stats['punctuality']['total_count']);
+        assertSame(4,  (int) $stats['punctuality']['measured_count'], 'Messungen gehoeren zum Bereich von R');
+        assertSame(15, (int) $stats['reliability']['total']);
+    });
 });
 
 test('Statistik-Welt wird aufgeraeumt', function () use (&$sgWorld) {
