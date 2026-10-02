@@ -138,3 +138,45 @@ function groupsAttachToMembers($db, $database, array $members, array $termGroupI
 
     return $members;
 }
+
+/**
+ * Regel nach dem Aendern der Gruppen eines Registers (Spec 2026-10-02, 4.2):
+ * Mitglieder von S, die in keiner Gruppe aus P(S) stehen -- bei genau einer
+ * Gruppe ergaenzen, bei mehreren warnen. Niemand wird entfernt.
+ *
+ * @return array{added: array<int, array{member_id: int, group_id: int}>,
+ *               warnings: array<int, array{member_id: int, subgroup_id: int}>}
+ */
+function groupsApplySubgroupRule($db, $database, int $subgroupId): array
+{
+    $prefix = $database->table('');
+    $result = ['added' => [], 'warnings' => []];
+
+    $stmt = $db->prepare("SELECT group_id FROM {$prefix}subgroup_parents WHERE subgroup_id = ? ORDER BY group_id");
+    $stmt->execute([$subgroupId]);
+    $parents = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    if ($parents === []) {
+        return $result;
+    }
+
+    $in   = implode(',', array_fill(0, count($parents), '?'));
+    $stmt = $db->prepare("SELECT a.member_id FROM {$prefix}member_group_assignments a
+                           WHERE a.group_id = ?
+                             AND NOT EXISTS (SELECT 1 FROM {$prefix}member_group_assignments p
+                                              WHERE p.member_id = a.member_id AND p.group_id IN ({$in}))
+                           ORDER BY a.member_id");
+    $stmt->execute(array_merge([$subgroupId], $parents));
+    $memberIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $insert = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
+    foreach ($memberIds as $memberId) {
+        if (count($parents) === 1) {
+            $insert->execute([$memberId, $parents[0]]);
+            $result['added'][] = ['member_id' => $memberId, 'group_id' => $parents[0]];
+        } else {
+            $result['warnings'][] = ['member_id' => $memberId, 'subgroup_id' => $subgroupId];
+        }
+    }
+
+    return $result;
+}

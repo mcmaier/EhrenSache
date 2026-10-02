@@ -13,6 +13,74 @@
 // MEMBER GROUPS Controller
 // ============================================
 
+/**
+ * Prueft parent_group_ids eines Registers (Spec 2026-10-02, 3): Liste ganzer
+ * Zahlen, jede Gruppe muss existieren und eine gewoehnliche Gruppe sein (keine
+ * Untergruppe, nicht die Gruppe selbst). Nur Untergruppen duerfen Gruppen haben.
+ *
+ * @return array{ids: array<int, int>, error: ?string} bereinigte, sortierte Liste
+ */
+function memberGroupsCheckParents($db, string $prefix, $raw, bool $isSubgroup, int $selfId): array {
+    if(!is_array($raw)) {
+        return ['ids' => [], 'error' => 'parent_group_ids muss eine Liste sein'];
+    }
+
+    $ids = [];
+    foreach($raw as $value) {
+        if(is_int($value) || (is_string($value) && ctype_digit($value))) {
+            $ids[(int) $value] = (int) $value;
+        } else {
+            return ['ids' => [], 'error' => 'parent_group_ids darf nur Gruppen-IDs enthalten'];
+        }
+    }
+    $ids = array_values($ids);
+    sort($ids);
+
+    if($ids === []) {
+        return ['ids' => [], 'error' => null];
+    }
+    if(!$isSubgroup) {
+        return ['ids' => [], 'error' => 'Nur eine Untergruppe kann Gruppen haben'];
+    }
+    if($selfId > 0 && in_array($selfId, $ids, true)) {
+        return ['ids' => [], 'error' => 'Eine Untergruppe kann nicht zu sich selbst gehören'];
+    }
+
+    $in   = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $db->prepare("SELECT group_id FROM {$prefix}member_groups WHERE group_id IN ({$in}) AND is_subgroup = 0");
+    $stmt->execute($ids);
+    if(count($stmt->fetchAll(PDO::FETCH_COLUMN)) !== count($ids)) {
+        return ['ids' => [], 'error' => 'Jede Gruppe muss existieren und eine gewöhnliche Gruppe sein'];
+    }
+
+    return ['ids' => $ids, 'error' => null];
+}
+
+/** Ersetzt die Gruppen eines Registers: loeschen und neu einfuegen. */
+function memberGroupsWriteParents($db, string $prefix, int $subgroupId, array $parentIds): void {
+    $db->prepare("DELETE FROM {$prefix}subgroup_parents WHERE subgroup_id = ?")->execute([$subgroupId]);
+    $insert = $db->prepare("INSERT INTO {$prefix}subgroup_parents (subgroup_id, group_id) VALUES (?, ?)");
+    foreach($parentIds as $parentId) {
+        $insert->execute([$subgroupId, $parentId]);
+    }
+}
+
+/** Gruppen je Register als Karte subgroup_id => sortierte Liste von ints (mit ID: nur dieses Register). */
+function memberGroupsParentMap($db, string $prefix, ?int $subgroupId = null): array {
+    if($subgroupId !== null) {
+        $stmt = $db->prepare("SELECT subgroup_id, group_id FROM {$prefix}subgroup_parents WHERE subgroup_id = ? ORDER BY group_id");
+        $stmt->execute([$subgroupId]);
+    } else {
+        $stmt = $db->query("SELECT subgroup_id, group_id FROM {$prefix}subgroup_parents ORDER BY group_id");
+    }
+    $map = [];
+    foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $map[(int) $row['subgroup_id']][] = (int) $row['group_id'];
+    }
+
+    return $map;
+}
+
 function handleMemberGroups($db, $database, $method, $id) {
 
     $prefix = $database->table('');
@@ -44,6 +112,7 @@ function handleMemberGroups($db, $database, $method, $id) {
                     $memberStmt->execute([$id]);
                     $members = $memberStmt->fetchAll(PDO::FETCH_ASSOC);
                     $group['members'] = $members;
+                    $group['parent_group_ids'] = memberGroupsParentMap($db, $prefix, (int) $id)[(int) $id] ?? [];
 
                     echo json_encode($group);
                 } else {
@@ -58,7 +127,13 @@ function handleMemberGroups($db, $database, $method, $id) {
                                     LEFT JOIN {$prefix}member_group_assignments mga ON g.group_id = mga.group_id
                                     GROUP BY g.group_id
                                     ORDER BY g.sort_order, g.group_name");
-                    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $parentMap = memberGroupsParentMap($db, $prefix);
+                    foreach($rows as &$row) {
+                        $row['parent_group_ids'] = $parentMap[(int) $row['group_id']] ?? [];
+                    }
+                    unset($row);
+                    echo json_encode($rows);
             }
             break;
 
@@ -78,6 +153,18 @@ function handleMemberGroups($db, $database, $method, $id) {
                 break;
             }
 
+            // Gruppen des Registers pruefen, bevor etwas geschrieben wird
+            $parentIdsPost = null;
+            if(property_exists($data, 'parent_group_ids')) {
+                $check = memberGroupsCheckParents($db, $prefix, $data->parent_group_ids, (bool) $isSubgroupPost, 0);
+                if($check['error'] !== null) {
+                    http_response_code(400);
+                    echo json_encode(["message" => $check['error']]);
+                    break;
+                }
+                $parentIdsPost = $check['ids'];
+            }
+
             // Wenn is_default=true, setze alle anderen auf false
             if($isDefaultPost) {
                 $db->exec("UPDATE {$prefix}member_groups SET is_default = 0");
@@ -93,8 +180,18 @@ function handleMemberGroups($db, $database, $method, $id) {
                 $isSubgroupPost,
                 (int) ($data->sort_order ?? 0)
             ])) {
+                $newId = (int) $db->lastInsertId();
+                $added = [];
+                $warnings = [];
+                if($parentIdsPost) {
+                    memberGroupsWriteParents($db, $prefix, $newId, $parentIdsPost);
+                    $rule = groupsApplySubgroupRule($db, $database, $newId);
+                    $added = $rule['added'];
+                    $warnings = $rule['warnings'];
+                }
                 http_response_code(201);
-                echo json_encode(["message" => "Group created", "id" => $db->lastInsertId()]);
+                echo json_encode(["message" => "Group created", "id" => $newId,
+                                  "added_groups" => $added, "group_warnings" => $warnings]);
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to create group"]);
@@ -140,6 +237,30 @@ function handleMemberGroups($db, $database, $method, $id) {
                 break;
             }
 
+            // Eine Gruppe, der Register zugeordnet sind, darf keine Untergruppe
+            // werden -- sonst entstuenden drei Ebenen.
+            if($isSubgroup) {
+                $childStmt = $db->prepare("SELECT 1 FROM {$prefix}subgroup_parents WHERE group_id = ? LIMIT 1");
+                $childStmt->execute([$id]);
+                if($childStmt->fetchColumn()) {
+                    http_response_code(400);
+                    echo json_encode(["message" => "Eine Gruppe mit Untergruppen kann nicht selbst Untergruppe werden"]);
+                    break;
+                }
+            }
+
+            // Gruppen des Registers: fehlt das Feld, bleiben die Zuordnungen stehen
+            $parentIdsPut = null;
+            if(property_exists($data, 'parent_group_ids')) {
+                $check = memberGroupsCheckParents($db, $prefix, $data->parent_group_ids, (bool) $isSubgroup, (int) $id);
+                if($check['error'] !== null) {
+                    http_response_code(400);
+                    echo json_encode(["message" => $check['error']]);
+                    break;
+                }
+                $parentIdsPut = $check['ids'];
+            }
+
             // Wenn is_default=true, setze alle anderen auf false (außer dieser)
             if(isset($data->is_default) && $data->is_default) {
                 $db->prepare("UPDATE {$prefix}member_groups SET is_default = 0 WHERE group_id != ?")->execute([$id]);
@@ -157,7 +278,19 @@ function handleMemberGroups($db, $database, $method, $id) {
                 $sortOrder,
                 $id
             ])) {
-                echo json_encode(["message" => "Group updated"]);
+                $added = [];
+                $warnings = [];
+                if(!$isSubgroup) {
+                    // Wer keine Untergruppe mehr ist, verliert seine Zuordnungen
+                    memberGroupsWriteParents($db, $prefix, (int) $id, []);
+                } elseif($parentIdsPut !== null) {
+                    memberGroupsWriteParents($db, $prefix, (int) $id, $parentIdsPut);
+                    $rule = groupsApplySubgroupRule($db, $database, (int) $id);
+                    $added = $rule['added'];
+                    $warnings = $rule['warnings'];
+                }
+                echo json_encode(["message" => "Group updated",
+                                  "added_groups" => $added, "group_warnings" => $warnings]);
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to update group"]);

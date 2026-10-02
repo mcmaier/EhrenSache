@@ -1,0 +1,198 @@
+<?php
+/**
+ * EhrenSache - Anwesenheitserfassung fürs Ehrenamt
+ *
+ * Copyright (c) 2026 Martin Maier
+ *
+ * Dieses Programm ist unter der AGPL-3.0-Lizenz für gemeinnützige Nutzung
+ * oder unter einer kommerziellen Lizenz verfügbar.
+ * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
+ */
+
+/** Register gehoeren zu Gruppen: API und Mitgliedschaftsregel (Spec 2026-10-02, 3 und 4). */
+declare(strict_types=1);
+
+require_once __DIR__ . '/../lib/api.php';
+
+if (!extension_loaded('curl')) {
+    return;
+}
+
+function spCreate(string $resource, array $body): array
+{
+    $res = apiRequest('POST', $resource, ['token' => apiToken('admin'), 'body' => $body]);
+    assertStatus(201, $res, "{$resource} konnte nicht angelegt werden: " . $res['raw']);
+    assertTrue((int) ($res['body']['id'] ?? 0) > 0, 'keine ID: ' . $res['raw']);
+
+    return $res['body'];
+}
+
+function spDelete(string $resource, int $id): void
+{
+    apiRequest('DELETE', $resource, ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+}
+
+function spGroupIdsOf(int $memberId): array
+{
+    $res = apiRequest('GET', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
+    assertStatus(200, $res);
+    $ids = array_map(static fn ($g) => (int) $g['group_id'], $res['body']['groups']);
+    sort($ids);
+
+    return $ids;
+}
+
+function spGroup(int $groupId): array
+{
+    $res = apiRequest('GET', 'member_groups', ['token' => apiToken('admin'), 'query' => ['id' => $groupId]]);
+    assertStatus(200, $res);
+
+    return $res['body'];
+}
+
+/** PUT member_groups als Voll-Update; $extra ergaenzt den Koerper. */
+function spPutGroup(int $groupId, string $name, array $extra): array
+{
+    return apiRequest('PUT', 'member_groups', ['token' => apiToken('admin'), 'query' => ['id' => $groupId],
+        'body' => array_merge(['group_name' => $name], $extra)]);
+}
+
+test('Gruppen eines Registers: anlegen, lesen, Regeln', function () {
+    $s   = uniqid();
+    $ids = [];
+    try {
+        $g  = $ids[] = (int) spCreate('member_groups', ['group_name' => "SP G {$s}"])['id'];
+        $g2 = $ids[] = (int) spCreate('member_groups', ['group_name' => "SP G2 {$s}"])['id'];
+        $r  = $ids[] = (int) spCreate('member_groups', ['group_name' => "SP R {$s}", 'is_subgroup' => true,
+                                                      'parent_group_ids' => [$g2, $g]])['id'];
+        $expected = [$g, $g2];
+        sort($expected);
+        assertSame($expected, spGroup($r)['parent_group_ids'] ?? null, 'parent_group_ids wird sortiert gelesen');
+        assertSame([], spGroup($g)['parent_group_ids'] ?? null, 'gewoehnliche Gruppe: leere Liste');
+
+        $list = apiRequest('GET', 'member_groups', ['token' => apiToken('admin')]);
+        assertStatus(200, $list);
+        $row = null;
+        foreach ($list['body'] as $candidate) {
+            if ((int) $candidate['group_id'] === $r) { $row = $candidate; }
+        }
+        assertSame($expected, $row['parent_group_ids'] ?? null, 'Liste liefert parent_group_ids');
+
+        // Untergruppe als Ziel: 400
+        $bad = apiRequest('POST', 'member_groups', ['token' => apiToken('admin'), 'body' => [
+            'group_name' => "SP X {$s}", 'is_subgroup' => true, 'parent_group_ids' => [$r]]]);
+        assertStatus(400, $bad, 'Register eines Registers muss abgewiesen werden');
+
+        // unbekannte Gruppe, falscher Typ: 400
+        $bad = apiRequest('POST', 'member_groups', ['token' => apiToken('admin'), 'body' => [
+            'group_name' => "SP X {$s}", 'is_subgroup' => true, 'parent_group_ids' => [999999999]]]);
+        assertStatus(400, $bad, 'unbekannte Gruppe');
+        $bad = apiRequest('POST', 'member_groups', ['token' => apiToken('admin'), 'body' => [
+            'group_name' => "SP X {$s}", 'is_subgroup' => true, 'parent_group_ids' => $g]]);
+        assertStatus(400, $bad, 'parent_group_ids muss eine Liste sein');
+
+        // Gruppen fuer gewoehnliche Gruppe: 400
+        $bad = spPutGroup($g2, "SP G2 {$s}", ['parent_group_ids' => [$g]]);
+        assertStatus(400, $bad, 'parent_group_ids nur fuer Untergruppen');
+
+        // Gruppe mit Registern darf nicht zur Untergruppe werden
+        $bad = spPutGroup($g, "SP G {$s}", ['is_subgroup' => true]);
+        assertStatus(400, $bad, 'Gruppe mit Registern darf keine Untergruppe werden');
+
+        // PUT ohne das Feld behaelt die Zuordnungen
+        $res = spPutGroup($r, "SP R {$s} neu", ['is_subgroup' => true]);
+        assertStatus(200, $res);
+        assertSame($expected, spGroup($r)['parent_group_ids'] ?? null, 'PUT ohne Feld behaelt Zuordnungen');
+
+        // Loeschen einer der Gruppen entfernt nur deren Zuordnung
+        spDelete('member_groups', $g);
+        $ids = array_values(array_diff($ids, [$g]));
+        assertSame([$g2], spGroup($r)['parent_group_ids'] ?? null, 'CASCADE: nur die geloeschte Zuordnung faellt weg');
+
+        // Register -> gewoehnliche Gruppe: Zuordnungen weg
+        $res = spPutGroup($r, "SP R {$s}", ['is_subgroup' => false]);
+        assertStatus(200, $res);
+        assertSame([], spGroup($r)['parent_group_ids'] ?? null, 'gewoehnlich: keine Zuordnungen');
+    } finally {
+        foreach (array_reverse($ids) as $id) { spDelete('member_groups', $id); }
+    }
+});
+
+test('Mitgliedschaftsregel: nachtraegliche Zuordnung (eine Gruppe ergaenzt, mehrere warnen)', function () {
+    $s       = uniqid();
+    $groups  = [];
+    $members = [];
+    try {
+        $g = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP G {$s}"])['id'];
+        $h = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP H {$s}"])['id'];
+        $q = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP Q {$s}", 'is_subgroup' => true])['id'];
+        $w = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP W {$s}", 'is_subgroup' => true])['id'];
+
+        $m1 = $members[] = (int) spCreate('members', ['name' => 'Sp', 'surname' => "1 {$s}", 'active' => 1,
+                                                      'group_ids' => [$q]])['id'];
+
+        // Eine Gruppe: Mitglied wird ergaenzt, Antwort meldet es
+        $res = spPutGroup($q, "SP Q {$s}", ['is_subgroup' => true, 'parent_group_ids' => [$h]]);
+        assertStatus(200, $res);
+        $exp = [$h, $q]; sort($exp);
+        assertSame($exp, spGroupIdsOf($m1));
+        assertSame([['member_id' => $m1, 'group_id' => $h]], $res['body']['added_groups'] ?? null, 'Meldung bei Zuordnung');
+        assertSame([], $res['body']['group_warnings'] ?? null);
+
+        // Zweiter Lauf ist ohne Wirkung (Mitglied steht schon in H)
+        $res = spPutGroup($q, "SP Q {$s}", ['is_subgroup' => true, 'parent_group_ids' => [$h]]);
+        assertSame([], $res['body']['added_groups'] ?? null, 'nichts mehr zu ergaenzen');
+
+        // Zwei Gruppen: Mitglied in keiner -> keine Ergaenzung, Warnung
+        $m2 = $members[] = (int) spCreate('members', ['name' => 'Sp', 'surname' => "2 {$s}", 'active' => 1,
+                                                      'group_ids' => [$w]])['id'];
+        $m3 = $members[] = (int) spCreate('members', ['name' => 'Sp', 'surname' => "3 {$s}", 'active' => 1,
+                                                      'group_ids' => [$w, $g]])['id'];
+        $res = spPutGroup($w, "SP W {$s}", ['is_subgroup' => true, 'parent_group_ids' => [$g, $h]]);
+        assertStatus(200, $res);
+        assertSame([$w], spGroupIdsOf($m2), 'bei mehreren Gruppen wird nichts ergaenzt');
+        assertSame([], $res['body']['added_groups'] ?? null);
+        assertSame([['member_id' => $m2, 'subgroup_id' => $w]], $res['body']['group_warnings'] ?? null,
+            'Warnung nur fuer das Mitglied ohne beide Gruppen');
+        $exp = [$g, $w]; sort($exp);
+        assertSame($exp, spGroupIdsOf($m3), 'Mitglied in einer der Gruppen bleibt unveraendert');
+
+        // POST mit Gruppe: ohne Mitglieder leere Listen
+        $body = spCreate('member_groups', ['group_name' => "SP N {$s}", 'is_subgroup' => true, 'parent_group_ids' => [$g]]);
+        $groups[] = (int) $body['id'];
+        assertSame([], $body['added_groups'] ?? null);
+        assertSame([], $body['group_warnings'] ?? null);
+        assertSame([$g], spGroup((int) $body['id'])['parent_group_ids'] ?? null);
+    } finally {
+        foreach ($members as $id) { spDelete('members', $id); }
+        foreach (array_reverse($groups) as $id) { spDelete('member_groups', $id); }
+    }
+});
+
+// Haengt an Task 3 (POST/PUT members normalisieren die Gruppenliste); bis dahin rot.
+test('Mitgliedschaftsregel: POST und PUT members ziehen die Gruppe nach', function () {
+    $s       = uniqid();
+    $groups  = [];
+    $members = [];
+    try {
+        $g = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP G {$s}"])['id'];
+        $h = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP H {$s}"])['id'];
+        $r = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP R {$s}", 'is_subgroup' => true,
+                                                         'parent_group_ids' => [$g]])['id'];
+
+        $body = spCreate('members', ['name' => 'Sp', 'surname' => "1 {$s}", 'active' => 1, 'group_ids' => [$r]]);
+        $m1 = $members[] = (int) $body['id'];
+        $exp = [$g, $r]; sort($exp);
+        assertSame($exp, spGroupIdsOf($m1));
+        assertSame([['member_id' => $m1, 'group_id' => $g]], $body['added_groups'] ?? null, 'Meldung bei POST');
+
+        $res = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $m1],
+            'body' => ['group_ids' => [$r, $h]]]);
+        assertStatus(200, $res);
+        $exp = [$g, $h, $r]; sort($exp);
+        assertSame($exp, spGroupIdsOf($m1), 'Register gewinnt bei einer Gruppe');
+    } finally {
+        foreach ($members as $id) { spDelete('members', $id); }
+        foreach (array_reverse($groups) as $id) { spDelete('member_groups', $id); }
+    }
+});
