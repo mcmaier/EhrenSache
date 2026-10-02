@@ -13,7 +13,7 @@ eine Grundsatzentscheidung fällt oder eine alte gekippt wird.
 **Wenn Historie und heutiger Stand auseinandergehen, gilt der Code.** Wo eine Entscheidung
 später korrigiert wurde, steht das unter „heute" direkt dabei.
 
-**Stand:** 2026-09-25 · **Quelle:** verdichtete Projektchats bis 2026-04-15; ab da liegt die
+**Stand:** 2026-10-02 · **Quelle:** verdichtete Projektchats bis 2026-04-15; ab da liegt die
 Historie in `git log`, `CHANGELOG.md` und `docs/` — nur Grundsatzentscheidungen dieser Zeit
 stehen hier, in Kapitel 12
 
@@ -134,6 +134,9 @@ Repositories.)*
   vorhandenen `member_groups` an der Standard-Terminart abgebildet; gegen die dabei
   entstehende Doppelzählung wird zusätzlich nach `type_id` ausgewertet. Ein eigener
   Gruppen-Unterbau (Tabellen, API, UI) wurde verworfen.
+  *Heute:* Register sind seit 1.8.0 als Untergruppen markierte `member_groups`, und seit
+  2026-10-02 (unveröffentlicht) gehören sie über die Tabelle `subgroup_parents` zu Gruppen —
+  eine Verbindung, kein zweiter Unterbau, siehe Kapitel 12.
 
 ## 5 · Auswertung: die API rechnet, das Frontend zeigt (12/2025)
 
@@ -321,6 +324,26 @@ Grundsatzentscheidung ablöst oder eine neue setzt — alles andere bleibt in Ch
   > Text. Wer die beiden Fassungen später weiter auseinanderzieht, kippt nicht diesen Vermerk,
   > sondern den Fehlerbericht aus FI-1.
 
+- **Register gehören zu Gruppen, ohne Vererbung** (2026-10-02, noch unveröffentlicht, Spec
+  `docs/superpowers/specs/2026-10-02-register-gruppe-besetzung-design.md`). Das kippt
+  **teilweise** die Entscheidung „Markierung statt Hierarchie“ aus 1.8.0 (Spec
+  `2026-09-16-untergruppen-gliederung-design.md`, Abschnitt 3.1): Damals wurde ein Register nur
+  als Untergruppe markiert, eine Zuordnung zu einer Gruppe bewusst weggelassen, weil die
+  Folgefragen „heute niemand“ stelle. **Anlass** war der Praxistest der Registerstatistik:
+  Gruppen spielen zwei Rollen — Zielgruppe (wer wird erwartet: Aktive, Jugend, Vorstandschaft) und
+  Einteilung (welches Register) —, und ohne Verbindung zwischen beiden rechnete die
+  Registertabelle Vorstandssitzungen mit, nur weil Vorstandsmitglieder auch im Register spielen;
+  eine Vorstandssitzung bot die Gliederung nach Register an. **Befund aus der Umsetzung:** Die
+  erste Fassung ließ ein Register zu genau einer Gruppe gehören und nahm seine Mitglieder dort
+  auf. Auf den Demodaten hat aber jedes Register Mitglieder aus Aktiven **und** Jugend — der
+  Server hätte Jungmusiker in „Aktive“ aufgenommen. Deshalb gehört ein Register zu **einer oder
+  mehreren** Gruppen (Tabelle `subgroup_parents`), bei genau einer ergänzt der Server sie, bei
+  mehreren warnt er nur. **Vererbung bleibt verworfen:** Erwartet wird weiterhin allein über die
+  Gruppen der Terminart; die Zuordnung bestimmt nur, welche Termine in der Registerstatistik
+  zählen und welche Register eine Liste gliedern. Bestehende Register werden bei der Umstellung
+  bewusst **nicht** abgeleitet — jedes Register enthält auch ein Vorstandsmitglied, und keine
+  Zählregel trennt das von einem Jugendlichen.
+
 ---
 
 ## Leitplanken, die aus alldem folgen
@@ -362,6 +385,8 @@ Kurzfassung für den Alltag — alles oben begründet:
 | MIT/Apache, Open Core, Source Available | kein Schutz vor proprietärer SaaS-Nutzung |
 | Preisliste in der öffentlichen Lizenz | Preisbindung, kein Verhandlungsspielraum |
 | Interne `member_id` in Import/Export | DB-Interna, nicht stabil zwischen Instanzen |
+| Vererbung zwischen Register und Gruppe (Terminarten, Sichtbarkeit) | schlägt in Erwartung, Cross-Filtering und Statistik durch; die Zuordnung Register → Gruppen (2026-10-02) genügt, Kapitel 12 |
+| Register zu genau einer Gruppe; Gruppen bestehender Register ableiten | Register haben Mitglieder aus Aktiven und Jugend; keine Zählregel trennt Vorstand von Jugend (2026-10-02) |
 
 ---
 

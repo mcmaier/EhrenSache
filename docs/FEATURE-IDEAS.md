@@ -51,7 +51,7 @@ durchschlägt.
 | [FI-11](#fi-11--mehrsprachigkeit-der-oberfläche) | Mehrsprachigkeit der Oberfläche | niedrig | L | — |
 | [FI-12](#fi-12--material--und-instrumentenausleihe) | Material- und Instrumentenausleihe | niedrig | L | — |
 | [FI-13](#fi-13--geburtstagsliste-mit-gratulationsvermerk) | Geburtstagsliste mit Gratulationsvermerk | mittel | M | — |
-| [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht — **Variante B in 1.8.0, Besetzung umgesetzt auf `feat/register-statistik`, unveröffentlicht** (ohne Mindestbesetzung) | mittel¹ | M | FI-1 für die Wirkung |
+| [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht — **Variante B in 1.8.0; Register mit Gruppen und Besetzung je Register umgesetzt auf `feat/register-statistik`, unveröffentlicht** (ohne Mindestbesetzung, ohne Vererbung) | mittel¹ | M | FI-1 für die Wirkung |
 | [FI-15](#fi-15--rolle-gruppenleiter) | Rolle „Gruppenleiter" | hoch | L | — |
 | [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) | Feiertage und Ferien im Terminkalender — **Feiertagsteil umgesetzt in 1.11.0, Ferien offen bei FI-18** | mittel | M | FI-7 für die Wirkung |
 | [FI-17](#fi-17--offene-punkte-unter-mein-konto) | Offene Punkte unter „Mein Konto" — **umgesetzt in 1.13.0** | hoch | S | — |
@@ -176,20 +176,37 @@ die Namensliste der Terminrückmeldung lassen sich per Umschalter „Alphabetisc
 **Besetzungsübersicht mit Sollstärke** — „Klarinette 3 von 6" statt nur der Gliederung nach
 Register. Der Rest dieses Abschnitts beschreibt diesen offenen Teil.
 
-**Umgesetzt am 2026-10-02, noch unveröffentlicht** (Zweig `feat/register-statistik`) — Spec
-`docs/superpowers/specs/2026-10-01-register-statistik-besetzung-design.md`, zusammen mit
-[OI-70](OPEN-ITEMS.md#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach
-Register). Rückmeldungsdialog, Check-in-App und Druck der Rückmeldungen zeigen Verwaltern je
-Register „3 von 6“ mit unsicher, Absagen und offen; die Abschnittszeilen der Verwalter-Tabelle
-lauten „Klarinetten · 3 von 6 zugesagt“. Der Server rechnet die Zahlen einmal
-(`responsesStaffing()`, Feld `staffing` in `appointment_responses`, nur für Admin und Manager),
-die Oberflächen zeigen sie nur an. Die beiden offenen Fragen unten sind so entschieden:
+**Umgesetzt am 2026-10-02, noch unveröffentlicht** (Zweig `feat/register-statistik`) — Specs
+`docs/superpowers/specs/2026-10-01-register-statistik-besetzung-design.md` und, nach einem
+Praxistest am selben Tag, `docs/superpowers/specs/2026-10-02-register-gruppe-besetzung-design.md`,
+zusammen mit [OI-70](OPEN-ITEMS.md#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik
+nach Register).
+
+- **Register gehören zu Gruppen.** Ein Register gehört zu einer oder mehreren gewöhnlichen Gruppen
+  (Tabelle `subgroup_parents`, im Gruppendialog „gehört zu“) — mehrere, weil Jungmusiker im
+  Register mitspielen und Register so Mitglieder aus „Aktive“ und „Jugend“ haben. **Ohne
+  Vererbung:** Erwartet wird weiterhin nur über die Terminart. Das ist ein Teil von Variante C
+  (unten) — die Verbindung, nicht die Hierarchie.
+- **Mitgliedschaftsregel:** Wer in einem Register steht, steht auch in einer seiner Gruppen. Bei
+  genau einer Gruppe ergänzt der Server sie, bei mehreren warnt er und speichert, ohne Gruppe tut
+  er nichts. Gilt für Mitgliederdialog, API, CSV-Import und das Zuordnen der Gruppen eines
+  Registers.
+- **Besetzung in der Gliederung:** Rückmeldungsdialog und Check-in-App zeigen keinen eigenen
+  Block „Besetzung“ mehr (so der erste Entwurf), sondern zugeklappte Abschnitte je Register mit
+  Balken und „2 von 5 · 1 unsicher · 2 offen“, „Alle aufklappen“ und offenen Abschnitten unter
+  jedem Filter. Als Abschnitte erscheinen nur Register, deren Gruppe (oder die selbst) der
+  Terminart zugeordnet ist — eine Vorstandssitzung wird nicht nach Register gegliedert.
+  Verwalter sehen die Liste mit Namen auch in der App; Mitglieder ohne „Namen sichtbar“ nur den
+  Gesamtbalken. Der Druck behält die Tabelle „Besetzung“, gebildet aus derselben Liste; ein
+  Feld `staffing` in der API gibt es nicht.
+
+Die beiden offenen Fragen unten sind so entschieden:
 
 - **Sollstärke = Zahl der zu diesem Termin erwarteten Registermitglieder**, keine gepflegte
   Mindestbesetzung. Kein neues Pflegefeld; Mindestbesetzung und Warnfarben bleiben weg.
-- **Doppelspieler zählen in jedem ihrer Register voll** und werden ausgewiesen („davon n
-  mehrfach eingeteilt“, im Druck Spalte „Mehrfach eingeteilt“). Die Gesamtzahlen der Rückmeldung
-  bleiben entdoppelt.
+- **Doppelspieler zählen in jedem ihrer Register voll** und werden ausgewiesen (Hinweis „in
+  mehreren Abschnitten“, im Druck Spalte „Mehrfach eingeteilt“). Die Gesamtzahlen der
+  Rückmeldung bleiben entdoppelt.
 
 Nicht enthalten: Anwesenheit je Register nach Terminbeginn (wäre FI-2 je Register), Kurzform in
 der Terminliste, Hauptregister je Mitglied. Variante C bleibt weggelassen.
@@ -208,10 +225,13 @@ Beliebige, geht die Probe; fehlt die einzige Tuba, klingt sie nicht.
 | **B: Gruppenart** — Häkchen `is_subgroup` und `sort_order` an `member_groups` | eine Migration, etwas Oberfläche | **Umgesetzt in 1.8.0:** Listen nach Register gliedern, ohne dass bestehende Logik sich ändert. Keine Besetzungsübersicht |
 | **C: echte Hierarchie** — `parent_group_id` in `member_groups` | schlägt in Terminarten-Zuordnung, Sichtbarkeitsprüfung, Cross-Filtering, Statistik, Import/Export durch | Vererbung: ein Termin für das Orchester erreicht alle Register automatisch |
 
-Variante C bleibt bewusst weggelassen (Spec-Abschnitt 10): Ein Mitglied in mehreren
-Untergruppen wird mehrfach angezeigt, statt es einem Hauptregister zuzuordnen oder Ebenen zu
-vererben — die Doppelnennung ist die gewählte Antwort auf Mehrfachzugehörigkeit, nicht eine
-Hierarchie.
+Variante C bleibt in ihrem Kern weggelassen (Spec-Abschnitt 10 von 1.8.0): Ein Mitglied in
+mehreren Untergruppen wird mehrfach angezeigt, statt es einem Hauptregister zuzuordnen oder
+Ebenen zu vererben — die Doppelnennung ist die gewählte Antwort auf Mehrfachzugehörigkeit, nicht
+eine Hierarchie. **Seit 2026-10-02 (unveröffentlicht) gibt es die Verbindung Register → Gruppen**,
+allerdings als eigene Tabelle mit mehreren Gruppen je Register statt `parent_group_id` und
+**ohne Vererbung** — Terminarten, Sichtbarkeit und Cross-Filtering bleiben unberührt. Begründung
+in `docs/project_history.md`, Kapitel 12.
 
 **Berührt (für die Besetzungsübersicht):** `statistics.php`, Filterleisten der
 Mitgliederliste, Druckbericht der Besetzung (bleibt bewusst nach Terminart-Gruppe gegliedert,
@@ -1078,7 +1098,7 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
    sinnvoller Schritt gegen die Holschuld. Kein Cron, kein Zustellrisiko, keine Einwilligung;
    bündelt, was FI-6 später verschickt, und speist sich aus derselben Abfrage.
 3. ~~**FI-14 Register** in der kleinen Variante, dann die Besetzungsansicht~~ (Gruppenart
-   umgesetzt in 1.8.0, Besetzung je Register zusammen mit
+   umgesetzt in 1.8.0, Register mit Gruppen und Besetzung je Register zusammen mit
    [OI-70](OPEN-ITEMS.md#oi-70--statistik-nach-untergruppe-rechnet-nicht) am 2026-10-02 gebaut,
    noch unveröffentlicht) — ~~die Besetzungsansicht ist der Grund, warum die Zusagen aus 1.7.0
    mehr sind als eine Anwesenheitsprognose; beide brauchen dieselbe Rechengrundlage für ein
