@@ -611,9 +611,28 @@ anschließendes `PUT` gesetzt (so verfährt auch das Dashboard).
 ```json
 {
   "message": "Member created",
-  "id": 42
+  "id": 42,
+  "added_groups": [ { "member_id": 42, "group_id": 1 } ],
+  "group_warnings": [ { "member_id": 42, "subgroup_id": 7 } ]
 }
 ```
+
+**Mitgliedschaftsregel für Register (noch unveröffentlicht, Spec
+`2026-10-02-register-gruppe-besetzung-design.md`):** Ein Register (Untergruppe) kann zu einer
+oder mehreren gewöhnlichen Gruppen gehören (`parent_group_ids` bei `member_groups`). Steht in
+`group_ids` ein Register, aber keine seiner Gruppen, dann
+
+- ergänzt der Server bei **genau einer** Gruppe diese Gruppe und meldet sie in `added_groups`
+  (`[{member_id, group_id}]`);
+- speichert er bei **mehreren** Gruppen unverändert und meldet das Register in `group_warnings`
+  (`[{member_id, subgroup_id}]`) — etwa ein Jugendlicher im Register „Klarinetten“ der Gruppen
+  „Aktive“ und „Jugend“, bei dem der Server nicht wissen kann, welche gemeint ist;
+- tut er bei einem Register **ohne** Gruppe nichts.
+
+Das Ergebnis hängt nicht von der Reihenfolge in `group_ids` ab: Erst werden die Gruppen der
+Register mit genau einer Gruppe ergänzt, danach die Register mit mehreren gegen die ergänzte
+Liste geprüft. Entfernt wird nie etwas. Beide Felder stehen immer in der Antwort, ohne Treffer
+als leeres Array. Dieselbe Regel gilt für `PUT` (unten) und den CSV-Import.
 
 ---
 
@@ -638,9 +657,14 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
 **Response:**
 ```json
 {
-  "message": "Member updated"
+  "message": "Member updated",
+  "added_groups": [],
+  "group_warnings": []
 }
 ```
+
+`added_groups` und `group_warnings` wie bei POST (Mitgliedschaftsregel für Register); ohne
+`group_ids` im Körper bleiben die Zuordnungen unverändert und beide Listen leer.
 
 ---
 
@@ -1800,12 +1824,23 @@ Löschen sind nie betroffen.
     "created_at": "2026-09-10 11:41:55",
     "is_subgroup": 1,
     "sort_order": 20,
-    "member_count": 9
+    "member_count": 9,
+    "parent_group_ids": [1, 2]
   }
 ]
 ```
 
 Sortiert nach `sort_order`, bei Gleichstand nach `group_name`.
+
+**Gruppen eines Registers (noch unveröffentlicht, Spec
+`2026-10-02-register-gruppe-besetzung-design.md`):** `parent_group_ids` nennt die gewöhnlichen
+Gruppen, zu denen eine Untergruppe gehört — aufsteigend sortiert, leer bei gewöhnlichen Gruppen
+und bei einem Register ohne Gruppe. Gespeichert in der Tabelle `subgroup_parents`. Es gibt genau
+zwei Ebenen und **keine Vererbung**: Erwartet wird weiterhin nur über die Gruppen der Terminart.
+Die Zuordnung bestimmt, welche Termine in der Registerstatistik zählen (siehe `statistics`) und
+welche Register eine Liste gliedern (siehe `attendance_list`, `appointment_responses`); sie
+steuert die Mitgliedschaftsregel bei `members` (siehe „Mitglied erstellen“). Ein Register ohne
+Gruppe ist weiterhin eine Untergruppe, rechnet aber keine Statistik.
 
 **Seit 1.8.0:** `is_subgroup` (0/1) markiert eine Gruppe als Untergruppe (z. B. Register), die
 Anwesenheitslisten und Namenslisten der Terminrückmeldung gliedert — siehe `attendance_list` und
@@ -1829,7 +1864,7 @@ GET /api.php?resource=member_groups&id=1
 Antwort ist die Gruppenzeile mit zusätzlichem Feld `members`: Admin/Manager erhalten je
 Mitglied `member_id`, `name`, `surname`, `member_number`, `active`, `created_at`; andere
 Rollen nur `member_id`, `name`, `surname`. Weder `pin_hash` noch `pin_updated_at` werden hier
-je ausgeliefert.
+je ausgeliefert. Auch die Einzelantwort trägt `parent_group_ids`.
 
 ---
 
@@ -1845,11 +1880,41 @@ je ausgeliefert.
   "description": "Posaunenregister",
   "is_default": false,
   "is_subgroup": true,
-  "sort_order": 60
+  "sort_order": 60,
+  "parent_group_ids": [1]
 }
 ```
 
-`is_subgroup` und `sort_order` sind optional, Vorgabe `false`/`0`.
+`is_subgroup` und `sort_order` sind optional, Vorgabe `false`/`0`. `parent_group_ids` ist
+optional (noch unveröffentlicht); fehlt es, entsteht ein Register ohne Gruppe.
+
+**Response (`201`):**
+```json
+{
+  "message": "Group created",
+  "id": 12,
+  "added_groups": [ { "member_id": 42, "group_id": 1 } ],
+  "group_warnings": []
+}
+```
+
+`id` ist eine Zahl (bis 1.19.0 eine Zeichenkette). `added_groups` und `group_warnings` folgen der
+Mitgliedschaftsregel, angewandt auf die Mitglieder des Registers — bei einer neuen Gruppe sind
+beide in der Regel leer (siehe „Gruppe aktualisieren“).
+
+**`400` bei `parent_group_ids`:**
+
+| Meldung | Fall |
+|---|---|
+| `parent_group_ids muss eine Liste sein` | kein Array |
+| `parent_group_ids darf nur Gruppen-IDs enthalten` | ein Eintrag ist keine ganze Zahl (Zahl oder Ziffernfolge) |
+| `Nur eine Untergruppe kann Gruppen haben` | nicht leere Liste bei `is_subgroup` falsch |
+| `Eine Untergruppe kann nicht zu sich selbst gehören` | eigene ID in der Liste (nur `PUT`) |
+| `Jede Gruppe muss existieren und eine gewöhnliche Gruppe sein` | unbekannte ID oder eine Untergruppe in der Liste |
+
+Gruppe, Zuordnungen und Mitgliedschaftsregel werden in einer Transaktion geschrieben — ganz oder
+gar nicht. Ein Datenbankkonflikt (Deadlock, Lock-Timeout) antwortet mit `503`, der Aufruf kann
+wiederholt werden.
 
 ---
 
@@ -1866,6 +1931,31 @@ auf `null`, `is_default` auf `false`) statt unverändert zu bleiben.
 Körper fehlen — ein `PUT`, das nur `group_name` ändert, löscht damit nicht still die gepflegte
 Reihenfolge (gleiches Muster wie bei Terminarten, OI-54).
 
+**Gruppen eines Registers (noch unveröffentlicht):**
+
+- `parent_group_ids` fehlt: Die Zuordnungen bleiben unverändert.
+- `parent_group_ids` gesetzt: Die Zuordnungen werden ersetzt (`[]` = ohne Gruppe). Danach gilt
+  die Mitgliedschaftsregel für jedes Mitglied des Registers, das in keiner der neuen Gruppen
+  steht: bei genau einer Gruppe ergänzt (`added_groups`), bei mehreren nur gemeldet
+  (`group_warnings`). Niemand wird aus einer Gruppe entfernt.
+- Wird aus einer Untergruppe eine gewöhnliche Gruppe (`is_subgroup` falsch), verliert sie ihre
+  Zuordnungen.
+- Eine gewöhnliche Gruppe, der Register zugeordnet sind, kann keine Untergruppe werden:
+  `400 "Eine Gruppe mit Untergruppen kann nicht selbst Untergruppe werden"`.
+- Übrige `400`-Fälle wie bei „Gruppe erstellen“.
+
+Trifft `id` keine Gruppe, antwortet der Endpunkt mit `404 "Group not found"` (bis 1.19.0
+`200 "Group updated"`, ohne etwas zu ändern).
+
+**Response:**
+```json
+{
+  "message": "Group updated",
+  "added_groups": [],
+  "group_warnings": [ { "member_id": 42, "subgroup_id": 12 } ]
+}
+```
+
 ---
 
 ### Gruppe löschen
@@ -1875,6 +1965,11 @@ Reihenfolge (gleiches Muster wie bei Terminarten, OI-54).
 
 **Seit 1.9.1:** Fehlt `id`, antwortet der Endpunkt mit `400 {"message": "id ist erforderlich"}`;
 trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200 "Group deleted"` (OI-56).
+
+Das Löschen entfernt die Zuordnungen in `subgroup_parents` mit (Fremdschlüssel `ON DELETE
+CASCADE`): Wird ein Register gelöscht, verschwinden seine Gruppen; wird eine Gruppe gelöscht,
+verschwindet nur sie aus der Liste ihrer Register — ein Register mit zwei Gruppen behält die
+andere, eines mit nur dieser steht danach ohne Gruppe.
 
 ---
 
@@ -1957,7 +2052,12 @@ am Termindatum aktiv ist. Geräte haben keinen Zugriff (`403`).
 
 **Berechtigung:** jede angemeldete Rolle außer Gerät. Liefert die Termine, zu denen das Mitglied
 des Kontos erwartet ist — auch für Admin und Manager in der Sicht eines Mitglieds. Ohne
-verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
+verknüpftes Mitglied: leere Liste. Höchstens 50 Termine. Für Admin und Manager trägt jeder
+Termin mit Rückmeldung zusätzlich `members` (siehe „Ein Termin“, nur die Felder `member_id`,
+`name`, `surname`, `group_name`, `status`, `groups`, `subgroups`) — auch ohne „Namen sichtbar“
+(noch unveröffentlicht). Die Check-in-App zeigt Verwaltern damit dieselbe gegliederte Liste wie
+das Dashboard, mit einer Kopfzeile und den Zahlen je Abschnitt. Mitglieder bekommen `members`
+wie bei „Ein Termin“ nur bei `names_visible`.
 
 **Response:**
 ```json
@@ -2017,13 +2117,23 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
   nach Beginn `present`, **seit OI-109** außerdem `has_access`. **Mitglied:** nur bei
   `names_visible`, dann ausschließlich `member_id`,
   Name, Gruppe und Status. Ohne `names_visible` und ohne Admin/Manager-Rechte fehlt `members`
-  ganz — keine Namen, keine Zugehörigkeiten.
+  ganz — keine Namen, keine Zugehörigkeiten. **Liste `?upcoming=1` für Admin/Manager:** `members`
+  steht auch ohne `names_visible`, jedoch nur mit `member_id`, `name`, `surname`, `group_name`,
+  `status`, `groups` und `subgroups` — ohne Bemerkung, Antragsstand und Zugangshinweis.
+  **Kein Feld `staffing`:** Der erste Entwurf der Besetzung je Register (unveröffentlicht) lieferte
+  es; es ist wieder entfallen. Dashboard, App und Druck bilden die Zahlen je Abschnitt aus
+  `members` und `subgroups`.
 
   Jedes Element trägt außerdem `group_name` (die Gruppe der Terminart, über die das Mitglied
   erwartet wird) sowie **seit 1.8.0** `groups` und `subgroups` — dieselbe Struktur wie bei
   `attendance_list`: `groups` sind die Gruppen des Mitglieds, die zur Terminart gehören und
-  **seit 1.9.0** nicht als Untergruppe markiert sind, `subgroups` alle als Untergruppe
-  markierten Gruppen des Mitglieds, unabhängig vom Termin. Beide Listen sind überschneidungsfrei
+  **seit 1.9.0** nicht als Untergruppe markiert sind, `subgroups` die als Untergruppe
+  markierten Gruppen des Mitglieds — **noch unveröffentlicht** nur noch die, die zum Termin
+  passen: das Register ist selbst der Terminart zugeordnet, oder mindestens eine seiner Gruppen
+  (`parent_group_ids`) ist es. Ein Vorstandsmitglied, das Trompete spielt, trägt auf der Liste
+  einer Vorstandssitzung kein Register; ohne passendes Register bietet die Oberfläche die Stufe
+  „<Oberbegriff>“ gar nicht an. Bis dahin standen hier alle Untergruppen des Mitglieds,
+  unabhängig vom Termin. Beide Listen sind überschneidungsfrei
   und unterliegen denselben Sichtbarkeitsregeln wie die Namen selbst — ohne Namen keine
   Zugehörigkeiten.
 - `has_access` (in `members`) und `summary.open_without_access` — **nur Admin/Manager** (OI-109).
@@ -2043,7 +2153,13 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
   Rückmeldung selbst angelegt wurde (`appointment_responses.exception_created`) **und** die
   Verknüpfung noch besteht (`excuse_state` nicht `null`). Entscheidet, ob eine Rücknahme den Antrag
   mitlöscht oder ein nur verknüpfter Antrag bestehen bleibt.
-- `&format=html` (Admin/Manager): Druckansicht der Besetzung je Gruppe.
+- `&format=html` (Admin/Manager): Druckansicht der Besetzung je Gruppe. Gehört mindestens
+  ein erwartetes Mitglied einem zum Termin passenden Register an (dieselbe Regel wie `subgroups`
+  oben), steht am Kopf des Blatts ein Abschnitt „Besetzung“ mit den Spalten <Oberbegriff>,
+  Zusagen („3 von 6“ — 6 ist die Zahl der zu diesem Termin erwarteten Registermitglieder, keine
+  gepflegte Mindestbesetzung), Unsicher, Absagen, Offen und „Mehrfach eingeteilt“ (leer bei 0),
+  am Ende „Ohne <Oberbegriff>“; die Gliederung darunter bleibt nach Terminart-Gruppe. Die Zahlen
+  bildet der Server aus derselben Mitgliederliste wie `members`.
 
 ### Antworten
 **Endpoint:** `PUT /api.php?resource=appointment_responses&appointment_id=42`
@@ -2457,6 +2573,8 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
     {
       "group_id": 1,
       "group_name": "Aktive",
+      "is_subgroup": false,
+      "parent_group_names": [],
       "appointment_types": [
         { "type_id": 1, "type_name": "Gesamtprobe" },
         { "type_id": 2, "type_name": "Registerprobe" }
@@ -2508,6 +2626,51 @@ Mitgliedschaftszeiträume des Mitglieds. Begonnen heißt: Das Check-in-Fenster i
 Startzeit minus `checkin_tolerance_hours`, gemessen an der Uhr der Datenbank. Bis OI-89 zählte
 hier `date <= CURDATE() + 2h` gegen die Datumsspalte, also jeder Termin von heute ab Mitternacht.
 
+**Erwartet ist ein Mitglied zu einem Termin, wenn die Terminart einer seiner Gruppen zugeordnet
+ist und es am Termindatum aktiv ist** — dieselbe Regel wie in Anwesenheitsliste, Kalender und
+Rückmeldung. Bis 1.19.0 genügte der Statistik „irgendwann im Jahr aktiv“: Wer unterm Jahr ein-
+oder austrat, bekam die Termine außerhalb seines Mitgliedschaftszeitraums als unentschuldigt
+angerechnet. Pünktlichkeit, Zuverlässigkeit und der Anwesenheitsbericht rechnen über dieselbe
+Menge.
+
+**Untergruppen (`is_subgroup: true`, noch unveröffentlicht)** — im Musikverein die Register —
+rechnen über ihre Mitglieder, aber nur über die Termine, die über das Register selbst oder über
+eine seiner Gruppen kommen (`parent_group_ids` bei `member_groups`, Spec
+`2026-10-02-register-gruppe-besetzung-design.md`, Abschnitt 5.1):
+
+- **Termine:** Paare der Soll-Menge mit einem Mitglied des Registers, deren Termin über das
+  Register oder über eine seiner Gruppen erwartet wird. Nicht dazu gehören Termine über andere
+  Gruppen der Mitglieder (die Vorstandssitzung eines Vorstandsmitglieds, das Trompete spielt)
+  und über ein anderes Register (die Registerprobe Flügelhorn eines Doppelspielers). Ein
+  Jugendlicher in einem Register der Gruppen „Aktive“ und „Jugend“ zählt mit seinen
+  Jugendproben, ohne selbst in „Aktive“ zu stehen.
+- **Spalten (`appointment_types`):** die Terminarten des Registers und seiner Gruppen, etwa
+  Gesamtprobe und Auftritt über „Aktive“, Jugendprobe über „Jugend“, dazu die Registerprobe.
+  Gehört eine dieser Terminarten zu keiner Gruppe eines Mitglieds, trägt sein `by_type`-Eintrag
+  dazu `total_appointments: 0`.
+- **Zeilen:** die Mitglieder des Registers mit mindestens einem Termin im Bereich. Wer in zwei
+  Registern steht, erscheint in beiden Tabellen voll.
+- **`parent_group_names`:** jeder Eintrag in `statistics[]` trägt die Namen der Gruppen des
+  Registers, nach Name sortiert; bei gewöhnlichen Gruppen leer. Die Oberfläche schreibt daraus
+  die Unterzeile „<Oberbegriff> von Aktive, Jugend: Termine von Aktive, Jugend und eigene
+  Termine“.
+- **Register ohne Gruppe** haben **keine Tabelle**. Mit `group_id` eines solchen Registers ist
+  die ganze Antwort leer — `statistics: []`, Kopfzahlen 0, Pünktlichkeit und Zuverlässigkeit
+  über einen leeren Bereich —, ohne `warning`, weil es kein Zugriffsproblem ist. Ohne Filter
+  zählen seine eigenen Termine (etwa eine nur ihm zugeordnete Registerprobe) in den Kopfzahlen
+  trotzdem mit: Zu ihnen werden Mitglieder erwartet.
+- **Reihenfolge:** Tabellen der Untergruppen folgen nach den gewöhnlichen Gruppen, sortiert nach
+  `sort_order`, dann Name.
+- **Mit `group_id` eines Registers** rechnen auch `summary`, Pünktlichkeit und Zuverlässigkeit
+  über denselben Bereich, entdoppelt wie ohne Filter. Ohne Filter ändern Register an den
+  Kopfzahlen nichts: Ihr Bereich ist eine Teilmenge der Termine aller Gruppen.
+
+Bis 1.19.0 rechnete eine Untergruppe nur über die Terminarten, denen sie selbst zugeordnet war
+(meist keine — dann blieb sie leer). Der erste, unveröffentlichte Entwurf rechnete über alle
+Termine aller Gruppen der Mitglieder; das zog Vorstandssitzungen in die Registerquote und ist
+durch die Regel oben ersetzt. Gewöhnliche Gruppen (`is_subgroup: false`) rechnen unverändert über
+ihre eigenen Terminarten.
+
 `appointment_types` listet **alle** Terminarten, an denen die Gruppe hängt. `by_type` führt sie
 je Mitglied in **derselben Länge und derselben Reihenfolge** — Eintrag *n* von `by_type` gehört
 zu Eintrag *n* von `appointment_types`. Wer die Spalten einer Terminart sucht, muss also nicht
@@ -2527,6 +2690,11 @@ Unterschied zwischen „je Gruppe gezählt" und „unterschiedliche Termine gez�
 2026-09-11 etwa tragen „Aktive" und „Jugend" je 62 Termine, die Vorstandschaft 9 — macht 133 in
 der Summe der Gruppentabellen, während die Kopfzahl bei 71 steht, weil sich Aktive und Jugend
 dieselben 62 Termine teilen.
+
+`summary.total_appointments` zählt außerdem nur Termine, zu denen im Bereich mindestens ein
+Mitglied erwartet wurde — mit `member_id` (für `user` immer erzwungen) also nur die Termine, zu
+denen dieses Mitglied erwartet war. Bis 1.19.0 stand dort mit Mitgliedsfilter die Zahl aller
+Termine des Bereichs, bei einem Admin ohne Gruppenfilter die aller Termine des Vereins.
 
 #### Arbeitszeit im Ergebnis (`include=worktime`)
 
@@ -2663,9 +2831,15 @@ dass es sich um erfundene Daten handelt.
 2. je Gruppe eine Tabelle: Mitglied, Termine, Anwesend, Entschuldigt, Unentschuldigt, Quote —
    danach **je Terminart der Gruppe eine weitere Spalte** mit der Quote des Mitglieds für
    genau diese Terminart. Hat eine Terminart im Berichtsjahr keine Termine, steht dort ein
-   Strich statt „0 %": Eine Null läse sich auf einem Nachweis wie ein Vorwurf.
+   Strich statt „0 %": Eine Null läse sich auf einem Nachweis wie ein Vorwurf. Tabellen von
+   Untergruppen folgen nach den gewöhnlichen Gruppen; ihre Überschrift trägt den Zusatz
+   „(<Oberbegriff> von Aktive, Jugend: Termine von Aktive, Jugend und eigene Termine)“ mit den
+   Gruppen des Registers, Spalten wie bei `statistics` beschrieben. Register ohne Gruppe haben
+   keine Tabelle.
 3. **nur bei genau einem Mitglied** — für `user` also immer — der Abschnitt
-   „Termine im Einzelnen": Datum, Termin, Terminart, Status, Ankunft, Herkunft
+   „Termine im Einzelnen": Datum, Termin, Terminart, Status, Ankunft, Herkunft. Er enthält nur
+   Termine, zu denen das Mitglied erwartet war — keine vor seinem Eintritt oder nach seinem
+   Austritt (bis 1.19.0 auch diese)
 
 **Die Spalte Herkunft** sagt, worauf eine Ankunftszeit beruht. `records.arrival_time` ist keine
 durchgehende Messung — seit 1.5.0 darf sie aber `null` sein und sagt dann aus, dass keine Ankunft
@@ -3073,9 +3247,20 @@ Karteileiche.
   "updated": 3,
   "skipped": 0,
   "appointments_created": 0,
-  "errors": []
+  "errors": [],
+  "added_groups": [ { "member_id": 42, "group_id": 1 } ],
+  "group_warnings": []
 }
 ```
+
+**Gruppen bei `members` (noch unveröffentlicht):** Die Spalte mit den Gruppen eines Mitglieds
+folgt derselben Mitgliedschaftsregel wie `POST`/`PUT members`: Steht ein Register in der Zeile,
+aber keine seiner Gruppen, ergänzt der Import bei genau einer Gruppe diese (`added_groups`) und
+meldet bei mehreren das Register (`group_warnings`), jeweils als `[{member_id, group_id}]` bzw.
+`[{member_id, subgroup_id}]` über alle Zeilen. Beide Felder stehen nur in der Antwort auf
+`type=members`, dort immer, ohne Treffer leer. Beim Import trägt jeder Eintrag zusätzlich
+`member_name` (`"Nachname, Vorname"` der CSV-Zeile), weil die Mitglieder dem Aufrufer noch nicht
+bekannt sein müssen; `POST`/`PUT members` und `member_groups` liefern das Feld nicht.
 
 **Bestehende Termine bei `appointments`.** Ein Termin gleicher Terminart, gleichen Datums und
 gleicher Startzeit wird aktualisiert statt neu angelegt: Titel und Beschreibung immer, Ort und
@@ -3418,8 +3603,11 @@ Zeichenkette `groups`:
   markiert sind**. Vor 1.9.0 enthielt diese Liste auch Terminart-Gruppen, die zugleich als
   Untergruppe markiert waren — eine Terminart mit direkt zugeordnetem Register führte so zu
   einer doppelten Erwartung desselben Mitglieds (einmal über `groups`, einmal über `subgroups`).
-- `subgroups`: **alle** als Untergruppe markierten Gruppen des Mitglieds (z. B. das Register),
-  unabhängig davon, ob die Terminart selbst nach diesen Gruppen eingeteilt ist.
+- `subgroups`: die als Untergruppe markierten Gruppen des Mitglieds (z. B. das Register). Bis
+  1.19.0 **alle**, unabhängig vom Termin; **noch unveröffentlicht** nur die, die selbst der
+  Terminart zugeordnet sind oder von deren Gruppen (`parent_group_ids` bei `member_groups`)
+  mindestens eine es ist. Ein Register ohne Gruppe erscheint damit nur noch auf Listen, deren
+  Terminart es direkt zugeordnet ist (etwa die Registerprobe).
 
 Die beiden Listen sind seit 1.9.0 überschneidungsfrei: eine als Untergruppe markierte Gruppe
 steht nie in `groups`, auch wenn sie zur Terminart gehört. Beide Listen sind nach `sort_order`,

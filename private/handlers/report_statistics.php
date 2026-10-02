@@ -74,8 +74,9 @@ function handleStatisticsReport($db, $database, $request_method, $authUserRole, 
         $result['summary'], $result['punctuality'], $result['reliability']
     )];
 
+    $subgroupWord = groupSubgroupLabel(systemSetting($db, $database, 'subgroup_label', ''));
     foreach ($result['statistics'] as $group) {
-        $sections[] = statisticsReportGroupSection($group);
+        $sections[] = statisticsReportGroupSection($group, $subgroupWord);
     }
 
     if ($memberId !== null) {
@@ -171,7 +172,7 @@ function statisticsReportSummarySection(array $summary,
 }
 
 /** Ein Abschnitt je Gruppe: eine Zeile je Mitglied, Spalten je Terminart. */
-function statisticsReportGroupSection(array $group): array
+function statisticsReportGroupSection(array $group, string $subgroupWord = 'Untergruppe'): array
 {
     $columns = ['Mitglied', 'Termine', 'Anwesend', 'Entschuldigt', 'Unentschuldigt', 'Quote'];
 
@@ -202,8 +203,17 @@ function statisticsReportGroupSection(array $group): array
         $rows[] = $row;
     }
 
+    $parentNames = !empty($group['parent_group_names'])
+        ? implode(', ', $group['parent_group_names'])
+        : '';
+
     $section = [
-        'heading' => $group['group_name'],
+        // Register zaehlen Termine ihrer Gruppen und eigene -- die Ueberschrift
+        // nennt die Gruppen, damit die Tabelle nicht wie eine Gruppentabelle
+        // gelesen wird. Ohne Gruppe gibt es keine Tabelle, hier nur der Name.
+        'heading' => !empty($group['is_subgroup']) && !empty($group['parent_group_names'])
+            ? $group['group_name'] . " ({$subgroupWord} von " . $parentNames . ": Termine von {$parentNames} und eigene Termine)"
+            : $group['group_name'],
         'class'   => 'report-attendance',
         'columns' => $columns,
         'rows'    => $rows,
@@ -234,16 +244,13 @@ function statisticsReportRate($rate): string
 }
 
 /**
- * Termine eines Mitglieds im Jahr, mit Status und Herkunft der Ankunftszeit.
+ * Termine eines Mitglieds im Einzelnen, aus der Soll-Menge.
  *
- * Die Terminarten kommen als Parameter herein, aus demselben Ergebnis, aus dem
- * auch die Quoten stammen. Das ist der Kern dieser Funktion: Eine eigene
- * Ableitung wuerde eine andere Menge treffen als die Rechnung darueber -- die
- * Zuordnung Gruppe -> Terminart ist im Bestand nicht eindeutig (OI-48) --, und
- * auf dem Blatt staende eine Liste, die der Quote widerspricht.
- *
- * Kein DISTINCT noetig: Ueber die Terminarten gefiltert erscheint jeder Termin
- * genau einmal, ohne Umweg ueber die Gruppenzuordnung.
+ * Nur Termine, zu denen das Mitglied erwartet wurde (aktiv am Termindatum,
+ * ueber eine seiner Gruppen), eingeschraenkt auf die Terminarten, ueber die
+ * die Quoten darueber gerechnet wurden. Bis 2026-10-01 listete diese
+ * Funktion alle Termine dieser Terminarten im Jahr -- mit Registertabellen
+ * waeren das Termine fremder Gruppen geworden.
  *
  * @param array<int, int> $typeIds Terminarten, ueber die gerechnet wurde
  * @return array<int, array<string, mixed>>
@@ -254,12 +261,17 @@ function statisticsReportAppointments($db, $database, int $memberId, int $year, 
         return [];
     }
 
-    require_once __DIR__ . '/../helpers/member_activity.php';
+    require_once __DIR__ . '/../helpers/expected_pairs.php';
     require_once __DIR__ . '/../helpers/attendance.php';
 
-    $prefix        = $database->table('');
-    $activityWhere = getMemberActivityWhereYear($year, 'm');
-    $placeholders  = implode(',', array_fill(0, count($typeIds), '?'));
+    $prefix = $database->table('');
+    [$epSql, $epParams] = expectedPairsSql($database, [
+        'year'         => $year,
+        'member_id'    => $memberId,
+        'started_lead' => checkinToleranceHours($db, $database),
+    ]);
+    $typeIds      = array_values(array_map('intval', $typeIds));
+    $placeholders = implode(',', array_fill(0, count($typeIds), '?'));
 
     $sql = "
         SELECT
@@ -271,24 +283,18 @@ function statisticsReportAppointments($db, $database, int $memberId, int $year, 
             r.arrival_time,
             r.status,
             r.checkin_source
-        FROM {$prefix}appointments a
+        FROM (SELECT DISTINCT ep.appointment_id FROM ({$epSql}) ep) p
+        JOIN {$prefix}appointments a ON a.appointment_id = p.appointment_id
         JOIN {$prefix}appointment_types at ON at.type_id = a.type_id
-        JOIN {$prefix}members m
-            ON m.member_id = ?
-            AND {$activityWhere}
         LEFT JOIN {$prefix}records r
             ON r.appointment_id = a.appointment_id
-            AND r.member_id     = m.member_id
+            AND r.member_id     = ?
         WHERE a.type_id IN ({$placeholders})
-          AND YEAR(a.date) = ?
-          AND " . attendanceStartedSql(checkinToleranceHours($db, $database)) . "
         ORDER BY a.date, a.start_time
     ";
 
-    $params = array_merge([$memberId], $typeIds, [$year]);
-
     $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    $stmt->execute(array_merge($epParams, [$memberId], $typeIds));
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }

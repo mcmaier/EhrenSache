@@ -36,7 +36,7 @@ function handleAppointmentResponses($db, $database, $method, $authUserId, $authU
     switch ($method) {
         case 'GET':
             if (isset($_GET['upcoming'])) {
-                responsesGetUpcoming($db, $database, $authMemberId, $now, $globalHours, isset($_GET['with_info']));
+                responsesGetUpcoming($db, $database, $authMemberId, $now, $globalHours, isset($_GET['with_info']), $isManager);
             } else {
                 responsesGetOne($db, $database, $isManager, $authMemberId, $now, $globalHours);
             }
@@ -75,7 +75,7 @@ function responsesQueryInt(string $key): ?int
     return (ctype_digit($raw) && (int) $raw > 0) ? (int) $raw : -1;
 }
 
-function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $globalHours, bool $withInfo = false): void
+function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $globalHours, bool $withInfo = false, bool $isManager = false): void
 {
     if ($memberId === null) {
         echo json_encode(['appointments' => []]);
@@ -88,7 +88,7 @@ function responsesGetUpcoming($db, $database, ?int $memberId, string $now, int $
         if ($apt !== null) {
             // Auch Admin und Manager bekommen hier die Sicht des Mitglieds:
             // Die Liste ist zum Antworten da, die Planung sitzt im Dashboard.
-            $items[] = responsesPayload($db, $database, $apt, false, $memberId, $now, $globalHours);
+            $items[] = responsesPayload($db, $database, $apt, false, $memberId, $now, $globalHours, $isManager);
         }
     }
 
@@ -149,7 +149,8 @@ function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string
  * @param ?int $viewerMemberId Mitglied, dessen Antwort als "own" erscheint
  * @param int $globalHours Globale Frist-Einstellung, einmal je Anfrage gelesen
  */
-function responsesPayload($db, $database, array $apt, bool $isManager, ?int $viewerMemberId, string $now, int $globalHours): array
+function responsesPayload($db, $database, array $apt, bool $isManager, ?int $viewerMemberId, string $now, int $globalHours,
+                          bool $managerNames = false): array
 {
     $appointmentId = (int) $apt['appointment_id'];
     $hours = responseDeadlineHours($apt['response_deadline_hours'], (string) $globalHours);
@@ -241,8 +242,10 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
         if ($started) {
             $payload['comparison'] = array_map('count', responseComparison($expectedIds, $statusByMember, $present));
         }
-    } elseif ($payload['settings']['names_visible']) {
+    } elseif ($payload['settings']['names_visible'] || $managerNames) {
         // Bemerkungen, Zeitpunkte und Antraege anderer sieht ein Mitglied nie (Spec 3.6).
+        // $managerNames: die Listenantwort der App gibt Verwaltern die Namen
+        // auch ohne "Namen sichtbar" -- daraus bildet die App die Besetzung.
         $members = array_values(array_map(static fn ($m, $id) => [
             'member_id'  => $id,
             'name'       => $m['name'],
@@ -288,6 +291,35 @@ function responsesRenderPrint($db, $database, array $payload): void
             'columns' => ['Name', 'Rückmeldung', 'Bemerkung', 'Zeitpunkt'],
             'rows'    => $rows,
         ];
+    }
+
+    // Besetzung je Register am Kopf des Blatts (Spec 2026-10-01, 5.2); die
+    // Gliederung darunter bleibt nach Terminart-Gruppe (Entscheidung 1.8.0).
+    $statusByMember = [];
+    foreach ($payload['members'] as $m) {
+        if ($m['status'] !== null) {
+            $statusByMember[(int) $m['member_id']] = $m['status'];
+        }
+    }
+    $staffing = responsesStaffing($payload['members'], $statusByMember);
+    if (!empty($staffing)) {
+        $word = groupSubgroupLabel(systemSetting($db, $database, 'subgroup_label', ''));
+        $rows = [];
+        foreach ($staffing as $st) {
+            $rows[] = [
+                $st['group_id'] === null ? "Ohne {$word}" : (string) $st['name'],
+                "{$st['yes']} von {$st['expected']}",
+                (string) $st['maybe'],
+                (string) $st['no'],
+                (string) $st['open'],
+                $st['shared'] > 0 ? (string) $st['shared'] : '',
+            ];
+        }
+        array_unshift($sections, [
+            'heading' => 'Besetzung',
+            'columns' => [$word, 'Zusagen', 'Unsicher', 'Absagen', 'Offen', 'Mehrfach eingeteilt'],
+            'rows'    => $rows,
+        ]);
     }
 
     $s = $payload['summary'];

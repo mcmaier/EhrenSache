@@ -314,6 +314,16 @@
     margin-top: var(--spacing-xs);
 }
 
+.import-groups {
+    margin-top: var(--spacing-sm);
+    font-size: 14px;
+}
+
+.import-groups ul {
+    margin: var(--spacing-xs) 0 0;
+    padding-left: var(--spacing-lg);
+}
+
 /* USER MODAL */
 
 .modal-section {
@@ -590,13 +600,53 @@
 /* Antworten anderer Mitglieder nach Gruppe (namesListHtml() in responses.js,
    Rolle user + names_visible) -- Layout, Faerbung der Chips in badges.css. */
 .response-names-grouped { display: flex; flex-direction: column; gap: var(--spacing-md); margin-top: var(--spacing-sm); }
-.response-name-group__heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 600; margin-bottom: 6px; }
-.response-name-group__label { color: var(--text-dark); }
 .response-name-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .response-summary { font-weight: 600; margin-bottom: var(--spacing-sm); }
 .response-deadline { color: var(--text-medium); }
 .response-group-row td { background: var(--bg-gray); font-weight: 600; }
-/* Segmentgruppe .response-filter: siehe components/buttons.css */
+/* Zuklappbare Abschnittskopfzeile (groupingSectionHeaderHtml() in grouping.js) */
+.section-head {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-xs) var(--spacing-sm);
+    width: 100%; padding: var(--spacing-xs) 0;
+    border: 0; background: none; color: inherit; font: inherit; font-weight: 600;
+    text-align: left; cursor: pointer;
+}
+.section-head:disabled { cursor: default; color: inherit; }
+.section-head:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+.section-head__chevron { flex: 0 0 1em; }
+.section-head__label {
+    /* Feste Spalte, damit der Balken in allen Kopfzeilen links gleich beginnt */
+    flex: 0 0 10rem; max-width: 100%; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text-dark);
+}
+.section-head__summary { display: inline-flex; align-items: center; gap: var(--spacing-sm); color: var(--text-medium); font-weight: 400; font-size: 0.9em; white-space: nowrap; margin-left: auto; }
+/* Gesamtzahl "von 5" am Ende hinter den vier Chips, in normaler Textfarbe.
+   Feste Mindestbreiten halten Chips und Zahl ueber alle Zeilen in einer Spalte,
+   auch wenn eine Zeile "von 12" statt "von 5" traegt. */
+.section-head__total { color: var(--text-dark); min-width: 3.6em; }
+.section-head__summary .response-chip { min-width: 2.8em; justify-content: center; }
+.section-bar {
+    display: flex; flex: 1 1 80px; min-width: 60px; max-width: 200px; height: 8px;
+    border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-gray);
+}
+.section-bar__seg { height: 100%; }
+.section-bar__seg--yes   { background: var(--success-color); }
+.section-bar__seg--maybe { background: var(--warning-color); }
+.section-bar__seg--no    { background: var(--danger-color); }
+.section-bar__seg--open  { background: var(--text-light); }
+.list-grouping__toggle-all {
+    /* Kleiner Zweitknopf im Stil von .list-grouping__btn (components/buttons.css) */
+    padding: 3px 10px; font-size: 12px; margin: var(--spacing-xs) 0;
+}
+.list-grouping__toggle-all:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+/* Zeile unter den Filter-Chips: Gliederung links, "Alle aufklappen" rechts */
+.response-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: var(--spacing-xs) var(--spacing-sm); margin: var(--spacing-sm) 0;
+}
+.response-toolbar .list-grouping { margin: 0; }
+.response-toolbar .list-grouping__toggle-all { margin: 0 0 0 auto; }
 
 /* Gestapelter Anteilsbalken der Rueckmeldungen (nur im Modal gebraucht). */
 .response-bar {

@@ -23,19 +23,24 @@ Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
 *mittel* = sollte vor der Freigabe an Vereine gelöst sein · *niedrig* = Verbesserung
 
-**Nächste Umsetzung (Stand 2026-10-01):** noch nicht festgelegt. Entschieden, aber nicht gebaut
-bleibt [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) — es
-braucht eine eigene Spec, nicht nur eine Umsetzung. Diese Spec sollte die Besetzungsübersicht mit
-Sollstärke aus [FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht)
-gleich mitentwerfen: Beide fragen, wie über ein Register gerechnet wird, dem keine Terminart
-zugeordnet ist.
+**Nächste Umsetzung (Stand 2026-10-02):** noch nicht festgelegt.
+[OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) ist am
+2026-10-02 zusammen mit der Besetzung je Register aus
+[FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht) gebaut, noch
+unveröffentlicht (Specs `2026-10-01-register-statistik-besetzung-design.md` und
+`2026-10-02-register-gruppe-besetzung-design.md`; Register gehören seither zu Gruppen). Dabei
+fiel [OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt) an und wurde
+behoben, [OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse) bleibt als bekannte Grenze offen.
+**Vor dem Release:**
+[OI-116](#oi-116--migrationsschritt-für-subgroup_parents-fehlt) (Priorität *hoch* — ohne
+Migrationsschritt fehlt bestehenden Installationen die Tabelle `subgroup_parents`) und
+[OI-118](#oi-118--demo-generator-kennt-subgroup_parents-nicht) (Demo).
 
 **Berührungspunkte mit Feature-Ideen** (Vorschlag vom 2026-10-01, nicht entschieden) — Einträge
 dieser Datei, die beim Bau einer Idee ohnehin auf dem Tisch liegen:
 
 | Idee | Eintrag | Warum zusammen |
 |---|---|---|
-| FI-14 Besetzungsübersicht | OI-70 | dieselbe Rechengrundlage für Untergruppen |
 | FI-24 Freigaben in der App | [OI-39](#oi-39--freigaben-liegen-an-zwei-orten) | beide brauchen eine sammelnde Abfrage offener Freigaben — eine für beide, nicht zwei (FI-24 lässt Arbeitszeiten bewusst weg) |
 | FI-4 / FI-3 Check-in-Wege | [OI-6](#oi-6--totp-secret-im-klartext), [OI-46](#oi-46--einmal-kopplungscode-statt-token-im-qr-bild), [OI-7](#oi-7--gültigkeitsfenster-der-totp-codes), [OI-45](#oi-45--kamera-scanner-in-der-station) | Gerätekopplung, Beweiswert und Quellen einmal festlegen |
 | FI-8 ICS-Abo | [OI-97](#oi-97--terminarten-kennen-keine-gruppengrenze) | der Feed braucht die Gruppengrenze, die bei Terminarten fehlt |
@@ -43,7 +48,7 @@ dieser Datei, die beim Bau einer Idee ohnehin auf dem Tisch liegen:
 | FI-2 Rest (je Person) | [OI-61](#oi-61--terminrückmeldung-einstellungen-der-terminart-wirken-rückwirkend-auf-die-zuverlässigkeit) | dieselbe Kennzahl, dieselbe Frage nach rückwirkenden Einstellungen |
 
 Offen mit Priorität *mittel*: OI-67, OI-98, OI-63 (nur noch die Spur), OI-6, OI-22, OI-23 (am
-2026-09-25 einzeln gegen den Code geprüft), dazu OI-70 und
+2026-09-25 einzeln gegen den Code geprüft), dazu
 [OI-113](#oi-113--der-senken-wächter-folgt-join-nicht--fehlende-maskierung-bleibt-unbemerkt)
 (aufgenommen am 2026-09-28). OI-67 ist im Dashboard seit 1.19.0 entschärft (Cache-TTL zwei
 Minuten), in der Check-in-App unverändert. **OI-3 und OI-20 tragen ebenfalls *mittel*, stehen aber
@@ -1196,6 +1201,68 @@ gültiges Gerätetoken und eine am Gerät angelernte Biometrie. Es geht um Daten
 
 ---
 
+### OI-116 · Migrationsschritt für `subgroup_parents` fehlt
+**Priorität:** hoch — blockiert das Release · aufgenommen am 2026-10-02 (Zweig
+`feat/register-statistik`, Spec `2026-10-02-register-gruppe-besetzung-design.md`, Abschnitt 8)
+
+Register gehören seit diesem Zweig zu Gruppen; die Zuordnung steht in der neuen Tabelle
+`subgroup_parents`. `private/setup/ehrensache_db.sql` legt sie für neue Installationen an, einen
+Schritt in `private/migrations/` legt nach der Regel für parallele Sitzungen (`CLAUDE.md`) aber
+erst die Release-Sitzung an. **Ohne ihn fehlt bestehenden Installationen die Tabelle**, und jede
+Abfrage, die sie liest — Gruppenliste, Statistik, Rückmeldung, Anwesenheitsliste, Speichern eines
+Mitglieds —, scheitert mit einem Datenbankfehler.
+
+**Für die Release-Sitzung:** neue Migrationsdatei mit dem nächsten Manifest-Eintrag, die
+`subgroupParentMigrate(PDO $pdo, string $prefix)` aus `private/helpers/subgroup_parent.php`
+aufruft und deren `log`/`warnings` zurückgibt. Die Funktion
+
+- legt `subgroup_parents` an, falls sie fehlt (`information_schema.TABLES`), und ist wiederholbar;
+- **leitet nichts ab** und ergänzt niemanden — jedes bestehende Register steht danach ohne
+  Gruppe;
+- meldet je Register ohne Gruppe die Warnung „Register <Name> (<ID>) ohne Gruppe -- bitte in der
+  Gruppenverwaltung zuordnen.“, die der Update-Assistent anzeigt.
+
+`subgroup_parent.php` hält PHP-8.0-Syntax und steht in der Liste von `tests/suites/update_path_syntax.php`.
+Das Changelog nennt bereits, dass Register nach dem Update einmal ihren Gruppen zugeordnet werden
+müssen.
+
+**Testdatenbanken:** `php tests/db/apply_subgroup_parent.php` wendet die Funktion auf die
+Datenbank aus `private/config/config.php` an (für die Worktree-Kopie `ehrensache_reg` erledigt).
+Die Datenbank des Hauptverzeichnisses (laut Spec `ehrensache`) braucht die Tabelle vor dem Merge
+nach `dev` — nur mit Freigabe des Nutzers; sonst scheitern dort die Suiten. Bis der Schritt in der Kette steht, ist `tests/db/verify_schema_convergence.php` rot
+(drei Fehler: `subgroup_parents` fehlt im migrierten Schema); das ist erwartet und wird mit dem
+Schritt grün.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-118 · Demo-Generator kennt `subgroup_parents` nicht
+**Priorität:** — · **erledigt am 2026-10-02 — unveröffentlicht (Zweig `feat/register-statistik`)** ·
+aufgenommen am 2026-10-02
+
+`private/demo/plan.php` legt fünf Register an (Flöte, Klarinette, Trompete, Tenorhorn,
+Schlagzeug), ordnet sie aber keiner Gruppe zu. Nach einem Reset hat die Demo damit **keine
+Registerstatistik** — genau die Funktion, die sie zeigen soll —, und die Gruppenverwaltung zeigt
+alle Register mit dem Hinweis „ohne Gruppe“.
+
+Dazu ein Rückstand beim Leeren: `private/demo/seed.php` löscht die Tabellen aus `DEMO_TABLES`
+mit `FOREIGN_KEY_CHECKS = 0`; dabei greift `ON DELETE CASCADE` nicht. `subgroup_parents` steht
+nicht in der Liste, also überlebt eine Zuordnung, die ein Besucher angelegt hat, den Reset — und
+weil der Plan die Gruppen mit festen IDs neu anlegt, gilt sie danach wieder.
+
+**Erledigt:** `subgroup_parents` steht in `DEMO_TABLES` (vor `member_groups`), der Plan liefert
+über `buildSubgroupParents()` je Register seine Gruppen (alle: Aktive und Jugend; die Ehrenmitglieder 9–12
+spielen in keinem Register mit, damit ihre Termine nicht in die Registerstatistik zählen), `writePlan()` schreibt sie. Die
+Suiten `demo_seed_unit` und `demo_seed_cli` prüfen Zuordnung, Mitgliedschaftsregel, Leerungsliste
+und Schreiben. **Für die Release-Sitzung:** `DEMO_MIN_SCHEMA` (`private/demo/seed.php`) steht noch
+auf 1.11.0; der Generator braucht jetzt die Tabelle und muss auf den Schemastand der Migration
+angehoben werden, die `subgroup_parents` anlegt.
+
+**Nicht sicherheitsrelevant:** Es überleben nur Zuordnungen zwischen Gruppen-IDs, keine Texte.
+
+---
+
 ## Sicherheit
 
 > **Was hier stehen darf.** Dieser Abschnitt ist öffentlich. Aufgenommen werden nur
@@ -2100,6 +2167,98 @@ ohne Zugang)“) und Druckbericht. Die Ampel-Chips der Terminliste bleiben ohne.
 
 ---
 
+### OI-114 · Statistik zählte Termine vor Eintritt und nach Austritt
+**Priorität:** erledigt am 2026-10-02 — unveröffentlicht (Zweig `feat/register-statistik`) ·
+gefunden am 2026-10-01 (beim Entwurf zu [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht))
+
+Die Statistik prüfte die Aktivität eines Mitglieds mit `getMemberActivityWhereYear()`:
+„irgendwann im Jahr aktiv“. Anwesenheitsliste, Kalender und Rückmeldung prüfen dagegen am
+Termindatum. Wer unterm Jahr ein- oder austrat, bekam deshalb jeden Termin außerhalb seines
+Mitgliedschaftszeitraums als unentschuldigt angerechnet.
+
+**Beleg (Testdatenbank):** Mitglied #6, Eintritt 01.12.2025 — die Statistik 2025 rechnete mit
+20 Terminen statt 5 und kam bei einer Anwesenheit auf eine Quote von 5 % statt 20 %. Betroffen waren Quote, Kopfzahlen,
+Pünktlichkeit (Messabdeckung), Zuverlässigkeit und die Einzeltermine des Anwesenheitsberichts —
+jede Stelle mit einer eigenen Kopie derselben Joins.
+
+**Behoben** (Spec `2026-10-01-register-statistik-besetzung-design.md`, Abschnitt 3): Alle
+Statistikabfragen und `attendanceExpectedMemberIds()` lesen aus einer gemeinsamen Soll-Menge
+(`private/helpers/expected_pairs.php`, `fdfabb5`, `332d8a6`), die die Aktivität am Termindatum
+prüft. Die Einzeltermine des Berichts folgen (`ffb3b3b`). Dabei mitbehoben (`6afc6aa`): Die
+Kopfzahl „Termine“ beachtete den Mitgliedsfilter nicht und zählte mit `member_id` — also für jede
+Rolle `user` — alle Termine des Bereichs, bei einem Admin ohne Gruppenfilter die des ganzen
+Vereins. Die Gleichheitsprüfung `tests/db/verify_statistics_parity.php` vergleicht vor und nach
+dem Umbau: Abweichungen nur bei Mitgliedern mit Ein- oder Austritt im Jahr und den Zahlen, in
+denen sie stecken, sowie bei den neuen Untergruppen-Tabellen.
+
+**Bewusst unverändert:** Auswahllisten (`members.php`, `attendance_list.php`) und die Kopfzahl
+„Mitglieder“ bleiben bei „im Jahr aktiv“ — dort ist das die richtige Frage.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-115 · Gruppenzugehörigkeit ohne Zeitachse
+**Priorität:** niedrig · aufgenommen am 2026-10-02 (Spec
+`2026-10-01-register-statistik-besetzung-design.md`, Abschnitt 4.5)
+
+`member_group_assignments` kennt keinen Zeitraum. Wer im Juni von Klarinette zu Saxophon wechselt
+oder von „Jugend“ zu „Aktive“, zählt in der Statistik das ganze Jahr in der neuen Gruppe und gar
+nicht mehr in der alten — auch rückwirkend für Jahre, in denen er noch in der alten stand. Das
+betrifft alle Gruppen, nicht nur Register, und ebenso Anwesenheitsliste, Kalender und
+Rückmeldung vergangener Termine: Erwartet ist, wer **heute** in der Gruppe steht und am
+Termindatum aktiv war.
+
+Seit [OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt) gilt die
+Aktivität je Termindatum; für die Gruppenzugehörigkeit fehlt das Gegenstück.
+
+**Lösung, falls gewünscht:** Zeiträume an `member_group_assignments` (Migration), ausgewertet in
+der gemeinsamen Soll-Menge (`expected_pairs.php`) — dort an einer Stelle, nicht in jeder Abfrage.
+Offen wäre dann die Pflege: Wer trägt den Wechsel mit Datum ein, und was zeigt die
+Mitgliederverwaltung? Bewusst nicht Teil von OI-70.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-117 · Check-in-App: Registerzeilen erst hinter „Wer hat geantwortet?“
+**Priorität:** niedrig · aufgenommen am 2026-10-02 (Zweig `feat/register-statistik`) ·
+**Entscheidung des Nutzers vom 2026-10-02: so belassen** — die Registerzeilen bleiben im Bereich „Wer hat geantwortet?“.
+
+In der Check-in-App stehen die zugeklappten Registerabschnitte mit Balken innerhalb des
+bestehenden Aufklappbereichs „Wer hat geantwortet?“ der Terminkarte. Ein Verwalter, der vor
+einem Auftritt nur die Besetzung sehen will, tippt damit einmal mehr als im Dashboard: Karte
+aufklappen, „Wer hat geantwortet?“ öffnen, dann erst die Abschnitte. So gebaut, damit die Karte
+kompakt bleibt und keine zweite Aufklappstelle neben der vorhandenen entsteht.
+
+**Falls es stört:** die Kopfzeilen der Abschnitte (Name, Balken, Zahlen) für Verwalter direkt
+unter dem Gesamtbalken der Karte zeigen und nur die Namen hinter „Wer hat geantwortet?“ lassen.
+Vorher die Praxis abwarten.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-119 · CSV-Import zeigt die Folgen der Mitgliedschaftsregel nicht an
+**Priorität:** erledigt am 2026-10-02 (unveröffentlicht, Zweig `feat/register-statistik`) · aufgenommen am 2026-10-02
+
+Der Mitgliederimport wendet die Mitgliedschaftsregel für Register an und liefert `added_groups`
+und `group_warnings` in der Antwort (siehe `API.md`, „Import“). Die Oberfläche
+(`public/js/modules/import_export.js`) zeigt aber nur neue, aktualisierte und fehlerhafte Zeilen
+an. Ein Admin erfährt also nicht, dass der Import Mitglieder einer Gruppe hinzugefügt hat oder
+dass ein Mitglied in keiner der Gruppen seines Registers steht. Mitgliederdialog und
+Gruppendialog zeigen beides als Hinweis (Spec `2026-10-02-register-gruppe-besetzung-design.md`,
+Abschnitt 4.3, verlangt das für alle Wege).
+
+**Zu tun:** im Ergebnis des Mitgliederimports zwei Zeilen „n Mitglied(er) zusätzlich einer Gruppe
+zugeordnet“ und „n Mitglied(er) in keiner Gruppe ihres Registers“, Namen über den Gruppen-Cache.
+
+**Umgesetzt:** `displayImportResult()` hängt `importGroupSummaryHtml()` an. Den Mitgliedsnamen liefert der Server je Eintrag als `member_name` (nur beim Import); die Gruppennamen kommen aus dem Cache, gesichert in `importNameLookup()` vor der Invalidierung. Ist der Gruppen-Cache nicht geladen, erscheint „Gruppe #ID“. Wächter in `tests/suites/subgroup_parent_frontend.php`.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
@@ -2766,7 +2925,7 @@ damit es nicht erneut vorgeschlagen wird, ohne dass sich an den Gründen etwas g
 | Punkt | Grund | Wo es weitergeht |
 |---|---|---|
 | Erinnerung an offene Rückmeldungen | braucht einen Versandweg | FI-6 |
-| Besetzungsansicht mit Sollstärke | Untergruppen gibt es seit 1.8.0, die Sollstärke fehlt | FI-14 |
+| Besetzungsansicht mit Sollstärke | Untergruppen gibt es seit 1.8.0, die Sollstärke fehlt | FI-14 — Besetzung je Register seit 2026-10-02 gebaut (unveröffentlicht): zugeklappte Abschnitte mit Balken und „x von n“, n = Zahl der Erwarteten statt einer gepflegten Mindestbesetzung |
 | Rolle „Gruppenleiter" | der Dirigent erhält ein Manager-Konto | FI-15 |
 | Kennzahl „Zusagetreue" je Person | Personenbewertung; die Zuverlässigkeit deckt die Frage ab | — |
 | Verlauf der Antwortänderungen | mehr Datenbestand, eigene Löschfrist, wäre wieder eine Personenauswertung | — |
@@ -3303,7 +3462,44 @@ dürfte.
 ---
 
 ### OI-70 · Statistik nach Untergruppe rechnet nicht
-**Priorität:** mittel — Entscheidung getroffen, Umsetzung offen · aufgenommen am 2026-09-17
+**Priorität:** erledigt am 2026-10-02 — unveröffentlicht (Zweig `feat/register-statistik`) ·
+aufgenommen am 2026-09-17
+
+**Erledigt am 2026-10-02** nach Spec
+`docs/superpowers/specs/2026-10-01-register-statistik-besetzung-design.md`, am selben Tag nach
+einem Praxistest korrigiert durch
+`docs/superpowers/specs/2026-10-02-register-gruppe-besetzung-design.md`, zusammen mit der
+Besetzung je Register aus [FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht).
+Alle Statistikabfragen lesen aus einer gemeinsamen Soll-Menge (`private/helpers/expected_pairs.php`,
+`fdfabb5`).
+
+**Endstand:** Ein Register gehört zu einer oder mehreren gewöhnlichen Gruppen (Tabelle
+`subgroup_parents`, `parent_group_ids` an `member_groups`, ohne Vererbung). Seine Tabelle rechnet
+über die Mitglieder des Registers und die Termine, die über das Register selbst oder eine seiner
+Gruppen kommen; Spalten sind die Terminarten des Registers und seiner Gruppen (`150e1a8`). Ein
+Register ohne Gruppe hat keine Tabelle; mit Filter darauf sind auch die Kopfzahlen leer
+(`ef953ec`). `statistics[]` trägt `is_subgroup` und `parent_group_names`; die Unterzeile lautet
+„<Oberbegriff> von Aktive, Jugend: Termine von Aktive, Jugend und eigene Termine“ (`0a17944`),
+der Anwesenheitsbericht trägt denselben Zusatz in der Überschrift.
+
+**Warum korrigiert:** Die erste Fassung rechnete über alle Termine aller Gruppen der Mitglieder.
+In den Demodaten stehen alle sechs Vorstandsmitglieder auch in einem Register — die
+Registertabelle bekam eine Spalte „Vorstandssitzung“, und die Sitzungen zählten in die
+Registerquote. Ebenso ein Doppelspieler: Die Registerprobe seines anderen Registers wurde zur
+Spalte. Die Verbindung Register → Gruppe beseitigt beides.
+
+Die Antworten auf die Fragen unten: Es zählen die Termine des Registers und seiner Gruppen; ein
+Doppelspieler steht in beiden Registertabellen voll; Pünktlichkeit und Zuverlässigkeit rechnen
+mit Filter auf ein Register über denselben Bereich. Nebenbei fiel die Jahresregel auf
+([OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt)), offen bleibt
+[OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse). Abgesichert durch
+`statistics_subgroups_api` (Welt mit drei Gruppen und Registern mit zwei, keiner und einer
+Gruppe), `subgroup_parent_api` und die Gleichheitsprüfung `tests/db/verify_statistics_parity.php`
+— die meldet für gewöhnliche Gruppen nur die Abweichungen aus OI-114, für die Demo-Register nach
+der Umstellung **keine** Tabellen mehr (sie stehen ohne Gruppe, gewollt). Vor dem Release fehlt
+noch der Migrationsschritt ([OI-116](#oi-116--migrationsschritt-für-subgroup_parents-fehlt)).
+
+Der Text darunter ist der Stand vor der Umsetzung.
 
 Wählt man in der Statistik eine Gruppe, die als Untergruppe markiert ist (im Musikverein das
 Register), bleibt die Auswertung leer. Das ist kein Fehler, sondern die Folge der Datenlage: Die
@@ -4433,6 +4629,12 @@ eine Frage an das Produkt.
 Lücken risse. Dagegen spricht, dass Name und Gruppenzuordnung einer Terminart verraten, welche
 Gruppen es gibt und was sie tun. Wenn eingeschränkt werden soll, ist der Weg vermutlich, die
 **Gruppenliste** je Terminart für Nicht-Verwalter wegzulassen, nicht die Terminart selbst.
+
+**Statistik nach Register ([OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht),
+unveröffentlicht):** Ein am 2026-10-02 notierter indirekter Weg — die Spalten einer
+Registertabelle verrieten die Gruppen von Registerkollegen — ist mit der Korrektur am selben Tag
+entfallen. Die Spalten sind jetzt nur noch die Terminarten des Registers und seiner eigenen
+Gruppen, nicht mehr die der Gruppen seiner Mitglieder.
 
 **Nicht sicherheitsrelevant** im Sinne von SECURITY.md: kein Zugriff ohne Konto, keine
 Rechteausweitung, keine personenbezogenen Daten.

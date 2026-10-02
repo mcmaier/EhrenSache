@@ -203,10 +203,10 @@ function reliabilityBuild(array $pairs): array
 /**
  * FROM ... WHERE der Soll-Menge und seine Parameter.
  *
- * Derselbe Join wie attendanceFetchMemberTotals(): Terminart -> Gruppe ->
- * Mitglied, aktiv im Jahr, Termin begonnen. Die beiden duerfen nicht
- * auseinanderlaufen -- tests/suites/punctuality_api.php prueft das gegen den
- * Bestand, statt die OI-48-Rechnung fuer eine gemeinsame Funktion aufzubrechen.
+ * Dieselbe Menge wie attendanceFetchMemberTotals(): die Paare aus
+ * expectedPairsSql(), eingegrenzt mit expectedPairsScopeSql(), je Paar einmal.
+ * Danach stehen a, m und r wie bisher zur Verfuegung, und der Baustein endet
+ * auf WHERE 1 = 1, damit Aufrufer mit " AND ..." anhaengen koennen.
  *
  * @param array<int, int> $groupIds nicht leer
  * @return array{0: string, 1: array<int, mixed>}
@@ -214,44 +214,39 @@ function reliabilityBuild(array $pairs): array
 function punctualityScope($database, array $groupIds, int $year, ?int $memberId,
                           ?int $appointmentTypeId, int $leadHours): array
 {
-    require_once __DIR__ . '/member_activity.php';
+    require_once __DIR__ . '/expected_pairs.php';
 
-    $prefix        = $database->table('');
-    $activityWhere = getMemberActivityWhereYear($year, 'm');
-    $placeholders  = implode(',', array_fill(0, count($groupIds), '?'));
+    $prefix = $database->table('');
+    [$epSql, $epParams]       = expectedPairsSql($database, [
+        'year'         => $year,
+        'type_id'      => $appointmentTypeId,
+        'member_id'    => $memberId,
+        'started_lead' => $leadHours,
+    ]);
+    [$scopeSql, $scopeParams] = expectedPairsScopeSql($database, $groupIds);
 
     $sql = "
-        FROM {$prefix}appointments a
-        JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
-        JOIN {$prefix}member_group_assignments mga
-             ON mga.group_id = atg.group_id AND mga.group_id IN ({$placeholders})
-        JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activityWhere}
+        FROM (
+            SELECT DISTINCT ep.member_id, ep.appointment_id
+            FROM ({$epSql}) ep
+            WHERE {$scopeSql}
+        ) p
+        JOIN {$prefix}appointments a ON a.appointment_id = p.appointment_id
+        JOIN {$prefix}members m ON m.member_id = p.member_id
         LEFT JOIN {$prefix}records r
              ON r.appointment_id = a.appointment_id AND r.member_id = m.member_id
-        WHERE YEAR(a.date) = ?
-          AND " . attendanceStartedSql($leadHours) . "
+        WHERE 1 = 1
     ";
 
-    $params   = array_values(array_map('intval', $groupIds));
-    $params[] = $year;
-
-    if ($memberId !== null) {
-        $sql .= " AND m.member_id = ?";
-        $params[] = $memberId;
-    }
-    if ($appointmentTypeId !== null) {
-        $sql .= " AND a.type_id = ?";
-        $params[] = $appointmentTypeId;
-    }
-
-    return [$sql, $params];
+    return [$sql, array_merge($epParams, $scopeParams)];
 }
 
 /**
  * Gemessene Ankuenfte im Bereich, je Record einmal.
  *
- * DISTINCT r.record_id ist die Entdopplung: Erreicht ein Termin ein Mitglied
- * ueber zwei Gruppen, liefert der Join denselben Record zweimal.
+ * Der Bereich kommt aus punctualityScope(); dessen Paare (p) sind schon je
+ * Mitglied und Termin einmalig, der Join liefert also keinen Record doppelt.
+ * DISTINCT r.record_id bleibt als harmlose Absicherung stehen.
  *
  * Gemessen heisst: anwesend, mit Uhrzeit, und nicht aus Import oder Timer
  * (Spec 3.5). Eine genehmigte Zeitkorrektur zaehlt mit -- ihre Herkunft steht

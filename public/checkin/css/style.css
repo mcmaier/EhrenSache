@@ -2987,20 +2987,73 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     padding-top: 10px;
 }
 
-/* Je Mitgliedsgruppe ein Block (Nutzer-Entscheidung) -- die Ueberschrift
-   traegt keine eigene Statusfarbe mehr, sie steht ja fuer eine Gruppe, nicht
-   fuer einen Antwortstatus. Die Faerbung nach Status sitzt jetzt an den
-   einzelnen Namens-Chips darunter. */
-.response-name-group__heading {
+/* Kopfzeile eines zuklappbaren Abschnitts mit Balken (wie .section-head im
+   Dashboard, components/modals.css). Darf unter ~480px umbrechen. */
+.section-head {
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
-    gap: 4px;
-    font-size: 12px;
+    align-items: center;
+    gap: 4px 8px;
+    width: 100%;
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 13px;
     font-weight: 600;
-    color: var(--text);
-    margin-bottom: 4px;
+    text-align: left;
+    cursor: pointer;
 }
+.section-head:disabled { cursor: default; }
+.section-head:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+.section-head__chevron { flex: 0 0 1em; }
+.section-head__label {
+    /* Feste Spalte, damit der Balken in allen Kopfzeilen links gleich beginnt;
+       max-width verhindert Ueberlauf in sehr schmalen Fenstern (320px). */
+    flex: 0 0 7.5rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+}
+.section-head__summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    color: var(--text-light);
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+}
+/* Gesamtzahl "von 5" am Ende hinter den vier Chips, in normaler Textfarbe.
+   Feste Mindestbreiten halten Chips und Zahl ueber alle Zeilen in einer Spalte. */
+.section-head__total {
+    min-width: 3.6em;
+    color: var(--text);
+}
+.section-head__summary .response-count-chip {
+    min-width: 2.8em;
+    justify-content: center;
+}
+.section-bar {
+    display: flex;
+    flex: 1 1 80px;
+    min-width: 60px;
+    max-width: 200px;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--border);
+}
+.section-bar__seg { height: 100%; }
+.section-bar__seg--yes   { background: var(--success); }
+.section-bar__seg--maybe { background: var(--warning); }
+.section-bar__seg--no    { background: var(--error); }
+.section-bar__seg--open  { background: var(--text-light); }
 
 /* Chips statt Bullet-Liste (Nutzer-Feedback: Punkte sassen zu weit links am
    Kartenrand) -- keine ul/li mehr, daher auch kein list-style noetig. */

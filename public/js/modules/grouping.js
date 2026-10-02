@@ -17,6 +17,8 @@
  * Mehrfachnennungen, damit die Oberfläche sie ausweisen kann.
  */
 
+import { escapeHtml } from './utils.js';
+
 export const GROUPING_STAGES = ['alpha', 'group', 'subgroup'];
 
 function sortMembers(members) {
@@ -110,3 +112,41 @@ export function groupingStore(key, stage) {
 
 export const GROUPING_KEY_ATTENDANCE = 'es_grouping_attendance';
 export const GROUPING_KEY_RESPONSES  = 'es_grouping_responses';
+
+/** Zählt Rückmeldungen eines Abschnitts; alles außer yes/maybe/no ist offen. */
+export function groupingStatusCounts(members) {
+    const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
+    members.forEach(m => {
+        const key = ['yes', 'maybe', 'no'].includes(m.status) ? m.status : 'open';
+        counts[key]++;
+    });
+    return counts;
+}
+
+/**
+ * Kopfzeile eines zuklappbaren Abschnitts (Spec 2026-10-02, Abschnitt 6):
+ * Knopf mit Name, Balken, vier Icon-Chips (chipsHtml, vom Aufrufer
+ * mit responseChipsHtml() gebaut, Zusagen eingeschlossen) und am Ende "von 5" -- grouping.js darf responses.js nicht
+ * importieren, das waere ein Zyklus; der Vollsatz steht im aria-label). Die Breiten
+ * der Balkenteile sind Zahlen -- sie gehen über toFixed() ins style-Attribut.
+ * Der Aufrufer maskiert nichts vorher; hier wird alles maskiert.
+ */
+export function groupingSectionHeaderHtml({ key, label, counts, expanded, disabled = false, chipsHtml = '' }) {
+    const total = counts.yes + counts.maybe + counts.no + counts.open;
+    // Vorlesetext: Die Icon-Chips sind aria-hidden bzw. nur Symbole, der Knopf
+    // bekommt deshalb den vollen Satz als aria-label.
+    const spoken = `${label}: ${counts.yes} von ${total} zugesagt, ${counts.maybe} unsicher, `
+        + `${counts.no} ${counts.no === 1 ? 'Absage' : 'Absagen'}, ${counts.open} ohne Antwort`;
+    const segments = total === 0 ? '' : ['yes', 'maybe', 'no', 'open']
+        .filter(k => counts[k] > 0)
+        .map(k => `<span class="section-bar__seg section-bar__seg--${k}" style="width:${(counts[k] / total * 100).toFixed(2)}%"></span>`)
+        .join('');
+
+    return `<button type="button" class="section-head" aria-label="${escapeHtml(spoken)}" aria-expanded="${expanded ? 'true' : 'false'}"${disabled ? ' disabled' : ''}
+                data-action="toggle-response-section" data-key="${escapeHtml(key)}">
+            <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
+            <span class="section-head__label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+            <span class="section-bar" aria-hidden="true">${segments}</span>
+            <span class="section-head__summary" aria-hidden="true">${chipsHtml}<span class="section-head__total">von ${total}</span></span>
+        </button>`;
+}

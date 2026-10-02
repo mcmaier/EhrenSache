@@ -192,6 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const dataActions = {
         'attendance-grouping':  (el) => window.setAttendanceGrouping(el.dataset.stage),
         'responses-grouping':   (el) => window.setResponsesGrouping(el.dataset.stage),
+        'toggle-response-section':      (el) => toggleResponseSection(el.dataset.key),
         'correct-work-session': (el) => openWorkSessionModal(Number(el.dataset.sessionId)),
         'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId))
     };
@@ -602,6 +603,47 @@ function groupingSections(members, stage, emptyLabel) {
 function groupingDuplicateCount(members, stage) {
     if (stage !== 'group' && stage !== 'subgroup') return 0;
     return members.filter(m => listFor(m, stage).length > 1).length;
+}
+
+/**
+ * Zählt Rückmeldungen eines Abschnitts; alles außer yes/maybe/no ist offen.
+ * Absichtlich gleich gehalten mit groupingStatusCounts() in
+ * public/js/modules/grouping.js -- die App hat kein Modulsystem.
+ */
+function groupingStatusCounts(members) {
+    const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
+    members.forEach(m => {
+        const key = ['yes', 'maybe', 'no'].includes(m.status) ? m.status : 'open';
+        counts[key]++;
+    });
+    return counts;
+}
+
+/**
+ * Kopfzeile eines zuklappbaren Abschnitts (Spec 2026-10-02, Abschnitt 6):
+ * Knopf mit Name, Balken, vier Icon-Chips und am Ende "von 5" (Vollsatz im aria-label). Absichtlich
+ * gleich gehalten mit groupingSectionHeaderHtml() in grouping.js. Die Aktion
+ * steht als Literal im Markup, der Schlüssel in data-key; die Breiten der
+ * Balkenteile sind Zahlen und gehen über toFixed() ins style-Attribut.
+ */
+function groupingSectionHeaderHtml({ key, label, counts, expanded, disabled = false }) {
+    const total = counts.yes + counts.maybe + counts.no + counts.open;
+    // Vorlesetext: Die Icon-Chips sind aria-hidden bzw. nur Symbole, der Knopf
+    // bekommt deshalb den vollen Satz als aria-label.
+    const spoken = `${label}: ${counts.yes} von ${total} zugesagt, ${counts.maybe} unsicher, `
+        + `${counts.no} ${counts.no === 1 ? 'Absage' : 'Absagen'}, ${counts.open} ohne Antwort`;
+    const segments = total === 0 ? '' : ['yes', 'maybe', 'no', 'open']
+        .filter(k => counts[k] > 0)
+        .map(k => `<span class="section-bar__seg section-bar__seg--${k}" style="width:${(counts[k] / total * 100).toFixed(2)}%"></span>`)
+        .join('');
+
+    return `<button type="button" class="section-head" aria-label="${escapeHtml(spoken)}" aria-expanded="${expanded ? 'true' : 'false'}"${disabled ? ' disabled' : ''}
+                data-action="toggle-response-section" data-key="${escapeHtml(key)}">
+            <span class="section-head__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
+            <span class="section-head__label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+            <span class="section-bar" aria-hidden="true">${segments}</span>
+            <span class="section-head__summary" aria-hidden="true"><span class="response-count-row">${responseCountChipsHtml(counts)}</span><span class="section-head__total">von ${total}</span></span>
+        </button>`;
 }
 
 /**
@@ -4413,6 +4455,8 @@ function pendingStatusFor(id) {
 // renderResponses()). Geleert in resetResponsesTab().
 const responsesOpenComments = new Set();
 const responsesOpenNames = new Set();
+// Aufgeklappte Abschnitte in "Wer hat geantwortet?": `${appointmentId}:${stage}:${section.key}`.
+const responsesOpenSections = new Set();
 
 // Aufgeklappte Karten der Terminliste (seit 1.10.0). Anfangs ist alles
 // zugeklappt; ein Neuaufbau durch renderResponses() -- etwa nach einem
@@ -4439,6 +4483,7 @@ function resetResponsesTab() {
     responsesPending.clear();
     responsesOpenComments.clear();
     responsesOpenNames.clear();
+    responsesOpenSections.clear();
     responsesExpanded.clear();
     responsesSaveFailed.clear();
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
@@ -4607,8 +4652,8 @@ function responseChipHtml(item, deadlinePassed) {
  * optisch gleich bleiben. Die Summary von "Wer hat geantwortet?" traegt
  * bewusst keine eigene Zaehlung mehr -- das waere dieselbe Gesamtzahl ein
  * zweites Mal auf derselben Karte (Nutzer-Feedback). */
-function responseCountChipsHtml(counts) {
-    return RESPONSE_NAME_GROUPS.map(g =>
+function responseCountChipsHtml(counts, skip = []) {
+    return RESPONSE_NAME_GROUPS.filter(g => !skip.includes(g.key)).map(g =>
         `<span class="response-count-chip response-count-chip--${g.key}${counts[g.key] === 0 ? ' is-zero' : ''}">${g.icon} ${counts[g.key]}</span>`
     ).join('');
 }
@@ -4791,13 +4836,15 @@ function responsesGroupingSwitcher(stages, stage) {
  * Umschalter gegliedert statt fest nach Terminart-Gruppe -- analog zu
  * namesListHtml() im Dashboard (public/js/modules/responses.js). Vorgabe
  * 'group', außer es gibt Untergruppen (groupingStored() fällt dann auf
- * 'subgroup' zurück). Die Summary traegt bewusst KEINE eigene Ampel-Zeile
- * mehr (Nutzer-Feedback: doppelt mit .response-status in der Fristzeile,
- * die direkt darueber steht und immer sichtbar ist) -- je Abschnitt bleibt
- * eine eigene Ampel-Zeile in der Ueberschrift, das ist eine Aufschluesselung,
- * keine Wiederholung derselben Gesamtzahl. Chips darunter Zusage -> Unsicher
- * -> Absage -> ohne Antwort, darin nach Nachname/Vorname (schon durch
- * groupingSections() sortiert). Wer in mehreren Abschnitten steht
+ * 'subgroup' zurück). Die Summary trägt bewusst keine eigene Ampel-Zeile
+ * (doppelt mit .response-status in der Fristzeile darüber). Je Abschnitt
+ * eine einklappbare Kopfzeile mit Balken (groupingSectionHeaderHtml(), Zahlen
+ * aus allen Mitgliedern des Abschnitts, auch zugeklappt); im aufgeklappten
+ * Abschnitt Chips Zusage -> Unsicher -> Absage -> ohne Antwort, darin nach
+ * Nachname/Vorname (schon durch groupingSections() sortiert). Alphabetisch
+ * gibt es nur einen Abschnitt ohne Kopfzeile. Die Namen liefert der Server
+ * nur bei names_visible bzw. für Manager -- hier wird alles gezeigt, was
+ * in item.members ankommt. Wer in mehreren Abschnitten steht
  * (Gruppe/Untergruppe), erscheint mehrfach -- groupingDuplicateCount() macht
  * das sichtbar (Spec 6.4).
  */
@@ -4816,12 +4863,15 @@ function responseNamesHtml(members, appointmentId) {
         hint = `<p class="list-grouping-hint">${text} in mehreren Abschnitten.</p>`;
     }
 
+    const sectionKey = section => `${appointmentId}:${stage}:${section.key}`;
+    const grouped = stage === 'group' || stage === 'subgroup';
+
     const groups = sections.map(section => {
         const label = section.label === null ? 'Alle Mitglieder' : section.label;
-        const groupCounts = { yes: 0, maybe: 0, no: 0, open: 0 };
-        section.members.forEach(m => groupCounts[m.status || 'open']++);
+        // Alphabetisch gibt es nur einen Abschnitt ohne Kopfzeile -- immer offen.
+        const expanded = !grouped || responsesOpenSections.has(sectionKey(section));
 
-        const chips = RESPONSE_NAME_GROUPS.map(g => {
+        const chips = !expanded ? '' : RESPONSE_NAME_GROUPS.map(g => {
             const inStatus = section.members.filter(m => (m.status || null) === g.status);
             if (inStatus.length === 0) return '';
 
@@ -4838,9 +4888,15 @@ function responseNamesHtml(members, appointmentId) {
             return shown.map(m => responseNameChip(m, g.status)).join('') + moreChip;
         }).join('');
 
+        // Die Zahlen der Kopfzeile kommen aus allen Mitgliedern des Abschnitts,
+        // auch zugeklappt (der Balken ist die Zusammenfassung).
+        const heading = grouped
+            ? groupingSectionHeaderHtml({ key: sectionKey(section), label, counts: groupingStatusCounts(section.members), expanded })
+            : '';
+
         return `<div class="response-name-group">
-            <div class="response-name-group__heading"><span class="response-name-group__label">${escapeHtml(label)}</span> · <span class="response-count-row">${responseCountChipsHtml(groupCounts)}</span></div>
-            <div class="response-name-chips">${chips}</div>
+            ${heading}
+            ${chips ? `<div class="response-name-chips">${chips}</div>` : ''}
         </div>`;
     }).join('');
 
@@ -4851,9 +4907,22 @@ function responseNamesHtml(members, appointmentId) {
     </details>`;
 }
 
+/** Fokus nach dem Neuzeichnen zurück auf den gedrückten Knopf (Tastaturbedienung). */
+function renderResponsesKeepingFocus(selector) {
+    renderResponses(null);
+    document.getElementById('responsesList')?.querySelector(selector)?.focus();
+}
+
+/** Klick auf eine Kopfzeile: Abschnitt auf- bzw. zuklappen. */
+function toggleResponseSection(key) {
+    responsesOpenSections.has(key) ? responsesOpenSections.delete(key) : responsesOpenSections.add(key);
+    renderResponsesKeepingFocus(`.section-head[data-key="${CSS.escape(key)}"]`);
+}
+
 /** Umschalter-Klick (Spec 6.2): merkt die Wahl und baut die Termine-Liste neu
  * auf -- kein erneuter API-Aufruf. */
 window.setResponsesGrouping = function(stage) {
+    responsesOpenSections.clear();
     groupingStore(GROUPING_KEY_RESPONSES, stage);
     renderResponses(null);
 };
@@ -5038,6 +5107,7 @@ async function onResponsesClick(event) {
     const btn = event.target.closest('button');
     if (!btn || btn.disabled) return;
 
+    if (!btn.dataset.appointmentId) return; // z. B. Abschnittsknöpfe: eigener Klickweg über dataActions
     const appointmentId = Number(btn.dataset.appointmentId);
     if (responsesInFlight.has(appointmentId)) return; // Speichert schon -- Doppeltipp ignorieren.
 

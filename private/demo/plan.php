@@ -177,6 +177,36 @@ function buildGroups(): array
 const DEMO_SUBGROUP_IDS = [5, 6, 7, 8, 9];
 
 /**
+ * Zu welchen gewöhnlichen Gruppen ein Register gehört (Tabelle subgroup_parents,
+ * Spec 2026-10-02-register-gruppe-besetzung). Ohne diese Zuordnung gäbe es in der
+ * Demo weder Registerstatistik noch Besetzung (OI-118).
+ *
+ * Aktive und Jugend spielen gemeinsam. Ehrenmitglieder (ohne Dienstpflicht) sind
+ * bewusst kein Register-Elternteil und spielen in keinem Register mit — sonst
+ * zählten ihre Termine in der Registerstatistik. Jedes Registermitglied muss in
+ * mindestens einer Gruppe seines Registers stehen — das prüft die Suite demo_seed_unit.
+ */
+function buildSubgroupParents(): array
+{
+    $parentsOf = [
+        5 => [1, 2],       // Flöte: Aktive, Jugend
+        6 => [1, 2],       // Klarinette
+        7 => [1, 2],       // Trompete
+        8 => [1, 2],       // Tenorhorn
+        9 => [1, 2],       // Schlagzeug
+    ];
+
+    $rows = [];
+    foreach (DEMO_SUBGROUP_IDS as $subgroupId) {
+        foreach ($parentsOf[$subgroupId] as $groupId) {
+            $rows[] = ['subgroup_id' => $subgroupId, 'group_id' => $groupId];
+        }
+    }
+
+    return $rows;
+}
+
+/**
  * Terminarten.
  *
  * Nur der Auftritt fragt Rueckmeldungen ab (FI-1) -- wie im Verein: Zur Probe
@@ -395,9 +425,21 @@ function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'):
     // ("Ohne " . subgroup_label) im Demo-Bestand leer und ließe sich nie mit
     // echten Daten zeigen -- genau der Fall, den Abschnitt 3.2 der
     // Spezifikation als eigenen Abschnitt vorsieht.
+    //
+    // Ebenfalls ohne Register: die Ehrenmitglieder (Mitglieder 9–12, Gruppe 4,
+    // "ohne Dienstpflicht"). Sie gehören keiner Gruppe eines Registers an; ein
+    // Register verlangt aber Mitgliedschaft in einer seiner Gruppen. Die Zuordnung
+    // der Reihe nach würde sie sonst in die Klarinette setzen.
     $noSubgroupMemberIds = [1, 2];
+    $honoraryIds = [];
+    foreach ($assignments as $a) {
+        if ($a['group_id'] === 4) {
+            $honoraryIds[] = $a['member_id'];
+        }
+    }
     foreach ($members as $member) {
-        if (in_array($member['member_id'], $noSubgroupMemberIds, true)) {
+        if (in_array($member['member_id'], $noSubgroupMemberIds, true)
+            || in_array($member['member_id'], $honoraryIds, true)) {
             continue;
         }
         $registerIndex = intdiv($member['member_id'] - 1, 8);
@@ -1395,6 +1437,7 @@ function buildDemoPlan(int $seed, string $referenceDate, string $referenceTime =
         'settings'                 => buildSettings(),
         'groups'                   => buildGroups(),
         'members'                  => $members['members'],
+        'subgroup_parents'         => buildSubgroupParents(),
         'member_group_assignments' => $members['assignments'],
         'membership_dates'         => $members['membership_dates'],
         'users'                    => buildUsers(),

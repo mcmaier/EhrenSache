@@ -2091,6 +2091,15 @@
                             Untergruppe sein.
                         </small>
                     </div>
+                    <div class="form-group" id="group_parent_row" hidden>
+                        <label>Gehört zu</label>
+                        <div id="group_parent_list" class="group-parent-list">
+                            <!-- Wird dynamisch gefüllt -->
+                        </div>
+                        <small class="input-hint">Ein Register kann zu mehreren Gruppen gehören.
+                            Gehört es zu genau einer Gruppe, stehen seine Mitglieder automatisch auch dort;
+                            bei mehreren gibt es nur einen Hinweis. Ohne Gruppe gibt es keine Registerstatistik.</small>
+                    </div>
                     <div class="form-group">
                         <label for="group_sort_order">Reihenfolge</label>
                         <input type="number" id="group_sort_order" value="0" step="1">

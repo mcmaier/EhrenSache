@@ -268,6 +268,15 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}member_group_assignments` (
   FOREIGN KEY (group_id) REFERENCES `{PREFIX}member_groups`(group_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Register -> Gruppen (ein Register kann zu mehreren Gruppen gehoeren)
+CREATE TABLE IF NOT EXISTS `{PREFIX}subgroup_parents` (
+  subgroup_id INT NOT NULL,
+  group_id INT NOT NULL,
+  PRIMARY KEY (subgroup_id, group_id),
+  FOREIGN KEY (subgroup_id) REFERENCES `{PREFIX}member_groups`(group_id) ON DELETE CASCADE,
+  FOREIGN KEY (group_id) REFERENCES `{PREFIX}member_groups`(group_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Neue Tabelle: Terminarten
 CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_types` (
   type_id INT PRIMARY KEY AUTO_INCREMENT,

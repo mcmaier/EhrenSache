@@ -32,6 +32,7 @@ const UPDATE_PATH_FILES = [
     'private/helpers/update_source.php',
     'private/helpers/update_package.php',
     'private/helpers/update_swap.php',
+    'private/helpers/subgroup_parent.php',
 ];
 
 /** Liste der gefundenen Konstrukte nach PHP 8.0 als "Konstrukt (Zeile n)". */

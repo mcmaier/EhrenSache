@@ -1492,3 +1492,68 @@ angegeben):
 | TS-11 | Als Nutzer ohne Verwaltungsrecht: Kalender öffnen, auf einen leeren Tag klicken | Keine Reaktion; keine Serienknöpfe im Termin-Popup |
 | TS-12 | Bundesland in den Einstellungen wechseln (Termine → Kalender), zurück zum Kalender | Feiertagsnamen und -markierung ändern sich sofort, ohne Neuladen der Seite |
 | TS-13 | Als Manager/Admin: Herkunftsfilter auf „Nur Serientermine" bzw. „Ohne Serientermine" stellen | Liste, Kalender und Anzeige-Chips „Vergangen"/„Kommend" zeigen nur die passende Teilmenge; „Filter zurücksetzen" stellt „Alle" wieder her |
+
+---
+
+## 26. Register (Gruppen, Statistik, Besetzung) — unveröffentlicht
+
+Specs `docs/superpowers/specs/2026-10-01-register-statistik-besetzung-design.md` (Soll-Menge,
+Abschnitt 3) und `2026-10-02-register-gruppe-besetzung-design.md` (ersetzt dort die Abschnitte 4
+und 5) — OI-70, FI-14, OI-114. Automatisiert: `php tests/run.php subgroup_parent_api`,
+`subgroup_parent_frontend`, `statistics_subgroups_api`, `subgroups_api`, `responses_staffing_unit`,
+`responses_staffing_api`, `staffing_frontend`, dazu `tests/db/verify_statistics_parity.php`
+(Gleichheitsprüfung) und `tests/db/apply_subgroup_parent.php` (Tabelle `subgroup_parents` auf
+einer Testdatenbank anlegen, solange der Migrationsschritt fehlt, OI-116). Der Klickdurchgang
+`tests/browser/click-through.mjs` (nur lokal) belegt, dass die Knöpfe unter der CSP etwas tun,
+prüft aber weder Zahlen noch Balken.
+
+Voraussetzung: Gruppen „Aktive“, „Jugend“, „Vorstandschaft“; mindestens zwei Register, eines mit
+eigener Terminart (Registerprobe); ein Mitglied, das in „Vorstandschaft“ und einem Register steht;
+eine Terminart mit Rückmeldung für „Aktive“ und eine für „Vorstandschaft“. Der Oberbegriff
+(`subgroup_label`) steht unten als <Wort>. **Nach dem Update** (bzw. nach
+`apply_subgroup_parent.php`) stehen alle Register ohne Gruppe — für REG-1 bis REG-6 zuerst die
+Register ihren Gruppen zuordnen.
+
+**Gruppen und Mitgliedschaftsregel**
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| REG-1 | Verwaltung → Gruppen, ein Register bearbeiten | Bei gesetztem Häkchen „Untergruppe“ erscheint „Gehört zu“ mit allen gewöhnlichen Gruppen außer der eigenen als Checkboxen; ohne Häkchen ist die Auswahl verborgen |
+| REG-2 | Register „Aktive“ und „Jugend“ zuordnen, speichern, Gruppenliste ansehen | Das Register steht eingerückt unter **beiden** Gruppen; ein Register ohne Gruppe steht am Ende mit „ohne Gruppe — bitte zuordnen; bis dahin keine Registerstatistik“ |
+| REG-3 | Register mit **einer** Gruppe zuordnen, in dem ein Mitglied steht, das nicht in dieser Gruppe ist | Hinweis „1 Mitglied(er) zusätzlich der Gruppe des Registers zugeordnet“; das Mitglied steht danach in der Gruppe |
+| REG-4 | Dasselbe mit **zwei** Gruppen | Hinweis „… stehen in keiner der Gruppen des Registers — bitte prüfen“; niemand wird ergänzt oder entfernt |
+| REG-5 | Gewöhnliche Gruppe, der ein Register zugeordnet ist, zur Untergruppe machen | Fehlermeldung, nichts gespeichert (`400`) |
+| REG-6 | Mitgliederdialog: ein Register mit **einer** Gruppe anhaken | Die Gruppe wird mit angehakt; nach dem Speichern ggf. „Zusätzlich den Gruppen zugeordnet: …“ |
+| REG-7 | Mitgliederdialog: ein Register mit **zwei** Gruppen anhaken, keine davon | Hinweis neben dem Register „in keiner seiner Gruppen: Aktive, Jugend“; Speichern gelingt, danach Warnhinweis „Steht in keiner der Gruppen des Registers: …“ |
+| REG-8 | Mitgliederdialog: eine Gruppe abwählen, deren Register angehakt ist und keine weitere angehakte Gruppe hat | Das Register wird mit abgewählt |
+| REG-9 | Terminart bearbeiten, Gruppenauswahl ansehen | Register eingerückt unter ihrer ersten Gruppe (nach Name), weitere Gruppen als Unterzeile, Hinweis „nur für eigene Termine, z. B. Registerprobe“ |
+
+**Statistik**
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| REG-10 | Admin: Statistik ohne Gruppenfilter | Erst die gewöhnlichen Gruppen, danach die Register nach `sort_order`; Register ohne Gruppe fehlen; kein Hinweis „Untergruppe ohne Terminarten“ |
+| REG-11 | Filter auf ein Register der Gruppen „Aktive“ und „Jugend“ | Unterzeile „<Wort> von Aktive, Jugend: Termine von Aktive, Jugend und eigene Termine“; Spalten = Terminarten von Aktive, Jugend und dem Register; **keine** Spalte „Vorstandssitzung“, auch wenn Vorstandsmitglieder im Register stehen; ein Jugendlicher im Register zählt mit seinen Jugendproben |
+| REG-12 | Doppelspieler in zwei Registern, nur eines mit Registerprobe; Statistik des **anderen** Registers | Das Mitglied steht in beiden Tabellen; die Tabelle ohne eigene Registerprobe zeigt **keine** Spalte „Registerprobe“ des anderen Registers |
+| REG-13 | Filter auf ein Register **ohne** Gruppe | Keine Tabelle, Kopfzahlen 0, kein Fehlerhinweis |
+| REG-14 | Gewöhnliche Gruppe filtern (z. B. „Aktive“) | Keine Unterzeile; Spalten nur die eigenen Terminarten der Gruppe, wie bisher |
+| REG-15 | User: Statistik, Filter auf das eigene Register | Registertabelle mit genau einer Zeile (die eigene); fremdes Register → 403 bzw. kein Eintrag im Filter |
+| REG-16 | Statistik eines Mitglieds, das im gewählten Jahr eingetreten ist (Admin: Mitgliedsfilter), danach „📄 Bericht“ | Termine vor dem Eintritt zählen nicht, Kopfzahl „Termine“ = Termine, zu denen es erwartet war; im Bericht beginnt „Termine im Einzelnen“ mit dem Eintritt, Registertabellen tragen in der Überschrift den Zusatz „(<Wort> von …: Termine von … und eigene Termine)“ |
+
+**Rückmeldung: Gliederung und Besetzung**
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| REG-17 | Admin: Rückmeldungsdialog eines Termins für „Aktive“, Gliederung „<Wort>“ | Kein eigener Block „Besetzung“; je Register eine zugeklappte Kopfzeile „▸ <Name> [Balken] ✓ x ? x ✗ x — x von n“ (Nullwerte grau), Chips und „von n“ über alle Zeilen bündig, am Ende „Ohne <Wort>“; Hinweis „n Mitglied(er) … in mehreren Abschnitten“ beim Doppelspieler |
+| REG-18 | Kopfzeile anklicken, danach per Tastatur (Tab, Enter/Leertaste) | Abschnitt klappt auf und zu; der Fokus bleibt auf der Kopfzeile; Screenreader liest den Zustand (`aria-expanded`), nicht den Balken |
+| REG-19 | „Alle aufklappen“ (rechts neben dem Umschalter), dann „Alle zuklappen“ | Alle Abschnitte öffnen bzw. schließen; Beschriftung wechselt; Fokus bleibt auf dem Knopf. Auf der Stufe „Gruppe“ dasselbe, bei „Alphabetisch“ kein Knopf |
+| REG-20 | Chip „Ohne Antwort“ anklicken, danach eine Vergleichskachel (nach Beginn) | Alle Abschnitte offen, Kopfzeilen nicht klickbar, „Alle aufklappen“ verschwindet; die Zahlen der Kopfzeilen ändern sich **nicht** (zählen alle Mitglieder des Abschnitts). Filter aus → gemerkter Klappzustand kehrt zurück |
+| REG-21 | Rückmeldungsdialog eines Termins für „Vorstandschaft“ | Die Stufe „<Wort>“ fehlt im Umschalter, obwohl Vorstandsmitglieder in Registern stehen |
+| REG-22 | Register **ohne** Gruppe, das direkt einer Terminart zugeordnet ist (Registerprobe): Rückmeldung dieses Termins | Das Register erscheint als Abschnitt; auf Terminen für „Aktive“ erscheint es nicht |
+| REG-23 | Rückmeldung im Dialog ändern (z. B. Zusage für ein Registermitglied eintragen) | Kopfzeile und Balken zeigen nach dem Speichern ohne Neuladen die neue Zahl |
+| REG-24 | Mitglied (Rolle `user`) bei „Namen sichtbar“ | Gegliederte Liste mit Status, zugeklappt mit Kopfzeilen, ohne Bemerkungen |
+| REG-25 | Mitglied (Rolle `user`) **ohne** „Namen sichtbar“ | Nur der Gesamtbalken, keine Registerzeilen, keine Namen |
+| REG-26 | Check-in-App als Manager: Tab „Rückmeldungen“, Karte eines Termins mit Registermitgliedern, „Wer hat geantwortet?“ öffnen | Dieselbe gegliederte Liste wie im Dashboard mit Namen, auch bei Terminen **ohne** „Namen sichtbar“; Kopfzeilen klappen per Tipp; kein Block „Besetzung“, kein Knopf „Alle aufklappen“ |
+| REG-27 | REG-26 bei 320 px Breite | Kein waagerechtes Scrollen, Kopfzeilen umbrechen lesbar, Balken bleibt sichtbar |
+| REG-28 | Admin: Druckansicht der Rückmeldungen desselben Termins | Am Kopf Tabelle „Besetzung“ mit Spalten <Wort>, Zusagen („x von n“), Unsicher, Absagen, Offen, „Mehrfach eingeteilt“ (leer bei 0), nur Register, die zum Termin passen; die Gliederung darunter bleibt nach Terminart-Gruppe. Bei einer Vorstandssitzung keine Tabelle |
+| REG-29 | Admin: Chips oben im Rückmeldungsdialog nacheinander anklicken (Zusage, Unsicher, Absage, Ohne Antwort), denselben Chip ein zweites Mal | Keine eigene Filterleiste mehr; der Chip ist umrandet, die Tabelle zeigt nur diesen Status; zweiter Klick → wieder „Alle“, Fokus bleibt auf dem Chip. „Ohne Antwort“ trägt „davon n ohne Zugang“, wenn es solche gibt. Als Mitglied (Rolle `user`) sind die Chips nicht klickbar |

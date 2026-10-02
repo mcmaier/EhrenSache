@@ -210,3 +210,18 @@ test('statisticsReportSummarySection nennt ohne Termine keine fehlenden Messunge
         assertTrue($row[0] !== 'Messabdeckung', 'Ohne Termine keine Messabdeckung "0 von 0"');
     }
 });
+
+test('Gruppenabschnitt: Untergruppe nennt die Rechnung ueber Mitglieder in der Ueberschrift', function () {
+    $gruppe = gruppeMitTypen();
+    $gruppe['is_subgroup'] = true;
+    $gruppe['parent_group_names'] = ['Aktive', 'Jugend'];
+    $section = statisticsReportGroupSection($gruppe, 'Register');
+    assertTrue(str_ends_with($section['heading'], '(Register von Aktive, Jugend: Termine von Aktive, Jugend und eigene Termine)'), $section['heading']);
+
+    // Register ohne Gruppe: nur der Name
+    $gruppe['parent_group_names'] = [];
+    assertSame($gruppe['group_name'], statisticsReportGroupSection($gruppe, 'Register')['heading']);
+
+    $gruppe['is_subgroup'] = false;
+    assertSame($gruppe['group_name'], statisticsReportGroupSection($gruppe, 'Register')['heading']);
+});

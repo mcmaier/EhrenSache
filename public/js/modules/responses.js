@@ -17,7 +17,7 @@ import { registerActions } from './actions.js';
 // refreshAppointmentsKeepPage erst beim Schliessen des Modals gerufen wird,
 // nie beim Laden des Moduls.
 import { refreshAppointmentsKeepPage } from './appointments.js';
-import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStored, groupingStore, GROUPING_KEY_RESPONSES } from './grouping.js';
+import { groupingAvailableStages, groupingSections, groupingDuplicateCount, groupingStatusCounts, groupingSectionHeaderHtml, groupingStored, groupingStore, GROUPING_KEY_RESPONSES } from './grouping.js';
 
 // ============================================
 // TERMINRUECKMELDUNG (FI-1)
@@ -36,6 +36,16 @@ const CHIP_ORDER = ['yes', 'maybe', 'no', 'open'];
 
 let current = null;          // letzte API-Antwort des offenen Modals
 let currentFilter = 'all';
+
+// Aufgeklappte Abschnitte der Rückmeldeliste (Spec 2026-10-02, Abschnitt 6),
+// Schlüssel = section.key. Wird beim Öffnen eines anderen Termins und beim
+// Wechsel der Gliederungsstufe geleert -- Schlüssel gelten nur je Stufe.
+const expandedSections = new Set();
+
+/** Unter jedem aktiven Filter zählt alles als aufgeklappt (und ist nicht umschaltbar), sonst der gemerkte Zustand. */
+function isSectionExpanded(key) {
+    return currentFilter !== 'all' || expandedSections.has(key);
+}
 
 // OI-63: Schutzschritt gegen einen Fehlklick auf die fremde Rueckmeldung
 // eines anderen Mitglieds. Das Modal oeffnet gesperrt und sperrt sich beim
@@ -73,8 +83,8 @@ export function responseSummaryTitle(summary) {
  * Chip-Gruppe der Ampel (Zusage/Unsicher/Absage/Ohne Antwort). `large` schaltet
  * die beschriftete Modal-Variante ein (Terminliste bleibt bei Icon + Zahl).
  */
-export function responseChipsHtml(summary, { large = false } = {}) {
-    const chips = CHIP_ORDER.map(key => {
+export function responseChipsHtml(summary, { large = false, skip = [] } = {}) {
+    const chips = CHIP_ORDER.filter(key => !skip.includes(key)).map(key => {
         const count = Number(summary[key] ?? 0);
         const zero = count === 0 ? ' is-zero' : '';
         const label = large ? `<span class="response-chip__label">${RESPONSE_LABELS[key]}</span>` : '';
@@ -85,8 +95,38 @@ export function responseChipsHtml(summary, { large = false } = {}) {
     return `<span class="response-chip-group${large ? ' response-chip-group--lg' : ''}">${chips}</span>`;
 }
 
-/** Summenblock des Modals: beschriftete Chips plus gestapelter Balken. */
-function responseSummaryBlock(summary) {
+/**
+ * Filter-Chips der Verwalter-Tabelle: dieselben beschrifteten Chips wie der
+ * Summenblock, aber als Knöpfe mit "Alle" davor -- Anzeige und Filter in einem
+ * (wie die Status-Chips des Dashboards, OI-86). Ein zweiter Klick auf den
+ * aktiven Chip hebt den Filter wieder auf. Die Zahl ohne Zugang (OI-109)
+ * steht im Chip "Ohne Antwort", dort, wo sie vorher im Filterknopf stand.
+ */
+function responseFilterChipsHtml(summary, noAccessCount) {
+    const total = CHIP_ORDER.reduce((sum, key) => sum + Number(summary[key] ?? 0), 0);
+    const chip = (key, cls, inner) => {
+        const active = currentFilter === key;
+        const target = active && key !== 'all' ? 'all' : key;
+        return `<button type="button" class="response-chip response-chip--btn ${cls}${active ? ' is-active' : ''}"
+                aria-pressed="${active ? 'true' : 'false'}" data-action="filter-responses" data-value="${escapeHtml(target)}" data-chip="${escapeHtml(key)}">${inner}</button>`;
+    };
+    const all = chip('all', 'response-chip--all',
+        `<span class="response-chip__label">Alle</span><span class="response-chip__count">${total}</span>`);
+    const status = CHIP_ORDER.map(key => {
+        const count = Number(summary[key] ?? 0);
+        const note = key === 'open' && noAccessCount > 0
+            ? `<span class="response-chip__note">davon ${Number(noAccessCount)} ohne Zugang</span>` : '';
+        return chip(key, `response-chip--${key}${count === 0 ? ' is-zero' : ''}`,
+            `<span class="response-chip__label">${RESPONSE_LABELS[key]}</span>`
+            + `<span class="response-chip__icon" aria-hidden="true">${RESPONSE_ICONS[key]}</span>`
+            + `<span class="response-chip__count">${count}</span>${note}`);
+    }).join('');
+    return `<span class="response-chip-group response-chip-group--lg" role="group" aria-label="Nach Rückmeldung filtern">${all}${status}</span>`;
+}
+
+/** Summenblock des Modals: beschriftete Chips plus gestapelter Balken. Für
+ * Verwalter sind die Chips zugleich der Filter (responseFilterChipsHtml()). */
+function responseSummaryBlock(summary, { filterable = false, noAccessCount = 0 } = {}) {
     const total = CHIP_ORDER.reduce((sum, key) => sum + Number(summary[key] ?? 0), 0);
     const bar = total > 0 ? `
         <div class="response-bar" role="img" aria-label="${responseSummaryTitle(summary)}">
@@ -94,7 +134,10 @@ function responseSummaryBlock(summary) {
                 `<span class="response-bar__seg response-bar__seg--${key}" style="width:${(Number(summary[key]) / total * 100).toFixed(2)}%"></span>`
             ).join('')}
         </div>` : '';
-    return `<div class="response-summary">${responseChipsHtml(summary, { large: true })}</div>${bar}`;
+    const chips = filterable
+        ? responseFilterChipsHtml(summary, noAccessCount)
+        : responseChipsHtml(summary, { large: true });
+    return `<div class="response-summary">${chips}</div>${bar}`;
 }
 
 /** Zelle der Terminliste. */
@@ -120,6 +163,7 @@ export function responseSummaryCell(apt) {
 
 export async function openResponsesModal(appointmentId) {
     currentFilter = 'all';
+    if (openAppointmentId !== appointmentId) expandedSections.clear();
     locked = true;
     openAppointmentId = appointmentId;
     document.getElementById('responsesModalBody').innerHTML = '<p class="loading">Lade Rückmeldungen...</p>';
@@ -190,7 +234,11 @@ function renderResponsesModal() {
         `Rückmeldungen: ${apt.title} (${date}, ${apt.start_time.substring(0, 5)})`;
 
     let html = `<p class="response-deadline">${escapeHtml(deadlineText(data))}</p>`;
-    html += responseSummaryBlock(data.summary);
+    const filterable = isAdminOrManager && Boolean(data.members);
+    // OI-109: aus derselben Quelle wie die Tabelle, damit Chip und Zeilen passen.
+    const noAccessCount = filterable
+        ? data.members.filter(m => m.status === null && m.has_access === false).length : 0;
+    html += responseSummaryBlock(data.summary, { filterable, noAccessCount });
 
     if (data.expected) html += ownResponseHtml(data);
     if (data.comparison) html += comparisonHtml(data.comparison);
@@ -272,6 +320,9 @@ function comparisonHtml(c) {
 
 function matchesFilter(m, filter) {
     switch (filter) {
+        case 'yes':
+        case 'maybe':
+        case 'no':          return m.status === filter;
         case 'open':        return m.status === null;
         case 'yes_present': return m.status === 'yes' && m.present === true;
         case 'yes_absent':  return m.status === 'yes' && m.present === false;
@@ -383,14 +434,6 @@ function managerMemberRowHtml(m, started) {
 function managerTableHtml(data) {
     const started = data.started;
     const colspan = started ? 6 : 5;
-    const allCount = data.members.length;
-    const openCount = data.members.filter(m => m.status === null).length;
-    // OI-109: aus derselben Quelle wie openCount, damit Knopf und Tabelle passen.
-    const noAccessCount = data.members.filter(m => m.status === null && m.has_access === false).length;
-    const openLabel = noAccessCount > 0
-        ? `Keine Antwort (${openCount}, davon ${noAccessCount} ohne Zugang)`
-        : `Keine Antwort (${openCount})`;
-
     const filtered = data.members.filter(m => matchesFilter(m, currentFilter));
 
     const stages = groupingAvailableStages(data.members);
@@ -399,6 +442,13 @@ function managerTableHtml(data) {
     // Sammelabschnitt das eingestellte Wort (z.B. "Ohne Register").
     const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
     const sections = groupingSections(filtered, stage, emptyLabel);
+    // Zahlen der Kopfzeile je Abschnitt aus ALLEN Mitgliedern des Abschnitts
+    // (Spec 5.2): Bei aktivem Filter "Keine Antwort" stuende sonst "0 von 2"
+    // ueber einem Register, in dem vier von sechs zugesagt haben.
+    const sectionCounts = new Map(groupingSections(data.members, stage, emptyLabel).map(s => [
+        s.key,
+        groupingStatusCounts(s.members),
+    ]));
     const duplicates = groupingDuplicateCount(filtered, stage);
 
     let hint = '';
@@ -408,20 +458,20 @@ function managerTableHtml(data) {
     }
 
     const rows = sections.map(section => {
-        const groupRow = section.label !== null
-            ? `<tr class="response-group-row"><td colspan="${colspan}">${escapeHtml(section.label)} · ${section.members.length}</td></tr>`
-            : '';
-        return groupRow + section.members.map(m => managerMemberRowHtml(m, started)).join('');
+        // Alphabetisch: flache Liste ohne Kopfzeile
+        if (section.label === null) {
+            return section.members.map(m => managerMemberRowHtml(m, started)).join('');
+        }
+        const counts = sectionCounts.get(section.key) ?? groupingStatusCounts(section.members);
+        const expanded = isSectionExpanded(section.key);
+        const groupRow = `<tr class="response-group-row"><td colspan="${colspan}">${groupingSectionHeaderHtml({
+            key: section.key, label: section.label, counts, expanded, disabled: currentFilter !== 'all',
+            chipsHtml: responseChipsHtml(counts) })}</td></tr>`;
+        return groupRow + (expanded ? section.members.map(m => managerMemberRowHtml(m, started)).join('') : '');
     }).join('');
 
     return `
-        <div class="response-filter">
-            <button type="button" class="response-filter__btn${currentFilter === 'all' ? ' is-active' : ''}"
-                    aria-pressed="${currentFilter === 'all' ? 'true' : 'false'}" data-action="filter-responses" data-value="all">Alle (${allCount})</button>
-            <button type="button" class="response-filter__btn${currentFilter === 'open' ? ' is-active' : ''}"
-                    aria-pressed="${currentFilter === 'open' ? 'true' : 'false'}" data-action="filter-responses" data-value="open">${openLabel}</button>
-        </div>
-        ${responsesGroupingSwitcher(stages, stage)}${hint}
+        ${responsesToolbarHtml(responsesGroupingSwitcher(stages, stage), toggleAllSectionsHtml(stage, sectionKeys(data.members, stage, emptyLabel)))}${hint}
         <div class="data-table">
             <table>
                 <thead><tr>
@@ -452,6 +502,46 @@ function responsesGroupingSwitcher(stages, stage) {
     return `<div class="list-grouping">${buttons}</div>`;
 }
 
+/** Eine Zeile unter den Chips: Gliederung links, "Alle aufklappen" rechts. */
+function responsesToolbarHtml(switcher, toggleAll) {
+    if (!switcher && !toggleAll) return '';
+    return `<div class="response-toolbar">${switcher}${toggleAll}</div>`;
+}
+
+/** Schlüssel der Abschnitte, wie sie die Anzeige bildet (ungefiltert). */
+function sectionKeys(members, stage, emptyLabel) {
+    return groupingSections(members, stage, emptyLabel).map(s => s.key);
+}
+
+/** Knopf "Alle aufklappen/zuklappen" über der Liste; bei alphabetischer Stufe gibt es keine Abschnitte. */
+function toggleAllSectionsHtml(stage, keys) {
+    if (stage === 'alpha' || keys.length === 0 || currentFilter !== 'all') return '';
+    const allOpen = keys.every(isSectionExpanded);
+    return `<button type="button" class="list-grouping__btn list-grouping__toggle-all" data-action="toggle-all-response-sections">${allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}</button>`;
+}
+
+/** Klick auf "Alle aufklappen/zuklappen": gleiche Stufe wie die Anzeige. */
+function toggleAllResponseSections() {
+    if (!current || !current.members || currentFilter !== 'all') return;
+    const members = current.members;
+    const stage = groupingStored(GROUPING_KEY_RESPONSES, groupingAvailableStages(members), 'group');
+    const emptyLabel = stage === 'subgroup' ? `Ohne ${subgroupLabel()}` : 'Ohne Gruppe';
+    const keys = sectionKeys(members, stage, emptyLabel);
+    const allOpen = keys.every(key => expandedSections.has(key));
+    if (allOpen) keys.forEach(key => expandedSections.delete(key));
+    else keys.forEach(key => expandedSections.add(key));
+    renderKeepingFocus();
+}
+
+/** Rendert das Modal neu und setzt den Fokus auf den gleichen Knopf zurück (Kopfzeile je Schlüssel, sonst der Alle-Knopf). */
+function renderKeepingFocus(key) {
+    renderResponsesModal();
+    const selector = key === undefined
+        ? '.list-grouping__toggle-all'
+        : `.section-head[data-key="${CSS.escape(key)}"]`;
+    document.getElementById('responsesModalBody').querySelector(selector)?.focus();
+}
+
 /**
  * Antworten anderer Mitglieder (Rolle user, names_visible): gegliedert nach
  * dem gewaehlten Umschalter statt fest nach Terminart-Gruppe -- denselben
@@ -459,9 +549,13 @@ function responsesGroupingSwitcher(stages, stage) {
  * dort als eigene, absichtlich gleich gehaltene Fassung der grouping.js-
  * Funktionen, weil die PWA kein Modulsystem hat. Vorgabe 'group', ausser es
  * gibt Untergruppen (groupingStored()). Je
- * Abschnitt eine Ampel-Zeile aus responseChipsHtml() und darunter Namens-Chips
- * Zusage -> Unsicher -> Absage -> ohne Antwort (CHIP_ORDER), darin nach
- * Nachname/Vorname (schon durch groupingSections() sortiert). Wer in
+ * Abschnitt eine Kopfzeile mit Balken (groupingSectionHeaderHtml(), Zahlen aus
+ * allen Mitgliedern des Abschnitts); die Abschnitte sind einklappbar
+ * (isSectionExpanded(), Alle-Knopf toggleAllSectionsHtml()), im aufgeklappten
+ * Abschnitt stehen Namens-Chips Zusage -> Unsicher -> Absage -> ohne Antwort
+ * (CHIP_ORDER), darin nach Nachname/Vorname (schon durch groupingSections()
+ * sortiert). Alphabetisch gibt es nur eine flache Liste ohne Kopfzeile.
+ * Nur fuer die Rolle user: Admin/Manager bekommen managerTableHtml(). Wer in
  * mehreren Abschnitten steht (Gruppe/Untergruppe), erscheint mehrfach --
  * groupingDuplicateCount() macht das ueber der Liste sichtbar (Spec 6.4).
  */
@@ -481,33 +575,46 @@ function namesListHtml(members) {
     }
 
     const groups = sections.map(section => {
-        const label = section.label === null ? 'Alle Mitglieder' : section.label;
-        const counts = { yes: 0, maybe: 0, no: 0, open: 0 };
-        section.members.forEach(m => counts[m.status ?? 'open']++);
-
-        const chips = CHIP_ORDER.map(key =>
+        const chipsHtml = () => CHIP_ORDER.map(key =>
             section.members.filter(m => (m.status ?? 'open') === key).map(responseNameChip).join('')
         ).join('');
 
+        // Alphabetisch: eine flache Liste ohne Kopfzeile
+        if (section.label === null) {
+            return `<div class="response-name-group">
+            <div class="response-name-chips">${chipsHtml()}</div>
+        </div>`;
+        }
+
+        const expanded = isSectionExpanded(section.key);
         return `<div class="response-name-group">
-            <div class="response-name-group__heading"><span class="response-name-group__label">${escapeHtml(label)}</span> ${responseChipsHtml(counts)}</div>
-            <div class="response-name-chips">${chips}</div>
+            ${groupingSectionHeaderHtml({ key: section.key, label: section.label,
+                counts: groupingStatusCounts(section.members), expanded, disabled: currentFilter !== 'all',
+                chipsHtml: responseChipsHtml(groupingStatusCounts(section.members)) })}
+            ${expanded ? `<div class="response-name-chips">${chipsHtml()}</div>` : ''}
         </div>`;
     }).join('');
 
-    return `${responsesGroupingSwitcher(stages, stage)}${hint}<div class="response-names-grouped">${groups}</div>`;
+    return `${responsesToolbarHtml(responsesGroupingSwitcher(stages, stage), toggleAllSectionsHtml(stage, sections.map(s => s.key)))}${hint}<div class="response-names-grouped">${groups}</div>`;
 }
 
 /** Umschalter-Klick: merkt die Wahl und rendert das offene Modal aus den
  * vorliegenden Daten neu -- kein erneuter API-Aufruf. */
 function setResponsesGrouping(stage) {
+    expandedSections.clear();
     groupingStore(GROUPING_KEY_RESPONSES, stage);
     if (current) renderResponsesModal();
 }
 
-export function filterResponses(filter) {
+/** chip: Schlüssel des geklickten Filter-Chips -- der Fokus bleibt nach dem
+ * Neuzeichnen auf ihm (Tastaturbedienung), auch wenn er den Filter aufhebt. */
+export function filterResponses(filter, chip) {
     currentFilter = filter;
     renderResponsesModal();
+    if (chip) {
+        document.getElementById('responsesModalBody')
+            .querySelector(`.response-chip--btn[data-chip="${CSS.escape(chip)}"]`)?.focus();
+    }
 }
 
 /**
@@ -663,13 +770,20 @@ export function printResponses() {
 
 registerActions({
     'close-responses-modal': () => closeResponsesModal(),
-    'filter-responses': (el) => filterResponses(el.dataset.value),
+    'filter-responses': (el) => filterResponses(el.dataset.value, el.dataset.chip),
     'open-responses-modal': (el) => openResponsesModal(Number(el.dataset.id)),
     'print-responses': () => printResponses(),
     'save-own-comment': () => saveOwnComment(),
     'set-member-response': (el) => setMemberResponse(Number(el.dataset.id), el.dataset.value),
     'set-own-response': (el) => setOwnResponse(el.dataset.value),
     'set-responses-grouping': (el) => setResponsesGrouping(el.dataset.value),
+    'toggle-all-response-sections': () => toggleAllResponseSections(),
+    'toggle-response-section': (el) => {
+        if (currentFilter !== 'all') return;
+        const key = el.dataset.key;
+        expandedSections.has(key) ? expandedSections.delete(key) : expandedSections.add(key);
+        renderKeepingFocus(key);
+    },
     'toggle-responses-lock': () => toggleResponsesLock(),
     'withdraw-own-response': () => withdrawOwnResponse(),
 });

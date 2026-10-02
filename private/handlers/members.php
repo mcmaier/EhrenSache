@@ -282,6 +282,13 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 break;
             }
 
+            // group_ids: nur Liste ganzer Zahlen (vor jeder Aenderung pruefen)
+            if (isset($cleanData->group_ids) && ($groupIdsError = groupsCheckMemberGroupIds($cleanData->group_ids)) !== null) {
+                http_response_code(400);
+                echo json_encode(["message" => $groupIdsError, "field" => "group_ids"]);
+                break;
+            }
+
             // Umgebende Leerzeichen entfernen, bevor auf Duplikate geprueft
             // und gespeichert wird — sonst waeren "AB1" und "AB1 " zwei
             // "unterschiedliche" Nummern. Leer nach dem Trim faellt wie
@@ -312,16 +319,22 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                                $cleanData->active ?? true])) {
                 $memberId = $db->lastInsertId();
                 // Speichere Gruppen-Zuordnungen
+                $addedGroups = [];
+                $groupWarnings = [];
                 if(isset($cleanData->group_ids) && is_array($cleanData->group_ids)) {
+                    // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
+                    $normalized = groupsWithParents($db, $database, $cleanData->group_ids);
                     $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-                    foreach($cleanData->group_ids as $groupId) {
+                    foreach($normalized['group_ids'] as $groupId) {
                         $groupStmt->execute([$memberId, $groupId]);
                     }
+                    [$addedGroups, $groupWarnings] = groupsRuleReport((int) $memberId, $normalized);
                 }
                 http_response_code(201);
                 // $memberId, nicht lastInsertId(): Nach dem Insert der
                 // Gruppenzuordnung (ohne AUTO_INCREMENT) liefert es 0.
-                echo json_encode(["message" => "Member created", "id" => $memberId]);
+                echo json_encode(["message" => "Member created", "id" => $memberId,
+                                  "added_groups" => $addedGroups, "group_warnings" => $groupWarnings]);
             } else {
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to create member"]);
@@ -340,6 +353,13 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 if (isset($data->$field)) {
                     $cleanData->$field = $data->$field;
                 }
+            }
+
+            // group_ids: nur Liste ganzer Zahlen (vor jeder Aenderung pruefen)
+            if (isset($cleanData->group_ids) && ($groupIdsError = groupsCheckMemberGroupIds($cleanData->group_ids)) !== null) {
+                http_response_code(400);
+                echo json_encode(["message" => $groupIdsError, "field" => "group_ids"]);
+                break;
             }
 
             // Umgebende Leerzeichen entfernen — siehe POST weiter oben.
@@ -442,17 +462,23 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
             }
 
             // Gruppen-Zuordnungen aktualisieren (wenn group_ids geliefert)
+            $addedGroups = [];
+            $groupWarnings = [];
             if (isset($cleanData->group_ids)) {
                 $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
                 if (is_array($cleanData->group_ids)) {
+                    // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
+                    $normalized = groupsWithParents($db, $database, $cleanData->group_ids);
                     $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-                    foreach ($cleanData->group_ids as $groupId) {
+                    foreach ($normalized['group_ids'] as $groupId) {
                         $groupStmt->execute([$id, $groupId]);
                     }
+                    [$addedGroups, $groupWarnings] = groupsRuleReport((int) $id, $normalized);
                 }
             }
 
-            echo json_encode(["message" => "Member updated"]);
+            echo json_encode(["message" => "Member updated",
+                              "added_groups" => $addedGroups, "group_warnings" => $groupWarnings]);
             break;
             
         case 'DELETE':

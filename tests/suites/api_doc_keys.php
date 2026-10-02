@@ -97,7 +97,12 @@ function adContext(): array
         if ($seriesId === null && !empty($apt['series_id'])) {
             $seriesId = (int) $apt['series_id'];
         }
-        if ($responsesAppointmentId === null && !empty($apt['responses'])) {
+        // Nur ein begonnener Termin: bei einem kuenftigen fehlen 'comparison' und
+        // 'present', die API.md beschreibt -- sonst wird der Test rot, sobald der
+        // erste Termin mit Rueckmeldung in der Zukunft liegt.
+        $begun = isset($apt['date'], $apt['start_time'])
+            && $apt['date'] . ' ' . $apt['start_time'] <= date('Y-m-d H:i:s');
+        if ($responsesAppointmentId === null && $begun && !empty($apt['responses'])) {
             $responsesAppointmentId = (int) $apt['appointment_id'];
         }
     }

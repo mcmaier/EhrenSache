@@ -103,7 +103,10 @@ test('responses.js bindet grouping.js ein, gliedert die Namensliste und fuehrt r
     assertTrue(!str_contains($js, 'responseGroupKey'), 'responseGroupKey() ist noch vorhanden -- sollte durch grouping.js ersetzt sein');
 
     $body = ugfBody($js, 'function namesListHtml', 'function setResponsesGrouping');
-    assertTrue(str_contains($body, 'escapeHtml(label)'), 'namesListHtml() maskiert die Abschnittsueberschrift nicht');
+    // Die Bezeichnung geht an die gemeinsame Kopfzeile, die sie maskiert.
+    assertTrue(str_contains($body, 'groupingSectionHeaderHtml('), 'namesListHtml() reicht die Abschnittsueberschrift nicht an groupingSectionHeaderHtml() weiter');
+    $grouping = (string) sourceCode($ugfRoot . '/public/js/modules/grouping.js');
+    assertTrue(str_contains($grouping, 'escapeHtml(label)'), 'groupingSectionHeaderHtml() maskiert die Abschnittsueberschrift nicht');
     assertTrue(str_contains($body, 'response-names-grouped'), 'Aeusserer Rahmen response-names-grouped fehlt weiterhin');
     assertTrue(str_contains($body, 'groupingSections('), 'namesListHtml() bildet die Abschnitte nicht ueber groupingSections()');
 

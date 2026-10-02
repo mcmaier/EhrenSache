@@ -7,6 +7,76 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Neu
+- **Register gehören zu Gruppen.** Im Gruppendialog erscheint bei einer Untergruppe die Auswahl
+  „gehört zu“ mit allen gewöhnlichen Gruppen, mehrere sind möglich — etwa Klarinetten zu
+  „Aktive“ und „Jugend“, weil Jungmusiker im Register mitspielen. Es gibt keine Vererbung:
+  Erwartet wird weiterhin nur über die Gruppen der Terminart. Die Gruppenverwaltung zeigt Register
+  eingerückt unter jeder ihrer Gruppen, Register ohne Gruppe am Ende mit dem Hinweis „ohne Gruppe
+  — bitte zuordnen; bis dahin keine Registerstatistik“. Die API liest und schreibt dazu
+  `parent_group_ids` an `member_groups`.
+- **Wer in einem Register steht, steht auch in einer seiner Gruppen.** Hat das Register genau
+  eine Gruppe, ergänzt der Server sie beim Speichern eines Mitglieds, beim CSV-Import und beim
+  Zuordnen der Gruppen eines Registers; hat es mehrere und das Mitglied steht in keiner, speichert
+  er und meldet es. Entfernt wird nie jemand. Der Mitgliederdialog hakt die Gruppe gleich mit an
+  und zeigt bei mehreren Gruppen einen Hinweis; die Antworten tragen `added_groups` und
+  `group_warnings`. Auch das Ergebnis des Mitgliederimports nennt Zuordnungen und Register ohne
+  Gruppe, mit Namen (`member_name` in der Antwort).
+- **Statistik nach Register:** Ein Register rechnet über seine Mitglieder; gezählt werden die
+  Termine seiner Gruppen und seine eigenen (Registerprobe). Eine Vorstandssitzung zählt nicht in
+  die Registerquote, nur weil Vorstandsmitglieder auch im Register spielen. Bisher blieb eine
+  Untergruppe leer oder zeigte nur ihre eigene Terminart. Die Tabellen der Register stehen nach
+  den gewöhnlichen Gruppen und tragen die Unterzeile „Register von Aktive, Jugend: Termine von
+  Aktive, Jugend und eigene Termine“, im Anwesenheitsbericht als Zusatz in der Überschrift.
+  Kopfzahlen, Pünktlichkeit und Zuverlässigkeit rechnen mit Filter auf ein Register über
+  denselben Bereich. Ein Register ohne Gruppe bekommt keine Tabelle. Der Hinweis „Untergruppe ohne
+  Terminarten“ aus 1.8.0 entfällt. Die API liefert dazu `is_subgroup` und `parent_group_names` je
+  Tabelle (OI-70).
+- **Filter-Chips im Rückmeldungsdialog:** Für Verwalter sind die Chips oben im Dialog (Alle,
+  Zusage, Unsicher, Absage, Ohne Antwort) zugleich der Filter der Tabelle, wie die Status-Chips im
+  Dashboard; ein zweiter Klick hebt ihn auf. Die eigene Filterleiste entfällt, „davon n ohne Zugang“
+  steht im Chip „Ohne Antwort“. Gliederung und „Alle aufklappen“ teilen sich eine Zeile.
+- **Besetzung je Register in der Rückmeldung:** Rückmeldungsdialog und Check-in-App gliedern die
+  Liste in zugeklappte Abschnitte; jede Kopfzeile zeigt einen Balken in den Farben des
+  Ampelbalkens und dahinter vier Chips (✓ 2 · ? 1 · ✗ 1 · — 1) mit „von 5“ am Ende. Die 5 ist die
+  Zahl der zu diesem Termin erwarteten Registermitglieder, keine gepflegte Mindestbesetzung. Im
+  Dashboard öffnet „Alle aufklappen“ alle Abschnitte, ein aktiver Filter ebenso; in der App genügt
+  der Tipp auf die Zeile. Wer in mehreren Registern steht, zählt in jedem voll.
+  Als Abschnitte erscheinen nur Register, die zum Termin passen: Eine Vorstandssitzung bietet
+  die Gliederung nach Register nicht mehr an. Verwalter sehen in der App jetzt dieselbe
+  gegliederte Namensliste wie im Dashboard; Mitglieder mit „Namen sichtbar“ die Liste mit
+  Status, ohne „Namen sichtbar“ nur den Gesamtbalken. Der Druck der Rückmeldungen beginnt mit
+  einer Tabelle „Besetzung“ (Zusagen, Unsicher, Absagen, Offen, Mehrfach eingeteilt) (FI-14).
+- **Nach dem Update: Register einmal ihren Gruppen zuordnen.** Das Update leitet keine
+  Zuordnung ab — jedes bestehende Register steht danach ohne Gruppe, und bis zur Zuordnung in
+  der Gruppenverwaltung gibt es keine Registerstatistik. Der Update-Assistent nennt die
+  betroffenen Register.
+
+### Geändert
+- **API `member_groups`:** `POST` liefert `id` als Zahl (bisher als String). `PUT` auf eine
+  unbekannte ID antwortet mit 404 (bisher 200, ohne dass etwas geändert wurde).
+- **API `members`:** `group_ids` muss eine Liste ganzer Zahlen sein (auch als Ziffern-String);
+  `POST` und `PUT` antworten sonst mit 400 statt die Werte still umzuwandeln. Ein `PUT` mit
+  falschem Typ löschte bisher die bestehende Gruppenzuordnung.
+
+### Behoben
+- **Die Statistik zählte Termine vor dem Eintritt und nach dem Austritt mit.** Wer im Laufe
+  eines Jahres ein- oder austrat, bekam alle Termine außerhalb seines Mitgliedschaftszeitraums
+  als unentschuldigt angerechnet — die Quoten dieser Mitglieder waren zu niedrig (im Testbestand
+  5 % statt 20 %). Sie steigen jetzt auf ihren richtigen Wert, ebenso die Gruppen- und
+  Gesamtquoten, in denen sie stecken; Pünktlichkeit, Zuverlässigkeit und Anwesenheitsbericht
+  folgen. Die Statistik prüft die Aktivität jetzt am Termindatum, wie Anwesenheitsliste,
+  Kalender und Rückmeldung schon bisher. Die Zahl der Termine in den Kopfzahlen zählt nur noch
+  Termine, zu denen jemand erwartet wurde (OI-114).
+- **Kopfzahl „Termine“ mit Mitgliedsfilter:** Sie zählt nur noch die Termine, zu denen das
+  gewählte Mitglied erwartet war. Bisher stand dort die Zahl aller Termine des Bereichs — bei
+  einem Admin ohne Gruppenfilter die aller Termine des Vereins. Betrifft auch die Rolle `user`,
+  deren Statistik immer auf das eigene Mitglied gefiltert ist.
+- **Anwesenheitsbericht:** Die Einzeltermine eines Mitglieds enthalten nur noch Termine, zu
+  denen es erwartet war, also keine vor seinem Eintritt oder nach seinem Austritt.
+
 ## [1.19.0] – 2026-10-01
 
 ### Geändert

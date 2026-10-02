@@ -199,3 +199,22 @@ tr.row-inactive:hover td.actions-cell > * {
     color: var(--text-medium);
     font-weight: 500;
 }
+
+/* Gruppenliste: Register unter ihrer Gruppe eingerückt (Spec 2026-10-02, 7) */
+.group-row--sub td:first-child {
+    padding-left: var(--spacing-xl);
+}
+
+.group-row--unassigned td:first-child {
+    border-left: 3px solid var(--danger-color);
+}
+
+.group-unassigned-hint {
+    display: block;
+    color: var(--text-muted);
+}
+
+.badge-small {
+    font-size: 10px;
+    padding: 2px 6px;
+}

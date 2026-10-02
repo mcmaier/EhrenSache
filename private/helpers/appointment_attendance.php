@@ -12,19 +12,20 @@
 /**
  * Anwesenheitszahlen je Termin (Spec 2026-09-22-kalender-anwesenheit).
  *
- * "Erwartet" folgt derselben Regel wie Anwesenheitsliste und Statistik:
- * Gruppen der Terminart (appointment_type_groups) mal Gruppenzuordnung des
- * Mitglieds, eingeschraenkt auf den Aktivzeitraum zum Termindatum
- * (getMemberActivityWhere). Gezaehlt wird in zwei Abfragen fuer die ganze
- * Liste, im selben Stil wie responsesAttachSummaries() in responses.php --
+ * "Erwartet" folgt derselben Regel wie Anwesenheitsliste und Statistik. Die
+ * Soll-Menge (Gruppen der Terminart mal Gruppenzuordnung des Mitglieds,
+ * eingeschraenkt auf den Aktivzeitraum zum Termindatum) steht in
+ * expected_pairs.php (expectedPairsSql()); attendanceExpectedMemberIds() liest
+ * sie von dort. Gezaehlt wird in zwei Abfragen fuer die ganze Liste, im selben Stil wie responsesAttachSummaries() in responses.php --
  * die beiden Helfer stehen nebeneinander, responses.php bindet diesen hier
  * zusaetzlich ein (fuer attendanceExpectedMemberIds()).
  */
 declare(strict_types=1);
 
-// getMemberActivityWhere() wird hier gebraucht -- dieser Helfer bindet
-// member_activity.php selbst ein, unabhaengig davon, ob der Aufrufer (etwa
-// responses.php, das umgekehrt diesen Helfer einbindet) das schon getan hat.
+// Diese Datei ruft getMemberActivityWhere() nicht mehr selbst auf (die Joins
+// leben in expected_pairs.php). Der Include bleibt der Ladereihenfolge wegen:
+// Aufrufer wie handlers/appointments.php binden nur diesen Helfer ein und
+// verlassen sich darauf, dass member_activity.php mitkommt.
 require_once __DIR__ . '/member_activity.php';
 
 const ATTENDANCE_PRESENT = 'present';
@@ -126,38 +127,29 @@ function attendanceCounts(array $expected, array $status): array
 }
 
 /**
- * Erwartete Mitglieder je Termin: Gruppen der Terminart
- * (appointment_type_groups) mal Gruppenzuordnung des Mitglieds, eingeschraenkt
- * auf den Aktivzeitraum zum Termindatum (getMemberActivityWhere). Ein
- * Mitglied in zwei Gruppen derselben Terminart zaehlt wegen SELECT DISTINCT
- * nur einmal.
+ * Erwartete Mitglieder je Termin, aus der Soll-Menge (expected_pairs.php).
+ * Ein Mitglied in zwei Gruppen derselben Terminart zaehlt einmal.
  *
  * Gemeinsame Abfrage fuer attendanceAttachSummaries() unten und
- * responsesAttachSummaries() in responses.php -- beide fuehrten bislang
- * dieselbe SQL doppelt.
+ * responsesAttachSummaries() in responses.php. Die Regel steht seit
+ * 2026-10-01 nur noch in expectedPairsSql() -- auch die Statistik liest dort.
  *
  * @param array<int, int> $appointmentIds
  * @return array<int, array<int, bool>> appointmentId => [memberId => true]
  */
-function attendanceExpectedMemberIds(PDO $db, string $prefix, array $appointmentIds): array
+function attendanceExpectedMemberIds(PDO $db, $database, array $appointmentIds): array
 {
     $expectedBy = [];
     if ($appointmentIds === []) {
         return $expectedBy;
     }
 
-    $placeholders = implode(',', array_fill(0, count($appointmentIds), '?'));
-    $activity     = getMemberActivityWhere('m', 'a.date');
+    require_once __DIR__ . '/expected_pairs.php';
 
-    $stmt = $db->prepare("
-        SELECT DISTINCT a.appointment_id, m.member_id
-        FROM {$prefix}appointments a
-        JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
-        JOIN {$prefix}member_group_assignments mga ON mga.group_id = atg.group_id
-        JOIN {$prefix}members m ON m.member_id = mga.member_id AND ({$activity})
-        WHERE a.appointment_id IN ({$placeholders})
-    ");
-    $stmt->execute($appointmentIds);
+    [$epSql, $epParams] = expectedPairsSql($database, ['appointment_ids' => $appointmentIds]);
+
+    $stmt = $db->prepare("SELECT DISTINCT ep.appointment_id, ep.member_id FROM ({$epSql}) ep");
+    $stmt->execute($epParams);
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $expectedBy[(int) $row['appointment_id']][(int) $row['member_id']] = true;
     }
@@ -190,7 +182,7 @@ function attendanceAttachSummaries($db, $database, array $appointments, ?int $vi
 
     if ($ids !== []) {
         $prefix       = $database->table('');
-        $expectedBy   = attendanceExpectedMemberIds($db, $prefix, $ids);
+        $expectedBy   = attendanceExpectedMemberIds($db, $database, $ids);
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
         $stmt = $db->prepare("SELECT appointment_id, member_id, status

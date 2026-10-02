@@ -95,17 +95,27 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
         // aufrufbar sein -- der Anwesenheitsbericht ruft sie so. Das kostet fuer
         // Nicht-Manager mit Gruppenfilter eine zusaetzliche, indizierte
         // COUNT-Abfrage. Wer hier "bereinigt", macht den Bericht angreifbar.
+        // Leerer Bereich: Auch hier beide Kennzahl-Bloecke -- eine eingeschaltete
+        // Kennzahl ueber einen leeren Bereich ist leer, nicht abgeschaltet.
+        $emptyResult = static fn (?string $warning): array => [
+            'warning'    => $warning,
+            'year'       => $year,
+            'worktime'   => null,
+            'summary'    => attendanceBuildSummary([], 0, 0),
+            'statistics' => [],
+            'rate_bands' => rateBands($db, $database),
+        ] + punctualityBlocks($db, $database, [], $year, $memberId, $appointmentTypeId, 0);
+
         if (!hasStatisticsGroupAccess($db, $database, $authMemberId, $role, $groupId)) {
-            // Auch hier beide Bloecke: eine eingeschaltete Kennzahl ueber einen
-            // leeren Bereich ist leer, nicht abgeschaltet.
-            return [
-                'warning'    => 'group not accessible',
-                'year'       => $year,
-                'worktime'   => null,
-                'summary'    => attendanceBuildSummary([], 0, 0),
-                'statistics' => [],
-                'rate_bands' => rateBands($db, $database),
-            ] + punctualityBlocks($db, $database, [], $year, $memberId, $appointmentTypeId, 0);
+            return $emptyResult('group not accessible');
+        }
+
+        // Register ohne Gruppe rechnet nicht (Spec 2026-10-02, 5.1): keine
+        // Tabelle und ebenso keine Kopfzahlen, Puenktlichkeit, Zuverlaessigkeit.
+        // Kein Zugriffsproblem, daher ohne Warnung.
+        $filterMeta = attendanceGroupMeta($db, $database, [$groupId])[$groupId] ?? null;
+        if ($filterMeta !== null && $filterMeta['is_subgroup'] && $filterMeta['parent_group_names'] === []) {
+            return $emptyResult(null);
         }
         $groups = [$groupId];
     } else {
@@ -114,14 +124,34 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
 
     $groups = array_map('intval', $groups);
 
-    $statistics = [];
-    $groupNames = attendanceGroupNames($db, $database, $groups);
+    $meta = attendanceGroupMeta($db, $database, $groups);
 
-    foreach ($groups as $gid) {
-        // Gruppe ohne Terminart -- oder ohne die angefragte -- hat keine
-        // Anwesenheit, ueber die sich reden liesse. Sie entfaellt, wie bisher.
+    // Reihenfolge (Spec 4.3): gewoehnliche Gruppen wie bisher, danach die
+    // Untergruppen nach sort_order und Name. Nur die Tabellen werden
+    // umsortiert; $groups bleibt fuer die Kopfzahlen unveraendert.
+    $ordinary  = array_values(array_filter($groups, static fn (int $g) => isset($meta[$g]) && !$meta[$g]['is_subgroup']));
+    $subgroups = array_values(array_filter($groups, static fn (int $g) => isset($meta[$g]) && $meta[$g]['is_subgroup']));
+    usort($subgroups, static fn (int $a, int $b) => groupSortCompare($meta[$a], $meta[$b]));
+
+    $statistics = [];
+
+    foreach (array_merge($ordinary, $subgroups) as $gid) {
+        $isSubgroup = $meta[$gid]['is_subgroup'];
+
+        // Register ohne Gruppe: keine Tabelle (Spec 2026-10-02, 5.1) -- erst
+        // die Zuordnung in der Gruppenverwaltung legt fest, welche Termine
+        // ausser den eigenen zaehlen.
+        if ($isSubgroup && $meta[$gid]['parent_group_names'] === []) {
+            continue;
+        }
+
+        // Gewoehnliche Gruppe: ihre Terminarten. Register: die eigenen und die
+        // seiner Gruppen P(S). Ohne Spalte -- oder ohne die angefragte
+        // Terminart -- entfaellt die Tabelle, wie bisher.
         $types = attendanceFilterTypes(
-            attendanceGroupTypes($db, $database, $gid),
+            $isSubgroup
+                ? attendanceSubgroupTypes($db, $database, $gid)
+                : attendanceGroupTypes($db, $database, $gid),
             $appointmentTypeId
         );
 
@@ -137,18 +167,16 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
             continue;
         }
 
-        $groupName = $groupNames[$gid] ?? null;
-        if ($groupName === null) {
-            continue;
-        }
-
-        $statistics[] = attendanceBuildGroup($gid, $groupName, $types, $rows);
+        $block = attendanceBuildGroup($gid, $meta[$gid]['group_name'], $types, $rows);
+        $block['is_subgroup']        = $isSubgroup;
+        $block['parent_group_names'] = $meta[$gid]['parent_group_names'];
+        $statistics[] = $block;
     }
 
     $memberTotals = attendanceFetchMemberTotals($db, $database, $groups, $year,
                                                 $memberId, $appointmentTypeId);
     $appointments = attendanceDistinctAppointmentCount($db, $database, $groups, $year,
-                                                       $appointmentTypeId);
+                                                       $memberId, $appointmentTypeId);
     $memberCount  = attendanceActiveMemberCount($db, $database, $groups, $year, $memberId);
 
     // Soll-Paare aus derselben Rechnung wie die Zusammenfassung -- die

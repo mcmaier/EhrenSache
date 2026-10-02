@@ -82,6 +82,17 @@ test('Der alte Datums-Cutoff ist entfernt', function () {
               'private/handlers/report_statistics.php'] as $file) {
         $src = (string) sourceCode($root . '/' . $file);
         assertSame(0, substr_count($src, 'ATTENDANCE_STARTED_CUTOFF_SQL'), $file . ' nutzt noch den alten Cutoff');
-        assertTrue(str_contains($src, 'attendanceStartedSql('), $file . ' nutzt die gemeinsame Regel nicht');
+        // Seit der gemeinsamen Soll-Menge (2026-10-01) reichen attendance.php und
+        // punctuality.php den Vorlauf als started_lead an expectedPairsSql() weiter;
+        // die Regel selbst steht dort einmal.
+        assertTrue(str_contains($src, 'attendanceStartedSql(') || str_contains($src, 'expectedPairsSql('),
+            $file . ' nutzt die gemeinsame Regel nicht');
+        // Jede Soll-Menge bekommt den Vorlauf mit: ohne started_lead zaehlte
+        // sie auch Termine, die noch nicht begonnen haben.
+        assertSame(substr_count($src, "'started_lead'"), substr_count($src, 'expectedPairsSql('),
+            $file . ': nicht jeder Aufruf von expectedPairsSql() uebergibt started_lead');
     }
+
+    $pairs = (string) sourceCode($root . '/private/helpers/expected_pairs.php');
+    assertTrue(str_contains($pairs, 'attendanceStartedSql('), 'expected_pairs.php nutzt die gemeinsame Regel nicht');
 });

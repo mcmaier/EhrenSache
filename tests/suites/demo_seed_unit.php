@@ -1153,7 +1153,7 @@ test('buildDemoPlan liefert genau die erwarteten Abschnitte', function () {
     assertSame([
         'activity_type_groups', 'activity_types', 'appointment_responses', 'appointment_series', 'appointment_type_groups',
         'appointment_types', 'appointments', 'exceptions', 'groups', 'member_group_assignments',
-        'members', 'membership_dates', 'records', 'settings', 'users', 'work_session_log', 'work_sessions',
+        'members', 'membership_dates', 'records', 'settings', 'subgroup_parents', 'users', 'work_session_log', 'work_sessions',
     ], $keys);
 });
 
@@ -1422,4 +1422,47 @@ test('buildAppointmentResponses: der kommende Auftritt hat Zusagen und offene An
     $expected = demoExpectedPairs($plan['members'], $plan['member_group_assignments'], $plan['membership_dates'],
         [$concert], $plan['appointment_type_groups'], '9999-12-31');
     assertTrue(count($rows) < count($expected), 'Alle haben geantwortet -- die Demo zeigt dann keine offenen');
+});
+
+// OI-118: Register gehoeren zu Gruppen (subgroup_parents). Ohne Zuordnung gaebe es
+// in der Demo keine Registerstatistik und keine Besetzung.
+test('jedes Register hat mindestens eine Gruppe im Plan, und zwar eine gewoehnliche', function () {
+    $plan      = buildDemoPlan(20260908, '2026-09-08');
+    $ordinary  = array_map(fn ($g) => $g['group_id'], array_filter($plan['groups'], fn ($g) => $g['is_subgroup'] === 0));
+    $parentsOf = [];
+    foreach ($plan['subgroup_parents'] as $row) {
+        assertSame(['subgroup_id', 'group_id'], array_keys($row));
+        assertTrue(in_array($row['group_id'], $ordinary, true), "Gruppe {$row['group_id']} ist kein gewoehnliche Gruppe");
+        $parentsOf[$row['subgroup_id']][] = $row['group_id'];
+    }
+    foreach ($plan['groups'] as $g) {
+        if ($g['is_subgroup'] === 1) {
+            assertTrue(!empty($parentsOf[$g['group_id']]), "Register {$g['group_name']} ohne Gruppe");
+        } else {
+            assertTrue(!isset($parentsOf[$g['group_id']]), "Gewoehnliche Gruppe {$g['group_name']} als Register zugeordnet");
+        }
+    }
+    assertSame(count($plan['subgroup_parents']), count(array_unique(array_map(fn ($r) => $r['subgroup_id'] . '-' . $r['group_id'], $plan['subgroup_parents']))));
+});
+
+test('jedes Registermitglied steht in mindestens einer Gruppe seines Registers (Mitgliedschaftsregel)', function () {
+    $plan      = buildDemoPlan(20260908, '2026-09-08');
+    $parentsOf = [];
+    foreach ($plan['subgroup_parents'] as $row) {
+        $parentsOf[$row['subgroup_id']][] = $row['group_id'];
+    }
+    $groupsOf = [];
+    foreach ($plan['member_group_assignments'] as $a) {
+        $groupsOf[$a['member_id']][] = $a['group_id'];
+    }
+    $checked = 0;
+    foreach ($plan['member_group_assignments'] as $a) {
+        if (!isset($parentsOf[$a['group_id']])) {
+            continue;
+        }
+        $checked++;
+        $hit = array_intersect($groupsOf[$a['member_id']], $parentsOf[$a['group_id']]);
+        assertTrue($hit !== [], "Mitglied {$a['member_id']} im Register {$a['group_id']}, aber in keiner seiner Gruppen");
+    }
+    assertTrue($checked > 0, 'Kein Registermitglied geprueft');
 });

@@ -435,9 +435,11 @@ export async function openMemberModal(memberId = null) {
     const title = document.getElementById('memberModalTitle');
     const membershipGroup = document.getElementById('membershipDatesGroup');
 
-    // Lade alle verfügbaren Gruppen
+    // Lade alle verfügbaren Gruppen -- mit await: ohne es baute sich der Dialog
+    // bei leerem Cache (frischer Seitenaufruf, nach dem Speichern eines
+    // Mitglieds) ohne Gruppenauswahl auf ("Keine Gruppen verfügbar").
     if (dataCache.groups.data.length === 0) {
-        loadGroups(true);
+        await loadGroups(true);
     }
     
     const pinSettings = await loadStationPinSettings();
@@ -534,19 +536,76 @@ function renderMemberGroups() {
         return;
     }
     
-    container.innerHTML = dataCache.groups.data.map(group => `
-        <label class="group-choice" style="display: flex; align-items: flex-start; padding: 8px; cursor: pointer; border-radius: 4px;">
-            <input type="checkbox" 
-                   class="member-group-checkbox" 
-                   value="${group.group_id}" 
+    container.innerHTML = dataCache.groups.data.map(group => {
+        const parentIds = group.is_subgroup == 1 && Array.isArray(group.parent_group_ids)
+            ? group.parent_group_ids.map(Number).join(',')
+            : '';
+        return `
+        <label class="group-choice group-choice--member">
+            <input type="checkbox"
+                   class="member-group-checkbox"
+                   value="${Number(group.group_id)}"
+                   data-group-name="${escapeHtml(group.group_name)}"
+                   data-parent-ids="${escapeHtml(parentIds)}"
+                   data-action-change="sync-member-groups"
                    ${currentMemberGroups.includes(group.group_id) ? 'checked' : ''}>
-            <span style="margin-left: 8px; flex: 1;">
+            <span class="group-choice-text">
                 <strong>${escapeHtml(group.group_name)}</strong>
-                ${group.is_default ? ' <span class="status-badge status-approved" style="font-size: 10px; padding: 2px 6px;">Standard</span>' : ''}
-                ${group.description ? `<br><small style="color: #7f8c8d;">${escapeHtml(group.description)}</small>` : ''}
+                ${group.is_default ? ' <span class="status-badge status-approved badge-small">Standard</span>' : ''}
+                ${group.description ? `<small class="group-choice-note">${escapeHtml(group.description)}</small>` : ''}
             </span>
-        </label>
-    `).join('');
+        </label>`;
+    }).join('');
+
+    syncMemberGroupCheckboxes(null);
+}
+
+/**
+ * Mitgliedschaftsregel im Dialog (Spec 2026-10-02, 4.4): Register angehakt ->
+ * seine Gruppe mit, sofern es genau eine hat; Gruppe abgewählt -> Register
+ * ab, die danach in keiner ihrer Gruppen mehr angehakt wären. Bequemlichkeit --
+ * maßgeblich ist die Regel auf dem Server. changed = null: nur Hinweise neu setzen.
+ */
+function syncMemberGroupCheckboxes(changed) {
+    const boxes = [...document.querySelectorAll('.member-group-checkbox')];
+    const byId = id => boxes.find(b => b.value === String(id));
+    const parentsOf = box => (box.dataset.parentIds || '').split(',').filter(Boolean);
+    if (changed) {
+        if (changed.checked) {
+            const parents = parentsOf(changed);
+            if (parents.length === 1 && byId(parents[0])) byId(parents[0]).checked = true;
+        } else {
+            boxes.filter(b => b.checked && parentsOf(b).includes(changed.value))
+                .filter(b => !parentsOf(b).some(p => byId(p)?.checked))
+                .forEach(b => { b.checked = false; });
+        }
+    }
+    updateMemberGroupHints(boxes, byId, parentsOf);
+}
+
+/**
+ * Hinweis neben einem angehakten Register mit mehreren Gruppen, von denen
+ * keine angehakt ist: der Server ergänzt dann niemanden, sondern warnt nur.
+ */
+function updateMemberGroupHints(boxes, byId, parentsOf) {
+    boxes.forEach(box => {
+        const text = box.closest('label')?.querySelector('.group-choice-text');
+        if (!text) return;
+        const parents = parentsOf(box);
+        const missing = box.checked && parents.length > 1 && !parents.some(p => byId(p)?.checked);
+        let hint = text.querySelector('.member-group-hint');
+        if (!missing) {
+            if (hint) hint.remove();
+            return;
+        }
+        if (!hint) {
+            hint = document.createElement('small');
+            hint.className = 'member-group-hint';
+            text.appendChild(hint);
+        }
+        const names = parents.map(p => byId(p)?.dataset.groupName).filter(Boolean);
+        hint.textContent = 'in keiner seiner Gruppen: ' + names.join(', ');
+    });
 }
 
 // ============================================
@@ -562,6 +621,12 @@ export async function saveMember() {
     }
 
     const memberId = document.getElementById('member_id').value;
+
+    // Gruppennamen jetzt sichern: invalidateMemberDependents() leert den
+    // Gruppen-Cache, bevor die Hinweise zu den Gruppen angezeigt werden.
+    const groupNameById = new Map(
+        (dataCache.groups?.data || []).map(g => [Number(g.group_id), g.group_name])
+    );
 
     // Sammle ausgewählte Gruppen
     const groupCheckboxes = document.querySelectorAll('.member-group-checkbox:checked');
@@ -636,6 +701,7 @@ export async function saveMember() {
         // damit zu den Erwarteten: Terminabruf verwerfen wie im Erfolgsfall.
         await invalidateCache('appointments');
         await invalidateMemberDependents();
+        showGroupConsequences(result, groupNameById);
 
         // Modal bleibt offen, wechselt aber in den Bearbeiten-Modus für das neu angelegte Mitglied
         await openMemberModal(result.id);
@@ -661,7 +727,26 @@ export async function saveMember() {
             memberId ? 'Mitglied wurde erfolgreich aktualisiert' : 'Mitglied wurde erfolgreich erstellt',
             'success'
         );
+
+        showGroupConsequences(result, groupNameById);
     }    
+}
+
+/**
+ * Hinweise zu den Folgen der Mitgliedschaftsregel (Spec 2026-10-02, 4.1):
+ * zusätzlich zugeordnete Gruppen und Register ohne Gruppe des Registers.
+ * Die Namen kommen aus der vor der Cache-Invalidierung gesicherten Map.
+ */
+function showGroupConsequences(result, groupNameById) {
+    const names = ids => [...new Set(ids.map(id => groupNameById.get(Number(id))).filter(Boolean))];
+    const addedNames = names((result.added_groups || []).map(a => a.group_id));
+    if (addedNames.length > 0) {
+        showToast('Zusätzlich den Gruppen zugeordnet: ' + addedNames.join(', '), 'info');
+    }
+    const warnedNames = names((result.group_warnings || []).map(w => w.subgroup_id));
+    if (warnedNames.length > 0) {
+        showToast('Steht in keiner der Gruppen des Registers: ' + warnedNames.join(', '), 'warning');
+    }
 }
 
 /**
@@ -832,5 +917,6 @@ registerActions({
     'open-member-modal': (el) => openMemberModal(el.dataset.id ? Number(el.dataset.id) : null),
     'remove-membership-date': (el) => removeMembershipDate(Number(el.dataset.index)),
     'save-member': () => saveMember(),
+    'sync-member-groups': (el) => syncMemberGroupCheckboxes(el),
     'update-membership-date': (el) => updateMembershipDate(Number(el.dataset.index), el.dataset.field, el.value),
 });

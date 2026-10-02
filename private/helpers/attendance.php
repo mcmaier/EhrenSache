@@ -262,17 +262,60 @@ function attendanceGroupTypes($db, $database, int $groupId): array
 }
 
 /**
- * Namen mehrerer Gruppen auf einmal, als Zuordnung group_id => group_name.
+ * Spalten eines Registers S: die Terminarten von S selbst und die seiner
+ * Gruppen P(S) aus subgroup_parents (Spec 2026-10-02, 5.1). Terminarten
+ * anderer Gruppen, in denen Registermitglieder zufaellig auch stehen, gehoeren
+ * nicht dazu. Haengt nicht vom Jahr ab -- die Spalten sollen beim
+ * Jahreswechsel nicht springen, wie bei attendanceGroupTypes().
  *
- * Eine Abfrage statt einer je Gruppe: Der Name haengt weder an Terminart noch
- * an Jahr, er muss nicht in der Gruppenschleife geholt werden. Fehlt eine
- * group_id im Ergebnis, gibt es die Gruppe nicht mehr -- der Aufrufer
- * ueberspringt sie dann.
+ * Jede Zeile aus attendanceFetchGroupRows() kommt ueber S oder eine Gruppe
+ * aus P(S) (expectedPairsScopeSql) und traegt damit eine Terminart dieser
+ * Liste; die Vertragspruefung in attendanceBuildGroup() bleibt gueltig.
+ *
+ * @return array<int, array{type_id: int, type_name: ?string}>
+ */
+function attendanceSubgroupTypes($db, $database, int $subgroupId): array
+{
+    $prefix = $database->table('');
+
+    $stmt = $db->prepare("
+        SELECT DISTINCT atg.type_id, at.type_name
+        FROM {$prefix}appointment_type_groups atg
+        LEFT JOIN {$prefix}appointment_types at ON at.type_id = atg.type_id
+        WHERE atg.group_id = ?
+           OR atg.group_id IN (
+                SELECT sp.group_id FROM {$prefix}subgroup_parents sp WHERE sp.subgroup_id = ?
+           )
+        ORDER BY at.type_name, atg.type_id
+    ");
+    $stmt->execute([$subgroupId, $subgroupId]);
+
+    $types = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $types[] = [
+            'type_id'   => (int) $row['type_id'],
+            'type_name' => $row['type_name'],
+        ];
+    }
+
+    return $types;
+}
+
+/**
+ * Name, Gruppenart und Sortierung mehrerer Gruppen auf einmal.
+ *
+ * Eine Abfrage statt einer je Gruppe. Fehlt eine group_id im Ergebnis, gibt
+ * es die Gruppe nicht mehr -- der Aufrufer ueberspringt sie dann.
+ *
+ * parent_group_names: Namen der Gruppen eines Registers aus subgroup_parents,
+ * nach Name sortiert (Spec 2026-10-02, 5.1); leer bei gewoehnlichen Gruppen
+ * und bei Registern ohne Gruppe.
  *
  * @param array<int, int> $groupIds
- * @return array<int, string>
+ * @return array<int, array{group_name: string, is_subgroup: bool, sort_order: int,
+ *                          parent_group_names: array<int, string>}>
  */
-function attendanceGroupNames($db, $database, array $groupIds): array
+function attendanceGroupMeta($db, $database, array $groupIds): array
 {
     if ($groupIds === []) {
         return [];
@@ -282,81 +325,98 @@ function attendanceGroupNames($db, $database, array $groupIds): array
     $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
 
     $stmt = $db->prepare("
-        SELECT group_id, group_name
+        SELECT group_id, group_name, is_subgroup, sort_order
         FROM {$prefix}member_groups
         WHERE group_id IN ({$placeholders})
     ");
-    $stmt->execute($groupIds);
+    $ids = array_values(array_map('intval', $groupIds));
+    $stmt->execute($ids);
 
-    $names = [];
+    $meta = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $names[(int) $row['group_id']] = (string) $row['group_name'];
+        $meta[(int) $row['group_id']] = [
+            'group_name'         => (string) $row['group_name'],
+            'is_subgroup'        => (int) $row['is_subgroup'] === 1,
+            'sort_order'         => (int) $row['sort_order'],
+            'parent_group_names' => [],
+        ];
     }
 
-    return $names;
+    // Eine zweite Abfrage fuer alle Zuordnungen, nicht eine je Register.
+    $parents = $db->prepare("
+        SELECT sp.subgroup_id, p.group_name
+        FROM {$prefix}subgroup_parents sp
+        JOIN {$prefix}member_groups p ON p.group_id = sp.group_id
+        WHERE sp.subgroup_id IN ({$placeholders})
+        ORDER BY p.group_name, p.group_id
+    ");
+    $parents->execute($ids);
+    foreach ($parents->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $sid = (int) $row['subgroup_id'];
+        if (isset($meta[$sid])) {
+            $meta[$sid]['parent_group_names'][] = (string) $row['group_name'];
+        }
+    }
+
+    return $meta;
 }
 
 /**
  * Je Mitglied und Terminart eine Zeile innerhalb einer Gruppe.
  *
- * Der Join auf appointment_type_groups ist an die feste group_id gebunden --
- * dadurch entsteht kein Faecher, jeder Termin trifft jedes Mitglied der Gruppe
- * genau einmal. Die Gruppierung nach member_id und type_id ist die
- * Voraussetzung, die attendanceBuildGroup() prueft: keine doppelte Zeile fuer
- * dieselbe Kombination.
+ * Der Bereich kommt aus expectedPairsScopeSql(): bei einer gewoehnlichen
+ * Gruppe die Paare, die ueber sie kommen, bei einem Register S die Paare, deren
+ * Mitglied in S steht und deren Termin ueber S selbst oder eine Gruppe aus
+ * P(S) kommt (Spec 2026-10-02, 5.1). DISTINCT auf (Mitglied, Termin) vor dem
+ * Join auf records: Ein Termin, der ein Registermitglied ueber S und eine
+ * Gruppe aus P(S) zugleich erreicht, zaehlt einmal. Die Gruppierung nach member_id und type_id ist die
+ * Voraussetzung, die attendanceBuildGroup() prueft.
  *
  * @return array<int, array<string, mixed>>
  */
 function attendanceFetchGroupRows($db, $database, int $groupId, int $year,
                                   ?int $memberId, ?int $appointmentTypeId): array
 {
-    require_once __DIR__ . '/member_activity.php';
+    require_once __DIR__ . '/expected_pairs.php';
 
-    $prefix        = $database->table('');
-    $activityWhere = getMemberActivityWhereYear($year, 'm');
+    $prefix = $database->table('');
+    [$epSql, $epParams]       = expectedPairsSql($database, [
+        'year'         => $year,
+        'type_id'      => $appointmentTypeId,
+        'member_id'    => $memberId,
+        'started_lead' => checkinToleranceHours($db, $database),
+    ]);
+    [$scopeSql, $scopeParams] = expectedPairsScopeSql($database, [$groupId]);
 
     $sql = "
-        SELECT m.member_id, m.name, m.surname, a.type_id,
-               COUNT(a.appointment_id)                                   AS total,
+        SELECT m.member_id, m.name, m.surname, p.type_id,
+               COUNT(p.appointment_id)                                   AS total,
                SUM(CASE WHEN r.status = 'present' THEN 1 ELSE 0 END)     AS attended,
                SUM(CASE WHEN r.appointment_id IS NULL THEN 1 ELSE 0 END) AS unexcused
-        FROM {$prefix}appointments a
-        JOIN {$prefix}appointment_type_groups atg
-             ON atg.type_id = a.type_id AND atg.group_id = ?
-        JOIN {$prefix}member_group_assignments mga ON mga.group_id = atg.group_id
-        JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activityWhere}
+        FROM (
+            SELECT DISTINCT ep.member_id, ep.appointment_id, ep.type_id
+            FROM ({$epSql}) ep
+            WHERE {$scopeSql}
+        ) p
+        JOIN {$prefix}members m ON m.member_id = p.member_id
         LEFT JOIN {$prefix}records r
-             ON r.appointment_id = a.appointment_id AND r.member_id = m.member_id
-        WHERE YEAR(a.date) = ?
-          AND " . attendanceStartedSql(checkinToleranceHours($db, $database)) . "
+             ON r.appointment_id = p.appointment_id AND r.member_id = p.member_id
+        GROUP BY m.member_id, p.type_id
+        ORDER BY m.surname, m.name, p.type_id
     ";
 
-    $params = [$groupId, $year];
-
-    if ($memberId !== null) {
-        $sql .= " AND m.member_id = ?";
-        $params[] = $memberId;
-    }
-    if ($appointmentTypeId !== null) {
-        $sql .= " AND a.type_id = ?";
-        $params[] = $appointmentTypeId;
-    }
-
-    $sql .= " GROUP BY m.member_id, a.type_id ORDER BY m.surname, m.name, a.type_id";
-
     $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    $stmt->execute(array_merge($epParams, $scopeParams));
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 /**
- * Je Mitglied eine Zeile, ueber alle Gruppen, entdoppelt.
+ * Je Mitglied eine Zeile ueber den Bereich mehrerer Gruppen, entdoppelt.
  *
- * COUNT(DISTINCT a.appointment_id) ist die Entdopplung: Erreicht ein Termin
- * ein Mitglied ueber zwei Gruppen, zaehlt er einmal. Ohne das waeren die
- * Kopfzahlen die Summe der Gruppentabellen und wuerden die Wirklichkeit
- * uebersteigen.
+ * DISTINCT (Mitglied, Termin) ist die Entdopplung: Erreicht ein Termin ein
+ * Mitglied ueber zwei Gruppen, zaehlt er einmal. Ohne das waeren die
+ * Kopfzahlen die Summe der Gruppentabellen.
  *
  * @param array<int, int> $groupIds
  * @return array<int, array<string, mixed>>
@@ -368,78 +428,67 @@ function attendanceFetchMemberTotals($db, $database, array $groupIds, int $year,
         return [];
     }
 
-    require_once __DIR__ . '/member_activity.php';
+    require_once __DIR__ . '/expected_pairs.php';
 
-    $prefix        = $database->table('');
-    $activityWhere = getMemberActivityWhereYear($year, 'm');
-    $placeholders  = implode(',', array_fill(0, count($groupIds), '?'));
+    $prefix = $database->table('');
+    [$epSql, $epParams]       = expectedPairsSql($database, [
+        'year'         => $year,
+        'type_id'      => $appointmentTypeId,
+        'member_id'    => $memberId,
+        'started_lead' => checkinToleranceHours($db, $database),
+    ]);
+    [$scopeSql, $scopeParams] = expectedPairsScopeSql($database, $groupIds);
 
     $sql = "
-        SELECT m.member_id,
-               COUNT(DISTINCT a.appointment_id) AS total,
-               COUNT(DISTINCT CASE WHEN r.status = 'present' THEN a.appointment_id END) AS attended,
-               COUNT(DISTINCT CASE WHEN r.status = 'excused' THEN a.appointment_id END) AS excused
-        FROM {$prefix}appointments a
-        JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
-        JOIN {$prefix}member_group_assignments mga
-             ON mga.group_id = atg.group_id AND mga.group_id IN ({$placeholders})
-        JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activityWhere}
+        SELECT p.member_id,
+               COUNT(p.appointment_id) AS total,
+               SUM(CASE WHEN r.status = 'present' THEN 1 ELSE 0 END) AS attended,
+               SUM(CASE WHEN r.status = 'excused' THEN 1 ELSE 0 END) AS excused
+        FROM (
+            SELECT DISTINCT ep.member_id, ep.appointment_id
+            FROM ({$epSql}) ep
+            WHERE {$scopeSql}
+        ) p
         LEFT JOIN {$prefix}records r
-             ON r.appointment_id = a.appointment_id AND r.member_id = m.member_id
-        WHERE YEAR(a.date) = ?
-          AND " . attendanceStartedSql(checkinToleranceHours($db, $database)) . "
+             ON r.appointment_id = p.appointment_id AND r.member_id = p.member_id
+        GROUP BY p.member_id
     ";
 
-    $params = $groupIds;
-    $params[] = $year;
-
-    if ($memberId !== null) {
-        $sql .= " AND m.member_id = ?";
-        $params[] = $memberId;
-    }
-    if ($appointmentTypeId !== null) {
-        $sql .= " AND a.type_id = ?";
-        $params[] = $appointmentTypeId;
-    }
-
-    $sql .= " GROUP BY m.member_id";
-
     $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    $stmt->execute(array_merge($epParams, $scopeParams));
 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/** Zahl der Termine im Auswertungsbereich, jeder einmal. */
+/**
+ * Zahl der Termine im Auswertungsbereich, jeder einmal.
+ *
+ * Gezaehlt werden Termine, zu denen im Bereich jemand erwartet wird -- ein
+ * Termin ohne erwartetes Mitglied (alle vor ihm ausgetreten) traegt zu keiner
+ * Quote bei und zaehlt deshalb auch hier nicht mehr (Spec 3.5).
+ *
+ * Mit $memberId zaehlen nur die Termine, zu denen dieses Mitglied erwartet
+ * wird -- die Zahl gehoert zu denselben Paaren wie Quote und Tabellenzeilen.
+ */
 function attendanceDistinctAppointmentCount($db, $database, array $groupIds, int $year,
-                                            ?int $appointmentTypeId): int
+                                            ?int $memberId, ?int $appointmentTypeId): int
 {
     if ($groupIds === []) {
         return 0;
     }
 
-    $prefix       = $database->table('');
-    $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+    require_once __DIR__ . '/expected_pairs.php';
 
-    $sql = "
-        SELECT COUNT(DISTINCT a.appointment_id)
-        FROM {$prefix}appointments a
-        JOIN {$prefix}appointment_type_groups atg
-             ON atg.type_id = a.type_id AND atg.group_id IN ({$placeholders})
-        WHERE YEAR(a.date) = ?
-          AND " . attendanceStartedSql(checkinToleranceHours($db, $database)) . "
-    ";
+    [$epSql, $epParams]       = expectedPairsSql($database, [
+        'year'         => $year,
+        'member_id'    => $memberId,
+        'type_id'      => $appointmentTypeId,
+        'started_lead' => checkinToleranceHours($db, $database),
+    ]);
+    [$scopeSql, $scopeParams] = expectedPairsScopeSql($database, $groupIds);
 
-    $params = $groupIds;
-    $params[] = $year;
-
-    if ($appointmentTypeId !== null) {
-        $sql .= " AND a.type_id = ?";
-        $params[] = $appointmentTypeId;
-    }
-
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    $stmt = $db->prepare("SELECT COUNT(DISTINCT ep.appointment_id) FROM ({$epSql}) ep WHERE {$scopeSql}");
+    $stmt->execute(array_merge($epParams, $scopeParams));
 
     return (int) $stmt->fetchColumn();
 }

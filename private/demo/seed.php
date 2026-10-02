@@ -52,6 +52,7 @@ const DEMO_TABLES = [
     'activity_type_groups',
     'activity_types',
     'member_group_assignments',
+    'subgroup_parents',
     'membership_dates',
     'members',
     'member_groups',
@@ -400,6 +401,8 @@ function writePlan(PDO $db, string $prefix, array $plan, string $password, ?stri
     // 2. member_groups (vorgezogen, siehe Hinweis oben — keine Abhängigkeit
     // zu members/users in beide Richtungen).
     $written['member_groups'] = insertRows($db, $prefix, 'member_groups', $plan['groups']);
+    // Register → Gruppen (OI-118); nach member_groups, beide Spalten sind Fremdschlüssel darauf.
+    $written['subgroup_parents'] = insertRows($db, $prefix, 'subgroup_parents', $plan['subgroup_parents']);
 
     // 3. members. `pin` ist im Plan Klartext und darf nicht in die
     // Datenbank — ersetzt durch pin_hash, mit pin_updated_at nur, wenn eine

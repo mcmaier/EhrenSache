@@ -26,6 +26,7 @@ require_once __DIR__ . '/member_activity.php';
 // hier direkt eingebunden statt sich auf die Ladereihenfolge des Aufrufers
 // zu verlassen.
 require_once __DIR__ . '/appointment_attendance.php';
+require_once __DIR__ . '/groups.php';   // groupSortCompare() fuer responsesStaffing()
 
 const RESPONSE_STATUSES = ['yes', 'no', 'maybe'];
 
@@ -235,6 +236,67 @@ function responseSummary(array $expectedMemberIds, array $statusByMember): array
 }
 
 /**
+ * Besetzung je Untergruppe (Spec 2026-10-01-register-statistik-besetzung, 5.1).
+ *
+ * $members sind die erwarteten Mitglieder eines Termins mit ihren
+ * Untergruppen (subgroups aus groupsAttachToMembers()). Ein Doppelspieler
+ * zaehlt in jeder seiner Untergruppen voll und erhoeht dort 'shared'. Wer in
+ * keiner Untergruppe steht, landet in der Abschlusszeile mit group_id null.
+ * Gibt es unter den Erwarteten keine Untergruppe, ist das Ergebnis leer --
+ * dann gibt es keine Besetzung zu zeigen.
+ *
+ * @param array<int, array<string, mixed>> $members
+ * @param array<int, string> $statusByMember member_id => yes|no|maybe
+ * @return array<int, array{group_id: ?int, name: ?string, expected: int, yes: int, maybe: int, no: int, open: int, shared: int}>
+ */
+function responsesStaffing(array $members, array $statusByMember): array
+{
+    $empty   = ['expected' => 0, 'yes' => 0, 'maybe' => 0, 'no' => 0, 'open' => 0, 'shared' => 0];
+    $bySub   = [];
+    $meta    = [];
+    $without = null;
+
+    foreach ($members as $member) {
+        $status = $statusByMember[(int) $member['member_id']] ?? null;
+        $key    = in_array($status, ['yes', 'maybe', 'no'], true) ? $status : 'open';
+        $subs   = $member['subgroups'] ?? [];
+
+        if ($subs === []) {
+            $without ??= ['group_id' => null, 'name' => null] + $empty;
+            $without['expected']++;
+            $without[$key]++;
+            continue;
+        }
+
+        foreach ($subs as $sub) {
+            $gid = (int) $sub['group_id'];
+            if (!isset($bySub[$gid])) {
+                $bySub[$gid] = ['group_id' => $gid, 'name' => (string) $sub['group_name']] + $empty;
+                $meta[$gid]  = ['group_name' => (string) $sub['group_name'], 'sort_order' => (int) ($sub['sort_order'] ?? 0)];
+            }
+            $bySub[$gid]['expected']++;
+            $bySub[$gid][$key]++;
+            if (count($subs) > 1) {
+                $bySub[$gid]['shared']++;
+            }
+        }
+    }
+
+    if ($bySub === []) {
+        return [];
+    }
+
+    uksort($bySub, static fn (int $a, int $b) => groupSortCompare($meta[$a], $meta[$b]));
+    $rows = array_values($bySub);
+
+    if ($without !== null) {
+        $rows[] = $without;
+    }
+
+    return $rows;
+}
+
+/**
  * Gegenueberstellung nach Beginn (Spec 5.6), als Mitglieds-IDs je Feld.
  *
  * @param array<int, int> $expectedMemberIds
@@ -349,7 +411,8 @@ function responsesFetchAppointment($db, $database, int $appointmentId): ?array
 
 /**
  * Erwartete Mitglieder: Terminart -> Gruppe -> Mitglied, aktiv am Termindatum.
- * Derselbe Weg wie punctualityScope(). Ein Mitglied in zwei Gruppen kommt
+ * Dieselbe Regel wie expectedPairsSql() (Soll-Menge), hier eigens gebaut, weil
+ * die Gruppennamen mitgebraucht werden. Ein Mitglied in zwei Gruppen kommt
  * zweimal -- entdoppelt wird mit responsesDedupeExpected().
  */
 function responsesFetchExpected($db, $database, int $appointmentId): array
@@ -614,7 +677,7 @@ function responsesAttachSummaries($db, $database, array $appointments, ?int $vie
         // Gemeinsame Regel mit den Anwesenheitszahlen im Kalender
         // (attendanceExpectedMemberIds()); hier auf die Listenform gebracht,
         // die responseSummary() und responseComparison() erwarten.
-        foreach (attendanceExpectedMemberIds($db, $prefix, $ids) as $appointmentId => $memberIds) {
+        foreach (attendanceExpectedMemberIds($db, $database, $ids) as $appointmentId => $memberIds) {
             $expectedBy[$appointmentId] = array_keys($memberIds);
         }
 
