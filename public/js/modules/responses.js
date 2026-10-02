@@ -436,7 +436,7 @@ function managerTableHtml(data) {
     // (Spec 5.2): Bei aktivem Filter "Keine Antwort" stuende sonst "0 von 2"
     // ueber einem Register, in dem vier von sechs zugesagt haben.
     const sectionCounts = new Map(groupingSections(data.members, stage, emptyLabel).map(s => [
-        s.label,
+        s.key,
         { yes: s.members.filter(m => m.status === 'yes').length, total: s.members.length },
     ]));
     const duplicates = groupingDuplicateCount(filtered, stage);
@@ -448,7 +448,7 @@ function managerTableHtml(data) {
     }
 
     const rows = sections.map(section => {
-        const c = sectionCounts.get(section.label) ?? { yes: 0, total: section.members.length };
+        const c = sectionCounts.get(section.key) ?? { yes: 0, total: section.members.length };
         const groupRow = section.label !== null
             ? `<tr class="response-group-row"><td colspan="${colspan}">${escapeHtml(section.label)} · ${escapeHtml(String(c.yes))} von ${escapeHtml(String(c.total))} zugesagt</td></tr>`
             : '';

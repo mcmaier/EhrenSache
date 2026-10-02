@@ -61,4 +61,9 @@ test('Dashboard: Abschnittszeilen sagen "x von n zugesagt", unabhaengig vom Filt
     assertTrue(str_contains($body, 'zugesagt'), 'Abschnittszeile ohne Zusagen');
     assertTrue(str_contains($body, 'groupingSections(data.members'),
         'Die Zahl muss aus allen Mitgliedern des Abschnitts kommen, nicht aus der gefilterten Liste');
+    assertTrue(str_contains($body, 'sectionCounts.get(section.key)'),
+        'Die Zahlen muessen ueber den Abschnittsschluessel gesucht werden, Bezeichnungen sind nicht eindeutig');
+    assertTrue(str_contains($body, 's.key,'), 'Die Zahlen muessen nach s.key abgelegt werden');
+    assertTrue(preg_match('/c\.yes.*?von.*?c\.total.*?zugesagt/s', $body) === 1,
+        'Die Abschnittszeile muss c.yes und c.total der Zaehlung zeigen');
 });
