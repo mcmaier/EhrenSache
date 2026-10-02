@@ -113,7 +113,7 @@ mit beendeter Mitgliedschaft und 16 mit Stations-PIN (15 gewürfelt, dazu M001 m
 (Flöte, Klarinette, Trompete, Tenorhorn, Schlagzeug, in dieser `sort_order`), 38 der 40
 Mitglieder darin (Flöte 6, die übrigen vier Register je 8), vier davon zusätzlich in einem
 zweiten Register, zwei Mitglieder bewusst ohne Register — damit der Sammelabschnitt der
-Gliederung auch mit echten Daten zu sehen ist · vier Terminarten und rund 135 Termine über
+Gliederung auch mit echten Daten zu sehen ist · jedes Register gehört zu Gruppen (Aktive und Jugend, Klarinette zusätzlich Ehrenmitglieder; Tabelle `subgroup_parents`), damit Registerstatistik und Besetzung Daten zeigen · vier Terminarten und rund 135 Termine über
 zwölf Monate rückwärts und fünf bis sechs Monate vorwärts, Proben und Vorstandssitzung als
 Terminserien (siehe unten) · Bundesland Baden-Württemberg für die Feiertage
 (`holiday_region = BW`) · rund 2200 Anwesenheiten mit gestreuter Quote

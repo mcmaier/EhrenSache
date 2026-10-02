@@ -1238,8 +1238,8 @@ Schritt grün.
 ---
 
 ### OI-118 · Demo-Generator kennt `subgroup_parents` nicht
-**Priorität:** mittel — vor dem nächsten Demo-Update · aufgenommen am 2026-10-02 (Zweig
-`feat/register-statistik`)
+**Priorität:** — · **erledigt am 2026-10-02 — unveröffentlicht (Zweig `feat/register-statistik`)** ·
+aufgenommen am 2026-10-02
 
 `private/demo/plan.php` legt fünf Register an (Flöte, Klarinette, Trompete, Tenorhorn,
 Schlagzeug), ordnet sie aber keiner Gruppe zu. Nach einem Reset hat die Demo damit **keine
@@ -1251,10 +1251,13 @@ mit `FOREIGN_KEY_CHECKS = 0`; dabei greift `ON DELETE CASCADE` nicht. `subgroup_
 nicht in der Liste, also überlebt eine Zuordnung, die ein Besucher angelegt hat, den Reset — und
 weil der Plan die Gruppen mit festen IDs neu anlegt, gilt sie danach wieder.
 
-**Zu tun:** `subgroup_parents` in `DEMO_TABLES` aufnehmen, im Plan je Register seine Gruppen
-setzen (nach dem Befund aus Spec 1.1 haben die Register Mitglieder aus „Aktive“ und „Jugend“) und
-die Suite des Generators ergänzen. Im Zweig nicht erledigt, weil der Generator außerhalb des
-Auftrags lag; am Code nicht ausprobiert, nur gelesen.
+**Erledigt:** `subgroup_parents` steht in `DEMO_TABLES` (vor `member_groups`), der Plan liefert
+über `buildSubgroupParents()` je Register seine Gruppen (alle: Aktive und Jugend, Klarinette
+zusätzlich Ehrenmitglieder, weil die Mitglieder 9–12 dort sitzen), `writePlan()` schreibt sie. Die
+Suiten `demo_seed_unit` und `demo_seed_cli` prüfen Zuordnung, Mitgliedschaftsregel, Leerungsliste
+und Schreiben. **Für die Release-Sitzung:** `DEMO_MIN_SCHEMA` (`private/demo/seed.php`) steht noch
+auf 1.11.0; der Generator braucht jetzt die Tabelle und muss auf den Schemastand der Migration
+angehoben werden, die `subgroup_parents` anlegt.
 
 **Nicht sicherheitsrelevant:** Es überleben nur Zuordnungen zwischen Gruppen-IDs, keine Texte.
 

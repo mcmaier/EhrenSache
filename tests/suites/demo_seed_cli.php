@@ -435,3 +435,20 @@ test('ein geplantes Ende behaelt seinen Rueckgabewert', function () {
     assertSame(1, $fail['code'], 'finishRun(1)');
     assertSame('', $fail['stderr'], 'keine zweite Meldung des Waechters zum geplanten Fehler');
 });
+
+// OI-118: Mit FOREIGN_KEY_CHECKS=0 greift ON DELETE CASCADE nicht; die Tabelle muss
+// deshalb selbst in der Liste stehen, vor member_groups (Kinder vor Eltern).
+test('DEMO_TABLES leert subgroup_parents vor member_groups', function () {
+    $pos = array_search('subgroup_parents', DEMO_TABLES, true);
+    assertTrue($pos !== false, 'subgroup_parents fehlt in DEMO_TABLES');
+    assertTrue($pos < array_search('member_groups', DEMO_TABLES, true));
+});
+
+test('writePlan schreibt subgroup_parents aus dem Plan', function () {
+    $plan    = buildDemoPlan(20260908, '2026-09-21');
+    $db      = demoSeedCliPlanDb($plan);
+    $written = writePlan($db, 'test_', $plan, 'probelauf');
+
+    assertSame(count($plan['subgroup_parents']), $written['subgroup_parents']);
+    assertSame(count($plan['subgroup_parents']), (int) $db->query('SELECT COUNT(*) FROM test_subgroup_parents')->fetchColumn());
+});

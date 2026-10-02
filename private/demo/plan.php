@@ -177,6 +177,36 @@ function buildGroups(): array
 const DEMO_SUBGROUP_IDS = [5, 6, 7, 8, 9];
 
 /**
+ * Zu welchen gewöhnlichen Gruppen ein Register gehört (Tabelle subgroup_parents,
+ * Spec 2026-10-02-register-gruppe-besetzung). Ohne diese Zuordnung gäbe es in der
+ * Demo weder Registerstatistik noch Besetzung (OI-118).
+ *
+ * Aktive und Jugend spielen gemeinsam; Klarinette hat zusätzlich Ehrenmitglieder
+ * (Mitglieder 9–12 sind dort eingeordnet). Jedes Registermitglied muss in
+ * mindestens einer dieser Gruppen stehen — das prüft die Suite demo_seed_unit.
+ * Flöte: Jugend (Mitglieder 3–8) und Aktive (Mitglied 16 als Zweitregister).
+ */
+function buildSubgroupParents(): array
+{
+    $parentsOf = [
+        5 => [1, 2],       // Flöte: Aktive, Jugend
+        6 => [1, 2, 4],    // Klarinette: Aktive, Jugend, Ehrenmitglieder
+        7 => [1, 2],       // Trompete
+        8 => [1, 2],       // Tenorhorn
+        9 => [1, 2],       // Schlagzeug
+    ];
+
+    $rows = [];
+    foreach (DEMO_SUBGROUP_IDS as $subgroupId) {
+        foreach ($parentsOf[$subgroupId] as $groupId) {
+            $rows[] = ['subgroup_id' => $subgroupId, 'group_id' => $groupId];
+        }
+    }
+
+    return $rows;
+}
+
+/**
  * Terminarten.
  *
  * Nur der Auftritt fragt Rueckmeldungen ab (FI-1) -- wie im Verein: Zur Probe
@@ -1395,6 +1425,7 @@ function buildDemoPlan(int $seed, string $referenceDate, string $referenceTime =
         'settings'                 => buildSettings(),
         'groups'                   => buildGroups(),
         'members'                  => $members['members'],
+        'subgroup_parents'         => buildSubgroupParents(),
         'member_group_assignments' => $members['assignments'],
         'membership_dates'         => $members['membership_dates'],
         'users'                    => buildUsers(),
