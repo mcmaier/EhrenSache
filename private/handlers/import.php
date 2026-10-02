@@ -322,7 +322,7 @@ function importMembers($db, $database, $filePath) {
             "imported" => $imported,
             "updated" => $updated,
             "errors" => $errors,
-            "groups_added" => $groupsAdded,
+            "added_groups" => $groupsAdded,
             "group_warnings" => $groupWarnings
         ];
         

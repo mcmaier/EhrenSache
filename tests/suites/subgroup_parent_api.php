@@ -237,6 +237,32 @@ test('Mitgliedschaftsregel: Register mit zwei Gruppen warnt bei POST und PUT mem
     }
 });
 
+test('Mitgliedschaftsregel: Ergebnis haengt nicht von der Reihenfolge der Register ab', function () {
+    $s       = uniqid();
+    $groups  = [];
+    $members = [];
+    try {
+        $g = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP G {$s}"])['id'];
+        $h = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP H {$s}"])['id'];
+        // R2 zuerst angelegt: seine ID sortiert vor der von R1
+        $r2 = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP R2 {$s}", 'is_subgroup' => true,
+                                                          'parent_group_ids' => [$g, $h]])['id'];
+        $r1 = $groups[] = (int) spCreate('member_groups', ['group_name' => "SP R1 {$s}", 'is_subgroup' => true,
+                                                          'parent_group_ids' => [$g]])['id'];
+        assertTrue($r2 < $r1, 'Testvoraussetzung: R2 vor R1');
+
+        $body = spCreate('members', ['name' => 'Sp', 'surname' => "1 {$s}", 'active' => 1, 'group_ids' => [$r2, $r1]]);
+        $m = $members[] = (int) $body['id'];
+        $exp = [$g, $r1, $r2]; sort($exp);
+        assertSame($exp, spGroupIdsOf($m), 'G wird ueber R1 ergaenzt');
+        assertSame([['member_id' => $m, 'group_id' => $g]], $body['added_groups'] ?? null);
+        assertSame([], $body['group_warnings'] ?? null, 'R2 hat durch R1 seine Gruppe G, keine Warnung');
+    } finally {
+        foreach ($members as $id) { spDelete('members', $id); }
+        foreach (array_reverse($groups) as $id) { spDelete('member_groups', $id); }
+    }
+});
+
 /** Laedt eine Mitglieder-CSV ueber POST import hoch. */
 function spImportMembers(string $csv): array
 {
@@ -290,7 +316,7 @@ test('Mitgliedschaftsregel: CSV-Import zieht die Gruppe nach und meldet Warnunge
         $exp = [$g, $r]; sort($exp);
         assertSame($exp, spGroupIdsOf($ids[$numbers[0]]), 'Import ergaenzt die einzige Gruppe');
         assertSame([$r2], spGroupIdsOf($ids[$numbers[1]]), 'Import ergaenzt bei mehreren Gruppen nichts');
-        assertSame([['member_id' => $ids[$numbers[0]], 'group_id' => $g]], $res['body']['groups_added'] ?? null);
+        assertSame([['member_id' => $ids[$numbers[0]], 'group_id' => $g]], $res['body']['added_groups'] ?? null);
         assertSame([['member_id' => $ids[$numbers[1]], 'subgroup_id' => $r2]], $res['body']['group_warnings'] ?? null);
     } finally {
         foreach (apiRequest('GET', 'members', ['token' => apiToken('admin')])['body'] ?? [] as $m) {

@@ -213,15 +213,17 @@ function groupsWithParents($db, $database, array $groupIds): array
         $parentsOf[(int) $row['subgroup_id']][] = (int) $row['group_id'];
     }
 
-    foreach ($parentsOf as $subgroupId => $parents) {
-        if (array_intersect($parents, $ids) !== []) {
-            continue;
-        }
-        if (count($parents) === 1) {
+    // Zwei Phasen, damit das Ergebnis nicht von der Reihenfolge abhaengt: erst die
+    // Register mit genau einer Gruppe, dann die mit mehreren gegen die ergaenzte Liste.
+    foreach ($parentsOf as $parents) {
+        if (count($parents) === 1 && !in_array($parents[0], $ids, true)) {
             $result['group_ids'][] = $parents[0];
             $result['added'][]     = $parents[0];
             $ids[]                 = $parents[0];
-        } else {
+        }
+    }
+    foreach ($parentsOf as $subgroupId => $parents) {
+        if (count($parents) > 1 && array_intersect($parents, $ids) === []) {
             $result['warnings'][] = $subgroupId;
         }
     }
