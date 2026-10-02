@@ -67,3 +67,15 @@ test('Dashboard: Abschnittszeilen sagen "x von n zugesagt", unabhaengig vom Filt
     assertTrue(preg_match('/c\.yes.*?von.*?c\.total.*?zugesagt/s', $body) === 1,
         'Die Abschnittszeile muss c.yes und c.total der Zaehlung zeigen');
 });
+
+test('App: Besetzungsblock liest staffing und rechnet nicht selbst', function () use ($stRoot) {
+    $js   = (string) sourceCode($stRoot . '/public/checkin/js/app.js');
+    $body = stFunctionBody($js, 'staffingHtml');
+
+    assertTrue(str_contains($body, '.expected'), 'staffingHtml() muss expected aus staffing lesen');
+    assertTrue(!str_contains($body, 'members'), 'staffingHtml() darf nicht aus der Mitgliederliste zaehlen');
+    assertTrue(!str_contains($body, '++'), 'staffingHtml() darf nicht zaehlen');
+
+    $card = stFunctionBody($js, 'responseCardHtml');
+    assertTrue(str_contains($card, 'staffingHtml(item.staffing)'), 'Die Karte muss den Block aus item.staffing zeigen');
+});

@@ -3002,6 +3002,16 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     margin-bottom: 4px;
 }
 
+/* Besetzung je Register (nur Verwalter), steht ueber den Namenslisten. */
+.staffing { margin: 8px 0 12px; }
+.staffing__title { margin: 0 0 4px; font-size: 13px; }
+.staffing-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.staffing-table th,
+.staffing-table td { padding: 2px 8px 2px 0; text-align: left; vertical-align: baseline; }
+.staffing-table th { font-weight: 600; color: var(--text); }
+.staffing-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.staffing-details { color: var(--text-light); }
+
 /* Chips statt Bullet-Liste (Nutzer-Feedback: Punkte sassen zu weit links am
    Kartenrand) -- keine ul/li mehr, daher auch kein list-style noetig. */
 .response-name-chips {

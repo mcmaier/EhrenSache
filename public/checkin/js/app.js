@@ -4948,6 +4948,38 @@ function excuseSectionHtml(item) {
         </div>`;
 }
 
+/**
+ * Besetzung je Register fuer Verwalter (Spec 2026-10-01, 5.2). Der Server
+ * schickt `staffing` nur an Verwalter; ohne das Feld bleibt der Block weg.
+ * Gleiche Darstellung wie staffingHtml() in public/js/modules/responses.js --
+ * die Zahlen kommen aus responsesStaffing(), hier wird nichts gezaehlt.
+ */
+function staffingHtml(staffing) {
+    if (!Array.isArray(staffing) || staffing.length === 0) return '';
+
+    const word = subgroupLabel();
+    const num = value => escapeHtml(String(Number(value)));
+    const rows = staffing.map(s => {
+        const name = s.group_id === null ? `Ohne ${word}` : s.name;
+        const details = [];
+        if (Number(s.maybe) > 0) details.push(`${Number(s.maybe)} unsicher`);
+        if (Number(s.no) > 0) details.push(`${Number(s.no)} ${Number(s.no) === 1 ? 'Absage' : 'Absagen'}`);
+        if (Number(s.open) > 0) details.push(`${Number(s.open)} offen`);
+        const shared = Number(s.shared) > 0 ? ` (davon ${Number(s.shared)} mehrfach eingeteilt)` : '';
+
+        return `<tr>
+            <th scope="row">${escapeHtml(name)}</th>
+            <td class="staffing-count">${num(s.yes)} von ${num(s.expected)}</td>
+            <td class="staffing-details">${escapeHtml(details.join(' · '))}${escapeHtml(shared)}</td>
+        </tr>`;
+    }).join('');
+
+    return `<section class="staffing" aria-label="Besetzung">
+        <h4 class="staffing__title">Besetzung</h4>
+        <table class="staffing-table"><tbody>${rows}</tbody></table>
+    </section>`;
+}
+
 function responseCardHtml(item) {
     const apt = item.appointment;
     const id = Number(apt.appointment_id);
@@ -5028,6 +5060,7 @@ function responseCardHtml(item) {
                         <button type="button" class="response-comment__save" data-appointment-id="${id}"${off}>${saveLabel}</button>
                     </div>
                 </details>`}
+                ${staffingHtml(item.staffing)}
                 ${names}
                 ${offline && !started ? '<div class="response-card__offline">Ohne Netz ist keine Rückmeldung möglich.</div>' : ''}
             </div>
