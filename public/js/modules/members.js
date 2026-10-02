@@ -435,9 +435,11 @@ export async function openMemberModal(memberId = null) {
     const title = document.getElementById('memberModalTitle');
     const membershipGroup = document.getElementById('membershipDatesGroup');
 
-    // Lade alle verfügbaren Gruppen
+    // Lade alle verfügbaren Gruppen -- mit await: ohne es baute sich der Dialog
+    // bei leerem Cache (frischer Seitenaufruf, nach dem Speichern eines
+    // Mitglieds) ohne Gruppenauswahl auf ("Keine Gruppen verfügbar").
     if (dataCache.groups.data.length === 0) {
-        loadGroups(true);
+        await loadGroups(true);
     }
     
     const pinSettings = await loadStationPinSettings();
