@@ -110,6 +110,7 @@ test('Mitgliederimport: Ergebnis zeigt added_groups und group_warnings, Namen vo
     $summary = spfBody($js, 'function importGroupSummaryHtml', "\n}");
     assertTrue(str_contains($summary, 'added_groups') && str_contains($summary, 'group_warnings'),
         'importGroupSummaryHtml() wertet added_groups/group_warnings nicht aus');
+    assertTrue(str_contains($summary, 'member_name'), 'importGroupSummaryHtml() nutzt member_name nicht');
     assertTrue(str_contains($summary, 'escapeHtml('), 'importGroupSummaryHtml() maskiert nicht');
     assertTrue(!str_contains($summary, 'style='), 'importGroupSummaryHtml() setzt Inline-Styles');
 

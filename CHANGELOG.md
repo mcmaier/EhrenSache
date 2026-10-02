@@ -22,7 +22,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Zuordnen der Gruppen eines Registers; hat es mehrere und das Mitglied steht in keiner, speichert
   er und meldet es. Entfernt wird nie jemand. Der Mitgliederdialog hakt die Gruppe gleich mit an
   und zeigt bei mehreren Gruppen einen Hinweis; die Antworten tragen `added_groups` und
-  `group_warnings`.
+  `group_warnings`. Auch das Ergebnis des Mitgliederimports nennt Zuordnungen und Register ohne
+  Gruppe, mit Namen (`member_name` in der Antwort).
 - **Statistik nach Register:** Ein Register rechnet über seine Mitglieder; gezählt werden die
   Termine seiner Gruppen und seine eigenen (Registerprobe). Eine Vorstandssitzung zählt nicht in
   die Registerquote, nur weil Vorstandsmitglieder auch im Register spielen. Bisher blieb eine

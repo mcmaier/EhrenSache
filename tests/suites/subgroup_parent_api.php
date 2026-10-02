@@ -316,8 +316,8 @@ test('Mitgliedschaftsregel: CSV-Import zieht die Gruppe nach und meldet Warnunge
         $exp = [$g, $r]; sort($exp);
         assertSame($exp, spGroupIdsOf($ids[$numbers[0]]), 'Import ergaenzt die einzige Gruppe');
         assertSame([$r2], spGroupIdsOf($ids[$numbers[1]]), 'Import ergaenzt bei mehreren Gruppen nichts');
-        assertSame([['member_id' => $ids[$numbers[0]], 'group_id' => $g]], $res['body']['added_groups'] ?? null);
-        assertSame([['member_id' => $ids[$numbers[1]], 'subgroup_id' => $r2]], $res['body']['group_warnings'] ?? null);
+        assertSame([['member_id' => $ids[$numbers[0]], 'group_id' => $g, 'member_name' => "Eins {$s}, Sp"]], $res['body']['added_groups'] ?? null);
+        assertSame([['member_id' => $ids[$numbers[1]], 'subgroup_id' => $r2, 'member_name' => "Zwei {$s}, Sp"]], $res['body']['group_warnings'] ?? null);
     } finally {
         foreach (apiRequest('GET', 'members', ['token' => apiToken('admin')])['body'] ?? [] as $m) {
             if (in_array($m['member_number'] ?? '', $numbers, true)) {

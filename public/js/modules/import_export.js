@@ -319,7 +319,8 @@ function importNameLookup() {
  */
 function importGroupSummaryHtml(result, nameLookup) {
     const lookup = nameLookup || { groups: new Map(), members: new Map() };
-    const memberLabel = id => lookup.members.get(Number(id)) || `Mitglied #${id}`;
+    // member_name kommt vom Server (auch für neu angelegte Mitglieder), der Cache ist Rückfall
+    const memberLabel = entry => entry.member_name || lookup.members.get(Number(entry.member_id)) || `Mitglied #${entry.member_id}`;
     const groupLabel = id => lookup.groups.get(Number(id)) || `Gruppe #${id}`;
     const section = (title, rows) => {
         const items = [...new Set(rows)].map(r => `<li>${escapeHtml(r)}</li>`).join('');
@@ -333,14 +334,14 @@ function importGroupSummaryHtml(result, nameLookup) {
         const count = new Set(added.map(a => Number(a.member_id))).size;
         html += section(
             `${count} Mitglied(er) zusätzlich einer Gruppe zugeordnet`,
-            added.map(a => `${memberLabel(a.member_id)}: ${groupLabel(a.group_id)}`)
+            added.map(a => `${memberLabel(a)}: ${groupLabel(a.group_id)}`)
         );
     }
     if (warned.length > 0) {
         const count = new Set(warned.map(w => Number(w.member_id))).size;
         html += section(
             `${count} Mitglied(er) in keiner Gruppe ihres Registers`,
-            warned.map(w => `${memberLabel(w.member_id)}: ${groupLabel(w.subgroup_id)}`)
+            warned.map(w => `${memberLabel(w)}: ${groupLabel(w.subgroup_id)}`)
         );
     }
     return html;

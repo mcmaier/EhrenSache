@@ -309,8 +309,14 @@ function importMembers($db, $database, $filePath) {
                     $stmt->execute([$memberId, $groupId]);
                 }
                 [$addedRows, $warningRows] = groupsRuleReport((int) $memberId, $normalized);
-                $groupsAdded = array_merge($groupsAdded, $addedRows);
-                $groupWarnings = array_merge($groupWarnings, $warningRows);
+                // Name der Zeile mitgeben, damit die Oberfläche auch neu angelegte Mitglieder benennen kann
+                $memberName = $surname . ', ' . $name;
+                foreach ($addedRows as $r) {
+                    $groupsAdded[] = $r + ['member_name' => $memberName];
+                }
+                foreach ($warningRows as $r) {
+                    $groupWarnings[] = $r + ['member_name' => $memberName];
+                }
             }
         }
 

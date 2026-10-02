@@ -3258,7 +3258,9 @@ folgt derselben Mitgliedschaftsregel wie `POST`/`PUT members`: Steht ein Registe
 aber keine seiner Gruppen, ergänzt der Import bei genau einer Gruppe diese (`added_groups`) und
 meldet bei mehreren das Register (`group_warnings`), jeweils als `[{member_id, group_id}]` bzw.
 `[{member_id, subgroup_id}]` über alle Zeilen. Beide Felder stehen nur in der Antwort auf
-`type=members`, dort immer, ohne Treffer leer.
+`type=members`, dort immer, ohne Treffer leer. Beim Import trägt jeder Eintrag zusätzlich
+`member_name` (`"Nachname, Vorname"` der CSV-Zeile), weil die Mitglieder dem Aufrufer noch nicht
+bekannt sein müssen; `POST`/`PUT members` und `member_groups` liefern das Feld nicht.
 
 **Bestehende Termine bei `appointments`.** Ein Termin gleicher Terminart, gleichen Datums und
 gleicher Startzeit wird aktualisiert statt neu angelegt: Titel und Beschreibung immer, Ort und
