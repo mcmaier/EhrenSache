@@ -330,6 +330,40 @@ test('attendance_list: Register einer fremden Gruppe erscheinen nicht, Register 
     }
 });
 
+test('attendance_list: Register ohne Gruppe, nicht direkt zugeordnet, erscheint nicht', function () {
+    $welt = ugWorld('OhneGruppe');
+    try {
+        $r = ugCreate('member_groups', ['group_name' => 'UG R0 ' . uniqid(), 'is_subgroup' => true]);
+        $welt['extraGroups'][] = $r;
+        ugSetMemberGroups($welt['member'], array_values(array_unique(array_merge(ugMemberGroupIds($welt['member']), [$r]))));
+
+        $zeile = ugAttendanceRow($welt['appointment'], $welt['member']);
+        $ids   = array_map(static fn ($g) => (int) $g['group_id'], $zeile['subgroups']);
+        assertTrue(!in_array($r, $ids, true), 'Register ohne Gruppe darf nicht in subgroups stehen');
+    } finally {
+        ugDropWorld($welt);
+    }
+});
+
+test('attendance_list: Register mit zwei Gruppen erscheint, wenn eine davon zum Termin gehoert', function () {
+    $welt = ugWorld('ZweiGruppen');
+    try {
+        $v = ugAddGroupToMember($welt, 'Vorstand', false, 0);
+        $r = ugCreate('member_groups', [
+            'group_name' => 'UG R2G ' . uniqid(), 'is_subgroup' => true,
+            'parent_group_ids' => [$v, $welt['group']],
+        ]);
+        $welt['extraGroups'][] = $r;
+        ugSetMemberGroups($welt['member'], array_values(array_unique(array_merge(ugMemberGroupIds($welt['member']), [$r]))));
+
+        $zeile = ugAttendanceRow($welt['appointment'], $welt['member']);
+        $ids   = array_map(static fn ($g) => (int) $g['group_id'], $zeile['subgroups']);
+        assertTrue(in_array($r, $ids, true), 'Register mit einer Gruppe des Termins muss in subgroups stehen');
+    } finally {
+        ugDropWorld($welt);
+    }
+});
+
 /**
  * Registerprobe: eine Terminart mit NUR einem Register zugeordnet, keine
  * gewoehnliche Gruppe -- anders als ugWorld(), dessen Terminart-Gruppe nie
