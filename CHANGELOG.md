@@ -48,6 +48,13 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   der Gruppenverwaltung gibt es keine Registerstatistik. Der Update-Assistent nennt die
   betroffenen Register.
 
+### Geändert
+- **API `member_groups`:** `POST` liefert `id` als Zahl (bisher als String). `PUT` auf eine
+  unbekannte ID antwortet mit 404 (bisher 200, ohne dass etwas geändert wurde).
+- **API `members`:** `group_ids` muss eine Liste ganzer Zahlen sein (auch als Ziffern-String);
+  `POST` und `PUT` antworten sonst mit 400 statt die Werte still umzuwandeln. Ein `PUT` mit
+  falschem Typ löschte bisher die bestehende Gruppenzuordnung.
+
 ### Behoben
 - **Die Statistik zählte Termine vor dem Eintritt und nach dem Austritt mit.** Wer im Laufe
   eines Jahres ein- oder austrat, bekam alle Termine außerhalb seines Mitgliedschaftszeitraums
