@@ -140,7 +140,8 @@ test('staffing: Verwalter bekommt Besetzung je Register, Mitglied nicht', functi
         $posKla       = strpos($html, "RST Kla {$s}");
         assertTrue($posBesetzung !== false, 'Abschnitt Besetzung fehlt im Druck');
         assertTrue($posKla !== false && $posKla > $posBesetzung, 'Register steht im Besetzungsabschnitt');
-        assertTrue(str_contains($html, '1 von 2'), 'Zahl "1 von 2" fuer das erste Register fehlt');
+        assertTrue(preg_match('#RST Kla ' . preg_quote($s, '#') . '</td>\s*<td>1 von 2</td>#', $html) === 1,
+            'Zahl "1 von 2" in der Zeile des ersten Registers fehlt');
     } catch (Throwable $failure) {
         throw $failure;
     } finally {
