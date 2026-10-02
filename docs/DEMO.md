@@ -264,11 +264,25 @@ Die Seite selbst (`index.html`) kommt neu, die CSS-Module unter `css/` und die J
 `?v=` hilft nur der einen eingebundenen Datei, nicht den Modulen, die sie nachlädt.
 Am 2026-10-02 nach dem Update der Demo auf 1.20.0 so beobachtet.
 
-Abhilfe in Cloudflare unter *Caching → Configuration*: **Browser Cache TTL** auf
-**„Respect Existing Headers“** stellen. Nach einem Update zusätzlich **„Purge Everything“**,
-damit auch der Zwischenspeicher bei Cloudflare frisch ist. Prüfen lässt es sich im Browser
-(Entwicklerwerkzeuge → Netzwerk): `css/variables.css` muss `no-cache, must-revalidate` tragen,
-nicht `max-age=…`. Wer schon einen alten Stand im Browser hat, lädt einmal mit Strg+F5 neu.
+Abhilfe in Cloudflare, **beide Einstellungen zusammen**:
+
+1. *Caching → Configuration*: **Browser Cache TTL** auf **„Respect Existing Headers“**. Der
+   Browser fragt dann vor jeder Verwendung nach.
+2. *Caching → Cache Rules*: Regel für die Dateiendungen `css` und `js`, **Edge TTL „Ignore
+   cache-control header and use this TTL“** (1 Tag), Browser TTL „Respect origin“. Damit
+   beantwortet Cloudflare die Nachfragen selbst.
+
+Nur Schritt 1 allein ist schlechter als der Ausgangszustand: Dann folgt auch Cloudflare dem
+`no-cache` und reicht jede Nachfrage an den Server durch — ein Dashboard-Aufruf sind rund 45
+gleichzeitige Anfragen. Der Hoster der Demo weist ab etwa der zwölften gleichzeitigen Anfrage mit
+Apaches eigenem `503 Service Unavailable` ab; das Dashboard blieb leer, weil die JS-Module fehlten
+(2026-10-02 gemessen). Mit der Regel aus Schritt 2 kommt je Datei und Tag nur eine Anfrage beim
+Server an.
+
+Nach einem Update **„Purge Everything“**. Direkt danach ist der Zwischenspeicher bei Cloudflare
+kalt, der erste Aufruf kann deshalb noch einzelne 503 sehen; ab dem zweiten liefert Cloudflare aus.
+Prüfen im Browser (Entwicklerwerkzeuge → Netzwerk): `css/variables.css` trägt
+`cache-control: no-cache, must-revalidate` **und** ab dem zweiten Abruf `cf-cache-status: HIT`.
 
 **Die Testsuite läuft gegen eine Demo-Installation nicht.** Mit gesetztem `DEMO_MODE` werden
 über hundert Prüfungen rot, weil die Suiten `settings` schreiben — und genau das sperrt der

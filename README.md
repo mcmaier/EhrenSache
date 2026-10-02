@@ -211,8 +211,16 @@ Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 > sonst bis zu vier Stunden altes CSS und JS im Browser: Das Dashboard erscheint ungestylt, oder
 > Knöpfe tun nichts. EhrenSache verlangt für CSS und JS eine Nachfrage vor jeder Verwendung
 > (`no-cache`), Cloudflare ersetzt das in der Voreinstellung durch vier Stunden. In Cloudflare
-> unter *Caching → Configuration* die **Browser Cache TTL auf „Respect Existing Headers“** stellen
-> und nach jedem Update **„Purge Everything“** auslösen. Wer den alten Stand schon im Browser hat,
+> zwei Einstellungen, **beide** nötig:
+> 1. *Caching → Configuration*: **Browser Cache TTL auf „Respect Existing Headers“** — der
+>    Browser fragt dann vor jeder Verwendung nach, aber bei Cloudflare.
+> 2. *Caching → Cache Rules*: eine Regel für die Dateiendungen `css` und `js` mit **Edge TTL
+>    „Ignore cache-control header“**, etwa 1 Tag; Browser TTL bleibt „Respect origin“. Ohne diese
+>    Regel reicht Cloudflare jede Nachfrage an den Server durch — rund 45 gleichzeitige Anfragen
+>    je Seitenaufruf, die günstige Hoster mit `503 Service Unavailable` abweisen; das Dashboard
+>    bleibt dann leer.
+>
+> Nach jedem Update **„Purge Everything“** auslösen. Wer den alten Stand schon im Browser hat,
 > lädt einmal mit Strg+F5 neu.
 
 > [!NOTE]
