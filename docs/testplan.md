@@ -1500,7 +1500,10 @@ angegeben):
 Spec `docs/superpowers/specs/2026-10-01-register-statistik-besetzung-design.md` (OI-70, FI-14,
 OI-114). Automatisiert: `php tests/run.php statistics_subgroups_api`, `responses_staffing_unit`,
 `responses_staffing_api`, `staffing_frontend`, dazu die Gleichheitsprüfung
-`tests/db/verify_statistics_parity.php` und der Klickdurchgang `tests/browser/click-through.mjs`.
+`tests/db/verify_statistics_parity.php`. Der Block „Besetzung“ selbst ist durch
+`staffing_frontend` und `responses_staffing_api` sowie die manuellen Schritte REG-10 bis REG-18
+abgedeckt; der Klickdurchgang `tests/browser/click-through.mjs` (nur lokal) belegt lediglich, dass
+der Rückmeldungsdialog unter der CSP aufgeht, und prüft `.staffing` nicht.
 Voraussetzung: mindestens zwei Gruppen als Untergruppe markiert (Demo-Bestand: Klarinetten,
 Trompete), eine davon mit eigener Terminart (Registerprobe), eine Terminart mit Rückmeldung.
 Der Oberbegriff (`subgroup_label`) steht unten als <Wort>.
