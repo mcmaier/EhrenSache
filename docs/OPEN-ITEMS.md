@@ -2263,6 +2263,38 @@ zugeordnet“ und „n Mitglied(er) in keiner Gruppe ihres Registers“, Namen �
 
 ---
 
+### OI-120 · Das Dashboard lädt rund 45 Einzeldateien
+**Priorität:** niedrig · aufgenommen am 2026-10-02 (Demo nach dem Update auf 1.20.0)
+
+Ein Aufruf des Dashboards fordert rund 45 Dateien gleichzeitig an: 21 CSS-Module per `@import`
+aus `main.css` und gut 20 JS-Module per `import`. Ohne Build-Kette gibt es kein Bündel. Weil CSS
+und JS mit `no-cache` ausgeliefert werden (siehe Abschnitt Caching in `public/.htaccess`), fragt
+der Browser bei **jedem** Seitenaufruf alle diese Dateien nach — unverändert beantwortet der
+Server mit 304, aber jede Nachfrage ist eine eigene Anfrage.
+
+Auf der Demo (Shared Hosting) weist der Hoster ab etwa der zwölften gleichzeitigen Anfrage mit
+Apaches eigenem `503 Service Unavailable` ab. Das fiel auf, als Cloudflare die Dateien nicht
+mehr selbst zwischenspeicherte: Die JS-Module kamen mit 503, das Dashboard blieb leer. Mit einer
+Cache-Regel bei Cloudflare ist es behoben (README, Abschnitt Update; `docs/DEMO.md` Abschnitt 6).
+**Ohne** CDN trifft dieselbe Grenze jeden Verein, dessen Hoster gleichzeitige Anfragen so knapp
+begrenzt — dort gibt es keine Einstellung, die hilft.
+
+**Mögliche Wege, nicht entschieden:**
+1. CSS ohne Build bündeln: `main.css` statt `@import`-Kette eine zusammengesetzte Datei, die das
+   Update-Paket fertig mitbringt (Erzeugen beim Paketbau, nicht im Repository pflegen).
+2. Für CSS und JS `max-age` plus Inhalts-Versionierung statt `no-cache`: spart die Nachfragen,
+   setzt aber Versionsangaben an den Modul-Importen voraus — genau das, wovor der Kommentar in
+   `public/.htaccess` warnt (doppelte Modulinstanzen). Bräuchte eine Import-Map.
+3. Erst messen: Wie viele Vereine laufen auf Hostern mit so knapper Grenze? Ohne Rückmeldung aus
+   dem Betrieb kein Umbau.
+
+Siehe [OI-74](#oi-74--der-cache-bust-erreicht-nur-einen-teil-der-dateien) — dieselbe Ursache
+(Module ohne eigene Versionsangabe), dort für das Erneuern nach einem Update.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
