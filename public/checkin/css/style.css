@@ -3029,9 +3029,15 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     font-weight: 400;
     white-space: nowrap;
 }
-/* Gesamtzahl "von 5" am Ende hinter den vier Chips, in normaler Textfarbe */
+/* Gesamtzahl "von 5" am Ende hinter den vier Chips, in normaler Textfarbe.
+   Feste Mindestbreiten halten Chips und Zahl ueber alle Zeilen in einer Spalte. */
 .section-head__total {
+    min-width: 3.6em;
     color: var(--text);
+}
+.section-head__summary .response-count-chip {
+    min-width: 2.8em;
+    justify-content: center;
 }
 .section-bar {
     display: flex;

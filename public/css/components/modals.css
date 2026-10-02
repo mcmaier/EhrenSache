@@ -621,8 +621,11 @@
     color: var(--text-dark);
 }
 .section-head__summary { display: inline-flex; align-items: center; gap: var(--spacing-sm); color: var(--text-medium); font-weight: 400; font-size: 0.9em; white-space: nowrap; margin-left: auto; }
-/* Gesamtzahl "von 5" am Ende hinter den vier Chips, in normaler Textfarbe */
-.section-head__total { color: var(--text-dark); }
+/* Gesamtzahl "von 5" am Ende hinter den vier Chips, in normaler Textfarbe.
+   Feste Mindestbreiten halten Chips und Zahl ueber alle Zeilen in einer Spalte,
+   auch wenn eine Zeile "von 12" statt "von 5" traegt. */
+.section-head__total { color: var(--text-dark); min-width: 3.6em; }
+.section-head__summary .response-chip { min-width: 2.8em; justify-content: center; }
 .section-bar {
     display: flex; flex: 1 1 80px; min-width: 60px; max-width: 200px; height: 8px;
     border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-gray);
