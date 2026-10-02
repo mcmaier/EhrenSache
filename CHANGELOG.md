@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.20.0] – 2026-10-02
 
 ### Neu
 - **Register gehören zu Gruppen.** Im Gruppendialog erscheint bei einer Untergruppe die Auswahl

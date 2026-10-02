@@ -103,8 +103,15 @@ test('assertSchema laesst den Mindeststand durch', function () {
     assertSchema($db, 'test_');
 });
 
-test('assertSchema laesst 1.11.1 durch', function () {
-    $db = demoSeedCliMakeSchemaDb(['1.11.1']);
+test('assertSchema wirft bei 1.19.0 (subgroup_parents fehlt)', function () {
+    // Seit 1.20.0 schreibt der Generator subgroup_parents; auf 1.19.0 fehlt die
+    // Tabelle.
+    $db = demoSeedCliMakeSchemaDb(['1.19.0']);
+    assertThrows(fn () => assertSchema($db, 'test_'));
+});
+
+test('assertSchema laesst einen Patchstand ueber dem Mindeststand durch', function () {
+    $db = demoSeedCliMakeSchemaDb(['1.20.1']);
     assertSchema($db, 'test_');
 });
 
