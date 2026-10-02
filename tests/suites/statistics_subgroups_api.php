@@ -294,6 +294,19 @@ test('Anwesenheitsbericht listet nur Termine im Aktivzeitraum', function () use 
     assertTrue(!str_contains($html, 'SG R1'), 'R1 liegt vor dem Eintritt von D');
 });
 
+test('Anwesenheitsbericht listet einen Termin einmal, auch wenn mehrere Gruppen ihn erwarten', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w   = $sgWorld;
+    // C steht in zwei Registern (R und R2): Termin R1 entsteht in der Soll-Menge doppelt.
+    $res = apiRequest('GET', 'statistics_report', ['token' => apiToken('admin'), 'query' => [
+        'year' => $w['year'], 'member_id' => $w['members']['C']]]);
+    assertStatus(200, $res);
+
+    foreach (['SG G1', 'SG R1', 'SG R2'] as $title) {
+        assertSame(1, substr_count($res['raw'], $title), "{$title} muss genau einmal im Bericht stehen");
+    }
+});
+
 test('Statistik-Welt wird aufgeraeumt', function () use (&$sgWorld) {
     if (!empty($sgWorld)) {
         sgDropWorld($sgWorld);
