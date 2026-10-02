@@ -34,11 +34,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   denselben Bereich. Ein Register ohne Gruppe bekommt keine Tabelle. Der Hinweis „Untergruppe ohne
   Terminarten“ aus 1.8.0 entfällt. Die API liefert dazu `is_subgroup` und `parent_group_names` je
   Tabelle (OI-70).
+- **Filter-Chips im Rückmeldungsdialog:** Für Verwalter sind die Chips oben im Dialog (Alle,
+  Zusage, Unsicher, Absage, Ohne Antwort) zugleich der Filter der Tabelle, wie die Status-Chips im
+  Dashboard; ein zweiter Klick hebt ihn auf. Die eigene Filterleiste entfällt, „davon n ohne Zugang“
+  steht im Chip „Ohne Antwort“. Gliederung und „Alle aufklappen“ teilen sich eine Zeile.
 - **Besetzung je Register in der Rückmeldung:** Rückmeldungsdialog und Check-in-App gliedern die
   Liste in zugeklappte Abschnitte; jede Kopfzeile zeigt einen Balken in den Farben des
-  Ampelbalkens und „2 von 5 · 1 unsicher · 2 offen“. Die 5 ist die Zahl der zu diesem Termin
-  erwarteten Registermitglieder, keine gepflegte Mindestbesetzung. „Alle aufklappen“ öffnet alle
-  Abschnitte, ein aktiver Filter ebenso. Wer in mehreren Registern steht, zählt in jedem voll.
+  Ampelbalkens und dahinter vier Chips (✓ 2 · ? 1 · ✗ 1 · — 1) mit „von 5“ am Ende. Die 5 ist die
+  Zahl der zu diesem Termin erwarteten Registermitglieder, keine gepflegte Mindestbesetzung. Im
+  Dashboard öffnet „Alle aufklappen“ alle Abschnitte, ein aktiver Filter ebenso; in der App genügt
+  der Tipp auf die Zeile. Wer in mehreren Registern steht, zählt in jedem voll.
   Als Abschnitte erscheinen nur Register, die zum Termin passen: Eine Vorstandssitzung bietet
   die Gliederung nach Register nicht mehr an. Verwalter sehen in der App jetzt dieselbe
   gegliederte Namensliste wie im Dashboard; Mitglieder mit „Namen sichtbar“ die Liste mit
