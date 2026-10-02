@@ -196,3 +196,38 @@ test('Mitgliedschaftsregel: POST und PUT members ziehen die Gruppe nach', functi
         foreach (array_reverse($groups) as $id) { spDelete('member_groups', $id); }
     }
 });
+
+test('Gruppen eines Registers: Selbstbezug, Duplikate, Ziffern-Strings, Rechte, unbekannte ID', function () {
+    $s   = uniqid();
+    $ids = [];
+    try {
+        $g = $ids[] = (int) spCreate('member_groups', ['group_name' => "SP G {$s}"])['id'];
+        $r = $ids[] = (int) spCreate('member_groups', ['group_name' => "SP R {$s}", 'is_subgroup' => true])['id'];
+
+        // Selbstbezug: 400, nichts gespeichert
+        $bad = spPutGroup($r, "SP R {$s}", ['is_subgroup' => true, 'parent_group_ids' => [$r]]);
+        assertStatus(400, $bad, 'Selbstbezug muss abgewiesen werden');
+        assertSame([], spGroup($r)['parent_group_ids'] ?? null);
+
+        // Duplikate werden zusammengefasst
+        $res = spPutGroup($r, "SP R {$s}", ['is_subgroup' => true, 'parent_group_ids' => [$g, $g]]);
+        assertStatus(200, $res);
+        assertSame([$g], spGroup($r)['parent_group_ids'] ?? null, 'Duplikate ergeben eine Zuordnung');
+
+        // Ziffern-Strings werden angenommen
+        $res = spPutGroup($r, "SP R {$s}", ['is_subgroup' => true, 'parent_group_ids' => [(string) $g]]);
+        assertStatus(200, $res);
+        assertSame([$g], spGroup($r)['parent_group_ids'] ?? null, 'Ziffern-String gilt als ID');
+
+        // Manager darf keine Gruppe anlegen
+        $res = apiRequest('POST', 'member_groups', ['token' => apiToken('manager'),
+            'body' => ['group_name' => "SP M {$s}"]]);
+        assertStatus(403, $res, 'POST member_groups ist Admin-Sache');
+
+        // PUT auf unbekannte ID: 404
+        $res = spPutGroup(999999999, "SP U {$s}", []);
+        assertStatus(404, $res, 'unbekannte Gruppe');
+    } finally {
+        foreach (array_reverse($ids) as $id) { spDelete('member_groups', $id); }
+    }
+});

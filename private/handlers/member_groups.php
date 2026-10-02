@@ -141,6 +141,7 @@ function handleMemberGroups($db, $database, $method, $id) {
             requireAdmin();
 
             $data = json_decode(file_get_contents("php://input"));
+            $data = (object) ($data ?? []);
 
             $isSubgroupPost = !empty($data->is_subgroup) ? 1 : 0;
             $isDefaultPost  = !empty($data->is_default) ? 1 : 0;
@@ -165,21 +166,26 @@ function handleMemberGroups($db, $database, $method, $id) {
                 $parentIdsPost = $check['ids'];
             }
 
-            // Wenn is_default=true, setze alle anderen auf false
-            if($isDefaultPost) {
-                $db->exec("UPDATE {$prefix}member_groups SET is_default = 0");
-            }
+            // Alles in einer Transaktion: Gruppe, Zuordnungen und Mitgliedschaftsregel
+            // gelten ganz oder gar nicht. Nichts darin gibt etwas aus.
+            try {
+                $db->beginTransaction();
 
-            $stmt = $db->prepare("INSERT INTO {$prefix}member_groups
-                                  (group_name, description, is_default, is_subgroup, sort_order)
-                                  VALUES (?, ?, ?, ?, ?)");
-            if($stmt->execute([
-                $data->group_name,
-                $data->description ?? null,
-                $isDefaultPost,
-                $isSubgroupPost,
-                (int) ($data->sort_order ?? 0)
-            ])) {
+                // Wenn is_default=true, setze alle anderen auf false
+                if($isDefaultPost) {
+                    $db->exec("UPDATE {$prefix}member_groups SET is_default = 0");
+                }
+
+                $stmt = $db->prepare("INSERT INTO {$prefix}member_groups
+                                      (group_name, description, is_default, is_subgroup, sort_order)
+                                      VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([
+                    $data->group_name ?? null,
+                    $data->description ?? null,
+                    $isDefaultPost,
+                    $isSubgroupPost,
+                    (int) ($data->sort_order ?? 0)
+                ]);
                 $newId = (int) $db->lastInsertId();
                 $added = [];
                 $warnings = [];
@@ -189,12 +195,25 @@ function handleMemberGroups($db, $database, $method, $id) {
                     $added = $rule['added'];
                     $warnings = $rule['warnings'];
                 }
+
+                $db->commit();
+
                 http_response_code(201);
                 echo json_encode(["message" => "Group created", "id" => $newId,
                                   "added_groups" => $added, "group_warnings" => $warnings]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["message" => "Failed to create group"]);
+            } catch (PDOException $e) {
+                if($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                // Deadlock (1213) oder Lock-Timeout (1205): Client kann sofort wiederholen
+                $isDeadlock = in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
+                http_response_code($isDeadlock ? 503 : 500);
+                echo json_encode([
+                    "message" => $isDeadlock
+                        ? "Temporärer Datenbankkonflikt. Bitte erneut versuchen."
+                        : "Failed to create group",
+                ]);
+                error_log("POST member_groups failed: " . $e->getMessage());
             }
             break;
 
@@ -211,7 +230,12 @@ function handleMemberGroups($db, $database, $method, $id) {
             // loeschen. description/is_default bleiben Altbestand (?? wie bisher).
             $currentStmt = $db->prepare("SELECT is_subgroup, sort_order, is_default FROM {$prefix}member_groups WHERE group_id = ?");
             $currentStmt->execute([$id]);
-            $currentRow = $currentStmt->fetch(PDO::FETCH_ASSOC) ?: ['is_subgroup' => 0, 'sort_order' => 0, 'is_default' => 0];
+            $currentRow = $currentStmt->fetch(PDO::FETCH_ASSOC);
+            if(!$currentRow) {
+                http_response_code(404);
+                echo json_encode(["message" => "Group not found"]);
+                break;
+            }
 
             $isSubgroup = property_exists($data, 'is_subgroup')
                 ? (!empty($data->is_subgroup) ? 1 : 0)
@@ -261,23 +285,29 @@ function handleMemberGroups($db, $database, $method, $id) {
                 $parentIdsPut = $check['ids'];
             }
 
-            // Wenn is_default=true, setze alle anderen auf false (außer dieser)
-            if(isset($data->is_default) && $data->is_default) {
-                $db->prepare("UPDATE {$prefix}member_groups SET is_default = 0 WHERE group_id != ?")->execute([$id]);
-            }
+            // Alles in einer Transaktion: Gruppe, Zuordnungen und Mitgliedschaftsregel
+            // gelten ganz oder gar nicht. Nichts darin gibt etwas aus.
+            try {
+                $db->beginTransaction();
 
-            $stmt = $db->prepare("UPDATE {$prefix}member_groups
-                                  SET group_name = ?, description = ?, is_default = ?,
-                                      is_subgroup = ?, sort_order = ?
-                                  WHERE group_id = ?");
-            if($stmt->execute([
-                $data->group_name,
-                $data->description ?? null,
-                $data->is_default ?? false,
-                $isSubgroup,
-                $sortOrder,
-                $id
-            ])) {
+                // Wenn is_default=true, setze alle anderen auf false (außer dieser)
+                if(isset($data->is_default) && $data->is_default) {
+                    $db->prepare("UPDATE {$prefix}member_groups SET is_default = 0 WHERE group_id != ?")->execute([$id]);
+                }
+
+                $stmt = $db->prepare("UPDATE {$prefix}member_groups
+                                      SET group_name = ?, description = ?, is_default = ?,
+                                          is_subgroup = ?, sort_order = ?
+                                      WHERE group_id = ?");
+                $stmt->execute([
+                    $data->group_name ?? null,
+                    $data->description ?? null,
+                    $data->is_default ?? false,
+                    $isSubgroup,
+                    $sortOrder,
+                    $id
+                ]);
+
                 $added = [];
                 $warnings = [];
                 if(!$isSubgroup) {
@@ -289,14 +319,26 @@ function handleMemberGroups($db, $database, $method, $id) {
                     $added = $rule['added'];
                     $warnings = $rule['warnings'];
                 }
+
+                $db->commit();
+
                 echo json_encode(["message" => "Group updated",
                                   "added_groups" => $added, "group_warnings" => $warnings]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["message" => "Failed to update group"]);
+            } catch (PDOException $e) {
+                if($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                $isDeadlock = in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
+                http_response_code($isDeadlock ? 503 : 500);
+                echo json_encode([
+                    "message" => $isDeadlock
+                        ? "Temporärer Datenbankkonflikt. Bitte erneut versuchen."
+                        : "Failed to update group",
+                ]);
+                error_log("PUT member_groups $id failed: " . $e->getMessage());
             }
             break;
-            
+
         case 'DELETE':
             requireAdmin();
 
