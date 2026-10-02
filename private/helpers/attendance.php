@@ -444,9 +444,12 @@ function attendanceFetchMemberTotals($db, $database, array $groupIds, int $year,
  * Gezaehlt werden Termine, zu denen im Bereich jemand erwartet wird -- ein
  * Termin ohne erwartetes Mitglied (alle vor ihm ausgetreten) traegt zu keiner
  * Quote bei und zaehlt deshalb auch hier nicht mehr (Spec 3.5).
+ *
+ * Mit $memberId zaehlen nur die Termine, zu denen dieses Mitglied erwartet
+ * wird -- die Zahl gehoert zu denselben Paaren wie Quote und Tabellenzeilen.
  */
 function attendanceDistinctAppointmentCount($db, $database, array $groupIds, int $year,
-                                            ?int $appointmentTypeId): int
+                                            ?int $memberId, ?int $appointmentTypeId): int
 {
     if ($groupIds === []) {
         return 0;
@@ -456,6 +459,7 @@ function attendanceDistinctAppointmentCount($db, $database, array $groupIds, int
 
     [$epSql, $epParams]       = expectedPairsSql($database, [
         'year'         => $year,
+        'member_id'    => $memberId,
         'type_id'      => $appointmentTypeId,
         'started_lead' => checkinToleranceHours($db, $database),
     ]);

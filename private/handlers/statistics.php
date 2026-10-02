@@ -158,7 +158,7 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
     $memberTotals = attendanceFetchMemberTotals($db, $database, $groups, $year,
                                                 $memberId, $appointmentTypeId);
     $appointments = attendanceDistinctAppointmentCount($db, $database, $groups, $year,
-                                                       $appointmentTypeId);
+                                                       $memberId, $appointmentTypeId);
     $memberCount  = attendanceActiveMemberCount($db, $database, $groups, $year, $memberId);
 
     // Soll-Paare aus derselben Rechnung wie die Zusammenfassung -- die
