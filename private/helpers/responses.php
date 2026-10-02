@@ -349,7 +349,8 @@ function responsesFetchAppointment($db, $database, int $appointmentId): ?array
 
 /**
  * Erwartete Mitglieder: Terminart -> Gruppe -> Mitglied, aktiv am Termindatum.
- * Derselbe Weg wie punctualityScope(). Ein Mitglied in zwei Gruppen kommt
+ * Dieselbe Regel wie expectedPairsSql() (Soll-Menge), hier eigens gebaut, weil
+ * die Gruppennamen mitgebraucht werden. Ein Mitglied in zwei Gruppen kommt
  * zweimal -- entdoppelt wird mit responsesDedupeExpected().
  */
 function responsesFetchExpected($db, $database, int $appointmentId): array

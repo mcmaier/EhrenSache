@@ -244,8 +244,9 @@ function punctualityScope($database, array $groupIds, int $year, ?int $memberId,
 /**
  * Gemessene Ankuenfte im Bereich, je Record einmal.
  *
- * DISTINCT r.record_id ist die Entdopplung: Erreicht ein Termin ein Mitglied
- * ueber zwei Gruppen, liefert der Join denselben Record zweimal.
+ * Der Bereich kommt aus punctualityScope(); dessen Paare (p) sind schon je
+ * Mitglied und Termin einmalig, der Join liefert also keinen Record doppelt.
+ * DISTINCT r.record_id bleibt als harmlose Absicherung stehen.
  *
  * Gemessen heisst: anwesend, mit Uhrzeit, und nicht aus Import oder Timer
  * (Spec 3.5). Eine genehmigte Zeitkorrektur zaehlt mit -- ihre Herkunft steht

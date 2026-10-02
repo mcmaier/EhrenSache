@@ -87,6 +87,12 @@ test('Der alte Datums-Cutoff ist entfernt', function () {
         // die Regel selbst steht dort einmal.
         assertTrue(str_contains($src, 'attendanceStartedSql(') || str_contains($src, 'expectedPairsSql('),
             $file . ' nutzt die gemeinsame Regel nicht');
+        if ($file !== 'private/handlers/report_statistics.php') {
+            // Jede Soll-Menge bekommt den Vorlauf mit: ohne started_lead zaehlte
+            // sie auch Termine, die noch nicht begonnen haben.
+            assertSame(substr_count($src, "'started_lead'"), substr_count($src, 'expectedPairsSql('),
+                $file . ': nicht jeder Aufruf von expectedPairsSql() uebergibt started_lead');
+        }
     }
 
     $pairs = (string) sourceCode($root . '/private/helpers/expected_pairs.php');
