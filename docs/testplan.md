@@ -1492,3 +1492,36 @@ angegeben):
 | TS-11 | Als Nutzer ohne Verwaltungsrecht: Kalender öffnen, auf einen leeren Tag klicken | Keine Reaktion; keine Serienknöpfe im Termin-Popup |
 | TS-12 | Bundesland in den Einstellungen wechseln (Termine → Kalender), zurück zum Kalender | Feiertagsnamen und -markierung ändern sich sofort, ohne Neuladen der Seite |
 | TS-13 | Als Manager/Admin: Herkunftsfilter auf „Nur Serientermine" bzw. „Ohne Serientermine" stellen | Liste, Kalender und Anzeige-Chips „Vergangen"/„Kommend" zeigen nur die passende Teilmenge; „Filter zurücksetzen" stellt „Alle" wieder her |
+
+---
+
+## 26. Register (Statistik, Besetzung) — unveröffentlicht
+
+Spec `docs/superpowers/specs/2026-10-01-register-statistik-besetzung-design.md` (OI-70, FI-14,
+OI-114). Automatisiert: `php tests/run.php statistics_subgroups_api`, `responses_staffing_unit`,
+`responses_staffing_api`, `staffing_frontend`, dazu die Gleichheitsprüfung
+`tests/db/verify_statistics_parity.php` und der Klickdurchgang `tests/browser/click-through.mjs`.
+Voraussetzung: mindestens zwei Gruppen als Untergruppe markiert (Demo-Bestand: Klarinetten,
+Trompete), eine davon mit eigener Terminart (Registerprobe), eine Terminart mit Rückmeldung.
+Der Oberbegriff (`subgroup_label`) steht unten als <Wort>.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| REG-1 | Admin: Statistik ohne Gruppenfilter | Erst die gewöhnlichen Gruppen, danach die Register nach ihrer Reihenfolge (`sort_order`); kein Hinweis „Untergruppe ohne Terminarten“ mehr |
+| REG-2 | Statistik mit Filter auf ein Register **ohne** eigene Terminart | Tabelle erscheint (bis 1.19.0 leer); Unterzeile „<Wort>: alle Termine der Mitglieder“; Spalten = Terminarten aller Gruppen der Registermitglieder (z. B. Gesamtprobe, Auftritt, Jugendprobe) |
+| REG-3 | Statistik mit Filter auf ein Register **mit** Registerprobe | Spalten wie REG-2 **plus** Registerprobe; Kopfzahlen, Pünktlichkeit und Zuverlässigkeit beziehen sich auf die Registermitglieder |
+| REG-4 | Gewöhnliche Gruppe filtern (z. B. „Aktive“) | Keine Unterzeile; Spalten nur die eigenen Terminarten der Gruppe, wie bisher |
+| REG-5 | Ein Mitglied in zwei Register setzen (Doppelspieler), nur eines davon mit Registerprobe; Statistik beider Register öffnen | Mitglied steht in beiden Tabellen; die Tabelle des Registers **ohne** Registerprobe zeigt trotzdem eine Spalte „Registerprobe“ (über den Doppelspieler) — gewollt, Spec 4.2 |
+| REG-6 | Register, aus dem ein Mitglied mit eigener Gruppe (z. B. „Jugend“) ausgetreten ist | Spalten können die Terminart dieser Gruppe weiter führen, mit „–“ bzw. 0 von 0 bei allen übrigen — die Spaltenliste hängt nicht vom Jahr ab, gewollt |
+| REG-7 | User: Statistik, Filter auf das eigene Register | Registertabelle mit genau einer Zeile (die eigene); fremdes Register → 403 bzw. kein Eintrag im Filter |
+| REG-8 | Statistik eines Mitglieds, das im gewählten Jahr eingetreten ist (Admin: Mitgliedsfilter) | Termine vor dem Eintritt zählen nicht; Quote entsprechend höher als vor der Umstellung; Kopfzahl „Termine“ = Termine, zu denen das Mitglied erwartet war, nicht alle des Vereins |
+| REG-9 | Für dasselbe Mitglied „📄 Bericht“ | „Termine im Einzelnen“ beginnt erst mit dem Eintritt; Register-Tabellen tragen in der Überschrift den Zusatz „(<Wort>: alle Termine der Mitglieder)“ |
+| REG-10 | Admin: Terminliste, Termin mit Rückmeldung und Registermitgliedern, Rückmeldungsdialog öffnen | Block „Besetzung“ zwischen Ampelbalken und Tabelle: je Register „x von n“ mit unsicher/Absage(n)/offen (Nullwerte fehlen), am Ende „Ohne <Wort>“; beim Doppelspieler „(davon 1 mehrfach eingeteilt)“ |
+| REG-11 | Im selben Dialog Gliederung „Gruppe“ und „<Wort>“ durchschalten | Abschnittszeilen lauten „<Name> · x von n zugesagt“ auf beiden Stufen |
+| REG-12 | Filter „Keine Antwort“ einschalten | Abschnittszahlen ändern sich **nicht** (zählen alle Mitglieder des Abschnitts) |
+| REG-13 | Termin, dessen erwartete Mitglieder in keinem Register stehen | Kein Block „Besetzung“ |
+| REG-14 | Mitglied (Rolle `user`) öffnet denselben Termin, auch bei sichtbaren Namen | Kein Block „Besetzung“ (die API liefert `staffing` nicht) |
+| REG-15 | Check-in-App als Manager: Tab „Rückmeldungen“, Karte eines Termins mit Registermitgliedern aufklappen | Block „Besetzung“ über der Namensliste, Werte wie im Dashboard; zugeklappt bleibt die Karte kompakt |
+| REG-16 | REG-15 bei 320 px Breite | Kein waagerechtes Scrollen, Zeilen umbrechen lesbar |
+| REG-17 | Admin: Druckansicht der Rückmeldungen desselben Termins | Am Kopf Abschnitt „Besetzung“ mit Spalten <Wort>, Zusagen, Unsicher, Absagen, Offen, „Mehrfach eingeteilt“ (leer bei 0); die Gliederung darunter bleibt nach Terminart-Gruppe |
+| REG-18 | Rückmeldung im Dialog ändern (z. B. Zusage für ein Registermitglied eintragen) | Block „Besetzung“ zeigt nach dem Speichern ohne Neuladen der Seite die neue Zahl |

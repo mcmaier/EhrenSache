@@ -51,7 +51,7 @@ durchschlägt.
 | [FI-11](#fi-11--mehrsprachigkeit-der-oberfläche) | Mehrsprachigkeit der Oberfläche | niedrig | L | — |
 | [FI-12](#fi-12--material--und-instrumentenausleihe) | Material- und Instrumentenausleihe | niedrig | L | — |
 | [FI-13](#fi-13--geburtstagsliste-mit-gratulationsvermerk) | Geburtstagsliste mit Gratulationsvermerk | mittel | M | — |
-| [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht — **Variante B teilweise umgesetzt in 1.8.0** | mittel¹ | M | FI-1 für die Wirkung |
+| [FI-14](#fi-14--untergruppen-register-und-besetzungsübersicht) | Untergruppen (Register) und Besetzungsübersicht — **Variante B in 1.8.0, Besetzung umgesetzt auf `feat/register-statistik`, unveröffentlicht** (ohne Mindestbesetzung) | mittel¹ | M | FI-1 für die Wirkung |
 | [FI-15](#fi-15--rolle-gruppenleiter) | Rolle „Gruppenleiter" | hoch | L | — |
 | [FI-16](#fi-16--feiertage-und-ferien-im-terminkalender) | Feiertage und Ferien im Terminkalender — **Feiertagsteil umgesetzt in 1.11.0, Ferien offen bei FI-18** | mittel | M | FI-7 für die Wirkung |
 | [FI-17](#fi-17--offene-punkte-unter-mein-konto) | Offene Punkte unter „Mein Konto" — **umgesetzt in 1.13.0** | hoch | S | — |
@@ -176,6 +176,24 @@ die Namensliste der Terminrückmeldung lassen sich per Umschalter „Alphabetisc
 **Besetzungsübersicht mit Sollstärke** — „Klarinette 3 von 6" statt nur der Gliederung nach
 Register. Der Rest dieses Abschnitts beschreibt diesen offenen Teil.
 
+**Umgesetzt am 2026-10-02, noch unveröffentlicht** (Zweig `feat/register-statistik`) — Spec
+`docs/superpowers/specs/2026-10-01-register-statistik-besetzung-design.md`, zusammen mit
+[OI-70](OPEN-ITEMS.md#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach
+Register). Rückmeldungsdialog, Check-in-App und Druck der Rückmeldungen zeigen Verwaltern je
+Register „3 von 6“ mit unsicher, Absagen und offen; die Abschnittszeilen der Verwalter-Tabelle
+lauten „Klarinetten · 3 von 6 zugesagt“. Der Server rechnet die Zahlen einmal
+(`responsesStaffing()`, Feld `staffing` in `appointment_responses`, nur für Admin und Manager),
+die Oberflächen zeigen sie nur an. Die beiden offenen Fragen unten sind so entschieden:
+
+- **Sollstärke = Zahl der zu diesem Termin erwarteten Registermitglieder**, keine gepflegte
+  Mindestbesetzung. Kein neues Pflegefeld; Mindestbesetzung und Warnfarben bleiben weg.
+- **Doppelspieler zählen in jedem ihrer Register voll** und werden ausgewiesen („davon n
+  mehrfach eingeteilt“, im Druck Spalte „Mehrfach eingeteilt“). Die Gesamtzahlen der Rückmeldung
+  bleiben entdoppelt.
+
+Nicht enthalten: Anwesenheit je Register nach Terminbeginn (wäre FI-2 je Register), Kurzform in
+der Terminliste, Hauptregister je Mitglied. Variante C bleibt weggelassen.
+
 Zusammen mit der Zusage ([FI-1](#fi-1--terminzusage-im-vorfeld), umgesetzt in 1.7.0) ergäbe das
 die eigentlich interessante Auskunft vor einem Auftritt: nicht „38 von 55 haben zugesagt",
 sondern „Klarinette 3 von 6, Horn 0 von 2" — also die Frage, ob das Stück überhaupt spielbar
@@ -201,7 +219,8 @@ Spec-Abschnitt 10) · bei Variante C zusätzlich `appointment_type_groups`,
 `hasStatisticsGroupAccess()` und die Cross-Filtering-Logik aus
 `docs/superpowers/specs/2026-04-15-dropdown-cross-filtering-design.md`.
 
-**Vorher zu klären, noch offen:**
+**Vorher zu klären** (die ersten beiden Punkte am 2026-10-01 entschieden, siehe „Umgesetzt“
+oben; der dritte bleibt offen, falls Variante C je verfolgt wird):
 
 - **Sollstärke je Register.** „3 von 6" setzt voraus, dass irgendwo 6 steht. Ist das die Zahl
   der zugeordneten Mitglieder oder eine gepflegte Mindestbesetzung? Ersteres ist geschenkt,
@@ -1058,12 +1077,12 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
 2. ~~**FI-17 Offene Punkte unter „Mein Konto"**~~ (umgesetzt in 1.13.0) — kleinster
    sinnvoller Schritt gegen die Holschuld. Kein Cron, kein Zustellrisiko, keine Einwilligung;
    bündelt, was FI-6 später verschickt, und speist sich aus derselben Abfrage.
-3. ~~**FI-14 Register** in der kleinen Variante~~ (Gruppenart umgesetzt in 1.8.0) — offen ist
-   die Besetzungsansicht mit Sollstärke, und sie ist der Grund, warum die Zusagen aus 1.7.0
-   mehr sind als eine Anwesenheitsprognose. Zusammen mit
-   [OI-70](OPEN-ITEMS.md#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach
-   Untergruppe) entwerfen: Beide brauchen dieselbe Rechengrundlage für ein Register ohne
-   eigene Terminart.
+3. ~~**FI-14 Register** in der kleinen Variante, dann die Besetzungsansicht~~ (Gruppenart
+   umgesetzt in 1.8.0, Besetzung je Register zusammen mit
+   [OI-70](OPEN-ITEMS.md#oi-70--statistik-nach-untergruppe-rechnet-nicht) am 2026-10-02 gebaut,
+   noch unveröffentlicht) — ~~die Besetzungsansicht ist der Grund, warum die Zusagen aus 1.7.0
+   mehr sind als eine Anwesenheitsprognose; beide brauchen dieselbe Rechengrundlage für ein
+   Register ohne eigene Terminart~~.
 4. **FI-6 Benachrichtigungen** — erst jetzt, und erst nachdem die Auslöserfrage beantwortet ist.
    Danach wird alles Vorherige wirksamer, FI-1 am deutlichsten. Die Einmal-Links aus der Mail
    gehören in dieselbe Runde, weil sie dieselbe Sicherheitsprüfung brauchen.

@@ -7,6 +7,41 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Neu
+- **Statistik nach Register:** Eine Untergruppe (z. B. Register) rechnet jetzt über ihre
+  Mitglieder — alle Termine, zu denen sie erwartet werden, gleich über welche Gruppe, mit der
+  Registerprobe als eigener Spalte. Bisher blieb sie leer oder zeigte nur ihre eigene Terminart.
+  Die Tabellen der Untergruppen stehen nach den gewöhnlichen Gruppen und tragen die Unterzeile
+  „<Oberbegriff>: alle Termine der Mitglieder“, im Anwesenheitsbericht als Zusatz in der
+  Überschrift. Der Hinweis „Untergruppe ohne Terminarten“ aus 1.8.0 entfällt. Die API liefert
+  dazu `is_subgroup` je Tabelle (OI-70).
+- **Besetzung je Register:** Rückmeldungsdialog, Check-in-App und Druck zeigen Verwaltern je
+  Register „3 von 6 zugesagt“, dazu unsicher, Absagen und offen; wer in mehreren Registern
+  steht, zählt in jedem voll und wird als „davon n mehrfach eingeteilt“ (Druck: Spalte
+  „Mehrfach eingeteilt“) ausgewiesen. Die 6 ist die Zahl der zu diesem Termin erwarteten
+  Registermitglieder, keine gepflegte Mindestbesetzung. Die Abschnittszeilen der
+  Verwalter-Tabelle nennen die Zusagen („Klarinetten · 3 von 6 zugesagt“) auf jeder
+  Gliederungsstufe, unabhängig vom Filter „Keine Antwort“. Die API liefert dazu `staffing`,
+  nur für Admin und Manager (FI-14).
+
+### Behoben
+- **Die Statistik zählte Termine vor dem Eintritt und nach dem Austritt mit.** Wer im Laufe
+  eines Jahres ein- oder austrat, bekam alle Termine außerhalb seines Mitgliedschaftszeitraums
+  als unentschuldigt angerechnet — die Quoten dieser Mitglieder waren zu niedrig (im Testbestand
+  5 % statt 20 %). Sie steigen jetzt auf ihren richtigen Wert, ebenso die Gruppen- und
+  Gesamtquoten, in denen sie stecken; Pünktlichkeit, Zuverlässigkeit und Anwesenheitsbericht
+  folgen. Die Statistik prüft die Aktivität jetzt am Termindatum, wie Anwesenheitsliste,
+  Kalender und Rückmeldung schon bisher. Die Zahl der Termine in den Kopfzahlen zählt nur noch
+  Termine, zu denen jemand erwartet wurde (OI-114).
+- **Kopfzahl „Termine“ mit Mitgliedsfilter:** Sie zählt nur noch die Termine, zu denen das
+  gewählte Mitglied erwartet war. Bisher stand dort die Zahl aller Termine des Bereichs — bei
+  einem Admin ohne Gruppenfilter die aller Termine des Vereins. Betrifft auch die Rolle `user`,
+  deren Statistik immer auf das eigene Mitglied gefiltert ist.
+- **Anwesenheitsbericht:** Die Einzeltermine eines Mitglieds enthalten nur noch Termine, zu
+  denen es erwartet war, also keine vor seinem Eintritt oder nach seinem Austritt.
+
 ## [1.19.0] – 2026-10-01
 
 ### Geändert

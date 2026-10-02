@@ -23,19 +23,19 @@ Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
 **Priorität:** *hoch* = blockiert einen Merge nach `main` oder den produktiven Einsatz ·
 *mittel* = sollte vor der Freigabe an Vereine gelöst sein · *niedrig* = Verbesserung
 
-**Nächste Umsetzung (Stand 2026-10-01):** noch nicht festgelegt. Entschieden, aber nicht gebaut
-bleibt [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) — es
-braucht eine eigene Spec, nicht nur eine Umsetzung. Diese Spec sollte die Besetzungsübersicht mit
-Sollstärke aus [FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht)
-gleich mitentwerfen: Beide fragen, wie über ein Register gerechnet wird, dem keine Terminart
-zugeordnet ist.
+**Nächste Umsetzung (Stand 2026-10-02):** noch nicht festgelegt.
+[OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht) (Statistik nach Untergruppe) ist am
+2026-10-02 zusammen mit der Besetzungsübersicht aus
+[FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht) gebaut, noch
+unveröffentlicht (Spec `2026-10-01-register-statistik-besetzung-design.md`); dabei fiel
+[OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt) an und wurde behoben,
+[OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse) bleibt als bekannte Grenze offen.
 
 **Berührungspunkte mit Feature-Ideen** (Vorschlag vom 2026-10-01, nicht entschieden) — Einträge
 dieser Datei, die beim Bau einer Idee ohnehin auf dem Tisch liegen:
 
 | Idee | Eintrag | Warum zusammen |
 |---|---|---|
-| FI-14 Besetzungsübersicht | OI-70 | dieselbe Rechengrundlage für Untergruppen |
 | FI-24 Freigaben in der App | [OI-39](#oi-39--freigaben-liegen-an-zwei-orten) | beide brauchen eine sammelnde Abfrage offener Freigaben — eine für beide, nicht zwei (FI-24 lässt Arbeitszeiten bewusst weg) |
 | FI-4 / FI-3 Check-in-Wege | [OI-6](#oi-6--totp-secret-im-klartext), [OI-46](#oi-46--einmal-kopplungscode-statt-token-im-qr-bild), [OI-7](#oi-7--gültigkeitsfenster-der-totp-codes), [OI-45](#oi-45--kamera-scanner-in-der-station) | Gerätekopplung, Beweiswert und Quellen einmal festlegen |
 | FI-8 ICS-Abo | [OI-97](#oi-97--terminarten-kennen-keine-gruppengrenze) | der Feed braucht die Gruppengrenze, die bei Terminarten fehlt |
@@ -43,7 +43,7 @@ dieser Datei, die beim Bau einer Idee ohnehin auf dem Tisch liegen:
 | FI-2 Rest (je Person) | [OI-61](#oi-61--terminrückmeldung-einstellungen-der-terminart-wirken-rückwirkend-auf-die-zuverlässigkeit) | dieselbe Kennzahl, dieselbe Frage nach rückwirkenden Einstellungen |
 
 Offen mit Priorität *mittel*: OI-67, OI-98, OI-63 (nur noch die Spur), OI-6, OI-22, OI-23 (am
-2026-09-25 einzeln gegen den Code geprüft), dazu OI-70 und
+2026-09-25 einzeln gegen den Code geprüft), dazu
 [OI-113](#oi-113--der-senken-wächter-folgt-join-nicht--fehlende-maskierung-bleibt-unbemerkt)
 (aufgenommen am 2026-09-28). OI-67 ist im Dashboard seit 1.19.0 entschärft (Cache-TTL zwei
 Minuten), in der Check-in-App unverändert. **OI-3 und OI-20 tragen ebenfalls *mittel*, stehen aber
@@ -2100,6 +2100,60 @@ ohne Zugang)“) und Druckbericht. Die Ampel-Chips der Terminliste bleiben ohne.
 
 ---
 
+### OI-114 · Statistik zählte Termine vor Eintritt und nach Austritt
+**Priorität:** erledigt am 2026-10-02 — unveröffentlicht (Zweig `feat/register-statistik`) ·
+gefunden am 2026-10-01 (beim Entwurf zu [OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht))
+
+Die Statistik prüfte die Aktivität eines Mitglieds mit `getMemberActivityWhereYear()`:
+„irgendwann im Jahr aktiv“. Anwesenheitsliste, Kalender und Rückmeldung prüfen dagegen am
+Termindatum. Wer unterm Jahr ein- oder austrat, bekam deshalb jeden Termin außerhalb seines
+Mitgliedschaftszeitraums als unentschuldigt angerechnet.
+
+**Beleg (Testdatenbank):** Mitglied #6, Eintritt 01.12.2025 — die Statistik 2025 rechnete mit
+20 Terminen statt 5 und kam bei einer Anwesenheit auf eine Quote von 5 % statt 20 %. Betroffen waren Quote, Kopfzahlen,
+Pünktlichkeit (Messabdeckung), Zuverlässigkeit und die Einzeltermine des Anwesenheitsberichts —
+jede Stelle mit einer eigenen Kopie derselben Joins.
+
+**Behoben** (Spec `2026-10-01-register-statistik-besetzung-design.md`, Abschnitt 3): Alle
+Statistikabfragen und `attendanceExpectedMemberIds()` lesen aus einer gemeinsamen Soll-Menge
+(`private/helpers/expected_pairs.php`, `fdfabb5`, `332d8a6`), die die Aktivität am Termindatum
+prüft. Die Einzeltermine des Berichts folgen (`ffb3b3b`). Dabei mitbehoben (`6afc6aa`): Die
+Kopfzahl „Termine“ beachtete den Mitgliedsfilter nicht und zählte mit `member_id` — also für jede
+Rolle `user` — alle Termine des Bereichs, bei einem Admin ohne Gruppenfilter die des ganzen
+Vereins. Die Gleichheitsprüfung `tests/db/verify_statistics_parity.php` vergleicht vor und nach
+dem Umbau: Abweichungen nur bei Mitgliedern mit Ein- oder Austritt im Jahr und den Zahlen, in
+denen sie stecken, sowie bei den neuen Untergruppen-Tabellen.
+
+**Bewusst unverändert:** Auswahllisten (`members.php`, `attendance_list.php`) und die Kopfzahl
+„Mitglieder“ bleiben bei „im Jahr aktiv“ — dort ist das die richtige Frage.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-115 · Gruppenzugehörigkeit ohne Zeitachse
+**Priorität:** niedrig · aufgenommen am 2026-10-02 (Spec
+`2026-10-01-register-statistik-besetzung-design.md`, Abschnitt 4.5)
+
+`member_group_assignments` kennt keinen Zeitraum. Wer im Juni von Klarinette zu Saxophon wechselt
+oder von „Jugend“ zu „Aktive“, zählt in der Statistik das ganze Jahr in der neuen Gruppe und gar
+nicht mehr in der alten — auch rückwirkend für Jahre, in denen er noch in der alten stand. Das
+betrifft alle Gruppen, nicht nur Register, und ebenso Anwesenheitsliste, Kalender und
+Rückmeldung vergangener Termine: Erwartet ist, wer **heute** in der Gruppe steht und am
+Termindatum aktiv war.
+
+Seit [OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt) gilt die
+Aktivität je Termindatum; für die Gruppenzugehörigkeit fehlt das Gegenstück.
+
+**Lösung, falls gewünscht:** Zeiträume an `member_group_assignments` (Migration), ausgewertet in
+der gemeinsamen Soll-Menge (`expected_pairs.php`) — dort an einer Stelle, nicht in jeder Abfrage.
+Offen wäre dann die Pflege: Wer trägt den Wechsel mit Datum ein, und was zeigt die
+Mitgliederverwaltung? Bewusst nicht Teil von OI-70.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
@@ -2766,7 +2820,7 @@ damit es nicht erneut vorgeschlagen wird, ohne dass sich an den Gründen etwas g
 | Punkt | Grund | Wo es weitergeht |
 |---|---|---|
 | Erinnerung an offene Rückmeldungen | braucht einen Versandweg | FI-6 |
-| Besetzungsansicht mit Sollstärke | Untergruppen gibt es seit 1.8.0, die Sollstärke fehlt | FI-14 |
+| Besetzungsansicht mit Sollstärke | Untergruppen gibt es seit 1.8.0, die Sollstärke fehlt | FI-14 — Besetzung je Register seit 2026-10-02 gebaut (unveröffentlicht), als Zahl der Erwarteten statt einer gepflegten Mindestbesetzung |
 | Rolle „Gruppenleiter" | der Dirigent erhält ein Manager-Konto | FI-15 |
 | Kennzahl „Zusagetreue" je Person | Personenbewertung; die Zuverlässigkeit deckt die Frage ab | — |
 | Verlauf der Antwortänderungen | mehr Datenbestand, eigene Löschfrist, wäre wieder eine Personenauswertung | — |
@@ -3303,7 +3357,27 @@ dürfte.
 ---
 
 ### OI-70 · Statistik nach Untergruppe rechnet nicht
-**Priorität:** mittel — Entscheidung getroffen, Umsetzung offen · aufgenommen am 2026-09-17
+**Priorität:** erledigt am 2026-10-02 — unveröffentlicht (Zweig `feat/register-statistik`) ·
+aufgenommen am 2026-09-17
+
+**Erledigt am 2026-10-02** nach Spec
+`docs/superpowers/specs/2026-10-01-register-statistik-besetzung-design.md`, zusammen mit der
+Besetzungsübersicht aus [FI-14](FEATURE-IDEAS.md#fi-14--untergruppen-register-und-besetzungsübersicht).
+Alle Statistikabfragen lesen aus einer gemeinsamen Soll-Menge (`private/helpers/expected_pairs.php`,
+`fdfabb5`); eine Untergruppe rechnet darin über ihre Mitglieder — alle Termine, zu denen sie
+erwartet werden, gleich über welche Gruppe —, ihre Spalten sind die Terminarten aller Gruppen
+ihrer Mitglieder (`8ca9815`). `statistics[]` trägt `is_subgroup`, die Untergruppen-Tabellen
+folgen nach den gewöhnlichen Gruppen. Die Oberfläche zeigt statt des Hinweises aus 1.8.0 die
+Unterzeile „<Oberbegriff>: alle Termine der Mitglieder“ (`995a6f1`; die Spec nannte „Alle Termine
+der Mitglieder dieses Registers“), der Anwesenheitsbericht denselben Zusatz in der Überschrift.
+Die Antworten auf die Fragen unten: alle Termine der Mitglieder zählen; ein Doppelspieler steht
+in beiden Registertabellen voll; Pünktlichkeit und Zuverlässigkeit rechnen mit Filter auf eine
+Untergruppe über denselben Bereich. Nebenbei fiel die Jahresregel auf
+([OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt)), offen bleibt
+[OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse). Abgesichert durch
+`statistics_subgroups_api` und die Gleichheitsprüfung `tests/db/verify_statistics_parity.php`.
+
+Der Text darunter ist der Stand vor der Umsetzung.
 
 Wählt man in der Statistik eine Gruppe, die als Untergruppe markiert ist (im Musikverein das
 Register), bleibt die Auswertung leer. Das ist kein Fehler, sondern die Folge der Datenlage: Die
@@ -4433,6 +4507,16 @@ eine Frage an das Produkt.
 Lücken risse. Dagegen spricht, dass Name und Gruppenzuordnung einer Terminart verraten, welche
 Gruppen es gibt und was sie tun. Wenn eingeschränkt werden soll, ist der Weg vermutlich, die
 **Gruppenliste** je Terminart für Nicht-Verwalter wegzulassen, nicht die Terminart selbst.
+
+**Seit der Statistik nach Register ([OI-70](#oi-70--statistik-nach-untergruppe-rechnet-nicht),
+unveröffentlicht)** kommt ein indirekter Weg dazu: Die Spalten einer Registertabelle sind die
+Terminarten aller Gruppen der Registermitglieder. Ein `user` sieht in seiner Registertabelle zwar
+nur die eigene Zeile, an einer Spalte wie „Jugendprobe“ aber, dass ein Registerkollege in einer
+Gruppe mit dieser Terminart steht — nicht, wer, bei einem kleinen Register aber erschließbar.
+Das bleibt auf das eigene Register beschränkt und
+geht nicht über das hinaus, was Terminarten samt Gruppenzuordnung ohnehin offenlegen; eine
+Einschränkung nach dem Vorschlag oben müsste die Spalten der Registertabelle für Nicht-Verwalter
+mit bedenken.
 
 **Nicht sicherheitsrelevant** im Sinne von SECURITY.md: kein Zugriff ohne Konto, keine
 Rechteausweitung, keine personenbezogenen Daten.

@@ -1957,7 +1957,9 @@ am Termindatum aktiv ist. Geräte haben keinen Zugriff (`403`).
 
 **Berechtigung:** jede angemeldete Rolle außer Gerät. Liefert die Termine, zu denen das Mitglied
 des Kontos erwartet ist — auch für Admin und Manager in der Sicht eines Mitglieds. Ohne
-verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
+verknüpftes Mitglied: leere Liste. Höchstens 50 Termine. Für Admin und Manager trägt jeder
+Termin mit Rückmeldung zusätzlich `staffing` (siehe „Ein Termin“) — gebildet aus allen
+erwarteten Mitgliedern, ohne dass die Namensliste in die Antwort kommt.
 
 **Response:**
 ```json
@@ -2008,10 +2010,28 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
            "is_late": false, "excuse_state": "pending", "excuse_created": true },
   "summary": { "yes": 21, "no": 4, "maybe": 3, "open": 9, "open_without_access": 5 },
   "members": [ … ],
-  "comparison": { … }
+  "comparison": { … },
+  "staffing": [
+    { "group_id": 5720, "name": "Klarinetten", "expected": 6, "yes": 3, "maybe": 1, "no": 1,
+      "open": 1, "shared": 1 },
+    { "group_id": null, "name": null, "expected": 4, "yes": 2, "maybe": 0, "no": 0,
+      "open": 2, "shared": 0 }
+  ]
 }
 ```
 
+- `staffing` — **neu, noch unveröffentlicht (FI-14):** Besetzung je Untergruppe (Register). **Nur für Admin und Manager**, auch in `?upcoming=1` (je Termin mit
+  Rückmeldung, nicht in den schlanken `with_info`-Einträgen) und in der Antwort auf `PUT`.
+  Mitglieder bekommen das Feld nie, auch nicht bei `names_visible`. Eine Zeile je Untergruppe, in
+  der mindestens ein erwartetes Mitglied steht, sortiert nach `sort_order`, dann Name.
+  `expected` ist die Zahl der zu diesem Termin erwarteten Mitglieder der Untergruppe — keine
+  gepflegte Mindestbesetzung —, `yes`/`maybe`/`no`/`open` deren Rückmeldungen (`open` = ohne
+  Antwort). `shared` zählt, wie viele davon zusätzlich in einer anderen Untergruppe stehen; ein
+  solcher Doppelspieler zählt in jeder seiner Untergruppen voll. **Leeres Array, wenn keines der
+  erwarteten Mitglieder einer Untergruppe angehört. `group_id: null` ist die Abschlusszeile für
+  Mitglieder ohne Untergruppe**; ihr `name` ist `null`, die Oberflächen schreiben „Ohne
+  <Oberbegriff>“. Dashboard, Check-in-App und Druckansicht zeigen genau diese Zahlen und rechnen
+  nicht nach.
 - `members` — **Admin/Manager:** alle erwarteten Mitglieder nach Gruppen mit `status` (`null` =
   keine Antwort), `comment`, `status_changed_at`, `is_late`, `excuse_state`, `excuse_created` und
   nach Beginn `present`, **seit OI-109** außerdem `has_access`. **Mitglied:** nur bei
@@ -2043,7 +2063,10 @@ verknüpftes Mitglied: leere Liste. Höchstens 50 Termine.
   Rückmeldung selbst angelegt wurde (`appointment_responses.exception_created`) **und** die
   Verknüpfung noch besteht (`excuse_state` nicht `null`). Entscheidet, ob eine Rücknahme den Antrag
   mitlöscht oder ein nur verknüpfter Antrag bestehen bleibt.
-- `&format=html` (Admin/Manager): Druckansicht der Besetzung je Gruppe.
+- `&format=html` (Admin/Manager): Druckansicht der Besetzung je Gruppe. Bei nicht leerem
+  `staffing` steht am Kopf des Blatts ein Abschnitt „Besetzung“ mit den Spalten <Oberbegriff>,
+  Zusagen („3 von 6“), Unsicher, Absagen, Offen und „Mehrfach eingeteilt“ (`shared`, leer bei 0);
+  die Gliederung darunter bleibt nach Terminart-Gruppe.
 
 ### Antworten
 **Endpoint:** `PUT /api.php?resource=appointment_responses&appointment_id=42`
@@ -2457,6 +2480,7 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
     {
       "group_id": 1,
       "group_name": "Aktive",
+      "is_subgroup": false,
       "appointment_types": [
         { "type_id": 1, "type_name": "Gesamtprobe" },
         { "type_id": 2, "type_name": "Registerprobe" }
@@ -2508,6 +2532,27 @@ Mitgliedschaftszeiträume des Mitglieds. Begonnen heißt: Das Check-in-Fenster i
 Startzeit minus `checkin_tolerance_hours`, gemessen an der Uhr der Datenbank. Bis OI-89 zählte
 hier `date <= CURDATE() + 2h` gegen die Datumsspalte, also jeder Termin von heute ab Mitternacht.
 
+**Erwartet ist ein Mitglied zu einem Termin, wenn die Terminart einer seiner Gruppen zugeordnet
+ist und es am Termindatum aktiv ist** — dieselbe Regel wie in Anwesenheitsliste, Kalender und
+Rückmeldung. Bis 1.19.0 genügte der Statistik „irgendwann im Jahr aktiv“: Wer unterm Jahr ein-
+oder austrat, bekam die Termine außerhalb seines Mitgliedschaftszeitraums als unentschuldigt
+angerechnet. Pünktlichkeit, Zuverlässigkeit und der Anwesenheitsbericht rechnen über dieselbe
+Menge.
+
+**Untergruppen (`is_subgroup: true`)** rechnen über ihre Mitglieder: alle Termine, zu denen die
+Mitglieder erwartet werden, gleich über welche Gruppe. Ihre Spalten (`appointment_types`) sind
+die Terminarten aller Gruppen ihrer Mitglieder, einschließlich der Untergruppe selbst — etwa
+Gesamtprobe und Auftritt über „Aktive“, dazu die Registerprobe des Registers. Gehört eine dieser
+Terminarten zu keiner Gruppe eines Mitglieds, trägt sein `by_type`-Eintrag dazu
+`total_appointments: 0`. Die Spaltenliste hängt nicht vom
+Jahr ab und kann deshalb auch Terminarten der Gruppen ehemaliger Mitglieder enthalten. Wer in zwei
+Untergruppen steht, erscheint in beiden Tabellen, und die Spalten jeder der beiden enthalten auch
+die Terminarten der anderen. Gewöhnliche Gruppen (`is_subgroup: false`) rechnen unverändert über
+ihre eigenen Terminarten. Tabellen der Untergruppen folgen nach den gewöhnlichen Gruppen,
+sortiert nach `sort_order`, dann Name. Mit `group_id` einer Untergruppe rechnen auch `summary`,
+Pünktlichkeit und Zuverlässigkeit über diesen Bereich, entdoppelt wie ohne Filter. Ohne Filter
+ändern Untergruppen an den Kopfzahlen nichts: Jeder ihrer Termine kommt ohnehin über eine Gruppe.
+
 `appointment_types` listet **alle** Terminarten, an denen die Gruppe hängt. `by_type` führt sie
 je Mitglied in **derselben Länge und derselben Reihenfolge** — Eintrag *n* von `by_type` gehört
 zu Eintrag *n* von `appointment_types`. Wer die Spalten einer Terminart sucht, muss also nicht
@@ -2527,6 +2572,11 @@ Unterschied zwischen „je Gruppe gezählt" und „unterschiedliche Termine gez�
 2026-09-11 etwa tragen „Aktive" und „Jugend" je 62 Termine, die Vorstandschaft 9 — macht 133 in
 der Summe der Gruppentabellen, während die Kopfzahl bei 71 steht, weil sich Aktive und Jugend
 dieselben 62 Termine teilen.
+
+`summary.total_appointments` zählt außerdem nur Termine, zu denen im Bereich mindestens ein
+Mitglied erwartet wurde — mit `member_id` (für `user` immer erzwungen) also nur die Termine, zu
+denen dieses Mitglied erwartet war. Bis 1.19.0 stand dort mit Mitgliedsfilter die Zahl aller
+Termine des Bereichs, bei einem Admin ohne Gruppenfilter die aller Termine des Vereins.
 
 #### Arbeitszeit im Ergebnis (`include=worktime`)
 
@@ -2663,9 +2713,13 @@ dass es sich um erfundene Daten handelt.
 2. je Gruppe eine Tabelle: Mitglied, Termine, Anwesend, Entschuldigt, Unentschuldigt, Quote —
    danach **je Terminart der Gruppe eine weitere Spalte** mit der Quote des Mitglieds für
    genau diese Terminart. Hat eine Terminart im Berichtsjahr keine Termine, steht dort ein
-   Strich statt „0 %": Eine Null läse sich auf einem Nachweis wie ein Vorwurf.
+   Strich statt „0 %": Eine Null läse sich auf einem Nachweis wie ein Vorwurf. Tabellen von
+   Untergruppen folgen nach den gewöhnlichen Gruppen; ihre Überschrift trägt den Zusatz
+   „(<Oberbegriff>: alle Termine der Mitglieder)“, Spalten wie bei `statistics` beschrieben.
 3. **nur bei genau einem Mitglied** — für `user` also immer — der Abschnitt
-   „Termine im Einzelnen": Datum, Termin, Terminart, Status, Ankunft, Herkunft
+   „Termine im Einzelnen": Datum, Termin, Terminart, Status, Ankunft, Herkunft. Er enthält nur
+   Termine, zu denen das Mitglied erwartet war — keine vor seinem Eintritt oder nach seinem
+   Austritt (bis 1.19.0 auch diese)
 
 **Die Spalte Herkunft** sagt, worauf eine Ankunftszeit beruht. `records.arrival_time` ist keine
 durchgehende Messung — seit 1.5.0 darf sie aber `null` sein und sagt dann aus, dass keine Ankunft
