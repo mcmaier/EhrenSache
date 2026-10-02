@@ -128,9 +128,16 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
     foreach (array_merge($ordinary, $subgroups) as $gid) {
         $isSubgroup = $meta[$gid]['is_subgroup'];
 
-        // Gewoehnliche Gruppe: ihre Terminarten. Untergruppe: die Terminarten
-        // der Gruppen ihrer Mitglieder (Spec 4.2). Ohne Spalte -- oder ohne
-        // die angefragte Terminart -- entfaellt die Tabelle, wie bisher.
+        // Register ohne Gruppe: keine Tabelle (Spec 2026-10-02, 5.1) -- erst
+        // die Zuordnung in der Gruppenverwaltung legt fest, welche Termine
+        // ausser den eigenen zaehlen.
+        if ($isSubgroup && $meta[$gid]['parent_group_names'] === []) {
+            continue;
+        }
+
+        // Gewoehnliche Gruppe: ihre Terminarten. Register: die eigenen und die
+        // seiner Gruppen P(S). Ohne Spalte -- oder ohne die angefragte
+        // Terminart -- entfaellt die Tabelle, wie bisher.
         $types = attendanceFilterTypes(
             $isSubgroup
                 ? attendanceSubgroupTypes($db, $database, $gid)
@@ -151,7 +158,8 @@ function buildStatisticsResult($db, $database, int $year, ?int $groupId, ?int $m
         }
 
         $block = attendanceBuildGroup($gid, $meta[$gid]['group_name'], $types, $rows);
-        $block['is_subgroup'] = $isSubgroup;
+        $block['is_subgroup']        = $isSubgroup;
+        $block['parent_group_names'] = $meta[$gid]['parent_group_names'];
         $statistics[] = $block;
     }
 

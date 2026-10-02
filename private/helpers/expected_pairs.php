@@ -89,16 +89,19 @@ function expectedPairsSql($database, array $filter = []): array
 
 /**
  * Bereichsfilter ueber eine Gruppenliste, fuer "WHERE ..." auf der
- * abgeleiteten Tabelle ep (Spec 4.1):
+ * abgeleiteten Tabelle ep (Spec 2026-10-02, 5.1):
  *
- *   gewoehnliche Gruppe G: Paare, die ueber G kommen (ep.via_group_id = G)
- *   Untergruppe S:         Paare, deren Mitglied in S steht -- gleich, ueber
- *                          welche Gruppe der Termin kommt
+ *   gewoehnliche Gruppe G:     Paare, die ueber G kommen (ep.via_group_id = G)
+ *   Register S mit Gruppen P:  Paare, deren Mitglied in S steht und deren
+ *                              Termin ueber S selbst oder eine Gruppe aus
+ *                              P(S) (subgroup_parents) kommt -- Termine
+ *                              anderer Gruppen des Mitglieds zaehlen nicht
+ *   Register ohne Gruppe:      nur Paare ueber S selbst (erster Teil); der
+ *                              Join auf subgroup_parents schliesst es aus
+ *                              dem zweiten Teil aus
  *
- * Beides in einer Bedingung: Der erste Teil trifft fuer eine Untergruppe nur
- * Paare ihrer eigenen Terminarten (Registerprobe), die der zweite Teil ohnehin
- * enthaelt. Die Gruppenart steht in member_groups.is_subgroup, der Aufrufer
- * muss sie nicht kennen.
+ * Beides in einer Bedingung. Die Gruppenart steht in member_groups.is_subgroup,
+ * der Aufrufer muss sie nicht kennen.
  *
  * @param array<int, int> $groupIds nicht leer
  * @return array{0: string, 1: array<int, int>}
@@ -118,11 +121,15 @@ function expectedPairsScopeSql($database, array $groupIds, string $alias = 'ep')
 
     $sql = "(
         {$alias}.via_group_id IN ({$in})
-        OR {$alias}.member_id IN (
-            SELECT sga.member_id
-            FROM {$prefix}member_group_assignments sga
-            JOIN {$prefix}member_groups sg ON sg.group_id = sga.group_id
-            WHERE sga.group_id IN ({$in}) AND sg.is_subgroup = 1
+        OR EXISTS (
+            SELECT 1
+            FROM {$prefix}member_groups sg
+            JOIN {$prefix}member_group_assignments sga
+                 ON sga.group_id = sg.group_id AND sga.member_id = {$alias}.member_id
+            JOIN {$prefix}subgroup_parents sp ON sp.subgroup_id = sg.group_id
+            WHERE sg.group_id IN ({$in})
+              AND sg.is_subgroup = 1
+              AND ({$alias}.via_group_id = sg.group_id OR {$alias}.via_group_id = sp.group_id)
         )
     )";
 

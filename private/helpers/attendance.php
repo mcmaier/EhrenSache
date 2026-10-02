@@ -262,14 +262,15 @@ function attendanceGroupTypes($db, $database, int $groupId): array
 }
 
 /**
- * Spalten einer Untergruppe: alle Terminarten aller Gruppen, in denen
- * mindestens ein Mitglied der Untergruppe steht, die Untergruppe selbst
- * eingeschlossen (Spec 4.2). Haengt nicht vom Jahr ab -- die Spalten sollen
- * beim Jahreswechsel nicht springen, wie bei attendanceGroupTypes().
+ * Spalten eines Registers S: die Terminarten von S selbst und die seiner
+ * Gruppen P(S) aus subgroup_parents (Spec 2026-10-02, 5.1). Terminarten
+ * anderer Gruppen, in denen Registermitglieder zufaellig auch stehen, gehoeren
+ * nicht dazu. Haengt nicht vom Jahr ab -- die Spalten sollen beim
+ * Jahreswechsel nicht springen, wie bei attendanceGroupTypes().
  *
- * Jede Zeile aus attendanceFetchGroupRows() traegt eine Terminart einer
- * Gruppe ihres Mitglieds und liegt damit in dieser Liste; die
- * Vertragspruefung in attendanceBuildGroup() bleibt gueltig.
+ * Jede Zeile aus attendanceFetchGroupRows() kommt ueber S oder eine Gruppe
+ * aus P(S) (expectedPairsScopeSql) und traegt damit eine Terminart dieser
+ * Liste; die Vertragspruefung in attendanceBuildGroup() bleibt gueltig.
  *
  * @return array<int, array{type_id: int, type_name: ?string}>
  */
@@ -281,16 +282,13 @@ function attendanceSubgroupTypes($db, $database, int $subgroupId): array
         SELECT DISTINCT atg.type_id, at.type_name
         FROM {$prefix}appointment_type_groups atg
         LEFT JOIN {$prefix}appointment_types at ON at.type_id = atg.type_id
-        WHERE atg.group_id IN (
-            SELECT mga.group_id
-            FROM {$prefix}member_group_assignments mga
-            WHERE mga.member_id IN (
-                SELECT sga.member_id FROM {$prefix}member_group_assignments sga WHERE sga.group_id = ?
-            )
-        )
+        WHERE atg.group_id = ?
+           OR atg.group_id IN (
+                SELECT sp.group_id FROM {$prefix}subgroup_parents sp WHERE sp.subgroup_id = ?
+           )
         ORDER BY at.type_name, atg.type_id
     ");
-    $stmt->execute([$subgroupId]);
+    $stmt->execute([$subgroupId, $subgroupId]);
 
     $types = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
@@ -309,8 +307,13 @@ function attendanceSubgroupTypes($db, $database, int $subgroupId): array
  * Eine Abfrage statt einer je Gruppe. Fehlt eine group_id im Ergebnis, gibt
  * es die Gruppe nicht mehr -- der Aufrufer ueberspringt sie dann.
  *
+ * parent_group_names: Namen der Gruppen eines Registers aus subgroup_parents,
+ * nach Name sortiert (Spec 2026-10-02, 5.1); leer bei gewoehnlichen Gruppen
+ * und bei Registern ohne Gruppe.
+ *
  * @param array<int, int> $groupIds
- * @return array<int, array{group_name: string, is_subgroup: bool, sort_order: int}>
+ * @return array<int, array{group_name: string, is_subgroup: bool, sort_order: int,
+ *                          parent_group_names: array<int, string>}>
  */
 function attendanceGroupMeta($db, $database, array $groupIds): array
 {
@@ -326,15 +329,33 @@ function attendanceGroupMeta($db, $database, array $groupIds): array
         FROM {$prefix}member_groups
         WHERE group_id IN ({$placeholders})
     ");
-    $stmt->execute(array_values(array_map('intval', $groupIds)));
+    $ids = array_values(array_map('intval', $groupIds));
+    $stmt->execute($ids);
 
     $meta = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $meta[(int) $row['group_id']] = [
-            'group_name'  => (string) $row['group_name'],
-            'is_subgroup' => (int) $row['is_subgroup'] === 1,
-            'sort_order'  => (int) $row['sort_order'],
+            'group_name'         => (string) $row['group_name'],
+            'is_subgroup'        => (int) $row['is_subgroup'] === 1,
+            'sort_order'         => (int) $row['sort_order'],
+            'parent_group_names' => [],
         ];
+    }
+
+    // Eine zweite Abfrage fuer alle Zuordnungen, nicht eine je Register.
+    $parents = $db->prepare("
+        SELECT sp.subgroup_id, p.group_name
+        FROM {$prefix}subgroup_parents sp
+        JOIN {$prefix}member_groups p ON p.group_id = sp.group_id
+        WHERE sp.subgroup_id IN ({$placeholders})
+        ORDER BY p.group_name, p.group_id
+    ");
+    $parents->execute($ids);
+    foreach ($parents->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $sid = (int) $row['subgroup_id'];
+        if (isset($meta[$sid])) {
+            $meta[$sid]['parent_group_names'][] = (string) $row['group_name'];
+        }
     }
 
     return $meta;
