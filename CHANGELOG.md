@@ -18,7 +18,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Überschrift. Der Hinweis „Untergruppe ohne Terminarten“ aus 1.8.0 entfällt. Die API liefert
   dazu `is_subgroup` je Tabelle (OI-70).
 - **Besetzung je Register:** Rückmeldungsdialog, Check-in-App und Druck zeigen Verwaltern je
-  Register „3 von 6 zugesagt“, dazu unsicher, Absagen und offen; wer in mehreren Registern
+  Register „3 von 6“ (Druck: Spalte „Zusagen“), dazu unsicher, Absagen und offen; wer in mehreren Registern
   steht, zählt in jedem voll und wird als „davon n mehrfach eingeteilt“ (Druck: Spalte
   „Mehrfach eingeteilt“) ausgewiesen. Die 6 ist die Zahl der zu diesem Termin erwarteten
   Registermitglieder, keine gepflegte Mindestbesetzung. Die Abschnittszeilen der
