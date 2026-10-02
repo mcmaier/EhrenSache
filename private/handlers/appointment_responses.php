@@ -128,7 +128,7 @@ function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string
         return;
     }
 
-    $payload = responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours, $isManager);
+    $payload = responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours);
 
     if (!$isManager && !$payload['expected']) {
         responsesFail(403, 'Für dieses Mitglied ist zu diesem Termin keine Rückmeldung vorgesehen');
@@ -150,7 +150,7 @@ function responsesGetOne($db, $database, bool $isManager, ?int $memberId, string
  * @param int $globalHours Globale Frist-Einstellung, einmal je Anfrage gelesen
  */
 function responsesPayload($db, $database, array $apt, bool $isManager, ?int $viewerMemberId, string $now, int $globalHours,
-                          bool $withStaffing = false): array
+                          bool $managerNames = false): array
 {
     $appointmentId = (int) $apt['appointment_id'];
     $hours = responseDeadlineHours($apt['response_deadline_hours'], (string) $globalHours);
@@ -242,8 +242,10 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
         if ($started) {
             $payload['comparison'] = array_map('count', responseComparison($expectedIds, $statusByMember, $present));
         }
-    } elseif ($payload['settings']['names_visible']) {
+    } elseif ($payload['settings']['names_visible'] || $managerNames) {
         // Bemerkungen, Zeitpunkte und Antraege anderer sieht ein Mitglied nie (Spec 3.6).
+        // $managerNames: die Listenantwort der App gibt Verwaltern die Namen
+        // auch ohne "Namen sichtbar" -- daraus bildet die App die Besetzung.
         $members = array_values(array_map(static fn ($m, $id) => [
             'member_id'  => $id,
             'name'       => $m['name'],
@@ -252,17 +254,6 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
             'status'     => $responses[$id]['status'] ?? null,
         ], $expected, array_keys($expected)));
         $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds);
-    }
-
-    // Besetzung je Register (Spec 2026-10-01, 5.1) -- nur für Verwalter.
-    // Aus den erwarteten Mitgliedern mit ihren Untergruppen; die Namensliste
-    // muss dafür nicht in der Antwort stehen (Listenantwort der App).
-    if ($withStaffing) {
-        $staffMembers = array_map(static fn (int $id) => ['member_id' => $id], $expectedIds);
-        $payload['staffing'] = responsesStaffing(
-            groupsAttachToMembers($db, $database, $staffMembers, []),
-            $statusByMember
-        );
     }
 
     return $payload;
@@ -304,10 +295,17 @@ function responsesRenderPrint($db, $database, array $payload): void
 
     // Besetzung je Register am Kopf des Blatts (Spec 2026-10-01, 5.2); die
     // Gliederung darunter bleibt nach Terminart-Gruppe (Entscheidung 1.8.0).
-    if (!empty($payload['staffing'])) {
+    $statusByMember = [];
+    foreach ($payload['members'] as $m) {
+        if ($m['status'] !== null) {
+            $statusByMember[(int) $m['member_id']] = $m['status'];
+        }
+    }
+    $staffing = responsesStaffing($payload['members'], $statusByMember);
+    if (!empty($staffing)) {
         $word = groupSubgroupLabel(systemSetting($db, $database, 'subgroup_label', ''));
         $rows = [];
-        foreach ($payload['staffing'] as $st) {
+        foreach ($staffing as $st) {
             $rows[] = [
                 $st['group_id'] === null ? "Ohne {$word}" : (string) $st['name'],
                 "{$st['yes']} von {$st['expected']}",
@@ -549,7 +547,7 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
     }
 
     // "own" traegt die Antwort des betroffenen Mitglieds, auch wenn ein Verwalter schrieb.
-    echo json_encode(responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours, $isManager), JSON_UNESCAPED_UNICODE);
+    echo json_encode(responsesPayload($db, $database, $apt, $isManager, $memberId, $now, $globalHours), JSON_UNESCAPED_UNICODE);
 }
 
 function responsesDelete($db, $database, bool $isManager, ?int $authMemberId, string $now): void

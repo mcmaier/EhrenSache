@@ -1958,8 +1958,9 @@ am Termindatum aktiv ist. Geräte haben keinen Zugriff (`403`).
 **Berechtigung:** jede angemeldete Rolle außer Gerät. Liefert die Termine, zu denen das Mitglied
 des Kontos erwartet ist — auch für Admin und Manager in der Sicht eines Mitglieds. Ohne
 verknüpftes Mitglied: leere Liste. Höchstens 50 Termine. Für Admin und Manager trägt jeder
-Termin mit Rückmeldung zusätzlich `staffing` (siehe „Ein Termin“) — gebildet aus allen
-erwarteten Mitgliedern, ohne dass die Namensliste in die Antwort kommt.
+Termin mit Rückmeldung zusätzlich `members` (siehe „Ein Termin“, nur die Felder `member_id`,
+`name`, `surname`, `group_name`, `status`, `groups`, `subgroups`) — auch ohne „Namen sichtbar“;
+die Check-in-App bildet daraus die Besetzung je Register.
 
 **Response:**
 ```json
@@ -2010,34 +2011,20 @@ erwarteten Mitgliedern, ohne dass die Namensliste in die Antwort kommt.
            "is_late": false, "excuse_state": "pending", "excuse_created": true },
   "summary": { "yes": 21, "no": 4, "maybe": 3, "open": 9, "open_without_access": 5 },
   "members": [ … ],
-  "comparison": { … },
-  "staffing": [
-    { "group_id": 5720, "name": "Klarinetten", "expected": 6, "yes": 3, "maybe": 1, "no": 1,
-      "open": 1, "shared": 1 },
-    { "group_id": null, "name": null, "expected": 4, "yes": 2, "maybe": 0, "no": 0,
-      "open": 2, "shared": 0 }
-  ]
+  "comparison": { … }
 }
 ```
 
-- `staffing` — **neu, noch unveröffentlicht (FI-14):** Besetzung je Untergruppe (Register). **Nur für Admin und Manager**, auch in `?upcoming=1` (je Termin mit
-  Rückmeldung, nicht in den schlanken `with_info`-Einträgen) und in der Antwort auf `PUT`.
-  Mitglieder bekommen das Feld nie, auch nicht bei `names_visible`. Eine Zeile je Untergruppe, in
-  der mindestens ein erwartetes Mitglied steht, sortiert nach `sort_order`, dann Name.
-  `expected` ist die Zahl der zu diesem Termin erwarteten Mitglieder der Untergruppe — keine
-  gepflegte Mindestbesetzung —, `yes`/`maybe`/`no`/`open` deren Rückmeldungen (`open` = ohne
-  Antwort). `shared` zählt, wie viele davon zusätzlich in einer anderen Untergruppe stehen; ein
-  solcher Doppelspieler zählt in jeder seiner Untergruppen voll. **Leeres Array, wenn keines der
-  erwarteten Mitglieder einer Untergruppe angehört. `group_id: null` ist die Abschlusszeile für
-  Mitglieder ohne Untergruppe**; ihr `name` ist `null`, die Oberflächen schreiben „Ohne
-  <Oberbegriff>“. Dashboard, Check-in-App und Druckansicht zeigen genau diese Zahlen und rechnen
-  nicht nach.
 - `members` — **Admin/Manager:** alle erwarteten Mitglieder nach Gruppen mit `status` (`null` =
   keine Antwort), `comment`, `status_changed_at`, `is_late`, `excuse_state`, `excuse_created` und
   nach Beginn `present`, **seit OI-109** außerdem `has_access`. **Mitglied:** nur bei
   `names_visible`, dann ausschließlich `member_id`,
   Name, Gruppe und Status. Ohne `names_visible` und ohne Admin/Manager-Rechte fehlt `members`
-  ganz — keine Namen, keine Zugehörigkeiten.
+  ganz — keine Namen, keine Zugehörigkeiten. **Liste `?upcoming=1` für Admin/Manager:** `members`
+  steht auch ohne `names_visible`, jedoch nur mit `member_id`, `name`, `surname`, `group_name`,
+  `status`, `groups` und `subgroups` — ohne Bemerkung, Antragsstand und Zugangshinweis. Eine
+  Besetzung (`staffing`) liefert die API nicht; Dashboard, App und Druck bilden sie aus
+  `members` und `subgroups`.
 
   Jedes Element trägt außerdem `group_name` (die Gruppe der Terminart, über die das Mitglied
   erwartet wird) sowie **seit 1.8.0** `groups` und `subgroups` — dieselbe Struktur wie bei
@@ -2063,9 +2050,10 @@ erwarteten Mitgliedern, ohne dass die Namensliste in die Antwort kommt.
   Rückmeldung selbst angelegt wurde (`appointment_responses.exception_created`) **und** die
   Verknüpfung noch besteht (`excuse_state` nicht `null`). Entscheidet, ob eine Rücknahme den Antrag
   mitlöscht oder ein nur verknüpfter Antrag bestehen bleibt.
-- `&format=html` (Admin/Manager): Druckansicht der Besetzung je Gruppe. Bei nicht leerem
-  `staffing` steht am Kopf des Blatts ein Abschnitt „Besetzung“ mit den Spalten <Oberbegriff>,
-  Zusagen („3 von 6“), Unsicher, Absagen, Offen und „Mehrfach eingeteilt“ (`shared`, leer bei 0);
+- `&format=html` (Admin/Manager): Druckansicht der Besetzung je Gruppe. Gehört mindestens
+  ein erwartetes Mitglied einem Register an, steht am Kopf des Blatts ein Abschnitt „Besetzung“ mit
+  den Spalten <Oberbegriff>, Zusagen („3 von 6“), Unsicher, Absagen, Offen und „Mehrfach
+  eingeteilt“ (leer bei 0);
   die Gliederung darunter bleibt nach Terminart-Gruppe.
 
 ### Antworten

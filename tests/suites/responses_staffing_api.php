@@ -10,8 +10,9 @@
  */
 
 /**
- * Feld staffing der Terminrueckmeldung (Spec 2026-10-01, 5.1): Verwalter
- * bekommen es in Einzel- und Listenantwort, Mitglieder nie.
+ * Besetzung in der Terminrueckmeldung (Spec 2026-10-02, 6): `staffing` steht in
+ * keiner JSON-Antwort mehr; Verwalter bekommen in der Listenantwort der App die
+ * Namensliste (`members` mit Untergruppen), der Druck bildet die Besetzung daraus.
  *
  * Die Listenantwort zeigt nur Termine, zu denen das angemeldete Mitglied
  * erwartet wird -- das Mitglied des Testkontos manager wird deshalb fuer die
@@ -60,10 +61,13 @@ test('staffing: Verwalter bekommt Besetzung je Register, Mitglied nicht', functi
 
     try {
         $g  = $ids['groups'][] = rstCreate('member_groups', ['group_name' => "RST G {$s}"]);
-        $k  = $ids['groups'][] = rstCreate('member_groups', ['group_name' => "RST Kla {$s}", 'is_subgroup' => true, 'sort_order' => 1]);
-        $x  = $ids['groups'][] = rstCreate('member_groups', ['group_name' => "RST Sax {$s}", 'is_subgroup' => true, 'sort_order' => 2]);
+        $k  = $ids['groups'][] = rstCreate('member_groups', ['group_name' => "RST Kla {$s}", 'is_subgroup' => true, 'sort_order' => 1, 'parent_group_ids' => [$g]]);
+        $x  = $ids['groups'][] = rstCreate('member_groups', ['group_name' => "RST Sax {$s}", 'is_subgroup' => true, 'sort_order' => 2, 'parent_group_ids' => [$g]]);
         $t  = $ids['types'][]  = rstCreate('appointment_types', ['type_name' => "RST {$s}", 'is_default' => 0,
             'color' => '#667eea', 'group_ids' => [$g], 'responses_enabled' => 1, 'responses_names_visible' => 1]);
+
+        $t2 = $ids['types'][]  = rstCreate('appointment_types', ['type_name' => "RST ohne Namen {$s}", 'is_default' => 0,
+            'color' => '#667eea', 'group_ids' => [$g], 'responses_enabled' => 1, 'responses_names_visible' => 0]);
 
         $m1 = $ids['members'][] = rstCreate('members', ['name' => 'Rst', 'surname' => "1 {$s}", 'active' => 1, 'group_ids' => [$g, $k]]);
         $m2 = $ids['members'][] = rstCreate('members', ['name' => 'Rst', 'surname' => "2 {$s}", 'active' => 1, 'group_ids' => [$g, $k, $x]]);
@@ -76,54 +80,66 @@ test('staffing: Verwalter bekommt Besetzung je Register, Mitglied nicht', functi
         $date = date('Y-m-d', strtotime('+3 days'));
         $apt  = $ids['appointments'][] = rstCreate('appointments', ['title' => "RST {$s}", 'date' => $date,
             'start_time' => '19:00:00', 'type_id' => $t]);
+        $apt2 = $ids['appointments'][] = rstCreate('appointments', ['title' => "RST ohne Namen {$s}", 'date' => $date,
+            'start_time' => '20:00:00', 'type_id' => $t2]);
 
         $put1 = apiRequest('PUT', 'appointment_responses', ['token' => apiToken('admin'),
             'query' => ['appointment_id' => $apt, 'member_id' => $m1], 'body' => ['status' => 'yes']]);
         assertStatus(200, $put1);
-        assertTrue(is_array($put1['body']['staffing'] ?? null) && $put1['body']['staffing'] !== [],
-            'staffing fehlt in der PUT-Antwort des Verwalters');
+        assertTrue(!array_key_exists('staffing', $put1['body']), 'staffing darf in der PUT-Antwort nicht mehr stehen');
         assertStatus(200, apiRequest('PUT', 'appointment_responses', ['token' => apiToken('admin'),
             'query' => ['appointment_id' => $apt, 'member_id' => $m2], 'body' => ['status' => 'maybe']]));
 
         // Einzelantwort, Verwalter
         $one = apiRequest('GET', 'appointment_responses', ['token' => apiToken('manager'), 'query' => ['appointment_id' => $apt]]);
         assertStatus(200, $one);
-        $st = $one['body']['staffing'] ?? null;
-        assertTrue(is_array($st), 'staffing fehlt in der Einzelantwort: ' . substr($one['raw'], 0, 300));
+        assertTrue(!array_key_exists('staffing', $one['body']), 'staffing darf in der Einzelantwort nicht mehr stehen');
 
-        $byName = [];
-        foreach ($st as $row) { $byName[$row['name'] ?? '(ohne)'] = $row; }
-        assertSame(['group_id' => $k, 'name' => "RST Kla {$s}", 'expected' => 2, 'yes' => 1, 'maybe' => 1, 'no' => 0, 'open' => 0, 'shared' => 1],
-            $byName["RST Kla {$s}"] ?? null);
-        assertSame(['group_id' => $x, 'name' => "RST Sax {$s}", 'expected' => 1, 'yes' => 0, 'maybe' => 1, 'no' => 0, 'open' => 0, 'shared' => 1],
-            $byName["RST Sax {$s}"] ?? null);
-        // Abschlusszeile: m3 sicher; Verwalter und Testmitglied nur, wenn sie
-        // im Bestand keinem Register angehoeren -- deshalb ">= 1", nicht "= 3".
-        // Ihre echten Register koennen als weitere Zeilen auftauchen.
-        $ohne = $byName['(ohne)'] ?? null;
-        assertTrue($ohne !== null && $ohne['expected'] >= 1, 'Abschlusszeile fehlt oder ist leer');
-        assertSame(null, $ohne['group_id']);
-        assertSame(null, end($st)['group_id'], 'Abschlusszeile steht am Ende');
-
-        // Listenantwort (Check-in-App), Verwalter
+        // Listenantwort (Check-in-App), Verwalter: Namensliste fuer die Besetzung
         $list = apiRequest('GET', 'appointment_responses', ['token' => apiToken('manager'), 'query' => ['upcoming' => 1, 'with_info' => 1]]);
         assertStatus(200, $list);
         $item = null;
+        $item2 = null;
         foreach ($list['body']['appointments'] as $a) {
+            assertTrue(!array_key_exists('staffing', $a), 'staffing darf in der Liste nicht mehr stehen');
             if ((int) $a['appointment']['appointment_id'] === $apt) { $item = $a; }
+            if ((int) $a['appointment']['appointment_id'] === $apt2) { $item2 = $a; }
         }
         assertTrue($item !== null, 'Termin fehlt in der Liste des Verwalters');
-        assertSame($st, $item['staffing'] ?? null, 'Liste und Einzelantwort muessen dieselbe Besetzung liefern');
+        assertTrue(is_array($item['members'] ?? null), 'Verwalter bekommt in der Liste keine members');
+        $byId = [];
+        foreach ($item['members'] as $mm) { $byId[(int) $mm['member_id']] = $mm; }
+        foreach ([$m1, $m2, $m3] as $mid) {
+            assertTrue(isset($byId[$mid]), "Mitglied {$mid} fehlt in members der Liste");
+            $keys = array_keys($byId[$mid]);
+            sort($keys);
+            assertSame(['group_name', 'groups', 'member_id', 'name', 'status', 'subgroups', 'surname'], $keys,
+                'Felder der Namensliste in der Listenantwort');
+        }
+        assertSame('yes', $byId[$m1]['status']);
+        assertSame('maybe', $byId[$m2]['status']);
+        assertSame([$k, $x], array_map(static fn ($sg) => (int) $sg['group_id'], $byId[$m2]['subgroups']));
+        assertSame([], $byId[$m3]['subgroups']);
+
+        // Terminart ohne "Namen sichtbar": der Verwalter bekommt die Liste trotzdem
+        assertTrue($item2 !== null && is_array($item2['members'] ?? null), 'Verwalter: members fehlen bei Terminart ohne sichtbare Namen');
 
         // Mitglied: nie, auch nicht bei sichtbaren Namen
         $u1 = apiRequest('GET', 'appointment_responses', ['token' => apiToken('user'), 'query' => ['appointment_id' => $apt]]);
         assertStatus(200, $u1);
         assertTrue(!array_key_exists('staffing', $u1['body']), 'Mitglied darf staffing nicht sehen (Einzelantwort)');
+        assertTrue(is_array($u1['body']['members'] ?? null), 'Mitglied sieht bei sichtbaren Namen die Liste');
         $u2 = apiRequest('GET', 'appointment_responses', ['token' => apiToken('user'), 'query' => ['upcoming' => 1, 'with_info' => 1]]);
         assertStatus(200, $u2);
         foreach ($u2['body']['appointments'] as $a) {
             assertTrue(!array_key_exists('staffing', $a), 'Mitglied darf staffing nicht sehen (Liste)');
+            if ((int) $a['appointment']['appointment_id'] === $apt2) {
+                assertTrue(!array_key_exists('members', $a), 'Mitglied ohne sichtbare Namen: members in der Liste');
+            }
         }
+        $u3 = apiRequest('GET', 'appointment_responses', ['token' => apiToken('user'), 'query' => ['appointment_id' => $apt2]]);
+        assertStatus(200, $u3);
+        assertTrue(!array_key_exists('members', $u3['body']), 'Mitglied ohne sichtbare Namen: members in der Einzelantwort');
 
         // PUT-Antwort: Mitglied traegt sich selbst ein -- kein staffing
         $own = apiRequest('PUT', 'appointment_responses', ['token' => apiToken('user'),
