@@ -12,19 +12,20 @@
 /**
  * Anwesenheitszahlen je Termin (Spec 2026-09-22-kalender-anwesenheit).
  *
- * "Erwartet" folgt derselben Regel wie Anwesenheitsliste und Statistik:
- * Gruppen der Terminart (appointment_type_groups) mal Gruppenzuordnung des
- * Mitglieds, eingeschraenkt auf den Aktivzeitraum zum Termindatum
- * (getMemberActivityWhere). Gezaehlt wird in zwei Abfragen fuer die ganze
- * Liste, im selben Stil wie responsesAttachSummaries() in responses.php --
+ * "Erwartet" folgt derselben Regel wie Anwesenheitsliste und Statistik. Die
+ * Soll-Menge (Gruppen der Terminart mal Gruppenzuordnung des Mitglieds,
+ * eingeschraenkt auf den Aktivzeitraum zum Termindatum) steht in
+ * expected_pairs.php (expectedPairsSql()); attendanceExpectedMemberIds() liest
+ * sie von dort. Gezaehlt wird in zwei Abfragen fuer die ganze Liste, im selben Stil wie responsesAttachSummaries() in responses.php --
  * die beiden Helfer stehen nebeneinander, responses.php bindet diesen hier
  * zusaetzlich ein (fuer attendanceExpectedMemberIds()).
  */
 declare(strict_types=1);
 
-// getMemberActivityWhere() wird hier gebraucht -- dieser Helfer bindet
-// member_activity.php selbst ein, unabhaengig davon, ob der Aufrufer (etwa
-// responses.php, das umgekehrt diesen Helfer einbindet) das schon getan hat.
+// Diese Datei ruft getMemberActivityWhere() nicht mehr selbst auf (die Joins
+// leben in expected_pairs.php). Der Include bleibt der Ladereihenfolge wegen:
+// Aufrufer wie handlers/appointments.php binden nur diesen Helfer ein und
+// verlassen sich darauf, dass member_activity.php mitkommt.
 require_once __DIR__ . '/member_activity.php';
 
 const ATTENDANCE_PRESENT = 'present';
