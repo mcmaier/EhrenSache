@@ -296,14 +296,20 @@ test('Anwesenheitsbericht listet nur Termine im Aktivzeitraum', function () use 
 
 test('Anwesenheitsbericht listet einen Termin einmal, auch wenn mehrere Gruppen ihn erwarten', function () use (&$sgWorld) {
     assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
-    $w   = $sgWorld;
-    // C steht in zwei Registern (R und R2): Termin R1 entsteht in der Soll-Menge doppelt.
-    $res = apiRequest('GET', 'statistics_report', ['token' => apiToken('admin'), 'query' => [
-        'year' => $w['year'], 'member_id' => $w['members']['C']]]);
-    assertStatus(200, $res);
-
-    foreach (['SG G1', 'SG R1', 'SG R2'] as $title) {
-        assertSame(1, substr_count($res['raw'], $title), "{$title} muss genau einmal im Bericht stehen");
+    $w = $sgWorld;
+    // Terminart an zwei Gruppen, in denen C steht: die Soll-Menge enthaelt (C, Termin) doppelt.
+    $typeId = sgCreate('appointment_types', ['type_name' => 'SG Doppelprobe ' . uniqid(), 'is_default' => 0,
+        'color' => '#667eea', 'group_ids' => [$w['groups']['G'], $w['groups']['R2']]]);
+    $apptId = sgCreate('appointments', ['title' => 'SG DOPPEL', 'date' => "{$w['year']}-10-01",
+        'start_time' => '19:00:00', 'type_id' => $typeId]);
+    try {
+        $res = apiRequest('GET', 'statistics_report', ['token' => apiToken('admin'), 'query' => [
+            'year' => $w['year'], 'member_id' => $w['members']['C']]]);
+        assertStatus(200, $res);
+        assertSame(1, substr_count($res['raw'], 'SG DOPPEL'), 'Der Termin muss genau einmal im Bericht stehen');
+    } finally {
+        sgDelete('appointments', $apptId);
+        sgDelete('appointment_types', $typeId);
     }
 });
 
