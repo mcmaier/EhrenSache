@@ -206,6 +206,15 @@ https://ehrensache.meine-domain.de/update
 
 Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 
+> [!TIP]
+> **Läuft die Installation hinter Cloudflare** (oder einem anderen CDN), bleibt nach einem Update
+> sonst bis zu vier Stunden altes CSS und JS im Browser: Das Dashboard erscheint ungestylt, oder
+> Knöpfe tun nichts. EhrenSache verlangt für CSS und JS eine Nachfrage vor jeder Verwendung
+> (`no-cache`), Cloudflare ersetzt das in der Voreinstellung durch vier Stunden. In Cloudflare
+> unter *Caching → Configuration* die **Browser Cache TTL auf „Respect Existing Headers“** stellen
+> und nach jedem Update **„Purge Everything“** auslösen. Wer den alten Stand schon im Browser hat,
+> lädt einmal mit Strg+F5 neu.
+
 > [!NOTE]
 > Bei Update von **v1.0.0 → v1.1.x**: Der Wizard ergänzt `config.php` automatisch um das Prefix-Feld und benennt alle Tabellen entsprechend um. Es ist kein manueller Eingriff in die Konfiguration nötig.
 

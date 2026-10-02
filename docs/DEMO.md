@@ -253,7 +253,22 @@ Bewusst hingenommen, damit die Demo zeigen kann, wofür sie da ist:
 
 ---
 
-## 6. Zwei Dinge, die überraschen
+## 6. Drei Dinge, die überraschen
+
+**Hinter Cloudflare bleibt nach einem Update altes CSS und JS im Browser.** EhrenSache liefert
+CSS und JS mit `Cache-Control: no-cache, must-revalidate` aus (`public/.htaccess`), damit der
+Browser nach jedem Update nachfragt. Cloudflare ersetzt das mit seiner Voreinstellung
+„Browser Cache TTL“ durch `max-age=14400` — der Browser fragt dann vier Stunden lang nicht nach.
+Die Seite selbst (`index.html`) kommt neu, die CSS-Module unter `css/` und die JS-Module unter
+`js/modules/` nicht: Das Dashboard steht ungestylt da oder Knöpfe tun nichts. Der Versions-Query
+`?v=` hilft nur der einen eingebundenen Datei, nicht den Modulen, die sie nachlädt.
+Am 2026-10-02 nach dem Update der Demo auf 1.20.0 so beobachtet.
+
+Abhilfe in Cloudflare unter *Caching → Configuration*: **Browser Cache TTL** auf
+**„Respect Existing Headers“** stellen. Nach einem Update zusätzlich **„Purge Everything“**,
+damit auch der Zwischenspeicher bei Cloudflare frisch ist. Prüfen lässt es sich im Browser
+(Entwicklerwerkzeuge → Netzwerk): `css/variables.css` muss `no-cache, must-revalidate` tragen,
+nicht `max-age=…`. Wer schon einen alten Stand im Browser hat, lädt einmal mit Strg+F5 neu.
 
 **Die Testsuite läuft gegen eine Demo-Installation nicht.** Mit gesetztem `DEMO_MODE` werden
 über hundert Prüfungen rot, weil die Suiten `settings` schreiben — und genau das sperrt der
