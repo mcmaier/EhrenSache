@@ -256,7 +256,9 @@ CREATE TABLE  IF NOT EXISTS `{PREFIX}member_groups` (
   is_default BOOLEAN DEFAULT 0,
   is_subgroup TINYINT(1) NOT NULL DEFAULT 0,
   sort_order INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  parent_group_id INT NULL DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_{PREFIX}member_groups_parent` FOREIGN KEY (parent_group_id) REFERENCES `{PREFIX}member_groups`(group_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- M:N-Tabelle: Member <-> Groups
