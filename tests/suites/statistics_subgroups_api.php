@@ -335,6 +335,20 @@ test('Anwesenheitsbericht listet einen Termin einmal, auch wenn mehrere Gruppen 
     }
 });
 
+test('Anwesenheitsbericht mit Gruppenfilter listet nur Termine dieser Spalten', function () use (&$sgWorld) {
+    assertTrue(!empty($sgWorld['members']), 'Statistik-Welt fehlt -- Aufbau gescheitert');
+    $w   = $sgWorld;
+    // Spalten = nur Gesamtprobe (Gruppe G). D wird zwar auch zur Registerprobe R2 erwartet
+    // (ueber R), diese Terminart gehoert aber nicht zu den Spalten des Berichts.
+    $res = apiRequest('GET', 'statistics_report', ['token' => apiToken('admin'), 'query' => [
+        'year' => $w['year'], 'member_id' => $w['members']['D'], 'group_id' => $w['groups']['G']]]);
+    assertStatus(200, $res);
+
+    $html = $res['raw'];
+    assertTrue(preg_match('#<td>SG G2</td>#', $html) === 1, 'G2 (Gesamtprobe) muss als Tabellenzelle im Bericht stehen');
+    assertTrue(preg_match('#<td>SG R2</td>#', $html) !== 1, 'R2 gehoert zu einer Terminart ausserhalb der Spalten');
+});
+
 test('Statistik-Welt wird aufgeraeumt', function () use (&$sgWorld) {
     if (!empty($sgWorld)) {
         sgDropWorld($sgWorld);
