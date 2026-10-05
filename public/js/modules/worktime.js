@@ -539,6 +539,13 @@ async function fillWorkSessionAppointments(session) {
     const select = document.getElementById('workSessionAppointment');
     if (!select) return;
 
+    // Ohne Terminplanung (OI-62, Etappe 2) keine Auswahl und kein Abruf; das
+    // Feld ist per data-feature ausgeblendet.
+    if (!isFeatureOn('appointments')) {
+        select.innerHTML = '<option value="">Kein Termin</option>';
+        return;
+    }
+
     let appointments = dataCache.appointments?.[currentYear]?.data || [];
 
     if (!appointments.length) {
@@ -716,10 +723,14 @@ export async function saveWorkSession() {
     // Immer mitsenden, auch leer: Der Server unterscheidet „Feld nicht dabei"
     // (Termin bleibt) von „Feld leer" (Zuordnung wird gelöst). Ohne das ließe
     // sich ein einmal gesetzter Termin nicht mehr entfernen.
-    const appointmentSelect = document.getElementById('workSessionAppointment');
-    body.appointment_id = appointmentSelect && appointmentSelect.value
-        ? parseInt(appointmentSelect.value, 10)
-        : null;
+    // Ohne Terminplanung bleibt das Feld ganz weg (OI-62, Etappe 2) -- der
+    // Server liesse eine bestehende Zuordnung dann stehen.
+    if (isFeatureOn('appointments')) {
+        const appointmentSelect = document.getElementById('workSessionAppointment');
+        body.appointment_id = appointmentSelect && appointmentSelect.value
+            ? parseInt(appointmentSelect.value, 10)
+            : null;
+    }
 
     if (!body.start_time || !body.end_time) {
         showToast('Beginn und Ende sind erforderlich', 'error');
@@ -1011,8 +1022,10 @@ export async function openActivityTypeModal(activityId = null) {
     await loadGroups();
     renderActivityGroups(activity ? (activity.groups || []) : []);
 
-    await loadTypes();
-    renderActivityAppointmentTypes(activity ? (activity.appointment_type_ids || []) : []);
+    if (isFeatureOn('appointments')) {
+        await loadTypes();
+        renderActivityAppointmentTypes(activity ? (activity.appointment_type_ids || []) : []);
+    }
 
     modal.classList.add('active');
 }
@@ -1081,13 +1094,18 @@ export async function saveActivityType() {
         color: document.getElementById('activityTypeColor').value,
         verification: document.getElementById('activityTypeVerification').value,
         is_active: document.getElementById('activityTypeActive').checked ? 1 : 0,
-        group_ids: groupIds,
-        // Immer mitsenden, auch leer: Ein leeres Array löst die Eingrenzung und
-        // ist hier zulässig — es bedeutet „alle Termine", nicht „keine".
-        appointment_type_ids:
-            [...document.querySelectorAll('.activity-appointment-type-checkbox:checked')]
-                .map(cb => parseInt(cb.value, 10))
+        group_ids: groupIds
     };
+
+    // Immer mitsenden, auch leer: Ein leeres Array löst die Eingrenzung und
+    // ist hier zulässig — es bedeutet „alle Termine", nicht „keine". Ohne
+    // Terminplanung (OI-62, Etappe 2) bleibt das Feld weg: Der Server laesst
+    // die gespeicherte Eingrenzung dann unangetastet (activity_types.php).
+    if (isFeatureOn('appointments')) {
+        body.appointment_type_ids =
+            [...document.querySelectorAll('.activity-appointment-type-checkbox:checked')]
+                .map(cb => parseInt(cb.value, 10));
+    }
 
     if (!body.activity_name) {
         showToast('Ein Name ist erforderlich', 'error');

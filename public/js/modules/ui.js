@@ -27,6 +27,7 @@ import { registerActions } from './actions.js';
 import { forgetPendingLoads, sharedLoad } from './pending_loads.js';
 import {renderSystemSettings} from './settings.js';
 import {loadImportLogs} from './import_export.js';
+import { isFeatureOn } from './features.js';
 
 // ============================================
 // UI
@@ -1071,21 +1072,22 @@ export async function loadAllData() {
 
     
     // Hintergrund-Laden nur für ungecachte Daten
+    // Termine und Anwesenheit nur, wenn die Funktion an ist (OI-62, Etappe 2) -- sonst 403 samt Toast.
     setTimeout(() => {
         if ((section !== 'mitglieder') && !isCacheValid('members', currentYear))
             loadMembers();
-        if ((section !== 'termine') && !isCacheValid('appointments',currentYear)) 
+        if (isFeatureOn('appointments') && (section !== 'termine') && !isCacheValid('appointments',currentYear)) 
             loadAppointments();
-        if ((section !== 'anwesenheit') && !isCacheValid('records',currentYear)) {
+        if (isFeatureOn('attendance') && (section !== 'anwesenheit') && !isCacheValid('records',currentYear)) {
             loadRecords();
         }
-        if ((section !== 'antraege') && !isCacheValid('exceptions',currentYear)) {
+        if (isFeatureOn('attendance') && (section !== 'antraege') && !isCacheValid('exceptions',currentYear)) {
             loadExceptions();
         }  
         if(!sectionsUsingTypes.includes(section))
         {            
             if (!isCacheValid('groups')) loadGroups();
-            if (!isCacheValid('types')) loadTypes();
+            if (isFeatureOn('appointments') && !isCacheValid('types')) loadTypes();
         }        
         if(isAdmin)
         {

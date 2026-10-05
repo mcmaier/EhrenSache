@@ -244,3 +244,95 @@ test('featureSettingsWithDefaults ergaenzt fehlende Schalter mit ihrem Default',
     sort($sortiert);
     assertSame($sortiert, $keys, 'Wie die Abfrage nach setting_key sortiert');
 });
+
+// ---- Etappe 2: Oberflächen ----------------------------------------------------
+
+/** Rumpf einer JS-Funktion ab ihrer Signatur, per Klammerzählung (Kommentare sind schon entfernt). */
+function fuBody(string $src, string $signature): string
+{
+    $start = strpos($src, $signature);
+    assertTrue($start !== false, "Funktion '{$signature}' nicht gefunden");
+    $open  = strpos($src, '{', $start + strlen($signature));
+    $depth = 0;
+    for ($i = $open, $n = strlen($src); $i < $n; $i++) {
+        if ($src[$i] === '{') {
+            $depth++;
+        } elseif ($src[$i] === '}' && --$depth === 0) {
+            return substr($src, $open, $i - $open + 1);
+        }
+    }
+    throw new RuntimeException("Rumpf von '{$signature}' nicht abgeschlossen");
+}
+
+/** Steht vor jedem Vorkommen von $call im zugehörigen if die Prüfung $check? */
+function fuGuarded(string $body, string $call, string $check): bool
+{
+    $offset = 0;
+    $found  = false;
+    while (($pos = strpos($body, $call, $offset)) !== false) {
+        $found = true;
+        $if = strrpos(substr($body, 0, $pos), 'if');
+        if ($if === false || !str_contains(substr($body, $if, $pos - $if), $check)) {
+            return false;
+        }
+        $offset = $pos + strlen($call);
+    }
+    return $found;
+}
+
+test('Dashboard: Menuepunkte, Terminarten und Terminfelder tragen data-feature', function () {
+    $html = sourceCode(FU_ROOT . '/public/index.html');
+    foreach (['termine' => 'appointments', 'anwesenheit' => 'attendance',
+              'antraege' => 'attendance', 'statistik' => 'attendance'] as $section => $key) {
+        assertTrue((bool) preg_match('/<li class="nav-item" data-section="' . $section . '" data-feature="' . $key . '"/', $html),
+            "Menuepunkt {$section} braucht data-feature=\"{$key}\"");
+    }
+    assertTrue((bool) preg_match('/data-feature="appointments"[^>]*>\s*<div[^>]*>\s*<h2[^>]*>📅 Terminarten/u', $html),
+        'Block Terminarten in der Verwaltung braucht data-feature="appointments"');
+    assertTrue((bool) preg_match('/data-feature="appointments"[^>]*>\s*<label for="workSessionAppointment"/', $html),
+        'Terminauswahl im Dialog der Arbeitszeit braucht data-feature="appointments"');
+    assertTrue((bool) preg_match('/data-feature="appointments"[^>]*>\s*<label>Passende Terminarten/u', $html),
+        'Terminarten im Dialog der Taetigkeitsart brauchen data-feature="appointments"');
+});
+
+test('Dashboard: Startabrufe in loadAllData haengen an den Schaltern', function () {
+    $ui   = sourceCode(FU_ROOT . '/public/js/modules/ui.js');
+    $body = fuBody($ui, 'function loadAllData(');
+    foreach ([['loadAppointments()', "isFeatureOn('appointments')"], ['loadTypes()', "isFeatureOn('appointments')"],
+              ['loadRecords()', "isFeatureOn('attendance')"], ['loadExceptions()', "isFeatureOn('attendance')"]] as [$call, $check]) {
+        assertTrue(fuGuarded($body, $call, $check), "{$call} in loadAllData() ohne {$check}");
+    }
+    assertTrue(str_contains($ui, "import { isFeatureOn } from './features.js';"), 'ui.js importiert isFeatureOn nicht');
+});
+
+test('Dashboard: Kalender und Rueckmeldetabelle ohne Anwesenheitswerte, wenn die Anwesenheit aus ist', function () {
+    $js = sourceCode(FU_ROOT . '/public/js/modules/appointments.js');
+    assertTrue(str_contains(fuBody($js, 'function loadAppointments('),
+        "isFeatureOn('attendance') ? { year: year, include: 'attendance' } : { year: year }"),
+        'loadAppointments() fragt include=attendance ohne Bedingung ab');
+    foreach (['function attendanceTotals(', 'function worstOwnStatus(', 'function attendanceLineHtml('] as $sig) {
+        assertTrue(str_contains(fuBody($js, $sig), "isFeatureOn('attendance')"), "{$sig}) zeichnet Anwesenheit ohne Schalter");
+    }
+    assertTrue(str_contains(fuBody($js, 'function renderAppointments('), "isFeatureOn('attendance') && appointmentHasStarted(apt)"),
+        'Listenknopf „Anwesenheit anzeigen“ ohne Schalter');
+    assertTrue(str_contains(fuBody($js, 'function showAppointmentPopup('), "appointmentHasStarted(apt) && isFeatureOn('attendance')"),
+        'Popup-Knopf „Anwesenheit“ ohne Schalter');
+    $resp = sourceCode(FU_ROOT . '/public/js/modules/responses.js');
+    assertTrue(str_contains(fuBody($resp, 'function managerTableHtml('), "data.started && isFeatureOn('attendance')"),
+        'Rueckmeldetabelle zeigt die Spalte Anwesenheit ohne Schalter');
+});
+
+test('Dashboard: Zeiterfassung und Verwaltung fragen ohne Terminplanung keine Termine ab', function () {
+    $wt = sourceCode(FU_ROOT . '/public/js/modules/worktime.js');
+    assertTrue(str_contains(fuBody($wt, 'function fillWorkSessionAppointments('), "if (!isFeatureOn('appointments'))"),
+        'fillWorkSessionAppointments() laedt Termine ohne Schalter');
+    assertTrue(fuGuarded(fuBody($wt, 'function saveWorkSession('), 'body.appointment_id =', "isFeatureOn('appointments')"),
+        'saveWorkSession() sendet appointment_id ohne Schalter');
+    assertTrue(fuGuarded(fuBody($wt, 'function openActivityTypeModal('), 'loadTypes()', "isFeatureOn('appointments')"),
+        'openActivityTypeModal() laedt Terminarten ohne Schalter');
+    assertTrue(fuGuarded(fuBody($wt, 'function saveActivityType('), 'body.appointment_type_ids =', "isFeatureOn('appointments')"),
+        'saveActivityType() sendet appointment_type_ids ohne Schalter -- die gespeicherte Eingrenzung ginge verloren');
+    $mg = sourceCode(FU_ROOT . '/public/js/modules/management.js');
+    assertTrue(fuGuarded(fuBody($mg, 'function showGroupSection('), 'loadTypes(', "isFeatureOn('appointments')"),
+        'showGroupSection() laedt Terminarten ohne Schalter');
+});

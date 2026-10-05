@@ -13,6 +13,7 @@ import { apiCall, isAdminOrManager, currentUser } from './api.js';
 import { showToast, showConfirm, showReasonDialog, invalidateCache, subgroupLabel } from './ui.js';
 import { escapeHtml, translateExceptionStatus } from './utils.js';
 import { registerActions } from './actions.js';
+import { isFeatureOn } from './features.js';
 // Kreisimport (appointments.js importiert von hier): unbedenklich, weil
 // refreshAppointmentsKeepPage erst beim Schliessen des Modals gerufen wird,
 // nie beim Laden des Moduls.
@@ -432,7 +433,8 @@ function managerMemberRowHtml(m, started) {
  * Filter "Keine Antwort" zufaellig niemanden mit Untergruppe zeigt.
  */
 function managerTableHtml(data) {
-    const started = data.started;
+    // Spalte „Anwesenheit“ nur mit eingeschalteter Anwesenheit (OI-62, Etappe 2).
+    const started = data.started && isFeatureOn('attendance');
     const colspan = started ? 6 : 5;
     const filtered = data.members.filter(m => matchesFilter(m, currentFilter));
 

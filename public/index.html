@@ -76,16 +76,16 @@
                 <li class="nav-item active" data-section="mitglieder" data-role="manager">
                     <span>🧑‍🤝‍🧑 Mitglieder</span>
                 </li>     
-                <li class="nav-item" data-section="termine">
+                <li class="nav-item" data-section="termine" data-feature="appointments">
                     <span>📅 Termine</span>
                 </li>                                                   
-                <li class="nav-item" data-section="anwesenheit">
+                <li class="nav-item" data-section="anwesenheit" data-feature="attendance">
                     <span>✅ Anwesenheit</span>
                 </li>
-                <li class="nav-item" data-section="antraege">
+                <li class="nav-item" data-section="antraege" data-feature="attendance">
                     <span>📋 Anträge</span>
                 </li>  
-                <li class="nav-item" data-section="statistik">
+                <li class="nav-item" data-section="statistik" data-feature="attendance">
                     <span>📊 Statistik</span>
                 </li>
                 <li class="nav-item" data-section="zeiterfassung" data-feature="worktime" style="display: none;">
@@ -1292,8 +1292,8 @@
                     </table>
                 </div>
 
-                <!-- Terminarten -->
-                <div class="data-table" style="margin-top: 30px;">
+                <!-- Terminarten (nur mit Terminplanung, OI-62 Etappe 2) -->
+                <div class="data-table" style="margin-top: 30px;" data-feature="appointments">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <h2 style="margin: 0;">📅 Terminarten</h2>
                         <button class="btn-add" data-action="open-type-modal">+ Neue Terminart</button>
@@ -2569,7 +2569,7 @@
                         <select id="workSessionActivity" required></select>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" data-feature="appointments">
                         <label for="workSessionAppointment">Termin</label>
                         <select id="workSessionAppointment">
                             <option value="">Kein Termin</option>
@@ -2724,7 +2724,7 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group" data-feature="appointments">
                         <label>Passende Terminarten</label>
                         <small style="color: #7f8c8d; display: block; margin-bottom: 10px;">
                             Grenzt die Terminauswahl beim Erfassen ein — „Bühnenaufbau" bietet

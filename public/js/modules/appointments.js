@@ -21,6 +21,7 @@ import { globalPaginationValue } from './settings.js';
 import { responseSummaryCell, responseChipsHtml, responseSummaryTitle, RESPONSE_ICONS, RESPONSE_LABELS, openResponsesModal } from './responses.js';
 import { appointmentTimeChips, localTodayIso, countChips, renderFilterChips, setResetEnabled } from './filter_chips.js';
 import { registerActions } from './actions.js';
+import { isFeatureOn } from './features.js';
 
 // ============================================
 // APPOINTMENTS
@@ -82,7 +83,9 @@ export async function loadAppointments(forceReload = false) {
         // (Schritt 2a). Die Zahlen liegen damit im ohnehin vorhandenen Cache des
         // Jahres -- der Kalender braucht keinen zweiten Abruf und keinen eigenen
         // Cache. Ohne Zeitraum wuerde der Server den Zusatz ignorieren.
-        const appointments = await apiCall('appointments', 'GET', null, { year: year, include: 'attendance' });
+        // Ohne Anwesenheit (OI-62, Etappe 2) gibt es keine Zahlen zu holen.
+        const params = isFeatureOn('attendance') ? { year: year, include: 'attendance' } : { year: year };
+        const appointments = await apiCall('appointments', 'GET', null, params);
 
         // Cache für dieses Jahr speichern
         if (!dataCache.appointments[year]) {
@@ -323,7 +326,7 @@ async function renderAppointments(appointments, page = 1) {
 
         const actionsHtml = isAdminOrManager ? `
             <td class="actions-cell">
-                    ${appointmentHasStarted(apt) ? `<button class="action-btn btn-icon"
+                    ${isFeatureOn('attendance') && appointmentHasStarted(apt) ? `<button class="action-btn btn-icon"
                             data-action="jump-to-attendance" data-id="${Number(apt.appointment_id)}" data-value="list"
                             title="Anwesenheit anzeigen" aria-label="Anwesenheit anzeigen">📋</button>` : ''}
                     <button class="action-btn btn-icon btn-edit"
@@ -550,6 +553,11 @@ function hasOwnStatusText(status) {
  * schon zwei Stunden frueher als begonnen an.
  */
 function attendanceTotals(dayAppointments) {
+    // Anwesenheit aus (OI-62, Etappe 2): keine Balken, auch nicht aus einem
+    // Cache, der noch vor dem Umschalten gefuellt wurde.
+    if (!isFeatureOn('attendance')) {
+        return { expected: 0, present: 0, excused: 0, missing: 0 };
+    }
     return (dayAppointments || []).reduce((sum, apt) => {
         const a = apt.attendance;
         if (!a) {
@@ -570,6 +578,9 @@ function attendanceTotals(dayAppointments) {
  * begonnen" oder "hier nicht erwartet", beides ohne Punkt.
  */
 function worstOwnStatus(dayAppointments) {
+    if (!isFeatureOn('attendance')) {
+        return null;
+    }
     const rank = { missing: 3, excused: 2, present: 1 };
     let worst = null;
     (dayAppointments || []).forEach(apt => {
@@ -853,6 +864,9 @@ function calendarResponseLineHtml(apt, fest) {
  * Einzelabruf eines Termins, der das Feld gar nicht kennt.
  */
 function attendanceLineHtml(apt) {
+    if (!isFeatureOn('attendance')) {
+        return '';
+    }
     const a = apt.attendance;
     if (isAdminOrManager && a && Number(a.expected) > 0) {
         return `<div class="calendar-attendance-line">`
@@ -988,7 +1002,7 @@ function showAppointmentPopup(ziel, appointments, fest = true) {
                 ${attendanceLineHtml(apt)}
                 ${fest && isAdminOrManager ? `<button type="button" class="calendar-event-edit"
                     data-action="calendar-open-appointment" data-id="${Number(apt.appointment_id)}">Bearbeiten</button>` : ''}
-                ${fest && isAdminOrManager && appointmentHasStarted(apt) ? `<button type="button" class="calendar-event-edit"
+                ${fest && isAdminOrManager && appointmentHasStarted(apt) && isFeatureOn('attendance') ? `<button type="button" class="calendar-event-edit"
                     data-action="calendar-jump-to-attendance" data-id="${Number(apt.appointment_id)}">Anwesenheit</button>` : ''}
             </div>
         `;
