@@ -74,7 +74,8 @@ body {
 }
 
 /* Login Screen */
-#loginScreen {
+#loginScreen,
+#startScreen {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -90,11 +91,23 @@ body {
     background-attachment: fixed;
 }
 
-#loginScreen.active {
+#loginScreen.active,
+#startScreen.active {
     display: flex;
 }
 
-#loginScreen:not(.active) {
+#loginScreen:not(.active),
+#startScreen:not(.active) {
+    display: none;
+}
+
+/* Ladeanzeige beim Start (OI-121) */
+.start-status {
+    margin-top: 24px;
+    text-align: center;
+}
+
+#startRetryBtn[hidden] {
     display: none;
 }
 

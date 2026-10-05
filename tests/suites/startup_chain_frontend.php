@@ -25,6 +25,7 @@ declare(strict_types=1);
 $scRoot    = dirname(__DIR__, 2);
 $scApi     = (string) sourceCode($scRoot . '/public/js/modules/api.js');
 $scPwa     = (string) sourceCode($scRoot . '/public/checkin/js/app.js');
+$scPwaHtml = (string) sourceCode($scRoot . '/public/checkin/index.html');
 
 const SC_RETRY_STATUSES = [502, 503, 504, 520, 521, 522, 523, 524];
 
@@ -61,3 +62,18 @@ foreach (['Dashboard' => 'scApi', 'PWA' => 'scPwa'] as $wo => $var) {
         assertSame(2, substr_count($body, 'await fetch(url, options)'), 'Nicht genau ein zweiter Versuch');
     });
 }
+
+test('PWA: Ladeanzeige ist der Anfangszustand, nicht die Anmeldemaske', function () use ($scPwaHtml) {
+    assertTrue(preg_match('/<div id="startScreen" class="active">/', $scPwaHtml) === 1,
+        'startScreen fehlt oder ist beim Laden nicht aktiv');
+    assertTrue(preg_match('/<div id="loginScreen" class="active">/', $scPwaHtml) === 0,
+        'Die Anmeldemaske ist beim Laden aktiv -- ein angemeldetes Mitglied saehe sie bis zum Ende des Starts');
+    assertTrue(str_contains($scPwaHtml, 'data-action="start-retry"'), 'Knopf "Erneut versuchen" fehlt');
+});
+
+test('PWA: "Erneut versuchen" startet die Anmeldepruefung neu', function () use ($scPwa) {
+    assertTrue(preg_match("/'start-retry'\s*:\s*\(\)\s*=>\s*checkAutoLogin\(\)/", $scPwa) === 1,
+        'start-retry ist nicht in dataActions registriert');
+    assertTrue(str_contains(scBody($scPwa, 'function showScreen('), "getElementById('startScreen')"),
+        'showScreen() kennt die Ladeanzeige nicht');
+});

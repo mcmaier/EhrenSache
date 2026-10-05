@@ -194,7 +194,8 @@ document.addEventListener('DOMContentLoaded', function() {
         'responses-grouping':   (el) => window.setResponsesGrouping(el.dataset.stage),
         'toggle-response-section':      (el) => toggleResponseSection(el.dataset.key),
         'correct-work-session': (el) => openWorkSessionModal(Number(el.dataset.sessionId)),
-        'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId))
+        'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId)),
+        'start-retry':          () => checkAutoLogin()
     };
     document.addEventListener('click', (event) => {
         const el = event.target.closest('[data-action]');
@@ -2746,14 +2747,23 @@ async function submitException() {
 // UI HELPERS
 // ========================================
 function showScreen(screenName) {
-    elements.loginScreen.classList.remove('active');
-    elements.mainScreen.classList.remove('active');
-    
-    if (screenName === 'login') {
-        elements.loginScreen.classList.add('active');
-    } else {
-        elements.mainScreen.classList.add('active');
-    }
+    const screens = {
+        start: document.getElementById('startScreen'),
+        login: elements.loginScreen,
+        main:  elements.mainScreen
+    };
+
+    Object.values(screens).forEach(screen => screen?.classList.remove('active'));
+    screens[screenName]?.classList.add('active');
+}
+
+/** Text der Ladeanzeige; bei einem Fehler zusaetzlich "Erneut versuchen". */
+function showStartStatus(text, failed) {
+    const status = document.getElementById('startStatus');
+    const retry  = document.getElementById('startRetryBtn');
+
+    if (status) status.textContent = text;
+    if (retry) retry.hidden = !failed;
 }
 
 function showError(message) {
