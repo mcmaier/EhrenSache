@@ -533,7 +533,12 @@ async function saveAllSettings() {
 
         // Wurde die Zeiterfassung ein- oder ausgeschaltet, muss die Navigation
         // sofort folgen — sonst bliebe der Punkt bis zum Neuladen falsch.
-        if (updates.some(u => u.key === 'worktime_enabled')) {
+        // Ein Schalter aus FEATURES wurde umgelegt (OI-62): Stand aus me neu
+        // holen, Menue anwenden, dann die Zusatzbedingung der Zeiterfassung.
+        const FEATURE_KEYS = ['worktime_enabled', 'station_pin_enabled', 'punctuality_enabled', 'reliability_enabled'];
+        if (updates.some(u => FEATURE_KEYS.includes(u.key))) {
+            const { refreshFeatures } = await import('./features.js');
+            await refreshFeatures();
             const { resetWorktimeEnabled, checkWorktimeEnabled } = await import('./worktime.js');
             resetWorktimeEnabled();
             await checkWorktimeEnabled();

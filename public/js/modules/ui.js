@@ -757,7 +757,14 @@ export function showDashboard() {
         let section = sessionStorage.getItem('currentSection');
                 
         // Validiere Section für User
-        if (!section || (section === 'mitglieder' && !isAdminOrManager)) {
+        // Ein Bereich, dessen Funktion inzwischen abgeschaltet ist (OI-62),
+        // bleibt zu -- applyFeatureVisibility() hat ihn in setCurrentUser()
+        // markiert.
+        const storedNavItem = section
+            ? document.querySelector(`.nav-item[data-section="${section}"]`)
+            : null;
+        if (!section || (section === 'mitglieder' && !isAdminOrManager)
+            || storedNavItem?.dataset.featureHidden === '1') {
             section = 'profil';
             sessionStorage.setItem('currentSection', section);
         }
@@ -994,11 +1001,10 @@ export async function initEventHandlers()
     initProfileEventHandler();
     initWorktimeEventHandlers();
 
-    // Blendet Navigationspunkt und Stammdatenblock ein, sofern die
-    // Zeiterfassung freigeschaltet ist. Ist sie es nicht, antwortet
-    // activity_types mit 404 und beides bleibt verborgen. Die Liste der
-    // Taetigkeitsarten kommt mit derselben Antwort und wird dort gezeichnet --
-    // ein zweiter Abruf ueber loadActivityTypes(true) holte sie doppelt.
+    // Blendet Navigationspunkt und Stammdatenblock ein, wenn die Zeiterfassung
+    // eingeschaltet ist (features aus me, OI-62) und -- fuer Mitglieder -- es
+    // mindestens eine Taetigkeitsart gibt. Die Liste kommt mit derselben
+    // Antwort und wird dort gezeichnet.
     await checkWorktimeEnabled();
 }
 

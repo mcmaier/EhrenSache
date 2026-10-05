@@ -59,6 +59,7 @@ require_once '../../private/helpers/appointment_series.php';
 require_once '../../private/helpers/groups.php';
 require_once '../../private/helpers/demo_mode.php';
 require_once '../../private/helpers/open_items.php';
+require_once '../../private/helpers/features.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';
@@ -547,13 +548,16 @@ if ($authUserRole === 'device' && $authDeviceType === 'kiosk'
 
 if($resource === 'me' && $request_method === 'GET') {
 
+    // features (OI-62): der eine Kanal, ueber den Dashboard und PWA erfahren,
+    // welche Funktionen an sind -- me rufen beide beim Start ohnehin auf.
     if($isTokenAuth) {
         echo json_encode([
             "user_id" => $authUserId,
             "email" => $_SESSION['email'] ?? "token-auth",
             "role" => $authUserRole,
             "member_id" => $authMemberId,
-            "auth_type" => "token"
+            "auth_type" => "token",
+            "features" => enabledFeatures($db, $database)
         ]);
     } else {
         // member_id gehoert in beide Zweige (OI-87): Das Dashboard meldet sich
@@ -565,7 +569,8 @@ if($resource === 'me' && $request_method === 'GET') {
             "email" => $_SESSION['email'],
             "role" => $_SESSION['role'],
             "member_id" => $authMemberId,
-            "auth_type" => "session"
+            "auth_type" => "session",
+            "features" => enabledFeatures($db, $database)
         ]);
     }
     exit();
@@ -619,6 +624,15 @@ if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 // ============================================
 // 10. ROUTING
 // ============================================
+
+// Abgeschaltete Funktionen (OI-62): Haengt die Ressource vollstaendig an
+// einer Funktion (FEATURES in private/helpers/features.php), endet die
+// Anfrage hier mit 403 FEATURE_DISABLED -- kein Handler kann die Pruefung
+// vergessen. Teilpfade pruefen an ihrer Stelle mit requireFeature().
+$sperrendeFunktion = featureForResource($resource);
+if ($sperrendeFunktion !== null) {
+    requireFeature($db, $database, $sperrendeFunktion);
+}
 
 // renderReport() (private/helpers/report.php) wirft InvalidArgumentException,
 // wenn einem Bericht ein Pflichtschluessel fehlt -- ein Vertragsbruch zwischen

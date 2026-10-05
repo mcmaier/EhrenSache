@@ -11,6 +11,7 @@
 import { apiCall } from './api.js';
 import { showToast, showConfirm, dataCache, invalidateCache, loadClientSettings } from './ui.js';
 import { loadUserData } from './users.js';
+import { isFeatureOn } from './features.js';
 import { debug } from '../app.js'
 import { API_BASE } from '../config.js';
 import { loadOpenItems } from './open_items.js';
@@ -107,7 +108,7 @@ export async function loadProfile(forceReload = false) {
     try {
         const res = await loadClientSettings();
         const s   = res?.settings || {};
-        const enabled = s.station_pin_enabled === '1' && !!userDetails.member_id;
+        const enabled = isFeatureOn('station_pin') && !!userDetails.member_id;
         card.style.display = enabled ? 'block' : 'none';
         document.getElementById('new_pin_hint').textContent =
             `${parseInt(s.station_pin_min_length || '4', 10)}–8 Ziffern, keine Folge wie 1234, keine Wiederholung wie 0000`;

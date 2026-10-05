@@ -12,6 +12,8 @@ import { API_BASE } from '../config.js';
 import { handleLogout, resetSessionTimeout } from './auth.js';
 import { debug } from '../app.js'
 
+import { setFeatures, applyFeatureVisibility } from './features.js';
+
 // Globale State
 export let currentUser = null;
 export let isAdmin = false;
@@ -25,6 +27,11 @@ export async function setCurrentUser(user) {
     isAdmin = user?.role === 'admin';
     isManager = user?.role === 'manager';
     isAdminOrManager = isAdmin || isManager;
+
+    // Abschaltbare Funktionen (OI-62): vor allem anderen, damit showDashboard()
+    // einen inzwischen abgeschalteten Bereich schon verborgen vorfindet.
+    setFeatures(user?.features ?? {});
+    applyFeatureVisibility();
 
     // Lade Member-Name falls vorhanden
     if (user && user.member_id) {

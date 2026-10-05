@@ -11,6 +11,7 @@
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, groupSelectOptionsHtml, loadClientSettings} from './ui.js';
 import { sharedLoad } from './pending_loads.js';
+import { isFeatureOn } from './features.js';
 import { loadUserData } from './users.js';
 import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { registerActions } from './actions.js';
@@ -51,7 +52,7 @@ async function loadStationPinSettings() {
     const res = await loadClientSettings();
     const s   = res?.settings || {};   // apiCall liefert den JSON-Body direkt
     const settings = {
-        enabled:   s.station_pin_enabled === '1',
+        enabled:   isFeatureOn('station_pin'),
         minLength: parseInt(s.station_pin_min_length || '4', 10)
     };
 
@@ -694,7 +695,12 @@ export async function saveMember() {
         // Die Einstellung koennte sich seit dem Oeffnen des Modals geaendert
         // haben (z.B. 409, weil die PIN-Anmeldung inzwischen abgeschaltet
         // wurde) — das PIN-Feld soll beim Wiederoeffnen dem aktuellen Stand
-        // folgen statt dem gecachten.
+        // folgen statt dem gecachten. Der Schalter kommt seit OI-62 aus den
+        // Features (me): bei FEATURE_DISABLED diese zuerst neu lesen.
+        if (pinResult?.code === 'FEATURE_DISABLED') {
+            const { refreshFeatures } = await import('./features.js');
+            await refreshFeatures();
+        }
         resetStationPinSettings();
 
         // Das Mitglied steht trotz abgelehnter PIN in der Datenbank und zaehlt

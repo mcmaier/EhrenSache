@@ -106,10 +106,13 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
             return;
         }
 
-        if (!isStationPinEnabled($db, $database)) {
-            http_response_code(409);
-            echo json_encode(["message" => "Station PIN login is disabled"]);
-            return;
+        requireFeature($db, $database, 'station_pin');
+
+        // Eine abgeschaltete Zeiterfassung wird VOR der PIN-Pruefung gemeldet:
+        // Sonst verbraucht ein work_*-Aufruf einen PIN-Versuch (Sperrzaehler),
+        // obwohl er ohnehin mit 403 enden wuerde.
+        if (str_starts_with($action, 'work_')) {
+            requireFeature($db, $database, 'worktime');
         }
 
         $member = stationRequireMember($db, $database, $device, $data);
@@ -347,7 +350,7 @@ function stationCheckin($db, $database, array $device, array $member)
  */
 function stationWork($db, $database, array $device, array $member, string $action, $data)
 {
-    requireWorktimeEnabled($db, $database);   // 404 und Ende, wenn die Zeiterfassung aus ist
+    requireWorktimeEnabled($db, $database);   // 403 FEATURE_DISABLED und Ende, wenn die Zeiterfassung aus ist
 
     $deviceUserId = (int) $device['user_id'];
     $memberId     = $member['member_id'];

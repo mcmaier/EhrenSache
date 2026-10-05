@@ -383,14 +383,9 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
             // property_exists statt isset, weil isset() bei null false liefert.
             $pinAction = null;
             if (is_object($data) && property_exists($data, 'pin')) {
-                // Dieselbe Freischaltung wie change_pin (dort 404, da der ganze
-                // Endpunkt dann nicht existiert) — hier 409, weil die Mitglieds-
-                // aktualisierung selbst eine gueltige Resource bleibt.
-                if (!isStationPinEnabled($db, $database)) {
-                    http_response_code(409);
-                    echo json_encode(["message" => "Station PIN login is disabled", "field" => "pin"]);
-                    break;
-                }
+                // Dieselbe Freischaltung wie change_pin, dieselbe Antwort (OI-62);
+                // field bleibt, damit das Formular den Fehler am Feld zeigt.
+                requireFeature($db, $database, 'station_pin', ['field' => 'pin']);
 
                 if ($data->pin === null || $data->pin === '') {
                     $pinAction = 'clear';
