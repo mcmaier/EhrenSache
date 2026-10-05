@@ -236,6 +236,11 @@
                 </div>
                 <!-- Ende Ansicht 2 -->
 
+                <!-- Ansicht 2b: nichts freigeschaltet (OI-62, Etappe 2) -->
+                <div id="captureNone" class="info-box" hidden>
+                    <p>Hier ist nichts zum Erfassen freigeschaltet.</p>
+                </div>
+
             <!-- Ansicht 3: Arbeitszeit -->
             <div id="captureWorktime" hidden>
                 <div class="worktime-section">
@@ -246,7 +251,7 @@
                             <select id="worktimeActivity"></select>
                             <div class="field-hint field-hint-proof" id="worktimeActivityHint" hidden></div>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="worktimeAppointmentGroup">
                             <label for="worktimeAppointment">Termin (optional)</label>
                             <select id="worktimeAppointment">
                                 <option value="">— kein Termin —</option>
@@ -345,7 +350,7 @@
                     </div>
 
                     <!-- Stats Cards -->
-                    <div class="stats-cards">
+                    <div class="stats-cards" id="statsAttendanceCards">
                         <div class="stat-card">
                             <div class="stat-icon">✓</div>
                             <div class="stat-value" id="statAttendanceRate">-</div>
@@ -374,7 +379,7 @@
                     </div>
 
                     <!-- Gruppen-Übersicht -->
-                    <div class="stats-section">
+                    <div class="stats-section" id="statsGroupsSection">
                         <h3>👥 Übersicht nach Gruppen</h3>
                         <div class="groups-list" id="groupsList">
                             <!-- Dynamisch gefüllt -->
@@ -532,7 +537,7 @@
                 <label for="workSessionBreak">Pause in Minuten</label>
                 <input type="number" id="workSessionBreak" min="0" step="1" value="0">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="workSessionAppointmentGroup">
                 <label for="workSessionAppointment">Termin (optional)</label>
                 <select id="workSessionAppointment">
                     <option value="">— kein Termin —</option>

@@ -685,6 +685,45 @@ const GROUPING_KEY_ATTENDANCE = 'es_grouping_attendance';
 const GROUPING_KEY_RESPONSES  = 'es_grouping_responses';
 
 /**
+ * Abschaltbare Funktionen (OI-62): Stand aus me (userData.features). Fehlt der
+ * Schluessel (aelterer Server), gilt die Funktion als an -- so verhielt sich
+ * die App vor den Schaltern fuer Terminplanung und Anwesenheit.
+ */
+function pwaFeatureOn(key) {
+    const f = userData?.features;
+    if (!f || typeof f !== 'object' || !(key in f)) return true;
+    return f[key] === true;
+}
+
+/**
+ * Blendet Tabs und Felder aus, deren Funktion abgeschaltet ist (OI-62,
+ * Etappe 2). Laeuft in initTabs(), also nach loadUserData() -- dann stehen
+ * features und worktimeActivities fest.
+ */
+function applyPwaFeatureTabs() {
+    const termine     = pwaFeatureOn('appointments');
+    const anwesenheit = pwaFeatureOn('attendance');
+    const arbeitszeit = worktimeActivities.length > 0;
+
+    // Termine: resetResponsesTab() hat ihn verborgen; ohne Terminplanung laedt
+    // initResponsesTab() nichts, also blendet ihn auch nichts wieder ein.
+    const responsesTab = document.querySelector('.tab-button[data-tab="responses"]');
+    if (responsesTab && !termine) responsesTab.hidden = true;
+
+    // Verlauf und Statistik haben nur Abschnitte fuer Anwesenheit und Arbeitszeit.
+    const historyTab = document.querySelector('.tab-button[data-tab="history"]');
+    if (historyTab) historyTab.hidden = !anwesenheit && !arbeitszeit;
+    const statsTab = document.querySelector('.tab-button[data-tab="stats"]');
+    if (statsTab) statsTab.hidden = !anwesenheit && !arbeitszeit;
+
+    // Terminbezug der Arbeitszeit
+    ['worktimeAppointmentGroup', 'workSessionAppointmentGroup'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = termine ? '' : 'none';
+    });
+}
+
+/**
  * Eingestelltes Wort für Untergruppen (z. B. "Register"), Vorgabe
  * "Untergruppe". `subgroup_label` liegt wie Vereinsname und Farben in der
  * Einstellungskategorie 'public' und kommt deshalb über denselben Weg:
@@ -915,11 +954,16 @@ async function handleLogin(e) {
         
         debug.log('✓ Login erfolgreich');
 
-        // Lade Daten
-        await loadAppointmentTypes();
+        // Lade Daten. me zuerst (OI-62, Etappe 2): erst danach steht fest,
+        // ob Terminplanung und Anwesenheit an sind.
         await loadUserData();
+        if (pwaFeatureOn('appointments')) {
+            await loadAppointmentTypes();
+        }
         await loadClientSettings();
-        await loadCheckinAppointments();
+        if (pwaFeatureOn('attendance')) {
+            await loadCheckinAppointments();
+        }
         //await loadHistory();
         await initTabs();
         await initYearNavigation();    
@@ -1003,11 +1047,16 @@ async function checkAutoLogin() {
 
             debug.log('✓ Auto-Login erfolgreich');
 
-            // Lade Daten
-            await loadAppointmentTypes();
+            // Lade Daten. me zuerst (OI-62, Etappe 2): erst danach steht fest,
+            // ob Terminplanung und Anwesenheit an sind.
             await loadUserData();
+            if (pwaFeatureOn('appointments')) {
+                await loadAppointmentTypes();
+            }
             await loadClientSettings();
-            await loadCheckinAppointments();
+            if (pwaFeatureOn('attendance')) {
+                await loadCheckinAppointments();
+            }
             //await loadHistory();
             await initTabs();
             await initYearNavigation();      
@@ -1227,7 +1276,11 @@ let success = false;
 async function initAttendanceList() {
 
     // Prüfe ob Benutzer Admin oder Manager ist
-    if (!userData || (userData.role !== 'admin' && userData.role !== 'manager')) {
+    // Nur Verwalter, nur mit Anwesenheit (OI-62, Etappe 2). „Termin anlegen“
+    // steht in diesem Tab und braucht die Terminplanung -- die setzt die
+    // Anwesenheit ohnehin voraus.
+    if (!userData || (userData.role !== 'admin' && userData.role !== 'manager')
+        || !pwaFeatureOn('attendance')) {
         // Tab ausblenden falls vorhanden
         const tab = document.querySelector('[data-tab="attendance-list"]');
         if (tab) tab.style.display = 'none';
@@ -2808,31 +2861,37 @@ function isOpenHistoryEntry(entry) {
 async function loadHistory() {
         
     try {
-        // Lade letzte 10 Records
-        let result = await apiCall('records','GET',null,{ member_id: userData.member_id });
-        if (!result.success) {
-            throw new Error(result.error);
-        }
-        let records = result.data;
+        // Anwesenheiten und Antraege nur mit eingeschalteter Anwesenheit
+        // (OI-62, Etappe 2) -- sonst antwortet der Server 403.
+        let records = [];
+        let exceptions = [];
+        if (pwaFeatureOn('attendance')) {
+            // Lade letzte 10 Records
+            let result = await apiCall('records','GET',null,{ member_id: userData.member_id });
+            if (!result.success) {
+                throw new Error(result.error);
+            }
+            records = result.data;
         
-        // Lade offene Exceptions
-        result = await apiCall('exceptions', 'GET', null, { member_id: userData.member_id,status: 'pending' });
-         if (!result.success) {
-            throw new Error(result.error);
-        }
+            // Lade offene Exceptions
+            result = await apiCall('exceptions', 'GET', null, { member_id: userData.member_id,status: 'pending' });
+             if (!result.success) {
+                throw new Error(result.error);
+            }
 
-        let exceptions = result.data;
+            exceptions = result.data;
 
-        // Abgelehnte Antraege der letzten 14 Tage dazu (FI-17): Die Uebersicht
-        // „Offene Punkte" springt hierher, und ohne sie liefe der Sprung ins
-        // Leere. Dasselbe Fenster wie serverseitig OPEN_ITEMS_REJECTED_DAYS.
-        const rejected = await apiCall('exceptions', 'GET', null, {
-            member_id: userData.member_id, status: 'rejected'
-        });
-        if (rejected.success && Array.isArray(rejected.data)) {
-            const grenze = Date.now() - 14 * 24 * 60 * 60 * 1000;
-            exceptions = exceptions.concat(rejected.data.filter(e =>
-                e.approved_at && new Date(String(e.approved_at).replace(' ', 'T')).getTime() >= grenze));
+            // Abgelehnte Antraege der letzten 14 Tage dazu (FI-17): Die Uebersicht
+            // „Offene Punkte" springt hierher, und ohne sie liefe der Sprung ins
+            // Leere. Dasselbe Fenster wie serverseitig OPEN_ITEMS_REJECTED_DAYS.
+            const rejected = await apiCall('exceptions', 'GET', null, {
+                member_id: userData.member_id, status: 'rejected'
+            });
+            if (rejected.success && Array.isArray(rejected.data)) {
+                const grenze = Date.now() - 14 * 24 * 60 * 60 * 1000;
+                exceptions = exceptions.concat(rejected.data.filter(e =>
+                    e.approved_at && new Date(String(e.approved_at).replace(' ', 'T')).getTime() >= grenze));
+            }
         }
 
         // Arbeitszeiten nur abrufen, wenn das Mitglied ueberhaupt welche
@@ -3334,11 +3393,16 @@ async function saveWorkSession() {
         start_time:     fromDateTimeLocal(document.getElementById('workSessionStart').value),
         end_time:       fromDateTimeLocal(document.getElementById('workSessionEnd').value),
         break_minutes:  parseInt(document.getElementById('workSessionBreak').value, 10) || 0,
-        note:           document.getElementById('workSessionNote').value.trim(),
-        // Leer heisst hier bewusst „Zuordnung loesen": Das Formular zeigt den
-        // aktuellen Stand, also ist die fehlende Auswahl eine Aussage.
-        appointment_id: termin ? parseInt(termin, 10) : null
+        note:           document.getElementById('workSessionNote').value.trim()
     };
+
+    // Leer heisst hier bewusst „Zuordnung loesen": Das Formular zeigt den
+    // aktuellen Stand, also ist die fehlende Auswahl eine Aussage. Ohne
+    // Terminplanung (OI-62, Etappe 2) bleibt das Feld weg, die bestehende
+    // Zuordnung bleibt stehen.
+    if (pwaFeatureOn('appointments')) {
+        body.appointment_id = termin ? parseInt(termin, 10) : null;
+    }
 
     // Zwei schnelle Tipser wuerden beim Nachtrag zwei Sitzungen anlegen — der
     // Nachtrag hat keine id, also faende der zweite Aufruf nichts vor, was er
@@ -4053,6 +4117,13 @@ async function loadWorktimeAppointments() {
 
     const previous = select.value;
 
+    // Ohne Terminplanung (OI-62, Etappe 2) keine Terminauswahl.
+    if (!pwaFeatureOn('appointments')) {
+        worktimeAppointments = [];
+        renderWorktimeAppointmentOptions('');
+        return;
+    }
+
     // Fenster um heute, nicht das ganze Jahr.
     //
     // Bis 1.2.2 fragte diese Stelle from_date = to_date = heute ab, das war zu
@@ -4210,7 +4281,8 @@ function formatDateShortDe(isoDateString) {
 const CAPTURE_VIEWS = {
     chooser:    'captureChooser',
     attendance: 'captureAttendance',
-    worktime:   'captureWorktime'
+    worktime:   'captureWorktime',
+    none:       'captureNone'      // nichts freigeschaltet (OI-62, Etappe 2)
 };
 
 /** Ist diese Ansicht gerade sichtbar? Einzige Quelle fuer den Zweck eines Scans. */
@@ -4227,7 +4299,8 @@ function isCaptureViewVisible(view) {
  * steht nach initWorktime() in worktimeActivities.
  */
 function availableIntents() {
-    const intents = ['attendance'];
+    // Anwesenheit nur, wenn sie eingeschaltet ist (OI-62, Etappe 2).
+    const intents = pwaFeatureOn('attendance') ? ['attendance'] : [];
 
     if (worktimeActivities.length > 0) {
         intents.push('worktime');
@@ -4406,7 +4479,8 @@ async function loadOpenItems() {
 function enterCaptureTab() {
     const intents = availableIntents();
 
-    showCaptureView(intents.length > 1 ? 'chooser' : intents[0]);
+    // Ohne jede Absicht der Hinweis statt eines leeren Tabs (OI-62, Etappe 2).
+    showCaptureView(intents.length > 1 ? 'chooser' : (intents[0] ?? 'none'));
     loadOpenItems();
 }
 
@@ -4523,6 +4597,8 @@ async function initResponsesTab() {
         responsesNetworkBound = true;
     }
 
+    // Ohne Terminplanung bleibt der Tab verborgen (OI-62, Etappe 2).
+    if (!pwaFeatureOn('appointments')) return;
     if (!userData || !userData.member_id) return;
     await loadResponses();
 }
@@ -5331,6 +5407,7 @@ function initTabs() {
     // Der Erfassen-Tab ist beim Start offen. initWorktime() lief in
     // loadUserData() bereits durch, worktimeActivities ist also gefuellt und
     // availableIntents() liefert die richtige Antwort.
+    applyPwaFeatureTabs();
     initCaptureTab();
 
     // Rueckmeldungen laden im Hintergrund; der Tab erscheint erst mit Inhalt.
@@ -5416,6 +5493,13 @@ async function loadStatistics() {
         // nur, wenn das Mitglied ueberhaupt Zeiten erfassen darf — dieselbe
         // Bedingung, an der schon der Verlauf haengt.
         const zeigtArbeitszeit = worktimeActivities.length > 0;
+        // Ohne Anwesenheit (OI-62, Etappe 2) bleibt nur der Arbeitszeitblock;
+        // ohne beides ist der Tab ausgeblendet (applyPwaFeatureTabs()).
+        const zeigtAnwesenheit = pwaFeatureOn('attendance');
+        if (!zeigtAnwesenheit && !zeigtArbeitszeit) {
+            statsLoading.style.display = 'none';
+            return;
+        }
 
         const params = {
             member_id: userData.member_id,
@@ -5450,8 +5534,11 @@ async function loadStatistics() {
         // Zeige Jahr an
         document.getElementById('currentYear').textContent = currentStatsYear;
         
-        // Zeige Statistiken an
-        displayStatistics(stats);
+        // Zeige Statistiken an -- Quote, Termine und Gruppen nur mit Anwesenheit
+        setStatsAttendanceVisible(zeigtAnwesenheit);
+        if (zeigtAnwesenheit) {
+            displayStatistics(stats);
+        }
 
         // Der Arbeitszeitblock haengt an einem zweiten Abruf. Scheitert der,
         // bleibt die Hauptzahl stehen und nur die Fussnote fehlt — ein
@@ -5477,6 +5564,14 @@ async function loadStatistics() {
 // ========================================
 // STATISTICS DISPLAY
 // ========================================
+/** Quote, Terminzahl und Gruppenübersicht gehören zur Anwesenheit (OI-62, Etappe 2). */
+function setStatsAttendanceVisible(visible) {
+    ['statsAttendanceCards', 'statsGroupsSection'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = visible ? '' : 'none';
+    });
+}
+
 function displayStatistics(stats) {
     if (!stats || !stats.summary) {
         document.getElementById('statAttendanceRate').textContent = '0%';

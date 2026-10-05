@@ -363,3 +363,50 @@ test('Einstellungen: Schalter fuer Terminplanung und Anwesenheit, gestuft', func
         assertTrue(str_contains($m[1], "'{$f['setting']}'"), "FEATURE_KEYS fehlt {$f['setting']}");
     }
 });
+
+test('PWA: Anmeldung liest me vor den Terminen und laedt sie nur mit eingeschalteter Funktion', function () {
+    $pwa = sourceCode(FU_ROOT . '/public/checkin/js/app.js');
+    assertTrue(str_contains($pwa, 'function pwaFeatureOn('), 'pwaFeatureOn() fehlt');
+    foreach (['async function handleLogin(', 'async function checkAutoLogin('] as $sig) {
+        $body  = fuBody($pwa, $sig);
+        $me    = strpos($body, 'await loadUserData()');
+        $typen = strpos($body, 'await loadAppointmentTypes()');
+        assertTrue($me !== false && $typen !== false && $me < $typen, "{$sig}) laedt Terminarten vor me");
+        assertTrue(fuGuarded($body, 'loadAppointmentTypes()', "pwaFeatureOn('appointments')"), "{$sig}) laedt Terminarten ohne Schalter");
+        assertTrue(fuGuarded($body, 'loadCheckinAppointments()', "pwaFeatureOn('attendance')"), "{$sig}) laedt Check-in-Termine ohne Schalter");
+    }
+});
+
+test('PWA: Erfassen, Termine, Verlauf, Statistik und Liste folgen den Schaltern', function () {
+    $pwa  = sourceCode(FU_ROOT . '/public/checkin/js/app.js');
+    $html = sourceCode(FU_ROOT . '/public/checkin/index.html');
+    assertTrue(str_contains(fuBody($pwa, 'function availableIntents('), "pwaFeatureOn('attendance')"), 'Absicht Anwesenheit ohne Schalter');
+    assertTrue((bool) preg_match("/none:\s*'captureNone'/", $pwa), 'CAPTURE_VIEWS kennt die Ansicht none nicht');
+    assertTrue(str_contains(fuBody($pwa, 'function enterCaptureTab('), "'none'"), 'Ohne Absicht muss der Hinweis erscheinen');
+    assertTrue(str_contains($html, 'id="captureNone"') && str_contains($html, 'Hier ist nichts zum Erfassen freigeschaltet'),
+        'Hinweis „Hier ist nichts zum Erfassen freigeschaltet“ fehlt');
+    assertTrue(str_contains(fuBody($pwa, 'function initResponsesTab('), "pwaFeatureOn('appointments')"), 'Tab Termine ohne Schalter');
+    assertTrue(fuGuarded(fuBody($pwa, 'function loadHistory('), "apiCall('records'", "pwaFeatureOn('attendance')"), 'Verlauf fragt records ohne Schalter ab');
+    $tabs = fuBody($pwa, 'function applyPwaFeatureTabs(');
+    foreach (['responses', 'history', 'stats'] as $tab) {
+        assertTrue(str_contains($tabs, "data-tab=\"{$tab}\""), "applyPwaFeatureTabs() behandelt den Tab {$tab} nicht");
+    }
+    assertTrue(str_contains(fuBody($pwa, 'function initTabs('), 'applyPwaFeatureTabs()'), 'initTabs() ruft applyPwaFeatureTabs() nicht');
+    assertTrue(str_contains(fuBody($pwa, 'function initAttendanceList('), "pwaFeatureOn('attendance')"), 'Anwesenheitsliste ohne Schalter');
+    assertTrue(str_contains(fuBody($pwa, 'function loadStatistics('), "pwaFeatureOn('attendance')"), 'Statistik ohne Schalter');
+    assertTrue(str_contains($html, 'id="statsAttendanceCards"') && str_contains($html, 'id="statsGroupsSection"'),
+        'Statistik: Quote und Gruppenuebersicht brauchen eine id zum Ausblenden');
+});
+
+test('PWA: Zeiterfassung ohne Terminbezug, wenn die Terminplanung aus ist', function () {
+    $pwa  = sourceCode(FU_ROOT . '/public/checkin/js/app.js');
+    $html = sourceCode(FU_ROOT . '/public/checkin/index.html');
+    assertTrue(str_contains(fuBody($pwa, 'function loadWorktimeAppointments('), "pwaFeatureOn('appointments')"),
+        'loadWorktimeAppointments() fragt Termine ohne Schalter ab');
+    assertTrue(fuGuarded(fuBody($pwa, 'function saveWorkSession('), 'body.appointment_id =', "pwaFeatureOn('appointments')"),
+        'saveWorkSession() sendet appointment_id ohne Schalter');
+    assertTrue(str_contains($html, 'id="worktimeAppointmentGroup"') && str_contains($html, 'id="workSessionAppointmentGroup"'),
+        'Terminfelder der Arbeitszeit brauchen eine id zum Ausblenden');
+    assertTrue(str_contains(fuBody($pwa, 'function applyPwaFeatureTabs('), 'workSessionAppointmentGroup'),
+        'applyPwaFeatureTabs() blendet die Terminfelder nicht aus');
+});
