@@ -361,6 +361,19 @@ function stationSetSetting(string $key, string $value): void
     assertStatus(200, $res, "Einstellung '{$key}' konnte nicht gesetzt werden");
 }
 
+/** Liest eine Systemeinstellung als Admin ('' wenn nicht vorhanden). */
+function stationGetSetting(string $key): string
+{
+    $res = apiRequest('GET', 'settings', ['token' => apiToken('admin')]);
+    assertStatus(200, $res, "Einstellungen konnten nicht gelesen werden");
+    foreach ($res['body']['settings'] ?? [] as $row) {
+        if (($row['setting_key'] ?? null) === $key) {
+            return (string)($row['setting_value'] ?? '');
+        }
+    }
+    return '';
+}
+
 /** Schaltet die PIN-Anmeldung fuer die Suite ein (bleibt danach an — Entwicklungsinstanz). */
 function enableStationPin(): void
 {
@@ -372,11 +385,13 @@ function enableStationPin(): void
     }
 }
 
-test('settings: Client-Scope liefert station_pin_enabled und station_pin_min_length', function () {
+test('settings: Client-Scope liefert station_pin_min_length, der Schalter steht in me', function () {
     enableStationPin();
     $res = apiRequest('GET', 'settings', ['token' => apiToken('user'), 'query' => ['scope' => 'client']]);
     assertStatus(200, $res);
-    assertSame('1', $res['body']['settings']['station_pin_enabled']);
+    assertTrue(!array_key_exists('station_pin_enabled', $res['body']['settings']));
+    $me = apiRequest('GET', 'me', ['token' => apiToken('user')]);
+    assertSame(true, $me['body']['features']['station_pin'] ?? null);
     assertSame('4', $res['body']['settings']['station_pin_min_length']);
 });
 
@@ -589,10 +604,13 @@ test('members: PUT mit leerem Body -> 400 statt Fatal', function () {
 
 // ---- Phase 2: PIN bei abgeschalteter Anmeldung, Selbstauskunft, Geraetefilter
 
-test('members: PIN bei abgeschalteter Anmeldung -> 409', function () {
+test('members: PIN bei abgeschalteter Anmeldung -> 403 mit field', function () {
     stationSetSetting('station_pin_enabled', '0');
     try {
-        assertStatus(409, stationSetPin('2580'), 'PUT members mit pin haette bei abgeschalteter Anmeldung 409 liefern muessen');
+        $res = stationSetPin('2580');
+        assertStatus(403, $res, 'PUT members mit pin haette bei abgeschalteter Anmeldung 403 liefern muessen');
+        assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null);
+        assertSame('pin', $res['body']['field'] ?? null, 'field muss fuer das Formular erhalten bleiben');
     } finally {
         // Fuer nachfolgende Tests (und die Entwicklungsinstanz) wieder einschalten.
         stationSetSetting('station_pin_enabled', '1');
@@ -771,11 +789,12 @@ test('station: unbekannte Nummer sperrt nach fuenf Fehlversuchen wie eine bekann
     assertSame('Too many attempts', $res['body']['message']);
 });
 
-test('station: identify bei abgeschalteter PIN-Anmeldung → 409', function () {
+test('station: identify bei abgeschalteter PIN-Anmeldung → 403', function () {
     stationSetSetting('station_pin_enabled', '0');
     try {
         $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
-        assertStatus(409, $res);
+        assertStatus(403, $res);
+        assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null);
     } finally {
         stationSetSetting('station_pin_enabled', '1');
     }
@@ -976,15 +995,35 @@ test('station: work_stop ohne laufende Sitzung → 409', function () {
     assertStatus(409, stationPost('work_stop', stationCreds()));
 });
 
-test('station: work_* bei abgeschalteter Zeiterfassung → 404', function () {
+test('station: work_* bei abgeschalteter Zeiterfassung → 403', function () {
     $fx = stationWorkFixture();
+    $vorher = stationGetSetting('worktime_enabled');
     stationSetSetting('worktime_enabled', '0');
     try {
         $res = stationPost('work_start', stationCreds() + ['activity_id' => $fx['activity_id']]);
-        assertStatus(404, $res);
+        assertStatus(403, $res);
+        assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null);
     } finally {
-        stationSetSetting('worktime_enabled', '1');
+        stationSetSetting('worktime_enabled', $vorher !== '' ? $vorher : '1');
     }
+});
+
+test('station: work_* bei abgeschalteter Zeiterfassung verbraucht keinen PIN-Versuch', function () {
+    $fx = stationWorkFixture();
+    $vorher = stationGetSetting('worktime_enabled');
+    stationSetSetting('worktime_enabled', '0');
+    try {
+        $falsch = ['member_number' => stationMember()['member_number'], 'pin' => '9999'];
+        for ($i = 0; $i < 8; $i++) {
+            $res = stationPost('work_start', $falsch + ['activity_id' => $fx['activity_id']]);
+            assertStatus(403, $res, "Versuch {$i}: erst die Funktion, nicht die PIN pruefen");
+            assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null, "Versuch {$i}: Kennung fehlt");
+        }
+    } finally {
+        stationSetSetting('worktime_enabled', $vorher !== '' ? $vorher : '1');
+    }
+    // Kein Sperrzaehler hochgezaehlt: die richtige PIN geht weiter.
+    assertStatus(200, stationPost('identify', stationCreds()), 'PIN darf nicht gesperrt sein');
 });
 
 // ---- Auth-Geraete haben kein Secret -----------------------------------------

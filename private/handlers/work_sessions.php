@@ -14,8 +14,6 @@
 // ============================================
 function handleWorkSessions($db, $database, $method, $id, $authUserId, $authMemberId, $isTokenAuth) {
 
-    requireWorktimeEnabled($db, $database);
-
     // Geräte haben keinen Zugriff: eine Station kann keine Tätigkeitsart
     // erfragen, und Geräte-Timer erzeugten Karteileichen.
     if(isDevice()) {

@@ -73,8 +73,6 @@ function setActivityAppointmentTypes($db, $database, int $activityId, array $typ
 // ============================================
 function handleActivityTypes($db, $database, $method, $id) {
 
-    requireWorktimeEnabled($db, $database);
-
     $prefix = $database->table('');
     $allowedVerification = ['none', 'start', 'start_end'];
 

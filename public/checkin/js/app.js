@@ -461,6 +461,16 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
             };
         }
 
+        // Abgeschaltete Funktion (OI-62): nicht "Keine Berechtigung".
+        if (responseData?.code === 'FEATURE_DISABLED') {
+            return {
+                success: false,
+                status: response.status,
+                error: 'Diese Funktion ist abgeschaltet',
+                data: responseData
+            };
+        }
+
         // Spezifische Fehlermeldungen
         switch (response.status) {
             /*case 400:
@@ -3721,13 +3731,18 @@ const WORKTIME_APPOINTMENT_PAST_DAYS = 60;
 const WORKTIME_APPOINTMENT_FUTURE_DAYS = 30;
 
 /**
- * Prueft, ob die Zeiterfassung freigeschaltet ist, und blendet den Tab ein.
- * Ist das Feature aus, antwortet die Ressource mit 404 — dann bleibt der
- * Tab verborgen und nichts weiter passiert.
+ * Laedt die Taetigkeitsarten, wenn die Zeiterfassung eingeschaltet ist
+ * (features aus me, OI-62). Ist sie aus, bleibt worktimeActivities leer und
+ * availableIntents() bietet die Arbeitszeit nicht an.
  */
 async function initWorktime(generation = sessionGeneration) {
-    // Taetigkeiten und laufende Sitzung gleichzeitig (OI-121). Ist die
-    // Zeiterfassung aus, scheitern beide, und es passiert nichts -- wie bisher.
+    // userData setzt startSession() vor dem Aufruf.
+    if (!userData?.features?.worktime) {
+        worktimeActivities = [];
+        return;
+    }
+
+    // Taetigkeiten und laufende Sitzung gleichzeitig (OI-121).
     const [result, running] = await Promise.all([
         apiCall('activity_types', 'GET'),
         apiCall('work_sessions', 'GET', null, { running: 1 })

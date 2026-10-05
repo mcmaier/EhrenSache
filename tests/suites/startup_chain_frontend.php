@@ -173,8 +173,17 @@ test('Dashboard: die Benutzerliste laedt nicht beim Start', function () use ($sc
 });
 
 test('Dashboard: gleichzeitige Freischaltpruefungen teilen sich eine Anfrage', function () use ($scWork) {
-    assertTrue(preg_match("/sharedLoad\('worktimeEnabled'/", scBody($scWork, 'export async function checkWorktimeEnabled(')) === 1,
+    // Seit OI-62 teilt checkWorktimeEnabled() laufende Pruefungen ueber das
+    // gemerkte Promise worktimeCheck (dashboard_regressions_frontend prueft nur
+    // die Weiterleitung an doCheckWorktimeEnabled(), nicht das Teilen).
+    $body = scBody($scWork, 'export function checkWorktimeEnabled(');
+    assertTrue($body !== '', 'checkWorktimeEnabled() nicht gefunden');
+    assertTrue(preg_match('/if\s*\(\s*!worktimeCheck\s*\)/', $body) === 1,
         'Startet der Bereich Zeiterfassung, fragt der Start activity_types doppelt');
+    assertTrue(preg_match('/return\s+worktimeCheck\s*;/', $body) === 1,
+        'Ein zweiter Aufrufer bekommt nicht die laufende Pruefung');
+    assertTrue(!str_contains($scWork, "sharedLoad('worktimeEnabled'"),
+        'Zwei Mechanismen fuer dieselbe Pruefung');
 });
 
 test('Dashboard: das Profil laedt gleichzeitig', function () use ($scProfile) {

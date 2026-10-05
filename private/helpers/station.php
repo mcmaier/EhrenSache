@@ -15,6 +15,7 @@ declare(strict_types=1);
 // Aktivitaetsregel der Statistik (OI-27) -- selbst eingebunden, statt sich auf
 // die Reihenfolge in api.php zu verlassen, wie responses.php es auch tut.
 require_once __DIR__ . '/member_activity.php';
+require_once __DIR__ . '/features.php';
 
 /**
  * Fachlogik der Stations-Anmeldung (Kiosk): Einstellungen, PIN-Regeln,
@@ -46,10 +47,10 @@ function stationNow($db): string
     return (string) $db->query("SELECT NOW()")->fetchColumn();
 }
 
-/** Ist die PIN-Anmeldung an Stationen freigeschaltet? (E13) */
+/** Ist die PIN-Anmeldung an Stationen freigeschaltet? (E13) Weiterleitung, siehe features.php. */
 function isStationPinEnabled($db, $database): bool
 {
-    return systemSetting($db, $database, 'station_pin_enabled', '0') === '1';
+    return isFeatureEnabled($db, $database, 'station_pin');
 }
 
 /** Klemmt eine PIN-Laenge auf den erlaubten Bereich 4..8. */

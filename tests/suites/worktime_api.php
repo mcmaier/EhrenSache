@@ -191,12 +191,13 @@ test('activity_types: user sieht ausgemusterte Arten nicht', function () {
     apiRequest('DELETE', 'activity_types', ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
 });
 
-test('Feature-Schalter: bei worktime_enabled=0 antwortet activity_types mit 404', function () {
+test('Feature-Schalter: bei worktime_enabled=0 antwortet activity_types mit 403 FEATURE_DISABLED', function () {
     enableWorktime();
     try {
         setSetting('worktime_enabled', '0');
         $res = apiRequest('GET', 'activity_types', ['token' => apiToken('admin')]);
-        assertStatus(404, $res, 'Abgeschaltetes Feature muss 404 liefern, nicht 403');
+        assertStatus(403, $res, 'Abgeschaltetes Feature muss 403 liefern (OI-62)');
+        assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null);
     } finally {
         // Der Schalter muss in jedem Fall zurueck, sonst scheitern alle
         // folgenden Tests an einer abgeschalteten Zeiterfassung.

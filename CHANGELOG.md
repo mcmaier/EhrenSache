@@ -9,6 +9,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Geändert
+- **Abgeschaltete Funktionen antworten einheitlich mit 403.** Ist die Zeiterfassung aus,
+  antworten `activity_types`, `work_sessions`, die drei Arbeitszeit-Exporte und die
+  Arbeitszeit-Aktionen der Station mit `403` und `"code": "FEATURE_DISABLED"` statt `404`. Ist
+  die Stations-PIN aus, antworten `change_pin` (bisher `404`), das Feld `pin` bei `members` PUT
+  und die PIN-Aktionen der Station (bisher `409`) ebenso. Welche Funktionen an sind, steht
+  jetzt in der Antwort von `me` im Feld `features`; `settings&scope=client` führt
+  `station_pin_enabled` nicht mehr. Dashboard und Check-in-App erkennen die Zeiterfassung
+  darüber statt an einem `404` (OI-62).
+
 ### Behoben
 - **Check-in-App und Dashboard starten deutlich schneller, vor allem im Mobilfunk.** Beide
   warteten beim Start jeden Abruf einzeln ab — die Check-in-App zehnmal hintereinander, das

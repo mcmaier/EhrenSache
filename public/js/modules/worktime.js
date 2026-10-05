@@ -10,10 +10,10 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdmin, isAdminOrManager } from './api.js';
+import { isFeatureOn } from './features.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear } from './ui.js';
 import { debug } from '../app.js';
 import { registerActions } from './actions.js';
-import { sharedLoad, forgetPendingLoads } from './pending_loads.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { updateModalId, safeTypeColor, clampPage } from './utils.js';
@@ -26,6 +26,7 @@ import { CHIPS_WORKTIME, CHIPS_ACTIVITY_TYPES, countChips, filterByChip, renderF
 
 let activityTypes = [];
 let worktimeEnabled = null;   // null = noch nicht geprüft
+let worktimeCheck = null;     // laufende Prüfung, von gleichzeitigen Aufrufern geteilt
 
 // Aktiver Status-Chip (Spec 2026-09-22); ersetzt das frühere Status-Auswahlfeld
 let worktimeStatusChip = 'all';
@@ -122,29 +123,37 @@ function proofOf(session) {
 }
 
 /**
- * Ist die Zeiterfassung freigeschaltet? Ist sie es nicht, antwortet die
- * Ressource mit 404 — dann bleibt der Navigationspunkt verborgen.
- */
-/**
  * Verwirft das gemerkte Ergebnis, damit checkWorktimeEnabled() neu prueft.
  * Wird nach dem Speichern der Einstellungen aufgerufen: sonst bliebe der
  * Navigationspunkt bis zum naechsten Neuladen verborgen bzw. sichtbar.
  */
 export function resetWorktimeEnabled() {
     worktimeEnabled = null;
+    worktimeCheck = null;
     activityTypes = [];
-    forgetPendingLoads('worktimeEnabled');
 }
 
-export async function checkWorktimeEnabled() {
-    if (worktimeEnabled !== null) return worktimeEnabled;
+/**
+ * Ob die Zeiterfassung eingeschaltet ist, steht seit OI-62 in features (me).
+ * Diese Funktion entscheidet nur noch die fachliche Zusatzbedingung: Ein
+ * Mitglied sieht den Bereich nur, wenn es mindestens eine Taetigkeitsart gibt.
+ *
+ * Gleichzeitige Aufrufer (Start: Navigation und Bereichsaufruf) teilen sich
+ * dieselbe Abfrage, es geht nur eine activity_types-Anfrage hinaus.
+ */
+export function checkWorktimeEnabled() {
+    if (worktimeEnabled !== null) return Promise.resolve(worktimeEnabled);
+    if (!worktimeCheck) {
+        worktimeCheck = doCheckWorktimeEnabled().finally(() => { worktimeCheck = null; });
+    }
+    return worktimeCheck;
+}
 
-    // Der 404 IST hier die Antwort „Feature aus" — kein Fehler, der das
-    // Mitglied etwas anginge.
-    // Startet der Bereich Zeiterfassung, fragen initEventHandlers() und
-    // showWorktimeSection() gleichzeitig -- eine Anfrage fuer beide (OI-121).
-    const result = await sharedLoad('worktimeEnabled', false,
-        () => apiCall('activity_types', 'GET', null, {}, { silentStatuses: [404] }));
+async function doCheckWorktimeEnabled() {
+    let result = null;
+    if (isFeatureOn('worktime')) {
+        result = await apiCall('activity_types', 'GET');
+    }
     const freigeschaltet = Array.isArray(result);
 
     if (freigeschaltet) {
@@ -183,6 +192,11 @@ export async function checkWorktimeEnabled() {
 
 export async function showWorktimeSection(forceReload = false) {
     if (!(await checkWorktimeEnabled())) {
+        // Bereich nicht verfuegbar (Funktion aus oder keine Taetigkeitsart):
+        // zurueck ins Profil statt auf einer leeren Seite stehen zu bleiben.
+        // Dynamischer Import, weil ui.js dieses Modul statisch einbindet.
+        const { navigateToSection } = await import('./ui.js');
+        await navigateToSection('profil');
         return;
     }
 
