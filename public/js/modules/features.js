@@ -43,6 +43,7 @@ export function applyFeatureVisibility() {
 
 /** Nach dem Speichern der Einstellungen: Stand neu holen und anwenden. */
 export async function refreshFeatures() {
+    // Schlaegt `me` fehl, bleibt der bisherige Stand bewusst stehen (apiCall zeigt schon einen Toast).
     const { apiCall } = await import('./api.js');
     const me = await apiCall('me');
     if (me && me.features) {

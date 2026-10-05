@@ -695,7 +695,12 @@ export async function saveMember() {
         // Die Einstellung koennte sich seit dem Oeffnen des Modals geaendert
         // haben (z.B. 409, weil die PIN-Anmeldung inzwischen abgeschaltet
         // wurde) — das PIN-Feld soll beim Wiederoeffnen dem aktuellen Stand
-        // folgen statt dem gecachten.
+        // folgen statt dem gecachten. Der Schalter kommt seit OI-62 aus den
+        // Features (me): bei FEATURE_DISABLED diese zuerst neu lesen.
+        if (pinResult?.code === 'FEATURE_DISABLED') {
+            const { refreshFeatures } = await import('./features.js');
+            await refreshFeatures();
+        }
         resetStationPinSettings();
 
         // Das Mitglied steht trotz abgelehnter PIN in der Datenbank und zaehlt

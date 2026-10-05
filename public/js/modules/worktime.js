@@ -26,6 +26,7 @@ import { CHIPS_WORKTIME, CHIPS_ACTIVITY_TYPES, countChips, filterByChip, renderF
 
 let activityTypes = [];
 let worktimeEnabled = null;   // null = noch nicht geprüft
+let worktimeCheck = null;     // laufende Prüfung, von gleichzeitigen Aufrufern geteilt
 
 // Aktiver Status-Chip (Spec 2026-09-22); ersetzt das frühere Status-Auswahlfeld
 let worktimeStatusChip = 'all';
@@ -122,23 +123,33 @@ function proofOf(session) {
 }
 
 /**
- * Ob die Zeiterfassung eingeschaltet ist, steht seit OI-62 in features (me).
- * Diese Funktion entscheidet nur noch die fachliche Zusatzbedingung: Ein
- * Mitglied sieht den Bereich nur, wenn es mindestens eine Taetigkeitsart gibt.
- */
-/**
  * Verwirft das gemerkte Ergebnis, damit checkWorktimeEnabled() neu prueft.
  * Wird nach dem Speichern der Einstellungen aufgerufen: sonst bliebe der
  * Navigationspunkt bis zum naechsten Neuladen verborgen bzw. sichtbar.
  */
 export function resetWorktimeEnabled() {
     worktimeEnabled = null;
+    worktimeCheck = null;
     activityTypes = [];
 }
 
-export async function checkWorktimeEnabled() {
-    if (worktimeEnabled !== null) return worktimeEnabled;
+/**
+ * Ob die Zeiterfassung eingeschaltet ist, steht seit OI-62 in features (me).
+ * Diese Funktion entscheidet nur noch die fachliche Zusatzbedingung: Ein
+ * Mitglied sieht den Bereich nur, wenn es mindestens eine Taetigkeitsart gibt.
+ *
+ * Gleichzeitige Aufrufer (Start: Navigation und Bereichsaufruf) teilen sich
+ * dieselbe Abfrage, es geht nur eine activity_types-Anfrage hinaus.
+ */
+export function checkWorktimeEnabled() {
+    if (worktimeEnabled !== null) return Promise.resolve(worktimeEnabled);
+    if (!worktimeCheck) {
+        worktimeCheck = doCheckWorktimeEnabled().finally(() => { worktimeCheck = null; });
+    }
+    return worktimeCheck;
+}
 
+async function doCheckWorktimeEnabled() {
     let result = null;
     if (isFeatureOn('worktime')) {
         result = await apiCall('activity_types', 'GET');
@@ -181,6 +192,11 @@ export async function checkWorktimeEnabled() {
 
 export async function showWorktimeSection(forceReload = false) {
     if (!(await checkWorktimeEnabled())) {
+        // Bereich nicht verfuegbar (Funktion aus oder keine Taetigkeitsart):
+        // zurueck ins Profil statt auf einer leeren Seite stehen zu bleiben.
+        // Dynamischer Import, weil ui.js dieses Modul statisch einbindet.
+        const { navigateToSection } = await import('./ui.js');
+        await navigateToSection('profil');
         return;
     }
 
