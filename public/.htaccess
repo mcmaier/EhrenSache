@@ -27,6 +27,30 @@ RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1) [NC]
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # ============================================
+# VERSIONIERTE PFADE (OI-120, OI-74)
+# ============================================
+# Dashboard und Anmeldeseite laden CSS und JS ueber css/v<Version>/… und
+# js/v<Version>/…. Relative import- und @import-Pfade erben den Abschnitt, so
+# traegt jede Datei die Version, ohne dass eine Importzeile ihn kennt -- und
+# keine Datei wird unter zwei Adressen geladen (doppelte Module). Hier wird der
+# Abschnitt intern entfernt; die Dateien liegen, wo sie immer lagen.
+#
+# Die Bedingung liest den vollen URL-Pfad, damit die Ersetzung absolut ist und
+# auch in einer Installation unter einem Unterordner (lokal /EhrenSache/public/)
+# ohne RewriteBase stimmt. Das Muster ist eng (v, Ziffer, dann Ziffern und
+# Punkte), damit js/vendor/ nicht getroffen wird. E=ES_VERSIONED markiert die
+# Antwort fuer das lange Caching unten (Abschnitt CACHING).
+#
+# Abgebildet werden nur schlichte .css- und .js-Dateien unter css/ und js/:
+# Buchstaben, Ziffern, _ . / -, kein % und kein "..". %{REQUEST_URI} ist schon
+# dekodiert, das interne Umschreiben dekodiert ein zweites Mal -- mit weitem
+# Muster wurde aus js/v…/%252e%252e/login.html die Anmeldeseite, ausgeliefert
+# mit einem Jahr Cache. Alles andere unter v<Version>/ endet jetzt mit 404.
+RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/([A-Za-z0-9_./-]+\.(?:css|js))$
+RewriteCond %3 !\.\.
+RewriteRule ^(css|js)/v[0-9][0-9.]*/[A-Za-z0-9_./-]+\.(?:css|js)$ %1/%2/%3 [L,E=ES_VERSIONED:1]
+
+# ============================================
 # SICHERHEIT
 # ============================================
 
@@ -111,19 +135,27 @@ AddType text/cache-manifest .appcache
 # CACHING
 # ============================================
 # Die Anwendung hat keine Build-Kette und keine Content-Hashes im Dateinamen.
-# Damit ein Update bei den Mitgliedern ankommt, muss der Browser vor der
-# Wiederverwendung nachfragen. "no-cache" heisst nicht "nicht cachen", sondern
-# "vor Benutzung revalidieren" -- unveraenderte Dateien beantwortet Apache per
-# ETag mit 304, der Mehraufwand ist also eine leere Antwort.
+# Ohne Versionsangabe muss der Browser vor der Wiederverwendung nachfragen:
+# "no-cache" heisst nicht "nicht cachen", sondern "vor Benutzung revalidieren"
+# -- unveraenderte Dateien beantwortet Apache per ETag mit 304.
 #
-# Der Versions-Query an den CSS-Links reicht dafuer nicht aus: Die ES-Module
-# unter js/modules/ importieren sich gegenseitig relativ, und diese Importe
-# erben den Query des Script-Tags nicht. Ihn dort anzuhaengen waere sogar
-# schaedlich, weil dieselbe Datei dann zweimal als getrenntes Modul geladen
-# wuerde -- mit doppeltem Zustand.
+# Dashboard und Anmeldeseite laden CSS und JS ueber versionierte Pfade
+# (Abschnitt VERSIONIERTE PFADE). Diese Antworten duerfen ein Jahr liegen
+# (immutable): Ein Update aendert den Pfad, also die Adresse. Wiederkehrende
+# Nutzer schicken dafuer keine einzige Anfrage mehr -- auf Shared Hosting mit
+# knapper Grenze gleichzeitiger Prozesse war genau diese Welle das Problem
+# (OI-120). Die HTML-Seiten tragen die Version und bleiben no-cache, ebenso
+# Check-in-App und Station, die ihre wenigen Dateien per ?v= versionieren.
+#
+# Ein Query (?v=) an den Modul-Importen waere kein Ersatz: Eine Stelle ohne ihn
+# laedt dieselbe Datei als zweites Modul -- mit doppeltem Zustand.
 <IfModule mod_headers.c>
     <FilesMatch "\.(css|js|html)$">
         Header set Cache-Control "no-cache, must-revalidate"
+        # Nach dem internen Umschreiben durch die Regel VERSIONIERTE PFADE heisst
+        # deren Markierung REDIRECT_ES_VERSIONED; env=ES_VERSIONED greift hier
+        # nicht (am 2026-10-05 per curl geprueft).
+        Header set Cache-Control "public, max-age=31536000, immutable" env=REDIRECT_ES_VERSIONED
     </FilesMatch>
 </IfModule>
 

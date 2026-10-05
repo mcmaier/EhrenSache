@@ -82,6 +82,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Lesende Abrufe überstehen eine kurze Überlastung.** Antwortet der Server mit 502, 503, 504
   oder einem Cloudflare-Fehler 520–524, fragen Dashboard und Check-in-App nach einer kurzen Pause
   einmal nach. Speichernde Abrufe werden nie wiederholt.
+- **Dashboard und Anmeldeseite laden beim wiederholten Aufruf keine CSS- und JS-Datei mehr
+  nach.** Bisher fragte der Browser bei jedem Aufruf rund 45 Dateien beim Server nach; auf Shared
+  Hosting mit knapper Grenze gleichzeitiger Prozesse führte diese Welle zu Fehlern (503). Die
+  Dateien tragen die Version jetzt im Pfad und dürfen im Browser liegen; nach einem Update kommen
+  sie über die neue Adresse frisch an. Damit erreicht der Versionssprung auch alle Dateien, die
+  bisher ohne Versionsangabe nachgeladen wurden (OI-74). Der Update-Assistent schreibt
+  `index.html` und `login.html` deshalb als letzte Dateien; wer von Hand hochlädt, lädt diese
+  beiden ebenfalls zuletzt hoch (README).
 
 ### Intern
 - **Neue Suite `js_syntax`:** Jede ausgelieferte JavaScript-Datei (Dashboard, Check-in-App,

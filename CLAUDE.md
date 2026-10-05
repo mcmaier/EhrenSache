@@ -243,6 +243,10 @@ exceptions, statistics und work_sessions (siehe `docs/OPEN-ITEMS.md`).
   Schlüssels und Jahres teilen sich eine Anfrage
 - `sessionStorage` wird nur für den Redirect-Loop-Schutz in `app.js` verwendet
 - Ziel: Reduktion der API-Anfragen
+- Browser-Cache der Dateien: CSS und JS von Dashboard und Anmeldeseite laufen über
+  `css/v<Version>/…` bzw. `js/v<Version>/…` und sind `immutable` (OI-120, `public/.htaccess`).
+  Jede neue lokale `css/`/`js/`-Referenz in diesen Seiten braucht den Abschnitt, sonst lädt die
+  Datei unter zweiter Adresse
 
 ## Sicherheit
 
@@ -299,6 +303,12 @@ php tests/run.php worktime_api
 - Klickdurchgang durch das Dashboard unter der CSP (nur lokal, nicht Teil von `tests/run.php`):
   `cd tests/browser && npm install`, dann `node tests/browser/click-through.mjs`; Details in
   `tests/browser/README.md`
+- **Veraltetes CSS/JS im Browser:** Dashboard und Anmeldeseite laden CSS und JS über
+  `css/v<Version>/…`, auch lokal ein Jahr `immutable` (OI-120). Im Feature-Branch ändert sich die
+  Version nicht — nach einer Änderung an CSS oder JS zeigt ein Browser (auch die Browser-Pane)
+  weiter den alten Stand, ein normales Neuladen hilft nicht. Abhilfe: harter Reload bzw. in den
+  Entwicklerwerkzeugen „Disable cache“; Puppeteer-Skripte mit frischem Profil sind nicht
+  betroffen. Die HTML-Seiten selbst bleiben `no-cache`
 - Konfiguration: `tests/config.php` aus `tests/config.example.php` kopieren (ignoriert)
 - Manueller Testplan: `docs/testplan.md`
 - Verifizierung wenn möglich selbst durchführen
@@ -340,7 +350,10 @@ php tests/run.php worktime_api
 - Migrationen lesen die `config.php` nur über `private/helpers/config_reader.php`, nie per
   `require`/`include`; Migrationsdateien werden nie gelöscht
 - Sprache: Deutsch (UI, Kommentare), Englisch (Code/Variablen)
-- Versionssprung: `version.json` und `CHANGELOG.md` gemeinsam pflegen
+- Versionssprung: `version.json` und `CHANGELOG.md` gemeinsam pflegen; dazu die Versionsangabe an
+  den Assets — `?v=` in Check-in-App und Station, der Pfadabschnitt `v<Version>/` in
+  `public/index.html` und `public/login.html` (Suchen und Ersetzen; `tests/suites/assets.php`
+  meldet jede vergessene Stelle)
 
 ## Releases bei parallelen Sitzungen
 

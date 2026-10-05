@@ -1,7 +1,7 @@
 # Version im Pfad: Dashboard und Login dürfen gecacht werden
 
 **Datum:** 2026-10-05
-**Status:** Entwurf, mit dem Nutzer abschnittsweise abgestimmt
+**Status:** Umgesetzt auf feat/oi-120-version-im-pfad (unveröffentlicht)
 **Anlass:** [OI-120](../../OPEN-ITEMS.md#oi-120--das-dashboard-lädt-rund-45-einzeldateien) (Weg 2),
 erledigt nebenbei [OI-74](../../OPEN-ITEMS.md#oi-74--der-cache-bust-erreicht-nur-einen-teil-der-dateien)
 **Zielversion:** keine — Arbeit ohne Versionssprung, Eintrag unter `[Unreleased]`. **Keine
@@ -67,12 +67,26 @@ Zustand. Der Test in 4.1 verbietet das.
 
 ### 3.2 Rewrite
 
-`public/.htaccess` bildet `^(css|js)/v[0-9][0-9.]*/(.+)$` intern auf `$1/$2` ab — keine
-Weiterleitung, die Dateien bleiben, wo sie sind. Das Muster ist eng (`v`, eine Ziffer, dann nur
-Ziffern und Punkte), damit kein echter Ordnername getroffen wird. Die Regel steht vor allen
-Regeln, die ein `[L]` auf solche Pfade setzen könnten, und funktioniert unabhängig davon, ob die
-Installation im Wurzelverzeichnis oder in einem Unterordner liegt (lokal:
-`/EhrenSache/public/`). Eine nicht vorhandene Datei unter versioniertem Pfad ergibt 404.
+`public/.htaccess` entfernt den Abschnitt intern — keine Weiterleitung, die Dateien bleiben, wo
+sie sind:
+
+```apache
+RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/([A-Za-z0-9_./-]+\.(?:css|js))$
+RewriteCond %3 !\.\.
+RewriteRule ^(css|js)/v[0-9][0-9.]*/[A-Za-z0-9_./-]+\.(?:css|js)$ %1/%2/%3 [L,E=ES_VERSIONED:1]
+```
+
+Die Bedingung liest den vollen URL-Pfad (`%{REQUEST_URI}`), damit die Ersetzung absolut ist und
+ohne `RewriteBase` auch in einem Unterordner stimmt (lokal: `/EhrenSache/public/`). Der
+Versionsabschnitt ist eng (`v`, eine Ziffer, dann nur Ziffern und Punkte), damit kein echter
+Ordnername wie `js/vendor/` getroffen wird.
+
+Der Rest des Pfads ist ebenso eng: nur Buchstaben, Ziffern, `_ . / -`, Endung `.css` oder `.js`,
+kein `..`. `%{REQUEST_URI}` ist bereits dekodiert, und das interne Umschreiben dekodiert ein
+zweites Mal — mit dem ursprünglichen Muster `(.+)` lieferte `js/v<Version>/%252e%252e/login.html`
+die Anmeldeseite mit einem Jahr Cache aus, `js/v<Version>/%2561pp.js` die `app.js`. Solche Pfade
+enden jetzt mit 404, ebenso eine nicht vorhandene Datei unter versioniertem Pfad. Die Regel steht
+vor allen Regeln, die ein `[L]` auf solche Pfade setzen könnten.
 
 `mod_rewrite` setzt das Projekt bereits voraus (`RewriteEngine On` in `public/.htaccess`).
 
@@ -97,6 +111,19 @@ Der Kommentarblock „CACHING“ in `public/.htaccess` wird auf das neue Verfahr
 - Wer während eines Updates das alte Dashboard offen hat und danach ein spät geladenes Modul
   nachlädt (`import('./features.js')`), bekommt die neue Datei unter dem alten Pfad — derselbe
   Fall wie heute, nur für offene Tabs im Moment des Updates.
+- **Lücke beim Dateitausch:** Der Tausch ist nicht atomar. Stünde die neue `index.html` schon
+  da, die Module aber noch nicht, bekäme ein Besucher die neue Seite mit `v<neu>/`-Pfaden und
+  alten Dateien — und hielte sie ein Jahr (`immutable`), hinter Cloudflare auch dessen Rand.
+  Gegenmittel: Der Updater schreibt `public/index.html` und `public/login.html` als letzte
+  Dateien (`UPDATE_APPLY_LAST` in `private/helpers/update_swap.php`, Test in
+  `update_swap_unit.php`); README und `docs/DEMO.md` verlangen beim Hochladen von Hand dieselbe
+  Reihenfolge; „Purge Everything“ bei Cloudflare bleibt nach jedem Update Pflicht. Er fängt ab,
+  was die Reihenfolge nicht abdeckt: einen Upload von Hand in falscher Reihenfolge oder einen
+  Tausch, der mittendrin abbricht. **Wirksam erst ab dem übernächsten Update:** Den Tausch
+  führt der bereits installierte Updater aus (`public/update/index.php` lädt
+  `private/helpers/` der laufenden Installation). Das Update, das diese Änderung ausliefert,
+  tauscht deshalb noch in der alten Reihenfolge — für dieses eine Update bleibt die Lücke von
+  wenigen Sekunden, und der Purge ist dort besonders wichtig.
 - In `index.html` steht die Version danach rund 25-mal. Ein Versionssprung ist trotzdem ein
   Suchen und Ersetzen; der Test meldet jede vergessene Stelle.
 
@@ -120,6 +147,8 @@ In einer bestehenden HTTP-Suite (oder einer neuen, falls keine passt):
 - `js/app.js` (ohne Version) → 200, `no-cache`.
 - `index.html` → `no-cache`.
 - `js/v9.9.9/gibtsnicht.js` → 404.
+- Kodierte Abschnitte (`js/v<Version>/%252e%252e/login.html`, `css/v<Version>/%252e%252e/index.html`,
+  `js/v<Version>/%2561pp.js`) → nie 200 mit `immutable` (curl mit `CURLOPT_PATH_AS_IS`).
 
 ### 4.3 Browser
 
@@ -134,9 +163,9 @@ In einer bestehenden HTTP-Suite (oder einer neuen, falls keine passt):
 - **OI-120:** Vermerk „Weg 2 als Version im Pfad umgesetzt (Spec 2026-10-05-version-im-pfad);
   der Erstbesuch lädt weiter einzeln, Bündeln bleibt offen“.
 - **OI-74:** erledigt.
-- **`docs/DEMO.md`:** Nach einem Update ist für versionierte Dateien kein „Purge“ bei Cloudflare
-  mehr nötig (neuer Pfad = neue Adresse), für die HTML-Seiten weiterhin. Die bestehende
-  Cache-Regel (Edge TTL für css/js) bleibt sinnvoll.
+- **`docs/DEMO.md`:** Versionierte Dateien bekommen mit jedem Update neue Adressen; der „Purge“
+  bei Cloudflare bleibt trotzdem nach jedem Update Pflicht (Lücke beim Dateitausch, 3.4). Die
+  bestehende Cache-Regel (Edge TTL für css/js) bleibt sinnvoll.
 - **Release-Ablauf:** Beim Versionssprung wird der Abschnitt `v<Version>` in `index.html` und
   `login.html` mit ersetzt — wo heute `?v=` steht. `CLAUDE.md` erwähnt das im Abschnitt
   Konventionen beim Versionssprung.

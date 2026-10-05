@@ -42,6 +42,38 @@ test('Plan kopiert Paketdateien, aber nie geschuetzte', function () {
     updateRemoveTree($install);
 });
 
+test('Plan schreibt die Einstiegsseiten von Dashboard und Anmeldung zuletzt', function () {
+    // OI-120: Die Seiten verweisen auf css/v<Version>/… und js/v<Version>/…,
+    // und diese Antworten liegen ein Jahr im Cache. Kaeme index.html vor den
+    // Modulen, laedt ein Besucher in der Luecke die neue Seite mit alten
+    // Modulen -- und behaelt sie unter der neuen Adresse.
+    $paket = swapTree([
+        'public/index.html'         => 'neu',
+        'public/login.html'         => 'neu',
+        'public/api/api.php'        => 'neu',
+        'public/css/main.css'       => 'neu',
+        'public/js/app.js'          => 'neu',
+        'public/js/modules/ui.js'   => 'neu',
+        'public/station/index.html' => 'neu',
+        'version.json'              => '{}',
+    ]);
+    $install = swapTree(['version.json' => '{}']);
+
+    assertSame([
+        'public/api/api.php',
+        'public/css/main.css',
+        'public/js/app.js',
+        'public/js/modules/ui.js',
+        'public/station/index.html',
+        'version.json',
+        'public/index.html',
+        'public/login.html',
+    ], updateBuildPlan($paket, $install)['copy']);
+
+    updateRemoveTree($paket);
+    updateRemoveTree($install);
+});
+
 test('Plan loescht veraltete PHP- und JS-Dateien in betretenen Verzeichnissen', function () {
     $paket   = swapTree(['private/handlers/a.php' => 'neu', 'public/js/modules/b.js' => 'neu']);
     $install = swapTree([

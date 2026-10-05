@@ -194,7 +194,10 @@ https://ehrensache.meine-domain.de/update
 
    **Von Hand stattdessen:** [Aktuelle Version herunterladen](https://github.com/mcmaier/EhrenSache/releases/latest),
    die Dateien auf den Server hochladen (bestehende überschreiben) und im Assistenten
-   „Dateien bereits hochgeladen" wählen.
+   „Dateien bereits hochgeladen" wählen. `public/index.html` und `public/login.html` dabei
+   **zuletzt** hochladen: Sie verweisen auf CSS und JS der neuen Version, und wer sie vorher
+   aufruft, bekäme alte Dateien unter der neuen Adresse — die dann lange im Browser liegen
+   bleiben. Der Assistent hält diese Reihenfolge beim Tausch selbst ein.
 
 > [!WARNING]
 > Beim Hochladen von Hand `private/config/config.php` **nicht** überschreiben – sie enthält die Zugangsdaten der Installation! Der Assistent lässt sie beim Tausch unberührt.
@@ -225,7 +228,10 @@ Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 >    lange vor Ablauf der Edge TTL.
 >
 > Nach jedem Update **„Purge Everything“** auslösen. Wer den alten Stand schon im Browser hat,
-> lädt einmal mit Strg+F5 neu.
+> lädt einmal mit Strg+F5 neu. Dashboard und Anmeldeseite laden CSS und JS zwar unter einer
+> Adresse mit der Version (`css/v<Version>/…`), ein Update erzeugt also neue Adressen. Ruft aber
+> während des Dateitauschs jemand auf, kann Cloudflare eine alte Datei unter der neuen Adresse
+> speichern — der Purge räumt das ab.
 >
 > Außerdem in `private/config/config.php` unter **`trusted_proxies`** die Adressbereiche von
 > Cloudflare eintragen ([cloudflare.com/ips](https://www.cloudflare.com/ips/)). Sonst sieht

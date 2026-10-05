@@ -12,7 +12,9 @@
 declare(strict_types=1);
 
 /**
- * Der Versions-Query an den Asset-Links muss zu version.json passen.
+ * Die Versionsangabe an den Asset-Links — `?v=` in Check-in-App und Station, der
+ * Pfadabschnitt `v<Version>/` in Dashboard und Anmeldeseite — muss zu version.json
+ * passen.
  *
  * Ohne Build-Kette wird er von Hand gepflegt — und genau das wird vergessen.
  * Diese Suite lässt einen vergessenen Sprung auffliegen, statt ihn erst beim
@@ -71,7 +73,10 @@ test('ES-Module tragen KEINEN Versions-Query', function () use ($repoRoot) {
 });
 
 test('Die .htaccess laesst CSS und JS revalidieren', function () use ($repoRoot) {
-    // Faengt ab, was der Query nicht abdeckt: relativ importierte Module.
+    // Grundregel no-cache fuer alles ohne Versionsabschnitt im Pfad: unversionierte
+    // Aufrufe von CSS/JS, die HTML-Seiten sowie Check-in-App und Station (die
+    // ihre Dateien per ?v= versionieren). Das lange Caching fuer css/v<Version>/
+    // und js/v<Version>/ prueft der Test zu VERSIONIERTE PFADE weiter unten.
     $htaccess = (string) sourceCode($repoRoot . '/public/.htaccess');
 
     assertTrue(
@@ -236,6 +241,8 @@ test('Jedes Script-Tag zeigt auf eine vorhandene Datei', function () use ($repoR
             if (preg_match('#^(?:https?:)?//#', $src) === 1) {
                 continue;
             }
+            // OI-120: der Pfadabschnitt v<Version>/ gibt es nur als Rewrite, nicht als Ordner.
+            $src  = preg_replace('#^((?:\./)?(?:css|js))/v[0-9][0-9.]*/#', '$1/', $src);
             $pfad = $dir . '/' . explode('?', $src)[0];
             if (!is_file($pfad)) {
                 $fehlend[] = $rel . ' -> ' . $src;
@@ -367,4 +374,52 @@ test('Mitgliedsname landet in <option>-Listen nur maskiert', function () use ($r
         $verstoesse === [],
         "<option> mit unmaskiertem Mitgliedsnamen:\n  " . implode("\n  ", $verstoesse)
     );
+});
+
+test('Die .htaccess bildet versionierte Pfade ab und laesst sie lange cachen', function () use ($repoRoot) {
+    // OI-120/OI-74: css/v<Version>/… und js/v<Version>/… zeigen auf die echten
+    // Dateien; nur diese Antworten duerfen ein Jahr liegen. Die Bedingung ist
+    // bewusst eng: nur schlichte .css/.js-Pfade, kein % und kein "..", weil das
+    // interne Umschreiben ein zweites Mal dekodiert (%252e%252e wuerde zu "..").
+    $htaccess = (string) sourceCode($repoRoot . '/public/.htaccess');
+
+    assertTrue(str_contains($htaccess, 'RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/([A-Za-z0-9_./-]+\.(?:css|js))$'),
+        'Die enge Rewrite-Bedingung fuer versionierte Pfade fehlt');
+    assertTrue(str_contains($htaccess, 'RewriteCond %3 !\.\.'),
+        'Die Bedingung gegen ".." im abgebildeten Pfad fehlt');
+    assertTrue(str_contains($htaccess, 'RewriteRule ^(css|js)/v[0-9][0-9.]*/[A-Za-z0-9_./-]+\.(?:css|js)$ %1/%2/%3 [L,E=ES_VERSIONED:1]'),
+        'Die Rewrite-Regel fuer versionierte Pfade fehlt oder setzt die Markierung nicht');
+    assertTrue(preg_match('#^\s*RewriteCond %\{REQUEST_URI\} \^\(\.\*\)/\(css\|js\)/v[^\r\n]*\(\.\+\)\$#m', $htaccess) === 0,
+        'Die alte, weite Bedingung (.+) steht noch in der .htaccess');
+    assertTrue(preg_match('/Header set Cache-Control "public, max-age=31536000, immutable" env=(REDIRECT_)?ES_VERSIONED/', $htaccess) === 1,
+        'Versionierte Pfade bekommen kein langes Caching');
+});
+
+test('Dashboard und Login laden jede lokale CSS- und JS-Datei ueber die Version im Pfad', function () use ($repoRoot) {
+    // OI-120/OI-74. Eine einzige Referenz ohne Abschnitt laedt eine Datei unter
+    // zweiter Adresse: bei einem Modul mit eigenem Zustand, bei allem anderen
+    // bleibt nach einem Update die alte Fassung im Cache.
+    $version = json_decode((string) sourceCode($repoRoot . '/version.json'), true)['version'];
+
+    foreach (['/public/index.html', '/public/login.html'] as $rel) {
+        $html = (string) sourceCode($repoRoot . $rel);
+
+        // Jede href/src in einfachen oder doppelten Anfuehrungszeichen. Lokal ist
+        // alles ausser http(s)://, //… und data:; jede lokale Referenz, die css/
+        // oder js/ enthaelt (auch ../js/… oder /…/js/…), muss die Form
+        // [./]css|js/v<Version>/… haben.
+        preg_match_all('/\b(?:href|src)\s*=\s*(["\'])(.*?)\1/i', $html, $m);
+        $lokal = array_filter($m[2], static function (string $ref): bool {
+            return preg_match('#^(?:[a-z][a-z0-9+.-]*:|//)#i', $ref) !== 1
+                && preg_match('#(?:^|/)(?:css|js)/#', $ref) === 1;
+        });
+        assertTrue(count($lokal) > 0, "{$rel}: keine css/js-Referenz gefunden");
+
+        foreach ($lokal as $ref) {
+            assertTrue(
+                preg_match('#^(?:\./)?(?:css|js)/v' . preg_quote($version, '#') . '/[^?"\']+$#', $ref) === 1,
+                "{$rel}: {$ref} traegt nicht den Pfadabschnitt v{$version} (oder noch ?v=)"
+            );
+        }
+    }
 });
