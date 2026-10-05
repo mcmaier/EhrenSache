@@ -75,21 +75,37 @@ test('isFeatureEnabled wirft bei unbekanntem Schlüssel', function () {
 });
 
 test('Außerhalb von features.php liest niemand einen Schalter direkt', function () {
-    $schalter = implode('|', array_map(fn ($f) => preg_quote($f['setting'], '/'), FEATURES));
-    $muster   = "/(?:systemSetting|worktimeSetting)\s*\([^;]*'(?:{$schalter})'/";
-    $funde    = [];
-    foreach (projectFiles(FU_ROOT . '/private', 'php') as $datei) {
-        if (preg_match('#/private/(migrations|setup|demo)/#', $datei)
-            || str_ends_with($datei, '/private/helpers/features.php')) {
+    // Gesucht wird der WORTLAUT des Schalternamens, nicht ein bestimmter Aufruf:
+    // so fällt auch ein mehrzeiliger systemSetting(...) oder ein SQL mit
+    // setting_key = 'worktime_enabled' auf. Jeder legitime Fund steht mit Grund
+    // in der Liste, alles andere muss über isFeatureEnabled() laufen.
+    $erlaubt = [
+        'private/handlers/station.php' => ['Antwortschlüssel worktime_enabled in status/identify — keine Lesung des Schalters'],
+    ];
+    $namen   = implode('|', array_map(fn ($f) => preg_quote($f['setting'], '/'), FEATURES));
+    $muster  = "/['\"](?:{$namen})['\"]/";
+    $funde   = [];
+    $ausnahmen = [];
+    $root    = str_replace("\\", "/", (string) realpath(FU_ROOT));
+    $dateien = array_merge(projectFiles($root . '/private', 'php'), projectFiles($root . '/public', 'php'));
+    foreach ($dateien as $datei) {
+        $rel = ltrim(substr($datei, strlen($root)), '/');
+        if (preg_match('#^private/(migrations|setup|demo)/#', $rel) || $rel === 'private/helpers/features.php') {
             continue;
         }
-        foreach (sourceLines($datei) as $i => $zeile) {
-            if (preg_match($muster, $zeile)) {
-                $funde[] = basename($datei) . ':' . ($i + 1);
-            }
+        if (!preg_match($muster, sourceCode($datei))) {
+            continue;
+        }
+        if (isset($erlaubt[$rel])) {
+            $ausnahmen[$rel] = true;
+        } else {
+            $funde[] = $rel;
         }
     }
-    assertSame([], $funde, 'Direkter Lesezugriff statt isFeatureEnabled(): ' . implode(', ', $funde));
+    assertSame([], $funde, 'Schalter wörtlich außerhalb von features.php, statt isFeatureEnabled(): ' . implode(', ', $funde));
+    foreach (array_keys($erlaubt) as $rel) {
+        assertTrue(isset($ausnahmen[$rel]), "{$rel} steht in der Ausnahmeliste, enthält aber keinen Schalternamen mehr — Eintrag streichen");
+    }
 });
 
 test('api.php sperrt Funktionen zentral nach der CSRF-Pruefung und vor dem Routing', function () {
@@ -100,6 +116,8 @@ test('api.php sperrt Funktionen zentral nach der CSRF-Pruefung und vor dem Routi
     assertTrue($sperre !== false, 'Zentrale Sperre featureForResource($resource) fehlt in api.php');
     assertTrue($csrf !== false && $sperre > $csrf, 'Sperre muss nach der CSRF-Pruefung stehen');
     assertTrue($sperre < $router, 'Sperre muss vor switch($resource) stehen');
+    assertTrue((bool) preg_match('/^\$\w+\s*=\s*featureForResource\(\$resource\)/m', $src),
+        'Die Sperre muss auf oberster Ebene stehen (ohne Einrückung), nicht im CSRF-if-Block, der nur Sitzungen trifft');
     assertTrue(str_contains($src, "require_once '../../private/helpers/features.php';"),
         'api.php muss features.php laden');
 });

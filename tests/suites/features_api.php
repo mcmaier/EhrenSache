@@ -19,6 +19,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/api.php';
+require_once __DIR__ . '/../../private/helpers/features.php';
 
 if (!extension_loaded('curl')) {
     return;
@@ -46,15 +47,33 @@ function fsGetSetting(string $key): string
     throw new RuntimeException("Einstellung {$key} nicht gefunden");
 }
 
-/** Führt $fn mit dem Schalter auf $value aus und stellt den alten Stand wieder her. */
+/**
+ * Führt $fn mit dem Schalter auf $value aus und stellt den alten Stand wieder her.
+ * Scheitert $fn UND die Wiederherstellung, nennt die Meldung beides — das
+ * Zurücksetzen darf den eigentlichen Fehler nicht verdecken.
+ */
 function fsWith(string $key, string $value, callable $fn): void
 {
     $vorher = fsGetSetting($key);
     fsSetting($key, $value);
+    $fehler = null;
     try {
         $fn();
-    } finally {
+    } catch (Throwable $e) {
+        $fehler = $e;
+    }
+    try {
         fsSetting($key, $vorher);
+    } catch (Throwable $restore) {
+        throw new RuntimeException(
+            "Schalter {$key} konnte nicht zurückgesetzt werden: " . $restore->getMessage()
+            . ($fehler ? ' | ursprünglicher Fehler: ' . $fehler->getMessage() : ''),
+            0,
+            $fehler ?? $restore
+        );
+    }
+    if ($fehler) {
+        throw $fehler;
     }
 }
 
@@ -82,6 +101,11 @@ test('Zeiterfassung aus: activity_types, work_sessions und Exporte antworten 403
 test('Zeiterfassung an: activity_types antwortet wieder 200', function () {
     fsWith('worktime_enabled', '1', function () {
         assertStatus(200, apiRequest('GET', 'activity_types', ['token' => apiToken('admin')]));
+        assertStatus(200, apiRequest('GET', 'work_sessions', ['token' => apiToken('admin')]));
+        $res = apiRequest('GET', 'export', ['token' => apiToken('admin'),
+            'query' => ['type' => 'worktime_member', 'from' => date('Y') . '-01-01', 'to' => date('Y') . '-12-31']]);
+        assertTrue(($res['body']['code'] ?? null) !== 'FEATURE_DISABLED', 'export worktime_member darf bei eingeschalteter Zeiterfassung nicht gesperrt sein');
+        assertTrue($res['status'] !== 403, 'export worktime_member liefert 403');
     });
 });
 
@@ -94,6 +118,14 @@ test('Zeiterfassung aus: my_data liefert die Arbeitszeiten weiter (Auskunft)', f
     });
 });
 
+test('Stations-PIN an: change_pin wird nicht von der Funktionssperre abgewiesen', function () {
+    fsWith('station_pin_enabled', '1', function () {
+        $res = apiRequest('POST', 'change_pin', ['token' => apiToken('user'),
+            'body' => ['current_password' => 'sicher-falsch', 'new_pin' => '2580']]);
+        assertTrue(($res['body']['code'] ?? null) !== 'FEATURE_DISABLED', 'change_pin darf bei eingeschalteter Anmeldung nicht FEATURE_DISABLED liefern');
+    });
+});
+
 test('Stations-PIN aus: change_pin antwortet 403', function () {
     fsWith('station_pin_enabled', '0', function () {
         fsAssertDisabled(apiRequest('POST', 'change_pin', ['token' => apiToken('user'),
@@ -102,18 +134,22 @@ test('Stations-PIN aus: change_pin antwortet 403', function () {
 });
 
 test('me meldet alle Funktionen mit ihrem Stand', function () {
-    fsWith('worktime_enabled', '0', function () {
+    $meFeatures = function (): array {
         $res = apiRequest('GET', 'me', ['token' => apiToken('user')]);
         assertStatus(200, $res);
         $f = $res['body']['features'] ?? null;
         assertTrue(is_array($f), 'me muss features liefern');
-        assertSame(['worktime', 'station_pin', 'punctuality', 'reliability'], array_keys($f));
-        assertSame(false, $f['worktime']);
-    });
-    fsWith('worktime_enabled', '1', function () {
-        $res = apiRequest('GET', 'me', ['token' => apiToken('user')]);
-        assertSame(true, $res['body']['features']['worktime'] ?? null);
-    });
+        assertSame(array_keys(FEATURES), array_keys($f));
+        return $f;
+    };
+    foreach (FEATURES as $key => $def) {
+        fsWith($def['setting'], '0', function () use ($key, $meFeatures) {
+            assertSame(false, $meFeatures()[$key], "features.{$key} muss bei Schalter aus false sein");
+        });
+        fsWith($def['setting'], '1', function () use ($key, $meFeatures) {
+            assertSame(true, $meFeatures()[$key], "features.{$key} muss bei Schalter an true sein");
+        });
+    }
 });
 
 test('settings scope=client fuehrt station_pin_enabled nicht mehr', function () {
