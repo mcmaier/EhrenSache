@@ -504,7 +504,14 @@ if($apiToken) {
 
     // Session verlängern: Last Activity aktualisieren
     $_SESSION['last_activity'] = time();
-    
+
+    // Letzter Schreibzugriff auf die Sitzung -- jetzt freigeben. PHP sperrt die
+    // Sitzungsdatei bis zum Schliessen; offen gelassen liefen alle parallelen
+    // Abrufe des Dashboards nacheinander, und jeder wartende belegte einen
+    // PHP-Prozess. $_SESSION bleibt lesbar, Schreiben danach ginge still
+    // verloren (Waechter: tests/suites/session_lock_api.php).
+    session_write_close();
+
     $authUserId = intval($_SESSION['user_id']);
     $authUserRole = $_SESSION['role'];
     
