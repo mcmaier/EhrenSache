@@ -103,3 +103,31 @@ test('api.php sperrt Funktionen zentral nach der CSRF-Pruefung und vor dem Routi
     assertTrue(str_contains($src, "require_once '../../private/helpers/features.php';"),
         'api.php muss features.php laden');
 });
+
+test('Jedes data-feature im Dashboard nennt eine bekannte Funktion', function () {
+    preg_match_all('/data-feature="([^"]*)"/', sourceCode(FU_ROOT . '/public/index.html'), $m);
+    assertTrue(in_array('worktime', $m[1], true), 'Der Menuepunkt Zeiterfassung muss data-feature="worktime" tragen');
+    foreach ($m[1] as $key) {
+        assertTrue(isset(FEATURES[$key]), "data-feature=\"{$key}\" ist keine Funktion aus FEATURES");
+    }
+});
+
+test('Keine Oberflaeche erkennt eine Funktion mehr an einem 404', function () {
+    $dateien = array_merge(projectFiles(FU_ROOT . '/public/js', 'js'), [FU_ROOT . '/public/checkin/js/app.js']);
+    $funde = [];
+    foreach ($dateien as $datei) {
+        $code = sourceCode($datei);
+        if (preg_match('/activity_types[^;]*silentStatuses\s*:\s*\[\s*404/', $code)) {
+            $funde[] = basename($datei);
+        }
+    }
+    assertSame([], $funde, 'Erkennung der Zeiterfassung per 404 statt features: ' . implode(', ', $funde));
+});
+
+test('Dashboard fuellt features aus me', function () {
+    $api = sourceCode(FU_ROOT . '/public/js/modules/api.js');
+    assertTrue(str_contains($api, 'setFeatures(user?.features'), 'setCurrentUser() muss setFeatures(user?.features …) aufrufen');
+    assertTrue(str_contains($api, 'applyFeatureVisibility()'), 'setCurrentUser() muss applyFeatureVisibility() aufrufen');
+    $pin = sourceCode(FU_ROOT . '/public/js/modules/members.js') . sourceCode(FU_ROOT . '/public/js/modules/profile.js');
+    assertTrue(!str_contains($pin, 'station_pin_enabled'), 'members.js/profile.js lesen station_pin_enabled noch aus scope=client');
+});

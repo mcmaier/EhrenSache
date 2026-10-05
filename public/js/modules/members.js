@@ -11,6 +11,7 @@
 import { apiCall, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear, groupSelectOptionsHtml, loadClientSettings} from './ui.js';
 import { sharedLoad } from './pending_loads.js';
+import { isFeatureOn } from './features.js';
 import { loadUserData } from './users.js';
 import { updateModalId, escapeHtml, clampPage } from './utils.js';
 import { registerActions } from './actions.js';
@@ -51,7 +52,7 @@ async function loadStationPinSettings() {
     const res = await loadClientSettings();
     const s   = res?.settings || {};   // apiCall liefert den JSON-Body direkt
     const settings = {
-        enabled:   s.station_pin_enabled === '1',
+        enabled:   isFeatureOn('station_pin'),
         minLength: parseInt(s.station_pin_min_length || '4', 10)
     };
 

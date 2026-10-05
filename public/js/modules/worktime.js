@@ -10,6 +10,7 @@
 
 import { API_BASE } from '../config.js';
 import { apiCall, isAdmin, isAdminOrManager } from './api.js';
+import { isFeatureOn } from './features.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear } from './ui.js';
 import { debug } from '../app.js';
 import { registerActions } from './actions.js';
@@ -121,8 +122,9 @@ function proofOf(session) {
 }
 
 /**
- * Ist die Zeiterfassung freigeschaltet? Ist sie es nicht, antwortet die
- * Ressource mit 404 — dann bleibt der Navigationspunkt verborgen.
+ * Ob die Zeiterfassung eingeschaltet ist, steht seit OI-62 in features (me).
+ * Diese Funktion entscheidet nur noch die fachliche Zusatzbedingung: Ein
+ * Mitglied sieht den Bereich nur, wenn es mindestens eine Taetigkeitsart gibt.
  */
 /**
  * Verwirft das gemerkte Ergebnis, damit checkWorktimeEnabled() neu prueft.
@@ -137,10 +139,10 @@ export function resetWorktimeEnabled() {
 export async function checkWorktimeEnabled() {
     if (worktimeEnabled !== null) return worktimeEnabled;
 
-    // Der 404 IST hier die Antwort „Feature aus" — kein Fehler, der das
-    // Mitglied etwas anginge.
-    const result = await apiCall('activity_types', 'GET', null, {},
-                                 { silentStatuses: [404] });
+    let result = null;
+    if (isFeatureOn('worktime')) {
+        result = await apiCall('activity_types', 'GET');
+    }
     const freigeschaltet = Array.isArray(result);
 
     if (freigeschaltet) {
