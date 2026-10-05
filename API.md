@@ -564,7 +564,8 @@ Die Einzelantwort ist ein Objekt und trägt statt der beiden Zeichenketten ein `
 `groups_valid_from` (`JJJJ-MM-TT`, heute oder früher, Vorgabe heute), ab wann eine Änderung von
 `group_ids` gilt; ein ungültiges oder künftiges Datum ergibt `422` mit `field: groups_valid_from`,
 ohne dass etwas gespeichert wird. `GET my_data` führt dasselbe als `groups[].valid_from` und
-`group_history` auf.
+`group_history` auf. Die Mitgliederliste (`GET members` ohne `id`) bleibt beim heutigen Stand und
+trägt weder `valid_from` noch `group_history`.
 
 Ein `user` ohne Admin- oder Managerrolle bekommt auf denselben Endpunkt nur die eigenen
 Stammdaten (`member_id`, `name`, `surname`, `member_number`, `active`, `group_ids`,
@@ -616,6 +617,12 @@ ignoriert, nicht abgewiesen. `is_active_in_period` folgt derselben Regel wie im 
 
 Ein mitgeschicktes `pin` wird beim Anlegen ignoriert — die Stations-PIN wird erst über ein
 anschließendes `PUT` gesetzt (so verfährt auch das Dashboard).
+
+**Gruppen beim Anlegen (noch unveröffentlicht):** Die Zuordnungen in `group_ids` gelten **von
+Anfang an** (`valid_from: null`); begrenzt wird das neue Mitglied allein durch seine
+Mitgliedschaftszeiträume. `groups_valid_from` ist beim Anlegen nicht vorgesehen und wird
+ignoriert. Eine unbekannte Gruppe in `group_ids` ergibt `400` mit `field: "group_ids"`, bevor
+etwas gespeichert wird; Mitglied und Zuordnungen entstehen in einer Transaktion.
 
 **Response:**
 ```json
@@ -675,6 +682,27 @@ Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitg
 
 `added_groups` und `group_warnings` wie bei POST (Mitgliedschaftsregel für Register); ohne
 `group_ids` im Körper bleiben die Zuordnungen unverändert und beide Listen leer.
+
+**Gruppenwechsel mit Datum (noch unveröffentlicht, Spec `2026-10-05-gruppen-zeitraum-design.md`):**
+Mit `group_ids` darf der Körper zusätzlich `groups_valid_from` führen:
+
+| Feld | Wert | Wirkung |
+|---|---|---|
+| `groups_valid_from` | `JJJJ-MM-TT`, nicht nach heute, Jahr ab 1000; Vorgabe heute; nur zusammen mit `group_ids` wirksam | ab wann die Änderung der Gruppen gilt |
+
+Je Gruppe gilt: Unverändert bleibt unberührt. Eine **entfernte** Gruppe endet am Vortag des
+Datums und steht danach in `group_history`; hatte die Zuordnung erst am oder nach dem Datum
+begonnen, war sie nie gültig (Korrektur) und hinterlässt keinen Verlauf. Eine **hinzugefügte**
+Gruppe gilt ab dem Datum; Verlauf derselben Gruppe, der darüber hinausreicht, wird gekürzt, und
+ein Verlauf, der lückenlos davor endet, wird mit der neuen Zuordnung zusammengeführt (Häkchen weg
+und am selben Tag wieder dran ergibt den Ausgangszustand). Gruppen, die die Mitgliedschaftsregel
+für Register ergänzt, bekommen dasselbe Datum.
+
+Fehler, jeweils vor jeder Änderung: `422` mit `field: "groups_valid_from"` bei ungültigem oder
+künftigem Datum; `400` mit `field: "group_ids"` bei einer unbekannten Gruppe oder einer Liste, die
+keine Zahlen enthält; `404 "Member not found"` bei unbekanntem Mitglied, auch wenn nur
+`group_ids` kommt. Name, Stammdaten und Gruppen werden zusammen in **einer Transaktion**
+gespeichert — scheitert eines, bleibt nichts zurück.
 
 ---
 
@@ -2643,6 +2671,15 @@ oder austrat, bekam die Termine außerhalb seines Mitgliedschaftszeitraums als u
 angerechnet. Pünktlichkeit, Zuverlässigkeit und der Anwesenheitsbericht rechnen über dieselbe
 Menge.
 
+**Die Gruppe gilt am Termindatum (noch unveröffentlicht, OI-115).** Wer im Juni von „Jugend“ zu
+„Aktive“ wechselt, ist für Termine bis Mai in der Jugend erwartet und ab Juni bei den Aktiven;
+er steht in beiden Gruppentabellen des Jahres, jeweils nur mit den Terminen seines Zeitraums. Das
+gilt ebenso für Register (Zugehörigkeit am Termindatum; die Zuordnung Register → Gruppe hat keinen
+Zeitraum), Pünktlichkeit, Zuverlässigkeit und Anwesenheitsbericht. `summary.total_members` zählt
+je Gruppe die Mitglieder, deren Gruppenzeitraum das Jahr überschneidet **und** die im Jahr aktiv
+waren. Mitglieder (Rolle `user`) erreichen auch die Statistik **ehemaliger** Gruppen; sichtbar
+bleibt nur die eigene Zeile.
+
 **Untergruppen (`is_subgroup: true`, noch unveröffentlicht)** — im Musikverein die Register —
 rechnen über ihre Mitglieder, aber nur über die Termine, die über das Register selbst oder über
 eine seiner Gruppen kommen (`parent_group_ids` bei `member_groups`, Spec
@@ -3148,6 +3185,10 @@ Vorgang, Änderungen als JSON). **Seit 1.7.0** trägt die JSON-Antwort
 zusätzlich `appointment_responses` (Termin, Status, Bemerkung, Zeitpunkte der letzten Status- und
 der letzten Änderung), die CSV-Form einen Abschnitt „TERMINRÜCKMELDUNGEN" mit den Spalten
 Termindatum, Termin, Rückmeldung, Bemerkung, Status geändert, Zuletzt geändert.
+**Noch unveröffentlicht:** `groups[]` trägt `valid_from` (Beginn der heutigen Zuordnung, `null` =
+von Anfang an), dazu steht `group_history` mit den beendeten Zuordnungen (`group_name`,
+`valid_from`, `valid_to`); die CSV-Form führt das bislang nicht. Die
+Verhaltenskennzahlen (`behavior`) rechnen auch mit ehemaligen Gruppen.
 
 **Query-Parameter:**
 
@@ -3561,6 +3602,11 @@ Alle Schritte laufen in **einer Transaktion**.
 ### Anwesenheitsliste für Termin
 **Endpoint:** `GET /api.php?resource=attendance_list&appointment_id=10`
 
+Wer erwartet ist und unter welcher Gruppe oder welchem Register er erscheint, richtet sich
+(noch unveröffentlicht, OI-115) nach der Gruppenzugehörigkeit am **Termindatum**: Ein Mitglied, das
+nach dem Termin die Gruppe gewechselt hat, steht weiter unter der alten. Dasselbe gilt für die
+Namensliste des Rückmeldedialogs (`appointment_responses`) zu einem vergangenen Termin.
+
 **Response:**
 ```json
 {
@@ -3686,6 +3732,10 @@ ist vor diesem Zeitpunkt „kommend“, nicht „fehlend“. Dieselbe Grenze gil
   ]
 }
 ```
+
+Die Liste enthält die Termine, zu denen das Mitglied am Termindatum über eine Gruppe erwartet
+war — auch Termine **ehemaliger** Gruppen und auch dann, wenn es heute in keiner Gruppe mehr
+steht (noch unveröffentlicht, OI-115).
 
 `member.groups` bleibt hier die kommagetrennte Zeichenkette aller Gruppen des Mitglieds — diese
 Ansicht wurde von der Untergruppen-Gliederung (1.8.0) nicht angefasst, da sie zum Ausfüllen
