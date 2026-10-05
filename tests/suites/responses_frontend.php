@@ -137,7 +137,8 @@ test('updateTableHeaders() in ui.js fuehrt Rueckmeldung fuer die Terminliste', f
 test('Rueckmeldungs-Modal ist eingebunden', function () use ($rsRoot) {
     $html = (string) sourceCode($rsRoot . '/public/index.html');
     assertTrue(str_contains($html, 'id="responsesModal"'), 'Modal fehlt');
-    assertTrue(str_contains($html, 'src="./js/modules/responses.js"'), 'Modul nicht geladen');
+    // Seit OI-120 mit Versionsabschnitt im Pfad (js/v<Version>/modules/…).
+    assertTrue(preg_match('#src="\./js/v[0-9][0-9.]*/modules/responses\.js"#', $html) === 1, 'Modul nicht geladen');
 
     $js = (string) sourceCode($rsRoot . '/public/js/modules/responses.js');
     // Seit OI-17 Etappe 2 laufen die Knoepfe ueber die Aktionstabelle, nicht
