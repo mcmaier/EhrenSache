@@ -86,3 +86,10 @@ test('JS: Daten im Verlauf zweistellig (31.05.2026)', function () use ($ghfRoot)
     $js = (string) sourceCode($ghfRoot . '/public/js/modules/members.js');
     assertTrue(str_contains(ghfBody($js, 'formatIsoDateDe'), "month: '2-digit'"), 'Datum nicht zweistellig formatiert');
 });
+
+test('Import: Ergebnis nennt "Gruppenaenderungen gelten ab heute"', function () use ($ghfRoot) {
+    $js = (string) sourceCode($ghfRoot . '/public/js/modules/import_export.js');
+    $sum = ghfBody($js, 'importGroupSummaryHtml');
+    assertTrue(str_contains($sum, 'result.group_changes'), 'group_changes wird nicht gelesen');
+    assertTrue(str_contains($sum, 'Gruppenänderungen gelten ab heute'), 'Satz fehlt');
+});
