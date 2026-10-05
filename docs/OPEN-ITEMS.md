@@ -2310,6 +2310,44 @@ Siehe [OI-74](#oi-74--der-cache-bust-erreicht-nur-einen-teil-der-dateien) — di
 
 ---
 
+### OI-121 · Der Dashboard-Start lädt in fünf Stufen nacheinander
+**Priorität:** mittel · aufgenommen am 2026-10-05 (Messung auf der Demo nach dem Update auf 1.20.1)
+
+Nach dem Fix der Sitzungssperre (1.20.1) laufen gleichzeitige API-Abrufe auch gleichzeitig; ein
+einzelner Abruf braucht auf der Demo im Median rund 40 ms. Trotzdem stand die Profilansicht in
+drei Messungen erst nach 1,5 s, 2,8 s und 1,6 s. Ohne Ausreißer wären es rund 0,6 s.
+
+**Ausreißer beim Hoster.** 80 nacheinander gesendete Abrufe (`ping`, `version`, `me`,
+`settings`): etwa 4 % brauchten 1,0 bis 1,25 s statt 40 ms, unabhängig vom Endpunkt — auch
+`ping`, das fast keinen Code ausführt. Die Ursache liegt beim Hoster (vermutlich Start eines
+PHP-Prozesses), nicht im Code, und ist von hier aus nicht zu beheben.
+
+**Warum sie so durchschlagen.** Der Start wartet Stufe für Stufe (Admin, Bereich Profil):
+
+| Stufe | Abrufe | Ausgelöst von |
+|---|---|---|
+| 1 | `me` | `checkAuth()` in `app.js` |
+| 2 | `users&user_type=human`, `activity_types`, `available_years` | `initEventHandlers()` (lädt die Benutzerliste, auch wenn der Bereich Benutzer gar nicht offen ist), `initAllYearFilters()` (abgewartet) |
+| 3 | `version` | `loadVersion()`, abgewartet vor `showDashboard()` |
+| 4 | `my_open_items`, `users&id=<eigene>` | `loadProfile()` |
+| 5 | `settings&scope=client` | `loadProfile()`, erst nach den Benutzerdaten |
+
+Danach folgt nach 500 ms das Vorladen der übrigen Bereiche (`loadAllData()`, sechs Abrufe
+gleichzeitig) — gewollt und nicht auf dem Weg zur sichtbaren Ansicht. Zwingend hängt nur alles
+an `me` (Rolle). Version und Jahresliste sperren die Ansicht, ohne dass sie sie brauchte; die
+Profilabrufe hängen voneinander nicht ab. Jeder Ausreißer auf diesem Weg addiert sich, bei rund
+zehn Abrufen trifft es grob jeden dritten Seitenaufruf.
+
+**Ziel:** nach `me` alles Nötige gleichzeitig, also zwei Stufen statt fünf. Ein Ausreißer kostet
+dann höchstens einmal eine Sekunde. Reiner Frontend-Umbau, keine Migration. Konzept in Arbeit
+(Spec unter `docs/superpowers/specs/`).
+
+Verwandt: [OI-120](#oi-120--das-dashboard-lädt-rund-45-einzeldateien) (Dateien, eigene Ursache).
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
