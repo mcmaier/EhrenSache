@@ -20,15 +20,11 @@ declare(strict_types=1);
 
 function handlePinChange($db, $database, $request_method, $authUserId, $authMemberId)
 {
+    // Ob die PIN-Anmeldung freigeschaltet ist, prueft api.php vor dem Routing
+    // (FEATURES, OI-62).
     if ($request_method !== 'POST') {
         http_response_code(405);
         echo json_encode(["message" => "Method not allowed"]);
-        return;
-    }
-
-    if (!isStationPinEnabled($db, $database)) {
-        http_response_code(404);
-        echo json_encode(["message" => "Endpoint not found"]);
         return;
     }
 

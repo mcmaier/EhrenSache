@@ -91,3 +91,15 @@ test('Außerhalb von features.php liest niemand einen Schalter direkt', function
     }
     assertSame([], $funde, 'Direkter Lesezugriff statt isFeatureEnabled(): ' . implode(', ', $funde));
 });
+
+test('api.php sperrt Funktionen zentral nach der CSRF-Pruefung und vor dem Routing', function () {
+    $src    = apiRoutesFromSource()['src'];
+    $sperre = strpos($src, 'featureForResource($resource)');
+    $csrf   = strpos($src, 'validateCSRFToken(');
+    $router = strpos($src, 'switch($resource) {');
+    assertTrue($sperre !== false, 'Zentrale Sperre featureForResource($resource) fehlt in api.php');
+    assertTrue($csrf !== false && $sperre > $csrf, 'Sperre muss nach der CSRF-Pruefung stehen');
+    assertTrue($sperre < $router, 'Sperre muss vor switch($resource) stehen');
+    assertTrue(str_contains($src, "require_once '../../private/helpers/features.php';"),
+        'api.php muss features.php laden');
+});

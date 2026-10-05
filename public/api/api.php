@@ -59,6 +59,7 @@ require_once '../../private/helpers/appointment_series.php';
 require_once '../../private/helpers/groups.php';
 require_once '../../private/helpers/demo_mode.php';
 require_once '../../private/helpers/open_items.php';
+require_once '../../private/helpers/features.php';
 
 // Handler laden
 require_once '../../private/handlers/members.php';
@@ -619,6 +620,15 @@ if(!$isTokenAuth && in_array($request_method, ['POST', 'PUT', 'DELETE'])) {
 // ============================================
 // 10. ROUTING
 // ============================================
+
+// Abgeschaltete Funktionen (OI-62): Haengt die Ressource vollstaendig an
+// einer Funktion (FEATURES in private/helpers/features.php), endet die
+// Anfrage hier mit 403 FEATURE_DISABLED -- kein Handler kann die Pruefung
+// vergessen. Teilpfade pruefen an ihrer Stelle mit requireFeature().
+$sperrendeFunktion = featureForResource($resource);
+if ($sperrendeFunktion !== null) {
+    requireFeature($db, $database, $sperrendeFunktion);
+}
 
 // renderReport() (private/helpers/report.php) wirft InvalidArgumentException,
 // wenn einem Bericht ein Pflichtschluessel fehlt -- ein Vertragsbruch zwischen

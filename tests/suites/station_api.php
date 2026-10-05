@@ -589,10 +589,13 @@ test('members: PUT mit leerem Body -> 400 statt Fatal', function () {
 
 // ---- Phase 2: PIN bei abgeschalteter Anmeldung, Selbstauskunft, Geraetefilter
 
-test('members: PIN bei abgeschalteter Anmeldung -> 409', function () {
+test('members: PIN bei abgeschalteter Anmeldung -> 403 mit field', function () {
     stationSetSetting('station_pin_enabled', '0');
     try {
-        assertStatus(409, stationSetPin('2580'), 'PUT members mit pin haette bei abgeschalteter Anmeldung 409 liefern muessen');
+        $res = stationSetPin('2580');
+        assertStatus(403, $res, 'PUT members mit pin haette bei abgeschalteter Anmeldung 403 liefern muessen');
+        assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null);
+        assertSame('pin', $res['body']['field'] ?? null, 'field muss fuer das Formular erhalten bleiben');
     } finally {
         // Fuer nachfolgende Tests (und die Entwicklungsinstanz) wieder einschalten.
         stationSetSetting('station_pin_enabled', '1');
@@ -771,11 +774,12 @@ test('station: unbekannte Nummer sperrt nach fuenf Fehlversuchen wie eine bekann
     assertSame('Too many attempts', $res['body']['message']);
 });
 
-test('station: identify bei abgeschalteter PIN-Anmeldung → 409', function () {
+test('station: identify bei abgeschalteter PIN-Anmeldung → 403', function () {
     stationSetSetting('station_pin_enabled', '0');
     try {
         $res = stationPost('identify', ['member_number' => stationMember()['member_number'], 'pin' => '2580']);
-        assertStatus(409, $res);
+        assertStatus(403, $res);
+        assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null);
     } finally {
         stationSetSetting('station_pin_enabled', '1');
     }
@@ -976,12 +980,13 @@ test('station: work_stop ohne laufende Sitzung → 409', function () {
     assertStatus(409, stationPost('work_stop', stationCreds()));
 });
 
-test('station: work_* bei abgeschalteter Zeiterfassung → 404', function () {
+test('station: work_* bei abgeschalteter Zeiterfassung → 403', function () {
     $fx = stationWorkFixture();
     stationSetSetting('worktime_enabled', '0');
     try {
         $res = stationPost('work_start', stationCreds() + ['activity_id' => $fx['activity_id']]);
-        assertStatus(404, $res);
+        assertStatus(403, $res);
+        assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null);
     } finally {
         stationSetSetting('worktime_enabled', '1');
     }
