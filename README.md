@@ -222,6 +222,11 @@ Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 >
 > Nach jedem Update **„Purge Everything“** auslösen. Wer den alten Stand schon im Browser hat,
 > lädt einmal mit Strg+F5 neu.
+>
+> Außerdem in `private/config/config.php` unter **`trusted_proxies`** die Adressbereiche von
+> Cloudflare eintragen ([cloudflare.com/ips](https://www.cloudflare.com/ips/)). Sonst sieht
+> EhrenSache statt der Besucher nur Cloudflare, und der Rate Limiter zählt alle Besucher
+> gemeinsam. Vorlage und Beispiel in `private/config/config_example.php`.
 
 > [!NOTE]
 > Bei Update von **v1.0.0 → v1.1.x**: Der Wizard ergänzt `config.php` automatisch um das Prefix-Feld und benennt alle Tabellen entsprechend um. Es ist kein manueller Eingriff in die Konfiguration nötig.
