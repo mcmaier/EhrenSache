@@ -361,6 +361,19 @@ function stationSetSetting(string $key, string $value): void
     assertStatus(200, $res, "Einstellung '{$key}' konnte nicht gesetzt werden");
 }
 
+/** Liest eine Systemeinstellung als Admin ('' wenn nicht vorhanden). */
+function stationGetSetting(string $key): string
+{
+    $res = apiRequest('GET', 'settings', ['token' => apiToken('admin')]);
+    assertStatus(200, $res, "Einstellungen konnten nicht gelesen werden");
+    foreach ($res['body']['settings'] ?? [] as $row) {
+        if (($row['setting_key'] ?? null) === $key) {
+            return (string)($row['setting_value'] ?? '');
+        }
+    }
+    return '';
+}
+
 /** Schaltet die PIN-Anmeldung fuer die Suite ein (bleibt danach an — Entwicklungsinstanz). */
 function enableStationPin(): void
 {
@@ -984,18 +997,20 @@ test('station: work_stop ohne laufende Sitzung → 409', function () {
 
 test('station: work_* bei abgeschalteter Zeiterfassung → 403', function () {
     $fx = stationWorkFixture();
+    $vorher = stationGetSetting('worktime_enabled');
     stationSetSetting('worktime_enabled', '0');
     try {
         $res = stationPost('work_start', stationCreds() + ['activity_id' => $fx['activity_id']]);
         assertStatus(403, $res);
         assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null);
     } finally {
-        stationSetSetting('worktime_enabled', '1');
+        stationSetSetting('worktime_enabled', $vorher !== '' ? $vorher : '1');
     }
 });
 
 test('station: work_* bei abgeschalteter Zeiterfassung verbraucht keinen PIN-Versuch', function () {
     $fx = stationWorkFixture();
+    $vorher = stationGetSetting('worktime_enabled');
     stationSetSetting('worktime_enabled', '0');
     try {
         $falsch = ['member_number' => stationMember()['member_number'], 'pin' => '9999'];
@@ -1005,7 +1020,7 @@ test('station: work_* bei abgeschalteter Zeiterfassung verbraucht keinen PIN-Ver
             assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null, "Versuch {$i}: Kennung fehlt");
         }
     } finally {
-        stationSetSetting('worktime_enabled', '1');
+        stationSetSetting('worktime_enabled', $vorher !== '' ? $vorher : '1');
     }
     // Kein Sperrzaehler hochgezaehlt: die richtige PIN geht weiter.
     assertStatus(200, stationPost('identify', stationCreds()), 'PIN darf nicht gesperrt sein');
