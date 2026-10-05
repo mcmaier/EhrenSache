@@ -40,6 +40,18 @@ function handleAvailableYears($db, $database, $request_method, $id) {
             ORDER BY year DESC
         ");
         $years = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        // Jahre der Arbeitszeit (OI-62, Etappe 2): Ein Verein ohne Termine
+        // braucht trotzdem eine Jahresliste. Nur solange die Zeiterfassung an
+        // ist; Datumstraeger ist der Beginn, wie in worktimeResolvePeriod().
+        if (isFeatureEnabled($db, $database, 'worktime')) {
+            $wsStmt = $db->query("
+                SELECT DISTINCT YEAR(start_time) AS year
+                FROM {$prefix}work_sessions
+                WHERE start_time IS NOT NULL
+            ");
+            $years = array_values(array_unique(array_merge($years, $wsStmt->fetchAll(PDO::FETCH_COLUMN))));
+        }
         
         // Aktuelles Jahr + 1 immer einschließen (für neue Termine)
         $currentYear = (int)date('Y');
@@ -216,6 +228,19 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
     $memberId = isset($_GET['member_id']) ? intval($_GET['member_id']) : null;
     $appointmentTypeId = isset($_GET['appointment_type_id']) ? intval($_GET['appointment_type_id']) : null;
 
+    // Anwesenheit aus (OI-62, Etappe 2): Ohne den Arbeitszeitblock bleibt
+    // nichts zu zeigen -- 403 attendance. Mit include=worktime antwortet die
+    // Ressource nur mit diesem Block (Check-in-App, Tab Statistik) bzw. mit
+    // 403 worktime, wenn auch die Zeiterfassung aus ist.
+    $withWorktime = ($_GET['include'] ?? null) === 'worktime';
+    $attendanceOn = isFeatureEnabled($db, $database, 'attendance');
+    if (!$attendanceOn) {
+        if (!$withWorktime) {
+            requireFeature($db, $database, 'attendance');
+        }
+        requireFeature($db, $database, 'worktime');
+    }
+
     $warning = null;
 
     if (!isAdminOrManager()) {
@@ -231,6 +256,20 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
             echo json_encode(["message" => "No access to this group"]);
             return;
         }
+    }
+
+    if (!$attendanceOn) {
+        // Nur der Arbeitszeitblock: Quote, Kopfzahlen, Puenktlichkeit und
+        // Zuverlaessigkeit sind Anwesenheitswerte und entfallen ganz. $memberId
+        // ist oben fuer Nicht-Verwalter bereits auf das eigene Mitglied gesetzt.
+        echo json_encode([
+            'warning'  => $warning,
+            'year'     => $year,
+            'worktime' => worktimeStatistics(
+                $db, $database, worktimeResolvePeriod(null, null, $year), $memberId
+            ),
+        ]);
+        return;
     }
 
     $result = buildStatisticsResult($db, $database, $year, $groupId, $memberId,

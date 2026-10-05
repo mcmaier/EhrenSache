@@ -22,6 +22,14 @@ function handleExport($db, $database, $request_method, $authMemberId) {
 
     $type = $_GET['type'] ?? 'members';
 
+    // Typen einer abgeschalteten Funktion (OI-62, Etappe 2). Die Arbeitszeit-
+    // Exporte pruefen weiter unten selbst (requireWorktimeEnabled());
+    // worktime_appointment nennt weiter die Titel vorhandener Termine.
+    $exportFeature = ['appointments' => 'appointments', 'records' => 'attendance'][$type] ?? null;
+    if ($exportFeature !== null) {
+        requireFeature($db, $database, $exportFeature);
+    }
+
     // Rechte je Exporttyp statt pauschal: Der Stundennachweis ist der einzige
     // Typ, der sich sinnvoll auf eine Person einschraenken laesst. Alle
     // uebrigen aggregieren ueber Personen hinweg und bleiben admin/manager.

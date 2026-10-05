@@ -235,3 +235,156 @@ test('GET settings nennt jeden Schalter, auch ohne Zeile in der Datenbank', func
         assertTrue(in_array($f['setting'], $keys, true), "{$f['setting']} fehlt in GET settings");
     }
 });
+
+/** Admin legt an, liefert die id (201 erwartet). Muster: rsCreate() in responses_api.php. */
+function fsCreate(string $resource, array $body): int
+{
+    $res = apiRequest('POST', $resource, ['token' => apiToken('admin'), 'body' => $body]);
+    assertStatus(201, $res, "{$resource} konnte nicht angelegt werden");
+    return (int) $res['body']['id'];
+}
+
+function fsDelete(string $resource, int $id): void
+{
+    apiRequest('DELETE', $resource, ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+}
+
+/**
+ * Gruppe, Terminart (mit Rückmeldung und Entschuldigungspflicht), ein Mitglied
+ * mit Nummer in der Gruppe und ein Termin, der vor zehn Minuten begonnen hat.
+ * Anlegen nur bei eingeschalteter Terminplanung (Default). Muster: rsWorld().
+ *
+ * @return array{group: ?int, type: ?int, member: ?int, member_number: string, appointment: ?int}
+ */
+function fsWorld(string $label): array
+{
+    $suffix = substr(uniqid(), -6);
+    $w = ['group' => null, 'type' => null, 'member' => null,
+          'member_number' => 'FS' . $suffix, 'appointment' => null];
+    try {
+        $w['group'] = fsCreate('member_groups', ['group_name' => "FS {$label} {$suffix}"]);
+        $w['type']  = fsCreate('appointment_types', [
+            'type_name' => "FS {$label} {$suffix}", 'is_default' => 0, 'color' => '#667eea',
+            'group_ids' => [$w['group']], 'responses_enabled' => 1, 'responses_require_excuse' => 1,
+        ]);
+        $w['member'] = fsCreate('members', [
+            'name' => 'Fs', 'surname' => "Test {$label} {$suffix}", 'member_number' => $w['member_number'],
+            'active' => 1, 'group_ids' => [$w['group']],
+        ]);
+        $beginn = time() - 600;
+        $w['appointment'] = fsCreate('appointments', [
+            'title' => "FS-Termin {$label}", 'type_id' => $w['type'],
+            'date'  => date('Y-m-d', $beginn), 'start_time' => date('H:i:s', $beginn),
+        ]);
+    } catch (Throwable $e) {
+        fsDropWorld($w);
+        throw $e;
+    }
+    return $w;
+}
+
+/** Löscht in umgekehrter Reihenfolge; der Termin nimmt Records und Anträge mit (ON DELETE CASCADE). */
+function fsDropWorld(array $w): void
+{
+    if ($w['appointment'] !== null) {
+        fsDelete('appointments', $w['appointment']);
+    }
+    if ($w['member'] !== null) {
+        fsDelete('members', $w['member']);
+    }
+    if ($w['type'] !== null) {
+        fsDelete('appointment_types', $w['type']);
+    }
+    if ($w['group'] !== null) {
+        fsDelete('member_groups', $w['group']);
+    }
+}
+
+test('Anwesenheit aus: statistics 403, mit include=worktime nur der Arbeitszeitblock', function () {
+    $user = apiToken('user');
+    fsWith('worktime_enabled', '1', function () use ($user) {
+        $res = apiRequest('GET', 'statistics', ['token' => $user, 'query' => ['include' => 'worktime']]);
+        assertStatus(200, $res);
+        assertTrue(array_key_exists('summary', $res['body']), 'Gegenprobe: mit Anwesenheit kommt die volle Statistik');
+    });
+    fsWith('attendance_enabled', '0', function () use ($user) {
+        fsAssertDisabled(apiRequest('GET', 'statistics', ['token' => $user]), 'attendance', 'GET statistics');
+        fsWith('worktime_enabled', '1', function () use ($user) {
+            $res = apiRequest('GET', 'statistics', ['token' => $user, 'query' => ['include' => 'worktime']]);
+            assertStatus(200, $res);
+            $keys = array_keys($res['body']);
+            sort($keys);
+            assertSame(['warning', 'worktime', 'year'], $keys, 'Ohne Anwesenheit nur der Arbeitszeitblock');
+            assertTrue(is_array($res['body']['worktime']), 'Der Block worktime fehlt');
+        });
+        fsWith('worktime_enabled', '0', function () use ($user) {
+            fsAssertDisabled(apiRequest('GET', 'statistics', ['token' => $user, 'query' => ['include' => 'worktime']]),
+                'worktime', 'GET statistics include=worktime bei Zeiterfassung aus');
+        });
+    });
+});
+
+test('Anwesenheit aus: statistics_report antwortet 403', function () {
+    fsWith('attendance_enabled', '0', function () {
+        fsAssertDisabled(apiRequest('GET', 'statistics_report', ['token' => apiToken('admin')]), 'attendance', 'GET statistics_report');
+    });
+});
+
+test('Export und Import: Typen abgeschalteter Funktionen antworten 403', function () {
+    $admin = apiToken('admin');
+    fsWith('attendance_enabled', '0', function () use ($admin) {
+        fsAssertDisabled(apiRequest('GET', 'export', ['token' => $admin, 'query' => ['type' => 'records']]), 'attendance', 'export records');
+        $ap = apiRequest('GET', 'export', ['token' => $admin, 'query' => ['type' => 'appointments']]);
+        assertTrue($ap['status'] !== 403, 'export appointments haengt nicht an der Anwesenheit');
+        foreach (['records', 'extract_appointments'] as $typ) {
+            fsAssertDisabled(apiRequest('POST', 'import', ['token' => $admin, 'query' => ['type' => $typ]]), 'attendance', "import {$typ}");
+        }
+        assertStatus(400, apiRequest('POST', 'import', ['token' => $admin, 'query' => ['type' => 'appointments']]),
+            'import appointments ohne Datei: 400 (keine Datei), nicht 403');
+    });
+    fsWith('appointments_enabled', '0', function () use ($admin) {
+        fsAssertDisabled(apiRequest('GET', 'export', ['token' => $admin, 'query' => ['type' => 'appointments']]), 'appointments', 'export appointments');
+        fsAssertDisabled(apiRequest('POST', 'import', ['token' => $admin, 'query' => ['type' => 'appointments']]), 'appointments', 'import appointments');
+        fsAssertDisabled(apiRequest('GET', 'export', ['token' => $admin, 'query' => ['type' => 'records']]), 'attendance', 'export records bei Terminplanung aus');
+    });
+});
+
+test('available_years enthaelt ein Jahr, in dem es nur Arbeitszeit gibt', function () {
+    fsWith('worktime_enabled', '1', function () {
+        $jahr  = 2001;
+        $jahre = function (): array {
+            $res = apiRequest('GET', 'available_years', ['token' => apiToken('admin')]);
+            assertStatus(200, $res);
+            return array_map('intval', $res['body']);
+        };
+        assertTrue(!in_array($jahr, $jahre(), true),
+            "Voraussetzung: {$jahr} steht schon in der Jahresliste (Termine in {$jahr}?) -- Test braucht ein leeres Jahr");
+
+        $w = fsWorld('Jahre');
+        $activity = null;
+        $session  = null;
+        try {
+            $activity = fsCreate('activity_types', ['activity_name' => 'FS-Jahr ' . uniqid(), 'group_ids' => [$w['group']]]);
+            $res = apiRequest('POST', 'work_sessions', ['token' => apiToken('admin'), 'body' => [
+                'member_id' => $w['member'], 'activity_id' => $activity,
+                'start_time' => "{$jahr}-03-01 10:00:00", 'end_time' => "{$jahr}-03-01 11:00:00",
+                'break_minutes' => 0, 'note' => 'OI-62',
+            ]]);
+            assertStatus(201, $res, 'Sitzung konnte nicht angelegt werden');
+            $session = (int) $res['body']['session']['session_id'];
+
+            assertTrue(in_array($jahr, $jahre(), true), "{$jahr} fehlt, obwohl dort eine Arbeitszeitsitzung liegt");
+            fsWith('worktime_enabled', '0', function () use ($jahr, $jahre) {
+                assertTrue(!in_array($jahr, $jahre(), true), 'Ohne Zeiterfassung zaehlen ihre Jahre nicht');
+            });
+        } finally {
+            if ($session !== null) {
+                fsDelete('work_sessions', $session);
+            }
+            if ($activity !== null) {
+                fsDelete('activity_types', $activity);
+            }
+            fsDropWorld($w);
+        }
+    });
+});
