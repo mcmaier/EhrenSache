@@ -131,3 +131,9 @@ test('Dashboard fuellt features aus me', function () {
     $pin = sourceCode(FU_ROOT . '/public/js/modules/members.js') . sourceCode(FU_ROOT . '/public/js/modules/profile.js');
     assertTrue(!str_contains($pin, 'station_pin_enabled'), 'members.js/profile.js lesen station_pin_enabled noch aus scope=client');
 });
+
+test('PWA prueft features.worktime vor activity_types und kennt FEATURE_DISABLED', function () {
+    $pwa = sourceCode(FU_ROOT . '/public/checkin/js/app.js');
+    assertTrue((bool) preg_match('/features\?\.worktime/', $pwa), 'initWorktime() muss userData?.features?.worktime pruefen');
+    assertTrue(str_contains($pwa, "'FEATURE_DISABLED'"), 'apiCall() der PWA muss FEATURE_DISABLED unterscheiden');
+});
