@@ -77,3 +77,49 @@ test('PWA: "Erneut versuchen" startet die Anmeldepruefung neu', function () use 
     assertTrue(str_contains(scBody($scPwa, 'function showScreen('), "getElementById('startScreen')"),
         'showScreen() kennt die Ladeanzeige nicht');
 });
+
+test('PWA: beide Anmeldewege laufen ueber startSession()', function () use ($scPwa) {
+    foreach (['async function checkAutoLogin(', 'async function handleLogin('] as $sig) {
+        $body = scBody($scPwa, $sig);
+        assertTrue($body !== '', "{$sig} fehlt");
+        assertTrue(str_contains($body, 'startSession('), "{$sig} ruft startSession() nicht auf");
+        foreach (['loadClientSettings(', 'loadCheckinAppointments(', 'initTabs(', 'initWorktime(', 'loadAppointmentTypes('] as $eigen) {
+            assertTrue(!str_contains($body, $eigen), "{$sig} traegt wieder eine eigene Ladekette ({$eigen})");
+        }
+    }
+});
+
+test('PWA: me wird beim Start nur einmal geholt', function () use ($scPwa) {
+    assertSame(2, substr_count($scPwa, "apiCall('me')"),
+        "apiCall('me') gehoert genau in checkAutoLogin() und handleLogin() -- ein drittes ist eine zusaetzliche Stufe");
+    assertTrue(!str_contains($scPwa, 'function loadUserData('), 'loadUserData() holte me ein zweites Mal und ist ersetzt');
+});
+
+test('PWA: startSession() laedt gleichzeitig und blendet danach ein', function () use ($scPwa) {
+    $body = scBody($scPwa, 'async function startSession(');
+    $all  = strpos($body, 'Promise.all(');
+    $main = strpos($body, "showScreen('main')");
+    assertTrue($all !== false, 'startSession() laedt nicht gleichzeitig');
+    assertTrue($main !== false && $main > $all, 'Der Hauptbildschirm erscheint nicht nach Stufe 2');
+    assertTrue(preg_match('/generation\s*!==\s*sessionGeneration\)\s*return/', $body) === 1,
+        'startSession() zeichnet auch nach einem Abmelden weiter');
+});
+
+test('PWA: Token nur bei 401 oder 403 loeschen', function () use ($scPwa) {
+    $body = scBody($scPwa, 'async function checkAutoLogin(');
+    assertSame(1, substr_count($body, "localStorage.removeItem('api_token')"),
+        'Der Token wird an mehr als einer Stelle geloescht');
+    assertTrue(preg_match("/status\s*===\s*401\s*\|\|\s*result\.status\s*===\s*403\)\s*\{[^}]*localStorage\.removeItem\('api_token'\)/s", $body) === 1,
+        'Der Token wird nicht im 401/403-Zweig geloescht -- ein Haenger beim Hoster meldete sonst ab');
+});
+
+test('PWA: Abmelden verwirft einen laufenden Start', function () use ($scPwa) {
+    assertTrue(str_contains(scBody($scPwa, 'function resetSessionState('), 'sessionGeneration++'),
+        'resetSessionState() erhoeht sessionGeneration nicht');
+});
+
+test('PWA: Zeiterfassung fragt Taetigkeiten und laufende Sitzung gleichzeitig', function () use ($scPwa) {
+    $body = scBody($scPwa, 'async function initWorktime(');
+    assertTrue(preg_match("/Promise\.all\(\[\s*apiCall\('activity_types'/", $body) === 1,
+        'initWorktime() wartet die Taetigkeiten ab, bevor es die laufende Sitzung fragt');
+});
