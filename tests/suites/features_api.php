@@ -44,6 +44,13 @@ function fsGetSetting(string $key): string
             return (string) $row['setting_value'];
         }
     }
+    // Bestandsinstallationen kennen die Zeilen der Schalter aus Etappe 2 nicht;
+    // dann gilt der Default aus FEATURES (OI-62, Etappe 2).
+    foreach (FEATURES as $f) {
+        if ($f['setting'] === $key) {
+            return $f['default'];
+        }
+    }
     throw new RuntimeException("Einstellung {$key} nicht gefunden");
 }
 
@@ -159,4 +166,63 @@ test('settings scope=client fuehrt station_pin_enabled nicht mehr', function () 
         'Der Schalter kommt seit OI-62 ueber me, nicht mehr ueber scope=client');
     assertTrue(array_key_exists('station_pin_min_length', $res['body']['settings'] ?? []),
         'station_pin_min_length bleibt in scope=client');
+});
+
+// ---- Etappe 2: Terminplanung und Anwesenheit ----------------------------------
+
+function fsMeFeatures(): array
+{
+    $res = apiRequest('GET', 'me', ['token' => apiToken('user')]);
+    assertStatus(200, $res);
+    return $res['body']['features'] ?? [];
+}
+
+test('Terminplanung aus: alle Termin- und Anwesenheitsressourcen antworten 403', function () {
+    fsWith('appointments_enabled', '0', function () {
+        $admin = apiToken('admin');
+        $alle  = array_merge(FEATURES['appointments']['resources'], FEATURES['attendance']['resources']);
+        assertSame(10, count($alle), 'Liste der Ressourcen hat sich geaendert -- Test nachziehen');
+        foreach ($alle as $r) {
+            // feature nennt den gefragten Schluessel, nicht die Voraussetzung
+            fsAssertDisabled(apiRequest('GET', $r, ['token' => $admin]), featureForResource($r), "GET {$r}");
+        }
+    });
+});
+
+test('me meldet abhaengige Funktionen als aus, auch wenn ihre eigene Einstellung an ist', function () {
+    fsWith('punctuality_enabled', '1', function () {
+        fsWith('reliability_enabled', '1', function () {
+            fsWith('appointments_enabled', '0', function () {
+                $f = fsMeFeatures();
+                foreach (['appointments', 'attendance', 'punctuality', 'reliability'] as $k) {
+                    assertSame(false, $f[$k] ?? null, "features.{$k} bei Terminplanung aus");
+                }
+            });
+            fsWith('attendance_enabled', '0', function () {
+                $f = fsMeFeatures();
+                assertSame(true, $f['appointments'] ?? null, 'Terminplanung bleibt an');
+                foreach (['attendance', 'punctuality', 'reliability'] as $k) {
+                    assertSame(false, $f[$k] ?? null, "features.{$k} bei Anwesenheit aus");
+                }
+            });
+        });
+    });
+});
+
+test('Terminplanung aus: my_data bleibt erreichbar (Auskunft)', function () {
+    fsWith('appointments_enabled', '0', function () {
+        $res = apiRequest('GET', 'my_data', ['token' => apiToken('user')]);
+        assertStatus(200, $res, 'my_data darf an keinem Schalter haengen');
+    });
+});
+
+test('Anwesenheit aus: Anwesenheitsressourcen 403, Terminressourcen 200', function () {
+    fsWith('attendance_enabled', '0', function () {
+        $admin = apiToken('admin');
+        foreach (FEATURES['attendance']['resources'] as $r) {
+            fsAssertDisabled(apiRequest('GET', $r, ['token' => $admin]), 'attendance', "GET {$r}");
+        }
+        assertStatus(200, apiRequest('GET', 'appointments', ['token' => $admin]));
+        assertStatus(200, apiRequest('GET', 'appointment_types', ['token' => $admin]));
+    });
 });

@@ -26,10 +26,14 @@ const FU_ROOT = __DIR__ . '/../..';
 
 test('FEATURES ist wörtlich festgehalten', function () {
     assertSame([
-        'worktime'    => ['setting' => 'worktime_enabled',    'default' => '0', 'resources' => ['activity_types', 'work_sessions']],
-        'station_pin' => ['setting' => 'station_pin_enabled', 'default' => '0', 'resources' => ['change_pin']],
-        'punctuality' => ['setting' => 'punctuality_enabled', 'default' => '0', 'resources' => []],
-        'reliability' => ['setting' => 'reliability_enabled', 'default' => '0', 'resources' => []],
+        'appointments' => ['setting' => 'appointments_enabled', 'default' => '1', 'requires' => [],
+                           'resources' => ['appointments', 'appointment_series', 'appointment_types', 'appointment_responses', 'holidays']],
+        'attendance'   => ['setting' => 'attendance_enabled',   'default' => '1', 'requires' => ['appointments'],
+                           'resources' => ['records', 'exceptions', 'attendance_list', 'auto_checkin', 'totp_checkin']],
+        'worktime'     => ['setting' => 'worktime_enabled',     'default' => '0', 'requires' => [], 'resources' => ['activity_types', 'work_sessions']],
+        'station_pin'  => ['setting' => 'station_pin_enabled',  'default' => '0', 'requires' => [], 'resources' => ['change_pin']],
+        'punctuality'  => ['setting' => 'punctuality_enabled',  'default' => '0', 'requires' => ['attendance'], 'resources' => []],
+        'reliability'  => ['setting' => 'reliability_enabled',  'default' => '0', 'requires' => ['attendance'], 'resources' => []],
     ], FEATURES);
 });
 
@@ -154,4 +158,69 @@ test('PWA prueft features.worktime vor activity_types und kennt FEATURE_DISABLED
     $pwa = sourceCode(FU_ROOT . '/public/checkin/js/app.js');
     assertTrue((bool) preg_match('/features\?\.worktime/', $pwa), 'initWorktime() muss userData?.features?.worktime pruefen');
     assertTrue(str_contains($pwa, "'FEATURE_DISABLED'"), 'apiCall() der PWA muss FEATURE_DISABLED unterscheiden');
+});
+
+// ---- Etappe 2: Voraussetzungen (requires) ------------------------------------
+
+/** Alle Schalter mit eigener Einstellung „an“. */
+function fuAlleAn(): array
+{
+    return array_fill_keys(array_keys(FEATURES), true);
+}
+
+test('requires nennt nur bekannte Funktionen und bildet keinen Ring', function () {
+    foreach (FEATURES as $key => $f) {
+        assertTrue(is_array($f['requires'] ?? null), "{$key}: Feld requires fehlt");
+        foreach ($f['requires'] as $r) {
+            assertTrue(isset(FEATURES[$r]), "{$key} setzt die unbekannte Funktion {$r} voraus");
+        }
+    }
+    foreach (array_keys(FEATURES) as $start) {
+        $todo = [[$start, [$start]]];
+        while ($todo !== []) {
+            [$k, $pfad] = array_pop($todo);
+            foreach (FEATURES[$k]['requires'] as $r) {
+                assertTrue(!in_array($r, $pfad, true), 'Ring in requires: ' . implode(' -> ', [...$pfad, $r]));
+                $todo[] = [$r, [...$pfad, $r]];
+            }
+        }
+    }
+});
+
+test('resolveFeatures: alles an bleibt an', function () {
+    assertSame(fuAlleAn(), resolveFeatures(fuAlleAn()));
+});
+
+test('resolveFeatures: Terminplanung aus nimmt Anwesenheit, Pünktlichkeit und Zuverlässigkeit mit', function () {
+    assertSame([
+        'appointments' => false, 'attendance' => false, 'worktime' => true,
+        'station_pin'  => true,  'punctuality' => false, 'reliability' => false,
+    ], resolveFeatures(['appointments' => false] + fuAlleAn()));
+});
+
+test('resolveFeatures: Anwesenheit aus lässt die Terminplanung an', function () {
+    assertSame([
+        'appointments' => true, 'attendance' => false, 'worktime' => true,
+        'station_pin'  => true, 'punctuality' => false, 'reliability' => false,
+    ], resolveFeatures(['attendance' => false] + fuAlleAn()));
+});
+
+test('resolveFeatures: fehlender Schlüssel gilt als aus, Zeiterfassung und PIN bleiben unberührt', function () {
+    assertSame(array_fill_keys(array_keys(FEATURES), false), resolveFeatures([]));
+    assertSame([
+        'appointments' => false, 'attendance' => false, 'worktime' => true,
+        'station_pin'  => true,  'punctuality' => false, 'reliability' => false,
+    ], resolveFeatures(['worktime' => true, 'station_pin' => true, 'punctuality' => true]));
+});
+
+test('featureForResource kennt Termin- und Anwesenheitsressourcen', function () {
+    assertSame('appointments', featureForResource('appointments'));
+    assertSame('appointments', featureForResource('holidays'));
+    assertSame('appointments', featureForResource('appointment_responses'));
+    assertSame('attendance', featureForResource('records'));
+    assertSame('attendance', featureForResource('totp_checkin'));
+    assertSame(null, featureForResource('statistics'));
+    assertSame(null, featureForResource('statistics_report'));
+    assertSame(null, featureForResource('my_data'));
+    assertSame(null, featureForResource('available_years'));
 });
