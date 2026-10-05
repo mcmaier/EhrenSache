@@ -263,7 +263,23 @@ CREATE TABLE  IF NOT EXISTS `{PREFIX}member_groups` (
 CREATE TABLE IF NOT EXISTS `{PREFIX}member_group_assignments` (
   member_id INT NOT NULL,
   group_id INT NOT NULL,
+  valid_from DATE NULL,
   PRIMARY KEY (member_id, group_id),
+  FOREIGN KEY (member_id) REFERENCES `{PREFIX}members`(member_id) ON DELETE CASCADE,
+  FOREIGN KEY (group_id) REFERENCES `{PREFIX}member_groups`(group_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Beendete Gruppenzuordnungen (Spec 2026-10-05): valid_from NULL = von Anfang an,
+-- valid_to = letzter Tag der Zugehoerigkeit
+CREATE TABLE IF NOT EXISTS `{PREFIX}member_group_history` (
+  history_id INT NOT NULL AUTO_INCREMENT,
+  member_id INT NOT NULL,
+  group_id INT NOT NULL,
+  valid_from DATE NULL,
+  valid_to DATE NOT NULL,
+  PRIMARY KEY (history_id),
+  KEY `{PREFIX}idx_mgh_member` (member_id),
+  KEY `{PREFIX}idx_mgh_group_to` (group_id, valid_to),
   FOREIGN KEY (member_id) REFERENCES `{PREFIX}members`(member_id) ON DELETE CASCADE,
   FOREIGN KEY (group_id) REFERENCES `{PREFIX}member_groups`(group_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
