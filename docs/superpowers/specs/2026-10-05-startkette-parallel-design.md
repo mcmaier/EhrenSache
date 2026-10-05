@@ -129,7 +129,9 @@ Höchstens fünf Abrufe gleichzeitig je Gerät.
      Auswahlfelder füllen sich nebenher
    - `loadVersion()` — nicht mehr abgewartet; Versionsnummer und Update-Hinweis erscheinen mit
      der Antwort
-   - `checkWorktimeEnabled()` — `activity_types`, wie heute, nur nicht mehr vor der Ansicht
+   - `checkWorktimeEnabled()` — `activity_types` nur, wenn die Zeiterfassung laut `features`
+     (me, OI-62) an ist, nicht mehr vor der Ansicht; gleichzeitige Aufrufe (Navigation und
+     Bereichsaufruf) teilen sich über das gemerkte Promise `worktimeCheck` eine Anfrage
    - Name im Kopf: `setCurrentUser()` holt `members&id` nicht mehr abgewartet; bis die Antwort da
      ist, steht dort die E-Mail-Adresse (wie heute bei Benutzern ohne Mitglied), danach der Name
 
@@ -185,8 +187,10 @@ ein Ausfall dort lässt nur die Vereinsfarben weg.
 2. **Verhaltensprüfung im Browser**, neues Skript `tests/browser/startup-chain.mjs` (lokal, nicht
    Teil von `tests/run.php`, wie `click-through.mjs`):
    - **Stufen zählen statt Zeit messen:** Jede API-Antwort wird per Request-Interception um
-     300 ms verzögert. Zusicherung: Hauptbildschirm bzw. Profil sichtbar nach weniger als drei
-     Verzögerungen (zwei Stufen plus Spielraum). Heute fiele das bei zehn bzw. fünf Stufen durch.
+     500 ms je Antwort verzögert; gemessen wird der Mehraufwand gegenüber einem Lauf ohne
+     Verzögerung (Minimum aus drei Läufen), Grenze +2,5 × Verzögerung. Zusicherung:
+     Hauptbildschirm bzw. Profil sichtbar nach höchstens zwei Stufen plus Spielraum. Heute fiele
+     das bei zehn bzw. fünf Stufen durch.
    - **Wiederholung:** Ein `GET` bekommt einmal 503 und kommt trotzdem an. Ein `POST` bekommt
      503 und wird **nicht** wiederholt.
    - **Abmeldung:** `me` mit 503 (zweimal) → Token bleibt, „Erneut versuchen“ sichtbar; Knopf

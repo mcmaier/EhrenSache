@@ -1409,7 +1409,7 @@ Automatisiert: `startup_chain_frontend` (statisch), `tests/browser/startup-chain
 | SK-5 | Konto im Dashboard deaktivieren, dann Check-in-App öffnen | Anmeldeformular |
 | SK-6 | Check-in-App: Tab „Verlauf" direkt nach dem Start | Einträge mit Farbpunkt der Terminart |
 | SK-7 | Dashboard neu laden, Bereich „Mein Profil" | Ansicht steht, Name in der Kopfzeile folgt kurz danach, Versionsnummer erscheint |
-| SK-8 | Dashboard neu laden, Bereich „Zeiterfassung" | Bereich lädt; im Netzwerk `activity_types` nur einmal |
+| SK-8 | Admin mit mindestens einer Tätigkeitsart: Dashboard neu laden, Bereich „Zeiterfassung" | Bereich lädt; im Netzwerk `activity_types` nur einmal |
 
 ### Status-Chips (OI-86, 1.13.0)
 
