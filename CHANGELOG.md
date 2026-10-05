@@ -17,6 +17,15 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Limiter hinter Cloudflare alle Besucher unter der Adresse des Proxys. Ohne Eintrag bleibt
   alles wie bisher. Für Installationen hinter Cloudflare siehe README, Abschnitt Update.
 
+### Behoben
+- **Das Dashboard lud langsam, weil parallele Abrufe nacheinander liefen.** Die API hielt die
+  Sitzung jedes Abrufs bis zu dessen Ende gesperrt. Startete das Dashboard mehrere Abrufe
+  gleichzeitig, bediente der Server sie deshalb der Reihe nach, und jeder wartende Abruf
+  belegte einen PHP-Prozess (auf der Demo wartete ein schneller Abruf 1,2 s hinter einem
+  langsamen). Die Sitzung wird jetzt freigegeben, sobald die Anmeldung geprüft ist. Spürbar
+  vor allem bei mobiler Verbindung und auf Hostern, die gleichzeitige PHP-Prozesse knapp
+  begrenzen.
+
 ---
 
 ## [1.20.0] – 2026-10-02
