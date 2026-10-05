@@ -51,3 +51,14 @@ nicht abmeldet und „Erneut versuchen“ hilft, und dass `me` mit 401 zur Anmel
 
 Braucht in `tests/config.php` die Konten `admin` und `user`. `ES_BASE_URL` überschreibt
 `base_url`, etwa für eine Gegenprobe gegen einen älteren Stand.
+
+# Version im Pfad (OI-120)
+
+`cache-reuse.mjs` ruft Anmeldeseite und Dashboard je zweimal auf. Beim ersten Mal müssen alle
+CSS- und JS-Adressen den Abschnitt `v<Version>/` tragen und keine Datei darf unter zwei Adressen
+laden; beim zweiten Mal darf keine CSS- oder JS-Anfrage den Server erreichen (alles aus dem
+Browser-Speicher, `immutable`). Ohne Request-Interception, weil sie den Cache abschaltet.
+
+    node tests/browser/cache-reuse.mjs
+
+Braucht in `tests/config.php` das Konto `admin`. `ES_BASE_URL` überschreibt `base_url`.
