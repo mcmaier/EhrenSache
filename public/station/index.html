@@ -66,6 +66,10 @@
                 <button id="stampStart" class="btn primary huge">Stempeln</button>
                 <p class="muted">Mitgliedsnummer und PIN eingeben</p>
             </div>
+
+            <div id="noFunctionPanel" class="card" hidden>
+                <p>An dieser Station ist keine Funktion freigeschaltet.</p>
+            </div>
         </main>
     </section>
 
@@ -103,7 +107,7 @@
         <div class="action">
             <h2 id="greeting">Hallo</h2>
             <div class="cards">
-                <div class="card">
+                <div class="card" id="attendanceCard">
                     <h3>Anwesenheit</h3>
                     <p id="attendanceInfo" class="muted"></p>
                     <button id="attendanceBtn" class="btn primary big">Einchecken</button>
@@ -123,6 +127,7 @@
                     </div>
                 </div>
             </div>
+            <p id="actionNoFunction" class="muted" hidden>An dieser Station ist keine Funktion freigeschaltet.</p>
             <div class="row">
                 <button id="actionDone" class="btn">Fertig</button>
             </div>

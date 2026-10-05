@@ -303,6 +303,12 @@ body {
     margin-bottom: 5px;
 }
 
+/* Ohne diese Regel schlaegt das display der Klasse das [hidden] des Browsers
+   (Hinweis „nichts freigeschaltet“ im Erfassen-Tab, OI-62 Etappe 2). */
+.info-box[hidden] {
+    display: none;
+}
+
 
 /* Dashboard Link */
 .dashboard-link {

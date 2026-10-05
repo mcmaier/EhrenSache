@@ -52,6 +52,20 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   jetzt in der Antwort von `me` im Feld `features`; `settings&scope=client` führt
   `station_pin_enabled` nicht mehr. Dashboard und Check-in-App erkennen die Zeiterfassung
   darüber statt an einem `404` (OI-62).
+- **Terminplanung und Anwesenheitserfassung lassen sich abschalten.** Zwei neue Schalter in
+  den Einstellungen (Tab „Termine & Anwesenheit“), `appointments_enabled` und
+  `attendance_enabled`, ab Werk an; Anwesenheit setzt die Terminplanung voraus. Ist die
+  Terminplanung aus, antworten `appointments`, `appointment_series`, `appointment_types`,
+  `appointment_responses` und `holidays` mit `403` und `"code": "FEATURE_DISABLED"`; ist die
+  Anwesenheit aus (oder die Terminplanung), ebenso `records`, `exceptions`, `attendance_list`,
+  `auto_checkin`, `totp_checkin`, `statistics_report`, `statistics` ohne `include=worktime`,
+  die Exporte und Importe der betroffenen Typen und `station` `checkin`. `statistics` mit
+  `include=worktime` liefert dann nur den Arbeitszeitblock, `station` `status` meldet
+  `attendance_enabled`, `me` meldet `features.appointments` und `features.attendance`;
+  Pünktlichkeit und Zuverlässigkeit gelten ohne Anwesenheit als aus. `available_years` nennt
+  zusätzlich die Jahre mit Arbeitszeit, solange die Zeiterfassung an ist. Dashboard,
+  Check-in-App und Station blenden aus, was abgeschaltet ist; `my_data` bleibt erreichbar.
+  Solange beide Schalter an sind, ändert sich für bestehende Clients nichts (OI-62).
 
 ### Behoben
 - **Check-in-App und Dashboard starten deutlich schneller, vor allem im Mobilfunk.** Beide

@@ -328,9 +328,11 @@ php tests/run.php worktime_api
   Installationen wird dafür **nicht** angefasst — der Default greift. Seit 1.6.0 enthält
   `config.php` nur Daten; Programmcode gehört nach `private/helpers/`
 - Neue abschaltbare Funktion: Eintrag in `FEATURES` (`private/helpers/features.php`) mit
-  Einstellungsschlüssel im Schema; ganze Ressourcen sperrt `api.php` dann selbst, Teilpfade
-  rufen `requireFeature()`. Frontend: `data-feature="<key>"` bzw. `isFeatureOn()` aus
-  `features.js`. Wächter: `tests/suites/features_unit.php`
+  Einstellungsschlüssel im Schema und `requires` (Voraussetzungen, rekursiv aufgelöst);
+  ganze Ressourcen sperrt `api.php` dann selbst, Teilpfade rufen `requireFeature()`.
+  Frontend: `data-feature="<key>"` bzw. `isFeatureOn()` aus `features.js`, in der PWA
+  `pwaFeatureOn()`. Einstellungsseite: abhängige Felder in `FEATURE_SWITCHES` (Reihenfolge =
+  Stufung), Schlüssel in `FEATURE_KEYS` (`settings.js`). Wächter: `tests/suites/features_unit.php`
 - Update-Pfad (`public/update/index.php` und die Helfer, die er lädt — Liste in
   `tests/suites/update_path_syntax.php`): **nur Syntax bis PHP 8.0**, auch wenn die Anwendung
   selbst mehr verlangt. Neue Anforderungen der Anwendung gehören nach `requires` in

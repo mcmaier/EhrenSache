@@ -742,6 +742,8 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('station_pin_min_length', '4', 'number', 'general', 'Mindestlänge der Stations-PIN (4 bis 8 Ziffern)'),
 ('punctuality_enabled', '0', 'boolean', 'general', 'Pünktlichkeitskennzahl berechnen und anzeigen'),
 ('reliability_enabled', '0', 'boolean', 'general', 'Zuverlässigkeitskennzahl berechnen und anzeigen'),
+('appointments_enabled', '1', 'boolean', 'general', 'Terminplanung aktiviert (Termine, Terminarten, Kalender, Rückmeldungen)'),
+('attendance_enabled', '1', 'boolean', 'general', 'Anwesenheitserfassung aktiviert (setzt die Terminplanung voraus)'),
 ('punctuality_grace_minutes', '0', 'number', 'general', 'Karenz in Minuten relativ zum Terminbeginn (-60 bis 60)'),
 ('response_deadline_hours', '24', 'number', 'general', 'Frist für Terminrückmeldungen in Stunden vor Beginn (0 bis 720)'),
 ('rate_threshold_mid', '40', 'number', 'general', 'Ab dieser Quote Orange statt Rot'),

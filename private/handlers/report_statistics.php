@@ -32,6 +32,9 @@ function handleStatisticsReport($db, $database, $request_method, $authUserRole, 
         exit();
     }
 
+    // Der Bericht besteht nur aus Anwesenheitswerten (OI-62, Etappe 2).
+    requireFeature($db, $database, 'attendance');
+
     $year     = isset($_GET['year'])      ? intval($_GET['year'])      : (int) date('Y');
     $groupId  = isset($_GET['group_id'])  ? intval($_GET['group_id'])  : null;
     $memberId = isset($_GET['member_id']) ? intval($_GET['member_id']) : null;

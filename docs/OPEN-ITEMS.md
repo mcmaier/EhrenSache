@@ -3192,11 +3192,15 @@ schlechtesten Fall eine nachträglich verschobene Kennzahl.
 ---
 
 ### OI-62 · Feature-Schalter ohne gemeinsame Prüfstelle
-**Priorität:** Etappe 1 erledigt am 2026-10-05 (Zweig `feat/feature-schalter`, Spec
+**Priorität:** Erledigt am 2026-10-05. Etappe 1 (Zweig `feat/feature-schalter`, Spec
 `docs/superpowers/specs/2026-10-05-feature-schalter-design.md`): Liste `FEATURES` in
 `private/helpers/features.php`, zentrale Sperre in `api.php`, `403 FEATURE_DISABLED`, Feld
-`features` in `me`. **Offen: Etappe 2** — Schalter für Terminplanung und
-Anwesenheitserfassung, eigene Spec. Ursprünglich niedrig–mittel · aufgenommen am 2026-09-16
+`features` in `me`. Etappe 2 (Zweig `feat/feature-schalter-2`, Spec
+`docs/superpowers/specs/2026-10-05-feature-schalter-etappe-2-design.md`): Schalter
+`appointments` und `attendance`, Feld `requires` (Anwesenheit setzt Terminplanung voraus,
+Pünktlichkeit und Zuverlässigkeit die Anwesenheit), Teilpfade in Statistik, Export/Import,
+Station, Rückmeldungen und Arbeitszeit. Nicht Teil: weitere Schalter (etwa Rückmeldungen
+vereinsweit). Ursprünglich niedrig–mittel · aufgenommen am 2026-09-16
 
 Abschaltbare Grundfunktionen gibt es bereits, aber jede wurde einzeln nachgerüstet und wird
 anders geprüft:

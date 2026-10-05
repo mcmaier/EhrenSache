@@ -142,7 +142,10 @@ function openItemsForMember($db, $database, int $memberId, string $now): array
         $db, $database, 'response_deadline_hours', (string) RESPONSE_DEADLINE_DEFAULT_HOURS
     ));
     $horizon = openItemsResponseHorizon($now);
-    $ids = responsesFetchUpcomingIds($db, $database, $memberId, $now);
+    // Terminplanung aus (OI-62, Etappe 2): keine Rueckmeldepunkte.
+    $ids = isFeatureEnabled($db, $database, 'appointments')
+        ? responsesFetchUpcomingIds($db, $database, $memberId, $now)
+        : [];
     if ($ids !== []) {
         $in   = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $db->prepare("
@@ -186,7 +189,10 @@ function openItemsForMember($db, $database, int $memberId, string $now): array
           AND (e.status = 'pending' OR (e.status = 'rejected' AND e.approved_at >= ?))
     ");
     $stmt->execute([$memberId, $since]);
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $e) {
+    // Anwesenheit aus (OI-62, Etappe 2): Antraege sind Anwesenheitsdaten und
+    // entfallen; bei Terminplanung aus folgt das aus requires.
+    $exceptionRows = isFeatureEnabled($db, $database, 'attendance') ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+    foreach ($exceptionRows as $e) {
         $item = [
             'kind'           => 'exception',
             'state'          => $e['status'],

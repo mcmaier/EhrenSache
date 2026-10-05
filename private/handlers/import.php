@@ -26,6 +26,13 @@ function handleImport($db, $database, $request_method) {
     $prefix = $database->table('');
     
     $type = $_GET['type'] ?? 'members';
+
+    // Vor der Dateipruefung: Ein abgeschalteter Typ soll keine Datei ablegen (OI-62, Etappe 2).
+    $importFeature = ['appointments' => 'appointments', 'records' => 'attendance',
+                      'extract_appointments' => 'attendance'][$type] ?? null;
+    if ($importFeature !== null) {
+        requireFeature($db, $database, $importFeature);
+    }
     
     // Prüfe ob Datei hochgeladen wurde
     if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {

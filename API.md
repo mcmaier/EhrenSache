@@ -331,6 +331,8 @@ Gibt Informationen über den aktuell angemeldeten Benutzer zurück.
   "member_id": 5,
   "auth_type": "session",
   "features": {
+    "appointments": true,
+    "attendance": true,
     "worktime": true,
     "station_pin": false,
     "punctuality": true,
@@ -342,6 +344,13 @@ Gibt Informationen über den aktuell angemeldeten Benutzer zurück.
 `features` nennt für jede abschaltbare Funktion, ob sie eingeschaltet ist (seit OI-62). Die
 Werte sind für alle Rollen gleich. Abgeschaltete Funktionen antworten mit `403` und
 `"code": "FEATURE_DISABLED"`, siehe Fehlerbehandlung.
+
+Seit Etappe 2 auch `appointments` (Einstellung `appointments_enabled`) und `attendance`
+(`attendance_enabled`), beide ab Werk an. Funktionen bauen aufeinander auf: Anwesenheit setzt
+die Terminplanung voraus, Pünktlichkeit und Zuverlässigkeit die Anwesenheit. Ein Wert ist nur
+`true`, wenn die eigene Einstellung **und** alle Voraussetzungen an sind — bei abgeschalteter
+Terminplanung melden also auch `attendance`, `punctuality` und `reliability` `false`, ohne
+dass sich deren Einstellung ändert.
 
 ---
 
@@ -735,6 +744,8 @@ etwaigen Benutzerkontos (`users.member_id` wird auf `NULL` gesetzt, das Konto bl
 
 ## Termine (appointments)
 
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `appointments_enabled = 0` antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "appointments"`.
+
 ### Alle Termine abrufen
 **Endpoint:** `GET /api.php?resource=appointments`
 
@@ -845,6 +856,9 @@ die Anwesenheit an.
   `year`, `from_date` oder `to_date` liefe die Zählung über die ganze Historie — dieselbe
   Kostengrenze wie bei den Rückmeldungssummen darüber.
 - Der Einzelabruf (`?id=`) kennt den Zusatz nicht.
+
+Bei abgeschalteter Anwesenheitserfassung entfällt der Zusatz still: Die Antwort trägt dann
+weder `attendance` noch `own_attendance` (seit OI-62, Etappe 2).
 
 ---
 
@@ -959,6 +973,8 @@ erforderlich"}` statt mit einer Erfolgsmeldung (OI-56).
 ---
 
 ## Terminserien (appointment_series)
+
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `appointments_enabled = 0` antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "appointments"`.
 
 **Seit 1.11.0 (FI-7).** Eine Serie ist eine Regel (Teilmenge von RFC 5545) plus Vorlage; die
 Termine selbst sind gewöhnliche `appointments` mit `series_id` (siehe oben). Termine mit
@@ -1220,6 +1236,8 @@ Unbekannte `id` → `404`. Einfacher Nutzer oder Gerät → `403`.
 
 ## Feiertage (holidays)
 
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `appointments_enabled = 0` antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "appointments"`.
+
 **Seit 1.11.0 (FI-16).** Berechnete gesetzliche Feiertage (Gauß/Meeus-Osterformel), **ohne**
 externe Quelle und **ohne** `ext-calendar`. Bundesweite Feiertage immer, dazu die des in den
 Einstellungen hinterlegten Bundeslands (`holiday_region`, siehe unten).
@@ -1260,6 +1278,8 @@ Sachsens und Thüringens) sowie einmalige Feiertage (z. B. Reformationstag 2017 
 ---
 
 ## Anwesenheit (records)
+
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `attendance_enabled = 0` — oder abgeschalteter Terminplanung, die sie voraussetzt — antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "attendance"`.
 
 ### Anwesenheitseinträge abrufen
 **Endpoint:** `GET /api.php?resource=records`
@@ -1422,6 +1442,8 @@ deleted"` ein `deleted_count`:
 
 ## Auto Check-In
 
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `attendance_enabled = 0` — oder abgeschalteter Terminplanung, die sie voraussetzt — antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "attendance"`.
+
 ### Automatischer Check-In
 Geräte-Endpunkt (source_device).
 
@@ -1544,6 +1566,8 @@ normalisiert wie das PWA-Format.
 
 ## TOTP Check-In
 
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `attendance_enabled = 0` — oder abgeschalteter Terminplanung, die sie voraussetzt — antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "attendance"`.
+
 ### Check-In mit TOTP-Code
 Standortverifizierter Check-In mit zeitbasiertem Einmalpasswort.
 Wird automatisch für Authorisierten User durchgeführt (z.B. User über PWA).
@@ -1627,10 +1651,16 @@ Steuerung über `?action=`. Andere Methoden als GET und POST antworten `405`.
   "pin_enabled": true,
   "pin_min_length": 4,
   "worktime_enabled": true,
+  "attendance_enabled": true,
   "server_time": "2026-09-04 19:02:11",
   "server_unix": 1788800531
 }
 ```
+
+`attendance_enabled` (seit OI-62, Etappe 2): `false`, wenn die Anwesenheitserfassung aus ist.
+Dann liefert `identify` `checkin_candidate: null`, und `POST checkin` antwortet
+`403 FEATURE_DISABLED` (`"feature": "attendance"`) — geprüft vor der PIN, nach der Prüfung
+von `station_pin_enabled`.
 
 ### Stations-Code
 **Endpoint:** `GET /api.php?resource=station&action=totp`
@@ -1701,6 +1731,7 @@ updated / unchanged) plus `appointment {appointment_id, title, date, start_time}
 bestehender Record mit Status `excused` wird von einem Check-in immer auf `present` mit der
 neuen Ankunftszeit gehoben (`record_action: updated`) — ein tatsächlicher Stempel schlägt eine
 Entschuldigung, unabhängig vom sonst geltenden Zeitvergleich.
+`403 FEATURE_DISABLED` wenn die Anwesenheitserfassung aus ist (seit OI-62, Etappe 2).
 
 ### Arbeitszeit: work_start, work_pause, work_resume, work_stop
 **Endpoint:** `POST /api.php?resource=station&action=work_start` (Body zusätzlich `activity_id`, positive Ganzzahl)
@@ -1715,6 +1746,8 @@ Notizpflicht (`worktime_require_note`) gilt am Kiosk nicht. `created_by` ist das
 ---
 
 ## Ausnahmen (exceptions)
+
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `attendance_enabled = 0` — oder abgeschalteter Terminplanung, die sie voraussetzt — antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "attendance"`.
 
 ### Ausnahmen abrufen
 **Endpoint:** `GET /api.php?resource=exceptions`
@@ -2022,6 +2055,8 @@ andere, eines mit nur dieser steht danach ohne Gruppe.
 
 ## Terminarten (appointment_types)
 
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `appointments_enabled = 0` antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "appointments"`.
+
 ### Terminarten abrufen
 **Endpoint:** `GET /api.php?resource=appointment_types`
 
@@ -2090,6 +2125,8 @@ jedem `PUT` ohne `group_ids` (OI-54).
 
 ## Terminrückmeldungen (appointment_responses)
 
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `appointments_enabled = 0` antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "appointments"`.
+
 Seit 1.7.0. Mitglieder melden sich zu kommenden Terminen zu, ab oder unsicher. Nur bei
 Terminarten mit `responses_enabled`. Erwartet ist, wer über Terminart → Gruppe erreicht wird und
 am Termindatum aktiv ist. Geräte haben keinen Zugriff (`403`).
@@ -2125,7 +2162,7 @@ wie bei „Ein Termin“ nur bei `names_visible`.
   sie zusätzlich `started` (wie oben) und `own_absence`: den jüngsten eigenen
   Entschuldigungsantrag zum Termin als `{"exception_id", "status"}` oder `null`. Die Check-in-App
   bietet damit bis Terminbeginn „Entschuldigen“ an und zeigt den Stand. Eingereicht wird über
-  `POST exceptions` mit `exception_type: absence`, zurückgezogen über `DELETE exceptions`. Die Antwort ist
+  `POST exceptions` mit `exception_type: absence`, zurückgezogen über `DELETE exceptions`. Mit ausgeschalteter Anwesenheit ist `own_absence` immer `null` (seit OI-62, Etappe 2). Die Antwort ist
   dann chronologisch nach Datum und Beginn sortiert. Ohne den Schalter bleibt sie wie bisher,
   damit ein vor dem Update geöffneter Tab der Check-in-App keine Einträge bekommt, die sein Code
   nicht kennt.
@@ -2192,6 +2229,8 @@ wie bei „Ein Termin“ nur bei `names_visible`.
   Zahl und kennzeichnet die Zeilen mit „keine Antwort (kein Zugang)“.
 - `comparison` — nur Admin/Manager, nur nach Beginn: Anzahl je `yes_present`, `yes_absent`,
   `no_present`, `no_absent`, `maybe_present`, `maybe_absent`, `none_present`, `none_absent`.
+  Bei abgeschalteter Anwesenheitserfassung entfällt `comparison`, und `present` ist bei jedem
+  Mitglied `null` (seit OI-62, Etappe 2).
 - `is_late` — die letzte **Statusänderung** liegt nach der Frist (Frist = Beginn minus
   `deadline_hours`). Eine geänderte Bemerkung verschiebt den Zeitpunkt nicht. Wird für jeden Status
   geliefert; die Oberflächen (Dashboard, Druckansicht, PWA) kennzeichnen „kurzfristig" nur bei einer
@@ -2225,6 +2264,10 @@ Admin und Manager tragen mit `&member_id=7` für ein Mitglied ein, auch nach Beg
 nicht schon `no`) braucht `comment` und legt einen Abwesenheitsantrag (`exceptions`, `pending`) an.
 Hat das Mitglied schon einen eigenen offenen oder genehmigten Antrag zum Termin — etwa direkt über
 `exceptions` gestellt —, wird dieser nur **verknüpft**, statt einen zweiten anzulegen.
+
+Solange die Anwesenheitserfassung aus ist, ruht die Pflicht (seit OI-62, Etappe 2):
+`settings.require_excuse` ist `false`, eine Absage braucht keine Begründung und legt keinen
+Antrag an. Bereits angelegte Anträge bleiben unverändert.
 
 Ob der verknüpfte Antrag der Rückmeldung „gehört", entscheidet, was mit ihm geschieht:
 
@@ -2545,6 +2588,10 @@ Optional bei `POST` und `PUT`. Beim `PUT` entscheidet die Anwesenheit des Feldes
 | `appointment_id: <id>` | Zuordnung auf diesen Termin; unbekannte ID ergibt `400`. Ohne Verwalterrolle ebenso ein Termin, dessen Terminart keiner Gruppe des Mitglieds zugeordnet ist (ab 1.11.2, gilt auch für `action: 'start'`) |
 | `appointment_id: null` (oder leer) | Die Zuordnung wird gelöst |
 
+**Bei abgeschalteter Terminplanung** (seit OI-62, Etappe 2): Ein gesetztes `appointment_id`
+bei `POST` oder `PUT` antwortet `403 FEATURE_DISABLED` mit `"field": "appointment_id"`. Ein
+leerer Wert wird ignoriert, die bestehende Zuordnung bleibt; Lesen ist unverändert.
+
 **Ein Nachtrag erzeugt keinen Anwesenheitseintrag** — auch nicht bei der Freigabe. Arbeit für
 einen Termin ist keine Anwesenheit bei ihm: Wer den Bühnenaufbau nachträgt, war nicht
 notwendig beim Konzert. Zudem ist ein Nachtrag bis zur Freigabe eine ungeprüfte Behauptung.
@@ -2598,6 +2645,11 @@ Gruppen-403 (`Activity type not allowed for this member`) sichert ein Test in
 - `year`: Jahr (Standard: aktuelles)
 - `appointment_type_id`: auf eine Terminart einschränken
 - `include=worktime`: hängt den Arbeitszeitblock an (siehe unten); jeder andere Wert wird ignoriert
+
+**Bei abgeschalteter Anwesenheitserfassung** (seit OI-62, Etappe 2): ohne `include=worktime`
+`403 FEATURE_DISABLED` (`"feature": "attendance"`). Mit `include=worktime` enthält die Antwort
+nur `warning`, `year` und `worktime` — oder `403` mit `"feature": "worktime"`, wenn auch die
+Zeiterfassung aus ist.
 
 **Response:**
 ```json
@@ -2864,6 +2916,9 @@ Liefert die Anwesenheitsstatistik als **druckbare HTML-Seite** — nicht als JSO
 Lesen, Drucken und Vorlegen; die Zahlen selbst holt man über `resource=statistics`.
 
 **Endpoint:** `GET /api.php?resource=statistics_report`
+
+`403 FEATURE_DISABLED` (`"feature": "attendance"`), wenn die Anwesenheitserfassung aus ist
+(seit OI-62, Etappe 2).
 
 **Berechtigung:** Admin, Manager und User. Ein `user` erhält ausschließlich die eigene Person;
 eine mitgeschickte fremde `member_id` wird **ignoriert, nicht abgewiesen**. Ein Gerätekonto
@@ -3180,6 +3235,12 @@ HTML-Seite.
 | `worktime_activity`, `worktime_appointment` | ja | **nein** (403) |
 | `worktime_member` | ja, auch als CSV, auch für fremde `member_id` | ja — **nur** die eigene Person, **nur** mit `format=html` |
 
+Abgeschaltete Funktionen (seit OI-62, Etappe 2): Typ `appointments` antwortet bei
+abgeschalteter Terminplanung `403 FEATURE_DISABLED` (`"feature": "appointments"`), Typ
+`records` bei abgeschalteter Anwesenheit (`"feature": "attendance"`). Die Arbeitszeit-Exporte
+hängen nur an der Zeiterfassung; `worktime_appointment` nennt weiter die Titel vorhandener
+Termine.
+
 Ein `user` bekommt den eigenen Stundennachweis also ausschließlich als Druckansicht. Ohne
 `format=html` antwortet der Server mit **403**, nicht mit einer stillen HTML-Ausgabe: Der
 Aufrufer soll wissen, dass er nicht bekommt, was er angefordert hat. Eine mitgeschickte fremde
@@ -3256,6 +3317,10 @@ Spaltenreihenfolge spielt keine Rolle, gelesen wird nach Namen, und unbekannte S
 
 `type` steht in der **Query**, nicht im Formular: `members` (Vorgabe, wenn `type` fehlt),
 `appointments`, `records`, `extract_appointments`.
+
+Abgeschaltete Funktionen (seit OI-62, Etappe 2), geprüft vor der Datei: `appointments`
+antwortet bei abgeschalteter Terminplanung `403 FEATURE_DISABLED`, `records` und
+`extract_appointments` bei abgeschalteter Anwesenheit.
 
 **Berechtigung:** Admin
 
@@ -3610,6 +3675,8 @@ Alle Schritte laufen in **einer Transaktion**.
 
 ## Anwesenheitsliste
 
+**Abschaltbar** (seit OI-62, Etappe 2): Bei `attendance_enabled = 0` — oder abgeschalteter Terminplanung, die sie voraussetzt — antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "attendance"`.
+
 ### Anwesenheitsliste für Termin
 **Endpoint:** `GET /api.php?resource=attendance_list&appointment_id=10`
 
@@ -3767,7 +3834,9 @@ auch kommende, und das Dashboard trennt sie über dieses Feld ab.
 **Endpoint:** `GET /api.php?resource=available_years`
 
 **Response:** ein **nacktes Array**, kein `{"years": …}`-Umschlag — absteigend sortiert
-(Jahre von `appointments.date`, neuestes zuerst):
+(Jahre von `appointments.date`, seit OI-62 Etappe 2 zusätzlich die Jahre von
+`work_sessions.start_time`, solange die Zeiterfassung an ist; das laufende Jahr ist immer
+dabei; neuestes zuerst):
 ```json
 [2026, 2025]
 ```
@@ -3894,7 +3963,10 @@ trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200` (OI-56).
   "feature": "worktime"
 }
 ```
-Welche Funktionen eingeschaltet sind, meldet `me` im Feld `features`.
+Welche Funktionen eingeschaltet sind, meldet `me` im Feld `features`. `feature` nennt den
+gefragten Schlüssel, nicht die Voraussetzung: Ein `GET records` bei abgeschalteter
+Terminplanung meldet `"feature": "attendance"`. Erreichbar bleibt bei jedem Stand `my_data`
+(Auskunft nach DSGVO Art. 15) — Abschalten ist keine Löschung.
 
 ---
 

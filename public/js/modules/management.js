@@ -18,6 +18,7 @@ import { groupChips, CHIPS_APPOINTMENT_TYPES, countChips, filterByChip,
          renderFilterChips } from './filter_chips.js';
 import {debug} from '../app.js'
 import { registerActions } from './actions.js';
+import { isFeatureOn } from './features.js';
 
 // ============================================
 // MANAGEMENT (Groups & Types)
@@ -39,8 +40,12 @@ export async function showGroupSection(forceReload = false)
     const groupData = await loadGroups(forceReload);
     renderGroups(groupData);
 
-    const typeData = await loadTypes(forceReload);
-    renderTypeGroupOverview(typeData);
+    // Terminarten nur mit Terminplanung (OI-62, Etappe 2); der Block traegt
+    // data-feature="appointments" und ist dann ausgeblendet.
+    if (isFeatureOn('appointments')) {
+        const typeData = await loadTypes(forceReload);
+        renderTypeGroupOverview(typeData);
+    }
 }
 
 // ============================================

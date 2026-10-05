@@ -588,7 +588,11 @@ function responsesFetchUpcomingInfo($db, $database, int $memberId, string $now):
     ");
     $stmt->execute([$memberId, $now, $now]);
 
-    return array_map(static fn (array $row) => responsesInfoItem($row, $now),
+    // Ohne Anwesenheit (OI-62, Etappe 2) antwortet exceptions mit 403: keine
+    // eigene Entschuldigung ausliefern, die Karte bietet dann nichts an.
+    $attendanceOn = isFeatureEnabled($db, $database, 'attendance');
+
+    return array_map(static fn (array $row) => responsesInfoItem($row, $now, $attendanceOn),
                      $stmt->fetchAll(PDO::FETCH_ASSOC));
 }
 
@@ -597,12 +601,13 @@ function responsesFetchUpcomingInfo($db, $database, int $memberId, string $now):
  *
  * started und own_absence tragen die Entschuldigung an der Karte (seit
  * 1.12.0): bis Terminbeginn beantragen, solange offen zurueckziehen.
+ * Mit ausgeschalteter Anwesenheit ist own_absence immer null.
  */
-function responsesInfoItem(array $row, string $now): array
+function responsesInfoItem(array $row, string $now, bool $attendanceOn = true): array
 {
     return [
         'started'     => responseHasStarted($row['date'], $row['start_time'], $now),
-        'own_absence' => $row['absence_id'] === null ? null : [
+        'own_absence' => ($row['absence_id'] === null || !$attendanceOn) ? null : [
             'exception_id' => (int) $row['absence_id'],
             'status'       => $row['absence_status'],
         ],

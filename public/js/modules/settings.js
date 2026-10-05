@@ -222,31 +222,47 @@ export function hasUnsavedSettings() {
  * wird ein Wert gespeichert, den niemand liest.
  */
 const FEATURE_SWITCHES = {
-    worktime_enabled:    ['worktime_max_session_hours', 'worktime_require_note'],
-    station_pin_enabled: ['station_pin_min_length'],
-    punctuality_enabled: ['punctuality_grace_minutes'],
+    // Reihenfolge traegt die Stufung (OI-62, Etappe 2): Ein Schalter, den ein
+    // vorheriger sperrt, zaehlt als aus -- Terminplanung aus sperrt den
+    // Anwesenheitsschalter und damit auch dessen abhaengige Felder.
+    appointments_enabled: ['attendance_enabled', 'holiday_region', 'response_deadline_hours'],
+    attendance_enabled:   ['checkin_auto_create_appointment', 'checkin_tolerance_hours',
+                           'punctuality_enabled', 'reliability_enabled',
+                           'rate_threshold_mid', 'rate_threshold_fair', 'rate_threshold_good'],
+    punctuality_enabled:  ['punctuality_grace_minutes'],
+    worktime_enabled:     ['worktime_max_session_hours', 'worktime_require_note'],
+    station_pin_enabled:  ['station_pin_min_length'],
 };
 
 function applyFeatureSwitchState() {
+    const gesperrt = new Set();
     Object.entries(FEATURE_SWITCHES).forEach(([schalter, abhaengige]) => {
         const box = document.querySelector(`[data-key="${schalter}"]`);
         if (!box) {
             return;
         }
-
-        abhaengige.forEach(key => {
-            const feld = document.querySelector(`[data-key="${key}"]`);
-            if (!feld) {
-                return;
-            }
-
-            feld.disabled = !box.checked;
-            const karte = feld.closest('.settings-card');
-            if (karte) {
-                karte.classList.toggle('is-disabled', !box.checked);
-            }
-        });
+        if (!box.checked || gesperrt.has(schalter)) {
+            abhaengige.forEach(key => gesperrt.add(key));
+        }
     });
+
+    // Eine Karte gilt als ausgegraut, sobald eines ihrer abhaengigen Felder
+    // gesperrt ist -- wie bisher bei Zeiterfassung und Stations-PIN.
+    const karten = new Map();
+    Object.values(FEATURE_SWITCHES).flat().forEach(key => {
+        const feld = document.querySelector(`[data-key="${key}"]`);
+        if (!feld) {
+            return;
+        }
+        feld.disabled = gesperrt.has(key);
+        const karte = feld.closest('.settings-card');
+        // Ein Schalter, den die Stufung sperrt, ist selbst abhaengig, gehoert aber
+        // zu seiner Karte (z. B. Funktionen): Er blendet sie nicht aus.
+        if (karte && !Object.prototype.hasOwnProperty.call(FEATURE_SWITCHES, key)) {
+            karten.set(karte, karten.get(karte) === true || feld.disabled);
+        }
+    });
+    karten.forEach((aus, karte) => karte.classList.toggle('is-disabled', aus));
 }
 
 function setupColorReset() {
@@ -535,10 +551,16 @@ async function saveAllSettings() {
         // sofort folgen — sonst bliebe der Punkt bis zum Neuladen falsch.
         // Ein Schalter aus FEATURES wurde umgelegt (OI-62): Stand aus me neu
         // holen, Menue anwenden, dann die Zusatzbedingung der Zeiterfassung.
-        const FEATURE_KEYS = ['worktime_enabled', 'station_pin_enabled', 'punctuality_enabled', 'reliability_enabled'];
+        const FEATURE_KEYS = ['appointments_enabled', 'attendance_enabled', 'worktime_enabled',
+                              'station_pin_enabled', 'punctuality_enabled', 'reliability_enabled'];
         if (updates.some(u => FEATURE_KEYS.includes(u.key))) {
             const { refreshFeatures } = await import('./features.js');
             await refreshFeatures();
+            // Die Termine des Jahres tragen die Anwesenheitszahlen (include=attendance) --
+            // nach dem Umschalten muessen sie neu kommen (OI-62, Etappe 2).
+            if (updates.some(u => u.key === 'appointments_enabled' || u.key === 'attendance_enabled')) {
+                await invalidateCache('appointments');
+            }
             const { resetWorktimeEnabled, checkWorktimeEnabled } = await import('./worktime.js');
             resetWorktimeEnabled();
             await checkWorktimeEnabled();
