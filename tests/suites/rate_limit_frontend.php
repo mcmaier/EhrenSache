@@ -54,7 +54,9 @@ test('Rate-Grenze: sie zaehlt unangemeldete Aufrufe je Adresse', function () use
     assertTrue($end !== false, 'Ende des Blocks if (!$istAngemeldet) nicht gefunden');
     $block = substr($rlSource, $start, $end - $start);
 
-    assertTrue(preg_match('/\$rateLimiter->check\(\s*\$_SERVER\[\'REMOTE_ADDR\'\]/', $block) === 1,
+    // Je Adresse heisst seit dem Proxy-Fix: ueber currentClientIp(), das hinter
+    // einem eingetragenen Proxy die Besucheradresse liefert (client_ip_unit).
+    assertTrue(preg_match('/\$rateLimiter->check\(\s*currentClientIp\(\)/', $block) === 1,
         'Gezaehlt wird nicht je Adresse, oder nicht innerhalb von if (!$istAngemeldet)');
 });
 
