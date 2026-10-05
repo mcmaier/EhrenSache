@@ -372,11 +372,13 @@ function enableStationPin(): void
     }
 }
 
-test('settings: Client-Scope liefert station_pin_enabled und station_pin_min_length', function () {
+test('settings: Client-Scope liefert station_pin_min_length, der Schalter steht in me', function () {
     enableStationPin();
     $res = apiRequest('GET', 'settings', ['token' => apiToken('user'), 'query' => ['scope' => 'client']]);
     assertStatus(200, $res);
-    assertSame('1', $res['body']['settings']['station_pin_enabled']);
+    assertTrue(!array_key_exists('station_pin_enabled', $res['body']['settings']));
+    $me = apiRequest('GET', 'me', ['token' => apiToken('user')]);
+    assertSame(true, $me['body']['features']['station_pin'] ?? null);
     assertSame('4', $res['body']['settings']['station_pin_min_length']);
 });
 

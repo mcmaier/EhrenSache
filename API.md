@@ -329,9 +329,19 @@ Gibt Informationen über den aktuell angemeldeten Benutzer zurück.
   "email": "admin@example.com",
   "role": "admin",
   "member_id": 5,
-  "auth_type": "session"
+  "auth_type": "session",
+  "features": {
+    "worktime": true,
+    "station_pin": false,
+    "punctuality": true,
+    "reliability": false
+  }
 }
 ```
+
+`features` nennt für jede abschaltbare Funktion, ob sie eingeschaltet ist (seit OI-62). Die
+Werte sind für alle Rollen gleich. Abgeschaltete Funktionen antworten mit `403` und
+`"code": "FEATURE_DISABLED"`, siehe Fehlerbehandlung.
 
 ---
 
@@ -3366,8 +3376,8 @@ im Tab „Erfassen" der Check-in-App (FI-17).
 
 Liefert eine feste Auswahl an Einstellungen an **jede angemeldete Rolle**, nicht nur an
 Administratoren. Die Liste steht als Whitelist im Handler und umfasst derzeit
-`checkin_auto_create_appointment`, `checkin_tolerance_hours`, `station_pin_enabled` und
-`station_pin_min_length` (die beiden letzteren seit 1.3.0).
+`checkin_auto_create_appointment`, `checkin_tolerance_hours` und `station_pin_min_length`
+(seit 1.3.0). `station_pin_enabled` steht seit OI-62 in `me` (`features.station_pin`).
 
 Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
 
@@ -3379,7 +3389,6 @@ Ohne `scope=client` bleibt die Ressource Administratoren vorbehalten.
   "settings": {
     "checkin_auto_create_appointment": "1",
     "checkin_tolerance_hours": "2",
-    "station_pin_enabled": "1",
     "station_pin_min_length": "4"
   }
 }

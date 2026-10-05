@@ -367,7 +367,7 @@ test('scope=client liefert genau die Whitelist an eine Rolle user', function () 
 
     assertSame(
         ['checkin_auto_create_appointment', 'checkin_tolerance_hours',
-         'station_pin_enabled', 'station_pin_min_length'],
+         'station_pin_min_length'],
         $keys,
         'Es duerfen ausschliesslich die freigegebenen Schluessel erscheinen'
     );

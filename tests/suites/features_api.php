@@ -100,3 +100,27 @@ test('Stations-PIN aus: change_pin antwortet 403', function () {
             'body' => ['current_password' => 'x', 'new_pin' => '2580']]), 'station_pin', 'POST change_pin');
     });
 });
+
+test('me meldet alle Funktionen mit ihrem Stand', function () {
+    fsWith('worktime_enabled', '0', function () {
+        $res = apiRequest('GET', 'me', ['token' => apiToken('user')]);
+        assertStatus(200, $res);
+        $f = $res['body']['features'] ?? null;
+        assertTrue(is_array($f), 'me muss features liefern');
+        assertSame(['worktime', 'station_pin', 'punctuality', 'reliability'], array_keys($f));
+        assertSame(false, $f['worktime']);
+    });
+    fsWith('worktime_enabled', '1', function () {
+        $res = apiRequest('GET', 'me', ['token' => apiToken('user')]);
+        assertSame(true, $res['body']['features']['worktime'] ?? null);
+    });
+});
+
+test('settings scope=client fuehrt station_pin_enabled nicht mehr', function () {
+    $res = apiRequest('GET', 'settings', ['token' => apiToken('user'), 'query' => ['scope' => 'client']]);
+    assertStatus(200, $res);
+    assertTrue(!array_key_exists('station_pin_enabled', $res['body']['settings'] ?? []),
+        'Der Schalter kommt seit OI-62 ueber me, nicht mehr ueber scope=client');
+    assertTrue(array_key_exists('station_pin_min_length', $res['body']['settings'] ?? []),
+        'station_pin_min_length bleibt in scope=client');
+});

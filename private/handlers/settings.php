@@ -28,10 +28,10 @@ function handleSettings($db, $database, $method, $authUserId) {
     // unangemeldete Anfragen vor dem Routing. Hier fällt nur die
     // Administrator-Schranke.
     if ($method === 'GET' && ($_GET['scope'] ?? null) === 'client') {
+        // station_pin_enabled steht seit OI-62 in me (features), nicht mehr hier.
         $whitelist = [
             'checkin_auto_create_appointment',
             'checkin_tolerance_hours',
-            'station_pin_enabled',
             'station_pin_min_length',
         ];
 
