@@ -7,6 +7,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [1.20.2] – 2026-10-05
+
+### Sicherheit
+- **Die Statistik zeigt die Arbeitszeiten nur noch für das eigene Mitglied.** Ein angemeldetes
+  Konto mit Rolle `user`, das mit keinem Mitglied verknüpft ist — so entsteht etwa jedes
+  selbst registrierte Konto —, bekam bei eingeschalteter Zeiterfassung über die Statistik die
+  Arbeitsstunden aller Mitglieder mit Name, Mitgliedsnummer und Tätigkeit zu sehen. Betroffen
+  waren alle Versionen seit 1.2.0. Siehe Advisory GHSA-48rv-x952-g7xm.
+
+---
+
 ## [1.20.1] – 2026-10-05
 
 ### Sicherheit
