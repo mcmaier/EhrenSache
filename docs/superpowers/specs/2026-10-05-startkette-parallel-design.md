@@ -104,7 +104,12 @@ Höchstens fünf Abrufe gleichzeitig je Gerät.
   `station` darf) — „Erneut versuchen" hülfe dort nie.
 - **`me` scheitert anders** (503 nach Wiederholung, sonstiger Status, Timeout, kein Netz): Token
   **bleibt**. Die Ladeanzeige zeigt „Server nicht erreichbar“ und einen Knopf „Erneut versuchen“,
-  der `checkAutoLogin()` erneut ausführt. Der Knopf trägt `data-action` (CSP).
+  der `checkAutoLogin()` erneut ausführt, daneben „Mit anderem Konto anmelden“ (verwirft den
+  gespeicherten Zugang, zeigt die Anmeldemaske — Ausweg, falls der Server für diesen Token
+  dauerhaft scheitert; ergänzt nach der Code-Prüfung am 2026-10-05). Beide Knöpfe tragen
+  `data-action` (CSP) und erscheinen nur nach einem Fehlschlag.
+- **Ein Fehler beim Aufbau** (Ausnahme in `startSession()`): dieselbe Anzeige mit „Die App
+  konnte nicht starten.“ — die Ladeanzeige bleibt nie ohne Ausweg stehen.
 - **Ein Abruf aus Stufe 2 scheitert:** wie heute — der betroffene Bereich bleibt leer bzw.
   verborgen, die App erscheint trotzdem.
 - **Abmelden während des Starts:** `resetSessionState()` bleibt die Stelle, die Zustand verwirft.
