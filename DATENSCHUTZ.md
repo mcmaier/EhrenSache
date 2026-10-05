@@ -160,7 +160,7 @@ Die Selbstauskunft (JSON und CSV) enthält seit 1.3.0 zur Stations-PIN nur `has_
 `pin_updated_at` (bzw. die Zeilen "Stations-PIN gesetzt" und "PIN zuletzt geändert") — nie den
 Hash selbst.
 
-Die JSON-Form der Selbstauskunft nennt außerdem die **beendeten Gruppenzugehörigkeiten** (Gruppe, von, bis); die
+Die Selbstauskunft (JSON und CSV) nennt außerdem die **beendeten Gruppenzugehörigkeiten** (Gruppe, von, bis); die
 heutigen Gruppen tragen ihr Beginndatum. Der Verlauf wird zusammen mit dem Mitglied gelöscht und
 hat keine eigene Löschfrist — wie die heutigen Zuordnungen. Wird eine Gruppe gelöscht, entfallen
 auch die Verlaufszeilen zu dieser Gruppe.

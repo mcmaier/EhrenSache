@@ -24,7 +24,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Anwesenheit „nach Mitglied“ zeigt auch Termine ehemaliger Gruppen**, selbst wenn das Mitglied
   heute in keiner Gruppe mehr steht. Die Abschnitte (Gruppe, Register) im Rückmeldedialog und in
   der Anwesenheitsliste eines Termins richten sich nach dem Termindatum.
-- **Selbstauskunft:** `my_data` (JSON-Form) führt beendete Gruppenzugehörigkeiten (Gruppe, von,
+- **Selbstauskunft:** `my_data` (JSON und CSV) führt beendete Gruppenzugehörigkeiten (Gruppe, von,
   bis); die Verhaltenskennzahlen berücksichtigen ehemalige Gruppen.
 
 ### Geändert

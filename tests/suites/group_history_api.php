@@ -234,6 +234,21 @@ test('Selbstauskunft my_data: ehemalige Gruppe steht im Verlauf, heutige Gruppen
         foreach ($res['body']['groups'] ?? [] as $grp) {
             assertTrue(array_key_exists('valid_from', $grp), 'groups[].valid_from fehlt');
         }
+
+        // CSV-Form fuehrt dasselbe (beide Formate beantworten dasselbe Auskunftsersuchen)
+        $csv = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'csv']]);
+        assertTrue(str_contains($csv['raw'], '[ GRUPPEN – FRÜHER ]'), 'CSV: Abschnitt fruehere Gruppen fehlt');
+        $csvLine = null;
+        foreach (preg_split('/?
+/', $csv['raw']) as $line) {
+            if (str_contains($line, 'GH Auskunft')) {
+                $csvLine = $line;
+            }
+        }
+        assertTrue($csvLine !== null, 'CSV: ehemalige Gruppe fehlt');
+        assertTrue(str_contains($csvLine, date('d.m.Y', strtotime($twoYears))), 'CSV: von fehlt: ' . $csvLine);
+        assertTrue(str_contains($csvLine, date('d.m.Y', strtotime('-1 day'))), 'CSV: bis fehlt: ' . $csvLine);
+        assertTrue(str_contains($csv['raw'], 'Gruppe,seit'), 'CSV: Spalte seit fehlt');
     } finally {
         if ($g) { ghDelete('member_groups', $g); }
     }

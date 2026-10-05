@@ -1585,4 +1585,4 @@ diesem Mitglied verknüpft ist.
 | GZ-12 | Häkchen entfernen, speichern, am selben Tag wieder ankreuzen und speichern | Ausgangszustand: Gruppe gilt von Anfang an (kein „seit“), kein Verlauf („Bisher“ fehlt) |
 | GZ-13 | Gruppe heute mit Datum von vor zwei Tagen ergänzen, dann mit Datum von vor drei Tagen wieder entfernen | Zuordnung weg, kein Verlaufseintrag (Korrektur, die Gruppe hat nie gegolten) |
 | GZ-14 | Ein bestehendes Mitglied nachträglich einer Gruppe zuordnen, ohne das Datum zu ändern; Statistik des Vorjahres | Die Gruppe zählt erst ab heute; für das Vorjahr keine Termine dieser Gruppe — mit früherem „Änderung gilt ab“ erscheinen sie |
-| GZ-15 | Selbstauskunft (Profil → „Meine Daten“, JSON) nach GZ-4 | Beendete Zuordnung mit Gruppe, von, bis steht in der Auskunft; die heutige Gruppe trägt ihr Beginndatum |
+| GZ-15 | Selbstauskunft (Profil → „Meine Daten“, JSON und CSV) nach GZ-4 | Beendete Zuordnung mit Gruppe, von, bis steht in der Auskunft; die heutige Gruppe trägt ihr Beginndatum |

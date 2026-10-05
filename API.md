@@ -3187,7 +3187,7 @@ der letzten Änderung), die CSV-Form einen Abschnitt „TERMINRÜCKMELDUNGEN" mi
 Termindatum, Termin, Rückmeldung, Bemerkung, Status geändert, Zuletzt geändert.
 **Noch unveröffentlicht:** `groups[]` trägt `valid_from` (Beginn der heutigen Zuordnung, `null` =
 von Anfang an), dazu steht `group_history` mit den beendeten Zuordnungen (`group_name`,
-`valid_from`, `valid_to`); die CSV-Form führt das bislang nicht. Die
+`valid_from`, `valid_to`); die CSV-Form führt die heutigen Gruppen mit „seit“ und den Abschnitt „GRUPPEN – FRÜHER“ (Gruppe, von, bis). Die
 Verhaltenskennzahlen (`behavior`) rechnen auch mit ehemaligen Gruppen.
 
 **Query-Parameter:**

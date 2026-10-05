@@ -256,9 +256,24 @@ function exportAsCSV($data) {
     
     // Gruppen
     $csvZeile(['[ GRUPPEN ]']);
-    $csvZeile(['Gruppe']);
+    $csvZeile(['Gruppe', 'seit']);
     foreach($data['groups'] as $group) {
-        $csvZeile([$group['group_name']]);
+        $csvZeile([
+            $group['group_name'],
+            !empty($group['valid_from']) ? date('d.m.Y', strtotime($group['valid_from'])) : ''
+        ]);
+    }
+    $csvZeile([]);
+
+    // Beendete Gruppenzugehoerigkeiten (leer = von Anfang an); wie die JSON-Form
+    $csvZeile(['[ GRUPPEN – FRÜHER ]']);
+    $csvZeile(['Gruppe', 'von', 'bis']);
+    foreach ($data['group_history'] as $frueher) {
+        $csvZeile([
+            $frueher['group_name'],
+            !empty($frueher['valid_from']) ? date('d.m.Y', strtotime($frueher['valid_from'])) : '',
+            date('d.m.Y', strtotime($frueher['valid_to']))
+        ]);
     }
     $csvZeile([]);
 
