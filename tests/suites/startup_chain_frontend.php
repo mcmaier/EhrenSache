@@ -26,6 +26,9 @@ $scRoot    = dirname(__DIR__, 2);
 $scApi     = (string) sourceCode($scRoot . '/public/js/modules/api.js');
 $scPwa     = (string) sourceCode($scRoot . '/public/checkin/js/app.js');
 $scPwaHtml = (string) sourceCode($scRoot . '/public/checkin/index.html');
+$scApp     = (string) sourceCode($scRoot . '/public/js/app.js');
+$scUsers   = (string) sourceCode($scRoot . '/public/js/modules/users.js');
+$scWork    = (string) sourceCode($scRoot . '/public/js/modules/worktime.js');
 
 const SC_RETRY_STATUSES = [502, 503, 504, 520, 521, 522, 523, 524];
 
@@ -143,4 +146,32 @@ test('PWA: von der Ladeanzeige fuehrt ein Weg zur Anmeldemaske', function () use
         'switchAccount() verwirft den Zugang nicht oder zeigt die Anmeldemaske nicht');
     assertTrue(str_contains(scBody($scPwa, 'function showStartStatus('), "getElementById('startSwitchBtn')"),
         'showStartStatus() blendet den Knopf nicht mit ein');
+});
+
+test('Dashboard: init() wartet nach me nichts mehr ab', function () use ($scApp) {
+    $body = scBody($scApp, 'async function init(');
+    assertTrue($body !== '', 'init() nicht gefunden');
+    assertTrue(!str_contains($body, 'await loadVersion('), 'Die Version haelt die Ansicht auf');
+    assertTrue(!str_contains($body, 'await initAllYearFilters('), 'Die Jahresliste haelt die Ansicht auf');
+    $show = strpos($body, 'showDashboard()');
+    $load = strpos($body, 'loadAllData()');
+    assertTrue($show !== false && $load !== false && $show < $load, 'Das Dashboard erscheint nicht vor dem Laden der Daten');
+});
+
+test('Dashboard: setCurrentUser() holt nichts', function () use ($scApi) {
+    assertTrue(!str_contains(scBody($scApi, 'export async function setCurrentUser('), 'apiCall('),
+        'setCurrentUser() wartet wieder auf members -- eine Stufe vor dem Einblenden');
+});
+
+test('Dashboard: die Benutzerliste laedt nicht beim Start', function () use ($scUsers) {
+    $body = scBody($scUsers, 'export async function initUsersEventHandlers(');
+    // Die Filter-Zuhoerer rufen applyUserFilters() bei einer Aenderung -- das
+    // ist gewollt. Verboten ist nur der Aufruf beim Einrichten selbst.
+    assertTrue(!str_contains($body, 'await applyUserFilters(') && !str_contains($body, 'loadUsers('),
+        'initUsersEventHandlers() laedt die Liste, auch wenn der Bereich Benutzer gar nicht offen ist');
+});
+
+test('Dashboard: gleichzeitige Freischaltpruefungen teilen sich eine Anfrage', function () use ($scWork) {
+    assertTrue(preg_match("/sharedLoad\('worktimeEnabled'/", scBody($scWork, 'export async function checkWorktimeEnabled(')) === 1,
+        'Startet der Bereich Zeiterfassung, fragt der Start activity_types doppelt');
 });

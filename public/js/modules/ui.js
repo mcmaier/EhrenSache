@@ -110,6 +110,32 @@ export function resetClientSettings() {
 }
 
 /**
+ * Das eigene Mitglied (members&id aus me). Kopfzeile und Profil fragen beim
+ * Start gleichzeitig -- sie teilen sich eine Anfrage (OI-121).
+ */
+export function loadOwnMember() {
+    if (!currentUser?.member_id) {
+        return Promise.resolve(null);
+    }
+
+    return sharedLoad(`ownMember:${currentUser.member_id}`, false,
+        () => apiCall('members', 'GET', null, { id: currentUser.member_id }));
+}
+
+/**
+ * Name des Mitglieds in der Kopfzeile. Bis die Antwort da ist, steht dort die
+ * E-Mail-Adresse, wie bei Benutzern ohne Mitglied.
+ */
+export async function loadOwnMemberName() {
+    const member = await loadOwnMember();
+
+    if (member?.success && member.name) {
+        currentUser.member_name = `${member.name} ${member.surname}`;
+        document.getElementById('currentUser').textContent = currentUser.member_name;
+    }
+}
+
+/**
  * Globaler Eintrag ({ data, timestamp }) oder jahresabhaengiger ({ <jahr>: {...} })?
  * Beide sind Objekte; unterscheiden laesst sie nur der Schluessel. Ein leerer
  * jahresabhaengiger Eintrag ist {}, ein geleerter globaler traegt data = [].

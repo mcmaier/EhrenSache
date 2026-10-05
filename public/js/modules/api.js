@@ -26,17 +26,8 @@ export async function setCurrentUser(user) {
     isManager = user?.role === 'manager';
     isAdminOrManager = isAdmin || isManager;
 
-    // Lade Member-Name falls vorhanden
-    if (user && user.member_id) {
-        try {
-            const member = await apiCall('members', 'GET', null, { id: user.member_id });
-            if (member) {
-                currentUser.member_name = `${member.name} ${member.surname}`;
-            }
-        } catch (error) {
-            debug.log('Member-Name konnte nicht geladen werden:', error);
-        }
-    }
+    // Den Namen des Mitglieds holt loadOwnMemberName() in ui.js nach dem
+    // Einblenden. Bis 1.20.1 wartete der Start hier darauf (OI-121).
 }
 
 export function setCsrfToken(token) {

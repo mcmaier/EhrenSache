@@ -13,6 +13,7 @@ import { apiCall, isAdmin, isAdminOrManager } from './api.js';
 import { showToast, showConfirm, dataCache, isCacheValid, invalidateCache, currentYear } from './ui.js';
 import { debug } from '../app.js';
 import { registerActions } from './actions.js';
+import { sharedLoad, forgetPendingLoads } from './pending_loads.js';
 import { loadGroups, loadTypes } from './management.js';
 import { loadMembers } from './members.js';
 import { updateModalId, safeTypeColor, clampPage } from './utils.js';
@@ -132,6 +133,7 @@ function proofOf(session) {
 export function resetWorktimeEnabled() {
     worktimeEnabled = null;
     activityTypes = [];
+    forgetPendingLoads('worktimeEnabled');
 }
 
 export async function checkWorktimeEnabled() {
@@ -139,8 +141,10 @@ export async function checkWorktimeEnabled() {
 
     // Der 404 IST hier die Antwort „Feature aus" — kein Fehler, der das
     // Mitglied etwas anginge.
-    const result = await apiCall('activity_types', 'GET', null, {},
-                                 { silentStatuses: [404] });
+    // Startet der Bereich Zeiterfassung, fragen initEventHandlers() und
+    // showWorktimeSection() gleichzeitig -- eine Anfrage fuer beide (OI-121).
+    const result = await sharedLoad('worktimeEnabled', false,
+        () => apiCall('activity_types', 'GET', null, {}, { silentStatuses: [404] }));
     const freigeschaltet = Array.isArray(result);
 
     if (freigeschaltet) {
