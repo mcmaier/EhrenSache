@@ -387,8 +387,9 @@ export async function initUsersEventHandlers()
         });
             
 
-    // Users laden und anzeigen
-    await applyUserFilters();
+    // Die Liste laedt showUserSection() beim Oeffnen und das Vorladen in
+    // loadAllData(). Bis 1.20.1 holte der Start sie hier, auch wenn der
+    // Bereich Benutzer gar nicht offen war (OI-121).
 }
 
 // ============================================

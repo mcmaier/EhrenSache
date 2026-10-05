@@ -70,13 +70,24 @@ function handleMyData($db, $database, $request_method, $authUserId)
 
     // 3. Gruppenzugehörigkeiten
     $stmt = $db->prepare("
-        SELECT mg.group_name, mg.description
+        SELECT mg.group_name, mg.description, mga.valid_from
         FROM {$prefix}member_group_assignments mga
         JOIN {$prefix}member_groups mg ON mga.group_id = mg.group_id
         WHERE mga.member_id = ?
     ");
     $stmt->execute([$member_id]);
     $data['groups'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Beendete Gruppenzugehoerigkeiten (Spec 2026-10-05) -- personenbezogen, gehoeren in die Auskunft
+    $stmt = $db->prepare("
+        SELECT mg.group_name, h.valid_from, h.valid_to
+        FROM {$prefix}member_group_history h
+        JOIN {$prefix}member_groups mg ON h.group_id = mg.group_id
+        WHERE h.member_id = ?
+        ORDER BY h.valid_to DESC
+    ");
+    $stmt->execute([$member_id]);
+    $data['group_history'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // 4. Anwesenheitsdaten
     $stmt = $db->prepare("
@@ -185,7 +196,9 @@ function handleMyData($db, $database, $request_method, $authUserId)
     // des Profilings (DATENSCHUTZ.md, Abschnitt 11). Ausgeschaltet: leer.
     require_once __DIR__ . '/../helpers/punctuality.php';
 
-    $groupStmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?");
+    // Heutige und ehemalige Gruppen, damit Jahre vor einem Wechsel ihre Gruppe behalten
+    require_once __DIR__ . '/../helpers/group_history.php';
+    $groupStmt = $db->prepare("SELECT DISTINCT group_id FROM " . groupAssignmentsSql($database) . " ga WHERE member_id = ?");
     $groupStmt->execute([$member_id]);
     $ownGroupIds = array_map('intval', $groupStmt->fetchAll(PDO::FETCH_COLUMN));
 
@@ -243,9 +256,24 @@ function exportAsCSV($data) {
     
     // Gruppen
     $csvZeile(['[ GRUPPEN ]']);
-    $csvZeile(['Gruppe']);
+    $csvZeile(['Gruppe', 'seit']);
     foreach($data['groups'] as $group) {
-        $csvZeile([$group['group_name']]);
+        $csvZeile([
+            $group['group_name'],
+            !empty($group['valid_from']) ? date('d.m.Y', strtotime($group['valid_from'])) : ''
+        ]);
+    }
+    $csvZeile([]);
+
+    // Beendete Gruppenzugehoerigkeiten (leer = von Anfang an); wie die JSON-Form
+    $csvZeile(['[ GRUPPEN – FRÜHER ]']);
+    $csvZeile(['Gruppe', 'von', 'bis']);
+    foreach ($data['group_history'] as $frueher) {
+        $csvZeile([
+            $frueher['group_name'],
+            !empty($frueher['valid_from']) ? date('d.m.Y', strtotime($frueher['valid_from'])) : '',
+            date('d.m.Y', strtotime($frueher['valid_to']))
+        ]);
     }
     $csvZeile([]);
 

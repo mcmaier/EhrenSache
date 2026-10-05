@@ -52,6 +52,7 @@ const DEMO_TABLES = [
     'activity_type_appointment_types',
     'activity_type_groups',
     'activity_types',
+    'member_group_history',
     'member_group_assignments',
     'subgroup_parents',
     'membership_dates',

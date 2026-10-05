@@ -26,6 +26,7 @@ require_once __DIR__ . '/member_activity.php';
 // hier direkt eingebunden statt sich auf die Ladereihenfolge des Aufrufers
 // zu verlassen.
 require_once __DIR__ . '/appointment_attendance.php';
+require_once __DIR__ . '/group_history.php';  // groupAssignmentsSql(), groupAssignmentActiveOn()
 require_once __DIR__ . '/groups.php';   // groupSortCompare() fuer responsesStaffing()
 
 const RESPONSE_STATUSES = ['yes', 'no', 'maybe'];
@@ -410,21 +411,24 @@ function responsesFetchAppointment($db, $database, int $appointmentId): ?array
 }
 
 /**
- * Erwartete Mitglieder: Terminart -> Gruppe -> Mitglied, aktiv am Termindatum.
- * Dieselbe Regel wie expectedPairsSql() (Soll-Menge), hier eigens gebaut, weil
- * die Gruppennamen mitgebraucht werden. Ein Mitglied in zwei Gruppen kommt
- * zweimal -- entdoppelt wird mit responsesDedupeExpected().
+ * Erwartete Mitglieder: Terminart -> Gruppe -> Mitglied, aktiv am Termindatum
+ * und Mitglied der Gruppe am Termindatum (Gruppenzeitraum, Spec 2026-10-05).
+ * Dieselbe Regel wie expectedPairsSql() (Soll-Menge; Stichtag a.date), hier
+ * eigens gebaut, weil die Gruppennamen mitgebraucht werden. Ein Mitglied in
+ * zwei Gruppen kommt zweimal -- entdoppelt wird mit responsesDedupeExpected().
  */
 function responsesFetchExpected($db, $database, int $appointmentId): array
 {
-    $prefix   = $database->table('');
-    $activity = getMemberActivityWhere('m', 'a.date');
+    $prefix      = $database->table('');
+    $activity    = getMemberActivityWhere('m', 'a.date');
+    $assignments = groupAssignmentsSql($database);
+    $activeOn    = groupAssignmentActiveOn('mga', 'a.date');
 
     $stmt = $db->prepare("
         SELECT m.member_id, m.name, m.surname, g.group_id, g.group_name
         FROM {$prefix}appointments a
         JOIN {$prefix}appointment_type_groups atg ON atg.type_id = a.type_id
-        JOIN {$prefix}member_group_assignments mga ON mga.group_id = atg.group_id
+        JOIN {$assignments} mga ON mga.group_id = atg.group_id AND {$activeOn}
         JOIN {$prefix}member_groups g ON g.group_id = mga.group_id
         JOIN {$prefix}members m ON m.member_id = mga.member_id AND {$activity}
         WHERE a.appointment_id = ?

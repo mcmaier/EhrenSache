@@ -78,6 +78,15 @@ let isNFCScanning = false;
 let tickTimer = null;
 let appointments = [];
 let appointmentTypes = [];
+
+// Laufender Abruf der Terminarten aus Stufe 3 des Starts. Der Verlauf faerbt
+// nach Terminart und wartet darauf (OI-121).
+let appointmentTypesLoad = null;
+
+// Steigt bei jedem Abmelden. Ein Start, der danach noch Antworten bekommt,
+// zeichnet nichts mehr (OI-121).
+let sessionGeneration = 0;
+
 let checkinAppointments = [];
 let clientSettings = { checkin_auto_create_appointment: '1', checkin_tolerance_hours: '2' };
 let deleteExceptionId = null;
@@ -194,7 +203,9 @@ document.addEventListener('DOMContentLoaded', function() {
         'responses-grouping':   (el) => window.setResponsesGrouping(el.dataset.stage),
         'toggle-response-section':      (el) => toggleResponseSection(el.dataset.key),
         'correct-work-session': (el) => openWorkSessionModal(Number(el.dataset.sessionId)),
-        'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId))
+        'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId)),
+        'start-retry':          () => checkAutoLogin(),
+        'start-switch-account': () => switchAccount()
     };
     document.addEventListener('click', (event) => {
         const el = event.target.closest('[data-action]');
@@ -367,6 +378,16 @@ function apiTimeoutMessage(method) {
         : 'Keine Antwort vom Server. Ob gespeichert wurde, ist unklar – bitte die Ansicht neu laden, bevor du es erneut versuchst.';
 }
 
+// Einmalige Wiederholung lesender Abrufe (OI-121) -- dieselbe Regel wie in
+// public/js/modules/api.js: nur GET, nur bei Ueberlastung, einmal, Timeout
+// fuer beide Versuche zusammen.
+const RETRY_STATUSES = [502, 503, 504, 520, 521, 522, 523, 524];
+
+/** 300 bis 600 ms -- gestreut, damit viele Geraete nicht im selben Takt erneut fragen. */
+function retryPause() {
+    return new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 300));
+}
+
 async function apiCall(resource, method = 'GET', data = null, params = {}) {
 
     const url = new URL(API_BASE);
@@ -399,7 +420,11 @@ async function apiCall(resource, method = 'GET', data = null, params = {}) {
 
     try {
         debug.log('API Call:', method, url.toString());
-        const response = await fetch(url, options);
+        let response = await fetch(url, options);
+        if (method === 'GET' && RETRY_STATUSES.includes(response.status)) {
+            await retryPause();
+            response = await fetch(url, options);
+        }
 
         // Parse Response Body
         let responseData = null;
@@ -767,19 +792,31 @@ async function loadClientSettings() {
  * bis d7ee191 abends ab 22:00 MESZ den Folgetag an.
  */
 async function loadCheckinAppointments() {
-    const select = document.getElementById('checkinAppointment');
-    if (!select || !userData || !userData.member_id) return;
+    applyCheckinAppointments(await fetchCheckinAppointments());
+}
+
+/** Holt die Termine von heute, ohne zu zeichnen -- fuer Stufe 2 des Starts. */
+async function fetchCheckinAppointments() {
+    if (!userData || !userData.member_id) return null;
 
     const now = new Date();
     const heute = `${now.getFullYear()}-`
                 + `${String(now.getMonth() + 1).padStart(2, '0')}-`
                 + `${String(now.getDate()).padStart(2, '0')}`;
 
-    const result = await apiCall('appointments', 'GET', null, {
+    return apiCall('appointments', 'GET', null, {
         member_id: userData.member_id,
         from_date: heute,
         to_date: heute
     });
+}
+
+/**
+ * Uebernimmt die Antwort von fetchCheckinAppointments() und zeichnet die
+ * Auswahl. Erst nach Stufe 2, weil der Hinweistext clientSettings liest.
+ */
+function applyCheckinAppointments(result) {
+    if (!result || !document.getElementById('checkinAppointment')) return;
 
     checkinAppointments = (result.success && Array.isArray(result.data)) ? result.data : [];
 
@@ -946,36 +983,32 @@ async function handleLogin(e) {
         
         // Speichere Token
         apiToken = result.data.token;
-        
+
+        debug.log('✓ Login erfolgreich');
+
+        showStartStatus('Wird geladen …', false);
+        showScreen('start');
+
+        const me = await apiCall('me');
+        if (!me.success) {
+            apiToken = null;
+            showScreen('login');
+            throw new Error(me.error || 'Login fehlgeschlagen');
+        }
+
+        // Erst speichern, wenn me den Token angenommen hat (OI-121).
         if (elements.saveLoginCheckbox.checked) {
             // Speichere Token (Base64 kodiert)
             localStorage.setItem('api_token', btoa(apiToken));
         }
-        
-        debug.log('✓ Login erfolgreich');
 
-        // Lade Daten. me zuerst (OI-62, Etappe 2): erst danach steht fest,
-        // ob Terminplanung und Anwesenheit an sind.
-        await loadUserData();
-        if (pwaFeatureOn('appointments')) {
-            await loadAppointmentTypes();
-        }
-        await loadClientSettings();
-        if (pwaFeatureOn('attendance')) {
-            await loadCheckinAppointments();
-        }
-        //await loadHistory();
-        await initTabs();
-        await initYearNavigation();    
-        // Anwesenheitsliste initialisieren
-        //await initAttendanceList();
+        await startSession(me.data);
 
-        debug.log("Showing main screen");        
-        showScreen('main');
-        startTicker();
-        
     } catch (error) {
         debug.error('Login Fehler:', error);
+        // Die Fehlermeldung steht in der Anmeldemaske; laeuft der Fehler aus
+        // startSession(), ist gerade die Ladeanzeige zu sehen.
+        showScreen('login');
         showError(error.message || 'Ungültige Anmeldedaten oder Token abgelaufen');
     }
 
@@ -1031,50 +1064,135 @@ async function handleTokenLogin() {
 // AUTO LOGIN
 // ========================================
 async function checkAutoLogin() {
-    const savedToken = localStorage.getItem('api_token');
-    
-    if (savedToken) {
-        try {
-            apiToken = atob(savedToken);
-        
-            // Teste Token
-            const result = await apiCall('me');
+    const token = readSavedToken();
 
-            if (!result.success) {
-                const error = result;
-                throw new Error(error.message || 'Login fehlgeschlagen');
-            }  
-
-            debug.log('✓ Auto-Login erfolgreich');
-
-            // Lade Daten. me zuerst (OI-62, Etappe 2): erst danach steht fest,
-            // ob Terminplanung und Anwesenheit an sind.
-            await loadUserData();
-            if (pwaFeatureOn('appointments')) {
-                await loadAppointmentTypes();
-            }
-            await loadClientSettings();
-            if (pwaFeatureOn('attendance')) {
-                await loadCheckinAppointments();
-            }
-            //await loadHistory();
-            await initTabs();
-            await initYearNavigation();      
-            // Anwesenheitsliste initialisieren
-            //await initAttendanceList();  
-
-            debug.log("Showing main screen");
-                
-            showScreen('main');
-            startTicker();
-            
-        } catch (error) {
-            debug.log('Auto-Login fehlgeschlagen:', error);
-            // Token ungültig - zeige Login
-            localStorage.removeItem('api_token');
-            apiToken = null;
-        }
+    if (!token) {
+        showScreen('login');
+        return;
     }
+
+    apiToken = token;
+    showStartStatus('Wird geladen …', false);
+    showScreen('start');
+
+    const result = await apiCall('me');
+
+    // Nur ein abgelehnter Token meldet ab: 401 ungueltig oder abgelaufen, 403
+    // fuer die App nicht zugelassen (etwa ein Kiosk-Token). Ein 503, ein
+    // Timeout oder fehlendes Netz sagen nichts ueber den Token -- bis 1.20.1
+    // loeschte ihn jeder Fehlschlag, und ein Haenger beim Hoster meldete das
+    // Mitglied ab (OI-121).
+    if (result.status === 401 || result.status === 403) {
+        debug.log('Auto-Login: Token abgelehnt', result.status);
+        localStorage.removeItem('api_token');
+        apiToken = null;
+        showScreen('login');
+        return;
+    }
+
+    if (!result.success) {
+        debug.log('Auto-Login: Server nicht erreichbar', result.error);
+        showStartStatus(result.timedOut ? 'Der Server antwortet nicht.' : 'Server nicht erreichbar.', true);
+        return;
+    }
+
+    debug.log('✓ Auto-Login erfolgreich');
+
+    // Ein Fehler beim Aufbau darf die Ladeanzeige nicht ohne Ausweg stehen
+    // lassen: checkAutoLogin() laeuft ohne await, die Ablehnung ginge verloren.
+    try {
+        await startSession(result.data);
+    } catch (error) {
+        debug.error('Start fehlgeschlagen:', error);
+        showStartStatus('Die App konnte nicht starten.', true);
+        showScreen('start');
+    }
+}
+
+/** Gespeicherter Token oder '' -- auch bei einem unlesbaren Eintrag. */
+function readSavedToken() {
+    try {
+        return atob(localStorage.getItem('api_token') || '');
+    } catch (error) {
+        return '';
+    }
+}
+
+/**
+ * Alles nach einer erfolgreichen Anmeldung, fuer beide Wege (gespeicherter
+ * Token und Formular). Bis 1.20.1 standen hier zwei Kopien, die jeden Abruf
+ * einzeln abwarteten: zehn Stufen, und so lange stand die Anmeldemaske da
+ * (OI-121). Jetzt Stufe 2 gleichzeitig, dann einblenden, Stufe 3 danach.
+ */
+async function startSession(meData) {
+    const generation = sessionGeneration;
+    const hasMember  = !!meData.member_id;
+    userData = meData;
+
+    // Stufe 2: was die Erfassen-Ansicht braucht. Keiner der Abrufe haengt von
+    // einem anderen ab; member_id kommt aus me.
+    const [memberResult, , appointmentsResult] = await Promise.all([
+        hasMember ? apiCall('members', 'GET', null, { id: meData.member_id }) : Promise.resolve(null),
+        loadClientSettings(),
+        // Check-in-Termine nur mit eingeschalteter Anwesenheit (OI-62, Etappe 2).
+        hasMember && pwaFeatureOn('attendance') ? fetchCheckinAppointments() : Promise.resolve(null),
+        hasMember ? initWorktime(generation) : Promise.resolve()
+    ]);
+
+    // Abgemeldet, waehrend Stufe 2 lief: nichts mehr zeichnen.
+    if (generation !== sessionGeneration) return;
+
+    renderUserHeader(meData, memberResult);
+    applyCheckinAppointments(appointmentsResult);
+    if (hasMember) {
+        await initAttendanceList();
+    }
+
+    showScreen('main');
+    startTicker();
+
+    // Stufe 3: nach dem Einblenden. initTabs() startet ueber den Erfassen-Tab
+    // die offenen Punkte und die Rueckmeldungen. Die Terminarten braucht erst
+    // der Verlauf (Farben); der Termindialog laedt sie ohnehin selbst.
+    initTabs();
+    initYearNavigation();
+    // Terminarten nur mit eingeschalteter Terminplanung (OI-62, Etappe 2).
+    appointmentTypesLoad = pwaFeatureOn('appointments') ? loadAppointmentTypes() : null;
+}
+
+/**
+ * Name, Rolle und Mitgliedsnummer im Kopf. memberResult ist die Antwort von
+ * members&id oder null.
+ */
+function renderUserHeader(meData, memberResult) {
+    let roleText = 'Mitglied';
+    if (meData.role === 'admin') roleText = 'Administrator';
+    else if (meData.role === 'manager') roleText = 'Manager';
+
+    // Wie bis 1.20.1: ohne verknuepftes Mitglied nur der Hinweis, der Kopf
+    // bleibt unberuehrt.
+    if (!meData.member_id) {
+        showMessage('Kein Mitglied mit diesem Benutzer verknüpft. Bitte Administrator kontaktieren.', 'error');
+        return;
+    }
+
+    const member = memberResult && memberResult.success ? memberResult.data : null;
+    if (member) {
+        elements.userName.textContent = `${member.name} ${member.surname}`;
+        elements.userRole.textContent = member.member_number
+            ? `${roleText} • Nr. ${member.member_number}`
+            : roleText;
+        return;
+    }
+
+    if (meData.email && meData.email !== 'token-auth') {
+        elements.userName.textContent = meData.email;
+    } else if (meData.user_id) {
+        elements.userName.textContent = `User #${meData.user_id}`;
+    } else {
+        elements.userName.textContent = 'Benutzer';
+    }
+    elements.userRole.textContent = roleText;
 }
 
 // ========================================
@@ -1101,6 +1219,10 @@ async function checkAutoLogin() {
  * Reload dazwischenkommt.
  */
 function resetSessionState() {
+    // Ein noch laufender Start zeichnet danach nichts mehr (OI-121).
+    sessionGeneration++;
+    appointmentTypesLoad = null;
+
     userData = null;
     resetResponsesTab();
 
@@ -1185,88 +1307,6 @@ async function handleLogout() {
     stopTicker();
 
     debug.log('✓ Abgemeldet');
-}
-
-async function loadUserData() {
-let success = false;
-
-    try {
-        const result = await apiCall('me');
-        if (!result.success) {
-            throw new Error(result.error);
-        }
-
-        const meData = result.data;
-        userData = meData;
-        
-        if (meData.member_id) {
-            try {
-                const result = await apiCall('members', 'GET', null, { id: meData.member_id });
-
-                if (!result.success) {
-                            throw new Error(result.error);
-                        }
-                
-                const member = result.data;
-                
-                if (member) {
-                    elements.userName.textContent = `${member.name} ${member.surname}`;
-                    
-                    // Rollentext mit Manager-Unterstützung
-                    let roleText = 'Mitglied';
-                    if (meData.role === 'admin') roleText = 'Administrator';
-                    else if (meData.role === 'manager') roleText = 'Manager';
-                    
-                    if (member.member_number) {
-                        elements.userRole.textContent = `${roleText} • Nr. ${member.member_number}`;
-                    } else {
-                        elements.userRole.textContent = roleText;
-                    }
-                    success = true;
-                    
-                    // Anwesenheitsliste initialisieren wenn Admin/Manager
-                    await initAttendanceList();
-
-                    // Zeiterfassung initialisieren; blendet sich selbst aus,
-                    // wenn das Feature nicht freigeschaltet ist
-                    await initWorktime();
-
-                    return success;
-                }
-            } catch (error) {
-                debug.log('Member-Daten konnten nicht geladen werden:', error);
-            }
-        }
-        else
-        {
-            showMessage('Kein Mitglied mit diesem Benutzer verknüpft. Bitte Administrator kontaktieren.', 'error');
-            return false;
-        }
-        
-        // Fallback
-        if (meData.email && meData.email !== 'token-auth') {
-            elements.userName.textContent = meData.email;
-        } else if (meData.user_id) {
-            elements.userName.textContent = `User #${meData.user_id}`;
-        } else {
-            elements.userName.textContent = 'Benutzer';
-        }
-        
-        // Rollentext mit Manager-Unterstützung
-        let roleText = 'Mitglied';
-        if (meData.role === 'admin') roleText = 'Administrator';
-        else if (meData.role === 'manager') roleText = 'Manager';
-        elements.userRole.textContent = roleText;
-
-        success = true;
-        
-    } catch (error) {
-        debug.log('User-Daten konnten nicht geladen werden:', error);
-        elements.userName.textContent = 'Benutzer';
-        elements.userRole.textContent = 'Mitglied';
-    }
-
-    return success;
 }
 
 // ========================================
@@ -2795,14 +2835,39 @@ async function submitException() {
 // UI HELPERS
 // ========================================
 function showScreen(screenName) {
-    elements.loginScreen.classList.remove('active');
-    elements.mainScreen.classList.remove('active');
-    
-    if (screenName === 'login') {
-        elements.loginScreen.classList.add('active');
-    } else {
-        elements.mainScreen.classList.add('active');
-    }
+    const screens = {
+        start: document.getElementById('startScreen'),
+        login: elements.loginScreen,
+        main:  elements.mainScreen
+    };
+
+    Object.values(screens).forEach(screen => screen?.classList.remove('active'));
+    screens[screenName]?.classList.add('active');
+}
+
+/**
+ * Text der Ladeanzeige; bei einem Fehler zusaetzlich "Erneut versuchen" und
+ * "Mit anderem Konto anmelden".
+ */
+function showStartStatus(text, failed) {
+    const status = document.getElementById('startStatus');
+    const retry  = document.getElementById('startRetryBtn');
+    const change = document.getElementById('startSwitchBtn');
+
+    if (status) status.textContent = text;
+    if (retry) retry.hidden = !failed;
+    if (change) change.hidden = !failed;
+}
+
+/**
+ * Ausweg von der Ladeanzeige: gespeicherten Zugang verwerfen und die
+ * Anmeldemaske zeigen. Fuer den Fall, dass der Server fuer diesen Token
+ * dauerhaft scheitert (etwa 500) -- "Erneut versuchen" hilft dann nie.
+ */
+function switchAccount() {
+    localStorage.removeItem('api_token');
+    apiToken = null;
+    showScreen('login');
 }
 
 function showError(message) {
@@ -2859,8 +2924,11 @@ function isOpenHistoryEntry(entry) {
 
 // Lädt History beim Login
 async function loadHistory() {
-        
+
     try {
+        // Die Farben haengen an den Terminarten aus Stufe 3 des Starts (OI-121).
+        if (appointmentTypesLoad) await appointmentTypesLoad;
+
         // Anwesenheiten und Antraege nur mit eingeschalteter Anwesenheit
         // (OI-62, Etappe 2) -- sonst antwortet der Server 403.
         let records = [];
@@ -3723,13 +3791,20 @@ const WORKTIME_APPOINTMENT_FUTURE_DAYS = 30;
  * (features aus me, OI-62). Ist sie aus, bleibt worktimeActivities leer und
  * availableIntents() bietet die Arbeitszeit nicht an.
  */
-async function initWorktime() {
+async function initWorktime(generation = sessionGeneration) {
+    // userData setzt startSession() vor dem Aufruf.
     if (!userData?.features?.worktime) {
         worktimeActivities = [];
         return;
     }
 
-    const result = await apiCall('activity_types', 'GET');
+    // Taetigkeiten und laufende Sitzung gleichzeitig (OI-121).
+    const [result, running] = await Promise.all([
+        apiCall('activity_types', 'GET'),
+        apiCall('work_sessions', 'GET', null, { running: 1 })
+    ]);
+
+    if (generation !== sessionGeneration) return;
 
     if (!result.success) {
         debug.log('Zeiterfassung nicht verfuegbar:', result.error);
@@ -3805,18 +3880,17 @@ async function initWorktime() {
     // damit die Leiste sofort steht. Die uebrigen Abrufe von
     // loadWorktimeState() — Termine und erfasste Zeiten — kann sich der Start
     // sparen, sie werden erst beim Oeffnen der Ansicht gebraucht.
-    await loadRunningSession();
+    applyRunningSession(running);
 }
 
 /**
- * Holt nur die laufende Sitzung und aktualisiert die Leiste.
+ * Uebernimmt die laufende Sitzung und aktualisiert die Leiste.
  *
  * Ohne diesen Abruf beim Start erfuhr niemand von einer laufenden Sitzung,
  * der nicht zufaellig die Arbeitszeit-Ansicht oeffnete — eine vergessene
  * Sitzung lief so bis zur Obergrenze weiter.
  */
-async function loadRunningSession() {
-    const result = await apiCall('work_sessions', 'GET', null, { running: 1 });
+function applyRunningSession(result) {
     worktimeSession = result.success ? result.data : null;
 
     renderRunningBar();
@@ -5408,9 +5482,9 @@ function initTabs() {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    // Der Erfassen-Tab ist beim Start offen. initWorktime() lief in
-    // loadUserData() bereits durch, worktimeActivities ist also gefuellt und
-    // availableIntents() liefert die richtige Antwort.
+    // Der Erfassen-Tab ist beim Start offen. initWorktime() lief in Stufe 2
+    // von startSession() bereits durch, worktimeActivities ist also gefuellt
+    // und availableIntents() liefert die richtige Antwort.
     applyPwaFeatureTabs();
     initCaptureTab();
 

@@ -211,6 +211,7 @@ function importMembers($db, $database, $filePath) {
         $groupCache[$row['group_name']] = $row['group_id'];
     }
     
+    $groupChanges = 0;
     $db->beginTransaction();
     
     try {
@@ -273,6 +274,7 @@ function importMembers($db, $database, $filePath) {
             }
 
             // Update oder Insert
+            $isNewMember = !$memberId;
             if ($memberId) {
                 // Update existierendes Mitglied
                 $stmt = $db->prepare("
@@ -293,12 +295,9 @@ function importMembers($db, $database, $filePath) {
                 $imported++;
             }                       
             
-            // Gruppenzuordnungen aktualisieren
+            // Gruppenzuordnungen: vergleichen statt loeschen (Spec 2026-10-05, 4.2) --
+            // neue Mitglieder von Anfang an, bestehende ab heute.
             if (!empty($groups)) {
-                // Alte Zuordnungen löschen
-                $stmt = $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id=?");
-                $stmt->execute([$memberId]);
-                
                 // Gruppen-IDs erst sammeln, dann die Mitgliedschaftsregel anwenden
                 // (Spec 2026-10-02, 4.1) und danach schreiben.
                 $resolved = [];
@@ -310,10 +309,16 @@ function importMembers($db, $database, $filePath) {
                         $errors[] = "Row $rowNumber: Group '$groupName' not found";
                     }
                 }
+                // Nur wenn mindestens eine Gruppe aufgeloest wurde, wird verglichen;
+                // sonst bleibt der Stand eines bestehenden Mitglieds unveraendert.
+                if ($resolved === []) {
+                    continue;
+                }
                 $normalized = groupsWithParents($db, $database, $resolved);
-                $stmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-                foreach ($normalized['group_ids'] as $groupId) {
-                    $stmt->execute([$memberId, $groupId]);
+                $changed = groupsApplyChange($db, $database, (int) $memberId, $normalized['group_ids'],
+                    $isNewMember ? null : date('Y-m-d'));
+                if ($changed && !$isNewMember) {
+                    $groupChanges++;
                 }
                 [$addedRows, $warningRows] = groupsRuleReport((int) $memberId, $normalized);
                 // Name der Zeile mitgeben, damit die Oberfläche auch neu angelegte Mitglieder benennen kann
@@ -336,7 +341,8 @@ function importMembers($db, $database, $filePath) {
             "updated" => $updated,
             "errors" => $errors,
             "added_groups" => $groupsAdded,
-            "group_warnings" => $groupWarnings
+            "group_warnings" => $groupWarnings,
+            "group_changes" => $groupChanges
         ];
         
     } catch (Exception $e) {

@@ -293,6 +293,9 @@ php tests/run.php worktime_api
   worktime_api, worktime_unit, station_api, station_unit, open_items_unit, open_items_api,
   open_items_frontend
 - Einzelprüfungen gegen die Datenbank: `tests/db/verify_*.php`
+- Die Suite `js_syntax` setzt **Node.js im PATH** voraus: Sie lässt jede `.js`-Datei unter
+  `public/js`, `public/checkin` und `public/station` von Node parsen und schlägt ohne Node fehl.
+  Nicht `node --check <datei>` nehmen — bei ES-Modulen in `.js` meldet Node 24 dort immer Erfolg.
 - Klickdurchgang durch das Dashboard unter der CSP (nur lokal, nicht Teil von `tests/run.php`):
   `cd tests/browser && npm install`, dann `node tests/browser/click-through.mjs`; Details in
   `tests/browser/README.md`

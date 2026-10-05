@@ -451,6 +451,14 @@ test('DEMO_TABLES leert subgroup_parents vor member_groups', function () {
     assertTrue($pos < array_search('member_groups', DEMO_TABLES, true));
 });
 
+// OI-115: Zugehoerigkeitsverlauf wird mit den Gruppen geleert (Kinder vor Eltern).
+test('DEMO_TABLES leert member_group_history vor member_groups', function () {
+    $pos = array_search('member_group_history', DEMO_TABLES, true);
+    assertTrue($pos !== false, 'member_group_history fehlt in DEMO_TABLES');
+    assertTrue($pos < array_search('member_groups', DEMO_TABLES, true));
+    assertTrue($pos < array_search('members', DEMO_TABLES, true));
+});
+
 test('writePlan schreibt subgroup_parents aus dem Plan', function () {
     $plan    = buildDemoPlan(20260908, '2026-09-21');
     $db      = demoSeedCliPlanDb($plan);

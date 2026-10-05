@@ -344,6 +344,18 @@ Grundsatzentscheidung ablöst oder eine neue setzt — alles andere bleibt in Ch
   bewusst **nicht** abgeleitet — jedes Register enthält auch ein Vorstandsmitglied, und keine
   Zählregel trennt das von einem Jugendlichen.
 
+**Gruppenzugehörigkeit bekommt eine Zeitachse (2026-10-05, OI-115).** Wer im Juni von „Jugend“
+zu „Aktive“ wechselt, zählte bis dahin das ganze Jahr in der neuen Gruppe und gar nicht mehr in
+der alten — dieselbe Fehlerklasse wie die Aktivität am Termindatum (OI-114), nur für die Gruppe.
+Gewählt wurde **der heutige Stand in `member_group_assignments` plus eine Verlaufstabelle
+`member_group_history`** statt Zeitraum-Spalten an der Zuordnung: Alle Abfragen, die nur den
+heutigen Stand brauchen (Check-in, Station, Zeiterfassung, Terminregeln), bleiben unverändert, und
+nur die Soll-Menge und die Listen vergangener Termine lesen die Vereinigung beider Tabellen. Gepflegt
+wird ausschließlich über „Änderung gilt ab“; den Verlauf bearbeitet niemand einzeln, Zukunftsdaten
+sind nicht erlaubt, ein neu angelegtes Mitglied gilt von Anfang an, und der CSV-Import vergleicht
+statt zu löschen (gültig ab Importtag). Spec:
+`docs/superpowers/specs/2026-10-05-gruppen-zeitraum-design.md`.
+
 ---
 
 ## Leitplanken, die aus alldem folgen
@@ -386,6 +398,7 @@ Kurzfassung für den Alltag — alles oben begründet:
 | Preisliste in der öffentlichen Lizenz | Preisbindung, kein Verhandlungsspielraum |
 | Interne `member_id` in Import/Export | DB-Interna, nicht stabil zwischen Instanzen |
 | Vererbung zwischen Register und Gruppe (Terminarten, Sichtbarkeit) | schlägt in Erwartung, Cross-Filtering und Statistik durch; die Zuordnung Register → Gruppen (2026-10-02) genügt, Kapitel 12 |
+| Zeitraum-Spalten an jeder Zuordnung; bearbeitbarer Verlauf; geplante Wechsel in der Zukunft | der heutige Stand bleibt unverändert lesbar, Verlauf nur über „Änderung gilt ab“, keine Zukunftsdaten (2026-10-05, Kapitel 12) |
 | Register zu genau einer Gruppe; Gruppen bestehender Register ableiten | Register haben Mitglieder aus Aktiven und Jugend; keine Zählregel trennt Vorstand von Jugend (2026-10-02) |
 
 ---

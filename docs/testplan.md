@@ -1394,6 +1394,23 @@ antwortende Fassung ersetzen, die auf `signal` hört.
 | LT-6 | PWA, wie LT-4 | Meldung wie LT-4, **kein** Offline-Hinweis |
 | LT-7 | Einstellungen → Löschfristen ausführen bzw. Update holen bei langsamem Server | Kein Abbruch nach 20 s |
 
+### Startkette (OI-121, unveröffentlicht)
+
+Automatisiert: `startup_chain_frontend` (statisch), `tests/browser/startup-chain.mjs`
+(Wartestufen, Wiederholung, Abmelderegel). Von Hand im Mobilfunk bzw. mit Drosselung
+(DevTools → Netzwerk → „Slow 4G").
+
+| ID | Szenario | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| SK-1 | Check-in-App mit gespeicherter Anmeldung öffnen | Logo und „Wird geladen …", **nie** das Anmeldeformular; danach der Hauptbildschirm |
+| SK-2 | Check-in-App ohne gespeicherte Anmeldung öffnen | Sofort das Anmeldeformular |
+| SK-3 | Wie SK-1, Netz vorher abschalten | „Server nicht erreichbar." mit „Erneut versuchen" und „Mit anderem Konto anmelden"; Netz an, „Erneut versuchen" → App erscheint, ohne neue Anmeldung |
+| SK-4 | Wie SK-3, dann „Mit anderem Konto anmelden" | Anmeldeformular; nach Neuladen weiterhin das Formular (Zugang verworfen) |
+| SK-5 | Konto im Dashboard deaktivieren, dann Check-in-App öffnen | Anmeldeformular |
+| SK-6 | Check-in-App: Tab „Verlauf" direkt nach dem Start | Einträge mit Farbpunkt der Terminart |
+| SK-7 | Dashboard neu laden, Bereich „Mein Profil" | Ansicht steht, Name in der Kopfzeile folgt kurz danach, Versionsnummer erscheint |
+| SK-8 | Admin mit mindestens einer Tätigkeitsart: Dashboard neu laden, Bereich „Zeiterfassung" | Bereich lädt; im Netzwerk `activity_types` nur einmal |
+
 ### Status-Chips (OI-86, 1.13.0)
 
 Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).
@@ -1557,3 +1574,33 @@ Register ihren Gruppen zuordnen.
 | REG-27 | REG-26 bei 320 px Breite | Kein waagerechtes Scrollen, Kopfzeilen umbrechen lesbar, Balken bleibt sichtbar |
 | REG-28 | Admin: Druckansicht der Rückmeldungen desselben Termins | Am Kopf Tabelle „Besetzung“ mit Spalten <Wort>, Zusagen („x von n“), Unsicher, Absagen, Offen, „Mehrfach eingeteilt“ (leer bei 0), nur Register, die zum Termin passen; die Gliederung darunter bleibt nach Terminart-Gruppe. Bei einer Vorstandssitzung keine Tabelle |
 | REG-29 | Admin: Chips oben im Rückmeldungsdialog nacheinander anklicken (Zusage, Unsicher, Absage, Ohne Antwort), denselben Chip ein zweites Mal | Keine eigene Filterleiste mehr; der Chip ist umrandet, die Tabelle zeigt nur diesen Status; zweiter Klick → wieder „Alle“, Fokus bleibt auf dem Chip. „Ohne Antwort“ trägt „davon n ohne Zugang“, wenn es solche gibt. Als Mitglied (Rolle `user`) sind die Chips nicht klickbar |
+
+## 27. Gruppenzugehörigkeit mit Zeitraum — unveröffentlicht
+
+Spec `docs/superpowers/specs/2026-10-05-gruppen-zeitraum-design.md` (OI-115). Automatisiert:
+`php tests/run.php group_history_unit`, `group_history_api`, `group_history_frontend`, `group_history_read_api`,
+`group_history_migrate_db`, dazu
+`tests/db/verify_statistics_parity.php` (Gleichheit ohne Verlauf) und `tests/db/apply_group_history.php`
+(Spalte und Tabelle auf einer Testdatenbank anlegen, solange der Migrationsschritt fehlt, OI-122).
+
+Voraussetzung: Gruppen „Jugend“ und „Aktive“ mit je einer Terminart und regelmäßigen Terminen im
+Vorjahr (vor und nach dem 01.06.); ein Mitglied in „Jugend“; ein Benutzer mit Rolle `user`, der mit
+diesem Mitglied verknüpft ist.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|---|---|---|
+| GZ-1 | Mitglied anlegen und eine Gruppe ankreuzen | Kein Feld „Änderung gilt ab“, kein „seit“ bei der Gruppe; nach dem Speichern und erneuten Öffnen ebenfalls nicht |
+| GZ-2 | Mitglied bearbeiten, nur den Namen ändern | Kein Feld „Änderung gilt ab“ |
+| GZ-3 | Mitglied bearbeiten, ein Häkchen ändern; danach zurücksetzen | Feld erscheint mit heutigem Datum, `max` ist heute, Vorschau „X endet am … · Y ab …“; nach dem Zurücksetzen verschwindet das Feld wieder |
+| GZ-4 | Wechsel Jugend → Aktive mit Datum 01.06. des Vorjahres speichern, Mitglied erneut öffnen | Aktive zeigt „seit 01.06.“, darunter „Bisher: Jugend bis 31.05.“ |
+| GZ-5 | Statistik des Vorjahres nach GZ-4 | Das Mitglied steht in beiden Gruppentabellen, jeweils nur mit den Terminen seines Zeitraums; keine unentschuldigten Termine der Aktiven vor dem Wechsel; `summary.total_members` zählt es einmal je Gruppe |
+| GZ-6 | Rückmeldedialog und Anwesenheitsliste eines Termins vor dem Wechsel | Das Mitglied steht unter der Gruppe Jugend, bei einem Termin nach dem Wechsel unter Aktive |
+| GZ-7 | Anwesenheit „nach Mitglied“ im Vorjahr; ebenso für ein Mitglied, das heute in keiner Gruppe mehr steht | Termine beider Zeiträume erscheinen; beim Mitglied ohne heutige Gruppe die Termine der früheren Gruppen |
+| GZ-8 | `PUT members` mit `groups_valid_from` in der Zukunft bzw. im falschen Format, danach mit unbekannter Gruppe in `group_ids`, danach für ein unbekanntes Mitglied | `422` (`field: groups_valid_from`); `400` (`field: group_ids`); `404`; jeweils ohne dass etwas gespeichert wurde |
+| GZ-9 | CSV-Import mit geänderter Gruppe eines bestehenden Mitglieds; danach dieselbe Datei erneut | Ergebnis nennt „Gruppenänderungen gelten ab heute“, entfernte Gruppe steht im Verlauf bis gestern; zweiter Import: keine Änderung, `group_changes` 0 |
+| GZ-10 | Als Mitglied (Rolle `user`) die Statistik einer ehemaligen Gruppe öffnen | Erreichbar, nur die eigene Zeile |
+| GZ-11 | Eine Gruppe löschen, die im Verlauf eines Mitglieds steht | Kein Fehler; Verlaufszeile verschwindet mit der Gruppe |
+| GZ-12 | Häkchen entfernen, speichern, am selben Tag wieder ankreuzen und speichern | Ausgangszustand: Gruppe gilt von Anfang an (kein „seit“), kein Verlauf („Bisher“ fehlt) |
+| GZ-13 | Gruppe heute mit Datum von vor zwei Tagen ergänzen, dann mit Datum von vor drei Tagen wieder entfernen | Zuordnung weg, kein Verlaufseintrag (Korrektur, die Gruppe hat nie gegolten) |
+| GZ-14 | Ein bestehendes Mitglied nachträglich einer Gruppe zuordnen, ohne das Datum zu ändern; Statistik des Vorjahres | Die Gruppe zählt erst ab heute; für das Vorjahr keine Termine dieser Gruppe — mit früherem „Änderung gilt ab“ erscheinen sie |
+| GZ-15 | Selbstauskunft (Profil → „Meine Daten“, JSON und CSV) nach GZ-4 | Beendete Zuordnung mit Gruppe, von, bis steht in der Auskunft; die heutige Gruppe trägt ihr Beginndatum |

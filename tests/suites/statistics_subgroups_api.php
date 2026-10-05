@@ -483,7 +483,9 @@ test('Mitglied sieht in seiner Registertabelle nur sich, fremdes Register ist ge
 
     try {
         $put = apiRequest('PUT', 'members', ['token' => apiToken('admin'),
-            'query' => ['id' => $memberId], 'body' => ['group_ids' => array_merge($vorher, [$w['groups']['R']])]]);
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => array_merge($vorher, [$w['groups']['R']]),
+                // Die Gruppe gilt ab Jahresbeginn der Welt: seit OI-115 zaehlt die Gruppe am Termindatum
+                'groups_valid_from' => $w['year'] . '-01-01']]);
         assertStatus(200, $put);
         assertSame([['member_id' => $memberId, 'subgroup_id' => $w['groups']['R']]], $put['body']['group_warnings'] ?? null,
             'R hat zwei Gruppen, das Testmitglied steht in keiner: Warnung');
@@ -499,7 +501,8 @@ test('Mitglied sieht in seiner Registertabelle nur sich, fremdes Register ist ge
         assertStatus(403, $fremd, 'Fremdes Register muss gesperrt sein');
     } finally {
         apiRequest('PUT', 'members', ['token' => apiToken('admin'),
-            'query' => ['id' => $memberId], 'body' => ['group_ids' => $vorher]]);
+            // Gleiches Datum wie beim Hinzufuegen: der Zeitraum von R bleibt leer und hinterlaesst keinen Verlauf
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => $vorher, 'groups_valid_from' => $w['year'] . '-01-01']]);
     }
 });
 

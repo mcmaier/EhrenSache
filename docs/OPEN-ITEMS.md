@@ -7,7 +7,7 @@ oder noch nicht gebaut.
 **Zuletzt geprüft:** 2026-09-28 gegen `v1.17.1` (`8d77479`), Eintrag für Eintrag gegen Code und git ·
 **Status nachgezogen:** 2026-10-01 gegen `v1.19.0` (`d672b8d`) — nur Veröffentlichungsvermerke und
 Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
-**Version:** 1.20.1
+**Version:** 1.20.2
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
 > während der Code auf 1.9.0 war — fünf Punkte waren längst behoben, ohne dass ihr Eintrag es
@@ -30,7 +30,9 @@ Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
 mit 1.20.0 (Specs `2026-10-01-register-statistik-besetzung-design.md` und
 `2026-10-02-register-gruppe-besetzung-design.md`; Register gehören seither zu Gruppen). Dabei
 fiel [OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt) an und wurde
-behoben, [OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse) bleibt als bekannte Grenze offen.
+behoben, [OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse) blieb zunächst als bekannte Grenze
+offen und ist am 2026-10-05 behoben (unveröffentlicht, Zweig `feat/gruppen-zeitraum`;
+Migrationsschritt: [OI-122](#oi-122--migrationsschritt-für-member_group_history-fehlt)).
 Mit demselben Release erledigt:
 [OI-116](#oi-116--migrationsschritt-für-subgroup_parents-fehlt) (Migrationsschritt) und
 [OI-118](#oi-118--demo-generator-kennt-subgroup_parents-nicht) (Demo).
@@ -1267,6 +1269,44 @@ der `subgroup_parents` anlegt.
 
 ---
 
+### OI-122 · Migrationsschritt für `member_group_history` fehlt
+**Priorität:** hoch · aufgenommen am 2026-10-05 (Zweig `feat/gruppen-zeitraum`, Spec
+`2026-10-05-gruppen-zeitraum-design.md`, Abschnitt 3.2)
+
+Die Gruppenzugehörigkeit hat seit diesem Zweig einen Zeitraum: eine Spalte `valid_from` an
+`member_group_assignments` und die neue Tabelle `member_group_history`.
+`private/setup/ehrensache_db.sql` legt beides für neue Installationen an, einen Schritt in
+`private/migrations/` legt nach der Regel für parallele Sitzungen (`CLAUDE.md`) aber erst die
+Release-Sitzung an. **Ohne ihn fehlen bestehenden Installationen Spalte und Tabelle**, und jede
+Abfrage, die sie liest — Statistik, Rückmeldung, Anwesenheitsliste, Mitgliederdialog, Selbstauskunft,
+Speichern eines Mitglieds, Import —, scheitert mit einem Datenbankfehler.
+
+**Für die Release-Sitzung:** neue Migrationsdatei mit dem nächsten Manifest-Eintrag, die
+`groupHistoryMigrate(PDO $pdo, string $prefix)` aus `private/helpers/group_history.php`
+aufruft und deren `log`/`warnings` zurückgibt. Die Funktion
+
+- fügt `valid_from` hinzu, falls sie fehlt, und legt `member_group_history` an, falls sie fehlt
+  (`information_schema`), und ist wiederholbar;
+- **verändert keine Daten:** alle bestehenden Zuordnungen behalten `valid_from` NULL, das Verhalten
+  ist bis zum ersten Wechsel identisch zu vorher.
+
+`group_history.php` hält PHP-8.0-Syntax und steht in der Liste von
+`tests/suites/update_path_syntax.php`. **`DEMO_MIN_SCHEMA`** (`private/demo/seed.php`) ist mit dem
+Schritt auf den neuen Schemastand anzuheben. Das Changelog nennt unter „Geändert“, dass die
+Gruppen bestehender Mitglieder nachträglich nur noch ab heute gelten, sofern kein früheres Datum
+gewählt wird.
+
+**Testdatenbanken:** `php tests/db/apply_group_history.php` wendet die Funktion auf die
+Datenbank aus `private/config/config.php` an (für die Worktree-Kopie `ehrensache_zr` erledigt). Die
+Datenbank des Hauptverzeichnisses (`ehrensache`) braucht Spalte und Tabelle vor dem Merge nach
+`dev` — nur mit Freigabe des Nutzers; sonst scheitern dort die Suiten. Bis der Schritt in der Kette
+steht, ist `tests/db/verify_schema_convergence.php` rot (erwartet); mit dem Schritt wird sie grün.
+Die Umstellungsfunktion ist durch `tests/suites/group_history_migrate_db.php` abgesichert.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Sicherheit
 
 > **Was hier stehen darf.** Dieser Abschnitt ist öffentlich. Aufgenommen werden nur
@@ -2203,8 +2243,21 @@ denen sie stecken, sowie bei den neuen Untergruppen-Tabellen.
 ---
 
 ### OI-115 · Gruppenzugehörigkeit ohne Zeitachse
-**Priorität:** niedrig · aufgenommen am 2026-10-02 (Spec
-`2026-10-01-register-statistik-besetzung-design.md`, Abschnitt 4.5)
+**Priorität:** — · **erledigt am 2026-10-05 — unveröffentlicht (Zweig `feat/gruppen-zeitraum`)** ·
+aufgenommen am 2026-10-02 (Spec `2026-10-01-register-statistik-besetzung-design.md`, Abschnitt 4.5)
+
+**Umsetzung:** Spec `docs/superpowers/specs/2026-10-05-gruppen-zeitraum-design.md`. Der heutige
+Stand bleibt in `member_group_assignments` (neue Spalte `valid_from`, NULL = von Anfang an),
+beendete Zuordnungen stehen in der neuen Tabelle `member_group_history`. Alle Schreibwege
+(Mitgliederdialog, `POST`/`PUT members`, CSV-Import) laufen über `groupsApplyChange()` in
+`private/helpers/group_history.php`; gelesen wird über `groupAssignmentsSql()` und
+`groupAssignmentActiveOn()` mit Stichtag Termindatum — in der gemeinsamen Soll-Menge, in Rückmeldung,
+Anwesenheitsliste und Abschnittsgliederung. Gepflegt wird nur über „Änderung gilt ab“ (nicht in
+der Zukunft); der Verlauf ist nicht bearbeitbar. Folge für die Bedienung: Wer ein bestehendes
+Mitglied nachträglich einer Gruppe zuordnet, wählt für vergangene Termine ein früheres Datum,
+sonst gilt die Gruppe ab heute. Offen bleibt der Migrationsschritt:
+[OI-122](#oi-122--migrationsschritt-für-member_group_history-fehlt). Der Text darunter ist der
+Stand vor der Umsetzung.
 
 `member_group_assignments` kennt keinen Zeitraum. Wer im Juni von Klarinette zu Saxophon wechselt
 oder von „Jugend“ zu „Aktive“, zählt in der Statistik das ganze Jahr in der neuen Gruppe und gar
@@ -2305,6 +2358,60 @@ PHP-Prozesse, was auf dieselbe Grenze des Hosters einzahlte (siehe CHANGELOG, `[
 
 Siehe [OI-74](#oi-74--der-cache-bust-erreicht-nur-einen-teil-der-dateien) — dieselbe Ursache
 (Module ohne eigene Versionsangabe), dort für das Erneuern nach einem Update.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
+### OI-121 · Dashboard und Check-in-App laden beim Start Stufe für Stufe
+**Priorität:** mittel · aufgenommen am 2026-10-05 (Messung auf der Demo nach dem Update auf 1.20.1) ·
+**umgesetzt** auf `feat/oi-121-startkette`, unveröffentlicht — offen bleibt die Messung auf der
+Demo nach dem Release (Spec Abschnitt 7, Punkt 5)
+
+Nach dem Fix der Sitzungssperre (1.20.1) laufen gleichzeitige API-Abrufe auch gleichzeitig; ein
+einzelner Abruf braucht auf der Demo im Median rund 40 ms. Trotzdem stand die Profilansicht in
+drei Messungen erst nach 1,5 s, 2,8 s und 1,6 s. Ohne Ausreißer wären es rund 0,6 s.
+
+**Ausreißer beim Hoster.** 80 nacheinander gesendete Abrufe (`ping`, `version`, `me`,
+`settings`): etwa 4 % brauchten 1,0 bis 1,25 s statt 40 ms, unabhängig vom Endpunkt — auch
+`ping`, das fast keinen Code ausführt. Die Ursache liegt beim Hoster (vermutlich Start eines
+PHP-Prozesses), nicht im Code, und ist von hier aus nicht zu beheben.
+
+**Warum sie so durchschlagen.** Der Start wartet Stufe für Stufe (Admin, Bereich Profil):
+
+| Stufe | Abrufe | Ausgelöst von |
+|---|---|---|
+| 1 | `me` | `checkAuth()` in `app.js` |
+| 2 | `users&user_type=human`, `activity_types`, `available_years` | `initEventHandlers()` (lädt die Benutzerliste, auch wenn der Bereich Benutzer gar nicht offen ist), `initAllYearFilters()` (abgewartet) |
+| 3 | `version` | `loadVersion()`, abgewartet vor `showDashboard()` |
+| 4 | `my_open_items`, `users&id=<eigene>` | `loadProfile()` |
+| 5 | `settings&scope=client` | `loadProfile()`, erst nach den Benutzerdaten |
+
+Danach folgt nach 500 ms das Vorladen der übrigen Bereiche (`loadAllData()`, sechs Abrufe
+gleichzeitig) — gewollt und nicht auf dem Weg zur sichtbaren Ansicht. Zwingend hängt nur alles
+an `me` (Rolle). Version und Jahresliste sperren die Ansicht, ohne dass sie sie brauchte; die
+Profilabrufe hängen voneinander nicht ab. Jeder Ausreißer auf diesem Weg addiert sich, bei rund
+zehn Abrufen trifft es grob jeden dritten Seitenaufruf.
+
+**Check-in-App: zehn Stufen, und solange steht die Anmeldemaske da.** Gemessen am selben Tag,
+angemeldet als Mitglied, Handy-Ansicht. `checkAutoLogin()` (`public/checkin/js/app.js`) wartet
+jeden Abruf einzeln ab: `me` → `appointment_types` → `me` (ein zweites Mal, in
+`loadUserData()`) → `members&id` → `activity_types` → `work_sessions&running=1` →
+`settings&scope=client` → `appointments` (heute) → dann `my_open_items` und
+`appointment_responses`. Erst danach blendet `showScreen('main')` die App ein. Bis dahin sieht
+ein angemeldetes Mitglied die **Anmeldemaske** — in zwei Läufen 1,7 s und 3,1 s lang (im zweiten
+mit zwei Ausreißern). Im Mobilfunk kostet jede Stufe zusätzlich die Laufzeit der Verbindung
+(typisch 50 bis 150 ms), die Kette vervielfacht sie. Das ist der Hauptgrund für den Eindruck „vor
+allem mobil langsam“.
+
+**Ziel:** nach `me` alles Nötige gleichzeitig, also zwei Stufen statt fünf (Dashboard) bzw. zehn
+(Check-in-App). Ein Ausreißer kostet
+dann höchstens einmal eine Sekunde. Reiner Frontend-Umbau, keine Migration. **Entschieden 2026-10-05:** Weg „erst
+parallelisieren, dann messen“, mit zwei Wellen und einmaliger Wiederholung lesender Abrufe bei
+503; dazu meldet ein Fehlschlag von `me` außer 401 niemanden mehr ab. Spec
+`docs/superpowers/specs/2026-10-05-startkette-parallel-design.md`.
+
+Verwandt: [OI-120](#oi-120--das-dashboard-lädt-rund-45-einzeldateien) (Dateien, eigene Ursache).
 
 **Nicht sicherheitsrelevant.**
 
@@ -3550,8 +3657,8 @@ Spalte. Die Verbindung Register → Gruppe beseitigt beides.
 Die Antworten auf die Fragen unten: Es zählen die Termine des Registers und seiner Gruppen; ein
 Doppelspieler steht in beiden Registertabellen voll; Pünktlichkeit und Zuverlässigkeit rechnen
 mit Filter auf ein Register über denselben Bereich. Nebenbei fiel die Jahresregel auf
-([OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt)), offen bleibt
-[OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse). Abgesichert durch
+([OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt)), offen blieb
+[OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse) (inzwischen erledigt, unveröffentlicht). Abgesichert durch
 `statistics_subgroups_api` (Welt mit drei Gruppen und Registern mit zwei, keiner und einer
 Gruppe), `subgroup_parent_api` und die Gleichheitsprüfung `tests/db/verify_statistics_parity.php`
 — die meldet für gewöhnliche Gruppen nur die Abweichungen aus OI-114, für die Demo-Register nach

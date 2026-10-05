@@ -344,6 +344,11 @@ function importGroupSummaryHtml(result, nameLookup) {
             warned.map(w => `${memberLabel(w)}: ${groupLabel(w.subgroup_id)}`)
         );
     }
+    const changes = Number(result.group_changes) || 0;
+    if (changes > 0) {
+        html += `<div class="import-groups"><strong>${changes} bestehende(s) Mitglied(er) mit geänderten Gruppen</strong>`
+            + `<p>Gruppenänderungen gelten ab heute.</p></div>`;
+    }
     return html;
 }
 

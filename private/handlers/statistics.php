@@ -282,8 +282,14 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
         && isWorktimeEnabled($db, $database)) {
         // Die Statistikseite bleibt jahresbasiert. Der Zeitraum ist ein
         // Berichtsparameter der Exporte, siehe worktimeResolvePeriod().
+        //
+        // worktimeStatistics() filtert nur bei gesetzter member_id; null heisst
+        // dort "alle Mitglieder". Ein Nicht-Verwalter ohne verknuepftes Mitglied
+        // hat keine eigenen Stunden -- 0 trifft niemanden und liefert die leere
+        // Form, statt die Stunden aller Mitglieder.
+        $worktimeMemberId = (!isAdminOrManager() && $memberId === null) ? 0 : $memberId;
         $result['worktime'] = worktimeStatistics(
-            $db, $database, worktimeResolvePeriod(null, null, $year), $memberId
+            $db, $database, worktimeResolvePeriod(null, null, $year), $worktimeMemberId
         );
     }
 
@@ -306,9 +312,11 @@ function getStatisticsGroups($db, $database, $memberId, $role) {
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }    
 
+    // Heutige und ehemalige Gruppen (Spec 2026-10-05, 5.4) -- sichtbar bleibt nur die eigene Zeile.
+    $assignments = groupAssignmentsSql($database);
     $stmt = $db->prepare("
-        SELECT DISTINCT group_id 
-        FROM {$prefix}member_group_assignments 
+        SELECT DISTINCT group_id
+        FROM {$assignments} ga
         WHERE member_id = ?
         ORDER BY group_id
     ");
@@ -323,9 +331,11 @@ function hasStatisticsGroupAccess($db, $database, $memberId, $role, $groupId) {
 
     $prefix = $database->table('');
     
+    // Heutige und ehemalige Gruppen (Spec 2026-10-05, 5.4) -- sichtbar bleibt nur die eigene Zeile.
+    $assignments = groupAssignmentsSql($database);
     $stmt = $db->prepare("
-        SELECT COUNT(*) 
-        FROM {$prefix}member_group_assignments 
+        SELECT COUNT(*)
+        FROM {$assignments} ga
         WHERE member_id = ? AND group_id = ?
     ");
     $stmt->execute([$memberId, $groupId]);
