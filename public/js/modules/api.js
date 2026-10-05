@@ -33,17 +33,8 @@ export async function setCurrentUser(user) {
     setFeatures(user?.features ?? {});
     applyFeatureVisibility();
 
-    // Lade Member-Name falls vorhanden
-    if (user && user.member_id) {
-        try {
-            const member = await apiCall('members', 'GET', null, { id: user.member_id });
-            if (member) {
-                currentUser.member_name = `${member.name} ${member.surname}`;
-            }
-        } catch (error) {
-            debug.log('Member-Name konnte nicht geladen werden:', error);
-        }
-    }
+    // Den Namen des Mitglieds holt loadOwnMemberName() in ui.js nach dem
+    // Einblenden. Bis 1.20.1 wartete der Start hier darauf (OI-121).
 }
 
 export function setCsrfToken(token) {
@@ -113,6 +104,18 @@ export function apiTimeoutMessage(method) {
         : 'Keine Antwort vom Server. Ob gespeichert wurde, ist unklar – bitte die Ansicht neu laden, bevor du es erneut versuchst.';
 }
 
+// Einmalige Wiederholung lesender Abrufe (OI-121). Shared Hosting weist bei
+// Last mit 503 ab, Cloudflare meldet einen nicht erreichbaren Herkunftsserver
+// mit 52x. Nur GET: ein wiederholter POST koennte doppelt anlegen. Der Timeout
+// gilt fuer beide Versuche zusammen. Dieselbe Regel steht in
+// public/checkin/js/app.js.
+export const RETRY_STATUSES = [502, 503, 504, 520, 521, 522, 523, 524];
+
+/** 300 bis 600 ms -- gestreut, damit viele Geraete nicht im selben Takt erneut fragen. */
+function retryPause() {
+    return new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 300));
+}
+
 /**
  * API Helper Funktion
  *
@@ -171,7 +174,11 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
     loadingStart();
 
     try {
-        const response = await fetch(url, options);
+        let response = await fetch(url, options);
+        if (method === 'GET' && RETRY_STATUSES.includes(response.status)) {
+            await retryPause();
+            response = await fetch(url, options);
+        }
         result = await response.json();
 
         result.success = response.ok;

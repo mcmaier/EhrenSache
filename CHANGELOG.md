@@ -19,11 +19,29 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   `station_pin_enabled` nicht mehr. Dashboard und Check-in-App erkennen die Zeiterfassung
   darüber statt an einem `404` (OI-62).
 
+### Behoben
+- **Check-in-App und Dashboard starten deutlich schneller, vor allem im Mobilfunk.** Beide
+  warteten beim Start jeden Abruf einzeln ab — die Check-in-App zehnmal hintereinander, das
+  Dashboard fünfmal. Jede Wartezeit im Mobilfunk und jeder kurze Hänger beim Hoster addierte
+  sich; auf der Demo stand die Check-in-App erst nach 1,7 bis 3,1 Sekunden. Jetzt laden beide
+  nach der Anmeldeprüfung alles für die erste Ansicht gleichzeitig.
+- **Die Check-in-App zeigt beim Start eine Ladeanzeige statt der Anmeldemaske.** Angemeldete
+  Mitglieder sahen bisher bis zum Ende des Starts das Anmeldeformular.
+- **Ein überlasteter Server meldet in der Check-in-App niemanden mehr ab.** Bisher löschte jeder
+  Fehlschlag der Anmeldeprüfung beim Start den gespeicherten Zugang, auch ein kurzer 503 des
+  Hosters. Jetzt nur noch eine echte Ablehnung (401/403); sonst bietet die Ladeanzeige
+  „Erneut versuchen“ und „Mit anderem Konto anmelden“.
+- **Lesende Abrufe überstehen eine kurze Überlastung.** Antwortet der Server mit 502, 503, 504
+  oder einem Cloudflare-Fehler 520–524, fragen Dashboard und Check-in-App nach einer kurzen Pause
+  einmal nach. Speichernde Abrufe werden nie wiederholt.
+
 ### Intern
 - **Neue Suite `js_syntax`:** Jede ausgelieferte JavaScript-Datei (Dashboard, Check-in-App,
   Station, Service Worker, vendor) wird von Node geparst. Anlass war eine doppelte
   `const`-Deklaration in `ui.js`, die das Dashboard leer ließ, während alle PHP-Suiten grün
   waren. Die Suite braucht Node.js im PATH und schlägt ohne Node fehl, statt zu überspringen.
+
+---
 
 ## [1.20.1] – 2026-10-05
 

@@ -47,7 +47,7 @@ function checkRedirectLoop() {
 // Vor dem Router aufrufen
 checkRedirectLoop();
 
-import { loadAllData, showDashboard, initNavigation, initNavTabs, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, initEventHandlers, loadVersion} from './modules/ui.js';
+import { loadAllData, showDashboard, initNavigation, initNavTabs, initAllYearFilters, createMobileMenuButton, initModalEscHandler, initPWAQuickAccess, initEventHandlers, loadVersion, loadOwnMemberName} from './modules/ui.js';
 import { setCurrentUser, setCsrfToken, setInitialLoad, } from './modules/api.js';
 import { initAuth, startSessionTimeout} from './modules/auth.js';
 
@@ -159,11 +159,15 @@ async function init() {
         //Event Handler Registrieren
         initEventHandlers();
         
-        await initAllYearFilters();
-        await loadVersion(); 
-
-        showDashboard();        
+        // Ansicht sofort, alles Weitere gleichzeitig (OI-121). Version,
+        // Jahresliste und Mitgliedsname hielten die Ansicht bis 1.20.1 auf,
+        // ohne dass sie sie brauchte; der Bereich laedt ohnehin mit dem
+        // aktuellen Jahr.
+        showDashboard();
         loadAllData();
+        initAllYearFilters();
+        loadVersion();
+        loadOwnMemberName();
 
         startSessionTimeout();
         

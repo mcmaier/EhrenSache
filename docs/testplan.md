@@ -1394,6 +1394,23 @@ antwortende Fassung ersetzen, die auf `signal` hört.
 | LT-6 | PWA, wie LT-4 | Meldung wie LT-4, **kein** Offline-Hinweis |
 | LT-7 | Einstellungen → Löschfristen ausführen bzw. Update holen bei langsamem Server | Kein Abbruch nach 20 s |
 
+### Startkette (OI-121, unveröffentlicht)
+
+Automatisiert: `startup_chain_frontend` (statisch), `tests/browser/startup-chain.mjs`
+(Wartestufen, Wiederholung, Abmelderegel). Von Hand im Mobilfunk bzw. mit Drosselung
+(DevTools → Netzwerk → „Slow 4G").
+
+| ID | Szenario | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| SK-1 | Check-in-App mit gespeicherter Anmeldung öffnen | Logo und „Wird geladen …", **nie** das Anmeldeformular; danach der Hauptbildschirm |
+| SK-2 | Check-in-App ohne gespeicherte Anmeldung öffnen | Sofort das Anmeldeformular |
+| SK-3 | Wie SK-1, Netz vorher abschalten | „Server nicht erreichbar." mit „Erneut versuchen" und „Mit anderem Konto anmelden"; Netz an, „Erneut versuchen" → App erscheint, ohne neue Anmeldung |
+| SK-4 | Wie SK-3, dann „Mit anderem Konto anmelden" | Anmeldeformular; nach Neuladen weiterhin das Formular (Zugang verworfen) |
+| SK-5 | Konto im Dashboard deaktivieren, dann Check-in-App öffnen | Anmeldeformular |
+| SK-6 | Check-in-App: Tab „Verlauf" direkt nach dem Start | Einträge mit Farbpunkt der Terminart |
+| SK-7 | Dashboard neu laden, Bereich „Mein Profil" | Ansicht steht, Name in der Kopfzeile folgt kurz danach, Versionsnummer erscheint |
+| SK-8 | Admin mit mindestens einer Tätigkeitsart: Dashboard neu laden, Bereich „Zeiterfassung" | Bereich lädt; im Netzwerk `activity_types` nur einmal |
+
 ### Status-Chips (OI-86, 1.13.0)
 
 Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).

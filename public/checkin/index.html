@@ -25,8 +25,28 @@
     <link rel="stylesheet" href="css/style.css?v=1.20.1">        
 </head>
 <body>
+    <!-- Ladeanzeige beim Start (OI-121). Liegt kein Token vor, blendet app.js
+         sofort die Anmeldemaske ein; sonst steht diese Anzeige bis zum Ende
+         des Starts da -- bis 1.20.1 war es die Anmeldemaske. -->
+    <div id="startScreen" class="active">
+        <div class="login-box">
+            <div class="org-branding">
+                <img class="org-logo" src="../assets/logo-default.png" alt="Logo">
+                <div class="org-info">
+                    <h3 class="org-name">Mein Verein</h3>
+                    <span class="app-badge">📍 Check-in</span>
+                </div>
+            </div>
+            <p id="startStatus" class="start-status" role="status">Wird geladen …</p>
+            <button type="button" id="startRetryBtn" class="action-button btn-login"
+                    data-action="start-retry" hidden>Erneut versuchen</button>
+            <button type="button" id="startSwitchBtn" class="action-button secondary"
+                    data-action="start-switch-account" hidden>Mit anderem Konto anmelden</button>
+        </div>
+    </div>
+
     <!-- Login Screen -->
-    <div id="loginScreen" class="active">
+    <div id="loginScreen">
         <div class="login-box">
             <div class="org-branding">
                     <img class="org-logo" src="../assets/logo-default.png" alt="Logo">

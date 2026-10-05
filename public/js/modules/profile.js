@@ -8,8 +8,8 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-import { apiCall } from './api.js';
-import { showToast, showConfirm, dataCache, invalidateCache, loadClientSettings } from './ui.js';
+import { apiCall, currentUser } from './api.js';
+import { showToast, showConfirm, dataCache, invalidateCache, loadClientSettings, loadOwnMember } from './ui.js';
 import { loadUserData } from './users.js';
 import { isFeatureOn } from './features.js';
 import { debug } from '../app.js'
@@ -31,9 +31,23 @@ export async function loadProfile(forceReload = false) {
 
     loadOpenItems();
 
-    await loadUserData(forceReload);
+    // Gleichzeitig statt nacheinander (OI-121). Das Mitglied kommt ueber
+    // member_id aus me (currentUser), das beim Seitenaufruf geladen wurde.
+    const [, ownMember, clientRes] = await Promise.all([
+        loadUserData(forceReload),
+        loadOwnMember(),
+        loadClientSettings().catch(() => null)
+    ]);
 
-    const userDetails = dataCache.userData.data.userDetails; 
+    const userDetails = dataCache.userData.data.userDetails;
+
+    // Hat ein Admin sein eigenes Konto inzwischen neu verknuepft, ist me
+    // veraltet: dann das Mitglied aus den frischen Benutzerdaten nachladen.
+    // Selten -- der uebliche Weg bleibt parallel.
+    let member = ownMember;
+    if (userDetails.member_id && String(userDetails.member_id) !== String(currentUser?.member_id ?? '')) {
+        member = await loadOwnMember(userDetails.member_id);
+    }
 
     // Account-Informationen
     document.getElementById('profile_email').value = userDetails.email;
@@ -48,10 +62,7 @@ export async function loadProfile(forceReload = false) {
     const memberInput = document.getElementById('profile_member');
     
     if (userDetails.member_id) {
-        // Hole Mitglieds-Details
-        const member = await apiCall('members', 'GET', null, { id: userDetails.member_id });
-        
-        if (member) {
+        if (member?.success) {
             memberInfoDiv.style.display = 'block';
             memberInput.value = `${member.surname}, ${member.name}`;
             
@@ -105,16 +116,13 @@ export async function loadProfile(forceReload = false) {
 
     // Stations-PIN nur zeigen, wenn freigeschaltet und ein Mitglied verknuepft ist
     const card = document.getElementById('profilePinCard');
-    try {
-        const res = await loadClientSettings();
-        const s   = res?.settings || {};
-        const enabled = isFeatureOn('station_pin') && !!userDetails.member_id;
-        card.style.display = enabled ? 'block' : 'none';
-        document.getElementById('new_pin_hint').textContent =
-            `${parseInt(s.station_pin_min_length || '4', 10)}–8 Ziffern, keine Folge wie 1234, keine Wiederholung wie 0000`;
-    } catch (e) {
-        card.style.display = 'none';
-    }
+    // Ob die PIN eingeschaltet ist, steht in features (me, OI-62); aus den
+    // Client-Einstellungen kommt nur noch die Mindestlaenge.
+    const s    = clientRes?.settings || {};
+    const enabled = isFeatureOn('station_pin') && !!userDetails.member_id;
+    card.style.display = enabled ? 'block' : 'none';
+    document.getElementById('new_pin_hint').textContent =
+        `${parseInt(s.station_pin_min_length || '4', 10)}–8 Ziffern, keine Folge wie 1234, keine Wiederholung wie 0000`;
 }
 
 
