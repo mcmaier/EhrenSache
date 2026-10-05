@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.21.0] – 2026-10-05
 
 ### Neu
 - **Gruppenwechsel mit Datum.** Im Mitgliederdialog erscheint beim Ändern der Gruppen „Änderung
