@@ -12,7 +12,9 @@
 declare(strict_types=1);
 
 /**
- * Der Versions-Query an den Asset-Links muss zu version.json passen.
+ * Die Versionsangabe an den Asset-Links — `?v=` in Check-in-App und Station, der
+ * Pfadabschnitt `v<Version>/` in Dashboard und Anmeldeseite — muss zu version.json
+ * passen.
  *
  * Ohne Build-Kette wird er von Hand gepflegt — und genau das wird vergessen.
  * Diese Suite lässt einen vergessenen Sprung auffliegen, statt ihn erst beim
@@ -236,6 +238,8 @@ test('Jedes Script-Tag zeigt auf eine vorhandene Datei', function () use ($repoR
             if (preg_match('#^(?:https?:)?//#', $src) === 1) {
                 continue;
             }
+            // OI-120: der Pfadabschnitt v<Version>/ gibt es nur als Rewrite, nicht als Ordner.
+            $src  = preg_replace('#^((?:\./)?(?:css|js))/v[0-9][0-9.]*/#', '$1/', $src);
             $pfad = $dir . '/' . explode('?', $src)[0];
             if (!is_file($pfad)) {
                 $fehlend[] = $rel . ' -> ' . $src;
@@ -380,4 +384,25 @@ test('Die .htaccess bildet versionierte Pfade ab und laesst sie lange cachen', f
         'Die Rewrite-Regel fuer versionierte Pfade fehlt oder setzt die Markierung nicht');
     assertTrue(preg_match('/Header set Cache-Control "public, max-age=31536000, immutable" env=(REDIRECT_)?ES_VERSIONED/', $htaccess) === 1,
         'Versionierte Pfade bekommen kein langes Caching');
+});
+
+test('Dashboard und Login laden jede lokale CSS- und JS-Datei ueber die Version im Pfad', function () use ($repoRoot) {
+    // OI-120/OI-74. Eine einzige Referenz ohne Abschnitt laedt eine Datei unter
+    // zweiter Adresse: bei einem Modul mit eigenem Zustand, bei allem anderen
+    // bleibt nach einem Update die alte Fassung im Cache.
+    $version = json_decode((string) sourceCode($repoRoot . '/version.json'), true)['version'];
+
+    foreach (['/public/index.html', '/public/login.html'] as $rel) {
+        $html = (string) sourceCode($repoRoot . $rel);
+
+        preg_match_all('/(?:href|src)="(?:\.\/)?((?:css|js)\/[^"]*)"/', $html, $m);
+        assertTrue(count($m[1]) > 0, "{$rel}: keine css/js-Referenz gefunden");
+
+        foreach ($m[1] as $ref) {
+            assertTrue(
+                preg_match('#^(?:css|js)/v' . preg_quote($version, '#') . '/[^?"]+$#', $ref) === 1,
+                "{$rel}: {$ref} traegt nicht den Pfadabschnitt v{$version} (oder noch ?v=)"
+            );
+        }
+    }
 });
