@@ -24,6 +24,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/attendance.php';
 require_once __DIR__ . '/responses.php';
+require_once __DIR__ . '/features.php';
 
 /** Unter dieser Zahl gemessener Ankuenfte gibt es keine Quote (Spec 5.1). */
 const PUNCTUALITY_MIN_MEASUREMENTS = 5;
@@ -377,7 +378,7 @@ function punctualityBlocks($db, $database, array $groupIds, int $year, ?int $mem
         'reliability' => ['enabled' => false],
     ];
 
-    if (systemSetting($db, $database, 'punctuality_enabled', '0') === '1') {
+    if (isFeatureEnabled($db, $database, 'punctuality')) {
         $grace = punctualityGraceFromSetting(
             systemSetting($db, $database, 'punctuality_grace_minutes', '0')
         );
@@ -389,7 +390,7 @@ function punctualityBlocks($db, $database, array $groupIds, int $year, ?int $mem
         );
     }
 
-    if (systemSetting($db, $database, 'reliability_enabled', '0') === '1') {
+    if (isFeatureEnabled($db, $database, 'reliability')) {
         $blocks['reliability'] = reliabilityBuild(
             reliabilityFetchPairs($db, $database, $groupIds, $year, $memberId, $appointmentTypeId)
         );
@@ -411,8 +412,8 @@ function punctualityByYear($db, $database, int $memberId, array $groupIds): arra
 {
     require_once __DIR__ . '/utils.php';
 
-    $anyOn = systemSetting($db, $database, 'punctuality_enabled', '0') === '1'
-          || systemSetting($db, $database, 'reliability_enabled', '0') === '1';
+    $anyOn = isFeatureEnabled($db, $database, 'punctuality')
+          || isFeatureEnabled($db, $database, 'reliability');
 
     if (!$anyOn || $groupIds === []) {
         return [];

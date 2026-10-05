@@ -73,3 +73,21 @@ test('isFeatureEnabled wirft bei unbekanntem Schlüssel', function () {
     assertThrows(fn () => isFeatureEnabled(null, null, 'gibt_es_nicht'),
         'Ein Tippfehler im Schlüssel muss auffallen, nicht still false liefern');
 });
+
+test('Außerhalb von features.php liest niemand einen Schalter direkt', function () {
+    $schalter = implode('|', array_map(fn ($f) => preg_quote($f['setting'], '/'), FEATURES));
+    $muster   = "/(?:systemSetting|worktimeSetting)\s*\([^;]*'(?:{$schalter})'/";
+    $funde    = [];
+    foreach (projectFiles(FU_ROOT . '/private', 'php') as $datei) {
+        if (preg_match('#/private/(migrations|setup|demo)/#', $datei)
+            || str_ends_with($datei, '/private/helpers/features.php')) {
+            continue;
+        }
+        foreach (sourceLines($datei) as $i => $zeile) {
+            if (preg_match($muster, $zeile)) {
+                $funde[] = basename($datei) . ':' . ($i + 1);
+            }
+        }
+    }
+    assertSame([], $funde, 'Direkter Lesezugriff statt isFeatureEnabled(): ' . implode(', ', $funde));
+});

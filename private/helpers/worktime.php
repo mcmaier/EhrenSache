@@ -16,6 +16,7 @@
 // Die Abhängigkeit wird hier deklariert und nicht der Ladereihenfolge in
 // api.php überlassen: worktime_unit.php lädt diese Datei allein.
 require_once __DIR__ . '/utils.php';
+require_once __DIR__ . '/features.php';
 
 // ============================================
 // REINE LOGIK
@@ -268,24 +269,20 @@ function worktimeSetting($db, $database, string $key, string $default): string
     return systemSetting($db, $database, $key, $default);
 }
 
-/** Ist die Zeiterfassung freigeschaltet? */
+/** Ist die Zeiterfassung freigeschaltet? Weiterleitung, siehe features.php (OI-62). */
 function isWorktimeEnabled($db, $database): bool
 {
-    return worktimeSetting($db, $database, 'worktime_enabled', '0') === '1';
+    return isFeatureEnabled($db, $database, 'worktime');
 }
 
 /**
- * Antwortet mit 404 und beendet, wenn das Feature aus ist.
- * Bewusst 404 und nicht 403: ein abgeschaltetes Feature soll nicht einmal
- * verraten, dass es existiert.
+ * Antwortet mit 403 FEATURE_DISABLED und beendet, wenn die Zeiterfassung aus
+ * ist. Bis OI-62 war es 404 („Existenz nicht verraten“) — bei quelloffener
+ * Software trägt das nicht, und das Frontend musste am Status raten.
  */
 function requireWorktimeEnabled($db, $database): void
 {
-    if (!isWorktimeEnabled($db, $database)) {
-        http_response_code(404);
-        echo json_encode(["message" => "Endpoint not found"]);
-        exit();
-    }
+    requireFeature($db, $database, 'worktime');
 }
 
 /**
