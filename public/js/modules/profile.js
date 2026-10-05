@@ -9,7 +9,7 @@
  */
 
 import { apiCall } from './api.js';
-import { showToast, showConfirm, dataCache, invalidateCache, loadClientSettings } from './ui.js';
+import { showToast, showConfirm, dataCache, invalidateCache, loadClientSettings, loadOwnMember } from './ui.js';
 import { loadUserData } from './users.js';
 import { debug } from '../app.js'
 import { API_BASE } from '../config.js';
@@ -30,7 +30,13 @@ export async function loadProfile(forceReload = false) {
 
     loadOpenItems();
 
-    await loadUserData(forceReload);
+    // Gleichzeitig statt nacheinander (OI-121). Das Mitglied kommt ueber
+    // member_id aus me (currentUser) -- dieselbe wie in den Benutzerdaten.
+    const [, member, clientRes] = await Promise.all([
+        loadUserData(forceReload),
+        loadOwnMember(),
+        loadClientSettings().catch(() => null)
+    ]);
 
     const userDetails = dataCache.userData.data.userDetails; 
 
@@ -47,10 +53,7 @@ export async function loadProfile(forceReload = false) {
     const memberInput = document.getElementById('profile_member');
     
     if (userDetails.member_id) {
-        // Hole Mitglieds-Details
-        const member = await apiCall('members', 'GET', null, { id: userDetails.member_id });
-        
-        if (member) {
+        if (member?.success) {
             memberInfoDiv.style.display = 'block';
             memberInput.value = `${member.surname}, ${member.name}`;
             
@@ -104,16 +107,11 @@ export async function loadProfile(forceReload = false) {
 
     // Stations-PIN nur zeigen, wenn freigeschaltet und ein Mitglied verknuepft ist
     const card = document.getElementById('profilePinCard');
-    try {
-        const res = await loadClientSettings();
-        const s   = res?.settings || {};
-        const enabled = s.station_pin_enabled === '1' && !!userDetails.member_id;
-        card.style.display = enabled ? 'block' : 'none';
-        document.getElementById('new_pin_hint').textContent =
-            `${parseInt(s.station_pin_min_length || '4', 10)}–8 Ziffern, keine Folge wie 1234, keine Wiederholung wie 0000`;
-    } catch (e) {
-        card.style.display = 'none';
-    }
+    const s    = clientRes?.settings || {};
+    const enabled = !!clientRes && s.station_pin_enabled === '1' && !!userDetails.member_id;
+    card.style.display = enabled ? 'block' : 'none';
+    document.getElementById('new_pin_hint').textContent =
+        `${parseInt(s.station_pin_min_length || '4', 10)}–8 Ziffern, keine Folge wie 1234, keine Wiederholung wie 0000`;
 }
 
 

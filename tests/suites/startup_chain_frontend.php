@@ -29,6 +29,7 @@ $scPwaHtml = (string) sourceCode($scRoot . '/public/checkin/index.html');
 $scApp     = (string) sourceCode($scRoot . '/public/js/app.js');
 $scUsers   = (string) sourceCode($scRoot . '/public/js/modules/users.js');
 $scWork    = (string) sourceCode($scRoot . '/public/js/modules/worktime.js');
+$scProfile = (string) sourceCode($scRoot . '/public/js/modules/profile.js');
 
 const SC_RETRY_STATUSES = [502, 503, 504, 520, 521, 522, 523, 524];
 
@@ -174,4 +175,12 @@ test('Dashboard: die Benutzerliste laedt nicht beim Start', function () use ($sc
 test('Dashboard: gleichzeitige Freischaltpruefungen teilen sich eine Anfrage', function () use ($scWork) {
     assertTrue(preg_match("/sharedLoad\('worktimeEnabled'/", scBody($scWork, 'export async function checkWorktimeEnabled(')) === 1,
         'Startet der Bereich Zeiterfassung, fragt der Start activity_types doppelt');
+});
+
+test('Dashboard: das Profil laedt gleichzeitig', function () use ($scProfile) {
+    $body = scBody($scProfile, 'export async function loadProfile(');
+    assertTrue(str_contains($body, 'Promise.all('), 'loadProfile() wartet die Abrufe einzeln ab');
+    assertTrue(str_contains($body, 'loadOwnMember()'), 'loadProfile() teilt sich das Mitglied nicht mit der Kopfzeile');
+    assertTrue(!str_contains($body, "apiCall('members'"), 'loadProfile() holt das Mitglied ein zweites Mal');
+    assertTrue(str_contains($body, 'loadOpenItems('), 'loadProfile() startet die offenen Punkte nicht mehr');
 });
