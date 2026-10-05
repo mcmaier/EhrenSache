@@ -2311,7 +2311,9 @@ Siehe [OI-74](#oi-74--der-cache-bust-erreicht-nur-einen-teil-der-dateien) — di
 ---
 
 ### OI-121 · Dashboard und Check-in-App laden beim Start Stufe für Stufe
-**Priorität:** mittel · aufgenommen am 2026-10-05 (Messung auf der Demo nach dem Update auf 1.20.1)
+**Priorität:** mittel · aufgenommen am 2026-10-05 (Messung auf der Demo nach dem Update auf 1.20.1) ·
+**umgesetzt** auf `feat/oi-121-startkette`, unveröffentlicht — offen bleibt die Messung auf der
+Demo nach dem Release (Spec Abschnitt 7, Punkt 5)
 
 Nach dem Fix der Sitzungssperre (1.20.1) laufen gleichzeitige API-Abrufe auch gleichzeitig; ein
 einzelner Abruf braucht auf der Demo im Median rund 40 ms. Trotzdem stand die Profilansicht in
