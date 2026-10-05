@@ -160,3 +160,25 @@ function enabledFeatures($db, $database): array
 {
     return resolveFeatures(featureRawSettings($db, $database, array_keys(FEATURES)));
 }
+
+/**
+ * Ergänzt die Zeilen aus system_settings um jeden Schalter, dessen Zeile
+ * fehlt, mit dem Default aus FEATURES (OI-62, Etappe 2). Ohne das stünde in
+ * den Einstellungen ein leeres Häkchen für eine eingeschaltete Funktion, und
+ * das nächste Speichern schaltete sie ab. Sortiert nach setting_key wie die
+ * Abfrage in getSettings().
+ *
+ * @param array<int, array{setting_key: string, setting_value: mixed}> $rows
+ */
+function featureSettingsWithDefaults(array $rows): array
+{
+    $vorhanden = array_column($rows, 'setting_key');
+    foreach (FEATURES as $f) {
+        if (!in_array($f['setting'], $vorhanden, true)) {
+            $rows[] = ['setting_key' => $f['setting'], 'setting_value' => $f['default']];
+        }
+    }
+    usort($rows, static fn ($a, $b) => strcmp((string) $a['setting_key'], (string) $b['setting_key']));
+
+    return $rows;
+}

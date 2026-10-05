@@ -178,7 +178,8 @@ function getSettings($db, $database) {
 
     try {
         $stmt = $db->query("SELECT setting_key, setting_value FROM {$prefix}system_settings ORDER BY setting_key");
-        $settings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Fehlende Schalterzeilen mit Default (OI-62, Etappe 2) -- siehe features.php.
+        $settings = featureSettingsWithDefaults($stmt->fetchAll(PDO::FETCH_ASSOC));
         
         echo json_encode(['settings' => $settings]);
         

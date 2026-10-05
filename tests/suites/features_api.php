@@ -226,3 +226,12 @@ test('Anwesenheit aus: Anwesenheitsressourcen 403, Terminressourcen 200', functi
         assertStatus(200, apiRequest('GET', 'appointment_types', ['token' => $admin]));
     });
 });
+
+test('GET settings nennt jeden Schalter, auch ohne Zeile in der Datenbank', function () {
+    $res = apiRequest('GET', 'settings', ['token' => apiToken('admin')]);
+    assertStatus(200, $res);
+    $keys = array_column($res['body']['settings'], 'setting_key');
+    foreach (FEATURES as $f) {
+        assertTrue(in_array($f['setting'], $keys, true), "{$f['setting']} fehlt in GET settings");
+    }
+});

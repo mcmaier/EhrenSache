@@ -224,3 +224,23 @@ test('featureForResource kennt Termin- und Anwesenheitsressourcen', function () 
     assertSame(null, featureForResource('my_data'));
     assertSame(null, featureForResource('available_years'));
 });
+
+test('featureSettingsWithDefaults ergaenzt fehlende Schalter mit ihrem Default', function () {
+    $rows = featureSettingsWithDefaults([
+        ['setting_key' => 'worktime_enabled',  'setting_value' => '1'],
+        ['setting_key' => 'organization_name', 'setting_value' => 'Verein'],
+    ]);
+    $map = array_column($rows, 'setting_value', 'setting_key');
+    assertSame('1', $map['worktime_enabled'], 'Eine vorhandene Zeile bleibt unveraendert');
+    assertSame('Verein', $map['organization_name']);
+    foreach (FEATURES as $f) {
+        assertTrue(array_key_exists($f['setting'], $map), "{$f['setting']} fehlt");
+    }
+    assertSame('1', $map['appointments_enabled']);
+    assertSame('1', $map['attendance_enabled']);
+    assertSame('0', $map['station_pin_enabled']);
+    $keys = array_column($rows, 'setting_key');
+    $sortiert = $keys;
+    sort($sortiert);
+    assertSame($sortiert, $keys, 'Wie die Abfrage nach setting_key sortiert');
+});
