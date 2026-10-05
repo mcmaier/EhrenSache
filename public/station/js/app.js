@@ -407,8 +407,14 @@ function enterBlocked(message) {
 function applyStatus() {
     const s = state.status || {};
     $('deviceName').textContent = s.device_name || '';
-    $('totpPanel').hidden = !s.totp_enabled;
-    $('pinPanel').hidden = !s.pin_enabled;
+    // Anwesenheit aus (OI-62, Etappe 2): Der Stations-Code bleibt als
+    // Ortsnachweis der Zeiterfassung; ohne beides gibt es hier nichts zu tun.
+    // Ein aelterer Server ohne das Feld gilt als "an".
+    const anwesenheit = s.attendance_enabled !== false;
+    const nichts = !anwesenheit && !s.worktime_enabled;
+    $('totpPanel').hidden = !s.totp_enabled || nichts;
+    $('pinPanel').hidden = !s.pin_enabled || nichts;
+    $('noFunctionPanel').hidden = !nichts;
 }
 
 async function refreshStatus() {
@@ -698,10 +704,18 @@ function renderAction() {
     $('greeting').textContent = `Hallo ${id.member.name} ${id.member.surname}`;
     showError('actionError', null);
 
-    // Anwesenheit
+    // Anwesenheit -- nur, wenn sie eingeschaltet ist (OI-62, Etappe 2). Ohne
+    // sie verschwindet die Karte ganz, statt „Kein Termin im Zeitfenster“ zu
+    // behaupten.
+    const anwesenheit = state.status?.attendance_enabled !== false;
+    $('attendanceCard').hidden = !anwesenheit;
+    $('actionNoFunction').hidden = anwesenheit || !!id.worktime_enabled;
+
     const c = id.checkin_candidate;
     const btn = $('attendanceBtn');
-    if (!c) {
+    if (!anwesenheit) {
+        btn.disabled = true;
+    } else if (!c) {
         $('attendanceInfo').textContent = 'Kein Termin im Zeitfenster.';
         btn.disabled = true;
     } else if (c.already_checked_in) {

@@ -410,3 +410,13 @@ test('PWA: Zeiterfassung ohne Terminbezug, wenn die Terminplanung aus ist', func
     assertTrue(str_contains(fuBody($pwa, 'function applyPwaFeatureTabs('), 'workSessionAppointmentGroup'),
         'applyPwaFeatureTabs() blendet die Terminfelder nicht aus');
 });
+
+test('Station blendet den Check-in aus, wenn die Anwesenheit aus ist', function () {
+    $js   = sourceCode(FU_ROOT . '/public/station/js/app.js');
+    $html = sourceCode(FU_ROOT . '/public/station/index.html');
+    assertTrue(str_contains(fuBody($js, 'function applyStatus('), 'attendance_enabled'), 'applyStatus() wertet attendance_enabled nicht aus');
+    assertTrue(str_contains(fuBody($js, 'function renderAction('), "\$('attendanceCard').hidden"), 'renderAction() blendet die Anwesenheitskarte nicht aus');
+    assertTrue(str_contains($html, 'id="attendanceCard"'), 'Die Anwesenheitskarte braucht eine id');
+    assertSame(2, substr_count($html, 'An dieser Station ist keine Funktion freigeschaltet.'),
+        'Der Hinweis gehoert ins Ruhebild und in die Aktionsansicht');
+});
