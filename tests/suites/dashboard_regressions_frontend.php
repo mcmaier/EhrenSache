@@ -60,7 +60,12 @@ test('Geraeteliste: Badge und Kennzahl lesen is_active gleich', function () use 
 
 test('Zeiterfassung: nach dem Einschalten stehen die Taetigkeitsarten sofort da', function () use ($drRoot) {
     $js = (string) sourceCode($drRoot . '/public/js/modules/worktime.js');
-    $rumpf = drFunktion($js, 'checkWorktimeEnabled');
+    // Seit OI-62 teilt checkWorktimeEnabled() gleichzeitige Aufrufe ueber ein
+    // gemerktes Promise; der eigentliche Rumpf steht in doCheckWorktimeEnabled().
+    $huelle = drFunktion($js, 'checkWorktimeEnabled');
+    $rumpf  = drFunktion($js, 'doCheckWorktimeEnabled');
+    assertTrue(str_contains($huelle, 'doCheckWorktimeEnabled()'),
+        'checkWorktimeEnabled() leitet nicht an doCheckWorktimeEnabled() weiter');
 
     // settings.js ruft checkWorktimeEnabled() direkt nach dem Einschalten.
     // Die Liste kam an, wurde aber nicht gezeichnet: Die Tabelle blieb bis
