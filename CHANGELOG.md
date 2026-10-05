@@ -31,7 +31,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Wer ein bestehendes Mitglied nachträglich einer Gruppe zuordnet, muss für vergangene Termine
   ein früheres „Änderung gilt ab“ wählen.** Ohne diese Angabe gilt die neue Gruppe ab heute —
   bisher galt sie rückwirkend für alle Termine. Neu angelegte Mitglieder und Gruppen aus dem
-  Import neuer Mitglieder gelten weiterhin von Anfang an.
+  Import neuer Mitglieder gelten weiterhin von Anfang an. Vorhandene Anwesenheiten vor dem gewählten
+  Datum erscheinen dann nicht in Anwesenheitsliste und Statistik der neuen Gruppe.
 - **CSV-Import vergleicht die Gruppen bestehender Mitglieder, statt sie neu anzulegen.**
   Änderungen gelten ab dem Importtag, entfernte Gruppen wandern in den Verlauf; die Antwort nennt
   `group_changes`, die Ergebnisanzeige „Gruppenänderungen gelten ab heute“. Eine Zeile, in der
@@ -42,7 +43,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - API `members`: `groups[].valid_from`, `group_history` (nur im Einzelabruf) und `groups_valid_from`
   bei `PUT`. Eine unbekannte Gruppe in `group_ids` ergibt bei `POST` und `PUT` `400`
   (`field: group_ids`), ein unbekanntes Mitglied bei `PUT` `404` — beides vor jeder Änderung. Name
-  und Gruppen eines Mitglieds werden in einer Transaktion gespeichert.
+  und Gruppen eines Mitglieds werden bei `POST` und `PUT` in einer Transaktion gespeichert.
 
 ---
 

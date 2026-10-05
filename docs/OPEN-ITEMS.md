@@ -1301,6 +1301,7 @@ Datenbank aus `private/config/config.php` an (für die Worktree-Kopie `ehrensach
 Datenbank des Hauptverzeichnisses (`ehrensache`) braucht Spalte und Tabelle vor dem Merge nach
 `dev` — nur mit Freigabe des Nutzers; sonst scheitern dort die Suiten. Bis der Schritt in der Kette
 steht, ist `tests/db/verify_schema_convergence.php` rot (erwartet); mit dem Schritt wird sie grün.
+Die Umstellungsfunktion ist durch `tests/suites/group_history_migrate_db.php` abgesichert.
 
 **Nicht sicherheitsrelevant.**
 

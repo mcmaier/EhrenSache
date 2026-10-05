@@ -563,8 +563,8 @@ Die Einzelantwort ist ein Objekt und trägt statt der beiden Zeichenketten ein `
 `group_history` die beendeten Zuordnungen, neueste zuerst. Beim `PUT` steuert das optionale
 `groups_valid_from` (`JJJJ-MM-TT`, heute oder früher, Vorgabe heute), ab wann eine Änderung von
 `group_ids` gilt; ein ungültiges oder künftiges Datum ergibt `422` mit `field: groups_valid_from`,
-ohne dass etwas gespeichert wird. `GET my_data` führt dasselbe als `groups[].valid_from` und
-`group_history` auf. Die Mitgliederliste (`GET members` ohne `id`) bleibt beim heutigen Stand und
+ohne dass etwas gespeichert wird. `GET my_data` führt `groups[].valid_from` und
+`group_history` auf; im Verlauf der Selbstauskunft fehlt `group_id` (nur Gruppenname, von, bis). Die Mitgliederliste (`GET members` ohne `id`) bleibt beim heutigen Stand und
 trägt weder `valid_from` noch `group_history`.
 
 Ein `user` ohne Admin- oder Managerrolle bekommt auf denselben Endpunkt nur die eigenen

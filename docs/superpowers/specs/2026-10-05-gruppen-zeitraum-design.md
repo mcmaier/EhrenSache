@@ -1,6 +1,6 @@
 # Gruppenzugehörigkeit mit Zeitraum (OI-115)
 
-**Stand:** 2026-10-05 · **Status:** abgestimmt mit dem Nutzer, noch nicht umgesetzt
+**Stand:** 2026-10-05 · **Status:** umgesetzt im Zweig `feat/gruppen-zeitraum`, unveröffentlicht
 **Bezug:** [OI-115](../../OPEN-ITEMS.md#oi-115--gruppenzugehörigkeit-ohne-zeitachse),
 Vorläufer `2026-10-01-register-statistik-besetzung-design.md` (Abschnitt 4.5) und
 `2026-10-02-register-gruppe-besetzung-design.md`
@@ -114,6 +114,10 @@ Durch die Mitgliedschaftsregel ergänzte Gruppen bekommen dasselbe `$date`. Erg�
 Zuordnung das `valid_from` der Registerzuordnung. Alles läuft in einer
 Transaktion mit dem übrigen Speichern des Mitglieds.
 
+**Register mit Register-`valid_from` NULL:** Ergänzt die Registerregel eine Gruppe, deren Registerzuordnung
+`valid_from` NULL hat („von Anfang an“), gilt die ergänzte Gruppe ebenfalls von Anfang an und verdrängt ihren
+Verlauf. Bewusst: das folgt aus „von Anfang an“.
+
 ### 4.2 Wer welches Datum setzt
 
 | Schreibweg | `$date` |
@@ -124,7 +128,9 @@ Transaktion mit dem übrigen Speichern des Mitglieds.
 | CSV-Import, bestehendes Mitglied | heute; **Vergleich statt Löschen** (heute: `DELETE` aller Zuordnungen, siehe `private/handlers/import.php`); die Antwort zählt in `group_changes`, bei wie vielen bestehenden Mitgliedern sich Gruppen geändert haben |
 
 `groups_valid_from` muss ein gültiges Datum `YYYY-MM-DD` sein und darf nicht nach heute liegen,
-sonst 422 mit Fehlermeldung. Ohne Änderung an den Gruppen wird es ignoriert.
+sonst 422 mit Fehlermeldung. Geprüft wird es, sobald `group_ids` mitgeschickt wird — auch ohne
+tatsächliche Änderung der Gruppen (Code-Verhalten); ohne `group_ids` wird es ignoriert. Ohne Änderung
+an den Gruppen hat es keine Wirkung auf die Daten.
 
 ### 4.3 Löschen
 
@@ -163,6 +169,14 @@ Gruppenanzeige im Mitgliederdialog, Kopfzeile des Mitgliedsmodus in `attendance_
 (Gruppennamen von heute), Terminregeln
 (`appointment_rules.php`).
 
+Bewusst beim heutigen Stand belassen sind außerdem: `member_groups.php` (Mitglieder und Zahl je
+Gruppe), `members.php` (Liste, Gruppenfilter), `appointmentGroupVisibility()` in
+`appointment_rules.php` (Terminliste der Rolle `user`), `memberMayLinkAppointment()` und
+`auto_checkin.php` (auch Anträge der Rolle `user`) sowie der Mitgliederfilter in `records.js`.
+Ein Mitglied sieht seine frühere Gruppe in der Statistik (5.4), deren vergangene Termine aber nicht
+in der eigenen Terminliste und kann dazu keinen Antrag stellen; Verwalter können das. Keine
+Verschlechterung gegenüber vorher.
+
 ### 5.4 Statistikzugriff der Rolle `user` (E5)
 
 `getStatisticsGroups()` und `hasStatisticsGroupAccess()` (`statistics.php`) berücksichtigen
@@ -173,6 +187,11 @@ heutige **und** ehemalige Gruppen. Sichtbar ist dort wie bisher nur die eigene Z
 Die Vereinigung wird in jeder Soll-Menge mitgerechnet. Messung gegen den Demo-Bestand vor und
 nach der Änderung (Statistik, Rückmeldedialog, Anwesenheitsliste); Erwartung: im Rahmen der
 bisherigen 95–181 ms.
+
+Gemessen am 2026-10-05 mit `tests/db/verify_statistics_parity.php timing` (Median aus fünf Läufen),
+dev / Zweig: Statistik ohne Filter 195 / 161 ms, Gruppe 130 / 109 ms, Untergruppe 96 / 104 ms,
+Termine+Anwesenheit 113 / 123 ms — gleichwertig. Gleichheitsprüfung (`snapshot` auf dev, `compare`
+im Zweig): keine Abweichung.
 
 ## 6. Oberfläche
 
@@ -225,6 +244,8 @@ dieses Jahres, jeweils mit den Terminen seines Zeitraums.
    Zuordnung Register → Gruppe (`subgroup_parents`) bleibt ohne Zeitraum.
 5. **Demo-Generator:** schreibt keinen Verlauf; `member_group_history` steht in `DEMO_TABLES`
    (vor `member_groups` geleert). `DEMO_MIN_SCHEMA` hebt die Release-Sitzung an.
+6. **Mitternacht:** Browser- und Serveruhr können um einen Tag abweichen; der Server antwortet dann
+   422 „Zukunft“ — bewusst hingenommen.
 
 ## 8. Tests
 

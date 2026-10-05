@@ -1561,7 +1561,8 @@ Register ihren Gruppen zuordnen.
 ## 27. Gruppenzugehörigkeit mit Zeitraum — unveröffentlicht
 
 Spec `docs/superpowers/specs/2026-10-05-gruppen-zeitraum-design.md` (OI-115). Automatisiert:
-`php tests/run.php group_history_unit`, `group_history_api`, `group_history_frontend`, dazu
+`php tests/run.php group_history_unit`, `group_history_api`, `group_history_frontend`, `group_history_read_api`,
+`group_history_migrate_db`, dazu
 `tests/db/verify_statistics_parity.php` (Gleichheit ohne Verlauf) und `tests/db/apply_group_history.php`
 (Spalte und Tabelle auf einer Testdatenbank anlegen, solange der Migrationsschritt fehlt, OI-122).
 
