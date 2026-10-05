@@ -22,6 +22,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../private/helpers/demo_mode.php';
+require_once __DIR__ . '/../lib/api_routes.php';
 
 // ---- demoRequestAllowed: GET/HEAD -----------------------------------------
 
@@ -292,43 +293,13 @@ test('DEMO_MODE als Boolean false zeigt den Waechter untaetig', function () {
  * fruehen Ausstieg aufgerufen wird. Ein zweites sourceCode() dafuer
  * waere nur eine unnoetige zweite Wahrheit ueber denselben Dateiinhalt.
  *
+ * Seit OI-62 liegt der Rumpf in `tests/lib/api_routes.php`.
+ *
  * @return array{cases: string[], early: string[], src: string}
  */
 function demoTestResourcesFromApi(): array
 {
-    static $cache = null;
-
-    if ($cache !== null) {
-        return $cache;
-    }
-
-    $src = (string) sourceCode(dirname(__DIR__, 2) . '/public/api/api.php');
-
-    $marker = 'switch($resource) {';
-    $cut = strpos($src, $marker);
-
-    if ($cut === false) {
-        throw new RuntimeException(
-            "Trennzeile '{$marker}' nicht in api.php gefunden - "
-            . 'demoTestResourcesFromApi() kann den Ressourcen-Router nicht mehr '
-            . 'von den fruehen Ausstiegen trennen. api.php wurde vermutlich '
-            . 'umgebaut; die Suche in dieser Funktion muss nachziehen.'
-        );
-    }
-
-    $earlyExitsSrc = substr($src, 0, $cut);
-    $routerSrc = substr($src, $cut);
-
-    preg_match_all('/\$resource\s*===\s*[\'"]([a-z0-9_\-]+)[\'"]/i', $earlyExitsSrc, $early);
-    preg_match_all('/case\s+[\'"]([a-z0-9_\-]+)[\'"]\s*:/i', $routerSrc, $cases);
-
-    $cache = [
-        'cases' => array_values(array_unique($cases[1])),
-        'early' => array_values(array_unique($early[1])),
-        'src'   => $src,
-    ];
-
-    return $cache;
+    return apiRoutesFromSource();
 }
 
 /** Alle Ressourcen aus api.php, Router und fruehe Ausstiege zusammen, sortiert. */
