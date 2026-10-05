@@ -289,6 +289,57 @@ test('Anwesenheitsliste je Mitglied: auch ohne heutige Gruppe', function () use 
     assertSame($expected, $got, 'N war im Vorjahr durchgehend in A');
 });
 
+test('Statistik: Mitglied sieht ehemalige Gruppe (nur eigene Zeile)', function () {
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Testkonto user ohne Mitglied');
+    $s = uniqid();
+    $groupId = $typeId = $aptId = $otherId = 0;
+    try {
+        $groupId = ghrCreate('member_groups', ['group_name' => "GHR Ehemals {$s}"]);
+        // Termin im Vorjahr (Mitgliedschaft lief ueber zwei Jahre) und ein weiteres, heutiges Mitglied der Gruppe
+        $typeId = ghrCreate('appointment_types', ['type_name' => "GHR Ehemals {$s}", 'is_default' => 0,
+            'color' => '#667eea', 'group_ids' => [$groupId], 'responses_enabled' => 1]);
+        $aptId = ghrCreate('appointments', ['title' => 'GHR Ehemals', 'date' => (date('Y') - 1) . '-06-01',
+            'start_time' => '19:00:00', 'type_id' => $typeId]);
+        $otherId = ghrCreate('members', ['name' => 'Ghr', 'surname' => "E {$s}", 'active' => 1, 'group_ids' => [$groupId]]);
+        $admin = apiToken('admin');
+        $before = apiRequest('GET', 'members', ['token' => $admin, 'query' => ['id' => $memberId]]);
+        assertStatus(200, $before);
+        $own = array_map(static fn ($g) => (int) $g['group_id'], $before['body']['groups']);
+
+        // Zwei Jahre zurueck hinzufuegen, ab heute wieder entfernen -> Verlauf; die
+        // uebrigen Gruppen bleiben unveraendert.
+        $put = static fn (array $ids, string $from) => apiRequest('PUT', 'members', ['token' => $admin,
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => $ids, 'groups_valid_from' => $from]]);
+        assertStatus(200, $put(array_merge($own, [$groupId]), date('Y-m-d', strtotime('-2 years'))));
+        assertStatus(200, $put($own, date('Y-m-d')));
+
+        // Der Test ist nur aussagekraeftig, wenn der Verlauf wirklich existiert.
+        $mid = apiRequest('GET', 'members', ['token' => $admin, 'query' => ['id' => $memberId]]);
+        $hist = array_map(static fn ($h) => (int) $h['group_id'], $mid['body']['group_history'] ?? []);
+        assertTrue(in_array($groupId, $hist, true), 'Verlauf der Gruppe fehlt -- Test waere wertlos');
+
+        $res = apiRequest('GET', 'statistics', ['token' => apiToken('user'),
+            'query' => ['year' => (int) date('Y') - 1, 'group_id' => $groupId]]);
+        assertStatus(200, $res, 'ehemalige Gruppe muss erreichbar sein: ' . $res['raw']);
+        $table = ghrTable($res['body'], $groupId);
+        assertTrue($table !== null, 'Tabelle der ehemaligen Gruppe fehlt: ' . $res['raw']);
+        $ids = array_map(static fn ($m) => (int) $m['member_id'], $table['members']);
+        assertTrue(in_array($memberId, $ids, true), 'eigene Zeile fehlt');
+        assertTrue(array_diff($ids, [$memberId]) === [], 'fremde Zeilen in der Tabelle: ' . implode(',', $ids));
+
+        $after = apiRequest('GET', 'members', ['token' => $admin, 'query' => ['id' => $memberId]]);
+        $ownAfter = array_map(static fn ($g) => (int) $g['group_id'], $after['body']['groups']);
+        sort($own); sort($ownAfter);
+        assertSame($own, $ownAfter, 'heutige Gruppen des Testkontos unveraendert');
+    } finally {
+        if ($aptId)   { ghrDelete('appointments', $aptId); }
+        if ($otherId) { ghrDelete('members', $otherId); }
+        if ($typeId)  { ghrDelete('appointment_types', $typeId); }
+        if ($groupId) { ghrDelete('member_groups', $groupId); }   // raeumt den Verlauf per Fremdschluessel
+    }
+});
+
 test('Lese-Welt aufraeumen', function () use (&$ghrWorld) {
     ghrDropWorld($ghrWorld);
 });
