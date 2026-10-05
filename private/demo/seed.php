@@ -28,12 +28,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers/bootstrap.php';
 require_once __DIR__ . '/plan.php';
 
-// Seit 1.20.0 schreibt der Generator subgroup_parents (Register gehören zu Gruppen).
+// Seit 1.21.0 leert der Generator member_group_history (Gruppenzeitraum, OI-115).
+// Davor: Seit 1.20.0 schreibt der Generator subgroup_parents (Register gehören zu Gruppen).
 // Davor: Seit 1.11.0 leert und schreibt der Generator appointment_series samt
 // appointments.series_id/is_detached; ältere Schemata kennen beides nicht. Davor war 1.8.0 die Schwelle
 // (member_groups mit is_subgroup/sort_order), davor 1.7.0
 // (appointment_responses).
-const DEMO_MIN_SCHEMA = '1.20.0';
+const DEMO_MIN_SCHEMA = '1.21.0';
 
 /**
  * Reihenfolge beim Leeren: Kinder vor Eltern.
