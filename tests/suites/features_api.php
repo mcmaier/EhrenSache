@@ -719,3 +719,47 @@ test('PWA-Terminliste: own_absence der Infokarten entfaellt ohne Anwesenheit', f
         });
     });
 });
+
+test('Gruppenverlauf (OI-115) wird auch bei abgeschalteter Terminplanung weitergefuehrt', function () {
+    // Leser des Verlaufs (Rueckmeldungen, Anwesenheitsliste, Statistik) haengen
+    // an Terminplanung bzw. Anwesenheit. Geschrieben wird er aber weiter, damit
+    // die Gruppen am Termindatum nach dem Wiedereinschalten stimmen.
+    $s = uniqid();
+    $admin = apiToken('admin');
+    $mk = function (string $resource, array $body) use ($admin): int {
+        $res = apiRequest('POST', $resource, ['token' => $admin, 'body' => $body]);
+        assertStatus(201, $res, "{$resource} konnte nicht angelegt werden: " . substr($res['raw'], 0, 200));
+        return (int) $res['body']['id'];
+    };
+    $groups = [];
+    $memberId = 0;
+    try {
+        $a = $groups[] = $mk('member_groups', ['group_name' => "FS GH A {$s}"]);
+        $b = $groups[] = $mk('member_groups', ['group_name' => "FS GH B {$s}"]);
+        $memberId = $mk('members', ['name' => 'Fs', 'surname' => "Verlauf {$s}", 'active' => 1, 'group_ids' => [$a]]);
+
+        fsWith('appointments_enabled', '0', function () use ($admin, $memberId, $a, $b) {
+            $res = apiRequest('PUT', 'members', ['token' => $admin, 'query' => ['id' => $memberId],
+                'body' => ['group_ids' => [$b], 'groups_valid_from' => '2026-06-01']]);
+            assertStatus(200, $res, 'Gruppenwechsel mit Datum ohne Terminplanung: ' . substr($res['raw'], 0, 200));
+
+            $member = apiRequest('GET', 'members', ['token' => $admin, 'query' => ['id' => $memberId]]);
+            assertStatus(200, $member);
+            $since = [];
+            foreach ($member['body']['groups'] as $g) {
+                $since[(int) $g['group_id']] = $g['valid_from'];
+            }
+            assertSame([$b => '2026-06-01'], $since, 'Neue Gruppe ab Datum');
+            $history = array_map(static fn ($h) => [(int) $h['group_id'], $h['valid_from'], $h['valid_to']],
+                $member['body']['group_history'] ?? []);
+            assertSame([[$a, null, '2026-05-31']], $history, 'Alte Gruppe endet am Vortag');
+        });
+    } finally {
+        if ($memberId) {
+            apiRequest('DELETE', 'members', ['token' => $admin, 'query' => ['id' => $memberId]]);
+        }
+        foreach ($groups as $g) {
+            apiRequest('DELETE', 'member_groups', ['token' => $admin, 'query' => ['id' => $g]]);
+        }
+    }
+});
