@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Klickdurchgang durch das Dashboard unter CSP (OI-17). Nur Entwicklung, nicht im Installationspaket.",
   "scripts": {
-    "click-through": "node click-through.mjs"
+    "click-through": "node click-through.mjs",
+    "startup-chain": "node startup-chain.mjs"
   },
   "dependencies": {
     "puppeteer-core": "^23.0.0"

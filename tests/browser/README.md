@@ -34,3 +34,16 @@ Ohne beides wird ein installiertes Google Chrome unter `C:/Program Files` verwen
 Liest `base_url` und das Admin-Konto aus `tests/config.php`. Gegen eine
 Installation laufen lassen, deren Datenbank eine Kopie ist — geöffnet wird
 viel, gespeichert nichts, aber Filter und Ansichten wechseln.
+
+# Startkette (OI-121)
+
+`startup-chain.mjs` zählt die Wartestufen beim Start von Check-in-App und Dashboard: Jede
+API-Antwort wird um 500 ms verzögert, die erste Ansicht muss nach höchstens zwei Stufen stehen
+(gemessen wird der Mehraufwand gegenüber einem Lauf ohne Verzögerung, Grenze +1250 ms). Dazu
+prüft es die einmalige Wiederholung bei 503 (nur GET), dass `me` mit 503
+nicht abmeldet und „Erneut versuchen“ hilft, und dass `me` mit 401 zur Anmeldemaske führt.
+
+    node tests/browser/startup-chain.mjs
+
+Braucht in `tests/config.php` die Konten `admin` und `user`. `ES_BASE_URL` überschreibt
+`base_url`, etwa für eine Gegenprobe gegen einen älteren Stand.
