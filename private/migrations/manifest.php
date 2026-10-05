@@ -270,4 +270,10 @@ return [
         'file'     => '1.20.1.php',
         'function' => 'migrate_1_20_1',
     ],
+    [
+        'from'     => '1.20.2',
+        'to'       => '1.21.0',
+        'file'     => '1.20.2.php',
+        'function' => 'migrate_1_20_2',
+    ],
 ];

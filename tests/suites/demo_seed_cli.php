@@ -110,8 +110,15 @@ test('assertSchema wirft bei 1.19.0 (subgroup_parents fehlt)', function () {
     assertThrows(fn () => assertSchema($db, 'test_'));
 });
 
+test('assertSchema wirft bei 1.20.2 (member_group_history fehlt)', function () {
+    // Seit 1.21.0 leert der Generator member_group_history; auf 1.20.2 fehlt die
+    // Tabelle.
+    $db = demoSeedCliMakeSchemaDb(['1.20.2']);
+    assertThrows(fn () => assertSchema($db, 'test_'));
+});
+
 test('assertSchema laesst einen Patchstand ueber dem Mindeststand durch', function () {
-    $db = demoSeedCliMakeSchemaDb(['1.20.1']);
+    $db = demoSeedCliMakeSchemaDb(['1.21.1']);
     assertSchema($db, 'test_');
 });
 
