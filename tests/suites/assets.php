@@ -368,3 +368,16 @@ test('Mitgliedsname landet in <option>-Listen nur maskiert', function () use ($r
         "<option> mit unmaskiertem Mitgliedsnamen:\n  " . implode("\n  ", $verstoesse)
     );
 });
+
+test('Die .htaccess bildet versionierte Pfade ab und laesst sie lange cachen', function () use ($repoRoot) {
+    // OI-120/OI-74: css/v<Version>/… und js/v<Version>/… zeigen auf die echten
+    // Dateien; nur diese Antworten duerfen ein Jahr liegen.
+    $htaccess = (string) sourceCode($repoRoot . '/public/.htaccess');
+
+    assertTrue(str_contains($htaccess, 'RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/(.+)$'),
+        'Die Rewrite-Bedingung fuer versionierte Pfade fehlt');
+    assertTrue(str_contains($htaccess, 'RewriteRule ^(css|js)/v[0-9][0-9.]*/ %1/%2/%3 [L,E=ES_VERSIONED:1]'),
+        'Die Rewrite-Regel fuer versionierte Pfade fehlt oder setzt die Markierung nicht');
+    assertTrue(preg_match('/Header set Cache-Control "public, max-age=31536000, immutable" env=(REDIRECT_)?ES_VERSIONED/', $htaccess) === 1,
+        'Versionierte Pfade bekommen kein langes Caching');
+});
