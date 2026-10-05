@@ -185,7 +185,9 @@ function handleAppointments($db, $database, $method, $id) {
                     // Antwort unveraendert; ohne Zeitraum waere die Zaehlung
                     // ueber die ganze Historie zu teuer -- dieselbe Grenze wie
                     // bei den Rueckmeldungen oben.
-                    if (($_GET['include'] ?? '') === 'attendance') {
+                    // Ohne Anwesenheit keine Zahlen (OI-62, Etappe 2).
+                    if (($_GET['include'] ?? '') === 'attendance'
+                        && isFeatureEnabled($db, $database, 'attendance')) {
                         $rows = attendanceAttachSummaries(
                             $db, $database, $rows,
                             $viewerMemberId ? (int) $viewerMemberId : null,

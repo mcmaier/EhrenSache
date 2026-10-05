@@ -84,7 +84,7 @@ test('Außerhalb von features.php liest niemand einen Schalter direkt', function
     // setting_key = 'worktime_enabled' auf. Jeder legitime Fund steht mit Grund
     // in der Liste, alles andere muss über isFeatureEnabled() laufen.
     $erlaubt = [
-        'private/handlers/station.php' => ['Antwortschlüssel worktime_enabled in status/identify — keine Lesung des Schalters'],
+        'private/handlers/station.php' => ['Antwortschlüssel worktime_enabled und attendance_enabled in status/identify — keine Lesung des Schalters'],
     ];
     $namen   = implode('|', array_map(fn ($f) => preg_quote($f['setting'], '/'), FEATURES));
     $muster  = "/['\"](?:{$namen})['\"]/";

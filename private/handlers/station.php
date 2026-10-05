@@ -114,6 +114,11 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
         if (str_starts_with($action, 'work_')) {
             requireFeature($db, $database, 'worktime');
         }
+        // Dasselbe fuer den Check-in (OI-62, Etappe 2): vor der PIN, damit ein
+        // gesperrter Aufruf keinen Fehlversuch verbraucht.
+        if ($action === 'checkin') {
+            requireFeature($db, $database, 'attendance');
+        }
 
         $member = stationRequireMember($db, $database, $device, $data);
         if ($member === null) {
@@ -167,6 +172,8 @@ function stationStatus($db, $database, array $device)
         'pin_enabled'      => isStationPinEnabled($db, $database),
         'pin_min_length'   => stationPinMinLength($db, $database),
         'worktime_enabled' => stationWorktimeAvailable($db, $database, $device),
+        // Anwesenheit aus (OI-62, Etappe 2): der Kiosk blendet den Check-in aus.
+        'attendance_enabled' => isFeatureEnabled($db, $database, 'attendance'),
         'server_time'      => stationNow($db),
         // server_unix bleibt PHP-Zeit (nicht die DB-Uhr): er treibt den
         // TOTP-Zaehler mit an, und RFC 6238 rechnet mit Unix-Zeit — davon
@@ -252,8 +259,12 @@ function stationIdentify($db, $database, array $device, array $member)
     $timestamp = stationNow($db);
 
     $candidate = null;
-    $matched   = findCheckinAppointment($db, $prefix, $member['member_id'], $timestamp,
-                                        checkinToleranceHours($db, $database) * 3600);
+    // Ohne Anwesenheit (OI-62, Etappe 2) gibt es keinen Kandidaten -- gesucht
+    // wird dann gar nicht erst.
+    $matched   = isFeatureEnabled($db, $database, 'attendance')
+        ? findCheckinAppointment($db, $prefix, $member['member_id'], $timestamp,
+                                 checkinToleranceHours($db, $database) * 3600)
+        : null;
     if ($matched !== null) {
         // status mitlesen statt nur record_id: "bereits eingecheckt" heisst
         // konkret ein PRAESENTER Eintrag (K2) — ein entschuldigter Termin

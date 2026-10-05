@@ -388,3 +388,114 @@ test('available_years enthaelt ein Jahr, in dem es nur Arbeitszeit gibt', functi
         }
     });
 });
+
+/** Kiosk mit Gerätenamen; der Aufrufer löscht ihn (DELETE users). */
+function fsKiosk(): array
+{
+    $res = apiRequest('POST', 'users', ['token' => apiToken('admin'), 'body' => [
+        'action' => 'create_device', 'device_name' => 'FS-Kiosk ' . uniqid(),
+        'device_type' => 'kiosk', 'totp_enabled' => false,
+    ]]);
+    assertStatus(200, $res, 'Kiosk konnte nicht angelegt werden');
+    return ['user_id' => (int) $res['body']['device']['user_id'],
+            'token'   => (string) $res['body']['device']['api_token']];
+}
+
+function fsStation(string $method, string $action, string $token, ?array $body = null): array
+{
+    $opts = ['token' => $token, 'query' => ['action' => $action]];
+    if ($body !== null) {
+        $opts['body'] = $body;
+    }
+    return apiRequest($method, 'station', $opts);
+}
+
+test('Station: Anwesenheit aus -- status meldet es, identify ohne Kandidat, checkin 403', function () {
+    fsWith('station_pin_enabled', '1', function () {
+        $w = fsWorld('Station');
+        $kiosk = null;
+        try {
+            assertStatus(200, apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+                'query' => ['id' => $w['member']], 'body' => ['pin' => '2580']]), 'PIN konnte nicht gesetzt werden');
+            $kiosk = fsKiosk();
+            $creds = ['member_number' => $w['member_number'], 'pin' => '2580'];
+
+            $status = fsStation('GET', 'status', $kiosk['token']);
+            assertStatus(200, $status);
+            assertSame(true, $status['body']['attendance_enabled'] ?? null, 'status muss attendance_enabled melden');
+            $id = fsStation('POST', 'identify', $kiosk['token'], $creds);
+            assertStatus(200, $id);
+            assertTrue($id['body']['checkin_candidate'] !== null, 'Gegenprobe: Terminkandidat erwartet');
+
+            fsWith('attendance_enabled', '0', function () use ($kiosk, $creds) {
+                $status = fsStation('GET', 'status', $kiosk['token']);
+                assertStatus(200, $status);
+                assertSame(false, $status['body']['attendance_enabled'] ?? null);
+                $id = fsStation('POST', 'identify', $kiosk['token'], $creds);
+                assertStatus(200, $id, 'identify bleibt erreichbar (Arbeitszeit)');
+                assertSame(null, $id['body']['checkin_candidate'], 'Ohne Anwesenheit kein Terminkandidat');
+                fsAssertDisabled(fsStation('POST', 'checkin', $kiosk['token'], $creds), 'attendance', 'POST station checkin');
+            });
+        } finally {
+            if ($kiosk !== null) {
+                fsDelete('users', $kiosk['user_id']);
+            }
+            fsDropWorld($w);
+        }
+    });
+});
+
+test('Anwesenheit aus: appointments liefert bei include=attendance keine Zahlen', function () {
+    $w = fsWorld('Kalender');
+    try {
+        $zeile = function () use ($w): array {
+            $res = apiRequest('GET', 'appointments', ['token' => apiToken('admin'), 'query' => [
+                'year' => (int) date('Y', time() - 600), 'include' => 'attendance']]);
+            assertStatus(200, $res);
+            foreach ($res['body'] as $row) {
+                if ((int) $row['appointment_id'] === $w['appointment']) {
+                    return $row;
+                }
+            }
+            throw new RuntimeException('Testtermin fehlt in der Liste');
+        };
+        assertTrue(array_key_exists('attendance', $zeile()), 'Gegenprobe: mit Anwesenheit traegt der Termin das Feld attendance');
+        fsWith('attendance_enabled', '0', function () use ($zeile) {
+            $row = $zeile();
+            assertTrue(!array_key_exists('attendance', $row) && !array_key_exists('own_attendance', $row),
+                'Ohne Anwesenheit keine Anwesenheitszahlen');
+        });
+    } finally {
+        fsDropWorld($w);
+    }
+});
+
+test('my_open_items: Antraege entfallen ohne Anwesenheit, auch bei Terminplanung aus', function () {
+    $w = fsWorld('Offen');
+    try {
+        $userMember = apiMemberId('user');
+        assertTrue($userMember !== null, 'Das Testkonto user braucht ein verknuepftes Mitglied');
+        fsCreate('exceptions', ['member_id' => $userMember, 'appointment_id' => $w['appointment'],
+                                'exception_type' => 'absence', 'reason' => 'OI-62 Test']);
+        $arten = function () use ($w): array {
+            $res = apiRequest('GET', 'my_open_items', ['token' => apiToken('user')]);
+            assertStatus(200, $res);
+            $treffer = array_filter($res['body']['items'], fn ($i) => ($i['appointment_id'] ?? null) === $w['appointment']);
+            return array_values(array_column($treffer, 'kind'));
+        };
+        assertSame(['exception'], $arten(), 'Gegenprobe: der Antrag steht in den offenen Punkten');
+        fsWith('attendance_enabled', '0', function () use ($arten) {
+            assertSame([], $arten(), 'Ohne Anwesenheit keine Antraege');
+        });
+        fsWith('appointments_enabled', '0', function () {
+            $res = apiRequest('GET', 'my_open_items', ['token' => apiToken('user')]);
+            assertStatus(200, $res);
+            foreach ($res['body']['items'] as $i) {
+                assertTrue(!in_array($i['kind'], ['response', 'exception'], true),
+                    "Ohne Terminplanung darf kein Punkt der Art {$i['kind']} erscheinen");
+            }
+        });
+    } finally {
+        fsDropWorld($w);   // der Termin nimmt den Antrag mit
+    }
+});
