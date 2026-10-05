@@ -62,3 +62,8 @@ Browser-Speicher, `immutable`). Ohne Request-Interception, weil sie den Cache ab
     node tests/browser/cache-reuse.mjs
 
 Braucht in `tests/config.php` das Konto `admin`. `ES_BASE_URL` überschreibt `base_url`.
+
+**Falle beim Entwickeln:** Dieselbe Regel gilt lokal. Im Feature-Branch bleibt die Version gleich,
+nach einer Änderung an CSS oder JS liefert der Browser also weiter die alte Datei aus seinem
+Speicher — ein normales Neuladen hilft nicht, nur ein harter Reload oder „Disable cache“ in den
+Entwicklerwerkzeugen. Die Skripte hier starten mit frischem Profil und sind nicht betroffen.
