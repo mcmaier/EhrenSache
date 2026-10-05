@@ -19,6 +19,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   `station_pin_enabled` nicht mehr. Dashboard und Check-in-App erkennen die Zeiterfassung
   darüber statt an einem `404` (OI-62).
 
+### Intern
+- **Neue Suite `js_syntax`:** Jede ausgelieferte JavaScript-Datei (Dashboard, Check-in-App,
+  Station, Service Worker, vendor) wird von Node geparst. Anlass war eine doppelte
+  `const`-Deklaration in `ui.js`, die das Dashboard leer ließ, während alle PHP-Suiten grün
+  waren. Die Suite braucht Node.js im PATH und schlägt ohne Node fehl, statt zu überspringen.
+
 ## [1.20.1] – 2026-10-05
 
 ### Sicherheit
