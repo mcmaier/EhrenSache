@@ -760,11 +760,11 @@ export function showDashboard() {
         // Ein Bereich, dessen Funktion inzwischen abgeschaltet ist (OI-62),
         // bleibt zu -- applyFeatureVisibility() hat ihn in setCurrentUser()
         // markiert.
-        const navItem = section
+        const storedNavItem = section
             ? document.querySelector(`.nav-item[data-section="${section}"]`)
             : null;
         if (!section || (section === 'mitglieder' && !isAdminOrManager)
-            || navItem?.dataset.featureHidden === '1') {
+            || storedNavItem?.dataset.featureHidden === '1') {
             section = 'profil';
             sessionStorage.setItem('currentSection', section);
         }
