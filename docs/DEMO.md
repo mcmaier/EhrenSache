@@ -298,6 +298,12 @@ kalt, der erste Aufruf kann deshalb noch einzelne 503 sehen; ab dem zweiten lief
 Prüfen im Browser (Entwicklerwerkzeuge → Netzwerk): `css/variables.css` trägt
 `cache-control: no-cache, must-revalidate` **und** ab dem zweiten Abruf `cf-cache-status: HIT`.
 
+Seit der Version im Pfad (OI-120) tragen CSS und JS von Dashboard und Anmeldeseite die Version in
+der Adresse (`css/v<Version>/…`). Ein Update erzeugt also neue Adressen; für diese Dateien ist
+kein „Purge“ mehr nötig, sie liegen ohnehin ein Jahr (`immutable`). Für die HTML-Seiten, die
+Check-in-App und die Station bleibt der Purge nach einem Update richtig. Die Cache-Regel (Edge TTL
+für css/js) bleibt sinnvoll.
+
 Dazu gehört in `config.php` der Schlüssel **`trusted_proxies`** mit den Adressbereichen von
 Cloudflare (https://www.cloudflare.com/ips/). Ohne ihn sieht der Rate Limiter nur die Adressen von
 Cloudflare und zählt alle Besucher, die über denselben Knoten kommen, gemeinsam.

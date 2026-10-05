@@ -2266,6 +2266,13 @@ zugeordnet“ und „n Mitglied(er) in keiner Gruppe ihres Registers“, Namen �
 ### OI-120 · Das Dashboard lädt rund 45 Einzeldateien
 **Priorität:** mittel (bis 2026-10-05 niedrig) · aufgenommen am 2026-10-02 (Demo nach dem Update auf 1.20.0)
 
+**Stand 2026-10-05:** Weg 2 als **Version im Pfad** umgesetzt (Spec
+`docs/superpowers/specs/2026-10-05-version-im-pfad-design.md`, Zweig `feat/oi-120-version-im-pfad`,
+unveröffentlicht): Dashboard und Anmeldeseite laden CSS und JS über `css/v<Version>/…` bzw.
+`js/v<Version>/…`, diese Antworten sind `immutable`. Wiederkehrende Nutzer fragen keine Datei mehr
+nach. **Offen bleibt der Erstbesuch** (und der erste Aufruf nach einem Update): Er lädt weiter alle
+Dateien einzeln — dafür bliebe Weg 1 (Bündeln).
+
 Ein Aufruf des Dashboards fordert rund 45 Dateien gleichzeitig an: 21 CSS-Module per `@import`
 aus `main.css` und gut 20 JS-Module per `import`. Ohne Build-Kette gibt es kein Bündel. Weil CSS
 und JS mit `no-cache` ausgeliefert werden (siehe Abschnitt Caching in `public/.htaccess`), fragt
@@ -3734,7 +3741,9 @@ Fehler. Aufgefallen bei den Filterleisten für 1.9.2 (Spec
 ---
 
 ### OI-74 · Der Cache-Bust erreicht nur einen Teil der Dateien
-**Priorität:** niedrig · aufgenommen am 2026-09-18
+**Priorität:** erledigt am 2026-10-05 — mit der Version im Pfad (OI-120): Jede CSS- und JS-Datei
+von Dashboard und Anmeldeseite trägt die Version über ihren Pfad, auch ohne `mod_headers`.
+Unveröffentlicht auf `feat/oi-120-version-im-pfad`. · aufgenommen am 2026-09-18
 
 Jede HTML-Einstiegsseite hängt `?v=<version>` an ihre Assets, und `tests/suites/assets.php`
 erzwingt, dass der Wert zu `version.json` passt. Im Dashboard erreicht das aber nur einen

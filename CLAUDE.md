@@ -243,6 +243,10 @@ exceptions, statistics und work_sessions (siehe `docs/OPEN-ITEMS.md`).
   Schlüssels und Jahres teilen sich eine Anfrage
 - `sessionStorage` wird nur für den Redirect-Loop-Schutz in `app.js` verwendet
 - Ziel: Reduktion der API-Anfragen
+- Browser-Cache der Dateien: CSS und JS von Dashboard und Anmeldeseite laufen über
+  `css/v<Version>/…` bzw. `js/v<Version>/…` und sind `immutable` (OI-120, `public/.htaccess`).
+  Jede neue lokale `css/`/`js/`-Referenz in diesen Seiten braucht den Abschnitt, sonst lädt die
+  Datei unter zweiter Adresse
 
 ## Sicherheit
 
@@ -338,7 +342,10 @@ php tests/run.php worktime_api
 - Migrationen lesen die `config.php` nur über `private/helpers/config_reader.php`, nie per
   `require`/`include`; Migrationsdateien werden nie gelöscht
 - Sprache: Deutsch (UI, Kommentare), Englisch (Code/Variablen)
-- Versionssprung: `version.json` und `CHANGELOG.md` gemeinsam pflegen
+- Versionssprung: `version.json` und `CHANGELOG.md` gemeinsam pflegen; dazu die Versionsangabe an
+  den Assets — `?v=` in Check-in-App und Station, der Pfadabschnitt `v<Version>/` in
+  `public/index.html` und `public/login.html` (Suchen und Ersetzen; `tests/suites/assets.php`
+  meldet jede vergessene Stelle)
 
 ## Releases bei parallelen Sitzungen
 
