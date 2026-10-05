@@ -12,6 +12,28 @@
 // ============================================
 // WORK_SESSIONS Controller
 // ============================================
+/**
+ * Terminbezug bei abgeschalteter Terminplanung (OI-62, Etappe 2).
+ *
+ * Ein gesetzter Wert antwortet 403 mit field, damit ein Formular das Feld
+ * benennen kann. Ein leerer Wert wird ohne Terminplanung ignoriert statt die
+ * Zuordnung zu loesen: Aeltere Clients schicken appointment_id: null bei jeder
+ * Korrektur mit -- bestehende Verknuepfungen sollen stehen bleiben.
+ */
+function workSessionGuardAppointmentField($db, $database, $data): void
+{
+    if (!is_object($data) || !property_exists($data, 'appointment_id')) {
+        return;
+    }
+    if (!empty($data->appointment_id)) {
+        requireFeature($db, $database, 'appointments', ['field' => 'appointment_id']);
+        return;
+    }
+    if (!isFeatureEnabled($db, $database, 'appointments')) {
+        unset($data->appointment_id);
+    }
+}
+
 function handleWorkSessions($db, $database, $method, $id, $authUserId, $authMemberId, $isTokenAuth) {
 
     // Geräte haben keinen Zugriff: eine Station kann keine Tätigkeitsart
@@ -29,6 +51,7 @@ function handleWorkSessions($db, $database, $method, $id, $authUserId, $authMemb
 
         case 'POST':
             $data   = json_decode(file_get_contents("php://input"));
+            workSessionGuardAppointmentField($db, $database, $data);
             $action = $data->action ?? null;
 
             switch($action) {
@@ -61,6 +84,7 @@ function handleWorkSessions($db, $database, $method, $id, $authUserId, $authMemb
                 return;
             }
             $data = json_decode(file_get_contents("php://input"));
+            workSessionGuardAppointmentField($db, $database, $data);
             workSessionUpdate($db, $database, $id, $data, $authUserId, $authMemberId);
             break;
 

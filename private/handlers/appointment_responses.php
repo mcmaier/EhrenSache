@@ -61,6 +61,25 @@ function responsesFail(int $code, string $message): void
     echo json_encode(['message' => $message], JSON_UNESCAPED_UNICODE);
 }
 
+/**
+ * Anwesenheit eingeschaltet? Einmal je Anfrage gelesen (OI-62, Etappe 2) --
+ * responsesPayload() laeuft in der Liste je Termin. Ist sie aus, entfallen
+ * der Abgleich mit den Anwesenden und die Entschuldigungspflicht: Ein Antrag
+ * waere eine Anwesenheitsressource, die niemand bearbeiten kann.
+ */
+function responsesAttendanceOn($db, $database): bool
+{
+    static $on = null;
+
+    return $on ??= isFeatureEnabled($db, $database, 'attendance');
+}
+
+/** Entschuldigungspflicht der Terminart -- ruht, solange die Anwesenheit aus ist. */
+function responsesRequireExcuse($db, $database, array $apt): bool
+{
+    return (int) $apt['responses_require_excuse'] === 1 && responsesAttendanceOn($db, $database);
+}
+
 /** null = nicht angegeben, -1 = ungueltig, sonst die positive Zahl. */
 function responsesQueryInt(string $key): ?int
 {
@@ -180,7 +199,7 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
         ],
         'settings' => [
             'names_visible'  => (int) $apt['responses_names_visible'] === 1,
-            'require_excuse' => (int) $apt['responses_require_excuse'] === 1,
+            'require_excuse' => responsesRequireExcuse($db, $database, $apt),
             'deadline_hours' => $hours,
             'deadline'       => $deadline,
         ],
@@ -207,7 +226,9 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
     }
 
     if ($isManager) {
-        $present = $started ? responsesFetchPresentMemberIds($db, $database, $appointmentId) : [];
+        // Abgleich mit Anwesenden nur mit eingeschalteter Anwesenheit (OI-62, Etappe 2).
+        $compare = $started && responsesAttendanceOn($db, $database);
+        $present = $compare ? responsesFetchPresentMemberIds($db, $database, $appointmentId) : [];
         $presentLookup = array_flip($present);
         // OI-109: nur fuer Verwalter -- Mitglieder sollen nicht sehen, wer ein Konto hat.
         $withAccess = responsesFetchMemberIdsWithAccess($db, $database, $expectedIds);
@@ -232,14 +253,14 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
                 'excuse_state'      => $r['excuse_state'] ?? null,
                 // G3: wie bei 'own' -- angelegt UND noch verknuepft.
                 'excuse_created'    => $r !== null && $r['excuse_state'] !== null && (int) $r['exception_created'] === 1,
-                'present'           => $started ? isset($presentLookup[$memberId]) : null,
+                'present'           => $compare ? isset($presentLookup[$memberId]) : null,
                 'has_access'        => $hasAccess,
             ];
         }
         $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds);
         $payload['summary']['open_without_access'] = $openWithoutAccess;
 
-        if ($started) {
+        if ($compare) {
             $payload['comparison'] = array_map('count', responseComparison($expectedIds, $statusByMember, $present));
         }
     } elseif ($payload['settings']['names_visible'] || $managerNames) {
@@ -439,7 +460,7 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
         return;
     }
     $comment       = responseNormalizeComment($commentRaw);
-    $requireExcuse = (int) $apt['responses_require_excuse'] === 1;
+    $requireExcuse = responsesRequireExcuse($db, $database, $apt);
 
     if ($requireExcuse && $status === 'no' && $comment === null) {
         responsesFail(422, 'Eine Absage zu diesem Termin braucht eine Begründung');
@@ -579,7 +600,7 @@ function responsesDelete($db, $database, bool $isManager, ?int $authMemberId, st
         }
 
         $exceptionCreated = (int) ($existing['exception_created'] ?? 0);
-        $action = responseExcuseAction((int) $apt['responses_require_excuse'] === 1,
+        $action = responseExcuseAction(responsesRequireExcuse($db, $database, $apt),
                                        $existing['status'], null, $existing['excuse_state'], false,
                                        $exceptionCreated === 1);
         if ($action === 'delete') {

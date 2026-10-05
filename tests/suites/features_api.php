@@ -499,3 +499,87 @@ test('my_open_items: Antraege entfallen ohne Anwesenheit, auch bei Terminplanung
         fsDropWorld($w);   // der Termin nimmt den Antrag mit
     }
 });
+
+test('Anwesenheit aus: Rueckmeldungen ohne Abgleich und ohne Entschuldigungsantrag', function () {
+    $w = fsWorld('Rueckmeldung');
+    $admin = apiToken('admin');
+    $query = ['appointment_id' => $w['appointment'], 'member_id' => $w['member']];
+    try {
+        // Gegenprobe mit Anwesenheit: Absage legt einen Antrag an, Abgleich nach Beginn vorhanden
+        $put = apiRequest('PUT', 'appointment_responses', ['token' => $admin, 'query' => $query,
+            'body' => ['status' => 'no', 'comment' => 'krank']]);
+        assertStatus(200, $put);
+        assertSame('pending', $put['body']['own']['excuse_state'] ?? null, 'Gegenprobe: Entschuldigungsantrag erwartet');
+        $get = apiRequest('GET', 'appointment_responses', ['token' => $admin, 'query' => ['appointment_id' => $w['appointment']]]);
+        assertStatus(200, $get);
+        assertTrue(array_key_exists('comparison', $get['body']), 'Gegenprobe: Abgleich nach Beginn erwartet');
+        assertStatus(200, apiRequest('DELETE', 'appointment_responses', ['token' => $admin, 'query' => $query]));
+
+        fsWith('attendance_enabled', '0', function () use ($admin, $query, $w) {
+            $put = apiRequest('PUT', 'appointment_responses', ['token' => $admin, 'query' => $query,
+                'body' => ['status' => 'no']]);
+            assertStatus(200, $put, 'Absage ohne Begruendung: die Pflicht ruht ohne Anwesenheit');
+            assertTrue(array_key_exists('excuse_state', $put['body']['own'] ?? []) && $put['body']['own']['excuse_state'] === null, 'Kein Entschuldigungsantrag ohne Anwesenheit');
+            assertSame(false, $put['body']['settings']['require_excuse'] ?? null, 'require_excuse ruht');
+            $get = apiRequest('GET', 'appointment_responses', ['token' => $admin, 'query' => ['appointment_id' => $w['appointment']]]);
+            assertStatus(200, $get);
+            assertTrue(!array_key_exists('comparison', $get['body']), 'Kein Abgleich mit Anwesenden ohne Anwesenheit');
+            foreach ($get['body']['members'] ?? [] as $m) {
+                assertTrue(array_key_exists('present', $m) && $m['present'] === null, 'present muss ohne Anwesenheit null sein');
+            }
+        });
+    } finally {
+        fsDropWorld($w);
+    }
+});
+
+test('Terminplanung aus: work_sessions mit appointment_id antwortet 403 mit field', function () {
+    fsWith('worktime_enabled', '1', function () {
+        fsWith('appointments_enabled', '0', function () {
+            $admin = apiToken('admin');
+            $body  = ['activity_id' => 1, 'start_time' => '2001-03-01 10:00:00',
+                      'end_time' => '2001-03-01 11:00:00', 'appointment_id' => 1];
+            $post = apiRequest('POST', 'work_sessions', ['token' => $admin, 'body' => $body]);
+            fsAssertDisabled($post, 'appointments', 'POST work_sessions mit appointment_id');
+            assertSame('appointment_id', $post['body']['field'] ?? null, 'POST: field fehlt');
+            $put = apiRequest('PUT', 'work_sessions', ['token' => $admin, 'query' => ['id' => 999999999], 'body' => $body]);
+            fsAssertDisabled($put, 'appointments', 'PUT work_sessions mit appointment_id');
+            assertSame('appointment_id', $put['body']['field'] ?? null, 'PUT: field fehlt');
+        });
+    });
+});
+
+test('Terminplanung aus: leeres appointment_id loest eine bestehende Verknuepfung nicht', function () {
+    fsWith('worktime_enabled', '1', function () {
+        $w = fsWorld('Verknuepfung');
+        $activity = null;
+        $session  = null;
+        try {
+            $activity = fsCreate('activity_types', ['activity_name' => 'FS-Taetigkeit ' . uniqid(), 'group_ids' => [$w['group']]]);
+            $felder = ['member_id' => $w['member'], 'activity_id' => $activity,
+                       'start_time' => '2001-03-01 10:00:00', 'end_time' => '2001-03-01 11:00:00',
+                       'break_minutes' => 0, 'note' => 'OI-62'];
+            $res = apiRequest('POST', 'work_sessions', ['token' => apiToken('admin'),
+                'body' => $felder + ['appointment_id' => $w['appointment']]]);
+            assertStatus(201, $res, 'Sitzung mit Termin konnte nicht angelegt werden');
+            $session = (int) $res['body']['session']['session_id'];
+
+            fsWith('appointments_enabled', '0', function () use ($session, $felder, $w) {
+                $put = apiRequest('PUT', 'work_sessions', ['token' => apiToken('admin'),
+                    'query' => ['id' => $session], 'body' => $felder + ['appointment_id' => null]]);
+                assertStatus(200, $put, 'Korrektur eines alten Clients (appointment_id: null) muss gelingen');
+                $get = apiRequest('GET', 'work_sessions', ['token' => apiToken('admin'), 'query' => ['id' => $session]]);
+                assertStatus(200, $get);
+                assertSame($w['appointment'], (int) $get['body']['appointment_id'], 'Die Verknuepfung muss stehen bleiben');
+            });
+        } finally {
+            if ($session !== null) {
+                fsDelete('work_sessions', $session);
+            }
+            if ($activity !== null) {
+                fsDelete('activity_types', $activity);
+            }
+            fsDropWorld($w);
+        }
+    });
+});
