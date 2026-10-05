@@ -375,13 +375,19 @@ test('Mitgliedsname landet in <option>-Listen nur maskiert', function () use ($r
 
 test('Die .htaccess bildet versionierte Pfade ab und laesst sie lange cachen', function () use ($repoRoot) {
     // OI-120/OI-74: css/v<Version>/… und js/v<Version>/… zeigen auf die echten
-    // Dateien; nur diese Antworten duerfen ein Jahr liegen.
+    // Dateien; nur diese Antworten duerfen ein Jahr liegen. Die Bedingung ist
+    // bewusst eng: nur schlichte .css/.js-Pfade, kein % und kein "..", weil das
+    // interne Umschreiben ein zweites Mal dekodiert (%252e%252e wuerde zu "..").
     $htaccess = (string) sourceCode($repoRoot . '/public/.htaccess');
 
-    assertTrue(str_contains($htaccess, 'RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/(.+)$'),
-        'Die Rewrite-Bedingung fuer versionierte Pfade fehlt');
-    assertTrue(str_contains($htaccess, 'RewriteRule ^(css|js)/v[0-9][0-9.]*/ %1/%2/%3 [L,E=ES_VERSIONED:1]'),
+    assertTrue(str_contains($htaccess, 'RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/([A-Za-z0-9_./-]+\.(?:css|js))$'),
+        'Die enge Rewrite-Bedingung fuer versionierte Pfade fehlt');
+    assertTrue(str_contains($htaccess, 'RewriteCond %3 !\.\.'),
+        'Die Bedingung gegen ".." im abgebildeten Pfad fehlt');
+    assertTrue(str_contains($htaccess, 'RewriteRule ^(css|js)/v[0-9][0-9.]*/[A-Za-z0-9_./-]+\.(?:css|js)$ %1/%2/%3 [L,E=ES_VERSIONED:1]'),
         'Die Rewrite-Regel fuer versionierte Pfade fehlt oder setzt die Markierung nicht');
+    assertTrue(preg_match('#^\s*RewriteCond %\{REQUEST_URI\} \^\(\.\*\)/\(css\|js\)/v[^\r\n]*\(\.\+\)\$#m', $htaccess) === 0,
+        'Die alte, weite Bedingung (.+) steht noch in der .htaccess');
     assertTrue(preg_match('/Header set Cache-Control "public, max-age=31536000, immutable" env=(REDIRECT_)?ES_VERSIONED/', $htaccess) === 1,
         'Versionierte Pfade bekommen kein langes Caching');
 });

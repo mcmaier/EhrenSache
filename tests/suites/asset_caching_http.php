@@ -37,6 +37,9 @@ function acFetch(string $url): array
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    // Pfad unveraendert schicken: Die Faelle unten pruefen gerade, was Apache
+    // aus kodierten Abschnitten macht -- curl soll nichts vorab bereinigen.
+    curl_setopt($ch, CURLOPT_PATH_AS_IS, true);
     curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $line) use (&$headers): int {
         $pos = strpos($line, ':');
         if ($pos !== false) {
@@ -97,4 +100,29 @@ test('Die Seite selbst bleibt no-cache', function () use ($acBase) {
 
 test('Versionierter Pfad zu einer fehlenden Datei ergibt 404', function () use ($acBase) {
     assertSame(404, acFetch($acBase . '/js/v9.9.9/gibtsnicht.js')['status']);
+});
+
+test('Kodierte Abschnitte im versionierten Pfad bekommen kein langes Caching', function () use ($acBase, $acVersion) {
+    // %{REQUEST_URI} ist bereits dekodiert, das interne Umschreiben dekodiert
+    // ein zweites Mal: Aus %252e%252e wurde so "..", aus %2561 ein "a". Mit der
+    // frueheren, weiten Regel lieferte js/v…/%252e%252e/login.html die
+    // Anmeldeseite mit einem Jahr Cache aus -- eine Seite, die nie veralten darf.
+    //
+    // Erwartet: 404 (oder 400/403). Der index.html-Fall endet vorher in der
+    // allgemeinen Umleitung "index.html -> Verzeichnis" (301 auf .../%252e%252e/,
+    // dort 404) -- auch das ist in Ordnung, solange kein langes Caching dranhaengt.
+    $paths = [
+        "/js/v{$acVersion}/%252e%252e/login.html",
+        "/css/v{$acVersion}/%252e%252e/index.html",
+        "/js/v{$acVersion}/%2561pp.js",
+    ];
+    $verstoesse = [];
+    foreach ($paths as $path) {
+        $r  = acFetch($acBase . $path);
+        $cc = $r['headers']['cache-control'] ?? '';
+        if (!in_array($r['status'], [301, 400, 403, 404], true) || str_contains($cc, 'immutable')) {
+            $verstoesse[] = "{$path}: Status {$r['status']}, Cache-Control: " . ($cc === '' ? '-' : $cc);
+        }
+    }
+    assertTrue($verstoesse === [], "Kodierter Pfad falsch abgebildet:\n  " . implode("\n  ", $verstoesse));
 });
