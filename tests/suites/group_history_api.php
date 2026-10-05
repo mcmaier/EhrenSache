@@ -315,7 +315,7 @@ test('Korrektur: am selben Tag oder davor entfernt ergibt keinen Verlaufseintrag
     }
 });
 
-test('Registerregel ueber den Planer: Verlauf der ergaenzten Gruppe wird gekuerzt', function () {
+test('Registerregel ueber den Planer: ueberlappender Verlauf der ergaenzten Gruppe wird zusammengefuehrt', function () {
     $s = uniqid();
     $ids = ['g' => [], 'm' => 0];
     try {
@@ -333,8 +333,11 @@ test('Registerregel ueber den Planer: Verlauf der ergaenzten Gruppe wird gekuerz
         assertStatus(200, $put, $put['raw']);
 
         $member = ghMember($m);
-        assertSame('2026-04-01', ghSince($member)[$p] ?? 'fehlt', 'P heute ab 01.04.');
-        assertSame([[$p, '2025-01-01', '2026-03-31']], ghHistory($member), 'Verlauf von P gekuerzt, keine Ueberlappung');
+        // P galt bis 31.05.; ab 01.04. kommt P ueber das Register hinzu -- durchgehend seit
+        // 2025-01-01, also zusammengefuehrt (Spec 7.1). Ein direktes INSERT ergaebe dagegen
+        // P ab 01.04. plus den unveraenderten Verlauf bis 31.05. (Ueberlappung).
+        assertSame('2025-01-01', ghSince($member)[$p] ?? 'fehlt', 'P durchgehend seit 2025-01-01');
+        assertSame([], ghHistory($member), 'Verlauf von P aufgeloest, keine Ueberlappung');
     } finally {
         if ($ids['m']) { ghDelete('members', $ids['m']); }
         foreach (array_reverse($ids['g']) as $g) { ghDelete('member_groups', $g); }
