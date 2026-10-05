@@ -73,7 +73,10 @@ test('ES-Module tragen KEINEN Versions-Query', function () use ($repoRoot) {
 });
 
 test('Die .htaccess laesst CSS und JS revalidieren', function () use ($repoRoot) {
-    // Faengt ab, was der Query nicht abdeckt: relativ importierte Module.
+    // Grundregel no-cache fuer alles ohne Versionsabschnitt im Pfad: unversionierte
+    // Aufrufe von CSS/JS, die HTML-Seiten sowie Check-in-App und Station (die
+    // ihre Dateien per ?v= versionieren). Das lange Caching fuer css/v<Version>/
+    // und js/v<Version>/ prueft der Test zu VERSIONIERTE PFADE weiter unten.
     $htaccess = (string) sourceCode($repoRoot . '/public/.htaccess');
 
     assertTrue(
@@ -401,12 +404,20 @@ test('Dashboard und Login laden jede lokale CSS- und JS-Datei ueber die Version 
     foreach (['/public/index.html', '/public/login.html'] as $rel) {
         $html = (string) sourceCode($repoRoot . $rel);
 
-        preg_match_all('/(?:href|src)="(?:\.\/)?((?:css|js)\/[^"]*)"/', $html, $m);
-        assertTrue(count($m[1]) > 0, "{$rel}: keine css/js-Referenz gefunden");
+        // Jede href/src in einfachen oder doppelten Anfuehrungszeichen. Lokal ist
+        // alles ausser http(s)://, //… und data:; jede lokale Referenz, die css/
+        // oder js/ enthaelt (auch ../js/… oder /…/js/…), muss die Form
+        // [./]css|js/v<Version>/… haben.
+        preg_match_all('/\b(?:href|src)\s*=\s*(["\'])(.*?)\1/i', $html, $m);
+        $lokal = array_filter($m[2], static function (string $ref): bool {
+            return preg_match('#^(?:[a-z][a-z0-9+.-]*:|//)#i', $ref) !== 1
+                && preg_match('#(?:^|/)(?:css|js)/#', $ref) === 1;
+        });
+        assertTrue(count($lokal) > 0, "{$rel}: keine css/js-Referenz gefunden");
 
-        foreach ($m[1] as $ref) {
+        foreach ($lokal as $ref) {
             assertTrue(
-                preg_match('#^(?:css|js)/v' . preg_quote($version, '#') . '/[^?"]+$#', $ref) === 1,
+                preg_match('#^(?:\./)?(?:css|js)/v' . preg_quote($version, '#') . '/[^?"\']+$#', $ref) === 1,
                 "{$rel}: {$ref} traegt nicht den Pfadabschnitt v{$version} (oder noch ?v=)"
             );
         }

@@ -85,7 +85,7 @@ try {
         loginFirst.length > 0 && loginFirst.every(r => r.url.includes(`/v${VERSION}/`)),
         loginFirst.filter(r => !r.url.includes(`/v${VERSION}/`)).map(r => r.url).join(', '));
     check('Login: zweiter Aufruf ohne CSS/JS-Anfrage an den Server',
-        loginSecond.every(r => r.cached),
+        loginSecond.length > 0 && loginSecond.every(r => r.cached),
         `${loginSecond.filter(r => !r.cached).length} von ${loginSecond.length} vom Server`);
 
     // Anmelden
