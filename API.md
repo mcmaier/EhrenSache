@@ -2124,7 +2124,7 @@ wie bei „Ein Termin“ nur bei `names_visible`.
   sie zusätzlich `started` (wie oben) und `own_absence`: den jüngsten eigenen
   Entschuldigungsantrag zum Termin als `{"exception_id", "status"}` oder `null`. Die Check-in-App
   bietet damit bis Terminbeginn „Entschuldigen“ an und zeigt den Stand. Eingereicht wird über
-  `POST exceptions` mit `exception_type: absence`, zurückgezogen über `DELETE exceptions`. Die Antwort ist
+  `POST exceptions` mit `exception_type: absence`, zurückgezogen über `DELETE exceptions`. Mit ausgeschalteter Anwesenheit ist `own_absence` immer `null` (seit OI-62, Etappe 2). Die Antwort ist
   dann chronologisch nach Datum und Beginn sortiert. Ohne den Schalter bleibt sie wie bisher,
   damit ein vor dem Update geöffneter Tab der Check-in-App keine Einträge bekommt, die sein Code
   nicht kennt.

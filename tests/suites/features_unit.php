@@ -420,3 +420,10 @@ test('Station blendet den Check-in aus, wenn die Anwesenheit aus ist', function 
     assertSame(2, substr_count($html, 'An dieser Station ist keine Funktion freigeschaltet.'),
         'Der Hinweis gehoert ins Ruhebild und in die Aktionsansicht');
 });
+
+test('PWA: Entschuldigen und Zurueckziehen brauchen die Anwesenheit', function () {
+    $pwa = sourceCode(FU_ROOT . '/public/checkin/js/app.js');
+    foreach (['function excuseSectionHtml(', 'function excuseChipHtml(', 'async function submitExcuse(', 'function withdrawExcuse('] as $sig) {
+        assertTrue(str_contains(fuBody($pwa, $sig), "pwaFeatureOn('attendance')"), "{$sig}) ohne Schalter Anwesenheit");
+    }
+});

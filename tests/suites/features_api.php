@@ -643,3 +643,79 @@ test('Terminplanung aus: leeres appointment_id loest eine bestehende Verknuepfun
         }
     });
 });
+
+/**
+ * Welt fuer Infokarten der PWA: Gruppe des Testkontos user, Terminart OHNE
+ * Rueckmeldung, ein Termin in zehn Tagen und ein eigener Entschuldigungsantrag
+ * dazu. Muster: fsWithOpenResponse().
+ */
+function fsWithInfoAbsence(callable $fn): void
+{
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Das Testkonto user braucht ein verknuepftes Mitglied');
+    $res = apiRequest('GET', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
+    assertStatus(200, $res);
+    $original = array_map(static fn ($g) => (int) $g['group_id'], $res['body']['groups'] ?? []);
+
+    $suffix = substr(uniqid(), -6);
+    $group = $type = $appointment = $exception = null;
+    try {
+        $group = fsCreate('member_groups', ['group_name' => "FS Info {$suffix}"]);
+        $type  = fsCreate('appointment_types', [
+            'type_name' => "FS Info {$suffix}", 'is_default' => 0, 'color' => '#667eea',
+            'group_ids' => [$group], 'responses_enabled' => 0,
+        ]);
+        $appointment = fsCreate('appointments', [
+            'title' => 'FS-Info', 'type_id' => $type,
+            'date'  => date('Y-m-d', strtotime('+10 days')), 'start_time' => '19:30',
+        ]);
+        $exception = fsCreate('exceptions', [
+            'member_id' => $memberId, 'appointment_id' => $appointment,
+            'exception_type' => 'absence', 'reason' => 'FS-Info',
+        ]);
+        assertStatus(200, apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => array_values(array_unique(array_merge($original, [$group])))]]));
+        $fn($appointment);
+    } finally {
+        apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => $original]]);
+        if ($exception !== null) {
+            fsDelete('exceptions', $exception);
+        }
+        if ($appointment !== null) {
+            fsDelete('appointments', $appointment);
+        }
+        if ($type !== null) {
+            fsDelete('appointment_types', $type);
+        }
+        if ($group !== null) {
+            fsDelete('member_groups', $group);
+        }
+    }
+}
+
+test('PWA-Terminliste: own_absence der Infokarten entfaellt ohne Anwesenheit', function () {
+    fsWithInfoAbsence(function (int $appointment) {
+        $karte = function () use ($appointment): array {
+            $res = apiRequest('GET', 'appointment_responses', ['token' => apiToken('user'),
+                'query' => ['upcoming' => 1, 'with_info' => 1]]);
+            assertStatus(200, $res);
+            foreach ($res['body']['appointments'] as $item) {
+                if ((int) $item['appointment']['appointment_id'] === $appointment) {
+                    return $item;
+                }
+            }
+            throw new RuntimeException('Infokarte fehlt in der Antwort');
+        };
+
+        $an = $karte();
+        assertTrue(array_key_exists('own_absence', $an), 'Gegenprobe: own_absence ist Teil der Antwortform');
+        assertTrue($an['own_absence'] !== null, 'Gegenprobe: Mit Anwesenheit steht der eigene Antrag an der Karte');
+
+        fsWith('attendance_enabled', '0', function () use ($karte) {
+            $aus = $karte();
+            assertTrue(array_key_exists('own_absence', $aus), 'Form bleibt stabil: Schluessel own_absence vorhanden');
+            assertSame(null, $aus['own_absence'], 'Ohne Anwesenheit keine Entschuldigung an der Karte');
+        });
+    });
+});
