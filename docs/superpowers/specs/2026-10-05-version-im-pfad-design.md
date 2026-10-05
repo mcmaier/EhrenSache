@@ -119,7 +119,11 @@ Der Kommentarblock „CACHING“ in `public/.htaccess` wird auf das neue Verfahr
   `update_swap_unit.php`); README und `docs/DEMO.md` verlangen beim Hochladen von Hand dieselbe
   Reihenfolge; „Purge Everything“ bei Cloudflare bleibt nach jedem Update Pflicht. Er fängt ab,
   was die Reihenfolge nicht abdeckt: einen Upload von Hand in falscher Reihenfolge oder einen
-  Tausch, der mittendrin abbricht.
+  Tausch, der mittendrin abbricht. **Wirksam erst ab dem übernächsten Update:** Den Tausch
+  führt der bereits installierte Updater aus (`public/update/index.php` lädt
+  `private/helpers/` der laufenden Installation). Das Update, das diese Änderung ausliefert,
+  tauscht deshalb noch in der alten Reihenfolge — für dieses eine Update bleibt die Lücke von
+  wenigen Sekunden, und der Purge ist dort besonders wichtig.
 - In `index.html` steht die Version danach rund 25-mal. Ein Versionssprung ist trotzdem ein
   Suchen und Ersetzen; der Test meldet jede vergessene Stelle.
 
