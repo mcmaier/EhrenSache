@@ -485,6 +485,10 @@ function responsesPut($db, $database, int $authUserId, bool $isManager, ?int $au
 
         $exceptionId      = $existing['exception_id'] ?? null;
         $exceptionCreated = (int) ($existing['exception_created'] ?? 0);
+        // Ohne Anwesenheit ist $requireExcuse false und die Aktion 'none'
+        // (OI-62, Etappe 2): Ein zuvor angelegter offener Antrag bleibt
+        // verknuepft -- Abschalten aendert keine Daten. Er wird wieder
+        // sichtbar, sobald die Anwesenheit wieder an ist.
         $action = responseExcuseAction($requireExcuse, $existing['status'] ?? null, $status,
                                        $existing['excuse_state'] ?? null, $ownAbsence !== null,
                                        $exceptionCreated === 1);

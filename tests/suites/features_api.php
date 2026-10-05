@@ -470,7 +470,7 @@ test('Anwesenheit aus: appointments liefert bei include=attendance keine Zahlen'
     }
 });
 
-test('my_open_items: Antraege entfallen ohne Anwesenheit, auch bei Terminplanung aus', function () {
+test('my_open_items: Antraege entfallen ohne Anwesenheit und ohne Terminplanung', function () {
     $w = fsWorld('Offen');
     try {
         $userMember = apiMemberId('user');
@@ -487,17 +487,77 @@ test('my_open_items: Antraege entfallen ohne Anwesenheit, auch bei Terminplanung
         fsWith('attendance_enabled', '0', function () use ($arten) {
             assertSame([], $arten(), 'Ohne Anwesenheit keine Antraege');
         });
-        fsWith('appointments_enabled', '0', function () {
-            $res = apiRequest('GET', 'my_open_items', ['token' => apiToken('user')]);
-            assertStatus(200, $res);
-            foreach ($res['body']['items'] as $i) {
-                assertTrue(!in_array($i['kind'], ['response', 'exception'], true),
-                    "Ohne Terminplanung darf kein Punkt der Art {$i['kind']} erscheinen");
-            }
+        // Ohne Terminplanung gilt dasselbe (Anwesenheit setzt sie voraus);
+        // die Rueckmeldepunkte prueft der Test darunter an einem kuenftigen Termin.
+        fsWith('appointments_enabled', '0', function () use ($arten) {
+            assertSame([], $arten(), 'Ohne Terminplanung keine Antraege');
         });
     } finally {
         fsDropWorld($w);   // der Termin nimmt den Antrag mit
     }
+});
+
+/**
+ * Welt für offene Rückmeldepunkte: Gruppe des Testkontos user, Terminart mit
+ * Rückmeldung, ein Termin in zehn Tagen (innerhalb des 14-Tage-Horizonts).
+ * Muster: oiWithWorld() in open_items_api.php; eigene Namen wegen des
+ * gemeinsamen Prozesses beim Gesamtlauf.
+ */
+function fsWithOpenResponse(callable $fn): void
+{
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Das Testkonto user braucht ein verknuepftes Mitglied');
+    $res = apiRequest('GET', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
+    assertStatus(200, $res);
+    $original = array_map(static fn ($g) => (int) $g['group_id'], $res['body']['groups'] ?? []);
+
+    $suffix = substr(uniqid(), -6);
+    $group = $type = $appointment = null;
+    try {
+        $group = fsCreate('member_groups', ['group_name' => "FS Offen {$suffix}"]);
+        $type  = fsCreate('appointment_types', [
+            'type_name' => "FS Offen {$suffix}", 'is_default' => 0, 'color' => '#667eea',
+            'group_ids' => [$group], 'responses_enabled' => 1, 'response_deadline_hours' => 24,
+        ]);
+        $appointment = fsCreate('appointments', [
+            'title' => 'FS-Offen', 'type_id' => $type,
+            'date'  => date('Y-m-d', strtotime('+10 days')), 'start_time' => '19:30',
+        ]);
+        assertStatus(200, apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => array_values(array_unique(array_merge($original, [$group])))]]));
+        $fn($appointment);
+    } finally {
+        apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => $original]]);
+        if ($appointment !== null) {
+            fsDelete('appointments', $appointment);
+        }
+        if ($type !== null) {
+            fsDelete('appointment_types', $type);
+        }
+        if ($group !== null) {
+            fsDelete('member_groups', $group);
+        }
+    }
+}
+
+test('my_open_items: Rueckmeldepunkte entfallen ohne Terminplanung', function () {
+    fsWithOpenResponse(function (int $appointment) {
+        $punkt = function () use ($appointment): ?array {
+            $res = apiRequest('GET', 'my_open_items', ['token' => apiToken('user')]);
+            assertStatus(200, $res);
+            foreach ($res['body']['items'] as $i) {
+                if ($i['kind'] === 'response' && (int) ($i['appointment_id'] ?? 0) === $appointment) {
+                    return $i;
+                }
+            }
+            return null;
+        };
+        assertTrue($punkt() !== null, 'Gegenprobe: Mit Terminplanung steht die offene Rueckmeldung in den Punkten');
+        fsWith('appointments_enabled', '0', function () use ($punkt) {
+            assertSame(null, $punkt(), 'Ohne Terminplanung kein Rueckmeldepunkt');
+        });
+    });
 });
 
 test('Anwesenheit aus: Rueckmeldungen ohne Abgleich und ohne Entschuldigungsantrag', function () {
