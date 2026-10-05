@@ -3139,6 +3139,9 @@ Aufrufer soll wissen, dass er nicht bekommt, was er angefordert hat. Eine mitges
 `member_id` wird **ignoriert, nicht abgewiesen** — eine Fehlermeldung wäre ein Orakel darüber,
 welche IDs existieren. Gerätekonten erhalten 403, weil ihnen kein Mitglied zugeordnet ist.
 
+Ist die Zeiterfassung abgeschaltet, antworten alle drei `worktime_*`-Typen mit
+**403 `FEATURE_DISABLED`** (seit OI-62).
+
 Die eigenen Rohdaten gibt es über `resource=my_data`. **JSON und CSV enthalten dasselbe** — die
 CSV-Form führt neben Stammdaten, Gruppen, Anwesenheiten und Ausnahmen auch die Abschnitte
 „MITGLIEDSCHAFTSZEITRÄUME", „ARBEITSZEITEN" (Beginn, Ende, Pause, Dauer, Tätigkeit, Termin,

@@ -108,6 +108,13 @@ function handleStation($db, $database, $method, $authUserId, $authUserRole, $aut
 
         requireFeature($db, $database, 'station_pin');
 
+        // Eine abgeschaltete Zeiterfassung wird VOR der PIN-Pruefung gemeldet:
+        // Sonst verbraucht ein work_*-Aufruf einen PIN-Versuch (Sperrzaehler),
+        // obwohl er ohnehin mit 403 enden wuerde.
+        if (str_starts_with($action, 'work_')) {
+            requireFeature($db, $database, 'worktime');
+        }
+
         $member = stationRequireMember($db, $database, $device, $data);
         if ($member === null) {
             return; // bereits geantwortet

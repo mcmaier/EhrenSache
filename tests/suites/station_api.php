@@ -994,6 +994,23 @@ test('station: work_* bei abgeschalteter Zeiterfassung → 403', function () {
     }
 });
 
+test('station: work_* bei abgeschalteter Zeiterfassung verbraucht keinen PIN-Versuch', function () {
+    $fx = stationWorkFixture();
+    stationSetSetting('worktime_enabled', '0');
+    try {
+        $falsch = ['member_number' => stationMember()['member_number'], 'pin' => '9999'];
+        for ($i = 0; $i < 8; $i++) {
+            $res = stationPost('work_start', $falsch + ['activity_id' => $fx['activity_id']]);
+            assertStatus(403, $res, "Versuch {$i}: erst die Funktion, nicht die PIN pruefen");
+            assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null, "Versuch {$i}: Kennung fehlt");
+        }
+    } finally {
+        stationSetSetting('worktime_enabled', '1');
+    }
+    // Kein Sperrzaehler hochgezaehlt: die richtige PIN geht weiter.
+    assertStatus(200, stationPost('identify', stationCreds()), 'PIN darf nicht gesperrt sein');
+});
+
 // ---- Auth-Geraete haben kein Secret -----------------------------------------
 
 test('users: auth_device lehnt totp_action generate ab, clear und GET liefern kein Secret', function () {
