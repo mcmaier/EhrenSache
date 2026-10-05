@@ -198,15 +198,14 @@ function groupsApplySubgroupRule($db, $database, int $subgroupId): array
 
     // Die ergaenzte Gruppe gilt ab demselben Tag wie die Registerzuordnung (Spec 2026-10-05, 4.1);
     // der Planer kuerzt dabei einen Verlauf der Gruppe, damit nichts ueberlappt.
-    $currentStmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?");
     foreach ($rows as $row) {
         $memberId = (int) $row['member_id'];
         if (count($parents) === 1) {
-            $currentStmt->execute([$memberId]);
-            $groupIds   = array_map('intval', $currentStmt->fetchAll(PDO::FETCH_COLUMN));
-            $groupIds[] = $parents[0];
-            groupsApplyChange($db, $database, $memberId, $groupIds, $row['valid_from']);
-            $result['added'][] = ['member_id' => $memberId, 'group_id' => $parents[0]];
+            // Nur ergaenzend: der Stand wird unter der Sperre gelesen. Stand P inzwischen
+            // schon da, aendert sich nichts und es wird nichts gemeldet.
+            if (groupsApplyChange($db, $database, $memberId, [$parents[0]], $row['valid_from'], true)) {
+                $result['added'][] = ['member_id' => $memberId, 'group_id' => $parents[0]];
+            }
         } else {
             $result['warnings'][] = ['member_id' => $memberId, 'subgroup_id' => $subgroupId];
         }

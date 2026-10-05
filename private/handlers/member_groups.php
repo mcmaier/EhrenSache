@@ -201,12 +201,12 @@ function handleMemberGroups($db, $database, $method, $id) {
                 http_response_code(201);
                 echo json_encode(["message" => "Group created", "id" => $newId,
                                   "added_groups" => $added, "group_warnings" => $warnings]);
-            } catch (PDOException $e) {
+            } catch (Throwable $e) {
                 if($db->inTransaction()) {
                     $db->rollBack();
                 }
                 // Deadlock (1213) oder Lock-Timeout (1205): Client kann sofort wiederholen
-                $isDeadlock = in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
+                $isDeadlock = $e instanceof PDOException && in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
                 http_response_code($isDeadlock ? 503 : 500);
                 echo json_encode([
                     "message" => $isDeadlock
@@ -324,11 +324,11 @@ function handleMemberGroups($db, $database, $method, $id) {
 
                 echo json_encode(["message" => "Group updated",
                                   "added_groups" => $added, "group_warnings" => $warnings]);
-            } catch (PDOException $e) {
+            } catch (Throwable $e) {
                 if($db->inTransaction()) {
                     $db->rollBack();
                 }
-                $isDeadlock = in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
+                $isDeadlock = $e instanceof PDOException && in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
                 http_response_code($isDeadlock ? 503 : 500);
                 echo json_encode([
                     "message" => $isDeadlock

@@ -339,7 +339,7 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 // Speichere Gruppen-Zuordnungen
                 $addedGroups = [];
                 $groupWarnings = [];
-                if(isset($cleanData->group_ids) && is_array($cleanData->group_ids)) {
+                if(isset($cleanData->group_ids)) {
                     // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
                     $normalized = groupsWithParents($db, $database, $cleanData->group_ids);
                     groupsApplyChange($db, $database, (int) $memberId, $normalized['group_ids'], null);

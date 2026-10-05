@@ -255,7 +255,15 @@ test('PUT: unbekannte Gruppe ergibt 400, nichts wird gespeichert', function () {
         $post = apiRequest('POST', 'members', ['token' => apiToken('admin'), 'body' =>
             ['name' => 'Gh', 'surname' => "Unbek2 {$s}", 'active' => 1, 'group_ids' => [999999999]]]);
         assertStatus(400, $post, $post['raw']);
+        $list = apiRequest('GET', 'members', ['token' => apiToken('admin')]);
+        foreach ($list['body'] as $row) {
+            if (($row['surname'] ?? '') === "Unbek2 {$s}") {
+                $ids['extra'] = (int) $row['member_id'];
+            }
+        }
+        assertTrue(!isset($ids['extra']), 'POST mit unbekannter Gruppe hat ein Mitglied angelegt');
     } finally {
+        if (!empty($ids['extra'])) { ghDelete('members', $ids['extra']); }
         if ($ids['m']) { ghDelete('members', $ids['m']); }
         foreach ($ids['g'] as $g) { ghDelete('member_groups', $g); }
     }

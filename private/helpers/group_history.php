@@ -225,9 +225,11 @@ function groupsPlanChange(array $current, array $history, array $newGroupIds, ?s
  * Transaktion des Aufrufers oder in einer eigenen.
  *
  * @param array<int, int|string> $newGroupIds
+ * @param bool $addOnly true: $newGroupIds wird zum heutigen Stand (nach der Sperre gelesen)
+ *                      hinzugefuegt, es wird nie etwas entfernt (Mitgliedschaftsregel)
  * @return bool ob sich die heutigen Zuordnungen geaendert haben
  */
-function groupsApplyChange(PDO $db, $database, int $memberId, array $newGroupIds, ?string $date): bool
+function groupsApplyChange(PDO $db, $database, int $memberId, array $newGroupIds, ?string $date, bool $addOnly = false): bool
 {
     $prefix = $database->table('');
     $own    = !$db->inTransaction();
@@ -240,15 +242,23 @@ function groupsApplyChange(PDO $db, $database, int $memberId, array $newGroupIds
         $lock = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ? FOR UPDATE");
         $lock->execute([$memberId]);
 
-        $stmt = $db->prepare("SELECT group_id, valid_from FROM {$prefix}member_group_assignments WHERE member_id = ?");
+        // Beide Lesezugriffe mit FOR UPDATE: Ein gewoehnliches SELECT liest unter
+        // REPEATABLE READ den Snapshot der Transaktion, der schon vor der Sperre
+        // entstanden sein kann (z. B. durch groupsWithParents()). Sperrende Lesezugriffe
+        // sehen dagegen den neuesten bestaetigten Stand.
+        $stmt = $db->prepare("SELECT group_id, valid_from FROM {$prefix}member_group_assignments WHERE member_id = ? FOR UPDATE");
         $stmt->execute([$memberId]);
         $current = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $current[(int) $row['group_id']] = $row['valid_from'];
         }
-        $stmt = $db->prepare("SELECT history_id, group_id, valid_from, valid_to FROM {$prefix}member_group_history WHERE member_id = ?");
+        $stmt = $db->prepare("SELECT history_id, group_id, valid_from, valid_to FROM {$prefix}member_group_history WHERE member_id = ? FOR UPDATE");
         $stmt->execute([$memberId]);
         $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if ($addOnly) {
+            $newGroupIds = array_merge(array_keys($current), $newGroupIds);
+        }
 
         $plan = groupsPlanChange($current, $history, $newGroupIds, $date);
 
