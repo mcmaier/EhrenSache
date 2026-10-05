@@ -106,6 +106,18 @@ export function apiTimeoutMessage(method) {
         : 'Keine Antwort vom Server. Ob gespeichert wurde, ist unklar – bitte die Ansicht neu laden, bevor du es erneut versuchst.';
 }
 
+// Einmalige Wiederholung lesender Abrufe (OI-121). Shared Hosting weist bei
+// Last mit 503 ab, Cloudflare meldet einen nicht erreichbaren Herkunftsserver
+// mit 52x. Nur GET: ein wiederholter POST koennte doppelt anlegen. Der Timeout
+// gilt fuer beide Versuche zusammen. Dieselbe Regel steht in
+// public/checkin/js/app.js.
+export const RETRY_STATUSES = [502, 503, 504, 520, 521, 522, 523, 524];
+
+/** 300 bis 600 ms -- gestreut, damit viele Geraete nicht im selben Takt erneut fragen. */
+function retryPause() {
+    return new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 300));
+}
+
 /**
  * API Helper Funktion
  *
@@ -164,7 +176,11 @@ export async function apiCall(resource, method = 'GET', data = null, params = {}
     loadingStart();
 
     try {
-        const response = await fetch(url, options);
+        let response = await fetch(url, options);
+        if (method === 'GET' && RETRY_STATUSES.includes(response.status)) {
+            await retryPause();
+            response = await fetch(url, options);
+        }
         result = await response.json();
 
         result.success = response.ok;
