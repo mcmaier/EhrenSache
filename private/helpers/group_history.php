@@ -71,7 +71,12 @@ function groupHistoryMigrate(PDO $pdo, string $prefix): array
 /** Vortag eines Datums JJJJ-MM-TT. */
 function groupHistoryDayBefore(string $date): string
 {
-    return (new DateTimeImmutable($date))->modify('-1 day')->format('Y-m-d');
+    $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+    if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
+        throw new InvalidArgumentException('Ungültiges Datum: ' . $date);
+    }
+
+    return $parsed->modify('-1 day')->format('Y-m-d');
 }
 
 /**
@@ -89,11 +94,37 @@ function groupsCheckValidFrom($raw, string $today): ?string
     if ($parsed === false || $parsed->format('Y-m-d') !== $raw) {
         return 'groups_valid_from ist kein gültiges Datum (JJJJ-MM-TT)';
     }
+    if ($raw < '1000-01-01') {
+        return 'groups_valid_from ist kein gültiges Datum (Jahr vor 1000)';
+    }
     if ($raw > $today) {
         return 'groups_valid_from darf nicht in der Zukunft liegen';
     }
 
     return null;
+}
+
+/**
+ * Kuerzt bzw. loescht Verlaufseintraege einer Gruppe, die ab $date noch gelten
+ * (Spec 2026-10-05, 4.1): beginnt der Eintrag nach dem Vortag, entfaellt er,
+ * sonst endet er am Vortag. Gemeinsam fuer Hinzufuegen und Entfernen.
+ *
+ * @param array<int, array{history_id: int|string, group_id: int|string, valid_from: ?string, valid_to: string}> $history
+ * @param array $plan  Plan aus groupsPlanChange(), wird ergaenzt
+ */
+function groupHistoryTrim(array $history, int $groupId, string $date, array &$plan): void
+{
+    $dayBefore = groupHistoryDayBefore($date);
+    foreach ($history as $h) {
+        if ((int) $h['group_id'] !== $groupId || $h['valid_to'] < $date) {
+            continue;
+        }
+        if ($h['valid_from'] !== null && $h['valid_from'] > $dayBefore) {
+            $plan['delete_history'][] = (int) $h['history_id'];
+        } else {
+            $plan['update_history'][] = ['history_id' => (int) $h['history_id'], 'valid_to' => $dayBefore];
+        }
+    }
 }
 
 /**
@@ -127,12 +158,17 @@ function groupsPlanChange(array $current, array $history, array $newGroupIds, ?s
         if (isset($new[$groupId])) {
             continue;
         }
+        if ($date === null) {
+            throw new InvalidArgumentException('Datum null nur beim Anlegen');
+        }
         $plan['delete_current'][] = $groupId;
         // Hat die Zuordnung vor dem Datum gegolten, wandert sie in den Verlauf;
         // begann sie erst am Datum oder spaeter, war es eine Korrektur.
-        if ($date !== null && ($validFrom === null || $validFrom < $date)) {
+        if ($validFrom === null || $validFrom < $date) {
             $plan['insert_history'][] = ['group_id' => $groupId, 'valid_from' => $validFrom, 'valid_to' => $dayBefore];
         }
+        // Aeltere Verlaufseintraege derselben Gruppe duerfen sich nicht ueberlappen.
+        groupHistoryTrim($history, $groupId, $date, $plan);
     }
 
     foreach (array_keys($new) as $groupId) {
@@ -141,23 +177,15 @@ function groupsPlanChange(array $current, array $history, array $newGroupIds, ?s
         }
         $plan['insert_current'][] = ['group_id' => $groupId, 'valid_from' => $date];
 
-        foreach ($history as $h) {
-            if ((int) $h['group_id'] !== $groupId) {
-                continue;
-            }
+        if ($date === null) {
             // "Von Anfang an" verdraengt jeden Verlauf derselben Gruppe.
-            if ($date === null) {
-                $plan['delete_history'][] = (int) $h['history_id'];
-                continue;
+            foreach ($history as $h) {
+                if ((int) $h['group_id'] === $groupId) {
+                    $plan['delete_history'][] = (int) $h['history_id'];
+                }
             }
-            if ($h['valid_to'] < $date) {
-                continue;
-            }
-            if ($h['valid_from'] !== null && $h['valid_from'] > $dayBefore) {
-                $plan['delete_history'][] = (int) $h['history_id'];
-            } else {
-                $plan['update_history'][] = ['history_id' => (int) $h['history_id'], 'valid_to' => $dayBefore];
-            }
+        } else {
+            groupHistoryTrim($history, $groupId, $date, $plan);
         }
     }
 

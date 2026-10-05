@@ -119,3 +119,62 @@ test('groupsPlanChange: Verlauf beginnt genau am Vortag bleibt als Eintageszeitr
     assertSame([['history_id' => 8, 'valid_to' => '2026-05-31']], $plan['update_history']);
     assertSame([], $plan['delete_history']);
 });
+
+test('groupsPlanChange: Entfernen kuerzt auch den Verlauf derselben Gruppe', function () {
+    $history = [['history_id' => 3, 'group_id' => 1, 'valid_from' => null, 'valid_to' => '2026-05-31']];
+    $plan = groupsPlanChange([1 => '2026-06-01'], $history, [], '2026-05-15');
+    assertSame([1], $plan['delete_current']);
+    assertSame([], $plan['insert_history']);
+    assertSame([['history_id' => 3, 'valid_to' => '2026-05-14']], $plan['update_history']);
+    assertSame([], $plan['delete_history']);
+});
+
+test('groupsPlanChange: Entfernen mit Verlaufseintrag loescht spaeter beginnenden Verlauf', function () {
+    $history = [['history_id' => 4, 'group_id' => 1, 'valid_from' => '2026-05-20', 'valid_to' => '2026-05-25']];
+    $plan = groupsPlanChange([1 => null], $history, [], '2026-05-15');
+    assertSame([['group_id' => 1, 'valid_from' => null, 'valid_to' => '2026-05-14']], $plan['insert_history']);
+    assertSame([4], $plan['delete_history']);
+    assertSame([], $plan['update_history']);
+});
+
+test('groupsPlanChange: IDs als Strings (wie aus PDO) werden erkannt', function () {
+    $history = [['history_id' => '7', 'group_id' => '5', 'valid_from' => null, 'valid_to' => '2026-08-31']];
+    $plan = groupsPlanChange([], $history, ['5'], '2026-06-01');
+    assertSame([['history_id' => 7, 'valid_to' => '2026-05-31']], $plan['update_history']);
+});
+
+test('groupsPlanChange: Datum null verdraengt Verlauf beim Hinzufuegen', function () {
+    $history = [['history_id' => 7, 'group_id' => 5, 'valid_from' => null, 'valid_to' => '2026-08-31'],
+                ['history_id' => 8, 'group_id' => 6, 'valid_from' => null, 'valid_to' => '2026-08-31']];
+    $plan = groupsPlanChange([], $history, [5], null);
+    assertSame([7], $plan['delete_history']);
+    assertSame([], $plan['update_history']);
+});
+
+test('groupsPlanChange: Entfernen ohne Datum ist ein Fehler', function () {
+    $thrown = false;
+    try {
+        groupsPlanChange([1 => null], [], [], null);
+    } catch (InvalidArgumentException $e) {
+        $thrown = true;
+    }
+    assertTrue($thrown, 'InvalidArgumentException erwartet');
+});
+
+test('groupsCheckValidFrom: Jahre vor 1000 werden abgelehnt', function () {
+    assertTrue(groupsCheckValidFrom('0999-12-31', '2026-10-05') !== null, '0999');
+    assertTrue(groupsCheckValidFrom('0026-06-01', '2026-10-05') !== null, '0026');
+    assertSame(null, groupsCheckValidFrom('1000-01-01', '2026-10-05'));
+});
+
+test('groupHistoryDayBefore: Schaltjahr, Monatswechsel, ungueltig', function () {
+    assertSame('2028-02-29', groupHistoryDayBefore('2028-03-01'));
+    assertSame('2026-04-30', groupHistoryDayBefore('2026-05-01'));
+    $thrown = false;
+    try {
+        groupHistoryDayBefore('gestern');
+    } catch (InvalidArgumentException $e) {
+        $thrown = true;
+    }
+    assertTrue($thrown, 'InvalidArgumentException erwartet');
+});
