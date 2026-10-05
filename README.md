@@ -219,6 +219,10 @@ Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 >    Regel reicht Cloudflare jede Nachfrage an den Server durch — rund 45 gleichzeitige Anfragen
 >    je Seitenaufruf, die günstige Hoster mit `503 Service Unavailable` abweisen; das Dashboard
 >    bleibt dann leer.
+> 3. *Caching → Tiered Cache*: **Smart Tiered Caching** einschalten (kostenlos). Ein Standort
+>    von Cloudflare, dessen Zwischenspeicher leer ist, fragt dann zuerst einen zentralen Knoten
+>    statt den Server. Bei wenig besuchten Installationen verdrängt Cloudflare Dateien nämlich
+>    lange vor Ablauf der Edge TTL.
 >
 > Nach jedem Update **„Purge Everything“** auslösen. Wer den alten Stand schon im Browser hat,
 > lädt einmal mit Strg+F5 neu.

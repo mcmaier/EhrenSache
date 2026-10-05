@@ -2264,7 +2264,7 @@ zugeordnet“ und „n Mitglied(er) in keiner Gruppe ihres Registers“, Namen �
 ---
 
 ### OI-120 · Das Dashboard lädt rund 45 Einzeldateien
-**Priorität:** niedrig · aufgenommen am 2026-10-02 (Demo nach dem Update auf 1.20.0)
+**Priorität:** mittel (bis 2026-10-05 niedrig) · aufgenommen am 2026-10-02 (Demo nach dem Update auf 1.20.0)
 
 Ein Aufruf des Dashboards fordert rund 45 Dateien gleichzeitig an: 21 CSS-Module per `@import`
 aus `main.css` und gut 20 JS-Module per `import`. Ohne Build-Kette gibt es kein Bündel. Weil CSS
@@ -2278,6 +2278,21 @@ mehr selbst zwischenspeicherte: Die JS-Module kamen mit 503, das Dashboard blieb
 Cache-Regel bei Cloudflare ist es behoben (README, Abschnitt Update; `docs/DEMO.md` Abschnitt 6).
 **Ohne** CDN trifft dieselbe Grenze jeden Verein, dessen Hoster gleichzeitige Anfragen so knapp
 begrenzt — dort gibt es keine Einstellung, die hilft.
+
+**Nachtrag 2026-10-05: Die Cache-Regel behebt es nicht dauerhaft.** Der Nutzer sah auf der Demo
+wiederholt erst eine ungestylte Login-Seite, dann eine weiße, kurz darauf die richtige. Messung:
+Die Regel wirkt (eine fehlende Datei liegt beim zweiten Abruf im Zwischenspeicher), aber
+Cloudflare verdrängt auf einer wenig besuchten Seite Dateien lange vor Ablauf der Edge TTL.
+`main.css`, `app.js` und `ui.js` waren eine Stunde nach einem Dashboard-Aufruf schon wieder weg.
+Jeder leere Zwischenspeicher schickt die ganze Welle an den Hoster. Tiered Cache ist auf der Demo
+seither eingeschaltet und macht das seltener (README, `docs/DEMO.md` Abschnitt 6), verhindern
+kann es das nicht. Damit trifft die Grenze auch Vereine **mit** CDN, sobald sie wenig Verkehr
+haben, und das ist der Normalfall. Deshalb Priorität mittel. Weg 3 (erst messen) ist damit für
+die Demo beantwortet.
+
+Verwandt, aber eigene Ursache: Bis zum Fix `fix/session-lock` hielt die API die Sitzung über den
+ganzen Abruf gesperrt. Parallele API-Abrufe liefen dadurch nacheinander und belegten wartend
+PHP-Prozesse, was auf dieselbe Grenze des Hosters einzahlte (siehe CHANGELOG, `[Unreleased]`).
 
 **Mögliche Wege, nicht entschieden:**
 1. CSS ohne Build bündeln: `main.css` statt `@import`-Kette eine zusammengesetzte Datei, die das
