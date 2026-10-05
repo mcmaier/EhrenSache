@@ -2351,8 +2351,10 @@ allem mobil langsam“.
 
 **Ziel:** nach `me` alles Nötige gleichzeitig, also zwei Stufen statt fünf (Dashboard) bzw. zehn
 (Check-in-App). Ein Ausreißer kostet
-dann höchstens einmal eine Sekunde. Reiner Frontend-Umbau, keine Migration. Konzept in Arbeit
-(Spec unter `docs/superpowers/specs/`).
+dann höchstens einmal eine Sekunde. Reiner Frontend-Umbau, keine Migration. **Entschieden 2026-10-05:** Weg „erst
+parallelisieren, dann messen“, mit zwei Wellen und einmaliger Wiederholung lesender Abrufe bei
+503; dazu meldet ein Fehlschlag von `me` außer 401 niemanden mehr ab. Spec
+`docs/superpowers/specs/2026-10-05-startkette-parallel-design.md`.
 
 Verwandt: [OI-120](#oi-120--das-dashboard-lädt-rund-45-einzeldateien) (Dateien, eigene Ursache).
 
