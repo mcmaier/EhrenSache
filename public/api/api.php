@@ -332,8 +332,9 @@ $istAngemeldet = $tokenTraegt || isset($_SESSION['user_id']);
 if (!$istAngemeldet) {
     $rateLimiter = new RateLimiter($db, $database);
 
-    // API Rate Limit: 150 Requests pro Minute je Adresse
-    if (!$rateLimiter->check($_SERVER['REMOTE_ADDR'] ?? 'unknown', 'api_request', 150, 60)) {
+    // API Rate Limit: 150 Requests pro Minute je Adresse. Hinter einem Proxy die
+    // des Besuchers (config.php: trusted_proxies), sonst teilten sich alle einen Zaehler.
+    if (!$rateLimiter->check(currentClientIp(), 'api_request', 150, 60)) {
         http_response_code(429);
         echo json_encode([
             "message" => "Rate limit exceeded",

@@ -284,6 +284,10 @@ kalt, der erste Aufruf kann deshalb noch einzelne 503 sehen; ab dem zweiten lief
 Prüfen im Browser (Entwicklerwerkzeuge → Netzwerk): `css/variables.css` trägt
 `cache-control: no-cache, must-revalidate` **und** ab dem zweiten Abruf `cf-cache-status: HIT`.
 
+Dazu gehört in `config.php` der Schlüssel **`trusted_proxies`** mit den Adressbereichen von
+Cloudflare (https://www.cloudflare.com/ips/). Ohne ihn sieht der Rate Limiter nur die Adressen von
+Cloudflare und zählt alle Besucher, die über denselben Knoten kommen, gemeinsam.
+
 **Die Testsuite läuft gegen eine Demo-Installation nicht.** Mit gesetztem `DEMO_MODE` werden
 über hundert Prüfungen rot, weil die Suiten `settings` schreiben — und genau das sperrt der
 Wächter. Das ist die korrekte Wirkung, sieht aber wie ein Regress aus. Tests gehören auf eine

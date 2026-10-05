@@ -7,6 +7,18 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Sicherheit
+- **Der Rate Limiter erkennt die Besucheradresse auch hinter einem Reverse-Proxy oder CDN.**
+  Neuer Schlüssel `trusted_proxies` in `config.php`: Kommt eine Anfrage von einer dort
+  eingetragenen Adresse, gilt die weitergereichte Besucheradresse (`CF-Connecting-IP` bzw.
+  `X-Forwarded-For`); Header von anderen Adressen werden ignoriert. Bisher zählte der Rate
+  Limiter hinter Cloudflare alle Besucher unter der Adresse des Proxys. Ohne Eintrag bleibt
+  alles wie bisher. Für Installationen hinter Cloudflare siehe README, Abschnitt Update.
+
+---
+
 ## [1.20.0] – 2026-10-02
 
 ### Neu

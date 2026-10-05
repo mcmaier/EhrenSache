@@ -9,6 +9,8 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
+require_once __DIR__ . '/client_ip.php';
+
 class RateLimiter {
     private $db;
     private $useDatabase;
@@ -256,7 +258,8 @@ class RateLimiter {
      * IP-basiertes Rate Limiting für Formulare
      */
     public function canSubmitForm($action, $maxAttempts = 10, $windowSeconds = 3600) {
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        // Hinter einem Proxy die Adresse des Besuchers, nicht die des Proxys.
+        $ip = currentClientIp();
         return $this->check($ip, "form_$action", $maxAttempts, $windowSeconds);
     }
     

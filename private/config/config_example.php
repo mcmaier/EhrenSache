@@ -59,4 +59,14 @@ return [
     // Der Token kann nur stempeln und nur mit der PIN eines Mitglieds.
     // Für eine normale Vereinsinstallation null lassen.
     'demo_station_token' => null,
+
+    // Reverse-Proxy oder CDN vor der Installation (z. B. Cloudflare): dessen
+    // Adressen oder Bereiche in CIDR-Schreibweise. Kommt eine Anfrage von dort,
+    // gilt die weitergereichte Besucheradresse (CF-Connecting-IP bzw.
+    // X-Forwarded-For) — für den Rate Limiter, der sonst alle Besucher hinter dem
+    // Proxy gemeinsam zählt. Header von anderen Adressen werden ignoriert.
+    // Cloudflare veröffentlicht seine Bereiche unter https://www.cloudflare.com/ips/
+    // Beispiel: ['173.245.48.0/20', '103.21.244.0/22', '2400:cb00::/32', ...]
+    // Ungültige Einträge werden still ignoriert. Ohne Proxy leer lassen.
+    'trusted_proxies' => [],
 ];

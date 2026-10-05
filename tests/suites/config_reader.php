@@ -189,6 +189,28 @@ test('configWithDefaults fuellt fehlende Schluessel', function () {
     assertSame('es_', $cfg['db']['prefix']);
 });
 
+test('configWithDefaults: trusted_proxies fehlt -> leere Liste', function () {
+    // Bestehende config.php kennen den Schluessel nicht; ohne Eintrag gilt wie
+    // bisher allein die Adresse der Verbindung.
+    assertSame([], configWithDefaults(['db' => []])['trusted_proxies']);
+});
+
+test('configWithDefaults: trusted_proxies behaelt nur gueltige Adressen und Bereiche', function () {
+    $cfg = configWithDefaults(['trusted_proxies' => [
+        '173.245.48.0/20', ' 127.0.0.1 ', '2400:cb00::/32', 'kaputt', '10.0.0.0/33', 42, '',
+    ]]);
+    assertSame(['173.245.48.0/20', '127.0.0.1', '2400:cb00::/32'], $cfg['trusted_proxies']);
+    assertSame([], configWithDefaults(['trusted_proxies' => '127.0.0.1'])['trusted_proxies'],
+        'Ein einzelner String statt einer Liste wird nicht still umgedeutet');
+});
+
+test('renderConfigFile schreibt trusted_proxies mit', function () {
+    $text = renderConfigFile(['db' => [], 'trusted_proxies' => ['127.0.0.1']]);
+    $pfad = configReaderFixture($text);
+    assertSame(['127.0.0.1'], readConfigFile($pfad)['trusted_proxies']);
+    unlink($pfad);
+});
+
 test('configWithDefaults bringt demo_station_token auf String oder null', function () {
     assertSame('abc', configWithDefaults(['demo_station_token' => '  abc '])['demo_station_token']);
     assertSame(null, configWithDefaults(['demo_station_token' => '   '])['demo_station_token']);
