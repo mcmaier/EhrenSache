@@ -12,8 +12,10 @@
 //
 // Jede API-Antwort wird um DELAY ms verzoegert. Wer Stufe fuer Stufe laedt,
 // braucht ein Vielfaches davon. Gemessen wird der Mehraufwand gegenueber
-// einem Lauf ohne Verzoegerung (Seitenaufbau, Servertempo fallen heraus):
-// zwei Stufen bleiben unter LIMIT, drei nicht. Dazu: einmalige Wiederholung bei 503 (nur GET),
+// einem Lauf ohne Verzoegerung (Seitenaufbau, Servertempo fallen heraus),
+// je drei Laeufe, davon jeweils das Minimum: zwei Stufen bleiben unter LIMIT,
+// drei nicht. Das Dashboard gilt erst als fertig, wenn loadProfile() nach
+// allen Abrufen den PIN-Hinweis geschrieben hat. Dazu: einmalige Wiederholung bei 503 (nur GET),
 // Abmeldung nur bei 401/403, Ladeanzeige statt Anmeldemaske.
 //
 // Aufruf:  node tests/browser/startup-chain.mjs
@@ -69,6 +71,12 @@ async function newPage(browser) {
     await page.setViewport({ width: 1280, height: 900 });
     await page.setBypassServiceWorker(true);
     await page.setRequestInterception(true);
+    // Die Messung laedt das Dashboard mehrfach kurz hintereinander; der
+    // Redirect-Loop-Schutz in app.js (mehr als 5 Aufrufe binnen 3 s) hielte
+    // das fuer eine Schleife. Ihn prueft dieses Skript nicht.
+    await page.evaluateOnNewDocument(() => {
+        try { sessionStorage.removeItem('auth_redirect_count'); } catch { /* about:blank */ }
+    });
     page.on('dialog', d => d.dismiss());
     page.on('pageerror', e => failures.push(`Laufzeitfehler: ${e.message}`));
     page.on('request', req => {
@@ -86,11 +94,41 @@ async function newPage(browser) {
     return page;
 }
 
-/** Zeit vom Navigationsbeginn bis cond() wahr ist, in ms. */
+/**
+ * Zeit vom Navigationsbeginn bis cond() wahr ist, in ms. Erst about:blank:
+ * ein goto auf dieselbe URL behandelt Chrome wie ein Neuladen und stellt
+ * Formularwerte wieder her -- cond() saehe dann Werte vom letzten Lauf.
+ */
 async function timeUntil(page, url, cond) {
+    await page.goto('about:blank');
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     const reached = await page.waitForFunction(cond, { polling: 20, timeout: 20000 }).then(() => true, () => false);
     return reached ? page.evaluate(() => performance.now()) : Infinity;
+}
+
+const RUNS = 3;
+
+/**
+ * Mehraufwand durch DELAY: je RUNS Laeufe ohne und mit Verzoegerung, von
+ * beiden das Minimum. Das Minimum filtert Ausreisser durch Last auf dem
+ * Rechner heraus; eine echte Wartestufe steckt in jedem Lauf.
+ */
+async function extraTime(page, url, cond) {
+    const base = [];
+    const slow = [];
+    for (let i = 0; i < RUNS; i++) {
+        delay = 0;
+        base.push(await timeUntil(page, url, cond));
+        delay = DELAY;
+        slow.push(await timeUntil(page, url, cond));
+    }
+    delay = 0;
+    const b = Math.min(...base);
+    const s = Math.min(...slow);
+    return {
+        extra: s - (Number.isFinite(b) ? b : 0),
+        detail: `ohne ${base.map(Math.round).join('/')} ms, mit ${slow.map(Math.round).join('/')} ms`
+    };
 }
 
 const html503 = { status: 503, contentType: 'text/html', body: 'Service Unavailable' };
@@ -110,18 +148,18 @@ try {
 
     // Stufen: Ladeanzeige, dann Hauptbildschirm in hoechstens zwei Stufen.
     const pwaMain = () => document.getElementById('mainScreen')?.classList.contains('active');
-    const pwaBase = await timeUntil(pwa, `${BASE}/checkin/`, pwaMain);
     delay = DELAY;
     await pwa.goto(`${BASE}/checkin/`, { waitUntil: 'domcontentloaded' });
     const startShown = await pwa.evaluate(() =>
         document.getElementById('startScreen')?.classList.contains('active')
         && !document.getElementById('loginScreen')?.classList.contains('active'));
     check('PWA: Ladeanzeige statt Anmeldemaske beim Start', startShown);
-
-    const pwaMs = await timeUntil(pwa, `${BASE}/checkin/`, pwaMain) - (Number.isFinite(pwaBase) ? pwaBase : 0);
-    check('PWA: Hauptbildschirm nach hoechstens zwei Stufen', pwaMs < LIMIT,
-        `+${Math.round(pwaMs)} ms bei ${DELAY} ms je Antwort, Grenze +${LIMIT} ms`);
+    await pwa.waitForFunction(pwaMain, { timeout: 20000 }).catch(() => {});
     delay = 0;
+
+    const pwaRun = await extraTime(pwa, `${BASE}/checkin/`, pwaMain);
+    check('PWA: Hauptbildschirm nach hoechstens zwei Stufen', pwaRun.extra < LIMIT,
+        `+${Math.round(pwaRun.extra)} ms bei ${DELAY} ms je Antwort, Grenze +${LIMIT} ms (${pwaRun.detail})`);
 
     // GET wird nach 503 einmal wiederholt (PWA, klassisches Skript: apiCall global).
     let served = 0;
@@ -181,14 +219,15 @@ try {
     await dash.waitForSelector('#dashboard.active', { timeout: 20000 });
     await dash.evaluate(() => sessionStorage.setItem('currentSection', 'profil'));
 
+    // Fertig ist das Profil erst, wenn loadProfile() nach ALLEN seinen Abrufen
+    // den PIN-Hinweis neu geschrieben hat (im Markup steht nur "4–8 Ziffern").
+    // Textinhalt stellt Chrome anders als Formularwerte nie wieder her.
     const dashReady = () => document.getElementById('dashboard')?.classList.contains('active')
-              && (document.getElementById('profile_email')?.value || '') !== '';
-    const dashBase = await timeUntil(dash, `${BASE}/index.html`, dashReady);
-    delay = DELAY;
-    const dashMs = await timeUntil(dash, `${BASE}/index.html`, dashReady) - (Number.isFinite(dashBase) ? dashBase : 0);
-    check('Dashboard: Profil nach hoechstens zwei Stufen', dashMs < LIMIT,
-        `+${Math.round(dashMs)} ms bei ${DELAY} ms je Antwort, Grenze +${LIMIT} ms`);
-    delay = 0;
+              && (document.getElementById('profile_email')?.value || '') !== ''
+              && (document.getElementById('new_pin_hint')?.textContent || '').includes('keine Folge');
+    const dashRun = await extraTime(dash, `${BASE}/index.html`, dashReady);
+    check('Dashboard: Profil nach hoechstens zwei Stufen', dashRun.extra < LIMIT,
+        `+${Math.round(dashRun.extra)} ms bei ${DELAY} ms je Antwort, Grenze +${LIMIT} ms (${dashRun.detail})`);
 
     await dash.waitForNetworkIdle({ idleTime: 800, timeout: 20000 }).catch(() => {});
 
