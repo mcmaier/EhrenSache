@@ -336,3 +336,30 @@ test('Dashboard: Zeiterfassung und Verwaltung fragen ohne Terminplanung keine Te
     assertTrue(fuGuarded(fuBody($mg, 'function showGroupSection('), 'loadTypes(', "isFeatureOn('appointments')"),
         'showGroupSection() laedt Terminarten ohne Schalter');
 });
+
+test('Einstellungen: Schalter fuer Terminplanung und Anwesenheit, gestuft', function () {
+    $html  = sourceCode(FU_ROOT . '/public/index.html');
+    $panel = strpos($html, 'data-settings-panel="termine"');
+    $a     = strpos($html, 'data-key="appointments_enabled"');
+    $b     = strpos($html, 'data-key="attendance_enabled"');
+    $c     = strpos($html, 'data-key="checkin_auto_create_appointment"');
+    assertTrue($panel !== false && $a !== false && $b !== false && $a > $panel && $b > $a && $c > $b,
+        'Die beiden Schalter gehoeren als erste Karte in den Tab „Termine & Anwesenheit“');
+
+    $js = sourceCode(FU_ROOT . '/public/js/modules/settings.js');
+    assertTrue((bool) preg_match("/appointments_enabled:\s*\[[^\]]*'attendance_enabled'[^\]]*'holiday_region'[^\]]*'response_deadline_hours'/", $js),
+        'FEATURE_SWITCHES: Terminplanung sperrt Anwesenheitsschalter, Feiertage und Rueckmeldefrist');
+    assertTrue((bool) preg_match("/attendance_enabled:\s*\[[^\]]*'checkin_auto_create_appointment'[^\]]*'checkin_tolerance_hours'[^\]]*'punctuality_enabled'[^\]]*'reliability_enabled'[^\]]*'rate_threshold_good'/", $js),
+        'FEATURE_SWITCHES: Anwesenheit sperrt Check-in-Fenster, Terminanlage, Kennzahlen und Quotenschwellen');
+    $pA = strpos($js, 'appointments_enabled:');
+    $pB = strpos($js, 'attendance_enabled:');
+    $pC = strpos($js, 'punctuality_enabled:');
+    assertTrue($pA !== false && $pB > $pA && $pC > $pB, 'Die Reihenfolge in FEATURE_SWITCHES traegt die Stufung');
+    assertTrue(str_contains(fuBody($js, 'function applyFeatureSwitchState('), 'gesperrt.has(schalter)'),
+        'applyFeatureSwitchState() wertet einen gesperrten Schalter nicht als aus');
+
+    assertTrue((bool) preg_match('/const FEATURE_KEYS = \[([^\]]*)\]/', $js, $m), 'FEATURE_KEYS fehlt');
+    foreach (FEATURES as $f) {
+        assertTrue(str_contains($m[1], "'{$f['setting']}'"), "FEATURE_KEYS fehlt {$f['setting']}");
+    }
+});
