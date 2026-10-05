@@ -208,12 +208,135 @@ test('Mitglied loeschen raeumt den Verlauf', function () {
     }
 });
 
-test('Selbstauskunft my_data enthaelt Verlauf und valid_from', function () {
-    $res = apiRequest('GET', 'my_data', ['token' => apiToken('user')]);
-    assertStatus(200, $res, $res['raw']);
-    assertTrue(is_array($res['body']['group_history'] ?? null), 'group_history fehlt oder ist keine Liste');
-    foreach ($res['body']['groups'] ?? [] as $g) {
-        assertTrue(array_key_exists('valid_from', $g), 'groups[].valid_from fehlt');
+test('Selbstauskunft my_data: ehemalige Gruppe steht im Verlauf, heutige Gruppen bleiben', function () {
+    $userMember = apiMemberId('user');
+    assertTrue($userMember !== null, 'Testkonto user hat kein Mitglied');
+    $before = array_keys(ghSince(ghMember($userMember)));
+    $g = 0;
+    try {
+        $g = ghCreate('member_groups', ['group_name' => 'GH Auskunft ' . uniqid()]);
+        $twoYears = date('Y-m-d', strtotime('-2 years'));
+        assertStatus(200, ghPut($userMember, ['group_ids' => array_merge($before, [$g]), 'groups_valid_from' => $twoYears]));
+        assertStatus(200, ghPut($userMember, ['group_ids' => $before, 'groups_valid_from' => date('Y-m-d')]));
+
+        $res = apiRequest('GET', 'my_data', ['token' => apiToken('user')]);
+        assertStatus(200, $res, $res['raw']);
+        assertTrue(is_array($res['body']['group_history'] ?? null), 'group_history fehlt oder ist keine Liste');
+        $found = null;
+        foreach ($res['body']['group_history'] as $h) {
+            if (str_starts_with($h['group_name'], 'GH Auskunft')) {
+                $found = $h;
+            }
+        }
+        assertTrue($found !== null, 'ehemalige Gruppe fehlt im Verlauf: ' . $res['raw']);
+        assertSame($twoYears, $found['valid_from']);
+        assertSame(date('Y-m-d', strtotime('-1 day')), $found['valid_to']);
+        foreach ($res['body']['groups'] ?? [] as $grp) {
+            assertTrue(array_key_exists('valid_from', $grp), 'groups[].valid_from fehlt');
+        }
+    } finally {
+        if ($g) { ghDelete('member_groups', $g); }
+    }
+    assertSame($before, array_keys(ghSince(ghMember($userMember))), 'heutige Gruppen des Kontos unveraendert');
+});
+
+test('PUT: unbekannte Gruppe ergibt 400, nichts wird gespeichert', function () {
+    $s = uniqid();
+    $ids = ['g' => [], 'm' => 0];
+    try {
+        $a = $ids['g'][] = ghCreate('member_groups', ['group_name' => "GH A {$s}"]);
+        $m = $ids['m'] = ghCreate('members', ['name' => 'Gh', 'surname' => "Unbek {$s}", 'active' => 1, 'group_ids' => [$a]]);
+        $res = ghPut($m, ['group_ids' => [$a, 999999999], 'surname' => "Geaendert {$s}"]);
+        assertStatus(400, $res, $res['raw']);
+        assertSame('group_ids', $res['body']['field'] ?? null);
+        $member = ghMember($m);
+        assertSame("Unbek {$s}", $member['surname'], 'Name unveraendert');
+        assertSame([$a => null], ghSince($member));
+        $post = apiRequest('POST', 'members', ['token' => apiToken('admin'), 'body' =>
+            ['name' => 'Gh', 'surname' => "Unbek2 {$s}", 'active' => 1, 'group_ids' => [999999999]]]);
+        assertStatus(400, $post, $post['raw']);
+    } finally {
+        if ($ids['m']) { ghDelete('members', $ids['m']); }
+        foreach ($ids['g'] as $g) { ghDelete('member_groups', $g); }
     }
 });
 
+test('PUT: unbekanntes Mitglied ergibt 404, auch nur mit group_ids', function () {
+    $s = uniqid();
+    $g = 0;
+    try {
+        $g = ghCreate('member_groups', ['group_name' => "GH A {$s}"]);
+        $res = ghPut(999999999, ['group_ids' => [$g]]);
+        assertStatus(404, $res, $res['raw']);
+    } finally {
+        if ($g) { ghDelete('member_groups', $g); }
+    }
+});
+
+test('groups_valid_from wird nur zusammen mit group_ids geprueft', function () {
+    $s = uniqid();
+    $m = 0;
+    try {
+        $m = ghCreate('members', ['name' => 'Gh', 'surname' => "Ignor {$s}", 'active' => 1]);
+        $res = ghPut($m, ['surname' => "Neu {$s}", 'groups_valid_from' => 'unsinn']);
+        assertStatus(200, $res, $res['raw']);
+        assertSame("Neu {$s}", ghMember($m)['surname']);
+    } finally {
+        if ($m) { ghDelete('members', $m); }
+    }
+});
+
+test('group_ids als Zeichenkette ergibt 400', function () {
+    $s = uniqid();
+    $m = 0;
+    try {
+        $m = ghCreate('members', ['name' => 'Gh', 'surname' => "Str {$s}", 'active' => 1]);
+        $res = ghPut($m, ['group_ids' => '1,2']);
+        assertStatus(400, $res, $res['raw']);
+    } finally {
+        if ($m) { ghDelete('members', $m); }
+    }
+});
+
+test('Korrektur: am selben Tag oder davor entfernt ergibt keinen Verlaufseintrag', function () {
+    $s = uniqid();
+    $ids = ['g' => [], 'm' => 0];
+    try {
+        $a = $ids['g'][] = ghCreate('member_groups', ['group_name' => "GH A {$s}"]);
+        $m = $ids['m'] = ghCreate('members', ['name' => 'Gh', 'surname' => "Korr {$s}", 'active' => 1]);
+        assertStatus(200, ghPut($m, ['group_ids' => [$a], 'groups_valid_from' => '2026-06-10']));
+        assertStatus(200, ghPut($m, ['group_ids' => [], 'groups_valid_from' => '2026-06-01']));
+        $member = ghMember($m);
+        assertSame([], ghSince($member));
+        assertSame([], ghHistory($member));
+    } finally {
+        if ($ids['m']) { ghDelete('members', $ids['m']); }
+        foreach ($ids['g'] as $g) { ghDelete('member_groups', $g); }
+    }
+});
+
+test('Registerregel ueber den Planer: Verlauf der ergaenzten Gruppe wird gekuerzt', function () {
+    $s = uniqid();
+    $ids = ['g' => [], 'm' => 0];
+    try {
+        $p = $ids['g'][] = ghCreate('member_groups', ['group_name' => "GH P {$s}"]);
+        $x = $ids['g'][] = ghCreate('member_groups', ['group_name' => "GH X {$s}"]);
+        $m = $ids['m'] = ghCreate('members', ['name' => 'Gh', 'surname' => "Ueberl {$s}", 'active' => 1, 'group_ids' => [$x]]);
+        assertStatus(200, ghPut($m, ['group_ids' => [$x, $p], 'groups_valid_from' => '2025-01-01']));
+        assertStatus(200, ghPut($m, ['group_ids' => [$x], 'groups_valid_from' => '2026-06-01']));
+        assertSame([[$p, '2025-01-01', '2026-05-31']], ghHistory(ghMember($m)));
+
+        $r = $ids['g'][] = ghCreate('member_groups', ['group_name' => "GH R {$s}", 'is_subgroup' => true, 'parent_group_ids' => []]);
+        assertStatus(200, ghPut($m, ['group_ids' => [$x, $r], 'groups_valid_from' => '2026-04-01']));
+        $put = apiRequest('PUT', 'member_groups', ['token' => apiToken('admin'), 'query' => ['id' => $r],
+            'body' => ['group_name' => "GH R {$s}", 'is_subgroup' => true, 'parent_group_ids' => [$p]]]);
+        assertStatus(200, $put, $put['raw']);
+
+        $member = ghMember($m);
+        assertSame('2026-04-01', ghSince($member)[$p] ?? 'fehlt', 'P heute ab 01.04.');
+        assertSame([[$p, '2025-01-01', '2026-03-31']], ghHistory($member), 'Verlauf von P gekuerzt, keine Ueberlappung');
+    } finally {
+        if ($ids['m']) { ghDelete('members', $ids['m']); }
+        foreach (array_reverse($ids['g']) as $g) { ghDelete('member_groups', $g); }
+    }
+});

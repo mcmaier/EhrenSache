@@ -300,6 +300,13 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 break;
             }
 
+            // Unbekannte Gruppen vor jeder Schreiboperation abweisen
+            if (isset($cleanData->group_ids) && !groupsAllExist($db, $database, $cleanData->group_ids)) {
+                http_response_code(400);
+                echo json_encode(["message" => "Unbekannte Gruppe", "field" => "group_ids"]);
+                break;
+            }
+
             // Umgebende Leerzeichen entfernen, bevor auf Duplikate geprueft
             // und gespeichert wird — sonst waeren "AB1" und "AB1 " zwei
             // "unterschiedliche" Nummern. Leer nach dem Trim faellt wie
@@ -372,13 +379,29 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
 
             // groups_valid_from (Spec 2026-10-05, 4.2): nur heute oder Vergangenheit
             $groupsValidFrom = date('Y-m-d');
-            if (isset($cleanData->groups_valid_from)) {
+            if (isset($cleanData->group_ids) && isset($cleanData->groups_valid_from)) {
                 if (($validFromError = groupsCheckValidFrom($cleanData->groups_valid_from, date('Y-m-d'))) !== null) {
                     http_response_code(422);
                     echo json_encode(["message" => $validFromError, "field" => "groups_valid_from"]);
                     break;
                 }
                 $groupsValidFrom = $cleanData->groups_valid_from;
+            }
+
+            // Unbekannte Gruppen vor jeder Schreiboperation abweisen
+            if (isset($cleanData->group_ids) && !groupsAllExist($db, $database, $cleanData->group_ids)) {
+                http_response_code(400);
+                echo json_encode(["message" => "Unbekannte Gruppe", "field" => "group_ids"]);
+                break;
+            }
+
+            // Existenz des Mitglieds vor jeder Schreiboperation (auch nur mit group_ids)
+            $existsStmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ?");
+            $existsStmt->execute([$id]);
+            if (!$existsStmt->fetch()) {
+                http_response_code(404);
+                echo json_encode(["message" => "Member not found"]);
+                break;
             }
 
             // Umgebende Leerzeichen entfernen — siehe POST weiter oben.
@@ -457,39 +480,44 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 break;
             }
 
-            if (!empty($setParts)) {
-                $params[] = $id;
-                $stmt = $db->prepare("UPDATE {$prefix}members SET " . implode(', ', $setParts) . " WHERE member_id = ?");
-                $stmt->execute($params);
-
-                if ($stmt->rowCount() === 0) {
-                    // Prüfen ob member existiert
-                    $exists = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ?");
-                    $exists->execute([$id]);
-                    if (!$exists->fetch()) {
-                        http_response_code(404);
-                        echo json_encode(["message" => "Member not found"]);
-                        break;
-                    }
-                }
-            }
-
-            // P2: Eine neue PIN hebt die Sperre auf — sonst wartet das Mitglied
-            // trotz neuer PIN 15 Minuten.
-            if ($pinAction !== null) {
-                (new RateLimiter($db, $database))->reset('station_member_' . (int) $id, 'station_pin');
-            }
-
-            // Gruppen-Zuordnungen aktualisieren (wenn group_ids geliefert)
+            // Stammdaten, PIN-Sperre und Gruppen in einer Transaktion (Spec 2026-10-05, 4.1)
             $addedGroups = [];
             $groupWarnings = [];
-            if (isset($cleanData->group_ids)) {
-                // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
-                $normalized = is_array($cleanData->group_ids)
-                    ? groupsWithParents($db, $database, $cleanData->group_ids)
-                    : ['group_ids' => [], 'added' => [], 'warnings' => []];
-                groupsApplyChange($db, $database, (int) $id, $normalized['group_ids'], $groupsValidFrom);
-                [$addedGroups, $groupWarnings] = groupsRuleReport((int) $id, $normalized);
+            try {
+                $db->beginTransaction();
+
+                if (!empty($setParts)) {
+                    $params[] = $id;
+                    $stmt = $db->prepare("UPDATE {$prefix}members SET " . implode(', ', $setParts) . " WHERE member_id = ?");
+                    $stmt->execute($params);
+                }
+
+                // P2: Eine neue PIN hebt die Sperre auf — sonst wartet das Mitglied
+                // trotz neuer PIN 15 Minuten.
+                if ($pinAction !== null) {
+                    (new RateLimiter($db, $database))->reset('station_member_' . (int) $id, 'station_pin');
+                }
+
+                // Gruppen-Zuordnungen aktualisieren (wenn group_ids geliefert)
+                if (isset($cleanData->group_ids)) {
+                    // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
+                    $normalized = groupsWithParents($db, $database, $cleanData->group_ids);
+                    groupsApplyChange($db, $database, (int) $id, $normalized['group_ids'], $groupsValidFrom);
+                    [$addedGroups, $groupWarnings] = groupsRuleReport((int) $id, $normalized);
+                }
+
+                $db->commit();
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                $isDeadlock = $e instanceof PDOException && in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
+                http_response_code($isDeadlock ? 503 : 500);
+                echo json_encode(["message" => $isDeadlock
+                    ? "Temporärer Datenbankkonflikt. Bitte erneut versuchen."
+                    : "Fehler beim Aktualisieren des Mitglieds"]);
+                error_log("PUT member $id failed: " . $e->getMessage());
+                break;
             }
 
             echo json_encode(["message" => "Member updated",

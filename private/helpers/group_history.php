@@ -208,6 +208,11 @@ function groupsApplyChange(PDO $db, $database, int $memberId, array $newGroupIds
         $db->beginTransaction();
     }
     try {
+        // Gleichzeitige Bearbeitung desselben Mitglieds: Zeile sperren, bevor der
+        // Stand gelesen wird (Spec 4.1, Invariante keine Ueberlappung).
+        $lock = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ? FOR UPDATE");
+        $lock->execute([$memberId]);
+
         $stmt = $db->prepare("SELECT group_id, valid_from FROM {$prefix}member_group_assignments WHERE member_id = ?");
         $stmt->execute([$memberId]);
         $current = [];

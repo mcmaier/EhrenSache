@@ -196,12 +196,16 @@ function groupsApplySubgroupRule($db, $database, int $subgroupId): array
     $stmt->execute(array_merge([$subgroupId], $parents));
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Die ergaenzte Gruppe gilt ab demselben Tag wie die Registerzuordnung (Spec 2026-10-05, 4.1).
-    $insert = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id, valid_from) VALUES (?, ?, ?)");
+    // Die ergaenzte Gruppe gilt ab demselben Tag wie die Registerzuordnung (Spec 2026-10-05, 4.1);
+    // der Planer kuerzt dabei einen Verlauf der Gruppe, damit nichts ueberlappt.
+    $currentStmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?");
     foreach ($rows as $row) {
         $memberId = (int) $row['member_id'];
         if (count($parents) === 1) {
-            $insert->execute([$memberId, $parents[0], $row['valid_from']]);
+            $currentStmt->execute([$memberId]);
+            $groupIds   = array_map('intval', $currentStmt->fetchAll(PDO::FETCH_COLUMN));
+            $groupIds[] = $parents[0];
+            groupsApplyChange($db, $database, $memberId, $groupIds, $row['valid_from']);
             $result['added'][] = ['member_id' => $memberId, 'group_id' => $parents[0]];
         } else {
             $result['warnings'][] = ['member_id' => $memberId, 'subgroup_id' => $subgroupId];
@@ -294,4 +298,23 @@ function groupsRuleReport(int $memberId, array $normalized): array
     $warnings = array_map(static fn (int $s) => ['member_id' => $memberId, 'subgroup_id' => $s], $normalized['warnings']);
 
     return [$added, $warnings];
+}
+
+/**
+ * Prueft, dass alle Gruppen-IDs existieren (vor jeder Schreiboperation).
+ *
+ * @param array<int, int|string> $groupIds bereits durch groupsCheckMemberGroupIds() geprueft
+ */
+function groupsAllExist($db, $database, array $groupIds): bool
+{
+    $ids = array_values(array_unique(array_map('intval', $groupIds)));
+    if ($ids === []) {
+        return true;
+    }
+    $prefix = $database->table('');
+    $in     = implode(',', array_fill(0, count($ids), '?'));
+    $stmt   = $db->prepare("SELECT COUNT(*) FROM {$prefix}member_groups WHERE group_id IN ({$in})");
+    $stmt->execute($ids);
+
+    return (int) $stmt->fetchColumn() === count($ids);
 }
