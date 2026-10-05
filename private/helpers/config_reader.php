@@ -33,12 +33,13 @@ const CONFIG_FORMAT_UNKNOWN = 'unknown';  // Datei existiert, ist aber keine von
 /**
  * Liest eine Konfigurationsdatei und liefert sie normalisiert:
  *   ['db' => [host, name, user, pass, prefix], 'base_url', 'demo_mode',
- *    'demo_station_token', 'format']
+ *    'demo_station_token', 'trusted_proxies', 'format']
  *
  * base_url:  Zeichenkette oder null (= automatisch ermitteln)
  * demo_mode: der Rohwert, oder null (= nicht gesetzt). Bewusst kein Boolean,
  *            siehe demoModeActive() in private/helpers/demo_mode.php.
  * demo_station_token: Zeichenkette oder null; nur für private/demo/seed.php.
+ * trusted_proxies: Liste gültiger IP-Adressen bzw. CIDR-Bereiche, sonst leer.
  *
  * Wirft nie. Der Aufrufer entscheidet anhand von 'format', was ein Fehlschlag bedeutet.
  */
@@ -120,8 +121,47 @@ function configWithDefaults(array $cfg): array
         'demo_station_token' => is_string($cfg['demo_station_token'] ?? null) && trim($cfg['demo_station_token']) !== ''
             ? trim($cfg['demo_station_token'])
             : null,
+        // Reverse-Proxys bzw. CDN-Adressen, deren Weiterleitungs-Header (CF-Connecting-IP,
+        // X-Forwarded-For) als Besucheradresse gelten. Leer = nur REMOTE_ADDR, wie bisher.
+        // Siehe private/helpers/client_ip.php.
+        'trusted_proxies' => configTrustedProxies($cfg['trusted_proxies'] ?? []),
         'format'    => $cfg['format'] ?? CONFIG_FORMAT_UNKNOWN,
     ];
+}
+
+/**
+ * Nur gültige Einträge: eine IP-Adresse oder ein Bereich in CIDR-Schreibweise
+ * (IPv4 /0–32, IPv6 /0–128). Alles andere fällt still weg — ein Tippfehler darf
+ * weder die Anwendung anhalten noch einen unerwartet weiten Bereich freigeben.
+ * Ein einzelner String statt einer Liste wird nicht umgedeutet.
+ */
+function configTrustedProxies($wert): array
+{
+    if (!is_array($wert)) {
+        return [];
+    }
+
+    $gueltig = [];
+    foreach ($wert as $eintrag) {
+        if (!is_string($eintrag)) {
+            continue;
+        }
+        $eintrag = trim($eintrag);
+        $teile   = explode('/', $eintrag, 2);
+        $ip      = filter_var($teile[0], FILTER_VALIDATE_IP);
+        if ($ip === false) {
+            continue;
+        }
+        if (count($teile) === 2) {
+            $max = strpos($ip, ':') !== false ? 128 : 32;
+            if (!ctype_digit($teile[1]) || (int) $teile[1] > $max) {
+                continue;
+            }
+        }
+        $gueltig[] = $eintrag;
+    }
+
+    return $gueltig;
 }
 
 /** Zeilen ohne Kommentare: Blockkommentare entfernt, //- und #-Zeilen übersprungen. */
@@ -253,6 +293,10 @@ function renderConfigFile(array $cfg): string
         . "    // Demo-Modus für öffentlich erreichbare Installationen.\n"
         . "    // false oder null = aus. Jeder andere Wert gilt absichtlich als an,\n"
         . "    // siehe private/helpers/demo_mode.php.\n"
-        . "    'demo_mode' => " . $w($cfg['demo_mode']) . ",\n"
+        . "    'demo_mode' => " . $w($cfg['demo_mode']) . ",\n\n"
+        . "    // Reverse-Proxy oder CDN vor der Installation (z. B. Cloudflare): deren\n"
+        . "    // Adressen oder Bereiche, damit der Rate Limiter die Besucheradresse sieht.\n"
+        . "    // Leer lassen, wenn kein Proxy davorsteht. Siehe README, Abschnitt Update.\n"
+        . "    'trusted_proxies' => " . $w($cfg['trusted_proxies']) . ",\n"
         . "];\n";
 }
