@@ -94,6 +94,9 @@ function handleAttendanceList($db, $database, $method, $id) {
         
         // Hole alle Mitglieder der relevanten Gruppen
         $placeholders = str_repeat('?,', count($group_ids) - 1) . '?';
+        // Mitglied der Gruppe am Termindatum (Spec 2026-10-05, 5.2)
+        $assignmentsSql = groupAssignmentsSql($database);
+        $activeOnSql    = groupAssignmentActiveOn('mga', 'a.date');
 
         $stmt = $db->prepare("
             SELECT DISTINCT
@@ -106,13 +109,14 @@ function handleAttendanceList($db, $database, $method, $id) {
                 r.checkin_source,
                 r.status
             FROM {$prefix}members m
-            JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
+            JOIN {$assignmentsSql} mga ON m.member_id = mga.member_id
             JOIN {$prefix}member_groups mg ON mga.group_id = mg.group_id
             CROSS JOIN {$prefix}appointments a
             LEFT JOIN {$prefix}records r ON m.member_id = r.member_id
                 AND r.appointment_id = ?
             WHERE mga.group_id IN ($placeholders)
                 AND a.appointment_id = ?
+                AND {$activeOnSql}
                 AND ($activityWhere)
             GROUP BY m.member_id
             ORDER BY m.surname, m.name
@@ -194,18 +198,6 @@ function handleAttendanceList($db, $database, $method, $id) {
             exit();
         }            
 
-        // Parse Member-Gruppen
-        $member_group_ids = $member['group_ids'] ? explode(',', $member['group_ids']) : [];
-        
-        if(empty($member_group_ids)) {
-            echo json_encode([
-                'member' => $member,
-                'year' => $year,
-                'appointments' => []
-            ]);
-            exit();
-        }
-        
         // WHERE-Clause für type_id aufbauen
         
         $params = [$member_id, $year, $member_id];
@@ -224,9 +216,10 @@ function handleAttendanceList($db, $database, $method, $id) {
         // Kommende Termine (OI-89) -- dieselbe Regel wie im Modus je Termin.
         $startedSql = attendanceStartedSql(checkinToleranceHours($db, $database));
 
-        // Hole alle Termine des Jahres, die für die Member-Gruppen relevant sind
-        $placeholders = str_repeat('?,', count($member_group_ids) - 1) . '?';
-        $params = array_merge($params, $member_group_ids);
+        // Termine des Jahres, die für eine Gruppe des Mitglieds am Termindatum
+        // bestimmt sind (Spec 2026-10-05, 5.2) -- auch ohne heutige Gruppe.
+        $assignmentsSql = groupAssignmentsSql($database);
+        $activeOnGaSql  = groupAssignmentActiveOn('ga', 'a.date');
 
         $stmt = $db->prepare("
             SELECT 
@@ -259,7 +252,12 @@ function handleAttendanceList($db, $database, $method, $id) {
             WHERE YEAR(a.date) = ?
                 AND m.member_id = ?
                 $typeCondition
-                AND atg.group_id IN ($placeholders)
+                AND EXISTS (
+                    SELECT 1 FROM {$assignmentsSql} ga
+                     WHERE ga.member_id = m.member_id
+                       AND ga.group_id = atg.group_id
+                       AND {$activeOnGaSql}
+                )
                 AND ($activityWhere)
             GROUP BY a.appointment_id
             ORDER BY a.date DESC, a.start_time DESC

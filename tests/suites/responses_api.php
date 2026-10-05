@@ -115,16 +115,27 @@ function rsMemberGroupIds(int $memberId): array
     return array_map(static fn ($g) => (int) $g['group_id'], $res['body']['groups']);
 }
 
-function rsSetMemberGroups(int $memberId, array $groupIds): void
+/** $validFrom: Gruppenzeitraum (OI-115); ohne Angabe gilt ab heute. */
+function rsSetMemberGroups(int $memberId, array $groupIds, ?string $validFrom = null): void
 {
+    $body = ['group_ids' => $groupIds];
+    if ($validFrom !== null) {
+        $body['groups_valid_from'] = $validFrom;
+    }
     assertStatus(200, apiRequest('PUT', 'members', [
         'token' => apiToken('admin'),
         'query' => ['id' => $memberId],
-        'body'  => ['group_ids' => $groupIds],
+        'body'  => $body,
     ]), "Gruppen von Mitglied {$memberId} konnten nicht gesetzt werden");
 }
 
-/** Haengt das Mitglied des Kontos "user" fuer $fn in die Gruppe der Welt. */
+/**
+ * Haengt das Mitglied des Kontos "user" fuer $fn in die Gruppe der Welt.
+ *
+ * Rueckwirkend (OI-115): Die Gruppe zaehlt am Termindatum, auch fuer die
+ * vergangenen Termine der Tests. Beim Zuruecksetzen dasselbe Datum, dann
+ * bleibt kein Verlauf beim Testmitglied zurueck.
+ */
 function rsWithUserInWorld(array $world, callable $fn): void
 {
     $memberId = apiMemberId('user');
@@ -132,15 +143,16 @@ function rsWithUserInWorld(array $world, callable $fn): void
 
     $original   = rsMemberGroupIds($memberId);
     $bodyError  = null;
+    $validFrom  = date('Y-m-d', strtotime('-1 year'));
 
     try {
-        rsSetMemberGroups($memberId, array_values(array_unique(array_merge($original, [$world['group']]))));
+        rsSetMemberGroups($memberId, array_values(array_unique(array_merge($original, [$world['group']]))), $validFrom);
         $fn($memberId);
     } catch (Throwable $e) {
         $bodyError = $e;
     } finally {
         try {
-            rsSetMemberGroups($memberId, $original);
+            rsSetMemberGroups($memberId, $original, $validFrom);
         } catch (Throwable $restoreError) {
             if ($bodyError !== null) {
                 throw new RuntimeException(

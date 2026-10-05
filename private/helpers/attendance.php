@@ -496,7 +496,9 @@ function attendanceDistinctAppointmentCount($db, $database, array $groupIds, int
 /**
  * Zahl der aktiven Mitglieder im Auswertungsbereich.
  *
- * Unveraendert uebernommen aus getActiveMemberCount() in handlers/statistics.php.
+ * Mit Gruppenfilter zaehlt, wer irgendwann im Jahr in einer der Gruppen war
+ * und aktiv war (Gruppenzeitraum, Spec 2026-10-05, 5.2); ohne Filter alle
+ * aktiven Mitglieder des Jahres.
  */
 function attendanceActiveMemberCount($db, $database, array $groupIds, int $year,
                                      ?int $memberId): int
@@ -512,11 +514,15 @@ function attendanceActiveMemberCount($db, $database, array $groupIds, int $year,
 
     if (!empty($groupIds)) {
         $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+        require_once __DIR__ . '/group_history.php';
+        $assignments = groupAssignmentsSql($database);
+        $overlaps    = groupAssignmentOverlapsYear('mga', $year);
         $stmt = $db->prepare("
             SELECT COUNT(DISTINCT mga.member_id)
-            FROM {$prefix}member_group_assignments mga
+            FROM {$assignments} mga
             JOIN {$prefix}members m ON mga.member_id = m.member_id
             WHERE mga.group_id IN ({$placeholders})
+              AND {$overlaps}
               AND {$activityWhere}
         ");
         $stmt->execute($groupIds);

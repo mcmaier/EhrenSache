@@ -172,6 +172,61 @@ test('Stichtag am Termindatum: Grenztage und Register (eigene Welt)', function (
     }
 });
 
+test('Rueckmeldung eines Maerztermins: M ist bei A erwartet, bei B nicht', function () use (&$ghrWorld) {
+    assertTrue(!empty($ghrWorld['members']['N']), 'Welt fehlt');
+    $w = $ghrWorld;
+    $ids = static function (int $appointmentId): array {
+        $res = apiRequest('GET', 'appointment_responses', ['token' => apiToken('admin'), 'query' => ['appointment_id' => $appointmentId]]);
+        assertStatus(200, $res, $res['raw']);
+        return array_map(static fn ($m) => (int) $m['member_id'], $res['body']['members'] ?? []);
+    };
+    assertTrue(in_array($w['members']['M'], $ids($w['appointments']['A1']), true), 'M fehlt bei A1');
+    assertTrue(!in_array($w['members']['M'], $ids($w['appointments']['B1']), true), 'M darf bei B1 nicht erwartet sein');
+    assertTrue(in_array($w['members']['M'], $ids($w['appointments']['B2']), true), 'M fehlt bei B2');
+});
+
+test('Anwesenheitsliste je Termin: Gruppe am Termindatum', function () use (&$ghrWorld) {
+    assertTrue(!empty($ghrWorld['members']['N']), 'Welt fehlt');
+    $w = $ghrWorld;
+    $ids = static function (int $appointmentId): array {
+        $res = apiRequest('GET', 'attendance_list', ['token' => apiToken('admin'), 'query' => ['appointment_id' => $appointmentId]]);
+        assertStatus(200, $res, $res['raw']);
+        return array_map(static fn ($m) => (int) $m['member_id'], $res['body']['members'] ?? []);
+    };
+    assertTrue(in_array($w['members']['M'], $ids($w['appointments']['A1']), true), 'M fehlt bei A1');
+    assertTrue(!in_array($w['members']['M'], $ids($w['appointments']['A2']), true), 'M darf bei A2 nicht stehen');
+    assertTrue(!in_array($w['members']['M'], $ids($w['appointments']['B1']), true), 'M darf bei B1 nicht stehen');
+});
+
+test('Anwesenheitsliste je Mitglied: Termine aus dem jeweiligen Zeitraum', function () use (&$ghrWorld) {
+    assertTrue(!empty($ghrWorld['members']['N']), 'Welt fehlt');
+    $w = $ghrWorld;
+    $res = apiRequest('GET', 'attendance_list', ['token' => apiToken('admin'),
+        'query' => ['member_id' => $w['members']['M'], 'year' => $w['year']]]);
+    assertStatus(200, $res, $res['raw']);
+    $got = array_map(static fn ($a) => (int) $a['appointment_id'], $res['body']['appointments'] ?? []);
+    sort($got);
+    $expected = [$w['appointments']['A1'], $w['appointments']['B2']];
+    sort($expected);
+    assertSame($expected, $got, 'nur A1 und B2');
+});
+
+test('Anwesenheitsliste je Mitglied: auch ohne heutige Gruppe', function () use (&$ghrWorld) {
+    assertTrue(!empty($ghrWorld['members']['N']), 'Welt fehlt');
+    $w = $ghrWorld;
+    $put = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $w['members']['N']],
+        'body' => ['group_ids' => [], 'groups_valid_from' => date('Y-m-d')]]);
+    assertStatus(200, $put);
+    $res = apiRequest('GET', 'attendance_list', ['token' => apiToken('admin'),
+        'query' => ['member_id' => $w['members']['N'], 'year' => $w['year']]]);
+    assertStatus(200, $res, $res['raw']);
+    $got = array_map(static fn ($a) => (int) $a['appointment_id'], $res['body']['appointments'] ?? []);
+    sort($got);
+    $expected = [$w['appointments']['A1'], $w['appointments']['A2']];
+    sort($expected);
+    assertSame($expected, $got, 'N war im Vorjahr durchgehend in A');
+});
+
 test('Lese-Welt aufraeumen', function () use (&$ghrWorld) {
     ghrDropWorld($ghrWorld);
 });
