@@ -99,7 +99,7 @@ Bei Session-basierter Authentifizierung ist ein CSRF-Token erforderlich:
 | 201 | Ressource erstellt |
 | 400 | Ungültige Anfrage |
 | 401 | Nicht authentifiziert |
-| 403 | Keine Berechtigung / CSRF-Fehler |
+| 403 | Keine Berechtigung / CSRF-Fehler / Funktion abgeschaltet (`code: FEATURE_DISABLED`) |
 | 404 | Ressource nicht gefunden |
 | 409 | Konflikt (z.B. Duplikat) |
 | 429 | Rate Limit überschritten |
@@ -658,9 +658,8 @@ als leeres Array. Dieselbe Regel gilt für `PUT` (unten) und den CSV-Import.
 | Ziffernfolge (String) | setzt die PIN — 4 bis 8 Ziffern, Mindestlänge aus `station_pin_min_length`, nicht eine einzige wiederholte Ziffer, keine auf- oder absteigende Zahlenfolge |
 | `null` oder `""` | löscht die PIN |
 
-`409 "Station PIN login is disabled"` (`field: "pin"`) wenn `station_pin_enabled = 0` — die
-Mitgliedsaktualisierung selbst bleibt eine gültige Ressource, daher `409` statt `404` (anders
-als bei `change_pin`, siehe unten). `400` mit Fehlertext und `field: "pin"` bei einem
+`403 FEATURE_DISABLED` (mit `field: "pin"`) wenn `station_pin_enabled = 0` — die
+Mitgliedsaktualisierung selbst bleibt eine gültige Ressource (seit OI-62 `403`, vorher `409`). `400` mit Fehlertext und `field: "pin"` bei einem
 Regelverstoß. Setzen oder Löschen der PIN hebt eine bestehende Sperre des Mitglieds
 (`station: identify`) auf.
 
@@ -1612,8 +1611,8 @@ das Fensterende (Unix-Sekunden) sowie `now`, um die Restlaufzeit gegen die Serve
 
 Alle POST-Aktionen tragen `member_number` und `pin` im Body (Strings; numerische Werte werden
 angenommen); der Kiosk hält beides nur im Speicher und verwirft es nach der Ruhezeit.
-`409 "Station PIN login is disabled"` wenn `station_pin_enabled = 0` — geprüft vor der
-Anmeldung. `409 "Device has no name"` wenn dem Kiosk der Gerätename fehlt (er ist der Ortsnachweis).
+`403 FEATURE_DISABLED` wenn `station_pin_enabled = 0` — geprüft vor der
+Anmeldung (seit OI-62, vorher `409`); gilt ebenso für `checkin` und `work_*`. `409 "Device has no name"` wenn dem Kiosk der Gerätename fehlt (er ist der Ortsnachweis).
 
 ```json
 { "member_number": "M123", "pin": "2580" }
@@ -1672,7 +1671,7 @@ Verhalten wie `work_sessions` mit `action` start/pause/resume/stop, mit drei Unt
 `source = station`; `start_location_name` und `end_location_name` = Gerätename des Kiosks
 (der Kiosk gilt als Ortsnachweis, auch für nachweispflichtige Tätigkeitsarten); die
 Notizpflicht (`worktime_require_note`) gilt am Kiosk nicht. `created_by` ist das Kioskkonto.
-`404` wenn die Zeiterfassung aus ist · `400` bei fehlender oder ungültiger `activity_id` ·
+`403 FEATURE_DISABLED` wenn die Zeiterfassung aus ist · `400` bei fehlender oder ungültiger `activity_id` ·
 `409` bei bereits laufender Sitzung bzw. `work_stop` ohne laufende Sitzung.
 
 ---
@@ -2238,8 +2237,8 @@ zwischenzeitlich abgeschaltet hat.
 ## Tätigkeitsarten (activity_types)
 
 Stammdaten der Arbeitszeiterfassung. Ist die Zeiterfassung abgeschaltet
-(`worktime_enabled = 0`), antwortet die Ressource mit **404** — ein
-abgeschaltetes Feature verrät nicht, dass es existiert.
+(`worktime_enabled = 0`), antwortet die Ressource mit **403** und
+`"code": "FEATURE_DISABLED"` (seit OI-62, vorher 404).
 
 ### Tätigkeitsarten abrufen
 **Endpoint:** `GET /api.php?resource=activity_types`
@@ -2381,7 +2380,7 @@ trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200` (OI-56).
 
 ## Arbeitszeiten (work_sessions)
 
-Erfassung geleisteter Arbeitszeit. Wie `activity_types` mit **404**, wenn die
+Erfassung geleisteter Arbeitszeit. Wie `activity_types` mit **403 `FEATURE_DISABLED`**, wenn die
 Zeiterfassung abgeschaltet ist. Geräte (Rolle `device`) haben keinen Zugriff.
 
 Je Mitglied kann höchstens **eine** Sitzung offen sein; ein zweiter Start
@@ -3109,7 +3108,7 @@ Doppelte Eingabeprüfung erfolgt in HTML.
 
 ### Stations-PIN ändern
 **Endpoint:** `POST /api.php?resource=change_pin`
-**Berechtigung:** angemeldeter Nutzer mit verknüpftem Mitglied; `404` wenn `station_pin_enabled = 0`; Geräte `403`
+**Berechtigung:** angemeldeter Nutzer mit verknüpftem Mitglied; `403 FEATURE_DISABLED` wenn `station_pin_enabled = 0` (seit OI-62, vorher `404`); Geräte `403`
 
 ```json
 { "current_password": "geheim", "new_pin": "2580" }
@@ -3815,6 +3814,16 @@ trifft `id` keinen Datensatz, mit `404`. Zuvor meldete beides `200` (OI-56).
   "message": "Endpoint not found"
 }
 ```
+
+**Funktion abgeschaltet** (seit OI-62):
+```json
+{
+  "message": "Diese Funktion ist abgeschaltet",
+  "code": "FEATURE_DISABLED",
+  "feature": "worktime"
+}
+```
+Welche Funktionen eingeschaltet sind, meldet `me` im Feld `features`.
 
 ---
 
