@@ -200,3 +200,30 @@ test('groupsPlanChange: Luecke von einem Tag wird nicht zusammengefuehrt', funct
     assertSame([], $plan['delete_history']);
     assertSame([], $plan['update_history']);
 });
+
+/** Attrappe: table('') liefert wie Database::table() nur das Praefix. */
+final class GhFakeDatabase
+{
+    public function table(string $name): string
+    {
+        return 'zz_' . $name;
+    }
+}
+
+test('groupAssignmentsSql vereint heutigen Stand und Verlauf', function () {
+    $sql = groupAssignmentsSql(new GhFakeDatabase());
+    assertTrue(str_contains($sql, 'FROM zz_member_group_assignments'), 'heutiger Stand fehlt');
+    assertTrue(str_contains($sql, 'FROM zz_member_group_history'), 'Verlauf fehlt');
+    assertTrue(str_contains($sql, 'UNION ALL'), 'UNION ALL fehlt');
+});
+
+test('groupAssignmentActiveOn: Bedingung und Aliaspruefung', function () {
+    assertSame('((ga.valid_from IS NULL OR ga.valid_from <= a.date) AND (ga.valid_to IS NULL OR ga.valid_to >= a.date))',
+        groupAssignmentActiveOn('ga', 'a.date'));
+    assertThrows(fn () => groupAssignmentActiveOn('ga; DROP', 'a.date'), 'ungueltiger Alias muss werfen');
+});
+
+test('groupAssignmentOverlapsYear: Zeitraum schneidet das Jahr', function () {
+    assertSame("((ga.valid_from IS NULL OR ga.valid_from <= '2025-12-31') AND (ga.valid_to IS NULL OR ga.valid_to >= '2025-01-01'))",
+        groupAssignmentOverlapsYear('ga', 2025));
+});

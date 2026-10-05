@@ -295,3 +295,42 @@ function groupsApplyChange(PDO $db, $database, int $memberId, array $newGroupIds
 
     return $plan['insert_current'] !== [] || $plan['delete_current'] !== [];
 }
+
+/** Prueft einen SQL-Tabellenalias. */
+function groupHistoryCheckAlias(string $alias): void
+{
+    if (preg_match('/^[a-z_][a-z0-9_]*$/i', $alias) !== 1) {
+        throw new InvalidArgumentException('Ungueltiger Tabellenalias: ' . $alias);
+    }
+}
+
+/**
+ * Wer war wann in welcher Gruppe (Spec 2026-10-05, 5.1): abgeleitete Tabelle mit
+ * member_id, group_id, valid_from, valid_to (NULL = bis heute).
+ */
+function groupAssignmentsSql($database): string
+{
+    $prefix = $database->table('');
+
+    return "(SELECT member_id, group_id, valid_from, CAST(NULL AS DATE) AS valid_to
+               FROM {$prefix}member_group_assignments
+             UNION ALL
+             SELECT member_id, group_id, valid_from, valid_to
+               FROM {$prefix}member_group_history)";
+}
+
+/** Die einzige Stelle mit der Stichtagsregel. $dateExpr ist ein SQL-Ausdruck (z. B. a.date). */
+function groupAssignmentActiveOn(string $alias, string $dateExpr): string
+{
+    groupHistoryCheckAlias($alias);
+
+    return "(({$alias}.valid_from IS NULL OR {$alias}.valid_from <= {$dateExpr}) AND ({$alias}.valid_to IS NULL OR {$alias}.valid_to >= {$dateExpr}))";
+}
+
+/** Zeitraum schneidet das Kalenderjahr. */
+function groupAssignmentOverlapsYear(string $alias, int $year): string
+{
+    groupHistoryCheckAlias($alias);
+
+    return "(({$alias}.valid_from IS NULL OR {$alias}.valid_from <= '{$year}-12-31') AND ({$alias}.valid_to IS NULL OR {$alias}.valid_to >= '{$year}-01-01'))";
+}

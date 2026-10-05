@@ -197,9 +197,9 @@ function handleMyData($db, $database, $request_method, $authUserId)
     require_once __DIR__ . '/../helpers/punctuality.php';
 
     // Heutige und ehemalige Gruppen, damit Jahre vor einem Wechsel ihre Gruppe behalten
-    $groupStmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?
-                               UNION SELECT group_id FROM {$prefix}member_group_history WHERE member_id = ?");
-    $groupStmt->execute([$member_id, $member_id]);
+    require_once __DIR__ . '/../helpers/group_history.php';
+    $groupStmt = $db->prepare("SELECT DISTINCT group_id FROM " . groupAssignmentsSql($database) . " ga WHERE member_id = ?");
+    $groupStmt->execute([$member_id]);
     $ownGroupIds = array_map('intval', $groupStmt->fetchAll(PDO::FETCH_COLUMN));
 
     $data['behavior'] = punctualityByYear($db, $database, (int) $member_id, $ownGroupIds);

@@ -53,12 +53,17 @@ function caMemberGroupIds(int $memberId): array
 }
 
 /** Wie rsSetMemberGroups() in responses_api.php. */
-function caSetMemberGroups(int $memberId, array $groupIds): void
+function caSetMemberGroups(int $memberId, array $groupIds, ?string $validFrom = null): void
 {
+    $body = ['group_ids' => $groupIds];
+    if ($validFrom !== null) {
+        // Die Gruppe gilt am Termindatum (OI-115): Aenderung rueckwirkend setzen
+        $body['groups_valid_from'] = $validFrom;
+    }
     assertStatus(200, apiRequest('PUT', 'members', [
         'token' => apiToken('admin'),
         'query' => ['id' => $memberId],
-        'body'  => ['group_ids' => $groupIds],
+        'body'  => $body,
     ]), "Gruppen von Mitglied {$memberId} konnten nicht gesetzt werden");
 }
 
@@ -228,7 +233,7 @@ test('Ein Mitglied sieht nur den eigenen Status, keine Zahlen', function () {
     assertTrue($gruppenVorher !== [], "Testkonto user (Mitglied {$memberId}) hat keine Gruppe");
 
     try {
-        caSetMemberGroups($memberId, array_values(array_unique(array_merge($gruppenVorher, [$world['group']]))));
+        caSetMemberGroups($memberId, array_values(array_unique(array_merge($gruppenVorher, [$world['group']]))), caDateInDays(-30));
 
         $tag = caDateInDays(-2);
         $apt = caAppointment($world, $tag);
@@ -250,7 +255,7 @@ test('Ein Mitglied sieht nur den eigenen Status, keine Zahlen', function () {
         // Erst aufraeumen, dann pruefen: Eine Assertion im finally wuerde
         // sonst die echte Fehlermeldung des try-Blocks ueberschreiben und
         // die Welt stehen lassen.
-        caSetMemberGroups($memberId, $gruppenVorher);
+        caSetMemberGroups($memberId, $gruppenVorher, caDateInDays(-30));
         $gruppenNachher = caMemberGroupIds($memberId);
         caDropWorld($world);
 
