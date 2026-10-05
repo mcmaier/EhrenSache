@@ -84,17 +84,24 @@ das Ergebnis seiner Tokenprüfung.
 
    `renderCheckinAppointmentOptions()` liest `clientSettings` für den Hinweistext. Es läuft erst,
    wenn Stufe 2 vollständig ist, damit die Reihenfolge der Antworten keine Rolle spielt.
+
+   Ohne `member_id` (Konto ohne verknüpftes Mitglied) entfallen in Stufe 2 `members`,
+   `appointments` und die Zeiterfassung, und die Anwesenheitsliste wird nicht eingerichtet — wie
+   bisher, wo `loadUserData()` in diesem Fall vorzeitig zurückkehrte.
 4. **Hauptbildschirm einblenden** (`showScreen('main')`, `startTicker()`), danach `initTabs()`
    und `initYearNavigation()`, wie bisher.
 5. **Stufe 3, im Hintergrund:** `my_open_items` und `appointment_responses` (wie heute über
-   `initTabs()`/`enterCaptureTab()`), dazu `appointment_types` — nur für Admin und Manager, denn
-   nur deren Termindialog braucht die Terminarten. Mitglieder laden sie nicht mehr.
+   `initTabs()`/`enterCaptureTab()`), dazu `appointment_types` — für **alle** Rollen: Der Verlauf färbt seine Einträge nach Terminart
+   (`getTypeColor()`), deshalb wartet `loadHistory()` auf diesen Abruf. Der Termindialog für Admin
+   und Manager lädt die Terminarten ohnehin selbst.
 
 Höchstens fünf Abrufe gleichzeitig je Gerät.
 
 ### 4.3 Fehler
 
-- **`me` scheitert mit 401:** Token löschen, Anmeldemaske — wie heute.
+- **`me` scheitert mit 401 oder 403:** Token löschen, Anmeldemaske. 401 heißt ungültig oder
+  abgelaufen; 403 heißt gültig, aber für die App nicht zugelassen (etwa ein Kiosk-Token, der nur
+  `station` darf) — „Erneut versuchen" hülfe dort nie.
 - **`me` scheitert anders** (503 nach Wiederholung, sonstiger Status, Timeout, kein Netz): Token
   **bleibt**. Die Ladeanzeige zeigt „Server nicht erreichbar“ und einen Knopf „Erneut versuchen“,
   der `checkAutoLogin()` erneut ausführt. Der Knopf trägt `data-action` (CSP).
@@ -152,7 +159,8 @@ Regel. Beide Stellen tragen einen Kommentar, der auf die jeweils andere verweist
 - Der Zähler offener Anfragen (Ladebalken) bleibt über die Wiederholung hinweg belegt; die
   Wiederholung ist für den Nutzer unsichtbar.
 - Scheitert auch der zweite Versuch, gilt die heutige Fehlerbehandlung unverändert.
-- Der Timeout von 20 s gilt je Versuch.
+- Der Timeout von 20 s gilt für beide Versuche **zusammen**: Ein lesender Abruf wartet nie länger
+  als heute.
 
 `theme.js` und `loadAppearanceSettings()` rufen `fetch` direkt auf und bleiben ohne Wiederholung;
 ein Ausfall dort lässt nur die Vereinsfarben weg.
@@ -163,7 +171,7 @@ ein Ausfall dort lässt nur die Vereinsfarben weg.
    `tests/lib/source.php`:
    - Check-in-App: `checkAutoLogin()` und `handleLogin()` rufen `startSession()` auf und enthalten
      keine eigene Ladekette; `loadUserData()` ruft `apiCall('me')` nicht auf; das Löschen von
-     `api_token` in `checkAutoLogin()` steht nur im Zweig für Status 401.
+     `api_token` in `checkAutoLogin()` steht nur im Zweig für Status 401 oder 403.
    - Dashboard: `init()` wartet `loadVersion()` nicht ab; `initUsersEventHandlers()` ruft weder
      `applyUserFilters()` noch `loadUsers()` auf.
    - Beide `apiCall()`: Die Wiederholung ist an `GET` gebunden, die Statusliste ist vorhanden.
