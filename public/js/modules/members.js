@@ -660,9 +660,26 @@ function updateMemberGroupChange() {
         const cb = document.querySelector(`.member-group-checkbox[value="${id}"]`);
         return cb ? cb.dataset.groupName : `Gruppe #${id}`;
     };
+    const date = input.value;
+    const dayBefore = dayBeforeIso(date);
     const parts = [
-        ...removed.map(id => `${nameOf(id)} endet am ${formatIsoDateDe(dayBeforeIso(input.value))}`),
-        ...added.map(id => `${nameOf(id)} ab ${formatIsoDateDe(input.value)}`),
+        ...removed.map(id => {
+            // Galt die Gruppe erst ab dem gewählten Datum oder später, entfällt sie ganz.
+            const since = currentMemberGroupSince.get(id);
+            return since && since >= date
+                ? `${nameOf(id)} wird gestrichen (galt erst ab ${formatIsoDateDe(since)})`
+                : `${nameOf(id)} endet am ${formatIsoDateDe(dayBefore)}`;
+        }),
+        ...added.map(id => {
+            // Ein früherer Verlaufseintrag, der lückenlos anschließt oder überlappt, wird fortgesetzt.
+            const prior = currentMemberGroupHistory
+                .filter(h => Number(h.group_id) === id && h.valid_to >= dayBefore)
+                .sort((x, y) => (x.valid_from || '') < (y.valid_from || '') ? -1 : 1)[0];
+            if (prior) {
+                return `${nameOf(id)} gilt durchgehend weiter (${prior.valid_from ? 'seit ' + formatIsoDateDe(prior.valid_from) : 'von Anfang an'})`;
+            }
+            return `${nameOf(id)} ab ${formatIsoDateDe(date)}`;
+        }),
     ];
     preview.textContent = parts.join(' · ');
     box.hidden = false;

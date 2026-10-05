@@ -328,32 +328,48 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 }
             }
 
-            $stmt = $db->prepare("INSERT INTO {$prefix}members (name, surname, member_number, active)
-                                  VALUES (?, ?, ?, ?)");
-            // === '' statt empty(): "0" ist eine gueltige Mitgliedsnummer,
-            // wuerde von empty() aber faelschlich als leer behandelt.
-            if($stmt->execute([$cleanData->name, $cleanData->surname,
-                               (($cleanData->member_number ?? '') === '') ? null : $cleanData->member_number,
-                               $cleanData->active ?? true])) {
+            // Mitglied und Gruppen in einer Transaktion (Spec 2026-10-05, 4.1)
+            $addedGroups = [];
+            $groupWarnings = [];
+            try {
+                $db->beginTransaction();
+
+                $stmt = $db->prepare("INSERT INTO {$prefix}members (name, surname, member_number, active)
+                                      VALUES (?, ?, ?, ?)");
+                // === '' statt empty(): "0" ist eine gueltige Mitgliedsnummer,
+                // wuerde von empty() aber faelschlich als leer behandelt.
+                $stmt->execute([$cleanData->name, $cleanData->surname,
+                                (($cleanData->member_number ?? '') === '') ? null : $cleanData->member_number,
+                                $cleanData->active ?? true]);
                 $memberId = $db->lastInsertId();
+
                 // Speichere Gruppen-Zuordnungen
-                $addedGroups = [];
-                $groupWarnings = [];
                 if(isset($cleanData->group_ids)) {
                     // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
                     $normalized = groupsWithParents($db, $database, $cleanData->group_ids);
                     groupsApplyChange($db, $database, (int) $memberId, $normalized['group_ids'], null);
                     [$addedGroups, $groupWarnings] = groupsRuleReport((int) $memberId, $normalized);
                 }
-                http_response_code(201);
-                // $memberId, nicht lastInsertId(): Nach dem Insert der
-                // Gruppenzuordnung (ohne AUTO_INCREMENT) liefert es 0.
-                echo json_encode(["message" => "Member created", "id" => $memberId,
-                                  "added_groups" => $addedGroups, "group_warnings" => $groupWarnings]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["message" => "Failed to create member"]);
+
+                $db->commit();
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                $isDeadlock = $e instanceof PDOException && in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
+                http_response_code($isDeadlock ? 503 : 500);
+                echo json_encode(["message" => $isDeadlock
+                    ? "Temporärer Datenbankkonflikt. Bitte erneut versuchen."
+                    : "Failed to create member"]);
+                error_log("POST member failed: " . $e->getMessage());
+                break;
             }
+
+            http_response_code(201);
+            // $memberId, nicht lastInsertId(): Nach dem Insert der
+            // Gruppenzuordnung (ohne AUTO_INCREMENT) liefert es 0.
+            echo json_encode(["message" => "Member created", "id" => $memberId,
+                              "added_groups" => $addedGroups, "group_warnings" => $groupWarnings]);
             break;
             
         case 'PUT':

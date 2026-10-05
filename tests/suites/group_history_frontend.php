@@ -93,3 +93,27 @@ test('Import: Ergebnis nennt "Gruppenaenderungen gelten ab heute"', function () 
     assertTrue(str_contains($sum, 'result.group_changes'), 'group_changes wird nicht gelesen');
     assertTrue(str_contains($sum, 'Gruppenänderungen gelten ab heute'), 'Satz fehlt');
 });
+
+test('POST members: INSERT und Gruppen in einer Transaktion mit Rollback', function () use ($ghfRoot) {
+    $php   = (string) sourceCode($ghfRoot . '/private/handlers/members.php');
+    $start = strpos($php, "case 'POST':");
+    $end   = strpos($php, "case 'PUT':");
+    assertTrue($start !== false && $end !== false && $end > $start, "POST-Abschnitt nicht gefunden");
+    $post   = substr($php, $start, $end - $start);
+    $begin  = strpos($post, 'beginTransaction');
+    $insert = strpos($post, 'INSERT INTO');
+    assertTrue($begin !== false, 'POST ohne beginTransaction');
+    assertTrue($insert !== false && $begin < $insert, 'beginTransaction muss vor dem INSERT stehen');
+    assertTrue(strpos($post, 'groupsApplyChange') > $insert, 'groupsApplyChange muss nach dem INSERT stehen');
+    assertTrue(str_contains($post, 'catch (Throwable') && str_contains($post, 'rollBack'), 'catch (Throwable) mit rollBack fehlt');
+    assertTrue(strpos($post, 'commit()') > strpos($post, 'groupsApplyChange'), 'commit() muss nach groupsApplyChange stehen');
+});
+
+test('JS: Vorschau nennt gestrichene und durchgehend weiterlaufende Gruppen', function () use ($ghfRoot) {
+    $js  = (string) sourceCode($ghfRoot . '/public/js/modules/members.js');
+    $upd = ghfBody($js, 'updateMemberGroupChange');
+    assertTrue(str_contains($upd, 'wird gestrichen'), 'Text "wird gestrichen" fehlt');
+    assertTrue(str_contains($upd, 'gilt durchgehend weiter'), 'Text "gilt durchgehend weiter" fehlt');
+    assertTrue(str_contains($upd, 'currentMemberGroupSince'), 'valid_from der entfernten Gruppe wird nicht gelesen');
+    assertTrue(str_contains($upd, 'currentMemberGroupHistory'), 'Verlauf der hinzugefuegten Gruppe wird nicht gelesen');
+});
