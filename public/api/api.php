@@ -57,6 +57,7 @@ require_once '../../private/helpers/holidays.php';
 require_once '../../private/helpers/appointment_rules.php';
 require_once '../../private/helpers/appointment_series.php';
 require_once '../../private/helpers/groups.php';
+require_once '../../private/helpers/group_history.php';
 require_once '../../private/helpers/demo_mode.php';
 require_once '../../private/helpers/open_items.php';
 require_once '../../private/helpers/features.php';

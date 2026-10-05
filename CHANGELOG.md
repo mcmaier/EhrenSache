@@ -9,7 +9,41 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Neu
+- **Gruppenwechsel mit Datum.** Im Mitgliederdialog erscheint beim Ändern der Gruppen „Änderung
+  gilt ab“ (Vorgabe heute, auch rückwirkend); darunter steht, was geschieht („Jugend endet am
+  31.05.2026 · Aktive ab 01.06.2026“). Der Dialog zeigt, seit wann eine Gruppe gilt und welche
+  früher galten („Bisher: Jugend bis 31.05.2026“). Statistik, Druckbericht, Kalender, Rückmeldung
+  und Anwesenheitsliste vergangener Termine rechnen mit der Gruppe am Termindatum: Wer im Juni von
+  „Jugend“ zu „Aktive“ wechselt, zählt bis Mai bei der Jugend und hat keine unentschuldigten
+  Aktive-Proben vor dem Wechsel; in der Statistik steht er in beiden Gruppentabellen, jeweils mit
+  den Terminen seines Zeitraums. Ein Datum in der Zukunft ist nicht möglich. Häkchen weg und am
+  selben Tag wieder dran ergibt den Ausgangszustand, ein Verlauf, der lückenlos davor endet, wird
+  mit der neuen Zuordnung zusammengeführt; wer ein Häkchen mit zu frühem Datum setzt, kann es mit
+  einem früheren Datum berichtigen, ohne dass ein falscher Verlauf zurückbleibt (OI-115).
+- **Anwesenheit „nach Mitglied“ zeigt auch Termine ehemaliger Gruppen**, selbst wenn das Mitglied
+  heute in keiner Gruppe mehr steht. Die Abschnitte (Gruppe, Register) im Rückmeldedialog und in
+  der Anwesenheitsliste eines Termins richten sich nach dem Termindatum.
+- **Selbstauskunft:** `my_data` (JSON und CSV) führt beendete Gruppenzugehörigkeiten (Gruppe, von,
+  bis); die Verhaltenskennzahlen berücksichtigen ehemalige Gruppen.
+
 ### Geändert
+- **Wer ein bestehendes Mitglied nachträglich einer Gruppe zuordnet, muss für vergangene Termine
+  ein früheres „Änderung gilt ab“ wählen.** Ohne diese Angabe gilt die neue Gruppe ab heute —
+  bisher galt sie rückwirkend für alle Termine. Neu angelegte Mitglieder und Gruppen aus dem
+  Import neuer Mitglieder gelten weiterhin von Anfang an. Vorhandene Anwesenheiten vor dem gewählten
+  Datum erscheinen dann nicht in Anwesenheitsliste und Statistik der neuen Gruppe.
+- **CSV-Import vergleicht die Gruppen bestehender Mitglieder, statt sie neu anzulegen.**
+  Änderungen gelten ab dem Importtag, entfernte Gruppen wandern in den Verlauf; die Antwort nennt
+  `group_changes`, die Ergebnisanzeige „Gruppenänderungen gelten ab heute“. Eine Zeile, in der
+  keine einzige Gruppe aufgelöst werden kann, lässt die Gruppen des Mitglieds unverändert.
+- **Mitglieder (Rolle `user`) sehen in der Statistik auch ehemalige Gruppen** (nur die eigene
+  Zeile). `summary.total_members` zählt je Gruppe, wessen Gruppenzeitraum das Jahr überschneidet
+  und wer im Jahr aktiv war.
+- API `members`: `groups[].valid_from`, `group_history` (nur im Einzelabruf) und `groups_valid_from`
+  bei `PUT`. Eine unbekannte Gruppe in `group_ids` ergibt bei `POST` und `PUT` `400`
+  (`field: group_ids`), ein unbekanntes Mitglied bei `PUT` `404` — beides vor jeder Änderung. Name
+  und Gruppen eines Mitglieds werden bei `POST` und `PUT` in einer Transaktion gespeichert.
 - **Abgeschaltete Funktionen antworten einheitlich mit 403.** Ist die Zeiterfassung aus,
   antworten `activity_types`, `work_sessions`, die drei Arbeitszeit-Exporte und die
   Arbeitszeit-Aktionen der Station mit `403` und `"code": "FEATURE_DISABLED"` statt `404`. Ist

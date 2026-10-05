@@ -30,7 +30,9 @@ Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
 mit 1.20.0 (Specs `2026-10-01-register-statistik-besetzung-design.md` und
 `2026-10-02-register-gruppe-besetzung-design.md`; Register gehören seither zu Gruppen). Dabei
 fiel [OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt) an und wurde
-behoben, [OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse) bleibt als bekannte Grenze offen.
+behoben, [OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse) blieb zunächst als bekannte Grenze
+offen und ist am 2026-10-05 behoben (unveröffentlicht, Zweig `feat/gruppen-zeitraum`;
+Migrationsschritt: [OI-122](#oi-122--migrationsschritt-für-member_group_history-fehlt)).
 Mit demselben Release erledigt:
 [OI-116](#oi-116--migrationsschritt-für-subgroup_parents-fehlt) (Migrationsschritt) und
 [OI-118](#oi-118--demo-generator-kennt-subgroup_parents-nicht) (Demo).
@@ -1267,6 +1269,44 @@ der `subgroup_parents` anlegt.
 
 ---
 
+### OI-122 · Migrationsschritt für `member_group_history` fehlt
+**Priorität:** hoch · aufgenommen am 2026-10-05 (Zweig `feat/gruppen-zeitraum`, Spec
+`2026-10-05-gruppen-zeitraum-design.md`, Abschnitt 3.2)
+
+Die Gruppenzugehörigkeit hat seit diesem Zweig einen Zeitraum: eine Spalte `valid_from` an
+`member_group_assignments` und die neue Tabelle `member_group_history`.
+`private/setup/ehrensache_db.sql` legt beides für neue Installationen an, einen Schritt in
+`private/migrations/` legt nach der Regel für parallele Sitzungen (`CLAUDE.md`) aber erst die
+Release-Sitzung an. **Ohne ihn fehlen bestehenden Installationen Spalte und Tabelle**, und jede
+Abfrage, die sie liest — Statistik, Rückmeldung, Anwesenheitsliste, Mitgliederdialog, Selbstauskunft,
+Speichern eines Mitglieds, Import —, scheitert mit einem Datenbankfehler.
+
+**Für die Release-Sitzung:** neue Migrationsdatei mit dem nächsten Manifest-Eintrag, die
+`groupHistoryMigrate(PDO $pdo, string $prefix)` aus `private/helpers/group_history.php`
+aufruft und deren `log`/`warnings` zurückgibt. Die Funktion
+
+- fügt `valid_from` hinzu, falls sie fehlt, und legt `member_group_history` an, falls sie fehlt
+  (`information_schema`), und ist wiederholbar;
+- **verändert keine Daten:** alle bestehenden Zuordnungen behalten `valid_from` NULL, das Verhalten
+  ist bis zum ersten Wechsel identisch zu vorher.
+
+`group_history.php` hält PHP-8.0-Syntax und steht in der Liste von
+`tests/suites/update_path_syntax.php`. **`DEMO_MIN_SCHEMA`** (`private/demo/seed.php`) ist mit dem
+Schritt auf den neuen Schemastand anzuheben. Das Changelog nennt unter „Geändert“, dass die
+Gruppen bestehender Mitglieder nachträglich nur noch ab heute gelten, sofern kein früheres Datum
+gewählt wird.
+
+**Testdatenbanken:** `php tests/db/apply_group_history.php` wendet die Funktion auf die
+Datenbank aus `private/config/config.php` an (für die Worktree-Kopie `ehrensache_zr` erledigt). Die
+Datenbank des Hauptverzeichnisses (`ehrensache`) braucht Spalte und Tabelle vor dem Merge nach
+`dev` — nur mit Freigabe des Nutzers; sonst scheitern dort die Suiten. Bis der Schritt in der Kette
+steht, ist `tests/db/verify_schema_convergence.php` rot (erwartet); mit dem Schritt wird sie grün.
+Die Umstellungsfunktion ist durch `tests/suites/group_history_migrate_db.php` abgesichert.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Sicherheit
 
 > **Was hier stehen darf.** Dieser Abschnitt ist öffentlich. Aufgenommen werden nur
@@ -2203,8 +2243,21 @@ denen sie stecken, sowie bei den neuen Untergruppen-Tabellen.
 ---
 
 ### OI-115 · Gruppenzugehörigkeit ohne Zeitachse
-**Priorität:** niedrig · aufgenommen am 2026-10-02 (Spec
-`2026-10-01-register-statistik-besetzung-design.md`, Abschnitt 4.5)
+**Priorität:** — · **erledigt am 2026-10-05 — unveröffentlicht (Zweig `feat/gruppen-zeitraum`)** ·
+aufgenommen am 2026-10-02 (Spec `2026-10-01-register-statistik-besetzung-design.md`, Abschnitt 4.5)
+
+**Umsetzung:** Spec `docs/superpowers/specs/2026-10-05-gruppen-zeitraum-design.md`. Der heutige
+Stand bleibt in `member_group_assignments` (neue Spalte `valid_from`, NULL = von Anfang an),
+beendete Zuordnungen stehen in der neuen Tabelle `member_group_history`. Alle Schreibwege
+(Mitgliederdialog, `POST`/`PUT members`, CSV-Import) laufen über `groupsApplyChange()` in
+`private/helpers/group_history.php`; gelesen wird über `groupAssignmentsSql()` und
+`groupAssignmentActiveOn()` mit Stichtag Termindatum — in der gemeinsamen Soll-Menge, in Rückmeldung,
+Anwesenheitsliste und Abschnittsgliederung. Gepflegt wird nur über „Änderung gilt ab“ (nicht in
+der Zukunft); der Verlauf ist nicht bearbeitbar. Folge für die Bedienung: Wer ein bestehendes
+Mitglied nachträglich einer Gruppe zuordnet, wählt für vergangene Termine ein früheres Datum,
+sonst gilt die Gruppe ab heute. Offen bleibt der Migrationsschritt:
+[OI-122](#oi-122--migrationsschritt-für-member_group_history-fehlt). Der Text darunter ist der
+Stand vor der Umsetzung.
 
 `member_group_assignments` kennt keinen Zeitraum. Wer im Juni von Klarinette zu Saxophon wechselt
 oder von „Jugend“ zu „Aktive“, zählt in der Statistik das ganze Jahr in der neuen Gruppe und gar
@@ -3600,8 +3653,8 @@ Spalte. Die Verbindung Register → Gruppe beseitigt beides.
 Die Antworten auf die Fragen unten: Es zählen die Termine des Registers und seiner Gruppen; ein
 Doppelspieler steht in beiden Registertabellen voll; Pünktlichkeit und Zuverlässigkeit rechnen
 mit Filter auf ein Register über denselben Bereich. Nebenbei fiel die Jahresregel auf
-([OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt)), offen bleibt
-[OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse). Abgesichert durch
+([OI-114](#oi-114--statistik-zählte-termine-vor-eintritt-und-nach-austritt)), offen blieb
+[OI-115](#oi-115--gruppenzugehörigkeit-ohne-zeitachse) (inzwischen erledigt, unveröffentlicht). Abgesichert durch
 `statistics_subgroups_api` (Welt mit drei Gruppen und Registern mit zwei, keiner und einer
 Gruppe), `subgroup_parent_api` und die Gleichheitsprüfung `tests/db/verify_statistics_parity.php`
 — die meldet für gewöhnliche Gruppen nur die Abweichungen aus OI-114, für die Demo-Register nach

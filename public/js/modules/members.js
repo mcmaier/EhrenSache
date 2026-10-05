@@ -36,6 +36,11 @@ let allFilteredMembers = [];
 
 let currentMembershipDates = [];
 let currentMemberGroups = [];
+// Stand beim Öffnen (Spec 2026-10-05, 6.1): Vergleichsbasis für das Feld
+// "Änderung gilt ab", dazu seit-Daten und Verlauf aus GET members?id=.
+let loadedMemberGroups = [];
+let currentMemberGroupSince = new Map();
+let currentMemberGroupHistory = [];
 let memberFilterInitialized = false;
 
 // Aktiver Status-Chip (Spec 2026-09-22). Vorgabe "active" = frueher
@@ -485,6 +490,9 @@ export async function openMemberModal(memberId = null) {
         // Setze Standard-Gruppe als vorausgewählt
         const defaultGroup = dataCache.groups.data.find(g => g.is_default);
         currentMemberGroups = defaultGroup ? [defaultGroup.group_id] : [];
+        loadedMemberGroups = [];
+        currentMemberGroupSince = new Map();
+        currentMemberGroupHistory = [];
 
         pinGroup.style.display = pinSettings.enabled ? 'block' : 'none';
         document.getElementById('member_pin').value = '';
@@ -492,7 +500,9 @@ export async function openMemberModal(memberId = null) {
         document.getElementById('member_pin_hint').textContent = `Keine PIN gesetzt. ${pinSettings.minLength}–8 Ziffern.`;
     }
 
+    document.getElementById('member_groups_valid_from').value = '';
     renderMemberGroups();
+    renderMemberGroupHistory();
     
     modal.classList.add('active');
 }
@@ -522,6 +532,9 @@ export async function loadMemberData(memberId) {
         }
         // Speichere ausgewählte Gruppen
         currentMemberGroups = member.groups ? member.groups.map(g => g.group_id) : [];
+        loadedMemberGroups = [...currentMemberGroups];
+        currentMemberGroupSince = new Map((member.groups || []).map(g => [Number(g.group_id), g.valid_from || null]));
+        currentMemberGroupHistory = Array.isArray(member.group_history) ? member.group_history : [];
 
         // Stations-PIN-Status für den Hinweistext im Modal
         currentMemberHasPin = !!member.has_pin;
@@ -553,6 +566,7 @@ function renderMemberGroups() {
             <span class="group-choice-text">
                 <strong>${escapeHtml(group.group_name)}</strong>
                 ${group.is_default ? ' <span class="status-badge status-approved badge-small">Standard</span>' : ''}
+                ${currentMemberGroupSince.get(Number(group.group_id)) ? `<small class="group-choice-since">seit ${escapeHtml(formatIsoDateDe(currentMemberGroupSince.get(Number(group.group_id))))}</small>` : ''}
                 ${group.description ? `<small class="group-choice-note">${escapeHtml(group.description)}</small>` : ''}
             </span>
         </label>`;
@@ -582,6 +596,94 @@ function syncMemberGroupCheckboxes(changed) {
         }
     }
     updateMemberGroupHints(boxes, byId, parentsOf);
+    updateMemberGroupChange();
+}
+
+/** JJJJ-MM-TT → TT.MM.JJJJ */
+function formatIsoDateDe(iso) {
+    // Zweistellig wie im übrigen Dashboard (31.05.2026, nicht 31.5.2026)
+    return new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function isoOfLocalDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Vortag eines JJJJ-MM-TT-Datums. */
+function dayBeforeIso(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() - 1);
+    return isoOfLocalDate(d);
+}
+
+/** Nur lesbare Verlaufszeile "Bisher: Jugend vom 01.01.2026 bis 31.05.2026, …" (Spec 6.1). */
+function renderMemberGroupHistory() {
+    const el = document.getElementById('memberGroupsHistory');
+    if (currentMemberGroupHistory.length === 0) {
+        el.hidden = true;
+        el.textContent = '';
+        return;
+    }
+    const parts = currentMemberGroupHistory.map(h => {
+        const from = h.valid_from ? ` vom ${formatIsoDateDe(h.valid_from)}` : '';
+        return `${escapeHtml(h.group_name)}${from} bis ${formatIsoDateDe(h.valid_to)}`;
+    });
+    el.innerHTML = `Bisher: ${parts.join(', ')}`;
+    el.hidden = false;
+}
+
+/**
+ * Feld "Änderung gilt ab" (Spec 6.1): nur beim Bearbeiten und nur, wenn die
+ * Häkchen vom geladenen Stand abweichen; Vorschau der Wirkung darunter.
+ */
+function updateMemberGroupChange() {
+    const box = document.getElementById('memberGroupsChange');
+    const input = document.getElementById('member_groups_valid_from');
+    const preview = document.getElementById('memberGroupsPreview');
+    const editing = document.getElementById('member_id').value !== '';
+    const checked = [...document.querySelectorAll('.member-group-checkbox:checked')].map(cb => Number(cb.value));
+    const loaded = loadedMemberGroups.map(Number);
+    const removed = loaded.filter(id => !checked.includes(id));
+    const added = checked.filter(id => !loaded.includes(id));
+
+    if (!editing || (removed.length === 0 && added.length === 0)) {
+        box.hidden = true;
+        input.value = '';
+        preview.textContent = '';
+        return;
+    }
+    const today = isoOfLocalDate(new Date());
+    input.max = today;
+    if (!input.value || input.value > today) {
+        input.value = today;
+    }
+    const nameOf = id => {
+        const cb = document.querySelector(`.member-group-checkbox[value="${id}"]`);
+        return cb ? cb.dataset.groupName : `Gruppe #${id}`;
+    };
+    const date = input.value;
+    const dayBefore = dayBeforeIso(date);
+    const parts = [
+        ...removed.map(id => {
+            // Galt die Gruppe erst ab dem gewählten Datum oder später, entfällt sie ganz.
+            const since = currentMemberGroupSince.get(id);
+            return since && since >= date
+                ? `${nameOf(id)} wird gestrichen (galt erst ab ${formatIsoDateDe(since)})`
+                : `${nameOf(id)} endet am ${formatIsoDateDe(dayBefore)}`;
+        }),
+        ...added.map(id => {
+            // Ein früherer Verlaufseintrag, der lückenlos anschließt oder überlappt, wird fortgesetzt.
+            const prior = currentMemberGroupHistory
+                .filter(h => Number(h.group_id) === id && h.valid_to >= dayBefore)
+                .sort((x, y) => (x.valid_from || '') < (y.valid_from || '') ? -1 : 1)[0];
+            if (prior) {
+                return `${nameOf(id)} gilt durchgehend weiter (${prior.valid_from ? 'seit ' + formatIsoDateDe(prior.valid_from) : 'von Anfang an'})`;
+            }
+            return `${nameOf(id)} ab ${formatIsoDateDe(date)}`;
+        }),
+    ];
+    preview.textContent = parts.join(' · ');
+    box.hidden = false;
 }
 
 /**
@@ -647,6 +749,11 @@ export async function saveMember() {
         } else if (document.getElementById('member_pin').value) {
             data.pin = document.getElementById('member_pin').value;
         }
+    }
+
+    // Gruppenwechsel mit Datum (Spec 2026-10-05, 6.1): nur, wenn das Feld sichtbar ist
+    if (memberId && !document.getElementById('memberGroupsChange').hidden) {
+        data.groups_valid_from = document.getElementById('member_groups_valid_from').value;
     }
 
     let result;
@@ -920,6 +1027,7 @@ registerActions({
     'close-member-modal': () => closeMemberModal(),
     'delete-member': (el) => deleteMember(Number(el.dataset.id)),
     'go-to-members-page': (el) => goToMembersPage(Number(el.dataset.page)),
+    'preview-member-group-change': () => updateMemberGroupChange(),
     'open-member-modal': (el) => openMemberModal(el.dataset.id ? Number(el.dataset.id) : null),
     'remove-membership-date': (el) => removeMembershipDate(Number(el.dataset.index)),
     'save-member': () => saveMember(),

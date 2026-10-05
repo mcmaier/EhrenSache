@@ -1,6 +1,6 @@
 # Gruppenzugehörigkeit mit Zeitraum (OI-115)
 
-**Stand:** 2026-10-05 · **Status:** abgestimmt mit dem Nutzer, noch nicht umgesetzt
+**Stand:** 2026-10-05 · **Status:** umgesetzt im Zweig `feat/gruppen-zeitraum`, unveröffentlicht
 **Bezug:** [OI-115](../../OPEN-ITEMS.md#oi-115--gruppenzugehörigkeit-ohne-zeitachse),
 Vorläufer `2026-10-01-register-statistik-besetzung-design.md` (Abschnitt 4.5) und
 `2026-10-02-register-gruppe-besetzung-design.md`
@@ -95,12 +95,28 @@ erlaubt. Je Gruppe gilt:
 | unverändert (vorher und nachher angehakt) | Zeile bleibt unberührt, `valid_from` ändert sich nicht |
 | entfernt, `valid_from` NULL oder `< $date` | Verlaufseintrag `(valid_from, $date − 1 Tag)`, Zeile in `member_group_assignments` gelöscht |
 | entfernt, `valid_from >= $date` | **Korrektur:** Zeile gelöscht, **kein** Verlaufseintrag (die Zuordnung hat nie gegolten) |
-| hinzugefügt | neue Zeile mit `valid_from = $date`; Verlaufseinträge derselben Gruppe mit `valid_to >= $date` werden auf `$date − 1 Tag` gekürzt, ein dadurch leerer Eintrag (`valid_to < valid_from`) wird gelöscht |
+| hinzugefügt | neue Zeile mit `valid_from = $date`; Verlaufseinträge derselben Gruppe mit `valid_to >= $date` werden auf `$date − 1 Tag` gekürzt, ein dadurch leerer Eintrag (`valid_to < valid_from`) wird gelöscht; schließt ein Eintrag lückenlos an (`valid_to = $date − 1 Tag`), wird er mit der neuen Zuordnung zusammengeführt (siehe unten) |
+
+**Kürzung des Verlaufs (`groupHistoryTrim()`):** Beim Hinzufügen **und** beim Entfernen werden
+Verlaufseinträge derselben Gruppe mit `valid_to >= $date` auf `$date − 1 Tag` gekürzt bzw.
+gelöscht, wenn sie erst ab `$date` beginnen. Sonst bliebe nach Grenzfall 7.1 und einer späteren
+rückwirkenden Entfernung ein Verlaufseintrag stehen, der über das neue Ende hinausreicht
+(Review-Befund 2026-10-05).
+
+**Zusammenführen beim Hinzufügen (Grenzfall 7.1):** Endet nach der Kürzung ein Verlaufseintrag derselben
+Gruppe genau am Vortag von `$date`, wird er gelöscht und die neue Zuordnung übernimmt sein
+`valid_from` (kann NULL sein), statt mit `valid_from = $date` neu zu beginnen. Beim Entfernen
+ändert sich nichts. `$date` null mit einer Entfernung ist ein Programmierfehler
+(`InvalidArgumentException`). `groups_valid_from` verlangt zusätzlich ein Jahr ab 1000.
 
 Durch die Mitgliedschaftsregel ergänzte Gruppen bekommen dasselbe `$date`. Ergänzt
 `groupsApplySubgroupRule()` (Register bekommt eine Gruppe) Mitglieder, übernimmt die neue
 Zuordnung das `valid_from` der Registerzuordnung. Alles läuft in einer
 Transaktion mit dem übrigen Speichern des Mitglieds.
+
+**Register mit Register-`valid_from` NULL:** Ergänzt die Registerregel eine Gruppe, deren Registerzuordnung
+`valid_from` NULL hat („von Anfang an“), gilt die ergänzte Gruppe ebenfalls von Anfang an und verdrängt ihren
+Verlauf. Bewusst: das folgt aus „von Anfang an“.
 
 ### 4.2 Wer welches Datum setzt
 
@@ -112,7 +128,9 @@ Transaktion mit dem übrigen Speichern des Mitglieds.
 | CSV-Import, bestehendes Mitglied | heute; **Vergleich statt Löschen** (heute: `DELETE` aller Zuordnungen, siehe `private/handlers/import.php`); die Antwort zählt in `group_changes`, bei wie vielen bestehenden Mitgliedern sich Gruppen geändert haben |
 
 `groups_valid_from` muss ein gültiges Datum `YYYY-MM-DD` sein und darf nicht nach heute liegen,
-sonst 422 mit Fehlermeldung. Ohne Änderung an den Gruppen wird es ignoriert.
+sonst 422 mit Fehlermeldung. Geprüft wird es, sobald `group_ids` mitgeschickt wird — auch ohne
+tatsächliche Änderung der Gruppen (Code-Verhalten); ohne `group_ids` wird es ignoriert. Ohne Änderung
+an den Gruppen hat es keine Wirkung auf die Daten.
 
 ### 4.3 Löschen
 
@@ -139,6 +157,7 @@ In `private/helpers/group_history.php`:
 | `responsesFetchExpected()` (`responses.php`) | Rückmeldedialog und Druck eines Termins |
 | `attendance_list.php`, Modus je Termin | Anwesenheitsliste vergangener Termine |
 | `attendance_list.php`, Modus je Mitglied | Termine des Jahres, zu denen das Mitglied am Termindatum über eine Gruppe gehörte — auch wenn es heute in keiner Gruppe mehr steht (bisher Abbruch ohne Termine) |
+| `groupsAttachToMembers()` mit Termindatum | Abschnitte (Gruppe/Register) in Rückmeldedialog und Anwesenheitsliste je Termin |
 | `attendanceActiveMemberCount()` (`attendance.php`) | Mitgliederzahl einer Gruppe im Jahr: Zeitraum überschneidet das Jahr **und** aktiv |
 
 ### 5.3 Bleiben beim heutigen Stand
@@ -147,9 +166,16 @@ Kommende Termine in Rückmeldung und App (`responsesFetchUpcomingIds()`,
 `responsesFetchUpcomingInfo()` — ohne Zukunftsdaten ist der heutige Stand dort richtig), Check-in
 (`auto_checkin.php`), Station, Zeiterfassung (`worktime.php`, `work_sessions.php`), Export,
 Gruppenanzeige im Mitgliederdialog, Kopfzeile des Mitgliedsmodus in `attendance_list.php`
-(Gruppennamen von heute), Registerzuordnung der Anwesenheitsliste (`groupsAttachToMembers()`),
-Terminregeln
+(Gruppennamen von heute), Terminregeln
 (`appointment_rules.php`).
+
+Bewusst beim heutigen Stand belassen sind außerdem: `member_groups.php` (Mitglieder und Zahl je
+Gruppe), `members.php` (Liste, Gruppenfilter), `appointmentGroupVisibility()` in
+`appointment_rules.php` (Terminliste der Rolle `user`), `memberMayLinkAppointment()` und
+`auto_checkin.php` (auch Anträge der Rolle `user`) sowie der Mitgliederfilter in `records.js`.
+Ein Mitglied sieht seine frühere Gruppe in der Statistik (5.4), deren vergangene Termine aber nicht
+in der eigenen Terminliste und kann dazu keinen Antrag stellen; Verwalter können das. Keine
+Verschlechterung gegenüber vorher.
 
 ### 5.4 Statistikzugriff der Rolle `user` (E5)
 
@@ -161,6 +187,11 @@ heutige **und** ehemalige Gruppen. Sichtbar ist dort wie bisher nur die eigene Z
 Die Vereinigung wird in jeder Soll-Menge mitgerechnet. Messung gegen den Demo-Bestand vor und
 nach der Änderung (Statistik, Rückmeldedialog, Anwesenheitsliste); Erwartung: im Rahmen der
 bisherigen 95–181 ms.
+
+Gemessen am 2026-10-05 mit `tests/db/verify_statistics_parity.php timing` (Median aus fünf Läufen),
+dev / Zweig: Statistik ohne Filter 195 / 161 ms, Gruppe 130 / 109 ms, Untergruppe 96 / 104 ms,
+Termine+Anwesenheit 113 / 123 ms — gleichwertig. Gleichheitsprüfung (`snapshot` auf dev, `compare`
+im Zweig): keine Abweichung.
 
 ## 6. Oberfläche
 
@@ -197,17 +228,24 @@ dieses Jahres, jeweils mit den Terminen seines Zeitraums.
 
 1. **Am selben Tag hin und zurück:** Häkchen weg (speichern), wieder dran (speichern), beide
    Male Datum heute → die erste Speicherung schreibt einen Verlaufseintrag bis gestern, die
-   zweite kürzt ihn nicht (endet vor heute) und legt die Zuordnung ab heute neu an. Ergebnis:
-   Lücke von null Tagen, Verlaufseintrag + heutige Zuordnung ab heute. Fachlich korrekt
-   (durchgehende Zugehörigkeit), Anzeige „seit heute“. *Bewusst akzeptiert;* kein Zusammenführen.
+   zweite findet einen Eintrag, der lückenlos an das neue Datum anschließt, und führt ihn mit
+   der neuen Zuordnung zusammen. Ergebnis ist der Ausgangszustand (Zuordnung von Anfang an,
+   kein Verlauf). Begründung: Testsuiten und Dialog – ein versehentlich entferntes Häkchen
+   lässt sich spurlos rückgängig machen, und nicht jedes Entfernen-und-Wiederhinzufügen
+   hinterlässt einen Verlaufseintrag. Gilt für jeden lückenlosen Anschluss (Verlaufseintrag
+   endet genau am Vortag des neuen Datums, auch nach der Kürzung), nicht für Lücken ab einem Tag.
 2. **Rückwirkende Korrektur einer neuen Zuordnung:** Gruppe am 10.05. ergänzt, am 20.05. mit
    Datum 01.05. entfernt → Korrektur ohne Verlaufseintrag (4.1, dritte Zeile).
 3. **Austritt während der Gruppenzugehörigkeit:** Gruppenzeitraum und Aktiv-Zeiträume werden
-   geschnitten; gezählt wird nur, wo beide gelten.
+   geschnitten; gezählt wird nur, wo beide gelten. Die Kopfzahl `total_members`
+   (`attendanceActiveMemberCount()`) zählt bewusst einfacher: Gruppenzeitraum überschneidet das
+   Jahr **und** im Jahr aktiv, ohne Schnitt beider Zeiträume — die Zahl wird nur in der API ausgegeben.
 4. **Register:** `expectedPairsScopeSql()` prüft die Registerzugehörigkeit am Termindatum, die
    Zuordnung Register → Gruppe (`subgroup_parents`) bleibt ohne Zeitraum.
 5. **Demo-Generator:** schreibt keinen Verlauf; `member_group_history` steht in `DEMO_TABLES`
    (vor `member_groups` geleert). `DEMO_MIN_SCHEMA` hebt die Release-Sitzung an.
+6. **Mitternacht:** Browser- und Serveruhr können um einen Tag abweichen; der Server antwortet dann
+   422 „Zukunft“ — bewusst hingenommen.
 
 ## 8. Tests
 

@@ -1528,6 +1528,12 @@
                         <div id="memberGroupsList" style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; max-height: 200px; overflow-y: auto;">
 
                         </div>
+                        <p id="memberGroupsHistory" class="member-groups-history" hidden></p>
+                        <div id="memberGroupsChange" class="member-groups-change" hidden>
+                            <label for="member_groups_valid_from">Änderung gilt ab</label>
+                            <input type="date" id="member_groups_valid_from" data-action-change="preview-member-group-change">
+                            <small id="memberGroupsPreview" class="input-hint"></small>
+                        </div>
                     </div>                                       
                     <div class="form-group" id="membershipDatesGroup" style="display: none;">
                         <label>Mitgliedschaftszeiträume</label>

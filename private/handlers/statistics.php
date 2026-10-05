@@ -267,9 +267,11 @@ function getStatisticsGroups($db, $database, $memberId, $role) {
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }    
 
+    // Heutige und ehemalige Gruppen (Spec 2026-10-05, 5.4) -- sichtbar bleibt nur die eigene Zeile.
+    $assignments = groupAssignmentsSql($database);
     $stmt = $db->prepare("
-        SELECT DISTINCT group_id 
-        FROM {$prefix}member_group_assignments 
+        SELECT DISTINCT group_id
+        FROM {$assignments} ga
         WHERE member_id = ?
         ORDER BY group_id
     ");
@@ -284,9 +286,11 @@ function hasStatisticsGroupAccess($db, $database, $memberId, $role, $groupId) {
 
     $prefix = $database->table('');
     
+    // Heutige und ehemalige Gruppen (Spec 2026-10-05, 5.4) -- sichtbar bleibt nur die eigene Zeile.
+    $assignments = groupAssignmentsSql($database);
     $stmt = $db->prepare("
-        SELECT COUNT(*) 
-        FROM {$prefix}member_group_assignments 
+        SELECT COUNT(*)
+        FROM {$assignments} ga
         WHERE member_id = ? AND group_id = ?
     ");
     $stmt->execute([$memberId, $groupId]);
