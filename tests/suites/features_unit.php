@@ -367,14 +367,22 @@ test('Einstellungen: Schalter fuer Terminplanung und Anwesenheit, gestuft', func
 test('PWA: Anmeldung liest me vor den Terminen und laedt sie nur mit eingeschalteter Funktion', function () {
     $pwa = sourceCode(FU_ROOT . '/public/checkin/js/app.js');
     assertTrue(str_contains($pwa, 'function pwaFeatureOn('), 'pwaFeatureOn() fehlt');
+    // Seit OI-121 laufen Anmeldung und Auto-Login ueber startSession(me.data).
     foreach (['async function handleLogin(', 'async function checkAutoLogin('] as $sig) {
         $body  = fuBody($pwa, $sig);
-        $me    = strpos($body, 'await loadUserData()');
-        $typen = strpos($body, 'await loadAppointmentTypes()');
-        assertTrue($me !== false && $typen !== false && $me < $typen, "{$sig}) laedt Terminarten vor me");
-        assertTrue(fuGuarded($body, 'loadAppointmentTypes()', "pwaFeatureOn('appointments')"), "{$sig}) laedt Terminarten ohne Schalter");
-        assertTrue(fuGuarded($body, 'loadCheckinAppointments()', "pwaFeatureOn('attendance')"), "{$sig}) laedt Check-in-Termine ohne Schalter");
+        $me    = strpos($body, "apiCall('me')");
+        $start = strpos($body, 'startSession(');
+        assertTrue($me !== false && $start !== false && $me < $start, "{$sig}) startet die Sitzung nicht nach me");
     }
+    $session = fuBody($pwa, 'async function startSession(');
+    $user    = strpos($session, 'userData = meData');
+    $termine = strpos($session, 'fetchCheckinAppointments()');
+    assertTrue($user !== false && $termine !== false && $user < $termine,
+        'startSession() muss userData (features) vor den Terminen setzen');
+    assertTrue((bool) preg_match("/pwaFeatureOn\('attendance'\)\s*\?\s*fetchCheckinAppointments\(\)/", $session),
+        'startSession() laedt Check-in-Termine ohne Schalter');
+    assertTrue((bool) preg_match("/pwaFeatureOn\('appointments'\)\s*\?\s*loadAppointmentTypes\(\)/", $session),
+        'startSession() laedt Terminarten ohne Schalter');
 });
 
 test('PWA: Erfassen, Termine, Verlauf, Statistik und Liste folgen den Schaltern', function () {
