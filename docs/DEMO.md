@@ -264,7 +264,7 @@ Die Seite selbst (`index.html`) kommt neu, die CSS-Module unter `css/` und die J
 `?v=` hilft nur der einen eingebundenen Datei, nicht den Modulen, die sie nachlädt.
 Am 2026-10-02 nach dem Update der Demo auf 1.20.0 so beobachtet.
 
-Abhilfe in Cloudflare, **beide Einstellungen zusammen**:
+Abhilfe in Cloudflare, **die ersten beiden Einstellungen nur zusammen**:
 
 1. *Caching → Configuration*: **Browser Cache TTL** auf **„Respect Existing Headers“**. Der
    Browser fragt dann vor jeder Verwendung nach.
@@ -278,6 +278,20 @@ gleichzeitige Anfragen. Der Hoster der Demo weist ab etwa der zwölften gleichze
 Apaches eigenem `503 Service Unavailable` ab; das Dashboard blieb leer, weil die JS-Module fehlten
 (2026-10-02 gemessen). Mit der Regel aus Schritt 2 kommt je Datei und Tag nur eine Anfrage beim
 Server an.
+
+3. *Caching → Tiered Cache*: **Smart Tiered Caching** einschalten (kostenlos). Ohne diese
+   Einstellung hat jedes Rechenzentrum von Cloudflare einen eigenen Zwischenspeicher, und jedes
+   holt die Dateien selbst beim Server. Mit ihr fragt ein leerer Standort zuerst einen zentralen
+   Knoten von Cloudflare.
+
+**Die Edge TTL ist eine Obergrenze, keine Zusage.** Auf einer wenig besuchten Seite verdrängt
+Cloudflare selten abgerufene Dateien lange vor Ablauf der TTL. Am 2026-10-05 gemessen: `main.css`,
+`app.js` und `ui.js` waren eine Stunde nach einem Dashboard-Aufruf schon nicht mehr im
+Zwischenspeicher, andere Dateien lagen dort seit über einer Stunde. Ein leerer Zwischenspeicher
+heißt eine Welle von Anfragen an den Server, und das sah der Nutzer am Wochenende davor als
+ungestylte Login-Seite, dann weiße Seite, kurz darauf richtig. Tiered Cache macht das seltener,
+verhindern kann es das nicht. Dauerhaft hilft nur, weniger Dateien zu laden (OI-120 in
+`docs/OPEN-ITEMS.md`).
 
 Nach einem Update **„Purge Everything“**. Direkt danach ist der Zwischenspeicher bei Cloudflare
 kalt, der erste Aufruf kann deshalb noch einzelne 503 sehen; ab dem zweiten liefert Cloudflare aus.
