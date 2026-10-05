@@ -256,7 +256,9 @@ function applyFeatureSwitchState() {
         }
         feld.disabled = gesperrt.has(key);
         const karte = feld.closest('.settings-card');
-        if (karte) {
+        // Ein Schalter, den die Stufung sperrt, ist selbst abhaengig, gehoert aber
+        // zu seiner Karte (z. B. Funktionen): Er blendet sie nicht aus.
+        if (karte && !Object.prototype.hasOwnProperty.call(FEATURE_SWITCHES, key)) {
             karten.set(karte, karten.get(karte) === true || feld.disabled);
         }
     });

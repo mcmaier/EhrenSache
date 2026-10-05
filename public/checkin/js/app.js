@@ -1276,9 +1276,9 @@ let success = false;
 async function initAttendanceList() {
 
     // Prüfe ob Benutzer Admin oder Manager ist
-    // Nur Verwalter, nur mit Anwesenheit (OI-62, Etappe 2). „Termin anlegen“
-    // steht in diesem Tab und braucht die Terminplanung -- die setzt die
-    // Anwesenheit ohnehin voraus.
+    // Nur Verwalter, nur mit Anwesenheit (OI-62, Etappe 2): Der Tab (mit „Termin
+    // anlegen“) setzt die Anwesenheit voraus. Bei „nur Terminplanung“ legen
+    // Verwalter Termine im Dashboard an.
     if (!userData || (userData.role !== 'admin' && userData.role !== 'manager')
         || !pwaFeatureOn('attendance')) {
         // Tab ausblenden falls vorhanden
@@ -5052,6 +5052,8 @@ function infoCardHtml(item) {
  * Rueckmeldung ist Hingehen der Normalfall, nichts ist "offen".
  */
 function excuseChipHtml(item) {
+    // Ohne Anwesenheit antwortet exceptions mit 403 (OI-62, Etappe 2): nur der Beginn bleibt
+    if (!pwaFeatureOn('attendance')) return item.started ? '<span class="response-chip response-chip--muted">hat begonnen</span>' : '';
     const status = item.own_absence?.status;
     if (status === 'pending')  return '<span class="response-chip response-chip--maybe">⏳ Entschuldigung beantragt</span>';
     if (status === 'approved') return '<span class="response-chip response-chip--no">✗ entschuldigt</span>';
@@ -5070,6 +5072,7 @@ function excuseChipHtml(item) {
  * Liste ueber dieselbe Entwurfslogik.
  */
 function excuseSectionHtml(item) {
+    if (!pwaFeatureOn('attendance')) return '';
     const id = Number(item.appointment.appointment_id);
     const absence = item.own_absence;
     const off = navigator.onLine ? '' : ' disabled';
@@ -5275,6 +5278,7 @@ async function onResponsesClick(event) {
  * einen, den die PWA sich zusammenreimt.
  */
 async function submitExcuse(item, card) {
+    if (!pwaFeatureOn('attendance')) return;
     const key = Number(item.appointment.appointment_id);
     const textarea = card?.querySelector('.response-comment textarea');
     const reason = textarea ? textarea.value.trim() : '';
@@ -5317,7 +5321,7 @@ async function submitExcuse(item, card) {
 
 /** Zieht eine offene Entschuldigung zurueck -- nach Rueckfrage, sie ist dann weg. */
 function withdrawExcuse(item, exceptionId) {
-    if (!exceptionId) return;
+    if (!exceptionId || !pwaFeatureOn('attendance')) return;
 
     showNavigationConfirm(
         'Entschuldigung zurückziehen?',
