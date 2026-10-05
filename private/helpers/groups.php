@@ -10,6 +10,8 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/group_history.php';
+
 /** Vorgabe, wenn die Einstellung fehlt oder unbrauchbar ist. */
 const GROUP_SUBGROUP_LABEL_DEFAULT = 'Untergruppe';
 
@@ -85,10 +87,15 @@ function groupsSortForDisplay(array $groups): array
  * @param PDO $db Datenbankverbindung
  * @param Database $database Liefert den Tabellenpräfix über table()
  * @param array<int, array<string, mixed>> $members Zeilen mit member_id, werden um groups/subgroups ergänzt
+ * Mit $onDate (JJJJ-MM-TT, z. B. das Termindatum) zaehlen Gruppen und Register,
+ * in denen das Mitglied an diesem Tag war (Gruppenzeitraum, Spec 2026-10-05);
+ * ohne Datum der heutige Stand wie bisher.
+ *
  * @param array<int, int|string> $termGroupIds Gruppen-IDs, die als `groups` gelten
+ * @param string|null $onDate Stichtag fuer die Zugehoerigkeit, null = heute
  * @return array<int, array<string, mixed>>
  */
-function groupsAttachToMembers($db, $database, array $members, array $termGroupIds): array
+function groupsAttachToMembers($db, $database, array $members, array $termGroupIds, ?string $onDate = null): array
 {
     if (empty($members)) {
         return $members;
@@ -98,13 +105,23 @@ function groupsAttachToMembers($db, $database, array $members, array $termGroupI
     $memberIds = array_map(static fn ($m) => (int) $m['member_id'], $members);
     $inMembers = str_repeat('?,', count($memberIds) - 1) . '?';
 
+    if ($onDate === null) {
+        $source = "{$prefix}member_group_assignments";
+        $filter = '';
+        $params = $memberIds;
+    } else {
+        $source = groupAssignmentsSql($database);
+        $filter = ' AND ' . groupAssignmentActiveOn('mga', '?');
+        // Der Platzhalter steht zweimal im Ausdruck (valid_from und valid_to)
+        $params = array_merge($memberIds, [$onDate, $onDate]);
+    }
     $stmt = $db->prepare("
         SELECT mga.member_id, g.group_id, g.group_name, g.sort_order, g.is_subgroup
-        FROM {$prefix}member_group_assignments mga
+        FROM {$source} mga
         JOIN {$prefix}member_groups g ON g.group_id = mga.group_id
-        WHERE mga.member_id IN ($inMembers)
+        WHERE mga.member_id IN ($inMembers){$filter}
     ");
-    $stmt->execute($memberIds);
+    $stmt->execute($params);
 
     $termGroups = array_map('intval', $termGroupIds);
     $byMember   = [];
@@ -186,19 +203,24 @@ function groupsApplySubgroupRule($db, $database, int $subgroupId): array
     }
 
     $in   = implode(',', array_fill(0, count($parents), '?'));
-    $stmt = $db->prepare("SELECT a.member_id FROM {$prefix}member_group_assignments a
+    $stmt = $db->prepare("SELECT a.member_id, a.valid_from FROM {$prefix}member_group_assignments a
                            WHERE a.group_id = ?
                              AND NOT EXISTS (SELECT 1 FROM {$prefix}member_group_assignments p
                                               WHERE p.member_id = a.member_id AND p.group_id IN ({$in}))
                            ORDER BY a.member_id");
     $stmt->execute(array_merge([$subgroupId], $parents));
-    $memberIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $insert = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-    foreach ($memberIds as $memberId) {
+    // Die ergaenzte Gruppe gilt ab demselben Tag wie die Registerzuordnung (Spec 2026-10-05, 4.1);
+    // der Planer kuerzt dabei einen Verlauf der Gruppe, damit nichts ueberlappt.
+    foreach ($rows as $row) {
+        $memberId = (int) $row['member_id'];
         if (count($parents) === 1) {
-            $insert->execute([$memberId, $parents[0]]);
-            $result['added'][] = ['member_id' => $memberId, 'group_id' => $parents[0]];
+            // Nur ergaenzend: der Stand wird unter der Sperre gelesen. Stand P inzwischen
+            // schon da, aendert sich nichts und es wird nichts gemeldet.
+            if (groupsApplyChange($db, $database, $memberId, [$parents[0]], $row['valid_from'], true)) {
+                $result['added'][] = ['member_id' => $memberId, 'group_id' => $parents[0]];
+            }
         } else {
             $result['warnings'][] = ['member_id' => $memberId, 'subgroup_id' => $subgroupId];
         }
@@ -290,4 +312,23 @@ function groupsRuleReport(int $memberId, array $normalized): array
     $warnings = array_map(static fn (int $s) => ['member_id' => $memberId, 'subgroup_id' => $s], $normalized['warnings']);
 
     return [$added, $warnings];
+}
+
+/**
+ * Prueft, dass alle Gruppen-IDs existieren (vor jeder Schreiboperation).
+ *
+ * @param array<int, int|string> $groupIds bereits durch groupsCheckMemberGroupIds() geprueft
+ */
+function groupsAllExist($db, $database, array $groupIds): bool
+{
+    $ids = array_values(array_unique(array_map('intval', $groupIds)));
+    if ($ids === []) {
+        return true;
+    }
+    $prefix = $database->table('');
+    $in     = implode(',', array_fill(0, count($ids), '?'));
+    $stmt   = $db->prepare("SELECT COUNT(*) FROM {$prefix}member_groups WHERE group_id IN ({$in})");
+    $stmt->execute($ids);
+
+    return (int) $stmt->fetchColumn() === count($ids);
 }

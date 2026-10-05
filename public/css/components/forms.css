@@ -368,3 +368,25 @@
     max-height: 200px;
     overflow-y: auto;
 }
+
+/* Mitgliederdialog: Gruppenwechsel mit Datum (Spec 2026-10-05, 6.1) */
+.member-groups-change {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xs) var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+.member-groups-change[hidden],
+.member-groups-history[hidden] { display: none; }
+.member-groups-change .input-hint { flex-basis: 100%; }
+.member-groups-history {
+    margin: var(--spacing-xs) 0 0;
+    color: var(--text-medium);
+    font-size: 0.9em;
+}
+.group-choice-since {
+    margin-left: var(--spacing-xs);
+    color: var(--text-medium);
+    font-weight: 400;
+}

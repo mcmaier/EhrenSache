@@ -30,12 +30,23 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
 
                     if($member) {
                         // Lade zugehörige Gruppen
-                        $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name
+                        $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name, mga.valid_from
                                                     FROM {$prefix}member_groups g
                                                     INNER JOIN {$prefix}member_group_assignments mga ON g.group_id = mga.group_id
                                                     WHERE mga.member_id = ?");
                         $groupStmt->execute([$id]);
                         $member['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+                        // Beendete Zuordnungen, neueste zuerst (Spec 2026-10-05, 6.1)
+                        $historyStmt = $db->prepare("SELECT h.group_id, g.group_name, h.valid_from, h.valid_to
+                                                       FROM {$prefix}member_group_history h
+                                                       JOIN {$prefix}member_groups g ON g.group_id = h.group_id
+                                                      WHERE h.member_id = ?
+                                                      ORDER BY h.valid_to DESC, g.group_name");
+                        $historyStmt->execute([$id]);
+                        $member['group_history'] = array_map(static fn ($h) => [
+                            'group_id' => (int) $h['group_id'], 'group_name' => $h['group_name'],
+                            'valid_from' => $h['valid_from'], 'valid_to' => $h['valid_to'],
+                        ], $historyStmt->fetchAll(PDO::FETCH_ASSOC));
                         $member = memberPublicRow($member);
 
                         echo json_encode($member ?: []);
@@ -289,6 +300,13 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 break;
             }
 
+            // Unbekannte Gruppen vor jeder Schreiboperation abweisen
+            if (isset($cleanData->group_ids) && !groupsAllExist($db, $database, $cleanData->group_ids)) {
+                http_response_code(400);
+                echo json_encode(["message" => "Unbekannte Gruppe", "field" => "group_ids"]);
+                break;
+            }
+
             // Umgebende Leerzeichen entfernen, bevor auf Duplikate geprueft
             // und gespeichert wird — sonst waeren "AB1" und "AB1 " zwei
             // "unterschiedliche" Nummern. Leer nach dem Trim faellt wie
@@ -310,35 +328,48 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 }
             }
 
-            $stmt = $db->prepare("INSERT INTO {$prefix}members (name, surname, member_number, active)
-                                  VALUES (?, ?, ?, ?)");
-            // === '' statt empty(): "0" ist eine gueltige Mitgliedsnummer,
-            // wuerde von empty() aber faelschlich als leer behandelt.
-            if($stmt->execute([$cleanData->name, $cleanData->surname,
-                               (($cleanData->member_number ?? '') === '') ? null : $cleanData->member_number,
-                               $cleanData->active ?? true])) {
+            // Mitglied und Gruppen in einer Transaktion (Spec 2026-10-05, 4.1)
+            $addedGroups = [];
+            $groupWarnings = [];
+            try {
+                $db->beginTransaction();
+
+                $stmt = $db->prepare("INSERT INTO {$prefix}members (name, surname, member_number, active)
+                                      VALUES (?, ?, ?, ?)");
+                // === '' statt empty(): "0" ist eine gueltige Mitgliedsnummer,
+                // wuerde von empty() aber faelschlich als leer behandelt.
+                $stmt->execute([$cleanData->name, $cleanData->surname,
+                                (($cleanData->member_number ?? '') === '') ? null : $cleanData->member_number,
+                                $cleanData->active ?? true]);
                 $memberId = $db->lastInsertId();
+
                 // Speichere Gruppen-Zuordnungen
-                $addedGroups = [];
-                $groupWarnings = [];
-                if(isset($cleanData->group_ids) && is_array($cleanData->group_ids)) {
+                if(isset($cleanData->group_ids)) {
                     // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
                     $normalized = groupsWithParents($db, $database, $cleanData->group_ids);
-                    $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-                    foreach($normalized['group_ids'] as $groupId) {
-                        $groupStmt->execute([$memberId, $groupId]);
-                    }
+                    groupsApplyChange($db, $database, (int) $memberId, $normalized['group_ids'], null);
                     [$addedGroups, $groupWarnings] = groupsRuleReport((int) $memberId, $normalized);
                 }
-                http_response_code(201);
-                // $memberId, nicht lastInsertId(): Nach dem Insert der
-                // Gruppenzuordnung (ohne AUTO_INCREMENT) liefert es 0.
-                echo json_encode(["message" => "Member created", "id" => $memberId,
-                                  "added_groups" => $addedGroups, "group_warnings" => $groupWarnings]);
-            } else {
-                http_response_code(500);
-                echo json_encode(["message" => "Failed to create member"]);
+
+                $db->commit();
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                $isDeadlock = $e instanceof PDOException && in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
+                http_response_code($isDeadlock ? 503 : 500);
+                echo json_encode(["message" => $isDeadlock
+                    ? "Temporärer Datenbankkonflikt. Bitte erneut versuchen."
+                    : "Failed to create member"]);
+                error_log("POST member failed: " . $e->getMessage());
+                break;
             }
+
+            http_response_code(201);
+            // $memberId, nicht lastInsertId(): Nach dem Insert der
+            // Gruppenzuordnung (ohne AUTO_INCREMENT) liefert es 0.
+            echo json_encode(["message" => "Member created", "id" => $memberId,
+                              "added_groups" => $addedGroups, "group_warnings" => $groupWarnings]);
             break;
             
         case 'PUT':
@@ -347,7 +378,7 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
             $data = json_decode(file_get_contents("php://input"));
 
             // Erlaubte Felder
-            $allowedFields = ['name', 'surname', 'member_number', 'active', 'group_ids'];
+            $allowedFields = ['name', 'surname', 'member_number', 'active', 'group_ids', 'groups_valid_from'];
             $cleanData = new stdClass();
             foreach ($allowedFields as $field) {
                 if (isset($data->$field)) {
@@ -359,6 +390,33 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
             if (isset($cleanData->group_ids) && ($groupIdsError = groupsCheckMemberGroupIds($cleanData->group_ids)) !== null) {
                 http_response_code(400);
                 echo json_encode(["message" => $groupIdsError, "field" => "group_ids"]);
+                break;
+            }
+
+            // groups_valid_from (Spec 2026-10-05, 4.2): nur heute oder Vergangenheit
+            $groupsValidFrom = date('Y-m-d');
+            if (isset($cleanData->group_ids) && isset($cleanData->groups_valid_from)) {
+                if (($validFromError = groupsCheckValidFrom($cleanData->groups_valid_from, date('Y-m-d'))) !== null) {
+                    http_response_code(422);
+                    echo json_encode(["message" => $validFromError, "field" => "groups_valid_from"]);
+                    break;
+                }
+                $groupsValidFrom = $cleanData->groups_valid_from;
+            }
+
+            // Unbekannte Gruppen vor jeder Schreiboperation abweisen
+            if (isset($cleanData->group_ids) && !groupsAllExist($db, $database, $cleanData->group_ids)) {
+                http_response_code(400);
+                echo json_encode(["message" => "Unbekannte Gruppe", "field" => "group_ids"]);
+                break;
+            }
+
+            // Existenz des Mitglieds vor jeder Schreiboperation (auch nur mit group_ids)
+            $existsStmt = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ?");
+            $existsStmt->execute([$id]);
+            if (!$existsStmt->fetch()) {
+                http_response_code(404);
+                echo json_encode(["message" => "Member not found"]);
                 break;
             }
 
@@ -433,43 +491,44 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 break;
             }
 
-            if (!empty($setParts)) {
-                $params[] = $id;
-                $stmt = $db->prepare("UPDATE {$prefix}members SET " . implode(', ', $setParts) . " WHERE member_id = ?");
-                $stmt->execute($params);
-
-                if ($stmt->rowCount() === 0) {
-                    // Prüfen ob member existiert
-                    $exists = $db->prepare("SELECT member_id FROM {$prefix}members WHERE member_id = ?");
-                    $exists->execute([$id]);
-                    if (!$exists->fetch()) {
-                        http_response_code(404);
-                        echo json_encode(["message" => "Member not found"]);
-                        break;
-                    }
-                }
-            }
-
-            // P2: Eine neue PIN hebt die Sperre auf — sonst wartet das Mitglied
-            // trotz neuer PIN 15 Minuten.
-            if ($pinAction !== null) {
-                (new RateLimiter($db, $database))->reset('station_member_' . (int) $id, 'station_pin');
-            }
-
-            // Gruppen-Zuordnungen aktualisieren (wenn group_ids geliefert)
+            // Stammdaten, PIN-Sperre und Gruppen in einer Transaktion (Spec 2026-10-05, 4.1)
             $addedGroups = [];
             $groupWarnings = [];
-            if (isset($cleanData->group_ids)) {
-                $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
-                if (is_array($cleanData->group_ids)) {
+            try {
+                $db->beginTransaction();
+
+                if (!empty($setParts)) {
+                    $params[] = $id;
+                    $stmt = $db->prepare("UPDATE {$prefix}members SET " . implode(', ', $setParts) . " WHERE member_id = ?");
+                    $stmt->execute($params);
+                }
+
+                // P2: Eine neue PIN hebt die Sperre auf — sonst wartet das Mitglied
+                // trotz neuer PIN 15 Minuten.
+                if ($pinAction !== null) {
+                    (new RateLimiter($db, $database))->reset('station_member_' . (int) $id, 'station_pin');
+                }
+
+                // Gruppen-Zuordnungen aktualisieren (wenn group_ids geliefert)
+                if (isset($cleanData->group_ids)) {
                     // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
                     $normalized = groupsWithParents($db, $database, $cleanData->group_ids);
-                    $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-                    foreach ($normalized['group_ids'] as $groupId) {
-                        $groupStmt->execute([$id, $groupId]);
-                    }
+                    groupsApplyChange($db, $database, (int) $id, $normalized['group_ids'], $groupsValidFrom);
                     [$addedGroups, $groupWarnings] = groupsRuleReport((int) $id, $normalized);
                 }
+
+                $db->commit();
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                $isDeadlock = $e instanceof PDOException && in_array($e->errorInfo[1] ?? 0, [1205, 1213]);
+                http_response_code($isDeadlock ? 503 : 500);
+                echo json_encode(["message" => $isDeadlock
+                    ? "Temporärer Datenbankkonflikt. Bitte erneut versuchen."
+                    : "Fehler beim Aktualisieren des Mitglieds"]);
+                error_log("PUT member $id failed: " . $e->getMessage());
+                break;
             }
 
             echo json_encode(["message" => "Member updated",
@@ -507,6 +566,7 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 $db->prepare("DELETE FROM {$prefix}exceptions               WHERE member_id = ?")->execute([$id]);
                 $db->prepare("DELETE FROM {$prefix}membership_dates         WHERE member_id = ?")->execute([$id]);
                 $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
+                $db->prepare("DELETE FROM {$prefix}member_group_history     WHERE member_id = ?")->execute([$id]);
                 $db->prepare("UPDATE {$prefix}users SET member_id = NULL    WHERE member_id = ?")->execute([$id]);
                 $db->prepare("DELETE FROM {$prefix}members                  WHERE member_id = ?")->execute([$id]);
 

@@ -106,7 +106,9 @@ Sie benötigen eine **Rechtsgrundlage** für die Datenverarbeitung (Art. 6 DSGVO
 - **Name, Vorname** (Identifikation)
 - **Mitgliedsnummer** (optional, interne Verwaltung)
 - **E-Mail** (optional, Kommunikation)
-- **Gruppenzugehörigkeit** (z.B. "Vorstand", "Jugend")
+- **Gruppenzugehörigkeit** (z.B. "Vorstand", "Jugend"), seit der Gruppenzugehörigkeit mit Zeitraum
+  auch mit Beginn; **beendete Zuordnungen** bleiben als Verlauf (Gruppe, von, bis) gespeichert,
+  damit Statistik und Listen vergangener Termine die damalige Gruppe zeigen
 - **Anwesenheitszeiten** (Datum, Uhrzeit, Dauer)
 - **Ausnahmen** (Urlaub, Krankheit - optional)
 - **Arbeitszeiten** (nur bei aktivierter Zeiterfassung, siehe Abschnitt 10):
@@ -158,6 +160,11 @@ Die Selbstauskunft (JSON und CSV) enthält seit 1.3.0 zur Stations-PIN nur `has_
 `pin_updated_at` (bzw. die Zeilen "Stations-PIN gesetzt" und "PIN zuletzt geändert") — nie den
 Hash selbst.
 
+Die Selbstauskunft (JSON und CSV) nennt außerdem die **beendeten Gruppenzugehörigkeiten** (Gruppe, von, bis); die
+heutigen Gruppen tragen ihr Beginndatum. Der Verlauf wird zusammen mit dem Mitglied gelöscht und
+hat keine eigene Löschfrist — wie die heutigen Zuordnungen. Wird eine Gruppe gelöscht, entfallen
+auch die Verlaufszeilen zu dieser Gruppe.
+
 ---
 
 ## 6. Muster-Texte
@@ -179,7 +186,7 @@ ehrenamtlicher Tätigkeiten:
 - Name, Vorname
 - Mitgliedsnummer (falls vorhanden)
 - Anwesenheitszeiten (Datum, Uhrzeit, Dauer)
-- Gruppenzugehörigkeit
+- Gruppenzugehörigkeit (auch frühere, mit Zeitraum)
 - Optional: E-Mail-Adresse
 
 Rechtsgrundlage: Berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO) 
