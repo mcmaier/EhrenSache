@@ -105,3 +105,17 @@ test('groupsCheckValidFrom: gueltig, Zukunft, Unsinn', function () {
     assertTrue(groupsCheckValidFrom(20260601, '2026-10-05') !== null, 'Zahl');
     assertTrue(groupsCheckValidFrom(null, '2026-10-05') !== null, 'null');
 });
+
+test('groupsPlanChange: Verlauf endet genau am Datum wird gekuerzt', function () {
+    $history = [['history_id' => 7, 'group_id' => 5, 'valid_from' => '2026-01-01', 'valid_to' => '2026-06-01']];
+    $plan = groupsPlanChange([], $history, [5], '2026-06-01');
+    assertSame([['history_id' => 7, 'valid_to' => '2026-05-31']], $plan['update_history']);
+    assertSame([], $plan['delete_history']);
+});
+
+test('groupsPlanChange: Verlauf beginnt genau am Vortag bleibt als Eintageszeitraum', function () {
+    $history = [['history_id' => 8, 'group_id' => 5, 'valid_from' => '2026-05-31', 'valid_to' => '2026-07-01']];
+    $plan = groupsPlanChange([], $history, [5], '2026-06-01');
+    assertSame([['history_id' => 8, 'valid_to' => '2026-05-31']], $plan['update_history']);
+    assertSame([], $plan['delete_history']);
+});
