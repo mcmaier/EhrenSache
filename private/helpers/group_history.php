@@ -67,3 +67,99 @@ function groupHistoryMigrate(PDO $pdo, string $prefix): array
 
     return ['log' => $log, 'warnings' => []];
 }
+
+/** Vortag eines Datums JJJJ-MM-TT. */
+function groupHistoryDayBefore(string $date): string
+{
+    return (new DateTimeImmutable($date))->modify('-1 day')->format('Y-m-d');
+}
+
+/**
+ * Prueft groups_valid_from: Datum JJJJ-MM-TT, nicht nach $today.
+ *
+ * @param mixed $raw
+ * @return ?string Fehlermeldung oder null, wenn gueltig
+ */
+function groupsCheckValidFrom($raw, string $today): ?string
+{
+    if (!is_string($raw)) {
+        return 'groups_valid_from muss ein Datum sein (JJJJ-MM-TT)';
+    }
+    $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $raw);
+    if ($parsed === false || $parsed->format('Y-m-d') !== $raw) {
+        return 'groups_valid_from ist kein gültiges Datum (JJJJ-MM-TT)';
+    }
+    if ($raw > $today) {
+        return 'groups_valid_from darf nicht in der Zukunft liegen';
+    }
+
+    return null;
+}
+
+/**
+ * Plant eine Aenderung der Gruppen eines Mitglieds (Spec 2026-10-05, 4.1),
+ * ohne Datenbank. Daten sind Strings JJJJ-MM-TT und werden als solche
+ * verglichen.
+ *
+ * @param array<int, ?string> $current  heutige Zuordnungen: group_id => valid_from
+ * @param array<int, array{history_id: int|string, group_id: int|string, valid_from: ?string, valid_to: string}> $history
+ * @param array<int, int|string> $newGroupIds  bereits durch groupsWithParents() gelaufen
+ * @param ?string $date  null = von Anfang an (nur beim Anlegen)
+ * @return array{insert_current: array<int, array{group_id: int, valid_from: ?string}>,
+ *               delete_current: array<int, int>,
+ *               insert_history: array<int, array{group_id: int, valid_from: ?string, valid_to: string}>,
+ *               update_history: array<int, array{history_id: int, valid_to: string}>,
+ *               delete_history: array<int, int>}
+ */
+function groupsPlanChange(array $current, array $history, array $newGroupIds, ?string $date): array
+{
+    $plan = ['insert_current' => [], 'delete_current' => [], 'insert_history' => [],
+             'update_history' => [], 'delete_history' => []];
+
+    $new = [];
+    foreach ($newGroupIds as $id) {
+        $new[(int) $id] = true;
+    }
+    $dayBefore = $date === null ? null : groupHistoryDayBefore($date);
+
+    foreach ($current as $groupId => $validFrom) {
+        $groupId = (int) $groupId;
+        if (isset($new[$groupId])) {
+            continue;
+        }
+        $plan['delete_current'][] = $groupId;
+        // Hat die Zuordnung vor dem Datum gegolten, wandert sie in den Verlauf;
+        // begann sie erst am Datum oder spaeter, war es eine Korrektur.
+        if ($date !== null && ($validFrom === null || $validFrom < $date)) {
+            $plan['insert_history'][] = ['group_id' => $groupId, 'valid_from' => $validFrom, 'valid_to' => $dayBefore];
+        }
+    }
+
+    foreach (array_keys($new) as $groupId) {
+        if (array_key_exists($groupId, $current)) {
+            continue;
+        }
+        $plan['insert_current'][] = ['group_id' => $groupId, 'valid_from' => $date];
+
+        foreach ($history as $h) {
+            if ((int) $h['group_id'] !== $groupId) {
+                continue;
+            }
+            // "Von Anfang an" verdraengt jeden Verlauf derselben Gruppe.
+            if ($date === null) {
+                $plan['delete_history'][] = (int) $h['history_id'];
+                continue;
+            }
+            if ($h['valid_to'] < $date) {
+                continue;
+            }
+            if ($h['valid_from'] !== null && $h['valid_from'] > $dayBefore) {
+                $plan['delete_history'][] = (int) $h['history_id'];
+            } else {
+                $plan['update_history'][] = ['history_id' => (int) $h['history_id'], 'valid_to' => $dayBefore];
+            }
+        }
+    }
+
+    return $plan;
+}
