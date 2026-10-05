@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT  = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const PHP   = process.env.PHP_BIN || 'C:/xampp/php/php.exe';
-const DELAY = 500;
+const DELAY = 800;
 const LIMIT = 2.5 * DELAY;
 
 function config() {
