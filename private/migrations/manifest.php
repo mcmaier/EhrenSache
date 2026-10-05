@@ -258,4 +258,10 @@ return [
         'file'     => '1.19.0.php',
         'function' => 'migrate_1_19_0',
     ],
+    [
+        'from'     => '1.20.0',
+        'to'       => '1.20.1',
+        'file'     => '1.20.0.php',
+        'function' => 'migrate_1_20_0',
+    ],
 ];

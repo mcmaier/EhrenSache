@@ -7,7 +7,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
-## [Unreleased]
+## [1.20.1] – 2026-10-05
 
 ### Sicherheit
 - **Der Rate Limiter erkennt die Besucheradresse auch hinter einem Reverse-Proxy oder CDN.**
