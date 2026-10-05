@@ -192,4 +192,8 @@ test('Dashboard: das Profil laedt gleichzeitig', function () use ($scProfile) {
     assertTrue(str_contains($body, 'loadOwnMember()'), 'loadProfile() teilt sich das Mitglied nicht mit der Kopfzeile');
     assertTrue(!str_contains($body, "apiCall('members'"), 'loadProfile() holt das Mitglied ein zweites Mal');
     assertTrue(str_contains($body, 'loadOpenItems('), 'loadProfile() startet die offenen Punkte nicht mehr');
+    // Verknuepft ein Admin sein eigenes Konto neu, weicht member_id aus me von
+    // den frischen Benutzerdaten ab: dann das Mitglied nach userDetails holen.
+    assertTrue(str_contains($body, 'loadOwnMember(userDetails.member_id)'),
+        'loadProfile() zeigt nach dem Neuverknuepfen das alte Mitglied bis zum Neuladen');
 });

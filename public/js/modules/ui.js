@@ -112,14 +112,17 @@ export function resetClientSettings() {
 /**
  * Das eigene Mitglied (members&id aus me). Kopfzeile und Profil fragen beim
  * Start gleichzeitig -- sie teilen sich eine Anfrage (OI-121).
+ *
+ * memberId weicht nur ab, wenn das Profil nach einem Neuverknuepfen frischere
+ * Benutzerdaten hat als me beim Seitenaufruf.
  */
-export function loadOwnMember() {
-    if (!currentUser?.member_id) {
+export function loadOwnMember(memberId = currentUser?.member_id) {
+    if (!memberId) {
         return Promise.resolve(null);
     }
 
-    return sharedLoad(`ownMember:${currentUser.member_id}`, false,
-        () => apiCall('members', 'GET', null, { id: currentUser.member_id }));
+    return sharedLoad(`ownMember:${memberId}`, false,
+        () => apiCall('members', 'GET', null, { id: memberId }));
 }
 
 /**

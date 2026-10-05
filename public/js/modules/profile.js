@@ -8,7 +8,7 @@
  * Siehe LICENSE und COMMERCIAL-LICENSE.md für Details.
  */
 
-import { apiCall } from './api.js';
+import { apiCall, currentUser } from './api.js';
 import { showToast, showConfirm, dataCache, invalidateCache, loadClientSettings, loadOwnMember } from './ui.js';
 import { loadUserData } from './users.js';
 import { isFeatureOn } from './features.js';
@@ -32,14 +32,22 @@ export async function loadProfile(forceReload = false) {
     loadOpenItems();
 
     // Gleichzeitig statt nacheinander (OI-121). Das Mitglied kommt ueber
-    // member_id aus me (currentUser) -- dieselbe wie in den Benutzerdaten.
-    const [, member, clientRes] = await Promise.all([
+    // member_id aus me (currentUser), das beim Seitenaufruf geladen wurde.
+    const [, ownMember, clientRes] = await Promise.all([
         loadUserData(forceReload),
         loadOwnMember(),
         loadClientSettings().catch(() => null)
     ]);
 
-    const userDetails = dataCache.userData.data.userDetails; 
+    const userDetails = dataCache.userData.data.userDetails;
+
+    // Hat ein Admin sein eigenes Konto inzwischen neu verknuepft, ist me
+    // veraltet: dann das Mitglied aus den frischen Benutzerdaten nachladen.
+    // Selten -- der uebliche Weg bleibt parallel.
+    let member = ownMember;
+    if (userDetails.member_id && String(userDetails.member_id) !== String(currentUser?.member_id ?? '')) {
+        member = await loadOwnMember(userDetails.member_id);
+    }
 
     // Account-Informationen
     document.getElementById('profile_email').value = userDetails.email;
