@@ -125,6 +125,53 @@ test('Statistik: Wechsel mitten im Jahr zaehlt je Gruppe nur den eigenen Zeitrau
 
 // Weitere Tests dieser Datei kommen in Task 6 und 7 hinzu.
 
+test('Stichtag am Termindatum: Grenztage und Register (eigene Welt)', function () {
+    $y = (int) date('Y') - 1;
+    $s = uniqid();
+    $ids = ['appointments' => [], 'members' => [], 'types' => [], 'groups' => []];
+    try {
+        $a = $ids['groups'][] = ghrCreate('member_groups', ['group_name' => "GHR SA {$s}"]);
+        $b = $ids['groups'][] = ghrCreate('member_groups', ['group_name' => "GHR SB {$s}"]);
+        $r = $ids['groups'][] = ghrCreate('member_groups', ['group_name' => "GHR SR {$s}", 'is_subgroup' => true, 'parent_group_ids' => [$a]]);
+        $type = [];
+        foreach (['TA' => $a, 'TB' => $b, 'TR' => $r] as $key => $g) {
+            $type[$key] = $ids['types'][] = ghrCreate('appointment_types', ['type_name' => "GHR S{$key} {$s}", 'is_default' => 0,
+                'color' => '#667eea', 'group_ids' => [$g], 'responses_enabled' => 1]);
+        }
+        // M: von Anfang an in A und R, wechselt zum 01.06. nach B (A und R enden am 31.05.)
+        $m = $ids['members'][] = ghrCreate('members', ['name' => 'Ghr', 'surname' => "SM {$s}", 'active' => 1, 'group_ids' => [$a, $r]]);
+        $put = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $m],
+            'body' => ['group_ids' => [$b], 'groups_valid_from' => "{$y}-06-01"]]);
+        assertStatus(200, $put, $put['raw']);
+        // P: von Anfang an in A, tritt dem Register R erst zum 01.06. bei
+        $p = $ids['members'][] = ghrCreate('members', ['name' => 'Ghr', 'surname' => "SP {$s}", 'active' => 1, 'group_ids' => [$a]]);
+        $put = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $p],
+            'body' => ['group_ids' => [$a, $r], 'groups_valid_from' => "{$y}-06-01"]]);
+        assertStatus(200, $put, $put['raw']);
+
+        foreach ([['TA', '05-31'], ['TA', '06-01'], ['TB', '06-01'], ['TB', '05-31'], ['TR', '05-31'], ['TR', '06-01'], ['TA', '09-01']] as $i => [$t, $md]) {
+            $ids['appointments'][] = ghrCreate('appointments', ['title' => "GHR S{$i}", 'date' => "{$y}-{$md}",
+                'start_time' => '19:00:00', 'type_id' => $type[$t]]);
+        }
+
+        $w = ['year' => $y];
+        $ta = ghrTable(ghrStats($w, ['group_id' => $a]), $a);
+        $tb = ghrTable(ghrStats($w, ['group_id' => $b]), $b);
+        $tr = ghrTable(ghrStats($w, ['group_id' => $r]), $r);
+        assertTrue($ta !== null && $tb !== null && $tr !== null, 'Tabellen A, B und R fehlen');
+        assertSame(1, ghrRow($ta, $m)[0] ?? null, 'A: M nur am letzten Tag (31.05.), nicht am 01.06.');
+        assertSame(1, ghrRow($tb, $m)[0] ?? null, 'B: M ab dem ersten Tag (01.06.), nicht am 31.05.');
+        assertSame(2, ghrRow($tr, $m)[0] ?? null, 'R: A am 31.05. (ueber die Gruppe A) und R am 31.05.; nichts nach dem Austritt');
+        assertSame(3, ghrRow($ta, $p)[0] ?? null, 'A: P durchgehend, drei Termine der Art A');
+        assertSame(3, ghrRow($tr, $p)[0] ?? null, 'R: P erst ab 01.06. im Register -- A am 31.05. zaehlt dort nicht');
+    } finally {
+        foreach ($ids['appointments'] as $id) { ghrDelete('appointments', $id); }
+        foreach ($ids['members'] as $id)      { ghrDelete('members', $id); }
+        foreach ($ids['types'] as $id)        { ghrDelete('appointment_types', $id); }
+        foreach (array_reverse($ids['groups']) as $id) { ghrDelete('member_groups', $id); }
+    }
+});
+
 test('Lese-Welt aufraeumen', function () use (&$ghrWorld) {
     ghrDropWorld($ghrWorld);
 });

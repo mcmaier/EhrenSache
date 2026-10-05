@@ -102,13 +102,16 @@ function expectedPairsSql($database, array $filter = []): array
  * abgeleiteten Tabelle ep (Spec 2026-10-02, 5.1):
  *
  *   gewoehnliche Gruppe G:     Paare, die ueber G kommen (ep.via_group_id = G)
- *   Register S mit Gruppen P:  Paare, deren Mitglied in S steht und deren
+ *   Register S mit Gruppen P:  Paare, deren Mitglied am Termindatum in S stand und deren
  *                              Termin ueber S selbst oder eine Gruppe aus
  *                              P(S) (subgroup_parents) kommt -- Termine
  *                              anderer Gruppen des Mitglieds zaehlen nicht
  *   Register ohne Gruppe:      nur Paare ueber S selbst (erster Teil); der
  *                              Join auf subgroup_parents schliesst es aus
  *                              dem zweiten Teil aus
+ *
+ * Die Tabelle unter $alias muss die Spalten member_id, via_group_id und
+ * appointment_date liefern (nur die Soll-Menge aus expectedPairsSql()).
  *
  * Beides in einer Bedingung. Die Gruppenart steht in member_groups.is_subgroup,
  * der Aufrufer muss sie nicht kennen.

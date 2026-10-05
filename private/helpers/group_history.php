@@ -319,7 +319,10 @@ function groupAssignmentsSql($database): string
                FROM {$prefix}member_group_history)";
 }
 
-/** Die einzige Stelle mit der Stichtagsregel. $dateExpr ist ein SQL-Ausdruck (z. B. a.date). */
+/**
+ * Die einzige Stelle mit der Stichtagsregel. $dateExpr ist ein SQL-Ausdruck (z. B. a.date)
+ * aus dem Code, nie aus einer Eingabe.
+ */
 function groupAssignmentActiveOn(string $alias, string $dateExpr): string
 {
     groupHistoryCheckAlias($alias);
