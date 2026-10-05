@@ -107,7 +107,12 @@ body {
     text-align: center;
 }
 
-#startRetryBtn[hidden] {
+#startSwitchBtn {
+    margin-top: 10px;
+}
+
+#startRetryBtn[hidden],
+#startSwitchBtn[hidden] {
     display: none;
 }
 

@@ -204,7 +204,8 @@ document.addEventListener('DOMContentLoaded', function() {
         'toggle-response-section':      (el) => toggleResponseSection(el.dataset.key),
         'correct-work-session': (el) => openWorkSessionModal(Number(el.dataset.sessionId)),
         'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId)),
-        'start-retry':          () => checkAutoLogin()
+        'start-retry':          () => checkAutoLogin(),
+        'start-switch-account': () => switchAccount()
     };
     document.addEventListener('click', (event) => {
         const el = event.target.closest('[data-action]');
@@ -933,12 +934,7 @@ async function handleLogin(e) {
         
         // Speichere Token
         apiToken = result.data.token;
-        
-        if (elements.saveLoginCheckbox.checked) {
-            // Speichere Token (Base64 kodiert)
-            localStorage.setItem('api_token', btoa(apiToken));
-        }
-        
+
         debug.log('✓ Login erfolgreich');
 
         showStartStatus('Wird geladen …', false);
@@ -946,14 +942,24 @@ async function handleLogin(e) {
 
         const me = await apiCall('me');
         if (!me.success) {
+            apiToken = null;
             showScreen('login');
             throw new Error(me.error || 'Login fehlgeschlagen');
+        }
+
+        // Erst speichern, wenn me den Token angenommen hat (OI-121).
+        if (elements.saveLoginCheckbox.checked) {
+            // Speichere Token (Base64 kodiert)
+            localStorage.setItem('api_token', btoa(apiToken));
         }
 
         await startSession(me.data);
 
     } catch (error) {
         debug.error('Login Fehler:', error);
+        // Die Fehlermeldung steht in der Anmeldemaske; laeuft der Fehler aus
+        // startSession(), ist gerade die Ladeanzeige zu sehen.
+        showScreen('login');
         showError(error.message || 'Ungültige Anmeldedaten oder Token abgelaufen');
     }
 
@@ -1042,7 +1048,16 @@ async function checkAutoLogin() {
     }
 
     debug.log('✓ Auto-Login erfolgreich');
-    await startSession(result.data);
+
+    // Ein Fehler beim Aufbau darf die Ladeanzeige nicht ohne Ausweg stehen
+    // lassen: checkAutoLogin() laeuft ohne await, die Ablehnung ginge verloren.
+    try {
+        await startSession(result.data);
+    } catch (error) {
+        debug.error('Start fehlgeschlagen:', error);
+        showStartStatus('Die App konnte nicht starten.', true);
+        showScreen('start');
+    }
 }
 
 /** Gespeicherter Token oder '' -- auch bei einem unlesbaren Eintrag. */
@@ -2775,13 +2790,29 @@ function showScreen(screenName) {
     screens[screenName]?.classList.add('active');
 }
 
-/** Text der Ladeanzeige; bei einem Fehler zusaetzlich "Erneut versuchen". */
+/**
+ * Text der Ladeanzeige; bei einem Fehler zusaetzlich "Erneut versuchen" und
+ * "Mit anderem Konto anmelden".
+ */
 function showStartStatus(text, failed) {
     const status = document.getElementById('startStatus');
     const retry  = document.getElementById('startRetryBtn');
+    const change = document.getElementById('startSwitchBtn');
 
     if (status) status.textContent = text;
     if (retry) retry.hidden = !failed;
+    if (change) change.hidden = !failed;
+}
+
+/**
+ * Ausweg von der Ladeanzeige: gespeicherten Zugang verwerfen und die
+ * Anmeldemaske zeigen. Fuer den Fall, dass der Server fuer diesen Token
+ * dauerhaft scheitert (etwa 500) -- "Erneut versuchen" hilft dann nie.
+ */
+function switchAccount() {
+    localStorage.removeItem('api_token');
+    apiToken = null;
+    showScreen('login');
 }
 
 function showError(message) {

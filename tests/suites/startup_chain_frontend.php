@@ -90,8 +90,10 @@ test('PWA: beide Anmeldewege laufen ueber startSession()', function () use ($scP
 });
 
 test('PWA: me wird beim Start nur einmal geholt', function () use ($scPwa) {
-    assertSame(2, substr_count($scPwa, "apiCall('me')"),
-        "apiCall('me') gehoert genau in checkAutoLogin() und handleLogin() -- ein drittes ist eine zusaetzliche Stufe");
+    foreach (['async function checkAutoLogin(', 'async function handleLogin('] as $sig) {
+        assertSame(1, substr_count(scBody($scPwa, $sig), "apiCall('me')"), "{$sig} holt me nicht genau einmal");
+    }
+    assertTrue(!str_contains(scBody($scPwa, 'async function startSession('), "apiCall('me')"), 'startSession() holt me erneut');
     assertTrue(!str_contains($scPwa, 'function loadUserData('), 'loadUserData() holte me ein zweites Mal und ist ersetzt');
 });
 
@@ -122,4 +124,23 @@ test('PWA: Zeiterfassung fragt Taetigkeiten und laufende Sitzung gleichzeitig', 
     $body = scBody($scPwa, 'async function initWorktime(');
     assertTrue(preg_match("/Promise\.all\(\[\s*apiCall\('activity_types'/", $body) === 1,
         'initWorktime() wartet die Taetigkeiten ab, bevor es die laufende Sitzung fragt');
+});
+
+test('PWA: ein Fehler im Start laesst einen Ausweg', function () use ($scPwa) {
+    $auto = scBody($scPwa, 'async function checkAutoLogin(');
+    assertTrue(preg_match('/try\s*\{\s*await startSession\(result\.data\);\s*\}\s*catch/', $auto) === 1,
+        'checkAutoLogin() faengt einen Fehler in startSession() nicht ab -- die Ladeanzeige hinge ohne Ausweg');
+    $form = scBody($scPwa, 'async function handleLogin(');
+    $catch = substr($form, (int) strrpos($form, 'catch (error)'));
+    assertTrue(str_contains($catch, "showScreen('login')"), 'Die Fehlermeldung der Anmeldung steht auf einem verdeckten Bildschirm');
+});
+
+test('PWA: von der Ladeanzeige fuehrt ein Weg zur Anmeldemaske', function () use ($scPwa, $scPwaHtml) {
+    assertTrue(str_contains($scPwaHtml, 'data-action="start-switch-account"'), 'Knopf "Mit anderem Konto anmelden" fehlt');
+    assertTrue(preg_match("/'start-switch-account'\s*:\s*\(\)\s*=>\s*switchAccount\(\)/", $scPwa) === 1, 'start-switch-account ist nicht registriert');
+    $body = scBody($scPwa, 'function switchAccount(');
+    assertTrue(str_contains($body, "localStorage.removeItem('api_token')") && str_contains($body, "showScreen('login')"),
+        'switchAccount() verwirft den Zugang nicht oder zeigt die Anmeldemaske nicht');
+    assertTrue(str_contains(scBody($scPwa, 'function showStartStatus('), "getElementById('startSwitchBtn')"),
+        'showStartStatus() blendet den Knopf nicht mit ein');
 });
