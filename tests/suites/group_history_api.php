@@ -351,3 +351,96 @@ test('Registerregel ueber den Planer: ueberlappender Verlauf der ergaenzten Grup
         foreach (array_reverse($ids['g']) as $g) { ghDelete('member_groups', $g); }
     }
 });
+
+function ghImport(string $csv): array
+{
+    $file = tempnam(sys_get_temp_dir(), 'gh');
+    file_put_contents($file, $csv);
+    $cfg = testConfig();
+    $ch = curl_init(rtrim($cfg['base_url'], '/') . '/api/api.php?resource=import&type=members');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15,
+        CURLOPT_HTTPHEADER => ['Accept: application/json', 'Authorization: Bearer ' . apiToken('admin')],
+        CURLOPT_POSTFIELDS => ['file' => new CURLFile($file, 'text/csv', 'gh.csv')],
+    ]);
+    $raw = (string) curl_exec($ch);
+    $res = ['status' => (int) curl_getinfo($ch, CURLINFO_HTTP_CODE), 'body' => json_decode($raw, true), 'raw' => $raw];
+    curl_close($ch);
+    unlink($file);
+
+    return $res;
+}
+
+/** Entfernt die Importprotokolle, die dieser Test erzeugt hat (Dateiname gh.csv). */
+function ghDropImportLogs(): void
+{
+    $logs = apiRequest('GET', 'import_logs', ['token' => apiToken('admin')])['body'] ?? [];
+    foreach ($logs as $log) {
+        if (($log['filename'] ?? '') === 'gh.csv') {
+            apiRequest('DELETE', 'import_logs', ['token' => apiToken('admin'), 'query' => ['id' => (int) $log['log_id']]]);
+        }
+    }
+}
+
+test('Import: bestehendes Mitglied vergleichen ab heute, neues von Anfang an', function () {
+    $s = uniqid();
+    $ids = ['g' => [], 'm' => []];
+    try {
+        $a = $ids['g'][] = ghCreate('member_groups', ['group_name' => "GH A {$s}"]);
+        $b = $ids['g'][] = ghCreate('member_groups', ['group_name' => "GH B {$s}"]);
+        $m = $ids['m'][] = ghCreate('members', ['name' => 'Gh', 'surname' => "Imp M {$s}", 'member_number' => "GHM{$s}",
+                                               'active' => 1, 'group_ids' => [$a]]);
+        $csv = "name;surname;member_number;groups\n"
+             . "Gh;Imp M {$s};GHM{$s};GH B {$s}\n"
+             . "Gh;Imp N {$s};GHN{$s};GH A {$s}\n";
+
+        $res = ghImport($csv);
+        assertStatus(200, $res, $res['raw']);
+        assertSame(1, $res['body']['group_changes'] ?? null, 'ein bestehendes Mitglied mit geaenderten Gruppen');
+
+        $all = apiRequest('GET', 'members', ['token' => apiToken('admin')])['body'] ?? [];
+        $n = 0;
+        foreach ($all as $row) {
+            if (($row['member_number'] ?? '') === "GHN{$s}") { $n = (int) $row['member_id']; }
+        }
+        assertTrue($n > 0, 'neues Mitglied N nicht gefunden');
+        $ids['m'][] = $n;
+
+        $memberM = ghMember($m);
+        assertSame([$b => date('Y-m-d')], ghSince($memberM), 'M: B ab heute');
+        assertSame([[$a, null, date('Y-m-d', strtotime('-1 day'))]], ghHistory($memberM), 'M: A bis gestern');
+        $memberN = ghMember($n);
+        assertSame([$a => null], ghSince($memberN), 'N: von Anfang an');
+        assertSame([], ghHistory($memberN), 'N: kein Verlauf');
+
+        $again = ghImport($csv);
+        assertStatus(200, $again, $again['raw']);
+        assertSame(0, $again['body']['group_changes'] ?? null, 'zweiter Import aendert nichts');
+        assertSame(1, count(ghMember($m)['group_history']), 'Verlauf von M unveraendert');
+    } finally {
+        foreach ($ids['m'] as $id) { ghDelete('members', $id); }
+        foreach ($ids['g'] as $g) { ghDelete('member_groups', $g); }
+        ghDropImportLogs();
+    }
+});
+
+test('Import: nur unbekannte Gruppe laesst die Gruppen eines bestehenden Mitglieds unveraendert', function () {
+    $s = uniqid();
+    $ids = ['g' => [], 'm' => []];
+    try {
+        $a = $ids['g'][] = ghCreate('member_groups', ['group_name' => "GH U {$s}"]);
+        $m = $ids['m'][] = ghCreate('members', ['name' => 'Gh', 'surname' => "Imp U {$s}", 'member_number' => "GHU{$s}",
+                                               'active' => 1, 'group_ids' => [$a]]);
+        $res = ghImport("name;surname;member_number;groups\nGh;Imp U {$s};GHU{$s};GH Unbekannt {$s}\n");
+        assertStatus(200, $res, $res['raw']);
+        assertSame(0, $res['body']['group_changes'] ?? null, 'keine Aenderung gezaehlt');
+        assertTrue(count($res['body']['errors'] ?? []) === 1, 'Fehlermeldung fuer unbekannte Gruppe');
+        $member = ghMember($m);
+        assertSame([$a => null], ghSince($member), 'Gruppe A bleibt');
+        assertSame([], ghHistory($member), 'kein Verlauf');
+    } finally {
+        foreach ($ids['m'] as $id) { ghDelete('members', $id); }
+        foreach ($ids['g'] as $g) { ghDelete('member_groups', $g); }
+        ghDropImportLogs();
+    }
+});

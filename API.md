@@ -3259,7 +3259,8 @@ Karteileiche.
   "appointments_created": 0,
   "errors": [],
   "added_groups": [ { "member_id": 42, "group_id": 1 } ],
-  "group_warnings": []
+  "group_warnings": [],
+  "group_changes": 0
 }
 ```
 
@@ -3271,6 +3272,13 @@ meldet bei mehreren das Register (`group_warnings`), jeweils als `[{member_id, g
 `type=members`, dort immer, ohne Treffer leer. Beim Import trägt jeder Eintrag zusätzlich
 `member_name` (`"Nachname, Vorname"` der CSV-Zeile), weil die Mitglieder dem Aufrufer noch nicht
 bekannt sein müssen; `POST`/`PUT members` und `member_groups` liefern das Feld nicht.
+
+Der Import vergleicht die Gruppen mit dem Bestand, statt sie zu löschen und neu anzulegen
+(Gruppenzugehörigkeit mit Zeitraum): Neue Mitglieder bekommen ihre Gruppen von Anfang an,
+bei bestehenden Mitgliedern gelten Änderungen ab heute, entfernte Gruppen wandern in den
+Verlauf. `group_changes` (nur bei `type=members`) zählt die bestehenden Mitglieder, deren
+heutige Gruppen sich geändert haben. Wird in einer Zeile keine einzige Gruppe aufgelöst,
+bleiben die Gruppen eines bestehenden Mitglieds unverändert.
 
 **Bestehende Termine bei `appointments`.** Ein Termin gleicher Terminart, gleichen Datums und
 gleicher Startzeit wird aktualisiert statt neu angelegt: Titel und Beschreibung immer, Ort und
