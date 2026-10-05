@@ -322,7 +322,9 @@ test('checkin/js/app.js: apiCall()-Ergebnisse (Konvention: Variable "result") we
     $js = (string) sourceCode($ugfRoot . '/public/checkin/js/app.js');
 
     preg_match_all('/\bresult\.([a-zA-Z_][a-zA-Z0-9_]*)/', $js, $matches);
-    $erlaubt = ['success', 'status', 'data', 'error'];
+    // timedOut gehoert seit OI-85 zur Huellstruktur (Timeout statt Antwort);
+    // die Ladeanzeige der PWA unterscheidet damit ihre Meldung (OI-121).
+    $erlaubt = ['success', 'status', 'data', 'error', 'timedOut'];
     $unerwartet = array_values(array_unique(array_diff($matches[1], $erlaubt)));
 
     assertTrue(
