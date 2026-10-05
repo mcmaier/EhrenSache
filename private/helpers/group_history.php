@@ -186,6 +186,33 @@ function groupsPlanChange(array $current, array $history, array $newGroupIds, ?s
             }
         } else {
             groupHistoryTrim($history, $groupId, $date, $plan);
+            // Lückenloser Anschluss: zusammenführen, statt eine Zuordnung mit Lücke null
+            // zu zerschneiden (Spec 7.1, geändert am 2026-10-05 – sonst hinterlässt jedes
+            // Entfernen-und-Wiederhinzufügen einen Verlaufseintrag).
+            $trimmed = [];
+            foreach ($plan['update_history'] as $u) {
+                $trimmed[$u['history_id']] = $u['valid_to'];
+            }
+            foreach ($history as $h) {
+                $hid = (int) $h['history_id'];
+                if ((int) $h['group_id'] !== $groupId || in_array($hid, $plan['delete_history'], true)) {
+                    continue;
+                }
+                $effectiveTo = $trimmed[$hid] ?? $h['valid_to'];
+                if ($effectiveTo !== $dayBefore) {
+                    continue;
+                }
+                $last = count($plan['insert_current']) - 1;
+                $plan['insert_current'][$last]['valid_from'] = $h['valid_from'];
+                $plan['delete_history'][] = $hid;
+                $plan['update_history'] = array_values(array_filter(
+                    $plan['update_history'],
+                    static function (array $u) use ($hid): bool {
+                        return $u['history_id'] !== $hid;
+                    }
+                ));
+                break;
+            }
         }
     }
 

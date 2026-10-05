@@ -77,8 +77,9 @@ test('groupsPlanChange: Wiederhinzufuegen kuerzt einen ueberlappenden Verlauf', 
         ['history_id' => 10, 'group_id' => 6, 'valid_from' => null,        'valid_to' => '2026-08-31'],
     ];
     $plan = groupsPlanChange([], $history, [5], '2026-06-01');
-    assertSame([['history_id' => 7, 'valid_to' => '2026-05-31']], $plan['update_history'], 'Eintrag 7 endet am Vortag');
-    assertSame([8], $plan['delete_history'], 'Eintrag 8 beginnt nach dem Datum und entfaellt');
+    assertSame([8, 7], $plan['delete_history'], 'Eintrag 8 beginnt nach dem Datum und entfaellt, 7 wird nach Kuerzung zusammengefuehrt');
+    assertSame([], $plan['update_history']);
+    assertSame([['group_id' => 5, 'valid_from' => null]], $plan['insert_current'], 'Anschluss an 7: von Anfang an');
     // 9 endet vorher, 10 ist eine andere Gruppe: unberuehrt
 });
 
@@ -86,9 +87,10 @@ test('groupsPlanChange: Grenzfall hin und zurueck am selben Tag (Spec 7.1)', fun
     $first = groupsPlanChange([1 => null], [], [], '2026-06-01');
     assertSame([['group_id' => 1, 'valid_from' => null, 'valid_to' => '2026-05-31']], $first['insert_history']);
     $second = groupsPlanChange([], [['history_id' => 3, 'group_id' => 1, 'valid_from' => null, 'valid_to' => '2026-05-31']], [1], '2026-06-01');
-    assertSame([['group_id' => 1, 'valid_from' => '2026-06-01']], $second['insert_current']);
+    // Lueckenloser Anschluss: zusammenfuehren, Ergebnis ist der Ausgangszustand.
+    assertSame([['group_id' => 1, 'valid_from' => null]], $second['insert_current']);
+    assertSame([3], $second['delete_history']);
     assertSame([], $second['update_history']);
-    assertSame([], $second['delete_history']);
 });
 
 test('groupsPlanChange: Jahresgrenze beim Vortag', function () {
@@ -106,18 +108,20 @@ test('groupsCheckValidFrom: gueltig, Zukunft, Unsinn', function () {
     assertTrue(groupsCheckValidFrom(null, '2026-10-05') !== null, 'null');
 });
 
-test('groupsPlanChange: Verlauf endet genau am Datum wird gekuerzt', function () {
+test('groupsPlanChange: Verlauf endet genau am Datum wird gekuerzt und zusammengefuehrt', function () {
     $history = [['history_id' => 7, 'group_id' => 5, 'valid_from' => '2026-01-01', 'valid_to' => '2026-06-01']];
     $plan = groupsPlanChange([], $history, [5], '2026-06-01');
-    assertSame([['history_id' => 7, 'valid_to' => '2026-05-31']], $plan['update_history']);
-    assertSame([], $plan['delete_history']);
+    assertSame([['group_id' => 5, 'valid_from' => '2026-01-01']], $plan['insert_current']);
+    assertSame([7], $plan['delete_history']);
+    assertSame([], $plan['update_history']);
 });
 
-test('groupsPlanChange: Verlauf beginnt genau am Vortag bleibt als Eintageszeitraum', function () {
+test('groupsPlanChange: Verlauf beginnt genau am Vortag wird zum Anschluss', function () {
     $history = [['history_id' => 8, 'group_id' => 5, 'valid_from' => '2026-05-31', 'valid_to' => '2026-07-01']];
     $plan = groupsPlanChange([], $history, [5], '2026-06-01');
-    assertSame([['history_id' => 8, 'valid_to' => '2026-05-31']], $plan['update_history']);
-    assertSame([], $plan['delete_history']);
+    assertSame([['group_id' => 5, 'valid_from' => '2026-05-31']], $plan['insert_current']);
+    assertSame([8], $plan['delete_history']);
+    assertSame([], $plan['update_history']);
 });
 
 test('groupsPlanChange: Entfernen kuerzt auch den Verlauf derselben Gruppe', function () {
@@ -140,7 +144,9 @@ test('groupsPlanChange: Entfernen mit Verlaufseintrag loescht spaeter beginnende
 test('groupsPlanChange: IDs als Strings (wie aus PDO) werden erkannt', function () {
     $history = [['history_id' => '7', 'group_id' => '5', 'valid_from' => null, 'valid_to' => '2026-08-31']];
     $plan = groupsPlanChange([], $history, ['5'], '2026-06-01');
-    assertSame([['history_id' => 7, 'valid_to' => '2026-05-31']], $plan['update_history']);
+    assertSame([['group_id' => 5, 'valid_from' => null]], $plan['insert_current']);
+    assertSame([7], $plan['delete_history']);
+    assertSame([], $plan['update_history']);
 });
 
 test('groupsPlanChange: Datum null verdraengt Verlauf beim Hinzufuegen', function () {
@@ -177,4 +183,20 @@ test('groupHistoryDayBefore: Schaltjahr, Monatswechsel, ungueltig', function () 
         $thrown = true;
     }
     assertTrue($thrown, 'InvalidArgumentException erwartet');
+});
+
+test('groupsPlanChange: Anschluss nach Kuerzung wird zusammengefuehrt', function () {
+    $history = [['history_id' => 4, 'group_id' => 1, 'valid_from' => '2025-01-01', 'valid_to' => '2026-08-31']];
+    $plan = groupsPlanChange([], $history, [1], '2026-06-01');
+    assertSame([['group_id' => 1, 'valid_from' => '2025-01-01']], $plan['insert_current']);
+    assertSame([4], $plan['delete_history']);
+    assertSame([], $plan['update_history']);
+});
+
+test('groupsPlanChange: Luecke von einem Tag wird nicht zusammengefuehrt', function () {
+    $history = [['history_id' => 5, 'group_id' => 1, 'valid_from' => null, 'valid_to' => '2026-05-30']];
+    $plan = groupsPlanChange([], $history, [1], '2026-06-01');
+    assertSame([['group_id' => 1, 'valid_from' => '2026-06-01']], $plan['insert_current']);
+    assertSame([], $plan['delete_history']);
+    assertSame([], $plan['update_history']);
 });

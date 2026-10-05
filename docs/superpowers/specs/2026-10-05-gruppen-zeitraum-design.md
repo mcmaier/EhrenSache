@@ -95,13 +95,18 @@ erlaubt. Je Gruppe gilt:
 | unverändert (vorher und nachher angehakt) | Zeile bleibt unberührt, `valid_from` ändert sich nicht |
 | entfernt, `valid_from` NULL oder `< $date` | Verlaufseintrag `(valid_from, $date − 1 Tag)`, Zeile in `member_group_assignments` gelöscht |
 | entfernt, `valid_from >= $date` | **Korrektur:** Zeile gelöscht, **kein** Verlaufseintrag (die Zuordnung hat nie gegolten) |
-| hinzugefügt | neue Zeile mit `valid_from = $date`; Verlaufseinträge derselben Gruppe mit `valid_to >= $date` werden auf `$date − 1 Tag` gekürzt, ein dadurch leerer Eintrag (`valid_to < valid_from`) wird gelöscht |
+| hinzugefügt | neue Zeile mit `valid_from = $date`; Verlaufseinträge derselben Gruppe mit `valid_to >= $date` werden auf `$date − 1 Tag` gekürzt, ein dadurch leerer Eintrag (`valid_to < valid_from`) wird gelöscht; schließt ein Eintrag lückenlos an (`valid_to = $date − 1 Tag`), wird er mit der neuen Zuordnung zusammengeführt (siehe unten) |
 
 **Kürzung des Verlaufs (`groupHistoryTrim()`):** Beim Hinzufügen **und** beim Entfernen werden
 Verlaufseinträge derselben Gruppe mit `valid_to >= $date` auf `$date − 1 Tag` gekürzt bzw.
 gelöscht, wenn sie erst ab `$date` beginnen. Sonst bliebe nach Grenzfall 7.1 und einer späteren
 rückwirkenden Entfernung ein Verlaufseintrag stehen, der über das neue Ende hinausreicht
-(Review-Befund 2026-10-05). `$date` null mit einer Entfernung ist ein Programmierfehler
+(Review-Befund 2026-10-05).
+
+**Zusammenführen beim Hinzufügen (Grenzfall 7.1):** Endet nach der Kürzung ein Verlaufseintrag derselben
+Gruppe genau am Vortag von `$date`, wird er gelöscht und die neue Zuordnung übernimmt sein
+`valid_from` (kann NULL sein), statt mit `valid_from = $date` neu zu beginnen. Beim Entfernen
+ändert sich nichts. `$date` null mit einer Entfernung ist ein Programmierfehler
 (`InvalidArgumentException`). `groups_valid_from` verlangt zusätzlich ein Jahr ab 1000.
 
 Durch die Mitgliedschaftsregel ergänzte Gruppen bekommen dasselbe `$date`. Ergänzt
@@ -204,9 +209,12 @@ dieses Jahres, jeweils mit den Terminen seines Zeitraums.
 
 1. **Am selben Tag hin und zurück:** Häkchen weg (speichern), wieder dran (speichern), beide
    Male Datum heute → die erste Speicherung schreibt einen Verlaufseintrag bis gestern, die
-   zweite kürzt ihn nicht (endet vor heute) und legt die Zuordnung ab heute neu an. Ergebnis:
-   Lücke von null Tagen, Verlaufseintrag + heutige Zuordnung ab heute. Fachlich korrekt
-   (durchgehende Zugehörigkeit), Anzeige „seit heute“. *Bewusst akzeptiert;* kein Zusammenführen.
+   zweite findet einen Eintrag, der lückenlos an das neue Datum anschließt, und führt ihn mit
+   der neuen Zuordnung zusammen. Ergebnis ist der Ausgangszustand (Zuordnung von Anfang an,
+   kein Verlauf). Begründung: Testsuiten und Dialog – ein versehentlich entferntes Häkchen
+   lässt sich spurlos rückgängig machen, und nicht jedes Entfernen-und-Wiederhinzufügen
+   hinterlässt einen Verlaufseintrag. Gilt für jeden lückenlosen Anschluss (Verlaufseintrag
+   endet genau am Vortag des neuen Datums, auch nach der Kürzung), nicht für Lücken ab einem Tag.
 2. **Rückwirkende Korrektur einer neuen Zuordnung:** Gruppe am 10.05. ergänzt, am 20.05. mit
    Datum 01.05. entfernt → Korrektur ohne Verlaufseintrag (4.1, dritte Zeile).
 3. **Austritt während der Gruppenzugehörigkeit:** Gruppenzeitraum und Aktiv-Zeiträume werden
