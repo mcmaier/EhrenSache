@@ -73,7 +73,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Hosting mit knapper Grenze gleichzeitiger Prozesse führte diese Welle zu Fehlern (503). Die
   Dateien tragen die Version jetzt im Pfad und dürfen im Browser liegen; nach einem Update kommen
   sie über die neue Adresse frisch an. Damit erreicht der Versionssprung auch alle Dateien, die
-  bisher ohne Versionsangabe nachgeladen wurden (OI-74).
+  bisher ohne Versionsangabe nachgeladen wurden (OI-74). Der Update-Assistent schreibt
+  `index.html` und `login.html` deshalb als letzte Dateien; wer von Hand hochlädt, lädt diese
+  beiden ebenfalls zuletzt hoch (README).
 
 ### Intern
 - **Neue Suite `js_syntax`:** Jede ausgelieferte JavaScript-Datei (Dashboard, Check-in-App,

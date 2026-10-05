@@ -46,6 +46,17 @@ const UPDATE_NEVER_DELETE_IN = ['private/config/'];
 
 const UPDATE_DELETABLE_EXTENSIONS = ['php', 'js'];
 
+/**
+ * Einstiegsseiten, die der Tausch als letzte schreibt (OI-120). Sie verweisen
+ * auf css/v<Version>/… und js/v<Version>/…, und diese Antworten liegen ein Jahr
+ * im Browser-Cache (immutable), hinter Cloudflare auch an dessen Rand. Stünde
+ * die neue index.html vor den neuen Modulen, bekäme ein Besucher in dieser
+ * Lücke die neue Seite mit alten Dateien -- und behielte sie unter der neuen
+ * Adresse. Zuletzt geschrieben, sieht er entweder die alte Seite mit alten
+ * Adressen oder die neue mit vollständig getauschten Dateien.
+ */
+const UPDATE_APPLY_LAST = ['public/index.html', 'public/login.html'];
+
 function updatePathListed(string $rel, array $liste): bool
 {
     foreach ($liste as $eintrag) {
@@ -112,6 +123,21 @@ function updateListFiles(string $root): array
     return $liste;
 }
 
+/** Reihenfolge des Tauschs: sortiert, die Einstiegsseiten aus UPDATE_APPLY_LAST ans Ende. */
+function updateOrderForApply(array $copy): array
+{
+    $vorne   = [];
+    $zuletzt = [];
+    foreach ($copy as $rel) {
+        if (in_array($rel, UPDATE_APPLY_LAST, true)) {
+            $zuletzt[] = $rel;
+        } else {
+            $vorne[] = $rel;
+        }
+    }
+    return array_merge($vorne, $zuletzt);
+}
+
 /** @return array{copy: list<string>, delete: list<string>} */
 function updateBuildPlan(string $packageRoot, string $installRoot): array
 {
@@ -157,7 +183,7 @@ function updateBuildPlan(string $packageRoot, string $installRoot): array
     }
 
     sort($delete);
-    return ['copy' => $copy, 'delete' => $delete];
+    return ['copy' => updateOrderForApply($copy), 'delete' => $delete];
 }
 
 /** Lässt sich $dir anlegen oder beschreiben? */
@@ -249,6 +275,7 @@ function updateBackup(array $plan, string $installRoot, string $backupDir, array
     return $eintrag;
 }
 
+/** Schreibt in der Reihenfolge des Plans -- die Einstiegsseiten zuletzt (UPDATE_APPLY_LAST). */
 function updateApply(array $plan, string $packageRoot, string $installRoot): void
 {
     foreach ($plan['copy'] as $rel) {

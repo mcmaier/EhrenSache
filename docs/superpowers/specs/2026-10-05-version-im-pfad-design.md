@@ -97,6 +97,15 @@ Der Kommentarblock „CACHING“ in `public/.htaccess` wird auf das neue Verfahr
 - Wer während eines Updates das alte Dashboard offen hat und danach ein spät geladenes Modul
   nachlädt (`import('./features.js')`), bekommt die neue Datei unter dem alten Pfad — derselbe
   Fall wie heute, nur für offene Tabs im Moment des Updates.
+- **Lücke beim Dateitausch:** Der Tausch ist nicht atomar. Stünde die neue `index.html` schon
+  da, die Module aber noch nicht, bekäme ein Besucher die neue Seite mit `v<neu>/`-Pfaden und
+  alten Dateien — und hielte sie ein Jahr (`immutable`), hinter Cloudflare auch dessen Rand.
+  Gegenmittel: Der Updater schreibt `public/index.html` und `public/login.html` als letzte
+  Dateien (`UPDATE_APPLY_LAST` in `private/helpers/update_swap.php`, Test in
+  `update_swap_unit.php`); README und `docs/DEMO.md` verlangen beim Hochladen von Hand dieselbe
+  Reihenfolge; „Purge Everything“ bei Cloudflare bleibt nach jedem Update Pflicht. Er fängt ab,
+  was die Reihenfolge nicht abdeckt: einen Upload von Hand in falscher Reihenfolge oder einen
+  Tausch, der mittendrin abbricht.
 - In `index.html` steht die Version danach rund 25-mal. Ein Versionssprung ist trotzdem ein
   Suchen und Ersetzen; der Test meldet jede vergessene Stelle.
 
@@ -134,9 +143,9 @@ In einer bestehenden HTTP-Suite (oder einer neuen, falls keine passt):
 - **OI-120:** Vermerk „Weg 2 als Version im Pfad umgesetzt (Spec 2026-10-05-version-im-pfad);
   der Erstbesuch lädt weiter einzeln, Bündeln bleibt offen“.
 - **OI-74:** erledigt.
-- **`docs/DEMO.md`:** Nach einem Update ist für versionierte Dateien kein „Purge“ bei Cloudflare
-  mehr nötig (neuer Pfad = neue Adresse), für die HTML-Seiten weiterhin. Die bestehende
-  Cache-Regel (Edge TTL für css/js) bleibt sinnvoll.
+- **`docs/DEMO.md`:** Versionierte Dateien bekommen mit jedem Update neue Adressen; der „Purge“
+  bei Cloudflare bleibt trotzdem nach jedem Update Pflicht (Lücke beim Dateitausch, 3.4). Die
+  bestehende Cache-Regel (Edge TTL für css/js) bleibt sinnvoll.
 - **Release-Ablauf:** Beim Versionssprung wird der Abschnitt `v<Version>` in `index.html` und
   `login.html` mit ersetzt — wo heute `?v=` steht. `CLAUDE.md` erwähnt das im Abschnitt
   Konventionen beim Versionssprung.
