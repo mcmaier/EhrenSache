@@ -30,12 +30,23 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
 
                     if($member) {
                         // Lade zugehörige Gruppen
-                        $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name
+                        $groupStmt = $db->prepare(" SELECT g.group_id, g.group_name, mga.valid_from
                                                     FROM {$prefix}member_groups g
                                                     INNER JOIN {$prefix}member_group_assignments mga ON g.group_id = mga.group_id
                                                     WHERE mga.member_id = ?");
                         $groupStmt->execute([$id]);
                         $member['groups'] = $groupStmt->fetchAll(PDO::FETCH_ASSOC);
+                        // Beendete Zuordnungen, neueste zuerst (Spec 2026-10-05, 6.1)
+                        $historyStmt = $db->prepare("SELECT h.group_id, g.group_name, h.valid_from, h.valid_to
+                                                       FROM {$prefix}member_group_history h
+                                                       JOIN {$prefix}member_groups g ON g.group_id = h.group_id
+                                                      WHERE h.member_id = ?
+                                                      ORDER BY h.valid_to DESC, g.group_name");
+                        $historyStmt->execute([$id]);
+                        $member['group_history'] = array_map(static fn ($h) => [
+                            'group_id' => (int) $h['group_id'], 'group_name' => $h['group_name'],
+                            'valid_from' => $h['valid_from'], 'valid_to' => $h['valid_to'],
+                        ], $historyStmt->fetchAll(PDO::FETCH_ASSOC));
                         $member = memberPublicRow($member);
 
                         echo json_encode($member ?: []);
@@ -324,10 +335,7 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 if(isset($cleanData->group_ids) && is_array($cleanData->group_ids)) {
                     // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
                     $normalized = groupsWithParents($db, $database, $cleanData->group_ids);
-                    $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-                    foreach($normalized['group_ids'] as $groupId) {
-                        $groupStmt->execute([$memberId, $groupId]);
-                    }
+                    groupsApplyChange($db, $database, (int) $memberId, $normalized['group_ids'], null);
                     [$addedGroups, $groupWarnings] = groupsRuleReport((int) $memberId, $normalized);
                 }
                 http_response_code(201);
@@ -347,7 +355,7 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
             $data = json_decode(file_get_contents("php://input"));
 
             // Erlaubte Felder
-            $allowedFields = ['name', 'surname', 'member_number', 'active', 'group_ids'];
+            $allowedFields = ['name', 'surname', 'member_number', 'active', 'group_ids', 'groups_valid_from'];
             $cleanData = new stdClass();
             foreach ($allowedFields as $field) {
                 if (isset($data->$field)) {
@@ -360,6 +368,17 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 http_response_code(400);
                 echo json_encode(["message" => $groupIdsError, "field" => "group_ids"]);
                 break;
+            }
+
+            // groups_valid_from (Spec 2026-10-05, 4.2): nur heute oder Vergangenheit
+            $groupsValidFrom = date('Y-m-d');
+            if (isset($cleanData->groups_valid_from)) {
+                if (($validFromError = groupsCheckValidFrom($cleanData->groups_valid_from, date('Y-m-d'))) !== null) {
+                    http_response_code(422);
+                    echo json_encode(["message" => $validFromError, "field" => "groups_valid_from"]);
+                    break;
+                }
+                $groupsValidFrom = $cleanData->groups_valid_from;
             }
 
             // Umgebende Leerzeichen entfernen — siehe POST weiter oben.
@@ -465,16 +484,12 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
             $addedGroups = [];
             $groupWarnings = [];
             if (isset($cleanData->group_ids)) {
-                $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
-                if (is_array($cleanData->group_ids)) {
-                    // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
-                    $normalized = groupsWithParents($db, $database, $cleanData->group_ids);
-                    $groupStmt = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-                    foreach ($normalized['group_ids'] as $groupId) {
-                        $groupStmt->execute([$id, $groupId]);
-                    }
-                    [$addedGroups, $groupWarnings] = groupsRuleReport((int) $id, $normalized);
-                }
+                // Mitgliedschaftsregel (Spec 2026-10-02, 4.1): Register ziehen ihre Gruppe nach.
+                $normalized = is_array($cleanData->group_ids)
+                    ? groupsWithParents($db, $database, $cleanData->group_ids)
+                    : ['group_ids' => [], 'added' => [], 'warnings' => []];
+                groupsApplyChange($db, $database, (int) $id, $normalized['group_ids'], $groupsValidFrom);
+                [$addedGroups, $groupWarnings] = groupsRuleReport((int) $id, $normalized);
             }
 
             echo json_encode(["message" => "Member updated",
@@ -512,6 +527,7 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 $db->prepare("DELETE FROM {$prefix}exceptions               WHERE member_id = ?")->execute([$id]);
                 $db->prepare("DELETE FROM {$prefix}membership_dates         WHERE member_id = ?")->execute([$id]);
                 $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ?")->execute([$id]);
+                $db->prepare("DELETE FROM {$prefix}member_group_history     WHERE member_id = ?")->execute([$id]);
                 $db->prepare("UPDATE {$prefix}users SET member_id = NULL    WHERE member_id = ?")->execute([$id]);
                 $db->prepare("DELETE FROM {$prefix}members                  WHERE member_id = ?")->execute([$id]);
 

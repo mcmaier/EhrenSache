@@ -191,3 +191,65 @@ function groupsPlanChange(array $current, array $history, array $newGroupIds, ?s
 
     return $plan;
 }
+
+/**
+ * Fuehrt eine Gruppenaenderung fuer ein Mitglied aus (Spec 2026-10-05, 4.1).
+ * $newGroupIds ist bereits durch groupsWithParents() gelaufen. Laeuft in der
+ * Transaktion des Aufrufers oder in einer eigenen.
+ *
+ * @param array<int, int|string> $newGroupIds
+ * @return bool ob sich die heutigen Zuordnungen geaendert haben
+ */
+function groupsApplyChange(PDO $db, $database, int $memberId, array $newGroupIds, ?string $date): bool
+{
+    $prefix = $database->table('');
+    $own    = !$db->inTransaction();
+    if ($own) {
+        $db->beginTransaction();
+    }
+    try {
+        $stmt = $db->prepare("SELECT group_id, valid_from FROM {$prefix}member_group_assignments WHERE member_id = ?");
+        $stmt->execute([$memberId]);
+        $current = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $current[(int) $row['group_id']] = $row['valid_from'];
+        }
+        $stmt = $db->prepare("SELECT history_id, group_id, valid_from, valid_to FROM {$prefix}member_group_history WHERE member_id = ?");
+        $stmt->execute([$memberId]);
+        $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $plan = groupsPlanChange($current, $history, $newGroupIds, $date);
+
+        $ins = $db->prepare("INSERT INTO {$prefix}member_group_history (member_id, group_id, valid_from, valid_to) VALUES (?, ?, ?, ?)");
+        foreach ($plan['insert_history'] as $h) {
+            $ins->execute([$memberId, $h['group_id'], $h['valid_from'], $h['valid_to']]);
+        }
+        $del = $db->prepare("DELETE FROM {$prefix}member_group_assignments WHERE member_id = ? AND group_id = ?");
+        foreach ($plan['delete_current'] as $groupId) {
+            $del->execute([$memberId, $groupId]);
+        }
+        $upd = $db->prepare("UPDATE {$prefix}member_group_history SET valid_to = ? WHERE history_id = ? AND member_id = ?");
+        foreach ($plan['update_history'] as $h) {
+            $upd->execute([$h['valid_to'], $h['history_id'], $memberId]);
+        }
+        $delH = $db->prepare("DELETE FROM {$prefix}member_group_history WHERE history_id = ? AND member_id = ?");
+        foreach ($plan['delete_history'] as $historyId) {
+            $delH->execute([$historyId, $memberId]);
+        }
+        $insC = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id, valid_from) VALUES (?, ?, ?)");
+        foreach ($plan['insert_current'] as $c) {
+            $insC->execute([$memberId, $c['group_id'], $c['valid_from']]);
+        }
+
+        if ($own) {
+            $db->commit();
+        }
+    } catch (Throwable $e) {
+        if ($own) {
+            $db->rollBack();
+        }
+        throw $e;
+    }
+
+    return $plan['insert_current'] !== [] || $plan['delete_current'] !== [];
+}

@@ -70,13 +70,24 @@ function handleMyData($db, $database, $request_method, $authUserId)
 
     // 3. Gruppenzugehörigkeiten
     $stmt = $db->prepare("
-        SELECT mg.group_name, mg.description
+        SELECT mg.group_name, mg.description, mga.valid_from
         FROM {$prefix}member_group_assignments mga
         JOIN {$prefix}member_groups mg ON mga.group_id = mg.group_id
         WHERE mga.member_id = ?
     ");
     $stmt->execute([$member_id]);
     $data['groups'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Beendete Gruppenzugehoerigkeiten (Spec 2026-10-05) -- personenbezogen, gehoeren in die Auskunft
+    $stmt = $db->prepare("
+        SELECT mg.group_name, h.valid_from, h.valid_to
+        FROM {$prefix}member_group_history h
+        JOIN {$prefix}member_groups mg ON h.group_id = mg.group_id
+        WHERE h.member_id = ?
+        ORDER BY h.valid_to DESC
+    ");
+    $stmt->execute([$member_id]);
+    $data['group_history'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // 4. Anwesenheitsdaten
     $stmt = $db->prepare("
@@ -185,8 +196,10 @@ function handleMyData($db, $database, $request_method, $authUserId)
     // des Profilings (DATENSCHUTZ.md, Abschnitt 11). Ausgeschaltet: leer.
     require_once __DIR__ . '/../helpers/punctuality.php';
 
-    $groupStmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?");
-    $groupStmt->execute([$member_id]);
+    // Heutige und ehemalige Gruppen, damit Jahre vor einem Wechsel ihre Gruppe behalten
+    $groupStmt = $db->prepare("SELECT group_id FROM {$prefix}member_group_assignments WHERE member_id = ?
+                               UNION SELECT group_id FROM {$prefix}member_group_history WHERE member_id = ?");
+    $groupStmt->execute([$member_id, $member_id]);
     $ownGroupIds = array_map('intval', $groupStmt->fetchAll(PDO::FETCH_COLUMN));
 
     $data['behavior'] = punctualityByYear($db, $database, (int) $member_id, $ownGroupIds);

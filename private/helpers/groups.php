@@ -10,6 +10,8 @@
  */
 declare(strict_types=1);
 
+require_once __DIR__ . '/group_history.php';
+
 /** Vorgabe, wenn die Einstellung fehlt oder unbrauchbar ist. */
 const GROUP_SUBGROUP_LABEL_DEFAULT = 'Untergruppe';
 
@@ -186,18 +188,20 @@ function groupsApplySubgroupRule($db, $database, int $subgroupId): array
     }
 
     $in   = implode(',', array_fill(0, count($parents), '?'));
-    $stmt = $db->prepare("SELECT a.member_id FROM {$prefix}member_group_assignments a
+    $stmt = $db->prepare("SELECT a.member_id, a.valid_from FROM {$prefix}member_group_assignments a
                            WHERE a.group_id = ?
                              AND NOT EXISTS (SELECT 1 FROM {$prefix}member_group_assignments p
                                               WHERE p.member_id = a.member_id AND p.group_id IN ({$in}))
                            ORDER BY a.member_id");
     $stmt->execute(array_merge([$subgroupId], $parents));
-    $memberIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $insert = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id) VALUES (?, ?)");
-    foreach ($memberIds as $memberId) {
+    // Die ergaenzte Gruppe gilt ab demselben Tag wie die Registerzuordnung (Spec 2026-10-05, 4.1).
+    $insert = $db->prepare("INSERT INTO {$prefix}member_group_assignments (member_id, group_id, valid_from) VALUES (?, ?, ?)");
+    foreach ($rows as $row) {
+        $memberId = (int) $row['member_id'];
         if (count($parents) === 1) {
-            $insert->execute([$memberId, $parents[0]]);
+            $insert->execute([$memberId, $parents[0], $row['valid_from']]);
             $result['added'][] = ['member_id' => $memberId, 'group_id' => $parents[0]];
         } else {
             $result['warnings'][] = ['member_id' => $memberId, 'subgroup_id' => $subgroupId];

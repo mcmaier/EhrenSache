@@ -549,12 +549,22 @@ Die Einzelantwort ist ein Objekt und trägt statt der beiden Zeichenketten ein `
   "active": 1,
   "created_at": "2026-09-10 11:41:55",
   "groups": [
-    { "group_id": 2, "group_name": "Jugend" },
-    { "group_id": 5720, "group_name": "Klarinetten" }
+    { "group_id": 2, "group_name": "Jugend", "valid_from": null },
+    { "group_id": 5720, "group_name": "Klarinetten", "valid_from": "2026-06-01" }
+  ],
+  "group_history": [
+    { "group_id": 9, "group_name": "Horn", "valid_from": null, "valid_to": "2026-05-31" }
   ],
   "has_pin": false
 }
 ```
+
+`groups[].valid_from` ist der Beginn der heutigen Zuordnung (`null` = von Anfang an),
+`group_history` die beendeten Zuordnungen, neueste zuerst. Beim `PUT` steuert das optionale
+`groups_valid_from` (`JJJJ-MM-TT`, heute oder früher, Vorgabe heute), ab wann eine Änderung von
+`group_ids` gilt; ein ungültiges oder künftiges Datum ergibt `422` mit `field: groups_valid_from`,
+ohne dass etwas gespeichert wird. `GET my_data` führt dasselbe als `groups[].valid_from` und
+`group_history` auf.
 
 Ein `user` ohne Admin- oder Managerrolle bekommt auf denselben Endpunkt nur die eigenen
 Stammdaten (`member_id`, `name`, `surname`, `member_number`, `active`, `group_ids`,
