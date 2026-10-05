@@ -258,15 +258,20 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
         }
     }
 
+    // worktimeStatistics() filtert nur bei gesetzter member_id; null heisst
+    // dort "alle Mitglieder". Ein Nicht-Verwalter ohne verknuepftes Mitglied
+    // hat keine eigenen Stunden -- 0 trifft niemanden und liefert die leere
+    // Form, statt die Stunden aller Mitglieder. Gilt fuer beide Pfade unten.
+    $worktimeMemberId = (!isAdminOrManager() && $memberId === null) ? 0 : $memberId;
+
     if (!$attendanceOn) {
         // Nur der Arbeitszeitblock: Quote, Kopfzahlen, Puenktlichkeit und
-        // Zuverlaessigkeit sind Anwesenheitswerte und entfallen ganz. $memberId
-        // ist oben fuer Nicht-Verwalter bereits auf das eigene Mitglied gesetzt.
+        // Zuverlaessigkeit sind Anwesenheitswerte und entfallen ganz.
         echo json_encode([
             'warning'  => $warning,
             'year'     => $year,
             'worktime' => worktimeStatistics(
-                $db, $database, worktimeResolvePeriod(null, null, $year), $memberId
+                $db, $database, worktimeResolvePeriod(null, null, $year), $worktimeMemberId
             ),
         ]);
         return;
@@ -282,12 +287,6 @@ function handleStatistics($db, $database, $request_method, $authUserId, $authUse
         && isWorktimeEnabled($db, $database)) {
         // Die Statistikseite bleibt jahresbasiert. Der Zeitraum ist ein
         // Berichtsparameter der Exporte, siehe worktimeResolvePeriod().
-        //
-        // worktimeStatistics() filtert nur bei gesetzter member_id; null heisst
-        // dort "alle Mitglieder". Ein Nicht-Verwalter ohne verknuepftes Mitglied
-        // hat keine eigenen Stunden -- 0 trifft niemanden und liefert die leere
-        // Form, statt die Stunden aller Mitglieder.
-        $worktimeMemberId = (!isAdminOrManager() && $memberId === null) ? 0 : $memberId;
         $result['worktime'] = worktimeStatistics(
             $db, $database, worktimeResolvePeriod(null, null, $year), $worktimeMemberId
         );
