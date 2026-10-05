@@ -236,7 +236,7 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
                 'has_access'        => $hasAccess,
             ];
         }
-        $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds);
+        $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds, (string) $apt['date']);
         $payload['summary']['open_without_access'] = $openWithoutAccess;
 
         if ($started) {
@@ -253,7 +253,7 @@ function responsesPayload($db, $database, array $apt, bool $isManager, ?int $vie
             'group_name' => $m['group_name'],
             'status'     => $responses[$id]['status'] ?? null,
         ], $expected, array_keys($expected)));
-        $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds);
+        $payload['members'] = groupsAttachToMembers($db, $database, $members, $termGroupIds, (string) $apt['date']);
     }
 
     return $payload;

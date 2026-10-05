@@ -151,6 +151,7 @@ In `private/helpers/group_history.php`:
 | `responsesFetchExpected()` (`responses.php`) | Rückmeldedialog und Druck eines Termins |
 | `attendance_list.php`, Modus je Termin | Anwesenheitsliste vergangener Termine |
 | `attendance_list.php`, Modus je Mitglied | Termine des Jahres, zu denen das Mitglied am Termindatum über eine Gruppe gehörte — auch wenn es heute in keiner Gruppe mehr steht (bisher Abbruch ohne Termine) |
+| `groupsAttachToMembers()` mit Termindatum | Abschnitte (Gruppe/Register) in Rückmeldedialog und Anwesenheitsliste je Termin |
 | `attendanceActiveMemberCount()` (`attendance.php`) | Mitgliederzahl einer Gruppe im Jahr: Zeitraum überschneidet das Jahr **und** aktiv |
 
 ### 5.3 Bleiben beim heutigen Stand
@@ -159,8 +160,7 @@ Kommende Termine in Rückmeldung und App (`responsesFetchUpcomingIds()`,
 `responsesFetchUpcomingInfo()` — ohne Zukunftsdaten ist der heutige Stand dort richtig), Check-in
 (`auto_checkin.php`), Station, Zeiterfassung (`worktime.php`, `work_sessions.php`), Export,
 Gruppenanzeige im Mitgliederdialog, Kopfzeile des Mitgliedsmodus in `attendance_list.php`
-(Gruppennamen von heute), Registerzuordnung der Anwesenheitsliste (`groupsAttachToMembers()`),
-Terminregeln
+(Gruppennamen von heute), Terminregeln
 (`appointment_rules.php`).
 
 ### 5.4 Statistikzugriff der Rolle `user` (E5)
@@ -218,7 +218,9 @@ dieses Jahres, jeweils mit den Terminen seines Zeitraums.
 2. **Rückwirkende Korrektur einer neuen Zuordnung:** Gruppe am 10.05. ergänzt, am 20.05. mit
    Datum 01.05. entfernt → Korrektur ohne Verlaufseintrag (4.1, dritte Zeile).
 3. **Austritt während der Gruppenzugehörigkeit:** Gruppenzeitraum und Aktiv-Zeiträume werden
-   geschnitten; gezählt wird nur, wo beide gelten.
+   geschnitten; gezählt wird nur, wo beide gelten. Die Kopfzahl `total_members`
+   (`attendanceActiveMemberCount()`) zählt bewusst einfacher: Gruppenzeitraum überschneidet das
+   Jahr **und** im Jahr aktiv, ohne Schnitt beider Zeiträume — die Zahl wird nur in der API ausgegeben.
 4. **Register:** `expectedPairsScopeSql()` prüft die Registerzugehörigkeit am Termindatum, die
    Zuordnung Register → Gruppe (`subgroup_parents`) bleibt ohne Zeitraum.
 5. **Demo-Generator:** schreibt keinen Verlauf; `member_group_history` steht in `DEMO_TABLES`

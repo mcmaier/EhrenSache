@@ -130,7 +130,7 @@ function handleAttendanceList($db, $database, $method, $id) {
         // nur strukturiert) und alle Untergruppen des Mitglieds -- Letztere
         // bewusst ohne die Einschränkung auf die Gruppen der Terminart, denn
         // genau daran fehlte die Gliederung nach Register bis 1.8.0.
-        $members = groupsAttachToMembers($db, $database, $members, $group_ids);
+        $members = groupsAttachToMembers($db, $database, $members, $group_ids, (string) $appointment['date']);
 
         // Offene Antraege je Mitglied (seit 1.12.0): Die PWA laesst Admin und
         // Manager sie live in der Liste bescheiden. Nur offene -- genehmigte

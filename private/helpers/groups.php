@@ -87,10 +87,15 @@ function groupsSortForDisplay(array $groups): array
  * @param PDO $db Datenbankverbindung
  * @param Database $database Liefert den Tabellenpräfix über table()
  * @param array<int, array<string, mixed>> $members Zeilen mit member_id, werden um groups/subgroups ergänzt
+ * Mit $onDate (JJJJ-MM-TT, z. B. das Termindatum) zaehlen Gruppen und Register,
+ * in denen das Mitglied an diesem Tag war (Gruppenzeitraum, Spec 2026-10-05);
+ * ohne Datum der heutige Stand wie bisher.
+ *
  * @param array<int, int|string> $termGroupIds Gruppen-IDs, die als `groups` gelten
+ * @param string|null $onDate Stichtag fuer die Zugehoerigkeit, null = heute
  * @return array<int, array<string, mixed>>
  */
-function groupsAttachToMembers($db, $database, array $members, array $termGroupIds): array
+function groupsAttachToMembers($db, $database, array $members, array $termGroupIds, ?string $onDate = null): array
 {
     if (empty($members)) {
         return $members;
@@ -100,13 +105,23 @@ function groupsAttachToMembers($db, $database, array $members, array $termGroupI
     $memberIds = array_map(static fn ($m) => (int) $m['member_id'], $members);
     $inMembers = str_repeat('?,', count($memberIds) - 1) . '?';
 
+    if ($onDate === null) {
+        $source = "{$prefix}member_group_assignments";
+        $filter = '';
+        $params = $memberIds;
+    } else {
+        $source = groupAssignmentsSql($database);
+        $filter = ' AND ' . groupAssignmentActiveOn('mga', '?');
+        // Der Platzhalter steht zweimal im Ausdruck (valid_from und valid_to)
+        $params = array_merge($memberIds, [$onDate, $onDate]);
+    }
     $stmt = $db->prepare("
         SELECT mga.member_id, g.group_id, g.group_name, g.sort_order, g.is_subgroup
-        FROM {$prefix}member_group_assignments mga
+        FROM {$source} mga
         JOIN {$prefix}member_groups g ON g.group_id = mga.group_id
-        WHERE mga.member_id IN ($inMembers)
+        WHERE mga.member_id IN ($inMembers){$filter}
     ");
-    $stmt->execute($memberIds);
+    $stmt->execute($params);
 
     $termGroups = array_map('intval', $termGroupIds);
     $byMember   = [];

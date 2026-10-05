@@ -211,6 +211,68 @@ test('Anwesenheitsliste je Mitglied: Termine aus dem jeweiligen Zeitraum', funct
     assertSame($expected, $got, 'nur A1 und B2');
 });
 
+test('Abschnitte vergangener Termine: Gruppe am Termindatum, nicht von heute', function () use (&$ghrWorld) {
+    assertTrue(!empty($ghrWorld['members']['N']), 'Welt fehlt');
+    $w = $ghrWorld;
+    $groupIdsOf = static function (string $resource, array $res) use ($w): array {
+        assertStatus(200, $res, $res['raw']);
+        foreach ($res['body']['members'] ?? [] as $m) {
+            if ((int) $m['member_id'] === $w['members']['M']) {
+                return array_map(static fn ($g) => (int) $g['group_id'], $m['groups'] ?? []);
+            }
+        }
+        assertTrue(false, "M fehlt in {$resource}");
+        return [];
+    };
+    $list = apiRequest('GET', 'attendance_list', ['token' => apiToken('admin'), 'query' => ['appointment_id' => $w['appointments']['A1']]]);
+    assertSame([$w['groups']['A']], $groupIdsOf('attendance_list', $list), 'Anwesenheitsliste A1: M steht in A, nicht in B');
+    $resp = apiRequest('GET', 'appointment_responses', ['token' => apiToken('admin'), 'query' => ['appointment_id' => $w['appointments']['A1']]]);
+    assertSame([$w['groups']['A']], $groupIdsOf('appointment_responses', $resp), 'Rueckmeldung A1: M steht in A, nicht in B');
+});
+
+test('Statistik: Mitgliederzahl je Gruppe und Jahr mit Gruppenzeitraum', function () use (&$ghrWorld) {
+    assertTrue(!empty($ghrWorld['members']['N']), 'Welt fehlt');
+    $w   = $ghrWorld;
+    $cnt = static fn (int $year, int $g): int =>
+        (int) ghrStats(['year' => $year], ['group_id' => $g])['summary']['total_members'];
+    assertSame(2, $cnt($w['year'], $w['groups']['A']), 'Vorjahr A: M (Verlauf) und N');
+    assertSame(1, $cnt($w['year'], $w['groups']['B']), 'Vorjahr B: M ab 01.06.');
+    assertSame(1, $cnt($w['year'] + 1, $w['groups']['A']), 'laufendes Jahr A: nur N');
+    assertSame(1, $cnt($w['year'] + 1, $w['groups']['B']), 'laufendes Jahr B: M');
+});
+
+test('Doppelgruppe am Termindatum: Mitglied steht nur einmal in Liste und Rueckmeldung', function () {
+    $y = (int) date('Y') - 1;
+    $s = uniqid();
+    $ids = ['appointments' => [], 'members' => [], 'types' => [], 'groups' => []];
+    try {
+        $a = $ids['groups'][] = ghrCreate('member_groups', ['group_name' => "GHR DA {$s}"]);
+        $b = $ids['groups'][] = ghrCreate('member_groups', ['group_name' => "GHR DB {$s}"]);
+        $t = $ids['types'][] = ghrCreate('appointment_types', ['type_name' => "GHR DT {$s}", 'is_default' => 0,
+            'color' => '#667eea', 'group_ids' => [$a, $b], 'responses_enabled' => 1]);
+        $q = $ids['members'][] = ghrCreate('members', ['name' => 'Ghr', 'surname' => "DQ {$s}", 'active' => 1, 'group_ids' => [$a]]);
+        foreach ([[[$a, $b], "{$y}-06-01"], [[$b], "{$y}-09-01"]] as [$groups, $from]) {
+            $put = apiRequest('PUT', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $q],
+                'body' => ['group_ids' => $groups, 'groups_valid_from' => $from]]);
+            assertStatus(200, $put, $put['raw']);
+        }
+        $apt = $ids['appointments'][] = ghrCreate('appointments', ['title' => 'GHR D', 'date' => "{$y}-07-01",
+            'start_time' => '19:00:00', 'type_id' => $t]);
+        $count = static function (string $resource) use ($apt, $q): int {
+            $res = apiRequest('GET', $resource, ['token' => apiToken('admin'), 'query' => ['appointment_id' => $apt]]);
+            assertStatus(200, $res, $res['raw']);
+            return count(array_filter($res['body']['members'] ?? [], static fn ($m) => (int) $m['member_id'] === $q));
+        };
+        assertSame(1, $count('attendance_list'), 'Anwesenheitsliste: Q genau einmal');
+        assertSame(1, $count('appointment_responses'), 'Rueckmeldung: Q genau einmal');
+    } finally {
+        foreach ($ids['appointments'] as $id) { ghrDelete('appointments', $id); }
+        foreach ($ids['members'] as $id)      { ghrDelete('members', $id); }
+        foreach ($ids['types'] as $id)        { ghrDelete('appointment_types', $id); }
+        foreach (array_reverse($ids['groups']) as $id) { ghrDelete('member_groups', $id); }
+    }
+});
+
 test('Anwesenheitsliste je Mitglied: auch ohne heutige Gruppe', function () use (&$ghrWorld) {
     assertTrue(!empty($ghrWorld['members']['N']), 'Welt fehlt');
     $w = $ghrWorld;
