@@ -2310,7 +2310,7 @@ Siehe [OI-74](#oi-74--der-cache-bust-erreicht-nur-einen-teil-der-dateien) — di
 
 ---
 
-### OI-121 · Der Dashboard-Start lädt in fünf Stufen nacheinander
+### OI-121 · Dashboard und Check-in-App laden beim Start Stufe für Stufe
 **Priorität:** mittel · aufgenommen am 2026-10-05 (Messung auf der Demo nach dem Update auf 1.20.1)
 
 Nach dem Fix der Sitzungssperre (1.20.1) laufen gleichzeitige API-Abrufe auch gleichzeitig; ein
@@ -2338,7 +2338,19 @@ an `me` (Rolle). Version und Jahresliste sperren die Ansicht, ohne dass sie sie 
 Profilabrufe hängen voneinander nicht ab. Jeder Ausreißer auf diesem Weg addiert sich, bei rund
 zehn Abrufen trifft es grob jeden dritten Seitenaufruf.
 
-**Ziel:** nach `me` alles Nötige gleichzeitig, also zwei Stufen statt fünf. Ein Ausreißer kostet
+**Check-in-App: zehn Stufen, und solange steht die Anmeldemaske da.** Gemessen am selben Tag,
+angemeldet als Mitglied, Handy-Ansicht. `checkAutoLogin()` (`public/checkin/js/app.js`) wartet
+jeden Abruf einzeln ab: `me` → `appointment_types` → `me` (ein zweites Mal, in
+`loadUserData()`) → `members&id` → `activity_types` → `work_sessions&running=1` →
+`settings&scope=client` → `appointments` (heute) → dann `my_open_items` und
+`appointment_responses`. Erst danach blendet `showScreen('main')` die App ein. Bis dahin sieht
+ein angemeldetes Mitglied die **Anmeldemaske** — in zwei Läufen 1,7 s und 3,1 s lang (im zweiten
+mit zwei Ausreißern). Im Mobilfunk kostet jede Stufe zusätzlich die Laufzeit der Verbindung
+(typisch 50 bis 150 ms), die Kette vervielfacht sie. Das ist der Hauptgrund für den Eindruck „vor
+allem mobil langsam“.
+
+**Ziel:** nach `me` alles Nötige gleichzeitig, also zwei Stufen statt fünf (Dashboard) bzw. zehn
+(Check-in-App). Ein Ausreißer kostet
 dann höchstens einmal eine Sekunde. Reiner Frontend-Umbau, keine Migration. Konzept in Arbeit
 (Spec unter `docs/superpowers/specs/`).
 
