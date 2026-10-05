@@ -81,3 +81,8 @@ test('Cache: saveMember verwirft weiter alle Jahre (rueckwirkende Aenderung)', f
     }
     assertTrue(!str_contains($dep, 'invalidateCache(key, '), 'invalidateMemberDependents darf nicht auf ein Jahr eingrenzen');
 });
+
+test('JS: Daten im Verlauf zweistellig (31.05.2026)', function () use ($ghfRoot) {
+    $js = (string) sourceCode($ghfRoot . '/public/js/modules/members.js');
+    assertTrue(str_contains(ghfBody($js, 'formatIsoDateDe'), "month: '2-digit'"), 'Datum nicht zweistellig formatiert');
+});

@@ -600,7 +600,8 @@ function syncMemberGroupCheckboxes(changed) {
 
 /** JJJJ-MM-TT → TT.MM.JJJJ */
 function formatIsoDateDe(iso) {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('de-DE');
+    // Zweistellig wie im übrigen Dashboard (31.05.2026, nicht 31.5.2026)
+    return new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function isoOfLocalDate(d) {
