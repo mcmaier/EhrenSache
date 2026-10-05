@@ -97,6 +97,13 @@ erlaubt. Je Gruppe gilt:
 | entfernt, `valid_from >= $date` | **Korrektur:** Zeile gelöscht, **kein** Verlaufseintrag (die Zuordnung hat nie gegolten) |
 | hinzugefügt | neue Zeile mit `valid_from = $date`; Verlaufseinträge derselben Gruppe mit `valid_to >= $date` werden auf `$date − 1 Tag` gekürzt, ein dadurch leerer Eintrag (`valid_to < valid_from`) wird gelöscht |
 
+**Kürzung des Verlaufs (`groupHistoryTrim()`):** Beim Hinzufügen **und** beim Entfernen werden
+Verlaufseinträge derselben Gruppe mit `valid_to >= $date` auf `$date − 1 Tag` gekürzt bzw.
+gelöscht, wenn sie erst ab `$date` beginnen. Sonst bliebe nach Grenzfall 7.1 und einer späteren
+rückwirkenden Entfernung ein Verlaufseintrag stehen, der über das neue Ende hinausreicht
+(Review-Befund 2026-10-05). `$date` null mit einer Entfernung ist ein Programmierfehler
+(`InvalidArgumentException`). `groups_valid_from` verlangt zusätzlich ein Jahr ab 1000.
+
 Durch die Mitgliedschaftsregel ergänzte Gruppen bekommen dasselbe `$date`. Ergänzt
 `groupsApplySubgroupRule()` (Register bekommt eine Gruppe) Mitglieder, übernimmt die neue
 Zuordnung das `valid_from` der Registerzuordnung. Alles läuft in einer
