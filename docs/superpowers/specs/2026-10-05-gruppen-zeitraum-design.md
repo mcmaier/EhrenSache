@@ -79,8 +79,14 @@ Der Zweig zieht `private/setup/ehrensache_db.sql` nach und liefert
 
 ### 4.1 Ein Baustein für alle Schreibwege
 
-`groupsApplyChange(PDO $db, $database, int $memberId, array $newGroupIds, ?string $date): array`
-in `private/helpers/groups.php`. `$newGroupIds` ist bereits durch `groupsWithParents()`
+Aufgeteilt in einen reinen Planer und einen Ausführer (beide in `private/helpers/group_history.php`):
+
+- `groupsPlanChange(array $current, array $history, array $newGroupIds, ?string $date): array` —
+  rechnet ohne Datenbank aus, welche Zeilen anzulegen, zu löschen und zu kürzen sind
+  (Unit-Test ohne Datenbank).
+- `groupsApplyChange(PDO $db, $database, int $memberId, array $newGroupIds, ?string $date): bool` —
+  liest den Stand, ruft den Planer, schreibt; Rückgabe: ob sich etwas geändert hat.
+ `$newGroupIds` ist bereits durch `groupsWithParents()`
 (Mitgliedschaftsregel) gelaufen. `$date` NULL bedeutet „von Anfang an“ und ist nur beim Anlegen
 erlaubt. Je Gruppe gilt:
 
@@ -91,7 +97,9 @@ erlaubt. Je Gruppe gilt:
 | entfernt, `valid_from >= $date` | **Korrektur:** Zeile gelöscht, **kein** Verlaufseintrag (die Zuordnung hat nie gegolten) |
 | hinzugefügt | neue Zeile mit `valid_from = $date`; Verlaufseinträge derselben Gruppe mit `valid_to >= $date` werden auf `$date − 1 Tag` gekürzt, ein dadurch leerer Eintrag (`valid_to < valid_from`) wird gelöscht |
 
-Durch die Mitgliedschaftsregel ergänzte Gruppen bekommen dasselbe `$date`. Alles läuft in einer
+Durch die Mitgliedschaftsregel ergänzte Gruppen bekommen dasselbe `$date`. Ergänzt
+`groupsApplySubgroupRule()` (Register bekommt eine Gruppe) Mitglieder, übernimmt die neue
+Zuordnung das `valid_from` der Registerzuordnung. Alles läuft in einer
 Transaktion mit dem übrigen Speichern des Mitglieds.
 
 ### 4.2 Wer welches Datum setzt
@@ -101,7 +109,7 @@ Transaktion mit dem übrigen Speichern des Mitglieds.
 | Mitglied anlegen (Dialog, `POST members`) | NULL |
 | Mitglied bearbeiten (Dialog, `PUT members`) | `groups_valid_from` aus dem Request, fehlt es: heute |
 | CSV-Import, neues Mitglied | NULL |
-| CSV-Import, bestehendes Mitglied | heute; **Vergleich statt Löschen** (heute: `DELETE` aller Zuordnungen, siehe `private/handlers/import.php`) |
+| CSV-Import, bestehendes Mitglied | heute; **Vergleich statt Löschen** (heute: `DELETE` aller Zuordnungen, siehe `private/handlers/import.php`); die Antwort zählt in `group_changes`, bei wie vielen bestehenden Mitgliedern sich Gruppen geändert haben |
 
 `groups_valid_from` muss ein gültiges Datum `YYYY-MM-DD` sein und darf nicht nach heute liegen,
 sonst 422 mit Fehlermeldung. Ohne Änderung an den Gruppen wird es ignoriert.
@@ -129,7 +137,8 @@ In `private/helpers/group_history.php`:
 |---|---|
 | `expectedPairsSql()` und Register-Zweig `expectedPairsScopeSql()` (`expected_pairs.php`) | Statistik, Druckbericht, Kalender, Kopfzahlen: bis zum Wechsel in der alten, danach in der neuen Gruppe |
 | `responsesFetchExpected()` (`responses.php`) | Rückmeldedialog und Druck eines Termins |
-| Terminliste in `attendance_list.php` | Anwesenheitsliste vergangener Termine |
+| `attendance_list.php`, Modus je Termin | Anwesenheitsliste vergangener Termine |
+| `attendance_list.php`, Modus je Mitglied | Termine des Jahres, zu denen das Mitglied am Termindatum über eine Gruppe gehörte — auch wenn es heute in keiner Gruppe mehr steht (bisher Abbruch ohne Termine) |
 | `attendanceActiveMemberCount()` (`attendance.php`) | Mitgliederzahl einer Gruppe im Jahr: Zeitraum überschneidet das Jahr **und** aktiv |
 
 ### 5.3 Bleiben beim heutigen Stand
@@ -137,7 +146,9 @@ In `private/helpers/group_history.php`:
 Kommende Termine in Rückmeldung und App (`responsesFetchUpcomingIds()`,
 `responsesFetchUpcomingInfo()` — ohne Zukunftsdaten ist der heutige Stand dort richtig), Check-in
 (`auto_checkin.php`), Station, Zeiterfassung (`worktime.php`, `work_sessions.php`), Export,
-Gruppenanzeige im Mitgliederdialog, Einzelabruf in `attendance_list.php`, Terminregeln
+Gruppenanzeige im Mitgliederdialog, Kopfzeile des Mitgliedsmodus in `attendance_list.php`
+(Gruppennamen von heute), Registerzuordnung der Anwesenheitsliste (`groupsAttachToMembers()`),
+Terminregeln
 (`appointment_rules.php`).
 
 ### 5.4 Statistikzugriff der Rolle `user` (E5)
@@ -163,14 +174,14 @@ bisherigen 95–181 ms.
 - Verlauf: Gibt es Verlaufseinträge oder heutige Zuordnungen mit `valid_from`, zeigen die
   Häkchen den Zusatz „seit TT.MM.JJJJ“ und darunter steht eine nur lesbare Zeile
   „Bisher: Jugend bis 31.05.2026, …“. Sonst bleibt der Dialog wie heute.
-- Daten aus `GET members?id=`: neue Felder `group_since` (Objekt Gruppen-ID → Datum oder null)
-  und `group_history` (Liste `{group_id, group_name, valid_from, valid_to}`, neueste zuerst).
+- Daten aus `GET members?id=`: die Einträge in `groups` bekommen `valid_from` (Datum oder null),
+  neu ist `group_history` (Liste `{group_id, group_name, valid_from, valid_to}`, neueste zuerst).
 - Aktionen über `data-action`/`registerActions()` (CSP), keine Inline-Handler, Maskierung mit
   `escapeHtml`.
-- Nach dem Speichern mit einem Datum vor heute zusätzlich `invalidateCache()` für die
-  jahresabhängigen Schlüssel `members`, `appointments`, `records` und `exceptions` aller Jahre
-  vom Jahr des Datums bis heute — die Zuordnung vergangener Termine ändert sich (Regel aus
-  `CLAUDE.md`). Die Statistik hat keinen Cache-Schlüssel und lädt ohnehin neu.
+- Cache: `saveMember()` verwirft schon heute `appointments` sowie über
+  `invalidateMemberDependents()` `members`, `records` und `exceptions` **aller** Jahre — das deckt
+  rückwirkende Änderungen ab. Ein Wächtertest hält das fest. Die Statistik hat keinen
+  Cache-Schlüssel und lädt ohnehin neu.
 
 ### 6.2 Import
 
@@ -200,11 +211,11 @@ dieses Jahres, jeweils mit den Terminen seines Zeitraums.
 
 ## 8. Tests
 
-- `tests/suites/group_history_unit.php` — `groupsApplyChange()` in eigener Testwelt: Entfernen
+- `tests/suites/group_history_unit.php` — `groupsPlanChange()` ohne Datenbank: Entfernen
   mit Verlauf, Korrektur ohne Verlauf, Wiederhinzufügen kürzt Überlappung, Unverändertes bleibt,
   Regel setzt dasselbe Datum, Grenzfall 7.1.
 - `tests/suites/group_history_api.php` — `PUT members` mit `groups_valid_from` (200; 422 bei
-  Zukunft und ungültigem Format), `GET members?id=` mit `group_since`/`group_history`, Import
+  Zukunft und ungültigem Format), `GET members?id=` mit `groups[].valid_from`/`group_history`, Import
   vergleicht statt zu löschen, neues Mitglied mit NULL, Statistikzugriff auf ehemalige Gruppe.
 - Statistik/Rückmeldung/Anwesenheit mit Wechsel zum 01.06.: Mitglied in beiden Tabellen, A zählt
   nur Termine bis 31.05., B nur ab 01.06., keine unentschuldigten B-Termine vor dem Wechsel;
@@ -212,7 +223,7 @@ dieses Jahres, jeweils mit den Terminen seines Zeitraums.
 - Gegenprobe ohne Verlauf: `tests/db/verify_statistics_parity.php` gegen die Hauptdatenbank,
   identische Zahlen.
 - Frontend-Wächter (`group_history_frontend.php`): Datumsfeld nur beim Bearbeiten und nur bei
-  geänderten Häkchen, `max` heute, Invalidierung bei Datum vor heute, keine Inline-Handler.
+  geänderten Häkchen, `max` heute, `saveMember()` verwirft weiter alle Jahre, keine Inline-Handler.
 - Mutationsproben je Kernregel (4.1 vier Fälle, 5.1 Bedingung, 5.4 Zugriff).
 - `tests/db/verify_schema_convergence.php` ist bis zum Migrationsschritt der Release-Sitzung rot
   (erwartet, wie bei 1.20.0).
@@ -223,7 +234,7 @@ dieses Jahres, jeweils mit den Terminen seines Zeitraums.
   Datenbankkopie `ehrensache_zr`.
 - Kein Versionssprung, kein Migrationsschritt, kein `?v=`-Sprung; Changelog unter
   `## [Unreleased]`.
-- Doku: `API.md` (`members`: `groups_valid_from`, `group_since`, `group_history`), Testplan
+- Doku: `API.md` (`members`: `groups_valid_from`, `groups[].valid_from`, `group_history`; `import`: `group_changes`), Testplan
   (neuer Abschnitt), OPEN-ITEMS (OI-115 erledigt, neuer Eintrag für den Migrationsschritt),
   `project_history.md` (Gruppenzugehörigkeit bekommt eine Zeitachse).
 - Hauptdatenbank `ehrensache` braucht Spalte und Tabelle vor dem Merge nach `dev` — nur mit
