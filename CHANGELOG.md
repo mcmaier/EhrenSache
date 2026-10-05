@@ -30,10 +30,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Ein überlasteter Server meldet in der Check-in-App niemanden mehr ab.** Bisher löschte jeder
   Fehlschlag der Anmeldeprüfung beim Start den gespeicherten Zugang, auch ein kurzer 503 des
   Hosters. Jetzt nur noch eine echte Ablehnung (401/403); sonst bietet die Ladeanzeige
-  „Erneut versuchen" und „Mit anderem Konto anmelden".
+  „Erneut versuchen“ und „Mit anderem Konto anmelden“.
 - **Lesende Abrufe überstehen eine kurze Überlastung.** Antwortet der Server mit 502, 503, 504
   oder einem Cloudflare-Fehler 520–524, fragen Dashboard und Check-in-App nach einer kurzen Pause
   einmal nach. Speichernde Abrufe werden nie wiederholt.
+
+### Intern
+- **Neue Suite `js_syntax`:** Jede ausgelieferte JavaScript-Datei (Dashboard, Check-in-App,
+  Station, Service Worker, vendor) wird von Node geparst. Anlass war eine doppelte
+  `const`-Deklaration in `ui.js`, die das Dashboard leer ließ, während alle PHP-Suiten grün
+  waren. Die Suite braucht Node.js im PATH und schlägt ohne Node fehl, statt zu überspringen.
 
 ---
 
