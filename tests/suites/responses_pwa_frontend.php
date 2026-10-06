@@ -334,3 +334,26 @@ test('PWA: Termin-Dialog sperrt Speichern waehrend des Aufrufs', function () use
         'Ohne finally bliebe der Knopf nach einem Fehler gesperrt');
     assertTrue(str_contains($rumpf, "getElementById('btnSaveAppointment')"), 'Gesperrt wird nicht der Speichern-Knopf');
 });
+
+test('PWA: Termin-Dialog gibt den Fokus an seinen Knopf zurueck', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+
+    $schliessen = rspFunktion($js, 'closeAppointmentModal');
+    assertTrue(str_contains($schliessen, 'appointmentModalOpener') && str_contains($schliessen, '.focus()'),
+        'closeAppointmentModal setzt den Fokus nicht zurueck');
+
+    // Alle drei Wege aus dem Dialog laufen ueber closeAppointmentModal().
+    assertTrue(substr_count(rspFunktion($js, 'initAppointmentModal'), 'closeAppointmentModal()') === 2,
+        'Abbrechen und Klick daneben schliessen nicht ueber closeAppointmentModal()');
+    assertTrue(str_contains(rspFunktion($js, 'submitAppointmentForm'), 'closeAppointmentModal()'),
+        'Speichern schliesst nicht ueber closeAppointmentModal()');
+    assertTrue(!str_contains($js, "getElementById('appointmentModal').classList.remove('active')"),
+        'Noch eine Stelle schliesst den Dialog am Fokus vorbei');
+
+    // Gemerkt wird der Knopf selbst, nicht document.activeElement: Safari
+    // fokussiert Knoepfe beim Antippen nicht.
+    assertTrue(str_contains(rspFunktion($js, 'showCreateAppointmentModal'), 'appointmentModalOpener ='),
+        'Anlegen merkt sich seinen Knopf nicht');
+    assertTrue(str_contains(rspFunktion($js, 'showEditAppointmentModal'), "appointmentModalOpener = document.getElementById('btnEditAppointment')"),
+        'Bearbeiten merkt sich seinen Knopf nicht');
+});

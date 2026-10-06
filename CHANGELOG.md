@@ -54,6 +54,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Check-in-App: Doppeltipp auf „Speichern“ im Termin-Dialog.** Bei langsamem Netz gingen mehrere
   Anfragen hinaus; der Termin wurde angelegt, der Dialog blieb aber mit der Dublettenmeldung der
   zweiten Anfrage offen. Der Knopf ist jetzt gesperrt, bis die Antwort da ist.
+- **Check-in-App: Fokus nach dem Termin-Dialog.** Nach Abbrechen, Klick daneben oder Speichern
+  springt der Fokus zurück auf den Knopf, der den Dialog geöffnet hat, statt an den Seitenanfang –
+  wichtig für Tastatur und Screenreader.
 
 ---
 

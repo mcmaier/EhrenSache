@@ -1343,17 +1343,34 @@ function initAppointmentModal() {
     const appointmentModal = document.getElementById('appointmentModal');
 
     bindOnce(document.getElementById('btnCancelAppointment'), 'click', () => {
-        appointmentModal?.classList.remove('active');
+        closeAppointmentModal();
     });
 
     // Klick neben den Dialog schliesst ihn
     bindOnce(appointmentModal, 'click', (e) => {
         if (e.target.id === 'appointmentModal') {
-            appointmentModal.classList.remove('active');
+            closeAppointmentModal();
         }
     });
 
     bindOnce(document.getElementById('appointmentForm'), 'submit', submitAppointmentForm);
+}
+
+/**
+ * Schliesst den Termin-Dialog und gibt den Fokus an den Knopf zurueck, der ihn
+ * geoeffnet hat -- sonst landet er am Seitenanfang, und wer mit Tastatur oder
+ * Screenreader arbeitet, muss sich zurueckhangeln.
+ */
+function closeAppointmentModal() {
+    document.getElementById('appointmentModal')?.classList.remove('active');
+
+    const opener = appointmentModalOpener;
+    appointmentModalOpener = null;
+    // Nur, wenn der Knopf noch zu sehen ist: Nach dem Speichern in der
+    // Anwesenheitsliste weicht „Termin anlegen“ dem gewaehlten Termin.
+    if (opener && opener.isConnected && opener.offsetParent !== null) {
+        opener.focus();
+    }
 }
 
 async function initAttendanceList() {
@@ -1460,7 +1477,7 @@ async function submitAppointmentForm(e) {
         }
 
         showFormErrors('appointmentErrors', []);
-        document.getElementById('appointmentModal').classList.remove('active');
+        closeAppointmentModal();
 
         const id = neu ? String(result.data?.id ?? '') : String(currentEditAppointmentId);
 
@@ -3738,9 +3755,16 @@ async function fillPwaLocationSuggestions() {
 // 'responses' (OI-123). submitAppointmentForm() laedt danach diesen Tab neu.
 let appointmentModalOrigin = 'attendance';
 
+// Der Knopf, der den Dialog geoeffnet hat; closeAppointmentModal() gibt ihm den
+// Fokus zurueck. Gemerkt wird der Knopf selbst, nicht document.activeElement:
+// Safari fokussiert Knoepfe beim Antippen nicht.
+let appointmentModalOpener = null;
+
 async function showCreateAppointmentModal(origin = 'attendance') {
     currentEditAppointmentId = null;
     appointmentModalOrigin = origin;
+    appointmentModalOpener = document.getElementById(
+        origin === 'responses' ? 'btnAddAppointment' : 'btnCreateAppointment');
     document.getElementById('appointmentModalTitle').textContent = 'Termin anlegen';
 
     // Lade Terminarten
@@ -3774,6 +3798,7 @@ async function showEditAppointmentModal() {
     currentEditAppointmentId = appointmentId;
     // Bearbeiten gibt es nur in der Anwesenheitsliste.
     appointmentModalOrigin = 'attendance';
+    appointmentModalOpener = document.getElementById('btnEditAppointment');
     document.getElementById('appointmentModalTitle').textContent = 'Termin bearbeiten';
     showFormErrors('appointmentErrors', []);
 
