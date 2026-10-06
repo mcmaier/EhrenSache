@@ -16,6 +16,7 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   dadurch 21 Anfragen weniger, und das Layout wartet nicht mehr auf eine zweite Stufe. Die
   Quelldateien bleiben einzeln, es gibt keinen Build-Schritt (OI-120).
 - Der Updater schreibt `public/.htaccess` jetzt kurz vor den Einstiegsseiten.
+- Fehlt `bundle.php` (z. B. mitten im Update), lädt die Seite die Einzeldateien.
 
 ## [1.21.0] – 2026-10-05
 

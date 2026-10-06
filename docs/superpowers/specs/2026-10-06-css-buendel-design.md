@@ -53,6 +53,12 @@ Regel, die genau diese beiden Pfade intern auf `css/bundle.php?entry=main|login`
 (absolut über `%{REQUEST_URI}`, ohne `RewriteBase`, wie die bestehende Regel). Alle anderen
 versionierten Dateien laufen weiter über die bisherige Regel und bleiben statisch.
 
+Die Regel greift nur, wenn `css/bundle.php` existiert (`RewriteCond … -f`, Pfad aus
+`%{REQUEST_FILENAME}`); sonst fällt die Anfrage auf die allgemeine Versionsregel durch und bekommt
+die statische `main.css` mit ihren `@import` (siehe 3.5). Reihenfolge der Bedingungen: Pfad, `-f`,
+dann `REQUEST_URI` zuletzt, weil `%1` in der Regel die zuletzt geprüfte Bedingung meint (URL-Präfix);
+den Einstieg liefert `$1` der Regel.
+
 Unversioniertes `css/main.css` bleibt die statische Datei mit `@import` und funktioniert
 unverändert.
 
@@ -62,9 +68,10 @@ unverändert.
   `cssBundle(string $entry, ?string $root = null): string` (Copyright-Header,
   `declare(strict_types=1)`). `$root` ist standardmäßig `public/css/`; der Parameter dient nur den
   Tests.
-- `public/css/bundle.php`: dünner Einstieg — Version aus `version.json` lesen
-  (`private/helpers/version.php`), Kopfzeilen setzen, `cssBundle()` ausgeben. Keine Datenbank,
-  kein `config.php`, kein Bootstrap.
+- `public/css/bundle.php`: dünner Einstieg — Version über `cssBundleCurrentVersion()` aus
+  `css_bundle.php` lesen (nicht `getVersion()` aus `version.php`: das gibt selbst aus und ruft
+  `exit`), das Bündel bauen, dann erst Kopfzeilen setzen. Keine Datenbank, kein `config.php`,
+  kein Bootstrap. `entry` nur als Zeichenkette (`?entry[]=x` ist 404 ohne Warning).
 
 ### 3.3 Zusammenfügen
 
@@ -77,7 +84,12 @@ unverändert.
   Datei wird höchstens einmal eingefügt.
 - Ein nicht auflösbarer Import (fehlt, außerhalb, doppelt) wird durch einen CSS-Kommentar mit dem
   Grund ersetzt; der Rest wird ausgeliefert. Der Bestandswächter (4.1) stellt sicher, dass das im
-  Bestand nie vorkommt.
+  Bestand nie vorkommt. Der Kommentartext enthält weder `*` noch `@`, kann den Kommentar also
+  nicht verlassen.
+- Importe in CSS-Kommentaren bleiben unberührt. Jede andere `@import`-Form (ohne `url()`, ohne
+  Anführungszeichen, mit Medienabfrage) wird nicht eingefügt, sondern durch den Fehlerkommentar
+  „Form nicht unterstützt“ ersetzt — mit Medienabfrage ginge beim Einfügen die Bedingung verloren.
+- Eine BOM am Anfang einer Datei wird entfernt.
 
 ### 3.4 Caching und Kopfzeilen
 
@@ -88,13 +100,19 @@ unverändert.
   landet neuer Inhalt nie für ein Jahr unter einer alten Adresse.
 - Die Version liest das Skript aus dem ursprünglichen Pfad (`REQUEST_URI`), nicht aus einem
   Query-Parameter.
+- Fehler werden nicht gecacht: Enthält das Bündel einen Fehlerkommentar, gilt `no-cache` auch für
+  die aktuelle Version (`cssBundleCacheControl()`). Lässt sich das Bündel gar nicht bauen (Datei
+  nicht lesbar), antwortet das Skript 503, `text/plain`, `Cache-Control: no-store`, Rumpf nur
+  „CSS bundle unavailable“ (kein Pfad, keine Meldung).
 
 ### 3.5 Updater
 
 `public/.htaccess` kommt in `UPDATE_APPLY_LAST` (`private/helpers/update_swap.php`) **vor** die
 beiden HTML-Seiten. Sonst zeigt die neue Regel kurz auf ein `bundle.php`, das noch nicht da ist.
 Wie bei OI-120 wirkt das erst ab dem übernächsten Update (der installierte Updater führt den
-Tausch aus); beim ausliefernden Update bleibt eine Lücke von wenigen Sekunden, Purge bei
+Tausch aus); beim ausliefernden Update schreibt der alte Updater `public/.htaccess` früh und
+`css/bundle.php` spät. Diese Lücke von wenigen Sekunden fängt die `-f`-Bedingung (3.1) ab: ohne
+`bundle.php` lädt die Seite die Einzeldateien statt 404 zu bekommen. Purge bei
 Cloudflare bleibt Pflicht. `update_swap.php` bleibt bei PHP-8.0-Syntax.
 
 ## 4 Tests
@@ -108,12 +126,20 @@ Cloudflare bleibt Pflicht. `update_swap.php` bleibt bei PHP-8.0-Syntax.
 - Pfade außerhalb von `$root` (`../`, absolut) und doppelte Importe werden abgewiesen
   (Fehlerkommentar), mit Testdateien in einem Scratch-Verzeichnis als `$root`.
 - Fehlender Import erzeugt den Fehlerkommentar und bricht nicht ab.
+- `cssBundleCacheControl()`: aktuell und sauber `immutable`; aktuell mit Fehlerkommentar und alte
+  Version `no-cache`.
+- BOM in Einstieg und eingefügter Datei fehlt im Ergebnis.
+- Sterne im Pfad (`x**//body{…}/**.css`): im Ergebnis gleich viele `/*` wie `*/`.
+- Auskommentierter Import wird nicht eingefügt, der Kommentar bleibt.
+- `@import url('a.css') screen;`, `@import 'a.css';`, `@import url(a.css);`: Fehlerkommentar,
+  kein `@import` im Ergebnis.
 - **Bestandswächter:** `main` und `login` lösen sich ohne einen einzigen Fehlerkommentar auf.
 
 ### 4.2 Statisch
 
 - `assets.php`: Die Rewrite-Regel für die beiden Einstiege steht in `public/.htaccess` vor der
-  allgemeinen Versionsregel.
+  allgemeinen Versionsregel, mit `-f`-Bedingung auf `bundle.php` und der Bedingungsreihenfolge
+  Pfad, `-f`, `REQUEST_URI`.
 - `update_swap_unit.php`: `UPDATE_APPLY_LAST` nennt `public/.htaccess` vor den HTML-Seiten.
 - `update_path_syntax.php` deckt `update_swap.php` weiter ab.
 
@@ -127,6 +153,11 @@ Cloudflare bleibt Pflicht. `update_swap.php` bleibt bei PHP-8.0-Syntax.
 | `css/main.css` | statisch, enthält `@import`, `no-cache` |
 | `css/v<Version>/components/buttons.css` | statisch, `immutable` |
 | `css/bundle.php?entry=../../private/config/config` | kein 200 mit Inhalt |
+| `css/bundle.php?entry[]=x` | 404, Rumpf ohne „Warning“ und ohne Pfad |
+
+Von Hand (nicht automatisiert, weil es die Dateien umbenennt): ohne `css/bundle.php` liefert
+`css/v<Version>/main.css` 200 mit der statischen Datei; ohne `login.css` antwortet `bundle.php`
+503 mit `no-store`.
 
 ### 4.4 Mutationsproben
 
