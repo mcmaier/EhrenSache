@@ -2559,6 +2559,28 @@ Verwandt: [OI-120](#oi-120--das-dashboard-lädt-rund-45-einzeldateien) (Dateien,
 
 ---
 
+### OI-126 · API sendet `Access-Control-Allow-Origin: *` zusammen mit `Allow-Credentials: true`
+**Priorität:** niedrig · aufgenommen am 2026-10-06 (Messung auf der Demo nach dem Update auf 1.22.0)
+
+`public/api/api.php` setzt in Abschnitt 1 für jede Antwort `Access-Control-Allow-Origin: *` und
+`Access-Control-Allow-Credentials: true`. Die Kombination ist laut Fetch-Standard ungültig: Bei
+Abrufen mit Cookies verwerfen Browser die Antwort, wenn der Ursprung `*` lautet. Die Zeile
+`Allow-Credentials` bewirkt also nichts, und der Kopf verspricht etwas, das nicht gilt.
+
+Ausnutzbar ist das nicht: Eine fremde Seite kann eine angemeldete Sitzung über CORS nicht lesen,
+genau weil der Browser die Kombination ablehnt. Ohne Cookies liest sie nur, was ohnehin ohne
+Anmeldung abrufbar ist.
+
+**Zu klären:** Braucht überhaupt ein Aufrufer CORS? Dashboard, Check-in-App und Station laufen auf
+demselben Ursprung wie die API, das IoT-Terminal ist kein Browser. Falls niemand: alle vier
+CORS-Köpfe und die Sonderbehandlung von `OPTIONS` entfernen. Falls doch: nur
+`Allow-Credentials` streichen, `*` bleibt für Token-Aufrufe. Die auskommentierten Zeilen in
+`public/api/.htaccess` gleich mit aufräumen.
+
+**Nicht sicherheitsrelevant** (Härtung).
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
