@@ -9,6 +9,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.22.0] – 2026-10-06
+
 ### Neu
 - **Check-in-App: Termine anlegen im Tab „Termine“** (OI-123). Admin und Manager sehen neben
   „Kommende Termine“ einen Plus-Knopf, der den Termin-Dialog öffnet – auch wenn die

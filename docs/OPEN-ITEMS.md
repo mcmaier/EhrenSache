@@ -7,7 +7,7 @@ oder noch nicht gebaut.
 **Zuletzt geprüft:** 2026-09-28 gegen `v1.17.1` (`8d77479`), Eintrag für Eintrag gegen Code und git ·
 **Status nachgezogen:** 2026-10-01 gegen `v1.19.0` (`d672b8d`) — nur Veröffentlichungsvermerke und
 Kopfzeilen gegen git, **nicht** Eintrag für Eintrag gegen den Code ·
-**Version:** 1.21.0
+**Version:** 1.22.0
 
 > **Diese Angabe ist Teil der Pflege, nicht Zierde.** Am 2026-09-17 stand hier noch 1.7.0,
 > während der Code auf 1.9.0 war — fünf Punkte waren längst behoben, ohne dass ihr Eintrag es
