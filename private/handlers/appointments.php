@@ -35,7 +35,7 @@ function handleAppointments($db, $database, $method, $id) {
                 // Zaehlungen fuer die Rueckfrage vor dem Loeschen (OI-125):
                 // nur fuer Verwalter -- sie verraten, wie viele Mitglieder
                 // geantwortet oder Antraege gestellt haben.
-                $withDependents = isset($_GET['dependents']);
+                $withDependents = ($_GET['dependents'] ?? '') === '1';
                 if ($withDependents && !isAdminOrManager()) {
                     http_response_code(403);
                     echo json_encode(["message" => "Nur für Admin und Manager"], JSON_UNESCAPED_UNICODE);

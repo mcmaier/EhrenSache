@@ -1246,6 +1246,8 @@ function resetSessionState() {
     appointmentTypes = [];
     checkinAppointments = [];
     confirmDeleteAction = null;
+    confirmDeleteOpener = null;
+    appointmentModalData = null;
     currentEditAppointmentId = null;
     currentStatsYear = new Date().getFullYear();
 
@@ -1397,9 +1399,20 @@ async function deleteAppointmentFromModal() {
     knopf.disabled = true;
     try {
         const result = await apiCall('appointments', 'GET', null, { id: apt.appointment_id, dependents: 1 });
+
+        // Waehrend der Abfrage abgebrochen oder ein anderer Termin geoeffnet:
+        // keine Rueckfrage ueber einer Liste oder zu einem fremden Termin.
+        if (appointmentModalData !== apt
+            || !document.getElementById('appointmentModal').classList.contains('active')) {
+            return;
+        }
+
         if (!result.success) {
             if (result.status === 404) {
-                await confirmDeleteAppointment(apt.appointment_id);
+                // Schon anderswo geloescht: nichts mehr zu loeschen, nur neu laden.
+                closeAppointmentModal();
+                await loadResponses();
+                showMessage('Termin nicht mehr vorhanden', 'info');
                 return;
             }
             showFormErrors('appointmentErrors', [result.error || 'Prüfung fehlgeschlagen']);
@@ -1450,16 +1463,31 @@ function appointmentDeleteQuestion(apt) {
  * (404) ist kein Fehler -- er ist weg, wie gewuenscht.
  */
 async function confirmDeleteAppointment(appointmentId) {
-    const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
+    // Waehrend des DELETE weder erneut loeschen noch speichern: Ein Speichern
+    // koennte den Termin noch aendern, den die Anfrage gerade entfernt.
+    const knoepfe = ['btnDeleteAppointment', 'btnSaveAppointment']
+        .map(id => document.getElementById(id)).filter(Boolean);
+    knoepfe.forEach(k => { k.disabled = true; });
+
+    let result;
+    try {
+        result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
+    } finally {
+        knoepfe.forEach(k => { k.disabled = false; });
+    }
+
     const schonWeg = !result.success && result.status === 404;
     if (!result.success && !schonWeg) {
         showFormErrors('appointmentErrors', [result.error || 'Löschen fehlgeschlagen']);
+        // Der Dialog bleibt mit der Meldung offen; der Fokus soll nicht im
+        // Nichts landen, nachdem die Rueckfrage zu war.
+        document.getElementById('btnDeleteAppointment')?.focus();
         return;
     }
 
     closeAppointmentModal();
     await loadResponses();
-    showMessage(schonWeg ? 'Termin war schon gelöscht' : 'Termin gelöscht', schonWeg ? 'info' : 'success');
+    showMessage(schonWeg ? 'Termin nicht mehr vorhanden' : 'Termin gelöscht', schonWeg ? 'info' : 'success');
 }
 
 async function initAttendanceList() {
@@ -3850,6 +3878,7 @@ let appointmentModalOrigin = 'attendance';
 let appointmentModalOpener = null;
 
 async function showCreateAppointmentModal(origin = 'attendance') {
+    const generation = ++appointmentModalGeneration;
     currentEditAppointmentId = null;
     appointmentModalOrigin = origin;
     appointmentModalOpener = document.getElementById(
@@ -3860,7 +3889,9 @@ async function showCreateAppointmentModal(origin = 'attendance') {
 
     // Lade Terminarten
     await loadAppointmentTypes();
+    if (generation !== appointmentModalGeneration) return;
     await fillPwaLocationSuggestions();
+    if (generation !== appointmentModalGeneration) return;
 
     // Formular zurücksetzen
     document.getElementById('appointmentForm').reset();
@@ -3886,6 +3917,11 @@ async function showCreateAppointmentModal(origin = 'attendance') {
 // Loeschen braucht Titel, Datum, Beginn und series_id fuer die Rueckfrage.
 let appointmentModalData = null;
 
+// Zaehlt jedes Oeffnen des Termin-Dialogs. Zwei schnelle Taps auf verschiedene
+// Karten starten zwei Abrufe; der spaetere darf nicht vom frueheren ueber-
+// schrieben werden, sonst landen die Felder von A im Dialog von B.
+let appointmentModalGeneration = 0;
+
 /**
  * Oeffnet den Dialog zum Bearbeiten. Aus der Anwesenheitsliste kommt die id
  * aus deren Auswahl, aus dem Tab „Termine“ von der Karte (OI-125). Der Fokus
@@ -3896,6 +3932,7 @@ async function showEditAppointmentModal(origin = 'attendance', id = null) {
     const appointmentId = id ?? document.getElementById('attendanceAppointmentFilter').value;
     if (!appointmentId) return;
 
+    const generation = ++appointmentModalGeneration;
     currentEditAppointmentId = appointmentId;
     appointmentModalOrigin = origin;
     appointmentModalOpener = document.getElementById(
@@ -3909,11 +3946,14 @@ async function showEditAppointmentModal(origin = 'attendance', id = null) {
     try {
         // Lade Terminarten
         await loadAppointmentTypes();
+        if (generation !== appointmentModalGeneration) return;
         await fillPwaLocationSuggestions();
-        
+        if (generation !== appointmentModalGeneration) return;
+
         // Lade Termin-Daten
         const result = await apiCall('appointments', 'GET', null, { id: appointmentId });
-         if (!result.success) {
+        if (generation !== appointmentModalGeneration) return;
+        if (!result.success) {
             throw new Error(result.error);
         }
 

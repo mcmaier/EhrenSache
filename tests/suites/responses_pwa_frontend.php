@@ -464,3 +464,34 @@ test('PWA OI-125: Bearbeiten aus dem Tab Termine meldet „aktualisiert“', fun
     assertTrue(str_contains($zweig, "neu ? 'Termin erstellt' : 'Termin aktualisiert'"),
         'Nach dem Bearbeiten stuende „Termin erstellt“');
 });
+
+test('PWA OI-125: waehrend des Loeschens sind Speichern und Loeschen gesperrt', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'confirmDeleteAppointment');
+    assertTrue(str_contains($rumpf, "'btnSaveAppointment'") && str_contains($rumpf, "'btnDeleteAppointment'"),
+        'Waehrend des DELETE liesse sich speichern oder erneut loeschen');
+    $sperre = strpos($rumpf, 'disabled = true');
+    $delete = strpos($rumpf, "apiCall('appointments', 'DELETE'");
+    assertTrue($sperre !== false && $delete !== false && $sperre < $delete, 'Gesperrt wird erst nach dem DELETE');
+    assertTrue((bool) preg_match('/finally\s*\{[^}]*disabled = false/', $rumpf), 'Ohne finally blieben die Knoepfe gesperrt');
+});
+
+test('PWA OI-125: keine Rueckfrage zu einem geschlossenen oder fremden Dialog', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'deleteAppointmentFromModal');
+    $abruf = strpos($rumpf, 'dependents: 1');
+    $waechter = strpos($rumpf, 'appointmentModalData !== apt');
+    $rueckfrage = strpos($rumpf, 'openConfirmDeleteModal(');
+    assertTrue($abruf !== false && $waechter !== false && $abruf < $waechter && $waechter < $rueckfrage,
+        'Nach der Abfrage fehlt die Pruefung, ob der Dialog noch denselben Termin zeigt');
+    assertTrue(!str_contains($rumpf, 'confirmDeleteAppointment(apt.appointment_id)'),
+        'Bei 404 wird ohne Rueckfrage geloescht statt nur neu geladen');
+});
+
+test('PWA OI-125: ein spaeter Abruf ueberschreibt den Dialog nicht', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+    foreach (['showEditAppointmentModal', 'showCreateAppointmentModal'] as $name) {
+        $rumpf = rspFunktion($js, $name);
+        assertTrue(str_contains($rumpf, '++appointmentModalGeneration'), "{$name} zaehlt die Generation nicht hoch");
+        assertTrue(substr_count($rumpf, 'generation !== appointmentModalGeneration') >= 2,
+            "{$name} prueft die Generation nicht nach den Abrufen");
+    }
+});
