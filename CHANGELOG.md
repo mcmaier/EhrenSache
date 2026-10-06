@@ -41,6 +41,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   niedriger Bildschirmhöhe über den Rand, „Speichern“ war nicht erreichbar, und ein Wischen rollte
   stattdessen die ausgeblendete Seite dahinter. Alle Dialoge der App sind jetzt in der Höhe begrenzt
   und rollen selbst; die Seite dahinter steht still, solange ein Dialog offen ist.
+- **Check-in-App: Doppeltipp auf „Speichern“ im Termin-Dialog.** Bei langsamem Netz gingen mehrere
+  Anfragen hinaus; der Termin wurde angelegt, der Dialog blieb aber mit der Dublettenmeldung der
+  zweiten Anfrage offen. Der Knopf ist jetzt gesperrt, bis die Antwort da ist.
 
 ---
 

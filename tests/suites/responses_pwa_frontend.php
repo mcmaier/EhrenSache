@@ -320,3 +320,17 @@ test('PWA OI-123: Dialoge rollen selbst, der Hintergrund steht still', function 
     assertTrue((bool) preg_match('/body:has\(\.modal\.active\)\s*\{[^}]*overflow:\s*hidden/', $css),
         'Bei offenem Dialog rollt sonst die ausgeblendete Seite dahinter');
 });
+
+test('PWA: Termin-Dialog sperrt Speichern waehrend des Aufrufs', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'submitAppointmentForm');
+
+    // Ein Doppeltipp bei langsamem Netz legte den Termin an und zeigte danach
+    // im noch offenen Dialog die Dublette (409) des zweiten Aufrufs.
+    $sperre  = strpos($rumpf, 'knopf.disabled = true');
+    $aufruf  = strpos($rumpf, "apiCall('appointments'");
+    assertTrue($sperre !== false && $aufruf !== false && $sperre < $aufruf,
+        'Der Speichern-Knopf wird nicht vor dem Aufruf gesperrt');
+    assertTrue((bool) preg_match('/finally\s*\{[^}]*knopf\.disabled = false/', $rumpf),
+        'Ohne finally bliebe der Knopf nach einem Fehler gesperrt');
+    assertTrue(str_contains($rumpf, "getElementById('btnSaveAppointment')"), 'Gesperrt wird nicht der Speichern-Knopf');
+});

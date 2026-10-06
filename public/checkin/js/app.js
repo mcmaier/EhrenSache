@@ -1428,6 +1428,13 @@ async function submitAppointmentForm(e) {
         location: document.getElementById('appointmentLocation').value.trim() || null,
     };
 
+    // Ein Doppeltipp bei langsamem Netz legte den Termin an und zeigte danach
+    // im noch offenen Dialog die Dublette (409) des zweiten Aufrufs. Dasselbe
+    // Muster wie bei „Zeit nachtragen“.
+    const knopf = document.getElementById('btnSaveAppointment');
+    if (knopf?.disabled) return;
+    if (knopf) knopf.disabled = true;
+
     try {
         const neu = !currentEditAppointmentId;
         const result = neu
@@ -1490,6 +1497,8 @@ async function submitAppointmentForm(e) {
     } catch (error) {
         debug.log('Fehler beim Speichern:', error);
         showMessage('Fehler beim Speichern', 'error');
+    } finally {
+        if (knopf) knopf.disabled = false;
     }
 }
 
