@@ -2468,10 +2468,25 @@ Cache aus, je 3 Läufe, ohne Anmeldung — das Dashboard lädt alle Module vor d
   JS, HTML; **nicht** `application/json` der API wegen BREACH) und gzip im `bundle.php`, dazu
   prüfen, ob der Hoster `mod_deflate` überhaupt lädt.
 
-**Kompression (unveröffentlicht):** umgesetzt nach Spec
+**Kompression (veröffentlicht mit 1.22.1):** umgesetzt nach Spec
 `docs/superpowers/specs/2026-10-06-kompression-design.md` — `mod_deflate` für CSS, JS, HTML,
 SVG und Manifest, nicht für API-JSON und PHP-Ausgaben; das CSS-Bündel komprimiert sich selbst.
-Ob der Hoster der Demo `mod_deflate` lädt, zeigt die Messung nach dem Release.
+
+**Nachmessung auf der Demo (2026-10-06, 1.22.1, gleiches Verfahren wie oben):** Der Hoster lädt
+`mod_deflate`. CSS, JS, HTML, Check-in-App, Station und Manifest kommen mit `content-encoding:
+gzip` und `Vary: Accept-Encoding`; API (`ping`) und `reset_password.php` unkomprimiert.
+Revalidierung von `/` und `/checkin/` mit dem `-gzip`-ETag ergibt 304.
+
+| | vorher (1.22.0) | nachher (1.22.1) |
+|---|---|---|
+| Dashboard übertragen (JS / CSS-Bündel) | 743 / 127 KB | 224 / 30 KB |
+| Dashboard „Fast 4G“, CSS + JS fertig | 6,2–7,0 s | 3,1–3,6 s |
+| Dashboard ungedrosselt | 0,59–0,63 s | 0,56–0,78 s (ein Ausreißer 1,57 s) |
+| Anmeldeseite „Fast 4G“, JS fertig | 0,67–0,69 s | 0,56–0,58 s |
+
+Bei „Fast 4G“ warten JS-Anfragen noch bis 1,7 s auf eine Verbindung (vorher 3,6 s). Den Rest
+könnte nur noch JS-Bündeln holen (Build-Schritt, siehe Messung oben) — derzeit nicht
+vorgesehen. Damit ist OI-120 für den Erstbesuch so weit erledigt, wie es ohne Build-Schritt geht.
 
 Ein Aufruf des Dashboards fordert rund 45 Dateien gleichzeitig an: 21 CSS-Module per `@import`
 aus `main.css` und gut 20 JS-Module per `import`. Ohne Build-Kette gibt es kein Bündel. Weil CSS
