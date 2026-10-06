@@ -9,6 +9,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+## [1.22.1] – 2026-10-06
+
 ### Geändert
 - **CSS, JS und HTML kommen komprimiert an.** `public/.htaccess` schaltet gzip für statische
   Textdateien ein (`mod_deflate`, sofern der Hoster es lädt); das CSS-Bündel komprimiert sich
