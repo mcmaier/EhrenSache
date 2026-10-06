@@ -39,11 +39,13 @@ function cbRemove(string $dir): void
     if (!is_dir($dir)) {
         return;
     }
-    foreach (new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CHILD_FIRST
-    ) as $f) {
-        $f->isDir() ? rmdir($f->getPathname()) : unlink($f->getPathname());
+    // Eigene Rekursion: ein RecursiveDirectoryIterator in Suiten verbietet source_lib.
+    foreach (scandir($dir) ?: [] as $name) {
+        if ($name === '.' || $name === '..') {
+            continue;
+        }
+        $pfad = $dir . '/' . $name;
+        is_dir($pfad) ? cbRemove($pfad) : unlink($pfad);
     }
     rmdir($dir);
 }
@@ -58,7 +60,7 @@ function cbSections(string $css): array
 /** Importpfade einer Datei in Reihenfolge (nur die eigene Ebene). */
 function cbImports(string $file): array
 {
-    preg_match_all("#^\s*@import\s+url\(\s*['\"]([^'\"]+)['\"]\s*\)\s*;#m", (string) file_get_contents($file), $m);
+    preg_match_all("#^\s*@import\s+url\(\s*['\"]([^'\"]+)['\"]\s*\)\s*;#m", rawSource($file), $m);
     return $m[1];
 }
 
@@ -92,7 +94,7 @@ test('Bündel enthält den Inhalt der Quellen unverändert', function () use ($c
     $css = cssBundle('main');
     foreach (cbImports($cbCssRoot . '/main.css') as $rel) {
         // rtrim: das Bündel normalisiert nur das Dateiende auf einen Zeilenumbruch.
-        assertTrue(str_contains($css, rtrim((string) file_get_contents($cbCssRoot . '/' . $rel))),
+        assertTrue(str_contains($css, rtrim(rawSource($cbCssRoot . '/' . $rel))),
             "Inhalt von {$rel} fehlt oder ist verändert");
     }
 });
@@ -150,7 +152,7 @@ test('Fehlerkommentar kann nicht aus dem Kommentar ausbrechen', function () {
 });
 
 test('cssBundleCurrentVersion liest version.json', function () {
-    $v = json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/version.json'), true)['version'];
+    $v = json_decode(rawSource(dirname(__DIR__, 2) . '/version.json'), true)['version'];
     assertSame($v, cssBundleCurrentVersion());
 });
 
