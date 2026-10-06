@@ -48,6 +48,7 @@ test('Plan schreibt die Einstiegsseiten von Dashboard und Anmeldung zuletzt', fu
     // Modulen, laedt ein Besucher in der Luecke die neue Seite mit alten
     // Modulen -- und behaelt sie unter der neuen Adresse.
     $paket = swapTree([
+        'public/.htaccess'          => 'neu',
         'public/index.html'         => 'neu',
         'public/login.html'         => 'neu',
         'public/api/api.php'        => 'neu',
@@ -66,12 +67,22 @@ test('Plan schreibt die Einstiegsseiten von Dashboard und Anmeldung zuletzt', fu
         'public/js/modules/ui.js',
         'public/station/index.html',
         'version.json',
+        'public/.htaccess',
         'public/index.html',
         'public/login.html',
     ], updateBuildPlan($paket, $install)['copy']);
 
     updateRemoveTree($paket);
     updateRemoveTree($install);
+});
+
+test('Zuletzt geschriebene Dateien folgen der Reihenfolge der Konstante', function () {
+    // .htaccess vor den Seiten: Die neue Regel zeigt auf css/bundle.php; stuende
+    // sie vor dessen Kopie, gaebe es kurz kein CSS. Die Seiten zuletzt (OI-120).
+    assertSame(
+        ['public/a.php', 'public/.htaccess', 'public/index.html', 'public/login.html'],
+        updateOrderForApply(['public/login.html', 'public/a.php', 'public/index.html', 'public/.htaccess'])
+    );
 });
 
 test('Plan loescht veraltete PHP- und JS-Dateien in betretenen Verzeichnissen', function () {
