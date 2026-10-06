@@ -401,18 +401,26 @@ test('Die .htaccess schickt main.css und login.css unter Version an das Buendel'
     // Versionsregel stehen -- die endet mit [L] und liesse sonst die statische
     // main.css mit ihren 21 @import ausliefern.
     $htaccess = (string) sourceCode($repoRoot . '/public/.htaccess');
+    $fs   = 'RewriteCond %{REQUEST_FILENAME} ^(.+)[/\x5C]css[/\x5C]v[0-9][0-9.]*(?:[/\x5C]|$)';
+    $exist = 'RewriteCond %1/css/bundle.php -f';
     $cond = 'RewriteCond %{REQUEST_URI} ^(.*)/css/v[0-9][0-9.]*/(main|login)\.css$';
-    $rule = 'RewriteRule ^css/v[0-9][0-9.]*/(main|login)\.css$ %1/css/bundle.php?entry=%2 [L]';
+    $rule = 'RewriteRule ^css/v[0-9][0-9.]*/(main|login)\.css$ %1/css/bundle.php?entry=$1 [L]';
     $allg = 'RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/';
 
-    assertTrue(str_contains($htaccess, $cond), 'Bedingung fuer das CSS-Buendel fehlt');
-    assertTrue(str_contains($htaccess, $rule), 'Rewrite-Regel fuer das CSS-Buendel fehlt');
-    $posRule = strpos($htaccess, $rule);
+    foreach (['Pfadbedingung' => $fs, 'Existenzpruefung (-f)' => $exist, 'URL-Bedingung' => $cond, 'Regel' => $rule] as $was => $zeile) {
+        assertTrue(str_contains($htaccess, $zeile), "{$was} fuer das CSS-Buendel fehlt");
+    }
+    // Die REQUEST_URI-Bedingung steht zuletzt: %1 in der Regel meint die zuletzt
+    // gepruefte Bedingung (URL-Praefix), %1 in der -f-Bedingung die davor (Dateipfad).
+    $lines = [$fs, $exist, $cond, $rule];
+    $pos = array_map(static fn (string $z): int => (int) strpos($htaccess, $z), $lines);
+    $sorted = $pos;
+    sort($sorted);
+    assertSame($sorted, $pos, 'Bedingungen und Regel des Buendels stehen nicht in der Reihenfolge Pfad, -f, URL, Regel');
+    assertTrue($pos[3] - $pos[0] < 400, 'Bedingungen und Regel des Buendels gehoeren direkt zusammen');
     $posAllg = strpos($htaccess, $allg);
-    assertTrue($posRule !== false && $posAllg !== false && $posRule < $posAllg,
+    assertTrue($posAllg !== false && $pos[3] < $posAllg,
         'Die Buendel-Regel muss vor der allgemeinen Versionsregel stehen');
-    assertTrue(strpos($htaccess, $cond) < $posRule && $posRule - strpos($htaccess, $cond) < 200,
-        'Bedingung und Regel des Buendels gehoeren direkt zusammen');
 });
 
 test('Dashboard und Login laden jede lokale CSS- und JS-Datei ueber die Version im Pfad', function () use ($repoRoot) {

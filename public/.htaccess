@@ -51,8 +51,23 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 # bzw. 3 Anfragen eine. bundle.php setzt Cache-Control selbst (immutable nur
 # fuer die aktuelle Version); der FilesMatch-Block unten greift fuer .php
 # nicht. Steht vor der allgemeinen Regel, die mit [L] endet.
+# Rueckfall: Die Regel greift nur, wenn bundle.php existiert (-f). Der Updater
+# tauscht public/.htaccess frueher als public/css/bundle.php; in der Luecke
+# wuerde die Regel sonst 404 fuer main.css liefern. Ohne -f faellt die Anfrage
+# auf die allgemeine Regel darunter durch und bekommt die statische main.css
+# mit ihren @import.
+# Reihenfolge der Bedingungen: %N verweist auf die ZULETZT geprueften Muster;
+# die REQUEST_URI-Bedingung steht deshalb zuletzt, ihr %1 ist der URL-Praefix
+# der Installation (lokal /EhrenSache/public). Der Pfad im Dateisystem kommt
+# aus REQUEST_FILENAME (der bestehende Teil des Pfads -- endet bei css/v<Version>,
+# weil es das Verzeichnis nicht gibt; der Rest ist PATH_INFO; Windows
+# schreibt Rueckwaerts- oder Schraegstriche, daher die Zeichenklassen mit
+# beiden; \x5C statt eines Backslash, den der Konfigurationsleser verschluckt).
+# Der Einstieg main|login kommt aus $1.
+RewriteCond %{REQUEST_FILENAME} ^(.+)[/\x5C]css[/\x5C]v[0-9][0-9.]*(?:[/\x5C]|$)
+RewriteCond %1/css/bundle.php -f
 RewriteCond %{REQUEST_URI} ^(.*)/css/v[0-9][0-9.]*/(main|login)\.css$
-RewriteRule ^css/v[0-9][0-9.]*/(main|login)\.css$ %1/css/bundle.php?entry=%2 [L]
+RewriteRule ^css/v[0-9][0-9.]*/(main|login)\.css$ %1/css/bundle.php?entry=$1 [L]
 
 RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/([A-Za-z0-9_./-]+\.(?:css|js))$
 RewriteCond %3 !\.\.
