@@ -813,7 +813,10 @@ und der Zeiterfassungsregel.
 ---
 
 ### OI-123 · Check-in-App: „Termin anlegen“ fehlt in der Stufe „nur Terminplanung“
-**Priorität:** niedrig · aufgenommen am 2026-10-06 (Rest aus
+**Priorität:** erledigt am 2026-10-06 — in dev (`dca87d1`), geht mit dem nächsten Release mit.
+Plus-Knopf im Tab „Termine“ wie unten entschieden, alle vier Punkte umgesetzt; die Meldung nennt
+zusätzlich den Acht-Wochen-Horizont der Infotermine. Nebenbei behoben: Die Dialoge der App rollen
+auf kurzen Displays selbst, die Seite dahinter steht still. · aufgenommen am 2026-10-06 (Rest aus
 [OI-62](#oi-62--feature-schalter-ohne-gemeinsame-prüfstelle), Etappe 2)
 
 Der Knopf „➕ Termin anlegen“ der Check-in-App sitzt im Tab „Anwesenheitsliste“
