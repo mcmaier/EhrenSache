@@ -1356,6 +1356,8 @@ function initAppointmentModal() {
         }
     });
 
+    bindOnce(document.getElementById('btnDeleteAppointment'), 'click', deleteAppointmentFromModal);
+
     bindOnce(document.getElementById('appointmentForm'), 'submit', submitAppointmentForm);
 }
 
@@ -1374,6 +1376,90 @@ function closeAppointmentModal() {
     if (opener && opener.isConnected && opener.offsetParent !== null) {
         opener.focus();
     }
+}
+
+/**
+ * „Termin loeschen“ im Dialog (OI-125). Prueft der Reihe nach: hat der Termin
+ * inzwischen begonnen, haengen Erfassungen daran -- dann loescht die App nicht
+ * selbst, sondern verweist aufs Dashboard. Sonst fragt sie mit den Zahlen nach,
+ * die mit verloren gehen.
+ */
+async function deleteAppointmentFromModal() {
+    const apt = appointmentModalData;
+    const knopf = document.getElementById('btnDeleteAppointment');
+    if (!apt || !knopf || knopf.disabled) return;
+
+    if (new Date(`${apt.date}T${apt.start_time}`) <= new Date()) {
+        showFormErrors('appointmentErrors', ['Der Termin hat schon begonnen – löschen nur noch im Dashboard.']);
+        return;
+    }
+
+    knopf.disabled = true;
+    try {
+        const result = await apiCall('appointments', 'GET', null, { id: apt.appointment_id, dependents: 1 });
+        if (!result.success) {
+            if (result.status === 404) {
+                await confirmDeleteAppointment(apt.appointment_id);
+                return;
+            }
+            showFormErrors('appointmentErrors', [result.error || 'Prüfung fehlgeschlagen']);
+            return;
+        }
+
+        const termin = result.data;
+        if (termin.dependents.records > 0) {
+            showFormErrors('appointmentErrors',
+                ['Zu diesem Termin gibt es schon Erfassungen – bitte im Dashboard löschen.']);
+            return;
+        }
+
+        showFormErrors('appointmentErrors', []);
+        openConfirmDeleteModal({
+            text: appointmentDeleteQuestion(termin),
+            onConfirm: () => confirmDeleteAppointment(termin.appointment_id),
+            opener: knopf,
+        });
+    } finally {
+        knopf.disabled = false;
+    }
+}
+
+/** Text der Rueckfrage: Termin, was mit verloren geht, Hinweis bei Serien. */
+function appointmentDeleteQuestion(apt) {
+    const wann = formatResponseCardHead(apt.date, apt.start_time, null);
+    const rueckmeldungen = apt.dependents?.responses ?? 0;
+    const antraege = apt.dependents?.exceptions ?? 0;
+
+    const teile = [];
+    if (rueckmeldungen > 0) teile.push(rueckmeldungen === 1 ? '1 Rückmeldung' : `${rueckmeldungen} Rückmeldungen`);
+    if (antraege > 0) teile.push(antraege === 1 ? '1 Antrag' : `${antraege} Anträge`);
+
+    let text = `Termin „${apt.title}“ (${wann}) löschen?`;
+    if (teile.length > 0) {
+        const einzeln = rueckmeldungen + antraege === 1;
+        text += ` Dabei ${einzeln ? 'geht' : 'gehen'} ${teile.join(' und ')} verloren.`;
+    }
+    if (apt.series_id) {
+        text += ' Nur dieser Termin, die Serie bleibt bestehen.';
+    }
+    return text;
+}
+
+/**
+ * Loescht nach der Rueckfrage. Ein inzwischen anderswo geloeschter Termin
+ * (404) ist kein Fehler -- er ist weg, wie gewuenscht.
+ */
+async function confirmDeleteAppointment(appointmentId) {
+    const result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
+    const schonWeg = !result.success && result.status === 404;
+    if (!result.success && !schonWeg) {
+        showFormErrors('appointmentErrors', [result.error || 'Löschen fehlgeschlagen']);
+        return;
+    }
+
+    closeAppointmentModal();
+    await loadResponses();
+    showMessage(schonWeg ? 'Termin war schon gelöscht' : 'Termin gelöscht', schonWeg ? 'info' : 'success');
 }
 
 async function initAttendanceList() {

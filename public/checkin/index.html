@@ -537,6 +537,12 @@
                     <button type="button" class="action-button btn-cancel" id="btnCancelAppointment">Abbrechen</button>
                     <button type="submit" class="action-button" id="btnSaveAppointment">Speichern</button>
                 </div>
+                <!-- Nur beim Bearbeiten aus dem Tab „Termine“ (OI-125). Eigene
+                     Zeile mit hidden: .action-button setzt display:flex und
+                     schluege das hidden-Attribut am Knopf selbst. -->
+                <div id="appointmentDeleteRow" class="appointment-delete-row" hidden>
+                    <button type="button" class="action-button btn-delete" id="btnDeleteAppointment">Termin löschen</button>
+                </div>
             </form>
         </div>
     </div>

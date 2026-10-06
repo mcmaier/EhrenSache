@@ -1511,6 +1511,19 @@ body:has(.modal.active) {
     line-height: 1.4;
 }
 
+/* Loeschen im Termin-Dialog (OI-125): abgesetzt unter Abbrechen/Speichern,
+   damit es nicht neben „Speichern“ liegt. */
+.appointment-delete-row {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.appointment-delete-row .action-button {
+    padding: 12px 10px;
+    font-size: 15px;
+}
+
 .btn-login {
     width: 100%;
     max-width: 400px;
