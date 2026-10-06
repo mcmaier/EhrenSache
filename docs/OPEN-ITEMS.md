@@ -2431,7 +2431,10 @@ zugeordnet“ und „n Mitglied(er) in keiner Gruppe ihres Registers“, Namen �
 ---
 
 ### OI-120 · Das Dashboard lädt rund 45 Einzeldateien
-**Priorität:** mittel (bis 2026-10-05 niedrig) · aufgenommen am 2026-10-02 (Demo nach dem Update auf 1.20.0)
+**Priorität:** erledigt am 2026-10-06 — mit **1.21.0** (Version im Pfad), **1.22.0** (CSS-Bündel)
+und **1.22.1** (Kompression); auf der Demo nachgemessen (Abschnitte unten). JS-Bündeln bleibt
+bewusst offen, weil es einen Build-Schritt verlangt · zuvor mittel (bis 2026-10-05 niedrig) ·
+aufgenommen am 2026-10-02 (Demo nach dem Update auf 1.20.0)
 
 **Stand 2026-10-06:** Weg 2 als **Version im Pfad** mit 1.21.0 veröffentlicht (Spec
 `docs/superpowers/specs/2026-10-05-version-im-pfad-design.md`). Auf der Demo nachgemessen: Beim
