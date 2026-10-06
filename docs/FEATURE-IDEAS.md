@@ -63,6 +63,7 @@ durchschlägt.
 | [FI-23](#fi-23--ort-und-ende-am-termin) | Ort und Ende am Termin (rein informativ) — **umgesetzt in 1.10.0** | mittel | M | — |
 | [FI-24](#fi-24--freigaben-in-der-check-in-app) | Freigaben in der Check-in-App (Anträge außerhalb des Zeitfensters) | mittel | M | — |
 | [FI-25](#fi-25--docker-als-zweiter-auslieferungsweg) | Docker als zweiter Auslieferungsweg | niedrig² | S/M | — |
+| [FI-26](#fi-26--terminabstimmung-mit-übernahme-in-den-termin) | Terminabstimmung mit Übernahme in den Termin | mittel | M | FI-1, FI-6 für die Wirkung |
 
 ¹ hoch in Kombination mit [FI-1](#fi-1--terminzusage-im-vorfeld), für sich allein mittel.
 ² für Vereine; als Entwicklungs- und Testumgebung mittel. Aufwand S für die Compose-Variante,
@@ -82,6 +83,10 @@ freigeben können — was seit 1.12.0 möglich ist, aber nur im Zeitfenster der 
 FI-25 kam am 2026-10-01 aus der Frage auf, ob EhrenSache zusätzlich als Docker-Container
 ausgeliefert werden kann. Es ist keine Funktion, sondern ein Auslieferungsweg, und steht deshalb
 in einem eigenen Abschnitt F.
+
+FI-26 kam am 2026-10-06 als Wunsch dazu: Abstimmung über mehrere Termine oder Zeitfenster,
+aus der ein Termin samt Zusagen entsteht. Sie überschneidet sich mit
+[FI-20](#fi-20--einfache-umfragen), ist aber enger gefasst und steht deshalb unter A.
 
 FI-16 bis FI-22 kamen am 2026-09-16 aus einem getrennt geführten Ideen-Backlog dazu, teils aus
 einem Vergleich mit `konzertmeister.app`. Aus demselben Abgleich stammen die Ergänzungen an
@@ -254,6 +259,51 @@ oben; der dritte bleibt offen, falls Variante C je verfolgt wird):
   wird: Erbt eine Untergruppe die Terminarten der Obergruppe? Sieht ein Nutzer mit Zugriff auf
   das Register auch die Orchesterdaten — oder umgekehrt? Jede Antwort ist für sich vertretbar,
   muss aber zusammenpassen.
+
+---
+
+### FI-26 · Terminabstimmung mit Übernahme in den Termin
+**Nutzen:** mittel · **Aufwand:** M — baut auf [FI-1](#fi-1--terminzusage-im-vorfeld) auf, **wirkt erst mit [FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push)**
+
+Eine Abstimmung mit mehreren Optionen: verschiedene Tage für einen Termin oder ein Tag mit
+mehreren Zeitfenstern (Doodle-Prinzip). Mitglieder antworten je Option, die Verwaltung sieht die
+Verteilung und wählt eine Option aus. Daraus entsteht ein regulärer Termin, und wer für diese
+Option gestimmt hat, ist dort bereits als *zugesagt* eingetragen — ebenso *abgesagt* und
+*unsicher*, falls die Abstimmung diese Abstufung kennt.
+
+**Warum interessant:** Die Terminfindung für Zusatzproben, Arbeitseinsätze oder Ausschusssitzungen
+läuft heute außerhalb von EhrenSache (Doodle, Messenger-Gruppe), und das Ergebnis wird danach von
+Hand übertragen. Die Übernahme in die Rückmeldung schließt genau diese Lücke — und unterscheidet
+die Idee von [FI-20](#fi-20--einfache-umfragen): Sie ist kein zweites Antwortmuster neben FI-1,
+sondern dessen Vorstufe. Die Antwort auf die gewählte Option *ist* die spätere Zusage.
+
+**Berührt:** neue Tabellen für Abstimmung, Optionen und Antworten je Mitglied und Option ·
+neue Ressource in `api.php` samt Eintrag in `demo_mode.php` · Übernahme nach
+`appointment_responses` (Regeln aus `private/helpers/responses.php`) · Dashboard: Anlegen,
+Auswertung, Auswahl · PWA: Abstimmen · [FI-17](#fi-17--offene-punkte-unter-mein-konto) als
+Hinweis „offene Abstimmung", solange FI-6 fehlt · vermutlich ein Feature-Schalter (`FEATURES`).
+
+**Vorher zu klären:**
+
+- **Wer darf abstimmen?** Naheliegend dieselbe Zielgruppe wie beim späteren Termin, also
+  Terminart und Gruppen schon an der Abstimmung festlegen. Sonst stimmen Mitglieder ab, die beim
+  entstandenen Termin gar nicht erwartet werden, und ihre Zusage hängt an einem Termin, der sie
+  nicht betrifft.
+- **Antwortstufen je Option.** Nur ja/nein oder ja/vielleicht/nein? Die dreistufige Variante
+  passt direkt auf *zugesagt / unsicher / abgesagt*, ist aber mühsamer auszufüllen.
+- **Was wird aus Nichtantworten?** Wer nicht abgestimmt hat, bekommt keine Rückmeldung — er
+  bleibt „ohne Rückmeldung", wie bei jedem neuen Termin. Keine Absage erfinden.
+- **Mehrere Optionen übernehmen?** Bei Zeitfenstern kann es sinnvoll sein, zwei Fenster als zwei
+  Termine anzulegen (z. B. Schichten). Das streift [FI-9](#fi-9--dienst--und-schichtplanung-für-veranstaltungen)
+  — klare Grenze ziehen, sonst wird die Abstimmung zur Schichtplanung.
+- **Frist und Abschluss.** Endet die Abstimmung zu einem Zeitpunkt oder erst mit der Auswahl?
+  Danach schreibgeschützt; spätere Änderungen laufen über die Rückmeldung am Termin.
+- **Sichtbarkeit der Stimmen.** Wie bei FI-1 eine Offenlegung innerhalb des Vereins
+  (`DATENSCHUTZ.md`); sinnvoll dieselbe Regel wie die Namenssichtbarkeit der Terminart.
+- **Aufbewahrung.** Nach der Übernahme sind die Stimmen zu den nicht gewählten Optionen
+  wertlos — Löschfrist festlegen, statt sie unbegrenzt zu halten.
+- **Verhältnis zu FI-20.** Wird FI-26 gebaut, ist FI-20 im Kern erledigt oder wird zur
+  Verallgemeinerung (Optionen ohne Terminbezug). Nicht beides getrennt bauen.
 
 ---
 
@@ -983,6 +1033,10 @@ Termin — dieselbe Mechanik aus Frage, Antwort je Mitglied, Frist und Auswertun
 hat entweder zwei Umsetzungen desselben Musters oder muss die vorhandene verallgemeinern, und
 das ist der eigentliche Aufwand. Ohne Versandweg beantwortet außerdem niemand eine Umfrage, von
 der er nichts erfährt.
+
+**Siehe auch [FI-26](#fi-26--terminabstimmung-mit-übernahme-in-den-termin):** der Fall
+„Terminfindung“ enger gefasst, mit Übernahme der Stimmen als Zusagen — das löst den Einwand
+oben, weil die Abstimmung dort in FI-1 mündet statt daneben zu stehen.
 
 ---
 
