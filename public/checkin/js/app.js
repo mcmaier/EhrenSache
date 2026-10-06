@@ -1389,13 +1389,6 @@ async function initAttendanceList() {
 }
 
 /**
- * Speichert den Termin aus dem Dialog der Anwesenheitsliste.
- *
- * Steht als benannte Funktion neben initAttendanceList(), nicht als Arrow im
- * bindOnce()-Aufruf: Der Rumpf ist laenger als die uebrige Bindung zusammen
- * und verdeckte dort, was die Funktion sonst noch tut.
- */
-/**
  * Meldungen zu einem gescheiterten Speichern im Termin-Dialog.
  *
  * Bei einer Dublette (409) ersetzt apiCall() die Servermeldung durch das
@@ -1416,6 +1409,13 @@ function appointmentErrorMessages(result) {
     ];
 }
 
+/**
+ * Speichert den Termin aus dem Termin-Dialog (Anwesenheitsliste oder Tab „Termine“).
+ *
+ * Steht als benannte Funktion neben initAttendanceList(), nicht als Arrow im
+ * bindOnce()-Aufruf: Der Rumpf ist laenger als die uebrige Bindung zusammen
+ * und verdeckte dort, was die Funktion sonst noch tut.
+ */
 async function submitAppointmentForm(e) {
     e.preventDefault();
 
@@ -1447,6 +1447,26 @@ async function submitAppointmentForm(e) {
         document.getElementById('appointmentModal').classList.remove('active');
 
         const id = neu ? String(result.data?.id ?? '') : String(currentEditAppointmentId);
+
+        // Aus dem Tab „Termine“ (OI-123): Die Liste dort zeigt nur kommende
+        // Termine der eigenen Gruppen (responsesFetchUpcomingIds/-Info). Ein
+        // Termin fuer eine fremde Gruppe oder in der Vergangenheit ist
+        // gespeichert, aber dort unsichtbar -- dann sagt die Meldung das,
+        // statt still „erstellt“ zu melden. Die Anwesenheitsliste laedt beim
+        // Tab-Wechsel ohnehin neu.
+        if (appointmentModalOrigin === 'responses') {
+            await loadResponses();
+            const sichtbar = id !== '' && upcomingResponses.some(
+                i => String(i.appointment.appointment_id) === id);
+            if (sichtbar) {
+                showMessage('Termin erstellt', 'success');
+            } else {
+                const wann = formatResponseCardHead(formData.date, formData.start_time, null);
+                showMessage(`Termin angelegt (${wann}) – nicht in deiner Liste: Sie zeigt nur kommende Termine deiner Gruppen.`, 'info');
+            }
+            return;
+        }
+
         await loadAttendanceAppointments();
 
         // Die Auswahl zeigt nur Termine im Fenster um jetzt -- diese Liste
@@ -3638,26 +3658,34 @@ async function fillPwaLocationSuggestions() {
     list.innerHTML = orte.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
 }
 
-async function showCreateAppointmentModal() {
+// Aus welchem Tab der Termin-Dialog geoeffnet wurde: 'attendance' oder
+// 'responses' (OI-123). submitAppointmentForm() laedt danach diesen Tab neu.
+let appointmentModalOrigin = 'attendance';
+
+async function showCreateAppointmentModal(origin = 'attendance') {
     currentEditAppointmentId = null;
+    appointmentModalOrigin = origin;
     document.getElementById('appointmentModalTitle').textContent = 'Termin anlegen';
 
     // Lade Terminarten
     await loadAppointmentTypes();
     await fillPwaLocationSuggestions();
-    
+
     // Formular zurücksetzen
     document.getElementById('appointmentForm').reset();
     showFormErrors('appointmentErrors', []);
 
-    // Mit "jetzt" vorbelegt: Der Knopf dient dem Fall, dass gerade etwas
-    // stattfindet, das noch kein Termin ist. Bis 1.11.0 waren Datum und
-    // Uhrzeit leer -- ein vertippter Tag liess den Termin danach ausserhalb
-    // des Fensters verschwinden.
-    const jetzt = new Date();
-    document.getElementById('appointmentDate').value = formatDate(jetzt);
-    document.getElementById('appointmentTime').value =
-        `${String(jetzt.getHours()).padStart(2, '0')}:${String(jetzt.getMinutes()).padStart(2, '0')}`;
+    // Mit "jetzt" vorbelegt: Der Knopf der Anwesenheitsliste dient dem Fall,
+    // dass gerade etwas stattfindet, das noch kein Termin ist. Bis 1.11.0
+    // waren Datum und Uhrzeit leer -- ein vertippter Tag liess den Termin
+    // danach ausserhalb des Fensters verschwinden. Aus dem Tab „Termine“
+    // bleiben beide leer: Wer dort anlegt, plant fuer spaeter (OI-123).
+    if (origin === 'attendance') {
+        const jetzt = new Date();
+        document.getElementById('appointmentDate').value = formatDate(jetzt);
+        document.getElementById('appointmentTime').value =
+            `${String(jetzt.getHours()).padStart(2, '0')}:${String(jetzt.getMinutes()).padStart(2, '0')}`;
+    }
 
     // Zeige Modal
     document.getElementById('appointmentModal').classList.add('active');
@@ -3668,6 +3696,8 @@ async function showEditAppointmentModal() {
     if (!appointmentId) return;
     
     currentEditAppointmentId = appointmentId;
+    // Bearbeiten gibt es nur in der Anwesenheitsliste.
+    appointmentModalOrigin = 'attendance';
     document.getElementById('appointmentModalTitle').textContent = 'Termin bearbeiten';
     showFormErrors('appointmentErrors', []);
 
