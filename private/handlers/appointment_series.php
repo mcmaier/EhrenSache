@@ -226,6 +226,12 @@ function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, arr
         seriesRespond(400, ['message' => $fehler]);
         return;
     }
+    // OI-124: wie beim Einzel-PUT -- ohne Angabe fragt der Server per 409.
+    $resetFlag = responsesResetFlag($raw);
+    if ($resetFlag['error']) {
+        seriesRespond(400, ['message' => 'reset_responses muss true oder false sein']);
+        return;
+    }
 
     $hasStart = in_array('start_time', $provided, true);
     $hasEnd   = in_array('end_time', $provided, true);
@@ -245,6 +251,7 @@ function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, arr
     $detach = $db->prepare("UPDATE {$prefix}appointments SET is_detached = 1 WHERE appointment_id = ?");
     $updated  = 0;
     $detached = [];
+    $verlegt  = [];   // aktualisierte Termine mit neuem Beginn (OI-124)
 
     foreach (seriesFollowing($db, $prefix, $series['series_id'], $from) as $row) {
         $effectiveStart = $hasStart ? $template['start_time'] : $row['start_time'];
@@ -275,7 +282,8 @@ function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, arr
             // Nur eine erfasste ANWESENHEIT haengt an der Puenktlichkeit dieses Termins --
             // Zeit oder Terminart aendern sich dafuer nicht mehr rueckwirkend. Eine
             // Rueckmeldung, Ausnahme oder Arbeitszeit darf sich mit der Serie weiterbewegen
-            // (Hauptfall: ein zukuenftiger Probentermin, zu dem schon zugesagt wurde). Andere
+            // (Hauptfall: ein zukuenftiger Probentermin, zu dem schon zugesagt wurde; was mit
+            // den Zusagen geschieht, entscheidet reset_responses, OI-124). Andere
             // Felder (Titel, Ort, Beschreibung, Ende) sind ohnehin unkritisch und aendern
             // sich auch bei erfasster Anwesenheit normal weiter unten.
             if (appointmentHasAttendance($db, $prefix, $row['appointment_id'])) {
@@ -288,11 +296,29 @@ function seriesHandleUpdateFollowing(PDO $db, string $prefix, array $series, arr
 
         $update->execute(array_merge($setValues, [$row['appointment_id']]));
         $updated++;
+        if (appointmentFieldChanged('start_time', $effectiveStart, $row['start_time'])) {
+            $verlegt[] = $row['appointment_id'];
+        }
+    }
+
+    // OI-124: Zusagen zu einem neuen Beginn hat niemand gegeben. Abgeloeste
+    // Termine (Konflikt, Anwesenheit) behalten ihren Beginn und zaehlen nicht.
+    $zurueckgesetzt = 0;
+    if ($verlegt !== [] && $resetFlag['value'] !== false) {
+        $betroffen = responsesCountResettable($db, $prefix, $verlegt);
+        if ($betroffen['responses'] > 0 && $resetFlag['value'] === null) {
+            $db->rollBack();
+            seriesRespond(409, responsesAffectedBody($betroffen));
+            return;
+        }
+        if ($resetFlag['value'] === true) {
+            $zurueckgesetzt = responsesReset($db, $prefix, $verlegt);
+        }
     }
 
     $db->commit();
 
-    seriesRespond(200, ['updated' => $updated, 'detached' => $detached]);
+    seriesRespond(200, ['updated' => $updated, 'detached' => $detached, 'responses_reset' => $zurueckgesetzt]);
 }
 
 /**

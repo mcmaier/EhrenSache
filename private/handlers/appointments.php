@@ -305,6 +305,15 @@ function handleAppointments($db, $database, $method, $id) {
                 break;
             }
 
+            // OI-124: Was mit Zusagen geschieht, wenn sich der Zeitpunkt aendert,
+            // entscheidet der Client. Ohne Angabe fragt der Server unten per 409.
+            $resetFlag = responsesResetFlag(get_object_vars($rawData));
+            if ($resetFlag['error']) {
+                http_response_code(400);
+                echo json_encode(["message" => "reset_responses muss true oder false sein"], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+
             // Mitgeschickte Kernfelder pruefen; was fehlt, bleibt wie gespeichert.
             // title, date und start_time sind Pflicht und lassen sich nicht per
             // null loeschen. type_id darf null werden (keine Terminart),
@@ -380,6 +389,7 @@ function handleAppointments($db, $database, $method, $id) {
             $updateParams = [];
             $geaendert = false;
             $datumGeaendert = false;
+            $zeitpunktGeaendert = false;
 
             foreach (['title', 'type_id', 'description', 'date', 'start_time', 'location', 'end_time'] as $feld) {
                 if (array_key_exists($feld, $vorhanden)) {
@@ -390,12 +400,15 @@ function handleAppointments($db, $database, $method, $id) {
                         if ($feld === 'date') {
                             $datumGeaendert = true;
                         }
+                        if ($feld === 'date' || $feld === 'start_time') {
+                            $zeitpunktGeaendert = true;
+                        }
                     }
                 }
             }
 
             if (empty($updateFields)) {
-                echo json_encode(["message" => "Appointment updated"]);
+                echo json_encode(["message" => "Appointment updated", "responses_reset" => 0]);
                 break;
             }
 
@@ -408,10 +421,33 @@ function handleAppointments($db, $database, $method, $id) {
             }
 
             $updateParams[] = $id;
-            $stmt = $db->prepare("UPDATE {$prefix}appointments SET " . implode(', ', $updateFields)
-                                 . " WHERE appointment_id = ?");
 
-            if($stmt->execute($updateParams)) {
+            // Aenderung, Seriendatum und Zuruecksetzen gelingen gemeinsam oder
+            // gar nicht (OI-124). Die Zeilensperre haelt die Zahl der Rueckfrage
+            // bis zum Schreiben stabil.
+            $db->beginTransaction();
+            try {
+                $db->prepare("SELECT appointment_id FROM {$prefix}appointments WHERE appointment_id = ? FOR UPDATE")
+                   ->execute([$id]);
+
+                $zurueckgesetzt = 0;
+                if ($zeitpunktGeaendert && $resetFlag['value'] !== false) {
+                    $betroffen = responsesCountResettable($db, $prefix, [(int) $id]);
+                    if ($betroffen['responses'] > 0 && $resetFlag['value'] === null) {
+                        $db->rollBack();
+                        http_response_code(409);
+                        echo json_encode(responsesAffectedBody($betroffen), JSON_UNESCAPED_UNICODE);
+                        break;
+                    }
+                    if ($resetFlag['value'] === true) {
+                        $zurueckgesetzt = responsesReset($db, $prefix, [(int) $id]);
+                    }
+                }
+
+                $db->prepare("UPDATE {$prefix}appointments SET " . implode(', ', $updateFields)
+                             . " WHERE appointment_id = ?")
+                   ->execute($updateParams);
+
                 // Verschiebt sich ein Serientermin auf ein anderes Datum, gilt das
                 // ALTE Datum als Ausfall der Serie -- wie beim Einzel-DELETE (FI-7).
                 // Ohne diesen Eintrag legt eine spaetere Serienaktion (z. B. ein
@@ -420,8 +456,14 @@ function handleAppointments($db, $database, $method, $id) {
                 if ($bestand['series_id'] !== null && $datumGeaendert) {
                     seriesAddExdates($db, $prefix, (int) $bestand['series_id'], [$bestand['date']]);
                 }
-                echo json_encode(["message" => "Appointment updated"]);
-            } else {
+
+                $db->commit();
+                echo json_encode(["message" => "Appointment updated", "responses_reset" => $zurueckgesetzt]);
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                error_log('appointments PUT: ' . $e->getMessage());
                 http_response_code(500);
                 echo json_encode(["message" => "Failed to update appointment"]);
             }

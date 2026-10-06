@@ -143,7 +143,8 @@ test('Dialog: Serientermin fragt nach "Nur dieser" oder "Dieser und alle folgend
     assertTrue(str_contains($js, 'showChoice('));
     assertTrue(str_contains($js, "'Nur dieser'"));
     assertTrue(str_contains($js, "'Dieser und alle folgenden'"));
-    assertTrue(str_contains($js, "apiCall('appointment_series', 'PUT'"));
+    // Seit OI-124 laeuft der Serien-PUT ueber die Rueckfrage zu den Rueckmeldungen.
+    assertTrue(str_contains($js, "putAskingAboutResponses('appointment_series'"));
     assertTrue(str_contains($js, "apiCall('appointment_series', 'DELETE'"));
 });
 

@@ -940,7 +940,10 @@ test('PUT: eine Rueckmeldung allein haelt den Beginn nicht fest -- die Serie bew
             'query' => ['appointment_id' => $apt['appointment_id'], 'member_id' => $world['member']],
             'body' => ['status' => 'yes']]));
 
-        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'start_time' => '19:00']);
+        // Seit OI-124 fragt der Server ohne reset_responses zurueck; die Zusage
+        // haelt den Termin trotzdem nicht fest -- er wird nicht abgeloest.
+        $res = asSeriesPut($sid, ['from_date' => '2031-03-04', 'start_time' => '19:00',
+                                  'reset_responses' => false]);
         assertStatus(200, $res);
         assertSame(5, $res['body']['updated']);
         assertSame([], $res['body']['detached']);

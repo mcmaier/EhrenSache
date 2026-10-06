@@ -957,6 +957,36 @@ trifft (z. B. ein `action=split`), am alten Datum erneut einen Termin anlegen: e
 Probe. Geprüft wird `appointmentFieldChanged('date', …)` — ein `PUT`, das `date` unverändert
 mitschickt oder gar nicht sendet, trägt nichts nach.
 
+**Verlegen mit vorhandenen Zusagen (seit OI-124):** Ändern sich `date` oder `start_time`
+tatsächlich und liegen für den Termin Rückmeldungen `yes` oder `maybe` vor, entscheidet der
+Aufrufer über das zusätzliche Feld `reset_responses`:
+
+| `reset_responses` | Wirkung |
+|---|---|
+| fehlt | `409` (siehe unten), **nichts** wird geschrieben |
+| `true` | Termin geändert, Rückmeldungen `yes`/`maybe` gelöscht — in einer Transaktion |
+| `false` | Termin geändert, alle Rückmeldungen bleiben (Verhalten bis OI-124) |
+| anderer Typ | `400 {"message": "reset_responses muss true oder false sein"}` |
+
+Absagen (`no`) bleiben immer stehen, samt verknüpftem Antrag. Andere Felder (`title`, `location`,
+`end_time`, `type_id`, `description`) lösen keine Rückfrage aus, ebenso wenig unverändert
+mitgeschickte Werte. Die Dublettenprüfung läuft vorher; ihr `409` trägt kein `code`.
+
+```json
+{
+  "code": "responses_affected",
+  "message": "Für den Termin liegen Zusagen vor, Datum oder Beginn ändern sich",
+  "appointments": 1,
+  "responses": 12
+}
+```
+
+**Antwort (`200`):** `{"message": "Appointment updated", "responses_reset": 0}` — `responses_reset`
+zählt die gelöschten Rückmeldungen.
+
+**Änderung für Skripte:** Bis OI-124 antwortete ein solches `PUT` mit `200`. Wer Termine per API
+verlegt, schickt `reset_responses` mit, um die Rückfrage zu vermeiden.
+
 ---
 
 ### Termin löschen
@@ -1105,7 +1135,8 @@ Ein Termin bleibt unverändert, wird abgelöst (`is_detached = 1`) und im Ergebn
 - **nur** bei einer Änderung von `start_time` oder `type_id`: für den Termin bereits
   **Anwesenheit erfasst** ist (`reason: has_data` — geprüft wird ausschließlich `records`, **nicht**
   Rückmeldungen, Ausnahmen oder Arbeitszeit; diese ziehen mit der Serie weiter, damit sich ein
-  bereits zugesagter künftiger Termin noch verschieben lässt).
+  bereits zugesagter künftiger Termin noch verschieben lässt — was mit den Zusagen geschieht,
+  regelt `reset_responses`, siehe unten).
 
 Titel, Beschreibung, Ort und Ende ändern sich bei erfasster Anwesenheit normal weiter — nur
 Beginn und Terminart schützen eine erfasste Anwesenheit (Pünktlichkeit) vor dem Mitziehen.
@@ -1129,6 +1160,13 @@ möglich, während die Serienvorlage bereits den neuen Wert trägt (z. B. wenn a
 Termine abgelöst sind oder es dort keine mehr gibt). **Fehlt jedes Vorlagenfeld im Request**,
 ändert sich nichts — auch die Serienvorlage nicht —, und die Antwort ist sofort
 `{"updated": 0, "detached": []}`.
+
+**Verlegen mit vorhandenen Zusagen (seit OI-124):** Ändert sich der Beginn aktualisierter Termine
+und liegen dort Rückmeldungen `yes` oder `maybe` vor, gilt dasselbe Feld `reset_responses` wie bei
+`PUT appointments` (fehlt → `409 responses_affected`, nichts geschrieben, auch nicht die
+Serienvorlage; `true` → löschen; `false` → behalten; anderer Typ → `400`). `appointments` im
+`409` zählt die betroffenen Termine. Abgelöste Termine (`detached`) behalten ihren Beginn und
+zählen nicht mit. Die Antwort `200` enthält zusätzlich `responses_reset`.
 
 ### Regel ab einem Termin ändern: „Dieser und alle folgenden" mit Regeländerung (Split)
 **Endpoint:** `POST /api.php?resource=appointment_series&id=1&action=split`

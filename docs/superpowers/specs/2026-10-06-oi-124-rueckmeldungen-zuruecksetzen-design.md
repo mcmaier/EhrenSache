@@ -29,13 +29,14 @@ Zählaufruf nötig); stilles Zurücksetzen ohne Rückfrage (widerspricht dem Wun
 - `responsesCountResettable(PDO $db, string $prefix, array $appointmentIds): array` —
   liefert `['appointments' => int, 'responses' => int]`: Anzahl der Termine mit mindestens einer
   Rückmeldung `yes`/`maybe` und Anzahl dieser Rückmeldungen. Leere Liste → beides 0.
-- `responsesReset(PDO $db, Database $database, string $prefix, array $appointmentIds): int` —
-  löscht die Rückmeldungen `yes`/`maybe` dieser Termine und gibt die Anzahl zurück. Ist an
-  einer solchen Zeile ausnahmsweise ein Antrag verknüpft, gilt pro Zeile dieselbe Behandlung wie
-  beim Zurückziehen einer Rückmeldung (`DELETE appointment_responses`): `responseExcuseAction()`
-  mit neuem Status `null`; nur bei `'delete'` wird der offene, selbst erzeugte Antrag mit der
-  zusätzlichen Bindung (A2: `member_id`, `appointment_id`, `exception_type = 'absence'`,
-  `status = 'pending'`) gelöscht. Läuft innerhalb der Transaktion des Aufrufers.
+- `responsesReset($db, string $prefix, array $appointmentIds): int` — löscht die Rückmeldungen
+  `yes`/`maybe` dieser Termine und gibt die Anzahl zurück. Läuft innerhalb der Transaktion des
+  Aufrufers. **Beim Planen geprüft:** `responseExcuseAction()` liefert für einen alten Status
+  `yes`/`maybe` und neuen Status `null` nur `none` oder `keep`, nie `delete`. Ein ausnahmsweise
+  verknüpfter Antrag bleibt also stehen wie beim heutigen `DELETE appointment_responses`; ein
+  schlichtes `DELETE … WHERE status IN ('yes','maybe')` genügt.
+- `responsesResetFlag(array $body)` liest das Feld (siehe 3.2), `responsesAffectedBody()` baut den
+  409-Körper.
 
 ### 3.2 Parameter `reset_responses`
 

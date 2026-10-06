@@ -755,3 +755,87 @@ function responsesTermGroupIds(array $rows): array
 {
     return array_values(array_unique(array_map(static fn ($r) => (int) $r['group_id'], $rows)));
 }
+
+// ---- Verlegen eines Termins (OI-124) ----------------------------------------
+
+/**
+ * Liest reset_responses aus dem Anfragekoerper eines Termin-PUT.
+ *
+ * null = nicht angegeben: Der Server fragt per 409 zurueck, wenn Zusagen
+ * betroffen sind. Nur echte Wahrheitswerte gelten -- "true" als Text oder 1
+ * sind ein Fehler, damit kein Client versehentlich zuruecksetzt.
+ *
+ * @return array{value: ?bool, error: bool}
+ */
+function responsesResetFlag(array $body): array
+{
+    if (!array_key_exists('reset_responses', $body)) {
+        return ['value' => null, 'error' => false];
+    }
+    $value = $body['reset_responses'];
+
+    return is_bool($value)
+        ? ['value' => $value, 'error' => false]
+        : ['value' => null, 'error' => true];
+}
+
+/**
+ * Zaehlt Zusagen und "unsicher" der Termine -- das, was beim Verlegen
+ * zurueckgesetzt wuerde. Absagen zaehlen nicht (Spec E1).
+ *
+ * @param int[] $appointmentIds
+ * @return array{appointments: int, responses: int}
+ */
+function responsesCountResettable($db, string $prefix, array $appointmentIds): array
+{
+    if ($appointmentIds === []) {
+        return ['appointments' => 0, 'responses' => 0];
+    }
+    $in = implode(',', array_fill(0, count($appointmentIds), '?'));
+    $stmt = $db->prepare("SELECT COUNT(DISTINCT appointment_id) AS a, COUNT(*) AS r
+                          FROM {$prefix}appointment_responses
+                          WHERE appointment_id IN ({$in}) AND status IN ('yes', 'maybe')");
+    $stmt->execute(array_map('intval', array_values($appointmentIds)));
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return ['appointments' => (int) $row['a'], 'responses' => (int) $row['r']];
+}
+
+/**
+ * Loescht Zusagen und "unsicher" der Termine und liefert die Anzahl.
+ *
+ * Absagen bleiben (Spec E1). Ein verknuepfter Antrag bleibt stehen wie beim
+ * Zuruecknehmen einer Rueckmeldung: responseExcuseAction() liefert fuer
+ * yes/maybe -> null nie 'delete', nur 'none' oder 'keep'. Laeuft in der
+ * Transaktion des Aufrufers.
+ *
+ * @param int[] $appointmentIds
+ */
+function responsesReset($db, string $prefix, array $appointmentIds): int
+{
+    if ($appointmentIds === []) {
+        return 0;
+    }
+    $in = implode(',', array_fill(0, count($appointmentIds), '?'));
+    $stmt = $db->prepare("DELETE FROM {$prefix}appointment_responses
+                          WHERE appointment_id IN ({$in}) AND status IN ('yes', 'maybe')");
+    $stmt->execute(array_map('intval', array_values($appointmentIds)));
+
+    return $stmt->rowCount();
+}
+
+/**
+ * 409-Koerper der Rueckfrage. Der Dubletten-409 (appointmentConflictBody)
+ * traegt kein 'code' -- daran unterscheiden die Clients die beiden.
+ *
+ * @param array{appointments: int, responses: int} $count
+ */
+function responsesAffectedBody(array $count): array
+{
+    return [
+        'code'         => 'responses_affected',
+        'message'      => 'Für den Termin liegen Zusagen vor, Datum oder Beginn ändern sich',
+        'appointments' => $count['appointments'],
+        'responses'    => $count['responses'],
+    ];
+}

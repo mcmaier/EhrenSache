@@ -1668,21 +1668,21 @@ export async function saveAppointment() {
         if (!scope) return;
         if (scope === 'following') {
             const changed = changedTemplateFields(template, currentAppointment);
-            const result = await apiCall('appointment_series', 'PUT',
-                { ...changed, from_date: currentAppointment.date }, { id: currentSeries.series_id });
+            const result = await putAskingAboutResponses('appointment_series',
+                { ...changed, from_date: currentAppointment.date }, { id: currentSeries.series_id }, true);
             if (!result || !result.success) return;
             closeAppointmentModal();
             await invalidateSeriesYears(currentAppointment.date, currentSeries.until);
             await invalidateAppointmentDependents();
             showAppointmentSection(true, currentAppointmentsPage);
-            showToast(seriesResultText(result), 'success');
+            showToast(seriesResultText(result) + responsesResetText(result), 'success');
             return;
         }
     }
 
     let result;
     if (appointmentId) {
-        result = await apiCall('appointments', 'PUT', data, { id: appointmentId });
+        result = await putAskingAboutResponses('appointments', data, { id: appointmentId }, false);
     } else {
         result = await apiCall('appointments', 'POST', data);
     }
@@ -1701,10 +1701,56 @@ export async function saveAppointment() {
 
         // Erfolgs-Toast
         showToast(
-            appointmentId ? 'Termin wurde erfolgreich aktualisiert' : 'Termin wurde erfolgreich erstellt',
+            (appointmentId ? 'Termin wurde erfolgreich aktualisiert' : 'Termin wurde erfolgreich erstellt')
+                + responsesResetText(result),
             'success'
         );
     }
+}
+
+/**
+ * PUT mit Rueckfrage zu den Rueckmeldungen (OI-124).
+ *
+ * Aendern sich Datum oder Beginn eines Termins mit Zusagen, antwortet der Server
+ * mit 409 responses_affected und schreibt nichts. Dann entscheidet der Nutzer,
+ * und dieselbe Anfrage laeuft mit reset_responses erneut. Liefert das Ergebnis
+ * der letzten Anfrage; bricht der Nutzer ab, ein Ergebnis ohne success, und der
+ * Termin-Dialog bleibt offen.
+ *
+ * Die erste Anfrage laeuft ohne Fehler-Toast fuer 409 -- die Rueckfrage ist kein
+ * Fehler. Ein anderer 409 (Dublette) bekommt seinen Toast hier nachgereicht.
+ */
+async function putAskingAboutResponses(resource, data, params, isSeries) {
+    const result = await apiCall(resource, 'PUT', data, params, { silentStatuses: [409] });
+    if (!result || result.success) return result;
+
+    if (result.code !== 'responses_affected') {
+        showToast(result.message || result.hint || 'Konflikt', 'error');
+        return result;
+    }
+
+    const choice = await showChoice(responsesResetQuestion(result, isSeries), 'Rückmeldungen zurücksetzen?', [
+        { value: 'keep', label: 'Beibehalten', className: 'btn-secondary' },
+        { value: 'reset', label: 'Zurücksetzen' },
+    ]);
+    if (!choice) return { success: false };
+
+    return apiCall(resource, 'PUT', { ...data, reset_responses: choice === 'reset' }, params);
+}
+
+function responsesResetQuestion(r, isSeries) {
+    const where = isSeries
+        ? `Bei ${r.appointments} Terminen liegen ${r.responses} Zusagen bzw. „unsicher“ vor`
+        : `Für diesen Termin liegen ${r.responses} Zusagen bzw. „unsicher“ vor`;
+    return `${where}, und Datum oder Beginn ändern sich. Sollen diese Rückmeldungen zurückgesetzt `
+        + 'werden? Absagen bleiben bestehen.';
+}
+
+/** Zusatz fuer den Erfolgs-Toast, leer ohne zurueckgesetzte Rueckmeldungen. */
+function responsesResetText(result) {
+    const n = Number(result?.responses_reset) || 0;
+    if (n === 0) return '';
+    return n === 1 ? ' · 1 Rückmeldung zurückgesetzt' : ` · ${n} Rückmeldungen zurückgesetzt`;
 }
 
 export async function deleteAppointment(appointmentId) {
