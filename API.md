@@ -860,6 +860,17 @@ die Anwesenheit an.
 Bei abgeschalteter Anwesenheitserfassung entfällt der Zusatz still: Die Antwort trägt dann
 weder `attendance` noch `own_attendance` (seit OI-62, Etappe 2).
 
+**`dependents=1`** (nur Einzelabruf `?id=`, nur Admin und Manager, seit OI-125): hängt an den Termin,
+was ein `DELETE` mitlöschen würde:
+
+`"dependents": {"records": 0, "responses": 12, "exceptions": 3}`
+
+- `records` Erfassungen, `responses` Rückmeldungen, `exceptions` Anträge jeder Art (Entschuldigung
+  und Zeitkorrektur).
+- Andere Rollen erhalten mit dem Parameter `403`; ohne ihn bleibt der Einzelabruf unverändert.
+- Die Check-in-App nennt die Zahlen in der Rückfrage vor dem Löschen und löscht bei `records > 0`
+  nicht selbst, sondern verweist aufs Dashboard.
+
 ---
 
 ### Termin erstellen

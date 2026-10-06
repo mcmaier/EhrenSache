@@ -226,3 +226,25 @@ function appointmentGroupVisibility(PDO $db, string $prefix, $memberId, string $
         $groupIds,
     ];
 }
+
+/**
+ * Was ein DELETE des Termins mitloescht, gezaehlt (OI-125): Erfassungen,
+ * Rueckmeldungen und Antraege jeder Art. Die Check-in-App nennt die Zahlen in
+ * der Rueckfrage und verweist bei Erfassungen aufs Dashboard.
+ *
+ * Die Tabellen stehen hier fest und nicht als Parameter: dieselben drei, die
+ * der DELETE-Zweig in handlers/appointments.php leert.
+ *
+ * @return array{records: int, responses: int, exceptions: int}
+ */
+function appointmentDependentCounts(PDO $db, string $prefix, int $appointmentId): array
+{
+    $tables = ['records' => 'records', 'responses' => 'appointment_responses', 'exceptions' => 'exceptions'];
+    $counts = [];
+    foreach ($tables as $key => $table) {
+        $stmt = $db->prepare("SELECT COUNT(*) FROM {$prefix}{$table} WHERE appointment_id = ?");
+        $stmt->execute([$appointmentId]);
+        $counts[$key] = (int) $stmt->fetchColumn();
+    }
+    return $counts;
+}

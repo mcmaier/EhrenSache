@@ -32,6 +32,16 @@ function handleAppointments($db, $database, $method, $id) {
             }
 
             if($id) {
+                // Zaehlungen fuer die Rueckfrage vor dem Loeschen (OI-125):
+                // nur fuer Verwalter -- sie verraten, wie viele Mitglieder
+                // geantwortet oder Antraege gestellt haben.
+                $withDependents = isset($_GET['dependents']);
+                if ($withDependents && !isAdminOrManager()) {
+                    http_response_code(403);
+                    echo json_encode(["message" => "Nur für Admin und Manager"], JSON_UNESCAPED_UNICODE);
+                    break;
+                }
+
                 $sql = "SELECT a.*,
                                         at.type_name,
                                         at.color,
@@ -68,6 +78,9 @@ function handleAppointments($db, $database, $method, $id) {
                 $stmt->execute($params);
                 $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
                 if($appointment) {
+                    if ($withDependents) {
+                        $appointment['dependents'] = appointmentDependentCounts($db, $prefix, (int) $id);
+                    }
                     echo json_encode($appointment);
                 } else {
                     http_response_code(404);
