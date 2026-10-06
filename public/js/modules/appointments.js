@@ -1753,6 +1753,41 @@ function responsesResetText(result) {
     return n === 1 ? ' · 1 Rückmeldung zurückgesetzt' : ` · ${n} Rückmeldungen zurückgesetzt`;
 }
 
+/**
+ * Aufzaehlung dessen, was an einem Termin haengt, fuer die Loesch-Rueckfrage:
+ * „18 Erfassungen, 12 Rückmeldungen und 3 Anträge“. Erfassungen zuerst -- sie
+ * sind die eigentlichen Daten des Vereins und gehen beim Loeschen mit verloren.
+ * Liefert null, wenn nichts dranhaengt.
+ */
+function appointmentDependentsList(dep) {
+    const erfassungen = dep.records ?? 0;
+    const rueckmeldungen = dep.responses ?? 0;
+    const antraege = dep.exceptions ?? 0;
+
+    const teile = [];
+    if (erfassungen > 0) teile.push(erfassungen === 1 ? '1 Erfassung' : `${erfassungen} Erfassungen`);
+    if (rueckmeldungen > 0) teile.push(rueckmeldungen === 1 ? '1 Rückmeldung' : `${rueckmeldungen} Rückmeldungen`);
+    if (antraege > 0) teile.push(antraege === 1 ? '1 Antrag' : `${antraege} Anträge`);
+    if (teile.length === 0) return null;
+
+    const liste = teile.length === 1
+        ? teile[0]
+        : `${teile.slice(0, -1).join(', ')} und ${teile[teile.length - 1]}`;
+    return { liste, einzeln: erfassungen + rueckmeldungen + antraege === 1 };
+}
+
+/**
+ * Was beim Loeschen dieses einen Termins mit verloren geht (Folge aus OI-125),
+ * vom Server gezaehlt. Scheitert der Abruf, fragt das Dashboard wie bisher ohne
+ * Zahlen -- deshalb ohne Fehler-Toast und mit null als Rueckfall.
+ */
+async function appointmentDeleteConsequences(appointmentId) {
+    const result = await apiCall('appointments', 'GET', null, { id: appointmentId, dependents: 1 },
+        { silentStatuses: [403, 404, 500] });
+    if (!result || !result.success || !result.dependents) return null;
+    return appointmentDependentsList(result.dependents);
+}
+
 export async function deleteAppointment(appointmentId) {
     // Titel aus dem Cache holen statt aus dem onclick-Attribut: ein Termin-Titel
     // mit Apostroph oder HTML sprengte dort sonst den Aufruf bzw. liesse sich als
@@ -1761,11 +1796,16 @@ export async function deleteAppointment(appointmentId) {
     const cached = dataCache.appointments[currentYear]?.data?.find(a => a.appointment_id == appointmentId);
     const title = cached ? cached.title : 'diesem Termin';
 
+    // Bis OI-125 fragte das Dashboard nur „wirklich löschen?“ -- und nahm dabei
+    // ohne Hinweis die Erfassungen eines ganzen Abends mit. Gezaehlt wird nur
+    // dieser eine Termin; „Dieser und alle folgenden“ zaehlt der Server nicht.
+    const folgen = await appointmentDeleteConsequences(appointmentId);
+
     // Serientermin (FI-7): nur dieser oder ab hier die ganze Serie beenden.
     // showChoice() setzt die Nachricht per textContent -- der Titel bleibt roh.
     if (cached && cached.series_id && Number(cached.is_detached) !== 1) {
         const scope = await showChoice(
-            `„${title}" gehört zu einer Serie. Was soll gelöscht werden?`,
+            `„${title}" gehört zu einer Serie. Was soll gelöscht werden?${folgen ? ` An diesem Termin ${folgen.einzeln ? 'hängt' : 'hängen'} ${folgen.liste}.` : ''}`,
             'Serientermin löschen',
             [{ value: 'single', label: 'Nur dieser', className: 'btn-confirm-delete' },
              { value: 'following', label: 'Dieser und alle folgenden', className: 'btn-confirm-delete' }]
@@ -1792,7 +1832,7 @@ export async function deleteAppointment(appointmentId) {
     }
 
     const confirmed = await showConfirm(
-        `Termin "${title}" wirklich löschen?`,
+        `Termin "${title}" wirklich löschen?${folgen ? ` Dabei ${folgen.einzeln ? 'geht' : 'gehen'} ${folgen.liste} verloren.` : ''}`,
         'Termin löschen'
     );
 

@@ -28,6 +28,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   „Offene Punkte“. Titel, Ort oder Ende zu ändern, löst keine Rückfrage aus.
 
 ### Geändert
+- **Dashboard: Die Rückfrage beim Löschen eines Termins nennt, was mit verloren geht** (Folge aus
+  OI-125), etwa „Dabei gehen 18 Erfassungen, 12 Rückmeldungen und 3 Anträge verloren.“ Bisher
+  fragte das Dashboard nur „wirklich löschen?“ und nahm die Erfassungen ohne Hinweis mit. Bei
+  Serienterminen steht der Satz in der Auswahl „Nur dieser / Dieser und alle folgenden“ und gilt
+  für diesen einen Termin; die Folgen von „Dieser und alle folgenden“ zählt das Dashboard nicht.
 - **API: `PUT appointments` und `PUT appointment_series` können mit `409 responses_affected`
   antworten** (OI-124). Das geschieht, wenn sich Datum oder Beginn ändern, Zusagen vorliegen und
   das neue Feld `reset_responses` fehlt — geschrieben wird dann nichts. Skripte, die Termine
