@@ -89,7 +89,10 @@ let sessionGeneration = 0;
 
 let checkinAppointments = [];
 let clientSettings = { checkin_auto_create_appointment: '1', checkin_tolerance_hours: '2' };
-let deleteExceptionId = null;
+// Aktion des Bestaetigungsdialogs: Seit OI-125 loescht er nicht mehr nur
+// Antraege, sondern auch Termine -- wer ihn oeffnet, gibt mit, was „Loeschen“ tut.
+let confirmDeleteAction = null;
+let confirmDeleteOpener = null;
 let nfcAbortController = null;
 let nfcAvailable = false;
 let currentStatsYear = new Date().getFullYear();
@@ -1242,7 +1245,7 @@ function resetSessionState() {
     appointments = [];
     appointmentTypes = [];
     checkinAppointments = [];
-    deleteExceptionId = null;
+    confirmDeleteAction = null;
     currentEditAppointmentId = null;
     currentStatsYear = new Date().getFullYear();
 
@@ -3864,49 +3867,55 @@ async function loadAppointmentTypes() {
 // CONFIRMATION MODAL
 // ========================================
 
-// Wrapper für Exception löschen
-async function deleteException(exceptionId) 
-{    
-    deleteExceptionId = exceptionId;
-    openConfirmDeleteModal();    
-        
+// Antrag loeschen: Rueckfrage ohne Zusatztext, danach Verlauf neu laden.
+async function deleteException(exceptionId) {
+    openConfirmDeleteModal({ onConfirm: () => deleteExceptionConfirmed(exceptionId) });
 }
 
-async function openConfirmDeleteModal(exceptionId) {
+async function deleteExceptionConfirmed(exceptionId) {
+    try {
+        const result = await apiCall('exceptions', 'DELETE', null, { id: exceptionId });
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        showMessage('✓ Antrag erfolgreich gelöscht', 'success');
+        await loadHistory();
+    } catch (error) {
+        debug.error('Fehler beim Löschen:', error);
+        showMessage(error.message || 'Fehler beim Löschen', 'error');
+    }
+}
 
+/**
+ * Oeffnet die Rueckfrage „Loeschen bestaetigen“. text erscheint unter der
+ * Ueberschrift (leer: nur die Ueberschrift), onConfirm laeuft nach „Loeschen“,
+ * opener bekommt beim Abbrechen den Fokus zurueck.
+ */
+function openConfirmDeleteModal({ text = '', onConfirm, opener = null }) {
+    confirmDeleteAction = onConfirm;
+    confirmDeleteOpener = opener;
+    const absatz = document.getElementById('confirmDeleteText');
+    absatz.textContent = text;
+    absatz.hidden = text === '';
     elements.confirmDeleteModal.classList.add('active');
     elements.closeConfirmDeleteBtn.focus();
 }
 
 function closeConfirmDeleteModal() {
-    deleteExceptionId = null;
+    const opener = confirmDeleteOpener;
+    confirmDeleteAction = null;
+    confirmDeleteOpener = null;
     elements.confirmDeleteModal.classList.remove('active');
+    if (opener && opener.isConnected && opener.offsetParent !== null) opener.focus();
 }
 
 async function submitConfirmDelete() {
-    
-    if(!deleteExceptionId)
-        return;    
-
-    try {
-        const result =  await apiCall('exceptions', 'DELETE', null, { id: deleteExceptionId });
-
-         if (!result.success) {
-            throw new Error(result.error);
-        }
-        
-        showMessage('✓ Antrag erfolgreich gelöscht', 'success');
-        
-        // History neu laden
-        await loadHistory();
-        
-    } catch (error) {
-        debug.error('Fehler beim Löschen:', error);
-        showMessage(error.message || 'Fehler beim Löschen', 'error');
-    }
-
-    deleteExceptionId = null;
-    elements.confirmDeleteModal.classList.remove('active');
+    const action = confirmDeleteAction;
+    // Erst schliessen, dann ausfuehren: Die Aktion darf selbst Dialoge
+    // schliessen oder Meldungen zeigen, ohne dass dieser darueber liegt.
+    confirmDeleteOpener = null;
+    closeConfirmDeleteModal();
+    if (action) await action();
 }
 
 // ========================================

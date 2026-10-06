@@ -1505,6 +1505,12 @@ body:has(.modal.active) {
     color: var(--card-bg);
 }
 
+/* Zusatztext der Loesch-Rueckfrage (seit OI-125): nennt, was mit verloren geht. */
+.confirm-delete-text {
+    margin: 0 0 16px;
+    line-height: 1.4;
+}
+
 .btn-login {
     width: 100%;
     max-width: 400px;
