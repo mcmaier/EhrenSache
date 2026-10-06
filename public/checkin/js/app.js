@@ -1449,20 +1449,21 @@ async function submitAppointmentForm(e) {
         const id = neu ? String(result.data?.id ?? '') : String(currentEditAppointmentId);
 
         // Aus dem Tab „Termine“ (OI-123): Die Liste dort zeigt nur kommende
-        // Termine der eigenen Gruppen (responsesFetchUpcomingIds/-Info). Ein
-        // Termin fuer eine fremde Gruppe oder in der Vergangenheit ist
-        // gespeichert, aber dort unsichtbar -- dann sagt die Meldung das,
+        // Termine der eigenen Gruppen (responsesFetchUpcomingIds/-Info);
+        // Termine ohne Rueckmeldung nur acht Wochen (56 Tage) voraus. Ein
+        // Termin fuer eine fremde Gruppe, in der Vergangenheit oder weiter
+        // in der Zukunft ist gespeichert, aber dort unsichtbar -- dann sagt die Meldung das,
         // statt still „erstellt“ zu melden. Die Anwesenheitsliste laedt beim
         // Tab-Wechsel ohnehin neu.
         if (appointmentModalOrigin === 'responses') {
-            await loadResponses();
-            const sichtbar = id !== '' && upcomingResponses.some(
+            const geladen = await loadResponses();
+            const sichtbar = geladen && id !== '' && upcomingResponses.some(
                 i => String(i.appointment.appointment_id) === id);
-            if (sichtbar) {
+            if (sichtbar || !geladen) {
                 showMessage('Termin erstellt', 'success');
             } else {
                 const wann = formatResponseCardHead(formData.date, formData.start_time, null);
-                showMessage(`Termin angelegt (${wann}) – nicht in deiner Liste: Sie zeigt nur kommende Termine deiner Gruppen.`, 'info');
+                showMessage(`Termin angelegt (${wann}) – erscheint nicht in deiner Liste (nicht deine Gruppe, vergangen oder mehr als acht Wochen voraus).`, 'info');
             }
             return;
         }
@@ -4747,6 +4748,11 @@ async function initResponsesTab() {
     }
 
     if (!userData || !userData.member_id) return;
+
+    // Verwalter brauchen den Tab auch, wenn das Laden scheitert -- sonst
+    // fehlte der Knopf bis zur naechsten Anmeldung.
+    const respTab = document.querySelector('.tab-button[data-tab="responses"]');
+    if (respTab && isPwaManager()) respTab.hidden = false;
     await loadResponses();
 }
 
@@ -4754,11 +4760,11 @@ async function loadResponses() {
     const generation = responsesGeneration;
     const previousResponses = upcomingResponses;
     const result = await apiCall('appointment_responses', 'GET', null, { upcoming: 1, with_info: 1 });
-    if (generation !== responsesGeneration) return; // Abgemeldet/neu gestartet, waehrend die Antwort unterwegs war.
+    if (generation !== responsesGeneration) return false; // Abgemeldet/neu gestartet, waehrend die Antwort unterwegs war.
 
     if (!result.success) {
         debug.log('Rückmeldungen nicht geladen:', result.error);
-        return;
+        return false;
     }
 
     const nextResponses = result.data.appointments || [];
@@ -4800,6 +4806,7 @@ async function loadResponses() {
 
     updateResponsesBadge();
     renderResponses(null, drafts);
+    return true;
 }
 
 // Wie weit ein Termin in die Zukunft reichen darf, damit seine Rueckmeldung

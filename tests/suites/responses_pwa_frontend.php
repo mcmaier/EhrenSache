@@ -292,3 +292,20 @@ test('PWA OI-123: nach dem Speichern aus dem Termine-Tab Liste neu laden und Uns
         'Ohne Sichtbarkeitspruefung meldet die App „erstellt“ fuer einen Termin, der nirgends erscheint');
     assertTrue(str_contains($rumpf, 'nicht in deiner Liste'), 'Meldung fuer den unsichtbaren Termin fehlt');
 });
+
+test('PWA OI-123: Tab Termine fuer Verwalter schon vor dem Laden sichtbar', function () use ($rspRoot) {
+    $init = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'initResponsesTab');
+    $sichtbar = strpos($init, 'isPwaManager()) respTab.hidden = false');
+    $laden    = strpos($init, 'await loadResponses()');
+    assertTrue($sichtbar !== false && $laden !== false && $sichtbar < $laden,
+        'Scheitert das erste Laden, fehlten dem Verwalter Tab und Plus-Knopf');
+});
+
+test('PWA OI-123: gescheitertes Neuladen meldet keinen unsichtbaren Termin', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+    assertTrue(str_contains(rspFunktion($js, 'loadResponses'), 'return false'), 'loadResponses meldet Fehler nicht zurueck');
+    assertTrue(str_contains(rspFunktion($js, 'submitAppointmentForm'), '!geladen'),
+        'Ohne frische Liste darf die App nicht behaupten, der Termin sei unsichtbar');
+    assertTrue(str_contains(rspFunktion($js, 'submitAppointmentForm'), 'acht Wochen'),
+        'Die Meldung muss den Horizont von acht Wochen nennen');
+});
