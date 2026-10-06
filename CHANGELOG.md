@@ -7,6 +7,15 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Geändert
+- **Check-in-App: Konten ohne verknüpftes Mitglied werden abgewiesen.** Bisher startete die App
+  trotzdem, zeigte nur einen Hinweis, und die Tabs blieben leer oder liefen ins Leere. Jetzt
+  erscheint nach der Anmeldung nur noch die Meldung, dass das Konto mit keinem Mitglied verknüpft
+  ist, und der Knopf „Zurück zum Login“. Ein gespeicherter Zugang wird dabei verworfen. Das
+  Dashboard ist nicht betroffen.
+
 ## [1.21.0] – 2026-10-05
 
 ### Neu

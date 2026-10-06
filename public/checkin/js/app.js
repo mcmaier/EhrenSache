@@ -1125,18 +1125,25 @@ function readSavedToken() {
  * (OI-121). Jetzt Stufe 2 gleichzeitig, dann einblenden, Stufe 3 danach.
  */
 async function startSession(meData) {
+    // Ohne verknuepftes Mitglied kann die App nichts: kein Check-in, kein
+    // Verlauf, keine Rueckmeldung. Bis hierher startete sie trotzdem und
+    // zeigte nur einen Hinweis, die Tabs liefen ins Leere.
+    if (!meData.member_id) {
+        blockUnlinkedAccount();
+        return;
+    }
+
     const generation = sessionGeneration;
-    const hasMember  = !!meData.member_id;
     userData = meData;
 
     // Stufe 2: was die Erfassen-Ansicht braucht. Keiner der Abrufe haengt von
     // einem anderen ab; member_id kommt aus me.
     const [memberResult, , appointmentsResult] = await Promise.all([
-        hasMember ? apiCall('members', 'GET', null, { id: meData.member_id }) : Promise.resolve(null),
+        apiCall('members', 'GET', null, { id: meData.member_id }),
         loadClientSettings(),
         // Check-in-Termine nur mit eingeschalteter Anwesenheit (OI-62, Etappe 2).
-        hasMember && pwaFeatureOn('attendance') ? fetchCheckinAppointments() : Promise.resolve(null),
-        hasMember ? initWorktime(generation) : Promise.resolve()
+        pwaFeatureOn('attendance') ? fetchCheckinAppointments() : Promise.resolve(null),
+        initWorktime(generation)
     ]);
 
     // Abgemeldet, waehrend Stufe 2 lief: nichts mehr zeichnen.
@@ -1144,9 +1151,7 @@ async function startSession(meData) {
 
     renderUserHeader(meData, memberResult);
     applyCheckinAppointments(appointmentsResult);
-    if (hasMember) {
-        await initAttendanceList();
-    }
+    await initAttendanceList();
 
     showScreen('main');
     startTicker();
@@ -1161,6 +1166,20 @@ async function startSession(meData) {
 }
 
 /**
+ * Sperre fuer ein Konto ohne verknuepftes Mitglied: nur die Meldung und
+ * "Zurueck zum Login". Der gespeicherte Token geht mit, sonst stuende die
+ * Sperre bei jedem Oeffnen wieder da.
+ */
+function blockUnlinkedAccount() {
+    localStorage.removeItem('api_token');
+    apiToken = null;
+    showStartStatus('Dieses Benutzerkonto ist mit keinem Mitglied verknüpft. '
+        + 'Die Check-in-App steht deshalb nicht zur Verfügung. '
+        + 'Bitte wenden Sie sich an die Vereinsverwaltung.', true, true);
+    showScreen('start');
+}
+
+/**
  * Name, Rolle und Mitgliedsnummer im Kopf. memberResult ist die Antwort von
  * members&id oder null.
  */
@@ -1168,13 +1187,6 @@ function renderUserHeader(meData, memberResult) {
     let roleText = 'Mitglied';
     if (meData.role === 'admin') roleText = 'Administrator';
     else if (meData.role === 'manager') roleText = 'Manager';
-
-    // Wie bis 1.20.1: ohne verknuepftes Mitglied nur der Hinweis, der Kopf
-    // bleibt unberuehrt.
-    if (!meData.member_id) {
-        showMessage('Kein Mitglied mit diesem Benutzer verknüpft. Bitte Administrator kontaktieren.', 'error');
-        return;
-    }
 
     const member = memberResult && memberResult.success ? memberResult.data : null;
     if (member) {
@@ -2847,16 +2859,22 @@ function showScreen(screenName) {
 
 /**
  * Text der Ladeanzeige; bei einem Fehler zusaetzlich "Erneut versuchen" und
- * "Mit anderem Konto anmelden".
+ * "Mit anderem Konto anmelden". blocked: Ein neuer Versuch hilft nie, es
+ * bleibt nur "Zurueck zum Login".
  */
-function showStartStatus(text, failed) {
+function showStartStatus(text, failed, blocked = false) {
     const status = document.getElementById('startStatus');
     const retry  = document.getElementById('startRetryBtn');
     const change = document.getElementById('startSwitchBtn');
 
     if (status) status.textContent = text;
-    if (retry) retry.hidden = !failed;
-    if (change) change.hidden = !failed;
+    if (retry) retry.hidden = !failed || blocked;
+    if (change) {
+        change.hidden = !failed;
+        change.textContent = blocked ? 'Zurück zum Login' : 'Mit anderem Konto anmelden';
+        change.classList.toggle('secondary', !blocked);
+        change.classList.toggle('btn-login', blocked);
+    }
 }
 
 /**
