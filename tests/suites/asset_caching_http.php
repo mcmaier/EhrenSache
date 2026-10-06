@@ -168,3 +168,12 @@ test('CSS-Buendel: kein fremder Einstieg ueber den Parameter', function () use (
         assertSame(404, $r['status'], "entry={$entry}: Status {$r['status']}");
     }
 });
+
+test('CSS-Buendel: ein Array als Einstieg ist ein 404 ohne Fehlertext', function () use ($acBase) {
+    // ?entry[]=x ist ein Array; ohne Absicherung gaebe das Warning (und bei
+    // display_errors den Serverpfad) in den Rumpf.
+    $r = acFetch("{$acBase}/css/bundle.php?entry[]=x");
+    assertSame(404, $r['status'], "Status {$r['status']}");
+    assertTrue(!stripos($r['body'], 'warning') && !str_contains($r['body'], 'bundle.php'),
+        "Fehlertext im Rumpf: {$r['body']}");
+});

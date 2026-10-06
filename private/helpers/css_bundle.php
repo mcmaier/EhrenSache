@@ -46,15 +46,40 @@ function cssBundle(string $entry, ?string $root = null): string
     return cssBundleInline($root, $file, $seen);
 }
 
-/** Inhalt von $file mit aufgelösten Importen. $seen: bereits eingefügte Dateien. */
+/**
+ * Inhalt von $file mit aufgelösten Importen. $seen: bereits eingefügte Dateien.
+ *
+ * Erkannt wird nur die Form, die die Quellen benutzen: eine Zeile
+ * @import url('…'); (einfache oder doppelte Anführungszeichen). Importe in
+ * Kommentaren bleiben unberührt. Jede andere @import-Anweisung (ohne url(),
+ * ohne Anführungszeichen, mit Medienabfrage) wird nicht eingefügt, sondern
+ * durch einen Fehlerkommentar ersetzt -- eine Medienabfrage ginge beim
+ * Einfügen verloren.
+ *
+ * @throws RuntimeException wenn die Datei nicht lesbar ist
+ */
 function cssBundleInline(string $root, string $file, array &$seen): string
 {
     $seen[$file] = true;
     $dir = dirname($file);
 
-    return (string) preg_replace_callback(
-        "/^[ \\t]*@import\\s+url\\(\\s*(['\"])([^'\"]*)\\1\\s*\\)\\s*;[ \\t\\r]*$/m",
+    $source = @file_get_contents($file);
+    if ($source === false) {
+        throw new RuntimeException('CSS-Datei nicht lesbar');
+    }
+    // Eine BOM mitten im Bündel wäre ein ungültiges Zeichen vor der nächsten Regel.
+    if (str_starts_with($source, "\xEF\xBB\xBF")) {
+        $source = substr($source, 3);
+    }
+
+    $result = preg_replace_callback(
+        '#/\*.*?\*/(*SKIP)(*F)'
+        . '|^[ \t]*@import\s+url\(\s*([\'"])([^\'"]*)\1\s*\)\s*;[ \t\r]*$'
+        . '|@import\b[^;\r\n]*;?#ms',
         static function (array $m) use ($root, $dir, &$seen): string {
+            if (!isset($m[2])) {
+                return cssBundleError(trim($m[0]), 'Form nicht unterstützt');
+            }
             $ref = $m[2];
             if ($ref === '' || $ref[0] === '/' || $ref[0] === '\\' || preg_match('#^[a-z][a-z0-9+.-]*:#i', $ref)) {
                 return cssBundleError($ref, 'nur relative Pfade');
@@ -69,18 +94,39 @@ function cssBundleInline(string $root, string $file, array &$seen): string
             if (isset($seen[$target])) {
                 return cssBundleError($ref, 'doppelt importiert');
             }
-            $rel = str_replace('\\', '/', substr($target, strlen($root) + 1));
+            $rel = str_replace(['\\', '*'], ['/', ''], substr($target, strlen($root) + 1));
             return "/* ---- {$rel} ---- */\n" . rtrim(cssBundleInline($root, $target, $seen)) . "\n";
         },
-        (string) file_get_contents($file)
+        $source
     );
+    if ($result === null) {
+        throw new RuntimeException('CSS-Datei nicht verarbeitbar');
+    }
+    return $result;
 }
 
-/** Ersatz für einen nicht einbindbaren Import; kann den Kommentar nicht beenden. */
+/**
+ * Ersatz für einen nicht einbindbaren Import. Ohne Stern im Text kann der
+ * Kommentar weder vorzeitig enden noch ein neuer in ihm beginnen.
+ */
 function cssBundleError(string $ref, string $grund): string
 {
-    $ref = str_replace(['*/', '/*'], '', $ref);
+    // Auch kein @: der Kommentar soll nicht wie ein Import aussehen (Prüfung auf @import im Bündel).
+    $ref = str_replace(['*', '@'], '', $ref);
     return "/* css-bundle: {$ref} nicht eingebunden ({$grund}) */";
+}
+
+/**
+ * Cache-Control der Bündel-Antwort. Ein Jahr nur für die aktuelle Version und
+ * nur ohne Fehlerkommentar: ein unvollständiges Bündel darf nicht unter einer
+ * unveränderlichen Adresse im Browser bleiben, wenn die Datei später da ist.
+ */
+function cssBundleCacheControl(string $css, bool $currentVersion): string
+{
+    if ($currentVersion && !str_contains($css, '/* css-bundle:')) {
+        return 'public, max-age=31536000, immutable';
+    }
+    return 'no-cache, must-revalidate';
 }
 
 /** Aktuelle Version aus version.json. */

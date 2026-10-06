@@ -174,3 +174,68 @@ test('Importe werden mit LF und CRLF aufgelöst', function () {
         }
     }
 });
+
+test('cssBundleCacheControl: immutable nur für aktuelle Version ohne Fehlerkommentar', function () {
+    assertTrue(str_contains(cssBundleCacheControl('.a{}', true), 'immutable'), 'aktuell + sauber');
+    $fehler = cssBundleCacheControl("/* css-bundle: x nicht eingebunden (Datei fehlt) */\n.a{}", true);
+    assertTrue(str_contains($fehler, 'no-cache') && !str_contains($fehler, 'immutable'), "aktuell + Fehler: {$fehler}");
+    $alt = cssBundleCacheControl('.a{}', false);
+    assertTrue(str_contains($alt, 'no-cache') && !str_contains($alt, 'immutable'), "alt: {$alt}");
+});
+
+test('BOM am Dateianfang wird entfernt (Einstieg und eingefügte Datei)', function () {
+    $root = cbTree([
+        'main.css' => "\xEF\xBB\xBF@import url('a.css');\n.main{}\n",
+        'a.css'    => "\xEF\xBB\xBF.a{}\n",
+    ]);
+    try {
+        $css = cssBundle('main', $root);
+        assertTrue(!str_contains($css, "\xEF\xBB\xBF"), 'BOM im Ergebnis');
+        assertSame(['a.css'], cbSections($css), 'Import hinter BOM nicht aufgelöst');
+    } finally {
+        cbRemove($root);
+    }
+});
+
+test('Sterne im Pfad öffnen oder schließen keinen Kommentar', function () {
+    $root = cbTree([
+        'main.css'          => "@import url('x**//body{color:red}/**.css');\n.main{}\n",
+    ]);
+    try {
+        $css = cssBundle('main', $root);
+        assertTrue(substr_count($css, '/*') >= 1, 'Fehlerkommentar fehlt');
+        assertSame(substr_count($css, '/*'), substr_count($css, '*/'), "Kommentar unausgewogen:\n{$css}");
+    } finally {
+        cbRemove($root);
+    }
+});
+
+test('Auskommentierte Importe werden nicht eingefügt', function () {
+    $root = cbTree([
+        'main.css' => "/*\n@import url('a.css');\n*/\n.main{}\n",
+        'a.css'    => ".a{}\n",
+    ]);
+    try {
+        $css = cssBundle('main', $root);
+        assertTrue(!str_contains($css, '.a{}'), 'a.css eingefügt');
+        assertTrue(str_contains($css, "@import url('a.css');"), 'Kommentar verändert');
+        assertSame([], cbSections($css));
+    } finally {
+        cbRemove($root);
+    }
+});
+
+test('Übrige Importformen ergeben Fehlerkommentar statt @import', function () {
+    foreach (["@import url('a.css') screen;", "@import 'a.css';", '@import url(a.css);', '@import "a.css" print;'] as $zeile) {
+        $root = cbTree(['main.css' => "{$zeile}\n.main{}\n", 'a.css' => ".a{}\n"]);
+        try {
+            $css = cssBundle('main', $root);
+            assertTrue(!str_contains($css, '.a{}'), "{$zeile}: eingefügt");
+            assertTrue(!str_contains($css, '@import'), "{$zeile}: @import im Ergebnis");
+            assertSame(1, substr_count($css, '/* css-bundle:'), "{$zeile}: kein Fehlerkommentar:\n{$css}");
+            assertTrue(str_contains($css, '.main{}'), "{$zeile}: Rest fehlt");
+        } finally {
+            cbRemove($root);
+        }
+    }
+});
