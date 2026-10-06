@@ -239,3 +239,14 @@ test('Übrige Importformen ergeben Fehlerkommentar statt @import', function () {
         }
     }
 });
+
+test('Nicht lesbare Datei wirft statt ein leeres Bündel zu liefern', function () {
+    // Ein Verzeichnis namens main.css: realpath() findet es, lesen lässt es sich nicht.
+    $root = cbTree(['x/.keep' => '']);
+    mkdir($root . '/main.css');
+    try {
+        assertThrows(fn () => cssBundle('main', $root), 'Verzeichnis als Einstieg');
+    } finally {
+        cbRemove($root);
+    }
+});
