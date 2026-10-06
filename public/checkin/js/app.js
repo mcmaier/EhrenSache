@@ -1151,6 +1151,7 @@ async function startSession(meData) {
 
     renderUserHeader(meData, memberResult);
     applyCheckinAppointments(appointmentsResult);
+    initAppointmentModal();
     await initAttendanceList();
 
     showScreen('main');
@@ -1325,14 +1326,41 @@ async function handleLogout() {
 // ATTENDANCE LIST (Admin/Manager)
 // ========================================
 
+/** Admin oder Manager -- die Rollen, die in der App Termine anlegen. */
+function isPwaManager() {
+    return !!userData && (userData.role === 'admin' || userData.role === 'manager');
+}
+
+/**
+ * Bindet den Termin-Dialog: Abbrechen, Klick daneben, Speichern.
+ *
+ * Bis OI-123 stand das in initAttendanceList(). Seit der Dialog auch aus dem
+ * Tab „Termine“ kommt, reicht das nicht: Bei „nur Terminplanung“ kehrt
+ * initAttendanceList() vor den Bindungen zurueck, und der Dialog speicherte
+ * nicht. bindOnce() macht wiederholte Aufrufe unschaedlich.
+ */
+function initAppointmentModal() {
+    const appointmentModal = document.getElementById('appointmentModal');
+
+    bindOnce(document.getElementById('btnCancelAppointment'), 'click', () => {
+        appointmentModal?.classList.remove('active');
+    });
+
+    // Klick neben den Dialog schliesst ihn
+    bindOnce(appointmentModal, 'click', (e) => {
+        if (e.target.id === 'appointmentModal') {
+            appointmentModal.classList.remove('active');
+        }
+    });
+
+    bindOnce(document.getElementById('appointmentForm'), 'submit', submitAppointmentForm);
+}
+
 async function initAttendanceList() {
 
-    // Prüfe ob Benutzer Admin oder Manager ist
-    // Nur Verwalter, nur mit Anwesenheit (OI-62, Etappe 2): Der Tab (mit „Termin
-    // anlegen“) setzt die Anwesenheit voraus. Bei „nur Terminplanung“ legen
-    // Verwalter Termine im Dashboard an.
-    if (!userData || (userData.role !== 'admin' && userData.role !== 'manager')
-        || !pwaFeatureOn('attendance')) {
+    // Nur Verwalter, nur mit Anwesenheit (OI-62, Etappe 2): Der Tab lebt von
+    // Erfassungen. Termine anlegen geht seit OI-123 auch im Tab „Termine“.
+    if (!isPwaManager() || !pwaFeatureOn('attendance')) {
         // Tab ausblenden falls vorhanden
         const tab = document.querySelector('[data-tab="attendance-list"]');
         if (tab) tab.style.display = 'none';
@@ -1354,34 +1382,12 @@ async function initAttendanceList() {
     });
 
     bindOnce(document.getElementById('btnCreateAppointment'), 'click',
-        showCreateAppointmentModal);
+        () => showCreateAppointmentModal('attendance'));
 
     bindOnce(document.getElementById('btnEditAppointment'), 'click',
         showEditAppointmentModal);
-
-    const appointmentModal = document.getElementById('appointmentModal');
-
-    bindOnce(document.getElementById('btnCancelAppointment'), 'click', () => {
-        appointmentModal?.classList.remove('active');
-    });
-
-    // Klick neben den Dialog schliesst ihn
-    bindOnce(appointmentModal, 'click', (e) => {
-        if (e.target.id === 'appointmentModal') {
-            appointmentModal.classList.remove('active');
-        }
-    });
-
-    bindOnce(document.getElementById('appointmentForm'), 'submit', submitAppointmentForm);
 }
 
-/**
- * Speichert den Termin aus dem Dialog der Anwesenheitsliste.
- *
- * Steht als benannte Funktion neben initAttendanceList(), nicht als Arrow im
- * bindOnce()-Aufruf: Der Rumpf ist laenger als die uebrige Bindung zusammen
- * und verdeckte dort, was die Funktion sonst noch tut.
- */
 /**
  * Meldungen zu einem gescheiterten Speichern im Termin-Dialog.
  *
@@ -1403,6 +1409,13 @@ function appointmentErrorMessages(result) {
     ];
 }
 
+/**
+ * Speichert den Termin aus dem Termin-Dialog (Anwesenheitsliste oder Tab „Termine“).
+ *
+ * Steht als benannte Funktion neben initAttendanceList(), nicht als Arrow im
+ * bindOnce()-Aufruf: Der Rumpf ist laenger als die uebrige Bindung zusammen
+ * und verdeckte dort, was die Funktion sonst noch tut.
+ */
 async function submitAppointmentForm(e) {
     e.preventDefault();
 
@@ -1434,6 +1447,27 @@ async function submitAppointmentForm(e) {
         document.getElementById('appointmentModal').classList.remove('active');
 
         const id = neu ? String(result.data?.id ?? '') : String(currentEditAppointmentId);
+
+        // Aus dem Tab „Termine“ (OI-123): Die Liste dort zeigt nur kommende
+        // Termine der eigenen Gruppen (responsesFetchUpcomingIds/-Info);
+        // Termine ohne Rueckmeldung nur acht Wochen (56 Tage) voraus. Ein
+        // Termin fuer eine fremde Gruppe, in der Vergangenheit oder weiter
+        // in der Zukunft ist gespeichert, aber dort unsichtbar -- dann sagt die Meldung das,
+        // statt still „erstellt“ zu melden. Die Anwesenheitsliste laedt beim
+        // Tab-Wechsel ohnehin neu.
+        if (appointmentModalOrigin === 'responses') {
+            const geladen = await loadResponses();
+            const sichtbar = geladen && id !== '' && upcomingResponses.some(
+                i => String(i.appointment.appointment_id) === id);
+            if (sichtbar || !geladen) {
+                showMessage('Termin erstellt', 'success');
+            } else {
+                const wann = formatResponseCardHead(formData.date, formData.start_time, null);
+                showMessage(`Termin angelegt (${wann}) – erscheint nicht in deiner Liste (nicht deine Gruppe, vergangen oder mehr als acht Wochen voraus).`, 'info');
+            }
+            return;
+        }
+
         await loadAttendanceAppointments();
 
         // Die Auswahl zeigt nur Termine im Fenster um jetzt -- diese Liste
@@ -3625,26 +3659,34 @@ async function fillPwaLocationSuggestions() {
     list.innerHTML = orte.map(o => `<option value="${escapeHtml(o)}"></option>`).join('');
 }
 
-async function showCreateAppointmentModal() {
+// Aus welchem Tab der Termin-Dialog geoeffnet wurde: 'attendance' oder
+// 'responses' (OI-123). submitAppointmentForm() laedt danach diesen Tab neu.
+let appointmentModalOrigin = 'attendance';
+
+async function showCreateAppointmentModal(origin = 'attendance') {
     currentEditAppointmentId = null;
+    appointmentModalOrigin = origin;
     document.getElementById('appointmentModalTitle').textContent = 'Termin anlegen';
 
     // Lade Terminarten
     await loadAppointmentTypes();
     await fillPwaLocationSuggestions();
-    
+
     // Formular zurücksetzen
     document.getElementById('appointmentForm').reset();
     showFormErrors('appointmentErrors', []);
 
-    // Mit "jetzt" vorbelegt: Der Knopf dient dem Fall, dass gerade etwas
-    // stattfindet, das noch kein Termin ist. Bis 1.11.0 waren Datum und
-    // Uhrzeit leer -- ein vertippter Tag liess den Termin danach ausserhalb
-    // des Fensters verschwinden.
-    const jetzt = new Date();
-    document.getElementById('appointmentDate').value = formatDate(jetzt);
-    document.getElementById('appointmentTime').value =
-        `${String(jetzt.getHours()).padStart(2, '0')}:${String(jetzt.getMinutes()).padStart(2, '0')}`;
+    // Mit "jetzt" vorbelegt: Der Knopf der Anwesenheitsliste dient dem Fall,
+    // dass gerade etwas stattfindet, das noch kein Termin ist. Bis 1.11.0
+    // waren Datum und Uhrzeit leer -- ein vertippter Tag liess den Termin
+    // danach ausserhalb des Fensters verschwinden. Aus dem Tab „Termine“
+    // bleiben beide leer: Wer dort anlegt, plant fuer spaeter (OI-123).
+    if (origin === 'attendance') {
+        const jetzt = new Date();
+        document.getElementById('appointmentDate').value = formatDate(jetzt);
+        document.getElementById('appointmentTime').value =
+            `${String(jetzt.getHours()).padStart(2, '0')}:${String(jetzt.getMinutes()).padStart(2, '0')}`;
+    }
 
     // Zeige Modal
     document.getElementById('appointmentModal').classList.add('active');
@@ -3655,6 +3697,8 @@ async function showEditAppointmentModal() {
     if (!appointmentId) return;
     
     currentEditAppointmentId = appointmentId;
+    // Bearbeiten gibt es nur in der Anwesenheitsliste.
+    appointmentModalOrigin = 'attendance';
     document.getElementById('appointmentModalTitle').textContent = 'Termin bearbeiten';
     showFormErrors('appointmentErrors', []);
 
@@ -4669,6 +4713,9 @@ function resetResponsesTab() {
     responsesSaveFailed.clear();
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
     if (tab) tab.hidden = true;
+    // Nach Abmelden und Anmelden als Mitglied darf der Knopf nicht stehen bleiben.
+    const btnAdd = document.getElementById('btnAddAppointment');
+    if (btnAdd) btnAdd.hidden = true;
     updateResponsesBadge();
     const list = document.getElementById('responsesList');
     if (list) list.innerHTML = '';
@@ -4691,7 +4738,21 @@ async function initResponsesTab() {
 
     // Ohne Terminplanung bleibt der Tab verborgen (OI-62, Etappe 2).
     if (!pwaFeatureOn('appointments')) return;
+
+    // Plus-Knopf fuer Verwalter (OI-123): immer, sobald die Terminplanung an
+    // ist -- auch mit Anwesenheitsliste, damit er an einem festen Ort steht.
+    const btnAdd = document.getElementById('btnAddAppointment');
+    if (btnAdd) {
+        btnAdd.hidden = !isPwaManager();
+        bindOnce(btnAdd, 'click', () => showCreateAppointmentModal('responses'));
+    }
+
     if (!userData || !userData.member_id) return;
+
+    // Verwalter brauchen den Tab auch, wenn das Laden scheitert -- sonst
+    // fehlte der Knopf bis zur naechsten Anmeldung.
+    const respTab = document.querySelector('.tab-button[data-tab="responses"]');
+    if (respTab && isPwaManager()) respTab.hidden = false;
     await loadResponses();
 }
 
@@ -4699,11 +4760,11 @@ async function loadResponses() {
     const generation = responsesGeneration;
     const previousResponses = upcomingResponses;
     const result = await apiCall('appointment_responses', 'GET', null, { upcoming: 1, with_info: 1 });
-    if (generation !== responsesGeneration) return; // Abgemeldet/neu gestartet, waehrend die Antwort unterwegs war.
+    if (generation !== responsesGeneration) return false; // Abgemeldet/neu gestartet, waehrend die Antwort unterwegs war.
 
     if (!result.success) {
         debug.log('Rückmeldungen nicht geladen:', result.error);
-        return;
+        return false;
     }
 
     const nextResponses = result.data.appointments || [];
@@ -4733,16 +4794,19 @@ async function loadResponses() {
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
     if (tab) {
         const wasActiveTab = tab.classList.contains('active');
-        tab.hidden = !hasResponses;
+        // Verwalter sehen den Tab auch ohne Termine: Dort sitzt der Knopf zum
+        // Anlegen (OI-123), und gerade ohne Termine braucht man ihn.
+        tab.hidden = !hasResponses && !isPwaManager();
         // Der Tab, den man gerade ansieht, verschwindet nicht unter einem weg --
         // ohne Inhalt geht es zurueck zum Erfassen-Tab.
-        if (!hasResponses && wasActiveTab) {
+        if (tab.hidden && wasActiveTab) {
             document.querySelector('.tab-button[data-tab="capture"]')?.click();
         }
     }
 
     updateResponsesBadge();
     renderResponses(null, drafts);
+    return true;
 }
 
 // Wie weit ein Termin in die Zukunft reichen darf, damit seine Rueckmeldung

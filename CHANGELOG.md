@@ -9,6 +9,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Neu
+- **Check-in-App: Termine anlegen im Tab „Termine“** (OI-123). Admin und Manager sehen neben
+  „Kommende Termine“ einen Plus-Knopf, der den Termin-Dialog öffnet – auch wenn die
+  Anwesenheitserfassung abgeschaltet ist. Bisher ging das nur über die Anwesenheitsliste. Datum und
+  Uhrzeit sind hier nicht mit „jetzt“ vorbelegt. Erscheint der neue Termin nicht in der eigenen
+  Liste (fremde Gruppe, vergangen, mehr als acht Wochen voraus), sagt die App das. Für Verwalter
+  bleibt der Tab auch ohne kommende Termine sichtbar.
+
 ### Geändert
 - **Demo-Bestand: Der Manager hängt an einem Mitglied** (M013, Aktive und Vorstandschaft). Wer die
   Demo als `manager@` öffnet, sieht in der Check-in-App eigene Termine, offene Punkte und die
@@ -27,6 +35,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Quelldateien bleiben einzeln, es gibt keinen Build-Schritt (OI-120).
 - Der Updater schreibt `public/.htaccess` jetzt kurz vor den Einstiegsseiten.
 - Fehlt `bundle.php` (z. B. mitten im Update), lädt die Seite die Einzeldateien.
+
+### Behoben
+- **Check-in-App: Dialoge rollen auf kurzen Displays.** Der Dialog „Termin anlegen“ ragte bei
+  niedriger Bildschirmhöhe über den Rand, „Speichern“ war nicht erreichbar, und ein Wischen rollte
+  stattdessen die ausgeblendete Seite dahinter. Alle Dialoge der App sind jetzt in der Höhe begrenzt
+  und rollen selbst; die Seite dahinter steht still, solange ein Dialog offen ist.
 
 ---
 

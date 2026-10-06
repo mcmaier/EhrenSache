@@ -182,3 +182,141 @@ test('PWA: Termine-Tab bekommt denselben weissen Rahmen wie der Verlauf-Tab, Kar
     assertTrue((bool) preg_match('/\.response-card\s*\{[^}]*background:\s*#f8f9fa/', $css),
         '.response-card ist nicht hellgrau wie .history-item');
 });
+
+// ---------------------------------------------------------------------------
+// OI-123: Termin anlegen aus dem Tab „Termine“ (Admin/Manager), auch ohne
+// Anwesenheitserfassung.
+// ---------------------------------------------------------------------------
+
+/** Rumpf von function $name( bis zur naechsten Funktion auf oberster Ebene. */
+function rspFunktion(string $js, string $name): string
+{
+    $start = strpos($js, 'function ' . $name . '(');
+    assertTrue($start !== false, $name . '() nicht gefunden');
+
+    if (preg_match('/\n(?:async\s+)?function\s/', $js, $m, PREG_OFFSET_CAPTURE, $start + 1)) {
+        return substr($js, $start, $m[0][1] - $start);
+    }
+    return substr($js, $start);
+}
+
+test('PWA OI-123: Plus-Knopf im Kopf des Termine-Tabs, zunaechst verborgen', function () use ($rspRoot) {
+    $html  = (string) sourceCode($rspRoot . '/public/checkin/index.html');
+    $start = strpos($html, 'class="tab-content" data-tab="responses"');
+    assertTrue($start !== false, 'Inhalt des Termine-Tabs fehlt');
+
+    $knopf = strpos($html, 'id="btnAddAppointment"', $start);
+    $liste = strpos($html, 'id="responsesList"', $start);
+    assertTrue($knopf !== false && $liste !== false && $knopf < $liste,
+        'Der Knopf steht nicht im Kopf des Termine-Tabs');
+
+    $tag = rspTag($html, 'id="btnAddAppointment"');
+    assertTrue(str_contains($tag, ' hidden'), 'Der Knopf muss verborgen starten -- nur Verwalter sehen ihn');
+    assertTrue(str_contains($tag, 'aria-label="Termin anlegen"'), 'Ein reines Plus braucht eine Beschriftung');
+    assertTrue(str_contains($tag, 'type="button"'), 'Ohne type="button" waere es ein Absendeknopf');
+});
+
+test('PWA OI-123: hidden schlaegt display des Plus-Knopfs', function () use ($rspRoot) {
+    $css = (string) sourceCode($rspRoot . '/public/checkin/css/style.css');
+    assertTrue(str_contains($css, '.btn-add-appointment[hidden]'),
+        'Ohne [hidden]-Regel zeigt display:inline-flex den Knopf auch Mitgliedern');
+});
+
+test('PWA OI-123: Termin-Dialog wird unabhaengig von der Anwesenheit gebunden', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+
+    assertTrue(!str_contains(rspFunktion($js, 'initAttendanceList'), 'appointmentForm'),
+        'Bindung haengt noch an initAttendanceList -- bei „nur Terminplanung“ speichert der Dialog nicht');
+
+    $modal = rspFunktion($js, 'initAppointmentModal');
+    assertTrue(str_contains($modal, "'submit', submitAppointmentForm"), 'Speichern nicht gebunden');
+    assertTrue(str_contains($modal, 'btnCancelAppointment'), 'Abbrechen nicht gebunden');
+
+    assertTrue((bool) preg_match('/initAppointmentModal\(\);\s*await initAttendanceList\(\);/',
+        rspFunktion($js, 'startSession')),
+        'startSession bindet den Dialog nicht unmittelbar vor der Anwesenheitsliste');
+});
+
+test('PWA OI-123: beide Knoepfe nennen ihre Herkunft', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+
+    // Als direkte Referenz gebunden bekaeme die Funktion das Click-Event als
+    // origin -- dann waere weder 'attendance' noch 'responses' gesetzt.
+    assertTrue(str_contains(rspFunktion($js, 'initAttendanceList'), "showCreateAppointmentModal('attendance')"),
+        'Anwesenheitsliste uebergibt ihre Herkunft nicht');
+    assertTrue(str_contains(rspFunktion($js, 'initResponsesTab'), "showCreateAppointmentModal('responses')"),
+        'Termine-Tab uebergibt seine Herkunft nicht');
+    assertTrue(str_contains(rspFunktion($js, 'showEditAppointmentModal'), "appointmentModalOrigin = 'attendance'"),
+        'Bearbeiten kommt nur aus der Anwesenheitsliste und muss das setzen');
+});
+
+test('PWA OI-123: Plus-Knopf nur fuer Verwalter, bei der Abmeldung wieder verborgen', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+
+    $init = rspFunktion($js, 'initResponsesTab');
+    assertTrue(str_contains($init, 'btnAddAppointment') && str_contains($init, 'isPwaManager()'),
+        'initResponsesTab blendet den Knopf nicht nach Rolle ein');
+    // Erst nach der Schalterpruefung: ohne Terminplanung bleibt er verborgen.
+    $schalter = strpos($init, "pwaFeatureOn('appointments')");
+    $knopf    = strpos($init, 'btnAddAppointment');
+    assertTrue($schalter !== false && $knopf !== false && $schalter < $knopf,
+        'Der Knopf wird vor der Schalterpruefung eingeblendet');
+
+    assertTrue(str_contains(rspFunktion($js, 'resetResponsesTab'), 'btnAddAppointment'),
+        'Nach Abmelden und Anmelden als Mitglied stuende der Knopf noch da');
+
+    $rolle = rspFunktion($js, 'isPwaManager');
+    assertTrue(str_contains($rolle, "'admin'") && str_contains($rolle, "'manager'"), 'Rollenpruefung unvollstaendig');
+});
+
+test('PWA OI-123: Termine-Tab bleibt fuer Verwalter auch ohne Termine sichtbar', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'loadResponses');
+    assertTrue((bool) preg_match('/tab\.hidden\s*=\s*!hasResponses\s*&&\s*!isPwaManager\(\)/', $rumpf),
+        'Ohne kommende Termine verschwaende der Tab samt Plus-Knopf');
+    assertTrue(str_contains($rumpf, 'tab.hidden && wasActiveTab'),
+        'Rueckfall auf den Erfassen-Tab muss an der tatsaechlichen Sichtbarkeit haengen');
+});
+
+test('PWA OI-123: aus dem Termine-Tab kein „jetzt“ vorbelegen', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'showCreateAppointmentModal');
+    assertTrue(str_contains($rumpf, 'appointmentModalOrigin = origin'), 'Herkunft wird nicht gemerkt');
+    assertTrue((bool) preg_match("/if \(origin === 'attendance'\) \{[^}]*new Date\(\)/", $rumpf),
+        '„jetzt“ darf nur aus der Anwesenheitsliste vorbelegt werden');
+});
+
+test('PWA OI-123: nach dem Speichern aus dem Termine-Tab Liste neu laden und Unsichtbares melden', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'submitAppointmentForm');
+    assertTrue((bool) preg_match("/appointmentModalOrigin === 'responses'[\s\S]{0,200}await loadResponses\(\)/", $rumpf),
+        'Der Termine-Tab wird nach dem Speichern nicht neu geladen');
+    assertTrue(str_contains($rumpf, 'upcomingResponses.some('),
+        'Ohne Sichtbarkeitspruefung meldet die App „erstellt“ fuer einen Termin, der nirgends erscheint');
+    assertTrue(str_contains($rumpf, 'nicht in deiner Liste'), 'Meldung fuer den unsichtbaren Termin fehlt');
+});
+
+test('PWA OI-123: Tab Termine fuer Verwalter schon vor dem Laden sichtbar', function () use ($rspRoot) {
+    $init = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'initResponsesTab');
+    $sichtbar = strpos($init, 'isPwaManager()) respTab.hidden = false');
+    $laden    = strpos($init, 'await loadResponses()');
+    assertTrue($sichtbar !== false && $laden !== false && $sichtbar < $laden,
+        'Scheitert das erste Laden, fehlten dem Verwalter Tab und Plus-Knopf');
+});
+
+test('PWA OI-123: gescheitertes Neuladen meldet keinen unsichtbaren Termin', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+    assertTrue(str_contains(rspFunktion($js, 'loadResponses'), 'return false'), 'loadResponses meldet Fehler nicht zurueck');
+    assertTrue(str_contains(rspFunktion($js, 'submitAppointmentForm'), '!geladen'),
+        'Ohne frische Liste darf die App nicht behaupten, der Termin sei unsichtbar');
+    assertTrue(str_contains(rspFunktion($js, 'submitAppointmentForm'), 'acht Wochen'),
+        'Die Meldung muss den Horizont von acht Wochen nennen');
+});
+
+test('PWA OI-123: Dialoge rollen selbst, der Hintergrund steht still', function () use ($rspRoot) {
+    $css = (string) sourceCode($rspRoot . '/public/checkin/css/style.css');
+
+    // Der Termin-Dialog hat sechs Felder: Bei 560 px Hoehe ragte er oben
+    // 93 px aus dem Bild, „Speichern“ war nicht erreichbar.
+    assertTrue((bool) preg_match('/\n\.modal-content\s*\{[^}]*max-height:[^}]*overflow-y:\s*auto/', $css),
+        '.modal-content braucht max-height und overflow-y: auto -- fuer alle Dialoge, nicht nur einen');
+    assertTrue((bool) preg_match('/body:has\(\.modal\.active\)\s*\{[^}]*overflow:\s*hidden/', $css),
+        'Bei offenem Dialog rollt sonst die ausgeblendete Seite dahinter');
+});
