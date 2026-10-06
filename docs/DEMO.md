@@ -95,7 +95,7 @@ Demo nicht stillschweigend ungeschützt.
 | Konto | Rolle |
 |---|---|
 | `admin@musterhausen.example` | Administrator |
-| `manager@musterhausen.example` | Manager |
+| `manager@musterhausen.example` | Manager, Mitglied M013 |
 | `user@musterhausen.example` | Mitglied M001, trägt die laufende Arbeitszeitsitzung |
 | `user2@musterhausen.example` | Mitglied M002 |
 

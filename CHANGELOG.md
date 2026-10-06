@@ -7,6 +7,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Geändert
+- **Demo-Bestand: Der Manager hängt an einem Mitglied** (M013, Aktive und Vorstandschaft). Wer die
+  Demo als `manager@` öffnet, sieht in der Check-in-App eigene Termine, offene Punkte und die
+  Zeiterfassung. Anträge und Arbeitszeiten dieses Mitglieds entscheidet im Bestand der Admin,
+  damit nichts als Selbstgenehmigung erscheint. Nebenbei laufen `self_approval_api` und
+  `responses_staffing_api` nach einem Generatorlauf wieder durch; sie verlangten das Mitglied.
+
+---
+
 ## [1.21.0] – 2026-10-05
 
 ### Neu
