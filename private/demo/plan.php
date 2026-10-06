@@ -107,6 +107,24 @@ const DEMO_STATION_NAME = 'Probenraum-Station';
 const DEMO_PUBLIC_PIN_MEMBER_ID = 1;
 const DEMO_PUBLIC_PIN           = '4711';
 
+/**
+ * Mitglied hinter manager@ (Schriftführung). Aktiv, in der Vorstandschaft und in
+ * einem Register — so zeigt die Check-in-App dem Manager eigene Termine, und die
+ * Testsuiten (self_approval_api, responses_staffing_api) finden das verknüpfte
+ * Mitglied, das sie verlangen. Nicht 1 (laufende Sitzung) und nicht 2 (user2@).
+ */
+const DEMO_MANAGER_MEMBER_ID = 13;
+
+/**
+ * Wer einen Antrag oder eine Arbeitszeit von $memberId entscheidet: der Manager,
+ * außer bei seinem eigenen Mitglied — das entscheidet der Admin. Sonst stünde
+ * jeder dieser Einträge als Selbstgenehmigung markiert (OI-87).
+ */
+function demoApproverFor(int $memberId): string
+{
+    return $memberId === DEMO_MANAGER_MEMBER_ID ? 'admin' : 'manager';
+}
+
 /** Bundesland für Feiertage im Kalender und die Ausfälle der Serien (FI-16). */
 const DEMO_HOLIDAY_REGION = 'BW';
 
@@ -852,7 +870,8 @@ function buildRecords(
  * und genau er belegt, dass es einen Freigabeweg gibt.
  *
  * created_by und approved_by tragen Platzhalter-IDs; seed.php ersetzt sie durch
- * die tatsächlichen Benutzer-IDs (2 = Manager). Der Plan kennt keine Konten.
+ * die tatsächlichen Benutzer-IDs (2 = Manager, 1 = Admin für das Mitglied des
+ * Managers, siehe demoApproverFor()). Der Plan kennt keine Konten.
  */
 const DEMO_EXCEPTION_REASONS = [
     'Krankheit', 'Beruflich verhindert', 'Urlaub', 'Familienfeier',
@@ -940,7 +959,7 @@ function buildExceptions(
                 : null,
             'status'                 => $status,
             'created_by'             => 'member',  // seed.php löst auf
-            'approved_by'            => $status === 'pending' ? null : 'manager',
+            'approved_by'            => $status === 'pending' ? null : demoApproverFor($pair['member_id']),
             'approved_at'            => $status === 'pending'
                 ? null
                 : date('Y-m-d H:i:s', $start + $random->int(1, 5) * 86400),
@@ -1169,7 +1188,7 @@ function buildWorkSessions(
             $approvedBy = null;
             $approvedAt = null;
         } else {
-            $approvedBy = 'manager';
+            $approvedBy = demoApproverFor($memberId);
             $approvedAt = date('Y-m-d H:i:s', strtotime($startTime) + $random->int(1, 4) * 86400);
         }
 
@@ -1209,7 +1228,7 @@ function buildWorkSessions(
             if ($status === 'confirmed') {
                 $log[] = [
                     'session_id' => $n,
-                    'changed_by' => 'manager', // seed.php löst auf
+                    'changed_by' => demoApproverFor($memberId), // seed.php löst auf
                     'changed_at' => $decisionAt,
                     'action'     => 'approve',
                     'changes'    => null,
@@ -1217,7 +1236,7 @@ function buildWorkSessions(
             } elseif ($status === 'rejected') {
                 $log[] = [
                     'session_id' => $n,
-                    'changed_by' => 'manager', // seed.php löst auf
+                    'changed_by' => demoApproverFor($memberId), // seed.php löst auf
                     'changed_at' => $decisionAt,
                     'action'     => 'reject',
                     'changes'    => 'Doppelte Erfassung',
@@ -1386,7 +1405,7 @@ function buildUsers(): array
 {
     return [
         ['user_id' => 1, 'email' => 'admin@musterhausen.example',   'name' => 'Vereinsverwaltung', 'device_name' => null, 'role' => 'admin',   'device_type' => null, 'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 1],
-        ['user_id' => 2, 'email' => 'manager@musterhausen.example', 'name' => 'Schriftführung',    'device_name' => null, 'role' => 'manager', 'device_type' => null, 'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 1],
+        ['user_id' => 2, 'email' => 'manager@musterhausen.example', 'name' => 'Schriftführung',    'device_name' => null, 'role' => 'manager', 'device_type' => null, 'member_id' => DEMO_MANAGER_MEMBER_ID, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 1],
         ['user_id' => 3, 'email' => 'user@musterhausen.example',    'name' => 'Mitglied',          'device_name' => null, 'role' => 'user',    'device_type' => null, 'member_id' => 1,    'is_active' => 1, 'account_status' => 'active', 'email_verified' => 1],
         ['user_id' => 4, 'email' => null, 'name' => null, 'device_name' => DEMO_STATION_NAME, 'role' => 'device', 'device_type' => 'kiosk',          'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 0],
         ['user_id' => 5, 'email' => null, 'name' => null, 'device_name' => 'Proberaum',        'role' => 'device', 'device_type' => 'totp_location', 'member_id' => null, 'is_active' => 1, 'account_status' => 'active', 'email_verified' => 0],

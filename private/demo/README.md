@@ -85,13 +85,13 @@ php -r "require 'private/demo/plan.php'; foreach (buildMembers(new DemoRandom(20
 | Konto | Rolle |
 |---|---|
 | `admin@musterhausen.example` | Administrator |
-| `manager@musterhausen.example` | Manager |
+| `manager@musterhausen.example` | Manager, verknüpft mit Mitglied **M013** (Aktive, Vorstandschaft, Register) — damit die Check-in-App auch als Manager eigene Termine zeigt. Über die Anträge und Arbeitszeiten von M013 entscheidet im Bestand der Admin, nicht der Manager selbst (OI-87) |
 | `user@musterhausen.example` | Benutzer, verknüpft mit Mitglied **M001** — trägt die laufende Sitzung, hiermit wird die PWA fotografiert |
 | `user2@musterhausen.example` | Benutzer, verknüpft mit Mitglied **M002** — nur für die Testsuiten, ohne laufende Sitzung |
 
 Passwort für alle vier: der Wert von `--password`, Vorgabe `probelauf`.
 
-**Diese Konten stehen auch in `tests/config.php`**, dort `user2@` als Rolle `user`. Der
+**Diese Konten stehen auch in `tests/config.php`**, dort `user2@` als Rolle `user`. `self_approval_api` und `responses_staffing_api` verlangen, dass `manager@` an einem Mitglied hängt. Der
 Generator leert `users` — wer die Zugänge hier ändert, muss sie dort ändern, sonst scheitert
 der gesamte Testlauf an der Anmeldung.
 

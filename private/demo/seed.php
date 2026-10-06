@@ -342,8 +342,9 @@ function demoBase32Secret(): string
 }
 
 /**
- * Löst die Platzhalter 'member' und 'manager' aus dem Plan in tatsächliche
- * Benutzer-IDs auf (3 = Mitgliedskonto, 2 = Schriftführung/Manager). `null`
+ * Löst die Platzhalter 'member', 'manager' und 'admin' aus dem Plan in
+ * tatsächliche Benutzer-IDs auf (3 = Mitgliedskonto, 2 = Schriftführung/Manager,
+ * 1 = Vereinsverwaltung/Admin, siehe demoApproverFor() in plan.php). `null`
  * bleibt `null`. Der Plan kennt keine Konten, siehe Kommentar über
  * buildExceptions() und buildWorkSessions() in plan.php.
  */
@@ -354,6 +355,9 @@ function demoResolveActor(string|int|null $value): int|null
     }
     if ($value === 'manager') {
         return 2;
+    }
+    if ($value === 'admin') {
+        return 1;
     }
 
     return $value;
@@ -579,8 +583,8 @@ if ($isMainScript) {
         echo "Saat:      {$options['seed']}\n";
         echo "\nKonten (Passwort: {$options['password']}):\n";
         echo "  admin@musterhausen.example    (admin)\n";
-        echo "  manager@musterhausen.example  (manager)\n";
-        echo "  user@musterhausen.example     (Mitglied)\n";
+        echo "  manager@musterhausen.example  (manager, Mitglied M" . sprintf('%03d', DEMO_MANAGER_MEMBER_ID) . ")\n";
+        echo "  user@musterhausen.example     (Mitglied M" . sprintf('%03d', DEMO_PUBLIC_PIN_MEMBER_ID) . ")\n";
         echo "\nÖffentliche Stations-PIN: M" . sprintf('%03d', DEMO_PUBLIC_PIN_MEMBER_ID) . ' / ' . DEMO_PUBLIC_PIN . "\n";
         echo $stationToken !== null
             ? "Stations-Token: fest aus config.php (demo_station_token).\n"

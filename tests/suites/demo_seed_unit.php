@@ -1221,21 +1221,86 @@ test('Testkonto und Demokonto haengen an verschiedenen Mitgliedern', function ()
     $plan     = buildDemoPlan(20260908, '2026-09-08');
     $verknuepft = array_values(array_filter($plan['users'], fn ($u) => $u['member_id'] !== null));
 
-    assertSame(2, count($verknuepft), 'zwei Mitgliedskonten erwartet');
-    assertTrue(
-        $verknuepft[0]['member_id'] !== $verknuepft[1]['member_id'],
-        'beide Konten haengen am selben Mitglied'
-    );
+    assertSame(3, count($verknuepft), 'drei Mitgliedskonten erwartet (manager, user, user2)');
+    $mitglieder = array_column($verknuepft, 'member_id');
+    assertSame(count($mitglieder), count(array_unique($mitglieder)), 'zwei Konten haengen am selben Mitglied');
 
-    // Das Konto der Testsuite (tests/config.php, Rolle "user") ist user2@ und
-    // darf kein Mitglied mit laufender Sitzung tragen.
-    $test = array_values(array_filter($plan['users'], fn ($u) => $u['email'] === 'user2@musterhausen.example'))[0];
+    // Die Konten der Testsuite (tests/config.php, Rollen "user" und "manager")
+    // sind user2@ und manager@ und duerfen kein Mitglied mit laufender Sitzung
+    // tragen.
+    $testkonten = array_values(array_filter(
+        $plan['users'],
+        fn ($u) => in_array($u['email'], ['user2@musterhausen.example', 'manager@musterhausen.example'], true)
+    ));
+    assertSame(2, count($testkonten));
     foreach ($plan['work_sessions'] as $s) {
         if ($s['end_time'] === null) {
-            assertTrue(
-                $s['member_id'] !== $test['member_id'],
-                'die laufende Sitzung gehoert dem Testkonto'
-            );
+            foreach ($testkonten as $test) {
+                assertTrue(
+                    $s['member_id'] !== $test['member_id'],
+                    "die laufende Sitzung gehoert dem Testkonto {$test['email']}"
+                );
+            }
+        }
+    }
+});
+
+test('Manager haengt an einem aktiven Mitglied der Vorstandschaft', function () {
+    // Die Check-in-App zeigt einem Konto ohne Mitglied keine eigenen Termine,
+    // und self_approval_api sowie responses_staffing_api verlangen das
+    // verknuepfte Mitglied -- ohne es waren beide nach jedem Generatorlauf rot.
+    $plan    = buildDemoPlan(20260908, '2026-09-08');
+    $manager = array_values(array_filter($plan['users'], fn ($u) => $u['role'] === 'manager'))[0];
+    assertSame(DEMO_MANAGER_MEMBER_ID, $manager['member_id']);
+
+    $member = array_values(array_filter($plan['members'], fn ($m) => $m['member_id'] === $manager['member_id']))[0];
+    assertSame(1, $member['active'], 'Mitglied des Managers ist inaktiv');
+
+    $gruppen = array_column(array_filter($plan['member_group_assignments'], fn ($a) => $a['member_id'] === $manager['member_id']), 'group_id');
+    assertTrue(in_array(3, $gruppen, true), 'Mitglied des Managers ist nicht in der Vorstandschaft');
+    assertTrue(in_array(1, $gruppen, true), 'Mitglied des Managers ist nicht bei den Aktiven');
+});
+
+test('Der Manager entscheidet nichts ueber sein eigenes Mitglied (OI-87)', function () {
+    // Sonst stuende jeder dieser Eintraege in der Oberflaeche als
+    // Selbstgenehmigung markiert. Der Bestand haengt am Stichtag, der Cron
+    // nimmt jeden Tag einen anderen -- deshalb mehrere Stichtage. Am ersten
+    // (2026-10-06) hat das Mitglied entschiedene Antraege und Arbeitszeiten;
+    // die Zaehler unten halten fest, dass die Pruefung nicht ins Leere geht.
+    $own = DEMO_MANAGER_MEMBER_ID;
+    foreach (['2026-10-06', '2026-09-08', '2026-12-15', '2027-03-01'] as $i => $stichtag) {
+        $plan = buildDemoPlan(20260908, $stichtag);
+
+        $ownExceptions = array_filter($plan['exceptions'], fn ($e) => $e['member_id'] === $own && $e['approved_by'] !== null);
+        foreach ($ownExceptions as $e) {
+            assertSame('admin', $e['approved_by'], 'Antrag des Manager-Mitglieds vom Manager entschieden');
+        }
+        foreach ($plan['exceptions'] as $e) {
+            if ($e['member_id'] !== $own && $e['approved_by'] !== null) {
+                assertSame('manager', $e['approved_by'], 'fremder Antrag nicht vom Manager entschieden');
+            }
+        }
+
+        $ownSessions = [];
+        foreach ($plan['work_sessions'] as $s) {
+            if ($s['member_id'] === $own) {
+                $ownSessions[$s['session_id']] = true;
+                if ($s['approved_by'] !== null) {
+                    assertSame('admin', $s['approved_by'], 'Arbeitszeit des Manager-Mitglieds vom Manager entschieden');
+                }
+            }
+        }
+        $ownDecisions = 0;
+        foreach ($plan['work_session_log'] as $l) {
+            if (isset($ownSessions[$l['session_id']]) && in_array($l['action'], ['approve', 'reject'], true)) {
+                assertSame('admin', $l['changed_by'], 'Auditspur nennt den Manager als Entscheider');
+                $ownDecisions++;
+            }
+        }
+
+        if ($i === 0) {
+            assertTrue(count($ownExceptions) > 0, 'Mitglied des Managers hat keinen entschiedenen Antrag -- Pruefung leer');
+            assertTrue($ownDecisions > 0, 'Mitglied des Managers hat keine entschiedene Arbeitszeit -- Pruefung leer');
         }
     }
 });
