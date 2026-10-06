@@ -1435,6 +1435,16 @@ Automatisiert: `css_bundle_unit`, `assets`, `asset_caching_http`, `tests/browser
 | CB-2 | Anmeldeseite mit leerem Cache öffnen | Genau eine CSS-Anfrage `css/v<Version>/login.css` |
 | CB-3 | Layout, Farben, Dunkelmodus und Druckansicht von Dashboard und Anmeldeseite | Unverändert gegenüber der Version davor |
 
+### Kompression (OI-120, unveröffentlicht)
+
+Automatisiert: `css_bundle_unit`, `assets`, `asset_caching_http`.
+
+| ID | Szenario | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| KO-1 | Dashboard mit leerem Cache öffnen, Netzwerkliste | CSS-, JS- und HTML-Antworten tragen `content-encoding: gzip` |
+| KO-2 | `api/api.php?resource=ping` und `reset_password.php` aufrufen | Antworten ohne `content-encoding` |
+| KO-3 | Eine Seite der Check-in-App neu laden (F5) | Dateien kommen mit 304, nicht mit 200 |
+
 ### Status-Chips (OI-86, 1.13.0)
 
 Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).

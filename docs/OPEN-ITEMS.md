@@ -2468,6 +2468,11 @@ Cache aus, je 3 Läufe, ohne Anmeldung — das Dashboard lädt alle Module vor d
   JS, HTML; **nicht** `application/json` der API wegen BREACH) und gzip im `bundle.php`, dazu
   prüfen, ob der Hoster `mod_deflate` überhaupt lädt.
 
+**Kompression (unveröffentlicht):** umgesetzt nach Spec
+`docs/superpowers/specs/2026-10-06-kompression-design.md` — `mod_deflate` für CSS, JS, HTML,
+SVG und Manifest, nicht für API-JSON und PHP-Ausgaben; das CSS-Bündel komprimiert sich selbst.
+Ob der Hoster der Demo `mod_deflate` lädt, zeigt die Messung nach dem Release.
+
 Ein Aufruf des Dashboards fordert rund 45 Dateien gleichzeitig an: 21 CSS-Module per `@import`
 aus `main.css` und gut 20 JS-Module per `import`. Ohne Build-Kette gibt es kein Bündel. Weil CSS
 und JS mit `no-cache` ausgeliefert werden (siehe Abschnitt Caching in `public/.htaccess`), fragt

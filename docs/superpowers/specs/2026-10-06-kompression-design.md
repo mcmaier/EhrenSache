@@ -1,7 +1,7 @@
 # Kompression: CSS, JS und HTML komprimiert ausliefern
 
 **Datum:** 2026-10-06
-**Status:** Entwurf
+**Status:** Umgesetzt auf feat/kompression (unveröffentlicht)
 **Anlass:** [OI-120](../../OPEN-ITEMS.md#oi-120--das-dashboard-lädt-rund-45-einzeldateien),
 Messung auf der Demo nach dem CSS-Bündel (1.22.0)
 **Zielversion:** keine — Arbeit ohne Versionssprung, Eintrag unter `[Unreleased]`. **Keine
@@ -80,6 +80,10 @@ RequestHeader edit "If-None-Match" '^"((.*)-gzip)"$' '"$1", "$2"'
 ```
 
 Die Umsetzung hält das Ergebnis im Kommentar fest.
+
+**Ergebnis (Umsetzung):** Mit Apache 2.4.58 lieferte die Revalidierung mit dem `-gzip`-ETag ohne
+Gegenmaßnahme 200 statt 304. Die `RequestHeader edit`-Zeile steht deshalb in
+`<IfModule mod_headers.c>`; der HTTP-Test liefert danach 304 für `/` und `/checkin/`.
 
 ### 3.3 `bundle.php` komprimiert selbst
 

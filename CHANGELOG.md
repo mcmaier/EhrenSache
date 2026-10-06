@@ -9,6 +9,13 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Geändert
+- **CSS, JS und HTML kommen komprimiert an.** `public/.htaccess` schaltet gzip für statische
+  Textdateien ein (`mod_deflate`, sofern der Hoster es lädt); das CSS-Bündel komprimiert sich
+  selbst. Das Dashboard überträgt beim Erstbesuch rund 210 statt 870 KB, auch Check-in-App und
+  Station werden kleiner. API-Antworten und von PHP erzeugte Seiten bleiben bewusst
+  unkomprimiert (OI-120).
+
 ### Behoben
 - **Demo-Bestand ohne Einträge aus der Zukunft.** Ein Termin am Abend bekam schon beim Lauf am
   Morgen Anwesenheiten mit Ankunft am Abend, und Genehmigungen von Anträgen und Arbeitszeiten zu

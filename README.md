@@ -115,6 +115,9 @@ Fachanwalt für IT-Recht, um die DSGVO-Konformität sicherzustellen.
 - Apache ab 2.4.7 (`Header … setifempty`) mit `mod_headers`; `AllowOverride` muss
   die `Header`-Direktiven zulassen (`FileInfo`). Ohne `mod_headers` fehlen die Sicherheits-Header samt
   Content-Security-Policy aus den `.htaccess`-Dateien still
+- Empfohlen: `mod_deflate` und `mod_filter`. Damit kommen CSS, JS und HTML komprimiert an
+  (beim ersten Aufruf des Dashboards rund 210 statt 870 KB). Ohne die Module läuft alles,
+  nur langsamer im Mobilfunk
 - SSL-Zertifikat (für PWA und sichere Authentifizierung)
 - Schreibrechte für Upload-Verzeichnisse
 
