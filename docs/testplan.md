@@ -1411,6 +1411,16 @@ Automatisiert: `startup_chain_frontend` (statisch), `tests/browser/startup-chain
 | SK-7 | Dashboard neu laden, Bereich „Mein Profil" | Ansicht steht, Name in der Kopfzeile folgt kurz danach, Versionsnummer erscheint |
 | SK-8 | Admin mit mindestens einer Tätigkeitsart: Dashboard neu laden, Bereich „Zeiterfassung" | Bereich lädt; im Netzwerk `activity_types` nur einmal |
 
+### CSS-Bündel (OI-120, unveröffentlicht)
+
+Automatisiert: `css_bundle_unit`, `assets`, `asset_caching_http`, `tests/browser/cache-reuse.mjs`.
+
+| ID | Szenario | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| CB-1 | Dashboard mit leerem Cache öffnen, Netzwerkliste | Genau eine CSS-Anfrage `css/v<Version>/main.css`, Antwort ohne `@import` |
+| CB-2 | Anmeldeseite mit leerem Cache öffnen | Genau eine CSS-Anfrage `css/v<Version>/login.css` |
+| CB-3 | Layout, Farben, Dunkelmodus und Druckansicht von Dashboard und Anmeldeseite | Unverändert gegenüber der Version davor |
+
 ### Status-Chips (OI-86, 1.13.0)
 
 Automatisiert: `filter_chips_unit` (Node), `filter_chips_frontend` (statisch).

@@ -7,6 +7,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ---
 
+## [Unreleased]
+
+### Geändert
+- **Dashboard und Anmeldeseite laden ihr CSS als eine Datei.** Statt 22 bzw. 3 einzelner
+  Stylesheets liefert der Server ein Bündel aus, das die `@import`-Zeilen auflöst
+  (`public/css/bundle.php`). Der Erstbesuch und der erste Aufruf nach einem Update brauchen
+  dadurch 21 Anfragen weniger, und das Layout wartet nicht mehr auf eine zweite Stufe. Die
+  Quelldateien bleiben einzeln, es gibt keinen Build-Schritt (OI-120).
+- Der Updater schreibt `public/.htaccess` jetzt kurz vor den Einstiegsseiten.
+
 ## [1.21.0] – 2026-10-05
 
 ### Neu

@@ -1,7 +1,7 @@
 # CSS-Bündel: Dashboard und Anmeldeseite laden eine CSS-Datei
 
 **Datum:** 2026-10-06
-**Status:** Entwurf
+**Status:** Umgesetzt auf feat/css-buendel (unveröffentlicht)
 **Anlass:** [OI-120](../../OPEN-ITEMS.md#oi-120--das-dashboard-lädt-rund-45-einzeldateien) (Weg 1, Bündeln),
 Folge von `2026-10-05-version-im-pfad-design.md`
 **Zielversion:** keine — Arbeit ohne Versionssprung, Eintrag unter `[Unreleased]`. **Keine
