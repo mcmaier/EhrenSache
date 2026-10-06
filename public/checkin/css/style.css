@@ -1505,6 +1505,25 @@ body:has(.modal.active) {
     color: var(--card-bg);
 }
 
+/* Zusatztext der Loesch-Rueckfrage (seit OI-125): nennt, was mit verloren geht. */
+.confirm-delete-text {
+    margin: 0 0 16px;
+    line-height: 1.4;
+}
+
+/* Loeschen im Termin-Dialog (OI-125): abgesetzt unter Abbrechen/Speichern,
+   damit es nicht neben „Speichern“ liegt. */
+.appointment-delete-row {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.appointment-delete-row .action-button {
+    padding: 12px 10px;
+    font-size: 15px;
+}
+
 .btn-login {
     width: 100%;
     max-width: 400px;
@@ -3013,6 +3032,23 @@ details.response-card[open] > .response-card__summary .response-card__meta::afte
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--button-bg);
+}
+
+/* Verwalter-Zeile am Ende einer aufgeklappten Karte (OI-125). Knopf wie die
+   uebrigen Kartenknoepfe; rechts, damit er nicht mit den Antwortknoepfen
+   verwechselt wird. */
+.response-card__manage {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.response-card__edit {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--button-bg);
+    cursor: pointer;
 }
 
 .response-late {

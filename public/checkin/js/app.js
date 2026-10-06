@@ -89,7 +89,10 @@ let sessionGeneration = 0;
 
 let checkinAppointments = [];
 let clientSettings = { checkin_auto_create_appointment: '1', checkin_tolerance_hours: '2' };
-let deleteExceptionId = null;
+// Aktion des Bestaetigungsdialogs: Seit OI-125 loescht er nicht mehr nur
+// Antraege, sondern auch Termine -- wer ihn oeffnet, gibt mit, was „Loeschen“ tut.
+let confirmDeleteAction = null;
+let confirmDeleteOpener = null;
 let nfcAbortController = null;
 let nfcAvailable = false;
 let currentStatsYear = new Date().getFullYear();
@@ -1242,7 +1245,9 @@ function resetSessionState() {
     appointments = [];
     appointmentTypes = [];
     checkinAppointments = [];
-    deleteExceptionId = null;
+    confirmDeleteAction = null;
+    confirmDeleteOpener = null;
+    appointmentModalData = null;
     currentEditAppointmentId = null;
     currentStatsYear = new Date().getFullYear();
 
@@ -1353,6 +1358,8 @@ function initAppointmentModal() {
         }
     });
 
+    bindOnce(document.getElementById('btnDeleteAppointment'), 'click', deleteAppointmentFromModal);
+
     bindOnce(document.getElementById('appointmentForm'), 'submit', submitAppointmentForm);
 }
 
@@ -1371,6 +1378,116 @@ function closeAppointmentModal() {
     if (opener && opener.isConnected && opener.offsetParent !== null) {
         opener.focus();
     }
+}
+
+/**
+ * „Termin loeschen“ im Dialog (OI-125). Prueft der Reihe nach: hat der Termin
+ * inzwischen begonnen, haengen Erfassungen daran -- dann loescht die App nicht
+ * selbst, sondern verweist aufs Dashboard. Sonst fragt sie mit den Zahlen nach,
+ * die mit verloren gehen.
+ */
+async function deleteAppointmentFromModal() {
+    const apt = appointmentModalData;
+    const knopf = document.getElementById('btnDeleteAppointment');
+    if (!apt || !knopf || knopf.disabled) return;
+
+    if (new Date(`${apt.date}T${apt.start_time}`) <= new Date()) {
+        showFormErrors('appointmentErrors', ['Der Termin hat schon begonnen – löschen nur noch im Dashboard.']);
+        return;
+    }
+
+    knopf.disabled = true;
+    try {
+        const result = await apiCall('appointments', 'GET', null, { id: apt.appointment_id, dependents: 1 });
+
+        // Waehrend der Abfrage abgebrochen oder ein anderer Termin geoeffnet:
+        // keine Rueckfrage ueber einer Liste oder zu einem fremden Termin.
+        if (appointmentModalData !== apt
+            || !document.getElementById('appointmentModal').classList.contains('active')) {
+            return;
+        }
+
+        if (!result.success) {
+            if (result.status === 404) {
+                // Schon anderswo geloescht: nichts mehr zu loeschen, nur neu laden.
+                closeAppointmentModal();
+                await loadResponses();
+                showMessage('Termin nicht mehr vorhanden', 'info');
+                return;
+            }
+            showFormErrors('appointmentErrors', [result.error || 'Prüfung fehlgeschlagen']);
+            return;
+        }
+
+        const termin = result.data;
+        if (termin.dependents.records > 0) {
+            showFormErrors('appointmentErrors',
+                ['Zu diesem Termin gibt es schon Erfassungen – bitte im Dashboard löschen.']);
+            return;
+        }
+
+        showFormErrors('appointmentErrors', []);
+        openConfirmDeleteModal({
+            text: appointmentDeleteQuestion(termin),
+            onConfirm: () => confirmDeleteAppointment(termin.appointment_id),
+            opener: knopf,
+        });
+    } finally {
+        knopf.disabled = false;
+    }
+}
+
+/** Text der Rueckfrage: Termin, was mit verloren geht, Hinweis bei Serien. */
+function appointmentDeleteQuestion(apt) {
+    const wann = formatResponseCardHead(apt.date, apt.start_time, null);
+    const rueckmeldungen = apt.dependents?.responses ?? 0;
+    const antraege = apt.dependents?.exceptions ?? 0;
+
+    const teile = [];
+    if (rueckmeldungen > 0) teile.push(rueckmeldungen === 1 ? '1 Rückmeldung' : `${rueckmeldungen} Rückmeldungen`);
+    if (antraege > 0) teile.push(antraege === 1 ? '1 Antrag' : `${antraege} Anträge`);
+
+    let text = `Termin „${apt.title}“ (${wann}) löschen?`;
+    if (teile.length > 0) {
+        const einzeln = rueckmeldungen + antraege === 1;
+        text += ` Dabei ${einzeln ? 'geht' : 'gehen'} ${teile.join(' und ')} verloren.`;
+    }
+    if (apt.series_id) {
+        text += ' Nur dieser Termin, die Serie bleibt bestehen.';
+    }
+    return text;
+}
+
+/**
+ * Loescht nach der Rueckfrage. Ein inzwischen anderswo geloeschter Termin
+ * (404) ist kein Fehler -- er ist weg, wie gewuenscht.
+ */
+async function confirmDeleteAppointment(appointmentId) {
+    // Waehrend des DELETE weder erneut loeschen noch speichern: Ein Speichern
+    // koennte den Termin noch aendern, den die Anfrage gerade entfernt.
+    const knoepfe = ['btnDeleteAppointment', 'btnSaveAppointment']
+        .map(id => document.getElementById(id)).filter(Boolean);
+    knoepfe.forEach(k => { k.disabled = true; });
+
+    let result;
+    try {
+        result = await apiCall('appointments', 'DELETE', null, { id: appointmentId });
+    } finally {
+        knoepfe.forEach(k => { k.disabled = false; });
+    }
+
+    const schonWeg = !result.success && result.status === 404;
+    if (!result.success && !schonWeg) {
+        showFormErrors('appointmentErrors', [result.error || 'Löschen fehlgeschlagen']);
+        // Der Dialog bleibt mit der Meldung offen; der Fokus soll nicht im
+        // Nichts landen, nachdem die Rueckfrage zu war.
+        document.getElementById('btnDeleteAppointment')?.focus();
+        return;
+    }
+
+    closeAppointmentModal();
+    await loadResponses();
+    showMessage(schonWeg ? 'Termin nicht mehr vorhanden' : 'Termin gelöscht', schonWeg ? 'info' : 'success');
 }
 
 async function initAttendanceList() {
@@ -1402,7 +1519,7 @@ async function initAttendanceList() {
         () => showCreateAppointmentModal('attendance'));
 
     bindOnce(document.getElementById('btnEditAppointment'), 'click',
-        showEditAppointmentModal);
+        () => showEditAppointmentModal('attendance'));
 }
 
 /**
@@ -1493,10 +1610,10 @@ async function submitAppointmentForm(e) {
             const sichtbar = geladen && id !== '' && upcomingResponses.some(
                 i => String(i.appointment.appointment_id) === id);
             if (sichtbar || !geladen) {
-                showMessage('Termin erstellt', 'success');
+                showMessage(neu ? 'Termin erstellt' : 'Termin aktualisiert', 'success');
             } else {
                 const wann = formatResponseCardHead(formData.date, formData.start_time, null);
-                showMessage(`Termin angelegt (${wann}) – erscheint nicht in deiner Liste (nicht deine Gruppe, vergangen oder mehr als acht Wochen voraus).`, 'info');
+                showMessage(`Termin ${neu ? 'angelegt' : 'gespeichert'} (${wann}) – erscheint nicht in deiner Liste (nicht deine Gruppe, vergangen oder mehr als acht Wochen voraus).`, 'info');
             }
             return;
         }
@@ -3761,15 +3878,20 @@ let appointmentModalOrigin = 'attendance';
 let appointmentModalOpener = null;
 
 async function showCreateAppointmentModal(origin = 'attendance') {
+    const generation = ++appointmentModalGeneration;
     currentEditAppointmentId = null;
     appointmentModalOrigin = origin;
     appointmentModalOpener = document.getElementById(
         origin === 'responses' ? 'btnAddAppointment' : 'btnCreateAppointment');
+    appointmentModalData = null;
+    document.getElementById('appointmentDeleteRow').hidden = true;
     document.getElementById('appointmentModalTitle').textContent = 'Termin anlegen';
 
     // Lade Terminarten
     await loadAppointmentTypes();
+    if (generation !== appointmentModalGeneration) return;
     await fillPwaLocationSuggestions();
+    if (generation !== appointmentModalGeneration) return;
 
     // Formular zurücksetzen
     document.getElementById('appointmentForm').reset();
@@ -3791,29 +3913,52 @@ async function showCreateAppointmentModal(origin = 'attendance') {
     document.getElementById('appointmentModal').classList.add('active');
 }
 
-async function showEditAppointmentModal() {
-    const appointmentId = document.getElementById('attendanceAppointmentFilter').value;
+// Der Termin, den der Dialog gerade bearbeitet, wie der Server ihn lieferte --
+// Loeschen braucht Titel, Datum, Beginn und series_id fuer die Rueckfrage.
+let appointmentModalData = null;
+
+// Zaehlt jedes Oeffnen des Termin-Dialogs. Zwei schnelle Taps auf verschiedene
+// Karten starten zwei Abrufe; der spaetere darf nicht vom frueheren ueber-
+// schrieben werden, sonst landen die Felder von A im Dialog von B.
+let appointmentModalGeneration = 0;
+
+/**
+ * Oeffnet den Dialog zum Bearbeiten. Aus der Anwesenheitsliste kommt die id
+ * aus deren Auswahl, aus dem Tab „Termine“ von der Karte (OI-125). Der Fokus
+ * geht danach an den Plus-Knopf: Die Karte wird nach dem Speichern neu
+ * gezeichnet, ihr Knopf existiert dann nicht mehr.
+ */
+async function showEditAppointmentModal(origin = 'attendance', id = null) {
+    const appointmentId = id ?? document.getElementById('attendanceAppointmentFilter').value;
     if (!appointmentId) return;
-    
+
+    const generation = ++appointmentModalGeneration;
     currentEditAppointmentId = appointmentId;
-    // Bearbeiten gibt es nur in der Anwesenheitsliste.
-    appointmentModalOrigin = 'attendance';
-    appointmentModalOpener = document.getElementById('btnEditAppointment');
+    appointmentModalOrigin = origin;
+    appointmentModalOpener = document.getElementById(
+        origin === 'responses' ? 'btnAddAppointment' : 'btnEditAppointment');
+    appointmentModalData = null;
+    // Loeschen nur aus dem Tab „Termine“: dort stehen nur kommende Termine.
+    document.getElementById('appointmentDeleteRow').hidden = origin !== 'responses';
     document.getElementById('appointmentModalTitle').textContent = 'Termin bearbeiten';
     showFormErrors('appointmentErrors', []);
 
     try {
         // Lade Terminarten
         await loadAppointmentTypes();
+        if (generation !== appointmentModalGeneration) return;
         await fillPwaLocationSuggestions();
-        
+        if (generation !== appointmentModalGeneration) return;
+
         // Lade Termin-Daten
         const result = await apiCall('appointments', 'GET', null, { id: appointmentId });
-         if (!result.success) {
+        if (generation !== appointmentModalGeneration) return;
+        if (!result.success) {
             throw new Error(result.error);
         }
 
         const appointment = result.data;
+        appointmentModalData = appointment;
         
         if (appointment) {
             document.getElementById('appointmentTitle').value = appointment.title || '';
@@ -3864,49 +4009,55 @@ async function loadAppointmentTypes() {
 // CONFIRMATION MODAL
 // ========================================
 
-// Wrapper für Exception löschen
-async function deleteException(exceptionId) 
-{    
-    deleteExceptionId = exceptionId;
-    openConfirmDeleteModal();    
-        
+// Antrag loeschen: Rueckfrage ohne Zusatztext, danach Verlauf neu laden.
+async function deleteException(exceptionId) {
+    openConfirmDeleteModal({ onConfirm: () => deleteExceptionConfirmed(exceptionId) });
 }
 
-async function openConfirmDeleteModal(exceptionId) {
+async function deleteExceptionConfirmed(exceptionId) {
+    try {
+        const result = await apiCall('exceptions', 'DELETE', null, { id: exceptionId });
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        showMessage('✓ Antrag erfolgreich gelöscht', 'success');
+        await loadHistory();
+    } catch (error) {
+        debug.error('Fehler beim Löschen:', error);
+        showMessage(error.message || 'Fehler beim Löschen', 'error');
+    }
+}
 
+/**
+ * Oeffnet die Rueckfrage „Loeschen bestaetigen“. text erscheint unter der
+ * Ueberschrift (leer: nur die Ueberschrift), onConfirm laeuft nach „Loeschen“,
+ * opener bekommt beim Abbrechen den Fokus zurueck.
+ */
+function openConfirmDeleteModal({ text = '', onConfirm, opener = null }) {
+    confirmDeleteAction = onConfirm;
+    confirmDeleteOpener = opener;
+    const absatz = document.getElementById('confirmDeleteText');
+    absatz.textContent = text;
+    absatz.hidden = text === '';
     elements.confirmDeleteModal.classList.add('active');
     elements.closeConfirmDeleteBtn.focus();
 }
 
 function closeConfirmDeleteModal() {
-    deleteExceptionId = null;
+    const opener = confirmDeleteOpener;
+    confirmDeleteAction = null;
+    confirmDeleteOpener = null;
     elements.confirmDeleteModal.classList.remove('active');
+    if (opener && opener.isConnected && opener.offsetParent !== null) opener.focus();
 }
 
 async function submitConfirmDelete() {
-    
-    if(!deleteExceptionId)
-        return;    
-
-    try {
-        const result =  await apiCall('exceptions', 'DELETE', null, { id: deleteExceptionId });
-
-         if (!result.success) {
-            throw new Error(result.error);
-        }
-        
-        showMessage('✓ Antrag erfolgreich gelöscht', 'success');
-        
-        // History neu laden
-        await loadHistory();
-        
-    } catch (error) {
-        debug.error('Fehler beim Löschen:', error);
-        showMessage(error.message || 'Fehler beim Löschen', 'error');
-    }
-
-    deleteExceptionId = null;
-    elements.confirmDeleteModal.classList.remove('active');
+    const action = confirmDeleteAction;
+    // Erst schliessen, dann ausfuehren: Die Aktion darf selbst Dialoge
+    // schliessen oder Meldungen zeigen, ohne dass dieser darueber liegt.
+    confirmDeleteOpener = null;
+    closeConfirmDeleteModal();
+    if (action) await action();
 }
 
 // ========================================
@@ -5275,6 +5426,21 @@ window.setResponsesGrouping = function(stage) {
 };
 
 /**
+ * „Bearbeiten“ am Ende einer aufgeklappten Karte (OI-125): nur fuer Verwalter
+ * und nur vor Beginn -- danach haengen Erfassungen am Termin, geaendert wird
+ * dann im Dashboard.
+ */
+function managerActionsHtml(item) {
+    if (!isPwaManager() || item.started) return '';
+    const id = Number(item.appointment.appointment_id);
+    const off = navigator.onLine ? '' : ' disabled';
+    return `
+        <div class="response-card__manage">
+            <button type="button" class="response-card__edit" data-appointment-id="${id}"${off}>✎ Bearbeiten</button>
+        </div>`;
+}
+
+/**
  * Karte eines Termins ohne Rueckmeldung. Aufklappbar nur, wenn es eine
  * Beschreibung gibt -- eine Probe ohne Beschreibung bleibt eine ruhige Zeile.
  */
@@ -5298,6 +5464,7 @@ function infoCardHtml(item) {
                 <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
                 ${apt.description ? `<div class="response-card__desc">${escapeHtml(apt.description)}</div>` : ''}
                 ${excuseSectionHtml(item)}
+                ${managerActionsHtml(item)}
             </div>
         </details>`;
 }
@@ -5449,6 +5616,7 @@ function responseCardHtml(item) {
                 </details>`}
                 ${names}
                 ${offline && !started ? '<div class="response-card__offline">Ohne Netz ist keine Rückmeldung möglich.</div>' : ''}
+                ${managerActionsHtml(item)}
             </div>
         </details>`;
 }
@@ -5463,6 +5631,13 @@ async function onResponsesClick(event) {
 
     const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === appointmentId);
     if (!item) return;
+
+    // Bearbeiten (OI-125) -- vor allem anderen: Die Kommentarlogik unten
+    // setzt eine Rueckmeldekarte mit Bemerkungsfeld voraus.
+    if (btn.classList.contains('response-card__edit')) {
+        showEditAppointmentModal('responses', appointmentId);
+        return;
+    }
 
     // Entschuldigung an der Infokarte (seit 1.12.0) -- eigene Wege, die
     // Infokarte hat weder Antwortknoepfe noch "Bemerkung".

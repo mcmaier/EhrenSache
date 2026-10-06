@@ -16,6 +16,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Uhrzeit sind hier nicht mit „jetzt“ vorbelegt. Erscheint der neue Termin nicht in der eigenen
   Liste (fremde Gruppe, vergangen, mehr als acht Wochen voraus), sagt die App das. Für Verwalter
   bleibt der Tab auch ohne kommende Termine sichtbar.
+- **Check-in-App: kommende Termine bearbeiten und löschen** (OI-125). Admin und Manager finden in
+  der aufgeklappten Karte im Tab „Termine“ „✎ Bearbeiten“, im Dialog „Termin löschen“ – beides nur
+  bis Terminbeginn. Die Rückfrage nennt, wie viele Rückmeldungen und Anträge mit verloren gehen; gibt
+  es schon Erfassungen, verweist die App aufs Dashboard. Bei Serienterminen löscht sie nur diesen
+  einen Termin. Neu in der API: `GET appointments?id=X&dependents=1` (nur Verwalter).
 - **Rückfrage beim Verlegen eines Termins mit Zusagen (OI-124).** Ändern sich Datum oder Beginn
   eines Termins, zu dem schon Zusagen oder „unsicher“ vorliegen, fragen Dashboard und Check-in-App,
   ob diese Rückmeldungen zurückgesetzt werden sollen. Absagen bleiben immer stehen. Gilt auch für

@@ -246,8 +246,10 @@ test('PWA OI-123: beide Knoepfe nennen ihre Herkunft', function () use ($rspRoot
         'Anwesenheitsliste uebergibt ihre Herkunft nicht');
     assertTrue(str_contains(rspFunktion($js, 'initResponsesTab'), "showCreateAppointmentModal('responses')"),
         'Termine-Tab uebergibt seine Herkunft nicht');
-    assertTrue(str_contains(rspFunktion($js, 'showEditAppointmentModal'), "appointmentModalOrigin = 'attendance'"),
-        'Bearbeiten kommt nur aus der Anwesenheitsliste und muss das setzen');
+    assertTrue(str_contains(rspFunktion($js, 'showEditAppointmentModal'), 'appointmentModalOrigin = origin'),
+        'Bearbeiten merkt sich seine Herkunft nicht');
+    assertTrue(str_contains(rspFunktion($js, 'initAttendanceList'), "showEditAppointmentModal('attendance')"),
+        'Als direkte Referenz bekaeme Bearbeiten das Click-Event als Herkunft');
 });
 
 test('PWA OI-123: Plus-Knopf nur fuer Verwalter, bei der Abmeldung wieder verborgen', function () use ($rspRoot) {
@@ -354,8 +356,9 @@ test('PWA: Termin-Dialog gibt den Fokus an seinen Knopf zurueck', function () us
     // fokussiert Knoepfe beim Antippen nicht.
     assertTrue(str_contains(rspFunktion($js, 'showCreateAppointmentModal'), 'appointmentModalOpener ='),
         'Anlegen merkt sich seinen Knopf nicht');
-    assertTrue(str_contains(rspFunktion($js, 'showEditAppointmentModal'), "appointmentModalOpener = document.getElementById('btnEditAppointment')"),
-        'Bearbeiten merkt sich seinen Knopf nicht');
+    $bearbeiten = rspFunktion($js, 'showEditAppointmentModal');
+    assertTrue(str_contains($bearbeiten, "'btnEditAppointment'") && str_contains($bearbeiten, "'btnAddAppointment'"),
+        'Bearbeiten merkt sich seinen Knopf nicht (Anwesenheitsliste bzw. Plus-Knopf im Tab Termine)');
 });
 
 test('PWA: Plus-Knopf hat 44 px Tippflaeche und ein gezeichnetes Plus', function () use ($rspRoot) {
@@ -370,4 +373,125 @@ test('PWA: Plus-Knopf hat 44 px Tippflaeche und ein gezeichnetes Plus', function
     $html = (string) sourceCode($rspRoot . '/public/checkin/index.html');
     assertTrue((bool) preg_match('/id="btnAddAppointment"[^>]*>\s*<\/button>/', $html),
         'Neben dem gezeichneten Plus stuende noch das Zeichen');
+});
+
+// ---------------------------------------------------------------------------
+// OI-125: kommende Termine im Tab „Termine“ bearbeiten und loeschen.
+// ---------------------------------------------------------------------------
+
+test('PWA OI-125: Bearbeiten nur fuer Verwalter und nur vor Beginn', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+    $rumpf = rspFunktion($js, 'managerActionsHtml');
+    assertTrue(str_contains($rumpf, 'isPwaManager()') && str_contains($rumpf, 'item.started'),
+        'Bearbeiten haengt nicht an Rolle und Beginn');
+    assertTrue(str_contains($rumpf, 'response-card__edit'), 'Knopf fehlt');
+    assertTrue(str_contains(rspFunktion($js, 'infoCardHtml'), 'managerActionsHtml(item)'), 'Infokarte ohne Bearbeiten');
+    assertTrue(str_contains(rspFunktion($js, 'responseCardHtml'), 'managerActionsHtml(item)'), 'Rueckmeldekarte ohne Bearbeiten');
+
+    $klick = rspFunktion($js, 'onResponsesClick');
+    assertTrue(str_contains($klick, "classList.contains('response-card__edit')")
+        && str_contains($klick, "showEditAppointmentModal('responses', appointmentId)"),
+        'Der Klick auf Bearbeiten oeffnet den Dialog nicht');
+    // Vor der Kommentarlogik: die Rueckmeldekarte haette sonst kein
+    // .response-comment-details mehr fuer einen Verwalter-Knopf.
+    assertTrue(strpos($klick, 'response-card__edit') < strpos($klick, 'response-comment-details'),
+        'Bearbeiten muss vor der Kommentarlogik abzweigen');
+});
+
+test('PWA OI-125: Loeschen nur beim Bearbeiten aus dem Tab Termine', function () use ($rspRoot) {
+    $html = (string) sourceCode($rspRoot . '/public/checkin/index.html');
+    $tag = rspTag($html, 'id="appointmentDeleteRow"');
+    assertTrue(str_contains($tag, ' hidden'), 'Loeschen muss verborgen starten');
+    assertTrue(str_contains($html, 'id="btnDeleteAppointment"'), 'Loeschen-Knopf fehlt');
+
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+    assertTrue(str_contains(rspFunktion($js, 'showCreateAppointmentModal'), "getElementById('appointmentDeleteRow').hidden = true"),
+        'Beim Anlegen stuende Loeschen im Dialog');
+    assertTrue(str_contains(rspFunktion($js, 'showEditAppointmentModal'), "getElementById('appointmentDeleteRow').hidden = origin !== 'responses'"),
+        'Loeschen haengt nicht an der Herkunft');
+    assertTrue(str_contains(rspFunktion($js, 'initAppointmentModal'), "'btnDeleteAppointment'"),
+        'Loeschen-Knopf nicht gebunden');
+});
+
+test('PWA OI-125: Loeschen prueft Beginn und Erfassungen vor der Rueckfrage', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'deleteAppointmentFromModal');
+    $beginn    = strpos($rumpf, 'new Date()');
+    $abruf     = strpos($rumpf, 'dependents: 1');
+    $records   = strpos($rumpf, 'dependents.records > 0');
+    $rueckfrage = strpos($rumpf, 'openConfirmDeleteModal(');
+    assertTrue($beginn !== false && $abruf !== false && $records !== false && $rueckfrage !== false,
+        'Pruefung auf Beginn, Zaehlungen, Erfassungen oder Rueckfrage fehlt');
+    assertTrue($beginn < $abruf && $abruf < $records && $records < $rueckfrage,
+        'Reihenfolge: Beginn, Zaehlungen holen, Erfassungen pruefen, dann fragen');
+    assertTrue(str_contains($rumpf, 'im Dashboard'), 'Bei Erfassungen fehlt der Verweis aufs Dashboard');
+    assertTrue((bool) preg_match('/finally\s*\{[^}]*knopf\.disabled = false/', $rumpf),
+        'Der Loeschen-Knopf bliebe nach einem Fehler gesperrt');
+});
+
+test('PWA OI-125: Rueckfrage nennt Folgen, Serie und Einzahl', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'appointmentDeleteQuestion');
+    assertTrue(str_contains($rumpf, "'1 Rückmeldung'") && str_contains($rumpf, "'1 Antrag'"), 'Einzahl fehlt');
+    assertTrue(str_contains($rumpf, 'Rückmeldungen') && str_contains($rumpf, 'Anträge'), 'Mehrzahl fehlt');
+    assertTrue(str_contains($rumpf, 'series_id') && str_contains($rumpf, 'die Serie bleibt bestehen'),
+        'Serienhinweis fehlt');
+});
+
+test('PWA OI-125: Bestaetigungsdialog nimmt Text und Aktion', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+    $oeffnen = rspFunktion($js, 'openConfirmDeleteModal');
+    assertTrue(str_contains($oeffnen, 'onConfirm') && str_contains($oeffnen, 'confirmDeleteText'),
+        'openConfirmDeleteModal uebernimmt Text oder Aktion nicht');
+    assertTrue(!str_contains($js, 'deleteExceptionId'), 'Der feste Antrags-Weg lebt noch neben dem allgemeinen');
+    assertTrue(str_contains(rspFunktion($js, 'deleteException'), 'openConfirmDeleteModal('),
+        'Antrag loeschen nutzt den allgemeinen Dialog nicht');
+    assertTrue(str_contains((string) sourceCode($rspRoot . '/public/checkin/index.html'), 'id="confirmDeleteText"'),
+        'Textfeld im Bestaetigungsdialog fehlt');
+});
+
+test('PWA OI-125: nach dem Loeschen Liste neu laden, Fokus auf Plus', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'confirmDeleteAppointment');
+    assertTrue(str_contains($rumpf, "apiCall('appointments', 'DELETE'"), 'Kein DELETE');
+    assertTrue(str_contains($rumpf, 'closeAppointmentModal()') && str_contains($rumpf, 'await loadResponses()'),
+        'Dialog schliessen und Liste neu laden fehlt');
+    assertTrue(str_contains($rumpf, 'status === 404'), 'Ein inzwischen geloeschter Termin waere ein Fehler');
+});
+
+test('PWA OI-125: Bearbeiten aus dem Tab Termine meldet „aktualisiert“', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'submitAppointmentForm');
+    $start = (int) strpos($rumpf, "appointmentModalOrigin === 'responses'");
+    // Nur der Zweig des Tabs Termine, nicht die Anwesenheitsliste dahinter.
+    $zweig = substr($rumpf, $start, (int) strpos($rumpf, 'return;', $start) - $start);
+    assertTrue(str_contains($zweig, "neu ? 'Termin erstellt' : 'Termin aktualisiert'"),
+        'Nach dem Bearbeiten stuende „Termin erstellt“');
+});
+
+test('PWA OI-125: waehrend des Loeschens sind Speichern und Loeschen gesperrt', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'confirmDeleteAppointment');
+    assertTrue(str_contains($rumpf, "'btnSaveAppointment'") && str_contains($rumpf, "'btnDeleteAppointment'"),
+        'Waehrend des DELETE liesse sich speichern oder erneut loeschen');
+    $sperre = strpos($rumpf, 'disabled = true');
+    $delete = strpos($rumpf, "apiCall('appointments', 'DELETE'");
+    assertTrue($sperre !== false && $delete !== false && $sperre < $delete, 'Gesperrt wird erst nach dem DELETE');
+    assertTrue((bool) preg_match('/finally\s*\{[^}]*disabled = false/', $rumpf), 'Ohne finally blieben die Knoepfe gesperrt');
+});
+
+test('PWA OI-125: keine Rueckfrage zu einem geschlossenen oder fremden Dialog', function () use ($rspRoot) {
+    $rumpf = rspFunktion((string) sourceCode($rspRoot . '/public/checkin/js/app.js'), 'deleteAppointmentFromModal');
+    $abruf = strpos($rumpf, 'dependents: 1');
+    $waechter = strpos($rumpf, 'appointmentModalData !== apt');
+    $rueckfrage = strpos($rumpf, 'openConfirmDeleteModal(');
+    assertTrue($abruf !== false && $waechter !== false && $abruf < $waechter && $waechter < $rueckfrage,
+        'Nach der Abfrage fehlt die Pruefung, ob der Dialog noch denselben Termin zeigt');
+    assertTrue(!str_contains($rumpf, 'confirmDeleteAppointment(apt.appointment_id)'),
+        'Bei 404 wird ohne Rueckfrage geloescht statt nur neu geladen');
+});
+
+test('PWA OI-125: ein spaeter Abruf ueberschreibt den Dialog nicht', function () use ($rspRoot) {
+    $js = (string) sourceCode($rspRoot . '/public/checkin/js/app.js');
+    foreach (['showEditAppointmentModal', 'showCreateAppointmentModal'] as $name) {
+        $rumpf = rspFunktion($js, $name);
+        assertTrue(str_contains($rumpf, '++appointmentModalGeneration'), "{$name} zaehlt die Generation nicht hoch");
+        assertTrue(substr_count($rumpf, 'generation !== appointmentModalGeneration') >= 2,
+            "{$name} prueft die Generation nicht nach den Abrufen");
+    }
 });
