@@ -1417,9 +1417,18 @@ async function submitAppointmentForm(e) {
 
     try {
         const neu = !currentEditAppointmentId;
-        const result = neu
+        let result = neu
             ? await apiCall('appointments', 'POST', formData)
             : await apiCall('appointments', 'PUT', formData, { id: currentEditAppointmentId });
+
+        // OI-124: Verlegung mit Zusagen -- der Server fragt zurueck und hat noch
+        // nichts geschrieben. Abbrechen laesst den Dialog mit den Eingaben offen.
+        if (!result.success && result.status === 409 && result.data?.code === 'responses_affected') {
+            const choice = await askResponsesReset(result.data);
+            if (!choice) return;
+            result = await apiCall('appointments', 'PUT',
+                { ...formData, reset_responses: choice === 'reset' }, { id: currentEditAppointmentId });
+        }
 
         // Bei einem Fehler bleibt der Dialog offen. Bis 1.11.0 schloss er sich
         // auch dann -- etwa bei einer Dublette (409) -- und die Eingaben waren
@@ -1446,8 +1455,10 @@ async function submitAppointmentForm(e) {
         select.value = sichtbar ? id : '';
         await loadAttendanceList();
 
+        const reset = Number(result.data?.responses_reset) || 0;
         if (sichtbar) {
-            showMessage(neu ? 'Termin erstellt' : 'Termin aktualisiert', 'success');
+            showMessage((neu ? 'Termin erstellt' : 'Termin aktualisiert')
+                + (reset > 0 ? ` · ${reset} Rückmeldung${reset === 1 ? '' : 'en'} zurückgesetzt` : ''), 'success');
         } else {
             const wann = formatResponseCardHead(formData.date, formData.start_time, null);
             showMessage(`Termin ${neu ? 'angelegt' : 'gespeichert'} (${wann}) – außerhalb von ± ${attendanceWindowHours()} Std. um jetzt, daher nicht in dieser Liste.`, 'info');
@@ -2089,6 +2100,61 @@ function showNavigationConfirm(title, message, onConfirm) {
     });
     
     modal.classList.add('active');
+}
+
+/**
+ * Rueckfrage beim Verlegen eines Termins mit Zusagen (OI-124).
+ * Liefert 'reset', 'keep' oder null (abgebrochen).
+ *
+ * Eigenes Modal nach dem Muster von showNavigationConfirm(): Browserdialoge
+ * werden in einer installierten PWA teils unterdrueckt, und es braucht drei
+ * Ausgaenge statt zwei.
+ */
+function askResponsesReset(info) {
+    return new Promise((resolve) => {
+        let modal = document.getElementById('pwaResponsesResetModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'pwaResponsesResetModal';
+            modal.className = 'pwa-confirm-modal';
+            modal.innerHTML = `
+                <div class="pwa-confirm-content" role="dialog" aria-modal="true" aria-labelledby="pwaResponsesResetTitle">
+                    <h3 id="pwaResponsesResetTitle">Rückmeldungen zurücksetzen?</h3>
+                    <p id="pwaResponsesResetMessage"></p>
+                    <div class="pwa-confirm-buttons pwa-confirm-buttons--stack">
+                        <button type="button" class="btn-confirm-yes" data-choice="reset">Zurücksetzen</button>
+                        <button type="button" class="btn-confirm-no" data-choice="keep">Beibehalten</button>
+                        <button type="button" class="btn-confirm-no" data-choice="">Abbrechen</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        document.getElementById('pwaResponsesResetMessage').textContent =
+            `Für diesen Termin liegen ${Number(info.responses) || 0} Zusagen bzw. „unsicher“ vor, `
+            + 'und Datum oder Beginn ändern sich. Sollen diese Rückmeldungen zurückgesetzt werden? '
+            + 'Absagen bleiben bestehen.';
+
+        // Listener je Aufruf neu: Das Modal bleibt im DOM, das Promise nicht.
+        const finish = (value) => {
+            modal.classList.remove('active');
+            modal.removeEventListener('click', onClick);
+            resolve(value);
+        };
+        const onClick = (e) => {
+            if (e.target === modal) {
+                finish(null);
+                return;
+            }
+            const btn = e.target.closest('button[data-choice]');
+            if (btn) {
+                finish(btn.dataset.choice || null);
+            }
+        };
+        modal.addEventListener('click', onClick);
+        modal.classList.add('active');
+    });
 }
 
 // ========================================

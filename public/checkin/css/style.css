@@ -423,6 +423,11 @@ body {
     gap: 10px;
 }
 
+/* Drei Ausgaenge passen nebeneinander nicht lesbar auf ein Telefon (OI-124) */
+.pwa-confirm-buttons--stack {
+    flex-direction: column;
+}
+
 .pwa-confirm-buttons button {
     flex: 1;
     padding: 12px;
