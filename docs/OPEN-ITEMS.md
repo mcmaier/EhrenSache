@@ -812,6 +812,33 @@ und der Zeiterfassungsregel.
 
 ---
 
+### OI-123 · Check-in-App: „Termin anlegen“ fehlt in der Stufe „nur Terminplanung“
+**Priorität:** niedrig · aufgenommen am 2026-10-06 (Rest aus
+[OI-62](#oi-62--feature-schalter-ohne-gemeinsame-prüfstelle), Etappe 2)
+
+Der Knopf „➕ Termin anlegen“ der Check-in-App sitzt im Tab „Anwesenheitsliste“
+(`public/checkin/index.html`, `#btnCreateAppointment`). Seit 1.21.0 blendet `initAttendanceList()`
+(`public/checkin/js/app.js`) diesen Tab aus, sobald die Anwesenheitserfassung abgeschaltet ist —
+der Tab lebt von Erfassungen. Mit ihm verschwindet der Knopf: **Ist nur die Terminplanung an,
+können Verwalter in der App keine Termine anlegen**, nur im Dashboard. Der Kommentar an der
+Stelle hält das als bewusste Grenze von Etappe 2 fest.
+
+Keine Daten gehen verloren, Server und Rechte sind unberührt — es ist eine Lücke in der
+Bedienung, kein Fehler.
+
+**Zu entscheiden:**
+
+- **So lassen.** Wer nur Termine plant, tut das meist am Schreibtisch; das Dashboard kann es
+  vollständig.
+- **Knopf auch ohne Anwesenheit anbieten,** etwa im Tab „Termine“ (Rückmeldungen), nur für Admin
+  und Manager. `showCreateAppointmentModal()` hängt nicht an der Anwesenheitsliste; zu prüfen ist,
+  was nach dem Anlegen neu geladen wird (heute die Liste des Anwesenheits-Tabs) und ob der Dialog
+  Felder zeigt, die ohne Anwesenheit keinen Sinn ergeben.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Restarbeiten
 
 ### OI-4 · Terminbezug: Oberfläche unvollständig
