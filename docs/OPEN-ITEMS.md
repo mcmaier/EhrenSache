@@ -906,7 +906,10 @@ die Rückmeldungen zurückgesetzt werden sollen.
 **Nicht sicherheitsrelevant.**
 
 ### OI-125 · Check-in-App: kommende Termine bearbeiten und löschen
-**Priorität:** mittel · aufgenommen am 2026-10-06 (Folge aus
+**Priorität:** erledigt am 2026-10-06 — in dev (`f39d7a8`), geht mit dem nächsten Release mit.
+Umgesetzt wie unten entschieden; neu in der API `GET appointments?id=X&dependents=1`. Bewusst offen:
+Nach einer Terminverlegung nennt der Tab „Termine“ die Zahl zurückgesetzter Rückmeldungen nicht
+(die Anwesenheitsliste schon). · aufgenommen am 2026-10-06 (Folge aus
 [OI-123](#oi-123--check-in-app-termin-anlegen-fehlt-in-der-stufe-nur-terminplanung))
 
 Mit OI-123 legen Verwalter Termine im Tab „Termine“ an, können einen falsch angelegten dort aber
