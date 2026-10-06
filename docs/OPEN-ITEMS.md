@@ -863,7 +863,15 @@ der Termin außerhalb des Fensters liegt. Daran ist nichts zu öffnen.
 ---
 
 ### OI-124 · Terminänderung lässt vorhandene Rückmeldungen unverändert stehen
-**Priorität:** mittel · aufgenommen am 2026-10-06 (Wunsch des Nutzers, Rest aus FI-1 / 1.7.0)
+**Priorität:** erledigt am 2026-10-06 — auf `feat/oi-124-responses-reset`, unveröffentlicht ·
+aufgenommen am 2026-10-06 (Wunsch des Nutzers, Rest aus FI-1 / 1.7.0)
+
+**Umgesetzt** nach Spec `docs/superpowers/specs/2026-10-06-oi-124-rueckmeldungen-zuruecksetzen-design.md`:
+Der Server fragt bei geändertem Datum oder Beginn per `409 responses_affected` zurück, der Client
+wiederholt mit `reset_responses`. Zurückgesetzt werden nur Zusagen und „unsicher“; Absagen samt
+Antrag bleiben. Gilt für Einzeltermin, „dieser und alle folgenden“ und die Check-in-App. Tests:
+`responses_reset_unit`, `responses_reset_api`, `responses_reset_frontend`. Der Rest dieses
+Abschnitts ist die ursprüngliche Fragestellung.
 
 Wird ein Termin bearbeitet, für den schon Rückmeldungen vorliegen, bleiben sie unverändert
 stehen — `PUT appointments` (`private/handlers/appointments.php`) fasst `appointment_responses`

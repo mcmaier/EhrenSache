@@ -1295,7 +1295,8 @@ Manuell — Dashboard und Station:
 ## 23. Terminrückmeldung (seit 1.7.0)
 
 Automatisiert: `php tests/run.php responses_unit`, `responses_api`, `responses_frontend`,
-`punctuality_unit`, `demo_seed_unit`. Manuell:
+`punctuality_unit`, `demo_seed_unit`, seit OI-124 `responses_reset_unit`, `responses_reset_api`,
+`responses_reset_frontend`. Manuell:
 
 | ID | Testfall | Erwartetes Ergebnis |
 |----|----------|---------------------|
@@ -1324,6 +1325,9 @@ Automatisiert: `php tests/run.php responses_unit`, `responses_api`, `responses_f
 | RM-23 | Absage mit Begründung bei einer Terminart mit Entschuldigungspflicht, danach unter „Anträge" einen zweiten Abwesenheitsantrag zum selben Termin stellen | Der zweite Antrag wird abgewiesen, der Dialog bleibt offen und meldet, dass es zu diesem Termin bereits einen Antrag dieser Art gibt; unter „Anträge" steht weiterhin genau einer |
 | RM-24 | Manager öffnet Rückmeldungen eines Termins, klickt ohne zu entsperren auf eine Aktion einer fremden Zeile; dann das Schloss 🔒 im Spaltenkopf „Aktion" klicken und erneut versuchen; danach Modal schließen und neu öffnen | Erster Klick ändert nichts, Knöpfe zeigen den Hinweis „Zum Ändern zuerst entsperren"; nach dem Entsperren funktionieren sie; ist der Manager selbst in der Liste, ist seine eigene Zeile von Anfang an bedienbar; nach erneutem Öffnen ist der Dialog wieder gesperrt (OI-63) |
 | RM-25 | Manager öffnet die Rückmeldungen eines Termins, zu dem ein Mitglied ohne Benutzerkonto und eines mit gesperrtem Konto erwartet sind, beide ohne Antwort; danach für eines von beiden eine Zusage eintragen (zuvor über das Schloss 🔒 entsperren); danach „Druckansicht“ | Beide offenen Zeilen zeigen „kein Zugang“ mit Tooltip, der Filterknopf „Keine Antwort (n, davon 2 ohne Zugang)“; nach der Zusage verschwindet das Kennzeichen dieser Zeile und die Zahl sinkt auf 1; die Druckansicht nennt „davon 1 ohne Zugang“; als Mitglied mit „Namen sichtbar“ erscheint nichts davon (OI-109) |
+| RM-26 | Termin mit Zusage, „unsicher“ und Absage im Dashboard auf einen anderen Tag legen; Rückfrage erst mit „Abbrechen“, dann erneut speichern und „Zurücksetzen“ | Rückfrage nennt 2 Rückmeldungen; Abbrechen lässt den Dialog offen und speichert nichts; „Zurücksetzen“ speichert, Toast nennt „2 Rückmeldungen zurückgesetzt“, nur die Absage bleibt (OI-124) |
+| RM-27 | wie RM-26 in der Check-in-App (Liste → Termin bearbeiten → Uhrzeit ändern), „Beibehalten“ | Termin verlegt, alle drei Rückmeldungen bleiben (OI-124) |
+| RM-28 | Serie: „Dieser und alle folgenden“ mit neuer Uhrzeit, wenn an folgenden Terminen Zusagen vorliegen | Rückfrage nennt Zahl der Termine und Rückmeldungen; Titel- oder Ortsänderung fragt nicht (OI-124) |
 
 ### Terminliste der PWA (seit 1.10.0)
 

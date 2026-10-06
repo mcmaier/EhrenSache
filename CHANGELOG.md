@@ -9,7 +9,19 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Hinzugefügt
+- **Rückfrage beim Verlegen eines Termins mit Zusagen (OI-124).** Ändern sich Datum oder Beginn
+  eines Termins, zu dem schon Zusagen oder „unsicher“ vorliegen, fragen Dashboard und Check-in-App,
+  ob diese Rückmeldungen zurückgesetzt werden sollen. Absagen bleiben immer stehen. Gilt auch für
+  „Dieser und alle folgenden“ bei Serien; zurückgesetzte Mitglieder sehen den Termin wieder unter
+  „Offene Punkte“. Titel, Ort oder Ende zu ändern, löst keine Rückfrage aus.
+
 ### Geändert
+- **API: `PUT appointments` und `PUT appointment_series` können mit `409 responses_affected`
+  antworten** (OI-124). Das geschieht, wenn sich Datum oder Beginn ändern, Zusagen vorliegen und
+  das neue Feld `reset_responses` fehlt — geschrieben wird dann nichts. Skripte, die Termine
+  verlegen, schicken `reset_responses: true` oder `false` mit. Die Erfolgsantwort nennt
+  `responses_reset`. Details in `API.md`.
 - **Demo-Bestand: Der Manager hängt an einem Mitglied** (M013, Aktive und Vorstandschaft). Wer die
   Demo als `manager@` öffnet, sieht in der Check-in-App eigene Termine, offene Punkte und die
   Zeiterfassung. Anträge und Arbeitszeiten dieses Mitglieds entscheidet im Bestand der Admin,
