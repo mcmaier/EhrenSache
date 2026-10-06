@@ -11,6 +11,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/api.php';
+require_once __DIR__ . '/../../private/helpers/css_bundle.php';
 
 /**
  * Version im Pfad (OI-120, OI-74): was der Server tatsaechlich ausliefert.
@@ -29,7 +30,7 @@ $acVersion = json_decode((string) sourceCode(dirname(__DIR__, 2) . '/version.jso
 /**
  * GET ohne Weiterleitung; Kopfzeilen kleingeschrieben.
  *
- * @return array{status: int, headers: array<string, string>}
+ * @return array{status: int, headers: array<string, string>, body: string}
  */
 function acFetch(string $url): array
 {
@@ -49,7 +50,8 @@ function acFetch(string $url): array
         return strlen($line);
     });
 
-    if (curl_exec($ch) === false) {
+    $body = curl_exec($ch);
+    if ($body === false) {
         $err = curl_error($ch);
         curl_close($ch);
         throw new RuntimeException("HTTP-Anfrage fehlgeschlagen: {$err}");
@@ -58,7 +60,7 @@ function acFetch(string $url): array
     $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    return ['status' => $status, 'headers' => $headers];
+    return ['status' => $status, 'headers' => $headers, 'body' => (string) $body];
 }
 
 test('Versionierter Pfad: main.css kommt mit langem Caching', function () use ($acBase, $acVersion) {
@@ -125,4 +127,53 @@ test('Kodierte Abschnitte im versionierten Pfad bekommen kein langes Caching', f
         }
     }
     assertTrue($verstoesse === [], "Kodierter Pfad falsch abgebildet:\n  " . implode("\n  ", $verstoesse));
+});
+
+test('CSS-Buendel: main.css und login.css kommen als eine Antwort', function () use ($acBase, $acVersion) {
+    // OI-120 Weg 1. Der Inhalt muss exakt dem Buendel entsprechen -- damit
+    // faellt auch auf, wenn Apache die statische main.css mit @import liefert.
+    foreach (['main', 'login'] as $entry) {
+        $r = acFetch("{$acBase}/css/v{$acVersion}/{$entry}.css");
+        assertSame(200, $r['status'], "{$entry}.css: Status {$r['status']}");
+        assertTrue(str_starts_with($r['headers']['content-type'] ?? '', 'text/css'),
+            "{$entry}.css: Inhaltstyp " . ($r['headers']['content-type'] ?? '-'));
+        assertTrue(str_contains($r['headers']['cache-control'] ?? '', 'immutable'),
+            "{$entry}.css: kein langes Caching: " . ($r['headers']['cache-control'] ?? '-'));
+        assertTrue(!str_contains($r['body'], '@import'), "{$entry}.css: @import in der Antwort -- greift die Buendel-Regel?");
+        assertSame(cssBundle($entry), $r['body'], "{$entry}.css: Antwort weicht vom Buendel ab");
+    }
+});
+
+test('CSS-Buendel: eine fremde Version bekommt kein langes Caching', function () use ($acBase) {
+    $r  = acFetch("{$acBase}/css/v0.0.1/main.css");
+    $cc = $r['headers']['cache-control'] ?? '';
+    assertSame(200, $r['status'], 'Alte Seite nach Update braucht trotzdem CSS');
+    assertTrue(str_contains($cc, 'no-cache') && !str_contains($cc, 'immutable'), "Bekommen: {$cc}");
+});
+
+test('CSS-Buendel: die Einzeldateien bleiben statisch erreichbar', function () use ($acBase, $acVersion) {
+    $r = acFetch("{$acBase}/css/main.css");
+    assertSame(200, $r['status']);
+    assertTrue(str_contains($r['body'], '@import'), 'css/main.css ohne Version muss die Quelldatei sein');
+    assertTrue(str_contains($r['headers']['cache-control'] ?? '', 'no-cache'), 'css/main.css ohne Version: no-cache');
+
+    $r = acFetch("{$acBase}/css/v{$acVersion}/components/buttons.css");
+    assertSame(200, $r['status']);
+    assertTrue(str_contains($r['headers']['cache-control'] ?? '', 'immutable'), 'Versionierte Einzeldatei: immutable');
+});
+
+test('CSS-Buendel: kein fremder Einstieg ueber den Parameter', function () use ($acBase) {
+    foreach (['../../private/config/config', 'print', '', 'main.css'] as $entry) {
+        $r = acFetch("{$acBase}/css/bundle.php?entry=" . rawurlencode($entry));
+        assertSame(404, $r['status'], "entry={$entry}: Status {$r['status']}");
+    }
+});
+
+test('CSS-Buendel: ein Array als Einstieg ist ein 404 ohne Fehlertext', function () use ($acBase) {
+    // ?entry[]=x ist ein Array; ohne Absicherung gaebe das Warning (und bei
+    // display_errors den Serverpfad) in den Rumpf.
+    $r = acFetch("{$acBase}/css/bundle.php?entry[]=x");
+    assertSame(404, $r['status'], "Status {$r['status']}");
+    assertTrue(!stripos($r['body'], 'warning') && !str_contains($r['body'], 'bundle.php'),
+        "Fehlertext im Rumpf: {$r['body']}");
 });

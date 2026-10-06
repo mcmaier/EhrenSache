@@ -246,7 +246,11 @@ exceptions, statistics und work_sessions (siehe `docs/OPEN-ITEMS.md`).
 - Browser-Cache der Dateien: CSS und JS von Dashboard und Anmeldeseite laufen über
   `css/v<Version>/…` bzw. `js/v<Version>/…` und sind `immutable` (OI-120, `public/.htaccess`).
   Jede neue lokale `css/`/`js/`-Referenz in diesen Seiten braucht den Abschnitt, sonst lädt die
-  Datei unter zweiter Adresse
+  Datei unter zweiter Adresse.
+  `css/v<Version>/main.css` und `login.css` liefert `public/css/bundle.php` als Bündel aus
+  (`@import` aufgelöst, `private/helpers/css_bundle.php`). Eine neue CSS-Datei dieser Seiten
+  wird nur per `@import url('…');` in `main.css` bzw. `login.css` eingebunden, nie als eigenes
+  `<link>`; `tests/suites/css_bundle_unit.php` meldet einen Import, der sich nicht auflösen lässt
 
 ## Sicherheit
 

@@ -2411,6 +2411,12 @@ Server. Dashboard und Anmeldeseite laden CSS und JS über `css/v<Version>/…` b
 nach. **Offen bleibt der Erstbesuch** (und der erste Aufruf nach einem Update): Er lädt weiter alle
 Dateien einzeln — dafür bliebe Weg 1 (Bündeln).
 
+**CSS-Bündel (unveröffentlicht):** Dashboard und Anmeldeseite laden ihr CSS als eine Antwort
+(`public/css/bundle.php`, Spec `docs/superpowers/specs/2026-10-06-css-buendel-design.md`) —
+beim Erstbesuch 21 bzw. 2 Anfragen weniger, keine serielle `@import`-Stufe mehr. Ob sich
+JS-Bündeln lohnt (verlangt einen Build-Schritt), klärt eine Messung auf der Demo nach dem
+Release.
+
 Ein Aufruf des Dashboards fordert rund 45 Dateien gleichzeitig an: 21 CSS-Module per `@import`
 aus `main.css` und gut 20 JS-Module per `import`. Ohne Build-Kette gibt es kein Bündel. Weil CSS
 und JS mit `no-cache` ausgeliefert werden (siehe Abschnitt Caching in `public/.htaccess`), fragt

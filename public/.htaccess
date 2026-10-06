@@ -46,6 +46,29 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 # dekodiert, das interne Umschreiben dekodiert ein zweites Mal -- mit weitem
 # Muster wurde aus js/v…/%252e%252e/login.html die Anmeldeseite, ausgeliefert
 # mit einem Jahr Cache. Alles andere unter v<Version>/ endet jetzt mit 404.
+# CSS-Buendel (OI-120 Weg 1): main.css und login.css unter Version kommen als
+# eine Antwort aus css/bundle.php, das die @import-Zeilen aufloest -- statt 22
+# bzw. 3 Anfragen eine. bundle.php setzt Cache-Control selbst (immutable nur
+# fuer die aktuelle Version); der FilesMatch-Block unten greift fuer .php
+# nicht. Steht vor der allgemeinen Regel, die mit [L] endet.
+# Rueckfall: Die Regel greift nur, wenn bundle.php existiert (-f). Der Updater
+# tauscht public/.htaccess frueher als public/css/bundle.php; in der Luecke
+# wuerde die Regel sonst 404 fuer main.css liefern. Ohne -f faellt die Anfrage
+# auf die allgemeine Regel darunter durch und bekommt die statische main.css
+# mit ihren @import.
+# Reihenfolge der Bedingungen: %N verweist auf die ZULETZT geprueften Muster;
+# die REQUEST_URI-Bedingung steht deshalb zuletzt, ihr %1 ist der URL-Praefix
+# der Installation (lokal /EhrenSache/public). Der Pfad im Dateisystem kommt
+# aus REQUEST_FILENAME (der bestehende Teil des Pfads -- endet bei css/v<Version>,
+# weil es das Verzeichnis nicht gibt; der Rest ist PATH_INFO; Windows
+# schreibt Rueckwaerts- oder Schraegstriche, daher die Zeichenklassen mit
+# beiden; \x5C statt eines Backslash, den der Konfigurationsleser verschluckt).
+# Der Einstieg main|login kommt aus $1.
+RewriteCond %{REQUEST_FILENAME} ^(.+)[/\x5C]css[/\x5C]v[0-9][0-9.]*(?:[/\x5C]|$)
+RewriteCond %1/css/bundle.php -f
+RewriteCond %{REQUEST_URI} ^(.*)/css/v[0-9][0-9.]*/(main|login)\.css$
+RewriteRule ^css/v[0-9][0-9.]*/(main|login)\.css$ %1/css/bundle.php?entry=$1 [L]
+
 RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/([A-Za-z0-9_./-]+\.(?:css|js))$
 RewriteCond %3 !\.\.
 RewriteRule ^(css|js)/v[0-9][0-9.]*/[A-Za-z0-9_./-]+\.(?:css|js)$ %1/%2/%3 [L,E=ES_VERSIONED:1]
@@ -146,6 +169,11 @@ AddType text/cache-manifest .appcache
 # knapper Grenze gleichzeitiger Prozesse war genau diese Welle das Problem
 # (OI-120). Die HTML-Seiten tragen die Version und bleiben no-cache, ebenso
 # Check-in-App und Station, die ihre wenigen Dateien per ?v= versionieren.
+#
+# main.css und login.css unter Version liefert css/bundle.php als Buendel aus
+# (Abschnitt VERSIONIERTE PFADE) und setzt Cache-Control selbst. Die
+# Einzeldateien bleiben unter ihren Pfaden erreichbar, ohne Version weiter
+# no-cache.
 #
 # Ein Query (?v=) an den Modul-Importen waere kein Ersatz: Eine Stelle ohne ihn
 # laedt dieselbe Datei als zweites Modul -- mit doppeltem Zustand.

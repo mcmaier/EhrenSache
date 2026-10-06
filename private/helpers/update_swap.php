@@ -54,8 +54,11 @@ const UPDATE_DELETABLE_EXTENSIONS = ['php', 'js'];
  * Lücke die neue Seite mit alten Dateien -- und behielte sie unter der neuen
  * Adresse. Zuletzt geschrieben, sieht er entweder die alte Seite mit alten
  * Adressen oder die neue mit vollständig getauschten Dateien.
+ * public/.htaccess kommt vor den Seiten: Seine Regel schickt css/v<Version>/main.css
+ * an css/bundle.php; vor dessen Kopie gäbe es kurz kein CSS. Die Reihenfolge der
+ * Liste ist die Reihenfolge des Tauschs.
  */
-const UPDATE_APPLY_LAST = ['public/index.html', 'public/login.html'];
+const UPDATE_APPLY_LAST = ['public/.htaccess', 'public/index.html', 'public/login.html'];
 
 function updatePathListed(string $rel, array $liste): bool
 {
@@ -123,7 +126,7 @@ function updateListFiles(string $root): array
     return $liste;
 }
 
-/** Reihenfolge des Tauschs: sortiert, die Einstiegsseiten aus UPDATE_APPLY_LAST ans Ende. */
+/** Reihenfolge des Tauschs: sortiert, die Dateien aus UPDATE_APPLY_LAST in deren Reihenfolge ans Ende. */
 function updateOrderForApply(array $copy): array
 {
     $vorne   = [];
@@ -135,6 +138,9 @@ function updateOrderForApply(array $copy): array
             $vorne[] = $rel;
         }
     }
+    usort($zuletzt, static function (string $a, string $b): int {
+        return array_search($a, UPDATE_APPLY_LAST, true) <=> array_search($b, UPDATE_APPLY_LAST, true);
+    });
     return array_merge($vorne, $zuletzt);
 }
 
