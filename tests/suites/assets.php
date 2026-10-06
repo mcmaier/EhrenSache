@@ -395,6 +395,26 @@ test('Die .htaccess bildet versionierte Pfade ab und laesst sie lange cachen', f
         'Versionierte Pfade bekommen kein langes Caching');
 });
 
+test('Die .htaccess schickt main.css und login.css unter Version an das Buendel', function () use ($repoRoot) {
+    // OI-120 Weg 1: css/v<Version>/main.css und login.css kommen als eine
+    // Antwort aus public/css/bundle.php. Die Regel muss VOR der allgemeinen
+    // Versionsregel stehen -- die endet mit [L] und liesse sonst die statische
+    // main.css mit ihren 21 @import ausliefern.
+    $htaccess = (string) sourceCode($repoRoot . '/public/.htaccess');
+    $cond = 'RewriteCond %{REQUEST_URI} ^(.*)/css/v[0-9][0-9.]*/(main|login)\.css$';
+    $rule = 'RewriteRule ^css/v[0-9][0-9.]*/(main|login)\.css$ %1/css/bundle.php?entry=%2 [L]';
+    $allg = 'RewriteCond %{REQUEST_URI} ^(.*)/(css|js)/v[0-9][0-9.]*/';
+
+    assertTrue(str_contains($htaccess, $cond), 'Bedingung fuer das CSS-Buendel fehlt');
+    assertTrue(str_contains($htaccess, $rule), 'Rewrite-Regel fuer das CSS-Buendel fehlt');
+    $posRule = strpos($htaccess, $rule);
+    $posAllg = strpos($htaccess, $allg);
+    assertTrue($posRule !== false && $posAllg !== false && $posRule < $posAllg,
+        'Die Buendel-Regel muss vor der allgemeinen Versionsregel stehen');
+    assertTrue(strpos($htaccess, $cond) < $posRule && $posRule - strpos($htaccess, $cond) < 200,
+        'Bedingung und Regel des Buendels gehoeren direkt zusammen');
+});
+
 test('Dashboard und Login laden jede lokale CSS- und JS-Datei ueber die Version im Pfad', function () use ($repoRoot) {
     // OI-120/OI-74. Eine einzige Referenz ohne Abschnitt laedt eine Datei unter
     // zweiter Adresse: bei einem Modul mit eigenem Zustand, bei allem anderen
