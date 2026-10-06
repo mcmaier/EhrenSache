@@ -71,6 +71,11 @@ Gleicher Saat und gleicher Stichtag ergeben denselben Bestand — mit drei benan
   negative Laufzeit und ließe sich nicht beenden. `buildDemoPlan()` nimmt dafür eine Uhrzeit
   entgegen, die `seed.php` aus der Systemuhr setzt.
 - **`pin_updated_at`** trägt den Zeitpunkt des Laufs.
+- **Was nach dem Lauf läge, fehlt.** Anwesenheiten zu Terminen, die noch nicht begonnen haben,
+  fallen weg, ebenso Zeitkorrekturen dazu; eine Entscheidung, die nach dem Lauf datiert wäre,
+  bleibt offen. Die Probe um 19:30 hat ihre Anwesenheiten also erst ab dem Lauf um 20:00.
+  `demoDropFuture()` verwirft nachträglich, die Ziehungen selbst bleiben gleich — mittags
+  fehlt gegenüber abends nur, was dazwischen liegt.
 
 Alles Übrige hängt allein an Saat und Stichtag.
 
@@ -117,8 +122,8 @@ Gliederung auch mit echten Daten zu sehen ist · jedes Register gehört zu Grupp
 zwölf Monate rückwärts und fünf bis sechs Monate vorwärts, Proben und Vorstandssitzung als
 Terminserien (siehe unten) · Bundesland Baden-Württemberg für die Feiertage
 (`holiday_region = BW`) · rund 2200 Anwesenheiten mit gestreuter Quote
-und Ankunftszeit · 25 Anträge, davon fünf offen · sechs Tätigkeitsarten mit Gruppenbindung ·
-120 Arbeitszeiten (106 bestätigt, 10 eingereicht, 4 abgelehnt) samt Auditspur.
+und Ankunftszeit · 25 Anträge, davon fünf offen (je nach Stichtag ein, zwei mehr offen bzw. eine Zeitkorrektur weniger, siehe Reproduzierbarkeit) · sechs Tätigkeitsarten mit Gruppenbindung ·
+120 Arbeitszeiten (106 bestätigt, 10 eingereicht, 4 abgelehnt; die jüngsten ein, zwei Entscheidungen bleiben je nach Stichtag offen) samt Auditspur.
 
 ## Terminserien
 
@@ -165,6 +170,8 @@ Sie stehen als Tests fest, weil jede von ihnen einmal verletzt war:
   Nachweispflicht — sonst ließe sie sich ohne TOTP-Code nicht beenden, etwa von einem
   Besucher der Demo, der den Timer ausprobiert.
 - Das Konto der Testsuite hängt an einem **anderen** Mitglied als die laufende Sitzung.
+- **Kein Zeitstempel liegt nach dem Lauf** — weder eine Ankunft noch eine Genehmigung oder ein
+  Eintrag der Auditspur. Bis 06.10.2026 bekam ein Termin am Abend schon morgens Anwesenheiten.
 
 ## Bekannte Stolperstellen
 
