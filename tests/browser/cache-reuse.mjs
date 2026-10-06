@@ -12,7 +12,8 @@
 // darf fuer CSS und JS keine Anfrage an den Server schicken -- alles kommt aus
 // dem Browser-Speicher. Dazu: jede geladene CSS/JS-Adresse traegt den
 // Versionsabschnitt, keine Datei kommt unter zwei Adressen, keine
-// Laufzeitfehler.
+// Laufzeitfehler. Seit dem CSS-Buendel (OI-120 Weg 1) laden beide Seiten genau
+// eine CSS-Datei.
 //
 // Ohne Request-Interception: sie schaltet den Browser-Cache ab.
 //
@@ -84,6 +85,10 @@ try {
     check('Login: alle CSS/JS-Adressen tragen die Version',
         loginFirst.length > 0 && loginFirst.every(r => r.url.includes(`/v${VERSION}/`)),
         loginFirst.filter(r => !r.url.includes(`/v${VERSION}/`)).map(r => r.url).join(', '));
+    const isCss = r => new URL(r.url).pathname.endsWith('.css');
+    check('Login: CSS kommt als eine Antwort (Buendel)',
+        loginFirst.filter(isCss).length === 1,
+        loginFirst.filter(isCss).map(r => new URL(r.url).pathname).join(', '));
     check('Login: zweiter Aufruf ohne CSS/JS-Anfrage an den Server',
         loginSecond.length > 0 && loginSecond.every(r => r.cached),
         `${loginSecond.filter(r => !r.cached).length} von ${loginSecond.length} vom Server`);
@@ -109,6 +114,9 @@ try {
     const paths = dashFirst.map(r => new URL(r.url).pathname.replace(/\/v[0-9][0-9.]*\//, '/'));
     const dupes = paths.filter((p, i) => paths.indexOf(p) !== i);
     check('Dashboard: keine Datei unter zwei Adressen', dupes.length === 0, dupes.join(', '));
+    check('Dashboard: CSS kommt als eine Antwort (Buendel)',
+        dashFirst.filter(isCss).length === 1,
+        dashFirst.filter(isCss).map(r => new URL(r.url).pathname).join(', '));
 
     check('Dashboard: zweiter Aufruf ohne CSS/JS-Anfrage an den Server',
         dashSecond.length > 0 && dashSecond.every(r => r.cached),
