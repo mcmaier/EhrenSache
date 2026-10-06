@@ -201,3 +201,27 @@ test('Kompression: ohne Accept-Encoding kommt das Buendel unkomprimiert', functi
     assertTrue(stripos($r['headers']['vary'] ?? '', 'accept-encoding') !== false, 'Vary fehlt auch hier');
     assertSame(cssBundle('main'), $r['body']);
 });
+
+test('Kompression: JS, Dashboard-Seite und Check-in-App kommen mit gzip', function () use ($acBase, $acVersion) {
+    // Setzt mod_deflate + mod_filter im lokalen Apache voraus (httpd.conf).
+    $pfade = [
+        "/js/v{$acVersion}/modules/ui.js",
+        '/',
+        "/checkin/js/app.js?v={$acVersion}",
+    ];
+    foreach ($pfade as $p) {
+        $r = acFetch($acBase . $p, ['Accept-Encoding: gzip']);
+        assertSame(200, $r['status'], "{$p}: Status {$r['status']}");
+        assertSame('gzip', $r['headers']['content-encoding'] ?? '',
+            "{$p}: nicht komprimiert -- mod_deflate nicht geladen? (httpd.conf, LoadModule deflate_module und filter_module)");
+        assertTrue(@gzdecode($r['body']) !== false, "{$p}: Rumpf ist kein gzip");
+    }
+});
+
+test('Kompression: API und PHP-Seiten bleiben unkomprimiert (BREACH)', function () use ($acBase) {
+    foreach (['/api/api.php?resource=ping', '/reset_password.php'] as $p) {
+        $r = acFetch($acBase . $p, ['Accept-Encoding: gzip']);
+        assertTrue(!isset($r['headers']['content-encoding']),
+            "{$p}: komprimiert ({$r['headers']['content-encoding']}) -- no-gzip fuer .php greift nicht oder json steht in der Typliste");
+    }
+});

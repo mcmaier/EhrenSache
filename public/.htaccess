@@ -198,8 +198,22 @@ AddType text/cache-manifest .appcache
 </IfModule>
 
 # ============================================
-# COMPRESSION (optional)
+# COMPRESSION
 # ============================================
-# <IfModule mod_deflate.c>
-#    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json
-# </IfModule>
+# Statische Textdateien gzip-komprimiert ausliefern (OI-120): Das Dashboard
+# uebertraegt beim Erstbesuch rund 870 KB CSS und JS, komprimiert rund 210 KB.
+# Gilt fuer ganz public/, also auch checkin/ und station/. Ohne mod_deflate
+# (oder mod_filter) bleibt der Block wirkungslos, nichts bricht.
+#
+# Bewusst NICHT komprimiert: application/json (API) und jede Ausgabe einer
+# .php-Datei (reset_password.php, verify_email.php, install/, update/). Dort
+# stehen Token neben Eingaben aus der Anfrage -- die Voraussetzung fuer BREACH.
+# Das CSS-Buendel (css/bundle.php) komprimiert sich selbst.
+<IfModule mod_deflate.c>
+    <IfModule mod_filter.c>
+        AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript image/svg+xml application/manifest+json
+    </IfModule>
+    <FilesMatch "\.php$">
+        SetEnv no-gzip 1
+    </FilesMatch>
+</IfModule>

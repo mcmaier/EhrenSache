@@ -423,6 +423,42 @@ test('Die .htaccess schickt main.css und login.css unter Version an das Buendel'
         'Die Buendel-Regel muss vor der allgemeinen Versionsregel stehen');
 });
 
+test('Die .htaccess komprimiert statische Textdateien, aber kein JSON und kein PHP', function () use ($repoRoot) {
+    // Kompression (OI-120). API-JSON und PHP-Ausgaben bleiben unkomprimiert:
+    // Token neben Eingaben aus der Anfrage sind die Voraussetzung fuer BREACH.
+    $h = (string) sourceCode($repoRoot . '/public/.htaccess');
+
+    assertTrue(preg_match('/^\s*<IfModule mod_deflate\.c>\s*$/m', $h) === 1, 'Block <IfModule mod_deflate.c> fehlt');
+    $posDeflate = strpos($h, '<IfModule mod_deflate.c>');
+    assertTrue($posDeflate !== false, 'Block <IfModule mod_deflate.c> fehlt (auskommentiert?)');
+    // Der Block endet am schliessenden </FilesMatch> des no-gzip-Teils; ein
+    // anderes <FilesMatch "\.php$"> weiter oben in der Datei zaehlt nicht.
+    $posEndFm = strpos($h, '</FilesMatch>', (int) $posDeflate);
+    assertTrue($posEndFm !== false, 'FilesMatch im mod_deflate-Block fehlt');
+    $block = substr($h, (int) $posDeflate, $posEndFm - (int) $posDeflate);
+
+    assertTrue(preg_match('/^\s*AddOutputFilterByType DEFLATE ([^\r\n]*)\r?$/m', $block, $m) === 1,
+        'AddOutputFilterByType DEFLATE fehlt (auskommentiert?)');
+    $typen = preg_split('/\s+/', trim($m[1]));
+    foreach (['text/html', 'text/css', 'text/javascript', 'application/javascript'] as $typ) {
+        assertTrue(in_array($typ, $typen, true), "DEFLATE nennt {$typ} nicht");
+    }
+    // application/manifest+json (PWA-Manifest) ist erlaubt, JSON der API nicht.
+    foreach (['application/json', 'text/json', 'text/plain'] as $typ) {
+        assertTrue(!in_array($typ, $typen, true), "DEFLATE darf {$typ} nicht nennen (API, BREACH)");
+    }
+    assertTrue(preg_match('/^\s*<FilesMatch "\\\.php\$">\s*$/m', $block) === 1
+        && preg_match('/^\s*SetEnv no-gzip 1\s*$/m', $block) === 1,
+        'no-gzip fuer .php fehlt im mod_deflate-Block');
+
+    if (str_contains($h, 'RequestHeader edit "If-None-Match"')) {
+        $pos = strpos($h, 'RequestHeader edit "If-None-Match"');
+        $vor = substr($h, 0, $pos);
+        assertTrue(strrpos($vor, '<IfModule mod_headers.c>') > strrpos($vor, '</IfModule>'),
+            'Die ETag-Zeile gehoert in <IfModule mod_headers.c>');
+    }
+});
+
 test('Dashboard und Login laden jede lokale CSS- und JS-Datei ueber die Version im Pfad', function () use ($repoRoot) {
     // OI-120/OI-74. Eine einzige Referenz ohne Abschnitt laedt eine Datei unter
     // zweiter Adresse: bei einem Modul mit eigenem Zustand, bei allem anderen
