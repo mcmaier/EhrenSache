@@ -1355,6 +1355,11 @@ Automatisiert: `responses_api` (Fenster, Sichtbarkeit bis Tagesende, Sortierung)
 | PWA-TL-17 | Plus → Termin gestern oder Infotermin in drei Monaten anlegen | Toast „… erscheint nicht in deiner Liste (…)“; Termin im Dashboard vorhanden |
 | PWA-TL-18 | Anwesenheit aus, Terminplanung an, als Manager | Kein Tab „Anwesenheitsliste“; Plus-Knopf im Tab „Termine“ öffnet den Dialog, Speichern und Abbrechen funktionieren |
 | PWA-TL-19 | Manager ohne kommende Termine | Tab „Termine“ sichtbar mit „Keine Termine in den nächsten acht Wochen.“ und Plus-Knopf |
+| PWA-TL-20 | Manager: kommende Karte aufklappen (seit OI-125) | „✎ Bearbeiten“ unten rechts; nicht bei begonnenen Terminen, nicht für Mitglieder |
+| PWA-TL-21 | Bearbeiten → Titel ändern → Speichern | Toast „Termin aktualisiert“, Karte zeigt neuen Titel |
+| PWA-TL-22 | Bearbeiten → „Termin löschen“ bei Termin mit Rückmeldungen | Rückfrage nennt Zahl der Rückmeldungen/Anträge; nach „Löschen“ Toast „Termin gelöscht“, Karte weg |
+| PWA-TL-23 | „Termin löschen“ bei Termin mit Erfassung (Check-in-Fenster vor Beginn) | Hinweis „…bitte im Dashboard löschen“, nichts gelöscht |
+| PWA-TL-24 | „Termin löschen“ bei Serientermin | Rückfrage mit „Nur dieser Termin, die Serie bleibt bestehen“; Dashboard zeigt den Tag als Ausnahme |
 
 ### Anträge in der Anwesenheitsliste der PWA (seit 1.12.0)
 
