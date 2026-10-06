@@ -53,12 +53,20 @@ header('Vary: Accept-Encoding');
 
 // Kompression (OI-120): mod_deflate lässt .php aus (no-gzip), das Bündel
 // komprimiert selbst. zlib.output_compression kann "On", "1" oder eine
-// Puffergröße sein -- alles außer "aus" heißt: PHP komprimiert schon.
-$oc   = strtolower(trim((string) ini_get('zlib.output_compression')));
+// Puffergröße sein -- alles außer "aus" heißt: PHP komprimiert schon. Das
+// spätere Content-Length würde diese Kompression ohnehin abschalten (Bündel
+// unkomprimiert), also wird sie hier gezielt ausgeschaltet. Gelingt das, packt
+// das Bündel selbst; gelingt es nicht (ini_set gesperrt), bleibt PHPs eigene
+// Kompression zuständig und das Bündel komprimiert nicht doppelt.
+$oc = strtolower(trim((string) ini_get('zlib.output_compression')));
+$outputCompression = !in_array($oc, ['', '0', 'off', 'false', 'no'], true);
+if ($outputCompression && @ini_set('zlib.output_compression', '0') !== false) {
+    $outputCompression = false;
+}
 $gzip = cssBundleUseGzip(
     (string) ($_SERVER['HTTP_ACCEPT_ENCODING'] ?? ''),
     function_exists('gzencode'),
-    !in_array($oc, ['', '0', 'off', 'false', 'no'], true)
+    $outputCompression
 );
 if ($gzip) {
     $css = (string) gzencode($css, 6);

@@ -221,6 +221,12 @@ AddType text/cache-manifest .appcache
 # Zeile passt es bei der Revalidierung nicht und jede no-cache-Datei kommt
 # voll statt mit 304 (am 2026-10-06 mit Apache 2.4.58 geprueft, Test in
 # asset_caching_http).
+# Folge: Die Umschreibung liefert auch einer Anfrage ohne gzip mit dem
+# -gzip-ETag ein 304. Falscher Inhalt entsteht nur bei einem geteilten Cache,
+# der die gzip-Variante haelt und fuer einen Client ohne gzip nachfragt --
+# bewusst hingenommen (Browser senden immer gzip, HTTPS, Cloudflare verwaltet
+# die Kodierung selbst). Schwache ETags (W/"...-gzip") werden nicht
+# umgeschrieben: dann 200 statt 304, harmlos.
 <IfModule mod_headers.c>
     RequestHeader edit "If-None-Match" '^"((.*)-gzip)"$' '"$1", "$2"'
 </IfModule>

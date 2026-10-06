@@ -451,12 +451,13 @@ test('Die .htaccess komprimiert statische Textdateien, aber kein JSON und kein P
         && preg_match('/^\s*SetEnv no-gzip 1\s*$/m', $block) === 1,
         'no-gzip fuer .php fehlt im mod_deflate-Block');
 
-    if (str_contains($h, 'RequestHeader edit "If-None-Match"')) {
-        $pos = strpos($h, 'RequestHeader edit "If-None-Match"');
-        $vor = substr($h, 0, $pos);
-        assertTrue(strrpos($vor, '<IfModule mod_headers.c>') > strrpos($vor, '</IfModule>'),
-            'Die ETag-Zeile gehoert in <IfModule mod_headers.c>');
-    }
+    // Spec 3.2: ohne diese Zeile kommt jede Revalidierung komprimierter Dateien als 200.
+    $pos = strpos($h, 'RequestHeader edit "If-None-Match"');
+    assertTrue($pos !== false, 'RequestHeader edit "If-None-Match" fehlt (gzip-ETag, Spec 3.2)');
+    $vor = substr($h, 0, (int) $pos);
+    $auf = strrpos($vor, '<IfModule mod_headers.c>');
+    assertTrue($auf !== false && $auf > (int) strrpos($vor, '</IfModule>'),
+        'Die ETag-Zeile gehoert in <IfModule mod_headers.c>');
 });
 
 test('Dashboard und Login laden jede lokale CSS- und JS-Datei ueber die Version im Pfad', function () use ($repoRoot) {

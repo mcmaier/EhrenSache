@@ -85,6 +85,13 @@ Die Umsetzung hält das Ergebnis im Kommentar fest.
 Gegenmaßnahme 200 statt 304. Die `RequestHeader edit`-Zeile steht deshalb in
 `<IfModule mod_headers.c>`; der HTTP-Test liefert danach 304 für `/` und `/checkin/`.
 
+**Bekannte Grenze (bewusst hingenommen):** Die Umschreibung liefert auch einer Anfrage ohne
+gzip, die das `-gzip`-ETag mitschickt, ein 304. Falscher Inhalt entsteht nur bei einem
+geteilten Cache, der die gzip-Variante hält und für einen Client ohne gzip nachfragt.
+Browser senden immer gzip, die Auslieferung läuft über HTTPS, und Cloudflare verwaltet die
+Kodierung selbst. Schwache ETags (`W/"…-gzip"`) werden nicht umgeschrieben; dann kommt 200
+statt 304, was harmlos ist.
+
 ### 3.3 `bundle.php` komprimiert selbst
 
 - Reine Funktion in `private/helpers/css_bundle.php`:

@@ -234,7 +234,8 @@ der Satz steht fest verdrahtet in `public/js/theme.js`, `public/checkin/js/app.j
 - [ ] CSS und JS kommen komprimiert: In den Entwicklerwerkzeugen zeigt die Antwort auf
       `css/v<Version>/main.css` und eine Datei unter `js/v<Version>/` `content-encoding: gzip`;
       eine API-Antwort (`api/api.php?resource=ping`) nicht. Fehlt gzip an den JS-Dateien, lädt
-      der Hoster `mod_deflate` nicht.
+      der Hoster `mod_deflate` nicht. Mit leerem Cache bzw. „Disable cache“ prüfen: Dateien
+      unter `v<Version>/` sind `immutable` und kommen sonst ohne Antwortköpfe aus dem Cache.
 
 ---
 

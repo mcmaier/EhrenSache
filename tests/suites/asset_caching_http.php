@@ -208,6 +208,7 @@ test('Kompression: JS, Dashboard-Seite und Check-in-App kommen mit gzip', functi
         "/js/v{$acVersion}/modules/ui.js",
         '/',
         "/checkin/js/app.js?v={$acVersion}",
+        '/station/',
     ];
     foreach ($pfade as $p) {
         $r = acFetch($acBase . $p, ['Accept-Encoding: gzip']);
@@ -221,8 +222,9 @@ test('Kompression: JS, Dashboard-Seite und Check-in-App kommen mit gzip', functi
 test('Kompression: API und PHP-Seiten bleiben unkomprimiert (BREACH)', function () use ($acBase) {
     foreach (['/api/api.php?resource=ping', '/reset_password.php'] as $p) {
         $r = acFetch($acBase . $p, ['Accept-Encoding: gzip']);
+        assertSame(200, $r['status'], "{$p}: Status {$r['status']}");
         assertTrue(!isset($r['headers']['content-encoding']),
-            "{$p}: komprimiert ({$r['headers']['content-encoding']}) -- no-gzip fuer .php greift nicht oder json steht in der Typliste");
+            "{$p}: komprimiert (" . ($r['headers']['content-encoding'] ?? '') . ") -- no-gzip fuer .php greift nicht oder json steht in der Typliste");
     }
 });
 
@@ -230,7 +232,7 @@ test('Kompression: Revalidierung der Seite mit dem gzip-ETag ergibt 304', functi
     // Apache 2.4 haengt an komprimierte Antworten "-gzip" an das ETag. Passt es
     // als If-None-Match nicht mehr, liefert jede Revalidierung 200 mit vollem
     // Inhalt -- fuer alle no-cache-Dateien (HTML, Check-in-App, Station).
-    foreach (['/', '/checkin/'] as $p) {
+    foreach (['/', '/checkin/', '/station/'] as $p) {
         $erst = acFetch($acBase . $p, ['Accept-Encoding: gzip']);
         $etag = $erst['headers']['etag'] ?? '';
         assertTrue($etag !== '', "{$p}: kein ETag");
