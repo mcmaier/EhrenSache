@@ -1151,6 +1151,7 @@ async function startSession(meData) {
 
     renderUserHeader(meData, memberResult);
     applyCheckinAppointments(appointmentsResult);
+    initAppointmentModal();
     await initAttendanceList();
 
     showScreen('main');
@@ -1325,14 +1326,41 @@ async function handleLogout() {
 // ATTENDANCE LIST (Admin/Manager)
 // ========================================
 
+/** Admin oder Manager -- die Rollen, die in der App Termine anlegen. */
+function isPwaManager() {
+    return !!userData && (userData.role === 'admin' || userData.role === 'manager');
+}
+
+/**
+ * Bindet den Termin-Dialog: Abbrechen, Klick daneben, Speichern.
+ *
+ * Bis OI-123 stand das in initAttendanceList(). Seit der Dialog auch aus dem
+ * Tab „Termine“ kommt, reicht das nicht: Bei „nur Terminplanung“ kehrt
+ * initAttendanceList() vor den Bindungen zurueck, und der Dialog speicherte
+ * nicht. bindOnce() macht wiederholte Aufrufe unschaedlich.
+ */
+function initAppointmentModal() {
+    const appointmentModal = document.getElementById('appointmentModal');
+
+    bindOnce(document.getElementById('btnCancelAppointment'), 'click', () => {
+        appointmentModal?.classList.remove('active');
+    });
+
+    // Klick neben den Dialog schliesst ihn
+    bindOnce(appointmentModal, 'click', (e) => {
+        if (e.target.id === 'appointmentModal') {
+            appointmentModal.classList.remove('active');
+        }
+    });
+
+    bindOnce(document.getElementById('appointmentForm'), 'submit', submitAppointmentForm);
+}
+
 async function initAttendanceList() {
 
-    // Prüfe ob Benutzer Admin oder Manager ist
-    // Nur Verwalter, nur mit Anwesenheit (OI-62, Etappe 2): Der Tab (mit „Termin
-    // anlegen“) setzt die Anwesenheit voraus. Bei „nur Terminplanung“ legen
-    // Verwalter Termine im Dashboard an.
-    if (!userData || (userData.role !== 'admin' && userData.role !== 'manager')
-        || !pwaFeatureOn('attendance')) {
+    // Nur Verwalter, nur mit Anwesenheit (OI-62, Etappe 2): Der Tab lebt von
+    // Erfassungen. Termine anlegen geht seit OI-123 auch im Tab „Termine“.
+    if (!isPwaManager() || !pwaFeatureOn('attendance')) {
         // Tab ausblenden falls vorhanden
         const tab = document.querySelector('[data-tab="attendance-list"]');
         if (tab) tab.style.display = 'none';
@@ -1354,25 +1382,10 @@ async function initAttendanceList() {
     });
 
     bindOnce(document.getElementById('btnCreateAppointment'), 'click',
-        showCreateAppointmentModal);
+        () => showCreateAppointmentModal('attendance'));
 
     bindOnce(document.getElementById('btnEditAppointment'), 'click',
         showEditAppointmentModal);
-
-    const appointmentModal = document.getElementById('appointmentModal');
-
-    bindOnce(document.getElementById('btnCancelAppointment'), 'click', () => {
-        appointmentModal?.classList.remove('active');
-    });
-
-    // Klick neben den Dialog schliesst ihn
-    bindOnce(appointmentModal, 'click', (e) => {
-        if (e.target.id === 'appointmentModal') {
-            appointmentModal.classList.remove('active');
-        }
-    });
-
-    bindOnce(document.getElementById('appointmentForm'), 'submit', submitAppointmentForm);
 }
 
 /**
