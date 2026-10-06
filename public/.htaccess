@@ -217,3 +217,10 @@ AddType text/cache-manifest .appcache
         SetEnv no-gzip 1
     </FilesMatch>
 </IfModule>
+# Apache haengt an komprimierte Antworten "-gzip" an das ETag; ohne diese
+# Zeile passt es bei der Revalidierung nicht und jede no-cache-Datei kommt
+# voll statt mit 304 (am 2026-10-06 mit Apache 2.4.58 geprueft, Test in
+# asset_caching_http).
+<IfModule mod_headers.c>
+    RequestHeader edit "If-None-Match" '^"((.*)-gzip)"$' '"$1", "$2"'
+</IfModule>

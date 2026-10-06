@@ -225,3 +225,16 @@ test('Kompression: API und PHP-Seiten bleiben unkomprimiert (BREACH)', function 
             "{$p}: komprimiert ({$r['headers']['content-encoding']}) -- no-gzip fuer .php greift nicht oder json steht in der Typliste");
     }
 });
+
+test('Kompression: Revalidierung der Seite mit dem gzip-ETag ergibt 304', function () use ($acBase) {
+    // Apache 2.4 haengt an komprimierte Antworten "-gzip" an das ETag. Passt es
+    // als If-None-Match nicht mehr, liefert jede Revalidierung 200 mit vollem
+    // Inhalt -- fuer alle no-cache-Dateien (HTML, Check-in-App, Station).
+    foreach (['/', '/checkin/'] as $p) {
+        $erst = acFetch($acBase . $p, ['Accept-Encoding: gzip']);
+        $etag = $erst['headers']['etag'] ?? '';
+        assertTrue($etag !== '', "{$p}: kein ETag");
+        $zweit = acFetch($acBase . $p, ['Accept-Encoding: gzip', "If-None-Match: {$etag}"]);
+        assertSame(304, $zweit['status'], "{$p}: Revalidierung mit {$etag} ergibt {$zweit['status']} statt 304");
+    }
+});
