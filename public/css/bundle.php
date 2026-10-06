@@ -49,5 +49,21 @@ $aktuell = $current !== '' && preg_match($pattern, $path, $m) === 1 && $m[1] ===
 
 header('Content-Type: text/css; charset=utf-8');
 header('Cache-Control: ' . cssBundleCacheControl($css, $aktuell));
+header('Vary: Accept-Encoding');
+
+// Kompression (OI-120): mod_deflate lässt .php aus (no-gzip), das Bündel
+// komprimiert selbst. zlib.output_compression kann "On", "1" oder eine
+// Puffergröße sein -- alles außer "aus" heißt: PHP komprimiert schon.
+$oc   = strtolower(trim((string) ini_get('zlib.output_compression')));
+$gzip = cssBundleUseGzip(
+    (string) ($_SERVER['HTTP_ACCEPT_ENCODING'] ?? ''),
+    function_exists('gzencode'),
+    !in_array($oc, ['', '0', 'off', 'false', 'no'], true)
+);
+if ($gzip) {
+    $css = (string) gzencode($css, 6);
+    header('Content-Encoding: gzip');
+}
+header('Content-Length: ' . strlen($css));
 
 echo $css;

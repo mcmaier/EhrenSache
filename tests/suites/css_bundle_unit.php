@@ -250,3 +250,27 @@ test('Nicht lesbare Datei wirft statt ein leeres Bündel zu liefern', function (
         cbRemove($root);
     }
 });
+
+test('cssBundleUseGzip: gzip nur bei Annahme durch den Browser, mit zlib und ohne PHP-Kompression', function () {
+    // Kompression (OI-120): bundle.php komprimiert selbst; mod_deflate ist für
+    // .php abgeschaltet (no-gzip, BREACH). Ist zlib.output_compression an,
+    // komprimiert PHP bereits -- ein zweites gzip wäre kaputt.
+    $faelle = [
+        ['gzip',              true,  false, true],
+        ['br, gzip',          true,  false, true],
+        ['gzip, deflate, br', true,  false, true],
+        ['GZIP',              true,  false, true],
+        ['gzip;q=0.5',        true,  false, true],
+        ['gzip;q=0',          true,  false, false],
+        ['gzip; q=0.0',       true,  false, false],
+        ['',                  true,  false, false],
+        ['deflate',           true,  false, false],
+        ['x-gzip-foo',        true,  false, false],
+        ['gzip',              false, false, false],
+        ['gzip',              true,  true,  false],
+    ];
+    foreach ($faelle as [$ae, $zlib, $oc, $erwartet]) {
+        assertSame($erwartet, cssBundleUseGzip($ae, $zlib, $oc),
+            "Accept-Encoding '{$ae}', zlib " . var_export($zlib, true) . ', output_compression ' . var_export($oc, true));
+    }
+});

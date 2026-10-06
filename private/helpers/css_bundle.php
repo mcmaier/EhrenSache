@@ -129,6 +129,31 @@ function cssBundleCacheControl(string $css, bool $currentVersion): string
     return 'no-cache, must-revalidate';
 }
 
+/**
+ * Ob bundle.php seine Antwort mit gzip komprimiert (Kompression, OI-120).
+ * mod_deflate lässt .php-Ausgaben bewusst aus (no-gzip in public/.htaccess),
+ * das Bündel komprimiert deshalb selbst. Nicht, wenn PHP es schon tut
+ * (zlib.output_compression) oder zlib fehlt; gzip;q=0 heißt „nicht annehmen“.
+ */
+function cssBundleUseGzip(string $acceptEncoding, bool $zlib, bool $outputCompression): bool
+{
+    if (!$zlib || $outputCompression) {
+        return false;
+    }
+    foreach (explode(',', $acceptEncoding) as $teil) {
+        $stuecke = array_map('trim', explode(';', $teil));
+        if (strtolower($stuecke[0]) !== 'gzip') {
+            continue;
+        }
+        foreach (array_slice($stuecke, 1) as $param) {
+            if (preg_match('/^q\s*=\s*([0-9.]+)$/i', $param, $m) === 1) {
+                return (float) $m[1] > 0;
+            }
+        }
+        return true;
+    }
+    return false;
+}
 /** Aktuelle Version aus version.json. */
 function cssBundleCurrentVersion(): string
 {

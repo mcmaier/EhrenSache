@@ -28,11 +28,13 @@ $acBase    = rtrim(testConfig()['base_url'], '/');
 $acVersion = json_decode((string) sourceCode(dirname(__DIR__, 2) . '/version.json'), true)['version'];
 
 /**
- * GET ohne Weiterleitung; Kopfzeilen kleingeschrieben.
+ * GET ohne Weiterleitung; Kopfzeilen kleingeschrieben. curl entpackt nicht
+ * selbst (kein CURLOPT_ENCODING): die Tests sehen die Antwort, wie sie kommt.
  *
+ * @param list<string> $requestHeaders z. B. ['Accept-Encoding: gzip']
  * @return array{status: int, headers: array<string, string>, body: string}
  */
-function acFetch(string $url): array
+function acFetch(string $url, array $requestHeaders = []): array
 {
     $headers = [];
     $ch = curl_init($url);
@@ -41,6 +43,9 @@ function acFetch(string $url): array
     // Pfad unveraendert schicken: Die Faelle unten pruefen gerade, was Apache
     // aus kodierten Abschnitten macht -- curl soll nichts vorab bereinigen.
     curl_setopt($ch, CURLOPT_PATH_AS_IS, true);
+    if ($requestHeaders !== []) {
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
+    }
     curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $line) use (&$headers): int {
         $pos = strpos($line, ':');
         if ($pos !== false) {
@@ -176,4 +181,23 @@ test('CSS-Buendel: ein Array als Einstieg ist ein 404 ohne Fehlertext', function
     assertSame(404, $r['status'], "Status {$r['status']}");
     assertTrue(!stripos($r['body'], 'warning') && !str_contains($r['body'], 'bundle.php'),
         "Fehlertext im Rumpf: {$r['body']}");
+});
+
+test('Kompression: das CSS-Buendel kommt mit gzip, wenn der Browser es annimmt', function () use ($acBase, $acVersion) {
+    $r = acFetch("{$acBase}/css/v{$acVersion}/main.css", ['Accept-Encoding: gzip']);
+    assertSame(200, $r['status']);
+    assertSame('gzip', $r['headers']['content-encoding'] ?? '', 'Buendel nicht komprimiert');
+    assertTrue(stripos($r['headers']['vary'] ?? '', 'accept-encoding') !== false,
+        'Vary: Accept-Encoding fehlt: ' . ($r['headers']['vary'] ?? '-'));
+    $entpackt = @gzdecode($r['body']);
+    assertTrue($entpackt !== false, 'Rumpf ist kein gzip');
+    assertSame(cssBundle('main'), $entpackt, 'Entpacktes Buendel weicht ab');
+});
+
+test('Kompression: ohne Accept-Encoding kommt das Buendel unkomprimiert', function () use ($acBase, $acVersion) {
+    $r = acFetch("{$acBase}/css/v{$acVersion}/main.css");
+    assertSame(200, $r['status']);
+    assertTrue(!isset($r['headers']['content-encoding']), 'Unerwartet komprimiert: ' . ($r['headers']['content-encoding'] ?? ''));
+    assertTrue(stripos($r['headers']['vary'] ?? '', 'accept-encoding') !== false, 'Vary fehlt auch hier');
+    assertSame(cssBundle('main'), $r['body']);
 });
