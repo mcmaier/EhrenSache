@@ -839,6 +839,40 @@ Bedienung, kein Fehler.
 
 ---
 
+### OI-124 · Terminänderung lässt vorhandene Rückmeldungen unverändert stehen
+**Priorität:** mittel · aufgenommen am 2026-10-06 (Wunsch des Nutzers, Rest aus FI-1 / 1.7.0)
+
+Wird ein Termin bearbeitet, für den schon Rückmeldungen vorliegen, bleiben sie unverändert
+stehen — `PUT appointments` (`private/handlers/appointments.php`) fasst `appointment_responses`
+nicht an, das Folgetermin-Bearbeiten der Serien (`seriesHandleUpdateFollowing()`) ebenso wenig.
+Eine Zusage für „Dienstag 19 Uhr“ gilt nach einer Verlegung auf Donnerstag stillschweigend
+weiter, obwohl das Mitglied dann womöglich gar nicht kann. Die Besetzungsübersicht zeigt eine
+Zahl, die niemand mehr bestätigt hat.
+
+**Gewünscht:** Beim Speichern eines Termins mit vorhandenen Rückmeldungen eine Rückfrage, ob
+die Rückmeldungen zurückgesetzt werden sollen.
+
+**Zu entscheiden:**
+
+- **Wann fragen?** Nur bei Änderungen, die die Zusage berühren (Datum, Beginn, Ende, evtl.
+  Ort), nicht bei Titel oder Beschreibung. Sonst wird die Rückfrage zur Klickhürde.
+- **Was zurücksetzen?** Alle Rückmeldungen oder nur Zusagen und „unsicher“? Eine Absage zu einem
+  verlegten Termin kann hinfällig sein, ist aber oft weiter richtig.
+- **Absagen mit Entschuldigung.** `appointment_responses.exception_id` verweist auf einen
+  `exceptions`-Antrag (Spec 2026-09-14). Ein Zurücksetzen muss klären, was aus dem Antrag wird —
+  vor allem aus einem schon genehmigten.
+- **Serien.** Das Bearbeiten „dieser und folgende“ betrifft viele Termine auf einmal; die
+  Rückfrage braucht dort eine Zahl („bei 7 Terminen liegen 43 Rückmeldungen vor“).
+- **Wo entscheidet sich das?** Die Rückfrage ist Oberfläche, die Ausführung gehört in den Server
+  (ein Parameter am `PUT`, etwa `reset_responses`), damit Dashboard und Check-in-App dasselbe tun.
+- **Benachrichtigung.** Ohne [FI-6](FEATURE-IDEAS.md#fi-6--benachrichtigungskanal-e-mail-web-push)
+  erfährt niemand, dass er neu antworten soll; der Termin taucht wieder unter „Offene Punkte“
+  (FI-17) auf, das ist bis dahin der einzige Hinweis.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Restarbeiten
 
 ### OI-4 · Terminbezug: Oberfläche unvollständig
