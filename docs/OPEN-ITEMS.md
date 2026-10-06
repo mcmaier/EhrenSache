@@ -2441,11 +2441,32 @@ Server. Dashboard und Anmeldeseite laden CSS und JS über `css/v<Version>/…` b
 nach. **Offen bleibt der Erstbesuch** (und der erste Aufruf nach einem Update): Er lädt weiter alle
 Dateien einzeln — dafür bliebe Weg 1 (Bündeln).
 
-**CSS-Bündel (unveröffentlicht):** Dashboard und Anmeldeseite laden ihr CSS als eine Antwort
-(`public/css/bundle.php`, Spec `docs/superpowers/specs/2026-10-06-css-buendel-design.md`) —
-beim Erstbesuch 21 bzw. 2 Anfragen weniger, keine serielle `@import`-Stufe mehr. Ob sich
-JS-Bündeln lohnt (verlangt einen Build-Schritt), klärt eine Messung auf der Demo nach dem
-Release.
+**CSS-Bündel (veröffentlicht mit 1.22.0):** Dashboard und Anmeldeseite laden ihr CSS als eine
+Antwort (`public/css/bundle.php`, Spec `docs/superpowers/specs/2026-10-06-css-buendel-design.md`)
+— beim Erstbesuch 21 bzw. 2 Anfragen weniger, keine serielle `@import`-Stufe mehr.
+
+**Messung Erstbesuch auf der Demo (2026-10-06, 1.22.0, „DNS only“, HTTP/1.1, frisches Profil,
+Cache aus, je 3 Läufe, ohne Anmeldung — das Dashboard lädt alle Module vor der Umleitung):**
+
+| | ohne Drosselung | „Fast 4G“ (150 ms, ~1,4 Mbit/s) |
+|---|---|---|
+| Anmeldeseite: CSS fertig / JS fertig | 0,19–0,21 s / 0,26–0,28 s | 0,52–0,54 s / 0,67–0,69 s |
+| Dashboard: CSS + JS fertig | 0,59–0,63 s | 6,2–6,96 s |
+
+- Das Bündel kommt auf dem Hoster an: genau eine CSS-Anfrage je Seite, ohne `@import`,
+  `immutable`, Serverzeit 33–40 ms (die 1-s-Hänger der API-Abrufe, OI-121, trafen es nicht).
+- Das Dashboard überträgt rund 870 KB (743 KB JS in 31 Dateien, 127 KB CSS) — **unkomprimiert**.
+  Der Hoster komprimiert keine Antwort, auch HTML und API nicht; der Abschnitt `mod_deflate` in
+  `public/.htaccess` ist seit dem Anfang auskommentiert. Bei „Fast 4G“ sind ~870 KB allein rund
+  5 s Übertragung; JS-Anfragen warten bis 3,6 s auf eine freie Verbindung, weil die Leitung voll
+  ist, nicht weil es zu viele Anfragen sind. Die Serverzeit je Datei liegt bei 33–51 ms
+  (ungedrosselt).
+- **Folgerung:** JS-Bündeln brächte geschätzt unter 1 s (weniger Runden), verlangt aber einen
+  Build-Schritt — **nicht empfohlen**. Kompression (gzip) bringt CSS+JS von ~870 KB auf ~210 KB
+  (lokal gemessen: JS 699 → 177 KB, CSS-Bündel 129 → 30 KB), also geschätzt 3–4 s bei
+  „Fast 4G“, ohne Build-Schritt. Nächster Schritt wäre `mod_deflate` für statische Typen (CSS,
+  JS, HTML; **nicht** `application/json` der API wegen BREACH) und gzip im `bundle.php`, dazu
+  prüfen, ob der Hoster `mod_deflate` überhaupt lädt.
 
 Ein Aufruf des Dashboards fordert rund 45 Dateien gleichzeitig an: 21 CSS-Module per `@import`
 aus `main.css` und gut 20 JS-Module per `import`. Ohne Build-Kette gibt es kein Bündel. Weil CSS
