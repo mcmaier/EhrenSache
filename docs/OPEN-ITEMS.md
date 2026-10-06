@@ -2319,9 +2319,10 @@ zugeordnet“ und „n Mitglied(er) in keiner Gruppe ihres Registers“, Namen �
 ### OI-120 · Das Dashboard lädt rund 45 Einzeldateien
 **Priorität:** mittel (bis 2026-10-05 niedrig) · aufgenommen am 2026-10-02 (Demo nach dem Update auf 1.20.0)
 
-**Stand 2026-10-05:** Weg 2 als **Version im Pfad** umgesetzt (Spec
-`docs/superpowers/specs/2026-10-05-version-im-pfad-design.md`, Zweig `feat/oi-120-version-im-pfad`,
-unveröffentlicht): Dashboard und Anmeldeseite laden CSS und JS über `css/v<Version>/…` bzw.
+**Stand 2026-10-06:** Weg 2 als **Version im Pfad** mit 1.21.0 veröffentlicht (Spec
+`docs/superpowers/specs/2026-10-05-version-im-pfad-design.md`). Auf der Demo nachgemessen: Beim
+erneuten Aufruf kommen 0 von 51 CSS/JS-Dateien des Dashboards und 0 von 5 der Anmeldeseite vom
+Server. Dashboard und Anmeldeseite laden CSS und JS über `css/v<Version>/…` bzw.
 `js/v<Version>/…`, diese Antworten sind `immutable`. Wiederkehrende Nutzer fragen keine Datei mehr
 nach. **Offen bleibt der Erstbesuch** (und der erste Aufruf nach einem Update): Er lädt weiter alle
 Dateien einzeln — dafür bliebe Weg 1 (Bündeln).
@@ -2371,9 +2372,23 @@ Siehe [OI-74](#oi-74--der-cache-bust-erreicht-nur-einen-teil-der-dateien) — di
 ---
 
 ### OI-121 · Dashboard und Check-in-App laden beim Start Stufe für Stufe
-**Priorität:** mittel · aufgenommen am 2026-10-05 (Messung auf der Demo nach dem Update auf 1.20.1) ·
-**umgesetzt** auf `feat/oi-121-startkette`, unveröffentlicht — offen bleibt die Messung auf der
-Demo nach dem Release (Spec Abschnitt 7, Punkt 5)
+**Priorität:** erledigt mit 1.21.0 · aufgenommen am 2026-10-05 (Messung auf der Demo nach dem
+Update auf 1.20.1)
+
+**Nachmessung 2026-10-06 auf der Demo (1.21.0, DNS only, ohne Cloudflare-Proxy):**
+
+| | vorher (1.20.1) | nachher (1.21.0) |
+|---|---|---|
+| Dashboard, Profil fertig | 1,5 / 2,8 / 1,6 s, fünf Stufen | 0,42 / 0,41 / 0,43 s, zwei Stufen |
+| Check-in-App, Hauptbildschirm | 1,7 / 3,1 s, zehn Stufen, Anmeldemaske | 0,74 / 1,58 / 1,61 s, zwei Stufen, Ladeanzeige |
+
+Beide starten in zwei Stufen; die Check-in-App zeigt die Ladeanzeige, nie die Anmeldemaske. Die
+zwei langsameren Läufe der Check-in-App gehen je auf einen Hänger des Hosters von rund 1,1 s
+zurück, der jetzt nur noch einmal zählt. **Beobachtung ohne belegte Ursache:** In allen drei
+Läufen der Check-in-App (Token) hing mindestens ein Abruf so lange — einmal alle drei Abrufe der
+Stufe 3 gleichzeitig —, im Dashboard (Sitzung) in drei Läufen keiner. Die Rate-Grenze scheidet
+aus (gültige Token zählen nicht mit). Drei Läufe reichen für keinen Schluss; fällt es weiter auf,
+eigener Punkt.
 
 Nach dem Fix der Sitzungssperre (1.20.1) laufen gleichzeitige API-Abrufe auch gleichzeitig; ein
 einzelner Abruf braucht auf der Demo im Median rund 40 ms. Trotzdem stand die Profilansicht in
