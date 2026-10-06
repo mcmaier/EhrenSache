@@ -1346,6 +1346,11 @@ Automatisiert: `responses_api` (Fenster, Sichtbarkeit bis Tagesende, Sortierung)
 | PWA-TL-12 | „Zurückziehen“ | Rückfrage; danach Antrag gelöscht, Karte bietet wieder „Entschuldigen“ |
 | PWA-TL-13 | Antrag im Dashboard ablehnen bzw. genehmigen | Chip „Entschuldigung abgelehnt“ mit erneutem „Entschuldigen“ bzw. „✗ entschuldigt“ ohne Knopf |
 | PWA-TL-14 | Heute begonnene Infokarte ohne Antrag | Chip „hat begonnen“, kein „Entschuldigen“ |
+| PWA-TL-15 | Als Manager, Terminplanung an: Tab „Termine“ (seit OI-123) | Plus-Knopf rechts neben „Kommende Termine“; als Mitglied (user) kein Knopf |
+| PWA-TL-16 | Plus → Termin der eigenen Gruppe nächste Woche anlegen | Datum/Uhrzeit leer vorbelegt; Toast „Termin erstellt“, Karte erscheint in der Liste |
+| PWA-TL-17 | Plus → Termin gestern oder Infotermin in drei Monaten anlegen | Toast „… erscheint nicht in deiner Liste (…)“; Termin im Dashboard vorhanden |
+| PWA-TL-18 | Anwesenheit aus, Terminplanung an, als Manager | Kein Tab „Anwesenheitsliste“; Plus-Knopf im Tab „Termine“ öffnet den Dialog, Speichern und Abbrechen funktionieren |
+| PWA-TL-19 | Manager ohne kommende Termine | Tab „Termine“ sichtbar mit „Keine Termine in den nächsten acht Wochen.“ und Plus-Knopf |
 
 ### Anträge in der Anwesenheitsliste der PWA (seit 1.12.0)
 

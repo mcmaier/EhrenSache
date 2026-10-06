@@ -9,6 +9,14 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Neu
+- **Check-in-App: Termine anlegen im Tab „Termine“** (OI-123). Admin und Manager sehen neben
+  „Kommende Termine“ einen Plus-Knopf, der den Termin-Dialog öffnet – auch wenn die
+  Anwesenheitserfassung abgeschaltet ist. Bisher ging das nur über die Anwesenheitsliste. Datum und
+  Uhrzeit sind hier nicht mit „jetzt“ vorbelegt. Erscheint der neue Termin nicht in der eigenen
+  Liste (fremde Gruppe, vergangen, mehr als acht Wochen voraus), sagt die App das. Für Verwalter
+  bleibt der Tab auch ohne kommende Termine sichtbar.
+
 ### Geändert
 - **Demo-Bestand: Der Manager hängt an einem Mitglied** (M013, Aktive und Vorstandschaft). Wer die
   Demo als `manager@` öffnet, sieht in der Check-in-App eigene Termine, offene Punkte und die
