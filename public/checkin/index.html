@@ -337,7 +337,13 @@
             <!-- TAB: TERMINE (Rückmeldungen, FI-1) -->
             <div class="tab-content" data-tab="responses">
                 <div class="responses-section">
-                    <h3>🗓️ Kommende Termine</h3>
+                    <!-- Plus-Knopf nur fuer Admin/Manager, eingeblendet von
+                         initResponsesTab() (OI-123) -->
+                    <div class="responses-header">
+                        <h3>🗓️ Kommende Termine</h3>
+                        <button type="button" id="btnAddAppointment" class="btn-add-appointment"
+                                aria-label="Termin anlegen" title="Termin anlegen" hidden>+</button>
+                    </div>
                     <div id="responsesList" class="responses-list"></div>
                 </div>
             </div>

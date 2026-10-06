@@ -2644,6 +2644,49 @@ body {
     max-width: 400px;
 }
 
+/* Kopf des Termine-Tabs: Ueberschrift links, Plus-Knopf fuer Verwalter rechts
+   (OI-123). Dasselbe Muster wie #history-header. Der Abstand nach unten
+   wandert vom h3 an den Kopf, sonst saesse der Knopf hoeher als der Text. */
+.responses-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.responses-header h3 {
+    margin: 0;
+}
+
+.btn-add-appointment {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+/* display:inline-flex oben schlaegt sonst das hidden-Attribut -- dieselbe
+   Falle wie bei .tab-button[hidden]. */
+.btn-add-appointment[hidden] {
+    display: none;
+}
+
+.btn-add-appointment:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
 
 .responses-list {
     display: flex;
