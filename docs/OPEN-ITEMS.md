@@ -905,6 +905,22 @@ die Rückmeldungen zurückgesetzt werden sollen.
 
 **Nicht sicherheitsrelevant.**
 
+### OI-125 · Check-in-App: kommende Termine bearbeiten und löschen
+**Priorität:** mittel · aufgenommen am 2026-10-06 (Folge aus
+[OI-123](#oi-123--check-in-app-termin-anlegen-fehlt-in-der-stufe-nur-terminplanung))
+
+Mit OI-123 legen Verwalter Termine im Tab „Termine“ an, können einen falsch angelegten dort aber
+weder korrigieren noch löschen. Bearbeiten gibt es nur in der Anwesenheitsliste (Fenster um jetzt,
+nur mit Anwesenheit), Löschen gar nicht.
+
+**Entschieden** (Spec `docs/superpowers/specs/2026-10-06-oi-125-pwa-termin-bearbeiten-loeschen-design.md`):
+nur Admin/Manager, nur bis Terminbeginn; „Bearbeiten“ in der aufgeklappten Karte, „Löschen“ im
+Bearbeiten-Dialog; die Rückfrage nennt die Zahl der Rückmeldungen und Anträge, die mitgelöscht
+werden (neu: `GET appointments?id=X&dependents=1`); bei vorhandenen Erfassungen verweist die App aufs
+Dashboard; bei Serien nur dieser Termin.
+
+**Nicht sicherheitsrelevant.**
+
 ---
 
 ## Restarbeiten
