@@ -4712,6 +4712,9 @@ function resetResponsesTab() {
     responsesSaveFailed.clear();
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
     if (tab) tab.hidden = true;
+    // Nach Abmelden und Anmelden als Mitglied darf der Knopf nicht stehen bleiben.
+    const btnAdd = document.getElementById('btnAddAppointment');
+    if (btnAdd) btnAdd.hidden = true;
     updateResponsesBadge();
     const list = document.getElementById('responsesList');
     if (list) list.innerHTML = '';
@@ -4734,6 +4737,15 @@ async function initResponsesTab() {
 
     // Ohne Terminplanung bleibt der Tab verborgen (OI-62, Etappe 2).
     if (!pwaFeatureOn('appointments')) return;
+
+    // Plus-Knopf fuer Verwalter (OI-123): immer, sobald die Terminplanung an
+    // ist -- auch mit Anwesenheitsliste, damit er an einem festen Ort steht.
+    const btnAdd = document.getElementById('btnAddAppointment');
+    if (btnAdd) {
+        btnAdd.hidden = !isPwaManager();
+        bindOnce(btnAdd, 'click', () => showCreateAppointmentModal('responses'));
+    }
+
     if (!userData || !userData.member_id) return;
     await loadResponses();
 }
@@ -4776,10 +4788,12 @@ async function loadResponses() {
     const tab = document.querySelector('.tab-button[data-tab="responses"]');
     if (tab) {
         const wasActiveTab = tab.classList.contains('active');
-        tab.hidden = !hasResponses;
+        // Verwalter sehen den Tab auch ohne Termine: Dort sitzt der Knopf zum
+        // Anlegen (OI-123), und gerade ohne Termine braucht man ihn.
+        tab.hidden = !hasResponses && !isPwaManager();
         // Der Tab, den man gerade ansieht, verschwindet nicht unter einem weg --
         // ohne Inhalt geht es zurueck zum Erfassen-Tab.
-        if (!hasResponses && wasActiveTab) {
+        if (tab.hidden && wasActiveTab) {
             document.querySelector('.tab-button[data-tab="capture"]')?.click();
         }
     }
