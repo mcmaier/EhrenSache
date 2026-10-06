@@ -1405,7 +1405,7 @@ async function initAttendanceList() {
         () => showCreateAppointmentModal('attendance'));
 
     bindOnce(document.getElementById('btnEditAppointment'), 'click',
-        showEditAppointmentModal);
+        () => showEditAppointmentModal('attendance'));
 }
 
 /**
@@ -1496,10 +1496,10 @@ async function submitAppointmentForm(e) {
             const sichtbar = geladen && id !== '' && upcomingResponses.some(
                 i => String(i.appointment.appointment_id) === id);
             if (sichtbar || !geladen) {
-                showMessage('Termin erstellt', 'success');
+                showMessage(neu ? 'Termin erstellt' : 'Termin aktualisiert', 'success');
             } else {
                 const wann = formatResponseCardHead(formData.date, formData.start_time, null);
-                showMessage(`Termin angelegt (${wann}) – erscheint nicht in deiner Liste (nicht deine Gruppe, vergangen oder mehr als acht Wochen voraus).`, 'info');
+                showMessage(`Termin ${neu ? 'angelegt' : 'gespeichert'} (${wann}) – erscheint nicht in deiner Liste (nicht deine Gruppe, vergangen oder mehr als acht Wochen voraus).`, 'info');
             }
             return;
         }
@@ -3768,6 +3768,8 @@ async function showCreateAppointmentModal(origin = 'attendance') {
     appointmentModalOrigin = origin;
     appointmentModalOpener = document.getElementById(
         origin === 'responses' ? 'btnAddAppointment' : 'btnCreateAppointment');
+    appointmentModalData = null;
+    document.getElementById('appointmentDeleteRow').hidden = true;
     document.getElementById('appointmentModalTitle').textContent = 'Termin anlegen';
 
     // Lade Terminarten
@@ -3794,14 +3796,27 @@ async function showCreateAppointmentModal(origin = 'attendance') {
     document.getElementById('appointmentModal').classList.add('active');
 }
 
-async function showEditAppointmentModal() {
-    const appointmentId = document.getElementById('attendanceAppointmentFilter').value;
+// Der Termin, den der Dialog gerade bearbeitet, wie der Server ihn lieferte --
+// Loeschen braucht Titel, Datum, Beginn und series_id fuer die Rueckfrage.
+let appointmentModalData = null;
+
+/**
+ * Oeffnet den Dialog zum Bearbeiten. Aus der Anwesenheitsliste kommt die id
+ * aus deren Auswahl, aus dem Tab „Termine“ von der Karte (OI-125). Der Fokus
+ * geht danach an den Plus-Knopf: Die Karte wird nach dem Speichern neu
+ * gezeichnet, ihr Knopf existiert dann nicht mehr.
+ */
+async function showEditAppointmentModal(origin = 'attendance', id = null) {
+    const appointmentId = id ?? document.getElementById('attendanceAppointmentFilter').value;
     if (!appointmentId) return;
-    
+
     currentEditAppointmentId = appointmentId;
-    // Bearbeiten gibt es nur in der Anwesenheitsliste.
-    appointmentModalOrigin = 'attendance';
-    appointmentModalOpener = document.getElementById('btnEditAppointment');
+    appointmentModalOrigin = origin;
+    appointmentModalOpener = document.getElementById(
+        origin === 'responses' ? 'btnAddAppointment' : 'btnEditAppointment');
+    appointmentModalData = null;
+    // Loeschen nur aus dem Tab „Termine“: dort stehen nur kommende Termine.
+    document.getElementById('appointmentDeleteRow').hidden = origin !== 'responses';
     document.getElementById('appointmentModalTitle').textContent = 'Termin bearbeiten';
     showFormErrors('appointmentErrors', []);
 
@@ -3817,6 +3832,7 @@ async function showEditAppointmentModal() {
         }
 
         const appointment = result.data;
+        appointmentModalData = appointment;
         
         if (appointment) {
             document.getElementById('appointmentTitle').value = appointment.title || '';
@@ -5284,6 +5300,21 @@ window.setResponsesGrouping = function(stage) {
 };
 
 /**
+ * „Bearbeiten“ am Ende einer aufgeklappten Karte (OI-125): nur fuer Verwalter
+ * und nur vor Beginn -- danach haengen Erfassungen am Termin, geaendert wird
+ * dann im Dashboard.
+ */
+function managerActionsHtml(item) {
+    if (!isPwaManager() || item.started) return '';
+    const id = Number(item.appointment.appointment_id);
+    const off = navigator.onLine ? '' : ' disabled';
+    return `
+        <div class="response-card__manage">
+            <button type="button" class="response-card__edit" data-appointment-id="${id}"${off}>✎ Bearbeiten</button>
+        </div>`;
+}
+
+/**
  * Karte eines Termins ohne Rueckmeldung. Aufklappbar nur, wenn es eine
  * Beschreibung gibt -- eine Probe ohne Beschreibung bleibt eine ruhige Zeile.
  */
@@ -5307,6 +5338,7 @@ function infoCardHtml(item) {
                 <div class="response-card__type">${escapeHtml(apt.type_name || '')}</div>
                 ${apt.description ? `<div class="response-card__desc">${escapeHtml(apt.description)}</div>` : ''}
                 ${excuseSectionHtml(item)}
+                ${managerActionsHtml(item)}
             </div>
         </details>`;
 }
@@ -5458,6 +5490,7 @@ function responseCardHtml(item) {
                 </details>`}
                 ${names}
                 ${offline && !started ? '<div class="response-card__offline">Ohne Netz ist keine Rückmeldung möglich.</div>' : ''}
+                ${managerActionsHtml(item)}
             </div>
         </details>`;
 }
@@ -5472,6 +5505,13 @@ async function onResponsesClick(event) {
 
     const item = upcomingResponses.find(i => Number(i.appointment.appointment_id) === appointmentId);
     if (!item) return;
+
+    // Bearbeiten (OI-125) -- vor allem anderen: Die Kommentarlogik unten
+    // setzt eine Rueckmeldekarte mit Bemerkungsfeld voraus.
+    if (btn.classList.contains('response-card__edit')) {
+        showEditAppointmentModal('responses', appointmentId);
+        return;
+    }
 
     // Entschuldigung an der Infokarte (seit 1.12.0) -- eigene Wege, die
     // Infokarte hat weder Antwortknoepfe noch "Bemerkung".
