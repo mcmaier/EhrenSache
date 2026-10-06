@@ -826,14 +826,37 @@ Stelle hält das als bewusste Grenze von Etappe 2 fest.
 Keine Daten gehen verloren, Server und Rechte sind unberührt — es ist eine Lücke in der
 Bedienung, kein Fehler.
 
-**Zu entscheiden:**
+**Entschieden (2026-10-06):** Admin und Manager bekommen im Tab „Termine“ oben rechts neben der
+Überschrift „🗓️ Kommende Termine“ einen Plus-Knopf, der den bestehenden Termin-Dialog öffnet —
+**immer**, sobald die Terminplanung an ist, nicht nur in der Stufe „nur Terminplanung“. Planen
+wohnt damit im Tab „Termine“, das spontane Anlegen („jetzt“) bleibt zusätzlich in der
+Anwesenheitsliste. Verworfen: „So lassen“ (Verwalter planen auch unterwegs).
 
-- **So lassen.** Wer nur Termine plant, tut das meist am Schreibtisch; das Dashboard kann es
-  vollständig.
-- **Knopf auch ohne Anwesenheit anbieten,** etwa im Tab „Termine“ (Rückmeldungen), nur für Admin
-  und Manager. `showCreateAppointmentModal()` hängt nicht an der Anwesenheitsliste; zu prüfen ist,
-  was nach dem Anlegen neu geladen wird (heute die Liste des Anwesenheits-Tabs) und ob der Dialog
-  Felder zeigt, die ohne Anwesenheit keinen Sinn ergeben.
+Die Startzeit war auch in der Anwesenheitsliste nie eingegrenzt: Der Dialog setzt kein
+`min`/`max`, er belegt nur Datum und Uhrzeit mit „jetzt“ vor und meldet nach dem Speichern, wenn
+der Termin außerhalb des Fensters liegt. Daran ist nichts zu öffnen.
+
+**Bei der Umsetzung zu beachten:**
+
+- **Tab muss für Verwalter sichtbar bleiben.** `loadResponses()` blendet den Tab aus, solange
+  keine kommenden Termine da sind (`tab.hidden = !hasResponses`). Ein Verein ohne geplante Termine
+  sähe den Plus-Knopf also nie. Für Admin und Manager bleibt der Tab deshalb stehen, mit leerem
+  Hinweis statt Karten. (Konten ohne verknüpftes Mitglied sind kein Fall: Die PWA wird für sie
+  künftig ohnehin abgefangen, weil sie ohne Mitglied nicht funktioniert.)
+- **Neuer Termin erscheint womöglich nicht in der Liste.** Die Liste zeigt nur Termine, deren
+  Terminart einer Gruppe zugeordnet ist, in der der Verwalter selbst Mitglied ist
+  (`responsesFetchUpcomingIds()` / `responsesFetchUpcomingInfo()` in
+  `private/helpers/responses.php`). Legt er einen Termin für eine fremde Gruppe an, braucht es eine
+  Meldung, wo er geblieben ist — nach dem Muster der Anwesenheitsliste in
+  `submitAppointmentForm()`. Sonst wiederholt sich „Termin erstellt“ ohne sichtbaren Termin (bis
+  1.11.0).
+- **Dialog und Speichern hängen an der Anwesenheitsliste.** Abbrechen, Klick daneben und `submit`
+  des `#appointmentModal` werden in `initAttendanceList()` gebunden, die bei abgeschalteter
+  Anwesenheit vorher zurückkehrt — ohne Umbau speichert der Dialog dort nicht. Die Bindung gehört
+  heraus; `submitAppointmentForm()` lädt danach fest die Anwesenheitsliste neu und muss je nach
+  Herkunft stattdessen `loadResponses()` aufrufen.
+- **Vorbelegung:** Aus dem Tab „Termine“ nicht „jetzt“ vorbelegen — wer dort anlegt, plant für
+  später.
 
 **Nicht sicherheitsrelevant.**
 
