@@ -153,3 +153,22 @@ test('cssBundleCurrentVersion liest version.json', function () {
     $v = json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/version.json'), true)['version'];
     assertSame($v, cssBundleCurrentVersion());
 });
+
+test('Importe werden mit LF und CRLF aufgelöst', function () {
+    // Der Windows-Bestand hat CRLF; ein $ vor \r liesse die Importe stehen.
+    foreach (["\n", "\r\n"] as $eol) {
+        $label = $eol === "\n" ? 'LF' : 'CRLF';
+        $root = cbTree([
+            'main.css' => "@import url('a.css');{$eol}@import url('b.css');{$eol}.main{}{$eol}",
+            'a.css'    => '.a{}',
+            'b.css'    => '.b{}',
+        ]);
+        try {
+            $css = cssBundle('main', $root);
+            assertSame(['a.css', 'b.css'], cbSections($css), "{$label}: Abschnitte");
+            assertTrue(!str_contains($css, '@import'), "{$label}: @import im Ergebnis");
+        } finally {
+            cbRemove($root);
+        }
+    }
+});
