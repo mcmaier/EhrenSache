@@ -209,6 +209,24 @@ https://ehrensache.meine-domain.de/update
 
 Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 
+> [!WARNING]
+> **Cloudflare als Proxy kann einen knapp bemessenen Hoster überlasten.** Viele günstige Hoster
+> sprechen direkt nur HTTP/1.1. Dabei öffnet der Browser höchstens sechs Verbindungen
+> gleichzeitig, und die rund 50 Dateien des Dashboards kommen in Schüben. Hinter dem Proxy von
+> Cloudflare (orange Wolke) spricht der Browser HTTP/2 und fordert alle Dateien auf einmal an.
+> Fehlen sie im Zwischenspeicher von Cloudflare, etwa nach einem Update oder nach einer ruhigen
+> Nacht, reicht Cloudflare die ganze Welle gleichzeitig an den Server weiter. Ein Hoster, der
+> nur wenige gleichzeitige Anfragen zulässt, antwortet dann mit `503 Service Unavailable`. Das
+> Dashboard erscheint ungestylt oder leer, in der Browser-Konsole stehen Meldungen wie
+> „Refused to apply style … MIME type ('text/html')“.
+>
+> Prüfen: die Seite einmal ohne Cloudflare aufrufen und in den Entwicklerwerkzeugen (Netzwerk,
+> Spalte „Protokoll“) nachsehen. Steht dort `http/1.1`, betrifft es diese Installation.
+> Einfachste Abhilfe: den DNS-Eintrag in Cloudflare auf **„DNS only“** (graue Wolke) stellen. Der
+> Hoster braucht dann ein eigenes gültiges Zertifikat, und `trusted_proxies` (unten) bleibt leer.
+> Wer den Proxy behalten will, richtet den Zwischenspeicher wie unten beschrieben ein. Ganz
+> verhindern lässt sich die Welle damit aber nicht.
+
 > [!TIP]
 > **Läuft die Installation hinter Cloudflare** (oder einem anderen CDN), bleibt nach einem Update
 > sonst bis zu vier Stunden altes CSS und JS im Browser: Das Dashboard erscheint ungestylt, oder
@@ -218,10 +236,12 @@ Nach erfolgter Migration sperrt sich der Wizard automatisch wieder.
 > 1. *Caching → Configuration*: **Browser Cache TTL auf „Respect Existing Headers“** — der
 >    Browser fragt dann vor jeder Verwendung nach, aber bei Cloudflare.
 > 2. *Caching → Cache Rules*: eine Regel für die Dateiendungen `css` und `js` mit **Edge TTL
->    „Ignore cache-control header“**, etwa 1 Tag; Browser TTL bleibt „Respect origin“. Ohne diese
->    Regel reicht Cloudflare jede Nachfrage an den Server durch — rund 45 gleichzeitige Anfragen
->    je Seitenaufruf, die günstige Hoster mit `503 Service Unavailable` abweisen; das Dashboard
->    bleibt dann leer.
+>    „Ignore cache-control header“**, mehrere Wochen (etwa 1 Monat); Browser TTL bleibt „Respect
+>    origin“. Bei nur einem Tag läuft der Zwischenspeicher auf wenig besuchten Installationen
+>    jede Nacht ab. Fehlerantworten (Statuscodes 500–599) in derselben Regel nicht
+>    zwischenspeichern. Ohne diese Regel reicht Cloudflare jede Nachfrage an den Server durch —
+>    rund 45 gleichzeitige Anfragen je Seitenaufruf, die günstige Hoster mit
+>    `503 Service Unavailable` abweisen; das Dashboard bleibt dann leer.
 > 3. *Caching → Tiered Cache*: **Smart Tiered Caching** einschalten (kostenlos). Ein Standort
 >    von Cloudflare, dessen Zwischenspeicher leer ist, fragt dann zuerst einen zentralen Knoten
 >    statt den Server. Bei wenig besuchten Installationen verdrängt Cloudflare Dateien nämlich

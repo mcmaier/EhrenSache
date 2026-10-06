@@ -255,6 +255,23 @@ Bewusst hingenommen, damit die Demo zeigen kann, wofür sie da ist:
 
 ## 6. Drei Dinge, die überraschen
 
+**Die Demo läuft seit 2026-10-06 ohne Cloudflare-Proxy („DNS only“).** Die Abschnitte unten
+beschreiben, was hinter dem Proxy nötig war. Warum es ohne ihn besser geht: Der Hoster der Demo
+spricht direkt nur HTTP/1.1. Der Browser öffnet dorthin höchstens sechs Verbindungen gleichzeitig,
+die Grenze des Hosters von etwa zwölf gleichzeitigen Anfragen wird nie erreicht. Hinter Cloudflare
+sprach der Browser HTTP/2, alle Dateien starteten in derselben Millisekunde. Fehlten sie im
+Zwischenspeicher von Cloudflare, ging die ganze Welle von rund 50 Anfragen gleichzeitig an den
+Hoster, und ab der zwölften kam `503`. Gemessen am 2026-10-06: über Cloudflare `h2`, direkt
+`http/1.1` (`server: Apache`, kein `cf-ray`). Ausgelöst hatte das eine abgelaufene Edge TTL von
+einem Tag: Am Morgen kamen 21 CSS-Dateien als `503`-Fehlerseite (`text/html`), dazu fünf
+JS-Module und `appearance`.
+
+Wer prüfen will, ob eine Installation direkt angesprochen wird: In den Entwicklerwerkzeugen
+(Netzwerk) trägt die Antwort dann `server: Apache` und kein `cf-ray`. Nach der Umstellung hält der
+Browser noch eine Weile die alte HTTP/2-Verbindung zu Cloudflare. Abhilfe: den Browser neu starten
+oder unter `chrome://net-internals` den DNS-Cache leeren und die Socket-Pools leeren. Ohne Proxy ist
+`trusted_proxies` in `config.php` wirkungslos und kann leer bleiben.
+
 **Hinter Cloudflare bleibt nach einem Update altes CSS und JS im Browser.** EhrenSache liefert
 CSS und JS mit `Cache-Control: no-cache, must-revalidate` aus (`public/.htaccess`), damit der
 Browser nach jedem Update nachfragt. Cloudflare ersetzt das mit seiner Voreinstellung
@@ -269,8 +286,9 @@ Abhilfe in Cloudflare, **die ersten beiden Einstellungen nur zusammen**:
 1. *Caching → Configuration*: **Browser Cache TTL** auf **„Respect Existing Headers“**. Der
    Browser fragt dann vor jeder Verwendung nach.
 2. *Caching → Cache Rules*: Regel für die Dateiendungen `css` und `js`, **Edge TTL „Ignore
-   cache-control header and use this TTL“** (1 Tag), Browser TTL „Respect origin“. Damit
-   beantwortet Cloudflare die Nachfragen selbst.
+   cache-control header and use this TTL“** (mehrere Wochen, etwa 1 Monat; ursprünglich 1 Tag,
+   der jede Nacht ablief), Browser TTL „Respect origin“, Statuscodes 500–599 nicht
+   zwischenspeichern. Damit beantwortet Cloudflare die Nachfragen selbst.
 
 Nur Schritt 1 allein ist schlechter als der Ausgangszustand: Dann folgt auch Cloudflare dem
 `no-cache` und reicht jede Nachfrage an den Server durch — ein Dashboard-Aufruf sind rund 45
