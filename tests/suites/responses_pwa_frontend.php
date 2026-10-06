@@ -357,3 +357,17 @@ test('PWA: Termin-Dialog gibt den Fokus an seinen Knopf zurueck', function () us
     assertTrue(str_contains(rspFunktion($js, 'showEditAppointmentModal'), "appointmentModalOpener = document.getElementById('btnEditAppointment')"),
         'Bearbeiten merkt sich seinen Knopf nicht');
 });
+
+test('PWA: Plus-Knopf hat 44 px Tippflaeche und ein gezeichnetes Plus', function () use ($rspRoot) {
+    $css = (string) sourceCode($rspRoot . '/public/checkin/css/style.css');
+    assertTrue((bool) preg_match('/\n\.btn-add-appointment\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/', $css),
+        'Unter 44 px ist der Knopf auf dem Telefon schwer zu treffen');
+
+    // Ein Textzeichen „+“ sitzt je nach Schrift versetzt (gemessen 1 px zu
+    // hoch); zwei Balken liegen auf jeder Plattform mittig.
+    assertTrue(str_contains($css, '.btn-add-appointment::before') && str_contains($css, '.btn-add-appointment::after'),
+        'Das Plus wird nicht gezeichnet');
+    $html = (string) sourceCode($rspRoot . '/public/checkin/index.html');
+    assertTrue((bool) preg_match('/id="btnAddAppointment"[^>]*>\s*<\/button>/', $html),
+        'Neben dem gezeichneten Plus stuende noch das Zeichen');
+});

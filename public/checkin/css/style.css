@@ -2671,21 +2671,38 @@ body:has(.modal.active) {
     margin: 0;
 }
 
+/* 44 px: die uebliche Mindestgroesse fuer Tippflaechen. Das Plus ist
+   gezeichnet, nicht als Zeichen gesetzt: Ein „+“ sass je nach Schrift
+   versetzt (gemessen 1 px zu hoch), zwei Balken liegen auf jeder Plattform
+   mittig. Gerade Masse (44 / 18 / 2 px) halten die Kanten scharf. */
 .btn-add-appointment {
+    position: relative;
     display: inline-flex;
-    align-items: center;
-    justify-content: center;
     flex-shrink: 0;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     border: none;
     border-radius: 50%;
     background: var(--primary-color);
     color: white;
-    font-size: 22px;
-    line-height: 1;
     cursor: pointer;
+}
+
+.btn-add-appointment::before,
+.btn-add-appointment::after {
+    content: '';
+    position: absolute;
+    top: calc(50% - 1px);
+    left: calc(50% - 9px);
+    width: 18px;
+    height: 2px;
+    border-radius: 1px;
+    background: currentColor;
+}
+
+.btn-add-appointment::after {
+    transform: rotate(90deg);
 }
 
 /* display:inline-flex oben schlaegt sonst das hidden-Attribut -- dieselbe
