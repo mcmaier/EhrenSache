@@ -149,6 +149,23 @@ test('PWA: von der Ladeanzeige fuehrt ein Weg zur Anmeldemaske', function () use
         'showStartStatus() blendet den Knopf nicht mit ein');
 });
 
+test('PWA: ein Konto ohne Mitglied kommt nicht in die App', function () use ($scPwa) {
+    $body  = scBody($scPwa, 'async function startSession(');
+    $block = strpos($body, 'blockUnlinkedAccount()');
+    assertTrue(preg_match('/if\s*\(\s*!meData\.member_id\s*\)\s*\{\s*blockUnlinkedAccount\(\);\s*return;/', $body) === 1,
+        'startSession() startet auch ohne verknuepftes Mitglied');
+    assertTrue($block !== false && $block < (int) strpos($body, 'userData = meData'),
+        'Die Sperre greift erst, nachdem userData gesetzt ist');
+    $sperre = scBody($scPwa, 'function blockUnlinkedAccount(');
+    assertTrue(str_contains($sperre, "localStorage.removeItem('api_token')"),
+        'Der gespeicherte Token bleibt -- die Sperre stuende bei jedem Oeffnen wieder da');
+    assertTrue(str_contains($sperre, "showScreen('start')") && !str_contains($sperre, "showScreen('main')"),
+        'Die Sperre zeigt nicht die Ladeanzeige mit der Meldung');
+    $status = scBody($scPwa, 'function showStartStatus(');
+    assertTrue(str_contains($status, 'Zurück zum Login') && preg_match('/retry\.hidden\s*=\s*!failed\s*\|\|\s*blocked/', $status) === 1,
+        'Bei der Sperre stehen nicht nur Meldung und "Zurueck zum Login"');
+});
+
 test('Dashboard: init() wartet nach me nichts mehr ab', function () use ($scApp) {
     $body = scBody($scApp, 'async function init(');
     assertTrue($body !== '', 'init() nicht gefunden');

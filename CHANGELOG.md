@@ -15,6 +15,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Zeiterfassung. Anträge und Arbeitszeiten dieses Mitglieds entscheidet im Bestand der Admin,
   damit nichts als Selbstgenehmigung erscheint. Nebenbei laufen `self_approval_api` und
   `responses_staffing_api` nach einem Generatorlauf wieder durch; sie verlangten das Mitglied.
+- **Check-in-App: Konten ohne verknüpftes Mitglied werden abgewiesen.** Bisher startete die App
+  trotzdem, zeigte nur einen Hinweis, und die Tabs blieben leer oder liefen ins Leere. Jetzt
+  erscheint nach der Anmeldung nur noch die Meldung, dass das Konto mit keinem Mitglied verknüpft
+  ist, und der Knopf „Zurück zum Login“. Ein gespeicherter Zugang wird dabei verworfen. Das
+  Dashboard ist nicht betroffen.
 
 ---
 
