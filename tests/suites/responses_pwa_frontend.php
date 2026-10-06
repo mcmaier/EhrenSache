@@ -309,3 +309,14 @@ test('PWA OI-123: gescheitertes Neuladen meldet keinen unsichtbaren Termin', fun
     assertTrue(str_contains(rspFunktion($js, 'submitAppointmentForm'), 'acht Wochen'),
         'Die Meldung muss den Horizont von acht Wochen nennen');
 });
+
+test('PWA OI-123: Dialoge rollen selbst, der Hintergrund steht still', function () use ($rspRoot) {
+    $css = (string) sourceCode($rspRoot . '/public/checkin/css/style.css');
+
+    // Der Termin-Dialog hat sechs Felder: Bei 560 px Hoehe ragte er oben
+    // 93 px aus dem Bild, „Speichern“ war nicht erreichbar.
+    assertTrue((bool) preg_match('/\n\.modal-content\s*\{[^}]*max-height:[^}]*overflow-y:\s*auto/', $css),
+        '.modal-content braucht max-height und overflow-y: auto -- fuer alle Dialoge, nicht nur einen');
+    assertTrue((bool) preg_match('/body:has\(\.modal\.active\)\s*\{[^}]*overflow:\s*hidden/', $css),
+        'Bei offenem Dialog rollt sonst die ausgeblendete Seite dahinter');
+});

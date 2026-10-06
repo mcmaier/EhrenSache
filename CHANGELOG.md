@@ -29,6 +29,12 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   ist, und der Knopf „Zurück zum Login“. Ein gespeicherter Zugang wird dabei verworfen. Das
   Dashboard ist nicht betroffen.
 
+### Behoben
+- **Check-in-App: Dialoge rollen auf kurzen Displays.** Der Dialog „Termin anlegen“ ragte bei
+  niedriger Bildschirmhöhe über den Rand, „Speichern“ war nicht erreichbar, und ein Wischen rollte
+  stattdessen die ausgeblendete Seite dahinter. Alle Dialoge der App sind jetzt in der Höhe begrenzt
+  und rollen selbst; die Seite dahinter steht still, solange ein Dialog offen ist.
+
 ---
 
 ## [1.21.0] – 2026-10-05
