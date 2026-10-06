@@ -9,6 +9,13 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Behoben
+- **Demo-Bestand ohne Einträge aus der Zukunft.** Ein Termin am Abend bekam schon beim Lauf am
+  Morgen Anwesenheiten mit Ankunft am Abend, und Genehmigungen von Anträgen und Arbeitszeiten zu
+  kürzlich vergangenen Terminen trugen ein Datum einige Tage nach dem Lauf. Solche Anwesenheiten
+  fehlen jetzt bis zum Terminbeginn, solche Entscheidungen bleiben offen. Betrifft nur den
+  Demo-Generator (`private/demo/plan.php`).
+
 ## [1.22.0] – 2026-10-06
 
 ### Neu

@@ -1419,6 +1419,69 @@ function buildUsers(): array
 }
 
 /**
+ * Entfernt aus dem Bestand alles, was nach dem Zeitpunkt des Laufs ($now) läge.
+ *
+ * demoExpectedPairs() entscheidet nur nach dem Datum: Ein Termin heute um 19:30
+ * zählt ab Mitternacht als vergangen und bekäme Anwesenheiten mit Ankunft um
+ * 19:30. Genehmigungen tragen „Beginn + einige Tage“ und lägen bei kürzlich
+ * vergangenen Terminen ebenfalls in der Zukunft.
+ *
+ * Die Prüfung geschieht nachträglich statt in demoExpectedPairs(), damit die
+ * Ziehungen unverändert bleiben: Sonst hinge die Folge der Zufallswerte an der
+ * Stunde des Laufs, und der stündlich zurückgesetzte Bestand sähe nach jedem
+ * Reset anders aus. So fallen nur Einträge weg oder bleiben offen.
+ *
+ * - Anwesenheiten zu Terminen, die noch nicht begonnen haben, fallen weg,
+ *   ebenso Zeitkorrekturen dazu. Entschuldigungen bleiben — sie dürfen vorab
+ *   eingehen.
+ * - Ein Antrag, dessen Entscheidung nach $now läge, bleibt offen (`pending`).
+ * - Eine Arbeitszeit, deren Entscheidung nach $now läge, bleibt eingereicht
+ *   (`submitted`); ihr approve-/reject-Eintrag in der Auditspur entfällt.
+ *
+ * @return array{0: array, 1: array, 2: array{sessions: array, log: array}}
+ */
+function demoDropFuture(array $records, array $exceptions, array $work, array $appointments, string $now): array
+{
+    $notStarted = [];
+    foreach ($appointments as $a) {
+        if ("{$a['date']} {$a['start_time']}" > $now) {
+            $notStarted[$a['appointment_id']] = true;
+        }
+    }
+
+    $records = array_values(array_filter($records, fn ($r) => !isset($notStarted[$r['appointment_id']])));
+
+    $keptExceptions = [];
+    foreach ($exceptions as $e) {
+        if ($e['exception_type'] === 'time_correction' && isset($notStarted[$e['appointment_id']])) {
+            continue;
+        }
+        if ($e['approved_at'] !== null && $e['approved_at'] > $now) {
+            $e['status']      = 'pending';
+            $e['approved_by'] = null;
+            $e['approved_at'] = null;
+        }
+        $keptExceptions[] = $e;
+    }
+
+    $reopened = [];
+    foreach ($work['sessions'] as $i => $s) {
+        if ($s['approved_at'] !== null && $s['approved_at'] > $now) {
+            $work['sessions'][$i]['status']      = 'submitted';
+            $work['sessions'][$i]['approved_by'] = null;
+            $work['sessions'][$i]['approved_at'] = null;
+            $reopened[$s['session_id']]          = true;
+        }
+    }
+    $work['log'] = array_values(array_filter(
+        $work['log'],
+        fn ($l) => !(isset($reopened[$l['session_id']]) && in_array($l['action'], ['approve', 'reject'], true))
+    ));
+
+    return [$records, $keptExceptions, $work];
+}
+
+/**
  * Der vollständige Bestand.
  *
  * Ein Aufruf, ein Zufallsgenerator, eine Reihenfolge — damit derselbe Saat
@@ -1428,7 +1491,8 @@ function buildUsers(): array
  * Reproduzierbarkeit hängt an Saat und Stichtag ($referenceDate) — mit einer
  * Ausnahme: Der Start der einen laufenden Arbeitszeitsitzung (siehe
  * buildWorkSessions()) hängt zusätzlich an $referenceTime, dem Zeitpunkt des
- * Laufs. Alles andere im Bestand ist von $referenceTime unabhängig.
+ * Laufs. Außerdem verwirft bzw. öffnet demoDropFuture(), was nach diesem
+ * Zeitpunkt läge — die Ziehungen selbst bleiben davon unberührt.
  *
  * Nach allen Ziehungen hängt diese Funktion einen kommenden Auftritt an — den
  * aus buildFutureConcert() (FI-1). Die übrigen künftigen Termine stammen aus
@@ -1447,6 +1511,10 @@ function buildDemoPlan(int $seed, string $referenceDate, string $referenceTime =
     $records    = buildRecords($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $referenceDate);
     $exceptions = buildExceptions($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $records, $referenceDate);
     $work       = buildWorkSessions($random, $members['members'], $members['assignments'], $members['membership_dates'], $appointments, $typeGroups, $activityGroups, $referenceDate, $referenceTime);
+
+    // Ohne Ziehung: verwirft, was nach dem Lauf läge. Die Ziehungen oben
+    // bleiben dadurch unverändert, siehe demoDropFuture().
+    [$records, $exceptions, $work] = demoDropFuture($records, $exceptions, $work, $appointments, "{$referenceDate} {$referenceTime}");
 
     // Erst nach allen Ziehungen oben -- siehe buildAppointmentResponses().
     $appointments[] = buildFutureConcert($appointments, $referenceDate);

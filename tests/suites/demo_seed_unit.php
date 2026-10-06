@@ -1402,8 +1402,10 @@ test('buildDemoPlan: der Gesamtplan enthaelt genau einen kommenden Auftritt', fu
 
 test('buildDemoPlan: die bestehenden Abschnitte bleiben durch die Rueckmeldungen unveraendert', function () {
     // Die neuen Bausteine ziehen erst nach allen anderen aus dem Zufall. Aendert
-    // sich hier etwas, verschiebt sich der ganze Demo-Bestand.
-    $plan = buildDemoPlan(20260908, '2026-09-08');
+    // sich hier etwas, verschiebt sich der ganze Demo-Bestand. Lauf um
+    // 23:59:59, nach dem letzten Termin des Tages: Mittags verwirft
+    // demoDropFuture() die Anwesenheiten der Abendprobe.
+    $plan = buildDemoPlan(20260908, '2026-09-08', '23:59:59');
     $r    = new DemoRandom(20260908);
     $m    = buildMembers($r, '2026-09-08');
     $appts = buildAppointments($r, '2026-09-08');
@@ -1530,4 +1532,84 @@ test('jedes Registermitglied steht in mindestens einer Gruppe seines Registers (
         assertTrue($hit !== [], "Mitglied {$a['member_id']} im Register {$a['group_id']}, aber in keiner seiner Gruppen");
     }
     assertTrue($checked > 0, 'Kein Registermitglied geprueft');
+});
+
+/**
+ * Alle Zeitstempel eines Plans, die nach $now liegen, als lesbare Liste.
+ */
+function demoFutureStamps(array $plan, string $now): array
+{
+    $fields = [
+        'records'               => ['arrival_time'],
+        'exceptions'            => ['created_at', 'approved_at', 'requested_arrival_time'],
+        'work_sessions'         => ['start_time', 'end_time', 'approved_at'],
+        'work_session_log'      => ['changed_at'],
+        'appointment_responses' => ['status_changed_at', 'updated_at'],
+    ];
+    $found = [];
+    foreach ($fields as $table => $columns) {
+        foreach ($plan[$table] as $row) {
+            foreach ($columns as $col) {
+                if (($row[$col] ?? null) !== null && $row[$col] > $now) {
+                    $found[] = "{$table}.{$col} = {$row[$col]}";
+                }
+            }
+        }
+    }
+    return $found;
+}
+
+test('Kein Zeitstempel im Plan liegt nach dem Zeitpunkt des Laufs', function () {
+    // demoExpectedPairs() entscheidet nach dem Datum: Ohne demoDropFuture()
+    // bekam die Registerprobe am 2026-10-06 um 19:30 schon mittags 28
+    // Anwesenheiten mit Ankunft am Abend, und Genehmigungen trugen Daten
+    // einige Tage nach dem Lauf.
+    $laeufe = [
+        ['2026-10-06', '12:00:00'], ['2026-10-06', '19:29:00'], ['2026-10-09', '08:00:00'],
+        ['2026-10-13', '12:00:00'], ['2026-11-03', '12:00:00'], ['2026-12-04', '23:00:00'],
+        ['2027-01-15', '12:00:00'],
+    ];
+    foreach ($laeufe as [$tag, $zeit]) {
+        $found = demoFutureStamps(buildDemoPlan(20260908, $tag, $zeit), "{$tag} {$zeit}");
+        assertSame([], array_slice($found, 0, 5), "Lauf {$tag} {$zeit}: " . count($found) . ' Zeitstempel nach dem Lauf');
+    }
+});
+
+test('Ein Termin bekommt seine Anwesenheiten, sobald er begonnen hat', function () {
+    // Gegenprobe zu oben: demoDropFuture() darf nicht mehr verwerfen als
+    // noetig. Termin 98 ist die Registerprobe am 2026-10-06 um 19:30.
+    $count = function (string $zeit): int {
+        $plan = buildDemoPlan(20260908, '2026-10-06', $zeit);
+        $appt = array_values(array_filter($plan['appointments'], fn ($a) => $a['date'] === '2026-10-06'));
+        assertSame(1, count($appt), 'Vorbedingung: genau ein Termin am 2026-10-06');
+        assertSame('19:30:00', $appt[0]['start_time']);
+        return count(array_filter($plan['records'], fn ($r) => $r['appointment_id'] === $appt[0]['appointment_id']));
+    };
+    assertSame(0, $count('12:00:00'), 'Anwesenheiten vor Beginn');
+    assertTrue($count('23:00:00') > 10, 'nach Beginn fehlen die Anwesenheiten');
+});
+
+test('Die Uhrzeit des Laufs verschiebt keine Ziehung', function () {
+    // Mittags fehlt gegenueber dem Abend nur, was erst danach liegt: Jede
+    // Anwesenheit von mittags steht abends unveraendert da, Mitglieder,
+    // Termine und Antraege sind dieselben. Haengte die Ziehung an der Stunde,
+    // saehe die stuendlich zurueckgesetzte Demo nach jedem Reset anders aus.
+    $mittag = buildDemoPlan(20260908, '2026-10-06', '12:00:00');
+    $abend  = buildDemoPlan(20260908, '2026-10-06', '23:00:00');
+
+    assertSame($mittag['members'], $abend['members']);
+    assertSame($mittag['appointments'], $abend['appointments']);
+
+    $key       = fn ($r) => $r['member_id'] . '-' . $r['appointment_id'] . '-' . $r['arrival_time'];
+    $abendKeys = array_flip(array_map($key, $abend['records']));
+    foreach ($mittag['records'] as $r) {
+        assertTrue(isset($abendKeys[$key($r)]), 'Anwesenheit von mittags fehlt abends: ' . $key($r));
+    }
+    assertTrue(count($abend['records']) > count($mittag['records']), 'abends keine zusaetzlichen Anwesenheiten');
+
+    $exKey = fn ($e) => $e['member_id'] . '-' . $e['appointment_id'] . '-' . $e['exception_type'] . '-' . $e['created_at'];
+    $abendEx = array_map($exKey, $abend['exceptions']);
+    foreach (array_map($exKey, $mittag['exceptions']) as $k) {
+        assertTrue(in_array($k, $abendEx, true), "Antrag von mittags fehlt abends: {$k}");
+    }
 });
