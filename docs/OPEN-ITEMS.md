@@ -2625,6 +2625,34 @@ CORS-Köpfe und die Sonderbehandlung von `OPTIONS` entfernen. Falls doch: nur
 
 ---
 
+### OI-127 · `activate_user` und `user_status` sind in API.md falsch beschrieben
+**Priorität:** niedrig · aufgenommen am 2026-10-07 (Fund beim Bau des Gerätesimulators im IoT-Repo)
+
+`API.md` (Abschnitte „Benutzer aktivieren/deaktivieren“ und „Benutzerstatus aktualisieren“)
+beschreibt beide Ressourcen anders, als der Code arbeitet:
+
+| Ressource | API.md | Code (`private/handlers/users.php`) |
+|---|---|---|
+| `activate_user` | `{user_id, is_active}`, „aktivieren/deaktivieren“ | `handleUserActivation()`: liest nur `user_id` und `member_id`, `is_active` wird ignoriert. Setzt immer `account_status = 'active'`, `is_active = 1`, übernimmt `pending_member_id` und verschickt die Aktivierungsmail — die Freigabe einer Registrierung, kein Schalter |
+| `user_status` | `{user_id, role, member_id}` | `handleUserStatus()`: erwartet `{user_id, status}` mit `status` = `active` oder `suspended` und setzt `account_status` und `is_active` |
+
+Das Dashboard ruft beide richtig auf (`public/js/modules/users.js`), betroffen ist nur, wer nach
+der Doku arbeitet. Der Gerätesimulator im IoT-Repo schaltete ein Gerät zunächst per
+`activate_user {is_active: 0}` ab — der Aufruf antwortete 200, das Gerät blieb aktiv. Geräte
+schaltet man über `PUT users&id=<gerät>` mit `is_active` (Gerätezweig, `users.php`).
+
+**Nebenbefund:** `handleUserActivation()` prüft die Kontoart nicht. Auf ein Gerätekonto
+angewandt, setzt es `account_status` und versucht `sendActivationEmail()` an eine leere Adresse
+(Geräte haben keine E-Mail).
+
+**Vorschlag:** Beide Abschnitte in `API.md` nach dem Code neu schreiben; `activate_user` für
+Geräte und für bereits aktive Konten mit `400` bzw. `409` abweisen. Ob `api_doc_keys` die
+Request-Felder dieser beiden Ressourcen mit abdecken kann, dabei prüfen.
+
+**Nicht sicherheitsrelevant:** beide Ressourcen verlangen die Rolle Admin.
+
+---
+
 ## Bewusst entschieden — nicht erneut aufmachen
 
 | Thema | Entscheidung | Grund |
