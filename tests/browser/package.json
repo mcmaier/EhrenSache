@@ -6,9 +6,11 @@
   "scripts": {
     "click-through": "node click-through.mjs",
     "startup-chain": "node startup-chain.mjs",
-    "cache-reuse": "node cache-reuse.mjs"
+    "cache-reuse": "node cache-reuse.mjs",
+    "ics-check": "node ics-check.mjs"
   },
   "dependencies": {
+    "ical.js": "^2.2.1",
     "puppeteer-core": "^23.0.0"
   }
 }

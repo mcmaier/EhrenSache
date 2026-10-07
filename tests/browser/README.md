@@ -67,3 +67,26 @@ Braucht in `tests/config.php` das Konto `admin`. `ES_BASE_URL` überschreibt `ba
 nach einer Änderung an CSS oder JS liefert der Browser also weiter die alte Datei aus seinem
 Speicher — ein normales Neuladen hilft nicht, nur ein harter Reload oder „Disable cache“ in den
 Entwicklerwerkzeugen. Die Skripte hier starten mit frischem Profil und sind nicht betroffen.
+
+# Kalender-Feed mit ical.js (FI-8)
+
+`ics-check.mjs` parst den echten Kalender-Feed mit [ical.js](https://github.com/kewisch/ical.js),
+dem Parser von Thunderbird — ohne Browser, alles lokal. Ablauf: Anmeldung als `user` über
+`resource=auth`, Schalter `calendar_feed_enabled` als `admin` einschalten, einen Probetermin mit
+Umlauten (23:15 bis 00:45, Terminart eines Termins des Mitglieds) anlegen, Abo erzeugen, den vom
+Server ausgegebenen Link abrufen. Am Ende (auch nach einem Fehler) werden Probetermin und Abo
+gelöscht und der Schalter auf den vorherigen Wert zurückgestellt. Hat `user` schon ein Abo, bricht
+das Skript ab, statt es zu ersetzen.
+
+Geprüft werden: `VERSION:2.0` und `PRODID`; mindestens ein `VEVENT`; je Termin eine eindeutige
+`UID`, `DTSTART`/`DTEND` mit `TZID=Europe/Berlin`, Ende nach Beginn, Dauer unter 24 h, `SUMMARY`;
+die Umrechnung nach UTC ergibt +1 h im Winter und +2 h im Sommer (EU-Regel, letzter Sonntag im
+März/Oktober) — das gelingt nur, wenn ical.js den `VTIMEZONE`-Block liest; Titel (ohne `✓ `/`✗ `/`? `),
+Ort, Datum und Uhrzeit stimmen mit `GET appointments` desselben Kontos überein; der Probetermin
+kommt mit Umlauten unversehrt an und endet am Folgetag; Zeilen höchstens 75 Oktette, Zeilenende
+CRLF (RFC 5545, 3.1).
+
+    node tests/browser/ics-check.mjs      (oder: cd tests/browser && npm run ics-check)
+
+Braucht in `tests/config.php` die Konten `admin` und `user` (mit verknüpftem Mitglied) und die
+Tabelle `calendar_feeds`. `ES_BASE_URL` überschreibt `base_url`. Rückgabewert 1 bei jedem Fehler.

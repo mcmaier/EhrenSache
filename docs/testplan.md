@@ -1656,5 +1656,6 @@ Spec `docs/superpowers/specs/2026-10-07-kalender-abo-design.md`. Automatisiert:
 | CAL-7 | „Neuen Link erzeugen“ | Rückfrage; alter Link → 404, neuer liefert |
 | CAL-8 | „Abo beenden“ | Rückfrage; Link → 404; Karte zeigt wieder „Abo-Link erzeugen“ |
 | CAL-9 | Konto ohne Mitglied | Hinweis, kein Knopf |
-| CAL-10 | Link in Thunderbird/Outlook/Apple Kalender abonnieren | Termine mit richtiger Uhrzeit, Ort, Rückmeldung im Titel |
-| CAL-11 | Demo: Link in Google Kalender abonnieren | Termine erscheinen (verzögert) |
+| CAL-10 | Link in Thunderbird/Outlook/Apple Kalender abonnieren (Vorprüfung automatisiert: `node tests/browser/ics-check.mjs` parst den Feed mit ical.js, dem Parser von Thunderbird) | Termine mit richtiger Uhrzeit, Ort, Rückmeldung im Titel |
+| CAL-11 | Demo-Betrieb: Profil öffnen, Feed-URL abrufen | Hinweis „Im Demo-Betrieb nicht verfügbar.“, keine Knöpfe; Feed → 404 |
+| CAL-12 | Öffentlich erreichbare Installation **ohne** Demo-Modus: Link in Google Kalender abonnieren | Termine erscheinen (verzögert) |

@@ -310,6 +310,8 @@ php tests/run.php worktime_api
 - Klickdurchgang durch das Dashboard unter der CSP (nur lokal, nicht Teil von `tests/run.php`):
   `cd tests/browser && npm install`, dann `node tests/browser/click-through.mjs`; Details in
   `tests/browser/README.md`
+- Kalender-Feed (FI-8) mit ical.js, dem Parser von Thunderbird, prüfen (ebenfalls nur lokal):
+  `node tests/browser/ics-check.mjs` — schaltet die Funktion vorübergehend ein und räumt auf
 - **Veraltetes CSS/JS im Browser:** Dashboard und Anmeldeseite laden CSS und JS über
   `css/v<Version>/…`, auch lokal ein Jahr `immutable` (OI-120). Im Feature-Branch ändert sich die
   Version nicht — nach einer Änderung an CSS oder JS zeigt ein Browser (auch die Browser-Pane)
