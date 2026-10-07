@@ -225,7 +225,7 @@ const FEATURE_SWITCHES = {
     // Reihenfolge traegt die Stufung (OI-62, Etappe 2): Ein Schalter, den ein
     // vorheriger sperrt, zaehlt als aus -- Terminplanung aus sperrt den
     // Anwesenheitsschalter und damit auch dessen abhaengige Felder.
-    appointments_enabled: ['attendance_enabled', 'holiday_region', 'response_deadline_hours'],
+    appointments_enabled: ['attendance_enabled', 'holiday_region', 'response_deadline_hours', 'calendar_feed_enabled'],
     attendance_enabled:   ['checkin_auto_create_appointment', 'checkin_tolerance_hours',
                            'punctuality_enabled', 'reliability_enabled',
                            'rate_threshold_mid', 'rate_threshold_fair', 'rate_threshold_good'],
@@ -552,7 +552,8 @@ async function saveAllSettings() {
         // Ein Schalter aus FEATURES wurde umgelegt (OI-62): Stand aus me neu
         // holen, Menue anwenden, dann die Zusatzbedingung der Zeiterfassung.
         const FEATURE_KEYS = ['appointments_enabled', 'attendance_enabled', 'worktime_enabled',
-                              'station_pin_enabled', 'punctuality_enabled', 'reliability_enabled'];
+                              'station_pin_enabled', 'punctuality_enabled', 'reliability_enabled',
+                              'calendar_feed_enabled'];
         if (updates.some(u => FEATURE_KEYS.includes(u.key))) {
             const { refreshFeatures } = await import('./features.js');
             await refreshFeatures();
