@@ -68,3 +68,57 @@ test('Demo-Betrieb: Hinweis statt Knoepfen', function () {
     assertTrue((bool) preg_match("/byId\('calendarFeedInactive'\)\.classList\.toggle\('hidden',\s*demo\s*\|\|/", $js),
         'Knopf „Abo-Link erzeugen“ bleibt im Demo-Betrieb sichtbar');
 });
+
+// ---- Rueckmelde-Link in der Check-in-App (Entscheidung 2026-10-07) ----------
+
+/** Rumpf einer JS-Funktion bis zur naechsten Top-Level-Funktion. */
+function cffFunctionBody(string $js, string $name): string
+{
+    $start = strpos($js, "function {$name}(");
+    assertTrue($start !== false, "Funktion {$name} fehlt");
+    $next = preg_match('/\n(?:export\s+)?(?:async\s+)?function\s/', $js, $m, PREG_OFFSET_CAPTURE, $start + 10)
+        ? $m[0][1] : strlen($js);
+
+    return substr($js, $start, $next - $start);
+}
+
+test('PWA: #rueckmeldung=<id> wird gelesen und nur als Zahl angenommen', function () {
+    $js = sourceCode(CFF_ROOT . '/public/checkin/js/app.js');
+    $parse = cffFunctionBody($js, 'parseResponseDeepLink');
+    assertTrue(strpos($parse, '/^#rueckmeldung=(\d+)$/') !== false, 'Muster ^#rueckmeldung=(\d+)$ fehlt');
+    assertTrue((bool) preg_match('/let pendingResponseLink = parseResponseDeepLink\(window\.location\.hash\);/', $js),
+        'Fragment wird beim Laden nicht gelesen');
+});
+
+test('PWA: Offene Punkte und Rueckmelde-Link oeffnen die Karte ueber dieselbe Funktion', function () {
+    $js = sourceCode(CFF_ROOT . '/public/checkin/js/app.js');
+
+    $card = cffFunctionBody($js, 'openResponseCard');
+    assertTrue(strpos($card, 'responsesExpanded.add(') !== false, 'Karte wird nicht aufgeklappt');
+    assertTrue(strpos($card, 'data-tab="responses"') !== false, 'Termine-Tab wird nicht geoeffnet');
+    assertTrue(strpos($card, 'await loadResponses()') !== false, 'Karte wird nicht nach dem Laden gesucht');
+    assertTrue(strpos($card, 'scrollIntoView(') !== false, 'Karte wird nicht in den Blick geholt');
+
+    $click = cffFunctionBody($js, 'onOpenItemsClick');
+    assertTrue(strpos($click, 'openResponseCard(') !== false, 'Offene Punkte nutzen openResponseCard() nicht');
+    assertTrue(strpos($click, 'responsesExpanded.add(') === false, 'Offene Punkte haben eine eigene Kopie der Logik');
+
+    $link = cffFunctionBody($js, 'openPendingResponseLink');
+    assertTrue(strpos($link, 'openResponseCard(') !== false, 'Rueckmelde-Link oeffnet die Karte nicht');
+    assertTrue(strpos($link, "pwaFeatureOn('appointments')") !== false, 'Rueckmelde-Link prueft die Terminplanung nicht');
+    assertTrue(strpos($link, 'history.replaceState(null, \'\', window.location.pathname + window.location.search)') !== false,
+        'Fragment wird nicht entfernt');
+});
+
+test('PWA: Rueckmelde-Link greift nach dem Start (beide Anmeldewege) und bei hashchange', function () {
+    $js = sourceCode(CFF_ROOT . '/public/checkin/js/app.js');
+
+    // startSession() ist der gemeinsame Abschluss von gespeichertem Token und
+    // Anmeldeformular; der Aufruf muss nach initTabs() stehen, das die
+    // Rueckmeldungen zuruecksetzt.
+    $start = cffFunctionBody($js, 'startSession');
+    assertTrue((bool) preg_match('/initTabs\(\);[\s\S]*openPendingResponseLink\(\);/', $start),
+        'startSession() oeffnet den Rueckmelde-Link nicht nach initTabs()');
+
+    assertTrue((bool) preg_match("/addEventListener\('hashchange'/", $js), 'Kein hashchange-Zuhoerer');
+});

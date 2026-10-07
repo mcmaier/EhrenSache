@@ -522,6 +522,53 @@ test('Feed: hide_declined aus zeigt den abgesagten Termin mit ✗', function () 
     });
 });
 
+/** Entfalteter VEVENT eines Termins ('' wenn nicht im Feed). */
+function cfEventBlock(string $ics, int $appointmentId): string
+{
+    $u = str_replace("\r\n ", '', $ics);
+    $pos = strpos($u, "UID:appointment-{$appointmentId}@");
+    if ($pos === false) {
+        return '';
+    }
+    $start = strrpos(substr($u, 0, $pos), 'BEGIN:VEVENT');
+    $end   = strpos($u, 'END:VEVENT', $pos);
+
+    return substr($u, (int) $start, (int) $end - (int) $start);
+}
+
+test('Feed: Rueckmelde-Link nur fuer kommende Termine mit Rueckmeldungen', function () {
+    cfWithFeature(function () {
+        cfWithWorld(function (array $ids) {
+            try {
+                $neu = cfFeed('user', 'POST', []);
+                assertStatus(201, $neu);
+                // BASE_URL des Servers aus der Feed-URL, nicht aus der Testkonfiguration
+                assertTrue((bool) preg_match('#^(.*)/api/calendar/[0-9a-f]{64}\.ics$#', $neu['body']['url'], $m));
+                $base = $m[1];
+                $ics  = cfFetch($neu['body']['url'])['body'];
+
+                $in   = cfEventBlock($ics, $ids['in']);
+                $link = "{$base}/checkin/#rueckmeldung={$ids['in']}";
+                assertTrue(strpos($in, "\r\nURL:{$link}\r\n") !== false, "URL fehlt im kommenden Termin: {$in}");
+                assertTrue(strpos($in, 'Rückmeldung geben: ' . str_replace([',', ';'], ['\\,', '\\;'], $link)) !== false,
+                    '„Rückmeldung geben“ fehlt');
+
+                $evtl = cfEventBlock($ics, $ids['evtl']);
+                assertTrue(strpos($evtl, "\r\nURL:{$base}/checkin/#rueckmeldung={$ids['evtl']}\r\n") !== false, 'URL fehlt bei „unsicher“');
+                assertTrue(strpos($evtl, 'Rückmeldung ändern: ') !== false, '„Rückmeldung ändern“ fehlt bei eigener Rueckmeldung');
+                assertTrue(strpos($evtl, 'Rückmeldung geben') === false, '„geben“ trotz eigener Rueckmeldung');
+
+                $nah = cfEventBlock($ics, $ids['nah']);
+                assertTrue($nah !== '', 'Vergangener Termin fehlt im Feed');
+                assertTrue(strpos($nah, 'URL:') === false, 'Vergangener Termin hat einen Rueckmelde-Link');
+                assertTrue(strpos($nah, '#rueckmeldung=') === false, 'Vergangener Termin nennt den Link in der Beschreibung');
+            } finally {
+                cfFeed('user', 'DELETE');
+            }
+        });
+    });
+});
+
 test('Feed: Header, HEAD ohne Rumpf, last_fetched_at gesetzt', function () {
     cfWithFeature(function () {
         try {
@@ -730,6 +777,8 @@ test('Feed: Absage bei Terminart ohne Rueckmeldungen blendet nicht aus, kein ✗
                 assertTrue(cfHasEvent($ics, $aptId), 'Termin ohne Rueckmeldungen trotz hide_declined ausgeblendet');
                 assertTrue(strpos($ics, "SUMMARY:CF ohne {$s}") !== false, 'SUMMARY ohne Praefix erwartet');
                 assertTrue(strpos($ics, "SUMMARY:✗ CF ohne {$s}") === false, 'Praefix ✗ bei Terminart ohne Rueckmeldungen');
+                assertTrue(strpos(cfEventBlock($ics, $aptId), '#rueckmeldung=') === false,
+                    'Rueckmelde-Link bei Terminart ohne Rueckmeldungen');
             } finally {
                 cfFeed('user', 'DELETE');
                 if ($aptId !== null) {

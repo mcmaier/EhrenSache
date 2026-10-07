@@ -172,11 +172,23 @@ function icalBuildEvent(array $row, string $uidHost, string $dtstamp): array
         $kommentar = trim((string) ($row['response_comment'] ?? ''));
         $meta[] = 'Deine Rückmeldung: ' . $status[1] . ($kommentar !== '' ? ' – ' . $kommentar : '');
     }
+    // Rueckmelde-Link (Entscheidung 2026-10-07): Ob er erscheint, entscheidet der
+    // Handler (Rueckmeldungen an, Termin nicht vorbei) -- hier nur die Ausgabe.
+    $responseUrl = $row['response_url'] ?? null;
+    $responseUrl = is_string($responseUrl) && $responseUrl !== '' ? $responseUrl : null;
+    if ($responseUrl !== null) {
+        $meta[] = ($status !== null ? 'Rückmeldung ändern: ' : 'Rückmeldung geben: ') . $responseUrl;
+    }
     if ($meta !== []) {
         $absaetze[] = implode("\n", $meta);
     }
     if ($absaetze !== []) {
         $lines[] = 'DESCRIPTION:' . icalEscapeText(implode("\n\n", $absaetze));
+    }
+    if ($responseUrl !== null) {
+        // URL ist ein URI-Wert, kein TEXT: keine Maskierung (RFC 5545, 3.8.4.6).
+        // Steuerzeichen und Zeilenumbrueche wuerden die Zeile brechen -- raus damit.
+        $lines[] = 'URL:' . preg_replace('/[\x00-\x1F\x7F]/', '', $responseUrl);
     }
 
     $lines[] = 'END:VEVENT';

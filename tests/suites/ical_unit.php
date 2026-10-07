@@ -243,3 +243,47 @@ test('VCALENDAR: eine kaputte Zeile wird uebersprungen, der Rest bleibt', functi
     assertTrue(strpos(icUnfold($ics), 'UID:appointment-42@') !== false, 'Gueltiger Termin fehlt');
     assertTrue(strpos($ics, "END:VCALENDAR\r\n") !== false);
 });
+
+// ---- Rueckmelde-Link (FI-8, Entscheidung 2026-10-07) -----------------------
+
+const IC_RESPONSE_URL = 'https://verein.example/ehrensache/public/checkin/#rueckmeldung=42';
+
+test('VEVENT: Rueckmelde-Link als URL und letzte Zeile der Beschreibung (ohne Rueckmeldung)', function () {
+    $l = icEventLines(icRow(['response_url' => IC_RESPONSE_URL]));
+    assertSame('URL:' . IC_RESPONSE_URL, icLine($l, 'URL'));
+    assertSame('DESCRIPTION:Terminart: Gesamtprobe\nRückmeldung geben: ' . IC_RESPONSE_URL,
+        icLine($l, 'DESCRIPTION'));
+});
+
+test('VEVENT: Rueckmelde-Link mit eigener Rueckmeldung heisst „ändern“', function () {
+    $l = icEventLines(icRow(['response_url' => IC_RESPONSE_URL, 'response_status' => 'maybe',
+                             'description' => 'Noten mitbringen']));
+    assertSame('DESCRIPTION:Noten mitbringen\n\nTerminart: Gesamtprobe\nDeine Rückmeldung: Unsicher\n'
+        . 'Rückmeldung ändern: ' . IC_RESPONSE_URL, icLine($l, 'DESCRIPTION'));
+    assertSame('URL:' . IC_RESPONSE_URL, icLine($l, 'URL'));
+});
+
+test('VEVENT: ohne response_url weder URL noch Link-Zeile', function () {
+    foreach ([null, ''] as $wert) {
+        $l = icEventLines(icRow(['response_url' => $wert]));
+        assertSame(null, icLine($l, 'URL'));
+        assertTrue(strpos((string) icLine($l, 'DESCRIPTION'), 'Rückmeldung geben') === false, 'Link-Zeile ohne URL');
+    }
+    $l = icEventLines(icRow());
+    assertSame(null, icLine($l, 'URL'));
+});
+
+test('VEVENT: URL ist ein URI-Wert -- nicht maskiert, aber gefaltet', function () {
+    $url = 'https://verein.example/a,b;c/' . str_repeat('x', 80) . '/checkin/#rueckmeldung=42';
+    $ics = icalBuildCalendar('Termine', [icRow(['response_url' => $url])], 'verein.example',
+        new DateTimeImmutable('2026-10-07 12:00:00', new DateTimeZone('UTC')));
+    foreach (explode("\r\n", $ics) as $i => $physisch) {
+        assertTrue(strlen($physisch) <= 75, "Zeile {$i} hat " . strlen($physisch) . ' Bytes');
+    }
+    // Entfaltet exakt zum Original -- damit auch Komma und Semikolon unmaskiert
+    assertTrue(strpos(icUnfold($ics), "\r\nURL:" . $url . "\r\n") !== false, 'URL-Zeile entfaltet nicht zum Original');
+    assertTrue(strpos(icUnfold($ics), 'URL:https://verein.example/a\\,b') === false, 'URL als TEXT maskiert');
+    // In der Beschreibung (TEXT) dagegen maskiert
+    assertTrue(strpos(icUnfold($ics), 'Rückmeldung geben: https://verein.example/a\\,b\\;c/') !== false,
+        'Link in der Beschreibung nicht als TEXT maskiert');
+});

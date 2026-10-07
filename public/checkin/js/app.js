@@ -87,6 +87,12 @@ let appointmentTypesLoad = null;
 // zeichnet nichts mehr (OI-121).
 let sessionGeneration = 0;
 
+// Rueckmelde-Link aus dem Kalender-Abo (FI-8): checkin/#rueckmeldung=<id>.
+// Das Fragment geht nicht an den Server, der Link traegt kein Token. Gelesen
+// wird es hier beim Laden; die Anmeldung laeuft ohne Neuladen in der Seite,
+// das Fragment bleibt also stehen, bis startSession() es einloest.
+let pendingResponseLink = parseResponseDeepLink(window.location.hash);
+
 let checkinAppointments = [];
 let clientSettings = { checkin_auto_create_appointment: '1', checkin_tolerance_hours: '2' };
 // Aktion des Bestaetigungsdialogs: Seit OI-125 loescht er nicht mehr nur
@@ -227,6 +233,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     checkNFCSupport();
+
+    // Rueckmelde-Link bei offener App (FI-8): Ein zweiter Link auf dieselbe
+    // Seite laedt nicht neu, der Browser meldet nur hashchange. Angemeldet
+    // (Hauptansicht steht) sofort einloesen, sonst tut es startSession().
+    window.addEventListener('hashchange', () => {
+        const id = parseResponseDeepLink(window.location.hash);
+        if (id === null) return;
+        pendingResponseLink = id;
+        if (elements.mainScreen?.classList.contains('active')) {
+            openPendingResponseLink();
+        }
+    });
 
     // Auto-Login prüfen
     checkAutoLogin();
@@ -1167,6 +1185,10 @@ async function startSession(meData) {
     initYearNavigation();
     // Terminarten nur mit eingeschalteter Terminplanung (OI-62, Etappe 2).
     appointmentTypesLoad = pwaFeatureOn('appointments') ? loadAppointmentTypes() : null;
+
+    // Rueckmelde-Link (FI-8): erst nach initTabs(), dessen initResponsesTab()
+    // die aufgeklappten Karten zuruecksetzt. Gilt fuer beide Anmeldewege.
+    openPendingResponseLink();
 }
 
 /**
@@ -4795,20 +4817,55 @@ async function onOpenItemsClick(event) {
     const btn = event.target.closest('.open-item-pwa');
     if (!btn) return;
     if (btn.dataset.kind === 'response') {
-        const id = Number(btn.dataset.appointmentId);
-        responsesExpanded.add(id);
         // Der Rueckmeldungs-Tab ist sichtbar, sobald es einen Punkt der Art
         // "response" gibt -- der setzt einen rueckmeldefaehigen Termin voraus,
         // und genau dieser haelt den Tab-Button ungeblendet (loadResponses()).
-        document.querySelector('.tab-button[data-tab="responses"]')?.click();
-        // loadResponses() ist idempotent; der eigene await liefert -- anders
-        // als der Klick oben -- einen Zeitpunkt, zu dem die Karte im DOM
-        // steht, ohne eine feste Wartezeit zu raten.
-        await loadResponses();
-        document.querySelector(`#responsesList .response-card[data-appointment-id="${id}"]`)
-            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await openResponseCard(Number(btn.dataset.appointmentId));
     } else {
         document.querySelector('.tab-button[data-tab="history"]')?.click();
+    }
+}
+
+/**
+ * Oeffnet den Termine-Tab mit aufgeklappter Karte des Termins und holt sie in
+ * den Blick. Gemeinsam fuer "Offene Punkte" und den Rueckmelde-Link (FI-8).
+ * Gibt es die Karte nicht (Termin vorbei, unbekannt, fremde Gruppe), bleibt
+ * der Tab einfach offen -- ohne Fehlermeldung. Ist er ganz ohne Inhalt,
+ * blendet loadResponses() ihn aus und kehrt zum Erfassen-Tab zurueck.
+ */
+async function openResponseCard(id) {
+    responsesExpanded.add(id);
+    document.querySelector('.tab-button[data-tab="responses"]')?.click();
+    // loadResponses() ist idempotent; der eigene await liefert -- anders
+    // als der Klick oben -- einen Zeitpunkt, zu dem die Karte im DOM
+    // steht, ohne eine feste Wartezeit zu raten.
+    await loadResponses();
+    document.querySelector(`#responsesList .response-card[data-appointment-id="${id}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/** Termin-ID aus '#rueckmeldung=<id>', sonst null. */
+function parseResponseDeepLink(hash) {
+    const m = /^#rueckmeldung=(\d+)$/.exec(hash || '');
+    return m ? Number(m[1]) : null;
+}
+
+/**
+ * Loest einen gemerkten Rueckmelde-Link ein (FI-8): einmalig, danach ist das
+ * Fragment aus der Adresse entfernt -- ein Neuladen oeffnet die Karte nicht
+ * erneut. Ohne Terminplanung (OI-62) gibt es keinen Tab, dann nur aufraeumen.
+ */
+async function openPendingResponseLink() {
+    const id = pendingResponseLink;
+    if (id === null) return;
+    pendingResponseLink = null;
+
+    try {
+        if (pwaFeatureOn('appointments')) {
+            await openResponseCard(id);
+        }
+    } finally {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
     }
 }
 

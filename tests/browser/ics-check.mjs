@@ -22,7 +22,8 @@
 // dass der VTIMEZONE-Block richtig gelesen wird); keine Dauer ab 24 h;
 // Titel, Ort, Datum und Uhrzeit stimmen mit GET appointments desselben
 // Kontos ueberein; Zeilen hoechstens 75 Oktette, CRLF als Zeilenende
-// (RFC 5545, 3.1). Damit sicher Umlaute dabei sind, legt das Skript als admin
+// (RFC 5545, 3.1); ein Rueckmelde-Link (URL) zeigt auf checkin/#rueckmeldung=<id>,
+// steht nur an kommenden Terminen und als letzte Zeile der Beschreibung. Damit sicher Umlaute dabei sind, legt das Skript als admin
 // einen Probetermin mit langem Titel und Ort voller Umlaute an (ueber
 // Mitternacht, Terminart eines Termins des Mitglieds) und loescht ihn am Ende.
 //
@@ -229,6 +230,9 @@ async function main() {
         let last = null;
         let nonAscii = 0;
         let compared = 0;
+        let links = 0;
+        const checkinBase = post.json.url.replace(/\/api\/calendar\/[0-9a-f]{64}\.ics$/, '') + '/checkin/#rueckmeldung=';
+        const todayYmd = ymd(new Date());
         const offsets = { 1: 0, 2: 0 };
 
         for (const comp of events) {
@@ -284,6 +288,18 @@ async function main() {
             const wantStart = `${appt.date} ${String(appt.start_time).slice(0, 5)}`;
             check(`${tag}: Beginn = Datum/Uhrzeit`, localText(start) === wantStart, `${localText(start)} vs. ${wantStart}`);
             if (/[^\x00-\x7f]/.test(title + feedLoc)) nonAscii++;
+
+            // Rueckmelde-Link (Entscheidung 2026-10-07): URL als URI-Wert und als
+            // letzte Zeile der Beschreibung, nur fuer heute und spaeter
+            const url = comp.getFirstPropertyValue('url');
+            if (url) {
+                links++;
+                check(`${tag}: URL = Rueckmelde-Link`, url === checkinBase + id, `${url}`);
+                check(`${tag}: Rueckmelde-Link nur fuer kommende Termine`, appt.date >= todayYmd, appt.date);
+                const desc = comp.getFirstPropertyValue('description') ?? '';
+                check(`${tag}: Beschreibung endet mit dem Link`,
+                    desc.endsWith(`Rückmeldung geben: ${url}`) || desc.endsWith(`Rückmeldung ändern: ${url}`), JSON.stringify(desc.slice(-120)));
+            }
         }
 
         const probe = events.map(c => new ICAL.Event(c)).find(e => (e.uid ?? '').startsWith(`appointment-${probeId}@`));
@@ -298,6 +314,7 @@ async function main() {
         console.log('ical.js-Prüfung des Kalender-Feeds (FI-8)');
         console.log(`  ical.js:        ${ICAL_VERSION}`);
         console.log(`  Termine:        ${events.length} (davon ${compared} mit der Terminliste abgeglichen, ${nonAscii} mit Umlauten/Sonderzeichen)`);
+        console.log(`  Rückmelde-Link: ${links} Termine`);
         console.log(`  Zeitraum:       ${first?.s ?? '-'} bis ${last?.s ?? '-'} (Ortszeit ${TZID})`);
         console.log(`  UTC-Abstand:    ${offsets[1]} × +1 h (Winter), ${offsets[2]} × +2 h (Sommer)`);
     } finally {

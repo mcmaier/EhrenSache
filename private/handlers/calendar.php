@@ -224,6 +224,18 @@ function handleCalendarDownload($db, $database, string $method, ?array $owner): 
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Rueckmelde-Link (Entscheidung 2026-10-07): nur bei Terminarten mit
+        // Rueckmeldungen und nur fuer heute und spaeter. Der Link traegt kein
+        // Token -- die Check-in-App liest das Fragment und verlangt die Anmeldung.
+        $today      = date('Y-m-d');
+        $checkinUrl = rtrim(BASE_URL, '/') . '/checkin/#rueckmeldung=';
+        foreach ($rows as &$row) {
+            $row['response_url'] = ((int) $row['responses_enabled'] === 1 && (string) $row['date'] >= $today)
+                ? $checkinUrl . (int) $row['appointment_id']
+                : null;
+        }
+        unset($row);
     }
 
     $db->prepare("UPDATE {$prefix}calendar_feeds SET last_fetched_at = ?
