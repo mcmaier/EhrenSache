@@ -167,7 +167,8 @@ Gelöschte Termine fehlen beim nächsten Abruf; der Feed wird jedes Mal vollstä
   (Fortsetzung mit führendem Leerzeichen, nie innerhalb eines UTF-8-Zeichens), Zeilenende CRLF.
 - Header: `Content-Type: text/calendar; charset=utf-8`,
   `Content-Disposition: inline; filename="termine.ics"`, `Cache-Control: private, max-age=0`,
-  `X-Robots-Tag: noindex`, `Referrer-Policy: no-referrer`.
+  `X-Robots-Tag: noindex`. Für `Referrer-Policy` gilt die globale Vorgabe aus `public/.htaccess`
+  (`strict-origin-when-cross-origin`); ein eigener Header aus PHP käme nur zusätzlich an.
 
 ### Aufbau
 

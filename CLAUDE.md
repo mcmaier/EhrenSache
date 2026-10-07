@@ -90,6 +90,7 @@ EhrenSache/
 │   │   ├── attendance_list.php, my_data.php, my_open_items.php
 │   │   ├── auto_checkin.php, totp_checkin.php, station.php
 │   │   ├── regenerate_token.php, change_password.php, change_pin.php, user_mailer.php
+│   │   ├── calendar.php        # Kalender-Abo: Verwaltung calendar_feed und öffentlicher Feed calendar
 │   │   └── update_check.php    # Update-Prüfung auf Knopfdruck
 │   ├── helpers/
 │   │   ├── auth.php            # login(), requireRole(), isAdmin(), isDevice(), CSRF
@@ -106,6 +107,8 @@ EhrenSache/
 │   │   ├── groups.php          # Fachlogik Untergruppen: Bezeichnung, Sortierung (FI-14, 1.8.0)
 │   │   ├── station.php         # Fachlogik virtuelle Station (Kiosk): Code, PIN-Prüfung, Sperre
 │   │   ├── open_items.php      # Offene Punkte je Mitglied, FI-17
+│   │   ├── ical.php            # ICS-Erzeugung
+│   │   ├── calendar_feed_schema.php # Tabelle calendar_feeds anlegen, für den Migrationsschritt
 │   │   ├── migrations.php      # Ausführung der Migrationskette
 │   │   ├── version.php         # Liest version.json
 │   │   ├── branding.php, mail_template.php, mailer.php
@@ -132,7 +135,7 @@ EhrenSache/
     │   └── modules/            # api, auth, ui, members, appointments, records,
     │                           # exceptions, users, devices, profile, management,
     │                           # settings, statistics, worktime, responses, grouping,
-    │                           # import_export, open_items, utils
+    │                           # import_export, open_items, calendar_feed, utils
     ├── css/
     │   ├── variables.css, reset.css, main.css, responsive.css, utilities.css, login.css
     │   ├── components/         # buttons, cards, forms, modals, tables, badges,
@@ -168,7 +171,7 @@ Request-Parameter: `?resource=<name>&id=<id>`
 
 **Ressourcen:** members, appointments, records, exceptions, users, membership_dates,
 member_groups, appointment_types, appointment_responses, activity_types, work_sessions,
-statistics, available_years,
+statistics, available_years, calendar_feed, calendar,
 auto_checkin, totp_checkin, station, regenerate_token, change_password, change_pin, export,
 import, import_logs, settings, upload-logo, attendance_list, activate_user, user_status,
 cleanup, my_data, my_open_items, session_info, version, update_check, ping — Details in `API.md`.

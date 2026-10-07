@@ -2663,7 +2663,10 @@ Das Kalender-Abo (FI-8) braucht die Tabelle `calendar_feeds`. `private/setup/ehr
 legt sie für neue Installationen an; den Schritt in `private/migrations/` legt nach der Regel für
 parallele Sitzungen erst die Release-Sitzung an. **Ohne ihn scheitert bei bestehenden
 Installationen die Datenauskunft (`my_data`)** — sie liest den Abo-Status auch bei
-abgeschalteter Funktion —, und das Einschalten der Funktion führt zu Datenbankfehlern.
+abgeschalteter Funktion. Bei **eingeschalteter** Funktion scheitern zusätzlich die Verwaltung
+(`calendar_feed`) und der öffentliche Feed (`calendar`). Bei abgeschalteter Funktion berührt der
+öffentliche Feed die Tabelle nicht: `api.php` schlägt den Token nur bei eingeschalteter Funktion
+nach, der Abruf endet mit 404 und zählt wie jeder unangemeldete Aufruf in die Rate-Grenze.
 
 **Für die Release-Sitzung:** Migrationsdatei mit dem nächsten Manifest-Eintrag, die
 `calendarFeedMigrate(PDO $pdo, string $prefix)` aus `private/helpers/calendar_feed_schema.php`
@@ -2671,6 +2674,13 @@ aufruft und `log`/`warnings` zurückgibt (wiederholbar, verändert keine Daten; 
 Einstellungszeile ist nicht nötig, der Default aus `FEATURES` greift).
 `calendar_feed_schema.php` hält PHP-8.0-Syntax und gehört dann in die Liste von
 `tests/suites/update_path_syntax.php`. `DEMO_MIN_SCHEMA` (`private/demo/seed.php`) mit anheben.
+
+**Demo-Rücksetzung, mit demselben Schritt:** `DEMO_TABLES` in `private/demo/seed.php` braucht
+`calendar_feeds` (vor `users`), dazu ein Test analog zur Prüfung von `subgroup_parents` in
+`tests/suites/demo_seed_cli.php`. `clearAll()` schaltet die Fremdschlüsselprüfung ab, das
+`ON DELETE CASCADE` greift dort also nicht: Ein Abo-Link eines Demo-Besuchers überlebte sonst die
+nächtliche Rücksetzung und funktionierte für das neu angelegte Konto mit derselben `user_id`
+weiter. Nicht vorab eintragen — `seed.php` scheiterte sonst auf Datenbanken ohne die Tabelle.
 
 **Testdatenbanken:** `php tests/db/apply_calendar_feed.php` legt die Tabelle in der Datenbank
 aus `private/config/config.php` an (für `ehrensache_fi8` erledigt). Die Datenbank des

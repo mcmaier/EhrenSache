@@ -1388,8 +1388,9 @@ Termine. Die eigene Rückmeldung steht als Präfix im Titel (`✓ `, `✗ `, `? 
 Beschreibung; mit `hide_declined` fehlen abgesagte Termine. Ein Termin mit nicht lesbarer
 Uhrzeit wird übersprungen (im Fehlerlog vermerkt), der übrige Feed wird geliefert.
 
-Der Feed sendet **keine CORS-Header** (für diese Ressource entfernt) und `Referrer-Policy:
-no-referrer`.
+Der Feed sendet **keine CORS-Header** (für diese Ressource entfernt). Es gilt die globale
+`Referrer-Policy` aus `public/.htaccess` (`strict-origin-when-cross-origin`); eine eigene setzt
+der Feed nicht, Apache würde sie nur als zweiten Header danebenstellen.
 
 `404` mit leerem Rumpf bei unbekanntem Token, deaktiviertem Konto, Konto ohne Mitglied und
 abgeschalteter Funktion — bewusst ununterscheidbar. Abrufe mit gültigem Token zählen nicht in

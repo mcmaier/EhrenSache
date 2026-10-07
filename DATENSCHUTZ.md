@@ -724,8 +724,9 @@ einen persönlichen Abo-Link erzeugen.
   Zugriffsprotokollen des Webservers und beim Kalenderanbieter. In der Datenbank liegt nur ein
   Hash. Das Mitglied kann den Link jederzeit ersetzen oder das Abo beenden; „zuletzt abgerufen“
   zeigt, ob er noch benutzt wird. Ein deaktiviertes Konto liefert keinen Feed mehr.
-- **Gespeichert:** Hash, Zeitpunkt der Erzeugung, letzter Abruf (stündlich gerundet), Einstellung
-  „abgesagte ausblenden“. Enthalten in der Datenauskunft; gelöscht mit dem Konto.
+- **Gespeichert:** Hash, Zeitpunkt der Erzeugung, letzter Abruf (höchstens einmal pro Stunde
+  aktualisiert, nicht gerundet), Einstellung „abgesagte ausblenden“. Enthalten in der
+  Datenauskunft; gelöscht mit dem Konto.
 - **Verschlüsselte Übertragung:** Läuft die Installation hinter einem Proxy, der TLS beendet,
   `base_url` in der `config.php` mit `https://` setzen — sonst kann der erzeugte Link mit
   `http://` beginnen. Viele Kalender-Apps lösen `webcal://` beim ersten Abruf als `http://` auf;
