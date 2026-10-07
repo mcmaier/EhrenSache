@@ -190,6 +190,19 @@ function handleMyData($db, $database, $request_method, $authUserId)
     $stmt->execute([$member_id]);
     $data['appointment_responses'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Kalender-Abo (FI-8): nur der Status, nie der Hash des Tokens
+    $stmt = $db->prepare("SELECT created_at, last_fetched_at, hide_declined FROM {$prefix}calendar_feeds WHERE user_id = ?");
+    $stmt->execute([$authUserId]);
+    $feed = $stmt->fetch(PDO::FETCH_ASSOC);
+    $data['calendar_feed'] = $feed === false
+        ? ['active' => false]
+        : [
+            'active'          => true,
+            'created_at'      => $feed['created_at'],
+            'last_fetched_at' => $feed['last_fetched_at'],
+            'hide_declined'   => (int) $feed['hide_declined'] === 1,
+        ];
+
     // Puenktlichkeit und Zuverlaessigkeit je Jahr -- abgeleitete Kennzahlen,
     // keine gespeicherten Daten. Sie gehoeren trotzdem in die Auskunft: Die
     // DSGVO nennt Zuverlaessigkeit und Verhalten bei der Begriffsbestimmung
@@ -252,6 +265,11 @@ function exportAsCSV($data) {
     $csvZeile(['Aktiv', $data['member']['active'] ? 'Ja' : 'Nein']);
     $csvZeile(['Stations-PIN gesetzt', $data['member']['has_pin'] ? 'Ja' : 'Nein']);
     $csvZeile(['PIN zuletzt geändert', $data['member']['pin_updated_at'] ?? '-']);
+    $csvZeile(['Kalender-Abo', $data['calendar_feed']['active']
+        ? 'aktiv seit ' . $data['calendar_feed']['created_at']
+          . ', zuletzt abgerufen ' . ($data['calendar_feed']['last_fetched_at'] ?? 'nie')
+          . ', abgesagte ' . ($data['calendar_feed']['hide_declined'] ? 'ausgeblendet' : 'angezeigt')
+        : 'nein']);
     $csvZeile([]);
     
     // Gruppen

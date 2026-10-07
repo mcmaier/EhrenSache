@@ -695,3 +695,29 @@ test('Feed: Absage bei Terminart ohne Rueckmeldungen blendet nicht aus, kein ✗
         });
     });
 });
+
+test('my_data enthaelt den Abo-Status, nie den Hash', function () {
+    cfWithFeature(function () {
+        try {
+            cfFeed('user', 'DELETE');
+            $res = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'json']]);
+            assertStatus(200, $res);
+            assertSame(['active' => false], $res['body']['calendar_feed'] ?? null);
+
+            assertStatus(201, cfFeed('user', 'POST', []));
+            $res = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'json']]);
+            $feed = $res['body']['calendar_feed'] ?? [];
+            assertSame(true, $feed['active'] ?? null);
+            assertTrue(!empty($feed['created_at']), 'created_at fehlt');
+            assertTrue(array_key_exists('last_fetched_at', $feed));
+            assertSame(true, $feed['hide_declined'] ?? null);
+            assertTrue(strpos($res['raw'], 'token_hash') === false, 'my_data enthaelt den Hash');
+
+            $csv = apiRequest('GET', 'my_data', ['token' => apiToken('user'), 'query' => ['format' => 'csv']]);
+            assertStatus(200, $csv);
+            assertTrue(strpos($csv['raw'], 'Kalender-Abo') !== false, 'CSV nennt das Kalender-Abo nicht');
+        } finally {
+            cfFeed('user', 'DELETE');
+        }
+    });
+});
