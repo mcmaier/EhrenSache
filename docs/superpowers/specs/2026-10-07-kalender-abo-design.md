@@ -152,7 +152,7 @@ Organisationsname aus `system_settings` (`organization_name`); fehlt er, nur „
 | `UID` | `appointment-<id>@<Host der Basis-URL>` |
 | `DTSTAMP` | Erzeugungszeitpunkt, UTC (`…Z`) |
 | `DTSTART;TZID=Europe/Berlin` | `date` + `start_time` |
-| `DTEND;TZID=Europe/Berlin` | `date` + `end_time`; Ende ≤ Beginn → Folgetag; ohne Ende entfällt das Feld |
+| `DTEND;TZID=Europe/Berlin` | `date` + `end_time`; Ende < Beginn → Folgetag; ohne Ende oder Ende = Beginn Beginn + 2 h (Entscheidung 2026-10-07) |
 | `SUMMARY` | Präfix der eigenen Rückmeldung + Titel: `✓ ` zugesagt, `✗ ` abgesagt, `? ` unsicher, sonst nichts |
 | `LOCATION` | `location`, falls gesetzt |
 | `CATEGORIES` | Name der Terminart, falls gesetzt — nie die Gruppenzuordnung |
@@ -224,7 +224,7 @@ Mitglieder, Benachrichtigung bei Terminänderung.
 ## Tests
 
 - **`ical_unit`** (neu): Maskierung; Faltung bei 75 Bytes mit Umlauten und Emoji an der Grenze;
-  CRLF; Ende ≤ Beginn → Folgetag; ohne Ende kein `DTEND`; Präfixe je Rückmeldung; kein Präfix
+  CRLF; Ende < Beginn → Folgetag; ohne Ende oder Ende = Beginn `DTEND` = Beginn + 2 h (auch über Mitternacht); Präfixe je Rückmeldung; kein Präfix
   ohne Rückmeldung oder bei abgeschalteten Rückmeldungen; `VTIMEZONE` vorhanden; leerer Kalender
   gültig.
 - **`calendar_feed_api`** (neu):

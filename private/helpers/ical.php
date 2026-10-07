@@ -25,6 +25,9 @@ declare(strict_types=1);
 
 const ICAL_TZID = 'Europe/Berlin';
 
+// Termin ohne Ende oder mit Ende gleich Beginn: zwei Stunden, Entscheidung 2026-10-07.
+const ICAL_DEFAULT_DURATION_HOURS = 2;
+
 const ICAL_VTIMEZONE = [
     'BEGIN:VTIMEZONE',
     'TZID:Europe/Berlin',
@@ -129,13 +132,20 @@ function icalBuildEvent(array $row, string $uidHost, string $dtstamp): array
         'DTSTART;TZID=' . ICAL_TZID . ':' . icalLocalDateTime($date, $start),
     ];
 
-    if ($end !== null) {
+    $startLocal = icalLocalDateTime($date, $start);
+    if ($end === null || icalLocalDateTime($date, $end) === $startLocal) {
+        // Kein sinnvolles Ende: Standarddauer, ggf. ueber Mitternacht
+        $endLocal = (new DateTimeImmutable($startLocal))
+            ->modify('+' . ICAL_DEFAULT_DURATION_HOURS . ' hours')->format('Ymd\THis');
+    } else {
         $endDate = $date;
-        if (icalLocalDateTime($date, $end) <= icalLocalDateTime($date, $start)) {
+        if (icalLocalDateTime($date, $end) < $startLocal) {
+            // Ende vor Beginn: Termin ueber Mitternacht, Ende am Folgetag
             $endDate = (new DateTimeImmutable($date))->modify('+1 day')->format('Y-m-d');
         }
-        $lines[] = 'DTEND;TZID=' . ICAL_TZID . ':' . icalLocalDateTime($endDate, $end);
+        $endLocal = icalLocalDateTime($endDate, $end);
     }
+    $lines[] = 'DTEND;TZID=' . ICAL_TZID . ':' . $endLocal;
 
     $lines[] = 'SUMMARY:' . icalEscapeText(($status[0] ?? '') . (string) $row['title']);
 

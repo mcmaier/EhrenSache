@@ -610,7 +610,8 @@ Mail-Programm abonniert. Nur lesend, nur die Termine der eigenen Gruppen.
 Feed Einträge ohne Ort und mit geratener Länge — technisch ein gültiger Kalender, praktisch
 eine Liste von Titeln. Seit 1.10.0 sind beide Felder da: `LOCATION` und `DTEND` lassen sich
 direkt übernehmen; ein Ende vor dem Beginn ergibt `DTEND` am Folgetag, ohne Ende bleibt es beim
-reinen `DTSTART`.
+reinen `DTSTART`. *(Am 2026-10-07 anders entschieden: Termine ohne Ende oder mit Ende gleich
+Beginn erhalten im Feed zwei Stunden Dauer.)*
 
 **Warum interessant:** Sehr viel Wirkung für sehr wenig Code — ICS ist Textausgabe, keine
 Bibliothek nötig, was zur Linie des Projekts passt (kein PDF-Export, „würde eine Bibliothek

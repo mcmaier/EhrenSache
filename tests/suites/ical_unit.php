@@ -102,16 +102,26 @@ test('VEVENT: Zeiten ohne Sekunden werden ergaenzt', function () {
     assertSame('DTEND;TZID=Europe/Berlin:20261112T210000', icLine($l, 'DTEND'));
 });
 
-test('VEVENT: Ende vor oder gleich Beginn liegt am Folgetag', function () {
+test('VEVENT: Ende vor Beginn liegt am Folgetag', function () {
     $l = icEventLines(icRow(['date' => '2026-12-31', 'start_time' => '20:00:00', 'end_time' => '01:00:00']));
     assertSame('DTEND;TZID=Europe/Berlin:20270101T010000', icLine($l, 'DTEND'));
-    $l = icEventLines(icRow(['start_time' => '20:00:00', 'end_time' => '20:00:00']));
-    assertSame('DTEND;TZID=Europe/Berlin:20261113T200000', icLine($l, 'DTEND'));
 });
 
-test('VEVENT: ohne Ende kein DTEND', function () {
-    assertSame(null, icLine(icEventLines(icRow(['end_time' => null])), 'DTEND'));
-    assertSame(null, icLine(icEventLines(icRow(['end_time' => ''])), 'DTEND'));
+test('VEVENT: Ende gleich Beginn ergibt zwei Stunden Dauer', function () {
+    $l = icEventLines(icRow(['start_time' => '20:00:00', 'end_time' => '20:00:00']));
+    assertSame('DTEND;TZID=Europe/Berlin:20261112T220000', icLine($l, 'DTEND'));
+});
+
+test('VEVENT: ohne Ende ergibt zwei Stunden Dauer', function () {
+    $l = icEventLines(icRow(['start_time' => '19:30:00', 'end_time' => null]));
+    assertSame('DTEND;TZID=Europe/Berlin:20261112T213000', icLine($l, 'DTEND'));
+    $l = icEventLines(icRow(['start_time' => '19:30:00', 'end_time' => '']));
+    assertSame('DTEND;TZID=Europe/Berlin:20261112T213000', icLine($l, 'DTEND'));
+});
+
+test('VEVENT: zwei Stunden Standarddauer ueber Mitternacht', function () {
+    $l = icEventLines(icRow(['date' => '2026-12-31', 'start_time' => '23:00:00', 'end_time' => null]));
+    assertSame('DTEND;TZID=Europe/Berlin:20270101T010000', icLine($l, 'DTEND'));
 });
 
 test('VEVENT: Praefix der eigenen Rueckmeldung', function () {
