@@ -56,7 +56,9 @@ const ICAL_RESPONSE_LABELS = [
 /** Maskiert einen TEXT-Wert (RFC 5545, 3.3.11). */
 function icalEscapeText(string $text): string
 {
+    $text = mb_scrub($text, 'UTF-8');
     $text = str_replace(["\r\n", "\r"], "\n", $text);
+    $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $text);
 
     return str_replace(['\\', ';', ',', "\n"], ['\\\\', '\\;', '\\,', '\\n'], $text);
 }
@@ -68,6 +70,7 @@ function icalEscapeText(string $text): string
  */
 function icalFoldLine(string $line): string
 {
+    $line = mb_scrub($line, 'UTF-8');
     if (strlen($line) <= 75) {
         return $line;
     }
@@ -88,12 +91,18 @@ function icalFoldLine(string $line): string
     return implode("\r\n ", $teile);
 }
 
-/** 'Y-m-d' + 'H:i[:s]' -> 'YmdTHis' */
+/**
+ * 'Y-m-d' + 'H:i[:s[.frac]]' (auch einstellige Stunde) -> 'YmdTHis'.
+ *
+ * @throws InvalidArgumentException bei ungueltiger Uhrzeit
+ */
 function icalLocalDateTime(string $date, string $time): string
 {
-    $time = strlen($time) === 5 ? $time . ':00' : substr($time, 0, 8);
+    if (!preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?/', $time, $m)) {
+        throw new InvalidArgumentException("Ungueltige Uhrzeit: {$time}");
+    }
 
-    return str_replace('-', '', $date) . 'T' . str_replace(':', '', $time);
+    return str_replace('-', '', $date) . 'T' . sprintf('%02d%02d%02d', (int) $m[1], (int) $m[2], (int) ($m[3] ?? 0));
 }
 
 /**

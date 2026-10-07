@@ -161,7 +161,9 @@ test('VCALENDAR: Kopf, VTIMEZONE, CRLF und abschliessendes CRLF', function () {
               'METHOD:PUBLISH', 'X-WR-CALNAME:MV Beispiel – Termine', 'X-WR-TIMEZONE:Europe/Berlin',
               'BEGIN:VTIMEZONE', 'TZID:Europe/Berlin', 'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU',
               'RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU', 'END:VTIMEZONE',
-              'DTSTAMP:20261007T120000Z', 'END:VCALENDAR'] as $erwartet) {
+              'DTSTAMP:20261007T120000Z', 'END:VCALENDAR',
+              'TZOFFSETFROM:+0100', 'TZOFFSETTO:+0200', 'DTSTART:19700329T020000',
+              'TZOFFSETFROM:+0200', 'TZOFFSETTO:+0100', 'DTSTART:19701025T030000'] as $erwartet) {
         assertTrue(strpos($u, $erwartet . "\r\n") !== false, "Zeile fehlt: {$erwartet}");
     }
     assertSame(1, substr_count($u, 'BEGIN:VEVENT'));
@@ -177,4 +179,49 @@ test('VCALENDAR: ohne Termine gueltig und ohne VEVENT', function () {
 test('VCALENDAR: Kalendername wird maskiert', function () {
     $ics = icalBuildCalendar('A, B; C', [], 'verein.example', new DateTimeImmutable('now', new DateTimeZone('UTC')));
     assertTrue(strpos($ics, "X-WR-CALNAME:A\\, B\\; C\r\n") !== false);
+});
+
+test('icalFoldLine: ungueltiges UTF-8 liefert gueltigen, gefalteten Text', function () {
+    $folded = icalFoldLine('DESCRIPTION:' . str_repeat('a', 80) . "\xE4");
+    assertTrue($folded !== '', 'Ausgabe ist leer');
+    assertTrue(preg_match('//u', $folded) === 1, 'Ausgabe ist kein gueltiges UTF-8');
+    foreach (explode("\r\n", $folded) as $i => $physisch) {
+        assertTrue(strlen($physisch) <= 75, "Zeile {$i} hat " . strlen($physisch) . ' Bytes');
+    }
+});
+
+test('icalEscapeText: ungueltiges UTF-8 wird bereinigt', function () {
+    assertTrue(preg_match('//u', icalEscapeText("a\xE4b")) === 1);
+});
+
+test('icalEscapeText: Steuerzeichen entfernt, Tabulator bleibt', function () {
+    assertSame("ab\tc", icalEscapeText("a\x01b\tc"));
+});
+
+test('icalLocalDateTime: Uhrzeiten werden normalisiert', function () {
+    assertSame('20261112T073000', icalLocalDateTime('2026-11-12', '7:30'));
+    assertSame('20261112T193000', icalLocalDateTime('2026-11-12', '19:30:00.000000'));
+    assertSame('20261112T090000', icalLocalDateTime('2026-11-12', '9:00:00'));
+    assertThrows(function () {
+        icalLocalDateTime('2026-11-12', 'abc');
+    });
+});
+
+test('icalFoldLine: Zeile mit 76 Bytes wird gefaltet', function () {
+    $line = 'SUMMARY:' . str_repeat('x', 68);
+    assertSame(76, strlen($line));
+    $teile = explode("\r\n", icalFoldLine($line));
+    assertSame(2, count($teile));
+    assertSame(75, strlen($teile[0]));
+});
+
+test('VEVENT: CATEGORIES maskiert Komma', function () {
+    assertSame('CATEGORIES:Sport\, Spiel', icLine(icEventLines(icRow(['type_name' => 'Sport, Spiel'])), 'CATEGORIES'));
+});
+
+test('VEVENT: ohne responses_enabled auch fuer no und maybe kein Praefix', function () {
+    foreach (['no', 'maybe'] as $st) {
+        $l = icEventLines(icRow(['response_status' => $st, 'responses_enabled' => 0]));
+        assertSame('SUMMARY:Probe', icLine($l, 'SUMMARY'));
+    }
 });
