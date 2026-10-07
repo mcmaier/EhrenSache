@@ -225,3 +225,11 @@ test('VEVENT: ohne responses_enabled auch fuer no und maybe kein Praefix', funct
         assertSame('SUMMARY:Probe', icLine($l, 'SUMMARY'));
     }
 });
+
+test('VCALENDAR: eine kaputte Zeile wird uebersprungen, der Rest bleibt', function () {
+    $rows = [icRow(), icRow(['appointment_id' => 43, 'start_time' => 'kaputt'])];
+    $ics  = icalBuildCalendar('Termine', $rows, 'verein.example', new DateTimeImmutable('now', new DateTimeZone('UTC')));
+    assertSame(1, substr_count($ics, 'BEGIN:VEVENT'));
+    assertTrue(strpos(icUnfold($ics), 'UID:appointment-42@') !== false, 'Gueltiger Termin fehlt');
+    assertTrue(strpos($ics, "END:VCALENDAR\r\n") !== false);
+});

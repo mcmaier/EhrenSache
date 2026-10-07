@@ -198,7 +198,15 @@ function icalBuildCalendar(string $calName, array $rows, string $uidHost, DateTi
         $lines[] = $l;
     }
     foreach ($rows as $row) {
-        foreach (icalBuildEvent($row, $uidHost, $dtstamp) as $l) {
+        // Eine kaputte Zeile (z. B. unlesbare Uhrzeit) darf nicht den ganzen
+        // Feed brechen: Der Kalender des Mitglieds liefe sonst leer.
+        try {
+            $event = icalBuildEvent($row, $uidHost, $dtstamp);
+        } catch (InvalidArgumentException $e) {
+            error_log('Kalender-Abo: Termin ' . ($row['appointment_id'] ?? '?') . ' uebersprungen: ' . $e->getMessage());
+            continue;
+        }
+        foreach ($event as $l) {
             $lines[] = $l;
         }
     }
