@@ -171,7 +171,9 @@ if(!$apiToken && isset($_GET['api_token'])) {
 // Session NUR starten wenn:
 // 1. Kein Token vorhanden UND
 // 2. Nicht auf öffentlichem Endpoint (außer login/logout/register)
-if (!$apiToken) {
+// Der Kalender-Feed (FI-8) braucht keine Sitzung: Kalender-Apps nehmen keine
+// Cookies an, jeder Abruf legte sonst eine neue Sitzungsdatei an.
+if (!$apiToken && $resource !== 'calendar') {
     session_start();
 
     // Die Ablaufpruefung steht bei der Authentifizierung weiter unten. Hier ist
@@ -330,7 +332,15 @@ $tokenTraegt = $tokenUser !== null
 // Zeitueberschreitung greift erst im Auth-Block. Das ist bewusst so -- dafuer
 // braucht es eine echte Anmeldung vorher, und ein Cookie laeuft nur mit dem
 // Browser mit, der es bekommen hat.
-$istAngemeldet = $tokenTraegt || isset($_SESSION['user_id']);
+// Kalender-Feed (FI-8): Ein Abruf mit gueltigem Abo-Token zaehlt nicht mit.
+// Kalenderanbieter rufen alle Feeds von wenigen eigenen Adressen ab und
+// liefen sonst in die Grenze. Ein ungueltiger Token zaehlt wie jeder
+// unangemeldete Aufruf -- das bremst das Durchprobieren.
+$calendarFeedOwner = $resource === 'calendar'
+    ? calendarFeedOwner($db, $prefix, $_GET['token'] ?? null)
+    : null;
+
+$istAngemeldet = $tokenTraegt || isset($_SESSION['user_id']) || $calendarFeedOwner !== null;
 
 if (!$istAngemeldet) {
     $rateLimiter = new RateLimiter($db, $database);
@@ -345,6 +355,12 @@ if (!$istAngemeldet) {
         ]);
         exit();
     }
+}
+
+// KALENDER-FEED (FI-8, oeffentlich; das Token in der URL ist der Zugang)
+if ($resource === 'calendar') {
+    handleCalendarDownload($db, $database, $request_method, $calendarFeedOwner);
+    exit();
 }
 
 // APPEARANCE

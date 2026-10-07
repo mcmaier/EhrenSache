@@ -130,3 +130,106 @@ function handleCalendarFeed($db, $database, string $method, int $authUserId, ?in
             echo json_encode(['message' => 'Method not allowed']);
     }
 }
+
+/**
+ * Inhaber eines Abo-Tokens, nur wenn der Abruf liefern darf: Konto aktiv und
+ * freigeschaltet, Mitglied verknuepft, kein Geraet. Sonst null -- api.php zaehlt
+ * den Abruf dann in die Rate-Grenze fuer Unangemeldete (Abschnitt 6.2).
+ *
+ * @return array{user_id: int|string, member_id: int|string, hide_declined: int|string}|null
+ */
+function calendarFeedOwner(PDO $db, string $prefix, $token): ?array
+{
+    if (!is_string($token) || !preg_match('/^[0-9a-f]{64}$/', $token)) {
+        return null;
+    }
+
+    $stmt = $db->prepare("SELECT f.user_id, u.member_id, f.hide_declined
+                          FROM {$prefix}calendar_feeds f
+                          JOIN {$prefix}users u ON u.user_id = f.user_id
+                          WHERE f.token_hash = ?
+                            AND u.is_active = 1
+                            AND u.account_status = 'active'
+                            AND u.member_id IS NOT NULL
+                            AND u.role <> 'device'");
+    $stmt->execute([calendarFeedTokenHash($token)]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row === false ? null : $row;
+}
+
+/** Einheitliche Antwort fuer jeden Fall, in dem es keinen Feed gibt -- sie verraet nicht, warum. */
+function calendarFeedNotFound(): void
+{
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=utf-8');
+    header('Cache-Control: no-store');
+}
+
+/** @param array<string, mixed>|null $owner Ergebnis von calendarFeedOwner() */
+function handleCalendarDownload($db, $database, string $method, ?array $owner): void
+{
+    if ($method !== 'GET' && $method !== 'HEAD') {
+        http_response_code(405);
+        header('Allow: GET, HEAD');
+        header('Content-Type: text/plain; charset=utf-8');
+        return;
+    }
+
+    // Abgeschaltet: 404 wie ein unbekannter Link, nicht FEATURE_DISABLED (Spec).
+    if ($owner === null || !isFeatureEnabled($db, $database, 'calendar_feed')) {
+        calendarFeedNotFound();
+        return;
+    }
+
+    $prefix   = $database->table('');
+    $memberId = (int) $owner['member_id'];
+    $rows     = [];
+
+    // Dieselbe Sichtbarkeitsregel wie die Terminliste, fuer jede Rolle (Spec).
+    $vis = appointmentGroupVisibility($db, $prefix, $memberId);
+    if ($vis !== null) {
+        // COALESCE um r.status: ohne Rueckmeldung ist r.status NULL, und
+        // NOT(... AND NULL) waere NULL -- der Termin fiele still heraus.
+        $sql = "SELECT a.appointment_id, a.title, a.description, a.location, a.date,
+                       a.start_time, a.end_time, at.type_name,
+                       COALESCE(at.responses_enabled, 0) AS responses_enabled,
+                       r.status AS response_status, r.comment AS response_comment
+                FROM {$prefix}appointments a
+                LEFT JOIN {$prefix}appointment_types at ON at.type_id = a.type_id
+                LEFT JOIN {$prefix}appointment_responses r
+                       ON r.appointment_id = a.appointment_id AND r.member_id = ?
+                WHERE a.date BETWEEN ? AND ?
+                  AND a.is_auto_created = 0"
+             . $vis[0]
+             . " AND NOT (? = 1 AND COALESCE(at.responses_enabled, 0) = 1 AND COALESCE(r.status, '') = 'no')
+                ORDER BY a.date, a.start_time";
+        $params = array_merge(
+            [$memberId, date('Y-m-d', strtotime('-3 months')), date('Y-m-d', strtotime('+12 months'))],
+            $vis[1],
+            [(int) $owner['hide_declined']]
+        );
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    $db->prepare("UPDATE {$prefix}calendar_feeds SET last_fetched_at = ?
+                  WHERE user_id = ? AND (last_fetched_at IS NULL OR last_fetched_at < ?)")
+       ->execute([date('Y-m-d H:i:s'), $owner['user_id'], date('Y-m-d H:i:s', time() - CALENDAR_FEED_FETCH_RESOLUTION)]);
+
+    $org     = trim(systemSetting($db, $database, 'organization_name', ''));
+    $calName = $org !== '' ? $org . ' – Termine' : 'Termine';
+    $host    = parse_url(BASE_URL, PHP_URL_HOST) ?: 'ehrensache';
+    $body    = icalBuildCalendar($calName, $rows, $host, new DateTimeImmutable('now', new DateTimeZone('UTC')));
+
+    header('Content-Type: text/calendar; charset=utf-8');
+    header('Content-Disposition: inline; filename="termine.ics"');
+    header('Cache-Control: private, max-age=0');
+    header('X-Robots-Tag: noindex');
+    header('Referrer-Policy: no-referrer');
+
+    if ($method === 'GET') {
+        echo $body;
+    }
+}

@@ -108,6 +108,7 @@ const DEMO_READ_ONLY = [
     'import_logs',
     'export',
     'holidays',
+    'calendar',     // Kalender-Feed (FI-8), nur GET/HEAD
 ];
 
 /**

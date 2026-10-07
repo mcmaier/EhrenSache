@@ -288,3 +288,289 @@ test('calendar_feed: Konto loeschen entfernt das Abo (CASCADE)', function () {
     $stmt->execute([$user]);
     assertSame(0, (int) $stmt->fetchColumn());
 });
+
+// ---- Feed ------------------------------------------------------------------
+
+/** Ruft eine absolute URL ab. @return array{status: int, body: string, headers: array<string, string>} */
+function cfFetch(string $url, string $method = 'GET'): array
+{
+    $headers = [];
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    if ($method === 'HEAD') {
+        curl_setopt($ch, CURLOPT_NOBODY, true);
+    }
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_HEADERFUNCTION, static function ($ch, string $h) use (&$headers): int {
+        $teile = explode(':', $h, 2);
+        if (count($teile) === 2) {
+            $headers[strtolower(trim($teile[0]))] = trim($teile[1]);
+        }
+
+        return strlen($h);
+    });
+    $body = curl_exec($ch);
+    if ($body === false) {
+        throw new RuntimeException('Abruf fehlgeschlagen: ' . curl_error($ch));
+    }
+    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    return ['status' => $status, 'body' => (string) $body, 'headers' => $headers];
+}
+
+/** Feed-URL ueber den Query-Parameter, ohne Rewrite. */
+function cfQueryUrl(string $token): string
+{
+    return rtrim(testConfig()['base_url'], '/') . '/api/api.php?resource=calendar&token=' . $token;
+}
+
+function cfTokenFromUrl(string $url): string
+{
+    assertTrue((bool) preg_match('#/([0-9a-f]{64})\.ics$#', $url, $m), "Keine Feed-URL: {$url}");
+
+    return $m[1];
+}
+
+function cfCountApiRequests(): int
+{
+    return (int) cfPdo()->query("SELECT COUNT(*) FROM " . cfPrefix() . "rate_limits WHERE action = 'api_request'")->fetchColumn();
+}
+
+function cfCreate(string $resource, array $body): int
+{
+    $res = apiRequest('POST', $resource, ['token' => apiToken('admin'), 'body' => $body]);
+    assertStatus(201, $res, "{$resource} konnte nicht angelegt werden");
+
+    return (int) $res['body']['id'];
+}
+
+function cfDelete(string $resource, ?int $id): void
+{
+    if ($id !== null) {
+        apiRequest('DELETE', $resource, ['token' => apiToken('admin'), 'query' => ['id' => $id]]);
+    }
+}
+
+/**
+ * Welt: eigene Gruppe mit Terminart (Rueckmeldungen an), fremde Gruppe mit
+ * Terminart, das Mitglied von "user" kommt in die eigene Gruppe. Termine:
+ * in    (+10 Tage, eigene Gruppe)        -> im Feed
+ * fremd (+10 Tage, fremde Gruppe)        -> nie im Feed
+ * alt   (-4 Monate)                      -> ausserhalb des Zeitraums
+ * nah   (-2 Monate)                      -> im Feed
+ * fern  (+13 Monate)                     -> ausserhalb des Zeitraums
+ * auto  (+9 Tage, is_auto_created = 1)   -> nie im Feed (nicht +10: Dublettenpruefung ±2h gegen "in")
+ * ab    (+11 Tage, Rueckmeldung no)      -> nur ohne hide_declined
+ * evtl  (+12 Tage, Rueckmeldung maybe)   -> immer im Feed
+ *
+ * @param callable(array<string, int>): void $fn
+ */
+function cfWithWorld(callable $fn): void
+{
+    $memberId = apiMemberId('user');
+    assertTrue($memberId !== null, 'Das Testkonto user braucht ein verknuepftes Mitglied');
+    $res = apiRequest('GET', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
+    assertStatus(200, $res);
+    $original = array_map(static fn ($g) => (int) $g['group_id'], $res['body']['groups'] ?? []);
+
+    $s = substr(uniqid(), -6);
+    $ids = [];
+    try {
+        $ids['group']  = cfCreate('member_groups', ['group_name' => "CF Eigen {$s}"]);
+        $ids['group2'] = cfCreate('member_groups', ['group_name' => "CF Fremd {$s}"]);
+        $ids['type']   = cfCreate('appointment_types', [
+            'type_name' => "CF Eigen {$s}", 'is_default' => 0, 'color' => '#667eea',
+            'group_ids' => [$ids['group']], 'responses_enabled' => 1, 'response_deadline_hours' => 24,
+        ]);
+        $ids['type2']  = cfCreate('appointment_types', [
+            'type_name' => "CF Fremd {$s}", 'is_default' => 0, 'color' => '#667eea',
+            'group_ids' => [$ids['group2']],
+        ]);
+        assertStatus(200, apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId],
+            'body'  => ['group_ids' => array_values(array_unique(array_merge($original, [$ids['group']])))]]));
+
+        $termin = static function (string $titel, string $tage, int $type) use ($s): int {
+            return cfCreate('appointments', [
+                'title' => "CF {$titel} {$s}", 'type_id' => $type,
+                'date'  => date('Y-m-d', strtotime($tage)), 'start_time' => '19:30', 'end_time' => '21:00',
+                'location' => 'Probenlokal',
+            ]);
+        };
+        $ids['in']    = $termin('in', '+10 days', $ids['type']);
+        $ids['fremd'] = $termin('fremd', '+10 days', $ids['type2']);
+        $ids['alt']   = $termin('alt', '-4 months', $ids['type']);
+        $ids['nah']   = $termin('nah', '-2 months', $ids['type']);
+        $ids['fern']  = $termin('fern', '+13 months', $ids['type']);
+        $ids['auto']  = $termin('auto', '+9 days', $ids['type']);
+        $ids['ab']    = $termin('ab', '+11 days', $ids['type']);
+        $ids['evtl']  = $termin('evtl', '+12 days', $ids['type']);
+        cfPdo()->prepare('UPDATE ' . cfPrefix() . 'appointments SET is_auto_created = 1 WHERE appointment_id = ?')
+               ->execute([$ids['auto']]);
+
+        assertStatus(200, apiRequest('PUT', 'appointment_responses', ['token' => apiToken('user'),
+            'query' => ['appointment_id' => $ids['ab']], 'body' => ['status' => 'no', 'comment' => 'Urlaub']]));
+        assertStatus(200, apiRequest('PUT', 'appointment_responses', ['token' => apiToken('user'),
+            'query' => ['appointment_id' => $ids['evtl']], 'body' => ['status' => 'maybe']]));
+
+        $fn($ids);
+    } finally {
+        foreach (['in', 'fremd', 'alt', 'nah', 'fern', 'auto', 'ab', 'evtl'] as $k) {
+            cfDelete('appointments', $ids[$k] ?? null);
+        }
+        apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+            'query' => ['id' => $memberId], 'body' => ['group_ids' => $original]]);
+        cfDelete('appointment_types', $ids['type'] ?? null);
+        cfDelete('appointment_types', $ids['type2'] ?? null);
+        cfDelete('member_groups', $ids['group'] ?? null);
+        cfDelete('member_groups', $ids['group2'] ?? null);
+    }
+}
+
+function cfHasEvent(string $ics, int $appointmentId): bool
+{
+    return strpos(str_replace("\r\n ", '', $ics), "UID:appointment-{$appointmentId}@") !== false;
+}
+
+test('Feed: Gruppengrenze, Zeitraum, Auto-Termine, abgesagte ausgeblendet', function () {
+    cfWithFeature(function () {
+        cfWithWorld(function (array $ids) {
+            try {
+                $neu = cfFeed('user', 'POST', []);
+                assertStatus(201, $neu);
+                $res = cfFetch($neu['body']['url']);
+                assertSame(200, $res['status'], 'Feed ueber die Rewrite-URL nicht abrufbar: ' . substr($res['body'], 0, 300));
+                $ics = $res['body'];
+
+                assertTrue(cfHasEvent($ics, $ids['in']), 'Termin der eigenen Gruppe fehlt');
+                assertTrue(cfHasEvent($ics, $ids['nah']), 'Termin vor zwei Monaten fehlt');
+                assertTrue(cfHasEvent($ics, $ids['evtl']), 'Termin mit „unsicher“ fehlt');
+                assertTrue(!cfHasEvent($ics, $ids['fremd']), 'Termin einer fremden Gruppe im Feed');
+                assertTrue(!cfHasEvent($ics, $ids['alt']), 'Termin vor vier Monaten im Feed');
+                assertTrue(!cfHasEvent($ics, $ids['fern']), 'Termin in dreizehn Monaten im Feed');
+                assertTrue(!cfHasEvent($ics, $ids['auto']), 'Auto-Termin im Feed');
+                assertTrue(!cfHasEvent($ics, $ids['ab']), 'Abgesagter Termin trotz Standard „ausblenden“ im Feed');
+                assertTrue(strpos(str_replace("\r\n ", '', $ics), 'SUMMARY:? CF evtl') !== false, 'Praefix „? “ fehlt');
+            } finally {
+                cfFeed('user', 'DELETE');
+            }
+        });
+    });
+});
+
+test('Feed: hide_declined aus zeigt den abgesagten Termin mit ✗', function () {
+    cfWithFeature(function () {
+        cfWithWorld(function (array $ids) {
+            try {
+                $neu = cfFeed('user', 'POST', []);
+                assertStatus(200, cfFeed('user', 'PUT', ['hide_declined' => false]));
+                $ics = str_replace("\r\n ", '', cfFetch($neu['body']['url'])['body']);
+                assertTrue(cfHasEvent($ics, $ids['ab']), 'Abgesagter Termin fehlt trotz hide_declined = false');
+                assertTrue(strpos($ics, 'SUMMARY:✗ CF ab') !== false, 'Praefix „✗ “ fehlt');
+                assertTrue(strpos($ics, 'Deine Rückmeldung: Abgesagt – Urlaub') !== false, 'Eigener Kommentar fehlt');
+            } finally {
+                cfFeed('user', 'DELETE');
+            }
+        });
+    });
+});
+
+test('Feed: Header, HEAD ohne Rumpf, last_fetched_at gesetzt', function () {
+    cfWithFeature(function () {
+        try {
+            $neu = cfFeed('user', 'POST', []);
+            $res = cfFetch($neu['body']['url']);
+            assertSame(200, $res['status']);
+            assertTrue(strpos($res['headers']['content-type'] ?? '', 'text/calendar') === 0, 'Content-Type: ' . ($res['headers']['content-type'] ?? '-'));
+            assertSame('private, max-age=0', $res['headers']['cache-control'] ?? null);
+            assertSame('noindex', $res['headers']['x-robots-tag'] ?? null);
+            assertTrue(!isset($res['headers']['set-cookie']), 'Feed startet eine Sitzung');
+            assertTrue(cfFeed('user', 'GET')['body']['last_fetched_at'] !== null, 'last_fetched_at nicht gesetzt');
+
+            $head = cfFetch($neu['body']['url'], 'HEAD');
+            assertSame(200, $head['status']);
+            assertSame('', $head['body']);
+            assertSame(405, cfFetch($neu['body']['url'], 'POST')['status']);
+        } finally {
+            cfFeed('user', 'DELETE');
+        }
+    });
+});
+
+test('Feed: 404 bei unbekanntem, falsch geformtem, ersetztem und widerrufenem Token', function () {
+    cfWithFeature(function () {
+        try {
+            assertSame(404, cfFetch(cfQueryUrl(str_repeat('a', 64)))['status']);
+            assertSame(404, cfFetch(cfQueryUrl('kurz'))['status']);
+            assertSame(404, cfFetch(cfQueryUrl(''))['status']);
+
+            $alt = cfTokenFromUrl(cfFeed('user', 'POST', [])['body']['url']);
+            assertSame(200, cfFetch(cfQueryUrl($alt))['status']);
+            $neu = cfTokenFromUrl(cfFeed('user', 'POST', [])['body']['url']);
+            assertSame(404, cfFetch(cfQueryUrl($alt))['status'], 'Ersetzter Link liefert noch');
+            assertSame(200, cfFetch(cfQueryUrl($neu))['status']);
+            cfFeed('user', 'DELETE');
+            assertSame(404, cfFetch(cfQueryUrl($neu))['status'], 'Widerrufener Link liefert noch');
+        } finally {
+            cfFeed('user', 'DELETE');
+        }
+    });
+});
+
+test('Feed: Schalter aus -> 404 ohne JSON-Hinweis', function () {
+    $token = null;
+    try {
+        cfWithFeature(function () use (&$token) {
+            $token = cfTokenFromUrl(cfFeed('user', 'POST', [])['body']['url']);
+        });
+        cfWithFeature(function () use ($token) {
+            $res = cfFetch(cfQueryUrl($token));
+            assertSame(404, $res['status']);
+            assertSame('', $res['body']);
+        }, '0');
+    } finally {
+        cfWithFeature(fn () => cfFeed('user', 'DELETE'));
+    }
+});
+
+test('Feed: deaktiviertes Konto und Konto ohne Mitglied -> 404', function () {
+    $user = null;
+    try {
+        [$user] = cfCreateUser('user', apiMemberId('user'));
+        $token = bin2hex(random_bytes(32));
+        cfPdo()->prepare('INSERT INTO ' . cfPrefix() . 'calendar_feeds (user_id, token_hash, hide_declined, created_at) VALUES (?, ?, 1, NOW())')
+               ->execute([$user, hash('sha256', $token)]);
+        cfWithFeature(function () use ($user, $token) {
+            assertSame(200, cfFetch(cfQueryUrl($token))['status'], 'Gegenprobe: aktives Konto muss liefern');
+            $set = cfPdo()->prepare('UPDATE ' . cfPrefix() . 'users SET is_active = ?, account_status = ?, member_id = ? WHERE user_id = ?');
+            $set->execute([0, 'active', apiMemberId('user'), $user]);
+            assertSame(404, cfFetch(cfQueryUrl($token))['status'], 'is_active = 0 liefert');
+            $set->execute([1, 'suspended', apiMemberId('user'), $user]);
+            assertSame(404, cfFetch(cfQueryUrl($token))['status'], 'account_status suspended liefert');
+            $set->execute([1, 'active', null, $user]);
+            assertSame(404, cfFetch(cfQueryUrl($token))['status'], 'Konto ohne Mitglied liefert');
+        });
+    } finally {
+        cfDeleteUser($user);
+    }
+});
+
+test('Feed: ungueltige Tokens zaehlen in die Rate-Grenze, gueltige nicht', function () {
+    cfWithFeature(function () {
+        try {
+            $token = cfTokenFromUrl(cfFeed('user', 'POST', [])['body']['url']);
+
+            $vorher = cfCountApiRequests();
+            assertSame(200, cfFetch(cfQueryUrl($token))['status']);
+            assertSame(200, cfFetch(cfQueryUrl($token))['status']);
+            assertSame($vorher, cfCountApiRequests(), 'Gueltiger Feed-Abruf wurde gezaehlt');
+
+            assertSame(404, cfFetch(cfQueryUrl(str_repeat('b', 64)))['status']);
+            assertSame($vorher + 1, cfCountApiRequests(), 'Ungueltiger Feed-Abruf wurde nicht gezaehlt');
+        } finally {
+            cfFeed('user', 'DELETE');
+        }
+    });
+});

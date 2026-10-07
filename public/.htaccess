@@ -74,6 +74,18 @@ RewriteCond %3 !\.\.
 RewriteRule ^(css|js)/v[0-9][0-9.]*/[A-Za-z0-9_./-]+\.(?:css|js)$ %1/%2/%3 [L,E=ES_VERSIONED:1]
 
 # ============================================
+# KALENDER-ABO (FI-8)
+# ============================================
+# …/api/calendar/<token>.ics -> api/api.php?resource=calendar&token=<token>.
+# Die Endung .ics mögen Outlook und iOS lieber als einen Query-Parameter.
+# Bewusst hier und nicht in api/.htaccess: Eine eigene RewriteEngine dort
+# ersetzte für alle API-Aufrufe die Regeln dieser Datei, darunter das
+# Durchreichen des Authorization-Headers weiter unten.
+# %1 ist der URL-Präfix der Installation (wie bei den versionierten Pfaden).
+RewriteCond %{REQUEST_URI} ^(.*)/api/calendar/([0-9a-f]{64})\.ics$
+RewriteRule ^api/calendar/[0-9a-f]{64}\.ics$ %1/api/api.php?resource=calendar&token=%2 [L]
+
+# ============================================
 # SICHERHEIT
 # ============================================
 
