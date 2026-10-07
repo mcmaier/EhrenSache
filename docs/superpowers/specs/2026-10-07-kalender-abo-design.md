@@ -76,9 +76,13 @@ Konfiguration oder geraten), nicht das Frontend. `webcal_url` ist dieselbe URL m
 
 ### `calendar` (öffentlich, Abschnitt 6 in `api.php`)
 
-- URL: `…/api/calendar/<token>.ics`, per `RewriteRule` in `public/api/.htaccess` auf
+- URL: `…/api/calendar/<token>.ics`, per `RewriteRule` in **`public/.htaccess`** auf
   `api.php?resource=calendar&token=<token>`. Direkter Aufruf über den Query-Parameter
-  funktioniert ebenso.
+  funktioniert ebenso. Nicht in `public/api/.htaccess`: Eine eigene `RewriteEngine` dort ersetzte
+  für alle API-Aufrufe die Regeln von `public/.htaccess`, darunter das Durchreichen des
+  `Authorization`-Headers (beim Planen festgestellt).
+- Keine Sitzung (`session_start()` entfällt für `calendar`), keine CORS-Header (der Feed braucht
+  keinen Zugriff aus fremden Seiten; vgl. OI-126).
 - Nur `GET` (und `HEAD`), sonst `405`.
 - Token-Format prüfen (`^[0-9a-f]{64}$`), dann Hash nachschlagen, verknüpftes Konto und Mitglied
   laden.
@@ -93,9 +97,10 @@ Konfiguration oder geraten), nicht das Frontend. `webcal_url` ist dieselbe URL m
 
 Ein Abruf mit **gültigem** Token zählt nicht in die Grenze für Unangemeldete; ein Abruf mit
 ungültigem Token zählt wie bisher. So bleibt Durchprobieren gebremst, und gemeinsame Abruf-IPs
-großer Kalenderanbieter laufen nicht voll. Umsetzung: die Prüfung in Abschnitt 6.2 nimmt die
-Ressource `calendar` aus, der Handler zählt im Fehlerfall selbst über den vorhandenen Zähler
-(`rate_limiter.php`). Die genaue Einhängestelle legt der Plan nach Lesen von 6.2 fest.
+großer Kalenderanbieter laufen nicht voll. Umsetzung: Abschnitt 6.2 von `api.php` ermittelt
+für `calendar` den Inhaber (`calendarFeedOwner()`); ein gültiger Inhaber gilt dort wie eine
+Anmeldung, alles andere läuft durch den vorhandenen Zähler. Direkt danach endet der Abruf im
+Handler — es gibt keinen zweiten Zählweg.
 
 ### Feature-Schalter
 
