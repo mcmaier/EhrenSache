@@ -24,7 +24,7 @@ test('Profil: Karte mit data-feature und allen Zustaenden', function () {
     assertTrue((bool) preg_match('/id="calendarFeedCard"[^>]*data-feature="calendar_feed"|data-feature="calendar_feed"[^>]*id="calendarFeedCard"/', $html),
         'Karte calendarFeedCard mit data-feature="calendar_feed" fehlt');
     foreach (['calendarFeedNoMember', 'calendarFeedInactive', 'calendarFeedFresh', 'calendarFeedActive',
-              'calendarFeedUrl', 'calendarFeedWebcal', 'calendarFeedStatus', 'calendarFeedHideDeclined'] as $id) {
+              'calendarFeedUrl', 'calendarFeedWebcal', 'calendarFeedStatus', 'calendarFeedHideDeclined', 'calendarFeedHideDeclinedLabel', 'calendarFeedRenew'] as $id) {
         assertTrue(strpos($html, 'id="' . $id . '"') !== false, "Element #{$id} fehlt");
     }
     foreach (['calendar-feed-create', 'calendar-feed-renew', 'calendar-feed-end', 'calendar-feed-copy'] as $a) {

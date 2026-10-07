@@ -70,6 +70,11 @@
     gap: 10px;
 }
 
+.calendar-feed-actions .btn-std {
+    border: 1px solid;
+    background: transparent;
+}
+
 .calendar-feed-help {
     margin-top: 20px;
     font-size: 13px;

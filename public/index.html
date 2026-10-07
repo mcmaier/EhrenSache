@@ -265,20 +265,20 @@
                                 <input type="text" id="calendarFeedUrl" readonly class="calendar-feed-url">
                                 <button type="button" class="btn-add calendar-feed-button" data-action="calendar-feed-copy">📋 Kopieren</button>
                             </div>
-                            <a class="btn-std calendar-feed-webcal" id="calendarFeedWebcal" href="#">In Kalender öffnen</a>
+                            <a class="btn-add calendar-feed-webcal" id="calendarFeedWebcal" href="#">In Kalender öffnen</a>
                             <p class="calendar-feed-warning">
                                 Der Link wird nur jetzt angezeigt. Wer ihn hat, sieht deine Termine.
                             </p>
                         </div>
 
                         <div class="hidden" id="calendarFeedActive">
-                            <p class="calendar-feed-status" id="calendarFeedStatus"></p>
-                            <label class="checkbox-label calendar-feed-toggle">
+                            <p class="calendar-feed-status" id="calendarFeedStatus" aria-live="polite"></p>
+                            <label class="checkbox-label calendar-feed-toggle" id="calendarFeedHideDeclinedLabel">
                                 <input type="checkbox" id="calendarFeedHideDeclined" data-action-change="calendar-feed-hide-declined">
                                 Abgesagte Termine nicht im Kalender anzeigen
                             </label>
                             <div class="calendar-feed-actions">
-                                <button type="button" class="btn-std" data-action="calendar-feed-renew">🔄 Neuen Link erzeugen</button>
+                                <button type="button" class="btn-std btn-view" id="calendarFeedRenew" data-action="calendar-feed-renew">🔄 Neuen Link erzeugen</button>
                                 <button type="button" class="btn-std btn-delete" data-action="calendar-feed-end">Abo beenden</button>
                             </div>
                         </div>

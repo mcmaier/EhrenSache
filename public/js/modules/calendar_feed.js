@@ -21,6 +21,8 @@ import { registerActions } from './actions.js';
 
 // { url, webcal_url } nur bis zum naechsten Laden der Seite
 let freshLink = null;
+// Verhindert doppelte Aufrufe (Doppelklick) und uebereinanderliegende Rueckfragen
+let busy = false;
 
 function byId(id) {
     return document.getElementById(id);
@@ -43,8 +45,11 @@ function render(status) {
     const noMember = !status.member_linked;
     byId('calendarFeedNoMember').classList.toggle('hidden', !noMember);
     byId('calendarFeedInactive').classList.toggle('hidden', noMember || status.active);
-    byId('calendarFeedActive').classList.toggle('hidden', noMember || !status.active);
+    byId('calendarFeedActive').classList.toggle('hidden', !status.active);
     byId('calendarFeedFresh').classList.toggle('hidden', noMember || !status.active || !freshLink);
+    // Abo ohne Mitglied: nur beenden, der Server wuerde Aendern und Erneuern abweisen
+    byId('calendarFeedHideDeclinedLabel').classList.toggle('hidden', noMember);
+    byId('calendarFeedRenew').classList.toggle('hidden', noMember);
 
     if (status.active) {
         const seit = formatDateTime(status.created_at) ?? '–';
@@ -64,7 +69,9 @@ export async function loadCalendarFeedCard() {
     if (!byId('calendarFeedCard') || !isFeatureOn('calendar_feed')) {
         return;
     }
-    const status = await apiCall('calendar_feed', 'GET');
+    // Der Link gilt nur direkt nach dem Erzeugen: bei jedem Laden vergessen
+    freshLink = null;
+    const status = await apiCall('calendar_feed', 'GET', null, {}, { silentStatuses: [403, 404] });
     if (!status?.success) {
         return;
     }
@@ -72,6 +79,18 @@ export async function loadCalendarFeedCard() {
 }
 
 async function createCalendarFeed(replace) {
+    if (busy) {
+        return;
+    }
+    busy = true;
+    try {
+        await doCreateCalendarFeed(replace);
+    } finally {
+        busy = false;
+    }
+}
+
+async function doCreateCalendarFeed(replace) {
     if (replace) {
         const ok = await showConfirm(
             'Neuen Link erzeugen? Der bisherige Link funktioniert danach nicht mehr – auch nicht in Kalendern, die ihn schon abonniert haben.',
@@ -94,9 +113,23 @@ async function createCalendarFeed(replace) {
         hide_declined: result.hide_declined
     });
     showToast('Abo-Link erzeugt', 'success');
+    byId('calendarFeedUrl').focus();
+    byId('calendarFeedUrl').select();
 }
 
 async function endCalendarFeed() {
+    if (busy) {
+        return;
+    }
+    busy = true;
+    try {
+        await doEndCalendarFeed();
+    } finally {
+        busy = false;
+    }
+}
+
+async function doEndCalendarFeed() {
     const ok = await showConfirm(
         'Abo beenden? Kalender, die den Link abonniert haben, erhalten danach keine Termine mehr.',
         'Kalender-Abo beenden'
@@ -114,12 +147,21 @@ async function endCalendarFeed() {
 }
 
 async function setHideDeclined(checkbox) {
-    const result = await apiCall('calendar_feed', 'PUT', { hide_declined: checkbox.checked });
-    if (!result?.success) {
+    if (busy) {
         checkbox.checked = !checkbox.checked;
         return;
     }
-    showToast(checkbox.checked ? 'Abgesagte Termine werden ausgeblendet' : 'Abgesagte Termine werden angezeigt', 'success');
+    busy = true;
+    try {
+        const result = await apiCall('calendar_feed', 'PUT', { hide_declined: checkbox.checked });
+        if (!result?.success) {
+            checkbox.checked = !checkbox.checked;
+            return;
+        }
+        showToast(checkbox.checked ? 'Abgesagte Termine werden ausgeblendet' : 'Abgesagte Termine werden angezeigt', 'success');
+    } finally {
+        busy = false;
+    }
 }
 
 function copyCalendarFeedUrl() {
@@ -127,14 +169,19 @@ function copyCalendarFeedUrl() {
     if (!input?.value) {
         return;
     }
-    navigator.clipboard.writeText(input.value).then(
-        () => showToast('Link kopiert', 'success'),
-        () => {
-            input.select();
-            document.execCommand('copy');
-            showToast('Link kopiert', 'success');
-        }
-    );
+    const fallback = () => {
+        input.select();
+        const ok = document.execCommand('copy');
+        showToast(ok ? 'Link kopiert' : 'Bitte den Link manuell kopieren', ok ? 'success' : 'warning');
+    };
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(input.value).then(
+            () => showToast('Link kopiert', 'success'),
+            fallback
+        );
+    } else {
+        fallback();
+    }
 }
 
 registerActions({

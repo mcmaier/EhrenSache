@@ -226,6 +226,7 @@ const FEATURE_SWITCHES = {
     // vorheriger sperrt, zaehlt als aus -- Terminplanung aus sperrt den
     // Anwesenheitsschalter und damit auch dessen abhaengige Felder.
     appointments_enabled: ['attendance_enabled', 'holiday_region', 'response_deadline_hours', 'calendar_feed_enabled'],
+    calendar_feed_enabled: [],
     attendance_enabled:   ['checkin_auto_create_appointment', 'checkin_tolerance_hours',
                            'punctuality_enabled', 'reliability_enabled',
                            'rate_threshold_mid', 'rate_threshold_fair', 'rate_threshold_good'],
