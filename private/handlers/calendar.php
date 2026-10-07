@@ -169,6 +169,15 @@ function calendarFeedNotFound(): void
 /** @param array<string, mixed>|null $owner Ergebnis von calendarFeedOwner() */
 function handleCalendarDownload($db, $database, string $method, ?array $owner): void
 {
+    // api.php setzt CORS-Header fuer alle Aufrufe. Der Feed braucht keinen
+    // Zugriff aus fremden Seiten (Kalender-Apps rufen direkt ab) -- mit dem
+    // Token in der URL soll ihn auch kein Skript einer anderen Seite lesen
+    // koennen (vgl. OI-126). Gilt fuer jede Antwort, auch 404 und 405.
+    header_remove('Access-Control-Allow-Origin');
+    header_remove('Access-Control-Allow-Methods');
+    header_remove('Access-Control-Allow-Headers');
+    header_remove('Access-Control-Allow-Credentials');
+
     if ($method !== 'GET' && $method !== 'HEAD') {
         http_response_code(405);
         header('Allow: GET, HEAD');

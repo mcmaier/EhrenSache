@@ -333,9 +333,24 @@ function cfTokenFromUrl(string $url): string
     return $m[1];
 }
 
-function cfCountApiRequests(): int
+/** Hoechste id in rate_limits -- Ausgangspunkt fuer cfCountApiRequestsSince(). */
+function cfMaxRateId(): int
 {
-    return (int) cfPdo()->query("SELECT COUNT(*) FROM " . cfPrefix() . "rate_limits WHERE action = 'api_request'")->fetchColumn();
+    return (int) cfPdo()->query('SELECT COALESCE(MAX(id), 0) FROM ' . cfPrefix() . 'rate_limits')->fetchColumn();
+}
+
+/**
+ * Neue api_request-Zeilen seit $maxId. Bewusst ueber die id und nicht als
+ * Differenz zweier Gesamtzahlen: Der Rate Limiter loescht vor dem Zaehlen alle
+ * Zeilen, die aelter als 60 s sind -- die Gesamtzahl kann also zwischen zwei
+ * Abrufen sinken, ohne dass etwas falsch laeuft.
+ */
+function cfCountApiRequestsSince(int $maxId): int
+{
+    $stmt = cfPdo()->prepare('SELECT COUNT(*) FROM ' . cfPrefix() . "rate_limits WHERE action = 'api_request' AND id > ?");
+    $stmt->execute([$maxId]);
+
+    return (int) $stmt->fetchColumn();
 }
 
 function cfCreate(string $resource, array $body): int
@@ -499,6 +514,28 @@ test('Feed: Header, HEAD ohne Rumpf, last_fetched_at gesetzt', function () {
     });
 });
 
+test('Feed: Antworten ohne CORS-Header (200, 404, 405)', function () {
+    cfWithFeature(function () {
+        try {
+            $url = cfFeed('user', 'POST', [])['body']['url'];
+            $ok  = cfFetch($url);
+            assertSame(200, $ok['status']);
+            assertTrue(!isset($ok['headers']['access-control-allow-origin']), 'Feed (200) traegt Access-Control-Allow-Origin');
+            assertTrue(!isset($ok['headers']['access-control-allow-credentials']), 'Feed (200) traegt Access-Control-Allow-Credentials');
+
+            $weg = cfFetch(cfQueryUrl(str_repeat('c', 64)));
+            assertSame(404, $weg['status']);
+            assertTrue(!isset($weg['headers']['access-control-allow-origin']), '404 traegt Access-Control-Allow-Origin');
+
+            $post = cfFetch($url, 'POST');
+            assertSame(405, $post['status']);
+            assertTrue(!isset($post['headers']['access-control-allow-origin']), '405 traegt Access-Control-Allow-Origin');
+        } finally {
+            cfFeed('user', 'DELETE');
+        }
+    });
+});
+
 test('Feed: 404 bei unbekanntem, falsch geformtem, ersetztem und widerrufenem Token', function () {
     cfWithFeature(function () {
         try {
@@ -562,15 +599,99 @@ test('Feed: ungueltige Tokens zaehlen in die Rate-Grenze, gueltige nicht', funct
         try {
             $token = cfTokenFromUrl(cfFeed('user', 'POST', [])['body']['url']);
 
-            $vorher = cfCountApiRequests();
+            $maxId = cfMaxRateId();
             assertSame(200, cfFetch(cfQueryUrl($token))['status']);
             assertSame(200, cfFetch(cfQueryUrl($token))['status']);
-            assertSame($vorher, cfCountApiRequests(), 'Gueltiger Feed-Abruf wurde gezaehlt');
+            assertSame(0, cfCountApiRequestsSince($maxId), 'Gueltiger Feed-Abruf wurde gezaehlt');
 
             assertSame(404, cfFetch(cfQueryUrl(str_repeat('b', 64)))['status']);
-            assertSame($vorher + 1, cfCountApiRequests(), 'Ungueltiger Feed-Abruf wurde nicht gezaehlt');
+            assertSame(1, cfCountApiRequestsSince($maxId), 'Ungueltiger Feed-Abruf wurde nicht genau einmal gezaehlt');
         } finally {
             cfFeed('user', 'DELETE');
         }
+    });
+});
+
+/** @return int[] Gruppen eines Mitglieds (ueber die API, wie cfWithWorld) */
+function cfMemberGroups(int $memberId): array
+{
+    $res = apiRequest('GET', 'members', ['token' => apiToken('admin'), 'query' => ['id' => $memberId]]);
+    assertStatus(200, $res);
+
+    return array_map(static fn ($g) => (int) $g['group_id'], $res['body']['groups'] ?? []);
+}
+
+/** @param int[] $groupIds */
+function cfSetMemberGroups(int $memberId, array $groupIds): void
+{
+    assertStatus(200, apiRequest('PUT', 'members', ['token' => apiToken('admin'),
+        'query' => ['id' => $memberId], 'body' => ['group_ids' => array_values(array_unique($groupIds))]]));
+}
+
+test('Feed: Gruppengrenze gilt auch fuer Verwalter', function () {
+    $managerMember = apiMemberId('manager');
+    assertTrue($managerMember !== null, 'Das Testkonto manager braucht ein verknuepftes Mitglied');
+    assertTrue($managerMember !== apiMemberId('user'), 'manager und user teilen sich ein Mitglied -- Test waere wertlos');
+
+    cfWithFeature(function () use ($managerMember) {
+        cfWithWorld(function (array $ids) use ($managerMember) {
+            $original = cfMemberGroups($managerMember);
+            try {
+                assertTrue(!in_array($ids['group2'], $original, true), 'Mitglied des Managers steckt in der Fremdgruppe');
+                // Gegenprobe: In die eigene Gruppe aufnehmen, damit der Feed nicht nur
+                // deshalb leer ist, weil das Mitglied gar keiner Gruppe angehoert.
+                cfSetMemberGroups($managerMember, array_merge($original, [$ids['group']]));
+
+                $neu = cfFeed('manager', 'POST', []);
+                assertStatus(201, $neu);
+                $res = cfFetch($neu['body']['url']);
+                assertSame(200, $res['status']);
+                assertTrue(cfHasEvent($res['body'], $ids['in']), 'Gegenprobe: Termin der eigenen Gruppe fehlt im Manager-Feed');
+                assertTrue(!cfHasEvent($res['body'], $ids['fremd']), 'Manager-Feed enthaelt Termin einer fremden Gruppe');
+            } finally {
+                cfFeed('manager', 'DELETE');
+                cfSetMemberGroups($managerMember, $original);
+            }
+        });
+    });
+});
+
+test('Feed: Absage bei Terminart ohne Rueckmeldungen blendet nicht aus, kein ✗', function () {
+    cfWithFeature(function () {
+        cfWithWorld(function (array $ids) {
+            $s = substr(uniqid(), -6);
+            $typeId = $aptId = null;
+            try {
+                $typeId = cfCreate('appointment_types', [
+                    'type_name' => "CF Ohne {$s}", 'is_default' => 0, 'color' => '#667eea',
+                    'group_ids' => [$ids['group']], 'responses_enabled' => 0,
+                ]);
+                $aptId = cfCreate('appointments', [
+                    'title' => "CF ohne {$s}", 'type_id' => $typeId,
+                    'date'  => date('Y-m-d', strtotime('+14 days')), 'start_time' => '19:30', 'end_time' => '21:00',
+                ]);
+                // Die API nimmt fuer diese Terminart keine Rueckmeldung an; eine alte
+                // Rueckmeldung (Art spaeter umgestellt) kann aber in der Tabelle stehen.
+                cfPdo()->prepare('INSERT INTO ' . cfPrefix() . "appointment_responses
+                        (appointment_id, member_id, status, status_changed_at, updated_at)
+                        VALUES (?, ?, 'no', NOW(), NOW())")
+                       ->execute([$aptId, apiMemberId('user')]);
+
+                $neu = cfFeed('user', 'POST', []);
+                assertStatus(201, $neu);
+                assertSame(true, $neu['body']['hide_declined'], 'Standard hide_declined erwartet');
+                $ics = str_replace("\r\n ", '', cfFetch($neu['body']['url'])['body']);
+                assertTrue(cfHasEvent($ics, $aptId), 'Termin ohne Rueckmeldungen trotz hide_declined ausgeblendet');
+                assertTrue(strpos($ics, "SUMMARY:CF ohne {$s}") !== false, 'SUMMARY ohne Praefix erwartet');
+                assertTrue(strpos($ics, "SUMMARY:✗ CF ohne {$s}") === false, 'Praefix ✗ bei Terminart ohne Rueckmeldungen');
+            } finally {
+                cfFeed('user', 'DELETE');
+                if ($aptId !== null) {
+                    cfPdo()->prepare('DELETE FROM ' . cfPrefix() . 'appointment_responses WHERE appointment_id = ?')->execute([$aptId]);
+                }
+                cfDelete('appointments', $aptId);
+                cfDelete('appointment_types', $typeId);
+            }
+        });
     });
 });
