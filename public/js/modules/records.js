@@ -1061,14 +1061,14 @@ function getSourceBadge(record) {
         'none': { icon: '', label: '-', color: '#c3c5c7' },
         'admin': { icon: '👤', label: 'Admin', color: '#72afd8' },
         'user_totp': { icon: '📱', label: 'App', color: '#65c48c' },
-        'device_auth': { icon: '🔐', label: 'Gerät', color: '#d89c57' },        
+        'device_auth': { icon: '🔐', label: 'Gerät', color: '#5b8def' },        
         'auto_checkin': { icon: '🤖', label: 'Auto', color: '#95a5a6' },
         'import':{icon: '📤', label: 'Import', color: 'rgb(231, 209, 109)'},
         // Entsteht, wenn eine Arbeitszeitsitzung mit Terminbezug startet
         'timer': { icon: '⏱️', label: 'Timer', color: '#a98bd0' },
         // Mitgliedsnummer + PIN an einer virtuellen Station (Kiosk). Die PIN ist
         // weitergebbar — darum eigene Kennzeichnung statt 'device_auth'.
-        'station_pin': { icon: '🖥️', label: 'Station (PIN)', color: '#5b8def' },
+        'station_pin': { icon: '🖥️', label: 'Station (PIN)', color: '#d89c57' },
         // Genehmigter Zeitkorrektur-Antrag. Admin-Farbe, weil die Freigabe vom
         // Admin kommt — eigenes Label, weil die Uhrzeit es nicht tut: Sie
         // stammt aus der Angabe des Mitglieds. Ohne diese Unterscheidung sähe
