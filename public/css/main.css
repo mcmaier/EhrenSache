@@ -30,6 +30,7 @@
 @import url('components/loading.css');
 @import url('components/pagination.css');
 @import url('components/demo-banner.css');
+@import url('components/calendar-feed.css');
 
 /* Sections */
 @import url('sections/sidebar.css');

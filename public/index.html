@@ -240,6 +240,59 @@
                             </button>                             
                         </div>
                     </div>
+
+                    <!-- Kalender-Abo (FI-8) -->
+                    <div class="profile-card calendar-feed-card" id="calendarFeedCard" data-feature="calendar_feed">
+                        <h3>Kalender-Abo</h3>
+                        <p class="calendar-feed-intro">
+                            Deine Termine im Kalender von Handy oder Computer — automatisch aktuell,
+                            nur lesend, nur die Termine deiner Gruppen.
+                        </p>
+
+                        <p class="calendar-feed-note hidden" id="calendarFeedNoMember">
+                            Das Abo braucht ein verknüpftes Mitglied. Bitte wende dich an den Vorstand.
+                        </p>
+
+                        <div class="hidden" id="calendarFeedInactive">
+                            <button type="button" class="btn-add calendar-feed-button" data-action="calendar-feed-create">
+                                📅 Abo-Link erzeugen
+                            </button>
+                        </div>
+
+                        <div class="calendar-feed-fresh hidden" id="calendarFeedFresh">
+                            <label for="calendarFeedUrl">Dein Abo-Link</label>
+                            <div class="calendar-feed-link-row">
+                                <input type="text" id="calendarFeedUrl" readonly class="calendar-feed-url">
+                                <button type="button" class="btn-add calendar-feed-button" data-action="calendar-feed-copy">📋 Kopieren</button>
+                            </div>
+                            <a class="btn-std calendar-feed-webcal" id="calendarFeedWebcal" href="#">In Kalender öffnen</a>
+                            <p class="calendar-feed-warning">
+                                Der Link wird nur jetzt angezeigt. Wer ihn hat, sieht deine Termine.
+                            </p>
+                        </div>
+
+                        <div class="hidden" id="calendarFeedActive">
+                            <p class="calendar-feed-status" id="calendarFeedStatus"></p>
+                            <label class="checkbox-label calendar-feed-toggle">
+                                <input type="checkbox" id="calendarFeedHideDeclined" data-action-change="calendar-feed-hide-declined">
+                                Abgesagte Termine nicht im Kalender anzeigen
+                            </label>
+                            <div class="calendar-feed-actions">
+                                <button type="button" class="btn-std" data-action="calendar-feed-renew">🔄 Neuen Link erzeugen</button>
+                                <button type="button" class="btn-std btn-delete" data-action="calendar-feed-end">Abo beenden</button>
+                            </div>
+                        </div>
+
+                        <details class="calendar-feed-help">
+                            <summary>So abonnierst du den Kalender</summary>
+                            <ul>
+                                <li><strong>Google Kalender:</strong> im Browser unter „Weitere Kalender“ → „Per URL“ den Link einfügen.</li>
+                                <li><strong>iPhone/Mac:</strong> „In Kalender öffnen“ antippen, oder Einstellungen → Kalender → Accounts → Abonnierter Kalender.</li>
+                                <li><strong>Outlook:</strong> Kalender hinzufügen → „Aus dem Internet“ → Link einfügen.</li>
+                            </ul>
+                            <p>Google ruft abonnierte Kalender nur alle paar Stunden ab — Änderungen kommen dort verzögert an.</p>
+                        </details>
+                    </div>
                 </div>
             </div>    
             

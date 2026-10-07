@@ -1,0 +1,94 @@
+/* ============================================
+   KALENDER-ABO (FI-8) - Karte in „Mein Profil“
+   ============================================ */
+
+.calendar-feed-intro,
+.calendar-feed-note,
+.calendar-feed-status {
+    color: var(--text-medium);
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+.calendar-feed-fresh label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-medium);
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.calendar-feed-link-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.calendar-feed-url {
+    flex: 1;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 5px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.calendar-feed-button {
+    margin: 0;
+    width: auto;
+}
+
+.calendar-feed-webcal {
+    display: inline-block;
+    margin-top: 10px;
+    text-decoration: none;
+}
+
+.calendar-feed-warning {
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dark);
+}
+
+.calendar-feed-fresh {
+    margin-bottom: 20px;
+}
+
+.calendar-feed-toggle {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.calendar-feed-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.calendar-feed-help {
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--text-medium);
+}
+
+.calendar-feed-help summary {
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.calendar-feed-help ul {
+    margin: 10px 0 10px 20px;
+    list-style: disc;
+}
+
+@media (max-width: 600px) {
+    .calendar-feed-link-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

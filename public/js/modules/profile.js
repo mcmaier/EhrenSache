@@ -16,6 +16,7 @@ import { debug } from '../app.js'
 import { API_BASE } from '../config.js';
 import { loadOpenItems } from './open_items.js';
 import { registerActions } from './actions.js';
+import { loadCalendarFeedCard } from './calendar_feed.js';
 
 // ============================================
 // PROFLE
@@ -123,6 +124,9 @@ export async function loadProfile(forceReload = false) {
     card.style.display = enabled ? 'block' : 'none';
     document.getElementById('new_pin_hint').textContent =
         `${parseInt(s.station_pin_min_length || '4', 10)}–8 Ziffern, keine Folge wie 1234, keine Wiederholung wie 0000`;
+
+    // Kalender-Abo (FI-8): eigener Abruf, haengt am Schalter
+    loadCalendarFeedCard();
 }
 
 
