@@ -705,6 +705,25 @@ CREATE TABLE IF NOT EXISTS `{PREFIX}appointment_responses` (
       REFERENCES `{PREFIX}exceptions`(exception_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------------------------------------
+
+--
+-- Tabellenstruktur für Tabelle `calendar_feeds` (FI-8, Kalender-Abo)
+-- Je Konto höchstens ein Abo-Link; gespeichert wird nur der SHA-256 des Tokens.
+--
+
+CREATE TABLE IF NOT EXISTS `{PREFIX}calendar_feeds` (
+  `user_id` int(11) NOT NULL,
+  `token_hash` char(64) NOT NULL,
+  `hide_declined` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL,
+  `last_fetched_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `token_hash` (`token_hash`),
+  CONSTRAINT `{PREFIX}calfeed_user_fk` FOREIGN KEY (`user_id`)
+      REFERENCES `{PREFIX}users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 --
 -- records.checkin_source auf den vollen Wertevorrat ziehen
 --
@@ -744,6 +763,7 @@ INSERT IGNORE INTO `{PREFIX}system_settings` (`setting_key`, `setting_value`, `s
 ('reliability_enabled', '0', 'boolean', 'general', 'Zuverlässigkeitskennzahl berechnen und anzeigen'),
 ('appointments_enabled', '1', 'boolean', 'general', 'Terminplanung aktiviert (Termine, Terminarten, Kalender, Rückmeldungen)'),
 ('attendance_enabled', '1', 'boolean', 'general', 'Anwesenheitserfassung aktiviert (setzt die Terminplanung voraus)'),
+('calendar_feed_enabled', '0', 'boolean', 'general', 'Kalender-Abo: persönlicher ICS-Link für Mitglieder (setzt die Terminplanung voraus)'),
 ('punctuality_grace_minutes', '0', 'number', 'general', 'Karenz in Minuten relativ zum Terminbeginn (-60 bis 60)'),
 ('response_deadline_hours', '24', 'number', 'general', 'Frist für Terminrückmeldungen in Stunden vor Beginn (0 bis 720)'),
 ('rate_threshold_mid', '40', 'number', 'general', 'Ab dieser Quote Orange statt Rot'),

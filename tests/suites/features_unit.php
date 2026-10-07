@@ -34,6 +34,8 @@ test('FEATURES ist wörtlich festgehalten', function () {
         'station_pin'  => ['setting' => 'station_pin_enabled',  'default' => '0', 'requires' => [], 'resources' => ['change_pin']],
         'punctuality'  => ['setting' => 'punctuality_enabled',  'default' => '0', 'requires' => ['attendance'], 'resources' => []],
         'reliability'  => ['setting' => 'reliability_enabled',  'default' => '0', 'requires' => ['attendance'], 'resources' => []],
+        'calendar_feed' => ['setting' => 'calendar_feed_enabled', 'default' => '0', 'requires' => ['appointments'],
+                            'resources' => ['calendar_feed']],
     ], FEATURES);
 });
 
@@ -195,6 +197,7 @@ test('resolveFeatures: Terminplanung aus nimmt Anwesenheit, Pünktlichkeit und Z
     assertSame([
         'appointments' => false, 'attendance' => false, 'worktime' => true,
         'station_pin'  => true,  'punctuality' => false, 'reliability' => false,
+        'calendar_feed' => false,
     ], resolveFeatures(['appointments' => false] + fuAlleAn()));
 });
 
@@ -202,6 +205,7 @@ test('resolveFeatures: Anwesenheit aus lässt die Terminplanung an', function ()
     assertSame([
         'appointments' => true, 'attendance' => false, 'worktime' => true,
         'station_pin'  => true, 'punctuality' => false, 'reliability' => false,
+        'calendar_feed' => true,
     ], resolveFeatures(['attendance' => false] + fuAlleAn()));
 });
 
@@ -210,6 +214,7 @@ test('resolveFeatures: fehlender Schlüssel gilt als aus, Zeiterfassung und PIN 
     assertSame([
         'appointments' => false, 'attendance' => false, 'worktime' => true,
         'station_pin'  => true,  'punctuality' => false, 'reliability' => false,
+        'calendar_feed' => false,
     ], resolveFeatures(['worktime' => true, 'station_pin' => true, 'punctuality' => true]));
 });
 

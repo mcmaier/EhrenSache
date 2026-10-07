@@ -44,6 +44,11 @@ const FEATURES = [
     'station_pin'  => ['setting' => 'station_pin_enabled',  'default' => '0', 'requires' => [], 'resources' => ['change_pin']],
     'punctuality'  => ['setting' => 'punctuality_enabled',  'default' => '0', 'requires' => ['attendance'], 'resources' => []],
     'reliability'  => ['setting' => 'reliability_enabled',  'default' => '0', 'requires' => ['attendance'], 'resources' => []],
+    // Kalender-Abo (FI-8). Der oeffentliche Feed `calendar` steht bewusst NICHT in
+    // resources: api.php antwortete sonst mit dem JSON FEATURE_DISABLED. Der Feed
+    // prueft den Schalter selbst und antwortet 404 (handlers/calendar.php).
+    'calendar_feed' => ['setting' => 'calendar_feed_enabled', 'default' => '0', 'requires' => ['appointments'],
+                        'resources' => ['calendar_feed']],
 ];
 
 /** Der Schlüssel und alle seine Voraussetzungen, rekursiv, ohne Doppelte. */
