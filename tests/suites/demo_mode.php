@@ -125,6 +125,7 @@ test('Die Erlaubnisliste entspricht der Spezifikation', function () {
         'auto_checkin'      => ['POST'],
         'totp_checkin'      => ['POST'],
         'station'           => ['POST'],
+        'calendar_feed'     => ['POST', 'PUT', 'DELETE'],
     ], DEMO_WRITE_ALLOWED);
 });
 

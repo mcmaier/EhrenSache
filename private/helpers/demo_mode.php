@@ -53,6 +53,7 @@ const DEMO_WRITE_ALLOWED = [
     'auto_checkin'      => ['POST'],
     'totp_checkin'      => ['POST'],
     'station'           => ['POST'],
+    'calendar_feed'     => ['POST', 'PUT', 'DELETE'], // eigenes Abo; der Link zeigt nur Demodaten
 ];
 
 /**

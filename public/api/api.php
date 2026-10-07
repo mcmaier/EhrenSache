@@ -93,6 +93,7 @@ require_once '../../private/handlers/update_check.php';
 require_once '../../private/handlers/appointment_responses.php';
 require_once '../../private/handlers/appointment_series.php';
 require_once '../../private/handlers/holidays.php';
+require_once '../../private/handlers/calendar.php';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -754,6 +755,9 @@ try {
         break;
     case 'holidays':
         handleHolidays($db, $database, $request_method);
+        break;
+    case 'calendar_feed':
+        handleCalendarFeed($db, $database, $request_method, $authUserId, $authMemberId);
         break;
 
     default:
