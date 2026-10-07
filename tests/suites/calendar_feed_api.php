@@ -612,6 +612,22 @@ test('Feed: ungueltige Tokens zaehlen in die Rate-Grenze, gueltige nicht', funct
     });
 });
 
+test('Schalter aus: Abruf mit gueltigem Token zaehlt in die Rate-Grenze', function () {
+    $token = null;
+    try {
+        cfWithFeature(function () use (&$token) {
+            $token = cfTokenFromUrl(cfFeed('user', 'POST', [])['body']['url']);
+        });
+        cfWithFeature(function () use ($token) {
+            $maxId = cfMaxRateId();
+            assertSame(404, cfFetch(cfQueryUrl($token))['status']);
+            assertSame(1, cfCountApiRequestsSince($maxId), 'Abruf bei ausgeschalteter Funktion wurde nicht genau einmal gezaehlt');
+        }, '0');
+    } finally {
+        cfWithFeature(fn () => cfFeed('user', 'DELETE'));
+    }
+});
+
 /** @return int[] Gruppen eines Mitglieds (ueber die API, wie cfWithWorld) */
 function cfMemberGroups(int $memberId): array
 {

@@ -336,7 +336,10 @@ $tokenTraegt = $tokenUser !== null
 // Kalenderanbieter rufen alle Feeds von wenigen eigenen Adressen ab und
 // liefen sonst in die Grenze. Ein ungueltiger Token zaehlt wie jeder
 // unangemeldete Aufruf -- das bremst das Durchprobieren.
-$calendarFeedOwner = $resource === 'calendar'
+// Bei ausgeschalteter Funktion wird der Token gar nicht nachgeschlagen: Der
+// Abruf zaehlt wie jeder unangemeldete Aufruf, und die Tabelle calendar_feeds
+// wird nicht beruehrt (vor dem Migrationsschritt gibt es sie noch nicht).
+$calendarFeedOwner = ($resource === 'calendar' && isFeatureEnabled($db, $database, 'calendar_feed'))
     ? calendarFeedOwner($db, $prefix, $_GET['token'] ?? null)
     : null;
 

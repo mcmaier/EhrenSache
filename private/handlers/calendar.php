@@ -236,7 +236,6 @@ function handleCalendarDownload($db, $database, string $method, ?array $owner): 
     header('Content-Disposition: inline; filename="termine.ics"');
     header('Cache-Control: private, max-age=0');
     header('X-Robots-Tag: noindex');
-    header('Referrer-Policy: no-referrer');
 
     if ($method === 'GET') {
         echo $body;
