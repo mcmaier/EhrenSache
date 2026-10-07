@@ -710,6 +710,30 @@ angebracht sein, dass es sich nicht unbemerkt öffnen lässt.
 
 ---
 
+## 13a. Kalender-Abo (optional)
+
+Die Funktion ist standardmäßig **aus**. Ist sie eingeschaltet, kann jedes Mitglied
+einen persönlichen Abo-Link erzeugen.
+
+- **Was hinausgeht:** Titel, Datum, Uhrzeit, Ort, Beschreibung und Terminart der Termine der
+  eigenen Gruppen sowie die **eigene** Rückmeldung samt Kommentar. Keine Daten anderer Personen.
+- **An wen:** an den Kalenderanbieter, bei dem das Mitglied den Link abonniert (z. B. Google,
+  Apple, Microsoft). Er ruft den Link regelmäßig ab und speichert die Termine. Das veranlasst das
+  Mitglied selbst; der Verein sollte in der Information für Mitglieder darauf hinweisen.
+- **Link als Zugang:** Wer den Link kennt, sieht die Termine. Der Link steht in den
+  Zugriffsprotokollen des Webservers und beim Kalenderanbieter. In der Datenbank liegt nur ein
+  Hash. Das Mitglied kann den Link jederzeit ersetzen oder das Abo beenden; „zuletzt abgerufen“
+  zeigt, ob er noch benutzt wird. Ein deaktiviertes Konto liefert keinen Feed mehr.
+- **Gespeichert:** Hash, Zeitpunkt der Erzeugung, letzter Abruf (stündlich gerundet), Einstellung
+  „abgesagte ausblenden“. Enthalten in der Datenauskunft; gelöscht mit dem Konto.
+- **Verschlüsselte Übertragung:** Läuft die Installation hinter einem Proxy, der TLS beendet,
+  `base_url` in der `config.php` mit `https://` setzen — sonst kann der erzeugte Link mit
+  `http://` beginnen. Viele Kalender-Apps lösen `webcal://` beim ersten Abruf als `http://` auf;
+  eine Weiterleitung auf HTTPS und HSTS auf dem Host verhindern, dass das Token unverschlüsselt
+  unterwegs ist.
+
+---
+
 ## 14. Hilfreiche Links & Ressourcen
 
 ### Gesetzestexte

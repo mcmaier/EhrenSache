@@ -1326,6 +1326,77 @@ Sachsens und Thüringens) sowie einmalige Feiertage (z. B. Reformationstag 2017 
 
 ---
 
+## Kalender-Abo (calendar_feed, calendar)
+
+Seit FI-8. Abschaltbar über `calendar_feed_enabled` (Standard **aus**, setzt die
+Terminplanung voraus). Je Konto höchstens ein Abo-Link; gespeichert wird nur der SHA-256
+des Tokens.
+
+### Status abrufen
+
+`GET ?resource=calendar_feed`
+
+**Berechtigung:** angemeldetes Konto; Geräte `403`; Funktion aus `403 FEATURE_DISABLED`
+
+```json
+{
+  "active": true,
+  "member_linked": true,
+  "hide_declined": true,
+  "created_at": "2026-10-07 14:20:00",
+  "last_fetched_at": null
+}
+```
+
+`member_linked: false` bei einem Konto ohne verknüpftes Mitglied — dann ist kein Abo möglich.
+`last_fetched_at` wird höchstens stündlich fortgeschrieben.
+
+### Abo-Link erzeugen oder ersetzen
+
+`POST ?resource=calendar_feed` — kein Rumpf nötig. Antwort `201`; **der Link steht nur in
+dieser Antwort.** Ersetzen macht den bisherigen Link sofort ungültig und behält
+`hide_declined`.
+
+```json
+{
+  "url": "https://verein.example/api/calendar/3f2a…e9.ics",
+  "webcal_url": "webcal://verein.example/api/calendar/3f2a…e9.ics",
+  "created_at": "2026-10-07 14:20:00",
+  "hide_declined": true
+}
+```
+
+`409` mit `code: "NO_MEMBER"` ohne verknüpftes Mitglied. Die URL baut der Server aus `BASE_URL`.
+
+### Abgesagte Termine ein- oder ausblenden
+
+`PUT ?resource=calendar_feed` mit `{"hide_declined": false}`. Antwort wie „Status abrufen“.
+`400`, wenn `hide_declined` fehlt, `null` oder kein Wahrheitswert ist; `404` ohne Abo.
+
+### Abo beenden
+
+`DELETE ?resource=calendar_feed` — `200 {"message": "Kalender-Abo beendet"}`, auch wenn keins
+bestand.
+
+### Feed abrufen
+
+`GET …/api/calendar/<token>.ics` (gleichwertig `?resource=calendar&token=<token>`), auch `HEAD`,
+andere Methoden `405`. **Öffentlich** — das Token ist der Zugang; keine Sitzung, kein Cookie.
+Antwort `text/calendar` (RFC 5545), Zeitzone `Europe/Berlin`, Zeitraum heute − 3 Monate bis
+heute + 12 Monate, nur Termine der Gruppen des verknüpften Mitglieds, ohne automatisch angelegte
+Termine. Die eigene Rückmeldung steht als Präfix im Titel (`✓ `, `✗ `, `? `) und in der
+Beschreibung; mit `hide_declined` fehlen abgesagte Termine. Ein Termin mit nicht lesbarer
+Uhrzeit wird übersprungen (im Fehlerlog vermerkt), der übrige Feed wird geliefert.
+
+Der Feed sendet **keine CORS-Header** (für diese Ressource entfernt) und `Referrer-Policy:
+no-referrer`.
+
+`404` mit leerem Rumpf bei unbekanntem Token, deaktiviertem Konto, Konto ohne Mitglied und
+abgeschalteter Funktion — bewusst ununterscheidbar. Abrufe mit gültigem Token zählen nicht in
+die Rate-Grenze für unangemeldete Aufrufe, ungültige schon.
+
+---
+
 ## Anwesenheit (records)
 
 **Abschaltbar** (seit OI-62, Etappe 2): Bei `attendance_enabled = 0` — oder abgeschalteter Terminplanung, die sie voraussetzt — antwortet die Ressource `403 FEATURE_DISABLED` mit `"feature": "attendance"`.

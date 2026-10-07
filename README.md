@@ -27,6 +27,7 @@ Jeder kann seine Statistik einsehen und prüfen, ob alles erfasst wurde. Inklusi
 - **Gruppenverwaltung**: Organisation von Mitgliedern in Gruppen, inklusive Aktiv- und Inaktiv-Zeiträumen
 - **Arbeitszeiterfassung** (seit 1.2.0, abschaltbar): Beginn, Ende und Pause je Tätigkeitsart,
   mit Änderungshistorie — für Vereine, die geleistete Stunden nachweisen müssen
+- **Kalender-Abo** (abschaltbar, standardmäßig aus): persönlicher ICS-Link für Google, Apple und Outlook
 - **Statistik und Export**: Auswertung nach Termin, Gruppe und Jahr; CSV-Import und -Export
   für Mitglieder, Termine, Anwesenheiten und Arbeitszeit
 

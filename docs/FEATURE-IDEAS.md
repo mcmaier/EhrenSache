@@ -45,7 +45,7 @@ durchschlägt.
 | [FI-5](#fi-5--pin-anmeldung-am-auth-gerät) | PIN-Anmeldung am Auth-Gerät — **umgesetzt in 1.3.0** | mittel | M | FI-4 |
 | [FI-6](#fi-6--benachrichtigungskanal-e-mail-web-push) | Benachrichtigungskanal (E-Mail, Web-Push) | hoch | M | — |
 | [FI-7](#fi-7--terminserien-für-wiederkehrende-proben) | Terminserien für wiederkehrende Proben — **umgesetzt in 1.11.0** | hoch | M | — |
-| [FI-8](#fi-8--kalender-abo-ics-feed) | Kalender-Abo (ICS-Feed) | mittel | S | — |
+| [FI-8](#fi-8--kalender-abo-ics-feed) | Kalender-Abo (ICS-Feed) — **umgesetzt auf `feat/fi-8-ics-abo`, unveröffentlicht** | mittel | S | — |
 | [FI-9](#fi-9--dienst--und-schichtplanung-für-veranstaltungen) | Dienst- und Schichtplanung für Veranstaltungen | mittel | L | FI-1 |
 | [FI-10](#fi-10--jubiläen-und-ehrungen-automatisch-ermitteln) | Jubiläen und Ehrungen automatisch ermitteln | mittel | S | — |
 | [FI-11](#fi-11--mehrsprachigkeit-der-oberfläche) | Mehrsprachigkeit der Oberfläche | niedrig | L | — |
@@ -597,6 +597,11 @@ FI-8 zusammen kommen oder warten, bis ein Verein danach fragt.
 
 ### FI-8 · Kalender-Abo (ICS-Feed)
 **Nutzen:** mittel · **Aufwand:** S — Voraussetzung [FI-23](#fi-23--ort-und-ende-am-termin) **seit 1.10.0 erfüllt**
+
+**Umgesetzt (unveröffentlicht)** — Spec `docs/superpowers/specs/2026-10-07-kalender-abo-design.md`.
+Entschieden: eigenes Token (nur Hash gespeichert), Termine der eigenen Gruppen für jede Rolle,
+eigene Rückmeldung im Titel, abgesagte standardmäßig ausgeblendet, Europe/Berlin mit VTIMEZONE,
+Einzeltermine statt RRULE, Funktion standardmäßig aus.
 
 Persönliche, mit Token geschützte Kalender-URL, die jedes Mitglied in Telefon oder
 Mail-Programm abonniert. Nur lesend, nur die Termine der eigenen Gruppen.
@@ -1160,7 +1165,7 @@ Keine Zusage, nur die Abhängigkeiten in ihrer natürlichen Ordnung.
 4. **FI-6 Benachrichtigungen** — erst jetzt, und erst nachdem die Auslöserfrage beantwortet ist.
    Danach wird alles Vorherige wirksamer, FI-1 am deutlichsten. Die Einmal-Links aus der Mail
    gehören in dieselbe Runde, weil sie dieselbe Sicherheitsprüfung brauchen.
-5. ~~**FI-23 Ort und Ende**~~ (umgesetzt in 1.10.0), dann **FI-8 ICS-Abo** — in dieser Reihenfolge. FI-8 ist weiterhin
+5. ~~**FI-23 Ort und Ende**~~ (umgesetzt in 1.10.0), dann ~~**FI-8 ICS-Abo**~~ (umgesetzt, unveröffentlicht) — in dieser Reihenfolge. FI-8 ist weiterhin
    die günstigste Idee der Liste, aber ein Feed ohne Ort und ohne Dauer ist eine Liste von
    Titeln; die zwei Felder davor gebaut, macht aus derselben Arbeit einen brauchbaren Kalender.
    FI-23 nützt außerdem für sich allein und hebt nebenbei FI-19. Nach FI-7 wird FI-8 noch

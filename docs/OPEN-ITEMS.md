@@ -44,7 +44,7 @@ dieser Datei, die beim Bau einer Idee ohnehin auf dem Tisch liegen:
 |---|---|---|
 | FI-24 Freigaben in der App | [OI-39](#oi-39--freigaben-liegen-an-zwei-orten) | beide brauchen eine sammelnde Abfrage offener Freigaben — eine für beide, nicht zwei (FI-24 lässt Arbeitszeiten bewusst weg) |
 | FI-4 / FI-3 Check-in-Wege | [OI-6](#oi-6--totp-secret-im-klartext), [OI-46](#oi-46--einmal-kopplungscode-statt-token-im-qr-bild), [OI-7](#oi-7--gültigkeitsfenster-der-totp-codes), [OI-45](#oi-45--kamera-scanner-in-der-station) | Gerätekopplung, Beweiswert und Quellen einmal festlegen |
-| FI-8 ICS-Abo | [OI-97](#oi-97--terminarten-kennen-keine-gruppengrenze) | der Feed braucht die Gruppengrenze, die bei Terminarten fehlt |
+| FI-8 ICS-Abo | [OI-97](#oi-97--terminarten-kennen-keine-gruppengrenze) | der Feed braucht die Gruppengrenze, die bei Terminarten fehlt — geklärt 2026-10-07: nicht nötig, siehe OI-97 |
 | FI-18 ICS-Import | [OI-20](#oi-20--auto-termine-zählen-weiter-in-die-statistik) | Termine mit Herkunft, die nicht in die Statistik zählen — dieselbe Regel; OI-20 müsste dafür neu aufgemacht werden |
 | FI-2 Rest (je Person) | [OI-61](#oi-61--terminrückmeldung-einstellungen-der-terminart-wirken-rückwirkend-auf-die-zuverlässigkeit) | dieselbe Kennzahl, dieselbe Frage nach rückwirkenden Einstellungen |
 
@@ -2621,6 +2621,8 @@ CORS-Köpfe und die Sonderbehandlung von `OPTIONS` entfernen. Falls doch: nur
 `Allow-Credentials` streichen, `*` bleibt für Token-Aufrufe. Die auskommentierten Zeilen in
 `public/api/.htaccess` gleich mit aufräumen.
 
+Der Kalender-Feed (FI-8, Ressource `calendar`) sendet bereits keine CORS-Header; er entfernt sie für sich.
+
 **Nicht sicherheitsrelevant** (Härtung).
 
 ---
@@ -2650,6 +2652,31 @@ Geräte und für bereits aktive Konten mit `400` bzw. `409` abweisen. Ob `api_do
 Request-Felder dieser beiden Ressourcen mit abdecken kann, dabei prüfen.
 
 **Nicht sicherheitsrelevant:** beide Ressourcen verlangen die Rolle Admin.
+
+---
+
+### OI-128 · Migrationsschritt für `calendar_feeds` fehlt
+**Priorität:** hoch · aufgenommen am 2026-10-07 (Zweig `feat/fi-8-ics-abo`, Spec
+`2026-10-07-kalender-abo-design.md`)
+
+Das Kalender-Abo (FI-8) braucht die Tabelle `calendar_feeds`. `private/setup/ehrensache_db.sql`
+legt sie für neue Installationen an; den Schritt in `private/migrations/` legt nach der Regel für
+parallele Sitzungen erst die Release-Sitzung an. **Ohne ihn scheitert bei bestehenden
+Installationen die Datenauskunft (`my_data`)** — sie liest den Abo-Status auch bei
+abgeschalteter Funktion —, und das Einschalten der Funktion führt zu Datenbankfehlern.
+
+**Für die Release-Sitzung:** Migrationsdatei mit dem nächsten Manifest-Eintrag, die
+`calendarFeedMigrate(PDO $pdo, string $prefix)` aus `private/helpers/calendar_feed_schema.php`
+aufruft und `log`/`warnings` zurückgibt (wiederholbar, verändert keine Daten; die
+Einstellungszeile ist nicht nötig, der Default aus `FEATURES` greift).
+`calendar_feed_schema.php` hält PHP-8.0-Syntax und gehört dann in die Liste von
+`tests/suites/update_path_syntax.php`. `DEMO_MIN_SCHEMA` (`private/demo/seed.php`) mit anheben.
+
+**Testdatenbanken:** `php tests/db/apply_calendar_feed.php` legt die Tabelle in der Datenbank
+aus `private/config/config.php` an (für `ehrensache_fi8` erledigt). Die Datenbank des
+Hauptverzeichnisses braucht sie vor dem Merge nach `dev` — nur mit Freigabe des Nutzers.
+
+**Nicht sicherheitsrelevant.**
 
 ---
 
@@ -5042,6 +5069,9 @@ Gruppen, nicht mehr die der Gruppen seiner Mitglieder.
 
 **Nicht sicherheitsrelevant** im Sinne von SECURITY.md: kein Zugriff ohne Konto, keine
 Rechteausweitung, keine personenbezogenen Daten.
+
+**Kalender-Abo (FI-8, 2026-10-07):** berührt diesen Punkt nicht. Der Feed gibt nur den
+Namen der Terminart aus (`CATEGORIES`), nie ihre Gruppenzuordnung.
 
 ---
 

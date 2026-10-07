@@ -9,6 +9,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Hinzugefügt
+
+- **Kalender-Abo (FI-8):** Mitglieder erzeugen unter „Mein Profil“ einen persönlichen Link und
+  abonnieren ihre Termine in Google Kalender, Apple Kalender oder Outlook — nur lesend, nur die
+  Termine der eigenen Gruppen, die eigene Rückmeldung im Titel, abgesagte Termine auf Wunsch
+  ausgeblendet. Link jederzeit ersetzbar oder widerrufbar; gespeichert wird nur ein Hash.
+  **Standardmäßig aus** (Systemeinstellungen → Termine & Anwesenheit). Neue Ressourcen
+  `calendar_feed` und `calendar` (API.md). **Braucht die Tabelle `calendar_feeds`** — der
+  Migrationsschritt kommt mit dem Release.
+
 ## [1.22.1] – 2026-10-06
 
 ### Geändert

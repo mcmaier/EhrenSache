@@ -1638,3 +1638,23 @@ diesem Mitglied verknüpft ist.
 | GZ-13 | Gruppe heute mit Datum von vor zwei Tagen ergänzen, dann mit Datum von vor drei Tagen wieder entfernen | Zuordnung weg, kein Verlaufseintrag (Korrektur, die Gruppe hat nie gegolten) |
 | GZ-14 | Ein bestehendes Mitglied nachträglich einer Gruppe zuordnen, ohne das Datum zu ändern; Statistik des Vorjahres | Die Gruppe zählt erst ab heute; für das Vorjahr keine Termine dieser Gruppe — mit früherem „Änderung gilt ab“ erscheinen sie |
 | GZ-15 | Selbstauskunft (Profil → „Meine Daten“, JSON und CSV) nach GZ-4 | Beendete Zuordnung mit Gruppe, von, bis steht in der Auskunft; die heutige Gruppe trägt ihr Beginndatum |
+
+## 28. Kalender-Abo (FI-8) — unveröffentlicht
+
+Spec `docs/superpowers/specs/2026-10-07-kalender-abo-design.md`. Automatisiert:
+`php tests/run.php ical_unit`, `calendar_feed_api`. Die Tabelle `calendar_feeds` legt
+`php tests/db/apply_calendar_feed.php` an, solange der Migrationsschritt fehlt (OI-128).
+
+| ID | Testfall | Erwartetes Ergebnis |
+|---|---|---|
+| CAL-1 | Schalter „Kalender-Abo“ aus | Karte im Profil fehlt; `…/api/calendar/<token>.ics` → 404 |
+| CAL-2 | Schalter an, Profil als Mitglied öffnen | Karte mit „Abo-Link erzeugen“ |
+| CAL-3 | Link erzeugen | Link, „Kopieren“, „In Kalender öffnen“, Warnhinweis; Status „noch nie abgerufen“ |
+| CAL-4 | Link im Browser öffnen | `.ics`-Datei mit den Terminen der eigenen Gruppen |
+| CAL-5 | Profil neu laden bzw. Bereich wechseln und zurück | Link nicht mehr sichtbar, Status „zuletzt abgerufen …“ |
+| CAL-6 | Termin absagen, Feed neu laden | Termin fehlt; Schalter „Abgesagte …“ aus → Termin mit „✗“ |
+| CAL-7 | „Neuen Link erzeugen“ | Rückfrage; alter Link → 404, neuer liefert |
+| CAL-8 | „Abo beenden“ | Rückfrage; Link → 404; Karte zeigt wieder „Abo-Link erzeugen“ |
+| CAL-9 | Konto ohne Mitglied | Hinweis, kein Knopf |
+| CAL-10 | Link in Thunderbird/Outlook/Apple Kalender abonnieren | Termine mit richtiger Uhrzeit, Ort, Rückmeldung im Titel |
+| CAL-11 | Demo: Link in Google Kalender abonnieren | Termine erscheinen (verzögert) |
