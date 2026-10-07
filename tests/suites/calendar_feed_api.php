@@ -116,6 +116,15 @@ function cfCreateUser(string $role, ?int $memberId, int $isActive = 1, string $s
     return [(int) cfPdo()->lastInsertId(), $token];
 }
 
+/** user_id des Testkontos einer Rolle (ueber dessen Token). */
+function cfUserId(string $role): int
+{
+    $stmt = cfPdo()->prepare('SELECT user_id FROM ' . cfPrefix() . 'users WHERE api_token = ?');
+    $stmt->execute([apiToken($role)]);
+
+    return (int) $stmt->fetchColumn();
+}
+
 function cfDeleteUser(?int $userId): void
 {
     if ($userId !== null) {
@@ -123,70 +132,82 @@ function cfDeleteUser(?int $userId): void
     }
 }
 
-test('calendar_feed: Schalter aus -> 403 FEATURE_DISABLED', function () {
+test('calendar_feed: Schalter aus -> 403 FEATURE_DISABLED (alle Methoden)', function () {
     cfWithFeature(function () {
-        $res = cfFeed('user', 'GET');
-        assertStatus(403, $res);
-        assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null);
+        $bodies = ['GET' => null, 'POST' => [], 'PUT' => ['hide_declined' => false], 'DELETE' => null];
+        foreach ($bodies as $method => $body) {
+            $res = cfFeed('user', $method, $body);
+            assertStatus(403, $res, $method);
+            assertSame('FEATURE_DISABLED', $res['body']['code'] ?? null, $method);
+        }
     }, '0');
 });
 
 test('calendar_feed: ohne Abo inaktiv, Erzeugen liefert URL einmalig, Status aktiv', function () {
     cfWithFeature(function () {
-        cfFeed('user', 'DELETE');
-        $res = cfFeed('user', 'GET');
-        assertStatus(200, $res);
-        assertSame(false, $res['body']['active']);
-        assertSame(true, $res['body']['member_linked']);
-        assertSame(true, $res['body']['hide_declined'], 'Standard: abgesagte ausblenden');
+        try {
+            cfFeed('user', 'DELETE');
+            $res = cfFeed('user', 'GET');
+            assertStatus(200, $res);
+            assertSame(false, $res['body']['active']);
+            assertSame(true, $res['body']['member_linked']);
+            assertSame(true, $res['body']['hide_declined'], 'Standard: abgesagte ausblenden');
 
-        $neu = cfFeed('user', 'POST', []);
-        assertStatus(201, $neu);
-        assertTrue((bool) preg_match('#/api/calendar/[0-9a-f]{64}\.ics$#', (string) $neu['body']['url']),
-            'URL hat nicht die Form …/api/calendar/<64 hex>.ics: ' . $neu['raw']);
-        assertTrue(strpos((string) $neu['body']['webcal_url'], 'webcal://') === 0);
-        assertSame(substr($neu['body']['url'], strpos($neu['body']['url'], '://')),
-                   substr($neu['body']['webcal_url'], strpos($neu['body']['webcal_url'], '://')));
+            $neu = cfFeed('user', 'POST', []);
+            assertStatus(201, $neu);
+            assertTrue((bool) preg_match('#/api/calendar/[0-9a-f]{64}\.ics$#', (string) $neu['body']['url']),
+                'URL hat nicht die Form …/api/calendar/<64 hex>.ics: ' . $neu['raw']);
+            assertTrue(strpos((string) $neu['body']['webcal_url'], 'webcal://') === 0);
+            assertSame(substr($neu['body']['url'], strpos($neu['body']['url'], '://')),
+                       substr($neu['body']['webcal_url'], strpos($neu['body']['webcal_url'], '://')));
 
-        $status = cfFeed('user', 'GET');
-        assertSame(true, $status['body']['active']);
-        assertSame(null, $status['body']['last_fetched_at']);
-        assertTrue(!array_key_exists('url', $status['body']), 'GET darf den Link nicht erneut liefern');
-        assertTrue(strpos($status['raw'], '"token') === false, 'GET verraet Token oder Hash');
-        cfFeed('user', 'DELETE');
+            $status = cfFeed('user', 'GET');
+            assertSame(true, $status['body']['active']);
+            assertSame(null, $status['body']['last_fetched_at']);
+            assertTrue(!array_key_exists('url', $status['body']), 'GET darf den Link nicht erneut liefern');
+            assertTrue(strpos($status['raw'], '"token') === false, 'GET verraet Token oder Hash');
+        } finally {
+            cfFeed('user', 'DELETE');
+        }
     });
 });
 
 test('calendar_feed: Datenbank speichert nur den Hash', function () {
     cfWithFeature(function () {
-        $neu = cfFeed('user', 'POST', []);
-        assertStatus(201, $neu);
-        preg_match('#/([0-9a-f]{64})\.ics$#', $neu['body']['url'], $m);
-        $stmt = cfPdo()->prepare('SELECT token_hash FROM ' . cfPrefix() . 'calendar_feeds f
-            JOIN ' . cfPrefix() . 'users u ON u.user_id = f.user_id WHERE u.member_id = ?');
-        $stmt->execute([apiMemberId('user')]);
-        $hash = (string) $stmt->fetchColumn();
-        assertSame(hash('sha256', $m[1]), $hash);
-        assertTrue($hash !== $m[1]);
-        cfFeed('user', 'DELETE');
+        try {
+            $neu = cfFeed('user', 'POST', []);
+            assertStatus(201, $neu);
+            preg_match('#/([0-9a-f]{64})\.ics$#', $neu['body']['url'], $m);
+            $stmt = cfPdo()->prepare('SELECT token_hash FROM ' . cfPrefix() . 'calendar_feeds f WHERE f.user_id = ?');
+            $stmt->execute([cfUserId('user')]);
+            $hash = (string) $stmt->fetchColumn();
+            assertSame(hash('sha256', $m[1]), $hash);
+            assertTrue($hash !== $m[1]);
+        } finally {
+            cfFeed('user', 'DELETE');
+        }
     });
 });
 
 test('calendar_feed: PUT hide_declined, ohne Abo 404, ungueltig 400', function () {
     cfWithFeature(function () {
-        cfFeed('user', 'DELETE');
-        assertStatus(404, cfFeed('user', 'PUT', ['hide_declined' => false]));
-        assertStatus(201, cfFeed('user', 'POST', []));
-        assertStatus(400, cfFeed('user', 'PUT', ['hide_declined' => 'vielleicht']));
-        assertStatus(400, cfFeed('user', 'PUT', []));
-        $res = cfFeed('user', 'PUT', ['hide_declined' => false]);
-        assertStatus(200, $res);
-        assertSame(false, $res['body']['hide_declined']);
-        assertSame(false, cfFeed('user', 'GET')['body']['hide_declined']);
-        // Ersetzen behaelt die Einstellung
-        assertStatus(201, cfFeed('user', 'POST', []));
-        assertSame(false, cfFeed('user', 'GET')['body']['hide_declined']);
-        cfFeed('user', 'DELETE');
+        try {
+            cfFeed('user', 'DELETE');
+            assertStatus(404, cfFeed('user', 'PUT', ['hide_declined' => false]));
+            assertStatus(201, cfFeed('user', 'POST', []));
+            assertStatus(400, cfFeed('user', 'PUT', ['hide_declined' => 'vielleicht']));
+            assertStatus(400, cfFeed('user', 'PUT', ['hide_declined' => null]));
+            assertStatus(400, cfFeed('user', 'PUT', []));
+            $res = cfFeed('user', 'PUT', ['hide_declined' => false]);
+            assertStatus(200, $res);
+            assertSame(false, $res['body']['hide_declined']);
+            assertSame(false, cfFeed('user', 'GET')['body']['hide_declined']);
+            // Ersetzen behaelt die Einstellung
+            assertStatus(201, cfFeed('user', 'POST', []));
+            assertSame(false, cfFeed('user', 'GET')['body']['hide_declined']);
+        } finally {
+            cfFeed('user', 'DELETE');
+        }
     });
 });
 
@@ -194,6 +215,21 @@ test('calendar_feed: DELETE ohne Abo ist ebenfalls Erfolg', function () {
     cfWithFeature(function () {
         cfFeed('user', 'DELETE');
         assertStatus(200, cfFeed('user', 'DELETE'));
+    });
+});
+
+test('calendar_feed: DELETE des einen Nutzers laesst das Abo eines anderen bestehen', function () {
+    cfWithFeature(function () {
+        try {
+            assertStatus(201, cfFeed('user', 'POST', []));
+            assertStatus(201, cfFeed('manager', 'POST', []));
+            assertStatus(200, cfFeed('user', 'DELETE'));
+            assertSame(false, cfFeed('user', 'GET')['body']['active']);
+            assertSame(true, cfFeed('manager', 'GET')['body']['active'], 'Abo des anderen Nutzers wurde mitgeloescht');
+        } finally {
+            cfFeed('user', 'DELETE');
+            cfFeed('manager', 'DELETE');
+        }
     });
 });
 
@@ -216,6 +252,26 @@ test('calendar_feed: Geraet 403, Konto ohne Mitglied 409 (GET meldet member_link
         cfDeleteUser($device);
         cfDeleteUser($ohne);
     }
+});
+
+test('calendar_feed: Sitzungsweg verlangt CSRF-Token', function () {
+    cfWithFeature(function () {
+        $cfg   = testConfig();
+        $login = apiRequest('POST', 'login', ['body' => [
+            'email' => $cfg['user']['email'], 'password' => $cfg['user']['password'],
+        ]]);
+        assertStatus(200, $login, 'Anmeldung fehlgeschlagen');
+        $cookie = explode(';', (string) $login['set_cookie'])[0];
+        $csrf   = (string) $login['body']['csrf_token'];
+        try {
+            $ohne = apiRequest('POST', 'calendar_feed', ['cookie' => $cookie, 'body' => []]);
+            assertStatus(403, $ohne);
+            assertSame('Invalid CSRF token', $ohne['body']['message'] ?? null);
+            assertStatus(201, apiRequest('POST', 'calendar_feed', ['cookie' => $cookie, 'body' => ['csrf_token' => $csrf]]));
+        } finally {
+            apiRequest('DELETE', 'calendar_feed', ['cookie' => $cookie, 'query' => ['csrf_token' => $csrf]]);
+        }
+    });
 });
 
 test('calendar_feed: Konto loeschen entfernt das Abo (CASCADE)', function () {

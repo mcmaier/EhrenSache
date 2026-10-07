@@ -100,7 +100,7 @@ function handleCalendarFeed($db, $database, string $method, int $authUserId, ?in
 
         case 'PUT':
             $data = json_decode(file_get_contents('php://input'), true);
-            $hide = is_array($data) && array_key_exists('hide_declined', $data)
+            $hide = is_array($data) && isset($data['hide_declined'])
                 ? filter_var($data['hide_declined'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
                 : null;
             if ($hide === null) {
