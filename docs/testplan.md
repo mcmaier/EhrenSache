@@ -1642,7 +1642,7 @@ diesem Mitglied verknüpft ist.
 ## 28. Kalender-Abo (FI-8) — unveröffentlicht
 
 Spec `docs/superpowers/specs/2026-10-07-kalender-abo-design.md`. Automatisiert:
-`php tests/run.php ical_unit`, `calendar_feed_api`. Die Tabelle `calendar_feeds` legt
+`php tests/run.php ical_unit`, `calendar_feed_api`, `calendar_feed_frontend`; Rückmelde-Link im Browser: CAL-13. Die Tabelle `calendar_feeds` legt
 `php tests/db/apply_calendar_feed.php` an, solange der Migrationsschritt fehlt (OI-128).
 
 | ID | Testfall | Erwartetes Ergebnis |
@@ -1659,3 +1659,4 @@ Spec `docs/superpowers/specs/2026-10-07-kalender-abo-design.md`. Automatisiert:
 | CAL-10 | Link in Thunderbird/Outlook/Apple Kalender abonnieren (Vorprüfung automatisiert: `node tests/browser/ics-check.mjs` parst den Feed mit ical.js, dem Parser von Thunderbird) | Termine mit richtiger Uhrzeit, Ort, Rückmeldung im Titel |
 | CAL-11 | Demo-Betrieb: Profil öffnen, Feed-URL abrufen | Hinweis „Im Demo-Betrieb nicht verfügbar.“, keine Knöpfe; Feed → 404 |
 | CAL-12 | Öffentlich erreichbare Installation **ohne** Demo-Modus: Link in Google Kalender abonnieren | Termine erscheinen (verzögert) |
+| CAL-13 | Im Kalender bei einem kommenden Termin mit Rückmeldung den Link „Rückmeldung geben“ (bzw. das URL-Feld) öffnen — einmal mit gespeicherter Anmeldung, einmal abgemeldet | Check-in-App öffnet den Tab „Termine“ mit aufgeklappter Karte genau dieses Termins, abgemeldet erst nach der Anmeldung; danach steht kein `#rueckmeldung=` mehr in der Adresse. Vergangene Termine und Terminarten ohne Rückmeldung tragen keinen Link |

@@ -156,7 +156,14 @@ Organisationsname aus `system_settings` (`organization_name`); fehlt er, nur „
 | `SUMMARY` | Präfix der eigenen Rückmeldung + Titel: `✓ ` zugesagt, `✗ ` abgesagt, `? ` unsicher, sonst nichts |
 | `LOCATION` | `location`, falls gesetzt |
 | `CATEGORIES` | Name der Terminart, falls gesetzt — nie die Gruppenzuordnung |
-| `DESCRIPTION` | Beschreibung; Leerzeile; `Terminart: …`; `Deine Rückmeldung: Zugesagt/Abgesagt/Unsicher` und ggf. `– <eigener Kommentar>` |
+| `DESCRIPTION` | Beschreibung; Leerzeile; `Terminart: …`; `Deine Rückmeldung: Zugesagt/Abgesagt/Unsicher` und ggf. `– <eigener Kommentar>`; als letzte Zeile ggf. `Rückmeldung geben: <Link>` bzw. mit eigener Rückmeldung `Rückmeldung ändern: <Link>` |
+| `URL` | Rückmelde-Link `<Basis-URL>/checkin/#rueckmeldung=<id>`, nur bei Terminart mit Rückmeldungen und Termin ab heute (Serverdatum); URI-Wert, nicht als Text maskiert (Entscheidung 2026-10-07) |
+
+Rückmelde-Link (Entscheidung 2026-10-07): Fragment statt Pfad oder Query, damit die Termin-ID nicht
+an den Server und in kein Zugriffsprotokoll geht; kein Token im Link — die Check-in-App verlangt
+die normale Anmeldung, öffnet danach den Tab „Termine“ mit aufgeklappter Karte und entfernt das
+Fragment. Ob ein Termin den Link bekommt, entscheidet der Handler (`response_url` je Zeile);
+`ical.php` gibt nur aus.
 
 Gelöschte Termine fehlen beim nächsten Abruf; der Feed wird jedes Mal vollständig erzeugt,
 `STATUS:CANCELLED` ist nicht nötig.

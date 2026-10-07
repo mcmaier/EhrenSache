@@ -1389,7 +1389,11 @@ andere Methoden `405`. **Öffentlich** — das Token ist der Zugang; keine Sitzu
 Antwort `text/calendar` (RFC 5545), Zeitzone `Europe/Berlin`, Zeitraum heute − 3 Monate bis
 heute + 12 Monate, nur Termine der Gruppen des verknüpften Mitglieds, ohne automatisch angelegte
 Termine. Die eigene Rückmeldung steht als Präfix im Titel (`✓ `, `✗ `, `? `) und in der
-Beschreibung; mit `hide_declined` fehlen abgesagte Termine. Ein Termin mit nicht lesbarer
+Beschreibung; mit `hide_declined` fehlen abgesagte Termine. Kommende Termine (ab heute,
+Serverdatum) einer Terminart mit Rückmeldungen tragen einen **Rückmelde-Link** in die
+Check-in-App, `<Basis-URL>/checkin/#rueckmeldung=<appointment_id>` — als `URL`-Feld und als
+letzte Zeile der Beschreibung („Rückmeldung geben: …“, mit eigener Rückmeldung „Rückmeldung
+ändern: …“). Der Link enthält kein Token; die App verlangt die Anmeldung. Ein Termin mit nicht lesbarer
 Uhrzeit wird übersprungen (im Fehlerlog vermerkt), der übrige Feed wird geliefert.
 
 Der Feed sendet **keine CORS-Header** (für diese Ressource entfernt). Es gilt die globale

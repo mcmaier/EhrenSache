@@ -68,6 +68,11 @@ Sobald du dich im Web-Dashboard registriert hast und von einem Admin freigeschal
   korrigieren, vergessene Sitzungen nachtragen — beides geht erneut in die Freigabe
 - **Termine zu- und absagen**: Tab „Termine" mit Zusage, Unsicher, Absage und Bemerkung;
   erscheint nur, wenn es kommende Termine mit Rückmeldung gibt. Ohne Netz gesperrt
+- **Rückmelde-Link** (`checkin/#rueckmeldung=<Termin-ID>`): Das Kalender-Abo (FI-8) setzt ihn
+  an kommende Termine mit Rückmeldung. Die App liest das Fragment beim Laden, meldet ggf. erst an
+  und öffnet dann den Tab „Termine“ mit aufgeklappter Karte des Termins; danach entfernt sie das
+  Fragment aus der Adresse. Der Link trägt kein Token, das Fragment erreicht den Server nicht.
+  Gibt es die Karte nicht (Termin vorbei oder unbekannt), bleibt der Tab ohne Fehlermeldung offen
 
 ### ⚠️ Limitierungen
 
