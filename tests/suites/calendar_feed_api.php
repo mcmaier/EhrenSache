@@ -21,6 +21,36 @@ declare(strict_types=1);
 require_once __DIR__ . '/../lib/api.php';
 require_once __DIR__ . '/../../private/helpers/config_reader.php';
 require_once __DIR__ . '/../../private/helpers/features.php';
+require_once __DIR__ . '/../lib/source.php';
+
+// ---- Demo-Betrieb: kein Feed --------------------------------------------
+// DEMO_MODE kommt aus config.php und laesst sich ueber HTTP nicht umschalten.
+// Deshalb der Handler im Unterprozess mit gesetzter Konstante, ohne Datenbank:
+// Greift die Demo-Pruefung nicht zuerst, scheitert er an isFeatureEnabled().
+
+test('Feed: im Demo-Betrieb 404, bevor irgendetwas abgefragt wird', function () {
+    if (!function_exists('shell_exec')) {
+        throw new RuntimeException('shell_exec() ist gesperrt -- Unterprozess-Test nicht moeglich');
+    }
+    $root = __DIR__ . '/../../private';
+    // Nur einfache Anfuehrungszeichen im Code (escapeshellarg unter Windows, vgl. demo_mode.php)
+    $code = "define('DEMO_MODE', true);"
+          . ' require ' . var_export($root . '/helpers/demo_mode.php', true) . ';'
+          . ' require ' . var_export($root . '/handlers/calendar.php', true) . ';'
+          . " handleCalendarDownload(null, null, 'GET', ['user_id' => 1, 'member_id' => 1, 'hide_declined' => 1]);"
+          . " echo 'STATUS=' . http_response_code();";
+    $out = (string) shell_exec(escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($code) . ' 2>&1');
+    assertTrue(str_contains($out, 'STATUS=404'), 'Feed antwortet im Demo-Betrieb nicht mit 404: ' . $out);
+    assertTrue(!str_contains($out, 'BEGIN:VCALENDAR'), 'Feed liefert im Demo-Betrieb einen Kalender');
+});
+
+test('api.php schlaegt den Abo-Inhaber im Demo-Betrieb nicht nach', function () {
+    $api = sourceCode(__DIR__ . '/../../public/api/api.php');
+    assertTrue((bool) preg_match('/\$calendarFeedOwner\s*=\s*\(([^?]*)\)\s*\?\s*calendarFeedOwner\(/s', $api, $m),
+        'Zuweisung $calendarFeedOwner nicht gefunden');
+    assertTrue(str_contains($m[1], '!demoModeActive()'), 'Bedingung fuer den Inhaber-Nachschlag prueft demoModeActive() nicht: ' . $m[1]);
+    assertTrue(str_contains($m[1], "isFeatureEnabled(\$db, \$database, 'calendar_feed')"), 'Bedingung prueft den Schalter nicht mehr');
+});
 
 if (!extension_loaded('curl')) {
     return;

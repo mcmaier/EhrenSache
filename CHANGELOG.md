@@ -17,7 +17,8 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   ausgeblendet. Termine ohne Ende erscheinen mit zwei Stunden Dauer. Link jederzeit ersetzbar oder widerrufbar; gespeichert wird nur ein Hash.
   **Standardmäßig aus** (Systemeinstellungen → Termine & Anwesenheit). Neue Ressourcen
   `calendar_feed` und `calendar` (API.md). **Braucht die Tabelle `calendar_feeds`** — der
-  Migrationsschritt kommt mit dem Release.
+  Migrationsschritt kommt mit dem Release. In der öffentlichen Demo lassen sich keine Abo-Links
+  erzeugen, der Feed antwortet dort immer mit 404.
 
 ## [1.22.1] – 2026-10-06
 

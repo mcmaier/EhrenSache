@@ -158,6 +158,7 @@ einmal in der Datenbank prüfen.
 | Gruppen, Terminarten, Mitgliedschaftszeiträume | Systemeinstellungen, Logo-Upload |
 | Check-in, TOTP-Check-in, Kiosk | Import, Mailversand, API-Token erzeugen |
 | alles Lesen, einschließlich Export | Datenbereinigung (`cleanup`) |
+| | Kalender-Abo-Links (Feed antwortet `404`) |
 
 Maßgeblich sind die drei Listen in `private/helpers/demo_mode.php`. **Eine Ressource, die dort
 in keiner Liste steht, ist auch lesend gesperrt** — das ist Absicht, damit eine künftig neue

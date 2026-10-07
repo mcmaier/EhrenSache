@@ -1332,6 +1332,10 @@ Seit FI-8. Abschaltbar über `calendar_feed_enabled` (Standard **aus**, setzt di
 Terminplanung voraus). Je Konto höchstens ein Abo-Link; gespeichert wird nur der SHA-256
 des Tokens.
 
+**Demo-Betrieb:** `POST`, `PUT` und `DELETE` auf `calendar_feed` sperrt der Wächter (`403`,
+`"demo": true`), `GET` bleibt lesbar. Der Feed antwortet dort immer `404` — Besucher könnten
+sonst selbst angelegte Termine als abonnierbaren Kalender unter der Demo-Domain verbreiten.
+
 ### Status abrufen
 
 `GET ?resource=calendar_feed`
@@ -1392,8 +1396,8 @@ Der Feed sendet **keine CORS-Header** (für diese Ressource entfernt). Es gilt d
 `Referrer-Policy` aus `public/.htaccess` (`strict-origin-when-cross-origin`); eine eigene setzt
 der Feed nicht, Apache würde sie nur als zweiten Header danebenstellen.
 
-`404` mit leerem Rumpf bei unbekanntem Token, deaktiviertem Konto, Konto ohne Mitglied und
-abgeschalteter Funktion — bewusst ununterscheidbar. Abrufe mit gültigem Token zählen nicht in
+`404` mit leerem Rumpf bei unbekanntem Token, deaktiviertem Konto, Konto ohne Mitglied,
+abgeschalteter Funktion und im Demo-Betrieb — bewusst ununterscheidbar. Abrufe mit gültigem Token zählen nicht in
 die Rate-Grenze für unangemeldete Aufrufe, ungültige schon.
 
 ---

@@ -2681,6 +2681,9 @@ Einstellungszeile ist nicht nötig, der Default aus `FEATURES` greift).
 `ON DELETE CASCADE` greift dort also nicht: Ein Abo-Link eines Demo-Besuchers überlebte sonst die
 nächtliche Rücksetzung und funktionierte für das neu angelegte Konto mit derselben `user_id`
 weiter. Nicht vorab eintragen — `seed.php` scheiterte sonst auf Datenbanken ohne die Tabelle.
+Seit dem Demo-Schloss (Wächter sperrt `calendar_feed` schreibend, Feed antwortet in der Demo
+immer `404`) kann die Demo keine Abo-Links mehr anlegen; der Eintrag bleibt als Absicherung
+sinnvoll, ist aber nicht mehr dringend.
 
 **Testdatenbanken:** `php tests/db/apply_calendar_feed.php` legt die Tabelle in der Datenbank
 aus `private/config/config.php` an (für `ehrensache_fi8` erledigt). Die Datenbank des

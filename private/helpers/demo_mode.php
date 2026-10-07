@@ -53,7 +53,6 @@ const DEMO_WRITE_ALLOWED = [
     'auto_checkin'      => ['POST'],
     'totp_checkin'      => ['POST'],
     'station'           => ['POST'],
-    'calendar_feed'     => ['POST', 'PUT', 'DELETE'], // eigenes Abo; der Link zeigt nur Demodaten
 ];
 
 /**
@@ -84,6 +83,9 @@ const DEMO_WRITE_DENIED = [
     'cleanup',                // löscht Daten
     'regenerate_token',       // erzeugt API-Zugangsmittel
     'update_check',           // fragt GitHub an und schreibt Einstellungen
+    'calendar_feed',          // Abo-Links (FI-8): Besucher legen Termine mit beliebigem
+                              // Text an und koennten sie als abonnierbaren Kalender
+                              // unter der Projektdomain verbreiten; GET (Status) bleibt
 ];
 
 /**

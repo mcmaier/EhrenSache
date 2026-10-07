@@ -339,7 +339,10 @@ $tokenTraegt = $tokenUser !== null
 // Bei ausgeschalteter Funktion wird der Token gar nicht nachgeschlagen: Der
 // Abruf zaehlt wie jeder unangemeldete Aufruf, und die Tabelle calendar_feeds
 // wird nicht beruehrt (vor dem Migrationsschritt gibt es sie noch nicht).
-$calendarFeedOwner = ($resource === 'calendar' && isFeatureEnabled($db, $database, 'calendar_feed'))
+// Ebenso im Demo-Betrieb: Dort gibt es keine Feeds (handleCalendarDownload()
+// antwortet 404), jeder Abruf zaehlt also wie ein unangemeldeter.
+$calendarFeedOwner = ($resource === 'calendar' && !demoModeActive()
+                      && isFeatureEnabled($db, $database, 'calendar_feed'))
     ? calendarFeedOwner($db, $prefix, $_GET['token'] ?? null)
     : null;
 

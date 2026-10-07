@@ -41,12 +41,29 @@ function formatDateTime(value) {
     });
 }
 
+// Demo-Betrieb: theme.js legt das Merkmal aus resource=appearance ('demo')
+// in sessionStorage ab und setzt die Klasse has-demo-banner -- dieselbe Quelle
+// wie das Demo-Band. Der Server sperrt POST/PUT/DELETE ohnehin (demo_mode.php).
+function isDemoInstallation() {
+    if (document.body.classList.contains('has-demo-banner')) {
+        return true;
+    }
+    try {
+        return sessionStorage.getItem('theme-demo') === '1';
+    } catch {
+        return false;
+    }
+}
+
 function render(status) {
+    // In der Demo nur der Hinweis, keine Knoepfe zum Erzeugen, Erneuern, Beenden
+    const demo = isDemoInstallation();
+    byId('calendarFeedDemo').classList.toggle('hidden', !demo);
     const noMember = !status.member_linked;
-    byId('calendarFeedNoMember').classList.toggle('hidden', !noMember);
-    byId('calendarFeedInactive').classList.toggle('hidden', noMember || status.active);
-    byId('calendarFeedActive').classList.toggle('hidden', !status.active);
-    byId('calendarFeedFresh').classList.toggle('hidden', noMember || !status.active || !freshLink);
+    byId('calendarFeedNoMember').classList.toggle('hidden', demo || !noMember);
+    byId('calendarFeedInactive').classList.toggle('hidden', demo || noMember || status.active);
+    byId('calendarFeedActive').classList.toggle('hidden', demo || !status.active);
+    byId('calendarFeedFresh').classList.toggle('hidden', demo || noMember || !status.active || !freshLink);
     // Abo ohne Mitglied: nur beenden, der Server wuerde Aendern und Erneuern abweisen
     byId('calendarFeedHideDeclinedLabel').classList.toggle('hidden', noMember);
     byId('calendarFeedRenew').classList.toggle('hidden', noMember);

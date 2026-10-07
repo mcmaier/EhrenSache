@@ -57,3 +57,14 @@ test('CSS: eigene Datei per @import in main.css', function () {
     $css = sourceCode(CFF_ROOT . '/public/css/main.css');
     assertTrue(strpos($css, "@import url('components/calendar-feed.css');") !== false, '@import fehlt');
 });
+
+test('Demo-Betrieb: Hinweis statt Knoepfen', function () {
+    $html = sourceCode(CFF_ROOT . '/public/index.html');
+    assertTrue((bool) preg_match('/<p class="[^"]*\bhidden\b[^"]*" id="calendarFeedDemo">\s*Im Demo-Betrieb nicht verfügbar\.\s*<\/p>/u', $html),
+        'Hinweis #calendarFeedDemo (versteckt, „Im Demo-Betrieb nicht verfügbar.“) fehlt');
+    $js = sourceCode(CFF_ROOT . '/public/js/modules/calendar_feed.js');
+    assertTrue(strpos($js, "sessionStorage.getItem('theme-demo')") !== false, 'Modul liest das Demo-Merkmal aus theme.js nicht');
+    assertTrue(strpos($js, "byId('calendarFeedDemo')") !== false, 'Modul schaltet den Demo-Hinweis nicht');
+    assertTrue((bool) preg_match("/byId\('calendarFeedInactive'\)\.classList\.toggle\('hidden',\s*demo\s*\|\|/", $js),
+        'Knopf „Abo-Link erzeugen“ bleibt im Demo-Betrieb sichtbar');
+});

@@ -75,6 +75,15 @@ test('Kleinschreibung und unbekannte Methoden sperren, auch bei erlaubter Ressou
     assertSame(false, demoRequestAllowed('records', 'TRACE'), 'records TRACE');
 });
 
+test('Kalender-Abo: in der Demo keine Abo-Links, Status lesbar (FI-8)', function () {
+    // Besucher legen Termine mit beliebigem Text an; ein Abo-Link machte daraus
+    // einen abonnierbaren Kalender unter der Projektdomain.
+    assertTrue(demoRequestAllowed('calendar_feed', 'GET'), 'calendar_feed GET');
+    assertSame(false, demoRequestAllowed('calendar_feed', 'POST'), 'calendar_feed POST');
+    assertSame(false, demoRequestAllowed('calendar_feed', 'PUT'), 'calendar_feed PUT');
+    assertSame(false, demoRequestAllowed('calendar_feed', 'DELETE'), 'calendar_feed DELETE');
+});
+
 // ---- Die drei Listen tragen die Last selbst -------------------------------
 
 test('Jede gesperrte Ressource weist jeden Schreibzugriff ab', function () {
@@ -125,7 +134,6 @@ test('Die Erlaubnisliste entspricht der Spezifikation', function () {
         'auto_checkin'      => ['POST'],
         'totp_checkin'      => ['POST'],
         'station'           => ['POST'],
-        'calendar_feed'     => ['POST', 'PUT', 'DELETE'],
     ], DEMO_WRITE_ALLOWED);
 });
 
@@ -137,6 +145,7 @@ test('Die Sperrliste entspricht der Spezifikation', function () {
         'change_password', 'change_pin', 'users', 'activate_user', 'user_status',
         'register', 'password_reset_request', 'settings', 'upload-logo',
         'import', 'cleanup', 'regenerate_token', 'update_check',
+        'calendar_feed',
     ], DEMO_WRITE_DENIED);
 });
 

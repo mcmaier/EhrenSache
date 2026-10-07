@@ -186,7 +186,10 @@ function handleCalendarDownload($db, $database, string $method, ?array $owner): 
     }
 
     // Abgeschaltet: 404 wie ein unbekannter Link, nicht FEATURE_DISABLED (Spec).
-    if ($owner === null || !isFeatureEnabled($db, $database, 'calendar_feed')) {
+    // Im Demo-Betrieb gibt es keine Feeds: Besucher legen Termine mit beliebigem
+    // Text an und koennten sie sonst als abonnierbaren Kalender unter der
+    // Projektdomain verbreiten. Die Pruefung steht vorn, damit keine Abfrage laeuft.
+    if (demoModeActive() || $owner === null || !isFeatureEnabled($db, $database, 'calendar_feed')) {
         calendarFeedNotFound();
         return;
     }
