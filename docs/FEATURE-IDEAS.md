@@ -61,7 +61,7 @@ durchschlägt.
 | [FI-21](#fi-21--aufgaben-mit-zuweisung-und-fälligkeit) | Aufgaben mit Zuweisung und Fälligkeit | niedrig | L | FI-6 |
 | [FI-22](#fi-22--musikstücke-und-programme) | Musikstücke und Programme | niedrig | L | — |
 | [FI-23](#fi-23--ort-und-ende-am-termin) | Ort und Ende am Termin (rein informativ) — **umgesetzt in 1.10.0** | mittel | M | — |
-| [FI-24](#fi-24--freigaben-in-der-check-in-app) | Freigaben in der Check-in-App (Anträge außerhalb des Zeitfensters) | mittel | M | — |
+| [FI-24](#fi-24--freigaben-in-der-check-in-app) | Freigaben in der Check-in-App (Anträge außerhalb des Zeitfensters) — **umgesetzt auf `feat/fi-24-freigaben`, unveröffentlicht** | mittel | M | — |
 | [FI-25](#fi-25--docker-als-zweiter-auslieferungsweg) | Docker als zweiter Auslieferungsweg | niedrig² | S/M | — |
 | [FI-26](#fi-26--terminabstimmung-mit-übernahme-in-den-termin) | Terminabstimmung mit Übernahme in den Termin | mittel | M | FI-1, FI-6 für die Wirkung |
 
@@ -770,6 +770,15 @@ soll.
 
 ### FI-24 · Freigaben in der Check-in-App
 **Nutzen:** mittel · **Aufwand:** M
+
+**Umgesetzt (unveröffentlicht)** — Spec `docs/superpowers/specs/2026-10-08-fi-24-freigaben-pwa-design.md`.
+Entschieden: kein sechster Tab, sondern ein Umschalter „Anwesenheit | Offene Anträge (n)“ im Tab
+„Liste“; Entschuldigungen und Zeitanträge (Arbeitszeiten bleiben im Dashboard); alle offenen
+Anträge, geteilt in „Kommende“ und „Vergangene Termine“; keine Gruppengrenze für Manager (FI-15
+bliebe eigene Frage); Selbstgenehmigung über dieselbe Regel wie die Liste (OI-87), vom Server als
+`self_decision_blocked` geliefert; Zeitanträge zeigen die erfasste Ankunft. Keine neue Ressource:
+`GET exceptions` trägt für Verwalter drei Zusatzfelder. Die gemeinsame Abfrage mit OI-39 ist damit
+vorbereitet, aber nicht gebaut. Der ursprüngliche Text unten bleibt als Begründung stehen.
 
 Ein eigener Bereich in der Check-in-App, in dem Admin und Manager **alle** offenen Anträge
 sehen und entscheiden — unabhängig davon, ob gerade ein Termin läuft.

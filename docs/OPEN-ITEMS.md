@@ -495,6 +495,9 @@ für eine Freigabeliste tun.
 `public/js/modules/worktime.js`, gegebenenfalls `private/handlers/` für einen
 zusammenfassenden Lesezugriff. Kein Schemabedarf für die erste Stufe.
 
+FI-24 (2026-10-08) hat `GET exceptions` um Verwalterfelder erweitert; eine gemeinsame Ansicht im
+Dashboard kann darauf aufsetzen.
+
 ---
 
 ### OI-42 · Neun Versionen haben den Release-Branch nie erreicht

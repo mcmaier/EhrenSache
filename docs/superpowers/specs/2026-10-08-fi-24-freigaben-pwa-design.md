@@ -134,3 +134,17 @@ OI-39 darauf aufsetzen kann). Kein Versionssprung, kein Migrationsschritt.
 Eine parallele Sitzung arbeitet an OI-43 (Zweig `feat/oi-43-rahmen`, Service Worker der
 Check-in-App). Beide berühren `public/checkin/`; vor dem Merge den Stand von `dev` holen und
 Konflikte in `app.js`/`index.html` gezielt auflösen.
+
+## Nachtrag nach Umsetzung (2026-10-08)
+
+Abweichungen und Ergänzungen gegenüber dem Entwurf:
+
+- Die Terminart steht in der Kopfzeile eines Termins nur, wenn sie vom Titel abweicht.
+- Zurücksetzen des Umschalters auf „Anwesenheit“ und Neuladen der Zahl geschehen bei **jedem**
+  Öffnen des Tabs „Liste“; `initAttendanceList()` läuft nur bei der Anmeldung.
+- Eine Laufnummer verhindert, dass eine ältere Antwort eine neuere überschreibt (schnelles
+  Umschalten, Entscheidung während eines Abrufs).
+- Nach einer Entscheidung unter „Offene Anträge“ lädt die Anwesenheitsliste beim Zurückschalten
+  einmal neu.
+- Die Selbstgenehmigungsregel ist eine reine Funktion `selfDecisionBlocked()`
+  (`private/helpers/utils.php`) mit eigener Unit-Suite (`self_decision_unit`).
