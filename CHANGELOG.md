@@ -32,6 +32,10 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Browser-Anwendungen auf fremden Domains werden nicht unterstützt, Fremdsysteme rufen
   serverseitig mit Token ab. `OPTIONS` und andere unbekannte Methoden antworten jetzt mit `405`
   (bisher leeres `200`). Die auskommentierten CORS-Zeilen in `public/api/.htaccess` sind entfernt.
+- **Leistung: Terminliste mit Anwesenheit für Mitglieder (OI-98):** Bei `include=attendance` rechnet
+  der Server für Konten ohne Verwaltungsrechte nur noch das eigene Mitglied statt der Soll-Menge des
+  ganzen Vereins; die Antwort bleibt gleich, ein Jahresabruf wird bei 500 Mitgliedern und 600
+  Terminen im Jahr rund 300 ms schneller.
 
 ### Behoben
 

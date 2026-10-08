@@ -48,13 +48,14 @@ dieser Datei, die beim Bau einer Idee ohnehin auf dem Tisch liegen:
 | FI-18 ICS-Import | [OI-20](#oi-20--auto-termine-zählen-weiter-in-die-statistik) | Termine mit Herkunft, die nicht in die Statistik zählen — dieselbe Regel; OI-20 müsste dafür neu aufgemacht werden |
 | FI-2 Rest (je Person) | [OI-61](#oi-61--terminrückmeldung-einstellungen-der-terminart-wirken-rückwirkend-auf-die-zuverlässigkeit) | dieselbe Kennzahl, dieselbe Frage nach rückwirkenden Einstellungen |
 
-Offen mit Priorität *mittel*: OI-67, OI-98, OI-63 (nur noch die Spur), OI-6, OI-22, OI-23 (am
+Offen mit Priorität *mittel*: OI-67, OI-63 (nur noch die Spur), OI-6, OI-22, OI-23 (am
 2026-09-25 einzeln gegen den Code geprüft);
 [OI-113](#oi-113--der-senken-wächter-folgt-join-nicht--fehlende-maskierung-bleibt-unbemerkt)
 ist am 2026-10-08 erledigt (unveröffentlicht). OI-67 ist im Dashboard seit 1.19.0 entschärft (Cache-TTL zwei
 Minuten), in der Check-in-App unverändert. **OI-3 und OI-20 tragen ebenfalls *mittel*, stehen aber
 bewusst so** — sie halten eine in Kauf genommene Folge fest, keine Restarbeit, und gehören deshalb
-nicht in eine Umsetzungsreihe. OI-62 steht auf *niedrig–mittel*, OI-104 auf *niedrig*.
+nicht in eine Umsetzungsreihe. OI-62 steht auf *niedrig–mittel*, OI-104 auf *niedrig*, OI-98 seit der Messung vom 2026-10-08
+ebenfalls.
 
 Seit der Durchsicht vom 17.09. veröffentlicht: OI-82 bis OI-84 (1.11.2), OI-85 (1.12.1),
 OI-86 und OI-87 (1.13.0), OI-25, OI-27, OI-66 und OI-95 (1.14.x),
@@ -5163,8 +5164,8 @@ Namen der Terminart aus (`CATEGORIES`), nie ihre Gruppenzuordnung.
 
 ---
 
-### OI-98 · Lastverhalten von `include=attendance` bei großem Bestand ungemessen
-**Priorität:** mittel · aufgenommen am 2026-09-24 (Vorbehalt aus der Spec zu 1.14.0)
+### OI-98 · Lastverhalten von `include=attendance` bei großem Bestand
+**Priorität:** niedrig (am 2026-10-08 gemessen, von *mittel* gesenkt) · aufgenommen am 2026-09-24 (Vorbehalt aus der Spec zu 1.14.0)
 
 Seit 1.14.0 hängt `loadAppointments()` ([appointments.js](../public/js/modules/appointments.js))
 den Zusatz `include=attendance` an **jeden** Jahresabruf der Termine — nicht nur, wenn der Kalender
@@ -5188,6 +5189,52 @@ Kopie die Zahlen?“. Genau daraus entsteht später ein veralteter Balken.
 **Am 2026-09-25 gegen den Code geprüft: unverändert.** `loadAppointments()` hängt
 `include: 'attendance'` weiterhin an **jeden** Jahresabruf, unabhängig davon, ob der Kalender
 sichtbar ist. Die Messung mit großem Bestand steht weiter aus.
+
+**Am 2026-10-08 gemessen.** Eigenes Worktree mit Datenbankkopie, synthetischer Bestand aus
+einem Generator (Seed fest), XAMPP unter Windows mit PHP 8.2 **ohne OPcache**. Ein leerer
+Request kostet dort schon 105–110 ms; aussagekräftig ist der Unterschied mit und ohne Zusatz.
+
+| Bestand | Mitglieder | Gruppen | Termine/Jahr | records | erwartete Paare 2026 |
+|---|---:|---:|---:|---:|---:|
+| L („großer Verein“) | 200 | 6 | 300 | 46 735 | 18 068 |
+| XL (Stress) | 500 | 6 | 600 | 239 370 | 95 492 |
+
+Mediane in ms, je 10 Läufe nach einem Aufwärmlauf (`GET appointments&year=…`):
+
+| | ohne Zusatz | mit `include=attendance` | Aufschlag |
+|---|---:|---:|---:|
+| L admin 2026 / 2025 | 152 / 146 | 224 / 219 | +72 / +73 |
+| L user 2026 / 2025 | 147 / 133 | 204 / 202 | +57 / +69 |
+| XL admin 2026 / 2025 | 268 / 246 | 624 / 671 | +356 / +425 |
+| XL user 2026 / 2025 | 265 / 261 | 571 / 612 | +306 / +351 |
+
+Das Dashboard löst beim Start **einen** solchen Abruf aus (`sharedLoad()` legt Bereich und
+Hintergrundladen zusammen), danach je Jahreswechsel und nach Ablauf der Cache-TTL einen.
+Für L also unkritisch, für XL spürbar, aber unter einer Sekunde.
+
+**Ursache, kein Index-Problem:** Die Kosten wachsen linear mit der Zahl der erwarteten Paare
+(Termine × erwartete Mitglieder). Die Soll-Paar-Abfrage nutzt durchgehend Indizes; die beiden
+korrelierten Unterabfragen auf `membership_dates` laufen über `idx_member_dates`. MariaDB schaltet
+ihren Unterabfrage-Cache aber nach 200 Fehltreffern ab (`expression_cache: disabled`), sodass
+`NOT EXISTS` bei XL gut 104 000-mal läuft — etwa die Hälfte der 138 ms Datenbankzeit; der Rest
+bis rund 280 ms ist PHP, das die Paare holt und zählt. Zwei Index-Kandidaten
+(`membership_dates(member_id, start_date, end_date)`, `records(appointment_id, member_id, status)`)
+brachten über HTTP nichts Messbares und wurden verworfen. Eine Zählung per `GROUP BY` in SQL
+sparte nur 15 %.
+
+**Umgesetzt (Abhilfe für Mitglieder):** Ein Konto ohne Verwaltungsrechte bekommt nur
+`own_attendance`, die Zahlen über andere sieht es nie. `attendanceAttachSummaries()` berechnete
+dafür trotzdem die Soll-Menge des ganzen Vereins und las alle Records; jetzt grenzen beide
+Abfragen auf das eigene Mitglied ein (Filter `member_id` von `expectedPairsSql()`), ohne
+verknüpftes Mitglied entfallen sie. Antwortform und Cache-Schlüssel bleiben gleich — also nicht
+die oben verworfene zweite Variante. Nachmessung XL: **user 2026 / 2025 mit Zusatz 277 / 266 ms**
+(vorher 571 / 612), praktisch so schnell wie ohne Zusatz; admin unverändert (642 / 703 ms,
+Rauschen). Wächter: `tests/suites/attendance_member_scope_unit.php`.
+
+**Offen, nur bei Bedarf:** Für Verwalter bleibt der Jahresabruf bei XL um 0,6–0,7 s. Der Hebel
+ist weiterhin der monatsweise Abruf für den Kalender (gemessen: ein Monat mit Zahlen rund
+180 ms), mit eigenem Cache-Schlüssel je Monat. Erst angehen, wenn ein Verein dieser Größe die
+Ladezeit tatsächlich bemerkt.
 
 **Nicht sicherheitsrelevant.**
 
