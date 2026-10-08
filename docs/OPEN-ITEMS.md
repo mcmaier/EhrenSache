@@ -988,6 +988,44 @@ Dashboard; bei Serien nur dieser Termin.
 
 **Nicht sicherheitsrelevant.**
 
+### OI-129 · Kein Rückkanal von Vereinen, die EhrenSache einsetzen
+**Priorität:** niedrig · aufgenommen am 2026-10-08 (Frage des Nutzers, nicht entschieden)
+
+Es gibt keinen Weg zu erfahren, ob und wo EhrenSache eingesetzt wird. Ein Verein meldet sich
+nur, wenn etwas nicht funktioniert; ein GitHub-Issue ist für einen Vereinsadmin ohne Konto eine
+hohe Hürde.
+
+**Bewertet und abgelehnt** (Gespräch vom 2026-10-08):
+
+- **Popup oder automatische Meldung aus der Software an ehrensache.app** — Verantwortlicher nach
+  DSGVO ist der Verein; eine selbständige Übertragung müsste er kennen und dokumentieren und
+  widerspricht dem Selbstverständnis selbst gehosteter Software. Die CSP (`connect-src 'self'`)
+  müsste dafür aufgeweicht werden; ein Fork entfernt es ohnehin.
+- **Freiwillige Registrierung** — bei kostenloser Software kaum genutzt, erzeugt aber
+  Datenhaltung und Löschpflichten.
+
+**Vorschlag:**
+
+1. **Kontaktformular der Website** (`ehrensache_app/index.php`, Abschnitt `#kontakt`) richtet
+   sich heute an Interessenten (Einführung, Lizenz, Anpassungen). Ergänzen: Option „Wir setzen
+   EhrenSache ein / Rückmeldung“ im Feld „Interesse“, ein Satz im Einleitungstext, Name für diesen
+   Anlass optional; Vorauswahl über einen Parameter wie `?anlass=rueckmeldung`.
+2. **Link aus der Software**: „Rückmeldung geben“ für Admins in den Einstellungen, als normaler
+   Link auf `https://ehrensache.app/?anlass=rueckmeldung#kontakt` (optional mit
+   `utm_source=app`). Kein Datenabfluss vom Server, CSP unverändert. Höchstens ein einmaliger,
+   nicht-modaler, dauerhaft ausblendbarer Hinweis — kein Popup.
+3. **Vorhandenes Signal auswerten**: Die Anwendung sendet `Referrer-Policy:
+   strict-origin-when-cross-origin` (`public/.htaccess`). Ein Klick auf den Schriftzug
+   „EhrenSache“ in der Seitenleiste (`public/index.html`) übermittelt die Domain der Installation;
+   Umami auf ehrensache.app zeigt sie unter „Referrer“. Lückenhaft (nur bei Klick, kein
+   `localhost`, Blocker). Die Domains nicht ungefragt anschreiben oder als Referenz nennen.
+
+**Bewusst offen gelassen:** Update-Prüfung über ehrensache.app statt direkt gegen GitHub, um
+aktive Installationen zu zählen — aussagekräftigster, aber heikelster Weg (IP-Adresse,
+Offenlegung in `DATENSCHUTZ.md`, eigener Server als Abhängigkeit). Nur als Grundsatzentscheidung.
+
+**Nicht sicherheitsrelevant.**
+
 ---
 
 ## Restarbeiten
