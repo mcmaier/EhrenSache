@@ -934,19 +934,36 @@ function handleUserActivation($db, $database, $method) {
     try{            
         // User-Daten holen
         $stmt = $db->prepare(
-            "SELECT email, name, email_verified, pending_member_id 
-             FROM {$prefix}users 
+            "SELECT email, name, role, account_status, is_active, email_verified, pending_member_id
+             FROM {$prefix}users
              WHERE user_id = ?"
         );
         $stmt->execute([$userId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$user) {
             http_response_code(404);
             echo json_encode(['message' => 'User nicht gefunden']);
             exit();
         }
-        
+
+        // Freigabe gilt nur fuer Registrierungen (OI-127). Geraete haben keine
+        // E-Mail und werden ueber PUT users (is_active) geschaltet.
+        if ($user['role'] === 'device') {
+            http_response_code(400);
+            echo json_encode(['message' => 'Gerätekonten werden nicht freigegeben, sondern über die Geräteverwaltung aktiviert oder deaktiviert']);
+            exit();
+        }
+
+        // Bereits freigegeben: Ein erneuter Aufruf verschickte die Aktivierungsmail
+        // noch einmal und ueberschriebe member_id (ohne member_id im Request mit
+        // pending_member_id, also meist NULL). Gesperrte Konten hebt user_status auf.
+        if ($user['account_status'] === 'active' && (int) $user['is_active'] === 1) {
+            http_response_code(409);
+            echo json_encode(['message' => 'Benutzer ist bereits aktiv']);
+            exit();
+        }
+
         // Email muss verifiziert sein
         if (!$user['email_verified']) {
             http_response_code(400);

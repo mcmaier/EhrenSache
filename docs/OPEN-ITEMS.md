@@ -2682,7 +2682,25 @@ Der Kalender-Feed (FI-8, Ressource `calendar`) sendet bereits keine CORS-Header;
 ---
 
 ### OI-127 · `activate_user` und `user_status` sind in API.md falsch beschrieben
-**Priorität:** niedrig · aufgenommen am 2026-10-07 (Fund beim Bau des Gerätesimulators im IoT-Repo)
+**Priorität:** erledigt am 2026-10-08 — auf `dev`, unveröffentlicht · aufgenommen am 2026-10-07
+(Fund beim Bau des Gerätesimulators im IoT-Repo)
+
+**Umgesetzt wie vorgeschlagen:** Beide Abschnitte in `API.md` sind nach dem Code neu geschrieben
+(„Registrierung freigeben“, „Benutzer sperren und entsperren“, mit Fehlertabellen).
+`handleUserActivation()` weist Gerätekonten mit `400` und bereits aktive Konten
+(`account_status = 'active'` und `is_active = 1`) mit `409` ab, bevor etwas geändert oder eine
+Mail versucht wird. Das Dashboard ruft `activate_user` nur für `pending`-Konten auf
+(`users.js`), der `409` trifft dort keinen Ablauf. Tests: `tests/suites/user_activation_api.php`
+— dort auch der Schlüssel-Abgleich der beiden Erfolgsantworten und ein Abgleich der
+Request-Beispiele gegen die Felder, die der Handler liest (`api_doc_keys_write` ruft
+`activate_user` bewusst nicht auf, weil es Mails verschickt).
+
+**Dabei aufgefallen, offen gelassen** (in API.md dokumentiert): `activate_user` gibt ein
+gesperrtes oder per `is_active = 0` abgeschaltetes Konto weiterhin frei und verschickt die
+Mail; es prüft nicht, ob das Mitglied schon mit einem anderen Benutzer verknüpft ist (anders
+als `PUT users`); scheitert der Mailversand (SMTP nicht erreichbar), antwortet es `500`, obwohl
+die Freigabe bereits gespeichert ist. `user_status` antwortet `404`, wenn Status und
+`is_active` schon den Zielwert haben (`rowCount() === 0`). Alles nur für Admins erreichbar.
 
 `API.md` (Abschnitte „Benutzer aktivieren/deaktivieren“ und „Benutzerstatus aktualisieren“)
 beschreibt beide Ressourcen anders, als der Code arbeitet:

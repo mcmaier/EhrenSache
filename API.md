@@ -3280,22 +3280,61 @@ erzeugen.
 
 ---
 
-### Benutzer aktivieren/deaktivieren
+### Registrierung freigeben
 **Endpoint:** `POST /api.php?resource=activate_user`
 
 **Berechtigung:** Admin
+
+Gibt eine **Registrierung** frei (`account_status = 'pending'`) — kein Schalter zum An- und
+Abschalten. Gesperrte Konten entsperrt `user_status`, Geräte schaltet `PUT users&id=<gerät>` mit
+`is_active`. Ein mitgeschicktes `is_active` wird ignoriert.
 
 **Request:**
 ```json
 {
   "user_id": 5,
-  "is_active": 1
+  "member_id": 10
 }
 ```
 
+| Feld | Pflicht | Bedeutung |
+|------|---------|-----------|
+| `user_id` | ja | das freizugebende Konto |
+| `member_id` | nein | Mitglied, mit dem das Konto verknüpft wird. Ohne das Feld gilt das bei der Registrierung gewählte `pending_member_id` (kann `null` sein) |
+
+**Wirkung:** Setzt `account_status = 'active'`, `is_active = 1`, `member_id` (aus dem Request bzw.
+`pending_member_id`) und leert `pending_member_id`. Danach geht die Aktivierungsmail an die
+Adresse des Kontos, sofern Mailversand, SMTP und Aktivierungsmails in den Einstellungen
+eingeschaltet sind. Ob das Mitglied schon mit einem anderen Benutzer verknüpft ist, prüft der
+Endpunkt — anders als `PUT users` — nicht; ein nicht vorhandenes Mitglied scheitert an der
+Datenbank (`500`).
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Benutzer erfolgreich aktiviert"
+}
+```
+
+**Fehler:**
+
+| Code | Wann |
+|------|------|
+| `400` | `user_id` fehlt (`"User ID erforderlich"`), Gerätekonto (seit OI-127, nichts wird geändert) oder E-Mail-Adresse noch nicht bestätigt (`"Email noch nicht verifiziert"`) |
+| `403` | nicht Admin |
+| `404` | Konto existiert nicht |
+| `405` | andere Methode als `POST` |
+| `409` | Konto ist bereits aktiv (`account_status = 'active'` und `is_active = 1`; seit OI-127, keine Mail) |
+| `500` | Datenbankfehler — **oder Versand der Aktivierungsmail gescheitert**: Die Freigabe ist dann bereits gespeichert |
+
+Ein gesperrtes (`suspended`) oder ein aktives, aber per `is_active = 0` abgeschaltetes Konto
+weist der Endpunkt nicht ab: Er gibt es frei und verschickt die Aktivierungsmail. Das Dashboard
+ruft ihn nur für Registrierungen auf.
+
 ---
 
-### Benutzerstatus aktualisieren
+### Benutzer sperren und entsperren
 **Endpoint:** `POST /api.php?resource=user_status`
 
 **Berechtigung:** Admin
@@ -3304,10 +3343,33 @@ erzeugen.
 ```json
 {
   "user_id": 5,
-  "role": "manager",
-  "member_id": 10
+  "status": "suspended"
 }
 ```
+
+`status` ist `active` oder `suspended`. Gesetzt werden `account_status = status` und
+`is_active` (`1` bei `active`, `0` bei `suspended`); weitere Felder liest der Endpunkt nicht. Die
+Kontoart prüft er nicht.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Benutzer gesperrt"
+}
+```
+
+Bei `status: "active"` lautet `message` `"Benutzer aktiviert"`.
+
+**Fehler:**
+
+| Code | Wann |
+|------|------|
+| `400` | `user_id` fehlt oder `status` ist weder `active` noch `suspended` (`"Ungültige Parameter"`) |
+| `403` | nicht Admin |
+| `404` | keine Zeile geändert (`"User nicht gefunden"`) — auch wenn das Konto existiert und Status und `is_active` schon den Zielwert haben |
+| `405` | andere Methode als `POST` |
+| `500` | Datenbankfehler |
 
 ---
 

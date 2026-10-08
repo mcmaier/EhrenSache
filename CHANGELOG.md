@@ -33,7 +33,19 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   serverseitig mit Token ab. `OPTIONS` und andere unbekannte Methoden antworten jetzt mit `405`
   (bisher leeres `200`). Die auskommentierten CORS-Zeilen in `public/api/.htaccess` sind entfernt.
 
+### Behoben
+
+- **`activate_user` weist Geräte und aktive Konten ab (OI-127):** Die Freigabe einer
+  Registrierung setzte auf einem Gerätekonto `account_status` und versuchte eine Mail an eine
+  leere Adresse; auf einem bereits aktiven Konto verschickte sie die Aktivierungsmail erneut und
+  überschrieb dabei die Mitgliedsverknüpfung. Jetzt antwortet sie mit `400` (Gerät) bzw. `409`
+  (bereits aktiv), bevor etwas geändert wird. Das Dashboard ruft den Endpunkt nur für offene
+  Registrierungen auf und ist nicht betroffen. Die Abschnitte zu `activate_user` und
+  `user_status` in `API.md` beschrieben andere Felder (`is_active`, `role`) und sind nach dem Code
+  neu geschrieben.
+
 ## [1.22.1]
+
  – 2026-10-06
 
 ### Geändert
