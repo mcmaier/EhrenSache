@@ -129,13 +129,11 @@ function handleExceptions($db, $database, $method, $id) {
                     // FI-24: Die Check-in-App entscheidet Antraege ausserhalb der Liste und
                     // braucht dafuer die Selbstgenehmigungsregel (OI-87) und die erfasste
                     // Ankunft. Einmal je Abruf, nicht je Zeile.
-                    $viewerStmt = $db->prepare("SELECT member_id FROM {$prefix}users WHERE user_id = ?");
-                    $viewerStmt->execute([getCurrentUserId()]);
-                    $viewerMember = $viewerStmt->fetchColumn();
-                    $blocked = $viewerMember
+                    $viewerMember = memberIdOfUser($db, $database, (int) getCurrentUserId());
+                    $otherApprover = $viewerMember !== null
                         && otherActiveApproverExists($db, $database, (int) getCurrentUserId());
                     foreach ($rows as &$row) {
-                        $row['self_decision_blocked'] = $blocked && (string) $row['member_id'] === (string) $viewerMember;
+                        $row['self_decision_blocked'] = selfDecisionBlocked($viewerMember, $otherApprover, (int) $row['member_id']);
                     }
                     unset($row);
                 } else {

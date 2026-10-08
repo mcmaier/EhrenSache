@@ -2108,13 +2108,21 @@ async function reloadAttendanceView() {
     }
 }
 
+// Laufende Nummer der Abrufe offener Antraege: Es zaehlt der zuletzt
+// angeforderte, nicht der zuletzt eintreffende (Zahl und Ansicht).
+let pendingRequestsSeq = 0;
+
 /**
  * Alle offenen Antraege (Entschuldigungen und Zeitantraege). Der Server liefert
  * Verwaltern je Zeile self_decision_blocked und die erfasste Ankunft mit.
  * countOnly: nur die Zahl am Umschalter, ohne Meldung bei einem Fehler.
  */
 async function loadPendingRequests({ countOnly = false } = {}) {
+    const seq = ++pendingRequestsSeq;
     const result = await apiCall('exceptions', 'GET', null, { status: 'pending' });
+    // Ein spaeter angeforderter Abruf ist schon unterwegs: Diese Antwort waere
+    // veraltet -- weder Zahl noch Ansicht noch Fehlermeldung.
+    if (seq !== pendingRequestsSeq) return;
     if (!result.success) {
         if (!countOnly) {
             showMessage(result.error || 'Offene Anträge konnten nicht geladen werden', 'error');
@@ -2133,7 +2141,7 @@ async function loadPendingRequests({ countOnly = false } = {}) {
 
 /** Reihenfolge der Antraege eines Termins: Nachname, dann Vorname. */
 function pendingRequestNameOrder(x, y) {
-    return `${x.surname} ${x.name}`.localeCompare(`${y.surname} ${y.name}`, 'de');
+    return `${x.surname ?? ''} ${x.name ?? ''}`.localeCompare(`${y.surname ?? ''} ${y.name ?? ''}`, 'de');
 }
 
 /**
@@ -2150,7 +2158,7 @@ function renderPendingRequests(antraege) {
     }
 
     const heute = formatDate(new Date());   // YYYY-MM-DD in Ortszeit
-    const key = a => `${String(a.appointment_date).slice(0, 10)} ${a.appointment_start_time}`;
+    const key = a => `${String(a.appointment_date ?? '').slice(0, 10)} ${a.appointment_start_time ?? ''}`;
     const termine = new Map();
     antraege.forEach(a => {
         const id = Number(a.appointment_id);
@@ -2158,9 +2166,9 @@ function renderPendingRequests(antraege) {
         termine.get(id).antraege.push(a);
     });
     const liste = [...termine.values()];
-    const kommend = liste.filter(t => String(t.kopf.appointment_date).slice(0, 10) >= heute)
+    const kommend = liste.filter(t => String(t.kopf.appointment_date ?? '').slice(0, 10) >= heute)
         .sort((x, y) => key(x.kopf).localeCompare(key(y.kopf)));
-    const vergangen = liste.filter(t => String(t.kopf.appointment_date).slice(0, 10) < heute)
+    const vergangen = liste.filter(t => String(t.kopf.appointment_date ?? '').slice(0, 10) < heute)
         .sort((x, y) => key(y.kopf).localeCompare(key(x.kopf)));
 
     const terminHtml = t => {
@@ -6106,7 +6114,10 @@ function initTabs() {
             {
                 debug.log("Loading Attendance List");
                 // FI-24: Beim Oeffnen gilt "Anwesenheit", die Zahl am Umschalter
-                // kommt frisch (Spec: geladen beim Oeffnen des Tabs).
+                // kommt frisch (Spec: geladen beim Oeffnen des Tabs). Die Liste
+                // laedt der Handler unten ohnehin neu -- setAttendanceView() soll es
+                // nicht ein zweites Mal tun.
+                attendanceListStale = false;
                 setAttendanceView('attendance');
                 loadPendingRequests({ countOnly: true });
                 loadAttendanceAppointments().then(() => {

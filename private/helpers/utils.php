@@ -296,6 +296,21 @@ function otherActiveApproverExists($db, $database, int $userId): bool
 }
 
 /**
+ * Darf das anfragende Konto diesen Antrag nicht selbst entscheiden? (OI-87, FI-24)
+ *
+ * Gesperrt ist nur der eigene Antrag — und nur, solange ein weiteres Konto
+ * freigeben kann. Ein Konto ohne Mitglied hat keinen eigenen Antrag. Reine
+ * Funktion: Die Abfragen nach Mitglied und weiterem Verwalter macht der
+ * Aufrufer, damit die Regel ohne Datenbank in allen Faellen pruefbar ist.
+ */
+function selfDecisionBlocked(?int $viewerMemberId, bool $otherApproverExists, int $requestMemberId): bool
+{
+    return $viewerMemberId !== null
+        && $otherApproverExists
+        && $viewerMemberId === $requestMemberId;
+}
+
+/**
  * Mitglied, das zu einem Konto gehört — oder null. (OI-87)
  */
 function memberIdOfUser($db, $database, int $userId): ?int

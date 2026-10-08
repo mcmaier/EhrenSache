@@ -88,3 +88,55 @@ test('Umschalter ist in der Aktionstabelle registriert, keine Inline-Handler', f
     assertTrue(str_contains(prJs(), "'attendance-view':"), 'Aktion attendance-view nicht registriert');
     assertTrue(!preg_match('/\son[a-z]+=/i', prHtml()), 'Inline-Handler im Markup');
 });
+
+test('Abrufe ueberholen sich nicht: Sequenzwaechter vor Zahl und Ansicht', function () {
+    $load = prFunktion('loadPendingRequests');
+    assertTrue(str_contains($load, 'const seq = ++pendingRequestsSeq'), 'Kein Sequenzwaechter in loadPendingRequests');
+    $waechter = strpos($load, 'if (seq !== pendingRequestsSeq) return;');
+    assertTrue($waechter !== false, 'Veraltete Antwort wird nicht verworfen');
+    assertTrue($waechter > strpos($load, 'await apiCall('),
+        'Der Waechter steht nicht nach dem Abruf');
+    assertTrue($waechter < strpos($load, 'pendingRequestsCount'), 'Die Zahl wird vor dem Waechter gesetzt');
+    assertTrue(str_contains(prJs(), 'let pendingRequestsSeq = 0;'), 'Zaehler pendingRequestsSeq fehlt');
+});
+
+test('countOnly zeichnet die Ansicht nicht', function () {
+    $load = prFunktion('loadPendingRequests');
+    assertTrue(preg_match('/if\s*\(\s*!countOnly\s*\)\s*renderPendingRequests\(/', $load) === 1,
+        'renderPendingRequests() laeuft auch beim reinen Zaehlen');
+    assertTrue(substr_count($load, 'renderPendingRequests(') === 1, 'renderPendingRequests() wird mehrfach aufgerufen');
+});
+
+test('Heute zaehlt als kommend', function () {
+    $render = prFunktion('renderPendingRequests');
+    assertTrue(preg_match('/kommend = .*?>= heute/s', $render) === 1, 'Kommende Termine nicht mit >= heute');
+    assertTrue(preg_match('/vergangen = .*?< heute/s', $render) === 1, 'Vergangene Termine nicht mit < heute');
+});
+
+test('Terminkopf maskiert Titel und Terminart', function () {
+    $render = prFunktion('renderPendingRequests');
+    assertTrue(str_contains($render, 'escapeHtml(k.appointment_title)'), 'Termintitel unmaskiert');
+    assertTrue(str_contains($render, 'escapeHtml(k.appointment_type_name)'), 'Terminart unmaskiert');
+});
+
+test('Sortierschluessel machen aus null keinen Text', function () {
+    $render = prFunktion('renderPendingRequests');
+    assertTrue(str_contains($render, "a.appointment_start_time ?? ''"), 'Beginn ohne ?? im Sortierschluessel');
+    $namen = prFunktion('pendingRequestNameOrder');
+    foreach (['x.surname', 'x.name', 'y.surname', 'y.name'] as $f) {
+        assertTrue(str_contains($namen, "{$f} ?? ''"), "{$f} ohne ?? im Namensvergleich");
+    }
+});
+
+test('Beim Oeffnen des Tabs gilt Anwesenheit, ohne doppeltes Laden', function () {
+    $tabs  = prFunktion('initTabs');
+    $start = strpos($tabs, "targetTab === 'attendance-list'");
+    assertTrue($start !== false, 'Zweig attendance-list fehlt');
+    $zweig = substr($tabs, $start);
+    $setzen = strpos($zweig, "setAttendanceView('attendance')");
+    assertTrue($setzen !== false, 'Tab-Handler waehlt nicht Anwesenheit');
+    assertTrue(str_contains($zweig, 'loadPendingRequests({ countOnly: true })'), 'Zahl wird beim Oeffnen nicht geladen');
+    $reset = strpos($zweig, 'attendanceListStale = false');
+    assertTrue($reset !== false && $reset < $setzen,
+        'attendanceListStale wird nicht vor setAttendanceView zurueckgesetzt -- die Liste laedt doppelt');
+});
