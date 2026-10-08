@@ -1957,6 +1957,46 @@ function attendanceRequestsCountHtml(members) {
 }
 
 /**
+ * Eine Antragszeile (FI-24): gemeinsam fuer die Anwesenheitsliste und die
+ * Ansicht "Offene Antraege". Zugeklappt nur die Art -- die Begruendung kann
+ * Gesundheitliches enthalten. `blocked` = eigener Antrag nach der Serverregel
+ * (OI-87): statt der Knoepfe der Hinweis.
+ */
+function requestItemHtml(a, blocked) {
+    const zeit = a.requested_arrival_time ? String(a.requested_arrival_time).slice(11, 16) : '';
+    const istZeit = a.exception_type !== 'absence';
+    const art = istZeit ? (zeit ? `Zeitantrag ${zeit} Uhr` : 'Zeitantrag') : 'Entschuldigung';
+    const off = navigator.onLine ? '' : ' disabled';
+
+    // Nur wenn der Server die erfasste Ankunft mitliefert (Verwalter-Abruf);
+    // in der Anwesenheitsliste fehlt das Feld, dort entfaellt der Absatz.
+    let erfasst = '';
+    if (istZeit && 'recorded_arrival_time' in a) {
+        const text = a.recorded_status === 'excused'
+            ? 'entschuldigt'
+            : (a.recorded_arrival_time ? `erfasst: ${String(a.recorded_arrival_time).slice(11, 16)} Uhr` : 'keine Erfassung');
+        erfasst = `<p class="attendance-request__recorded">${escapeHtml(text)}</p>`;
+    }
+
+    const aktionen = blocked
+        ? '<p class="attendance-request__own">Eigener Antrag – bitte im Dashboard von jemand anderem entscheiden lassen.</p>'
+        : `<div class="attendance-request__actions">
+               <button type="button" class="btn-request-decide btn-request-decide--approve" data-exception-id="${Number(a.exception_id)}" data-decision="approved"${off}>Genehmigen</button>
+               <button type="button" class="btn-request-decide btn-request-decide--reject" data-exception-id="${Number(a.exception_id)}" data-decision="rejected"${off}>Ablehnen</button>
+           </div>`;
+
+    return `
+        <details class="attendance-request">
+            <summary>⏳ ${escapeHtml(art)}</summary>
+            <div class="attendance-request__body">
+                <p class="attendance-request__reason">${escapeHtml(a.reason || '')}</p>
+                ${erfasst}
+                ${aktionen}
+            </div>
+        </details>`;
+}
+
+/**
  * Offene Antraege eines Mitglieds in seiner Zeile (seit 1.12.0).
  *
  * Zugeklappt nur die Art -- die Begruendung kann Gesundheitliches enthalten,
@@ -1974,32 +2014,8 @@ function attendanceRequestsHtml(member) {
     // seinen Antrag also auch hier bescheiden — sonst bliebe er liegen.
     const eigener = attendanceSelfBlocked
         && userData && String(userData.member_id) === String(member.member_id);
-    const off = navigator.onLine ? '' : ' disabled';
 
-    const zeilen = antraege.map(a => {
-        const zeit = a.requested_arrival_time ? String(a.requested_arrival_time).slice(11, 16) : '';
-        const art = a.exception_type === 'absence'
-            ? 'Entschuldigung'
-            : (zeit ? `Zeitantrag ${zeit} Uhr` : 'Zeitantrag');
-
-        const aktionen = eigener
-            ? '<p class="attendance-request__own">Eigener Antrag – bitte im Dashboard von jemand anderem entscheiden lassen.</p>'
-            : `<div class="attendance-request__actions">
-                   <button type="button" class="btn-request-decide btn-request-decide--approve" data-exception-id="${Number(a.exception_id)}" data-decision="approved"${off}>Genehmigen</button>
-                   <button type="button" class="btn-request-decide btn-request-decide--reject" data-exception-id="${Number(a.exception_id)}" data-decision="rejected"${off}>Ablehnen</button>
-               </div>`;
-
-        return `
-            <details class="attendance-request">
-                <summary>⏳ ${escapeHtml(art)}</summary>
-                <div class="attendance-request__body">
-                    <p class="attendance-request__reason">${escapeHtml(a.reason || '')}</p>
-                    ${aktionen}
-                </div>
-            </details>`;
-    }).join('');
-
-    return `<div class="attendance-requests">${zeilen}</div>`;
+    return `<div class="attendance-requests">${antraege.map(a => requestItemHtml(a, eigener)).join('')}</div>`;
 }
 
 /**
