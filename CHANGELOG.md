@@ -64,6 +64,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   eingesetzt; sie wird jetzt maskiert. Gefunden vom Senken-Wächter
   (`tests/suites/html_sinks_frontend.php`), der jetzt auch Werten folgt, die per `join()` oder
   `+`-Verkettung zusammengesetzt werden.
+- **Seitenleiste: Symbole auf älteren Systemen:** „Mein Profil“ trug den Ausweis 🪪 (Emoji 14.0),
+  den Windows 10 nicht kennt — dort erschien ein leeres Kästchen. Profil und Mitglieder tragen
+  jetzt ℹ️ und 👫 aus Emoji 1.0.
 
 ## [1.22.2] – 2026-10-08
 
