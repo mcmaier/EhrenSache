@@ -60,7 +60,7 @@ Daten werden **nicht** zwischengespeichert (Stufe 2), Schreibaktionen ohne Netz 
 - **Statische Suite `tests/suites/pwa_cache_frontend.php`:**
   - `VERSION` im Service Worker entspricht `version.json`.
   - Jede lokale Datei, die `public/checkin/index.html` per `href`/`src` lädt (ohne externe
-    URLs), steht genau so in der Vorladeliste; jeder Eintrag der Liste außer `./` wird von
+    URLs), steht genau so in der Vorladeliste; jeder Eintrag der Liste ist `index.html`, wird von
     `index.html` geladen oder ist ein Manifest-Icon.
   - Kein Eintrag beginnt mit `/`; keiner verweist auf `api/`.
   - `skipWaiting()` steht nicht unbedingt in `install`.
