@@ -98,6 +98,9 @@ frischem Profil: Anmeldung als `user`, Service Worker übernimmt (ohne automatis
 `checkin-<Version>` existiert. Offline lädt die App aus dem Speicher (`./`, `index.html`, Rückmelde-Link)
 und der Startbildschirm meldet „Server nicht erreichbar.“. Danach wird eine neue Version simuliert: Die
 Hinweisleiste erscheint, „Neu laden“ lädt genau einmal neu, und es bleibt nur der neue Speicher.
+Dazu kommt Stufe 2: Nach dem Laden von Termine- und Verlauf-Tab liegt ein Schnappschuss vor, offline zeigt der
+Knopf „Letzten Stand ansehen“ die Ansicht mit Verlauf (ohne Bedienknöpfe außer „Erneut verbinden“), und das
+Abmelden löscht Token und Schnappschuss.
 
     node tests/browser/pwa-offline.mjs      (oder: cd tests/browser && npm run pwa-offline)
 

@@ -111,6 +111,21 @@ try {
     check('Hinweisleiste nach Erstinstallation versteckt',
         await page.$eval('#updateBanner', el => el.hidden));
 
+    // Schnappschuss (Stufe 2): Termine- und Verlauf-Tab laden, danach liegt er im Speicher
+    const responsesTab = await page.$('.tab-button[data-tab="responses"]:not([hidden])');
+    if (responsesTab) {
+        await responsesTab.click();
+        await page.waitForSelector('#responsesList', { timeout: 15000 });
+        await sleep(1500);
+    }
+    await page.click('.tab-button[data-tab="history"]');
+    await page.waitForSelector('#historyList .history-item', { timeout: 15000 });
+    await sleep(500);
+    check('Schnappschuss geschrieben', await page.evaluate(() => {
+        const s = JSON.parse(localStorage.getItem('offline_snapshot') || 'null');
+        return !!(s && s.history && s.history.items.length > 0);
+    }));
+
     // 2. Offline: Rahmen aus dem Speicher, App meldet fehlenden Server
     await page.setOfflineMode(true);
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -120,6 +135,26 @@ try {
         [...document.styleSheets].some(s => (s.href || '').includes('css/style.css') && s.cssRules.length > 0)));
     check('offline: Token bleibt gespeichert',
         await page.evaluate(() => localStorage.getItem('api_token') !== null));
+
+    // Letzter Stand aus dem Schnappschuss
+    check('offline: Knopf „Letzten Stand ansehen“ sichtbar', await page.$eval('#startSnapshotBtn',
+        el => !el.hidden && el.textContent.includes('Letzten Stand')));
+    await page.click('#startSnapshotBtn');
+    await page.waitForSelector('#snapshotScreen.active', { timeout: 5000 });
+    check('Letzter Stand: Leiste nennt „ohne Verbindung“', await page.$eval('#snapshotStamp',
+        el => el.textContent.includes('ohne Verbindung')));
+    const sections = await page.$$eval('#snapshotContent .snapshot-section', ss => ss.map(s => ({
+        title: s.querySelector('h3')?.textContent.trim() || '',
+        entries: s.querySelectorAll('.snapshot-entry').length,
+    })));
+    const verlauf = sections.find(s => s.title === 'Verlauf');
+    check('Letzter Stand: Verlauf mit Einträgen', !!verlauf && verlauf.entries > 0, JSON.stringify(sections));
+    if (responsesTab) {
+        const termine = sections.find(s => s.title === 'Kommende Termine');
+        check('Letzter Stand: Kommende Termine vorhanden', !!termine, JSON.stringify(sections));
+    }
+    check('Letzter Stand: keine Knöpfe außer „Erneut verbinden“', await page.$$eval('#snapshotScreen button',
+        b => b.length === 1 && b[0].dataset.action === 'snapshot-reconnect'));
 
     // Weitere Einstiege: index.html wird von Apache auf ./ umgeleitet, ein
     // Rueckmelde-Link traegt ein Fragment. Beide muessen aus dem Speicher kommen.
@@ -161,6 +196,15 @@ try {
         check('nach dem Knopf: Leiste wieder versteckt',
             await page.$eval('#updateBanner', el => el.hidden));
     }
+
+    // 4. Abmelden loescht Token und Schnappschuss
+    await page.waitForSelector('#mainScreen.active', { timeout: 15000 });
+    await page.click('#logoutBtn');
+    await page.waitForSelector('#pwaConfirmYes', { visible: true, timeout: 5000 });
+    await page.click('#pwaConfirmYes');
+    await page.waitForSelector('#loginScreen.active', { timeout: 15000 });
+    check('Abmelden: Token und Schnappschuss gelöscht', await page.evaluate(() =>
+        localStorage.getItem('api_token') === null && localStorage.getItem('offline_snapshot') === null));
 } finally {
     restore();
     await browser.close();
