@@ -624,7 +624,7 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 ---
 
 ### OI-43 · Offline-Betrieb der Check-in-PWA
-**Priorität:** niedrig — heute bewusst ohne, aber nie entschieden
+**Priorität:** niedrig · **Richtung entschieden am 2026-10-08:** Rahmen ja, Lesestand begrenzt, Schreiben nein — gebaut ist noch nichts
 
 Die Check-in-PWA hat **keinen Cache**. Ihr Service Worker reicht jede Anfrage ans Netz durch;
 er dient allein der Installierbarkeit auf dem Startbildschirm. Ohne Verbindung zeigt die App
@@ -651,9 +651,50 @@ Kommentar in `public/checkin/service-worker.js`.
   Die virtuelle Station hat sich aus demselben Grund bewusst dagegen entschieden — dort steht
   zusätzlich, dass eine Offline-Warteschlange keine verlässliche Uhr hätte.
 
-**Falls dafür:** Pfade relativ zum Scope (`./index.html` statt `/index.html`), Cache-Name an
-`version.json` hängen und wie die `?v=`-Links per Test absichern, und einen Weg vorsehen, wie
-ein Nutzer einen veralteten Rahmen loswird.
+**Widerspruch bis 2026-10-08.** Dieser Eintrag nannte die Frage „nie entschieden“, die Tabelle
+[Bewusst entschieden](#bewusst-entschieden--nicht-erneut-aufmachen) führte „Kein Offline-Betrieb
+in der PWA“ zugleich als „So belassen“. Beides stimmte halb: Die Tabellenbegründung (Zeitstempel
+vom Client sind als Nachweis wertlos) trägt für **Schreibaktionen**, sagt aber nichts über das
+Laden des Rahmens oder das Lesen. Die Tabellenzeile ist entsprechend eingegrenzt.
+
+**Richtung, drei Stufen:**
+
+1. **App-Rahmen zwischenspeichern — ja.** HTML, CSS, JS, Manifest und Icons beim Installieren
+   vorladen. Im Funkloch erscheint die Oberfläche mit der vorhandenen Meldung „keine Verbindung“
+   statt der Fehlerseite des Browsers; bei langsamer Verbindung wartet nur noch der API-Abruf.
+   Voraussetzungen: Pfade relativ zum Scope (`./index.html` statt `/index.html` — genau daran
+   scheiterte es 2025), Cache-Name an `version.json` hängen und wie die `?v=`-Links per Test
+   absichern (`tests/suites/assets.php`), alte Caches in `activate` löschen und eine neue
+   Version sichtbar anbieten („Neue Version — neu laden“), damit niemand an einem veralteten
+   Rahmen hängen bleibt.
+2. **Gelesene Daten — höchstens begrenzt.** Für Terminliste und eigenen Verlauf denkbar als
+   „Netz zuerst, sonst letzter Stand“. Bedingungen: Jede so gezeigte Ansicht trägt sichtbar
+   „Stand von hh:mm, ohne Verbindung“ — sonst entsteht absichtlich, was
+   [OI-67](#oi-67--offene-ansichten-merken-nicht-dass-sich-daten-geändert-haben) als Fehler
+   beschreibt. Der Speicher ist an ein Konto gebunden und wird beim Abmelden und beim
+   Kontowechsel geleert (geteilte Geräte, `DATENSCHUTZ.md`). Statistik und offene Punkte
+   nicht — dort wäre ein alter Stand eher irreführend als hilfreich.
+3. **Schreibaktionen in einer Warteschlange — nein.**
+   - *Check-in mit und ohne TOTP, Arbeitszeit:* Der Zeitpunkt käme vom Client und hätte keinen
+     Nachweiswert. Beim TOTP-Check-in kommt hinzu: Online muss ein abfotografierter Code
+     binnen Sekunden eingelöst werden, mit Warteschlange ließe er sich Stunden später für den
+     damaligen Zeitpunkt nachreichen. Der Ortsnachweis wäre entwertet; eine kurze
+     Nachreichfrist deckt nur den Keller ohne Empfang und macht den Server komplizierter.
+   - *Rückmeldungen:* fachlich kein Nachweis, aber während der Wartezeit kann die Frist
+     (`responseDeadlineHours()`) ablaufen, ein Manager zurücksetzen
+     ([OI-124](#oi-124--terminänderung-lässt-vorhandene-rückmeldungen-unverändert-stehen), `409 responses_affected`) oder der Termin
+     verschoben werden. Ein „zugesagt“ auf dem Telefon, das nie angekommen ist, ist schlimmer
+     als der heute gesperrte Knopf mit „Ohne Netz ist keine Rückmeldung möglich.“
+   - *Anträge:* unkritisch, weil ein Mensch genehmigt — lohnt die Warteschlange samt
+     Konfliktbehandlung aber nicht allein.
+
+**Push-Benachrichtigungen** sind ein eigenes Thema und gehören zu
+[FI-6](FEATURE-IDEAS.md#fi-6--benachrichtigungskanal-e-mail-web-push). Sie brauchen ebenfalls den
+Service Worker, aber keinen Cache.
+
+**Berührt bei Umsetzung:** `public/checkin/service-worker.js` (Kommentar dort nachziehen),
+`public/checkin/js/app.js` (Versionshinweis, ggf. Standvermerk), `tests/suites/assets.php`,
+`public/checkin/README.md`, bei Stufe 2 `DATENSCHUTZ.md`.
 
 ---
 
@@ -2701,7 +2742,7 @@ Hauptverzeichnisses braucht sie vor dem Merge nach `dev` — nur mit Freigabe de
 | Pause verlangt nie einen Nachweis | So belassen | Eine Pause ist keine Anwesenheitsbehauptung |
 | Kein `force` beim Timer-Start | So belassen | Ein unbelegter Start bei nachweispflichtiger Tätigkeit soll gar nicht erst als Timer laufen; der Weg ist die nachträgliche Erfassung mit Freigabe |
 | Kein Segmentmodell für Pausen | So belassen | Nachweise verlangen Dauer, nicht die Lage der Pausen. Nachrüstbar ohne Datenmigration |
-| Kein Offline-Betrieb in der PWA | So belassen | Erzeugte Client-Zeitstempel, die als Nachweis wertlos sind |
+| Keine Offline-Schreibaktionen in der PWA | So belassen (eingegrenzt 2026-10-08) | Erzeugte Client-Zeitstempel, die als Nachweis wertlos sind. Gilt für Check-in, Arbeitszeit und Rückmeldungen; Rahmen und begrenzter Lesestand sind davon getrennt, siehe [OI-43](#oi-43--offline-betrieb-der-check-in-pwa) |
 | Keine Pinnwand, kein Chat, keine Dateiablage | Bleibt draußen (2026-09-16) | Drei Funktionen, die jede Vereins-App mitbringt und die hier bewusst fehlen. Sie haben keine Datenberührung zu Anwesenheit, Pünktlichkeit oder Arbeitszeit, kosten aber jeweils ein eigenes Datenmodell mit Moderation, Löschfristen und Missbrauchsfällen. Eine Dateiablage bringt zusätzlich Uploads fremder Herkunft in ein System, das heute nur ein Vereinslogo entgegennimmt; ein Chat macht aus einer Anwesenheitserfassung einen Nachrichtendienst mit allem, was die DSGVO daran hängt. Wer Kommunikation braucht, hat sie bereits — EhrenSache tritt nicht gegen Messenger an. Die Grenze berührt auch FI-17: systemerzeugte offene Punkte ja, an einzelne Mitglieder adressierte Nachrichten nein |
 | Kein PDF-Export | So belassen | Würde eine Bibliothek einschleppen, die das Projekt bewusst nicht hat. Der Bedarf ist seit 1.2.2 über die Druckansicht (`&format=html`) gedeckt: Das PDF entsteht im Druckdialog des Browsers |
 | Installer und Update-Assistent werden gesperrt ausgeliefert | So belassen | Ein hochgeladener, aber noch nicht eingerichteter Webspace soll `/install` nicht offen zeigen. Der Freischaltschritt steht für beide in der README; nach dem Lauf sperrt sich jeder Assistent selbst wieder. Die Alternative — ungesperrt ausliefern — nähme dem Ersteinrichter eine Hürde, öffnete aber ein Zeitfenster zwischen Upload und Installation |

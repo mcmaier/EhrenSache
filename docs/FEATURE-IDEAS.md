@@ -461,6 +461,36 @@ erfunden werden. Solange FI-6 nicht steht, deckt [FI-17](#fi-17--offene-punkte-u
 denselben Bedarf als Holschuld: ohne Infrastruktur, ohne Zustellrisiko und mit einem Bruchteil
 des Aufwands.
 
+**Web-Push — Stand der Überlegung vom 2026-10-08:**
+
+- *Die PWA verschickt nichts selbst.* Sie holt die Erlaubnis ein (nur nach einem Tipp des
+  Nutzers) und meldet sich beim Push-Dienst des Browsers an; Endpoint und Schlüssel speichert
+  der Server in einer Abo-Tabelle je Gerät. Zur gegebenen Zeit schickt **der Server** eine mit
+  VAPID signierte Nachricht, der Service Worker zeigt sie an — auch bei geschlossener App.
+  Lokal geplante Erinnerungen ohne Server gibt es nicht (die Notification Triggers API wurde
+  nie ausgeliefert). Push hängt damit an derselben Auslöserfrage wie die Mail.
+- *iOS* stellt Push erst ab 16.4 zu und **nur an eine auf dem Home-Bildschirm installierte**
+  PWA, nicht im Safari-Tab. Ein Teil der Mitglieder bekäme also nichts, ohne es zu merken.
+- *Verschlüsselung:* Nachrichten mit Inhalt verlangen RFC 8291 (ECDH + AES-GCM). Mit
+  `ext-openssl` von Hand machbar, aber fehleranfällig; `web-push-php` brächte Abhängigkeiten,
+  die das Projekt bewusst nicht hat. Ausweg: **Push ohne Inhalt** als reiner Weckruf, der
+  Service Worker holt sich dann `my_open_items` selbst. Dafür braucht er das Token, das heute
+  in `localStorage` liegt und im Service Worker nicht erreichbar ist — es müsste zusätzlich
+  in IndexedDB.
+- *Datenschutz:* Die Endpoints liegen bei Google, Apple bzw. Mozilla. Mit verschlüsseltem
+  Inhalt sehen sie nur Metadaten, trotzdem gehört das samt Einwilligung und Abmeldung je
+  Gerät in `DATENSCHUTZ.md`.
+- *Kein Ersatz für [OI-67](OPEN-ITEMS.md#oi-67--offene-ansichten-merken-nicht-dass-sich-daten-geändert-haben):*
+  Push als Signal „Daten haben sich geändert“ wäre eine Zweckentfremdung; SSE und WebSocket
+  sind dort aus demselben Hosting-Grund verworfen.
+- *Unabhängig von [OI-43](OPEN-ITEMS.md#oi-43--offline-betrieb-der-check-in-pwa):* Push braucht
+  den Service Worker, aber keinen Cache.
+
+**Vorschlag zur Reihenfolge:** E-Mail zuerst, weil sie jeden erreicht, auch iOS ohne
+installierte App; Push danach als zweiter Kanal mit denselben Anlässen aus
+`openItemsForMember()`. Beide erst, wenn die Auslöserfrage beantwortet ist — sonst entsteht
+ein Kanal ohne Absender.
+
 ---
 
 ### FI-7 · Terminserien für wiederkehrende Proben
