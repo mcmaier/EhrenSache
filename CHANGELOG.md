@@ -11,6 +11,11 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 
 ### Hinzugefügt
 
+- **Offene Anträge in der Check-in-App (FI-24):** Verwalter schalten im Tab „Liste“ auf „Offene
+  Anträge“ um und entscheiden Entschuldigungen und Zeitanträge zu allen Terminen, auch außerhalb
+  des Check-in-Fensters — kommende Termine oben, vergangene darunter; Zeitanträge zeigen die
+  erfasste Ankunft. Die Zahl steht am Umschalter. `GET exceptions` liefert Verwaltern dafür
+  `self_decision_blocked`, `recorded_arrival_time` und `recorded_status` (API.md).
 - **Kalender-Abo (FI-8):** Mitglieder erzeugen unter „Mein Profil“ einen persönlichen Link und
   abonnieren ihre Termine in Google Kalender, Apple Kalender oder Outlook — nur lesend, nur die
   Termine der eigenen Gruppen, die eigene Rückmeldung im Titel, abgesagte Termine auf Wunsch

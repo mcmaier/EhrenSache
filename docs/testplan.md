@@ -1374,10 +1374,33 @@ Automatisiert: `responses_api` (pending_exceptions), `pwa_termine_frontend`.
 | PWA-AL-5 | Ablehnen | Rückfrage; danach Antrag weg, Zeile unverändert |
 | PWA-AL-6 | Eigener Antrag des Managers | Hinweis „Eigener Antrag …“, keine Knöpfe |
 | PWA-AL-7 | Entschuldigt-Zeile, Knopf ✗ | Rückfrage „Entschuldigt-Eintrag entfernen“; danach abwesend, der Antrag bleibt genehmigt |
-| PWA-AL-8 | Antrag zu einem Termin außerhalb des Check-in-Fensters | Termin steht nicht in der Auswahl der Liste — bewusst, die Liste ist für den laufenden Termin; entschieden wird im Dashboard oder am Tag |
+| PWA-AL-8 | Antrag zu einem Termin außerhalb des Check-in-Fensters | Termin steht nicht in der Auswahl der Liste — bewusst, die Liste ist für den laufenden Termin; entschieden wird unter „Offene Anträge“ (siehe PWA-OA), im Dashboard oder am Tag |
 | PWA-AL-9 | Termin wählen, wieder abwählen, dann „Gruppe“/„Register“ antippen | Umschalter verschwindet mit der Abwahl; keine Liste des vorigen Termins |
 | PWA-AL-10 | Kein Termin im Zeitfenster | Hinweis auf „➕ Termin anlegen“ statt leerer Fläche |
 | PWA-AL-11 | Termin gewählt, Tab wechseln und zurück | Termin bleibt gewählt, Liste steht wieder da |
+
+### Offene Anträge in der Check-in-App (FI-24)
+
+Automatisiert: `exceptions_pending_api` (Serverfelder), `self_decision_unit` (Sperrregel), `pending_requests_pwa_frontend` (Verdrahtung). Als Manager anmelden, Anwesenheit eingeschaltet; mindestens je eine Entschuldigung und ein Zeitantrag zu einem kommenden und einem vergangenen Termin außerhalb des Check-in-Fensters.
+
+| ID | Testfall | Erwartetes Ergebnis |
+|----|----------|---------------------|
+| PWA-OA-1 | Tab „Liste“ öffnen | Oben Umschalter „Anwesenheit \| Offene Anträge (n)“; „Anwesenheit“ gewählt, bisherige Ansicht unverändert. Als Mitglied (Rolle user) oder ohne Anwesenheit: kein Umschalter |
+| PWA-OA-2 | Zahl am Umschalter | Entspricht der Zahl offener Anträge im Dashboard; ohne offene Anträge steht „Offene Anträge“ ohne Zahl |
+| PWA-OA-3 | „Offene Anträge“ antippen | Terminauswahl und Liste verschwinden; Abschnitte „Kommende Termine“ (aufsteigend, heute zählt dazu) und „Vergangene Termine“ (neueste zuerst), nur wenn befüllt |
+| PWA-OA-4 | Kopfzeile eines Termins | Datum, Beginn, Titel; die Terminart nur, wenn sie vom Titel abweicht |
+| PWA-OA-5 | Antrag zugeklappt/aufgeklappt | Zugeklappt nur „Entschuldigung“ bzw. „Zeitantrag 19:45 Uhr“, ohne Begründung; aufgeklappt Begründung, Genehmigen, Ablehnen |
+| PWA-OA-6 | Zeitantrag mit Erfassung, aufgeklappt | „erfasst: 19:52 Uhr“ bzw. „entschuldigt“ je nach Erfassung |
+| PWA-OA-7 | Zeitantrag ohne Erfassung, aufgeklappt | „keine Erfassung“ |
+| PWA-OA-8 | Antrag genehmigen | Antrag verschwindet, Zahl am Umschalter sinkt; ist ein Termin leer, verschwindet auch seine Kopfzeile, ebenso ein leerer Abschnitt |
+| PWA-OA-9 | Antrag ablehnen | Rückfrage; nach Bestätigung Antrag weg, Zahl sinkt; Erfassung des Mitglieds unverändert |
+| PWA-OA-10 | Nach einer Entscheidung zurück zu „Anwesenheit“ | Liste lädt einmal neu und zeigt die Folge der Entscheidung (z. B. „entschuldigt“) |
+| PWA-OA-11 | Eigener Antrag des Managers (zweites aktives Verwalterkonto vorhanden) | Statt der Knöpfe der Hinweis „Eigener Antrag – bitte im Dashboard von jemand anderem entscheiden lassen.“ |
+| PWA-OA-12 | Verein mit nur einem Verwalterkonto: eigener Antrag | Knöpfe vorhanden, Genehmigung möglich |
+| PWA-OA-13 | Keine offenen Anträge | Hinweis „Keine offenen Anträge.“ |
+| PWA-OA-14 | Tab wechseln und zurück zu „Liste“ | „Anwesenheit“ ist wieder gewählt; Zahl neu geladen |
+| PWA-OA-15 | Offline (Flugmodus) | Genehmigen und Ablehnen gesperrt; Ladefehler erscheint als Hinweis, die Ansicht bleibt bedienbar |
+| PWA-OA-16 | Breite 375 px | Umschalter, Kopfzeilen und Antragszeilen ohne waagerechtes Scrollen |
 
 ### Anträge in der Anwesenheitsliste des Dashboards (OI-87)
 

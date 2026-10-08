@@ -68,6 +68,13 @@ Sobald du dich im Web-Dashboard registriert hast und von einem Admin freigeschal
   korrigieren, vergessene Sitzungen nachtragen — beides geht erneut in die Freigabe
 - **Termine zu- und absagen**: Tab „Termine" mit Zusage, Unsicher, Absage und Bemerkung;
   erscheint nur, wenn es kommende Termine mit Rückmeldung gibt. Ohne Netz gesperrt
+- **Offene Anträge** (nur Verwalter, nur mit eingeschalteter Anwesenheit): Im Tab „Liste“ schaltet
+  ein Umschalter zwischen „Anwesenheit“ und „Offene Anträge (n)“ um. Die Ansicht zeigt alle
+  offenen Entschuldigungen und Zeitanträge, geteilt in „Kommende Termine“ und „Vergangene
+  Termine“ — unabhängig vom Check-in-Fenster. Zugeklappt steht nur die Art des Antrags, die
+  Begründung erst aufgeklappt; Zeitanträge zeigen dort die erfasste Ankunft. Genehmigen und
+  Ablehnen wie in der Anwesenheitsliste (Ablehnen mit Rückfrage, offline gesperrt); eigene
+  Anträge sind gesperrt, solange ein zweites aktives Verwalterkonto existiert
 - **Rückmelde-Link** (`checkin/#rueckmeldung=<Termin-ID>`): Das Kalender-Abo (FI-8) setzt ihn
   an kommende Termine mit Rückmeldung. Die App liest das Fragment beim Laden, meldet ggf. erst an
   und öffnet dann den Tab „Termine“ mit aufgeklappter Karte des Termins; danach entfernt sie das

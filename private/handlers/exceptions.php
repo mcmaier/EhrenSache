@@ -85,13 +85,16 @@ function handleExceptions($db, $database, $method, $id) {
                         at.type_id as appointment_type_id, at.type_name as appointment_type_name,
                         u1.email as created_by_email,
                         u2.email as approved_by_email,
-                        (u2.member_id IS NOT NULL AND u2.member_id = e.member_id) AS self_approved
+                        (u2.member_id IS NOT NULL AND u2.member_id = e.member_id) AS self_approved,
+                        r.arrival_time AS recorded_arrival_time,
+                        r.status AS recorded_status
                         FROM {$prefix}exceptions e 
                         JOIN {$prefix}members m ON e.member_id = m.member_id 
                         JOIN {$prefix}appointments a ON e.appointment_id = a.appointment_id 
                         LEFT JOIN {$prefix}users u1 ON e.created_by = u1.user_id
                         LEFT JOIN {$prefix}users u2 ON e.approved_by = u2.user_id
                         LEFT JOIN {$prefix}appointment_types at ON a.type_id = at.type_id
+                        LEFT JOIN {$prefix}records r ON r.member_id = e.member_id AND r.appointment_id = e.appointment_id
                         WHERE 1=1";
                 
                 $params = [];
@@ -120,7 +123,28 @@ function handleExceptions($db, $database, $method, $id) {
                 
                 $stmt = $db->prepare($sql);
                 $stmt->execute($params);
-                echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (isAdminOrManager()) {
+                    // FI-24: Die Check-in-App entscheidet Antraege ausserhalb der Liste und
+                    // braucht dafuer die Selbstgenehmigungsregel (OI-87) und die erfasste
+                    // Ankunft. Einmal je Abruf, nicht je Zeile.
+                    $viewerMember = memberIdOfUser($db, $database, (int) getCurrentUserId());
+                    $otherApprover = $viewerMember !== null
+                        && otherActiveApproverExists($db, $database, (int) getCurrentUserId());
+                    foreach ($rows as &$row) {
+                        $row['self_decision_blocked'] = selfDecisionBlocked($viewerMember, $otherApprover, (int) $row['member_id']);
+                    }
+                    unset($row);
+                } else {
+                    // Mitglieder: Antwort unveraendert
+                    foreach ($rows as &$row) {
+                        unset($row['recorded_arrival_time'], $row['recorded_status']);
+                    }
+                    unset($row);
+                }
+
+                echo json_encode($rows);
             }
             break;
             
@@ -298,7 +322,11 @@ function handleExceptions($db, $database, $method, $id) {
 
                 if ($eigenesMitglied !== null
                     && (int) $existing['member_id'] === $eigenesMitglied
-                    && otherActiveApproverExists($db, $database, (int) getCurrentUserId())) {
+                    && selfDecisionBlocked(
+                        $eigenesMitglied,
+                        otherActiveApproverExists($db, $database, (int) getCurrentUserId()),
+                        (int) $existing['member_id']
+                    )) {
                     http_response_code(403);
                     echo json_encode([
                         "message" => "Den eigenen Antrag genehmigt ein anderer Verwalter"

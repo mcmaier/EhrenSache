@@ -279,6 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const dataActions = {
         'attendance-grouping':  (el) => window.setAttendanceGrouping(el.dataset.stage),
         'responses-grouping':   (el) => window.setResponsesGrouping(el.dataset.stage),
+        'attendance-view':      (el) => setAttendanceView(el.dataset.view),
         'toggle-response-section':      (el) => toggleResponseSection(el.dataset.key),
         'correct-work-session': (el) => openWorkSessionModal(Number(el.dataset.sessionId)),
         'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId)),
@@ -2026,6 +2027,46 @@ function attendanceRequestsCountHtml(members) {
 }
 
 /**
+ * Eine Antragszeile (FI-24): gemeinsam fuer die Anwesenheitsliste und die
+ * Ansicht "Offene Antraege". Zugeklappt nur die Art -- die Begruendung kann
+ * Gesundheitliches enthalten. `blocked` = eigener Antrag nach der Serverregel
+ * (OI-87): statt der Knoepfe der Hinweis.
+ */
+function requestItemHtml(a, blocked) {
+    const zeit = a.requested_arrival_time ? String(a.requested_arrival_time).slice(11, 16) : '';
+    const istZeit = a.exception_type !== 'absence';
+    const art = istZeit ? (zeit ? `Zeitantrag ${zeit} Uhr` : 'Zeitantrag') : 'Entschuldigung';
+    const off = navigator.onLine ? '' : ' disabled';
+
+    // Nur wenn der Server die erfasste Ankunft mitliefert (Verwalter-Abruf);
+    // in der Anwesenheitsliste fehlt das Feld, dort entfaellt der Absatz.
+    let erfasst = '';
+    if (istZeit && 'recorded_arrival_time' in a) {
+        const text = a.recorded_status === 'excused'
+            ? 'entschuldigt'
+            : (a.recorded_arrival_time ? `erfasst: ${String(a.recorded_arrival_time).slice(11, 16)} Uhr` : 'keine Erfassung');
+        erfasst = `<p class="attendance-request__recorded">${escapeHtml(text)}</p>`;
+    }
+
+    const aktionen = blocked
+        ? '<p class="attendance-request__own">Eigener Antrag – bitte im Dashboard von jemand anderem entscheiden lassen.</p>'
+        : `<div class="attendance-request__actions">
+               <button type="button" class="btn-request-decide btn-request-decide--approve" data-exception-id="${Number(a.exception_id)}" data-decision="approved"${off}>Genehmigen</button>
+               <button type="button" class="btn-request-decide btn-request-decide--reject" data-exception-id="${Number(a.exception_id)}" data-decision="rejected"${off}>Ablehnen</button>
+           </div>`;
+
+    return `
+        <details class="attendance-request">
+            <summary>⏳ ${escapeHtml(art)}</summary>
+            <div class="attendance-request__body">
+                <p class="attendance-request__reason">${escapeHtml(a.reason || '')}</p>
+                ${erfasst}
+                ${aktionen}
+            </div>
+        </details>`;
+}
+
+/**
  * Offene Antraege eines Mitglieds in seiner Zeile (seit 1.12.0).
  *
  * Zugeklappt nur die Art -- die Begruendung kann Gesundheitliches enthalten,
@@ -2043,32 +2084,8 @@ function attendanceRequestsHtml(member) {
     // seinen Antrag also auch hier bescheiden — sonst bliebe er liegen.
     const eigener = attendanceSelfBlocked
         && userData && String(userData.member_id) === String(member.member_id);
-    const off = navigator.onLine ? '' : ' disabled';
 
-    const zeilen = antraege.map(a => {
-        const zeit = a.requested_arrival_time ? String(a.requested_arrival_time).slice(11, 16) : '';
-        const art = a.exception_type === 'absence'
-            ? 'Entschuldigung'
-            : (zeit ? `Zeitantrag ${zeit} Uhr` : 'Zeitantrag');
-
-        const aktionen = eigener
-            ? '<p class="attendance-request__own">Eigener Antrag – bitte im Dashboard von jemand anderem entscheiden lassen.</p>'
-            : `<div class="attendance-request__actions">
-                   <button type="button" class="btn-request-decide btn-request-decide--approve" data-exception-id="${Number(a.exception_id)}" data-decision="approved"${off}>Genehmigen</button>
-                   <button type="button" class="btn-request-decide btn-request-decide--reject" data-exception-id="${Number(a.exception_id)}" data-decision="rejected"${off}>Ablehnen</button>
-               </div>`;
-
-        return `
-            <details class="attendance-request">
-                <summary>⏳ ${escapeHtml(art)}</summary>
-                <div class="attendance-request__body">
-                    <p class="attendance-request__reason">${escapeHtml(a.reason || '')}</p>
-                    ${aktionen}
-                </div>
-            </details>`;
-    }).join('');
-
-    return `<div class="attendance-requests">${zeilen}</div>`;
+    return `<div class="attendance-requests">${antraege.map(a => requestItemHtml(a, eigener)).join('')}</div>`;
 }
 
 /**
@@ -2097,7 +2114,7 @@ async function handleRequestDecision(event) {
 
         showMessage(decision === 'approved' ? '✓ Antrag genehmigt' : 'Antrag abgelehnt',
                     decision === 'approved' ? 'success' : 'warning');
-        await loadAttendanceList();
+        await reloadAttendanceView();
     };
 
     if (decision === 'rejected') {
@@ -2106,6 +2123,152 @@ async function handleRequestDecision(event) {
         return;
     }
     await entscheiden();
+}
+
+// ========================================
+// FI-24: OFFENE ANTRAEGE IM TAB „LISTE“
+// ========================================
+
+// Umschalter im Tab „Liste“: „Anwesenheit“ (bisherige Ansicht) oder „Offene
+// Antraege“ (alle offenen Antraege, unabhaengig vom Check-in-Fenster). Die Wahl
+// wird nicht gespeichert; beim Oeffnen des Tabs gilt „Anwesenheit“.
+let attendanceViewMode = 'attendance';
+
+// Eine Entscheidung in „Offene Antraege“ kann den in „Anwesenheit“ gewaehlten
+// Termin betreffen (Genehmigung legt den Eintrag an). Dann beim Zurueckschalten
+// einmal frisch laden, sonst bleibt die Ansicht unveraendert stehen.
+let attendanceListStale = false;
+
+function setAttendanceView(mode) {
+    const vorher = attendanceViewMode;
+    attendanceViewMode = mode === 'requests' ? 'requests' : 'attendance';
+    document.querySelectorAll('#attendanceViewSwitch [data-view]').forEach(b => {
+        const aktiv = b.dataset.view === attendanceViewMode;
+        b.classList.toggle('is-active', aktiv);
+        b.setAttribute('aria-pressed', aktiv ? 'true' : 'false');
+    });
+    // Nur das hidden-Attribut der Huellen -- die Inline-Anzeige der Knoepfe
+    // (Aktualisieren/Bearbeiten) setzt loadAttendanceList() und bleibt so stehen.
+    ['attendanceViewHeader', 'attendanceView'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.hidden = attendanceViewMode !== 'attendance';
+    });
+    const ansicht = document.getElementById('pendingRequestsView');
+    if (ansicht) ansicht.hidden = attendanceViewMode !== 'requests';
+
+    if (attendanceViewMode === 'requests') {
+        loadPendingRequests();
+    } else if (vorher === 'requests' && attendanceListStale) {
+        attendanceListStale = false;
+        if (document.getElementById('attendanceAppointmentFilter')?.value) {
+            loadAttendanceList();
+        }
+    }
+}
+
+/** Laedt die gerade sichtbare Ansicht neu und aktualisiert die Zahl am Umschalter. */
+async function reloadAttendanceView() {
+    if (attendanceViewMode === 'requests') {
+        attendanceListStale = true;
+        await loadPendingRequests();
+    } else {
+        await loadAttendanceList();
+        await loadPendingRequests({ countOnly: true });
+    }
+}
+
+// Laufende Nummer der Abrufe offener Antraege: Es zaehlt der zuletzt
+// angeforderte, nicht der zuletzt eintreffende (Zahl und Ansicht).
+let pendingRequestsSeq = 0;
+
+/**
+ * Alle offenen Antraege (Entschuldigungen und Zeitantraege). Der Server liefert
+ * Verwaltern je Zeile self_decision_blocked und die erfasste Ankunft mit.
+ * countOnly: nur die Zahl am Umschalter, ohne Meldung bei einem Fehler.
+ */
+async function loadPendingRequests({ countOnly = false } = {}) {
+    const seq = ++pendingRequestsSeq;
+    const result = await apiCall('exceptions', 'GET', null, { status: 'pending' });
+    // Ein spaeter angeforderter Abruf ist schon unterwegs: Diese Antwort waere
+    // veraltet -- weder Zahl noch Ansicht noch Fehlermeldung.
+    if (seq !== pendingRequestsSeq) return;
+    if (!result.success) {
+        if (!countOnly) {
+            showMessage(result.error || 'Offene Anträge konnten nicht geladen werden', 'error');
+            const content = document.getElementById('pendingRequestsContent');
+            if (content && !content.innerHTML.trim()) {
+                content.innerHTML = '<div class="info-box"><p>Offene Anträge konnten nicht geladen werden.</p></div>';
+            }
+        }
+        return;
+    }
+    const antraege = Array.isArray(result.data) ? result.data : [];
+    const zahl = document.getElementById('pendingRequestsCount');
+    if (zahl) zahl.textContent = antraege.length > 0 ? ` (${antraege.length})` : '';
+    if (!countOnly) renderPendingRequests(antraege);
+}
+
+/** Reihenfolge der Antraege eines Termins: Nachname, dann Vorname. */
+function pendingRequestNameOrder(x, y) {
+    return `${x.surname ?? ''} ${x.name ?? ''}`.localeCompare(`${y.surname ?? ''} ${y.name ?? ''}`, 'de');
+}
+
+/**
+ * Ansicht „Offene Antraege“: je Termin eine Kopfzeile, darunter je Antrag Name
+ * und die gemeinsame Antragszeile. Kommende Termine (ab heute) aufsteigend,
+ * vergangene absteigend; ein leerer Abschnitt entfaellt.
+ */
+function renderPendingRequests(antraege) {
+    const content = document.getElementById('pendingRequestsContent');
+    if (!content) return;
+    if (antraege.length === 0) {
+        content.innerHTML = '<div class="info-box"><p>Keine offenen Anträge.</p></div>';
+        return;
+    }
+
+    const heute = formatDate(new Date());   // YYYY-MM-DD in Ortszeit
+    const key = a => `${String(a.appointment_date ?? '').slice(0, 10)} ${a.appointment_start_time ?? ''}`;
+    const termine = new Map();
+    antraege.forEach(a => {
+        const id = Number(a.appointment_id);
+        if (!termine.has(id)) termine.set(id, { kopf: a, antraege: [] });
+        termine.get(id).antraege.push(a);
+    });
+    const liste = [...termine.values()];
+    const kommend = liste.filter(t => String(t.kopf.appointment_date ?? '').slice(0, 10) >= heute)
+        .sort((x, y) => key(x.kopf).localeCompare(key(y.kopf)));
+    const vergangen = liste.filter(t => String(t.kopf.appointment_date ?? '').slice(0, 10) < heute)
+        .sort((x, y) => key(y.kopf).localeCompare(key(x.kopf)));
+
+    const terminHtml = t => {
+        const k = t.kopf;
+        // Terminart nur, wenn sie etwas sagt -- oft heisst der Termin wie seine Art.
+        const art = k.appointment_type_name && k.appointment_type_name !== k.appointment_title
+            ? ` · ${escapeHtml(k.appointment_type_name)}` : '';
+        t.antraege.sort(pendingRequestNameOrder);
+        const zeilen = t.antraege
+            .map(a => `
+                <div class="pending-request">
+                    <span class="member-name">${escapeHtml(a.surname)}, ${escapeHtml(a.name)}</span>
+                    ${requestItemHtml(a, a.self_decision_blocked === true)}
+                </div>`).join('');
+        return `
+            <div class="pending-requests__appointment">
+                <h5 class="pending-requests__head">${escapeHtml(formatResponseCardHead(k.appointment_date, k.appointment_start_time, null))}
+                    · ${escapeHtml(k.appointment_title)}${art}</h5>
+                ${zeilen}
+            </div>`;
+    };
+    const abschnitt = (titel, gruppe) => gruppe.length === 0 ? '' : `
+        <section class="pending-requests__section">
+            <h4 class="group-header">${titel}</h4>
+            ${gruppe.map(terminHtml).join('')}
+        </section>`;
+
+    content.innerHTML = abschnitt('Kommende Termine', kommend) + abschnitt('Vergangene Termine', vergangen);
+    content.querySelectorAll('.btn-request-decide').forEach(btn => {
+        btn.addEventListener('click', handleRequestDecision);
+    });
 }
 
 /** Umschalter Alphabetisch/Gruppe/<Wort> + Hinweiszeile bei Mehrfachnennung
@@ -6022,6 +6185,13 @@ function initTabs() {
             else if(targetTab === 'attendance-list')
             {
                 debug.log("Loading Attendance List");
+                // FI-24: Beim Oeffnen gilt "Anwesenheit", die Zahl am Umschalter
+                // kommt frisch (Spec: geladen beim Oeffnen des Tabs). Die Liste
+                // laedt der Handler unten ohnehin neu -- setAttendanceView() soll es
+                // nicht ein zweites Mal tun.
+                attendanceListStale = false;
+                setAttendanceView('attendance');
+                loadPendingRequests({ countOnly: true });
                 loadAttendanceAppointments().then(() => {
                     // Stelle gespeicherte Auswahl wieder her
                     if (currentEditAppointmentId) {
