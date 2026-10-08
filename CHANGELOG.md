@@ -18,6 +18,16 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Tätigkeitsarten samt ihrer Terminart-Zuordnung kamen nur bei der Anmeldung; eine danach
   gesetzte Zuordnung wirkte erst nach einem Neustart der App. Die Ansicht lädt sie jetzt bei
   jedem Öffnen nach, die getroffene Auswahl bleibt stehen.
+- **Zeiträume mit Status „Inaktiv“ wirkten wie aktive (OI-130).** Ein Mitglied, das z. B. ab dem
+  1. des Monats auf „Inaktiv“ gesetzt wurde, blieb überall aktiv — in Statistik,
+  Anwesenheitsliste, Station, Terminrückmeldungen und Kalender-Abo. Jetzt gilt: Ein inaktiver
+  Zeitraum beendet oder unterbricht die Aktivität; gibt es aktive Zeiträume, muss der Tag in einem
+  davon liegen. **Bestandsdaten prüfen:** Wer einen beendeten Zeitraum bisher als „Inaktiv“
+  markiert hat, um das Ende der Mitgliedschaft anzuzeigen, stellt ihn auf „Aktiv“ um.
+- **Mitgliederliste zeigt aktiv/inaktiv tagesgenau.** Bisher galt ein Mitglied als aktiv, wenn es
+  irgendwann im gewählten Jahr aktiv war; ein im September beendeter Zeitraum stand bis
+  Jahresende als „Aktiv“ da. Spalte, Hervorhebung und Filter „Aktiv/Inaktiv“ zeigen jetzt den
+  Stand von heute. `GET members` liefert dafür `is_active_today` (API.md).
 
 ## [1.23.0] – 2026-10-08
 

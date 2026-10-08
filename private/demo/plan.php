@@ -391,7 +391,9 @@ function buildMembers(DemoRandom $random, string $referenceDate = '2026-09-08'):
             'member_id'  => $id,
             'start_date' => $startDate,
             'end_date'   => $endDate,
-            'status'     => $active === 1 ? 'active' : 'inactive',
+            // Auch ein beendeter Zeitraum ist ein aktiver: Status inactive
+            // hiesse seit OI-130 "in diesem Zeitraum inaktiv".
+            'status'     => 'active',
         ];
     }
 

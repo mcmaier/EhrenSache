@@ -24,7 +24,10 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 // Zugriffskontrolle: Nur Admin können alle Infos lesen  
                 if(isAdminOrManager())                
                 {
-                    $stmt = $db->prepare("SELECT * FROM {$prefix}members WHERE member_id = ?");
+                    // is_active_today: Stand heute fuer die Anzeige im Dashboard (OI-130)
+                    $stmt = $db->prepare("SELECT m.*,
+                                                 CASE WHEN (" . memberActiveTodayWhere() . ") THEN 1 ELSE 0 END AS is_active_today
+                                          FROM {$prefix}members m WHERE m.member_id = ?");
                     $stmt->execute([$id]);
                     $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -71,7 +74,8 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                     $stmt = $db->prepare("
                         SELECT m.member_id, m.name, m.surname, m.member_number, m.active,
                                GROUP_CONCAT(mga.group_id SEPARATOR ', ') as group_ids,
-                               $ownActivityFlag as is_active_in_period
+                               $ownActivityFlag as is_active_in_period,
+                               CASE WHEN (" . memberActiveTodayWhere() . ") THEN 1 ELSE 0 END as is_active_today
                         FROM {$prefix}members m
                         LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
                         WHERE m.member_id = ?
@@ -94,6 +98,7 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                             "active"              => (int) $member['active'],
                             "group_ids"           => $member['group_ids'],
                             "is_active_in_period" => (int) $member['is_active_in_period'],
+                            "is_active_today"     => (int) $member['is_active_today'],
                             "warning"             => $warning
                         ]);
                     } else {
@@ -128,56 +133,22 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                     $checkDate = "'$date'"; // Spezifisches Datum (bereits als Y-m-d validiert)
                 } elseif ($year) {
                     $yearRangeCheck = true;
-                    $yearStart = "'" . $year . "-01-01'";
-                    $yearEnd   = "'" . $year . "-12-31'";
                 }
 
                 $activityFilter = '';
                 $activityFlag = 'm.active';
 
-                if ($yearRangeCheck && !$includeInactive) {
-                    // Filter: War im Jahr IRGENDWANN aktiv
-                    $activityFilter = "AND (
-                        m.active = 1
-                        AND (
-                            -- Keine membership_dates → immer aktiv
-                            NOT EXISTS (
-                                SELECT 1 FROM {$prefix}membership_dates md 
-                                WHERE md.member_id = m.member_id
-                            )
-                            OR
-                            -- Hat membership_dates → Zeitraum überlappt mit Jahr
-                            EXISTS (
-                                SELECT 1 FROM {$prefix}membership_dates md
-                                WHERE md.member_id = m.member_id
-                                AND md.start_date <= $yearEnd
-                                AND (md.end_date IS NULL OR md.end_date >= $yearStart)
-                            )
-                        )
-                    )";
-                }
-
                 if ($yearRangeCheck) {
-                    // Flag: War im Jahr aktiv (für Anzeige)
-                    $activityFlag = "CASE 
-                        WHEN (
-                            m.active = 1
-                            AND (
-                                NOT EXISTS (
-                                    SELECT 1 FROM {$prefix}membership_dates md 
-                                    WHERE md.member_id = m.member_id
-                                )
-                                OR
-                                EXISTS (
-                                    SELECT 1 FROM {$prefix}membership_dates md
-                                    WHERE md.member_id = m.member_id
-                                    AND md.start_date <= $yearEnd
-                                    AND (md.end_date IS NULL OR md.end_date >= $yearStart)
-                                )
-                            )
-                        ) THEN 1 
-                        ELSE 0 
-                    END";
+                    // War im Jahr IRGENDWANN aktiv -- dieselbe Regel wie
+                    // Statistik und Anwesenheitsliste (OI-130: vorher eine
+                    // eigene Kopie, die den Status der Zeitraeume nicht kannte)
+                    $yearActivity = getMemberActivityWhereYear($year, 'm');
+
+                    if (!$includeInactive) {
+                        $activityFilter = "AND ($yearActivity)";
+                    }
+
+                    $activityFlag = "CASE WHEN ($yearActivity) THEN 1 ELSE 0 END";
                 } elseif ($checkDate) {
                     // Spezifisches Datum
                     $activityWhere = getMemberActivityWhere('m', $checkDate, false);
@@ -193,11 +164,17 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                 if(isAdminOrManager())    
                 {
                     $params = [];
+
+                    // Stand heute, unabhaengig von year/date: Die Mitgliederliste
+                    // im Dashboard zeigt aktiv/inaktiv tagesgenau (OI-130).
+                    // is_active_in_period bleibt fuer die Auswahllisten.
+                    $todayFlag = "CASE WHEN (" . memberActiveTodayWhere() . ") THEN 1 ELSE 0 END";
                     
                     if($group_id)
                     {
                         $sql = "SELECT m.*, g.group_id, g.group_name,    
-                                        $activityFlag as is_active_in_period                              
+                                        $activityFlag as is_active_in_period,
+                                        $todayFlag as is_active_today
                                     FROM {$prefix}members m
                                     LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
                                     LEFT JOIN {$prefix}member_groups g ON mga.group_id = g.group_id
@@ -212,7 +189,8 @@ function handleMembers($db, $database, $method, $id, $authUserId, $authMemberId)
                         $sql = "SELECT m.*,
                                         GROUP_CONCAT(g.group_id SEPARATOR ', ') as group_ids,
                                         GROUP_CONCAT(g.group_name SEPARATOR ', ') as group_names,
-                                        $activityFlag as is_active_in_period
+                                        $activityFlag as is_active_in_period,
+                                        $todayFlag as is_active_today
                                     FROM {$prefix}members m
                                     LEFT JOIN {$prefix}member_group_assignments mga ON m.member_id = mga.member_id
                                     LEFT JOIN {$prefix}member_groups g ON mga.group_id = g.group_id

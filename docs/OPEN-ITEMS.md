@@ -1028,6 +1028,37 @@ Offenlegung in `DATENSCHUTZ.md`, eigener Server als Abhängigkeit). Nur als Grun
 
 ---
 
+### OI-130 · Status „Inaktiv“ der Mitgliedschaftszeiträume wirkte nicht
+**Priorität:** mittel · aufgenommen und behoben am 2026-10-08 (Zweig `fix/aktivzeitraum-status`,
+noch nicht veröffentlicht)
+
+**Befund:** Der Mitglieds-Dialog bietet je Zeitraum „Aktiv“ oder „Inaktiv“, gespeichert in
+`membership_dates.status`. Keine Abfrage las die Spalte — jeder Zeitraum wirkte wie ein aktiver.
+Ein Zeitraum „ab 01.10. Inaktiv“ machte das Mitglied also ab dem 01.10. *aktiv*, und zwar in
+Statistik, Anwesenheitsliste, Kiosk, `auto_checkin`, Rückmeldungen und Kalender-Abo. Daneben
+zeigte die Mitgliederliste „Aktiv“, wenn das Mitglied **irgendwann im gewählten Jahr** aktiv war:
+Ein Zeitraum, der im September endete, stand bis 31.12. als aktiv da.
+
+**Entschieden (Nutzer, 2026-10-08):** Status auswerten (Variante a, nicht Feld abschaffen).
+Aktiv an einem Tag ist, wer `members.active = 1` hat, an dem Tag in keinem inaktiven Zeitraum
+liegt und — sofern es aktive Zeiträume gibt — in einem davon (`memberActivityPeriodsSql()` in
+`private/helpers/member_activity.php`). „Im Jahr aktiv“ prüft die Tage, an denen sich der Status
+ändern kann. Die Mitgliederliste im Dashboard zeigt den Stand **heute** (`is_active_today`), die
+Auswahllisten bleiben bei „im Jahr aktiv“ (`is_active_in_period`), damit rückwirkend erfasst werden
+kann. Die Kopie der Jahresregel in `members.php` ist entfernt. Wächter:
+`tests/suites/member_activity_api.php`, Kiosk-Fall in `station_unit.php`.
+
+**Offen für das Release — Bestandsdaten:** Wer bisher einen *beendeten* Zeitraum als „Inaktiv“
+markiert hat (so tat es auch der Demo-Datengenerator, jetzt korrigiert), meinte „war aktiv von–bis“.
+Nach der neuen Regel heißt derselbe Eintrag „war inaktiv von–bis“; hat das Mitglied keinen
+weiteren aktiven Zeitraum und steht `members.active` auf 1, gilt es danach wieder als aktiv.
+Zu entscheiden: nur im Changelog darauf hinweisen oder einen Migrationsschritt, der solche
+Einträge meldet (nicht still umdeutet). Ist `members.active = 0`, ändert sich nichts.
+
+**Nicht sicherheitsrelevant.**
+
+---
+
 ## Restarbeiten
 
 ### OI-4 · Terminbezug: Oberfläche unvollständig
