@@ -185,6 +185,15 @@ test('fetch: Anfragen ausserhalb des Rahmens gehen unberuehrt ans Netz', functio
         'Der fetch-Handler muss gegen die Vorladeliste pruefen');
 });
 
+test('fetch: Seitenaufrufe ohne Query und Fragment vergleichen', function () use ($repoRoot) {
+    $sw = sourceCode($repoRoot . '/public/checkin/service-worker.js');
+
+    assertTrue(str_contains($sw, "url.search = '';"),
+        'Die Query muss vor dem Vergleich der Seitenadresse entfernt werden');
+    assertTrue(str_contains($sw, "url.hash = '';"),
+        'Chrome liefert das Fragment bei Seitenaufrufen mit; ohne url.hash = \'\' zeigt der Rueckmelde-Link (#rueckmeldung=...) offline die Fehlerseite');
+});
+
 test('Hinweisleiste: Markup in index.html', function () use ($repoRoot) {
     $html = sourceCode($repoRoot . '/public/checkin/index.html');
 

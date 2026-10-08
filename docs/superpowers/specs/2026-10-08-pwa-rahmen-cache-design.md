@@ -37,7 +37,9 @@ Daten werden **nicht** zwischengespeichert (Stufe 2), Schreibaktionen ohne Netz 
 - **activate:** alle Speicher `checkin-*` außer dem eigenen löschen, dann `clients.claim()`.
 - **fetch:** Nur GET-Anfragen, deren URL in der Vorladeliste steht, werden aus dem Speicher
   beantwortet. Ein Seitenaufruf (`request.mode === 'navigate'`) auf `./` oder `index.html`
-  bekommt die gespeicherte `index.html`. Alles andere — insbesondere `../api/` — ruft
+  bekommt die gespeicherte `index.html`; Query und Fragment werden vor dem Vergleich
+  entfernt (Chrome liefert das Fragment bei Navigationen mit, z. B. beim Rückmelde-Link
+  `#rueckmeldung=…`). Alles andere — insbesondere `../api/` — ruft
   `respondWith` nicht auf und geht unverändert ans Netz. Das bisherige
   `respondWith(fetch(event.request))` entfällt.
 - **message `SKIP_WAITING`:** ruft `skipWaiting()`.

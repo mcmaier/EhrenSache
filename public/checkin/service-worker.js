@@ -127,10 +127,13 @@ self.addEventListener('fetch', (event) => {
     let key;
     if (request.mode === 'navigate') {
         // Startadresse aus dem Manifest, Verzeichnisaufruf und Rueckmelde-Link
-        // (#rueckmeldung=..., das Fragment kommt hier nicht an) fuehren alle
-        // auf dieselbe Seite.
+        // (#rueckmeldung=...) fuehren alle auf dieselbe Seite. Chrome reicht
+        // bei Seitenaufrufen das Fragment in request.url mit; der Rueckmelde-
+        // Link wird deshalb erst nach dem Entfernen erkannt — sonst zeigt er
+        // offline die Fehlerseite (gefunden mit tests/browser/pwa-offline.mjs).
         const url = new URL(request.url);
         url.search = '';
+        url.hash = '';
         if (url.href !== SCOPE_URL && url.href !== INDEX_URL) {
             return;
         }
