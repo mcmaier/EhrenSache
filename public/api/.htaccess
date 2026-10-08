@@ -10,11 +10,9 @@
 # Blockiere direkte Aufrufe von Unterordnern
 RedirectMatch 403 ^/api/(handlers|helpers)/
 
-# CORS Headers für API (bei Bedarf)
-# Aktiviere nur wenn Frontend auf anderer Domain läuft
-# Header always set Access-Control-Allow-Origin "*"
-# Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-# Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-API-Key"
+# Keine CORS-Header (OI-126): Alle Oberflächen laufen auf demselben Ursprung
+# wie die API. Nicht „bei Bedarf“ einschalten — eine konkrete Origin zusammen
+# mit Allow-Credentials machte jede Sitzungsantwort für diese Origin lesbar.
 
 # Rate Limiting (optional, wenn mod_ratelimit verfügbar)
  <IfModule mod_ratelimit.c>

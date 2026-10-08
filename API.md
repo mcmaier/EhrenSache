@@ -71,6 +71,19 @@ Bei Session-basierter Authentifizierung ist ein CSRF-Token erforderlich:
 - **DELETE:** Als Query-Parameter `?csrf_token=XXX`
 - **Ausnahmen:** `login`, `logout`, `auth`, `register`, `regenerate_token`
 
+### Aufrufe aus dem Browser (CORS) und HTTP-Methoden
+
+Die API sendet **keine CORS-Header** (`Access-Control-*`, seit OI-126). Dashboard, Check-in-App
+und Station laufen auf demselben Ursprung wie die API und brauchen keine. Browser-Anwendungen
+auf einem **fremden Ursprung** werden nicht unterstützt — der Browser gibt ihnen die Antwort
+nicht heraus. Fremdsysteme rufen die API serverseitig auf (eigener Server, Skript, IoT-Gerät)
+und melden sich dabei mit Token an (siehe oben).
+
+Angenommen werden nur `GET`, `HEAD`, `POST`, `PUT` und `DELETE`. Jede andere Methode —
+auch `OPTIONS`, also ein CORS-Preflight — antwortet vor Anmeldung und Routing mit `405`,
+`Allow: GET, HEAD, POST, PUT, DELETE` und `{"message": "Method not allowed"}`. Ob eine
+Ressource `HEAD` tatsächlich bedient, steht bei der Ressource (heute nur der Kalender-Feed).
+
 ## Rollen & Berechtigungen
 
 | Rolle | Beschreibung |
@@ -101,6 +114,7 @@ Bei Session-basierter Authentifizierung ist ein CSRF-Token erforderlich:
 | 401 | Nicht authentifiziert |
 | 403 | Keine Berechtigung / CSRF-Fehler / Funktion abgeschaltet (`code: FEATURE_DISABLED`) |
 | 404 | Ressource nicht gefunden |
+| 405 | Methode nicht erlaubt (unbekannte Methode wie `OPTIONS`, oder von der Ressource nicht bedient) |
 | 409 | Konflikt (z.B. Duplikat) |
 | 429 | Rate Limit überschritten |
 | 500 | Serverfehler |
@@ -1399,7 +1413,7 @@ Rückmeldungen, ab heute nach Serverdatum, höchstens die nächsten 50), tragen 
 sie nachrücken. Der Link enthält kein Token; die App verlangt die Anmeldung. Ein Termin mit nicht lesbarer
 Uhrzeit wird übersprungen (im Fehlerlog vermerkt), der übrige Feed wird geliefert.
 
-Der Feed sendet **keine CORS-Header** (für diese Ressource entfernt). Es gilt die globale
+Der Feed sendet wie die ganze API **keine CORS-Header**. Es gilt die globale
 `Referrer-Policy` aus `public/.htaccess` (`strict-origin-when-cross-origin`); eine eigene setzt
 der Feed nicht, Apache würde sie nur als zweiten Header danebenstellen.
 

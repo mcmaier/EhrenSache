@@ -24,7 +24,17 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Migrationsschritt kommt mit dem Release. In der öffentlichen Demo lassen sich keine Abo-Links
   erzeugen, der Feed antwortet dort immer mit 404.
 
-## [1.22.1] – 2026-10-06
+### Geändert
+
+- **API ohne CORS-Header (OI-126):** `api.php` sendet keine `Access-Control-*`-Köpfe mehr. Bisher
+  stand dort `Allow-Origin: *` zusammen mit `Allow-Credentials: true`, eine Kombination, die
+  Browser verwerfen. Alle eigenen Oberflächen laufen auf demselben Ursprung wie die API;
+  Browser-Anwendungen auf fremden Domains werden nicht unterstützt, Fremdsysteme rufen
+  serverseitig mit Token ab. `OPTIONS` und andere unbekannte Methoden antworten jetzt mit `405`
+  (bisher leeres `200`). Die auskommentierten CORS-Zeilen in `public/api/.htaccess` sind entfernt.
+
+## [1.22.1]
+ – 2026-10-06
 
 ### Geändert
 - **CSS, JS und HTML kommen komprimiert an.** `public/.htaccess` schaltet gzip für statische

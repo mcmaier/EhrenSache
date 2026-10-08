@@ -1663,7 +1663,9 @@ CORS-Zeilen auskommentiert unter der Überschrift „bei Bedarf". `Access-Contro
 allein ist harmlos, weil der Browser dann keine Cookies mitsendet. Wer dort je eine konkrete
 Origin zusammen mit `Access-Control-Allow-Credentials: true` einträgt, macht jede
 Session-Antwort für diese Origin lesbar. Vor dem Aktivieren zu prüfen, welche Endpoints dann
-von fremden Seiten lesbar würden.
+von fremden Seiten lesbar würden. *Nachtrag 2026-10-08:* Die Zeilen sind mit
+[OI-126](#oi-126--api-sendet-access-control-allow-origin--zusammen-mit-allow-credentials-true)
+entfernt; an ihrer Stelle steht eine Warnung, CORS dort nicht einzuschalten.
 
 Die Funktion heißt seit demselben Tag `getSessionStatus()`; der alte Name benannte einen
 Zweck, den sie nach der Kürzung nicht mehr hat.
@@ -2645,7 +2647,18 @@ Verwandt: [OI-120](#oi-120--das-dashboard-lädt-rund-45-einzeldateien) (Dateien,
 ---
 
 ### OI-126 · API sendet `Access-Control-Allow-Origin: *` zusammen mit `Allow-Credentials: true`
-**Priorität:** niedrig · aufgenommen am 2026-10-06 (Messung auf der Demo nach dem Update auf 1.22.0)
+**Priorität:** erledigt am 2026-10-08 — auf `dev`, unveröffentlicht · aufgenommen am 2026-10-06
+(Messung auf der Demo nach dem Update auf 1.22.0)
+
+**Umgesetzt:** Kein Aufrufer braucht CORS (Dashboard, Check-in-App und Station auf demselben
+Ursprung, IoT-Terminal kein Browser, die Werbeseite ruft die API nicht aus dem Browser ab). Alle
+vier Köpfe und der `OPTIONS`-Sonderzweig sind aus `api.php` entfernt, ebenso das `header_remove()`
+im Kalender-Feed und die auskommentierten Zeilen in `public/api/.htaccess`. **Abweichend vom
+Vorschlag** weist `api.php` jetzt jede Methode außer `GET`, `HEAD`, `POST`, `PUT`, `DELETE` vor
+Sitzung und Anmeldung mit `405` ab: Durchgereicht lieferte `OPTIONS` bei mehreren Handlern ohne
+`default`-Zweig (`members`, `users`, `appointments`, `records`) ein leeres `200`, und die
+CSRF-Prüfung kennt nur `POST`/`PUT`/`DELETE`. Wächter: `tests/suites/cors_api.php`; API.md
+(Abschnitt „Aufrufe aus dem Browser (CORS) und HTTP-Methoden“).
 
 `public/api/api.php` setzt in Abschnitt 1 für jede Antwort `Access-Control-Allow-Origin: *` und
 `Access-Control-Allow-Credentials: true`. Die Kombination ist laut Fetch-Standard ungültig: Bei

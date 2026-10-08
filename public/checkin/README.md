@@ -91,7 +91,8 @@ Sobald du dich im Web-Dashboard registriert hast und von einem Admin freigeschal
 ### "Keine Verbindung zur API"
 
 - API-URL in `js/app.js` prüfen
-- CORS-Einstellungen in `api.php` prüfen
+- Die App muss auf demselben Ursprung (Domain, Protokoll, Port) laufen wie die API — die API
+  sendet keine CORS-Header, eine Check-in-App auf fremder Domain kann sie nicht abfragen
 - Browser Console (F12) für Fehler checken
 
 ### Service Worker lädt nicht

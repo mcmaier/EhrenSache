@@ -16,10 +16,13 @@
 
 // Headers
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key");
-header("Access-Control-Allow-Credentials: true"); 
+
+// Keine CORS-Header (OI-126): Dashboard, Check-in-App und Station laufen auf
+// demselben Ursprung wie die API, das IoT-Terminal ist kein Browser. Bis 1.22.x
+// standen hier Allow-Origin: * und Allow-Credentials: true -- eine Kombination,
+// die Browser verwerfen. Browser-Anwendungen auf fremden Urspruengen werden
+// nicht unterstuetzt; Fremdsysteme rufen serverseitig mit Token ab.
+// Wache: tests/suites/cors_api.php.
 
 // ============================================
 // 2. INCLUDES
@@ -96,15 +99,23 @@ require_once '../../private/handlers/holidays.php';
 require_once '../../private/handlers/calendar.php';
 
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
-
 // ============================================
 // 3. REQUEST VARIABLEN
 // ============================================
 $request_method = $_SERVER['REQUEST_METHOD'];
+
+// Nur die Methoden, die die API kennt (HEAD fuer den Kalender-Feed). Bis 1.22.x
+// beantwortete ein Sonderzweig OPTIONS als CORS-Preflight mit leerem 200; ohne
+// CORS (OI-126) gibt es keinen Preflight mehr. Durchgereicht lieferte OPTIONS bei
+// mehreren Handlern ohne default-Zweig ebenfalls ein leeres 200, und die
+// CSRF-Pruefung (Abschnitt 8) kennt nur POST/PUT/DELETE -- deshalb 405 fuer alles
+// Uebrige, vor Sitzung und Anmeldung.
+if (!in_array($request_method, ['GET', 'HEAD', 'POST', 'PUT', 'DELETE'], true)) {
+    http_response_code(405);
+    header('Allow: GET, HEAD, POST, PUT, DELETE');
+    echo json_encode(['message' => 'Method not allowed']);
+    exit();
+}
 
 // $_GET['resource'] kann ein Array sein (?resource[]=x). api.php hat kein
 // declare(strict_types=1), aber Array -> string ist auch im schwachen Modus
