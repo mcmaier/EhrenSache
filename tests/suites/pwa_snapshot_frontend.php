@@ -97,7 +97,7 @@ test('loadHistory prueft nach jedem await die Sitzung (kein Verlauf unter fremde
 test('Abgeschaltete Terminplanung entfernt den Teil appointments', function () use ($snapRepo) {
     $js = str_replace("\r\n", "\n", sourceCode($snapRepo . '/public/checkin/js/app.js'));
     $body = snapFunctionBody($js, 'startSession');
-    assertTrue(str_contains($body, "dropSnapshotPart('appointments')"),
+    assertTrue(str_contains($body, "dropSnapshotPart('appointments', "),
         "startSession() muss bei abgeschalteter Terminplanung dropSnapshotPart('appointments') aufrufen");
 });
 

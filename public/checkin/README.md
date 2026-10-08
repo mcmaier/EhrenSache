@@ -96,9 +96,10 @@ Anmeldung („Angemeldet bleiben“) bietet der Startbildschirm zusätzlich „L
 die kommenden Termine mit eigener Rückmeldung und den Verlauf, so wie sie zuletzt geladen wurden,
 als alter Stand gekennzeichnet und ohne Aktionen. Der Verlauf ist nur dabei, wenn das Mitglied
 den Tab „Verlauf“ geöffnet hatte (oder ein Check-in ihn aufgefrischt hat); sonst steht dort
-„Nicht geladen, solange Verbindung bestand.“ Weitere Daten hält sie nicht vor, und ohne Netz nimmt sie keine Check-ins, Rückmeldungen oder Zeiten an — ein
-Zeitpunkt vom Telefon wäre als Nachweis wertlos (OI-43). Auch der Rückmelde-Link
-(`#rueckmeldung=…`) öffnet ohne Netz den gespeicherten Rahmen.
+„Nicht geladen, solange Verbindung bestand.“ Ist eine Funktion im Verein abgeschaltet, steht ihr
+Abschnitt nicht darin. Weitere Daten hält sie nicht vor, und ohne Netz nimmt sie keine Check-ins,
+Rückmeldungen oder Zeiten an — ein Zeitpunkt vom Telefon wäre als Nachweis wertlos (OI-43). Auch
+der Rückmelde-Link (`#rueckmeldung=…`) öffnet ohne Netz den gespeicherten Rahmen.
 
 Nach einem Update erscheint oben „Neue Version verfügbar“. Erst „Neu laden“ übernimmt sie, damit
 keine laufende Eingabe verloren geht.

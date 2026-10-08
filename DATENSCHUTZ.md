@@ -140,8 +140,9 @@ Die Check-in-App legt im Browser des Mitglieds ab:
   seiner Rückmeldung und die zuletzt angezeigten Einträge seines Verlaufs (Anwesenheiten,
   Anträge, Arbeitszeiten). Er dient allein dazu, diese Angaben ohne Verbindung ansehen zu können.
 
-Beides wird beim Abmelden, beim Wechsel des Kontos und bei einem ungültigen Token gelöscht. Daten
-anderer Mitglieder liegen dort nicht. Auf gemeinsam genutzten Geräten sollten Mitglieder
+Beides wird beim Abmelden, beim Wechsel des Kontos und beim nächsten Start mit Verbindung
+gelöscht, wenn der Server die gespeicherte Anmeldung nicht mehr annimmt. Daten anderer Mitglieder
+liegen dort nicht. Auf gemeinsam genutzten Geräten sollten Mitglieder
 „Angemeldet bleiben“ nicht wählen.
 
 ---

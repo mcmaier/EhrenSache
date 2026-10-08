@@ -831,6 +831,8 @@ function applyPwaFeatureTabs() {
     // Verlauf und Statistik haben nur Abschnitte fuer Anwesenheit und Arbeitszeit.
     const historyTab = document.querySelector('.tab-button[data-tab="history"]');
     if (historyTab) historyTab.hidden = !anwesenheit && !arbeitszeit;
+    // Ohne Verlauf laedt loadHistory() nie: ein alter Verlauf bliebe im letzten Stand.
+    if (!anwesenheit && !arbeitszeit) dropSnapshotPart('history', userData?.member_id);
     const statsTab = document.querySelector('.tab-button[data-tab="stats"]');
     if (statsTab) statsTab.hidden = !anwesenheit && !arbeitszeit;
 
@@ -1220,6 +1222,8 @@ function readSavedToken() {
 function forgetSavedLogin() {
     localStorage.removeItem('api_token');
     clearSnapshot();
+    // Auch die gezeichnete Ansicht: auf einem geteilten Geraet bliebe sie im DOM.
+    document.getElementById('snapshotContent')?.replaceChildren();
 }
 
 /** Termine-Teil des letzten Stands aus dem gerade gehaltenen Stand (OI-43). */
@@ -1261,7 +1265,7 @@ async function startSession(meData) {
     // Ohne Terminplanung laedt loadResponses() nie: Ein alter Stand bliebe
     // sonst stehen. pwaFeatureOn() liest userData.features aus "me" und ist
     // deshalb schon hier gueltig.
-    if (!pwaFeatureOn('appointments')) dropSnapshotPart('appointments');
+    if (!pwaFeatureOn('appointments')) dropSnapshotPart('appointments', meData.member_id);
 
     // Stufe 2: was die Erfassen-Ansicht braucht. Keiner der Abrufe haengt von
     // einem anderen ab; member_id kommt aus me.
@@ -3423,7 +3427,7 @@ function showStartStatus(text, failed, blocked = false) {
 function offerSnapshot() {
     const btn = document.getElementById('startSnapshotBtn');
     const snap = readSnapshot();
-    if (!btn || !snap) return;
+    if (!btn || !snapshotHasContent(snap)) return;
     btn.textContent = `Letzten Stand ansehen (${snapshotStamp(snap.saved_at)})`;
     btn.hidden = false;
 }

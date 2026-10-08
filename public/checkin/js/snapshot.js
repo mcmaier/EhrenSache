@@ -54,6 +54,17 @@ function clearSnapshot() {
     }
 }
 
+/** Juengster Zeitpunkt aller Teile mit saved_at; abgeschaltete und fehlende zaehlen nicht. */
+function snapshotLatest(snap) {
+    return [snap.appointments && snap.appointments.saved_at, snap.history && snap.history.saved_at]
+        .filter(Boolean).sort().pop();
+}
+
+/** Hat der Schnappschuss mindestens einen geladenen (nicht abgeschalteten) Teil? */
+function snapshotHasContent(snap) {
+    return !!snap && snapshotLatest(snap) !== undefined;
+}
+
 /**
  * Ersetzt einen Teil ('appointments' | 'history') und laesst den anderen
  * stehen. Ein Schnappschuss eines anderen Mitglieds wird ganz ersetzt.
@@ -71,8 +82,7 @@ function saveSnapshotPart(part, items, memberId, header, now = new Date()) {
 
         snap[part] = { saved_at: now.toISOString(), items };
         snap.header = header;
-        snap.saved_at = [snap.appointments && snap.appointments.saved_at, snap.history && snap.history.saved_at]
-            .filter(Boolean).sort().pop();
+        snap.saved_at = snapshotLatest(snap);
 
         localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
     } catch (error) {
@@ -83,14 +93,19 @@ function saveSnapshotPart(part, items, memberId, header, now = new Date()) {
 /**
  * Markiert einen Teil als abgeschaltet (Funktion im Verein ausgeschaltet): Die
  * Ansicht blendet ihn aus, statt "Nicht geladen" zu melden oder einen alten
- * Stand zu zeigen. Nur mit Schnappschuss und gespeichertem Token.
+ * Stand zu zeigen. Nur mit gespeichertem Token; fehlt der Schnappschuss (oder
+ * gehoert er einem anderen Mitglied), entsteht ein leeres Geruest, damit die
+ * Marke auch vor dem ersten Schreiben des anderen Teils steht.
  */
-function dropSnapshotPart(part) {
+function dropSnapshotPart(part, memberId) {
     try {
-        if (!localStorage.getItem('api_token')) return;
-        const snap = readSnapshot();
-        if (!snap) return;
+        if (!localStorage.getItem('api_token') || !memberId) return;
+        let snap = readSnapshot();
+        if (!snap || Number(snap.member_id) !== Number(memberId)) {
+            snap = { version: SNAPSHOT_VERSION, member_id: Number(memberId), appointments: null, history: null };
+        }
         snap[part] = { off: true };
+        snap.saved_at = snapshotLatest(snap);
         localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap));
     } catch (error) {
         // wie saveSnapshotPart()

@@ -112,19 +112,27 @@ try {
         await page.$eval('#updateBanner', el => el.hidden));
 
     // Schnappschuss (Stufe 2): Termine- und Verlauf-Tab laden, danach liegt er im Speicher
+    const t0 = new Date().toISOString();
     const responsesTab = await page.$('.tab-button[data-tab="responses"]:not([hidden])');
     if (responsesTab) {
         await responsesTab.click();
         await page.waitForSelector('#responsesList', { timeout: 15000 });
-        await sleep(1500);
+        await page.waitForFunction(t => {
+            const s = JSON.parse(localStorage.getItem('offline_snapshot') || 'null');
+            return !!(s && s.appointments && s.appointments.saved_at >= t);
+        }, { timeout: 15000 }, t0).catch(() => {});
     }
     await page.click('.tab-button[data-tab="history"]');
     await page.waitForSelector('#historyList .history-item', { timeout: 15000 });
-    await sleep(500);
-    check('Schnappschuss geschrieben', await page.evaluate(() => {
+    await page.waitForFunction(t => {
         const s = JSON.parse(localStorage.getItem('offline_snapshot') || 'null');
-        return !!(s && s.history && s.history.items.length > 0);
-    }));
+        return !!(s && s.history && s.history.saved_at >= t && s.history.items.length > 0);
+    }, { timeout: 15000 }, t0).catch(() => {});
+    check('Schnappschuss geschrieben', await page.evaluate((withAppointments, t) => {
+        const s = JSON.parse(localStorage.getItem('offline_snapshot') || 'null');
+        const fresh = p => !!(p && p.saved_at >= t);
+        return !!(s && fresh(s.history) && s.history.items.length > 0 && (!withAppointments || fresh(s.appointments)));
+    }, !!responsesTab, t0));
 
     // 2. Offline: Rahmen aus dem Speicher, App meldet fehlenden Server
     await page.setOfflineMode(true);

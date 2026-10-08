@@ -61,6 +61,10 @@ jede Aktion.
 - Bekannte Grenze: Der Verlauf wird erst geschrieben, wenn das Mitglied den Tab „Verlauf“
   geöffnet hat (oder ein Check-in ihn auffrischt); sonst zeigt die Ansicht dort „Nicht geladen,
   solange Verbindung bestand.“
+- Abgeschaltete Funktionen hinterlassen keinen Teil: Ist die Terminplanung aus (`startSession`) oder
+  gibt es weder Anwesenheit noch Arbeitszeit (Verlauf-Tab ausgeblendet), setzt
+  `dropSnapshotPart(part, memberId)` die Marke `{ off: true }`; die Ansicht lässt den Abschnitt weg,
+  und ein Schnappschuss ohne geladenen Teil wird nicht angeboten (`snapshotHasContent`).
 
 ## Löschen
 

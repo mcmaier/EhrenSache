@@ -696,7 +696,7 @@ Laden des Rahmens oder das Lesen. Die Tabellenzeile ist entsprechend eingegrenzt
    `localStorage` nur bei „Angemeldet bleiben“, gelöscht mit dem Token. Bekannte Grenze: Der
    Verlauf wird erst geschrieben, wenn das Mitglied den Tab „Verlauf“ geöffnet hat (oder ein
    Check-in ihn auffrischt); sonst zeigt die Ansicht dort „Nicht geladen, solange Verbindung
-   bestand.“
+   bestand.“ Abgeschaltete Funktionen hinterlassen keinen Teil, ihr Abschnitt entfällt.
 3. **Schreibaktionen in einer Warteschlange — nein.**
    - *Check-in mit und ohne TOTP, Arbeitszeit:* Der Zeitpunkt käme vom Client und hätte keinen
      Nachweiswert. Beim TOTP-Check-in kommt hinzu: Online muss ein abfotografierter Code
