@@ -569,6 +569,66 @@ test('Feed: Rueckmelde-Link nur fuer kommende Termine mit Rueckmeldungen', funct
     });
 });
 
+// ---- Abgleich mit der Terminliste der App (Entscheidung 2026-10-08) ---------
+
+test('Feed: Termine in einem inaktiven Zeitraum des Mitglieds fehlen', function () {
+    cfWithFeature(function () {
+        cfWithWorld(function (array $ids) {
+            // Eigenes Mitglied mit eigenem Konto: Die Zeitraeume des gemeinsamen
+            // Testmitglieds bleiben unberuehrt.
+            $s = substr(uniqid(), -6);
+            $memberId = $userId = $aktiv = $inaktiv = null;
+            try {
+                $memberId = cfCreate('members', ['name' => 'CF', 'surname' => "Pause {$s}", 'group_ids' => [$ids['group']]]);
+                // Aktiv bis in 30 Tagen, danach (ohne weiteren Zeitraum) inaktiv.
+                assertStatus(201, apiRequest('POST', 'membership_dates', ['token' => apiToken('admin'), 'body' => [
+                    'member_id' => $memberId, 'start_date' => date('Y-m-d', strtotime('-1 year')),
+                    'end_date'  => date('Y-m-d', strtotime('+30 days'))]]));
+
+                $termin = static fn (string $titel, string $tage): int => cfCreate('appointments', [
+                    'title' => "CF {$titel} {$s}", 'type_id' => $ids['type'],
+                    'date'  => date('Y-m-d', strtotime($tage)), 'start_time' => '18:00', 'end_time' => '19:00',
+                ]);
+                $aktiv   = $termin('aktiv', '+20 days');
+                $inaktiv = $termin('inaktiv', '+40 days');
+
+                [$userId] = cfCreateUser('user', $memberId);
+                $token = bin2hex(random_bytes(32));
+                cfPdo()->prepare('INSERT INTO ' . cfPrefix() . 'calendar_feeds (user_id, token_hash, hide_declined, created_at) VALUES (?, ?, 1, NOW())')
+                       ->execute([$userId, hash('sha256', $token)]);
+
+                $res = cfFetch(cfQueryUrl($token));
+                assertSame(200, $res['status']);
+                assertTrue(cfHasEvent($res['body'], $aktiv), 'Gegenprobe: Termin im aktiven Zeitraum fehlt');
+                assertTrue(strpos(cfEventBlock($res['body'], $aktiv), "#rueckmeldung={$aktiv}") !== false,
+                    'Termin im aktiven Zeitraum hat keinen Rueckmelde-Link');
+                assertTrue(!cfHasEvent($res['body'], $inaktiv), 'Termin im inaktiven Zeitraum steht im Feed');
+            } finally {
+                cfDeleteUser($userId);   // calendar_feeds faellt per CASCADE mit
+                cfDelete('appointments', $aktiv);
+                cfDelete('appointments', $inaktiv);
+                if ($memberId !== null) {
+                    cfPdo()->prepare('DELETE FROM ' . cfPrefix() . 'membership_dates WHERE member_id = ?')->execute([$memberId]);
+                }
+                cfDelete('members', $memberId);
+            }
+        });
+    });
+});
+
+test('Feed: Rueckmelde-Link nur fuer Termine der App-Liste (responsesFetchUpcomingIds)', function () {
+    // Verhalten jenseits der 50 Termine der App-Liste ist zu teuer aufzubauen;
+    // deshalb statisch: Der Link haengt an genau dieser Liste.
+    $src   = sourceCode(__DIR__ . '/../../private/handlers/calendar.php');
+    $start = strpos($src, 'function handleCalendarDownload(');
+    assertTrue($start !== false, 'handleCalendarDownload fehlt');
+    $body  = substr($src, $start);
+    assertTrue((bool) preg_match('/\$linkable\s*=\s*array_flip\(\s*responsesFetchUpcomingIds\(\s*\$db,\s*\$database,\s*\$memberId,/', $body),
+        '$linkable wird nicht aus responsesFetchUpcomingIds() gebildet');
+    assertTrue((bool) preg_match("/\\\$row\\['response_url'\\]\s*=\s*isset\(\\\$linkable\[\(int\)\s*\\\$row\['appointment_id'\]\]\)/", $body),
+        'response_url haengt nicht an $linkable');
+});
+
 test('Feed: Header, HEAD ohne Rumpf, last_fetched_at gesetzt', function () {
     cfWithFeature(function () {
         try {

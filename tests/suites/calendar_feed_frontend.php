@@ -110,6 +110,17 @@ test('PWA: Offene Punkte und Rueckmelde-Link oeffnen die Karte ueber dieselbe Fu
         'Fragment wird nicht entfernt');
 });
 
+test('PWA: Rueckmelde-Link auf einen Termin ausserhalb der Liste nennt das', function () {
+    $js = sourceCode(CFF_ROOT . '/public/checkin/js/app.js');
+
+    $card = cffFunctionBody($js, 'openResponseCard');
+    assertTrue((bool) preg_match('/return\s+(?:!!|Boolean\()?\s*card\b/', $card), 'openResponseCard() meldet nicht, ob die Karte da ist');
+
+    $link = cffFunctionBody($js, 'openPendingResponseLink');
+    assertTrue((bool) preg_match("/!\s*\(\s*await openResponseCard\(id\)\s*\)\s*\)\s*\{\s*showMessage\('Dieser Termin steht nicht in deiner Terminliste\.',\s*'info'\)/", $link),
+        'Rueckmelde-Link zeigt bei fehlender Karte keinen Hinweis ueber showMessage()');
+});
+
 test('PWA: Rueckmelde-Link greift nach dem Start (beide Anmeldewege) und bei hashchange', function () {
     $js = sourceCode(CFF_ROOT . '/public/checkin/js/app.js');
 

@@ -201,6 +201,11 @@ function handleCalendarDownload($db, $database, string $method, ?array $owner): 
     // Dieselbe Sichtbarkeitsregel wie die Terminliste, fuer jede Rolle (Spec).
     $vis = appointmentGroupVisibility($db, $prefix, $memberId);
     if ($vis !== null) {
+        // Inaktive Zeitraeume (membership_dates, members.active) zaehlen wie in der
+        // Terminliste der App und in der Statistik (Entscheidung 2026-10-08): Ein
+        // Termin, zu dem das Mitglied nicht erwartet ist, gehoert nicht in seinen
+        // Kalender. $database ausdruecklich, nicht das globale Objekt.
+        $activity = getMemberActivityWhere('m', 'a.date', false, $database);
         // COALESCE um r.status: ohne Rueckmeldung ist r.status NULL, und
         // NOT(... AND NULL) waere NULL -- der Termin fiele still heraus.
         $sql = "SELECT a.appointment_id, a.title, a.description, a.location, a.date,
@@ -208,6 +213,7 @@ function handleCalendarDownload($db, $database, string $method, ?array $owner): 
                        COALESCE(at.responses_enabled, 0) AS responses_enabled,
                        r.status AS response_status, r.comment AS response_comment
                 FROM {$prefix}appointments a
+                JOIN {$prefix}members m ON m.member_id = ? AND {$activity}
                 LEFT JOIN {$prefix}appointment_types at ON at.type_id = a.type_id
                 LEFT JOIN {$prefix}appointment_responses r
                        ON r.appointment_id = a.appointment_id AND r.member_id = ?
@@ -217,7 +223,7 @@ function handleCalendarDownload($db, $database, string $method, ?array $owner): 
              . " AND NOT (? = 1 AND COALESCE(at.responses_enabled, 0) = 1 AND COALESCE(r.status, '') = 'no')
                 ORDER BY a.date, a.start_time";
         $params = array_merge(
-            [$memberId, date('Y-m-d', strtotime('-3 months')), date('Y-m-d', strtotime('+12 months'))],
+            [$memberId, $memberId, date('Y-m-d', strtotime('-3 months')), date('Y-m-d', strtotime('+12 months'))],
             $vis[1],
             [(int) $owner['hide_declined']]
         );
@@ -225,13 +231,16 @@ function handleCalendarDownload($db, $database, string $method, ?array $owner): 
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Rueckmelde-Link (Entscheidung 2026-10-07): nur bei Terminarten mit
-        // Rueckmeldungen und nur fuer heute und spaeter. Der Link traegt kein
-        // Token -- die Check-in-App liest das Fragment und verlangt die Anmeldung.
-        $today      = date('Y-m-d');
+        // Rueckmelde-Link (Entscheidungen 2026-10-07 und 2026-10-08): nur fuer Termine,
+        // die auch in der Terminliste der App stehen -- sonst fuehrte der Link ins
+        // Leere. Die Liste deckt Terminarten mit Rueckmeldungen, heute und spaeter und
+        // die Aktivitaet ab; sie endet nach 50 Terminen, spaetere bekommen den Link,
+        // sobald sie nachruecken. Der Link traegt kein Token -- die Check-in-App liest
+        // das Fragment und verlangt die Anmeldung.
+        $linkable   = array_flip(responsesFetchUpcomingIds($db, $database, $memberId, date('Y-m-d H:i:s')));
         $checkinUrl = rtrim(BASE_URL, '/') . '/checkin/#rueckmeldung=';
         foreach ($rows as &$row) {
-            $row['response_url'] = ((int) $row['responses_enabled'] === 1 && (string) $row['date'] >= $today)
+            $row['response_url'] = isset($linkable[(int) $row['appointment_id']])
                 ? $checkinUrl . (int) $row['appointment_id']
                 : null;
         }

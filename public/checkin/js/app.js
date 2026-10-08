@@ -4830,8 +4830,10 @@ async function onOpenItemsClick(event) {
  * Oeffnet den Termine-Tab mit aufgeklappter Karte des Termins und holt sie in
  * den Blick. Gemeinsam fuer "Offene Punkte" und den Rueckmelde-Link (FI-8).
  * Gibt es die Karte nicht (Termin vorbei, unbekannt, fremde Gruppe), bleibt
- * der Tab einfach offen -- ohne Fehlermeldung. Ist er ganz ohne Inhalt,
- * blendet loadResponses() ihn aus und kehrt zum Erfassen-Tab zurueck.
+ * der Tab einfach offen. Ist er ganz ohne Inhalt, blendet loadResponses() ihn
+ * aus und kehrt zum Erfassen-Tab zurueck. Liefert, ob die Karte gefunden
+ * wurde -- den Hinweis dazu gibt nur der Rueckmelde-Link, die Offenen Punkte
+ * bleiben wie bisher still.
  */
 async function openResponseCard(id) {
     responsesExpanded.add(id);
@@ -4840,8 +4842,9 @@ async function openResponseCard(id) {
     // als der Klick oben -- einen Zeitpunkt, zu dem die Karte im DOM
     // steht, ohne eine feste Wartezeit zu raten.
     await loadResponses();
-    document.querySelector(`#responsesList .response-card[data-appointment-id="${id}"]`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const card = document.querySelector(`#responsesList .response-card[data-appointment-id="${id}"]`);
+    card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return card !== null;
 }
 
 /** Termin-ID aus '#rueckmeldung=<id>', sonst null. */
@@ -4861,8 +4864,10 @@ async function openPendingResponseLink() {
     pendingResponseLink = null;
 
     try {
-        if (pwaFeatureOn('appointments')) {
-            await openResponseCard(id);
+        // Der Kalender kann Termine fuehren, die (noch) nicht in der Liste
+        // stehen, etwa jenseits der 50 kommenden (FI-8, 2026-10-08).
+        if (pwaFeatureOn('appointments') && !(await openResponseCard(id))) {
+            showMessage('Dieser Termin steht nicht in deiner Terminliste.', 'info');
         }
     } finally {
         history.replaceState(null, '', window.location.pathname + window.location.search);
