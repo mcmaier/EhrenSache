@@ -111,7 +111,12 @@ body {
     margin-top: 10px;
 }
 
+#startSnapshotBtn {
+    margin-top: 10px;
+}
+
 #startRetryBtn[hidden],
+#startSnapshotBtn[hidden],
 #startSwitchBtn[hidden] {
     display: none;
 }
@@ -345,6 +350,92 @@ body {
 #mainScreen.active {
     display: flex;
  }
+
+/* Letzter Stand ohne Verbindung (OI-43, Stufe 2) */
+#snapshotScreen {
+    display: none;
+    flex-direction: column;
+    min-height: 100vh;
+    background: var(--bg);
+}
+
+#snapshotScreen.active {
+    display: flex;
+}
+
+.snapshot-bar {
+    position: sticky;
+    top: 0;
+    z-index: 90;
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 14px;
+    background: var(--text);
+    color: var(--card-bg);
+}
+
+.snapshot-body {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.snapshot-header h2 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--text);
+}
+
+.snapshot-header p {
+    margin: 4px 0 0;
+    color: var(--text-light);
+}
+
+.snapshot-section {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 12px 16px;
+}
+
+.snapshot-section h3 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    color: var(--text);
+}
+
+.snapshot-section__stamp {
+    margin: -4px 0 8px;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.snapshot-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+}
+
+.snapshot-section h3 + .snapshot-entry,
+.snapshot-section__stamp + .snapshot-entry {
+    border-top: none;
+}
+
+.snapshot-entry__title {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.snapshot-entry__line,
+.snapshot-empty {
+    font-size: 13px;
+    color: var(--text-light);
+}
 
 .header {
     padding: 12px 15px;

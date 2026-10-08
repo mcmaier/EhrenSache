@@ -46,8 +46,21 @@
             <p id="startStatus" class="start-status" role="status">Wird geladen …</p>
             <button type="button" id="startRetryBtn" class="action-button btn-login"
                     data-action="start-retry" hidden>Erneut versuchen</button>
+            <button type="button" id="startSnapshotBtn" class="action-button secondary"
+                    data-action="start-snapshot" hidden>Letzten Stand ansehen</button>
             <button type="button" id="startSwitchBtn" class="action-button secondary"
                     data-action="start-switch-account" hidden>Mit anderem Konto anmelden</button>
+        </div>
+    </div>
+
+    <!-- Letzter Stand ohne Verbindung (OI-43, Stufe 2): nur lesen, keine Aktionen.
+         Inhalt baut renderSnapshotView() in js/snapshot.js per textContent. -->
+    <div id="snapshotScreen">
+        <div id="snapshotStamp" class="snapshot-bar" role="status"></div>
+        <div class="snapshot-body">
+            <div id="snapshotContent"></div>
+            <button type="button" class="action-button btn-login"
+                    data-action="snapshot-reconnect">Erneut verbinden</button>
         </div>
     </div>
 
@@ -634,6 +647,7 @@
     <!-- html5-qrcode 2.3.8 liegt im Paket statt auf einem CDN: script-src 'self' (OI-17)
          und Vereinsnetze ohne Internetzugang -->
     <script src="../js/vendor/html5-qrcode.min.js"></script>
+    <script src="js/snapshot.js?v=1.22.2"></script>
     <script src="js/app.js?v=1.22.2"></script>
 </body>
 </html>

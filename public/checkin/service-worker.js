@@ -34,6 +34,7 @@ const SHELL = [
     './',
     `css/style.css?v=${VERSION}`,
     `js/app.js?v=${VERSION}`,
+    `js/snapshot.js?v=${VERSION}`,
     'manifest.json',
     'icon-192.png',
     'icon-512.png',

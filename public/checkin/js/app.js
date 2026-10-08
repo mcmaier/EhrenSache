@@ -284,7 +284,9 @@ document.addEventListener('DOMContentLoaded', function() {
         'correct-work-session': (el) => openWorkSessionModal(Number(el.dataset.sessionId)),
         'delete-exception':     (el) => deleteException(Number(el.dataset.exceptionId)),
         'start-retry':          () => checkAutoLogin(),
-        'start-switch-account': () => switchAccount()
+        'start-switch-account': () => switchAccount(),
+        'start-snapshot':       () => openSnapshotView(),
+        'snapshot-reconnect':   () => checkAutoLogin()
     };
     document.addEventListener('click', (event) => {
         const el = event.target.closest('[data-action]');
@@ -1175,7 +1177,7 @@ async function checkAutoLogin() {
     // Mitglied ab (OI-121).
     if (result.status === 401 || result.status === 403) {
         debug.log('Auto-Login: Token abgelehnt', result.status);
-        localStorage.removeItem('api_token');
+        forgetSavedLogin();
         apiToken = null;
         showScreen('login');
         return;
@@ -1184,6 +1186,7 @@ async function checkAutoLogin() {
     if (!result.success) {
         debug.log('Auto-Login: Server nicht erreichbar', result.error);
         showStartStatus(result.timedOut ? 'Der Server antwortet nicht.' : 'Server nicht erreichbar.', true);
+        offerSnapshot();
         return;
     }
 
@@ -1210,6 +1213,24 @@ function readSavedToken() {
 }
 
 /**
+ * Gespeicherten Zugang vergessen. Token und "Letzter Stand" gehoeren
+ * zusammen: Wer abgemeldet ist, soll auf dem Geraet keine eigenen Termine und
+ * keinen Verlauf mehr hinterlassen (OI-43, Stufe 2).
+ */
+function forgetSavedLogin() {
+    localStorage.removeItem('api_token');
+    clearSnapshot();
+}
+
+/** Kopf des Schnappschusses: Verein und Mitglied, wie gerade angezeigt. */
+function snapshotHeader() {
+    return {
+        organization: appearanceSettings.organization_name || 'EhrenSache',
+        member: (elements.userName?.textContent || '').trim()
+    };
+}
+
+/**
  * Alles nach einer erfolgreichen Anmeldung, fuer beide Wege (gespeicherter
  * Token und Formular). Bis 1.20.1 standen hier zwei Kopien, die jeden Abruf
  * einzeln abwarteten: zehn Stufen, und so lange stand die Anmeldemaske da
@@ -1223,6 +1244,10 @@ async function startSession(meData) {
         blockUnlinkedAccount();
         return;
     }
+
+    // Ein Schnappschuss eines anderen Mitglieds gehoert nicht auf dieses
+    // Konto (OI-43, Stufe 2).
+    discardForeignSnapshot(meData.member_id);
 
     const generation = sessionGeneration;
     userData = meData;
@@ -1267,7 +1292,7 @@ async function startSession(meData) {
  * Sperre bei jedem Oeffnen wieder da.
  */
 function blockUnlinkedAccount() {
-    localStorage.removeItem('api_token');
+    forgetSavedLogin();
     apiToken = null;
     showStartStatus('Dieses Benutzerkonto ist mit keinem Mitglied verknüpft. '
         + 'Die Check-in-App steht deshalb nicht zur Verfügung. '
@@ -1397,7 +1422,7 @@ async function handleLogout() {
     await stopScannerIfRunning();
     await stopNFCReader();
 
-    localStorage.removeItem('api_token');
+    forgetSavedLogin();
     apiToken = null;
 
     resetSessionState();
@@ -3350,7 +3375,8 @@ function showScreen(screenName) {
     const screens = {
         start: document.getElementById('startScreen'),
         login: elements.loginScreen,
-        main:  elements.mainScreen
+        main:  elements.mainScreen,
+        snapshot: document.getElementById('snapshotScreen')
     };
 
     Object.values(screens).forEach(screen => screen?.classList.remove('active'));
@@ -3367,6 +3393,11 @@ function showStartStatus(text, failed, blocked = false) {
     const retry  = document.getElementById('startRetryBtn');
     const change = document.getElementById('startSwitchBtn');
 
+    // Das Angebot gilt nur fuer "Server nicht erreichbar" -- offerSnapshot()
+    // blendet es dort ein, jeder andere Status nimmt es zurueck.
+    const snapshotBtn = document.getElementById('startSnapshotBtn');
+    if (snapshotBtn) snapshotBtn.hidden = true;
+
     if (status) status.textContent = text;
     if (retry) retry.hidden = !failed || blocked;
     if (change) {
@@ -3377,13 +3408,33 @@ function showStartStatus(text, failed, blocked = false) {
     }
 }
 
+/** Knopf "Letzten Stand ansehen", wenn ein Schnappschuss da ist (OI-43, Stufe 2). */
+function offerSnapshot() {
+    const btn = document.getElementById('startSnapshotBtn');
+    const snap = readSnapshot();
+    if (!btn || !snap) return;
+    btn.textContent = `Letzten Stand ansehen (${snapshotStamp(snap.saved_at)})`;
+    btn.hidden = false;
+}
+
+function openSnapshotView() {
+    const snap = readSnapshot();
+    if (!snap) {
+        showStartStatus('Kein letzter Stand vorhanden.', true);
+        return;
+    }
+    renderSnapshotView(document.getElementById('snapshotContent'),
+        document.getElementById('snapshotStamp'), snap, new Date());
+    showScreen('snapshot');
+}
+
 /**
  * Ausweg von der Ladeanzeige: gespeicherten Zugang verwerfen und die
  * Anmeldemaske zeigen. Fuer den Fall, dass der Server fuer diesen Token
  * dauerhaft scheitert (etwa 500) -- "Erneut versuchen" hilft dann nie.
  */
 function switchAccount() {
-    localStorage.removeItem('api_token');
+    forgetSavedLogin();
     apiToken = null;
     showScreen('login');
 }
@@ -3553,6 +3604,9 @@ async function loadHistory() {
             : [...top20, ...pinnedBeyond].sort((a, b) => b.timestamp - a.timestamp);
 
         renderHistory(toRender);
+        // Gelesen wird die angezeigte Liste: dieselben Beschriftungen wie im Tab.
+        saveSnapshotPart('history', historyFromList(elements.historyList),
+            userData?.member_id, snapshotHeader());
         
     } catch (error) {
         debug.error('Fehler beim Laden der History:', error);
@@ -5354,6 +5408,8 @@ async function loadResponses() {
 
     updateResponsesBadge();
     renderResponses(null, drafts);
+    saveSnapshotPart('appointments', upcomingResponses.map(snapshotAppointment),
+        userData?.member_id, snapshotHeader());
     return true;
 }
 
