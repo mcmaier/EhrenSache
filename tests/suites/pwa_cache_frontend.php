@@ -11,6 +11,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../lib/api.php';
+
 /**
  * App-Rahmen der Check-in-PWA im Service Worker (OI-43, Stufe 1).
  *
@@ -95,7 +97,7 @@ test('Vorladeliste: jeder Eintrag wird wirklich gebraucht', function () use ($re
     $version = pwaVersion($repoRoot);
     $shell   = pwaShellList(sourceCode($repoRoot . '/public/checkin/service-worker.js'), $version);
     $needed  = array_merge(
-        ['index.html'],
+        ['./'],
         pwaIndexAssets(sourceCode($repoRoot . '/public/checkin/index.html')),
         pwaManifestIcons($repoRoot)
     );
@@ -119,8 +121,43 @@ test('Vorladeliste: jeder Eintrag existiert als Datei', function () use ($repoRo
     $shell = pwaShellList(sourceCode($repoRoot . '/public/checkin/service-worker.js'), pwaVersion($repoRoot));
 
     foreach ($shell as $entry) {
-        $path = $repoRoot . '/public/checkin/' . preg_replace('/\?.*$/', '', $entry);
+        $file = $entry === './' ? 'index.html' : preg_replace('/\?.*$/', '', $entry);
+        $path = $repoRoot . '/public/checkin/' . $file;
         assertTrue(is_file($path), "'{$entry}' gibt es nicht — cache.addAll() scheiterte an der 404");
+    }
+});
+
+test('Vorladeliste: jeder Eintrag antwortet direkt mit 200, ohne Weiterleitung', function () use ($repoRoot) {
+    if (!extension_loaded('curl')) {
+        return;
+    }
+    $cfg   = testConfig();
+    $base  = rtrim((string) $cfg['base_url'], '/') . '/checkin/';
+    $shell = pwaShellList(sourceCode($repoRoot . '/public/checkin/service-worker.js'), pwaVersion($repoRoot));
+
+    foreach ($shell as $entry) {
+        $up = $base;
+        $rel = $entry;
+        while (str_starts_with($rel, '../')) {
+            $up  = preg_replace('#[^/]+/$#', '', $up);
+            $rel = substr($rel, 3);
+        }
+        $url = $entry === './' ? $base : $up . $rel;
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_NOBODY         => false,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+        curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        assertSame(200, $status,
+            "'{$entry}' ({$url}) antwortet mit {$status}: Eine umgeleitete Antwort im Speicher "
+            . 'bricht Seitenaufrufe (gespeicherte Weiterleitung -> Fehlerseite des Browsers)');
     }
 });
 

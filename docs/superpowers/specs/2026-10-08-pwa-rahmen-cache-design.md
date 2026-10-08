@@ -23,10 +23,10 @@ Daten werden **nicht** zwischengespeichert (Stufe 2), Schreibaktionen ohne Netz 
 - `const VERSION = '<Version>'`; Speichername `checkin-<VERSION>`.
 - Vorladeliste, **relativ zum Service Worker**, nie mit führendem `/` (daran scheiterte die
   Zwischenspeicherung 2025):
-  `index.html`, `css/style.css?v=<VERSION>`, `js/app.js?v=<VERSION>`, `manifest.json`,
+  `./`, `css/style.css?v=<VERSION>`, `js/app.js?v=<VERSION>`, `manifest.json`,
   `icon-192.png`, `icon-512.png`, `icon-maskable-192.png`, `icon-maskable-512.png`,
   `apple-touch-icon.png`, `../js/vendor/html5-qrcode.min.js`, `../assets/logo-default.png`.
-  `./` steht nicht in der Liste: Ein Seitenaufruf auf `./` bekommt im `fetch`-Handler die gespeicherte `index.html`.
+  Statt `index.html` steht `./` in der Liste: Apache leitet `index.html` per 301 auf `./` um, und eine umgeleitete Antwort verweigert der Browser für Seitenaufrufe. Seitenaufrufe auf `./` und `index.html` bekommen die unter `./` gespeicherte Seite; umgeleitete Antworten werden beim Vorladen zusätzlich neu verpackt.
   Die `?v=`-Einträge entstehen aus `VERSION` und treffen damit genau die Anfragen aus
   `index.html`.
 - **install:** alles vorladen (`cache.addAll`). Scheitert eine Datei, scheitert die
@@ -60,9 +60,10 @@ Daten werden **nicht** zwischengespeichert (Stufe 2), Schreibaktionen ohne Netz 
 - **Statische Suite `tests/suites/pwa_cache_frontend.php`:**
   - `VERSION` im Service Worker entspricht `version.json`.
   - Jede lokale Datei, die `public/checkin/index.html` per `href`/`src` lädt (ohne externe
-    URLs), steht genau so in der Vorladeliste; jeder Eintrag der Liste ist `index.html`, wird von
+    URLs), steht genau so in der Vorladeliste; jeder Eintrag der Liste ist `./`, wird von
     `index.html` geladen oder ist ein Manifest-Icon.
   - Kein Eintrag beginnt mit `/`; keiner verweist auf `api/`.
+  - Jeder Eintrag antwortet direkt mit 200, ohne Weiterleitung (HTTP).
   - `skipWaiting()` steht nicht unbedingt in `install`.
   - Die Hinweisleiste existiert in `index.html` und ist in `app.js` verdrahtet.
 - **Lokales Puppeteer-Skript `tests/browser/pwa-offline.mjs`** (nicht Teil von

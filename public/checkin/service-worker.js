@@ -31,7 +31,7 @@ const CACHE_PREFIX = 'checkin-';
 const CACHE_NAME = CACHE_PREFIX + VERSION;
 
 const SHELL = [
-    'index.html',
+    './',
     `css/style.css?v=${VERSION}`,
     `js/app.js?v=${VERSION}`,
     'manifest.json',
@@ -45,26 +45,59 @@ const SHELL = [
 ];
 
 const SHELL_URLS = new Set(SHELL.map(path => new URL(path, self.location).href));
-const INDEX_URL = new URL('index.html', self.location).href;
 const SCOPE_URL = new URL('./', self.location).href;
+// Nur zum Vergleich: Apache leitet index.html auf ./ um, gespeichert ist ./ .
+const INDEX_URL = new URL('index.html', self.location).href;
 
 self.addEventListener('install', (event) => {
     event.waitUntil((async () => {
         // Gibt es noch keinen eigenen Speicher, laeuft hier die
         // Erstinstallation oder der Umstieg vom Durchreich-Worker bis 1.22.x.
         // Dann gibt es keinen alten Rahmen, der mit dem neuen durcheinander-
-        // geraten koennte, und der neue Worker uebernimmt sofort.
+        // geraten koennte, und der neue Worker uebernimmt sofort. Loescht der
+        // Browser die Speicher (Speicherdruck, "Websitedaten loeschen"),
+        // uebernimmt die naechste neue Version ebenfalls sofort, ohne
+        // Hinweisleiste — hinnehmbar.
         const hadCache = (await caches.keys()).some(key => key.startsWith(CACHE_PREFIX));
 
+        // Gleiche VERSION kommt nur ausserhalb eines Releases vor (Feature-Zweig,
+        // dev); ein Release zieht VERSION immer mit (Test). Dann oeffnet der neue
+        // Worker denselben Speicher wie der aktive und darf ihn bei einem
+        // Fehler nicht loeschen.
+        const existed = await caches.has(CACHE_NAME);
+
         try {
-            const cache = await caches.open(CACHE_NAME);
             // cache: 'reload' umgeht den HTTP-Cache des Browsers: Der Rahmen
             // soll aus derselben Auslieferung stammen wie diese Datei.
-            await cache.addAll(SHELL.map(path => new Request(path, { cache: 'reload' })));
+            const requests = SHELL.map(path => new Request(path, { cache: 'reload' }));
+            // Erst alles holen, dann schreiben: Ein Fehler hinterlaesst nichts
+            // Halbes.
+            const responses = await Promise.all(requests.map(async (request) => {
+                let response = await fetch(request);
+                if (!response.ok) {
+                    throw new Error(`${request.url}: ${response.status}`);
+                }
+                // Apache leitet index.html per 301 auf ./ um. Eine umgeleitete
+                // Antwort verweigert der Browser fuer Seitenaufrufe (Netzwerk-
+                // fehler statt Seite), auch online. Darum neu verpacken — so
+                // macht es auch Workbox.
+                if (response.redirected) {
+                    response = new Response(await response.blob(), {
+                        status: response.status,
+                        statusText: response.statusText,
+                        headers: response.headers,
+                    });
+                }
+                return response;
+            }));
+            const cache = await caches.open(CACHE_NAME);
+            await Promise.all(requests.map((request, i) => cache.put(request, responses[i])));
         } catch (error) {
             // Kein halber Speicher: Er liesse die naechste Installation
             // glauben, es gebe schon einen Rahmen.
-            await caches.delete(CACHE_NAME);
+            if (!existed) {
+                await caches.delete(CACHE_NAME);
+            }
             throw error;
         }
 
@@ -101,7 +134,7 @@ self.addEventListener('fetch', (event) => {
         if (url.href !== SCOPE_URL && url.href !== INDEX_URL) {
             return;
         }
-        key = INDEX_URL;
+        key = SCOPE_URL;
     } else if (SHELL_URLS.has(request.url)) {
         key = request.url;
     } else {
@@ -110,8 +143,16 @@ self.addEventListener('fetch', (event) => {
     }
 
     event.respondWith((async () => {
-        const cache = await caches.open(CACHE_NAME);
-        return (await cache.match(key)) || fetch(request);
+        try {
+            const cache = await caches.open(CACHE_NAME);
+            const cached = await cache.match(key);
+            if (cached) {
+                return cached;
+            }
+        } catch (error) {
+            // Speicher nicht lesbar: wie ohne Service Worker.
+        }
+        return fetch(request);
     })());
 });
 
