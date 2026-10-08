@@ -652,7 +652,7 @@ Vorlage für die Struktur sind die drei Dateien, mit denen der Import zuletzt ge
 | UI-2 | Caching: Mitgliederliste nach Änderung | Cache invalidiert; frische Daten geladen |
 | UI-3 | Caching: Termine jahresweise | Nur das geänderte Jahr invalidiert |
 | UI-4 | Navigation ohne Login | Redirect zur Login-Seite |
-| UI-5 | PWA: Service Worker registriert | Offline-Funktionalität vorhanden |
+| UI-5 | PWA: Service Worker registriert | App-Rahmen lädt offline; mit gespeicherter Anmeldung meldet der Startbildschirm ‚Server nicht erreichbar.‘ — Daten und Check-ins nur online |
 | UI-6 | Statistik-Chart: Daten korrekt | Anzeige stimmt mit API-Werten überein |
 
 ---

@@ -29,8 +29,14 @@ Daten werden **nicht** zwischengespeichert (Stufe 2), Schreibaktionen ohne Netz 
   Statt `index.html` steht `./` in der Liste: Apache leitet `index.html` per 301 auf `./` um, und eine umgeleitete Antwort verweigert der Browser für Seitenaufrufe. Seitenaufrufe auf `./` und `index.html` bekommen die unter `./` gespeicherte Seite; umgeleitete Antworten werden beim Vorladen zusätzlich neu verpackt.
   Die `?v=`-Einträge entstehen aus `VERSION` und treffen damit genau die Anfragen aus
   `index.html`.
-- **install:** alles vorladen (`cache.addAll`). Scheitert eine Datei, scheitert die
-  Installation; der bisherige Stand bleibt aktiv. Kein unbedingtes `skipWaiting()`.
+- **install:** alles vorladen, aber nicht mit `cache.addAll`: Jeder Eintrag wird einzeln mit
+  `fetch(…, { cache: 'reload' })` geholt (am HTTP-Cache des Browsers vorbei). Ist eine Antwort
+  nicht ok, bricht die Installation ab. Umgeleitete Antworten werden neu verpackt
+  (`new Response(body, …)`), erst dann kommt jeder Eintrag per `put` in den Speicher. Bei einem
+  Fehler wird der Speicher nur gelöscht, wenn er vor dieser Installation nicht existierte — bei
+  unveränderter `VERSION` außerhalb von Releases ist es der aktive Speicher, den ein halber
+  Neuaufbau nicht beschädigen darf. Navigationen bekommen die Seite unter dem Schlüssel `./`.
+  Scheitert die Installation, bleibt der bisherige Stand aktiv. Kein unbedingtes `skipWaiting()`.
   Ausnahme: Existiert noch kein Speicher `checkin-*` (Erstinstallation oder Umstieg vom
   Durchreich-Worker bis 1.22.x), ruft `install` `skipWaiting()` — es gibt keinen alten Stand,
   der mit dem neuen durcheinandergeraten könnte.

@@ -627,9 +627,10 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 ### OI-43 · Offline-Betrieb der Check-in-PWA
 **Priorität:** niedrig · **Richtung entschieden am 2026-10-08:** Rahmen ja, Lesestand begrenzt, Schreiben nein · **Stufe 1 gebaut** (2026-10-08, unveröffentlicht)
 
-Die Check-in-PWA hat **keinen Cache**. Ihr Service Worker reicht jede Anfrage ans Netz durch;
-er dient allein der Installierbarkeit auf dem Startbildschirm. Ohne Verbindung zeigt die App
-also nichts.
+Bis zu Stufe 1 (2026-10-08) hatte die Check-in-PWA **keinen Cache**: Ihr Service Worker reichte
+jede Anfrage ans Netz durch und diente allein der Installierbarkeit auf dem Startbildschirm; ohne
+Verbindung zeigte die App nichts. Heute hält der Service Worker nur den App-Rahmen vor; Antworten
+der API gehen immer ans Netz.
 
 **Wie es dazu kam.** Eine Zwischenspeicherung war gebaut und wurde am 2025-12-08 mit `ffe4690`
 stillgelegt — demselben Umbau, der die Web-Root auf `public/` legte. Danach zeigten die
@@ -640,8 +641,8 @@ worker" und behebt es durch Abschalten.
 
 Der abgeschaltete Code stand danach neun Monate auskommentiert in der Datei, zusammen mit
 `CACHE_NAME` und `urlsToCache` — zwei Konstanten, die nach Bedeutung aussahen und keine
-hatten. Am 2026-09-09 entfernt (die Historie hält sie fest), der Verzicht steht jetzt als
-Kommentar in `public/checkin/service-worker.js`.
+hatten. Am 2026-09-09 entfernt; der entfernte Code steht in der Historie (git), und der damals
+an seine Stelle gesetzte Kommentar zum Verzicht wurde mit Stufe 1 ersetzt.
 
 **Zu entscheiden:** Soll die PWA offline etwas können?
 
@@ -665,7 +666,7 @@ Laden des Rahmens oder das Lesen. Die Tabellenzeile ist entsprechend eingegrenzt
    statt der Fehlerseite des Browsers; bei langsamer Verbindung wartet nur noch der API-Abruf.
    Voraussetzungen: Pfade relativ zum Scope (`./index.html` statt `/index.html` — genau daran
    scheiterte es 2025), Cache-Name an `version.json` hängen und wie die `?v=`-Links per Test
-   absichern (`tests/suites/assets.php`), alte Caches in `activate` löschen und eine neue
+   absichern (`tests/suites/pwa_cache_frontend.php`), alte Caches in `activate` löschen und eine neue
    Version sichtbar anbieten („Neue Version — neu laden“), damit niemand an einem veralteten
    Rahmen hängen bleibt.
    **Umgesetzt** (Spec `docs/superpowers/specs/2026-10-08-pwa-rahmen-cache-design.md`): Speicher
@@ -674,12 +675,12 @@ Laden des Rahmens oder das Lesen. Die Tabellenzeile ist entsprechend eingegrenzt
    Service Worker legt `./` vor (Apache leitet `index.html` auf `./` um; eine umgeleitete Antwort
    im Speicher bricht Navigationen) und beantwortet `./`, `index.html` und den Rückmelde-Link
    `#rueckmeldung=…` aus dem Speicher, Query und Fragment werden vor dem Vergleich abgeschnitten.
-   Bekannte Grenzen: (1) Ohne Netz fehlt das Erscheinungsbild des Vereins — die Darstellungsdaten
-   kommen aus der API, die App zeigt dann Name „EhrenSache“, Standardlogo und Standardfarben. (2) Ein zweiter offener Tab, in dem niemand „Neu
-   laden“ gedrückt hat, behält den alten Rahmen bis zum Neuladen. (3) Bei unveränderter `VERSION`
-   (Feature-Zweige, `dev`) überschreibt ein geänderter Service Worker den aktiven Speicher an Ort
-   und Stelle — nur außerhalb von Releases, denn jedes Release erhöht `VERSION` (Test
-   `pwa_cache_frontend`).
+   Bekannte Grenzen: (1) Ohne Netz fehlt das Erscheinungsbild des Vereins — die
+   Darstellungsdaten kommen aus der API, die App zeigt dann Name „EhrenSache“, Standardlogo und
+   Standardfarben. (2) Ein zweiter offener Tab, in dem niemand „Neu laden“ gedrückt hat, behält
+   den alten Rahmen bis zum Neuladen. (3) Bei unveränderter `VERSION` (Feature-Zweige, `dev`)
+   überschreibt ein geänderter Service Worker den aktiven Speicher an Ort und Stelle — nur
+   außerhalb von Releases, denn jedes Release erhöht `VERSION` (Test `pwa_cache_frontend`).
 2. **Gelesene Daten — höchstens begrenzt.** Für Terminliste und eigenen Verlauf denkbar als
    „Netz zuerst, sonst letzter Stand“. Bedingungen: Jede so gezeigte Ansicht trägt sichtbar
    „Stand von hh:mm, ohne Verbindung“ — sonst entsteht absichtlich, was
@@ -706,8 +707,8 @@ Laden des Rahmens oder das Lesen. Die Tabellenzeile ist entsprechend eingegrenzt
 Service Worker, aber keinen Cache.
 
 **Berührt bei Umsetzung:** `public/checkin/service-worker.js` (Kommentar dort nachziehen),
-`public/checkin/js/app.js` (Versionshinweis, ggf. Standvermerk), `tests/suites/assets.php`,
-`public/checkin/README.md`, bei Stufe 2 `DATENSCHUTZ.md`.
+`public/checkin/js/app.js` (Versionshinweis, ggf. Standvermerk),
+`tests/suites/pwa_cache_frontend.php`, `public/checkin/README.md`, bei Stufe 2 `DATENSCHUTZ.md`.
 
 ---
 
@@ -3800,10 +3801,9 @@ Legt ein Manager im Dashboard einen Termin für heute an, während auf dem Telef
 Check-in-PWA bereits geöffnet ist, fehlt dieser Termin in der Auswahl „Termin wählen …". Er
 erscheint erst, wenn die Seite neu geladen wird.
 
-**Der Service Worker ist es nicht.** `public/checkin/service-worker.js` speichert nichts
-zwischen — jede Anfrage geht ans Netz (Zwischenspeicherung stillgelegt 2025-12-08, siehe
-[OI-43](#oi-43--offline-betrieb-der-check-in-pwa)). Der veraltete Stand steckt im
-JavaScript-Zustand der laufenden Seite: `loadCheckinAppointments()`
+**Der Service Worker ist es nicht.** `public/checkin/service-worker.js` hält nur den App-Rahmen
+vor ([OI-43](#oi-43--offline-betrieb-der-check-in-pwa), Stufe 1); Antworten der API gehen
+immer ans Netz. Der veraltete Stand steckt im JavaScript-Zustand der laufenden Seite: `loadCheckinAppointments()`
 (`public/checkin/js/app.js`) läuft genau zweimal — beim Anmelden bzw. beim Start mit
 gespeichertem Token und nach einem erfolgreichen Check-in. Danach nie wieder.
 

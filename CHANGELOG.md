@@ -24,8 +24,9 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   Migrationsschritt kommt mit dem Release. In der öffentlichen Demo lassen sich keine Abo-Links
   erzeugen, der Feed antwortet dort immer mit 404.
 - **Die Check-in-App öffnet auch ohne Verbindung.** Ihr Service Worker hält den App-Rahmen vor,
-  statt jede Anfrage nur durchzureichen. Ohne Netz erscheint der Startbildschirm mit „Server nicht
-  erreichbar.“ statt der Fehlerseite des Browsers, bei schlechtem Netz lädt die Oberfläche sofort.
+  statt jede Anfrage nur durchzureichen. Ohne Netz erscheint mit gespeicherter Anmeldung der
+  Startbildschirm mit „Server nicht erreichbar.“ statt der Fehlerseite des Browsers (ohne
+  gespeicherte Anmeldung das Anmeldeformular), bei schlechtem Netz lädt die Oberfläche sofort.
   Daten werden nicht zwischengespeichert, Check-ins ohne Netz gibt es weiterhin nicht. Eine neue
   Version kündigt eine Leiste „Neue Version verfügbar“ an; erst „Neu laden“ übernimmt sie (OI-43).
 

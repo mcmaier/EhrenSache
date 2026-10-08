@@ -76,6 +76,15 @@ async function offlineStartShown(page) {
 }
 
 const original = readFileSync(SW, 'utf8');
+if (!original.includes(`const VERSION = '${VERSION}'`)) {
+    console.error(`Abbruch: service-worker.js enthaelt nicht "const VERSION = '${VERSION}'". `
+        + 'Rest eines abgebrochenen Laufs? Dann: git checkout public/checkin/service-worker.js');
+    process.exit(1);
+}
+const restore = () => writeFileSync(SW, original);
+for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.once(sig, () => { restore(); process.exit(130); });
+}
 const browser  = await puppeteer.launch({ executablePath: chromePath(), headless: 'new' });
 
 try {
@@ -130,7 +139,9 @@ try {
     await page.setOfflineMode(false);
 
     // 3. Neue Version: Leiste erscheint, Knopf uebernimmt
-    writeFileSync(SW, original.replace(/const VERSION = '[^']+'/, `const VERSION = '${PROBE_VERSION}'`));
+    const probe = original.replace(/const VERSION = '[^']+'/, `const VERSION = '${PROBE_VERSION}'`);
+    if (probe === original) throw new Error('VERSION in service-worker.js nicht ersetzt (Muster trifft nichts)');
+    writeFileSync(SW, probe);
     await page.goto(`${BASE}/checkin/`, { waitUntil: 'networkidle2' });
     const bannerShown = await page.waitForSelector('#updateBanner:not([hidden])', { timeout: 20000 })
         .then(() => true, () => false);
@@ -151,7 +162,7 @@ try {
             await page.$eval('#updateBanner', el => el.hidden));
     }
 } finally {
-    writeFileSync(SW, original);
+    restore();
     await browser.close();
 }
 

@@ -82,8 +82,9 @@ Sobald du dich im Web-Dashboard registriert hast und von einem Admin freigeschal
 ### Ohne Verbindung
 
 Die App hält ihren Rahmen (Seite, Gestaltung, Programmcode, Symbole) im Speicher des Service
-Workers. Ohne Netz öffnet sie deshalb trotzdem und meldet „Server nicht erreichbar.“ mit der
-Möglichkeit, es erneut zu versuchen; die gespeicherte Anmeldung bleibt erhalten. Daten hält sie
+Workers. Ohne Netz öffnet sie deshalb trotzdem. Mit gespeicherter Anmeldung meldet sie „Server
+nicht erreichbar.“ mit der Möglichkeit, es erneut zu versuchen; die Anmeldung bleibt erhalten.
+Ohne gespeicherte Anmeldung zeigt sie offline das Anmeldeformular. Daten hält sie
 nicht vor, und ohne Netz nimmt sie keine Check-ins, Rückmeldungen oder Zeiten an — ein
 Zeitpunkt vom Telefon wäre als Nachweis wertlos (OI-43). Auch der Rückmelde-Link
 (`#rueckmeldung=…`) öffnet ohne Netz den gespeicherten Rahmen.

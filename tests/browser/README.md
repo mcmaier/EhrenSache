@@ -103,5 +103,8 @@ Hinweisleiste erscheint, „Neu laden“ lädt genau einmal neu, und es bleibt n
 
 Das Skript überschreibt `public/checkin/service-worker.js` vorübergehend (andere `VERSION`) und schreibt
 die Datei im `finally` zurück; `git status` danach prüfen. `base_url` in `tests/config.php` (oder
-`ES_BASE_URL`) muss auf denselben Arbeitsbaum zeigen, in dem das Skript liegt. Braucht das Konto `user`.
+`ES_BASE_URL`) muss auf denselben Arbeitsbaum zeigen, in dem das Skript liegt. Braucht das Konto `user`. Solange das Skript läuft, würde jeder andere Browser, der denselben
+Arbeitsbaum öffnet, die Probe-Version installieren. Ein abgebrochener Lauf wird beim nächsten Start
+erkannt (das Skript bricht ab, wenn die `VERSION` in der Datei nicht zu `version.json` passt);
+behoben mit `git checkout public/checkin/service-worker.js`.
 Rückgabewert 1 bei jedem Fehler.
