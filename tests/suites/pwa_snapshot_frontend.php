@@ -65,14 +65,40 @@ test('Termine und Verlauf schreiben ihren Teil nach erfolgreichem Laden', functi
     $js = str_replace("\r\n", "\n", sourceCode($snapRepo . '/public/checkin/js/app.js'));
 
     $resp = snapFunctionBody($js, 'loadResponses');
-    $pos  = strpos($resp, "saveSnapshotPart('appointments'");
-    assertTrue($pos !== false, "loadResponses() schreibt den Teil 'appointments' nicht");
+    $pos  = strpos($resp, 'saveAppointmentsSnapshot()');
+    assertTrue($pos !== false, 'loadResponses() schreibt den Teil appointments nicht');
     assertTrue($pos > strpos($resp, 'if (!result.success)'), 'Erst nach der Erfolgspruefung schreiben');
+
+    assertTrue(str_contains(snapFunctionBody($js, 'saveAppointmentsSnapshot'), "saveSnapshotPart('appointments'"),
+        "saveAppointmentsSnapshot() muss den Teil 'appointments' schreiben");
+
+    $submit = snapFunctionBody($js, 'submitResponse');
+    $assign = strpos($submit, 'upcomingResponses[index] = result.data');
+    $save   = strpos($submit, 'saveAppointmentsSnapshot()');
+    assertTrue($save !== false && $assign !== false && $save > $assign,
+        'submitResponse() muss nach der geaenderten Rueckmeldung den Schnappschuss neu schreiben');
 
     $hist = snapFunctionBody($js, 'loadHistory');
     $pos  = strpos($hist, "saveSnapshotPart('history'");
     assertTrue($pos !== false, "loadHistory() schreibt den Teil 'history' nicht");
     assertTrue($pos > strpos($hist, 'renderHistory(toRender)'), 'Erst nach dem Anzeigen schreiben — gelesen wird die Liste');
+});
+
+test('loadHistory prueft nach jedem await die Sitzung (kein Verlauf unter fremdem Mitglied)', function () use ($snapRepo) {
+    $js = str_replace("\r\n", "\n", sourceCode($snapRepo . '/public/checkin/js/app.js'));
+    $body = snapFunctionBody($js, 'loadHistory');
+
+    assertTrue(str_contains($body, 'const generation = sessionGeneration'), 'loadHistory() merkt sich die Sitzung nicht');
+    assertTrue(!str_contains($body, 'userData.member_id'), 'loadHistory() liest userData.member_id nach einem await — memberId vorab merken');
+    assertTrue(substr_count($body, 'generation !== sessionGeneration') >= substr_count($body, 'await '),
+        'Nach jedem await in loadHistory() fehlt die Pruefung generation !== sessionGeneration');
+});
+
+test('Abgeschaltete Terminplanung entfernt den Teil appointments', function () use ($snapRepo) {
+    $js = str_replace("\r\n", "\n", sourceCode($snapRepo . '/public/checkin/js/app.js'));
+    $body = snapFunctionBody($js, 'startSession');
+    assertTrue(str_contains($body, "dropSnapshotPart('appointments')"),
+        "startSession() muss bei abgeschalteter Terminplanung dropSnapshotPart('appointments') aufrufen");
 });
 
 test('Nach "me" wird ein fremder Schnappschuss verworfen', function () use ($snapRepo) {
@@ -89,7 +115,11 @@ test('Startbildschirm bietet den letzten Stand nur bei fehlendem Server an', fun
     $auto = snapFunctionBody($js, 'checkAutoLogin');
     $offer = strpos($auto, 'offerSnapshot()');
     assertTrue($offer !== false, 'checkAutoLogin() bietet den letzten Stand nicht an');
-    assertTrue($offer > strpos($auto, 'if (!result.success)'), 'Angebot nur im Zweig ohne Server');
+    $branch = strpos($auto, 'if (!result.success)');
+    assertTrue($offer > $branch, 'Angebot nur im Zweig ohne Server');
+    $status = strpos($auto, 'showStartStatus(', $branch);
+    assertTrue($status !== false && $offer > $status,
+        'offerSnapshot() muss nach showStartStatus() stehen — sonst blendet es den Knopf gleich wieder aus');
 });
 
 test('Markup: Knopf, Bildschirm, Skript vor app.js', function () use ($snapRepo) {
@@ -114,6 +144,8 @@ test('Aktionen und Bildschirm in app.js verdrahtet', function () use ($snapRepo)
     assertTrue(str_contains($js, "'snapshot-reconnect':"), "Aktion 'snapshot-reconnect' fehlt in dataActions");
     assertTrue(str_contains(snapFunctionBody($js, 'showScreen'), "getElementById('snapshotScreen')"),
         'showScreen() kennt den Bildschirm snapshot nicht');
-    assertTrue(str_contains(snapFunctionBody($js, 'openSnapshotView'), 'renderSnapshotView('),
-        'openSnapshotView() muss renderSnapshotView() aufrufen');
+    $open = snapFunctionBody($js, 'openSnapshotView');
+    assertTrue(str_contains($open, 'renderSnapshotView('), 'openSnapshotView() muss renderSnapshotView() aufrufen');
+    assertTrue(str_contains($open, 'try {') && str_contains($open, 'clearSnapshot()'),
+        'openSnapshotView() muss einen kaputten Schnappschuss abfangen und verwerfen');
 });
