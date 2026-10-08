@@ -113,9 +113,9 @@ test('PWA: startSession() laedt gleichzeitig und blendet danach ein', function (
 
 test('PWA: Token nur bei 401 oder 403 loeschen', function () use ($scPwa) {
     $body = scBody($scPwa, 'async function checkAutoLogin(');
-    assertSame(1, substr_count($body, "localStorage.removeItem('api_token')"),
+    assertSame(1, substr_count($body, 'forgetSavedLogin()'),
         'Der Token wird an mehr als einer Stelle geloescht');
-    assertTrue(preg_match("/status\s*===\s*401\s*\|\|\s*result\.status\s*===\s*403\)\s*\{[^}]*localStorage\.removeItem\('api_token'\)/s", $body) === 1,
+    assertTrue(preg_match("/status\s*===\s*401\s*\|\|\s*result\.status\s*===\s*403\)\s*\{[^}]*forgetSavedLogin\(\)/s", $body) === 1,
         'Der Token wird nicht im 401/403-Zweig geloescht -- ein Haenger beim Hoster meldete sonst ab');
 });
 
@@ -143,7 +143,7 @@ test('PWA: von der Ladeanzeige fuehrt ein Weg zur Anmeldemaske', function () use
     assertTrue(str_contains($scPwaHtml, 'data-action="start-switch-account"'), 'Knopf "Mit anderem Konto anmelden" fehlt');
     assertTrue(preg_match("/'start-switch-account'\s*:\s*\(\)\s*=>\s*switchAccount\(\)/", $scPwa) === 1, 'start-switch-account ist nicht registriert');
     $body = scBody($scPwa, 'function switchAccount(');
-    assertTrue(str_contains($body, "localStorage.removeItem('api_token')") && str_contains($body, "showScreen('login')"),
+    assertTrue(str_contains($body, 'forgetSavedLogin()') && str_contains($body, "showScreen('login')"),
         'switchAccount() verwirft den Zugang nicht oder zeigt die Anmeldemaske nicht');
     assertTrue(str_contains(scBody($scPwa, 'function showStartStatus('), "getElementById('startSwitchBtn')"),
         'showStartStatus() blendet den Knopf nicht mit ein');
@@ -157,7 +157,7 @@ test('PWA: ein Konto ohne Mitglied kommt nicht in die App', function () use ($sc
     assertTrue($block !== false && $block < (int) strpos($body, 'userData = meData'),
         'Die Sperre greift erst, nachdem userData gesetzt ist');
     $sperre = scBody($scPwa, 'function blockUnlinkedAccount(');
-    assertTrue(str_contains($sperre, "localStorage.removeItem('api_token')"),
+    assertTrue(str_contains($sperre, 'forgetSavedLogin()'),
         'Der gespeicherte Token bleibt -- die Sperre stuende bei jedem Oeffnen wieder da');
     assertTrue(str_contains($sperre, "showScreen('start')") && !str_contains($sperre, "showScreen('main')"),
         'Die Sperre zeigt nicht die Ladeanzeige mit der Meldung');
