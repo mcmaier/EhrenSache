@@ -126,7 +126,7 @@ test('PWA: Abmelden verwirft einen laufenden Start', function () use ($scPwa) {
 
 test('PWA: Zeiterfassung fragt Taetigkeiten und laufende Sitzung gleichzeitig', function () use ($scPwa) {
     $body = scBody($scPwa, 'async function initWorktime(');
-    assertTrue(preg_match("/Promise\.all\(\[\s*apiCall\('activity_types'/", $body) === 1,
+    assertTrue(preg_match("/Promise\.all\(\[\s*fetchWorktimeActivities\(\)/", $body) === 1,
         'initWorktime() wartet die Taetigkeiten ab, bevor es die laufende Sitzung fragt');
 });
 

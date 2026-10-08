@@ -105,6 +105,39 @@ test('Check-in-PWA: die Taetigkeitsarten sind die des eigenen Mitglieds', functi
     );
 });
 
+test('Check-in-PWA: die Arbeitszeit-Ansicht laedt die Taetigkeitsarten beim Oeffnen nach', function () use ($repoRoot) {
+    $js   = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
+    $body = frontendFunctionBody($js, 'loadWorktimeState');
+
+    // Bis dahin kamen die Arten nur bei der Anmeldung. Eine im Dashboard
+    // geaenderte Terminart-Zuordnung erreichte eine laufende App nicht — die
+    // Terminliste blieb ungefiltert, bis die App neu startete.
+    $abruf   = strpos($body, 'fetchWorktimeActivities(');
+    $termine = strpos($body, 'loadWorktimeAppointments(');
+
+    assertTrue($abruf !== false, 'loadWorktimeState() holt die Taetigkeitsarten nicht');
+    assertTrue(
+        $termine !== false && $abruf < $termine,
+        'Die Terminliste wird vor den frischen Taetigkeitsarten aufgebaut'
+    );
+    assertTrue(
+        strpos($body, 'applyWorktimeActivities(') !== false,
+        'loadWorktimeState() uebernimmt die Arten nicht ueber applyWorktimeActivities()'
+    );
+});
+
+test('Check-in-PWA: das Neuladen der Taetigkeitsarten behaelt die Auswahl', function () use ($repoRoot) {
+    $js   = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
+    $body = frontendFunctionBody($js, 'applyWorktimeActivities');
+
+    // Sonst sprang die Auswahl bei jedem Oeffnen auf die erste Art zurueck.
+    assertTrue(
+        preg_match('/const\s+previous\s*=\s*select\.value/', $body) === 1
+        && strpos($body, 'select.value = previous') !== false,
+        'applyWorktimeActivities() stellt die vorherige Auswahl nicht wieder her'
+    );
+});
+
 test('Check-in-PWA: die Abmeldung raeumt die Ansichten des Mitglieds ab', function () use ($repoRoot) {
     $js = (string) sourceCode($repoRoot . '/public/checkin/js/app.js');
 

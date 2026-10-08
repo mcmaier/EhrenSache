@@ -4459,13 +4459,8 @@ async function initWorktime(generation = sessionGeneration) {
     }
 
     // Taetigkeiten und laufende Sitzung gleichzeitig (OI-121).
-    //
-    // member_id immer mit: Ohne sie bekommen Admin und Manager ALLE Arten
-    // (Verwaltungssicht), starten duerfen sie aber nur die ihrer eigenen
-    // Gruppen — die PWA bot sonst Arten an, deren Start der Server ablehnt.
-    // Ohne verknuepftes Mitglied 0: keine Art, wie bei der Rolle user.
     const [result, running] = await Promise.all([
-        apiCall('activity_types', 'GET', null, { member_id: userData.member_id || 0 }),
+        fetchWorktimeActivities(),
         apiCall('work_sessions', 'GET', null, { running: 1 })
     ]);
 
@@ -4476,22 +4471,10 @@ async function initWorktime(generation = sessionGeneration) {
         return;
     }
 
-    // Es gibt keinen eigenen Zeit-Tab mehr, den man einblenden koennte: ob die
-    // Arbeitszeit ueberhaupt zur Wahl steht, entscheidet availableIntents()
-    // anhand genau dieser Liste.
-    worktimeActivities = result.data || [];
+    applyWorktimeActivities(result.data || []);
 
     const select = document.getElementById('worktimeActivity');
     if (select) {
-        // Das Schloss steht schon in der aufgeklappten Liste: die Nachweispflicht
-        // ist bei der Wahl zu sehen, nicht erst beim gescheiterten Start.
-        select.innerHTML = worktimeActivities
-            .map(a => {
-                const lock = (a.verification && a.verification !== 'none') ? '🔒 ' : '';
-                return `<option value="${a.activity_id}">${lock}${escapeHtml(a.activity_name)}</option>`;
-            })
-            .join('');
-
         bindOnce(select, 'change', () => {
             renderWorktimeActivityHint();
             // Die Terminarten der neuen Taetigkeit grenzen die Terminliste
@@ -4500,7 +4483,6 @@ async function initWorktime(generation = sessionGeneration) {
             renderWorktimeAppointmentOptions(
                 document.getElementById('worktimeAppointment')?.value || '');
         });
-        renderWorktimeActivityHint();
     }
 
     // bindOnce, weil initWorktime() bei jeder Anmeldung erneut laeuft.
@@ -4565,9 +4547,71 @@ function applyRunningSession(result) {
     }
 }
 
+/**
+ * Die Taetigkeitsarten des eigenen Mitglieds.
+ *
+ * member_id immer mit: Ohne sie bekommen Admin und Manager ALLE Arten
+ * (Verwaltungssicht), starten duerfen sie aber nur die ihrer eigenen Gruppen —
+ * die PWA bot sonst Arten an, deren Start der Server ablehnt. Ohne verknuepftes
+ * Mitglied 0: keine Art, wie bei der Rolle user.
+ */
+function fetchWorktimeActivities() {
+    return apiCall('activity_types', 'GET', null, { member_id: userData?.member_id || 0 });
+}
+
+/**
+ * Uebernimmt die Taetigkeitsarten und baut die Auswahl neu auf. Eine bereits
+ * getroffene Wahl bleibt stehen, solange es die Art noch gibt.
+ *
+ * Es gibt keinen eigenen Zeit-Tab mehr, den man einblenden koennte: ob die
+ * Arbeitszeit ueberhaupt zur Wahl steht, entscheidet availableIntents()
+ * anhand genau dieser Liste.
+ */
+function applyWorktimeActivities(activities) {
+    worktimeActivities = activities;
+
+    const select = document.getElementById('worktimeActivity');
+    if (!select) return;
+
+    const previous = select.value;
+
+    // Das Schloss steht schon in der aufgeklappten Liste: die Nachweispflicht
+    // ist bei der Wahl zu sehen, nicht erst beim gescheiterten Start.
+    select.innerHTML = worktimeActivities
+        .map(a => {
+            const lock = (a.verification && a.verification !== 'none') ? '🔒 ' : '';
+            return `<option value="${a.activity_id}">${lock}${escapeHtml(a.activity_name)}</option>`;
+        })
+        .join('');
+
+    if (previous && worktimeActivities.some(a => String(a.activity_id) === previous)) {
+        select.value = previous;
+    }
+
+    renderWorktimeActivityHint();
+}
+
 /** Holt den Zustand IMMER vom Server — nie aus dem Browser-Speicher. */
 async function loadWorktimeState() {
-    const result = await apiCall('work_sessions', 'GET', null, { running: 1 });
+    const generation = sessionGeneration;
+
+    // Die Taetigkeitsarten kommen bei jedem Oeffnen mit: Sie tragen die
+    // Terminart-Zuordnung, nach der die Terminliste filtert. Bis dahin kamen
+    // sie nur bei der Anmeldung — eine im Dashboard geaenderte Zuordnung
+    // erreichte eine laufende App erst nach einem Neustart.
+    const [result, activities] = await Promise.all([
+        apiCall('work_sessions', 'GET', null, { running: 1 }),
+        fetchWorktimeActivities()
+    ]);
+
+    // Abgemeldet, waehrend die Abrufe liefen: nichts vom Vorgaenger zeigen.
+    if (generation !== sessionGeneration) return;
+
+    // Ein gescheiterter Abruf laesst die bekannte Liste stehen.
+    if (activities.success) {
+        applyWorktimeActivities(activities.data || []);
+    }
+
     worktimeSession = result.success ? result.data : null;
 
     renderWorktime();

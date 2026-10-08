@@ -14,6 +14,10 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
 - **Check-in-App: Admins und Manager sahen fremde Tätigkeitsarten.** Die Auswahl der
   Arbeitszeit bot ihnen alle Tätigkeitsarten an, auch solche außerhalb der eigenen Gruppen;
   deren Start lehnte der Server ab. Die App fragt jetzt nur die Arten des eigenen Mitglieds ab.
+- **Check-in-App: Terminliste der Arbeitszeit ungefiltert nach Änderungen im Dashboard.** Die
+  Tätigkeitsarten samt ihrer Terminart-Zuordnung kamen nur bei der Anmeldung; eine danach
+  gesetzte Zuordnung wirkte erst nach einem Neustart der App. Die Ansicht lädt sie jetzt bei
+  jedem Öffnen nach, die getroffene Auswahl bleibt stehen.
 
 ## [1.23.0] – 2026-10-08
 
