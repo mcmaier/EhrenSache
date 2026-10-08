@@ -91,9 +91,8 @@ Zeitpunkt vom Telefon wäre als Nachweis wertlos (OI-43). Auch der Rückmelde-Li
 Nach einem Update erscheint oben „Neue Version verfügbar“. Erst „Neu laden“ übernimmt sie, damit
 keine laufende Eingabe verloren geht.
 
-Bekannte Grenze: Ein hochgeladenes Vereinslogo (`../uploads/…`) wird nicht zwischengespeichert.
-Ohne Netz zeigt die App an seiner Stelle ein defektes Bild; das Standardlogo ist gespeichert,
-doch die Darstellungseinstellungen bestimmen, welche Adresse geladen wird.
+Bekannte Grenze: Name, Logo und Farben des Vereins kommen aus der API. Ohne Netz zeigt die App
+deshalb „EhrenSache“, das Standardlogo und die Standardfarben.
 
 ---
 

@@ -674,8 +674,8 @@ Laden des Rahmens oder das Lesen. Die Tabellenzeile ist entsprechend eingegrenzt
    Service Worker legt `./` vor (Apache leitet `index.html` auf `./` um; eine umgeleitete Antwort
    im Speicher bricht Navigationen) und beantwortet `./`, `index.html` und den Rückmelde-Link
    `#rueckmeldung=…` aus dem Speicher, Query und Fragment werden vor dem Vergleich abgeschnitten.
-   Bekannte Grenzen: (1) Ein hochgeladenes Vereinslogo (`../uploads/…`) wird nicht gespeichert —
-   ohne Netz erscheint dort ein defektes Bild. (2) Ein zweiter offener Tab, in dem niemand „Neu
+   Bekannte Grenzen: (1) Ohne Netz fehlt das Erscheinungsbild des Vereins — die Darstellungsdaten
+   kommen aus der API, die App zeigt dann Name „EhrenSache“, Standardlogo und Standardfarben. (2) Ein zweiter offener Tab, in dem niemand „Neu
    laden“ gedrückt hat, behält den alten Rahmen bis zum Neuladen. (3) Bei unveränderter `VERSION`
    (Feature-Zweige, `dev`) überschreibt ein geänderter Service Worker den aktiven Speicher an Ort
    und Stelle — nur außerhalb von Releases, denn jedes Release erhöht `VERSION` (Test
