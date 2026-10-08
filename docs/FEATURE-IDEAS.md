@@ -61,7 +61,7 @@ durchschlägt.
 | [FI-21](#fi-21--aufgaben-mit-zuweisung-und-fälligkeit) | Aufgaben mit Zuweisung und Fälligkeit | niedrig | L | FI-6 |
 | [FI-22](#fi-22--musikstücke-und-programme) | Musikstücke und Programme | niedrig | L | — |
 | [FI-23](#fi-23--ort-und-ende-am-termin) | Ort und Ende am Termin (rein informativ) — **umgesetzt in 1.10.0** | mittel | M | — |
-| [FI-24](#fi-24--freigaben-in-der-check-in-app) | Freigaben in der Check-in-App (Anträge außerhalb des Zeitfensters) — **umgesetzt auf `feat/fi-24-freigaben`, unveröffentlicht** | mittel | M | — |
+| [FI-24](#fi-24--freigaben-in-der-check-in-app) | Freigaben in der Check-in-App (Anträge außerhalb des Zeitfensters) — **umgesetzt, unveröffentlicht** | mittel | M | — |
 | [FI-25](#fi-25--docker-als-zweiter-auslieferungsweg) | Docker als zweiter Auslieferungsweg | niedrig² | S/M | — |
 | [FI-26](#fi-26--terminabstimmung-mit-übernahme-in-den-termin) | Terminabstimmung mit Übernahme in den Termin | mittel | M | FI-1, FI-6 für die Wirkung |
 

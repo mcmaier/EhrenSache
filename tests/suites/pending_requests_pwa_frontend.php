@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 /**
  * FI-24: Freigaben in der Check-in-App — statische Gegenproben.
- * Laufzeitverhalten prueft der Browser-Durchgang (Task 5).
+ * Das Laufzeitverhalten wurde einmal mit einem Puppeteer-Lauf und in der
+ * Browser-Pane waehrend der Umsetzung geprueft (2026-10-08); ein eingecheckter
+ * Browser-Durchgang dafuer existiert nicht.
  */
 
 function prJs(): string

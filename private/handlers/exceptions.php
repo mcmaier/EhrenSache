@@ -322,7 +322,11 @@ function handleExceptions($db, $database, $method, $id) {
 
                 if ($eigenesMitglied !== null
                     && (int) $existing['member_id'] === $eigenesMitglied
-                    && otherActiveApproverExists($db, $database, (int) getCurrentUserId())) {
+                    && selfDecisionBlocked(
+                        $eigenesMitglied,
+                        otherActiveApproverExists($db, $database, (int) getCurrentUserId()),
+                        (int) $existing['member_id']
+                    )) {
                     http_response_code(403);
                     echo json_encode([
                         "message" => "Den eigenen Antrag genehmigt ein anderer Verwalter"

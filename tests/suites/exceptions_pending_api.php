@@ -132,11 +132,11 @@ test('Eigener Antrag: blockiert fuer den Antragsteller, nicht fuer andere', func
     epWithWorld(function (array $ids) {
         // manager hat ein Mitglied, admin ist zweiter aktiver Verwalter -> eigener Antrag gesperrt
         $asManager = epPending('manager');
-        assertSame(true, (bool) $asManager[$ids['ex_own']]['self_decision_blocked'], 'Eigener Antrag nicht gesperrt');
-        assertSame(false, (bool) $asManager[$ids['ex_rec']]['self_decision_blocked'], 'Fremder Antrag gesperrt');
+        assertSame(true, $asManager[$ids['ex_own']]['self_decision_blocked'], 'Eigener Antrag nicht gesperrt');
+        assertSame(false, $asManager[$ids['ex_rec']]['self_decision_blocked'], 'Fremder Antrag gesperrt');
         // admin hat kein Mitglied -> nichts ist sein eigener Antrag
         $asAdmin = epPending('admin');
-        assertSame(false, (bool) $asAdmin[$ids['ex_own']]['self_decision_blocked']);
+        assertSame(false, $asAdmin[$ids['ex_own']]['self_decision_blocked']);
     });
 });
 

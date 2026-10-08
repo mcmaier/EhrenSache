@@ -1959,7 +1959,7 @@ Notizpflicht (`worktime_require_note`) gilt am Kiosk nicht. `created_by` ist das
 ]
 ```
 
-Die letzten drei Felder (`self_decision_blocked`, `recorded_arrival_time`, `recorded_status`) gibt es **nur für Admin und Manager** (FI-24, Check-in-App). `self_decision_blocked` folgt der Selbstgenehmigungsregel: `true`, wenn der Antrag dem Mitglied des anfragenden Kontos gehört, solange ein zweites aktives Verwalterkonto existiert; ein Konto ohne Mitglied erhält immer `false`. `recorded_arrival_time` und `recorded_status` (`present`/`excused`) stammen aus der Erfassung (`records`) desselben Mitglieds zum selben Termin, ohne Erfassung sind sie `null`. Mitglieder erhalten die Felder nicht; der Einzelabruf (`id`) liefert sie ebenfalls nicht.
+Die letzten drei Felder (`self_decision_blocked`, `recorded_arrival_time`, `recorded_status`) gibt es **nur für Admin und Manager** (FI-24, Check-in-App). `self_decision_blocked` folgt der Selbstgenehmigungsregel: `true`, wenn der Antrag dem Mitglied des anfragenden Kontos gehört, solange ein zweites aktives Verwalterkonto existiert; ein Konto ohne Mitglied erhält immer `false`. Der Server verweigert nur die Genehmigung (403); Ablehnen bleibt erlaubt, die App blendet der Einfachheit halber beide Knöpfe aus. `recorded_arrival_time` und `recorded_status` (`present`/`excused`) stammen aus der Erfassung (`records`) desselben Mitglieds zum selben Termin, ohne Erfassung sind sie `null`. Mitglieder erhalten die Felder nicht; der Einzelabruf (`id`) liefert sie ebenfalls nicht.
 
 Felder gibt es weder `exception_date` noch `type` — richtig heißen sie `appointment_date` und
 `exception_type`.
