@@ -245,6 +245,8 @@ exceptions, statistics und work_sessions (siehe `docs/OPEN-ITEMS.md`).
 - Loader laufen über `sharedLoad()` aus `pending_loads.js`: gleichzeitige Abrufe desselben
   Schlüssels und Jahres teilen sich eine Anfrage
 - `sessionStorage` wird nur für den Redirect-Loop-Schutz in `app.js` verwendet
+- Die Check-in-App legt in `localStorage` den Token und bei „Angemeldet bleiben“ den „Letzten Stand“
+  (`offline_snapshot`, OI-43) ab; gelöscht wird beides über `forgetSavedLogin()`.
 - Ziel: Reduktion der API-Anfragen
 - Browser-Cache der Dateien: CSS und JS von Dashboard und Anmeldeseite laufen über
   `css/v<Version>/…` bzw. `js/v<Version>/…` und sind `immutable` (OI-120, `public/.htaccess`).

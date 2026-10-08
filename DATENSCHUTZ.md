@@ -131,6 +131,19 @@ Sie benötigen eine **Rechtsgrundlage** für die Datenverarbeitung (Art. 6 DSGVO
 - **Session-Tokens** (temporär)
 - **Login-Zeitpunkte** (optional in Logs)
 
+### Daten auf dem Telefon (Check-in-App)
+
+Die Check-in-App legt im Browser des Mitglieds ab:
+
+- den **Anmelde-Token**, wenn „Angemeldet bleiben“ gewählt ist;
+- in diesem Fall zusätzlich einen **„Letzten Stand“**: die kommenden Termine des Mitglieds mit
+  seiner Rückmeldung und die zuletzt angezeigten Einträge seines Verlaufs (Anwesenheiten,
+  Anträge, Arbeitszeiten). Er dient allein dazu, diese Angaben ohne Verbindung ansehen zu können.
+
+Beides wird beim Abmelden, beim Wechsel des Kontos und bei einem ungültigen Token gelöscht. Daten
+anderer Mitglieder liegen dort nicht. Auf gemeinsam genutzten Geräten sollten Mitglieder
+„Angemeldet bleiben“ nicht wählen.
+
 ---
 
 ### Update-Prüfung

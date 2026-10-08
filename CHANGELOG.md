@@ -34,6 +34,10 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/).
   gespeicherte Anmeldung das Anmeldeformular), bei schlechtem Netz lädt die Oberfläche sofort.
   Daten werden nicht zwischengespeichert, Check-ins ohne Netz gibt es weiterhin nicht. Eine neue
   Version kündigt eine Leiste „Neue Version verfügbar“ an; erst „Neu laden“ übernimmt sie (OI-43).
+- **Letzter Stand ohne Verbindung in der Check-in-App.** Startet die App ohne Netz, bietet der
+  Startbildschirm „Letzten Stand ansehen“ an: die kommenden Termine mit eigener Rückmeldung und
+  der Verlauf, so wie sie zuletzt geladen wurden, klar als alter Stand gekennzeichnet und ohne
+  Aktionen. Gespeichert wird nur bei „Angemeldet bleiben“ und gelöscht mit der Abmeldung (OI-43).
 
 ### Geändert
 

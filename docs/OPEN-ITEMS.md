@@ -628,7 +628,7 @@ zurück. Ein Merge wäre ein Fast-Forward, es gibt nichts aufzulösen.
 ---
 
 ### OI-43 · Offline-Betrieb der Check-in-PWA
-**Priorität:** niedrig · **Richtung entschieden am 2026-10-08:** Rahmen ja, Lesestand begrenzt, Schreiben nein · **Stufe 1 gebaut** (2026-10-08, unveröffentlicht)
+**Priorität:** niedrig · **Richtung entschieden am 2026-10-08:** Rahmen ja, Lesestand begrenzt, Schreiben nein · **Stufe 1 und 2 gebaut** (2026-10-08, unveröffentlicht)
 
 Bis zu Stufe 1 (2026-10-08) hatte die Check-in-PWA **keinen Cache**: Ihr Service Worker reichte
 jede Anfrage ans Netz durch und diente allein der Installierbarkeit auf dem Startbildschirm; ohne
@@ -691,6 +691,12 @@ Laden des Rahmens oder das Lesen. Die Tabellenzeile ist entsprechend eingegrenzt
    beschreibt. Der Speicher ist an ein Konto gebunden und wird beim Abmelden und beim
    Kontowechsel geleert (geteilte Geräte, `DATENSCHUTZ.md`). Statistik und offene Punkte
    nicht — dort wäre ein alter Stand eher irreführend als hilfreich.
+   **Umgesetzt** (Spec `docs/superpowers/specs/2026-10-08-pwa-letzter-stand-design.md`):
+   Nur-Lese-Ansicht „Letzter Stand“ auf dem Startbildschirm ohne Verbindung, Schnappschuss in
+   `localStorage` nur bei „Angemeldet bleiben“, gelöscht mit dem Token. Bekannte Grenze: Der
+   Verlauf wird erst geschrieben, wenn das Mitglied den Tab „Verlauf“ geöffnet hat (oder ein
+   Check-in ihn auffrischt); sonst zeigt die Ansicht dort „Nicht geladen, solange Verbindung
+   bestand.“
 3. **Schreibaktionen in einer Warteschlange — nein.**
    - *Check-in mit und ohne TOTP, Arbeitszeit:* Der Zeitpunkt käme vom Client und hätte keinen
      Nachweiswert. Beim TOTP-Check-in kommt hinzu: Online muss ein abfotografierter Code
