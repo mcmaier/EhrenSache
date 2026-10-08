@@ -175,9 +175,9 @@ function findCheckinAppointment($db, $prefix, int $memberId, string $timestamp, 
  * Auto-Anlage eines Termins rundet auf fuenf Minuten, der Eintrag selbst
  * traegt weiterhin die Sekunde des Stempels.
  *
- * Der gespeicherte arrival_time ist die normalisierte 'Y-m-d H:i:s'-Form des
- * Request-Werts — fuer das PWA-Format byte-identisch, ein ISO-Input mit 'T'
- * wird seit 1.3.0 ebenso normalisiert.
+ * Woher $arrivalTimestamp kommt, entscheidet resolveCheckinArrival(): fuer
+ * Mitglieder und jeden TOTP-Check-in die Serveruhr, fuer Geraete und
+ * Verwalter die normalisierte 'Y-m-d H:i:s'-Form des Request-Werts.
  *
  * @return array{status: int, body: array<string, mixed>}
  */
@@ -225,6 +225,7 @@ function writeCheckinRecord($db, $prefix, int $memberId, int $appointmentId, str
             "message"       => "Check-in " . $recordAction,
             "record_action" => $recordAction,
             "record_id"     => (int)$existingRecord['record_id'],
+            "arrival_time"  => $replace ? $arrivalTimestamp : $existingRecord['arrival_time'],
         ], $common)];
     }
 
@@ -248,7 +249,70 @@ function writeCheckinRecord($db, $prefix, int $memberId, int $appointmentId, str
         "message"       => "Check-in successful",
         "record_action" => "created",
         "record_id"     => (int)$db->lastInsertId(),
+        "arrival_time"  => $arrivalTimestamp,
     ], $common)];
+}
+
+/** Wie weit ein Geraet hoechstens in die Zukunft stempeln darf (Uhrenabweichung). */
+const CHECKIN_DEVICE_MAX_AHEAD_SECONDS = 300;
+
+/** Untergrenze des Rueckblicks fuer Geraete, auch bei Toleranz 0 (Sendeverzug). */
+const CHECKIN_DEVICE_MIN_LOOKBACK_SECONDS = 600;
+
+/**
+ * Wessen Uhr gilt fuer diesen Check-in?
+ *
+ * - Mitglied (Rolle user): immer die Serveruhr. Eine mitgeschickte
+ *   arrival_time wirkt nicht. Bis 1.22.1 wurde sie uebernommen, und
+ *   Tagesgrenze wie Toleranzfenster rechneten gegen sie — ein Mitglied konnte
+ *   sich so mit einem erfundenen Zeitpunkt fuer jeden vergangenen Termin
+ *   seiner Gruppe eintragen.
+ * - TOTP-Check-in, gleich welche Rolle: immer die Serveruhr. Der Code belegt,
+ *   dass jemand die Station JETZT sieht, nicht frueher.
+ * - Geraet: die eigene Uhr, weil das IoT-Terminal Erfassungen ohne Netz puffert
+ *   und nachreicht. Begrenzt auf das Toleranzfenster zurueck (mindestens zehn
+ *   Minuten) und fuenf Minuten voraus — dieselbe Grenze, nach der das Terminal
+ *   seine Warteschlange selbst verwirft.
+ * - Admin und Manager: frei. Sie schreiben Anwesenheiten ohnehin ueber records.
+ *
+ * Fehlt arrival_time, gilt in jedem Fall die Serveruhr.
+ *
+ * @return array{time: DateTime}|array{status: int, body: array<string, mixed>}
+ */
+function resolveCheckinArrival($data, string $checkinSource, int $toleranceHours): array
+{
+    $now = new DateTime();
+
+    $clientMaySetTime = $checkinSource !== 'user_totp' && (isDevice() || isAdminOrManager());
+    if(!$clientMaySetTime || !isset($data->arrival_time) || $data->arrival_time === '') {
+        return ['time' => $now];
+    }
+
+    try {
+        $arrival = new DateTime((string)$data->arrival_time);
+    } catch(Exception $e) {
+        return ['status' => 400, 'body' => [
+            "message"  => "Invalid arrival_time format",
+            "expected" => "YYYY-MM-DD HH:MM:SS",
+            "example"  => $now->format('Y-m-d H:i:s'),
+        ]];
+    }
+
+    if(isDevice()) {
+        $lookback = max($toleranceHours * 3600, CHECKIN_DEVICE_MIN_LOOKBACK_SECONDS);
+        $offset   = $arrival->getTimestamp() - $now->getTimestamp();
+
+        if($offset > CHECKIN_DEVICE_MAX_AHEAD_SECONDS || -$offset > $lookback) {
+            return ['status' => 400, 'body' => [
+                "message" => "arrival_time liegt außerhalb des zulässigen Zeitraums",
+                "reason"  => "arrival_time_out_of_range",
+                "hint"    => "Zulässig: bis " . intdiv($lookback, 60) . " Minuten zurück, "
+                           . intdiv(CHECKIN_DEVICE_MAX_AHEAD_SECONDS, 60) . " Minuten voraus",
+            ]];
+        }
+    }
+
+    return ['time' => $arrival];
 }
 
 function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, $authMemberId, $isTokenAuth, $checkinSource = 'auto_checkin', $sourceInfo = []) {
@@ -261,12 +325,8 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     $prefix = $database->table('');
     
     $data = json_decode(file_get_contents("php://input"));
-    
-    // Validierung
-    if(!isset($data->arrival_time)) {
-        http_response_code(400);
-        echo json_encode(["message" => "arrival_time is required"]);
-        return;
+    if(!is_object($data)) {
+        $data = new stdClass();
     }
 
     /*
@@ -341,18 +401,27 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
     }    
 
 
-    // Konvertiere arrival_time zu DateTime
-    try {
-        $arrivalTime = new DateTime($data->arrival_time);
-    } catch(Exception $e) {
-        http_response_code(400);
-        echo json_encode([
-            "message" => "Invalid arrival_time format",
-            "expected" => "YYYY-MM-DD HH:MM:SS",
-            "example" => date('Y-m-d H:i:s')
-        ]);
+    // Zeittoleranz: Einstellung schlaegt Konstante. Ein mitgeschickter Wert
+    // schlaegt beides, aber nur fuer Geraete — ein Mitglied koennte sich sonst
+    // sein eigenes Fenster bis auf acht Stunden aufziehen.
+    $configuredTolerance = checkinToleranceHours($db, $database);
+    $tolerance = (isDevice() && isset($data->tolerance_hours))
+        ? intval($data->tolerance_hours) : $configuredTolerance;
+
+    // Begrenze Toleranz auf sinnvollen Bereich
+    if($tolerance < 0 || $tolerance > 8) {
+        $tolerance = $configuredTolerance;
+    }
+
+    $toleranceSeconds = $tolerance * 3600;
+
+    $arrival = resolveCheckinArrival($data, $checkinSource, $tolerance);
+    if(!isset($arrival['time'])) {
+        http_response_code($arrival['status']);
+        echo json_encode($arrival['body']);
         return;
     }
+    $arrivalTime = $arrival['time'];
     
     $arrivalDate = $arrivalTime->format('Y-m-d');
     $arrivalTimeStr = $arrivalTime->format('H:i:s');
@@ -377,17 +446,6 @@ function handleAutoCheckin($db, $database, $method, $authUserId, $authUserRole, 
         return;
     }
         
-    // Zeittoleranz: Einstellung schlaegt Konstante, ein mitgeschickter Wert
-    // schlaegt beides. Der Request-Parameter bleibt fuer Geraete bestehen.
-    $configuredTolerance = checkinToleranceHours($db, $database);
-    $tolerance = isset($data->tolerance_hours) ? intval($data->tolerance_hours) : $configuredTolerance;
-
-    // Begrenze Toleranz auf sinnvollen Bereich
-    if($tolerance < 0 || $tolerance > 8) {
-        $tolerance = $configuredTolerance;
-    }
-
-    $toleranceSeconds = $tolerance * 3600;
 
     //DEBUG Info Zeitfenster
     /*
